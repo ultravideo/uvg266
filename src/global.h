@@ -49,6 +49,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+
+// VVC related definitions
+#define ENABLE_WPP_PARALLELISM 0
+
+
 /**
  * \defgroup Bitstream
  * HEVC bitstream coding

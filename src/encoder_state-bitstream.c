@@ -307,8 +307,10 @@ static void encoder_state_write_bitstream_SPS_extension(bitstream_t *stream,
     WRITE_U(stream, 1, 1, "sps_range_extension_flag");
     WRITE_U(stream, 0, 1, "sps_multilayer_extension_flag");
     WRITE_U(stream, 0, 1, "sps_3d_extension_flag");
-    WRITE_U(stream, 0, 5, "sps_extension_5bits");
+    WRITE_U(stream, 1, 1, "sps_next_extension_flag");
+    WRITE_U(stream, 0, 4, "sps_extension_4bits");
 
+	  // Range Extension
     WRITE_U(stream, 0, 1, "transform_skip_rotation_enabled_flag");
     WRITE_U(stream, 0, 1, "transform_skip_context_enabled_flag");
     WRITE_U(stream, 1, 1, "implicit_rdpcm_enabled_flag");
@@ -318,6 +320,17 @@ static void encoder_state_write_bitstream_SPS_extension(bitstream_t *stream,
     WRITE_U(stream, 0, 1, "high_precision_offsets_enabled_flag");
     WRITE_U(stream, 0, 1, "persistent_rice_adaptation_enabled_flag");
     WRITE_U(stream, 0, 1, "cabac_bypass_alignment_enabled_flag");
+
+	  // Next extension
+	  WRITE_U(stream, 0, "qtbt_flag");
+	  WRITE_U(stream, 0, "large_ctu_flag");
+	  WRITE_U(stream, 0, "disable_motion_compression_flag");
+	  WRITE_U(stream, 0, 5, "reserved_flag_5bits");
+
+	  WRITE_U(stream, 0, "mtt_enabled_flag");
+	  WRITE_U(stream, 0, "next_dqp_enabled_flag");
+
+
   } else {
     WRITE_U(stream, 0, 1, "sps_extension_present_flag");
   }
@@ -333,7 +346,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
 #endif
 
   // TODO: profile IDC and level IDC should be defined later on
-  WRITE_U(stream, 0, 4, "sps_video_parameter_set_id");
+  //WRITE_U(stream, 0, 4, "sps_video_parameter_set_id");
   WRITE_U(stream, 1, 3, "sps_max_sub_layers_minus1");
   WRITE_U(stream, 0, 1, "sps_temporal_id_nesting_flag");
 
@@ -376,29 +389,31 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
 
   //for each layer
   if (encoder->cfg.gop_lowdelay) {
-    WRITE_UE(stream, encoder->cfg.ref_frames, "sps_max_dec_pic_buffering");
-    WRITE_UE(stream, 0, "sps_num_reorder_pics");
+    WRITE_UE(stream, encoder->cfg.ref_frames, "sps_max_dec_pic_buffering_minus1");
+    WRITE_UE(stream, 0, "sps_max_num_reorder_pics");
   } else {
-    WRITE_UE(stream, encoder->cfg.ref_frames + encoder->cfg.gop_len, "sps_max_dec_pic_buffering");
-    WRITE_UE(stream, encoder->cfg.gop_len, "sps_num_reorder_pics");
+    WRITE_UE(stream, encoder->cfg.ref_frames + encoder->cfg.gop_len, "sps_max_dec_pic_buffering_minus1");
+    WRITE_UE(stream, encoder->cfg.gop_len, "sps_max_num_reorder_pics");
   }
-  WRITE_UE(stream, 0, "sps_max_latency_increase");
+  WRITE_UE(stream, 0, "sps_max_latency_increase_plus1");
   //end for
 
-  WRITE_UE(stream, MIN_SIZE-3, "log2_min_coding_block_size_minus3");
-  WRITE_UE(stream, MAX_DEPTH, "log2_diff_max_min_coding_block_size");
-  WRITE_UE(stream, 0, "log2_min_transform_block_size_minus2");   // 4x4
-  WRITE_UE(stream, 3, "log2_diff_max_min_transform_block_size"); // 4x4...32x32
+  WRITE_UE(stream, MIN_SIZE-3, "log2_min_luma_coding_block_size_minus3");
+  WRITE_UE(stream, MAX_DEPTH, "log2_diff_max_min_luma_coding_block_size");
+
+  // ToDo: redefine for VVC
+  WRITE_UE(stream, 0, "log2_min_luma_transform_block_size_minus2");   // 4x4
+  WRITE_UE(stream, 3, "log2_diff_max_min_luma_transform_block_size"); // 4x4...32x32
   WRITE_UE(stream, encoder->tr_depth_inter, "max_transform_hierarchy_depth_inter");
   WRITE_UE(stream, encoder->cfg.tr_depth_intra, "max_transform_hierarchy_depth_intra");
-
+  /*
   // scaling list
   WRITE_U(stream, encoder->scaling_list.enable, 1, "scaling_list_enable_flag");
   if (encoder->scaling_list.enable) {
     WRITE_U(stream, 1, 1, "sps_scaling_list_data_present_flag");
     encoder_state_write_bitstream_scaling_list(stream, state);
   }
-
+  */
   WRITE_U(stream, (encoder->cfg.amp_enable ? 1 : 0), 1, "amp_enabled_flag");
 
   WRITE_U(stream, encoder->cfg.sao_type ? 1 : 0, 1,
@@ -424,7 +439,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
 
   WRITE_U(stream, state->encoder_control->cfg.tmvp_enable, 1,
           "sps_temporal_mvp_enable_flag");
-  WRITE_U(stream, 0, 1, "sps_strong_intra_smoothing_enable_flag");
+  //WRITE_U(stream, 0, 1, "sps_strong_intra_smoothing_enable_flag");
   WRITE_U(stream, 1, 1, "vui_parameters_present_flag");
 
   encoder_state_write_bitstream_VUI(stream, state);
