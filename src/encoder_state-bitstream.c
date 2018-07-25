@@ -322,13 +322,13 @@ static void encoder_state_write_bitstream_SPS_extension(bitstream_t *stream,
     WRITE_U(stream, 0, 1, "cabac_bypass_alignment_enabled_flag");
 
 	  // Next extension
-	  WRITE_U(stream, 0, "qtbt_flag");
-	  WRITE_U(stream, 0, "large_ctu_flag");
-	  WRITE_U(stream, 0, "disable_motion_compression_flag");
+	  WRITE_U(stream, 0, 1, "qtbt_flag");
+	  WRITE_U(stream, 0, 1, "large_ctu_flag");
+	  WRITE_U(stream, 0, 1, "disable_motion_compression_flag");
 	  WRITE_U(stream, 0, 5, "reserved_flag_5bits");
 
-	  WRITE_U(stream, 0, "mtt_enabled_flag");
-	  WRITE_U(stream, 0, "next_dqp_enabled_flag");
+	  WRITE_U(stream, 0, 1, "mtt_enabled_flag");
+	  WRITE_U(stream, 0, 1, "next_dqp_enabled_flag");
 
 
   } else {
