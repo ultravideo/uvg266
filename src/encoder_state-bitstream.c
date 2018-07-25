@@ -871,7 +871,7 @@ void kvz_encoder_state_write_bitstream_slice_header(
   //if (independent) {
     kvz_encoder_state_write_bitstream_slice_header_independent(stream, state);
   //}
-   
+   /*
   if (encoder->tiles_enable || encoder->cfg.wpp) {
     int num_entry_points = 0;
     int max_length_seen = 0;
@@ -892,6 +892,7 @@ void kvz_encoder_state_write_bitstream_slice_header(
       encoder_state_write_bitstream_entry_points_write(stream, state, num_entry_points, offset_len, &entry_points_written); 
     }
   }
+  */
 }
 
 
