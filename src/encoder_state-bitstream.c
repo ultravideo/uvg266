@@ -62,7 +62,7 @@ static void encoder_state_write_bitstream_PTL(bitstream_t *stream,
   WRITE_U(stream, 0, 2, "general_profile_space");
   WRITE_U(stream, state->encoder_control->cfg.high_tier, 1, "general_tier_flag");
   // Main Profile == 1,  Main 10 profile == 2
-  WRITE_U(stream, (state->encoder_control->bitdepth == 8)?1:2, 5, "general_profile_idc");
+  WRITE_U(stream, 6, 5, "general_profile_idc");
   /* Compatibility flags should be set at general_profile_idc
    *  (so with general_profile_idc = 1, compatibility_flag[1] should be 1)
    * According to specification, when compatibility_flag[1] is set,
@@ -302,7 +302,7 @@ static void encoder_state_write_bitstream_SPS_extension(bitstream_t *stream,
                                                         encoder_state_t * const state)
 {
   const kvz_config *cfg = &state->encoder_control->cfg;
-  if (cfg->implicit_rdpcm && cfg->lossless) {
+  //if (cfg->implicit_rdpcm && cfg->lossless) {
     WRITE_U(stream, 1, 1, "sps_extension_present_flag");
 
     WRITE_U(stream, 1, 1, "sps_range_extension_flag");
@@ -311,7 +311,7 @@ static void encoder_state_write_bitstream_SPS_extension(bitstream_t *stream,
     WRITE_U(stream, 1, 1, "sps_next_extension_flag");
     WRITE_U(stream, 0, 4, "sps_extension_4bits");
 
-	  // Range Extension
+    // Range Extension
     WRITE_U(stream, 0, 1, "transform_skip_rotation_enabled_flag");
     WRITE_U(stream, 0, 1, "transform_skip_context_enabled_flag");
     WRITE_U(stream, 1, 1, "implicit_rdpcm_enabled_flag");
@@ -322,19 +322,26 @@ static void encoder_state_write_bitstream_SPS_extension(bitstream_t *stream,
     WRITE_U(stream, 0, 1, "persistent_rice_adaptation_enabled_flag");
     WRITE_U(stream, 0, 1, "cabac_bypass_alignment_enabled_flag");
 
-	  // Next extension
-	  WRITE_U(stream, 0, 1, "qtbt_flag");
-	  WRITE_U(stream, 0, 1, "large_ctu_flag");
-	  WRITE_U(stream, 0, 1, "disable_motion_compression_flag");
-	  WRITE_U(stream, 0, 5, "reserved_flag_5bits");
+    // Next extension
+    WRITE_U(stream, 1, 1, "qtbt_flag");
+    WRITE_U(stream, 0, 1, "large_ctu_flag");
+    WRITE_U(stream, 0, 1, "disable_motion_compression_flag");
+    WRITE_U(stream, 0, 5, "reserved_flag_5bits");
 
-	  WRITE_U(stream, 0, 1, "mtt_enabled_flag");
-	  WRITE_U(stream, 0, 1, "next_dqp_enabled_flag");
+    WRITE_U(stream, 0, 1, "mtt_enabled_flag");
+    WRITE_U(stream, 0, 1, "next_dqp_enabled_flag");
 
+    // QTBT
+    WRITE_U(stream, 0, 1, spsNext.getUseDualITree(), "qtbt_dual_intra_tree");
+    WRITE_UE(stream, 5, "log2_CTU_size_minus2");
+    WRITE_UE(stream, 0, "log2_minQT_ISlice_minus2");
+    WRITE_UE(stream, 0, "log2_minQT_PBSlice_minus2");
+    WRITE_UE(stream, MAX_DEPTH, "max_bt_depth");
+    WRITE_UE(stream, MAX_DEPTH, "max_bt_depth_i_slice");
 
-  } else {
-    WRITE_U(stream, 0, 1, "sps_extension_present_flag");
-  }
+  //} else {
+  //  WRITE_U(stream, 0, 1, "sps_extension_present_flag");
+ // }
 }
 
 static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
