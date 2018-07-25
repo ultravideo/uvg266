@@ -814,7 +814,7 @@ static void kvz_encoder_state_write_bitstream_slice_header_independent(
           WRITE_UE(stream, 0, "collocated_ref_idx");
         }
       }
-
+      // ToDo: VVC check num of merge cands, might be 7
       WRITE_UE(stream, 5-MRG_MAX_NUM_CANDS, "five_minus_max_num_merge_cand");
   }
 
@@ -852,9 +852,11 @@ void kvz_encoder_state_write_bitstream_slice_header(
   WRITE_UE(stream, 0, "slice_pic_parameter_set_id");
 
   if (!first_slice_segment_in_pic) {
+    /*
     if (encoder->pps.dependent_slice_segments_enabled_flag) {
       WRITE_U(stream, !independent, 1, "dependent_slice_segment_flag");
     }
+    */
 
     int lcu_cnt = encoder->in.width_in_lcu * encoder->in.height_in_lcu;
     int num_bits = kvz_math_ceil_log2(lcu_cnt);
@@ -865,9 +867,9 @@ void kvz_encoder_state_write_bitstream_slice_header(
     WRITE_U(stream, slice_start_rs, num_bits, "slice_segment_address");
   }
 
-  if (independent) {
+  //if (independent) {
     kvz_encoder_state_write_bitstream_slice_header_independent(stream, state);
-  }
+  //}
    
   if (encoder->tiles_enable || encoder->cfg.wpp) {
     int num_entry_points = 0;
