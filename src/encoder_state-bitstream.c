@@ -93,6 +93,7 @@ static void encoder_state_write_bitstream_PTL(bitstream_t *stream,
   // end PTL
 }
 
+/*
 static void encoder_state_write_bitstream_vid_parameter_set(bitstream_t* stream,
                                                             encoder_state_t * const state)
 {
@@ -186,7 +187,7 @@ static void encoder_state_write_bitstream_scaling_list(bitstream_t *stream,
     }
   }
 }
-
+*/
 
 static void encoder_state_write_bitstream_VUI(bitstream_t *stream,
                                               encoder_state_t * const state)
@@ -1080,8 +1081,10 @@ void kvz_encoder_state_write_parameter_sets(bitstream_t *stream,
                                             encoder_state_t * const state)
 {
   // Video Parameter Set (VPS)
+  /*
   kvz_nal_write(stream, KVZ_NAL_VPS_NUT, 0, 1);
   encoder_state_write_bitstream_vid_parameter_set(stream, state);
+  */
 
   // Sequence Parameter Set (SPS)
   kvz_nal_write(stream, KVZ_NAL_SPS_NUT, 0, 1);
