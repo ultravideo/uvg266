@@ -116,7 +116,7 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
   int32_t i;
   uint32_t sig_coeffgroup_flag[8 * 8] = { 0 };
 
-  int8_t be_valid = encoder->cfg.signhide_enable;
+  int8_t be_valid = 0;// encoder->cfg.signhide_enable;
   int32_t scan_pos_sig;
   uint32_t go_rice_param = 0;
   uint32_t blk_pos, pos_y, pos_x, sig, ctx_sig;

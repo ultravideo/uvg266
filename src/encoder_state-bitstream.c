@@ -469,7 +469,7 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
   WRITE_U(stream, encoder->pps.dependent_slice_segments_enabled_flag, 1, "dependent_slice_segments_enabled_flag");
   WRITE_U(stream, 0, 1, "output_flag_present_flag");
   WRITE_U(stream, 0, 3, "num_extra_slice_header_bits");
-  WRITE_U(stream, encoder->cfg.signhide_enable, 1, "sign_data_hiding_flag");
+  //WRITE_U(stream, encoder->cfg.signhide_enable, 1, "sign_data_hiding_flag");
   WRITE_U(stream, 0, 1, "cabac_init_present_flag");
 
   WRITE_UE(stream, 0, "num_ref_idx_l0_default_active_minus1");
