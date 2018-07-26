@@ -1079,36 +1079,37 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
   // part_mode
   //encode_part_mode(state, cabac, cur_cu, depth);
 
+  
 
 #if ENABLE_PCM
   // Code IPCM block
-  if (cur_cu->type == CU_PCM) {
+  if (FORCE_PCM || cur_cu->type == CU_PCM) {
     kvz_cabac_encode_bin_trm(cabac, 1); // IPCMFlag == 1
     kvz_cabac_finish(cabac);
-    kvz_bitstream_add_rbsp_trailing_bits(cabac.stream);
-
+    kvz_bitstream_add_rbsp_trailing_bits(cabac->stream);
+    
     // PCM sample
-    pixel *base_y = &cur_pic->y_data[x + y * encoder->in.width];
-    pixel *base_u = &cur_pic->u_data[x / 2 + y / 2 * encoder->in.width / 2];
-    pixel *base_v = &cur_pic->v_data[x / 2 + y / 2 * encoder->in.width / 2];
+    kvz_pixel *base_y = &frame->source->y[x + y * ctrl->in.width];
+    kvz_pixel *base_u = &frame->source->u[x / 2 + y / 2 * ctrl->in.width / 2];
+    kvz_pixel *base_v = &frame->source->v[x / 2 + y / 2 * ctrl->in.width / 2];
 
     // Luma
     for (unsigned y_px = 0; y_px < LCU_WIDTH >> depth; y_px++) {
       for (unsigned x_px = 0; x_px < LCU_WIDTH >> depth; x_px++) {
-        kvz_bitstream_put(cabac.stream, base_y[x_px + y_px * encoder->in.width], 8);
+        kvz_bitstream_put(cabac->stream, base_y[x_px + y_px * ctrl->in.width], 8);
       }
     }
 
     // Chroma
-    if (encoder->in.video_format != FORMAT_400) {
+    if (ctrl->chroma_format != KVZ_CSP_400) {
       for (unsigned y_px = 0; y_px < LCU_WIDTH >> (depth + 1); y_px++) {
         for (unsigned x_px = 0; x_px < LCU_WIDTH >> (depth + 1); x_px++) {
-          kvz_bitstream_put(cabac.stream, base_u[x_px + y_px * (encoder->in.width >> 1)], 8);
+          kvz_bitstream_put(cabac->stream, base_u[x_px + y_px * (ctrl->in.width >> 1)], 8);
         }
       }
       for (unsigned y_px = 0; y_px < LCU_WIDTH >> (depth + 1); y_px++) {
         for (unsigned x_px = 0; x_px < LCU_WIDTH >> (depth + 1); x_px++) {
-          kvz_bitstream_put(cabac.stream, base_v[x_px + y_px * (encoder->in.width >> 1)], 8);
+          kvz_bitstream_put(cabac->stream, base_v[x_px + y_px * (ctrl->in.width >> 1)], 8);
         }
       }
     }
