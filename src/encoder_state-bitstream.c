@@ -466,7 +466,7 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
 #endif
   WRITE_UE(stream, 0, "pic_parameter_set_id");
   WRITE_UE(stream, 0, "seq_parameter_set_id");
-  WRITE_U(stream, encoder->pps.dependent_slice_segments_enabled_flag, 1, "dependent_slice_segments_enabled_flag");
+  //WRITE_U(stream, encoder->pps.dependent_slice_segments_enabled_flag, 1, "dependent_slice_segments_enabled_flag");
   WRITE_U(stream, 0, 1, "output_flag_present_flag");
   WRITE_U(stream, 0, 3, "num_extra_slice_header_bits");
   //WRITE_U(stream, encoder->cfg.signhide_enable, 1, "sign_data_hiding_flag");
@@ -495,6 +495,8 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
 
   //WRITE_U(stream, 0, 1, "dependent_slices_enabled_flag");
   WRITE_U(stream, encoder->cfg.lossless, 1, "transquant_bypass_enable_flag");
+
+  /*
   WRITE_U(stream, encoder->tiles_enable, 1, "tiles_enabled_flag");
   //wavefronts
   WRITE_U(stream, encoder->cfg.wpp, 1, "entropy_coding_sync_enabled_flag");
@@ -517,7 +519,7 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
     WRITE_U(stream, 0, 1, "loop_filter_across_tiles_enabled_flag");
     
   }
-  
+  */
   WRITE_U(stream, 0, 1, "loop_filter_across_slice_flag");
   WRITE_U(stream, 1, 1, "deblocking_filter_control_present_flag");
 
@@ -534,7 +536,7 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
 
     //ENDIF
   //ENDIF
-  WRITE_U(stream, 0, 1, "pps_scaling_list_data_present_flag");
+  //WRITE_U(stream, 0, 1, "pps_scaling_list_data_present_flag");
   //IF scaling_list
   //ENDIF
   WRITE_U(stream, 0, 1, "lists_modification_present_flag");
