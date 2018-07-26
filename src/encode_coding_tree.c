@@ -57,10 +57,11 @@ static void encode_last_significant_xy(cabac_data_t * const cabac,
 
   cabac_ctx_t *base_ctx_x = (type ? cabac->ctx.cu_ctx_last_x_chroma : cabac->ctx.cu_ctx_last_x_luma);
   cabac_ctx_t *base_ctx_y = (type ? cabac->ctx.cu_ctx_last_y_chroma : cabac->ctx.cu_ctx_last_y_luma);
-
+  /*
   if (scan == SCAN_VER) {
     SWAP(lastpos_x, lastpos_y, uint8_t);
   }
+  */
 
   const int group_idx_x = g_group_idx[lastpos_x];
   const int group_idx_y = g_group_idx[lastpos_y];
@@ -214,6 +215,7 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
       scan_pos_sig--;
     }
 
+    // Encode significant coeff group flag when not the last or the first
     if (i == scan_cg_last || i == 0) {
       sig_coeffgroup_flag[cg_blk_pos] = 1;
     } else {
@@ -223,6 +225,7 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
       cabac->cur_ctx = &base_coeff_group_ctx[ctx_sig];
       CABAC_BIN(cabac, sig_coeff_group, "coded_sub_block_flag");
     }
+
 
     if (sig_coeffgroup_flag[cg_blk_pos]) {
       int32_t pattern_sig_ctx = kvz_context_calc_pattern_sig_ctx(sig_coeffgroup_flag,
@@ -463,6 +466,9 @@ static void encode_transform_coeff(encoder_state_t * const state,
   // - transform size is 4 (depth == MAX_PU_DEPTH)
   // - transform depth is max
   // - cu is intra NxN and it's the first split
+  
+  //ToDo: check BMS transform split in QTBT
+  /*
   if (depth > 0 &&
       depth < MAX_PU_DEPTH &&
       tr_depth < max_tr_depth &&
@@ -471,6 +477,7 @@ static void encode_transform_coeff(encoder_state_t * const state,
     cabac->cur_ctx = &(cabac->ctx.trans_subdiv_model[5 - ((kvz_g_convert_to_bit[LCU_WIDTH] + 2) - depth)]);
     CABAC_BIN(cabac, split, "split_transform_flag");
   }
+  */
 
   // Chroma cb flags are not signaled when one of the following:
   // - transform size is 4 (2x2 chroma transform doesn't exist)
@@ -1070,7 +1077,44 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
   }
 
   // part_mode
-  encode_part_mode(state, cabac, cur_cu, depth);
+  //encode_part_mode(state, cabac, cur_cu, depth);
+
+
+#if ENABLE_PCM
+  // Code IPCM block
+  if (cur_cu->type == CU_PCM) {
+    kvz_cabac_encode_bin_trm(cabac, 1); // IPCMFlag == 1
+    kvz_cabac_finish(cabac);
+    kvz_bitstream_add_rbsp_trailing_bits(cabac.stream);
+
+    // PCM sample
+    pixel *base_y = &cur_pic->y_data[x + y * encoder->in.width];
+    pixel *base_u = &cur_pic->u_data[x / 2 + y / 2 * encoder->in.width / 2];
+    pixel *base_v = &cur_pic->v_data[x / 2 + y / 2 * encoder->in.width / 2];
+
+    // Luma
+    for (unsigned y_px = 0; y_px < LCU_WIDTH >> depth; y_px++) {
+      for (unsigned x_px = 0; x_px < LCU_WIDTH >> depth; x_px++) {
+        kvz_bitstream_put(cabac.stream, base_y[x_px + y_px * encoder->in.width], 8);
+      }
+    }
+
+    // Chroma
+    if (encoder->in.video_format != FORMAT_400) {
+      for (unsigned y_px = 0; y_px < LCU_WIDTH >> (depth + 1); y_px++) {
+        for (unsigned x_px = 0; x_px < LCU_WIDTH >> (depth + 1); x_px++) {
+          kvz_bitstream_put(cabac.stream, base_u[x_px + y_px * (encoder->in.width >> 1)], 8);
+        }
+      }
+      for (unsigned y_px = 0; y_px < LCU_WIDTH >> (depth + 1); y_px++) {
+        for (unsigned x_px = 0; x_px < LCU_WIDTH >> (depth + 1); x_px++) {
+          kvz_bitstream_put(cabac.stream, base_v[x_px + y_px * (encoder->in.width >> 1)], 8);
+        }
+      }
+    }
+    kvz_cabac_start(cabac);
+  } else 
+#endif
 
   if (cur_cu->type == CU_INTER) {
     const int num_pu = kvz_part_mode_num_parts[cur_cu->part_size];
@@ -1102,42 +1146,6 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
   } else if (cur_cu->type == CU_INTRA) {
     encode_intra_coding_unit(state, cabac, cur_cu, x, y, depth);
   }
-
-#if ENABLE_PCM
-  // Code IPCM block
-  else if (cur_cu->type == CU_PCM) {
-    kvz_cabac_encode_bin_trm(cabac, 1); // IPCMFlag == 1
-    kvz_cabac_finish(cabac);
-    kvz_bitstream_add_rbsp_trailing_bits(cabac.stream);
-
-    // PCM sample
-    pixel *base_y = &cur_pic->y_data[x     + y * encoder->in.width];
-    pixel *base_u = &cur_pic->u_data[x / 2 + y / 2 * encoder->in.width / 2];
-    pixel *base_v = &cur_pic->v_data[x / 2 + y / 2 * encoder->in.width / 2];
-
-    // Luma
-    for (unsigned y_px = 0; y_px < LCU_WIDTH >> depth; y_px++) {
-      for (unsigned  x_px = 0; x_px < LCU_WIDTH >> depth; x_px++) {
-        kvz_bitstream_put(cabac.stream, base_y[x_px + y_px * encoder->in.width], 8);
-      }
-    }
-
-    // Chroma
-    if (encoder->in.video_format != FORMAT_400) {
-      for (unsigned y_px = 0; y_px < LCU_WIDTH >> (depth + 1); y_px++) {
-        for (unsigned x_px = 0; x_px < LCU_WIDTH >> (depth + 1); x_px++) {
-          kvz_bitstream_put(cabac.stream, base_u[x_px + y_px * (encoder->in.width >> 1)], 8);
-        }
-      }
-      for (unsigned y_px = 0; y_px < LCU_WIDTH >> (depth + 1); y_px++) {
-        for (unsigned x_px = 0; x_px < LCU_WIDTH >> (depth + 1); x_px++) {
-          kvz_bitstream_put(cabac.stream, base_v[x_px + y_px * (encoder->in.width >> 1)], 8);
-        }
-      }
-    }
-    kvz_cabac_start(cabac);
-  }
-#endif
 
   else {
     // CU type not set. Should not happen.
