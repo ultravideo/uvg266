@@ -1030,6 +1030,14 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
     }
   }
 
+  //ToDo: check if we can actually split
+  //ToDo: Implement MT split
+  if (depth < MAX_PU_DEPTH)
+  {
+   // cabac->cur_ctx = &(cabac->ctx.trans_subdiv_model[5 - ((kvz_g_convert_to_bit[LCU_WIDTH] + 2) - depth)]);
+   // CABAC_BIN(cabac, 0, "split_transform_flag");
+  }
+
   if (ctrl->cfg.lossless) {
     cabac->cur_ctx = &cabac->ctx.cu_transquant_bypass;
     CABAC_BIN(cabac, 1, "cu_transquant_bypass_flag");
@@ -1086,7 +1094,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
   if (FORCE_PCM || cur_cu->type == CU_PCM) {
     kvz_cabac_encode_bin_trm(cabac, 1); // IPCMFlag == 1
     kvz_cabac_finish(cabac);
-    kvz_bitstream_add_rbsp_trailing_bits(cabac->stream);
+    kvz_bitstream_align(cabac->stream);
     
     // PCM sample
     kvz_pixel *base_y = &frame->source->y[x + y * ctrl->in.width];

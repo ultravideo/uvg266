@@ -332,12 +332,12 @@ static void encoder_state_write_bitstream_SPS_extension(bitstream_t *stream,
     WRITE_U(stream, 0, 1, "next_dqp_enabled_flag");
 
     // QTBT
-    WRITE_U(stream, 0, 1, spsNext.getUseDualITree(), "qtbt_dual_intra_tree");
+    WRITE_U(stream, 0, 1, "qtbt_dual_intra_tree");
     WRITE_UE(stream, 5, "log2_CTU_size_minus2");
     WRITE_UE(stream, 0, "log2_minQT_ISlice_minus2");
     WRITE_UE(stream, 0, "log2_minQT_PBSlice_minus2");
-    WRITE_UE(stream, MAX_DEPTH, "max_bt_depth");
-    WRITE_UE(stream, MAX_DEPTH, "max_bt_depth_i_slice");
+    WRITE_UE(stream, 0, "max_bt_depth");
+    WRITE_UE(stream, 0, "max_bt_depth_i_slice");
 
   //} else {
   //  WRITE_U(stream, 0, 1, "sps_extension_present_flag");
@@ -412,8 +412,8 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   // ToDo: redefine for VVC
   WRITE_UE(stream, 0, "log2_min_luma_transform_block_size_minus2");   // 4x4
   WRITE_UE(stream, 3, "log2_diff_max_min_luma_transform_block_size"); // 4x4...32x32
-  WRITE_UE(stream, encoder->tr_depth_inter, "max_transform_hierarchy_depth_inter");
-  WRITE_UE(stream, encoder->cfg.tr_depth_intra, "max_transform_hierarchy_depth_intra");
+  WRITE_UE(stream, 0/*encoder->tr_depth_inter*/, "max_transform_hierarchy_depth_inter");
+  WRITE_UE(stream, 0/*encoder->cfg.tr_depth_intra*/, "max_transform_hierarchy_depth_intra");
   /*
   // scaling list
   WRITE_U(stream, encoder->scaling_list.enable, 1, "scaling_list_enable_flag");
