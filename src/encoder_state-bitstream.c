@@ -562,8 +562,8 @@ static void encoder_state_write_bitstream_prefix_sei_version(encoder_state_t * c
   memcpy(buf, uuid, 16);
 
   // user_data_payload_byte
-  s += sprintf(s, "Kvazaar HEVC Encoder v. " VERSION_STRING " - "
-                  "Copyleft 2012-2015 - http://ultravideo.cs.tut.fi/ - options:");
+  s += sprintf(s, "Kvazaar VVC Encoder v. " VERSION_STRING " - "
+                  "Copyleft 2018- - http://ultravideo.cs.tut.fi/ - options:");
   s += sprintf(s, " %dx%d", cfg->width, cfg->height);
   s += sprintf(s, " deblock=%d:%d:%d", cfg->deblock_enable,
                cfg->deblock_beta, cfg->deblock_tc);
