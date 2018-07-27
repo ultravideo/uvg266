@@ -87,10 +87,10 @@ static const uint8_t INIT_PART_SIZE[3][4] = {
   { 184,  CNU,  CNU,  CNU, },
 };
 
-static const uint8_t  INIT_SPLIT_FLAG[3][3] = {
-  { 107,  139,  126 },
-  { 107,  139,  126 },
-  { 139,  141,  157 },
+static const uint8_t  INIT_SPLIT_FLAG[3][5] = {
+  { 107, 139, 126, 255, 0, },
+  { 107, 139, 126, 255, 0, },
+  { 139, 141, 157, 255, 0, },
 };
 
 static const uint8_t INIT_INTRA_PRED_MODE[3] = {
@@ -230,6 +230,9 @@ void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
   kvz_ctx_init(&cabac->ctx.split_flag_model[0], QP, INIT_SPLIT_FLAG[slice][0]);
   kvz_ctx_init(&cabac->ctx.split_flag_model[1], QP, INIT_SPLIT_FLAG[slice][1]);
   kvz_ctx_init(&cabac->ctx.split_flag_model[2], QP, INIT_SPLIT_FLAG[slice][2]);
+  // VVC Large CTU use
+  kvz_ctx_init(&cabac->ctx.split_flag_model[3], QP, INIT_SPLIT_FLAG[slice][3]);
+  kvz_ctx_init(&cabac->ctx.split_flag_model[4], QP, INIT_SPLIT_FLAG[slice][4]);
 
   kvz_ctx_init(&cabac->ctx.intra_mode_model, QP, INIT_INTRA_PRED_MODE[slice]);
 

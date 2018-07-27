@@ -53,7 +53,7 @@ typedef struct
   struct {
     cabac_ctx_t sao_merge_flag_model;
     cabac_ctx_t sao_type_idx_model;
-    cabac_ctx_t split_flag_model[3]; //!< \brief split flag context models
+    cabac_ctx_t split_flag_model[5]; //!< \brief split flag context models
     cabac_ctx_t intra_mode_model;    //!< \brief intra mode context models
     cabac_ctx_t chroma_pred_model[2];
     cabac_ctx_t inter_dir[5];
