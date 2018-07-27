@@ -333,7 +333,7 @@ static void encoder_state_write_bitstream_SPS_extension(bitstream_t *stream,
 
     // QTBT
     WRITE_U(stream, 0, 1, "qtbt_dual_intra_tree");
-    WRITE_UE(stream, 5, "log2_CTU_size_minus2");
+    WRITE_UE(stream, 4, "log2_CTU_size_minus2"); // Max size 2^6 = 64x64
     WRITE_UE(stream, 0, "log2_minQT_ISlice_minus2");
     WRITE_UE(stream, 0, "log2_minQT_PBSlice_minus2");
     WRITE_UE(stream, 0, "max_bt_depth");
@@ -431,7 +431,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
     WRITE_U(stream, 7, 4, "pcm_sample_bit_depth_luma_minus1");
     WRITE_U(stream, 7, 4, "pcm_sample_bit_depth_chroma_minus1");
     WRITE_UE(stream, 0, "log2_min_pcm_coding_block_size_minus3");
-    WRITE_UE(stream, 2, "log2_diff_max_min_pcm_coding_block_size");
+    WRITE_UE(stream, 3, "log2_diff_max_min_pcm_coding_block_size");
     WRITE_U(stream, 1, 1, "pcm_loop_filter_disable_flag");
   #endif
 

@@ -978,7 +978,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
     above_cu = kvz_cu_array_at_const(frame->cu_array, x, y - 1);
   }
 
-  uint8_t split_flag = GET_SPLITDATA(cur_cu, depth);
+  uint8_t split_flag = 0;// GET_SPLITDATA(cur_cu, depth);
   uint8_t split_model = 0;
 
   // Absolute coordinates
@@ -1094,7 +1094,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
   if (FORCE_PCM || cur_cu->type == CU_PCM) {
     kvz_cabac_encode_bin_trm(cabac, 1); // IPCMFlag == 1
     kvz_cabac_finish(cabac);
-    kvz_bitstream_align(cabac->stream);
+    kvz_bitstream_add_rbsp_trailing_bits(cabac->stream);
     
     // PCM sample
     kvz_pixel *base_y = &frame->source->y[x + y * ctrl->in.width];
@@ -1167,6 +1167,7 @@ end:
   if (is_last_cu_in_qg(state, x, y, depth)) {
     state->last_qp = cur_cu->qp;
   }
+
 }
 
 
