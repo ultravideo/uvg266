@@ -124,9 +124,11 @@ void kvz_cabac_write_unary_max_symbol_ep(cabac_data_t *data, unsigned int symbol
 #ifdef VERBOSE
 #define CABAC_BIN(data, value, name) { \
     uint32_t prev_state = (data)->cur_ctx->uc_state; \
+    printf("%s = %u, range = %u LPS = %u state = %u -> ", \
+           (name), (uint32_t)(value), (data)->range, kvz_g_auc_lpst_table[CTX_STATE(data->cur_ctx)][((data)->range >> 6) & 3], prev_state); \
     kvz_cabac_encode_bin((data), (value)); \
-    printf("%s = %u, state = %u -> %u\n", \
-           (name), (uint32_t)(value), prev_state, (data)->cur_ctx->uc_state); }
+    printf("%u\n", (data)->cur_ctx->uc_state); }
+    
 
   #define CABAC_BINS_EP(data, value, bins, name) { \
     uint32_t prev_state = (data)->cur_ctx->uc_state; \
