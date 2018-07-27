@@ -1,6 +1,6 @@
 Kvazaar
 =======
-An open-source HEVC encoder licensed under LGPLv2.1
+An open-source VVC encoder licensed under LGPLv2.1
 
 Join channel #kvazaar_hevc in Freenode IRC network to contact us.
 
@@ -33,7 +33,13 @@ http://ultravideo.cs.tut.fi/#encoder for more information.
   - [Unit tests](#unit-tests)
   - [Code style](#code-style)
 
-## Using Kvazaar
+## Using Kvazaar VVC
+
+### Debugging:
+
+    ./kvazaar -i BQMall_832x480_60.yuv -o BQMall.266 -n 10 --no-sao --threads=0 --no-wpp -p 1 --rd=0 --fast-residual-cost=32 --no-deblock > debug.txt
+    
+    ./DecoderAnalyserApp -b BQMall.266 --TraceFile=trace.txt --TraceRule=D_COMMON,D_CABAC,D_SYNTAX,D_NALUNITHEADER,D_HEADER:poc>=0 -o rec.yuv
 
 ### Example:
 
