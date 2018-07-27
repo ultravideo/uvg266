@@ -718,7 +718,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       cost = split_cost;
       work_tree_copy_up(x_local, y_local, depth, work_tree);
 #if KVZ_DEBUG
-      debug_split = 1;
+      //debug_split = 1;
 #endif
     } else if (depth > 0) {
       // Copy this CU's mode all the way down for use in adjacent CUs mode

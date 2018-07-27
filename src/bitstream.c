@@ -43,6 +43,8 @@ const uint32_t kvz_bit_set_mask[] =
 //#define VERBOSE
 
 #ifdef VERBOSE
+#include <stdarg.h>
+#include <stdio.h>
 void printf_bitstream(char *msg, ...)
 {
   va_list fmtargs;
