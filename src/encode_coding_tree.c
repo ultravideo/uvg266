@@ -1108,10 +1108,15 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
     kvz_pixel *base_u = &frame->source->u[x / 2 + y / 2 * ctrl->in.width / 2];
     kvz_pixel *base_v = &frame->source->v[x / 2 + y / 2 * ctrl->in.width / 2];
 
+    kvz_pixel *rec_base_y = &frame->rec->y[x + y * ctrl->in.width];
+    kvz_pixel *rec_base_u = &frame->rec->u[x / 2 + y / 2 * ctrl->in.width / 2];
+    kvz_pixel *rec_base_v = &frame->rec->v[x / 2 + y / 2 * ctrl->in.width / 2];
+
     // Luma
     for (unsigned y_px = 0; y_px < LCU_WIDTH >> depth; y_px++) {
       for (unsigned x_px = 0; x_px < LCU_WIDTH >> depth; x_px++) {
         kvz_bitstream_put(cabac->stream, base_y[x_px + y_px * ctrl->in.width], 8);
+        rec_base_y[x_px + y_px * ctrl->in.width] = base_y[x_px + y_px * ctrl->in.width];
       }
     }
 
@@ -1120,11 +1125,13 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
       for (unsigned y_px = 0; y_px < LCU_WIDTH >> (depth + 1); y_px++) {
         for (unsigned x_px = 0; x_px < LCU_WIDTH >> (depth + 1); x_px++) {
           kvz_bitstream_put(cabac->stream, base_u[x_px + y_px * (ctrl->in.width >> 1)], 8);
+          rec_base_u[x_px + y_px * (ctrl->in.width >> 1)] = base_u[x_px + y_px * (ctrl->in.width >> 1)];
         }
       }
       for (unsigned y_px = 0; y_px < LCU_WIDTH >> (depth + 1); y_px++) {
         for (unsigned x_px = 0; x_px < LCU_WIDTH >> (depth + 1); x_px++) {
           kvz_bitstream_put(cabac->stream, base_v[x_px + y_px * (ctrl->in.width >> 1)], 8);
+          rec_base_v[x_px + y_px * (ctrl->in.width >> 1)] = base_v[x_px + y_px * (ctrl->in.width >> 1)];
         }
       }
     }
