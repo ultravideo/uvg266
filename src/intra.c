@@ -313,20 +313,21 @@ void kvz_intra_predict(
     kvz_intra_pred_planar(log2_width, used_ref->top, used_ref->left, dst);
   } else if (mode == 1) {
     // Do extra post filtering for edge pixels of luma DC mode.
-    if (color == COLOR_Y && width < 32) {
-      intra_pred_filtered_dc(log2_width, used_ref->top, used_ref->left, dst);
-    } else {
+    //if (color == COLOR_Y && width < 32) {
+    //  intra_pred_filtered_dc(log2_width, used_ref->top, used_ref->left, dst);
+    //} else {
       intra_pred_dc(log2_width, used_ref->top, used_ref->left, dst);
-    }
+    //}
   } else {
     kvz_angular_pred(log2_width, mode, used_ref->top, used_ref->left, dst);
-    if (color == COLOR_Y && width < 32 && filter_boundary) {
-      if (mode == 10) {
-        intra_post_process_angular(width, 1, used_ref->top, dst);
-      } else if (mode == 26) {
-        intra_post_process_angular(width, width, used_ref->left, dst);
-      }
-    }
+
+    //if (color == COLOR_Y && width < 32 && filter_boundary) {
+    //  if (mode == 10) {
+    //    intra_post_process_angular(width, 1, used_ref->top, dst);
+    //  } else if (mode == 26) {
+    //    intra_post_process_angular(width, width, used_ref->left, dst);
+    //  }
+    //}
   }
 }
 
