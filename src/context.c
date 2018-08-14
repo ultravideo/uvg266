@@ -93,6 +93,12 @@ static const uint8_t  INIT_SPLIT_FLAG[3][5] = {
   { 139, 141, 157, 255, 0, },
 };
 
+static const uint8_t INIT_BT_SPLIT_FLAG[3][12] = {
+  { 107, 139, 126, 154, 154, 154, 154, 154, 154, 154, 154, 154, },
+  { 107, 139, 126, 154, 154, 154, 154, 154, 154, 154, 154, 154, },
+  { 139, 141, 157, 154, 154, 154, 154, 154, 154, 154, 154, 154, },
+};
+
 static const uint8_t INIT_INTRA_PRED_MODE[3] = {
   183, 154, 184
 };
@@ -233,6 +239,20 @@ void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
   // VVC Large CTU use
   kvz_ctx_init(&cabac->ctx.split_flag_model[3], QP, INIT_SPLIT_FLAG[slice][3]);
   kvz_ctx_init(&cabac->ctx.split_flag_model[4], QP, INIT_SPLIT_FLAG[slice][4]);
+
+  // BT split flag init
+  kvz_ctx_init(&cabac->ctx.bt_split_flag_model[0], QP, INIT_BT_SPLIT_FLAG[slice][0]);
+  kvz_ctx_init(&cabac->ctx.bt_split_flag_model[1], QP, INIT_BT_SPLIT_FLAG[slice][1]);
+  kvz_ctx_init(&cabac->ctx.bt_split_flag_model[2], QP, INIT_BT_SPLIT_FLAG[slice][2]);
+  kvz_ctx_init(&cabac->ctx.bt_split_flag_model[3], QP, INIT_BT_SPLIT_FLAG[slice][3]);
+  kvz_ctx_init(&cabac->ctx.bt_split_flag_model[4], QP, INIT_BT_SPLIT_FLAG[slice][4]);
+  kvz_ctx_init(&cabac->ctx.bt_split_flag_model[5], QP, INIT_BT_SPLIT_FLAG[slice][5]);
+  kvz_ctx_init(&cabac->ctx.bt_split_flag_model[6], QP, INIT_BT_SPLIT_FLAG[slice][6]);
+  kvz_ctx_init(&cabac->ctx.bt_split_flag_model[7], QP, INIT_BT_SPLIT_FLAG[slice][7]);
+  kvz_ctx_init(&cabac->ctx.bt_split_flag_model[8], QP, INIT_BT_SPLIT_FLAG[slice][8]);
+  kvz_ctx_init(&cabac->ctx.bt_split_flag_model[9], QP, INIT_BT_SPLIT_FLAG[slice][9]);
+  kvz_ctx_init(&cabac->ctx.bt_split_flag_model[10], QP, INIT_BT_SPLIT_FLAG[slice][10]);
+  kvz_ctx_init(&cabac->ctx.bt_split_flag_model[11], QP, INIT_BT_SPLIT_FLAG[slice][11]);
 
   kvz_ctx_init(&cabac->ctx.intra_mode_model, QP, INIT_INTRA_PRED_MODE[slice]);
 
