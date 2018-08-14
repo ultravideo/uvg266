@@ -977,11 +977,8 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
   if (y > 0) {
     above_cu = kvz_cu_array_at_const(frame->cu_array, x, y - 1);
   }
-#if FORCE_PCM != 1
+
   uint8_t split_flag = GET_SPLITDATA(cur_cu, depth);
-#else
-  uint8_t split_flag = 0;
-#endif
   uint8_t split_model = 0;
 
   // Absolute coordinates
@@ -1005,15 +1002,11 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
     if (!border) {
       // Get left and top block split_flags and if they are present and true, increase model number
       if (left_cu && GET_SPLITDATA(left_cu, depth) == 1) {
-#if FORCE_PCM != 1
         split_model++;
-#endif
       }
 
       if (above_cu && GET_SPLITDATA(above_cu, depth) == 1) {
-#if FORCE_PCM != 1
         split_model++;
-#endif
       }
 
       cabac->cur_ctx = &(cabac->ctx.split_flag_model[split_model]);
