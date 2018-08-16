@@ -67,11 +67,11 @@ dct_func * kvz_get_dct_func(int8_t width, color_t color, cu_type_t type)
 {
   switch (width) {
   case 4:
-    if (color == COLOR_Y && type == CU_INTRA) {
-      return kvz_fast_forward_dst_4x4;
-    } else {
+    //if (color == COLOR_Y && type == CU_INTRA) {
+    //  return kvz_fast_forward_dst_4x4;
+    //} else {
       return kvz_dct_4x4;
-    }
+    //}
   case 8:
     return kvz_dct_8x8;
   case 16:
@@ -96,11 +96,11 @@ dct_func * kvz_get_idct_func(int8_t width, color_t color, cu_type_t type)
 {
   switch (width) {
   case 4:
-    if (color == COLOR_Y && type == CU_INTRA) {
-      return kvz_fast_inverse_dst_4x4;
-    } else {
+    //if (color == COLOR_Y && type == CU_INTRA) {
+    //  return kvz_fast_inverse_dst_4x4;
+    //} else {
       return kvz_idct_4x4;
-    }
+    //}
   case 8:
     return kvz_idct_8x8;
   case 16:
