@@ -103,7 +103,8 @@ void kvz_quant_flat_avx2(const encoder_state_t * const state, coeff_t *coef, coe
   temp = _mm_add_epi32(temp, _mm_shuffle_epi32(temp, _MM_SHUFFLE(1, 0, 3, 2)));
   temp = _mm_add_epi32(temp, _mm_shuffle_epi32(temp, _MM_SHUFFLE(0, 1, 0, 1)));
   ac_sum += _mm_cvtsi128_si32(temp);
-
+  /*
+  // Signhiding disabled in VVC
   if (!encoder->cfg.signhide_enable || ac_sum < 2) return;
 
   int32_t delta_u[LCU_WIDTH*LCU_WIDTH >> 2];
@@ -231,6 +232,7 @@ void kvz_quant_flat_avx2(const encoder_state_t * const state, coeff_t *coef, coe
 #undef SCAN_SET_SIZE
 #undef LOG2_SCAN_SET_SIZE
   }
+  */
 }
 
 static INLINE __m128i get_residual_4x1_avx2(const kvz_pixel *a_in, const kvz_pixel *b_in){
