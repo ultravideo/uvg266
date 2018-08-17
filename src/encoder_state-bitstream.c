@@ -813,28 +813,34 @@ static void kvz_encoder_state_write_bitstream_slice_header_independent(
   }
 
   if (state->frame->slicetype != KVZ_SLICE_I) {
-      WRITE_U(stream, 1, 1, "num_ref_idx_active_override_flag");
-      WRITE_UE(stream, MAX(0, ((int)state->frame->ref_LX_size[0]) - 1), "num_ref_idx_l0_active_minus1");
+    WRITE_U(stream, 1, 1, "num_ref_idx_active_override_flag");
+    WRITE_UE(stream, MAX(0, ((int)state->frame->ref_LX_size[0]) - 1), "num_ref_idx_l0_active_minus1");
+    if (state->frame->slicetype == KVZ_SLICE_B) {
+      WRITE_UE(stream, MAX(0, ((int)state->frame->ref_LX_size[1]) - 1), "num_ref_idx_l1_active_minus1");
+      WRITE_U(stream, 0, 1, "mvd_l1_zero_flag");
+    }
+
+    // Temporal Motion Vector Prediction flags
+    if (state->encoder_control->cfg.tmvp_enable && ref_negative > 0) {
       if (state->frame->slicetype == KVZ_SLICE_B) {
-        WRITE_UE(stream, MAX(0, ((int)state->frame->ref_LX_size[1]) - 1), "num_ref_idx_l1_active_minus1");
-        WRITE_U(stream, 0, 1, "mvd_l1_zero_flag");
+        // Always use L0 for prediction
+        WRITE_U(stream, 1, 1, "collocated_from_l0_flag");
       }
 
-      // Temporal Motion Vector Prediction flags
-      if (state->encoder_control->cfg.tmvp_enable && ref_negative > 0) {
-        if (state->frame->slicetype == KVZ_SLICE_B) {
-          // Always use L0 for prediction
-          WRITE_U(stream, 1, 1, "collocated_from_l0_flag");
-        }
-
-        if (ref_negative > 1) {
-          // Use first reference from L0
-          // ToDo: use better reference
-          WRITE_UE(stream, 0, "collocated_ref_idx");
-        }
+      if (ref_negative > 1) {
+        // Use first reference from L0
+        // ToDo: use better reference
+        WRITE_UE(stream, 0, "collocated_ref_idx");
       }
-      // ToDo: VVC check num of merge cands, might be 7
-      WRITE_UE(stream, 5-MRG_MAX_NUM_CANDS, "five_minus_max_num_merge_cand");
+    }
+  }
+  WRITE_U(stream, 0, 1, "dep_quant_enable_flag");
+  //if !dep_quant_enable_flag
+    WRITE_U(stream, 0, 1, "sign_data_hiding_enable_flag");
+
+  if (state->frame->slicetype != KVZ_SLICE_I) {
+    // ToDo: VVC check num of merge cands, might be 7
+    WRITE_UE(stream, 5-MRG_MAX_NUM_CANDS, "five_minus_max_num_merge_cand");
   }
 
   {
