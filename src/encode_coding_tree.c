@@ -822,8 +822,11 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
       for (int i = 2; i >= 0; i--) {
         tmp_pred = (tmp_pred > intra_preds[j][i] ? tmp_pred - 1 : tmp_pred);
       }
-
-      CABAC_BINS_EP(cabac, tmp_pred, 5, "rem_intra_luma_pred_mode");
+      static const uint8_t intra_mode_33_to_65_angle[36] =
+        //                                   H                               D                               V
+        //0, 1, 2, 3, 4, 5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, DM
+      { 0, 1, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48, 50, 52, 54, 56, 58, 60, 62, 64, 66, 68 };
+      CABAC_BINS_EP(cabac, intra_mode_33_to_65_angle[tmp_pred], 6, "rem_intra_luma_pred_mode");
     }
   }
 
