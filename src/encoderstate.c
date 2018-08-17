@@ -1361,6 +1361,7 @@ coeff_scan_order_t kvz_get_scan_order(int8_t cu_type, int intra_mode, int depth)
   // Scan mode is diagonal, except for 4x4+8x8 luma and 4x4 chroma, where:
   // - angular 6-14 = vertical
   // - angular 22-30 = horizontal
+#if HEVC_USE_MDCS
   if (cu_type == CU_INTRA && depth >= 3) {
     if (intra_mode >= 6 && intra_mode <= 14) {
       return SCAN_VER;
@@ -1368,7 +1369,7 @@ coeff_scan_order_t kvz_get_scan_order(int8_t cu_type, int intra_mode, int depth)
       return SCAN_HOR;
     }
   }
-
+#endif
   return SCAN_DIAG;
 }
 
