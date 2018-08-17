@@ -421,6 +421,8 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   WRITE_UE(stream, 3, "log2_diff_max_min_luma_transform_block_size"); // 4x4...32x32
   WRITE_UE(stream, encoder->tr_depth_inter, "max_transform_hierarchy_depth_inter");
   WRITE_UE(stream, encoder->cfg.tr_depth_intra, "max_transform_hierarchy_depth_intra");
+
+  WRITE_U(stream, 0, 1, "sps_alf_enable_flag");
   /*
   // scaling list
   WRITE_U(stream, encoder->scaling_list.enable, 1, "scaling_list_enable_flag");
