@@ -151,6 +151,7 @@ typedef int16_t coeff_t;
 #define TR_MIN_LOG2_SIZE 2
 #define TR_MIN_WIDTH (1 << TR_MIN_LOG2_SIZE)
 
+// ToDo: add VVC large block support
 #if LCU_WIDTH != 64
   #error "Kvazaar only support LCU_WIDTH == 64"
 #endif

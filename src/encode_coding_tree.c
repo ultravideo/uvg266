@@ -573,6 +573,7 @@ static void encode_inter_prediction_unit(encoder_state_t * const state,
       uint8_t inter_dir = cur_cu->inter.mv_dir-1;
 
       if (cur_cu->part_size == SIZE_2Nx2N || (LCU_WIDTH >> depth) != 8) {
+        // ToDo: large CTU changes this inter_dir context selection
         cabac->cur_ctx = &(cabac->ctx.inter_dir[depth]);
         CABAC_BIN(cabac, (inter_dir == 2), "inter_pred_idc");
       }

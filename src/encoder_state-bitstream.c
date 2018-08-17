@@ -324,7 +324,7 @@ static void encoder_state_write_bitstream_SPS_extension(bitstream_t *stream,
 
     // Next extension
     WRITE_U(stream, 1, 1, "qtbt_flag");
-    WRITE_U(stream, 0, 1, "large_ctu_flag");
+    WRITE_U(stream, 0, 1, "large_ctu_flag"); // ToDo: add VVC large block support
     WRITE_U(stream, 0, 1, "disable_motion_compression_flag");
     WRITE_U(stream, 0, 5, "reserved_flag_5bits");
 
@@ -334,8 +334,8 @@ static void encoder_state_write_bitstream_SPS_extension(bitstream_t *stream,
     // QTBT
     WRITE_U(stream, 0, 1, "qtbt_dual_intra_tree");
     WRITE_UE(stream, 4, "log2_CTU_size_minus2"); // Max size 2^6 = 64x64
-    WRITE_UE(stream, 0, "log2_minQT_ISlice_minus2");
-    WRITE_UE(stream, 0, "log2_minQT_PBSlice_minus2");
+    WRITE_UE(stream, 1, "log2_minQT_ISlice_minus2");
+    WRITE_UE(stream, 1, "log2_minQT_PBSlice_minus2");
     WRITE_UE(stream, 0, "max_bt_depth");
     WRITE_UE(stream, 0, "max_bt_depth_i_slice");
 

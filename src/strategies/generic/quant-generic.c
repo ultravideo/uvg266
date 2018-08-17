@@ -65,7 +65,8 @@ void kvz_quant_generic(const encoder_state_t * const state, coeff_t *coef, coeff
     level *= sign;
     q_coef[n] = (coeff_t)(CLIP(-32768, 32767, level));
   }
-
+  /*
+  // Signhiding disabled in VVC
   if (!encoder->cfg.signhide_enable || ac_sum < 2) return;
 
   int32_t delta_u[LCU_WIDTH*LCU_WIDTH >> 2];
@@ -160,6 +161,7 @@ void kvz_quant_generic(const encoder_state_t * const state, coeff_t *coef, coeff
 #undef SCAN_SET_SIZE
 #undef LOG2_SCAN_SET_SIZE
   }
+  */
 }
 
 /**
