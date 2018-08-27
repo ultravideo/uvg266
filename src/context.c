@@ -56,10 +56,11 @@ static const uint8_t INIT_MERGE_FLAG_EXT[3][1] = {
   { CNU, },
 };
 
-static const uint8_t INIT_MERGE_IDX_EXT[3][1] = {
-  { 137, },
-  { 122, },
-  { CNU, },
+// TODO: update usage
+static const uint8_t INIT_MERGE_IDX_EXT[3][5] = {
+  { 137, CNU, CNU, CNU, CNU, },
+  { 122, CNU, CNU, CNU, CNU, },
+  { CNU, CNU, CNU, CNU, CNU, },
 };
 
 static const uint8_t INIT_CU_TRANSQUANT_BYPASS[3][1] = {
@@ -82,8 +83,8 @@ static const uint8_t INIT_PRED_MODE[3][1] = {
 
 
 static const uint8_t INIT_PART_SIZE[3][4] = {
-  { 154,  139,  CNU,  CNU, },
-  { 154,  139,  CNU,  CNU, },
+  { 154,  139,  154,  154, },
+  { 154,  139,  154,  154, },
   { 184,  CNU,  CNU,  CNU, },
 };
 

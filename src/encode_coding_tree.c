@@ -666,12 +666,12 @@ static INLINE uint8_t intra_mode_encryption(encoder_state_t * const state,
     keybits = kvz_crypto_get_key(state->crypto_hdl, 5);
 
     scan_dir = SCAN_DIAG;
-    if (intra_pred_mode > 5  && intra_pred_mode < 15) {
+    /*if (intra_pred_mode > 5  && intra_pred_mode < 15) {
       scan_dir = SCAN_VER;
     }
     if (intra_pred_mode > 21 && intra_pred_mode < 31) {
       scan_dir = SCAN_HOR;
-    }
+    }*/
 
     for (int i = 0; i < nb_elems[scan_dir]; i++) {
       if (intra_pred_mode == sets[scan_dir][i]) {
@@ -877,6 +877,7 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
   encode_transform_coeff(state, x, y, depth, 0, 0, 0);
 }
 
+/**
 static void encode_part_mode(encoder_state_t * const state,
                              cabac_data_t * const cabac,
                              const cu_info_t * const cur_cu,
@@ -959,6 +960,7 @@ static void encode_part_mode(encoder_state_t * const state,
     }
   }
 }
+**/
 
 void kvz_encode_coding_tree(encoder_state_t * const state,
                             uint16_t x,

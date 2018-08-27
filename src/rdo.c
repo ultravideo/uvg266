@@ -842,7 +842,7 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
           uint32_t   pos_y = blkpos >> log2_block_size;
           uint32_t   pos_x = blkpos - ( pos_y << log2_block_size );
 
-          double cost_last = (scan_mode == SCAN_VER) ? get_rate_last(state, pos_y, pos_x,last_x_bits,last_y_bits) : get_rate_last(state, pos_x, pos_y, last_x_bits,last_y_bits );
+          double cost_last = /**(scan_mode == SCAN_VER) ? get_rate_last(state, pos_y, pos_x,last_x_bits,last_y_bits) : **/get_rate_last(state, pos_x, pos_y, last_x_bits,last_y_bits );
           double totalCost = base_cost + cost_last - cost_sig[ scanpos ];
 
           if( totalCost < best_cost ) {

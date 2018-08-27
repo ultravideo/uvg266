@@ -75,8 +75,12 @@ static void encoder_state_write_bitstream_PTL(bitstream_t *stream,
   WRITE_U(stream, 0, 1, "general_non_packed_constraint_flag");
   WRITE_U(stream, 0, 1, "general_frame_only_constraint_flag");
 
-  WRITE_U(stream, 0, 32, "XXX_reserved_zero_44bits[0..31]");
-  WRITE_U(stream, 0, 12, "XXX_reserved_zero_44bits[32..43]");
+  WRITE_U(stream, 0, 16, "XXX_reserved_zero_43bits[0..15]");
+  WRITE_U(stream, 0, 16, "XXX_reserved_zero_43bits[16..31]");
+  WRITE_U(stream, 0, 11, "XXX_reserved_zero_43bits[32..42]");
+
+  // TODO: figure out what this is
+  WRITE_U(stream, 0, 1, "general_inbld_flag");
 
   // end Profile Tier
 

@@ -227,8 +227,15 @@ static void intra_pred_dc(
     sum += ref_top[i + 1];
     sum += ref_left[i + 1];
   }
-
-  const kvz_pixel dc_val = (sum + width) >> (log2_width + 1);
+  
+  // JVET_K0122
+  // TODO: take non-square blocks into account
+  const int denom     = width << 1;
+  const int divShift  = kvz_math_floor_log2(denom);
+  const int divOffset = denom >> 1;
+  
+  const kvz_pixel dc_val = (sum + divOffset) >> divShift;
+  //const kvz_pixel dc_val = (sum + width) >> (log2_width + 1);
   const int_fast16_t block_size = 1 << (log2_width * 2);
 
   for (int_fast16_t i = 0; i < block_size; ++i) {
