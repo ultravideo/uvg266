@@ -175,19 +175,25 @@ static void intra_filter_reference(
   kvz_intra_ref *ref = &refs->ref;
   kvz_intra_ref *filtered_ref = &refs->filtered_ref;
 
+  // Starting point at top left for both iterations
   filtered_ref->left[0] = (ref->left[1] + 2 * ref->left[0] + ref->top[1] + 2) / 4;
   filtered_ref->top[0] = filtered_ref->left[0];
 
+  // TODO: use block height here instead of ref_width
+  // Top to bottom
   for (int_fast8_t y = 1; y < ref_width - 1; ++y) {
     kvz_pixel *p = &ref->left[y];
     filtered_ref->left[y] = (p[-1] + 2 * p[0] + p[1] + 2) / 4;
   }
+  // Bottom left (not filtered) 
   filtered_ref->left[ref_width - 1] = ref->left[ref_width - 1];
 
+  // Left to right
   for (int_fast8_t x = 1; x < ref_width - 1; ++x) {
     kvz_pixel *p = &ref->top[x];
     filtered_ref->top[x] = (p[-1] + 2 * p[0] + p[1] + 2) / 4;
   }
+  // Top right (not filtered)
   filtered_ref->top[ref_width - 1] = ref->top[ref_width - 1];
 }
 

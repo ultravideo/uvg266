@@ -133,7 +133,7 @@ static void kvz_angular_pred_generic(
         // Just copy the integer samples
         for (int_fast8_t x = 0; x < width; x++) {
           // TODO: check if [x + delta_int] or [x + delta_int + 1]
-          dst[y * width + x] = ref_main[x + delta_int];
+          dst[y * width + x] = ref_main[x + delta_int + 1];
         }
       }
 
@@ -146,8 +146,8 @@ static void kvz_angular_pred_generic(
           int wL = 16 >> MIN(31, ((x << 1) >> scale));
           if (wT + wL == 0) break;
           int c = x + y + 1;
-          const kvz_pixel left = ref_side[c + 1];
-          const kvz_pixel top = ref_main[c + 1];
+          const kvz_pixel left = (wL != 0) ? ref_side[c + 1] : 0;
+          const kvz_pixel top  = (wT != 0) ? ref_main[c + 1] : 0;
           dst[x] = CLIP_TO_PIXEL((wL * left + wT * top + (64 - wL - wT) * dst[x] + 32) >> 6);
         }
       }
