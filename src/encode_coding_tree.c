@@ -1005,7 +1005,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
   // When not in MAX_DEPTH, insert split flag and split the blocks if needed
   if (depth != MAX_DEPTH) {
     // Implisit split flag when on border
-    if (!border) {
+    if (!border || (depth >= 1 && (border_x != border_y)) ) {
       // Get left and top block split_flags and if they are present and true, increase model number
       if (left_cu && GET_SPLITDATA(left_cu, depth) == 1) {
         split_model++;
