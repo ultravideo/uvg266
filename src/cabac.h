@@ -64,7 +64,7 @@ typedef struct
     cabac_ctx_t qt_cbf_model_cb[5];
     cabac_ctx_t cu_qp_delta_abs[4];
     cabac_ctx_t part_size_model[4];
-    cabac_ctx_t cu_sig_coeff_group_model[4];
+    cabac_ctx_t cu_sig_coeff_group_model[8];
     cabac_ctx_t cu_sig_model_luma[3][20];
     cabac_ctx_t cu_sig_model_chroma[3][12];
     cabac_ctx_t cu_parity_flag_model_luma[21];

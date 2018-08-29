@@ -134,10 +134,10 @@ static const uint8_t INIT_CU_QP_DELTA_ABS[3][2] = {
   { 154, 154 },
 };
 
-static const uint8_t INIT_SIG_CG_FLAG[3][4] = {
-  { 121,  140,  61,  154  },
-  { 121,  140,  61,  154 },
-  {  91,  171,  134,  141  },
+static const uint8_t INIT_SIG_CG_FLAG[3][8] = {
+  { 121,  140,  61,  154, 122, 143,  91, 141, },
+  { 121,  140,  61,  154,  78, 111,  60, 140, },
+  {  91,  171,  134, 141, 135, 155, 104, 139, },
 };
 
 static const uint8_t INIT_SIG_FLAG[6][3][20] = {
