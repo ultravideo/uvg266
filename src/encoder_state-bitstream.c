@@ -843,6 +843,11 @@ static void kvz_encoder_state_write_bitstream_slice_header_independent(
     WRITE_U(stream, 0, 1, "sign_data_hiding_enable_flag");
 
   if (state->frame->slicetype != KVZ_SLICE_I) {
+
+    // BT Size set only with non-I-frames, in I-frames the size is 32x32
+    // but in other frames it is CTU size >> <this value>
+    WRITE_UE(stream, 0, "max_binary_tree_unit_size"); // Max BT size == CTU size
+
     // ToDo: VVC check num of merge cands, might be 7
     WRITE_UE(stream, 5-MRG_MAX_NUM_CANDS, "five_minus_max_num_merge_cand");
   }
