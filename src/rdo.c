@@ -822,7 +822,8 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
     best_cost  = block_uncoded_cost +   state->lambda * CTX_ENTROPY_BITS(&(cabac->ctx.cu_qt_root_cbf_model),0);
     base_cost +=   state->lambda * CTX_ENTROPY_BITS(&(cabac->ctx.cu_qt_root_cbf_model),1);
   } else {
-    cabac_ctx_t* base_cbf_model = type?(cabac->ctx.qt_cbf_model_chroma):(cabac->ctx.qt_cbf_model_luma);
+    // ToDo: update for VVC contexts
+    cabac_ctx_t* base_cbf_model = type?(cabac->ctx.qt_cbf_model_cb):(cabac->ctx.qt_cbf_model_luma);
     ctx_cbf    = ( type ? tr_depth : !tr_depth);
     best_cost  = block_uncoded_cost +  state->lambda * CTX_ENTROPY_BITS(&base_cbf_model[ctx_cbf],0);
     base_cost +=   state->lambda * CTX_ENTROPY_BITS(&base_cbf_model[ctx_cbf],1);

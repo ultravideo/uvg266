@@ -294,7 +294,8 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
 
   if (depth < MAX_PU_DEPTH) {
     const int tr_depth = depth - pred_cu->depth;
-    const cabac_ctx_t *ctx = &(state->cabac.ctx.qt_cbf_model_chroma[tr_depth]);
+    // ToDo: Update for VVC contexts
+    const cabac_ctx_t *ctx = &(state->cabac.ctx.qt_cbf_model_cb[tr_depth]);
     if (tr_depth == 0 || cbf_is_set(pred_cu->cbf, depth - 1, COLOR_U)) {
       tr_tree_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf, depth, COLOR_U));
     }

@@ -485,11 +485,13 @@ static void encode_transform_coeff(encoder_state_t * const state,
   // When they are not present they are inferred to be 0, except for size 4
   // when the flags from previous level are used.
   if (depth < MAX_PU_DEPTH && state->encoder_control->chroma_format != KVZ_CSP_400) {
-    cabac->cur_ctx = &(cabac->ctx.qt_cbf_model_chroma[tr_depth]);
+    
     if (tr_depth == 0 || parent_coeff_u) {
+      cabac->cur_ctx = &(cabac->ctx.qt_cbf_model_cb[tr_depth]);
       CABAC_BIN(cabac, cb_flag_u, "cbf_cb");
     }
     if (tr_depth == 0 || parent_coeff_v) {
+      cabac->cur_ctx = &(cabac->ctx.qt_cbf_model_cr[cb_flag_u]);
       CABAC_BIN(cabac, cb_flag_v, "cbf_cr");
     }
   }

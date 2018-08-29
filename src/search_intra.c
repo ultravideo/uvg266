@@ -291,7 +291,8 @@ static double search_intra_trdepth(encoder_state_t * const state,
     if (state->encoder_control->chroma_format != KVZ_CSP_400) {
       const uint8_t tr_depth = depth - pred_cu->depth;
 
-      const cabac_ctx_t *ctx = &(state->cabac.ctx.qt_cbf_model_chroma[tr_depth]);
+      // ToDo: update for VVC contexts
+      const cabac_ctx_t *ctx = &(state->cabac.ctx.qt_cbf_model_cb[tr_depth]);
       if (tr_depth == 0 || cbf_is_set(pred_cu->cbf, depth - 1, COLOR_U)) {
         cbf_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf, depth, COLOR_U));
       }

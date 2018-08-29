@@ -122,10 +122,10 @@ static const uint8_t INIT_TRANS_SUBDIV_FLAG[3][3] = {
   { 153,  138,  138 },
 };
 
-static const uint8_t INIT_QT_CBF[3][8] = {
-  { 153,  111,  CNU,  CNU,   149,   92,  167,  154 },
-  { 153,  111,  CNU,  CNU,   149,  107,  167,  154 },
-  { 111,  141,  CNU,  CNU,    94,  138,  182,  154 },
+static const uint8_t INIT_QT_CBF[3][15] = {
+  { 153,  111,  CNU,  CNU,  CNU,   149,   92,  167,  154, 154, 149, 149,  CNU,  CNU,  CNU },
+  { 153,  111,  CNU,  CNU,  CNU,   149,  107,  167,  154, 154, 149, 149,  CNU,  CNU,  CNU },
+  { 111,  141,  CNU,  CNU,  CNU,    94,  138,  182,  154, 154,  94,  94,  CNU,  CNU,  CNU },
 };
 
 static const uint8_t INIT_CU_QP_DELTA_ABS[3][2] = {
@@ -284,9 +284,10 @@ void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
   for (i = 0; i < 3; i++) {
     kvz_ctx_init(&cabac->ctx.trans_subdiv_model[i], QP, INIT_TRANS_SUBDIV_FLAG[slice][i]);
   }
-  for (i = 0; i < 4; i++) {
+  for (i = 0; i < 5; i++) {
     kvz_ctx_init(&cabac->ctx.qt_cbf_model_luma[i], QP, INIT_QT_CBF[slice][i]);
-    kvz_ctx_init(&cabac->ctx.qt_cbf_model_chroma[i], QP, INIT_QT_CBF[slice][i + 4]);
+    kvz_ctx_init(&cabac->ctx.qt_cbf_model_cb[i], QP, INIT_QT_CBF[slice][i + 5]);
+    kvz_ctx_init(&cabac->ctx.qt_cbf_model_cr[i], QP, INIT_QT_CBF[slice][i + 10]);
   }
 
   for (i = 0; i < 5; i++) {
