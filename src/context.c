@@ -140,22 +140,75 @@ static const uint8_t INIT_SIG_CG_FLAG[3][4] = {
   {  91,  171,  134,  141  },
 };
 
-static const uint8_t INIT_SIG_FLAG[3][42] = {
-   {170,154,139,153,139,123,123, 63,124,166,
-    183,140,136,153,154,166,183,140,136,153,
-    154,166,183,140,136,153,154,170,153,138,
-    138,122,121,122,121,167,151,183,140,151,
-    183,140},
-   {155,154,139,153,139,123,123,63,153,166,
-   183,140,136,153,154,166,183,140,136,153,
-   154,166,183,140,136,153,154,170,153,123,
-   123,107,121,107,121,167,151,183,140,151,
-   183,140},
-   {111,111,125,110,110,94,124,108,124,107,
-   125,141,179,153,125,107,125,141,179,153,
-   125,107,125,141,179,153,125,140,139,182,
-   182,152,136,152,136,153,136,139,111,136,
-   139,111},
+static const uint8_t INIT_SIG_FLAG[6][3][20] = {
+  {
+    { 106, 167, 182, 124, 139, 169, 134, 167, 197, 183, 183, 184, 209, 198, 168, 168, 183, 170, CNU, CNU, },
+    { 135, 152, 167, 153, 168, 140, 149, 182, 153, 183, 154, 155, 180, 198, 197, 183, 169, 170, CNU, CNU, },
+    { 121, 138, 124, 139, 125, 111, 135, 139, 154, 140, 155, 127, 107, 185, 169, 170, 156, 143, CNU, CNU, },
+  },
+  {
+    { 177, 196, 153, 124, 198, 183, 166, 213, 226, 198, 198, 156, },
+    { 134, 168, 168, 154, 169, 199, 166, 214, 227, 229, 185, 142, },
+    { 149, 168, 153, 111, 140, 126, 182, 200, 111, 143, 142, 158, },
+  },
+  {
+    { 181, 127, 173, 201, 187, 173, 226, 173, 188, 202, 173, 188, 196, 223, 237, 223, 221, 223, CNU, CNU, },
+    { 123, 142, 202, 157, 157, 188, 138, 158, 203, 173, 158, 174, 182, 223, 223, 223, 206, 237, CNU, CNU, },
+    { 108, 157, 173, 158, 218, 189, 123, 159, 159, 174, 189, 204,  79, 223, 223, 207, 253, 191, CNU, CNU, },
+  },
+  {
+    { 210, 170, 143, 143, 201, 244, 182, 223, 223, 223, 159, 223, },
+    { 167, 155, 158, 186, 127, 158, 197, 223, 223, 223, 206, 237, },
+    { 137, 158, 157, 187, 204, 159, 185, 223, 238, 220, 253, 237, },
+  },
+  {
+    { 137, 142, 159, 158, 187, 159, 241, 174, 174, 159, 159, 203, 210, 223, 223, 223, 223, 223, CNU, CNU, },
+    { 123, 157, 174, 143, 143, 203, 138, 159, 189, 159, 173, 174, 196, 223, 223, 223, 223, 223, CNU, CNU, },
+    { 107, 143, 218, 173, 218, 189,  63, 219, 189, 175, 189, 204,  63, 223, 223, 223, 253, 191, CNU, CNU, },
+  },
+  {
+    { 196, 199, 143, 172, 158, 203, 196, 223, 223, 223, 223, 223, },
+    { 167, 155, 159, 157, 157, 158, 182, 223, 223, 223, 223, 223, },
+    { 181, 159, 143, 232, 143, 173, 169, 237, 223, 223, 238, 253, },
+  }
+};
+
+static const uint8_t INIT_PARITY_FLAG[2][3][21] =
+{
+  {
+    { 162, 134, 136, 167, 153, 138, 135, 167, 182, 168, 168, 150, 182, 153, 168, 110, 180, 168, 139, 168, 154, },
+    { 133, 163, 151, 167, 138, 168, 149, 152, 153, 153, 124, 150, 153, 153, 168, 139, 166, 168, 168, 139, 139, },
+    { 134, 120, 152, 123, 153, 153, 136, 123, 153, 168, 154, 152, 153, 153, 124, 139, 123, 168, 139, 154, 139, },
+  },
+  {
+    { 57, 192, 194, 225, 153, 139, 209, 168, 213, 123,  95, },
+    { 147, 164, 137, 153, 124, 153, 210, 183, 183, 154, 139, },
+    { 134, 121, 182, 183, 138, 183, 198, 154, 154, 124, 154, },
+  }
+};
+
+static const uint8_t INIT_GTX_FLAG[4][3][21] =
+{
+  {
+    {  59,  57,  59, 133, 164, 165, 117, 147, 134, 150, 137, 133, 163, 121, 166, 167, 163, 135, 136, 181, 139, },
+    {  45,  57,  58,  44, 149,  91,  73,  89, 105,  91, 122,  74, 105, 121, 122, 138, 119, 106, 107, 152, 139, },
+    { 135,  43, 119,  90,  76, 107,  74,  75, 106,  77,  93, 105,  91, 122,  93,  94, 150, 136, 123, 153, 125, },
+  },
+  {
+    { 133,   3,  14, 120, 135,  91, 179, 103, 194,  94, 111, },
+    { 118, 102, 134, 135, 122, 123, 163, 120, 122, 153, 169, },
+    { 195,  88,  74, 105, 152, 138, 120,  90, 107, 139, 184, },
+  },
+  {
+    {   3,   3, 103, 119,  91, 151,   3, 148, 194, 152, 138, 147, 164, 166, 167, 168, 133, 180, 196, 139, 169, },
+    {   3,   3, 118, 120, 106, 152,   3, 119, 121, 122, 153, 118, 135, 166, 138, 139, 148, 151, 182, 168, 184, },
+    { 132, 102, 104, 121,  92,  93, 104, 106, 122, 123,  94, 105, 137, 153, 139,  95, 121, 123, 139, 154, 126, },
+  },
+  {
+    {   3,   3, 176, 193, 137, 181, 161, 137, 183, 155, 111, },
+    {   3,   3, 134, 137, 123, 124, 147, 167, 169, 199, 156, },
+    { 147,  73, 164, 151, 107, 109, 120, 152, 140, 185, 111, },
+  }
 };
 
 static const uint8_t INIT_LAST[3][30] = {
@@ -165,20 +218,6 @@ static const uint8_t INIT_LAST[3][30] = {
     108,  123,  108,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU  },
   { 110,  110,  124,  125,  140,  153,  125,  127,  140,  109,  111,  143,  127,  111,   79,
     108,  123,   63,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU  },
-};
-
-static const uint8_t INIT_ONE_FLAG[3][24] =
-{
-  {154,196,167,167,154,152,167,182,182,134,149,136,153,121,136,122,169,208,166,167,154,152,167,182},
-  {154,196,196,167,154,152,167,182,182,134,149,136,153,121,136,137,169,194,166,167,154,167,137,182},
-  {140, 92,137,138,140,152,138,139,153, 74,149, 92,139,107,122,152,140,179,166,182,140,227,122,197},
-};
-
-static const uint8_t INIT_ABS_FLAG[3][6] =
-{
-  { 107,167, 91,107,107,167},
-  { 107,167, 91,122,107,167},
-  { 138,153,136,167,152,152},
 };
 
 static const uint8_t INIT_TRANSFORMSKIP_FLAG[3][2] =
@@ -216,7 +255,7 @@ void kvz_ctx_init(cabac_ctx_t *ctx, uint32_t qp, uint32_t init_value)
 void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
 {
   cabac_data_t * const cabac = &state->cabac;
-  uint16_t i;
+  uint16_t i, ii;
 
   // Initialize contexts
   kvz_ctx_init(&cabac->ctx.transform_skip_model_luma, QP, INIT_TRANSFORMSKIP_FLAG[slice][0]);
@@ -260,9 +299,6 @@ void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
   kvz_ctx_init(&cabac->ctx.chroma_pred_model[0], QP, INIT_CHROMA_PRED_MODE[slice][0]);
   kvz_ctx_init(&cabac->ctx.chroma_pred_model[1], QP, INIT_CHROMA_PRED_MODE[slice][1]);
 
-  kvz_ctx_init(&cabac->ctx.cu_abs_model_chroma[0], QP, INIT_ABS_FLAG[slice][4]);
-  kvz_ctx_init(&cabac->ctx.cu_abs_model_chroma[1], QP, INIT_ABS_FLAG[slice][5]);
-
   //TODO: ignore P/B contexts on intra frame
   kvz_ctx_init(&cabac->ctx.cu_qt_root_cbf_model, QP, INIT_QT_ROOT_CBF[slice][0]);
 
@@ -278,7 +314,6 @@ void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
 
   for (i = 0; i < 4; i++) {
     kvz_ctx_init(&cabac->ctx.cu_sig_coeff_group_model[i], QP, INIT_SIG_CG_FLAG[slice][i]);
-    kvz_ctx_init(&cabac->ctx.cu_abs_model_luma[i], QP, INIT_ABS_FLAG[slice][i]);
     kvz_ctx_init(&cabac->ctx.part_size_model[i], QP, INIT_PART_SIZE[slice][i]);
   }
   for (i = 0; i < 3; i++) {
@@ -294,10 +329,6 @@ void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
     kvz_ctx_init(&cabac->ctx.inter_dir[i], QP, INIT_INTER_DIR[slice][i]);
   }
 
-  for (i = 0; i < 8; i++) {
-    kvz_ctx_init(&cabac->ctx.cu_one_model_chroma[i], QP, INIT_ONE_FLAG[slice][i+16]);
-  }
-
   for (i = 0; i < 15; i++) {
     kvz_ctx_init(&cabac->ctx.cu_ctx_last_y_luma[i], QP, INIT_LAST[slice][i] );
     kvz_ctx_init(&cabac->ctx.cu_ctx_last_x_luma[i], QP, INIT_LAST[slice][i] );
@@ -305,13 +336,24 @@ void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
     kvz_ctx_init(&cabac->ctx.cu_ctx_last_y_chroma[i], QP, INIT_LAST[slice][i+15] );
     kvz_ctx_init(&cabac->ctx.cu_ctx_last_x_chroma[i], QP, INIT_LAST[slice][i+15] );
 
-    kvz_ctx_init(&cabac->ctx.cu_one_model_luma[i], QP, INIT_ONE_FLAG[slice][i]);
   }
-  kvz_ctx_init(&cabac->ctx.cu_one_model_luma[15], QP, INIT_ONE_FLAG[slice][15]);
 
-  for (i = 0; i < 27; i++) {
-    kvz_ctx_init(&cabac->ctx.cu_sig_model_luma[i], QP, INIT_SIG_FLAG[slice][i]);
-    if(i < 15) kvz_ctx_init(&cabac->ctx.cu_sig_model_chroma[i], QP, INIT_SIG_FLAG[slice][i+27]);
+  for (ii = 0; ii < 3; ii++) {
+    for (i = 0; i < 20; i++) {
+      kvz_ctx_init(&cabac->ctx.cu_sig_model_luma[ii][i], QP, INIT_SIG_FLAG[ii*2][slice][i]);
+      if (i < 12) kvz_ctx_init(&cabac->ctx.cu_sig_model_chroma[ii][i], QP, INIT_SIG_FLAG[ii*2+1][slice][i]);
+    }
+  }
+  for (i = 0; i < 21; i++) {
+    kvz_ctx_init(&cabac->ctx.cu_parity_flag_model_luma[i], QP, INIT_PARITY_FLAG[0][slice][i]);
+    if (i < 11) kvz_ctx_init(&cabac->ctx.cu_parity_flag_model_chroma[i], QP, INIT_PARITY_FLAG[1][slice][i]);
+  }
+  for (ii = 0; ii < 2; ii++) {
+    for (i = 0; i < 21; i++) {
+      kvz_ctx_init(&cabac->ctx.cu_gtx_flag_model_luma[ii][i], QP, INIT_GTX_FLAG[ii * 2][slice][i]);
+      if (i < 12) kvz_ctx_init(&cabac->ctx.cu_gtx_flag_model_chroma[ii][i], QP, INIT_GTX_FLAG[ii * 2 + 1][slice][i]);
+
+    }
   }
 }
 

@@ -240,10 +240,10 @@ INLINE int32_t kvz_get_ic_rate(encoder_state_t * const state,
                     int8_t type)
 {
   cabac_data_t * const cabac = &state->cabac;
-  int32_t rate = 1 << CTX_FRAC_BITS;
+  int32_t rate = 1 << CTX_FRAC_BITS; // cost of sign bit
   uint32_t base_level  =  (c1_idx < C1FLAG_NUMBER)? (2 + (c2_idx < C2FLAG_NUMBER)) : 1;
-  cabac_ctx_t *base_one_ctx = (type == 0) ? &(cabac->ctx.cu_one_model_luma[0]) : &(cabac->ctx.cu_one_model_chroma[0]);
-  cabac_ctx_t *base_abs_ctx = (type == 0) ? &(cabac->ctx.cu_abs_model_luma[0]) : &(cabac->ctx.cu_abs_model_chroma[0]);
+  //cabac_ctx_t *base_one_ctx = (type == 0) ? &(cabac->ctx.cu_one_model_luma[0]) : &(cabac->ctx.cu_one_model_chroma[0]);
+  //cabac_ctx_t *base_abs_ctx = (type == 0) ? &(cabac->ctx.cu_abs_model_luma[0]) : &(cabac->ctx.cu_abs_model_chroma[0]);
 
   if ( abs_level >= base_level ) {
     int32_t symbol     = abs_level - base_level;
@@ -259,19 +259,43 @@ INLINE int32_t kvz_get_ic_rate(encoder_state_t * const state,
       }
       rate += (COEF_REMAIN_BIN_REDUCTION+length+1-abs_go_rice+length) * (1 << CTX_FRAC_BITS);
     }
-    if (c1_idx < C1FLAG_NUMBER) {
-      rate += CTX_ENTROPY_BITS(&base_one_ctx[ctx_num_one],1);
-
-      if (c2_idx < C2FLAG_NUMBER) {
-        rate += CTX_ENTROPY_BITS(&base_abs_ctx[ctx_num_abs],1);
-      }
-    }
-  }
-  else if( abs_level == 1 ) {
+    //ToDo: fix for VVC
+    /*
     rate += CTX_ENTROPY_BITS(&base_one_ctx[ctx_num_one],0);
-  } else if( abs_level == 2 ) {
-    rate += CTX_ENTROPY_BITS(&base_one_ctx[ctx_num_one],1);
-    rate += CTX_ENTROPY_BITS(&base_abs_ctx[ctx_num_abs],0);
+    iRate += fracBitsPar.intBits[(uiAbsLevel - 1) & 1];
+    iRate += fracBitsGt1.intBits[1];
+    iRate += fracBitsGt2.intBits[1];
+    */
+  }
+  else if (abs_level == 1)
+  {
+    /*
+    iRate += fracBitsPar.intBits[0];
+    iRate += fracBitsGt1.intBits[0];
+    */
+  }
+  else if (abs_level == 2)
+  {
+    /*
+    iRate += fracBitsPar.intBits[1];
+    iRate += fracBitsGt1.intBits[0];
+    */
+  }
+  else if (abs_level == 3)
+  {
+    /*
+    iRate += fracBitsPar.intBits[0];
+    iRate += fracBitsGt1.intBits[1];
+    iRate += fracBitsGt2.intBits[0];
+    */
+  }
+  else if (abs_level == 4)
+  {
+    /*
+    iRate += fracBitsPar.intBits[1];
+    iRate += fracBitsGt1.intBits[1];
+    iRate += fracBitsGt2.intBits[0];
+    */
   }
 
   return rate;
@@ -306,7 +330,7 @@ INLINE uint32_t kvz_get_coded_level ( encoder_state_t * const state, double *cod
   uint32_t best_abs_level = 0;
   int32_t abs_level;
   int32_t min_abs_level;
-  cabac_ctx_t* base_sig_model = type?(cabac->ctx.cu_sig_model_chroma):(cabac->ctx.cu_sig_model_luma);
+  cabac_ctx_t* base_sig_model = type?(cabac->ctx.cu_sig_model_chroma[0]):(cabac->ctx.cu_sig_model_luma[0]);
 
   if( !last && max_abs_level < 3 ) {
     *coded_cost_sig = state->lambda * CTX_ENTROPY_BITS(&base_sig_model[ctx_num_sig], 0);
@@ -606,7 +630,6 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
 
   cabac_ctx_t *base_coeff_group_ctx = &(cabac->ctx.cu_sig_coeff_group_model[type]);
   cabac_ctx_t *baseCtx              = (type == 0) ? &(cabac->ctx.cu_sig_model_luma[0]) : &(cabac->ctx.cu_sig_model_chroma[0]);
-  cabac_ctx_t *base_one_ctx = (type == 0) ? &(cabac->ctx.cu_one_model_luma[0]) : &(cabac->ctx.cu_one_model_chroma[0]);
 
   struct {
     double coded_level_and_dist;
