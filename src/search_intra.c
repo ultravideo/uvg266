@@ -677,7 +677,7 @@ double kvz_luma_mode_bits(const encoder_state_t *state, int8_t luma_mode, const 
 
 double kvz_chroma_mode_bits(const encoder_state_t *state, int8_t chroma_mode, int8_t luma_mode)
 {
-  const cabac_ctx_t *ctx = &(state->cabac.ctx.chroma_pred_model[0]);
+  const cabac_ctx_t *ctx = &(state->cabac.ctx.chroma_pred_model[1]);
   double mode_bits;
   if (chroma_mode == luma_mode) {
     mode_bits = CTX_ENTROPY_FBITS(ctx, 0);
