@@ -445,3 +445,54 @@ int32_t kvz_context_get_sig_ctx_inc(int32_t pattern_sig_ctx, uint32_t scan_idx, 
   }
   return (( texture_type == 0 && ((pos_x>>2) + (pos_y>>2)) > 0 ) ? 3 : 0) + offset + cnt;
 }
+
+
+/**
+* \brief Context derivation process of coeff_abs_significant_flag
+* \param coeff     pointer to the current coefficient
+* \param pos_x     column of current scan position
+* \param pos_y     row of current scan position
+* \param width     width of the block
+* \param height    height of the block
+* \param type      texture type (TEXT_LUMA...)
+* \param cabac     current cabac state struct
+
+* \returns context index for current scan position
+*/
+uint32_t kvz_context_get_sig_ctx_idx_abs(const coeff_t* coeff, int32_t pos_x, int32_t pos_y, 
+                                        uint32_t height, uint32_t width, int8_t type, cabac_data_t* cabac)
+{
+  const coeff_t* data = coeff + pos_x + pos_y * width;
+  const int     diag = pos_x + pos_y;
+  int           num_pos = 0;
+  int           sum_abs = 0;
+#define UPDATE(x) {int a=abs(x);sum_abs+=MIN(4-(a&1),a);num_pos+=(a?1:0);}
+  if (pos_x < width - 1)
+  {
+    UPDATE(data[1]);
+    if (pos_x < width - 2)
+    {
+      UPDATE(data[2]);
+    }
+    if (pos_y < height - 1)
+    {
+      UPDATE(data[width + 1]);
+    }
+  }
+  if (pos_y < height - 1)
+  {
+    UPDATE(data[width]);
+    if (pos_y < height - 2)
+    {
+      UPDATE(data[width << 1]);
+    }
+  }
+#undef UPDATE
+  int ctx_ofs = MIN(sum_abs, 5) + (diag < 2 ? 6 : 0);
+  if (type == 0 /* Luma */)
+  {
+    ctx_ofs += diag < 5 ? 6 : 0;
+  }
+  
+  return ctx_ofs;
+}

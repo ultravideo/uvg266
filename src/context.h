@@ -44,6 +44,9 @@ uint32_t kvz_context_get_sig_coeff_group( uint32_t *sig_coeff_group_flag,uint32_
 int32_t kvz_context_get_sig_ctx_inc(int32_t pattern_sig_ctx,uint32_t scan_idx,int32_t pos_x,
                                 int32_t pos_y,int32_t block_type, int8_t texture_type);
 
+uint32_t kvz_context_get_sig_ctx_idx_abs(const coeff_t* coeff, int32_t pos_x, int32_t pos_y,
+                                         uint32_t height, uint32_t width, int8_t type, cabac_data_t* cabac);
+
 #define CNU 154
 
 #endif
