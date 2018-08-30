@@ -346,8 +346,7 @@ void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
   for (ii = 0; ii < 2; ii++) {
     for (i = 0; i < 21; i++) {
       kvz_ctx_init(&cabac->ctx.cu_gtx_flag_model_luma[ii][i], QP, INIT_GTX_FLAG[ii * 2][slice][i]);
-      if (i < 12) kvz_ctx_init(&cabac->ctx.cu_gtx_flag_model_chroma[ii][i], QP, INIT_GTX_FLAG[ii * 2 + 1][slice][i]);
-
+      if (i < 11) kvz_ctx_init(&cabac->ctx.cu_gtx_flag_model_chroma[ii][i], QP, INIT_GTX_FLAG[ii * 2 + 1][slice][i]);
     }
   }
 }
