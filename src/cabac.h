@@ -71,10 +71,10 @@ typedef struct
     cabac_ctx_t cu_parity_flag_model_chroma[11];
     cabac_ctx_t cu_gtx_flag_model_luma[2][21];
     cabac_ctx_t cu_gtx_flag_model_chroma[2][11];
-    cabac_ctx_t cu_ctx_last_y_luma[15];
-    cabac_ctx_t cu_ctx_last_y_chroma[15];
-    cabac_ctx_t cu_ctx_last_x_luma[15];
-    cabac_ctx_t cu_ctx_last_x_chroma[15];
+    cabac_ctx_t cu_ctx_last_y_luma[19];
+    cabac_ctx_t cu_ctx_last_y_chroma[19];
+    cabac_ctx_t cu_ctx_last_x_luma[19];
+    cabac_ctx_t cu_ctx_last_x_chroma[19];
     cabac_ctx_t cu_pred_mode_model;
     cabac_ctx_t cu_skip_flag_model[3];
     cabac_ctx_t cu_merge_idx_ext_model;
