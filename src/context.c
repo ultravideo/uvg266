@@ -305,8 +305,11 @@ void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
   kvz_ctx_init(&cabac->ctx.cu_qp_delta_abs[1], QP, INIT_CU_QP_DELTA_ABS[slice][1]);
 
   for (i = 0; i < 4; i++) {
-    kvz_ctx_init(&cabac->ctx.cu_sig_coeff_group_model[i], QP, INIT_SIG_CG_FLAG[slice][i]);
+    
     kvz_ctx_init(&cabac->ctx.part_size_model[i], QP, INIT_PART_SIZE[slice][i]);
+  }
+  for (i = 0; i < 8; i++) {
+    kvz_ctx_init(&cabac->ctx.cu_sig_coeff_group_model[i], QP, INIT_SIG_CG_FLAG[slice][i]);
   }
   for (i = 0; i < 3; i++) {
     kvz_ctx_init(&cabac->ctx.trans_subdiv_model[i], QP, INIT_TRANS_SUBDIV_FLAG[slice][i]);

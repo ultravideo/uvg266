@@ -130,8 +130,8 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
 
   // Init base contexts according to block type
   cabac_ctx_t *base_coeff_group_ctx = &(cabac->ctx.cu_sig_coeff_group_model[type]);
-  cabac_ctx_t *baseCtx           = (type == 0) ? &(cabac->ctx.cu_sig_model_luma[0]) :
-                                 &(cabac->ctx.cu_sig_model_chroma[0]);
+  cabac_ctx_t *baseCtx           = (type == 0) ? &(cabac->ctx.cu_sig_model_luma[0][0]) :
+                                 &(cabac->ctx.cu_sig_model_chroma[0][0]);
 
   // Scan all coeff groups to find out which of them have coeffs.
   // Populate sig_coeffgroup_flag with that info.
