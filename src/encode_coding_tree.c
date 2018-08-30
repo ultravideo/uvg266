@@ -294,15 +294,14 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
 
       c1 = 1;
 
-      base_ctx_mod = (type == 0) ? &(cabac->ctx.cu_one_model_luma[4 * ctx_set]) :
-        &(cabac->ctx.cu_one_model_chroma[4 * ctx_set]);
+      //base_ctx_mod = (type == 0) ? &(cabac->ctx.cu_one_model_luma[4 * ctx_set]) :  &(cabac->ctx.cu_one_model_chroma[4 * ctx_set]);
       num_c1_flag = MIN(num_non_zero, C1FLAG_NUMBER);
       first_c2_flag_idx = -1;
 
       for (idx = 0; idx < num_c1_flag; idx++) {
         uint32_t symbol = (abs_coeff[idx] > 1) ? 1 : 0;
-        cabac->cur_ctx = &base_ctx_mod[c1];
-        CABAC_BIN(cabac, symbol, "coeff_abs_level_greater1_flag");
+        //cabac->cur_ctx = &base_ctx_mod[c1];
+        //CABAC_BIN(cabac, symbol, "coeff_abs_level_greater1_flag");
 
         if (symbol) {
           c1 = 0;
@@ -317,13 +316,12 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
       }
 
       if (c1 == 0) {
-        base_ctx_mod = (type == 0) ? &(cabac->ctx.cu_abs_model_luma[ctx_set]) :
-          &(cabac->ctx.cu_abs_model_chroma[ctx_set]);
+        //base_ctx_mod = (type == 0) ? &(cabac->ctx.cu_abs_model_luma[ctx_set]) : &(cabac->ctx.cu_abs_model_chroma[ctx_set]);
 
         if (first_c2_flag_idx != -1) {
           uint8_t symbol = (abs_coeff[first_c2_flag_idx] > 2) ? 1 : 0;
-          cabac->cur_ctx = &base_ctx_mod[0];
-          CABAC_BIN(cabac, symbol, "coeff_abs_level_greater2_flag");
+          //cabac->cur_ctx = &base_ctx_mod[0];
+          //CABAC_BIN(cabac, symbol, "coeff_abs_level_greater2_flag");
         }
       }
       if (be_valid && sign_hidden) {
