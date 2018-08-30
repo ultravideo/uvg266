@@ -256,29 +256,35 @@ void kvz_cabac_encode_bins_ep(cabac_data_t * const data, uint32_t bin_values, in
 }
 
 /**
- * \brief Coding of coeff_abs_level_minus3.
- * \param symbol Value of coeff_abs_level_minus3.
- * \param r_param Reference to Rice parameter.
+ * \brief Coding of remainder abs coeff value.
+ * \param remainder Value of remaining abs coeff
+ * \param rice_param Reference to Rice parameter.
  */
-void kvz_cabac_write_coeff_remain(cabac_data_t * const cabac, const uint32_t symbol, const uint32_t r_param)
+void kvz_cabac_write_coeff_remain(cabac_data_t * const cabac, const uint32_t remainder, const uint32_t rice_param)
 {
-  int32_t code_number = symbol;
-  uint32_t length;
+  const unsigned threshold = g_go_rice_range[rice_param] << rice_param;
+  uint32_t bins = remainder;
 
-  if (code_number < (3 << r_param)) {
-    length = code_number >> r_param;
-    CABAC_BINS_EP(cabac, (1 << (length + 1)) - 2 , length + 1, "coeff_abs_level_remaining");
-    CABAC_BINS_EP(cabac, (code_number % (1 << r_param)), r_param, "coeff_abs_level_remaining");
-  } else {
-    length = r_param;
-    code_number = code_number - (3 << r_param);
-    while (code_number >= (1 << length)) {
-      code_number -= 1 << length;
-      ++length;
+  if (bins < threshold) {
+    uint32_t length = (bins >> rice_param) + 1;
+    CABAC_BINS_EP(cabac, ((1 << (length)) - 2) , length, "coeff_abs_level_remaining");
+    CABAC_BINS_EP(cabac, bins & ((1 << rice_param) - 1), rice_param, "coeff_abs_level_remaining");
+  } 
+  //ToDo: else if (useLimitedPrefixLength)
+  else {
+    uint32_t length = rice_param;
+    uint32_t  delta = 1 << length;
+    bins -= threshold;
+    while (bins >= delta) {
+      bins -= delta;
+      delta = 1 << (++length);
     }
-    CABAC_BINS_EP(cabac, (1 << (3 + length + 1 - r_param)) - 2, 3 + length + 1 - r_param, "coeff_abs_level_remaining");
-    CABAC_BINS_EP(cabac, code_number, length, "coeff_abs_level_remaining");
-  }
+    uint32_t num_bins = g_go_rice_range[rice_param] + length + 1 - rice_param;
+
+    CABAC_BINS_EP(cabac, (1 << num_bins) - 2, num_bins, "coeff_abs_level_remaining");
+    CABAC_BINS_EP(cabac, bins, length, "coeff_abs_level_remaining");
+  }  
+
 }
 
 void kvz_cabac_write_coeff_remain_encry(struct encoder_state_t * const state, cabac_data_t * const cabac,const uint32_t symbol, const uint32_t r_param, int32_t base_level)

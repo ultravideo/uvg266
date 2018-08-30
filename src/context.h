@@ -45,7 +45,11 @@ int32_t kvz_context_get_sig_ctx_inc(int32_t pattern_sig_ctx,uint32_t scan_idx,in
                                 int32_t pos_y,int32_t block_type, int8_t texture_type);
 
 uint32_t kvz_context_get_sig_ctx_idx_abs(const coeff_t* coeff, int32_t pos_x, int32_t pos_y,
-                                         uint32_t height, uint32_t width, int8_t type, cabac_data_t* cabac);
+                                         uint32_t height, uint32_t width, int8_t type, 
+                                         int32_t* temp_diag, int32_t* temp_sum);
+
+uint32_t kvz_go_rice_par_abs(const coeff_t* coeff, int32_t pos_x, int32_t pos_y,
+                             uint32_t height, uint32_t width);
 
 #define CNU 154
 

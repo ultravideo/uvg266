@@ -455,12 +455,13 @@ int32_t kvz_context_get_sig_ctx_inc(int32_t pattern_sig_ctx, uint32_t scan_idx, 
 * \param width     width of the block
 * \param height    height of the block
 * \param type      texture type (TEXT_LUMA...)
-* \param cabac     current cabac state struct
-
+* \param temp_diag temporary output value used in the next steps
+* \param temp_sum  temporary output value used in the next steps
 * \returns context index for current scan position
 */
-uint32_t kvz_context_get_sig_ctx_idx_abs(const coeff_t* coeff, int32_t pos_x, int32_t pos_y, 
-                                        uint32_t height, uint32_t width, int8_t type, cabac_data_t* cabac)
+uint32_t kvz_context_get_sig_ctx_idx_abs(const coeff_t* coeff, int32_t pos_x, int32_t pos_y,
+                                         uint32_t height, uint32_t width, int8_t type,
+                                         int32_t* temp_diag, int32_t* temp_sum)
 {
   const coeff_t* data = coeff + pos_x + pos_y * width;
   const int     diag = pos_x + pos_y;
@@ -494,5 +495,47 @@ uint32_t kvz_context_get_sig_ctx_idx_abs(const coeff_t* coeff, int32_t pos_x, in
     ctx_ofs += diag < 5 ? 6 : 0;
   }
   
+  *temp_diag = diag;
+  *temp_sum = sum_abs - num_pos;
   return ctx_ofs;
+}
+
+/**
+* \brief Calculate Go rice parameter for remainder coefficient value coding
+* \param coeff     pointer to the current coefficient
+* \param pos_x     column of current scan position
+* \param pos_y     row of current scan position
+* \param width     width of the block
+* \param height    height of the block
+* \returns context go rice parameter
+*/
+uint32_t kvz_go_rice_par_abs(const coeff_t* coeff, int32_t pos_x, int32_t pos_y,
+                             uint32_t height, uint32_t width)
+{
+#define UPDATE(x) sum+=abs(x)-(x?1:0)
+
+  const coeff_t* data = coeff + pos_x + pos_y * width;
+  int           sum = 0;
+  if (pos_x < width - 1)
+  {
+    UPDATE(data[1]);
+    if (pos_x < width - 2)
+    {
+      UPDATE(data[2]);
+    }
+    if (pos_y < height - 1)
+    {
+      UPDATE(data[width + 1]);
+    }
+  }
+  if (pos_y < height - 1)
+  {
+    UPDATE(data[width]);
+    if (pos_y < height - 2)
+    {
+      UPDATE(data[width << 1]);
+    }
+  }
+#undef UPDATE
+  return  g_go_rice_pars[MIN(sum, 31)];
 }
