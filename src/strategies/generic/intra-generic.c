@@ -141,7 +141,7 @@ static void kvz_angular_pred_generic(
           int c = x + y + 1;
           const kvz_pixel left = (wL != 0) ? ref_side[c + 1] : 0;
           const kvz_pixel top  = (wT != 0) ? ref_main[c + 1] : 0;
-          dst[x] = CLIP_TO_PIXEL((wL * left + wT * top + (64 - wL - wT) * dst[x] + 32) >> 6);
+          dst[y * width + x] = CLIP_TO_PIXEL((wL * left + wT * top + (64 - wL - wT) * dst[y * width + x] + 32) >> 6);
         }
       }
       else if ((sample_disp >= 58) || sample_disp <= (10)) {
@@ -159,7 +159,7 @@ static void kvz_angular_pred_generic(
           if (wL == 0) break;
           kvz_pixel *p = ref_side + delta_y;
           kvz_pixel left = (((64 - delta_frac_0) * p[0] + delta_frac_0 * p[1] + 32) >> 6);
-          dst[x] = CLIP_TO_PIXEL((wL * left + (64 - wL) * dst[x] + 32) >> 6);
+          dst[y * width + x] = CLIP_TO_PIXEL((wL * left + (64 - wL) * dst[y * width + x] + 32) >> 6);
         }
       }
     }
