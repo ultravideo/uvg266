@@ -225,6 +225,9 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
     go_rice_param = 0;
     int32_t first_sig_pos = (i == scan_cg_last) ? scan_pos_last : (min_sub_pos + (1 << 4) - 1);
 
+    int32_t temp_diag = -1;
+    int32_t temp_sum = -1;
+
     // !!! residual_coding_subblock() !!!
 
     // Encode significant coeff group flag when not the last or the first
@@ -248,15 +251,14 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
          ****  FIRST PASS ****
       */
       for (next_sig_pos = first_sig_pos; next_sig_pos >= min_sub_pos; next_sig_pos--) {
-        int32_t temp_diag = 0;
-        int32_t temp_sum = 0;
+
 
         blk_pos = scan[next_sig_pos];
         pos_y = blk_pos >> log2_block_size;
         pos_x = blk_pos - (pos_y << log2_block_size);
         sig = (coeff[blk_pos] != 0) ? 1 : 0;
 
-        if (next_sig_pos > min_sub_pos || i == 0 || num_non_zero) {
+        if (num_non_zero && (next_sig_pos != first_sig_pos && next_sig_pos != min_sub_pos)) {
 
           ctx_sig = kvz_context_get_sig_ctx_idx_abs(&coeff[blk_pos], pos_x, pos_y, width, width, scan_mode, &temp_diag, &temp_sum);
           
