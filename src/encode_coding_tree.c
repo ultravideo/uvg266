@@ -209,6 +209,8 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
   uint32_t quant_state_transition_table = 0; //ToDo: dep quant enable changes this
   int32_t quant_state = 0;
   uint8_t  ctx_offset[16];
+  int32_t temp_diag = -1;
+  int32_t temp_sum = -1;
 
   // significant_coeff_flag
   for (i = scan_cg_last; i >= 0; i--) {
@@ -225,9 +227,7 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
     go_rice_param = 0;
     int32_t first_sig_pos = (i == scan_cg_last) ? scan_pos_last : (min_sub_pos + (1 << 4) - 1);
 
-    int32_t temp_diag = -1;
-    int32_t temp_sum = -1;
-
+    
     // !!! residual_coding_subblock() !!!
 
     // Encode significant coeff group flag when not the last or the first
@@ -260,7 +260,7 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
 
         if (num_non_zero && (next_sig_pos != first_sig_pos && next_sig_pos != min_sub_pos)) {
 
-          ctx_sig = kvz_context_get_sig_ctx_idx_abs(&coeff[blk_pos], pos_x, pos_y, width, width, scan_mode, &temp_diag, &temp_sum);
+          ctx_sig = kvz_context_get_sig_ctx_idx_abs(coeff, pos_x, pos_y, width, width, scan_mode, &temp_diag, &temp_sum);
           
           cabac_ctx_t* sig_ctx_luma = &(cabac->ctx.cu_sig_model_luma[MAX(0, quant_state - 1)][ctx_sig]);
           cabac_ctx_t* sig_ctx_chroma = &(cabac->ctx.cu_sig_model_chroma[MAX(0, quant_state - 1)][ctx_sig]);
@@ -339,7 +339,7 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
           pos_x = blk_pos - (pos_y << log2_block_size);
           if (abs(coeff[blk_pos]) > 4) {
             uint32_t remainder = (abs(coeff[blk_pos]) - 5) >> 1;
-            uint32_t rice_param = kvz_go_rice_par_abs(&coeff[blk_pos], pos_x, pos_y, width, width);
+            uint32_t rice_param = kvz_go_rice_par_abs(coeff, pos_x, pos_y, width, width);
 
             kvz_cabac_write_coeff_remain(cabac, remainder, go_rice_param);
           }
