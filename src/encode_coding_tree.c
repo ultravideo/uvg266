@@ -246,6 +246,9 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
     if (sig_coeffgroup_flag[cg_blk_pos]) {
 
       uint32_t next_pass = 0;
+      int32_t next_sig_pos = first_sig_pos;
+      int32_t infer_sig_pos = (next_sig_pos != scan_pos_last) ? ((i != 0) ? min_sub_pos : -1) : next_sig_pos;
+
 
       /*
          ****  FIRST PASS ****
@@ -258,7 +261,7 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
         pos_x = blk_pos - (pos_y << log2_block_size);
         sig = (coeff[blk_pos] != 0) ? 1 : 0;
 
-        if (num_non_zero && (next_sig_pos != first_sig_pos && next_sig_pos != min_sub_pos)) {
+        if (num_non_zero || (next_sig_pos != infer_sig_pos)) {
 
           ctx_sig = kvz_context_get_sig_ctx_idx_abs(coeff, pos_x, pos_y, width, width, scan_mode, &temp_diag, &temp_sum);
           
