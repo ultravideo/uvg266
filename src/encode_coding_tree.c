@@ -132,7 +132,6 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
 
   int32_t scan_pos;
   int32_t next_sig_pos;
-  uint32_t go_rice_param = 0;
   uint32_t blk_pos, pos_y, pos_x, sig, ctx_sig;
 
   // CONSTANTS
@@ -224,7 +223,6 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
     int32_t last_nz_pos_in_cg = -1;
     int32_t first_nz_pos_in_cg = 16;
     int32_t num_non_zero = 0;
-    go_rice_param = 0;
     int32_t first_sig_pos = (i == scan_cg_last) ? scan_pos_last : (min_sub_pos + (1 << 4) - 1);
 
     
@@ -344,7 +342,7 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
             uint32_t remainder = (abs(coeff[blk_pos]) - 5) >> 1;
             uint32_t rice_param = kvz_go_rice_par_abs(coeff, pos_x, pos_y, width, width);
 
-            kvz_cabac_write_coeff_remain(cabac, remainder, go_rice_param);
+            kvz_cabac_write_coeff_remain(cabac, remainder, rice_param);
           }
         }
       }
