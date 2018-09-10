@@ -124,10 +124,11 @@ void kvz_cabac_write_unary_max_symbol_ep(cabac_data_t *data, unsigned int symbol
 #define CTX_UPDATE_MPS(ctx) { (ctx)->uc_state = kvz_g_auc_next_state_mps[ (ctx)->uc_state ]; }
 
 #ifdef VERBOSE
+extern uint32_t kvz_cabac_bins_count;
 #define CABAC_BIN(data, value, name) { \
     uint32_t prev_state = (data)->cur_ctx->uc_state; \
-    printf("%s = %u, range = %u LPS = %u state = %u -> ", \
-           (name), (uint32_t)(value), (data)->range, kvz_g_auc_lpst_table[CTX_STATE(data->cur_ctx)][((data)->range >> 6) & 3], prev_state); \
+    printf("%d %d  [%d:%d]  %s = %u, range = %u LPS = %u state = %u -> ", \
+           kvz_cabac_bins_count++, (data)->range, (data)->range-kvz_g_auc_lpst_table[CTX_STATE(data->cur_ctx)][((data)->range >> 6) & 3], kvz_g_auc_lpst_table[CTX_STATE(data->cur_ctx)][((data)->range >> 6) & 3], (name), (uint32_t)(value), (data)->range, kvz_g_auc_lpst_table[CTX_STATE(data->cur_ctx)][((data)->range >> 6) & 3], prev_state); \
     kvz_cabac_encode_bin((data), (value)); \
     printf("%u\n", (data)->cur_ctx->uc_state); }
     
@@ -135,14 +136,14 @@ void kvz_cabac_write_unary_max_symbol_ep(cabac_data_t *data, unsigned int symbol
   #define CABAC_BINS_EP(data, value, bins, name) { \
     uint32_t prev_state = (data)->cur_ctx->uc_state; \
     kvz_cabac_encode_bins_ep((data), (value), (bins)); \
-    printf("%s = %u(%u bins), state = %u -> %u\n", \
-           (name), (uint32_t)(value), (bins), prev_state, (data)->cur_ctx->uc_state); }
+    printf("%d %s = %u(%u bins), state = %u -> %u\n", \
+           kvz_cabac_bins_count, (name), (uint32_t)(value), (bins), prev_state, (data)->cur_ctx->uc_state);  kvz_cabac_bins_count+=bins;}
 
   #define CABAC_BIN_EP(data, value, name) { \
     uint32_t prev_state = (data)->cur_ctx->uc_state; \
     kvz_cabac_encode_bin_ep((data), (value)); \
-    printf("%s = %u, state = %u -> %u\n", \
-           (name), (uint32_t)(value), prev_state, (data)->cur_ctx->uc_state); }
+    printf("%d %s = %u, state = %u -> %u\n", \
+           kvz_cabac_bins_count++, (name), (uint32_t)(value), prev_state, (data)->cur_ctx->uc_state); }
 #else
   #define CABAC_BIN(data, value, name) \
     kvz_cabac_encode_bin((data), (value));
