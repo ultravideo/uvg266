@@ -261,7 +261,7 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
 
         if (num_non_zero || (next_sig_pos != infer_sig_pos)) {
 
-          ctx_sig = kvz_context_get_sig_ctx_idx_abs(coeff, pos_x, pos_y, width, width, scan_mode, &temp_diag, &temp_sum);
+          ctx_sig = kvz_context_get_sig_ctx_idx_abs(coeff, pos_x, pos_y, width, width, type, &temp_diag, &temp_sum);
           
           cabac_ctx_t* sig_ctx_luma = &(cabac->ctx.cu_sig_model_luma[MAX(0, quant_state - 1)][ctx_sig]);
           cabac_ctx_t* sig_ctx_chroma = &(cabac->ctx.cu_sig_model_chroma[MAX(0, quant_state - 1)][ctx_sig]);
