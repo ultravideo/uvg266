@@ -54,10 +54,12 @@ static void kvz_angular_pred_generic(
   kvz_pixel tmp_ref[2 * 32];
   const int_fast8_t width = 1 << log2_width;
 
+  uint32_t pred_mode = intra_mode; // ToDo: handle WAIP
+
   // Whether to swap references to always project on the left reference row.
   const bool vertical_mode = intra_mode >= 34;
   // Modes distance to horizontal or vertical mode.
-  const int_fast8_t mode_disp = vertical_mode ? intra_mode - 50 : 18 - intra_mode;
+  const int_fast8_t mode_disp = vertical_mode ? pred_mode - 50 : 18 - pred_mode;
   //const int_fast8_t mode_disp = vertical_mode ? intra_mode - 26 : 10 - intra_mode;
   
   // Sample displacement per column in fractions of 32.
@@ -116,7 +118,6 @@ static void kvz_angular_pred_generic(
       if (delta_fract) {
         // Do linear filtering
         for (int_fast8_t x = 0; x < width; ++x) {
-          // TODO: is the ref1 same for the first iterator as in VTM?
           kvz_pixel ref1 = ref_main[x + delta_int];
           kvz_pixel ref2 = ref_main[x + delta_int + 1];
           dst[y * width + x] = ((32 - delta_fract) * ref1 + delta_fract * ref2 + 16) >> 5;
@@ -125,35 +126,34 @@ static void kvz_angular_pred_generic(
       else {
         // Just copy the integer samples
         for (int_fast8_t x = 0; x < width; x++) {
-          // TODO: check if [x + delta_int] or [x + delta_int + 1]
-          dst[y * width + x] = ref_main[x + delta_int + 1];
+          dst[y * width + x] = ref_main[x + delta_int];
         }
       }
 
       // TODO: replace latter width with height
       int scale = ((kvz_math_floor_log2(width) - 2 + kvz_math_floor_log2(width) - 2 + 2) >> 2);
 
-      if (sample_disp == 2 || sample_disp == 66) {
+      if (pred_mode == 2 || pred_mode == 66) {
         int wT = 16 >> MIN(31, ((y << 1) >> scale));
         for (int x = 0; x < width; x++) {
           int wL = 16 >> MIN(31, ((x << 1) >> scale));
           if (wT + wL == 0) break;
           int c = x + y + 1;
-          const kvz_pixel left = (wL != 0) ? ref_side[c + 1] : 0;
-          const kvz_pixel top  = (wT != 0) ? ref_main[c + 1] : 0;
+          const kvz_pixel left = (wL != 0) ? ref_side[c] : 0;
+          const kvz_pixel top  = (wT != 0) ? ref_main[c] : 0;
           dst[y * width + x] = CLIP_TO_PIXEL((wL * left + wT * top + (64 - wL - wT) * dst[y * width + x] + 32) >> 6);
         }
       }
-      else if ((sample_disp >= 58) || sample_disp <= (10)) {
+      else if (pred_mode >= 58 || pred_mode <= 10) {
         int inv_angle_sum_0 = 2;
         for (int x = 0; x < width; x++) {
           inv_angle_sum_0 += modedisp2invsampledisp[abs(mode_disp)];
           int delta_pos_0 = inv_angle_sum_0 >> 2;
           int delta_frac_0 = delta_pos_0 & 63;
           int delta_int_0 = delta_pos_0 >> 6;
-          int delta_y = y + delta_int_0 + 1;
+          int delta_y = y + delta_int_0;
           // TODO: convert to JVET_K0500_WAIP
-          if (delta_y > width + width - 1) break;
+          if (delta_y > width + width) break;
 
           int wL = 32 >> MIN(31, ((x << 1) >> scale));
           if (wL == 0) break;
@@ -170,7 +170,7 @@ static void kvz_angular_pred_generic(
     // TODO: update outer loop to use height instead of width
     for (int_fast8_t y = 0; y < width; ++y) {
       for (int_fast8_t x = 0; x < width; ++x) {
-        dst[y * width + x] = ref_main[x+1];
+        dst[y * width + x] = ref_main[x];
       }
     }
   }
