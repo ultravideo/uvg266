@@ -445,7 +445,7 @@ static int8_t search_intra_rough(encoder_state_t * const state,
 
   // Calculate SAD for evenly spaced modes to select the starting point for 
   // the recursive search.
-  for (int mode = 2; mode <= 34; mode += PARALLEL_BLKS * offset) {
+  for (int mode = 2; mode <= 66; mode += PARALLEL_BLKS * offset) {
     
     double costs_out[PARALLEL_BLKS] = { 0 };
     for (int i = 0; i < PARALLEL_BLKS; ++i) {
@@ -458,7 +458,7 @@ static int8_t search_intra_rough(encoder_state_t * const state,
     get_cost_dual(state, preds, orig_block, satd_dual_func, sad_dual_func, width, costs_out);
 
     for (int i = 0; i < PARALLEL_BLKS; ++i) {
-      if (mode + i * offset <= 34) {
+      if (mode + i * offset <= 66) {
         costs[modes_selected] = costs_out[i];
         modes[modes_selected] = mode + i * offset;
         min_cost = MIN(min_cost, costs[modes_selected]);
@@ -484,11 +484,11 @@ static int8_t search_intra_rough(encoder_state_t * const state,
       double costs_out[PARALLEL_BLKS] = { 0 };
       char mode_in_range = 0;
 
-      for (int i = 0; i < PARALLEL_BLKS; ++i) mode_in_range |= (test_modes[i] >= 2 && test_modes[i] <= 34);
+      for (int i = 0; i < PARALLEL_BLKS; ++i) mode_in_range |= (test_modes[i] >= 2 && test_modes[i] <= 66);
 
       if (mode_in_range) {
         for (int i = 0; i < PARALLEL_BLKS; ++i) {
-          if (test_modes[i] >= 2 && test_modes[i] <= 34) {
+          if (test_modes[i] >= 2 && test_modes[i] <= 66) {
             kvz_intra_predict(refs, log2_width, test_modes[i], COLOR_Y, preds[i], filter_boundary);
           }
         }
@@ -497,7 +497,7 @@ static int8_t search_intra_rough(encoder_state_t * const state,
         get_cost_dual(state, preds, orig_block, satd_dual_func, sad_dual_func, width, costs_out);
 
         for (int i = 0; i < PARALLEL_BLKS; ++i) {
-          if (test_modes[i] >= 2 && test_modes[i] <= 34) {
+          if (test_modes[i] >= 2 && test_modes[i] <= 66) {
             costs[modes_selected] = costs_out[i];
             modes[modes_selected] = test_modes[i];
             if (costs[modes_selected] < best_cost) {
@@ -831,8 +831,8 @@ void kvz_search_cu_intra(encoder_state_t * const state,
     kvz_intra_build_reference(log2_width, COLOR_Y, &luma_px, &pic_px, lcu, &refs);
   }
 
-  int8_t modes[35];
-  double costs[35];
+  int8_t modes[67];
+  double costs[67];
 
   // Find best intra mode for 2Nx2N.
   kvz_pixel *ref_pixels = &lcu->ref.y[lcu_px.x + lcu_px.y * LCU_WIDTH];
@@ -846,7 +846,7 @@ void kvz_search_cu_intra(encoder_state_t * const state,
                                          log2_width, candidate_modes,
                                          modes, costs);
   } else {
-    number_of_modes = 35;
+    number_of_modes = 67;
     for (int i = 0; i < number_of_modes; ++i) {
       modes[i] = i;
       costs[i] = MAX_INT;
@@ -860,7 +860,7 @@ void kvz_search_cu_intra(encoder_state_t * const state,
   if (rdo_level >= 2 || skip_rough_search) {
     int number_of_modes_to_search;
     if (rdo_level == 3) {
-      number_of_modes_to_search = 35;
+      number_of_modes_to_search = 67;
     } else if (rdo_level == 2) {
       number_of_modes_to_search = (cu_width == 4) ? 3 : 2;
     } else {
