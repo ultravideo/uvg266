@@ -1094,13 +1094,13 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
 
   // Code chroma prediction mode.
   if (state->encoder_control->chroma_format != KVZ_CSP_400) {
-    unsigned pred_mode = 5;
-    unsigned chroma_pred_modes[4] = {0, 26, 10, 1};
+    unsigned pred_mode = 67;
+    unsigned chroma_pred_modes[4] = {0, 50, 18, 1};
 
     if (intra_pred_mode_chroma == intra_pred_mode_actual[0]) {
-      pred_mode = 4;
-    } else if (intra_pred_mode_chroma == 34) {
-      // Angular 34 mode is possible only if intra pred mode is one of the
+      pred_mode = 68;
+    } else if (intra_pred_mode_chroma == 66) {
+      // Angular 66 mode is possible only if intra pred mode is one of the
       // possible chroma pred modes, in which case it is signaled with that
       // duplicate mode.
       for (int i = 0; i < 4; ++i) {
@@ -1112,9 +1112,9 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
       }
     }
 
-    // pred_mode == 5 mean intra_pred_mode_chroma is something that can't
+    // pred_mode == 67 mean intra_pred_mode_chroma is something that can't
     // be coded.
-    assert(pred_mode != 5);
+    assert(pred_mode != 67);
 
     /**
      * Table 9-35 - Binarization for intra_chroma_pred_mode
@@ -1128,7 +1128,7 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
      *   intra_chroma_pred_mode[][] = 0, bypass, bypass
      */
     cabac->cur_ctx = &(cabac->ctx.chroma_pred_model[1]);
-    if (pred_mode == 4) {
+    if (pred_mode == 68) {
       CABAC_BIN(cabac, 0, "intra_chroma_pred_mode");
     } else {
       CABAC_BIN(cabac, 1, "intra_chroma_pred_mode");
