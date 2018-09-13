@@ -389,6 +389,49 @@ static void fast_inverse_dst_4_generic(const short *tmp, short *block, int shift
   }
 }
 
+static void partial_butterfly_2_generic(const short *src, short *dst,
+  int32_t shift)
+{
+  int32_t j;
+  int32_t e, o;
+  int32_t add = 1 << (shift - 1);
+  const int32_t line = 2;
+
+  for (j = 0; j < line; j++) {
+    // E and O
+    e = src[0] + src[1];
+    o = src[0] - src[1];
+
+    dst[0] = (short)((kvz_g_dct_2[0][0] * e + add) >> shift);
+    dst[line] = (short)((kvz_g_dct_2[1][0] * o + add) >> shift);
+    src += 2;
+    dst++;
+  }
+}
+
+
+static void partial_butterfly_inverse_2_generic(const short *src, short *dst,
+  int shift)
+{
+  int j;
+  int e, o;
+  int add = 1 << (shift - 1);
+  const int32_t line = 2;
+
+  for (j = 0; j < line; j++) {
+    // Utilizing symmetry properties to the maximum to minimize the number of multiplications
+    e = kvz_g_dct_2[0][0] * (src[0] + src[line]);
+    o = kvz_g_dct_2[1][0] * (src[0] - src[line]);
+
+    // Combining even and odd terms at each hierarchy levels to calculate the final spatial domain vector
+    dst[0] = (short)CLIP(-32768, 32767, (e + add) >> shift);
+    dst[1] = (short)CLIP(-32768, 32767, (o + add) >> shift);
+
+    src++;
+    dst += 2;
+  }
+}
+
 
 static void partial_butterfly_4_generic(const short *src, short *dst,
   int32_t shift)
@@ -736,11 +779,13 @@ static void idct_ ## n ## x ## n ## _generic(int8_t bitdepth, const int16_t *inp
   partial_butterfly_inverse_ ## n ## _generic(tmp, output, shift_2nd); \
 }
 
+DCT_NXN_GENERIC(2);
 DCT_NXN_GENERIC(4);
 DCT_NXN_GENERIC(8);
 DCT_NXN_GENERIC(16);
 DCT_NXN_GENERIC(32);
 
+IDCT_NXN_GENERIC(2);
 IDCT_NXN_GENERIC(4);
 IDCT_NXN_GENERIC(8);
 IDCT_NXN_GENERIC(16);
