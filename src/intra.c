@@ -310,8 +310,8 @@ void kvz_intra_predict(
   } else {
     // Angular modes use smoothed reference pixels, unless the mode is close
     // to being either vertical or horizontal.
-    static const int kvz_intra_hor_ver_dist_thres[2][8] = { { 20, 20, 20, 14, 2, 0, 20, 0 }, {40, 40, 40, 28, 4, 0, 40, 0} };
-    int filter_threshold = kvz_intra_hor_ver_dist_thres[color == COLOR_Y ? 0 : 1][kvz_math_floor_log2(width)];
+    static const int kvz_intra_hor_ver_dist_thres[6] = {20, 14, 2, 0, 20, 0 };
+    int filter_threshold = kvz_intra_hor_ver_dist_thres[kvz_math_floor_log2(width)-2];
     int dist_from_vert_or_hor = MIN(abs(mode - 50), abs(mode - 18));
     if (dist_from_vert_or_hor > filter_threshold) {
       used_ref = &refs->filtered_ref;
