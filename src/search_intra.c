@@ -449,7 +449,7 @@ static int8_t search_intra_rough(encoder_state_t * const state,
     
     double costs_out[PARALLEL_BLKS] = { 0 };
     for (int i = 0; i < PARALLEL_BLKS; ++i) {
-      if (mode + i * offset <= 34) {
+      if (mode + i * offset <= 66) {
         kvz_intra_predict(refs, log2_width, mode + i * offset, COLOR_Y, preds[i], filter_boundary);
       }
     }
