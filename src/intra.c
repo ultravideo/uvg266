@@ -88,16 +88,19 @@ int8_t kvz_intra_get_dir_luma_predictor(
     above_intra_dir = above_pu->intra.mode;
   }
 
+  const int offset = 67 - 5;
+  const int mod = offset + 3;
+
   // If the predictions are the same, add new predictions
   if (left_intra_dir == above_intra_dir) {
     if (left_intra_dir > 1) { // angular modes
       preds[0] = left_intra_dir;
-      preds[1] = ((left_intra_dir + 29) % 32) + 2;
-      preds[2] = ((left_intra_dir - 1 ) % 32) + 2;
+      preds[1] = ((left_intra_dir + offset) % mod) + 2;
+      preds[2] = ((left_intra_dir - 1 ) % mod) + 2;
     } else { //non-angular
       preds[0] = 0;//PLANAR_IDX;
       preds[1] = 1;//DC_IDX;
-      preds[2] = 26;//VER_IDX;
+      preds[2] = 50;//VER_IDX;
     }
   } else { // If we have two distinct predictions
     preds[0] = left_intra_dir;
@@ -106,8 +109,8 @@ int8_t kvz_intra_get_dir_luma_predictor(
     // add planar mode if it's not yet present
     if (left_intra_dir && above_intra_dir ) {
       preds[2] = 0; // PLANAR_IDX;
-    } else {  // Add DC mode if it's not present, otherwise 26.
-      preds[2] =  (left_intra_dir+above_intra_dir)<2? 26 : 1;
+    } else {  // Add DC mode if it's not present, otherwise VER_IDX.
+      preds[2] =  (left_intra_dir+above_intra_dir)<2? 50 : 1;
     }
   }
 
