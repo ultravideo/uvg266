@@ -153,7 +153,7 @@ static void kvz_angular_pred_generic(
           int delta_int_0 = delta_pos_0 >> 6;
           int delta_y = y + delta_int_0;
           // TODO: convert to JVET_K0500_WAIP
-          if (delta_y > width + width) break;
+          if (delta_y > width + width - 2) break;
 
           int wL = 32 >> MIN(31, ((x << 1) >> scale));
           if (wL == 0) break;
