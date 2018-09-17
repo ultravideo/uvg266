@@ -744,8 +744,8 @@ int8_t kvz_search_cu_intra_chroma(encoder_state_t * const state,
   int8_t intra_mode = cur_pu->intra.mode;
 
   double costs[5];
-  int8_t modes[5] = { 0, 26, 10, 1, 34 };
-  if (intra_mode != 0 && intra_mode != 26 && intra_mode != 10 && intra_mode != 1) {
+  int8_t modes[5] = { 0, 50, 18, 1, 66 };
+  if (intra_mode != 0 && intra_mode != 50 && intra_mode != 18 && intra_mode != 1) {
     modes[4] = intra_mode;
   }
 

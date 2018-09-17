@@ -361,9 +361,9 @@ static void quantize_tr_residual(encoder_state_t * const state,
                                    coeff);
     if (cfg->implicit_rdpcm && cur_pu->type == CU_INTRA) {
       // implicit rdpcm for horizontal and vertical intra modes
-      if (mode == 10) {
+      if (mode == 18) {
         rdpcm(tr_width, RDPCM_HOR, coeff);
-      } else if (mode == 26) {
+      } else if (mode == 50) {
         rdpcm(tr_width, RDPCM_VER, coeff);
       }
     }
