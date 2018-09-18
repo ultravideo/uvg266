@@ -406,7 +406,7 @@ static int8_t search_intra_rough(encoder_state_t * const state,
                                  kvz_pixel *orig, int32_t origstride,
                                  kvz_intra_references *refs,
                                  int log2_width, int8_t *intra_preds,
-                                 int8_t modes[35], double costs[35])
+                                 int8_t modes[67], double costs[67])
 {
   #define PARALLEL_BLKS 2 // TODO: use 4 for AVX-512 in the future?
   assert(log2_width >= 2 && log2_width <= 5);
