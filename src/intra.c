@@ -88,8 +88,8 @@ int8_t kvz_intra_get_dir_luma_predictor(
     above_intra_dir = above_pu->intra.mode;
   }
 
-  const int offset = 67 - 5;
-  const int mod = offset + 3;
+  const int offset = 61;
+  const int mod = 64;
 
   // If the predictions are the same, add new predictions
   if (left_intra_dir == above_intra_dir) {
