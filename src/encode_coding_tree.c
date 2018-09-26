@@ -1270,7 +1270,20 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
     // Implisit split flag when on border
     // Exception made in VVC with flag not being implicit if the BT can be used for
     // horizontal or vertical split, then this flag tells if QT or BT is used
-    if (!border || (depth >= 1 && (border_x != border_y)) ) {
+
+    bool implicit_split = border;
+    bool bottom_left_available = (abs_x >= 0) && (abs_y + cu_width - 1 > ctrl->in.height);
+    bool top_right_available = (abs_x + cu_width - 1 < ctrl->in.width) && (abs_y >= 0);
+
+    if((depth >= 1 && (border_x != border_y))) implicit_split = false;
+    if (state->frame->slicetype != KVZ_SLICE_I) {
+      if (border_x != border_y) implicit_split = false;
+      if (!bottom_left_available && top_right_available) implicit_split = false;
+      if (!top_right_available && bottom_left_available) implicit_split = false;
+    }
+
+    // Only signal split when it is not implicit
+    if (!implicit_split) {
       // Get left and top block split_flags and if they are present and true, increase model number
       if (left_cu && GET_SPLITDATA(left_cu, depth) == 1) {
         split_model++;
@@ -1316,7 +1329,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
 
   // Encode skip flag
   if (state->frame->slicetype != KVZ_SLICE_I) {
-    // uiCtxSkip = aboveskipped + leftskipped;
+
     int8_t ctx_skip = 0;
 
     if (left_cu && left_cu->skipped) {
