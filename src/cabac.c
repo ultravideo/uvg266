@@ -25,8 +25,9 @@
 #include "extras/crypto.h"
 #include "kvazaar.h"
 
-#ifdef VERBOSE
+#ifdef KVZ_DEBUG_PRINT_CABAC
 uint32_t kvz_cabac_bins_count = 0;
+bool kvz_cabac_bins_verbose = true;
 #endif
 
 const uint8_t kvz_g_auc_next_state_mps[128] =
@@ -570,5 +571,5 @@ void kvz_cabac_write_ep_ex_golomb(encoder_state_t * const state,
       bins                     = ( (bins >> (num_bins >>1) ) << (num_bins >>1) ) | state->crypto_prev_pos;
     }
   }
-  kvz_cabac_encode_bins_ep(data, bins, num_bins);
+  CABAC_BINS_EP(data, bins, num_bins, "ep_ex_golomb");
 }
