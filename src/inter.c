@@ -769,8 +769,13 @@ static void get_temporal_merge_candidates(const encoder_state_t * const state,
     if (state->frame->ref_LX_size[ref_list-1] > ref_idx) {
       colocated_ref = state->frame->ref_LX[ref_list - 1][ref_idx];
     } else {
-      // not found
-      return;
+      // Check if the other list has the reference available
+      if (state->frame->ref_LX_size[1 - (ref_list - 1)] > ref_idx) {
+        colocated_ref = state->frame->ref_LX[1-(ref_list - 1)][ref_idx];
+      } else {
+        // not found
+        return;
+      }
     }
 
     cu_array_t *ref_cu_array = state->frame->ref->cu_arrays[colocated_ref];
@@ -786,8 +791,8 @@ static void get_temporal_merge_candidates(const encoder_state_t * const state,
 
       // Y inside the current CTU / LCU
       if (yColBr % LCU_WIDTH != 0) {
-        H_offset = ((xColBr >> 4) << 4) / SCU_WIDTH +
-                  (((yColBr >> 4) << 4) / SCU_WIDTH) * cu_per_width;
+        H_offset = ((xColBr >> 3) << 3) / SCU_WIDTH +
+                  (((yColBr >> 3) << 3) / SCU_WIDTH) * cu_per_width;
       }
 
       if (H_offset >= 0) {
@@ -802,7 +807,7 @@ static void get_temporal_merge_candidates(const encoder_state_t * const state,
 
     // C3 must be inside the LCU, in the center position of current CU
     if (xColCtr < state->encoder_control->in.width && yColCtr < state->encoder_control->in.height) {
-      uint32_t C3_offset = ((xColCtr >> 4) << 4) / SCU_WIDTH + ((((yColCtr >> 4) << 4) / SCU_WIDTH) * cu_per_width);
+      uint32_t C3_offset = ((xColCtr >> 3) << 3) / SCU_WIDTH + ((((yColCtr >> 3) << 3) / SCU_WIDTH) * cu_per_width);
       if (ref_cu_array->data[C3_offset].type == CU_INTER) {
         cand_out->c3 = &ref_cu_array->data[C3_offset];
       }
@@ -1062,13 +1067,13 @@ static bool add_temporal_candidate(const encoder_state_t *state,
   // Kvazaar always sets collocated_from_l0_flag so the list is L1 when
   // there are future references.
   int col_list = reflist;
-  for (int i = 0; i < state->frame->ref->used_size; i++) {
+  /*for (int i = 0; i < state->frame->ref->used_size; i++) {
     if (state->frame->ref->pocs[i] > state->frame->poc) {
       col_list = 1;
       break;
     }
-  }
-
+  }*/
+  
   if ((colocated->inter.mv_dir & (col_list + 1)) == 0) {
     // Use the other list if the colocated PU does not have a MV for the
     // primary list.
@@ -1387,6 +1392,7 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
     const int max_reflist = (state->frame->slicetype == KVZ_SLICE_B ? 1 : 0);
     for (int reflist = 0; reflist <= max_reflist; reflist++) {
       // Fetch temporal candidates for the current CU
+      // ToDo: change collocated_from_l0_flag to allow L1 ref
       get_temporal_merge_candidates(state, x, y, width, height, 1, 0, &merge_cand);
       // TODO: enable L1 TMVP candidate
       // get_temporal_merge_candidates(state, x, y, width, height, 2, 0, &merge_cand);
@@ -1397,9 +1403,9 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
       if (add_temporal_candidate(state,
                                  // Reference index 0 is always used for
                                  // the temporal merge candidate.
-                                 state->frame->ref_LX[reflist][0],
+                                 state->frame->ref_LX[0][0],
                                  temporal_cand,
-                                 reflist,
+                                 0,
                                  mv_cand[candidates].mv[reflist])) {
         mv_cand[candidates].ref[reflist] = 0;
         mv_cand[candidates].dir |= (1 << reflist);
@@ -1420,6 +1426,7 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
           break;
         }
       }
+      // No duplicates found, continue adding the candidate
       if(add_tmvp) candidates++;
     }
   }
@@ -1461,18 +1468,8 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
 
   int num_ref = state->frame->ref->used_size;
 
-  if (candidates < MRG_MAX_NUM_CANDS && state->frame->slicetype == KVZ_SLICE_B) {
-    int j;
-    int ref_negative = 0;
-    int ref_positive = 0;
-    for (j = 0; j < state->frame->ref->used_size; j++) {
-      if (state->frame->ref->pocs[j] < state->frame->poc) {
-        ref_negative++;
-      } else {
-        ref_positive++;
-      }
-    }
-    num_ref = MIN(ref_negative, ref_positive);
+  if (state->frame->slicetype == KVZ_SLICE_B) {
+    num_ref = MIN(state->frame->ref_LX_size[0], state->frame->ref_LX_size[1]);
   }
 
   // Add (0,0) prediction
@@ -1480,9 +1477,9 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
     mv_cand[candidates].mv[0][0] = 0;
     mv_cand[candidates].mv[0][1] = 0;
     mv_cand[candidates].ref[0] = (zero_idx >= num_ref - 1) ? 0 : zero_idx;
-    mv_cand[candidates].ref[1] = mv_cand[candidates].ref[0];
     mv_cand[candidates].dir = 1;
     if (state->frame->slicetype == KVZ_SLICE_B) {
+      mv_cand[candidates].ref[1] = mv_cand[candidates].ref[0];
       mv_cand[candidates].mv[1][0] = 0;
       mv_cand[candidates].mv[1][1] = 0;
       mv_cand[candidates].dir = 3;
