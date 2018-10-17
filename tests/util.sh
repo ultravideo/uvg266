@@ -46,10 +46,10 @@ valgrind_test() {
     # arguments.
     print_and_run \
         libtool execute $valgrind \
-            ../src/kvazaar -i "${yuvfile}" "--input-res=${dimensions}" -o "${hevcfile}" "$@"
+            ../src/kvazaar --cpuid=0 -i "${yuvfile}" "--input-res=${dimensions}" -o "${hevcfile}" "$@"
 
     print_and_run \
-        TAppDecoderStatic -b "${hevcfile}"
+        DecoderAnalyserAppStatic -b "${hevcfile}"
 
     cleanup
 }
@@ -67,7 +67,7 @@ encode_test() {
     set +e
     print_and_run \
         libtool execute \
-            ../src/kvazaar -i "${yuvfile}" "--input-res=${dimensions}" -o "${hevcfile}" "$@"
+            ../src/kvazaar --cpuid=0 -i "${yuvfile}" "--input-res=${dimensions}" -o "${hevcfile}" "$@"
     actual_status="$?"
     set -e
     [ ${actual_status} -eq ${expected_status} ]

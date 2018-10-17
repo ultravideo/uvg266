@@ -305,7 +305,7 @@ static void encoder_state_write_bitstream_VUI(bitstream_t *stream,
 static void encoder_state_write_bitstream_SPS_extension(bitstream_t *stream,
                                                         encoder_state_t * const state)
 {
-  const kvz_config *cfg = &state->encoder_control->cfg;
+  //const kvz_config *cfg = &state->encoder_control->cfg;
   //if (cfg->implicit_rdpcm && cfg->lossless) {
     WRITE_U(stream, 1, 1, "sps_extension_present_flag");
 
@@ -683,7 +683,8 @@ static void encoder_state_write_picture_timing_sei_message(encoder_state_t * con
   }
 }
 
-
+/*
+// ToDo: Enable tiles/wpp
 static void encoder_state_entry_points_explore(const encoder_state_t * const state, int * const r_count, int * const r_max_length) {
   int i;
   for (i = 0; state->children[i].encoder_control; ++i) {
@@ -714,6 +715,7 @@ static void encoder_state_write_bitstream_entry_points_write(bitstream_t * const
     }
   }
 }
+*/
 
 static void kvz_encoder_state_write_bitstream_slice_header_independent(
     struct bitstream_t * const stream,

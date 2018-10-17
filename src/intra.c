@@ -200,7 +200,7 @@ static void intra_filter_reference(
   filtered_ref->top[ref_width - 1] = ref->top[ref_width - 1];
 }
 
-
+/*
 static void intra_post_process_angular(
   unsigned width,
   unsigned stride,
@@ -214,6 +214,7 @@ static void intra_post_process_angular(
     block[i * stride] = CLIP_TO_PIXEL(val + ((ref1 - ref2) >> 1));
   }
 }
+*/
 
 
 /**
@@ -260,6 +261,7 @@ static void intra_pred_dc(
 * \param in_ref_left   Pointer to -1 index of left reference, length=width*2+1.
 * \param dst           Buffer of size width*width.
 */
+/*
 static void intra_pred_filtered_dc(
   const int_fast8_t log2_width,
   const kvz_pixel *const ref_top,
@@ -292,7 +294,7 @@ static void intra_pred_filtered_dc(
     }
   }
 }
-
+*/
 
 void kvz_intra_predict(
   kvz_intra_references *refs,

@@ -389,6 +389,7 @@ static void fast_inverse_dst_4_generic(const short *tmp, short *block, int shift
   }
 }
 
+/*
 static void partial_butterfly_2_generic(const short *src, short *dst,
   int32_t shift)
 {
@@ -431,6 +432,7 @@ static void partial_butterfly_inverse_2_generic(const short *src, short *dst,
     dst += 2;
   }
 }
+*/
 
 
 static void partial_butterfly_4_generic(const short *src, short *dst,
@@ -779,13 +781,13 @@ static void idct_ ## n ## x ## n ## _generic(int8_t bitdepth, const int16_t *inp
   partial_butterfly_inverse_ ## n ## _generic(tmp, output, shift_2nd); \
 }
 
-DCT_NXN_GENERIC(2);
+//DCT_NXN_GENERIC(2);
 DCT_NXN_GENERIC(4);
 DCT_NXN_GENERIC(8);
 DCT_NXN_GENERIC(16);
 DCT_NXN_GENERIC(32);
 
-IDCT_NXN_GENERIC(2);
+//IDCT_NXN_GENERIC(2);
 IDCT_NXN_GENERIC(4);
 IDCT_NXN_GENERIC(8);
 IDCT_NXN_GENERIC(16);
@@ -2304,7 +2306,7 @@ static void fastInverse ## t ## _B ## n ## (const int16_t *coeff, int16_t *block
     for (j = 0; j < n; j++) {\
       iSum = 0;\
       for (k = 0; k < n; k++) {\
-        iSum += coeff[k*line] * iT_ # t ## _ ## n ##[k * n + j];\
+        iSum += coeff[k*line] * iT_ ## t ## _ ## n ##[k * n + j];\
       }\
       block[j] = (int16_t)CLIP(-32768, 32767, (iSum + rnd_factor) >> shift);\
     }\
@@ -2342,12 +2344,12 @@ typedef enum tr_type_t {
 static const tr_type_t emt_subset_intra[3][2] = { { DST7, DCT8 }, { DST7, DCT8 }, { DST7, DCT8 } };
 static const tr_type_t emt_subset_inter[2] = { DCT8, DST7 };
 
-const int intra_mode_to_emt_subset_ver[67] =
+static const int intra_mode_to_emt_subset_ver[67] =
 {//0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66
    2, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0
 };
 
-const int intra_mode_to_emt_subset_hor[67] =
+static const int intra_mode_to_emt_subset_hor[67] =
 {//0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66
    2, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0
 };

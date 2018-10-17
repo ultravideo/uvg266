@@ -123,7 +123,7 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
   int8_t tr_skip)
 {
   const encoder_control_t * const encoder = state->encoder_control;
-  int c1 = 1;
+  //int c1 = 1;
   uint8_t last_coeff_x = 0;
   uint8_t last_coeff_y = 0;
   int32_t i;
@@ -131,7 +131,7 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
   uint32_t sig_coeffgroup_flag[8 * 8] = { 0 };
 
   int32_t scan_pos;
-  int32_t next_sig_pos;
+  //int32_t next_sig_pos;
   uint32_t blk_pos, pos_y, pos_x, sig, ctx_sig;
 
   // CONSTANTS
@@ -214,14 +214,14 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
   // significant_coeff_flag
   for (i = scan_cg_last; i >= 0; i--) {
     int32_t min_sub_pos = i << 4; // LOG2_SCAN_SET_SIZE;
-    int32_t abs_coeff[64*64];
+    //int32_t abs_coeff[64*64];
     int32_t cg_blk_pos = scan_cg[i];
     int32_t cg_pos_y = cg_blk_pos / num_blk_side;
     int32_t cg_pos_x = cg_blk_pos - (cg_pos_y * num_blk_side);
 
     uint32_t coeff_signs = 0;
     int32_t last_nz_pos_in_cg = -1;
-    int32_t first_nz_pos_in_cg = 16;
+    //int32_t first_nz_pos_in_cg = 16;
     int32_t num_non_zero = 0;
     int32_t first_sig_pos = (i == scan_cg_last) ? scan_pos_last : (min_sub_pos + (1 << 4) - 1);
 
@@ -284,7 +284,7 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
           num_non_zero++;
 
           last_nz_pos_in_cg = MAX(last_nz_pos_in_cg, next_sig_pos);
-          first_nz_pos_in_cg = next_sig_pos;
+          //first_nz_pos_in_cg = next_sig_pos;
 
           int32_t remainder_abs_coeff = abs(coeff[blk_pos]) - 1;
 
@@ -694,7 +694,7 @@ static void encode_transform_coeff(encoder_state_t * const state,
                                    uint8_t parent_coeff_v)
 {
   cabac_data_t * const cabac = &state->cabac;
-  const encoder_control_t *const ctrl = state->encoder_control;
+  //const encoder_control_t *const ctrl = state->encoder_control;
   const videoframe_t * const frame = state->tile->frame;
 
   const cu_info_t *cur_pu = kvz_cu_array_at_const(frame->cu_array, x, y);
@@ -707,15 +707,17 @@ static void encode_transform_coeff(encoder_state_t * const state,
   // NxN signifies implicit transform split at the first transform level.
   // There is a similar implicit split for inter, but it is only used when
   // transform hierarchy is not in use.
-  int intra_split_flag = (cur_cu->type == CU_INTRA && cur_cu->part_size == SIZE_NxN);
+  //int intra_split_flag = (cur_cu->type == CU_INTRA && cur_cu->part_size == SIZE_NxN);
 
   // The implicit split by intra NxN is not counted towards max_tr_depth.
+  /*
   int max_tr_depth;
   if (cur_cu->type == CU_INTRA) {
     max_tr_depth = ctrl->cfg.tr_depth_intra + intra_split_flag;
   } else {
     max_tr_depth = ctrl->tr_depth_inter;
   }
+  */
 
   int8_t split = (cur_cu->tr_depth > depth);
 
@@ -1272,8 +1274,8 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
     // horizontal or vertical split, then this flag tells if QT or BT is used
 
     bool implicit_split = border;
-    bool bottom_left_available = (abs_x >= 0) && (abs_y + cu_width - 1 > ctrl->in.height);
-    bool top_right_available = (abs_x + cu_width - 1 < ctrl->in.width) && (abs_y >= 0);
+    bool bottom_left_available = (abs_x > 0) && (abs_y + cu_width - 1 > ctrl->in.height);
+    bool top_right_available = (abs_x + cu_width - 1 < ctrl->in.width) && (abs_y > 0);
 
     if((depth >= 1 && (border_x != border_y))) implicit_split = false;
     if (state->frame->slicetype != KVZ_SLICE_I) {

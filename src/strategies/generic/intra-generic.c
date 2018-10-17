@@ -157,7 +157,7 @@ static void kvz_angular_pred_generic(
 
           int wL = 32 >> MIN(31, ((x << 1) >> scale));
           if (wL == 0) break;
-          kvz_pixel *p = ref_side + delta_y;
+          const kvz_pixel *p = ref_side + delta_y;
           kvz_pixel left = (((64 - delta_frac_0) * p[0] + delta_frac_0 * p[1] + 32) >> 6);
           dst[y * width + x] = CLIP_TO_PIXEL((wL * left + (64 - wL) * dst[y * width + x] + 32) >> 6);
         }

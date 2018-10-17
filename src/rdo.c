@@ -239,7 +239,7 @@ INLINE int32_t kvz_get_ic_rate(encoder_state_t * const state,
                     uint32_t c2_idx,
                     int8_t type)
 {
-  cabac_data_t * const cabac = &state->cabac;
+  //cabac_data_t * const cabac = &state->cabac;
   int32_t rate = 1 << CTX_FRAC_BITS; // cost of sign bit
   uint32_t base_level  =  (c1_idx < C1FLAG_NUMBER)? (2 + (c2_idx < C2FLAG_NUMBER)) : 1;
   //cabac_ctx_t *base_one_ctx = (type == 0) ? &(cabac->ctx.cu_one_model_luma[0]) : &(cabac->ctx.cu_one_model_chroma[0]);
@@ -718,7 +718,7 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
           sh_rates.sig_coeff_inc[blkpos] = greater_than_zero - zero;
         }
       }
-      /*
+      
       if (encoder->cfg.signhide_enable) {
         sh_rates.quant_delta[blkpos] = (level_double - level * (1 << q_bits)) >> (q_bits - 8);
         if (level > 0) {
@@ -728,9 +728,9 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
           sh_rates.inc[blkpos] = rate_up - rate_now;
           sh_rates.dec[blkpos] = rate_down - rate_now;
         } else { // level == 0
-          sh_rates.inc[blkpos]   = CTX_ENTROPY_BITS(&base_one_ctx[one_ctx], 0);
+          sh_rates.inc[blkpos] = 1;// CTX_ENTROPY_BITS(&base_one_ctx[one_ctx], 0);
         }
-      }*/
+      }
       dest_coeff[blkpos] = (coeff_t)level;
       base_cost         += cost_coeff[scanpos];
 
