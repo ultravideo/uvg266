@@ -331,7 +331,7 @@ static void encoder_state_write_bitstream_SPS_extension(bitstream_t *stream,
     WRITE_U(stream, 0, 1, "large_ctu_flag"); // ToDo: add VVC large block support
     WRITE_U(stream, 0, 1, "subpu_tmvp_flag");
     WRITE_U(stream, 0, 1, "imv_enable_flag");
-    WRITE_U(stream, 0, 1, "high_precision_motion_vectors");
+    //WRITE_U(stream, 0, 1, "high_precision_motion_vectors");
     WRITE_U(stream, 0, 1, "disable_motion_compression_flag");
     WRITE_U(stream, 0, 1, "lm_chroma_enabled_flag");
     WRITE_U(stream, 0, 1, "emt_intra_enabled_flag");
