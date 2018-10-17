@@ -1146,15 +1146,6 @@ void fastForwardDCT2_B4(const int16_t *src, int16_t *dst, int32_t shift) {
   int32_t add = 1 << (shift - 1);
   const int32_t line = 4;  // for square blocks
 
-  /*  for(j=0; j < 4*line; j++)
-  {
-  if ( (j % 4 != 3))
-  printf("src[%d]=%d\t",j,src[j]);
-  else
-  { printf("src[%d]=%d\t",j,src[j]);
-  printf(" \n");}
-  }*/
-
   for (j = 0; j < line; j++) {
     /* E and O */
     E[0] = src[0] + src[3];
@@ -1166,11 +1157,6 @@ void fastForwardDCT2_B4(const int16_t *src, int16_t *dst, int32_t shift) {
     dst[2 * line] = (iT2_4[8] * E[0] + iT2_4[9] * E[1] + add) >> shift;
     dst[line] = (iT2_4[4] * O[0] + iT2_4[5] * O[1] + add) >> shift;
     dst[3 * line] = (iT2_4[12] * O[0] + iT2_4[13] * O[1] + add) >> shift;
-
-    /*	dst[0] = (iT2_4[0] * E[0] + iT2_4[1] * E[1]);// +add) >> shift;
-    dst[2 * line] = (iT2_4[8] * E[0] + iT2_4[9] * E[1]);// +add) >> shift;
-    dst[line] = (iT2_4[4] * O[0] + iT2_4[5] * O[1]); //+add) >> shift;
-    dst[3 * line] = (iT2_4[12] * O[0] + iT2_4[13] * O[1]);// +add) >> shift;*/
 
     src += 4;
     dst++;
@@ -1185,16 +1171,6 @@ void fastForwardDCT2_B8(const int16_t *src, int16_t *dst, int32_t shift) {
   int32_t EE[2], EO[2];
   int32_t add = 1 << (shift - 1);
   const int32_t line = 8;  // for square blocks
-
-
-  /* for(j=0; j < 8*line; j++)
-  {
-  if ( (j % 8 != 7))
-  printf("src[%d]=%d\t",j,src[j]);
-  else
-  { printf("src[%d]=%d\t",j,src[j]);
-  printf(" \n");}
-  }*/
 
 
   for (j = 0; j < line; j++) {
@@ -1233,16 +1209,6 @@ void fastForwardDCT2_B16(const int16_t *src, int16_t *dst, int32_t shift) {
   int32_t EEE[2], EEO[2];
   int32_t add = 1 << (shift - 1);
   const int32_t line = 16;  // for square blocks
-
-
-  /*for(j=0;j < 16*line; j++)
-  {
-  if ( (j % 16 != 15))
-  printf("src[%d]=%d\t",j,src[j]);
-  else
-  { printf("src[%d]=%d\t",j,src[j]);
-  printf(" \n");}
-  }*/
 
   for (j = 0; j < line; j++) {
     /* E and O*/
@@ -1291,15 +1257,6 @@ void fastForwardDCT2_B32(const int16_t *src, int16_t *dst, int32_t shift) {
   int32_t EEEE[2], EEEO[2];
   int32_t add = 1 << (shift - 1);
   const int32_t line = 32;  // for square blocks
-
-  /*for(j=0;j < 32*line; j++)
-  {
-  if ( (j % 32 != 31))
-  printf("src[%d]=%d\t",j,src[j]);
-  else
-  { printf("src[%d]=%d\t",j,src[j]);
-  printf(" \n");}
-  }*/
 
   for (j = 0; j < line; j++) {
     /* E and O*/
@@ -1370,11 +1327,6 @@ void fastInverseDCT2_B4(const int16_t *src, int16_t *dst, int32_t shift)
     dst[1] = (short)CLIP(-32768, 32767, (E[1] + O[1] + add) >> shift);
     dst[2] = (short)CLIP(-32768, 32767, (E[1] - O[1] + add) >> shift);
     dst[3] = (short)CLIP(-32768, 32767, (E[0] - O[0] + add) >> shift);
-
-    /*	  dst[0] = (E[0] + O[0]);// +add) >> shift;
-    dst[1] = (E[1] + O[1]);// +add) >> shift;
-    dst[2] = (E[1] - O[1]); //+add) >> shift;
-    dst[3] = (E[0] - O[0]); //+add) >> shift; */
 
     src++;
     dst += 4;
@@ -1568,152 +1520,6 @@ void fastInverseDST7_B4(const int16_t *coeff, int16_t *block, int32_t shift) {
 
 }
 
-
-
-void fastForwardDST7_B8(const int16_t *block, int16_t *coeff, int32_t shift) {
-  int32_t i, j, k, iSum;
-  int32_t rnd_factor = 1 << (shift - 1);
-  int16_t *pcoef;
-  const int16_t *piT_DST7_8;
-  const int32_t line = 8;  // for square blocks
-
-
-  for (i = 0; i < line; i++) {
-    piT_DST7_8 = iT_DST7_8;
-    pcoef = coeff;
-    for (j = 0; j < 8; j++) {
-      iSum = 0;
-      for (k = 0; k < 8; k++) {
-        iSum += block[k] * piT_DST7_8[k];
-      }
-      pcoef[i + j * line] = (iSum + rnd_factor) >> shift;
-
-      piT_DST7_8 += 8;
-    }
-    block += 8;
-    pcoef += line;
-  }
-
-}
-
-void fastInverseDST7_B8(const int16_t *coeff, int16_t *block, int32_t shift) {
-  int32_t i, j, k, iSum;
-  int32_t rnd_factor = 1 << (shift - 1);
-  const int32_t line = 8;  // for square blocks 
-
-  // core function in JEM
-  for (i = 0; i < line; i++) {
-    for (j = 0; j < 8; j++) {
-      iSum = 0;
-      for (k = 0; k < 8; k++) {
-        iSum += coeff[k*line] * iT_DST7_8[k * 8 + j];
-      }
-      block[j] = (int16_t)CLIP(-32768, 32767, (iSum + rnd_factor) >> shift);
-    }
-    block += 8;
-    coeff++;
-  }
-
-}
-
-
-void fastForwardDST7_B16(const int16_t *block, int16_t *coeff, int32_t shift) {
-  int32_t i, j, k, iSum;
-  int32_t rnd_factor = 1 << (shift - 1);
-  int16_t *pcoef;
-  const int16_t *piT_DST7_16;
-  const int32_t line = 16;  // for square blocks
-
-  for (i = 0; i < line; i++) {
-    piT_DST7_16 = iT_DST7_16;
-    pcoef = coeff;
-    for (j = 0; j < 16; j++) {
-      iSum = 0;
-      for (k = 0; k < 16; k++) {
-        iSum += block[k] * piT_DST7_16[k];
-      }
-      pcoef[i + j * line] = (iSum + rnd_factor) >> shift;
-
-      piT_DST7_16 += 16;
-    }
-    block += 16;
-    pcoef += line;
-  }
-
-}
-
-
-void fastInverseDST7_B16(const int16_t *coeff, int16_t *block, int32_t shift) {
-  int32_t i, j, k, iSum;
-  int32_t rnd_factor = 1 << (shift - 1);
-  const int32_t line = 16;  // for square blocks
-
-
-  // core function in JEM
-  for (i = 0; i < line; i++) {
-    for (j = 0; j < 16; j++) {
-      iSum = 0;
-      for (k = 0; k < 16; k++) {
-        iSum += coeff[k*line] * iT_DST7_16[k * 16 + j];
-      }
-      block[j] = (int16_t)CLIP(-32768, 32767, (iSum + rnd_factor) >> shift);
-    }
-    block += 16;
-    coeff++;
-  }
-
-}
-
-
-
-void fastForwardDST7_B32(const int16_t *block, int16_t *coeff, int32_t shift) {
-  int32_t i, j, k, iSum;
-  int32_t rnd_factor = 1 << (shift - 1);
-  int16_t *pcoef;
-  const int16_t *piT_DST7_32;
-  const int32_t line = 32;  // for square blocks
-
-
-  for (i = 0; i < line; i++) {
-    piT_DST7_32 = iT_DST7_32;
-    pcoef = coeff;
-    for (j = 0; j < 32; j++) {
-      iSum = 0;
-      for (k = 0; k < 32; k++) {
-        iSum += block[k] * piT_DST7_32[k];
-      }
-      pcoef[i + j * line] = (iSum + rnd_factor) >> shift;
-
-      piT_DST7_32 += 32;
-    }
-    block += 32;
-    pcoef += line;
-  }
-
-}
-
-void fastInverseDST7_B32(const int16_t *coeff, int16_t *block, int32_t shift) {
-  int32_t i, j, k, iSum;
-  int32_t rnd_factor = 1 << (shift - 1);
-  const int32_t line = 32;  // for square blocks
-
-  // core function in JEM
-  for (i = 0; i < line; i++) {
-    for (j = 0; j < 32; j++) {
-      iSum = 0;
-      for (k = 0; k < 32; k++) {
-        iSum += coeff[k*line] * iT_DST7_32[k * 32 + j];
-      }
-      block[j] = (int16_t)CLIP(-32768, 32767, (iSum + rnd_factor) >> shift);
-    }
-    block += 32;
-    coeff++;
-  }
-
-}
-
-
-
 void fastForwardDST1_B4(const int16_t *block, int16_t *coeff, int32_t shift) {
   int32_t i;
   int32_t rnd_factor = 1 << (shift - 1);
@@ -1771,336 +1577,6 @@ void fastInverseDST1_B4(const int16_t *coeff, int16_t *block, int32_t shift) {
   }
 }
 
-
-void fastForwardDST1_B8(const int16_t *block, int16_t *coeff, int32_t shift) {
-  int32_t i, j, k, iSum;
-  int32_t rnd_factor = 1 << (shift - 1);
-  int16_t *pcoef;
-  const int16_t *piT_DST1_8;
-  const int32_t line = 8;  // for square blocks
-
-
-  for (i = 0; i < line; i++) {
-    piT_DST1_8 = iT_DST1_8;
-    pcoef = coeff;
-    for (j = 0; j < 8; j++) {
-      iSum = 0;
-      for (k = 0; k < 8; k++) {
-        iSum += block[k] * piT_DST1_8[k];
-      }
-      pcoef[i + j * line] = (iSum + rnd_factor) >> shift;
-
-      piT_DST1_8 += 8;
-    }
-
-    block += 8;
-    pcoef += line;
-  }
-
-}
-
-
-
-void fastInverseDST1_B8(const int16_t *coeff, int16_t *block, int32_t shift) {
-  int32_t i, j, k, iSum;
-  int32_t rnd_factor = 1 << (shift - 1);
-  const int32_t line = 8;  // for square blocks
-
-  // core function in JEM
-  for (i = 0; i < line; i++) {
-    for (j = 0; j < 8; j++) {
-      iSum = 0;
-      for (k = 0; k < 8; k++) {
-        iSum += coeff[k*line] * iT_DST1_8[k * 8 + j];
-      }
-      block[j] = (int16_t)CLIP(-32768, 32767, (iSum + rnd_factor) >> shift);
-    }
-    block += 8;
-    coeff++;
-  }
-
-}
-
-
-void fastForwardDST1_B16(const int16_t *block, int16_t *coeff, int32_t shift) {
-  int32_t i, j, k, iSum;
-  int32_t rnd_factor = 1 << (shift - 1);
-  int16_t *pcoef;
-  const int16_t *piT_DST1_16;
-  const int32_t line = 16;  // for square blocks
-
-  for (i = 0; i < line; i++) {
-    piT_DST1_16 = iT_DST1_16;
-    pcoef = coeff;
-    for (j = 0; j < 16; j++) {
-      iSum = 0;
-      for (k = 0; k < 16; k++) {
-        iSum += block[k] * iT_DST1_16[k];
-      }
-      pcoef[i + j * line] = (iSum + rnd_factor) >> shift;
-
-      piT_DST1_16 += 16;
-    }
-    block += 16;
-    pcoef += line;
-  }
-
-}
-
-
-
-void fastInverseDST1_B16(const int16_t *coeff, int16_t *block, int32_t shift) {
-  int32_t i, j, k, iSum;
-  int32_t rnd_factor = 1 << (shift - 1);
-  const int32_t line = 16;  // for square blocks
-
-  // core function in JEM
-  for (i = 0; i < line; i++) {
-    for (j = 0; j < 16; j++) {
-      iSum = 0;
-      for (k = 0; k < 16; k++) {
-        iSum += coeff[k*line] * iT_DST1_16[k * 16 + j];
-      }
-      block[j] = (int16_t)CLIP(-32768, 32767, (iSum + rnd_factor) >> shift);
-    }
-    block += 16;
-    coeff++;
-  }
-
-}
-
-
-void fastForwardDST1_B32(const int16_t *block, int16_t *coeff, int32_t shift) {
-  int32_t i, j, k, iSum;
-  int32_t rnd_factor = 1 << (shift - 1);
-  int16_t *pcoef;
-  const int16_t *piT_DST1_32;
-  const int32_t line = 32;  // for square blocks
-
-
-  for (i = 0; i < line; i++) {
-    piT_DST1_32 = iT_DST1_32;
-    pcoef = coeff;
-    for (j = 0; j < 32; j++) {
-      iSum = 0;
-      for (k = 0; k < 32; k++) {
-        iSum += block[k] * iT_DST1_32[k];
-      }
-      pcoef[i + j * line] = (iSum + rnd_factor) >> shift;
-
-      piT_DST1_32 += 32;
-    }
-    block += 32;
-    pcoef += line;
-  }
-
-}
-
-void fastInverseDST1_B32(const int16_t *coeff, int16_t *block, int32_t shift) {
-  int32_t i, j, k, iSum;
-  int32_t rnd_factor = 1 << (shift - 1);
-  const int32_t line = 32;  // for square blocks
-
-  // core function in JEM
-  for (i = 0; i < line; i++) {
-    for (j = 0; j < 32; j++) {
-      iSum = 0;
-      for (k = 0; k < 32; k++) {
-        iSum += coeff[k*line] * iT_DST1_32[k * 32 + j];
-      }
-      block[j] = (int16_t)CLIP(-32768, 32767, (iSum + rnd_factor) >> shift);
-    }
-    block += 32;
-    coeff++;
-  }
-
-}
-
-void fastForwardDCT5_B4(const int16_t *block, int16_t *coeff, int32_t shift) {
-  int32_t i, j, k, iSum;
-  int32_t rnd_factor = 1 << (shift - 1);
-  int16_t *pcoef;
-  const int16_t *piT_DCT5_4;
-  const int32_t line = 4;  // for square blocks
-
-
-  for (i = 0; i < line; i++) {
-    piT_DCT5_4 = iT_DCT5_4;
-    pcoef = coeff;
-    for (j = 0; j < 4; j++) {
-      iSum = 0;
-      for (k = 0; k < 4; k++) {
-        iSum += block[k] * piT_DCT5_4[k];
-      }
-      pcoef[i + j * line] = (iSum + rnd_factor) >> shift;
-      piT_DCT5_4 += 4;
-    }
-    block += 4;
-    pcoef += line;
-  }
-}
-
-
-void fastInverseDCT5_B4(const int16_t *coeff, int16_t *block, int32_t shift) {
-  int32_t i, j, k, iSum;
-  int32_t rnd_factor = 1 << (shift - 1);
-  const int32_t line = 4;  // for square blocks
-
-  // core function in JEM
-  for (i = 0; i < line; i++) {
-    for (j = 0; j < 4; j++) {
-      iSum = 0;
-      for (k = 0; k < 4; k++) {
-        iSum += coeff[k*line] * iT_DCT5_4[k * 4 + j];
-      }
-      block[j] = (int16_t)CLIP(-32768, 32767, (iSum + rnd_factor) >> shift);
-    }
-    block += 4;
-    coeff++;
-  }
-}
-
-
-void fastForwardDCT5_B8(const int16_t *block, int16_t *coeff, int32_t shift) {
-  int32_t i, j, k, iSum;
-  int32_t rnd_factor = 1 << (shift - 1);
-  int16_t *pcoef;
-  const int16_t *piT_DCT5_8;
-  const int32_t line = 8;  // for square blocks
-
-  for (i = 0; i < line; i++) {
-    piT_DCT5_8 = iT_DCT5_8;
-    pcoef = coeff;
-    for (j = 0; j < 8; j++) {
-      iSum = 0;
-      for (k = 0; k < 8; k++) {
-        iSum += block[k] * piT_DCT5_8[k];
-      }
-      pcoef[i + j * line] = (iSum + rnd_factor) >> shift;
-      piT_DCT5_8 += 8;
-    }
-    block += 8;
-    pcoef += line;
-  }
-
-}
-
-void fastInverseDCT5_B8(const int16_t *coeff, int16_t *block, int32_t shift) {
-  int32_t i, j, k, iSum;
-  int32_t rnd_factor = 1 << (shift - 1);
-  const int32_t line = 8;  // for square blocks
-
-  // core function in JEM
-  for (i = 0; i < line; i++) {
-    for (j = 0; j < 8; j++) {
-      iSum = 0;
-      for (k = 0; k < 8; k++) {
-        iSum += coeff[k*line] * iT_DCT5_8[k * 8 + j];
-      }
-      block[j] = (int16_t)CLIP(-32768, 32767, (iSum + rnd_factor) >> shift);
-    }
-    block += 8;
-    coeff++;
-  }
-
-}
-
-
-
-void fastForwardDCT5_B16(const int16_t *block, int16_t *coeff, int32_t shift) {
-  int32_t i, j, k, iSum;
-  int32_t rnd_factor = 1 << (shift - 1);
-  int16_t *pcoef;
-  const int16_t *piT_DCT5_16;
-  const int32_t line = 16;  // for square blocks
-
-
-  for (i = 0; i < line; i++) {
-    piT_DCT5_16 = iT_DCT5_16;
-    pcoef = coeff;
-    for (j = 0; j < 16; j++) {
-      iSum = 0;
-      for (k = 0; k < 16; k++) {
-        iSum += block[k] * piT_DCT5_16[k];
-      }
-      pcoef[i + j * line] = (iSum + rnd_factor) >> shift;
-      piT_DCT5_16 += 16;
-    }
-    block += 16;
-    pcoef += line;
-  }
-}
-
-
-
-void fastInverseDCT5_B16(const int16_t *coeff, int16_t *block, int32_t shift) {
-  int32_t i, j, k, iSum;
-  int32_t rnd_factor = 1 << (shift - 1);
-  const int32_t line = 16;  // for square blocks
-
-  // core function in JEM
-  for (i = 0; i < line; i++) {
-    for (j = 0; j < 16; j++) {
-      iSum = 0;
-      for (k = 0; k < 16; k++) {
-        iSum += coeff[k*line] * iT_DCT5_16[k * 16 + j];
-      }
-      block[j] = (int16_t)CLIP(-32768, 32767, (iSum + rnd_factor) >> shift);
-    }
-    block += 16;
-    coeff++;
-  }
-}
-
-
-
-
-void fastForwardDCT5_B32(const int16_t *block, int16_t *coeff, int32_t shift) {
-  int32_t i, j, k, iSum;
-  int32_t rnd_factor = 1 << (shift - 1);
-  int16_t *pcoef;
-  const int16_t *piT_DCT5_32;
-  const int32_t line = 32;  // for square blocks
-
-  for (i = 0; i < line; i++) {
-    piT_DCT5_32 = iT_DCT5_32;
-    pcoef = coeff;
-    for (j = 0; j < 32; j++) {
-      iSum = 0;
-      for (k = 0; k < 32; k++) {
-        iSum += block[k] * piT_DCT5_32[k];
-      }
-      pcoef[i + j * line] = (iSum + rnd_factor) >> shift;
-      //pcoef += line;
-      piT_DCT5_32 += 32;
-    }
-    block += 32;
-    pcoef += line;
-  }
-}
-
-
-
-void fastInverseDCT5_B32(const int16_t *coeff, int16_t *block, int32_t shift) {
-  int32_t i, j, k, iSum;
-  int32_t rnd_factor = 1 << (shift - 1);
-  const int32_t line = 32;  // for square blocks
-
-  // core function in JEM
-  for (i = 0; i < line; i++) {
-    for (j = 0; j < 32; j++) {
-      iSum = 0;
-      for (k = 0; k < 32; k++) {
-        iSum += coeff[k*line] * iT_DCT5_32[k * 32 + j];
-      }
-      block[j] = (int16_t)CLIP(-32768, 32767, (iSum + rnd_factor) >> shift);      
-    }
-    block += 32;
-    coeff++;
-  }
-}
-
-
 void fastForwardDCT8_B4(const int16_t *block, int16_t *coeff, int32_t shift) {
   int32_t i;
   int32_t rnd_factor = 1 << (shift - 1);
@@ -2157,147 +1633,32 @@ void fastInverseDCT8_B4(const int16_t *coeff, int16_t *block, int32_t shift) {
 }
 
 
+#define DCT_EMT_NXN_GENERIC(t, n) \
+void fastForward ## t ## _B ## n (const int16_t *block, int16_t *coeff, int32_t shift) {\
+  int32_t i, j, k, iSum;\
+  int32_t rnd_factor = 1 << (shift - 1);\
+  int16_t *pcoef;\
+  const int16_t *piT;\
+  const int32_t line = n;  /* for square blocks */ \
+  for (i = 0; i < line; i++) {\
+    piT = iT_ ## t ## _ ## n ;\
+    pcoef = coeff;\
+    for (j = 0; j < n; j++) {\
+      iSum = 0;\
+      for (k = 0; k < n; k++) {\
+        iSum += block[k] * piT[k];\
+      }\
+      pcoef[i] = (iSum + rnd_factor) >> shift;\
+      pcoef += line;\
+      piT += n;\
+    }\
+    block += n;\
+  }\
+}\
 
-void fastForwardDCT8_B8(const int16_t *block, int16_t *coeff, int32_t shift) {
-  int32_t i, j, k, iSum;
-  int32_t rnd_factor = 1 << (shift - 1);
-  int16_t *pcoef;
-  const int16_t *piT_DCT8_8;
-  const int32_t line = 8;  // for square blocks
-
-  for (i = 0; i < line; i++) {
-    piT_DCT8_8 = iT_DCT8_8;
-    pcoef = coeff;
-    for (j = 0; j < 8; j++) {
-      iSum = 0;
-      for (k = 0; k < 8; k++) {
-        iSum += block[k] * piT_DCT8_8[k];
-      }
-      pcoef[i + j * line] = (iSum + rnd_factor) >> shift;
-
-      piT_DCT8_8 += 8;
-    }
-    block += 8;
-    pcoef += line;
-  }
-}
-
-
-
-
-void fastInverseDCT8_B8(const int16_t *coeff, int16_t *block, int32_t shift) {
-  int32_t i, j, k, iSum;
-  int32_t rnd_factor = 1 << (shift - 1);
-  const int32_t line = 8;  // for square blocks
-
-  // core function in JEM
-  for (i = 0; i < line; i++) {
-    for (j = 0; j < 8; j++) {
-      iSum = 0;
-      for (k = 0; k < 8; k++) {
-        iSum += coeff[k*line] * iT_DCT8_8[k * 8 + j];
-      }
-      block[j] = (int16_t)CLIP(-32768, 32767, (iSum + rnd_factor) >> shift);
-    }
-    block += 8;
-    coeff++;
-  }
-}
-
-
-
-void fastForwardDCT8_B16(const int16_t *block, int16_t *coeff, int32_t shift) {
-  int32_t i, j, k, iSum;
-  int32_t rnd_factor = 1 << (shift - 1);
-  int16_t *pcoef;
-  const int16_t *piT_DCT8_16;
-  const int32_t line = 16;  // for square blocks
-
-  for (i = 0; i < line; i++) {
-    piT_DCT8_16 = iT_DCT8_16;
-    pcoef = coeff;
-    for (j = 0; j < 16; j++) {
-      iSum = 0;
-      for (k = 0; k < 16; k++) {
-        iSum += block[k] * piT_DCT8_16[k];
-      }
-      pcoef[i] = (iSum + rnd_factor) >> shift;
-      pcoef += line;
-      piT_DCT8_16 += 16;
-    }
-    block += 16;
-    
-  }
-}
-
-
-void fastInverseDCT8_B16(const int16_t *coeff, int16_t *block, int32_t shift) {
-  int32_t i, j, k, iSum;
-  int32_t rnd_factor = 1 << (shift - 1);
-  const int32_t line = 16;  // for square blocks
-
-  //core function in JEM
-  for (i = 0; i < line; i++) {
-    for (j = 0; j < 16; j++) {
-      iSum = 0;
-      for (k = 0; k < 16; k++) {
-        iSum += coeff[k*line] * iT_DCT8_16[k * 16 + j];
-      }
-      block[j] = (int16_t)CLIP(-32768, 32767, ((iSum + rnd_factor) >> shift));
-    }
-    block += 16;
-    coeff++;
-  }
-}
-
-
-
-void fastForwardDCT8_B32(const int16_t *block, int16_t *coeff, int32_t shift) {
-  int32_t i, j, k, iSum;
-  int32_t rnd_factor = 1 << (shift - 1);
-  int16_t *pcoef;
-  const int16_t *piT_DCT8_32;
-  const int32_t line = 32;  // for square blocks
-
-  for (i = 0; i < line; i++) {
-    piT_DCT8_32 = iT_DCT8_32;
-    pcoef = coeff;
-    for (j = 0; j < 32; j++) {
-      iSum = 0;
-      for (k = 0; k < 32; k++) {
-        iSum += block[k] * piT_DCT8_32[k];
-      }
-      pcoef[i] = (iSum + rnd_factor) >> shift;
-      pcoef += line;
-      piT_DCT8_32 += 32;
-    }
-    block += 32;
-    
-  }
-}
-
-
-void fastInverseDCT8_B32(const int16_t *coeff, int16_t *block, int32_t shift) {
-  int32_t i, j, k, iSum;
-  int32_t rnd_factor = 1 << (shift - 1);
-  const int32_t line = 32;  // for square blocks
-
-  for (i = 0; i < line; i++) {
-    for (j = 0; j < 32; j++) {
-      iSum = 0;
-      for (k = 0; k < 32; k++) {
-        iSum += coeff[k*line] * iT_DCT8_32[k * 32 + j];
-      }
-      block[j] = (int16_t)CLIP(-32768, 32767, (iSum + rnd_factor) >> shift);
-    }
-    block += 32;
-    coeff++;
-  }
-
-}
 
 #define IDCT_EMT_NXN_GENERIC(t, n) \
-static void fastInverse ## t ## _B ## n ## (const int16_t *coeff, int16_t *block, int32_t shift) { \
+static void fastInverse ## t ## _B ## n (const int16_t *coeff, int16_t *block, int32_t shift) { \
 \
   int32_t i, j, k, iSum; \
   int32_t rnd_factor = 1 << (shift - 1); \
@@ -2306,7 +1667,7 @@ static void fastInverse ## t ## _B ## n ## (const int16_t *coeff, int16_t *block
     for (j = 0; j < n; j++) {\
       iSum = 0;\
       for (k = 0; k < n; k++) {\
-        iSum += coeff[k*line] * iT_ ## t ## _ ## n ##[k * n + j];\
+        iSum += coeff[k*line] * iT_ ## t ## _ ## n [k * n + j];\
       }\
       block[j] = (int16_t)CLIP(-32768, 32767, (iSum + rnd_factor) >> shift);\
     }\
@@ -2314,6 +1675,44 @@ static void fastInverse ## t ## _B ## n ## (const int16_t *coeff, int16_t *block
     coeff++;\
   }\
 }
+
+// DCT 8
+IDCT_EMT_NXN_GENERIC(DCT8, 8);
+IDCT_EMT_NXN_GENERIC(DCT8, 16);
+IDCT_EMT_NXN_GENERIC(DCT8, 32);
+
+DCT_EMT_NXN_GENERIC(DCT8, 8);
+DCT_EMT_NXN_GENERIC(DCT8, 16);
+DCT_EMT_NXN_GENERIC(DCT8, 32);
+/*
+// DCT 5
+IDCT_EMT_NXN_GENERIC(DCT5, 4);
+IDCT_EMT_NXN_GENERIC(DCT5, 8);
+IDCT_EMT_NXN_GENERIC(DCT5, 16);
+IDCT_EMT_NXN_GENERIC(DCT5, 32);
+
+DCT_EMT_NXN_GENERIC(DCT5, 4);
+DCT_EMT_NXN_GENERIC(DCT5, 8);
+DCT_EMT_NXN_GENERIC(DCT5, 16);
+DCT_EMT_NXN_GENERIC(DCT5, 32);
+
+// DST 1
+IDCT_EMT_NXN_GENERIC(DST1, 8);
+IDCT_EMT_NXN_GENERIC(DST1, 16);
+IDCT_EMT_NXN_GENERIC(DST1, 32);
+
+DCT_EMT_NXN_GENERIC(DST1, 8);
+DCT_EMT_NXN_GENERIC(DST1, 16);
+DCT_EMT_NXN_GENERIC(DST1, 32);
+*/
+// DST 7
+IDCT_EMT_NXN_GENERIC(DST7, 8);
+IDCT_EMT_NXN_GENERIC(DST7, 16);
+IDCT_EMT_NXN_GENERIC(DST7, 32);
+
+DCT_EMT_NXN_GENERIC(DST7, 8);
+DCT_EMT_NXN_GENERIC(DST7, 16);
+DCT_EMT_NXN_GENERIC(DST7, 32);
 
 
 typedef void partial_tr_func(const int16_t *, int16_t *, int32_t);
