@@ -48,6 +48,21 @@ extern dct_func * kvz_idct_16x16;
 extern dct_func * kvz_idct_32x32;
 
 
+extern void(*kvz_emt_dct)(
+  int8_t bitdepth,
+  color_t color,
+  const cu_info_t *tu,
+  int8_t width,
+  const int16_t *input,
+  int16_t *output);
+extern void(*kvz_emt_idct)(
+  int8_t bitdepth,
+  color_t color,
+  const cu_info_t *tu,
+  int8_t width,
+  const int16_t *input,
+  int16_t *output);
+
 int kvz_strategy_register_dct(void* opaque, uint8_t bitdepth);
 dct_func * kvz_get_dct_func(int8_t width, color_t color, cu_type_t type);
 dct_func * kvz_get_idct_func(int8_t width, color_t color, cu_type_t type);
@@ -68,6 +83,9 @@ dct_func * kvz_get_idct_func(int8_t width, color_t color, cu_type_t type);
   {"idct_8x8", (void**)&kvz_idct_8x8}, \
   {"idct_16x16", (void**)&kvz_idct_16x16}, \
   {"idct_32x32", (void**)&kvz_idct_32x32}, \
+  {"emt_dct",  (void**)&kvz_emt_dct }, \
+  {"emt_idct", (void**)&kvz_emt_idct }, \
+
 
 
 

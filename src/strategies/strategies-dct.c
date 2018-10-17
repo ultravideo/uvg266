@@ -40,6 +40,19 @@ dct_func * kvz_idct_8x8= 0;
 dct_func * kvz_idct_16x16 = 0;
 dct_func * kvz_idct_32x32 = 0;
 
+void(*kvz_emt_dct)(int8_t bitdepth,
+  color_t color,
+  const cu_info_t *tu,
+  int8_t width,
+  const int16_t *input,
+  int16_t *output);
+void(*kvz_emt_idct)(int8_t bitdepth,
+  color_t color,
+  const cu_info_t *tu,
+  int8_t width,
+  const int16_t *input,
+  int16_t *output);
+
 
 int kvz_strategy_register_dct(void* opaque, uint8_t bitdepth) {
   bool success = true;

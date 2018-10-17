@@ -124,6 +124,8 @@ typedef struct
   uint8_t merged    : 1; //!< \brief flag to indicate this block is merged
   uint8_t merge_idx : 3; //!< \brief merge index
   uint8_t tr_skip   : 1; //!< \brief transform skip flag
+  uint8_t emt : 1; //!< \brief enable multiple transforms
+  uint8_t tr_idx : 2; //!< \brief transform index
 
   uint16_t cbf;
 
