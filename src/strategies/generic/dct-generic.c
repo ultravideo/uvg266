@@ -814,13 +814,13 @@ static void fast_inverse_dst_4x4_generic(int8_t bitdepth, const int16_t *input, 
 }
 
 
-const int16_t iT2_4[16] = {
+const int16_t kvz_g_iT_DCT2_4[16] = {
 256,256,256,256,
 334,139,-139,-334,
 256,-256,-256,256,
 139,-334,334,-139 };
 
-const int16_t iT2_8[64] = {
+const int16_t kvz_g_iT_DCT2_8[64] = {
 256 ,256 ,256 ,256 ,256 ,256 ,256 ,256
 ,355 ,301 ,201 ,71 ,-71 ,-201 ,-301 ,-355
 ,334 ,139 ,-139 ,-334 ,-334 ,-139 ,139 ,334
@@ -830,7 +830,7 @@ const int16_t iT2_8[64] = {
 ,139 ,-334 ,334 ,-139 ,-139 ,334 ,-334 ,139
 ,71 ,-201 ,301 ,-355 ,355 ,-301 ,201 ,-71 };
 
-const int16_t iT2_16[256] = {
+const int16_t kvz_g_iT_DCT2_16[256] = {
 256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,
 360,346,319,280,230,171,105,35,-35,-105,-171,-230,-280,-319,-346,-360,
 355,301,201,71,-71,-201,-301,-355,-355,-301,-201,-71,71,201,301,355,
@@ -848,7 +848,7 @@ const int16_t iT2_16[256] = {
 71,-201,301,-355,355,-301,201,-71,-71,201,-301,355, -355,301,-201,71,
 35,-105,171,-230,280,-319,346,-360,360,-346,319, -280,230,-171,105,-35 };
 
-const int16_t iT2_32[1024] = { 256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,
+const int16_t kvz_g_iT_DCT2_32[1024] = { 256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,256,
 362,358,351,341,327,311,291,268,243,216,186,155,122,88,53,18,-18,-53,-88,-122,-155,-186,-216,-243,-268,-291,-311,-327,-341,-351,-358,-362,
 360,346,319,280,230,171,105,35,-35,-105,-171,-230,-280,-319,-346,-360,-360,-346,-319,-280,-230,-171,-105,-35,35,105,171,230,280,319,346,360,
 358,327,268,186,88,-18,-122,-216,-291,-341,-362,-351,-311,-243,-155,-53,53,155,243,311,351,362,341,291,216,122,18,-88,-186,-268,-327,-358,
@@ -881,12 +881,12 @@ const int16_t iT2_32[1024] = { 256,256,256,256,256,256,256,256,256,256,256,256,2
 35,-105,171,-230,280,-319,346,-360,360,-346,319,-280,230,-171,105,-35,-35,105,-171,230,-280,319,-346,360,-360,346,-319,280,-230,171,-105,35,
 18,-53,88,-122,155,-186,216,-243,268,-291,311,-327,341,-351,358,-362,362,-358,351,-341,327,-311,291,-268,243,-216,186,-155,122,-88,53,-18 };
 
-const int16_t iT_DST7_4[16] = { 117,219,296,336,
+const int16_t kvz_g_iT_DST7_4[16] = { 117,219,296,336,
 296,296,0,-296,
 336,-117,-296,219,
 219,-336,296,-117 };
 
-const int16_t iT_DST7_8[64] = { 65,127,185,237,280,314,338,350,
+const int16_t kvz_g_iT_DST7_8[64] = { 65,127,185,237,280,314,338,350,
 185,314,350,280,127,-65,-237,-338,
 280,338,127,-185,-350,-237,65,314,
 338,185,-237,-314,65,350,127,-280,
@@ -895,7 +895,7 @@ const int16_t iT_DST7_8[64] = { 65,127,185,237,280,314,338,350,
 237,-350,280,-65,-185,338,-314,127,
 127,-237,314,-350,338,-280,185,-65 };
 
-const int16_t iT_DST7_16[256] = { 34,67,100,133,163,193,220,246,269,290,309,324,337,346,353,356,
+const int16_t kvz_g_iT_DST7_16[256] = { 34,67,100,133,163,193,220,246,269,290,309,324,337,346,353,356,
 100,193,269,324,353,353,324,269,193,100,0,-100,-193,-269,-324,-353,
 163,290,353,337,246,100,-67,-220,-324,-356,-309,-193,-34,133,269,346,
 220,346,324,163,-67,-269,-356,-290,-100,133,309,353,246,34,-193,-337,
@@ -912,7 +912,7 @@ const int16_t iT_DST7_16[256] = { 34,67,100,133,163,193,220,246,269,290,309,324,
 133,-246,324,-356,337,-269,163,-34,-100,220,-309,353,-346,290,-193,67,
 67,-133,193,-246,290,-324,346,-356,353,-337,309,-269,220,-163,100,-34 };
 
-const int16_t iT_DST7_32[1024] = { 17,35,52,69,86,103,119,135,151,167,182,197,211,225,238,251,263,275,285,296,305,314,322,329,336,342,347,351,354,357,358,359,
+const int16_t kvz_g_iT_DST7_32[1024] = { 17,35,52,69,86,103,119,135,151,167,182,197,211,225,238,251,263,275,285,296,305,314,322,329,336,342,347,351,354,357,358,359,
 52,103,151,197,238,275,305,329,347,357,359,354,342,322,296,263,225,182,135,86,35,-17,-69,-119,-167,-211,-251,-285,-314,-336,-351,-358,
 86,167,238,296,336,357,357,336,296,238,167,86,0,-86,-167,-238,-296,-336,-357,-357,-336,-296,-238,-167,-86,0,86,167,238,296,336,357,
 119,225,305,351,357,322,251,151,35,-86,-197,-285,-342,-359,-336,-275,-182,-69,52,167,263,329,358,347,296,211,103,-17,-135,-238,-314,-354,
@@ -946,12 +946,12 @@ const int16_t iT_DST7_32[1024] = { 17,35,52,69,86,103,119,135,151,167,182,197,21
 35,-69,103,-135,167,-197,225,-251,275,-296,314,-329,342,-351,357,-359,358,-354,347,-336,322,-305,285,-263,238,-211,182,-151,119,-86,52,-17 };
 
 
-const int16_t iT_DST1_4[16] = { 190,308,308,190,
+const int16_t kvz_g_iT_DST1_4[16] = { 190,308,308,190,
 308,190,-190,-308,
 308,-190,-190,308,
 190,-308,308,-190 };
 
-const int16_t iT_DST1_8[64] = { 117,219,296,336,336,296,219,117,
+const int16_t kvz_g_iT_DST1_8[64] = { 117,219,296,336,336,296,219,117,
 219,336,296,117,-117,-296,-336,-219,
 296,296,0,-296,-296,0,296,296,
 336,117,-296,-219,219,296,-117,-336,
@@ -960,7 +960,7 @@ const int16_t iT_DST1_8[64] = { 117,219,296,336,336,296,219,117,
 219,-336,296,-117,-117,296,-336,219,
 117,-219,296,-336,336,-296,219,-117 };
 
-const int16_t iT_DST1_16[256] = { 65,127,185,237,280,314,338,350,350,338,314,280,237,185,127,65,
+const int16_t kvz_g_iT_DST1_16[256] = { 65,127,185,237,280,314,338,350,350,338,314,280,237,185,127,65,
 127,237,314,350,338,280,185,65,-65,-185,-280,-338,-350,-314,-237,-127,
 185,314,350,280,127,-65,-237,-338,-338,-237,-65,127,280,350,314,185,
 237,350,280,65,-185,-338,-314,-127,127,314,338,185,-65,-280,-350,-237,
@@ -977,7 +977,7 @@ const int16_t iT_DST1_16[256] = { 65,127,185,237,280,314,338,350,350,338,314,280
 127,-237,314,-350,338,-280,185,-65,-65,185,-280,338,-350,314,-237,127,
 65,-127,185,-237,280,-314,338,-350,350,-338,314,-280,237,-185,127,-65 };
 
-const int16_t iT_DST1_32[1024] = { 34,67,100,133,163,193,220,246,269,290,309,324,337,346,353,356,356,353,346,337,324,309,290,269,246,220,193,163,133,100,67,34,
+const int16_t kvz_g_iT_DST1_32[1024] = { 34,67,100,133,163,193,220,246,269,290,309,324,337,346,353,356,356,353,346,337,324,309,290,269,246,220,193,163,133,100,67,34,
 67,133,193,246,290,324,346,356,353,337,309,269,220,163,100,34,-34,-100,-163,-220,-269,-309,-337,-353,-356,-346,-324,-290,-246,-193,-133,-67,
 100,193,269,324,353,353,324,269,193,100,0,-100,-193,-269,-324,-353,-353,-324,-269,-193,-100,0,100,193,269,324,353,353,324,269,193,100,
 133,246,324,356,337,269,163,34,-100,-220,-309,-353,-346,-290,-193,-67,67,193,290,346,353,309,220,100,-34,-163,-269,-337,-356,-324,-246,-133,
@@ -1010,12 +1010,12 @@ const int16_t iT_DST1_32[1024] = { 34,67,100,133,163,193,220,246,269,290,309,324
 67,-133,193,-246,290,-324,346,-356,353,-337,309,-269,220,-163,100,-34,-34,100,-163,220,-269,309,-337,353,-356,346,-324,290,-246,193,-133,67,
 34,-67,100,-133,163,-193,220,-246,269,-290,309,-324,337,-346,353,-356,356,-353,346,-337,324,-309,290,-269,246,-220,193,-163,133,-100,67,-34 };
 
-const int16_t iT_DCT5_4[16] = { 194,274,274,274,
+const int16_t kvz_g_iT_DCT5_4[16] = { 194,274,274,274,
 274,241,-86,-349,
 274,-86,-349,241,
 274,-349,241,-86 };
 
-const int16_t iT_DCT5_8[64] = { 187,264,264,264,264,264,264,264,
+const int16_t kvz_g_iT_DCT5_8[64] = { 187,264,264,264,264,264,264,264,
 264,342,250,116,-39,-187,-303,-366,
 264,250,-39,-303,-366,-187,116,342,
 264,116,-303,-303,116,374,116,-303,
@@ -1024,7 +1024,7 @@ const int16_t iT_DCT5_8[64] = { 187,264,264,264,264,264,264,264,
 264,-303,116,116,-303,374,-303,116,
 264,-366,342,-303,250,-187,116,-39 };
 
-const int16_t iT_DCT5_16[256] = { 184,260,260,260,260,260,260,260,260,260,260,260,260,260,260,260,
+const int16_t kvz_g_iT_DCT5_16[256] = { 184,260,260,260,260,260,260,260,260,260,260,260,260,260,260,260,
 260,360,338,302,253,195,128,56,-19,-92,-162,-225,-279,-322,-351,-366,
 260,338,253,128,-19,-162,-279,-351,-366,-322,-225,-92,56,195,302,360,
 260,302,128,-92,-279,-366,-322,-162,56,253,360,338,195,-19,-225,-351,
@@ -1041,7 +1041,7 @@ const int16_t iT_DCT5_16[256] = { 184,260,260,260,260,260,260,260,260,260,260,26
 260,-351,302,-225,128,-19,-92,195,-279,338,-366,360,-322,253,-162,56,
 260,-366,360,-351,338,-322,302,-279,253,-225,195,-162,128,-92,56,-19 };
 
-const int16_t iT_DCT5_32[1024] = { 182,258,258,258,258,258,258,258,258,258,258,258,258,258,258,258,258,258,258,258,258,258,258,258,258,258,258,258,258,258,258,258,
+const int16_t kvz_g_iT_DCT5_32[1024] = { 182,258,258,258,258,258,258,258,258,258,258,258,258,258,258,258,258,258,258,258,258,258,258,258,258,258,258,258,258,258,258,258,
 258,363,358,349,336,320,301,280,255,228,198,166,133,99,63,27,-9,-45,-81,-116,-150,-182,-213,-241,-267,-291,-311,-329,-343,-354,-361,-364,
 258,358,336,301,255,198,133,63,-9,-81,-150,-213,-267,-311,-343,-361,-364,-354,-329,-291,-241,-182,-116,-45,27,99,166,228,280,320,349,363,
 258,349,301,228,133,27,-81,-182,-267,-329,-361,-361,-329,-267,-182,-81,27,133,228,301,349,365,349,301,228,133,27,-81,-182,-267,-329,-361,
@@ -1074,12 +1074,12 @@ const int16_t iT_DCT5_32[1024] = { 182,258,258,258,258,258,258,258,258,258,258,2
 258,-361,349,-329,301,-267,228,-182,133,-81,27,27,-81,133,-182,228,-267,301,-329,349,-361,365,-361,349,-329,301,-267,228,-182,133,-81,27,
 258,-364,363,-361,358,-354,349,-343,336,-329,320,-311,301,-291,280,-267,255,-241,228,-213,198,-182,166,-150,133,-116,99,-81,63,-45,27,-9 };
 
-const int16_t iT_DCT8_4[16] = { 336,296,219,117,
+const int16_t kvz_g_iT_DCT8_4[16] = { 336,296,219,117,
 296,0,-296,-296,
 219,-296,-117,336,
 117,-296,336,-219 };
 
-const int16_t iT_DCT8_8[64] = { 350,338,314,280,237,185,127,65,
+const int16_t kvz_g_iT_DCT8_8[64] = { 350,338,314,280,237,185,127,65,
 338,237,65,-127,-280,-350,-314,-185,
 314,65,-237,-350,-185,127,338,280,
 280,-127,-350,-65,314,237,-185,-338,
@@ -1088,7 +1088,7 @@ const int16_t iT_DCT8_8[64] = { 350,338,314,280,237,185,127,65,
 127,-314,338,-185,-65,280,-350,237,
 65,-185,280,-338,350,-314,237,-127 };
 
-const int16_t iT_DCT8_16[256] = { 356,353,346,337,324,309,290,269,246,220,193,163,133,100,67,34,
+const int16_t kvz_g_iT_DCT8_16[256] = { 356,353,346,337,324,309,290,269,246,220,193,163,133,100,67,34,
 353,324,269,193,100,0,-100,-193,-269,-324,-353,-353,-324,-269,-193,-100,
 346,269,133,-34,-193,-309,-356,-324,-220,-67,100,246,337,353,290,163,
 337,193,-34,-246,-353,-309,-133,100,290,356,269,67,-163,-324,-346,-220,
@@ -1105,7 +1105,7 @@ const int16_t iT_DCT8_16[256] = { 356,353,346,337,324,309,290,269,246,220,193,16
 67,-193,290,-346,353,-309,220,-100,-34,163,-269,337,-356,324,-246,133,
 34,-100,163,-220,269,-309,337,-353,356,-346,324,-290,246,-193,133,-67 };
 
-const int16_t iT_DCT8_32[1024] = { 359,358,357,354,351,347,342,336,329,322,314,305,296,285,275,263,251,238,225,211,197,182,167,151,135,119,103,86,69,52,35,17,
+const int16_t kvz_g_iT_DCT8_32[1024] = { 359,358,357,354,351,347,342,336,329,322,314,305,296,285,275,263,251,238,225,211,197,182,167,151,135,119,103,86,69,52,35,17,
 358,351,336,314,285,251,211,167,119,69,17,-35,-86,-135,-182,-225,-263,-296,-322,-342,-354,-359,-357,-347,-329,-305,-275,-238,-197,-151,-103,-52,
 357,336,296,238,167,86,0,-86,-167,-238,-296,-336,-357,-357,-336,-296,-238,-167,-86,0,86,167,238,296,336,357,357,336,296,238,167,86,
 354,314,238,135,17,-103,-211,-296,-347,-358,-329,-263,-167,-52,69,182,275,336,359,342,285,197,86,-35,-151,-251,-322,-357,-351,-305,-225,-119,
@@ -1139,7 +1139,7 @@ const int16_t iT_DCT8_32[1024] = { 359,358,357,354,351,347,342,336,329,322,314,3
 17,-52,86,-119,151,-182,211,-238,263,-285,305,-322,336,-347,354,-358,359,-357,351,-342,329,-314,296,-275,251,-225,197,-167,135,-103,69,-35 };
 
 
-void fastForwardDCT2_B4(const int16_t *src, int16_t *dst, int32_t shift) {
+static void fastForwardDCT2_B4(const int16_t *src, int16_t *dst, int32_t shift) {
 
   int32_t j;
   int32_t E[2], O[2];
@@ -1153,10 +1153,10 @@ void fastForwardDCT2_B4(const int16_t *src, int16_t *dst, int32_t shift) {
     E[1] = src[1] + src[2];
     O[1] = src[1] - src[2];
 
-    dst[0] = (iT2_4[0] * E[0] + iT2_4[1] * E[1] + add) >> shift;
-    dst[2 * line] = (iT2_4[8] * E[0] + iT2_4[9] * E[1] + add) >> shift;
-    dst[line] = (iT2_4[4] * O[0] + iT2_4[5] * O[1] + add) >> shift;
-    dst[3 * line] = (iT2_4[12] * O[0] + iT2_4[13] * O[1] + add) >> shift;
+    dst[0] = (kvz_g_iT_DCT2_4[0] * E[0] + kvz_g_iT_DCT2_4[1] * E[1] + add) >> shift;
+    dst[2 * line] = (kvz_g_iT_DCT2_4[8] * E[0] + kvz_g_iT_DCT2_4[9] * E[1] + add) >> shift;
+    dst[line] = (kvz_g_iT_DCT2_4[4] * O[0] + kvz_g_iT_DCT2_4[5] * O[1] + add) >> shift;
+    dst[3 * line] = (kvz_g_iT_DCT2_4[12] * O[0] + kvz_g_iT_DCT2_4[13] * O[1] + add) >> shift;
 
     src += 4;
     dst++;
@@ -1164,7 +1164,7 @@ void fastForwardDCT2_B4(const int16_t *src, int16_t *dst, int32_t shift) {
 }
 
 //void fastForwardDCT2_B8(int32_t *src ,int32_t *dst,int32_t shift, int32_t line)
-void fastForwardDCT2_B8(const int16_t *src, int16_t *dst, int32_t shift) {
+static void fastForwardDCT2_B8(const int16_t *src, int16_t *dst, int32_t shift) {
 
   int32_t j, k;
   int32_t E[4], O[4];
@@ -1185,15 +1185,15 @@ void fastForwardDCT2_B8(const int16_t *src, int16_t *dst, int32_t shift) {
     EE[1] = E[1] + E[2];
     EO[1] = E[1] - E[2];
 
-    dst[0] = (iT2_8[0] * EE[0] + iT2_8[1] * EE[1] + add) >> shift;
-    dst[4 * line] = (iT2_8[32] * EE[0] + iT2_8[33] * EE[1] + add) >> shift;
-    dst[2 * line] = (iT2_8[16] * EO[0] + iT2_8[17] * EO[1] + add) >> shift;
-    dst[6 * line] = (iT2_8[48] * EO[0] + iT2_8[49] * EO[1] + add) >> shift;
+    dst[0] = (kvz_g_iT_DCT2_8[0] * EE[0] + kvz_g_iT_DCT2_8[1] * EE[1] + add) >> shift;
+    dst[4 * line] = (kvz_g_iT_DCT2_8[32] * EE[0] + kvz_g_iT_DCT2_8[33] * EE[1] + add) >> shift;
+    dst[2 * line] = (kvz_g_iT_DCT2_8[16] * EO[0] + kvz_g_iT_DCT2_8[17] * EO[1] + add) >> shift;
+    dst[6 * line] = (kvz_g_iT_DCT2_8[48] * EO[0] + kvz_g_iT_DCT2_8[49] * EO[1] + add) >> shift;
 
-    dst[line] = (iT2_8[8] * O[0] + iT2_8[9] * O[1] + iT2_8[10] * O[2] + iT2_8[11] * O[3] + add) >> shift;
-    dst[3 * line] = (iT2_8[24] * O[0] + iT2_8[25] * O[1] + iT2_8[26] * O[2] + iT2_8[27] * O[3] + add) >> shift;
-    dst[5 * line] = (iT2_8[40] * O[0] + iT2_8[41] * O[1] + iT2_8[42] * O[2] + iT2_8[43] * O[3] + add) >> shift;
-    dst[7 * line] = (iT2_8[56] * O[0] + iT2_8[57] * O[1] + iT2_8[58] * O[2] + iT2_8[59] * O[3] + add) >> shift;
+    dst[line] = (kvz_g_iT_DCT2_8[8] * O[0] + kvz_g_iT_DCT2_8[9] * O[1] + kvz_g_iT_DCT2_8[10] * O[2] + kvz_g_iT_DCT2_8[11] * O[3] + add) >> shift;
+    dst[3 * line] = (kvz_g_iT_DCT2_8[24] * O[0] + kvz_g_iT_DCT2_8[25] * O[1] + kvz_g_iT_DCT2_8[26] * O[2] + kvz_g_iT_DCT2_8[27] * O[3] + add) >> shift;
+    dst[5 * line] = (kvz_g_iT_DCT2_8[40] * O[0] + kvz_g_iT_DCT2_8[41] * O[1] + kvz_g_iT_DCT2_8[42] * O[2] + kvz_g_iT_DCT2_8[43] * O[3] + add) >> shift;
+    dst[7 * line] = (kvz_g_iT_DCT2_8[56] * O[0] + kvz_g_iT_DCT2_8[57] * O[1] + kvz_g_iT_DCT2_8[58] * O[2] + kvz_g_iT_DCT2_8[59] * O[3] + add) >> shift;
 
     src += 8;
     dst++;
@@ -1201,7 +1201,7 @@ void fastForwardDCT2_B8(const int16_t *src, int16_t *dst, int32_t shift) {
 }
 
 //void fastForwardDCT2_B16(int32_t *src ,int32_t *dst,int32_t shift, int32_t line)// for non square blocks
-void fastForwardDCT2_B16(const int16_t *src, int16_t *dst, int32_t shift) {
+static void fastForwardDCT2_B16(const int16_t *src, int16_t *dst, int32_t shift) {
 
   int32_t j, k;
   int32_t E[8], O[8];
@@ -1227,18 +1227,18 @@ void fastForwardDCT2_B16(const int16_t *src, int16_t *dst, int32_t shift) {
     EEE[1] = EE[1] + EE[2];
     EEO[1] = EE[1] - EE[2];
 
-    dst[0] = (iT2_16[0] * EEE[0] + iT2_16[1] * EEE[1] + add) >> shift;
-    dst[8 * line] = (iT2_16[8 * 16] * EEE[0] + iT2_16[8 * 16 + 1] * EEE[1] + add) >> shift;
-    dst[4 * line] = (iT2_16[4 * 16] * EEO[0] + iT2_16[4 * 16 + 1] * EEO[1] + add) >> shift;
-    dst[12 * line] = (iT2_16[12 * 16] * EEO[0] + iT2_16[12 * 16 + 1] * EEO[1] + add) >> shift;
+    dst[0] = (kvz_g_iT_DCT2_16[0] * EEE[0] + kvz_g_iT_DCT2_16[1] * EEE[1] + add) >> shift;
+    dst[8 * line] = (kvz_g_iT_DCT2_16[8 * 16] * EEE[0] + kvz_g_iT_DCT2_16[8 * 16 + 1] * EEE[1] + add) >> shift;
+    dst[4 * line] = (kvz_g_iT_DCT2_16[4 * 16] * EEO[0] + kvz_g_iT_DCT2_16[4 * 16 + 1] * EEO[1] + add) >> shift;
+    dst[12 * line] = (kvz_g_iT_DCT2_16[12 * 16] * EEO[0] + kvz_g_iT_DCT2_16[12 * 16 + 1] * EEO[1] + add) >> shift;
 
     for (k = 2; k < 16; k += 4) {
-      dst[k*line] = (iT2_16[k * 16] * EO[0] + iT2_16[k * 16 + 1] * EO[1] + iT2_16[k * 16 + 2] * EO[2] + iT2_16[k * 16 + 3] * EO[3] + add) >> shift;
+      dst[k*line] = (kvz_g_iT_DCT2_16[k * 16] * EO[0] + kvz_g_iT_DCT2_16[k * 16 + 1] * EO[1] + kvz_g_iT_DCT2_16[k * 16 + 2] * EO[2] + kvz_g_iT_DCT2_16[k * 16 + 3] * EO[3] + add) >> shift;
     }
 
     for (k = 1; k < 16; k += 2) {
-      dst[k*line] = (iT2_16[k * 16] * O[0] + iT2_16[k * 16 + 1] * O[1] + iT2_16[k * 16 + 2] * O[2] + iT2_16[k * 16 + 3] * O[3] +
-        iT2_16[k * 16 + 4] * O[4] + iT2_16[k * 16 + 5] * O[5] + iT2_16[k * 16 + 6] * O[6] + iT2_16[k * 16 + 7] * O[7] + add) >> shift;
+      dst[k*line] = (kvz_g_iT_DCT2_16[k * 16] * O[0] + kvz_g_iT_DCT2_16[k * 16 + 1] * O[1] + kvz_g_iT_DCT2_16[k * 16 + 2] * O[2] + kvz_g_iT_DCT2_16[k * 16 + 3] * O[3] +
+        kvz_g_iT_DCT2_16[k * 16 + 4] * O[4] + kvz_g_iT_DCT2_16[k * 16 + 5] * O[5] + kvz_g_iT_DCT2_16[k * 16 + 6] * O[6] + kvz_g_iT_DCT2_16[k * 16 + 7] * O[7] + add) >> shift;
     }
 
     src += 16;
@@ -1248,7 +1248,7 @@ void fastForwardDCT2_B16(const int16_t *src, int16_t *dst, int32_t shift) {
 }
 
 //void fastForwardDCT2_B32(int32_t *src ,int32_t *dst,int32_t shift, int32_t line)
-void fastForwardDCT2_B32(const int16_t *src, int16_t *dst, int32_t shift) {
+static void fastForwardDCT2_B32(const int16_t *src, int16_t *dst, int32_t shift) {
 
   int32_t j, k;
   int32_t E[16], O[16];
@@ -1280,22 +1280,22 @@ void fastForwardDCT2_B32(const int16_t *src, int16_t *dst, int32_t shift) {
     EEEE[1] = EEE[1] + EEE[2];
     EEEO[1] = EEE[1] - EEE[2];
 
-    dst[0] = (iT2_32[0 * 32 + 0] * EEEE[0] + iT2_32[0 * 32 + 1] * EEEE[1] + add) >> shift;
-    dst[16 * line] = (iT2_32[16 * 32 + 0] * EEEE[0] + iT2_32[16 * 32 + 1] * EEEE[1] + add) >> shift;
-    dst[8 * line] = (iT2_32[8 * 32 + 0] * EEEO[0] + iT2_32[8 * 32 + 1] * EEEO[1] + add) >> shift;
-    dst[24 * line] = (iT2_32[24 * 32 + 0] * EEEO[0] + iT2_32[24 * 32 + 1] * EEEO[1] + add) >> shift;
+    dst[0] = (kvz_g_iT_DCT2_32[0 * 32 + 0] * EEEE[0] + kvz_g_iT_DCT2_32[0 * 32 + 1] * EEEE[1] + add) >> shift;
+    dst[16 * line] = (kvz_g_iT_DCT2_32[16 * 32 + 0] * EEEE[0] + kvz_g_iT_DCT2_32[16 * 32 + 1] * EEEE[1] + add) >> shift;
+    dst[8 * line] = (kvz_g_iT_DCT2_32[8 * 32 + 0] * EEEO[0] + kvz_g_iT_DCT2_32[8 * 32 + 1] * EEEO[1] + add) >> shift;
+    dst[24 * line] = (kvz_g_iT_DCT2_32[24 * 32 + 0] * EEEO[0] + kvz_g_iT_DCT2_32[24 * 32 + 1] * EEEO[1] + add) >> shift;
     for (k = 4; k < 32; k += 8) {
-      dst[k*line] = (iT2_32[k * 32 + 0] * EEO[0] + iT2_32[k * 32 + 1] * EEO[1] + iT2_32[k * 32 + 2] * EEO[2] + iT2_32[k * 32 + 3] * EEO[3] + add) >> shift;
+      dst[k*line] = (kvz_g_iT_DCT2_32[k * 32 + 0] * EEO[0] + kvz_g_iT_DCT2_32[k * 32 + 1] * EEO[1] + kvz_g_iT_DCT2_32[k * 32 + 2] * EEO[2] + kvz_g_iT_DCT2_32[k * 32 + 3] * EEO[3] + add) >> shift;
     }
     for (k = 2; k < 32; k += 4) {
-      dst[k*line] = (iT2_32[k * 32 + 0] * EO[0] + iT2_32[k * 32 + 1] * EO[1] + iT2_32[k * 32 + 2] * EO[2] + iT2_32[k * 32 + 3] * EO[3] +
-        iT2_32[k * 32 + 4] * EO[4] + iT2_32[k * 32 + 5] * EO[5] + iT2_32[k * 32 + 6] * EO[6] + iT2_32[k * 32 + 7] * EO[7] + add) >> shift;
+      dst[k*line] = (kvz_g_iT_DCT2_32[k * 32 + 0] * EO[0] + kvz_g_iT_DCT2_32[k * 32 + 1] * EO[1] + kvz_g_iT_DCT2_32[k * 32 + 2] * EO[2] + kvz_g_iT_DCT2_32[k * 32 + 3] * EO[3] +
+        kvz_g_iT_DCT2_32[k * 32 + 4] * EO[4] + kvz_g_iT_DCT2_32[k * 32 + 5] * EO[5] + kvz_g_iT_DCT2_32[k * 32 + 6] * EO[6] + kvz_g_iT_DCT2_32[k * 32 + 7] * EO[7] + add) >> shift;
     }
     for (k = 1; k < 32; k += 2) {
-      dst[k*line] = (iT2_32[k * 32 + 0] * O[0] + iT2_32[k * 32 + 1] * O[1] + iT2_32[k * 32 + 2] * O[2] + iT2_32[k * 32 + 3] * O[3] +
-        iT2_32[k * 32 + 4] * O[4] + iT2_32[k * 32 + 5] * O[5] + iT2_32[k * 32 + 6] * O[6] + iT2_32[k * 32 + 7] * O[7] +
-        iT2_32[k * 32 + 8] * O[8] + iT2_32[k * 32 + 9] * O[9] + iT2_32[k * 32 + 10] * O[10] + iT2_32[k * 32 + 11] * O[11] +
-        iT2_32[k * 32 + 12] * O[12] + iT2_32[k * 32 + 13] * O[13] + iT2_32[k * 32 + 14] * O[14] + iT2_32[k * 32 + 15] * O[15] + add) >> shift;
+      dst[k*line] = (kvz_g_iT_DCT2_32[k * 32 + 0] * O[0] + kvz_g_iT_DCT2_32[k * 32 + 1] * O[1] + kvz_g_iT_DCT2_32[k * 32 + 2] * O[2] + kvz_g_iT_DCT2_32[k * 32 + 3] * O[3] +
+        kvz_g_iT_DCT2_32[k * 32 + 4] * O[4] + kvz_g_iT_DCT2_32[k * 32 + 5] * O[5] + kvz_g_iT_DCT2_32[k * 32 + 6] * O[6] + kvz_g_iT_DCT2_32[k * 32 + 7] * O[7] +
+        kvz_g_iT_DCT2_32[k * 32 + 8] * O[8] + kvz_g_iT_DCT2_32[k * 32 + 9] * O[9] + kvz_g_iT_DCT2_32[k * 32 + 10] * O[10] + kvz_g_iT_DCT2_32[k * 32 + 11] * O[11] +
+        kvz_g_iT_DCT2_32[k * 32 + 12] * O[12] + kvz_g_iT_DCT2_32[k * 32 + 13] * O[13] + kvz_g_iT_DCT2_32[k * 32 + 14] * O[14] + kvz_g_iT_DCT2_32[k * 32 + 15] * O[15] + add) >> shift;
     }
     src += 32;
     dst++;
@@ -1303,7 +1303,7 @@ void fastForwardDCT2_B32(const int16_t *src, int16_t *dst, int32_t shift) {
 }
 
 
-void fastInverseDCT2_B4(const int16_t *src, int16_t *dst, int32_t shift)
+static void fastInverseDCT2_B4(const int16_t *src, int16_t *dst, int32_t shift)
 // void fastInverseDCT2_B4(int32_t *src, int32_t *dst, int32_t shift, int32_t line)    // for non square blocks
 {
   int32_t j;
@@ -1317,10 +1317,10 @@ void fastInverseDCT2_B4(const int16_t *src, int16_t *dst, int32_t shift)
 
   {
     /* Utilizing symmetry properties to the maximum to minimize the number of multiplications */
-    O[0] = iT2_4[1 * 4 + 0] * src[line] + iT2_4[3 * 4 + 0] * src[3 * line];
-    O[1] = iT2_4[1 * 4 + 1] * src[line] + iT2_4[3 * 4 + 1] * src[3 * line];
-    E[0] = iT2_4[0 * 4 + 0] * src[0] + iT2_4[2 * 4 + 0] * src[2 * line];
-    E[1] = iT2_4[0 * 4 + 1] * src[0] + iT2_4[2 * 4 + 1] * src[2 * line];
+    O[0] = kvz_g_iT_DCT2_4[1 * 4 + 0] * src[line] + kvz_g_iT_DCT2_4[3 * 4 + 0] * src[3 * line];
+    O[1] = kvz_g_iT_DCT2_4[1 * 4 + 1] * src[line] + kvz_g_iT_DCT2_4[3 * 4 + 1] * src[3 * line];
+    E[0] = kvz_g_iT_DCT2_4[0 * 4 + 0] * src[0] + kvz_g_iT_DCT2_4[2 * 4 + 0] * src[2 * line];
+    E[1] = kvz_g_iT_DCT2_4[0 * 4 + 1] * src[0] + kvz_g_iT_DCT2_4[2 * 4 + 1] * src[2 * line];
 
     /* Combining even and odd terms at each hierarchy levels to calculate the final spatial domain vector */
     dst[0] = (short)CLIP(-32768, 32767, (E[0] + O[0] + add) >> shift);
@@ -1335,7 +1335,7 @@ void fastInverseDCT2_B4(const int16_t *src, int16_t *dst, int32_t shift)
 }
 
 
-void fastInverseDCT2_B8(const int16_t *src, int16_t *dst, int32_t shift) {
+static void fastInverseDCT2_B8(const int16_t *src, int16_t *dst, int32_t shift) {
   int32_t j, k;
   int32_t E[4], O[4];
   int32_t EE[2], EO[2];
@@ -1346,13 +1346,13 @@ void fastInverseDCT2_B8(const int16_t *src, int16_t *dst, int32_t shift) {
   for (j = 0; j < line; j++) {
     /* Utilizing symmetry properties to the maximum to minimize the number of multiplications */
     for (k = 0; k < 4; k++) {
-      O[k] = iT2_8[1 * 8 + k] * src[line] + iT2_8[3 * 8 + k] * src[3 * line] + iT2_8[5 * 8 + k] * src[5 * line] + iT2_8[7 * 8 + k] * src[7 * line];
+      O[k] = kvz_g_iT_DCT2_8[1 * 8 + k] * src[line] + kvz_g_iT_DCT2_8[3 * 8 + k] * src[3 * line] + kvz_g_iT_DCT2_8[5 * 8 + k] * src[5 * line] + kvz_g_iT_DCT2_8[7 * 8 + k] * src[7 * line];
     }
 
-    EO[0] = iT2_8[2 * 8 + 0] * src[2 * line] + iT2_8[6 * 8 + 0] * src[6 * line];
-    EO[1] = iT2_8[2 * 8 + 1] * src[2 * line] + iT2_8[6 * 8 + 1] * src[6 * line];
-    EE[0] = iT2_8[0 * 8 + 0] * src[0] + iT2_8[4 * 8 + 0] * src[4 * line];
-    EE[1] = iT2_8[0 * 8 + 1] * src[0] + iT2_8[4 * 8 + 1] * src[4 * line];
+    EO[0] = kvz_g_iT_DCT2_8[2 * 8 + 0] * src[2 * line] + kvz_g_iT_DCT2_8[6 * 8 + 0] * src[6 * line];
+    EO[1] = kvz_g_iT_DCT2_8[2 * 8 + 1] * src[2 * line] + kvz_g_iT_DCT2_8[6 * 8 + 1] * src[6 * line];
+    EE[0] = kvz_g_iT_DCT2_8[0 * 8 + 0] * src[0] + kvz_g_iT_DCT2_8[4 * 8 + 0] * src[4 * line];
+    EE[1] = kvz_g_iT_DCT2_8[0 * 8 + 1] * src[0] + kvz_g_iT_DCT2_8[4 * 8 + 1] * src[4 * line];
 
     /* Combining even and odd terms at each hierarchy levels to calculate the final spatial domain vector */
     E[0] = EE[0] + EO[0];
@@ -1371,7 +1371,7 @@ void fastInverseDCT2_B8(const int16_t *src, int16_t *dst, int32_t shift) {
   }
 }
 
-void fastInverseDCT2_B16(const int16_t *src, int16_t *dst, int32_t shift) {
+static void fastInverseDCT2_B16(const int16_t *src, int16_t *dst, int32_t shift) {
 
   int32_t j, k;
   int32_t E[8], O[8];
@@ -1384,16 +1384,16 @@ void fastInverseDCT2_B16(const int16_t *src, int16_t *dst, int32_t shift) {
   for (j = 0; j < line; j++) {
     /* Utilizing symmetry properties to the maximum to minimize the number of multiplications */
     for (k = 0; k < 8; k++) {
-      O[k] = iT2_16[1 * 16 + k] * src[line] + iT2_16[3 * 16 + k] * src[3 * line] + iT2_16[5 * 16 + k] * src[5 * line] + iT2_16[7 * 16 + k] * src[7 * line] +
-        iT2_16[9 * 16 + k] * src[9 * line] + iT2_16[11 * 16 + k] * src[11 * line] + iT2_16[13 * 16 + k] * src[13 * line] + iT2_16[15 * 16 + k] * src[15 * line];
+      O[k] = kvz_g_iT_DCT2_16[1 * 16 + k] * src[line] + kvz_g_iT_DCT2_16[3 * 16 + k] * src[3 * line] + kvz_g_iT_DCT2_16[5 * 16 + k] * src[5 * line] + kvz_g_iT_DCT2_16[7 * 16 + k] * src[7 * line] +
+        kvz_g_iT_DCT2_16[9 * 16 + k] * src[9 * line] + kvz_g_iT_DCT2_16[11 * 16 + k] * src[11 * line] + kvz_g_iT_DCT2_16[13 * 16 + k] * src[13 * line] + kvz_g_iT_DCT2_16[15 * 16 + k] * src[15 * line];
     }
     for (k = 0; k < 4; k++) {
-      EO[k] = iT2_16[2 * 16 + k] * src[2 * line] + iT2_16[6 * 16 + k] * src[6 * line] + iT2_16[10 * 16 + k] * src[10 * line] + iT2_16[14 * 16 + k] * src[14 * line];
+      EO[k] = kvz_g_iT_DCT2_16[2 * 16 + k] * src[2 * line] + kvz_g_iT_DCT2_16[6 * 16 + k] * src[6 * line] + kvz_g_iT_DCT2_16[10 * 16 + k] * src[10 * line] + kvz_g_iT_DCT2_16[14 * 16 + k] * src[14 * line];
     }
-    EEO[0] = iT2_16[4 * 16] * src[4 * line] + iT2_16[12 * 16] * src[12 * line];
-    EEE[0] = iT2_16[0] * src[0] + iT2_16[8 * 16] * src[8 * line];
-    EEO[1] = iT2_16[4 * 16 + 1] * src[4 * line] + iT2_16[12 * 16 + 1] * src[12 * line];
-    EEE[1] = iT2_16[0 * 16 + 1] * src[0] + iT2_16[8 * 16 + 1] * src[8 * line];
+    EEO[0] = kvz_g_iT_DCT2_16[4 * 16] * src[4 * line] + kvz_g_iT_DCT2_16[12 * 16] * src[12 * line];
+    EEE[0] = kvz_g_iT_DCT2_16[0] * src[0] + kvz_g_iT_DCT2_16[8 * 16] * src[8 * line];
+    EEO[1] = kvz_g_iT_DCT2_16[4 * 16 + 1] * src[4 * line] + kvz_g_iT_DCT2_16[12 * 16 + 1] * src[12 * line];
+    EEE[1] = kvz_g_iT_DCT2_16[0 * 16 + 1] * src[0] + kvz_g_iT_DCT2_16[8 * 16 + 1] * src[8 * line];
 
     /* Combining even and odd terms at each hierarchy levels to calculate the final spatial domain vector */
     for (k = 0; k < 2; k++) {
@@ -1413,7 +1413,7 @@ void fastInverseDCT2_B16(const int16_t *src, int16_t *dst, int32_t shift) {
   }
 }
 
-void fastInverseDCT2_B32(const int16_t *src, int16_t *dst, int32_t shift) {
+static void fastInverseDCT2_B32(const int16_t *src, int16_t *dst, int32_t shift) {
 
   int32_t j, k;
   int32_t E[16], O[16];
@@ -1427,22 +1427,22 @@ void fastInverseDCT2_B32(const int16_t *src, int16_t *dst, int32_t shift) {
   for (j = 0; j < line; j++) {
     /* Utilizing symmetry properties to the maximum to minimize the number of multiplications */
     for (k = 0; k < 16; k++) {
-      O[k] = iT2_32[1 * 32 + k] * src[line] + iT2_32[3 * 32 + k] * src[3 * line] + iT2_32[5 * 32 + k] * src[5 * line] + iT2_32[7 * 32 + k] * src[7 * line] +
-        iT2_32[9 * 32 + k] * src[9 * line] + iT2_32[11 * 32 + k] * src[11 * line] + iT2_32[13 * 32 + k] * src[13 * line] + iT2_32[15 * 32 + k] * src[15 * line] +
-        iT2_32[17 * 32 + k] * src[17 * line] + iT2_32[19 * 32 + k] * src[19 * line] + iT2_32[21 * 32 + k] * src[21 * line] + iT2_32[23 * 32 + k] * src[23 * line] +
-        iT2_32[25 * 32 + k] * src[25 * line] + iT2_32[27 * 32 + k] * src[27 * line] + iT2_32[29 * 32 + k] * src[29 * line] + iT2_32[31 * 32 + k] * src[31 * line];
+      O[k] = kvz_g_iT_DCT2_32[1 * 32 + k] * src[line] + kvz_g_iT_DCT2_32[3 * 32 + k] * src[3 * line] + kvz_g_iT_DCT2_32[5 * 32 + k] * src[5 * line] + kvz_g_iT_DCT2_32[7 * 32 + k] * src[7 * line] +
+        kvz_g_iT_DCT2_32[9 * 32 + k] * src[9 * line] + kvz_g_iT_DCT2_32[11 * 32 + k] * src[11 * line] + kvz_g_iT_DCT2_32[13 * 32 + k] * src[13 * line] + kvz_g_iT_DCT2_32[15 * 32 + k] * src[15 * line] +
+        kvz_g_iT_DCT2_32[17 * 32 + k] * src[17 * line] + kvz_g_iT_DCT2_32[19 * 32 + k] * src[19 * line] + kvz_g_iT_DCT2_32[21 * 32 + k] * src[21 * line] + kvz_g_iT_DCT2_32[23 * 32 + k] * src[23 * line] +
+        kvz_g_iT_DCT2_32[25 * 32 + k] * src[25 * line] + kvz_g_iT_DCT2_32[27 * 32 + k] * src[27 * line] + kvz_g_iT_DCT2_32[29 * 32 + k] * src[29 * line] + kvz_g_iT_DCT2_32[31 * 32 + k] * src[31 * line];
     }
     for (k = 0; k < 8; k++) {
-      EO[k] = iT2_32[2 * 32 + k] * src[2 * line] + iT2_32[6 * 32 + k] * src[6 * line] + iT2_32[10 * 32 + k] * src[10 * line] + iT2_32[14 * 32 + k] * src[14 * line] +
-        iT2_32[18 * 32 + k] * src[18 * line] + iT2_32[22 * 32 + k] * src[22 * line] + iT2_32[26 * 32 + k] * src[26 * line] + iT2_32[30 * 32 + k] * src[30 * line];
+      EO[k] = kvz_g_iT_DCT2_32[2 * 32 + k] * src[2 * line] + kvz_g_iT_DCT2_32[6 * 32 + k] * src[6 * line] + kvz_g_iT_DCT2_32[10 * 32 + k] * src[10 * line] + kvz_g_iT_DCT2_32[14 * 32 + k] * src[14 * line] +
+        kvz_g_iT_DCT2_32[18 * 32 + k] * src[18 * line] + kvz_g_iT_DCT2_32[22 * 32 + k] * src[22 * line] + kvz_g_iT_DCT2_32[26 * 32 + k] * src[26 * line] + kvz_g_iT_DCT2_32[30 * 32 + k] * src[30 * line];
     }
     for (k = 0; k < 4; k++) {
-      EEO[k] = iT2_32[4 * 32 + k] * src[4 * line] + iT2_32[12 * 32 + k] * src[12 * line] + iT2_32[20 * 32 + k] * src[20 * line] + iT2_32[28 * 32 + k] * src[28 * line];
+      EEO[k] = kvz_g_iT_DCT2_32[4 * 32 + k] * src[4 * line] + kvz_g_iT_DCT2_32[12 * 32 + k] * src[12 * line] + kvz_g_iT_DCT2_32[20 * 32 + k] * src[20 * line] + kvz_g_iT_DCT2_32[28 * 32 + k] * src[28 * line];
     }
-    EEEO[0] = iT2_32[8 * 32 + 0] * src[8 * line] + iT2_32[24 * 32 + 0] * src[24 * line];
-    EEEO[1] = iT2_32[8 * 32 + 1] * src[8 * line] + iT2_32[24 * 32 + 1] * src[24 * line];
-    EEEE[0] = iT2_32[0 * 32 + 0] * src[0] + iT2_32[16 * 32 + 0] * src[16 * line];
-    EEEE[1] = iT2_32[0 * 32 + 1] * src[0] + iT2_32[16 * 32 + 1] * src[16 * line];
+    EEEO[0] = kvz_g_iT_DCT2_32[8 * 32 + 0] * src[8 * line] + kvz_g_iT_DCT2_32[24 * 32 + 0] * src[24 * line];
+    EEEO[1] = kvz_g_iT_DCT2_32[8 * 32 + 1] * src[8 * line] + kvz_g_iT_DCT2_32[24 * 32 + 1] * src[24 * line];
+    EEEE[0] = kvz_g_iT_DCT2_32[0 * 32 + 0] * src[0] + kvz_g_iT_DCT2_32[16 * 32 + 0] * src[16 * line];
+    EEEE[1] = kvz_g_iT_DCT2_32[0 * 32 + 1] * src[0] + kvz_g_iT_DCT2_32[16 * 32 + 1] * src[16 * line];
 
     /* Combining even and odd terms at each hierarchy levels to calculate the final spatial domain vector */
     EEE[0] = EEEE[0] + EEEO[0];
@@ -1466,7 +1466,7 @@ void fastInverseDCT2_B32(const int16_t *src, int16_t *dst, int32_t shift) {
   }
 }
 
-void fastForwardDST7_B4(const int16_t *block, int16_t *coeff, int32_t shift) {
+static void fastForwardDST7_B4(const int16_t *block, int16_t *coeff, int32_t shift) {
   int32_t i;
   int32_t rnd_factor = 1 << (shift - 1);
   int32_t c[4];
@@ -1478,13 +1478,13 @@ void fastForwardDST7_B4(const int16_t *block, int16_t *coeff, int32_t shift) {
     c[0] = block[0] + block[3];
     c[1] = block[2] + block[0];
     c[2] = block[3] - block[2];
-    c[3] = iT_DST7_4[1] * block[1];
+    c[3] = kvz_g_iT_DST7_4[1] * block[1];
 
 
-    coeff[0 * line] = (iT_DST7_4[3] * c[0] + iT_DST7_4[2] * c[1] + c[3] + rnd_factor) >> shift;
-    coeff[1 * line] = (iT_DST7_4[1] * (block[0] - block[2] - block[3]) + rnd_factor) >> shift;
-    coeff[2 * line] = (iT_DST7_4[3] * c[2] + iT_DST7_4[2] * c[0] - c[3] + rnd_factor) >> shift;
-    coeff[3 * line] = (iT_DST7_4[3] * c[1] - iT_DST7_4[2] * c[2] - c[3] + rnd_factor) >> shift;
+    coeff[0 * line] = (kvz_g_iT_DST7_4[3] * c[0] + kvz_g_iT_DST7_4[2] * c[1] + c[3] + rnd_factor) >> shift;
+    coeff[1 * line] = (kvz_g_iT_DST7_4[1] * (block[0] - block[2] - block[3]) + rnd_factor) >> shift;
+    coeff[2 * line] = (kvz_g_iT_DST7_4[3] * c[2] + kvz_g_iT_DST7_4[2] * c[0] - c[3] + rnd_factor) >> shift;
+    coeff[3 * line] = (kvz_g_iT_DST7_4[3] * c[1] - kvz_g_iT_DST7_4[2] * c[2] - c[3] + rnd_factor) >> shift;
 
 
     block += 4;
@@ -1493,7 +1493,7 @@ void fastForwardDST7_B4(const int16_t *block, int16_t *coeff, int32_t shift) {
 
 }
 
-void fastInverseDST7_B4(const int16_t *coeff, int16_t *block, int32_t shift) {
+static void fastInverseDST7_B4(const int16_t *coeff, int16_t *block, int32_t shift) {
   int32_t i;
   int32_t rnd_factor = 1 << (shift - 1);
   int32_t c[4];
@@ -1505,14 +1505,14 @@ void fastInverseDST7_B4(const int16_t *coeff, int16_t *block, int32_t shift) {
     c[0] = coeff[0 * line] + coeff[2 * line];
     c[1] = coeff[2 * line] + coeff[3 * line];
     c[2] = coeff[0 * line] - coeff[3 * line];
-    c[3] = iT_DST7_4[2] * coeff[1 * line];
+    c[3] = kvz_g_iT_DST7_4[2] * coeff[1 * line];
 
 
-    block[0] = (short)CLIP(-32768, 32767, (iT_DST7_4[0] * c[0] + iT_DST7_4[1] * c[1] + c[3] + rnd_factor) >> shift);
-    block[1] = (short)CLIP(-32768, 32767, (iT_DST7_4[1] * c[2] - iT_DST7_4[0] * c[1] + c[3] + rnd_factor) >> shift);
-    block[2] = (short)CLIP(-32768, 32767, (iT_DST7_4[2] * (coeff[0 * line] - coeff[2 * line] + coeff[3 * line]) + rnd_factor) >> shift);
+    block[0] = (short)CLIP(-32768, 32767, (kvz_g_iT_DST7_4[0] * c[0] + kvz_g_iT_DST7_4[1] * c[1] + c[3] + rnd_factor) >> shift);
+    block[1] = (short)CLIP(-32768, 32767, (kvz_g_iT_DST7_4[1] * c[2] - kvz_g_iT_DST7_4[0] * c[1] + c[3] + rnd_factor) >> shift);
+    block[2] = (short)CLIP(-32768, 32767, (kvz_g_iT_DST7_4[2] * (coeff[0 * line] - coeff[2 * line] + coeff[3 * line]) + rnd_factor) >> shift);
 
-    block[3] = (short)CLIP(-32768, 32767, (iT_DST7_4[1] * c[0] + iT_DST7_4[0] * c[2] - c[3] + rnd_factor) >> shift);
+    block[3] = (short)CLIP(-32768, 32767, (kvz_g_iT_DST7_4[1] * c[0] + kvz_g_iT_DST7_4[0] * c[2] - c[3] + rnd_factor) >> shift);
 
     block += 4;
     coeff++;
@@ -1520,23 +1520,24 @@ void fastInverseDST7_B4(const int16_t *coeff, int16_t *block, int32_t shift) {
 
 }
 
-void fastForwardDST1_B4(const int16_t *block, int16_t *coeff, int32_t shift) {
+/*
+static void fastForwardDST1_B4(const int16_t *block, int16_t *coeff, int32_t shift) {
   int32_t i;
   int32_t rnd_factor = 1 << (shift - 1);
   int32_t E[2], O[2];
   const int32_t line = 4;  // for square blocks
 
   for (i = 0; i < line; i++) {
-    /* E and O */
+    // E and O
     E[0] = block[0] + block[3];
     O[0] = block[0] - block[3];
     E[1] = block[1] + block[2];
     O[1] = block[1] - block[2];
 
-    coeff[0] = (E[0] * iT_DST1_4[0] + E[1] * iT_DST1_4[1] + rnd_factor) >> shift;
-    coeff[line] = (O[0] * iT_DST1_4[1] + O[1] * iT_DST1_4[0] + rnd_factor) >> shift;
-    coeff[2 * line] = (E[0] * iT_DST1_4[1] - E[1] * iT_DST1_4[0] + rnd_factor) >> shift;
-    coeff[3 * line] = (O[0] * iT_DST1_4[0] - O[1] * iT_DST1_4[1] + rnd_factor) >> shift;
+    coeff[0] = (E[0] * kvz_g_iT_DST1_4[0] + E[1] * kvz_g_iT_DST1_4[1] + rnd_factor) >> shift;
+    coeff[line] = (O[0] * kvz_g_iT_DST1_4[1] + O[1] * kvz_g_iT_DST1_4[0] + rnd_factor) >> shift;
+    coeff[2 * line] = (E[0] * kvz_g_iT_DST1_4[1] - E[1] * kvz_g_iT_DST1_4[0] + rnd_factor) >> shift;
+    coeff[3 * line] = (O[0] * kvz_g_iT_DST1_4[0] - O[1] * kvz_g_iT_DST1_4[1] + rnd_factor) >> shift;
 
     block += 4;
     coeff++;
@@ -1545,20 +1546,20 @@ void fastForwardDST1_B4(const int16_t *block, int16_t *coeff, int32_t shift) {
 }
 
 
-void fastInverseDST1_B4(const int16_t *coeff, int16_t *block, int32_t shift) {
+static void fastInverseDST1_B4(const int16_t *coeff, int16_t *block, int32_t shift) {
   int32_t i;
   int32_t rnd_factor = 1 << (shift - 1);
   int32_t E[2], O[2];
   const int32_t line = 4;  // for square blocks
 
-  short iT_DST1_4[16] = { 190,308,308,190,
+  short kvz_g_iT_DST1_4[16] = { 190,308,308,190,
     308,190,-190,-308,
     308,-190,-190,308,
     190,-308,308,-190 };
 
 
   for (i = 0; i < line; i++) {
-    /* E and O */
+    // E and O 
 
     E[0] = coeff[0 * line] + coeff[3 * line];
     O[0] = coeff[0 * line] - coeff[3 * line];
@@ -1566,18 +1567,19 @@ void fastInverseDST1_B4(const int16_t *coeff, int16_t *block, int32_t shift) {
     O[1] = coeff[1 * line] - coeff[2 * line];
 
 
-    block[0] = (short)CLIP(-32768, 32767, (E[0] * iT_DST1_4[0] + E[1] * iT_DST1_4[1] + rnd_factor) >> shift);
-    block[1] = (short)CLIP(-32768, 32767, (O[0] * iT_DST1_4[1] + O[1] * iT_DST1_4[0] + rnd_factor) >> shift);
-    block[2] = (short)CLIP(-32768, 32767, (E[0] * iT_DST1_4[1] - E[1] * iT_DST1_4[0] + rnd_factor) >> shift);
-    block[3] = (short)CLIP(-32768, 32767, (O[0] * iT_DST1_4[0] - O[1] * iT_DST1_4[1] + rnd_factor) >> shift);
+    block[0] = (short)CLIP(-32768, 32767, (E[0] * kvz_g_iT_DST1_4[0] + E[1] * kvz_g_iT_DST1_4[1] + rnd_factor) >> shift);
+    block[1] = (short)CLIP(-32768, 32767, (O[0] * kvz_g_iT_DST1_4[1] + O[1] * kvz_g_iT_DST1_4[0] + rnd_factor) >> shift);
+    block[2] = (short)CLIP(-32768, 32767, (E[0] * kvz_g_iT_DST1_4[1] - E[1] * kvz_g_iT_DST1_4[0] + rnd_factor) >> shift);
+    block[3] = (short)CLIP(-32768, 32767, (O[0] * kvz_g_iT_DST1_4[0] - O[1] * kvz_g_iT_DST1_4[1] + rnd_factor) >> shift);
 
     block += 4;
     coeff++;
 
   }
 }
+*/
 
-void fastForwardDCT8_B4(const int16_t *block, int16_t *coeff, int32_t shift) {
+static void fastForwardDCT8_B4(const int16_t *block, int16_t *coeff, int32_t shift) {
   int32_t i;
   int32_t rnd_factor = 1 << (shift - 1);
   int32_t c[4];
@@ -1588,13 +1590,13 @@ void fastForwardDCT8_B4(const int16_t *block, int16_t *coeff, int32_t shift) {
     c[0] = block[0] + block[3];
     c[1] = block[2] + block[0];
     c[2] = block[3] - block[2];
-    c[3] = iT_DCT8_4[1] * block[1];
+    c[3] = kvz_g_iT_DCT8_4[1] * block[1];
 
 
-    coeff[0 * line] = (iT_DCT8_4[3] * c[0] + iT_DCT8_4[2] * c[1] + c[3] + rnd_factor) >> shift;
-    coeff[1 * line] = (iT_DCT8_4[1] * (block[0] - block[2] - block[3]) + rnd_factor) >> shift;
-    coeff[2 * line] = (iT_DCT8_4[3] * c[2] + iT_DCT8_4[2] * c[0] - c[3] + rnd_factor) >> shift;
-    coeff[3 * line] = (iT_DCT8_4[3] * c[1] - iT_DCT8_4[2] * c[2] - c[3] + rnd_factor) >> shift;
+    coeff[0 * line] = (kvz_g_iT_DCT8_4[3] * c[0] + kvz_g_iT_DCT8_4[2] * c[1] + c[3] + rnd_factor) >> shift;
+    coeff[1 * line] = (kvz_g_iT_DCT8_4[1] * (block[0] - block[2] - block[3]) + rnd_factor) >> shift;
+    coeff[2 * line] = (kvz_g_iT_DCT8_4[3] * c[2] + kvz_g_iT_DCT8_4[2] * c[0] - c[3] + rnd_factor) >> shift;
+    coeff[3 * line] = (kvz_g_iT_DCT8_4[3] * c[1] - kvz_g_iT_DCT8_4[2] * c[2] - c[3] + rnd_factor) >> shift;
 
 
     block += 4;
@@ -1604,7 +1606,7 @@ void fastForwardDCT8_B4(const int16_t *block, int16_t *coeff, int32_t shift) {
 
 
 
-void fastInverseDCT8_B4(const int16_t *coeff, int16_t *block, int32_t shift) {
+static void fastInverseDCT8_B4(const int16_t *coeff, int16_t *block, int32_t shift) {
   int32_t i;
   int32_t rnd_factor = 1 << (shift - 1);
   int32_t c[4];
@@ -1617,14 +1619,14 @@ void fastInverseDCT8_B4(const int16_t *coeff, int16_t *block, int32_t shift) {
     c[0] = coeff[0 * line] + coeff[3 * line];
     c[1] = coeff[2 * line] + coeff[0 * line];
     c[2] = coeff[3 * line] - coeff[2 * line];
-    c[3] = iT_DCT8_4[1] * coeff[1 * line];
+    c[3] = kvz_g_iT_DCT8_4[1] * coeff[1 * line];
 
 
-    block[0] = (iT_DCT8_4[3] * c[0] + iT_DCT8_4[2] * c[1] + c[3] + rnd_factor) >> shift;
+    block[0] = (kvz_g_iT_DCT8_4[3] * c[0] + kvz_g_iT_DCT8_4[2] * c[1] + c[3] + rnd_factor) >> shift;
 
-    block[1] = (iT_DCT8_4[1] * (coeff[0 * line] - coeff[2 * line] - coeff[3 * line]) + rnd_factor) >> shift;
-    block[2] = (iT_DCT8_4[3] * c[2] + iT_DCT8_4[2] * c[0] - c[3] + rnd_factor) >> shift;
-    block[3] = (iT_DCT8_4[3] * c[1] - iT_DCT8_4[2] * c[2] - c[3] + rnd_factor) >> shift;
+    block[1] = (kvz_g_iT_DCT8_4[1] * (coeff[0 * line] - coeff[2 * line] - coeff[3 * line]) + rnd_factor) >> shift;
+    block[2] = (kvz_g_iT_DCT8_4[3] * c[2] + kvz_g_iT_DCT8_4[2] * c[0] - c[3] + rnd_factor) >> shift;
+    block[3] = (kvz_g_iT_DCT8_4[3] * c[1] - kvz_g_iT_DCT8_4[2] * c[2] - c[3] + rnd_factor) >> shift;
 
     block += 4;
     coeff++;
@@ -1634,14 +1636,14 @@ void fastInverseDCT8_B4(const int16_t *coeff, int16_t *block, int32_t shift) {
 
 
 #define DCT_EMT_NXN_GENERIC(t, n) \
-void fastForward ## t ## _B ## n (const int16_t *block, int16_t *coeff, int32_t shift) {\
+static void fastForward ## t ## _B ## n (const int16_t *block, int16_t *coeff, int32_t shift) {\
   int32_t i, j, k, iSum;\
   int32_t rnd_factor = 1 << (shift - 1);\
   int16_t *pcoef;\
   const int16_t *piT;\
   const int32_t line = n;  /* for square blocks */ \
   for (i = 0; i < line; i++) {\
-    piT = iT_ ## t ## _ ## n ;\
+    piT = kvz_g_iT_ ## t ## _ ## n ;\
     pcoef = coeff;\
     for (j = 0; j < n; j++) {\
       iSum = 0;\
@@ -1667,7 +1669,7 @@ static void fastInverse ## t ## _B ## n (const int16_t *coeff, int16_t *block, i
     for (j = 0; j < n; j++) {\
       iSum = 0;\
       for (k = 0; k < n; k++) {\
-        iSum += coeff[k*line] * iT_ ## t ## _ ## n [k * n + j];\
+        iSum += coeff[k*line] * kvz_g_iT_ ## t ## _ ## n [k * n + j];\
       }\
       block[j] = (int16_t)CLIP(-32768, 32767, (iSum + rnd_factor) >> shift);\
     }\
