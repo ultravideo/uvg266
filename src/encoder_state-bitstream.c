@@ -79,8 +79,7 @@ static void encoder_state_write_bitstream_PTL(bitstream_t *stream,
   WRITE_U(stream, 0, 16, "XXX_reserved_zero_43bits[16..31]");
   WRITE_U(stream, 0, 11, "XXX_reserved_zero_43bits[32..42]");
 
-  // TODO: figure out what this is
-  WRITE_U(stream, 0, 1, "general_inbld_flag");
+  WRITE_U(stream, 0, 1, "reserved_zero_bit");
 
   // end Profile Tier
 
@@ -327,28 +326,27 @@ static void encoder_state_write_bitstream_SPS_extension(bitstream_t *stream,
     WRITE_U(stream, 0, 1, "cabac_bypass_alignment_enabled_flag");
 
     // Next extension
-    WRITE_U(stream, 1, 1, "qtbt_flag");
+    //WRITE_U(stream, 1, 1, "qtbt_flag");
     WRITE_U(stream, 0, 1, "large_ctu_flag"); // ToDo: add VVC large block support
     WRITE_U(stream, 0, 1, "subpu_tmvp_flag");
     WRITE_U(stream, 0, 1, "imv_enable_flag");
     //WRITE_U(stream, 0, 1, "high_precision_motion_vectors");
     WRITE_U(stream, 0, 1, "disable_motion_compression_flag");
     WRITE_U(stream, 0, 1, "lm_chroma_enabled_flag");
-    WRITE_U(stream, 0, 1, "emt_intra_enabled_flag");
-    WRITE_U(stream, 0, 1, "emt_inter_enabled_flag");
+    WRITE_U(stream, 0, 1, "mts_enabled_flag");
+    // IF MTS
+      //WRITE_U(stream, 0, 1, "mts_intra_enabled_flag");
+      //WRITE_U(stream, 0, 1, "mts_inter_enabled_flag");
+    // endif
     WRITE_U(stream, 0, 1, "affine_flag");
+    WRITE_U(stream, 0, 1, "gbi_flag");    
     WRITE_U(stream, 0, 5, "reserved_flag_5bits");
 
     WRITE_U(stream, 0, 1, "mtt_enabled_flag");
-    WRITE_U(stream, 0, 1, "next_dqp_enabled_flag");
+    WRITE_U(stream, 0, 1, "mhintra_flag");
+    WRITE_U(stream, 0, 1, "triangle_flag");
+    //WRITE_U(stream, 0, 1, "next_dqp_enabled_flag");
 
-    // QTBT
-    WRITE_U(stream, 0, 1, "qtbt_dual_intra_tree");
-    WRITE_UE(stream, 4, "log2_CTU_size_minus2"); // Max size 2^6 = 64x64
-    WRITE_UE(stream, 1, "log2_minQT_ISlice_minus2");
-    WRITE_UE(stream, 1, "log2_minQT_PBSlice_minus2");
-    WRITE_UE(stream, 0, "max_bt_depth");
-    WRITE_UE(stream, 0, "max_bt_depth_i_slice");
 
   //} else {
   //  WRITE_U(stream, 0, 1, "sps_extension_present_flag");
@@ -364,8 +362,26 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   printf("=========== Sequence Parameter Set ID: 0 ===========\n");
 #endif
 
-  // TODO: profile IDC and level IDC should be defined later on
-  //WRITE_U(stream, 0, 4, "sps_video_parameter_set_id");
+  
+  WRITE_U(stream, 0, 1, "intra_only_constraint_flag");
+  WRITE_U(stream, 0, 4, "max_bitdepth_constraint_idc");
+  WRITE_U(stream, 0, 2, "max_chroma_format_constraint_idc");
+  WRITE_U(stream, 0, 1, "frame_only_constraint_flag");
+  WRITE_U(stream, 0, 1, "no_qtbtt_dual_tree_intra_constraint_flag");
+  WRITE_U(stream, 0, 1, "no_cclm_constraint_flag");
+  WRITE_U(stream, 0, 1, "no_sao_constraint_flag");
+  WRITE_U(stream, 0, 1, "no_alf_constraint_flag");
+  WRITE_U(stream, 0, 1, "no_pcm_constraint_flag");
+  WRITE_U(stream, 0, 1, "no_temporal_mvp_constraint_flag");
+  WRITE_U(stream, 0, 1, "no_sbtmvp_constraint_flag");
+  WRITE_U(stream, 0, 1, "no_amvr_constraint_flag");
+  WRITE_U(stream, 0, 1, "no_affine_motion_constraint_flag");
+  WRITE_U(stream, 0, 1, "no_mts_constraint_flag");
+  WRITE_U(stream, 0, 1, "no_ladf_constraint_flag");
+  WRITE_U(stream, 0, 1, "no_dep_quant_constraint_flag");
+  WRITE_U(stream, 0, 1, "no_sign_data_hiding_constraint_flag");
+  WRITE_U(stream, 0, 1, "ibc_flag");
+
   WRITE_U(stream, 1, 3, "sps_max_sub_layers_minus1");
   WRITE_U(stream, 0, 1, "sps_temporal_id_nesting_flag");
 
@@ -381,25 +397,22 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   WRITE_UE(stream, encoder->in.width, "pic_width_in_luma_samples");
   WRITE_UE(stream, encoder->in.height, "pic_height_in_luma_samples");
 
-  if (encoder->in.width != encoder->in.real_width || encoder->in.height != encoder->in.real_height) {
+  bool use_conformance_window = encoder->in.width != encoder->in.real_width || encoder->in.height != encoder->in.real_height;
+
+  WRITE_U(stream, use_conformance_window, 1, "conformance_window_flag");
+  if (use_conformance_window) {
     // The standard does not seem to allow setting conf_win values such that
     // the number of luma samples is not a multiple of 2. Options are to either
     // hide one line or show an extra line of non-video. Neither seems like a
     // very good option, so let's not even try.
     assert(!(encoder->in.width % 2));
-    WRITE_U(stream, 1, 1, "conformance_window_flag");
     WRITE_UE(stream, 0, "conf_win_left_offset");
     WRITE_UE(stream, (encoder->in.width - encoder->in.real_width) >> 1,
              "conf_win_right_offset");
     WRITE_UE(stream, 0, "conf_win_top_offset");
     WRITE_UE(stream, (encoder->in.height - encoder->in.real_height) >> 1,
              "conf_win_bottom_offset");
-  } else {
-    WRITE_U(stream, 0, 1, "conformance_window_flag");
   }
-
-  //IF window flag
-  //END IF
 
   WRITE_UE(stream, encoder->bitdepth-8, "bit_depth_luma_minus8");
   WRITE_UE(stream, encoder->bitdepth-8, "bit_depth_chroma_minus8");
@@ -417,8 +430,22 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   WRITE_UE(stream, 0, "sps_max_latency_increase_plus1");
   //end for
 
-  WRITE_UE(stream, MIN_SIZE-3, "log2_min_luma_coding_block_size_minus3");
-  WRITE_UE(stream, MAX_DEPTH, "log2_diff_max_min_luma_coding_block_size");
+  // QTBT
+  WRITE_U(stream, 0, 1, "qtbt_dual_intra_tree");
+  WRITE_UE(stream, 4, "log2_CTU_size_minus2"); // Max size 2^6 = 64x64
+  WRITE_UE(stream, MIN_SIZE-2, "log2_min_luma_coding_block_size_minus2"); // Min size 2^3 = 8x8
+  WRITE_U(stream, 0, 1, "sps_override_partition_constraints_enable_flag");
+  WRITE_UE(stream, MAX_DEPTH, "sps_log2_diff_min_qt_min_cb_intra_slice");
+  WRITE_UE(stream, MAX_DEPTH, "sps_log2_diff_min_qt_min_cb_inter_slice");
+  WRITE_UE(stream, 0, "sps_max_mtt_hierarchy_depth_inter_slices");
+  WRITE_UE(stream, 0, "sps_max_mtt_hierarchy_depth_intra_slices");
+
+
+  //WRITE_UE(stream, 1, "log2_minQT_ISlice_minus2");
+  //WRITE_UE(stream, 1, "log2_minQT_PBSlice_minus2");
+
+
+
 
   // ToDo: redefine for VVC
   WRITE_UE(stream, 0, "log2_min_luma_transform_block_size_minus2");   // 4x4
@@ -426,19 +453,12 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   WRITE_UE(stream, encoder->tr_depth_inter, "max_transform_hierarchy_depth_inter");
   WRITE_UE(stream, encoder->cfg.tr_depth_intra, "max_transform_hierarchy_depth_intra");
 
+  WRITE_U(stream, encoder->cfg.sao_type ? 1 : 0, 1, "sps_sao_enabled_flag");
   WRITE_U(stream, 0, 1, "sps_alf_enable_flag");
-  /*
-  // scaling list
-  WRITE_U(stream, encoder->scaling_list.enable, 1, "scaling_list_enable_flag");
-  if (encoder->scaling_list.enable) {
-    WRITE_U(stream, 1, 1, "sps_scaling_list_data_present_flag");
-    encoder_state_write_bitstream_scaling_list(stream, state);
-  }
-  */
+
   WRITE_U(stream, (encoder->cfg.amp_enable ? 1 : 0), 1, "amp_enabled_flag");
 
-  WRITE_U(stream, encoder->cfg.sao_type ? 1 : 0, 1,
-          "sample_adaptive_offset_enabled_flag");
+  
   WRITE_U(stream, ENABLE_PCM, 1, "pcm_enabled_flag");
   #if ENABLE_PCM == 1
     WRITE_U(stream, 7, 4, "pcm_sample_bit_depth_luma_minus1");
@@ -447,6 +467,27 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
     WRITE_UE(stream, 3, "log2_diff_max_min_pcm_coding_block_size");
     WRITE_U(stream, 1, 1, "pcm_loop_filter_disable_flag");
   #endif
+
+  WRITE_U(stream, 0, 1, "sps_ref_wraparound_enabled_flag");
+  WRITE_U(stream, state->encoder_control->cfg.tmvp_enable, 1,
+        "sps_temporal_mvp_enable_flag");
+  if (state->encoder_control->cfg.tmvp_enable) {
+    WRITE_U(stream, 0, 1, "sps_sbtmvp_enabled_flag");
+  }
+
+  WRITE_U(stream, 0, 1, "sps_bdof_enabled_flag");
+  WRITE_U(stream, 0, 1, "sps_fracmmvd_disabled_flag");
+  WRITE_U(stream, 0, 1, "sps_affine_amvr_enabled_flag");
+  WRITE_U(stream, 0, 1, "dmvr_enable_flag");
+    /*
+// scaling list
+WRITE_U(stream, encoder->scaling_list.enable, 1, "scaling_list_enable_flag");
+if (encoder->scaling_list.enable) {
+  WRITE_U(stream, 1, 1, "sps_scaling_list_data_present_flag");
+  encoder_state_write_bitstream_scaling_list(stream, state);
+}
+*/
+  WRITE_U(stream, 0, 1, "sbt_enable_flag");
 
   WRITE_UE(stream, 0, "num_short_term_ref_pic_sets");
 
@@ -458,8 +499,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   //IF long_term_ref_pics_present
   //ENDIF
 
-  WRITE_U(stream, state->encoder_control->cfg.tmvp_enable, 1,
-          "sps_temporal_mvp_enable_flag");
+
   //WRITE_U(stream, 0, 1, "sps_strong_intra_smoothing_enable_flag");
   WRITE_U(stream, 1, 1, "vui_parameters_present_flag");
 
@@ -491,12 +531,10 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
   WRITE_U(stream, 0, 1, "constrained_intra_pred_flag");
   WRITE_U(stream, encoder->cfg.trskip_enable, 1, "transform_skip_enabled_flag");
 
+  WRITE_U(stream, encoder->max_qp_delta_depth >= 0 ? 1:0, 1, "cu_qp_delta_enabled_flag");
   if (encoder->max_qp_delta_depth >= 0) {
-    // Use separate QP for each LCU when rate control is enabled.
-    WRITE_U(stream, 1, 1, "cu_qp_delta_enabled_flag");
+    // Use separate QP for each LCU when rate control is enabled.    
     WRITE_UE(stream, encoder->max_qp_delta_depth, "diff_cu_qp_delta_depth");
-  } else {
-    WRITE_U(stream, 0, 1, "cu_qp_delta_enabled_flag");
   }
 
   //TODO: add QP offsets
@@ -504,10 +542,10 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
   WRITE_SE(stream, 0, "pps_cr_qp_offset");
   WRITE_U(stream, 0, 1, "pps_slice_chroma_qp_offsets_present_flag");
   WRITE_U(stream, 0, 1, "weighted_pred_flag");
-  WRITE_U(stream, 0, 1, "weighted_bipred_idc");
+  WRITE_U(stream, 0, 1, "weighted_bipred_flag");
 
   //WRITE_U(stream, 0, 1, "dependent_slices_enabled_flag");
-  WRITE_U(stream, encoder->cfg.lossless, 1, "transquant_bypass_enable_flag");
+  WRITE_U(stream, encoder->cfg.lossless, 1, "transquant_bypass_enabled_flag");
 
   /*
   WRITE_U(stream, encoder->tiles_enable, 1, "tiles_enabled_flag");
@@ -533,18 +571,18 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
     
   }
   */
-  WRITE_U(stream, 0, 1, "loop_filter_across_slice_flag");
+  WRITE_U(stream, 0, 1, "pps_loop_filter_across_slices_enabled_flag");
   WRITE_U(stream, 1, 1, "deblocking_filter_control_present_flag");
 
   //IF deblocking_filter
-    WRITE_U(stream, 0, 1, "deblocking_filter_override_enabled_flag");
+  WRITE_U(stream, 0, 1, "deblocking_filter_override_enabled_flag");
   WRITE_U(stream, encoder->cfg.deblock_enable ? 0 : 1, 1,
           "pps_disable_deblocking_filter_flag");
 
     //IF !disabled
-  if (encoder->cfg.deblock_enable) {
-     WRITE_SE(stream, encoder->cfg.deblock_beta, "beta_offset_div2");
-     WRITE_SE(stream, encoder->cfg.deblock_tc, "tc_offset_div2");
+    if (encoder->cfg.deblock_enable) {
+       WRITE_SE(stream, encoder->cfg.deblock_beta, "beta_offset_div2");
+       WRITE_SE(stream, encoder->cfg.deblock_tc, "tc_offset_div2");
     }
 
     //ENDIF
