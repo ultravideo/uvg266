@@ -95,10 +95,8 @@ void kvz_cabac_start(cabac_data_t * const data)
  */
 void kvz_cabac_encode_bin(cabac_data_t * const data, const uint32_t bin_value)
 {
-  uint32_t lps;
+  uint32_t lps = CTX_LPS(data->cur_ctx, data->range);
 
-
-  lps = kvz_g_auc_lpst_table[CTX_STATE(data->cur_ctx)][(data->range >> 6) & 3];
   data->range -= lps;
 
   // Not the Most Probable Symbol?
@@ -106,22 +104,23 @@ void kvz_cabac_encode_bin(cabac_data_t * const data, const uint32_t bin_value)
     int num_bits = kvz_g_auc_renorm_table[lps >> 3];
     data->low = (data->low + data->range) << num_bits;
     data->range = lps << num_bits;
-
-    CTX_UPDATE_LPS(data->cur_ctx);
-
+    
     data->bits_left -= num_bits;
-  } else {
-    CTX_UPDATE_MPS(data->cur_ctx);
-    if (data->range >= 256) return;
+    if (data->bits_left < 12) {
+      kvz_cabac_write(data);
+    }
+  } else {    
+    if (data->range < 256) {
+      data->low <<= 1;
+      data->range <<= 1;
+      data->bits_left--;
 
-    data->low <<= 1;
-    data->range <<= 1;
-    data->bits_left--;
+      if (data->bits_left < 12) {
+        kvz_cabac_write(data);
+      }
+    }
   }
-
-  if (data->bits_left < 12) {
-    kvz_cabac_write(data);
-  }
+  CTX_UPDATE(data->cur_ctx, bin_value);
 }
 
 /**
