@@ -224,6 +224,7 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
     //int32_t first_nz_pos_in_cg = 16;
     int32_t num_non_zero = 0;
     int32_t first_sig_pos = (i == scan_cg_last) ? scan_pos_last : (min_sub_pos + (1 << 4) - 1);
+    int32_t reg_bins = 32; //8 for 2x2
 
     
     // !!! residual_coding_subblock() !!!
@@ -251,7 +252,7 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
       /*
          ****  FIRST PASS ****
       */
-      for (next_sig_pos = first_sig_pos; next_sig_pos >= min_sub_pos; next_sig_pos--) {
+      for (next_sig_pos = first_sig_pos; next_sig_pos >= min_sub_pos && reg_bins >= 4; next_sig_pos--) {
 
 
         blk_pos = scan[next_sig_pos];
@@ -267,6 +268,7 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
           cabac_ctx_t* sig_ctx_chroma = &(cabac->ctx.cu_sig_model_chroma[MAX(0, quant_state - 1)][ctx_sig]);
           cabac->cur_ctx = (type == 0 ? sig_ctx_luma : sig_ctx_chroma);
           CABAC_BIN(cabac, sig, "sig_coeff_flag");
+          reg_bins--;
         }
 
         if (sig) {
@@ -963,19 +965,6 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
   uint8_t intra_pred_mode_actual[4];
   uint8_t *intra_pred_mode = intra_pred_mode_actual;
 
-#if KVZ_SEL_ENCRYPTION
-  const bool do_crypto =
-    !state->cabac.only_count &&
-    state->encoder_control->cfg.crypto_features & KVZ_CRYPTO_INTRA_MODE;
-#else
-  const bool do_crypto = false;
-#endif
-
-  uint8_t intra_pred_mode_encry[4] = {-1, -1, -1, -1};
-  if (do_crypto) {
-    intra_pred_mode = intra_pred_mode_encry;
-  }
-
   uint8_t intra_pred_mode_chroma = cur_cu->intra.mode_chroma;
   int8_t intra_preds[4][3] = {{-1, -1, -1},{-1, -1, -1},{-1, -1, -1},{-1, -1, -1}};
   int8_t mpm_preds[4] = {-1, -1, -1, -1};
@@ -985,6 +974,14 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
   // Code must start after variable initialization
   kvz_cabac_encode_bin_trm(cabac, 0); // IPCMFlag == 0
   #endif
+
+  // Intra Subpartition mode
+  bool enough_samples = kvz_g_convert_to_bit[(LCU_WIDTH >> depth)] * 2 > kvz_g_convert_to_bit[4 /* MIN_TB_SIZEY*/];
+  bool allow_isp = enough_samples;
+  if (allow_isp) {
+    cabac->cur_ctx = &(cabac->ctx.intra_subpart_model[0]);
+    CABAC_BIN(cabac, 0, "intra_subPartitions");
+  }
 
   // PREDINFO CODING
   // If intra prediction mode is found from the predictors,
@@ -1011,26 +1008,14 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
       above_pu = kvz_cu_array_at_const(frame->cu_array, pu_x, pu_y - 1);
     }
 
-    if (do_crypto) {
-#if KVZ_SEL_ENCRYPTION
-      // Need to wrap in preprocessor directives because this function is
-      // only defined when KVZ_SEL_ENCRYPTION is defined.
-      kvz_intra_get_dir_luma_predictor_encry(pu_x, pu_y,
-                                             intra_preds[j],
-                                             cur_pu,
-                                             left_pu, above_pu);
-#endif
-    } else {
-      kvz_intra_get_dir_luma_predictor(pu_x, pu_y,
-                                       intra_preds[j],
-                                       cur_pu,
-                                       left_pu, above_pu);
-    }
+
+    kvz_intra_get_dir_luma_predictor(pu_x, pu_y,
+                                      intra_preds[j],
+                                      cur_pu,
+                                      left_pu, above_pu);
+
 
     intra_pred_mode_actual[j] = cur_pu->intra.mode;
-    if (do_crypto) {
-      intra_pred_mode_encry[j] = intra_mode_encryption(state, cur_pu->intra.mode);
-    }
 
     for (int i = 0; i < 3; i++) {
       if (intra_preds[j][i] == intra_pred_mode[j]) {
@@ -1040,25 +1025,6 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
     }
     flag[j] = (mpm_preds[j] == -1) ? 0 : 1;
 
-#if KVZ_SEL_ENCRYPTION
-    // Need to wrap in preprocessor directives because
-    // cu_info_t.intra.mode_encry is only defined when KVZ_SEL_ENCRYPTION
-    // is defined.
-    if (do_crypto) {
-      // Set the modified intra_pred_mode of the current pu here to make it
-      // available from its neighbours for mpm decision.
-
-      // FIXME: there might be a more efficient way to propagate mode_encry
-      // for future use from left and above PUs
-      const int pu_width = PU_GET_W(cur_cu->part_size, cu_width, j);
-      for (int y = pu_y; y < pu_y + pu_width; y += 4 ) {
-        for (int x = pu_x; x < pu_x + pu_width; x += 4) {
-          cu_info_t *cu = kvz_cu_array_at(frame->cu_array, x, y);
-          cu->intra.mode_encry = intra_pred_mode_encry[j];
-        }
-      }
-    }
-#endif
   }
 
   cabac->cur_ctx = &(cabac->ctx.intra_mode_model);
@@ -1273,20 +1239,53 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
     // Exception made in VVC with flag not being implicit if the BT can be used for
     // horizontal or vertical split, then this flag tells if QT or BT is used
 
+    bool no_split, qt_split, bh_split, bv_split, th_split, tv_split;
+    no_split = qt_split = bh_split = bv_split = th_split = tv_split = true;
+    bool allow_qt = cu_width > (LCU_WIDTH >> MAX_DEPTH);
+    bool allow_btt = false; //ToDo: Enable btt
+    
+
+    uint8_t implicit_split_mode = KVZ_NO_SPLIT;
     bool implicit_split = border;
     bool bottom_left_available = (abs_x > 0) && (abs_y + cu_width - 1 > ctrl->in.height);
     bool top_right_available = (abs_x + cu_width - 1 < ctrl->in.width) && (abs_y > 0);
-
+    /*
     if((depth >= 1 && (border_x != border_y))) implicit_split = false;
     if (state->frame->slicetype != KVZ_SLICE_I) {
       if (border_x != border_y) implicit_split = false;
       if (!bottom_left_available && top_right_available) implicit_split = false;
       if (!top_right_available && bottom_left_available) implicit_split = false;
     }
+    */
+    if (!bottom_left_available && !top_right_available && allow_qt) {
+      implicit_split_mode = KVZ_QUAD_SPLIT;
+    } else if (!bottom_left_available && allow_qt) {
+      implicit_split_mode = KVZ_HORZ_SPLIT;
+    } else if (!top_right_available && allow_qt) {
+      implicit_split_mode = KVZ_VERT_SPLIT;
+    } else if (!bottom_left_available && !top_right_available) {
+      implicit_split_mode = KVZ_QUAD_SPLIT;
+    }
 
-    // Only signal split when it is not implicit
-    if (!implicit_split) {
+    // Check split conditions
+    if (implicit_split_mode != KVZ_NO_SPLIT) {
+      no_split = th_split = tv_split = false;
+      bh_split = (implicit_split_mode == KVZ_HORZ_SPLIT);
+      bv_split = (implicit_split_mode == KVZ_VERT_SPLIT);
+    }
+
+    if (!allow_btt) {
+      bh_split = th_split = bv_split = tv_split = false;
+    }
+
+    bool allow_split = qt_split | bh_split | bv_split | th_split | tv_split;
+
+
+    if (no_split && allow_split) {
+
+      split_model = 0;
       // Get left and top block split_flags and if they are present and true, increase model number
+      // ToDo: should use height and width to increase model, PU_GET_W() ?
       if (left_cu && GET_SPLITDATA(left_cu, depth) == 1) {
         split_model++;
       }
@@ -1295,8 +1294,40 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
         split_model++;
       }
 
+      uint32_t split_num = 0;
+      if (qt_split) split_num++;
+      if (bh_split) split_num++;
+      if (bv_split) split_num++;
+      if (th_split) split_num++;
+      if (tv_split) split_num++;
+
+      if (split_num > 0) split_num--;
+
+      split_model += 3 * (split_num >> 1);
+
       cabac->cur_ctx = &(cabac->ctx.split_flag_model[split_model]);
       CABAC_BIN(cabac, split_flag, "SplitFlag");
+    }
+
+    if (!split_flag) return;
+
+    // Only signal split when it is not implicit, currently only Qt split supported
+    if (bh_split || bv_split || th_split || tv_split) {
+
+      split_model = 0;
+
+      // Get left and top block split_flags and if they are present and true, increase model number
+      if (left_cu && GET_SPLITDATA(left_cu, depth) == 1) {
+        split_model++;
+      }
+
+      if (above_cu && GET_SPLITDATA(above_cu, depth) == 1) {
+        split_model++;
+      }
+      split_model += (depth > 2 ? 0 : 3);
+
+      cabac->cur_ctx = &(cabac->ctx.qt_split_flag_model[split_model]);
+      CABAC_BIN(cabac, split_flag, "split_cu_mode");
     }
 
     if (split_flag || border) {

@@ -470,6 +470,13 @@ enum kvz_slice_type {
   KVZ_SLICE_I = 2,
 };
 
+enum kvz_split_mode {
+  KVZ_NO_SPLIT = 0,
+  KVZ_QUAD_SPLIT = 1,
+  KVZ_HORZ_SPLIT = 2,
+  KVZ_VERT_SPLIT = 3,
+};
+
 /**
  * \brief Other information about an encoded frame
  */
