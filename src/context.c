@@ -108,7 +108,7 @@ static const uint8_t INIT_BT_SPLIT_FLAG[3][12] = {
 };
 
 static const uint8_t INIT_INTRA_PRED_MODE[3] = {
-  183, 154, 184
+  154, 154, 170
 };
 
 static const uint8_t INIT_INTRA_SUBPART_MODE[3][2] = {
