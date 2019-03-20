@@ -88,11 +88,18 @@ static const uint8_t INIT_PART_SIZE[3][4] = {
   { 184,  CNU,  CNU,  CNU, },
 };
 
-static const uint8_t  INIT_SPLIT_FLAG[3][5] = {
-  { 107, 139, 126, 255, 0, },
-  { 107, 139, 126, 255, 0, },
-  { 139, 141, 157, 255, 0, },
+static const uint8_t  INIT_SPLIT_FLAG[3][9] = {
+  { 122, 124, 141, 108, 125, 156, 138, 126, 143, },
+  { 93, 139, 171, 124, 125, 141, 139, 141, 158, },
+  { 138, 154, 172, 124, 140, 142, 154, 127, 175, },
 };
+
+static const uint8_t  INIT_QT_SPLIT_FLAG[3][6] = {
+  { 138, 140, 142, 136, 138, 140, },
+  { 139, 126, 142, 107, 138, 125, },
+  { 139, 125, 127, 136, 153, 126, },
+};
+
 
 static const uint8_t INIT_BT_SPLIT_FLAG[3][12] = {
   { 107, 139, 126, 154, 154, 154, 154, 154, 154, 154, 154, 154, },
@@ -102,6 +109,12 @@ static const uint8_t INIT_BT_SPLIT_FLAG[3][12] = {
 
 static const uint8_t INIT_INTRA_PRED_MODE[3] = {
   183, 154, 184
+};
+
+static const uint8_t INIT_INTRA_SUBPART_MODE[3][2] = {
+  { 152, 154, },
+  { 166, 154, },
+  { 152, 154, },
 };
 
 static const uint8_t INIT_CHROMA_PRED_MODE[3][12] = {
@@ -228,6 +241,16 @@ static const uint8_t INIT_TRANSFORMSKIP_FLAG[3][2] =
 };
 
 
+static const uint16_t g_inistateToCount[128] = {
+  614,   647,   681,   718,   756,   797,   839,   884,   932,   982,   1034,  1089,  1148,  1209,  1274,  1342,
+  1414,  1490,  1569,  1653,  1742,  1835,  1933,  2037,  2146,  2261,  2382,  2509,  2643,  2785,  2934,  3091,
+  3256,  3430,  3614,  3807,  4011,  4225,  4452,  4690,  4941,  5205,  5483,  5777,  6086,  6412,  6755,  7116,
+  7497,  7898,  8320,  8766,  9235,  9729,  10249, 10798, 11375, 11984, 12625, 13300, 14012, 14762, 15551, 16384,
+  16384, 17216, 18005, 18755, 19467, 20142, 20783, 21392, 21969, 22518, 23038, 23532, 24001, 24447, 24869, 25270,
+  25651, 26012, 26355, 26681, 26990, 27284, 27562, 27826, 28077, 28315, 28542, 28756, 28960, 29153, 29337, 29511,
+  29676, 29833, 29982, 30124, 30258, 30385, 30506, 30621, 30730, 30834, 30932, 31025, 31114, 31198, 31277, 31353,
+  31425, 31493, 31558, 31619, 31678, 31733, 31785, 31835, 31883, 31928, 31970, 32011, 32049, 32086, 32120, 32153
+};
 
 
 /**
@@ -238,12 +261,18 @@ void kvz_ctx_init(cabac_ctx_t *ctx, uint32_t qp, uint32_t init_value)
   int slope = (init_value >> 4) * 5 - 45;
   int offset = ((init_value & 15) << 3) - 16;
   int init_state = MIN(MAX(1, ((slope * (int)qp) >> 4) + offset), 126);
+    
+  const int p1 = g_inistateToCount[init_state < 0 ? 0 : init_state > 127 ? 127 : init_state];
 
+  ctx->state[0] = p1 & CTX_MASK_0;
+  ctx->state[1] = p1 & CTX_MASK_1;
+  /*
   if (init_state >= 64) {
     ctx->uc_state = ((init_state - 64) << 1) + 1;
   } else {
     ctx->uc_state = (63 - init_state) << 1;
   }
+  */
 }
 
 /**
@@ -272,13 +301,17 @@ void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
   kvz_ctx_init(&cabac->ctx.cu_skip_flag_model[0], QP, INIT_SKIP_FLAG[slice][0]);
   kvz_ctx_init(&cabac->ctx.cu_skip_flag_model[1], QP, INIT_SKIP_FLAG[slice][1]);
   kvz_ctx_init(&cabac->ctx.cu_skip_flag_model[2], QP, INIT_SKIP_FLAG[slice][2]);
+  
+  kvz_ctx_init(&cabac->ctx.intra_subpart_model[0], QP, INIT_INTRA_SUBPART_MODE[slice][0]);
+  kvz_ctx_init(&cabac->ctx.intra_subpart_model[1], QP, INIT_INTRA_SUBPART_MODE[slice][1]);
+  
+  for (i = 0; i < 6; i++) {
+    kvz_ctx_init(&cabac->ctx.qt_split_flag_model[i], QP, INIT_QT_SPLIT_FLAG[slice][i]);
+  }
 
-  kvz_ctx_init(&cabac->ctx.split_flag_model[0], QP, INIT_SPLIT_FLAG[slice][0]);
-  kvz_ctx_init(&cabac->ctx.split_flag_model[1], QP, INIT_SPLIT_FLAG[slice][1]);
-  kvz_ctx_init(&cabac->ctx.split_flag_model[2], QP, INIT_SPLIT_FLAG[slice][2]);
-  // VVC Large CTU use
-  kvz_ctx_init(&cabac->ctx.split_flag_model[3], QP, INIT_SPLIT_FLAG[slice][3]);
-  kvz_ctx_init(&cabac->ctx.split_flag_model[4], QP, INIT_SPLIT_FLAG[slice][4]);
+  for (i = 0; i < 9; i++) {
+    kvz_ctx_init(&cabac->ctx.split_flag_model[i], QP, INIT_SPLIT_FLAG[slice][i]);
+  }
 
   // BT split flag init
   for (i = 0; i < 12; i++) {
