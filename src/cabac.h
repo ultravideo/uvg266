@@ -104,6 +104,7 @@ extern const uint8_t kvz_g_auc_renorm_table[32];
 void kvz_cabac_start(cabac_data_t *data);
 void kvz_cabac_encode_bin(cabac_data_t *data, uint32_t bin_value);
 void kvz_cabac_encode_bin_ep(cabac_data_t *data, uint32_t bin_value);
+void kvz_cabac_encode_trunc_bin(cabac_data_t *data, uint32_t bin_value, uint32_t max_value);
 void kvz_cabac_encode_bins_ep(cabac_data_t *data, uint32_t bin_values, int num_bins);
 void kvz_cabac_encode_bin_trm(cabac_data_t *data, uint8_t bin_value);
 void kvz_cabac_write(cabac_data_t *data);

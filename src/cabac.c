@@ -76,6 +76,17 @@ const uint8_t kvz_g_auc_renorm_table[32] =
   6, 5, 4, 4, 3, 3, 3, 3, 2, 2, 2, 2, 2, 2, 2, 2,
   1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
 };
+const uint8_t kvz_tb_max[257] = { 0, 0, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
+5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
+6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
+6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 7, 7,
+7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 8 };
+
 
 /**
  * \brief Initialize struct cabac_data.
@@ -213,6 +224,36 @@ void kvz_cabac_encode_bin_trm(cabac_data_t * const data, const uint8_t bin_value
     kvz_cabac_write(data);
   }
 }
+
+/**
+ * \brief encode truncated binary code
+ */
+void kvz_cabac_encode_trunc_bin(cabac_data_t * const data, const uint32_t bin_value, const uint32_t max_value) {
+  int thresh;
+  int symbol = bin_value;
+  if (max_value > 256) {
+    int threshVal = 1 << 8;
+    thresh = 8;
+    while (threshVal <= max_value) {
+      thresh++;
+      threshVal <<= 1;
+    }
+    thresh--;
+  } else {
+    thresh = kvz_tb_max[max_value];
+  }
+
+  int val = 1 << thresh;
+
+  int b = max_value - val;
+  if (symbol < val - b) {
+    CABAC_BINS_EP(data, symbol, thresh, "TruncSymbols");
+  } else {
+    symbol += val - b;
+    CABAC_BINS_EP(data, symbol, thresh + 1, "TruncSymbols");
+  }
+}
+
 
 /**
  * \brief
