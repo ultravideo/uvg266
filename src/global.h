@@ -160,6 +160,12 @@ typedef int16_t coeff_t;
 #define LCU_CHROMA_SIZE (LCU_WIDTH * LCU_WIDTH >> 2)
 
 /**
+ * \brief Number of Most Probable Modes in Intra coding
+ *
+ */
+#define INTRA_MPM_COUNT 6
+
+/**
  * \brief Number of pixels to delay deblocking.
  *
  * Number of pixels at the bottom and right side of the LCU that are not
@@ -185,7 +191,7 @@ typedef int16_t coeff_t;
 
 #define AMVP_MAX_NUM_CANDS 2
 #define AMVP_MAX_NUM_CANDS_MEM 3
-#define MRG_MAX_NUM_CANDS 5
+#define MRG_MAX_NUM_CANDS 7
 
 /* Some tools */
 #define ABS(a) ((a) >= 0 ? (a) : (-a))

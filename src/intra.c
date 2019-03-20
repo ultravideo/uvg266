@@ -77,13 +77,19 @@ int8_t kvz_intra_get_dir_luma_predictor(
   const cu_info_t *const left_pu,
   const cu_info_t *const above_pu)
 {
-  // The default mode if block is not coded yet is INTRA_DC.
-  int8_t left_intra_dir  = 1;
+  enum {
+    PLANAR_IDX = 0,
+    DC_IDX = 1,
+    HOR_IDX = 18,
+    VER_IDX = 50,
+  };
+  // The default mode if block is not coded yet is INTRA_PLANAR.
+  int8_t left_intra_dir  = 0;
   if (left_pu && left_pu->type == CU_INTRA) {
     left_intra_dir = left_pu->intra.mode;
   }
 
-  int8_t above_intra_dir = 1;
+  int8_t above_intra_dir = 0;
   if (above_pu && above_pu->type == CU_INTRA && y % LCU_WIDTH != 0) {
     above_intra_dir = above_pu->intra.mode;
   }
@@ -91,26 +97,44 @@ int8_t kvz_intra_get_dir_luma_predictor(
   const int offset = 61;
   const int mod = 64;
 
+  preds[0] = left_intra_dir;
+  preds[1] = (preds[0] == PLANAR_IDX) ? DC_IDX : PLANAR_IDX;
+  preds[2] = VER_IDX;
+  preds[3] = HOR_IDX;
+  preds[4] = VER_IDX - 4;
+  preds[5] = VER_IDX + 4;
+
   // If the predictions are the same, add new predictions
   if (left_intra_dir == above_intra_dir) {
-    if (left_intra_dir > 1) { // angular modes
+    if (left_intra_dir > DC_IDX) { // angular modes
       preds[0] = left_intra_dir;
-      preds[1] = ((left_intra_dir + offset) % mod) + 2;
-      preds[2] = ((left_intra_dir - 1 ) % mod) + 2;
-    } else { //non-angular
-      preds[0] = 0;//PLANAR_IDX;
-      preds[1] = 1;//DC_IDX;
-      preds[2] = 50;//VER_IDX;
+      preds[1] = PLANAR_IDX;
+      preds[2] = DC_IDX;
+      preds[3] = ((left_intra_dir + offset) % mod) + 2;
+      preds[4] = ((left_intra_dir - 1) % mod) + 2;
+      preds[5] = ((left_intra_dir + offset - 1) % mod) + 2;
     }
   } else { // If we have two distinct predictions
     preds[0] = left_intra_dir;
     preds[1] = above_intra_dir;
+    bool max_cand_mode_idx = preds[0] > preds[1] ? 0 : 1;
+    
+    if (left_intra_dir > DC_IDX && above_intra_dir > DC_IDX) {
+      preds[2] = PLANAR_IDX;
+      preds[3] = DC_IDX;      
 
-    // add planar mode if it's not yet present
-    if (left_intra_dir && above_intra_dir ) {
-      preds[2] = 0; // PLANAR_IDX;
+      if ((preds[max_cand_mode_idx] - preds[!max_cand_mode_idx] < 63) && (preds[max_cand_mode_idx] - preds[!max_cand_mode_idx] > 1)) {
+        preds[4] = ((preds[max_cand_mode_idx] + offset) % mod) + 2;
+        preds[5] = ((preds[max_cand_mode_idx] - 1) % mod) + 2;
+      } else {
+        preds[4] = ((preds[max_cand_mode_idx] + offset - 1) % mod) + 2;
+        preds[5] = ((preds[max_cand_mode_idx]) % mod) + 2;
+      }
     } else {  // Add DC mode if it's not present, otherwise VER_IDX.
-      preds[2] =  (left_intra_dir+above_intra_dir)<2? 50 : 1;
+      preds[2] = (preds[!max_cand_mode_idx] == PLANAR_IDX) ? DC_IDX : PLANAR_IDX;
+      preds[3] = ((preds[max_cand_mode_idx] + offset) % mod) + 2;
+      preds[4] = ((preds[max_cand_mode_idx] - 1) % mod) + 2;
+      preds[5] = ((preds[max_cand_mode_idx] + offset - 1) % mod) + 2;
     }
   }
 

@@ -966,7 +966,7 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
   uint8_t *intra_pred_mode = intra_pred_mode_actual;
 
   uint8_t intra_pred_mode_chroma = cur_cu->intra.mode_chroma;
-  int8_t intra_preds[4][3] = {{-1, -1, -1},{-1, -1, -1},{-1, -1, -1},{-1, -1, -1}};
+  int8_t intra_preds[4][INTRA_MPM_COUNT] = {{-1, -1, -1, -1, -1, -1},{-1, -1, -1, -1, -1, -1},{-1, -1, -1, -1, -1, -1},{-1, -1, -1, -1, -1, -1}};
   int8_t mpm_preds[4] = {-1, -1, -1, -1};
   uint32_t flag[4];
 
@@ -987,6 +987,7 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
   // If intra prediction mode is found from the predictors,
   // it can be signaled with two EP's. Otherwise we can send
   // 5 EP bins with the full predmode
+  // ToDo: fix comments for VVC
   const int num_pred_units = kvz_part_mode_num_parts[cur_cu->part_size];
   const int cu_width = LCU_WIDTH >> depth;
 
@@ -1017,7 +1018,7 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
 
     intra_pred_mode_actual[j] = cur_pu->intra.mode;
 
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < INTRA_MPM_COUNT; i++) {
       if (intra_preds[j][i] == intra_pred_mode[j]) {
         mpm_preds[j] = (int8_t)i;
         break;
@@ -1035,28 +1036,59 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
   for (int j = 0; j < num_pred_units; ++j) {
     // Signal index of the prediction mode in the prediction list.
     if (flag[j]) {
-      CABAC_BIN_EP(cabac, (mpm_preds[j] == 0 ? 0 : 1), "mpm_idx");
-      if (mpm_preds[j] != 0) {
-        CABAC_BIN_EP(cabac, (mpm_preds[j] == 1 ? 0 : 1), "mpm_idx");
+      CABAC_BIN_EP(cabac, (mpm_preds[j] > 0 ? 1 : 0), "mpm_idx");
+      if (mpm_preds[j] > 0) {
+        CABAC_BIN_EP(cabac, (mpm_preds[j] > 1 ? 1 : 0), "mpm_idx");
+      } else if (mpm_preds[j] > 1) {
+        CABAC_BIN_EP(cabac, (mpm_preds[j] > 2 ? 1 : 0), "mpm_idx");
+      } else if (mpm_preds[j] > 2) {
+        CABAC_BIN_EP(cabac, (mpm_preds[j] > 3 ? 1 : 0), "mpm_idx");
+      } else if (mpm_preds[j] > 3) {
+        CABAC_BIN_EP(cabac, (mpm_preds[j] > 4 ? 1 : 0), "mpm_idx");
       }
     } else {
-
       // Signal the actual prediction mode.
       int32_t tmp_pred = intra_pred_mode[j];
 
+      uint8_t intra_preds_temp[INTRA_MPM_COUNT+2];
+      memcpy(intra_preds_temp, intra_preds[j], sizeof(int8_t)*3);
+      memcpy(intra_preds_temp+4, &intra_preds[j][3], sizeof(int8_t)*3);
+      intra_preds_temp[3] = 255;
+      intra_preds_temp[7] = 255;
+
+      // Improvised merge sort
       // Sort prediction list from lowest to highest.
-      if (intra_preds[j][0] > intra_preds[j][1]) SWAP(intra_preds[j][0], intra_preds[j][1], int8_t);
-      if (intra_preds[j][0] > intra_preds[j][2]) SWAP(intra_preds[j][0], intra_preds[j][2], int8_t);
-      if (intra_preds[j][1] > intra_preds[j][2]) SWAP(intra_preds[j][1], intra_preds[j][2], int8_t);
+      if (intra_preds_temp[0] > intra_preds_temp[1]) SWAP(intra_preds_temp[0], intra_preds_temp[1], int8_t);
+      if (intra_preds_temp[0] > intra_preds_temp[2]) SWAP(intra_preds_temp[0], intra_preds_temp[2], int8_t);
+      if (intra_preds_temp[1] > intra_preds_temp[2]) SWAP(intra_preds_temp[1], intra_preds_temp[2], int8_t);
+
+      if (intra_preds_temp[4] > intra_preds_temp[5]) SWAP(intra_preds_temp[4], intra_preds_temp[5], int8_t);
+      if (intra_preds_temp[4] > intra_preds_temp[6]) SWAP(intra_preds_temp[4], intra_preds_temp[6], int8_t);
+      if (intra_preds_temp[5] > intra_preds_temp[6]) SWAP(intra_preds_temp[5], intra_preds_temp[6], int8_t);
+
+      // Merge two subarrays
+      int32_t array1 = 0;
+      int32_t array2 = 4;
+      for (int item = 0; item < INTRA_MPM_COUNT; item++) {
+        if (intra_preds_temp[array1] < intra_preds_temp[array2]) {
+          intra_preds[j][item] = intra_preds_temp[array1];
+          array1++;
+        } else {
+          intra_preds[j][item] = intra_preds_temp[array2];
+          array2++;
+        }
+      }
 
       // Reduce the index of the signaled prediction mode according to the
       // prediction list, as it has been already signaled that it's not one
       // of the prediction modes.
-      for (int i = 2; i >= 0; i--) {
-        tmp_pred = (tmp_pred > intra_preds[j][i] ? tmp_pred - 1 : tmp_pred);
+      for (int i = INTRA_MPM_COUNT-1; i >= 0; i--) {
+        if (tmp_pred > intra_preds[j][i]) {
+          tmp_pred--;
+        }
       }
-
-      CABAC_BINS_EP(cabac, tmp_pred, 6, "rem_intra_luma_pred_mode");
+      
+      kvz_cabac_encode_trunc_bin(cabac, tmp_pred, 67 - INTRA_MPM_COUNT);
     }
   }
 
