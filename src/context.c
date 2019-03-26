@@ -117,10 +117,10 @@ static const uint8_t INIT_INTRA_SUBPART_MODE[3][2] = {
   { 152, 154, },
 };
 
-static const uint8_t INIT_CHROMA_PRED_MODE[3][12] = {
-  { 139, 152, 139, 154, 154, 154, 154, 154, 154, 154, 154, 154, },
-  { 139, 152, 139, 154, 154, 154, 154, 154, 154, 154, 154, 154, },
-  { 139,  63, 139, 154, 154, 154, 154, 154, 154, 154, 154, 154, },
+static const uint8_t INIT_CHROMA_PRED_MODE[3][3] = {
+  {  137, 139, 140,},
+  {  138, 139, 169,},
+  {  154, 139, 154,},
 };
 
 static const uint8_t INIT_INTER_DIR[3][5] = {
@@ -136,9 +136,9 @@ static const uint8_t INIT_TRANS_SUBDIV_FLAG[3][3] = {
 };
 
 static const uint8_t INIT_QT_CBF[3][15] = {
-  { 153,  111,  CNU,  CNU,  CNU,   149,   92,  167,  154, 154, 149, 149,  CNU,  CNU,  CNU },
-  { 153,  111,  CNU,  CNU,  CNU,   149,  107,  167,  154, 154, 149, 149,  CNU,  CNU,  CNU },
-  { 111,  141,  CNU,  CNU,  CNU,    94,  138,  182,  154, 154,  94,  94,  CNU,  CNU,  CNU },
+  { 141, 127, 139, 140, 163, 154, CNU, CNU, CNU, 161, 154,},
+  { 142, 127, 139, 140, 164, 154, CNU, CNU, CNU, 192, 154,},
+  { CNU, 111, 124, 111, 109, CNU, CNU, CNU, CNU, 151, 155,},
 };
 
 static const uint8_t INIT_CU_QP_DELTA_ABS[3][2] = {
@@ -320,7 +320,7 @@ void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
 
   kvz_ctx_init(&cabac->ctx.intra_mode_model, QP, INIT_INTRA_PRED_MODE[slice]);
 
-  for (i = 0; i < 12; i++) {
+  for (i = 0; i < 3; i++) {
     kvz_ctx_init(&cabac->ctx.chroma_pred_model[i], QP, INIT_CHROMA_PRED_MODE[slice][i]);
   }
 
@@ -338,7 +338,7 @@ void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
   kvz_ctx_init(&cabac->ctx.cu_qp_delta_abs[1], QP, INIT_CU_QP_DELTA_ABS[slice][1]);
 
   for (i = 0; i < 4; i++) {
-    
+    kvz_ctx_init(&cabac->ctx.qt_cbf_model_luma[i], QP, INIT_QT_CBF[slice][i]);
     kvz_ctx_init(&cabac->ctx.part_size_model[i], QP, INIT_PART_SIZE[slice][i]);
   }
   for (i = 0; i < 8; i++) {
@@ -347,13 +347,14 @@ void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
   for (i = 0; i < 3; i++) {
     kvz_ctx_init(&cabac->ctx.trans_subdiv_model[i], QP, INIT_TRANS_SUBDIV_FLAG[slice][i]);
   }
-  for (i = 0; i < 5; i++) {
-    kvz_ctx_init(&cabac->ctx.qt_cbf_model_luma[i], QP, INIT_QT_CBF[slice][i]);
-    kvz_ctx_init(&cabac->ctx.qt_cbf_model_cb[i], QP, INIT_QT_CBF[slice][i + 5]);
-    kvz_ctx_init(&cabac->ctx.qt_cbf_model_cr[i], QP, INIT_QT_CBF[slice][i + 10]);
+  for (i = 0; i < 2; i++) {  
+    
+    kvz_ctx_init(&cabac->ctx.qt_cbf_model_cr[i], QP, INIT_QT_CBF[slice][i + 9]);
   }
 
   for (i = 0; i < 5; i++) {
+    kvz_ctx_init(&cabac->ctx.qt_cbf_model_cb[i], QP, INIT_QT_CBF[slice][i + 4]);
+
     kvz_ctx_init(&cabac->ctx.inter_dir[i], QP, INIT_INTER_DIR[slice][i]);
   }
 

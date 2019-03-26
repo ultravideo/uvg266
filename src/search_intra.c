@@ -810,7 +810,7 @@ void kvz_search_cu_intra(encoder_state_t * const state,
 
   kvz_intra_references refs;
 
-  int8_t candidate_modes[3];
+  int8_t candidate_modes[INTRA_MPM_COUNT];
 
   cu_info_t *left_cu = 0;
   cu_info_t *above_cu = 0;

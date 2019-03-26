@@ -1127,7 +1127,7 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
      * Table 9-37 - Assignment of ctxInc to syntax elements with context coded bins
      *   intra_chroma_pred_mode[][] = 0, bypass, bypass
      */
-    cabac->cur_ctx = &(cabac->ctx.chroma_pred_model[1]);
+    cabac->cur_ctx = &(cabac->ctx.chroma_pred_model[0]);
     if (pred_mode == 68) {
       CABAC_BIN(cabac, 0, "intra_chroma_pred_mode");
     } else {
