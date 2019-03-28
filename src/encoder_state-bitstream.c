@@ -59,39 +59,55 @@ static void encoder_state_write_bitstream_PTL(bitstream_t *stream,
 {
   // PTL
   // Profile Tier
-  WRITE_U(stream, 0, 2, "general_profile_space");
+  // Main Profile == 1,  Main 10 profile == 2, NEXT == 6
+  WRITE_U(stream, 6, 7, "general_profile_idc");
   WRITE_U(stream, state->encoder_control->cfg.high_tier, 1, "general_tier_flag");
-  // Main Profile == 1,  Main 10 profile == 2
-  WRITE_U(stream, 6, 5, "general_profile_idc");
-  /* Compatibility flags should be set at general_profile_idc
-   *  (so with general_profile_idc = 1, compatibility_flag[1] should be 1)
-   * According to specification, when compatibility_flag[1] is set,
-   *  compatibility_flag[2] should be set too.
-   */
-  WRITE_U(stream, 3<<29, 32, "general_profile_compatibility_flag[]");
 
   WRITE_U(stream, 1, 1, "general_progressive_source_flag");
   WRITE_U(stream, state->encoder_control->in.source_scan_type!= 0, 1, "general_interlaced_source_flag");
+
+  // Constraint flags
   WRITE_U(stream, 0, 1, "general_non_packed_constraint_flag");
   WRITE_U(stream, 0, 1, "general_frame_only_constraint_flag");
 
-  WRITE_U(stream, 0, 16, "XXX_reserved_zero_43bits[0..15]");
-  WRITE_U(stream, 0, 16, "XXX_reserved_zero_43bits[16..31]");
-  WRITE_U(stream, 0, 11, "XXX_reserved_zero_43bits[32..42]");
+  WRITE_U(stream, 0, 1, "intra_only_constraint_flag");
+  WRITE_U(stream, 0, 4, "max_bitdepth_constraint_idc");
+  WRITE_U(stream, 0, 2, "max_chroma_format_constraint_idc");
+  WRITE_U(stream, 0, 1, "no_qtbtt_dual_tree_intra_constraint_flag");
 
-  WRITE_U(stream, 0, 1, "reserved_zero_bit");
+  WRITE_U(stream, 0, 1, "no_sao_constraint_flag");
+  WRITE_U(stream, 0, 1, "no_alf_constraint_flag");
+  WRITE_U(stream, 0, 1, "no_pcm_constraint_flag");
+  WRITE_U(stream, 0, 1, "no_ref_wraparound_constraint_flag");
+
+  WRITE_U(stream, 0, 1, "no_temporal_mvp_constraint_flag");
+  WRITE_U(stream, 0, 1, "no_sbtmvp_constraint_flag");
+  WRITE_U(stream, 0, 1, "no_amvr_constraint_flag");
+  WRITE_U(stream, 0, 1, "no_bdof_constraint_flag");
+
+  WRITE_U(stream, 0, 1, "no_cclm_constraint_flag");
+  WRITE_U(stream, 0, 1, "no_mts_constraint_flag");
+  WRITE_U(stream, 0, 1, "no_affine_motion_constraint_flag");
+
+  WRITE_U(stream, 0, 1, "no_gbi_constraint_flag");
+  WRITE_U(stream, 0, 1, "no_mh_intra_constraint_flag");
+  WRITE_U(stream, 0, 1, "no_triangle_constraint_flag");
+
+  WRITE_U(stream, 0, 1, "no_ladf_constraint_flag");
+
+  WRITE_U(stream, 0, 1, "no_curr_pic_ref_constraint_flag");
+  WRITE_U(stream, 0, 1, "no_qp_delta_constraint_flag");
+
+  WRITE_U(stream, 0, 1, "no_dep_quant_constraint_flag");
+  WRITE_U(stream, 0, 1, "no_sign_data_hiding_constraint_flag");
 
   // end Profile Tier
 
   uint8_t level = state->encoder_control->cfg.level;
   WRITE_U(stream, level * 3, 8, "general_level_idc");
 
-  WRITE_U(stream, 0, 1, "sub_layer_profile_present_flag");
   WRITE_U(stream, 0, 1, "sub_layer_level_present_flag");
-
-  for (int i = 1; i < 8; i++) {
-    WRITE_U(stream, 0, 2, "reserved_zero_2bits");
-  }
+  WRITE_U(stream, 0, 1, "ptl_alignment_zero_bit");
 
   // end PTL
 }
@@ -304,15 +320,11 @@ static void encoder_state_write_bitstream_VUI(bitstream_t *stream,
 static void encoder_state_write_bitstream_SPS_extension(bitstream_t *stream,
                                                         encoder_state_t * const state)
 {
-  //const kvz_config *cfg = &state->encoder_control->cfg;
-  //if (cfg->implicit_rdpcm && cfg->lossless) {
     WRITE_U(stream, 1, 1, "sps_extension_present_flag");
 
     WRITE_U(stream, 1, 1, "sps_range_extension_flag");
     WRITE_U(stream, 0, 1, "sps_multilayer_extension_flag");
-    WRITE_U(stream, 0, 1, "sps_3d_extension_flag");
-    WRITE_U(stream, 1, 1, "sps_next_extension_flag");
-    WRITE_U(stream, 0, 4, "sps_extension_4bits");
+    WRITE_U(stream, 0, 6, "sps_extension_6bits");
 
     // Range Extension
     WRITE_U(stream, 0, 1, "transform_skip_rotation_enabled_flag");
@@ -324,35 +336,8 @@ static void encoder_state_write_bitstream_SPS_extension(bitstream_t *stream,
     WRITE_U(stream, 0, 1, "high_precision_offsets_enabled_flag");
     WRITE_U(stream, 0, 1, "persistent_rice_adaptation_enabled_flag");
     WRITE_U(stream, 0, 1, "cabac_bypass_alignment_enabled_flag");
-
-    // Next extension
-    //WRITE_U(stream, 1, 1, "qtbt_flag");
-    WRITE_U(stream, 0, 1, "large_ctu_flag"); // ToDo: add VVC large block support
-    WRITE_U(stream, 0, 1, "subpu_tmvp_flag");
-    WRITE_U(stream, 0, 1, "imv_enable_flag");
-    //WRITE_U(stream, 0, 1, "high_precision_motion_vectors");
-    WRITE_U(stream, 0, 1, "disable_motion_compression_flag");
-    WRITE_U(stream, 0, 1, "lm_chroma_enabled_flag");
-    WRITE_U(stream, 0, 1, "mts_enabled_flag");
-    // IF MTS
-      //WRITE_U(stream, 0, 1, "mts_intra_enabled_flag");
-      //WRITE_U(stream, 0, 1, "mts_inter_enabled_flag");
-    // endif
-    WRITE_U(stream, 0, 1, "affine_flag");
-    WRITE_U(stream, 0, 1, "gbi_flag");    
-    WRITE_U(stream, 0, 5, "reserved_flag_5bits");
-
-    WRITE_U(stream, 0, 1, "mtt_enabled_flag");
-    WRITE_U(stream, 0, 1, "mhintra_flag");
-    WRITE_U(stream, 0, 1, "triangle_flag");
-    //WRITE_U(stream, 0, 1, "next_dqp_enabled_flag");
-
-
-  //} else {
-  //  WRITE_U(stream, 0, 1, "sps_extension_present_flag");
- // }
-
-    WRITE_U(stream, 0, 1, "sps_reshaper_enable_flag");
+ 
+    
 }
 
 static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
@@ -363,46 +348,16 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
 #ifdef KVZ_DEBUG
   printf("=========== Sequence Parameter Set ID: 0 ===========\n");
 #endif
+  /*
 
-  WRITE_UE(stream, 0, "sps_seq_parameter_set_id");
 
-  WRITE_U(stream, 0, 1, "intra_only_constraint_flag");
-  WRITE_U(stream, 0, 4, "max_bitdepth_constraint_idc");
-  WRITE_U(stream, 0, 2, "max_chroma_format_constraint_idc");
-  WRITE_U(stream, 0, 1, "frame_only_constraint_flag");
-  WRITE_U(stream, 0, 1, "no_qtbtt_dual_tree_intra_constraint_flag");
-  
-  WRITE_U(stream, 0, 1, "no_sao_constraint_flag");
-  WRITE_U(stream, 0, 1, "no_alf_constraint_flag");
-  WRITE_U(stream, 0, 1, "no_pcm_constraint_flag");
-  WRITE_U(stream, 0, 1, "no_ref_wraparound_constraint_flag");
-  
-  WRITE_U(stream, 0, 1, "no_temporal_mvp_constraint_flag");
-  WRITE_U(stream, 0, 1, "no_sbtmvp_constraint_flag");
-  WRITE_U(stream, 0, 1, "no_amvr_constraint_flag");
-  WRITE_U(stream, 0, 1, "no_bdof_constraint_flag");
-
-  WRITE_U(stream, 0, 1, "no_cclm_constraint_flag");
-  WRITE_U(stream, 0, 1, "no_mts_constraint_flag");
-  WRITE_U(stream, 0, 1, "no_affine_motion_constraint_flag");
-
-  WRITE_U(stream, 0, 1, "no_gbi_constraint_flag");
-  WRITE_U(stream, 0, 1, "no_mh_intra_constraint_flag");
-  WRITE_U(stream, 0, 1, "no_triangle_constraint_flag");
-
-  WRITE_U(stream, 0, 1, "no_ladf_constraint_flag");
-
-  WRITE_U(stream, 0, 1, "no_curr_pic_ref_constraint_flag");
-  WRITE_U(stream, 0, 1, "no_qp_delta_constraint_flag");
-
-  WRITE_U(stream, 0, 1, "no_dep_quant_constraint_flag");
-  WRITE_U(stream, 0, 1, "no_sign_data_hiding_constraint_flag");
-
+  */
   WRITE_U(stream, 1, 3, "sps_max_sub_layers_minus1");
-  WRITE_U(stream, 0, 1, "sps_temporal_id_nesting_flag");
+  WRITE_U(stream, 0, 5, "sps_reserved_zero_5bits");
 
   encoder_state_write_bitstream_PTL(stream, state);
 
+  WRITE_UE(stream, 0, "sps_seq_parameter_set_id");
 
   WRITE_UE(stream, encoder->chroma_format, "chroma_format_idc");
 
@@ -519,7 +474,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   WRITE_U(stream, 0, 1, "sps_amvr_enabled_flag");
   WRITE_U(stream, 0, 1, "sps_bdof_enabled_flag");
   WRITE_U(stream, 0, 1, "sps_affine_amvr_enabled_flag");
-  WRITE_U(stream, 0, 1, "dmvr_enable_flag");
+  WRITE_U(stream, 0, 1, "sps_dmvr_enable_flag");
   WRITE_U(stream, 0, 1, "lm_chroma_enabled_flag");
   
   
@@ -974,8 +929,8 @@ void kvz_encoder_state_write_bitstream_slice_header(
 
   WRITE_U(stream, first_slice_segment_in_pic, 1, "first_slice_segment_in_pic_flag");
 
-  if (state->frame->pictype >= KVZ_NAL_BLA_W_LP
-    && state->frame->pictype <= KVZ_NAL_RSV_IRAP_VCL23) {
+  if (state->frame->pictype >= KVZ_NAL_IDR_W_RADL
+    && state->frame->pictype <= KVZ_NAL_CRA_NUT) {
     WRITE_U(stream, 0, 1, "no_output_of_prior_pics_flag");
   }
 

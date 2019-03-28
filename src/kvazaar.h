@@ -410,58 +410,46 @@ enum kvz_nal_unit_type {
   // Trailing pictures
 
   KVZ_NAL_TRAIL_N = 0,
-  KVZ_NAL_TRAIL_R = 1,
+  KVZ_NAL_TRAIL_R = 0,
 
-  KVZ_NAL_TSA_N = 2,
-  KVZ_NAL_TSA_R = 3,
-
-  KVZ_NAL_STSA_N = 4,
-  KVZ_NAL_STSA_R = 5,
+  KVZ_NAL_STSA_N = 1,
+  KVZ_NAL_STSA_R = 1,
 
   // Leading pictures
 
-  KVZ_NAL_RADL_N = 6,
-  KVZ_NAL_RADL_R = 7,
+  KVZ_NAL_RADL_N = 2,
+  KVZ_NAL_RADL_R = 2,
 
-  KVZ_NAL_RASL_N = 8,
-  KVZ_NAL_RASL_R = 9,
+  KVZ_NAL_RASL_N = 3,
+  KVZ_NAL_RASL_R = 3,
 
-  // Reserved non-IRAP RSV_VCL_N/R 10-15
 
   // Intra random access point pictures
 
-  KVZ_NAL_BLA_W_LP   = 16,
-  KVZ_NAL_BLA_W_RADL = 17,
-  KVZ_NAL_BLA_N_LP   = 18,
+  KVZ_NAL_IDR_W_RADL = 8,
+  KVZ_NAL_IDR_N_LP   = 9,
 
-  KVZ_NAL_IDR_W_RADL = 19,
-  KVZ_NAL_IDR_N_LP   = 20,
-
-  KVZ_NAL_CRA_NUT    = 21,
+  KVZ_NAL_CRA_NUT    = 10,
 
   // Reserved IRAP
 
-  KVZ_NAL_RSV_IRAP_VCL22 = 22,
-  KVZ_NAL_RSV_IRAP_VCL23 = 23,
+  KVZ_NAL_RSV_IRAP_VCL11 = 11,
+  KVZ_NAL_RSV_IRAP_VCL12 = 12,
 
-  // Reserved non-IRAP RSV_VCL 24-32
 
   // non-VCL
 
-  KVZ_NAL_VPS_NUT = 32,
-  KVZ_NAL_SPS_NUT = 33,
-  KVZ_NAL_PPS_NUT = 34,
+  KVZ_NAL_VPS_NUT = 16,
+  KVZ_NAL_SPS_NUT = 17,
+  KVZ_NAL_PPS_NUT = 18,
 
-  KVZ_NAL_AUD_NUT = 35,
-  KVZ_NAL_EOS_NUT = 36,
-  KVZ_NAL_EOB_NUT = 37,
-  KVZ_NAL_FD_NUT  = 38,
+  KVZ_NAL_AUD_NUT = 20,
+  KVZ_NAL_EOS_NUT = 21,
+  KVZ_NAL_EOB_NUT = 22,
+  KVZ_NAL_PREFIX_SEI_NUT = 23,
+  KVZ_NAL_SUFFIX_SEI_NUT = 24,
+  KVZ_NAL_FD_NUT  = 25,
 
-  KVZ_NAL_PREFIX_SEI_NUT = 39,
-  KVZ_NAL_SUFFIX_SEI_NUT = 40,
-
-  // Reserved RSV_NVCL 41-47
-  // Unspecified UNSPEC 48-63
 };
 
 enum kvz_slice_type {
