@@ -51,9 +51,10 @@ static void encode_last_significant_xy(cabac_data_t * const cabac,
                                        uint8_t width, uint8_t height,
                                        uint8_t type, uint8_t scan)
 {
-  const int index = kvz_math_floor_log2(width) - 2;
-  uint8_t ctx_offset = type ? 0 : (index * 3 + (index + 1) / 4);
-  uint8_t shift = type ? index : (index + 3) / 4;
+  const int index = kvz_math_floor_log2(width);
+  const int prefix_ctx[8] = { 0, 0, 0, 3, 6, 10, 15, 21 };
+  uint8_t ctx_offset = type ? 0 : prefix_ctx[index];
+  uint8_t shift = type ? CLIP(0, 2, width>>3) : (index+1)>>2;
 
   cabac_ctx_t *base_ctx_x = (type ? cabac->ctx.cu_ctx_last_x_chroma : cabac->ctx.cu_ctx_last_x_luma);
   cabac_ctx_t *base_ctx_y = (type ? cabac->ctx.cu_ctx_last_y_chroma : cabac->ctx.cu_ctx_last_y_luma);
@@ -63,8 +64,8 @@ static void encode_last_significant_xy(cabac_data_t * const cabac,
   }
   */
 
-  const int group_idx_x = g_group_idx[lastpos_x];
-  const int group_idx_y = g_group_idx[lastpos_y];
+  const int group_idx_x = g_group_idx[MIN(32, width)-1];
+  const int group_idx_y = g_group_idx[MIN(32, height)-1];
 
   // x prefix
   for (int last_x = 0; last_x < group_idx_x; last_x++) {
@@ -122,7 +123,7 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
   int8_t scan_mode,
   int8_t tr_skip)
 {
-  const encoder_control_t * const encoder = state->encoder_control;
+  //const encoder_control_t * const encoder = state->encoder_control;
   //int c1 = 1;
   uint8_t last_coeff_x = 0;
   uint8_t last_coeff_y = 0;
@@ -142,7 +143,7 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
   const uint32_t *scan_cg = g_sig_last_scan_cg[log2_block_size - 2][scan_mode];
 
   // Init base contexts according to block type
-  cabac_ctx_t *base_coeff_group_ctx = &(cabac->ctx.cu_sig_coeff_group_model[type]);
+  cabac_ctx_t *base_coeff_group_ctx = &(cabac->ctx.sig_coeff_group_model[type]);
 
   // Scan all coeff groups to find out which of them have coeffs.
   // Populate sig_coeffgroup_flag with that info.
@@ -186,10 +187,12 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
   int pos_last = scan[scan_pos_last];
 
   // transform skip flag
+  /*
   if (width == 4 && encoder->cfg.trskip_enable) {
     cabac->cur_ctx = (type == 0) ? &(cabac->ctx.transform_skip_model_luma) : &(cabac->ctx.transform_skip_model_chroma);
     CABAC_BIN(cabac, tr_skip, "transform_skip_flag");
   }
+  */
 
   last_coeff_x = pos_last & (width - 1);
   last_coeff_y = (uint8_t)(pos_last >> log2_block_size);
@@ -238,7 +241,7 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
       uint32_t ctx_sig = kvz_context_get_sig_coeff_group(sig_coeffgroup_flag, cg_pos_x,
         cg_pos_y, width);
       cabac->cur_ctx = &base_coeff_group_ctx[ctx_sig];
-      CABAC_BIN(cabac, sig_coeff_group, "coded_sub_block_flag");
+      CABAC_BIN(cabac, sig_coeff_group, "significant_coeffgroup_flag");
     }
 
 
@@ -911,51 +914,6 @@ static void encode_inter_prediction_unit(encoder_state_t * const state,
   } // if !merge
 }
 
-
-static INLINE uint8_t intra_mode_encryption(encoder_state_t * const state,
-                                            uint8_t intra_pred_mode)
-{
-  const uint8_t sets[3][17] =
-  {
-    {  0,  1,  2,  3,  4,  5, 15, 16, 17, 18, 19, 20, 21, 31, 32, 33, 34},  /* 17 */
-    { 22, 23, 24, 25, 27, 28, 29, 30, -1, -1, -1, -1, -1, -1, -1, -1, -1},  /* 9  */
-    {  6,  7,  8,  9, 11, 12, 13, 14, -1, -1, -1, -1, -1, -1, -1, -1, -1}   /* 9  */
-  };
-
-  const uint8_t nb_elems[3] = {17, 8, 8};
-
-  if (intra_pred_mode == 26 || intra_pred_mode == 10) {
-    // correct chroma intra prediction mode
-    return intra_pred_mode;
-
-  } else {
-    uint8_t keybits, scan_dir, elem_idx=0;
-
-    keybits = kvz_crypto_get_key(state->crypto_hdl, 5);
-
-    scan_dir = SCAN_DIAG;
-    /*if (intra_pred_mode > 5  && intra_pred_mode < 15) {
-      scan_dir = SCAN_VER;
-    }
-    if (intra_pred_mode > 21 && intra_pred_mode < 31) {
-      scan_dir = SCAN_HOR;
-    }*/
-
-    for (int i = 0; i < nb_elems[scan_dir]; i++) {
-      if (intra_pred_mode == sets[scan_dir][i]) {
-        elem_idx = i;
-        break;
-      }
-    }
-
-    keybits = keybits % nb_elems[scan_dir];
-    keybits = (elem_idx + keybits) % nb_elems[scan_dir];
-
-    return sets[scan_dir][keybits];
-  }
-}
-
-
 static void encode_intra_coding_unit(encoder_state_t * const state,
                                      cabac_data_t * const cabac,
                                      const cu_info_t * const cur_cu,
@@ -1278,7 +1236,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
     
 
     uint8_t implicit_split_mode = KVZ_NO_SPLIT;
-    bool implicit_split = border;
+    //bool implicit_split = border;
     bool bottom_left_available = (abs_x > 0) && (abs_y + cu_width - 1 > ctrl->in.height);
     bool top_right_available = (abs_x + cu_width - 1 < ctrl->in.width) && (abs_y > 0);
     /*

@@ -638,6 +638,8 @@ void kvz_rdoq_sign_hiding(
  * coding engines using probability models like CABAC
  * From HM 12.0
  */
+/*
+// ToDo: implement new RDOQ
 void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff, int32_t width,
            int32_t height, int8_t type, int8_t scan_mode, int8_t block_type, int8_t tr_depth)
 {
@@ -910,7 +912,7 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
   int8_t found_last        = 0;
   int32_t best_last_idx_p1 = 0;
 
-  if( block_type != CU_INTRA && !type/* && pcCU->getTransformIdx( uiAbsPartIdx ) == 0*/ ) {
+  if( block_type != CU_INTRA && !type ) {
     best_cost  = block_uncoded_cost +   state->lambda * CTX_ENTROPY_BITS(&(cabac->ctx.cu_qt_root_cbf_model),0);
     base_cost +=   state->lambda * CTX_ENTROPY_BITS(&(cabac->ctx.cu_qt_root_cbf_model),1);
   } else {
@@ -935,7 +937,7 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
           uint32_t   pos_y = blkpos >> log2_block_size;
           uint32_t   pos_x = blkpos - ( pos_y << log2_block_size );
 
-          double cost_last = /**(scan_mode == SCAN_VER) ? get_rate_last(state, pos_y, pos_x,last_x_bits,last_y_bits) : **/get_rate_last(state, pos_x, pos_y, last_x_bits,last_y_bits );
+          double cost_last = get_rate_last(state, pos_x, pos_y, last_x_bits,last_y_bits );
           double totalCost = base_cost + cost_last - cost_sig[ scanpos ];
 
           if( totalCost < best_cost ) {
@@ -972,6 +974,7 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
     kvz_rdoq_sign_hiding(state, qp_scaled, scan, &sh_rates, best_last_idx_p1, coef, dest_coeff);
   }
 }
+*/
 
 /**
  * Calculate cost of actual motion vectors using CABAC coding

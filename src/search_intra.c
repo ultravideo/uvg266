@@ -109,13 +109,16 @@ static double get_cost(encoder_state_t * const state,
 
     // Add the offset bit costs of signaling 'luma and chroma use trskip',
     // versus signaling 'luma and chroma don't use trskip' to the SAD cost.
-    const cabac_ctx_t *ctx = &state->cabac.ctx.transform_skip_model_luma;
-    double trskip_bits = CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0);
+    //const cabac_ctx_t *ctx = &state->cabac.ctx.transform_skip_model_luma;
+    double trskip_bits = 0.0;// CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0);
 
+    /*
+    // ToDo: Check cost
     if (state->encoder_control->chroma_format != KVZ_CSP_400) {
       ctx = &state->cabac.ctx.transform_skip_model_chroma;
       trskip_bits += 2.0 * (CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0));
     }
+    */
 
     double sad_cost = TRSKIP_RATIO * sad_func(pred, orig_block) + state->lambda_sqrt * trskip_bits;
     if (sad_cost < satd_cost) {
@@ -152,13 +155,16 @@ static void get_cost_dual(encoder_state_t * const state,
 
     // Add the offset bit costs of signaling 'luma and chroma use trskip',
     // versus signaling 'luma and chroma don't use trskip' to the SAD cost.
-    const cabac_ctx_t *ctx = &state->cabac.ctx.transform_skip_model_luma;
-    double trskip_bits = CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0);
+    //const cabac_ctx_t *ctx = &state->cabac.ctx.transform_skip_model_luma;
+    double trskip_bits = 0.0;// CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0);
 
+    /*
+    // ToDo: check cost
     if (state->encoder_control->chroma_format != KVZ_CSP_400) {
       ctx = &state->cabac.ctx.transform_skip_model_chroma;
       trskip_bits += 2.0 * (CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0));
     }
+    */
 
     unsigned unsigned_sad_costs[PARALLEL_BLKS] = { 0 };
     double sad_costs[PARALLEL_BLKS] = { 0 };
@@ -277,10 +283,13 @@ static double search_intra_trdepth(encoder_state_t * const state,
 
     // Add bits for split_transform_flag = 1, because transform depth search bypasses
     // the normal recursion in the cost functions.
+    /*
+    // ToDo: check costs
     if (depth >= 1 && depth <= 3) {
       const cabac_ctx_t *ctx = &(state->cabac.ctx.trans_subdiv_model[5 - (6 - depth)]);
       tr_split_bit += CTX_ENTROPY_FBITS(ctx, 1);
     }
+    */
 
     // Add cost of cbf chroma bits on transform tree.
     // All cbf bits are accumulated to pred_cu.cbf and cbf_is_set returns true
