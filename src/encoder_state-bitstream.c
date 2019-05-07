@@ -107,7 +107,7 @@ static void encoder_state_write_bitstream_PTL(bitstream_t *stream,
   WRITE_U(stream, level * 3, 8, "general_level_idc");
 
   WRITE_U(stream, 0, 1, "sub_layer_level_present_flag");
-  WRITE_U(stream, 0, 1, "ptl_alignment_zero_bit");
+  //WRITE_U(stream, 0, 1, "ptl_alignment_zero_bit");
 
   // end PTL
 }
@@ -487,14 +487,18 @@ if (encoder->scaling_list.enable) {
 }
 */
   WRITE_U(stream, 0, 1, "mts_enabled_flag");
+  WRITE_U(stream, 0, 1, "lfnst_enabled_flag");
+  WRITE_U(stream, 0, 1, "smvd_flag");
   WRITE_U(stream, 0, 1, "affine_flag");
   WRITE_U(stream, 0, 1, "gbi_flag");
   WRITE_U(stream, 0, 1, "ibc_flag");
   WRITE_U(stream, 0, 1, "mhintra_flag");
   WRITE_U(stream, 0, 1, "triangle_flag");
-  WRITE_U(stream, 0, 1, "sps_fracmmvd_disabled_flag");
+  WRITE_U(stream, 0, 1, "sps_mip_flag ");
   WRITE_U(stream, 0, 1, "sbt_enable_flag");
+  WRITE_U(stream, 0, 1, "max_sbt_size_64_flag");
   WRITE_U(stream, 0, 1, "sps_reshaper_enable_flag");
+  WRITE_U(stream, 0, 1, "isp_enable_flag");
   WRITE_U(stream, 0, 1, "sps_ladf_enabled_flag");
 
   WRITE_UE(stream, 0, "num_short_term_ref_pic_sets");
@@ -548,6 +552,7 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
   //TODO: add QP offsets
   WRITE_SE(stream, 0, "pps_cb_qp_offset");
   WRITE_SE(stream, 0, "pps_cr_qp_offset");
+  WRITE_SE(stream, 0, "pps_cb_cr_qp_offset");
   WRITE_U(stream, 0, 1, "pps_slice_chroma_qp_offsets_present_flag");
   WRITE_U(stream, 0, 1, "weighted_pred_flag");
   WRITE_U(stream, 0, 1, "weighted_bipred_flag");
