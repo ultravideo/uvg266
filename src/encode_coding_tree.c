@@ -296,20 +296,31 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
           // If shift sign pattern and add current sign
           coeff_signs = 2 * coeff_signs + (coeff[blk_pos] < 0);
 
-          // Code coeff parity
-          cabac->cur_ctx = (type == 0) ? &(cabac->ctx.cu_parity_flag_model_luma[*offset]) :
-                                         &(cabac->ctx.cu_parity_flag_model_chroma[*offset]);
-          CABAC_BIN(cabac, remainder_abs_coeff&1, "par_flag");
-          remainder_abs_coeff >>= 1;
+          
 
           // Code "greater than 1" flag
           uint8_t gt1 = remainder_abs_coeff ? 1 : 0;
           cabac->cur_ctx = (type == 0) ? &(cabac->ctx.cu_gtx_flag_model_luma[1][*offset]) :
                                          &(cabac->ctx.cu_gtx_flag_model_chroma[1][*offset]);
           CABAC_BIN(cabac, gt1, "gt1_flag");
+          reg_bins--;
 
-          next_pass |= gt1;
+          if (gt1) {
+            remainder_abs_coeff -= 1;
 
+            // Code coeff parity
+            cabac->cur_ctx = (type == 0) ? &(cabac->ctx.cu_parity_flag_model_luma[*offset]) :
+              &(cabac->ctx.cu_parity_flag_model_chroma[*offset]);
+            CABAC_BIN(cabac, remainder_abs_coeff & 1, "par_flag");
+            remainder_abs_coeff >>= 1;
+
+            reg_bins--;
+            uint8_t gt2 = remainder_abs_coeff ? 1 : 0;
+            cabac->cur_ctx = (type == 0) ? &(cabac->ctx.cu_gtx_flag_model_luma[0][*offset]) :
+              &(cabac->ctx.cu_gtx_flag_model_chroma[0][*offset]);
+            CABAC_BIN(cabac, gt2, "gt2_flag");
+            reg_bins--;
+          }
         }
 
         quant_state = (quant_state_transition_table >> ((quant_state << 2) + ((coeff[blk_pos] & 1) << 1))) & 3;
@@ -318,6 +329,7 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
       /*
       ****  SECOND PASS ****
       */
+      /*
       if (next_pass) {
         next_pass = 0;
         for (scan_pos = first_sig_pos; scan_pos >= min_sub_pos; scan_pos--) {
@@ -335,32 +347,61 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
           }
         }
       }
+      */
+      
       /*
       ****  THIRD PASS ****
       */
-      if (next_pass) {
-        for (scan_pos = first_sig_pos; scan_pos >= min_sub_pos; scan_pos--) {
-          blk_pos = scan[scan_pos];
-          pos_y = blk_pos >> log2_block_size;
-          pos_x = blk_pos - (pos_y << log2_block_size);
-          if (abs(coeff[blk_pos]) > 4) {
-            uint32_t remainder = (abs(coeff[blk_pos]) - 5) >> 1;
-            uint32_t rice_param = kvz_go_rice_par_abs(coeff, pos_x, pos_y, width, width);
 
-            kvz_cabac_write_coeff_remain(cabac, remainder, rice_param);
-          }
+      /*
+      ****  SECOND PASS: Go-rice  ****
+      */
+      uint32_t rice_param = 0;
+      uint32_t pos0 = 0;
+      for (scan_pos = first_sig_pos; scan_pos >= next_sig_pos; scan_pos--) {
+        blk_pos = scan[scan_pos];
+        pos_y = blk_pos >> log2_block_size;
+        pos_x = blk_pos - (pos_y << log2_block_size);
+        rice_param = kvz_go_rice_par_abs(coeff, pos_x, pos_y, width, width, 4);
+        if (abs(coeff[blk_pos]) >= 4) {
+          uint32_t remainder = (abs(coeff[blk_pos]) - 4) >> 1;
+          
+          kvz_cabac_write_coeff_remain(cabac, remainder, rice_param);
+        }
+      }
+
+      /*
+      ****  coeff bypass  ****
+      */
+      for (scan_pos = next_sig_pos; scan_pos >= min_sub_pos; scan_pos--) {
+        blk_pos = scan[scan_pos];
+        pos_y = blk_pos >> log2_block_size;
+        pos_x = blk_pos - (pos_y << log2_block_size);
+
+        uint32_t coeff_abs = abs(coeff[blk_pos]);
+        int32_t abs_sum = kvz_abs_sum(coeff, pos_x, pos_y, width, width, 0);
+        rice_param = g_go_rice_pars[abs_sum];
+        pos0 = g_go_rice_pos0[MAX(0, quant_state - 1)][abs_sum];
+        uint32_t remainder = (coeff_abs == 0 ? pos0 : coeff_abs <= pos0 ? coeff_abs - 1 : coeff_abs);
+        kvz_cabac_write_coeff_remain(cabac, remainder, rice_param);
+        quant_state = (quant_state_transition_table >> ((quant_state << 2) + ((coeff_abs & 1) << 1))) & 3;
+        if (coeff_abs) {
+          num_non_zero++;
+          last_nz_pos_in_cg = MAX(last_nz_pos_in_cg, scan_pos);
+          coeff_signs <<= 1;
+          if (coeff < 0) coeff_signs++;
         }
       }
 
       uint32_t num_signs = num_non_zero;
       //ToDo: sign hiding
-      /*
-       if(encoder->cfg.signhide_enable && (last_nz_pos_in_cg - first_nz_pos_in_cg >= SBH_THRESHOLD)
-       {
-         num_signs --;
-         coeff_signs >>= 1;
-       }
-      */
+      
+      if(state->encoder_control->cfg.signhide_enable && (last_nz_pos_in_cg - next_sig_pos >= 4))
+      {
+        num_signs --;
+        coeff_signs >>= 1;
+      }
+      
       CABAC_BINS_EP(cabac, coeff_signs, num_signs, "coeff_signs");
     }
   }

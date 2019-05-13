@@ -48,8 +48,11 @@ uint32_t kvz_context_get_sig_ctx_idx_abs(const coeff_t* coeff, int32_t pos_x, in
                                          uint32_t height, uint32_t width, int8_t type, 
                                          int32_t* temp_diag, int32_t* temp_sum);
 
+uint32_t kvz_abs_sum(const coeff_t* coeff, int32_t pos_x, int32_t pos_y,
+                     uint32_t height, uint32_t width, uint32_t baselevel);
+
 uint32_t kvz_go_rice_par_abs(const coeff_t* coeff, int32_t pos_x, int32_t pos_y,
-                             uint32_t height, uint32_t width);
+                             uint32_t height, uint32_t width, uint32_t baselevel);
 
 #define CNU 154
 #define DWS 8
