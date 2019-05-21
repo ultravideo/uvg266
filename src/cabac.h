@@ -60,7 +60,7 @@ typedef struct
     cabac_ctx_t intra_subpart_model[2];    //!< \brief intra sub part context models
     cabac_ctx_t chroma_pred_model[3];
     cabac_ctx_t inter_dir[5];
-    cabac_ctx_t qt_cbf_model_luma[4];
+    cabac_ctx_t qt_cbf_model_luma[5];
     cabac_ctx_t qt_cbf_model_cr[2];
     cabac_ctx_t qt_cbf_model_cb[5];
     cabac_ctx_t cu_qp_delta_abs[3];
@@ -85,6 +85,7 @@ typedef struct
     cabac_ctx_t mvp_idx_model[2];
     cabac_ctx_t cu_qt_root_cbf_model;
     cabac_ctx_t sig_coeff_group_model[8];
+    cabac_ctx_t luma_planar_model[2];
   } ctx;
 } cabac_data_t;
 

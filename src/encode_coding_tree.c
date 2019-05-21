@@ -975,11 +975,28 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
   #endif
 
   // Intra Subpartition mode
-  bool enough_samples = kvz_g_convert_to_bit[(LCU_WIDTH >> depth)] * 2 > kvz_g_convert_to_bit[4 /* MIN_TB_SIZEY*/];
+  uint32_t width = (LCU_WIDTH >> depth);
+  uint32_t height = (LCU_WIDTH >> depth);
+
+  bool enough_samples = kvz_g_convert_to_bit[width] + kvz_g_convert_to_bit[height] > (kvz_g_convert_to_bit[4 /* MIN_TB_SIZEY*/] << 1);
+  uint8_t isp_mode = 0;
+  // ToDo: add height comparison
+  isp_mode += ((width > TR_MAX_WIDTH) || !enough_samples) ? 1 : 0;
+  isp_mode += ((height > TR_MAX_WIDTH) || !enough_samples) ? 2 : 0;
   bool allow_isp = enough_samples;
-  if (allow_isp) {
-    cabac->cur_ctx = &(cabac->ctx.intra_subpart_model[0]);
-    CABAC_BIN(cabac, 0, "intra_subPartitions");
+  if (isp_mode != 0) {
+    if (isp_mode) {
+      cabac->cur_ctx = &(cabac->ctx.intra_subpart_model[0]);
+      CABAC_BIN(cabac, 0, "intra_subPartitions");
+    } else {
+      cabac->cur_ctx = &(cabac->ctx.intra_subpart_model[0]);
+      CABAC_BIN(cabac, 1, "intra_subPartitions");
+      // ToDo: complete this if-clause
+      if (isp_mode == 3) {
+        cabac->cur_ctx = &(cabac->ctx.intra_subpart_model[1]);
+        CABAC_BIN(cabac, allow_isp - 1, "intra_subPart_ver_hor");
+      }
+    }
   }
 
   // PREDINFO CODING
@@ -990,6 +1007,7 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
   const int num_pred_units = kvz_part_mode_num_parts[cur_cu->part_size];
   const int cu_width = LCU_WIDTH >> depth;
 
+  cabac->cur_ctx = &(cabac->ctx.intra_mode_model);
   for (int j = 0; j < num_pred_units; ++j) {
     const int pu_x = PU_GET_X(cur_cu->part_size, cu_width, x, j);
     const int pu_y = PU_GET_Y(cur_cu->part_size, cu_width, y, j);
@@ -1024,18 +1042,26 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
       }
     }
     flag[j] = (mpm_preds[j] == -1) ? 0 : 1;
-
+    if (!(cur_pu->intra.multi_ref_idx || (isp_mode))) {
+      CABAC_BIN(cabac, flag[j], "prev_intra_luma_pred_flag");
+    }
   }
 
-  cabac->cur_ctx = &(cabac->ctx.intra_mode_model);
-  for (int j = 0; j < num_pred_units; ++j) {
-    CABAC_BIN(cabac, flag[j], "prev_intra_luma_pred_flag");
-  }
+  
+
 
   for (int j = 0; j < num_pred_units; ++j) {
     // Signal index of the prediction mode in the prediction list.
     if (flag[j]) {
-      CABAC_BIN_EP(cabac, (mpm_preds[j] > 0 ? 1 : 0), "mpm_idx");
+      
+      const int pu_x = PU_GET_X(cur_cu->part_size, cu_width, x, j);
+      const int pu_y = PU_GET_Y(cur_cu->part_size, cu_width, y, j);
+      const cu_info_t *cur_pu = kvz_cu_array_at_const(frame->cu_array, pu_x, pu_y);
+      cabac->cur_ctx = &(cabac->ctx.luma_planar_model[(isp_mode ? 0 : 1)]);
+      if (cur_pu->intra.multi_ref_idx == 0) {
+        CABAC_BIN(cabac, (mpm_preds[j] > 0 ? 1 : 0), "mpm_idx_luma_planar");
+      }
+      //CABAC_BIN_EP(cabac, (mpm_preds[j] > 0 ? 1 : 0), "mpm_idx");
       if (mpm_preds[j] > 0) {
         CABAC_BIN_EP(cabac, (mpm_preds[j] > 1 ? 1 : 0), "mpm_idx");
       } else if (mpm_preds[j] > 1) {
@@ -1093,45 +1119,68 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
 
   // Code chroma prediction mode.
   if (state->encoder_control->chroma_format != KVZ_CSP_400) {
-    unsigned pred_mode = 67;
-    unsigned chroma_pred_modes[4] = {0, 50, 18, 1};
+    unsigned pred_mode = 0;
+    unsigned chroma_pred_modes[8] = {0, 50, 18, 1, 67, 68, 69, 70};
+    const int pu_x = PU_GET_X(cur_cu->part_size, cu_width, x, 0);
+    const int pu_y = PU_GET_Y(cur_cu->part_size, cu_width, y, 0);
+    const cu_info_t *first_pu = kvz_cu_array_at_const(frame->cu_array, pu_x, pu_y);
+    int8_t chroma_intra_dir = first_pu->intra.mode_chroma;
+    int8_t luma_intra_dir = first_pu->intra.mode;
 
-    if (intra_pred_mode_chroma == intra_pred_mode_actual[0]) {
-      pred_mode = 68;
-    } else if (intra_pred_mode_chroma == 66) {
-      // Angular 66 mode is possible only if intra pred mode is one of the
-      // possible chroma pred modes, in which case it is signaled with that
-      // duplicate mode.
-      for (int i = 0; i < 4; ++i) {
-        if (intra_pred_mode_actual[0] == chroma_pred_modes[i]) pred_mode = i;
-      }
-    } else {
-      for (int i = 0; i < 4; ++i) {
-        if (intra_pred_mode_chroma == chroma_pred_modes[i]) pred_mode = i;
-      }
-    }
-
-    // pred_mode == 67 mean intra_pred_mode_chroma is something that can't
-    // be coded.
-    assert(pred_mode != 67);
-
-    /**
-     * Table 9-35 - Binarization for intra_chroma_pred_mode
-     *   intra_chroma_pred_mode  bin_string
-     *                        4           0
-     *                        0         100
-     *                        1         101
-     *                        2         110
-     *                        3         111
-     * Table 9-37 - Assignment of ctxInc to syntax elements with context coded bins
-     *   intra_chroma_pred_mode[][] = 0, bypass, bypass
-     */
+    bool derived_mode = chroma_intra_dir == 70;
     cabac->cur_ctx = &(cabac->ctx.chroma_pred_model[0]);
-    if (pred_mode == 68) {
-      CABAC_BIN(cabac, 0, "intra_chroma_pred_mode");
-    } else {
-      CABAC_BIN(cabac, 1, "intra_chroma_pred_mode");
-      CABAC_BINS_EP(cabac, pred_mode, 2, "intra_chroma_pred_mode");
+    CABAC_BIN(cabac, derived_mode ? 0 : 1, "intra_chroma_pred_mode");
+
+
+    if (!derived_mode) {
+      /*for (int i = 0; i < 4; i++) {
+        if (luma_intra_dir == chroma_pred_modes[i]) {
+          chroma_pred_modes[i] = 66;
+          break;
+        }
+      }*/
+      for (; pred_mode < 8; pred_mode++) {
+        if (chroma_intra_dir == chroma_pred_modes[pred_mode]) {
+          break;
+        }
+      }
+      /*else if (intra_pred_mode_chroma == 66) {
+        // Angular 66 mode is possible only if intra pred mode is one of the
+        // possible chroma pred modes, in which case it is signaled with that
+        // duplicate mode.
+        for (int i = 0; i < 4; ++i) {
+          if (intra_pred_mode_actual[0] == chroma_pred_modes[i]) pred_mode = i;
+        }
+      }
+      else {
+        for (int i = 0; i < 4; ++i) {
+          if (intra_pred_mode_chroma == chroma_pred_modes[i]) pred_mode = i;
+        }
+      }
+
+      // pred_mode == 67 mean intra_pred_mode_chroma is something that can't
+      // be coded.
+      assert(pred_mode != 67);
+      */
+      /**
+       * Table 9-35 - Binarization for intra_chroma_pred_mode
+       *   intra_chroma_pred_mode  bin_string
+       *                        4           0
+       *                        0         100
+       *                        1         101
+       *                        2         110
+       *                        3         111
+       * Table 9-37 - Assignment of ctxInc to syntax elements with context coded bins
+       *   intra_chroma_pred_mode[][] = 0, bypass, bypass
+       */
+      /*cabac->cur_ctx = &(cabac->ctx.chroma_pred_model[0]);
+      if (pred_mode == 68) {
+        CABAC_BIN(cabac, 0, "intra_chroma_pred_mode");
+      }
+      else {
+        CABAC_BIN(cabac, 1, "intra_chroma_pred_mode");*/
+        CABAC_BINS_EP(cabac, pred_mode, 2, "intra_chroma_pred_mode");
+      //}
     }
   }
 
@@ -1311,10 +1360,10 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
 
     bool allow_split = qt_split | bh_split | bv_split | th_split | tv_split;
 
-
     if (no_split && allow_split) {
-
       split_model = 0;
+
+      
       // Get left and top block split_flags and if they are present and true, increase model number
       // ToDo: should use height and width to increase model, PU_GET_W() ?
       if (left_cu && GET_SPLITDATA(left_cu, depth) == 1) {
@@ -1337,8 +1386,9 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
       split_model += 3 * (split_num >> 1);
 
       cabac->cur_ctx = &(cabac->ctx.split_flag_model[split_model]);
-      CABAC_BIN(cabac, split_flag, "SplitFlag");
+      CABAC_BIN(cabac, !(implicit_split_mode == KVZ_NO_SPLIT), "SplitFlag");
     }
+    if (implicit_split_mode == KVZ_NO_SPLIT) return;
 
     if (!split_flag) return;
 

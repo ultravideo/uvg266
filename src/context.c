@@ -78,6 +78,13 @@ static const uint8_t INIT_INTRA_PRED_MODE[4] = {
   154, 154, 170, 6
 };
 
+static const uint8_t INIT_INTRA_LUMA_PLANAR_MODE[4][2] = {
+  { 125, 125, },
+  { 139, 139, },
+  { 110, 154, },
+  {   4,   5, },
+ };
+
 static const uint8_t INIT_CHROMA_PRED_MODE[4][3] = {
   { 137, 139, 140, },
   { 138, 139, 169, },
@@ -345,10 +352,11 @@ void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
   kvz_ctx_init(&cabac->ctx.cu_qt_root_cbf_model, QP, INIT_QT_ROOT_CBF[slice][0], INIT_QT_ROOT_CBF[3][0]);
 
   for (i = 0; i < 2; i++) {
-    kvz_ctx_init(&cabac->ctx.qt_cbf_model_cr[i], QP, INIT_QT_CBF[slice][i + 9], INIT_QT_CBF[3][i + 9]);
+    kvz_ctx_init(&cabac->ctx.qt_cbf_model_cr[i], QP, INIT_QT_CBF[slice][i + 10], INIT_QT_CBF[3][i + 10]);
     kvz_ctx_init(&cabac->ctx.cu_mvd_model[i], QP, INIT_MVD[slice][i], INIT_MVD[3][i]);
     kvz_ctx_init(&cabac->ctx.cu_ref_pic_model[i], QP, INIT_REF_PIC[slice][i], INIT_REF_PIC[3][i]);
     kvz_ctx_init(&cabac->ctx.mvp_idx_model[i], QP, INIT_MVP_IDX[slice][i], INIT_MVP_IDX[3][i]);
+    kvz_ctx_init(&cabac->ctx.luma_planar_model[i], QP, INIT_INTRA_LUMA_PLANAR_MODE[slice][i], INIT_INTRA_LUMA_PLANAR_MODE[3][i]);
     
   }
 
@@ -357,7 +365,7 @@ void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
   }
 
   for (i = 0; i < 4; i++) {
-    kvz_ctx_init(&cabac->ctx.qt_cbf_model_luma[i], QP, INIT_QT_CBF[slice][i], INIT_QT_CBF[3][i]);
+    
     kvz_ctx_init(&cabac->ctx.part_size_model[i], QP, INIT_PART_SIZE[slice][i], INIT_PART_SIZE[3][i]);
 
     kvz_ctx_init(&cabac->ctx.cu_ctx_last_y_chroma[i], QP, INIT_LAST_X[slice][i + 25], INIT_LAST_X[3][i + 25]);
@@ -365,7 +373,8 @@ void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
   }
 
   for (i = 0; i < 5; i++) {
-    kvz_ctx_init(&cabac->ctx.qt_cbf_model_cb[i], QP, INIT_QT_CBF[slice][i + 4], INIT_QT_CBF[3][i + 4]);
+    kvz_ctx_init(&cabac->ctx.qt_cbf_model_luma[i], QP, INIT_QT_CBF[slice][i], INIT_QT_CBF[3][i]);
+    kvz_ctx_init(&cabac->ctx.qt_cbf_model_cb[i], QP, INIT_QT_CBF[slice][i + 5], INIT_QT_CBF[3][i + 5]);
 
     kvz_ctx_init(&cabac->ctx.inter_dir[i], QP, INIT_INTER_DIR[slice][i], INIT_INTER_DIR[3][i]);
   }

@@ -104,10 +104,15 @@
 typedef int16_t coeff_t;
 
 //#define VERBOSE 1
+//#define KVZ_DEBUG_PRINT_CABAC 1
+//#define KVZ_DEBUG 1
 
 /* CONFIG VARIABLES */
 
 //spec: references to variables defined in Rec. ITU-T H.265 (04/2013)
+
+// VVC flags
+#define RDPCM 1
 
 //! Limits for prediction block sizes. 0 = 64x64, 4 = 4x4.
 #define PU_DEPTH_INTER_MIN 0

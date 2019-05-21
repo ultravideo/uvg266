@@ -266,8 +266,16 @@ void kvz_bitstream_put_se(bitstream_t *stream, int32_t data)
 void kvz_bitstream_add_rbsp_trailing_bits(bitstream_t * const stream)
 {
   kvz_bitstream_put(stream, 1, 1);
+#if VERBOSE
+  printf("%-40s u(%d) : %d\n", "rbsp_stop_one_bit", 1, 1);
+#endif
   if ((stream->cur_bit & 7) != 0) {
-    kvz_bitstream_put(stream, 0, 8 - (stream->cur_bit & 7));
+#if VERBOSE
+    for (int i = 0; i < (8 - stream->cur_bit) & 7; i++) {
+      printf("%-40s u(%d) : %d\n", "rbsp_alignment_zero_bit", 1, 0);
+    }
+#endif
+    kvz_bitstream_put(stream, 0, (8 - stream->cur_bit) & 7);
   }
 }
 
@@ -287,6 +295,11 @@ void kvz_bitstream_align(bitstream_t * const stream)
 void kvz_bitstream_align_zero(bitstream_t * const stream)
 {
   if ((stream->cur_bit & 7) != 0) {
-    kvz_bitstream_put(stream, 0, 8 - (stream->cur_bit & 7));
+#if VERBOSE
+    for (int i = 0; i < (8 - stream->cur_bit) & 7; i++) {
+      printf("%-40s u(%d) : %d\n", "rbsp_alignment_zero_bit", 1, 0);
+    }
+#endif
+    kvz_bitstream_put(stream, 0, (8 - stream->cur_bit) & 7);
   }
 }

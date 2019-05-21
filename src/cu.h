@@ -143,6 +143,7 @@ typedef struct
 #if KVZ_SEL_ENCRYPTION
       int8_t mode_encry;
 #endif
+      uint8_t multi_ref_idx;
     } intra;
     struct {
       int16_t mv[2][2];  // \brief Motion vectors for L0 and L1

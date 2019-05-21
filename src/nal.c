@@ -22,6 +22,7 @@
 
 #include "bitstream.h"
 #include "strategies/strategies-nal.h"
+#include <stdio.h>
 
 
 /**
@@ -35,6 +36,10 @@ void kvz_nal_write(bitstream_t * const bitstream, const uint8_t nal_type,
   // Some useful constants
   const uint8_t start_code_prefix_one_3bytes = 0x01;
   const uint8_t zero = 0x00;
+
+#ifdef KVZ_DEBUG
+  printf("=========== NAL unit  ===========\n");
+#endif
 
   // zero_byte (0x00) shall be present in the byte stream NALU of VPS, SPS
   // and PPS, or the first NALU of an access unit
@@ -54,6 +59,13 @@ void kvz_nal_write(bitstream_t * const bitstream, const uint8_t nal_type,
   // 5bits of nuh_layer_id + nuh_temporal_id_plus1(3)
   byte = (temporal_id + 1) & 7;
   kvz_bitstream_writebyte(bitstream, byte);
+
+#if VERBOSE
+  printf("%-40s u(%d) : %d\n", "forbidden_zero_bit", 1, 0);
+  printf("%-40s u(%d) : %d\n", "nal_unit_type", 6, nal_type);
+  printf("%-40s u(%d) : %d\n", "nuh_layer_id", 6, temporal_id);
+  printf("%-40s u(%d) : %d\n", "nuh_temporal_id", 3, temporal_id + 1);
+#endif
 }
 
 /*!
