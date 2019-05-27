@@ -107,6 +107,7 @@ static void encoder_state_write_bitstream_PTL(bitstream_t *stream,
   WRITE_U(stream, level * 3, 8, "general_level_idc");
 
   WRITE_U(stream, 0, 1, "sub_layer_level_present_flag");
+  kvz_bitstream_align_zero(stream);
   //WRITE_U(stream, 0, 1, "ptl_alignment_zero_bit");
 
   // end PTL
@@ -475,6 +476,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   WRITE_U(stream, 0, 1, "sps_bdof_enabled_flag");
   WRITE_U(stream, 0, 1, "sps_affine_amvr_enabled_flag");
   WRITE_U(stream, 0, 1, "sps_dmvr_enable_flag");
+  WRITE_U(stream, 0, 1, "sps_mmvd_enable_flag");
   WRITE_U(stream, 0, 1, "lm_chroma_enabled_flag");
   
   
@@ -496,7 +498,8 @@ if (encoder->scaling_list.enable) {
   WRITE_U(stream, 0, 1, "triangle_flag");
   WRITE_U(stream, 0, 1, "sps_mip_flag ");
   WRITE_U(stream, 0, 1, "sbt_enable_flag");
-  WRITE_U(stream, 0, 1, "max_sbt_size_64_flag");
+  // Written only if sbt is enabled
+  //WRITE_U(stream, 0, 1, "max_sbt_size_64_flag");
   WRITE_U(stream, 0, 1, "sps_reshaper_enable_flag");
   WRITE_U(stream, 0, 1, "isp_enable_flag");
   WRITE_U(stream, 0, 1, "sps_ladf_enabled_flag");
@@ -1054,6 +1057,7 @@ static void encoder_state_write_slice_header(
   state->frame->first_nal = false;
 
   kvz_encoder_state_write_bitstream_slice_header(stream, state, independent);
+  kvz_bitstream_align(stream);
   kvz_bitstream_add_rbsp_trailing_bits(stream);
 }
 
@@ -1076,6 +1080,7 @@ static void encoder_state_write_bitstream_children(encoder_state_t * const state
     kvz_encoder_state_write_bitstream(&state->children[i]);
     kvz_bitstream_move(&state->stream, &state->children[i].stream);
   }
+  
 }
 
 static void encoder_state_write_bitstream_main(encoder_state_t * const state)
