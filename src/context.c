@@ -74,6 +74,13 @@ static const uint8_t INIT_PRED_MODE[4][2] = {
   { 5,   2, },
 };
 
+static const uint8_t MULTI_REF_LINE_MODE[4][3] = {
+  { 90,  212, CNU, },
+  { 118, 212, CNU, },
+  { 134, 169, CNU, },
+  { 8,   8,   DWS, },
+};
+
 static const uint8_t INIT_INTRA_PRED_MODE[4] = {
   154, 154, 170, 6
 };
@@ -141,6 +148,13 @@ static const uint8_t INIT_QT_CBF[4][11] = {
   { CNU, 126, 124, 111, 124, CNU, CNU, CNU, CNU, 151, 141, },
   { 1,   5,   8,   8,   5,   0,   DWS, DWS, DWS, 2,   2,   },
 #endif
+};
+
+static const uint8_t BDPCM_MODE_INIT[4][2] = {
+  { 148, 154, },
+  { 0,   140, },
+  { 40,  169, },
+  { 1,   4,   },
 };
 
 static const uint8_t INIT_SIG_COEFF_GROUP[4][8] = {
@@ -332,6 +346,7 @@ void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
   for (i = 0; i < 3; i++) {
     kvz_ctx_init(&cabac->ctx.cu_skip_flag_model[i], QP, INIT_SKIP_FLAG[slice][i], INIT_SKIP_FLAG[3][i]);
     kvz_ctx_init(&cabac->ctx.chroma_pred_model[i], QP, INIT_CHROMA_PRED_MODE[slice][i], INIT_CHROMA_PRED_MODE[3][i]);
+    kvz_ctx_init(&cabac->ctx.multi_ref_line[i], QP, MULTI_REF_LINE_MODE[slice][i], MULTI_REF_LINE_MODE[3][i]);
   }
   
   for (i = 0; i < 6; i++) {
@@ -357,7 +372,7 @@ void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
     kvz_ctx_init(&cabac->ctx.cu_ref_pic_model[i], QP, INIT_REF_PIC[slice][i], INIT_REF_PIC[3][i]);
     kvz_ctx_init(&cabac->ctx.mvp_idx_model[i], QP, INIT_MVP_IDX[slice][i], INIT_MVP_IDX[3][i]);
     kvz_ctx_init(&cabac->ctx.luma_planar_model[i], QP, INIT_INTRA_LUMA_PLANAR_MODE[slice][i], INIT_INTRA_LUMA_PLANAR_MODE[3][i]);
-    
+    kvz_ctx_init(&cabac->ctx.bdpcm_mode[i], QP, BDPCM_MODE_INIT[slice][i], BDPCM_MODE_INIT[3][i]);
   }
 
   for (i = 0; i < 3; i++) {
@@ -368,8 +383,8 @@ void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
     
     kvz_ctx_init(&cabac->ctx.part_size_model[i], QP, INIT_PART_SIZE[slice][i], INIT_PART_SIZE[3][i]);
 
-    kvz_ctx_init(&cabac->ctx.cu_ctx_last_y_chroma[i], QP, INIT_LAST_X[slice][i + 25], INIT_LAST_X[3][i + 25]);
-    kvz_ctx_init(&cabac->ctx.cu_ctx_last_x_chroma[i], QP, INIT_LAST_Y[slice][i + 25], INIT_LAST_Y[3][i + 25]);
+    kvz_ctx_init(&cabac->ctx.cu_ctx_last_y_chroma[i], QP, INIT_LAST_Y[slice][i + 25], INIT_LAST_Y[3][i + 25]);
+    kvz_ctx_init(&cabac->ctx.cu_ctx_last_x_chroma[i], QP, INIT_LAST_X[slice][i + 25], INIT_LAST_X[3][i + 25]);
   }
 
   for (i = 0; i < 5; i++) {

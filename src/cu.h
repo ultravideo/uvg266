@@ -136,6 +136,8 @@ typedef struct
    */
   uint8_t qp;
 
+  uint8_t bdpcmMode;
+
   union {
     struct {
       int8_t mode;

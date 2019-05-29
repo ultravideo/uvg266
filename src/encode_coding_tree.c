@@ -796,12 +796,15 @@ static void encode_transform_coeff(encoder_state_t * const state,
   // when the flags from previous level are used.
   if (depth < MAX_PU_DEPTH && state->encoder_control->chroma_format != KVZ_CSP_400) {
     
-    if (tr_depth == 0 || parent_coeff_u) {
+    if (tr_depth != TR_MAX_LOG2_SIZE - 1 || (!(depth > tr_depth) && false/*ISPMode*/)) {
+    //if (tr_depth == 0 || parent_coeff_u) {
+      assert(tr_depth < 5);
       cabac->cur_ctx = &(cabac->ctx.qt_cbf_model_cb[tr_depth]);
       CABAC_BIN(cabac, cb_flag_u, "cbf_cb");
     }
-    if (tr_depth == 0 || parent_coeff_v) {
-      cabac->cur_ctx = &(cabac->ctx.qt_cbf_model_cr[cb_flag_u]);
+    if (tr_depth != TR_MAX_LOG2_SIZE - 1 || (!(depth > tr_depth) && false/*ISPMode*/)) {
+    //if (tr_depth == 0 || parent_coeff_v) {
+      cabac->cur_ctx = &(cabac->ctx.qt_cbf_model_cr[cb_flag_u ? 1 : 0]);
       CABAC_BIN(cabac, cb_flag_v, "cbf_cr");
     }
   }
@@ -969,10 +972,42 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
   int8_t mpm_preds[4] = {-1, -1, -1, -1};
   uint32_t flag[4];
 
+  /*
+  if ((cur_cu->type == CU_INTRA && (LCU_WIDTH >> cur_cu->depth <= 32))) {
+    cabac->cur_ctx = &(cabac->ctx.bdpcm_mode[0]);
+    CABAC_BIN(cabac, cur_cu->bdpcmMode > 0 ? 1 : 0, "bdpcm_mode");
+    if (cur_cu->bdpcmMode) {
+      cabac->cur_ctx = &(cabac->ctx.bdpcm_mode[1]);
+      CABAC_BIN(cabac, cur_cu->bdpcmMode > 1 ? 1 : 0, "bdpcm_mode > 1");
+    }
+  }
+  */
+
   #if ENABLE_PCM == 1
   // Code must start after variable initialization
   kvz_cabac_encode_bin_trm(cabac, 0); // IPCMFlag == 0
   #endif
+
+  const int num_pred_units = kvz_part_mode_num_parts[cur_cu->part_size];
+
+  //ToDo: update multi_ref_lines variable when it's something else than constant 3
+  int multi_ref_lines = 3;
+  /*
+  for (int i = 0; i < num_pred_units; i++) {
+    if (multi_ref_lines > 1) {
+      cabac->cur_ctx = &(cabac->ctx.multi_ref_line[0]);
+      CABAC_BIN(cabac, cur_cu->intra.multi_ref_idx != 0, "multi_ref_line_0");
+      if (multi_ref_lines > 2 && cur_cu->intra.multi_ref_idx != 0) {
+        cabac->cur_ctx = &(cabac->ctx.multi_ref_line[1]);
+        CABAC_BIN(cabac, cur_cu->intra.multi_ref_idx != 1, "multi_ref_line_1");
+        if (multi_ref_lines > 3 && cur_cu->intra.multi_ref_idx != 1) {
+          cabac->cur_ctx = &(cabac->ctx.multi_ref_line[2]);
+          CABAC_BIN(cabac, cur_cu->intra.multi_ref_idx != 3, "multi_ref_line_2");
+        }
+      }
+    }
+  }
+  */
 
   // Intra Subpartition mode
   uint32_t width = (LCU_WIDTH >> depth);
@@ -1004,7 +1039,6 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
   // it can be signaled with two EP's. Otherwise we can send
   // 5 EP bins with the full predmode
   // ToDo: fix comments for VVC
-  const int num_pred_units = kvz_part_mode_num_parts[cur_cu->part_size];
   const int cu_width = LCU_WIDTH >> depth;
 
   cabac->cur_ctx = &(cabac->ctx.intra_mode_model);

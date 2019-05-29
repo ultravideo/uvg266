@@ -900,7 +900,7 @@ static void kvz_encoder_state_write_bitstream_slice_header_independent(
   }
   WRITE_U(stream, 0, 1, "dep_quant_enable_flag");
   //if !dep_quant_enable_flag
-    WRITE_U(stream, 0, 1, "sign_data_hiding_enable_flag");
+    WRITE_U(stream, encoder->cfg.signhide_enable, 1, "sign_data_hiding_enable_flag");
 
   if (state->frame->slicetype != KVZ_SLICE_I) {
 
@@ -1057,7 +1057,6 @@ static void encoder_state_write_slice_header(
   state->frame->first_nal = false;
 
   kvz_encoder_state_write_bitstream_slice_header(stream, state, independent);
-  kvz_bitstream_align(stream);
   kvz_bitstream_add_rbsp_trailing_bits(stream);
 }
 

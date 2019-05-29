@@ -418,6 +418,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
   cur_cu->part_size = SIZE_2Nx2N;
   cur_cu->qp = state->qp;
   cur_cu->intra.multi_ref_idx = 0;
+  cur_cu->bdpcmMode = 0;
 
   // If the CU is completely inside the frame at this depth, search for
   // prediction modes at this depth.
