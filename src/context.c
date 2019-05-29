@@ -305,7 +305,7 @@ void kvz_ctx_init(cabac_ctx_t *ctx, uint32_t qp, uint32_t init_value, uint8_t ra
 {
   int slope = (init_value >> 4) * 5 - 45;
   int offset = ((init_value & 15) << 3) - 16;
-  int init_state = MIN(MAX(1, ((slope * (int)qp) >> 4) + offset), 126);
+  int init_state = ((slope * (int)qp) >> 4) + offset;
     
   const int p1 = g_inistateToCount[init_state < 0 ? 0 : init_state > 127 ? 127 : init_state];
 

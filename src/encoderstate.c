@@ -1220,9 +1220,9 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
       state->frame->pictype = KVZ_NAL_CRA_NUT;
     }
   } else if (state->frame->poc < state->frame->irap_poc) {
-    state->frame->pictype = KVZ_NAL_RASL_R;
+    state->frame->pictype = KVZ_NAL_RASL;
   } else {
-    state->frame->pictype = KVZ_NAL_TRAIL_R;
+    state->frame->pictype = KVZ_NAL_TRAIL;
   }
 
   encoder_state_remove_refs(state);

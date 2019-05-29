@@ -133,7 +133,7 @@ void kvz_cabac_write_unary_max_symbol_ep(cabac_data_t *data, unsigned int symbol
   (ctx)->state[1]=(state >> 1) & (int)CTX_MASK_1;\
 }
 #define CTX_MPS(ctx) (CTX_STATE(ctx)>>7)
-#define CTX_LPS(ctx,range) ( ((((CTX_STATE(ctx)&0x80) ? (CTX_STATE(ctx)^0xff) : (CTX_STATE(ctx))) >>2)*(range>>5)>>1)+4  )
+#define CTX_LPS(ctx,range) ((uint8_t)( ((((CTX_STATE(ctx)&0x80) ? (CTX_STATE(ctx)^0xff) : (CTX_STATE(ctx))) >>2)*(range>>5)>>1)+4  ))
 #define CTX_UPDATE(ctx,bin) { \
   int rate0 = (ctx)->rate >> 4;\
   int rate1 = (ctx)->rate & 15;\

@@ -248,14 +248,14 @@ static void encoder_state_write_bitstream_VUI(bitstream_t *stream,
   } else
     WRITE_U(stream, 0, 1, "aspect_ratio_info_present_flag");
 
-  //IF aspect ratio info
-  //ENDIF
+  WRITE_U(stream, 0, 1, "colour_description_present_flag");
 
   if (encoder->cfg.vui.overscan > 0) {
     WRITE_U(stream, 1, 1, "overscan_info_present_flag");
     WRITE_U(stream, encoder->cfg.vui.overscan - 1, 1, "overscan_appropriate_flag");
   } else
     WRITE_U(stream, 0, 1, "overscan_info_present_flag");
+
 
   //IF overscan info
   //ENDIF
@@ -353,6 +353,9 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
 
 
   */
+
+  WRITE_U(stream, 0, 4, "sps_decoding_parameter_set_id");
+
   WRITE_U(stream, 1, 3, "sps_max_sub_layers_minus1");
   WRITE_U(stream, 0, 5, "sps_reserved_zero_5bits");
 
@@ -515,10 +518,17 @@ if (encoder->scaling_list.enable) {
   //ENDIF
 
 
-  //WRITE_U(stream, 0, 1, "sps_strong_intra_smoothing_enable_flag");
-  WRITE_U(stream, 1, 1, "vui_parameters_present_flag");
+  WRITE_U(stream, encoder->vui.timing_info_present_flag, 1, "timing_info_present_flag");
+  if (encoder->vui.timing_info_present_flag) {
+    WRITE_U(stream, encoder->vui.num_units_in_tick, 32, "vui_num_units_in_tick");
+    WRITE_U(stream, encoder->vui.time_scale, 32, "vui_time_scale");
 
-  encoder_state_write_bitstream_VUI(stream, state);
+    WRITE_U(stream, 0, 1, "vui_hrd_parameters_present_flag");
+  }
+
+  WRITE_U(stream, 0, 1, "vui_parameters_present_flag");
+
+  //encoder_state_write_bitstream_VUI(stream, state);
 
   encoder_state_write_bitstream_SPS_extension(stream, state);
 
@@ -564,10 +574,8 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
   WRITE_U(stream, encoder->cfg.lossless, 1, "transquant_bypass_enabled_flag");
 
   
-  WRITE_U(stream, encoder->tiles_enable, 1, "tiles_enabled_flag");
-  //wavefronts
-  WRITE_U(stream, encoder->cfg.wpp, 1, "entropy_coding_sync_enabled_flag");
-
+  WRITE_U(stream, encoder->tiles_enable?0:1, 1, "single_tile_in_pic_flag");
+   
   if (encoder->tiles_enable) {
     WRITE_UE(stream, encoder->cfg.tiles_width_count  - 1, "num_tile_columns_minus1");
     WRITE_UE(stream, encoder->cfg.tiles_height_count - 1, "num_tile_rows_minus1");
@@ -586,8 +594,12 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
     WRITE_U(stream, 0, 1, "loop_filter_across_tiles_enabled_flag");
     
   }
-  
-  WRITE_U(stream, 0, 1, "pps_loop_filter_across_slices_enabled_flag");
+
+  WRITE_U(stream, 0, 1, "signalled_slice_id_flag");
+
+  //wavefronts
+  WRITE_U(stream, encoder->cfg.wpp, 1, "entropy_coding_sync_enabled_flag");
+
   WRITE_U(stream, 1, 1, "deblocking_filter_control_present_flag");
 
   //IF deblocking_filter
@@ -601,6 +613,8 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
        WRITE_SE(stream, encoder->cfg.deblock_tc, "tc_offset_div2");
     }
 
+
+  WRITE_U(stream, 0, 1, "pps_loop_filter_across_virtual_boundaries_disabled_flag");
     //ENDIF
   //ENDIF
   //WRITE_U(stream, 0, 1, "pps_scaling_list_data_present_flag");

@@ -52,19 +52,26 @@ void kvz_nal_write(bitstream_t * const bitstream, const uint8_t nal_type,
   kvz_bitstream_writebyte(bitstream, start_code_prefix_one_3bytes);
 
   // Handle header bits with full bytes instead of using bitstream
-  // forbidden_zero_flag(1) + nal_unit_type(6) + 1bit of nuh_layer_id
-  byte = nal_type << 1;
+  // forbidden_zero_flag(1) + nuh_temporal_id_plus1(3) + nal_unit_type(4)
+  uint8_t zero_tid_required_flag = 0;
+  if ((nal_type >= 16) && (nal_type <= 31)) {
+    zero_tid_required_flag = 1;
+  }
+  uint8_t nal_type_lsb = nal_type - (zero_tid_required_flag << 4);
+
+  byte = (zero_tid_required_flag<<7) + ((temporal_id + 1) << 4)  + nal_type_lsb;
   kvz_bitstream_writebyte(bitstream, byte);
 
-  // 5bits of nuh_layer_id + nuh_temporal_id_plus1(3)
-  byte = (temporal_id + 1) & 7;
+  // 7bits of nuh_layer_id_plus1
+  byte = 1<<1;
   kvz_bitstream_writebyte(bitstream, byte);
 
 #if VERBOSE
-  printf("%-40s u(%d) : %d\n", "forbidden_zero_bit", 1, 0);
-  printf("%-40s u(%d) : %d\n", "nal_unit_type", 6, nal_type);
-  printf("%-40s u(%d) : %d\n", "nuh_layer_id", 6, temporal_id);
-  printf("%-40s u(%d) : %d\n", "nuh_temporal_id", 3, temporal_id + 1);
+  printf("%-40s u(%d) : %d\n", "zero_tid_required_flag", 1, zero_tid_required_flag);
+  printf("%-40s u(%d) : %d\n", "nuh_temporal_id_plus1", 3, temporal_id + 1);
+  printf("%-40s u(%d) : %d\n", "nal_unit_type_lsb", 4, nal_type_lsb);
+  printf("%-40s u(%d) : %d\n", "nuh_layer_id_plus1", 6, 1);
+  
 #endif
 }
 
