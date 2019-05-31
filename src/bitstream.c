@@ -265,6 +265,9 @@ void kvz_bitstream_put_se(bitstream_t *stream, int32_t data)
  */
 void kvz_bitstream_add_rbsp_trailing_bits(bitstream_t * const stream)
 {
+#if VERBOSE
+  printf("%-40s u(%d) : %d\n", "rbsp_stop_one_bit", 1, 1);
+#endif
   kvz_bitstream_put(stream, 1, 1);
   kvz_bitstream_align_zero(stream);
 }

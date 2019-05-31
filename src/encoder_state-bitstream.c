@@ -250,6 +250,9 @@ static void encoder_state_write_bitstream_VUI(bitstream_t *stream,
 
   WRITE_U(stream, 0, 1, "colour_description_present_flag");
 
+  WRITE_U(stream, 0, 1, "field_seq_flag");
+  WRITE_U(stream, 0, 1, "chroma_loc_info_present_flag");
+
   if (encoder->cfg.vui.overscan > 0) {
     WRITE_U(stream, 1, 1, "overscan_info_present_flag");
     WRITE_U(stream, encoder->cfg.vui.overscan - 1, 1, "overscan_appropriate_flag");
@@ -257,9 +260,13 @@ static void encoder_state_write_bitstream_VUI(bitstream_t *stream,
     WRITE_U(stream, 0, 1, "overscan_info_present_flag");
 
 
+  WRITE_U(stream, 1, 1, "video_signal_type_present_flag");
+  WRITE_U(stream, encoder->cfg.vui.fullrange, 1, "video_full_range_flag");
+
   //IF overscan info
   //ENDIF
 
+  /*
   if (encoder->cfg.vui.videoformat != 5 ||
       encoder->cfg.vui.fullrange   != 0 ||
       encoder->cfg.vui.colorprim   != 2 ||
@@ -315,6 +322,8 @@ static void encoder_state_write_bitstream_VUI(bitstream_t *stream,
 
   //IF bitstream restriction
   //ENDIF
+
+  */
 }
 
 
@@ -526,9 +535,9 @@ if (encoder->scaling_list.enable) {
     WRITE_U(stream, 0, 1, "vui_hrd_parameters_present_flag");
   }
 
-  WRITE_U(stream, 0, 1, "vui_parameters_present_flag");
+  WRITE_U(stream, 1, 1, "vui_parameters_present_flag");
 
-  //encoder_state_write_bitstream_VUI(stream, state);
+  encoder_state_write_bitstream_VUI(stream, state);
 
   encoder_state_write_bitstream_SPS_extension(stream, state);
 
