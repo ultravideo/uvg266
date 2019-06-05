@@ -420,8 +420,8 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   WRITE_UE(stream, MIN_SIZE-2, "log2_min_luma_coding_block_size_minus2"); // Min size 2^3 = 8x8
   WRITE_U(stream, 0, 1, "partition_constraints_override_enabled_flag");
 
-  WRITE_UE(stream, MAX_DEPTH, "sps_log2_diff_min_qt_min_cb_intra_tile_group_luma");
-  WRITE_UE(stream, MAX_DEPTH, "sps_log2_diff_min_qt_min_cb_inter_tile_group");
+  WRITE_UE(stream, 0, "sps_log2_diff_min_qt_min_cb_intra_tile_group_luma");
+  WRITE_UE(stream, 0, "sps_log2_diff_min_qt_min_cb_inter_tile_group");
   WRITE_UE(stream, 0, "sps_max_mtt_hierarchy_depth_inter_tile_group");
   WRITE_UE(stream, 0, "sps_max_mtt_hierarchy_depth_intra_tile_group_luma");
 
@@ -527,6 +527,8 @@ if (encoder->scaling_list.enable) {
   //ENDIF
 
 
+  WRITE_U(stream, 0, 1, "scaling_list_enabled_flag");
+
   WRITE_U(stream, encoder->vui.timing_info_present_flag, 1, "timing_info_present_flag");
   if (encoder->vui.timing_info_present_flag) {
     WRITE_U(stream, encoder->vui.num_units_in_tick, 32, "vui_num_units_in_tick");
@@ -626,7 +628,7 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
   WRITE_U(stream, 0, 1, "pps_loop_filter_across_virtual_boundaries_disabled_flag");
     //ENDIF
   //ENDIF
-  //WRITE_U(stream, 0, 1, "pps_scaling_list_data_present_flag");
+  WRITE_U(stream, 0, 1, "pps_scaling_list_data_present_flag");
   //IF scaling_list
   //ENDIF
   WRITE_U(stream, 0, 1, "lists_modification_present_flag");
