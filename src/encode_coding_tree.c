@@ -64,15 +64,15 @@ static void encode_last_significant_xy(cabac_data_t * const cabac,
   }
   */
 
-  const int group_idx_x = g_group_idx[MIN(32, width)-1];
-  const int group_idx_y = g_group_idx[MIN(32, height)-1];
+  const int group_idx_x = g_group_idx[lastpos_x];
+  const int group_idx_y = g_group_idx[lastpos_y];
 
   // x prefix
   for (int last_x = 0; last_x < group_idx_x; last_x++) {
     cabac->cur_ctx = &base_ctx_x[ctx_offset + (last_x >> shift)];
     CABAC_BIN(cabac, 1, "last_sig_coeff_x_prefix");
   }
-  if (group_idx_x < g_group_idx[width - 1]) {
+  if (group_idx_x < ( width == 32 ? g_group_idx[15] : g_group_idx[MIN(32, width) - 1])) {
     cabac->cur_ctx = &base_ctx_x[ctx_offset + (group_idx_x >> shift)];
     CABAC_BIN(cabac, 0, "last_sig_coeff_x_prefix");
   }
@@ -82,7 +82,7 @@ static void encode_last_significant_xy(cabac_data_t * const cabac,
     cabac->cur_ctx = &base_ctx_y[ctx_offset + (last_y >> shift)];
     CABAC_BIN(cabac, 1, "last_sig_coeff_y_prefix");
   }
-  if (group_idx_y < g_group_idx[height - 1]) {
+  if (group_idx_y < ( height == 32 ? g_group_idx[15] : g_group_idx[MIN(32, height) - 1])) {
     cabac->cur_ctx = &base_ctx_y[ctx_offset + (group_idx_y >> shift)];
     CABAC_BIN(cabac, 0, "last_sig_coeff_y_prefix");
   }
@@ -129,7 +129,7 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
   uint8_t last_coeff_y = 0;
   int32_t i;
   // ToDo: large block support in VVC?
-  uint32_t sig_coeffgroup_flag[8 * 8] = { 0 };
+  uint32_t sig_coeffgroup_flag[32 * 32] = { 0 };
 
   int32_t scan_pos;
   //int32_t next_sig_pos;
@@ -148,6 +148,7 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
   // Scan all coeff groups to find out which of them have coeffs.
   // Populate sig_coeffgroup_flag with that info.
 
+  /*
   unsigned sig_cg_cnt = 0;
   for (int cg_y = 0; cg_y < width / 4; ++cg_y) {
     for (int cg_x = 0; cg_x < width / 4; ++cg_x) {
@@ -171,18 +172,32 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
   // Rest of the code assumes at least one non-zero coeff.
   assert(sig_cg_cnt > 0);
 
+  
   // Find the last coeff group by going backwards in scan order.
   unsigned scan_cg_last = num_blk_side * num_blk_side - 1;
   while (!sig_coeffgroup_flag[scan_cg[scan_cg_last]]) {
     --scan_cg_last;
   }
 
-  // Find the last coeff by going backwards in scan order.
-  
+  // Find the last coeff by going backwards in scan order. 
   unsigned scan_pos_last = scan_cg_last * 16 + 15;
   while (!coeff[scan[scan_pos_last]]) {
     --scan_pos_last;
   }
+  */
+  
+  
+  unsigned scan_cg_last = -1;
+  unsigned scan_pos_last = -1;
+
+  for (int i = 0; i < width * width; i++) {
+    if (coeff[scan[i]]) {
+      scan_cg_last = i;
+      scan_pos_last = i;
+      sig_coeffgroup_flag[i >> (width + width)] = 1;
+    }
+  }
+  
 
   int pos_last = scan[scan_pos_last];
 
@@ -193,9 +208,10 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
     CABAC_BIN(cabac, tr_skip, "transform_skip_flag");
   }
   */
-
-  last_coeff_x = pos_last & (width - 1);
-  last_coeff_y = (uint8_t)(pos_last >> log2_block_size);
+  
+  last_coeff_y = (uint8_t)(pos_last / width);
+  last_coeff_x = (uint8_t)(pos_last - (last_coeff_y * width));
+  
 
   // Code last_coeff_x and last_coeff_y
   encode_last_significant_xy(cabac,
@@ -294,7 +310,7 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
           int32_t remainder_abs_coeff = abs(coeff[blk_pos]) - 1;
 
           // If shift sign pattern and add current sign
-          coeff_signs = 2 * coeff_signs + (coeff[blk_pos] < 0);
+          coeff_signs = (next_sig_pos != scan_cg_last ? 2 * coeff_signs : coeff_signs) + (coeff[blk_pos] < 0);
 
           
 
@@ -988,6 +1004,9 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
   kvz_cabac_encode_bin_trm(cabac, 0); // IPCMFlag == 0
   #endif
 
+  cabac->cur_ctx = &(cabac->ctx.bdpcm_mode[0]);
+  CABAC_BIN(cabac, 0, "bdpcm_mode");
+
   const int num_pred_units = kvz_part_mode_num_parts[cur_cu->part_size];
 
   //ToDo: update multi_ref_lines variable when it's something else than constant 3
@@ -1356,13 +1375,13 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
     bool no_split, qt_split, bh_split, bv_split, th_split, tv_split;
     no_split = qt_split = bh_split = bv_split = th_split = tv_split = true;
     bool allow_qt = cu_width > (LCU_WIDTH >> MAX_DEPTH);
-    bool allow_btt = false; //ToDo: Enable btt
+    bool allow_btt = false;
     
 
     uint8_t implicit_split_mode = KVZ_NO_SPLIT;
     //bool implicit_split = border;
-    bool bottom_left_available = (abs_x > 0) && (abs_y + cu_width - 1 > ctrl->in.height);
-    bool top_right_available = (abs_x + cu_width - 1 < ctrl->in.width) && (abs_y > 0);
+    bool bottom_left_available = (abs_x > 0) && ((abs_y + cu_width - 1) < ctrl->in.height);
+    bool top_right_available = ((abs_x + cu_width - 1) < ctrl->in.width) && (abs_y > 0);
     /*
     if((depth >= 1 && (border_x != border_y))) implicit_split = false;
     if (state->frame->slicetype != KVZ_SLICE_I) {
@@ -1373,11 +1392,11 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
     */
     if (!bottom_left_available && !top_right_available && allow_qt) {
       implicit_split_mode = KVZ_QUAD_SPLIT;
-    } else if (!bottom_left_available && allow_qt) {
+    } else if (!bottom_left_available && allow_btt) {
       implicit_split_mode = KVZ_HORZ_SPLIT;
-    } else if (!top_right_available && allow_qt) {
+    } else if (!top_right_available && allow_btt) {
       implicit_split_mode = KVZ_VERT_SPLIT;
-    } else if (!bottom_left_available && !top_right_available) {
+    } else if (!bottom_left_available || !top_right_available) {
       implicit_split_mode = KVZ_QUAD_SPLIT;
     }
 
@@ -1388,11 +1407,9 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
       bv_split = (implicit_split_mode == KVZ_VERT_SPLIT);
     }
 
-    if (!allow_btt) {
-      bh_split = th_split = bv_split = tv_split = false;
-    }
-
     bool allow_split = qt_split | bh_split | bv_split | th_split | tv_split;
+    //ToDo: Change MAX_DEPTH to MAX_BT_DEPTH
+    allow_btt = depth < MAX_DEPTH;
 
     if (no_split && allow_split) {
       split_model = 0;
@@ -1422,12 +1439,19 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
       cabac->cur_ctx = &(cabac->ctx.split_flag_model[split_model]);
       CABAC_BIN(cabac, !(implicit_split_mode == KVZ_NO_SPLIT), "SplitFlag");
     }
+
     if (implicit_split_mode == KVZ_NO_SPLIT) return;
 
     if (!split_flag) return;
 
+    if (allow_qt && allow_btt) {
+      cabac->cur_ctx = &(cabac->ctx.split_flag_model[split_model]);
+      CABAC_BIN(cabac, qt_split, "QT_SplitFlag");
+    }
+    //if (qt_split) return;
+
     // Only signal split when it is not implicit, currently only Qt split supported
-    if (bh_split || bv_split || th_split || tv_split) {
+    if (!qt_split && (bh_split | bv_split | th_split | tv_split)) {
 
       split_model = 0;
 

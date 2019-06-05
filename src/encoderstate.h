@@ -341,7 +341,18 @@ static INLINE bool is_last_cu_in_qg(const encoder_state_t *state, int x, int y, 
          (bottom % qg_width == 0 || bottom >= state->tile->frame->height);
 }
 
+static const uint8_t g_group_idx[64] = {
+  0, 1, 2, 3, 4, 4, 5, 5,
+  6, 6, 6, 6, 7, 7, 7, 7,
+  8, 8, 8, 8, 8, 8, 8, 8,
+  9, 9, 9, 9, 9, 9, 9, 9,
+ 10,10,10,10,10,10,10,10,
+ 10,10,10,10,10,10,10,10,
+ 11,11,11,11,11,11,11,11,
+ 11,11,11,11,11,11,11,11
+};
 
+/*
 static const uint8_t g_group_idx[128] = {
   0, 1, 2, 3, 4, 4, 5, 5, 6, 6,
   6, 6, 7, 7, 7, 7, 8, 8, 8, 8,
@@ -356,9 +367,10 @@ static const uint8_t g_group_idx[128] = {
  13,13,13,13,13,13,13,13,13,13,
  13,13,13,13,13,13,13,13,13,13,
  13,13,13,13,13,13,13,13 };
+ */
 
-static const uint8_t g_min_in_group[10] = {
-  0, 1, 2, 3, 4, 6, 8, 12, 16, 24 };
+static const uint8_t g_min_in_group[14] = {
+  0,1,2,3,4,6,8,12,16,24,32,48,64,96 };
 
 
 #define C1FLAG_NUMBER 8 // maximum number of largerThan1 flag coded in one chunk

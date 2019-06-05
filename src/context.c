@@ -603,7 +603,7 @@ uint32_t kvz_abs_sum(const coeff_t* coeff, int32_t pos_x, int32_t pos_y,
     }
   }
 #undef UPDATE
-  return  MAX(MIN(sum - 5 * baselevel, 31),0);
+  return  MAX(MIN(sum - 5 * (int32_t)baselevel, 31),0);
   /*return  MIN(sum, 31);*/
 }
 
@@ -644,6 +644,7 @@ uint32_t kvz_go_rice_par_abs(const coeff_t* coeff, int32_t pos_x, int32_t pos_y,
 //    }
 //  }
 //#undef UPDATE
-  return  g_go_rice_pars[kvz_abs_sum(coeff, pos_x, pos_y, height, width, baselevel)];
+  uint32_t check = kvz_abs_sum(coeff, pos_x, pos_y, height, width, baselevel);
+  return  g_go_rice_pars[check];
   /*return  g_go_rice_pars[kvz_abs_sum(coeff, pos_x, pos_y, height, width, baselevel)];*/
 }
