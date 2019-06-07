@@ -68,22 +68,24 @@ static void encode_last_significant_xy(cabac_data_t * const cabac,
   const int group_idx_y = g_group_idx[lastpos_y];
 
   // x prefix
-  for (int last_x = 0; last_x < group_idx_x; last_x++) {
+  int last_x = 0;
+  for (last_x = 0; last_x < group_idx_x; last_x++) {
     cabac->cur_ctx = &base_ctx_x[ctx_offset + (last_x >> shift)];
     CABAC_BIN(cabac, 1, "last_sig_coeff_x_prefix");
   }
-  if (group_idx_x < ( width == 32 ? g_group_idx[15] : g_group_idx[MIN(32, width) - 1])) {
-    cabac->cur_ctx = &base_ctx_x[ctx_offset + (group_idx_x >> shift)];
+  if (group_idx_x < ( /*width == 32 ? g_group_idx[15] : */g_group_idx[MIN(32, (int32_t)width) - 1])) {
+    cabac->cur_ctx = &base_ctx_x[ctx_offset + (last_x >> shift)];
     CABAC_BIN(cabac, 0, "last_sig_coeff_x_prefix");
   }
 
   // y prefix
-  for (int last_y = 0; last_y < group_idx_y; last_y++) {
+  int last_y = 0;
+  for (last_y = 0; last_y < group_idx_y; last_y++) {
     cabac->cur_ctx = &base_ctx_y[ctx_offset + (last_y >> shift)];
     CABAC_BIN(cabac, 1, "last_sig_coeff_y_prefix");
   }
-  if (group_idx_y < ( height == 32 ? g_group_idx[15] : g_group_idx[MIN(32, height) - 1])) {
-    cabac->cur_ctx = &base_ctx_y[ctx_offset + (group_idx_y >> shift)];
+  if (group_idx_y < (/* height == 32 ? g_group_idx[15] : */g_group_idx[MIN(32, (int32_t)height) - 1])) {
+    cabac->cur_ctx = &base_ctx_y[ctx_offset + (last_y >> shift)];
     CABAC_BIN(cabac, 0, "last_sig_coeff_y_prefix");
   }
 
@@ -121,7 +123,8 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
   uint8_t width,
   uint8_t type,
   int8_t scan_mode,
-  int8_t tr_skip)
+  int8_t tr_skip,
+  uint8_t cbf_cb)
 {
   //const encoder_control_t * const encoder = state->encoder_control;
   //int c1 = 1;
@@ -144,6 +147,12 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
 
   // Init base contexts according to block type
   cabac_ctx_t *base_coeff_group_ctx = &(cabac->ctx.sig_coeff_group_model[type]);
+
+  // joint_cb_cr
+  if (type == 2 && cbf_cb) {
+    cabac->cur_ctx = &(cabac->ctx.joint_bc_br);
+    CABAC_BIN(cabac, 0, "joint_cb_cr");
+  }
 
   // Scan all coeff groups to find out which of them have coeffs.
   // Populate sig_coeffgroup_flag with that info.
@@ -374,7 +383,7 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
       */
       uint32_t rice_param = 0;
       uint32_t pos0 = 0;
-      for (scan_pos = first_sig_pos; scan_pos >= next_sig_pos; scan_pos--) {
+      for (scan_pos = first_sig_pos; scan_pos > next_sig_pos; scan_pos--) {
         blk_pos = scan[scan_pos];
         pos_y = blk_pos >> log2_block_size;
         pos_x = blk_pos - (pos_y << log2_block_size);
@@ -699,7 +708,8 @@ static void encode_transform_unit(encoder_state_t * const state,
                          width,
                          0,
                          scan_idx,
-                         cur_pu->tr_skip);
+                         cur_pu->tr_skip,
+                         0);
   }
 
   if (depth == MAX_DEPTH + 1) {
@@ -729,11 +739,11 @@ static void encode_transform_unit(encoder_state_t * const state,
     const coeff_t *coeff_v = &state->coeff->v[xy_to_zorder(LCU_WIDTH_C, x_local, y_local)];
 
     if (cbf_is_set(cur_pu->cbf, depth, COLOR_U)) {
-      kvz_encode_coeff_nxn(state, &state->cabac, coeff_u, width_c, 2, scan_idx, 0);
+      kvz_encode_coeff_nxn(state, &state->cabac, coeff_u, width_c, 1, scan_idx, 0, 0);
     }
 
     if (cbf_is_set(cur_pu->cbf, depth, COLOR_V)) {
-      kvz_encode_coeff_nxn(state, &state->cabac, coeff_v, width_c, 2, scan_idx, 0);
+      kvz_encode_coeff_nxn(state, &state->cabac, coeff_v, width_c, 2, scan_idx, 0, cbf_is_set(cur_pu->cbf, depth, COLOR_U));
     }
   }
 }
@@ -1038,6 +1048,14 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
   isp_mode += ((width > TR_MAX_WIDTH) || !enough_samples) ? 1 : 0;
   isp_mode += ((height > TR_MAX_WIDTH) || !enough_samples) ? 2 : 0;
   bool allow_isp = enough_samples;
+
+  if (cur_cu->type == 1/*intra*/ && y != 0) {
+    cabac->cur_ctx = &(cabac->ctx.multi_ref_line[0]);
+    CABAC_BIN(cabac, 0, "multi_ref_line");
+  }
+
+
+  // ToDo: update real usage, these if clauses as such don't make any sense
   if (isp_mode != 0) {
     if (isp_mode) {
       cabac->cur_ctx = &(cabac->ctx.intra_subpart_model[0]);

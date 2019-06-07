@@ -62,6 +62,7 @@ static void encoder_state_write_bitstream_PTL(bitstream_t *stream,
   // Main Profile == 1,  Main 10 profile == 2, NEXT == 6
   WRITE_U(stream, 6, 7, "general_profile_idc");
   WRITE_U(stream, state->encoder_control->cfg.high_tier, 1, "general_tier_flag");
+  WRITE_U(stream, 0, 24, "general_sub_profile_idc");
 
   WRITE_U(stream, 1, 1, "general_progressive_source_flag");
   WRITE_U(stream, state->encoder_control->in.source_scan_type!= 0, 1, "general_interlaced_source_flag");
@@ -74,6 +75,7 @@ static void encoder_state_write_bitstream_PTL(bitstream_t *stream,
   WRITE_U(stream, 0, 4, "max_bitdepth_constraint_idc");
   WRITE_U(stream, 0, 2, "max_chroma_format_constraint_idc");
   WRITE_U(stream, 0, 1, "no_qtbtt_dual_tree_intra_constraint_flag");
+  WRITE_U(stream, 0, 1, "no_partition_constraints_override_constraint_flag");
 
   WRITE_U(stream, 0, 1, "no_sao_constraint_flag");
   WRITE_U(stream, 0, 1, "no_alf_constraint_flag");
@@ -84,18 +86,22 @@ static void encoder_state_write_bitstream_PTL(bitstream_t *stream,
   WRITE_U(stream, 0, 1, "no_sbtmvp_constraint_flag");
   WRITE_U(stream, 0, 1, "no_amvr_constraint_flag");
   WRITE_U(stream, 0, 1, "no_bdof_constraint_flag");
+  WRITE_U(stream, 0, 1, "no_dmvr_constraint_flag");
 
   WRITE_U(stream, 0, 1, "no_cclm_constraint_flag");
   WRITE_U(stream, 0, 1, "no_mts_constraint_flag");
+  WRITE_U(stream, 0, 1, "no_sbt_constraint_flag");
   WRITE_U(stream, 0, 1, "no_affine_motion_constraint_flag");
 
   WRITE_U(stream, 0, 1, "no_gbi_constraint_flag");
+  WRITE_U(stream, 0, 1, "no_ibc_constraint_flag");
   WRITE_U(stream, 0, 1, "no_mh_intra_constraint_flag");
+  WRITE_U(stream, 0, 1, "no_fpel_mmvd_constraint_flag");
   WRITE_U(stream, 0, 1, "no_triangle_constraint_flag");
 
   WRITE_U(stream, 0, 1, "no_ladf_constraint_flag");
 
-  WRITE_U(stream, 0, 1, "no_curr_pic_ref_constraint_flag");
+  WRITE_U(stream, 0, 1, "no_transform_skip_constraint_flag");
   WRITE_U(stream, 0, 1, "no_qp_delta_constraint_flag");
 
   WRITE_U(stream, 0, 1, "no_dep_quant_constraint_flag");
@@ -415,10 +421,12 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   //end for
 
   // QTBT
-  WRITE_U(stream, 0, 1, "qtbt_dual_intra_tree");
+  // if(!no_qtbtt_dual_tree_intra_constraint_flag)
+    WRITE_U(stream, 0, 1, "qtbt_dual_intra_tree");
   WRITE_UE(stream, 4, "log2_CTU_size_minus2"); // Max size 2^6 = 64x64
   WRITE_UE(stream, MIN_SIZE-2, "log2_min_luma_coding_block_size_minus2"); // Min size 2^3 = 8x8
-  WRITE_U(stream, 0, 1, "partition_constraints_override_enabled_flag");
+  // if(!no_partition_constraints_override_constraint_flag)
+    WRITE_U(stream, 0, 1, "partition_constraints_override_enabled_flag");
 
   WRITE_UE(stream, 0, "sps_log2_diff_min_qt_min_cb_intra_tile_group_luma");
   WRITE_UE(stream, 0, "sps_log2_diff_min_qt_min_cb_inter_tile_group");
@@ -462,13 +470,15 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   WRITE_UE(stream, encoder->cfg.tr_depth_intra, "max_transform_hierarchy_depth_intra");
   */
 
-  WRITE_U(stream, encoder->cfg.sao_type ? 1 : 0, 1, "sps_sao_enabled_flag");
-  WRITE_U(stream, 0, 1, "sps_alf_enable_flag");
+  // if(!no_sao_constraint_flag)
+    WRITE_U(stream, encoder->cfg.sao_type ? 1 : 0, 1, "sps_sao_enabled_flag");
+  // if(!no_alf_constraint_flag)
+    WRITE_U(stream, 0, 1, "sps_alf_enable_flag");
 
   //WRITE_U(stream, (encoder->cfg.amp_enable ? 1 : 0), 1, "amp_enabled_flag");
 
-  
-  WRITE_U(stream, ENABLE_PCM, 1, "pcm_enabled_flag");
+  // if(!no_pcm_constraint_flag)
+    WRITE_U(stream, ENABLE_PCM, 1, "pcm_enabled_flag");
   #if ENABLE_PCM == 1
     WRITE_U(stream, 7, 4, "pcm_sample_bit_depth_luma_minus1");
     WRITE_U(stream, 7, 4, "pcm_sample_bit_depth_chroma_minus1");
@@ -477,19 +487,26 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
     WRITE_U(stream, 1, 1, "pcm_loop_filter_disable_flag");
   #endif
 
-  WRITE_U(stream, 0, 1, "sps_ref_wraparound_enabled_flag");
-  WRITE_U(stream, state->encoder_control->cfg.tmvp_enable, 1,
+  // if(!no_ref_wraparound_constraint_flag)
+    WRITE_U(stream, 0, 1, "sps_ref_wraparound_enabled_flag");
+  // if(!no_temporal_mvp_constraint_flag)
+    WRITE_U(stream, state->encoder_control->cfg.tmvp_enable, 1,
         "sps_temporal_mvp_enable_flag");
-  if (state->encoder_control->cfg.tmvp_enable) {
+  if (state->encoder_control->cfg.tmvp_enable /* && !no_sbtmvp_constraint_flag */) {
     WRITE_U(stream, 0, 1, "sps_sbtmvp_enabled_flag");
   }
 
-  WRITE_U(stream, 0, 1, "sps_amvr_enabled_flag");
-  WRITE_U(stream, 0, 1, "sps_bdof_enabled_flag");
-  WRITE_U(stream, 0, 1, "sps_affine_amvr_enabled_flag");
-  WRITE_U(stream, 0, 1, "sps_dmvr_enable_flag");
+  // if(!no_amvr_constraint_flag)
+    WRITE_U(stream, 0, 1, "sps_amvr_enabled_flag");
+  // if(!no_bdof_constraint_flag)
+    WRITE_U(stream, 0, 1, "sps_bdof_enabled_flag");
+  // if(!no_amvr_constraint_flag)
+    WRITE_U(stream, 0, 1, "sps_affine_amvr_enabled_flag");
+  // if(!no_dmvr_constraint_flag)
+    WRITE_U(stream, 0, 1, "sps_dmvr_enable_flag");
   WRITE_U(stream, 0, 1, "sps_mmvd_enable_flag");
-  WRITE_U(stream, 0, 1, "lm_chroma_enabled_flag");
+  // if(!no_cclm_constraint_flag)
+    WRITE_U(stream, 0, 1, "lm_chroma_enabled_flag");
   
   
     /*
@@ -500,20 +517,28 @@ if (encoder->scaling_list.enable) {
   encoder_state_write_bitstream_scaling_list(stream, state);
 }
 */
-  WRITE_U(stream, 0, 1, "mts_enabled_flag");
+  // if(!no_mts_constraint_flag)
+    WRITE_U(stream, 0, 1, "mts_enabled_flag");
   WRITE_U(stream, 0, 1, "lfnst_enabled_flag");
   WRITE_U(stream, 0, 1, "smvd_flag");
-  WRITE_U(stream, 0, 1, "affine_flag");
-  WRITE_U(stream, 0, 1, "gbi_flag");
-  WRITE_U(stream, 0, 1, "ibc_flag");
-  WRITE_U(stream, 0, 1, "mhintra_flag");
-  WRITE_U(stream, 0, 1, "triangle_flag");
+  // if(!no_affine_motion_constraint_flag)
+    WRITE_U(stream, 0, 1, "affine_flag");
+  // if(!no_gbi_constraint_flag)
+    WRITE_U(stream, 0, 1, "gbi_flag");
+  // if(!no_ibc_constraint_flag)
+    WRITE_U(stream, 0, 1, "ibc_flag");
+  // if(!no_mh_intra_constraint_flag)
+    WRITE_U(stream, 0, 1, "mhintra_flag");
+  // if(!no_triangle_constraint_flag)
+    WRITE_U(stream, 0, 1, "triangle_flag");
   WRITE_U(stream, 0, 1, "sps_mip_flag ");
-  WRITE_U(stream, 0, 1, "sbt_enable_flag");
+  // if(!no_sbt_constraint_flag)
+    WRITE_U(stream, 0, 1, "sbt_enable_flag");
   // Written only if sbt is enabled
   //WRITE_U(stream, 0, 1, "max_sbt_size_64_flag");
   WRITE_U(stream, 0, 1, "sps_reshaper_enable_flag");
   WRITE_U(stream, 0, 1, "isp_enable_flag");
+  // if(!no_ladf_constraint_flag)
   WRITE_U(stream, 0, 1, "sps_ladf_enabled_flag");
 
   WRITE_UE(stream, 0, "num_short_term_ref_pic_sets");

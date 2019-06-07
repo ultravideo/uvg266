@@ -268,6 +268,8 @@ static const uint8_t INIT_MVP_IDX[4][1] = {
   { 10,  },
 };
 
+static const uint8_t INIT_JOINT_CB_CR_FLAG[4] = { 156, 156, 184, 1 };
+
 static const uint8_t INIT_SAO_MERGE_FLAG[4] = { 31, 244, 214, 0 };
 
 static const uint8_t INIT_SAO_TYPE_IDX[4] = { 46, 95, 95, 0 };
@@ -342,6 +344,7 @@ void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
   kvz_ctx_init(&cabac->ctx.intra_subpart_model[0], QP, INIT_INTRA_SUBPART_MODE[slice][0], INIT_INTRA_SUBPART_MODE[3][0]);
   kvz_ctx_init(&cabac->ctx.intra_subpart_model[1], QP, INIT_INTRA_SUBPART_MODE[slice][1], INIT_INTRA_SUBPART_MODE[3][1]);
 
+  kvz_ctx_init(&cabac->ctx.joint_bc_br, QP, INIT_JOINT_CB_CR_FLAG[slice], INIT_JOINT_CB_CR_FLAG[3]);
 
   for (i = 0; i < 3; i++) {
     kvz_ctx_init(&cabac->ctx.cu_skip_flag_model[i], QP, INIT_SKIP_FLAG[slice][i], INIT_SKIP_FLAG[3][i]);

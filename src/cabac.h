@@ -88,6 +88,7 @@ typedef struct
     cabac_ctx_t luma_planar_model[2];
     cabac_ctx_t multi_ref_line[3];
     cabac_ctx_t bdpcm_mode[2];
+    cabac_ctx_t joint_bc_br;
   } ctx;
 } cabac_data_t;
 
