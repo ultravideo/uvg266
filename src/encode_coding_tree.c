@@ -201,12 +201,11 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
 
   for (int i = 0; i < width * width; i++) {
     if (coeff[scan[i]]) {
-      scan_cg_last = i;
       scan_pos_last = i;
-      sig_coeffgroup_flag[i >> (width + width)] = 1;
+      sig_coeffgroup_flag[i >> (2 * log2_block_size)] = 1;
     }
   }
-  
+  scan_cg_last = scan_pos_last >> log2_block_size;
 
   int pos_last = scan[scan_pos_last];
 
@@ -241,7 +240,7 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
 
   // significant_coeff_flag
   for (i = scan_cg_last; i >= 0; i--) {
-    int32_t min_sub_pos = i << 4; // LOG2_SCAN_SET_SIZE;
+    int32_t min_sub_pos = i << log2_block_size; // LOG2_SCAN_SET_SIZE;
     //int32_t abs_coeff[64*64];
     int32_t cg_blk_pos = scan_cg[i];
     int32_t cg_pos_y = cg_blk_pos / num_blk_side;
@@ -259,7 +258,7 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
 
     // Encode significant coeff group flag when not the last or the first
     if (i == scan_cg_last || i == 0) {
-      sig_coeffgroup_flag[cg_blk_pos] = 1;
+      //sig_coeffgroup_flag[cg_blk_pos] = 1;
     }
     else {
       uint32_t sig_coeff_group = (sig_coeffgroup_flag[cg_blk_pos] != 0);
@@ -1049,7 +1048,7 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
   isp_mode += ((height > TR_MAX_WIDTH) || !enough_samples) ? 2 : 0;
   bool allow_isp = enough_samples;
 
-  if (cur_cu->type == 1/*intra*/ && y != 0) {
+  if (cur_cu->type == 1/*intra*/ && (y % LCU_WIDTH) != 0) {
     cabac->cur_ctx = &(cabac->ctx.multi_ref_line[0]);
     CABAC_BIN(cabac, 0, "multi_ref_line");
   }
@@ -1250,7 +1249,7 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
       }
       else {
         CABAC_BIN(cabac, 1, "intra_chroma_pred_mode");*/
-        CABAC_BINS_EP(cabac, pred_mode, 2, "intra_chroma_pred_mode");
+        CABAC_BINS_EP(cabac, 0/*pred_mode*/, 2, "intra_chroma_pred_mode");
       //}
     }
   }
@@ -1458,11 +1457,15 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
       CABAC_BIN(cabac, !(implicit_split_mode == KVZ_NO_SPLIT), "SplitFlag");
     }
 
-    if (implicit_split_mode == KVZ_NO_SPLIT) return;
+    //if (implicit_split_mode == KVZ_NO_SPLIT) return;
 
-    if (!split_flag) return;
+    //if (!split_flag) return;
+
+
+    qt_split = implicit_split_mode == KVZ_QUAD_SPLIT && split_flag;
 
     if (allow_qt && allow_btt) {
+      split_model = (left_cu && GET_SPLITDATA(left_cu, depth)) + (above_cu && GET_SPLITDATA(above_cu, depth)) /*+ (depth < 2 ? 0 : 3)*/;
       cabac->cur_ctx = &(cabac->ctx.split_flag_model[split_model]);
       CABAC_BIN(cabac, qt_split, "QT_SplitFlag");
     }
