@@ -438,9 +438,9 @@ uint32_t kvz_context_get_sig_coeff_group( uint32_t *sig_coeff_group_flag,
 {
   uint32_t uiRight = 0;
   uint32_t uiLower = 0;
-  width >>= 2;
-  if (pos_x < (uint32_t)width - 1) uiRight = (sig_coeff_group_flag[pos_y * width + pos_x + 1] != 0);
-  if (pos_y < (uint32_t)width - 1) uiLower = (sig_coeff_group_flag[(pos_y  + 1 ) * width + pos_x] != 0);
+  //width >>= 2;
+  if (pos_x < (uint32_t)(width - 1)) uiRight = sig_coeff_group_flag[pos_y * width + pos_x + 1];
+  if (pos_y < (uint32_t)(width - 1)) uiLower = sig_coeff_group_flag[(pos_y  + 1 ) * width + pos_x];
 
   return uiRight || uiLower;
 }
