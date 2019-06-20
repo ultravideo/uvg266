@@ -1411,7 +1411,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
     // horizontal or vertical split, then this flag tells if QT or BT is used
 
     bool no_split, qt_split, bh_split, bv_split, th_split, tv_split;
-    no_split = qt_split = bh_split = bv_split = th_split = tv_split = true;
+    no_split = qt_split = bh_split = bv_split = th_split = tv_split = false;
     bool allow_qt = cu_width > (LCU_WIDTH >> MAX_DEPTH);
     bool allow_btt = false;
     
@@ -1445,6 +1445,8 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
       bv_split = (implicit_split_mode == KVZ_VERT_SPLIT);
     }
 
+    qt_split = implicit_split_mode == KVZ_QUAD_SPLIT && split_flag;
+
     bool allow_split = qt_split | bh_split | bv_split | th_split | tv_split;
     //ToDo: Change MAX_DEPTH to MAX_BT_DEPTH
     allow_btt = depth < MAX_DEPTH;
@@ -1464,7 +1466,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
       }
 
       uint32_t split_num = 0;
-      if (qt_split) split_num++;
+      if (qt_split) split_num+=2;
       if (bh_split) split_num++;
       if (bv_split) split_num++;
       if (th_split) split_num++;
@@ -1481,9 +1483,6 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
     //if (implicit_split_mode == KVZ_NO_SPLIT) return;
 
     //if (!split_flag) return;
-
-
-    qt_split = implicit_split_mode == KVZ_QUAD_SPLIT && split_flag;
 
     if (allow_qt && allow_btt) {
       split_model = (left_cu && GET_SPLITDATA(left_cu, depth)) + (above_cu && GET_SPLITDATA(above_cu, depth)) /*+ (depth < 2 ? 0 : 3)*/;
