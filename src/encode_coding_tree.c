@@ -144,7 +144,9 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
   const uint32_t *scan =
     kvz_g_sig_last_scan[scan_mode][log2_block_size - 1];
   const uint32_t *scan_cg = g_sig_last_scan_cg[log2_block_size - 2][scan_mode];
-  const uint32_t num_blk_side = width >> log2_block_size;
+  const uint32_t clipped_log2_size = log2_block_size > 4 ? 4 : log2_block_size;
+  const uint32_t num_blk_side = width >> clipped_log2_size;
+  
 
   // Init base contexts according to block type
   cabac_ctx_t *base_coeff_group_ctx = &(cabac->ctx.sig_coeff_group_model[type]);
@@ -203,10 +205,10 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
   for (int i = 0; i < width * width; i++) {
     if (coeff[scan[i]]) {
       scan_pos_last = i;
-      sig_coeffgroup_flag[i >> log2_block_size] = 1;
+      sig_coeffgroup_flag[scan_cg[i >> clipped_log2_size]] = 1;
     }
   }
-  scan_cg_last = scan_pos_last >> log2_block_size;
+  scan_cg_last = scan_pos_last >> clipped_log2_size;
 
   int pos_last = scan[scan_pos_last];
 
@@ -241,27 +243,29 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
 
   // significant_coeff_flag
   for (i = scan_cg_last; i >= 0; i--) {
-    int32_t min_sub_pos = i << log2_block_size; // LOG2_SCAN_SET_SIZE;
+    
     //int32_t abs_coeff[64*64];
     int32_t cg_blk_pos = scan_cg[i];
-    int32_t cg_pos_y = cg_blk_pos / num_blk_side;
-    int32_t cg_pos_x = cg_blk_pos - (cg_pos_y * num_blk_side);
+    int32_t cg_pos_y = cg_blk_pos / clipped_log2_size;
+    int32_t cg_pos_x = cg_blk_pos - (cg_pos_y * clipped_log2_size);
+    int32_t min_sub_pos = i << clipped_log2_size; // LOG2_SCAN_SET_SIZE;
 
-    if ((width == 32 && (cg_pos_x >= (16 >> log2_block_size))) || (width == 32 && (cg_pos_y >= (16 >> log2_block_size)))) {
-      continue;
-    }
-
-    uint32_t coeff_signs = 0;
-    int32_t last_nz_pos_in_cg = -1;
-    //int32_t first_nz_pos_in_cg = 16;
-    int32_t num_non_zero = 0;
-    int32_t first_sig_pos = (i == scan_cg_last) ? scan_pos_last : (min_sub_pos + (1 << log2_block_size) - 1);
-    int32_t reg_bins = 32; //8 for 2x2
+    /*if (type == 0 && width <= 32) {
+      if ((width == 32 && (cg_pos_x >= (16 >> clipped_log2_size))) || (width == 32 && (cg_pos_y >= (16 >> clipped_log2_size)))) {
+        printf("continued\n");
+        continue;
+      }
+    }*/
 
     
+    
+    
+    int32_t first_sig_pos = (i == scan_cg_last) ? scan_pos_last : (min_sub_pos + (1 << clipped_log2_size) - 1);
+    int32_t next_sig_pos = first_sig_pos;
+
+
     // !!! residual_coding_subblock() !!!
-
-    
+  
     // Encode significant coeff group flag when not the last or the first
     if (i == scan_cg_last || i == 0) {
       sig_coeffgroup_flag[cg_blk_pos] = 1;
@@ -269,7 +273,7 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
     else {
       uint32_t sig_coeff_group = (sig_coeffgroup_flag[cg_blk_pos] != 0);
       uint32_t ctx_sig = kvz_context_get_sig_coeff_group(sig_coeffgroup_flag, cg_pos_x,
-        cg_pos_y, width >> log2_block_size);
+        cg_pos_y, clipped_log2_size);
       cabac->cur_ctx = &base_coeff_group_ctx[ctx_sig];
       CABAC_BIN(cabac, sig_coeff_group, "significant_coeffgroup_flag");
     }
@@ -278,8 +282,14 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
     if (sig_coeffgroup_flag[cg_blk_pos]) {
 
       uint32_t next_pass = 0;
-      int32_t next_sig_pos = first_sig_pos;
+      
       int32_t infer_sig_pos = (next_sig_pos != scan_pos_last) ? ((i != 0) ? min_sub_pos : -1) : next_sig_pos;
+      int32_t num_non_zero = 0;
+      int32_t reg_bins = 32; //8 for 2x2
+      int32_t last_nz_pos_in_cg = -1;
+      int32_t first_nz_pos_in_cg = 16;
+      int32_t remainder_abs_coeff = -1;
+      uint32_t coeff_signs = 0;
 
 
       /*
@@ -289,11 +299,11 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
 
 
         blk_pos = scan[next_sig_pos];
-        pos_y = blk_pos >> log2_block_size;
-        pos_x = blk_pos - (pos_y << log2_block_size);
-        sig = (coeff[blk_pos] != 0) ? 1 : 0;
-        if (num_non_zero || (next_sig_pos != infer_sig_pos)) {
+        pos_y = blk_pos / width;
+        pos_x = blk_pos - (pos_y * width);
 
+        sig = (coeff[blk_pos] != 0) ? 1 : 0;
+        if (num_non_zero || next_sig_pos != infer_sig_pos) {
           ctx_sig = kvz_context_get_sig_ctx_idx_abs(coeff, pos_x, pos_y, width, width, type, &temp_diag, &temp_sum);
           
           cabac_ctx_t* sig_ctx_luma = &(cabac->ctx.cu_sig_model_luma[MAX(0, quant_state - 1)][ctx_sig]);
@@ -301,10 +311,12 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
           cabac->cur_ctx = (type == 0 ? sig_ctx_luma : sig_ctx_chroma);
           CABAC_BIN(cabac, sig, "sig_coeff_flag");
           reg_bins--;
+
         }
         else if(next_sig_pos != scan_pos_last) {
-          kvz_context_get_sig_ctx_idx_abs(coeff, pos_x, pos_y, width, width, type, &temp_diag, &temp_sum);
+          ctx_sig = kvz_context_get_sig_ctx_idx_abs(coeff, pos_x, pos_y, width, width, type, &temp_diag, &temp_sum);
         }
+        
 
         if (sig) {
           assert(next_sig_pos - min_sub_pos >= 0 && next_sig_pos - min_sub_pos < 16);
@@ -324,7 +336,7 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
           last_nz_pos_in_cg = MAX(last_nz_pos_in_cg, next_sig_pos);
           //first_nz_pos_in_cg = next_sig_pos;
 
-          int32_t remainder_abs_coeff = abs(coeff[blk_pos]) - 1;
+          remainder_abs_coeff = abs(coeff[blk_pos]) - 1;
 
           // If shift sign pattern and add current sign
           coeff_signs = (next_sig_pos != scan_cg_last ? 2 * coeff_signs : coeff_signs) + (coeff[blk_pos] < 0);
@@ -393,8 +405,8 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
       uint32_t pos0 = 0;
       for (scan_pos = first_sig_pos; scan_pos > next_sig_pos; scan_pos--) {
         blk_pos = scan[scan_pos];
-        pos_y = blk_pos >> log2_block_size;
-        pos_x = blk_pos - (pos_y << log2_block_size);
+        pos_y = blk_pos >> clipped_log2_size;
+        pos_x = blk_pos - (pos_y << clipped_log2_size);
         rice_param = kvz_go_rice_par_abs(coeff, pos_x, pos_y, width, width, 4);
         if (abs(coeff[blk_pos]) >= 4) {
           uint32_t remainder = (abs(coeff[blk_pos]) - 4) >> 1;
@@ -408,8 +420,8 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
       */
       for (scan_pos = next_sig_pos; scan_pos >= min_sub_pos; scan_pos--) {
         blk_pos = scan[scan_pos];
-        pos_y = blk_pos >> log2_block_size;
-        pos_x = blk_pos - (pos_y << log2_block_size);
+        pos_y = blk_pos >> clipped_log2_size;
+        pos_x = blk_pos - (pos_y << clipped_log2_size);
 
         uint32_t coeff_abs = abs(coeff[blk_pos]);
         int32_t abs_sum = kvz_abs_sum(coeff, pos_x, pos_y, width, width, 0);

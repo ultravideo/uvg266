@@ -985,7 +985,7 @@ void kvz_encoder_state_write_bitstream_slice_header(
     first_slice_segment_in_pic = false;
   }
 
-  WRITE_U(stream, first_slice_segment_in_pic, 1, "first_slice_segment_in_pic_flag");
+  //WRITE_U(stream, first_slice_segment_in_pic, 1, "first_slice_segment_in_pic_flag");
 
   if (state->frame->pictype >= KVZ_NAL_IDR_W_RADL
     && state->frame->pictype <= KVZ_NAL_CRA_NUT) {
@@ -994,21 +994,25 @@ void kvz_encoder_state_write_bitstream_slice_header(
 
   WRITE_UE(stream, 0, "slice_pic_parameter_set_id");
 
-  if (!first_slice_segment_in_pic) {
-    /*
-    if (encoder->pps.dependent_slice_segments_enabled_flag) {
-      WRITE_U(stream, !independent, 1, "dependent_slice_segment_flag");
-    }
-    */
 
-    int lcu_cnt = encoder->in.width_in_lcu * encoder->in.height_in_lcu;
-    int num_bits = kvz_math_ceil_log2(lcu_cnt);
-    int slice_start_rs = state->slice->start_in_rs;
-    if (state->encoder_control->cfg.slices & KVZ_SLICES_WPP) {
-      slice_start_rs += state->wfrow->lcu_offset_y * state->tile->frame->width_in_lcu;
-    }
-    WRITE_U(stream, slice_start_rs, num_bits, "slice_segment_address");
-  }
+  //if (!first_slice_segment_in_pic) {
+  //  /*
+  //  if (encoder->pps.dependent_slice_segments_enabled_flag) {
+  //    WRITE_U(stream, !independent, 1, "dependent_slice_segment_flag");
+  //  }
+  //  */
+
+  //  int lcu_cnt = encoder->in.width_in_lcu * encoder->in.height_in_lcu;
+  //  int num_bits = kvz_math_ceil_log2(lcu_cnt);
+  //  int slice_start_rs = state->slice->start_in_rs;
+  //  if (state->encoder_control->cfg.slices & KVZ_SLICES_WPP) {
+  //    slice_start_rs += state->wfrow->lcu_offset_y * state->tile->frame->width_in_lcu;
+  //  }
+  //  WRITE_U(stream, slice_start_rs, num_bits, "slice_segment_address");
+  //}
+
+  // ToDo: this probably needs to be changed to something proper at some point
+  WRITE_U(stream, 0, 1, "slice_address");
 
   //if (independent) {
     kvz_encoder_state_write_bitstream_slice_header_independent(stream, state);
