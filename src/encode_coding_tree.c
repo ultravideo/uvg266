@@ -288,7 +288,7 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
       int32_t num_non_zero = 0;
       int32_t reg_bins = 32; //8 for 2x2
       int32_t last_nz_pos_in_cg = -1;
-      int32_t first_nz_pos_in_cg = 16;
+      int32_t first_nz_pos_in_cg = next_sig_pos;
       int32_t remainder_abs_coeff = -1;
       uint32_t coeff_signs = 0;
 
@@ -335,7 +335,7 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
           
 
           last_nz_pos_in_cg = MAX(last_nz_pos_in_cg, next_sig_pos);
-          //first_nz_pos_in_cg = next_sig_pos;
+          first_nz_pos_in_cg = next_sig_pos;
 
           remainder_abs_coeff = abs(coeff[blk_pos]) - 1;
 
@@ -442,7 +442,7 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
       uint32_t num_signs = num_non_zero;
       //ToDo: sign hiding
       
-      if(state->encoder_control->cfg.signhide_enable && (last_nz_pos_in_cg - next_sig_pos >= 4))
+      if(state->encoder_control->cfg.signhide_enable && (last_nz_pos_in_cg - first_nz_pos_in_cg >= 4))
       {
         num_signs --;
         coeff_signs >>= 1;
