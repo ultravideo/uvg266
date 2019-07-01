@@ -407,6 +407,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   WRITE_UE(stream, encoder->bitdepth-8, "bit_depth_luma_minus8");
   WRITE_UE(stream, encoder->bitdepth-8, "bit_depth_chroma_minus8");
   WRITE_UE(stream, 1, "log2_max_pic_order_cnt_lsb_minus4");
+  WRITE_U(stream, 0, 1, "sps_idr_rpl_present_flag");
   WRITE_U(stream, 0, 1, "sps_sub_layer_ordering_info_present_flag");
 
   //for each layer
