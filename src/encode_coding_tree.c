@@ -150,7 +150,7 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
   
 
   // Init base contexts according to block type
-  cabac_ctx_t *base_coeff_group_ctx = &(cabac->ctx.sig_coeff_group_model[type]);
+  cabac_ctx_t *base_coeff_group_ctx = &(cabac->ctx.sig_coeff_group_model[(type == 0 ? 0 : 1) * 2]);
 
   // joint_cb_cr
   if (type == 2 && cbf_cb) {
@@ -249,11 +249,10 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
     int32_t cg_blk_pos = scan_cg[i];
     int32_t cg_pos_y = cg_blk_pos / (MIN((uint8_t)32, width) >> (clipped_log2_size/2));
     int32_t cg_pos_x = cg_blk_pos - (cg_pos_y * (MIN((uint8_t)32, width) >> (clipped_log2_size / 2)));
-    int32_t min_sub_pos = i << clipped_log2_size; // LOG2_SCAN_SET_SIZE;
+    
 
     /*if (type == 0 && width <= 32) {
       if ((width == 32 && (cg_pos_x >= (16 >> clipped_log2_size))) || (width == 32 && (cg_pos_y >= (16 >> clipped_log2_size)))) {
-        printf("continued\n");
         continue;
       }
     }*/
@@ -261,8 +260,6 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
     
     
     
-    int32_t first_sig_pos = (i == scan_cg_last) ? scan_pos_last : (min_sub_pos + (1 << clipped_log2_size) - 1);
-    int32_t next_sig_pos = first_sig_pos;
 
 
     // !!! residual_coding_subblock() !!!
@@ -283,6 +280,9 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
     if (sig_coeffgroup_flag[cg_blk_pos]) {
 
       uint32_t next_pass = 0;
+      int32_t min_sub_pos = i << clipped_log2_size; // LOG2_SCAN_SET_SIZE;
+      int32_t first_sig_pos = (i == scan_cg_last) ? scan_pos_last : (min_sub_pos + (1 << clipped_log2_size) - 1);
+      int32_t next_sig_pos = first_sig_pos;
       
       int32_t infer_sig_pos = (next_sig_pos != scan_pos_last) ? ((i != 0) ? min_sub_pos : -1) : next_sig_pos;
       int32_t num_non_zero = 0;
@@ -306,10 +306,10 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
         sig = (coeff[blk_pos] != 0) ? 1 : 0;
         if (num_non_zero || next_sig_pos != infer_sig_pos) {
           ctx_sig = kvz_context_get_sig_ctx_idx_abs(coeff, pos_x, pos_y, width, width, type, &temp_diag, &temp_sum);
-          
           cabac_ctx_t* sig_ctx_luma = &(cabac->ctx.cu_sig_model_luma[MAX(0, quant_state - 1)][ctx_sig]);
           cabac_ctx_t* sig_ctx_chroma = &(cabac->ctx.cu_sig_model_chroma[MAX(0, quant_state - 1)][ctx_sig]);
           cabac->cur_ctx = (type == 0 ? sig_ctx_luma : sig_ctx_chroma);
+          
           CABAC_BIN(cabac, sig, "sig_coeff_flag");
           reg_bins--;
 
@@ -340,7 +340,7 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
           remainder_abs_coeff = abs(coeff[blk_pos]) - 1;
 
           // If shift sign pattern and add current sign
-          coeff_signs = (next_sig_pos != scan_cg_last ? 2 * coeff_signs : coeff_signs) + (coeff[blk_pos] < 0);
+          coeff_signs = (next_sig_pos != scan_pos_last ? 2 * coeff_signs : coeff_signs) + (coeff[blk_pos] < 0);
 
           
 
@@ -406,12 +406,14 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
       uint32_t pos0 = 0;
       for (scan_pos = first_sig_pos; scan_pos > next_sig_pos; scan_pos--) {
         blk_pos = scan[scan_pos];
-        pos_y = blk_pos >> clipped_log2_size;
-        pos_x = blk_pos - (pos_y << clipped_log2_size);
-        rice_param = kvz_go_rice_par_abs(coeff, pos_x, pos_y, width, width, 4);
-        if (abs(coeff[blk_pos]) >= 4) {
-          uint32_t remainder = (abs(coeff[blk_pos]) - 4) >> 1;
-          
+        pos_y = blk_pos / width;
+        pos_x = blk_pos - (pos_y * width);
+        int32_t abs_sum = kvz_abs_sum(coeff, pos_x, pos_y, width, width, 4);
+        
+        rice_param = g_go_rice_pars[abs_sum];
+        uint32_t second_pass_abs_coeff = abs(coeff[blk_pos]);
+        if (second_pass_abs_coeff >= 4) {
+          uint32_t remainder = (second_pass_abs_coeff - 4) >> 1;
           kvz_cabac_write_coeff_remain(cabac, remainder, rice_param);
         }
       }
@@ -421,9 +423,8 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
       */
       for (scan_pos = next_sig_pos; scan_pos >= min_sub_pos; scan_pos--) {
         blk_pos = scan[scan_pos];
-        pos_y = blk_pos >> clipped_log2_size;
-        pos_x = blk_pos - (pos_y << clipped_log2_size);
-
+        pos_y = blk_pos / width;
+        pos_x = blk_pos - (pos_y * width);
         uint32_t coeff_abs = abs(coeff[blk_pos]);
         int32_t abs_sum = kvz_abs_sum(coeff, pos_x, pos_y, width, width, 0);
         rice_param = g_go_rice_pars[abs_sum];
@@ -435,13 +436,13 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
           num_non_zero++;
           last_nz_pos_in_cg = MAX(last_nz_pos_in_cg, scan_pos);
           coeff_signs <<= 1;
-          if (coeff < 0) coeff_signs++;
+          if (coeff[blk_pos] < 0) coeff_signs++;
         }
       }
 
       uint32_t num_signs = num_non_zero;
       //ToDo: sign hiding
-      
+
       if(state->encoder_control->cfg.signhide_enable && (last_nz_pos_in_cg - first_nz_pos_in_cg >= 4))
       {
         num_signs --;
@@ -812,7 +813,9 @@ static void encode_transform_coeff(encoder_state_t * const state,
   }
   */
 
-  int8_t split = (cur_cu->tr_depth > depth);
+  int8_t split = (LCU_WIDTH >> depth > TR_MAX_WIDTH);
+
+ 
 
   const int cb_flag_y = cbf_is_set(cur_pu->cbf, depth, COLOR_Y);
   const int cb_flag_u = cbf_is_set(cur_cu->cbf, depth, COLOR_U);
@@ -841,18 +844,18 @@ static void encode_transform_coeff(encoder_state_t * const state,
   // - they have already been signaled to 0 previously
   // When they are not present they are inferred to be 0, except for size 4
   // when the flags from previous level are used.
-  if (depth < MAX_PU_DEPTH && state->encoder_control->chroma_format != KVZ_CSP_400) {
+  if (state->encoder_control->chroma_format != KVZ_CSP_400) {
     
-    if (tr_depth != TR_MAX_LOG2_SIZE - 1 || (!(depth > tr_depth) && false/*ISPMode*/)) {
-    //if (tr_depth == 0 || parent_coeff_u) {
-      assert(tr_depth < 5);
-      cabac->cur_ctx = &(cabac->ctx.qt_cbf_model_cb[tr_depth]);
-      CABAC_BIN(cabac, cb_flag_u, "cbf_cb");
-    }
-    if (tr_depth != TR_MAX_LOG2_SIZE - 1 || (!(depth > tr_depth) && false/*ISPMode*/)) {
-    //if (tr_depth == 0 || parent_coeff_v) {
-      cabac->cur_ctx = &(cabac->ctx.qt_cbf_model_cr[cb_flag_u ? 1 : 0]);
-      CABAC_BIN(cabac, cb_flag_v, "cbf_cr");
+    if (!split) {
+      if (true) {
+        assert(tr_depth < 5);
+        cabac->cur_ctx = &(cabac->ctx.qt_cbf_model_cb[tr_depth]);
+        CABAC_BIN(cabac, cb_flag_u, "cbf_cb");
+      }
+      if (true) {
+        cabac->cur_ctx = &(cabac->ctx.qt_cbf_model_cr[cb_flag_u ? 1 : 0]);
+        CABAC_BIN(cabac, cb_flag_v, "cbf_cr");
+      }
     }
   }
 
@@ -1035,24 +1038,28 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
   kvz_cabac_encode_bin_trm(cabac, 0); // IPCMFlag == 0
   #endif
 
-  cabac->cur_ctx = &(cabac->ctx.bdpcm_mode[0]);
-  CABAC_BIN(cabac, 0, "bdpcm_mode");
+  if (cur_cu->type == 1 && (LCU_WIDTH >> depth <= 32)) {
+    cabac->cur_ctx = &(cabac->ctx.bdpcm_mode[0]);
+    CABAC_BIN(cabac, 0, "bdpcm_mode");
+  }
 
   const int num_pred_units = kvz_part_mode_num_parts[cur_cu->part_size];
 
   //ToDo: update multi_ref_lines variable when it's something else than constant 3
   int multi_ref_lines = 3;
   /*
-  for (int i = 0; i < num_pred_units; i++) {
-    if (multi_ref_lines > 1) {
-      cabac->cur_ctx = &(cabac->ctx.multi_ref_line[0]);
-      CABAC_BIN(cabac, cur_cu->intra.multi_ref_idx != 0, "multi_ref_line_0");
-      if (multi_ref_lines > 2 && cur_cu->intra.multi_ref_idx != 0) {
-        cabac->cur_ctx = &(cabac->ctx.multi_ref_line[1]);
-        CABAC_BIN(cabac, cur_cu->intra.multi_ref_idx != 1, "multi_ref_line_1");
-        if (multi_ref_lines > 3 && cur_cu->intra.multi_ref_idx != 1) {
-          cabac->cur_ctx = &(cabac->ctx.multi_ref_line[2]);
-          CABAC_BIN(cabac, cur_cu->intra.multi_ref_idx != 3, "multi_ref_line_2");
+  if(isp_enable_flag){ //ToDo: implement flag value to be something else than constant zero
+    for (int i = 0; i < num_pred_units; i++) {
+      if (multi_ref_lines > 1) {
+        cabac->cur_ctx = &(cabac->ctx.multi_ref_line[0]);
+        CABAC_BIN(cabac, cur_cu->intra.multi_ref_idx != 0, "multi_ref_line_0");
+        if (multi_ref_lines > 2 && cur_cu->intra.multi_ref_idx != 0) {
+          cabac->cur_ctx = &(cabac->ctx.multi_ref_line[1]);
+          CABAC_BIN(cabac, cur_cu->intra.multi_ref_idx != 1, "multi_ref_line_1");
+          if (multi_ref_lines > 3 && cur_cu->intra.multi_ref_idx != 1) {
+            cabac->cur_ctx = &(cabac->ctx.multi_ref_line[2]);
+            CABAC_BIN(cabac, cur_cu->intra.multi_ref_idx != 3, "multi_ref_line_2");
+          }
         }
       }
     }
@@ -1066,8 +1073,8 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
   bool enough_samples = kvz_g_convert_to_bit[width] + kvz_g_convert_to_bit[height] > (kvz_g_convert_to_bit[4 /* MIN_TB_SIZEY*/] << 1);
   uint8_t isp_mode = 0;
   // ToDo: add height comparison
-  isp_mode += ((width > TR_MAX_WIDTH) || !enough_samples) ? 1 : 0;
-  isp_mode += ((height > TR_MAX_WIDTH) || !enough_samples) ? 2 : 0;
+  //isp_mode += ((width > TR_MAX_WIDTH) || !enough_samples) ? 1 : 0;
+  //isp_mode += ((height > TR_MAX_WIDTH) || !enough_samples) ? 2 : 0;
   bool allow_isp = enough_samples;
 
   if (cur_cu->type == 1/*intra*/ && (y % LCU_WIDTH) != 0) {
@@ -1156,11 +1163,14 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
       //CABAC_BIN_EP(cabac, (mpm_preds[j] > 0 ? 1 : 0), "mpm_idx");
       if (mpm_preds[j] > 0) {
         CABAC_BIN_EP(cabac, (mpm_preds[j] > 1 ? 1 : 0), "mpm_idx");
-      } else if (mpm_preds[j] > 1) {
+      }
+      if (mpm_preds[j] > 1) {
         CABAC_BIN_EP(cabac, (mpm_preds[j] > 2 ? 1 : 0), "mpm_idx");
-      } else if (mpm_preds[j] > 2) {
+      }
+      if (mpm_preds[j] > 2) {
         CABAC_BIN_EP(cabac, (mpm_preds[j] > 3 ? 1 : 0), "mpm_idx");
-      } else if (mpm_preds[j] > 3) {
+      }
+      if (mpm_preds[j] > 3) {
         CABAC_BIN_EP(cabac, (mpm_preds[j] > 4 ? 1 : 0), "mpm_idx");
       }
     } else {
@@ -1411,16 +1421,21 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
     // Exception made in VVC with flag not being implicit if the BT can be used for
     // horizontal or vertical split, then this flag tells if QT or BT is used
 
-    bool no_split, qt_split, bh_split, bv_split, th_split, tv_split;
-    no_split = qt_split = bh_split = bv_split = th_split = tv_split = false;
-    bool allow_qt = cu_width > (LCU_WIDTH >> MAX_DEPTH);
-    bool allow_btt = false;
+    bool no_split, allow_qt, bh_split, bv_split, th_split, tv_split;
+    no_split = allow_qt = bh_split = bv_split = th_split = tv_split = true;
+    if(depth > MAX_DEPTH) allow_qt = false;
+    // ToDo: update this when btt is actually used
+    bool allow_btt = depth == MAX_DEPTH;
+    if (!allow_btt) {
+      bh_split = bv_split = th_split = tv_split = false;
+    }
     
 
     uint8_t implicit_split_mode = KVZ_NO_SPLIT;
     //bool implicit_split = border;
-    bool bottom_left_available = (abs_x > 0) && ((abs_y + cu_width - 1) < ctrl->in.height);
-    bool top_right_available = ((abs_x + cu_width - 1) < ctrl->in.width) && (abs_y > 0);
+    bool bottom_left_available = (abs_x >= 0) && ((abs_y + cu_width - 1) < ctrl->in.height);
+    bool top_right_available = ((abs_x + cu_width - 1) < ctrl->in.width) && (abs_y >= 0);
+
     /*
     if((depth >= 1 && (border_x != border_y))) implicit_split = false;
     if (state->frame->slicetype != KVZ_SLICE_I) {
@@ -1429,6 +1444,8 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
       if (!top_right_available && bottom_left_available) implicit_split = false;
     }
     */
+
+
     if (!bottom_left_available && !top_right_available && allow_qt) {
       implicit_split_mode = KVZ_QUAD_SPLIT;
     } else if (!bottom_left_available && allow_btt) {
@@ -1439,6 +1456,8 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
       implicit_split_mode = KVZ_QUAD_SPLIT;
     }
 
+    split_flag = implicit_split_mode != KVZ_NO_SPLIT;
+
     // Check split conditions
     if (implicit_split_mode != KVZ_NO_SPLIT) {
       no_split = th_split = tv_split = false;
@@ -1446,11 +1465,10 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
       bv_split = (implicit_split_mode == KVZ_VERT_SPLIT);
     }
 
-    qt_split = implicit_split_mode == KVZ_QUAD_SPLIT && split_flag;
-
-    bool allow_split = qt_split | bh_split | bv_split | th_split | tv_split;
+    bool allow_split = allow_qt | bh_split | bv_split | th_split | tv_split;
     //ToDo: Change MAX_DEPTH to MAX_BT_DEPTH
-    allow_btt = depth < MAX_DEPTH;
+    allow_btt = depth >= MAX_DEPTH;
+
 
     if (no_split && allow_split) {
       split_model = 0;
@@ -1459,15 +1477,15 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
       // Get left and top block split_flags and if they are present and true, increase model number
       // ToDo: should use height and width to increase model, PU_GET_W() ?
       if (left_cu && GET_SPLITDATA(left_cu, depth) == 1) {
-        split_model++;
+        //split_model++;
       }
 
       if (above_cu && GET_SPLITDATA(above_cu, depth) == 1) {
-        split_model++;
+        //split_model++;
       }
 
       uint32_t split_num = 0;
-      if (qt_split) split_num+=2;
+      if (allow_qt) split_num+=2;
       if (bh_split) split_num++;
       if (bv_split) split_num++;
       if (th_split) split_num++;
@@ -1481,19 +1499,16 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
       CABAC_BIN(cabac, !(implicit_split_mode == KVZ_NO_SPLIT), "SplitFlag");
     }
 
-    //if (implicit_split_mode == KVZ_NO_SPLIT) return;
+    bool qt_split = implicit_split_mode == KVZ_QUAD_SPLIT;
 
-    //if (!split_flag) return;
-
-    if (allow_qt && allow_btt) {
-      split_model = (left_cu && GET_SPLITDATA(left_cu, depth)) + (above_cu && GET_SPLITDATA(above_cu, depth)) /*+ (depth < 2 ? 0 : 3)*/;
+    if (!(implicit_split_mode == KVZ_NO_SPLIT) && (allow_qt && allow_btt)) {
+      split_model = (left_cu && GET_SPLITDATA(left_cu, depth)) + (above_cu && GET_SPLITDATA(above_cu, depth)) + (depth < 2 ? 0 : 3);
       cabac->cur_ctx = &(cabac->ctx.split_flag_model[split_model]);
       CABAC_BIN(cabac, qt_split, "QT_SplitFlag");
     }
-    //if (qt_split) return;
 
     // Only signal split when it is not implicit, currently only Qt split supported
-    if (!qt_split && (bh_split | bv_split | th_split | tv_split)) {
+    if (!(implicit_split_mode == KVZ_NO_SPLIT) && !qt_split && (bh_split | bv_split | th_split | tv_split)) {
 
       split_model = 0;
 

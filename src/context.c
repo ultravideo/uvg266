@@ -439,8 +439,8 @@ uint32_t kvz_context_get_sig_coeff_group( uint32_t *sig_coeff_group_flag,
   uint32_t uiRight = 0;
   uint32_t uiLower = 0;
   uint32_t position = pos_y * width + pos_x;
-  if (pos_x < (uint32_t)(width - 1)) uiRight = sig_coeff_group_flag[position + 1];
-  if (pos_y < (uint32_t)(width - 1)) uiLower = sig_coeff_group_flag[position + width];
+  if (pos_x + 1 < (uint32_t)width) uiRight = sig_coeff_group_flag[position + 1];
+  if (pos_y + 1 < (uint32_t)width) uiLower = sig_coeff_group_flag[position + width];
 
   return uiRight || uiLower;
 }
@@ -536,7 +536,7 @@ uint32_t kvz_context_get_sig_ctx_idx_abs(const coeff_t* coeff, int32_t pos_x, in
   const int     diag = pos_x + pos_y;
   int           num_pos = 0;
   int           sum_abs = 0;
-#define UPDATE(x) {int a=abs(x);sum_abs+=MIN(4-(a&1),a);num_pos+=(a?1:0);}
+#define UPDATE(x) {int a=abs(x);sum_abs+=MIN(4+(a&1),a);num_pos+=(a?1:0);}
   if (pos_x < width - 1)
   {
     UPDATE(data[1]);
@@ -582,6 +582,7 @@ uint32_t kvz_abs_sum(const coeff_t* coeff, int32_t pos_x, int32_t pos_y,
                              uint32_t height, uint32_t width, uint32_t baselevel)
 {
 #define UPDATE(x) sum+=abs(x)/*-(x?1:0)*/
+
 
   const coeff_t* data = coeff + pos_x + pos_y * width;
   int           sum = 0;

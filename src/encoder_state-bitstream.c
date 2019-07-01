@@ -420,6 +420,10 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   WRITE_UE(stream, 0, "sps_max_latency_increase_plus1");
   //end for
 
+  WRITE_U(stream, 0, 1, "long_term_ref_pics_flag");
+  WRITE_U(stream, 1, 1, "rpl1_copy_from_rpl0_flag");
+  WRITE_UE(stream, 0, "num_ref_pic_lists_in_sps[0]")
+
   // QTBT
   // if(!no_qtbtt_dual_tree_intra_constraint_flag)
     WRITE_U(stream, 0, 1, "qtbt_dual_intra_tree");
@@ -469,6 +473,10 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   WRITE_UE(stream, encoder->tr_depth_inter, "max_transform_hierarchy_depth_inter");
   WRITE_UE(stream, encoder->cfg.tr_depth_intra, "max_transform_hierarchy_depth_intra");
   */
+
+  // #if MAX_TB_SIZE_SIGNALING
+    WRITE_UE(stream, TR_MAX_LOG2_SIZE - 2, "log2_max_luma_transform_block_size_minus2");
+  // #endif
 
   // if(!no_sao_constraint_flag)
     WRITE_U(stream, encoder->cfg.sao_type ? 1 : 0, 1, "sps_sao_enabled_flag");
@@ -541,6 +549,7 @@ if (encoder->scaling_list.enable) {
   // if(!no_ladf_constraint_flag)
   WRITE_U(stream, 0, 1, "sps_ladf_enabled_flag");
 
+  /*
   WRITE_UE(stream, 0, "num_short_term_ref_pic_sets");
 
   //IF num short term ref pic sets
@@ -550,7 +559,7 @@ if (encoder->scaling_list.enable) {
 
   //IF long_term_ref_pics_present
   //ENDIF
-
+  */
 
   WRITE_U(stream, 0, 1, "scaling_list_enabled_flag");
 
@@ -588,6 +597,7 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
 
   WRITE_UE(stream, 0, "num_ref_idx_l0_default_active_minus1");
   WRITE_UE(stream, 0, "num_ref_idx_l1_default_active_minus1");
+  WRITE_U(stream, 0, 1, "rpl1IdxPresentFlag");
   WRITE_SE(stream, ((int8_t)encoder->cfg.qp) - 26, "init_qp_minus26");
   WRITE_U(stream, 0, 1, "constrained_intra_pred_flag");
   WRITE_U(stream, encoder->cfg.trskip_enable, 1, "transform_skip_enabled_flag");
@@ -656,7 +666,7 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
   WRITE_U(stream, 0, 1, "pps_scaling_list_data_present_flag");
   //IF scaling_list
   //ENDIF
-  WRITE_U(stream, 0, 1, "lists_modification_present_flag");
+  //WRITE_U(stream, 0, 1, "lists_modification_present_flag");
   WRITE_UE(stream, 0, "log2_parallel_merge_level_minus2");
   WRITE_U(stream, 0, 1, "slice_segment_header_extension_present_flag");
   WRITE_U(stream, 0, 1, "pps_extension_flag");
