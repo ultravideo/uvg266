@@ -53,6 +53,7 @@ static void encode_last_significant_xy(cabac_data_t * const cabac,
 {
   const int index = kvz_math_floor_log2(width);
   const int prefix_ctx[8] = { 0, 0, 0, 3, 6, 10, 15, 21 };
+  //ToDo: own ctx_offset and shift for X and Y 
   uint8_t ctx_offset = type ? 0 : prefix_ctx[index];
   uint8_t shift = type ? CLIP(0, 2, width>>3) : (index+1)>>2;
 

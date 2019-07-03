@@ -310,11 +310,11 @@ void kvz_cabac_encode_aligned_bins_ep(cabac_data_t * const data, uint32_t bin_va
 void kvz_cabac_encode_bins_ep(cabac_data_t * const data, uint32_t bin_values, int num_bins)
 {
   uint32_t pattern;
-
+  /*
   if (data->range == 256) {
     kvz_cabac_encode_aligned_bins_ep(data, bin_values, num_bins);
     return;
-  }
+  }*/
   while (num_bins > 8) {
     num_bins -= 8;
     pattern = bin_values >> num_bins;
