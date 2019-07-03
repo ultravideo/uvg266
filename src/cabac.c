@@ -294,7 +294,7 @@ void kvz_cabac_encode_aligned_bins_ep(cabac_data_t * const data, uint32_t bin_va
     //
     unsigned bins_to_code = MIN(rem_bins, 8); //code bytes if able to take advantage of the system's byte-write function
     unsigned bin_mask = (1 << bins_to_code) - 1;
-    unsigned new_bins = (num_bins >> (rem_bins - bins_to_code)) & bin_mask;
+    unsigned new_bins = (bin_values >> (rem_bins - bins_to_code)) & bin_mask;
     data->low = (data->low << bins_to_code) + (new_bins << 8); //range is known to be 256
     rem_bins -= bins_to_code;
     data->bits_left -= bins_to_code;
@@ -310,11 +310,11 @@ void kvz_cabac_encode_aligned_bins_ep(cabac_data_t * const data, uint32_t bin_va
 void kvz_cabac_encode_bins_ep(cabac_data_t * const data, uint32_t bin_values, int num_bins)
 {
   uint32_t pattern;
-  /*
+  
   if (data->range == 256) {
     kvz_cabac_encode_aligned_bins_ep(data, bin_values, num_bins);
     return;
-  }*/
+  }
   while (num_bins > 8) {
     num_bins -= 8;
     pattern = bin_values >> num_bins;
