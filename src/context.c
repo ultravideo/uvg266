@@ -379,6 +379,7 @@ void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
 
   for (i = 0; i < 9; i++) {
     kvz_ctx_init(&cabac->ctx.split_flag_model[i], QP, INIT_SPLIT_FLAG[slice][i], INIT_SPLIT_FLAG[3][i]);
+    kvz_ctx_init(&cabac->ctx.alf_ctb_flag_model[i], QP, INIT_ALF_CTB_FLAG[slice][i], INIT_ALF_CTB_FLAG[3][i]);
   }
   
 

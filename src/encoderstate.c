@@ -667,6 +667,14 @@ static void encoder_state_worker_encode_lcu(void * opaque)
     encode_sao(state, lcu->position.x, lcu->position.y, &frame->sao_luma[lcu->position.y * frame->width_in_lcu + lcu->position.x], &frame->sao_chroma[lcu->position.y * frame->width_in_lcu + lcu->position.x]);
   }
 
+  if (encoder->cfg.alf_enable) { 
+    cabac_data_t * const cabac = &state->cabac;
+    for (int component = 0; component < 1; component++) {
+      cabac->cur_ctx = &(cabac->ctx.alf_ctb_flag_model[component * 3]);
+      CABAC_BIN(cabac, 0, "alf_ctb_flag");
+    }
+  }
+
   //Encode coding tree
   kvz_encode_coding_tree(state, lcu->position.x * LCU_WIDTH, lcu->position.y * LCU_WIDTH, 0);
 

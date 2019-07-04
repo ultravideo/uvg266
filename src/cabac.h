@@ -52,6 +52,7 @@ typedef struct
 
   // CONTEXTS
   struct {
+    cabac_ctx_t alf_ctb_flag_model[9];
     cabac_ctx_t sao_merge_flag_model;
     cabac_ctx_t sao_type_idx_model;
     cabac_ctx_t split_flag_model[9]; //!< \brief split flag context models
