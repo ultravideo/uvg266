@@ -614,7 +614,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   // if(!no_sao_constraint_flag)
     WRITE_U(stream, encoder->cfg.sao_type ? 1 : 0, 1, "sps_sao_enabled_flag");
   // if(!no_alf_constraint_flag)
-    WRITE_U(stream, 0, 1, "sps_alf_enabled_flag");
+    WRITE_U(stream, encoder->cfg.alf_enable, 1, "sps_alf_enable_flag");
 
     WRITE_U(stream, 0, 1, "sps_lmcs_enable_flag");
 

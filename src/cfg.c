@@ -49,6 +49,7 @@ int kvz_config_init(kvz_config *cfg)
   cfg->deblock_beta    = 0;
   cfg->deblock_tc      = 0;
   cfg->sao_type        = 3;
+  cfg->alf_enable      = 0;
   cfg->rdoq_enable     = 1;
   cfg->rdoq_skip       = 1;
   cfg->signhide_enable = true;
@@ -796,6 +797,8 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     if (!parse_enum(value, sao_names, &sao_type)) sao_type = atobool(value) ? 3 : 0;
     cfg->sao_type = sao_type;
   }
+  else if OPT("alf")
+    cfg->alf_enable = atobool(value);
   else if OPT("rdoq")
     cfg->rdoq_enable = atobool(value);
   else if OPT("signhide")
