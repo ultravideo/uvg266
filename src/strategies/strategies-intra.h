@@ -33,6 +33,7 @@
 typedef void (angular_pred_func)(
   const int_fast8_t log2_width,
   const int_fast8_t intra_mode,
+  const int_fast8_t channel_type,
   const kvz_pixel *const in_ref_above,
   const kvz_pixel *const in_ref_left,
   kvz_pixel *const dst);

@@ -38,6 +38,7 @@
 static void kvz_angular_pred_generic(
   const int_fast8_t log2_width,
   const int_fast8_t intra_mode,
+  const int_fast8_t channel_type,
   const kvz_pixel *const in_ref_above,
   const kvz_pixel *const in_ref_left,
   kvz_pixel *const dst)
@@ -46,9 +47,42 @@ static void kvz_angular_pred_generic(
   assert(log2_width >= 2 && log2_width <= 5);
   assert(intra_mode >= 2 && intra_mode <= 66);
 
-  static const int8_t modedisp2sampledisp[27] = { 0, 1, 2, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 26, 29, 32, 35, 39, 45, 49, 54, 60, 68, 79, 93, 114 };
-  static const int16_t modedisp2invsampledisp[27] = { 0, 8192, 4096, 2731, 1638, 1170, 910, 745, 630, 546, 482, 431, 390, 356, 315, 282, 256, 234, 210, 182, 167, 152, 137, 120, 104, 88, 72 }; // (256 * 32) / sampledisp
-
+  static const int8_t modedisp2sampledisp[32] = { 0,    1,    2,    3,    4,    6,     8,   10,   12,   14,   16,   18,   20,   23,   26,   29,   32,   35,   39,  45,  51,  57,  64,  73,  86, 102, 128, 171, 256, 341, 512, 1024 };
+  static const int16_t modedisp2invsampledisp[32] = { 0, 8192, 4096, 2731, 2048, 1365,  1024,  819,  683,  585,  512,  455,  410,  356,  315,  282,  256,  234,  210, 182, 161, 144, 128, 112,  95,  80,  64,  48,  32,  24,  16,    8 }; // (256 * 32) / sampledisp
+  static const int16_t intraGaussFilter[32][4] = {
+  { 16, 32, 16, 0 },
+  { 15, 29, 17, 3 },
+  { 15, 29, 17, 3 },
+  { 14, 29, 18, 3 },
+  { 13, 29, 18, 4 },
+  { 13, 28, 19, 4 },
+  { 13, 28, 19, 4 },
+  { 12, 28, 20, 4 },
+  { 11, 28, 20, 5 },
+  { 11, 27, 21, 5 },
+  { 10, 27, 22, 5 },
+  { 9, 27, 22, 6 },
+  { 9, 26, 23, 6 },
+  { 9, 26, 23, 6 },
+  { 8, 25, 24, 7 },
+  { 8, 25, 24, 7 },
+  { 8, 24, 24, 8 },
+  { 7, 24, 25, 8 },
+  { 7, 24, 25, 8 },
+  { 6, 23, 26, 9 },
+  { 6, 23, 26, 9 },
+  { 6, 22, 27, 9 },
+  { 5, 22, 27, 10 },
+  { 5, 21, 27, 11 },
+  { 5, 20, 28, 11 },
+  { 4, 20, 28, 12 },
+  { 4, 19, 28, 13 },
+  { 4, 19, 28, 13 },
+  { 4, 18, 29, 13 },
+  { 3, 18, 29, 14 },
+  { 3, 17, 29, 15 },
+  { 3, 17, 29, 15 }
+  };
                                                     // Temporary buffer for modes 11-25.
                                                     // It only needs to be big enough to hold indices from -width to width-1.
   kvz_pixel tmp_ref[2 * 32];
@@ -116,12 +150,35 @@ static void kvz_angular_pred_generic(
       int_fast8_t delta_fract = delta_pos & (32 - 1);
 
       if (delta_fract) {
-        // Do linear filtering
-        for (int_fast8_t x = 0; x < width; ++x) {
-          kvz_pixel ref1 = ref_main[x + delta_int];
-          kvz_pixel ref2 = ref_main[x + delta_int + 1];
-          dst[y * width + x] = ((32 - delta_fract) * ref1 + delta_fract * ref2 + 16) >> 5;
+        /*
+        if (channel_type == 0) {
+          int32_t ref_main_index = delta_int;
+          kvz_pixel p[4];
+          bool use_cubic = false; // TODO: enable cubic filter when parameters are correct
+          int16_t *f = use_cubic ? 0 : intraGaussFilter[delta_fract];
+          // Do 4-tap intra interpolation filtering
+          for (int_fast8_t x = 0; x < width; x++) {
+            p[0] = ref_main[ref_main_index - 1];
+            p[1] = ref_main[ref_main_index];
+            p[2] = ref_main[ref_main_index - 1];
+            p[3] = f[3] != 0 ? ref_main[ref_main_index + 2] : 0;
+            if (use_cubic) {              
+              dst[y * width + x] = CLIP_TO_PIXEL(((int32_t)(f[0] * p[0]) + (int32_t)(f[1] * p[1]) + (int32_t)(f[2] * p[2]) + (int32_t)(f[3] * p[3]) + 32) >> 6);
+            }
+            else {
+              dst[y * width + x] = ((int32_t)(f[0]*p[0]) + (int32_t)(f[1]*p[1]) + (int32_t)(f[2]*p[2]) + (int32_t)(f[3]*p[3]) + 32) >> 6;
+            }
+          }
         }
+        else {
+        */
+          // Do linear filtering
+          for (int_fast8_t x = 0; x < width; ++x) {
+            kvz_pixel ref1 = ref_main[x + delta_int];
+            kvz_pixel ref2 = ref_main[x + delta_int + 1];
+            dst[y * width + x] = ((32 - delta_fract) * ref1 + delta_fract * ref2 + 16) >> 5;
+          }
+        //}
       }
       else {
         // Just copy the integer samples

@@ -327,7 +327,7 @@ void kvz_intra_predict(
       intra_pred_dc(log2_width, used_ref->top, used_ref->left, dst);
     //}
   } else {
-    kvz_angular_pred(log2_width, mode, used_ref->top, used_ref->left, dst);
+    kvz_angular_pred(log2_width, mode, color, used_ref->top, used_ref->left, dst);
 
     //if (color == COLOR_Y && width < 32 && filter_boundary) {
     //  if (mode == 10) {
