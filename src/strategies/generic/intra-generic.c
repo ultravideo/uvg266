@@ -121,6 +121,7 @@ static void kvz_angular_pred_generic(
     }
     // Get a pointer to block index 0 in tmp_ref.
     ref_main = &tmp_ref[width];
+    tmp_ref[width - 1] = tmp_ref[width];
 
     // Extend the side reference to the negative indices of main reference.
     int_fast32_t col_sample_disp = 128; // rounding for the ">> 8"
@@ -149,8 +150,8 @@ static void kvz_angular_pred_generic(
       int_fast8_t delta_int = delta_pos >> 5;
       int_fast8_t delta_fract = delta_pos & (32 - 1);
 
-      if (delta_fract) {
-        /*
+      if (abs(sample_disp) & 0x1F != 0) {
+        
         if (channel_type == 0) {
           int32_t ref_main_index = delta_int;
           kvz_pixel p[4];
@@ -158,10 +159,10 @@ static void kvz_angular_pred_generic(
           int16_t *f = use_cubic ? 0 : intraGaussFilter[delta_fract];
           // Do 4-tap intra interpolation filtering
           for (int_fast8_t x = 0; x < width; x++) {
-            p[0] = ref_main[ref_main_index - 1];
-            p[1] = ref_main[ref_main_index];
-            p[2] = ref_main[ref_main_index - 1];
-            p[3] = f[3] != 0 ? ref_main[ref_main_index + 2] : 0;
+            p[0] = ref_main[x + ref_main_index - 1];
+            p[1] = ref_main[x + ref_main_index];
+            p[2] = ref_main[x + ref_main_index + 1];
+            p[3] = f[3] != 0 ? ref_main[x + ref_main_index + 2] : 0;
             if (use_cubic) {              
               dst[y * width + x] = CLIP_TO_PIXEL(((int32_t)(f[0] * p[0]) + (int32_t)(f[1] * p[1]) + (int32_t)(f[2] * p[2]) + (int32_t)(f[3] * p[3]) + 32) >> 6);
             }
@@ -171,14 +172,14 @@ static void kvz_angular_pred_generic(
           }
         }
         else {
-        */
+        
           // Do linear filtering
           for (int_fast8_t x = 0; x < width; ++x) {
             kvz_pixel ref1 = ref_main[x + delta_int];
             kvz_pixel ref2 = ref_main[x + delta_int + 1];
             dst[y * width + x] = ((32 - delta_fract) * ref1 + delta_fract * ref2 + 16) >> 5;
           }
-        //}
+        }
       }
       else {
         // Just copy the integer samples
@@ -200,8 +201,7 @@ static void kvz_angular_pred_generic(
           const kvz_pixel top  = (wT != 0) ? ref_main[c] : 0;
           dst[y * width + x] = CLIP_TO_PIXEL((wL * left + wT * top + (64 - wL - wT) * dst[y * width + x] + 32) >> 6);
         }
-      }
-      else if (pred_mode >= 58 || pred_mode <= 10) {
+      } else {
         int inv_angle_sum_0 = 2;
         for (int x = 0; x < width; x++) {
           inv_angle_sum_0 += modedisp2invsampledisp[abs(mode_disp)];
@@ -214,8 +214,8 @@ static void kvz_angular_pred_generic(
 
           int wL = 32 >> MIN(31, ((x << 1) >> scale));
           if (wL == 0) break;
-          const kvz_pixel *p = ref_side + delta_y;
-          kvz_pixel left = (((64 - delta_frac_0) * p[0] + delta_frac_0 * p[1] + 32) >> 6);
+          const kvz_pixel *p = ref_side + delta_y + 1;
+          kvz_pixel left = p[delta_frac_0 >> 5];
           dst[y * width + x] = CLIP_TO_PIXEL((wL * left + (64 - wL) * dst[y * width + x] + 32) >> 6);
         }
       }
@@ -256,11 +256,13 @@ static void kvz_intra_pred_planar_generic(
   const kvz_pixel *const ref_left,
   kvz_pixel *const dst)
 {
+  // TODO: Add height
   assert(log2_width >= 2 && log2_width <= 5);
 
   const int_fast8_t width = 1 << log2_width;
   const kvz_pixel top_right = ref_top[width + 1];
   const kvz_pixel bottom_left = ref_left[width + 1];
+  const uint32_t offset = 1 <<(log2_width+ log2_width);
 
 #if 0
   // Unoptimized version for reference.
@@ -283,6 +285,7 @@ static void kvz_intra_pred_planar_generic(
       hor += top_right - ref_left[y + 1];
       top[x] += bottom_left - ref_top[x + 1];
       dst[y * width + x] = (hor + top[x]) >> (log2_width + 1);
+      //
     }
   }
 #endif
