@@ -85,7 +85,7 @@ static void kvz_angular_pred_generic(
   };
                                                     // Temporary buffer for modes 11-25.
                                                     // It only needs to be big enough to hold indices from -width to width-1.
-  kvz_pixel tmp_ref[2 * 32];
+  kvz_pixel tmp_ref[2 * 128] = { 0 };
   const int_fast8_t width = 1 << log2_width;
 
   uint32_t pred_mode = intra_mode; // ToDo: handle WAIP
@@ -127,12 +127,14 @@ static void kvz_angular_pred_generic(
     int_fast32_t col_sample_disp = 128; // rounding for the ">> 8"
     int_fast16_t inv_abs_sample_disp = modedisp2invsampledisp[abs(mode_disp)];
     // TODO: add 'vertical_mode ? height : width' instead of 'width'
-    int_fast8_t most_negative_index = (width * sample_disp) >> 5;
-    for (int_fast8_t x = -2; x >= most_negative_index; --x) {
+    int_fast8_t most_negative_index = ((width-1) * sample_disp) >> 5;
+    for (int_fast8_t x = -1; x > most_negative_index; --x) {
       col_sample_disp += inv_abs_sample_disp;
       int_fast8_t side_index = col_sample_disp >> 8;
-      tmp_ref[x + width] = ref_side[side_index - 1];
+      tmp_ref[x + width - 1] = ref_side[side_index - 1];
     }
+    tmp_ref[width + width - 1] = tmp_ref[width + width];
+    tmp_ref[most_negative_index + width - 1] = tmp_ref[most_negative_index + width];
   }
   else {
     // sample_disp >= 0 means we don't need to refer to negative indices,
@@ -150,8 +152,9 @@ static void kvz_angular_pred_generic(
       int_fast8_t delta_int = delta_pos >> 5;
       int_fast8_t delta_fract = delta_pos & (32 - 1);
 
-      if (abs(sample_disp) & 0x1F != 0) {
+      if ((abs(sample_disp) & 0x1F) != 0) {
         
+        // Luma Channel
         if (channel_type == 0) {
           int32_t ref_main_index = delta_int;
           kvz_pixel p[4];
@@ -190,31 +193,34 @@ static void kvz_angular_pred_generic(
 
       // TODO: replace latter width with height
       int scale = ((kvz_math_floor_log2(width) - 2 + kvz_math_floor_log2(width) - 2 + 2) >> 2);
-
+      
+      // PDPC
       if (pred_mode == 2 || pred_mode == 66) {
         int wT = 16 >> MIN(31, ((y << 1) >> scale));
         for (int x = 0; x < width; x++) {
           int wL = 16 >> MIN(31, ((x << 1) >> scale));
           if (wT + wL == 0) break;
           int c = x + y + 1;
+          if (c >= 2 * width) { wL = 0; }
+          if (c >= 2 * width) { wT = 0; }
           const kvz_pixel left = (wL != 0) ? ref_side[c] : 0;
           const kvz_pixel top  = (wT != 0) ? ref_main[c] : 0;
           dst[y * width + x] = CLIP_TO_PIXEL((wL * left + wT * top + (64 - wL - wT) * dst[y * width + x] + 32) >> 6);
         }
-      } else {
+      } else if (sample_disp == 0 || sample_disp >= 12) {
         int inv_angle_sum_0 = 2;
         for (int x = 0; x < width; x++) {
           inv_angle_sum_0 += modedisp2invsampledisp[abs(mode_disp)];
           int delta_pos_0 = inv_angle_sum_0 >> 2;
           int delta_frac_0 = delta_pos_0 & 63;
           int delta_int_0 = delta_pos_0 >> 6;
-          int delta_y = y + delta_int_0;
+          int delta_y = y + delta_int_0 + 1;
           // TODO: convert to JVET_K0500_WAIP
-          if (delta_y > width + width - 2) break;
+          if (delta_y > width + width - 1) break;
 
           int wL = 32 >> MIN(31, ((x << 1) >> scale));
           if (wL == 0) break;
-          const kvz_pixel *p = ref_side + delta_y + 1;
+          const kvz_pixel *p = ref_side + delta_y - 1;
           kvz_pixel left = p[delta_frac_0 >> 5];
           dst[y * width + x] = CLIP_TO_PIXEL((wL * left + (64 - wL) * dst[y * width + x] + 32) >> 6);
         }
