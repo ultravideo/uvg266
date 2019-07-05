@@ -82,7 +82,7 @@ typedef struct
     cabac_ctx_t cu_transquant_bypass;
     cabac_ctx_t cu_mvd_model[2];
     cabac_ctx_t cu_ref_pic_model[2];
-    cabac_ctx_t mvp_idx_model[2];
+    cabac_ctx_t mvp_idx_model;
     cabac_ctx_t cu_qt_root_cbf_model;
     cabac_ctx_t sig_coeff_group_model[8];
     cabac_ctx_t luma_planar_model[2];

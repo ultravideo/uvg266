@@ -368,12 +368,12 @@ void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
 
   //TODO: ignore P/B contexts on intra frame
   kvz_ctx_init(&cabac->ctx.cu_qt_root_cbf_model, QP, INIT_QT_ROOT_CBF[slice][0], INIT_QT_ROOT_CBF[3][0]);
+  kvz_ctx_init(&cabac->ctx.mvp_idx_model, QP, INIT_MVP_IDX[slice][0], INIT_MVP_IDX[3][0]);
 
   for (i = 0; i < 2; i++) {
     kvz_ctx_init(&cabac->ctx.qt_cbf_model_cr[i], QP, INIT_QT_CBF[slice][i + 10], INIT_QT_CBF[3][i + 10]);
     kvz_ctx_init(&cabac->ctx.cu_mvd_model[i], QP, INIT_MVD[slice][i], INIT_MVD[3][i]);
-    kvz_ctx_init(&cabac->ctx.cu_ref_pic_model[i], QP, INIT_REF_PIC[slice][i], INIT_REF_PIC[3][i]);
-    kvz_ctx_init(&cabac->ctx.mvp_idx_model[i], QP, INIT_MVP_IDX[slice][i], INIT_MVP_IDX[3][i]);
+    kvz_ctx_init(&cabac->ctx.cu_ref_pic_model[i], QP, INIT_REF_PIC[slice][i], INIT_REF_PIC[3][i]);    
     kvz_ctx_init(&cabac->ctx.luma_planar_model[i], QP, INIT_INTRA_LUMA_PLANAR_MODE[slice][i], INIT_INTRA_LUMA_PLANAR_MODE[3][i]);
     kvz_ctx_init(&cabac->ctx.bdpcm_mode[i], QP, BDPCM_MODE_INIT[slice][i], BDPCM_MODE_INIT[3][i]);
   }

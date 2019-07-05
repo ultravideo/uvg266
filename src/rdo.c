@@ -1136,7 +1136,7 @@ uint32_t kvz_calc_mvd_cost_cabac(const encoder_state_t * state,
         // Signal which candidate MV to use
         kvz_cabac_write_unary_max_symbol(
             cabac,
-            cabac->ctx.mvp_idx_model,
+            &cabac->ctx.mvp_idx_model,
             cur_mv_cand,
             1,
             AMVP_MAX_NUM_CANDS - 1);

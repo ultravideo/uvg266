@@ -1000,7 +1000,7 @@ static void encode_inter_prediction_unit(encoder_state_t * const state,
 
       // Signal which candidate MV to use
       kvz_cabac_write_unary_max_symbol(cabac,
-                                       cabac->ctx.mvp_idx_model,
+                                       &cabac->ctx.mvp_idx_model,
                                        CU_GET_MV_CAND(cur_cu, ref_list_idx),
                                        1,
                                        AMVP_MAX_NUM_CANDS - 1);
