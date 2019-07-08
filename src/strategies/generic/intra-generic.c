@@ -127,20 +127,27 @@ static void kvz_angular_pred_generic(
     int_fast32_t col_sample_disp = 128; // rounding for the ">> 8"
     int_fast16_t inv_abs_sample_disp = modedisp2invsampledisp[abs(mode_disp)];
     // TODO: add 'vertical_mode ? height : width' instead of 'width'
-    int_fast8_t most_negative_index = ((width-1) * sample_disp) >> 5;
+    int_fast8_t most_negative_index = (width * sample_disp) >> 5;
     for (int_fast8_t x = -1; x > most_negative_index; --x) {
       col_sample_disp += inv_abs_sample_disp;
       int_fast8_t side_index = col_sample_disp >> 8;
       tmp_ref[x + width - 1] = ref_side[side_index - 1];
     }
-    tmp_ref[width + width - 1] = tmp_ref[width + width];
+    tmp_ref[width + width] = tmp_ref[width + width-1];
     tmp_ref[most_negative_index + width - 1] = tmp_ref[most_negative_index + width];
   }
   else {
+    
     // sample_disp >= 0 means we don't need to refer to negative indices,
     // which means we can just use the references as is.
     ref_main = (vertical_mode ? in_ref_above : in_ref_left) + 1;
     ref_side = (vertical_mode ? in_ref_left : in_ref_above) + 1;
+
+    memcpy(tmp_ref + width, ref_main, (width*2) * sizeof(kvz_pixel));
+    ref_main = &tmp_ref[width];
+    tmp_ref[width-1] = tmp_ref[width];
+    int8_t last_index = 1 + width;
+    //tmp_ref[width + last_index] = tmp_ref[width + last_index - 1];
   }
 
   if (sample_disp != 0) {
