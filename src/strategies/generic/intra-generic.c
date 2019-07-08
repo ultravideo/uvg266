@@ -107,6 +107,7 @@ static void kvz_angular_pred_generic(
   // Set ref_main and ref_side such that, when indexed with 0, they point to
   // index 0 in block coordinates.
   if (sample_disp < 0) {
+    const uint32_t index_offset = width + 1;
     // Negative sample_disp means, we need to use both references.
 
     // TODO: update refs to take into account variating block size and shapes
@@ -117,11 +118,11 @@ static void kvz_angular_pred_generic(
     // Move the reference pixels to start from the middle to the later half of
     // the tmp_ref, so there is room for negative indices.
     for (int_fast8_t x = -1; x < width; ++x) {
-      tmp_ref[x + width] = ref_main[x];
+      tmp_ref[x + index_offset] = ref_main[x];
     }
     // Get a pointer to block index 0 in tmp_ref.
-    ref_main = &tmp_ref[width];
-    tmp_ref[width - 1] = tmp_ref[width];
+    ref_main = &tmp_ref[index_offset];
+    tmp_ref[index_offset -1] = tmp_ref[index_offset];
 
     // Extend the side reference to the negative indices of main reference.
     int_fast32_t col_sample_disp = 128; // rounding for the ">> 8"
@@ -131,10 +132,10 @@ static void kvz_angular_pred_generic(
     for (int_fast8_t x = -1; x > most_negative_index; --x) {
       col_sample_disp += inv_abs_sample_disp;
       int_fast8_t side_index = col_sample_disp >> 8;
-      tmp_ref[x + width - 1] = ref_side[side_index - 1];
+      tmp_ref[x + index_offset - 1] = ref_side[side_index - 1];
     }
-    tmp_ref[width + width] = tmp_ref[width + width-1];
-    tmp_ref[most_negative_index + width - 1] = tmp_ref[most_negative_index + width];
+    tmp_ref[width + index_offset] = tmp_ref[width + index_offset -1];
+    tmp_ref[most_negative_index + index_offset - 1] = tmp_ref[most_negative_index + index_offset];
   }
   else {
     
