@@ -846,7 +846,7 @@ void kvz_search_cu_intra(encoder_state_t * const state,
   // Find best intra mode for 2Nx2N.
   kvz_pixel *ref_pixels = &lcu->ref.y[lcu_px.x + lcu_px.y * LCU_WIDTH];
 
-  int8_t number_of_modes;
+  int8_t number_of_modes = 0;
   bool skip_rough_search = (depth == 0 || state->encoder_control->cfg.rdo >= 3);
   if (!skip_rough_search) {
     number_of_modes = search_intra_rough(state,

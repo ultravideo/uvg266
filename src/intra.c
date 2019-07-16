@@ -169,14 +169,14 @@ static void intra_filter_reference(
   kvz_intra_ref *filtered_ref = &refs->filtered_ref;
 
   // Starting point at top left for both iterations
-  filtered_ref->left[0] = (ref->left[1] + 2 * ref->left[0] + ref->top[1] + 2) / 4;
+  filtered_ref->left[0] = (ref->left[1] + 2 * ref->left[0] + ref->top[1] + 2) >> 2;
   filtered_ref->top[0] = filtered_ref->left[0];
 
   // TODO: use block height here instead of ref_width
   // Top to bottom
   for (int_fast8_t y = 1; y < ref_width - 1; ++y) {
     kvz_pixel *p = &ref->left[y];
-    filtered_ref->left[y] = (p[-1] + 2 * p[0] + p[1] + 2) / 4;
+    filtered_ref->left[y] = (p[-1] + 2 * p[0] + p[1] + 2) >> 2;
   }
   // Bottom left (not filtered) 
   filtered_ref->left[ref_width - 1] = ref->left[ref_width - 1];
@@ -184,27 +184,11 @@ static void intra_filter_reference(
   // Left to right
   for (int_fast8_t x = 1; x < ref_width - 1; ++x) {
     kvz_pixel *p = &ref->top[x];
-    filtered_ref->top[x] = (p[-1] + 2 * p[0] + p[1] + 2) / 4;
+    filtered_ref->top[x] = (p[-1] + 2 * p[0] + p[1] + 2) >> 2;
   }
   // Top right (not filtered)
   filtered_ref->top[ref_width - 1] = ref->top[ref_width - 1];
 }
-
-/*
-static void intra_post_process_angular(
-  unsigned width,
-  unsigned stride,
-  const kvz_pixel *ref,
-  kvz_pixel *block)
-{
-  kvz_pixel ref2 = ref[0];
-  for (unsigned i = 0; i < width; i++) {
-    kvz_pixel val = block[i * stride];
-    kvz_pixel ref1 = ref[i + 1];
-    block[i * stride] = CLIP_TO_PIXEL(val + ((ref1 - ref2) >> 1));
-  }
-}
-*/
 
 
 /**
@@ -243,49 +227,6 @@ static void intra_pred_dc(
   }
 }
 
-
-/**
-* \brief Generage intra DC prediction with post filtering applied.
-* \param log2_width    Log2 of width, range 2..5.
-* \param in_ref_above  Pointer to -1 index of above reference, length=width*2+1.
-* \param in_ref_left   Pointer to -1 index of left reference, length=width*2+1.
-* \param dst           Buffer of size width*width.
-*/
-/*
-static void intra_pred_filtered_dc(
-  const int_fast8_t log2_width,
-  const kvz_pixel *const ref_top,
-  const kvz_pixel *const ref_left,
-  kvz_pixel *const out_block)
-{
-  assert(log2_width >= 2 && log2_width <= 5);
-
-  const int_fast8_t width = 1 << log2_width;
-
-  int_fast16_t sum = 0;
-  for (int_fast8_t i = 0; i < width; ++i) {
-    sum += ref_top[i + 1];
-    sum += ref_left[i + 1];
-  }
-
-  const kvz_pixel dc_val = (sum + width) >> (log2_width + 1);
-
-  // Filter top-left with ([1 2 1] / 4)
-  out_block[0] = (ref_left[1] + 2 * dc_val + ref_top[1] + 2) / 4;
-
-  // Filter rest of the boundary with ([1 3] / 4)
-  for (int_fast8_t x = 1; x < width; ++x) {
-    out_block[x] = (ref_top[x + 1] + 3 * dc_val + 2) / 4;
-  }
-  for (int_fast8_t y = 1; y < width; ++y) {
-    out_block[y * width] = (ref_left[y + 1] + 3 * dc_val + 2) / 4;
-    for (int_fast8_t x = 1; x < width; ++x) {
-      out_block[y * width + x] = dc_val;
-    }
-  }
-}
-*/
-
 void kvz_intra_predict(
   kvz_intra_references *refs,
   int_fast8_t log2_width,
@@ -305,8 +246,8 @@ void kvz_intra_predict(
   } else {
     // Angular modes use smoothed reference pixels, unless the mode is close
     // to being either vertical or horizontal.
-    static const int kvz_intra_hor_ver_dist_thres[6] = {20, 14, 2, 0, 20, 0 };
-    int filter_threshold = kvz_intra_hor_ver_dist_thres[kvz_math_floor_log2(width)-2];
+    static const int kvz_intra_hor_ver_dist_thres[10] = {20, 20, 20, 14, 2, 0, 20, 0, 0, 0 };
+    int filter_threshold = kvz_intra_hor_ver_dist_thres[kvz_math_floor_log2(width)];
     int dist_from_vert_or_hor = MIN(abs(mode - 50), abs(mode - 18));
     if (dist_from_vert_or_hor > filter_threshold) {
       used_ref = &refs->filtered_ref;
@@ -320,22 +261,9 @@ void kvz_intra_predict(
   if (mode == 0) {
     kvz_intra_pred_planar(log2_width, used_ref->top, used_ref->left, dst);
   } else if (mode == 1) {
-    // Do extra post filtering for edge pixels of luma DC mode.
-    //if (color == COLOR_Y && width < 32) {
-    //  intra_pred_filtered_dc(log2_width, used_ref->top, used_ref->left, dst);
-    //} else {
-      intra_pred_dc(log2_width, used_ref->top, used_ref->left, dst);
-    //}
+    intra_pred_dc(log2_width, used_ref->top, used_ref->left, dst);
   } else {
     kvz_angular_pred(log2_width, mode, color, used_ref->top, used_ref->left, dst);
-
-    //if (color == COLOR_Y && width < 32 && filter_boundary) {
-    //  if (mode == 10) {
-    //    intra_post_process_angular(width, 1, used_ref->top, dst);
-    //  } else if (mode == 26) {
-    //    intra_post_process_angular(width, width, used_ref->left, dst);
-    //  }
-    //}
   }
 
   // pdpc
@@ -410,7 +338,7 @@ void kvz_intra_build_reference_any(
   kvz_pixel *out_left_ref = &refs->ref.left[0];
   kvz_pixel *out_top_ref = &refs->ref.top[0];
 
-  const kvz_pixel dc_val = 1 << (KVZ_BIT_DEPTH - 1);
+  const kvz_pixel dc_val = 1 << (KVZ_BIT_DEPTH - 1); //TODO: add used bitdepth as a variable
   const int is_chroma = color != COLOR_Y ? 1 : 0;
   const int_fast8_t width = 1 << log2_width;
 
