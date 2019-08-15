@@ -52,7 +52,8 @@ kvz_picture * kvz_image_alloc(enum kvz_chroma_format chroma_format, const int32_
   kvz_picture *im = MALLOC(kvz_picture, 1);
   if (!im) return NULL;
 
-  unsigned int luma_size = width * height;
+  //Add 3 pixel boundary to each side for ALF
+  unsigned int luma_size = (width + 8) * (height + 8);
   unsigned chroma_sizes[] = { 0, luma_size / 4, luma_size / 2, luma_size };
   unsigned chroma_size = chroma_sizes[chroma_format];
 
@@ -66,11 +67,13 @@ kvz_picture * kvz_image_alloc(enum kvz_chroma_format chroma_format, const int32_
   }
   im->fulldata = im->fulldata_buf + simd_padding_width / sizeof(kvz_pixel);
 
+  //Shift the image to allow ALF filtering
+  im->fulldata = &im->fulldata[4 * (width + 8) + 4];
   im->base_image = im;
   im->refcount = 1; //We give a reference to caller
   im->width = width;
   im->height = height;
-  im->stride = width;
+  im->stride = width + 8;
   im->chroma_format = chroma_format;
 
   im->y = im->data[COLOR_Y] = &im->fulldata[0];
@@ -79,8 +82,10 @@ kvz_picture * kvz_image_alloc(enum kvz_chroma_format chroma_format, const int32_
     im->u = im->data[COLOR_U] = NULL;
     im->v = im->data[COLOR_V] = NULL;
   } else {
-    im->u = im->data[COLOR_U] = &im->fulldata[luma_size];
-    im->v = im->data[COLOR_V] = &im->fulldata[luma_size + chroma_size];
+    im->u = im->data[COLOR_U] = &im->fulldata[luma_size - (4 * (width + 8) + 4) + (2 * (im->stride / 2) + 2)];
+    im->v = im->data[COLOR_V] = &im->fulldata[luma_size - (4 * (width + 8) + 4) + chroma_size + (2 * (im->stride / 2) + 2)];
+    //im->u = im->data[COLOR_U] = &im->fulldata[luma_size];
+    //im->v = im->data[COLOR_V] = &im->fulldata[luma_size + chroma_size];
   }
 
   im->pts = 0;

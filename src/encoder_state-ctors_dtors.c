@@ -35,6 +35,7 @@
 #include "threadqueue.h"
 #include "videoframe.h"
 #include "rate_control.h"
+#include "alf.h"
 
 
 static int encoder_state_config_frame_init(encoder_state_t * const state) {
@@ -194,6 +195,27 @@ static int encoder_state_config_slice_init(encoder_state_t * const state,
   
   state->slice->start_in_rs = state->encoder_control->tiles_ctb_addr_ts_to_rs[start_address_in_ts];
   state->slice->end_in_rs = state->encoder_control->tiles_ctb_addr_ts_to_rs[end_address_in_ts];
+
+  state->slice->aps = malloc(MAX_NUM_APS * sizeof(alf_aps));
+  for (int i = 0; i < MAX_NUM_APS; i++) {
+    state->slice->aps[i].aps_id = -1;
+    state->slice->aps[i].num_luma_filters = -1;
+    state->slice->aps[i].alf_luma_coeff_delta_flag = 0;
+    state->slice->aps[i].alf_luma_coeff_delta_prediction_flag = 0;
+    state->slice->aps[i].t_layer = -1;
+    state->slice->aps[i].fixed_filter_pattern = -1;
+    state->slice->aps[i].fixed_filter_set_index = -1;
+  }
+  state->slice->tile_group_num_aps = -1;
+  state->slice->tile_group_luma_aps_id = malloc(MAX_NUM_APS * sizeof(int));
+  state->slice->tile_group_chroma_aps_id = -1;
+  state->slice->param_set_map = malloc(sizeof(param_set_map) * MAX_NUM_APS);
+  for (int aps_idx = 0; aps_idx < MAX_NUM_APS; aps_idx++) {
+    state->slice->param_set_map[aps_idx].b_changed = 0;
+    state->slice->param_set_map[aps_idx].p_nalu_data = malloc(sizeof(uint8_t));
+  }
+  state->slice->num_of_param_sets = 0;
+
   return 1;
 }
 

@@ -216,6 +216,9 @@ typedef struct encoder_state_config_tile_t {
   // x-coordinate.
   yuv_t *ver_buf_before_sao;
 
+  yuv_t *hor_buf_before_alf;
+  yuv_t *ver_buf_before_alf;
+
   //Jobs for each individual LCU of a wavefront row.
   threadqueue_job_t **wf_jobs;
 
@@ -231,6 +234,16 @@ typedef struct encoder_state_config_slice_t {
   //Global coordinates
   int32_t start_in_rs;
   int32_t end_in_rs;
+
+  //ALF adaptation parameter set
+  struct alf_aps *aps; // [MAX_NUM_APS];
+  int tile_group_num_aps;
+  int *tile_group_luma_aps_id;
+  int tile_group_chroma_aps_id;
+  struct param_set_map *param_set_map;
+  uint32_t num_of_param_sets;
+  bool tile_group_alf_enabled_flag[3/*MAX_NUM_COMPONENT*/];
+
 } encoder_state_config_slice_t;
 
 typedef struct encoder_state_config_wfrow_t {

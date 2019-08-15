@@ -49,7 +49,7 @@ int kvz_config_init(kvz_config *cfg)
   cfg->deblock_beta    = 0;
   cfg->deblock_tc      = 0;
   cfg->sao_type        = 3;
-  cfg->alf_enable      = 0;
+  cfg->alf_enable      = 1;
   cfg->rdoq_enable     = 1;
   cfg->rdoq_skip       = 1;
   cfg->signhide_enable = true;

@@ -36,6 +36,7 @@
 #include "search.h"
 #include "tables.h"
 #include "threadqueue.h"
+#include "alf.h"
 
 #include "strategies/strategies-picture.h"
 
@@ -617,6 +618,7 @@ static void encoder_state_worker_encode_lcu(void * opaque)
   encoder_state_t *state = lcu->encoder_state;
   const encoder_control_t * const encoder = state->encoder_control;
   videoframe_t* const frame = state->tile->frame;
+  encoder_state_config_slice_t *slice = state->slice;
 
   switch (encoder->cfg.rc_algorithm) {
     case KVZ_NO_RC:
@@ -667,13 +669,83 @@ static void encoder_state_worker_encode_lcu(void * opaque)
     encode_sao(state, lcu->position.x, lcu->position.y, &frame->sao_luma[lcu->position.y * frame->width_in_lcu + lcu->position.x], &frame->sao_chroma[lcu->position.y * frame->width_in_lcu + lcu->position.x]);
   }
 
-  if (encoder->cfg.alf_enable) { 
+  //Tests
+  alf_info_t *alf = &frame->alf_info[lcu->position.y * frame->rec->stride + lcu->position.x];
+  kvz_alf_init(slice, alf);
+
+  kvz_alf_enc_create(state, lcu);
+
+  kvz_alf_enc_process(state, lcu);
+  kvz_alf_enc_destroy(state);
+
+
+  /*
+  // Uusi alf
+  // code_alf_ctu_enable_flag();
+  if (encoder->cfg.alf_enable )//&& (cs.slice->getTileGroupAlfEnabledFlag(COMPONENT_Y)))
+  {
+    bool leftAvail = lcu->left ? 1 : 0;
+    bool aboveAvail = lcu->above ? 1 : 0;
+
+    //Vaihda nimet
+    //Tarkista onko kyse vasemmanpuolimmaisesta ja ylimmästä vai pelkästää ensimmäisestä CTU:sta
+    int leftCTUAddr = leftAvail ? (lcu->left->position_px.x > 0 && lcu->left->position_px.y > 0 ? 1 : -1) : -1;
+    int aboveCTUAddr = aboveAvail ? (lcu->above->position_px.x > 0 && lcu->above->position_px.y > 0 ? 1 : -1) : -1;
+
     cabac_data_t * const cabac = &state->cabac;
-    for (int component = 0; component < 1; component++) {
-      cabac->cur_ctx = &(cabac->ctx.alf_ctb_flag_model[component * 3]);
-      CABAC_BIN(cabac, 0, "alf_ctb_flag");
+    for (int compIdx = 0; compIdx < MAX_NUM_COMPONENT; compIdx++)
+    {
+      int8_t tile_flag = state->encoder_control->cfg.alf_tile_group_enable_flag[compIdx];
+      if (tile_flag)//cs.slice->getTileGroupAlfEnabledFlag((ComponentID)compIdx))
+      {
+        //uint8_t* ctbAlfFlag = cs.slice->getPic()->getAlfCtuEnableFlag(compIdx);
+        int8_t ctbAlfFlag = state->encoder_control->cfg.alf_ctu_enable_flag[compIdx];
+
+        int ctx = 0;
+        ctx += leftCTUAddr > -1 ? (1/*ctbAlfFlag[leftCTUAddr]*//* ? 1 : 0) : 0;
+        ctx += aboveCTUAddr > -1 ? (1/*ctbAlfFlag[aboveCTUAddr]*//* ? 1 : 0) : 0;
+
+        //RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET(STATS__CABAC_BITS__ALF);
+        //ctbAlfFlag[ctuRsAddr] = m_BinDecoder.decodeBin(Ctx::ctbAlfFlag(compIdx * 3 + ctx));
+
+        cabac->cur_ctx = &(cabac->ctx.alf_ctb_flag_model[compIdx * 3 + ctx]);
+        CABAC_BIN(cabac, 0, "alf_ctb_flag");
+
+        if (compIdx == COMPONENT_Y && ctbAlfFlag)//isLuma((ComponentID)compIdx) && ctbAlfFlag[ctuRsAddr])
+        {
+          //readAlfCtuFilterIndex(cs, ctuRsAddr);
+        }
+      }
     }
   }
+  */
+  
+
+
+  /* Alkuperäinen ALF
+  if (encoder->cfg.alf_enable) {
+    short* filter_set;
+    alf_info_t* alf = state->tile->frame->alf_info;
+
+    /*encoder_state_recdata_before_alf_to_bufs(state,
+                                             lcu,
+                                             state->tile->hor_buf_before_alf,
+                                             state->tile->ver_buf_before_alf);
+                                             *//*
+    //ALF alustus tähän 
+    kvz_alf_init(alf);
+    kvz_alf_derive_classification(state, lcu);
+    clp_rng* clp_rng = state->tile->frame->alf_info->clp_rngs.comp[0];
+    kvz_alf_reconstruct_coeff_aps(state, false, true, false);
+    kvz_alf_filter_block(state, lcu, g_chroma_coeff_final, clp_rng);
+
+
+    cabac_data_t * const cabac = &state->cabac;
+    for (int component = 0; component < 1; component++) {
+      cabac->cur_ctx = &(cabac->ctx.alf_ctb_flag_model[component * 3 + ctx]);
+      CABAC_BIN(cabac, 0, "alf_ctb_flag");
+    }
+  }*/
 
   //Encode coding tree
   kvz_encode_coding_tree(state, lcu->position.x * LCU_WIDTH, lcu->position.y * LCU_WIDTH, 0);

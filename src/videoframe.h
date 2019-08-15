@@ -47,6 +47,7 @@ typedef struct videoframe
   cu_array_t* cu_array;     //!< \brief Info for each CU at each depth.
   struct sao_info_t *sao_luma;   //!< \brief Array of sao parameters for every LCU.
   struct sao_info_t *sao_chroma;   //!< \brief Array of sao parameters for every LCU.
+  struct alf_info_t *alf_info;   //!< \brief Array of alf parameters for both luma and chroma.
   int32_t poc;           //!< \brief Picture order count
 } videoframe_t;
 

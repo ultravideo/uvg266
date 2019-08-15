@@ -340,6 +340,8 @@ void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
   // Initialize contexts
   kvz_ctx_init(&cabac->ctx.sao_merge_flag_model, QP, INIT_SAO_MERGE_FLAG[slice], INIT_SAO_MERGE_FLAG[3]);
   kvz_ctx_init(&cabac->ctx.sao_type_idx_model, QP, INIT_SAO_TYPE_IDX[slice], INIT_SAO_TYPE_IDX[3]);
+  kvz_ctx_init(&cabac->ctx.alf_latest_filt, QP, INIT_ALF_LATEST_FILT[slice], INIT_ALF_LATEST_FILT[3]);
+  kvz_ctx_init(&cabac->ctx.alf_temporal_filt, QP, INIT_ALF_TEMPORAL_FILT[slice], INIT_ALF_TEMPORAL_FILT[3]);
 
   kvz_ctx_init(&cabac->ctx.cu_merge_flag_ext_model, QP, INIT_MERGE_FLAG_EXT[slice][0], INIT_MERGE_FLAG_EXT[3][0]);
   kvz_ctx_init(&cabac->ctx.cu_merge_idx_ext_model, QP, INIT_MERGE_IDX_EXT[slice][0], INIT_MERGE_IDX_EXT[3][0]);
