@@ -1230,12 +1230,12 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
     int8_t chroma_intra_dir = first_pu->intra.mode_chroma;
     int8_t luma_intra_dir = first_pu->intra.mode;
 
-    bool derived_mode = chroma_intra_dir == 70;
+    bool derived_mode = 1;// chroma_intra_dir == 70;
     cabac->cur_ctx = &(cabac->ctx.chroma_pred_model[0]);
     CABAC_BIN(cabac, derived_mode ? 0 : 1, "intra_chroma_pred_mode");
 
 
-    if (!derived_mode) {
+    if (false/* !derived_mode*/) {
       /*for (int i = 0; i < 4; i++) {
         if (luma_intra_dir == chroma_pred_modes[i]) {
           chroma_pred_modes[i] = 66;
