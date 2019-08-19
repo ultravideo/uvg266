@@ -58,23 +58,23 @@ typedef struct
     cabac_ctx_t qt_split_flag_model[6]; //!< \brief qt split flag context models
     cabac_ctx_t intra_mode_model;    //!< \brief intra mode context models
     cabac_ctx_t intra_subpart_model[2];    //!< \brief intra sub part context models
-    cabac_ctx_t chroma_pred_model[3];
+    cabac_ctx_t chroma_pred_model[1];
     cabac_ctx_t inter_dir[5];
-    cabac_ctx_t qt_cbf_model_luma[5];
+    cabac_ctx_t qt_cbf_model_luma[4];
     cabac_ctx_t qt_cbf_model_cr[2];
-    cabac_ctx_t qt_cbf_model_cb[5];
-    cabac_ctx_t cu_qp_delta_abs[3];
+    cabac_ctx_t qt_cbf_model_cb[1];
+    cabac_ctx_t cu_qp_delta_abs[2];
     cabac_ctx_t part_size_model[4];
-    cabac_ctx_t cu_sig_model_luma[3][18];
-    cabac_ctx_t cu_sig_model_chroma[3][12];
+    cabac_ctx_t cu_sig_model_luma[3][12];
+    cabac_ctx_t cu_sig_model_chroma[3][8];
     cabac_ctx_t cu_parity_flag_model_luma[21];
     cabac_ctx_t cu_parity_flag_model_chroma[11];
     cabac_ctx_t cu_gtx_flag_model_luma[2][21];
     cabac_ctx_t cu_gtx_flag_model_chroma[2][11];
-    cabac_ctx_t cu_ctx_last_y_luma[25];
-    cabac_ctx_t cu_ctx_last_y_chroma[4];
-    cabac_ctx_t cu_ctx_last_x_luma[25];
-    cabac_ctx_t cu_ctx_last_x_chroma[4];
+    cabac_ctx_t cu_ctx_last_y_luma[20];
+    cabac_ctx_t cu_ctx_last_y_chroma[3];
+    cabac_ctx_t cu_ctx_last_x_luma[20];
+    cabac_ctx_t cu_ctx_last_x_chroma[3];
     cabac_ctx_t cu_pred_mode_model;
     cabac_ctx_t cu_skip_flag_model[3];
     cabac_ctx_t cu_merge_idx_ext_model;
@@ -84,11 +84,11 @@ typedef struct
     cabac_ctx_t cu_ref_pic_model[2];
     cabac_ctx_t mvp_idx_model;
     cabac_ctx_t cu_qt_root_cbf_model;
-    cabac_ctx_t sig_coeff_group_model[8];
+    cabac_ctx_t sig_coeff_group_model[4];
     cabac_ctx_t luma_planar_model[2];
-    cabac_ctx_t multi_ref_line[3];
+    cabac_ctx_t multi_ref_line[2];
     cabac_ctx_t bdpcm_mode[2];
-    cabac_ctx_t joint_bc_br;
+    cabac_ctx_t joint_bc_br[3];
   } ctx;
 } cabac_data_t;
 

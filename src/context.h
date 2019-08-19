@@ -54,7 +54,7 @@ uint32_t kvz_abs_sum(const coeff_t* coeff, int32_t pos_x, int32_t pos_y,
 uint32_t kvz_go_rice_par_abs(const coeff_t* coeff, int32_t pos_x, int32_t pos_y,
                              uint32_t height, uint32_t width, uint32_t baselevel);
 
-#define CNU 154
+#define CNU 35
 #define DWS 8
 
 #endif
