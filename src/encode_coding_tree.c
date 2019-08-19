@@ -1107,7 +1107,7 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
   // ToDo: fix comments for VVC
   const int cu_width = LCU_WIDTH >> depth;
 
-  cabac->cur_ctx = &(cabac->ctx.intra_mode_model);
+  cabac->cur_ctx = &(cabac->ctx.intra_luma_mpm_flag_model);
   for (int j = 0; j < num_pred_units; ++j) {
     const int pu_x = PU_GET_X(cur_cu->part_size, cu_width, x, j);
     const int pu_y = PU_GET_Y(cur_cu->part_size, cu_width, y, j);

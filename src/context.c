@@ -81,8 +81,8 @@ static const uint8_t MULTI_REF_LINE_MODE[4][2] = {
   {   6,   8, },
 };
 
-static const uint8_t INIT_INTRA_PRED_MODE[4] = {
-  154, 154, 170, 6
+static const uint8_t INIT_INTRA_LUMA_MPM_FLAG[4] = {
+  36, 36, 45, 6
 };
 
 static const uint8_t INIT_INTRA_LUMA_PLANAR_MODE[4][2] = {
@@ -344,7 +344,7 @@ void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
   kvz_ctx_init(&cabac->ctx.cu_pred_mode_model, QP, INIT_PRED_MODE[slice][0], INIT_PRED_MODE[3][0]);
   kvz_ctx_init(&cabac->ctx.cu_transquant_bypass, QP, INIT_CU_TRANSQUANT_BYPASS[slice][0], INIT_CU_TRANSQUANT_BYPASS[3][0]);
   
-  kvz_ctx_init(&cabac->ctx.intra_mode_model, QP, INIT_INTRA_PRED_MODE[slice], INIT_INTRA_PRED_MODE[3]);
+  kvz_ctx_init(&cabac->ctx.intra_luma_mpm_flag_model, QP, INIT_INTRA_LUMA_MPM_FLAG[slice], INIT_INTRA_LUMA_MPM_FLAG[3]);
 
 
   kvz_ctx_init(&cabac->ctx.intra_subpart_model[0], QP, INIT_INTRA_SUBPART_MODE[slice][0], INIT_INTRA_SUBPART_MODE[3][0]);
