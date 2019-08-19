@@ -368,11 +368,12 @@ static alf_aps g_alf_slice_aps_temp;
 
 typedef struct param_set_map {
   bool b_changed;
-  uint8_t* p_nalu_data;
-  alf_aps parameter_set;
+  //uint8_t* p_nalu_data;
+  struct alf_aps parameter_set;
 } param_set_map;
 
-void kvz_alf_init(encoder_state_config_slice_t *slice,
+void kvz_alf_init(encoder_state_t *const state,
+  encoder_state_config_slice_t *slice,
   alf_info_t *alf);
 
 //-------------------------help functions---------------------------

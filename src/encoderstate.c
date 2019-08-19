@@ -671,7 +671,7 @@ static void encoder_state_worker_encode_lcu(void * opaque)
 
   //Tests
   alf_info_t *alf = &frame->alf_info[lcu->position.y * frame->rec->stride + lcu->position.x];
-  kvz_alf_init(slice, alf);
+  kvz_alf_init(state, slice, alf);
 
   kvz_alf_enc_create(state, lcu);
 

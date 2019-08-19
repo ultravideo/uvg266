@@ -12,31 +12,12 @@
 #include "strategies/strategies-sao.h"
 
 
-void kvz_alf_init(encoder_state_config_slice_t *slice,
+void kvz_alf_init(encoder_state_t *const state,
+  encoder_state_config_slice_t *slice,
   alf_info_t *alf)
 {
   //Slice alf init. Johonkin muualle?
-  /*
-  slice->aps = malloc(MAX_NUM_APS * sizeof(alf_aps));
-  for (int i = 0; i < MAX_NUM_APS; i++) {
-    slice->aps[i].aps_id = -1;
-    slice->aps[i].num_luma_filters = -1;
-    slice->aps[i].alf_luma_coeff_delta_flag = 0;
-    slice->aps[i].alf_luma_coeff_delta_prediction_flag = 0;
-    slice->aps[i].t_layer = -1;
-    slice->aps[i].fixed_filter_pattern = -1;
-    slice->aps[i].fixed_filter_set_index = -1;
-  }
-  slice->tile_group_num_aps = -1;
-  slice->tile_group_luma_aps_id = malloc(MAX_NUM_APS * sizeof(int));
-  slice->tile_group_chroma_aps_id = -1;
-  slice->param_set_map = malloc(sizeof(param_set_map) * MAX_NUM_APS);
-  for (int aps_idx = 0; aps_idx < MAX_NUM_APS; aps_idx++) {
-    slice->param_set_map[aps_idx].b_changed = 0;
-    //slice->param_set_map[aps_idx].p_nalu_data = malloc(sizeof(uint8_t));
-  }
-  slice->num_of_param_sets = 0;
-  */
+
   /*
   for (int i = 0; i < MAX_NUM_APS; i++)
   {
@@ -711,7 +692,7 @@ void kvz_alf_enc_process(encoder_state_t *const state,
   }
 
   alf_aps* new_aps = &state->slice->aps[31];
-  alf_aps* aps = malloc(sizeof(aps));
+  alf_aps* aps = malloc(sizeof(alf_aps));
   int width = state->tile->frame->width;
   int height = state->tile->frame->height;
   //state->slice->aps = aps;
@@ -738,11 +719,11 @@ void kvz_alf_enc_process(encoder_state_t *const state,
   aps->num_luma_filters = 1;
   aps->alf_luma_coeff_delta_flag = false;
   aps->alf_luma_coeff_delta_prediction_flag = false;
+  aps->t_layer = 0;
+  memset(aps->new_filter_flag, 0, sizeof(aps->new_filter_flag));
   aps->fixed_filter_pattern = 0;
   memset(aps->fixed_filter_idx, 0, sizeof(aps->fixed_filter_idx));
   aps->fixed_filter_set_index = 0;
-
-
 
   //const TempCtx  ctxStart(m_CtxCache, AlfCtx(m_CABACEstimator->getCtx()));
 
@@ -769,18 +750,17 @@ void kvz_alf_enc_process(encoder_state_t *const state,
   // derive classification
   //kutsutaan suurimmalla blokilla, mahdollisesti siis koko kuvalla
   kvz_alf_derive_classification(state, lcu, width, height, 0, 0);
+
   kvz_alf_reset_pcm_blk_class_info(state, lcu, width, height, 0, 0);
 
   // get CTB stats for filtering
   kvz_alf_derive_stats_for_filtering(state, lcu);
-
   // derive filter (luma)
   kvz_alf_encoder(state, lcu, aps, CHANNEL_TYPE_LUMA);
   // derive filter (chroma)
   kvz_alf_encoder(state, lcu, aps, CHANNEL_TYPE_CHROMA);
-
   //m_CABACEstimator->getCtx() = AlfCtx(ctxStart);
-  kvz_alf_encoder_ctb(state, lcu, aps);
+  kvz_alf_encoder_ctb(state, lcu, aps); // <----------- ongelma täälä
 
   kvz_alf_reconstructor(state, lcu);
 }
@@ -1241,9 +1221,7 @@ void kvz_alf_encoder_ctb(encoder_state_t *const state,
   alf_slice_param_new_filters_best.fixed_filter_pattern = aps->fixed_filter_pattern;
   memcpy(alf_slice_param_new_filters_best.fixed_filter_idx, aps->fixed_filter_idx, sizeof(alf_slice_param_new_filters_best.fixed_filter_idx));
   alf_slice_param_new_filters_best.fixed_filter_set_index = aps->fixed_filter_set_index;
-
-  alf_aps** apss = &state->slice->aps;
-
+  
   alf_component_id component_id = state->tile->frame->alf_info->component_id;
   bool is_luma = component_id == COMPONENT_Y ? true : false;
   kvz_config cfg = state->encoder_control->cfg;
@@ -1605,7 +1583,7 @@ void kvz_alf_encoder_ctb(encoder_state_t *const state,
     for (int i = 0; i < state->slice->tile_group_num_aps; i++)
     {
       //apss[apsIds[i]] = m_apsMap->getPS(apsIds[i]);
-      apss[aps_ids[i]] = &state->slice->param_set_map[aps_ids[i]].parameter_set;
+      state->slice->aps[aps_ids[i]] = state->slice->param_set_map[aps_ids[i]].parameter_set;
     }
   }
   
@@ -1852,20 +1830,20 @@ void kvz_alf_encoder_ctb(encoder_state_t *const state,
     }
     //apss[cs.slice->getTileGroupApsIdChroma()] = m_apsMap->getPS(cs.slice->getTileGroupApsIdChroma());
     //apss[state->slice->tile_group_chroma_aps_id] = state->slice->param_set_map[state->slice->tile_group_chroma_aps_id].parameter_set;
-    apss[state->slice->tile_group_chroma_aps_id]->aps_id = state->slice->param_set_map[state->slice->tile_group_chroma_aps_id].parameter_set.aps_id;
-    memcpy(apss[state->slice->tile_group_chroma_aps_id]->enabled_flag, state->slice->param_set_map[state->slice->tile_group_chroma_aps_id].parameter_set.enabled_flag, sizeof(apss[state->slice->tile_group_chroma_aps_id]->enabled_flag));
-    memcpy(apss[state->slice->tile_group_chroma_aps_id]->luma_coeff, state->slice->param_set_map[state->slice->tile_group_chroma_aps_id].parameter_set.luma_coeff, sizeof(apss[state->slice->tile_group_chroma_aps_id]->luma_coeff));
-    memcpy(apss[state->slice->tile_group_chroma_aps_id]->chroma_coeff, state->slice->param_set_map[state->slice->tile_group_chroma_aps_id].parameter_set.chroma_coeff, sizeof(apss[state->slice->tile_group_chroma_aps_id]->chroma_coeff));
-    memcpy(apss[state->slice->tile_group_chroma_aps_id]->filter_coeff_delta_idx, state->slice->param_set_map[state->slice->tile_group_chroma_aps_id].parameter_set.filter_coeff_delta_idx, sizeof(apss[state->slice->tile_group_chroma_aps_id]->filter_coeff_delta_idx));
-    memcpy(apss[state->slice->tile_group_chroma_aps_id]->alf_luma_coeff_flag, state->slice->param_set_map[state->slice->tile_group_chroma_aps_id].parameter_set.alf_luma_coeff_flag, sizeof(apss[state->slice->tile_group_chroma_aps_id]->alf_luma_coeff_flag));
-    apss[state->slice->tile_group_chroma_aps_id]->num_luma_filters = state->slice->param_set_map[state->slice->tile_group_chroma_aps_id].parameter_set.num_luma_filters;
-    apss[state->slice->tile_group_chroma_aps_id]->alf_luma_coeff_delta_flag = state->slice->param_set_map[state->slice->tile_group_chroma_aps_id].parameter_set.alf_luma_coeff_delta_flag;
-    apss[state->slice->tile_group_chroma_aps_id]->alf_luma_coeff_delta_prediction_flag = state->slice->param_set_map[state->slice->tile_group_chroma_aps_id].parameter_set.alf_luma_coeff_delta_prediction_flag;
-    apss[state->slice->tile_group_chroma_aps_id]->t_layer = state->slice->param_set_map[state->slice->tile_group_chroma_aps_id].parameter_set.t_layer;
-    memcpy(apss[state->slice->tile_group_chroma_aps_id]->new_filter_flag, state->slice->param_set_map[state->slice->tile_group_chroma_aps_id].parameter_set.new_filter_flag, sizeof(apss[state->slice->tile_group_chroma_aps_id]->new_filter_flag));
-    apss[state->slice->tile_group_chroma_aps_id]->fixed_filter_pattern = state->slice->param_set_map[state->slice->tile_group_chroma_aps_id].parameter_set.fixed_filter_pattern;
-    memcpy(apss[state->slice->tile_group_chroma_aps_id]->fixed_filter_idx, state->slice->param_set_map[state->slice->tile_group_chroma_aps_id].parameter_set.fixed_filter_idx, sizeof(apss[state->slice->tile_group_chroma_aps_id]->fixed_filter_idx));
-    apss[state->slice->tile_group_chroma_aps_id]->fixed_filter_set_index = state->slice->param_set_map[state->slice->tile_group_chroma_aps_id].parameter_set.fixed_filter_set_index;
+    state->slice->aps[state->slice->tile_group_chroma_aps_id].aps_id = state->slice->param_set_map[state->slice->tile_group_chroma_aps_id].parameter_set.aps_id;
+    memcpy(state->slice->aps[state->slice->tile_group_chroma_aps_id].enabled_flag, state->slice->param_set_map[state->slice->tile_group_chroma_aps_id].parameter_set.enabled_flag, sizeof(state->slice->aps[state->slice->tile_group_chroma_aps_id].enabled_flag));
+    memcpy(state->slice->aps[state->slice->tile_group_chroma_aps_id].luma_coeff, state->slice->param_set_map[state->slice->tile_group_chroma_aps_id].parameter_set.luma_coeff, sizeof(state->slice->aps[state->slice->tile_group_chroma_aps_id].luma_coeff));
+    memcpy(state->slice->aps[state->slice->tile_group_chroma_aps_id].chroma_coeff, state->slice->param_set_map[state->slice->tile_group_chroma_aps_id].parameter_set.chroma_coeff, sizeof(state->slice->aps[state->slice->tile_group_chroma_aps_id].chroma_coeff));
+    memcpy(state->slice->aps[state->slice->tile_group_chroma_aps_id].filter_coeff_delta_idx, state->slice->param_set_map[state->slice->tile_group_chroma_aps_id].parameter_set.filter_coeff_delta_idx, sizeof(state->slice->aps[state->slice->tile_group_chroma_aps_id].filter_coeff_delta_idx));
+    memcpy(state->slice->aps[state->slice->tile_group_chroma_aps_id].alf_luma_coeff_flag, state->slice->param_set_map[state->slice->tile_group_chroma_aps_id].parameter_set.alf_luma_coeff_flag, sizeof(state->slice->aps[state->slice->tile_group_chroma_aps_id].alf_luma_coeff_flag));
+    state->slice->aps[state->slice->tile_group_chroma_aps_id].num_luma_filters = state->slice->param_set_map[state->slice->tile_group_chroma_aps_id].parameter_set.num_luma_filters;
+    state->slice->aps[state->slice->tile_group_chroma_aps_id].alf_luma_coeff_delta_flag = state->slice->param_set_map[state->slice->tile_group_chroma_aps_id].parameter_set.alf_luma_coeff_delta_flag;
+    state->slice->aps[state->slice->tile_group_chroma_aps_id].alf_luma_coeff_delta_prediction_flag = state->slice->param_set_map[state->slice->tile_group_chroma_aps_id].parameter_set.alf_luma_coeff_delta_prediction_flag;
+    state->slice->aps[state->slice->tile_group_chroma_aps_id].t_layer = state->slice->param_set_map[state->slice->tile_group_chroma_aps_id].parameter_set.t_layer;
+    memcpy(state->slice->aps[state->slice->tile_group_chroma_aps_id].new_filter_flag, state->slice->param_set_map[state->slice->tile_group_chroma_aps_id].parameter_set.new_filter_flag, sizeof(state->slice->aps[state->slice->tile_group_chroma_aps_id].new_filter_flag));
+    state->slice->aps[state->slice->tile_group_chroma_aps_id].fixed_filter_pattern = state->slice->param_set_map[state->slice->tile_group_chroma_aps_id].parameter_set.fixed_filter_pattern;
+    memcpy(state->slice->aps[state->slice->tile_group_chroma_aps_id].fixed_filter_idx, state->slice->param_set_map[state->slice->tile_group_chroma_aps_id].parameter_set.fixed_filter_idx, sizeof(state->slice->aps[state->slice->tile_group_chroma_aps_id].fixed_filter_idx));
+    state->slice->aps[state->slice->tile_group_chroma_aps_id].fixed_filter_set_index = state->slice->param_set_map[state->slice->tile_group_chroma_aps_id].parameter_set.fixed_filter_set_index;
   }
 }
 
@@ -1881,7 +1859,23 @@ void kvz_alf_get_avai_aps_ids_luma(encoder_state_t *const state,
   for (int i = 0; i < MAX_NUM_APS; i++)
   {
     //apss[i] = m_apsMap->getPS(i);
-    apss[i] = &aps_set[i].parameter_set;
+    state->slice->aps[i] = aps_set[i].parameter_set;
+    /*
+    apss[i]->aps_id = aps_set[i].parameter_set->aps_id;
+    memcpy(apss[i]->enabled_flag, aps_set[i].parameter_set->enabled_flag, sizeof(apss[i]->enabled_flag));
+    memcpy(apss[i]->luma_coeff, aps_set[i].parameter_set->luma_coeff, sizeof(apss[i]->luma_coeff));
+    memcpy(apss[i]->chroma_coeff, aps_set[i].parameter_set->chroma_coeff, sizeof(apss[i]->chroma_coeff));
+    memcpy(apss[i]->filter_coeff_delta_idx, aps_set[i].parameter_set->filter_coeff_delta_idx, sizeof(apss[i]->filter_coeff_delta_idx));
+    memcpy(apss[i]->alf_luma_coeff_flag, aps_set[i].parameter_set->alf_luma_coeff_flag, sizeof(apss[i]->alf_luma_coeff_flag));
+    apss[i]->num_luma_filters = aps_set[i].parameter_set->num_luma_filters;
+    apss[i]->alf_luma_coeff_delta_flag = aps_set[i].parameter_set->alf_luma_coeff_delta_flag;
+    apss[i]->alf_luma_coeff_delta_prediction_flag = aps_set[i].parameter_set->alf_luma_coeff_delta_prediction_flag;
+    apss[i]->t_layer = aps_set[i].parameter_set->t_layer;
+    memcpy(apss[i]->new_filter_flag, aps_set[i].parameter_set->new_filter_flag, sizeof(apss[i]->new_filter_flag));
+    apss[i]->fixed_filter_pattern = aps_set[i].parameter_set->fixed_filter_pattern;
+    memcpy(apss[i]->fixed_filter_idx, aps_set[i].parameter_set->fixed_filter_idx, sizeof(apss[i]->fixed_filter_idx));
+    apss[i]->fixed_filter_set_index = aps_set[i].parameter_set->fixed_filter_set_index;
+    */
   }
 
   //std::vector<int> result;
@@ -1918,7 +1912,7 @@ void kvz_alf_get_avai_aps_ids_luma(encoder_state_t *const state,
     *newApsId = (int)MAX_NUM_APS - 1;
   }
 
-  //CHECK(newApsId >= (int)MAX_NUM_APS, "Wrong APS index assignment in getAvaiApsIdsLuma");
+  assert(*newApsId <= (int)MAX_NUM_APS); //Wrong APS index assignment in getAvaiApsIdsLuma
   //return result;
 }
 
@@ -3212,7 +3206,6 @@ void kvz_alf_process(encoder_state_t const *state,
   const lcu_order_element_t const *lcu)
 {
   enum kvz_chroma_format chroma_fmt = state->encoder_control->chroma_format;
-
   alf_classifier **classifier = state->tile->frame->alf_info->classifier;
   cabac_data_t * const cabac = &state->cabac;
   //cabac_data_t ctx = &state->cabac.ctx.alf_ctb_enable_flag;
@@ -3695,10 +3688,10 @@ void kvz_alf_derive_classification_blk(encoder_state_t * const state,
   for (int i = 0; i < height; i += 2)
   {
     int yoffset = (i + 1 + start_height) * stride - fl_p1;
-    const kvz_pixel *src0 = &(kvz_pixel)src[yoffset - stride];
-    const kvz_pixel *src1 = &(kvz_pixel)src[yoffset];
-    const kvz_pixel *src2 = &(kvz_pixel)src[yoffset + stride];
-    const kvz_pixel *src3 = &(kvz_pixel)src[yoffset + stride * 2];
+    const kvz_pixel *src0 = &src[yoffset - stride];
+    const kvz_pixel *src1 = &src[yoffset];
+    const kvz_pixel *src2 = &src[yoffset + stride];
+    const kvz_pixel *src3 = &src[yoffset + stride * 2];
 
     int *p_y_ver = laplacian[ALF_VER][i];
     int *p_y_hor = laplacian[ALF_HOR][i];
