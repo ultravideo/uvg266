@@ -32,7 +32,7 @@
 
 
 // Functions
-void kvz_ctx_init(cabac_ctx_t* ctx, uint32_t qp, uint32_t init_value, uint8_t rate);
+void kvz_ctx_init(cabac_ctx_t* ctx, int32_t qp, int32_t init_value, uint8_t rate);
 void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice);
 
 void kvz_context_copy(encoder_state_t * target_state, const encoder_state_t * source_state);

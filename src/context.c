@@ -301,7 +301,7 @@ static const uint16_t g_inistateToCount[128] = {
 /**
  * \brief Initialize struct cabac_ctx.
  */
-void kvz_ctx_init(cabac_ctx_t *ctx, uint32_t qp, uint32_t init_value, uint8_t rate)
+void kvz_ctx_init(cabac_ctx_t *ctx, int32_t qp, int32_t init_value, uint8_t rate)
 {
 
   int slope = (init_value >> 3) - 4;
