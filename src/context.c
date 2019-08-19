@@ -285,6 +285,7 @@ static const uint8_t INIT_INTRA_SUBPART_MODE[4][2] = {
   {   9,   2, },
 };
 
+/*
 static const uint16_t g_inistateToCount[128] = {
   614,   647,   681,   718,   756,   797,   839,   884,   932,   982,   1034,  1089,  1148,  1209,  1274,  1342,
   1414,  1490,  1569,  1653,  1742,  1835,  1933,  2037,  2146,  2261,  2382,  2509,  2643,  2785,  2934,  3091,
@@ -294,7 +295,7 @@ static const uint16_t g_inistateToCount[128] = {
   25651, 26012, 26355, 26681, 26990, 27284, 27562, 27826, 28077, 28315, 28542, 28756, 28960, 29153, 29337, 29511,
   29676, 29833, 29982, 30124, 30258, 30385, 30506, 30621, 30730, 30834, 30932, 31025, 31114, 31198, 31277, 31353,
   31425, 31493, 31558, 31619, 31678, 31733, 31785, 31835, 31883, 31928, 31970, 32011, 32049, 32086, 32120, 32153
-};
+};*/
 
 
 /**
@@ -302,11 +303,19 @@ static const uint16_t g_inistateToCount[128] = {
  */
 void kvz_ctx_init(cabac_ctx_t *ctx, uint32_t qp, uint32_t init_value, uint8_t rate)
 {
+
+  int slope = (init_value >> 3) - 4;
+  int offset = ((init_value & 7) * 18) + 1;
+  int inistate = ((slope   * (qp - 16)) >> 1) + offset;
+  int state_clip = inistate < 1 ? 1 : inistate > 127 ? 127 : inistate;
+  const int p1 = (state_clip << 8);
+  /*
   int slope = (init_value >> 4) * 5 - 45;
   int offset = ((init_value & 15) << 3) - 16;
   int init_state = ((slope * (int)qp) >> 4) + offset;
     
   const int p1 = g_inistateToCount[init_state < 0 ? 0 : init_state > 127 ? 127 : init_state];
+  */
 
   ctx->state[0] = p1 & CTX_MASK_0;
   ctx->state[1] = p1 & CTX_MASK_1;

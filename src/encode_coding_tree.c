@@ -155,7 +155,7 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
 
   // joint_cb_cr
   if (type == 2 && cbf_cb) {
-    cabac->cur_ctx = &(cabac->ctx.joint_bc_br);
+    cabac->cur_ctx = &(cabac->ctx.joint_bc_br[0]);
     CABAC_BIN(cabac, 0, "joint_cb_cr");
   }
 
