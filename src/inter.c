@@ -769,13 +769,8 @@ static void get_temporal_merge_candidates(const encoder_state_t * const state,
     if (state->frame->ref_LX_size[ref_list-1] > ref_idx) {
       colocated_ref = state->frame->ref_LX[ref_list - 1][ref_idx];
     } else {
-      // Check if the other list has the reference available
-      if (state->frame->ref_LX_size[1 - (ref_list - 1)] > ref_idx) {
-        colocated_ref = state->frame->ref_LX[1-(ref_list - 1)][ref_idx];
-      } else {
-        // not found
-        return;
-      }
+      // not found
+      return;
     }
 
     cu_array_t *ref_cu_array = state->frame->ref->cu_arrays[colocated_ref];

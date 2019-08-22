@@ -33,8 +33,8 @@
 
 
 typedef struct {
-  kvz_pixel left[2 * 32 + 1];
-  kvz_pixel top[2 * 32 + 1];
+  kvz_pixel left[2 * 128 + 3];
+  kvz_pixel top[2 * 128 + 3];
 } kvz_intra_ref;
 typedef struct
 {

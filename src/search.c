@@ -224,8 +224,9 @@ double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
       && width > TR_MIN_WIDTH
       && !intra_split_flag)
   {
-    const cabac_ctx_t *ctx = &(state->cabac.ctx.trans_subdiv_model[5 - (6 - depth)]);
-    tr_tree_bits += CTX_ENTROPY_FBITS(ctx, tr_depth > 0);
+    // ToDo: check cost
+    //const cabac_ctx_t *ctx = &(state->cabac.ctx.trans_subdiv_model[5 - (6 - depth)]);
+    //tr_tree_bits += CTX_ENTROPY_FBITS(ctx, tr_depth > 0);
   }
 
   if (tr_depth > 0) {
@@ -353,7 +354,7 @@ static double calc_mode_bits(const encoder_state_t *state,
 
   assert(cur_cu->type == CU_INTRA);
 
-  int8_t candidate_modes[3];
+  int8_t candidate_modes[INTRA_MPM_COUNT];
   {
     const cu_info_t *left_cu  = ((x >= SCU_WIDTH) ? LCU_GET_CU_AT_PX(lcu, x_local - SCU_WIDTH, y_local) : NULL);
     const cu_info_t *above_cu = ((y >= SCU_WIDTH) ? LCU_GET_CU_AT_PX(lcu, x_local, y_local - SCU_WIDTH) : NULL);
@@ -416,6 +417,8 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
   cur_cu->type = CU_NOTSET;
   cur_cu->part_size = SIZE_2Nx2N;
   cur_cu->qp = state->qp;
+  cur_cu->intra.multi_ref_idx = 0;
+  cur_cu->bdpcmMode = 0;
 
   // If the CU is completely inside the frame at this depth, search for
   // prediction modes at this depth.

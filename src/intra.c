@@ -77,13 +77,22 @@ int8_t kvz_intra_get_dir_luma_predictor(
   const cu_info_t *const left_pu,
   const cu_info_t *const above_pu)
 {
-  // The default mode if block is not coded yet is INTRA_DC.
-  int8_t left_intra_dir  = 1;
+  enum {
+    PLANAR_IDX = 0,
+    DC_IDX = 1,
+    HOR_IDX = 18,
+    VER_IDX = 50,
+  };
+
+  int8_t number_of_candidates = 0;
+
+  // The default mode if block is not coded yet is INTRA_PLANAR.
+  int8_t left_intra_dir  = 0;
   if (left_pu && left_pu->type == CU_INTRA) {
     left_intra_dir = left_pu->intra.mode;
   }
 
-  int8_t above_intra_dir = 1;
+  int8_t above_intra_dir = 0;
   if (above_pu && above_pu->type == CU_INTRA && y % LCU_WIDTH != 0) {
     above_intra_dir = above_pu->intra.mode;
   }
@@ -91,78 +100,59 @@ int8_t kvz_intra_get_dir_luma_predictor(
   const int offset = 61;
   const int mod = 64;
 
-  // If the predictions are the same, add new predictions
-  if (left_intra_dir == above_intra_dir) {
-    if (left_intra_dir > 1) { // angular modes
-      preds[0] = left_intra_dir;
-      preds[1] = ((left_intra_dir + offset) % mod) + 2;
-      preds[2] = ((left_intra_dir - 1 ) % mod) + 2;
-    } else { //non-angular
-      preds[0] = 0;//PLANAR_IDX;
-      preds[1] = 1;//DC_IDX;
-      preds[2] = 50;//VER_IDX;
-    }
-  } else { // If we have two distinct predictions
-    preds[0] = left_intra_dir;
-    preds[1] = above_intra_dir;
-
-    // add planar mode if it's not yet present
-    if (left_intra_dir && above_intra_dir ) {
-      preds[2] = 0; // PLANAR_IDX;
-    } else {  // Add DC mode if it's not present, otherwise VER_IDX.
-      preds[2] =  (left_intra_dir+above_intra_dir)<2? 50 : 1;
-    }
-  }
-
-  return 1;
-}
-
-#if KVZ_SEL_ENCRYPTION
-int8_t kvz_intra_get_dir_luma_predictor_encry(
-  const uint32_t x,
-  const uint32_t y,
-  int8_t *preds,
-  const cu_info_t *const cur_pu,
-  const cu_info_t *const left_pu,
-  const cu_info_t *const above_pu)
-{
-  // The default mode if block is not coded yet is INTRA_DC.
-  int8_t left_intra_dir  = 1;
-  if (left_pu && left_pu->type == CU_INTRA) {
-    left_intra_dir = left_pu->intra.mode_encry ;
-  }
-
-  int8_t above_intra_dir = 1;
-  if (above_pu && above_pu->type == CU_INTRA && y % LCU_WIDTH != 0) {
-    above_intra_dir = above_pu->intra.mode_encry;
-  }
+  preds[0] = PLANAR_IDX;
+  preds[1] = DC_IDX;
+  preds[2] = VER_IDX;
+  preds[3] = HOR_IDX;
+  preds[4] = VER_IDX - 4;
+  preds[5] = VER_IDX + 4;
 
   // If the predictions are the same, add new predictions
   if (left_intra_dir == above_intra_dir) {
-    if (left_intra_dir > 1) { // angular modes
-      preds[0] = left_intra_dir;
-      preds[1] = ((left_intra_dir + 29) % 32) + 2;
-      preds[2] = ((left_intra_dir - 1 ) % 32) + 2;
-    } else { //non-angular
-      preds[0] = 0;//PLANAR_IDX;
-      preds[1] = 1;//DC_IDX;
-      preds[2] = 26;//VER_IDX;
+    number_of_candidates = 1;
+    if (left_intra_dir > DC_IDX) { // angular modes
+      preds[0] = PLANAR_IDX;
+      preds[1] = left_intra_dir;
+      preds[2] = ((left_intra_dir + offset) % mod) + 2;
+      preds[3] = ((left_intra_dir - 1) % mod) + 2;
+      preds[4] = DC_IDX;
+      preds[5] = ((left_intra_dir + offset - 1) % mod) + 2;
     }
   } else { // If we have two distinct predictions
-    preds[0] = left_intra_dir;
-    preds[1] = above_intra_dir;
+    //preds[0] = left_intra_dir;
+    //preds[1] = above_intra_dir;
+    number_of_candidates = 2;
+    uint8_t max_cand_mode_idx = preds[0] > preds[1] ? 0 : 1;
+    
+    if (left_intra_dir > DC_IDX && above_intra_dir > DC_IDX) {
+      preds[0] = PLANAR_IDX;
+      preds[1] = left_intra_dir;
+      preds[2] = above_intra_dir;
+      preds[3] = DC_IDX;
+      max_cand_mode_idx = preds[1] > preds[2] ? 1 : 2;
+      uint8_t min_cand_mode_idx = preds[1] > preds[2] ? 2 : 1;
 
-    // add planar mode if it's not yet present
-    if (left_intra_dir && above_intra_dir ) {
-      preds[2] = 0; // PLANAR_IDX;
-    } else {  // Add DC mode if it's not present, otherwise 26.
-      preds[2] =  (left_intra_dir+above_intra_dir)<2? 26 : 1;
+      if ((preds[max_cand_mode_idx] - preds[min_cand_mode_idx] < 63) && (preds[max_cand_mode_idx] - preds[min_cand_mode_idx] > 1)) {
+        preds[4] = ((preds[max_cand_mode_idx] + offset) % mod) + 2;
+        preds[5] = ((preds[max_cand_mode_idx] - 1) % mod) + 2;
+      } else {
+        preds[4] = ((preds[max_cand_mode_idx] + offset - 1) % mod) + 2;
+        preds[5] = ((preds[max_cand_mode_idx]) % mod) + 2;
+      }
+    } else if(left_intra_dir + above_intra_dir >= 2){  // Add DC mode if it's not present, otherwise VER_IDX.
+      preds[0] = PLANAR_IDX;
+      preds[1] = (left_intra_dir < above_intra_dir) ? above_intra_dir : left_intra_dir;
+      preds[2] = DC_IDX;
+      max_cand_mode_idx = 1;
+
+      preds[3] = ((preds[max_cand_mode_idx] + offset) % mod) + 2;
+      preds[4] = ((preds[max_cand_mode_idx] - 1) % mod) + 2;
+      preds[5] = ((preds[max_cand_mode_idx] + offset - 1) % mod) + 2;
     }
   }
 
-  return 1;
+  return number_of_candidates;
 }
-#endif
 
 static void intra_filter_reference(
   int_fast8_t log2_width,
@@ -179,14 +169,14 @@ static void intra_filter_reference(
   kvz_intra_ref *filtered_ref = &refs->filtered_ref;
 
   // Starting point at top left for both iterations
-  filtered_ref->left[0] = (ref->left[1] + 2 * ref->left[0] + ref->top[1] + 2) / 4;
+  filtered_ref->left[0] = (ref->left[1] + 2 * ref->left[0] + ref->top[1] + 2) >> 2;
   filtered_ref->top[0] = filtered_ref->left[0];
 
   // TODO: use block height here instead of ref_width
   // Top to bottom
   for (int_fast8_t y = 1; y < ref_width - 1; ++y) {
     kvz_pixel *p = &ref->left[y];
-    filtered_ref->left[y] = (p[-1] + 2 * p[0] + p[1] + 2) / 4;
+    filtered_ref->left[y] = (p[-1] + 2 * p[0] + p[1] + 2) >> 2;
   }
   // Bottom left (not filtered) 
   filtered_ref->left[ref_width - 1] = ref->left[ref_width - 1];
@@ -194,27 +184,11 @@ static void intra_filter_reference(
   // Left to right
   for (int_fast8_t x = 1; x < ref_width - 1; ++x) {
     kvz_pixel *p = &ref->top[x];
-    filtered_ref->top[x] = (p[-1] + 2 * p[0] + p[1] + 2) / 4;
+    filtered_ref->top[x] = (p[-1] + 2 * p[0] + p[1] + 2) >> 2;
   }
   // Top right (not filtered)
   filtered_ref->top[ref_width - 1] = ref->top[ref_width - 1];
 }
-
-/*
-static void intra_post_process_angular(
-  unsigned width,
-  unsigned stride,
-  const kvz_pixel *ref,
-  kvz_pixel *block)
-{
-  kvz_pixel ref2 = ref[0];
-  for (unsigned i = 0; i < width; i++) {
-    kvz_pixel val = block[i * stride];
-    kvz_pixel ref1 = ref[i + 1];
-    block[i * stride] = CLIP_TO_PIXEL(val + ((ref1 - ref2) >> 1));
-  }
-}
-*/
 
 
 /**
@@ -253,49 +227,6 @@ static void intra_pred_dc(
   }
 }
 
-
-/**
-* \brief Generage intra DC prediction with post filtering applied.
-* \param log2_width    Log2 of width, range 2..5.
-* \param in_ref_above  Pointer to -1 index of above reference, length=width*2+1.
-* \param in_ref_left   Pointer to -1 index of left reference, length=width*2+1.
-* \param dst           Buffer of size width*width.
-*/
-/*
-static void intra_pred_filtered_dc(
-  const int_fast8_t log2_width,
-  const kvz_pixel *const ref_top,
-  const kvz_pixel *const ref_left,
-  kvz_pixel *const out_block)
-{
-  assert(log2_width >= 2 && log2_width <= 5);
-
-  const int_fast8_t width = 1 << log2_width;
-
-  int_fast16_t sum = 0;
-  for (int_fast8_t i = 0; i < width; ++i) {
-    sum += ref_top[i + 1];
-    sum += ref_left[i + 1];
-  }
-
-  const kvz_pixel dc_val = (sum + width) >> (log2_width + 1);
-
-  // Filter top-left with ([1 2 1] / 4)
-  out_block[0] = (ref_left[1] + 2 * dc_val + ref_top[1] + 2) / 4;
-
-  // Filter rest of the boundary with ([1 3] / 4)
-  for (int_fast8_t x = 1; x < width; ++x) {
-    out_block[x] = (ref_top[x + 1] + 3 * dc_val + 2) / 4;
-  }
-  for (int_fast8_t y = 1; y < width; ++y) {
-    out_block[y * width] = (ref_left[y + 1] + 3 * dc_val + 2) / 4;
-    for (int_fast8_t x = 1; x < width; ++x) {
-      out_block[y * width + x] = dc_val;
-    }
-  }
-}
-*/
-
 void kvz_intra_predict(
   kvz_intra_references *refs,
   int_fast8_t log2_width,
@@ -315,8 +246,8 @@ void kvz_intra_predict(
   } else {
     // Angular modes use smoothed reference pixels, unless the mode is close
     // to being either vertical or horizontal.
-    static const int kvz_intra_hor_ver_dist_thres[6] = {20, 14, 2, 0, 20, 0 };
-    int filter_threshold = kvz_intra_hor_ver_dist_thres[kvz_math_floor_log2(width)-2];
+    static const int kvz_intra_hor_ver_dist_thres[10] = {20, 20, 20, 14, 2, 0, 20, 0, 0, 0 };
+    int filter_threshold = kvz_intra_hor_ver_dist_thres[kvz_math_floor_log2(width)];
     int dist_from_vert_or_hor = MIN(abs(mode - 50), abs(mode - 18));
     if (dist_from_vert_or_hor > filter_threshold) {
       used_ref = &refs->filtered_ref;
@@ -330,22 +261,9 @@ void kvz_intra_predict(
   if (mode == 0) {
     kvz_intra_pred_planar(log2_width, used_ref->top, used_ref->left, dst);
   } else if (mode == 1) {
-    // Do extra post filtering for edge pixels of luma DC mode.
-    //if (color == COLOR_Y && width < 32) {
-    //  intra_pred_filtered_dc(log2_width, used_ref->top, used_ref->left, dst);
-    //} else {
-      intra_pred_dc(log2_width, used_ref->top, used_ref->left, dst);
-    //}
+    intra_pred_dc(log2_width, used_ref->top, used_ref->left, dst);
   } else {
-    kvz_angular_pred(log2_width, mode, used_ref->top, used_ref->left, dst);
-
-    //if (color == COLOR_Y && width < 32 && filter_boundary) {
-    //  if (mode == 10) {
-    //    intra_post_process_angular(width, 1, used_ref->top, dst);
-    //  } else if (mode == 26) {
-    //    intra_post_process_angular(width, width, used_ref->left, dst);
-    //  }
-    //}
+    kvz_angular_pred(log2_width, mode, color, used_ref->top, used_ref->left, dst);
   }
 
   // pdpc
@@ -420,7 +338,7 @@ void kvz_intra_build_reference_any(
   kvz_pixel *out_left_ref = &refs->ref.left[0];
   kvz_pixel *out_top_ref = &refs->ref.top[0];
 
-  const kvz_pixel dc_val = 1 << (KVZ_BIT_DEPTH - 1);
+  const kvz_pixel dc_val = 1 << (KVZ_BIT_DEPTH - 1); //TODO: add used bitdepth as a variable
   const int is_chroma = color != COLOR_Y ? 1 : 0;
   const int_fast8_t width = 1 << log2_width;
 

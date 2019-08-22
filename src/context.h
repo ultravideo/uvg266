@@ -32,7 +32,7 @@
 
 
 // Functions
-void kvz_ctx_init(cabac_ctx_t* ctx, uint32_t qp, uint32_t init_value);
+void kvz_ctx_init(cabac_ctx_t* ctx, int32_t qp, int32_t init_value, uint8_t rate);
 void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice);
 
 void kvz_context_copy(encoder_state_t * target_state, const encoder_state_t * source_state);
@@ -48,9 +48,13 @@ uint32_t kvz_context_get_sig_ctx_idx_abs(const coeff_t* coeff, int32_t pos_x, in
                                          uint32_t height, uint32_t width, int8_t type, 
                                          int32_t* temp_diag, int32_t* temp_sum);
 
-uint32_t kvz_go_rice_par_abs(const coeff_t* coeff, int32_t pos_x, int32_t pos_y,
-                             uint32_t height, uint32_t width);
+uint32_t kvz_abs_sum(const coeff_t* coeff, int32_t pos_x, int32_t pos_y,
+                     uint32_t height, uint32_t width, uint32_t baselevel);
 
-#define CNU 154
+uint32_t kvz_go_rice_par_abs(const coeff_t* coeff, int32_t pos_x, int32_t pos_y,
+                             uint32_t height, uint32_t width, uint32_t baselevel);
+
+#define CNU 35
+#define DWS 8
 
 #endif

@@ -77,6 +77,18 @@ const uint8_t kvz_g_auc_renorm_table[32] =
   1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
 };
 
+const uint8_t kvz_tb_max[257] = { 0, 0, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
+5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
+6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
+6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 7, 7,
+7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7,
+7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 8 };
+
+
 /**
  * \brief Initialize struct cabac_data.
  */
@@ -95,10 +107,8 @@ void kvz_cabac_start(cabac_data_t * const data)
  */
 void kvz_cabac_encode_bin(cabac_data_t * const data, const uint32_t bin_value)
 {
-  uint32_t lps;
+  uint32_t lps = CTX_LPS(data->cur_ctx, data->range);
 
-
-  lps = kvz_g_auc_lpst_table[CTX_STATE(data->cur_ctx)][(data->range >> 6) & 3];
   data->range -= lps;
 
   // Not the Most Probable Symbol?
@@ -106,22 +116,23 @@ void kvz_cabac_encode_bin(cabac_data_t * const data, const uint32_t bin_value)
     int num_bits = kvz_g_auc_renorm_table[lps >> 3];
     data->low = (data->low + data->range) << num_bits;
     data->range = lps << num_bits;
-
-    CTX_UPDATE_LPS(data->cur_ctx);
-
+    
     data->bits_left -= num_bits;
-  } else {
-    CTX_UPDATE_MPS(data->cur_ctx);
-    if (data->range >= 256) return;
+    if (data->bits_left < 12) {
+      kvz_cabac_write(data);
+    }
+  } else {    
+    if (data->range < 256) {
+      data->low <<= 1;
+      data->range <<= 1;
+      data->bits_left--;
 
-    data->low <<= 1;
-    data->range <<= 1;
-    data->bits_left--;
+      if (data->bits_left < 12) {
+        kvz_cabac_write(data);
+      }
+    }
   }
-
-  if (data->bits_left < 12) {
-    kvz_cabac_write(data);
-  }
+  CTX_UPDATE(data->cur_ctx, bin_value);
 }
 
 /**
@@ -216,6 +227,36 @@ void kvz_cabac_encode_bin_trm(cabac_data_t * const data, const uint8_t bin_value
 }
 
 /**
+ * \brief encode truncated binary code
+ */
+void kvz_cabac_encode_trunc_bin(cabac_data_t * const data, const uint32_t bin_value, const uint32_t max_value) {
+  int thresh;
+  int symbol = bin_value;
+  if (max_value > 256) {
+    int threshVal = 1 << 8;
+    thresh = 8;
+    while (threshVal <= max_value) {
+      thresh++;
+      threshVal <<= 1;
+    }
+    thresh--;
+  } else {
+    thresh = kvz_tb_max[max_value];
+  }
+
+  int val = 1 << thresh;
+
+  int b = max_value - val;
+  if (symbol < val - b) {
+    CABAC_BINS_EP(data, symbol, thresh, "TruncSymbols");
+  } else {
+    symbol += val - b;
+    CABAC_BINS_EP(data, symbol, thresh + 1, "TruncSymbols");
+  }
+}
+
+
+/**
  * \brief
  */
 void kvz_cabac_encode_bin_ep(cabac_data_t * const data, const uint32_t bin_value)
@@ -231,13 +272,49 @@ void kvz_cabac_encode_bin_ep(cabac_data_t * const data, const uint32_t bin_value
   }
 }
 
+// Import from VTM 4.0
+void kvz_cabac_encode_aligned_bins_ep(cabac_data_t * const data, uint32_t bin_values, int num_bins) 
+{
+  uint32_t rem_bins = num_bins;
+  while (rem_bins > 0) {
+    //The process of encoding an EP bin is the same as that of coding a normal
+    //bin where the symbol ranges for 1 and 0 are both half the range:
+    //
+    //  low = (low + range/2) << 1       (to encode a 1)
+    //  low =  low            << 1       (to encode a 0)
+    //
+    //  i.e.
+    //  low = (low + (bin * range/2)) << 1
+    //
+    //  which is equivalent to:
+    //
+    //  low = (low << 1) + (bin * range)
+    //
+    //  this can be generalised for multiple bins, producing the following expression:
+    //
+    unsigned bins_to_code = MIN(rem_bins, 8); //code bytes if able to take advantage of the system's byte-write function
+    unsigned bin_mask = (1 << bins_to_code) - 1;
+    unsigned new_bins = (bin_values >> (rem_bins - bins_to_code)) & bin_mask;
+    data->low = (data->low << bins_to_code) + (new_bins << 8); //range is known to be 256
+    rem_bins -= bins_to_code;
+    data->bits_left -= bins_to_code;
+    if (data->bits_left < 12) {
+      kvz_cabac_write(data);
+    }
+  }
+}
+
 /**
  * \brief
  */
 void kvz_cabac_encode_bins_ep(cabac_data_t * const data, uint32_t bin_values, int num_bins)
 {
   uint32_t pattern;
-
+  
+  if (data->range == 256) {
+    kvz_cabac_encode_aligned_bins_ep(data, bin_values, num_bins);
+    return;
+  }
   while (num_bins > 8) {
     num_bins -= 8;
     pattern = bin_values >> num_bins;
@@ -267,7 +344,7 @@ void kvz_cabac_encode_bins_ep(cabac_data_t * const data, uint32_t bin_values, in
  */
 void kvz_cabac_write_coeff_remain(cabac_data_t * const cabac, const uint32_t remainder, const uint32_t rice_param)
 {
-  const unsigned threshold = g_go_rice_range[rice_param] << rice_param;
+  const unsigned threshold = 5/*g_go_rice_range[rice_param]*/ << rice_param;
   uint32_t bins = remainder;
 
   if (bins < threshold) {
@@ -276,6 +353,27 @@ void kvz_cabac_write_coeff_remain(cabac_data_t * const cabac, const uint32_t rem
     CABAC_BINS_EP(cabac, bins & ((1 << rice_param) - 1), rice_param, "coeff_abs_level_remaining");
   } 
   //ToDo: else if (useLimitedPrefixLength)
+  else if (true) {
+    const unsigned max_prefix_length = 32 - 5/*coef_remain_bin_reduction*/ - 15/*max_log2_tr_dynamic_range*/;
+    unsigned prefix_length = 0;
+    unsigned code_value = (bins >> rice_param) - 5/*coef_remain_bin_reduction*/;
+    unsigned suffix_length;
+    if (code_value >= ((1 << max_prefix_length) - 1)) {
+      prefix_length = max_prefix_length;
+      suffix_length = 15 /*max_log2_tr_dynamic_range*/;
+    } else {
+      while (code_value > ((2 << prefix_length) - 2)) {
+        prefix_length++;
+      }
+      suffix_length = prefix_length + rice_param + 1;
+    }
+    const unsigned total_prefix_length = prefix_length + 5/*coef_remain_bin_reduction*/;
+    const unsigned bit_mask = (1 << rice_param) - 1;
+    const unsigned prefix = (1 << total_prefix_length) - 1;
+    const unsigned suffix = ((code_value - ((1 << prefix_length) - 1)) << rice_param) | (bins & bit_mask);
+    CABAC_BINS_EP(cabac, prefix, total_prefix_length, "coeff_abs_level_remaining");
+    CABAC_BINS_EP(cabac, suffix, suffix_length, "coeff_abs_level_remaining");
+  }
   else {
     uint32_t length = rice_param;
     uint32_t  delta = 1 << length;
@@ -292,198 +390,7 @@ void kvz_cabac_write_coeff_remain(cabac_data_t * const cabac, const uint32_t rem
 
 }
 
-void kvz_cabac_write_coeff_remain_encry(struct encoder_state_t * const state, cabac_data_t * const cabac,const uint32_t symbol, const uint32_t r_param, int32_t base_level)
-{
- int32_t codeNumber  = (int32_t)symbol;
- uint32_t length;
 
- if (codeNumber < (3 << r_param)) {
-   length = codeNumber>>r_param;
-   CABAC_BINS_EP(cabac, (1 << (length + 1)) - 2 , length + 1, "coeff_abs_level_remaining");
-   //m_pcBinIf->encodeBinsEP( (1<<(length+1))-2 , length+1);
-   uint32_t Suffix = (codeNumber%(1<<r_param));
-
-   if(!r_param)
-    CABAC_BINS_EP(cabac, Suffix, r_param, "coeff_abs_level_remaining");
-    //m_pcBinIf->encodeBinsEP(Suffix, r_param);
-   if(r_param==1) {
-     if(!(( base_level ==2 )&& (codeNumber==4 || codeNumber==5) ) ) {
-       uint32_t key = kvz_crypto_get_key(state->crypto_hdl, 1);
-       state->crypto_prev_pos  = ( Suffix + ( state->crypto_prev_pos^key ) ) & 1;
-       CABAC_BINS_EP(cabac, state->crypto_prev_pos, 1, "coeff_abs_level_remaining");
-       //m_pcBinIf->encodeBinsEP(m_prev_pos, 1);
-     } else {
-       CABAC_BINS_EP(cabac, Suffix, 1, "coeff_abs_level_remaining");
-       //m_pcBinIf->encodeBinsEP(Suffix, 1);
-     }
-   }
-   else
-    if(r_param==2) {
-       if( base_level ==1) {
-    	 uint32_t key    = kvz_crypto_get_key(state->crypto_hdl, 2);
-         state->crypto_prev_pos  = ( Suffix + ( state->crypto_prev_pos^key ) ) & 3;
-         CABAC_BINS_EP(cabac, state->crypto_prev_pos, 2, "coeff_abs_level_remaining");
-         //m_pcBinIf->encodeBinsEP(m_prev_pos, 2);
-       } else
-         if( base_level ==2) {
-           if(codeNumber<=7 || codeNumber>=12) {
-        	 uint32_t key    = kvz_crypto_get_key(state->crypto_hdl, 2);
-             state->crypto_prev_pos  = ( Suffix + ( state->crypto_prev_pos^key ) ) & 3;
-             CABAC_BINS_EP(cabac, state->crypto_prev_pos, 2, "coeff_abs_level_remaining");
-             //m_pcBinIf->encodeBinsEP(m_prev_pos, 2);
-           }
-           else
-             if(codeNumber<10) {
-                uint32_t key    = kvz_crypto_get_key(state->crypto_hdl, 1);
-                state->crypto_prev_pos  = (( (Suffix&1) + ( state->crypto_prev_pos^key )) & 1);
-                CABAC_BINS_EP(cabac, state->crypto_prev_pos, 2, "coeff_abs_level_remaining");
-                //m_pcBinIf->encodeBinsEP(m_prev_pos, 2);
-             } else
-               CABAC_BINS_EP(cabac, Suffix, 2, "coeff_abs_level_remaining");
-               //m_pcBinIf->encodeBinsEP(Suffix, 2);
-         } else { //base_level=3
-           if(codeNumber<=7 || codeNumber>11) {
-             uint32_t key    = kvz_crypto_get_key(state->crypto_hdl, 2);
-             state->crypto_prev_pos  = (Suffix + ( state->crypto_prev_pos^key ) ) & 3;
-             CABAC_BINS_EP(cabac, state->crypto_prev_pos, 2, "coeff_abs_level_remaining");
-             //m_pcBinIf->encodeBinsEP(m_prev_pos, 2);
-           } else {
-             uint32_t key    = kvz_crypto_get_key(state->crypto_hdl, 1);
-             state->crypto_prev_pos  = ((Suffix&2))+(( (Suffix&1) + ( state->crypto_prev_pos^key)) & 1);
-             CABAC_BINS_EP(cabac, state->crypto_prev_pos, 2, "coeff_abs_level_remaining");
-             //m_pcBinIf->encodeBinsEP(m_prev_pos, 2);
-           }
-         }
-     } else
-       if(r_param==3) {
-         if( base_level ==1) {
-           uint32_t key    = kvz_crypto_get_key(state->crypto_hdl, 3);
-           state->crypto_prev_pos  = ( Suffix + ( state->crypto_prev_pos^key ) ) & 7;
-           CABAC_BINS_EP(cabac, state->crypto_prev_pos, 3, "coeff_abs_level_remaining");
-           //m_pcBinIf->encodeBinsEP(m_prev_pos, 3);
-         }
-         else if( base_level ==2) {
-           if(codeNumber<=15 || codeNumber>23) {
-             uint32_t key    = kvz_crypto_get_key(state->crypto_hdl, 3);
-             state->crypto_prev_pos  = ( Suffix + ( state->crypto_prev_pos^key ) ) & 7;
-             CABAC_BINS_EP(cabac, state->crypto_prev_pos, 3, "coeff_abs_level_remaining");
-             //m_pcBinIf->encodeBinsEP(m_prev_pos, 3);
-           } else
-             if(codeNumber<=19){
-               uint32_t key    = kvz_crypto_get_key(state->crypto_hdl, 2);
-               state->crypto_prev_pos  = ((Suffix&4))+(( (Suffix&3) + (state->crypto_prev_pos^key )) & 3);
-               CABAC_BINS_EP(cabac, state->crypto_prev_pos, 3, "coeff_abs_level_remaining");
-               //m_pcBinIf->encodeBinsEP(m_prev_pos, 3);
-             } else
-               if(codeNumber<=21){
-            	 uint32_t key    = kvz_crypto_get_key(state->crypto_hdl, 1);
-                 state->crypto_prev_pos  = 4+(( (Suffix&1) + ( state->crypto_prev_pos^key )) & 1);
-                 CABAC_BINS_EP(cabac, state->crypto_prev_pos, 3, "coeff_abs_level_remaining");
-                 //m_pcBinIf->encodeBinsEP(m_prev_pos, 3);
-               } else
-                 CABAC_BINS_EP(cabac, Suffix, 3, "coeff_abs_level_remaining");
-           // m_pcBinIf->encodeBinsEP(Suffix, 3);
-         } else {//base_level=3
-           CABAC_BINS_EP(cabac, Suffix, 3, "coeff_abs_level_remaining");
-           //m_pcBinIf->encodeBinsEP(Suffix, 3);
-           if(codeNumber<=15 || codeNumber>23) {
-             uint32_t key    = kvz_crypto_get_key(state->crypto_hdl, 3);
-             state->crypto_prev_pos  = (Suffix + ( state->crypto_prev_pos^key ) ) & 7;
-             CABAC_BINS_EP(cabac, state->crypto_prev_pos, 3, "coeff_abs_level_remaining");
-             //m_pcBinIf->encodeBinsEP(m_prev_pos, 3);
-           } else
-             if(codeNumber<=19) {
-               uint32_t key    = kvz_crypto_get_key(state->crypto_hdl, 2);
-               state->crypto_prev_pos  = (( (Suffix&3) + ( state->crypto_prev_pos^key )) &3);
-               CABAC_BINS_EP(cabac, state->crypto_prev_pos, 3, "coeff_abs_level_remaining");
-               //m_pcBinIf->encodeBinsEP(m_prev_pos, 3);
-             } else
-               if(codeNumber<=23) {
-                 uint32_t key    = kvz_crypto_get_key(state->crypto_hdl, 1);
-                 state->crypto_prev_pos  = (Suffix&6)+(( (Suffix&1) + (state->crypto_prev_pos^key )) & 1);
-                 CABAC_BINS_EP(cabac, state->crypto_prev_pos, 3, "coeff_abs_level_remaining");
-                 //m_pcBinIf->encodeBinsEP(m_prev_pos, 3);
-               }
-         }
-       } else
-         if(r_param==4) {
-           if( base_level ==1) {
-             uint32_t key    = kvz_crypto_get_key(state->crypto_hdl, 4);
-             state->crypto_prev_pos  = ( Suffix + ( state->crypto_prev_pos^key ) ) & 15;
-             CABAC_BINS_EP(cabac, state->crypto_prev_pos, 4, "coeff_abs_level_remaining");
-             //m_pcBinIf->encodeBinsEP(m_prev_pos, 4);
-           } else
-             if( base_level ==2) {
-               if(codeNumber<=31 || codeNumber>47) {
-                 uint32_t key    = kvz_crypto_get_key(state->crypto_hdl, 4);
-                 state->crypto_prev_pos  = ( Suffix + ( state->crypto_prev_pos^key ) ) & 15;
-                 CABAC_BINS_EP(cabac, state->crypto_prev_pos, r_param, "coeff_abs_level_remaining");
-                 //m_pcBinIf->encodeBinsEP(m_prev_pos, r_param);
-               } else
-                 if(codeNumber<=39) {
-                   uint32_t key    = kvz_crypto_get_key(state->crypto_hdl, 3);
-                   state->crypto_prev_pos  = (( (Suffix&7) + ( state->crypto_prev_pos^key )) & 7);
-                   CABAC_BINS_EP(cabac, state->crypto_prev_pos, 4, "coeff_abs_level_remaining");
-                   //m_pcBinIf->encodeBinsEP(m_prev_pos, 4);
-                 } else
-                   if(codeNumber<=43) {
-                     uint32_t key    = kvz_crypto_get_key(state->crypto_hdl, 2);
-                     state->crypto_prev_pos  = 8+(( (Suffix&3) + ( state->crypto_prev_pos^key )) & 3);
-                     CABAC_BINS_EP(cabac, state->crypto_prev_pos, 4, "coeff_abs_level_remaining");
-                     //m_pcBinIf->encodeBinsEP(m_prev_pos, 4);
-                   } else
-                     if(codeNumber<=45){
-                       uint32_t key    = kvz_crypto_get_key(state->crypto_hdl, 1);
-                       state->crypto_prev_pos  = 12+(( (Suffix&1) + ( state->crypto_prev_pos^key )) & 1);
-                       CABAC_BINS_EP(cabac, state->crypto_prev_pos, 4, "coeff_abs_level_remaining");
-                       //m_pcBinIf->encodeBinsEP(m_prev_pos, 4);
-                     } else
-                       CABAC_BINS_EP(cabac, Suffix, 4, "coeff_abs_level_remaining");
-                       //m_pcBinIf->encodeBinsEP(Suffix, 4);
-             } else {//base_level=3
-               if(codeNumber<=31 || codeNumber>47) {
-                 uint32_t key    = kvz_crypto_get_key(state->crypto_hdl, 4);
-                 state->crypto_prev_pos  = (Suffix + ( state->crypto_prev_pos^key ) ) & 15;
-                 CABAC_BINS_EP(cabac, state->crypto_prev_pos, r_param, "coeff_abs_level_remaining");
-                 //m_pcBinIf->encodeBinsEP(m_prev_pos, r_param);
-               } else
-                 if(codeNumber<=39) {
-                   uint32_t key    = kvz_crypto_get_key(state->crypto_hdl, 3);
-                   state->crypto_prev_pos  = (( (Suffix&7) + ( state->crypto_prev_pos^key )) & 7);
-                   CABAC_BINS_EP(cabac, state->crypto_prev_pos, 4, "coeff_abs_level_remaining");
-                   //m_pcBinIf->encodeBinsEP(m_prev_pos, 4);
-                 } else
-                   if(codeNumber<=43) {
-                     uint32_t key    = kvz_crypto_get_key(state->crypto_hdl, 2);
-                     state->crypto_prev_pos  = 8+(( (Suffix&3) + ( state->crypto_prev_pos^key )) & 3);
-                     CABAC_BINS_EP(cabac, state->crypto_prev_pos, 4, "coeff_abs_level_remaining");
-                     //m_pcBinIf->encodeBinsEP(m_prev_pos, 4);
-                   } else
-                     if(codeNumber<=47) {
-                       uint32_t key    = kvz_crypto_get_key(state->crypto_hdl, 1);
-                       state->crypto_prev_pos  = (Suffix&14)+(( (Suffix&1) + (state->crypto_prev_pos^key )) & 1);
-                       CABAC_BINS_EP(cabac, state->crypto_prev_pos, 4, "coeff_abs_level_remaining");
-                       //m_pcBinIf->encodeBinsEP(m_prev_pos, 4);
-                     }
-             }
-       }
-  } else {
-    length = r_param;
-    codeNumber  = codeNumber - ( 3 << r_param);
-    while (codeNumber >= (1<<length)) {
-      codeNumber -=  (1<<(length));
-      ++length;
-    }
-    CABAC_BINS_EP(cabac, (1 << (3 + length + 1 - r_param)) - 2, 3 + length + 1 - r_param, "coeff_abs_level_remaining");
-    //m_pcBinIf->encodeBinsEP((1<<(COEF_REMAIN_BIN_REDUCTION+length+1-r_param))-2,COEF_REMAIN_BIN_REDUCTION+length+1-r_param);
-    uint32_t Suffix = codeNumber;
-    uint32_t key    = kvz_crypto_get_key(state->crypto_hdl, length);
-    uint32_t mask   = ( (1<<length ) -1 );
-    state->crypto_prev_pos  = ( Suffix + ( state->crypto_prev_pos^key ) ) & mask;
-    CABAC_BINS_EP(cabac, state->crypto_prev_pos, length, "coeff_abs_level_remaining");
-    //m_pcBinIf->encodeBinsEP(m_prev_pos,length);
-  }
-}
 /**
  * \brief
  */
@@ -495,17 +402,17 @@ void kvz_cabac_write_unary_max_symbol(cabac_data_t * const data, cabac_ctx_t * c
 
   if (!max_symbol) return;
 
-  data->cur_ctx = &ctx[0];
+  data->cur_ctx = ctx;
   CABAC_BIN(data, symbol, "ums");
 
   if (!symbol) return;
 
   while (--symbol) {
-    data->cur_ctx = &ctx[offset];
+    //data->cur_ctx = &ctx[offset];
     CABAC_BIN(data, 1, "ums");
   }
   if (code_last) {
-    data->cur_ctx = &ctx[offset];
+    //data->cur_ctx = &ctx[offset];
     CABAC_BIN(data, 0, "ums");
   }
 }

@@ -40,7 +40,8 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
                           uint8_t width,
                           uint8_t type,
                           int8_t scan_mode,
-                          int8_t tr_skip);
+                          int8_t tr_skip,
+                          uint8_t cbf_cb);
 
 void kvz_encode_mvd(encoder_state_t * const state,
                     cabac_data_t *cabac,
