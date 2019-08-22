@@ -237,6 +237,8 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
   int32_t temp_diag = -1;
   int32_t temp_sum = -1;
 
+  int32_t reg_bins = (width*width *28)>>4; //8 for 2x2
+
   // significant_coeff_flag
   for (i = scan_cg_last; i >= 0; i--) {
     
@@ -280,8 +282,7 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
       int32_t next_sig_pos = first_sig_pos;
       
       int32_t infer_sig_pos = (next_sig_pos != scan_pos_last) ? ((i != 0) ? min_sub_pos : -1) : next_sig_pos;
-      int32_t num_non_zero = 0;
-      int32_t reg_bins = 32; //8 for 2x2
+      int32_t num_non_zero = 0;      
       int32_t last_nz_pos_in_cg = -1;
       int32_t first_nz_pos_in_cg = next_sig_pos;
       int32_t remainder_abs_coeff = -1;
@@ -1043,10 +1044,12 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
   kvz_cabac_encode_bin_trm(cabac, 0); // IPCMFlag == 0
   #endif
 
+  /*
   if (cur_cu->type == 1 && (LCU_WIDTH >> depth <= 32)) {
     cabac->cur_ctx = &(cabac->ctx.bdpcm_mode[0]);
     CABAC_BIN(cabac, 0, "bdpcm_mode");
   }
+  */
 
   const int num_pred_units = kvz_part_mode_num_parts[cur_cu->part_size];
 
