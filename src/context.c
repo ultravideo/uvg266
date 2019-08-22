@@ -574,10 +574,10 @@ uint32_t kvz_context_get_sig_ctx_idx_abs(const coeff_t* coeff, int32_t pos_x, in
     }
   }
 #undef UPDATE
-  int ctx_ofs = MIN(sum_abs, 5) + (diag < 2 ? 6 : 0);
+  int ctx_ofs = MIN((sum_abs+1)>>1, 3) + (diag < 2 ? 4 : 0);
   if (type == 0 /* Luma */)
   {
-    ctx_ofs += diag < 5 ? 6 : 0;
+    ctx_ofs += diag < 5 ? 4 : 0;
   }
   
   *temp_diag = diag;
