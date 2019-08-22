@@ -850,7 +850,7 @@ static void encode_transform_coeff(encoder_state_t * const state,
     if (!split) {
       if (true) {
         assert(tr_depth < 5);
-        cabac->cur_ctx = &(cabac->ctx.qt_cbf_model_cb[tr_depth]);
+        cabac->cur_ctx = &(cabac->ctx.qt_cbf_model_cb[0]);
         CABAC_BIN(cabac, cb_flag_u, "cbf_cb");
       }
       if (true) {
@@ -877,7 +877,7 @@ static void encode_transform_coeff(encoder_state_t * const state,
   // - we have chroma coefficients at this level
   // When it is not present, it is inferred to be 1.
   if (cur_cu->type == CU_INTRA || tr_depth > 0 || cb_flag_u || cb_flag_v) {
-      cabac->cur_ctx = &(cabac->ctx.qt_cbf_model_luma[!tr_depth]);
+      cabac->cur_ctx = &(cabac->ctx.qt_cbf_model_luma[0]);
       CABAC_BIN(cabac, cb_flag_y, "cbf_luma");
   }
 
@@ -1231,7 +1231,7 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
     int8_t luma_intra_dir = first_pu->intra.mode;
 
     bool derived_mode = 1;// chroma_intra_dir == 70;
-    cabac->cur_ctx = &(cabac->ctx.chroma_pred_model[0]);
+    cabac->cur_ctx = &(cabac->ctx.chroma_pred_model);
     CABAC_BIN(cabac, derived_mode ? 0 : 1, "intra_chroma_pred_mode");
 
 
@@ -1478,11 +1478,11 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
       // Get left and top block split_flags and if they are present and true, increase model number
       // ToDo: should use height and width to increase model, PU_GET_W() ?
       if (left_cu && GET_SPLITDATA(left_cu, depth) == 1) {
-        //split_model++;
+        split_model++;
       }
 
       if (above_cu && GET_SPLITDATA(above_cu, depth) == 1) {
-        //split_model++;
+        split_model++;
       }
 
       uint32_t split_num = 0;

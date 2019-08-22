@@ -92,11 +92,11 @@ static const uint8_t INIT_INTRA_LUMA_PLANAR_MODE[4][2] = {
   {   4,   5, },
  };
 
-static const uint8_t INIT_CHROMA_PRED_MODE[4][1] = {
-  {  25, },
-  {  33, },
-  {  19, },
-  {   6, },
+static const uint8_t INIT_CHROMA_PRED_MODE[4] = {
+   25, 
+   33, 
+   19, 
+    6, 
 };
 
 static const uint8_t INIT_CU_QP_DELTA_ABS[4][2] = {
@@ -355,7 +355,7 @@ void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
   kvz_ctx_init(&cabac->ctx.multi_ref_line[0], QP, MULTI_REF_LINE_MODE[slice][0], MULTI_REF_LINE_MODE[3][0]);
   kvz_ctx_init(&cabac->ctx.multi_ref_line[1], QP, MULTI_REF_LINE_MODE[slice][1], MULTI_REF_LINE_MODE[3][1]);
 
-  kvz_ctx_init(&cabac->ctx.chroma_pred_model[0], QP, INIT_CHROMA_PRED_MODE[slice][0], INIT_CHROMA_PRED_MODE[3][0]);
+  kvz_ctx_init(&cabac->ctx.chroma_pred_model, QP, INIT_CHROMA_PRED_MODE[slice], INIT_CHROMA_PRED_MODE[3]);
 
 
   for (i = 0; i < 3; i++) {
@@ -384,10 +384,11 @@ void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
   kvz_ctx_init(&cabac->ctx.cu_qt_root_cbf_model, QP, INIT_QT_ROOT_CBF[slice][0], INIT_QT_ROOT_CBF[3][0]);
   kvz_ctx_init(&cabac->ctx.mvp_idx_model, QP, INIT_MVP_IDX[slice][0], INIT_MVP_IDX[3][0]);
 
-  kvz_ctx_init(&cabac->ctx.qt_cbf_model_cb[0], QP, INIT_QT_CBF[slice][5], INIT_QT_CBF[3][5]);
+  kvz_ctx_init(&cabac->ctx.qt_cbf_model_cb[0], QP, INIT_QT_CBF[slice][4], INIT_QT_CBF[3][4]);
 
   for (i = 0; i < 2; i++) {
-    kvz_ctx_init(&cabac->ctx.qt_cbf_model_cr[i], QP, INIT_QT_CBF[slice][i + 6], INIT_QT_CBF[3][i + 6]);
+    kvz_ctx_init(&cabac->ctx.qt_cbf_model_cr[i], QP, INIT_QT_CBF[slice][i + 5], INIT_QT_CBF[3][i + 5]);
+
     kvz_ctx_init(&cabac->ctx.cu_mvd_model[i], QP, INIT_MVD[slice][i], INIT_MVD[3][i]);
     kvz_ctx_init(&cabac->ctx.cu_ref_pic_model[i], QP, INIT_REF_PIC[slice][i], INIT_REF_PIC[3][i]);    
     kvz_ctx_init(&cabac->ctx.luma_planar_model[i], QP, INIT_INTRA_LUMA_PLANAR_MODE[slice][i], INIT_INTRA_LUMA_PLANAR_MODE[3][i]);

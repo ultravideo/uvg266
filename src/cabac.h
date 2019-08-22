@@ -58,7 +58,7 @@ typedef struct
     cabac_ctx_t qt_split_flag_model[6]; //!< \brief qt split flag context models
     cabac_ctx_t intra_luma_mpm_flag_model;    //!< \brief intra mode context models
     cabac_ctx_t intra_subpart_model[2];    //!< \brief intra sub part context models
-    cabac_ctx_t chroma_pred_model[1];
+    cabac_ctx_t chroma_pred_model;
     cabac_ctx_t inter_dir[5];
     cabac_ctx_t qt_cbf_model_luma[4];
     cabac_ctx_t qt_cbf_model_cr[2];
