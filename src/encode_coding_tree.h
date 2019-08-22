@@ -1,5 +1,4 @@
-#ifndef ENCODE_CODING_TREE_H_
-#define ENCODE_CODING_TREE_H_
+#pragma once
 
 /*****************************************************************************
  * This file is part of Kvazaar HEVC encoder.
@@ -34,18 +33,12 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
                             uint16_t y_ctb,
                             uint8_t depth);
 
-void kvz_encode_coeff_nxn(encoder_state_t * const state,
-                          cabac_data_t * const cabac,
-                          const coeff_t *coeff,
-                          uint8_t width,
-                          uint8_t type,
-                          int8_t scan_mode,
-                          int8_t tr_skip,
-                          uint8_t cbf_cb);
-
 void kvz_encode_mvd(encoder_state_t * const state,
                     cabac_data_t *cabac,
                     int32_t mvd_hor,
                     int32_t mvd_ver);
 
-#endif // ENCODE_CODING_TREE_H_
+void kvz_encode_last_significant_xy(cabac_data_t * const cabac,
+  uint8_t lastpos_x, uint8_t lastpos_y,
+  uint8_t width, uint8_t height,
+  uint8_t type, uint8_t scan);

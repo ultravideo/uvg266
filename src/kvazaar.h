@@ -207,6 +207,12 @@ enum kvz_sao {
   KVZ_SAO_FULL = 3
 };
 
+enum kvz_scalinglist {
+  KVZ_SCALING_LIST_OFF = 0,
+  KVZ_SCALING_LIST_CUSTOM = 1,
+  KVZ_SCALING_LIST_DEFAULT = 2,  
+};
+
 // Map from input format to chroma format.
 #define KVZ_FORMAT2CSP(format) ((enum kvz_chroma_format)"\0\1\2\3"[format])
 
@@ -368,6 +374,22 @@ typedef struct kvz_config
 
   /** \brief Minimum QP that uses CABAC for residual cost instead of a fast estimate. */
   int8_t fast_residual_cost_limit;
+
+  /** \brief Set QP at CU level keeping pic_init_qp_minus26 in PPS zero */
+  int8_t set_qp_in_cu;
+
+  /** \brief Flag to enable/disable open GOP configuration */
+  int8_t open_gop;
+
+  /** \brief Type of scaling lists to use */
+  int8_t scaling_list;
+
+  /** \brief Maximum number of merge cadidates */
+  uint8_t max_merge;
+
+  /** \brief Enable Early Skip Mode Decision */
+  uint8_t early_skip;
+
 } kvz_config;
 
 /**
@@ -376,7 +398,8 @@ typedef struct kvz_config
  * Function picture_alloc in kvz_api must be used for allocation.
  */
 typedef struct kvz_picture {
-  kvz_pixel *fulldata;         //!< \brief Allocated buffer (only used in the base_image)
+  kvz_pixel *fulldata_buf;     //!< \brief Allocated buffer with padding (only used in the base_image)
+  kvz_pixel *fulldata;         //!< \brief Allocated buffer portion that's actually used
 
   kvz_pixel *y;                //!< \brief Pointer to luma pixel array.
   kvz_pixel *u;                //!< \brief Pointer to chroma U pixel array.
