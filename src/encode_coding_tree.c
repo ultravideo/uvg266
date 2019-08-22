@@ -153,12 +153,6 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
   // Init base contexts according to block type
   cabac_ctx_t *base_coeff_group_ctx = &(cabac->ctx.sig_coeff_group_model[(type == 0 ? 0 : 1) * 2]);
 
-  // joint_cb_cr
-  if (type == 2 && cbf_cb) {
-    cabac->cur_ctx = &(cabac->ctx.joint_bc_br[0]);
-    CABAC_BIN(cabac, 0, "joint_cb_cr");
-  }
-
   // Scan all coeff groups to find out which of them have coeffs.
   // Populate sig_coeffgroup_flag with that info.
 
@@ -715,6 +709,16 @@ static void encode_transform_unit(encoder_state_t * const state,
   const cu_info_t *cur_pu = kvz_cu_array_at_const(frame->cu_array, x, y);
 
   int8_t scan_idx = kvz_get_scan_order(cur_pu->type, cur_pu->intra.mode, depth);
+
+  if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+    // joint_cb_cr
+    /*
+    if (type == 2 && cbf_mask) {
+      cabac->cur_ctx = &(cabac->ctx.joint_bc_br[0]);
+      CABAC_BIN(cabac, 0, "joint_cb_cr");
+    }
+    */
+  }
 
   int cbf_y = cbf_is_set(cur_pu->cbf, depth, COLOR_Y);
 
@@ -1478,11 +1482,11 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
       // Get left and top block split_flags and if they are present and true, increase model number
       // ToDo: should use height and width to increase model, PU_GET_W() ?
       if (left_cu && GET_SPLITDATA(left_cu, depth) == 1) {
-        split_model++;
+        //split_model++;
       }
 
       if (above_cu && GET_SPLITDATA(above_cu, depth) == 1) {
-        split_model++;
+        //split_model++;
       }
 
       uint32_t split_num = 0;
