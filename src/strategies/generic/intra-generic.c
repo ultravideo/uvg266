@@ -199,9 +199,21 @@ static void kvz_angular_pred_generic(
       }
 
       // TODO: replace latter width with height
-      int scale = ((kvz_math_floor_log2(width) - 2 + kvz_math_floor_log2(width) - 2 + 2) >> 2);
-      
+      int scale = MIN(2,kvz_math_floor_log2(width) - (kvz_math_floor_log2(3* modedisp2invsampledisp[abs(mode_disp)] - 2 ) - 8));
+
       // PDPC
+      if (pred_mode == 2 || pred_mode == 66 || sample_disp == 0 || sample_disp >= 12) {
+        int       inv_angle_sum = 256;
+        for (int x = 0; x < MIN(3 << scale, width); x++) {
+          inv_angle_sum += modedisp2invsampledisp[abs(mode_disp)];
+
+          int wL = 32 >> (2 * x >> scale);
+          const kvz_pixel left = ref_side[y + (inv_angle_sum >> 9) + 1];
+          dst[y * width + x] = dst[y * width + x] + ((wL * (left - dst[y * width + x]) + 32) >> 6);
+        }
+      }
+
+        /*
       if (pred_mode == 2 || pred_mode == 66) {
         int wT = 16 >> MIN(31, ((y << 1) >> scale));
         for (int x = 0; x < width; x++) {
@@ -231,7 +243,7 @@ static void kvz_angular_pred_generic(
           kvz_pixel left = p[delta_frac_0 >> 5];
           dst[y * width + x] = CLIP_TO_PIXEL((wL * left + (64 - wL) * dst[y * width + x] + 32) >> 6);
         }
-      }
+      }*/
     }
   }
   else {
