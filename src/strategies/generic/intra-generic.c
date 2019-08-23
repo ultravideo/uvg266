@@ -175,13 +175,10 @@ static void kvz_angular_pred_generic(
             p[0] = ref_main[ref_main_index - 1];
             p[1] = ref_main[ref_main_index];
             p[2] = ref_main[ref_main_index + 1];
-            p[3] = f[3] != 0 ? ref_main[ref_main_index + 2] : 0;
-            if (use_cubic) {              
-              dst[y * width + x] = CLIP_TO_PIXEL(((int32_t)(f[0] * p[0]) + (int32_t)(f[1] * p[1]) + (int32_t)(f[2] * p[2]) + (int32_t)(f[3] * p[3]) + 32) >> 6);
-            }
-            else {
-              dst[y * width + x] = ((int32_t)(f[0]*p[0]) + (int32_t)(f[1]*p[1]) + (int32_t)(f[2]*p[2]) + (int32_t)(f[3]*p[3]) + 32) >> 6;
-            }
+            p[3] = ref_main[ref_main_index + 2];
+         
+            dst[y * width + x] = CLIP_TO_PIXEL(((int32_t)(f[0] * p[0]) + (int32_t)(f[1] * p[1]) + (int32_t)(f[2] * p[2]) + (int32_t)(f[3] * p[3]) + 32) >> 6);
+
           }
         }
         else {
@@ -190,7 +187,7 @@ static void kvz_angular_pred_generic(
           for (int_fast32_t x = 0; x < width; ++x) {
             kvz_pixel ref1 = ref_main[x + delta_int];
             kvz_pixel ref2 = ref_main[x + delta_int + 1];
-            dst[y * width + x] = ((32 - delta_fract) * ref1 + delta_fract * ref2 + 16) >> 5;
+            dst[y * width + x] = ref1 + ((delta_fract * (ref2-ref1) + 16) >> 5);
           }
         }
       }
