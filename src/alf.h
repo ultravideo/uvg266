@@ -202,7 +202,7 @@ static const int alf_weights_5[8] = {
           2,  2,  2,
       2,  2,  1,  1
 };
-static const int alf_golomb_idx[8] = {
+static const int alf_golomb_idx_5[8] = {
               0,
           0,  1,  0,
       0,  1,  2,  2

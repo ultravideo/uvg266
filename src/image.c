@@ -52,7 +52,8 @@ kvz_picture * kvz_image_alloc(enum kvz_chroma_format chroma_format, const int32_
   kvz_picture *im = MALLOC(kvz_picture, 1);
   if (!im) return NULL;
 
-  //Add 3 pixel boundary to each side for ALF
+  //Add 4 pixel boundary to each side of luma for ALF
+  //This results also 2 pixel boundary for chroma
   unsigned int luma_size = (width + 8) * (height + 8);
   unsigned chroma_sizes[] = { 0, luma_size / 4, luma_size / 2, luma_size };
   unsigned chroma_size = chroma_sizes[chroma_format];
@@ -68,6 +69,7 @@ kvz_picture * kvz_image_alloc(enum kvz_chroma_format chroma_format, const int32_
   im->fulldata = im->fulldata_buf + simd_padding_width / sizeof(kvz_pixel);
 
   //Shift the image to allow ALF filtering
+  im->realfulldata = im->fulldata;
   im->fulldata = &im->fulldata[4 * (width + 8) + 4];
   im->base_image = im;
   im->refcount = 1; //We give a reference to caller
@@ -84,8 +86,6 @@ kvz_picture * kvz_image_alloc(enum kvz_chroma_format chroma_format, const int32_
   } else {
     im->u = im->data[COLOR_U] = &im->fulldata[luma_size - (4 * (width + 8) + 4) + (2 * (im->stride / 2) + 2)];
     im->v = im->data[COLOR_V] = &im->fulldata[luma_size - (4 * (width + 8) + 4) + chroma_size + (2 * (im->stride / 2) + 2)];
-    //im->u = im->data[COLOR_U] = &im->fulldata[luma_size];
-    //im->v = im->data[COLOR_V] = &im->fulldata[luma_size + chroma_size];
   }
 
   im->pts = 0;
@@ -120,11 +120,16 @@ void kvz_image_free(kvz_picture *const im)
   } else {
     free(im->fulldata_buf);
   }
+  else {
+    // Was free(im->fulldata) before.
+    free(im->realfulldata);
+  }
 
   // Make sure freed data won't be used.
   im->base_image = NULL;
   im->fulldata_buf = NULL;
   im->fulldata = NULL;
+  im->realfulldata = NULL;
   im->y = im->u = im->v = NULL;
   im->data[COLOR_Y] = im->data[COLOR_U] = im->data[COLOR_V] = NULL;
   free(im);

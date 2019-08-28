@@ -271,7 +271,7 @@ int length_golomb(int coeff_val, int k)
 double get_dist_force_0(channel_type channel, const int num_filters, double error_tab_force_0_coeff[MAX_NUM_ALF_CLASSES][2], bool* coded_var_bins)
 {
   int num_coeff = channel == CHANNEL_TYPE_LUMA ? 13 : 7;
-  const int *golomb_idx = channel == CHANNEL_TYPE_LUMA ? alf_golomb_idx_7 : alf_golomb_idx;
+  const int *golomb_idx = channel == CHANNEL_TYPE_LUMA ? alf_golomb_idx_7 : alf_golomb_idx_5;
 
   static int bits_var_bin[MAX_NUM_ALF_CLASSES];
 
@@ -283,7 +283,7 @@ double get_dist_force_0(channel_type channel, const int num_filters, double erro
       int coeff_val = abs(g_filter_coeff_set[ind][i]);
       for (int k = 1; k < 15; k++)
       {
-        g_bits_coeff_scan[alf_golomb_idx[i]][k] += length_golomb(coeff_val, k);
+        g_bits_coeff_scan[golomb_idx[i]][k] += length_golomb(coeff_val, k);
       }
     }
   }
@@ -316,7 +316,7 @@ int get_cost_filter_coeff_force_0(channel_type channel, int **p_diff_q_filter_co
 {
   const int num_coeff = channel == CHANNEL_TYPE_LUMA ? 13 : 7;
   const int max_golomb_idx = channel == CHANNEL_TYPE_LUMA ? 3 : 2;
-  const int *golomb_idx = channel == CHANNEL_TYPE_LUMA ? alf_golomb_idx_7 : alf_golomb_idx;
+  const int *golomb_idx = channel == CHANNEL_TYPE_LUMA ? alf_golomb_idx_7 : alf_golomb_idx_5;
   memset(g_bits_coeff_scan, 0, sizeof(g_bits_coeff_scan));
 
   for (int ind = 0; ind < num_filters; ++ind)
@@ -360,7 +360,7 @@ int get_cost_filter_coeff(channel_type channel, int **p_diff_q_filter_coeff_int_
 {
   const int num_coeff = channel == CHANNEL_TYPE_LUMA ? 13 : 7;
   const int max_golomb_idx = channel == CHANNEL_TYPE_LUMA ? 3 : 2;
-  const int *golomb_idx = channel == CHANNEL_TYPE_LUMA ? alf_golomb_idx_7 : alf_golomb_idx;
+  const int *golomb_idx = channel == CHANNEL_TYPE_LUMA ? alf_golomb_idx_7 : alf_golomb_idx_5;
 
   memset(g_bits_coeff_scan, 0, sizeof(g_bits_coeff_scan));
 
@@ -486,7 +486,7 @@ int get_coeff_rate(alf_aps *aps, bool is_chroma)
   bool *alf_luma_coeff_delta_flag = &aps->alf_luma_coeff_delta_flag;
 
   channel_type channel = !is_chroma ? CHANNEL_TYPE_LUMA : CHANNEL_TYPE_CHROMA;
-  const int *golomb_idx = !is_chroma ? alf_golomb_idx_7 : alf_golomb_idx;
+  const int *golomb_idx = !is_chroma ? alf_golomb_idx_7 : alf_golomb_idx_5;
   const int num_coeff = !is_chroma ? 13 : 7;
 
   int i_bits = 0;
@@ -692,7 +692,7 @@ void kvz_alf_enc_process(encoder_state_t *const state,
   }
 
   alf_aps* new_aps = &state->slice->aps[31];
-  alf_aps* aps = malloc(sizeof(alf_aps));
+  alf_aps aps;// = malloc(sizeof(alf_aps));
   int width = state->tile->frame->width;
   int height = state->tile->frame->height;
   //state->slice->aps = aps;
@@ -711,19 +711,19 @@ void kvz_alf_enc_process(encoder_state_t *const state,
   memset(g_fixed_filter_idx, 0, sizeof(g_fixed_filter_idx));
   g_fixed_filter_set_index = 0;
   */
-  memset(aps->enabled_flag, false, sizeof(aps->enabled_flag));
-  memset(aps->luma_coeff, 0, sizeof(aps->luma_coeff));
-  memset(aps->chroma_coeff, 0, sizeof(aps->chroma_coeff));
-  memset(aps->filter_coeff_delta_idx, 0, sizeof(aps->filter_coeff_delta_idx));
-  memset(aps->alf_luma_coeff_flag, true, sizeof(aps->alf_luma_coeff_flag));
-  aps->num_luma_filters = 1;
-  aps->alf_luma_coeff_delta_flag = false;
-  aps->alf_luma_coeff_delta_prediction_flag = false;
-  aps->t_layer = 0;
-  memset(aps->new_filter_flag, 0, sizeof(aps->new_filter_flag));
-  aps->fixed_filter_pattern = 0;
-  memset(aps->fixed_filter_idx, 0, sizeof(aps->fixed_filter_idx));
-  aps->fixed_filter_set_index = 0;
+  memset(aps.enabled_flag, false, sizeof(aps.enabled_flag));
+  memset(aps.luma_coeff, 0, sizeof(aps.luma_coeff));
+  memset(aps.chroma_coeff, 0, sizeof(aps.chroma_coeff));
+  memset(aps.filter_coeff_delta_idx, 0, sizeof(aps.filter_coeff_delta_idx));
+  memset(aps.alf_luma_coeff_flag, true, sizeof(aps.alf_luma_coeff_flag));
+  aps.num_luma_filters = 1;
+  aps.alf_luma_coeff_delta_flag = false;
+  aps.alf_luma_coeff_delta_prediction_flag = false;
+  aps.t_layer = 0;
+  memset(aps.new_filter_flag, 0, sizeof(aps.new_filter_flag));
+  aps.fixed_filter_pattern = 0;
+  memset(aps.fixed_filter_idx, 0, sizeof(aps.fixed_filter_idx));
+  aps.fixed_filter_set_index = 0;
 
   //const TempCtx  ctxStart(m_CtxCache, AlfCtx(m_CABACEstimator->getCtx()));
 
@@ -756,11 +756,11 @@ void kvz_alf_enc_process(encoder_state_t *const state,
   // get CTB stats for filtering
   kvz_alf_derive_stats_for_filtering(state, lcu);
   // derive filter (luma)
-  kvz_alf_encoder(state, lcu, aps, CHANNEL_TYPE_LUMA);
+  kvz_alf_encoder(state, lcu, &aps, CHANNEL_TYPE_LUMA);
   // derive filter (chroma)
-  kvz_alf_encoder(state, lcu, aps, CHANNEL_TYPE_CHROMA);
+  kvz_alf_encoder(state, lcu, &aps, CHANNEL_TYPE_CHROMA);
   //m_CABACEstimator->getCtx() = AlfCtx(ctxStart);
-  kvz_alf_encoder_ctb(state, lcu, aps); // <----------- ongelma täälä
+  kvz_alf_encoder_ctb(state, lcu, &aps);
 
   kvz_alf_reconstructor(state, lcu);
 }
@@ -1853,29 +1853,13 @@ void kvz_alf_get_avai_aps_ids_luma(encoder_state_t *const state,
   int *size_of_aps_ids)
 {
   //APS** apss = cs.slice->getAPSs();
-  alf_aps** apss = &state->slice->aps;
+  //alf_aps** apss = &state->slice->aps;
   param_set_map *aps_set = state->slice->param_set_map;
 
   for (int i = 0; i < MAX_NUM_APS; i++)
   {
     //apss[i] = m_apsMap->getPS(i);
     state->slice->aps[i] = aps_set[i].parameter_set;
-    /*
-    apss[i]->aps_id = aps_set[i].parameter_set->aps_id;
-    memcpy(apss[i]->enabled_flag, aps_set[i].parameter_set->enabled_flag, sizeof(apss[i]->enabled_flag));
-    memcpy(apss[i]->luma_coeff, aps_set[i].parameter_set->luma_coeff, sizeof(apss[i]->luma_coeff));
-    memcpy(apss[i]->chroma_coeff, aps_set[i].parameter_set->chroma_coeff, sizeof(apss[i]->chroma_coeff));
-    memcpy(apss[i]->filter_coeff_delta_idx, aps_set[i].parameter_set->filter_coeff_delta_idx, sizeof(apss[i]->filter_coeff_delta_idx));
-    memcpy(apss[i]->alf_luma_coeff_flag, aps_set[i].parameter_set->alf_luma_coeff_flag, sizeof(apss[i]->alf_luma_coeff_flag));
-    apss[i]->num_luma_filters = aps_set[i].parameter_set->num_luma_filters;
-    apss[i]->alf_luma_coeff_delta_flag = aps_set[i].parameter_set->alf_luma_coeff_delta_flag;
-    apss[i]->alf_luma_coeff_delta_prediction_flag = aps_set[i].parameter_set->alf_luma_coeff_delta_prediction_flag;
-    apss[i]->t_layer = aps_set[i].parameter_set->t_layer;
-    memcpy(apss[i]->new_filter_flag, aps_set[i].parameter_set->new_filter_flag, sizeof(apss[i]->new_filter_flag));
-    apss[i]->fixed_filter_pattern = aps_set[i].parameter_set->fixed_filter_pattern;
-    memcpy(apss[i]->fixed_filter_idx, aps_set[i].parameter_set->fixed_filter_idx, sizeof(apss[i]->fixed_filter_idx));
-    apss[i]->fixed_filter_set_index = aps_set[i].parameter_set->fixed_filter_set_index;
-    */
   }
 
   //std::vector<int> result;
@@ -1885,7 +1869,7 @@ void kvz_alf_get_avai_aps_ids_luma(encoder_state_t *const state,
     while (apsIdChecked < MAX_NUM_APS && /*!cs.slice->isIntra() &&*/ *size_of_aps_ids < (6/*ALF_CTB_MAX_NUM_APS*/ - 1) /*&& /*!cs.slice->getPendingRasInit() &&*/ /*!cs.slice->isIDRorBLA()*/)
     {
       //APS* curAPS = cs.slice->getAPSs()[curApsId];
-      alf_aps *curAPS = apss[curApsId];
+      alf_aps *curAPS = &state->slice->aps[curApsId];
 
       if (curAPS && curAPS->t_layer/*curAPS->getTemporalId()*/ <= state->slice->id/*cs.slice->getTLayer()*/ && curAPS->new_filter_flag[CHANNEL_TYPE_LUMA])
       {
