@@ -246,7 +246,7 @@ void kvz_intra_predict(
   } else {
     // Angular modes use smoothed reference pixels, unless the mode is close
     // to being either vertical or horizontal.
-    static const int kvz_intra_hor_ver_dist_thres[10] = {24, 24, 24, 14, 2, 0, 20, 0, 0, 0 };
+    static const int kvz_intra_hor_ver_dist_thres[8] = {24, 24, 24, 14, 2, 0, 0, 0 };
     int filter_threshold = kvz_intra_hor_ver_dist_thres[kvz_math_floor_log2(width)];
     int dist_from_vert_or_hor = MIN(abs(mode - 50), abs(mode - 18));
     if (dist_from_vert_or_hor > filter_threshold) {
@@ -273,53 +273,52 @@ void kvz_intra_predict(
     // TODO: replace latter log2_width with log2_height
     const int scale = ((log2_width - 2 + log2_width - 2 + 2) >> 2);
     
-    if (mode == 0) {  // planar
+    if (mode == 0 || mode == 1) {  // planar or DC
       // TODO: replace width with height
       for (int y = 0; y < width; y++) {
         int wT = 32 >> MIN(31, ((y << 1) >> scale));
         for (int x = 0; x < width; x++) {
           int wL = 32 >> MIN(31, ((x << 1) >> scale));
-          dst[x + y * width] = CLIP_TO_PIXEL((wL * used_ref->left[y + 1]
-            + wT * used_ref->top[x + 1]
-            + (64 - wL - wT) * dst[x + y * width] + 32) >> 6);
+          dst[x + y * width] = dst[x + y * width] + ((wL * (used_ref->left[y + 1] - dst[x + y * width])
+            + wT * (used_ref->top[x + 1] - dst[x + y * width]) + 32) >> 6);
         }
       }
     }
-    else if (mode == 1) { // DC
-      for (int y = 0; y < width; y++) {
-        int wT = 32 >> MIN(31, ((y << 1) >> scale));
-        for (int x = 0; x < width; x++) {
-          int wL = 32 >> MIN(31, ((x << 1) >> scale));
-          int wTL = (wL >> 4) + (wT >> 4);
-          dst[x + y * width] = CLIP_TO_PIXEL((wL * used_ref->left[y + 1]
-            + wT * used_ref->top[x + 1]
-            - wTL * used_ref->top[0]
-            + (64 - wL - wT + wTL) * dst[x + y * width] + 32) >> 6);
-        }
-      }
-    }
-    else if (mode == 18) {  // horizontal
-      for (int y = 0; y < width; y++) {
-        int wT = 32 >> MIN(31, ((y << 1) >> scale));
-        for (int x = 0; x < width; x++) {
-          int wTL = wT;
-          dst[x + y * width] = CLIP_TO_PIXEL((wT * used_ref->top[x + 1]
-            - wTL * used_ref->top[0]
-            + (64 - wT + wTL) * dst[x + y * width] + 32) >> 6);
-        }
-      }
-    }
-    else if (mode == 50) {  // vertical
-      for (int y = 0; y < width; y++) {
-        for (int x = 0; x < width; x++) {
-          int wL = 32 >> MIN(31, ((x << 1) >> scale));
-          int wTL = wL;
-          dst[x + y * width] = CLIP_TO_PIXEL((wL * used_ref->left[y + 1]
-            - wTL * used_ref->top[0]
-            + (64 - wL + wTL) * dst[x + y * width] + 32) >> 6);
-        }
-      }
-    }
+    //else if (mode == 1) { // DC
+    //  for (int y = 0; y < width; y++) {
+    //    int wT = 32 >> MIN(31, ((y << 1) >> scale));
+    //    for (int x = 0; x < width; x++) {
+    //      int wL = 32 >> MIN(31, ((x << 1) >> scale));
+    //      int wTL = (wL >> 4) + (wT >> 4);
+    //      dst[x + y * width] = CLIP_TO_PIXEL((wL * used_ref->left[y + 1]
+    //        + wT * used_ref->top[x + 1]
+    //        - wTL * used_ref->top[0]
+    //        + (64 - wL - wT + wTL) * dst[x + y * width] + 32) >> 6);
+    //    }
+    //  }
+    //}
+    //else if (mode == 18) {  // horizontal
+    //  for (int y = 0; y < width; y++) {
+    //    int wT = 32 >> MIN(31, ((y << 1) >> scale));
+    //    for (int x = 0; x < width; x++) {
+    //      int wTL = wT;
+    //      dst[x + y * width] = CLIP_TO_PIXEL((wT * used_ref->top[x + 1]
+    //        - wTL * used_ref->top[0]
+    //        + (64 - wT + wTL) * dst[x + y * width] + 32) >> 6);
+    //    }
+    //  }
+    //}
+    //else if (mode == 50) {  // vertical
+    //  for (int y = 0; y < width; y++) {
+    //    for (int x = 0; x < width; x++) {
+    //      int wL = 32 >> MIN(31, ((x << 1) >> scale));
+    //      int wTL = wL;
+    //      dst[x + y * width] = CLIP_TO_PIXEL((wL * used_ref->left[y + 1]
+    //        - wTL * used_ref->top[0]
+    //        + (64 - wL + wTL) * dst[x + y * width] + 32) >> 6);
+    //    }
+    //  }
+    //}
   }
 }
 
