@@ -242,15 +242,22 @@ void kvz_intra_predict(
     // For chroma, DC and 4x4 blocks, always use unfiltered reference.
   } else if (mode == 0) {
     // Otherwise, use filtered for planar.
-    used_ref = &refs->filtered_ref;
+    if (width * width > 32) {
+      used_ref = &refs->filtered_ref;
+    }
   } else {
     // Angular modes use smoothed reference pixels, unless the mode is close
     // to being either vertical or horizontal.
     static const int kvz_intra_hor_ver_dist_thres[8] = {24, 24, 24, 14, 2, 0, 0, 0 };
-    int filter_threshold = kvz_intra_hor_ver_dist_thres[kvz_math_floor_log2(width)];
+    int filter_threshold = kvz_intra_hor_ver_dist_thres[(log2_width + log2_width) >> 1];
     int dist_from_vert_or_hor = MIN(abs(mode - 50), abs(mode - 18));
     if (dist_from_vert_or_hor > filter_threshold) {
-      used_ref = &refs->filtered_ref;
+      static const int16_t modedisp2sampledisp[32] = { 0,    1,    2,    3,    4,    6,     8,   10,   12,   14,   16,   18,   20,   23,   26,   29,   32,   35,   39,  45,  51,  57,  64,  73,  86, 102, 128, 171, 256, 341, 512, 1024 };
+      const int_fast8_t mode_disp = (mode >= 34) ? mode - 50 : 18 - mode;
+      const int_fast8_t sample_disp = (mode_disp < 0 ? -1 : 1) * modedisp2sampledisp[abs(mode_disp)];
+      if ((abs(sample_disp) & 0x1F) == 0) {
+        used_ref = &refs->filtered_ref;
+      }
     }
   }
 
