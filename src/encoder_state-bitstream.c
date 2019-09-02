@@ -80,7 +80,6 @@ static void encoder_state_write_bitstream_PTL(bitstream_t *stream,
   WRITE_U(stream, 0, 1, "no_sao_constraint_flag");
   WRITE_U(stream, 0, 1, "no_alf_constraint_flag");
   WRITE_U(stream, 0, 1, "no_joint_cbcr_constraint_flag");
-  WRITE_U(stream, 0, 1, "no_pcm_constraint_flag");
   WRITE_U(stream, 0, 1, "no_ref_wraparound_constraint_flag");
 
   WRITE_U(stream, 0, 1, "no_temporal_mvp_constraint_flag");
@@ -386,25 +385,8 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
     WRITE_U(stream, 0, 1, "separate_colour_plane_flag");
   }
 
-  WRITE_UE(stream, encoder->in.width, "pic_width_in_luma_samples");
-  WRITE_UE(stream, encoder->in.height, "pic_height_in_luma_samples");
-
-  bool use_conformance_window = encoder->in.width != encoder->in.real_width || encoder->in.height != encoder->in.real_height;
-
-  WRITE_U(stream, use_conformance_window, 1, "conformance_window_flag");
-  if (use_conformance_window) {
-    // The standard does not seem to allow setting conf_win values such that
-    // the number of luma samples is not a multiple of 2. Options are to either
-    // hide one line or show an extra line of non-video. Neither seems like a
-    // very good option, so let's not even try.
-    assert(!(encoder->in.width % 2));
-    WRITE_UE(stream, 0, "conf_win_left_offset");
-    WRITE_UE(stream, (encoder->in.width - encoder->in.real_width) >> 1,
-             "conf_win_right_offset");
-    WRITE_UE(stream, 0, "conf_win_top_offset");
-    WRITE_UE(stream, (encoder->in.height - encoder->in.real_height) >> 1,
-             "conf_win_bottom_offset");
-  }
+  WRITE_UE(stream, encoder->in.width, "pic_width_max_in_luma_samples");
+  WRITE_UE(stream, encoder->in.height, "pic_height_max_in_luma_samples");
 
   WRITE_UE(stream, encoder->bitdepth-8, "bit_depth_luma_minus8");
   WRITE_UE(stream, encoder->bitdepth-8, "bit_depth_chroma_minus8");
@@ -506,17 +488,6 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
 
   //WRITE_U(stream, (encoder->cfg.amp_enable ? 1 : 0), 1, "amp_enabled_flag");
 
-  // if(!no_pcm_constraint_flag)
-    WRITE_U(stream, ENABLE_PCM, 1, "pcm_enabled_flag");
-  #if ENABLE_PCM == 1
-    WRITE_U(stream, 7, 4, "pcm_sample_bit_depth_luma_minus1");
-    WRITE_U(stream, 7, 4, "pcm_sample_bit_depth_chroma_minus1");
-    WRITE_UE(stream, 0, "log2_min_pcm_coding_block_size_minus3");
-    WRITE_UE(stream, 3, "log2_diff_max_min_pcm_coding_block_size");
-    WRITE_U(stream, 1, 1, "pcm_loop_filter_disable_flag");
-  #endif
-
-
     WRITE_U(stream, 0, 1, "sps_transform_skip_enabled_flag");
     WRITE_U(stream, 0, 1, "sps_joint_cbcr_enabled_flag");
   // if(!no_ref_wraparound_constraint_flag)
@@ -597,9 +568,32 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
 #endif
   WRITE_UE(stream, 0, "pic_parameter_set_id");
   WRITE_UE(stream, 0, "seq_parameter_set_id");
+
+
+  WRITE_UE(stream, encoder->in.width, "pic_width_in_luma_samples");
+  WRITE_UE(stream, encoder->in.height, "pic_height_in_luma_samples");
+
+  bool use_conformance_window = encoder->in.width != encoder->in.real_width || encoder->in.height != encoder->in.real_height;
+
+  WRITE_U(stream, use_conformance_window, 1, "conformance_window_flag");
+  if (use_conformance_window) {
+    // The standard does not seem to allow setting conf_win values such that
+    // the number of luma samples is not a multiple of 2. Options are to either
+    // hide one line or show an extra line of non-video. Neither seems like a
+    // very good option, so let's not even try.
+    assert(!(encoder->in.width % 2));
+    WRITE_UE(stream, 0, "conf_win_left_offset");
+    WRITE_UE(stream, (encoder->in.width - encoder->in.real_width) >> 1,
+      "conf_win_right_offset");
+    WRITE_UE(stream, 0, "conf_win_top_offset");
+    WRITE_UE(stream, (encoder->in.height - encoder->in.real_height) >> 1,
+      "conf_win_bottom_offset");
+  }
+
   WRITE_U(stream, 0, 1, "output_flag_present_flag");
   WRITE_U(stream, 0, 3, "num_extra_slice_header_bits");
   WRITE_U(stream, 0, 1, "cabac_init_present_flag");
+
 
   WRITE_UE(stream, 0, "num_ref_idx_l0_default_active_minus1");
   WRITE_UE(stream, 0, "num_ref_idx_l1_default_active_minus1");
