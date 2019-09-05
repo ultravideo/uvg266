@@ -115,8 +115,8 @@ int8_t kvz_intra_get_dir_luma_predictor(
       preds[1] = left_intra_dir;
       preds[2] = ((left_intra_dir + offset) % mod) + 2;
       preds[3] = ((left_intra_dir - 1) % mod) + 2;
-      preds[4] = DC_IDX;
-      preds[5] = ((left_intra_dir + offset - 1) % mod) + 2;
+      preds[4] = ((left_intra_dir + offset - 1) % mod) + 2;
+      preds[5] = (left_intra_dir % mod) + 2;
     }
   } else { // If we have two distinct predictions
     //preds[0] = left_intra_dir;
@@ -128,26 +128,36 @@ int8_t kvz_intra_get_dir_luma_predictor(
       preds[0] = PLANAR_IDX;
       preds[1] = left_intra_dir;
       preds[2] = above_intra_dir;
-      preds[3] = DC_IDX;
       max_cand_mode_idx = preds[1] > preds[2] ? 1 : 2;
       uint8_t min_cand_mode_idx = preds[1] > preds[2] ? 2 : 1;
 
-      if ((preds[max_cand_mode_idx] - preds[min_cand_mode_idx] < 63) && (preds[max_cand_mode_idx] - preds[min_cand_mode_idx] > 1)) {
+      if (preds[max_cand_mode_idx] - preds[min_cand_mode_idx] == 1) {
+        preds[3] = ((preds[min_cand_mode_idx] + offset) % mod) + 2;
+        preds[4] = ((preds[max_cand_mode_idx] - 1) % mod) + 2;
+        preds[5] = ((preds[min_cand_mode_idx] + offset - 1) % mod) + 2;
+      } else  if (preds[max_cand_mode_idx] - preds[min_cand_mode_idx] >= 62) {
+        preds[3] = ((preds[min_cand_mode_idx] - 1) % mod) + 2; 
         preds[4] = ((preds[max_cand_mode_idx] + offset) % mod) + 2;
+        preds[5] = (preds[min_cand_mode_idx] % mod) + 2;
+      } else  if (preds[max_cand_mode_idx] - preds[min_cand_mode_idx] == 2) {
+        preds[3] = ((preds[min_cand_mode_idx] - 1) % mod) + 2;
+        preds[4] = ((preds[min_cand_mode_idx] + offset) % mod) + 2;
         preds[5] = ((preds[max_cand_mode_idx] - 1) % mod) + 2;
       } else {
-        preds[4] = ((preds[max_cand_mode_idx] + offset - 1) % mod) + 2;
-        preds[5] = ((preds[max_cand_mode_idx]) % mod) + 2;
+        preds[3] = ((preds[min_cand_mode_idx] + offset) % mod) + 2;
+        preds[4] = ((preds[min_cand_mode_idx] - 1) % mod) + 2;
+        preds[5] = ((preds[max_cand_mode_idx] + offset) % mod) + 2;
       }
     } else if(left_intra_dir + above_intra_dir >= 2){  // Add DC mode if it's not present, otherwise VER_IDX.
       preds[0] = PLANAR_IDX;
       preds[1] = (left_intra_dir < above_intra_dir) ? above_intra_dir : left_intra_dir;
-      preds[2] = DC_IDX;
+      
       max_cand_mode_idx = 1;
 
-      preds[3] = ((preds[max_cand_mode_idx] + offset) % mod) + 2;
-      preds[4] = ((preds[max_cand_mode_idx] - 1) % mod) + 2;
-      preds[5] = ((preds[max_cand_mode_idx] + offset - 1) % mod) + 2;
+      preds[2] = ((preds[max_cand_mode_idx] + offset) % mod) + 2;
+      preds[3] = ((preds[max_cand_mode_idx] - 1) % mod) + 2;
+      preds[4] = ((preds[max_cand_mode_idx] +offset - 1) % mod) + 2;
+      preds[5] = ( preds[max_cand_mode_idx] % mod) + 2;
     }
   }
 
