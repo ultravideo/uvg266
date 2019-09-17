@@ -236,7 +236,7 @@ typedef struct encoder_state_config_slice_t {
   int32_t end_in_rs;
 
   //ALF adaptation parameter set
-  struct alf_aps *aps; // [MAX_NUM_APS];
+  struct alf_aps *apss; //[ALF_CTB_MAX_NUM_APS];
   int tile_group_num_aps;
   int *tile_group_luma_aps_id;
   int tile_group_chroma_aps_id;

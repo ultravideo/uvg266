@@ -287,9 +287,9 @@ typedef struct kvz_config
   int32_t deblock_enable; /*!< \brief Flag to enable deblocking filter */
   enum kvz_sao sao_type;     /*!< \brief Flag to enable sample adaptive offset filter */
   int8_t alf_enable;		/*!< \brief Flag to enable adaptive loop filter */
-  //int32_t alf_ctu_enable_flag[3/*MAX_NUM_COMPONENT*/];
-  //int32_t alf_tile_group_enable_flag[3/*MAX_NUM_COMPONENT*/];
   int32_t alf_slice_enable_flag[3/*MAX_NUM_COMPONENT*/];
+  int8_t alf_non_linear_luma;    /*!< \brief Flag to enable non linear alf for luma */
+  int8_t alf_non_linear_chroma;    /*!< \brief Flag to enable non linear alf for chroma */
   int32_t rdoq_enable;    /*!< \brief Flag to enable RD optimized quantization. */
   int32_t signhide_enable;   /*!< \brief Flag to enable sign hiding. */
   int32_t smp_enable;   /*!< \brief Flag to enable SMP blocks. */

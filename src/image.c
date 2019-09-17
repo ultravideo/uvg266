@@ -69,7 +69,6 @@ kvz_picture * kvz_image_alloc(enum kvz_chroma_format chroma_format, const int32_
   im->fulldata = im->fulldata_buf + simd_padding_width / sizeof(kvz_pixel);
 
   //Shift the image to allow ALF filtering
-  im->realfulldata = im->fulldata;
   im->fulldata = &im->fulldata[4 * (width + 8) + 4];
   im->base_image = im;
   im->refcount = 1; //We give a reference to caller
@@ -120,16 +119,11 @@ void kvz_image_free(kvz_picture *const im)
   } else {
     free(im->fulldata_buf);
   }
-  else {
-    // Was free(im->fulldata) before.
-    free(im->realfulldata);
-  }
 
   // Make sure freed data won't be used.
   im->base_image = NULL;
   im->fulldata_buf = NULL;
   im->fulldata = NULL;
-  im->realfulldata = NULL;
   im->y = im->u = im->v = NULL;
   im->data[COLOR_Y] = im->data[COLOR_U] = im->data[COLOR_V] = NULL;
   free(im);
