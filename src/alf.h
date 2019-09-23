@@ -347,8 +347,6 @@ void kvz_alf_init(encoder_state_t *const state,
   alf_info_t *alf);
 
 //-------------------------help functions---------------------------
-void reset_alf_covariance(alf_covariance *alf, int num_bins);
-//TODO
 bool is_crossed_by_virtual_boundaries(const int x_pos, const int y_pos, const int width, const int height, bool* clip_top, bool* clip_bottom, bool* clip_left, 
                                       bool* clip_right, int* num_hor_vir_bndry, int* num_ver_vir_bndry, int hor_vir_bndry_pos[], int ver_vir_bndry_pos[], encoder_state_t *const state);
 int clip_alf(const int clip, const short ref, const short val0, const short val1);//
@@ -388,11 +386,14 @@ void get_frame_stat(alf_covariance* frame_cov, alf_covariance** ctb_cov, uint8_t
 void copy_alf_param(alf_aps *dst, alf_aps *src);
 void reset_alf_param(alf_aps *src);
 void add_alf_cov(alf_covariance *dst, alf_covariance *src);
+void reset_alf_covariance(alf_covariance *alf, int num_bins);
+
 //-------------------------------------------------------------------
 
 //-------------------------encoding functions------------------------
 
 //VTM6.0
+//is_crossed_by_virtual_boundaries -osuus ep‰t‰ydellinen
 void kvz_alf_enc_process(encoder_state_t *const state,
   const lcu_order_element_t *const lcu);
 
@@ -430,12 +431,11 @@ void kvz_alf_derive_stats_for_filtering(encoder_state_t *const state,
   const lcu_order_element_t *const lcu);
 
 //VTM6.0
-//muuttuuko 'e_local' niin kuin pit‰‰ funktiokutsuissa?
 //mik‰ on alf_WSSD?
 void kvz_alf_get_blk_stats(encoder_state_t *const state,
   const lcu_order_element_t *const lcu,
   channel_type channel,
-  alf_covariance *alfCovariace,
+  alf_covariance **alfCovariace,
   alf_classifier **classifier,
   kvz_pixel *org,
   int32_t org_stride,
@@ -546,8 +546,8 @@ void code_alf_ctu_filter_index(encoder_state_t * const state,
 
 //-------------------------CTU functions--------------------------------
 //VTM6.0
+//Decoder?
 //Funktion kvz_alf_filter_block kutsut; w, h, x, y, x_dst, y_dst, buf(s)?
-//Ei kutsuta koskaan? -> En p‰‰se VTM:ll‰ kyseiseen funktioon
 void kvz_alf_process(encoder_state_t const *state,
   const lcu_order_element_t *lcu);
 
@@ -576,8 +576,6 @@ void kvz_alf_create(encoder_state_t const *state,
 void kvz_alf_destroy(encoder_state_t const *state);
 
 //VTM6.0
-//toimiiko x,y ja bufferit oikein? haetaanko oikeita pixeleit‰?
-//alf_input_bit_depth = 10 VTM:ss‰
 void kvz_alf_derive_classification(encoder_state_t *const state,
   const lcu_order_element_t *const lcu,
   const int width,
@@ -610,12 +608,13 @@ void kvz_alf_derive_classification_blk(encoder_state_t *const state,
   const int blk_pos_y,
   const int blk_dst_x,
   const int blk_dst_y,
-  const int vbCTUHeight,
-  int vbPos);
+  const int vb_ctu_height,
+  int vb_pos);
 
 //VTM6.0
 //OK
-//resetPCMBlkClassInfo-funktiossa VTM:ss‰ return, pois jotta
+//Pit‰isi testata; x,y,pixels,toimivuus
+//kvz_alf_reconstructor-funktiossa VTM:ss‰ return, pois jotta
 //p‰‰see t‰h‰n funktioon
 void kvz_alf_filter_block(encoder_state_t *const state,
   const lcu_order_element_t * const lcu,
@@ -629,8 +628,8 @@ void kvz_alf_filter_block(encoder_state_t *const state,
   int y_pos,
   int blk_dst_x,
   int blk_dst_y,
-  int vbPos,
-  const int vbCTUHeight);
+  int vb_pos,
+  const int vb_ctu_height);
 //---------------------------------------------------------------------
 
 //kvz_alf_filter_block funktion dst?

@@ -217,6 +217,12 @@ static int encoder_state_config_slice_init(encoder_state_t * const state,
   state->slice->tile_group_chroma_aps_id = -1;
   state->slice->num_of_param_sets = 0;
 
+  //For virtual boundaries
+  state->slice->num_hor_virtual_boundaries = 0;
+  state->slice->num_ver_virtual_boundaries = 0;
+  //state->slice->virtual_boundaries_pos_x[3];
+  //state->slice->virtual_boundaries_pos_y[3];
+
   return 1;
 }
 

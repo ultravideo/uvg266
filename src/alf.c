@@ -52,53 +52,45 @@ void kvz_alf_init(encoder_state_t *const state,
 
 //-------------------------help functions---------------------------
 
-void reset_alf_covariance(alf_covariance *alf, int num_bins) {
-  if (num_bins > 0) { alf->num_bins = num_bins; }
-  alf->pix_acc = 0;
-  memset(alf->y, 0, sizeof(alf->y));
-  memset(alf->ee, 0, sizeof(alf->ee));
-}
-
-bool is_crossed_by_virtual_boundaries(const int xPos, const int yPos, const int width, const int height, bool* clipTop, bool* clipBottom, bool* clipLeft, bool* clipRight, 
-                                      int* numHorVirBndry, int* numVerVirBndry, int horVirBndryPos[], int verVirBndryPos[], encoder_state_t *const state)
+bool is_crossed_by_virtual_boundaries(const int x_pos, const int y_pos, const int width, const int height, bool* clip_top, bool* clip_bottom, bool* clip_left, bool* clip_right, 
+                                      int* num_hor_vir_bndry, int* num_ver_vir_bndry, int hor_vir_bndry_pos[], int ver_vir_bndry_pos[], encoder_state_t *const state)
 {
-  clipTop = false; clipBottom = false; clipLeft = false; clipRight = false;
-  numHorVirBndry = 0; numVerVirBndry = 0;
-  /*
-  if (pps->getLoopFilterAcrossVirtualBoundariesDisabledFlag())
+  *clip_top = false; *clip_bottom = false; *clip_left = false; *clip_right = false;
+  *num_hor_vir_bndry = 0; *num_ver_vir_bndry = 0;
+  if (state->encoder_control->cfg.loop_filter_across_virtual_boundaries_disabled_flag)
   {
-    for (int i = 0; i < pps->getNumHorVirtualBoundaries(); i++)
+    for (int i = 0; i < state->slice->num_hor_virtual_boundaries; i++)
     {
-      if (pps->getVirtualBoundariesPosY(i) == y_pos)
+      if (state->slice->virtual_boundaries_pos_y[i] == y_pos)
       {
-        clip_top = true;
+        *clip_top = true;
       }
-      else if (pps->getVirtualBoundariesPosY(i) == y_pos + height)
+      else if (state->slice->virtual_boundaries_pos_y[i] == y_pos + height)
       {
-        clip_bottom = true;
+        *clip_bottom = true;
       }
-      else if (y_pos < pps->getVirtualBoundariesPosY(i) && pps->getVirtualBoundariesPosY(i) < y_pos + height)
+      else if (y_pos < state->slice->virtual_boundaries_pos_y[i] && state->slice->virtual_boundaries_pos_y[i] < y_pos + height)
       {
-        hor_vir_bndry_pos[num_hor_vir_bndry++] = pps->getVirtualBoundariesPosY(i);
+        hor_vir_bndry_pos[*num_hor_vir_bndry++] = state->slice->virtual_boundaries_pos_y[i];
       }
     }
-    for (int i = 0; i < pps->getNumVerVirtualBoundaries(); i++)
+    for (int i = 0; i < state->slice->num_ver_virtual_boundaries; i++)
     {
-      if (pps->getVirtualBoundariesPosX(i) == x_pos)
+      if (state->slice->virtual_boundaries_pos_x[i] == x_pos)
       {
-        clip_left = true;
+        *clip_left = true;
       }
-      else if (pps->getVirtualBoundariesPosX(i) == x_pos + width)
+      else if (state->slice->virtual_boundaries_pos_x[i] == x_pos + width)
       {
-        clip_right = true;
+        *clip_right = true;
       }
-      else if (x_pos < pps->getVirtualBoundariesPosX(i) && pps->getVirtualBoundariesPosX(i) < x_pos + width)
+      else if (x_pos < state->slice->virtual_boundaries_pos_x[i] && state->slice->virtual_boundaries_pos_x[i] < x_pos + width)
       {
-        ver_vir_bndry_pos[num_ver_vir_bndry++] = pps->getVirtualBoundariesPosX(i);
+        ver_vir_bndry_pos[*num_ver_vir_bndry++] = state->slice->virtual_boundaries_pos_x[i];
       }
     }
-  }*/
-  return numHorVirBndry > 0 || numVerVirBndry > 0 || clipTop || clipBottom || clipLeft || clipRight;
+  }
+  return *num_hor_vir_bndry > 0 || *num_ver_vir_bndry > 0 || *clip_top || *clip_bottom || *clip_left || *clip_right;
 }
 
 int clip_alf(const int clip, const short ref, const short val0, const short val1)
@@ -706,7 +698,7 @@ int get_tb_length(int ui_symbol, const int ui_max_symbol)
   int ui_val = 1 << ui_thresh;
   assert(ui_val <= ui_max_symbol);
   assert((ui_val << 1) > ui_max_symbol);
-  //assert(ui_symbol < ui_max_symbol);
+  assert(ui_symbol < ui_max_symbol);
   int b = ui_max_symbol - ui_val;
   assert(b < ui_val);
   if (ui_symbol < ui_val - b)
@@ -959,6 +951,13 @@ void add_alf_cov(alf_covariance *dst, alf_covariance *src)
   dst->pix_acc += src->pix_acc;
 }
 
+void reset_alf_covariance(alf_covariance *alf, int num_bins) {
+  if (num_bins > 0) { alf->num_bins = num_bins; }
+  alf->pix_acc = 0;
+  memset(alf->y, 0, sizeof(alf->y));
+  memset(alf->ee, 0, sizeof(alf->ee));
+}
+
 //-------------------------------------------------------------------
 
 //-------------------------encoding functions------------------------
@@ -966,6 +965,7 @@ void add_alf_cov(alf_covariance *dst, alf_covariance *src)
 void kvz_alf_enc_process(encoder_state_t *const state,
   const lcu_order_element_t *const lcu)
 {
+  //kerran muualla 
   if (false/*cs.slice->getPendingRasInit()*/ || true/*cs.slice->isIDRorBLA()*/)
   {
     //memset(state->slice->apss, 0, sizeof(alf_aps) * ALF_CTB_MAX_NUM_APS);
@@ -993,11 +993,14 @@ void kvz_alf_enc_process(encoder_state_t *const state,
       }
     }*/
   }
+
+  //luotava vain kerran?
   alf_aps alf_param;
   reset_alf_param(&alf_param);
 
   //const TempCtx  ctxStart(m_CtxCache, AlfCtx(m_CABACEstimator->getCtx()));
 
+  //muualla kerran
   // set CTU ALF enable flags, it was already reset before ALF process
   for (int comp_idx = 0; comp_idx < MAX_NUM_COMPONENT; comp_idx++)
   {
@@ -1008,15 +1011,14 @@ void kvz_alf_enc_process(encoder_state_t *const state,
   int width = state->tile->frame->width;
   int height = state->tile->frame->height;
 
-  reset_alf_param(&alf_param);
+  //turha
+  //reset_alf_param(&alf_param);
 
   //int shift_luma = 2 * 0;// DISTORTION_PRECISION_ADJUSTMENT(m_inputBitDepth[CHANNEL_TYPE_LUMA]);
   //int shift_chroma = 2 * 0;// DISTORTION_PRECISION_ADJUSTMENT(m_inputBitDepth[CHANNEL_TYPE_CHROMA]);
   g_lambda[COMPONENT_Y] = state->lambda;// 981.62883931057581 // lambdas[COMPONENT_Y] * double(1 << shiftLuma);
   g_lambda[COMPONENT_Cb] = state->lambda;// 1236.7748378312663 // lambdas[COMPONENT_Cb] * double(1 << shiftChroma);
   g_lambda[COMPONENT_Cr] = state->lambda;// 1236.7748378312663 //lambdas[COMPONENT_Cr] * double(1 << shiftChroma);
-
-
 
   //PelUnitBuf orgYuv = cs.getOrgBuf();
 
@@ -1025,23 +1027,30 @@ void kvz_alf_enc_process(encoder_state_t *const state,
   //recYuv.extendBorderPel(MAX_ALF_FILTER_LENGTH >> 1);
 
   // derive classification
-  //const CPelBuf& recLuma = recYuv.get(COMPONENT_Y);
+  //const kvz_pixel rec_luma = state->tile->frame->rec->y;
   //const PreCalcValues& pcv = *cs.pcv;
+
+  //turhat
   const int lumaHeight = state->tile->frame->height;
   const int lumaWidth = state->tile->frame->width;
   const int maxCUHeight = LCU_WIDTH;
   const int maxCUWidth = LCU_WIDTH;
+
   bool clip_top = false, clip_bottom = false, clip_left = false, clip_right = false;
   int num_hor_vir_bndry = 0, num_ver_vir_bndry = 0;
   int hor_vir_bndry_pos[] = { 0, 0, 0 };
   int ver_vir_bndry_pos[] = { 0, 0, 0 };
+  
+  //turha
   for (int y_pos = 0; y_pos < lumaHeight; y_pos += maxCUHeight)
   {
     for (int x_pos = 0; x_pos < lumaWidth; x_pos += maxCUWidth)
     {
+      //lcu->size näiden tilalle
       const int width = (x_pos + maxCUWidth > lumaWidth) ? (lumaWidth - x_pos) : maxCUWidth;
       const int height = (y_pos + maxCUHeight > lumaHeight) ? (lumaHeight - y_pos) : maxCUHeight;
 
+      //Tätä algoritmia pitää vielä viilata
       if (is_crossed_by_virtual_boundaries(x_pos, y_pos, width, height, &clip_top, &clip_bottom, &clip_left, &clip_right, &num_hor_vir_bndry, &num_ver_vir_bndry, hor_vir_bndry_pos, ver_vir_bndry_pos, state))
       {
         int y_start = y_pos;
@@ -1081,20 +1090,23 @@ void kvz_alf_enc_process(encoder_state_t *const state,
       }
       else
       {
-        //Area blk(xPos, yPos, width, height);
+        //Area blk(x_pos, y_pos, width, height);
         kvz_alf_derive_classification(state, lcu, width, height, x_pos, y_pos, x_pos, y_pos);
-        //Area blkPCM(xPos, yPos, width, height);
+        //Area blkPCM(x_pos, y_pos, width, height);
         kvz_alf_reset_pcm_blk_class_info(state, lcu, width, height, x_pos, y_pos);
       }
-    }
-  }
 
-  // get CTB stats for filtering
-  kvz_alf_derive_stats_for_filtering(state, lcu);
+    } //
+  } //
+
+  // get CTB stats for filtering 
+  kvz_alf_derive_stats_for_filtering(state, lcu); //checked
+
   // derive filter (luma)
-  kvz_alf_encoder(state, lcu, &alf_param, CHANNEL_TYPE_LUMA);
+  kvz_alf_encoder(state, lcu, &alf_param, CHANNEL_TYPE_LUMA); //ulkopuolelle
+
   // derive filter (chroma)
-  kvz_alf_encoder(state, lcu, &alf_param, CHANNEL_TYPE_CHROMA);
+  kvz_alf_encoder(state, lcu, &alf_param, CHANNEL_TYPE_CHROMA); //ulkopuolelle
 
   //m_CABACEstimator->getCtx() = AlfCtx(ctxStart);
   kvz_alf_encoder_ctb(state, lcu, &alf_param);
@@ -1469,7 +1481,6 @@ void kvz_alf_encoder(encoder_state_t *const state,
       }
     }
 
-
     const int non_linear_flag_max = (is_luma ? cfg.alf_non_linear_luma : cfg.alf_non_linear_chroma) ? 2 : 1;
 
     for (int non_linear_flag = 0; non_linear_flag < non_linear_flag_max; non_linear_flag++)
@@ -1625,10 +1636,11 @@ void kvz_alf_derive_stats_for_filtering(encoder_state_t *const state,
   enum kvz_chroma_format chroma_fmt = state->encoder_control->chroma_format;
   alf_classifier **classifier = state->tile->frame->alf_info->classifier;
 
+  //turhat
   int32_t pic_width = state->tile->frame->rec->width;
   int32_t pic_height = state->tile->frame->rec->height;
-
   int ctu_rs_addr = 0;
+
   const int number_of_components = (chroma_fmt == KVZ_CSP_400) ? 1 : MAX_NUM_COMPONENT;
 
   // init CTU stats buffers
@@ -1641,15 +1653,19 @@ void kvz_alf_derive_stats_for_filtering(encoder_state_t *const state,
     {
       for (int class_idx = 0; class_idx < num_classes; class_idx++)
       {
+        //tämä luup pois
         for (int ctu_idx = 0; ctu_idx < g_num_ctus_in_pic; ctu_idx++)
         {
+
           reset_alf_covariance(&g_alf_covariance[comp_idx][shape][ctu_idx][class_idx],
             g_alf_num_clipping_values[comp_idx == COMPONENT_Y ? CHANNEL_TYPE_LUMA : CHANNEL_TYPE_CHROMA]);
-        }
+        
+        } //
       }
     }
   }
 
+  //kerran jossain muualla (kai?)
   // init Frame stats buffers
   const int number_of_channels = (chroma_fmt == KVZ_CSP_400) ? 1 : MAX_NUM_CHANNEL_TYPE;
   for (int channel_idx = 0; channel_idx < number_of_channels; channel_idx++)
@@ -1672,13 +1688,16 @@ void kvz_alf_derive_stats_for_filtering(encoder_state_t *const state,
 
   int max_cu_width = LCU_WIDTH;
   int max_cu_height = LCU_WIDTH;
+
+  //turhat
   for (int y_pos = 0; y_pos < pic_height; y_pos += max_cu_height)
   {
     for (int x_pos = 0; x_pos < pic_width; x_pos += max_cu_width)
-    {
+    {//
+
+      //lcu->size
       int width = (x_pos + max_cu_width > pic_width) ? (pic_width - x_pos) : max_cu_width;
       int height = (y_pos + max_cu_height > pic_height) ? (pic_height - y_pos) : max_cu_height;
-
 
       if (is_crossed_by_virtual_boundaries(x_pos, y_pos, width, height, &clip_top, &clip_bottom, &clip_left, &clip_right, &num_hor_vir_bndry, &num_ver_vir_bndry, hor_vir_bndry_pos, ver_vir_bndry_pos, state))
       {
@@ -1728,8 +1747,10 @@ void kvz_alf_derive_stats_for_filtering(encoder_state_t *const state,
 
               for (int shape = 0; shape !=1/*m_filterShapes[ch_type].size()*/; shape++)
               {
-                kvz_alf_get_blk_stats(state, lcu, ch_type, g_alf_covariance[comp_idx][shape][ctu_rs_addr], comp_idx ? NULL : classifier, org, org_stride, rec, rec_stride, pos_x, pos_y, pos_x, pos_y, blk_w, blk_h, ((comp_idx == 0) ? g_alf_vb_luma_ctu_height : g_alf_vb_chma_ctu_height)
-                  , ((y_pos + max_cu_height >= pic_height) ? pic_height : ((comp_idx == 0) ? g_alf_vb_luma_pos : g_alf_vb_chma_pos))
+                kvz_alf_get_blk_stats(state, lcu, ch_type, &g_alf_covariance[comp_idx][shape][ctu_rs_addr], comp_idx ? NULL : classifier,
+                  org, org_stride, rec, rec_stride, pos_x, pos_y, pos_x, pos_y, blk_w, blk_h, 
+                  ((comp_idx == 0) ? g_alf_vb_luma_ctu_height : g_alf_vb_chma_ctu_height), 
+                  ((y_pos + max_cu_height >= pic_height) ? pic_height : ((comp_idx == 0) ? g_alf_vb_luma_pos : g_alf_vb_chma_pos))
                 );
               }
             }
@@ -1779,7 +1800,8 @@ void kvz_alf_derive_stats_for_filtering(encoder_state_t *const state,
 
           for (int shape = 0; shape != 1/*m_filterShapes[ch_type].size()*/; shape++)
           {
-            kvz_alf_get_blk_stats(state, lcu, ch_type, g_alf_covariance[comp_idx][shape][ctu_rs_addr], comp_idx ? NULL : classifier, org, org_stride, rec, rec_stride, pos_x, pos_y, pos_x, pos_y, blk_w, blk_h
+            g_alf_covariance[comp_idx][shape][ctu_rs_addr][0];
+            kvz_alf_get_blk_stats(state, lcu, ch_type, &g_alf_covariance[comp_idx][shape][ctu_rs_addr], comp_idx ? NULL : classifier, org, org_stride, rec, rec_stride, pos_x, pos_y, pos_x, pos_y, blk_w, blk_h
               , (is_luma ? g_alf_vb_luma_ctu_height : g_alf_vb_chma_ctu_height)
               , ((y_pos + max_cu_height >= pic_height) ? pic_height : ((is_luma) ? g_alf_vb_luma_pos : g_alf_vb_chma_pos)));
 
@@ -1792,15 +1814,16 @@ void kvz_alf_derive_stats_for_filtering(encoder_state_t *const state,
           }
         }
       }
+      //turhat
       ctu_rs_addr++;
     }
-  }
+  }//
 }
 
 void kvz_alf_get_blk_stats(encoder_state_t *const state,
   const lcu_order_element_t *const lcu,
   channel_type channel,
-  alf_covariance *alf_covariance,
+  alf_covariance **alf_covariance,
   alf_classifier **classifier,
   kvz_pixel *org,
   int32_t org_stride,
@@ -1857,11 +1880,11 @@ void kvz_alf_get_blk_stats(encoder_state_t *const state,
             {
               if (0/*m_alfWSSD*/)
               {
-                alf_covariance[class_idx].ee[b0][b1][k][l] += weight * (double)(e_local[k][b0] * e_local[l][b1]);
+                (*alf_covariance)[class_idx].ee[b0][b1][k][l] += weight * (double)(e_local[k][b0] * e_local[l][b1]);
               }
               else
               {
-                alf_covariance[class_idx].ee[b0][b1][k][l] += e_local[k][b0] * e_local[l][b1];
+                (*alf_covariance)[class_idx].ee[b0][b1][k][l] += e_local[k][b0] * e_local[l][b1];
               }
             }
           }
@@ -1870,21 +1893,21 @@ void kvz_alf_get_blk_stats(encoder_state_t *const state,
         {
           if (0/*m_alfWSSD*/)
           {
-            alf_covariance[class_idx].y[b][k] += weight * (double)(e_local[k][b] * y_local);
+            (*alf_covariance)[class_idx].y[b][k] += weight * (double)(e_local[k][b] * y_local);
           }
           else
           {
-            alf_covariance[class_idx].y[b][k] += e_local[k][b] * y_local;
+            (*alf_covariance)[class_idx].y[b][k] += e_local[k][b] * y_local;
           }
         }
       }
       if (0/*m_alfWSSD*/)
       {
-        alf_covariance[class_idx].pix_acc += weight * (double)(y_local * y_local);
+        (*alf_covariance)[class_idx].pix_acc += weight * (double)(y_local * y_local);
       }
       else
       {
-        alf_covariance[class_idx].pix_acc += y_local * y_local;
+        (*alf_covariance)[class_idx].pix_acc += y_local * y_local;
       }
     }
     org += org_stride;
@@ -1902,7 +1925,7 @@ void kvz_alf_get_blk_stats(encoder_state_t *const state,
         {
           for (int b1 = 0; b1 < num_bins; b1++)
           {
-            alf_covariance[class_idx].ee[b0][b1][k][l] = alf_covariance[class_idx].ee[b1][b0][l][k];
+            (*alf_covariance)[class_idx].ee[b0][b1][k][l] = (*alf_covariance)[class_idx].ee[b1][b0][l][k];
           }
         }
       }
@@ -2065,26 +2088,17 @@ double kvz_alf_get_filter_coeff_and_cost(encoder_state_t *const state,
   if (is_luma)
   {
     //std::fill_n(m_alfClipMerged[iShapeIdx][0][0], MAX_NUM_ALF_LUMA_COEFF*MAX_NUM_ALF_CLASSES*MAX_NUM_ALF_CLASSES, m_alfParamTemp.non_linear_flag[channel] ? AlfNumClippingValues[CHANNEL_TYPE_LUMA] / 2 : 0);
-    /*for (int i = 0; i < MAX_NUM_ALF_CLASSES;  i++) {
+    const int fill_val = g_alf_aps_temp.non_linear_flag[channel] ? g_alf_num_clipping_values[CHANNEL_TYPE_LUMA] / 2 : 0;
+    for (int i = 0; i < MAX_NUM_ALF_CLASSES; i++) {
       for (int j = 0; j < MAX_NUM_ALF_CLASSES; j++) {
         for (int k = 0; k < MAX_NUM_ALF_LUMA_COEFF; k++) {
-          g_alf_clip_merged[i_shape_idx][i][j][k] = g_alf_aps_temp.non_linear_flag[channel] ? g_alf_num_clipping_values[CHANNEL_TYPE_LUMA] / 2 : 0;
+          g_alf_clip_merged[i_shape_idx][i][j][k] = fill_val;
         }
       }
-    }*/
-    memset(g_alf_clip_merged[i_shape_idx], g_alf_aps_temp.non_linear_flag[channel] ? g_alf_num_clipping_values[CHANNEL_TYPE_LUMA] / 2 : 0, sizeof(int) * MAX_NUM_ALF_LUMA_COEFF*MAX_NUM_ALF_CLASSES*MAX_NUM_ALF_CLASSES);
-
+    }
     // Reset Merge Tmp Cov
-    if( g_alf_num_clipping_values[channel] < 0) { g_alf_covariance_merged[i_shape_idx][MAX_NUM_ALF_CLASSES].num_bins = g_alf_num_clipping_values[channel]; }
-    g_alf_covariance_merged[i_shape_idx][MAX_NUM_ALF_CLASSES].pix_acc = 0;
-    memset(g_alf_covariance_merged[i_shape_idx][MAX_NUM_ALF_CLASSES].y, 0, sizeof(*g_alf_covariance_merged[i_shape_idx][MAX_NUM_ALF_CLASSES].y));
-    memset(g_alf_covariance_merged[i_shape_idx][MAX_NUM_ALF_CLASSES].ee, 0, sizeof(*g_alf_covariance_merged[i_shape_idx][MAX_NUM_ALF_CLASSES].ee));
-
-    if (g_alf_num_clipping_values[channel] < 0) { g_alf_covariance_merged[i_shape_idx][MAX_NUM_ALF_CLASSES + 1].num_bins = g_alf_num_clipping_values[channel]; }
-    g_alf_covariance_merged[i_shape_idx][MAX_NUM_ALF_CLASSES + 1].pix_acc = 0;
-    memset(g_alf_covariance_merged[i_shape_idx][MAX_NUM_ALF_CLASSES + 1].y, 0, sizeof(*g_alf_covariance_merged[i_shape_idx][MAX_NUM_ALF_CLASSES + 1].y));
-    memset(g_alf_covariance_merged[i_shape_idx][MAX_NUM_ALF_CLASSES + 1].ee, 0, sizeof(*g_alf_covariance_merged[i_shape_idx][MAX_NUM_ALF_CLASSES + 1].ee));
-
+    reset_alf_covariance(&g_alf_covariance_merged[i_shape_idx][MAX_NUM_ALF_CLASSES], g_alf_num_clipping_values[channel]);
+    reset_alf_covariance(&g_alf_covariance_merged[i_shape_idx][MAX_NUM_ALF_CLASSES + 1], g_alf_num_clipping_values[channel]);
     //distortion
    dist += kvz_alf_merge_filters_and_cost(state, &g_alf_aps_temp, lcu, channel, ui_coeff_bits, g_alf_covariance_frame[channel][i_shape_idx], g_alf_covariance_merged[i_shape_idx], g_alf_clip_merged[i_shape_idx]);
   }
@@ -2093,7 +2107,11 @@ double kvz_alf_get_filter_coeff_and_cost(encoder_state_t *const state,
     //distortion
     assert(num_coeff == g_alf_covariance_frame[channel][i_shape_idx][0].num_coeff);
     //std::fill_n(m_filterClippSet[0], MAX_NUM_ALF_CHROMA_COEFF, m_alfParamTemp.non_linear_flag[channel] ? AlfNumClippingValues[CHANNEL_TYPE_CHROMA] / 2 : 0);
-    memset(g_filter_clipp_set[0], g_alf_aps_temp.non_linear_flag[channel] ? g_alf_num_clipping_values[CHANNEL_TYPE_CHROMA] / 2 : 0, sizeof(int) * MAX_NUM_ALF_CHROMA_COEFF);
+    const int fill_val = g_alf_aps_temp.non_linear_flag[channel] ? g_alf_num_clipping_values[CHANNEL_TYPE_CHROMA] / 2 : 0;
+    for (int i = 0; i < MAX_NUM_ALF_CHROMA_COEFF; i++) {
+      g_filter_clipp_set[0][i] = fill_val;
+    }
+
     dist += g_alf_covariance_frame[channel][i_shape_idx][0].pix_acc + kvz_alf_derive_coeff_quant(channel, g_filter_clipp_set[0], g_filter_coeff_set[0], &g_alf_covariance_frame[channel][i_shape_idx][0], ALF_NUM_BITS, g_alf_aps_temp.non_linear_flag[channel]);
 
     //setEnableFlag( m_alfSliceParamTemp, channel, m_ctuEnableFlag );
@@ -3636,7 +3654,7 @@ void kvz_alf_process(encoder_state_t const *state,
               //const Area blkSrc(0, 0, w, h);
               //const Area blkDst(x_start, y_start, w, h);
               //deriveClassification(m_classifier, buf.get(COMPONENT_Y), blkDst, blkSrc);
-              kvz_alf_derive_classification(state, lcu, w, h, 0, 0, x_start, y_start);
+              kvz_alf_derive_classification(state, lcu, w, h, x_start, y_start, x_start, y_start);
               //const Area blkPCM(x_start, y_start, w, h);
               //resetPCMBlkClassInfo(cs, m_classifier, buf.get(COMPONENT_Y), blkPCM);
               kvz_alf_reset_pcm_blk_class_info(state, lcu, w, h, x_start, y_start);
@@ -3654,7 +3672,7 @@ void kvz_alf_process(encoder_state_t const *state,
                 clip = g_clip_default;
               }
               kvz_alf_filter_block(state, lcu, coeff, clip, g_clp_rngs.comp[COMPONENT_Y], COMPONENT_Y, 
-                                    w, h, 0, 0, x_start, y_start, 
+                                    w, h, x_start, y_start, x_start, y_start, 
                                   ((y_pos + max_cu_height >= luma_height) ? luma_height : g_alf_vb_luma_pos),
                                   g_alf_vb_luma_ctu_height);
             }
@@ -3669,10 +3687,12 @@ void kvz_alf_process(encoder_state_t const *state,
               {
                 //const Area blkSrc(0, 0, w >> chromaScaleX, h >> chromaScaleY);
                 //const Area blkDst(x_start >> chromaScaleX, y_start >> chromaScaleY, w >> chromaScaleX, h >> chromaScaleY);
-                kvz_alf_filter_block(state, lcu, g_chroma_coeff_final, g_chroma_clipp_final, g_clp_rngs.comp[comp_idx],
-                                      comp_id, w >> chroma_scale_x, h >> chroma_scale_y, 0, 0, x_start >> chroma_scale_x,
-                                      y_start >> chroma_scale_y, ((y_pos + max_cu_height >= luma_height) ? luma_height : g_alf_vb_chma_pos), 
-                                      g_alf_vb_chma_ctu_height);
+                kvz_alf_filter_block(state, lcu, g_chroma_coeff_final, g_chroma_clipp_final, g_clp_rngs.comp[comp_idx], 
+                  comp_id, w >> chroma_scale_x, h >> chroma_scale_y, 
+                  x_start >> chroma_scale_x, y_start >> chroma_scale_y, 
+                  x_start >> chroma_scale_x, y_start >> chroma_scale_y, 
+                  ((y_pos + max_cu_height >= luma_height) ? luma_height : g_alf_vb_chma_pos),
+                  g_alf_vb_chma_ctu_height);
               }
             }
 
@@ -4025,6 +4045,7 @@ void kvz_alf_derive_classification(encoder_state_t *const state,
   //alf_classifier** classifier)
 {
   alf_classifier **classifier = state->tile->frame->alf_info->classifier;
+  int32_t pic_height = state->tile->frame->rec->height;
 
   int max_height = y_pos + height;
   int max_width = x_pos + width;
@@ -4037,7 +4058,9 @@ void kvz_alf_derive_classification(encoder_state_t *const state,
     {
       int n_width = MIN(j + CLASSIFICATION_BLK_SIZE, max_width) - j;
       //kvz_alf_derive_classification_blk(state, lcu, classifier, alf_input_bit_depth[CHANNEL_TYPE_LUMA] + 4, n_height, n_width, j, i);
-      kvz_alf_derive_classification_blk(state, lcu, classifier, g_input_bit_depth[CHANNEL_TYPE_LUMA] + 4, n_height, n_width, j, i, j - x_pos + blk_dst_x, i - y_pos + blk_dst_y, g_alf_vb_luma_ctu_height, ((i - y_pos + blk_dst_y + n_height >= g_pic_height) ? g_pic_height : g_alf_vb_luma_pos));
+      kvz_alf_derive_classification_blk(state, lcu, classifier, g_input_bit_depth[CHANNEL_TYPE_LUMA] + 4, n_height, n_width, j, i, 
+        j - x_pos + blk_dst_x, i - y_pos + blk_dst_y, g_alf_vb_luma_ctu_height, 
+        ((i - y_pos + blk_dst_y + n_height >= pic_height) ? pic_height : g_alf_vb_luma_pos));
     }
   }
 }
@@ -4116,8 +4139,8 @@ void kvz_alf_derive_classification_blk(encoder_state_t * const state,
   const int blk_pos_y,
   const int blk_dst_x,
   const int blk_dst_y,
-  const int vbCTUHeight,
-  int vbPos)
+  const int vb_ctu_height,
+  int vb_pos)
 {
   videoframe_t* const frame = state->tile->frame;
   int ***laplacian = state->tile->frame->alf_info->laplacian;
@@ -4136,8 +4159,8 @@ void kvz_alf_derive_classification_blk(encoder_state_t * const state,
   int main_direction, secondary_direction, dir_temp_hv, dir_temp_d;
   int pix_y;
 
-  kvz_pixel height = n_height + fl2;
-  kvz_pixel width = n_width + fl2;
+  int height = n_height + fl2;
+  int width = n_width + fl2;
   int pos_x = blk_pos_x;
   int pos_y = blk_pos_y;
   int start_height = pos_y - fl_p1;
@@ -4151,11 +4174,11 @@ void kvz_alf_derive_classification_blk(encoder_state_t * const state,
     const kvz_pixel *src3 = &src[yoffset + stride * 2];
 
     const int y = blk_dst_y - 2 + i;
-    if (y > 0 && (y & (vbCTUHeight - 1)) == vbPos - 2)
+    if (y > 0 && (y & (vb_ctu_height - 1)) == vb_pos - 2)
     {
       src3 = &src[yoffset + stride];
     }
-    else if (y > 0 && (y & (vbCTUHeight - 1)) == vbPos)
+    else if (y > 0 && (y & (vb_ctu_height - 1)) == vb_pos)
     {
       src0 = &src[yoffset];
     }
@@ -4227,14 +4250,14 @@ void kvz_alf_derive_classification_blk(encoder_state_t * const state,
     {
       int sum_v = 0; int sum_h = 0; int sum_d0 = 0; int sum_d1 = 0;
 
-      if (((i + blk_dst_y) % vbCTUHeight) == (vbPos - 4))
+      if (((i + blk_dst_y) % vb_ctu_height) == (vb_pos - 4))
       {
         sum_v = p_y_ver[j] + p_y_ver2[j] + p_y_ver4[j];
         sum_h = p_y_hor[j] + p_y_hor2[j] + p_y_hor4[j];
         sum_d0 = p_y_dig0[j] + p_y_dig02[j] + p_y_dig04[j];
         sum_d1 = p_y_dig1[j] + p_y_dig12[j] + p_y_dig14[j];
       }
-      else if (((i + blk_dst_y) % vbCTUHeight) == vbPos)
+      else if (((i + blk_dst_y) % vb_ctu_height) == vb_pos)
       {
         sum_v = p_y_ver2[j] + p_y_ver4[j] + p_y_ver6[j];
         sum_h = p_y_hor2[j] + p_y_hor4[j] + p_y_hor6[j];
@@ -4252,8 +4275,8 @@ void kvz_alf_derive_classification_blk(encoder_state_t * const state,
       int temp_act = sum_v + sum_h;
       int activity = 0;
 
-      const int y = (i + blk_dst_y) & (vbCTUHeight - 1);
-      if (y == vbPos - 4 || y == vbPos)
+      const int y = (i + blk_dst_y) & (vb_ctu_height - 1);
+      if (y == vb_pos - 4 || y == vb_pos)
       {
         activity = alf_clip3(0, max_activity, (temp_act * 96) >> shift);
       }

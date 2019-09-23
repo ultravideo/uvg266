@@ -244,6 +244,10 @@ typedef struct encoder_state_config_slice_t {
   uint32_t num_of_param_sets;
   bool tile_group_alf_enabled_flag[3/*MAX_NUM_COMPONENT*/];
 
+  unsigned num_hor_virtual_boundaries;
+  unsigned num_ver_virtual_boundaries;
+  unsigned virtual_boundaries_pos_x[3];
+  unsigned virtual_boundaries_pos_y[3];
 } encoder_state_config_slice_t;
 
 typedef struct encoder_state_config_wfrow_t {
