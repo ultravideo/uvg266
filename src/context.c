@@ -273,6 +273,13 @@ static const uint8_t INIT_JOINT_CB_CR_FLAG[4][3] = {
 };
 
 
+static const INIT_ALF_CTB_ALTERNATIVE[4][2] = {
+  { 18,  18, },
+  { 20,  12, },
+  { 44,  44, },
+  { 0,   0, },
+};
+
 static const uint8_t INIT_CU_TRANSQUANT_BYPASS[4][1] = {
   { CNU, },
   { CNU, },
@@ -365,7 +372,6 @@ void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
   for (i = 0; i < 3; i++) {
     kvz_ctx_init(&cabac->ctx.cu_skip_flag_model[i], QP, INIT_SKIP_FLAG[slice][i], INIT_SKIP_FLAG[3][i]);
     kvz_ctx_init(&cabac->ctx.joint_bc_br[i], QP, INIT_JOINT_CB_CR_FLAG[slice][i], INIT_JOINT_CB_CR_FLAG[3][i]);   
-    
   }
 
   for (i = 0; i < 4; i++) {
@@ -398,6 +404,7 @@ void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
     kvz_ctx_init(&cabac->ctx.cu_ref_pic_model[i], QP, INIT_REF_PIC[slice][i], INIT_REF_PIC[3][i]);    
     kvz_ctx_init(&cabac->ctx.luma_planar_model[i], QP, INIT_INTRA_LUMA_PLANAR_MODE[slice][i], INIT_INTRA_LUMA_PLANAR_MODE[3][i]);
     kvz_ctx_init(&cabac->ctx.cu_qp_delta_abs[i], QP, INIT_CU_QP_DELTA_ABS[slice][i], INIT_CU_QP_DELTA_ABS[3][i]);
+    kvz_ctx_init(&cabac->ctx.alf_ctb_alternatives[i], QP, INIT_ALF_CTB_ALTERNATIVE[slice][i], INIT_ALF_CTB_ALTERNATIVE[3][i]);
   }
 
   for (i = 0; i < 3; i++) {

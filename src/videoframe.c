@@ -49,7 +49,7 @@ videoframe_t * kvz_videoframe_alloc(int32_t width,
     frame->sao_chroma = MALLOC(sao_info_t, frame->width_in_lcu * frame->height_in_lcu);
   }
 
-  frame->alf_info = MALLOC(alf_info_t, frame->width_in_lcu * frame->height_in_lcu);
+  //frame->alf_info = MALLOC(alf_info_t, frame->width_in_lcu * frame->height_in_lcu);
 
   return frame;
 }

@@ -670,17 +670,17 @@ static void encoder_state_worker_encode_lcu(void * opaque)
   }
 
   //Tests
-  alf_info_t *alf = &frame->alf_info[lcu->position.y * frame->rec->stride + lcu->position.x];
-  kvz_alf_init(state, slice, alf);
+  //alf_info_t *alf = &frame->alf_info[lcu->position.y * frame->rec->stride + lcu->position.x];
+  //kvz_alf_enc_process(state, lcu);
 
-  kvz_alf_enc_create(state, lcu);
-
-  kvz_alf_enc_process(state, lcu);
-  kvz_alf_enc_destroy(state);
-
+  if (encoder->cfg.alf_enable) {
+    kvz_alf_enc_create(state, lcu);
+    kvz_alf_init(state, slice);
+    kvz_alf_enc_process(state, lcu);
+    //kvz_alf_enc_destroy(state); //pitää muokata ja valita paikka
+  }
 
   /*
-  // Uusi alf
   // code_alf_ctu_enable_flag();
   if (encoder->cfg.alf_enable )//&& (cs.slice->getTileGroupAlfEnabledFlag(COMPONENT_Y)))
   {
@@ -851,6 +851,10 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
 
     for (int i = 0; i < state->lcu_order_count; ++i) {
       encoder_state_worker_encode_lcu(&state->lcu_order[i]);
+    }
+    if (state->encoder_control->cfg.alf_enable) {
+      kvz_alf_derive_filter__encode__reconstruct(state, 0.0);
+      kvz_alf_enc_destroy(state); //eri paikkaan
     }
   } else {
     // Add each LCU in the wavefront row as it's own job to the queue.

@@ -39,6 +39,8 @@
 #define MAX_ALF_PADDING_SIZE            4
 #define MAX_ALF_NUM_CLIPPING_VALUES     4
 #define NUM_APS_TYPE_LEN                3
+#define SCALE_BITS                      15
+#define MAX_NUM_ALF_ALTERNATIVES_CHROMA 8
 
 static const int g_fixed_filter_set_coeff[ALF_FIXED_FILTER_NUM][MAX_NUM_ALF_LUMA_COEFF] =
 {
@@ -140,11 +142,14 @@ static const int alf_weights_5[8] = {
           2,  2,  2,
       2,  2,  1,  1
 };
+
+/*#if !JVET_O0216_ALF_COEFF_EG3 || !JVET_O0064_SIMP_ALF_CLIP_CODING
 static const int alf_golomb_idx_5[8] = {
               0,
           0,  1,  0,
       0,  1,  2,  2
 };
+#endif*/
 
 static const int alf_pattern_7[25] = {
               0,
@@ -161,13 +166,17 @@ static const int alf_weights_7[14] = {
       2,  2,  2,  2,  2,
   2,  2,  2,  1,  1
 };
+
+/*#if !JVET_O0216_ALF_COEFF_EG3 || !JVET_O0064_SIMP_ALF_CLIP_CODING
 static const int alf_golomb_idx_7[14] = {
               0,
           0,  1,  0,
       0,  1,  2,  1,  0,
   0,  1,  2,  3,  3
 };
+#endif*/
 
+//-------------------------typedef enums----------------------------
 typedef enum { ALF_FILTER_5X5 = 0, ALF_FILTER_7X7 = 1, ALF_NUM_OF_FILTER_TYPES = 2 } alf_filter_type;
 typedef enum { ALF_LUMA = 0, ALF_CHROMA = 1 } alf_type;
 
@@ -196,68 +205,9 @@ typedef enum {
   COMPONENT_Cr = 2,
   MAX_NUM_COMPONENT = 3,
 } alf_component_id;
+//----------------------------------------------------------------
 
-double* g_luma_level_to_weight_plut;
-
-static short g_fixed_filter_set_coeff_dec[ALF_NUM_FIXED_FILTER_SETS][MAX_NUM_ALF_CLASSES * MAX_NUM_ALF_LUMA_COEFF];
-
-static short g_coeff_aps_luma[ALF_CTB_MAX_NUM_APS][MAX_NUM_ALF_CLASSES * MAX_NUM_ALF_LUMA_COEFF];
-static short g_clipp_aps_luma[ALF_CTB_MAX_NUM_APS][MAX_NUM_ALF_CLASSES * MAX_NUM_ALF_LUMA_COEFF];
-static short g_coeff_final[MAX_NUM_ALF_CLASSES * MAX_NUM_ALF_LUMA_COEFF];
-static short g_clipp_final[MAX_NUM_ALF_CLASSES * MAX_NUM_ALF_LUMA_COEFF];
-
-//short g_luma_coeff[max_num_alf_classes * max_num_alf_luma_coeff];
-//short g_chroma_coeff[max_num_alf_chroma_coeff];
-static short g_chroma_coeff_final[MAX_NUM_ALF_LUMA_COEFF];
-static short g_chroma_clipp_final[MAX_NUM_ALF_LUMA_COEFF];
-//short g_filter_coeff_delta_idx[max_num_alf_classes];
-static short g_filter_indices[MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_CLASSES];
-static int g_clip_default_enc[MAX_NUM_ALF_LUMA_COEFF];
-static int g_filter_tmp[MAX_NUM_ALF_LUMA_COEFF];
-static int g_clip_tmp[MAX_NUM_ALF_LUMA_COEFF];
-//int g_fixed_filter_idx[max_num_alf_classes];
-static int g_bits_coeff_scan[11/*m_MAX_SCAN_VAL*/][16/*m_MAX_EXP_GOLOMB*/];
-
-//static short* g_alf_ctb_filter_set_index;
-short* g_alf_ctb_filter_set_index_tmp;
-short* g_alf_ctb_filter_index;
-//int g_fixed_filter_set_index;
-//int g_fixed_filter_pattern;
-//int g_num_luma_filters;
-//bool g_alf_luma_coeff_delta_flag;
-//bool g_alf_luma_coeff_delta_prediction_flag;
-//bool g_alf_luma_coeff_flag[max_num_alf_classes];
-
-int** g_diff_filter_coeff;
-int** g_filter_coeff_set; // [lumaClassIdx/chromaAltIdx][coeffIdx]
-int** g_filter_clipp_set; // [lumaClassIdx/chromaAltIdx][coeffIdx]
-
-static int g_aps_id_start;
-//static double* g_ctb_distortion_fixed_filter; //Ei k‰ytetty miss‰‰n
-
-static unsigned g_bits_new_filter[MAX_NUM_CHANNEL_TYPE];
-double *g_ctb_distortion_unfilter[MAX_NUM_COMPONENT];
-static double g_lambda[MAX_NUM_COMPONENT];
-
-static int g_k_min_tab[MAX_NUM_ALF_LUMA_COEFF];
-
-static const double frac_bits_scale = 1.0 / (double)(1 << 15/*SCALE_BITS*/);
-
-static int g_input_bit_depth[2] = { 8, 8 };
-static const int g_alf_num_clipping_values[MAX_NUM_CHANNEL_TYPE] = { 4,4 };
-static const int g_max_alf_num_clipping_values = 4;
-short g_alf_clipping_values[MAX_NUM_CHANNEL_TYPE][MAX_ALF_NUM_CLIPPING_VALUES];
-short g_clip_default[MAX_NUM_ALF_CLASSES * MAX_NUM_ALF_LUMA_COEFF];
-
-static int g_num_ctus_in_pic;
-int g_num_ctus_in_width;
-int g_num_ctus_in_height;
-int g_pic_height;
-int g_alf_vb_luma_ctu_height;
-int g_alf_vb_chma_ctu_height;
-int g_alf_vb_luma_pos;
-int g_alf_vb_chma_pos;
-
+//-------------------------typedef structs----------------------------
 typedef struct alf_covariance {
   int num_coeff;
   int num_bins;
@@ -265,14 +215,6 @@ typedef struct alf_covariance {
   double ee[MAX_NUM_ALF_LUMA_COEFF][MAX_NUM_ALF_LUMA_COEFF][MAX_ALF_NUM_CLIPPING_VALUES][MAX_ALF_NUM_CLIPPING_VALUES];
   double pix_acc;
 } alf_covariance;
-
-alf_covariance*** g_alf_covariance[MAX_NUM_COMPONENT]; //[component_id][filter_type][ctu_idx][class_idx]
-alf_covariance** g_alf_covariance_frame[MAX_NUM_CHANNEL_TYPE]; //[channel][filter_type][class_idx]
-alf_covariance g_alf_covariance_merged[ALF_NUM_OF_FILTER_TYPES][MAX_NUM_ALF_CLASSES + 2];
-int g_alf_clip_merged[ALF_NUM_OF_FILTER_TYPES][MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_LUMA_COEFF];
-uint8_t* g_ctu_enable_flag_tmp[MAX_NUM_COMPONENT];
-uint8_t* g_ctu_enable_flag[MAX_NUM_COMPONENT];
-//uint8_t g_alf_slice_param_temp[MAX_NUM_COMPONENT];
 
 typedef struct clp_rng {
   int min;
@@ -294,30 +236,39 @@ typedef struct alf_classifier {
   int transpose_idx;
 } alf_classifier;
 
-typedef struct alf_info_t {
-  //alf_type blk_type;
-  //alf_filter_type filter_type;
-  alf_component_id component_id;
-  //alf_directions direction;
-  const kvz_pixel *src_buf;
-  const kvz_pixel *dst_buf;
-  alf_classifier **classifier;
-  int **laplacian[NUM_DIRECTIONS];
-  bool created;
-  //clp_rngs clp_rngs;
-} alf_info_t;
+/*typedef struct alf_info_t {
+//alf_type blk_type;
+//alf_filter_type filter_type;
+//alf_component_id component_id;
+//alf_directions direction;
+//const kvz_pixel *src_buf;
+//const kvz_pixel *dst_buf;
+//alf_classifier **g_classifier;
+//int **g_laplacian[NUM_DIRECTIONS];
+//bool g_created;
+//clp_rngs clp_rngs;
+} alf_info_t;*/
 
 typedef struct alf_aps {
   int aps_id;
   int aps_type;
-
-  //sliceparam
+  //sliceparams
   bool enabled_flag[MAX_NUM_COMPONENT];                           // alf_slice_enable_flag, alf_chroma_idc
+//#if JVET_O0090_ALF_CHROMA_FILTER_ALTERNATIVES_CTB
+  bool non_linear_flag[MAX_NUM_CHANNEL_TYPE][MAX_NUM_ALF_ALTERNATIVES_CHROMA]; // alf_[luma/chroma]_clip_flag
+/*#else
   bool non_linear_flag[MAX_NUM_CHANNEL_TYPE];                       // alf_nonlinear_enable_flag[Luma/Chroma]
+#endif*/
   short luma_coeff[MAX_NUM_ALF_CLASSES * MAX_NUM_ALF_LUMA_COEFF]; // alf_coeff_luma_delta[i][j]
   short luma_clipp[MAX_NUM_ALF_CLASSES * MAX_NUM_ALF_LUMA_COEFF]; // alf_clipp_luma_[i][j]
+//#if JVET_O0090_ALF_CHROMA_FILTER_ALTERNATIVES_CTB
+  int num_alternatives_chroma;                                                  // alf_chroma_num_alts_minus_one + 1
+  short chroma_coeff[MAX_NUM_ALF_ALTERNATIVES_CHROMA][MAX_NUM_ALF_CHROMA_COEFF]; // alf_coeff_chroma[i]
+  short chroma_clipp[MAX_NUM_ALF_ALTERNATIVES_CHROMA][MAX_NUM_ALF_CHROMA_COEFF]; // alf_clipp_chroma[i]
+/*#else
   short chroma_coeff[MAX_NUM_ALF_CHROMA_COEFF];                   // alf_coeff_chroma[i]
   short chroma_clipp[MAX_NUM_ALF_CHROMA_COEFF];                   // alf_clipp_chroma[i]
+#endif*/
   short filter_coeff_delta_idx[MAX_NUM_ALF_CLASSES];              // filter_coeff_delta[i]
   bool alf_luma_coeff_flag[MAX_NUM_ALF_CLASSES];                  // alf_luma_coeff_flag[i]
   int num_luma_filters;                                           // number_of_filters_minus1 + 1
@@ -333,110 +284,196 @@ typedef struct alf_aps {
   bool new_filter_flag[MAX_NUM_CHANNEL_TYPE];
 } alf_aps;
 
-static alf_aps g_alf_aps_temp;
-static alf_aps g_alf_aps_temp_nl;
-
 typedef struct param_set_map {
   bool b_changed;
   //uint8_t* p_nalu_data;
   struct alf_aps parameter_set;
 } param_set_map;
+//---------------------------------------------------------------
 
+//dunno
+uint8_t *g_alf_ctu_enable_flag[MAX_NUM_COMPONENT];
+uint8_t* g_alf_ctu_alternative[MAX_NUM_COMPONENT];
+
+//VTM6.1
+//int *m_laplacian_ptr[NUM_DIRECTIONS][CLASSIFICATION_BLK_SIZE + 5];
+//int m_laplacian_data[NUM_DIRECTIONS][CLASSIFICATION_BLK_SIZE + 5][CLASSIFICATION_BLK_SIZE + 5];
+
+//tarpeeton jos WSSD=0
+double* g_luma_level_to_weight_plut; //Ei anneta arvoja miss‰‰n
+
+//defaults / consts
+static const int g_input_bit_depth[2] = { 8, 8 };
+static const int g_alf_num_clipping_values[MAX_NUM_CHANNEL_TYPE] = { 4,4 };
+static const int g_max_alf_num_clipping_values = 4;
+static const double frac_bits_scale = 1.0 / (double)(1 << SCALE_BITS);
+static unsigned g_bits_new_filter[MAX_NUM_CHANNEL_TYPE];
+static int g_clip_default_enc[MAX_NUM_ALF_LUMA_COEFF];
+
+//define during run
+//static int **g_laplacian[NUM_DIRECTIONS]; // korvattu alemmalla versiolla
+static int g_laplacian[NUM_DIRECTIONS][CLASSIFICATION_BLK_SIZE + 5][CLASSIFICATION_BLK_SIZE + 5]; //puhdista vasta koko encodauksen lopuksi
+static double g_lambda[MAX_NUM_COMPONENT];
+int g_alf_vb_luma_ctu_height;
+int g_alf_vb_chma_ctu_height;
+int g_alf_vb_luma_pos;
+int g_alf_vb_chma_pos;
+short g_alf_clipping_values[MAX_NUM_CHANNEL_TYPE][MAX_ALF_NUM_CLIPPING_VALUES];
+short g_clip_default[MAX_NUM_ALF_CLASSES * MAX_NUM_ALF_LUMA_COEFF];
+static short g_filter_indices[MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_CLASSES];
+//#if JVET_O0090_ALF_CHROMA_FILTER_ALTERNATIVES_CTB
+short g_chroma_coeff_final[MAX_NUM_ALF_ALTERNATIVES_CHROMA][MAX_NUM_ALF_CHROMA_COEFF];
+alf_aps* g_alf_aps_chroma;
+/*#else
+static short g_chroma_coeff_final[MAX_NUM_ALF_LUMA_COEFF]; #endif*/
+//#if JVET_O0090_ALF_CHROMA_FILTER_ALTERNATIVES_CTB
+short g_chroma_clipp_final[MAX_NUM_ALF_ALTERNATIVES_CHROMA][MAX_NUM_ALF_CHROMA_COEFF];
+/*#else
+static short g_chroma_clipp_final[MAX_NUM_ALF_LUMA_COEFF];
+#endif*/
+static short g_coeff_final[MAX_NUM_ALF_CLASSES * MAX_NUM_ALF_LUMA_COEFF];
+static short g_clipp_final[MAX_NUM_ALF_CLASSES * MAX_NUM_ALF_LUMA_COEFF];
+static short g_coeff_aps_luma[ALF_CTB_MAX_NUM_APS][MAX_NUM_ALF_CLASSES * MAX_NUM_ALF_LUMA_COEFF];
+static short g_clipp_aps_luma[ALF_CTB_MAX_NUM_APS][MAX_NUM_ALF_CLASSES * MAX_NUM_ALF_LUMA_COEFF];
+static short g_fixed_filter_set_coeff_dec[ALF_NUM_FIXED_FILTER_SETS][MAX_NUM_ALF_CLASSES * MAX_NUM_ALF_LUMA_COEFF];
+
+//once per frame
+static alf_classifier **g_classifier;
+static bool g_created = false;
+alf_covariance*** g_alf_covariance[MAX_NUM_COMPONENT]; //[component_id][filter_type][ctu_idx][class_idx]
+alf_covariance** g_alf_covariance_frame[MAX_NUM_CHANNEL_TYPE]; //[channel][filter_type][class_idx]
+alf_covariance g_alf_covariance_merged[ALF_NUM_OF_FILTER_TYPES][MAX_NUM_ALF_CLASSES + 2];
+int g_alf_clip_merged[ALF_NUM_OF_FILTER_TYPES][MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_LUMA_COEFF];
+uint8_t* g_ctu_enable_flag[MAX_NUM_COMPONENT];
+uint8_t* g_ctu_alternative[MAX_NUM_COMPONENT]; //#if JVET_O0090_ALF_CHROMA_FILTER_ALTERNATIVES_CTB
+static int g_num_ctus_in_pic;
+double *g_ctb_distortion_unfilter[MAX_NUM_COMPONENT];
+static int g_aps_id_start;
+int** g_diff_filter_coeff; // [lumaClassIdx][coeffIdx]
+int** g_filter_coeff_set;  // [lumaClassIdx][coeffIdx]
+int** g_filter_clipp_set;  // [lumaClassIdx][coeffIdx]
+short* g_alf_ctb_filter_set_index_tmp; //g_num_ctus_in_pic //voisi olla lokaali muuttuja?
+short* g_alf_ctb_filter_index;         //g_num_ctus_in_pic
+
+//temps
+static alf_aps g_alf_aps_temp;
+static alf_aps g_alf_aps_temp_nl;
+uint8_t* g_ctu_enable_flag_tmp[MAX_NUM_COMPONENT];
+uint8_t* g_ctu_enable_flag_tmp2[MAX_NUM_COMPONENT];
+uint8_t* g_ctu_alternative_tmp[MAX_NUM_COMPONENT];
+static int g_filter_tmp[MAX_NUM_ALF_LUMA_COEFF];
+static int g_clip_tmp[MAX_NUM_ALF_LUMA_COEFF];
+
+//-------------------------init function----------------------------
 void kvz_alf_init(encoder_state_t *const state,
-  encoder_state_config_slice_t *slice,
-  alf_info_t *alf);
+  encoder_state_config_slice_t *slice);
+  //alf_info_t *alf);
+
+//------------------------------------------------------------------
 
 //-------------------------help functions---------------------------
 bool is_crossed_by_virtual_boundaries(const int x_pos, const int y_pos, const int width, const int height, bool* clip_top, bool* clip_bottom, bool* clip_left, 
                                       bool* clip_right, int* num_hor_vir_bndry, int* num_ver_vir_bndry, int hor_vir_bndry_pos[], int ver_vir_bndry_pos[], encoder_state_t *const state);
-int clip_alf(const int clip, const short ref, const short val0, const short val1);//
-int alf_clip_pixel(const int a, const clp_rng clp_rng);//
-int alf_clip3(const int min_val, const int max_val, const int a);//
-void get_clip_max(alf_covariance *cov, int *clip_max);//
-void reduce_clip_cost(alf_covariance *cov, int *clip);//
-void set_ey_from_clip(alf_covariance *cov, const int* clip, double ee[MAX_NUM_ALF_LUMA_COEFF][MAX_NUM_ALF_LUMA_COEFF], double y[MAX_NUM_ALF_LUMA_COEFF], int siz);//
-double optimize_filter(alf_covariance *cov, int* clip, double *f, bool optimize_clip);//
-double optimize_filter_clip(alf_covariance *cov, int* clip);//
-double optimize_filter_gns_calc(alf_covariance *cov, const int* clip, double *f, int size);//
-void gns_backsubstitution(double r[MAX_NUM_ALF_LUMA_COEFF][MAX_NUM_ALF_LUMA_COEFF], double* z, int size, double* A);//
-void gns_transpose_backsubstitution(double u[MAX_NUM_ALF_LUMA_COEFF][MAX_NUM_ALF_LUMA_COEFF], double* rhs, double* x, int order);//
-int gns_cholesky_dec(double inp_matr[MAX_NUM_ALF_LUMA_COEFF][MAX_NUM_ALF_LUMA_COEFF], double out_matr[MAX_NUM_ALF_LUMA_COEFF][MAX_NUM_ALF_LUMA_COEFF], int num_eq);//
-int gns_solve_by_chol(double lhs[MAX_NUM_ALF_LUMA_COEFF][MAX_NUM_ALF_LUMA_COEFF], double rhs[MAX_NUM_ALF_LUMA_COEFF], double *x, int num_eq);//
-int gns_solve_by_chol_clip_gns(alf_covariance *cov, const int *clip, double *x, int num_eq);//
-double calc_error_for_coeffs(alf_covariance *cov, const int *clip, const int *coeff, const int num_coeff, const int bit_depth);//
+void init_ctu_alternative_chroma(uint8_t* ctu_alts[MAX_NUM_COMPONENT]);
+int clip_alf(const int clip, const short ref, const short val0, const short val1);
+int alf_clip_pixel(const int a, const clp_rng clp_rng);
+int alf_clip3(const int min_val, const int max_val, const int a);
+void get_clip_max(alf_covariance *cov, int *clip_max);
+void reduce_clip_cost(alf_covariance *cov, int *clip);
+void set_ey_from_clip(alf_covariance *cov, const int* clip, double ee[MAX_NUM_ALF_LUMA_COEFF][MAX_NUM_ALF_LUMA_COEFF], double y[MAX_NUM_ALF_LUMA_COEFF], int siz);
+double optimize_filter(alf_covariance *cov, int* clip, double *f, bool optimize_clip);
+double optimize_filter_clip(alf_covariance *cov, int* clip);
+double optimize_filter_gns_calc(alf_covariance *cov, const int* clip, double *f, int size);
+void gns_backsubstitution(double r[MAX_NUM_ALF_LUMA_COEFF][MAX_NUM_ALF_LUMA_COEFF], double* z, int size, double* A);
+void gns_transpose_backsubstitution(double u[MAX_NUM_ALF_LUMA_COEFF][MAX_NUM_ALF_LUMA_COEFF], double* rhs, double* x, int order);
+int gns_cholesky_dec(double inp_matr[MAX_NUM_ALF_LUMA_COEFF][MAX_NUM_ALF_LUMA_COEFF], double out_matr[MAX_NUM_ALF_LUMA_COEFF][MAX_NUM_ALF_LUMA_COEFF], int num_eq);
+int gns_solve_by_chol(double lhs[MAX_NUM_ALF_LUMA_COEFF][MAX_NUM_ALF_LUMA_COEFF], double rhs[MAX_NUM_ALF_LUMA_COEFF], double *x, int num_eq);
+int gns_solve_by_chol_clip_gns(alf_covariance *cov, const int *clip, double *x, int num_eq);
+double calc_error_for_coeffs(alf_covariance *cov, const int *clip, const int *coeff, const int num_coeff, const int bit_depth);
 //int get_golomb_k_min(channel_type channel, const int numFilters, int kMinTab[MAX_NUM_ALF_LUMA_COEFF], int bitsCoeffScan[11/*m_MAX_SCAN_VAL*/][16/*m_MAX_EXP_GOLOMB*/]);
-int length_golomb(int coeff_val, int k, bool signed_coeff);//
-double get_dist_coeff_force_0(bool* coded_var_bins, double error_force_0_coeff_tab[MAX_NUM_ALF_CLASSES][2], int* bits_var_bin, const int num_filters);//
-double get_dist_force_0(channel_type channel, const int num_filters, double error_tab_force_0_coeff[MAX_NUM_ALF_CLASSES][2], bool* coded_var_bins);//
-int get_cost_filter_coeff_force_0(channel_type channel, int **p_diff_q_filter_coeff_int_pp, const int num_filters, bool* coded_var_bins);//
-int get_cost_filter_coeff(channel_type channel, int **p_diff_q_filter_coeff_int_pp, const int num_filters);//
-int get_cost_filter_clipp(channel_type channel, int **p_diff_q_filter_coeff_int_pp, const int num_filters);//
-int get_tb_length(int ui_symbol, const int ui_max_symbol);//
-int get_non_filter_coeff_rate(alf_aps *aps);//
-int length_filter_coeffs(channel_type channel, const int num_filters, int **filter_coeff);//
-double calculate_error(alf_covariance *cov, const int *clip, const double *coeff);//
-double calculate_error_opt_filt(alf_covariance *cov, const int *clip);//
-int get_coeff_rate(alf_aps *aps, bool is_chroma);//
-int length_truncated_unary(int symbol, int max_symbol);//
-double get_filtered_distortion(alf_covariance* cov, const int num_classes, const int num_filters_minus1, const int num_coeff);//
-double get_unfiltered_distortion_cov_channel(alf_covariance* cov, channel_type channel);//
-double get_unfiltered_distortion_cov_classes(alf_covariance* cov, const int num_classes);//
-void get_frame_stats(channel_type channel, int i_shape_idx);//
-void get_frame_stat(alf_covariance* frame_cov, alf_covariance** ctb_cov, uint8_t* ctb_enable_flags, const int num_classes);//
+int length_golomb(int coeff_val, int k, bool signed_coeff);
+double get_dist_coeff_force_0(bool* coded_var_bins, double error_force_0_coeff_tab[MAX_NUM_ALF_CLASSES][2], int* bits_var_bin, const int num_filters);
+double get_dist_force_0(channel_type channel, const int num_filters, double error_tab_force_0_coeff[MAX_NUM_ALF_CLASSES][2], bool* coded_var_bins);
+int get_cost_filter_coeff_force_0(channel_type channel, int **p_diff_q_filter_coeff_int_pp, const int num_filters, bool* coded_var_bins);
+int get_cost_filter_coeff(channel_type channel, int **p_diff_q_filter_coeff_int_pp, const int num_filters);
+int get_cost_filter_clipp(channel_type channel, int **p_diff_q_filter_coeff_int_pp, const int num_filters);
+//int get_tb_length(int ui_symbol, const int ui_max_symbol);//#if !JVET_O0491_HLS_CLEANUP
+int get_non_filter_coeff_rate(alf_aps *aps);
+int length_filter_coeffs(channel_type channel, const int num_filters, int **filter_coeff);
+double calculate_error(alf_covariance *cov, const int *clip, const double *coeff);
+double calculate_error_opt_filt(alf_covariance *cov, const int *clip);
+//int get_coeff_rate(alf_aps *aps, bool is_chroma);//#if !JVET_O0090_ALF_CHROMA_FILTER_ALTERNATIVES_CTB
+int get_chroma_coeff_rate(alf_aps* aps, int alt_idx); 
+//int length_truncated_unary(int symbol, int max_symbol);//#if !JVET_O0491_HLS_CLEANUP
+double get_filtered_distortion(alf_covariance* cov, const int num_classes, const int num_filters_minus1, const int num_coeff);
+double get_unfiltered_distortion_cov_channel(alf_covariance* cov, channel_type channel);
+double get_unfiltered_distortion_cov_classes(alf_covariance* cov, const int num_classes);
+void get_frame_stats(channel_type channel, int i_shape_idx);
+void get_frame_stat(alf_covariance* frame_cov, alf_covariance** ctb_cov, uint8_t* ctb_enable_flags, uint8_t* ctb_alt_idx, const int num_classes, int alt_idx);
 void copy_alf_param(alf_aps *dst, alf_aps *src);
+void copy_alf_param_w_channel(alf_aps* dst, alf_aps* src, channel_type channel);
 void reset_alf_param(alf_aps *src);
 void add_alf_cov(alf_covariance *dst, alf_covariance *src);
+void add_alf_cov_lhs_rhs(alf_covariance *dst, alf_covariance *lhs, alf_covariance *rhs);
 void reset_alf_covariance(alf_covariance *alf, int num_bins);
 
 //-------------------------------------------------------------------
 
 //-------------------------encoding functions------------------------
 
-//VTM6.0
 //is_crossed_by_virtual_boundaries -osuus ep‰t‰ydellinen
 void kvz_alf_enc_process(encoder_state_t *const state,
-  const lcu_order_element_t *const lcu);
+  const lcu_order_element_t *const lcu
+//#if ENABLE_QPA
+  //const double lambdaChromaWeight
+//#endif
+  );
 
-//VTM6.0
+void kvz_alf_derive_filter__encode__reconstruct(encoder_state_t *const state
+  //#if ENABLE_QPA
+  , const double lambda_chroma_weight
+  //#endif
+  );
+
 //cabac contextit
 double kvz_alf_derive_ctb_alf_enable_flags(encoder_state_t * const state,
-  const lcu_order_element_t *const lcu,
   channel_type channel,
   const int i_shape_idx,
   double *dist_unfilter,
-  const int num_classes);
+  const int num_classes,
+//#if ENABLE_QPA
+  const double chroma_weight
+//#endif
+  );
 
-//VTM6.0
 void kvz_alf_enc_create(encoder_state_t const *state,
   const lcu_order_element_t *lcu);
 
-//VTM6.0
 void kvz_alf_enc_destroy(encoder_state_t const *state);
 
-//VTM6.0
 void kvz_alf_encoder(encoder_state_t *const state,
-  const lcu_order_element_t *const lcu,
   alf_aps *aps,
-  channel_type channel);
+  channel_type channel,
+//#if ENABLE_QPA
+  const double lambda_chroma_weight
+//#endif
+  );
 
-//VTM6.0
 //isIntra, PendingRasInit, IDRorBLA <--- ? selvit‰ n‰m‰
 void kvz_alf_get_avai_aps_ids_luma(encoder_state_t *const state,
   int *newApsId,
   int aps_ids[ALF_CTB_MAX_NUM_APS],
   int *size_of_aps_ids);
 
-//VTM6.0
 void kvz_alf_derive_stats_for_filtering(encoder_state_t *const state,
   const lcu_order_element_t *const lcu);
 
-//VTM6.0
 //mik‰ on alf_WSSD?
 void kvz_alf_get_blk_stats(encoder_state_t *const state,
   const lcu_order_element_t *const lcu,
   channel_type channel,
   alf_covariance **alfCovariace,
-  alf_classifier **classifier,
+  alf_classifier **g_classifier,
   kvz_pixel *org,
   int32_t org_stride,
   kvz_pixel *rec,
@@ -450,7 +487,6 @@ void kvz_alf_get_blk_stats(encoder_state_t *const state,
   int vb_ctu_height,
   int vb_pos);
 
-//VTM6.0
 void kvz_alf_calc_covariance(int e_local[MAX_NUM_ALF_LUMA_COEFF][MAX_ALF_NUM_CLIPPING_VALUES],
   const kvz_pixel *rec,
   const int stride,
@@ -458,9 +494,7 @@ void kvz_alf_calc_covariance(int e_local[MAX_NUM_ALF_LUMA_COEFF][MAX_ALF_NUM_CLI
   const int transpose_idx,
   int vb_distance);
 
-//VTM6.0
 double kvz_alf_get_filter_coeff_and_cost(encoder_state_t *const state,
-  const lcu_order_element_t *const lcu,
   channel_type channel,
   double dist_unfilter,
   int *ui_coeff_bits,
@@ -468,13 +502,11 @@ double kvz_alf_get_filter_coeff_and_cost(encoder_state_t *const state,
   bool b_re_collect_stat,
   bool only_filter_cost);
 
-//VTM6.0
 int kvz_alf_derive_filter_coefficients_prediction_mode(channel_type channel,
   int **filter_set,
   int** filter_coeff_diff,
   const int num_filters);
 
-//VTM6.0
 void kvz_alf_merge_classes(channel_type channel,
   alf_covariance* cov,
   alf_covariance* cov_merged,
@@ -482,17 +514,14 @@ void kvz_alf_merge_classes(channel_type channel,
   const int num_classes,
   short filter_indices[MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_CLASSES]);
 
-//VTM6.0
 double kvz_alf_merge_filters_and_cost(encoder_state_t *const state,
   alf_aps *alf_aps,
-  const lcu_order_element_t *const lcu,
   channel_type channel,
   int *ui_coeff_bits,
   alf_covariance *cov_frame,
   alf_covariance *cov_merged,
   int clip_merged[MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_LUMA_COEFF]);
 
-//VTM6.0
 double kvz_alf_derive_filter_coeffs(alf_aps *aps,
   channel_type channel,
   alf_covariance *cov,
@@ -502,7 +531,6 @@ double kvz_alf_derive_filter_coeffs(alf_aps *aps,
   double errorTabForce0Coeff[MAX_NUM_ALF_CLASSES][2],
   int clip_merged[MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_LUMA_COEFF]);
 
-//VTM6.0
 double kvz_alf_derive_coeff_quant(channel_type channel,
   int *filter_clipp,
   int *filter_coeff_quant,
@@ -510,72 +538,74 @@ double kvz_alf_derive_coeff_quant(channel_type channel,
   const int bit_depth,
   const bool oprimize_clip);
 
-//VTM6.0
 //Muutama asia pit‰‰ viel‰ p‰ivitt‰‰
 //bookmarks
 void kvz_alf_encoder_ctb(encoder_state_t *const state,
-  const lcu_order_element_t *const lcu,
-  alf_aps *aps);
+  alf_aps *aps,
+  //#if ENABLE_QPA
+  const double lambda_chroma_weight
+  //#endif 
+  );
 
-//VTM6.0
 //Funktion kvz_alf_filter_block kutsut; w, h, x, y, x_dst, y_dst, buf(s)?
-void kvz_alf_reconstructor(encoder_state_t const *state,
-  const lcu_order_element_t *const lcu);
+void kvz_alf_reconstructor(encoder_state_t const *state);
 
 //----------------------------------------------------------------------
 
 //-------------------------cabac writer functions------------------------
-//VTM6.0
+
 void code_alf_ctu_enable_flags(encoder_state_t * const state,
-  const lcu_order_element_t *const lcu,
   int8_t component_id,
   alf_aps *aps);
 
-//VTM6.0
 void code_alf_ctu_enable_flag(encoder_state_t * const state,
-  const lcu_order_element_t *const lcu,
   uint32_t ctu_rs_addr,
   int8_t component_id,
   alf_aps *aps);
 
 void code_alf_ctu_filter_index(encoder_state_t * const state,
-  const lcu_order_element_t *const lcu,
   uint32_t ctu_rs_addr,
   bool alf_enable_luma);
+
+void code_alf_ctu_alternatives_channel(encoder_state_t * const state,
+  channel_type channel,
+  alf_aps* aps);
+
+void code_alf_ctu_alternatives_component(encoder_state_t * const state,
+  alf_component_id comp_id,
+  alf_aps* aps);
+
+void code_alf_ctu_alternative_ctu(encoder_state_t * const state,
+  uint32_t ctu_rs_addr,
+  const int comp_idx,
+  const alf_aps* aps);
+
 //---------------------------------------------------------------------
 
 //-------------------------CTU functions--------------------------------
-//VTM6.0
+
 //Decoder?
 //Funktion kvz_alf_filter_block kutsut; w, h, x, y, x_dst, y_dst, buf(s)?
 void kvz_alf_process(encoder_state_t const *state,
   const lcu_order_element_t *lcu);
 
-//VTM6.0
 //ei varmuutta miten alf_param_tmp pit‰isi toimia t‰ss‰ tilanteessa
 void kvz_alf_reconstruct_coeff_aps(encoder_state_t *const state,
   bool luma,
   bool chroma,
   bool is_rdo);
 
-//VTM6.0
-//OK
 void kvz_alf_reconstruct_coeff(encoder_state_t *const state,
   alf_aps *aps,
   channel_type channel,
   const bool is_rdo,
   const bool is_redo);
 
-//VTM6.0
-//OK
 void kvz_alf_create(encoder_state_t const *state,
   const lcu_order_element_t *lcu);
 
-//VTM6.0
-//OK
 void kvz_alf_destroy(encoder_state_t const *state);
 
-//VTM6.0
 void kvz_alf_derive_classification(encoder_state_t *const state,
   const lcu_order_element_t *const lcu,
   const int width,
@@ -585,6 +615,7 @@ void kvz_alf_derive_classification(encoder_state_t *const state,
   const int blk_dst_x,
   const int blk_dst_y);
 
+/*#if !JVET_O0525_REMOVE_PCM
 //VTM6.0 (ei muuttunut)
 //OK
 //Turha jos PCM on pois p‰‰lt‰.
@@ -594,13 +625,10 @@ void kvz_alf_reset_pcm_blk_class_info(encoder_state_t *const state,
   const int width,
   const int height,
   int x_pos,
-  int y_pos);
+  int y_pos);*/
 
-//VTM6.0
-//OK
 void kvz_alf_derive_classification_blk(encoder_state_t *const state,
   const lcu_order_element_t * const lcu,
-  alf_classifier** classifier,
   const int shift,
   const int n_height,
   const int n_width,
@@ -611,13 +639,11 @@ void kvz_alf_derive_classification_blk(encoder_state_t *const state,
   const int vb_ctu_height,
   int vb_pos);
 
-//VTM6.0
-//OK
 //Pit‰isi testata; x,y,pixels,toimivuus
 //kvz_alf_reconstructor-funktiossa VTM:ss‰ return, pois jotta
 //p‰‰see t‰h‰n funktioon
+//tarkista toimivuus
 void kvz_alf_filter_block(encoder_state_t *const state,
-  const lcu_order_element_t * const lcu,
   const short* filter_set,
   const short *fClipSet,
   clp_rng clp_rng,

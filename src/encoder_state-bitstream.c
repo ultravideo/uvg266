@@ -24,6 +24,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "alf.h"
 #include "bitstream.h"
 #include "cabac.h"
 #include "checkpoint.h"

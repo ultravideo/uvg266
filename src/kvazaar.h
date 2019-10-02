@@ -671,7 +671,7 @@ typedef struct kvz_api {
    * Only one encoder may be open at a time.
    *
    * \param cfg   encoder configuration
-   * \return      created encoder, or NULL if creation failed.
+   * \return      g_created encoder, or NULL if creation failed.
    */
   kvz_encoder * (*encoder_open)(const kvz_config *cfg);
 
