@@ -270,14 +270,32 @@ static const uint8_t INIT_JOINT_CB_CR_FLAG[4][3] = {
   {  27,  36,  45, },
   {  12,  21,  35, },
   {   1,   1,   0, },
+static const uint8_t INIT_ALF_CTB_FLAG[4][9] = {
+  { 26,  45,  46,  33,  61,  54,  33,  61,  54, },
+  { 6,   23,  46,  27,  61,  54,  20,  46,  54, },
+  { 39,  39,  39,  54,  39,  39,  31,  62,  39, },
+  { 0,   0,   0,   0,   0,   0,   0,   0,   0, },
 };
-
 
 static const INIT_ALF_CTB_ALTERNATIVE[4][2] = {
   { 18,  18, },
   { 20,  12, },
   { 44,  44, },
   { 0,   0, },
+};
+
+static const uint8_t INIT_ALF_LATEST_FILT[4] = {
+  { 58, },
+  { 50, },
+  { 31, },
+  { 0, },
+};
+
+static const uint8_t INIT_ALF_TEMPORAL_FILT[4] = {
+  { 53, },
+  { 53, },
+  { CNU, },
+  { 0, },
 };
 
 static const uint8_t INIT_CU_TRANSQUANT_BYPASS[4][1] = {
