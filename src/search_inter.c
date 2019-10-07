@@ -1469,9 +1469,9 @@ static void search_pu_inter_bipred(inter_search_info_t *info,
                            false);
 
     const kvz_pixel *rec = &lcu->rec.y[SUB_SCU(y) * LCU_WIDTH + SUB_SCU(x)];
-    const kvz_pixel *src = &frame->source->y[x + y * frame->source->width];
+    const kvz_pixel *src = &frame->source->y[x + y * frame->source->stride];
     uint32_t cost =
-      kvz_satd_any_size(width, height, rec, LCU_WIDTH, src, frame->source->width);
+      kvz_satd_any_size(width, height, rec, LCU_WIDTH, src, frame->source->stride);
 
     uint32_t bitcost[2] = { 0, 0 };
 

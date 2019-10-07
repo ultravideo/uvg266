@@ -4278,6 +4278,8 @@ void code_alf_ctu_alternatives_component(encoder_state_t * const state, alf_comp
 
 void code_alf_ctu_alternative_ctu(encoder_state_t * const state, uint32_t ctu_rs_addr, const int comp_idx, const alf_aps* aps)
 {
+  cabac_data_t * const cabac = &state->cabac;
+
   if (comp_idx == COMPONENT_Y)
     return;
   int aps_idx = aps ? 0 : state->slice->tile_group_chroma_aps_id;
@@ -4295,11 +4297,11 @@ void code_alf_ctu_alternative_ctu(encoder_state_t * const state, uint32_t ctu_rs
       assert(ctb_alf_alternative[ctu_rs_addr] < num_alts);
       for (int i = 0; i < num_ones; ++i) {
         state->cabac.cur_ctx = &state->cabac.ctx.alf_ctb_alternatives[comp_idx - 1];
-        CABAC_BIN(&state->cabac, 1, "alf_ctb_alternatives");
+        CABAC_BIN(cabac, 1, "alf_ctb_alternatives");
       }
       if (num_ones < num_alts - 1) {
         state->cabac.cur_ctx = &state->cabac.ctx.alf_ctb_alternatives[comp_idx - 1];
-        CABAC_BIN(&state->cabac, 0, "alf_ctb_alternatives");
+        CABAC_BIN(cabac, 0, "alf_ctb_alternatives");
       }
     }
   }
@@ -4562,8 +4564,10 @@ void kvz_alf_reconstruct_coeff_aps(encoder_state_t *const state, bool luma, bool
     cur_aps = &apss[aps_idx_chroma];
 
 //#if JVET_O0090_ALF_CHROMA_FILTER_ALTERNATIVES_CTB
+    /* g_alf_aps_chroma turha välikäsi (?)
     copy_alf_param(g_alf_aps_chroma, cur_aps);
-    copy_alf_param(alf_param_tmp, g_alf_aps_chroma);
+    copy_alf_param(alf_param_tmp, g_alf_aps_chroma);*/
+    copy_alf_param(alf_param_tmp, cur_aps);
 /*#else
     copy_alf_param(alf_param_tmp, cur_aps);
 #endif*/

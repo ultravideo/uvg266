@@ -323,7 +323,7 @@ short g_clip_default[MAX_NUM_ALF_CLASSES * MAX_NUM_ALF_LUMA_COEFF];
 static short g_filter_indices[MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_CLASSES];
 //#if JVET_O0090_ALF_CHROMA_FILTER_ALTERNATIVES_CTB
 short g_chroma_coeff_final[MAX_NUM_ALF_ALTERNATIVES_CHROMA][MAX_NUM_ALF_CHROMA_COEFF];
-alf_aps* g_alf_aps_chroma;
+static alf_aps g_alf_aps_chroma; //pelkkä turha välikäsi (?)
 /*#else
 static short g_chroma_coeff_final[MAX_NUM_ALF_LUMA_COEFF]; #endif*/
 //#if JVET_O0090_ALF_CHROMA_FILTER_ALTERNATIVES_CTB

@@ -55,6 +55,8 @@ kvz_picture * kvz_image_alloc(enum kvz_chroma_format chroma_format, const int32_
   //Add 4 pixel boundary to each side of luma for ALF
   //This results also 2 pixel boundary for chroma
   unsigned int luma_size = (width + 8) * (height + 8);
+  //unsigned int luma_size = width * height;
+
   unsigned chroma_sizes[] = { 0, luma_size / 4, luma_size / 2, luma_size };
   unsigned chroma_size = chroma_sizes[chroma_format];
 
@@ -66,10 +68,11 @@ kvz_picture * kvz_image_alloc(enum kvz_chroma_format chroma_format, const int32_
     free(im);
     return NULL;
   }
-  im->fulldata = im->fulldata_buf + simd_padding_width / sizeof(kvz_pixel);
+  //im->fulldata = im->fulldata_buf + simd_padding_width / sizeof(kvz_pixel);
 
   //Shift the image to allow ALF filtering
-  im->fulldata = &im->fulldata[4 * (width + 8) + 4];
+  //im->fulldata = &im->fulldata[4 * (width + 8) + 4];
+  im->fulldata = &im->fulldata_buf[4 * (width + 8) + 4] + simd_padding_width / sizeof(kvz_pixel);
   im->base_image = im;
   im->refcount = 1; //We give a reference to caller
   im->width = width;

@@ -87,12 +87,12 @@ void kvz_nal_write(bitstream_t * const bitstream, const uint8_t nal_type,
 */
 void kvz_image_checksum(const kvz_picture *im, unsigned char checksum_out[][SEI_HASH_MAX_LENGTH], const uint8_t bitdepth)
 {
-  kvz_array_checksum(im->y, im->height, im->width, im->width, checksum_out[0], bitdepth);
+  kvz_array_checksum(im->y, im->height, im->width, im->stride, checksum_out[0], bitdepth);
 
   /* The number of chroma pixels is half that of luma. */
   if (im->chroma_format != KVZ_CSP_400) {
-    kvz_array_checksum(im->u, im->height >> 1, im->width >> 1, im->width >> 1, checksum_out[1], bitdepth);
-    kvz_array_checksum(im->v, im->height >> 1, im->width >> 1, im->width >> 1, checksum_out[2], bitdepth);
+    kvz_array_checksum(im->u, im->height >> 1, im->width >> 1, im->stride >> 1, checksum_out[1], bitdepth);
+    kvz_array_checksum(im->v, im->height >> 1, im->width >> 1, im->stride >> 1, checksum_out[2], bitdepth);
   }
 }
 
@@ -104,11 +104,11 @@ void kvz_image_checksum(const kvz_picture *im, unsigned char checksum_out[][SEI_
 */
 void kvz_image_md5(const kvz_picture *im, unsigned char checksum_out[][SEI_HASH_MAX_LENGTH], const uint8_t bitdepth)
 {
-  kvz_array_md5(im->y, im->height, im->width, im->width, checksum_out[0], bitdepth);
+  kvz_array_md5(im->y, im->height, im->width, im->stride, checksum_out[0], bitdepth);
 
   /* The number of chroma pixels is half that of luma. */
   if (im->chroma_format != KVZ_CSP_400) {
-    kvz_array_md5(im->u, im->height >> 1, im->width >> 1, im->width >> 1, checksum_out[1], bitdepth);
-    kvz_array_md5(im->v, im->height >> 1, im->width >> 1, im->width >> 1, checksum_out[2], bitdepth);
+    kvz_array_md5(im->u, im->height >> 1, im->width >> 1, im->stride >> 1, checksum_out[1], bitdepth);
+    kvz_array_md5(im->v, im->height >> 1, im->width >> 1, im->stride >> 1, checksum_out[2], bitdepth);
   }
 }

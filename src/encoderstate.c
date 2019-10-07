@@ -680,48 +680,6 @@ static void encoder_state_worker_encode_lcu(void * opaque)
     //kvz_alf_enc_destroy(state); //pitää muokata ja valita paikka
   }
 
-  /*
-  // code_alf_ctu_enable_flag();
-  if (encoder->cfg.alf_enable )//&& (cs.slice->getTileGroupAlfEnabledFlag(COMPONENT_Y)))
-  {
-    bool leftAvail = lcu->left ? 1 : 0;
-    bool aboveAvail = lcu->above ? 1 : 0;
-
-    //Vaihda nimet
-    //Tarkista onko kyse vasemmanpuolimmaisesta ja ylimmästä vai pelkästää ensimmäisestä CTU:sta
-    int leftCTUAddr = leftAvail ? (lcu->left->position_px.x > 0 && lcu->left->position_px.y > 0 ? 1 : -1) : -1;
-    int aboveCTUAddr = aboveAvail ? (lcu->above->position_px.x > 0 && lcu->above->position_px.y > 0 ? 1 : -1) : -1;
-
-    cabac_data_t * const cabac = &state->cabac;
-    for (int compIdx = 0; compIdx < MAX_NUM_COMPONENT; compIdx++)
-    {
-      int8_t tile_flag = state->encoder_control->cfg.alf_tile_group_enable_flag[compIdx];
-      if (tile_flag)//cs.slice->getTileGroupAlfEnabledFlag((ComponentID)compIdx))
-      {
-        //uint8_t* ctbAlfFlag = cs.slice->getPic()->getAlfCtuEnableFlag(compIdx);
-        int8_t ctbAlfFlag = state->encoder_control->cfg.alf_ctu_enable_flag[compIdx];
-
-        int ctx = 0;
-        ctx += leftCTUAddr > -1 ? (1/*ctbAlfFlag[leftCTUAddr]*//* ? 1 : 0) : 0;
-        ctx += aboveCTUAddr > -1 ? (1/*ctbAlfFlag[aboveCTUAddr]*//* ? 1 : 0) : 0;
-
-        //RExt__DECODER_DEBUG_BIT_STATISTICS_CREATE_SET(STATS__CABAC_BITS__ALF);
-        //ctbAlfFlag[ctuRsAddr] = m_BinDecoder.decodeBin(Ctx::ctbAlfFlag(compIdx * 3 + ctx));
-
-        cabac->cur_ctx = &(cabac->ctx.alf_ctb_flag_model[compIdx * 3 + ctx]);
-        CABAC_BIN(cabac, 0, "alf_ctb_flag");
-
-        if (compIdx == COMPONENT_Y && ctbAlfFlag)//isLuma((ComponentID)compIdx) && ctbAlfFlag[ctuRsAddr])
-        {
-          //readAlfCtuFilterIndex(cs, ctuRsAddr);
-        }
-      }
-    }
-  }
-  */
-  
-
-
   /* Alkuperäinen ALF
   if (encoder->cfg.alf_enable) {
     short* filter_set;

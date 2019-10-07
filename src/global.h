@@ -103,11 +103,9 @@
 
 typedef int16_t coeff_t;
 
-/*
 #define VERBOSE 1
 #define KVZ_DEBUG_PRINT_CABAC 1
 #define KVZ_DEBUG 1
-*/
 
 /* CONFIG VARIABLES */
 
@@ -230,7 +228,7 @@ typedef int16_t coeff_t;
 #endif
 #define VERSION_STRING QUOTE_EXPAND(KVZ_VERSION)
 
-#define VERBOSE 1
+//#define VERBOSE 1
 
 #define SAO_ABS_OFFSET_MAX ((1 << (MIN(KVZ_BIT_DEPTH, 10) - 5)) - 1)
 
