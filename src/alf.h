@@ -41,6 +41,7 @@
 #define NUM_APS_TYPE_LEN                3
 #define SCALE_BITS                      15
 #define MAX_NUM_ALF_ALTERNATIVES_CHROMA 8
+#define NUM_APS_TYPE_LEN                0 //1 //3
 
 static const int g_fixed_filter_set_coeff[ALF_FIXED_FILTER_NUM][MAX_NUM_ALF_LUMA_COEFF] =
 {
@@ -211,8 +212,8 @@ typedef enum {
 typedef struct alf_covariance {
   int num_coeff;
   int num_bins;
-  double y[MAX_NUM_ALF_LUMA_COEFF][MAX_ALF_NUM_CLIPPING_VALUES];
-  double ee[MAX_NUM_ALF_LUMA_COEFF][MAX_NUM_ALF_LUMA_COEFF][MAX_ALF_NUM_CLIPPING_VALUES][MAX_ALF_NUM_CLIPPING_VALUES];
+  double y[MAX_ALF_NUM_CLIPPING_VALUES][MAX_NUM_ALF_LUMA_COEFF];
+  double ee[MAX_ALF_NUM_CLIPPING_VALUES][MAX_ALF_NUM_CLIPPING_VALUES][MAX_NUM_ALF_LUMA_COEFF][MAX_NUM_ALF_LUMA_COEFF];
   double pix_acc;
 } alf_covariance;
 
@@ -363,6 +364,11 @@ uint8_t* g_ctu_enable_flag_tmp2[MAX_NUM_COMPONENT];
 uint8_t* g_ctu_alternative_tmp[MAX_NUM_COMPONENT];
 static int g_filter_tmp[MAX_NUM_ALF_LUMA_COEFF];
 static int g_clip_tmp[MAX_NUM_ALF_LUMA_COEFF];
+static kvz_picture tmp_rec_pic;
+
+//cabac temps
+cabac_data_t ctx_start;
+cabac_data_t cabac_estimator;
 
 //-------------------------init function----------------------------
 void kvz_alf_init(encoder_state_t *const state,
@@ -410,12 +416,16 @@ double get_unfiltered_distortion_cov_channel(alf_covariance* cov, channel_type c
 double get_unfiltered_distortion_cov_classes(alf_covariance* cov, const int num_classes);
 void get_frame_stats(channel_type channel, int i_shape_idx);
 void get_frame_stat(alf_covariance* frame_cov, alf_covariance** ctb_cov, uint8_t* ctb_enable_flags, uint8_t* ctb_alt_idx, const int num_classes, int alt_idx);
+
+void copy_cov(alf_covariance *dst, alf_covariance *src);
 void copy_alf_param(alf_aps *dst, alf_aps *src);
 void copy_alf_param_w_channel(alf_aps* dst, alf_aps* src, channel_type channel);
 void reset_alf_param(alf_aps *src);
 void add_alf_cov(alf_covariance *dst, alf_covariance *src);
 void add_alf_cov_lhs_rhs(alf_covariance *dst, alf_covariance *lhs, alf_covariance *rhs);
 void reset_alf_covariance(alf_covariance *alf, int num_bins);
+void adjust_pixels(kvz_pixel *src, int x_start, int x_end, int y_start, int y_end,
+                   int stride, int pic_width, int pic_height);
 
 //-------------------------------------------------------------------
 
@@ -429,7 +439,8 @@ void kvz_alf_enc_process(encoder_state_t *const state,
 //#endif
   );
 
-void kvz_alf_derive_filter__encode__reconstruct(encoder_state_t *const state
+void kvz_alf_derive_filter__encode__reconstruct(encoder_state_t *const state,
+  const lcu_order_element_t *lcu
   //#if ENABLE_QPA
   , const double lambda_chroma_weight
   //#endif
@@ -504,7 +515,7 @@ double kvz_alf_get_filter_coeff_and_cost(encoder_state_t *const state,
 
 int kvz_alf_derive_filter_coefficients_prediction_mode(channel_type channel,
   int **filter_set,
-  int** filter_coeff_diff,
+  int **filter_coeff_diff,
   const int num_filters);
 
 void kvz_alf_merge_classes(channel_type channel,
@@ -554,31 +565,54 @@ void kvz_alf_reconstructor(encoder_state_t const *state);
 
 //-------------------------cabac writer functions------------------------
 
-void code_alf_ctu_enable_flags(encoder_state_t * const state,
-  int8_t component_id,
+void kvz_cabac_reset_bits(cabac_data_t * const data);
+
+void code_alf_ctu_enable_flags_channel(encoder_state_t * const state,
+  cabac_data_t * const cabac,
+  channel_type channel,
   alf_aps *aps);
 
+void code_alf_ctu_enable_flags_component(encoder_state_t * const state,
+  cabac_data_t * const cabac,
+  alf_component_id component_id,
+  alf_aps *aps);
+
+//4
 void code_alf_ctu_enable_flag(encoder_state_t * const state,
+  cabac_data_t * const cabac,
   uint32_t ctu_rs_addr,
-  int8_t component_id,
+  alf_component_id component_id,
   alf_aps *aps);
 
+//1
 void code_alf_ctu_filter_index(encoder_state_t * const state,
+  cabac_data_t * const cabac,
   uint32_t ctu_rs_addr,
   bool alf_enable_luma);
 
 void code_alf_ctu_alternatives_channel(encoder_state_t * const state,
+  cabac_data_t * const cabac,
   channel_type channel,
   alf_aps* aps);
 
 void code_alf_ctu_alternatives_component(encoder_state_t * const state,
+  cabac_data_t * const cabac,
   alf_component_id comp_id,
   alf_aps* aps);
 
+//1
 void code_alf_ctu_alternative_ctu(encoder_state_t * const state,
+  cabac_data_t * const cabac,
   uint32_t ctu_rs_addr,
-  const int comp_idx,
+  const alf_component_id comp_idx,
   const alf_aps* aps);
+
+void kvz_encode_alf(encoder_state_t * const state,
+  const int ctu_idx,
+  alf_aps *aps);
+
+void kvz_encode_alf_new(encoder_state_t * const state,
+  const int ctu_idx);
 
 //---------------------------------------------------------------------
 
@@ -644,6 +678,10 @@ void kvz_alf_derive_classification_blk(encoder_state_t *const state,
 //p‰‰see t‰h‰n funktioon
 //tarkista toimivuus
 void kvz_alf_filter_block(encoder_state_t *const state,
+  const kvz_pixel *src_pixels,
+  kvz_pixel *dst_pixels,
+  const int src_stride,
+  const int dst_stride,
   const short* filter_set,
   const short *fClipSet,
   clp_rng clp_rng,

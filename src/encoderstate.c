@@ -810,10 +810,10 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
     for (int i = 0; i < state->lcu_order_count; ++i) {
       encoder_state_worker_encode_lcu(&state->lcu_order[i]);
     }
-    if (state->encoder_control->cfg.alf_enable) {
+    /*if (state->encoder_control->cfg.alf_enable) {
       kvz_alf_derive_filter__encode__reconstruct(state, 0.0);
       kvz_alf_enc_destroy(state); //eri paikkaan
-    }
+    }*/
   } else {
     // Add each LCU in the wavefront row as it's own job to the queue.
 
