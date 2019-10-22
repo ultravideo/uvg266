@@ -677,33 +677,8 @@ static void encoder_state_worker_encode_lcu(void * opaque)
     kvz_alf_enc_create(state, lcu);
     kvz_alf_init(state, slice);
     kvz_alf_enc_process(state, lcu);
-    //kvz_alf_enc_destroy(state); //pitää muokata ja valita paikka
+    kvz_alf_enc_destroy(frame, lcu);
   }
-
-  /* Alkuperäinen ALF
-  if (encoder->cfg.alf_enable) {
-    short* filter_set;
-    alf_info_t* alf = state->tile->frame->alf_info;
-
-    /*encoder_state_recdata_before_alf_to_bufs(state,
-                                             lcu,
-                                             state->tile->hor_buf_before_alf,
-                                             state->tile->ver_buf_before_alf);
-                                             *//*
-    //ALF alustus tähän 
-    kvz_alf_init(alf);
-    kvz_alf_derive_classification(state, lcu);
-    clp_rng* clp_rng = state->tile->frame->alf_info->clp_rngs.comp[0];
-    kvz_alf_reconstruct_coeff_aps(state, false, true, false);
-    kvz_alf_filter_block(state, lcu, g_chroma_coeff_final, clp_rng);
-
-
-    cabac_data_t * const cabac = &state->cabac;
-    for (int component = 0; component < 1; component++) {
-      cabac->cur_ctx = &(cabac->ctx.alf_ctb_flag_model[component * 3 + ctx]);
-      CABAC_BIN(cabac, 0, "alf_ctb_flag");
-    }
-  }*/
 
   //Encode coding tree
   kvz_encode_coding_tree(state, lcu->position.x * LCU_WIDTH, lcu->position.y * LCU_WIDTH, 0);

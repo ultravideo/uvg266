@@ -237,18 +237,21 @@ typedef struct alf_classifier {
   int transpose_idx;
 } alf_classifier;
 
-/*typedef struct alf_info_t {
-//alf_type blk_type;
-//alf_filter_type filter_type;
-//alf_component_id component_id;
-//alf_directions direction;
-//const kvz_pixel *src_buf;
-//const kvz_pixel *dst_buf;
-//alf_classifier **g_classifier;
-//int **g_laplacian[NUM_DIRECTIONS];
-//bool g_created;
-//clp_rngs clp_rngs;
-} alf_info_t;*/
+typedef struct alf_info_t {
+  alf_covariance*** g_alf_covariance[MAX_NUM_COMPONENT]; //[component_id][filter_type][ctu_idx][class_idx]
+  alf_covariance** g_alf_covariance_frame[MAX_NUM_CHANNEL_TYPE]; //[channel][filter_type][class_idx]
+  alf_covariance g_alf_covariance_merged[ALF_NUM_OF_FILTER_TYPES][MAX_NUM_ALF_CLASSES + 2];
+  int g_alf_clip_merged[ALF_NUM_OF_FILTER_TYPES][MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_LUMA_COEFF];
+  uint8_t* g_ctu_enable_flag[MAX_NUM_COMPONENT];
+  uint8_t* g_ctu_alternative[MAX_NUM_COMPONENT]; //#if JVET_O0090_ALF_CHROMA_FILTER_ALTERNATIVES_CTB
+  double *g_ctb_distortion_unfilter[MAX_NUM_COMPONENT];
+  int g_aps_id_start;
+  int** g_diff_filter_coeff; // [lumaClassIdx][coeffIdx]
+  int** g_filter_coeff_set;  // [lumaClassIdx][coeffIdx]
+  int** g_filter_clipp_set; // [lumaClassIdx][coeffIdx]
+  short* g_alf_ctb_filter_set_index_tmp; //g_num_ctus_in_pic //voisi olla lokaali muuttuja?
+  short* g_alf_ctb_filter_index;     //g_num_ctus_in_pic
+} alf_info_t;
 
 typedef struct alf_aps {
   int aps_id;
@@ -315,11 +318,6 @@ static int g_clip_default_enc[MAX_NUM_ALF_LUMA_COEFF];
 //static int **g_laplacian[NUM_DIRECTIONS]; // korvattu alemmalla versiolla
 static int g_laplacian[NUM_DIRECTIONS][CLASSIFICATION_BLK_SIZE + 5][CLASSIFICATION_BLK_SIZE + 5]; //puhdista vasta koko encodauksen lopuksi
 static double g_lambda[MAX_NUM_COMPONENT];
-int g_alf_vb_luma_ctu_height;
-int g_alf_vb_chma_ctu_height;
-int g_alf_vb_luma_pos;
-int g_alf_vb_chma_pos;
-short g_alf_clipping_values[MAX_NUM_CHANNEL_TYPE][MAX_ALF_NUM_CLIPPING_VALUES];
 short g_clip_default[MAX_NUM_ALF_CLASSES * MAX_NUM_ALF_LUMA_COEFF];
 static short g_filter_indices[MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_CLASSES];
 //#if JVET_O0090_ALF_CHROMA_FILTER_ALTERNATIVES_CTB
@@ -338,33 +336,43 @@ static short g_coeff_aps_luma[ALF_CTB_MAX_NUM_APS][MAX_NUM_ALF_CLASSES * MAX_NUM
 static short g_clipp_aps_luma[ALF_CTB_MAX_NUM_APS][MAX_NUM_ALF_CLASSES * MAX_NUM_ALF_LUMA_COEFF];
 static short g_fixed_filter_set_coeff_dec[ALF_NUM_FIXED_FILTER_SETS][MAX_NUM_ALF_CLASSES * MAX_NUM_ALF_LUMA_COEFF];
 
-//once per frame
+//once ever
+static int g_num_ctus_in_pic;
+static int g_alf_vb_luma_ctu_height;
+static int g_alf_vb_chma_ctu_height;
+static int g_alf_vb_luma_pos;
+static int g_alf_vb_chma_pos;
+static short g_alf_clipping_values[MAX_NUM_CHANNEL_TYPE][MAX_ALF_NUM_CLIPPING_VALUES];
 static alf_classifier **g_classifier;
 static bool g_created = false;
+static uint32_t g_slice_count = MAX_INT;
+
+//once per frame
 alf_covariance*** g_alf_covariance[MAX_NUM_COMPONENT]; //[component_id][filter_type][ctu_idx][class_idx]
 alf_covariance** g_alf_covariance_frame[MAX_NUM_CHANNEL_TYPE]; //[channel][filter_type][class_idx]
 alf_covariance g_alf_covariance_merged[ALF_NUM_OF_FILTER_TYPES][MAX_NUM_ALF_CLASSES + 2];
 int g_alf_clip_merged[ALF_NUM_OF_FILTER_TYPES][MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_LUMA_COEFF];
 uint8_t* g_ctu_enable_flag[MAX_NUM_COMPONENT];
 uint8_t* g_ctu_alternative[MAX_NUM_COMPONENT]; //#if JVET_O0090_ALF_CHROMA_FILTER_ALTERNATIVES_CTB
-static int g_num_ctus_in_pic;
 double *g_ctb_distortion_unfilter[MAX_NUM_COMPONENT];
 static int g_aps_id_start;
 int** g_diff_filter_coeff; // [lumaClassIdx][coeffIdx]
 int** g_filter_coeff_set;  // [lumaClassIdx][coeffIdx]
-int** g_filter_clipp_set;  // [lumaClassIdx][coeffIdx]
+int** g_filter_clipp_set; // [lumaClassIdx][coeffIdx]
 short* g_alf_ctb_filter_set_index_tmp; //g_num_ctus_in_pic //voisi olla lokaali muuttuja?
-short* g_alf_ctb_filter_index;         //g_num_ctus_in_pic
+short* g_alf_ctb_filter_index;     //g_num_ctus_in_pic
+static uint32_t g_curr_frame = MAX_INT;
+alf_aps alf_param;
 
 //temps
 static alf_aps g_alf_aps_temp;
 static alf_aps g_alf_aps_temp_nl;
-uint8_t* g_ctu_enable_flag_tmp[MAX_NUM_COMPONENT];
-uint8_t* g_ctu_enable_flag_tmp2[MAX_NUM_COMPONENT];
-uint8_t* g_ctu_alternative_tmp[MAX_NUM_COMPONENT];
+uint8_t* g_ctu_enable_flag_tmp[MAX_NUM_COMPONENT]; //kerran
+//uint8_t* g_ctu_enable_flag_tmp2[MAX_NUM_COMPONENT];
+uint8_t* g_ctu_alternative_tmp[MAX_NUM_COMPONENT]; //kerran
 static int g_filter_tmp[MAX_NUM_ALF_LUMA_COEFF];
 static int g_clip_tmp[MAX_NUM_ALF_LUMA_COEFF];
-static kvz_picture tmp_rec_pic;
+kvz_picture *tmp_rec_pic;
 
 //cabac temps
 cabac_data_t ctx_start;
@@ -460,7 +468,8 @@ double kvz_alf_derive_ctb_alf_enable_flags(encoder_state_t * const state,
 void kvz_alf_enc_create(encoder_state_t const *state,
   const lcu_order_element_t *lcu);
 
-void kvz_alf_enc_destroy(encoder_state_t const *state);
+void kvz_alf_enc_destroy(videoframe_t * const frame,
+  const lcu_order_element_t *lcu);
 
 void kvz_alf_encoder(encoder_state_t *const state,
   alf_aps *aps,
@@ -638,7 +647,7 @@ void kvz_alf_reconstruct_coeff(encoder_state_t *const state,
 void kvz_alf_create(encoder_state_t const *state,
   const lcu_order_element_t *lcu);
 
-void kvz_alf_destroy(encoder_state_t const *state);
+void kvz_alf_destroy(videoframe_t * const frame);
 
 void kvz_alf_derive_classification(encoder_state_t *const state,
   const lcu_order_element_t *const lcu,

@@ -237,7 +237,7 @@ typedef struct encoder_state_config_slice_t {
   int tile_group_num_aps;
   int *tile_group_luma_aps_id;
   int tile_group_chroma_aps_id;
-  struct param_set_map *param_set_map;
+  struct param_set_map *param_set_map; //mahdollisesti define during run
   uint32_t num_of_param_sets;
   bool tile_group_alf_enabled_flag[3/*MAX_NUM_COMPONENT*/];
 
