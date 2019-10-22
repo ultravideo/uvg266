@@ -378,6 +378,14 @@ kvz_picture *tmp_rec_pic;
 cabac_data_t ctx_start;
 cabac_data_t cabac_estimator;
 
+// encoder
+
+//kvz_alf_encoder_ctb
+int best_aps_ids[8]; //frame
+int new_aps_id;
+int aps_ids[ALF_CTB_MAX_NUM_APS];
+int size_of_aps_ids;
+
 //-------------------------init function----------------------------
 void kvz_alf_init(encoder_state_t *const state,
   encoder_state_config_slice_t *slice);
@@ -422,8 +430,8 @@ int get_chroma_coeff_rate(alf_aps* aps, int alt_idx);
 double get_filtered_distortion(alf_covariance* cov, const int num_classes, const int num_filters_minus1, const int num_coeff);
 double get_unfiltered_distortion_cov_channel(alf_covariance* cov, channel_type channel);
 double get_unfiltered_distortion_cov_classes(alf_covariance* cov, const int num_classes);
-void get_frame_stats(channel_type channel, int i_shape_idx);
-void get_frame_stat(alf_covariance* frame_cov, alf_covariance** ctb_cov, uint8_t* ctb_enable_flags, uint8_t* ctb_alt_idx, const int num_classes, int alt_idx);
+void get_frame_stats(channel_type channel, int i_shape_idx, int ctu_idx);
+void get_frame_stat(alf_covariance* frame_cov, alf_covariance** ctb_cov, uint8_t* ctb_enable_flags, uint8_t* ctb_alt_idx, const int num_classes, int alt_idx, int ctu_idx);
 
 void copy_cov(alf_covariance *dst, alf_covariance *src);
 void copy_alf_param(alf_aps *dst, alf_aps *src);
@@ -434,6 +442,8 @@ void add_alf_cov_lhs_rhs(alf_covariance *dst, alf_covariance *lhs, alf_covarianc
 void reset_alf_covariance(alf_covariance *alf, int num_bins);
 void adjust_pixels(kvz_pixel *src, int x_start, int x_end, int y_start, int y_end,
                    int stride, int pic_width, int pic_height);
+void set_ctu_enable_flag(uint8_t **flags, channel_type channel, int ctu_idx, uint8_t value);
+void copy_ctu_enable_flag(uint8_t **flags_dst, uint8_t **flags_src, channel_type channel, int ctu_idx);
 
 //-------------------------------------------------------------------
 
@@ -460,6 +470,7 @@ double kvz_alf_derive_ctb_alf_enable_flags(encoder_state_t * const state,
   const int i_shape_idx,
   double *dist_unfilter,
   const int num_classes,
+  int ctu_idx,
 //#if ENABLE_QPA
   const double chroma_weight
 //#endif
@@ -472,6 +483,7 @@ void kvz_alf_enc_destroy(videoframe_t * const frame,
   const lcu_order_element_t *lcu);
 
 void kvz_alf_encoder(encoder_state_t *const state,
+  const lcu_order_element_t *lcu,
   alf_aps *aps,
   channel_type channel,
 //#if ENABLE_QPA
@@ -520,7 +532,8 @@ double kvz_alf_get_filter_coeff_and_cost(encoder_state_t *const state,
   int *ui_coeff_bits,
   int i_shape_idx,
   bool b_re_collect_stat,
-  bool only_filter_cost);
+  bool only_filter_cost,
+  int ctu_idx);
 
 int kvz_alf_derive_filter_coefficients_prediction_mode(channel_type channel,
   int **filter_set,
@@ -562,13 +575,14 @@ double kvz_alf_derive_coeff_quant(channel_type channel,
 //bookmarks
 void kvz_alf_encoder_ctb(encoder_state_t *const state,
   alf_aps *aps,
+  int ctu_idx,
   //#if ENABLE_QPA
   const double lambda_chroma_weight
   //#endif 
   );
 
 //Funktion kvz_alf_filter_block kutsut; w, h, x, y, x_dst, y_dst, buf(s)?
-void kvz_alf_reconstructor(encoder_state_t const *state);
+void kvz_alf_reconstructor(encoder_state_t const *state, int ctu_idx);
 
 //----------------------------------------------------------------------
 
@@ -602,12 +616,14 @@ void code_alf_ctu_filter_index(encoder_state_t * const state,
 void code_alf_ctu_alternatives_channel(encoder_state_t * const state,
   cabac_data_t * const cabac,
   channel_type channel,
-  alf_aps* aps);
+  alf_aps* aps,
+  int ctu_idx);
 
 void code_alf_ctu_alternatives_component(encoder_state_t * const state,
   cabac_data_t * const cabac,
   alf_component_id comp_id,
-  alf_aps* aps);
+  alf_aps* aps,
+  int ctu_idx);
 
 //1
 void code_alf_ctu_alternative_ctu(encoder_state_t * const state,
