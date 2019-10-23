@@ -372,7 +372,12 @@ uint8_t* g_ctu_enable_flag_tmp[MAX_NUM_COMPONENT]; //kerran
 uint8_t* g_ctu_alternative_tmp[MAX_NUM_COMPONENT]; //kerran
 static int g_filter_tmp[MAX_NUM_ALF_LUMA_COEFF];
 static int g_clip_tmp[MAX_NUM_ALF_LUMA_COEFF];
-kvz_picture *tmp_rec_pic;
+//kvz_picture *tmp_rec_pic;
+
+kvz_pixel *alf_fulldata;
+kvz_pixel *alf_tmp_y;
+kvz_pixel *alf_tmp_u;
+kvz_pixel *alf_tmp_v;
 
 //cabac temps
 cabac_data_t ctx_start;
