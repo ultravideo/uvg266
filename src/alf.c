@@ -1812,34 +1812,13 @@ void kvz_alf_enc_create(encoder_state_t const *state,
   int width = state->tile->frame->width;
   int height = state->tile->frame->height;
   int stride = state->tile->frame->source->stride;
-  //tmp_rec_pic = MALLOC(kvz_picture, 1);
   unsigned int luma_size = (width + 8) * (height + 8);
   unsigned chroma_sizes[] = { 0, luma_size / 4, luma_size / 2, luma_size };
   unsigned chroma_size = chroma_sizes[chroma_fmt];
-  //tmp_rec_pic->fulldata_buf = MALLOC_SIMD_PADDED(kvz_pixel, (luma_size + 2 * chroma_size), simd_padding_width * 2);
-  
+ 
   alf_fulldata = MALLOC_SIMD_PADDED(kvz_pixel, (luma_size + 2 * chroma_size), simd_padding_width * 2);
-
-  //tmp_rec_pic->fulldata = &tmp_rec_pic->fulldata_buf[4 * (width + 8) + 4] + simd_padding_width / sizeof(kvz_pixel);
   alf_fulldata = &alf_fulldata[4 * (width + 8) + 4] + simd_padding_width / sizeof(kvz_pixel);
-  //tmp_rec_pic->base_image = tmp_rec_pic;
-  //tmp_rec_pic->refcount = 1; //We give a reference to caller
-  //tmp_rec_pic->width = width;
-  //tmp_rec_pic->height = height;
-  //tmp_rec_pic->stride = width + 8;
-  //tmp_rec_pic->chroma_format = chroma_fmt;
-
-  //tmp_rec_pic->y = tmp_rec_pic->data[COLOR_Y] = &tmp_rec_pic->fulldata[0];
   alf_tmp_y = &alf_fulldata[0];
-
-  /*if (chroma_fmt == KVZ_CSP_400) {
-    tmp_rec_pic->u = tmp_rec_pic->data[COLOR_U] = NULL;
-    tmp_rec_pic->v = tmp_rec_pic->data[COLOR_V] = NULL;
-  }
-  else {
-    tmp_rec_pic->u = tmp_rec_pic->data[COLOR_U] = &tmp_rec_pic->fulldata[luma_size - (4 * (width + 8) + 4) + (2 * (tmp_rec_pic->stride / 2) + 2)];
-    tmp_rec_pic->v = tmp_rec_pic->data[COLOR_V] = &tmp_rec_pic->fulldata[luma_size - (4 * (width + 8) + 4) + chroma_size + (2 * (tmp_rec_pic->stride / 2) + 2)];
-  }*/
 
   if (chroma_fmt == KVZ_CSP_400) {
     alf_tmp_u = NULL;
@@ -1850,26 +1829,12 @@ void kvz_alf_enc_create(encoder_state_t const *state,
     alf_tmp_v = &alf_fulldata[luma_size - (4 * (width + 8) + 4) + chroma_size + (2 * (stride / 2) + 2)];
   }
 
-  //tmp_rec_pic->pts = 0;
-  //tmp_rec_pic->dts = 0;
-
-  //tmp_rec_pic->interlacing = KVZ_INTERLACING_NONE;
-  
-  //kvz_alf_encoder_ctb
-  /*for (int i = 0; i < 8; i++) {
-    best_aps_ids[i] = -1;
-  }
-  size_of_aps_ids = 0;*/
-
-
   //kvz_alf_encoder_ctb
   for (int i = 0; i < ALF_CTB_MAX_NUM_APS; i++) {
     best_aps_ids[i] = -1;
     aps_ids[i] = -1;
   }
   size_of_aps_ids = 0;
-  new_aps_id = ALF_CTB_MAX_NUM_APS - 1;
-
 }
 
 
@@ -2005,10 +1970,26 @@ void kvz_alf_enc_destroy(videoframe_t * const frame,
     tmp_rec_pic = NULL;
   }*/
 
+  const int width = frame->width;
+  const int height = frame->height;
+  int stride = frame->rec->stride;
   {
-    memcpy(&frame->rec->y, &alf_tmp_y, sizeof(frame->rec->y));
-    memcpy(&frame->rec->u, &alf_tmp_u, sizeof(frame->rec->u));
-    memcpy(&frame->rec->v, &alf_tmp_v, sizeof(frame->rec->v));
+    for (int h = 0; h < height; h++) {
+      for (int w = 0; w < width; w++) {
+        frame->rec->y[h * stride + w] = alf_tmp_y[h * stride + w];
+      }
+    }
+    stride = stride >> 1;
+    for (int h = 0; h < height >> 1; h++) {
+      for (int w = 0; w < width >> 1; w++) {
+        frame->rec->u[h * stride + w] = alf_tmp_u[h * stride + w];
+        frame->rec->v[h * stride + w] = alf_tmp_v[h * stride + w];
+      }
+    }
+
+    //memcpy(&frame->rec->y, &alf_tmp_y, sizeof(frame->rec->y));
+    //memcpy(&frame->rec->u, &alf_tmp_u, sizeof(frame->rec->u));
+    //memcpy(&frame->rec->v, &alf_tmp_v, sizeof(frame->rec->v));
   }
 
   kvz_alf_destroy(frame);
@@ -2261,7 +2242,7 @@ void kvz_alf_encoder(encoder_state_t *const state,
 
 void kvz_alf_get_avai_aps_ids_luma(encoder_state_t *const state, 
   int *newApsId, 
-  int aps_ids[ALF_CTB_MAX_NUM_APS],
+  int *aps_ids,
   int *size_of_aps_ids)
 {
   param_set_map *aps_set = state->slice->param_set_map;
@@ -2277,12 +2258,13 @@ void kvz_alf_get_avai_aps_ids_luma(encoder_state_t *const state,
     while (aps_id_checked < ALF_CTB_MAX_NUM_APS && (state->frame->slicetype == KVZ_SLICE_I) && *size_of_aps_ids < ALF_CTB_MAX_NUM_APS /*&& /*!cs.slice->getPendingRasInit()*/ && (state->frame->pictype == KVZ_NAL_IDR_W_RADL || state->frame->pictype == KVZ_NAL_IDR_N_LP))
     {
       alf_aps *cur_aps = &state->slice->apss[cur_aps_id];
+      bool aps_found = aps_set[cur_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS].b_changed;
 
-      if (cur_aps && cur_aps->t_layer/*cur_aps->getTemporalId()*/ <= state->slice->id/*cs.slice->getTLayer()*/ && cur_aps->new_filter_flag[CHANNEL_TYPE_LUMA])
+      if (aps_found/*cur_aps*/ && cur_aps->t_layer/*cur_aps->getTemporalId()*/ <= state->slice->id/*cs.slice->getTLayer()*/ && cur_aps->new_filter_flag[CHANNEL_TYPE_LUMA])
       {
         //result.push_back(cur_aps_id);
         aps_ids[*size_of_aps_ids] = cur_aps_id;
-        *size_of_aps_ids++;
+        (*size_of_aps_ids)++;
       }
       aps_id_checked++;
       cur_aps_id = (cur_aps_id + 1) % ALF_CTB_MAX_NUM_APS;
@@ -3467,12 +3449,7 @@ void kvz_alf_encoder_ctb(encoder_state_t *const state,
   g_ctu_enable_flag[COMPONENT_Y][ctu_idx] = 0;
   double cost_off = get_unfiltered_distortion_cov_channel(g_alf_covariance_frame[CHANNEL_TYPE_LUMA][0], CHANNEL_TYPE_LUMA);
 
-  /*int best_aps_ids[8] = { -1, -1, -1, -1, -1, -1, -1, -1 };
-  int new_aps_id;
-  int aps_ids[ALF_CTB_MAX_NUM_APS];
-  int size_of_aps_ids = 0;*/
-
-  kvz_alf_get_avai_aps_ids_luma(state, &new_aps_id, &aps_ids[ALF_CTB_MAX_NUM_APS], &size_of_aps_ids);
+  kvz_alf_get_avai_aps_ids_luma(state, &new_aps_id, aps_ids, &size_of_aps_ids);
 
   double cost_min = MAX_DOUBLE;
   kvz_alf_reconstruct_coeff_aps(state, true, false, true);
@@ -4282,6 +4259,15 @@ void kvz_alf_reconstructor(encoder_state_t const *state,
           ((y_pos + max_cu_height >= luma_height) ? luma_height : g_alf_vb_luma_pos),
           g_alf_vb_luma_ctu_height);
       }
+      else
+      {
+        int stride = state->tile->frame->rec->stride;
+        for (int h = y_pos; h < y_pos + height; h++) {
+          for (int w = x_pos; w < x_pos + width; w++) {
+            alf_tmp_y[h * stride + w] = state->tile->frame->rec->y[h * stride + w];
+          }
+        }
+      }
       for (int comp_idx = 1; comp_idx < MAX_NUM_COMPONENT; comp_idx++)
       {
         alf_component_id comp_id = comp_idx;
@@ -4317,6 +4303,31 @@ void kvz_alf_reconstructor(encoder_state_t const *state,
             ((y_pos + max_cu_height >= luma_height) ? luma_height : g_alf_vb_chma_pos),
             g_alf_vb_chma_ctu_height);
 #endif*/
+        }
+        else
+        {
+          int stride = state->tile->frame->rec->stride >> chroma_scale_y;
+          int h_start = y_pos >> chroma_scale_y;
+          int w_start = x_pos >> chroma_scale_x;
+          int c_width = width >> chroma_scale_x;
+          int c_height = height >> chroma_scale_y;
+
+          if (comp_idx == COMPONENT_Cb) 
+          {
+            for (int h = h_start; h < h_start + c_height; h++) {
+              for (int w = w_start; w < w_start + c_width; w++) {
+                alf_tmp_u[h * stride + w] = state->tile->frame->rec->u[h * stride + w];
+              }
+            }
+          }
+          if (comp_idx == COMPONENT_Cr)
+          {
+            for (int h = h_start; h < h_start + c_height; h++) {
+              for (int w = w_start; w < w_start + c_width; w++) {
+                alf_tmp_v[h * stride + w] = state->tile->frame->rec->v[h * stride + w];
+              }
+            }
+          }
         }
       }
     }
@@ -5542,7 +5553,7 @@ void kvz_alf_filter_block(encoder_state_t * const state,
   const int end_width = start_width + width;
 
   const kvz_pixel *src = src_pixels;
-  kvz_pixel *dst = dst_pixels;
+  kvz_pixel *dst = dst_pixels + blk_dst_y * dst_stride;
 
   const kvz_pixel *p_img_y_pad_0, *p_img_y_pad_1, *p_img_y_pad_2, *p_img_y_pad_3, *p_img_y_pad_4, *p_img_y_pad_5, *p_img_y_pad_6;
   const kvz_pixel *p_img_0, *p_img_1, *p_img_2, *p_img_3, *p_img_4, *p_img_5, *p_img_6;

@@ -499,7 +499,7 @@ void kvz_alf_encoder(encoder_state_t *const state,
 //isIntra, PendingRasInit, IDRorBLA <--- ? selvitä nämä
 void kvz_alf_get_avai_aps_ids_luma(encoder_state_t *const state,
   int *newApsId,
-  int aps_ids[ALF_CTB_MAX_NUM_APS],
+  int *aps_ids,
   int *size_of_aps_ids);
 
 void kvz_alf_derive_stats_for_filtering(encoder_state_t *const state,
