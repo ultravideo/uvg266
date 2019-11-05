@@ -362,6 +362,7 @@ int** g_filter_clipp_set; // [lumaClassIdx][coeffIdx]
 short* g_alf_ctb_filter_set_index_tmp; //g_num_ctus_in_pic //voisi olla lokaali muuttuja?
 short* g_alf_ctb_filter_index;     //g_num_ctus_in_pic
 static uint32_t g_curr_frame = MAX_INT;
+static uint32_t g_old_frame = 0;
 alf_aps alf_param;
 
 //temps
@@ -469,7 +470,6 @@ void kvz_alf_derive_filter__encode__reconstruct(encoder_state_t *const state,
   //#endif
   );
 
-//cabac contextit
 double kvz_alf_derive_ctb_alf_enable_flags(encoder_state_t * const state,
   channel_type channel,
   const int i_shape_idx,
@@ -484,7 +484,8 @@ double kvz_alf_derive_ctb_alf_enable_flags(encoder_state_t * const state,
 void kvz_alf_enc_create(encoder_state_t const *state,
   const lcu_order_element_t *lcu);
 
-void kvz_alf_enc_destroy(videoframe_t * const frame,
+void kvz_alf_enc_destroy(encoder_state_t const *state,
+  videoframe_t * const frame,
   const lcu_order_element_t *lcu);
 
 void kvz_alf_encoder(encoder_state_t *const state,
@@ -586,7 +587,6 @@ void kvz_alf_encoder_ctb(encoder_state_t *const state,
   //#endif 
   );
 
-//Funktion kvz_alf_filter_block kutsut; w, h, x, y, x_dst, y_dst, buf(s)?
 void kvz_alf_reconstructor(encoder_state_t const *state, int ctu_idx);
 
 //----------------------------------------------------------------------
@@ -605,14 +605,12 @@ void code_alf_ctu_enable_flags_component(encoder_state_t * const state,
   alf_component_id component_id,
   alf_aps *aps);
 
-//4
 void code_alf_ctu_enable_flag(encoder_state_t * const state,
   cabac_data_t * const cabac,
   uint32_t ctu_rs_addr,
   alf_component_id component_id,
   alf_aps *aps);
 
-//1
 void code_alf_ctu_filter_index(encoder_state_t * const state,
   cabac_data_t * const cabac,
   uint32_t ctu_rs_addr,
@@ -630,18 +628,13 @@ void code_alf_ctu_alternatives_component(encoder_state_t * const state,
   alf_aps* aps,
   int ctu_idx);
 
-//1
 void code_alf_ctu_alternative_ctu(encoder_state_t * const state,
   cabac_data_t * const cabac,
   uint32_t ctu_rs_addr,
   const alf_component_id comp_idx,
   const alf_aps* aps);
 
-void kvz_encode_alf(encoder_state_t * const state,
-  const int ctu_idx,
-  alf_aps *aps);
-
-void kvz_encode_alf_new(encoder_state_t * const state,
+void kvz_encode_alf_bits(encoder_state_t * const state,
   const int ctu_idx);
 
 //---------------------------------------------------------------------
