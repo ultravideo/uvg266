@@ -430,32 +430,31 @@ typedef struct kvz_picture {
  */
 enum kvz_nal_unit_type {
 
-  // 
-
-  KVZ_NAL_PPS_NUT = 0,
-  KVZ_NAL_AUD_NUT = 1,
-  KVZ_NAL_PREFIX_SEI_NUT = 2,
-  KVZ_NAL_SUFFIX_SEI_NUT = 3,
-
   // Coded slices
 
-  KVZ_NAL_TRAIL = 8,
-  KVZ_NAL_STSA = 9,
-  KVZ_NAL_RADL = 10,
-  KVZ_NAL_RASL = 11,
-
-  // non-VCL  
-  KVZ_NAL_SPS_NUT = 17,
-
-  KVZ_NAL_EOS_NUT = 18,
-  KVZ_NAL_EOB_NUT = 19,
-  KVZ_NAL_VPS_NUT = 20,
+  KVZ_NAL_TRAIL = 0,
+  KVZ_NAL_STSA = 1,
+  KVZ_NAL_RADL = 2,
+  KVZ_NAL_RASL = 3,
 
   // Intra random access point pictures
-  KVZ_NAL_IDR_W_RADL = 24,
-  KVZ_NAL_IDR_N_LP = 25,
-  KVZ_NAL_CRA_NUT = 26,
-  KVZ_NAL_GRA_NUT = 27,
+  KVZ_NAL_IDR_W_RADL = 8,
+  KVZ_NAL_IDR_N_LP = 9,
+  KVZ_NAL_CRA_NUT = 10,
+  KVZ_NAL_GRA_NUT = 11,
+
+
+  // non-VCL  
+  KVZ_NAL_SPS_NUT = 16,
+  KVZ_NAL_PPS_NUT = 17,
+
+  KVZ_NAL_AUD_NUT = 19,
+
+  KVZ_NAL_EOS_NUT = 20,
+  KVZ_NAL_EOB_NUT = 21,
+  KVZ_NAL_PREFIX_SEI_NUT = 22,
+  KVZ_NAL_SUFFIX_SEI_NUT = 23,
+  KVZ_NAL_VPS_NUT = 25,
 
 };
 
