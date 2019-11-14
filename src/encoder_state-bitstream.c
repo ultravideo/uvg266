@@ -473,6 +473,8 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   WRITE_U(stream, (TR_MAX_LOG2_SIZE - 5) ? 1 : 0, 1, "sps_max_luma_transform_size_64_flag");
   // #endif
 
+  WRITE_U(stream, 0, 1, "sps_joint_cbcr_enabled_flag");
+
   if (encoder->chroma_format != KVZ_CSP_400) {    
     WRITE_U(stream, 1, 1, "same_qp_table_for_chroma");
 
@@ -553,6 +555,22 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
     WRITE_U(stream, encoder->vui.time_scale, 32, "time_scale");
 
     WRITE_U(stream, 0, 1, "sub_layer_cpb_parameters_present_flag");
+
+    WRITE_U(stream, 0, 1, "general_nal_hrd_parameters_present_flag");
+    WRITE_U(stream, 0, 1, "general_vcl_hrd_parameters_present_flag");
+    //// if nal_hrd or vlc_hrt
+    //  WRITE_U(stream, 0, 1, "decoding_unit_hrd_params_present_flag");
+    //  WRITE_U(stream, 0, 8, "tick_divisor_minus2");
+    //  WRITE_U(stream, 0, 1, "decoding_unit_cpb_params_in_pic_timing_sei_flag");
+    //  WRITE_U(stream, 0, 4, "bit_rate_scale");
+    //  WRITE_U(stream, 0, 4, "cpb_size_scale");
+    //  WRITE_U(stream, 0, 4, "cpb_size_du_scale");
+
+    WRITE_U(stream, 0, 1, "fixed_pic_rate_general_flag");
+      //WRITE_U(stream, 0, 1, "fixed_pic_rate_within_cvs_flag");
+    WRITE_U(stream, 0, 1, "low_delay_hrd_flag");
+
+    WRITE_UE(stream, 0, "cpb_cnt_minus1");
   }
 
   WRITE_U(stream, 0, 1, "vui_parameters_present_flag");
