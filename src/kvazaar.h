@@ -441,7 +441,7 @@ enum kvz_nal_unit_type {
   KVZ_NAL_IDR_W_RADL = 8,
   KVZ_NAL_IDR_N_LP = 9,
   KVZ_NAL_CRA_NUT = 10,
-  KVZ_NAL_GRA_NUT = 11,
+  KVZ_NAL_GDR_NUT = 11,
 
 
   // non-VCL  

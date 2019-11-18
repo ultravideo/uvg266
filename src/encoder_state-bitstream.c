@@ -894,7 +894,8 @@ static void kvz_encoder_state_write_bitstream_slice_header_independent(
   if (state->frame->pictype == KVZ_NAL_IDR_W_RADL
     || state->frame->pictype == KVZ_NAL_IDR_N_LP) {
 
-    WRITE_U(stream, 0, 5, "pic_order_cnt_lsb");
+    WRITE_U(stream, 0, 5, "slice_pic_order_cnt_lsb");
+    WRITE_U(stream, 0, 1, "no_output_of_prior_pics_flag");
   } else {
     int last_poc = 0;
     int poc_shift = 0;
@@ -997,6 +998,14 @@ static void kvz_encoder_state_write_bitstream_slice_header_independent(
       }
     }
   }
+
+  {
+    int slice_qp_delta = state->frame->QP - encoder->cfg.qp;
+    WRITE_SE(stream, slice_qp_delta, "slice_qp_delta");
+  }
+
+
+
   WRITE_U(stream, 0, 1, "dep_quant_enable_flag");
   //if !dep_quant_enable_flag
     WRITE_U(stream, encoder->cfg.signhide_enable, 1, "sign_data_hiding_enable_flag");
@@ -1008,11 +1017,6 @@ static void kvz_encoder_state_write_bitstream_slice_header_independent(
     WRITE_UE(stream, 0, "max_binary_tree_unit_size"); // Max BT size == CTU size
     
     WRITE_UE(stream, MRG_MAX_NUM_CANDS-6, "six_minus_max_num_merge_cand");
-  }
-
-  {
-    int slice_qp_delta = state->frame->QP - encoder->cfg.qp;
-    WRITE_SE(stream, slice_qp_delta, "slice_qp_delta");
   }
 }
 
@@ -1036,10 +1040,6 @@ void kvz_encoder_state_write_bitstream_slice_header(
 
   //WRITE_U(stream, first_slice_segment_in_pic, 1, "first_slice_segment_in_pic_flag");
 
-  if (state->frame->pictype >= KVZ_NAL_IDR_W_RADL
-    && state->frame->pictype <= KVZ_NAL_CRA_NUT) {
-    //WRITE_U(stream, 0, 1, "no_output_of_prior_pics_flag");
-  }
 
   WRITE_UE(stream, 0, "slice_pic_parameter_set_id");
 

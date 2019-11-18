@@ -94,9 +94,6 @@ typedef struct
 
 
 // Globals
-extern const uint8_t kvz_g_auc_next_state_mps[128];
-extern const uint8_t kvz_g_auc_next_state_lps[128];
-extern const uint8_t kvz_g_auc_lpst_table[64][4];
 extern const uint8_t kvz_g_auc_renorm_table[32];
 
 
