@@ -243,7 +243,8 @@ static void kvz_angular_pred_generic(
           if (dist_from_vert_or_hor <= filter_threshold) {
             use_cubic = true;
           }
-          int16_t const * const f = use_cubic ? cubic_filter[delta_fract] : intraGaussFilter[delta_fract];
+          const int16_t filter_coeff[4] = { 16 - (delta_fract >> 1), 32 - (delta_fract >> 1), 16 + (delta_fract >> 1), delta_fract >> 1 };
+          int16_t const * const f = use_cubic ? cubic_filter[delta_fract] : filter_coeff;
           // Do 4-tap intra interpolation filtering
           for (int_fast32_t x = 0; x < width; x++, ref_main_index++) {
             p[0] = ref_main[ref_main_index];
