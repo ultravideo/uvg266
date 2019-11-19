@@ -43,12 +43,6 @@ static const uint32_t g_go_rice_pos0[3][32] =
   { 1, 1, 1, 1, 2, 3, 4,    4, 4, 6, 6, 6, 8, 8,    8, 8, 8, 8, 12, 12, 12, 12, 12, 12, 12, 12, 16, 16,    16, 16, 16, 16 },
   { 1, 1, 2, 2, 2, 3, 4,    4, 4, 6, 6, 6, 8, 8,    8, 8, 8, 8, 12, 12, 12, 12, 12, 12, 12, 16, 16, 16,    16, 16, 16, 16 }
 };
-#define MAX_GR_ORDER_RESIDUAL 10
-#define COEF_REMAIN_BIN_REDUCTION 3 ///< indicates the level at which the VLC transitions from Golomb-Rice to TU+EG(k)
-static const uint32_t g_go_rice_range[MAX_GR_ORDER_RESIDUAL] =
-{
-  6, 5, 6, COEF_REMAIN_BIN_REDUCTION, COEF_REMAIN_BIN_REDUCTION, COEF_REMAIN_BIN_REDUCTION, COEF_REMAIN_BIN_REDUCTION, COEF_REMAIN_BIN_REDUCTION, COEF_REMAIN_BIN_REDUCTION, COEF_REMAIN_BIN_REDUCTION
-};
 
 /***
   * List of indices for 4x4 coefficient groups within 8x8 transform block.

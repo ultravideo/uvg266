@@ -301,21 +301,19 @@ void kvz_cabac_encode_bins_ep(cabac_data_t * const data, uint32_t bin_values, in
  * \param remainder Value of remaining abs coeff
  * \param rice_param Reference to Rice parameter.
  */
-void kvz_cabac_write_coeff_remain(cabac_data_t * const cabac, const uint32_t remainder, const uint32_t rice_param)
+void kvz_cabac_write_coeff_remain(cabac_data_t * const cabac, const uint32_t remainder, const uint32_t rice_param, const unsigned int cutoff)
 {
-  const unsigned threshold = 5/*g_go_rice_range[rice_param]*/ << rice_param;
+  const unsigned threshold = cutoff << rice_param;
   uint32_t bins = remainder;
 
   if (bins < threshold) {
     uint32_t length = (bins >> rice_param) + 1;
     CABAC_BINS_EP(cabac, ((1 << (length)) - 2) , length, "coeff_abs_level_remaining");
     CABAC_BINS_EP(cabac, bins & ((1 << rice_param) - 1), rice_param, "coeff_abs_level_remaining");
-  } 
-  //ToDo: else if (useLimitedPrefixLength)
-  else if (true) {
-    const unsigned max_prefix_length = 32 - 5/*coef_remain_bin_reduction*/ - 15/*max_log2_tr_dynamic_range*/;
+  } else {
+    const unsigned max_prefix_length = 32 - cutoff - 15/*max_log2_tr_dynamic_range*/;
     unsigned prefix_length = 0;
-    unsigned code_value = (bins >> rice_param) - 5/*coef_remain_bin_reduction*/;
+    unsigned code_value = (bins >> rice_param) - cutoff;
     unsigned suffix_length;
     if (code_value >= ((1 << max_prefix_length) - 1)) {
       prefix_length = max_prefix_length;
@@ -326,26 +324,13 @@ void kvz_cabac_write_coeff_remain(cabac_data_t * const cabac, const uint32_t rem
       }
       suffix_length = prefix_length + rice_param + 1;
     }
-    const unsigned total_prefix_length = prefix_length + 5/*coef_remain_bin_reduction*/;
+    const unsigned total_prefix_length = prefix_length + cutoff;
     const unsigned bit_mask = (1 << rice_param) - 1;
     const unsigned prefix = (1 << total_prefix_length) - 1;
     const unsigned suffix = ((code_value - ((1 << prefix_length) - 1)) << rice_param) | (bins & bit_mask);
     CABAC_BINS_EP(cabac, prefix, total_prefix_length, "coeff_abs_level_remaining");
     CABAC_BINS_EP(cabac, suffix, suffix_length, "coeff_abs_level_remaining");
   }
-  else {
-    uint32_t length = rice_param;
-    uint32_t  delta = 1 << length;
-    bins -= threshold;
-    while (bins >= delta) {
-      bins -= delta;
-      delta = 1 << (++length);
-    }
-    uint32_t num_bins = g_go_rice_range[rice_param] + length + 1 - rice_param;
-
-    CABAC_BINS_EP(cabac, (1 << num_bins) - 2, num_bins, "coeff_abs_level_remaining");
-    CABAC_BINS_EP(cabac, bins, length, "coeff_abs_level_remaining");
-  }  
 
 }
 

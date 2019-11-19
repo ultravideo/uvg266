@@ -277,7 +277,7 @@ void kvz_encode_coeff_nxn_generic(encoder_state_t * const state,
         uint32_t second_pass_abs_coeff = abs(coeff[blk_pos]);
         if (second_pass_abs_coeff >= 4) {
           uint32_t remainder = (second_pass_abs_coeff - 4) >> 1;
-          kvz_cabac_write_coeff_remain(cabac, remainder, rice_param);
+          kvz_cabac_write_coeff_remain(cabac, remainder, rice_param, 5);
         }
       }
 
@@ -290,10 +290,10 @@ void kvz_encode_coeff_nxn_generic(encoder_state_t * const state,
         pos_x = blk_pos - (pos_y * width);
         uint32_t coeff_abs = abs(coeff[blk_pos]);
         int32_t abs_sum = kvz_abs_sum(coeff, pos_x, pos_y, width, width, 0);
-        rice_param = g_go_rice_pars[abs_sum];
-        pos0 = g_go_rice_pos0[MAX(0, quant_state - 1)][abs_sum];
+        rice_param = g_go_rice_pars[abs_sum];        
+        pos0 = ((quant_state<2)?1:2) << rice_param;
         uint32_t remainder = (coeff_abs == 0 ? pos0 : coeff_abs <= pos0 ? coeff_abs - 1 : coeff_abs);
-        kvz_cabac_write_coeff_remain(cabac, remainder, rice_param);
+        kvz_cabac_write_coeff_remain(cabac, remainder, rice_param, 5);
         quant_state = (quant_state_transition_table >> ((quant_state << 2) + ((coeff_abs & 1) << 1))) & 3;
         if (coeff_abs) {
           num_non_zero++;
