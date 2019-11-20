@@ -289,7 +289,7 @@ void kvz_bitstream_align_zero(bitstream_t * const stream)
 {
   if ((stream->cur_bit & 7) != 0) {
 #if VERBOSE
-    for (int i = 0; i < (8 - stream->cur_bit) & 7; i++) {
+    for (int i = 0; i < ((8 - stream->cur_bit) & 7); i++) {
       printf("%-40s u(%d) : %d\n", "rbsp_alignment_zero_bit", 1, 0);
     }
 #endif

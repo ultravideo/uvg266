@@ -555,6 +555,7 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
         break;
       }
     }
+    // Is the mode in the MPM array or not
     flag[j] = (mpm_preds[j] == -1) ? 0 : 1;
     if (!(cur_pu->intra.multi_ref_idx || (isp_mode))) {
       CABAC_BIN(cabac, flag[j], "prev_intra_luma_pred_flag");
@@ -565,7 +566,7 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
 
 
   for (int j = 0; j < num_pred_units; ++j) {
-    // Signal index of the prediction mode in the prediction list.
+    // Signal index of the prediction mode in the prediction list, if it is there
     if (flag[j]) {
       
       const int pu_x = PU_GET_X(cur_cu->part_size, cu_width, x, j);
@@ -600,13 +601,13 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
 
       // Improvised merge sort
       // Sort prediction list from lowest to highest.
-      if (intra_preds_temp[0] > intra_preds_temp[1]) SWAP(intra_preds_temp[0], intra_preds_temp[1], int8_t);
-      if (intra_preds_temp[0] > intra_preds_temp[2]) SWAP(intra_preds_temp[0], intra_preds_temp[2], int8_t);
-      if (intra_preds_temp[1] > intra_preds_temp[2]) SWAP(intra_preds_temp[1], intra_preds_temp[2], int8_t);
+      if (intra_preds_temp[0] > intra_preds_temp[1]) SWAP(intra_preds_temp[0], intra_preds_temp[1], uint8_t);
+      if (intra_preds_temp[0] > intra_preds_temp[2]) SWAP(intra_preds_temp[0], intra_preds_temp[2], uint8_t);
+      if (intra_preds_temp[1] > intra_preds_temp[2]) SWAP(intra_preds_temp[1], intra_preds_temp[2], uint8_t);
 
-      if (intra_preds_temp[4] > intra_preds_temp[5]) SWAP(intra_preds_temp[4], intra_preds_temp[5], int8_t);
-      if (intra_preds_temp[4] > intra_preds_temp[6]) SWAP(intra_preds_temp[4], intra_preds_temp[6], int8_t);
-      if (intra_preds_temp[5] > intra_preds_temp[6]) SWAP(intra_preds_temp[5], intra_preds_temp[6], int8_t);
+      if (intra_preds_temp[4] > intra_preds_temp[5]) SWAP(intra_preds_temp[4], intra_preds_temp[5], uint8_t);
+      if (intra_preds_temp[4] > intra_preds_temp[6]) SWAP(intra_preds_temp[4], intra_preds_temp[6], uint8_t);
+      if (intra_preds_temp[5] > intra_preds_temp[6]) SWAP(intra_preds_temp[5], intra_preds_temp[6], uint8_t);
 
       // Merge two subarrays
       int32_t array1 = 0;

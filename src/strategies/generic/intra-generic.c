@@ -48,7 +48,7 @@ static void kvz_angular_pred_generic(
   assert(intra_mode >= 2 && intra_mode <= 66);
 
   static const int16_t modedisp2sampledisp[32] = { 0,    1,    2,    3,    4,    6,     8,   10,   12,   14,   16,   18,   20,   23,   26,   29,   32,   35,   39,  45,  51,  57,  64,  73,  86, 102, 128, 171, 256, 341, 512, 1024 };
-  static const int16_t modedisp2invsampledisp[32] = { 0, 8192, 4096, 2731, 2048, 1365,  1024,  819,  683,  585,  512,  455,  410,  356,  315,  282,  256,  234,  210, 182, 161, 144, 128, 112,  95,  80,  64,  48,  32,  24,  16,    8 }; // (256 * 32) / sampledisp
+  static const int16_t modedisp2invsampledisp[32] = { 0, 16384, 8192, 5461, 4096, 2731, 2048, 1638, 1365, 1170, 1024, 910, 819, 712, 630, 565, 512, 468, 420, 364, 321, 287, 256, 224, 191, 161, 128, 96, 64, 48, 32, 16 }; // (512 * 32) / sampledisp
   static const int16_t intraGaussFilter[32][4] = {
   { 16, 32, 16, 0 },
   { 15, 29, 17, 3 },
@@ -83,9 +83,47 @@ static void kvz_angular_pred_generic(
   { 3, 17, 29, 15 },
   { 3, 17, 29, 15 }
   };
+  static const int16_t cubic_filter[32][4] =
+  {
+    { 0, 64,  0,  0 },
+    { -1, 63,  2,  0 },
+    { -2, 62,  4,  0 },
+    { -2, 60,  7, -1 },
+    { -2, 58, 10, -2 },
+    { -3, 57, 12, -2 },
+    { -4, 56, 14, -2 },
+    { -4, 55, 15, -2 },
+    { -4, 54, 16, -2 },
+    { -5, 53, 18, -2 },
+    { -6, 52, 20, -2 },
+    { -6, 49, 24, -3 },
+    { -6, 46, 28, -4 },
+    { -5, 44, 29, -4 },
+    { -4, 42, 30, -4 },
+    { -4, 39, 33, -4 },
+    { -4, 36, 36, -4 },
+    { -4, 33, 39, -4 },
+    { -4, 30, 42, -4 },
+    { -4, 29, 44, -5 },
+    { -4, 28, 46, -6 },
+    { -3, 24, 49, -6 },
+    { -2, 20, 52, -6 },
+    { -2, 18, 53, -5 },
+    { -2, 16, 54, -4 },
+    { -2, 15, 55, -4 },
+    { -2, 14, 56, -4 },
+    { -2, 12, 57, -3 },
+    { -2, 10, 58, -2 },
+    { -1,  7, 60, -2 },
+    { 0,  4, 62, -2 },
+    { 0,  2, 63, -1 },
+  };
+
                                                     // Temporary buffer for modes 11-25.
                                                     // It only needs to be big enough to hold indices from -width to width-1.
   kvz_pixel tmp_ref[2 * 128] = { 0 };
+  kvz_pixel temp_main[2 * 128] = { 0 };
+  kvz_pixel temp_side[2 * 128] = { 0 };
   const int_fast32_t width = 1 << log2_width;
 
   uint32_t pred_mode = intra_mode; // ToDo: handle WAIP
@@ -93,7 +131,7 @@ static void kvz_angular_pred_generic(
   // Whether to swap references to always project on the left reference row.
   const bool vertical_mode = intra_mode >= 34;
   // Modes distance to horizontal or vertical mode.
-  const int_fast8_t mode_disp = vertical_mode ? pred_mode - 50 : 18 - pred_mode;
+  const int_fast8_t mode_disp = vertical_mode ? pred_mode - 50 : -(pred_mode - 18);
   //const int_fast8_t mode_disp = vertical_mode ? intra_mode - 26 : 10 - intra_mode;
   
   // Sample displacement per column in fractions of 32.
@@ -107,50 +145,80 @@ static void kvz_angular_pred_generic(
   // Set ref_main and ref_side such that, when indexed with 0, they point to
   // index 0 in block coordinates.
   if (sample_disp < 0) {
-    const uint32_t index_offset = width + 1;
-    const int32_t last_index = width;
-    const int_fast32_t most_negative_index = (width * sample_disp) >> 5;
-    // Negative sample_disp means, we need to use both references.
-
-    // TODO: update refs to take into account variating block size and shapes
-    //       (height is not always equal to width)
-    ref_side = (vertical_mode ? in_ref_left : in_ref_above) + 1;
-    ref_main = (vertical_mode ? in_ref_above : in_ref_left) + 1;
-
-    // Move the reference pixels to start from the middle to the later half of
-    // the tmp_ref, so there is room for negative indices.
-    for (int_fast32_t x = -1; x < width; ++x) {
-      tmp_ref[x + index_offset] = ref_main[x];
+    for (int i = 0; i <= width + 1; i++) {
+      temp_main[width + i] = (vertical_mode ? in_ref_above[i] : in_ref_left[i]);
+      temp_side[width + i] = (vertical_mode ? in_ref_left[i] : in_ref_above[i]);
     }
-    // Get a pointer to block index 0 in tmp_ref.
-    ref_main = &tmp_ref[index_offset];
-    tmp_ref[index_offset -1] = tmp_ref[index_offset];
 
-    // Extend the side reference to the negative indices of main reference.
-    int_fast32_t col_sample_disp = 128; // rounding for the ">> 8"
-    int_fast16_t inv_abs_sample_disp = modedisp2invsampledisp[abs(mode_disp)];
-    // TODO: add 'vertical_mode ? height : width' instead of 'width'
+    ref_main = temp_main + width;
+    ref_side = temp_side + width;
+
+    for (int i = -width; i <= -1; i++) {
+      ref_main[i] = ref_side[MIN((-i * modedisp2invsampledisp[abs(mode_disp)] + 256) >> 9, width)];
+    }
+
     
-    for (int_fast32_t x = -1; x > most_negative_index; x--) {
-      col_sample_disp += inv_abs_sample_disp;
-      int_fast32_t side_index = col_sample_disp >> 8;
-      tmp_ref[x + index_offset - 1] = ref_side[side_index - 1];
-    }
-    tmp_ref[last_index + index_offset] = tmp_ref[last_index + index_offset - 1];
-    tmp_ref[most_negative_index + index_offset - 1] = tmp_ref[most_negative_index + index_offset];
+
+    //const uint32_t index_offset = width + 1;
+    //const int32_t last_index = width;
+    //const int_fast32_t most_negative_index = (width * sample_disp) >> 5;
+    //// Negative sample_disp means, we need to use both references.
+
+    //// TODO: update refs to take into account variating block size and shapes
+    ////       (height is not always equal to width)
+    //ref_side = (vertical_mode ? in_ref_left : in_ref_above) + 1;
+    //ref_main = (vertical_mode ? in_ref_above : in_ref_left) + 1;
+
+    //// Move the reference pixels to start from the middle to the later half of
+    //// the tmp_ref, so there is room for negative indices.
+    //for (int_fast32_t x = -1; x < width; ++x) {
+    //  tmp_ref[x + index_offset] = ref_main[x];
+    //}
+    //// Get a pointer to block index 0 in tmp_ref.
+    //ref_main = &tmp_ref[index_offset];
+    //tmp_ref[index_offset -1] = tmp_ref[index_offset];
+
+    //// Extend the side reference to the negative indices of main reference.
+    //int_fast32_t col_sample_disp = 128; // rounding for the ">> 8"
+    //int_fast16_t inv_abs_sample_disp = modedisp2invsampledisp[abs(mode_disp)];
+    //// TODO: add 'vertical_mode ? height : width' instead of 'width'
+    //
+    //for (int_fast32_t x = -1; x > most_negative_index; x--) {
+    //  col_sample_disp += inv_abs_sample_disp;
+    //  int_fast32_t side_index = col_sample_disp >> 8;
+    //  tmp_ref[x + index_offset - 1] = ref_side[side_index - 1];
+    //}
+    //tmp_ref[last_index + index_offset] = tmp_ref[last_index + index_offset - 1];
+    //tmp_ref[most_negative_index + index_offset - 1] = tmp_ref[most_negative_index + index_offset];
   }
   else {
     
-    // sample_disp >= 0 means we don't need to refer to negative indices,
-    // which means we can just use the references as is.
-    ref_main = (vertical_mode ? in_ref_above : in_ref_left) + 1;
-    ref_side = (vertical_mode ? in_ref_left : in_ref_above) + 1;
+    for (int i = 0; i <= (width << 1); i++) {
+      temp_main[i] = (vertical_mode ? in_ref_above[i] : in_ref_left[i]);
+      temp_side[i] = (vertical_mode ? in_ref_left[i] : in_ref_above[i]);
+    }
 
-    memcpy(tmp_ref + width, ref_main, (width*2) * sizeof(kvz_pixel));
-    ref_main = &tmp_ref[width];
-    tmp_ref[width-1] = tmp_ref[width];
-    int8_t last_index = 1 + width*2;
-    tmp_ref[width + last_index] = tmp_ref[width + last_index - 1];
+    const int log2_ratio = 0;
+    const int s = 0;
+    const int max_index = (0 << s) + 2;
+    const int ref_length = width << 1;
+    const kvz_pixel val = temp_main[ref_length];
+    for (int j = 0; j <= max_index; j++) {
+      temp_main[ref_length + j] = val;
+    }
+
+    ref_main = temp_main;
+    ref_side = temp_side;
+    //// sample_disp >= 0 means we don't need to refer to negative indices,
+    //// which means we can just use the references as is.
+    //ref_main = (vertical_mode ? in_ref_above : in_ref_left) + 1;
+    //ref_side = (vertical_mode ? in_ref_left : in_ref_above) + 1;
+
+    //memcpy(tmp_ref + width, ref_main, (width*2) * sizeof(kvz_pixel));
+    //ref_main = &tmp_ref[width];
+    //tmp_ref[width-1] = tmp_ref[width];
+    //int8_t last_index = 1 + width*2;
+    //tmp_ref[width + last_index] = tmp_ref[width + last_index - 1];
   }
 
   if (sample_disp != 0) {
@@ -169,42 +237,67 @@ static void kvz_angular_pred_generic(
           int32_t ref_main_index = delta_int;
           kvz_pixel p[4];
           bool use_cubic = false; // TODO: enable cubic filter when parameters are correct
-          int16_t const * const f = use_cubic ? 0 : intraGaussFilter[delta_fract];
+          static const int kvz_intra_hor_ver_dist_thres[8] = { 24, 24, 24, 14, 2, 0, 0, 0 };
+          int filter_threshold = kvz_intra_hor_ver_dist_thres[kvz_math_floor_log2(width)];
+          int dist_from_vert_or_hor = MIN(abs(mode_disp - 50), abs(mode_disp - 18));
+          if (dist_from_vert_or_hor <= filter_threshold) {
+            use_cubic = true;
+          }
+          const int16_t filter_coeff[4] = { 16 - (delta_fract >> 1), 32 - (delta_fract >> 1), 16 + (delta_fract >> 1), delta_fract >> 1 };
+          int16_t const * const f = use_cubic ? cubic_filter[delta_fract] : filter_coeff;
           // Do 4-tap intra interpolation filtering
           for (int_fast32_t x = 0; x < width; x++, ref_main_index++) {
-            p[0] = ref_main[ref_main_index - 1];
-            p[1] = ref_main[ref_main_index];
-            p[2] = ref_main[ref_main_index + 1];
-            p[3] = f[3] != 0 ? ref_main[ref_main_index + 2] : 0;
-            if (use_cubic) {              
-              dst[y * width + x] = CLIP_TO_PIXEL(((int32_t)(f[0] * p[0]) + (int32_t)(f[1] * p[1]) + (int32_t)(f[2] * p[2]) + (int32_t)(f[3] * p[3]) + 32) >> 6);
-            }
-            else {
-              dst[y * width + x] = ((int32_t)(f[0]*p[0]) + (int32_t)(f[1]*p[1]) + (int32_t)(f[2]*p[2]) + (int32_t)(f[3]*p[3]) + 32) >> 6;
-            }
+            p[0] = ref_main[ref_main_index];
+            p[1] = ref_main[ref_main_index + 1];
+            p[2] = ref_main[ref_main_index + 2];
+            p[3] = ref_main[ref_main_index + 3];
+         
+            dst[y * width + x] = CLIP_TO_PIXEL(((int32_t)(f[0] * p[0]) + (int32_t)(f[1] * p[1]) + (int32_t)(f[2] * p[2]) + (int32_t)(f[3] * p[3]) + 32) >> 6);
+
           }
         }
         else {
         
           // Do linear filtering
           for (int_fast32_t x = 0; x < width; ++x) {
-            kvz_pixel ref1 = ref_main[x + delta_int];
-            kvz_pixel ref2 = ref_main[x + delta_int + 1];
-            dst[y * width + x] = ((32 - delta_fract) * ref1 + delta_fract * ref2 + 16) >> 5;
+            kvz_pixel ref1 = ref_main[x + delta_int + 1];
+            kvz_pixel ref2 = ref_main[x + delta_int + 2];
+            dst[y * width + x] = ref1 + ((delta_fract * (ref2-ref1) + 16) >> 5);
           }
         }
       }
       else {
         // Just copy the integer samples
         for (int_fast32_t x = 0; x < width; x++) {
-          dst[y * width + x] = ref_main[x + delta_int];
+          dst[y * width + x] = ref_main[x + delta_int + 1];
         }
       }
 
       // TODO: replace latter width with height
-      int scale = ((kvz_math_floor_log2(width) - 2 + kvz_math_floor_log2(width) - 2 + 2) >> 2);
-      
+      int scale = MIN(2, log2_width - ((int)kvz_math_floor_log2(3* modedisp2invsampledisp[abs(mode_disp)] - 2 ) - 8));
+
       // PDPC
+      bool PDPC_filter = (width >= 4 || channel_type != 0);
+      if (pred_mode > 1 && pred_mode < 67) {
+        if (mode_disp < 0) {
+          PDPC_filter = false;
+        }
+        else if (mode_disp > 0) {
+          PDPC_filter = (scale >= 0);
+        }
+      }
+      if(PDPC_filter) {
+        int       inv_angle_sum = 256;
+        for (int x = 0; x < MIN(3 << scale, width); x++) {
+          inv_angle_sum += modedisp2invsampledisp[abs(mode_disp)];
+
+          int wL = 32 >> (2 * x >> scale);
+          const kvz_pixel left = ref_side[y + (inv_angle_sum >> 9) + 1];
+          dst[y * width + x] = dst[y * width + x] + ((wL * (left - dst[y * width + x]) + 32) >> 6);
+        }
+      }
+
+        /*
       if (pred_mode == 2 || pred_mode == 66) {
         int wT = 16 >> MIN(31, ((y << 1) >> scale));
         for (int x = 0; x < width; x++) {
@@ -234,7 +327,7 @@ static void kvz_angular_pred_generic(
           kvz_pixel left = p[delta_frac_0 >> 5];
           dst[y * width + x] = CLIP_TO_PIXEL((wL * left + (64 - wL) * dst[y * width + x] + 32) >> 6);
         }
-      }
+      }*/
     }
   }
   else {
@@ -243,7 +336,17 @@ static void kvz_angular_pred_generic(
     // TODO: update outer loop to use height instead of width
     for (int_fast32_t y = 0; y < width; ++y) {
       for (int_fast32_t x = 0; x < width; ++x) {
-        dst[y * width + x] = ref_main[x];
+        dst[y * width + x] = ref_main[x + 1];
+      }
+      if ((width >= 4 || channel_type != 0) && sample_disp >= 0) {
+        int scale = (log2_width + log2_width - 2) >> 2;
+        const kvz_pixel top_left = ref_main[0];
+        const kvz_pixel left = ref_side[1 + y];
+        for (int i = 0; i < MIN(3 << scale, width); i++) {
+          const int wL = 32 >> (2 * i >> scale);
+          const kvz_pixel val = dst[y * width + i];
+          dst[y * width + i] = CLIP_TO_PIXEL(val + ((wL * (left - top_left) + 32) >> 6));
+        }
       }
     }
   }

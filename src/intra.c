@@ -115,12 +115,10 @@ int8_t kvz_intra_get_dir_luma_predictor(
       preds[1] = left_intra_dir;
       preds[2] = ((left_intra_dir + offset) % mod) + 2;
       preds[3] = ((left_intra_dir - 1) % mod) + 2;
-      preds[4] = DC_IDX;
-      preds[5] = ((left_intra_dir + offset - 1) % mod) + 2;
+      preds[4] = ((left_intra_dir + offset - 1) % mod) + 2;
+      preds[5] = (left_intra_dir % mod) + 2;
     }
   } else { // If we have two distinct predictions
-    //preds[0] = left_intra_dir;
-    //preds[1] = above_intra_dir;
     number_of_candidates = 2;
     uint8_t max_cand_mode_idx = preds[0] > preds[1] ? 0 : 1;
     
@@ -128,26 +126,36 @@ int8_t kvz_intra_get_dir_luma_predictor(
       preds[0] = PLANAR_IDX;
       preds[1] = left_intra_dir;
       preds[2] = above_intra_dir;
-      preds[3] = DC_IDX;
       max_cand_mode_idx = preds[1] > preds[2] ? 1 : 2;
       uint8_t min_cand_mode_idx = preds[1] > preds[2] ? 2 : 1;
 
-      if ((preds[max_cand_mode_idx] - preds[min_cand_mode_idx] < 63) && (preds[max_cand_mode_idx] - preds[min_cand_mode_idx] > 1)) {
+      if (preds[max_cand_mode_idx] - preds[min_cand_mode_idx] == 1) {
+        preds[3] = ((preds[min_cand_mode_idx] + offset) % mod) + 2;
+        preds[4] = ((preds[max_cand_mode_idx] - 1) % mod) + 2;
+        preds[5] = ((preds[min_cand_mode_idx] + offset - 1) % mod) + 2;
+      } else  if (preds[max_cand_mode_idx] - preds[min_cand_mode_idx] >= 62) {
+        preds[3] = ((preds[min_cand_mode_idx] - 1) % mod) + 2; 
         preds[4] = ((preds[max_cand_mode_idx] + offset) % mod) + 2;
+        preds[5] = (preds[min_cand_mode_idx] % mod) + 2;
+      } else  if (preds[max_cand_mode_idx] - preds[min_cand_mode_idx] == 2) {
+        preds[3] = ((preds[min_cand_mode_idx] - 1) % mod) + 2;
+        preds[4] = ((preds[min_cand_mode_idx] + offset) % mod) + 2;
         preds[5] = ((preds[max_cand_mode_idx] - 1) % mod) + 2;
       } else {
-        preds[4] = ((preds[max_cand_mode_idx] + offset - 1) % mod) + 2;
-        preds[5] = ((preds[max_cand_mode_idx]) % mod) + 2;
+        preds[3] = ((preds[min_cand_mode_idx] + offset) % mod) + 2;
+        preds[4] = ((preds[min_cand_mode_idx] - 1) % mod) + 2;
+        preds[5] = ((preds[max_cand_mode_idx] + offset) % mod) + 2;
       }
     } else if(left_intra_dir + above_intra_dir >= 2){  // Add DC mode if it's not present, otherwise VER_IDX.
       preds[0] = PLANAR_IDX;
       preds[1] = (left_intra_dir < above_intra_dir) ? above_intra_dir : left_intra_dir;
-      preds[2] = DC_IDX;
+      
       max_cand_mode_idx = 1;
 
-      preds[3] = ((preds[max_cand_mode_idx] + offset) % mod) + 2;
-      preds[4] = ((preds[max_cand_mode_idx] - 1) % mod) + 2;
-      preds[5] = ((preds[max_cand_mode_idx] + offset - 1) % mod) + 2;
+      preds[2] = ((preds[max_cand_mode_idx] + offset) % mod) + 2;
+      preds[3] = ((preds[max_cand_mode_idx] - 1) % mod) + 2;
+      preds[4] = ((preds[max_cand_mode_idx] +offset - 1) % mod) + 2;
+      preds[5] = ( preds[max_cand_mode_idx] % mod) + 2;
     }
   }
 
@@ -228,6 +236,7 @@ static void intra_pred_dc(
 }
 
 void kvz_intra_predict(
+  encoder_state_t *const state,
   kvz_intra_references *refs,
   int_fast8_t log2_width,
   int_fast8_t mode,
@@ -236,21 +245,29 @@ void kvz_intra_predict(
   bool filter_boundary)
 {
   const int_fast8_t width = 1 << log2_width;
+  const kvz_config *cfg = &state->encoder_control->cfg;
 
   const kvz_intra_ref *used_ref = &refs->ref;
-  if (color != COLOR_Y || mode == 1 || width == 4) {
+  if (cfg->intra_smoothing_disabled || color != COLOR_Y || mode == 1 || width == 4) {
     // For chroma, DC and 4x4 blocks, always use unfiltered reference.
   } else if (mode == 0) {
     // Otherwise, use filtered for planar.
-    used_ref = &refs->filtered_ref;
+    if (width * width > 32) {
+      used_ref = &refs->filtered_ref;
+    }
   } else {
     // Angular modes use smoothed reference pixels, unless the mode is close
     // to being either vertical or horizontal.
-    static const int kvz_intra_hor_ver_dist_thres[10] = {20, 20, 20, 14, 2, 0, 20, 0, 0, 0 };
-    int filter_threshold = kvz_intra_hor_ver_dist_thres[kvz_math_floor_log2(width)];
+    static const int kvz_intra_hor_ver_dist_thres[8] = {24, 24, 24, 14, 2, 0, 0, 0 };
+    int filter_threshold = kvz_intra_hor_ver_dist_thres[(log2_width + log2_width) >> 1];
     int dist_from_vert_or_hor = MIN(abs(mode - 50), abs(mode - 18));
     if (dist_from_vert_or_hor > filter_threshold) {
-      used_ref = &refs->filtered_ref;
+      static const int16_t modedisp2sampledisp[32] = { 0,    1,    2,    3,    4,    6,     8,   10,   12,   14,   16,   18,   20,   23,   26,   29,   32,   35,   39,  45,  51,  57,  64,  73,  86, 102, 128, 171, 256, 341, 512, 1024 };
+      const int_fast8_t mode_disp = (mode >= 34) ? mode - 50 : 18 - mode;
+      const int_fast8_t sample_disp = (mode_disp < 0 ? -1 : 1) * modedisp2sampledisp[abs(mode_disp)];
+      if ((abs(sample_disp) & 0x1F) == 0) {
+        used_ref = &refs->filtered_ref;
+      }
     }
   }
 
@@ -267,59 +284,23 @@ void kvz_intra_predict(
   }
 
   // pdpc
-  bool pdpcCondition = (mode == 0 || mode == 1 || mode == 18 || mode == 50);
-  if (pdpcCondition)
+  //bool pdpcCondition = (mode == 0 || mode == 1 || mode == 18 || mode == 50);
+  //if (pdpcCondition)
   {
     // TODO: replace latter log2_width with log2_height
     const int scale = ((log2_width - 2 + log2_width - 2 + 2) >> 2);
     
-    if (mode == 0) {  // planar
+    if (mode == 0 || mode == 1) {  // planar or DC
       // TODO: replace width with height
       for (int y = 0; y < width; y++) {
         int wT = 32 >> MIN(31, ((y << 1) >> scale));
         for (int x = 0; x < width; x++) {
           int wL = 32 >> MIN(31, ((x << 1) >> scale));
-          dst[x + y * width] = CLIP_TO_PIXEL((wL * used_ref->left[y + 1]
-            + wT * used_ref->top[x + 1]
-            + (64 - wL - wT) * dst[x + y * width] + 32) >> 6);
+          dst[x + y * width] = dst[x + y * width] + ((wL * (used_ref->left[y + 1] - dst[x + y * width])
+            + wT * (used_ref->top[x + 1] - dst[x + y * width]) + 32) >> 6);
         }
       }
-    }
-    else if (mode == 1) { // DC
-      for (int y = 0; y < width; y++) {
-        int wT = 32 >> MIN(31, ((y << 1) >> scale));
-        for (int x = 0; x < width; x++) {
-          int wL = 32 >> MIN(31, ((x << 1) >> scale));
-          int wTL = (wL >> 4) + (wT >> 4);
-          dst[x + y * width] = CLIP_TO_PIXEL((wL * used_ref->left[y + 1]
-            + wT * used_ref->top[x + 1]
-            - wTL * used_ref->top[0]
-            + (64 - wL - wT + wTL) * dst[x + y * width] + 32) >> 6);
-        }
-      }
-    }
-    else if (mode == 18) {  // horizontal
-      for (int y = 0; y < width; y++) {
-        int wT = 32 >> MIN(31, ((y << 1) >> scale));
-        for (int x = 0; x < width; x++) {
-          int wTL = wT;
-          dst[x + y * width] = CLIP_TO_PIXEL((wT * used_ref->top[x + 1]
-            - wTL * used_ref->top[0]
-            + (64 - wT + wTL) * dst[x + y * width] + 32) >> 6);
-        }
-      }
-    }
-    else if (mode == 50) {  // vertical
-      for (int y = 0; y < width; y++) {
-        for (int x = 0; x < width; x++) {
-          int wL = 32 >> MIN(31, ((x << 1) >> scale));
-          int wTL = wL;
-          dst[x + y * width] = CLIP_TO_PIXEL((wL * used_ref->left[y + 1]
-            - wTL * used_ref->top[0]
-            + (64 - wL + wTL) * dst[x + y * width] + 32) >> 6);
-        }
-      }
-    }
+    }  
   }
 }
 
@@ -612,7 +593,7 @@ static void intra_recon_tb_leaf(
 
   kvz_pixel pred[32 * 32];
   const bool filter_boundary = color == COLOR_Y && !(cfg->lossless && cfg->implicit_rdpcm);
-  kvz_intra_predict(&refs, log2width, intra_mode, color, pred, filter_boundary);
+  kvz_intra_predict(state, &refs, log2width, intra_mode, color, pred, filter_boundary);
 
   const int index = lcu_px.x + lcu_px.y * lcu_width;
   kvz_pixel *block = NULL;

@@ -141,6 +141,8 @@ int kvz_config_init(kvz_config *cfg)
   cfg->max_merge = 5;
   cfg->early_skip = true;
 
+  cfg->intra_smoothing_disabled = false;
+
   return 1;
 }
 

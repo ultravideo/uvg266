@@ -1,5 +1,4 @@
-#ifndef INTRA_H_
-#define INTRA_H_
+#pragma once
 /*****************************************************************************
  * This file is part of Kvazaar HEVC encoder.
  *
@@ -62,26 +61,6 @@ int8_t kvz_intra_get_dir_luma_predictor(
   const cu_info_t *const left_pu,
   const cu_info_t *const above_pu);
 
-#if KVZ_SEL_ENCRYPTION
-/**
-* \brief Function for deriving intra luma predictions with encryption
-* \param x          x-coordinate of the PU in pixels
-* \param y          y-coordinate of the PU in pixels
-* \param preds      output buffer for 3 predictions
-* \param cur_pu     PU to check
-* \param left_pu    PU to the left of cur_pu
-* \param above_pu   PU above cur_pu
-* \returns          1 if predictions are found, otherwise 0
-*/
-int8_t kvz_intra_get_dir_luma_predictor_encry(
-const uint32_t x,
-const uint32_t y,
-int8_t *preds,
-const cu_info_t *const cur_pu,
-const cu_info_t *const left_pu,
-const cu_info_t *const above_pu);
-#endif
-
 /**
 * \brief Generage angular predictions.
 * \param width    Width in pixels, range 4..32.
@@ -110,6 +89,7 @@ void kvz_intra_build_reference(
  * \param filter_boundary Whether to filter the boundary on modes 10 and 26.
  */
 void kvz_intra_predict(
+  encoder_state_t *const state,
   kvz_intra_references *refs,
   int_fast8_t log2_width,
   int_fast8_t mode,
@@ -127,4 +107,3 @@ void kvz_intra_recon_cu(
   cu_info_t *cur_cu,
   lcu_t *lcu);
 
-#endif

@@ -54,19 +54,23 @@ void kvz_nal_write(bitstream_t * const bitstream, const uint8_t nal_type,
   // Handle header bits with full bytes instead of using bitstream
   // forbidden_zero_flag(1) + nuh_temporal_id_plus1(3) + nal_unit_type(4)
   uint8_t zero_tid_required_flag = 0;
+  
   if ((nal_type >= 16) && (nal_type <= 31)) {
     zero_tid_required_flag = 1;
   }
   uint8_t nal_type_lsb = nal_type - (zero_tid_required_flag << 4);
-
-  byte = (zero_tid_required_flag<<7) + ((temporal_id + 1) << 4)  + nal_type_lsb;
+  
+  // forbidden zero (1bit) + reserver zero (1bit) layer_id (6 bits)
+  byte = 1; 
   kvz_bitstream_writebyte(bitstream, byte);
 
-  // 7bits of nuh_layer_id_plus1
-  byte = 1<<1;
+  // nal_unit_type (5bits) + temporal_id_plus1 (3 bits)
+  byte = (nal_type<<3)+(temporal_id + 1);
   kvz_bitstream_writebyte(bitstream, byte);
+
 
 #if VERBOSE
+  // ToDo: Match with the actual bits
   printf("%-40s u(%d) : %d\n", "zero_tid_required_flag", 1, zero_tid_required_flag);
   printf("%-40s u(%d) : %d\n", "nuh_temporal_id_plus1", 3, temporal_id + 1);
   printf("%-40s u(%d) : %d\n", "nal_unit_type_lsb", 4, nal_type_lsb);

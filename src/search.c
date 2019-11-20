@@ -524,11 +524,11 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         const int last_mode = (ctrl->cfg.amp_enable && cu_width >= 16) ? 5 : 1;
         for (int i = first_mode; i <= last_mode; ++i) {
           kvz_search_cu_smp(state,
-		                    x, y,
-		                    depth,
-		                    mp_modes[i],
-		                    &work_tree[depth + 1],
-		                    &mode_cost, &mode_bitcost);
+                        x, y,
+                        depth,
+                        mp_modes[i],
+                        &work_tree[depth + 1],
+                        &mode_cost, &mode_bitcost);
           if (mode_cost < cost) {
             cost = mode_cost;
             inter_bitcost = mode_bitcost;

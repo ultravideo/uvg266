@@ -341,7 +341,7 @@ static void search_intra_chroma_rough(encoder_state_t * const state,
   kvz_pixels_blit(orig_u, orig_block, width, width, origstride, width);
   for (int i = 0; i < 5; ++i) {
     if (modes[i] == luma_mode) continue;
-    kvz_intra_predict(refs_u, log2_width_c, modes[i], COLOR_U, pred, false);
+    kvz_intra_predict(state, refs_u, log2_width_c, modes[i], COLOR_U, pred, false);
     //costs[i] += get_cost(encoder_state, pred, orig_block, satd_func, sad_func, width);
     costs[i] += satd_func(pred, orig_block);
   }
@@ -349,7 +349,7 @@ static void search_intra_chroma_rough(encoder_state_t * const state,
   kvz_pixels_blit(orig_v, orig_block, width, width, origstride, width);
   for (int i = 0; i < 5; ++i) {
     if (modes[i] == luma_mode) continue;
-    kvz_intra_predict(refs_v, log2_width_c, modes[i], COLOR_V, pred, false);
+    kvz_intra_predict(state, refs_v, log2_width_c, modes[i], COLOR_V, pred, false);
     //costs[i] += get_cost(encoder_state, pred, orig_block, satd_func, sad_func, width);
     costs[i] += satd_func(pred, orig_block);
   }
@@ -436,7 +436,7 @@ static int8_t search_intra_rough(encoder_state_t * const state,
     double costs_out[PARALLEL_BLKS] = { 0 };
     for (int i = 0; i < PARALLEL_BLKS; ++i) {
       if (mode + i * offset <= 66) {
-        kvz_intra_predict(refs, log2_width, mode + i * offset, COLOR_Y, preds[i], filter_boundary);
+        kvz_intra_predict(state, refs, log2_width, mode + i * offset, COLOR_Y, preds[i], filter_boundary);
       }
     }
     
@@ -475,7 +475,7 @@ static int8_t search_intra_rough(encoder_state_t * const state,
       if (mode_in_range) {
         for (int i = 0; i < PARALLEL_BLKS; ++i) {
           if (test_modes[i] >= 2 && test_modes[i] <= 66) {
-            kvz_intra_predict(refs, log2_width, test_modes[i], COLOR_Y, preds[i], filter_boundary);
+            kvz_intra_predict(state, refs, log2_width, test_modes[i], COLOR_Y, preds[i], filter_boundary);
           }
         }
 
@@ -512,7 +512,7 @@ static int8_t search_intra_rough(encoder_state_t * const state,
     }
 
     if (!has_mode) {
-      kvz_intra_predict(refs, log2_width, mode, COLOR_Y, preds[0], filter_boundary);
+      kvz_intra_predict(state, refs, log2_width, mode, COLOR_Y, preds[0], filter_boundary);
       costs[modes_selected] = get_cost(state, preds[0], orig_block, satd_func, sad_func, width);
       modes[modes_selected] = mode;
       ++modes_selected;

@@ -62,7 +62,8 @@ static void encoder_state_write_bitstream_PTL(bitstream_t *stream,
   // Main Profile == 1,  Main 10 profile == 2, NEXT == 6
   WRITE_U(stream, 6, 7, "general_profile_idc");
   WRITE_U(stream, state->encoder_control->cfg.high_tier, 1, "general_tier_flag");
-  WRITE_U(stream, 0, 24, "general_sub_profile_idc");
+  WRITE_U(stream, 1, 8, "num_sub_profiles");
+  WRITE_U(stream, 0, 32, "general_sub_profile_idc");
 
   WRITE_U(stream, 1, 1, "general_progressive_source_flag");
   WRITE_U(stream, state->encoder_control->in.source_scan_type!= 0, 1, "general_interlaced_source_flag");
@@ -80,7 +81,6 @@ static void encoder_state_write_bitstream_PTL(bitstream_t *stream,
   WRITE_U(stream, 0, 1, "no_sao_constraint_flag");
   WRITE_U(stream, 0, 1, "no_alf_constraint_flag");
   WRITE_U(stream, 0, 1, "no_joint_cbcr_constraint_flag");
-  WRITE_U(stream, 0, 1, "no_pcm_constraint_flag");
   WRITE_U(stream, 0, 1, "no_ref_wraparound_constraint_flag");
 
   WRITE_U(stream, 0, 1, "no_temporal_mvp_constraint_flag");
@@ -350,7 +350,7 @@ static void encoder_state_write_bitstream_SPS_extension(bitstream_t *stream,
     WRITE_U(stream, 1, 1, "implicit_rdpcm_enabled_flag");
     WRITE_U(stream, 0, 1, "explicit_rdpcm_enabled_flag");
     WRITE_U(stream, 0, 1, "extended_precision_processing_flag");
-    WRITE_U(stream, 0, 1, "intra_smoothing_disabled_flag");
+    WRITE_U(stream, state->encoder_control->cfg.intra_smoothing_disabled, 1, "intra_smoothing_disabled_flag");
     WRITE_U(stream, 0, 1, "high_precision_offsets_enabled_flag");
     WRITE_U(stream, 0, 1, "persistent_rice_adaptation_enabled_flag");
     WRITE_U(stream, 0, 1, "cabac_bypass_alignment_enabled_flag");
@@ -378,6 +378,8 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
 
   encoder_state_write_bitstream_PTL(stream, state);
 
+  WRITE_U(stream, 0, 1, "gdr_enabled_flag");
+
   WRITE_UE(stream, 0, "sps_seq_parameter_set_id");
 
   WRITE_UE(stream, encoder->chroma_format, "chroma_format_idc");
@@ -386,33 +388,20 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
     WRITE_U(stream, 0, 1, "separate_colour_plane_flag");
   }
 
-  WRITE_UE(stream, encoder->in.width, "pic_width_in_luma_samples");
-  WRITE_UE(stream, encoder->in.height, "pic_height_in_luma_samples");
-
-  bool use_conformance_window = encoder->in.width != encoder->in.real_width || encoder->in.height != encoder->in.real_height;
-
-  WRITE_U(stream, use_conformance_window, 1, "conformance_window_flag");
-  if (use_conformance_window) {
-    // The standard does not seem to allow setting conf_win values such that
-    // the number of luma samples is not a multiple of 2. Options are to either
-    // hide one line or show an extra line of non-video. Neither seems like a
-    // very good option, so let's not even try.
-    assert(!(encoder->in.width % 2));
-    WRITE_UE(stream, 0, "conf_win_left_offset");
-    WRITE_UE(stream, (encoder->in.width - encoder->in.real_width) >> 1,
-             "conf_win_right_offset");
-    WRITE_UE(stream, 0, "conf_win_top_offset");
-    WRITE_UE(stream, (encoder->in.height - encoder->in.real_height) >> 1,
-             "conf_win_bottom_offset");
-  }
+  WRITE_UE(stream, encoder->in.width, "pic_width_max_in_luma_samples");
+  WRITE_UE(stream, encoder->in.height, "pic_height_max_in_luma_samples");
 
   WRITE_UE(stream, encoder->bitdepth-8, "bit_depth_luma_minus8");
   WRITE_UE(stream, encoder->bitdepth-8, "bit_depth_chroma_minus8");
 
   WRITE_UE(stream, 6, "min_qp_prime_ts_minus4");
 
+  WRITE_U(stream, 0, 1, "sps_weighted_pred_flag");
+  WRITE_U(stream, 0, 1, "sps_weighted_bipred_flag");
+
   WRITE_UE(stream, 1, "log2_max_pic_order_cnt_lsb_minus4");
   WRITE_U(stream, 0, 1, "sps_idr_rpl_present_flag");
+
   WRITE_U(stream, 0, 1, "sps_sub_layer_ordering_info_present_flag");
 
   //for each layer
@@ -432,16 +421,16 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
 
   // QTBT
   // if(!no_qtbtt_dual_tree_intra_constraint_flag)
-    WRITE_U(stream, 0, 1, "qtbt_dual_intra_tree");
+    WRITE_U(stream, 0, 1, "qtbtt_dual_tree_intra_flag");
   WRITE_U(stream, 1, 2, "log2_CTU_size_minus5"); // Max size 2^6 = 64x64
   WRITE_UE(stream, MIN_SIZE-2, "log2_min_luma_coding_block_size_minus2"); // Min size 2^3 = 8x8
   // if(!no_partition_constraints_override_constraint_flag)
     WRITE_U(stream, 0, 1, "partition_constraints_override_enabled_flag");
 
-  WRITE_UE(stream, 0, "sps_log2_diff_min_qt_min_cb_intra_tile_group_luma");
-  WRITE_UE(stream, 0, "sps_log2_diff_min_qt_min_cb_inter_tile_group");
-  WRITE_UE(stream, 0, "sps_max_mtt_hierarchy_depth_inter_tile_group");
-  WRITE_UE(stream, 0, "sps_max_mtt_hierarchy_depth_intra_tile_group_luma");
+  WRITE_UE(stream, 0, "sps_log2_diff_min_qt_min_cb_intra_slice_luma");
+  WRITE_UE(stream, 0, "sps_log2_diff_min_qt_min_cb_inter_slice");
+  WRITE_UE(stream, 0, "sps_max_mtt_hierarchy_depth_inter_slice");
+  WRITE_UE(stream, 0, "sps_max_mtt_hierarchy_depth_intra_slice_luma");
 
 #if 0 // mtt depth intra
   if (max_mtt_depth_intra != 0) {
@@ -484,6 +473,8 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   WRITE_U(stream, (TR_MAX_LOG2_SIZE - 5) ? 1 : 0, 1, "sps_max_luma_transform_size_64_flag");
   // #endif
 
+  WRITE_U(stream, 0, 1, "sps_joint_cbcr_enabled_flag");
+
   if (encoder->chroma_format != KVZ_CSP_400) {    
     WRITE_U(stream, 1, 1, "same_qp_table_for_chroma");
 
@@ -496,8 +487,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   }
 
 
-  WRITE_U(stream, 0, 1, "sps_weighted_pred_flag");
-  WRITE_U(stream, 0, 1, "sps_weighted_bipred_flag");
+
 
   // if(!no_sao_constraint_flag)
     WRITE_U(stream, encoder->cfg.sao_type ? 1 : 0, 1, "sps_sao_enabled_flag");
@@ -506,19 +496,8 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
 
   //WRITE_U(stream, (encoder->cfg.amp_enable ? 1 : 0), 1, "amp_enabled_flag");
 
-  // if(!no_pcm_constraint_flag)
-    WRITE_U(stream, ENABLE_PCM, 1, "pcm_enabled_flag");
-  #if ENABLE_PCM == 1
-    WRITE_U(stream, 7, 4, "pcm_sample_bit_depth_luma_minus1");
-    WRITE_U(stream, 7, 4, "pcm_sample_bit_depth_chroma_minus1");
-    WRITE_UE(stream, 0, "log2_min_pcm_coding_block_size_minus3");
-    WRITE_UE(stream, 3, "log2_diff_max_min_pcm_coding_block_size");
-    WRITE_U(stream, 1, 1, "pcm_loop_filter_disable_flag");
-  #endif
-
-
     WRITE_U(stream, 0, 1, "sps_transform_skip_enabled_flag");
-    WRITE_U(stream, 0, 1, "sps_joint_cbcr_enabled_flag");
+    //WRITE_U(stream, 0, 1, "sps_joint_cbcr_enabled_flag");
   // if(!no_ref_wraparound_constraint_flag)
     WRITE_U(stream, 0, 1, "sps_ref_wraparound_enabled_flag");
   // if(!no_temporal_mvp_constraint_flag)
@@ -570,12 +549,28 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
 
   WRITE_U(stream, 0, 1, "scaling_list_enabled_flag");
 
-  WRITE_U(stream, encoder->vui.timing_info_present_flag, 1, "timing_info_present_flag");
+  WRITE_U(stream, encoder->vui.timing_info_present_flag, 1, "general_hrd_parameters_present_flag");
   if (encoder->vui.timing_info_present_flag) {
-    WRITE_U(stream, encoder->vui.num_units_in_tick, 32, "vui_num_units_in_tick");
-    WRITE_U(stream, encoder->vui.time_scale, 32, "vui_time_scale");
+    WRITE_U(stream, encoder->vui.num_units_in_tick, 32, "num_units_in_tick");
+    WRITE_U(stream, encoder->vui.time_scale, 32, "time_scale");
 
-    WRITE_U(stream, 0, 1, "vui_hrd_parameters_present_flag");
+    WRITE_U(stream, 0, 1, "sub_layer_cpb_parameters_present_flag");
+
+    WRITE_U(stream, 0, 1, "general_nal_hrd_parameters_present_flag");
+    WRITE_U(stream, 0, 1, "general_vcl_hrd_parameters_present_flag");
+    //// if nal_hrd or vlc_hrt
+    //  WRITE_U(stream, 0, 1, "decoding_unit_hrd_params_present_flag");
+    //  WRITE_U(stream, 0, 8, "tick_divisor_minus2");
+    //  WRITE_U(stream, 0, 1, "decoding_unit_cpb_params_in_pic_timing_sei_flag");
+    //  WRITE_U(stream, 0, 4, "bit_rate_scale");
+    //  WRITE_U(stream, 0, 4, "cpb_size_scale");
+    //  WRITE_U(stream, 0, 4, "cpb_size_du_scale");
+
+    WRITE_U(stream, 0, 1, "fixed_pic_rate_general_flag");
+      //WRITE_U(stream, 0, 1, "fixed_pic_rate_within_cvs_flag");
+    WRITE_U(stream, 0, 1, "low_delay_hrd_flag");
+
+    WRITE_UE(stream, 0, "cpb_cnt_minus1");
   }
 
   WRITE_U(stream, 0, 1, "vui_parameters_present_flag");
@@ -597,13 +592,37 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
 #endif
   WRITE_UE(stream, 0, "pic_parameter_set_id");
   WRITE_UE(stream, 0, "seq_parameter_set_id");
+
+
+  WRITE_UE(stream, encoder->in.width, "pic_width_in_luma_samples");
+  WRITE_UE(stream, encoder->in.height, "pic_height_in_luma_samples");
+
+  bool use_conformance_window = encoder->in.width != encoder->in.real_width || encoder->in.height != encoder->in.real_height;
+
+  WRITE_U(stream, use_conformance_window, 1, "conformance_window_flag");
+  if (use_conformance_window) {
+    // The standard does not seem to allow setting conf_win values such that
+    // the number of luma samples is not a multiple of 2. Options are to either
+    // hide one line or show an extra line of non-video. Neither seems like a
+    // very good option, so let's not even try.
+    assert(!(encoder->in.width % 2));
+    WRITE_UE(stream, 0, "conf_win_left_offset");
+    WRITE_UE(stream, (encoder->in.width - encoder->in.real_width) >> 1,
+      "conf_win_right_offset");
+    WRITE_UE(stream, 0, "conf_win_top_offset");
+    WRITE_UE(stream, (encoder->in.height - encoder->in.real_height) >> 1,
+      "conf_win_bottom_offset");
+  }
+
   WRITE_U(stream, 0, 1, "output_flag_present_flag");
   WRITE_U(stream, 0, 3, "num_extra_slice_header_bits");
   WRITE_U(stream, 0, 1, "cabac_init_present_flag");
 
+
   WRITE_UE(stream, 0, "num_ref_idx_l0_default_active_minus1");
   WRITE_UE(stream, 0, "num_ref_idx_l1_default_active_minus1");
   WRITE_U(stream, 0, 1, "rpl1_idx_present_flag");
+  WRITE_U(stream, 0, 1, "constant_slice_header_params_enabled_flag");
   WRITE_SE(stream, ((int8_t)encoder->cfg.qp) - 26, "init_qp_minus26");
   WRITE_U(stream, 0, 1, "constrained_intra_pred_flag");
   //WRITE_U(stream, encoder->cfg.trskip_enable, 1, "transform_skip_enabled_flag");
@@ -617,8 +636,13 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
   //TODO: add QP offsets
   WRITE_SE(stream, 0, "pps_cb_qp_offset");
   WRITE_SE(stream, 0, "pps_cr_qp_offset");
-  WRITE_SE(stream, 0, "pps_joint_cbcr_qp_offset");
+  WRITE_U(stream, 0, 1, "pps_joint_cbcr_qp_offset_present_flag");
+    // If pps_joint_cbcr_qp_offset_present_flag
+    //WRITE_SE(stream, 0, "pps_joint_cbcr_qp_offset");
   WRITE_U(stream, 0, 1, "pps_slice_chroma_qp_offsets_present_flag");
+
+  WRITE_U(stream, 0, 1, "cu_chroma_qp_offset_enabled_flag");
+
   WRITE_U(stream, 0, 1, "weighted_pred_flag");
   WRITE_U(stream, 0, 1, "weighted_bipred_flag");
 
@@ -629,9 +653,7 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
   WRITE_U(stream, encoder->tiles_enable?0:1, 1, "single_tile_in_pic_flag");
    
   if (encoder->tiles_enable) {
-    WRITE_UE(stream, encoder->cfg.tiles_width_count  - 1, "num_tile_columns_minus1");
-    WRITE_UE(stream, encoder->cfg.tiles_height_count - 1, "num_tile_rows_minus1");
-    
+        
     WRITE_U(stream, encoder->tiles_uniform_spacing_flag, 1, "uniform_spacing_flag");
     
     if (!encoder->tiles_uniform_spacing_flag) {
@@ -642,11 +664,20 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
       for (i = 0; i < encoder->cfg.tiles_height_count - 1; ++i) {
         WRITE_UE(stream, encoder->tiles_row_height[i] - 1, "row_height_minus1[...]");
       }
-    }
-    WRITE_U(stream, 0, 1, "loop_filter_across_tiles_enabled_flag");
+    } else {
+      WRITE_UE(stream, encoder->cfg.tiles_width_count - 1, "num_tile_columns_minus1");
+      WRITE_UE(stream, encoder->cfg.tiles_height_count - 1, "num_tile_rows_minus1");
+      // ToDo: Signal the tiles properly
+    }   
+    WRITE_U(stream, 0, 1, "brick_splitting_present_flag");
+    WRITE_U(stream, 1, 1, "single_brick_per_slice_flag");
     
+    WRITE_U(stream, 0, 1, "loop_filter_across_bricks_enabled_flag");
+    // if loop_filter_across_bricks_enabled_flag
+    //WRITE_U(stream, 0, 1, "loop_filter_across_tiles_enabled_flag");
   }
-
+  
+  // If rect slice
   WRITE_U(stream, 0, 1, "signalled_slice_id_flag");
 
   //wavefronts
@@ -669,7 +700,7 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
   WRITE_U(stream, 0, 1, "pps_loop_filter_across_virtual_boundaries_disabled_flag");
     //ENDIF
   //ENDIF
-  WRITE_U(stream, 0, 1, "pps_scaling_list_data_present_flag");
+  //WRITE_U(stream, 0, 1, "pps_scaling_list_data_present_flag");
   //IF scaling_list
   //ENDIF
   //WRITE_U(stream, 0, 1, "lists_modification_present_flag");
@@ -856,12 +887,15 @@ static void kvz_encoder_state_write_bitstream_slice_header_independent(
     }
   } else ref_negative = state->frame->ref->used_size;
 
+  WRITE_U(stream, 0, 1, "non_reference_picture_flag");
+
   WRITE_UE(stream, state->frame->slicetype, "slice_type");
 
   if (state->frame->pictype == KVZ_NAL_IDR_W_RADL
     || state->frame->pictype == KVZ_NAL_IDR_N_LP) {
 
-    WRITE_U(stream, 0, 5, "pic_order_cnt_lsb");
+    WRITE_U(stream, 0, 5, "slice_pic_order_cnt_lsb");
+    WRITE_U(stream, 0, 1, "no_output_of_prior_pics_flag");
   } else {
     int last_poc = 0;
     int poc_shift = 0;
@@ -964,6 +998,14 @@ static void kvz_encoder_state_write_bitstream_slice_header_independent(
       }
     }
   }
+
+  {
+    int slice_qp_delta = state->frame->QP - encoder->cfg.qp;
+    WRITE_SE(stream, slice_qp_delta, "slice_qp_delta");
+  }
+
+
+
   WRITE_U(stream, 0, 1, "dep_quant_enable_flag");
   //if !dep_quant_enable_flag
     WRITE_U(stream, encoder->cfg.signhide_enable, 1, "sign_data_hiding_enable_flag");
@@ -975,11 +1017,6 @@ static void kvz_encoder_state_write_bitstream_slice_header_independent(
     WRITE_UE(stream, 0, "max_binary_tree_unit_size"); // Max BT size == CTU size
     
     WRITE_UE(stream, MRG_MAX_NUM_CANDS-6, "six_minus_max_num_merge_cand");
-  }
-
-  {
-    int slice_qp_delta = state->frame->QP - encoder->cfg.qp;
-    WRITE_SE(stream, slice_qp_delta, "slice_qp_delta");
   }
 }
 
@@ -1003,10 +1040,6 @@ void kvz_encoder_state_write_bitstream_slice_header(
 
   //WRITE_U(stream, first_slice_segment_in_pic, 1, "first_slice_segment_in_pic_flag");
 
-  if (state->frame->pictype >= KVZ_NAL_IDR_W_RADL
-    && state->frame->pictype <= KVZ_NAL_CRA_NUT) {
-    WRITE_U(stream, 0, 1, "no_output_of_prior_pics_flag");
-  }
 
   WRITE_UE(stream, 0, "slice_pic_parameter_set_id");
 

@@ -59,7 +59,7 @@ typedef struct
     cabac_ctx_t intra_luma_mpm_flag_model;    //!< \brief intra mode context models
     cabac_ctx_t intra_subpart_model[2];    //!< \brief intra sub part context models
     cabac_ctx_t chroma_pred_model;
-    cabac_ctx_t inter_dir[5];
+    cabac_ctx_t inter_dir[6];
     cabac_ctx_t qt_cbf_model_luma[4];
     cabac_ctx_t qt_cbf_model_cr[2];
     cabac_ctx_t qt_cbf_model_cb[1];
@@ -94,9 +94,6 @@ typedef struct
 
 
 // Globals
-extern const uint8_t kvz_g_auc_next_state_mps[128];
-extern const uint8_t kvz_g_auc_next_state_lps[128];
-extern const uint8_t kvz_g_auc_lpst_table[64][4];
 extern const uint8_t kvz_g_auc_renorm_table[32];
 
 
@@ -110,11 +107,9 @@ void kvz_cabac_encode_bin_trm(cabac_data_t *data, uint8_t bin_value);
 void kvz_cabac_write(cabac_data_t *data);
 void kvz_cabac_finish(cabac_data_t *data);
 void kvz_cabac_write_coeff_remain(cabac_data_t *cabac, uint32_t symbol,
-                              uint32_t r_param);
-void kvz_cabac_write_coeff_remain_encry(struct encoder_state_t * const state, cabac_data_t * const cabac, const uint32_t symbol,
-		const uint32_t r_param, int32_t base_level);
+                              uint32_t r_param, const unsigned int cutoff);
 void kvz_cabac_write_ep_ex_golomb(struct encoder_state_t * const state, cabac_data_t *data,
-								uint32_t symbol, uint32_t count);
+                uint32_t symbol, uint32_t count);
 void kvz_cabac_write_unary_max_symbol(cabac_data_t *data, cabac_ctx_t *ctx,
                                   uint32_t symbol, int32_t offset,
                                   uint32_t max_symbol);
