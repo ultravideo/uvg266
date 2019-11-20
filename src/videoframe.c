@@ -71,7 +71,7 @@ int kvz_videoframe_free(videoframe_t * const frame)
   FREE_POINTER(frame->sao_luma);
   FREE_POINTER(frame->sao_chroma);
 
-  //kvz_alf_enc_destroy(frame);
+  kvz_alf_enc_destroy(frame);
   //FREE_POINTER(frame->alf_info);
 
   free(frame);

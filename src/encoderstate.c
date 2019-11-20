@@ -677,7 +677,8 @@ static void encoder_state_worker_encode_lcu(void * opaque)
     kvz_alf_enc_create(state, lcu);
     kvz_alf_init(state, slice);
     kvz_alf_enc_process(state, lcu);
-    kvz_alf_enc_destroy(state, frame, lcu);
+    kvz_frame_end(state, frame, lcu);
+    //kvz_alf_enc_destroy(state, frame, lcu);
   }
 
   //Encode coding tree

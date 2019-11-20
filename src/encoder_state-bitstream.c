@@ -1373,6 +1373,88 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
     kvz_bitstream_add_rbsp_trailing_bits(stream);
   }
 
+  // Adaptation parameter set (APS)
+  if (0 /*pcSlice->getSPS()->getUseReshaper()*/)
+  {
+    /*//only 1 LMCS data for 1 picture
+    int apsId = pcSlice->getLmcsAPSId();
+    ParameterSetMap<APS> *apsMap = m_pcEncLib->getApsMap();
+    APS* aps = apsMap->getPS((apsId << NUM_APS_TYPE_LEN) + LMCS_APS);
+    bool writeAPS = aps && apsMap->getChangedFlag((apsId << NUM_APS_TYPE_LEN) + LMCS_APS);
+    if (writeAPS)
+    {
+    actualTotalBits += xWriteAPS(accessUnit, aps);
+    apsMap->clearChangedFlag((apsId << NUM_APS_TYPE_LEN) + LMCS_APS);
+    CHECK(aps != pcSlice->getLmcsAPS(), "Wrong LMCS APS pointer in compressGOP");
+    }*/
+  }
+
+  // Adaptation parameter set (APS)
+  for (int i = 0; state->children[i].encoder_control; ++i) {
+    if (state->children[i].type == ENCODER_STATE_TYPE_SLICE) {
+      if (encoder->cfg.alf_enable && state->children[i].slice->tile_group_alf_enabled_flag[COMPONENT_Y])
+      {
+        //#if JVET_O_MAX_NUM_ALF_APS_8
+        for (int apsId = ALF_CTB_MAX_NUM_APS - state->children[i].slice->tile_group_num_aps; apsId < ALF_CTB_MAX_NUM_APS; apsId++)
+          /*#else
+          for (int apsId = 0; apsId < MAX_NUM_APS; apsId++)   //HD: shouldn't this be looping over slice_alf_aps_id_luma[ i ]? By looping over MAX_NUM_APS, it is possible unused ALF APS is written. Please check!
+          #endif*/
+        {
+          //ParameterSetMap<APS> *apsMap = m_pcEncLib->getApsMap();
+          param_set_map *apsMap = state->children[i].slice->param_set_map;
+
+          //APS* aps = apsMap->getPS((apsId << NUM_APS_TYPE_LEN) + ALF_APS);
+          alf_aps aps = apsMap[apsId + T_ALF_APS].parameter_set;
+
+          //bool writeAPS = aps && apsMap->getChangedFlag((apsId << NUM_APS_TYPE_LEN) + ALF_APS);
+          bool writeAPS = apsMap[apsId + T_ALF_APS].b_changed;
+          if (!writeAPS && state->children[i].slice->apss && state->children[i].
+            slice->apss[apsId].aps_id >= 0 && state->children[i].slice->apss[apsId].aps_id < 8)
+          {
+            writeAPS = true;
+            //aps = pcSlice->getAlfAPSs()[apsId]; // use asp from slice header
+            aps = state->children[i].slice->apss[apsId];
+
+            //*apsMap->allocatePS(apsId) = *aps; //allocate and cpy
+            assert(apsId < ALF_CTB_MAX_NUM_APS);
+            bool found = false;
+            for (int ID = 0; ID < ALF_CTB_MAX_NUM_APS; ID++)
+            {
+              if (apsMap[ID + T_ALF_APS].parameter_set.aps_id == ID) {
+                found = true;
+              }
+            }
+            if (!found)
+            {
+              apsMap[apsId + T_ALF_APS].b_changed = true;
+              //apsMap[apsId].p_nalu_data = 0;
+            }
+            apsMap[apsId + T_ALF_APS].parameter_set.aps_id = apsId;
+            copy_alf_param(&apsMap[apsId + T_ALF_APS].parameter_set, &aps);
+            //
+
+            //m_pcALF->setApsIdStart(apsId);
+            g_aps_id_start = apsId;
+          }
+
+          if (writeAPS)
+          {
+            //actualTotalBits += xWriteAPS(accessUnit, aps);
+            kvz_nal_write(stream, KVZ_NAL_APS_NUT, 0, state->frame->first_nal);
+            state->frame->first_nal = false;
+            encoder_state_write_adaptation_parameter_set(state, &aps);
+
+            //apsMap->clearChangedFlag((apsId << NUM_APS_TYPE_LEN) + ALF_APS);
+            apsMap[apsId + T_ALF_APS].b_changed = false;
+
+            //CHECK(aps != pcSlice->getAlfAPSs()[apsId], "Wrong APS pointer in compressGOP");
+            assert(aps.aps_id == state->children[i].slice->apss[apsId].aps_id); //"Wrong APS id");
+          }
+        }
+      }
+    }
+  }
+
   encoder_state_write_bitstream_children(state);
 
   if (state->encoder_control->cfg.hash != KVZ_HASH_NONE) {

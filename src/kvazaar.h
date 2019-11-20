@@ -502,6 +502,7 @@ enum kvz_nal_unit_type {
   KVZ_NAL_STSA = 1,
   KVZ_NAL_RADL = 2,
   KVZ_NAL_RASL = 3,
+  KVZ_NAL_APS_NUT = 4,
 
   // Intra random access point pictures
   KVZ_NAL_IDR_W_RADL = 7,

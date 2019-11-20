@@ -38,7 +38,6 @@
 #define ALF_CTB_MAX_NUM_APS             8
 #define MAX_ALF_PADDING_SIZE            4
 #define MAX_ALF_NUM_CLIPPING_VALUES     4
-#define NUM_APS_TYPE_LEN                3
 #define SCALE_BITS                      15
 #define MAX_NUM_ALF_ALTERNATIVES_CHROMA 8
 #define NUM_APS_TYPE_LEN                0 //1 //3
@@ -337,6 +336,8 @@ static short g_clipp_aps_luma[ALF_CTB_MAX_NUM_APS][MAX_NUM_ALF_CLASSES * MAX_NUM
 static short g_fixed_filter_set_coeff_dec[ALF_NUM_FIXED_FILTER_SETS][MAX_NUM_ALF_CLASSES * MAX_NUM_ALF_LUMA_COEFF];
 
 //once ever
+static int chroma_scale_x;
+static int chroma_scale_y;
 static int g_num_ctus_in_pic;
 static int g_alf_vb_luma_ctu_height;
 static int g_alf_vb_chma_ctu_height;
@@ -379,6 +380,10 @@ kvz_pixel *alf_fulldata;
 kvz_pixel *alf_tmp_y;
 kvz_pixel *alf_tmp_u;
 kvz_pixel *alf_tmp_v;
+
+kvz_pixel *alf_ctb_tmp_y;
+kvz_pixel *alf_ctb_tmp_u;
+kvz_pixel *alf_ctb_tmp_v;
 
 //cabac temps
 cabac_data_t ctx_start;
@@ -448,6 +453,8 @@ void add_alf_cov_lhs_rhs(alf_covariance *dst, alf_covariance *lhs, alf_covarianc
 void reset_alf_covariance(alf_covariance *alf, int num_bins);
 void adjust_pixels(kvz_pixel *src, int x_start, int x_end, int y_start, int y_end,
                    int stride, int pic_width, int pic_height);
+void adjust_pixels_chroma(kvz_pixel *src, int x_start, int x_end, int y_start, int y_end, 
+                  int stride, int pic_width, int pic_height);
 void set_ctu_enable_flag(uint8_t **flags, channel_type channel, int ctu_idx, uint8_t value);
 void copy_ctu_enable_flag(uint8_t **flags_dst, uint8_t **flags_src, channel_type channel, int ctu_idx);
 
@@ -484,9 +491,11 @@ double kvz_alf_derive_ctb_alf_enable_flags(encoder_state_t * const state,
 void kvz_alf_enc_create(encoder_state_t const *state,
   const lcu_order_element_t *lcu);
 
-void kvz_alf_enc_destroy(encoder_state_t const *state,
-  videoframe_t * const frame,
-  const lcu_order_element_t *lcu);
+void kvz_frame_end(encoder_state_t const *state,
+  videoframe_t * const frame, 
+  const lcu_order_element_t *const lcu);
+
+void kvz_alf_enc_destroy(videoframe_t * const frame);
 
 void kvz_alf_encoder(encoder_state_t *const state,
   const lcu_order_element_t *lcu,
@@ -637,6 +646,22 @@ void code_alf_ctu_alternative_ctu(encoder_state_t * const state,
 void kvz_encode_alf_bits(encoder_state_t * const state,
   const int ctu_idx);
 
+void encoder_state_write_adaptation_parameter_set(encoder_state_t * const state,
+  alf_aps *aps);
+
+void code_alf_aps(encoder_state_t * const state,
+  alf_aps* aps);
+
+void alf_filter(encoder_state_t * const state,
+  alf_aps* aps,
+  const bool is_chroma,
+  const int alt_idx);
+
+void alf_golomb_encode(encoder_state_t * const state,
+  int coeff,
+  int k,
+  const bool signed_coeff);
+
 //---------------------------------------------------------------------
 
 //-------------------------CTU functions--------------------------------
@@ -664,7 +689,6 @@ void kvz_alf_create(encoder_state_t const *state,
 void kvz_alf_destroy(videoframe_t * const frame);
 
 void kvz_alf_derive_classification(encoder_state_t *const state,
-  const lcu_order_element_t *const lcu,
   const int width,
   const int height,
   int x_pos,
@@ -685,7 +709,6 @@ void kvz_alf_reset_pcm_blk_class_info(encoder_state_t *const state,
   int y_pos);*/
 
 void kvz_alf_derive_classification_blk(encoder_state_t *const state,
-  const lcu_order_element_t * const lcu,
   const int shift,
   const int n_height,
   const int n_width,
