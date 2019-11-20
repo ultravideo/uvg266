@@ -390,6 +390,9 @@ typedef struct kvz_config
   /** \brief Enable Early Skip Mode Decision */
   uint8_t early_skip;
 
+  /** \brief Disable intra smoothing when true */
+  uint8_t intra_smoothing_disabled;
+
 } kvz_config;
 
 /**
