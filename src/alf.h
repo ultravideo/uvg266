@@ -447,6 +447,7 @@ void get_frame_stat(alf_covariance* frame_cov, alf_covariance** ctb_cov, uint8_t
 void copy_cov(alf_covariance *dst, alf_covariance *src);
 void copy_alf_param(alf_aps *dst, alf_aps *src);
 void copy_alf_param_w_channel(alf_aps* dst, alf_aps* src, channel_type channel);
+//bool compare_alf_param(const alf_aps* aps_1, const alf_aps* aps_2);
 void reset_alf_param(alf_aps *src);
 void add_alf_cov(alf_covariance *dst, alf_covariance *src);
 void add_alf_cov_lhs_rhs(alf_covariance *dst, alf_covariance *lhs, alf_covariance *rhs);

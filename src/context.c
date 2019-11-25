@@ -271,31 +271,24 @@ static const uint8_t INIT_JOINT_CB_CR_FLAG[4][3] = {
   {  12,  21,  35, },
   {   1,   1,   0, },
 static const uint8_t INIT_ALF_CTB_FLAG[4][9] = {
-  { 26,  45,  46,  33,  61,  54,  33,  61,  54, },
-  { 6,   23,  46,  27,  61,  54,  20,  46,  54, },
-  { 39,  39,  39,  54,  39,  39,  31,  62,  39, },
-  { 0,   0,   0,   0,   0,   0,   0,   0,   0, },
+  {  26,  52,  46,  18,  61,  54,  18,  61,  54, },
+  {   6,  23,  46,  12,  61,  54,   5,  46,  54, },
+  {  39,  39,  39,  62,  39,  39,  31,  39,  39, },
+  {   0,   0,   0,   0,   0,   0,   0,   0,   0, },
 };
 
 static const INIT_ALF_CTB_ALTERNATIVE[4][2] = {
-  { 18,  18, },
-  { 20,  12, },
-  { 44,  44, },
-  { 0,   0, },
-};
-
-static const uint8_t INIT_ALF_LATEST_FILT[4] = {
-  { 58, },
-  { 50, },
-  { 31, },
-  { 0, },
+  {  11,  11, },
+  {  20,  12, },
+  {  28,  28, },
+  {   0,   0, },
 };
 
 static const uint8_t INIT_ALF_TEMPORAL_FILT[4] = {
-  { 53, },
-  { 53, },
-  { CNU, },
-  { 0, },
+  {  46, },
+  {  53, },
+  {  46, },
+  {   0, },
 };
 
 static const uint8_t INIT_CU_TRANSQUANT_BYPASS[4][1] = {
@@ -365,7 +358,6 @@ void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
   // Initialize contexts
   kvz_ctx_init(&cabac->ctx.sao_merge_flag_model, QP, INIT_SAO_MERGE_FLAG[slice], INIT_SAO_MERGE_FLAG[3]);
   kvz_ctx_init(&cabac->ctx.sao_type_idx_model, QP, INIT_SAO_TYPE_IDX[slice], INIT_SAO_TYPE_IDX[3]);
-  kvz_ctx_init(&cabac->ctx.alf_latest_filt, QP, INIT_ALF_LATEST_FILT[slice], INIT_ALF_LATEST_FILT[3]);
   kvz_ctx_init(&cabac->ctx.alf_temporal_filt, QP, INIT_ALF_TEMPORAL_FILT[slice], INIT_ALF_TEMPORAL_FILT[3]);
 
   kvz_ctx_init(&cabac->ctx.cu_merge_flag_ext_model, QP, INIT_MERGE_FLAG_EXT[slice][0], INIT_MERGE_FLAG_EXT[3][0]);

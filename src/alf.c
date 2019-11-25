@@ -565,7 +565,7 @@ int length_uvlc(int ui_code)
   return (ui_length >> 1) + ((ui_length + 1) >> 1);
 }
 
-double get_dist_coeff_force_0(bool* coded_var_bins, double error_force_0_coeff_tab[MAX_NUM_ALF_CLASSES][2], int* bits_var_bin, const int num_filters)
+double get_dist_coeff_force_0(bool* coded_var_bins, double error_force_0_coeff_tab[MAX_NUM_ALF_CLASSES][2], int* bits_var_bin, int zero_bits_var_bin, const int num_filters)
 {
   double dist_force_0 = 0;
   memset(coded_var_bins, 0, sizeof(*coded_var_bins) * MAX_NUM_ALF_CLASSES);
@@ -2537,7 +2537,8 @@ void kvz_alf_get_avai_aps_ids_luma(encoder_state_t *const state,
     state->slice->tile_group_luma_aps_id[i] = aps_ids[i];
   }
 
-  *new_aps_id = g_aps_id_start - 1;
+  //*new_aps_id = g_aps_id_start - 1;
+  *new_aps_id = ALF_CTB_MAX_NUM_APS - *size_of_aps_ids - 1;
   if (*new_aps_id < 0)
   {
     *new_aps_id = (int)ALF_CTB_MAX_NUM_APS - 1;
@@ -4391,16 +4392,6 @@ void kvz_alf_reconstructor(encoder_state_t const *state,
     {
       ctu_enable_flag |= g_ctu_enable_flag[comp_idx][ctu_idx] > 0;
     }
-    if (ctu_enable_flag && is_crossed_by_virtual_boundaries(x_pos, y_pos, width, height, &clip_top, &clip_bottom, &clip_left, &clip_right, &num_hor_vir_bndry, &num_ver_vir_bndry, hor_vir_bndry_pos, ver_vir_bndry_pos, state))
-    {
-      int y_start = y_pos;
-      for (int i = 0; i <= num_hor_vir_bndry; i++)
-      {
-        const int y_end = i == num_hor_vir_bndry ? y_pos + height : hor_vir_bndry_pos[i];
-        const int h = y_end - y_start;
-        const bool clip_t = (i == 0 && clip_top) || (i > 0) || (y_start == 0);
-        const bool clip_b = (i == num_hor_vir_bndry && clip_bottom) || (i < num_hor_vir_bndry) || (y_end == luma_height);
-
         int x_start = x_pos;
         for (int j = 0; j <= num_ver_vir_bndry; j++)
         {
@@ -4691,6 +4682,24 @@ void code_alf_ctu_filter_index(encoder_state_t * const state,
   unsigned num_available_filt_sets = num_aps + ALF_NUM_FIXED_FILTER_SETS;
   if (num_available_filt_sets > ALF_NUM_FIXED_FILTER_SETS)
   {
+#if JVET_P0162_REMOVE_ALF_CTB_FIRST_USE_APS_FLAG
+    int use_temporal_filt = (filter_set_idx >= ALF_NUM_FIXED_FILTER_SETS) ? 1 : 0;
+    cabac->cur_ctx = &(cabac->ctx.alf_temporal_filt);
+    CABAC_BIN(cabac, use_temporal_filt, "use_latest_filt");
+    if (use_temporal_filt)
+    {
+      assert(filter_set_idx < num_available_filt_sets); //"temporal non-latest set"
+      if (num_aps > 1)
+      {
+        kvz_cabac_encode_trunc_bin(cabac, filter_set_idx - ALF_NUM_FIXED_FILTER_SETS, num_available_filt_sets - ALF_NUM_FIXED_FILTER_SETS);
+      }
+    }
+    else
+    {
+      assert(filter_set_idx < ALF_NUM_FIXED_FILTER_SETS); //"fixed set larger than temporal"
+      kvz_cabac_encode_trunc_bin(cabac, filter_set_idx, ALF_NUM_FIXED_FILTER_SETS);
+    }
+#else
     int use_latest_filt = (filter_set_idx == ALF_NUM_FIXED_FILTER_SETS) ? 1 : 0;
     /*if (num_aps == 0) {
       use_latest_filt = 1;
@@ -4727,6 +4736,7 @@ void code_alf_ctu_filter_index(encoder_state_t * const state,
         }
       }
     }
+#endif
   }
   else
   {
@@ -4811,10 +4821,12 @@ void kvz_encode_alf_bits(encoder_state_t * const state,
   for (int comp_idx = 0; comp_idx < MAX_NUM_COMPONENT; comp_idx++)
   {
     bool is_luma = comp_idx == COMPONENT_Y ? true : false;
+    //Pitäisi poistaa//
     if (!is_luma)
     {
-      state->slice->tile_group_alf_enabled_flag[comp_idx] = 0;
+      state->slice->tile_group_alf_enabled_flag[comp_idx] = false;
     }
+    //               //
     code_alf_ctu_enable_flag(state, &state->cabac, ctu_idx, comp_idx, NULL);
     if (is_luma)
     {
@@ -4831,11 +4843,10 @@ void kvz_encode_alf_bits(encoder_state_t * const state,
           code_alf_ctu_filter_index(state, &state->cabac, ctu_idx, state->slice->tile_group_alf_enabled_flag[COMPONENT_Y]);
         }*/
 
-        int num_aps = state->slice->tile_group_num_aps;
-        state->slice->tile_group_num_aps = 2;
+        int num_aps = state->slice->tile_group_num_aps; //Pitäisi poistaa
+        state->slice->tile_group_num_aps = 1; //Pitäisi poistaa
         code_alf_ctu_filter_index(state, &state->cabac, ctu_idx, state->slice->tile_group_alf_enabled_flag[COMPONENT_Y]);
-        state->slice->tile_group_num_aps = num_aps;
-
+        state->slice->tile_group_num_aps = num_aps; //Pitäisi poistaa
       }
     }
     if (!is_luma)
@@ -5808,71 +5819,6 @@ void kvz_alf_derive_classification(encoder_state_t *const state,
     }
   }
 }
-
-/*kvz_alf_reset_pcm_blk_class_info
-//Turha jos PCM on pois päältä.
-void kvz_alf_reset_pcm_blk_class_info(encoder_state_t *const state,
-  const lcu_order_element_t *const lcu,
-  const int width,
-  const int height,
-  int x_pos,
-  int y_pos)
-{
-  if (!ENABLE_PCM) //!cs.sps->getPCMFilterDisableFlag()
-  {
-    return;
-  }
-
-  //alf_classifier **g_classifier = state->tile->frame->alf_info->g_classifier;
-
-  int max_height = y_pos + height;
-  int max_width = x_pos + width;
-  const int cls_size_y = 4;
-  const int cls_size_x = 4;
-  int class_idx = ALF_UNUSED_CLASS_IDX;
-  int transpose_idx = ALF_UNUSED_TRANSPOSE_IDX;
-
-  for (int i = y_pos; i < max_height; i += CLASSIFICATION_BLK_SIZE)
-  {
-    int n_height = MIN(i + CLASSIFICATION_BLK_SIZE, max_height) - i;
-
-    for (int j = x_pos; j < max_width; j += CLASSIFICATION_BLK_SIZE)
-    {
-      int n_width = MIN(j + CLASSIFICATION_BLK_SIZE, max_width) - j;
-      int pos_x = j;
-      int pos_y = i;
-
-      for (int subi = 0; subi < n_height; subi += cls_size_y)
-      {
-        for (int subj = 0; subj < n_width; subj += cls_size_x)
-        {
-          int y_offset = subi + pos_y;
-          int x_offset = subj + pos_x;
-          //Position pos(xOffset, yOffset);
-
-          //const CodingUnit* cu = cs.getCU(pos, CH_L);
-          if (1) //cu->ipcm ///ipcm_flag = 0
-          {
-            alf_classifier *cl0 = g_classifier[y_offset] + x_offset;
-            alf_classifier *cl1 = g_classifier[y_offset + 1] + x_offset;
-            alf_classifier *cl2 = g_classifier[y_offset + 2] + x_offset;
-            alf_classifier *cl3 = g_classifier[y_offset + 3] + x_offset;
-
-            cl0[0].class_idx = cl0[1].class_idx = cl0[2].class_idx = cl0[3].class_idx = 
-            cl1[0].class_idx = cl1[1].class_idx = cl1[2].class_idx = cl1[3].class_idx = 
-            cl2[0].class_idx = cl2[1].class_idx = cl2[2].class_idx = cl2[3].class_idx = 
-            cl3[0].class_idx = cl3[1].class_idx = cl3[2].class_idx = cl3[3].class_idx = class_idx;
-
-            cl0[0].transpose_idx = cl0[1].transpose_idx = cl0[2].transpose_idx = cl0[3].transpose_idx = 
-            cl1[0].transpose_idx = cl1[1].transpose_idx = cl1[2].transpose_idx = cl1[3].transpose_idx = 
-            cl2[0].transpose_idx = cl2[1].transpose_idx = cl2[2].transpose_idx = cl2[3].transpose_idx = 
-            cl3[0].transpose_idx = cl3[1].transpose_idx = cl3[2].transpose_idx = cl3[3].transpose_idx = transpose_idx;
-          }
-        }
-      }
-    }
-  }
-}*/
 
 void kvz_alf_derive_classification_blk(encoder_state_t * const state,
   const int shift,
