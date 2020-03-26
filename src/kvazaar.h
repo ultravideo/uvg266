@@ -441,23 +441,24 @@ enum kvz_nal_unit_type {
   KVZ_NAL_RASL = 3,
 
   // Intra random access point pictures
-  KVZ_NAL_IDR_W_RADL = 8,
-  KVZ_NAL_IDR_N_LP = 9,
-  KVZ_NAL_CRA_NUT = 10,
-  KVZ_NAL_GDR_NUT = 11,
+  KVZ_NAL_IDR_W_RADL = 7,
+  KVZ_NAL_IDR_N_LP = 8,
+  KVZ_NAL_CRA_NUT = 9,
+  KVZ_NAL_GDR_NUT = 10,
 
 
   // non-VCL  
-  KVZ_NAL_SPS_NUT = 16,
-  KVZ_NAL_PPS_NUT = 17,
+  KVZ_NAL_VPS_NUT = 14,
+  KVZ_NAL_SPS_NUT = 15,
+  KVZ_NAL_PPS_NUT = 16,
 
-  KVZ_NAL_AUD_NUT = 19,
+  KVZ_NAL_AUD_NUT = 20,
 
-  KVZ_NAL_EOS_NUT = 20,
-  KVZ_NAL_EOB_NUT = 21,
-  KVZ_NAL_PREFIX_SEI_NUT = 22,
-  KVZ_NAL_SUFFIX_SEI_NUT = 23,
-  KVZ_NAL_VPS_NUT = 25,
+  KVZ_NAL_EOS_NUT = 21,
+  KVZ_NAL_EOB_NUT = 22,
+  KVZ_NAL_PREFIX_SEI_NUT = 23,
+  KVZ_NAL_SUFFIX_SEI_NUT = 24,
+  
 
 };
 
