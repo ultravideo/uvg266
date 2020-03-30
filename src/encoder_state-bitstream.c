@@ -351,7 +351,12 @@ static void encoder_state_write_bitstream_SPS_extension(bitstream_t *stream,
 
     WRITE_U(stream, 1, 1, "sps_range_extension_flag");
     WRITE_U(stream, 0, 1, "sps_multilayer_extension_flag");
-    WRITE_U(stream, 0, 6, "sps_extension_6bits");
+    WRITE_U(stream, 0, 1, "sps_extension_6bits");
+    WRITE_U(stream, 0, 1, "sps_extension_6bits");
+    WRITE_U(stream, 0, 1, "sps_extension_6bits");
+    WRITE_U(stream, 0, 1, "sps_extension_6bits");
+    WRITE_U(stream, 0, 1, "sps_extension_6bits");
+    WRITE_U(stream, 0, 1, "sps_extension_6bits");
 
     // Range Extension
     WRITE_U(stream, 0, 1, "transform_skip_rotation_enabled_flag");
@@ -405,18 +410,23 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   WRITE_UE(stream, encoder->in.width, "pic_width_max_in_luma_samples");
   WRITE_UE(stream, encoder->in.height, "pic_height_max_in_luma_samples");
 
-  WRITE_UE(stream, encoder->bitdepth-8, "bit_depth_luma_minus8");
-  WRITE_UE(stream, encoder->bitdepth-8, "bit_depth_chroma_minus8");
+  WRITE_U(stream, 1, 2, "sps_log2_ctu_size_minus5"); // Max size 2^6 = 64x64
 
-  WRITE_UE(stream, 6, "min_qp_prime_ts_minus4");
+  WRITE_U(stream, 0, 1, "subpic_info_present_flag");
+
+  WRITE_UE(stream, encoder->bitdepth-8, "bit_depth_minus8");
+
+  //WRITE_UE(stream, 6, "min_qp_prime_ts_minus4");
 
   WRITE_U(stream, 0, 1, "sps_weighted_pred_flag");
   WRITE_U(stream, 0, 1, "sps_weighted_bipred_flag");
 
-  WRITE_UE(stream, 1, "log2_max_pic_order_cnt_lsb_minus4");
-  WRITE_U(stream, 0, 1, "sps_idr_rpl_present_flag");
+  WRITE_U(stream, 1, 4, "log2_max_pic_order_cnt_lsb_minus4");
+  WRITE_U(stream, 0, 1, "sps_poc_msb_flag");
+  WRITE_U(stream, 0, 2, "num_extra_ph_bits_bytes");
+  WRITE_U(stream, 0, 2, "num_extra_sh_bits_bytes");
 
-  WRITE_U(stream, 0, 1, "sps_sub_layer_ordering_info_present_flag");
+  WRITE_U(stream, 0, 1, "sps_sublayer_dpb_params_flag");
 
   //for each layer
   if (encoder->cfg.gop_lowdelay) {
@@ -430,21 +440,24 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   //end for
 
   WRITE_U(stream, 0, 1, "long_term_ref_pics_flag");
+  WRITE_U(stream, 1, 1, "inter_layer_ref_pics_present_flag");
+  WRITE_U(stream, 0, 1, "sps_idr_rpl_present_flag");
   WRITE_U(stream, 1, 1, "rpl1_copy_from_rpl0_flag");
   WRITE_UE(stream, 0, "num_ref_pic_lists_in_sps[0]")
 
   // QTBT
   // if(!no_qtbtt_dual_tree_intra_constraint_flag)
     WRITE_U(stream, 0, 1, "qtbtt_dual_tree_intra_flag");
-  WRITE_U(stream, 1, 2, "log2_CTU_size_minus5"); // Max size 2^6 = 64x64
+  
   WRITE_UE(stream, MIN_SIZE-2, "log2_min_luma_coding_block_size_minus2"); // Min size 2^3 = 8x8
   // if(!no_partition_constraints_override_constraint_flag)
     WRITE_U(stream, 0, 1, "partition_constraints_override_enabled_flag");
-
   WRITE_UE(stream, 0, "sps_log2_diff_min_qt_min_cb_intra_slice_luma");
+  WRITE_UE(stream, 0, "sps_max_mtt_hierarchy_depth_intra_slice_luma");  
+  
   WRITE_UE(stream, 0, "sps_log2_diff_min_qt_min_cb_inter_slice");
-  WRITE_UE(stream, 0, "sps_max_mtt_hierarchy_depth_inter_slice");
-  WRITE_UE(stream, 0, "sps_max_mtt_hierarchy_depth_intra_slice_luma");
+  WRITE_UE(stream, 0, "sps_max_mtt_hierarchy_depth_inter_slice");  
+
 
 #if 0 // mtt depth intra
   if (max_mtt_depth_intra != 0) {
@@ -492,21 +505,18 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   if (encoder->chroma_format != KVZ_CSP_400) {    
     WRITE_U(stream, 1, 1, "same_qp_table_for_chroma");
 
+      WRITE_SE(stream, 0, "qp_table_starts_minus26");    
       WRITE_UE(stream, 0, "num_points_in_qp_table_minus1");
 
         WRITE_UE(stream, 0, "delta_qp_in_val_minus1");
-        WRITE_UE(stream, 1, "delta_qp_out_val");
-
+        WRITE_UE(stream, 1, "delta_qp_diff_val");
 
   }
-
-
-
 
   // if(!no_sao_constraint_flag)
     WRITE_U(stream, encoder->cfg.sao_type ? 1 : 0, 1, "sps_sao_enabled_flag");
   // if(!no_alf_constraint_flag)
-    WRITE_U(stream, 0, 1, "sps_alf_enable_flag");
+    WRITE_U(stream, 0, 1, "sps_alf_enabled_flag");
 
   //WRITE_U(stream, (encoder->cfg.amp_enable ? 1 : 0), 1, "amp_enabled_flag");
 
@@ -516,7 +526,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
     WRITE_U(stream, 0, 1, "sps_ref_wraparound_enabled_flag");
   // if(!no_temporal_mvp_constraint_flag)
     WRITE_U(stream, state->encoder_control->cfg.tmvp_enable, 1,
-        "sps_temporal_mvp_enable_flag");
+        "sps_temporal_mvp_enabled_flag");
   if (state->encoder_control->cfg.tmvp_enable /* && !no_sbtmvp_constraint_flag */) {
     WRITE_U(stream, 0, 1, "sps_sbtmvp_enabled_flag");
   }
@@ -526,42 +536,41 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   // if(!no_bdof_constraint_flag)
     WRITE_U(stream, 0, 1, "sps_bdof_enabled_flag");
   // if(!no_dmvr_constraint_flag)
-    WRITE_U(stream, 0, 1, "sps_dmvr_enable_flag");
-  WRITE_U(stream, 0, 1, "sps_mmvd_enable_flag");
+    WRITE_U(stream, 0, 1, "sps_smvd_enabled_flag");
+
+  // if(!no_dmvr_constraint_flag)
+    WRITE_U(stream, 0, 1, "sps_dmvr_enabled_flag");
+  WRITE_U(stream, 0, 1, "sps_mmvd_enabled_flag");  
+  WRITE_U(stream, 0, 1, "sps_isp_enabled_flag");
+  WRITE_U(stream, 0, 1, "sps_mrl_enabled_flag");
+  WRITE_U(stream, 0, 1, "sps_mip_enabled_flag");
   // if(!no_cclm_constraint_flag)
-    WRITE_U(stream, 0, 1, "lm_chroma_enabled_flag");
-  
+    WRITE_U(stream, 0, 1, "sps_cclm_enabled_flag");
+
+  WRITE_U(stream, 0, 1, "sps_chroma_horizontal_collocated_flag");
+  WRITE_U(stream, 0, 1, "sps_chroma_vertical_collocated_flag");
 
   // if(!no_mts_constraint_flag)
-    WRITE_U(stream, 0, 1, "mts_enabled_flag");
-  WRITE_U(stream, 0, 1, "lfnst_enabled_flag");
-  WRITE_U(stream, 0, 1, "smvd_flag");
+    WRITE_U(stream, 0, 1, "sps_mts_enabled_flag");
+  WRITE_U(stream, 0, 1, "sps_sbt_enabled_flag");
   // if(!no_affine_motion_constraint_flag)
-    WRITE_U(stream, 0, 1, "affine_flag");
-  // if(!no_gbi_constraint_flag)
-    WRITE_U(stream, 0, 1, "gbi_flag");
-    if (encoder->chroma_format == KVZ_CSP_444) {
-      WRITE_U(stream, 0, 1, "plt_flag");
-    }
+  WRITE_U(stream, 0, 1, "sps_affine_enabled_flag");
+  WRITE_U(stream, 0, 1, "sps_palette_enabled_flag");
+  WRITE_U(stream, 0, 1, "sps_bcw_enabled_flag");
+  WRITE_U(stream, 0, 1, "sps_ibc_enabled_flag");
+  WRITE_U(stream, 0, 1, "sps_ciip_enabled_flag");
+  WRITE_U(stream, 0, 1, "sps_gpm_enabled_flag");
 
-  // if(!no_ibc_constraint_flag)
-    WRITE_U(stream, 0, 1, "ibc_flag");
-  // if(!no_mh_intra_constraint_flag)
-    WRITE_U(stream, 0, 1, "mhintra_flag");
-  // if(!no_triangle_constraint_flag)
-    WRITE_U(stream, 0, 1, "triangle_flag");
-  WRITE_U(stream, 0, 1, "sps_mip_flag ");
-  // if(!no_sbt_constraint_flag)
-    WRITE_U(stream, 0, 1, "sbt_enable_flag");
-  // Written only if sbt is enabled
-  //WRITE_U(stream, 0, 1, "max_sbt_size_64_flag");
-  WRITE_U(stream, 0, 1, "sps_reshaper_enable_flag");
-  WRITE_U(stream, 0, 1, "isp_enable_flag");
+  WRITE_U(stream, 0, 1, "sps_lmcs_enable_flag");
+  WRITE_U(stream, 0, 1, "sps_lfnst_enabled_flag");
   // if(!no_ladf_constraint_flag)
   WRITE_U(stream, 0, 1, "sps_ladf_enabled_flag");
 
+  WRITE_UE(stream, 0, "log2_parallel_merge_level_minus2");
 
   WRITE_U(stream, 0, 1, "scaling_list_enabled_flag");
+
+  WRITE_U(stream, 0, 1, "sps_loop_filter_across_virtual_boundaries_disabled_present_flag");  
 
   WRITE_U(stream, encoder->vui.timing_info_present_flag, 1, "general_hrd_parameters_present_flag");
   if (encoder->vui.timing_info_present_flag) {
@@ -572,21 +581,17 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
 
     WRITE_U(stream, 0, 1, "general_nal_hrd_parameters_present_flag");
     WRITE_U(stream, 0, 1, "general_vcl_hrd_parameters_present_flag");
-    //// if nal_hrd or vlc_hrt
-    //  WRITE_U(stream, 0, 1, "decoding_unit_hrd_params_present_flag");
-    //  WRITE_U(stream, 0, 8, "tick_divisor_minus2");
-    //  WRITE_U(stream, 0, 1, "decoding_unit_cpb_params_in_pic_timing_sei_flag");
-    //  WRITE_U(stream, 0, 4, "bit_rate_scale");
-    //  WRITE_U(stream, 0, 4, "cpb_size_scale");
-    //  WRITE_U(stream, 0, 4, "cpb_size_du_scale");
+    WRITE_U(stream, 0, 1, "general_decoding_unit_hrd_params_present_flag");
+    
+    WRITE_U(stream, 0, 4, "bit_rate_scale");
+    WRITE_U(stream, 0, 4, "cpb_size_scale");
 
     WRITE_U(stream, 0, 1, "fixed_pic_rate_general_flag");
-      //WRITE_U(stream, 0, 1, "fixed_pic_rate_within_cvs_flag");
+    WRITE_U(stream, 0, 1, "fixed_pic_rate_within_cvs_flag");
     WRITE_U(stream, 0, 1, "low_delay_hrd_flag");
-
     WRITE_UE(stream, 0, "cpb_cnt_minus1");
   }
-
+  WRITE_U(stream, 0, 1, "field_seq_flag");
   WRITE_U(stream, 0, 1, "vui_parameters_present_flag");
 
   // ToDo: Check and enable
