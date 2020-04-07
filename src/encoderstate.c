@@ -682,10 +682,8 @@ static void encoder_state_worker_encode_lcu(void * opaque)
 
 
     if (end_of_tile || end_of_wpp_row) {
-      if (!end_of_slice_segment_flag) {
-        // end_of_sub_stream_one_bit
-        kvz_cabac_encode_bin_trm(&state->cabac, 1);
-      }
+      // end_of_sub_stream_one_bit
+      kvz_cabac_encode_bin_trm(&state->cabac, 1);
 
       // Finish the substream by writing out remaining state.
       kvz_cabac_finish(&state->cabac);
