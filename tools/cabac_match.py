@@ -30,6 +30,7 @@ with open(file1, "r") as fd1:
     with open(file2, "r") as fd2:
         for file1_line in fd1:
             file1_values = file1_line.strip().split()
+            
             #print(file1_values[0])
 
             #print("{0} {1}".format(file1_values[0], check_int(file1_values[0])))
@@ -39,6 +40,8 @@ with open(file1, "r") as fd1:
             while 1:
                 if int(file1_values[0]) == int(file2_values[0]):
                     if check_values(file1_values, file2_values) != True:
+                        print(file1_line)
+                        print(file2_line)
                         print("Value mismatch at " + file1_values[0])
                         exit(1)
                     break

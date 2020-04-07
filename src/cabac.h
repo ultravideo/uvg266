@@ -61,8 +61,8 @@ typedef struct
     cabac_ctx_t chroma_pred_model;
     cabac_ctx_t inter_dir[6];
     cabac_ctx_t qt_cbf_model_luma[4];
-    cabac_ctx_t qt_cbf_model_cr[2];
-    cabac_ctx_t qt_cbf_model_cb[1];
+    cabac_ctx_t qt_cbf_model_cr[3];
+    cabac_ctx_t qt_cbf_model_cb[2];
     cabac_ctx_t cu_qp_delta_abs[2];
     cabac_ctx_t part_size_model[4];
     cabac_ctx_t cu_sig_model_luma[3][12];
