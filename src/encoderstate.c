@@ -674,7 +674,7 @@ static void encoder_state_worker_encode_lcu(void * opaque)
     bool is_last_tile = state->tile->id == last_tile_id;
     end_of_slice_segment_flag = is_last_tile && lcu->last_column && lcu->last_row;
   }
-  kvz_cabac_encode_bin_trm(&state->cabac, end_of_slice_segment_flag);
+  //kvz_cabac_encode_bin_trm(&state->cabac, end_of_slice_segment_flag);
 
   {
     const bool end_of_tile = lcu->last_column && lcu->last_row;

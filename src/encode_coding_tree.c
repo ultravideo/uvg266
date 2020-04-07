@@ -492,7 +492,7 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
   //isp_mode += ((height > TR_MAX_WIDTH) || !enough_samples) ? 2 : 0;
   bool allow_isp = enough_samples;
 
-  if (cur_cu->type == 1/*intra*/ && (y % LCU_WIDTH) != 0) {
+  if (0 && cur_cu->type == 1/*intra*/ && (y % LCU_WIDTH) != 0) {
     cabac->cur_ctx = &(cabac->ctx.multi_ref_line[0]);
     CABAC_BIN(cabac, 0, "multi_ref_line");
   }
@@ -841,10 +841,8 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
     no_split = allow_qt = bh_split = bv_split = th_split = tv_split = true;
     if(depth > MAX_DEPTH) allow_qt = false;
     // ToDo: update this when btt is actually used
-    bool allow_btt = depth == MAX_DEPTH;
-    if (!allow_btt) {
-      bh_split = bv_split = th_split = tv_split = false;
-    }
+    bool allow_btt = false;// when mt_depth < MAX_BT_DEPTH
+
     
 
     uint8_t implicit_split_mode = KVZ_NO_SPLIT;
@@ -872,7 +870,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
       implicit_split_mode = KVZ_QUAD_SPLIT;
     }
 
-    split_flag = implicit_split_mode != KVZ_NO_SPLIT;
+    //split_flag = implicit_split_mode != KVZ_NO_SPLIT;
 
     // Check split conditions
     if (implicit_split_mode != KVZ_NO_SPLIT) {
@@ -881,23 +879,25 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
       bv_split = (implicit_split_mode == KVZ_VERT_SPLIT);
     }
 
-    bool allow_split = allow_qt | bh_split | bv_split | th_split | tv_split;
-    //ToDo: Change MAX_DEPTH to MAX_BT_DEPTH
-    allow_btt = depth >= MAX_DEPTH;
+    if (!allow_btt) {
+      bh_split = bv_split = th_split = tv_split = false;
+    }
 
+    bool allow_split = allow_qt | bh_split | bv_split | th_split | tv_split;
+
+    split_flag |= implicit_split_mode != KVZ_NO_SPLIT;
 
     if (no_split && allow_split) {
       split_model = 0;
-
       
       // Get left and top block split_flags and if they are present and true, increase model number
       // ToDo: should use height and width to increase model, PU_GET_W() ?
-      if (left_cu && GET_SPLITDATA(left_cu, depth) == 1) {
-        //split_model++;
+      if (left_cu && PU_GET_H(left_cu->part_size,LCU_WIDTH>>left_cu->depth,0) < LCU_WIDTH>>depth) {
+        split_model++;
       }
 
-      if (above_cu && GET_SPLITDATA(above_cu, depth) == 1) {
-        //split_model++;
+      if (above_cu && PU_GET_W(above_cu->part_size, LCU_WIDTH >> above_cu->depth, 0) < LCU_WIDTH >> depth) {
+        split_model++;
       }
 
       uint32_t split_num = 0;
@@ -912,14 +912,15 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
       split_model += 3 * (split_num >> 1);
 
       cabac->cur_ctx = &(cabac->ctx.split_flag_model[split_model]);
-      CABAC_BIN(cabac, !(implicit_split_mode == KVZ_NO_SPLIT), "SplitFlag");
+      CABAC_BIN(cabac, split_flag, "SplitFlag");
+      //fprintf(stdout, "split_model=%d  %d / %d / %d / %d / %d\n", split_model, allow_qt, bh_split, bv_split, th_split, tv_split);
     }
 
-    bool qt_split = implicit_split_mode == KVZ_QUAD_SPLIT;
+    bool qt_split = split_flag || implicit_split_mode == KVZ_QUAD_SPLIT;
 
     if (!(implicit_split_mode == KVZ_NO_SPLIT) && (allow_qt && allow_btt)) {
       split_model = (left_cu && GET_SPLITDATA(left_cu, depth)) + (above_cu && GET_SPLITDATA(above_cu, depth)) + (depth < 2 ? 0 : 3);
-      cabac->cur_ctx = &(cabac->ctx.split_flag_model[split_model]);
+      cabac->cur_ctx = &(cabac->ctx.qt_split_flag_model[split_model]);
       CABAC_BIN(cabac, qt_split, "QT_SplitFlag");
     }
 
