@@ -894,19 +894,6 @@ static void kvz_encoder_state_write_bitstream_picture_header(
 {
   const encoder_control_t * const encoder = state->encoder_control;
 
-  int j;
-  int ref_negative = 0;
-  int ref_positive = 0;
-  if (encoder->cfg.gop_len) {
-    for (j = 0; j < state->frame->ref->used_size; j++) {
-      if (state->frame->ref->pocs[j] < state->frame->poc) {
-        ref_negative++;
-      } else {
-        ref_positive++;
-      }
-    }
-  } else ref_negative = state->frame->ref->used_size;
-
 #ifdef KVZ_DEBUG
   printf("=========== Picture Header ===========\n");
 #endif
@@ -931,75 +918,12 @@ static void kvz_encoder_state_write_bitstream_picture_header(
 
     WRITE_U(stream, 0, 5, "ph_pic_order_cnt_lsb");
     WRITE_U(stream, 0, 1, "no_output_of_prior_pics_flag");
-  } else {
-    int last_poc = 0;
-    int poc_shift = 0;
 
-      WRITE_U(stream, state->frame->poc&0x1f, 5, "ph_pic_order_cnt_lsb");
-      WRITE_U(stream, 0, 1, "short_term_ref_pic_set_sps_flag");
-      WRITE_UE(stream, ref_negative, "num_negative_pics");
-      WRITE_UE(stream, ref_positive, "num_positive_pics");
-    for (j = 0; j < ref_negative; j++) {
-      int8_t delta_poc = 0;
-      
-      if (encoder->cfg.gop_len) {
-        int8_t found = 0;
-        do {
-          delta_poc = encoder->cfg.gop[state->frame->gop_offset].ref_neg[j + poc_shift];
-          for (int i = 0; i < state->frame->ref->used_size; i++) {
-            if (state->frame->ref->pocs[i] == state->frame->poc - delta_poc) {
-              found = 1;
-              break;
-            }
-          }
-          if (!found) poc_shift++;
-          if (j + poc_shift == ref_negative) {
-            fprintf(stderr, "Failure, reference not found!");
-            exit(EXIT_FAILURE);
-          }
-        } while (!found);
-      }
-
-      WRITE_UE(stream, encoder->cfg.gop_len?delta_poc - last_poc - 1:0, "delta_poc_s0_minus1");
-      last_poc = delta_poc;
-      WRITE_U(stream, !state->frame->is_irap, 1, "used_by_curr_pic_s0_flag");
-    }
-    last_poc = 0;
-    poc_shift = 0;
-    for (j = 0; j < ref_positive; j++) {      
-      int8_t delta_poc = 0;
-      
-      if (encoder->cfg.gop_len) {
-        int8_t found = 0;
-        do {
-          delta_poc = encoder->cfg.gop[state->frame->gop_offset].ref_pos[j + poc_shift];
-          for (int i = 0; i < state->frame->ref->used_size; i++) {
-            if (state->frame->ref->pocs[i] == state->frame->poc + delta_poc) {
-              found = 1;
-              break;
-            }
-          }
-          if (!found) poc_shift++;
-          if (j + poc_shift == ref_positive) {
-            fprintf(stderr, "Failure, reference not found!");
-            exit(EXIT_FAILURE);
-          }
-        } while (!found);
-      }
-      
-      WRITE_UE(stream, encoder->cfg.gop_len ? delta_poc - last_poc - 1 : 0, "delta_poc_s1_minus1");
-      last_poc = delta_poc;
-      WRITE_U(stream, !state->frame->is_irap, 1, "used_by_curr_pic_s1_flag");
-    }
-    //WRITE_UE(stream, 0, "short_term_ref_pic_set_idx");
-    
-    if (state->encoder_control->cfg.tmvp_enable) {
-      WRITE_U(stream, ref_negative ? 1 : 0, 1, "slice_temporal_mvp_enabled_flag");
-    }
+  }
+  else {
+    WRITE_U(stream, state->frame->poc & 0x1f, 5, "ph_pic_order_cnt_lsb");
   }
 
-    //end if
-  //end if
   WRITE_U(stream, 0, 1, "ph_loop_filter_across_virtual_boundaries_disabled_present_flag");
 
 
@@ -1021,25 +945,104 @@ static void kvz_encoder_state_write_bitstream_picture_header(
   //if !dep_quant_enable_flag
   WRITE_U(stream, encoder->cfg.signhide_enable, 1, "pic_sign_data_hiding_enabled_flag");
 
-  {
-    WRITE_UE(stream, state->frame->slicetype, "slice_type");
 
-    int slice_qp_delta = state->frame->QP - encoder->cfg.qp;
-    WRITE_SE(stream, slice_qp_delta, "slice_qp_delta");
+  // getDeblockingFilterControlPresentFlag
+
+  // END PICTURE HEADER
+
+}
+
+static void kvz_encoder_state_write_bitstream_ref_pic_list(
+  struct bitstream_t* const stream,
+  struct encoder_state_t* const state)
+{
+  int j;
+  int ref_negative = 0;
+  int ref_positive = 0;
+  const encoder_control_t* const encoder = state->encoder_control;
+  if (encoder->cfg.gop_len) {
+    for (j = 0; j < state->frame->ref->used_size; j++) {
+      if (state->frame->ref->pocs[j] < state->frame->poc) {
+        ref_negative++;
+      }
+      else {
+        ref_positive++;
+      }
+    }
   }
+  else ref_negative = state->frame->ref->used_size;
+
+  int last_poc = 0;
+  int poc_shift = 0;
 
 
+  WRITE_UE(stream, ref_negative, "num_negative_pics");  
+  for (j = 0; j < ref_negative; j++) {
+    int8_t delta_poc = 0;
 
-  
-  if (state->frame->slicetype != KVZ_SLICE_I) {
+    if (encoder->cfg.gop_len) {
+      int8_t found = 0;
+      do {
+        delta_poc = encoder->cfg.gop[state->frame->gop_offset].ref_neg[j + poc_shift];
+        for (int i = 0; i < state->frame->ref->used_size; i++) {
+          if (state->frame->ref->pocs[i] == state->frame->poc - delta_poc) {
+            found = 1;
+            break;
+          }
+        }
+        if (!found) poc_shift++;
+        if (j + poc_shift == ref_negative) {
+          fprintf(stderr, "Failure, reference not found!");
+          exit(EXIT_FAILURE);
+        }
+      } while (!found);
+    }
 
-    // BT Size set only with non-I-frames, in I-frames the size is 32x32
-    // but in other frames it is CTU size >> <this value>
-    WRITE_UE(stream, 0, "max_binary_tree_unit_size"); // Max BT size == CTU size
+    WRITE_U(stream, j, 1, "inter_layer_ref_pic_flag");
+    if (j) {
+      WRITE_UE(stream, j, "ilrp_idx");
+    }
 
+    WRITE_UE(stream, delta_poc, "abs_delta_poc_st");
+    if (delta_poc+1) WRITE_U(stream, 1, 1, "strp_entry_sign_flag");
+    //WRITE_UE(stream, encoder->cfg.gop_len ? delta_poc - last_poc - 1 : 0, "delta_poc_s0_minus1");
+    //WRITE_U(stream, !state->frame->is_irap, 1, "used_by_curr_pic_s0_flag");
+    last_poc = delta_poc;
+    
   }
+  last_poc = 0;
+  poc_shift = 0;
+  WRITE_UE(stream, ref_positive, "num_positive_pics");
+  for (j = 0; j < ref_positive; j++) {
+    int8_t delta_poc = 0;
 
-  WRITE_U(stream, 0, 1, "slice_ts_residual_coding_disabled_flag");
+    if (encoder->cfg.gop_len) {
+      int8_t found = 0;
+      do {
+        delta_poc = encoder->cfg.gop[state->frame->gop_offset].ref_pos[j + poc_shift];
+        for (int i = 0; i < state->frame->ref->used_size; i++) {
+          if (state->frame->ref->pocs[i] == state->frame->poc + delta_poc) {
+            found = 1;
+            break;
+          }
+        }
+        if (!found) poc_shift++;
+        if (j + poc_shift == ref_positive) {
+          fprintf(stderr, "Failure, reference not found!");
+          exit(EXIT_FAILURE);
+        }
+      } while (!found);
+    }
+
+    WRITE_U(stream, j, 1, "inter_layer_ref_pic_flag");
+    if (j) {
+      WRITE_UE(stream, j, "ilrp_idx");
+    }
+
+    WRITE_UE(stream, delta_poc, "abs_delta_poc_st");
+    if (delta_poc+1) WRITE_U(stream, 0, 1, "strp_entry_sign_flag");
+    last_poc = delta_poc;
+  }
 
 }
 
@@ -1065,9 +1068,33 @@ void kvz_encoder_state_write_bitstream_slice_header(
 
   WRITE_U(stream, 1, 1, "picture_header_in_slice_header_flag");
 
-
   kvz_encoder_state_write_bitstream_picture_header(stream, state);
 
+  WRITE_UE(stream, state->frame->slicetype, "slice_type");
+
+  if (state->frame->slicetype != KVZ_SLICE_I) {
+    kvz_encoder_state_write_bitstream_ref_pic_list(stream, state);
+  }
+
+  if (state->encoder_control->cfg.tmvp_enable) {
+    //WRITE_U(stream, ref_negative ? 1 : 0, 1, "slice_temporal_mvp_enabled_flag");
+  }
+
+  int slice_qp_delta = state->frame->QP - encoder->cfg.qp;
+  WRITE_SE(stream, slice_qp_delta, "slice_qp_delta");
+
+
+
+
+  if (state->frame->slicetype != KVZ_SLICE_I) {
+
+    // BT Size set only with non-I-frames, in I-frames the size is 32x32
+    // but in other frames it is CTU size >> <this value>
+    //WRITE_UE(stream, 0, "max_binary_tree_unit_size"); // Max BT size == CTU size
+
+  }
+
+  WRITE_U(stream, 0, 1, "slice_ts_residual_coding_disabled_flag");
 }
 
 
