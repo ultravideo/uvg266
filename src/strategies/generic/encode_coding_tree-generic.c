@@ -235,32 +235,6 @@ void kvz_encode_coeff_nxn_generic(encoder_state_t * const state,
         quant_state = (quant_state_transition_table >> ((quant_state << 2) + ((coeff[blk_pos] & 1) << 1))) & 3;
       }
 
-      /*
-      ****  SECOND PASS ****
-      */
-      /*
-      if (next_pass) {
-        next_pass = 0;
-        for (scan_pos = first_sig_pos; scan_pos >= min_sub_pos; scan_pos--) {
-          blk_pos = scan[scan_pos];
-          pos_y = blk_pos >> log2_block_size;
-          pos_x = blk_pos - (pos_y << log2_block_size);
-          if (abs(coeff[blk_pos]) > 2) {
-            assert(scan_pos - min_sub_pos >= 0 && scan_pos - min_sub_pos < 16);
-            uint8_t* offset = &ctx_offset[scan_pos - min_sub_pos];
-            uint8_t gt2 = abs(coeff[blk_pos]) > 4 ? 1 : 0;
-            cabac->cur_ctx = (type == 0) ? &(cabac->ctx.cu_gtx_flag_model_luma[0][*offset]) :
-              &(cabac->ctx.cu_gtx_flag_model_chroma[0][*offset]);
-            CABAC_BIN(cabac, gt2, "gt2_flag");
-            next_pass |= gt2;
-          }
-        }
-      }
-      */
-
-      /*
-      ****  THIRD PASS ****
-      */
 
       /*
       ****  SECOND PASS: Go-rice  ****

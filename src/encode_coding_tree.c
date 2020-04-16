@@ -532,12 +532,12 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
 
     if (pu_x > 0) {
       assert(pu_x >> 2 > 0);
-      left_pu = kvz_cu_array_at_const(frame->cu_array, pu_x - 1, pu_y);
+      left_pu = kvz_cu_array_at_const(frame->cu_array, pu_x - 1, pu_y + cu_width - 1);
     }
     // Don't take the above PU across the LCU boundary.
     if (pu_y % LCU_WIDTH > 0 && pu_y > 0) {
       assert(pu_y >> 2 > 0);
-      above_pu = kvz_cu_array_at_const(frame->cu_array, pu_x, pu_y - 1);
+      above_pu = kvz_cu_array_at_const(frame->cu_array, pu_x + cu_width - 1, pu_y - 1);
     }
 
 
