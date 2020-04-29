@@ -52,19 +52,17 @@ void kvz_encode_last_significant_xy(cabac_data_t * const cabac,
                                        uint8_t width, uint8_t height,
                                        uint8_t type, uint8_t scan)
 {
-  const int index = kvz_math_floor_log2(width);
+  const int index_x = kvz_math_floor_log2(width);
+  const int index_y = kvz_math_floor_log2(width);
   const int prefix_ctx[8] = { 0, 0, 0, 3, 6, 10, 15, 21 };
   //ToDo: own ctx_offset and shift for X and Y 
-  uint8_t ctx_offset = type ? 0 : prefix_ctx[index];
-  uint8_t shift = type ? CLIP(0, 2, width>>3) : (index+1)>>2;
+  uint8_t ctx_offset_x = type ? 0 : prefix_ctx[index_x];
+  uint8_t ctx_offset_y = type ? 0 : prefix_ctx[index_y];
+  uint8_t shift_x = type ? CLIP(0, 2, width>>3) : (index_x+1)>>2;
+  uint8_t shift_y = type ? CLIP(0, 2, width >> 3) : (index_y + 1) >> 2;
 
   cabac_ctx_t *base_ctx_x = (type ? cabac->ctx.cu_ctx_last_x_chroma : cabac->ctx.cu_ctx_last_x_luma);
   cabac_ctx_t *base_ctx_y = (type ? cabac->ctx.cu_ctx_last_y_chroma : cabac->ctx.cu_ctx_last_y_luma);
-  /*
-  if (scan == SCAN_VER) {
-    SWAP(lastpos_x, lastpos_y, uint8_t);
-  }
-  */
 
   const int group_idx_x = g_group_idx[lastpos_x];
   const int group_idx_y = g_group_idx[lastpos_y];
@@ -72,22 +70,22 @@ void kvz_encode_last_significant_xy(cabac_data_t * const cabac,
   // x prefix
   int last_x = 0;
   for (last_x = 0; last_x < group_idx_x; last_x++) {
-    cabac->cur_ctx = &base_ctx_x[ctx_offset + (last_x >> shift)];
+    cabac->cur_ctx = &base_ctx_x[ctx_offset_x + (last_x >> shift_x)];
     CABAC_BIN(cabac, 1, "last_sig_coeff_x_prefix");
   }
   if (group_idx_x < ( /*width == 32 ? g_group_idx[15] : */g_group_idx[MIN(32, (int32_t)width) - 1])) {
-    cabac->cur_ctx = &base_ctx_x[ctx_offset + (last_x >> shift)];
+    cabac->cur_ctx = &base_ctx_x[ctx_offset_x + (last_x >> shift_x)];
     CABAC_BIN(cabac, 0, "last_sig_coeff_x_prefix");
   }
 
   // y prefix
   int last_y = 0;
   for (last_y = 0; last_y < group_idx_y; last_y++) {
-    cabac->cur_ctx = &base_ctx_y[ctx_offset + (last_y >> shift)];
+    cabac->cur_ctx = &base_ctx_y[ctx_offset_y + (last_y >> shift_y)];
     CABAC_BIN(cabac, 1, "last_sig_coeff_y_prefix");
   }
   if (group_idx_y < (/* height == 32 ? g_group_idx[15] : */g_group_idx[MIN(32, (int32_t)height) - 1])) {
-    cabac->cur_ctx = &base_ctx_y[ctx_offset + (last_y >> shift)];
+    cabac->cur_ctx = &base_ctx_y[ctx_offset_y + (last_y >> shift_y)];
     CABAC_BIN(cabac, 0, "last_sig_coeff_y_prefix");
   }
 
@@ -1135,11 +1133,6 @@ void kvz_encode_mvd(encoder_state_t * const state,
       kvz_cabac_write_ep_ex_golomb(state, cabac, mvd_hor_abs - 2, 1);
     }
     uint32_t mvd_hor_sign = (mvd_hor > 0) ? 0 : 1;
-    if (!state->cabac.only_count &&
-        state->encoder_control->cfg.crypto_features & KVZ_CRYPTO_MV_SIGNS)
-    {
-      mvd_hor_sign = mvd_hor_sign ^ kvz_crypto_get_key(state->crypto_hdl, 1);
-    }
     CABAC_BIN_EP(cabac, mvd_hor_sign, "mvd_sign_flag_hor");
   }
   if (ver_abs_gr0) {
@@ -1147,11 +1140,6 @@ void kvz_encode_mvd(encoder_state_t * const state,
       kvz_cabac_write_ep_ex_golomb(state, cabac, mvd_ver_abs - 2, 1);
     }
     uint32_t mvd_ver_sign = mvd_ver > 0 ? 0 : 1;
-    if (!state->cabac.only_count &&
-        state->encoder_control->cfg.crypto_features & KVZ_CRYPTO_MV_SIGNS)
-    {
-      mvd_ver_sign = mvd_ver_sign^kvz_crypto_get_key(state->crypto_hdl, 1);
-    }
     CABAC_BIN_EP(cabac, mvd_ver_sign, "mvd_sign_flag_ver");
   }
 }
