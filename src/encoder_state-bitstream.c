@@ -1394,11 +1394,7 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
     if (state->children[i].type == ENCODER_STATE_TYPE_SLICE) {
       if (encoder->cfg.alf_enable && state->children[i].slice->tile_group_alf_enabled_flag[COMPONENT_Y])
       {
-        //#if JVET_O_MAX_NUM_ALF_APS_8
-        for (int apsId = ALF_CTB_MAX_NUM_APS - state->children[i].slice->tile_group_num_aps; apsId < ALF_CTB_MAX_NUM_APS; apsId++)
-          /*#else
-          for (int apsId = 0; apsId < MAX_NUM_APS; apsId++)   //HD: shouldn't this be looping over slice_alf_aps_id_luma[ i ]? By looping over MAX_NUM_APS, it is possible unused ALF APS is written. Please check!
-          #endif*/
+        for (int apsId = ALF_CTB_MAX_NUM_APS - 0/*state->children[i].slice->tile_group_num_aps + 1*/; apsId < ALF_CTB_MAX_NUM_APS; apsId++) //HD: shouldn't this be looping over slice_alf_aps_id_luma[ i ]? By looping over MAX_NUM_APS, it is possible unused ALF APS is written. Please check!
         {
           //ParameterSetMap<APS> *apsMap = m_pcEncLib->getApsMap();
           param_set_map *apsMap = state->children[i].slice->param_set_map;
