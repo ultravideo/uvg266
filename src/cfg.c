@@ -52,7 +52,7 @@ int kvz_config_init(kvz_config *cfg)
   cfg->alf_enable      = 1;
   cfg->alf_non_linear_luma = 1;
   cfg->alf_non_linear_chroma = 1;
-  cfg->loop_filter_across_virtual_boundaries_disabled_flag = 0;
+  cfg->alf_virtual_boundaries_present_flag = 0;
   cfg->rdoq_enable     = 1;
   cfg->rdoq_skip       = 1;
   cfg->signhide_enable = true;

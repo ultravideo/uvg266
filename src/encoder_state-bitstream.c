@@ -1040,6 +1040,73 @@ static void kvz_encoder_state_write_bitstream_picture_header(
 
   
 
+  // alf enable flags and aps IDs
+  if (encoder->cfg.alf_enable)
+  {
+    if (encoder->cfg.alf_info_in_ph_flag)
+    {
+     /* WRITE_FLAG(picHeader->getAlfEnabledFlag(COMPONENT_Y), "ph_alf_enabled_flag");
+      if (picHeader->getAlfEnabledFlag(COMPONENT_Y))
+      {
+        WRITE_CODE(picHeader->getNumAlfAps(), 3, "ph_num_alf_aps_ids_luma");
+        const std::vector<int>&   apsId = picHeader->getAlfAPSs();
+        for (int i = 0; i < picHeader->getNumAlfAps(); i++)
+        {
+          WRITE_CODE(apsId[i], 3, "ph_alf_aps_id_luma");
+        }
+
+        const int alfChromaIdc = picHeader->getAlfEnabledFlag(COMPONENT_Cb) + picHeader->getAlfEnabledFlag(COMPONENT_Cr) * 2;
+        if (sps->getChromaFormatIdc() != CHROMA_400)
+        {
+          WRITE_CODE(alfChromaIdc, 2, "ph_alf_chroma_idc");
+        }
+        if (alfChromaIdc)
+        {
+          WRITE_CODE(picHeader->getAlfApsIdChroma(), 3, "ph_alf_aps_id_chroma");
+        }
+        if (sps->getCCALFEnabledFlag())
+        {
+          WRITE_FLAG(picHeader->getCcAlfEnabledFlag(COMPONENT_Cb), "ph_cc_alf_cb_enabled_flag");
+          if (picHeader->getCcAlfEnabledFlag(COMPONENT_Cb))
+          {
+            WRITE_CODE(picHeader->getCcAlfCbApsId(), 3, "ph_cc_alf_cb_aps_id");
+          }
+          WRITE_FLAG(picHeader->getCcAlfEnabledFlag(COMPONENT_Cr), "ph_cc_alf_cr_enabled_flag");
+          if (picHeader->getCcAlfEnabledFlag(COMPONENT_Cr))
+          {
+            WRITE_CODE(picHeader->getCcAlfCrApsId(), 3, "ph_cc_alf_cr_aps_id");
+          }
+        }
+      }*/
+    }
+    else
+    {
+      state->tile->frame->alf_info->g_ctu_enable_flag[COMPONENT_Y] = true;
+      state->tile->frame->alf_info->g_ctu_enable_flag[COMPONENT_Cb] = true;
+      state->tile->frame->alf_info->g_ctu_enable_flag[COMPONENT_Cr] = true;
+      state->tile->frame->alf_info->g_alf_cc_enable_flag[COMPONENT_Cb] = encoder->cfg.alf_cc_enabled_flag;
+      state->tile->frame->alf_info->g_alf_cc_enable_flag[COMPONENT_Cr] = encoder->cfg.alf_cc_enabled_flag;
+    }
+  }
+  else
+  {
+    state->tile->frame->alf_info->g_ctu_enable_flag[COMPONENT_Y] = false;
+    state->tile->frame->alf_info->g_ctu_enable_flag[COMPONENT_Cb] = false;
+    state->tile->frame->alf_info->g_ctu_enable_flag[COMPONENT_Cr] = false;
+    state->tile->frame->alf_info->g_alf_cc_enable_flag[COMPONENT_Cb] = false;
+    state->tile->frame->alf_info->g_alf_cc_enable_flag[COMPONENT_Cr] = false;
+  }
+
+  WRITE_U(stream, state->encoder_control->cfg.tmvp_enable, 1, "pic_temporal_mvp_enabled_flag");
+  WRITE_U(stream, 0, 1, "pic_mvd_l1_zero_flag");
+
+  if (encoder->cfg.sao_type) {
+    WRITE_U(stream, 1, 1, "slice_sao_luma_flag");
+    if (encoder->chroma_format != KVZ_CSP_400) {
+      WRITE_U(stream, 1, 1, "slice_sao_chroma_flag");
+    }
+  }
+
   // getDeblockingFilterControlPresentFlag
 
   // END PICTURE HEADER
@@ -1173,8 +1240,42 @@ void kvz_encoder_state_write_bitstream_slice_header(
     WRITE_U(stream, 0, 1, "sh_no_output_of_prior_pics_flag");
   }
 
-  if (state->frame->slicetype != KVZ_SLICE_I) {
-    kvz_encoder_state_write_bitstream_ref_pic_list(stream, state);
+    if (alf_enabled)
+    {
+      WRITE_U(stream, 0/*state->slice->tile_group_num_aps - 1*/, 3, "slice_num_alf_aps_ids_luma");
+      const int* aps_ids = state->slice->tile_group_luma_aps_id;
+      for (int i = 0; i < 0/*state->slice->tile_group_num_aps - 1*/; i++)
+      {
+        WRITE_U(stream, aps_ids[i], 3, "slice_alf_aps_id_luma");
+      }
+      const int alf_chroma_idc = state->slice->tile_group_alf_enabled_flag[COMPONENT_Cb] + state->slice->tile_group_alf_enabled_flag[COMPONENT_Cr] * 2;
+      if (encoder->chroma_format != KVZ_CSP_400)
+      {
+        WRITE_U(stream, alf_chroma_idc, 2, "slice_alf_chroma_idc");
+      }
+      if (alf_chroma_idc)
+      {
+        WRITE_U(stream, state->slice->tile_group_chroma_aps_id, 3, "slice_alf_aps_id_chroma");
+      }
+
+      if (encoder->cfg.alf_cc_enabled_flag)
+      {
+        /*CcAlfFilterParam &filterParam = pcSlice->m_ccAlfFilterParam;
+        WRITE_FLAG(filterParam.ccAlfFilterEnabled[COMPONENT_Cb - 1] ? 1 : 0, "slice_cc_alf_cb_enabled_flag");
+        if (filterParam.ccAlfFilterEnabled[COMPONENT_Cb - 1])
+        {
+          // write CC ALF Cb APS ID
+          WRITE_CODE(pcSlice->getTileGroupCcAlfCbApsId(), 3, "slice_cc_alf_cb_aps_id");
+        }
+        // Cr
+        WRITE_FLAG(filterParam.ccAlfFilterEnabled[COMPONENT_Cr - 1] ? 1 : 0, "slice_cc_alf_cr_enabled_flag");
+        if (filterParam.ccAlfFilterEnabled[COMPONENT_Cr - 1])
+        {
+          // write CC ALF Cr APS ID
+          WRITE_CODE(pcSlice->getTileGroupCcAlfCrApsId(), 3, "slice_cc_alf_cr_aps_id");
+        }*/
+      }
+    }
   }
 
   if (state->encoder_control->cfg.tmvp_enable) {
@@ -1374,77 +1475,107 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
   }
 
   // Adaptation parameter set (APS)
-  if (0 /*pcSlice->getSPS()->getUseReshaper()*/)
+  //send LMCS APS when LMCSModel is updated. It can be updated even current slice does not enable reshaper.
+  //For example, in RA, update is on intra slice, but intra slice may not use reshaper
+  if (0 /*pcSlice->getSPS()->getUseLmcs()*/)
   {
     /*//only 1 LMCS data for 1 picture
-    int apsId = pcSlice->getLmcsAPSId();
+    int apsId = picHeader->getLmcsAPSId();
     ParameterSetMap<APS> *apsMap = m_pcEncLib->getApsMap();
     APS* aps = apsMap->getPS((apsId << NUM_APS_TYPE_LEN) + LMCS_APS);
     bool writeAPS = aps && apsMap->getChangedFlag((apsId << NUM_APS_TYPE_LEN) + LMCS_APS);
     if (writeAPS)
     {
-    actualTotalBits += xWriteAPS(accessUnit, aps);
+    actualTotalBits += xWriteAPS(accessUnit, aps, m_pcEncLib->getLayerId(), true);
     apsMap->clearChangedFlag((apsId << NUM_APS_TYPE_LEN) + LMCS_APS);
-    CHECK(aps != pcSlice->getLmcsAPS(), "Wrong LMCS APS pointer in compressGOP");
+    CHECK(aps != picHeader->getLmcsAPS(), "Wrong LMCS APS pointer in compressGOP");
+    }*/
+  }
+
+  // Adaptation parameter set (APS)
+  // only 1 SCALING LIST data for 1 picture
+  if (0 /*pcSlice->getSPS()->getScalingListFlag() && (m_pcCfg->getUseScalingListId() == SCALING_LIST_FILE_READ)*/)
+  {
+    /*int apsId = picHeader->getScalingListAPSId();
+    ParameterSetMap<APS> *apsMap = m_pcEncLib->getApsMap();
+    APS* aps = apsMap->getPS((apsId << NUM_APS_TYPE_LEN) + SCALING_LIST_APS);
+    bool writeAPS = aps && apsMap->getChangedFlag((apsId << NUM_APS_TYPE_LEN) + SCALING_LIST_APS);
+    if (writeAPS)
+    {
+      actualTotalBits += xWriteAPS(accessUnit, aps, m_pcEncLib->getLayerId(), true);
+      apsMap->clearChangedFlag((apsId << NUM_APS_TYPE_LEN) + SCALING_LIST_APS);
+      CHECK(aps != picHeader->getScalingListAPS(), "Wrong SCALING LIST APS pointer in compressGOP");
     }*/
   }
 
   // Adaptation parameter set (APS)
   for (int i = 0; state->children[i].encoder_control; ++i) {
     if (state->children[i].type == ENCODER_STATE_TYPE_SLICE) {
-      if (encoder->cfg.alf_enable && state->children[i].slice->tile_group_alf_enabled_flag[COMPONENT_Y])
+      if (encoder->cfg.alf_enable && (state->children[i].slice->tile_group_alf_enabled_flag[COMPONENT_Y] || state->children[i].slice->tile_group_cc_alf_cb_enabled_flag || state->children[i].slice->tile_group_cc_alf_cr_enabled_flag))
       {
-        for (int apsId = ALF_CTB_MAX_NUM_APS - 0/*state->children[i].slice->tile_group_num_aps + 1*/; apsId < ALF_CTB_MAX_NUM_APS; apsId++) //HD: shouldn't this be looping over slice_alf_aps_id_luma[ i ]? By looping over MAX_NUM_APS, it is possible unused ALF APS is written. Please check!
+        for (int aps_id = ALF_CTB_MAX_NUM_APS - 0/*state->children[i].slice->tile_group_num_aps + 1*/; aps_id < ALF_CTB_MAX_NUM_APS; aps_id++) //HD: shouldn't this be looping over slice_alf_aps_id_luma[ i ]? By looping over MAX_NUM_APS, it is possible unused ALF APS is written. Please check!
         {
           //ParameterSetMap<APS> *apsMap = m_pcEncLib->getApsMap();
-          param_set_map *apsMap = state->children[i].slice->param_set_map;
+          param_set_map *aps_map = state->children[i].slice->param_set_map;
 
           //APS* aps = apsMap->getPS((apsId << NUM_APS_TYPE_LEN) + ALF_APS);
-          alf_aps aps = apsMap[apsId + T_ALF_APS].parameter_set;
+          alf_aps aps = aps_map[aps_id + T_ALF_APS].parameter_set;
 
           //bool writeAPS = aps && apsMap->getChangedFlag((apsId << NUM_APS_TYPE_LEN) + ALF_APS);
-          bool writeAPS = apsMap[apsId + T_ALF_APS].b_changed;
+          bool writeAPS = aps_map[aps_id + T_ALF_APS].b_changed;
           if (!writeAPS && state->children[i].slice->apss && state->children[i].
-            slice->apss[apsId].aps_id >= 0 && state->children[i].slice->apss[apsId].aps_id < 8)
+            slice->apss[aps_id].aps_id >= 0 && state->children[i].slice->apss[aps_id].aps_id < 8)
           {
             writeAPS = true;
             //aps = pcSlice->getAlfAPSs()[apsId]; // use asp from slice header
-            aps = state->children[i].slice->apss[apsId];
+            aps = state->children[i].slice->apss[aps_id];
 
             //*apsMap->allocatePS(apsId) = *aps; //allocate and cpy
-            assert(apsId < ALF_CTB_MAX_NUM_APS);
+            assert(aps_id < ALF_CTB_MAX_NUM_APS);
             bool found = false;
             for (int ID = 0; ID < ALF_CTB_MAX_NUM_APS; ID++)
             {
-              if (apsMap[ID + T_ALF_APS].parameter_set.aps_id == ID) {
+              if (aps_map[ID + T_ALF_APS].parameter_set.aps_id == ID) {
                 found = true;
               }
             }
             if (!found)
             {
-              apsMap[apsId + T_ALF_APS].b_changed = true;
+              aps_map[aps_id + T_ALF_APS].b_changed = true;
               //apsMap[apsId].p_nalu_data = 0;
             }
-            apsMap[apsId + T_ALF_APS].parameter_set.aps_id = apsId;
-            copy_alf_param(&apsMap[apsId + T_ALF_APS].parameter_set, &aps);
+            aps_map[aps_id + T_ALF_APS].parameter_set.aps_id = aps_id;
+            copy_alf_param(&aps_map[aps_id + T_ALF_APS].parameter_set, &aps);
             //
 
             //m_pcALF->setApsIdStart(apsId);
-            g_aps_id_start = apsId;
+            g_aps_id_start = aps_id;
+          }
+          else if (state->children[i].slice->tile_group_cc_alf_cb_enabled_flag && !writeAPS && aps_id == state->children[i].slice->tile_group_cc_alf_cb_aps_id)
+          {
+            writeAPS = true;
+            aps = aps_map[(state->children[i].slice->tile_group_cc_alf_cb_aps_id << NUM_APS_TYPE_LEN) + T_ALF_APS].parameter_set;
+          }
+          else if (state->children[i].slice->tile_group_cc_alf_cr_enabled_flag && !writeAPS && aps_id == state->children[i].slice->tile_group_cc_alf_cr_aps_id)
+          {
+            writeAPS = true;
+            aps = aps_map[(state->children[i].slice->tile_group_cc_alf_cr_aps_id << NUM_APS_TYPE_LEN) + T_ALF_APS].parameter_set;
           }
 
           if (writeAPS)
           {
             //actualTotalBits += xWriteAPS(accessUnit, aps);
-            kvz_nal_write(stream, KVZ_NAL_APS_NUT, 0, state->frame->first_nal);
+            kvz_nal_write(stream, NAL_UNIT_PREFIX_APS, 0, state->frame->first_nal);
             state->frame->first_nal = false;
             encoder_state_write_adaptation_parameter_set(state, &aps);
 
             //apsMap->clearChangedFlag((apsId << NUM_APS_TYPE_LEN) + ALF_APS);
-            apsMap[apsId + T_ALF_APS].b_changed = false;
+            aps_map[aps_id + T_ALF_APS].b_changed = false;
 
-            //CHECK(aps != pcSlice->getAlfAPSs()[apsId], "Wrong APS pointer in compressGOP");
-            assert(aps.aps_id == state->children[i].slice->apss[apsId].aps_id); //"Wrong APS id");
+            //CHECK(aps != pcSlice->getAlfAPSs()[apsId] && apsId != pcSlice->getTileGroupCcAlfCbApsId() && apsId != pcSlice->getTileGroupCcAlfCrApsId(), "Wrong APS pointer in compressGOP");
+            assert(aps.aps_id == state->children[i].slice->apss[aps_id].aps_id
+                  && aps_id != state->children[i].slice->tile_group_cc_alf_cr_aps_id
+                  && aps_id != state->children[i].slice->tile_group_cc_alf_cr_aps_id); //"Wrong APS id");
           }
         }
       }

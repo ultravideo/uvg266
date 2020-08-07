@@ -290,7 +290,7 @@ typedef struct kvz_config
   int32_t alf_slice_enable_flag[3/*MAX_NUM_COMPONENT*/];
   int32_t alf_non_linear_luma;    /*!< \brief Flag to enable non linear alf for luma */
   int32_t alf_non_linear_chroma;    /*!< \brief Flag to enable non linear alf for chroma */
-  int32_t loop_filter_across_virtual_boundaries_disabled_flag;
+  int32_t alf_virtual_boundaries_present_flag;
   int32_t rdoq_enable;    /*!< \brief Flag to enable RD optimized quantization. */
   int32_t signhide_enable;   /*!< \brief Flag to enable sign hiding. */
   int32_t smp_enable;   /*!< \brief Flag to enable SMP blocks. */
@@ -514,7 +514,8 @@ enum kvz_nal_unit_type {
   KVZ_NAL_VPS_NUT = 14,
   KVZ_NAL_SPS_NUT = 15,
   KVZ_NAL_PPS_NUT = 16,
-  KVZ_NAL_APS_NUT = 18,
+  NAL_UNIT_PREFIX_APS = 17,
+  NAL_UNIT_SUFFIX_APS = 18,
 
   KVZ_NAL_AUD_NUT = 20,
 

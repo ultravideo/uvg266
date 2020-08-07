@@ -216,6 +216,8 @@ static int encoder_state_config_slice_init(encoder_state_t * const state,
     state->slice->tile_group_num_aps = -1;
     state->slice->tile_group_luma_aps_id = malloc(MAX_NUM_APS * sizeof(int));
     state->slice->tile_group_chroma_aps_id = -1;
+    state->slice->tile_group_cc_alf_cb_aps_id = -1;
+    state->slice->tile_group_cc_alf_cr_aps_id = -1;
     state->slice->num_of_param_sets = 0;
 
     //For virtual boundaries

@@ -25,8 +25,11 @@
 #define MAX_NUM_ALF_CHROMA_COEFF        7
 #define MAX_ALF_FILTER_LENGTH           7
 #define MAX_NUM_ALF_COEFF               (MAX_ALF_FILTER_LENGTH * MAX_ALF_FILTER_LENGTH / 2 + 1)
+#define MAX_NUM_CC_ALF_FILTERS          4
+#define MAX_NUM_CC_ALF_CHROMA_COEFF     8
 #define ALF_NUM_FIXED_FILTER_SETS       16
 #define ALF_NUM_BITS                    8
+#define CC_ALF_BITS_PER_COEFF_LEVEL     3
 #define ALF_UNUSED_CLASS_IDX            255
 #define ALF_UNUSED_TRANSPOSE_IDX        255
 #define REG                             0.0001
@@ -252,9 +255,19 @@ typedef struct alf_info_t {
   short* g_alf_ctb_filter_index;     //g_num_ctus_in_pic
 } alf_info_t;
 
+typedef struct cc_alf_filter_param {
+  bool    cc_alf_filter_enabled[2];
+  bool    cc_alf_filter_idx_enabled[2][MAX_NUM_CC_ALF_FILTERS];
+  uint8_t cc_alf_filter_count[2];
+  short   cc_alf_coeff[2][MAX_NUM_CC_ALF_FILTERS][MAX_NUM_CC_ALF_CHROMA_COEFF];
+  int     new_cc_alf_filter[2];
+  int     number_valid_components;
+} cc_alf_filter_param;
+
 typedef struct alf_aps {
   int aps_id;
   int aps_type;
+
   //sliceparams
   bool enabled_flag[MAX_NUM_COMPONENT];                           // alf_slice_enable_flag, alf_chroma_idc
 //#if JVET_O0090_ALF_CHROMA_FILTER_ALTERNATIVES_CTB
@@ -285,6 +298,9 @@ typedef struct alf_aps {
   //std::vector<AlfFilterShape>* filterShapes;
   int t_layer;
   bool new_filter_flag[MAX_NUM_CHANNEL_TYPE];
+
+  struct cc_alf_filter_param cc_alf_aps_param;
+
 } alf_aps;
 
 typedef struct param_set_map {
@@ -297,11 +313,15 @@ typedef struct param_set_map {
 //dunno
 uint8_t *g_alf_ctu_enable_flag[MAX_NUM_COMPONENT];
 uint8_t* g_alf_ctu_alternative[MAX_NUM_COMPONENT];
-
-//VTM6.1
-//int *m_laplacian_ptr[NUM_DIRECTIONS][CLASSIFICATION_BLK_SIZE + 5];
-//int m_laplacian_data[NUM_DIRECTIONS][CLASSIFICATION_BLK_SIZE + 5][CLASSIFICATION_BLK_SIZE + 5];
-
+alf_covariance*** g_alf_covariance_cc_alf[2]; // [compIdx-1][shapeIdx][ctbAddr][filterIdx]
+alf_covariance** g_alf_covariance_frame_cc_alf[2]; // [compIdx-1][shapeIdx][filterIdx]
+uint8_t*               g_training_cov_control;
+uint64_t**             g_unfiltered_distortion;  // for different block size
+uint64_t*              g_training_distortion[MAX_NUM_CC_ALF_FILTERS];    // for current block size
+uint8_t*               g_filter_control;         // current iterations filter control
+uint8_t*               g_best_filter_control;     // best saved filter control
+uint64_t*              g_luma_swing_greater_than_threshold_count;
+uint64_t*              g_chroma_sample_count_near_mid_point;
 //tarpeeton jos WSSD=0
 double* g_luma_level_to_weight_plut; //Ei anneta arvoja miss‰‰n
 
@@ -347,6 +367,8 @@ static short g_alf_clipping_values[MAX_NUM_CHANNEL_TYPE][MAX_ALF_NUM_CLIPPING_VA
 static alf_classifier **g_classifier;
 static bool g_created = false;
 static uint32_t g_slice_count = MAX_INT;
+uint8_t* g_cc_alf_filter_control[2];
+int g_aps_id_cc_alf_start[2];
 
 //once per frame
 alf_covariance*** g_alf_covariance[MAX_NUM_COMPONENT]; //[component_id][filter_type][ctu_idx][class_idx]
@@ -365,6 +387,7 @@ short* g_alf_ctb_filter_index;     //g_num_ctus_in_pic
 static uint32_t g_curr_frame = MAX_INT;
 static uint32_t g_old_frame = 0;
 alf_aps alf_param;
+struct cc_alf_filter_param g_cc_alf_filter_param;
 
 //temps
 static alf_aps g_alf_aps_temp;
@@ -383,6 +406,7 @@ kvz_pixel *alf_tmp_v;
 
 //cabac temps
 cabac_data_t ctx_start;
+cabac_data_t ctx_start_cc_alf;
 cabac_data_t cabac_estimator;
 
 // encoder
@@ -451,6 +475,7 @@ void reset_alf_param(alf_aps *src);
 void add_alf_cov(alf_covariance *dst, alf_covariance *src);
 void add_alf_cov_lhs_rhs(alf_covariance *dst, alf_covariance *lhs, alf_covariance *rhs);
 void reset_alf_covariance(alf_covariance *alf, int num_bins);
+void reset_cc_alf_aps_param(cc_alf_filter_param *cc_alf);
 void adjust_pixels(kvz_pixel *src, int x_start, int x_end, int y_start, int y_end,
                    int stride, int pic_width, int pic_height);
 void adjust_pixels_chroma(kvz_pixel *src, int x_start, int x_end, int y_start, int y_end, 
@@ -461,6 +486,12 @@ void copy_ctu_enable_flag(uint8_t **flags_dst, uint8_t **flags_src, channel_type
 //-------------------------------------------------------------------
 
 //-------------------------encoding functions------------------------
+
+void apply_cc_alf_filter(encoder_state_t *const state, alf_component_id comp_id, const kvz_pixel *dst_pixels,
+  const kvz_pixel *recYuvExt, uint8_t *filterControl,
+  const short filterSet[MAX_NUM_CC_ALF_FILTERS][MAX_NUM_CC_ALF_CHROMA_COEFF],
+  const int   selectedFilterIdx
+  );
 
 //is_crossed_by_virtual_boundaries -osuus ep‰t‰ydellinen
 void kvz_alf_enc_process(encoder_state_t *const state,
@@ -598,6 +629,12 @@ void kvz_alf_encoder_ctb(encoder_state_t *const state,
 
 void kvz_alf_reconstructor(encoder_state_t const *state, int ctu_idx);
 
+/*
+void apply_cc_alf_filter(encoder_state_t *const state, alf_component_id comp_id, const kvz_pixel *dst_pixels,
+  const kvz_pixel *recYuvExt, uint8_t *filterControl,
+  const short filterSet[MAX_NUM_CC_ALF_FILTERS][MAX_NUM_CC_ALF_CHROMA_COEFF],
+  const int   selectedFilterIdx)
+*/
 //----------------------------------------------------------------------
 
 //-------------------------cabac writer functions------------------------
