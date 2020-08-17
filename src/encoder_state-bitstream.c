@@ -71,8 +71,8 @@ static void encoder_state_write_bitstream_PTL(bitstream_t *stream,
 {
   // PTL
   // Profile Tier
-  // Main Profile == 1,  Main 10 profile == 2, NEXT == 6
-  WRITE_U(stream, 6, 7, "general_profile_idc");
+  // Main 10 profile == 1
+  WRITE_U(stream, 1, 7, "general_profile_idc");
   WRITE_U(stream, state->encoder_control->cfg.high_tier, 1, "general_tier_flag");
 
 #if !JVET_S0179_CONDITIONAL_SIGNAL_GCI
@@ -142,7 +142,8 @@ static void encoder_state_write_bitstream_PTL(bitstream_t *stream,
   // end Profile Tier
 
   uint8_t level = state->encoder_control->cfg.level;
-  WRITE_U(stream, level * 3, 8, "general_level_idc");
+  // ToDo: level hardcoded to 5.2
+  WRITE_U(stream, 86, 8, "general_level_idc");
 
 
   WRITE_U(stream, 0, 1, "ptl_frame_only_constraint_flag");
@@ -216,6 +217,8 @@ static void encoder_state_write_bitstream_PTL(bitstream_t *stream,
   WRITE_U(stream, 1, 8, "num_sub_profiles");
   WRITE_U(stream, 0, 32, "general_sub_profile_idc");
 #endif
+
+  WRITE_U(stream, 0, 1, "sub_layer_level_present_flag");
 
   kvz_bitstream_align_zero(stream);
 
@@ -1111,15 +1114,17 @@ static void kvz_encoder_state_write_bitstream_picture_header(
     WRITE_U(stream, 0, 1, "ph_non_ref_pic_flag");
 #endif
     WRITE_U(stream, 0, 1, "gdr_pic_flag");
+    WRITE_U(stream, 0, 1, "pic_inter_slice_allowed_flag");
   }
   else {
     WRITE_U(stream, 0, 1, "gdr_or_irap_pic_flag");
 #if JVET_S0076_ASPECT1
     WRITE_U(stream, 0, 1, "ph_non_ref_pic_flag");
 #endif
+    WRITE_U(stream, 1, 1, "pic_inter_slice_allowed_flag");
+    WRITE_U(stream, 1, 1, "pic_intra_slice_allowed_flag");
   }
-  WRITE_U(stream, 1, 1, "pic_inter_slice_allowed_flag");
-  WRITE_U(stream, 1, 1, "pic_intra_slice_allowed_flag");
+
 #if !JVET_S0076_ASPECT1
   WRITE_U(stream, 0, 1, "non_reference_picture_flag");
 #endif
@@ -1129,9 +1134,6 @@ static void kvz_encoder_state_write_bitstream_picture_header(
     || state->frame->pictype == KVZ_NAL_IDR_N_LP) {
 
     WRITE_U(stream, 0, 5, "ph_pic_order_cnt_lsb");
-#if !JVET_S0193_NO_OUTPUT_PRIOR_PIC
-    WRITE_U(stream, 0, 1, "no_output_of_prior_pics_flag");
-#endif
   }
   else {
     WRITE_U(stream, state->frame->poc & 0x1f, 5, "ph_pic_order_cnt_lsb");
@@ -1143,10 +1145,14 @@ static void kvz_encoder_state_write_bitstream_picture_header(
       WRITE_U(stream, 1, 1, "slice_sao_chroma_flag");
     }
   }
-
-  // ToDo: ALF flag
-  WRITE_U(stream, state->encoder_control->cfg.tmvp_enable, 1, "pic_temporal_mvp_enabled_flag");
-  WRITE_U(stream, 0, 1, "pic_mvd_l1_zero_flag");
+  if (state->frame->pictype == KVZ_NAL_IDR_W_RADL
+    || state->frame->pictype == KVZ_NAL_IDR_N_LP) {
+  }
+  else {
+    // ToDo: ALF flag
+    WRITE_U(stream, state->encoder_control->cfg.tmvp_enable, 1, "pic_temporal_mvp_enabled_flag");
+    WRITE_U(stream, 0, 1, "pic_mvd_l1_zero_flag");
+  }
 
 
   // getDeblockingFilterControlPresentFlag
@@ -1273,7 +1279,7 @@ void kvz_encoder_state_write_bitstream_slice_header(
 
   kvz_encoder_state_write_bitstream_picture_header(stream, state);
 
-  WRITE_UE(stream, state->frame->slicetype, "slice_type");
+  //WRITE_UE(stream, state->frame->slicetype, "slice_type");
 
 #if JVET_S0193_NO_OUTPUT_PRIOR_PIC
   if (state->frame->pictype == KVZ_NAL_CRA_NUT || state->frame->pictype == KVZ_NAL_IDR_N_LP || state->frame->pictype == KVZ_NAL_IDR_W_RADL || state->frame->pictype == KVZ_NAL_GDR_NUT)
@@ -1495,8 +1501,8 @@ void kvz_encoder_state_write_parameter_sets(bitstream_t *stream,
                                             encoder_state_t * const state)
 {
   // Video Parameter Set (VPS)  
-  kvz_nal_write(stream, KVZ_NAL_VPS_NUT, 0, 1);
-  encoder_state_write_bitstream_vid_parameter_set(stream, state);
+  //kvz_nal_write(stream, KVZ_NAL_VPS_NUT, 0, 1);
+  //encoder_state_write_bitstream_vid_parameter_set(stream, state);
   
 
   // Sequence Parameter Set (SPS)
