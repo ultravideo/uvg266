@@ -196,7 +196,7 @@ typedef int16_t coeff_t;
 
 #define AMVP_MAX_NUM_CANDS 2
 #define AMVP_MAX_NUM_CANDS_MEM 3
-#define MRG_MAX_NUM_CANDS 7
+#define MRG_MAX_NUM_CANDS 6
 
 /* Some tools */
 #define ABS(a) ((a) >= 0 ? (a) : (-a))
