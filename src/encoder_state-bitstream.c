@@ -144,10 +144,9 @@ static void encoder_state_write_bitstream_PTL(bitstream_t *stream,
   uint8_t level = state->encoder_control->cfg.level;
   WRITE_U(stream, level * 3, 8, "general_level_idc");
 
-#if JVET_S0138_GCI_PTL
+
   WRITE_U(stream, 0, 1, "ptl_frame_only_constraint_flag");
   WRITE_U(stream, 0, 1, "ptl_multilayer_enabled_flag");
-#endif
 
 #if JVET_S0179_CONDITIONAL_SIGNAL_GCI
 #if JVET_S0179_CONDITIONAL_SIGNAL_GCI
@@ -218,22 +217,17 @@ static void encoder_state_write_bitstream_PTL(bitstream_t *stream,
   WRITE_U(stream, 0, 32, "general_sub_profile_idc");
 #endif
 
-
-  WRITE_U(stream, 0, 1, "sub_layer_level_present_flag");
-
   kvz_bitstream_align_zero(stream);
 
-  //WRITE_U(stream, 0, 1, "ptl_alignment_zero_bit");
 
-#if JVET_S_SUB_PROFILE
   WRITE_U(stream, 1, 8, "ptl_num_sub_profiles");
   WRITE_U(stream, 0, 32, "general_sub_profile_idc");
-#endif
+
 
   // end PTL
 }
 
-/*
+
 static void encoder_state_write_bitstream_vid_parameter_set(bitstream_t* stream,
                                                             encoder_state_t * const state)
 {
@@ -241,36 +235,23 @@ static void encoder_state_write_bitstream_vid_parameter_set(bitstream_t* stream,
   printf("=========== Video Parameter Set ID: 0 ===========\n");
 #endif
 
-  WRITE_U(stream, 0, 4, "vps_video_parameter_set_id");
-  WRITE_U(stream, 3, 2, "vps_reserved_three_2bits" );
-  WRITE_U(stream, 0, 6, "vps_reserved_zero_6bits" );
+  WRITE_U(stream, 1, 4, "vps_video_parameter_set_id");
+  WRITE_U(stream, 0, 6, "vps_max_layers_minus1" );
   WRITE_U(stream, 1, 3, "vps_max_sub_layers_minus1");
-  WRITE_U(stream, 0, 1, "vps_temporal_id_nesting_flag");
-  WRITE_U(stream, 0xffff, 16, "vps_reserved_ffff_16bits");
-
-  encoder_state_write_bitstream_PTL(stream, state);
-
-  WRITE_U(stream, 0, 1, "vps_sub_layer_ordering_info_present_flag");
 
   //for each layer
   for (int i = 0; i < 1; i++) {
-  WRITE_UE(stream, 1, "vps_max_dec_pic_buffering");
-  WRITE_UE(stream, 0, "vps_num_reorder_pics");
-  WRITE_UE(stream, 0, "vps_max_latency_increase");
+    WRITE_U(stream, 0, 6, "vps_layer_id");
   }
 
-  WRITE_U(stream, 0, 6, "vps_max_nuh_reserved_zero_layer_id");
-  WRITE_UE(stream, 0, "vps_max_op_sets_minus1");
-  WRITE_U(stream, 0, 1, "vps_timing_info_present_flag");
-
-  //IF timing info
-  //END IF
-
-  WRITE_U(stream, 0, 1, "vps_extension_flag");
+  kvz_bitstream_align_zero(stream);
+  encoder_state_write_bitstream_PTL(stream, state);
+  WRITE_U(stream, 0, 1, "vps_extension_flag")
 
   kvz_bitstream_add_rbsp_trailing_bits(stream);
 }
 
+/*
 static void encoder_state_write_bitstream_scaling_list(bitstream_t *stream,
                                                        encoder_state_t * const state)
 {
@@ -1513,11 +1494,10 @@ void kvz_encoder_state_worker_write_bitstream(void * opaque)
 void kvz_encoder_state_write_parameter_sets(bitstream_t *stream,
                                             encoder_state_t * const state)
 {
-  // Video Parameter Set (VPS)
-  /*
+  // Video Parameter Set (VPS)  
   kvz_nal_write(stream, KVZ_NAL_VPS_NUT, 0, 1);
   encoder_state_write_bitstream_vid_parameter_set(stream, state);
-  */
+  
 
   // Sequence Parameter Set (SPS)
   kvz_nal_write(stream, KVZ_NAL_SPS_NUT, 0, 1);
