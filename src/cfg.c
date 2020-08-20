@@ -45,7 +45,7 @@ int kvz_config_init(kvz_config *cfg)
   cfg->intra_qp_offset_auto = true;
   cfg->intra_period    = 64;
   cfg->vps_period      = 0;
-  cfg->deblock_enable  = 1;
+  cfg->deblock_enable  = 0;
   cfg->deblock_beta    = 0;
   cfg->deblock_tc      = 0;
   cfg->sao_type        = 3;

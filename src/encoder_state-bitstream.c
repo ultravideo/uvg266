@@ -1058,7 +1058,8 @@ static void kvz_encoder_state_write_bitstream_picture_header(
         const int alfChromaIdc = picHeader->getAlfEnabledFlag(COMPONENT_Cb) + picHeader->getAlfEnabledFlag(COMPONENT_Cr) * 2;
         if (sps->getChromaFormatIdc() != CHROMA_400)
         {
-          WRITE_CODE(alfChromaIdc, 2, "ph_alf_chroma_idc");
+          WRITE_CODE(picHeader->getAlfEnabledFlag(COMPONENT_Cb), 1, "ph_alf_cb_enabled_flag");
+          WRITE_CODE(picHeader->getAlfEnabledFlag(COMPONENT_Cr), 1, "ph_alf_cr_enabled_flag");
         }
         if (alfChromaIdc)
         {
@@ -1251,7 +1252,8 @@ void kvz_encoder_state_write_bitstream_slice_header(
       const int alf_chroma_idc = state->slice->tile_group_alf_enabled_flag[COMPONENT_Cb] + state->slice->tile_group_alf_enabled_flag[COMPONENT_Cr] * 2;
       if (encoder->chroma_format != KVZ_CSP_400)
       {
-        WRITE_U(stream, alf_chroma_idc, 2, "slice_alf_chroma_idc");
+        WRITE_U(state, state->slice->tile_group_alf_enabled_flag[COMPONENT_Cb], 1, "slice_alf_cb_enabled_flag");
+        WRITE_U(state, state->slice->tile_group_alf_enabled_flag[COMPONENT_Cr], 1, "slice_alf_cr_enabled_flag");
       }
       if (alf_chroma_idc)
       {

@@ -350,9 +350,9 @@ short g_chroma_clipp_final[MAX_NUM_ALF_ALTERNATIVES_CHROMA][MAX_NUM_ALF_CHROMA_C
 static short g_chroma_clipp_final[MAX_NUM_ALF_LUMA_COEFF];
 #endif*/
 static short g_coeff_final[MAX_NUM_ALF_CLASSES * MAX_NUM_ALF_LUMA_COEFF];
-static short g_clipp_final[MAX_NUM_ALF_CLASSES * MAX_NUM_ALF_LUMA_COEFF];
+static int16_t g_clipp_final[MAX_NUM_ALF_CLASSES * MAX_NUM_ALF_LUMA_COEFF];
 static short g_coeff_aps_luma[ALF_CTB_MAX_NUM_APS][MAX_NUM_ALF_CLASSES * MAX_NUM_ALF_LUMA_COEFF];
-static short g_clipp_aps_luma[ALF_CTB_MAX_NUM_APS][MAX_NUM_ALF_CLASSES * MAX_NUM_ALF_LUMA_COEFF];
+static int16_t g_clipp_aps_luma[ALF_CTB_MAX_NUM_APS][MAX_NUM_ALF_CLASSES * MAX_NUM_ALF_LUMA_COEFF];
 static short g_fixed_filter_set_coeff_dec[ALF_NUM_FIXED_FILTER_SETS][MAX_NUM_ALF_CLASSES * MAX_NUM_ALF_LUMA_COEFF];
 
 //once ever
@@ -431,9 +431,9 @@ void kvz_alf_init(encoder_state_t *const state,
 bool is_crossed_by_virtual_boundaries(const int x_pos, const int y_pos, const int width, const int height, bool* clip_top, bool* clip_bottom, bool* clip_left, 
                                       bool* clip_right, int* num_hor_vir_bndry, int* num_ver_vir_bndry, int hor_vir_bndry_pos[], int ver_vir_bndry_pos[], encoder_state_t *const state);
 void init_ctu_alternative_chroma(uint8_t* ctu_alts[MAX_NUM_COMPONENT]);
-int clip_alf(const int clip, const short ref, const short val0, const short val1);
+int16_t clip_alf(const int16_t clip, const int16_t ref, const int16_t val0, const int16_t val1);
 int alf_clip_pixel(const int a, const clp_rng clp_rng);
-int alf_clip3(const int min_val, const int max_val, const int a);
+int16_t alf_clip3(const int16_t min_val, const int16_t max_val, const int16_t a);
 void get_clip_max(alf_covariance *cov, int *clip_max);
 void reduce_clip_cost(alf_covariance *cov, int *clip);
 void set_ey_from_clip(alf_covariance *cov, const int* clip, double ee[MAX_NUM_ALF_LUMA_COEFF][MAX_NUM_ALF_LUMA_COEFF], double y[MAX_NUM_ALF_LUMA_COEFF], int siz);
@@ -565,7 +565,7 @@ void kvz_alf_get_blk_stats(encoder_state_t *const state,
   int vb_ctu_height,
   int vb_pos);
 
-void kvz_alf_calc_covariance(int e_local[MAX_NUM_ALF_LUMA_COEFF][MAX_ALF_NUM_CLIPPING_VALUES],
+void kvz_alf_calc_covariance(int16_t e_local[MAX_NUM_ALF_LUMA_COEFF][MAX_ALF_NUM_CLIPPING_VALUES],
   const kvz_pixel *rec,
   const int stride,
   const channel_type channel,
@@ -766,7 +766,7 @@ void kvz_alf_filter_block(encoder_state_t *const state,
   const int src_stride,
   const int dst_stride,
   const short* filter_set,
-  const short *fClipSet,
+  const int16_t *fClipSet,
   clp_rng clp_rng,
   alf_component_id component_id,
   const int width,
