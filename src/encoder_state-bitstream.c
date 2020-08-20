@@ -1131,12 +1131,6 @@ static void kvz_encoder_state_write_bitstream_picture_header(
     WRITE_U(stream, state->frame->poc & 0x1f, 5, "ph_pic_order_cnt_lsb");
   }
 
-  if (encoder->cfg.sao_type) {
-    WRITE_U(stream, 1, 1, "slice_sao_luma_flag");
-    if (encoder->chroma_format != KVZ_CSP_400) {
-      WRITE_U(stream, 1, 1, "slice_sao_chroma_flag");
-    }
-  }
   if (state->frame->pictype == KVZ_NAL_IDR_W_RADL
     || state->frame->pictype == KVZ_NAL_IDR_N_LP) {
   }
@@ -1292,7 +1286,12 @@ void kvz_encoder_state_write_bitstream_slice_header(
   WRITE_SE(stream, slice_qp_delta, "slice_qp_delta");
 
 
-
+  if (encoder->cfg.sao_type) {
+    WRITE_U(stream, 1, 1, "slice_sao_luma_flag");
+    if (encoder->chroma_format != KVZ_CSP_400) {
+      WRITE_U(stream, 1, 1, "slice_sao_chroma_flag");
+    }
+  }
 
   if (state->frame->slicetype != KVZ_SLICE_I) {
 
