@@ -917,15 +917,7 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
     if (encoder->cfg.deblock_enable) {
        WRITE_SE(stream, encoder->cfg.deblock_beta, "pps_beta_offset_div2");
        WRITE_SE(stream, encoder->cfg.deblock_tc, "pps_tc_offset_div2");
-       WRITE_SE(stream, encoder->cfg.deblock_beta, "pps_cb_beta_offset_div2");
-       WRITE_SE(stream, encoder->cfg.deblock_tc, "pps_cb_tc_offset_div2");
-       WRITE_SE(stream, encoder->cfg.deblock_beta, "pps_cr_beta_offset_div2");
-       WRITE_SE(stream, encoder->cfg.deblock_tc, "pps_cr_tc_offset_div2");
     }
-  //WRITE_U(stream, 0, 1, "rpl_info_in_ph_flag");
-  //WRITE_U(stream, 0, 1, "sao_info_in_ph_flag");
-  //WRITE_U(stream, 0, 1, "alf_info_in_ph_flag");
-  //WRITE_U(stream, 0, 1, "qp_delta_info_in_ph_flag");
 
 #if !JVET_S0132_HLS_REORDER
     WRITE_U(stream, 0, 1, "pps_ref_wraparound_enabled_flag");
