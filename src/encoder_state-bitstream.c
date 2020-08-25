@@ -1449,6 +1449,10 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
     add_checksum(state);
   }
 
+  kvz_nal_write(stream, KVZ_NAL_EOS_NUT, 0, 1);
+  kvz_nal_write(stream, KVZ_NAL_EOS_NUT, 0, 1);
+  
+
   //Get bitstream length for stats
   uint64_t newpos = kvz_bitstream_tell(stream);
   state->stats_bitstream_length = (newpos >> 3) - (curpos >> 3);
