@@ -1228,7 +1228,7 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
     }
     
     kvz_videoframe_set_poc(state->tile->frame, state->frame->poc);
-  } else if (cfg->intra_period > 0) {
+  } else if (cfg->intra_period > 1) {
     state->frame->poc = state->frame->num % cfg->intra_period;
   } else {
     state->frame->poc = state->frame->num;
@@ -1254,7 +1254,8 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
         cfg->gop_lowdelay ||
         !cfg->open_gop) // Closed GOP uses IDR pictures
     {
-      state->frame->pictype = KVZ_NAL_IDR_W_RADL;
+      state->frame->pictype = KVZ_NAL_IDR_N_LP;
+      if (cfg->intra_period == 1 && state->frame->num > 0) state->frame->pictype = KVZ_NAL_IDR_W_RADL;
     } else {
       state->frame->pictype = KVZ_NAL_CRA_NUT;
     }

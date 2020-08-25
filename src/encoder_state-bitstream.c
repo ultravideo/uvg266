@@ -58,6 +58,8 @@ static void encoder_state_write_bitstream_aud(encoder_state_t * const state)
   bitstream_t * const stream = &state->stream;
   kvz_nal_write(stream, KVZ_NAL_AUD_NUT, 0, 1);
 
+  WRITE_U(stream, 1, 1, "aud_irap_or_gdr_au_flag");
+
   uint8_t pic_type = state->frame->slicetype == KVZ_SLICE_I ? 0
                    : state->frame->slicetype == KVZ_SLICE_P ? 1
                    :                                       2;
@@ -1122,14 +1124,7 @@ static void kvz_encoder_state_write_bitstream_picture_header(
 #endif
   WRITE_UE(stream, 0, "ph_pic_parameter_set_id");
 
-  if (state->frame->pictype == KVZ_NAL_IDR_W_RADL
-    || state->frame->pictype == KVZ_NAL_IDR_N_LP) {
-
-    WRITE_U(stream, 0, 5, "ph_pic_order_cnt_lsb");
-  }
-  else {
-    WRITE_U(stream, state->frame->poc & 0x1f, 5, "ph_pic_order_cnt_lsb");
-  }
+  WRITE_U(stream, state->frame->poc & 0x1f, 5, "ph_pic_order_cnt_lsb");
 
   if (state->frame->pictype == KVZ_NAL_IDR_W_RADL
     || state->frame->pictype == KVZ_NAL_IDR_N_LP) {
@@ -1302,6 +1297,8 @@ void kvz_encoder_state_write_bitstream_slice_header(
   }
 
   //WRITE_U(stream, 0, 1, "slice_ts_residual_coding_disabled_flag");
+
+  //kvz_bitstream_align(stream);
 }
 
 
