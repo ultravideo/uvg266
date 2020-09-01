@@ -1124,6 +1124,23 @@ void reset_cc_alf_aps_param(cc_alf_filter_param *cc_alf) {
   cc_alf->new_cc_alf_filter[0] = cc_alf->new_cc_alf_filter[1] = 0;
 }
 
+void copy_pixels(kvz_pixel *src, int x_src_start, int y_src_start, int src_stride, 
+  kvz_pixel *dst, int x_dst_start, int y_dst_start, int dst_stride,
+  int width, int height)
+{
+  for (int y = 0; y < height; y++)
+  {
+    int src_y = y_src_start + y;
+    int dst_y = y_dst_start + y;
+    for (int x = 0; x < width; x++)
+    {
+      int src_x = x_src_start + x;
+      int dst_x = x_dst_start + x;
+      dst[dst_y*dst_stride + dst_x] = src[src_y*src_stride + src_x];
+    }
+  }
+}
+
 void adjust_pixels(kvz_pixel *src, int x_start, int x_end, int y_start, int y_end, int stride, int pic_width, int pic_height)
 {
   assert(x_start <= x_end);
@@ -1144,10 +1161,10 @@ void adjust_pixels(kvz_pixel *src, int x_start, int x_end, int y_start, int y_en
   //left side
   if (x_start == 0) {
     for (int y = y_start; y < y_end; y++) {
-      src[y * stride - 4] = 
-      src[y * stride - 3] = 
-      src[y * stride - 2] = 
-      src[y * stride - 1] = src[y * stride];
+      src[y * stride - 4] =
+        src[y * stride - 3] =
+        src[y * stride - 2] =
+        src[y * stride - 1] = src[y * stride];
     }
   }
   //right side
@@ -1155,18 +1172,18 @@ void adjust_pixels(kvz_pixel *src, int x_start, int x_end, int y_start, int y_en
     const int x_px = x_end - 1;
     for (int y = y_start; y < y_end; y++) {
       src[y * stride + x_px + 4] =
-      src[y * stride + x_px + 3] =
-      src[y * stride + x_px + 2] =
-      src[y * stride + x_px + 1] = src[y * stride + x_px];
+        src[y * stride + x_px + 3] =
+        src[y * stride + x_px + 2] =
+        src[y * stride + x_px + 1] = src[y * stride + x_px];
     }
   }
   //top
   if (y_start == 0) {
     for (int x = x_start; x < x_end; x++) {
-      src[-4 * stride + x] = 
-      src[-3 * stride + x] = 
-      src[-2 * stride + x] = 
-      src[-1 * stride + x] = src[x];
+      src[-4 * stride + x] =
+        src[-3 * stride + x] =
+        src[-2 * stride + x] =
+        src[-1 * stride + x] = src[x];
     }
   }
   //bottom
@@ -1174,11 +1191,215 @@ void adjust_pixels(kvz_pixel *src, int x_start, int x_end, int y_start, int y_en
     const int y_px = y_end - 1;
     for (int x = x_start; x < x_end; x++) {
       src[x + stride * (4 + y_px)] =
+        src[x + stride * (3 + y_px)] =
+        src[x + stride * (2 + y_px)] =
+        src[x + stride * (1 + y_px)] = src[x + stride * y_px];
+    }
+  }
+  //left top corner
+  if (top_left) {
+    for (int x = -4; x < 0; x++) {
+      src[-4 * stride + x] =
+        src[-3 * stride + x] =
+        src[-2 * stride + x] =
+        src[-1 * stride + x] = src[0];
+    }
+  }
+  //right top corner
+  if (top_right) {
+    const int x_px = x_end - 1;
+    for (int x = pic_width; x < pic_width + 4; x++) {
+      src[-4 * stride + x] =
+        src[-3 * stride + x] =
+        src[-2 * stride + x] =
+        src[-1 * stride + x] = src[x_px];
+    }
+  }
+
+  //left or right bottom corner
+  if (bottom_left) {
+    const int y_px = y_end - 1;
+    for (int x = -4; x < 0; x++) {
+      src[(4 + y_px) * stride + x] =
+        src[(3 + y_px) * stride + x] =
+        src[(2 + y_px) * stride + x] =
+        src[(1 + y_px) * stride + x] = src[stride * y_px];
+    }
+  }
+  if (bottom_right) {
+    const int x_px = x_end - 1;
+    const int y_px = y_end - 1;
+    for (int x = x_end; x < x_end + 4; x++) {
+      src[(4 + y_px) * stride + x] =
+        src[(3 + y_px) * stride + x] =
+        src[(2 + y_px) * stride + x] =
+        src[(1 + y_px) * stride + x] = src[stride * y_px + x_px];
+    }
+  }
+}
+
+void adjust_pixels_CTU_plus_4_pix(kvz_pixel *src, int x_start, int x_end, int y_start, int y_end, int stride, int pic_width, int pic_height)
+{
+  assert(x_start <= x_end);
+  assert(y_start <= y_end);
+  assert(x_end <= pic_width);
+  assert(y_end <= pic_height);
+
+  //not on any edge
+  if (x_start != 0 && y_start != 0 && x_end != pic_width && y_end != pic_height) {
+    return;
+  }
+
+  bool top_left = (x_start == 0 && y_start == 0);
+  bool top_right = (x_end == pic_width && y_start == 0);
+  bool bottom_left = (x_start == 0 && y_end == pic_height);
+  bool bottom_right = (x_end == pic_width && y_end == pic_height);
+
+  //left side
+  if (top_left && !bottom_left) {
+    for (int y = y_start; y < y_end + MAX_ALF_PADDING_SIZE; y++) {
+      src[y * stride - 4] = 
+      src[y * stride - 3] = 
+      src[y * stride - 2] = 
+      src[y * stride - 1] = src[y * stride];
+    }
+  }
+  else if (!top_left && bottom_left) {
+    for (int y = y_start + MAX_ALF_PADDING_SIZE; y < y_end; y++) {
+      src[y * stride - 4] =
+        src[y * stride - 3] =
+        src[y * stride - 2] =
+        src[y * stride - 1] = src[y * stride];
+    }
+  }
+  else if (top_left && bottom_left) {
+    for (int y = y_start; y < y_end; y++) {
+      src[y * stride - 4] =
+        src[y * stride - 3] =
+        src[y * stride - 2] =
+        src[y * stride - 1] = src[y * stride];
+    }
+  }
+  else if (x_start == 0) {
+    for (int y = y_start + MAX_ALF_PADDING_SIZE; y < y_end + MAX_ALF_PADDING_SIZE; y++) {
+      src[y * stride - 4] =
+        src[y * stride - 3] =
+        src[y * stride - 2] =
+        src[y * stride - 1] = src[y * stride];
+    }
+  }//left side 
+
+  //right side
+  if (top_right && !bottom_right) {
+    const int x_px = x_end - 1;
+    for (int y = y_start; y < y_end + MAX_ALF_PADDING_SIZE; y++) {
+      src[y * stride + x_px + 4] =
+      src[y * stride + x_px + 3] =
+      src[y * stride + x_px + 2] =
+      src[y * stride + x_px + 1] = src[y * stride + x_px];
+    }
+  }
+  else if (!top_right && bottom_right) {
+    const int x_px = x_end - 1;
+    for (int y = y_start + MAX_ALF_PADDING_SIZE; y < y_end; y++) {
+      src[y * stride + x_px + 4] =
+        src[y * stride + x_px + 3] =
+        src[y * stride + x_px + 2] =
+        src[y * stride + x_px + 1] = src[y * stride + x_px];
+    }
+  }
+  else if (top_right && bottom_right) {
+    const int x_px = x_end - 1;
+    for (int y = y_start; y < y_end; y++) {
+      src[y * stride + x_px + 4] =
+        src[y * stride + x_px + 3] =
+        src[y * stride + x_px + 2] =
+        src[y * stride + x_px + 1] = src[y * stride + x_px];
+    }
+  }
+  else if (x_end == pic_width) {
+    const int x_px = x_end - 1;
+    for (int y = y_start + MAX_ALF_PADDING_SIZE; y < y_end + MAX_ALF_PADDING_SIZE; y++) {
+      src[y * stride + x_px + 4] =
+        src[y * stride + x_px + 3] =
+        src[y * stride + x_px + 2] =
+        src[y * stride + x_px + 1] = src[y * stride + x_px];
+    }
+  }//right side
+
+  //top
+  if (top_left && !top_right) {
+    for (int x = x_start; x < x_end + MAX_ALF_PADDING_SIZE; x++) {
+      src[-4 * stride + x] = 
+      src[-3 * stride + x] = 
+      src[-2 * stride + x] = 
+      src[-1 * stride + x] = src[x];
+    }
+  }
+  else if (!top_left && top_right) {
+    for (int x = x_start + MAX_ALF_PADDING_SIZE; x < x_end; x++) {
+      src[-4 * stride + x] =
+        src[-3 * stride + x] =
+        src[-2 * stride + x] =
+        src[-1 * stride + x] = src[x];
+    }
+  }
+  else if (top_left && top_right) {
+    for (int x = x_start; x < x_end; x++) {
+      src[-4 * stride + x] =
+        src[-3 * stride + x] =
+        src[-2 * stride + x] =
+        src[-1 * stride + x] = src[x];
+    }
+  }
+  else if (y_start == 0) {
+    for (int x = x_start + MAX_ALF_PADDING_SIZE; x < x_end + MAX_ALF_PADDING_SIZE; x++) {
+      src[-4 * stride + x] =
+      src[-3 * stride + x] =
+      src[-2 * stride + x] =
+      src[-1 * stride + x] = src[x];
+    }
+  }//top
+
+  //bottom
+  if (bottom_left && !bottom_right) {
+    const int y_px = y_end - 1;
+    for (int x = x_start; x < x_end + MAX_ALF_PADDING_SIZE; x++) {
+      src[x + stride * (4 + y_px)] =
       src[x + stride * (3 + y_px)] =
       src[x + stride * (2 + y_px)] =
       src[x + stride * (1 + y_px)] = src[x + stride * y_px];
     }
   }
+  else if (!bottom_left && bottom_right) {
+    const int y_px = y_end - 1;
+    for (int x = x_start + MAX_ALF_PADDING_SIZE; x < x_end; x++) {
+      src[x + stride * (4 + y_px)] =
+        src[x + stride * (3 + y_px)] =
+        src[x + stride * (2 + y_px)] =
+        src[x + stride * (1 + y_px)] = src[x + stride * y_px];
+    }
+  }
+  else if (bottom_left && bottom_right) {
+    const int y_px = y_end - 1;
+    for (int x = x_start; x < x_end; x++) {
+      src[x + stride * (4 + y_px)] =
+        src[x + stride * (3 + y_px)] =
+        src[x + stride * (2 + y_px)] =
+        src[x + stride * (1 + y_px)] = src[x + stride * y_px];
+    }
+  }
+  else if (y_end == pic_height) {
+    const int y_px = y_end - 1;
+    for (int x = x_start + MAX_ALF_PADDING_SIZE; x < x_end + MAX_ALF_PADDING_SIZE; x++) {
+      src[x + stride * (4 + y_px)] =
+        src[x + stride * (3 + y_px)] =
+        src[x + stride * (2 + y_px)] =
+        src[x + stride * (1 + y_px)] = src[x + stride * y_px];
+    }
+  }//bottom
+
+
   //left top corner
   if (top_left) {
     for (int x = -4; x < 0; x++) {
@@ -1188,6 +1409,7 @@ void adjust_pixels(kvz_pixel *src, int x_start, int x_end, int y_start, int y_en
       src[-1 * stride + x] = src[0];
     }
   }
+
   //right top corner
   if (top_right) {
     const int x_px = x_end - 1;
@@ -1199,7 +1421,7 @@ void adjust_pixels(kvz_pixel *src, int x_start, int x_end, int y_start, int y_en
     }
   }
 
-  //left or right bottom corner
+  //left bottom corner
   if (bottom_left) {
     const int y_px = y_end - 1;
     for (int x = -4; x < 0; x++) {
@@ -1209,6 +1431,8 @@ void adjust_pixels(kvz_pixel *src, int x_start, int x_end, int y_start, int y_en
       src[(1 + y_px) * stride + x] = src[stride * y_px];
     }
   }
+
+  //right bottom corner
   if (bottom_right) {
     const int x_px = x_end - 1;
     const int y_px = y_end - 1;
@@ -1221,6 +1445,7 @@ void adjust_pixels(kvz_pixel *src, int x_start, int x_end, int y_start, int y_en
   }
 }
 
+//Need to adjust
 void adjust_pixels_chroma(kvz_pixel *src, int x_start, int x_end, int y_start, int y_end, int stride, int pic_width, int pic_height)
 {
   assert(x_start <= x_end);
@@ -1503,7 +1728,10 @@ void kvz_alf_derive_filter__encode__reconstruct(encoder_state_t *const state,
   //kvz_encode_alf(state, lcu->index, &alf_param);
   kvz_encode_alf_bits(state, lcu_index);
 
+  //siirretty kvz_frame_end -funktioon
+#if !RECONSTRUCT_AT_THE_END_OF_FRAME
   kvz_alf_reconstructor(state, lcu_index);
+#endif
 
   // Do not transmit CC ALF if it is unchanged
   if(state->slice->tile_group_alf_enabled_flag[COMPONENT_Y])
@@ -2046,6 +2274,13 @@ void kvz_frame_end(encoder_state_t const *state,
   if (lcu->index != g_num_ctus_in_pic - 1) {
     return;
   }
+
+#if RECONSTRUCT_AT_THE_END_OF_FRAME
+  for (int lcu_idx = 0; lcu_idx < g_num_ctus_in_pic; lcu_idx++)
+  {
+    kvz_alf_reconstructor(state, lcu_idx);
+  }
+#endif
 
   if (!g_created)
   {
@@ -6114,7 +6349,7 @@ void kvz_alf_create(encoder_state_t const *state,
   assert(g_alf_num_clipping_values[CHANNEL_TYPE_LUMA] > 0); //"g_alf_num_clipping_values[CHANNEL_TYPE_LUMA] must be at least one"
   g_alf_clipping_values[CHANNEL_TYPE_LUMA][0] = 1 << g_input_bit_depth[CHANNEL_TYPE_LUMA];
   int shift_luma = g_input_bit_depth[CHANNEL_TYPE_LUMA] - 8;
-  for (int i = 0; i < g_alf_num_clipping_values[CHANNEL_TYPE_LUMA]; ++i)
+  for (int i = 1; i < g_alf_num_clipping_values[CHANNEL_TYPE_LUMA]; ++i)
   {
     g_alf_clipping_values[CHANNEL_TYPE_LUMA][i] =
       (short)round(pow(2., g_input_bit_depth[CHANNEL_TYPE_LUMA] *
@@ -6207,23 +6442,29 @@ void kvz_alf_derive_classification(encoder_state_t *const state,
   int max_height = y_pos + height;
   int max_width = x_pos + width;
 
-  adjust_pixels(state->tile->frame->rec->y, x_pos, max_width, y_pos, max_height, state->tile->frame->rec->stride, max_width, max_height);
-  adjust_pixels_chroma(state->tile->frame->rec->u,
+  //Use if adjacent CTUs are not reconstructed 
+  adjust_pixels(state->tile->frame->rec->y, x_pos, state->tile->frame->width, y_pos, state->tile->frame->height, state->tile->frame->rec->stride,
+    state->tile->frame->width, state->tile->frame->height);
+  //Use if adjacent CTUs are reconstructed 
+  /*adjust_pixels_CTU_plus_4_pix(state->tile->frame->rec->y, x_pos, state->tile->frame->width, y_pos, state->tile->frame->height, state->tile->frame->rec->stride,
+    state->tile->frame->width, state->tile->frame->height);*/
+
+  /*adjust_pixels_chroma(state->tile->frame->rec->u,
     x_pos >> chroma_scale_x,
     max_width >> chroma_scale_x,
     y_pos >> chroma_scale_y,
     max_height >> chroma_scale_y,
     state->tile->frame->rec->stride >> chroma_scale_x,
-    max_width >> chroma_scale_x,
-    max_height >> chroma_scale_y);
+    state->tile->frame->width >> chroma_scale_x,
+    state->tile->frame->height >> chroma_scale_y);
   adjust_pixels_chroma(state->tile->frame->rec->v,
     x_pos >> chroma_scale_x,
     max_width >> chroma_scale_x,
     y_pos >> chroma_scale_y,
     max_height >> chroma_scale_y,
     state->tile->frame->rec->stride >> chroma_scale_x,
-    max_width >> chroma_scale_x,
-    max_height >> chroma_scale_y);
+    state->tile->frame->width >> chroma_scale_x,
+    state->tile->frame->height >> chroma_scale_y);*/
 
   for (int i = y_pos; i < max_height; i += CLASSIFICATION_BLK_SIZE)
   {

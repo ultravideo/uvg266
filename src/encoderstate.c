@@ -672,13 +672,31 @@ static void encoder_state_worker_encode_lcu(void * opaque)
   //Tests
   //alf_info_t *alf = &frame->alf_info[lcu->position.y * frame->rec->stride + lcu->position.x];
   //kvz_alf_enc_process(state, lcu);
-
   if (encoder->cfg.alf_enable) {
+#if RUN_ALF_AFTER_FULL_FRAME
+    if (lcu->last_column && lcu->last_row)
+    {
+      int total_num_lcus = frame->height_in_lcu * frame->width_in_lcu;
+      for (int lcu_idx = 0; lcu_idx < total_num_lcus; lcu_idx++)
+      {
+        lcu_order_element_t *cur_lcu = &state->lcu_order[lcu_idx];
+        kvz_alf_enc_create(state, cur_lcu);
+        kvz_alf_init(state, slice);
+        kvz_alf_enc_process(state, cur_lcu);
+        kvz_frame_end(state, frame, cur_lcu);
+        
+      }
+    }
+#else
+    int id = lcu->id;
+    int index = lcu->index;
     kvz_alf_enc_create(state, lcu);
     kvz_alf_init(state, slice);
     kvz_alf_enc_process(state, lcu);
     kvz_frame_end(state, frame, lcu);
-    //kvz_alf_enc_destroy(state, frame, lcu);
+#endif
+    //Moved to videoframe.c
+    //kvz_alf_enc_destroy(frame);
   }
 
   //Encode coding tree

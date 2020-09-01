@@ -19,6 +19,9 @@
 //To reduce bits overhead, filter coefficients of different classification can be merged.
 //In slice header, the indices of the APSs used for the current slice are signaled.
 
+#define RUN_ALF_AFTER_FULL_FRAME        0
+#define RECONSTRUCT_AT_THE_END_OF_FRAME 1
+
 #define ALF_FIXED_FILTER_NUM            64
 #define MAX_NUM_ALF_CLASSES             25
 #define MAX_NUM_ALF_LUMA_COEFF          13
@@ -476,10 +479,17 @@ void add_alf_cov(alf_covariance *dst, alf_covariance *src);
 void add_alf_cov_lhs_rhs(alf_covariance *dst, alf_covariance *lhs, alf_covariance *rhs);
 void reset_alf_covariance(alf_covariance *alf, int num_bins);
 void reset_cc_alf_aps_param(cc_alf_filter_param *cc_alf);
+void copy_pixels(kvz_pixel *src, int x_src_start, int y_src_start, int src_stride,
+  kvz_pixel *dst, int x_dst_start, int y_dst_start, int dst_stride,
+  int width, int height);
 void adjust_pixels(kvz_pixel *src, int x_start, int x_end, int y_start, int y_end,
+  int stride, int pic_width, int pic_height);
+void adjust_pixels_CTU_plus_4_pix(kvz_pixel *src, int x_start, int x_end, int y_start, int y_end,
                    int stride, int pic_width, int pic_height);
+//Need to adjust
 void adjust_pixels_chroma(kvz_pixel *src, int x_start, int x_end, int y_start, int y_end, 
                   int stride, int pic_width, int pic_height);
+
 void set_ctu_enable_flag(uint8_t **flags, channel_type channel, int ctu_idx, uint8_t value);
 void copy_ctu_enable_flag(uint8_t **flags_dst, uint8_t **flags_src, channel_type channel, int ctu_idx);
 
