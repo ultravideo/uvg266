@@ -236,12 +236,18 @@ static void kvz_angular_pred_generic(
         if (channel_type == 0) {
           int32_t ref_main_index = delta_int;
           kvz_pixel p[4];
-          bool use_cubic = false; // TODO: enable cubic filter when parameters are correct
+          bool use_cubic = true; // Default to cubic filter
           static const int kvz_intra_hor_ver_dist_thres[8] = { 24, 24, 24, 14, 2, 0, 0, 0 };
           int filter_threshold = kvz_intra_hor_ver_dist_thres[kvz_math_floor_log2(width)];
-          int dist_from_vert_or_hor = MIN(abs(mode_disp - 50), abs(mode_disp - 18));
-          if (dist_from_vert_or_hor <= filter_threshold) {
-            use_cubic = true;
+          int dist_from_vert_or_hor = MIN(abs(pred_mode - 50), abs(pred_mode - 18));
+          if (dist_from_vert_or_hor > filter_threshold) {
+            static const int16_t modedisp2sampledisp[32] = { 0,    1,    2,    3,    4,    6,     8,   10,   12,   14,   16,   18,   20,   23,   26,   29,   32,   35,   39,  45,  51,  57,  64,  73,  86, 102, 128, 171, 256, 341, 512, 1024 };
+            const int_fast8_t mode_disp = (pred_mode >= 34) ? pred_mode - 50 : 18 - pred_mode;
+            const int_fast8_t sample_disp = (mode_disp < 0 ? -1 : 1) * modedisp2sampledisp[abs(mode_disp)];
+            if ((abs(sample_disp) & 0x1F) != 0)
+            {
+              use_cubic = false;
+            }
           }
           const int16_t filter_coeff[4] = { 16 - (delta_fract >> 1), 32 - (delta_fract >> 1), 16 + (delta_fract >> 1), delta_fract >> 1 };
           int16_t const * const f = use_cubic ? cubic_filter[delta_fract] : filter_coeff;
