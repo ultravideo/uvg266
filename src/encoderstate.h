@@ -268,6 +268,7 @@ typedef struct lcu_order_element {
   int first_row;
   int last_column;
   int last_row;
+  lcu_coeff_t *coeff;
   
   struct lcu_order_element *above;
   struct lcu_order_element *below;
