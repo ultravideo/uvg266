@@ -40,11 +40,7 @@
 #include "threadqueue.h"
 #include "videoframe.h"
 
-#define JVET_S0132_HLS_REORDER 1
 #define JVET_S0266_VUI_length 1
-#define JVET_S0186_SPS_CLEANUP 1
-#define JVET_S0052_RM_SEPARATE_COLOUR_PLANE 1
-#define JVET_S0074_SPS_REORDER 1
 #define LUMA_ADAPTIVE_DEBLOCKING_FILTER_QP_OFFSET 1
 #define JVET_S0076_ASPECT1 1
 #define JVET_S0193_NO_OUTPUT_PRIOR_PIC 1
@@ -371,7 +367,6 @@ static void encoder_state_write_bitstream_VUI(bitstream_t *stream,
 
   WRITE_U(stream, 0, 1, "colour_description_present_flag");
 
-  //WRITE_U(stream, 0, 1, "field_seq_flag");
   WRITE_U(stream, 0, 1, "chroma_loc_info_present_flag");
 
 #if JVET_S0266_VUI_length
@@ -469,8 +464,7 @@ static void encoder_state_write_bitstream_SPS_extension(bitstream_t *stream,
     // Range Extension
     WRITE_U(stream, 0, 1, "transform_skip_rotation_enabled_flag");
     WRITE_U(stream, 0, 1, "transform_skip_context_enabled_flag");
-    //WRITE_U(stream, 1, 1, "implicit_rdpcm_enabled_flag");
-    //WRITE_U(stream, 0, 1, "explicit_rdpcm_enabled_flag");
+
     WRITE_U(stream, 0, 1, "extended_precision_processing_flag");
     WRITE_U(stream, state->encoder_control->cfg.intra_smoothing_disabled, 1, "intra_smoothing_disabled_flag");
     WRITE_U(stream, 0, 1, "high_precision_offsets_enabled_flag");
@@ -497,12 +491,10 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   WRITE_U(stream, 0, 4, "sps_video_parameter_set_id");
 
   WRITE_U(stream, 1, 3, "sps_max_sub_layers_minus1");
-#if JVET_S0186_SPS_CLEANUP
+
   WRITE_U(stream, encoder->chroma_format, 2, "chroma_format_idc");
   WRITE_U(stream, kvz_math_floor_log2(LCU_WIDTH) - 5, 2, "sps_log2_ctu_size_minus5");
-#else
-  WRITE_U(stream, 0, 4, "sps_reserved_zero_4bits");
-#endif
+
 
   WRITE_U(stream, 1, 1, "sps_ptl_dpb_hrd_params_present_flag");
 
@@ -510,16 +502,6 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
 
   WRITE_U(stream, 0, 1, "gdr_enabled_flag");
 
-  //WRITE_U(stream, 0, 4, "sps_seq_parameter_set_id");
-#if !JVET_S0186_SPS_CLEANUP
-  WRITE_U(stream, encoder->chroma_format, 2, "chroma_format_idc");
-#endif
-
-#if !JVET_S0052_RM_SEPARATE_COLOUR_PLANE
-  if (encoder->chroma_format == KVZ_CSP_444) {
-    WRITE_U(stream, 0, 1, "separate_colour_plane_flag");
-  }
-#endif
   WRITE_U(stream, 0, 1, "ref_pic_resampling_enabled_flag");
 
 
@@ -542,9 +524,6 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
     WRITE_UE(stream, (encoder->in.height - encoder->in.real_height) >> 1,
       "conf_win_bottom_offset");
   }
-#if !JVET_S0186_SPS_CLEANUP
-  WRITE_U(stream, 1, 2, "sps_log2_ctu_size_minus5"); // Max size 2^6 = 64x64
-#endif
 
   WRITE_U(stream, 0, 1, "subpic_info_present_flag");
 
@@ -552,9 +531,6 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
 
   WRITE_U(stream, encoder->cfg.wpp, 1, "entropy_coding_sync_enabled_flag");
   WRITE_U(stream, 0, 1, "sps_entry_point_offsets_present_flag");
-
-  //WRITE_U(stream, 0, 1, "sps_weighted_pred_flag");
-  //WRITE_U(stream, 0, 1, "sps_weighted_bipred_flag");
 
   WRITE_U(stream, 1, 4, "log2_max_pic_order_cnt_lsb_minus4");
   WRITE_U(stream, 0, 1, "sps_poc_msb_flag");
@@ -574,30 +550,16 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   WRITE_UE(stream, 0, "sps_max_latency_increase_plus1");
   //end for
 
-#if !JVET_S0132_HLS_REORDER
-  //WRITE_U(stream, 0, 1, "long_term_ref_pics_flag");
-  //WRITE_U(stream, 1, 1, "inter_layer_ref_pics_present_flag");
-  //WRITE_U(stream, 0, 1, "sps_idr_rpl_present_flag");
-  //WRITE_U(stream, 1, 1, "rpl1_copy_from_rpl0_flag");
-  //WRITE_UE(stream, 0, "num_ref_pic_lists_in_sps[0]")
-
-  // QTBT
-  // if(!no_qtbtt_dual_tree_intra_constraint_flag)
-    WRITE_U(stream, 0, 1, "qtbtt_dual_tree_intra_flag");
-#endif
-
   WRITE_UE(stream, MIN_SIZE-2, "log2_min_luma_coding_block_size_minus2"); // Min size 2^3 = 8x8
   // if(!no_partition_constraints_override_constraint_flag)
     WRITE_U(stream, 0, 1, "partition_constraints_override_enabled_flag");
   WRITE_UE(stream, 0, "sps_log2_diff_min_qt_min_cb_intra_slice_luma");
   WRITE_UE(stream, 0, "sps_max_mtt_hierarchy_depth_intra_slice_luma");  
 
-#if JVET_S0132_HLS_REORDER
   if (encoder->chroma_format != KVZ_CSP_400)
   {
     WRITE_U(stream, 0, 1, "qtbtt_dual_tree_intra_flag");
   }
-#endif
   
   WRITE_UE(stream, 0, "sps_log2_diff_min_qt_min_cb_inter_slice");
   WRITE_UE(stream, 0, "sps_max_mtt_hierarchy_depth_inter_slice");  
@@ -627,29 +589,14 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   }
 #endif
 
-
-  //WRITE_UE(stream, 1, "log2_minQT_ISlice_minus2");
-  //WRITE_UE(stream, 1, "log2_minQT_PBSlice_minus2");
-
-  
-  // ToDo: redefine for VVC
-  /*
-  WRITE_UE(stream, 0, "log2_min_luma_transform_block_size_minus2");   // 4x4
-  WRITE_UE(stream, 3, "log2_diff_max_min_luma_transform_block_size"); // 4x4...32x32
-  WRITE_UE(stream, encoder->tr_depth_inter, "max_transform_hierarchy_depth_inter");
-  WRITE_UE(stream, encoder->cfg.tr_depth_intra, "max_transform_hierarchy_depth_intra");
-  */
-
   if (LCU_WIDTH > 32)
     WRITE_U(stream, (TR_MAX_LOG2_SIZE - 5) ? 1 : 0, 1, "sps_max_luma_transform_size_64_flag");
 
-#if JVET_S0074_SPS_REORDER
+
   WRITE_U(stream, 0, 1, "sps_transform_skip_enabled_flag");
-
   WRITE_U(stream, 0, 1, "sps_mts_enabled_flag");
-
   WRITE_U(stream, 0, 1, "sps_lfnst_enabled_flag");
-#endif
+
 
   WRITE_U(stream, 0, 1, "sps_joint_cbcr_enabled_flag");
 
@@ -669,17 +616,11 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   // if(!no_alf_constraint_flag)
     WRITE_U(stream, 0, 1, "sps_alf_enabled_flag");
 
-#if JVET_S0074_SPS_REORDER
     WRITE_U(stream, 0, 1, "sps_lmcs_enable_flag");
-#else
-    WRITE_U(stream, 0, 1, "sps_transform_skip_enabled_flag");
-#endif
 
     WRITE_U(stream, 0, 1, "sps_weighted_pred_flag");           // Use of Weighting Prediction (P_SLICE)
     WRITE_U(stream, 0, 1, "sps_weighted_bipred_flag");        // Use of Weighting Bi-Prediction (B_SLICE)
 
-    //WRITE_U(stream, 0, 1, "sps_joint_cbcr_enabled_flag");
-  // if(!no_ref_wraparound_constraint_flag)
     WRITE_U(stream, 0, 1, "long_term_ref_pics_flag");
 
     WRITE_U(stream, 0, 1, "sps_idr_rpl_present_flag");
@@ -734,31 +675,13 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   WRITE_U(stream, 0, 1, "sps_chroma_horizontal_collocated_flag");
   WRITE_U(stream, 0, 1, "sps_chroma_vertical_collocated_flag");
 
-  // if(!no_mts_constraint_flag)
-#if !JVET_S0074_SPS_REORDER
-    WRITE_U(stream, 0, 1, "sps_mts_enabled_flag");
-#endif
-
-  //WRITE_UE(stream, MRG_MAX_NUM_CANDS - 6, "pic_six_minus_max_num_merge_cand");
-
-  //WRITE_U(stream, 0, 1, "sps_sbt_enabled_flag");
-  // if(!no_affine_motion_constraint_flag)
-  //WRITE_U(stream, 0, 1, "sps_affine_enabled_flag");
   WRITE_U(stream, 0, 1, "sps_palette_enabled_flag");
-  //WRITE_U(stream, 0, 1, "sps_bcw_enabled_flag");
   WRITE_U(stream, 0, 1, "sps_ibc_enabled_flag");
-#if !JVET_S0074_SPS_REORDER
-  //WRITE_U(stream, 0, 1, "sps_ciip_enabled_flag");
-  WRITE_U(stream, 0, 1, "sps_gpm_enabled_flag");
-  WRITE_U(stream, 0, 1, "sps_lmcs_enable_flag");
-  WRITE_U(stream, 0, 1, "sps_lfnst_enabled_flag");
-#endif
+
 #if LUMA_ADAPTIVE_DEBLOCKING_FILTER_QP_OFFSET
   // if(!no_ladf_constraint_flag)
   WRITE_U(stream, 0, 1, "sps_ladf_enabled_flag");
 #endif
-
-  //WRITE_UE(stream, 0, "log2_parallel_merge_level_minus2");
 
   WRITE_U(stream, 0, 1, "scaling_list_enabled_flag");
 
@@ -767,8 +690,6 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   WRITE_U(stream, encoder->cfg.signhide_enable, 1, "pic_sign_data_hiding_enabled_flag");
 
   WRITE_U(stream, 0, 1, "sps_virtual_boundaries_enabled_flag");
-  //WRITE_U(stream, 0, 1, "sps_loop_filter_across_virtual_boundaries_disabled_present_flag");  
-  
 
   WRITE_U(stream, 0, 1, "general_hrd_parameters_present_flag");
   /*
@@ -866,20 +787,16 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
   }
   */
   
-  //wavefronts
-  //WRITE_U(stream, encoder->cfg.wpp, 1, "entropy_coding_sync_enabled_flag");
   WRITE_U(stream, 0, 1, "cabac_init_present_flag");
 
   WRITE_UE(stream, 0, "num_ref_idx_l0_default_active_minus1");
   WRITE_UE(stream, 0, "num_ref_idx_l1_default_active_minus1");
   WRITE_U(stream, 0, 1, "rpl1_idx_present_flag");
-#if JVET_S0132_HLS_REORDER
+
   WRITE_U(stream, 0, 1, "weighted_pred_flag");   // Use of Weighting Prediction (P_SLICE)
   WRITE_U(stream, 0, 1, "weighted_bipred_flag");  // Use of Weighting Bi-Prediction (B_SLICE)
   WRITE_U(stream, 0, 1, "pps_ref_wraparound_enabled_flag");
-  //if (pcPPS->getWrapAroundEnabledFlag())
-    //WRITE_U(stream, 0, 1, "pps_pic_width_minus_wraparound_offset");
-#endif
+
   WRITE_SE(stream, ((int8_t)encoder->cfg.qp) - 26, "init_qp_minus26");
   WRITE_U(stream, encoder->max_qp_delta_depth >= 0 ? 1:0, 1, "cu_qp_delta_enabled_flag");
   if (encoder->max_qp_delta_depth >= 0) {
@@ -899,14 +816,6 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
 
   WRITE_U(stream, 0, 1, "cu_chroma_qp_offset_enabled_flag");
   */
-#if !JVET_S0132_HLS_REORDER
-  WRITE_U(stream, 0, 1, "weighted_pred_flag");
-  WRITE_U(stream, 0, 1, "weighted_bipred_flag");
-#endif
-  //WRITE_U(stream, 0, 1, "dependent_slices_enabled_flag");
-  //WRITE_U(stream, encoder->cfg.lossless, 1, "transquant_bypass_enabled_flag");
-
-
 
   WRITE_U(stream, 1, 1, "deblocking_filter_control_present_flag");
 
@@ -915,17 +824,11 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
   WRITE_U(stream, encoder->cfg.deblock_enable ? 0 : 1, 1,
           "pps_disable_deblocking_filter_flag");
 
-    //IF !disabled
-    if (encoder->cfg.deblock_enable) {
-       WRITE_SE(stream, encoder->cfg.deblock_beta, "pps_beta_offset_div2");
-       WRITE_SE(stream, encoder->cfg.deblock_tc, "pps_tc_offset_div2");
-    }
-
-#if !JVET_S0132_HLS_REORDER
-    WRITE_U(stream, 0, 1, "pps_ref_wraparound_enabled_flag");
-    //if (pcPPS->getWrapAroundEnabledFlag())
-      //WRITE_UVLC(pcPPS->getPicWidthMinusWrapAroundOffset(), "pps_pic_width_minus_wraparound_offset");
-#endif
+  //IF !disabled
+  if (encoder->cfg.deblock_enable) {
+      WRITE_SE(stream, encoder->cfg.deblock_beta, "pps_beta_offset_div2");
+      WRITE_SE(stream, encoder->cfg.deblock_tc, "pps_tc_offset_div2");
+  }
 
   WRITE_U(stream, 0, 1, "picture_header_extension_present_flag");
   WRITE_U(stream, 0, 1, "slice_header_extension_present_flag");
@@ -951,8 +854,8 @@ static void encoder_state_write_bitstream_prefix_sei_version(encoder_state_t * c
   memcpy(buf, uuid, 16);
 
   // user_data_payload_byte
-  s += sprintf(s, "Kvazaar VVC Encoder v. " VERSION_STRING " - "
-                  "Copyleft 2018- - http://ultravideo.cs.tut.fi/ - options:");
+  s += sprintf(s, "uvg266 VVC Encoder v. " VERSION_STRING " - "
+                  "Copyleft 2020- - http://ultravideo.fi/ - options:");
   s += sprintf(s, " %dx%d", cfg->width, cfg->height);
   s += sprintf(s, " deblock=%d:%d:%d", cfg->deblock_enable,
                cfg->deblock_beta, cfg->deblock_tc);
@@ -1195,8 +1098,6 @@ static void kvz_encoder_state_write_bitstream_ref_pic_list(
 
     WRITE_UE(stream, delta_poc, "abs_delta_poc_st");
     if (delta_poc+1) WRITE_U(stream, 1, 1, "strp_entry_sign_flag");
-    //WRITE_UE(stream, encoder->cfg.gop_len ? delta_poc - last_poc - 1 : 0, "delta_poc_s0_minus1");
-    //WRITE_U(stream, !state->frame->is_irap, 1, "used_by_curr_pic_s0_flag");
     last_poc = delta_poc;
     
   }
