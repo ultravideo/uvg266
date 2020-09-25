@@ -668,10 +668,10 @@ static void encoder_state_worker_encode_lcu(void * opaque)
     encode_sao(state, lcu->position.x, lcu->position.y, &frame->sao_luma[lcu->position.y * frame->width_in_lcu + lcu->position.x], &frame->sao_chroma[lcu->position.y * frame->width_in_lcu + lcu->position.x]);
   }
 
-  /*
   //Tests
   //alf_info_t *alf = &frame->alf_info[lcu->position.y * frame->rec->stride + lcu->position.x];
   //kvz_alf_enc_process(state, lcu);
+#if !FULL_FRAME
   if (encoder->cfg.alf_enable) {
 #if RUN_ALF_AFTER_FULL_FRAME
     if (lcu->last_column && lcu->last_row)
@@ -688,14 +688,15 @@ static void encoder_state_worker_encode_lcu(void * opaque)
       }
     }
 #else
-    kvz_alf_enc_create(state, lcu);
-    kvz_alf_init(state, slice);
+    kvz_alf_enc_create(state);
+    kvz_alf_init(state);
     kvz_alf_enc_process(state, lcu);
-    kvz_frame_end(state, frame, lcu);
+    kvz_frame_end(state, lcu);
 #endif
     //Moved to videoframe.c
     //kvz_alf_enc_destroy(frame);
-  }*/
+  }
+#endif
 
   //Encode coding tree
   kvz_encode_coding_tree(state, lcu->position.x * LCU_WIDTH, lcu->position.y * LCU_WIDTH, 0);
@@ -837,6 +838,10 @@ static void encoder_state_worker_encode_lcu_bitstream(void * opaque)
 
   //Encode ALF
   //TODO
+#if FULL_FRAME
+  const int ctu_idx = lcu->index;
+  kvz_encode_alf_bits(state, ctu_idx);
+#endif
 
   //Encode coding tree
   kvz_encode_coding_tree(state, lcu->position.x * LCU_WIDTH, lcu->position.y * LCU_WIDTH, 0);
@@ -905,6 +910,8 @@ static void encoder_state_worker_encode_lcu_bitstream(void * opaque)
 
 static void encoder_state_encode_leaf(encoder_state_t * const state)
 {
+  const encoder_control_t * const encoder = state->encoder_control;
+
   assert(state->is_leaf);
   assert(state->lcu_order_count > 0);
 
@@ -926,7 +933,7 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
   if (!use_parallel_encoding) {
     // Encode every LCU in order and perform SAO reconstruction after every
     // frame is encoded. Deblocking and SAO search is done during LCU encoding.
-#if 0
+#if !FULL_FRAME
     for (int i = 0; i < state->lcu_order_count; ++i) {
       encoder_state_worker_encode_lcu(&state->lcu_order[i]);
     }
@@ -936,6 +943,12 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
     }
 
     //Encode ALF
+    if (encoder->cfg.alf_enable) {
+      kvz_alf_enc_create(state);
+      kvz_alf_init(state);
+      kvz_alf_enc_process(state);
+      kvz_frame_end(state);
+    }
 
     for (int i = 0; i < state->lcu_order_count; ++i) {
       encoder_state_worker_encode_lcu_bitstream(&state->lcu_order[i]);
