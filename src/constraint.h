@@ -1,5 +1,5 @@
-#ifndef _PICTURE_X86_ASM_SAD_H_
-#define _PICTURE_X86_ASM_SAD_H_
+#ifndef CONSTRAINT_H_
+#define CONSTRAINT_H_
 /*****************************************************************************
  * This file is part of Kvazaar HEVC encoder.
  *
@@ -20,25 +20,21 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-/**
- * \ingroup Optimization
- * \file
- * Optimizations for AVX, utilizing ASM implementations.
+#include "ml_intra_cu_depth_pred.h"
+#include "encoderstate.h"
+
+
+ /* Constraint structure:
+  * Each field corresponds to a constraint technique. The encoder tests if the constraint
+  * pointer is allocated to apply the technique.
  */
+typedef struct {
+  // Structure used for the CTU depth prediction using Machine Learning in All Intra 
+  ml_intra_ctu_pred_t * ml_intra_depth_ctu;
+} constraint_t;
 
-#include "global.h" // IWYU pragma: keep
-#include "kvazaar.h"
 
-#if KVZ_BIT_DEPTH == 8
-unsigned kvz_sad_4x4_avx(const uint8_t*, const uint8_t*);
-unsigned kvz_sad_8x8_avx(const uint8_t*, const uint8_t*);
-unsigned kvz_sad_16x16_avx(const uint8_t*, const uint8_t*);
-
-unsigned kvz_sad_4x4_stride_avx(const uint8_t *data1, const uint8_t *data2, unsigned stride);
-unsigned kvz_sad_8x8_stride_avx(const uint8_t *data1, const uint8_t *data2, unsigned stride);
-unsigned kvz_sad_16x16_stride_avx(const uint8_t *data1, const uint8_t *data2, unsigned stride);
-unsigned kvz_sad_32x32_stride_avx(const uint8_t *data1, const uint8_t *data2, unsigned stride);
-unsigned kvz_sad_64x64_stride_avx(const uint8_t *data1, const uint8_t *data2, unsigned stride);
-#endif // KVZ_BIT_DEPTH == 8
+void * kvz_init_constraint(encoder_state_t* state, const encoder_control_t * const);
+void kvz_constraint_free(encoder_state_t* state);
 
 #endif

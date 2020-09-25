@@ -200,7 +200,7 @@ static void* input_read_thread(void* in_args)
                                     args->opts->config->height,
                                     args->encoder->cfg.input_bitdepth,
                                     args->encoder->bitdepth,
-                                    frame_in);
+                                    frame_in, args->opts->config->file_format);
     if (!read_success) {
       // reading failed
       if (feof(args->input)) {
@@ -219,7 +219,7 @@ static void* input_read_thread(void* in_args)
                                           args->opts->config->height,
                                           args->encoder->cfg.input_bitdepth,
                                           args->encoder->bitdepth,
-                                          frame_in);
+                                          frame_in, args->opts->config->file_format);
           if (!read_success) {
             fprintf(stderr, "Could not re-open input file, shutting down!\n");
             retval = RETVAL_FAILURE;
@@ -305,6 +305,96 @@ void output_recon_pictures(const kvz_api *const api,
   } while (picture_written);
 }
 
+static double calc_avg_qp(uint64_t qp_sum, uint32_t frames_done)
+{
+  return (double)qp_sum / (double)frames_done;
+}
+
+/**
+* \brief Reads the information in y4m header
+*
+* \param input  Pointer to the input file
+* \param config Pointer to the config struct
+*/
+static bool read_header(FILE* input, kvz_config* config) {
+  char buffer[256];
+  bool end_of_header = false;
+
+  while(!end_of_header) {
+    for (int i = 0; i < 256; i++) {
+      buffer[i] = getc(input);
+      // Start code of frame data
+      if (buffer[i] == 0x0A) {
+        for (; i > 0; i--) {
+          ungetc(buffer[i], input);
+        }
+        end_of_header = true;
+        break;
+      }
+      // Header sections are separated by space (ascii 0x20)
+      if (buffer[i] == 0x20) {
+        // Header start sequence does not hold any addition information, so it can be skipped
+        if ((i == 9) && strncmp(buffer, "YUV4MPEG2 ", 10) == 0) {
+          break;
+        }
+        switch (buffer[0]) {
+        // Width
+        case 'W':
+          // Exclude starting 'W' and the space at the end with substr
+          config->width = atoi(&buffer[1]);
+          break;
+        // Height
+        case 'H':
+          // Exclude starting 'H' and the space at the end with substr
+          config->height = atoi(&buffer[1]);
+          break;
+        // Framerate (or start code of frame)
+        case 'F':
+          // The header has no ending signature other than the start code of a frame
+          if (i > 5 && strncmp(buffer, "FRAME", 5) == 0) {
+            for (; i > 0; i--) {
+              ungetc(buffer[i], input);
+            }
+            end_of_header = true;
+            break;
+          }
+          else {
+            config->framerate_num = atoi(&buffer[1]);
+            for (int j = 0; j < i; j++) {
+              if (buffer[j] == ':') {
+                config->framerate_denom = atoi(&buffer[j + 1]);
+              }
+            }
+            break;
+          }
+        // Interlacing
+        case 'I':
+          break;
+        // Aspect ratio
+        case 'A':
+          break;
+        // Colour space
+        case 'C':
+          break;
+        // Comment
+        case 'X':
+          break;
+        default:
+          fprintf(stderr, "Unknown header argument starting with '%i'\n", buffer[0]);
+          break;
+        }
+        break;
+      }
+    }
+  }
+
+  if (config->width == 0 || config->height == 0 || config->framerate_num == 0 || config->framerate_denom == 0) {
+    fprintf(stderr, "Failed to read necessary info from y4m headers. Width, height and frame rate must be present in the headers.\n");
+    return false;
+  }
+
+  return true;
+}
 
 /**
  * \brief Program main function.
@@ -405,6 +495,13 @@ int main(int argc, char *argv[])
     }
   }
 
+  // Parse headers if input data is in y4m container
+  if (opts->config->file_format == KVZ_FORMAT_Y4M) {
+    if (!read_header(input, opts->config)) {
+      goto exit_failure;
+    }
+  }
+
   enc = api->encoder_open(opts->config);
   if (!enc) {
     fprintf(stderr, "Failed to open encoder.\n");
@@ -418,7 +515,7 @@ int main(int argc, char *argv[])
          encoder->in.width, encoder->in.height,
          encoder->in.real_width, encoder->in.real_height);
 
-  if (opts->seek > 0 && !yuv_io_seek(input, opts->seek, opts->config->width, opts->config->height)) {
+  if (opts->seek > 0 && !yuv_io_seek(input, opts->seek, opts->config->width, opts->config->height, opts->config->file_format)) {
     fprintf(stderr, "Failed to seek %d frames.\n", opts->seek);
     goto exit_failure;
   }
@@ -432,6 +529,7 @@ int main(int argc, char *argv[])
     uint64_t bitstream_length = 0;
     uint32_t frames_done = 0;
     double psnr_sum[3] = { 0.0, 0.0, 0.0 };
+    uint64_t qp_sum = 0;
 
     // how many bits have been written this second? used for checking if framerate exceeds level's limits
     uint64_t bits_this_second = 0;
@@ -597,12 +695,15 @@ int main(int argc, char *argv[])
                                 opts->config->height);
         }
 
+        qp_sum      += info_out.qp;
         frames_done += 1;
+
         psnr_sum[0] += frame_psnr[0];
         psnr_sum[1] += frame_psnr[1];
         psnr_sum[2] += frame_psnr[2];
 
-        print_frame_info(&info_out, frame_psnr, len_out, encoder->cfg.calc_psnr);
+        print_frame_info(&info_out, frame_psnr, len_out, encoder->cfg.calc_psnr,
+                         calc_avg_qp(qp_sum, frames_done));
       }
 
       api->picture_free(cur_in_img);
@@ -632,12 +733,38 @@ int main(int argc, char *argv[])
     fprintf(stderr, " Total CPU time: %.3f s.\n", ((float)(clock() - start_time)) / CLOCKS_PER_SEC);
 
     {
+      const double mega = (double)(1 << 20);
+
       double encoding_time = ( (double)(encoding_end_cpu_time - encoding_start_cpu_time) ) / (double) CLOCKS_PER_SEC;
       double wall_time = KVZ_CLOCK_T_AS_DOUBLE(encoding_end_real_time) - KVZ_CLOCK_T_AS_DOUBLE(encoding_start_real_time);
-      fprintf(stderr, " Encoding time: %.3f s.\n", encoding_time);
+
+      double encoding_cpu = 100.0 * encoding_time / wall_time;
+      double encoding_fps = (double)frames_done   / wall_time;
+
+      double n_bits       = (double)(bitstream_length * 8);
+      double sf_num       = (double)encoder->cfg.framerate_num;
+      double sf_den       = (double)encoder->cfg.framerate_denom;
+      double sequence_fps =         sf_num / sf_den;
+
+      double sequence_t   = (double)frames_done / sequence_fps;
+      double bitrate_bps  = (double)n_bits      / sequence_t;
+      double bitrate_mbps =         bitrate_bps / mega;
+
+      double avg_qp       = calc_avg_qp(qp_sum, frames_done);
+
+#ifdef _WIN32
+      if (encoding_cpu > 100.0) {
+        encoding_cpu = 100.0;
+      }
+#endif
+      fprintf(stderr, " Encoding time: %.3f s.\n",      encoding_time);
       fprintf(stderr, " Encoding wall time: %.3f s.\n", wall_time);
-      fprintf(stderr, " Encoding CPU usage: %.2f%%\n", encoding_time/wall_time*100.f);
-      fprintf(stderr, " FPS: %.2f\n", ((double)frames_done)/wall_time);
+
+      fprintf(stderr, " Encoding CPU usage: %.2f%%\n",  encoding_cpu);
+      fprintf(stderr, " FPS: %.2f\n",                   encoding_fps);
+
+      fprintf(stderr, " Bitrate: %.3f Mbps\n",          bitrate_mbps);
+      fprintf(stderr, " AVG QP: %.1f\n",                avg_qp);
     }
     pthread_join(input_thread, NULL);
   }

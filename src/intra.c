@@ -235,6 +235,7 @@ static void intra_pred_dc(
   }
 }
 
+
 void kvz_intra_predict(
   encoder_state_t *const state,
   kvz_intra_references *refs,
@@ -262,6 +263,7 @@ void kvz_intra_predict(
     int filter_threshold = kvz_intra_hor_ver_dist_thres[(log2_width + log2_width) >> 1];
     int dist_from_vert_or_hor = MIN(abs(mode - 50), abs(mode - 18));
     if (dist_from_vert_or_hor > filter_threshold) {
+
       static const int16_t modedisp2sampledisp[32] = { 0,    1,    2,    3,    4,    6,     8,   10,   12,   14,   16,   18,   20,   23,   26,   29,   32,   35,   39,  45,  51,  57,  64,  73,  86, 102, 128, 171, 256, 341, 512, 1024 };
       const int_fast8_t mode_disp = (mode >= 34) ? mode - 50 : 18 - mode;
       const int_fast8_t sample_disp = (mode_disp < 0 ? -1 : 1) * modedisp2sampledisp[abs(mode_disp)];
@@ -639,7 +641,18 @@ void kvz_intra_recon_cu(
     cur_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
   }
 
+  // Reset CBFs because CBFs might have been set
+  // for depth earlier
+  if (mode_luma >= 0) {
+    cbf_clear(&cur_cu->cbf, depth, COLOR_Y);
+  }
+  if (mode_chroma >= 0) {
+    cbf_clear(&cur_cu->cbf, depth, COLOR_U);
+    cbf_clear(&cur_cu->cbf, depth, COLOR_V);
+  }
+
   if (depth == 0 || cur_cu->tr_depth > depth) {
+
     const int offset = width / 2;
     const int32_t x2 = x + offset;
     const int32_t y2 = y + offset;
@@ -656,7 +669,7 @@ void kvz_intra_recon_cu(
       LCU_GET_CU_AT_PX(lcu, lcu_px.x + offset, lcu_px.y + offset)->cbf,
     };
 
-    if (mode_luma != -1 && depth < MAX_DEPTH) {
+    if (mode_luma != -1 && depth <= MAX_DEPTH) {
       cbf_set_conditionally(&cur_cu->cbf, child_cbfs, depth, COLOR_Y);
     }
     if (mode_chroma != -1 && depth <= MAX_DEPTH) {
@@ -675,6 +688,6 @@ void kvz_intra_recon_cu(
       intra_recon_tb_leaf(state, x, y, depth, mode_chroma, lcu, COLOR_V);
     }
 
-    kvz_quantize_lcu_residual(state, has_luma, has_chroma, x, y, depth, cur_cu, lcu);
+    kvz_quantize_lcu_residual(state, has_luma, has_chroma, x, y, depth, cur_cu, lcu, false);
   }
 }

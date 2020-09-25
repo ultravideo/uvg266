@@ -23,7 +23,7 @@
 #include "strategyselector.h"
 #include "tables.h"
 
-const int16_t kvz_g_dst_4[4][4] =
+ALIGNED(32) const int16_t kvz_g_dst_4[4][4] =
 {
   { 29, 55, 74, 84 },
   { 74, 74, 0, -74 },
@@ -31,13 +31,13 @@ const int16_t kvz_g_dst_4[4][4] =
   { 55, -84, 74, -29 }
 };
 
-const int16_t kvz_g_dct_2[2][2] =
+ALIGNED(32) const int16_t kvz_g_dct_2[2][2] =
 {
   {64, 64,  },
   {64, -64,  },
 };
 
-const int16_t kvz_g_dct_4[4][4] =
+ALIGNED(32) const int16_t kvz_g_dct_4[4][4] =
 {
   { 64, 64, 64, 64 },
   { 83, 36, -36, -83 },
@@ -45,8 +45,7 @@ const int16_t kvz_g_dct_4[4][4] =
   { 36, -83, 83, -36 }
 };
 
-
-const int16_t kvz_g_dct_8[8][8] =
+ALIGNED(64) const int16_t kvz_g_dct_8[8][8] =
 {
   { 64, 64, 64, 64, 64, 64, 64, 64 },
   { 89, 75, 50, 18, -18, -50, -75, -89 },
@@ -58,7 +57,7 @@ const int16_t kvz_g_dct_8[8][8] =
   { 18, -50, 75, -89, 89, -75, 50, -18 }
 };
 
-const int16_t kvz_g_dct_16[16][16] =
+ALIGNED(64) const int16_t kvz_g_dct_16[16][16] =
 {
   { 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64 },
   { 90, 87, 80, 70, 57, 43, 25, 9, -9, -25, -43, -57, -70, -80, -87, -90 },
@@ -78,7 +77,7 @@ const int16_t kvz_g_dct_16[16][16] =
   { 9, -25, 43, -57, 70, -80, 87, -90, 90, -87, 80, -70, 57, -43, 25, -9 }
 };
 
-const int16_t kvz_g_dct_32[32][32] =
+ALIGNED(64) const int16_t kvz_g_dct_32[32][32] =
 {
   { 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64 },
   { 90, 90, 88, 85, 82, 78, 73, 67, 61, 54, 46, 38, 31, 22, 13, 4, -4, -13, -22, -31, -38, -46, -54, -61, -67, -73, -78, -82, -85, -88, -90, -90 },
@@ -114,7 +113,7 @@ const int16_t kvz_g_dct_32[32][32] =
   { 4, -13, 22, -31, 38, -46, 54, -61, 67, -73, 78, -82, 85, -88, 90, -90, 90, -90, 88, -85, 82, -78, 73, -67, 61, -54, 46, -38, 31, -22, 13, -4 }
 };
 
-const int16_t kvz_g_dct_64[64][64] =
+ALIGNED(64) const int16_t kvz_g_dct_64[64][64] =
 {
    { 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, },
    { 91, 90, 90, 90, 88, 87, 86, 84, 83, 81, 79, 77, 73, 71, 69, 65, 62, 59, 56, 52, 48, 44, 41, 37, 33, 28, 24, 20, 15, 11, 7, 2, -2, -7, -11, -15, -20, -24, -28, -33, -37, -41, -44, -48, -52, -56, -59, -62, -65, -69, -71, -73, -77, -79, -81, -83, -84, -86, -87, -88, -90, -90, -90, -91, },
@@ -182,7 +181,7 @@ const int16_t kvz_g_dct_64[64][64] =
    { 2, -7, 11, -15, 20, -24, 28, -33, 37, -41, 44, -48, 52, -56, 59, -62, 65, -69, 71, -73, 77, -79, 81, -83, 84, -86, 87, -88, 90, -90, 90, -91, 91, -90, 90, -90, 88, -87, 86, -84, 83, -81, 79, -77, 73, -71, 69, -65, 62, -59, 56, -52, 48, -44, 41, -37, 33, -28, 24, -20, 15, -11, 7, -2, },
 };
 
-const int16_t kvz_g_dst_4_t[4][4] =
+ALIGNED(64) const int16_t kvz_g_dst_4_t[4][4] =
 {
   { 29, 74, 84, 55 },
   { 55, 74, -29, -84 },
@@ -190,13 +189,7 @@ const int16_t kvz_g_dst_4_t[4][4] =
   { 84, -74, 55, -29 }
 };
 
-const int16_t kvz_g_dct_2_t[2][2] =
-{
-  {64, 64,  },
-  {64, -64,  },
-};
-
-const int16_t kvz_g_dct_4_t[4][4] =
+ALIGNED(32) const int16_t kvz_g_dct_4_t[4][4] =
 {
   { 64, 83, 64, 36, },
   { 64, 36, -64, -83, },
@@ -204,7 +197,7 @@ const int16_t kvz_g_dct_4_t[4][4] =
   { 64, -83, 64, -36 }
 };
 
-const int16_t kvz_g_dct_8_t[8][8] =
+ALIGNED(64) const int16_t kvz_g_dct_8_t[8][8] =
 {
   { 64, 89, 83, 75, 64, 50, 36, 18, },
   { 64, 75, 36, -18, -64, -89, -83, -50, },
@@ -216,7 +209,7 @@ const int16_t kvz_g_dct_8_t[8][8] =
   { 64, -89, 83, -75, 64, -50, 36, -18 }
 };
 
-const int16_t kvz_g_dct_16_t[16][16] =
+ALIGNED(64) const int16_t kvz_g_dct_16_t[16][16] =
 {
   { 64, 90, 89, 87, 83, 80, 75, 70, 64, 57, 50, 43, 36, 25, 18, 9, },
   { 64, 87, 75, 57, 36, 9, -18, -43, -64, -80, -89, -90, -83, -70, -50, -25, },
@@ -236,7 +229,7 @@ const int16_t kvz_g_dct_16_t[16][16] =
   { 64, -90, 89, -87, 83, -80, 75, -70, 64, -57, 50, -43, 36, -25, 18, -9 }
 };
 
-const int16_t kvz_g_dct_32_t[32][32] =
+ALIGNED(64) const int16_t kvz_g_dct_32_t[32][32] =
 {
   { 64, 90, 90, 90, 89, 88, 87, 85, 83, 82, 80, 78, 75, 73, 70, 67, 64, 61, 57, 54, 50, 46, 43, 38, 36, 31, 25, 22, 18, 13, 9, 4, },
   { 64, 90, 87, 82, 75, 67, 57, 46, 36, 22, 9, -4, -18, -31, -43, -54, -64, -73, -80, -85, -89, -90, -90, -88, -83, -78, -70, -61, -50, -38, -25, -13, },
@@ -344,14 +337,14 @@ const int16_t kvz_g_dct_64_t[64][64] =
  *
  * TODO: description
  *
- * \param TODO   
+ * \param TODO
  *
  * \returns TODO
  */
 
-// Fast DST Algorithm. Full matrix multiplication for DST and Fast DST algorithm
-// gives identical results
-static void fast_forward_dst_4_generic(const short *block, short *coeff, int32_t shift)  // input block, output coeff
+ // Fast DST Algorithm. Full matrix multiplication for DST and Fast DST algorithm
+ // gives identical results
+static void fast_forward_dst_4_generic(const short* block, short* coeff, int32_t shift)  // input block, output coeff
 {
   int32_t i, c[4];
   int32_t rnd_factor = 1 << (shift - 1);
@@ -369,7 +362,7 @@ static void fast_forward_dst_4_generic(const short *block, short *coeff, int32_t
   }
 }
 
-static void fast_inverse_dst_4_generic(const short *tmp, short *block, int shift)  // input tmp, output block
+static void fast_inverse_dst_4_generic(const short* tmp, short* block, int shift)  // input tmp, output block
 {
   int i, c[4];
   int rnd_factor = 1 << (shift - 1);
@@ -387,53 +380,8 @@ static void fast_inverse_dst_4_generic(const short *tmp, short *block, int shift
   }
 }
 
-/*
-static void partial_butterfly_2_generic(const short *src, short *dst,
-  int32_t shift)
-{
-  int32_t j;
-  int32_t e, o;
-  int32_t add = 1 << (shift - 1);
-  const int32_t line = 2;
 
-  for (j = 0; j < line; j++) {
-    // E and O
-    e = src[0] + src[1];
-    o = src[0] - src[1];
-
-    dst[0] = (short)((kvz_g_dct_2[0][0] * e + add) >> shift);
-    dst[line] = (short)((kvz_g_dct_2[1][0] * o + add) >> shift);
-    src += 2;
-    dst++;
-  }
-}
-
-
-static void partial_butterfly_inverse_2_generic(const short *src, short *dst,
-  int shift)
-{
-  int j;
-  int e, o;
-  int add = 1 << (shift - 1);
-  const int32_t line = 2;
-
-  for (j = 0; j < line; j++) {
-    // Utilizing symmetry properties to the maximum to minimize the number of multiplications
-    e = kvz_g_dct_2[0][0] * (src[0] + src[line]);
-    o = kvz_g_dct_2[1][0] * (src[0] - src[line]);
-
-    // Combining even and odd terms at each hierarchy levels to calculate the final spatial domain vector
-    dst[0] = (short)CLIP(-32768, 32767, (e + add) >> shift);
-    dst[1] = (short)CLIP(-32768, 32767, (o + add) >> shift);
-
-    src++;
-    dst += 2;
-  }
-}
-*/
-
-
-static void partial_butterfly_4_generic(const short *src, short *dst,
+static void partial_butterfly_4_generic(const short* src, short* dst,
   int32_t shift)
 {
   int32_t j;
@@ -459,7 +407,7 @@ static void partial_butterfly_4_generic(const short *src, short *dst,
 }
 
 
-static void partial_butterfly_inverse_4_generic(const short *src, short *dst,
+static void partial_butterfly_inverse_4_generic(const short* src, short* dst,
   int shift)
 {
   int j;
@@ -486,7 +434,7 @@ static void partial_butterfly_inverse_4_generic(const short *src, short *dst,
 }
 
 
-static void partial_butterfly_8_generic(const short *src, short *dst,
+static void partial_butterfly_8_generic(const short* src, short* dst,
   int32_t shift)
 {
   int32_t j, k;
@@ -523,7 +471,7 @@ static void partial_butterfly_8_generic(const short *src, short *dst,
 }
 
 
-static void partial_butterfly_inverse_8_generic(const int16_t *src, int16_t *dst,
+static void partial_butterfly_inverse_8_generic(const int16_t* src, int16_t* dst,
   int32_t shift)
 {
   int32_t j, k;
@@ -558,7 +506,7 @@ static void partial_butterfly_inverse_8_generic(const int16_t *src, int16_t *dst
 }
 
 
-static void partial_butterfly_16_generic(const short *src, short *dst,
+static void partial_butterfly_16_generic(const short* src, short* dst,
   int32_t shift)
 {
   int32_t j, k;
@@ -591,11 +539,11 @@ static void partial_butterfly_16_generic(const short *src, short *dst,
     dst[12 * line] = (short)((kvz_g_dct_16[12][0] * eeo[0] + kvz_g_dct_16[12][1] * eeo[1] + add) >> shift);
 
     for (k = 2; k < 16; k += 4) {
-      dst[k*line] = (short)((kvz_g_dct_16[k][0] * eo[0] + kvz_g_dct_16[k][1] * eo[1] + kvz_g_dct_16[k][2] * eo[2] + kvz_g_dct_16[k][3] * eo[3] + add) >> shift);
+      dst[k * line] = (short)((kvz_g_dct_16[k][0] * eo[0] + kvz_g_dct_16[k][1] * eo[1] + kvz_g_dct_16[k][2] * eo[2] + kvz_g_dct_16[k][3] * eo[3] + add) >> shift);
     }
 
     for (k = 1; k < 16; k += 2) {
-      dst[k*line] = (short)((kvz_g_dct_16[k][0] * o[0] + kvz_g_dct_16[k][1] * o[1] + kvz_g_dct_16[k][2] * o[2] + kvz_g_dct_16[k][3] * o[3] +
+      dst[k * line] = (short)((kvz_g_dct_16[k][0] * o[0] + kvz_g_dct_16[k][1] * o[1] + kvz_g_dct_16[k][2] * o[2] + kvz_g_dct_16[k][3] * o[3] +
         kvz_g_dct_16[k][4] * o[4] + kvz_g_dct_16[k][5] * o[5] + kvz_g_dct_16[k][6] * o[6] + kvz_g_dct_16[k][7] * o[7] + add) >> shift);
     }
 
@@ -605,7 +553,7 @@ static void partial_butterfly_16_generic(const short *src, short *dst,
 }
 
 
-static void partial_butterfly_inverse_16_generic(const int16_t *src, int16_t *dst,
+static void partial_butterfly_inverse_16_generic(const int16_t* src, int16_t* dst,
   int32_t shift)
 {
   int32_t j, k;
@@ -617,7 +565,7 @@ static void partial_butterfly_inverse_16_generic(const int16_t *src, int16_t *ds
 
   for (j = 0; j < line; j++) {
     // Utilizing symmetry properties to the maximum to minimize the number of multiplications
-    for (k = 0; k < 8; k++)  {
+    for (k = 0; k < 8; k++) {
       o[k] = kvz_g_dct_16[1][k] * src[line] + kvz_g_dct_16[3][k] * src[3 * line] + kvz_g_dct_16[5][k] * src[5 * line] + kvz_g_dct_16[7][k] * src[7 * line] +
         kvz_g_dct_16[9][k] * src[9 * line] + kvz_g_dct_16[11][k] * src[11 * line] + kvz_g_dct_16[13][k] * src[13 * line] + kvz_g_dct_16[15][k] * src[15 * line];
     }
@@ -648,7 +596,7 @@ static void partial_butterfly_inverse_16_generic(const int16_t *src, int16_t *ds
 }
 
 
-static void partial_butterfly_32_generic(const short *src, short *dst,
+static void partial_butterfly_32_generic(const short* src, short* dst,
   int32_t shift)
 {
   int32_t j, k;
@@ -686,14 +634,14 @@ static void partial_butterfly_32_generic(const short *src, short *dst,
     dst[8 * line] = (short)((kvz_g_dct_32[8][0] * eeeo[0] + kvz_g_dct_32[8][1] * eeeo[1] + add) >> shift);
     dst[24 * line] = (short)((kvz_g_dct_32[24][0] * eeeo[0] + kvz_g_dct_32[24][1] * eeeo[1] + add) >> shift);
     for (k = 4; k < 32; k += 8) {
-      dst[k*line] = (short)((kvz_g_dct_32[k][0] * eeo[0] + kvz_g_dct_32[k][1] * eeo[1] + kvz_g_dct_32[k][2] * eeo[2] + kvz_g_dct_32[k][3] * eeo[3] + add) >> shift);
+      dst[k * line] = (short)((kvz_g_dct_32[k][0] * eeo[0] + kvz_g_dct_32[k][1] * eeo[1] + kvz_g_dct_32[k][2] * eeo[2] + kvz_g_dct_32[k][3] * eeo[3] + add) >> shift);
     }
     for (k = 2; k < 32; k += 4) {
-      dst[k*line] = (short)((kvz_g_dct_32[k][0] * eo[0] + kvz_g_dct_32[k][1] * eo[1] + kvz_g_dct_32[k][2] * eo[2] + kvz_g_dct_32[k][3] * eo[3] +
+      dst[k * line] = (short)((kvz_g_dct_32[k][0] * eo[0] + kvz_g_dct_32[k][1] * eo[1] + kvz_g_dct_32[k][2] * eo[2] + kvz_g_dct_32[k][3] * eo[3] +
         kvz_g_dct_32[k][4] * eo[4] + kvz_g_dct_32[k][5] * eo[5] + kvz_g_dct_32[k][6] * eo[6] + kvz_g_dct_32[k][7] * eo[7] + add) >> shift);
     }
     for (k = 1; k < 32; k += 2) {
-      dst[k*line] = (short)((kvz_g_dct_32[k][0] * o[0] + kvz_g_dct_32[k][1] * o[1] + kvz_g_dct_32[k][2] * o[2] + kvz_g_dct_32[k][3] * o[3] +
+      dst[k * line] = (short)((kvz_g_dct_32[k][0] * o[0] + kvz_g_dct_32[k][1] * o[1] + kvz_g_dct_32[k][2] * o[2] + kvz_g_dct_32[k][3] * o[3] +
         kvz_g_dct_32[k][4] * o[4] + kvz_g_dct_32[k][5] * o[5] + kvz_g_dct_32[k][6] * o[6] + kvz_g_dct_32[k][7] * o[7] +
         kvz_g_dct_32[k][8] * o[8] + kvz_g_dct_32[k][9] * o[9] + kvz_g_dct_32[k][10] * o[10] + kvz_g_dct_32[k][11] * o[11] +
         kvz_g_dct_32[k][12] * o[12] + kvz_g_dct_32[k][13] * o[13] + kvz_g_dct_32[k][14] * o[14] + kvz_g_dct_32[k][15] * o[15] + add) >> shift);
@@ -704,7 +652,7 @@ static void partial_butterfly_32_generic(const short *src, short *dst,
 }
 
 
-static void partial_butterfly_inverse_32_generic(const int16_t *src, int16_t *dst,
+static void partial_butterfly_inverse_32_generic(const int16_t* src, int16_t* dst,
   int32_t shift)
 {
   int32_t j, k;
@@ -715,7 +663,7 @@ static void partial_butterfly_inverse_32_generic(const int16_t *src, int16_t *ds
   int32_t add = 1 << (shift - 1);
   const int32_t line = 32;
 
-  for (j = 0; j<line; j++) {
+  for (j = 0; j < line; j++) {
     // Utilizing symmetry properties to the maximum to minimize the number of multiplications
     for (k = 0; k < 16; k++) {
       o[k] = kvz_g_dct_32[1][k] * src[line] + kvz_g_dct_32[3][k] * src[3 * line] + kvz_g_dct_32[5][k] * src[5 * line] + kvz_g_dct_32[7][k] * src[7 * line] +
@@ -748,7 +696,7 @@ static void partial_butterfly_inverse_32_generic(const int16_t *src, int16_t *ds
       e[k] = ee[k] + eo[k];
       e[k + 8] = ee[7 - k] - eo[7 - k];
     }
-    for (k = 0; k<16; k++) {
+    for (k = 0; k < 16; k++) {
       dst[k] = (short)MAX(-32768, MIN(32767, (e[k] + o[k] + add) >> shift));
       dst[k + 16] = (short)MAX(-32768, MIN(32767, (e[15 - k] - o[15 - k] + add) >> shift));
     }
@@ -779,29 +727,27 @@ static void idct_ ## n ## x ## n ## _generic(int8_t bitdepth, const int16_t *inp
   partial_butterfly_inverse_ ## n ## _generic(tmp, output, shift_2nd); \
 }
 
-//DCT_NXN_GENERIC(2);
 DCT_NXN_GENERIC(4);
 DCT_NXN_GENERIC(8);
 DCT_NXN_GENERIC(16);
 DCT_NXN_GENERIC(32);
 
-//IDCT_NXN_GENERIC(2);
 IDCT_NXN_GENERIC(4);
 IDCT_NXN_GENERIC(8);
 IDCT_NXN_GENERIC(16);
 IDCT_NXN_GENERIC(32);
 
-static void fast_forward_dst_4x4_generic(int8_t bitdepth, const int16_t *input, int16_t *output)
+static void fast_forward_dst_4x4_generic(int8_t bitdepth, const int16_t* input, int16_t* output)
 {
-  int16_t tmp[4*4]; 
+  int16_t tmp[4 * 4];
   int32_t shift_1st = kvz_g_convert_to_bit[4] + 1 + (bitdepth - 8);
   int32_t shift_2nd = kvz_g_convert_to_bit[4] + 8;
 
-  fast_forward_dst_4_generic(input, tmp, shift_1st); 
+  fast_forward_dst_4_generic(input, tmp, shift_1st);
   fast_forward_dst_4_generic(tmp, output, shift_2nd);
 }
 
-static void fast_inverse_dst_4x4_generic(int8_t bitdepth, const int16_t *input, int16_t *output)
+static void fast_inverse_dst_4x4_generic(int8_t bitdepth, const int16_t* input, int16_t* output)
 {
   int16_t tmp[4 * 4];
   int32_t shift_1st = 7;
@@ -1137,7 +1083,7 @@ const int16_t kvz_g_iT_DCT8_32[1024] = { 359,358,357,354,351,347,342,336,329,322
 17,-52,86,-119,151,-182,211,-238,263,-285,305,-322,336,-347,354,-358,359,-357,351,-342,329,-314,296,-275,251,-225,197,-167,135,-103,69,-35 };
 
 
-static void fastForwardDCT2_B4(const int16_t *src, int16_t *dst, int32_t shift) {
+static void fastForwardDCT2_B4(const int16_t* src, int16_t* dst, int32_t shift) {
 
   int32_t j;
   int32_t E[2], O[2];
@@ -1162,7 +1108,7 @@ static void fastForwardDCT2_B4(const int16_t *src, int16_t *dst, int32_t shift) 
 }
 
 //void fastForwardDCT2_B8(int32_t *src ,int32_t *dst,int32_t shift, int32_t line)
-static void fastForwardDCT2_B8(const int16_t *src, int16_t *dst, int32_t shift) {
+static void fastForwardDCT2_B8(const int16_t* src, int16_t* dst, int32_t shift) {
 
   int32_t j, k;
   int32_t E[4], O[4];
@@ -1199,7 +1145,7 @@ static void fastForwardDCT2_B8(const int16_t *src, int16_t *dst, int32_t shift) 
 }
 
 //void fastForwardDCT2_B16(int32_t *src ,int32_t *dst,int32_t shift, int32_t line)// for non square blocks
-static void fastForwardDCT2_B16(const int16_t *src, int16_t *dst, int32_t shift) {
+static void fastForwardDCT2_B16(const int16_t* src, int16_t* dst, int32_t shift) {
 
   int32_t j, k;
   int32_t E[8], O[8];
@@ -1231,11 +1177,11 @@ static void fastForwardDCT2_B16(const int16_t *src, int16_t *dst, int32_t shift)
     dst[12 * line] = (kvz_g_iT_DCT2_16[12 * 16] * EEO[0] + kvz_g_iT_DCT2_16[12 * 16 + 1] * EEO[1] + add) >> shift;
 
     for (k = 2; k < 16; k += 4) {
-      dst[k*line] = (kvz_g_iT_DCT2_16[k * 16] * EO[0] + kvz_g_iT_DCT2_16[k * 16 + 1] * EO[1] + kvz_g_iT_DCT2_16[k * 16 + 2] * EO[2] + kvz_g_iT_DCT2_16[k * 16 + 3] * EO[3] + add) >> shift;
+      dst[k * line] = (kvz_g_iT_DCT2_16[k * 16] * EO[0] + kvz_g_iT_DCT2_16[k * 16 + 1] * EO[1] + kvz_g_iT_DCT2_16[k * 16 + 2] * EO[2] + kvz_g_iT_DCT2_16[k * 16 + 3] * EO[3] + add) >> shift;
     }
 
     for (k = 1; k < 16; k += 2) {
-      dst[k*line] = (kvz_g_iT_DCT2_16[k * 16] * O[0] + kvz_g_iT_DCT2_16[k * 16 + 1] * O[1] + kvz_g_iT_DCT2_16[k * 16 + 2] * O[2] + kvz_g_iT_DCT2_16[k * 16 + 3] * O[3] +
+      dst[k * line] = (kvz_g_iT_DCT2_16[k * 16] * O[0] + kvz_g_iT_DCT2_16[k * 16 + 1] * O[1] + kvz_g_iT_DCT2_16[k * 16 + 2] * O[2] + kvz_g_iT_DCT2_16[k * 16 + 3] * O[3] +
         kvz_g_iT_DCT2_16[k * 16 + 4] * O[4] + kvz_g_iT_DCT2_16[k * 16 + 5] * O[5] + kvz_g_iT_DCT2_16[k * 16 + 6] * O[6] + kvz_g_iT_DCT2_16[k * 16 + 7] * O[7] + add) >> shift;
     }
 
@@ -1246,7 +1192,7 @@ static void fastForwardDCT2_B16(const int16_t *src, int16_t *dst, int32_t shift)
 }
 
 //void fastForwardDCT2_B32(int32_t *src ,int32_t *dst,int32_t shift, int32_t line)
-static void fastForwardDCT2_B32(const int16_t *src, int16_t *dst, int32_t shift) {
+static void fastForwardDCT2_B32(const int16_t* src, int16_t* dst, int32_t shift) {
 
   int32_t j, k;
   int32_t E[16], O[16];
@@ -1283,14 +1229,14 @@ static void fastForwardDCT2_B32(const int16_t *src, int16_t *dst, int32_t shift)
     dst[8 * line] = (kvz_g_iT_DCT2_32[8 * 32 + 0] * EEEO[0] + kvz_g_iT_DCT2_32[8 * 32 + 1] * EEEO[1] + add) >> shift;
     dst[24 * line] = (kvz_g_iT_DCT2_32[24 * 32 + 0] * EEEO[0] + kvz_g_iT_DCT2_32[24 * 32 + 1] * EEEO[1] + add) >> shift;
     for (k = 4; k < 32; k += 8) {
-      dst[k*line] = (kvz_g_iT_DCT2_32[k * 32 + 0] * EEO[0] + kvz_g_iT_DCT2_32[k * 32 + 1] * EEO[1] + kvz_g_iT_DCT2_32[k * 32 + 2] * EEO[2] + kvz_g_iT_DCT2_32[k * 32 + 3] * EEO[3] + add) >> shift;
+      dst[k * line] = (kvz_g_iT_DCT2_32[k * 32 + 0] * EEO[0] + kvz_g_iT_DCT2_32[k * 32 + 1] * EEO[1] + kvz_g_iT_DCT2_32[k * 32 + 2] * EEO[2] + kvz_g_iT_DCT2_32[k * 32 + 3] * EEO[3] + add) >> shift;
     }
     for (k = 2; k < 32; k += 4) {
-      dst[k*line] = (kvz_g_iT_DCT2_32[k * 32 + 0] * EO[0] + kvz_g_iT_DCT2_32[k * 32 + 1] * EO[1] + kvz_g_iT_DCT2_32[k * 32 + 2] * EO[2] + kvz_g_iT_DCT2_32[k * 32 + 3] * EO[3] +
+      dst[k * line] = (kvz_g_iT_DCT2_32[k * 32 + 0] * EO[0] + kvz_g_iT_DCT2_32[k * 32 + 1] * EO[1] + kvz_g_iT_DCT2_32[k * 32 + 2] * EO[2] + kvz_g_iT_DCT2_32[k * 32 + 3] * EO[3] +
         kvz_g_iT_DCT2_32[k * 32 + 4] * EO[4] + kvz_g_iT_DCT2_32[k * 32 + 5] * EO[5] + kvz_g_iT_DCT2_32[k * 32 + 6] * EO[6] + kvz_g_iT_DCT2_32[k * 32 + 7] * EO[7] + add) >> shift;
     }
     for (k = 1; k < 32; k += 2) {
-      dst[k*line] = (kvz_g_iT_DCT2_32[k * 32 + 0] * O[0] + kvz_g_iT_DCT2_32[k * 32 + 1] * O[1] + kvz_g_iT_DCT2_32[k * 32 + 2] * O[2] + kvz_g_iT_DCT2_32[k * 32 + 3] * O[3] +
+      dst[k * line] = (kvz_g_iT_DCT2_32[k * 32 + 0] * O[0] + kvz_g_iT_DCT2_32[k * 32 + 1] * O[1] + kvz_g_iT_DCT2_32[k * 32 + 2] * O[2] + kvz_g_iT_DCT2_32[k * 32 + 3] * O[3] +
         kvz_g_iT_DCT2_32[k * 32 + 4] * O[4] + kvz_g_iT_DCT2_32[k * 32 + 5] * O[5] + kvz_g_iT_DCT2_32[k * 32 + 6] * O[6] + kvz_g_iT_DCT2_32[k * 32 + 7] * O[7] +
         kvz_g_iT_DCT2_32[k * 32 + 8] * O[8] + kvz_g_iT_DCT2_32[k * 32 + 9] * O[9] + kvz_g_iT_DCT2_32[k * 32 + 10] * O[10] + kvz_g_iT_DCT2_32[k * 32 + 11] * O[11] +
         kvz_g_iT_DCT2_32[k * 32 + 12] * O[12] + kvz_g_iT_DCT2_32[k * 32 + 13] * O[13] + kvz_g_iT_DCT2_32[k * 32 + 14] * O[14] + kvz_g_iT_DCT2_32[k * 32 + 15] * O[15] + add) >> shift;
@@ -1301,7 +1247,7 @@ static void fastForwardDCT2_B32(const int16_t *src, int16_t *dst, int32_t shift)
 }
 
 
-static void fastInverseDCT2_B4(const int16_t *src, int16_t *dst, int32_t shift)
+static void fastInverseDCT2_B4(const int16_t* src, int16_t* dst, int32_t shift)
 // void fastInverseDCT2_B4(int32_t *src, int32_t *dst, int32_t shift, int32_t line)    // for non square blocks
 {
   int32_t j;
@@ -1333,7 +1279,7 @@ static void fastInverseDCT2_B4(const int16_t *src, int16_t *dst, int32_t shift)
 }
 
 
-static void fastInverseDCT2_B8(const int16_t *src, int16_t *dst, int32_t shift) {
+static void fastInverseDCT2_B8(const int16_t* src, int16_t* dst, int32_t shift) {
   int32_t j, k;
   int32_t E[4], O[4];
   int32_t EE[2], EO[2];
@@ -1369,7 +1315,7 @@ static void fastInverseDCT2_B8(const int16_t *src, int16_t *dst, int32_t shift) 
   }
 }
 
-static void fastInverseDCT2_B16(const int16_t *src, int16_t *dst, int32_t shift) {
+static void fastInverseDCT2_B16(const int16_t* src, int16_t* dst, int32_t shift) {
 
   int32_t j, k;
   int32_t E[8], O[8];
@@ -1411,7 +1357,7 @@ static void fastInverseDCT2_B16(const int16_t *src, int16_t *dst, int32_t shift)
   }
 }
 
-static void fastInverseDCT2_B32(const int16_t *src, int16_t *dst, int32_t shift) {
+static void fastInverseDCT2_B32(const int16_t* src, int16_t* dst, int32_t shift) {
 
   int32_t j, k;
   int32_t E[16], O[16];
@@ -1464,7 +1410,7 @@ static void fastInverseDCT2_B32(const int16_t *src, int16_t *dst, int32_t shift)
   }
 }
 
-static void fastForwardDST7_B4(const int16_t *block, int16_t *coeff, int32_t shift) {
+static void fastForwardDST7_B4(const int16_t* block, int16_t* coeff, int32_t shift) {
   int32_t i;
   int32_t rnd_factor = 1 << (shift - 1);
   int32_t c[4];
@@ -1491,7 +1437,7 @@ static void fastForwardDST7_B4(const int16_t *block, int16_t *coeff, int32_t shi
 
 }
 
-static void fastInverseDST7_B4(const int16_t *coeff, int16_t *block, int32_t shift) {
+static void fastInverseDST7_B4(const int16_t* coeff, int16_t* block, int32_t shift) {
   int32_t i;
   int32_t rnd_factor = 1 << (shift - 1);
   int32_t c[4];
@@ -1557,7 +1503,7 @@ static void fastInverseDST1_B4(const int16_t *coeff, int16_t *block, int32_t shi
 
 
   for (i = 0; i < line; i++) {
-    // E and O 
+    // E and O
 
     E[0] = coeff[0 * line] + coeff[3 * line];
     O[0] = coeff[0 * line] - coeff[3 * line];
@@ -1577,7 +1523,7 @@ static void fastInverseDST1_B4(const int16_t *coeff, int16_t *block, int32_t shi
 }
 */
 
-static void fastForwardDCT8_B4(const int16_t *block, int16_t *coeff, int32_t shift) {
+static void fastForwardDCT8_B4(const int16_t* block, int16_t* coeff, int32_t shift) {
   int32_t i;
   int32_t rnd_factor = 1 << (shift - 1);
   int32_t c[4];
@@ -1604,7 +1550,7 @@ static void fastForwardDCT8_B4(const int16_t *block, int16_t *coeff, int32_t shi
 
 
 
-static void fastInverseDCT8_B4(const int16_t *coeff, int16_t *block, int32_t shift) {
+static void fastInverseDCT8_B4(const int16_t* coeff, int16_t* block, int32_t shift) {
   int32_t i;
   int32_t rnd_factor = 1 << (shift - 1);
   int32_t c[4];
@@ -1715,16 +1661,16 @@ DCT_EMT_NXN_GENERIC(DST7, 16);
 DCT_EMT_NXN_GENERIC(DST7, 32);
 
 
-typedef void partial_tr_func(const int16_t *, int16_t *, int32_t);
+typedef void partial_tr_func(const int16_t*, int16_t*, int32_t);
 
 // ToDo: Enable EMT 2x2 and 64x64 transforms
-static partial_tr_func * dct_table[3][6] = {
+static partial_tr_func* dct_table[3][6] = {
   { /*fastForwardDCT2_B2*/NULL, fastForwardDCT2_B4, fastForwardDCT2_B8, fastForwardDCT2_B16, fastForwardDCT2_B32, NULL/*fastForwardDCT2_B64*/ },
   { NULL,               fastForwardDCT8_B4, fastForwardDCT8_B8, fastForwardDCT8_B16, fastForwardDCT8_B32, NULL },
   { NULL,               fastForwardDST7_B4, fastForwardDST7_B8, fastForwardDST7_B16, fastForwardDST7_B32, NULL },
 };
 
-static partial_tr_func * idct_table[3][6] = {
+static partial_tr_func* idct_table[3][6] = {
   { NULL/*fastInverseDCT2_B2*/, fastInverseDCT2_B4, fastInverseDCT2_B8, fastInverseDCT2_B16, fastInverseDCT2_B32, NULL/*fastInverseDCT2_B64*/ },
   { NULL,               fastInverseDCT8_B4, fastInverseDCT8_B8, fastInverseDCT8_B16, fastInverseDCT8_B32, NULL },
   { NULL,               fastInverseDST7_B4, fastInverseDST7_B8, fastInverseDST7_B16, fastInverseDST7_B32, NULL },
@@ -1757,20 +1703,23 @@ static const int intra_mode_to_emt_subset_hor[67] =
 static INLINE void get_tr_type(
   int8_t width,
   color_t color,
-  const cu_info_t *tu,
-  tr_type_t *hor_out,
-  tr_type_t *ver_out) {
+  const cu_info_t* tu,
+  tr_type_t* hor_out,
+  tr_type_t* ver_out) {
   if (tu->type == CU_INTRA) {
     if (width == 4 && color == COLOR_Y) {
       *hor_out = *ver_out = DST7;
-    } else {
+    }
+    else {
       *hor_out = *ver_out = DCT2;
     }
 
-  } else if (tu->emt == 0 || color != COLOR_Y) {
+  }
+  else if (tu->emt == 0 || color != COLOR_Y) {
     *hor_out = *ver_out = DCT2;
 
-  } else {
+  }
+  else {
     int index_hor = tu->tr_idx & 1;
     int index_ver = tu->tr_idx >> 1;
     *hor_out = emt_subset_inter[index_hor];
@@ -1782,10 +1731,10 @@ static INLINE void get_tr_type(
 static void emt_dct_generic(
   int8_t bitdepth,
   color_t color,
-  const cu_info_t *tu,
+  const cu_info_t* tu,
   int8_t width,
-  const int16_t *input,
-  int16_t *output) {
+  const int16_t* input,
+  int16_t* output) {
   tr_type_t type_hor;
   tr_type_t type_ver;
 
@@ -1793,8 +1742,8 @@ static void emt_dct_generic(
 
   const int log2_width_minus2 = kvz_g_convert_to_bit[width];
 
-  partial_tr_func * dct_hor = dct_table[type_hor][log2_width_minus2];
-  partial_tr_func * dct_ver = dct_table[type_ver][log2_width_minus2];
+  partial_tr_func* dct_hor = dct_table[type_hor][log2_width_minus2];
+  partial_tr_func* dct_ver = dct_table[type_ver][log2_width_minus2];
 
   int16_t tmp[32 * 32];
   int32_t shift_1st = log2_width_minus2 + 3 + (bitdepth - 8);
@@ -1808,10 +1757,10 @@ static void emt_dct_generic(
 static void emt_idct_generic(
   int8_t bitdepth,
   color_t color,
-  const cu_info_t *tu,
+  const cu_info_t* tu,
   int8_t width,
-  const int16_t *input,
-  int16_t *output) {
+  const int16_t* input,
+  int16_t* output) {
   tr_type_t type_hor;
   tr_type_t type_ver;
 
@@ -1819,8 +1768,8 @@ static void emt_idct_generic(
 
   const int log2_width_minus2 = kvz_g_convert_to_bit[width];
 
-  partial_tr_func * idct_hor = idct_table[type_hor][log2_width_minus2];
-  partial_tr_func * idct_ver = idct_table[type_ver][log2_width_minus2];
+  partial_tr_func* idct_hor = idct_table[type_hor][log2_width_minus2];
+  partial_tr_func* idct_ver = idct_table[type_ver][log2_width_minus2];
 
   int16_t tmp[32 * 32];
   int32_t shift_1st = 9;
@@ -1836,7 +1785,7 @@ int kvz_strategy_register_dct_generic(void* opaque, uint8_t bitdepth)
   bool success = true;
 
   success &= kvz_strategyselector_register(opaque, "fast_forward_dst_4x4", "generic", 0, &fast_forward_dst_4x4_generic);
-  
+
   success &= kvz_strategyselector_register(opaque, "dct_4x4", "generic", 0, &dct_4x4_generic);
   success &= kvz_strategyselector_register(opaque, "dct_8x8", "generic", 0, &dct_8x8_generic);
   success &= kvz_strategyselector_register(opaque, "dct_16x16", "generic", 0, &dct_16x16_generic);
