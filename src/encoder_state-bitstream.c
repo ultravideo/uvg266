@@ -1006,20 +1006,20 @@ static void kvz_encoder_state_write_bitstream_picture_header(
 
   if (state->frame->pictype == KVZ_NAL_IDR_W_RADL
     || state->frame->pictype == KVZ_NAL_IDR_N_LP) {
-    WRITE_U(stream, 1, 1, "gdr_or_irap_pic_flag");
+    WRITE_U(stream, 1, 1, "ph_gdr_or_irap_pic_flag");
 #if JVET_S0076_ASPECT1
     WRITE_U(stream, 0, 1, "ph_non_ref_pic_flag");
 #endif
-    WRITE_U(stream, 0, 1, "gdr_pic_flag");
-    WRITE_U(stream, 0, 1, "pic_inter_slice_allowed_flag");
+    WRITE_U(stream, 0, 1, "ph_gdr_pic_flag");
+    WRITE_U(stream, 0, 1, "ph_inter_slice_allowed_flag");
   }
   else {
-    WRITE_U(stream, 0, 1, "gdr_or_irap_pic_flag");
+    WRITE_U(stream, 0, 1, "ph_gdr_or_irap_pic_flag");
 #if JVET_S0076_ASPECT1
     WRITE_U(stream, 0, 1, "ph_non_ref_pic_flag");
 #endif
-    WRITE_U(stream, 1, 1, "pic_inter_slice_allowed_flag");
-    WRITE_U(stream, 1, 1, "pic_intra_slice_allowed_flag");
+    WRITE_U(stream, 1, 1, "ph_inter_slice_allowed_flag");
+    WRITE_U(stream, 1, 1, "ph_intra_slice_allowed_flag");
   }
 
 #if !JVET_S0076_ASPECT1
@@ -1034,10 +1034,11 @@ static void kvz_encoder_state_write_bitstream_picture_header(
   }
   else {
     // ToDo: ALF flag
-    WRITE_U(stream, state->encoder_control->cfg.tmvp_enable, 1, "pic_temporal_mvp_enabled_flag");
-    WRITE_U(stream, 0, 1, "pic_mvd_l1_zero_flag");
+    //WRITE_U(stream, state->encoder_control->cfg.tmvp_enable, 1, "ph_pic_temporal_mvp_enabled_flag");
+    WRITE_U(stream, 0, 1, "ph_mvd_l1_zero_flag");
   }
 
+  
 
   // getDeblockingFilterControlPresentFlag
 
@@ -1069,7 +1070,7 @@ static void kvz_encoder_state_write_bitstream_ref_pic_list(
   int poc_shift = 0;
 
 
-  WRITE_UE(stream, ref_negative, "num_negative_pics");  
+  WRITE_UE(stream, ref_negative, "num_ref_entries[0]");  
   for (j = 0; j < ref_negative; j++) {
     int8_t delta_poc = 0;
 
@@ -1090,12 +1091,12 @@ static void kvz_encoder_state_write_bitstream_ref_pic_list(
         }
       } while (!found);
     }
-
+    /*
     WRITE_U(stream, j, 1, "inter_layer_ref_pic_flag");
     if (j) {
       WRITE_UE(stream, j, "ilrp_idx");
     }
-
+    */
     WRITE_UE(stream, delta_poc, "abs_delta_poc_st");
     if (delta_poc+1) WRITE_U(stream, 1, 1, "strp_entry_sign_flag");
     last_poc = delta_poc;
@@ -1103,7 +1104,7 @@ static void kvz_encoder_state_write_bitstream_ref_pic_list(
   }
   last_poc = 0;
   poc_shift = 0;
-  WRITE_UE(stream, ref_positive, "num_positive_pics");
+  WRITE_UE(stream, ref_positive, "num_ref_entries[1]");
   for (j = 0; j < ref_positive; j++) {
     int8_t delta_poc = 0;
 
@@ -1124,11 +1125,12 @@ static void kvz_encoder_state_write_bitstream_ref_pic_list(
         }
       } while (!found);
     }
-
+    /*
     WRITE_U(stream, j, 1, "inter_layer_ref_pic_flag");
     if (j) {
       WRITE_UE(stream, j, "ilrp_idx");
     }
+    */
 
     WRITE_UE(stream, delta_poc, "abs_delta_poc_st");
     if (delta_poc+1) WRITE_U(stream, 0, 1, "strp_entry_sign_flag");
@@ -1161,14 +1163,15 @@ void kvz_encoder_state_write_bitstream_slice_header(
 
   kvz_encoder_state_write_bitstream_picture_header(stream, state);
 
-  //WRITE_UE(stream, state->frame->slicetype, "slice_type");
+  if (state->frame->pictype != KVZ_NAL_IDR_W_RADL
+    && state->frame->pictype != KVZ_NAL_IDR_N_LP) {
+    WRITE_UE(stream, state->frame->slicetype, "sh_slice_type");
+  }
 
-#if JVET_S0193_NO_OUTPUT_PRIOR_PIC
   if (state->frame->pictype == KVZ_NAL_CRA_NUT || state->frame->pictype == KVZ_NAL_IDR_N_LP || state->frame->pictype == KVZ_NAL_IDR_W_RADL || state->frame->pictype == KVZ_NAL_GDR_NUT)
   {
-    WRITE_U(stream, 0, 1, "no_output_of_prior_pics_flag");
+    WRITE_U(stream, 0, 1, "sh_no_output_of_prior_pics_flag");
   }
-#endif
 
   if (state->frame->slicetype != KVZ_SLICE_I) {
     kvz_encoder_state_write_bitstream_ref_pic_list(stream, state);
@@ -1176,16 +1179,17 @@ void kvz_encoder_state_write_bitstream_slice_header(
 
   if (state->encoder_control->cfg.tmvp_enable) {
     //WRITE_U(stream, ref_negative ? 1 : 0, 1, "slice_temporal_mvp_enabled_flag");
+    WRITE_U(stream, 0, 1, "sh_collocated_from_l0_flag");
   }
 
   int slice_qp_delta = state->frame->QP - encoder->cfg.qp;
-  WRITE_SE(stream, slice_qp_delta, "slice_qp_delta");
+  WRITE_SE(stream, slice_qp_delta, "sh_qp_delta");
 
 
   if (encoder->cfg.sao_type) {
-    WRITE_U(stream, 1, 1, "slice_sao_luma_flag");
+    WRITE_U(stream, 1, 1, "sh_sao_luma_flag");
     if (encoder->chroma_format != KVZ_CSP_400) {
-      WRITE_U(stream, 1, 1, "slice_sao_chroma_flag");
+      WRITE_U(stream, 1, 1, "sh_sao_chroma_flag");
     }
   }
 

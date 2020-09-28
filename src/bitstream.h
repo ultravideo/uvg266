@@ -85,9 +85,9 @@ void kvz_bitstream_align_zero(bitstream_t *stream);
 /* In debug mode print out some extra info */
 #ifdef VERBOSE
 /* Counter to keep up with bits written */
-#define WRITE_U(stream, data, bits, name) { printf("%-40s u(%d) : %d\n", name,bits,data); kvz_bitstream_put(stream,data,bits);}
-#define WRITE_UE(stream, data, name) { printf("%-40s ue(v): %d\n", name,data); kvz_bitstream_put_ue(stream,data);}
-#define WRITE_SE(stream, data, name) { printf("%-40s se(v): %d\n", name,data); kvz_bitstream_put_se(stream,(data));}
+#define WRITE_U(stream, data, bits, name) { printf("%-50s u(%d) : %d\n", name,bits,data); kvz_bitstream_put(stream,data,bits);}
+#define WRITE_UE(stream, data, name) { printf("%-50s ue(v): %d\n", name,data); kvz_bitstream_put_ue(stream,data);}
+#define WRITE_SE(stream, data, name) { printf("%-50s se(v): %d\n", name,data); kvz_bitstream_put_se(stream,(data));}
 #else
 #define WRITE_U(stream, data, bits, name) { kvz_bitstream_put(stream,data,bits); }
 #define WRITE_UE(stream, data, name) { kvz_bitstream_put_ue(stream,data); }

@@ -1468,7 +1468,7 @@ void kvz_encode_one_frame(encoder_state_t * const state, kvz_picture* frame)
 {
 #if KVZ_DEBUG_PRINT_CABAC == 1
   kvz_cabac_bins_count = 0;
-  if (state->frame->num == 0) kvz_cabac_bins_verbose = true;
+  if (state->frame->num == 1) kvz_cabac_bins_verbose = true;
   else kvz_cabac_bins_verbose = false;
 #endif
   encoder_state_init_new_frame(state, frame);
