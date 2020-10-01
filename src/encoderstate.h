@@ -235,7 +235,7 @@ typedef struct encoder_state_config_slice_t {
   //ALF adaptation parameter set
   struct alf_aps *apss; //[ALF_CTB_MAX_NUM_APS];
   int tile_group_num_aps;
-  int *tile_group_luma_aps_id;
+  int8_t *tile_group_luma_aps_id;
   int tile_group_chroma_aps_id;
   bool tile_group_cc_alf_cb_enabled_flag;
   bool tile_group_cc_alf_cr_enabled_flag;
@@ -245,10 +245,10 @@ typedef struct encoder_state_config_slice_t {
   uint32_t num_of_param_sets;
   bool tile_group_alf_enabled_flag[3/*MAX_NUM_COMPONENT*/];
 
-  unsigned num_hor_virtual_boundaries;
-  unsigned num_ver_virtual_boundaries;
-  unsigned virtual_boundaries_pos_x[3];
-  unsigned virtual_boundaries_pos_y[3];
+  //unsigned num_hor_virtual_boundaries;
+  //unsigned num_ver_virtual_boundaries;
+  //unsigned virtual_boundaries_pos_x[3];
+  //unsigned virtual_boundaries_pos_y[3];
 } encoder_state_config_slice_t;
 
 typedef struct encoder_state_config_wfrow_t {

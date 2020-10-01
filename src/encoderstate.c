@@ -837,7 +837,6 @@ static void encoder_state_worker_encode_lcu_bitstream(void * opaque)
   }
 
   //Encode ALF
-  //TODO
 #if FULL_FRAME
   const int ctu_idx = lcu->index;
   kvz_encode_alf_bits(state, ctu_idx);

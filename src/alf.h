@@ -9,6 +9,7 @@
 #include "kvazaar.h"
 #include "videoframe.h"
 #include "image.h"
+#include "nal.h"
 
 
 //ALF applied to 4x4 luma samples
@@ -32,7 +33,6 @@
 #define MAX_NUM_CC_ALF_FILTERS          4
 #define MAX_NUM_CC_ALF_CHROMA_COEFF     8
 #define ALF_NUM_FIXED_FILTER_SETS       16
-#define ALF_NUM_BITS                    8
 #define CC_ALF_BITS_PER_COEFF_LEVEL     3
 #define ALF_UNUSED_CLASS_IDX            255
 #define ALF_UNUSED_TRANSPOSE_IDX        255
@@ -360,6 +360,7 @@ static int16_t g_clipp_aps_luma[ALF_CTB_MAX_NUM_APS][MAX_NUM_ALF_CLASSES * MAX_N
 static short g_fixed_filter_set_coeff_dec[ALF_NUM_FIXED_FILTER_SETS][MAX_NUM_ALF_CLASSES * MAX_NUM_ALF_LUMA_COEFF];
 
 //once ever
+static int kvz_bit_depth;
 static int chroma_scale_x;
 static int chroma_scale_y;
 static int g_num_ctus_in_pic;
@@ -418,11 +419,15 @@ cabac_data_t cabac_estimator;
 //kvz_alf_encoder_ctb
 //int best_aps_ids[ALF_CTB_MAX_NUM_APS]; //frame
 //int size_of_best_aps_ids;
+#if !FULL_FRAME
 int new_aps_id;
 int aps_ids[ALF_CTB_MAX_NUM_APS];
-int size_of_aps_ids;
 double d_dist_org_new_filter;
 int blocks_using_new_filter;
+#endif // !FULL_FRAME
+
+int size_of_aps_ids;
+
 
 //-------------------------init function----------------------------
 void kvz_alf_init(encoder_state_t *const state);
@@ -481,6 +486,8 @@ void get_frame_stat(alf_covariance* frame_cov, alf_covariance** ctb_cov, uint8_t
 void copy_cov(alf_covariance *dst, alf_covariance *src);
 void copy_alf_param(alf_aps *dst, alf_aps *src);
 void copy_alf_param_w_channel(alf_aps* dst, alf_aps* src, channel_type channel);
+void copy_aps(alf_aps *dst, alf_aps *src);
+void copy_aps_to_map(param_set_map *dst, alf_aps *src, int8_t aps_id);
 //bool compare_alf_param(const alf_aps* aps_1, const alf_aps* aps_2);
 void reset_alf_param(alf_aps *src);
 void add_alf_cov(alf_covariance *dst, alf_covariance *src);
@@ -737,27 +744,31 @@ void kvz_encode_alf_bits(encoder_state_t * const state, const int ctu_idx);
 void encoder_state_write_adaptation_parameter_set(encoder_state_t * const state,
   alf_aps *aps);
 
-void code_alf_aps(encoder_state_t * const state,
+void encode_alf_aps_flags(encoder_state_t * const state,
   alf_aps* aps);
 
-void alf_filter(encoder_state_t * const state,
+void encode_alf_aps_filter(encoder_state_t * const state,
   alf_aps* aps,
   const bool is_chroma,
   const int alt_idx);
 
+/*
 void alf_golomb_encode(encoder_state_t * const state,
   int coeff,
   int k,
   const bool signed_coeff);
+  */
+void encode_alf_adaptive_parameter_set(encoder_state_t * const state);
+
+void encode_alf_aps_lmcs(encoder_state_t * const state);
+
+void encode_alf_aps_scaling_list(encoder_state_t * const state);
+
+void encode_alf_aps(encoder_state_t * const state);
 
 //---------------------------------------------------------------------
 
 //-------------------------CTU functions--------------------------------
-
-//Decoder?
-//Funktion kvz_alf_filter_block kutsut; w, h, x, y, x_dst, y_dst, buf(s)?
-void kvz_alf_process(encoder_state_t const *state,
-  const lcu_order_element_t *lcu);
 
 //ei varmuutta miten alf_param_tmp pitäisi toimia tässä tilanteessa
 void kvz_alf_reconstruct_coeff_aps(encoder_state_t *const state,

@@ -197,8 +197,8 @@ static int encoder_state_config_slice_init(encoder_state_t * const state,
   state->slice->end_in_rs = state->encoder_control->tiles_ctb_addr_ts_to_rs[end_address_in_ts];
 
   if (state->encoder_control->cfg.alf_enable) {
-    //state->slice->apss = malloc(ALF_CTB_MAX_NUM_APS * sizeof(alf_aps));
     state->slice->apss = malloc(sizeof(alf_aps) * ALF_CTB_MAX_NUM_APS);
+    state->slice->tile_group_luma_aps_id = malloc(ALF_CTB_MAX_NUM_APS * sizeof(int8_t));
     state->slice->param_set_map = malloc(sizeof(param_set_map) * ALF_CTB_MAX_NUM_APS);
     for (int aps_idx = 0; aps_idx < ALF_CTB_MAX_NUM_APS; aps_idx++) {
       /*state->slice->apss[aps_idx].aps_id = -1;
@@ -212,17 +212,24 @@ static int encoder_state_config_slice_init(encoder_state_t * const state,
       state->slice->param_set_map[aps_idx].b_changed = 0;
       //state->slice->param_set_map[aps_idx].p_nalu_data = malloc(sizeof(uint8_t));
       //state->slice->param_set_map[aps_idx].parameter_set = malloc(sizeof(alf_aps));
+
+      state->slice->tile_group_luma_aps_id[aps_idx] = -1;
     }
     state->slice->tile_group_num_aps = -1;
     state->slice->tile_group_luma_aps_id = malloc(MAX_NUM_APS * sizeof(int));
     state->slice->tile_group_chroma_aps_id = -1;
+    state->slice->tile_group_cc_alf_cb_enabled_flag = 0;
+    state->slice->tile_group_cc_alf_cr_enabled_flag = 0;
     state->slice->tile_group_cc_alf_cb_aps_id = -1;
     state->slice->tile_group_cc_alf_cr_aps_id = -1;
     state->slice->num_of_param_sets = 0;
 
+    //CcAlfFilterParam            m_ccAlfFilterParam;
+    //uint8_t*                    m_ccAlfFilterControl[2];
+
     //For virtual boundaries
-    state->slice->num_hor_virtual_boundaries = 0;
-    state->slice->num_ver_virtual_boundaries = 0;
+    //state->slice->num_hor_virtual_boundaries = 0;
+    //state->slice->num_ver_virtual_boundaries = 0;
     //state->slice->virtual_boundaries_pos_x[3];
     //state->slice->virtual_boundaries_pos_y[3];
   }
