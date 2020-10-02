@@ -133,7 +133,7 @@ int32_t kvz_get_scaled_qp(int8_t type, int8_t qp, int8_t qp_offset)
     qp_scaled = qp + qp_offset;
   } else {
     qp_scaled = CLIP(-qp_offset, 57, qp);
-    if(qp_scaled < 0) {
+    if(true||qp_scaled < 0) { //TODO: Enable chroma QP scaling in the SPS headers
       qp_scaled = qp_scaled + qp_offset;
     } else {
       qp_scaled = kvz_g_chroma_scale[qp_scaled] + qp_offset;
