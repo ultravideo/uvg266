@@ -1738,10 +1738,6 @@ void kvz_alf_enc_process(encoder_state_t *const state
   g_alf_ctb_filter_index[lcu->index] = ALF_NUM_FIXED_FILTER_SETS;
 #endif
 
-  //g_classifier
-  //g_alf_covariance
-  //g_alf_ctb_filter
-
   kvz_alf_derive_filter__encode__reconstruct(state, 
 #if !FULL_FRAME
     lcu,
@@ -1862,7 +1858,7 @@ void kvz_alf_derive_filter__encode__reconstruct(encoder_state_t *const state,
   }
   int chroma_alf_aps_id = (state->slice->tile_group_alf_enabled_flag[COMPONENT_Cb] || state->slice->tile_group_alf_enabled_flag[COMPONENT_Cr]) ? state->slice->tile_group_chroma_aps_id : -1;
   alf_aps* aps = (chroma_alf_aps_id >= 0) ? &state->slice->param_set_map[chroma_alf_aps_id + T_ALF_APS].parameter_set : NULL;
-  bool changed = state->slice->param_set_map[chroma_alf_aps_id + T_ALF_APS].b_changed;
+  bool changed = (chroma_alf_aps_id >= 0) ? state->slice->param_set_map[chroma_alf_aps_id + T_ALF_APS].b_changed : 0;
   if (aps && changed)
   {
     aps->cc_alf_aps_param.new_cc_alf_filter[0] = false;
@@ -2012,7 +2008,7 @@ double kvz_alf_derive_ctb_alf_enable_flags(encoder_state_t * const state,
           assert(state->slice->tile_group_num_aps == 1);
           code_alf_ctu_filter_index(state, &cabac_estimator, ctu_idx, g_alf_aps_temp.enabled_flag[COMPONENT_Y]);
         }
-      double cost_on = dist_unfilter_ctu + ctu_lambda * (23 - cabac_estimator.bits_left) + (cabac_estimator.num_buffered_bytes << 3); //frac_bits_scale * 0 /*m_CABACEstimator->getEstFracBits()*/;
+      double cost_on = dist_unfilter_ctu + ctu_lambda * (23 - cabac_estimator.bits_left) + (cabac_estimator.num_buffered_bytes << 3);
 /*#else
       double costOn = distUnfilterCtu + getFilteredDistortion(m_alfCovariance[compID][iShapeIdx][ctuIdx], numClasses, m_alfParamTemp.numLumaFilters - 1, numCoeff);
 #if ENABLE_QPA
@@ -2896,17 +2892,10 @@ void kvz_alf_encoder(encoder_state_t *const state,
         //m_CABACEstimator->getCtx() = AlfCtx(ctxStart);
         memcpy(&cabac_estimator, &ctx_start, sizeof(cabac_estimator));
         //setCtuEnableFlag(m_ctuEnableFlag, channel, 1);
-        /*if (is_luma) {
-          memset(g_ctu_enable_flag[COMPONENT_Y], 1, sizeof(uint8_t) * g_num_ctus_in_pic);
-        }
-        else {
-          memset(g_ctu_enable_flag[COMPONENT_Cb], 1, sizeof(uint8_t) * g_num_ctus_in_pic);
-          memset(g_ctu_enable_flag[COMPONENT_Cr], 1, sizeof(uint8_t) * g_num_ctus_in_pic);
-        }*/
 #if !FULL_FRAME
-        set_ctu_enable_flag(g_ctu_enable_flag_tmp, channel, ctu_idx, 0);
+        set_ctu_enable_flag(g_ctu_enable_flag_tmp, channel, ctu_idx, 1);
 #else
-        set_ctu_enable_flag(g_ctu_enable_flag_tmp, channel, 0);
+        set_ctu_enable_flag(g_ctu_enable_flag_tmp, channel, 1);
 #endif
       
   //#if JVET_O0090_ALF_CHROMA_FILTER_ALTERNATIVES_CTB
@@ -2932,17 +2921,10 @@ void kvz_alf_encoder(encoder_state_t *const state,
           //ctxBest = AlfCtx(m_CABACEstimator->getCtx());
           memcpy(&ctx_best, &cabac_estimator, sizeof(ctx_best));
           //setCtuEnableFlag(m_ctuEnableFlagTmp, channel, 1);
-          /*if (is_luma) {
-            memset(g_ctu_enable_flag_tmp[COMPONENT_Y], 1, sizeof(uint8_t) * g_num_ctus_in_pic);
-          }
-          else {
-            memset(g_ctu_enable_flag_tmp[COMPONENT_Cb], 1, sizeof(uint8_t) * g_num_ctus_in_pic);
-            memset(g_ctu_enable_flag_tmp[COMPONENT_Cr], 1, sizeof(uint8_t) * g_num_ctus_in_pic);
-          }*/
 #if !FULL_FRAME
-          set_ctu_enable_flag(g_ctu_enable_flag_tmp, channel, ctu_idx, 0);
+          set_ctu_enable_flag(g_ctu_enable_flag_tmp, channel, ctu_idx, 1);
 #else
-          set_ctu_enable_flag(g_ctu_enable_flag_tmp, channel, 0);
+          set_ctu_enable_flag(g_ctu_enable_flag_tmp, channel, 1);
 #endif
   //#if JVET_O0090_ALF_CHROMA_FILTER_ALTERNATIVES_CTB
           if (!is_luma) {
@@ -2987,7 +2969,6 @@ void kvz_alf_encoder(encoder_state_t *const state,
             if (cost < cost_min)
             {
               g_bits_new_filter[channel] = ui_coeff_bits;
-
               cost_min = cost;
               //ctxBest = AlfCtx(m_CABACEstimator->getCtx());
               memcpy(&ctx_best, &cabac_estimator, sizeof(ctx_best));
@@ -3052,15 +3033,6 @@ void kvz_alf_encoder(encoder_state_t *const state,
     g_ctu_alternative[COMPONENT_Cr][ctu_idx] = g_ctu_alternative_tmp[COMPONENT_Cr][ctu_idx];
 #endif
   }
-  /*if (is_luma)
-  {
-    memcpy(g_ctu_enable_flag[COMPONENT_Y], g_ctu_enable_flag_tmp[COMPONENT_Y], sizeof(uint8_t) * g_num_ctus_in_pic);
-  }
-  else
-  {
-    memcpy(g_ctu_enable_flag[COMPONENT_Cb], g_ctu_enable_flag_tmp[COMPONENT_Cb], sizeof(uint8_t) * g_num_ctus_in_pic);
-    memcpy(g_ctu_enable_flag[COMPONENT_Cr], g_ctu_enable_flag_tmp[COMPONENT_Cr], sizeof(uint8_t) * g_num_ctus_in_pic);
-  }*/
   copy_ctu_enable_flag(g_ctu_enable_flag, g_ctu_enable_flag_tmp, channel
 #if !FULL_FRAME
     , ctu_idx
@@ -3763,7 +3735,7 @@ double kvz_alf_get_filter_coeff_and_cost(encoder_state_t *const state,
       copy_alf_param(&g_alf_aps_temp, &best_slice_param);
     }
     *ui_coeff_bits += length_uvlc(g_alf_aps_temp.num_alternatives_chroma - 1);
-    *ui_coeff_bits++;
+    (*ui_coeff_bits)++;
 /*#if !JVET_O0491_HLS_CLEANUP
     uiSliceFlag = lengthTruncatedUnary(alfChromaIdc, 3)
       - lengthTruncatedUnary(0, 3);  // rate already put on Luma
@@ -6264,18 +6236,18 @@ void encode_alf_aps_scaling_list(encoder_state_t * const state)
 
   for (int y_pos = 0; y_pos < luma_height; y_pos += max_cu_width)
   {
+    param_set_map *aps_map = state->slice->param_set_map;
     for (int aps_id = 0; aps_id < ALF_CTB_MAX_NUM_APS; aps_id++)
     {
-      param_set_map *aps_map = state->slice->param_set_map;
-      alf_aps aps = aps_map[aps_id + T_ALF_APS].parameter_set;
-      bool write_aps = aps_map[aps_id + T_ALF_APS].b_changed;
+      alf_aps aps = aps_map[aps_id + T_ALF_APS + NUM_APS_TYPE_LEN].parameter_set;
+      bool write_aps = aps_map[aps_id + T_ALF_APS + NUM_APS_TYPE_LEN].b_changed;
       if (!write_aps && state->slice->apss && state->slice->apss[aps_id].aps_id >= 0 && state->slice->apss[aps_id].aps_id < 8)
       {
         write_aps = true;
         aps = state->slice->apss[aps_id]; // use asp from slice header
 
         //*apsMap->allocatePS(apsId) = *aps; //allocate and cpy
-        copy_aps_to_map(&aps_map[aps_id + T_ALF_APS], &aps, aps_id);
+        copy_aps_to_map(aps_map, &aps, aps_id + T_ALF_APS + NUM_APS_TYPE_LEN);
         //m_pcALF->setApsIdStart(apsId);
         g_aps_id_start = aps_id;
       }

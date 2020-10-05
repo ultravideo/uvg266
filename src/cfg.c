@@ -49,7 +49,9 @@ int kvz_config_init(kvz_config *cfg)
   cfg->deblock_beta    = 0;
   cfg->deblock_tc      = 0;
   cfg->sao_type        = 3;
-  cfg->alf_enable      = 1;
+  cfg->alf_enable      = 0;
+  cfg->alf_cc_enabled_flag = 0;
+  cfg->alf_info_in_ph_flag = 0;
   cfg->alf_non_linear_luma = 1;
   cfg->alf_non_linear_chroma = 1;
   cfg->alf_virtual_boundaries_present_flag = 0;

@@ -210,6 +210,9 @@ static int encoder_state_config_slice_init(encoder_state_t * const state,
       state->slice->apss[aps_idx].fixed_filter_set_index = -1;*/
 
       state->slice->param_set_map[aps_idx].b_changed = 0;
+      state->slice->param_set_map[aps_idx].parameter_set.aps_id = -1;
+      state->slice->param_set_map[aps_idx].parameter_set.temporal_id = -1;
+      state->slice->param_set_map[aps_idx].parameter_set.layer_id = -1;
       //state->slice->param_set_map[aps_idx].p_nalu_data = malloc(sizeof(uint8_t));
       //state->slice->param_set_map[aps_idx].parameter_set = malloc(sizeof(alf_aps));
 
