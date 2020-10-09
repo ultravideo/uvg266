@@ -16,15 +16,9 @@ TESTS = $(check_PROGRAMS) \
 
 EXTRA_DIST = \
     test_external_symbols.sh \
-    test_gop.sh \
     test_interlace.sh \
     test_intra.sh \
     test_invalid_input.sh \
-    test_mv_constraint.sh \
-    test_owf_wpp_tiles.sh \
-    test_rate_control.sh \
-    test_slices.sh \
-    test_smp.sh \
     test_tools.sh \
     test_weird_shapes.sh \
 	test_pu_depth_constraints.sh \
