@@ -16,12 +16,10 @@ TESTS = $(check_PROGRAMS) \
 
 EXTRA_DIST = \
     test_external_symbols.sh \
-    test_interlace.sh \
     test_intra.sh \
     test_invalid_input.sh \
     test_tools.sh \
     test_weird_shapes.sh \
-	test_pu_depth_constraints.sh \
     util.sh
 
 check_PROGRAMS = kvazaar_tests
