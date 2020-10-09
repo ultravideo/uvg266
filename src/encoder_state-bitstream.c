@@ -530,7 +530,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   WRITE_UE(stream, encoder->bitdepth-8, "bit_depth_minus8");
 
   WRITE_U(stream, encoder->cfg.wpp, 1, "entropy_coding_sync_enabled_flag");
-  WRITE_U(stream, 0, 1, "sps_entry_point_offsets_present_flag");
+  WRITE_U(stream, encoder->tiles_enable, 1, "sps_entry_point_offsets_present_flag");
 
   WRITE_U(stream, 1, 4, "log2_max_pic_order_cnt_lsb_minus4");
   WRITE_U(stream, 0, 1, "sps_poc_msb_flag");
@@ -601,13 +601,13 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   WRITE_U(stream, 0, 1, "sps_joint_cbcr_enabled_flag");
 
   if (encoder->chroma_format != KVZ_CSP_400) {    
-    WRITE_U(stream, 1, 1, "same_qp_table_for_chroma");
+    WRITE_U(stream, 1, 1, "same_qp_table_for_chroma"); //TODO: Enable chroma QP scaling and fix kvz_get_scaled_qp()
 
-      WRITE_SE(stream, 0, "qp_table_starts_minus26");    
-      WRITE_UE(stream, 0, "num_points_in_qp_table_minus1");
+    WRITE_SE(stream, 0, "qp_table_starts_minus26");    
+    WRITE_UE(stream, 0, "num_points_in_qp_table_minus1");
 
-        WRITE_UE(stream, 0, "delta_qp_in_val_minus1");
-        WRITE_UE(stream, 1, "delta_qp_diff_val");
+      WRITE_UE(stream, 0, "delta_qp_in_val_minus1");
+      WRITE_UE(stream, 1, "delta_qp_diff_val");
 
   }
 
@@ -1272,7 +1272,7 @@ static void encoder_state_write_slice_header(
   encoder_state_t * state,
   bool independent)
 {
-  kvz_nal_write(stream, state->frame->pictype, 0, state->frame->first_nal);
+  kvz_nal_write(stream, state->frame->pictype, (state->frame->pictype==KVZ_NAL_STSA)?1:0, state->frame->first_nal);
   state->frame->first_nal = false;
 
   kvz_encoder_state_write_bitstream_slice_header(stream, state, independent);

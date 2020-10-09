@@ -153,22 +153,22 @@ extern uint32_t kvz_cabac_bins_count;
 extern bool kvz_cabac_bins_verbose;
 #define CABAC_BIN(data, value, name) { \
     uint32_t prev_state = CTX_STATE(data->cur_ctx); \
-    if(kvz_cabac_bins_verbose) printf("%d %d  [%d:%d]  %s = %u, range = %u LPS = %u state = %u -> ", \
+    if(kvz_cabac_bins_verbose && !data->only_count) printf("%d %d  [%d:%d]  %s = %u, range = %u LPS = %u state = %u -> ", \
            kvz_cabac_bins_count++, (data)->range, (data)->range-CTX_LPS(data->cur_ctx,(data)->range), CTX_LPS(data->cur_ctx,(data)->range), (name), (uint32_t)(value), (data)->range, CTX_LPS(data->cur_ctx,(data)->range), prev_state); \
     kvz_cabac_encode_bin((data), (value)); \
-    if(kvz_cabac_bins_verbose) printf("%u\n", CTX_STATE(data->cur_ctx)); }
+    if(kvz_cabac_bins_verbose && !data->only_count) printf("%u\n", CTX_STATE(data->cur_ctx)); }
     
 
   #define CABAC_BINS_EP(data, value, bins, name) { \
     uint32_t prev_state = CTX_STATE(data->cur_ctx); \
     kvz_cabac_encode_bins_ep((data), (value), (bins)); \
-    if(kvz_cabac_bins_verbose) printf("%d %s = %u(%u bins), state = %u -> %u\n", \
+    if(kvz_cabac_bins_verbose && !data->only_count) printf("%d %s = %u(%u bins), state = %u -> %u\n", \
            kvz_cabac_bins_count, (name), (uint32_t)(value), (bins), prev_state, CTX_STATE(data->cur_ctx));  kvz_cabac_bins_count+=bins;}
 
   #define CABAC_BIN_EP(data, value, name) { \
     uint32_t prev_state = CTX_STATE(data->cur_ctx); \
     kvz_cabac_encode_bin_ep((data), (value)); \
-    if(kvz_cabac_bins_verbose) printf("%d %s = %u, state = %u -> %u\n", \
+    if(kvz_cabac_bins_verbose && !data->only_count) printf("%d %s = %u, state = %u -> %u\n", \
            kvz_cabac_bins_count++, (name), (uint32_t)(value), prev_state, CTX_STATE(data->cur_ctx)); }
 #else
   #define CABAC_BIN(data, value, name) \
