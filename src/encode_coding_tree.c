@@ -557,7 +557,7 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
     }
     // Is the mode in the MPM array or not
     flag[j] = (mpm_preds[j] == -1) ? 0 : 1;
-    if (!(cur_pu->intra.multi_ref_idx || (isp_mode))) {
+    if (true||!(cur_pu->intra.multi_ref_idx || (isp_mode))) {
       CABAC_BIN(cabac, flag[j], "prev_intra_luma_pred_flag");
     }
   }
@@ -573,7 +573,7 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
       const int pu_y = PU_GET_Y(cur_cu->part_size, cu_width, y, j);
       const cu_info_t *cur_pu = kvz_cu_array_at_const(frame->cu_array, pu_x, pu_y);
       cabac->cur_ctx = &(cabac->ctx.luma_planar_model[(isp_mode ? 0 : 1)]);
-      if (cur_pu->intra.multi_ref_idx == 0) {
+      if (true||cur_pu->intra.multi_ref_idx == 0) {
         CABAC_BIN(cabac, (mpm_preds[j] > 0 ? 1 : 0), "mpm_idx_luma_planar");
       }
       //CABAC_BIN_EP(cabac, (mpm_preds[j] > 0 ? 1 : 0), "mpm_idx");
