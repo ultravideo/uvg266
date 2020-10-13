@@ -7,7 +7,7 @@ test-kvazaar: &test-template
   script:
     - export PATH="${HOME}/bin:${PATH}"
     - ./autogen.sh
-    - ./configure --enable-werror || (cat config.log && false)
+    - ./configure || (cat config.log && false)
     - make --jobs=8
     - make check --jobs=8 VERBOSE=1
   artifacts:
@@ -56,12 +56,12 @@ test-distcheck:
   script:
     - export PATH="${HOME}/bin:${PATH}"
     - ./autogen.sh
-    - ./configure --enable-werror || (cat config.log && false)
+    - ./configure || (cat config.log && false)
     - make --jobs=8 VERBOSE=1 distcheck
 
-test-10bit:
-  <<: *test-template
-  variables:
-    CFLAGS: '-DKVZ_BIT_DEPTH=10'
+#test-10bit:
+#  <<: *test-template
+#  variables:
+#    CFLAGS: '-DKVZ_BIT_DEPTH=10'
     # VAQ is not currently supported on the 10-bit build, so xfail it
-    XFAIL_TESTS: test_tools.sh
+    #XFAIL_TESTS: test_tools.sh
