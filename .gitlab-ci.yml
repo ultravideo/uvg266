@@ -28,12 +28,12 @@ test-asan:
     # the external symbols test.
     XFAIL_TESTS: test_external_symbols.sh
 
-test-tsan:
-  <<: *test-template
-  variables:
-    CFLAGS: '-fsanitize=thread'
-    # Temporarily suppress known errors or false positives.
-    TSAN_OPTIONS: 'suppressions=/builds/TIE/ultravideo/kvazaar/tests/tsan_suppressions.txt'
+#test-tsan:
+#  <<: *test-template
+#  variables:
+#    CFLAGS: '-fsanitize=thread'
+#    # Temporarily suppress known errors or false positives.
+#    TSAN_OPTIONS: 'suppressions=/builds/TIE/ultravideo/kvazaar/tests/tsan_suppressions.txt'
 
 test-ubsan:
   <<: *test-template
@@ -43,22 +43,18 @@ test-ubsan:
 test-valgrind:
   <<: *test-template
   variables:
-    KVAZAAR_OVERRIDE_angular_pred: generic
-    KVAZAAR_OVERRIDE_sao_band_ddistortion: generic
-    KVAZAAR_OVERRIDE_sao_edge_ddistortion: generic
-    KVAZAAR_OVERRIDE_calc_sao_edge_dir: generic
     KVZ_TEST_VALGRIND: 1
 
 # TODO: If someone knows YAML better, there has to be some better way to
 # concatenate stuff into the test-template script than just manually copy
 # pasting
-test-distcheck:
-  <<: *test-template
-  script:
-    - export PATH="${HOME}/bin:${PATH}"
-    - ./autogen.sh
-    - ./configure || (cat config.log && false)
-    - make --jobs=8 VERBOSE=1 distcheck
+#test-distcheck:
+#  <<: *test-template
+#  script:
+#    - export PATH="${HOME}/bin:${PATH}"
+#    - ./autogen.sh
+#    - ./configure || (cat config.log && false)
+#    - make --jobs=8 VERBOSE=1 distcheck
 
 #test-10bit:
 #  <<: *test-template
