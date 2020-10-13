@@ -6,10 +6,10 @@ set -eu${BASH+o pipefail}
 
 # Temporary files for encoder input and output.
 yuvfile="$(mktemp)"
-hevcfile="$(mktemp)"
+vvcfile="$(mktemp)"
 
 cleanup() {
-    rm -rf "${yuvfile}" "${hevcfile}"
+    rm -rf "${yuvfile}" "${vvcfile}"
 }
 trap cleanup EXIT
 
@@ -46,10 +46,10 @@ valgrind_test() {
     # arguments.
     print_and_run \
         ../libtool execute $valgrind \
-            ../src/kvazaar -i "${yuvfile}" "--input-res=${dimensions}" -o "${hevcfile}" "$@"
+            ../src/kvazaar -i "${yuvfile}" "--input-res=${dimensions}" -o "${vvcfile}" "$@"
 
     print_and_run \
-        TAppDecoderStatic -b "${hevcfile}"
+        DecoderAppStatic -b "${vvcfile}"
 
     cleanup
 }
@@ -67,7 +67,7 @@ encode_test() {
     set +e
     print_and_run \
         ../libtool execute \
-            ../src/kvazaar -i "${yuvfile}" "--input-res=${dimensions}" -o "${hevcfile}" "$@"
+            ../src/kvazaar -i "${yuvfile}" "--input-res=${dimensions}" -o "${vvcfile}" "$@"
     actual_status="$?"
     set -e
     [ ${actual_status} -eq ${expected_status} ]
