@@ -436,6 +436,8 @@ void kvz_alf_init(encoder_state_t *const state);
 //------------------------------------------------------------------
 
 //-------------------------help functions---------------------------
+
+void set_config(kvz_config *const cfg);
 bool is_crossed_by_virtual_boundaries(const int x_pos, const int y_pos, const int width, const int height, bool* clip_top, bool* clip_bottom, bool* clip_left, 
                                       bool* clip_right, int* num_hor_vir_bndry, int* num_ver_vir_bndry, int hor_vir_bndry_pos[], int ver_vir_bndry_pos[], encoder_state_t *const state);
 void init_ctu_alternative_chroma(uint8_t* ctu_alts[MAX_NUM_COMPONENT]);

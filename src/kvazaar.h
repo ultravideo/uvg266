@@ -456,6 +456,8 @@ typedef struct kvz_config
   enum kvz_file_format file_format;
 
   char *stats_file_prefix;
+
+  struct param_set_map *param_set_map;
 } kvz_config;
 
 /**

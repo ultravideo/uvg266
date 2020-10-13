@@ -20,6 +20,7 @@
 
 #include "cfg.h"
 #include "gop.h"
+#include "alf.h"
 
 #include <limits.h>
 #include <stdio.h>
@@ -185,6 +186,10 @@ int kvz_config_destroy(kvz_config *cfg)
     FREE_POINTER(cfg->slice_addresses_in_ts);
     FREE_POINTER(cfg->roi.dqps);
     FREE_POINTER(cfg->optional_key);
+    if (cfg->param_set_map)
+    {
+      FREE_POINTER(cfg->param_set_map);
+    }
   }
   free(cfg);
 
@@ -1495,7 +1500,7 @@ static int validate_hevc_level(kvz_config *const cfg);
  * \param cfg   config to check
  * \return      1 if the config is ok, otherwise 1
  */
-int kvz_config_validate(const kvz_config *const cfg)
+int kvz_config_validate(kvz_config *const cfg)
 {
   int error = 0;
 
@@ -1728,6 +1733,11 @@ int kvz_config_validate(const kvz_config *const cfg)
   if(cfg->target_bitrate == 0 && cfg->rc_algorithm != KVZ_NO_RC) {
     fprintf(stderr, "Rate control algorithm set but bitrate not set.\n");
     error = 1;
+  }
+
+  if (cfg->alf_enable)
+  {
+    set_config(cfg);
   }
 
   return !error;

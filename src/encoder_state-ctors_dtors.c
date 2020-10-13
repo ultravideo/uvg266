@@ -199,7 +199,7 @@ static int encoder_state_config_slice_init(encoder_state_t * const state,
   if (state->encoder_control->cfg.alf_enable) {
     state->slice->apss = malloc(sizeof(alf_aps) * ALF_CTB_MAX_NUM_APS);
     state->slice->tile_group_luma_aps_id = malloc(ALF_CTB_MAX_NUM_APS * sizeof(int8_t));
-    state->slice->param_set_map = malloc(sizeof(param_set_map) * ALF_CTB_MAX_NUM_APS);
+    //state->slice->param_set_map = malloc(sizeof(param_set_map) * ALF_CTB_MAX_NUM_APS);
     for (int aps_idx = 0; aps_idx < ALF_CTB_MAX_NUM_APS; aps_idx++) {
       /*state->slice->apss[aps_idx].aps_id = -1;
       state->slice->apss[aps_idx].num_luma_filters = -1;
@@ -209,10 +209,10 @@ static int encoder_state_config_slice_init(encoder_state_t * const state,
       state->slice->apss[aps_idx].fixed_filter_pattern = -1;
       state->slice->apss[aps_idx].fixed_filter_set_index = -1;*/
 
-      state->slice->param_set_map[aps_idx].b_changed = 0;
+      /*state->slice->param_set_map[aps_idx].b_changed = 0;
       state->slice->param_set_map[aps_idx].parameter_set.aps_id = -1;
       state->slice->param_set_map[aps_idx].parameter_set.temporal_id = -1;
-      state->slice->param_set_map[aps_idx].parameter_set.layer_id = -1;
+      state->slice->param_set_map[aps_idx].parameter_set.layer_id = -1;*/
       //state->slice->param_set_map[aps_idx].p_nalu_data = malloc(sizeof(uint8_t));
       //state->slice->param_set_map[aps_idx].parameter_set = malloc(sizeof(alf_aps));
 
@@ -769,9 +769,9 @@ void kvz_encoder_state_finalize(encoder_state_t * const state) {
   if (!state->parent || (state->parent->slice != state->slice)) {
 
     if (state->encoder_control->cfg.alf_enable) {
-      if (state->slice->param_set_map && state->slice->param_set_map != NULL) {
+      /*if (state->slice->param_set_map && state->slice->param_set_map != NULL) {
         FREE_POINTER(state->slice->param_set_map);
-      }
+      }*/
       if (state->slice->apss != NULL) {
         /*for (int i = 0; i < ALF_CTB_MAX_NUM_APS; i++) {
           if (state->slice->apss[i] != NULL) {
