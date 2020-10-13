@@ -401,7 +401,11 @@ void gns_transpose_backsubstitution(double u[MAX_NUM_ALF_LUMA_COEFF][MAX_NUM_ALF
 
 int gns_cholesky_dec(double inp_matr[MAX_NUM_ALF_LUMA_COEFF][MAX_NUM_ALF_LUMA_COEFF], double out_matr[MAX_NUM_ALF_LUMA_COEFF][MAX_NUM_ALF_LUMA_COEFF], int num_eq)
 {
+#if FULL_FRAME
+  double inv_diag[MAX_NUM_ALF_LUMA_COEFF];  /* Vector of the inverse of diagonal entries of outMatr */
+#else
   static double inv_diag[MAX_NUM_ALF_LUMA_COEFF];  /* Vector of the inverse of diagonal entries of outMatr */
+#endif
 
   for (int i = 0; i < num_eq; i++)
   {
@@ -441,8 +445,13 @@ int gns_cholesky_dec(double inp_matr[MAX_NUM_ALF_LUMA_COEFF][MAX_NUM_ALF_LUMA_CO
 
 int gns_solve_by_chol(double lhs[MAX_NUM_ALF_LUMA_COEFF][MAX_NUM_ALF_LUMA_COEFF], double rhs[MAX_NUM_ALF_LUMA_COEFF], double *x, int num_eq)
 {
+#if FULL_FRAME
+  double aux[MAX_NUM_ALF_LUMA_COEFF];     /* Auxiliary vector */
+  double u[MAX_NUM_ALF_LUMA_COEFF][MAX_NUM_ALF_LUMA_COEFF];    /* Upper triangular Cholesky factor of lhs */
+#else
   static double aux[MAX_NUM_ALF_LUMA_COEFF];     /* Auxiliary vector */
   static double u[MAX_NUM_ALF_LUMA_COEFF][MAX_NUM_ALF_LUMA_COEFF];    /* Upper triangular Cholesky factor of lhs */
+#endif
   int res = 1;  // Signal that Cholesky factorization is successfully performed
 
                 /* The equation to be solved is LHSx = rhs */
@@ -1134,8 +1143,8 @@ void add_alf_cov_lhs_rhs(alf_covariance *dst, alf_covariance *lhs, alf_covarianc
 void reset_alf_covariance(alf_covariance *alf, int num_bins) {
   if (num_bins > 0) { alf->num_bins = num_bins; }
   alf->pix_acc = 0;
-  memset(&alf->y, 0, sizeof(alf->y));
-  memset(&alf->ee, 0, sizeof(alf->ee));
+  memset(alf->y, 0, sizeof(alf->y));
+  memset(alf->ee, 0, sizeof(alf->ee));
 }
 
 void reset_cc_alf_aps_param(cc_alf_filter_param *cc_alf) {
@@ -1617,6 +1626,7 @@ void kvz_alf_enc_process(encoder_state_t *const state
   memcpy(&ctx_start_cc_alf, &cabac_estimator, sizeof(ctx_start_cc_alf));
   cabac_estimator.only_count = 1;
   ctx_start.only_count = 1;
+  ctx_start_cc_alf.only_count = 1;
 
   // derive classification
   //const kvz_pixel rec_luma = state->tile->frame->rec->y;
@@ -1828,9 +1838,6 @@ void kvz_alf_derive_filter__encode__reconstruct(encoder_state_t *const state,
   }
 #endif
 
-  //memcpy(&state->cabac, &cabac_estimator, sizeof(state->cabac));
-  //state->cabac.only_count = 0;
-  //kvz_encode_alf(state, lcu->index, &alf_param);
 #if !FULL_FRAME
   kvz_encode_alf_bits(state, lcu_index);
 #endif
@@ -2872,7 +2879,6 @@ void kvz_alf_encoder(encoder_state_t *const state,
 //#endif
 
         //2. all CTUs are on
-        //setEnableFlag(m_alfSliceParamTemp, channel, true);
         if (is_luma) 
         {
           g_alf_aps_temp.enabled_flag[COMPONENT_Y] = 1;
@@ -2893,9 +2899,9 @@ void kvz_alf_encoder(encoder_state_t *const state,
         memcpy(&cabac_estimator, &ctx_start, sizeof(cabac_estimator));
         //setCtuEnableFlag(m_ctuEnableFlag, channel, 1);
 #if !FULL_FRAME
-        set_ctu_enable_flag(g_ctu_enable_flag_tmp, channel, ctu_idx, 1);
+        set_ctu_enable_flag(g_ctu_enable_flag, channel, ctu_idx, 1);
 #else
-        set_ctu_enable_flag(g_ctu_enable_flag_tmp, channel, 1);
+        set_ctu_enable_flag(g_ctu_enable_flag, channel, 1);
 #endif
       
   //#if JVET_O0090_ALF_CHROMA_FILTER_ALTERNATIVES_CTB
