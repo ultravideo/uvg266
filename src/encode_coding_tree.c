@@ -1010,7 +1010,14 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
 
   // Prediction mode
   if (state->frame->slicetype != KVZ_SLICE_I) {
-    cabac->cur_ctx = &(cabac->ctx.cu_pred_mode_model);
+
+    int8_t ctx_predmode = 0;
+
+    if ((left_cu && left_cu->type == CU_INTRA) || (above_cu && above_cu->type == CU_INTRA)) {
+      ctx_predmode=1;
+    }
+
+    cabac->cur_ctx = &(cabac->ctx.cu_pred_mode_model[ctx_predmode]);
     CABAC_BIN(cabac, (cur_cu->type == CU_INTRA), "PredMode");
   }
 

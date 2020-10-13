@@ -343,7 +343,7 @@ void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
 
   kvz_ctx_init(&cabac->ctx.cu_merge_flag_ext_model, QP, INIT_MERGE_FLAG_EXT[slice][0], INIT_MERGE_FLAG_EXT[3][0]);
   kvz_ctx_init(&cabac->ctx.cu_merge_idx_ext_model, QP, INIT_MERGE_IDX_EXT[slice][0], INIT_MERGE_IDX_EXT[3][0]);
-  kvz_ctx_init(&cabac->ctx.cu_pred_mode_model, QP, INIT_PRED_MODE[slice][0], INIT_PRED_MODE[3][0]);
+  
   kvz_ctx_init(&cabac->ctx.cu_transquant_bypass, QP, INIT_CU_TRANSQUANT_BYPASS[slice][0], INIT_CU_TRANSQUANT_BYPASS[3][0]);
   
   kvz_ctx_init(&cabac->ctx.intra_luma_mpm_flag_model, QP, INIT_INTRA_LUMA_MPM_FLAG[slice], INIT_INTRA_LUMA_MPM_FLAG[3]);
@@ -383,6 +383,9 @@ void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
   
 
   //TODO: ignore P/B contexts on intra frame
+  kvz_ctx_init(&cabac->ctx.cu_pred_mode_model[0], QP, INIT_PRED_MODE[slice][0], INIT_PRED_MODE[3][0]);
+  kvz_ctx_init(&cabac->ctx.cu_pred_mode_model[1], QP, INIT_PRED_MODE[slice][1], INIT_PRED_MODE[3][1]);
+
   kvz_ctx_init(&cabac->ctx.cu_qt_root_cbf_model, QP, INIT_QT_ROOT_CBF[slice][0], INIT_QT_ROOT_CBF[3][0]);
   kvz_ctx_init(&cabac->ctx.mvp_idx_model, QP, INIT_MVP_IDX[slice][0], INIT_MVP_IDX[3][0]);
 
