@@ -345,7 +345,7 @@ short g_clip_default[MAX_NUM_ALF_CLASSES * MAX_NUM_ALF_LUMA_COEFF];
 static short g_filter_indices[MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_CLASSES];
 //#if JVET_O0090_ALF_CHROMA_FILTER_ALTERNATIVES_CTB
 short g_chroma_coeff_final[MAX_NUM_ALF_ALTERNATIVES_CHROMA][MAX_NUM_ALF_CHROMA_COEFF];
-alf_aps* g_alf_aps_chroma; //pelkkä turha välikäsi (?)
+//alf_aps* g_alf_aps_chroma; //pelkkä turha välikäsi (?)
 /*#else
 static short g_chroma_coeff_final[MAX_NUM_ALF_LUMA_COEFF]; #endif*/
 //#if JVET_O0090_ALF_CHROMA_FILTER_ALTERNATIVES_CTB
@@ -536,9 +536,6 @@ void kvz_alf_enc_process(encoder_state_t *const state
 #if !FULL_FRAME
   , const lcu_order_element_t *const lcu
 #endif
-//#if ENABLE_QPA
-  //const double lambdaChromaWeight
-//#endif
   );
 
 double kvz_alf_derive_ctb_alf_enable_flags(encoder_state_t * const state,
@@ -549,9 +546,7 @@ double kvz_alf_derive_ctb_alf_enable_flags(encoder_state_t * const state,
 #if !FULL_FRAME
   int ctu_idx,
 #endif
-//#if ENABLE_QPA
   const double chroma_weight
-//#endif
   );
 
 void kvz_alf_enc_create(encoder_state_t const *state);
@@ -570,9 +565,7 @@ void kvz_alf_encoder(encoder_state_t *const state,
 #endif
   alf_aps *aps,
   channel_type channel,
-//#if ENABLE_QPA
   const double lambda_chroma_weight
-//#endif
   );
 
 //isIntra, PendingRasInit, IDRorBLA <--- ? selvitä nämä
@@ -667,9 +660,7 @@ void kvz_alf_encoder_ctb(encoder_state_t *const state,
 #if !FULL_FRAME
   int ctu_idx,
 #endif
-  //#if ENABLE_QPA
   const double lambda_chroma_weight
-  //#endif 
   );
 
 void kvz_alf_reconstructor(encoder_state_t const *state
