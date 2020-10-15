@@ -371,7 +371,7 @@ static int g_alf_vb_chma_pos;
 static short g_alf_clipping_values[MAX_NUM_CHANNEL_TYPE][MAX_ALF_NUM_CLIPPING_VALUES];
 static alf_classifier **g_classifier;
 static bool g_created = false;
-static uint32_t g_slice_count = MAX_INT;
+static uint32_t g_frame_count = MAX_INT;
 uint8_t* g_cc_alf_filter_control[2];
 int g_aps_id_cc_alf_start[2];
 
@@ -391,7 +391,9 @@ short* g_alf_ctb_filter_set_index_tmp; //g_num_ctus_in_pic //voisi olla lokaali 
 short* g_alf_ctb_filter_index;     //g_num_ctus_in_pic
 static uint32_t g_curr_frame = MAX_INT;
 static uint32_t g_old_frame = 0;
+#if !FULL_FRAME
 alf_aps alf_param;
+#endif
 struct cc_alf_filter_param g_cc_alf_filter_param;
 
 //temps
@@ -428,10 +430,11 @@ int blocks_using_new_filter;
 
 int size_of_aps_ids;
 
-
 //-------------------------init function----------------------------
+#if !FULL_FRAME
 void kvz_alf_init(encoder_state_t *const state);
   //alf_info_t *alf);
+#endif
 
 //------------------------------------------------------------------
 
@@ -536,15 +539,6 @@ void kvz_alf_enc_process(encoder_state_t *const state
 //#if ENABLE_QPA
   //const double lambdaChromaWeight
 //#endif
-  );
-
-void kvz_alf_derive_filter__encode__reconstruct(encoder_state_t *const state,
-#if !FULL_FRAME
-  const lcu_order_element_t *lcu,
-#endif
-  //#if ENABLE_QPA
-  const double lambda_chroma_weight
-  //#endif
   );
 
 double kvz_alf_derive_ctb_alf_enable_flags(encoder_state_t * const state,

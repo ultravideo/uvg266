@@ -1243,9 +1243,9 @@ void kvz_encoder_state_write_bitstream_slice_header(
 
     if (alf_enabled)
     {
-      WRITE_U(stream, 0/*state->slice->tile_group_num_aps - 1*/, 3, "slice_num_alf_aps_ids_luma");
+      WRITE_U(stream, state->slice->tile_group_num_aps, 3, "slice_num_alf_aps_ids_luma");
       const int8_t* aps_ids = state->slice->tile_group_luma_aps_id;
-      for (int i = 0; i < 0/*state->slice->tile_group_num_aps - 1*/; i++)
+      for (int i = 0; i < state->slice->tile_group_num_aps; i++)
       {
         WRITE_U(stream, aps_ids[i], 3, "slice_alf_aps_id_luma");
       }

@@ -1500,7 +1500,7 @@ static int validate_hevc_level(kvz_config *const cfg);
  * \param cfg   config to check
  * \return      1 if the config is ok, otherwise 1
  */
-int kvz_config_validate(kvz_config *const cfg)
+int kvz_config_validate(const kvz_config *const cfg)
 {
   int error = 0;
 
