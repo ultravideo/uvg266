@@ -1624,9 +1624,8 @@ void kvz_alf_enc_process(encoder_state_t *const state
 
 #if FULL_FRAME
   //int layerIdx = cs.vps == nullptr ? 0 : cs.vps->getGeneralLayerIdx(cs.slice->getPic()->layerId);
-  int layer_idx = state->frame->num;
 
-  if (layer_idx && (false/*cs.slice->getPendingRasInit()*/ || (state->frame->pictype == KVZ_NAL_IDR_W_RADL || state->frame->pictype == KVZ_NAL_IDR_N_LP)))
+  if (1 /*!layerIdx*/ && (false/*cs.slice->getPendingRasInit()*/ || (state->frame->pictype == KVZ_NAL_IDR_W_RADL || state->frame->pictype == KVZ_NAL_IDR_N_LP)))
   {
     for (int i = 0; i < ALF_CTB_MAX_NUM_APS; i++) {
       state->slice->apss[i].aps_id = -1;
@@ -2259,7 +2258,6 @@ void kvz_alf_enc_create(encoder_state_t const *state)
     g_filter_clipp_set[i] = malloc(MAX_NUM_ALF_LUMA_COEFF * sizeof(int));
     g_diff_filter_coeff[i] = malloc(MAX_NUM_ALF_LUMA_COEFF * sizeof(int));
   }
-  g_aps_id_start = ALF_CTB_MAX_NUM_APS;
 
   //g_ctb_distortion_fixed_filter = malloc(g_num_ctus_in_pic * sizeof(double));
   for (int comp = 0; comp < MAX_NUM_COMPONENT; comp++)
@@ -3146,10 +3144,10 @@ void kvz_alf_get_avai_aps_ids_luma(encoder_state_t *const state,
   int aps_id_checked = 0, cur_aps_id = g_aps_id_start;
   if (cur_aps_id < ALF_CTB_MAX_NUM_APS)
   {
-    while (aps_id_checked < ALF_CTB_MAX_NUM_APS && !(state->frame->slicetype == KVZ_SLICE_I) && *size_of_aps_ids < ALF_CTB_MAX_NUM_APS /*&& /*!cs.slice->getPendingRasInit()*/ && !(state->frame->pictype == KVZ_NAL_IDR_W_RADL || state->frame->pictype == KVZ_NAL_IDR_N_LP))
+    while ((aps_id_checked < ALF_CTB_MAX_NUM_APS) && !(state->frame->slicetype == KVZ_SLICE_I) && *size_of_aps_ids < ALF_CTB_MAX_NUM_APS /*&& /*!cs.slice->getPendingRasInit()*/ && !(state->frame->pictype == KVZ_NAL_IDR_W_RADL || state->frame->pictype == KVZ_NAL_IDR_N_LP))
     {
       alf_aps *cur_aps = &state->slice->apss[cur_aps_id];
-      bool aps_found = 0 <= cur_aps->aps_id < ALF_CTB_MAX_NUM_APS;
+      bool aps_found = (0 <= cur_aps->aps_id && cur_aps->aps_id < ALF_CTB_MAX_NUM_APS);
 
       if (aps_found/*cur_aps*/ && cur_aps->layer_id == 0/*cs.slice->getPic()->layerId*/ && cur_aps->temporal_id <= state->slice->id /*cs.slice->getTLayer(*/ && cur_aps->new_filter_flag[CHANNEL_TYPE_LUMA])
       {

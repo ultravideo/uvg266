@@ -383,7 +383,7 @@ int g_alf_clip_merged[ALF_NUM_OF_FILTER_TYPES][MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_
 uint8_t* g_ctu_enable_flag[MAX_NUM_COMPONENT];
 uint8_t* g_ctu_alternative[MAX_NUM_COMPONENT]; //#if JVET_O0090_ALF_CHROMA_FILTER_ALTERNATIVES_CTB
 double *g_ctb_distortion_unfilter[MAX_NUM_COMPONENT];
-static int g_aps_id_start;
+static int g_aps_id_start = ALF_CTB_MAX_NUM_APS;
 int** g_diff_filter_coeff; // [lumaClassIdx][coeffIdx]
 int** g_filter_coeff_set;  // [lumaClassIdx][coeffIdx]
 int** g_filter_clipp_set; // [lumaClassIdx][coeffIdx]
