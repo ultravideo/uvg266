@@ -1241,6 +1241,12 @@ void kvz_encoder_state_write_bitstream_slice_header(
     WRITE_U(stream, 0, 1, "sh_no_output_of_prior_pics_flag");
   }
 
+  //alf
+  if (encoder->cfg.alf_enable && !encoder->cfg.alf_info_in_ph_flag)
+  {
+    const int alf_enabled = state->slice->tile_group_alf_enabled_flag[COMPONENT_Y];
+    WRITE_U(stream, alf_enabled, 1, "slice_alf_enabled_flag");
+
     if (alf_enabled)
     {
       WRITE_U(stream, state->slice->tile_group_num_aps, 3, "slice_num_alf_aps_ids_luma");
