@@ -683,7 +683,7 @@ static void encoder_state_worker_encode_lcu(void * opaque)
         kvz_alf_enc_create(state, cur_lcu);
         kvz_alf_init(state, slice);
         kvz_alf_enc_process(state, cur_lcu);
-        kvz_frame_end(state, frame, cur_lcu);
+        kvz_alf_reconstruct(state, frame, cur_lcu);
         
       }
     }
@@ -691,7 +691,7 @@ static void encoder_state_worker_encode_lcu(void * opaque)
     kvz_alf_enc_create(state);
     kvz_alf_init(state);
     kvz_alf_enc_process(state, lcu);
-    kvz_frame_end(state, lcu);
+    kvz_alf_reconstruct(state, lcu);
 #endif
     //Moved to videoframe.c
     //kvz_alf_enc_destroy(frame);
@@ -948,7 +948,7 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
       kvz_alf_init(state);
 #endif
       kvz_alf_enc_process(state);
-      kvz_frame_end(state);
+      kvz_alf_reconstruct(state);
     }
 
     for (int i = 0; i < state->lcu_order_count; ++i) {

@@ -1875,11 +1875,6 @@ void kvz_alf_enc_process(encoder_state_t *const state
   kvz_encode_alf_bits(state, lcu_index);
 #endif
 
-  //siirretty kvz_frame_end -funktioon
-#if !RECONSTRUCT_AT_THE_END_OF_FRAME
-  kvz_alf_reconstructor(state, lcu_index);
-#endif
-
   // Do not transmit CC ALF if it is unchanged
   if(state->slice->tile_group_alf_enabled_flag[COMPONENT_Y])
   {
@@ -2414,7 +2409,7 @@ void kvz_alf_enc_create(encoder_state_t const *state)
   g_chroma_sample_count_near_mid_point = malloc(g_num_ctus_in_pic * sizeof(*g_chroma_sample_count_near_mid_point));
 }
 
-void kvz_frame_end(encoder_state_t const *state
+void kvz_alf_reconstruct(encoder_state_t const *state
 #if !FULL_FRAME
   , const lcu_order_element_t *const lcu
 #endif
@@ -2426,88 +2421,10 @@ void kvz_frame_end(encoder_state_t const *state
   }
 #endif
 
-#if RECONSTRUCT_AT_THE_END_OF_FRAME
-  for (int lcu_idx = 0; lcu_idx < g_num_ctus_in_pic; lcu_idx++)
+  if (g_created)
   {
-    kvz_alf_reconstructor(state
-#if !FULL_FRAME
-      , lcu_idx
-#endif
-    );
-  }
-#endif
-
-  if (!g_created)
-  {
-    return;
-  }
-
-  g_curr_frame += 1;
-
-  videoframe_t* const frame = state->tile->frame;
-
-  const int width = frame->width;
-  const int height = frame->height;
-  int height_in_lcu = frame->height_in_lcu;
-  int width_in_lcu = frame->width_in_lcu;
-  int luma_stride = frame->rec->stride;
-  int chroma_stride = luma_stride >> chroma_scale_x;
-  int h_end = 0;
-  int h_start = 0;
-  int h_end_chroma = 0;
-  int h_start_chroma = 0;
-  int w_end = 0;
-  int w_start = 0;
-  int w_end_chroma = 0;
-  int w_start_chroma = 0;
-  int cur_ctb = 0;
-  {
-    if (state->slice->tile_group_alf_enabled_flag[COMPONENT_Y])
-    {
-      for (int h_lcu = 0; h_lcu < height_in_lcu; h_lcu++)
-      {
-        h_end = MIN(h_end + LCU_WIDTH, height);
-        h_end_chroma = h_end >> chroma_scale_y;
-
-        for (int w_lcu = 0; w_lcu < width_in_lcu; w_lcu++)
-        {
-          w_end = MIN(w_end + LCU_WIDTH, width);
-          w_end_chroma = w_end >> chroma_scale_x;
-
-          if (g_ctu_enable_flag[COMPONENT_Y][cur_ctb])
-          {
-            for (int h = h_start; h < h_end; h++)
-            {
-              for (int w = w_start; w < w_end; w++)
-              {
-                frame->rec->y[h * luma_stride + w] = alf_tmp_y[h * luma_stride + w];
-              }
-            }
-          }
-          if (state->slice->tile_group_alf_enabled_flag[COMPONENT_Cb] || state->slice->tile_group_alf_enabled_flag[COMPONENT_Cr])
-          {
-            if (g_ctu_enable_flag[COMPONENT_Cb][cur_ctb] && g_ctu_enable_flag[COMPONENT_Cr][cur_ctb])
-            {
-              for (int h = h_start_chroma; h < h_end_chroma; h++)
-              {
-                for (int w = w_start_chroma; w < w_end_chroma; w++)
-                {
-                  frame->rec->u[h * chroma_stride + w] = alf_tmp_u[h * chroma_stride + w];
-                  frame->rec->v[h * chroma_stride + w] = alf_tmp_v[h * chroma_stride + w];
-                }
-              }
-            }
-          }
-          cur_ctb += 1;
-          w_start = w_end;
-          w_start_chroma = w_end_chroma;
-        }
-        w_start = w_end = 0;
-        w_start_chroma = w_end_chroma = 0;
-        h_start = h_end;
-        h_start_chroma = h_end_chroma;
-      }
-    }
+    g_curr_frame += 1;
+    kvz_alf_reconstructor(state);
   }
 }
 
@@ -5209,11 +5126,7 @@ void kvz_alf_encoder_ctb(encoder_state_t *const state,
   }
 }
 
-void kvz_alf_reconstructor(encoder_state_t const *state
-#if !FULL_FRAME
-  , int ctu_idx
-#endif
-  )
+void kvz_alf_reconstructor(encoder_state_t const *state)
 {
   enum kvz_chroma_format chroma_fmt = state->encoder_control->chroma_format;
 
@@ -5224,21 +5137,33 @@ void kvz_alf_reconstructor(encoder_state_t const *state
 
   kvz_alf_reconstruct_coeff_aps(state, true, state->slice->tile_group_alf_enabled_flag[COMPONENT_Cb] || state->slice->tile_group_alf_enabled_flag[COMPONENT_Cr], false);
 
-  int luma_height = state->tile->frame->height;
-  int luma_width = state->tile->frame->width;
+  const int luma_height = state->tile->frame->height;
+  const int luma_width = state->tile->frame->width;
   const int max_cu_width = LCU_WIDTH;
   const int max_cu_height = LCU_WIDTH;
 
-#if FULL_FRAME
   int ctu_idx = 0;
-#endif
   bool clip_top = false, clip_bottom = false, clip_left = false, clip_right = false;
   int num_hor_vir_bndry = 0, num_ver_vir_bndry = 0;
   int hor_vir_bndry_pos[] = { 0, 0, 0 };
   int ver_vir_bndry_pos[] = { 0, 0, 0 };
 
+  const int luma_stride = state->tile->frame->rec->stride;
+  const int chroma_stride = luma_stride >> chroma_scale_x;
+  const int chroma_height = luma_height >> chroma_scale_y;
+  const int chroma_padding = MAX_ALF_PADDING_SIZE >> chroma_scale_x;
 
-#if FULL_FRAME
+  const int index_luma = -(luma_stride * MAX_ALF_PADDING_SIZE + MAX_ALF_PADDING_SIZE);
+  const int index_chroma = -(chroma_stride * chroma_padding + chroma_padding);
+
+  //Copy reconstructed samples to a buffer.
+  memcpy(&alf_tmp_y[index_luma], &state->tile->frame->rec->y[index_luma],
+    sizeof(kvz_pixel) * luma_stride * (luma_height + MAX_ALF_PADDING_SIZE * 2));
+  memcpy(&alf_tmp_u[index_chroma], &state->tile->frame->rec->u[index_chroma],
+    sizeof(kvz_pixel) * chroma_stride * (chroma_height + chroma_padding * 2));
+  memcpy(&alf_tmp_v[index_chroma], &state->tile->frame->rec->v[index_chroma],
+    sizeof(kvz_pixel) * chroma_stride * (chroma_height + chroma_padding * 2));
+
   for (int y_pos = 0; y_pos < luma_height; y_pos += LCU_WIDTH)
   {
     for (int x_pos = 0; x_pos < luma_width; x_pos += LCU_WIDTH)
@@ -5302,8 +5227,8 @@ void kvz_alf_reconstructor(encoder_state_t const *state
                 clip = g_clip_default;
               }
               kvz_alf_filter_block(state,
-                state->tile->frame->rec->y, alf_tmp_y,
-                state->tile->frame->rec->stride, state->tile->frame->rec->stride,
+                alf_tmp_y, state->tile->frame->rec->y,
+                luma_stride, luma_stride,
                 coeff, clip, g_clp_rngs.comp[COMPONENT_Y], COMPONENT_Y,
                 w, h, x_start, y_start, x_start, y_start,
                 g_alf_vb_luma_pos, g_alf_vb_luma_ctu_height);
@@ -5371,8 +5296,8 @@ void kvz_alf_reconstructor(encoder_state_t const *state
             clip = g_clip_default;
           }
           kvz_alf_filter_block(state,
-            state->tile->frame->rec->y, alf_tmp_y,
-            state->tile->frame->rec->stride, state->tile->frame->rec->stride,
+            alf_tmp_y, state->tile->frame->rec->y,
+            luma_stride, luma_stride,
             coeff, clip, g_clp_rngs.comp[COMPONENT_Y], COMPONENT_Y,
             width, height, x_pos, y_pos, x_pos, y_pos,
             g_alf_vb_luma_pos, g_alf_vb_luma_ctu_height);
@@ -5409,10 +5334,8 @@ void kvz_alf_reconstructor(encoder_state_t const *state
             //m_filter5x5Blk(m_classifier, recYuv, tmpYuv, blk, comp_id, m_chromaCoeffFinal, clp_rngs.comp[comp_idx], cs);
 //#if JVET_O0090_ALF_CHROMA_FILTER_ALTERNATIVES_CTB
 
-            const kvz_pixel *src_pixels = comp_id - 1 ? state->tile->frame->rec->v : state->tile->frame->rec->u;
-            kvz_pixel *dst_pixels = comp_id - 1 ? alf_tmp_v : alf_tmp_u;
-            const int src_stride = state->tile->frame->rec->stride >> 1;
-            const int dst_stride = state->tile->frame->rec->stride >> 1;
+            kvz_pixel *dst_pixels = comp_id - 1 ? state->tile->frame->rec->v : state->tile->frame->rec->u;
+            const kvz_pixel *src_pixels = comp_id - 1 ? alf_tmp_v : alf_tmp_u;
 
           const int alt_num = g_ctu_alternative[comp_id][ctu_idx];
           kvz_alf_filter_block(state,
@@ -5459,7 +5382,6 @@ void kvz_alf_reconstructor(encoder_state_t const *state
           }
         }*/
       }
-#if FULL_FRAME
       ctu_idx++;
     }
   }

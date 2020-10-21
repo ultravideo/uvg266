@@ -22,7 +22,6 @@
 
 #define FULL_FRAME                      1
 #define RUN_ALF_AFTER_FULL_FRAME        0
-#define RECONSTRUCT_AT_THE_END_OF_FRAME 1
 
 #define ALF_FIXED_FILTER_NUM            64
 #define MAX_NUM_ALF_CLASSES             25
@@ -551,7 +550,7 @@ double kvz_alf_derive_ctb_alf_enable_flags(encoder_state_t * const state,
 
 void kvz_alf_enc_create(encoder_state_t const *state);
 
-void kvz_frame_end(encoder_state_t const *state
+void kvz_alf_reconstruct(encoder_state_t const *state
 #if !FULL_FRAME
   , const lcu_order_element_t *const lcu
 #endif
@@ -663,11 +662,7 @@ void kvz_alf_encoder_ctb(encoder_state_t *const state,
   const double lambda_chroma_weight
   );
 
-void kvz_alf_reconstructor(encoder_state_t const *state
-#if !FULL_FRAME
-  , int ctu_idx
-#endif
-  );
+void kvz_alf_reconstructor(encoder_state_t const *state);
 
 /*
 void apply_cc_alf_filter(encoder_state_t *const state, alf_component_id comp_id, const kvz_pixel *dst_pixels,
