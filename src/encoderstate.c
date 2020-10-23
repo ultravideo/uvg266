@@ -943,10 +943,6 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
 
     //Encode ALF
     if (encoder->cfg.alf_enable) {
-      kvz_alf_enc_create(state);
-#if !FULL_FRAME
-      kvz_alf_init(state);
-#endif
       kvz_alf_enc_process(state);
       kvz_alf_reconstruct(state);
     }

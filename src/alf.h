@@ -550,6 +550,10 @@ double kvz_alf_derive_ctb_alf_enable_flags(encoder_state_t * const state,
 
 void kvz_alf_enc_create(encoder_state_t const *state);
 
+#if !FULL_FRAME
+void kvz_alf_enc_init(encoder_state_t const *state);
+#endif // !FULL_FRAME
+
 void kvz_alf_reconstruct(encoder_state_t const *state
 #if !FULL_FRAME
   , const lcu_order_element_t *const lcu
@@ -763,8 +767,6 @@ void kvz_alf_reconstruct_coeff(encoder_state_t *const state,
   channel_type channel,
   const bool is_rdo,
   const bool is_redo);
-
-void kvz_alf_create(encoder_state_t const *state);
 
 void kvz_alf_destroy(videoframe_t * const frame);
 
