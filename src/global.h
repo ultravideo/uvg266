@@ -103,9 +103,9 @@
 
 typedef int16_t coeff_t;
 
-#define VERBOSE 1
-#define KVZ_DEBUG_PRINT_CABAC 1
-#define KVZ_DEBUG 1
+//#define VERBOSE 1
+//#define KVZ_DEBUG_PRINT_CABAC 1
+//#define KVZ_DEBUG 1
 
 /* CONFIG VARIABLES */
 
