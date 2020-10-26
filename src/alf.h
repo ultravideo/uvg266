@@ -668,12 +668,28 @@ void kvz_alf_encoder_ctb(encoder_state_t *const state,
 
 void kvz_alf_reconstructor(encoder_state_t const *state);
 
+//-------------------------CC ALF encoding functions------------------------
+
+void derive_stats_for_cc_alf_filtering(encoder_state_t const *state,
+  const kvz_picture *org_yuv, const kvz_picture *rec_yuv,
+  const int comp_idx, const int mask_stride,
+  const uint8_t filter_idc);
+
+void get_blk_stats_cc_alf(encoder_state_t const *state,
+  alf_covariance *alf_covariance, 
+  const kvz_picture *org_yuv, const kvz_picture *rec_yuv,
+  const alf_component_id comp_id,
+  const int x_pos, const int y_pos, 
+  const int width, const int height);
+
 /*
 void apply_cc_alf_filter(encoder_state_t *const state, alf_component_id comp_id, const kvz_pixel *dst_pixels,
   const kvz_pixel *recYuvExt, uint8_t *filterControl,
   const short filterSet[MAX_NUM_CC_ALF_FILTERS][MAX_NUM_CC_ALF_CHROMA_COEFF],
   const int   selectedFilterIdx)
 */
+
+//----------------------------------------------------------------------
 //----------------------------------------------------------------------
 
 //-------------------------cabac writer functions------------------------

@@ -8344,228 +8344,271 @@ void EncAdaptiveLoopFilter::deriveCcAlfFilter( CodingStructure& cs, ComponentID 
       }
     }
   }
-}
+}*/
 
 
-void EncAdaptiveLoopFilter::deriveStatsForCcAlfFiltering(const PelUnitBuf &orgYuv, const PelUnitBuf &recYuv,
-                                                         const int comp_idx, const int maskStride,
-                                                         const uint8_t filterIdc, CodingStructure &cs)
+void derive_stats_for_cc_alf_filtering(encoder_state_t const *state,
+  const kvz_picture *org_yuv, const kvz_picture *rec_yuv,
+  const int comp_idx, const int mask_stride,
+  const uint8_t filter_idc)
 {
-  const int filterIdx = filterIdc - 1;
+  const int filter_idx = filter_idc - 1;
 
   // init CTU stats buffers
-  for( int shape = 0; shape != m_filterShapesCcAlf[comp_idx-1].size(); shape++ )
+  for( int shape = 0; shape != 1/*m_filterShapesCcAlf[comp_idx-1].size()*/; shape++ )
   {
-    for (int ctuIdx = 0; ctuIdx < m_numCTUsInPic; ctuIdx++)
+    for (int ctuIdx = 0; ctuIdx < g_num_ctus_in_pic; ctuIdx++)
     {
-      m_alfCovarianceCcAlf[comp_idx - 1][shape][filterIdx][ctuIdx].reset();
+      reset_alf_covariance(&g_alf_covariance_cc_alf[comp_idx - 1][shape][filter_idx][ctuIdx], -1);
     }
   }
 
   // init Frame stats buffers
-  for (int shape = 0; shape != m_filterShapesCcAlf[comp_idx - 1].size(); shape++)
+  for (int shape = 0; shape != 1/*m_filterShapesCcAlf[comp_idx - 1].size()*/; shape++)
   {
-    m_alfCovarianceFrameCcAlf[comp_idx - 1][shape][filterIdx].reset();
+    reset_alf_covariance(&g_alf_covariance_frame_cc_alf[comp_idx - 1][shape][filter_idx], -1);
   }
 
-  int                  ctuRsAddr = 0;
-  const PreCalcValues &pcv       = *cs.pcv;
-  bool                 clipTop = false, clipBottom = false, clipLeft = false, clipRight = false;
-  int                  numHorVirBndry = 0, numVerVirBndry = 0;
-  int                  horVirBndryPos[] = { 0, 0, 0 };
-  int                  verVirBndryPos[] = { 0, 0, 0 };
+  int ctu_rs_addr = 0;
+  //const PreCalcValues &pcv       = *cs.pcv;
+  bool clip_top = false, clip_bottom = false, clip_left = false, clip_right = false;
+  int num_hor_vir_bndry = 0, num_ver_vir_bndry = 0;
+  int hor_vir_bndry_pos[] = { 0, 0, 0 };
+  int ver_vir_bndry_pos[] = { 0, 0, 0 };
+  const int frame_height = state->tile->frame->height;
+  const int frame_width = state->tile->frame->width;
+  const int max_cu_width = LCU_WIDTH;
+  const int max_cu_height = LCU_WIDTH;
 
-  for (int yPos = 0; yPos < m_picHeight; yPos += m_maxCUHeight)
+  for (int y_pos = 0; y_pos < state->tile->frame->height; y_pos += max_cu_height)
   {
-    for (int xPos = 0; xPos < m_picWidth; xPos += m_maxCUWidth)
+    for (int x_pos = 0; x_pos < state->tile->frame->width; x_pos += max_cu_width)
     {
-      if (m_trainingCovControl[ctuRsAddr] == filterIdc)
+      const int width = (x_pos + max_cu_width > frame_width) ? (frame_width - x_pos) : max_cu_width;
+      const int height = (y_pos + max_cu_height > frame_height) ? (frame_height - y_pos) : max_cu_height;
+      int       raster_slice_alf_pad = 0;
+      if ( 0 /*isCrossedByVirtualBoundaries(cs, x_pos, y_pos, width, height, clip_top, clip_bottom, clip_left, clip_right,
+                                       num_hor_vir_bndry, num_ver_vir_bndry, hor_vir_bndry_pos, ver_vir_bndry_pos,
+                                       raster_slice_alf_pad)*/)
       {
-        const int width             = (xPos + m_maxCUWidth > m_picWidth) ? (m_picWidth - xPos) : m_maxCUWidth;
-        const int height            = (yPos + m_maxCUHeight > m_picHeight) ? (m_picHeight - yPos) : m_maxCUHeight;
-        int       rasterSliceAlfPad = 0;
-        if (isCrossedByVirtualBoundaries(cs, xPos, yPos, width, height, clipTop, clipBottom, clipLeft, clipRight,
-                                         numHorVirBndry, numVerVirBndry, horVirBndryPos, verVirBndryPos,
-                                         rasterSliceAlfPad))
+        int y_start = y_pos;
+        for (int i = 0; i <= num_hor_vir_bndry; i++)
         {
-          int yStart = yPos;
-          for (int i = 0; i <= numHorVirBndry; i++)
+          const int  y_end   = i == num_hor_vir_bndry ? y_pos + height : hor_vir_bndry_pos[i];
+          const int  h      = y_end - y_start;
+          const bool clip_t  = (i == 0 && clip_top) || (i > 0) || (y_start == 0);
+          const bool clip_b  = (i == num_hor_vir_bndry && clip_bottom) || (i < num_hor_vir_bndry) || (y_end == frame_height);
+          int        x_start = x_pos;
+          for (int j = 0; j <= num_ver_vir_bndry; j++)
           {
-            const int  yEnd   = i == numHorVirBndry ? yPos + height : horVirBndryPos[i];
-            const int  h      = yEnd - yStart;
-            const bool clipT  = (i == 0 && clipTop) || (i > 0) || (yStart == 0);
-            const bool clipB  = (i == numHorVirBndry && clipBottom) || (i < numHorVirBndry) || (yEnd == pcv.lumaHeight);
-            int        xStart = xPos;
-            for (int j = 0; j <= numVerVirBndry; j++)
+            const int  x_end   = j == num_ver_vir_bndry ? x_pos + width : ver_vir_bndry_pos[j];
+            const int  w      = x_end - x_start;
+            const bool clip_l  = (j == 0 && clip_left) || (j > 0) || (x_start == 0);
+            const bool clip_r  = (j == num_ver_vir_bndry && clip_right) || (j < num_ver_vir_bndry) || (x_end == frame_width);
+            const int  w_buf   = w + (clip_l ? 0 : MAX_ALF_PADDING_SIZE) + (clip_r ? 0 : MAX_ALF_PADDING_SIZE);
+            const int  h_buf   = h + (clip_t ? 0 : MAX_ALF_PADDING_SIZE) + (clip_b ? 0 : MAX_ALF_PADDING_SIZE);
+            //PelUnitBuf recBuf = m_tempBuf2.subBuf(UnitArea(cs.area.chromaFormat, Area(0, 0, w_buf, h_buf)));
+            //recBuf.copyFrom(rec_yuv.subBuf(
+            //  UnitArea(cs.area.chromaFormat, Area(x_start - (clip_l ? 0 : MAX_ALF_PADDING_SIZE),
+            //                                      y_start - (clip_t ? 0 : MAX_ALF_PADDING_SIZE), w_buf, h_buf))));
+            // pad top-left unavailable samples for raster slice
+            if (x_start == x_pos && y_start == y_pos && (raster_slice_alf_pad & 1))
             {
-              const int  xEnd   = j == numVerVirBndry ? xPos + width : verVirBndryPos[j];
-              const int  w      = xEnd - xStart;
-              const bool clipL  = (j == 0 && clipLeft) || (j > 0) || (xStart == 0);
-              const bool clipR  = (j == numVerVirBndry && clipRight) || (j < numVerVirBndry) || (xEnd == pcv.lumaWidth);
-              const int  wBuf   = w + (clipL ? 0 : MAX_ALF_PADDING_SIZE) + (clipR ? 0 : MAX_ALF_PADDING_SIZE);
-              const int  hBuf   = h + (clipT ? 0 : MAX_ALF_PADDING_SIZE) + (clipB ? 0 : MAX_ALF_PADDING_SIZE);
-              PelUnitBuf recBuf = m_tempBuf2.subBuf(UnitArea(cs.area.chromaFormat, Area(0, 0, wBuf, hBuf)));
-              recBuf.copyFrom(recYuv.subBuf(
-                UnitArea(cs.area.chromaFormat, Area(xStart - (clipL ? 0 : MAX_ALF_PADDING_SIZE),
-                                                    yStart - (clipT ? 0 : MAX_ALF_PADDING_SIZE), wBuf, hBuf))));
-              // pad top-left unavailable samples for raster slice
-              if (xStart == xPos && yStart == yPos && (rasterSliceAlfPad & 1))
-              {
-                recBuf.padBorderPel(MAX_ALF_PADDING_SIZE, 1);
-              }
-
-              // pad bottom-right unavailable samples for raster slice
-              if (xEnd == xPos + width && yEnd == yPos + height && (rasterSliceAlfPad & 2))
-              {
-                recBuf.padBorderPel(MAX_ALF_PADDING_SIZE, 2);
-              }
-              recBuf.extendBorderPel(MAX_ALF_PADDING_SIZE);
-              recBuf = recBuf.subBuf(UnitArea(
-                cs.area.chromaFormat, Area(clipL ? 0 : MAX_ALF_PADDING_SIZE, clipT ? 0 : MAX_ALF_PADDING_SIZE, w, h)));
-
-              const UnitArea area(m_chromaFormat, Area(0, 0, w, h));
-              const UnitArea areaDst(m_chromaFormat, Area(xStart, yStart, w, h));
-
-              const ComponentID compID = ComponentID(comp_idx);
-
-              for (int shape = 0; shape != m_filterShapesCcAlf[comp_idx - 1].size(); shape++)
-              {
-                getBlkStatsCcAlf(m_alfCovarianceCcAlf[comp_idx - 1][0][filterIdx][ctuRsAddr],
-                                 m_filterShapesCcAlf[comp_idx - 1][shape], orgYuv, recBuf, areaDst, area, compID, yPos);
-                m_alfCovarianceFrameCcAlf[comp_idx - 1][shape][filterIdx] +=
-                  m_alfCovarianceCcAlf[comp_idx - 1][shape][filterIdx][ctuRsAddr];
-              }
-
-              xStart = xEnd;
+              //recBuf.padBorderPel(MAX_ALF_PADDING_SIZE, 1);
             }
 
-            yStart = yEnd;
-          }
-        }
-        else
-        {
-          const UnitArea area(m_chromaFormat, Area(xPos, yPos, width, height));
+            // pad bottom-right unavailable samples for raster slice
+            if (x_end == x_pos + width && y_end == y_pos + height && (raster_slice_alf_pad & 2))
+            {
+              //recBuf.padBorderPel(MAX_ALF_PADDING_SIZE, 2);
+            }
+            /*recBuf.extendBorderPel(MAX_ALF_PADDING_SIZE);
+            recBuf = recBuf.subBuf(UnitArea(
+              cs.area.chromaFormat, Area(clip_l ? 0 : MAX_ALF_PADDING_SIZE, clip_t ? 0 : MAX_ALF_PADDING_SIZE, w, h)));
 
-          const ComponentID compID = ComponentID(comp_idx);
+            const UnitArea area(m_chromaFormat, Area(0, 0, w, h));
+            const UnitArea areaDst(m_chromaFormat, Area(x_start, y_start, w, h));
 
-          for (int shape = 0; shape != m_filterShapesCcAlf[comp_idx - 1].size(); shape++)
-          {
-            getBlkStatsCcAlf(m_alfCovarianceCcAlf[comp_idx - 1][0][filterIdx][ctuRsAddr],
-                             m_filterShapesCcAlf[comp_idx - 1][shape], orgYuv, recYuv, area, area, compID, yPos);
-            m_alfCovarianceFrameCcAlf[comp_idx - 1][shape][filterIdx] +=
-              m_alfCovarianceCcAlf[comp_idx - 1][shape][filterIdx][ctuRsAddr];
+            const ComponentID compID = ComponentID(comp_idx);
+
+            for (int shape = 0; shape != m_filterShapesCcAlf[comp_idx - 1].size(); shape++)
+            {
+              getBlkStatsCcAlf(m_alfCovarianceCcAlf[comp_idx - 1][0][filter_idx][ctu_rs_addr],
+                               m_filterShapesCcAlf[comp_idx - 1][shape], org_yuv, recBuf, areaDst, area, compID, y_pos);
+              m_alfCovarianceFrameCcAlf[comp_idx - 1][shape][filter_idx] +=
+                m_alfCovarianceCcAlf[comp_idx - 1][shape][filter_idx][ctu_rs_addr];
+            }*/
+
+            x_start = x_end;
           }
+
+          y_start = y_end;
         }
       }
-      ctuRsAddr++;
+      else
+      {
+        //const UnitArea area(m_chromaFormat, Area(x_pos, y_pos, width, height));
+
+        for (int shape = 0; shape != 1/*m_filterShapesCcAlf[comp_idx - 1].size()*/; shape++)
+        {
+          get_blk_stats_cc_alf(state, &g_alf_covariance_cc_alf[comp_idx - 1][0][filter_idx][ctu_rs_addr],
+                           org_yuv, rec_yuv, comp_idx, x_pos, y_pos, width, height);
+          
+          add_alf_cov(&g_alf_covariance_frame_cc_alf[comp_idx - 1][shape][filter_idx], &g_alf_covariance_cc_alf[comp_idx - 1][shape][filter_idx][ctu_rs_addr]);
+        }
+      }
+      ctu_rs_addr++;
     }
   }
 }
 
 
-
-void EncAdaptiveLoopFilter::getBlkStatsCcAlf(AlfCovariance &alfCovariance, const AlfFilterShape &shape,
-                                             const PelUnitBuf &orgYuv, const PelUnitBuf &recYuv,
-                                             const UnitArea &areaDst, const UnitArea &area, const ComponentID compID,
-                                             const int yPos)
+void get_blk_stats_cc_alf(encoder_state_t const *state, 
+  alf_covariance *alf_covariance,
+  const kvz_picture *org_yuv, const kvz_picture *rec_yuv,
+  const alf_component_id comp_id,
+  const int x_pos, const int y_pos,
+  const int width, const int height)
 {
-  const int numberOfComponents = getNumberValidComponents( m_chromaFormat );
-  const CompArea &compArea           = areaDst.block(compID);
-  int  recStride[MAX_NUM_COMPONENT];
-  const Pel* rec[MAX_NUM_COMPONENT];
-  for ( int cIdx = 0; cIdx < numberOfComponents; cIdx++ )
+  const int frame_height = state->tile->frame->height;
+  const int frame_width = state->tile->frame->width;
+  const int max_cu_width = LCU_WIDTH;
+  const int max_cu_height = LCU_WIDTH;
+  const int x_pos_c = x_pos >> chroma_scale_x;
+  const int y_pos_c = y_pos >> chroma_scale_y;
+
+  const int num_coeff = 8;
+  const channel_type channel = (comp_id == COMPONENT_Y) ? CHANNEL_TYPE_LUMA : CHANNEL_TYPE_CHROMA;
+
+  enum kvz_chroma_format chroma_format = state->encoder_control->chroma_format;
+  const int number_of_components = (chroma_format == KVZ_CSP_400) ? 1 : MAX_NUM_COMPONENT;;
+  //const CompArea &compArea = areaDst.block(compID);
+  int  rec_stride[MAX_NUM_COMPONENT];
+  const kvz_pixel* rec[MAX_NUM_COMPONENT];
+  for (int c_idx = 0; c_idx < number_of_components; c_idx++)
   {
-    recStride[cIdx] = recYuv.get(ComponentID(cIdx)).stride;
-    rec[cIdx] = recYuv.get(ComponentID(cIdx)).bufAt(isLuma(ComponentID(cIdx)) ? area.lumaPos() : area.chromaPos());
-  }
-
-  int        orgStride = orgYuv.get(compID).stride;
-  const Pel *org       = orgYuv.get(compID).bufAt(compArea);
-  const int  numBins   = 1;
-
-  int vbCTUHeight = m_alfVBLumaCTUHeight;
-  int vbPos       = m_alfVBLumaPos;
-  if ((yPos + m_maxCUHeight) >= m_picHeight)
-  {
-    vbPos = m_picHeight;
-  }
-
-  int ELocal[MAX_NUM_CC_ALF_CHROMA_COEFF][1];
-
-  for (int i = 0; i < compArea.height; i++)
-  {
-    int vbDistance = ((i << getComponentScaleY(compID, m_chromaFormat)) % vbCTUHeight) - vbPos;
-    for (int j = 0; j < compArea.width; j++)
+    if (c_idx == COMPONENT_Y)
     {
-      std::memset(ELocal, 0, sizeof(ELocal));
+      rec_stride[c_idx] = rec_yuv->stride;
+      rec[c_idx] = rec_yuv->y;
+    }
+    else if (c_idx == COMPONENT_Cb)
+    {
+      rec_stride[c_idx] = rec_yuv->stride >> chroma_scale_x;
+      rec[c_idx] = rec_yuv->u;
+    }
+    else if (c_idx == COMPONENT_Cr)
+    {
+      rec_stride[c_idx] = rec_yuv->stride >> chroma_scale_x;
+      rec[c_idx] = rec_yuv->v;
+    }
+  }
+
+  int org_stride;
+  const kvz_pixel *org;
+  if (comp_id == COMPONENT_Y)
+  {
+    org_stride = org_yuv->stride;
+    org = &org_yuv->y[y_pos*org_stride + x_pos];
+  }
+  else if (comp_id == COMPONENT_Cb)
+  {
+    org_stride = org_yuv->stride >> chroma_scale_x;
+    org = &org_yuv->u[y_pos_c*org_stride + x_pos_c];
+  }
+  else if (comp_id == COMPONENT_Cr)
+  {
+    org_stride = org_yuv->stride >> chroma_scale_x;
+    org = &org_yuv->v[y_pos_c*org_stride + x_pos_c];
+  }
+
+  const int  num_bins = 1;
+  int vb_ctu_height = g_alf_vb_luma_ctu_height;
+  int vb_pos = g_alf_vb_luma_pos;
+  if ((y_pos + max_cu_height) >= frame_height)
+  {
+    vb_pos = frame_height;
+  }
+
+  kvz_pixel e_local[MAX_NUM_CC_ALF_CHROMA_COEFF][1];
+
+  for (int i = 0; i < height; i++)
+  {
+    uint8_t component_scale_y = (comp_id == COMPONENT_Y || chroma_format != KVZ_CSP_420) ? 0 : 1;
+    int vb_distance = ((i << component_scale_y) % vb_ctu_height) - vb_pos;
+    const bool skip_this_row = (component_scale_y == 0 && (vb_distance == 0 || vb_distance == 1));
+    for (int j = 0; j < width && (!skip_this_row); j++)
+    {
+      memset(e_local, 0, sizeof(e_local));
 
       double weight = 1.0;
-      if (m_alfWSSD)
+      if (0 /*g_alf_wssd*/)
       {
-        weight = m_lumaLevelToWeightPLUT[org[j]];
+        //weight = m_lumaLevelToWeightPLUT[org[j]];
       }
 
-      int yLocal = org[j] - rec[compID][j];
+      kvz_pixel y_local = org[j] - rec[comp_id][j];
 
-      calcCovarianceCcAlf( ELocal, rec[COMPONENT_Y] + ( j << getComponentScaleX(compID, m_chromaFormat)), recStride[COMPONENT_Y], shape, vbDistance );
+      //calcCovarianceCcAlf(ELocal, rec[COMPONENT_Y] + (j << getComponentScaleX(comp_id, m_chromaFormat)), rec_stride[COMPONENT_Y], shape, vb_distance);
 
-      for( int k = 0; k < (shape.numCoeff - 1); k++ )
+      for (int k = 0; k < (num_coeff - 1); k++)
       {
-        for( int l = k; l < (shape.numCoeff - 1); l++ )
+        for (int l = k; l < (num_coeff - 1); l++)
         {
-          for( int b0 = 0; b0 < numBins; b0++ )
+          for (int b0 = 0; b0 < num_bins; b0++)
           {
-            for (int b1 = 0; b1 < numBins; b1++)
+            for (int b1 = 0; b1 < num_bins; b1++)
             {
-              if (m_alfWSSD)
+              if (0 /*g_alf_wssd*/)
               {
-                alfCovariance.E[b0][b1][k][l] += weight * (double) (ELocal[k][b0] * ELocal[l][b1]);
+                alf_covariance->ee[b0][b1][k][l] += weight * (e_local[k][b0] * (double)e_local[l][b1]);
               }
               else
               {
-                alfCovariance.E[b0][b1][k][l] += ELocal[k][b0] * ELocal[l][b1];
+                alf_covariance->ee[b0][b1][k][l] += e_local[k][b0] * (double)e_local[l][b1];
               }
             }
           }
         }
-        for (int b = 0; b < numBins; b++)
+        for (int b = 0; b < num_bins; b++)
         {
-          if (m_alfWSSD)
+          if (0 /*g_alf_wssd*/)
           {
-            alfCovariance.y[b][k] += weight * (double) (ELocal[k][b] * yLocal);
+            alf_covariance->y[b][k] += weight * (e_local[k][b] * (double)y_local);
           }
           else
           {
-            alfCovariance.y[b][k] += ELocal[k][b] * yLocal;
+            alf_covariance->y[b][k] += e_local[k][b] * (double)y_local;
           }
         }
       }
-      if (m_alfWSSD)
+      if (0 /*g_alf_wssd*/)
       {
-        alfCovariance.pixAcc += weight * (double) (yLocal * yLocal);
+        alf_covariance->pix_acc += weight * (y_local * (double)y_local);
       }
       else
       {
-        alfCovariance.pixAcc += yLocal * yLocal;
+        alf_covariance->pix_acc += y_local * (double)y_local;
       }
     }
-    org += orgStride;
-    for (int srcCIdx = 0; srcCIdx < numberOfComponents; srcCIdx++)
+    org += org_stride;
+    for (int src_c_idx = 0; src_c_idx < number_of_components; src_c_idx++)
     {
-      ComponentID srcCompID = ComponentID(srcCIdx);
-      if (toChannelType(srcCompID) == toChannelType(compID))
+      alf_component_id src_comp_id = src_c_idx;
+      const channel_type c_channel = (src_c_idx == COMPONENT_Y) ? CHANNEL_TYPE_LUMA : CHANNEL_TYPE_CHROMA;
+      if (c_channel == channel)
       {
-        rec[srcCIdx] += recStride[srcCIdx];
+        rec[src_c_idx] += rec_stride[src_c_idx];
       }
       else
       {
-        if (isLuma(compID))
+        if (comp_id == COMPONENT_Y)
         {
-          rec[srcCIdx] += (recStride[srcCIdx] >> getComponentScaleY(srcCompID, m_chromaFormat));
+          rec[src_c_idx] += (rec_stride[src_c_idx] >> (src_comp_id == COMPONENT_Y || chroma_format != KVZ_CSP_420) ? 0 : 1);
         }
         else
         {
-          rec[srcCIdx] += (recStride[srcCIdx] << getComponentScaleY(compID, m_chromaFormat));
+          rec[src_c_idx] += (rec_stride[src_c_idx] << (comp_id == COMPONENT_Y || chroma_format != KVZ_CSP_420) ? 0 : 1);
         }
       }
     }
@@ -8575,18 +8618,18 @@ void EncAdaptiveLoopFilter::getBlkStatsCcAlf(AlfCovariance &alfCovariance, const
   {
     for (int l = 0; l < k; l++)
     {
-      for (int b0 = 0; b0 < numBins; b0++)
+      for (int b0 = 0; b0 < num_bins; b0++)
       {
-        for (int b1 = 0; b1 < numBins; b1++)
+        for (int b1 = 0; b1 < num_bins; b1++)
         {
-          alfCovariance.E[b0][b1][k][l] = alfCovariance.E[b1][b0][l][k];
+          alf_covariance->ee[b0][b1][k][l] = alf_covariance->ee[b1][b0][l][k];
         }
       }
     }
   }
 }
 
-
+/*
 void EncAdaptiveLoopFilter::calcCovarianceCcAlf(int ELocal[MAX_NUM_CC_ALF_CHROMA_COEFF][1], const Pel *rec, const int stride, const AlfFilterShape& shape, int vbDistance)
 {
   CHECK(shape.filterType != CC_ALF, "Bad CC ALF shape");
