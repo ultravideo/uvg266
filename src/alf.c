@@ -2414,8 +2414,8 @@ void kvz_alf_enc_create(encoder_state_t * const state)
   unsigned chroma_sizes[] = { 0, luma_size / 4, luma_size / 2, luma_size };
   unsigned chroma_size = chroma_sizes[chroma_fmt];
 
-  alf_fulldata = MALLOC_SIMD_PADDED(kvz_pixel, (luma_size + 2 * chroma_size), simd_padding_width * 2);
-  alf_fulldata = &alf_fulldata[4 * (width + 8) + 4] + simd_padding_width / sizeof(kvz_pixel);
+  alf_fulldata_buf = MALLOC_SIMD_PADDED(kvz_pixel, (luma_size + 2 * chroma_size), simd_padding_width * 2);
+  alf_fulldata = &alf_fulldata_buf[4 * (width + 8) + 4] + simd_padding_width / sizeof(kvz_pixel);
   alf_tmp_y = &alf_fulldata[0];
 
   if (chroma_fmt == KVZ_CSP_400) {
@@ -2638,6 +2638,27 @@ void kvz_alf_enc_destroy(videoframe_t * const frame)
     FREE_POINTER(g_alf_ctb_filter_set_index_tmp);
   }
 
+  if (alf_tmp_y)
+  {
+    alf_tmp_y = NULL;
+  }
+  if (alf_tmp_u)
+  {
+    alf_tmp_u = NULL;
+  }
+  if (alf_tmp_v)
+  {
+    alf_tmp_v = NULL;
+  }
+  if (alf_fulldata)
+  {
+    alf_fulldata = NULL;
+  }
+  if (alf_fulldata_buf)
+  {
+    FREE_POINTER(alf_fulldata_buf);
+  }
+
   for (int comp_idx = 1; comp_idx < MAX_NUM_COMPONENT; comp_idx++)
   {
     int num_filters = MAX_NUM_CC_ALF_FILTERS;
@@ -2753,7 +2774,23 @@ void kvz_alf_enc_destroy(videoframe_t * const frame)
     //memcpy(&frame->rec->u, &alf_tmp_u, sizeof(frame->rec->u));
     //memcpy(&frame->rec->v, &alf_tmp_v, sizeof(frame->rec->v));
 
-  kvz_alf_destroy(frame);
+  if (g_classifier)
+  {
+    FREE_POINTER(g_classifier[0]);
+    FREE_POINTER(g_classifier);
+  }
+
+  g_created = false;
+
+  if (g_cc_alf_filter_control[0])
+  {
+    FREE_POINTER(g_cc_alf_filter_control[0])
+  }
+
+  if (g_cc_alf_filter_control[1])
+  {
+    FREE_POINTER(g_cc_alf_filter_control[1])
+  }
 }
 
 
@@ -6196,7 +6233,7 @@ void encode_alf_aps_scaling_list(encoder_state_t * const state)
     {
       alf_aps aps = aps_map[aps_id + T_ALF_APS + NUM_APS_TYPE_LEN].parameter_set;
       bool write_aps = aps_map[aps_id + T_ALF_APS + NUM_APS_TYPE_LEN].b_changed;
-      if (!write_aps && state->slice->apss && state->slice->apss[aps_id].aps_id >= 0 && state->slice->apss[aps_id].aps_id < 8)
+      /*if (!write_aps && state->slice->apss && state->slice->apss[aps_id].aps_id >= 0 && state->slice->apss[aps_id].aps_id < 8)
       {
         write_aps = true;
         aps = state->slice->apss[aps_id]; // use aps from slice header
@@ -6205,8 +6242,10 @@ void encode_alf_aps_scaling_list(encoder_state_t * const state)
         copy_aps_to_map(aps_map, &aps, aps_id + T_ALF_APS + NUM_APS_TYPE_LEN);
         //m_pcALF->setApsIdStart(apsId);
         g_aps_id_start = aps_id;
-      }
-      else if (state->slice->tile_group_cc_alf_cb_enabled_flag && !write_aps && aps_id == state->slice->tile_group_cc_alf_cb_aps_id)
+      }*/
+
+      //else if
+      /*if (state->slice->tile_group_cc_alf_cb_enabled_flag && !write_aps && aps_id == state->slice->tile_group_cc_alf_cb_aps_id)
       {
         write_aps = true;
         aps = aps_map[(state->slice->tile_group_cc_alf_cb_aps_id << NUM_APS_TYPE_LEN) + T_ALF_APS].parameter_set;
@@ -6216,7 +6255,7 @@ void encode_alf_aps_scaling_list(encoder_state_t * const state)
       {
         write_aps = true;
         aps = aps_map[(state->slice->tile_group_cc_alf_cr_aps_id << NUM_APS_TYPE_LEN) + T_ALF_APS].parameter_set;
-      }
+      }*/
           const bool clipT = (i == 0 && clip_top) || (i > 0) || (y_start == 0);
           const bool clipB = (i == num_hor_vir_bndry && clip_bottom) || (i < num_hor_vir_bndry) || (y_end == luma_height);
 
@@ -8391,7 +8430,7 @@ void derive_stats_for_cc_alf_filtering(encoder_state_t * const state,
 
   int ctu_rs_addr = 0;
   //const PreCalcValues &pcv       = *cs.pcv;
-  bool clip_top = false, clip_bottom = false, clip_left = false, clip_right = false;
+  //bool clip_top = false, clip_bottom = false, clip_left = false, clip_right = false;
   int num_hor_vir_bndry = 0, num_ver_vir_bndry = 0;
   int hor_vir_bndry_pos[] = { 0, 0, 0 };
   int ver_vir_bndry_pos[] = { 0, 0, 0 };
@@ -8415,14 +8454,14 @@ void derive_stats_for_cc_alf_filtering(encoder_state_t * const state,
         for (int i = 0; i <= num_hor_vir_bndry; i++)
         {
           const int  y_end   = i == num_hor_vir_bndry ? y_pos + height : hor_vir_bndry_pos[i];
-          const int  h      = y_end - y_start;
-          const bool clip_t  = (i == 0 && clip_top) || (i > 0) || (y_start == 0);
-          const bool clip_b  = (i == num_hor_vir_bndry && clip_bottom) || (i < num_hor_vir_bndry) || (y_end == frame_height);
+          //const int  h      = y_end - y_start;
+          //const bool clip_t  = (i == 0 && clip_top) || (i > 0) || (y_start == 0);
+          //const bool clip_b  = (i == num_hor_vir_bndry && clip_bottom) || (i < num_hor_vir_bndry) || (y_end == frame_height);
           int        x_start = x_pos;
           for (int j = 0; j <= num_ver_vir_bndry; j++)
           {
             const int  x_end   = j == num_ver_vir_bndry ? x_pos + width : ver_vir_bndry_pos[j];
-            const int  w      = x_end - x_start;
+            //const int  w      = x_end - x_start;
             //const bool clip_l  = (j == 0 && clip_left) || (j > 0) || (x_start == 0);
             //const bool clip_r  = (j == num_ver_vir_bndry && clip_right) || (j < num_ver_vir_bndry) || (x_end == frame_width);
             //const int  w_buf   = w + (clip_l ? 0 : MAX_ALF_PADDING_SIZE) + (clip_r ? 0 : MAX_ALF_PADDING_SIZE);

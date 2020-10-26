@@ -405,6 +405,7 @@ static int g_filter_tmp[MAX_NUM_ALF_LUMA_COEFF];
 static int g_clip_tmp[MAX_NUM_ALF_LUMA_COEFF];
 //kvz_picture *tmp_rec_pic;
 
+kvz_pixel *alf_fulldata_buf;
 kvz_pixel *alf_fulldata;
 kvz_pixel *alf_tmp_y;
 kvz_pixel *alf_tmp_u;
@@ -783,8 +784,6 @@ void kvz_alf_reconstruct_coeff(encoder_state_t * const state,
   channel_type channel,
   const bool is_rdo,
   const bool is_redo);
-
-void kvz_alf_destroy(videoframe_t * const frame);
 
 void kvz_alf_derive_classification(encoder_state_t * const state,
   const int width,
