@@ -2187,7 +2187,11 @@ void kvz_alf_enc_create(encoder_state_t const *state)
 
   // Classification
   g_classifier = malloc(pic_height * sizeof(**g_classifier));
+  //memset(g_classifier, 0, pic_height * sizeof(**g_classifier));
+
   g_classifier[0] = malloc(pic_height * pic_width * sizeof(*g_classifier));
+  //memset(g_classifier[0], 0, pic_height * pic_width * sizeof(*g_classifier));
+
   for (int i = 1; i < pic_height; i++)
   {
     g_classifier[i] = g_classifier[0] + i * pic_width;
@@ -2225,7 +2229,10 @@ void kvz_alf_enc_create(encoder_state_t const *state)
   memset(g_clip_default_enc, 0, sizeof(g_clip_default_enc));
 
   g_cc_alf_filter_control[0] = malloc(g_num_ctus_in_pic * sizeof(*g_cc_alf_filter_control));
+  //memset(g_cc_alf_filter_control[0], 0, g_num_ctus_in_pic * sizeof(*g_cc_alf_filter_control));
+
   g_cc_alf_filter_control[1] = malloc(g_num_ctus_in_pic * sizeof(*g_cc_alf_filter_control));
+  //memset(g_cc_alf_filter_control[1], 0, g_num_ctus_in_pic * sizeof(*g_cc_alf_filter_control));
 
   kvz_bit_depth = state->encoder_control->bitdepth;
 
@@ -2258,6 +2265,8 @@ void kvz_alf_enc_create(encoder_state_t const *state)
   for (int comp_idx = 0; comp_idx < MAX_NUM_COMPONENT; comp_idx++)
   {
     g_ctu_enable_flag[comp_idx] = malloc(g_num_ctus_in_pic * sizeof(*g_ctu_enable_flag[comp_idx]));
+    //memset(g_ctu_enable_flag[comp_idx], 0, g_num_ctus_in_pic * sizeof(*g_ctu_enable_flag[comp_idx]));
+
     g_ctu_enable_flag_tmp[comp_idx] = malloc(g_num_ctus_in_pic * sizeof(*g_ctu_enable_flag_tmp[comp_idx]));
 //#if JVET_O0090_ALF_CHROMA_FILTER_ALTERNATIVES_CTB
    // g_ctu_enable_flag_tmp2[comp_idx] = malloc(g_num_ctus_in_pic * sizeof(*g_ctu_enable_flag_tmp2[comp_idx]));
@@ -2269,7 +2278,11 @@ void kvz_alf_enc_create(encoder_state_t const *state)
     else
     {
       g_ctu_alternative_tmp[comp_idx] = malloc(g_num_ctus_in_pic * sizeof(*g_ctu_alternative_tmp[comp_idx]));
+      //memset(g_ctu_alternative_tmp[comp_idx], 0, g_num_ctus_in_pic * sizeof(*g_ctu_alternative_tmp[comp_idx]));
+
       g_ctu_alternative[comp_idx] = malloc(g_num_ctus_in_pic * sizeof(*g_ctu_alternative[comp_idx]));
+      //memset(g_ctu_alternative[comp_idx], 0, g_num_ctus_in_pic * sizeof(*g_ctu_alternative[comp_idx]));
+
       for (int ctu_idx = 0; ctu_idx < g_num_ctus_in_pic; ctu_idx++) {
         g_ctu_alternative_tmp[comp_idx][ctu_idx] = 0;
         g_ctu_alternative[comp_idx][ctu_idx] = 0;
@@ -2312,17 +2325,27 @@ void kvz_alf_enc_create(encoder_state_t const *state)
   for (int i = 0; i < MAX_NUM_ALF_CLASSES; i++)
   {
     g_filter_coeff_set[i] = malloc(MAX_NUM_ALF_LUMA_COEFF * sizeof(int));
+    //memset(g_filter_coeff_set[i], 0, MAX_NUM_ALF_LUMA_COEFF * sizeof(int));
+
     g_filter_clipp_set[i] = malloc(MAX_NUM_ALF_LUMA_COEFF * sizeof(int));
+    //memset(g_filter_clipp_set[i], 0, MAX_NUM_ALF_LUMA_COEFF * sizeof(int));
+
     g_diff_filter_coeff[i] = malloc(MAX_NUM_ALF_LUMA_COEFF * sizeof(int));
+    //memset(g_diff_filter_coeff[i], 0, MAX_NUM_ALF_LUMA_COEFF * sizeof(int));
+
   }
 
   for (int comp = 0; comp < MAX_NUM_COMPONENT; comp++)
   {
     g_ctb_distortion_unfilter[comp] = malloc(g_num_ctus_in_pic * sizeof(double));
+    //memset(g_ctb_distortion_unfilter[comp], 0, g_num_ctus_in_pic * sizeof(double));
   }
   
   g_alf_ctb_filter_index = malloc(g_num_ctus_in_pic * sizeof(*g_alf_ctb_filter_index));
+  //memset(g_alf_ctb_filter_index, 0, g_num_ctus_in_pic * sizeof(*g_alf_ctb_filter_index));
+
   g_alf_ctb_filter_set_index_tmp = malloc(g_num_ctus_in_pic * sizeof(*g_alf_ctb_filter_set_index_tmp));
+  //memset(g_alf_ctb_filter_set_index_tmp, 0, g_num_ctus_in_pic * sizeof(*g_alf_ctb_filter_set_index_tmp));
 
   enum kvz_chroma_format chroma_fmt = state->encoder_control->chroma_format;
   const int number_of_components = (chroma_fmt == KVZ_CSP_400) ? 1 : MAX_NUM_COMPONENT;
@@ -2452,14 +2475,25 @@ void kvz_alf_enc_create(encoder_state_t const *state)
   }
 
   g_training_cov_control = malloc(g_num_ctus_in_pic * sizeof(*g_training_cov_control));
+  //memset(g_training_cov_control, 0, g_num_ctus_in_pic * sizeof(*g_training_cov_control));
+
   for (int i = 0; i < MAX_NUM_CC_ALF_FILTERS; i++)
   {
     g_training_distortion[i] = malloc(g_num_ctus_in_pic * sizeof(*g_training_distortion[i]));
+    //memset(g_training_distortion[i], 0, g_num_ctus_in_pic * sizeof(*g_training_distortion[i]));
+
   }
   g_filter_control = malloc(g_num_ctus_in_pic * sizeof(*g_filter_control));
+  //memset(g_filter_control, 0, g_num_ctus_in_pic * sizeof(*g_filter_control));
+
   g_best_filter_control = malloc(g_num_ctus_in_pic * sizeof(*g_best_filter_control));
+  //memset(g_best_filter_control, 0, g_num_ctus_in_pic * sizeof(*g_best_filter_control));
+
   g_luma_swing_greater_than_threshold_count = malloc(g_num_ctus_in_pic * sizeof(*g_luma_swing_greater_than_threshold_count));
+  //memset(g_luma_swing_greater_than_threshold_count, 0, g_num_ctus_in_pic * sizeof(*g_luma_swing_greater_than_threshold_count));
+
   g_chroma_sample_count_near_mid_point = malloc(g_num_ctus_in_pic * sizeof(*g_chroma_sample_count_near_mid_point));
+  //memset(g_chroma_sample_count_near_mid_point, 0, g_num_ctus_in_pic * sizeof(*g_chroma_sample_count_near_mid_point));
 
   g_created = true;
 }
@@ -7071,8 +7105,10 @@ void kvz_alf_filter_block(encoder_state_t * const state,
 
   //std::vector<Pel> filterCoeff(MAX_NUM_ALF_LUMA_COEFF);
   int filter_coeff[MAX_NUM_ALF_LUMA_COEFF];
+  memset(filter_coeff, 0, MAX_NUM_ALF_LUMA_COEFF * sizeof(int));
   //std::array<int, MAX_NUM_ALF_LUMA_COEFF> filterClipp;
   int filter_clipp[MAX_NUM_ALF_LUMA_COEFF];
+  memset(filter_clipp, 0, MAX_NUM_ALF_LUMA_COEFF * sizeof(int));
 
   p_img_y_pad_0 = src + start_height * src_stride + start_width;
   p_img_y_pad_1 = p_img_y_pad_0 + src_stride;
