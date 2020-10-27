@@ -668,36 +668,6 @@ static void encoder_state_worker_encode_lcu(void * opaque)
     encode_sao(state, lcu->position.x, lcu->position.y, &frame->sao_luma[lcu->position.y * frame->width_in_lcu + lcu->position.x], &frame->sao_chroma[lcu->position.y * frame->width_in_lcu + lcu->position.x]);
   }
 
-  //Tests
-  //alf_info_t *alf = &frame->alf_info[lcu->position.y * frame->rec->stride + lcu->position.x];
-  //kvz_alf_enc_process(state, lcu);
-#if !FULL_FRAME
-  if (encoder->cfg.alf_enable) {
-#if RUN_ALF_AFTER_FULL_FRAME
-    if (lcu->last_column && lcu->last_row)
-    {
-      int total_num_lcus = frame->height_in_lcu * frame->width_in_lcu;
-      for (int lcu_idx = 0; lcu_idx < total_num_lcus; lcu_idx++)
-      {
-        lcu_order_element_t *cur_lcu = &state->lcu_order[lcu_idx];
-        kvz_alf_enc_create(state, cur_lcu);
-        kvz_alf_init(state, slice);
-        kvz_alf_enc_process(state, cur_lcu);
-        kvz_alf_reconstruct(state, frame, cur_lcu);
-        
-      }
-    }
-#else
-    kvz_alf_enc_create(state);
-    kvz_alf_init(state);
-    kvz_alf_enc_process(state, lcu);
-    kvz_alf_reconstruct(state, lcu);
-#endif
-    //Moved to videoframe.c
-    //kvz_alf_enc_destroy(frame);
-  }
-#endif
-
   //Encode coding tree
   kvz_encode_coding_tree(state, lcu->position.x * LCU_WIDTH, lcu->position.y * LCU_WIDTH, 0);
 
@@ -837,10 +807,7 @@ static void encoder_state_worker_encode_lcu_bitstream(void * opaque)
   }
 
   //Encode ALF
-#if FULL_FRAME
-  const int ctu_idx = lcu->index;
-  kvz_encode_alf_bits(state, ctu_idx);
-#endif
+  kvz_encode_alf_bits(state, lcu->index);
 
   //Encode coding tree
   kvz_encode_coding_tree(state, lcu->position.x * LCU_WIDTH, lcu->position.y * LCU_WIDTH, 0);
@@ -932,11 +899,6 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
   if (!use_parallel_encoding) {
     // Encode every LCU in order and perform SAO reconstruction after every
     // frame is encoded. Deblocking and SAO search is done during LCU encoding.
-#if !FULL_FRAME
-    for (int i = 0; i < state->lcu_order_count; ++i) {
-      encoder_state_worker_encode_lcu(&state->lcu_order[i]);
-    }
-#else
     for (int i = 0; i < state->lcu_order_count; ++i) {
       encoder_state_worker_encode_lcu_search(&state->lcu_order[i]);
     }
@@ -950,7 +912,6 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
     for (int i = 0; i < state->lcu_order_count; ++i) {
       encoder_state_worker_encode_lcu_bitstream(&state->lcu_order[i]);
     }
-#endif // ORIG
   } else {
     // Add each LCU in the wavefront row as it's own job to the queue.
 
