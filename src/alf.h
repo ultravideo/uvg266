@@ -590,12 +590,18 @@ void get_blk_stats_cc_alf(encoder_state_t * const state,
   const int x_pos, const int y_pos, 
   const int width, const int height);
 
+void calc_covariance_cc_alf(int32_t e_local[MAX_NUM_CC_ALF_CHROMA_COEFF][1],
+  const kvz_pixel *rec, const int stride,
+  int vb_distance);
+
 /*
 void apply_cc_alf_filter(encoder_state_t *const state, alf_component_id comp_id, const kvz_pixel *dst_pixels,
   const kvz_pixel *recYuvExt, uint8_t *filterControl,
   const short filterSet[MAX_NUM_CC_ALF_FILTERS][MAX_NUM_CC_ALF_CHROMA_COEFF],
   const int   selectedFilterIdx)
 */
+
+void init_distortion_cc_alf(const int num_ctus);
 
 //----------------------------------------------------------------------
 //----------------------------------------------------------------------
@@ -656,12 +662,6 @@ void encode_alf_aps_filter(encoder_state_t * const state,
   const bool is_chroma,
   const int alt_idx);
 
-/*
-void alf_golomb_encode(encoder_state_t * const state,
-  int coeff,
-  int k,
-  const bool signed_coeff);
-  */
 void encode_alf_adaptive_parameter_set(encoder_state_t * const state);
 
 void encode_alf_aps_lmcs(encoder_state_t * const state);
@@ -674,7 +674,6 @@ void encode_alf_aps(encoder_state_t * const state);
 
 //-------------------------CTU functions--------------------------------
 
-//ei varmuutta miten alf_param_tmp pitäisi toimia tässä tilanteessa
 void kvz_alf_reconstruct_coeff_aps(encoder_state_t * const state,
   bool luma,
   bool chroma,

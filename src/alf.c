@@ -1796,19 +1796,16 @@ void kvz_alf_enc_process(encoder_state_t *const state)
     return;
   }
 
-  //m_tempBuf.get(COMPONENT_Cb).copyFrom(cs.getRecoBuf().get(COMPONENT_Cb));
-  //m_tempBuf.get(COMPONENT_Cr).copyFrom(cs.getRecoBuf().get(COMPONENT_Cr));
-  //recYuv = m_tempBuf.getBuf(cs.area);
-  //recYuv.extendBorderPel(MAX_ALF_FILTER_LENGTH >> 1);
+  const kvz_picture *org_yuv = state->tile->frame->source;
+  const kvz_picture *rec_yuv = state->tile->frame->rec;
+  const int num_ctus_in_width = state->tile->frame->width_in_lcu;
 
-  //deriveStatsForCcAlfFiltering(orgYuv, recYuv, COMPONENT_Cb, m_numCTUsInWidth, (0 + 1), cs);
-  //deriveStatsForCcAlfFiltering(orgYuv, recYuv, COMPONENT_Cr, m_numCTUsInWidth, (0 + 1), cs);
-  //initDistortionCcalf();
+  derive_stats_for_cc_alf_filtering(state, org_yuv, rec_yuv, COMPONENT_Cb, num_ctus_in_width, (0 + 1));
+  derive_stats_for_cc_alf_filtering(state, org_yuv, rec_yuv, COMPONENT_Cr, num_ctus_in_width, (0 + 1));
+  init_distortion_cc_alf(num_ctus_in_pic);
 
-  //m_CABACEstimator->getCtx() = SubCtx(Ctx::CcAlfFilterControlFlag, ctxStartCcAlf);
   memcpy(&cabac_estimator, &ctx_start_cc_alf, sizeof(cabac_estimator));
-  //deriveCcAlfFilter(cs, COMPONENT_Cb, orgYuv, recYuv, cs.getRecoBuf());
-  //m_CABACEstimator->getCtx() = SubCtx(Ctx::CcAlfFilterControlFlag, ctxStartCcAlf);
+  //derive_cc_alf_filter(cs, COMPONENT_Cb, orgYuv, recYuv, cs.getRecoBuf());
   memcpy(&cabac_estimator, &ctx_start_cc_alf, sizeof(cabac_estimator));
   //deriveCcAlfFilter(cs, COMPONENT_Cr, orgYuv, recYuv, cs.getRecoBuf());
 
@@ -8042,9 +8039,9 @@ void derive_stats_for_cc_alf_filtering(encoder_state_t * const state,
   // init CTU stats buffers
   for( int shape = 0; shape != 1/*m_filterShapesCcAlf[comp_idx-1].size()*/; shape++ )
   {
-    for (int ctuIdx = 0; ctuIdx < num_ctus_in_pic; ctuIdx++)
+    for (int ctu_idx = 0; ctu_idx < num_ctus_in_pic; ctu_idx++)
     {
-      reset_alf_covariance(&g_alf_covariance_cc_alf[comp_idx - 1][shape][filter_idx][ctuIdx], -1);
+      reset_alf_covariance(&g_alf_covariance_cc_alf[comp_idx - 1][shape][filter_idx][ctu_idx], -1);
     }
   }
 
@@ -8171,30 +8168,19 @@ void get_blk_stats_cc_alf(encoder_state_t * const state,
 
   enum kvz_chroma_format chroma_format = state->encoder_control->chroma_format;
   const int number_of_components = (chroma_format == KVZ_CSP_400) ? 1 : MAX_NUM_COMPONENT;;
-  //const CompArea &compArea = areaDst.block(compID);
-  int  rec_stride[MAX_NUM_COMPONENT];
-  const kvz_pixel* rec[MAX_NUM_COMPONENT];
+  int rec_stride[MAX_NUM_COMPONENT];
+  int rec_pixel_idx[MAX_NUM_COMPONENT];
+  const int luma_rec_pos = y_pos * rec_yuv->stride + x_pos;
+  const int chroma_rec_pos = y_pos_c * (rec_yuv->stride >> chroma_scale_x) + x_pos_c;
+  kvz_pixel *rec_y = &rec_yuv->y[luma_rec_pos];
+  kvz_pixel *rec_u = &rec_yuv->u[chroma_rec_pos];
+  kvz_pixel *rec_v = &rec_yuv->v[chroma_rec_pos];
+
   for (int c_idx = 0; c_idx < number_of_components; c_idx++)
   {
     bool is_luma = c_idx == COMPONENT_Y;
     rec_stride[c_idx] = rec_yuv->stride >> (is_luma ? 0 : chroma_scale_x);
-    
-    if (c_idx == COMPONENT_Cb)
-    {
-      rec[c_idx] = rec_yuv->y;
-    }
-    else if (c_idx == COMPONENT_Cb)
-    {
-      rec[c_idx] = rec_yuv->u;
-    }
-    else if (c_idx == COMPONENT_Cr)
-    {
-      rec[c_idx] = rec_yuv->v;
-    }
-    else
-    {
-      assert(false); //Invalid number of components.
-    }
+    rec_pixel_idx[c_idx] = 0;
   }
 
   int org_stride = 0;
@@ -8215,7 +8201,6 @@ void get_blk_stats_cc_alf(encoder_state_t * const state,
     org = &org_yuv->v[y_pos_c*org_stride + x_pos_c];
   }
 
-
   const int  num_bins = 1;
   int vb_ctu_height = alf_vb_luma_ctu_height;
   int vb_pos = alf_vb_luma_pos;
@@ -8224,11 +8209,14 @@ void get_blk_stats_cc_alf(encoder_state_t * const state,
     vb_pos = frame_height;
   }
 
-  kvz_pixel e_local[MAX_NUM_CC_ALF_CHROMA_COEFF][1];
+  int32_t e_local[MAX_NUM_CC_ALF_CHROMA_COEFF][1];
+  kvz_pixel *rec_pixels = (comp_id == COMPONENT_Y ? rec_y : (comp_id == COMPONENT_Cb ? rec_u : rec_v));
+  uint8_t component_scale_y = (comp_id == COMPONENT_Y || chroma_format != KVZ_CSP_420) ? 0 : 1;
+  uint8_t component_scale_x = (comp_id == COMPONENT_Y || chroma_format == KVZ_CSP_444) ? 0 : 1;
+  kvz_pixel y_local = 0;
 
   for (int i = 0; i < height; i++)
   {
-    uint8_t component_scale_y = (comp_id == COMPONENT_Y || chroma_format != KVZ_CSP_420) ? 0 : 1;
     int vb_distance = ((i << component_scale_y) % vb_ctu_height) - vb_pos;
     const bool skip_this_row = (component_scale_y == 0 && (vb_distance == 0 || vb_distance == 1));
     for (int j = 0; j < width && (!skip_this_row); j++)
@@ -8241,9 +8229,8 @@ void get_blk_stats_cc_alf(encoder_state_t * const state,
         //weight = m_lumaLevelToWeightPLUT[org[j]];
       }
 
-      kvz_pixel y_local = org[j] - rec[comp_id][j];
-
-      //calcCovarianceCcAlf(ELocal, rec[COMPONENT_Y] + (j << getComponentScaleX(comp_id, m_chromaFormat)), rec_stride[COMPONENT_Y], shape, vb_distance);
+      y_local = org[j] - rec_pixels[j + rec_pixel_idx[comp_id]];
+      calc_covariance_cc_alf(e_local, rec_y + rec_pixel_idx[COMPONENT_Y] + (j << component_scale_x), rec_stride[COMPONENT_Y], vb_distance);
 
       for (int k = 0; k < (num_coeff - 1); k++)
       {
@@ -8288,21 +8275,20 @@ void get_blk_stats_cc_alf(encoder_state_t * const state,
     org += org_stride;
     for (int src_c_idx = 0; src_c_idx < number_of_components; src_c_idx++)
     {
-      alf_component_id src_comp_id = src_c_idx;
       const channel_type c_channel = (src_c_idx == COMPONENT_Y) ? CHANNEL_TYPE_LUMA : CHANNEL_TYPE_CHROMA;
       if (c_channel == channel)
       {
-        rec[src_c_idx] += rec_stride[src_c_idx];
+        rec_pixel_idx[src_c_idx] += rec_stride[src_c_idx];
       }
       else
       {
         if (comp_id == COMPONENT_Y)
         {
-          rec[src_c_idx] += ((rec_stride[src_c_idx] >> (src_comp_id == COMPONENT_Y || chroma_format != KVZ_CSP_420) ? 0 : 1));
+          rec_pixel_idx[src_c_idx] += rec_stride[src_c_idx] >> ((src_c_idx == COMPONENT_Y || chroma_format != KVZ_CSP_420) ? 0 : 1);
         }
         else
         {
-          rec[src_c_idx] += ((rec_stride[src_c_idx] << (comp_id == COMPONENT_Y || chroma_format != KVZ_CSP_420) ? 0 : 1));
+          rec_pixel_idx[src_c_idx] += rec_stride[src_c_idx] << ((comp_id == COMPONENT_Y || chroma_format != KVZ_CSP_420) ? 0 : 1);
         }
       }
     }
@@ -8323,39 +8309,36 @@ void get_blk_stats_cc_alf(encoder_state_t * const state,
   }
 }
 
-/*
-void EncAdaptiveLoopFilter::calcCovarianceCcAlf(int ELocal[MAX_NUM_CC_ALF_CHROMA_COEFF][1], const Pel *rec, const int stride, const AlfFilterShape& shape, int vbDistance)
+void calc_covariance_cc_alf(int32_t e_local[MAX_NUM_CC_ALF_CHROMA_COEFF][1], const kvz_pixel *rec, const int stride, int vb_distance)
 {
-  CHECK(shape.filterType != CC_ALF, "Bad CC ALF shape");
+  const kvz_pixel *rec_y_m1 = rec - 1 * stride;
+  const kvz_pixel *rec_y_0  = rec;
+  const kvz_pixel *rec_y_p1 = rec + 1 * stride;
+  const kvz_pixel *rec_y_p2 = rec + 2 * stride;
 
-  const Pel *recYM1 = rec - 1 * stride;
-  const Pel *recY0  = rec;
-  const Pel *recYP1 = rec + 1 * stride;
-  const Pel *recYP2 = rec + 2 * stride;
-
-  if (vbDistance == -2 || vbDistance == +1)
+  if (vb_distance == -2 || vb_distance == +1)
   {
-    recYP2 = recYP1;
+    rec_y_p2 = rec_y_p1;
   }
-  else if (vbDistance == -1 || vbDistance == 0)
+  else if (vb_distance == -1 || vb_distance == 0)
   {
-    recYM1 = recY0;
-    recYP2 = recYP1 = recY0;
+    rec_y_m1 = rec_y_0;
+    rec_y_p2 = rec_y_p1 = rec_y_0;
   }
 
+  const kvz_pixel center_value = rec_y_0[+0];
   for (int b = 0; b < 1; b++)
   {
-    const Pel centerValue = recY0[+0];
-    ELocal[0][b] += recYM1[+0] - centerValue;
-    ELocal[1][b] += recY0[-1] - centerValue;
-    ELocal[2][b] += recY0[+1] - centerValue;
-    ELocal[3][b] += recYP1[-1] - centerValue;
-    ELocal[4][b] += recYP1[+0] - centerValue;
-    ELocal[5][b] += recYP1[+1] - centerValue;
-    ELocal[6][b] += recYP2[+0] - centerValue;
+    e_local[0][b] += rec_y_m1[+0] - center_value;
+    e_local[1][b] += rec_y_0[-1] - center_value;
+    e_local[2][b] += rec_y_0[+1] - center_value;
+    e_local[3][b] += rec_y_p1[-1] - center_value;
+    e_local[4][b] += rec_y_p1[+0] - center_value;
+    e_local[5][b] += rec_y_p1[+1] - center_value;
+    e_local[6][b] += rec_y_p2[+0] - center_value;
   }
 }
-
+/*
 void EncAdaptiveLoopFilter::countLumaSwingGreaterThanThreshold(const Pel* luma, int lumaStride, int height, int width, int log2BlockWidth, int log2BlockHeight, uint64_t* lumaSwingGreaterThanThresholdCount, int lumaCountStride)
 {
   const int lumaBitDepth = m_inputBitDepth[CH_L];
@@ -8484,21 +8467,20 @@ void EncAdaptiveLoopFilter::countChromaSampleValueNearMidPoint(const Pel* chroma
     }
   }
   DTRACE(g_trace_ctx, D_SYNTAX, "ccAlfFilterControlIdc() compID=%d pos=(%d,%d) ctxt=%d, filterCount=%d, idcVal=%d\n", compID, lumaPos.x, lumaPos.y, ctxt, filterCount, idcVal);
-}
+}*/
 
-
-void  EncAdaptiveLoopFilter::initDistortionCcalf()
+void init_distortion_cc_alf(const int num_ctus)
 {
   for (int comp = 1; comp < MAX_NUM_COMPONENT; comp++)
   {
-    for (int ctbIdx = 0; ctbIdx < m_numCTUsInPic; ctbIdx++)
+    for (int ctb_idx = 0; ctb_idx < num_ctus; ctb_idx++)
     {
-      m_ctbDistortionUnfilter[comp][ctbIdx] = m_alfCovarianceCcAlf[comp - 1][0][0][ctbIdx].pixAcc;
+      g_ctb_distortion_unfilter[comp][ctb_idx] = g_alf_covariance_cc_alf[comp - 1][0][0][ctb_idx].pix_acc;
     }
   }
 }
 
-
+/*
 void EncAdaptiveLoopFilter::getFrameStatsCcalf(ComponentID compIdx, int filterIdc)
 {
         int ctuRsAddr = 0;
