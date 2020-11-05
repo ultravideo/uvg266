@@ -7736,7 +7736,7 @@ void derive_cc_alf_filter(encoder_state_t * const state, alf_component_id comp_i
   int max_ctu_width_log2 = kvz_math_floor_log2(LCU_WIDTH);
   int max_ctu_width_log2_chrma = kvz_math_floor_log2(LCU_WIDTH) >> scale_x;
   int32_t ctus_in_width = state->tile->frame->width_in_lcu;
-  const int32_t num_ctus_in_pic = state->lcu_order_count;
+  const uint32_t num_ctus_in_pic = state->lcu_order_count;
   short best_filter_coeff_set[MAX_NUM_CC_ALF_FILTERS][MAX_NUM_CC_ALF_CHROMA_COEFF];
   bool best_filter_idx_enabled[MAX_NUM_CC_ALF_FILTERS];
   uint8_t best_filter_count = 0;
@@ -8188,6 +8188,8 @@ void get_blk_stats_cc_alf(encoder_state_t * const state,
   const int max_cu_height = LCU_WIDTH;
   const int x_pos_c = x_pos >> chroma_scale_x;
   const int y_pos_c = y_pos >> chroma_scale_y;
+  const int c_width = width >> chroma_scale_x;
+  const int c_height = height >> chroma_scale_y;
 
   const int num_coeff = 8;
   const channel_type channel = (comp_id == COMPONENT_Y) ? CHANNEL_TYPE_LUMA : CHANNEL_TYPE_CHROMA;
@@ -8239,13 +8241,13 @@ void get_blk_stats_cc_alf(encoder_state_t * const state,
   kvz_pixel *rec_pixels = (comp_id == COMPONENT_Y ? rec_y : (comp_id == COMPONENT_Cb ? rec_u : rec_v));
   uint8_t component_scale_y = (comp_id == COMPONENT_Y || chroma_format != KVZ_CSP_420) ? 0 : 1;
   uint8_t component_scale_x = (comp_id == COMPONENT_Y || chroma_format == KVZ_CSP_444) ? 0 : 1;
-  kvz_pixel y_local = 0;
+  int16_t y_local = 0;
 
-  for (int i = 0; i < height; i++)
+  for (int i = 0; i < (comp_id == COMPONENT_Y ? height : c_height); i++)
   {
     int vb_distance = ((i << component_scale_y) % vb_ctu_height) - vb_pos;
     const bool skip_this_row = (component_scale_y == 0 && (vb_distance == 0 || vb_distance == 1));
-    for (int j = 0; j < width && (!skip_this_row); j++)
+    for (int j = 0; j < (comp_id == COMPONENT_Y ? width : c_width) && (!skip_this_row); j++)
     {
       memset(e_local, 0, sizeof(e_local));
 
