@@ -43,7 +43,12 @@
 #define MAX_ALF_NUM_CLIPPING_VALUES     4
 #define SCALE_BITS                      15
 #define MAX_NUM_ALF_ALTERNATIVES_CHROMA 8
+#define CCALF_CANDS_COEFF_NR            8
+#define CCALF_DYNAMIC_RANGE             6
+#define CCALF_BITS_PER_COEFF_LEVEL      3
 #define NUM_APS_TYPE_LEN                0 //1 //3
+
+static const int cc_alf_small_tab[CCALF_CANDS_COEFF_NR] = { 0, 1, 2, 4, 8, 16, 32, 64 };
 
 static const int g_fixed_filter_set_coeff[ALF_FIXED_FILTER_NUM][MAX_NUM_ALF_LUMA_COEFF] =
 {
@@ -264,6 +269,12 @@ typedef struct cc_alf_filter_param {
   int     number_valid_components;
 } cc_alf_filter_param;
 
+/*typedef struct filter_idx_count
+{
+  uint64_t count;
+  uint8_t filter_idx;
+} filter_idx_count;*/
+
 typedef struct alf_aps {
   int aps_id;
   int aps_type;
@@ -351,6 +362,7 @@ static bool g_created = false;
 static uint32_t g_frame_count = MAX_INT;
 uint8_t* g_cc_alf_filter_control[2];
 int g_aps_id_cc_alf_start[2];
+int g_reuse_aps_id[2];
 
 //once per frame
 alf_covariance*** g_alf_covariance[MAX_NUM_COMPONENT]; //[component_id][filter_type][ctu_idx][class_idx]
@@ -459,12 +471,6 @@ void copy_ctu_enable_flag(uint8_t **flags_dst, uint8_t **flags_src, channel_type
 //-------------------------------------------------------------------
 
 //-------------------------encoding functions------------------------
-
-void apply_cc_alf_filter(encoder_state_t *const state, alf_component_id comp_id, const kvz_pixel *dst_pixels,
-  const kvz_pixel *recYuvExt, uint8_t *filterControl,
-  const short filterSet[MAX_NUM_CC_ALF_FILTERS][MAX_NUM_CC_ALF_CHROMA_COEFF],
-  const int   selectedFilterIdx
-  );
 
 //is_crossed_by_virtual_boundaries -osuus epätäydellinen
 void kvz_alf_enc_process(encoder_state_t *const state);
@@ -578,6 +584,43 @@ void kvz_alf_reconstructor(encoder_state_t * const state);
 
 //-------------------------CC ALF encoding functions------------------------
 
+void setup_cc_alf_aps(encoder_state_t * const state);
+
+void round_filt_coeff_cc_alf(int16_t *filter_coeff_quant,
+  double *filter_coeff, const int num_coeff,
+  const int factor);
+
+void derive_cc_alf_filter_coeff(alf_component_id comp_id,
+  const kvz_picture *rec_yuv, const kvz_picture *rec_yuv_ext,
+  short filter_coeff[MAX_NUM_CC_ALF_FILTERS][MAX_NUM_CC_ALF_CHROMA_COEFF],
+  const uint8_t filter_idx);
+
+void determine_control_idc_values(encoder_state_t *const state, const alf_component_id comp_id,
+  const int ctu_width_c, const int ctu_height_c, const int pic_width_c,
+  const int pic_height_c, double **unfiltered_distortion,
+  uint64_t *training_distortion[MAX_NUM_CC_ALF_FILTERS],
+  uint64_t *luma_swing_greater_than_threshold_count,
+  uint64_t *chroma_sample_count_near_mid_point,
+  bool reuse_temporal_filter_coeff, uint8_t *training_cov_control,
+  uint8_t *filter_control, uint64_t *cur_total_distortion,
+  double *cur_total_rate, bool filter_enabled[MAX_NUM_CC_ALF_FILTERS],
+  uint8_t  map_filter_idx_to_filter_idc[MAX_NUM_CC_ALF_FILTERS + 1],
+  uint8_t *cc_alf_filter_count);
+
+void get_available_cc_alf_aps_ids(encoder_state_t *const state,
+  alf_component_id compID, int *aps_ids_size,
+  int *aps_ids);
+
+void apply_cc_alf_filter(encoder_state_t * const state, alf_component_id comp_id, const kvz_pixel *dst_buf,
+  const kvz_pixel *rec_yuv_ext, const int luma_stride, uint8_t *filter_control,
+  const short filter_set[MAX_NUM_CC_ALF_FILTERS][MAX_NUM_CC_ALF_CHROMA_COEFF],
+  const int   selected_filter_idx);
+
+void derive_cc_alf_filter(encoder_state_t * const state,
+  alf_component_id comp_id, const kvz_picture *org_yuv,
+  const kvz_picture *temp_dec_yuv_buf,
+  const kvz_picture *dst_yuv);
+
 void derive_stats_for_cc_alf_filtering(encoder_state_t * const state,
   const kvz_picture *org_yuv, const kvz_picture *rec_yuv,
   const int comp_idx, const int mask_stride,
@@ -594,14 +637,24 @@ void calc_covariance_cc_alf(int32_t e_local[MAX_NUM_CC_ALF_CHROMA_COEFF][1],
   const kvz_pixel *rec, const int stride,
   int vb_distance);
 
-/*
-void apply_cc_alf_filter(encoder_state_t *const state, alf_component_id comp_id, const kvz_pixel *dst_pixels,
-  const kvz_pixel *recYuvExt, uint8_t *filterControl,
-  const short filterSet[MAX_NUM_CC_ALF_FILTERS][MAX_NUM_CC_ALF_CHROMA_COEFF],
-  const int   selectedFilterIdx)
-*/
+void count_luma_swing_greater_than_threshold(const kvz_pixel* luma, int luma_stride, int height, int width,
+  int log2_block_width, int log2_block_height, 
+  uint64_t* luma_swing_greater_than_threshold_count, 
+  int luma_count_stride,
+  int8_t input_bit_depth);
 
 void init_distortion_cc_alf(const int num_ctus);
+
+void get_frame_stats_cc_alf(alf_component_id comp_idx, int filter_idc, const int num_ctus_in_frame);
+
+void filter_blk_cc_alf(encoder_state_t * const state,
+  const kvz_pixel *dst_buf, const kvz_pixel *rec_src,
+  const int rec_luma_stride,
+  const alf_component_id comp_id, const int16_t *filter_coeff,
+  const clp_rngs clp_rngs, int vb_ctu_height, int vb_pos,
+  const int x_pos, const int y_pos,
+  const int blk_width,
+  const int blk_height);
 
 //----------------------------------------------------------------------
 //----------------------------------------------------------------------
@@ -670,6 +723,16 @@ void encode_alf_aps_scaling_list(encoder_state_t * const state);
 
 void encode_alf_aps(encoder_state_t * const state);
 
+
+//------------------------- CC ALF cabac writer functions------------------------
+
+void code_cc_alf_filter_control_idc(encoder_state_t * const state,
+  cabac_data_t * const cabac, uint8_t idc_val,
+  const alf_component_id comp_id, const int ctu_idx,
+  const uint8_t *filter_control_idc,
+  const int filter_count);
+
+//---------------------------------------------------------------------
 //---------------------------------------------------------------------
 
 //-------------------------CTU functions--------------------------------
