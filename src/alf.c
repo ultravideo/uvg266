@@ -19,14 +19,11 @@ typedef struct filter_idx_count
   uint8_t filter_idx;
 } filter_idx_count;
 
-/*bool compare_counts(uint64_t a, uint64_t b)
-{ 
-  return a > b; 
-}*/
-
-int compare(const void* a, const void* b)
+int comparator(const void *v1, const void *v2)
 {
-  return ( (*(uint64_t*)a) > (*(uint64_t*)b));
+  const filter_idx_count *p1 = (filter_idx_count *)v1;
+  const filter_idx_count *p2 = (filter_idx_count *)v2;
+  return (p1->count < p2->count);
 }
 #endif
 
@@ -7266,7 +7263,8 @@ void apply_cc_alf_filter(encoder_state_t * const state, alf_component_id comp_id
           //Area blkSrc(xPos, yPos, width, height);
 
           filter_blk_cc_alf(state, dst_buf, rec_yuv_ext, luma_stride, comp_id, filter_coeff, g_clp_rngs, alf_vb_luma_ctu_height,
-            alf_vb_luma_pos, x_pos, y_pos, width, height);
+            alf_vb_luma_pos, x_pos >> component_scale_x, y_pos >> component_scale_y,
+            width >> component_scale_x, height >> component_scale_y);
         }
       }
       ctu_idx++;
@@ -7617,17 +7615,20 @@ void determine_control_idc_values(encoder_state_t *const state, const alf_compon
     //std::copy_n(curFilterEnabled, MAX_NUM_CC_ALF_FILTERS, filterEnabled);
     memcpy(cur_filter_enabled, filter_enabled, sizeof(cur_filter_enabled));
 
-    uint64_t tmp_arr[MAX_NUM_CC_ALF_FILTERS];
+    /*uint64_t tmp_arr[MAX_NUM_CC_ALF_FILTERS];
     for (int i = 0; i < MAX_NUM_CC_ALF_FILTERS; i++)
     {
       tmp_arr[i] = filter_idx_count[i].count;
-    }
+      tmp_arr_filter_idx[i] = filter_idx_
+    }*/
     //std::sort(filterIdxCount, filterIdxCount + MAX_NUM_CC_ALF_FILTERS, compareCounts);
-    qsort(tmp_arr, MAX_NUM_CC_ALF_FILTERS, sizeof(uint64_t), compare);
-    for (int i = 0; i < MAX_NUM_CC_ALF_FILTERS; i++)
+    //qsort(tmp_arr, MAX_NUM_CC_ALF_FILTERS, sizeof(uint64_t), compare);
+    /*for (int i = 0; i < MAX_NUM_CC_ALF_FILTERS; i++)
     {
       filter_idx_count[i].count = tmp_arr[i];
-    }
+    }*/
+
+    qsort(filter_idx_count, MAX_NUM_CC_ALF_FILTERS, sizeof(*filter_idx_count), comparator);
 
     int filter_idc = 1;
     (*cc_alf_filter_count) = 0;
@@ -7688,7 +7689,7 @@ void get_available_cc_alf_aps_ids(encoder_state_t *const state, alf_component_id
   {
     while (aps_id_checked < ALF_CTB_MAX_NUM_APS &&
       state->frame->slicetype != KVZ_SLICE_I &&
-      *aps_ids_size < ALF_CTB_MAX_NUM_APS  &&
+      (*aps_ids_size) < ALF_CTB_MAX_NUM_APS  &&
       !(state->frame->pictype == KVZ_NAL_IDR_W_RADL || state->frame->pictype == KVZ_NAL_IDR_N_LP)) //&& !cs.slice->getPendingRasInit()
     {
       alf_aps cur_aps = state->slice->apss[cur_aps_id];
@@ -8518,8 +8519,8 @@ void filter_blk_cc_alf(encoder_state_t * const state,
   const int end_height = y_pos + blk_height;
   const int start_width = x_pos;
   const int end_width = x_pos + blk_width;
-  const int c_start_height = start_height >> scale_y;
-  const int c_start_width = start_width >> scale_x;
+  const int luma_start_height = start_height << scale_y;
+  const int luma_start_width = start_width << scale_x;
 
   assert(!(start_height % cls_size_y)); //Wrong start_height in filtering
   assert(!(start_width % cls_size_x)); //Wrong start_width in filtering
@@ -8527,10 +8528,10 @@ void filter_blk_cc_alf(encoder_state_t * const state,
   assert(!((end_width - start_width) % cls_size_x)); //Wrong end_width in filtering
 
   kvz_pixel* src_buf = rec_src;
-  const kvz_pixel* luma_ptr = src_buf + start_height * rec_luma_stride + start_width; //y_pos ja x_pos saattaa olla eri.
+  const kvz_pixel* luma_ptr = src_buf + luma_start_height * rec_luma_stride + luma_start_width;
 
   const int chroma_stride = rec_luma_stride >> scale_x;
-  kvz_pixel* chroma_ptr = dst_buf + c_start_height * chroma_stride + c_start_width;
+  kvz_pixel* chroma_ptr = dst_buf + start_height * chroma_stride + start_width;
 
   for (int i = 0; i < end_height - start_height; i += cls_size_y)
   {

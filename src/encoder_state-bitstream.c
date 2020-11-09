@@ -1268,20 +1268,19 @@ void kvz_encoder_state_write_bitstream_slice_header(
 
       if (encoder->cfg.alf_cc_enabled_flag)
       {
-        /*CcAlfFilterParam &filterParam = pcSlice->m_ccAlfFilterParam;
-        WRITE_FLAG(filterParam.ccAlfFilterEnabled[COMPONENT_Cb - 1] ? 1 : 0, "slice_cc_alf_cb_enabled_flag");
-        if (filterParam.ccAlfFilterEnabled[COMPONENT_Cb - 1])
+        WRITE_U(stream, g_cc_alf_filter_param.cc_alf_filter_enabled[COMPONENT_Cb - 1], 1, "slice_cc_alf_cb_enabled_flag");
+        if (g_cc_alf_filter_param.cc_alf_filter_enabled[COMPONENT_Cb - 1])
         {
           // write CC ALF Cb APS ID
-          WRITE_CODE(pcSlice->getTileGroupCcAlfCbApsId(), 3, "slice_cc_alf_cb_aps_id");
+          WRITE_U(stream, state->slice->tile_group_cc_alf_cb_aps_id, 3, "slice_cc_alf_cb_aps_id");
         }
         // Cr
-        WRITE_FLAG(filterParam.ccAlfFilterEnabled[COMPONENT_Cr - 1] ? 1 : 0, "slice_cc_alf_cr_enabled_flag");
-        if (filterParam.ccAlfFilterEnabled[COMPONENT_Cr - 1])
+        WRITE_U(stream, g_cc_alf_filter_param.cc_alf_filter_enabled[COMPONENT_Cr - 1], 1, "slice_cc_alf_cr_enabled_flag");
+        if (g_cc_alf_filter_param.cc_alf_filter_enabled[COMPONENT_Cr - 1])
         {
           // write CC ALF Cr APS ID
-          WRITE_CODE(pcSlice->getTileGroupCcAlfCrApsId(), 3, "slice_cc_alf_cr_aps_id");
-        }*/
+          WRITE_U(stream, state->slice->tile_group_cc_alf_cr_aps_id, 3, "slice_cc_alf_cr_aps_id");
+        }
       }
     }
   }
