@@ -1803,9 +1803,60 @@ void kvz_alf_enc_process(encoder_state_t *const state)
   const kvz_picture *org_yuv = state->tile->frame->source;
   const kvz_picture *rec_yuv = state->tile->frame->rec;
   const kvz_picture rec_yuv_buf;
-  memcpy(&rec_yuv_buf, rec_yuv, sizeof(rec_yuv_buf));
-  const int num_ctus_in_width = state->tile->frame->width_in_lcu;
 
+  //Some of these are not needed.
+  adjust_pixels_chroma(org_yuv->y,
+    0,
+    org_yuv->width,
+    0,
+    org_yuv->height,
+    org_yuv->stride,
+    org_yuv->width,
+    org_yuv->height);
+  adjust_pixels_chroma(org_yuv->u,
+    0,
+    org_yuv->width >> chroma_scale_x,
+    0,
+    org_yuv->height >> chroma_scale_y,
+    org_yuv->stride >> chroma_scale_x,
+    org_yuv->width >> chroma_scale_x,
+    org_yuv->height >> chroma_scale_y);
+  adjust_pixels_chroma(org_yuv->v,
+    0,
+    org_yuv->width >> chroma_scale_x,
+    0,
+    org_yuv->height >> chroma_scale_y,
+    org_yuv->stride >> chroma_scale_x,
+    org_yuv->width >> chroma_scale_x,
+    org_yuv->height >> chroma_scale_y);
+  adjust_pixels_chroma(rec_yuv->y,
+    0,
+    rec_yuv->width,
+    0,
+    rec_yuv->height,
+    rec_yuv->stride,
+    rec_yuv->width,
+    rec_yuv->height);
+  adjust_pixels_chroma(rec_yuv->u,
+    0,
+    rec_yuv->width >> chroma_scale_x,
+    0,
+    rec_yuv->height >> chroma_scale_y,
+    rec_yuv->stride >> chroma_scale_x,
+    rec_yuv->width >> chroma_scale_x,
+    rec_yuv->height >> chroma_scale_y);
+  adjust_pixels_chroma(rec_yuv->v,
+    0,
+    rec_yuv->width >> chroma_scale_x,
+    0,
+    rec_yuv->height >> chroma_scale_y,
+    rec_yuv->stride >> chroma_scale_x,
+    rec_yuv->width >> chroma_scale_x,
+    rec_yuv->height >> chroma_scale_y);
+
+  memcpy(&rec_yuv_buf, state->tile->frame->rec, sizeof(rec_yuv_buf));
+
+  const int num_ctus_in_width = state->tile->frame->width_in_lcu;
   derive_stats_for_cc_alf_filtering(state, org_yuv, &rec_yuv_buf, COMPONENT_Cb, num_ctus_in_width, (0 + 1));
   derive_stats_for_cc_alf_filtering(state, org_yuv, &rec_yuv_buf, COMPONENT_Cr, num_ctus_in_width, (0 + 1));
   init_distortion_cc_alf(num_ctus_in_pic);
