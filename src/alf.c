@@ -1802,34 +1802,21 @@ void kvz_alf_enc_process(encoder_state_t *const state)
 
   const kvz_picture *org_yuv = state->tile->frame->source;
   const kvz_picture *rec_yuv = state->tile->frame->rec;
-  const kvz_picture rec_yuv_buf;
 
-  //Some of these are not needed.
-  adjust_pixels_chroma(org_yuv->y,
-    0,
-    org_yuv->width,
-    0,
-    org_yuv->height,
-    org_yuv->stride,
-    org_yuv->width,
-    org_yuv->height);
-  adjust_pixels_chroma(org_yuv->u,
-    0,
-    org_yuv->width >> chroma_scale_x,
-    0,
-    org_yuv->height >> chroma_scale_y,
-    org_yuv->stride >> chroma_scale_x,
-    org_yuv->width >> chroma_scale_x,
-    org_yuv->height >> chroma_scale_y);
-  adjust_pixels_chroma(org_yuv->v,
-    0,
-    org_yuv->width >> chroma_scale_x,
-    0,
-    org_yuv->height >> chroma_scale_y,
-    org_yuv->stride >> chroma_scale_x,
-    org_yuv->width >> chroma_scale_x,
-    org_yuv->height >> chroma_scale_y);
-  adjust_pixels_chroma(rec_yuv->y,
+  const int luma_stride = state->tile->frame->rec->stride;
+  const int chroma_stride = luma_stride >> chroma_scale_x;
+  const int chroma_height = luma_height >> chroma_scale_y;
+  const int chroma_padding = MAX_ALF_PADDING_SIZE >> chroma_scale_x;
+
+  const int index_chroma = -(chroma_stride * chroma_padding + chroma_padding);
+
+  //Copy reconstructed samples to a buffer.
+  memcpy(&alf_tmp_u[index_chroma], &state->tile->frame->rec->u[index_chroma],
+    sizeof(kvz_pixel) * chroma_stride * (chroma_height + chroma_padding * 2));
+  memcpy(&alf_tmp_v[index_chroma], &state->tile->frame->rec->v[index_chroma],
+    sizeof(kvz_pixel) * chroma_stride * (chroma_height + chroma_padding * 2));
+
+  adjust_pixels_chroma(alf_tmp_y,
     0,
     rec_yuv->width,
     0,
@@ -1837,7 +1824,7 @@ void kvz_alf_enc_process(encoder_state_t *const state)
     rec_yuv->stride,
     rec_yuv->width,
     rec_yuv->height);
-  adjust_pixels_chroma(rec_yuv->u,
+  adjust_pixels_chroma(alf_tmp_u,
     0,
     rec_yuv->width >> chroma_scale_x,
     0,
@@ -1845,7 +1832,7 @@ void kvz_alf_enc_process(encoder_state_t *const state)
     rec_yuv->stride >> chroma_scale_x,
     rec_yuv->width >> chroma_scale_x,
     rec_yuv->height >> chroma_scale_y);
-  adjust_pixels_chroma(rec_yuv->v,
+  adjust_pixels_chroma(alf_tmp_v,
     0,
     rec_yuv->width >> chroma_scale_x,
     0,
@@ -1854,6 +1841,11 @@ void kvz_alf_enc_process(encoder_state_t *const state)
     rec_yuv->width >> chroma_scale_x,
     rec_yuv->height >> chroma_scale_y);
 
+
+
+
+
+  const kvz_picture rec_yuv_buf;
   memcpy(&rec_yuv_buf, state->tile->frame->rec, sizeof(rec_yuv_buf));
 
   const int num_ctus_in_width = state->tile->frame->width_in_lcu;
@@ -1874,7 +1866,7 @@ void kvz_alf_enc_process(encoder_state_t *const state)
     {
       const kvz_pixel* rec_uv = comp_idx == COMPONENT_Cb ? rec_yuv->u : rec_yuv->v;
       const int luma_stride = rec_yuv->stride;
-      apply_cc_alf_filter(state, comp_idx, rec_uv, rec_yuv_buf.y, luma_stride, g_cc_alf_filter_control[comp_idx - 1],
+      apply_cc_alf_filter(state, comp_idx, rec_uv, alf_tmp_y, luma_stride, g_cc_alf_filter_control[comp_idx - 1],
         g_cc_alf_filter_param.cc_alf_coeff[comp_idx - 1], -1);
     }
   }
@@ -8250,16 +8242,16 @@ void get_blk_stats_cc_alf(encoder_state_t * const state,
   const int number_of_components = (chroma_format == KVZ_CSP_400) ? 1 : MAX_NUM_COMPONENT;;
   int rec_stride[MAX_NUM_COMPONENT];
   int rec_pixel_idx[MAX_NUM_COMPONENT];
-  const int luma_rec_pos = y_pos * rec_yuv->stride + x_pos;
-  const int chroma_rec_pos = y_pos_c * (rec_yuv->stride >> chroma_scale_x) + x_pos_c;
-  kvz_pixel *rec_y = &rec_yuv->y[luma_rec_pos];
-  kvz_pixel *rec_u = &rec_yuv->u[chroma_rec_pos];
-  kvz_pixel *rec_v = &rec_yuv->v[chroma_rec_pos];
+  const int luma_rec_pos = y_pos * state->tile->frame->rec->stride + x_pos;
+  const int chroma_rec_pos = y_pos_c * (state->tile->frame->rec->stride >> chroma_scale_x) + x_pos_c;
+  kvz_pixel *rec_y = &alf_tmp_y[luma_rec_pos];
+  kvz_pixel *rec_u = &alf_tmp_u[chroma_rec_pos];
+  kvz_pixel *rec_v = &alf_tmp_v[chroma_rec_pos];
 
   for (int c_idx = 0; c_idx < number_of_components; c_idx++)
   {
     bool is_luma = c_idx == COMPONENT_Y;
-    rec_stride[c_idx] = rec_yuv->stride >> (is_luma ? 0 : chroma_scale_x);
+    rec_stride[c_idx] = state->tile->frame->rec->stride >> (is_luma ? 0 : chroma_scale_x);
     rec_pixel_idx[c_idx] = 0;
   }
 

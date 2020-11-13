@@ -622,7 +622,8 @@ void derive_cc_alf_filter(encoder_state_t * const state,
   const kvz_picture *dst_yuv);
 
 void derive_stats_for_cc_alf_filtering(encoder_state_t * const state,
-  const kvz_picture *org_yuv, const kvz_picture *rec_yuv,
+  const kvz_picture *org_yuv,
+  const kvz_picture *rec_yuv,
   const int comp_idx, const int mask_stride,
   const uint8_t filter_idc);
 
