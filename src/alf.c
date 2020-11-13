@@ -1841,10 +1841,6 @@ void kvz_alf_enc_process(encoder_state_t *const state)
     rec_yuv->width >> chroma_scale_x,
     rec_yuv->height >> chroma_scale_y);
 
-
-
-
-
   const kvz_picture rec_yuv_buf;
   memcpy(&rec_yuv_buf, state->tile->frame->rec, sizeof(rec_yuv_buf));
 

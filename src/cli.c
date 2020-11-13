@@ -51,6 +51,8 @@ static const struct option long_options[] = {
   { "no-sao",                   no_argument, NULL, 0 },
   { "alf",                      no_argument, NULL, 0 },
   { "no-alf",                   no_argument, NULL, 0 },
+  { "ccalf",                    no_argument, NULL, 0 },
+  { "no-ccalf",                 no_argument, NULL, 0 },
   { "rdoq",                     no_argument, NULL, 0 },
   { "no-rdoq",                  no_argument, NULL, 0 },
   { "signhide",                 no_argument, NULL, 0 },

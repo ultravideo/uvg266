@@ -809,6 +809,8 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   }
   else if OPT("alf")
     cfg->alf_enable = atobool(value);
+  else if OPT("ccalf")
+    cfg->alf_cc_enabled_flag = atobool(value);
   else if OPT("rdoq")
     cfg->rdoq_enable = atobool(value);
   else if OPT("signhide")
