@@ -615,7 +615,11 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   // if(!no_sao_constraint_flag)
     WRITE_U(stream, encoder->cfg.sao_type ? 1 : 0, 1, "sps_sao_enabled_flag");
   // if(!no_alf_constraint_flag)
-    WRITE_U(stream, encoder->cfg.alf_enable, 1, "sps_alf_enable_flag");
+    WRITE_U(stream, encoder->cfg.alf_type ? 1 : 0, 1, "sps_alf_enable_flag");
+    if (encoder->cfg.alf_type && encoder->chroma_format != KVZ_CSP_400)
+    {
+      WRITE_U(stream, encoder->cfg.alf_type == 2, 1, "sps_ccalf_enabled_flag");
+    }
 
     WRITE_U(stream, 0, 1, "sps_lmcs_enable_flag");
 
@@ -1041,7 +1045,7 @@ static void kvz_encoder_state_write_bitstream_picture_header(
   
 
   // alf enable flags and aps IDs
-  if (encoder->cfg.alf_enable)
+  if (encoder->cfg.alf_type)
   {
     if (encoder->cfg.alf_info_in_ph_flag)
     {
@@ -1085,8 +1089,8 @@ static void kvz_encoder_state_write_bitstream_picture_header(
       state->tile->frame->alf_info->g_ctu_enable_flag[COMPONENT_Y] = true;
       state->tile->frame->alf_info->g_ctu_enable_flag[COMPONENT_Cb] = true;
       state->tile->frame->alf_info->g_ctu_enable_flag[COMPONENT_Cr] = true;
-      state->tile->frame->alf_info->g_alf_cc_enable_flag[COMPONENT_Cb] = encoder->cfg.alf_cc_enabled_flag;
-      state->tile->frame->alf_info->g_alf_cc_enable_flag[COMPONENT_Cr] = encoder->cfg.alf_cc_enabled_flag;
+      state->tile->frame->alf_info->g_alf_cc_enable_flag[COMPONENT_Cb] = encoder->cfg.alf_type == 2;
+      state->tile->frame->alf_info->g_alf_cc_enable_flag[COMPONENT_Cr] = encoder->cfg.alf_type == 2;
     }
   }
   else
@@ -1242,7 +1246,7 @@ void kvz_encoder_state_write_bitstream_slice_header(
   }
 
   //alf
-  if (encoder->cfg.alf_enable && !encoder->cfg.alf_info_in_ph_flag)
+  if (encoder->cfg.alf_type && !encoder->cfg.alf_info_in_ph_flag)
   {
     const int alf_enabled = state->slice->tile_group_alf_enabled_flag[COMPONENT_Y];
     WRITE_U(stream, alf_enabled, 1, "slice_alf_enabled_flag");
@@ -1266,7 +1270,7 @@ void kvz_encoder_state_write_bitstream_slice_header(
         WRITE_U(stream, state->slice->tile_group_chroma_aps_id, 3, "slice_alf_aps_id_chroma");
       }
 
-      if (encoder->cfg.alf_cc_enabled_flag)
+      if (encoder->cfg.alf_type == 2)
       {
         WRITE_U(stream, g_cc_alf_filter_param.cc_alf_filter_enabled[COMPONENT_Cb - 1], 1, "slice_cc_alf_cb_enabled_flag");
         if (g_cc_alf_filter_param.cc_alf_filter_enabled[COMPONENT_Cb - 1])

@@ -50,8 +50,7 @@ int kvz_config_init(kvz_config *cfg)
   cfg->deblock_beta    = 0;
   cfg->deblock_tc      = 0;
   cfg->sao_type        = 3;
-  cfg->alf_enable      = 0;
-  cfg->alf_cc_enabled_flag = 0;
+  cfg->alf_type        = 0;
   cfg->alf_info_in_ph_flag = 0;
   cfg->alf_non_linear_luma = 1;
   cfg->alf_non_linear_chroma = 1;
@@ -460,6 +459,8 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
 
   static const char * const sao_names[] = { "off", "edge", "band", "full", NULL };
 
+  static const char * const alf_names[] = { "off", "no-cc", "full", NULL };
+
   static const char * const scaling_list_names[] = { "off", "custom", "default", NULL };
 
   static const char * const rc_algorithm_names[] = { "no-rc", "lambda", "oba", NULL };
@@ -807,10 +808,15 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     if (!parse_enum(value, sao_names, &sao_type)) sao_type = atobool(value) ? 3 : 0;
     cfg->sao_type = sao_type;
   }
-  else if OPT("alf")
-    cfg->alf_enable = atobool(value);
-  else if OPT("ccalf")
-    cfg->alf_cc_enabled_flag = atobool(value);
+  else if OPT("alf") {
+    int8_t alf_type = 0;
+    parse_enum(value, alf_names, &alf_type);
+    cfg->alf_type = alf_type;
+    if (cfg->alf_type)
+    {
+      set_config(cfg);
+    }
+  }
   else if OPT("rdoq")
     cfg->rdoq_enable = atobool(value);
   else if OPT("signhide")
@@ -1735,11 +1741,6 @@ int kvz_config_validate(const kvz_config *const cfg)
   if(cfg->target_bitrate == 0 && cfg->rc_algorithm != KVZ_NO_RC) {
     fprintf(stderr, "Rate control algorithm set but bitrate not set.\n");
     error = 1;
-  }
-
-  if (cfg->alf_enable)
-  {
-    set_config(cfg);
   }
 
   return !error;

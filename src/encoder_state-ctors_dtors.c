@@ -196,7 +196,7 @@ static int encoder_state_config_slice_init(encoder_state_t * const state,
   state->slice->start_in_rs = state->encoder_control->tiles_ctb_addr_ts_to_rs[start_address_in_ts];
   state->slice->end_in_rs = state->encoder_control->tiles_ctb_addr_ts_to_rs[end_address_in_ts];
 
-  if (state->encoder_control->cfg.alf_enable) {
+  if (state->encoder_control->cfg.alf_type) {
     state->slice->apss = malloc(sizeof(alf_aps) * ALF_CTB_MAX_NUM_APS);
     state->slice->tile_group_luma_aps_id = malloc(ALF_CTB_MAX_NUM_APS * sizeof(int8_t));
     //state->slice->param_set_map = malloc(sizeof(param_set_map) * ALF_CTB_MAX_NUM_APS);
@@ -768,7 +768,7 @@ void kvz_encoder_state_finalize(encoder_state_t * const state) {
   
   if (!state->parent || (state->parent->slice != state->slice)) {
 
-    if (state->encoder_control->cfg.alf_enable) {
+    if (state->encoder_control->cfg.alf_type) {
       /*if (state->slice->param_set_map && state->slice->param_set_map != NULL) {
         FREE_POINTER(state->slice->param_set_map);
       }*/

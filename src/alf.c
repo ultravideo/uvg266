@@ -1795,7 +1795,7 @@ void kvz_alf_enc_process(encoder_state_t *const state)
     aps->cc_alf_aps_param.new_cc_alf_filter[1] = false;
   }
   
-  if (!state->encoder_control->cfg.alf_cc_enabled_flag)
+  if (state->encoder_control->cfg.alf_type != 2)
   {
     return;
   }
@@ -5176,7 +5176,7 @@ void code_alf_ctu_enable_flag(encoder_state_t * const state,
   
   const bool alf_component_enabled = (aps != NULL) ? aps->enabled_flag[component_id] : state->slice->tile_group_alf_enabled_flag[component_id];
 
-  if (encoder->cfg.alf_enable && alf_component_enabled)
+  if (encoder->cfg.alf_type && alf_component_enabled)
   {
     int frame_width_in_ctus = state->tile->frame->width_in_lcu;
 
@@ -5204,7 +5204,7 @@ void code_alf_ctu_filter_index(encoder_state_t * const state,
 {
   const encoder_control_t * const encoder = state->encoder_control;
 
-  if (!encoder->cfg.alf_enable || !alf_enable_luma)//(!cs.sps->getALFEnabledFlag()) || (!alfEnableLuma))
+  if (!encoder->cfg.alf_type || !alf_enable_luma)//(!cs.sps->getALFEnabledFlag()) || (!alfEnableLuma))
   {
     return;
   }
@@ -5325,7 +5325,7 @@ void code_alf_ctu_alternative_ctu(encoder_state_t * const state,
   int aps_idx = aps ? 0 : state->slice->tile_group_chroma_aps_id;
   const alf_aps* alf_param_ref = aps ? (aps) : &state->slice->apss[aps_idx];
 
-  if (aps || (state->encoder_control->cfg.alf_enable && state->slice->tile_group_alf_enabled_flag[comp_idx]))
+  if (aps || (state->encoder_control->cfg.alf_type && state->slice->tile_group_alf_enabled_flag[comp_idx]))
   {
     uint8_t* ctb_alf_flag = g_ctu_enable_flag[comp_idx];
 
@@ -5349,7 +5349,7 @@ void code_alf_ctu_alternative_ctu(encoder_state_t * const state,
 
 void kvz_encode_alf_bits(encoder_state_t * const state, const int ctu_idx)
 {
-  if (state->encoder_control->cfg.alf_enable)
+  if (state->encoder_control->cfg.alf_type)
   {
     for (int comp_idx = 0; comp_idx < MAX_NUM_COMPONENT; comp_idx++)
     {
@@ -5839,25 +5839,11 @@ void encode_alf_aps_scaling_list(encoder_state_t * const state)
   }
 }
 
-  //PelUnitBuf recYuv = cs.getRecoBuf();
-  kvz_picture *rec_yuv = state->tile->frame->rec;
-  //m_tempBuf.copyFrom(recYuv);
-  //PelUnitBuf tmpYuv = m_tempBuf.getBuf(cs.area);
-  //tmpYuv.extendBorderPel(MAX_ALF_FILTER_LENGTH >> 1);
-
-  int luma_height = state->tile->frame->height;
-  int luma_width = state->tile->frame->width;
-
-  int ctu_idx = 0;
-  int max_cu_width = LCU_WIDTH;
-  int max_cu_height = LCU_WIDTH;
-
-  bool clip_top = false, clip_bottom = false, clip_left = false, clip_right = false;
-  int num_hor_vir_bndry = 0, num_ver_vir_bndry = 0;
-  int hor_vir_bndry_pos[] = { 0, 0, 0 };
-  int ver_vir_bndry_pos[] = { 0, 0, 0 };
-
-  for (int y_pos = 0; y_pos < luma_height; y_pos += max_cu_width)
+void encode_alf_aps(encoder_state_t * const state)
+{
+  const encoder_control_t * const encoder = state->encoder_control;
+  bitstream_t * const stream = &state->stream;
+  if (encoder->cfg.alf_type) // && (state->slice->tile_group_alf_enabled_flag[COMPONENT_Y] || state->slice->tile_group_cc_alf_cb_enabled_flag || state->slice->tile_group_cc_alf_cr_enabled_flag))
   {
     param_set_map *aps_map = state->encoder_control->cfg.param_set_map;
     for (int aps_id = 0; aps_id < ALF_CTB_MAX_NUM_APS; aps_id++)
