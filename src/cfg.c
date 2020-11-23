@@ -810,11 +810,10 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   }
   else if OPT("alf") {
     int8_t alf_type = 0;
-    parse_enum(value, alf_names, &alf_type);
-    cfg->alf_type = alf_type;
+    if(!parse_enum(value, alf_names, &alf_type)) cfg->alf_type = alf_type;
     if (cfg->alf_type)
     {
-      set_config(cfg);
+      set_aps_map(cfg);
     }
   }
   else if OPT("rdoq")

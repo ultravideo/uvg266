@@ -319,6 +319,7 @@ typedef struct param_set_map {
   //uint8_t* p_nalu_data;
   struct alf_aps parameter_set;
 } param_set_map;
+
 //---------------------------------------------------------------
 
 //dunno
@@ -403,9 +404,7 @@ cabac_data_t cabac_estimator;
 
 //-------------------------help functions---------------------------
 
-void set_config(kvz_config *const cfg);
-bool is_crossed_by_virtual_boundaries(const int x_pos, const int y_pos, const int width, const int height, bool* clip_top, bool* clip_bottom, bool* clip_left, 
-                                      bool* clip_right, int* num_hor_vir_bndry, int* num_ver_vir_bndry, int hor_vir_bndry_pos[], int ver_vir_bndry_pos[], encoder_state_t *const state);
+void set_aps_map(kvz_config *const cfg);
 void init_ctu_alternative_chroma(uint8_t* ctu_alts[MAX_NUM_COMPONENT], const int32_t num_ctus);
 int16_t clip_alf(const int16_t clip, const int16_t ref, const int16_t val0, const int16_t val1);
 int alf_clip_pixel(const int a, const clp_rng clp_rng);
@@ -591,7 +590,6 @@ void round_filt_coeff_cc_alf(int16_t *filter_coeff_quant,
   const int factor);
 
 void derive_cc_alf_filter_coeff(alf_component_id comp_id,
-  const kvz_picture *rec_yuv, const kvz_picture *rec_yuv_ext,
   short filter_coeff[MAX_NUM_CC_ALF_FILTERS][MAX_NUM_CC_ALF_CHROMA_COEFF],
   const uint8_t filter_idx);
 
@@ -618,18 +616,16 @@ void apply_cc_alf_filter(encoder_state_t * const state, alf_component_id comp_id
 
 void derive_cc_alf_filter(encoder_state_t * const state,
   alf_component_id comp_id, const kvz_picture *org_yuv,
-  const kvz_picture *temp_dec_yuv_buf,
-  const kvz_picture *dst_yuv);
+  const kvz_picture *rec_dst_yuv);
 
 void derive_stats_for_cc_alf_filtering(encoder_state_t * const state,
   const kvz_picture *org_yuv,
-  const kvz_picture *rec_yuv,
   const int comp_idx, const int mask_stride,
   const uint8_t filter_idc);
 
 void get_blk_stats_cc_alf(encoder_state_t * const state,
   alf_covariance *alf_covariance, 
-  const kvz_picture *org_yuv, const kvz_picture *rec_yuv,
+  const kvz_picture *org_yuv,
   const alf_component_id comp_id,
   const int x_pos, const int y_pos, 
   const int width, const int height);

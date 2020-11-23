@@ -27,9 +27,9 @@ int comparator(const void *v1, const void *v2)
 }
 #endif
 
-#if !FULL_FRAME
-void kvz_alf_init(encoder_state_t *const state)
-//alf_info_t *alf)
+//-------------------------help functions---------------------------
+
+void set_aps_map(kvz_config *const cfg)
 {
   if (g_frame_count == state->frame->num) {
     return;
@@ -83,49 +83,6 @@ void kvz_alf_init(encoder_state_t *const state)
                                                 //g_alf_covariance_frame_cc_alf[1] = 0;
 }
 #endif // !FULL_FRAME
-
-//-------------------------help functions---------------------------
-
-bool is_crossed_by_virtual_boundaries(const int x_pos, const int y_pos, const int width, const int height, bool* clip_top, bool* clip_bottom, bool* clip_left, bool* clip_right, 
-                                      int* num_hor_vir_bndry, int* num_ver_vir_bndry, int hor_vir_bndry_pos[], int ver_vir_bndry_pos[], encoder_state_t *const state)
-{
-  *clip_top = false; *clip_bottom = false; *clip_left = false; *clip_right = false;
-  *num_hor_vir_bndry = 0; *num_ver_vir_bndry = 0;
-  if (state->encoder_control->cfg.loop_filter_across_virtual_boundaries_disabled_flag)
-  {
-    for (int i = 0; i < state->slice->num_hor_virtual_boundaries; i++)
-    {
-      if (state->slice->virtual_boundaries_pos_y[i] == y_pos)
-      {
-        *clip_top = true;
-      }
-      else if (state->slice->virtual_boundaries_pos_y[i] == y_pos + height)
-      {
-        *clip_bottom = true;
-      }
-      else if (y_pos < state->slice->virtual_boundaries_pos_y[i] && state->slice->virtual_boundaries_pos_y[i] < y_pos + height)
-      {
-        hor_vir_bndry_pos[*num_hor_vir_bndry++] = state->slice->virtual_boundaries_pos_y[i];
-      }
-    }
-    for (int i = 0; i < state->slice->num_ver_virtual_boundaries; i++)
-    {
-      if (state->slice->virtual_boundaries_pos_x[i] == x_pos)
-      {
-        *clip_left = true;
-      }
-      else if (state->slice->virtual_boundaries_pos_x[i] == x_pos + width)
-      {
-        *clip_right = true;
-      }
-      else if (x_pos < state->slice->virtual_boundaries_pos_x[i] && state->slice->virtual_boundaries_pos_x[i] < x_pos + width)
-      {
-        ver_vir_bndry_pos[*num_ver_vir_bndry++] = state->slice->virtual_boundaries_pos_x[i];
-      }
-    }
-  }
-  return *num_hor_vir_bndry > 0 || *num_ver_vir_bndry > 0 || *clip_top || *clip_bottom || *clip_left || *clip_right;
-}
 
 void init_ctu_alternative_chroma(uint8_t* ctu_alts[MAX_NUM_COMPONENT], const int32_t num_ctus)
 {
@@ -1630,11 +1587,6 @@ void kvz_alf_enc_process(encoder_state_t *const state)
   const int luma_height = state->tile->frame->height;
   const int luma_width = state->tile->frame->width;
 
-  bool clip_top = false, clip_bottom = false, clip_left = false, clip_right = false;
-  int num_hor_vir_bndry = 0, num_ver_vir_bndry = 0;
-  int hor_vir_bndry_pos[] = { 0, 0, 0 };
-  int ver_vir_bndry_pos[] = { 0, 0, 0 };
-  
   for (int y_pos = 0; y_pos < luma_height; y_pos += LCU_WIDTH)
   {
     for (int x_pos = 0; x_pos < lumaWidth; x_pos += maxCUWidth)
@@ -1652,66 +1604,8 @@ void kvz_alf_enc_process(encoder_state_t *const state)
     {
       const int width = (x_pos + LCU_WIDTH > luma_width) ? (luma_width - x_pos) : LCU_WIDTH;
       const int height = (y_pos + LCU_WIDTH > luma_height) ? (luma_height - y_pos) : LCU_WIDTH;
-      int raster_slice_alf_pad = 0;
-      //T‰t‰ if-lauseen sis‰ll‰ olevaa algoritmia pit‰‰ viel‰ viilata
-      if (is_crossed_by_virtual_boundaries(x_pos, y_pos, width, height, &clip_top, &clip_bottom, &clip_left, &clip_right, &num_hor_vir_bndry, &num_ver_vir_bndry, hor_vir_bndry_pos, ver_vir_bndry_pos, &raster_slice_alf_pad, state))
       {
-        int y_start = y_pos;
-        for (int i = 0; i <= num_hor_vir_bndry; i++)
-        {
-          const int y_end = i == num_hor_vir_bndry ? y_pos + height : hor_vir_bndry_pos[i];
-          const int h = y_end - y_start;
-
-          //const bool clip_t = (i == 0 && clip_top) || (i > 0) || (y_start == 0);
-          //const bool clip_b = (i == num_hor_vir_bndry && clip_bottom) || (i < num_hor_vir_bndry) || (y_end == luma_height);
-
-          int x_start = x_pos;
-          for (int j = 0; j <= num_ver_vir_bndry; j++)
-          {
-            const int x_end = j == num_ver_vir_bndry ? x_pos + width : ver_vir_bndry_pos[j];
-            const int w = x_end - x_start;
-            //const bool clip_l = (j == 0 && clip_left) || (j > 0) || (x_start == 0);
-            //const bool clip_r = (j == num_ver_vir_bndry && clip_right) || (j < num_ver_vir_bndry) || (x_end == luma_width);
-
-            //const int w_buf = w + (clip_l ? 0 : MAX_ALF_PADDING_SIZE) + (clip_r ? 0 : MAX_ALF_PADDING_SIZE);
-            //const int h_buf = h + (clip_t ? 0 : MAX_ALF_PADDING_SIZE) + (clip_b ? 0 : MAX_ALF_PADDING_SIZE);
-            //PelUnitBuf buf = m_tempBuf2.subBuf(UnitArea(cs.area.chromaFormat, Area(0, 0, w_buf, h_buf)));
-            //buf.copyFrom(recYuv.subBuf(UnitArea(cs.area.chromaFormat, Area(x_start - (clip_l ? 0 : MAX_ALF_PADDING_SIZE), y_start - (clip_t ? 0 : MAX_ALF_PADDING_SIZE), w_buf, h_buf))));
-            //buf.extendBorderPel(MAX_ALF_PADDING_SIZE);
-            //buf = buf.subBuf(UnitArea(cs.area.chromaFormat, Area(clip_l ? 0 : MAX_ALF_PADDING_SIZE, clip_t ? 0 : MAX_ALF_PADDING_SIZE, w, h)));
-        
-            // pad top-left unavailable samples for raster slice
-            /*if (x_start == x_pos && y_start == y_pos && (raster_slice_alf_pad & 1))
-            {
-              buf.padBorderPel(MAX_ALF_PADDING_SIZE, 1);
-            }
-
-            // pad bottom-right unavailable samples for raster slice
-            if (xEnd == xPos + width && yEnd == yPos + height && (rasterSliceAlfPad & 2))
-            {
-              buf.padBorderPel(MAX_ALF_PADDING_SIZE, 2);
-            }*/
-
-            //const Area blkSrc(0, 0, w, h);
-            //const Area blkDst(xStart, yStart, w, h);
-            kvz_alf_derive_classification(state, w, h, x_start, y_start, x_start, y_start);
-            /*#if !JVET_O0525_REMOVE_PCM
-            //Area blkPCM(xStart, yStart, w, h);
-            kvz_alf_reset_pcm_blk_class_info(state, lcu, w, h, x_start, y_start);*/
-
-            x_start = x_end;
-          }
-
-          y_start = y_end;
-        }
-      }
-      else
-      {
-        //Area blk(x_pos, y_pos, width, height);
         kvz_alf_derive_classification(state, width, height, x_pos, y_pos, x_pos, y_pos);
-        /*#if !JVET_O0525_REMOVE_PCM
-        //Area blkPCM(x_pos, y_pos, width, height);
-        kvz_alf_reset_pcm_blk_class_info(state, lcu, width, height, x_pos, y_pos);*/
       }
     }
   } 
@@ -1816,14 +1710,6 @@ void kvz_alf_enc_process(encoder_state_t *const state)
   memcpy(&alf_tmp_v[index_chroma], &state->tile->frame->rec->v[index_chroma],
     sizeof(kvz_pixel) * chroma_stride * (chroma_height + chroma_padding * 2));
 
-  adjust_pixels_chroma(alf_tmp_y,
-    0,
-    rec_yuv->width,
-    0,
-    rec_yuv->height,
-    rec_yuv->stride,
-    rec_yuv->width,
-    rec_yuv->height);
   adjust_pixels_chroma(alf_tmp_u,
     0,
     rec_yuv->width >> chroma_scale_x,
@@ -1841,18 +1727,15 @@ void kvz_alf_enc_process(encoder_state_t *const state)
     rec_yuv->width >> chroma_scale_x,
     rec_yuv->height >> chroma_scale_y);
 
-  const kvz_picture rec_yuv_buf;
-  memcpy(&rec_yuv_buf, state->tile->frame->rec, sizeof(rec_yuv_buf));
-
   const int num_ctus_in_width = state->tile->frame->width_in_lcu;
-  derive_stats_for_cc_alf_filtering(state, org_yuv, &rec_yuv_buf, COMPONENT_Cb, num_ctus_in_width, (0 + 1));
-  derive_stats_for_cc_alf_filtering(state, org_yuv, &rec_yuv_buf, COMPONENT_Cr, num_ctus_in_width, (0 + 1));
+  derive_stats_for_cc_alf_filtering(state, org_yuv, COMPONENT_Cb, num_ctus_in_width, (0 + 1));
+  derive_stats_for_cc_alf_filtering(state, org_yuv, COMPONENT_Cr, num_ctus_in_width, (0 + 1));
   init_distortion_cc_alf(num_ctus_in_pic);
 
   memcpy(&cabac_estimator, &ctx_start_cc_alf, sizeof(cabac_estimator));
-  derive_cc_alf_filter(state, COMPONENT_Cb, org_yuv, &rec_yuv_buf, rec_yuv);
+  derive_cc_alf_filter(state, COMPONENT_Cb, org_yuv, rec_yuv);
   memcpy(&cabac_estimator, &ctx_start_cc_alf, sizeof(cabac_estimator));
-  derive_cc_alf_filter(state, COMPONENT_Cr, org_yuv, &rec_yuv_buf, rec_yuv);
+  derive_cc_alf_filter(state, COMPONENT_Cr, org_yuv, rec_yuv);
 
   setup_cc_alf_aps(state);
 
@@ -2999,12 +2882,6 @@ void kvz_alf_derive_stats_for_filtering(encoder_state_t * const state)
     }
   }
 
-
-  bool clip_top = false, clip_bottom = false, clip_left = false, clip_right = false;
-  int num_hor_vir_bndry = 0, num_ver_vir_bndry = 0;
-  int hor_vir_bndry_pos[] = { 0, 0, 0 };
-  int ver_vir_bndry_pos[] = { 0, 0, 0 };
-
   int max_cu_height = LCU_WIDTH;
 
 #if FULL_FRAME
@@ -3014,106 +2891,6 @@ void kvz_alf_derive_stats_for_filtering(encoder_state_t * const state)
     {
       const int width = (x_pos + LCU_WIDTH > pic_width) ? (pic_width - x_pos) : LCU_WIDTH;
       const int height = (y_pos + LCU_WIDTH > pic_height) ? (pic_height - y_pos) : LCU_WIDTH;
-#else
-      //lcu->size
-  const int x_pos = lcu->position_px.x;
-  const int y_pos = lcu->position_px.y;
-  const int width = lcu->size.x; //(x_pos + max_cu_width > pic_width) ? (pic_width - x_pos) : max_cu_width;
-  const int height = lcu->size.y; //(y_pos + max_cu_height > pic_height) ? (pic_height - y_pos) : max_cu_height;
-
-      if (is_crossed_by_virtual_boundaries(x_pos, y_pos, width, height, &clip_top, &clip_bottom, &clip_left, &clip_right, &num_hor_vir_bndry, &num_ver_vir_bndry, hor_vir_bndry_pos, ver_vir_bndry_pos, state))
-      {
-        int y_start = y_pos;
-        for (int i = 0; i <= num_hor_vir_bndry; i++)
-        {
-          const int y_end = i == num_hor_vir_bndry ? y_pos + height : hor_vir_bndry_pos[i];
-          const int h = y_end - y_start;
-          //const bool clip_t = (i == 0 && clip_top) || (i > 0) || (y_start == 0);
-          //const bool clip_b = (i == num_hor_vir_bndry && clip_bottom) || (i < num_hor_vir_bndry) || (y_end == pic_height);
-
-          int x_start = x_pos;
-          for (int j = 0; j <= num_ver_vir_bndry; j++)
-          {
-            const int x_end = j == num_ver_vir_bndry ? x_pos + width : ver_vir_bndry_pos[j];
-            const int w = x_end - x_start;
-            //const bool clip_l = (j == 0 && clip_left) || (j > 0) || (x_start == 0);
-            //const bool clip_r = (j == num_ver_vir_bndry && clip_right) || (j < num_ver_vir_bndry) || (x_end == pic_width);
-
-            //const int w_buf = w + (clip_l ? 0 : MAX_ALF_PADDING_SIZE) + (clip_r ? 0 : MAX_ALF_PADDING_SIZE);
-            //const int h_buf = h + (clip_t ? 0 : MAX_ALF_PADDING_SIZE) + (clip_b ? 0 : MAX_ALF_PADDING_SIZE);
-            //PelUnitBuf recBuf = m_tempBuf2.subBuf(UnitArea(cs.area.chromaFormat, Area(0, 0, w_buf, h_buf)));
-            //recBuf.copyFrom(recYuv.subBuf(UnitArea(cs.area.chromaFormat, Area(x_start - (clip_l ? 0 : MAX_ALF_PADDING_SIZE), y_start - (clip_t ? 0 : MAX_ALF_PADDING_SIZE), w_buf, h_buf))));
-            // pad top-left unavailable samples for raster slice
-            /*if (xStart == xPos && yStart == yPos && (rasterSliceAlfPad & 1))
-            {
-              recBuf.padBorderPel(MAX_ALF_PADDING_SIZE, 1);
-            }
-
-            // pad bottom-right unavailable samples for raster slice
-            if (xEnd == xPos + width && yEnd == yPos + height && (rasterSliceAlfPad & 2))
-            {
-              recBuf.padBorderPel(MAX_ALF_PADDING_SIZE, 2);
-            }*/
-            //recBuf.extendBorderPel(MAX_ALF_PADDING_SIZE);
-            //recBuf = recBuf.subBuf(UnitArea(cs.area.chromaFormat, Area(clip_l ? 0 : MAX_ALF_PADDING_SIZE, clip_t ? 0 : MAX_ALF_PADDING_SIZE, w, h)));
-
-            //const UnitArea area(m_chromaFormat, Area(0, 0, w, h));
-            //const UnitArea areaDst(m_chromaFormat, Area(x_start, y_start, w, h));
-            for (int comp_idx = 0; comp_idx < number_of_components; comp_idx++)
-            {
-              const bool is_luma = comp_idx == COMPONENT_Y ? 1 : 0;
-              channel_type ch_type = is_luma ? CHANNEL_TYPE_LUMA : CHANNEL_TYPE_CHROMA;
-
-              int blk_w = is_luma ? w : w >> chroma_scale_x;
-              int blk_h = is_luma ? h : h >> chroma_scale_y;
-              int pos_x = is_luma ? x_start : x_start >> chroma_scale_x;
-              int pos_y = is_luma ? y_start : y_start >> chroma_scale_y;
-
-              int32_t org_stride = is_luma ? state->tile->frame->source->stride : state->tile->frame->source->stride >> chroma_scale_x;
-              int32_t rec_stride = is_luma ? state->tile->frame->rec->stride    : state->tile->frame->rec->stride >> chroma_scale_x;
-
-              kvz_pixel *org = comp_idx ? (comp_idx - 1 ? &state->tile->frame->source->v[pos_x + pos_y * org_stride] : &state->tile->frame->source->u[pos_x + pos_y * org_stride]) : &state->tile->frame->source->y[pos_x + pos_y * org_stride];
-              kvz_pixel *rec = comp_idx ? (comp_idx - 1 ? &state->tile->frame->rec->v[pos_x + pos_y * org_stride]    : &state->tile->frame->rec->u[pos_x + pos_y * org_stride])    : &state->tile->frame->rec->y[pos_x + pos_y * org_stride];
-
-              for (int shape = 0; shape !=1/*m_filterShapes[ch_type].size()*/; shape++)
-              {
-                kvz_alf_get_blk_stats(state, ch_type,
-                  &g_alf_covariance[comp_idx][shape][ctu_rs_addr],
-                  comp_idx ? NULL : g_classifier,
-                  org, org_stride, rec, rec_stride, pos_x, pos_y, pos_x, pos_y, blk_w, blk_h, 
-                  ((comp_idx == 0) ? alf_vb_luma_ctu_height : alf_vb_chma_ctu_height), 
-                  (comp_idx == 0) ? alf_vb_luma_pos : alf_vb_chma_pos
-                );
-              }
-            }
-
-            x_start = x_end;
-          }
-
-          y_start = y_end;
-        }
-
-        for (int comp_idx = 0; comp_idx < number_of_components; comp_idx++)
-        {
-          const bool is_luma = comp_idx == COMPONENT_Y ? 1 : 0;
-          channel_type ch_type = is_luma ? CHANNEL_TYPE_LUMA : CHANNEL_TYPE_CHROMA;
-
-          for (int shape = 0; shape != 1/*m_filterShapes[chType].size()*/; shape++)
-          {
-            const int num_classes = is_luma ? MAX_NUM_ALF_CLASSES : 1;
-
-            for (int class_idx = 0; class_idx < num_classes; class_idx++)
-            {
-//#if JVET_O0090_ALF_CHROMA_FILTER_ALTERNATIVES_CTB
-              add_alf_cov(&g_alf_covariance_frame[ch_type][shape][is_luma ? class_idx : 0], &g_alf_covariance[comp_idx][shape][lcu->index][class_idx]);
-/*#else
-              add_alf_cov(&g_alf_covariance_frame[ch_type][shape][class_idx], &g_alf_covariance[comp_idx][shape][lcu->index][class_idx]);
-#endif*/
-            }
-          }
-        }
-      }
-      else
       {
         for (int comp_idx = 0; comp_idx < number_of_components; comp_idx++)
         {
@@ -4875,10 +4652,6 @@ void kvz_alf_reconstructor(encoder_state_t * const state)
   const int max_cu_height = LCU_WIDTH;
 
   int ctu_idx = 0;
-  bool clip_top = false, clip_bottom = false, clip_left = false, clip_right = false;
-  int num_hor_vir_bndry = 0, num_ver_vir_bndry = 0;
-  int hor_vir_bndry_pos[] = { 0, 0, 0 };
-  int ver_vir_bndry_pos[] = { 0, 0, 0 };
 
   const int luma_stride = state->tile->frame->rec->stride;
   const int chroma_stride = luma_stride >> chroma_scale_x;
@@ -4901,119 +4674,18 @@ void kvz_alf_reconstructor(encoder_state_t * const state)
     for (int x_pos = 0; x_pos < luma_width; x_pos += max_cu_width)
     {
 
-    bool ctu_enable_flag = g_ctu_enable_flag[COMPONENT_Y][ctu_idx];
-    for (int comp_idx = 1; comp_idx < MAX_NUM_COMPONENT; comp_idx++)
-    {
-      ctu_enable_flag |= g_ctu_enable_flag[comp_idx][ctu_idx] > 0;
-    }
-        int x_start = x_pos;
-        for (int j = 0; j <= num_ver_vir_bndry; j++)
-        {
-          const int x_end = j == num_ver_vir_bndry ? x_pos + width : ver_vir_bndry_pos[j];
-          const int w = x_end - x_start;
-          const bool clip_l = (j == 0 && clip_left) || (j > 0) || (x_start == 0);
-          const bool clip_r = (j == num_ver_vir_bndry && clip_right) || (j < num_ver_vir_bndry) || (x_end == luma_width);
+      const int width = (x_pos + max_cu_width > luma_width) ? (luma_width - x_pos) : max_cu_width;
+      const int height = (y_pos + max_cu_height > luma_height) ? (luma_height - y_pos) : max_cu_height;
 
-          const int w_buf = w + (clip_l ? 0 : MAX_ALF_PADDING_SIZE) + (clip_r ? 0 : MAX_ALF_PADDING_SIZE);
-          const int h_buf = h + (clip_t ? 0 : MAX_ALF_PADDING_SIZE) + (clip_b ? 0 : MAX_ALF_PADDING_SIZE);
-          //PelUnitBuf buf = m_tempBuf2.subBuf(UnitArea(cs.area.chromaFormat, Area(0, 0, w_buf, h_buf)));
-          //buf.copyFrom(recExtBuf.subBuf(UnitArea(cs.area.chromaFormat, Area(x_start - (clip_l ? 0 : MAX_ALF_PADDING_SIZE), y_start - (clip_t ? 0 : MAX_ALF_PADDING_SIZE), w_buf, h_buf))));
-          //buf.extendBorderPel(MAX_ALF_PADDING_SIZE);
-          //buf = buf.subBuf(UnitArea(cs.area.chromaFormat, Area(clip_l ? 0 : MAX_ALF_PADDING_SIZE, clip_t ? 0 : MAX_ALF_PADDING_SIZE, w, h)));
-
-          if (g_ctu_enable_flag[COMPONENT_Y][ctu_idx])
-          {
-            //const Area blkSrc(0, 0, w, h);
-            //const Area blkDst(x_start, y_start, w, h);
-            short filter_set_index = g_alf_ctb_filter_index[ctu_idx];
-            short *coeff;
-            int16_t *clip;
-            if (filter_set_index >= ALF_NUM_FIXED_FILTER_SETS)
-            {
-              buf.padBorderPel(MAX_ALF_PADDING_SIZE, 1);
-            }
-
-            // pad bottom-right unavailable samples for raster slice
-            if (xEnd == xPos + width && yEnd == yPos + height && (rasterSliceAlfPad & 2))
-            {
-              buf.padBorderPel(MAX_ALF_PADDING_SIZE, 2);
-            }*/
-            //buf.extendBorderPel(MAX_ALF_PADDING_SIZE);
-            //buf = buf.subBuf(UnitArea(cs.area.chromaFormat, Area(clip_l ? 0 : MAX_ALF_PADDING_SIZE, clip_t ? 0 : MAX_ALF_PADDING_SIZE, w, h)));
-
-            if (g_ctu_enable_flag[COMPONENT_Y][ctu_idx])
-            {
-              //const Area blkSrc(0, 0, w, h);
-              //const Area blkDst(x_start, y_start, w, h);
-              short filter_set_index = g_alf_ctb_filter_index[ctu_idx];
-              short *coeff;
-              int16_t *clip;
-              if (filter_set_index >= ALF_NUM_FIXED_FILTER_SETS)
-              {
-                coeff = g_coeff_aps_luma[filter_set_index - ALF_NUM_FIXED_FILTER_SETS];
-                clip = g_clipp_aps_luma[filter_set_index - ALF_NUM_FIXED_FILTER_SETS];
-              }
-              else
-              {
-                coeff = g_fixed_filter_set_coeff_dec[filter_set_index];
-                clip = g_clip_default;
-              }
-              kvz_alf_filter_block(state,
-                alf_tmp_y, state->tile->frame->rec->y,
-                luma_stride, luma_stride,
-                coeff, clip, g_clp_rngs.comp[COMPONENT_Y], COMPONENT_Y,
-                w, h, x_start, y_start, x_start, y_start,
-                alf_vb_luma_pos, alf_vb_luma_ctu_height);
-            }
-            kvz_alf_filter_block(state,
-              state->tile->frame->rec->y, alf_tmp_y,
-              state->tile->frame->rec->stride, state->tile->frame->rec->stride,
-              coeff, clip, g_clp_rngs.comp[COMPONENT_Y], COMPONENT_Y,
-              w, h, x_start, y_start, x_start, y_start,
-              ((y_pos + max_cu_height >= luma_height) ? luma_height : g_alf_vb_luma_pos),
-              g_alf_vb_luma_ctu_height);
-          }
-
-            for (int comp_idx = 1; comp_idx < MAX_NUM_COMPONENT; comp_idx++)
-            {
-              alf_component_id comp_id = comp_idx;
-//#if JVET_O0090_ALF_CHROMA_FILTER_ALTERNATIVES_CTB
-
-              if (g_ctu_enable_flag[comp_idx][ctu_idx])
-              {
-                //const Area blkSrc(0, 0, w >> chromaScaleX, h >> chromaScaleY);
-                //const Area blkDst(x_start >> chromaScaleX, y_start >> chromaScaleY, w >> chromaScaleX, h >> chromaScaleY);
-
-              const int alt_num = g_ctu_alternative[comp_id][ctu_idx];
-              kvz_alf_filter_block(state,
-                src_pixels, dst_pixels, src_stride, dst_stride,
-                g_chroma_coeff_final[alt_num], g_chroma_clipp_final[alt_num], g_clp_rngs.comp[comp_idx], comp_id,
-                w >> chroma_scale_x, h >> chroma_scale_y,
-                x_start >> chroma_scale_x, y_start >> chroma_scale_y,
-                x_start >> chroma_scale_x, y_start >> chroma_scale_y,
-                ((y_pos + max_cu_height >= luma_height) ? luma_height : g_alf_vb_chma_pos),
-                g_alf_vb_chma_ctu_height);
-/*#else
-              kvz_alf_filter_block(state, g_chroma_coeff_final, g_chroma_clipp_final, g_clp_rngs.comp[comp_idx], comp_id,
-                w >> chroma_scale_x, h >> chroma_scale_y,
-                x_start >> chroma_scale_x, y_start >> chroma_scale_y,
-                x_start >> chroma_scale_x, y_start >> chroma_scale_y,
-                ((y_pos + max_cu_height >= luma_height) ? luma_height : g_alf_vb_chma_pos),
-                g_alf_vb_chma_ctu_height);
-#endif*/
-            }
-
-            x_start = x_end;
-          }
-
-          y_start = y_end;
-        }
+      bool ctu_enable_flag = g_ctu_enable_flag[COMPONENT_Y][ctu_idx];
+      for (int comp_idx = 1; comp_idx < MAX_NUM_COMPONENT; comp_idx++)
+      {
+        ctu_enable_flag |= g_ctu_enable_flag[comp_idx][ctu_idx] > 0;
       }
-      else
+
       {
         if (g_ctu_enable_flag[COMPONENT_Y][ctu_idx])
         {
-          //Area blk(x_pos, y_pos, width, height);
           short filter_set_index = g_alf_ctb_filter_index[ctu_idx];
           short *coeff;
           int16_t *clip;
@@ -5062,10 +4734,6 @@ void kvz_alf_reconstructor(encoder_state_t * const state)
 
           if (g_ctu_enable_flag[comp_idx][ctu_idx])
           {
-            //Area blk(x_pos >> chroma_scale_x, y_pos >> chroma_scale_y, width >> chroma_scale_x, height >> chroma_scale_y);
-            //m_filter5x5Blk(m_classifier, recYuv, tmpYuv, blk, comp_id, m_chromaCoeffFinal, clp_rngs.comp[comp_idx], cs);
-//#if JVET_O0090_ALF_CHROMA_FILTER_ALTERNATIVES_CTB
-
             kvz_pixel *dst_pixels = comp_id - 1 ? state->tile->frame->rec->v : state->tile->frame->rec->u;
             const kvz_pixel *src_pixels = comp_id - 1 ? alf_tmp_v : alf_tmp_u;
 
@@ -5761,37 +5429,6 @@ void HLSWriter::alfFilter(const AlfParam& alfParam, const bool is_chroma)
 #endif*/
   }
 }
-
-/*
-void alf_golomb_encode(encoder_state_t * const state,
-  int coeff,
-  int k,
-  const bool signed_coeff)
-{
-  bitstream_t * const stream = &state->stream;
-
-  unsigned int symbol = abs(coeff);
-  while (symbol >= (unsigned int)(1 << k))
-  {
-    symbol -= 1 << k;
-    k++;
-    //WRITE_FLAG(0, "alf_coeff_abs_prefix");
-    WRITE_U(stream, 0, 1, "alf_coeff_abs_prefix");
-  }
-  //WRITE_FLAG(1, "alf_coeff_abs_prefix");
-  WRITE_U(stream, 1, 1, "alf_coeff_abs_prefix");
-
-  if (k > 0)
-  {
-    //WRITE_CODE(symbol, k, "alf_coeff_abs_suffix");
-    WRITE_U(stream, symbol, k, "alf_coeff_abs_suffix");
-  }
-  if (signed_coeff && coeff != 0)
-  {
-    //WRITE_FLAG((coeff < 0) ? 1 : 0, "alf_coeff_sign");
-    WRITE_U(stream, (coeff < 0) ? 1 : 0, 1, "alf_coeff_sign");
-  }
-}*/
 
 void encode_alf_adaptive_parameter_set(encoder_state_t * const state)
 {
@@ -7190,11 +6827,6 @@ void apply_cc_alf_filter(encoder_state_t * const state, alf_component_id comp_id
   const short filter_set[MAX_NUM_CC_ALF_FILTERS][MAX_NUM_CC_ALF_CHROMA_COEFF],
   const int   selected_filter_idx)
 {
-  bool clip_top = false, clip_bottom = false, clip_left = false, clip_right = false;
-  int  num_hor_vir_bndry = 0, num_ver_vir_bndry = 0;
-  int  hor_vir_bndry_pos[] = { 0, 0, 0 };
-  int  ver_vir_bndry_pos[] = { 0, 0, 0 };
-
   enum kvz_chroma_format chroma_format = state->encoder_control->chroma_format;
   uint8_t component_scale_y = (comp_id == COMPONENT_Y || chroma_format != KVZ_CSP_420) ? 0 : 1;
   uint8_t component_scale_x = (comp_id == COMPONENT_Y || chroma_format == KVZ_CSP_444) ? 0 : 1;
@@ -7229,64 +6861,7 @@ void apply_cc_alf_filter(encoder_state_t * const state, alf_component_id comp_id
         const int height = (y_pos + LCU_WIDTH > pic_height) ? (pic_height - y_pos) : LCU_WIDTH;
 
         int raster_slice_alf_pad = 0;
-        if (0/*isCrossedByVirtualBoundaries(cs, x_pos, y_pos, width, height, clip_top, clip_bottom, clip_left, clip_right,
-          num_hor_vir_bndry, num_ver_vir_bndry, hor_vir_bndry_pos, ver_vir_bndry_pos,
-          raster_slice_alf_pad)*/)
         {
-          /*int yStart = y_pos;
-          for (int i = 0; i <= num_hor_vir_bndry; i++)
-          {
-            const int  yEnd = i == num_hor_vir_bndry ? y_pos + height : hor_vir_bndry_pos[i];
-            const int  h = yEnd - yStart;
-            const bool clipT = (i == 0 && clip_top) || (i > 0) || (yStart == 0);
-            const bool clipB = (i == num_hor_vir_bndry && clip_bottom) || (i < num_hor_vir_bndry) || (yEnd == pic_height);
-            int        xStart = x_pos;
-            for (int j = 0; j <= num_ver_vir_bndry; j++)
-            {
-              const int  xEnd = j == num_ver_vir_bndry ? x_pos + width : ver_vir_bndry_pos[j];
-              const int  w = xEnd - xStart;
-              const bool clipL = (j == 0 && clip_left) || (j > 0) || (xStart == 0);
-              const bool clipR = (j == num_ver_vir_bndry && clip_right) || (j < num_ver_vir_bndry) || (xEnd == pic_width);
-              const int  wBuf = w + (clipL ? 0 : MAX_ALF_PADDING_SIZE) + (clipR ? 0 : MAX_ALF_PADDING_SIZE);
-              const int  hBuf = h + (clipT ? 0 : MAX_ALF_PADDING_SIZE) + (clipB ? 0 : MAX_ALF_PADDING_SIZE);
-              PelUnitBuf buf = m_tempBuf2.subBuf(UnitArea(cs.area.chromaFormat, Area(0, 0, wBuf, hBuf)));
-              buf.copyFrom(rec_yuv_ext.subBuf(
-                UnitArea(cs.area.chromaFormat, Area(xStart - (clipL ? 0 : MAX_ALF_PADDING_SIZE),
-                  yStart - (clipT ? 0 : MAX_ALF_PADDING_SIZE), wBuf, hBuf))));
-              // pad top-left unavailable samples for raster slice
-              if (xStart == x_pos && yStart == y_pos && (raster_slice_alf_pad & 1))
-              {
-                buf.padBorderPel(MAX_ALF_PADDING_SIZE, 1);
-              }
-
-              // pad bottom-right unavailable samples for raster slice
-              if (xEnd == x_pos + width && yEnd == y_pos + height && (raster_slice_alf_pad & 2))
-              {
-                buf.padBorderPel(MAX_ALF_PADDING_SIZE, 2);
-              }
-              buf.extendBorderPel(MAX_ALF_PADDING_SIZE);
-              buf = buf.subBuf(UnitArea(
-                cs.area.chromaFormat, Area(clipL ? 0 : MAX_ALF_PADDING_SIZE, clipT ? 0 : MAX_ALF_PADDING_SIZE, w, h)));
-
-              const Area blkSrc(0, 0, w, h);
-
-              const Area blkDst(xStart >> chromaScaleX, yStart >> chromaScaleY, w >> chromaScaleX, h >> chromaScaleY);
-              m_filterCcAlf(dst_buf, buf, blkDst, blkSrc, comp_id, filter_coeff, m_clpRngs, cs, m_alfVBLumaCTUHeight,
-                m_alfVBLumaPos);
-
-              xStart = xEnd;
-            }
-
-            yStart = yEnd;
-          }*/
-        }
-        else
-        {
-          //const UnitArea area(m_chromaFormat, Area(xPos, yPos, width, height));
-
-          //Area blkDst(x_pos >> chromaScaleX, yPos >> chromaScaleY, width >> chromaScaleX, height >> chromaScaleY);
-          //Area blkSrc(xPos, yPos, width, height);
-
           filter_blk_cc_alf(state, dst_buf, rec_yuv_ext, luma_stride, comp_id, filter_coeff, g_clp_rngs, alf_vb_luma_ctu_height,
             alf_vb_luma_pos, x_pos >> component_scale_x, y_pos >> component_scale_y,
             width >> component_scale_x, height >> component_scale_y);
@@ -7414,7 +6989,7 @@ int get_coeff_rate_cc_alf(short chroma_coeff[MAX_NUM_CC_ALF_FILTERS][MAX_NUM_CC_
   return bits;
 }
 
-void derive_cc_alf_filter_coeff( alf_component_id comp_id, const kvz_picture *rec_yuv, const kvz_picture *rec_yuv_ext, short filter_coeff[MAX_NUM_CC_ALF_FILTERS][MAX_NUM_CC_ALF_CHROMA_COEFF], const uint8_t filter_idx )
+void derive_cc_alf_filter_coeff( alf_component_id comp_id, short filter_coeff[MAX_NUM_CC_ALF_FILTERS][MAX_NUM_CC_ALF_CHROMA_COEFF], const uint8_t filter_idx )
 {
   int forward_tab[CCALF_CANDS_COEFF_NR * 2 - 1] = {0};
   for (int i = 0; i < CCALF_CANDS_COEFF_NR; i++)
@@ -7637,22 +7212,7 @@ void determine_control_idc_values(encoder_state_t *const state, const alf_compon
 #if MAX_NUM_CC_ALF_FILTERS>1
   if (!reuse_temporal_filter_coeff)
   {
-    //std::copy_n(curFilterEnabled, MAX_NUM_CC_ALF_FILTERS, filterEnabled);
     memcpy(cur_filter_enabled, filter_enabled, sizeof(cur_filter_enabled));
-
-    /*uint64_t tmp_arr[MAX_NUM_CC_ALF_FILTERS];
-    for (int i = 0; i < MAX_NUM_CC_ALF_FILTERS; i++)
-    {
-      tmp_arr[i] = filter_idx_count[i].count;
-      tmp_arr_filter_idx[i] = filter_idx_
-    }*/
-    //std::sort(filterIdxCount, filterIdxCount + MAX_NUM_CC_ALF_FILTERS, compareCounts);
-    //qsort(tmp_arr, MAX_NUM_CC_ALF_FILTERS, sizeof(uint64_t), compare);
-    /*for (int i = 0; i < MAX_NUM_CC_ALF_FILTERS; i++)
-    {
-      filter_idx_count[i].count = tmp_arr[i];
-    }*/
-
     qsort(filter_idx_count, MAX_NUM_CC_ALF_FILTERS, sizeof(*filter_idx_count), comparator);
 
     int filter_idc = 1;
@@ -7731,7 +7291,7 @@ void get_available_cc_alf_aps_ids(encoder_state_t *const state, alf_component_id
 }
 
 void derive_cc_alf_filter(encoder_state_t * const state, alf_component_id comp_id, 
-  const kvz_picture *org_yuv, const kvz_picture *temp_dec_yuv_buf, const kvz_picture *dst_yuv )
+  const kvz_picture *org_yuv, const kvz_picture *rec_dst_yuv )
 {
   if (!state->slice->tile_group_alf_enabled_flag[COMPONENT_Y])
   {
@@ -7754,7 +7314,7 @@ void derive_cc_alf_filter(encoder_state_t * const state, alf_component_id comp_i
   const int ctu_height_c           = LCU_WIDTH >> scale_y;
   const int pic_width_c            = state->tile->frame->width >> scale_x;
   const int pic_height_c           = state->tile->frame->height >> scale_y;
-  const int pic_stride_c           = dst_yuv->stride >> scale_x;
+  const int pic_stride_c           = rec_dst_yuv->stride >> scale_x;
   const int8_t bit_depth = state->encoder_control->bitdepth;
   const int max_training_iter_count = 15;
   int max_ctu_height_log2 = kvz_math_floor_log2(LCU_WIDTH);
@@ -7770,7 +7330,7 @@ void derive_cc_alf_filter(encoder_state_t * const state, alf_component_id comp_i
 
   if (limit_cc_alf)
   {
-    count_luma_swing_greater_than_threshold(dst_yuv->y, dst_yuv->stride, dst_yuv->height, dst_yuv->width,
+    count_luma_swing_greater_than_threshold(rec_dst_yuv->y, rec_dst_yuv->stride, rec_dst_yuv->height, rec_dst_yuv->width,
       max_ctu_width_log2, max_ctu_height_log2, g_luma_swing_greater_than_threshold_count,
       ctus_in_width, bit_depth);
   }
@@ -7778,14 +7338,14 @@ void derive_cc_alf_filter(encoder_state_t * const state, alf_component_id comp_i
   {
     if (comp_id == COMPONENT_Cb)
     {
-      count_luma_swing_greater_than_threshold(dst_yuv->u, pic_stride_c, pic_height_c, pic_width_c,
+      count_luma_swing_greater_than_threshold(rec_dst_yuv->u, pic_stride_c, pic_height_c, pic_width_c,
         max_ctu_width_log2_chrma, max_ctu_height_log2_chrma, g_luma_swing_greater_than_threshold_count,
         ctus_in_width, bit_depth);
 
     }
     else if (comp_id == COMPONENT_Cr)
     {
-      count_luma_swing_greater_than_threshold(dst_yuv->v, pic_stride_c, pic_height_c, pic_width_c,
+      count_luma_swing_greater_than_threshold(rec_dst_yuv->v, pic_stride_c, pic_height_c, pic_width_c,
         max_ctu_width_log2_chrma, max_ctu_height_log2_chrma, g_luma_swing_greater_than_threshold_count,
         ctus_in_width, bit_depth);
     }
@@ -7924,7 +7484,7 @@ void derive_cc_alf_filter(encoder_state_t * const state, alf_component_id comp_i
             if (!referencing_existing_aps)
             {
               get_frame_stats_cc_alf(comp_id, (filter_idx + 1), state->lcu_order_count);
-              derive_cc_alf_filter_coeff(comp_id, dst_yuv, temp_dec_yuv_buf, cc_alf_filter_coeff, filter_idx);
+              derive_cc_alf_filter_coeff(comp_id, cc_alf_filter_coeff, filter_idx);
             }
             
             for (int y = 0; y < pic_height_c; y += (1 << log2_block_height))
@@ -8081,7 +7641,7 @@ void derive_cc_alf_filter(encoder_state_t * const state, alf_component_id comp_i
 
 
 void derive_stats_for_cc_alf_filtering(encoder_state_t * const state,
-  const kvz_picture *org_yuv, const kvz_picture *rec_yuv,
+  const kvz_picture *org_yuv,
   const int comp_idx, const int mask_stride,
   const uint8_t filter_idc)
 {
@@ -8104,11 +7664,6 @@ void derive_stats_for_cc_alf_filtering(encoder_state_t * const state,
   }
 
   int ctu_rs_addr = 0;
-  //const PreCalcValues &pcv       = *cs.pcv;
-  //bool clip_top = false, clip_bottom = false, clip_left = false, clip_right = false;
-  int num_hor_vir_bndry = 0, num_ver_vir_bndry = 0;
-  int hor_vir_bndry_pos[] = { 0, 0, 0 };
-  int ver_vir_bndry_pos[] = { 0, 0, 0 };
   const int frame_height = state->tile->frame->height;
   const int frame_width = state->tile->frame->width;
   const int max_cu_width = LCU_WIDTH;
@@ -8121,72 +7676,11 @@ void derive_stats_for_cc_alf_filtering(encoder_state_t * const state,
       const int width = (x_pos + max_cu_width > frame_width) ? (frame_width - x_pos) : max_cu_width;
       const int height = (y_pos + max_cu_height > frame_height) ? (frame_height - y_pos) : max_cu_height;
       int       raster_slice_alf_pad = 0;
-      if ( 0 /*isCrossedByVirtualBoundaries(cs, x_pos, y_pos, width, height, clip_top, clip_bottom, clip_left, clip_right,
-                                       num_hor_vir_bndry, num_ver_vir_bndry, hor_vir_bndry_pos, ver_vir_bndry_pos,
-                                       raster_slice_alf_pad)*/)
       {
-        int y_start = y_pos;
-        for (int i = 0; i <= num_hor_vir_bndry; i++)
-        {
-          const int  y_end   = i == num_hor_vir_bndry ? y_pos + height : hor_vir_bndry_pos[i];
-          //const int  h      = y_end - y_start;
-          //const bool clip_t  = (i == 0 && clip_top) || (i > 0) || (y_start == 0);
-          //const bool clip_b  = (i == num_hor_vir_bndry && clip_bottom) || (i < num_hor_vir_bndry) || (y_end == frame_height);
-          int        x_start = x_pos;
-          for (int j = 0; j <= num_ver_vir_bndry; j++)
-          {
-            const int  x_end   = j == num_ver_vir_bndry ? x_pos + width : ver_vir_bndry_pos[j];
-            //const int  w      = x_end - x_start;
-            //const bool clip_l  = (j == 0 && clip_left) || (j > 0) || (x_start == 0);
-            //const bool clip_r  = (j == num_ver_vir_bndry && clip_right) || (j < num_ver_vir_bndry) || (x_end == frame_width);
-            //const int  w_buf   = w + (clip_l ? 0 : MAX_ALF_PADDING_SIZE) + (clip_r ? 0 : MAX_ALF_PADDING_SIZE);
-            //const int  h_buf   = h + (clip_t ? 0 : MAX_ALF_PADDING_SIZE) + (clip_b ? 0 : MAX_ALF_PADDING_SIZE);
-            //PelUnitBuf recBuf = m_tempBuf2.subBuf(UnitArea(cs.area.chromaFormat, Area(0, 0, w_buf, h_buf)));
-            //recBuf.copyFrom(rec_yuv.subBuf(
-            //  UnitArea(cs.area.chromaFormat, Area(x_start - (clip_l ? 0 : MAX_ALF_PADDING_SIZE),
-            //                                      y_start - (clip_t ? 0 : MAX_ALF_PADDING_SIZE), w_buf, h_buf))));
-            // pad top-left unavailable samples for raster slice
-            if (x_start == x_pos && y_start == y_pos && (raster_slice_alf_pad & 1))
-            {
-              //recBuf.padBorderPel(MAX_ALF_PADDING_SIZE, 1);
-            }
-
-            // pad bottom-right unavailable samples for raster slice
-            if (x_end == x_pos + width && y_end == y_pos + height && (raster_slice_alf_pad & 2))
-            {
-              //recBuf.padBorderPel(MAX_ALF_PADDING_SIZE, 2);
-            }
-            /*recBuf.extendBorderPel(MAX_ALF_PADDING_SIZE);
-            recBuf = recBuf.subBuf(UnitArea(
-              cs.area.chromaFormat, Area(clip_l ? 0 : MAX_ALF_PADDING_SIZE, clip_t ? 0 : MAX_ALF_PADDING_SIZE, w, h)));
-
-            const UnitArea area(m_chromaFormat, Area(0, 0, w, h));
-            const UnitArea areaDst(m_chromaFormat, Area(x_start, y_start, w, h));
-
-            const ComponentID compID = ComponentID(comp_idx);
-
-            for (int shape = 0; shape != m_filterShapesCcAlf[comp_idx - 1].size(); shape++)
-            {
-              getBlkStatsCcAlf(m_alfCovarianceCcAlf[comp_idx - 1][0][filter_idx][ctu_rs_addr],
-                               m_filterShapesCcAlf[comp_idx - 1][shape], org_yuv, recBuf, areaDst, area, compID, y_pos);
-              m_alfCovarianceFrameCcAlf[comp_idx - 1][shape][filter_idx] +=
-                m_alfCovarianceCcAlf[comp_idx - 1][shape][filter_idx][ctu_rs_addr];
-            }*/
-
-            x_start = x_end;
-          }
-
-          y_start = y_end;
-        }
-      }
-      else
-      {
-        //const UnitArea area(m_chromaFormat, Area(x_pos, y_pos, width, height));
-
         for (int shape = 0; shape != 1/*m_filterShapesCcAlf[comp_idx - 1].size()*/; shape++)
         {
           get_blk_stats_cc_alf(state, &g_alf_covariance_cc_alf[comp_idx - 1][0][filter_idx][ctu_rs_addr],
-                           org_yuv, rec_yuv, comp_idx, x_pos, y_pos, width, height);
+                           org_yuv, comp_idx, x_pos, y_pos, width, height);
           
           add_alf_cov(&g_alf_covariance_frame_cc_alf[comp_idx - 1][shape][filter_idx], &g_alf_covariance_cc_alf[comp_idx - 1][shape][filter_idx][ctu_rs_addr]);
         }
@@ -8199,7 +7693,7 @@ void derive_stats_for_cc_alf_filtering(encoder_state_t * const state,
 
 void get_blk_stats_cc_alf(encoder_state_t * const state, 
   alf_covariance *alf_covariance,
-  const kvz_picture *org_yuv, const kvz_picture *rec_yuv,
+  const kvz_picture *org_yuv,
   const alf_component_id comp_id,
   const int x_pos, const int y_pos,
   const int width, const int height)
