@@ -810,11 +810,8 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   }
   else if OPT("alf") {
     int8_t alf_type = 0;
-    if(!parse_enum(value, alf_names, &alf_type)) cfg->alf_type = alf_type;
-    if (cfg->alf_type)
-    {
-      set_aps_map(cfg);
-    }
+    if (!parse_enum(value, alf_names, &alf_type)) alf_type = atobool(value) ? 2 : 0;
+    cfg->alf_type = alf_type;
   }
   else if OPT("rdoq")
     cfg->rdoq_enable = atobool(value);

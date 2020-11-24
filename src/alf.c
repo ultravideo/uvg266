@@ -1991,6 +1991,13 @@ void kvz_alf_enc_create(encoder_state_t * const state)
     return;
   }
 
+  static bool init_aps_map = true;
+  if (init_aps_map)
+  {
+    set_aps_map(&state->encoder_control->cfg);
+    init_aps_map = false;
+  }
+
   enum kvz_chroma_format chroma_fmt = state->encoder_control->chroma_format;
   const int pic_width = state->tile->frame->width;
   const int pic_height = state->tile->frame->height;
@@ -7107,10 +7114,6 @@ void determine_control_idc_values(encoder_state_t *const state, const alf_compon
       for (int x = 0; x < pic_width_c; x += ctu_width_c)
       {
         const int filter_idx_plus1 = filter_control[ctu_idx];
-
-        //const Position lumaPos = Position(
-        //  { x << getComponentScaleX(comp_id, cs.pcv->chrFormat), y << getComponentScaleY(comp_id, cs.pcv->chrFormat) });
-
         code_cc_alf_filter_control_idc(state, &cabac_estimator, (filter_idx_plus1 == 0 ? 0
           : map_filter_idx_to_filter_idc[filter_idx_plus1 - 1]),
           comp_id, ctu_idx, filter_control, *cc_alf_filter_count);
@@ -7123,7 +7126,6 @@ void determine_control_idc_values(encoder_state_t *const state, const alf_compon
 #endif
 
   // restore for next iteration
-  //m_CABACEstimator->getCtx() = ctx_initial;
   memcpy(&cabac_estimator, &ctx_initial, sizeof(cabac_estimator));
 }
 

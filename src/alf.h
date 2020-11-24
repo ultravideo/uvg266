@@ -177,15 +177,6 @@ static const int alf_weights_7[14] = {
   2,  2,  2,  1,  1
 };
 
-/*#if !JVET_O0216_ALF_COEFF_EG3 || !JVET_O0064_SIMP_ALF_CLIP_CODING
-static const int alf_golomb_idx_7[14] = {
-              0,
-          0,  1,  0,
-      0,  1,  2,  1,  0,
-  0,  1,  2,  3,  3
-};
-#endif*/
-
 //-------------------------typedef enums----------------------------
 typedef enum { ALF_FILTER_5X5 = 0, ALF_FILTER_7X7 = 1, ALF_NUM_OF_FILTER_TYPES = 2 } alf_filter_type;
 typedef enum { ALF_LUMA = 0, ALF_CHROMA = 1 } alf_type;
@@ -270,12 +261,6 @@ typedef struct cc_alf_filter_param {
   int     new_cc_alf_filter[2];
   int     number_valid_components;
 } cc_alf_filter_param;
-
-/*typedef struct filter_idx_count
-{
-  uint64_t count;
-  uint8_t filter_idx;
-} filter_idx_count;*/
 
 typedef struct alf_aps {
   int aps_id;
