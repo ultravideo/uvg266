@@ -1991,13 +1991,6 @@ void kvz_alf_enc_create(encoder_state_t * const state)
     return;
   }
 
-  static bool init_aps_map = true;
-  if (init_aps_map)
-  {
-    set_aps_map(&state->encoder_control->cfg);
-    init_aps_map = false;
-  }
-
   enum kvz_chroma_format chroma_fmt = state->encoder_control->chroma_format;
   const int pic_width = state->tile->frame->width;
   const int pic_height = state->tile->frame->height;
@@ -2322,6 +2315,10 @@ void kvz_alf_enc_destroy(videoframe_t * const frame)
 
     if (g_alf_covariance[comp_idx])
     {
+      for (int k = 0; k < num_ctus_in_pic; k++)
+      {
+        FREE_POINTER(g_alf_covariance[comp_idx][k]);
+      }
       FREE_POINTER(g_alf_covariance[comp_idx]);
     }
   }
