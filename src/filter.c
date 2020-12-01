@@ -763,6 +763,12 @@ static void filter_deblock_lcu_rightmost(encoder_state_t * const state,
  * \param x_px    x-coordinate of the left edge of the LCU in pixels
  * \param y_px    y-coordinate of the top edge of the LCU in pixels
  */
+ //TODO: Things to check fix for VVC:
+// - Strength calculation to include average Luma level
+// - Stronger Luma and chroma filters (i.e. large block filtering)
+// - Luma deblocking on a 4x4 grid
+// - Deblocking filter for subblock boundaries
+// - Deblocking decision adaptation to smaller mv difference
 void kvz_filter_deblock_lcu(encoder_state_t * const state, int x_px, int y_px)
 {
   assert(!state->encoder_control->cfg.lossless);
