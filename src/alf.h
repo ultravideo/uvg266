@@ -140,42 +140,6 @@ static const int g_class_to_filter_mapping[ALF_NUM_FIXED_FILTER_SETS][MAX_NUM_AL
   { 16,  31,  32,  15,  60,  30,   4,  17,  19,  25,  22,  20,   4,  53,  19,  21,  22,  46,  25,  55,  26,  48,  63,  58,  55 },
 };
 
-static const int alf_pattern_5[13] = {
-              0,
-          1,  2,  3,
-      4,  5,  6,  5,  4,
-          3,  2,  1,
-              0
-};
-static const int alf_weights_5[8] = {
-              2,
-          2,  2,  2,
-      2,  2,  1,  1
-};
-
-/*#if !JVET_O0216_ALF_COEFF_EG3 || !JVET_O0064_SIMP_ALF_CLIP_CODING
-static const int alf_golomb_idx_5[8] = {
-              0,
-          0,  1,  0,
-      0,  1,  2,  2
-};
-#endif*/
-
-static const int alf_pattern_7[25] = {
-              0,
-          1,  2,  3,
-      4,  5,  6,  7,  8,
-  9, 10, 11, 12, 11, 10, 9,
-      8,  7,  6,  5,  4,
-          3,  2,  1,
-              0
-};
-static const int alf_weights_7[14] = {
-              2,
-          2,  2,  2,
-      2,  2,  2,  2,  2,
-  2,  2,  2,  1,  1
-};
 
 //-------------------------typedef enums----------------------------
 typedef enum { ALF_FILTER_5X5 = 0, ALF_FILTER_7X7 = 1, ALF_NUM_OF_FILTER_TYPES = 2 } alf_filter_type;
@@ -238,19 +202,22 @@ typedef struct alf_classifier {
 } alf_classifier;
 
 typedef struct alf_info_t {
-  alf_covariance** g_alf_covariance[MAX_NUM_COMPONENT]; //[component_id][ctu_idx][class_idx]
-  alf_covariance* g_alf_covariance_frame[MAX_NUM_CHANNEL_TYPE]; //[channel][class_idx]
-  alf_covariance g_alf_covariance_merged[ALF_NUM_OF_FILTER_TYPES][MAX_NUM_ALF_CLASSES + 2];
-  int g_alf_clip_merged[ALF_NUM_OF_FILTER_TYPES][MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_LUMA_COEFF];
-  uint8_t* g_ctu_enable_flag[MAX_NUM_COMPONENT];
-  uint8_t* g_ctu_alternative[MAX_NUM_COMPONENT]; //#if JVET_O0090_ALF_CHROMA_FILTER_ALTERNATIVES_CTB
-  double *g_ctb_distortion_unfilter[MAX_NUM_COMPONENT];
-  int g_aps_id_start;
-  int** g_diff_filter_coeff; // [lumaClassIdx][coeffIdx]
-  int** g_filter_coeff_set;  // [lumaClassIdx][coeffIdx]
-  int** g_filter_clipp_set; // [lumaClassIdx][coeffIdx]
-  short* g_alf_ctb_filter_set_index_tmp; //g_num_ctus_in_pic //voisi olla lokaali muuttuja?
-  short* g_alf_ctb_filter_index;     //g_num_ctus_in_pic
+  alf_covariance* alf_covariance; //Covariances of each CTU for luma and chroma components //[ctu_idx][class_idx]
+  alf_covariance* alf_covariance_y; //Pointer to the first luma covaraince //[ctu_idx][class_idx]
+  alf_covariance* alf_covariance_u; //Pointer to the first Cb covariance //[ctu_idx][class_idx]
+  alf_covariance* alf_covariance_v; //Pointer tot he first Cr covariance //[ctu_idx][class_idx]
+  alf_covariance alf_covariance_frame_luma[MAX_NUM_ALF_CLASSES]; //[class_idx]
+  alf_covariance alf_covariance_frame_chroma[MAX_NUM_ALF_ALTERNATIVES_CHROMA]; //[class_idx]
+  alf_covariance alf_covariance_merged[ALF_NUM_OF_FILTER_TYPES][MAX_NUM_ALF_CLASSES + 2];
+  int alf_clip_merged[ALF_NUM_OF_FILTER_TYPES][MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_LUMA_COEFF];
+  uint8_t* ctu_alternative[MAX_NUM_COMPONENT];
+  double *ctb_distortion_unfilter[MAX_NUM_COMPONENT];
+  int aps_id_start;
+  int** diff_filter_coeff; // [lumaClassIdx][coeffIdx]
+  int** filter_coeff_set;  // [lumaClassIdx][coeffIdx]
+  int** filter_clipp_set; // [lumaClassIdx][coeffIdx]
+  short* alf_ctb_filter_set_index_tmp; //g_num_ctus_in_pic //voisi olla lokaali muuttuja?
+  short* alf_ctb_filter_index;     //g_num_ctus_in_pic
 } alf_info_t;
 
 typedef struct cc_alf_filter_param {
@@ -353,8 +320,9 @@ int g_aps_id_cc_alf_start[2];
 int g_reuse_aps_id[2];
 
 //once per frame
-alf_covariance** g_alf_covariance[MAX_NUM_COMPONENT]; //[component_id][ctu_idx][class_idx]
-alf_covariance* g_alf_covariance_frame[MAX_NUM_CHANNEL_TYPE]; //[channel][class_idx]
+//alf_covariance** g_alf_covariance[MAX_NUM_COMPONENT]; //[component_id][ctu_idx][class_idx]
+//alf_covariance* g_alf_covariance_frame[MAX_NUM_CHANNEL_TYPE]; //[channel][class_idx]
+
 alf_covariance g_alf_covariance_merged[MAX_NUM_ALF_CLASSES + 2];
 uint8_t* g_ctu_enable_flag[MAX_NUM_COMPONENT];
 uint8_t* g_ctu_alternative[MAX_NUM_COMPONENT]; //#if JVET_O0090_ALF_CHROMA_FILTER_ALTERNATIVES_CTB
@@ -426,8 +394,8 @@ int get_chroma_coeff_rate(alf_aps* aps, int alt_idx);
 double get_filtered_distortion(alf_covariance* cov, const int num_classes, const int num_filters_minus1, const int num_coeff);
 double get_unfiltered_distortion_cov_channel(alf_covariance* cov, channel_type channel);
 double get_unfiltered_distortion_cov_classes(alf_covariance* cov, const int num_classes);
-void get_frame_stats(channel_type channel, const int32_t num_ctus);
-void get_frame_stat(alf_covariance* frame_cov, alf_covariance** ctb_cov, uint8_t* ctb_enable_flags, uint8_t* ctb_alt_idx, const int num_classes, int alt_idx, const int32_t num_ctus);
+void get_frame_stats(alf_info_t *alf_info, channel_type channel, const int32_t num_ctus);
+void get_frame_stat(alf_covariance* frame_cov, alf_covariance* ctb_cov, uint8_t* ctb_enable_flags, uint8_t* ctb_alt_idx, const int num_classes, int alt_idx, const int32_t num_ctus);
 
 void copy_cov(alf_covariance *dst, alf_covariance *src);
 void copy_alf_param(alf_aps *dst, alf_aps *src);
@@ -439,6 +407,7 @@ void reset_alf_param(alf_aps *src);
 void add_alf_cov(alf_covariance *dst, alf_covariance *src);
 void add_alf_cov_lhs_rhs(alf_covariance *dst, alf_covariance *lhs, alf_covariance *rhs);
 void reset_alf_covariance(alf_covariance *alf, int num_bins);
+void init_alf_covariance(alf_covariance *alf, int num_bins);
 void reset_cc_alf_aps_param(cc_alf_filter_param *cc_alf);
 void copy_pixels(kvz_pixel *src, int x_src_start, int y_src_start, int src_stride,
   kvz_pixel *dst, int x_dst_start, int y_dst_start, int dst_stride,
@@ -468,9 +437,13 @@ double kvz_alf_derive_ctb_alf_enable_flags(encoder_state_t * const state,
   const double chroma_weight
   );
 
+void kvz_alf_create(videoframe_t *frame, enum kvz_chroma_format chroma_format);
+
 void kvz_alf_enc_create(encoder_state_t * const state);
 
 void kvz_alf_reconstruct(encoder_state_t * const state);
+
+void kvz_alf_destroy(videoframe_t * const frame);
 
 void kvz_alf_enc_destroy(videoframe_t * const frame);
 
@@ -491,7 +464,7 @@ void kvz_alf_derive_stats_for_filtering(encoder_state_t * const state);
 //mikä on alf_WSSD?
 void kvz_alf_get_blk_stats(encoder_state_t * const state,
   channel_type channel,
-  alf_covariance **alfCovariace,
+  alf_covariance *alfCovariace,
   alf_classifier **g_classifier,
   kvz_pixel *org,
   int32_t org_stride,

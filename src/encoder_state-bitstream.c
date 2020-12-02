@@ -1086,20 +1086,20 @@ static void kvz_encoder_state_write_bitstream_picture_header(
     }
     else
     {
-      state->tile->frame->alf_info->g_ctu_enable_flag[COMPONENT_Y] = true;
-      state->tile->frame->alf_info->g_ctu_enable_flag[COMPONENT_Cb] = true;
-      state->tile->frame->alf_info->g_ctu_enable_flag[COMPONENT_Cr] = true;
-      state->tile->frame->alf_info->g_alf_cc_enable_flag[COMPONENT_Cb] = encoder->cfg.alf_type == 2;
-      state->tile->frame->alf_info->g_alf_cc_enable_flag[COMPONENT_Cr] = encoder->cfg.alf_type == 2;
+      /*state->tile->frame->ctu_enable_flag[COMPONENT_Y] = true;
+      state->tile->frame->ctu_enable_flag[COMPONENT_Cb] = true;
+      state->tile->frame->ctu_enable_flag[COMPONENT_Cr] = true;
+      state->tile->frame->alf_cc_enable_flag[COMPONENT_Cb] = encoder->cfg.alf_type == 2 ? 1 : 0;
+      state->tile->frame->alf_cc_enable_flag[COMPONENT_Cr] = encoder->cfg.alf_type == 2 ? 1 : 0;*/
     }
   }
   else
   {
-    state->tile->frame->alf_info->g_ctu_enable_flag[COMPONENT_Y] = false;
-    state->tile->frame->alf_info->g_ctu_enable_flag[COMPONENT_Cb] = false;
-    state->tile->frame->alf_info->g_ctu_enable_flag[COMPONENT_Cr] = false;
-    state->tile->frame->alf_info->g_alf_cc_enable_flag[COMPONENT_Cb] = false;
-    state->tile->frame->alf_info->g_alf_cc_enable_flag[COMPONENT_Cr] = false;
+    /*state->tile->frame->ctu_enable_flag[COMPONENT_Y] = false;
+    state->tile->frame->ctu_enable_flag[COMPONENT_Cb] = false;
+    state->tile->frame->ctu_enable_flag[COMPONENT_Cr] = false;
+    state->tile->frame->alf_cc_enable_flag[COMPONENT_Cb] = false;
+    state->tile->frame->alf_cc_enable_flag[COMPONENT_Cr] = false;*/
   }
 
   WRITE_U(stream, state->encoder_control->cfg.tmvp_enable, 1, "pic_temporal_mvp_enabled_flag");
