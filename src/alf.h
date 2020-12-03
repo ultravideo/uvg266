@@ -208,9 +208,14 @@ typedef struct alf_info_t {
   alf_covariance* alf_covariance_v; //Pointer tot he first Cr covariance //[ctu_idx][class_idx]
   alf_covariance alf_covariance_frame_luma[MAX_NUM_ALF_CLASSES]; //[class_idx]
   alf_covariance alf_covariance_frame_chroma[MAX_NUM_ALF_ALTERNATIVES_CHROMA]; //[class_idx]
-  alf_covariance alf_covariance_merged[ALF_NUM_OF_FILTER_TYPES][MAX_NUM_ALF_CLASSES + 2];
+  alf_covariance alf_covariance_merged[MAX_NUM_ALF_CLASSES + 2];
+  
+  bool *ctu_enable_flag[MAX_NUM_COMPONENT + 1];
+  bool *ctu_enable_flag_tmp[MAX_NUM_COMPONENT + 1];
+  uint8_t* ctu_alternative[MAX_NUM_COMPONENT + 1];
+  uint8_t* ctu_alternative_tmp[MAX_NUM_COMPONENT + 1];
+
   int alf_clip_merged[ALF_NUM_OF_FILTER_TYPES][MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_LUMA_COEFF];
-  uint8_t* ctu_alternative[MAX_NUM_COMPONENT];
   double *ctb_distortion_unfilter[MAX_NUM_COMPONENT];
   int aps_id_start;
   int** diff_filter_coeff; // [lumaClassIdx][coeffIdx]
@@ -320,12 +325,6 @@ int g_aps_id_cc_alf_start[2];
 int g_reuse_aps_id[2];
 
 //once per frame
-//alf_covariance** g_alf_covariance[MAX_NUM_COMPONENT]; //[component_id][ctu_idx][class_idx]
-//alf_covariance* g_alf_covariance_frame[MAX_NUM_CHANNEL_TYPE]; //[channel][class_idx]
-
-alf_covariance g_alf_covariance_merged[MAX_NUM_ALF_CLASSES + 2];
-uint8_t* g_ctu_enable_flag[MAX_NUM_COMPONENT];
-uint8_t* g_ctu_alternative[MAX_NUM_COMPONENT]; //#if JVET_O0090_ALF_CHROMA_FILTER_ALTERNATIVES_CTB
 double *g_ctb_distortion_unfilter[MAX_NUM_COMPONENT];
 static int g_aps_id_start = ALF_CTB_MAX_NUM_APS;
 int** g_diff_filter_coeff; // [lumaClassIdx][coeffIdx]
@@ -337,9 +336,6 @@ struct cc_alf_filter_param g_cc_alf_filter_param;
 
 //temps
 static alf_aps g_alf_aps_temp;
-uint8_t* g_ctu_enable_flag_tmp[MAX_NUM_COMPONENT]; //kerran
-//uint8_t* g_ctu_enable_flag_tmp2[MAX_NUM_COMPONENT];
-uint8_t* g_ctu_alternative_tmp[MAX_NUM_COMPONENT]; //kerran
 static int g_filter_tmp[MAX_NUM_ALF_LUMA_COEFF];
 static int g_clip_tmp[MAX_NUM_ALF_LUMA_COEFF];
 //kvz_picture *tmp_rec_pic;
@@ -395,7 +391,7 @@ double get_filtered_distortion(alf_covariance* cov, const int num_classes, const
 double get_unfiltered_distortion_cov_channel(alf_covariance* cov, channel_type channel);
 double get_unfiltered_distortion_cov_classes(alf_covariance* cov, const int num_classes);
 void get_frame_stats(alf_info_t *alf_info, channel_type channel, const int32_t num_ctus);
-void get_frame_stat(alf_covariance* frame_cov, alf_covariance* ctb_cov, uint8_t* ctb_enable_flags, uint8_t* ctb_alt_idx, const int num_classes, int alt_idx, const int32_t num_ctus);
+void get_frame_stat(alf_covariance* frame_cov, alf_covariance* ctb_cov, bool* ctb_enable_flags, uint8_t* ctb_alt_idx, const int num_classes, int alt_idx, const int32_t num_ctus);
 
 void copy_cov(alf_covariance *dst, alf_covariance *src);
 void copy_alf_param(alf_aps *dst, alf_aps *src);
@@ -420,8 +416,8 @@ void adjust_pixels_CTU_plus_4_pix(kvz_pixel *src, int x_start, int x_end, int y_
 void adjust_pixels_chroma(kvz_pixel *src, int x_start, int x_end, int y_start, int y_end, 
                   int stride, int pic_width, int pic_height);
 
-void set_ctu_enable_flag(uint8_t **flags, channel_type channel, uint8_t value, const int32_t num_ctus);
-void copy_ctu_enable_flag(uint8_t **flags_dst, uint8_t **flags_src, channel_type channel, const int32_t num_ctus);
+void set_ctu_enable_flag(bool **flags, channel_type channel, uint8_t value, const int32_t num_ctus);
+void copy_ctu_enable_flag(bool **flags_dst, bool **flags_src, channel_type channel, const int32_t num_ctus);
 
 //-------------------------------------------------------------------
 
