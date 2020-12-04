@@ -308,6 +308,28 @@ static INLINE void scatter_deblock_pixels(
 }
 
 /**
+* \brief Determine if strong or weak filtering should be used
+*/
+static INLINE bool use_strong_filtering(const kvz_pixel const* b0, const kvz_pixel const* b3,
+                                        const int_fast32_t dp0, const int_fast32_t dq0,
+                                        const int_fast32_t dp3, const int_fast32_t dq3,
+                                        const int32_t tc, const int32_t beta,
+                                        const bool isSidePLarge, const bool isSideQLarge)
+{
+  if (isSidePLarge || isSideQLarge) {
+    return false; //TODO: add proper implementation
+  } 
+  else {
+    return 2 * (dp0 + dq0) < beta >> 2 &&
+           2 * (dp3 + dq3) < beta >> 2 &&
+           abs(b0[3] - b0[4]) < (5 * tc + 1) >> 1 &&
+           abs(b3[3] - b3[4]) < (5 * tc + 1) >> 1 &&
+           abs(b0[0] - b0[3]) + abs(b0[4] - b0[7]) < beta >> 3 &&
+           abs(b3[0] - b3[3]) + abs(b3[4] - b3[7]) < beta >> 3;
+  }
+}
+
+/**
  * \brief Apply the deblocking filter to luma pixels on a single edge.
  *
  * The caller should check that the edge is a TU boundary or a PU boundary.
@@ -500,13 +522,8 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
       int_fast32_t dq = dq0 + dq3;
 
       if (dp + dq < beta) {
-        // Strong filtering flag checking
-        int8_t sw = 2 * (dp0 + dq0) < beta >> 2 &&
-                    2 * (dp3 + dq3) < beta >> 2 &&
-                    abs(b[0][3] - b[0][4]) < (5 * tc + 1) >> 1 &&
-                    abs(b[3][3] - b[3][4]) < (5 * tc + 1) >> 1 &&
-                    abs(b[0][0] - b[0][3]) + abs(b[0][4] - b[0][7]) < beta >> 3 &&
-                    abs(b[3][0] - b[3][3]) + abs(b[3][4] - b[3][7]) < beta >> 3;
+        // Strong filtering flag checking. TODO: account for 
+        int8_t sw = use_strong_filtering(b[0], b[3], dp0, dq0, dp3, dq3, tc, beta, 0, 0);
 
         // Read lines 1 and 2. Weak filtering doesn't use the outermost pixels
         // but let's give them anyway to simplify control flow.
@@ -773,7 +790,8 @@ static void filter_deblock_lcu_rightmost(encoder_state_t * const state,
  //TODO: Things to check/fix for VVC:
 // - Strength calculation to include average Luma level (Luma Adaptive Deblocing Filter LADF) (optional)
 // - Stronger Luma and chroma filters (i.e. large block filtering)
-// - Deblocking strength for CIIP and IBC modes (CIIP/IBC not used)
+// - Deblocking strength for CIIP and IBC modes (CIIP/IBC not currently used)
+// - Handle new prediction modes (i.e. PLT) (PLT not currently used)
 // - Luma deblocking on a 4x4 grid
 // - Deblocking filter for subblock boundaries
 // - Account for small blocks (in chroma) and max filter lengths
