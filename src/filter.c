@@ -352,13 +352,19 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
 
     const int32_t qp = get_qp_y_pred(state, x, y, dir);
 
+    const int MAX_QP = 63; //TODO: Make DEFAULT_INTRA_TC_OFFSET(=2) a define?
+    const int8_t lumaBitdepth = encoder->bitdepth;
+
     int8_t strength = 0;
-    int32_t bitdepth_scale  = 1 << (encoder->bitdepth - 8);
-    int32_t b_index         = CLIP(0, 51, qp + (beta_offset_div2 << 1));
+    int32_t bitdepth_scale  = 1 << (lumaBitdepth - 8);
+    int32_t b_index         = CLIP(0, MAX_QP, qp + (beta_offset_div2 << 1));
     int32_t beta            = kvz_g_beta_table_8x8[b_index] * bitdepth_scale;
     int32_t side_threshold  = (beta + (beta >>1 )) >> 3;
     int32_t tc_index;
     int32_t tc;
+
+    //Deblock adapted to halve pixel mvd. TODO: Tie into actual number of fractional mv bits
+    const int16_t mvdThreashold = 2; //(1 << (MV_INTERNAL_FRACTIONAL_BITS - 1))
 
     uint32_t num_4px_parts  = length / 4;
 
@@ -398,9 +404,9 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
           // Neither CU is intra so tr_depth <= MAX_DEPTH.
           strength = 1;       
         } else if (cu_p->inter.mv_dir != 3 && cu_q->inter.mv_dir != 3 &&
-                 ((abs(cu_q->inter.mv[cu_q->inter.mv_dir - 1][0] - cu_p->inter.mv[cu_p->inter.mv_dir - 1][0]) >= 4) ||
-                  (abs(cu_q->inter.mv[cu_q->inter.mv_dir - 1][1] - cu_p->inter.mv[cu_p->inter.mv_dir - 1][1]) >= 4))) {
-          // Absolute motion vector diff between blocks >= 1 (Integer pixel)
+                 ((abs(cu_q->inter.mv[cu_q->inter.mv_dir - 1][0] - cu_p->inter.mv[cu_p->inter.mv_dir - 1][0]) >= mvdThreashold) ||
+                  (abs(cu_q->inter.mv[cu_q->inter.mv_dir - 1][1] - cu_p->inter.mv[cu_p->inter.mv_dir - 1][1]) >= mvdThreashold))) {
+          // Absolute motion vector diff between blocks >= 0.5 (Integer pixel)
           strength = 1;
         } else if (cu_p->inter.mv_dir != 3 && cu_q->inter.mv_dir != 3 &&
                    cu_q->inter.mv_ref[cu_q->inter.mv_dir - 1] != cu_p->inter.mv_ref[cu_p->inter.mv_dir - 1]) {
@@ -443,34 +449,35 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
             // Different L0 & L1
             if ( refP0 != refP1 ) {          
               if ( refP0 == refQ0 ) {
-                strength  = ((abs(mvQ0[0] - mvP0[0]) >= 4) ||
-                             (abs(mvQ0[1] - mvP0[1]) >= 4) ||
-                             (abs(mvQ1[0] - mvP1[0]) >= 4) ||
-                             (abs(mvQ1[1] - mvP1[1]) >= 4)) ? 1 : 0;
+                strength  = ((abs(mvQ0[0] - mvP0[0]) >= mvdThreashold) ||
+                             (abs(mvQ0[1] - mvP0[1]) >= mvdThreashold) ||
+                             (abs(mvQ1[0] - mvP1[0]) >= mvdThreashold) ||
+                             (abs(mvQ1[1] - mvP1[1]) >= mvdThreashold)) ? 1 : 0;
               } else {
-                strength  = ((abs(mvQ1[0] - mvP0[0]) >= 4) ||
-                             (abs(mvQ1[1] - mvP0[1]) >= 4) ||
-                             (abs(mvQ0[0] - mvP1[0]) >= 4) ||
-                             (abs(mvQ0[1] - mvP1[1]) >= 4)) ? 1 : 0;
+                strength  = ((abs(mvQ1[0] - mvP0[0]) >= mvdThreashold) ||
+                             (abs(mvQ1[1] - mvP0[1]) >= mvdThreashold) ||
+                             (abs(mvQ0[0] - mvP1[0]) >= mvdThreashold) ||
+                             (abs(mvQ0[1] - mvP1[1]) >= mvdThreashold)) ? 1 : 0;
               }
             // Same L0 & L1
             } else {  
-              strength  = ((abs(mvQ0[0] - mvP0[0]) >= 4) ||
-                           (abs(mvQ0[1] - mvP0[1]) >= 4) ||
-                           (abs(mvQ1[0] - mvP1[0]) >= 4) ||
-                           (abs(mvQ1[1] - mvP1[1]) >= 4)) &&
-                          ((abs(mvQ1[0] - mvP0[0]) >= 4) ||
-                           (abs(mvQ1[1] - mvP0[1]) >= 4) ||
-                           (abs(mvQ0[0] - mvP1[0]) >= 4) ||
-                           (abs(mvQ0[1] - mvP1[1]) >= 4)) ? 1 : 0;
+              strength  = ((abs(mvQ0[0] - mvP0[0]) >= mvdThreashold) ||
+                           (abs(mvQ0[1] - mvP0[1]) >= mvdThreashold) ||
+                           (abs(mvQ1[0] - mvP1[0]) >= mvdThreashold) ||
+                           (abs(mvQ1[1] - mvP1[1]) >= mvdThreashold)) &&
+                          ((abs(mvQ1[0] - mvP0[0]) >= mvdThreashold) ||
+                           (abs(mvQ1[1] - mvP0[1]) >= mvdThreashold) ||
+                           (abs(mvQ0[0] - mvP1[0]) >= mvdThreashold) ||
+                           (abs(mvQ0[1] - mvP1[1]) >= mvdThreashold)) ? 1 : 0;
             }
           } else {
             strength = 1;
           }
         }
 
-        tc_index        = CLIP(0, 51 + 2, (int32_t)(qp + 2*(strength - 1) + (tc_offset_div2 << 1)));
-        tc              = kvz_g_tc_table_8x8[tc_index] * bitdepth_scale;
+        tc_index        = CLIP(0, MAX_QP + 2, (int32_t)(qp + 2*(strength - 1) + (tc_offset_div2 << 1)));
+        tc              = lumaBitdepth < 10 ? ((kvz_g_tc_table_8x8[tc_index] + (1 << (9 - lumaBitdepth))) >> (10 - lumaBitdepth))
+                                            : ((kvz_g_tc_table_8x8[tc_index] << (lumaBitdepth - 10)));
       }
 
       if (strength == 0) continue;
@@ -763,12 +770,14 @@ static void filter_deblock_lcu_rightmost(encoder_state_t * const state,
  * \param x_px    x-coordinate of the left edge of the LCU in pixels
  * \param y_px    y-coordinate of the top edge of the LCU in pixels
  */
- //TODO: Things to check fix for VVC:
-// - Strength calculation to include average Luma level
+ //TODO: Things to check/fix for VVC:
+// - Strength calculation to include average Luma level (Luma Adaptive Deblocing Filter LADF) (optional)
 // - Stronger Luma and chroma filters (i.e. large block filtering)
+// - Deblocking strength for CIIP and IBC modes (CIIP/IBC not used)
 // - Luma deblocking on a 4x4 grid
 // - Deblocking filter for subblock boundaries
-// - Deblocking decision adaptation to smaller mv difference
+// - Account for small blocks (in chroma) and max filter lengths
+// - Allow loop filtering across slice/tile boundaries?
 void kvz_filter_deblock_lcu(encoder_state_t * const state, int x_px, int y_px)
 {
   assert(!state->encoder_control->cfg.lossless);
