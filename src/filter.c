@@ -314,7 +314,8 @@ static INLINE bool use_strong_filtering(const kvz_pixel const* b0, const kvz_pix
                                         const int_fast32_t dp0, const int_fast32_t dq0,
                                         const int_fast32_t dp3, const int_fast32_t dq3,
                                         const int32_t tc, const int32_t beta,
-                                        const bool isSidePLarge, const bool isSideQLarge)
+                                        const bool isSidePLarge, const bool isSideQLarge,
+                                        const uint8_t max_filter_length_P, const uint8_t max_filter_length_Q)
 {
   if (isSidePLarge || isSideQLarge) {
     return false; //TODO: add proper implementation
@@ -504,12 +505,28 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
 
       if (strength == 0) continue;
 
+      bool is_side_P_large = false;
+      bool is_side_Q_large = false;
+      uint8_t max_filter_length_P = 7; //TODO: Get actual max filter length
+      uint8_t max_filter_length_Q = 7;
+
+      if (max_filter_length_P > 3) {
+        is_side_P_large = dir == EDGE_HOR && y % LCU_WIDTH == 0 ? false : true;
+        //TODO: Add affine/ATMVP related stuff
+        /*if (max_filter_length_P > 5 && cu_p->affine) {
+          max_filter_length_P = MIN(max_filter_length_P, 5);
+        }*/
+      }
+      if (max_filter_length_Q > 3) {
+        is_side_Q_large = true;
+      }
       //                   +-- edge_src
       //                   v
       // line0 p3 p2 p1 p0 q0 q1 q2 q3
       kvz_pixel *edge_src = &src[block_idx * 4 * y_stride];
 
       // Gather the lines of pixels required for the filter on/off decision.
+      //TODO: May need to limit reach in small blocks?
       kvz_pixel b[4][8];
       gather_deblock_pixels(edge_src, x_stride, 0 * y_stride, 4, &b[0][0]);
       gather_deblock_pixels(edge_src, x_stride, 3 * y_stride, 4, &b[3][0]);
@@ -521,25 +538,80 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
       int_fast32_t dp = dp0 + dp3;
       int_fast32_t dq = dq0 + dq3;
 
-      if (dp + dq < beta) {
-        // Strong filtering flag checking. TODO: account for 
-        int8_t sw = use_strong_filtering(b[0], b[3], dp0, dq0, dp3, dq3, tc, beta, 0, 0);
+      bool sw = false;
 
-        // Read lines 1 and 2. Weak filtering doesn't use the outermost pixels
-        // but let's give them anyway to simplify control flow.
-        gather_deblock_pixels(edge_src, x_stride, 1 * y_stride, 4, &b[1][0]);
-        gather_deblock_pixels(edge_src, x_stride, 2 * y_stride, 4, &b[2][0]);
+      if (is_side_P_large || is_side_Q_large) {
+        int_fast32_t dp0L = dp0;
+        int_fast32_t dq0L = dq0;
+        int_fast32_t dp3L = dp3;
+        int_fast32_t dq3L = dq3;
+        
+        kvz_pixel b0L[8];
+        kvz_pixel b3L[8];
+        if (is_side_P_large) {
+          gather_deblock_pixels(edge_src - 5 * x_stride, x_stride, 0 * y_stride, 2, &b0L[0]);
+          gather_deblock_pixels(edge_src - 5 * x_stride, x_stride, 3 * y_stride, 2, &b3L[0]);
+          dp0L = (dp0L + abs(b0L[0] - 2 * b0L[1] + b0L[2]) + 1) >> 1;
+          dp3L = (dp3L + abs(b3L[0] - 2 * b3L[1] + b3L[2]) + 1) >> 1;
+        }
+        if (is_side_Q_large) {
+          gather_deblock_pixels(edge_src + 5 * x_stride, x_stride, 0 * y_stride, 2, &b0L[4]);
+          gather_deblock_pixels(edge_src + 5 * x_stride, x_stride, 3 * y_stride, 2, &b3L[4]);
+          dq0L = (dq0L + abs(b0L[5] - 2 * b0L[6] + b0L[7]) + 1) >> 1;
+          dq3L = (dq3L + abs(b3L[5] - 2 * b3L[6] + b3L[7]) + 1) >> 1;
+        }
+        
+        int_fast32_t dpL = dp0L + dp3L;
+        int_fast32_t dqL = dq0L + dq3L;
 
-        for (int i = 0; i < 4; ++i) {
-          int filter_reach;
+        if (dpL + dqL < beta) {
+          sw = use_strong_filtering(b[0], b[3], dp0L, dq0L, dp3L, dq3L, tc, beta,
+                                    is_side_P_large, is_side_Q_large,
+                                    max_filter_length_P, max_filter_length_Q);
           if (sw) {
-            filter_reach = kvz_filter_deblock_luma_strong(&b[i][0], tc);
-          } else {
-            bool p_2nd = dp < side_threshold;
-            bool q_2nd = dq < side_threshold;
-            filter_reach = kvz_filter_deblock_luma_weak(encoder, &b[i][0], tc, p_2nd, q_2nd);
+            for (int i = 0; i < 4; ++i) {
+              int filter_reach;
+              filter_reach = kvz_filter_deblock_luma_strong(&b[i][0], tc); //TODO: Adapt to large block filtering
+              scatter_deblock_pixels(&b[i][0], x_stride, i * y_stride, filter_reach, edge_src);
+            }
+          } 
+          else {
+            is_side_P_large = false;
+            is_side_Q_large = false;
           }
-          scatter_deblock_pixels(&b[i][0], x_stride, i * y_stride, filter_reach, edge_src);
+        }
+      }
+
+      if (!sw)
+      {
+        if (dp + dq < beta) {
+          if (max_filter_length_P > 2 && max_filter_length_Q > 2) {
+            // Strong filtering flag checking.
+            sw = use_strong_filtering(b[0], b[3], dp0, dq0, dp3, dq3, tc, beta,
+                                      is_side_P_large, is_side_Q_large,
+                                      max_filter_length_P, max_filter_length_Q);
+          }
+
+          // Read lines 1 and 2. Weak filtering doesn't use the outermost pixels
+          // but let's give them anyway to simplify control flow.
+          gather_deblock_pixels(edge_src, x_stride, 1 * y_stride, 4, &b[1][0]);
+          gather_deblock_pixels(edge_src, x_stride, 2 * y_stride, 4, &b[2][0]);
+
+          for (int i = 0; i < 4; ++i) {
+            int filter_reach;
+            if (sw) {
+              filter_reach = kvz_filter_deblock_luma_strong(&b[i][0], tc);
+            } else {
+              bool p_2nd = false;
+              bool q_2nd = false;
+              if (max_filter_length_P > 1 && max_filter_length_Q > 1) {
+                p_2nd = dp < side_threshold;
+                q_2nd = dq < side_threshold;
+              }
+              filter_reach = kvz_filter_deblock_luma_weak(encoder, &b[i][0], tc, p_2nd, q_2nd);
+            }
+            scatter_deblock_pixels(&b[i][0], x_stride, i * y_stride, filter_reach, edge_src);
+          }
         }
       }
     }
