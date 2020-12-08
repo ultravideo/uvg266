@@ -1250,8 +1250,10 @@ static void add_checksum(encoder_state_t * const state)
   case KVZ_HASH_CHECKSUM:
     kvz_image_checksum(frame->rec, checksum, state->encoder_control->bitdepth);
 
-    WRITE_U(stream, 1 + num_colors * 4, 8, "size");
+    WRITE_U(stream, 2 + num_colors * 4, 8, "size");
     WRITE_U(stream, 2, 8, "hash_type");  // 2 = checksum
+    WRITE_U(stream, 0, 1, "dph_sei_single_component_flag");
+    WRITE_U(stream, 0, 7, "dph_sei_reserved_zero_7bits");
 
     for (int i = 0; i < num_colors; ++i) {
       uint32_t checksum_val = (
@@ -1266,8 +1268,10 @@ static void add_checksum(encoder_state_t * const state)
   case KVZ_HASH_MD5:
     kvz_image_md5(frame->rec, checksum, state->encoder_control->bitdepth);
 
-    WRITE_U(stream, 1 + num_colors * 16, 8, "size");
+    WRITE_U(stream, 2 + num_colors * 16, 8, "size");
     WRITE_U(stream, 0, 8, "hash_type");  // 0 = md5
+    WRITE_U(stream, 0, 1, "dph_sei_single_component_flag");
+    WRITE_U(stream, 0, 7, "dph_sei_reserved_zero_7bits");
 
     for (int i = 0; i < num_colors; ++i) {
       for (int b = 0; b < 16; ++b) {
