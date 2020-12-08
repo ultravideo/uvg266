@@ -200,6 +200,8 @@ typedef struct alf_classifier {
 } alf_classifier;
 
 typedef struct alf_info_t {
+  cabac_data_t cabac_estimator;
+
   kvz_pixel *alf_fulldata_buf;
   kvz_pixel *alf_fulldata;
   kvz_pixel *alf_tmp_y;
@@ -330,7 +332,6 @@ static alf_aps g_alf_aps_temp;
 
 
 
-cabac_data_t cabac_estimator;
 
 //-------------------------init function----------------------------
 

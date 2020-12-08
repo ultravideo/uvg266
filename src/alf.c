@@ -1612,10 +1612,11 @@ void kvz_alf_enc_process(encoder_state_t *const state)
 
   cabac_data_t ctx_start;
   cabac_data_t ctx_start_cc_alf;
-  memcpy(&cabac_estimator, &state->cabac, sizeof(cabac_estimator));
+  cabac_data_t *cabac_estimator = &alf_info->cabac_estimator;
+  memcpy(cabac_estimator, &state->cabac, sizeof(*cabac_estimator));
   memcpy(&ctx_start, &state->cabac, sizeof(ctx_start));
-  memcpy(&ctx_start_cc_alf, &cabac_estimator, sizeof(ctx_start_cc_alf));
-  cabac_estimator.only_count = 1;
+  memcpy(&ctx_start_cc_alf, cabac_estimator, sizeof(ctx_start_cc_alf));
+  cabac_estimator->only_count = 1;
   ctx_start.only_count = 1;
   ctx_start_cc_alf.only_count = 1;
 
@@ -1738,7 +1739,7 @@ void kvz_alf_enc_process(encoder_state_t *const state)
 //#endif
 
   //m_CABACEstimator->getCtx() = AlfCtx(ctxStart);
-  memcpy(&cabac_estimator, &ctx_start, sizeof(cabac_estimator));
+  memcpy(cabac_estimator, &ctx_start, sizeof(*cabac_estimator));
   kvz_alf_encoder_ctb(state, &alf_param, lambda_chroma_weight, &arr_vars);
 
   //for (int s = 0; s < state.; s++) //numSliceSegments
@@ -1825,9 +1826,9 @@ void kvz_alf_enc_process(encoder_state_t *const state)
   derive_stats_for_cc_alf_filtering(state, org_yuv, COMPONENT_Cr, num_ctus_in_width, (0 + 1));
   init_distortion_cc_alf(alf_info->alf_covariance_cc_alf ,alf_info->ctb_distortion_unfilter, num_ctus_in_pic);
 
-  memcpy(&cabac_estimator, &ctx_start_cc_alf, sizeof(cabac_estimator));
+  memcpy(cabac_estimator, &ctx_start_cc_alf, sizeof(*cabac_estimator));
   derive_cc_alf_filter(state, COMPONENT_Cb, org_yuv, rec_yuv, arr_vars.cc_reuse_aps_id);
-  memcpy(&cabac_estimator, &ctx_start_cc_alf, sizeof(cabac_estimator));
+  memcpy(cabac_estimator, &ctx_start_cc_alf, sizeof(*cabac_estimator));
   derive_cc_alf_filter(state, COMPONENT_Cr, org_yuv, rec_yuv, arr_vars.cc_reuse_aps_id);
 
   setup_cc_alf_aps(state, arr_vars.cc_reuse_aps_id);
@@ -1853,6 +1854,7 @@ double kvz_alf_derive_ctb_alf_enable_flags(encoder_state_t * const state,
 {
   alf_info_t *alf_info = state->tile->frame->alf_info;
   short* alf_ctb_filter_index = alf_info->alf_ctb_filter_index;
+  cabac_data_t *cabac_estimator = &alf_info->cabac_estimator;
   cabac_data_t ctx_temp_start;
   cabac_data_t ctx_temp_best;
 
@@ -1924,21 +1926,21 @@ double kvz_alf_derive_ctb_alf_enable_flags(encoder_state_t * const state,
       double dist_unfilter_ctu = get_unfiltered_distortion_cov_classes(&alf_cov[ctu_idx * num_classes], num_classes);
 
       //ctxTempStart = AlfCtx(m_CABACEstimator->getCtx());
-      memcpy(&ctx_temp_start, &cabac_estimator, sizeof(ctx_temp_start));
+      memcpy(&ctx_temp_start, cabac_estimator, sizeof(ctx_temp_start));
       //m_CABACEstimator->resetBits();
-      kvz_cabac_reset_bits(&cabac_estimator);
-      cabac_estimator.only_count = 1;
+      kvz_cabac_reset_bits(cabac_estimator);
+      cabac_estimator->only_count = 1;
       alf_info->ctu_enable_flag[comp_id][ctu_idx] = 1;
-      code_alf_ctu_enable_flag(state, &cabac_estimator, ctu_idx, comp_id, &g_alf_aps_temp);
+      code_alf_ctu_enable_flag(state, cabac_estimator, ctu_idx, comp_id, &g_alf_aps_temp);
 
       if (is_luma)
       {
         // Evaluate cost of signaling filter set index for convergence of filters enabled flag / filter derivation
         assert(alf_ctb_filter_index[ctu_idx] == ALF_NUM_FIXED_FILTER_SETS);
         assert(state->slice->tile_group_num_aps == 1);
-        code_alf_ctu_filter_index(state, &cabac_estimator, ctu_idx, g_alf_aps_temp.enabled_flag[COMPONENT_Y]);
+        code_alf_ctu_filter_index(state, cabac_estimator, ctu_idx, g_alf_aps_temp.enabled_flag[COMPONENT_Y]);
       }
-      double cost_on = dist_unfilter_ctu + ctu_lambda * (23 - cabac_estimator.bits_left) + (cabac_estimator.num_buffered_bytes << 3);
+      double cost_on = dist_unfilter_ctu + ctu_lambda * (23 - cabac_estimator->bits_left) + (cabac_estimator->num_buffered_bytes << 3);
 /*#else
       double costOn = distUnfilterCtu + getFilteredDistortion(m_alfCovariance[compID][iShapeIdx][ctuIdx], numClasses, m_alfParamTemp.numLumaFilters - 1, numCoeff);
 #if ENABLE_QPA
@@ -1950,7 +1952,7 @@ double kvz_alf_derive_ctb_alf_enable_flags(encoder_state_t * const state,
 #endif*/
 
       //ctxTempBest = AlfCtx(m_CABACEstimator->getCtx());
-      memcpy(&ctx_temp_best, &cabac_estimator, sizeof(ctx_temp_best));
+      memcpy(&ctx_temp_best, cabac_estimator, sizeof(ctx_temp_best));
 
 //#if JVET_O0090_ALF_CHROMA_FILTER_ALTERNATIVES_CTB
       if (is_luma)
@@ -1968,14 +1970,14 @@ double kvz_alf_derive_ctb_alf_enable_flags(encoder_state_t * const state,
           if (alt_idx) 
           {
             //m_CABACEstimator->getCtx() = AlfCtx(ctxTempAltStart);
-            memcpy(&cabac_estimator, &ctx_temp_alt_start, sizeof(cabac_estimator));
+            memcpy(cabac_estimator, &ctx_temp_alt_start, sizeof(*cabac_estimator));
           }
           //m_CABACEstimator->resetBits();
-          kvz_cabac_reset_bits(&cabac_estimator);
-          cabac_estimator.only_count = 1;
+          kvz_cabac_reset_bits(cabac_estimator);
+          cabac_estimator->only_count = 1;
           alf_info->ctu_alternative[comp_id][ctu_idx] = alt_idx;
-          code_alf_ctu_alternative_ctu(state, &cabac_estimator, ctu_idx, comp_id, &g_alf_aps_temp);
-          double r_altCost = ctu_lambda * (23 - cabac_estimator.bits_left) + (cabac_estimator.num_buffered_bytes << 3); //frac_bits_scale * 0/*m_CABACEstimator->getEstFracBits()*/;
+          code_alf_ctu_alternative_ctu(state, cabac_estimator, ctu_idx, comp_id, &g_alf_aps_temp);
+          double r_altCost = ctu_lambda * (23 - cabac_estimator->bits_left) + (cabac_estimator->num_buffered_bytes << 3); //frac_bits_scale * 0/*m_CABACEstimator->getEstFracBits()*/;
 
           double alt_dist = 0.;
           alt_dist += calc_error_for_coeffs(&alf_cov[ctu_idx * num_classes], arr_vars->filter_clipp_set[alt_idx], arr_vars->filter_coeff_set[alt_idx], num_coeff, bit_depth);
@@ -1986,7 +1988,7 @@ double kvz_alf_derive_ctb_alf_enable_flags(encoder_state_t * const state,
             best_alt_cost = alt_cost;
             best_alt_idx = alt_idx;
             //ctxTempBest = AlfCtx(m_CABACEstimator->getCtx());
-            memcpy(&ctx_temp_best, &cabac_estimator, sizeof(ctx_temp_best));
+            memcpy(&ctx_temp_best, cabac_estimator, sizeof(ctx_temp_best));
           }
         }
         alf_info->ctu_alternative[comp_id][ctu_idx] = best_alt_idx;
@@ -1995,19 +1997,19 @@ double kvz_alf_derive_ctb_alf_enable_flags(encoder_state_t * const state,
 //#endif
 
       //m_CABACEstimator->getCtx() = AlfCtx(ctxTempStart);
-      memcpy(&cabac_estimator, &ctx_temp_start, sizeof(cabac_estimator));
+      memcpy(cabac_estimator, &ctx_temp_start, sizeof(*cabac_estimator));
       //m_CABACEstimator->resetBits();
-      kvz_cabac_reset_bits(&cabac_estimator);
-      cabac_estimator.only_count = 1;
+      kvz_cabac_reset_bits(cabac_estimator);
+      cabac_estimator->only_count = 1;
       alf_info->ctu_enable_flag[comp_id][ctu_idx] = 0;
-      code_alf_ctu_enable_flag(state, &cabac_estimator, ctu_idx, comp_id, &g_alf_aps_temp);
-      double cost_off = dist_unfilter_ctu + ctu_lambda * (23 - cabac_estimator.bits_left) + (cabac_estimator.num_buffered_bytes << 3); //frac_bits_scale * 0;// m_CABACEstimator->getEstFracBits();
+      code_alf_ctu_enable_flag(state, cabac_estimator, ctu_idx, comp_id, &g_alf_aps_temp);
+      double cost_off = dist_unfilter_ctu + ctu_lambda * (23 - cabac_estimator->bits_left) + (cabac_estimator->num_buffered_bytes << 3); //frac_bits_scale * 0;// m_CABACEstimator->getEstFracBits();
 
       if (cost_on < cost_off)
       {
         cost += cost_on;
         //m_CABACEstimator->getCtx() = AlfCtx(ctxTempBest);
-        memcpy(&cabac_estimator, &ctx_temp_best, sizeof(cabac_estimator));
+        memcpy(cabac_estimator, &ctx_temp_best, sizeof(*cabac_estimator));
         alf_info->ctu_enable_flag[comp_id][ctu_idx] = 1;
       }
       else
@@ -2389,7 +2391,8 @@ void kvz_alf_encoder(encoder_state_t * const state,
   uint8_t **ctu_alternatives_tmp = alf_info->ctu_alternative_tmp;
   //const TempCtx  ctxStart(m_CtxCache, AlfCtx(m_CABACEstimator->getCtx()));
   cabac_data_t ctx_start;
-  memcpy(&ctx_start, &cabac_estimator, sizeof(ctx_start));
+  cabac_data_t *cabac_estimator = &alf_info->cabac_estimator;
+  memcpy(&ctx_start, cabac_estimator, sizeof(ctx_start));
   //TempCtx        ctxBest(m_CtxCache);
   cabac_data_t ctx_best;
 
@@ -2467,7 +2470,7 @@ void kvz_alf_encoder(encoder_state_t * const state,
       g_alf_aps_temp.non_linear_flag[channel] = non_linear_flag;
 
       //m_CABACEstimator->getCtx() = AlfCtx(ctxStart);
-      memcpy(&cabac_estimator, &ctx_start, sizeof(cabac_estimator));
+      memcpy(cabac_estimator, &ctx_start, sizeof(*cabac_estimator));
       //setCtuEnableFlag(m_ctuEnableFlag, channel, 1);
       set_ctu_enable_flag(ctu_enable_flags, channel, 1, num_ctus_in_pic);
       // all alternatives are on
@@ -2483,7 +2486,7 @@ void kvz_alf_encoder(encoder_state_t * const state,
         cost_min = cost;
         copy_alf_param_w_channel(aps, &g_alf_aps_temp, channel);
         //ctxBest = AlfCtx(m_CABACEstimator->getCtx());
-        memcpy(&ctx_best, &cabac_estimator, sizeof(ctx_best));
+        memcpy(&ctx_best, cabac_estimator, sizeof(ctx_best));
         //setCtuEnableFlag(m_ctuEnableFlagTmp, channel, 1);
         set_ctu_enable_flag(ctu_enable_flags_tmp, channel, 1, num_ctus_in_pic);
         if (!is_luma) 
@@ -2507,7 +2510,7 @@ void kvz_alf_encoder(encoder_state_t * const state,
         if ((iter & 0x01) == 0)
         {
           //m_CABACEstimator->getCtx() = AlfCtx(ctxStart);
-          memcpy(&cabac_estimator, &ctx_start, sizeof(cabac_estimator));
+          memcpy(cabac_estimator, &ctx_start, sizeof(*cabac_estimator));
           cost = lambda * ui_coeff_bits;
           cost += kvz_alf_derive_ctb_alf_enable_flags(state, channel, &dist_unfilter, num_classes, lambda_chroma_weight, arr_vars);
           if (cost < cost_min)
@@ -2515,7 +2518,7 @@ void kvz_alf_encoder(encoder_state_t * const state,
             bits_new_filter[channel] = ui_coeff_bits;
             cost_min = cost;
             //ctxBest = AlfCtx(m_CABACEstimator->getCtx());
-            memcpy(&ctx_best, &cabac_estimator, sizeof(ctx_best));
+            memcpy(&ctx_best, cabac_estimator, sizeof(ctx_best));
             //copyCtuEnableFlag(m_ctuEnableFlagTmp, m_ctuEnableFlag, channel);
             copy_ctu_enable_flag(ctu_enable_flags_tmp, ctu_enable_flags, channel, num_ctus_in_pic);
             if (!is_luma) 
@@ -2549,7 +2552,7 @@ void kvz_alf_encoder(encoder_state_t * const state,
     }
   }//for non_linea_flag
   //m_CABACEstimator->getCtx() = AlfCtx(ctxBest);
-  memcpy(&cabac_estimator, &ctx_best, sizeof(cabac_estimator));
+  memcpy(cabac_estimator, &ctx_best, sizeof(*cabac_estimator));
 //#if JVET_O0090_ALF_CHROMA_FILTER_ALTERNATIVES_CTB
   if (!is_luma) {
     memcpy(ctu_alternatives[COMPONENT_Cb], ctu_alternatives_tmp[COMPONENT_Cb], sizeof(uint8_t) * num_ctus_in_pic);
@@ -3053,6 +3056,7 @@ double kvz_alf_get_filter_coeff_and_cost(encoder_state_t * const state,
   array_variables *arr_vars)
 {
   alf_info_t *alf_info = state->tile->frame->alf_info;
+  cabac_data_t *cabac_estimator = &alf_info->cabac_estimator;
   bool is_luma = channel == CHANNEL_TYPE_LUMA ? 1 : 0;
   const int num_coeff = channel == CHANNEL_TYPE_LUMA ? 13 : 7;
   double lambda = state->frame->lambda;
@@ -3179,9 +3183,9 @@ double kvz_alf_get_filter_coeff_and_cost(encoder_state_t * const state,
   double rate = *ui_coeff_bits + ui_slice_flag;*/
   double rate = *ui_coeff_bits;
   //m_CABACEstimator->resetBits();
-  kvz_cabac_reset_bits(&cabac_estimator);
+  kvz_cabac_reset_bits(cabac_estimator);
   //m_CABACEstimator->codeAlfCtuEnableFlags(cs, channel, &m_alfParamTemp);
-  code_alf_ctu_enable_flags_channel(state, &cabac_estimator, channel, &g_alf_aps_temp);
+  code_alf_ctu_enable_flags_channel(state, cabac_estimator, channel, &g_alf_aps_temp);
 
 //#if JVET_O0090_ALF_CHROMA_FILTER_ALTERNATIVES_CTB
   //for (int ctu_idx = 0; ctu_idx < g_num_ctus_in_pic; ctu_idx++)
@@ -3192,14 +3196,12 @@ double kvz_alf_get_filter_coeff_and_cost(encoder_state_t * const state,
       assert(alf_info->alf_ctb_filter_index[ctu_idx] == ALF_NUM_FIXED_FILTER_SETS);
       assert(state->slice->tile_group_num_aps == 1);
       //m_CABACEstimator->codeAlfCtuFilterIndex(cs, ctu_idx, &m_alfParamTemp.enabledFlag[COMPONENT_Y]);
-      code_alf_ctu_filter_index(state, &cabac_estimator, ctu_idx, g_alf_aps_temp.enabled_flag[COMPONENT_Y]);
+      code_alf_ctu_filter_index(state, cabac_estimator, ctu_idx, g_alf_aps_temp.enabled_flag[COMPONENT_Y]);
     }
   }
   //m_CABACEstimator->codeAlfCtuAlternatives(cs, channel, &m_alfParamTemp);
-  code_alf_ctu_alternatives_channel(state, &cabac_estimator, channel, &g_alf_aps_temp);
-//#endif
-
-  rate += (23 - cabac_estimator.bits_left) + (cabac_estimator.num_buffered_bytes << 3); //frac_bits_scale * 0;/*(double)m_CABACEstimator->getEstFracBits();*/
+  code_alf_ctu_alternatives_channel(state, cabac_estimator, channel, &g_alf_aps_temp);
+  rate += (23 - cabac_estimator->bits_left) + (cabac_estimator->num_buffered_bytes << 3); //frac_bits_scale * 0;/*(double)m_CABACEstimator->getEstFracBits();*/
   return dist + lambda * rate;
 }
 
@@ -3736,7 +3738,8 @@ void kvz_alf_encoder_ctb(encoder_state_t * const state,
   short *alf_ctb_filter_set_index_tmp = alf_info->alf_ctb_filter_set_index_tmp;
 
   cabac_data_t ctx_start;
-  memcpy(&ctx_start, &cabac_estimator, sizeof(ctx_start));
+  cabac_data_t *cabac_estimator = &alf_info->cabac_estimator;
+  memcpy(&ctx_start, cabac_estimator, sizeof(ctx_start));
   //TempCtx        ctxBest(m_CtxCache);
   cabac_data_t ctx_best;
   //TempCtx        ctxTempStart(m_CtxCache);
@@ -3911,7 +3914,7 @@ void kvz_alf_encoder_ctb(encoder_state_t * const state,
         }
 
         //m_CABACEstimator->getCtx() = ctxStart;
-        memcpy(&cabac_estimator, &ctx_start, sizeof(cabac_estimator));
+        memcpy(cabac_estimator, &ctx_start, sizeof(*cabac_estimator));
         for (int ctu_idx = 0; ctu_idx < num_ctus_in_pic; ctu_idx++)
         {
           double dist_unfilter_ctb = ctb_distortions_unfilter[COMPONENT_Y][ctu_idx];
@@ -3919,22 +3922,22 @@ void kvz_alf_encoder_ctb(encoder_state_t * const state,
           ctu_enable_flag[COMPONENT_Y][ctu_idx] = 1;
           double cost_on = MAX_DOUBLE;
           //ctxTempStart = AlfCtx(m_CABACEstimator->getCtx());
-          memcpy(&ctx_temp_start, &cabac_estimator, sizeof(ctx_temp_start));
+          memcpy(&ctx_temp_start, cabac_estimator, sizeof(ctx_temp_start));
           ctx_temp_start.only_count = 1;
           int i_best_filter_set_idx = 0;
           for (int filter_set_idx = 0; filter_set_idx < num_filter_set; filter_set_idx++)
           {
             //rate
             //m_CABACEstimator->getCtx() = AlfCtx(ctxTempStart);
-            memcpy(&cabac_estimator, &ctx_temp_start, sizeof(cabac_estimator));
+            memcpy(cabac_estimator, &ctx_temp_start, sizeof(*cabac_estimator));
             //m_CABACEstimator->resetBits();
-            kvz_cabac_reset_bits(&cabac_estimator);
+            kvz_cabac_reset_bits(cabac_estimator);
             //m_CABACEstimator->codeAlfCtuEnableFlag(cs, ctbIdx, COMPONENT_Y, &m_alfSliceParamTemp);
-            code_alf_ctu_enable_flag(state, &cabac_estimator, ctu_idx, COMPONENT_Y, &g_alf_aps_temp);
+            code_alf_ctu_enable_flag(state, cabac_estimator, ctu_idx, COMPONENT_Y, &g_alf_aps_temp);
             alf_ctb_filter_index[ctu_idx] = filter_set_idx;
-            code_alf_ctu_filter_index(state, &cabac_estimator, ctu_idx, g_alf_aps_temp.enabled_flag[COMPONENT_Y]);
+            code_alf_ctu_filter_index(state, cabac_estimator, ctu_idx, g_alf_aps_temp.enabled_flag[COMPONENT_Y]);
 
-            double rate_on = (23 - cabac_estimator.bits_left) + (cabac_estimator.num_buffered_bytes << 3); //frac_bits_scale * 0; /*(double)m_CABACEstimator->getEstFracBits()*/ ;
+            double rate_on = (23 - cabac_estimator->bits_left) + (cabac_estimator->num_buffered_bytes << 3); //frac_bits_scale * 0; /*(double)m_CABACEstimator->getEstFracBits()*/ ;
             //distortion
             double dist = dist_unfilter_ctb;
             cov_indx = ctu_idx * MAX_NUM_ALF_CLASSES;
@@ -3977,7 +3980,7 @@ void kvz_alf_encoder_ctb(encoder_state_t * const state,
             if (cost_on_tmp < cost_on)
             {
               //ctxTempBest = AlfCtx(m_CABACEstimator->getCtx());
-              memcpy(&ctx_temp_best, &cabac_estimator, sizeof(ctx_temp_best));
+              memcpy(&ctx_temp_best, cabac_estimator, sizeof(ctx_temp_best));
               ctx_temp_best.only_count = 1;
               cost_on = cost_on_tmp;
               i_best_filter_set_idx = filter_set_idx;
@@ -3987,18 +3990,18 @@ void kvz_alf_encoder_ctb(encoder_state_t * const state,
           ctu_enable_flag[COMPONENT_Y][ctu_idx] = 0;
           //rate
           //m_CABACEstimator->getCtx() = AlfCtx(ctxTempStart);
-          memcpy(&cabac_estimator, &ctx_temp_start, sizeof(cabac_estimator));
+          memcpy(cabac_estimator, &ctx_temp_start, sizeof(*cabac_estimator));
           //m_CABACEstimator->resetBits();
-          kvz_cabac_reset_bits(&cabac_estimator);
+          kvz_cabac_reset_bits(cabac_estimator);
           //m_CABACEstimator->codeAlfCtuEnableFlag(cs, ctbIdx, COMPONENT_Y, &m_alfSliceParamTemp);
-          code_alf_ctu_enable_flag(state, &cabac_estimator, ctu_idx, COMPONENT_Y, &g_alf_aps_temp);
+          code_alf_ctu_enable_flag(state, cabac_estimator, ctu_idx, COMPONENT_Y, &g_alf_aps_temp);
 
           //cost
-          double cost_off = dist_unfilter_ctb + lambda * (23 - cabac_estimator.bits_left) + (cabac_estimator.num_buffered_bytes << 3);// frac_bits_scale * 0; /* (double)m_CABACEstimator->getEstFracBits()*/ ;
+          double cost_off = dist_unfilter_ctb + lambda * (23 - cabac_estimator->bits_left) + (cabac_estimator->num_buffered_bytes << 3);// frac_bits_scale * 0; /* (double)m_CABACEstimator->getEstFracBits()*/ ;
           if (cost_on < cost_off)
           {
             //m_CABACEstimator->getCtx() = AlfCtx(ctxTempBest);
-            memcpy(&cabac_estimator, &ctx_temp_best, sizeof(cabac_estimator));
+            memcpy(cabac_estimator, &ctx_temp_best, sizeof(*cabac_estimator));
             ctu_enable_flag[COMPONENT_Y][ctu_idx] = 1;
             alf_ctb_filter_index[ctu_idx] = i_best_filter_set_idx;
             cur_cost += cost_on;
@@ -4032,7 +4035,7 @@ void kvz_alf_encoder_ctb(encoder_state_t * const state,
           copy_alf_param(&alf_aps_new_filters_best, &g_alf_aps_temp);
 
           //ctxBest = AlfCtx(m_CABACEstimator->getCtx());
-          memcpy(&ctx_best, &cabac_estimator, sizeof(ctx_best));
+          memcpy(&ctx_best, cabac_estimator, sizeof(ctx_best));
           //copyCtuEnableFlag(m_ctuEnableFlagTmp, m_ctuEnableFlag, CHANNEL_TYPE_LUMA);
           memcpy(ctu_enable_flag_tmp[COMPONENT_Y], ctu_enable_flag[COMPONENT_Y], sizeof(bool) * num_ctus_in_pic);
           for (int ctu_idx = 0; ctu_idx < num_ctus_in_pic; ctu_idx++)
@@ -4164,9 +4167,9 @@ void kvz_alf_encoder_ctb(encoder_state_t * const state,
     cost_off = get_unfiltered_distortion_cov_channel(alf_info->alf_covariance_frame_chroma, CHANNEL_TYPE_CHROMA);
     cost_min = MAX_DOUBLE;
     //m_CABACEstimator->getCtx() = AlfCtx(ctxBest);
-    memcpy(&cabac_estimator, &ctx_best, sizeof(cabac_estimator));
+    memcpy(cabac_estimator, &ctx_best, sizeof(*cabac_estimator));
     //ctxStart = AlfCtx(m_CABACEstimator->getCtx());
-    memcpy(&ctx_start, &cabac_estimator, sizeof(ctx_start));
+    memcpy(&ctx_start, cabac_estimator, sizeof(ctx_start));
     ctx_start.only_count = 1;
     int new_aps_id_chroma = -1;
     if (alf_aps_new_filters_best.new_filter_flag[CHANNEL_TYPE_LUMA] && (alf_aps_new_filters_best.enabled_flag[COMPONENT_Cb] || alf_aps_new_filters_best.enabled_flag[COMPONENT_Cr]))
@@ -4250,7 +4253,7 @@ void kvz_alf_encoder_ctb(encoder_state_t * const state,
       }
       kvz_alf_reconstruct_coeff(state, &g_alf_aps_temp, CHANNEL_TYPE_CHROMA, true, true, arr_vars);
       //m_CABACEstimator->getCtx() = AlfCtx(ctxStart);
-      memcpy(&cabac_estimator, &ctx_start, sizeof(cabac_estimator));
+      memcpy(cabac_estimator, &ctx_start, sizeof(*cabac_estimator));
       for (int comp_id = 1; comp_id < MAX_NUM_COMPONENT; comp_id++)
       {
         alf_cov_chroma = comp_id == COMPONENT_Cb ? alf_info->alf_covariance_u : alf_info->alf_covariance_v;
@@ -4260,19 +4263,19 @@ void kvz_alf_encoder_ctb(encoder_state_t * const state,
           double dist_unfilter_ctu = ctb_distortions_unfilter[comp_id][ctu_idx];
           //cost on
           ctu_enable_flag[comp_id][ctu_idx] = 1;
-          memcpy(&ctx_temp_start, &cabac_estimator, sizeof(ctx_temp_start));
+          memcpy(&ctx_temp_start, cabac_estimator, sizeof(ctx_temp_start));
           ctx_temp_start.only_count = 1;
           //rate
           //memcpy(&cabac_estimator, &ctx_temp_start, sizeof(cabac_estimator));
-          kvz_cabac_reset_bits(&cabac_estimator);
+          kvz_cabac_reset_bits(cabac_estimator);
           //ctb flag
-          code_alf_ctu_enable_flag(state, &cabac_estimator, ctu_idx, comp_id, &g_alf_aps_temp);
-          double rate_on = (23 - cabac_estimator.bits_left) + (cabac_estimator.num_buffered_bytes << 3); //frac_bits_scale*(double)838/*m_CABACEstimator->getEstFracBits()*/;
+          code_alf_ctu_enable_flag(state, cabac_estimator, ctu_idx, comp_id, &g_alf_aps_temp);
+          double rate_on = (23 - cabac_estimator->bits_left) + (cabac_estimator->num_buffered_bytes << 3); //frac_bits_scale*(double)838/*m_CABACEstimator->getEstFracBits()*/;
           const double ctu_lambda = lambda_chroma_weight > 0.0 ? 0/*cs.picture->m_uEnerHpCtu[ctbIdx]*/ / lambda_chroma_weight : lambda;
           double dist = MAX_DOUBLE;
           int num_alts = g_alf_aps_temp.num_alternatives_chroma;
           //ctxTempBest = AlfCtx(m_CABACEstimator->getCtx());
-          memcpy(&ctx_temp_best, &cabac_estimator, sizeof(ctx_temp_best));
+          memcpy(&ctx_temp_best, cabac_estimator, sizeof(ctx_temp_best));
           ctx_temp_best.only_count = 1;
           double best_alt_rate = 0;
           double best_alt_cost = MAX_DOUBLE;
@@ -4283,14 +4286,14 @@ void kvz_alf_encoder_ctb(encoder_state_t * const state,
           {
             if (alt_idx) {
               //m_CABACEstimator->getCtx() = AlfCtx(ctxTempAltStart);
-              memcpy(&cabac_estimator, &ctx_temp_alt_start, sizeof(cabac_estimator));
+              memcpy(cabac_estimator, &ctx_temp_alt_start, sizeof(*cabac_estimator));
             }
             //m_CABACEstimator->resetBits();
-            kvz_cabac_reset_bits(&cabac_estimator);
+            kvz_cabac_reset_bits(cabac_estimator);
             ctu_alternatives[comp_id][ctu_idx] = alt_idx;
             //m_CABACEstimator->codeAlfCtuAlternative(cs, ctbIdx, compId, &m_alfParamTemp);
-            code_alf_ctu_alternative_ctu(state, &cabac_estimator, ctu_idx, comp_id, &g_alf_aps_temp);
-            double alt_rate = (23 - cabac_estimator.bits_left) + (cabac_estimator.num_buffered_bytes << 3); //frac_bits_scale * 0/*m_CABACEstimator->getEstFracBits()*/;
+            code_alf_ctu_alternative_ctu(state, cabac_estimator, ctu_idx, comp_id, &g_alf_aps_temp);
+            double alt_rate = (23 - cabac_estimator->bits_left) + (cabac_estimator->num_buffered_bytes << 3); //frac_bits_scale * 0/*m_CABACEstimator->getEstFracBits()*/;
             double r_alt_cost = ctu_lambda * alt_rate;
 
             //distortion
@@ -4307,7 +4310,7 @@ void kvz_alf_encoder_ctb(encoder_state_t * const state,
               best_alt_idx = alt_idx;
               best_alt_rate = alt_rate;
               //ctxTempBest = AlfCtx(m_CABACEstimator->getCtx());
-              memcpy(&ctx_temp_best, &cabac_estimator, sizeof(ctx_temp_best));
+              memcpy(&ctx_temp_best, cabac_estimator, sizeof(ctx_temp_best));
               ctx_temp_best.only_count = 1;
               dist = alt_dist;
             }
@@ -4320,15 +4323,15 @@ void kvz_alf_encoder_ctb(encoder_state_t * const state,
           //cost off
           ctu_enable_flag[comp_id][ctu_idx] = 0;
           //rate
-          memcpy(&cabac_estimator, &ctx_temp_start, sizeof(cabac_estimator));
-          kvz_cabac_reset_bits(&cabac_estimator);
-          code_alf_ctu_enable_flag(state, &cabac_estimator, ctu_idx, comp_id, &g_alf_aps_temp);
+          memcpy(cabac_estimator, &ctx_temp_start, sizeof(*cabac_estimator));
+          kvz_cabac_reset_bits(cabac_estimator);
+          code_alf_ctu_enable_flag(state, cabac_estimator, ctu_idx, comp_id, &g_alf_aps_temp);
           //cost
-          double cost_off = dist_unfilter_ctu + lambda * (23 - cabac_estimator.bits_left) + (cabac_estimator.num_buffered_bytes << 3); //frac_bits_scale*(double)838/*m_CABACEstimator->getEstFracBits()*/;
+          double cost_off = dist_unfilter_ctu + lambda * (23 - cabac_estimator->bits_left) + (cabac_estimator->num_buffered_bytes << 3); //frac_bits_scale*(double)838/*m_CABACEstimator->getEstFracBits()*/;
           if (cost_on < cost_off)
           {
             //m_CABACEstimator->getCtx() = AlfCtx(ctxTempBest);
-            memcpy(&cabac_estimator, &ctx_temp_best, sizeof(cabac_estimator));
+            memcpy(cabac_estimator, &ctx_temp_best, sizeof(*cabac_estimator));
             ctu_enable_flag[comp_id][ctu_idx] = 1;
             cur_cost += cost_on;
           }
@@ -6945,12 +6948,14 @@ void determine_control_idc_values(encoder_state_t *const state, const alf_compon
   double prev_rate = (*cur_total_rate);
 #endif
 
+  alf_info_t *alf_info = state->tile->frame->alf_info;
+  cabac_data_t *cabac_estimator = &alf_info->cabac_estimator;
   cabac_data_t ctx_initial;
   cabac_data_t ctx_best;
   cabac_data_t ctx_start;
-  memcpy(&ctx_initial, &cabac_estimator, sizeof(ctx_initial));
-  memcpy(&ctx_best, &cabac_estimator, sizeof(ctx_best));
-  cabac_estimator.only_count = 1;
+  memcpy(&ctx_initial, cabac_estimator, sizeof(ctx_initial));
+  memcpy(&ctx_best, cabac_estimator, sizeof(ctx_best));
+  cabac_estimator->only_count = 1;
   ctx_initial.only_count = 1;
   ctx_best.only_count = 1;
   ctx_start.only_count = 1;
@@ -6979,8 +6984,8 @@ void determine_control_idc_values(encoder_state_t *const state, const alf_compon
       const uint32_t number_of_chroma_samples = MIN(pic_height_c - y_ctu, ctu_height_c) * MIN(pic_height_c - x_ctu, ctu_width_c);
       const uint32_t threshold_c = (number_of_chroma_samples >> 2);
 
-      memcpy(&cabac_estimator, &ctx_best, sizeof(cabac_estimator));
-      memcpy(&ctx_start, &cabac_estimator, sizeof(ctx_start));
+      memcpy(cabac_estimator, &ctx_best, sizeof(*cabac_estimator));
+      memcpy(&ctx_start, cabac_estimator, sizeof(ctx_start));
 
       for (int filter_idx = 0; filter_idx <= MAX_NUM_CC_ALF_FILTERS; filter_idx++)
       {
@@ -6999,15 +7004,15 @@ void determine_control_idc_values(encoder_state_t *const state, const alf_compon
           ssd = training_distortion[filter_idx][ctu_idx];
         }
 
-        memcpy(&cabac_estimator, &ctx_start, sizeof(cabac_estimator));
-        kvz_cabac_reset_bits(&cabac_estimator);
+        memcpy(cabac_estimator, &ctx_start, sizeof(*cabac_estimator));
+        kvz_cabac_reset_bits(cabac_estimator);
 
         //const Position lumaPos = Position({ xCtu << getComponentScaleX(comp_id, cs.pcv->chrFormat),
         //  yCtu << getComponentScaleY(comp_id, cs.pcv->chrFormat) });
-        code_cc_alf_filter_control_idc(state, &cabac_estimator, filter_idc, comp_id, ctu_idx,
+        code_cc_alf_filter_control_idc(state, cabac_estimator, filter_idc, comp_id, ctu_idx,
           filter_control, *cc_alf_filter_count);
         //rate = FRAC_BITS_SCALE * m_CABACEstimator->getEstFracBits();
-        rate = (23 - cabac_estimator.bits_left) + (cabac_estimator.num_buffered_bytes << 3);
+        rate = (23 - cabac_estimator->bits_left) + (cabac_estimator->num_buffered_bytes << 3);
         cost = rate * lambda + ssd;
 
         bool limitation_exceeded = false;
@@ -7026,7 +7031,7 @@ void determine_control_idc_values(encoder_state_t *const state, const alf_compon
           best_filter_idx = filter_idx;
 
           //ctx_best = SubCtx(Ctx::CcAlfFilterControlFlag, m_CABACEstimator->getCtx());
-          memcpy(&ctx_best, &cabac_estimator, sizeof(ctx_best));
+          memcpy(&ctx_best, cabac_estimator, sizeof(ctx_best));
 
           training_cov_control[ctu_idx] = (filter_idx == MAX_NUM_CC_ALF_FILTERS) ? 0 : (filter_idx + 1);
           filter_control[ctu_idx] = (filter_idx == MAX_NUM_CC_ALF_FILTERS) ? 0 : (filter_idx + 1);
@@ -7066,9 +7071,9 @@ void determine_control_idc_values(encoder_state_t *const state, const alf_compon
 
     (*cur_total_rate) = prev_rate;
     //m_CABACEstimator->getCtx() = ctx_initial;
-    memcpy(&cabac_estimator, &ctx_initial, sizeof(cabac_estimator));
+    memcpy(cabac_estimator, &ctx_initial, sizeof(*cabac_estimator));
     //m_CABACEstimator->resetBits();
-    kvz_cabac_reset_bits(&cabac_estimator);
+    kvz_cabac_reset_bits(cabac_estimator);
 
     int ctu_idx = 0;
     for (int y = 0; y < pic_height_c; y += ctu_height_c)
@@ -7076,19 +7081,19 @@ void determine_control_idc_values(encoder_state_t *const state, const alf_compon
       for (int x = 0; x < pic_width_c; x += ctu_width_c)
       {
         const int filter_idx_plus1 = filter_control[ctu_idx];
-        code_cc_alf_filter_control_idc(state, &cabac_estimator, (filter_idx_plus1 == 0 ? 0
+        code_cc_alf_filter_control_idc(state, cabac_estimator, (filter_idx_plus1 == 0 ? 0
           : map_filter_idx_to_filter_idc[filter_idx_plus1 - 1]),
           comp_id, ctu_idx, filter_control, *cc_alf_filter_count);
 
         ctu_idx++;
       }
     }
-    (*cur_total_rate) += (23 - cabac_estimator.bits_left) + (cabac_estimator.num_buffered_bytes << 3);
+    (*cur_total_rate) += (23 - cabac_estimator->bits_left) + (cabac_estimator->num_buffered_bytes << 3);
   }
 #endif
 
   // restore for next iteration
-  memcpy(&cabac_estimator, &ctx_initial, sizeof(cabac_estimator));
+  memcpy(cabac_estimator, &ctx_initial, sizeof(*cabac_estimator));
 }
 
 void get_available_cc_alf_aps_ids(encoder_state_t *const state, alf_component_id compID, 
@@ -7165,7 +7170,8 @@ void derive_cc_alf_filter(encoder_state_t * const state, alf_component_id comp_i
   bool best_filter_idx_enabled[MAX_NUM_CC_ALF_FILTERS];
   uint8_t best_filter_count = 0;
   double lambda = state->frame->lambda;
-
+  cabac_data_t *cabac_estimator = &alf_info->cabac_estimator;
+  cabac_data_t ctx_start_cc_alf_filter_control_flag;
 
   //uint64_t* luma_swing_greater_than_threshold_count;
   //uint64_t* chroma_sample_count_near_mid_point;
@@ -7220,9 +7226,7 @@ void derive_cc_alf_filter(encoder_state_t * const state, alf_component_id comp_i
   int cc_alf_reuse_aps_id = -1;
   cc_reuse_aps_id[comp_id - 1] = -1;
 
-  //const TempCtx ctxStartCcAlfFilterControlFlag(m_CtxCache, SubCtx(Ctx::CcAlfFilterControlFlag, m_CABACEstimator->getCtx()));
-  cabac_data_t ctx_start_cc_alf_filter_control_flag;
-  memcpy(&ctx_start_cc_alf_filter_control_flag, &cabac_estimator, sizeof(ctx_start_cc_alf_filter_control_flag));
+  memcpy(&ctx_start_cc_alf_filter_control_flag, cabac_estimator, sizeof(ctx_start_cc_alf_filter_control_flag));
   ctx_start_cc_alf_filter_control_flag.only_count = 1;
 
   // compute cost of not filtering
@@ -7349,7 +7353,7 @@ void derive_cc_alf_filter(encoder_state_t * const state, alf_component_id comp_i
           }
         }
 
-        memcpy(&cabac_estimator, &ctx_start_cc_alf_filter_control_flag, sizeof(cabac_estimator));
+        memcpy(cabac_estimator, &ctx_start_cc_alf_filter_control_flag, sizeof(*cabac_estimator));
 
         cur_total_distortion = 0;
         cur_total_rate = 0;
