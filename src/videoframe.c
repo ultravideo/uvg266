@@ -79,7 +79,6 @@ int kvz_videoframe_free(videoframe_t * const frame)
   if (frame->alf_info)
   {
     kvz_alf_destroy(frame);
-    kvz_alf_enc_destroy(frame);
     FREE_POINTER(frame->alf_info);
   }
   

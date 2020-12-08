@@ -200,6 +200,12 @@ typedef struct alf_classifier {
 } alf_classifier;
 
 typedef struct alf_info_t {
+  kvz_pixel *alf_fulldata_buf;
+  kvz_pixel *alf_fulldata;
+  kvz_pixel *alf_tmp_y;
+  kvz_pixel *alf_tmp_u;
+  kvz_pixel *alf_tmp_v;
+
   alf_covariance* alf_covariance; //Covariances of each CTU for luma and chroma components //[ctu_idx][class_idx]
   alf_covariance* alf_covariance_y; //Pointer to the first luma covaraince //[ctu_idx][class_idx]
   alf_covariance* alf_covariance_u; //Pointer to the first Cb covariance //[ctu_idx][class_idx]
@@ -322,11 +328,7 @@ struct cc_alf_filter_param g_cc_alf_filter_param;
 static alf_aps g_alf_aps_temp;
 //kvz_picture *tmp_rec_pic;
 
-kvz_pixel *alf_fulldata_buf;
-kvz_pixel *alf_fulldata;
-kvz_pixel *alf_tmp_y;
-kvz_pixel *alf_tmp_u;
-kvz_pixel *alf_tmp_v;
+
 
 cabac_data_t cabac_estimator;
 
@@ -372,7 +374,6 @@ double get_unfiltered_distortion_cov_channel(alf_covariance* cov, channel_type c
 double get_unfiltered_distortion_cov_classes(alf_covariance* cov, const int num_classes);
 void get_frame_stats(alf_info_t *alf_info, channel_type channel, const int32_t num_ctus);
 void get_frame_stat(alf_covariance* frame_cov, alf_covariance* ctb_cov, bool* ctb_enable_flags, uint8_t* ctb_alt_idx, const int num_classes, int alt_idx, const int32_t num_ctus);
-
 void copy_cov(alf_covariance *dst, alf_covariance *src);
 void copy_alf_param(alf_aps *dst, alf_aps *src);
 void copy_alf_param_w_channel(alf_aps* dst, alf_aps* src, channel_type channel);
@@ -414,13 +415,11 @@ double kvz_alf_derive_ctb_alf_enable_flags(encoder_state_t * const state,
   array_variables *arr_vars
   );
 
+void kvz_alf_create_frame_buffer(encoder_state_t * const state, alf_info_t *alf_info);
+
 void kvz_alf_create(videoframe_t *frame, enum kvz_chroma_format chroma_format);
 
-void kvz_alf_enc_create(encoder_state_t * const state);
-
 void kvz_alf_destroy(videoframe_t * const frame);
-
-void kvz_alf_enc_destroy(videoframe_t * const frame);
 
 void kvz_alf_encoder(encoder_state_t * const state,
   alf_aps *aps,
@@ -498,9 +497,7 @@ double kvz_alf_merge_filters_and_cost(encoder_state_t * const state,
   alf_covariance *cov_frame,
   alf_covariance *cov_merged,
   int clip_merged[MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_LUMA_COEFF],
-  array_variables *arr_vars
-
-);
+  array_variables *arr_vars);
 
 double kvz_alf_derive_filter_coeffs(alf_aps *aps,
   channel_type channel,
@@ -521,8 +518,6 @@ double kvz_alf_derive_coeff_quant(channel_type channel,
   const int bit_depth,
   const bool oprimize_clip);
 
-//Muutama asia pit‰‰ viel‰ p‰ivitt‰‰
-//bookmarks
 void kvz_alf_encoder_ctb(encoder_state_t * const state,
   alf_aps *aps,
   const double lambda_chroma_weight,
@@ -744,10 +739,6 @@ void kvz_alf_derive_classification_blk(encoder_state_t *const state,
   const int vb_ctu_height,
   int vb_pos);
 
-//Pit‰isi testata; x,y,pixels,toimivuus
-//kvz_alf_reconstructor-funktiossa VTM:ss‰ return, pois jotta
-//p‰‰see t‰h‰n funktioon
-//tarkista toimivuus
 void kvz_alf_filter_block(encoder_state_t * const state,
   const kvz_pixel *src_pixels,
   kvz_pixel *dst_pixels,
@@ -765,7 +756,7 @@ void kvz_alf_filter_block(encoder_state_t * const state,
   int blk_dst_y,
   int vb_pos,
   const int vb_ctu_height);
+
 //---------------------------------------------------------------------
 
-//kvz_alf_filter_block funktion dst?
 #endif //ALF_H_
