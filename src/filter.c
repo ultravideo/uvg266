@@ -311,14 +311,52 @@ static INLINE void scatter_deblock_pixels(
 * \brief Determine if strong or weak filtering should be used
 */
 static INLINE bool use_strong_filtering(const kvz_pixel const* b0, const kvz_pixel const* b3,
+                                        const kvz_pixel const* b0L, const kvz_pixel const* b3L,
                                         const int_fast32_t dp0, const int_fast32_t dq0,
                                         const int_fast32_t dp3, const int_fast32_t dq3,
                                         const int32_t tc, const int32_t beta,
-                                        const bool isSidePLarge, const bool isSideQLarge,
+                                        const bool is_side_P_large, const bool is_side_Q_large,
                                         const uint8_t max_filter_length_P, const uint8_t max_filter_length_Q)
 {
-  if (isSidePLarge || isSideQLarge) {
-    return false; //TODO: add proper implementation
+  if (is_side_P_large || is_side_Q_large) {
+    int_fast32_t sp0 = abs(b0[0] - b0[3]);
+    int_fast32_t sq0 = abs(b0[4] - b0[7]);
+    int_fast32_t sp3 = abs(b3[0] - b3[3]);
+    int_fast32_t sq3 = abs(b3[4] - b3[7]);
+    kvz_pixel tmp0, tmp3;
+    if (is_side_P_large) {
+      if (max_filter_length_P == 7) {
+        tmp0 = b0L[0];
+        tmp3 = b3L[0];
+        sp0 = sp0 + abs(b0L[3] - b0L[2] - b0L[1] + tmp0);
+        sp3 = sp3 + abs(b3L[3] - b3L[2] - b3L[1] + tmp3);
+      }
+      else {
+        tmp0 = b0L[2];
+        tmp3 = b3L[2];
+      }
+      sp0 = (sp0 + abs(b0[0] - tmp0) + 1) >> 1;
+      sp3 = (sp3 + abs(b3[0] - tmp3) + 1) >> 1;
+    }
+    if (is_side_Q_large) {
+      if (max_filter_length_Q == 7) {
+        tmp0 = b0L[7];
+        tmp3 = b3L[7];
+        sq0 = sq0 + abs(b0L[4] - b0L[5] - b0L[6] + tmp0);
+        sq3 = sq3 + abs(b3L[4] - b3L[5] - b3L[6] + tmp3);
+      } else {
+        tmp0 = b0L[5];
+        tmp3 = b3L[5];
+      }
+      sq0 = (sq0 + abs(tmp0 - b0[7]) + 1) >> 1;
+      sq3 = (sq3 + abs(tmp3 - b3[7]) + 1) >> 1;
+    }
+    return 2 * (dp0 + dq0) < beta >> 4 &&
+           2 * (dp3 + dq3) < beta >> 4 &&
+           abs(b0[3] - b0[4]) < (5 * tc + 1) >> 1 &&
+           abs(b3[3] - b3[4]) < (5 * tc + 1) >> 1 &&
+           sp0 + sq0 < (beta * 3 >> 5) &&
+           sp3 + sq3 < (beta * 3 >> 5);
   } 
   else {
     return 2 * (dp0 + dq0) < beta >> 2 &&
@@ -546,26 +584,29 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
         int_fast32_t dp3L = dp3;
         int_fast32_t dq3L = dq3;
         
+        //b0L:
+        //line0 p7 p6 p5 p4 q4 q5 q6 q7
         kvz_pixel b0L[8];
         kvz_pixel b3L[8];
         if (is_side_P_large) {
-          gather_deblock_pixels(edge_src - 5 * x_stride, x_stride, 0 * y_stride, 2, &b0L[0]);
-          gather_deblock_pixels(edge_src - 5 * x_stride, x_stride, 3 * y_stride, 2, &b3L[0]);
-          dp0L = (dp0L + abs(b0L[0] - 2 * b0L[1] + b0L[2]) + 1) >> 1;
-          dp3L = (dp3L + abs(b3L[0] - 2 * b3L[1] + b3L[2]) + 1) >> 1;
+          gather_deblock_pixels(edge_src - 6 * x_stride, x_stride, 0 * y_stride, 2, &b0L[0]);
+          gather_deblock_pixels(edge_src - 6 * x_stride, x_stride, 3 * y_stride, 2, &b3L[0]);
+          dp0L = (dp0L + abs(b0L[1] - 2 * b0L[2] + b0L[3]) + 1) >> 1;
+          dp3L = (dp3L + abs(b3L[1] - 2 * b3L[2] + b3L[3]) + 1) >> 1;
         }
         if (is_side_Q_large) {
-          gather_deblock_pixels(edge_src + 5 * x_stride, x_stride, 0 * y_stride, 2, &b0L[4]);
-          gather_deblock_pixels(edge_src + 5 * x_stride, x_stride, 3 * y_stride, 2, &b3L[4]);
-          dq0L = (dq0L + abs(b0L[5] - 2 * b0L[6] + b0L[7]) + 1) >> 1;
-          dq3L = (dq3L + abs(b3L[5] - 2 * b3L[6] + b3L[7]) + 1) >> 1;
+          gather_deblock_pixels(edge_src + 6 * x_stride, x_stride, 0 * y_stride, 2, &b0L[4]);
+          gather_deblock_pixels(edge_src + 6 * x_stride, x_stride, 3 * y_stride, 2, &b3L[4]);
+          dq0L = (dq0L + abs(b0L[4] - 2 * b0L[5] + b0L[6]) + 1) >> 1;
+          dq3L = (dq3L + abs(b3L[4] - 2 * b3L[5] + b3L[6]) + 1) >> 1;
         }
         
         int_fast32_t dpL = dp0L + dp3L;
         int_fast32_t dqL = dq0L + dq3L;
 
         if (dpL + dqL < beta) {
-          sw = use_strong_filtering(b[0], b[3], dp0L, dq0L, dp3L, dq3L, tc, beta,
+          sw = use_strong_filtering(b[0], b[3], b0L, b3L,
+                                    dp0L, dq0L, dp3L, dq3L, tc, beta,
                                     is_side_P_large, is_side_Q_large,
                                     max_filter_length_P, max_filter_length_Q);
           if (sw) {
@@ -587,7 +628,8 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
         if (dp + dq < beta) {
           if (max_filter_length_P > 2 && max_filter_length_Q > 2) {
             // Strong filtering flag checking.
-            sw = use_strong_filtering(b[0], b[3], dp0, dq0, dp3, dq3, tc, beta,
+            sw = use_strong_filtering(b[0], b[3], NULL, NULL,
+                                      dp0, dq0, dp3, dq3, tc, beta,
                                       is_side_P_large, is_side_Q_large,
                                       max_filter_length_P, max_filter_length_Q);
           }
