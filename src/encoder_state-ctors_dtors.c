@@ -745,19 +745,14 @@ void kvz_encoder_state_finalize(encoder_state_t * const state) {
   if (!state->parent || (state->parent->slice != state->slice)) {
 
     if (state->encoder_control->cfg.alf_type) {
-      /*if (state->slice->param_set_map && state->slice->param_set_map != NULL) {
-        FREE_POINTER(state->slice->param_set_map);
-      }*/
       if (state->slice->apss != NULL) {
-        /*for (int i = 0; i < ALF_CTB_MAX_NUM_APS; i++) {
-          if (state->slice->apss[i] != NULL) {
-            FREE_POINTER(state->slice->apss[i]);
-          }
-        }*/
         FREE_POINTER(state->slice->apss);
       }
       if (state->slice->tile_group_luma_aps_id != NULL) {
         FREE_POINTER(state->slice->tile_group_luma_aps_id);
+      }
+      if (state->slice->cc_filter_param != NULL) {
+        FREE_POINTER(state->slice->cc_filter_param);
       }
     }
 
