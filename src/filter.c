@@ -87,13 +87,14 @@ static INLINE int kvz_filter_deblock_luma_strong(
   const kvz_pixel m5 = line[5];
   const kvz_pixel m6 = line[6];
   const kvz_pixel m7 = line[7];
+  const uint8_t tcW[3] = { 3, 2, 1 }; //Wheights for tc
 
-  line[1] = CLIP(m1 - 2*tc, m1 + 2*tc, (2*m0 + 3*m1 +   m2 +   m3 +   m4 + 4) >> 3);
-  line[2] = CLIP(m2 - 2*tc, m2 + 2*tc, (  m1 +   m2 +   m3 +   m4        + 2) >> 2);
-  line[3] = CLIP(m3 - 2*tc, m3 + 2*tc, (  m1 + 2*m2 + 2*m3 + 2*m4 +   m5 + 4) >> 3);
-  line[4] = CLIP(m4 - 2*tc, m4 + 2*tc, (  m2 + 2*m3 + 2*m4 + 2*m5 +   m6 + 4) >> 3);
-  line[5] = CLIP(m5 - 2*tc, m5 + 2*tc, (  m3 +   m4 +   m5 +   m6        + 2) >> 2);
-  line[6] = CLIP(m6 - 2*tc, m6 + 2*tc, (  m3 +   m4 +   m5 + 3*m6 + 2*m7 + 4) >> 3);
+  line[1] = CLIP(m1 - tcW[3]*tc, m1 + tcW[3]*tc, (2*m0 + 3*m1 +   m2 +   m3 +   m4 + 4) >> 3);
+  line[2] = CLIP(m2 - tcW[1]*tc, m2 + tcW[1]*tc, (  m1 +   m2 +   m3 +   m4        + 2) >> 2);
+  line[3] = CLIP(m3 - tcW[0]*tc, m3 + tcW[0]*tc, (  m1 + 2*m2 + 2*m3 + 2*m4 +   m5 + 4) >> 3);
+  line[4] = CLIP(m4 - tcW[0]*tc, m4 + tcW[0]*tc, (  m2 + 2*m3 + 2*m4 + 2*m5 +   m6 + 4) >> 3);
+  line[5] = CLIP(m5 - tcW[1]*tc, m5 + tcW[1]*tc, (  m3 +   m4 +   m5 +   m6        + 2) >> 2);
+  line[6] = CLIP(m6 - tcW[3]*tc, m6 + tcW[3]*tc, (  m3 +   m4 +   m5 + 3*m6 + 2*m7 + 4) >> 3);
 
   return 3;
 }
@@ -305,6 +306,13 @@ static INLINE void scatter_deblock_pixels(
   for (int i = -reach; i < +reach; ++i) {
     dst[i * step + stride] = src[i + 4];
   }
+}
+
+//TODO: Implement
+static INLINE int  kvz_filter_deblock_large_block(kvz_pixel *line, kvz_pixel *lineL, const int32_t tc,
+                                                  const uint8_t filter_length_P, const uint8_t filter_length_Q)
+{
+  return 3;
 }
 
 /**
@@ -584,36 +592,59 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
         int_fast32_t dp3L = dp3;
         int_fast32_t dq3L = dq3;
         
-        //b0L:
+        //bL:
         //line0 p7 p6 p5 p4 q4 q5 q6 q7
-        kvz_pixel b0L[8];
-        kvz_pixel b3L[8];
+        kvz_pixel bL[4][8];
+
         if (is_side_P_large) {
-          gather_deblock_pixels(edge_src - 6 * x_stride, x_stride, 0 * y_stride, 2, &b0L[0]);
-          gather_deblock_pixels(edge_src - 6 * x_stride, x_stride, 3 * y_stride, 2, &b3L[0]);
-          dp0L = (dp0L + abs(b0L[1] - 2 * b0L[2] + b0L[3]) + 1) >> 1;
-          dp3L = (dp3L + abs(b3L[1] - 2 * b3L[2] + b3L[3]) + 1) >> 1;
+          gather_deblock_pixels(edge_src - 6 * x_stride, x_stride, 0 * y_stride, 2, &bL[0][0]);
+          gather_deblock_pixels(edge_src - 6 * x_stride, x_stride, 3 * y_stride, 2, &bL[3][0]);
+          dp0L = (dp0L + abs(bL[0][1] - 2 * bL[0][2] + bL[0][3]) + 1) >> 1;
+          dp3L = (dp3L + abs(bL[3][1] - 2 * bL[3][2] + bL[3][3]) + 1) >> 1;
         }
         if (is_side_Q_large) {
-          gather_deblock_pixels(edge_src + 6 * x_stride, x_stride, 0 * y_stride, 2, &b0L[4]);
-          gather_deblock_pixels(edge_src + 6 * x_stride, x_stride, 3 * y_stride, 2, &b3L[4]);
-          dq0L = (dq0L + abs(b0L[4] - 2 * b0L[5] + b0L[6]) + 1) >> 1;
-          dq3L = (dq3L + abs(b3L[4] - 2 * b3L[5] + b3L[6]) + 1) >> 1;
+          gather_deblock_pixels(edge_src + 6 * x_stride, x_stride, 0 * y_stride, 2, &bL[0][4]);
+          gather_deblock_pixels(edge_src + 6 * x_stride, x_stride, 3 * y_stride, 2, &bL[3][4]);
+          dq0L = (dq0L + abs(bL[0][4] - 2 * bL[0][5] + bL[0][6]) + 1) >> 1;
+          dq3L = (dq3L + abs(bL[3][4] - 2 * bL[3][5] + bL[3][6]) + 1) >> 1;
         }
         
         int_fast32_t dpL = dp0L + dp3L;
         int_fast32_t dqL = dq0L + dq3L;
 
         if (dpL + dqL < beta) {
-          sw = use_strong_filtering(b[0], b[3], b0L, b3L,
+          sw = use_strong_filtering(&b[0][0], &b[3][0], &bL[0][0], &bL[3][0],
                                     dp0L, dq0L, dp3L, dq3L, tc, beta,
                                     is_side_P_large, is_side_Q_large,
                                     max_filter_length_P, max_filter_length_Q);
           if (sw) {
+            gather_deblock_pixels(edge_src, x_stride, 1 * y_stride, 4, &b[1][0]);
+            gather_deblock_pixels(edge_src, x_stride, 2 * y_stride, 4, &b[2][0]);
+            if (is_side_P_large)
+            {
+              gather_deblock_pixels(edge_src - 6 * x_stride, x_stride, 1 * y_stride, 2, &bL[1][0]);
+              gather_deblock_pixels(edge_src - 6 * x_stride, x_stride, 2 * y_stride, 2, &bL[2][0]);
+            }
+            if (is_side_Q_large)
+            {
+              gather_deblock_pixels(edge_src + 6 * x_stride, x_stride, 1 * y_stride, 2, &bL[1][4]);
+              gather_deblock_pixels(edge_src + 6 * x_stride, x_stride, 2 * y_stride, 2, &bL[2][4]);
+            }
+
             for (int i = 0; i < 4; ++i) {
               int filter_reach;
-              filter_reach = kvz_filter_deblock_luma_strong(&b[i][0], tc); //TODO: Adapt to large block filtering
+              filter_reach = kvz_filter_deblock_large_block(&b[i][0], &bL[i][0], tc,
+                                                            is_side_P_large ? max_filter_length_P : 3, 
+                                                            is_side_Q_large ? max_filter_length_Q : 3);
               scatter_deblock_pixels(&b[i][0], x_stride, i * y_stride, filter_reach, edge_src);
+              if (is_side_P_large) {
+                const int diff_reach = (max_filter_length_P - filter_reach) >> 1;
+                scatter_deblock_pixels(&bL[i][0] - diff_reach, x_stride, i * y_stride, diff_reach, edge_src - filter_reach - diff_reach);
+              }
+              if (is_side_Q_large) {
+                const int diff_reach = (max_filter_length_P - filter_reach) >> 1;
+                scatter_deblock_pixels(&bL[i][0] + diff_reach, x_stride, i * y_stride, diff_reach, edge_src + filter_reach + diff_reach);
+              }
             }
           } 
           else {
