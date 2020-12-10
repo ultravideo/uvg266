@@ -309,9 +309,71 @@ static INLINE void scatter_deblock_pixels(
 }
 
 //TODO: Implement
-static INLINE int  kvz_filter_deblock_large_block(kvz_pixel *line, kvz_pixel *lineL, const int32_t tc,
-                                                  const uint8_t filter_length_P, const uint8_t filter_length_Q)
+static INLINE int kvz_filter_deblock_large_block(kvz_pixel *line, kvz_pixel *lineL, const int32_t tc,
+                                                 const uint8_t filter_length_P, const uint8_t filter_length_Q)
 {
+  int refP = 0;
+  int refQ = 0;
+  int refMiddle = 0;
+
+  const int coeffs7[7] = { 59, 50, 41, 32, 23, 14, 5 };
+  const int coeffs5[5] = { 58, 45, 32, 19, 6 };
+  const int coeffs3[3] = { 53, 32, 11 };
+
+  int *coeffsP;
+  int *coeffsQ;
+
+  switch (filter_length_P)
+  {
+  case 7:
+    refP = (lineL[0] + lineL[1] + 1) >> 1;
+    coeffsP = coeffs7;
+    break;
+
+  case 5:
+    refP = (lineL[2] + lineL[3] + 1) >> 1;
+    coeffsP = coeffs5;
+    break;
+
+  case 3:
+    refP = (line[0] + line[1] + 1) >> 1;
+    coeffsP = coeffs3;
+    break;
+  }
+
+  switch (filter_length_Q)
+  {
+  case 7:
+    refQ = (lineL[6] + lineL[7] + 1) >> 1;
+    coeffsQ = coeffs7;
+    break;
+
+  case 5:
+    refQ = (lineL[4] + lineL[5] + 1) >> 1;
+    coeffsQ = coeffs5;
+    break;
+
+  case 3:
+    refQ = (line[6] + line[7] + 1) >> 1;
+    coeffsQ = coeffs3;
+    break;
+  }
+
+  if (filter_length_P == filter_length_Q) {
+    if (filter_length_P == 7) {
+      refMiddle = (lineL[1] + lineL[2] + lineL[3] + line[0] + line[1] + line[2] + 2 * (line[3] + line[4])
+                   + line[5] + line[6] + line[7] + lineL[4] + lineL[5] + lineL[6] + 8) >> 4;
+    }
+    else { //filter_length_P == 5
+      refMiddle = (lineL[3] + line[0] + 2 * (line[1] + line[2] + line[3] + line[4]
+        + line[5] + line[6]) + line[7] + lineL[4] + 8) >> 4;
+    }
+  }
+  else {
+    //TODO: add other length combinations
+  }
+  //TODO: add filtering
+
   return 3;
 }
 
