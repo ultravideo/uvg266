@@ -89,12 +89,12 @@ static INLINE int kvz_filter_deblock_luma_strong(
   const kvz_pixel m7 = line[7];
   const uint8_t tcW[3] = { 3, 2, 1 }; //Wheights for tc
 
-  line[1] = CLIP(m1 - tcW[3]*tc, m1 + tcW[3]*tc, (2*m0 + 3*m1 +   m2 +   m3 +   m4 + 4) >> 3);
+  line[1] = CLIP(m1 - tcW[2]*tc, m1 + tcW[2]*tc, (2*m0 + 3*m1 +   m2 +   m3 +   m4 + 4) >> 3);
   line[2] = CLIP(m2 - tcW[1]*tc, m2 + tcW[1]*tc, (  m1 +   m2 +   m3 +   m4        + 2) >> 2);
   line[3] = CLIP(m3 - tcW[0]*tc, m3 + tcW[0]*tc, (  m1 + 2*m2 + 2*m3 + 2*m4 +   m5 + 4) >> 3);
   line[4] = CLIP(m4 - tcW[0]*tc, m4 + tcW[0]*tc, (  m2 + 2*m3 + 2*m4 + 2*m5 +   m6 + 4) >> 3);
   line[5] = CLIP(m5 - tcW[1]*tc, m5 + tcW[1]*tc, (  m3 +   m4 +   m5 +   m6        + 2) >> 2);
-  line[6] = CLIP(m6 - tcW[3]*tc, m6 + tcW[3]*tc, (  m3 +   m4 +   m5 + 3*m6 + 2*m7 + 4) >> 3);
+  line[6] = CLIP(m6 - tcW[2]*tc, m6 + tcW[2]*tc, (  m3 +   m4 +   m5 + 3*m6 + 2*m7 + 4) >> 3);
 
   return 3;
 }
@@ -312,67 +312,119 @@ static INLINE void scatter_deblock_pixels(
 static INLINE int kvz_filter_deblock_large_block(kvz_pixel *line, kvz_pixel *lineL, const int32_t tc,
                                                  const uint8_t filter_length_P, const uint8_t filter_length_Q)
 {
-  int refP = 0;
-  int refQ = 0;
-  int refMiddle = 0;
+  int ref_P = 0;
+  int ref_Q = 0;
+  int ref_middle = 0;
 
   const int coeffs7[7] = { 59, 50, 41, 32, 23, 14, 5 };
   const int coeffs5[5] = { 58, 45, 32, 19, 6 };
   const int coeffs3[3] = { 53, 32, 11 };
 
-  int *coeffsP;
-  int *coeffsQ;
+  int *coeffs_P;
+  int *coeffs_Q;
 
+  //Form P/Q arrays that contain all of the samples to make things simpler later
+  const kvz_pixel* lineP[8] = { line + 3, line + 2, line + 1, line + 0,
+                                lineL + 3, lineL + 2, lineL + 1, lineL + 0 };
+  const kvz_pixel* lineQ[8] = { line + 4, line + 5, line + 6, line + 7,
+                                lineL + 4, lineL + 5, lineL + 6, lineL + 7 };
+  //Separate destination arrays with only six output pixels going in line and  rest to lineL to simplify things later
+  kvz_pixel* dstP[7] = { line + 3, line + 2, line + 1,
+                         lineL + 3, lineL + 2, lineL + 1, lineL + 0 };
+  kvz_pixel* dstQ[7] = { line + 4, line + 5, line + 6,
+                         lineL + 4, lineL + 5, lineL + 6, lineL + 7 };
+
+  //Get correct filter coeffs and Q/P end samples
   switch (filter_length_P)
   {
   case 7:
-    refP = (lineL[0] + lineL[1] + 1) >> 1;
-    coeffsP = coeffs7;
+    ref_P = (*lineP[6] + *lineP[7] + 1) >> 1;
+    coeffs_P = coeffs7;
     break;
 
   case 5:
-    refP = (lineL[2] + lineL[3] + 1) >> 1;
-    coeffsP = coeffs5;
+    ref_P = (*lineP[4] + *lineP[5] + 1) >> 1;
+    coeffs_P = coeffs5;
     break;
 
   case 3:
-    refP = (line[0] + line[1] + 1) >> 1;
-    coeffsP = coeffs3;
+    ref_P = (*lineP[2] + *lineP[3] + 1) >> 1;
+    coeffs_P = coeffs3;
     break;
   }
 
   switch (filter_length_Q)
   {
   case 7:
-    refQ = (lineL[6] + lineL[7] + 1) >> 1;
-    coeffsQ = coeffs7;
+    ref_Q = (*lineQ[6] + *lineQ[7] + 1) >> 1;
+    coeffs_Q = coeffs7;
     break;
 
   case 5:
-    refQ = (lineL[4] + lineL[5] + 1) >> 1;
-    coeffsQ = coeffs5;
+    ref_Q = (*lineQ[4] + *lineQ[5] + 1) >> 1;
+    coeffs_Q = coeffs5;
     break;
 
   case 3:
-    refQ = (line[6] + line[7] + 1) >> 1;
-    coeffsQ = coeffs3;
+    ref_Q = (*lineQ[2] + *lineQ[3] + 1) >> 1;
+    coeffs_Q = coeffs3;
     break;
   }
 
+  //Get middle samples
   if (filter_length_P == filter_length_Q) {
     if (filter_length_P == 7) {
-      refMiddle = (lineL[1] + lineL[2] + lineL[3] + line[0] + line[1] + line[2] + 2 * (line[3] + line[4])
-                   + line[5] + line[6] + line[7] + lineL[4] + lineL[5] + lineL[6] + 8) >> 4;
+      ref_middle = (*lineP[6] + *lineP[5] + *lineP[4] + *lineP[3] + *lineP[2] + *lineP[1]
+                    + 2 * (*lineP[0] + *lineQ[0])
+                    + *lineQ[1] + *lineQ[2] + *lineQ[3] + *lineQ[4] + *lineQ[5] + *lineQ[6] + 8) >> 4;
     }
     else { //filter_length_P == 5
-      refMiddle = (lineL[3] + line[0] + 2 * (line[1] + line[2] + line[3] + line[4]
-        + line[5] + line[6]) + line[7] + lineL[4] + 8) >> 4;
+      ref_middle = (*lineP[4] + *lineP[3]
+                    + 2 * (*lineP[2] + *lineP[1] + *lineP[0] + *lineQ[0] + *lineQ[1] + *lineQ[2])
+                    + *lineQ[3] + *lineQ[4] + 8) >> 4;
     }
   }
   else {
-    //TODO: add other length combinations
+    const uint8_t lenS = MIN(filter_length_P, filter_length_Q);
+    const uint8_t lenL = MAX(filter_length_P, filter_length_Q);
+    const kvz_pixel **refS = filter_length_P < filter_length_Q ? lineP : lineQ;
+    const kvz_pixel **refL = filter_length_P < filter_length_Q ? lineP : lineQ;
+
+    if (lenL == 7 && lenS == 5) {
+      ref_middle = (*lineP[5] + *lineP[4] + *lineP[3] + *lineP[2]
+                    + 2 * (*lineP[1] + *lineP[0] + *lineQ[0] + *lineQ[1])
+                    + *lineQ[2] + *lineQ[3] + *lineQ[4] + *lineQ[5] + 8) >> 4;
+    }
+    else if (lenL == 7 && lenS == 3) {
+      ref_middle = (3 * *refS[0] + 2 * *refL[0] + 3 * *refS[1] + *refL[1] + 2 * *refS[2]
+                    + *refL[2] + *refL[3] + *refL[4] + *refL[5] + *refL[6] + 8) >> 4;
+    }
+    else { //lenL == 5 && lenS == 3
+      ref_middle = (*lineP[3] + *lineP[2] + *lineP[1] + *lineP[0] 
+                    + *lineQ[0] + *lineQ[1] + *lineQ[2] + *lineQ[3] + 4) >> 3;
+
+    }
   }
-  //TODO: add filtering
+
+  //Filter pixels in the line
+
+  const uint8_t tc7[7] = { 6, 5, 4, 3, 2, 1, 1 };
+  const uint8_t tc3[3] = { 6, 4, 2 };
+
+  const uint8_t *tc_coeff_P = (filter_length_P == 3) ? tc3 : tc7;
+  const uint8_t *tc_coeff_Q = (filter_length_Q == 3) ? tc3 : tc7;
+
+  for (size_t i = 0; i < filter_length_P; i++)
+  {
+    int range = (tc * tc_coeff_P[i]) >> 1;
+    *dstP[i] = CLIP(*lineP[i] - range, *lineP[i] + range, (ref_middle * coeffs_P[i] + ref_P * (64 - coeffs_P[i]) + 32) >> 6);
+  }
+
+  for (size_t i = 0; i < filter_length_Q; i++)
+  {
+    int range = (tc * tc_coeff_P[i]) >> 1;
+    *dstQ[i] = CLIP(*lineQ[i] - range, *lineQ[i] + range, (ref_middle * coeffs_Q[i] + ref_Q * (64 - coeffs_Q[i]) + 32) >> 6);
+  }
 
   return 3;
 }
@@ -388,7 +440,7 @@ static INLINE bool use_strong_filtering(const kvz_pixel const* b0, const kvz_pix
                                         const bool is_side_P_large, const bool is_side_Q_large,
                                         const uint8_t max_filter_length_P, const uint8_t max_filter_length_Q)
 {
-  if (is_side_P_large || is_side_Q_large) {
+  if (is_side_P_large || is_side_Q_large) { //Large block decision
     int_fast32_t sp0 = abs(b0[0] - b0[3]);
     int_fast32_t sq0 = abs(b0[4] - b0[7]);
     int_fast32_t sp3 = abs(b3[0] - b3[3]);
@@ -428,7 +480,7 @@ static INLINE bool use_strong_filtering(const kvz_pixel const* b0, const kvz_pix
            sp0 + sq0 < (beta * 3 >> 5) &&
            sp3 + sq3 < (beta * 3 >> 5);
   } 
-  else {
+  else { //Normal decision
     return 2 * (dp0 + dq0) < beta >> 2 &&
            2 * (dp3 + dq3) < beta >> 2 &&
            abs(b0[3] - b0[4]) < (5 * tc + 1) >> 1 &&
