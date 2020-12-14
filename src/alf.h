@@ -20,39 +20,30 @@
 //To reduce bits overhead, filter coefficients of different classification can be merged.
 //In slice header, the indices of the APSs used for the current slice are signaled.
 
-#define ALF_FIXED_FILTER_NUM            64
 #define MAX_NUM_ALF_CLASSES             25
 #define MAX_NUM_ALF_LUMA_COEFF          13
 #define MAX_NUM_ALF_CHROMA_COEFF        7
-#define MAX_ALF_FILTER_LENGTH           7
-#define MAX_NUM_ALF_COEFF               (MAX_ALF_FILTER_LENGTH * MAX_ALF_FILTER_LENGTH / 2 + 1)
 #define MAX_NUM_CC_ALF_FILTERS          4
 #define MAX_NUM_CC_ALF_CHROMA_COEFF     8
 #define ALF_NUM_FIXED_FILTER_SETS       16
-#define CC_ALF_BITS_PER_COEFF_LEVEL     3
 #define ALF_UNUSED_CLASS_IDX            255
 #define ALF_UNUSED_TRANSPOSE_IDX        255
-#define REG                             0.0001
-#define REG_SQR                         0.0000001
-#define MAX_NUM_APS                     32
 #define CLASSIFICATION_BLK_SIZE         32
 #define ALF_VB_POS_ABOVE_CTUROW_LUMA    4
 #define ALF_VB_POS_ABOVE_CTUROW_CHMA    2
 #define ALF_CTB_MAX_NUM_APS             8
 #define MAX_ALF_PADDING_SIZE            4
 #define MAX_ALF_NUM_CLIPPING_VALUES     4
-#define SCALE_BITS                      15
 #define MAX_NUM_ALF_ALTERNATIVES_CHROMA 8
 #define CCALF_CANDS_COEFF_NR            8
 #define CCALF_DYNAMIC_RANGE             6
 #define CCALF_BITS_PER_COEFF_LEVEL      3
 #define NUM_APS_TYPE_LEN                0 //1 //3
-#define ALF_NONE_BOUNDARY               -128
 #define CC_ALF_NUM_COEFF                8
 
 static const int cc_alf_small_tab[CCALF_CANDS_COEFF_NR] = { 0, 1, 2, 4, 8, 16, 32, 64 };
 
-static const int g_fixed_filter_set_coeff[ALF_FIXED_FILTER_NUM][MAX_NUM_ALF_LUMA_COEFF] =
+static const int g_fixed_filter_set_coeff[64][MAX_NUM_ALF_LUMA_COEFF] =
 {
   { 0,   0,   2,  -3,   1,  -4,   1,   7,  -1,   1,  -1,   5,  0 },
   { 0,   0,   0,   0,   0,  -1,   0,   1,   0,   0,  -1,   2,  0 },
@@ -319,6 +310,7 @@ void init_ctu_alternative_chroma(const alf_aps *alf_param, uint8_t* ctu_alts[MAX
 int16_t clip_alf(const int16_t clip, const int16_t ref, const int16_t val0, const int16_t val1);
 int alf_clip_pixel(const int a, const clp_rng clp_rng);
 int16_t alf_clip3(const int16_t min_val, const int16_t max_val, const int16_t a);
+int alf_clip3_int(const int min_val, const int max_val, const int a);
 void get_clip_max(const alf_covariance *cov, int *clip_max);
 void reduce_clip_cost(const alf_covariance *cov, int *clip);
 void set_ey_from_clip(const alf_covariance *cov, const int* clip, double ee[MAX_NUM_ALF_LUMA_COEFF][MAX_NUM_ALF_LUMA_COEFF], double y[MAX_NUM_ALF_LUMA_COEFF], int siz);

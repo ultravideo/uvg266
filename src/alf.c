@@ -119,6 +119,11 @@ int16_t alf_clip3(const int16_t minVal, const int16_t maxVal, const int16_t a)
   return MIN(MAX(minVal, a), maxVal);
 }
 
+int alf_clip3_int(const int minVal, const int maxVal, const int a)
+{
+  return MIN(MAX(minVal, a), maxVal);
+}
+
 void get_clip_max(const alf_covariance *cov, int *clip_max)
 {
   const int num_coeff = cov->num_coeff;
@@ -384,7 +389,7 @@ int gns_cholesky_dec(double inp_matr[MAX_NUM_ALF_LUMA_COEFF][MAX_NUM_ALF_LUMA_CO
       /* Compute i'th row of outMatr */
       if (i == j)
       {
-        if (scale <= REG_SQR) // if(scale <= 0 )  /* If inpMatr is singular */
+        if (scale <= 0.0000001) // if(scale <= 0 )  /* If inpMatr is singular */
         {
           return 0;
         }
@@ -430,7 +435,7 @@ int gns_solve_by_chol(double lhs[MAX_NUM_ALF_LUMA_COEFF][MAX_NUM_ALF_LUMA_COEFF]
     /* Regularize lhs */
     for (int i = 0; i < num_eq; i++)
     {
-      lhs[i][i] += REG;
+      lhs[i][i] += 0.0001;
     }
 
     /* Compute upper triangular U such that U'*U = regularized lhs */
@@ -2637,7 +2642,7 @@ void kvz_alf_get_avai_aps_ids_luma(encoder_state_t * const state,
   int aps_id_checked = 0, cur_aps_id = state->tile->frame->alf_info->aps_id_start;
   if (cur_aps_id < ALF_CTB_MAX_NUM_APS)
   {
-    while ((aps_id_checked < ALF_CTB_MAX_NUM_APS) && state->frame->slicetype != KVZ_SLICE_I && *size_of_aps_ids < ALF_CTB_MAX_NUM_APS /*&& /*!cs.slice->getPendingRasInit()*/ && !(state->frame->pictype == KVZ_NAL_IDR_W_RADL || state->frame->pictype == KVZ_NAL_IDR_N_LP))
+    while ((aps_id_checked < ALF_CTB_MAX_NUM_APS) && !state->frame->is_irap && *size_of_aps_ids < ALF_CTB_MAX_NUM_APS /*&& /*!cs.slice->getPendingRasInit()*/)
     {
       alf_aps *cur_aps = &state->slice->apss[cur_aps_id];
       bool aps_found = (0 <= cur_aps->aps_id && cur_aps->aps_id < ALF_CTB_MAX_NUM_APS);
@@ -3891,7 +3896,12 @@ void kvz_alf_encoder_ctb(encoder_state_t * const state,
           memcpy(&ctx_temp_start, cabac_estimator, sizeof(ctx_temp_start));
           ctx_temp_start.only_count = 1;
           int i_best_filter_set_idx = 0;
-          for (int filter_set_idx = 0; filter_set_idx < num_filter_set; filter_set_idx++)
+          int first_filter_set_idx = 0;
+          if (!state->encoder_control->cfg.alf_allow_predefined_filters)
+          {
+            first_filter_set_idx = ALF_NUM_FIXED_FILTER_SETS;
+          }
+          for (int filter_set_idx = first_filter_set_idx; filter_set_idx < num_filter_set; filter_set_idx++)
           {
             //rate
             //m_CABACEstimator->getCtx() = AlfCtx(ctxTempStart);
@@ -4144,44 +4154,24 @@ void kvz_alf_encoder_ctb(encoder_state_t * const state,
 
     for (int cur_aps_id = 0; cur_aps_id < ALF_CTB_MAX_NUM_APS; cur_aps_id++)
     {
-      if ((/*(cs.slice->getPendingRasInit() ||*/ (state->frame->pictype == KVZ_NAL_IDR_W_RADL || state->frame->pictype == KVZ_NAL_IDR_N_LP) || (state->frame->slicetype == KVZ_SLICE_I)) && cur_aps_id != new_aps_id_chroma)
+      const bool reuse_existing_aps = cur_aps_id != new_aps_id_chroma;
+
+      if ((/*(cs.slice->getPendingRasInit() ||*/ state->frame->is_irap) && reuse_existing_aps)
       {
         continue;
       }
-      //APS* cur_aps = m_apsMap->getPS(cur_aps_id);
+
       alf_aps* cur_aps = &state->encoder_control->cfg.param_set_map[cur_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS].parameter_set;
-      if (cur_aps && cur_aps->layer_id != 0 /*cs.slice->getPic()->layerId*/)
-      {
-        continue;
-      }
       double cur_cost = lambda * 3;
 
-    if (cur_aps_id == new_aps_id_chroma)
-    {
-      copy_alf_param(&g_alf_aps_temp, aps);
-      cur_cost += g_lambda[CHANNEL_TYPE_CHROMA] * g_bits_new_filter[CHANNEL_TYPE_CHROMA];
-    }
-    else if (cur_aps && cur_aps->t_layer <= state->slice->id && cur_aps->new_filter_flag[CHANNEL_TYPE_CHROMA])
-    {
-      //g_alf_slice_aps_temp = cur_aps;
-      copy_alf_param(&g_alf_aps_temp, cur_aps);
-    }
-    else
-    {
-      continue;
-    }
-    kvz_alf_reconstruct_coeff(state, &g_alf_aps_temp, CHANNEL_TYPE_CHROMA, true, true);
-    //m_CABACEstimator->getCtx() = AlfCtx(ctxStart);
-    memcpy(&cabac_estimator, &ctx_start, sizeof(cabac_estimator));
-    for (int comp_id = 1; comp_id < MAX_NUM_COMPONENT; comp_id++)
-    {
-      g_alf_aps_temp.enabled_flag[comp_id] = true;
-      //for (int ctb_idx = 0; ctb_idx < g_num_ctus_in_pic; ctb_idx++)
+      if (!reuse_existing_aps)
       {
         copy_alf_param(alf_param_temp, aps);
         cur_cost += lambda * arr_bits_new_filter[CHANNEL_TYPE_CHROMA];
       }
-      else if (cur_aps && cur_aps->temporal_id <= state->slice->id && cur_aps->new_filter_flag[CHANNEL_TYPE_CHROMA])
+      else if (cur_aps && cur_aps->temporal_id <= state->slice->id 
+                && cur_aps->layer_id != 0 
+                && cur_aps->new_filter_flag[CHANNEL_TYPE_CHROMA])
       {
         //g_alf_slice_aps_temp = cur_aps;
         copy_alf_param(alf_param_temp, cur_aps);
@@ -4991,12 +4981,12 @@ void encode_alf_aps_flags(encoder_state_t * const state,
         {
           if (coeff[i] == 0)
           {
-            WRITE_U(stream, 0, CC_ALF_BITS_PER_COEFF_LEVEL,
+            WRITE_U(stream, 0, 3,
               cc_idx == 0 ? "alf_cc_cb_mapped_coeff_abs" : "alf_cc_cr_mapped_coeff_abs");
           }
           else
           {
-            WRITE_U(stream, 1 + kvz_math_floor_log2(abs(coeff[i])), CC_ALF_BITS_PER_COEFF_LEVEL,
+            WRITE_U(stream, 1 + kvz_math_floor_log2(abs(coeff[i])), 3,
               cc_idx == 0 ? "alf_cc_cb_mapped_coeff_abs" : "alf_cc_cr_mapped_coeff_abs");
             WRITE_U(stream, coeff[i] < 0 ? 1 : 0, 1, cc_idx == 0 ? "alf_cc_cb_coeff_sign" : "alf_cc_cr_coeff_sign");
           }
@@ -6039,11 +6029,11 @@ void kvz_alf_derive_classification_blk(encoder_state_t * const state,
       const int y = (i + blk_dst_y) & (vb_ctu_height - 1);
       if (y == vb_pos - 4 || y == vb_pos)
       {
-        activity = alf_clip3(0, max_activity, (temp_act * 96) >> shift);
+        activity = alf_clip3_int(0, max_activity, (temp_act * 96) >> shift);
       }
       else
       {
-        activity = alf_clip3(0, max_activity, (temp_act * 64) >> shift);
+        activity = alf_clip3_int(0, max_activity, (temp_act * 64) >> shift);
       }
 
       int class_idx = th[activity];
@@ -7037,9 +7027,9 @@ void get_available_cc_alf_aps_ids(encoder_state_t *const state, alf_component_id
   if (cur_aps_id < ALF_CTB_MAX_NUM_APS)
   {
     while (aps_id_checked < ALF_CTB_MAX_NUM_APS &&
-      state->frame->slicetype != KVZ_SLICE_I &&
-      (*aps_ids_size) < ALF_CTB_MAX_NUM_APS  &&
-      !(state->frame->pictype == KVZ_NAL_IDR_W_RADL || state->frame->pictype == KVZ_NAL_IDR_N_LP)) //&& !cs.slice->getPendingRasInit()
+      state->frame->is_irap &&
+      (*aps_ids_size) < ALF_CTB_MAX_NUM_APS 
+      /*&& !cs.slice->getPendingRasInit()*/) 
     {
       alf_aps cur_aps = state->slice->apss[cur_aps_id];
       bool aps_found = (0 <= cur_aps.aps_id && cur_aps.aps_id < ALF_CTB_MAX_NUM_APS);
