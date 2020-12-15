@@ -529,8 +529,8 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
 
   WRITE_UE(stream, encoder->bitdepth-8, "bit_depth_minus8");
 
-  WRITE_U(stream, encoder->cfg.wpp, 1, "entropy_coding_sync_enabled_flag");
-  WRITE_U(stream, encoder->tiles_enable, 1, "sps_entry_point_offsets_present_flag");
+  WRITE_U(stream, encoder->cfg.wpp, 1, "sps_entropy_coding_sync_enabled_flag");
+  WRITE_U(stream, encoder->tiles_enable || encoder->cfg.wpp, 1, "sps_entry_point_offsets_present_flag");
 
   WRITE_U(stream, 1, 4, "log2_max_pic_order_cnt_lsb_minus4");
   WRITE_U(stream, 0, 1, "sps_poc_msb_flag");
@@ -960,7 +960,7 @@ static void encoder_state_write_picture_timing_sei_message(encoder_state_t * con
   }
 }
 
-/*
+
 // ToDo: Enable tiles/wpp
 static void encoder_state_entry_points_explore(const encoder_state_t * const state, int * const r_count, int * const r_max_length) {
   int i;
@@ -992,7 +992,6 @@ static void encoder_state_write_bitstream_entry_points_write(bitstream_t * const
     }
   }
 }
-*/
 
 static void kvz_encoder_state_write_bitstream_picture_header(
     struct bitstream_t * const stream,
@@ -1199,6 +1198,28 @@ void kvz_encoder_state_write_bitstream_slice_header(
     // but in other frames it is CTU size >> <this value>
     //WRITE_UE(stream, 0, "max_binary_tree_unit_size"); // Max BT size == CTU size
 
+  }
+
+  if (encoder->tiles_enable || encoder->cfg.wpp) {
+    int num_entry_points = 0;
+    int max_length_seen = 0;
+
+    if (state->is_leaf) {
+      num_entry_points = 1;
+    }
+    else {
+      encoder_state_entry_points_explore(state, &num_entry_points, &max_length_seen);
+    }
+
+    int num_offsets = num_entry_points - 1;
+
+    //WRITE_UE(stream, num_offsets, "num_entry_point_offsets");
+    if (num_offsets > 0) {
+      int entry_points_written = 0;
+      int offset_len = kvz_math_floor_log2(max_length_seen) + 1;
+      WRITE_UE(stream, offset_len - 1, "offset_len_minus1");
+      encoder_state_write_bitstream_entry_points_write(stream, state, num_entry_points, offset_len, &entry_points_written);
+    }
   }
 
   //WRITE_U(stream, 0, 1, "slice_ts_residual_coding_disabled_flag");
