@@ -733,7 +733,7 @@ static void encoder_state_worker_encode_lcu(void * opaque)
   kvz_get_lcu_stats(state, lcu->position.x, lcu->position.y)->skipped = !not_skip;
 
   //Wavefronts need the context to be copied to the next row
-  if (state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW && lcu->index == 1) {
+  if (state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW && lcu->index == 0) {
     int j;
     //Find next encoder (next row)
     for (j=0; state->parent->children[j].encoder_control; ++j) {
@@ -856,6 +856,7 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
           kvz_threadqueue_job_dep_add(job[0], job[-1]);
         }
         // Add local WPP dependancy to the LCU on the top right.
+        // ToDo: do we need the dependancy on VVC? Causes non-deterministic output at the moment if removed
         if (lcu->above) {
           if (lcu->above->right) {
             kvz_threadqueue_job_dep_add(job[0], job[-state->tile->frame->width_in_lcu + 1]);
