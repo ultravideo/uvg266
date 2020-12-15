@@ -692,7 +692,6 @@ static void encoder_state_worker_encode_lcu(void * opaque)
     const bool end_of_tile = lcu->last_column && lcu->last_row;
     const bool end_of_wpp_row = encoder->cfg.wpp && lcu->last_column;
 
-
     if (end_of_tile || end_of_wpp_row) {
       // end_of_sub_stream_one_bit
       kvz_cabac_encode_bin_trm(&state->cabac, 1);
@@ -734,7 +733,7 @@ static void encoder_state_worker_encode_lcu(void * opaque)
   kvz_get_lcu_stats(state, lcu->position.x, lcu->position.y)->skipped = !not_skip;
 
   //Wavefronts need the context to be copied to the next row
-  if (state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW && lcu->index == 1) {
+  if (state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW && lcu->index == 0) {
     int j;
     //Find next encoder (next row)
     for (j=0; state->parent->children[j].encoder_control; ++j) {
@@ -856,13 +855,9 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
         if (lcu->left) {
           kvz_threadqueue_job_dep_add(job[0], job[-1]);
         }
-        // Add local WPP dependancy to the LCU on the top right.
+        // Add local WPP dependancy to the LCU on the top.
         if (lcu->above) {
-          if (lcu->above->right) {
-            kvz_threadqueue_job_dep_add(job[0], job[-state->tile->frame->width_in_lcu + 1]);
-          } else {
-            kvz_threadqueue_job_dep_add(job[0], job[-state->tile->frame->width_in_lcu]);
-          }
+          kvz_threadqueue_job_dep_add(job[0], job[-state->tile->frame->width_in_lcu]);
         }
 
         kvz_threadqueue_submit(state->encoder_control->threadqueue, state->tile->wf_jobs[lcu->id]);
@@ -1468,7 +1463,7 @@ void kvz_encode_one_frame(encoder_state_t * const state, kvz_picture* frame)
 {
 #if KVZ_DEBUG_PRINT_CABAC == 1
   kvz_cabac_bins_count = 0;
-  if (state->frame->num == 1) kvz_cabac_bins_verbose = true;
+  if (state->frame->num == 0) kvz_cabac_bins_verbose = true;
   else kvz_cabac_bins_verbose = false;
 #endif
   encoder_state_init_new_frame(state, frame);

@@ -14,12 +14,12 @@ tar xf ffmpeg-release-4.2.1-32bit-static.tar.xz
 cp ffmpeg-4.2.1-i686-static/ffmpeg "${HOME}/bin/ffmpeg"
 chmod +x "${HOME}/bin/ffmpeg"
 
-wget http://ultravideo.fi/ubuntu-vtm-ea11cf4b.tgz
+wget http://ultravideo.fi/ubuntu-vtm-11.0.tgz
 sha256sum -c - << EOF
-3216516a397d4a7ed3eb18279c53e69ee766fe5cdda7c6f3b2f0b0de951c716c  ubuntu-vtm-ea11cf4b.tgz
+0f1655a308ccba82976d11ed70ceb5a9cb4291db950558c707f0dfd84d5462ca  ubuntu-vtm-11.0.tgz
 EOF
-tar xf ubuntu-vtm-ea11cf4b.tgz
-cp DecoderAppStatic "${HOME}/bin/DecoderAppStatic"
+tar xf ubuntu-vtm-11.0.tgz
+cp DecoderApp "${HOME}/bin/DecoderAppStatic"
 chmod +x "${HOME}/bin/DecoderAppStatic"
 
 export PATH="${HOME}/bin:${PATH}"
