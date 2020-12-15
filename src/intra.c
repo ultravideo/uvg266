@@ -437,7 +437,8 @@ void kvz_intra_build_reference_inner(
   const vector2d_t *const luma_px,
   const vector2d_t *const pic_px,
   const lcu_t *const lcu,
-  kvz_intra_references *const refs)
+  kvz_intra_references *const refs,
+  bool entropy_sync)
 {
   assert(log2_width >= 2 && log2_width <= 5);
 
@@ -530,6 +531,8 @@ void kvz_intra_build_reference_inner(
   px_available_top = MIN(px_available_top, width * 2);
   px_available_top = MIN(px_available_top, (pic_px->x - luma_px->x) >> is_chroma);
 
+  if (entropy_sync && lcu_px.y == 0) px_available_top = MIN(px_available_top, ((LCU_WIDTH >> is_chroma) - lcu_px.x) -1);
+
   // Copy all the pixels we can.
   i = 0;
   do {
@@ -553,11 +556,12 @@ void kvz_intra_build_reference(
   const vector2d_t *const luma_px,
   const vector2d_t *const pic_px,
   const lcu_t *const lcu,
-  kvz_intra_references *const refs)
+  kvz_intra_references *const refs,
+  bool entropy_sync)
 {
   // Much logic can be discarded if not on the edge
   if (luma_px->x > 0 && luma_px->y > 0) {
-    kvz_intra_build_reference_inner(log2_width, color, luma_px, pic_px, lcu, refs);
+    kvz_intra_build_reference_inner(log2_width, color, luma_px, pic_px, lcu, refs, entropy_sync);
   } else {
     kvz_intra_build_reference_any(log2_width, color, luma_px, pic_px, lcu, refs);
   }
@@ -591,7 +595,7 @@ static void intra_recon_tb_leaf(
   const vector2d_t lcu_px = { SUB_SCU(x) >> shift, SUB_SCU(y) >> shift};
 
   kvz_intra_references refs;
-  kvz_intra_build_reference(log2width, color, &luma_px, &pic_px, lcu, &refs);
+  kvz_intra_build_reference(log2width, color, &luma_px, &pic_px, lcu, &refs, cfg->wpp);
 
   kvz_pixel pred[32 * 32];
   const bool filter_boundary = color == COLOR_Y && !(cfg->lossless && cfg->implicit_rdpcm);

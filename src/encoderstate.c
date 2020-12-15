@@ -855,14 +855,9 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
         if (lcu->left) {
           kvz_threadqueue_job_dep_add(job[0], job[-1]);
         }
-        // Add local WPP dependancy to the LCU on the top right.
-        // ToDo: do we need the dependancy on VVC? Causes non-deterministic output at the moment if removed
+        // Add local WPP dependancy to the LCU on the top.
         if (lcu->above) {
-          if (lcu->above->right) {
-            kvz_threadqueue_job_dep_add(job[0], job[-state->tile->frame->width_in_lcu + 1]);
-          } else {
-            kvz_threadqueue_job_dep_add(job[0], job[-state->tile->frame->width_in_lcu]);
-          }
+          kvz_threadqueue_job_dep_add(job[0], job[-state->tile->frame->width_in_lcu]);
         }
 
         kvz_threadqueue_submit(state->encoder_control->threadqueue, state->tile->wf_jobs[lcu->id]);
