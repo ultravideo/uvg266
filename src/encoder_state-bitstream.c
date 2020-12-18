@@ -594,9 +594,15 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
 
 
   WRITE_U(stream, 0, 1, "sps_transform_skip_enabled_flag");
-  WRITE_U(stream, 0, 1, "sps_mts_enabled_flag");
-  WRITE_U(stream, 0, 1, "sps_lfnst_enabled_flag");
 
+  const uint8_t mts_selection = encoder->cfg.mts;
+  WRITE_U(stream, mts_selection ? 1 : 0, 1, "sps_mts_enabled_flag");
+  if (mts_selection){
+    WRITE_U(stream, mts_selection == KVZ_MTS_INTRA || mts_selection == KVZ_MTS_BOTH ? 1 : 0, 1, "sps_explicit_mts_intra_enabled_flag");
+    WRITE_U(stream, mts_selection == KVZ_MTS_INTER || mts_selection == KVZ_MTS_BOTH ? 1 : 0, 1, "sps_explicit_mts_inter_enabled_flag");
+  }
+
+  WRITE_U(stream, 0, 1, "sps_lfnst_enabled_flag");
 
   WRITE_U(stream, 0, 1, "sps_joint_cbcr_enabled_flag");
 

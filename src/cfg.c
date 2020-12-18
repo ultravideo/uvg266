@@ -58,6 +58,7 @@ int kvz_config_init(kvz_config *cfg)
   cfg->mv_rdo          = 0;
   cfg->full_intra_search = 0;
   cfg->trskip_enable   = 0;
+  cfg->mts             = 0;
   cfg->tr_depth_intra  = 0;
   cfg->ime_algorithm   = 0; /* hexbs */
   cfg->fme_level       = 4;
@@ -449,6 +450,8 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
 
   static const char * const sao_names[] = { "off", "edge", "band", "full", NULL };
 
+  static const char * const mts_names[] = { "off", "intra", "inter", "both", NULL };
+
   static const char * const scaling_list_names[] = { "off", "custom", "default", NULL };
 
   static const char * const rc_algorithm_names[] = { "no-rc", "lambda", "oba", NULL };
@@ -810,6 +813,11 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     cfg->full_intra_search = atobool(value);
   else if OPT("transform-skip")
     cfg->trskip_enable = atobool(value);
+  else if OPT("mts") {
+    int8_t mts_type = 0;
+    if (!parse_enum(value, mts_names, &mts_type)) mts_type = atobool(value) ? 3 : 0;
+    cfg->mts = mts_type;
+  }
   else if OPT("tr-depth-intra")
     cfg->tr_depth_intra = atoi(value);
   else if OPT("me") {
