@@ -156,20 +156,52 @@ static INLINE void kvz_filter_deblock_chroma(const encoder_control_t * const enc
                                              int32_t offset,
                                              int32_t tc,
                                              int8_t part_P_nofilter,
-                                             int8_t part_Q_nofilter)
+                                             int8_t part_Q_nofilter,
+                                             bool sw,
+                                             bool large_boundary,
+                                             bool is_chroma_hor_CTB_boundary)
 {
   int32_t delta;
+  int16_t m0 = src[-offset * 4];
+  int16_t m1 = src[-offset * 3];
   int16_t m2 = src[-offset * 2];
   int16_t m3 = src[-offset];
   int16_t m4 = src[0];
   int16_t m5 = src[offset];
+  int16_t m6 = src[offset * 2];
+  int16_t m7 = src[offset * 3];
+
+  if (sw) {
+    if (is_chroma_hor_CTB_boundary) {
+      src[-offset * 1] = CLIP(m3 - tc, m3 + tc, (3 * m2 + 2 * m3 + m4 + m5 + m6 + 4) >> 3);
+      src[0] = CLIP(m4 - tc, m4 + tc, (2* m2 + m3 + 2 * m4 + m5 + m6 + m7 + 4) >> 3);
+    }
+    else {
+      src[-offset * 3] = CLIP(m1 - tc, m1 + tc, (3 * m0 + 2 * m1 + m2 + m3 + m4 + 4) >> 3);
+      src[-offset * 2] = CLIP(m2 - tc, m2 + tc, (2 * m0 + m1 + 2 * m2 + m3 + m4 + m5 + 4) >> 3);
+      src[-offset * 1] = CLIP(m3 - tc, m3 + tc, (m0 + m1 + m2 + 2 * m3 + m4 + m5 + m6 + 4) >> 3);
+      src[0] = CLIP(m4 - tc, m4 + tc, (m1 + m2 + m3 + 2 * m4 + m5 + m6 + m7 + 4) >> 3);
+
+    }
+
+    src[offset * 1] = CLIP(m5 - tc, m6 + tc, (m2 + m3 + m4 + 2 * m5 + m6 + 2 * m7 + 4) >> 3);
+    src[offset * 2] = CLIP(m6 - tc, m6 + tc, (m3 + m4 + m5 + 2 * m6 + 3 * m7 + 4) >> 3);
+  }
 
   delta = CLIP(-tc,tc, (((m4 - m3) * 4) + m2 - m5 + 4 ) >> 3);
   if(!part_P_nofilter) {
     src[-offset] = CLIP(0, (1 << encoder->bitdepth) - 1, m3 + delta);
   }
+  else if (large_boundary) {
+    src[-offset * 3] = m1;
+    src[-offset * 2] = m2;
+  }
   if(!part_Q_nofilter) {
     src[0] = CLIP(0, (1 << encoder->bitdepth) - 1, m4 - delta);
+  }
+  else if (large_boundary) {
+    src[offset * 1] = m5;
+    src[offset * 2] = m6;
   }
 }
 
@@ -938,14 +970,16 @@ static void filter_deblock_edge_chroma(encoder_state_t * const state,
                                                    dp0, dq0, dp3, dq3, Tc, beta,
                                                    false, false, 7, 7, is_chroma_hor_CTB_boundary);
               for (int i = 0; i < 4; i++) {//TODO: chroma deblocking
-                kvz_filter_deblock_chroma(encoder, src[component] + step * (4 * blk_idx + i), offset, Tc, 0, 0);
+                kvz_filter_deblock_chroma(encoder, src[component] + step * (4 * blk_idx + i), offset, Tc, 0, 0,
+                                          sw, large_boundary, is_chroma_hor_CTB_boundary);
               }
             }
           }
           if (!use_long_filter)
           {
             for (int i = 0; i < 4; i++) {
-              kvz_filter_deblock_chroma(encoder, src[component] + step * (4 * blk_idx + i), offset, Tc, 0, 0);
+              kvz_filter_deblock_chroma(encoder, src[component] + step * (4 * blk_idx + i), offset, Tc, 0, 0,
+                                        false, large_boundary, is_chroma_hor_CTB_boundary);
             }
           }
         }
