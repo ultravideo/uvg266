@@ -265,6 +265,13 @@ static const uint8_t INIT_SAO_MERGE_FLAG[4] = { 2, 60, 60, 0 };
 
 static const uint8_t INIT_SAO_TYPE_IDX[4] = { 2, 5, 13, 4 };
 
+static const uint8_t INIT_MTS_IDX[4][4] = {
+  {  45,  25,  27,   0, },
+  {  45,  40,  27,   0, },
+  {  29,   0,  28,   0, },
+  {   8,   0,   9,   0, },
+};
+
 static const uint8_t INIT_JOINT_CB_CR_FLAG[4][3] = {
   {  42,  43,  52, },
   {  27,  36,  45, },
@@ -368,6 +375,7 @@ void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
 
   for (i = 0; i < 4; i++) {
     kvz_ctx_init(&cabac->ctx.sig_coeff_group_model[i], QP, INIT_SIG_COEFF_GROUP[slice][i], INIT_SIG_COEFF_GROUP[3][i]);
+    kvz_ctx_init(&cabac->ctx.mts_idx_model[i], QP, INIT_MTS_IDX[slice][i], INIT_MTS_IDX[3][i]);
   }
 
 
