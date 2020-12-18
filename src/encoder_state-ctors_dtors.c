@@ -211,6 +211,10 @@ static int encoder_state_config_slice_init(encoder_state_t * const state,
     state->slice->tile_group_cc_alf_cb_aps_id = -1;
     state->slice->tile_group_cc_alf_cr_aps_id = -1;
     state->slice->num_of_param_sets = 0;
+    memset(state->slice->tile_group_alf_enabled_flag, 0, sizeof(state->slice->tile_group_alf_enabled_flag));
+    if (state->encoder_control->cfg.alf_type == KVZ_ALF_FULL) {
+      reset_cc_alf_aps_param(state->slice->cc_filter_param);
+    }
   }
   return 1;
 }

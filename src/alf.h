@@ -161,6 +161,7 @@ typedef enum {
   COMPONENT_Cr = 2,
   MAX_NUM_COMPONENT = 3,
 } alf_component_id;
+
 //----------------------------------------------------------------
 
 //-------------------------typedef structs----------------------------
@@ -222,7 +223,7 @@ typedef struct alf_aps {
   bool alf_luma_coeff_delta_flag;                                 // alf_luma_coeff_delta_flag
   bool new_filter_flag[MAX_NUM_CHANNEL_TYPE];
 
-  struct cc_alf_filter_param cc_alf_aps_param;
+  cc_alf_filter_param cc_alf_aps_param;
 
 } alf_aps;
 
@@ -343,15 +344,17 @@ void get_frame_stats(alf_info_t *alf_info, channel_type channel, const int32_t n
 void get_frame_stat(alf_covariance* frame_cov, alf_covariance* ctb_cov, bool* ctb_enable_flags, uint8_t* ctb_alt_idx, const int num_classes, int alt_idx, const int32_t num_ctus);
 void copy_cov(alf_covariance *dst, alf_covariance *src);
 void copy_alf_param(alf_aps *dst, alf_aps *src);
+void copy_cc_alf_param(cc_alf_filter_param *dst, cc_alf_filter_param *src);
 void copy_alf_param_w_channel(alf_aps* dst, alf_aps* src, channel_type channel);
-void copy_aps(alf_aps *dst, alf_aps *src);
-void copy_aps_to_map(param_set_map *dst, alf_aps *src, int8_t aps_id);
+void copy_aps(alf_aps *dst, alf_aps *src, bool cc_alf_enabled);
+void copy_aps_to_map(param_set_map *dst, alf_aps *src, int8_t aps_id, bool cc_alf_enabled);
+void reset_aps(alf_aps *src, bool cc_alf_enabled);
 void reset_alf_param(alf_aps *src);
+void reset_cc_alf_aps_param(cc_alf_filter_param *cc_alf);
 void add_alf_cov(alf_covariance *dst, alf_covariance *src);
 void add_alf_cov_lhs_rhs(alf_covariance *dst, alf_covariance *lhs, alf_covariance *rhs);
 void reset_alf_covariance(alf_covariance *alf, int num_bins);
 void init_alf_covariance(alf_covariance *alf, int num_bins);
-void reset_cc_alf_aps_param(cc_alf_filter_param *cc_alf);
 void copy_pixels(kvz_pixel *src, int x_src_start, int y_src_start, int src_stride,
   kvz_pixel *dst, int x_dst_start, int y_dst_start, int dst_stride,
   int width, int height);
