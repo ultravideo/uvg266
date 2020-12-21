@@ -149,7 +149,7 @@ static INLINE int kvz_filter_deblock_luma_weak(
 }
 
 /**
- * \brief
+ * \brief Performe strong/weak filtering for chroma
  */
 static INLINE void kvz_filter_deblock_chroma(const encoder_control_t * const encoder,
                                              kvz_pixel *src,
@@ -340,7 +340,15 @@ static INLINE void scatter_deblock_pixels(
   }
 }
 
-//TODO: Implement
+/**
+ * \brief Perform large block strong luma filtering in place.
+ * \param line  line of 8 pixels, with center at index 4
+ * \param lineL extended pixels with P pixels in [0,3] and Q pixels in [4,7]
+ * \param tc  tc treshold
+ * \param filter_length_P filter length in the P block
+ * \param filter_length_Q filter length in the Q block
+ * \return  Reach of the filter starting from center.
+ */
 static INLINE int kvz_filter_deblock_large_block(kvz_pixel *line, kvz_pixel *lineL, const int32_t tc,
                                                  const uint8_t filter_length_P, const uint8_t filter_length_Q)
 {
@@ -432,8 +440,8 @@ static INLINE int kvz_filter_deblock_large_block(kvz_pixel *line, kvz_pixel *lin
                     + *refL[2] + *refL[3] + *refL[4] + *refL[5] + *refL[6] + 8) >> 4;
     }
     else { //lenL == 5 && lenS == 3
-      ref_middle = (*lineP[3] + *lineP[2] + *lineP[1] + *lineP[0] 
-                    + *lineQ[0] + *lineQ[1] + *lineQ[2] + *lineQ[3] + 4) >> 3;
+    ref_middle = (*lineP[3] + *lineP[2] + *lineP[1] + *lineP[0]
+      + *lineQ[0] + *lineQ[1] + *lineQ[2] + *lineQ[3] + 4) >> 3;
 
     }
   }
@@ -465,17 +473,17 @@ static INLINE int kvz_filter_deblock_large_block(kvz_pixel *line, kvz_pixel *lin
 * \brief Determine if strong or weak filtering should be used
 */
 static INLINE bool use_strong_filtering(const kvz_pixel const* b0, const kvz_pixel const* b3,
-                                        const kvz_pixel const* b0L, const kvz_pixel const* b3L,
-                                        const int_fast32_t dp0, const int_fast32_t dq0,
-                                        const int_fast32_t dp3, const int_fast32_t dq3,
-                                        const int32_t tc, const int32_t beta,
-                                        const bool is_side_P_large, const bool is_side_Q_large,
-                                        const uint8_t max_filter_length_P, const uint8_t max_filter_length_Q,
-                                        const is_chroma_CTB_boundary)
+  const kvz_pixel const* b0L, const kvz_pixel const* b3L,
+  const int_fast32_t dp0, const int_fast32_t dq0,
+  const int_fast32_t dp3, const int_fast32_t dq3,
+  const int32_t tc, const int32_t beta,
+  const bool is_side_P_large, const bool is_side_Q_large,
+  const uint8_t max_filter_length_P, const uint8_t max_filter_length_Q,
+  const is_chroma_CTB_boundary)
 {
   int_fast32_t sp0 = is_chroma_CTB_boundary ? abs(b0[2] - b0[3]) : abs(b0[0] - b0[3]);
   int_fast32_t sp3 = is_chroma_CTB_boundary ? abs(b3[2] - b3[3]) : abs(b3[0] - b3[3]);
-  
+
   if (is_side_P_large || is_side_Q_large) { //Large block decision
     int_fast32_t sq0 = abs(b0[4] - b0[7]);
     int_fast32_t sq3 = abs(b3[4] - b3[7]);
@@ -486,8 +494,7 @@ static INLINE bool use_strong_filtering(const kvz_pixel const* b0, const kvz_pix
         tmp3 = b3L[0];
         sp0 = sp0 + abs(b0L[3] - b0L[2] - b0L[1] + tmp0);
         sp3 = sp3 + abs(b3L[3] - b3L[2] - b3L[1] + tmp3);
-      }
-      else {
+      } else {
         tmp0 = b0L[2];
         tmp3 = b3L[2];
       }
@@ -508,19 +515,75 @@ static INLINE bool use_strong_filtering(const kvz_pixel const* b0, const kvz_pix
       sq3 = (sq3 + abs(tmp3 - b3[7]) + 1) >> 1;
     }
     return 2 * (dp0 + dq0) < beta >> 4 &&
-           2 * (dp3 + dq3) < beta >> 4 &&
-           abs(b0[3] - b0[4]) < (5 * tc + 1) >> 1 &&
-           abs(b3[3] - b3[4]) < (5 * tc + 1) >> 1 &&
-           sp0 + sq0 < (beta * 3 >> 5) &&
-           sp3 + sq3 < (beta * 3 >> 5);
-  } 
-  else { //Normal decision
+      2 * (dp3 + dq3) < beta >> 4 &&
+      abs(b0[3] - b0[4]) < (5 * tc + 1) >> 1 &&
+      abs(b3[3] - b3[4]) < (5 * tc + 1) >> 1 &&
+      sp0 + sq0 < (beta * 3 >> 5) &&
+      sp3 + sq3 < (beta * 3 >> 5);
+  } else { //Normal decision
     return 2 * (dp0 + dq0) < beta >> 2 &&
-           2 * (dp3 + dq3) < beta >> 2 &&
-           abs(b0[3] - b0[4]) < (5 * tc + 1) >> 1 &&
-           abs(b3[3] - b3[4]) < (5 * tc + 1) >> 1 &&
-           sp0 + abs(b0[4] - b0[7]) < beta >> 3 &&
-           sp3 + abs(b3[4] - b3[7]) < beta >> 3;
+      2 * (dp3 + dq3) < beta >> 2 &&
+      abs(b0[3] - b0[4]) < (5 * tc + 1) >> 1 &&
+      abs(b3[3] - b3[4]) < (5 * tc + 1) >> 1 &&
+      sp0 + abs(b0[4] - b0[7]) < beta >> 3 &&
+      sp3 + abs(b3[4] - b3[7]) < beta >> 3;
+  }
+}
+
+static INLINE void get_max_filter_length(uint8_t *filt_len_P, uint8_t *filt_len_Q,
+                                         const encoder_state_t * const state, const uint32_t x, const uint32_t y,
+                                         const edge_dir dir, const bool transform_edge,
+                                         const int block_size, const int size_P_side, const int size_Q_side,
+                                         color_t comp)
+{
+  //const int size_P_side = 0;
+  //const int size_Q_side = 0;
+  //const int size = 0;
+  const int x_mul = dir == EDGE_HOR ? 0 : 1;
+  const int y_mul = dir == EDGE_HOR ? 1 : 0;
+  const int pos = (dir == EDGE_HOR ? y : x) % LCU_WIDTH;
+  //const bool transform_edge = is_tu_boundary(state, x, y, dir);
+  bool transform_edge_4x4[2] = { false, false };
+  bool transform_edge_8x8[2] = { false, false };
+  if (pos > 0) {
+    transform_edge_4x4[0] = is_tu_boundary(state, x + x_mul * 4, y + y_mul * 4, dir);
+    transform_edge_4x4[1] = is_tu_boundary(state, x - x_mul * 4, y - y_mul * 4, dir);
+    transform_edge_8x8[0] = is_tu_boundary(state, x + x_mul * 8, y + y_mul * 8, dir);
+    transform_edge_8x8[1] = is_tu_boundary(state, x - x_mul * 8, y - y_mul * 8, dir);
+  }
+
+  if (comp == COLOR_Y) {
+    if (size_P_side <= 4 && size_Q_side <= 4){
+      *filt_len_P = 1;
+      *filt_len_Q = 1;
+    }
+    else {
+      *filt_len_P = size_P_side >= 32 ? 7 : 3;
+      *filt_len_Q = size_Q_side >= 32 ? 7 : 3;
+    }
+
+    if (transform_edge) {
+      *filt_len_Q = MIN(*filt_len_Q, 5);
+      if (pos > 0) {
+        *filt_len_P = MIN(*filt_len_P, 5);
+      }
+    }
+    else if (pos > 0 && (transform_edge_4x4[0] || (pos + 4) >= block_size || transform_edge_4x4[1])) { //adjacent to transform edge (4x4 grid)
+      *filt_len_P = 1;
+      *filt_len_Q = 1;
+    }
+    else if (pos > 0 && (transform_edge_8x8[0] || (pos + 8) >= block_size || transform_edge_8x8[1])) { //adjacent to transform edge (8x8 grid)
+      *filt_len_P = 2;
+      *filt_len_Q = 2;
+    }
+    else {
+      *filt_len_P = 3;
+      *filt_len_Q = 3;
+    }
+  }
+  else {
+    *filt_len_P = (size_P_side >= 8 && size_Q_side >= 8) ? 3 : 1;
+    *filt_len_Q = (size_P_side >= 8 && size_Q_side >= 8) ? 3 : 1;
   }
 }
 
@@ -594,10 +657,11 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
 
     // For each 4-pixel part in the edge
     for (uint32_t block_idx = 0; block_idx < num_4px_parts; ++block_idx) {
+      
+      // CUs on both sides of the edge
+      cu_info_t *cu_p;
+      cu_info_t *cu_q;
       {
-        // CUs on both sides of the edge
-        cu_info_t *cu_p;
-        cu_info_t *cu_q;
         if (dir == EDGE_VER) {
           int32_t y_coord = y + 4 * block_idx;
           cu_p = kvz_cu_array_at(frame->cu_array, x - 1, y_coord);
@@ -701,8 +765,10 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
 
       bool is_side_P_large = false;
       bool is_side_Q_large = false;
-      uint8_t max_filter_length_P = 7; //TODO: Get actual max filter length
-      uint8_t max_filter_length_Q = 7;
+      uint8_t max_filter_length_P = 0;
+      uint8_t max_filter_length_Q = 0;
+      get_max_filter_length(&max_filter_length_P, &max_filter_length_Q, state, x, y, dir, tu_boundary,
+                            LCU_WIDTH >> cu_p->tr_depth, LCU_WIDTH >> cu_q->tr_depth, length, COLOR_Y);
 
       if (max_filter_length_P > 3) {
         is_side_P_large = dir == EDGE_HOR && y % LCU_WIDTH == 0 ? false : true;
@@ -888,7 +954,7 @@ static void filter_deblock_edge_chroma(encoder_state_t * const state,
     const uint8_t MAX_QP = 63;
 
     const int32_t luma_qp  = get_qp_y_pred(state, x << 1, y << 1, dir);
-    int32_t QP             = kvz_g_chroma_scale[luma_qp]; //TODO: Adjust if larger qp range is enabled
+    int32_t QP = luma_qp;//kvz_g_chroma_scale[luma_qp]; //TODO: Add BDOffset?
     int32_t bitdepth_scale = 1 << (encoder->bitdepth - 8);
     
 
@@ -913,8 +979,11 @@ static void filter_deblock_edge_chroma(encoder_state_t * const state,
         cu_q = kvz_cu_array_at(frame->cu_array, x_coord, (y    ) << 1);
       }
 
-      const uint8_t max_filter_length_P = 3;
-      const uint8_t max_filter_length_Q = 3;
+      uint8_t max_filter_length_P = 0;
+      uint8_t max_filter_length_Q = 0;
+      get_max_filter_length(&max_filter_length_P, &max_filter_length_Q, state, x, y, dir, tu_boundary,
+                            LCU_WIDTH >> cu_p->tr_depth, LCU_WIDTH >> cu_q->tr_depth, length,
+                            COLOR_U);
       const bool large_boundary = (max_filter_length_P >= 3 && max_filter_length_Q >= 3);
       const bool is_chroma_hor_CTB_boundary = (dir == EDGE_HOR && (y + 4 * blk_idx) << 1 % LCU_WIDTH == 0);
       uint8_t c_strength[2] = { 0, 0 };
@@ -969,7 +1038,7 @@ static void filter_deblock_edge_chroma(encoder_state_t * const state,
               const bool sw = use_strong_filtering(b[0], b[1], NULL, NULL,
                                                    dp0, dq0, dp3, dq3, Tc, beta,
                                                    false, false, 7, 7, is_chroma_hor_CTB_boundary);
-              for (int i = 0; i < 4; i++) {//TODO: chroma deblocking
+              for (int i = 0; i < 4; i++) {
                 kvz_filter_deblock_chroma(encoder, src[component] + step * (4 * blk_idx + i), offset, Tc, 0, 0,
                                           sw, large_boundary, is_chroma_hor_CTB_boundary);
               }
