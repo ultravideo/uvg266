@@ -191,6 +191,10 @@ Compression tools:
                                    - band: Band offset only
                                    - edge: Edge offset only
                                    - full: Full SAO
+      --alf <string>         : Adaptive Loop Filter [off]
+                                   - off: ALF disabled
+                                   - no-cc: ALF enabled without cross component refinement
+                                   - full: Full ALF
       --(no-)rdoq            : Rate-distortion optimized quantization [enabled]
       --(no-)rdoq-skip       : Skip RDOQ for 4x4 blocks. [disabled]
       --(no-)signhide        : Sign hiding [disabled]

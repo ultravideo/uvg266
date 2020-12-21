@@ -32,12 +32,6 @@ int comparator(const void *v1, const void *v2)
 void set_aps_map(kvz_config *const cfg)
 {
   cfg->param_set_map = malloc(ALF_CTB_MAX_NUM_APS * sizeof(param_set_map));
-  //memset(cfg->param_set_map, 0, ALF_CTB_MAX_NUM_APS * sizeof(*cfg->param_set_map));
-  if (g_frame_count == state->frame->num) {
-    return;
-  }
-  g_frame_count = state->frame->num;
-
   reset_alf_param(&alf_param);
     cfg->param_set_map[aps_idx + T_ALF_APS].b_changed = false;
     reset_aps(&cfg->param_set_map[aps_idx + T_ALF_APS].parameter_set, cfg->alf_type == KVZ_ALF_FULL);
@@ -50,7 +44,6 @@ void reset_aps(alf_aps *src, bool cc_alf_enabled)
   src->aps_id = -1;
   src->temporal_id = 0;
   src->layer_id = 0;
-
   reset_alf_param(src);
   if (cc_alf_enabled) {
     reset_cc_alf_aps_param(&src->cc_alf_aps_param);
@@ -1759,6 +1752,11 @@ void kvz_alf_enc_process(encoder_state_t *const state)
 
   kvz_alf_reconstruct(state, &arr_vars);
 
+  if (state->encoder_control->cfg.alf_type != KVZ_ALF_FULL)
+  {
+    return;
+  }
+
   // Do not transmit CC ALF if it is unchanged
   if(state->slice->tile_group_alf_enabled_flag[COMPONENT_Y])
   {
@@ -1782,11 +1780,6 @@ void kvz_alf_enc_process(encoder_state_t *const state)
   {
     aps->cc_alf_aps_param.new_cc_alf_filter[0] = false;
     aps->cc_alf_aps_param.new_cc_alf_filter[1] = false;
-  }
-  
-  if (state->encoder_control->cfg.alf_type != 2)
-  {
-    return;
   }
 
   const kvz_picture *org_yuv = state->tile->frame->source;
@@ -4820,15 +4813,14 @@ void kvz_encode_alf_bits(encoder_state_t * const state, const int ctu_idx)
       }
     }
 
-    int num_components = state->encoder_control->chroma_format == KVZ_CSP_400 ? 1 : MAX_NUM_COMPONENT;
-    for (int comp_idx = 1; comp_idx < num_components; comp_idx++)
-    {
-      if (cc_filter_param->cc_alf_filter_enabled[comp_idx - 1])
-      {
-        const int filter_count = cc_filter_param->cc_alf_filter_count[comp_idx - 1];
-
-        code_cc_alf_filter_control_idc(state, &state->cabac, alf_info->cc_alf_filter_control[comp_idx - 1][ctu_idx], comp_idx,
-          ctu_idx, alf_info->cc_alf_filter_control[comp_idx - 1], filter_count);
+    if (state->encoder_control->cfg.alf_type == KVZ_ALF_FULL) {
+      int num_components = state->encoder_control->chroma_format == KVZ_CSP_400 ? 1 : MAX_NUM_COMPONENT;
+      for (int comp_idx = 1; comp_idx < num_components; comp_idx++) {
+        if (cc_filter_param->cc_alf_filter_enabled[comp_idx - 1]) {
+          const int filter_count = cc_filter_param->cc_alf_filter_count[comp_idx - 1];
+          code_cc_alf_filter_control_idc(state, &state->cabac, alf_info->cc_alf_filter_control[comp_idx - 1][ctu_idx], comp_idx,
+            ctu_idx, alf_info->cc_alf_filter_control[comp_idx - 1], filter_count);
+        }
       }
     }
   }
@@ -4865,6 +4857,7 @@ void encode_alf_aps_flags(encoder_state_t * const state,
   alf_aps* aps)
 {
   bitstream_t * const stream = &state->stream;
+  const bool cc_alf_enabled = state->encoder_control->cfg.alf_type == KVZ_ALF_FULL;
 
   WRITE_U(stream, aps->new_filter_flag[CHANNEL_TYPE_LUMA], 1, "alf_luma_new_filter");
   if (state->encoder_control->chroma_format != KVZ_CSP_400)
@@ -4874,8 +4867,14 @@ void encode_alf_aps_flags(encoder_state_t * const state,
 
   if (state->encoder_control->chroma_format != KVZ_CSP_400)
   {
-    WRITE_U(stream, aps->cc_alf_aps_param.new_cc_alf_filter[COMPONENT_Cb - 1], 1, "alf_cc_cb_filter_signal_flag");
-    WRITE_U(stream, aps->cc_alf_aps_param.new_cc_alf_filter[COMPONENT_Cr - 1], 1, "alf_cc_cr_filter_signal_flag");
+    if (cc_alf_enabled) {
+      WRITE_U(stream, aps->cc_alf_aps_param.new_cc_alf_filter[COMPONENT_Cb - 1], 1, "alf_cc_cb_filter_signal_flag");
+      WRITE_U(stream, aps->cc_alf_aps_param.new_cc_alf_filter[COMPONENT_Cr - 1], 1, "alf_cc_cr_filter_signal_flag");
+    }
+    else {
+      WRITE_U(stream, 0, 1, "alf_cc_cb_filter_signal_flag");
+      WRITE_U(stream, 0, 1, "alf_cc_cr_filter_signal_flag");
+    }
   }
 
   if (aps->new_filter_flag[CHANNEL_TYPE_LUMA])
@@ -4956,47 +4955,42 @@ void encode_alf_aps_flags(encoder_state_t * const state,
 #endif*/
   }
 
-  for (int cc_idx = 0; cc_idx < 2; cc_idx++)
-  {
-    if (aps->cc_alf_aps_param.new_cc_alf_filter[cc_idx])
+  if (cc_alf_enabled) {
+    for (int cc_idx = 0; cc_idx < 2; cc_idx++)
     {
-      const int filter_count = aps->cc_alf_aps_param.cc_alf_filter_count[cc_idx];
-      assert(filter_count <= MAX_NUM_CC_ALF_FILTERS); // "CC ALF Filter count is too large"
-      assert(filter_count > 0); // "CC ALF Filter count is too small"
-
-      if (MAX_NUM_CC_ALF_FILTERS > 1)
+      if (aps->cc_alf_aps_param.new_cc_alf_filter[cc_idx])
       {
-        WRITE_UE(stream, filter_count - 1,
-          cc_idx == 0 ? "alf_cc_cb_filters_signalled_minus1" : "alf_cc_cr_filters_signalled_minus1");
-      }
+        const int filter_count = aps->cc_alf_aps_param.cc_alf_filter_count[cc_idx];
+        assert(filter_count <= MAX_NUM_CC_ALF_FILTERS); // "CC ALF Filter count is too large"
+        assert(filter_count > 0); // "CC ALF Filter count is too small"
 
-      for (int filter_idx = 0; filter_idx < filter_count; filter_idx++)
-      {
-        int num_coeff = 8; //CC_ALF_FILTER
-
-        const short *coeff = aps->cc_alf_aps_param.cc_alf_coeff[cc_idx][filter_idx];
-        // Filter coefficients
-        for (int i = 0; i < num_coeff - 1; i++)
+        if (MAX_NUM_CC_ALF_FILTERS > 1)
         {
-          if (coeff[i] == 0)
-          {
-            WRITE_U(stream, 0, 3,
-              cc_idx == 0 ? "alf_cc_cb_mapped_coeff_abs" : "alf_cc_cr_mapped_coeff_abs");
-          }
-          else
-          {
-            WRITE_U(stream, 1 + kvz_math_floor_log2(abs(coeff[i])), 3,
-              cc_idx == 0 ? "alf_cc_cb_mapped_coeff_abs" : "alf_cc_cr_mapped_coeff_abs");
-            WRITE_U(stream, coeff[i] < 0 ? 1 : 0, 1, cc_idx == 0 ? "alf_cc_cb_coeff_sign" : "alf_cc_cr_coeff_sign");
-          }
+          WRITE_UE(stream, filter_count - 1,
+            cc_idx == 0 ? "alf_cc_cb_filters_signalled_minus1" : "alf_cc_cr_filters_signalled_minus1");
         }
 
-        /*DTRACE(g_trace_ctx, D_SYNTAX, "%s coeff filter_idx %d: ", cc_idx == 0 ? "Cb" : "Cr", filter_idx);
-        for (int i = 0; i < alfShape.numCoeff; i++)
+        for (int filter_idx = 0; filter_idx < filter_count; filter_idx++)
         {
-          DTRACE(g_trace_ctx, D_SYNTAX, "%d ", coeff[i]);
+          int num_coeff = MAX_NUM_CC_ALF_CHROMA_COEFF; //CC_ALF_FILTER
+
+          const short *coeff = aps->cc_alf_aps_param.cc_alf_coeff[cc_idx][filter_idx];
+          // Filter coefficients
+          for (int i = 0; i < num_coeff - 1; i++)
+          {
+            if (coeff[i] == 0)
+            {
+              WRITE_U(stream, 0, 3,
+                cc_idx == 0 ? "alf_cc_cb_mapped_coeff_abs" : "alf_cc_cr_mapped_coeff_abs");
+            }
+            else
+            {
+              WRITE_U(stream, 1 + kvz_math_floor_log2(abs(coeff[i])), 3,
+                cc_idx == 0 ? "alf_cc_cb_mapped_coeff_abs" : "alf_cc_cr_mapped_coeff_abs");
+              WRITE_U(stream, coeff[i] < 0 ? 1 : 0, 1, cc_idx == 0 ? "alf_cc_cb_coeff_sign" : "alf_cc_cr_coeff_sign");
+            }
+          }
         }
-        DTRACE(g_trace_ctx, D_SYNTAX, "\n");*/
       }
     }
   }
@@ -5477,7 +5471,6 @@ void code_cc_alf_filter_control_idc(encoder_state_t * const state,
       CABAC_BIN_EP(cabac, 0, "cc_alf_filter_control_flag");
     }
   }
-  //DTRACE(g_trace_ctx, D_SYNTAX, "ccAlfFilterControlIdc() comp_id=%d pos=(%d,%d) ctxt=%d, filter_count=%d, idc_val=%d\n", comp_id, lumaPos.x, lumaPos.y, ctxt, filter_count, idc_val);
 }
 
 //---------------------------------------------------------------------

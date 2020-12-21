@@ -618,7 +618,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
     WRITE_U(stream, encoder->cfg.alf_type ? 1 : 0, 1, "sps_alf_enable_flag");
     if (encoder->cfg.alf_type && encoder->chroma_format != KVZ_CSP_400)
     {
-      WRITE_U(stream, encoder->cfg.alf_type == 2, 1, "sps_ccalf_enabled_flag");
+      WRITE_U(stream, encoder->cfg.alf_type == KVZ_ALF_FULL, 1, "sps_ccalf_enabled_flag");
     }
 
     WRITE_U(stream, 0, 1, "sps_lmcs_enable_flag");
@@ -1270,7 +1270,7 @@ void kvz_encoder_state_write_bitstream_slice_header(
         WRITE_U(stream, state->slice->tile_group_chroma_aps_id, 3, "slice_alf_aps_id_chroma");
       }
 
-      if (encoder->cfg.alf_type == 2)
+      if (encoder->cfg.alf_type == KVZ_ALF_FULL)
       {
         WRITE_U(stream, state->slice->cc_filter_param->cc_alf_filter_enabled[COMPONENT_Cb - 1], 1, "slice_cc_alf_cb_enabled_flag");
         if (state->slice->cc_filter_param->cc_alf_filter_enabled[COMPONENT_Cb - 1])
