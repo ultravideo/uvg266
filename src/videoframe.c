@@ -49,6 +49,9 @@ videoframe_t * kvz_videoframe_alloc(int32_t width,
     frame->sao_chroma = MALLOC(sao_info_t, frame->width_in_lcu * frame->height_in_lcu);
   }
 
+  frame->hmvp_lut = calloc(1, sizeof(vector2d_t) * frame->height_in_lcu);
+
+
   return frame;
 }
 
@@ -77,6 +80,8 @@ int kvz_videoframe_free(videoframe_t * const frame)
 
   FREE_POINTER(frame->sao_luma);
   FREE_POINTER(frame->sao_chroma);
+
+  FREE_POINTER(frame->hmvp_lut);
 
   free(frame);
 

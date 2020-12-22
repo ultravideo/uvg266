@@ -177,6 +177,7 @@ int kvz_config_init(kvz_config *cfg)
 
   cfg->stats_file_prefix = NULL;
 
+  cfg->log2_parallel_merge_level = 2;
   cfg->fastrd_sampling_on = 0;
   cfg->fastrd_accuracy_check_on = 0;
   cfg->fastrd_learning_outdir_fn = NULL;
