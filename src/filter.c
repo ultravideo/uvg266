@@ -778,11 +778,8 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
                                           : PU_GET_W(cu_q->part_size, cu_size, pu_part_idx);
       const int pu_pos = dir == EDGE_HOR ? y_coord - PU_GET_Y(cu_q->part_size, cu_size, 0, pu_part_idx) 
                                          : x_coord - PU_GET_X(cu_q->part_size, cu_size, 0, pu_part_idx);
-      get_max_filter_length(&max_filter_length_P, &max_filter_length_Q, state, 
-                            ,
-                            ,
-                            dir, tu_boundary,
-                            LCU_WIDTH >> cu_p->tr_depth, LCU_WIDTH >> cu_q->tr_depth,
+      get_max_filter_length(&max_filter_length_P, &max_filter_length_Q, state, x_coord, y_coord,
+                            dir, tu_boundary, LCU_WIDTH >> cu_p->tr_depth, LCU_WIDTH >> cu_q->tr_depth,
                             pu_pos, pu_size, COLOR_Y);
 
       if (max_filter_length_P > 3) {
@@ -978,22 +975,33 @@ static void filter_deblock_edge_chroma(encoder_state_t * const state,
       // CUs on both sides of the edge
       cu_info_t *cu_p;
       cu_info_t *cu_q;
+      int32_t x_coord = x;
+      int32_t y_coord = y;
       if (dir == EDGE_VER) {
-        int32_t y_coord = (y + 4 * blk_idx) << 1;
+        y_coord = (y + 4 * blk_idx) << 1;
         cu_p = kvz_cu_array_at(frame->cu_array, (x - 1) << 1, y_coord);
         cu_q = kvz_cu_array_at(frame->cu_array,  x      << 1, y_coord);
 
       } else {
-        int32_t x_coord = (x + 4 * blk_idx) << 1;
+        x_coord = (x + 4 * blk_idx) << 1;
         cu_p = kvz_cu_array_at(frame->cu_array, x_coord, (y - 1) << 1);
         cu_q = kvz_cu_array_at(frame->cu_array, x_coord, (y    ) << 1);
       }
 
+      const int cu_size = LCU_WIDTH >> cu_q->depth;
+      const int pu_part_idx = (y + PU_GET_H(cu_q->part_size, cu_size, 0) <= y_coord ?
+                               1 + (kvz_part_mode_num_parts[cu_q->part_size] >> 2) : 0)
+                              + (x + PU_GET_W(cu_q->part_size, cu_size, 0) <= x_coord ? 1 : 0);
+      const int pu_size = dir == EDGE_HOR ? PU_GET_H(cu_q->part_size, cu_size, pu_part_idx)
+                                          : PU_GET_W(cu_q->part_size, cu_size, pu_part_idx);
+      const int pu_pos = dir == EDGE_HOR ? y_coord - PU_GET_Y(cu_q->part_size, cu_size, 0, pu_part_idx)
+                                         : x_coord - PU_GET_X(cu_q->part_size, cu_size, 0, pu_part_idx);
+      get_max_filter_length(&max_filter_length_P, &max_filter_length_Q, state, x_coord, y_coord,
+                            dir, tu_boundary, LCU_WIDTH >> cu_p->tr_depth, LCU_WIDTH >> cu_q->tr_depth,
+                            pu_pos, pu_size, COLOR_Y);
       uint8_t max_filter_length_P = 0;
       uint8_t max_filter_length_Q = 0;
-      get_max_filter_length(&max_filter_length_P, &max_filter_length_Q, state, x, y, dir, tu_boundary,
-                            LCU_WIDTH >> cu_p->tr_depth, LCU_WIDTH >> cu_q->tr_depth, length,
-                            COLOR_U);
+
       const bool large_boundary = (max_filter_length_P >= 3 && max_filter_length_Q >= 3);
       const bool is_chroma_hor_CTB_boundary = (dir == EDGE_HOR && (y + 4 * blk_idx) << 1 % LCU_WIDTH == 0);
       uint8_t c_strength[2] = { 0, 0 };
