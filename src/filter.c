@@ -823,14 +823,14 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
         kvz_pixel bL[4][8];
 
         if (is_side_P_large) {
-          gather_deblock_pixels(edge_src - 6 * x_stride, x_stride, 0 * y_stride, 2, &bL[0][0]);
-          gather_deblock_pixels(edge_src - 6 * x_stride, x_stride, 3 * y_stride, 2, &bL[3][0]);
+          gather_deblock_pixels(edge_src - 6 * x_stride, x_stride, 0 * y_stride, 2, &bL[0][0] - 2);
+          gather_deblock_pixels(edge_src - 6 * x_stride, x_stride, 3 * y_stride, 2, &bL[3][0] - 2);
           dp0L = (dp0L + abs(bL[0][1] - 2 * bL[0][2] + bL[0][3]) + 1) >> 1;
           dp3L = (dp3L + abs(bL[3][1] - 2 * bL[3][2] + bL[3][3]) + 1) >> 1;
         }
         if (is_side_Q_large) {
-          gather_deblock_pixels(edge_src + 6 * x_stride, x_stride, 0 * y_stride, 2, &bL[0][4]);
-          gather_deblock_pixels(edge_src + 6 * x_stride, x_stride, 3 * y_stride, 2, &bL[3][4]);
+          gather_deblock_pixels(edge_src + 6 * x_stride, x_stride, 0 * y_stride, 2, &bL[0][2]);
+          gather_deblock_pixels(edge_src + 6 * x_stride, x_stride, 3 * y_stride, 2, &bL[3][2]);
           dq0L = (dq0L + abs(bL[0][4] - 2 * bL[0][5] + bL[0][6]) + 1) >> 1;
           dq3L = (dq3L + abs(bL[3][4] - 2 * bL[3][5] + bL[3][6]) + 1) >> 1;
         }
@@ -848,13 +848,13 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
             gather_deblock_pixels(edge_src, x_stride, 2 * y_stride, 4, &b[2][0]);
             if (is_side_P_large)
             {
-              gather_deblock_pixels(edge_src - 6 * x_stride, x_stride, 1 * y_stride, 2, &bL[1][0]);
-              gather_deblock_pixels(edge_src - 6 * x_stride, x_stride, 2 * y_stride, 2, &bL[2][0]);
+              gather_deblock_pixels(edge_src - 6 * x_stride, x_stride, 1 * y_stride, 2, &bL[1][0] - 2);
+              gather_deblock_pixels(edge_src - 6 * x_stride, x_stride, 2 * y_stride, 2, &bL[2][0] - 2);
             }
             if (is_side_Q_large)
             {
-              gather_deblock_pixels(edge_src + 6 * x_stride, x_stride, 1 * y_stride, 2, &bL[1][4]);
-              gather_deblock_pixels(edge_src + 6 * x_stride, x_stride, 2 * y_stride, 2, &bL[2][4]);
+              gather_deblock_pixels(edge_src + 6 * x_stride, x_stride, 1 * y_stride, 2, &bL[1][2]);
+              gather_deblock_pixels(edge_src + 6 * x_stride, x_stride, 2 * y_stride, 2, &bL[2][2]);
             }
 
             for (int i = 0; i < 4; ++i) {
