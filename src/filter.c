@@ -996,11 +996,12 @@ static void filter_deblock_edge_chroma(encoder_state_t * const state,
                                           : PU_GET_W(cu_q->part_size, cu_size, pu_part_idx);
       const int pu_pos = dir == EDGE_HOR ? y_coord - PU_GET_Y(cu_q->part_size, cu_size, 0, pu_part_idx)
                                          : x_coord - PU_GET_X(cu_q->part_size, cu_size, 0, pu_part_idx);
+      uint8_t max_filter_length_P = 0;
+      uint8_t max_filter_length_Q = 0;
       get_max_filter_length(&max_filter_length_P, &max_filter_length_Q, state, x_coord, y_coord,
                             dir, tu_boundary, LCU_WIDTH >> cu_p->tr_depth, LCU_WIDTH >> cu_q->tr_depth,
                             pu_pos, pu_size, COLOR_Y);
-      uint8_t max_filter_length_P = 0;
-      uint8_t max_filter_length_Q = 0;
+
 
       const bool large_boundary = (max_filter_length_P >= 3 && max_filter_length_Q >= 3);
       const bool is_chroma_hor_CTB_boundary = (dir == EDGE_HOR && (y + 4 * blk_idx) << 1 % LCU_WIDTH == 0);
