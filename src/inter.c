@@ -924,7 +924,7 @@ static void get_spatial_merge_candidates(int32_t x,
   // B0, B1 and B2 availability testing
   if (y != 0) {
     cu_info_t *b0 = NULL;
-    if (x + width < picture_width) {
+    if (x + width < picture_width) { // ToDo: do not use B0 when WPP enabled
       if (x_local + width < LCU_WIDTH) {
         b0 = LCU_GET_CU_AT_PX(lcu, x_local + width, y_local - 1);
       } else if (y_local == 0) {
@@ -1210,16 +1210,6 @@ static void get_mv_cand_from_candidates(const encoder_state_t * const state,
     }
   }
 
-  // Left predictors with scaling
-  if (candidates == 0) {
-    for (int i = 0; i < 2; i++) {
-      if (add_mvp_candidate(state, cur_cu, a[i], reflist, true, mv_cand[candidates])) {
-        candidates++;
-        break;
-      }
-    }
-  }
-
   // Top predictors without scaling
   for (int i = 0; i < 3; i++) {
     if (add_mvp_candidate(state, cur_cu, b[i], reflist, false, mv_cand[candidates])) {
@@ -1229,23 +1219,6 @@ static void get_mv_cand_from_candidates(const encoder_state_t * const state,
   }
 
   candidates += b_candidates;
-
-  // When a1 or a0 is available, we dont check for secondary B candidates.
-  if (a[0] || a[1]) {
-    b_candidates = 1;
-  } else if (candidates != 2) {
-    b_candidates = 0;
-  }
-
-  if (!b_candidates) {
-    // Top predictors with scaling
-    for (int i = 0; i < 3; i++) {
-      if (add_mvp_candidate(state, cur_cu, b[i], reflist, true, mv_cand[candidates])) {
-        candidates++;
-        break;
-      }
-    }
-  }
 
   // Remove identical candidate
   if (candidates == 2 && mv_cand[0][0] == mv_cand[1][0] && mv_cand[0][1] == mv_cand[1][1]) {
@@ -1269,6 +1242,19 @@ static void get_mv_cand_from_candidates(const encoder_state_t * const state,
   {
     candidates++;
   }
+
+  if (candidates < AMVP_MAX_NUM_CANDS)
+  {
+    const uint32_t ctu_row = (y >> LOG2_LCU_WIDTH);
+    const uint32_t ctu_row_mul_five = ctu_row * MAX_NUM_HMVP_CANDS;
+    int32_t num_cand = MIN(AMVP_MAX_NUM_CANDS - candidates, state->tile->frame->hmvp_size[ctu_row]);
+    for (int i = num_cand-1; i >= 0; i--) { // ToDo: VVC: Handle B-frames
+      mv_cand[candidates][0] = state->tile->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv[0][0];
+      mv_cand[candidates][1] = state->tile->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv[0][1];
+      candidates++;
+    }
+  }
+
 
   // Fill with (0,0)
   while (candidates < AMVP_MAX_NUM_CANDS) {
@@ -1388,6 +1374,68 @@ static bool add_merge_candidate(const cu_info_t *cand,
   return true;
 }
 
+
+static void hmvp_shift_lut(cu_info_t* lut, int32_t size, int32_t start, int32_t end) {
+
+  if (end > MAX_NUM_HMVP_CANDS) end = MAX_NUM_HMVP_CANDS;
+  if (end == 0 && size == 1) end = 1;
+  for (int i = end-1; i >= start; i--) {
+    memcpy(&lut[i + 1], &lut[i], sizeof(cu_info_t));
+  }
+}
+
+static bool hmvp_push_lut_item(cu_info_t* lut, int32_t size, cu_info_t* cu) {
+
+  int8_t duplicate = -1;
+
+  for (int i = 0; i < size; i++) {
+    if (is_duplicate_candidate(cu, &lut[i])) {
+      duplicate = i;
+      break;
+    }
+  }
+  // If duplicate found, shift the whole lut up to the duplicate, otherwise to the end
+  if(duplicate != 0) hmvp_shift_lut(lut, size, 0, duplicate == -1 ? MAX_NUM_HMVP_CANDS : duplicate);
+
+  memcpy(lut, cu, sizeof(cu_info_t));
+
+  return duplicate == -1;
+}
+
+void kvz_hmvp_add_mv(const encoder_state_t* const state, uint32_t pic_x, uint32_t pic_y, uint32_t block_width, uint32_t block_height, cu_info_t* cu)
+{
+  //if (!cu.geoFlag && !cu.affine)
+  {    
+
+    const uint8_t parallel_merge_level = state->encoder_control->cfg.log2_parallel_merge_level;
+    const uint32_t xBr = block_width + pic_x;
+    const uint32_t yBr = block_height + pic_y;
+    bool hmvp_possible = ((xBr >> parallel_merge_level) > (pic_x >> parallel_merge_level)) && ((yBr >> parallel_merge_level) > (pic_y >> parallel_merge_level));
+    if (hmvp_possible) { // ToDo: check for IBC
+      const uint32_t ctu_row = (pic_y >> LOG2_LCU_WIDTH);
+      const uint32_t ctu_row_mul_five = ctu_row * MAX_NUM_HMVP_CANDS;
+
+      
+      bool add_row = hmvp_push_lut_item(&state->tile->frame->hmvp_lut[ctu_row_mul_five], state->tile->frame->hmvp_size[ctu_row], cu);
+      if(add_row && state->tile->frame->hmvp_size[ctu_row] < MAX_NUM_HMVP_CANDS) {
+        state->tile->frame->hmvp_size[ctu_row]++;
+      }
+
+      static FILE* lut = NULL;
+      if (lut == NULL) lut = fopen("uvg_lut.txt", "w");
+      static int   val = 0;
+      fprintf(lut, "%d: (%d,%d) Block (%d,%d) -> %d,%d\n", val++, pic_x, pic_y, block_width, block_height, cu->inter.mv[0][0], cu->inter.mv[0][1]);
+
+      for (int i = 0; i < state->tile->frame->hmvp_size[ctu_row]; i++)
+      {
+        fprintf(lut, "(%d,%d), ", state->tile->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv[0][0], state->tile->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv[0][1]);
+      }
+      fprintf(lut, "\n");
+    }
+  }
+}
+
+
 /**
  * \brief Get merge predictions for current block
  * \param state     the encoder state
@@ -1425,8 +1473,8 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
   if (!use_a1) a[1] = NULL;
   if (!use_b1) b[1] = NULL;
 
-  if (add_merge_candidate(a[1], NULL, NULL, NULL, NULL, &mv_cand[candidates])) candidates++;
-  if (add_merge_candidate(b[1], a[1], NULL, NULL, NULL, &mv_cand[candidates])) candidates++;
+  if (add_merge_candidate(b[1], NULL, NULL, NULL, NULL, &mv_cand[candidates])) candidates++;
+  if (add_merge_candidate(a[1], b[1], NULL, NULL, NULL, &mv_cand[candidates])) candidates++;
   if (add_merge_candidate(b[0], b[1], a[1], NULL, NULL, &mv_cand[candidates])) candidates++;
   if (add_merge_candidate(a[0], a[1], b[1], b[0], NULL, &mv_cand[candidates])) candidates++;
   if (candidates < 4 &&

@@ -1352,6 +1352,8 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
       const cu_info_t *cur_pu = kvz_cu_array_at_const(frame->cu_array, pu_x, pu_y);
 
       encode_inter_prediction_unit(state, cabac, cur_pu, pu_x, pu_y, pu_w, pu_h, depth);
+
+      kvz_hmvp_add_mv(state, x, y, pu_w, pu_h, cur_pu);
     }
 
     {

@@ -57,8 +57,9 @@ typedef struct videoframe
   struct param_set_map* alf_param_set_map;
 
   int32_t poc;           //!< \brief Picture order count
-  vector2d_t* hmvp_lut; //!< \brief Look-up table for HMVP, one for each LCU row
+  cu_info_t* hmvp_lut; //!< \brief Look-up table for HMVP, one for each LCU row
 
+  uint8_t* hmvp_size; //!< \brief HMVP LUT size
   bool source_lmcs_mapped; //!< \brief Indicate if source_lmcs is available and mapped to LMCS
   bool lmcs_top_level; //!< \brief Indicate that in this level the LMCS images are allocated
   bool rec_lmcs_mapped; //!< \brief Indicate if rec_lmcs is available and mapped to LMCS
