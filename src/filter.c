@@ -535,7 +535,7 @@ static INLINE void get_max_filter_length(uint8_t *filt_len_P, uint8_t *filt_len_
                                          const edge_dir dir, const bool transform_edge,
                                          const int tu_size_P_side, const int tu_size_Q_side,
                                          const int pu_pos, const int pu_size, 
-                                         color_t comp)
+                                         const bool merge_flag, const color_t comp)
 {
   //const int tu_size_P_side = 0;
   //const int tu_size_Q_side = 0;
@@ -563,23 +563,23 @@ static INLINE void get_max_filter_length(uint8_t *filt_len_P, uint8_t *filt_len_
       *filt_len_Q = tu_size_Q_side >= 32 ? 7 : 3;
     }
 
-    if (transform_edge) {
-      *filt_len_Q = MIN(*filt_len_Q, 5);
-      if (pu_pos > 0) {
-        *filt_len_P = MIN(*filt_len_P, 5);
+    if ((merge_flag && false) || false) //TODO: Add merge_mode == SUBPU_ATMVP and cu.affine
+    {
+      if (transform_edge) {
+        *filt_len_Q = MIN(*filt_len_Q, 5);
+        if (pu_pos > 0) {
+          *filt_len_P = MIN(*filt_len_P, 5);
+        }
+      } else if (pu_pos > 0 && (transform_edge_4x4[0] || (pu_pos + 4) >= pu_size || transform_edge_4x4[1])) { //adjacent to transform edge (4x4 grid)
+        *filt_len_P = 1;
+        *filt_len_Q = 1;
+      } else if (pu_pos > 0 && (pu_pos == 8 || transform_edge_8x8[0] || (pu_pos + 8) >= pu_size || transform_edge_8x8[1])) { //adjacent to transform edge (8x8 grid)
+        *filt_len_P = 2;
+        *filt_len_Q = 2;
+      } else {
+        *filt_len_P = 3;
+        *filt_len_Q = 3;
       }
-    }
-    else if (pu_pos > 0 && (transform_edge_4x4[0] || (pu_pos + 4) >= pu_size || transform_edge_4x4[1])) { //adjacent to transform edge (4x4 grid)
-      *filt_len_P = 1;
-      *filt_len_Q = 1;
-    }
-    else if (pu_pos > 0 && (pu_pos == 8 || transform_edge_8x8[0] || (pu_pos + 8) >= pu_size || transform_edge_8x8[1])) { //adjacent to transform edge (8x8 grid)
-      *filt_len_P = 2;
-      *filt_len_Q = 2;
-    }
-    else {
-      *filt_len_P = 3;
-      *filt_len_Q = 3;
     }
   }
   else {
@@ -780,7 +780,7 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
                                          : x_coord - PU_GET_X(cu_q->part_size, cu_size, 0, pu_part_idx);
       get_max_filter_length(&max_filter_length_P, &max_filter_length_Q, state, x_coord, y_coord,
                             dir, tu_boundary, LCU_WIDTH >> cu_p->tr_depth, LCU_WIDTH >> cu_q->tr_depth,
-                            pu_pos, pu_size, COLOR_Y);
+                            pu_pos, pu_size, COLOR_Y, cu_q->merged);
 
       if (max_filter_length_P > 3) {
         is_side_P_large = dir == EDGE_HOR && y % LCU_WIDTH == 0 ? false : true;
@@ -1000,7 +1000,7 @@ static void filter_deblock_edge_chroma(encoder_state_t * const state,
       uint8_t max_filter_length_Q = 0;
       get_max_filter_length(&max_filter_length_P, &max_filter_length_Q, state, x_coord, y_coord,
                             dir, tu_boundary, LCU_WIDTH >> cu_p->tr_depth, LCU_WIDTH >> cu_q->tr_depth,
-                            pu_pos, pu_size, COLOR_Y);
+                            pu_pos, pu_size, COLOR_Y, cu_q->merged);
 
 
       const bool large_boundary = (max_filter_length_P >= 3 && max_filter_length_Q >= 3);
