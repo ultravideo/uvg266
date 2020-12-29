@@ -1247,11 +1247,12 @@ static void get_mv_cand_from_candidates(const encoder_state_t * const state,
   {
     const uint32_t ctu_row = (y >> LOG2_LCU_WIDTH);
     const uint32_t ctu_row_mul_five = ctu_row * MAX_NUM_HMVP_CANDS;
-    int32_t num_cand = MIN(AMVP_MAX_NUM_CANDS - candidates, state->tile->frame->hmvp_size[ctu_row]);
+    int32_t num_cand = state->tile->frame->hmvp_size[ctu_row];
     for (int i = num_cand-1; i >= 0; i--) { // ToDo: VVC: Handle B-frames
       mv_cand[candidates][0] = state->tile->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv[0][0];
       mv_cand[candidates][1] = state->tile->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv[0][1];
       candidates++;
+      if (candidates == AMVP_MAX_NUM_CANDS) return;
     }
   }
 
@@ -1402,6 +1403,16 @@ static bool hmvp_push_lut_item(cu_info_t* lut, int32_t size, cu_info_t* cu) {
   return duplicate == -1;
 }
 
+/**
+ * \brief Add processed CU motion vector to the HMVP look-up table
+ *
+ * \param state         encoder state
+ * \param pic_x         block x position in pixels
+ * \param pic_y         block y position in pixels
+ * \param block_width   block width in pixels
+ * \param block_height  block height in pixels
+ * \param cu            current CU
+ */
 void kvz_hmvp_add_mv(const encoder_state_t* const state, uint32_t pic_x, uint32_t pic_y, uint32_t block_width, uint32_t block_height, cu_info_t* cu)
 {
   //if (!cu.geoFlag && !cu.affine)
