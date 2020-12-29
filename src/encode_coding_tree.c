@@ -1261,6 +1261,8 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
     CABAC_BIN(cabac, cur_cu->skipped, "SkipFlag");
 
     if (cur_cu->skipped) {
+
+      kvz_hmvp_add_mv(state, x, y, cu_width, cu_width, cur_cu);
       int16_t num_cand = MRG_MAX_NUM_CANDS;
       if (num_cand > 1) {
         for (int ui = 0; ui < num_cand - 1; ui++) {
