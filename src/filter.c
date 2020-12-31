@@ -428,7 +428,7 @@ static INLINE int kvz_filter_deblock_large_block(kvz_pixel *line, kvz_pixel *lin
     const uint8_t lenS = MIN(filter_length_P, filter_length_Q);
     const uint8_t lenL = MAX(filter_length_P, filter_length_Q);
     const kvz_pixel **refS = filter_length_P < filter_length_Q ? lineP : lineQ;
-    const kvz_pixel **refL = filter_length_P < filter_length_Q ? lineP : lineQ;
+    const kvz_pixel **refL = filter_length_P < filter_length_Q ? lineQ : lineP;
 
     if (lenL == 7 && lenS == 5) {
       ref_middle = (*lineP[5] + *lineP[4] + *lineP[3] + *lineP[2]
@@ -792,9 +792,9 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
       if (max_filter_length_Q > 3) {
         is_side_Q_large = true;
       }
-      //                   +-- edge_src
-      //                   v
-      // line0 p3 p2 p1 p0 q0 q1 q2 q3
+      //                               +-- edge_src
+      //                               v
+      // line0 p7 p6 p5 p4 p3 p2 p1 p0 q0 q1 q2 q3 q4 q5 q6 q7
       kvz_pixel *edge_src = &src[block_idx * 4 * y_stride];
 
       // Gather the lines of pixels required for the filter on/off decision.
@@ -825,14 +825,14 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
         if (is_side_P_large) {
           gather_deblock_pixels(edge_src - 6 * x_stride, x_stride, 0 * y_stride, 2, &bL[0][0] - 2);
           gather_deblock_pixels(edge_src - 6 * x_stride, x_stride, 3 * y_stride, 2, &bL[3][0] - 2);
-          dp0L = (dp0L + abs(bL[0][1] - 2 * bL[0][2] + bL[0][3]) + 1) >> 1;
-          dp3L = (dp3L + abs(bL[3][1] - 2 * bL[3][2] + bL[3][3]) + 1) >> 1;
+          dp0L = (dp0L + abs(bL[0][2] - 2 * bL[0][3] + b[0][0]) + 1) >> 1;
+          dp3L = (dp3L + abs(bL[3][2] - 2 * bL[3][3] + b[3][0]) + 1) >> 1;
         }
         if (is_side_Q_large) {
           gather_deblock_pixels(edge_src + 6 * x_stride, x_stride, 0 * y_stride, 2, &bL[0][2]);
           gather_deblock_pixels(edge_src + 6 * x_stride, x_stride, 3 * y_stride, 2, &bL[3][2]);
-          dq0L = (dq0L + abs(bL[0][4] - 2 * bL[0][5] + bL[0][6]) + 1) >> 1;
-          dq3L = (dq3L + abs(bL[3][4] - 2 * bL[3][5] + bL[3][6]) + 1) >> 1;
+          dq0L = (dq0L + abs(b[0][7] - 2 * bL[0][4] + bL[0][5]) + 1) >> 1;
+          dq3L = (dq3L + abs(b[3][7] - 2 * bL[3][4] + bL[3][5]) + 1) >> 1;
         }
         
         int_fast32_t dpL = dp0L + dp3L;
@@ -865,11 +865,13 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
               scatter_deblock_pixels(&b[i][0], x_stride, i * y_stride, filter_reach, edge_src);
               if (is_side_P_large) {
                 const int diff_reach = (max_filter_length_P - filter_reach) >> 1;
-                scatter_deblock_pixels(&bL[i][0] - diff_reach, x_stride, i * y_stride, diff_reach, edge_src - filter_reach - diff_reach);
+                const int dst_offset = (filter_reach + diff_reach) * x_stride;
+                scatter_deblock_pixels(&bL[i][0] - diff_reach, x_stride, i * y_stride, diff_reach, edge_src - dst_offset);
               }
               if (is_side_Q_large) {
-                const int diff_reach = (max_filter_length_P - filter_reach) >> 1;
-                scatter_deblock_pixels(&bL[i][0] + diff_reach, x_stride, i * y_stride, diff_reach, edge_src + filter_reach + diff_reach);
+                const int diff_reach = (max_filter_length_Q - filter_reach) >> 1;
+                const int dst_offset = (filter_reach + diff_reach) * x_stride;
+                scatter_deblock_pixels(&bL[i][0] + diff_reach, x_stride, i * y_stride, diff_reach, edge_src + dst_offset);
               }
             }
           }
