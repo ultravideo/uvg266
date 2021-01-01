@@ -152,14 +152,14 @@ static INLINE int kvz_filter_deblock_luma_weak(
  * \brief Performe strong/weak filtering for chroma
  */
 static INLINE void kvz_filter_deblock_chroma(const encoder_control_t * const encoder,
-                                             kvz_pixel *src,
-                                             int32_t offset,
-                                             int32_t tc,
-                                             int8_t part_P_nofilter,
-                                             int8_t part_Q_nofilter,
-                                             bool sw,
-                                             bool large_boundary,
-                                             bool is_chroma_hor_CTB_boundary)
+  kvz_pixel *src,
+  int32_t offset,
+  int32_t tc,
+  int8_t part_P_nofilter,
+  int8_t part_Q_nofilter,
+  bool sw,
+  bool large_boundary,
+  bool is_chroma_hor_CTB_boundary)
 {
   int32_t delta;
   int16_t m0 = src[-offset * 4];
@@ -174,9 +174,8 @@ static INLINE void kvz_filter_deblock_chroma(const encoder_control_t * const enc
   if (sw) {
     if (is_chroma_hor_CTB_boundary) {
       src[-offset * 1] = CLIP(m3 - tc, m3 + tc, (3 * m2 + 2 * m3 + m4 + m5 + m6 + 4) >> 3);
-      src[0] = CLIP(m4 - tc, m4 + tc, (2* m2 + m3 + 2 * m4 + m5 + m6 + m7 + 4) >> 3);
-    }
-    else {
+      src[0] = CLIP(m4 - tc, m4 + tc, (2 * m2 + m3 + 2 * m4 + m5 + m6 + m7 + 4) >> 3);
+    } else {
       src[-offset * 3] = CLIP(m1 - tc, m1 + tc, (3 * m0 + 2 * m1 + m2 + m3 + m4 + 4) >> 3);
       src[-offset * 2] = CLIP(m2 - tc, m2 + tc, (2 * m0 + m1 + 2 * m2 + m3 + m4 + m5 + 4) >> 3);
       src[-offset * 1] = CLIP(m3 - tc, m3 + tc, (m0 + m1 + m2 + 2 * m3 + m4 + m5 + m6 + 4) >> 3);
@@ -186,25 +185,27 @@ static INLINE void kvz_filter_deblock_chroma(const encoder_control_t * const enc
 
     src[offset * 1] = CLIP(m5 - tc, m6 + tc, (m2 + m3 + m4 + 2 * m5 + m6 + 2 * m7 + 4) >> 3);
     src[offset * 2] = CLIP(m6 - tc, m6 + tc, (m3 + m4 + m5 + 2 * m6 + 3 * m7 + 4) >> 3);
-  }
-
-  delta = CLIP(-tc,tc, (((m4 - m3) * 4) + m2 - m5 + 4 ) >> 3);
-  if(!part_P_nofilter) {
+  } else {
+    delta = CLIP(-tc, tc, (((m4 - m3) * 4) + m2 - m5 + 4) >> 3);
     src[-offset] = CLIP(0, (1 << encoder->bitdepth) - 1, m3 + delta);
-  }
-  else if (large_boundary) {
-    src[-offset * 3] = m1;
-    src[-offset * 2] = m2;
-  }
-  if(!part_Q_nofilter) {
     src[0] = CLIP(0, (1 << encoder->bitdepth) - 1, m4 - delta);
   }
-  else if (large_boundary) {
-    src[offset * 1] = m5;
-    src[offset * 2] = m6;
+
+  if (part_P_nofilter) {
+    if (large_boundary) {
+      src[-offset * 3] = m1;
+      src[-offset * 2] = m2;
+    }
+    src[-offset * 1] = m3;
+  }
+  if (part_Q_nofilter) {
+    if (large_boundary) {
+      src[offset * 1] = m5;
+      src[offset * 2] = m6;
+    }
+    src[0] = m4;
   }
 }
-
 
 /**
  * \brief Check whether an edge is a TU boundary.
@@ -780,7 +781,7 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
                                          : x_coord - PU_GET_X(cu_q->part_size, cu_size, 0, pu_part_idx);
       get_max_filter_length(&max_filter_length_P, &max_filter_length_Q, state, x_coord, y_coord,
                             dir, tu_boundary, LCU_WIDTH >> cu_p->tr_depth, LCU_WIDTH >> cu_q->tr_depth,
-                            pu_pos, pu_size, COLOR_Y, cu_q->merged);
+                            pu_pos, pu_size, cu_q->merged, COLOR_Y);
 
       if (max_filter_length_P > 3) {
         is_side_P_large = dir == EDGE_HOR && y % LCU_WIDTH == 0 ? false : true;
@@ -980,12 +981,14 @@ static void filter_deblock_edge_chroma(encoder_state_t * const state,
       int32_t x_coord = x;
       int32_t y_coord = y;
       if (dir == EDGE_VER) {
+        x_coord <<= 1;
         y_coord = (y + 4 * blk_idx) << 1;
         cu_p = kvz_cu_array_at(frame->cu_array, (x - 1) << 1, y_coord);
         cu_q = kvz_cu_array_at(frame->cu_array,  x      << 1, y_coord);
 
       } else {
         x_coord = (x + 4 * blk_idx) << 1;
+        y_coord <<= 1;
         cu_p = kvz_cu_array_at(frame->cu_array, x_coord, (y - 1) << 1);
         cu_q = kvz_cu_array_at(frame->cu_array, x_coord, (y    ) << 1);
       }
@@ -1000,13 +1003,18 @@ static void filter_deblock_edge_chroma(encoder_state_t * const state,
                                          : x_coord - PU_GET_X(cu_q->part_size, cu_size, 0, pu_part_idx);
       uint8_t max_filter_length_P = 0;
       uint8_t max_filter_length_Q = 0;
+      //TU size should be in chroma samples (?)
+      const int chroma_shift = dir == EDGE_HOR ? (encoder->chroma_format == KVZ_CSP_420 ? 1 : 0)
+                                               : (encoder->chroma_format != KVZ_CSP_444 ? 1 : 0);
+      const int tu_p_size = LCU_WIDTH >> (cu_p->tr_depth + (chroma_shift));
+      const int tu_q_size = LCU_WIDTH >> (cu_q->tr_depth + (chroma_shift));
       get_max_filter_length(&max_filter_length_P, &max_filter_length_Q, state, x_coord, y_coord,
-                            dir, tu_boundary, LCU_WIDTH >> cu_p->tr_depth, LCU_WIDTH >> cu_q->tr_depth,
-                            pu_pos, pu_size, COLOR_Y, cu_q->merged);
+                            dir, tu_boundary, tu_p_size, tu_q_size,
+                            pu_pos, pu_size, cu_q->merged, COLOR_U);
 
 
       const bool large_boundary = (max_filter_length_P >= 3 && max_filter_length_Q >= 3);
-      const bool is_chroma_hor_CTB_boundary = (dir == EDGE_HOR && (y + 4 * blk_idx) << 1 % LCU_WIDTH == 0);
+      const bool is_chroma_hor_CTB_boundary = (dir == EDGE_HOR && y_coord % LCU_WIDTH == 0);
       uint8_t c_strength[2] = { 0, 0 };
       bool use_long_filter = false;
 
@@ -1037,8 +1045,8 @@ static void filter_deblock_edge_chroma(encoder_state_t * const state,
             //                   v
             // line0 p3 p2 p1 p0 q0 q1 q2 q3
             kvz_pixel *edge_src = &src[component][blk_idx * 4 * step];
-            const uint8_t sub_sampling_shift = 0; //TODO: figure out the correct value
-            const uint8_t sss = sub_sampling_shift == 1 ? 1 : 3;
+            
+            const uint8_t sss = chroma_shift == 1 ? 1 : 3;
             // Gather the lines of pixels required for the filter on/off decision.
             //TODO: May need to limit reach in small blocks?
             kvz_pixel b[2][8];
@@ -1059,7 +1067,7 @@ static void filter_deblock_edge_chroma(encoder_state_t * const state,
               const bool sw = use_strong_filtering(b[0], b[1], NULL, NULL,
                                                    dp0, dq0, dp3, dq3, Tc, beta,
                                                    false, false, 7, 7, is_chroma_hor_CTB_boundary);
-              for (int i = 0; i < 4; i++) {
+              for (int i = 0; i < 4; i++) { //TODO: Sometimes this needs to be done 2 lines at a time (uiLoopLength) ?
                 kvz_filter_deblock_chroma(encoder, src[component] + step * (4 * blk_idx + i), offset, Tc, 0, 0,
                                           sw, large_boundary, is_chroma_hor_CTB_boundary);
               }
