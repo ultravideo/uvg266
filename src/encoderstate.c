@@ -1402,6 +1402,7 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
       state->tile->frame->width,
       state->tile->frame->height
   );
+  memset(state->frame->hmvp_size, 0, sizeof(uint8_t) * state->encoder_control->in.height_in_lcu);
 
   // Variance adaptive quantization
   if (cfg->vaq) {
