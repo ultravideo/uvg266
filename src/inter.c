@@ -37,6 +37,17 @@ typedef struct {
   const cu_info_t *b[3];
   const cu_info_t *c3;
   const cu_info_t *h;
+
+  uint16_t mer_a0[2];
+  uint16_t mer_a1[2];
+
+  uint16_t mer_b0[2];
+  uint16_t mer_b1[2];
+  uint16_t mer_b2[2];
+
+  uint16_t mer_c3[2];
+  uint16_t mer_h[2];
+
 } merge_candidates_t;
 
 
@@ -888,7 +899,8 @@ static void get_spatial_merge_candidates(int32_t x,
                                          int32_t picture_width,
                                          int32_t picture_height,
                                          lcu_t *lcu,
-                                         merge_candidates_t *cand_out)
+                                         merge_candidates_t *cand_out,
+                                         uint8_t parallel_merge_level)
 {
   /*
   Predictor block locations
@@ -904,46 +916,47 @@ static void get_spatial_merge_candidates(int32_t x,
   int32_t y_local = SUB_SCU(y);
   // A0 and A1 availability testing
   if (x != 0) {
-    cu_info_t *a1 = LCU_GET_CU_AT_PX(lcu, x_local - 1, y_local + height - 1);
+    cu_info_t *a0 = LCU_GET_CU_AT_PX(lcu, x_local - 1, y_local + height - 1);
     // Do not check a1->coded because the block above is always coded before
     // the current one and the flag is not set when searching an SMP block.
-    if (a1->type == CU_INTER) {
-      inter_clear_cu_unused(a1);
-      cand_out->a[1] = a1;
+    if (a0->type == CU_INTER) {
+      inter_clear_cu_unused(a0);
+      cand_out->a[0] = a0;
+      cand_out->mer_a0[0] = parallel_merge_level;
     }
 
     if (y_local + height < LCU_WIDTH && y + height < picture_height) {
-      cu_info_t *a0 = LCU_GET_CU_AT_PX(lcu, x_local - 1, y_local + height);
-      if (a0->type == CU_INTER && is_a0_cand_coded(x, y, width, height)) {
-        inter_clear_cu_unused(a0);
-        cand_out->a[0] = a0;
+      cu_info_t *a1 = LCU_GET_CU_AT_PX(lcu, x_local - 1, y_local + height);
+      if (a1->type == CU_INTER && is_a0_cand_coded(x, y, width, height)) {
+        inter_clear_cu_unused(a1);
+        cand_out->a[1] = a1;
       }
     }
   }
 
   // B0, B1 and B2 availability testing
   if (y != 0) {
-    cu_info_t *b0 = NULL;
-    if (x + width < picture_width) { // ToDo: do not use B0 when WPP enabled
+    cu_info_t *b1 = NULL;
+    if (x + width < picture_width) { // ToDo: do not use B1 when WPP enabled
       if (x_local + width < LCU_WIDTH) {
-        b0 = LCU_GET_CU_AT_PX(lcu, x_local + width, y_local - 1);
+        b1 = LCU_GET_CU_AT_PX(lcu, x_local + width, y_local - 1);
       } else if (y_local == 0) {
         // Special case, top-right CU
-        b0 = LCU_GET_TOP_RIGHT_CU(lcu);
+        b1 = LCU_GET_TOP_RIGHT_CU(lcu);
       }
     }
-    if (b0 && b0->type == CU_INTER && is_b0_cand_coded(x, y, width, height)) {
-      inter_clear_cu_unused(b0);
-      cand_out->b[0] = b0;
-    }
-
-    cu_info_t *b1 = LCU_GET_CU_AT_PX(lcu, x_local + width - 1, y_local - 1);
-    // Do not check b1->coded because the block to the left is always coded
-    // before the current one and the flag is not set when searching an SMP
-    // block.
-    if (b1->type == CU_INTER) {
+    if (b1 && b1->type == CU_INTER && is_b0_cand_coded(x, y, width, height)) {
       inter_clear_cu_unused(b1);
       cand_out->b[1] = b1;
+    }
+
+    cu_info_t *b0 = LCU_GET_CU_AT_PX(lcu, x_local + width - 1, y_local - 1);
+    // Do not check b0->coded because the block to the left is always coded
+    // before the current one and the flag is not set when searching an SMP
+    // block.
+    if (b0->type == CU_INTER) {
+      inter_clear_cu_unused(b0);
+      cand_out->b[0] = b0;
     }
 
     if (x != 0) {
@@ -997,16 +1010,16 @@ static void get_spatial_merge_candidates_cua(const cu_array_t *cua,
   int32_t y_local = SUB_SCU(y);
   // A0 and A1 availability testing
   if (x != 0) {
-    const cu_info_t *a1 = kvz_cu_array_at_const(cua, x - 1, y + height - 1);
+    const cu_info_t *a0 = kvz_cu_array_at_const(cua, x - 1, y + height - 1);
     // The block above is always coded before the current one.
-    if (a1->type == CU_INTER) {
-      cand_out->a[1] = a1;
+    if (a0->type == CU_INTER) {
+      cand_out->a[0] = a0;
     }
 
     if (y_local + height < LCU_WIDTH && y + height < picture_height) {
-      const cu_info_t *a0 = kvz_cu_array_at_const(cua, x - 1, y + height);
-      if (a0->type == CU_INTER && is_a0_cand_coded(x, y, width, height)) {
-        cand_out->a[0] = a0;
+      const cu_info_t *a1 = kvz_cu_array_at_const(cua, x - 1, y + height);
+      if (a1->type == CU_INTER && is_a0_cand_coded(x, y, width, height)) {
+        cand_out->a[1] = a1;
       }
     }
   }
@@ -1014,16 +1027,16 @@ static void get_spatial_merge_candidates_cua(const cu_array_t *cua,
   // B0, B1 and B2 availability testing
   if (y != 0) {
     if (x + width < picture_width && (x_local + width < LCU_WIDTH || y_local == 0)) {
-      const cu_info_t *b0 = kvz_cu_array_at_const(cua, x + width, y - 1);
-      if (b0->type == CU_INTER && is_b0_cand_coded(x, y, width, height)) {
-        cand_out->b[0] = b0;
+      const cu_info_t *b1 = kvz_cu_array_at_const(cua, x + width, y - 1);
+      if (b1->type == CU_INTER && is_b0_cand_coded(x, y, width, height)) {
+        cand_out->b[1] = b1;
       }
     }
 
-    const cu_info_t *b1 = kvz_cu_array_at_const(cua, x + width - 1, y - 1);
+    const cu_info_t *b0 = kvz_cu_array_at_const(cua, x + width - 1, y - 1);
     // The block to the left is always coded before the current one.
-    if (b1->type == CU_INTER) {
-      cand_out->b[1] = b1;
+    if (b0->type == CU_INTER) {
+      cand_out->b[0] = b0;
     }
 
     if (x != 0) {
@@ -1203,19 +1216,21 @@ static void get_mv_cand_from_candidates(const encoder_state_t * const state,
   uint8_t b_candidates = 0;
 
   // Left predictors without scaling
-  for (int i = 0; i < 2; i++) {
-    if (add_mvp_candidate(state, cur_cu, a[i], reflist, false, mv_cand[candidates])) {
-      candidates++;
-      break;
-    }
+  if (add_mvp_candidate(state, cur_cu, a[1], reflist, false, mv_cand[candidates])) {
+    candidates++;
+  } else if (add_mvp_candidate(state, cur_cu, a[0], reflist, false, mv_cand[candidates])) {
+    candidates++;
   }
 
-  // Top predictors without scaling
-  for (int i = 0; i < 3; i++) {
-    if (add_mvp_candidate(state, cur_cu, b[i], reflist, false, mv_cand[candidates])) {
-      b_candidates++;
-      break;
-    }
+
+  // Top predictors without scaling  
+  if (add_mvp_candidate(state, cur_cu, b[1], reflist, false, mv_cand[candidates])) {
+    b_candidates++;
+  } else if (add_mvp_candidate(state, cur_cu, b[0], reflist, false, mv_cand[candidates])) {
+    b_candidates++;
+  }
+  else if (add_mvp_candidate(state, cur_cu, b[2], reflist, false, mv_cand[candidates])) {
+    b_candidates++;
   }
 
   candidates += b_candidates;
@@ -1247,10 +1262,10 @@ static void get_mv_cand_from_candidates(const encoder_state_t * const state,
   {
     const uint32_t ctu_row = (y >> LOG2_LCU_WIDTH);
     const uint32_t ctu_row_mul_five = ctu_row * MAX_NUM_HMVP_CANDS;
-    int32_t num_cand = state->tile->frame->hmvp_size[ctu_row];
+    int32_t num_cand = state->frame->hmvp_size[ctu_row];
     for (int i = num_cand-1; i >= 0; i--) { // ToDo: VVC: Handle B-frames
-      mv_cand[candidates][0] = state->tile->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv[0][0];
-      mv_cand[candidates][1] = state->tile->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv[0][1];
+      mv_cand[candidates][0] = state->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv[0][0];
+      mv_cand[candidates][1] = state->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv[0][1];
       candidates++;
       if (candidates == AMVP_MAX_NUM_CANDS) return;
     }
@@ -1289,12 +1304,12 @@ void kvz_inter_get_mv_cand(const encoder_state_t * const state,
                            int8_t reflist)
 {
   merge_candidates_t merge_cand = { {0, 0}, {0, 0, 0}, 0, 0 };
-
+  const uint8_t parallel_merge_level = state->encoder_control->cfg.log2_parallel_merge_level;
   get_spatial_merge_candidates(x, y, width, height,
                                state->tile->frame->width,
                                state->tile->frame->height,
                                lcu,
-                               &merge_cand);
+                               &merge_cand, parallel_merge_level);
   get_temporal_merge_candidates(state, x, y, width, height, 1, 0, &merge_cand);
   get_mv_cand_from_candidates(state, x, y, width, height, &merge_cand, cur_cu, reflist, mv_cand);
 }
@@ -1427,19 +1442,20 @@ void kvz_hmvp_add_mv(const encoder_state_t* const state, uint32_t pic_x, uint32_
       const uint32_t ctu_row_mul_five = ctu_row * MAX_NUM_HMVP_CANDS;
 
       
-      bool add_row = hmvp_push_lut_item(&state->tile->frame->hmvp_lut[ctu_row_mul_five], state->tile->frame->hmvp_size[ctu_row], cu);
-      if(add_row && state->tile->frame->hmvp_size[ctu_row] < MAX_NUM_HMVP_CANDS) {
-        state->tile->frame->hmvp_size[ctu_row]++;
+      bool add_row = hmvp_push_lut_item(&state->frame->hmvp_lut[ctu_row_mul_five], state->frame->hmvp_size[ctu_row], cu);
+      if(add_row && state->frame->hmvp_size[ctu_row] < MAX_NUM_HMVP_CANDS) {
+        state->frame->hmvp_size[ctu_row]++;
       }
 
       static FILE* lut = NULL;
       if (lut == NULL) lut = fopen("uvg_lut.txt", "w");
       static int   val = 0;
+
       fprintf(lut, "%d: (%d,%d) Block (%d,%d) -> %d,%d\n", val++, pic_x, pic_y, block_width, block_height, cu->inter.mv[0][0], cu->inter.mv[0][1]);
 
-      for (int i = 0; i < state->tile->frame->hmvp_size[ctu_row]; i++)
+      for (int i = 0; i < state->frame->hmvp_size[ctu_row]; i++)
       {
-        fprintf(lut, "(%d,%d), ", state->tile->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv[0][0], state->tile->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv[0][1]);
+        fprintf(lut, "(%d,%d), ", state->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv[0][0], state->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv[0][1]);
       }
       fprintf(lut, "\n");
     }
@@ -1469,27 +1485,27 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
 {
   uint8_t candidates = 0;
   int8_t zero_idx = 0;
-
+  const uint8_t parallel_merge_level = state->encoder_control->cfg.log2_parallel_merge_level;
   merge_candidates_t merge_cand = { {0, 0}, {0, 0, 0}, 0, 0 };
   const uint8_t max_num_cands = state->encoder_control->cfg.max_merge;
   get_spatial_merge_candidates(x, y, width, height,
                                state->tile->frame->width,
                                state->tile->frame->height,
                                lcu,
-                               &merge_cand);
+                               &merge_cand, parallel_merge_level);
 
   const cu_info_t **a = merge_cand.a;
   const cu_info_t **b = merge_cand.b;
+  const uint16_t mer[2] = {(x+width) >> parallel_merge_level, (y+height) >> parallel_merge_level };
 
-  if (!use_a1) a[1] = NULL;
-  if (!use_b1) b[1] = NULL;
+  if (!use_a1) a[0] = NULL;
+  if (!use_b1) b[0] = NULL;
 
   if (add_merge_candidate(b[1], NULL, NULL, NULL, NULL, &mv_cand[candidates])) candidates++;
   if (add_merge_candidate(a[1], b[1], NULL, NULL, NULL, &mv_cand[candidates])) candidates++;
   if (add_merge_candidate(b[0], b[1], a[1], NULL, NULL, &mv_cand[candidates])) candidates++;
   if (add_merge_candidate(a[0], a[1], b[1], b[0], NULL, &mv_cand[candidates])) candidates++;
   if (candidates < 4 &&
-
       add_merge_candidate(b[2], a[1], b[1], a[0], b[0], &mv_cand[candidates])) candidates++;
 
   bool can_use_tmvp =
