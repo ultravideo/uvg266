@@ -270,25 +270,34 @@ static const uint8_t INIT_JOINT_CB_CR_FLAG[4][3] = {
   {  27,  36,  45, },
   {  12,  21,  35, },
   {   1,   1,   0, },
-static const uint8_t INIT_ALF_CTB_FLAG[4][9] = {
-  {  26,  52,  46,  18,  61,  54,  18,  61,  54, },
-  {   6,  23,  46,  12,  61,  54,   5,  46,  54, },
-  {  39,  39,  39,  62,  39,  39,  31,  39,  39, },
-  {   0,   0,   0,   0,   0,   0,   0,   0,   0, },
 };
 
-static const INIT_ALF_CTB_ALTERNATIVE[4][2] = {
-  {  11,  11, },
+static const uint8_t INIT_CTB_ALF_FLAG[4][9] = {
+  {  33,  52,  46,  25,  61,  54,  25,  61,  54, },
+  {  13,  23,  46,   4,  61,  54,  19,  46,  54, },
+  {  62,  39,  39,  54,  39,  39,  31,  39,  39, },
+  {   0,   0,   0,   4,   0,   0,   1,   0,   0, },
+};
+
+static const uint8_t INIT_CTB_ALF_ALTERNATIVE[4][2] = {
+  {  11,  26, },
   {  20,  12, },
-  {  28,  28, },
+  {  11,  11, },
   {   0,   0, },
 };
 
-static const uint8_t INIT_ALF_TEMPORAL_FILT[4] = {
+static const uint8_t INIT_USE_TEMPORAL_ALF_FILT[4] = {
   {  46, },
-  {  53, },
+  {  46, },
   {  46, },
   {   0, },
+};
+
+static const uint8_t INIT_CC_ALF_FILTER_CONTROL_FLAG[4][6] = {
+  {  25,  35,  38,  25,  28,  38, },
+  {  18,  21,  38,  18,  21,  38, },
+  {  18,  30,  31,  18,  30,  31, },
+  {   4,   1,   4,   4,   1,   4, },
 };
 
 static const uint8_t INIT_CU_TRANSQUANT_BYPASS[4][1] = {
@@ -358,7 +367,7 @@ void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
   // Initialize contexts
   kvz_ctx_init(&cabac->ctx.sao_merge_flag_model, QP, INIT_SAO_MERGE_FLAG[slice], INIT_SAO_MERGE_FLAG[3]);
   kvz_ctx_init(&cabac->ctx.sao_type_idx_model, QP, INIT_SAO_TYPE_IDX[slice], INIT_SAO_TYPE_IDX[3]);
-  kvz_ctx_init(&cabac->ctx.alf_temporal_filt, QP, INIT_ALF_TEMPORAL_FILT[slice], INIT_ALF_TEMPORAL_FILT[3]);
+  kvz_ctx_init(&cabac->ctx.alf_temporal_filt, QP, INIT_USE_TEMPORAL_ALF_FILT[slice], INIT_USE_TEMPORAL_ALF_FILT[3]);
 
   kvz_ctx_init(&cabac->ctx.cu_merge_flag_ext_model, QP, INIT_MERGE_FLAG_EXT[slice][0], INIT_MERGE_FLAG_EXT[3][0]);
   kvz_ctx_init(&cabac->ctx.cu_merge_idx_ext_model, QP, INIT_MERGE_IDX_EXT[slice][0], INIT_MERGE_IDX_EXT[3][0]);
@@ -391,13 +400,14 @@ void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
 
   for (i = 0; i < 6; i++) {
     kvz_ctx_init(&cabac->ctx.qt_split_flag_model[i], QP, INIT_QT_SPLIT_FLAG[slice][i], INIT_QT_SPLIT_FLAG[3][i]);
+    kvz_ctx_init(&cabac->ctx.alf_cc_filter_control_flag[i], QP, INIT_CC_ALF_FILTER_CONTROL_FLAG[slice][i], INIT_CC_ALF_FILTER_CONTROL_FLAG[3][i]);
   }
 
 
 
   for (i = 0; i < 9; i++) {
     kvz_ctx_init(&cabac->ctx.split_flag_model[i], QP, INIT_SPLIT_FLAG[slice][i], INIT_SPLIT_FLAG[3][i]);
-    kvz_ctx_init(&cabac->ctx.alf_ctb_flag_model[i], QP, INIT_ALF_CTB_FLAG[slice][i], INIT_ALF_CTB_FLAG[3][i]);
+    kvz_ctx_init(&cabac->ctx.alf_ctb_flag_model[i], QP, INIT_CTB_ALF_FLAG[slice][i], INIT_CTB_ALF_FLAG[3][i]);
   }
   
 
@@ -414,7 +424,7 @@ void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
     kvz_ctx_init(&cabac->ctx.cu_ref_pic_model[i], QP, INIT_REF_PIC[slice][i], INIT_REF_PIC[3][i]);    
     kvz_ctx_init(&cabac->ctx.luma_planar_model[i], QP, INIT_INTRA_LUMA_PLANAR_MODE[slice][i], INIT_INTRA_LUMA_PLANAR_MODE[3][i]);
     kvz_ctx_init(&cabac->ctx.cu_qp_delta_abs[i], QP, INIT_CU_QP_DELTA_ABS[slice][i], INIT_CU_QP_DELTA_ABS[3][i]);
-    kvz_ctx_init(&cabac->ctx.alf_ctb_alternatives[i], QP, INIT_ALF_CTB_ALTERNATIVE[slice][i], INIT_ALF_CTB_ALTERNATIVE[3][i]);
+    kvz_ctx_init(&cabac->ctx.alf_ctb_alternatives[i], QP, INIT_CTB_ALF_ALTERNATIVE[slice][i], INIT_CTB_ALF_ALTERNATIVE[3][i]);
   }
 
   for (i = 0; i < 3; i++) {

@@ -204,7 +204,6 @@ static int encoder_state_config_slice_init(encoder_state_t * const state,
       state->slice->tile_group_luma_aps_id[aps_idx] = -1;
     }
     state->slice->tile_group_num_aps = -1;
-    state->slice->tile_group_luma_aps_id = malloc(MAX_NUM_APS * sizeof(int));
     state->slice->tile_group_chroma_aps_id = -1;
     state->slice->tile_group_cc_alf_cb_enabled_flag = 0;
     state->slice->tile_group_cc_alf_cr_enabled_flag = 0;

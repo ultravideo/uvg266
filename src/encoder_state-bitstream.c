@@ -1037,12 +1037,9 @@ static void kvz_encoder_state_write_bitstream_picture_header(
     || state->frame->pictype == KVZ_NAL_IDR_N_LP) {
   }
   else {
-    // ToDo: ALF flag
     //WRITE_U(stream, state->encoder_control->cfg.tmvp_enable, 1, "ph_pic_temporal_mvp_enabled_flag");
     WRITE_U(stream, 0, 1, "ph_mvd_l1_zero_flag");
   }
-
-  
 
   // alf enable flags and aps IDs
   if (encoder->cfg.alf_type)
@@ -1100,16 +1097,6 @@ static void kvz_encoder_state_write_bitstream_picture_header(
     state->tile->frame->ctu_enable_flag[COMPONENT_Cr] = false;
     state->tile->frame->alf_cc_enable_flag[COMPONENT_Cb] = false;
     state->tile->frame->alf_cc_enable_flag[COMPONENT_Cr] = false;*/
-  }
-
-  WRITE_U(stream, state->encoder_control->cfg.tmvp_enable, 1, "pic_temporal_mvp_enabled_flag");
-  WRITE_U(stream, 0, 1, "pic_mvd_l1_zero_flag");
-
-  if (encoder->cfg.sao_type) {
-    WRITE_U(stream, 1, 1, "slice_sao_luma_flag");
-    if (encoder->chroma_format != KVZ_CSP_400) {
-      WRITE_U(stream, 1, 1, "slice_sao_chroma_flag");
-    }
   }
 
   // getDeblockingFilterControlPresentFlag
@@ -1262,8 +1249,8 @@ void kvz_encoder_state_write_bitstream_slice_header(
       const int alf_chroma_idc = state->slice->tile_group_alf_enabled_flag[COMPONENT_Cb] + state->slice->tile_group_alf_enabled_flag[COMPONENT_Cr] * 2;
       if (encoder->chroma_format != KVZ_CSP_400)
       {
-        WRITE_U(state, state->slice->tile_group_alf_enabled_flag[COMPONENT_Cb], 1, "slice_alf_cb_enabled_flag");
-        WRITE_U(state, state->slice->tile_group_alf_enabled_flag[COMPONENT_Cr], 1, "slice_alf_cr_enabled_flag");
+        WRITE_U(stream, state->slice->tile_group_alf_enabled_flag[COMPONENT_Cb], 1, "slice_alf_cb_enabled_flag");
+        WRITE_U(stream, state->slice->tile_group_alf_enabled_flag[COMPONENT_Cr], 1, "slice_alf_cr_enabled_flag");
       }
       if (alf_chroma_idc)
       {

@@ -57,6 +57,7 @@ typedef struct
     cabac_ctx_t alf_temporal_filt;
     cabac_ctx_t alf_ctb_alternatives[2];
     cabac_ctx_t alf_luma_coeff_delta_prediction_flag;
+    cabac_ctx_t alf_cc_filter_control_flag[6];
     cabac_ctx_t sao_merge_flag_model;
     cabac_ctx_t sao_type_idx_model;
     cabac_ctx_t split_flag_model[9]; //!< \brief split flag context models
@@ -168,8 +169,7 @@ extern bool kvz_cabac_bins_verbose;
     uint32_t prev_state = CTX_STATE(data->cur_ctx); \
     kvz_cabac_encode_bins_ep((data), (value), (bins)); \
     if(kvz_cabac_bins_verbose && !data->only_count) { printf("%d %s = %u(%u bins), state = %u -> %u\n", \
-           kvz_cabac_bins_count, (name), (uint32_t)(value), (bins), prev_state, CTX_STATE(data->cur_ctx)); \
-    if (data->only_count == 0) kvz_cabac_bins_count+=bins;}
+           kvz_cabac_bins_count, (name), (uint32_t)(value), (bins), prev_state, CTX_STATE(data->cur_ctx));  kvz_cabac_bins_count+=bins;}}
 
   #define CABAC_BIN_EP(data, value, name) { \
     uint32_t prev_state = CTX_STATE(data->cur_ctx); \
