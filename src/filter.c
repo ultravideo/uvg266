@@ -990,14 +990,14 @@ static void filter_deblock_edge_chroma(encoder_state_t * const state,
       if (dir == EDGE_VER) {
         x_coord <<= 1;
         y_coord = (y + min_chroma_length * blk_idx) << 1;
-        cu_p = kvz_cu_array_at(frame->cu_array, (x - 1) << 1, y_coord);
-        cu_q = kvz_cu_array_at(frame->cu_array,  x      << 1, y_coord);
+        cu_p = kvz_cu_array_at(frame->cu_array, x_coord - 1, y_coord);
+        cu_q = kvz_cu_array_at(frame->cu_array, x_coord    , y_coord);
 
       } else {
         x_coord = (x + min_chroma_length * blk_idx) << 1;
         y_coord <<= 1;
-        cu_p = kvz_cu_array_at(frame->cu_array, x_coord, (y - 1) << 1);
-        cu_q = kvz_cu_array_at(frame->cu_array, x_coord, (y    ) << 1);
+        cu_p = kvz_cu_array_at(frame->cu_array, x_coord, y_coord - 1);
+        cu_q = kvz_cu_array_at(frame->cu_array, x_coord, y_coord    );
       }
 
       const int cu_size = LCU_WIDTH >> cu_q->depth;
@@ -1021,7 +1021,7 @@ static void filter_deblock_edge_chroma(encoder_state_t * const state,
       const bool large_boundary = (max_filter_length_P >= 3 && max_filter_length_Q >= 3);
       const bool is_chroma_hor_CTB_boundary = (dir == EDGE_HOR && y_coord % LCU_WIDTH == 0);
       uint8_t c_strength[2] = { 0, 0 };
-      bool use_long_filter = false;
+      
 
       if (cu_q->type == CU_INTRA || cu_p->type == CU_INTRA) {
         c_strength[0] = 2;
@@ -1042,6 +1042,8 @@ static void filter_deblock_edge_chroma(encoder_state_t * const state,
           int32_t TC_index = CLIP(0, MAX_QP + 2, (int32_t)(QP + 2 * (c_strength[component] - 1) + (tc_offset_div2 << 1)));
           int32_t Tc = encoder->bitdepth < 10 ? ((kvz_g_tc_table_8x8[TC_index] + (1 << (9 - encoder->bitdepth))) >> (10 - encoder->bitdepth))
                                               : (kvz_g_tc_table_8x8[TC_index] << (encoder->bitdepth - 10));
+
+          bool use_long_filter = false;
 
           //                   +-- edge_src
           //                   v
