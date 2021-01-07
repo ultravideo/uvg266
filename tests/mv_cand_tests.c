@@ -37,13 +37,14 @@ TEST test_get_spatial_merge_cand(void)
                                32, 24,      // width, height
                                1920, 1080,  // picture size
                                &lcu,
-                               &cand);
+                               &cand,
+                               2);
 
-  ASSERT_EQ(cand.b[0], &lcu.cu[289]);
-  ASSERT_EQ(cand.b[1], &lcu.cu[ 16]);
+  ASSERT_EQ(cand.b[1], &lcu.cu[289]);
+  ASSERT_EQ(cand.b[0], &lcu.cu[ 16]);
   ASSERT_EQ(cand.b[2], &lcu.cu[  8]);
-  ASSERT_EQ(cand.a[0], &lcu.cu[127]);
-  ASSERT_EQ(cand.a[1], &lcu.cu[110]);
+  ASSERT_EQ(cand.a[1], &lcu.cu[127]);
+  ASSERT_EQ(cand.a[0], &lcu.cu[110]);
 
   PASS();
 }
