@@ -183,7 +183,7 @@ static INLINE void kvz_filter_deblock_chroma(const encoder_control_t * const enc
 
     }
 
-    src[offset * 1] = CLIP(m5 - tc, m6 + tc, (m2 + m3 + m4 + 2 * m5 + m6 + 2 * m7 + 4) >> 3);
+    src[offset * 1] = CLIP(m5 - tc, m5 + tc, (m2 + m3 + m4 + 2 * m5 + m6 + 2 * m7 + 4) >> 3);
     src[offset * 2] = CLIP(m6 - tc, m6 + tc, (m3 + m4 + m5 + 2 * m6 + 3 * m7 + 4) >> 3);
   } else {
     delta = CLIP(-tc, tc, (((m4 - m3) * 4) + m2 - m5 + 4) >> 3);
