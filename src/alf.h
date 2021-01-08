@@ -326,6 +326,7 @@ static int gns_solve_by_chol(double lhs[MAX_NUM_ALF_LUMA_COEFF][MAX_NUM_ALF_LUMA
 static int gns_solve_by_chol_clip_gns(alf_covariance *cov, const int *clip, double *x, int num_eq);
 static double calc_error_for_coeffs(const alf_covariance *cov, const int *clip, const int *coeff, const int num_coeff, const int bit_depth);
 static double calc_error_for_cc_alf_coeffs(const alf_covariance *cov, const int16_t* coeff, const int num_coeff, const int bit_depth);
+static int length_uvlc(int ui_code);
 static double get_dist_coeff_force_0(bool* coded_var_bins, double error_force_0_coeff_tab[MAX_NUM_ALF_CLASSES][2], int* bits_var_bin, int zero_bits_var_bin, const int num_filters, double lambda);
 static double get_dist_force_0(const alf_aps *alf_param, channel_type channel, const int num_filters, double error_tab_force_0_coeff[MAX_NUM_ALF_CLASSES][2], bool* coded_var_bins, double lambda, int filter_coeff_set[MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_LUMA_COEFF], int filter_clipp_set[MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_LUMA_COEFF]);
 static int get_cost_filter_coeff_force_0(const alf_aps *alf_param, channel_type channel, const int num_filters, bool* coded_var_bins, int p_diff_q_filter_coeff_int_pp[MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_LUMA_COEFF], int filter_clipp_set[MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_LUMA_COEFF]);
@@ -491,6 +492,10 @@ static void round_filt_coeff_cc_alf(int16_t *filter_coeff_quant,
   double *filter_coeff, const int num_coeff,
   const int factor);
 
+static int get_coeff_rate_cc_alf(short chroma_coeff[MAX_NUM_CC_ALF_FILTERS][MAX_NUM_CC_ALF_CHROMA_COEFF],
+  bool filter_enabled[MAX_NUM_CC_ALF_FILTERS],
+  uint8_t filter_count, alf_component_id comp_id);
+
 static void derive_cc_alf_filter_coeff(alf_covariance *alf_covariance_frame_cc_alf,
   short filter_coeff[MAX_NUM_CC_ALF_FILTERS][MAX_NUM_CC_ALF_CHROMA_COEFF],
   const uint8_t filter_idx);
@@ -570,7 +575,7 @@ static void filter_blk_cc_alf(encoder_state_t * const state,
 
 static void alf_cabac_reset_bits(cabac_data_t * const data);
 
-void code_alf_ctu_enable_flags_channel(encoder_state_t * const state,
+static void code_alf_ctu_enable_flags_channel(encoder_state_t * const state,
   cabac_data_t * const cabac,
   channel_type channel,
   alf_aps *aps);

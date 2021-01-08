@@ -19,7 +19,7 @@ typedef struct filter_idx_count
   uint8_t filter_idx;
 } filter_idx_count;
 
-int comparator(const void *v1, const void *v2)
+static int comparator(const void *v1, const void *v2)
 {
   const filter_idx_count *p1 = (filter_idx_count *)v1;
   const filter_idx_count *p2 = (filter_idx_count *)v2;
@@ -466,7 +466,7 @@ static double calc_error_for_cc_alf_coeffs(const alf_covariance *cov, const int1
   return error / factor;
 }
 
-int length_uvlc(int ui_code)
+static int length_uvlc(int ui_code)
 {
   int ui_length = 1;
   int ui_temp = ++ui_code;
@@ -3779,7 +3779,7 @@ static void alf_cabac_reset_bits(cabac_data_t * const data)
   data->buffered_byte = 0xff;
 }
 
-void code_alf_ctu_enable_flags_channel(encoder_state_t * const state,
+static void code_alf_ctu_enable_flags_channel(encoder_state_t * const state,
   cabac_data_t * const cabac,
   channel_type channel,
   alf_aps *aps)
@@ -5255,7 +5255,7 @@ static void round_filt_coeff_cc_alf(int16_t *filter_coeff_quant, double *filter_
   }
 }
 
-int get_coeff_rate_cc_alf(short chroma_coeff[MAX_NUM_CC_ALF_FILTERS][MAX_NUM_CC_ALF_CHROMA_COEFF], bool filter_enabled[MAX_NUM_CC_ALF_FILTERS], uint8_t filter_count, alf_component_id comp_id)
+static int get_coeff_rate_cc_alf(short chroma_coeff[MAX_NUM_CC_ALF_FILTERS][MAX_NUM_CC_ALF_CHROMA_COEFF], bool filter_enabled[MAX_NUM_CC_ALF_FILTERS], uint8_t filter_count, alf_component_id comp_id)
 {
   int bits = 0;
 
