@@ -1473,7 +1473,7 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
   }
 
   // Adaptation parameter set (APS)
-  encode_alf_adaptive_parameter_set(state);
+  kvz_encode_alf_adaptive_parameter_set(state);
 
   encoder_state_write_bitstream_children(state);
 

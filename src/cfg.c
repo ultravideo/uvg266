@@ -814,7 +814,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     cfg->alf_type = alf_type;
     if (alf_type)
     {
-      set_aps_map(cfg);
+      kvz_set_aps_map(cfg);
     }
   }
   else if OPT("rdoq")
