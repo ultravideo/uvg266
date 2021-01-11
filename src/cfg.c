@@ -20,6 +20,7 @@
 
 #include "cfg.h"
 #include "gop.h"
+#include "alf.h"
 
 #include <limits.h>
 #include <stdio.h>
@@ -45,10 +46,15 @@ int kvz_config_init(kvz_config *cfg)
   cfg->intra_qp_offset_auto = true;
   cfg->intra_period    = 64;
   cfg->vps_period      = 0;
-  cfg->deblock_enable  = 1;
+  cfg->deblock_enable  = 0;
   cfg->deblock_beta    = 0;
   cfg->deblock_tc      = 0;
   cfg->sao_type        = 3;
+  cfg->alf_type        = 0;
+  cfg->alf_info_in_ph_flag = 0;
+  cfg->alf_non_linear_luma = 1;
+  cfg->alf_non_linear_chroma = 1;
+  cfg->alf_allow_predefined_filters = 1;
   cfg->rdoq_enable     = 1;
   cfg->rdoq_skip       = 1;
   cfg->signhide_enable = true;
@@ -179,6 +185,10 @@ int kvz_config_destroy(kvz_config *cfg)
     FREE_POINTER(cfg->slice_addresses_in_ts);
     FREE_POINTER(cfg->roi.dqps);
     FREE_POINTER(cfg->optional_key);
+    if (cfg->param_set_map)
+    {
+      FREE_POINTER(cfg->param_set_map);
+    }
   }
   free(cfg);
 
@@ -448,6 +458,8 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   static const char * const me_early_termination_names[] = { "off", "on", "sensitive", NULL };
 
   static const char * const sao_names[] = { "off", "edge", "band", "full", NULL };
+
+  static const char * const alf_names[] = { "off", "no-cc", "full", NULL };
 
   static const char * const scaling_list_names[] = { "off", "custom", "default", NULL };
 
@@ -795,6 +807,15 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     int8_t sao_type = 0;
     if (!parse_enum(value, sao_names, &sao_type)) sao_type = atobool(value) ? 3 : 0;
     cfg->sao_type = sao_type;
+  }
+  else if OPT("alf") {
+    int8_t alf_type = 0;
+    if (!parse_enum(value, alf_names, &alf_type)) alf_type = atobool(value) ? 2 : 0;
+    cfg->alf_type = alf_type;
+    if (alf_type)
+    {
+      kvz_set_aps_map(cfg);
+    }
   }
   else if OPT("rdoq")
     cfg->rdoq_enable = atobool(value);

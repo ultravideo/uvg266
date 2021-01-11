@@ -24,6 +24,7 @@
 
 #include "image.h"
 #include "sao.h"
+#include "alf.h"
 
 
 /**
@@ -33,7 +34,8 @@
  */
 videoframe_t * kvz_videoframe_alloc(int32_t width,
                                     int32_t height,
-                                    enum kvz_chroma_format chroma_format)
+                                    enum kvz_chroma_format chroma_format,
+                                    enum kvz_alf alf_type)
 {
   videoframe_t *frame = calloc(1, sizeof(videoframe_t));
   if (!frame) return 0;
@@ -47,6 +49,12 @@ videoframe_t * kvz_videoframe_alloc(int32_t width,
   if (chroma_format != KVZ_CSP_400) {
     frame->sao_chroma = MALLOC(sao_info_t, frame->width_in_lcu * frame->height_in_lcu);
   }
+
+  if (alf_type) {
+    frame->alf_info = MALLOC(alf_info_t, 1);
+    kvz_alf_create(frame, chroma_format);
+  }
+
 
   return frame;
 }
@@ -68,6 +76,12 @@ int kvz_videoframe_free(videoframe_t * const frame)
   FREE_POINTER(frame->sao_luma);
   FREE_POINTER(frame->sao_chroma);
 
+  if (frame->alf_info)
+  {
+    kvz_alf_destroy(frame);
+    FREE_POINTER(frame->alf_info);
+  }
+  
   free(frame);
 
   return 1;

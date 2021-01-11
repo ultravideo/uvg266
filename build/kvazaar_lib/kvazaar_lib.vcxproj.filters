@@ -174,9 +174,6 @@
     <ClCompile Include="..\..\src\rdo.c">
       <Filter>Compression</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\inter.c">
-      <Filter>Reconstruction</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\src\intra.c">
       <Filter>Reconstruction</Filter>
     </ClCompile>
@@ -242,6 +239,12 @@
     <ClCompile Include="..\..\src\ml_intra_cu_depth_pred.c">
       <Filter>Constraint</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\inter.c">
+      <Filter>Reconstruction</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\alf.c">
+      <Filter>Reconstruction</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\bitstream.h">
@@ -302,9 +305,6 @@
       <Filter>Extras</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\filter.h">
-      <Filter>Reconstruction</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\inter.h">
       <Filter>Reconstruction</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\intra.h">
@@ -452,6 +452,12 @@
     </ClInclude>
     <ClInclude Include="..\..\src\gop.h">
       <Filter>Control</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\inter.h">
+      <Filter>Reconstruction</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\alf.h">
+      <Filter>Reconstruction</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -267,7 +267,7 @@ void kvz_encode_coeff_nxn_avx2(encoder_state_t * const state,
   const __m256i twos = _mm256_set1_epi16(2);
 
   // Init base contexts according to block type
-  cabac_ctx_t *base_coeff_group_ctx = &(cabac->ctx.cu_sig_coeff_group_model[type]);
+  cabac_ctx_t *base_coeff_group_ctx = &(cabac->ctx.sig_coeff_group_model[type]);
   cabac_ctx_t *baseCtx           = (type == 0) ? &(cabac->ctx.cu_sig_model_luma[0]) :
                                  &(cabac->ctx.cu_sig_model_chroma[0]);
 
@@ -348,7 +348,7 @@ void kvz_encode_coeff_nxn_avx2(encoder_state_t * const state,
 
   // transform skip flag
   if(width == 4 && encoder->cfg.trskip_enable) {
-    cabac->cur_ctx = (type == 0) ? &(cabac->ctx.transform_skip_model_luma) : &(cabac->ctx.transform_skip_model_chroma);
+    cabac->cur_ctx = (type == 0) ? &(cabac->ctx.cu_sig_model_luma) : &(cabac->ctx.cu_sig_model_chroma);
     CABAC_BIN(cabac, tr_skip, "transform_skip_flag");
   }
 
@@ -483,8 +483,8 @@ void kvz_encode_coeff_nxn_avx2(encoder_state_t * const state,
         ctx_set++;
       }
 
-      base_ctx_mod     = (type == 0) ? &(cabac->ctx.cu_one_model_luma[4 * ctx_set]) :
-                         &(cabac->ctx.cu_one_model_chroma[4 * ctx_set]);
+      base_ctx_mod     = (type == 0) ? &(cabac->ctx.cu_sig_model_luma[4 * ctx_set]) :
+                         &(cabac->ctx.cu_sig_model_chroma[4 * ctx_set]);
       num_c1_flag      = MIN(num_non_zero, C1FLAG_NUMBER);
       first_c2_flag_idx = -1;
 
@@ -514,8 +514,8 @@ void kvz_encode_coeff_nxn_avx2(encoder_state_t * const state,
       }
 
       if (c1 == 0) {
-        base_ctx_mod = (type == 0) ? &(cabac->ctx.cu_abs_model_luma[ctx_set]) :
-                       &(cabac->ctx.cu_abs_model_chroma[ctx_set]);
+        base_ctx_mod = (type == 0) ? &(cabac->ctx.cu_sig_model_luma[ctx_set]) :
+                       &(cabac->ctx.cu_sig_model_chroma[ctx_set]);
 
         if (first_c2_flag_idx != -1) {
           uint32_t shift = (first_c2_flag_idx << 1) + 1;

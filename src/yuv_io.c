@@ -240,14 +240,14 @@ int yuv_io_read(FILE* file,
   ok = yuv_io_read_plane(
       file, 
       in_width, out_width, in_bitdepth,
-      img_out->width, img_out->height, out_bitdepth,
+      img_out->stride, img_out->height, out_bitdepth,
       img_out->y);
   if (!ok) return 0;
 
   if (img_out->chroma_format != KVZ_CSP_400) {
     unsigned uv_width_in = in_width / 2;
     unsigned uv_height_in = out_width / 2;
-    unsigned uv_width_out = img_out->width / 2;
+    unsigned uv_width_out = img_out->stride / 2;
     unsigned uv_height_out = img_out->height / 2;
 
     ok = yuv_io_read_plane(
@@ -327,18 +327,18 @@ int yuv_io_write(FILE* file,
                 const kvz_picture *img,
                 unsigned output_width, unsigned output_height)
 {
-  const int width = img->width;
+  const int stride = img->stride;
   for (int y = 0; y < output_height; ++y) {
-    fwrite(&img->y[y * width], sizeof(*img->y), output_width, file);
+    fwrite(&img->y[y * stride], sizeof(*img->y), output_width, file);
     // TODO: Check that fwrite succeeded.
   }
 
   if (img->chroma_format != KVZ_CSP_400) {
     for (int y = 0; y < output_height / 2; ++y) {
-      fwrite(&img->u[y * width / 2], sizeof(*img->u), output_width / 2, file);
+      fwrite(&img->u[y * stride / 2], sizeof(*img->u), output_width / 2, file);
     }
     for (int y = 0; y < output_height / 2; ++y) {
-      fwrite(&img->v[y * width / 2], sizeof(*img->v), output_width / 2, file);
+      fwrite(&img->v[y * stride / 2], sizeof(*img->v), output_width / 2, file);
     }
   }
 

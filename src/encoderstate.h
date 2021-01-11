@@ -231,6 +231,25 @@ typedef struct encoder_state_config_slice_t {
   //Global coordinates
   int32_t start_in_rs;
   int32_t end_in_rs;
+
+  //ALF adaptation parameter set
+  struct alf_aps *apss; //[ALF_CTB_MAX_NUM_APS];
+  struct cc_alf_filter_param *cc_filter_param;
+  int tile_group_num_aps;
+  int8_t *tile_group_luma_aps_id;
+  int tile_group_chroma_aps_id;
+  bool tile_group_cc_alf_cb_enabled_flag;
+  bool tile_group_cc_alf_cr_enabled_flag;
+  int tile_group_cc_alf_cb_aps_id;
+  int tile_group_cc_alf_cr_aps_id;
+  //struct param_set_map *param_set_map; //mahdollisesti define during run
+  uint32_t num_of_param_sets;
+  bool tile_group_alf_enabled_flag[3/*MAX_NUM_COMPONENT*/];
+
+  //unsigned num_hor_virtual_boundaries;
+  //unsigned num_ver_virtual_boundaries;
+  //unsigned virtual_boundaries_pos_x[3];
+  //unsigned virtual_boundaries_pos_y[3];
 } encoder_state_config_slice_t;
 
 typedef struct encoder_state_config_wfrow_t {
@@ -250,6 +269,7 @@ typedef struct lcu_order_element {
   int first_row;
   int last_column;
   int last_row;
+  lcu_coeff_t *coeff;
   
   struct lcu_order_element *above;
   struct lcu_order_element *below;

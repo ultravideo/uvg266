@@ -45,6 +45,8 @@ kvazaar_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 endif
 
 libkvazaar_la_SOURCES = \
+    alf.c \
+	alf.h \
 	bitstream.c \
 	bitstream.h \
 	cabac.c \

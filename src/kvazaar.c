@@ -209,20 +209,20 @@ static int yuv_io_extract_field(const kvz_picture *frame_in, unsigned source_sca
   for (int i = 0; i < field_out->height; ++i){
     kvz_pixel *row_in  = frame_in->y + MIN(frame_in->height - 1, 2 * i + offset) * frame_in->stride;
     kvz_pixel *row_out = field_out->y + i * field_out->stride;
-    memcpy(row_out, row_in, sizeof(kvz_pixel) * frame_in->width);
+    memcpy(row_out, row_in, sizeof(kvz_pixel) * frame_in->stride);
   }
 
   //Chroma
   for (int i = 0; i < field_out->height / 2; ++i){
     kvz_pixel *row_in = frame_in->u + MIN(frame_in->height / 2 - 1, 2 * i + offset) * frame_in->stride / 2;
     kvz_pixel *row_out = field_out->u + i * field_out->stride / 2;
-    memcpy(row_out, row_in, sizeof(kvz_pixel) * frame_in->width / 2);
+    memcpy(row_out, row_in, sizeof(kvz_pixel) * frame_in->stride / 2);
   }
 
   for (int i = 0; i < field_out->height / 2; ++i){
     kvz_pixel *row_in = frame_in->v + MIN(frame_in->height / 2 - 1, 2 * i + offset) * frame_in->stride / 2;
     kvz_pixel *row_out = field_out->v + i * field_out->stride / 2;
-    memcpy(row_out, row_in, sizeof(kvz_pixel) * frame_in->width / 2);
+    memcpy(row_out, row_in, sizeof(kvz_pixel) * frame_in->stride / 2);
   }
 
   return 1;

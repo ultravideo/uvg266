@@ -400,7 +400,7 @@ failed:
 /**
  * \brief Create a job and return a pointer to it.
  *
- * The job is created in a paused state. Function kvz_threadqueue_submit
+ * The job is g_created in a paused state. Function kvz_threadqueue_submit
  * must be called on the job in order to have it run.
  *
  * \return pointer to the job, or NULL on failure
