@@ -1126,13 +1126,14 @@ static void filter_deblock_unit(encoder_state_t * const state,
   if (dir == EDGE_HOR) {
     const videoframe_t * const frame = state->tile->frame;
     const int32_t x_right             = x + width;
-    const bool rightmost_4px_of_lcu   = x_right % LCU_WIDTH == 0;
-    const bool rightmost_4px_of_frame = x_right == frame->width;
+    const bool rightmost_8px_of_lcu   = x_right % LCU_WIDTH == 0;
+    const bool rightmost_8px_of_frame = x_right == frame->width;
 
-    if (rightmost_4px_of_lcu && !rightmost_4px_of_frame) {
-      // The last 4 pixels will be deblocked when processing the next LCU.
-      length   = width - 4;
+    if (rightmost_8px_of_lcu && !rightmost_8px_of_frame) {
+      // The last 8 pixels will be deblocked when processing the next LCU.
+      length   = width - 8;
       length_c = (width >> 1) - 4;
+      if (length == 0) return;
 
     } else {
       length   = width;
@@ -1186,7 +1187,7 @@ static void filter_deblock_lcu_inside(encoder_state_t * const state,
 
 
 /**
- * \brief Filter rightmost 4 pixels of the horizontal egdes of an LCU.
+ * \brief Filter rightmost 8 pixels of the horizontal egdes of an LCU.
  *
  * \param state     encoder state
  * \param x_px      x-coordinate of the *right* edge of the LCU in pixels
@@ -1197,14 +1198,14 @@ static void filter_deblock_lcu_rightmost(encoder_state_t * const state,
                                          int32_t y_px)
 {
   // Luma
-  const int x = x_px - 4;
+  const int x = x_px - 8;
   const int end = MIN(y_px + LCU_WIDTH, state->tile->frame->height);
   for (int y = y_px; y < end; y += 8) {
     // The top edge of the whole frame is not filtered.
     bool tu_boundary = is_tu_boundary(state, x, y, EDGE_HOR);
     bool pu_boundary = is_pu_boundary(state, x, y, EDGE_HOR);
     if (y > 0 && (tu_boundary || pu_boundary)) {
-      filter_deblock_edge_luma(state, x, y, 4, EDGE_HOR, tu_boundary);
+      filter_deblock_edge_luma(state, x, y, 8, EDGE_HOR, tu_boundary);
     }
   }
 
@@ -1234,15 +1235,15 @@ static void filter_deblock_lcu_rightmost(encoder_state_t * const state,
  *  2. All vertical edges within the LCU.
  *
  * Filter the following horizontal edges (vertical filtering):
- *  1. The rightmost 4 pixels of the top edge of the LCU to the left.
- *  2. The rightmost 4 pixels of all horizontal edges within the LCU to the
+ *  1. The rightmost 8 pixels of the top edge of the LCU to the left.
+ *  2. The rightmost 8 pixels of all horizontal edges within the LCU to the
  *     left.
  *  3. The top edge and all horizontal edges within the LCU, excluding the
- *     rightmost 4 pixels. If the LCU is the rightmost LCU of the frame, the
- *     last 4 pixels are also filtered.
+ *     rightmost 8 pixels. If the LCU is the rightmost LCU of the frame, the
+ *     last 8 pixels are also filtered.
  *
  * What is not filtered:
- *  - The rightmost 4 pixels of the top edge and all horizontal edges within
+ *  - The rightmost 8 pixels of the top edge and all horizontal edges within
  *    the LCU, unless the LCU is the rightmost LCU of the frame.
  *  - The bottom edge of the LCU.
  *  - The right edge of the LCU.
