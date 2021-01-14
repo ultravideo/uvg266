@@ -77,25 +77,35 @@ static struct sad_test_env_t {
 static void setup_tests()
 {
   g_pic = kvz_image_alloc(KVZ_CSP_420, 8, 8);
-  for (int i = 0; i < 64; ++i) {
-    g_pic->y[i] = pic_data[i] + 48;
+  for (int y = 0; y < 8; ++y) {
+    for (int x = 0; x < 8; ++x) {
+      g_pic->y[y*g_pic->stride + x] = pic_data[8*y + x] + 48;
+    }
   }
 
   g_ref = kvz_image_alloc(KVZ_CSP_420, 8, 8);
-  for (int i = 0; i < 64; ++i) {
-    g_ref->y[i] = ref_data[i] + 48;
+  for (int y = 0; y < 8; ++y) {
+    for (int x = 0; x < 8; ++x) {
+      g_ref->y[y*g_ref->stride + x] = ref_data[8*y + x] + 48;
+    }
   }
 
+  int i = 0;
   g_big_pic = kvz_image_alloc(KVZ_CSP_420, 64, 64);
-  for (int i = 0; i < 64*64; ++i) {
-    g_big_pic->y[i] = (i*i / 32 + i) % 255;
-    //g_big_pic->y[i] = i % 255;
+  for (int y = 0; y < 64; ++y) {
+    for (int x = 0; x < 64; ++x) {
+      i = ((64 * y) + x);
+      g_big_pic->y[y*g_big_pic->stride + x] = (i*i / 32 + i) % 255;
+    }
   }
 
+  i = 0;
   g_big_ref = kvz_image_alloc(KVZ_CSP_420, 64, 64);
-  for (int i = 0; i < 64 * 64; ++i) {
-    g_big_ref->y[i] = (i*i / 16 + i) % 255;
-    //g_big_ref->y[i] = (i / 2) % 255;
+  for (int y = 0; y < 64; ++y) {
+    for (int x = 0; x < 64; ++x) {
+      i = ((64 * y) + x);
+      g_big_ref->y[y*g_big_ref->stride + x] = (i*i / 16 + i) % 255;
+    }
   }
 
   g_64x64_zero = kvz_image_alloc(KVZ_CSP_420, 64, 64);
