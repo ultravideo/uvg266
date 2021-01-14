@@ -365,10 +365,10 @@ static INLINE int kvz_filter_deblock_large_block(kvz_pixel *line, kvz_pixel *lin
   const int *coeffs_Q = NULL;
 
   //Form P/Q arrays that contain all of the samples to make things simpler later
-  const kvz_pixel* lineP[8] = { line + 3, line + 2, line + 1, line + 0,
-                                lineL + 3, lineL + 2, lineL + 1, lineL + 0 };
-  const kvz_pixel* lineQ[8] = { line + 4, line + 5, line + 6, line + 7,
-                                lineL + 4, lineL + 5, lineL + 6, lineL + 7 };
+  const kvz_pixel lineP[8] = { line[3], line[2], line[1], line[0],
+                               lineL[3], lineL[2], lineL[1], lineL[0] };
+  const kvz_pixel lineQ[8] = { line[4], line[5], line[6], line[7],
+                               lineL[4], lineL[5], lineL[6], lineL[7] };
   //Separate destination arrays with only six output pixels going in line and  rest to lineL to simplify things later
   kvz_pixel* dstP[7] = { line + 3, line + 2, line + 1,
                          lineL + 3, lineL + 2, lineL + 1, lineL + 0 };
@@ -379,17 +379,17 @@ static INLINE int kvz_filter_deblock_large_block(kvz_pixel *line, kvz_pixel *lin
   switch (filter_length_P)
   {
   case 7:
-    ref_P = (*lineP[6] + *lineP[7] + 1) >> 1;
+    ref_P = (lineP[6] + lineP[7] + 1) >> 1;
     coeffs_P = coeffs7;
     break;
 
   case 5:
-    ref_P = (*lineP[4] + *lineP[5] + 1) >> 1;
+    ref_P = (lineP[4] + lineP[5] + 1) >> 1;
     coeffs_P = coeffs5;
     break;
 
   case 3:
-    ref_P = (*lineP[2] + *lineP[3] + 1) >> 1;
+    ref_P = (lineP[2] + lineP[3] + 1) >> 1;
     coeffs_P = coeffs3;
     break;
   }
@@ -397,17 +397,17 @@ static INLINE int kvz_filter_deblock_large_block(kvz_pixel *line, kvz_pixel *lin
   switch (filter_length_Q)
   {
   case 7:
-    ref_Q = (*lineQ[6] + *lineQ[7] + 1) >> 1;
+    ref_Q = (lineQ[6] + lineQ[7] + 1) >> 1;
     coeffs_Q = coeffs7;
     break;
 
   case 5:
-    ref_Q = (*lineQ[4] + *lineQ[5] + 1) >> 1;
+    ref_Q = (lineQ[4] + lineQ[5] + 1) >> 1;
     coeffs_Q = coeffs5;
     break;
 
   case 3:
-    ref_Q = (*lineQ[2] + *lineQ[3] + 1) >> 1;
+    ref_Q = (lineQ[2] + lineQ[3] + 1) >> 1;
     coeffs_Q = coeffs3;
     break;
   }
@@ -415,34 +415,34 @@ static INLINE int kvz_filter_deblock_large_block(kvz_pixel *line, kvz_pixel *lin
   //Get middle samples
   if (filter_length_P == filter_length_Q) {
     if (filter_length_P == 7) {
-      ref_middle = (*lineP[6] + *lineP[5] + *lineP[4] + *lineP[3] + *lineP[2] + *lineP[1]
-                    + 2 * (*lineP[0] + *lineQ[0])
-                    + *lineQ[1] + *lineQ[2] + *lineQ[3] + *lineQ[4] + *lineQ[5] + *lineQ[6] + 8) >> 4;
+      ref_middle = (lineP[6] + lineP[5] + lineP[4] + lineP[3] + lineP[2] + lineP[1]
+                    + 2 * (lineP[0] + lineQ[0])
+                    + lineQ[1] + lineQ[2] + lineQ[3] + lineQ[4] + lineQ[5] + lineQ[6] + 8) >> 4;
     }
     else { //filter_length_P == 5
-      ref_middle = (*lineP[4] + *lineP[3]
-                    + 2 * (*lineP[2] + *lineP[1] + *lineP[0] + *lineQ[0] + *lineQ[1] + *lineQ[2])
-                    + *lineQ[3] + *lineQ[4] + 8) >> 4;
+      ref_middle = (lineP[4] + lineP[3]
+                    + 2 * (lineP[2] + lineP[1] + lineP[0] + lineQ[0] + lineQ[1] + lineQ[2])
+                    + lineQ[3] + lineQ[4] + 8) >> 4;
     }
   }
   else {
     const uint8_t lenS = MIN(filter_length_P, filter_length_Q);
     const uint8_t lenL = MAX(filter_length_P, filter_length_Q);
-    const kvz_pixel **refS = filter_length_P < filter_length_Q ? lineP : lineQ;
-    const kvz_pixel **refL = filter_length_P < filter_length_Q ? lineQ : lineP;
+    const kvz_pixel *refS = filter_length_P < filter_length_Q ? lineP : lineQ;
+    const kvz_pixel *refL = filter_length_P < filter_length_Q ? lineQ : lineP;
 
     if (lenL == 7 && lenS == 5) {
-      ref_middle = (*lineP[5] + *lineP[4] + *lineP[3] + *lineP[2]
-                    + 2 * (*lineP[1] + *lineP[0] + *lineQ[0] + *lineQ[1])
-                    + *lineQ[2] + *lineQ[3] + *lineQ[4] + *lineQ[5] + 8) >> 4;
+      ref_middle = (lineP[5] + lineP[4] + lineP[3] + lineP[2]
+                    + 2 * (lineP[1] + lineP[0] + lineQ[0] + lineQ[1])
+                    + lineQ[2] + lineQ[3] + lineQ[4] + lineQ[5] + 8) >> 4;
     }
     else if (lenL == 7 && lenS == 3) {
-      ref_middle = (3 * *refS[0] + 2 * *refL[0] + 3 * *refS[1] + *refL[1] + 2 * *refS[2]
-                    + *refL[2] + *refL[3] + *refL[4] + *refL[5] + *refL[6] + 8) >> 4;
+      ref_middle = (3 * refS[0] + 2 * refL[0] + 3 * refS[1] + refL[1] + 2 * refS[2]
+                    + refL[2] + refL[3] + refL[4] + refL[5] + refL[6] + 8) >> 4;
     }
     else { //lenL == 5 && lenS == 3
-    ref_middle = (*lineP[3] + *lineP[2] + *lineP[1] + *lineP[0]
-      + *lineQ[0] + *lineQ[1] + *lineQ[2] + *lineQ[3] + 4) >> 3;
+    ref_middle = (lineP[3] + lineP[2] + lineP[1] + lineP[0]
+                  + lineQ[0] + lineQ[1] + lineQ[2] + lineQ[3] + 4) >> 3;
 
     }
   }
@@ -458,13 +458,13 @@ static INLINE int kvz_filter_deblock_large_block(kvz_pixel *line, kvz_pixel *lin
   for (size_t i = 0; i < filter_length_P; i++)
   {
     int range = (tc * tc_coeff_P[i]) >> 1;
-    *dstP[i] = CLIP(*lineP[i] - range, *lineP[i] + range, (ref_middle * coeffs_P[i] + ref_P * (64 - coeffs_P[i]) + 32) >> 6);
+    *dstP[i] = CLIP(lineP[i] - range, lineP[i] + range, (ref_middle * coeffs_P[i] + ref_P * (64 - coeffs_P[i]) + 32) >> 6);
   }
 
   for (size_t i = 0; i < filter_length_Q; i++)
   {
     int range = (tc * tc_coeff_Q[i]) >> 1;
-    *dstQ[i] = CLIP(*lineQ[i] - range, *lineQ[i] + range, (ref_middle * coeffs_Q[i] + ref_Q * (64 - coeffs_Q[i]) + 32) >> 6);
+    *dstQ[i] = CLIP(lineQ[i] - range, lineQ[i] + range, (ref_middle * coeffs_Q[i] + ref_Q * (64 - coeffs_Q[i]) + 32) >> 6);
   }
 
   return 3;
