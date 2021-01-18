@@ -35,7 +35,8 @@ void kvz_encode_coeff_nxn_generic(encoder_state_t * const state,
                                   uint8_t width,
                                   uint8_t type,
                                   int8_t scan_mode,
-                                  int8_t tr_skip);
+                                  cu_info_t* cur_cu,
+                                  bool is_luma);
 
 int kvz_strategy_register_encode_generic(void* opaque, uint8_t bitdepth);
 

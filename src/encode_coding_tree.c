@@ -34,6 +34,60 @@
 #include "tables.h"
 #include "videoframe.h"
 
+static bool is_mts_allowed(encoder_state_t * const state, cu_info_t *const pred_cu)
+{
+  uint32_t ts_max_size = 1 << 2; //cu.cs->sps->getLog2MaxTransformSkipBlockSize();
+  const int max_size = 32; // CU::isIntra(cu) ? MTS_INTRA_MAX_CU_SIZE : MTS_INTER_MAX_CU_SIZE;
+  const int cu_width = LCU_WIDTH >> pred_cu->depth;
+  const int cu_height = LCU_WIDTH >> pred_cu->depth;
+  //bool mts_allowed = cu.chType == CHANNEL_TYPE_LUMA && compID == COMPONENT_Y;
+
+  uint8_t mts_type = state->encoder_control->cfg.mts;
+  bool mts_allowed = mts_type == KVZ_MTS_BOTH || (pred_cu->type == CU_INTRA ? mts_type == KVZ_MTS_INTRA : pred_cu->type == CU_INTER && mts_type == KVZ_MTS_INTER);
+  mts_allowed &= cu_width <= max_size && cu_height <= max_size;
+  //mts_allowed &= !cu.ispMode;
+  //mts_allowed &= !cu.sbtInfo;
+  mts_allowed &= !(pred_cu->bdpcmMode && cu_width <= ts_max_size && cu_height <= ts_max_size);
+  return mts_allowed;
+}
+
+static void encode_mts_idx(encoder_state_t * const state,
+  cabac_data_t * const cabac,
+  cu_info_t *const pred_cu)
+{
+  //TransformUnit &tu = *cu.firstTU;
+  int mts_idx = 5; // pred_cu->tr_idx;
+
+  if (is_mts_allowed(state, pred_cu) && mts_idx != MTS_SKIP
+       && !pred_cu->violates_mts_coeff_constraint
+       && pred_cu->mts_last_scan_pos
+       //&& cu.lfnstIdx == 0
+    )
+  {
+    int symbol = mts_idx != MTS_DCT2_DCT2 ? 1 : 0;
+    int ctx_idx = 0;
+
+    cabac->cur_ctx = &(cabac->ctx.mts_idx_model[ctx_idx]);
+    CABAC_BIN(cabac, symbol, "mts_idx");
+
+    if (symbol)
+    {
+      ctx_idx = 1;
+      for (int i = 0; i < 3; i++, ctx_idx++)
+      {
+        symbol = mts_idx > i + MTS_DST7_DST7 ? 1 : 0;
+        cabac->cur_ctx = &(cabac->ctx.mts_idx_model[ctx_idx]);
+        CABAC_BIN(cabac, symbol, "mts_idx");
+
+        if (!symbol)
+        {
+          break;
+        }
+      }
+    }
+  }
+}
+
 /**
  * \brief Encode (X,Y) position of the last significant coefficient
  *
@@ -136,13 +190,15 @@ static void encode_transform_unit(encoder_state_t * const state,
 
     // CoeffNxN
     // Residual Coding
+
     kvz_encode_coeff_nxn(state,
                          &state->cabac,
                          coeff_y,
                          width,
                          0,
                          scan_idx,
-                         cur_pu->tr_skip);
+                         cur_pu,
+                         true);
   }
 
   if (depth == MAX_DEPTH + 1) {
@@ -172,11 +228,11 @@ static void encode_transform_unit(encoder_state_t * const state,
     const coeff_t *coeff_v = &state->coeff->v[xy_to_zorder(LCU_WIDTH_C, x_local, y_local)];
 
     if (cbf_is_set(cur_pu->cbf, depth, COLOR_U)) {
-      kvz_encode_coeff_nxn(state, &state->cabac, coeff_u, width_c, 1, scan_idx, 0);
+      kvz_encode_coeff_nxn(state, &state->cabac, coeff_u, width_c, 1, scan_idx, NULL, false);
     }
 
     if (cbf_is_set(cur_pu->cbf, depth, COLOR_V)) {
-      kvz_encode_coeff_nxn(state, &state->cabac, coeff_v, width_c, 2, scan_idx, 0);
+      kvz_encode_coeff_nxn(state, &state->cabac, coeff_v, width_c, 2, scan_idx, NULL, false);
     }
   }
 }
@@ -703,6 +759,8 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
   }
 
   encode_transform_coeff(state, x, y, depth, 0, 0, 0);
+
+  encode_mts_idx(state, cabac, cur_cu);
 }
 
 /**
@@ -798,7 +856,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
   cabac_data_t * const cabac = &state->cabac;
   const encoder_control_t * const ctrl = state->encoder_control;
   const videoframe_t * const frame = state->tile->frame;
-  const cu_info_t *cur_cu   = kvz_cu_array_at_const(frame->cu_array, x, y);
+  cu_info_t *cur_cu   = kvz_cu_array_at_const(frame->cu_array, x, y);
 
   const int cu_width = LCU_WIDTH >> depth;
   const int half_cu  = cu_width >> 1;
@@ -1097,6 +1155,8 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
       }
     }
   } else if (cur_cu->type == CU_INTRA) {
+    cur_cu->mts_last_scan_pos = false;
+    cur_cu->violates_mts_coeff_constraint = false;
     encode_intra_coding_unit(state, cabac, cur_cu, x, y, depth);
   }
 

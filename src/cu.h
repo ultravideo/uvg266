@@ -53,6 +53,15 @@ typedef enum {
   SIZE_nRx2N = 7,
 } part_mode_t;
 
+typedef enum {
+  MTS_DCT2_DCT2 = 0,
+  MTS_SKIP      = 1,
+  MTS_DST7_DST7 = 2,
+  MTS_DCT8_DST7 = 3,
+  MTS_DST7_DCT8 = 4,
+  MTS_DCT8_DCT8 = 5,
+} mts_idx;
+
 extern const uint8_t kvz_part_mode_num_parts[];
 extern const uint8_t kvz_part_mode_offsets[][4][2];
 extern const uint8_t kvz_part_mode_sizes[][4][2];
@@ -137,6 +146,9 @@ typedef struct
   uint8_t qp;
 
   uint8_t bdpcmMode;
+
+  bool violates_mts_coeff_constraint;
+  bool mts_last_scan_pos;
 
   union {
     struct {
