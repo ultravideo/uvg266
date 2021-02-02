@@ -216,7 +216,7 @@ int kvz_quantize_residual_generic(encoder_state_t *const state,
     kvz_transformskip(state->encoder_control, residual, coeff, width);
   }
   else {
-    kvz_transform2d(state->encoder_control, residual, coeff, width, color, cur_cu->type);
+    kvz_transform2d(state->encoder_control, residual, coeff, width, color, cur_cu);
   }
 
   // Quantize coeffs. (coeff -> coeff_out)
@@ -256,7 +256,7 @@ int kvz_quantize_residual_generic(encoder_state_t *const state,
       kvz_itransformskip(state->encoder_control, residual, coeff, width);
     }
     else {
-      kvz_itransform2d(state->encoder_control, residual, coeff, width, color, cur_cu->type);
+      kvz_itransform2d(state->encoder_control, residual, coeff, width, color, cur_cu);
     }
 
     // Get quantized reconstruction. (residual + pred_in -> rec_out)

@@ -40,7 +40,6 @@
 # define TRSKIP_RATIO 1.7
 #endif
 
-
 /**
 * \brief Select mode with the smallest cost.
 */
@@ -184,6 +183,7 @@ static double search_intra_trdepth(encoder_state_t * const state,
   const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
   cu_info_t *const tr_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
 
+  const bool mts_enabled = state->encoder_control->cfg.mts == KVZ_MTS_INTRA || state->encoder_control->cfg.mts == KVZ_MTS_BOTH;
   const bool reconstruct_chroma = !(x_px & 4 || y_px & 4) && state->encoder_control->chroma_format != KVZ_CSP_400;
 
   struct {
@@ -209,16 +209,73 @@ static double search_intra_trdepth(encoder_state_t * const state,
     }
 
     const int8_t chroma_mode = reconstruct_chroma ? intra_mode : -1;
-    kvz_intra_recon_cu(state,
-                       x_px, y_px,
-                       depth,
-                       intra_mode, chroma_mode,
-                       pred_cu, lcu);
+    double best_rd_cost = MAX_INT;
+    int best_emt = 0;
+    int best_tr_idx = 0;
 
-    nosplit_cost += kvz_cu_rd_cost_luma(state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
-    if (reconstruct_chroma) {
-      nosplit_cost += kvz_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
+    for (int trafo = 0; trafo < (mts_enabled ? MTS_TR_NUM : 1); trafo++) {
+      if (mts_enabled && trafo > 0)
+      {
+        pred_cu->emt = 1;
+        if (trafo == 1) {
+          //TODO: Consider tranform skip
+          continue;
+        }
+        else {
+          pred_cu->tr_idx = trafo;
+        }
+      }
+      else
+      {
+        pred_cu->emt = 0;
+        pred_cu->tr_idx = 0;
+      }
+
+
+      kvz_intra_recon_cu(state,
+        x_px, y_px,
+        depth,
+        intra_mode, chroma_mode,
+        pred_cu, lcu);
+
+      /*if (pred_cu->emt != 0 && !cbf_is_set(pred_cu->cbf, depth, COLOR_Y)) {
+        // cu_emt_flag is not written to the bitsream if there is no luma
+        // residual so pred_cu->emt cannot be nonzero.
+        continue;
+      }*/
+
+      /*if (pred_cu->tr_idx != 0) {
+        // tr_idx is not written to the bitsream if the number of
+        // significant coefficients is less than or equal to 2.
+        int num_sig_coeff = 0;
+        const coeff_t* coeff = &lcu->coeff.y[xy_to_zorder(LCU_WIDTH, lcu_px.x, lcu_px.y)];
+        for (int i = 0; i < width * width; i++) {
+          if (coeff[i] != 0) {
+            num_sig_coeff++;
+            if (num_sig_coeff > 2) break;
+          }
+        }
+        if (num_sig_coeff <= 2) continue;
+      }*/
+
+      double rd_cost = kvz_cu_rd_cost_luma(state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
+      if (reconstruct_chroma) {
+        rd_cost += kvz_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
+      }
+
+      if (rd_cost < best_rd_cost) {
+        best_rd_cost = rd_cost;
+        best_emt = pred_cu->emt;
+        best_tr_idx = pred_cu->tr_idx;
+      }
     }
+
+    pred_cu->emt = best_emt;
+    pred_cu->tr_idx = best_tr_idx;
+    //	printf(" best_emt-intra = %d / best_tr_idx = %d \n", best_emt, best_tr_idx);
+    //	if (best_emt==1 && best_tr_idx==0) 
+    //	{ printf("******************** emt 1 tridx 0 *******\n"); }
+    nosplit_cost += best_rd_cost;
 
     // Early stop codition for the recursive search.
     // If the cost of any 1/4th of the transform is already larger than the
@@ -563,7 +620,7 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
                              kvz_pixel *orig, int32_t origstride,
                              int8_t *intra_preds,
                              int modes_to_check,
-                             int8_t modes[35], double costs[35],
+                             int8_t modes[67], int8_t trafo[67], double costs[67],
                              lcu_t *lcu)
 {
   const int tr_depth = CLIP(1, MAX_PU_DEPTH, depth + state->encoder_control->cfg.tr_depth_intra);
@@ -602,6 +659,8 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
     pred_cu.part_size = ((depth == MAX_PU_DEPTH) ? SIZE_NxN : SIZE_2Nx2N);
     pred_cu.intra.mode = modes[rdo_mode];
     pred_cu.intra.mode_chroma = modes[rdo_mode];
+    pred_cu.emt = 0;
+    pred_cu.tr_idx = 0;
     FILL(pred_cu.cbf, 0);
 
     // Reset transform split data in lcu.cu for this area.
@@ -609,6 +668,7 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
 
     double mode_cost = search_intra_trdepth(state, x_px, y_px, depth, tr_depth, modes[rdo_mode], MAX_INT, &pred_cu, lcu);
     costs[rdo_mode] += mode_cost;
+    trafo[rdo_mode] = pred_cu.emt ? pred_cu.tr_idx : 0;
 
     // Early termination if no coefficients has to be coded
     if (state->encoder_control->cfg.intra_rdo_et && !cbf_is_set_any(pred_cu.cbf, depth)) {
@@ -787,7 +847,9 @@ int8_t kvz_search_cu_intra_chroma(encoder_state_t * const state,
 void kvz_search_cu_intra(encoder_state_t * const state,
                          const int x_px, const int y_px,
                          const int depth, lcu_t *lcu,
-                         int8_t *mode_out, double *cost_out)
+                         int8_t *mode_out, 
+                         int8_t *trafo_out, 
+                         double *cost_out)
 {
   const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
   const int8_t cu_width = LCU_WIDTH >> depth;
@@ -819,13 +881,15 @@ void kvz_search_cu_intra(encoder_state_t * const state,
   }
 
   int8_t modes[67];
+  int8_t trafo[67] = { 0 };
   double costs[67];
 
   // Find best intra mode for 2Nx2N.
   kvz_pixel *ref_pixels = &lcu->ref.y[lcu_px.x + lcu_px.y * LCU_WIDTH];
 
   int8_t number_of_modes = 0;
-  bool skip_rough_search = (depth == 0 || state->encoder_control->cfg.rdo >= 3);
+  const bool mts_enabled = state->encoder_control->cfg.mts == KVZ_MTS_INTRA || state->encoder_control->cfg.mts == KVZ_MTS_BOTH;
+  bool skip_rough_search = (mts_enabled ? 1 : (depth == 0 || state->encoder_control->cfg.rdo >= 3));
   if (!skip_rough_search) {
     number_of_modes = search_intra_rough(state,
                                          ref_pixels, LCU_WIDTH,
@@ -862,11 +926,12 @@ void kvz_search_cu_intra(encoder_state_t * const state,
                       ref_pixels, LCU_WIDTH,
                       candidate_modes,
                       num_modes_to_check,
-                      modes, costs, lcu);
+                      modes, trafo, costs, lcu);
   }
 
   uint8_t best_mode_i = select_best_mode_index(modes, costs, number_of_modes);
 
   *mode_out = modes[best_mode_i];
+  *trafo_out = trafo[best_mode_i];
   *cost_out = costs[best_mode_i];
 }

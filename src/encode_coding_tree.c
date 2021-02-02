@@ -56,7 +56,7 @@ static void encode_mts_idx(encoder_state_t * const state,
   cu_info_t *const pred_cu)
 {
   //TransformUnit &tu = *cu.firstTU;
-  int mts_idx = 5; // pred_cu->tr_idx;
+  int mts_idx = pred_cu->tr_idx;
 
   if (is_mts_allowed(state, pred_cu) && mts_idx != MTS_SKIP
        && !pred_cu->violates_mts_coeff_constraint
@@ -1155,8 +1155,6 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
       }
     }
   } else if (cur_cu->type == CU_INTRA) {
-    cur_cu->mts_last_scan_pos = false;
-    cur_cu->violates_mts_coeff_constraint = false;
     encode_intra_coding_unit(state, cabac, cur_cu, x, y, depth);
   }
 

@@ -139,6 +139,8 @@ static void lcu_fill_cu_info(lcu_t *lcu, int x_local, int y_local, int width, in
       to->depth     = cu->depth;
       to->part_size = cu->part_size;
       to->qp        = cu->qp;
+      //to->emt       = cu->emt;
+      //to->tr_idx    = cu->tr_idx;
 
       if (cu->type == CU_INTRA) {
         to->intra.mode        = cu->intra.mode;
@@ -490,13 +492,17 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
 
   cur_cu = LCU_GET_CU_AT_PX(lcu, x_local, y_local);
   // Assign correct depth
-  cur_cu->depth = depth > MAX_DEPTH ? MAX_DEPTH : depth;
-  cur_cu->tr_depth = depth > 0 ? depth : 1;
+  cur_cu->depth = (depth > MAX_DEPTH) ? MAX_DEPTH : depth;
+  cur_cu->tr_depth = (depth > 0) ? depth : 1;
   cur_cu->type = CU_NOTSET;
   cur_cu->part_size = SIZE_2Nx2N;
   cur_cu->qp = state->qp;
   cur_cu->intra.multi_ref_idx = 0;
   cur_cu->bdpcmMode = 0;
+  cur_cu->emt = 0;
+  cur_cu->tr_idx = 0;
+  cur_cu->violates_mts_coeff_constraint = 0;
+  cur_cu->mts_last_scan_pos = 0;
 
   // If the CU is completely inside the frame at this depth, search for
   // prediction modes at this depth.
@@ -578,14 +584,17 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
 
     if (can_use_intra && !skip_intra) {
       int8_t intra_mode;
+      int8_t intra_trafo;
       double intra_cost;
       kvz_search_cu_intra(state, x, y, depth, lcu,
-                          &intra_mode, &intra_cost);
+                          &intra_mode, &intra_trafo, &intra_cost);
       if (intra_cost < cost) {
         cost = intra_cost;
         cur_cu->type = CU_INTRA;
         cur_cu->part_size = depth > MAX_DEPTH ? SIZE_NxN : SIZE_2Nx2N;
         cur_cu->intra.mode = intra_mode;
+        cur_cu->emt = intra_trafo > 0;
+        cur_cu->tr_idx = intra_trafo;
       }
     }
 

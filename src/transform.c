@@ -192,10 +192,17 @@ void kvz_transform2d(const encoder_control_t * const encoder,
                      int16_t *coeff,
                      int8_t block_size,
                      color_t color,
-                     cu_type_t type)
+                     const cu_info_t *tu)
 {
-  dct_func *dct_func = kvz_get_dct_func(block_size, color, type);
-  dct_func(encoder->bitdepth, block, coeff);
+  if (tu->emt && color == COLOR_Y)
+  {
+    kvz_emt_dct(encoder->bitdepth, color, tu, block_size, block, coeff);
+  }
+  else
+  {
+    dct_func *dct_func = kvz_get_dct_func(block_size, color, tu->type);
+    dct_func(encoder->bitdepth, block, coeff);
+  }
 }
 
 void kvz_itransform2d(const encoder_control_t * const encoder,
@@ -203,10 +210,17 @@ void kvz_itransform2d(const encoder_control_t * const encoder,
                       int16_t *coeff,
                       int8_t block_size,
                       color_t color,
-                      cu_type_t type)
+                      const cu_info_t *tu)
 {
-  dct_func *idct_func = kvz_get_idct_func(block_size, color, type);
-  idct_func(encoder->bitdepth, coeff, block);
+  if (tu->emt && color == COLOR_Y)
+  {
+    kvz_emt_idct(encoder->bitdepth, color, tu, block_size, coeff, block);
+  }
+  else
+  {
+    dct_func *idct_func = kvz_get_idct_func(block_size, color, tu->type);
+    idct_func(encoder->bitdepth, coeff, block);
+  }
 }
 
 /**

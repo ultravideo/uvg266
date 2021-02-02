@@ -43,13 +43,15 @@ void kvz_transform2d(const encoder_control_t * const encoder,
                      int16_t *coeff,
                      int8_t block_size,
                      color_t color,
-                     cu_type_t type);
+                     const cu_info_t *tu);
+
 void kvz_itransform2d(const encoder_control_t * const encoder,
                       int16_t *block,
                       int16_t *coeff,
                       int8_t block_size,
                       color_t color,
-                      cu_type_t type);
+                      const cu_info_t *tu);
+
 
 int32_t kvz_get_scaled_qp(int8_t type, int8_t qp, int8_t qp_offset);
 
