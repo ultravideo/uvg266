@@ -156,6 +156,77 @@ static void get_cost_dual(encoder_state_t * const state,
   #undef PARALLEL_BLKS
 }
 
+
+/**
+* \brief Derives mts_last_scan_pos and violates_mts_coeff_constraint for pred_cu.
+*
+* Deriving mts_last_scan_pos and violates_mts_coeff_constraint is
+* based on checking coefficients of current luma block.
+*
+* \param pred_cu  Current prediction coding unit.
+* \param lcu      Current lcu.
+* \param depth    Current transform depth.
+* \param lcu_px   Position of the top left pixel of current CU within current LCU.
+*/
+static void derive_mts_constraints(cu_info_t *const pred_cu,
+                                   lcu_t *const lcu, const int depth,
+                                   const vector2d_t lcu_px)
+{
+  const int width = LCU_WIDTH >> depth;
+  int8_t scan_idx = kvz_get_scan_order(pred_cu->type, pred_cu->intra.mode, depth);
+  int32_t i;
+  // ToDo: large block support in VVC?
+  uint32_t sig_coeffgroup_flag[32 * 32] = { 0 };
+
+  const uint32_t log2_block_size = kvz_g_convert_to_bit[width] + 2;
+  const uint32_t log2_cg_size = kvz_g_log2_sbb_size[log2_block_size][log2_block_size][0]
+    + kvz_g_log2_sbb_size[log2_block_size][log2_block_size][1];
+  const uint32_t *scan = kvz_g_sig_last_scan[scan_idx][log2_block_size - 1];
+  const uint32_t *scan_cg = g_sig_last_scan_cg[log2_block_size - 2][scan_idx];
+  const coeff_t* coeff = &lcu->coeff.y[xy_to_zorder(LCU_WIDTH, lcu_px.x, lcu_px.y)];
+
+  signed scan_cg_last = -1;
+  signed scan_pos_last = -1;
+
+  for (int i = 0; i < width * width; i++) {
+    if (coeff[scan[i]]) {
+      scan_pos_last = i;
+      sig_coeffgroup_flag[scan_cg[i >> log2_cg_size]] = 1;
+    }
+  }
+  if (scan_pos_last < 0) return;
+
+  scan_cg_last = scan_pos_last >> log2_cg_size;
+
+  // significant_coeff_flag
+  for (i = scan_cg_last; i >= 0; i--) {
+    int32_t cg_blk_pos = scan_cg[i];
+    int32_t cg_pos_y = cg_blk_pos / (MIN((uint8_t)32, width) >> (log2_cg_size / 2));
+    int32_t cg_pos_x = cg_blk_pos - (cg_pos_y * (MIN((uint8_t)32, width) >> (log2_cg_size / 2)));
+
+    // Encode significant coeff group flag when not the last or the first
+    if (i == scan_cg_last || i == 0) {
+      sig_coeffgroup_flag[cg_blk_pos] = 1;
+    }
+
+    if (sig_coeffgroup_flag[cg_blk_pos]) {
+      int32_t min_sub_pos = i << log2_cg_size; // LOG2_SCAN_SET_SIZE;
+      int32_t first_sig_pos = (i == scan_cg_last) ? scan_pos_last : (min_sub_pos + (1 << log2_cg_size) - 1);
+
+      //if (is_luma /*&& cur_cu->tr_idx != MTS_SKIP*/)
+      {
+        pred_cu->mts_last_scan_pos |= first_sig_pos > 0;
+      }
+    }
+
+    if ((cg_pos_y > 3 || cg_pos_x > 3) && sig_coeffgroup_flag[cg_blk_pos] != 0)
+    {
+      pred_cu->violates_mts_coeff_constraint = true;
+    }
+  }
+}
+
+
 /**
 * \brief Perform search for best intra transform split configuration.
 *
@@ -163,16 +234,18 @@ static void get_cost_dual(encoder_state_t * const state,
 * configuration for a given intra prediction mode.
 *
 * \return RD cost of best transform split configuration. Splits in lcu->cu.
-* \param depth  Current transform depth.
-* \param max_depth  Depth to which TR split will be tried.
-* \param intra_mode  Intra prediction mode.
+* \param depth          Current transform depth.
+* \param max_depth      Depth to which TR split will be tried.
+* \param intra_mode     Intra prediction mode.
 * \param cost_treshold  RD cost at which search can be stopped.
+* \param mts_mode       Selected MTS mode for current intra mode.
 */
 static double search_intra_trdepth(encoder_state_t * const state,
                                    int x_px, int y_px, int depth, int max_depth,
                                    int intra_mode, int cost_treshold,
                                    cu_info_t *const pred_cu,
-                                   lcu_t *const lcu)
+                                   lcu_t *const lcu,
+                                   const int mts_mode)
 {
   assert(depth >= 0 && depth <= MAX_PU_DEPTH);
 
@@ -183,7 +256,6 @@ static double search_intra_trdepth(encoder_state_t * const state,
   const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
   cu_info_t *const tr_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
 
-  const bool mts_enabled = state->encoder_control->cfg.mts == KVZ_MTS_INTRA || state->encoder_control->cfg.mts == KVZ_MTS_BOTH;
   const bool reconstruct_chroma = !(x_px & 4 || y_px & 4) && state->encoder_control->chroma_format != KVZ_CSP_400;
 
   struct {
@@ -197,6 +269,7 @@ static double search_intra_trdepth(encoder_state_t * const state,
   double nosplit_cost = INT32_MAX;
 
   if (depth > 0) {
+    const bool mts_enabled = state->encoder_control->cfg.mts == KVZ_MTS_INTRA || state->encoder_control->cfg.mts == KVZ_MTS_BOTH;
     tr_cu->tr_depth = depth;
     pred_cu->tr_depth = depth;
 
@@ -213,10 +286,25 @@ static double search_intra_trdepth(encoder_state_t * const state,
     int best_emt = 0;
     int best_tr_idx = 0;
 
-    for (int trafo = 0; trafo < (mts_enabled ? MTS_TR_NUM : 1); trafo++) {
-      if (mts_enabled && trafo > 0)
+    int trafo = 0;
+    int num_transforms = 1;
+    if (mts_mode != -1)
+    {
+      trafo = mts_mode;
+      num_transforms = mts_mode + 1;
+    }
+    else
+    {
+      trafo = 0;
+      num_transforms = (mts_enabled ? MTS_TR_NUM : 1);
+    }
+    for (; trafo < num_transforms; trafo++) {
+      if (mts_enabled && (trafo > 0))
       {
         pred_cu->emt = 1;
+        pred_cu->mts_last_scan_pos = 0;
+        pred_cu->violates_mts_coeff_constraint = 0;
+
         if (trafo == 1) {
           //TODO: Consider tranform skip
           continue;
@@ -231,32 +319,21 @@ static double search_intra_trdepth(encoder_state_t * const state,
         pred_cu->tr_idx = 0;
       }
 
-
       kvz_intra_recon_cu(state,
         x_px, y_px,
         depth,
         intra_mode, chroma_mode,
         pred_cu, lcu);
 
-      /*if (pred_cu->emt != 0 && !cbf_is_set(pred_cu->cbf, depth, COLOR_Y)) {
-        // cu_emt_flag is not written to the bitsream if there is no luma
-        // residual so pred_cu->emt cannot be nonzero.
-        continue;
-      }*/
-
-      /*if (pred_cu->tr_idx != 0) {
-        // tr_idx is not written to the bitsream if the number of
-        // significant coefficients is less than or equal to 2.
-        int num_sig_coeff = 0;
-        const coeff_t* coeff = &lcu->coeff.y[xy_to_zorder(LCU_WIDTH, lcu_px.x, lcu_px.y)];
-        for (int i = 0; i < width * width; i++) {
-          if (coeff[i] != 0) {
-            num_sig_coeff++;
-            if (num_sig_coeff > 2) break;
-          }
+      if (pred_cu->tr_idx > 0)
+      {
+        derive_mts_constraints(pred_cu, lcu, depth, lcu_px);
+        if (pred_cu->violates_mts_coeff_constraint || !pred_cu->mts_last_scan_pos)
+        {
+          assert(mts_mode == -1);
+          continue;
         }
-        if (num_sig_coeff <= 2) continue;
-      }*/
+      }
 
       double rd_cost = kvz_cu_rd_cost_luma(state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
       if (reconstruct_chroma) {
@@ -270,11 +347,9 @@ static double search_intra_trdepth(encoder_state_t * const state,
       }
     }
 
+
     pred_cu->emt = best_emt;
     pred_cu->tr_idx = best_tr_idx;
-    //	printf(" best_emt-intra = %d / best_tr_idx = %d \n", best_emt, best_tr_idx);
-    //	if (best_emt==1 && best_tr_idx==0) 
-    //	{ printf("******************** emt 1 tridx 0 *******\n"); }
     nosplit_cost += best_rd_cost;
 
     // Early stop codition for the recursive search.
@@ -301,15 +376,15 @@ static double search_intra_trdepth(encoder_state_t * const state,
   if (depth < max_depth && depth < MAX_PU_DEPTH) {
     split_cost = 3 * state->lambda;
 
-    split_cost += search_intra_trdepth(state, x_px, y_px, depth + 1, max_depth, intra_mode, nosplit_cost, pred_cu, lcu);
+    split_cost += search_intra_trdepth(state, x_px, y_px, depth + 1, max_depth, intra_mode, nosplit_cost, pred_cu, lcu, -1);
     if (split_cost < nosplit_cost) {
-      split_cost += search_intra_trdepth(state, x_px + offset, y_px, depth + 1, max_depth, intra_mode, nosplit_cost, pred_cu, lcu);
+      split_cost += search_intra_trdepth(state, x_px + offset, y_px, depth + 1, max_depth, intra_mode, nosplit_cost, pred_cu, lcu, -1);
     }
     if (split_cost < nosplit_cost) {
-      split_cost += search_intra_trdepth(state, x_px, y_px + offset, depth + 1, max_depth, intra_mode, nosplit_cost, pred_cu, lcu);
+      split_cost += search_intra_trdepth(state, x_px, y_px + offset, depth + 1, max_depth, intra_mode, nosplit_cost, pred_cu, lcu, -1);
     }
     if (split_cost < nosplit_cost) {
-      split_cost += search_intra_trdepth(state, x_px + offset, y_px + offset, depth + 1, max_depth, intra_mode, nosplit_cost, pred_cu, lcu);
+      split_cost += search_intra_trdepth(state, x_px + offset, y_px + offset, depth + 1, max_depth, intra_mode, nosplit_cost, pred_cu, lcu, -1);
     }
 
     double tr_split_bit = 0.0;
@@ -659,14 +734,12 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
     pred_cu.part_size = ((depth == MAX_PU_DEPTH) ? SIZE_NxN : SIZE_2Nx2N);
     pred_cu.intra.mode = modes[rdo_mode];
     pred_cu.intra.mode_chroma = modes[rdo_mode];
-    pred_cu.emt = 0;
-    pred_cu.tr_idx = 0;
     FILL(pred_cu.cbf, 0);
 
     // Reset transform split data in lcu.cu for this area.
     kvz_lcu_fill_trdepth(lcu, x_px, y_px, depth, depth);
 
-    double mode_cost = search_intra_trdepth(state, x_px, y_px, depth, tr_depth, modes[rdo_mode], MAX_INT, &pred_cu, lcu);
+    double mode_cost = search_intra_trdepth(state, x_px, y_px, depth, tr_depth, modes[rdo_mode], MAX_INT, &pred_cu, lcu, -1);
     costs[rdo_mode] += mode_cost;
     trafo[rdo_mode] = pred_cu.emt ? pred_cu.tr_idx : 0;
 
@@ -678,7 +751,7 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
   }
 
   // Update order according to new costs
-  kvz_sort_modes(modes, costs, modes_to_check);
+  kvz_sort_modes_intra_luma(modes, trafo, costs, modes_to_check);
 
   // The best transform split hierarchy is not saved anywhere, so to get the
   // transform split hierarchy the search has to be performed again with the
@@ -691,7 +764,7 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
     pred_cu.intra.mode = modes[0];
     pred_cu.intra.mode_chroma = modes[0];
     FILL(pred_cu.cbf, 0);
-    search_intra_trdepth(state, x_px, y_px, depth, tr_depth, modes[0], MAX_INT, &pred_cu, lcu);
+    search_intra_trdepth(state, x_px, y_px, depth, tr_depth, modes[0], MAX_INT, &pred_cu, lcu, trafo[0]);
   }
 
   return modes_to_check;
@@ -888,8 +961,7 @@ void kvz_search_cu_intra(encoder_state_t * const state,
   kvz_pixel *ref_pixels = &lcu->ref.y[lcu_px.x + lcu_px.y * LCU_WIDTH];
 
   int8_t number_of_modes = 0;
-  const bool mts_enabled = state->encoder_control->cfg.mts == KVZ_MTS_INTRA || state->encoder_control->cfg.mts == KVZ_MTS_BOTH;
-  bool skip_rough_search = (mts_enabled ? 1 : (depth == 0 || state->encoder_control->cfg.rdo >= 3));
+  bool skip_rough_search = (depth == 0 || state->encoder_control->cfg.rdo >= 3);
   if (!skip_rough_search) {
     number_of_modes = search_intra_rough(state,
                                          ref_pixels, LCU_WIDTH,

@@ -1856,7 +1856,7 @@ static void fastForwardDCT8_B16(const int16_t *src, int16_t *dst, int32_t shift,
   int32_t a[5], b[5], c[5], d[5], t;
   int32_t add = (shift > 0) ? (1 << (shift - 1)) : 0;
 
-  const int16_t *iT = kvz_g_DCT8P16;
+  const int16_t *iT = kvz_g_DST7P16;
 
   int16_t *p_coef = dst;
   const int  reduced_line = line - skip_line;
@@ -1921,7 +1921,7 @@ static void fastInverseDCT8_B16(const int16_t *src, int16_t *dst, int32_t shift,
 
   int32_t add = (shift > 0) ? (1 << (shift - 1)) : 0;
 
-  const int16_t *iT = kvz_g_DCT8P16;
+  const int16_t *iT = kvz_g_DST7P16;
 
   const int reduced_line = line - skip_line;
 
@@ -1975,7 +1975,7 @@ static void fastForwardDCT8_B32(const int16_t *src, int16_t *dst, int32_t shift,
   int32_t c[2];
 
   int32_t add = (shift > 0) ? (1 << (shift - 1)) : 0;
-  const int16_t *iT = kvz_g_DCT8P32;
+  const int16_t *iT = kvz_g_DST7P32;
   int16_t *p_coef = dst;
   const int  reduced_line = line - skip_line;
   const int  cutoff = 32 - skip_line2;
@@ -2071,7 +2071,7 @@ static void fastInverseDCT8_B32(const int16_t *src, int16_t *dst, int32_t shift,
   int32_t c[2];
   int32_t add = (shift > 0) ? (1 << (shift - 1)) : 0;
 
-  const int16_t *iT = kvz_g_DCT8P32;
+  const int16_t *iT = kvz_g_DST7P32;
 
   const int  reduced_line = line - skip_line;
 
@@ -2323,12 +2323,11 @@ static void fastForward ## t ## _B ## n (const int16_t *src, int16_t *dst, int32
       p_coef += line;\
     }\
   }\
-}\
-
-/*if (skip_line2) {\
-  p_coef = dst + line * cutoff;\
-  memset(p_coef, 0, sizeof(int32_t) * line * skip_line2);\
-}\*/
+  if (skip_line2) {\
+    p_coef = dst + line * cutoff;\
+    memset(p_coef, 0, sizeof(int32_t) * line * skip_line2);\
+  }\
+}
 
 #define IDCT_EMT_NXN_GENERIC(t, n) \
 static void fastInverse ## t ## _B ## n (const int16_t *src, int16_t *dst, int32_t shift, int line, int skip_line, int skip_line2) {\
@@ -2426,7 +2425,7 @@ typedef enum tr_type_t {
 static const tr_type_t emt_subset_intra[4][2] = { { DST7, DST7 }, { DCT8, DST7 }, { DST7, DCT8 }, { DCT8, DCT8 } };
 static const tr_type_t emt_subset_inter[2] = { DCT8, DST7 };
 
-static const int intra_mode_to_emt_subset_ver[67] =
+/*static const int intra_mode_to_emt_subset_ver[67] =
 {//0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66
    2, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0
 };
@@ -2434,7 +2433,7 @@ static const int intra_mode_to_emt_subset_ver[67] =
 static const int intra_mode_to_emt_subset_hor[67] =
 {//0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66
    2, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0
-};
+};*/
 
 
 static INLINE void get_tr_type(
@@ -2442,7 +2441,8 @@ static INLINE void get_tr_type(
   color_t color,
   const cu_info_t* tu,
   tr_type_t* hor_out,
-  tr_type_t* ver_out) {
+  tr_type_t* ver_out) 
+{
   *hor_out = DCT2;
   *ver_out = DCT2;
 
@@ -2454,12 +2454,13 @@ static INLINE void get_tr_type(
 
 
 static void emt_dct_generic(
-  int8_t bitdepth,
-  color_t color,
+  const int8_t bitdepth,
+  const color_t color,
   const cu_info_t* tu,
-  int8_t width,
+  const int8_t width,
   const int16_t* input,
-  int16_t* output) {
+  int16_t* output) 
+{
   tr_type_t type_hor;
   tr_type_t type_ver;
 
@@ -2483,12 +2484,13 @@ static void emt_dct_generic(
 
 
 static void emt_idct_generic(
-  int8_t bitdepth,
-  color_t color,
+  const int8_t bitdepth,
+  const color_t color,
   const cu_info_t* tu,
-  int8_t width,
+  const int8_t width,
   const int16_t* input,
-  int16_t* output) {
+  int16_t* output) 
+{
   tr_type_t type_hor;
   tr_type_t type_ver;
 

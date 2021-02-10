@@ -33,6 +33,7 @@
 #include "constraint.h"
 
 void kvz_sort_modes(int8_t *__restrict modes, double *__restrict costs, uint8_t length);
+void kvz_sort_modes_intra_luma(int8_t *__restrict modes, int8_t *__restrict trafo, double *__restrict costs, uint8_t length);
 
 void kvz_search_lcu(encoder_state_t *state, int x, int y, const yuv_t *hor_buf, const yuv_t *ver_buf);
 

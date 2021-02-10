@@ -48,14 +48,6 @@ void kvz_encode_coeff_nxn_generic(encoder_state_t * const state,
   cu_info_t* cur_cu,
   bool is_luma) {
 
-  int8_t tr_skip = 0;
-  if (cur_cu == NULL) {
-    tr_skip = 0;
-  }
-  else {
-    tr_skip = cur_cu->tr_skip;
-  }
-
   //const encoder_control_t * const encoder = state->encoder_control;
   //int c1 = 1;
   uint8_t last_coeff_x = 0;
@@ -294,9 +286,9 @@ void kvz_encode_coeff_nxn_generic(encoder_state_t * const state,
         coeff_signs >>= 1;
       }
 
-      if (is_luma /*&& cur_cu->tr_idx != MTS_SKIP*/)
+      if (is_luma && cur_cu != NULL && cur_cu->tr_idx != MTS_SKIP)
       {
-        cur_cu->mts_last_scan_pos |= first_sig_pos >= 1;
+        cur_cu->mts_last_scan_pos |= first_sig_pos > 0;
       }
 
       CABAC_BINS_EP(cabac, coeff_signs, num_signs, "coeff_signs");

@@ -430,6 +430,33 @@ void kvz_sort_modes(int8_t *__restrict modes, double *__restrict costs, uint8_t 
   }
 }
 
+/**
+ * \brief Sort modes and costs to ascending order according to costs.
+ */
+void kvz_sort_modes_intra_luma(int8_t *__restrict modes, int8_t *__restrict trafo, double *__restrict costs, uint8_t length)
+{
+  // Length for intra is always between 5 and 23, and is either 21, 17, 9 or 8 about
+  // 60% of the time, so there should be no need for anything more complex
+  // than insertion sort.
+  // Length for merge is 5 or less.
+  for (uint8_t i = 1; i < length; ++i) {
+    const double cur_cost = costs[i];
+    const int8_t cur_mode = modes[i];
+    const int8_t cur_tr = trafo[i];
+    uint8_t j = i;
+    while (j > 0 && cur_cost < costs[j - 1]) {
+      costs[j] = costs[j - 1];
+      modes[j] = modes[j - 1];
+      trafo[j] = trafo[j - 1];
+      --j;
+    }
+    costs[j] = cur_cost;
+    modes[j] = cur_mode;
+    trafo[j] = cur_tr;
+  }
+}
+
+
 
 static uint8_t get_ctx_cu_split_model(const lcu_t *lcu, int x, int y, int depth)
 {
@@ -593,8 +620,17 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         cur_cu->type = CU_INTRA;
         cur_cu->part_size = depth > MAX_DEPTH ? SIZE_NxN : SIZE_2Nx2N;
         cur_cu->intra.mode = intra_mode;
-        cur_cu->emt = intra_trafo > 0;
-        cur_cu->tr_idx = intra_trafo;
+
+        //If the CU is not split from 64x64 block, the MTS is disabled for that CU.
+        if (depth > 0) {
+          cur_cu->emt = intra_trafo > 0;
+          cur_cu->tr_idx = intra_trafo;
+        }
+        else
+        {
+          cur_cu->emt = 0;
+          cur_cu->tr_idx = 0;
+        }
       }
     }
 
