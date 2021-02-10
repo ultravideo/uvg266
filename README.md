@@ -260,6 +260,13 @@ Compression tools:
       --(no-)implicit-rdpcm  : Implicit residual DPCM. Currently only supported
                                with lossless coding. [disabled]
       --(no-)tmvp            : Temporal motion vector prediction [enabled]
+      --mts <string>         : Multiple Transform Selection [off].
+                               (Currently only implemented for intra
+                               and has effect only when rd >= 2)
+                                   - off: MTS disabled
+                                   - intra: MTS applied only for intra blocks.
+                                   - inter: MTS applied only for inter blocks.
+                                   - both: MTS applied for both intra and inter blocks.
 
 Parallel processing:
       --threads <integer>    : Number of threads to use [auto]
