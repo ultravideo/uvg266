@@ -52,7 +52,10 @@ kvz_picture * kvz_image_alloc(enum kvz_chroma_format chroma_format, const int32_
   kvz_picture *im = MALLOC(kvz_picture, 1);
   if (!im) return NULL;
 
-  unsigned int luma_size = width * height;
+  //Add 4 pixel boundary to each side of luma for ALF
+  //This results also 2 pixel boundary for chroma
+  unsigned int luma_size = (width + FRAME_PADDING_LUMA) * (height + FRAME_PADDING_LUMA);
+
   unsigned chroma_sizes[] = { 0, luma_size / 4, luma_size / 2, luma_size };
   unsigned chroma_size = chroma_sizes[chroma_format];
 
@@ -64,14 +67,17 @@ kvz_picture * kvz_image_alloc(enum kvz_chroma_format chroma_format, const int32_
     free(im);
     return NULL;
   }
-  im->fulldata = im->fulldata_buf + simd_padding_width / sizeof(kvz_pixel);
 
-  im->base_image = im;
+  //Shift the image to allow ALF filtering
   im->refcount = 1; //We give a reference to caller
   im->width = width;
   im->height = height;
-  im->stride = width;
+  im->stride = width + FRAME_PADDING_LUMA;
   im->chroma_format = chroma_format;
+  const int padding_before_first_pixel_luma = (FRAME_PADDING_LUMA / 2) * (im->stride) + FRAME_PADDING_LUMA / 2;
+  const int padding_before_first_pixel_chroma = (FRAME_PADDING_CHROMA / 2) * (im->stride/2) + FRAME_PADDING_CHROMA / 2;
+  im->fulldata = &im->fulldata_buf[padding_before_first_pixel_luma] + simd_padding_width / sizeof(kvz_pixel);
+  im->base_image = im;
 
   im->y = im->data[COLOR_Y] = &im->fulldata[0];
 
@@ -79,8 +85,8 @@ kvz_picture * kvz_image_alloc(enum kvz_chroma_format chroma_format, const int32_
     im->u = im->data[COLOR_U] = NULL;
     im->v = im->data[COLOR_V] = NULL;
   } else {
-    im->u = im->data[COLOR_U] = &im->fulldata[luma_size];
-    im->v = im->data[COLOR_V] = &im->fulldata[luma_size + chroma_size];
+    im->u = im->data[COLOR_U] = &im->fulldata[luma_size - padding_before_first_pixel_luma + padding_before_first_pixel_chroma];
+    im->v = im->data[COLOR_V] = &im->fulldata[luma_size - padding_before_first_pixel_luma + chroma_size + padding_before_first_pixel_chroma];
   }
 
   im->pts = 0;

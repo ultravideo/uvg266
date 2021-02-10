@@ -215,6 +215,12 @@ enum kvz_sao {
   KVZ_SAO_FULL = 3
 };
 
+enum kvz_alf {
+  KVZ_ALF_OFF = 0,
+  KVZ_ALF_NO_CC_ALF = 1,
+  KVZ_ALF_FULL = 2
+};
+
 enum kvz_mts {
   KVZ_MTS_OFF = 0,
   KVZ_MTS_INTRA = 1,
@@ -293,6 +299,12 @@ typedef struct kvz_config
   int32_t framerate_denom; /*!< \brief Framerate denominator */
   int32_t deblock_enable; /*!< \brief Flag to enable deblocking filter */
   enum kvz_sao sao_type;     /*!< \brief Flag to enable sample adaptive offset filter */
+  enum kvz_alf alf_type;     /*!< \brief Flag to enable adaptive loop filter */
+  int32_t alf_info_in_ph_flag; /*!< \brief Flag to enable if ALF is applied to all slices in picture */
+  int32_t alf_slice_enable_flag[3/*MAX_NUM_COMPONENT*/];
+  int32_t alf_non_linear_luma;    /*!< \brief Flag to enable non linear alf for luma */
+  int32_t alf_non_linear_chroma;    /*!< \brief Flag to enable non linear alf for chroma */
+  int32_t alf_allow_predefined_filters;
   int32_t rdoq_enable;    /*!< \brief Flag to enable RD optimized quantization. */
   int32_t signhide_enable;   /*!< \brief Flag to enable sign hiding. */
   int32_t smp_enable;   /*!< \brief Flag to enable SMP blocks. */
@@ -459,6 +471,8 @@ typedef struct kvz_config
   enum kvz_file_format file_format;
 
   char *stats_file_prefix;
+
+  struct param_set_map *param_set_map;
 } kvz_config;
 
 /**
@@ -517,6 +531,8 @@ enum kvz_nal_unit_type {
   KVZ_NAL_VPS_NUT = 14,
   KVZ_NAL_SPS_NUT = 15,
   KVZ_NAL_PPS_NUT = 16,
+  NAL_UNIT_PREFIX_APS = 17,
+  NAL_UNIT_SUFFIX_APS = 18,
 
   KVZ_NAL_AUD_NUT = 20,
 
@@ -674,7 +690,7 @@ typedef struct kvz_api {
    * Only one encoder may be open at a time.
    *
    * \param cfg   encoder configuration
-   * \return      created encoder, or NULL if creation failed.
+   * \return      g_created encoder, or NULL if creation failed.
    */
   kvz_encoder * (*encoder_open)(const kvz_config *cfg);
 

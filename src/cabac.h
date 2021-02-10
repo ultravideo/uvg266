@@ -52,6 +52,12 @@ typedef struct
 
   // CONTEXTS
   struct {
+    cabac_ctx_t alf_ctb_flag_model[9];
+    cabac_ctx_t alf_latest_filt;
+    cabac_ctx_t alf_temporal_filt;
+    cabac_ctx_t alf_ctb_alternatives[2];
+    cabac_ctx_t alf_luma_coeff_delta_prediction_flag;
+    cabac_ctx_t alf_cc_filter_control_flag[6];
     cabac_ctx_t sao_merge_flag_model;
     cabac_ctx_t sao_type_idx_model;
     cabac_ctx_t mts_idx_model[4];

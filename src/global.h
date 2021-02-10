@@ -165,6 +165,18 @@ typedef int16_t coeff_t;
 #define LCU_CHROMA_SIZE (LCU_WIDTH * LCU_WIDTH >> 2)
 
 /**
+ * \brief Number of pixels padded around the frame for each row and column.
+ *
+ * Half of the padded pixels for each row are on the left side of the 
+ * frame and the other half on the right side. Half of the padded pixels
+ * for each column are on top of the frame and the other half below the frame.
+ * Padding also forms squares size of (<padding>/2)^2 to each corner.
+ */
+#define FRAME_PADDING_LUMA 8
+#define FRAME_PADDING_CHROMA (FRAME_PADDING_LUMA/2)
+
+
+/**
  * \brief Number of Most Probable Modes in Intra coding
  *
  */

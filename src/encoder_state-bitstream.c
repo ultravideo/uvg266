@@ -24,6 +24,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "alf.h"
 #include "bitstream.h"
 #include "cabac.h"
 #include "checkpoint.h"
@@ -620,7 +621,11 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   // if(!no_sao_constraint_flag)
     WRITE_U(stream, encoder->cfg.sao_type ? 1 : 0, 1, "sps_sao_enabled_flag");
   // if(!no_alf_constraint_flag)
-    WRITE_U(stream, 0, 1, "sps_alf_enabled_flag");
+    WRITE_U(stream, encoder->cfg.alf_type ? 1 : 0, 1, "sps_alf_enable_flag");
+    if (encoder->cfg.alf_type && encoder->chroma_format != KVZ_CSP_400)
+    {
+      WRITE_U(stream, encoder->cfg.alf_type == KVZ_ALF_FULL, 1, "sps_ccalf_enabled_flag");
+    }
 
     WRITE_U(stream, 0, 1, "sps_lmcs_enable_flag");
 
@@ -1038,12 +1043,67 @@ static void kvz_encoder_state_write_bitstream_picture_header(
     || state->frame->pictype == KVZ_NAL_IDR_N_LP) {
   }
   else {
-    // ToDo: ALF flag
     //WRITE_U(stream, state->encoder_control->cfg.tmvp_enable, 1, "ph_pic_temporal_mvp_enabled_flag");
     WRITE_U(stream, 0, 1, "ph_mvd_l1_zero_flag");
   }
 
-  
+  // alf enable flags and aps IDs
+  if (encoder->cfg.alf_type)
+  {
+    if (encoder->cfg.alf_info_in_ph_flag)
+    {
+     /* WRITE_FLAG(picHeader->getAlfEnabledFlag(COMPONENT_Y), "ph_alf_enabled_flag");
+      if (picHeader->getAlfEnabledFlag(COMPONENT_Y))
+      {
+        WRITE_CODE(picHeader->getNumAlfAps(), 3, "ph_num_alf_aps_ids_luma");
+        const std::vector<int>&   apsId = picHeader->getAlfAPSs();
+        for (int i = 0; i < picHeader->getNumAlfAps(); i++)
+        {
+          WRITE_CODE(apsId[i], 3, "ph_alf_aps_id_luma");
+        }
+
+        const int alfChromaIdc = picHeader->getAlfEnabledFlag(COMPONENT_Cb) + picHeader->getAlfEnabledFlag(COMPONENT_Cr) * 2;
+        if (sps->getChromaFormatIdc() != CHROMA_400)
+        {
+          WRITE_CODE(picHeader->getAlfEnabledFlag(COMPONENT_Cb), 1, "ph_alf_cb_enabled_flag");
+          WRITE_CODE(picHeader->getAlfEnabledFlag(COMPONENT_Cr), 1, "ph_alf_cr_enabled_flag");
+        }
+        if (alfChromaIdc)
+        {
+          WRITE_CODE(picHeader->getAlfApsIdChroma(), 3, "ph_alf_aps_id_chroma");
+        }
+        if (sps->getCCALFEnabledFlag())
+        {
+          WRITE_FLAG(picHeader->getCcAlfEnabledFlag(COMPONENT_Cb), "ph_cc_alf_cb_enabled_flag");
+          if (picHeader->getCcAlfEnabledFlag(COMPONENT_Cb))
+          {
+            WRITE_CODE(picHeader->getCcAlfCbApsId(), 3, "ph_cc_alf_cb_aps_id");
+          }
+          WRITE_FLAG(picHeader->getCcAlfEnabledFlag(COMPONENT_Cr), "ph_cc_alf_cr_enabled_flag");
+          if (picHeader->getCcAlfEnabledFlag(COMPONENT_Cr))
+          {
+            WRITE_CODE(picHeader->getCcAlfCrApsId(), 3, "ph_cc_alf_cr_aps_id");
+          }
+        }
+      }*/
+    }
+    else
+    {
+      /*state->tile->frame->ctu_enable_flag[COMPONENT_Y] = true;
+      state->tile->frame->ctu_enable_flag[COMPONENT_Cb] = true;
+      state->tile->frame->ctu_enable_flag[COMPONENT_Cr] = true;
+      state->tile->frame->alf_cc_enable_flag[COMPONENT_Cb] = encoder->cfg.alf_type == 2 ? 1 : 0;
+      state->tile->frame->alf_cc_enable_flag[COMPONENT_Cr] = encoder->cfg.alf_type == 2 ? 1 : 0;*/
+    }
+  }
+  else
+  {
+    /*state->tile->frame->ctu_enable_flag[COMPONENT_Y] = false;
+    state->tile->frame->ctu_enable_flag[COMPONENT_Cb] = false;
+    state->tile->frame->ctu_enable_flag[COMPONENT_Cr] = false;
+    state->tile->frame->alf_cc_enable_flag[COMPONENT_Cb] = false;
+    state->tile->frame->alf_cc_enable_flag[COMPONENT_Cr] = false;*/
+  }
 
   // getDeblockingFilterControlPresentFlag
 
@@ -1178,8 +1238,48 @@ void kvz_encoder_state_write_bitstream_slice_header(
     WRITE_U(stream, 0, 1, "sh_no_output_of_prior_pics_flag");
   }
 
-  if (state->frame->slicetype != KVZ_SLICE_I) {
-    kvz_encoder_state_write_bitstream_ref_pic_list(stream, state);
+  //alf
+  if (encoder->cfg.alf_type && !encoder->cfg.alf_info_in_ph_flag)
+  {
+    const int alf_enabled = state->slice->tile_group_alf_enabled_flag[COMPONENT_Y];
+    WRITE_U(stream, alf_enabled, 1, "slice_alf_enabled_flag");
+
+    if (alf_enabled)
+    {
+      WRITE_U(stream, state->slice->tile_group_num_aps, 3, "slice_num_alf_aps_ids_luma");
+      const int8_t* aps_ids = state->slice->tile_group_luma_aps_id;
+      for (int i = 0; i < state->slice->tile_group_num_aps; i++)
+      {
+        WRITE_U(stream, aps_ids[i], 3, "slice_alf_aps_id_luma");
+      }
+      const int alf_chroma_idc = state->slice->tile_group_alf_enabled_flag[COMPONENT_Cb] + state->slice->tile_group_alf_enabled_flag[COMPONENT_Cr] * 2;
+      if (encoder->chroma_format != KVZ_CSP_400)
+      {
+        WRITE_U(stream, state->slice->tile_group_alf_enabled_flag[COMPONENT_Cb], 1, "slice_alf_cb_enabled_flag");
+        WRITE_U(stream, state->slice->tile_group_alf_enabled_flag[COMPONENT_Cr], 1, "slice_alf_cr_enabled_flag");
+      }
+      if (alf_chroma_idc)
+      {
+        WRITE_U(stream, state->slice->tile_group_chroma_aps_id, 3, "slice_alf_aps_id_chroma");
+      }
+
+      if (encoder->cfg.alf_type == KVZ_ALF_FULL)
+      {
+        WRITE_U(stream, state->slice->cc_filter_param->cc_alf_filter_enabled[COMPONENT_Cb - 1], 1, "slice_cc_alf_cb_enabled_flag");
+        if (state->slice->cc_filter_param->cc_alf_filter_enabled[COMPONENT_Cb - 1])
+        {
+          // write CC ALF Cb APS ID
+          WRITE_U(stream, state->slice->tile_group_cc_alf_cb_aps_id, 3, "slice_cc_alf_cb_aps_id");
+        }
+        // Cr
+        WRITE_U(stream, state->slice->cc_filter_param->cc_alf_filter_enabled[COMPONENT_Cr - 1], 1, "slice_cc_alf_cr_enabled_flag");
+        if (state->slice->cc_filter_param->cc_alf_filter_enabled[COMPONENT_Cr - 1])
+        {
+          // write CC ALF Cr APS ID
+          WRITE_U(stream, state->slice->tile_group_cc_alf_cr_aps_id, 3, "slice_cc_alf_cr_aps_id");
+        }
+      }
+    }
   }
 
   if (state->encoder_control->cfg.tmvp_enable) {
@@ -1377,6 +1477,9 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
     // spec:sei_rbsp() rbsp_trailing_bits
     kvz_bitstream_add_rbsp_trailing_bits(stream);
   }
+
+  // Adaptation parameter set (APS)
+  kvz_encode_alf_adaptive_parameter_set(state);
 
   encoder_state_write_bitstream_children(state);
 

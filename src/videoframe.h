@@ -47,11 +47,12 @@ typedef struct videoframe
   cu_array_t* cu_array;     //!< \brief Info for each CU at each depth.
   struct sao_info_t *sao_luma;   //!< \brief Array of sao parameters for every LCU.
   struct sao_info_t *sao_chroma;   //!< \brief Array of sao parameters for every LCU.
+  struct alf_info_t *alf_info;   //!< \brief Array of alf parameters for both luma and chroma.
   int32_t poc;           //!< \brief Picture order count
 } videoframe_t;
 
 
-videoframe_t *kvz_videoframe_alloc(int32_t width, int32_t height, enum kvz_chroma_format chroma_format);
+videoframe_t *kvz_videoframe_alloc(int32_t width, int32_t height, enum kvz_chroma_format chroma_format, enum kvz_alf alf_type);
 int kvz_videoframe_free(videoframe_t * const frame);
 
 void kvz_videoframe_set_poc(videoframe_t * frame, int32_t poc);

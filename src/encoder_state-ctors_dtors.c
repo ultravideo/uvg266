@@ -35,6 +35,7 @@
 #include "threadqueue.h"
 #include "videoframe.h"
 #include "rate_control.h"
+#include "alf.h"
 
 
 static int encoder_state_config_frame_init(encoder_state_t * const state) {
@@ -101,7 +102,7 @@ static int encoder_state_config_tile_init(encoder_state_t * const state,
                                           const int width, const int height, const int width_in_lcu, const int height_in_lcu) {
   
   const encoder_control_t * const encoder = state->encoder_control;
-  state->tile->frame = kvz_videoframe_alloc(width, height, state->encoder_control->chroma_format);
+  state->tile->frame = kvz_videoframe_alloc(width, height, state->encoder_control->chroma_format, encoder->cfg.alf_type);
   
   state->tile->frame->rec = NULL;
   
@@ -194,6 +195,26 @@ static int encoder_state_config_slice_init(encoder_state_t * const state,
   
   state->slice->start_in_rs = state->encoder_control->tiles_ctb_addr_ts_to_rs[start_address_in_ts];
   state->slice->end_in_rs = state->encoder_control->tiles_ctb_addr_ts_to_rs[end_address_in_ts];
+
+  if (state->encoder_control->cfg.alf_type) {
+    state->slice->apss = malloc(sizeof(alf_aps) * ALF_CTB_MAX_NUM_APS);
+    state->slice->tile_group_luma_aps_id = malloc(ALF_CTB_MAX_NUM_APS * sizeof(int8_t));
+    state->slice->cc_filter_param = malloc(sizeof(*state->slice->cc_filter_param));
+    for (int aps_idx = 0; aps_idx < ALF_CTB_MAX_NUM_APS; aps_idx++) {
+      state->slice->tile_group_luma_aps_id[aps_idx] = -1;
+    }
+    state->slice->tile_group_num_aps = -1;
+    state->slice->tile_group_chroma_aps_id = -1;
+    state->slice->tile_group_cc_alf_cb_enabled_flag = 0;
+    state->slice->tile_group_cc_alf_cr_enabled_flag = 0;
+    state->slice->tile_group_cc_alf_cb_aps_id = -1;
+    state->slice->tile_group_cc_alf_cr_aps_id = -1;
+    state->slice->num_of_param_sets = 0;
+    memset(state->slice->tile_group_alf_enabled_flag, 0, sizeof(state->slice->tile_group_alf_enabled_flag));
+    if (state->encoder_control->cfg.alf_type == KVZ_ALF_FULL) {
+      kvz_reset_cc_alf_aps_param(state->slice->cc_filter_param);
+    }
+  }
   return 1;
 }
 
@@ -725,6 +746,19 @@ void kvz_encoder_state_finalize(encoder_state_t * const state) {
   }
   
   if (!state->parent || (state->parent->slice != state->slice)) {
+
+    if (state->encoder_control->cfg.alf_type) {
+      if (state->slice->apss != NULL) {
+        FREE_POINTER(state->slice->apss);
+      }
+      if (state->slice->tile_group_luma_aps_id != NULL) {
+        FREE_POINTER(state->slice->tile_group_luma_aps_id);
+      }
+      if (state->slice->cc_filter_param != NULL) {
+        FREE_POINTER(state->slice->cc_filter_param);
+      }
+    }
+
     FREE_POINTER(state->slice);
   }
   
