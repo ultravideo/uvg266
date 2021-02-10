@@ -139,7 +139,6 @@ static void lcu_fill_cu_info(lcu_t *lcu, int x_local, int y_local, int width, in
       to->depth     = cu->depth;
       to->part_size = cu->part_size;
       to->qp        = cu->qp;
-      //to->emt       = cu->emt;
       //to->tr_idx    = cu->tr_idx;
 
       if (cu->type == CU_INTRA) {
@@ -526,7 +525,6 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
   cur_cu->qp = state->qp;
   cur_cu->intra.multi_ref_idx = 0;
   cur_cu->bdpcmMode = 0;
-  cur_cu->emt = 0;
   cur_cu->tr_idx = 0;
   cur_cu->violates_mts_coeff_constraint = 0;
   cur_cu->mts_last_scan_pos = 0;
@@ -622,15 +620,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         cur_cu->intra.mode = intra_mode;
 
         //If the CU is not split from 64x64 block, the MTS is disabled for that CU.
-        if (depth > 0) {
-          cur_cu->emt = intra_trafo > 0;
-          cur_cu->tr_idx = intra_trafo;
-        }
-        else
-        {
-          cur_cu->emt = 0;
-          cur_cu->tr_idx = 0;
-        }
+        cur_cu->tr_idx = (depth > 0) ? intra_trafo : 0;
       }
     }
 

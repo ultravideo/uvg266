@@ -53,7 +53,7 @@ typedef enum {
   SIZE_nRx2N = 7,
 } part_mode_t;
 
-//EMT transform combinations
+//MTS transform combinations
 typedef enum {
   MTS_DCT2_DCT2 = 0,
   MTS_SKIP      = 1,
@@ -135,7 +135,6 @@ typedef struct
   uint8_t merged    : 1; //!< \brief flag to indicate this block is merged
   uint8_t merge_idx : 3; //!< \brief merge index
   uint8_t tr_skip   : 1; //!< \brief transform skip flag
-  uint8_t emt : 1; //!< \brief enable multiple transforms
   uint8_t tr_idx : 3; //!< \brief transform index
 
   uint16_t cbf;

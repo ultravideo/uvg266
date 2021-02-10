@@ -283,7 +283,6 @@ static double search_intra_trdepth(encoder_state_t * const state,
 
     const int8_t chroma_mode = reconstruct_chroma ? intra_mode : -1;
     double best_rd_cost = MAX_INT;
-    int best_emt = 0;
     int best_tr_idx = 0;
 
     int trafo = 0;
@@ -299,24 +298,16 @@ static double search_intra_trdepth(encoder_state_t * const state,
       num_transforms = (mts_enabled ? MTS_TR_NUM : 1);
     }
     for (; trafo < num_transforms; trafo++) {
-      if (mts_enabled && (trafo > 0))
+      pred_cu->tr_idx = trafo;
+      if (mts_enabled)
       {
-        pred_cu->emt = 1;
         pred_cu->mts_last_scan_pos = 0;
         pred_cu->violates_mts_coeff_constraint = 0;
 
-        if (trafo == 1) {
+        if (trafo == MTS_SKIP) {
           //TODO: Consider tranform skip
           continue;
         }
-        else {
-          pred_cu->tr_idx = trafo;
-        }
-      }
-      else
-      {
-        pred_cu->emt = 0;
-        pred_cu->tr_idx = 0;
       }
 
       kvz_intra_recon_cu(state,
@@ -342,13 +333,10 @@ static double search_intra_trdepth(encoder_state_t * const state,
 
       if (rd_cost < best_rd_cost) {
         best_rd_cost = rd_cost;
-        best_emt = pred_cu->emt;
         best_tr_idx = pred_cu->tr_idx;
       }
     }
 
-
-    pred_cu->emt = best_emt;
     pred_cu->tr_idx = best_tr_idx;
     nosplit_cost += best_rd_cost;
 
@@ -741,7 +729,7 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
 
     double mode_cost = search_intra_trdepth(state, x_px, y_px, depth, tr_depth, modes[rdo_mode], MAX_INT, &pred_cu, lcu, -1);
     costs[rdo_mode] += mode_cost;
-    trafo[rdo_mode] = pred_cu.emt ? pred_cu.tr_idx : 0;
+    trafo[rdo_mode] = pred_cu.tr_idx;
 
     // Early termination if no coefficients has to be coded
     if (state->encoder_control->cfg.intra_rdo_et && !cbf_is_set_any(pred_cu.cbf, depth)) {
