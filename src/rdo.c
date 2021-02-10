@@ -258,7 +258,8 @@ static INLINE uint32_t get_coeff_cabac_cost(
                        width,
                        type,
                        scan_mode,
-                       0);
+                       NULL,                   
+                       false);
 
   return (23 - cabac_copy.bits_left) + (cabac_copy.num_buffered_bytes << 3);
 }

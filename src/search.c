@@ -139,6 +139,7 @@ static void lcu_fill_cu_info(lcu_t *lcu, int x_local, int y_local, int width, in
       to->depth     = cu->depth;
       to->part_size = cu->part_size;
       to->qp        = cu->qp;
+      //to->tr_idx    = cu->tr_idx;
 
       if (cu->type == CU_INTRA) {
         to->intra.mode        = cu->intra.mode;
@@ -428,6 +429,33 @@ void kvz_sort_modes(int8_t *__restrict modes, double *__restrict costs, uint8_t 
   }
 }
 
+/**
+ * \brief Sort modes and costs to ascending order according to costs.
+ */
+void kvz_sort_modes_intra_luma(int8_t *__restrict modes, int8_t *__restrict trafo, double *__restrict costs, uint8_t length)
+{
+  // Length for intra is always between 5 and 23, and is either 21, 17, 9 or 8 about
+  // 60% of the time, so there should be no need for anything more complex
+  // than insertion sort.
+  // Length for merge is 5 or less.
+  for (uint8_t i = 1; i < length; ++i) {
+    const double cur_cost = costs[i];
+    const int8_t cur_mode = modes[i];
+    const int8_t cur_tr = trafo[i];
+    uint8_t j = i;
+    while (j > 0 && cur_cost < costs[j - 1]) {
+      costs[j] = costs[j - 1];
+      modes[j] = modes[j - 1];
+      trafo[j] = trafo[j - 1];
+      --j;
+    }
+    costs[j] = cur_cost;
+    modes[j] = cur_mode;
+    trafo[j] = cur_tr;
+  }
+}
+
+
 
 static uint8_t get_ctx_cu_split_model(const lcu_t *lcu, int x, int y, int depth)
 {
@@ -490,13 +518,16 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
 
   cur_cu = LCU_GET_CU_AT_PX(lcu, x_local, y_local);
   // Assign correct depth
-  cur_cu->depth = depth > MAX_DEPTH ? MAX_DEPTH : depth;
-  cur_cu->tr_depth = depth > 0 ? depth : 1;
+  cur_cu->depth = (depth > MAX_DEPTH) ? MAX_DEPTH : depth;
+  cur_cu->tr_depth = (depth > 0) ? depth : 1;
   cur_cu->type = CU_NOTSET;
   cur_cu->part_size = SIZE_2Nx2N;
   cur_cu->qp = state->qp;
   cur_cu->intra.multi_ref_idx = 0;
   cur_cu->bdpcmMode = 0;
+  cur_cu->tr_idx = 0;
+  cur_cu->violates_mts_coeff_constraint = 0;
+  cur_cu->mts_last_scan_pos = 0;
 
   // If the CU is completely inside the frame at this depth, search for
   // prediction modes at this depth.
@@ -578,14 +609,18 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
 
     if (can_use_intra && !skip_intra) {
       int8_t intra_mode;
+      int8_t intra_trafo;
       double intra_cost;
       kvz_search_cu_intra(state, x, y, depth, lcu,
-                          &intra_mode, &intra_cost);
+                          &intra_mode, &intra_trafo, &intra_cost);
       if (intra_cost < cost) {
         cost = intra_cost;
         cur_cu->type = CU_INTRA;
         cur_cu->part_size = depth > MAX_DEPTH ? SIZE_NxN : SIZE_2Nx2N;
         cur_cu->intra.mode = intra_mode;
+
+        //If the CU is not split from 64x64 block, the MTS is disabled for that CU.
+        cur_cu->tr_idx = (depth > 0) ? intra_trafo : 0;
       }
     }
 

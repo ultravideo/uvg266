@@ -64,6 +64,8 @@ static const struct option long_options[] = {
   { "no-full-intra-search",     no_argument, NULL, 0 },
   { "transform-skip",           no_argument, NULL, 0 },
   { "no-transform-skip",        no_argument, NULL, 0 },
+  { "mts",                required_argument, NULL, 0 },
+  { "no-mts",                   no_argument, NULL, 0 },
   { "tr-depth-intra",     required_argument, NULL, 0 },
   { "me",                 required_argument, NULL, 0 },
   { "subme",              required_argument, NULL, 0 },
