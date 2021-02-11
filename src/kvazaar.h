@@ -225,7 +225,8 @@ enum kvz_mts {
   KVZ_MTS_OFF = 0,
   KVZ_MTS_INTRA = 1,
   KVZ_MTS_INTER = 2,
-  KVZ_MTS_BOTH = 3
+  KVZ_MTS_BOTH = 3,
+  KVZ_MTS_IMPLICIT = 4,
 };
 
 enum kvz_scalinglist {
@@ -313,6 +314,7 @@ typedef struct kvz_config
   int32_t full_intra_search; /*!< \brief If true, don't skip modes in intra search. */
   int32_t trskip_enable;    /*!< \brief Flag to enable transform skip (for 4x4 blocks). */
   enum kvz_mts mts;        /*< \brief flag to enable multiple transform selection*/
+  int32_t mts_implicit;        /*< \brief flag to enable implicit multiple transform selection*/
   int32_t tr_depth_intra; /*!< \brief Maximum transform depth for intra. */
   enum kvz_ime_algorithm ime_algorithm;  /*!< \brief Integer motion estimation algorithm. */
   int32_t fme_level;      /*!< \brief Fractional pixel motion estimation level (0: disabled, 1: enabled). */

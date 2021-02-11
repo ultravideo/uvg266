@@ -271,6 +271,8 @@ Compression tools:
                                    - intra: MTS applied only for intra blocks.
                                    - inter: MTS applied only for inter blocks.
                                    - both: MTS applied for both intra and inter blocks.
+                                   - implicit: uses implicit MTS. Applies DST7 instead 
+                                               of DCT2 to certain intra blocks.
 
 Parallel processing:
       --threads <integer>    : Number of threads to use [auto]

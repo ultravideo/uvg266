@@ -45,13 +45,15 @@ void(*kvz_mts_dct)(int8_t bitdepth,
   const cu_info_t *tu,
   int8_t width,
   const int16_t *input,
-  int16_t *output);
+  int16_t *output,
+  const int8_t mts_idx);
 void(*kvz_mts_idct)(int8_t bitdepth,
   color_t color,
   const cu_info_t *tu,
   int8_t width,
   const int16_t *input,
-  int16_t *output);
+  int16_t *output,
+  const int8_t mts_idx);
 
 
 int kvz_strategy_register_dct(void* opaque, uint8_t bitdepth) {

@@ -194,9 +194,9 @@ void kvz_transform2d(const encoder_control_t * const encoder,
                      color_t color,
                      const cu_info_t *tu)
 {
-  if (tu->tr_idx > MTS_SKIP && color == COLOR_Y)
+  if (encoder->cfg.mts)
   {
-    kvz_mts_dct(encoder->bitdepth, color, tu, block_size, block, coeff);
+    kvz_mts_dct(encoder->bitdepth, color, tu, block_size, block, coeff, encoder->cfg.mts);
   }
   else
   {
@@ -212,9 +212,9 @@ void kvz_itransform2d(const encoder_control_t * const encoder,
                       color_t color,
                       const cu_info_t *tu)
 {
-  if (tu->tr_idx > MTS_SKIP && color == COLOR_Y)
+  if (encoder->cfg.mts)
   {
-    kvz_mts_idct(encoder->bitdepth, color, tu, block_size, coeff, block);
+    kvz_mts_idct(encoder->bitdepth, color, tu, block_size, coeff, block, encoder->cfg.mts);
   }
   else
   {

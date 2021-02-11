@@ -54,14 +54,16 @@ extern void(*kvz_mts_dct)(
   const cu_info_t *tu,
   int8_t width,
   const int16_t *input,
-  int16_t *output);
+  int16_t *output,
+  const int8_t mts_idx);
 extern void(*kvz_mts_idct)(
   int8_t bitdepth,
   color_t color,
   const cu_info_t *tu,
   int8_t width,
   const int16_t *input,
-  int16_t *output);
+  int16_t *output,
+  const int8_t mts_idx);
 
 int kvz_strategy_register_dct(void* opaque, uint8_t bitdepth);
 dct_func * kvz_get_dct_func(int8_t width, color_t color, cu_type_t type);

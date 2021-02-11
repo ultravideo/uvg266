@@ -321,7 +321,7 @@ static double search_intra_trdepth(encoder_state_t * const state,
         derive_mts_constraints(pred_cu, lcu, depth, lcu_px);
         if (pred_cu->violates_mts_coeff_constraint || !pred_cu->mts_last_scan_pos)
         {
-          assert(mts_mode == -1);
+          assert(mts_mode == -1); //mts mode should not be decided and then not allowed to be used. (might be some exception here)
           continue;
         }
       }

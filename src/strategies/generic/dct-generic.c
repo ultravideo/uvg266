@@ -2430,14 +2430,43 @@ static INLINE void get_tr_type(
   color_t color,
   const cu_info_t* tu,
   tr_type_t* hor_out,
-  tr_type_t* ver_out) 
+  tr_type_t* ver_out,
+  const int8_t mts_idx)
 {
   *hor_out = DCT2;
   *ver_out = DCT2;
 
-  if (tu->tr_idx > MTS_SKIP) {
-    *hor_out = mts_subset_intra[tu->tr_idx - MTS_DST7_DST7][0];
-    *ver_out = mts_subset_intra[tu->tr_idx - MTS_DST7_DST7][1];
+  if (color != COLOR_Y)
+  {
+    return;
+  }
+
+  const int height = width;
+  const bool explicit_mts = mts_idx == KVZ_MTS_BOTH || (tu->type == CU_INTRA ? mts_idx == KVZ_MTS_INTRA : (mts_idx == KVZ_MTS_INTER && tu->type == CU_INTER));
+  const bool implicit_mts = tu->type == CU_INTRA && (mts_idx == KVZ_MTS_IMPLICIT || mts_idx == KVZ_MTS_INTER);
+
+  if (implicit_mts)
+  {
+    bool width_ok = width >= 4 && width <= 16;
+    bool height_ok = height >= 4 && height <= 16;
+
+    if (width_ok)
+    {
+      *hor_out = DST7;
+    }
+    if (height_ok)
+    {
+      *ver_out = DST7;
+    }
+    return;
+  }
+
+  if (explicit_mts)
+  {
+    if (tu->tr_idx > MTS_SKIP) {
+      *hor_out = mts_subset_intra[tu->tr_idx - MTS_DST7_DST7][0];
+      *ver_out = mts_subset_intra[tu->tr_idx - MTS_DST7_DST7][1];
+    }
   }
 }
 
@@ -2448,27 +2477,36 @@ static void mts_dct_generic(
   const cu_info_t* tu,
   const int8_t width,
   const int16_t* input,
-  int16_t* output) 
+  int16_t* output,
+  const int8_t mts_idx)
 {
   tr_type_t type_hor;
   tr_type_t type_ver;
 
-  get_tr_type(width, color, tu, &type_hor, &type_ver);
+  get_tr_type(width, color, tu, &type_hor, &type_ver, mts_idx);
 
-  const int height = width;
-  const int skip_width = (type_hor != DCT2 && width == 32) ? 16 : (width > 32 ? width - 32 : 0);
-  const int skip_height = (type_ver != DCT2 && height == 32) ? 16 : (height > 32 ? height - 32 : 0);
-  const int log2_width_minus2 = kvz_g_convert_to_bit[width];
+  if (type_hor == DCT2 && type_ver == DCT2)
+  {
+    dct_func *dct_func = kvz_get_dct_func(width, color, tu->type);
+    dct_func(bitdepth, input, output);
+  }
+  else
+  {
+    const int height = width;
+    const int skip_width = (type_hor != DCT2 && width == 32) ? 16 : (width > 32 ? width - 32 : 0);
+    const int skip_height = (type_ver != DCT2 && height == 32) ? 16 : (height > 32 ? height - 32 : 0);
+    const int log2_width_minus2 = kvz_g_convert_to_bit[width];
 
-  partial_tr_func* dct_hor = dct_table[type_hor][log2_width_minus2];
-  partial_tr_func* dct_ver = dct_table[type_ver][log2_width_minus2];
+    partial_tr_func* dct_hor = dct_table[type_hor][log2_width_minus2];
+    partial_tr_func* dct_ver = dct_table[type_ver][log2_width_minus2];
 
-  int16_t tmp[32 * 32];
-  const int32_t shift_1st = log2_width_minus2 + bitdepth - 7;
-  const int32_t shift_2nd = log2_width_minus2 + 8;
+    int16_t tmp[32 * 32];
+    const int32_t shift_1st = log2_width_minus2 + bitdepth - 7;
+    const int32_t shift_2nd = log2_width_minus2 + 8;
 
-  dct_hor(input, tmp, shift_1st, height, 0, skip_width);
-  dct_ver(tmp, output, shift_2nd, width, skip_width, skip_height);
+    dct_hor(input, tmp, shift_1st, height, 0, skip_width);
+    dct_ver(tmp, output, shift_2nd, width, skip_width, skip_height);
+  }
 }
 
 
@@ -2478,27 +2516,36 @@ static void mts_idct_generic(
   const cu_info_t* tu,
   const int8_t width,
   const int16_t* input,
-  int16_t* output) 
+  int16_t* output,
+  const int8_t mts_idx)
 {
   tr_type_t type_hor;
   tr_type_t type_ver;
 
-  get_tr_type(width, color, tu, &type_hor, &type_ver);
+  get_tr_type(width, color, tu, &type_hor, &type_ver, mts_idx);
 
-  const int height = width;
-  const int skip_width = (type_hor != DCT2 && width == 32) ? 16 : width > 32 ? width - 32 : 0;
-  const int skip_height = (type_ver != DCT2 && height == 32) ? 16 : height > 32 ? height - 32 : 0;
-  const int log2_width_minus2 = kvz_g_convert_to_bit[width];
+  if (type_hor == DCT2 && type_ver == DCT2)
+  {
+    dct_func *idct_func = kvz_get_idct_func(width, color, tu->type);
+    idct_func(bitdepth, input, output);
+  }
+  else
+  {
+    const int height = width;
+    const int skip_width = (type_hor != DCT2 && width == 32) ? 16 : width > 32 ? width - 32 : 0;
+    const int skip_height = (type_ver != DCT2 && height == 32) ? 16 : height > 32 ? height - 32 : 0;
+    const int log2_width_minus2 = kvz_g_convert_to_bit[width];
 
-  partial_tr_func* idct_hor = idct_table[type_hor][log2_width_minus2];
-  partial_tr_func* idct_ver = idct_table[type_ver][log2_width_minus2];
+    partial_tr_func* idct_hor = idct_table[type_hor][log2_width_minus2];
+    partial_tr_func* idct_ver = idct_table[type_ver][log2_width_minus2];
 
-  int16_t tmp[32 * 32];
-  const int32_t shift_1st = 7;
-  const int32_t shift_2nd = 20 - bitdepth;
+    int16_t tmp[32 * 32];
+    const int32_t shift_1st = 7;
+    const int32_t shift_2nd = 20 - bitdepth;
 
-  idct_ver(input, tmp, shift_1st, width, skip_width, skip_height);
-  idct_hor(tmp, output, shift_2nd, height, 0, skip_width);
+    idct_ver(input, tmp, shift_1st, width, skip_width, skip_height);
+    idct_hor(tmp, output, shift_2nd, height, 0, skip_width);
+  }
 }
 
 
