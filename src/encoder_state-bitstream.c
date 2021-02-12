@@ -1298,6 +1298,12 @@ void kvz_encoder_state_write_bitstream_slice_header(
     }
   }
 
+  // ToDo: depquant
+
+  if (state->encoder_control->cfg.signhide_enable) {
+    WRITE_U(stream, 1, 1, "sh_sign_data_hiding_used_flag");
+  }
+
   if (state->frame->slicetype != KVZ_SLICE_I) {
 
     // BT Size set only with non-I-frames, in I-frames the size is 32x32
