@@ -273,6 +273,7 @@ void kvz_encode_coeff_nxn_generic(encoder_state_t * const state,
         quant_state = (quant_state_transition_table >> ((quant_state << 2) + ((coeff_abs & 1) << 1))) & 3;
         if (coeff_abs) {
           num_non_zero++;
+          first_nz_pos_in_cg = scan_pos;
           last_nz_pos_in_cg = MAX(last_nz_pos_in_cg, scan_pos);
           coeff_signs <<= 1;
           if (coeff[blk_pos] < 0) coeff_signs++;

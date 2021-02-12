@@ -638,7 +638,7 @@ void kvz_rdoq_sign_hiding(
  * coding engines using probability models like CABAC
  * From HM 12.0
  */
-/*
+
 // ToDo: implement new RDOQ
 void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff, int32_t width,
            int32_t height, int8_t type, int8_t scan_mode, int8_t block_type, int8_t tr_depth)
@@ -699,7 +699,7 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
     default: assert(0 && "There should be 1, 4, 16 or 64 coefficient groups");
   }
 
-  cabac_ctx_t *base_coeff_group_ctx = &(cabac->ctx.cu_sig_coeff_group_model[type]);
+  cabac_ctx_t *base_coeff_group_ctx = &(cabac->ctx.sig_coeff_group_model[type]);
   cabac_ctx_t *baseCtx              = (type == 0) ? &(cabac->ctx.cu_sig_model_luma[0][0]) : &(cabac->ctx.cu_sig_model_chroma[0][0]);
 
   struct {
@@ -974,7 +974,7 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
     kvz_rdoq_sign_hiding(state, qp_scaled, scan, &sh_rates, best_last_idx_p1, coef, dest_coeff);
   }
 }
-*/
+
 
 /**
  * Calculate cost of actual motion vectors using CABAC coding
