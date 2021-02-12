@@ -10,3 +10,5 @@ common_args='256x128 10 -p1 --preset=ultrafast --threads=0 --no-wpp --no-tmvp --
 valgrind_test $common_args --rd=1
 valgrind_test $common_args --rd=2 --no-transform-skip --qp 37
 valgrind_test $common_args --rd=2 --no-transform-skip --qp 37 --rdoq
+valgrind_test $common_args --rd=2 --no-transform-skip --qp 37 --signhide
+valgrind_test $common_args --rd=2 --no-transform-skip --qp 37 --signhide --rdoq
