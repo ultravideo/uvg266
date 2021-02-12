@@ -658,7 +658,7 @@ int kvz_quantize_residual_avx2(encoder_state_t *const state,
   }
 
   // Quantize coeffs. (coeff -> coeff_out)
-  /*
+  
   if (state->encoder_control->cfg.rdoq_enable &&
       (width > 4 || !state->encoder_control->cfg.rdoq_skip))
   {
@@ -666,7 +666,7 @@ int kvz_quantize_residual_avx2(encoder_state_t *const state,
     tr_depth += (cur_cu->part_size == SIZE_NxN ? 1 : 0);
     kvz_rdoq(state, coeff, coeff_out, width, width, (color == COLOR_Y ? 0 : 2),
       scan_order, cur_cu->type, tr_depth);
-  } else*/ {
+  } else {
     kvz_quant(state, coeff, coeff_out, width, width, (color == COLOR_Y ? 0 : 2),
       scan_order, cur_cu->type);
   }

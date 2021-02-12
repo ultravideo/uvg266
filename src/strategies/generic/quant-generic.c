@@ -38,8 +38,8 @@ void kvz_quant_generic(const encoder_state_t * const state, coeff_t *coef, coeff
   int32_t height, int8_t type, int8_t scan_idx, int8_t block_type)
 {
   const encoder_control_t * const encoder = state->encoder_control;
-  //const uint32_t log2_block_size = kvz_g_convert_to_bit[width] + 2;
-  //const uint32_t * const scan = kvz_g_sig_last_scan[scan_idx][log2_block_size - 1];
+  const uint32_t log2_block_size = kvz_g_convert_to_bit[width] + 2;
+  const uint32_t * const scan = kvz_g_sig_last_scan[scan_idx][log2_block_size - 1];
 
   int32_t qp_scaled = kvz_get_scaled_qp(type, state->qp, (encoder->bitdepth - 8) * 6);
   const uint32_t log2_tr_size = kvz_g_convert_to_bit[width] + 2;
@@ -48,7 +48,7 @@ void kvz_quant_generic(const encoder_state_t * const state, coeff_t *coef, coeff
   const int32_t transform_shift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - log2_tr_size; //!< Represents scaling through forward transform
   const int32_t q_bits = QUANT_SHIFT + qp_scaled / 6 + transform_shift;
   const int32_t add = ((state->frame->slicetype == KVZ_SLICE_I) ? 171 : 85) << (q_bits - 9);
-  //const int32_t q_bits8 = q_bits - 8;
+  const int32_t q_bits8 = q_bits - 8;
 
   uint32_t ac_sum = 0;
 
@@ -67,8 +67,8 @@ void kvz_quant_generic(const encoder_state_t * const state, coeff_t *coef, coeff
     q_coef[n] = (coeff_t)(CLIP(-32768, 32767, level));
 
   }
-  /*
-  // Signhiding disabled in VVC
+
+  // Signhiding
   if (!encoder->cfg.signhide_enable || ac_sum < 2) return;
 
   int32_t delta_u[LCU_WIDTH*LCU_WIDTH >> 2];
@@ -165,7 +165,6 @@ void kvz_quant_generic(const encoder_state_t * const state, coeff_t *coef, coeff
 #undef SCAN_SET_SIZE
 #undef LOG2_SCAN_SET_SIZE
   }
-  */
 }
 
 /**
@@ -220,7 +219,7 @@ int kvz_quantize_residual_generic(encoder_state_t *const state,
   }
 
   // Quantize coeffs. (coeff -> coeff_out)
-  /*
+  
   if (state->encoder_control->cfg.rdoq_enable &&
       (width > 4 || !state->encoder_control->cfg.rdoq_skip))
   {
@@ -228,7 +227,7 @@ int kvz_quantize_residual_generic(encoder_state_t *const state,
     tr_depth += (cur_cu->part_size == SIZE_NxN ? 1 : 0);
     kvz_rdoq(state, coeff, coeff_out, width, width, (color == COLOR_Y ? 0 : 2),
       scan_order, cur_cu->type, tr_depth);
-  } else*/ {
+  } else {
   
     kvz_quant(state, coeff, coeff_out, width, width, (color == COLOR_Y ? 0 : 2),
       scan_order, cur_cu->type);
