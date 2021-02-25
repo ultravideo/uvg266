@@ -301,18 +301,20 @@ uint32_t kvz_get_coeff_cost(const encoder_state_t * const state,
  */
 INLINE int32_t kvz_get_ic_rate(encoder_state_t * const state,
                     uint32_t abs_level,
-                    uint16_t ctx_num_one,
-                    uint16_t ctx_num_abs,
+                    uint16_t ctx_num_gt1,
+                    uint16_t ctx_num_gt2,
+                    uint16_t ctx_num_par,
                     uint16_t abs_go_rice,
                     uint32_t c1_idx,
                     uint32_t c2_idx,
                     int8_t type)
 {
-  //cabac_data_t * const cabac = &state->cabac;
+  cabac_data_t * const cabac = &state->cabac;
   int32_t rate = 1 << CTX_FRAC_BITS; // cost of sign bit
   uint32_t base_level  =  (c1_idx < C1FLAG_NUMBER)? (2 + (c2_idx < C2FLAG_NUMBER)) : 1;
-  //cabac_ctx_t *base_one_ctx = (type == 0) ? &(cabac->ctx.cu_one_model_luma[0]) : &(cabac->ctx.cu_one_model_chroma[0]);
-  //cabac_ctx_t *base_abs_ctx = (type == 0) ? &(cabac->ctx.cu_abs_model_luma[0]) : &(cabac->ctx.cu_abs_model_chroma[0]);
+  cabac_ctx_t *base_par_ctx = (type == 0) ? &(cabac->ctx.cu_parity_flag_model_luma[0]) : &(cabac->ctx.cu_parity_flag_model_chroma[0]);
+  cabac_ctx_t *base_gt1_ctx = (type == 0) ? &(cabac->ctx.cu_gtx_flag_model_luma[0][0]) : &(cabac->ctx.cu_gtx_flag_model_luma[0][0]);
+  cabac_ctx_t* base_gt2_ctx = (type == 0) ? &(cabac->ctx.cu_gtx_flag_model_luma[1][0]) : &(cabac->ctx.cu_gtx_flag_model_luma[1][0]);
 
   if ( abs_level >= base_level ) {
     int32_t symbol     = abs_level - base_level;
@@ -389,7 +391,7 @@ INLINE int32_t kvz_get_ic_rate(encoder_state_t * const state,
  */
 INLINE uint32_t kvz_get_coded_level ( encoder_state_t * const state, double *coded_cost, double *coded_cost0, double *coded_cost_sig,
                            int32_t level_double, uint32_t max_abs_level,
-                           uint16_t ctx_num_sig, uint16_t ctx_num_one, uint16_t ctx_num_abs,
+                           uint16_t ctx_num_sig, uint16_t ctx_num_gt1, uint16_t ctx_num_gt2, uint16_t ctx_num_par,
                            uint16_t abs_go_rice,
                            uint32_t c1_idx, uint32_t c2_idx,
                            int32_t q_bits,double temp, int8_t last, int8_t type)
@@ -417,7 +419,7 @@ INLINE uint32_t kvz_get_coded_level ( encoder_state_t * const state, double *cod
   for (abs_level = max_abs_level; abs_level >= min_abs_level ; abs_level-- ) {
     double err       = (double)(level_double - ( abs_level * (1 << q_bits) ) );
     double cur_cost  = err * err * temp + state->lambda *
-                       kvz_get_ic_rate( state, abs_level, ctx_num_one, ctx_num_abs,
+                       kvz_get_ic_rate( state, abs_level, ctx_num_gt1, ctx_num_gt2, ctx_num_par,
                                     abs_go_rice, c1_idx, c2_idx, type);
     cur_cost        += cur_cost_sig;
 
@@ -648,7 +650,7 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
   uint32_t log2_tr_size      = kvz_g_convert_to_bit[ width ] + 2;
   int32_t  transform_shift   = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - log2_tr_size;  // Represents scaling through forward transform
   uint16_t go_rice_param     = 0;
-  uint32_t log2_block_size   = kvz_g_convert_to_bit[ width ] + 2;
+  const uint32_t log2_block_size   = kvz_g_convert_to_bit[ width ] + 2;
   int32_t  scalinglist_type= (block_type == CU_INTRA ? 0 : 3) + (int8_t)("\0\3\1\2"[type]);
 
   int32_t qp_scaled = kvz_get_scaled_qp(type, state->qp, (encoder->bitdepth - 8) * 6);
@@ -665,6 +667,11 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
   double cost_coeff0[ 32 * 32 ];
 
   struct sh_rates_t sh_rates;
+
+
+  const uint32_t log2_cg_size = kvz_g_log2_sbb_size[log2_block_size][log2_block_size][0] + kvz_g_log2_sbb_size[log2_block_size][log2_block_size][1];
+
+  const uint32_t cg_width = (MIN((uint8_t)32, width) >> (log2_cg_size / 2));
 
   const uint32_t *scan_cg = g_sig_last_scan_cg[log2_block_size - 2][scan_mode];
   const uint32_t cg_size = 16;
@@ -768,12 +775,13 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
       block_uncoded_cost      += cost_coeff0[ scanpos ];
       //===== coefficient level estimation =====
       int32_t  level;
-      uint16_t  one_ctx = 4 * ctx_set + c1;
-      uint16_t  abs_ctx = ctx_set + c2;
+      uint16_t  gt1_ctx = 4 * ctx_set + c1;
+      uint16_t  gt2_ctx = 4 * ctx_set + c1;
+      uint16_t  par_ctx = ctx_set + c2;
 
       if( scanpos == last_scanpos ) {
         level            = kvz_get_coded_level(state, &cost_coeff[ scanpos ], &cost_coeff0[ scanpos ], &cost_sig[ scanpos ],
-                                             level_double, max_abs_level, 0, one_ctx, abs_ctx, go_rice_param,
+                                             level_double, max_abs_level, 0, gt1_ctx, gt2_ctx, par_ctx, go_rice_param,
                                              c1_idx, c2_idx, q_bits, temp, 1, type );
       } else {
         uint32_t  pos_y    = blkpos >> log2_block_size;
@@ -781,7 +789,7 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
         uint16_t  ctx_sig  = (uint16_t)kvz_context_get_sig_ctx_inc(pattern_sig_ctx, scan_mode, pos_x, pos_y,
                                                      log2_block_size, type);
         level              = kvz_get_coded_level(state, &cost_coeff[ scanpos ], &cost_coeff0[ scanpos ], &cost_sig[ scanpos ],
-                                             level_double, max_abs_level, ctx_sig, one_ctx, abs_ctx, go_rice_param,
+                                             level_double, max_abs_level, ctx_sig, gt1_ctx, gt2_ctx, par_ctx, go_rice_param,
                                              c1_idx, c2_idx, q_bits, temp, 0, type );
         if (encoder->cfg.signhide_enable) {
           int greater_than_zero = CTX_ENTROPY_BITS(&baseCtx[ctx_sig], 1);
@@ -793,9 +801,9 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
       if (encoder->cfg.signhide_enable) {
         sh_rates.quant_delta[blkpos] = (level_double - level * (1 << q_bits)) >> (q_bits - 8);
         if (level > 0) {
-          int32_t rate_now  = kvz_get_ic_rate(state, level, one_ctx, abs_ctx, go_rice_param, c1_idx, c2_idx, type);
-          int32_t rate_up   = kvz_get_ic_rate(state, level + 1, one_ctx, abs_ctx, go_rice_param, c1_idx, c2_idx, type);
-          int32_t rate_down = kvz_get_ic_rate(state, level - 1, one_ctx, abs_ctx, go_rice_param, c1_idx, c2_idx, type);
+          int32_t rate_now  = kvz_get_ic_rate(state, level, gt1_ctx, gt2_ctx, par_ctx, go_rice_param, c1_idx, c2_idx, type);
+          int32_t rate_up   = kvz_get_ic_rate(state, level + 1, gt1_ctx, gt2_ctx, par_ctx, go_rice_param, c1_idx, c2_idx, type);
+          int32_t rate_down = kvz_get_ic_rate(state, level - 1, gt1_ctx, gt2_ctx, par_ctx, go_rice_param, c1_idx, c2_idx, type);
           sh_rates.inc[blkpos] = rate_up - rate_now;
           sh_rates.dec[blkpos] = rate_down - rate_now;
         } else { // level == 0
@@ -853,7 +861,7 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
     if( cg_scanpos ) {
       if (sig_coeffgroup_flag[cg_blkpos] == 0) {
         uint32_t ctx_sig  = kvz_context_get_sig_coeff_group(sig_coeffgroup_flag, cg_pos_x,
-                                                        cg_pos_y, width);
+                                                        cg_pos_y, cg_width);
         cost_coeffgroup_sig[cg_scanpos] = state->lambda *CTX_ENTROPY_BITS(&base_coeff_group_ctx[ctx_sig],0);
         base_cost += cost_coeffgroup_sig[cg_scanpos]  - rd_stats.sig_cost;
       } else {
@@ -869,7 +877,7 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
 
           // add SigCoeffGroupFlag cost to total cost
           ctx_sig = kvz_context_get_sig_coeff_group(sig_coeffgroup_flag, cg_pos_x,
-            cg_pos_y, width);
+            cg_pos_y, cg_width);
 
           cost_coeffgroup_sig[cg_scanpos] = state->lambda * CTX_ENTROPY_BITS(&base_coeff_group_ctx[ctx_sig], 1);
           base_cost += cost_coeffgroup_sig[cg_scanpos];
@@ -1148,3 +1156,4 @@ uint32_t kvz_calc_mvd_cost_cabac(const encoder_state_t * state,
   // Store bitcost before restoring cabac
   return *bitcost * (uint32_t)(state->lambda_sqrt + 0.5);
 }
+

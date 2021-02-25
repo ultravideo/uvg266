@@ -45,11 +45,11 @@ uint32_t kvz_get_coeff_cost(const encoder_state_t * const state,
                             int32_t type,
                             int8_t scan_mode);
 
-int32_t kvz_get_ic_rate(encoder_state_t *state, uint32_t abs_level, uint16_t ctx_num_one, uint16_t ctx_num_abs,
+int32_t kvz_get_ic_rate(encoder_state_t *state, uint32_t abs_level, uint16_t ctx_num_gt1, uint16_t ctx_num_gt2, uint16_t ctx_num_par,
                     uint16_t abs_go_rice, uint32_t c1_idx, uint32_t c2_idx, int8_t type);
 uint32_t kvz_get_coded_level(encoder_state_t * state, double* coded_cost, double* coded_cost0, double* coded_cost_sig,
                          int32_t level_double, uint32_t max_abs_level,
-                         uint16_t ctx_num_sig, uint16_t ctx_num_one, uint16_t ctx_num_abs,
+                         uint16_t ctx_num_sig, uint16_t ctx_num_gt1, uint16_t ctx_num_gt2, uint16_t ctx_num_par,
                          uint16_t abs_go_rice,
                          uint32_t c1_idx, uint32_t c2_idx,
                          int32_t q_bits,double temp, int8_t last, int8_t type);
