@@ -312,8 +312,8 @@ INLINE int32_t kvz_get_ic_rate(encoder_state_t * const state,
   int32_t rate = 1 << CTX_FRAC_BITS; // cost of sign bit
   uint32_t base_level  =  4;
   cabac_ctx_t *base_par_ctx = (type == 0) ? &(cabac->ctx.cu_parity_flag_model_luma[0]) : &(cabac->ctx.cu_parity_flag_model_chroma[0]);
-  cabac_ctx_t *base_gt1_ctx = (type == 0) ? &(cabac->ctx.cu_gtx_flag_model_luma[0][0]) : &(cabac->ctx.cu_gtx_flag_model_luma[0][0]);
-  cabac_ctx_t* base_gt2_ctx = (type == 0) ? &(cabac->ctx.cu_gtx_flag_model_luma[1][0]) : &(cabac->ctx.cu_gtx_flag_model_luma[1][0]);
+  cabac_ctx_t *base_gt1_ctx = (type == 0) ? &(cabac->ctx.cu_gtx_flag_model_luma[0][0]) : &(cabac->ctx.cu_gtx_flag_model_chroma[0][0]);
+  cabac_ctx_t* base_gt2_ctx = (type == 0) ? &(cabac->ctx.cu_gtx_flag_model_luma[1][0]) : &(cabac->ctx.cu_gtx_flag_model_chroma[1][0]);
 
   if ( abs_level >= base_level ) {
     int32_t symbol     = abs_level - base_level;
@@ -696,6 +696,7 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
 
   cabac_ctx_t *base_coeff_group_ctx = &(cabac->ctx.sig_coeff_group_model[type]);
   cabac_ctx_t *baseCtx              = (type == 0) ? &(cabac->ctx.cu_sig_model_luma[0][0]) : &(cabac->ctx.cu_sig_model_chroma[0][0]);
+  cabac_ctx_t* base_gt1_ctx = (type == 0) ? &(cabac->ctx.cu_gtx_flag_model_luma[0][0]) : &(cabac->ctx.cu_gtx_flag_model_chroma[0][0]);
 
   struct {
     double coded_level_and_dist;
@@ -799,7 +800,7 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
           sh_rates.inc[blkpos] = rate_up - rate_now;
           sh_rates.dec[blkpos] = rate_down - rate_now;
         } else { // level == 0
-          sh_rates.inc[blkpos] = 1;// CTX_ENTROPY_BITS(&base_one_ctx[one_ctx], 0);
+          sh_rates.inc[blkpos] = CTX_ENTROPY_BITS(&base_gt1_ctx[gt1_ctx], 0);
         }
       }
       dest_coeff[blkpos] = (coeff_t)level;
