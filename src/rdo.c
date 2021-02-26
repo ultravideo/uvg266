@@ -305,13 +305,12 @@ INLINE int32_t kvz_get_ic_rate(encoder_state_t * const state,
                     uint16_t ctx_num_gt2,
                     uint16_t ctx_num_par,
                     uint16_t abs_go_rice,
-                    uint32_t c1_idx,
-                    uint32_t c2_idx,
+                    uint32_t reg_bins,
                     int8_t type)
 {
   cabac_data_t * const cabac = &state->cabac;
   int32_t rate = 1 << CTX_FRAC_BITS; // cost of sign bit
-  uint32_t base_level  =  (c1_idx < C1FLAG_NUMBER)? (2 + (c2_idx < C2FLAG_NUMBER)) : 1;
+  uint32_t base_level  =  4;
   cabac_ctx_t *base_par_ctx = (type == 0) ? &(cabac->ctx.cu_parity_flag_model_luma[0]) : &(cabac->ctx.cu_parity_flag_model_chroma[0]);
   cabac_ctx_t *base_gt1_ctx = (type == 0) ? &(cabac->ctx.cu_gtx_flag_model_luma[0][0]) : &(cabac->ctx.cu_gtx_flag_model_luma[0][0]);
   cabac_ctx_t* base_gt2_ctx = (type == 0) ? &(cabac->ctx.cu_gtx_flag_model_luma[1][0]) : &(cabac->ctx.cu_gtx_flag_model_luma[1][0]);
@@ -383,7 +382,7 @@ INLINE uint32_t kvz_get_coded_level ( encoder_state_t * const state, double *cod
                            int32_t level_double, uint32_t max_abs_level,
                            uint16_t ctx_num_sig, uint16_t ctx_num_gt1, uint16_t ctx_num_gt2, uint16_t ctx_num_par,
                            uint16_t abs_go_rice,
-                           uint32_t c1_idx, uint32_t c2_idx,
+                           uint32_t reg_bins,
                            int32_t q_bits,double temp, int8_t last, int8_t type)
 {
   cabac_data_t * const cabac = &state->cabac;
@@ -410,7 +409,7 @@ INLINE uint32_t kvz_get_coded_level ( encoder_state_t * const state, double *cod
     double err       = (double)(level_double - ( abs_level * (1 << q_bits) ) );
     double cur_cost  = err * err * temp + state->lambda *
                        kvz_get_ic_rate( state, abs_level, ctx_num_gt1, ctx_num_gt2, ctx_num_par,
-                                    abs_go_rice, c1_idx, c2_idx, type);
+                                    abs_go_rice, reg_bins, type);
     cur_cost        += cur_cost_sig;
 
     if( cur_cost < *coded_cost ) {
@@ -640,6 +639,7 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
   uint32_t log2_tr_size      = kvz_g_convert_to_bit[ width ] + 2;
   int32_t  transform_shift   = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - log2_tr_size;  // Represents scaling through forward transform
   uint16_t go_rice_param     = 0;
+  const uint32_t reg_bins = (width * height * 28) >> 4;
   const uint32_t log2_block_size   = kvz_g_convert_to_bit[ width ] + 2;
   int32_t  scalinglist_type= (block_type == CU_INTRA ? 0 : 3) + (int8_t)("\0\3\1\2"[type]);
 
@@ -671,12 +671,10 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
   uint32_t sig_coeffgroup_flag[ 64 ];
 
   uint16_t    ctx_set    = 0;
-  int16_t     c1         = 1;
-  int16_t     c2         = 0;
   double      base_cost  = 0;
+  int32_t temp_diag = -1;
+  int32_t temp_sum = -1;
 
-  uint32_t    c1_idx     = 0;
-  uint32_t    c2_idx     = 0;
   int32_t     base_level;
 
   const uint32_t *scan = kvz_g_sig_last_scan[ scan_mode ][ log2_block_size - 1 ];
@@ -721,8 +719,7 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
       uint32_t max_abs_level  = (level_double + (1 << (q_bits - 1))) >> q_bits;
 
       if (max_abs_level > 0) {
-        last_scanpos    = scanpos;
-        ctx_set         = (scanpos > 0 && type == 0) ? 2 : 0;
+        last_scanpos    = scanpos;        
         cg_last_scanpos = cg_scanpos;
         sh_rates.sig_coeff_inc[blkpos] = 0;
         break;
@@ -736,6 +733,7 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
     return;
   }
 
+
   for (; cg_scanpos >= 0; cg_scanpos--) cost_coeffgroup_sig[cg_scanpos] = 0;
 
   int32_t last_x_bits[32], last_y_bits[32];
@@ -745,9 +743,6 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
     uint32_t cg_blkpos  = scan_cg[cg_scanpos];
     uint32_t cg_pos_y   = cg_blkpos / num_blk_side;
     uint32_t cg_pos_x   = cg_blkpos - (cg_pos_y * num_blk_side);
-
-    int32_t pattern_sig_ctx = kvz_context_calc_pattern_sig_ctx(sig_coeffgroup_flag,
-                                                           cg_pos_x, cg_pos_y, width);
 
     FILL(rd_stats, 0);
     for (int32_t scanpos_in_cg = cg_size - 1; scanpos_in_cg >= 0; scanpos_in_cg--)  {
@@ -765,35 +760,42 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
       block_uncoded_cost      += cost_coeff0[ scanpos ];
       //===== coefficient level estimation =====
       int32_t  level;
-      uint16_t  gt1_ctx = 4 * ctx_set + c1;
-      uint16_t  gt2_ctx = 4 * ctx_set + c1;
-      uint16_t  par_ctx = ctx_set + c2;
+
+      uint16_t  gt1_ctx = ctx_set;
+      uint16_t  gt2_ctx = ctx_set;
+      uint16_t  par_ctx = ctx_set;
 
       if( scanpos == last_scanpos ) {
         level            = kvz_get_coded_level(state, &cost_coeff[ scanpos ], &cost_coeff0[ scanpos ], &cost_sig[ scanpos ],
                                              level_double, max_abs_level, 0, gt1_ctx, gt2_ctx, par_ctx, go_rice_param,
-                                             c1_idx, c2_idx, q_bits, temp, 1, type );
+                                             reg_bins, q_bits, temp, 1, type );
       } else {
         uint32_t  pos_y    = blkpos >> log2_block_size;
         uint32_t  pos_x    = blkpos - ( pos_y << log2_block_size );
-        uint16_t  ctx_sig  = (uint16_t)kvz_context_get_sig_ctx_inc(pattern_sig_ctx, scan_mode, pos_x, pos_y,
-                                                     log2_block_size, type);
+        uint16_t ctx_sig = kvz_context_get_sig_ctx_idx_abs(coef, pos_x, pos_y, width, height, type, &temp_diag, &temp_sum);
+        if (temp_diag != -1) {
+          ctx_set = (MIN(temp_sum, 4) + 1) + (!temp_diag ? ((type == 0) ? 15 : 5) : (type == 0) ? temp_diag < 3 ? 10 : (temp_diag < 10 ? 5 : 0) : 0);
+        }
+        else ctx_set = 0;
+
         level              = kvz_get_coded_level(state, &cost_coeff[ scanpos ], &cost_coeff0[ scanpos ], &cost_sig[ scanpos ],
                                              level_double, max_abs_level, ctx_sig, gt1_ctx, gt2_ctx, par_ctx, go_rice_param,
-                                             c1_idx, c2_idx, q_bits, temp, 0, type );
+                                             reg_bins, q_bits, temp, 0, type );
         if (encoder->cfg.signhide_enable) {
           int greater_than_zero = CTX_ENTROPY_BITS(&baseCtx[ctx_sig], 1);
           int zero = CTX_ENTROPY_BITS(&baseCtx[ctx_sig], 0);
           sh_rates.sig_coeff_inc[blkpos] = greater_than_zero - zero;
         }
       }
+
+
       
       if (encoder->cfg.signhide_enable) {
         sh_rates.quant_delta[blkpos] = (level_double - level * (1 << q_bits)) >> (q_bits - 8);
         if (level > 0) {
-          int32_t rate_now  = kvz_get_ic_rate(state, level, gt1_ctx, gt2_ctx, par_ctx, go_rice_param, c1_idx, c2_idx, type);
-          int32_t rate_up   = kvz_get_ic_rate(state, level + 1, gt1_ctx, gt2_ctx, par_ctx, go_rice_param, c1_idx, c2_idx, type);
-          int32_t rate_down = kvz_get_ic_rate(state, level - 1, gt1_ctx, gt2_ctx, par_ctx, go_rice_param, c1_idx, c2_idx, type);
+          int32_t rate_now  = kvz_get_ic_rate(state, level, gt1_ctx, gt2_ctx, par_ctx, go_rice_param, reg_bins, type);
+          int32_t rate_up   = kvz_get_ic_rate(state, level + 1, gt1_ctx, gt2_ctx, par_ctx, go_rice_param, reg_bins, type);
+          int32_t rate_down = kvz_get_ic_rate(state, level - 1, gt1_ctx, gt2_ctx, par_ctx, go_rice_param, reg_bins, type);
           sh_rates.inc[blkpos] = rate_up - rate_now;
           sh_rates.dec[blkpos] = rate_down - rate_now;
         } else { // level == 0
@@ -803,35 +805,18 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
       dest_coeff[blkpos] = (coeff_t)level;
       base_cost         += cost_coeff[scanpos];
 
-      base_level = (c1_idx < C1FLAG_NUMBER) ? (2 + (c2_idx < C2FLAG_NUMBER)) : 1;
+      base_level = 4;
       if (level >= base_level) {
         if(level  > 3*(1<<go_rice_param)) {
           go_rice_param = MIN(go_rice_param + 1, 4);
         }
       }
-      if (level >= 1) c1_idx ++;
-
-      //===== update bin model =====
-      if (level > 1) {
-        c1 = 0;
-        c2 += (c2 < 2);
-        c2_idx ++;
-      } else if( (c1 < 3) && (c1 > 0) && level) {
-        c1++;
-      }
-
       //===== context set update =====
       if ((scanpos % SCAN_SET_SIZE == 0) && scanpos > 0) {
-        c2                = 0;
+
         go_rice_param     = 0;
 
-        c1_idx   = 0;
-        c2_idx   = 0;
         ctx_set = (scanpos == SCAN_SET_SIZE || type != 0) ? 0 : 2;
-        if( c1 == 0 ) {
-          ctx_set++;
-        }
-        c1 = 1;
       }
 
       rd_stats.sig_cost += cost_sig[scanpos];
