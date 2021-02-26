@@ -110,13 +110,26 @@ static void compute_psnr(const kvz_picture *const src,
   double sse[3] = { 0.0 };
 
   for (int32_t c = 0; c < colors; ++c) {
+
+    kvz_pixel* src_ptr = src->data[c];
+    kvz_pixel* rec_ptr = rec->data[c];
+    int32_t width = src->width;
+    int32_t height = src->height;
+    int32_t stride = src->stride;
     int32_t num_pixels = pixels;
     if (c != COLOR_Y) {
+      width >>= 1;
+      height >>= 1;
+      stride >>= 1;
       num_pixels >>= 2;
     }
-    for (int32_t i = 0; i < num_pixels; ++i) {
-      const int32_t error = src->data[c][i] - rec->data[c][i];
-      sse[c] += error * error;
+    for (int32_t y = 0; y < height; ++y) {
+      for (int32_t x = 0; x < width; ++x) {
+        const int32_t error = src_ptr[x] - rec_ptr[x];
+        sse[c] += error * error;
+      }
+      src_ptr += stride;
+      rec_ptr += stride;
     }
 
     // Avoid division by zero
