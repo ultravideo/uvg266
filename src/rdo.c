@@ -330,43 +330,33 @@ INLINE int32_t kvz_get_ic_rate(encoder_state_t * const state,
       }
       rate += (COEF_REMAIN_BIN_REDUCTION+length+1-abs_go_rice+length) * (1 << CTX_FRAC_BITS);
     }
-    //ToDo: fix for VVC
-    /*
-    rate += CTX_ENTROPY_BITS(&base_one_ctx[ctx_num_one],0);
-    iRate += fracBitsPar.intBits[(uiAbsLevel - 1) & 1];
-    iRate += fracBitsGt1.intBits[1];
-    iRate += fracBitsGt2.intBits[1];
-    */
+
+    rate += CTX_ENTROPY_BITS(&base_par_ctx[ctx_num_par], (abs_level - 1) & 1);
+    rate += CTX_ENTROPY_BITS(&base_gt1_ctx[ctx_num_gt1], 1);
+    rate += CTX_ENTROPY_BITS(&base_gt2_ctx[ctx_num_gt2], 1);
+
   }
   else if (abs_level == 1)
   {
-    /*
-    iRate += fracBitsPar.intBits[0];
-    iRate += fracBitsGt1.intBits[0];
-    */
+    rate += CTX_ENTROPY_BITS(&base_par_ctx[ctx_num_par], 0);
+    rate += CTX_ENTROPY_BITS(&base_gt1_ctx[ctx_num_gt1], 0);
   }
   else if (abs_level == 2)
   {
-    /*
-    iRate += fracBitsPar.intBits[1];
-    iRate += fracBitsGt1.intBits[0];
-    */
+    rate += CTX_ENTROPY_BITS(&base_par_ctx[ctx_num_par], 1);
+    rate += CTX_ENTROPY_BITS(&base_gt1_ctx[ctx_num_gt1], 0);
   }
   else if (abs_level == 3)
   {
-    /*
-    iRate += fracBitsPar.intBits[0];
-    iRate += fracBitsGt1.intBits[1];
-    iRate += fracBitsGt2.intBits[0];
-    */
+    rate += CTX_ENTROPY_BITS(&base_par_ctx[ctx_num_par], 0);
+    rate += CTX_ENTROPY_BITS(&base_gt1_ctx[ctx_num_gt1], 1);
+    rate += CTX_ENTROPY_BITS(&base_gt2_ctx[ctx_num_gt2], 0);
   }
   else if (abs_level == 4)
   {
-    /*
-    iRate += fracBitsPar.intBits[1];
-    iRate += fracBitsGt1.intBits[1];
-    iRate += fracBitsGt2.intBits[0];
-    */
+    rate += CTX_ENTROPY_BITS(&base_par_ctx[ctx_num_par], 1);
+    rate += CTX_ENTROPY_BITS(&base_gt1_ctx[ctx_num_gt1], 1);
+    rate += CTX_ENTROPY_BITS(&base_gt2_ctx[ctx_num_gt2], 0);
   }
 
   return rate;
