@@ -290,7 +290,7 @@ uint32_t kvz_get_coeff_cost(const encoder_state_t * const state,
   }
 }
 
-#define COEF_REMAIN_BIN_REDUCTION 3
+#define COEF_REMAIN_BIN_REDUCTION 5
 /** Calculates the cost for specific absolute transform level
  * \param abs_level scaled quantized level
  * \param ctx_num_one current ctxInc for coeff_abs_level_greater1 (1st bin of coeff_abs_level_minus1 in AVC)
@@ -320,42 +320,40 @@ INLINE int32_t kvz_get_ic_rate(encoder_state_t * const state,
     int32_t length;
     if (symbol < (COEF_REMAIN_BIN_REDUCTION << abs_go_rice)) {
       length = symbol>>abs_go_rice;
-      rate += (length+1+abs_go_rice) * (1 << CTX_FRAC_BITS);
+      rate += (length + 1 + abs_go_rice) << CTX_FRAC_BITS;
     } else {
       length = abs_go_rice;
       symbol  = symbol - ( COEF_REMAIN_BIN_REDUCTION << abs_go_rice);
       while (symbol >= (1<<length)) {
         symbol -=  (1<<(length++));
       }
-      rate += (COEF_REMAIN_BIN_REDUCTION+length+1-abs_go_rice+length) * (1 << CTX_FRAC_BITS);
+      rate += (COEF_REMAIN_BIN_REDUCTION+length+1-abs_go_rice+length) << CTX_FRAC_BITS;
     }
 
-    rate += CTX_ENTROPY_BITS(&base_par_ctx[ctx_num_par], (abs_level - 1) & 1);
+    rate += CTX_ENTROPY_BITS(&base_par_ctx[ctx_num_par], (abs_level - 2) & 1);
     rate += CTX_ENTROPY_BITS(&base_gt1_ctx[ctx_num_gt1], 1);
     rate += CTX_ENTROPY_BITS(&base_gt2_ctx[ctx_num_gt2], 1);
 
   }
   else if (abs_level == 1)
-  {
-    rate += CTX_ENTROPY_BITS(&base_par_ctx[ctx_num_par], 0);
+  {    
     rate += CTX_ENTROPY_BITS(&base_gt1_ctx[ctx_num_gt1], 0);
   }
   else if (abs_level == 2)
   {
-    rate += CTX_ENTROPY_BITS(&base_par_ctx[ctx_num_par], 1);
-    rate += CTX_ENTROPY_BITS(&base_gt1_ctx[ctx_num_gt1], 0);
-  }
-  else if (abs_level == 3)
-  {
     rate += CTX_ENTROPY_BITS(&base_par_ctx[ctx_num_par], 0);
     rate += CTX_ENTROPY_BITS(&base_gt1_ctx[ctx_num_gt1], 1);
     rate += CTX_ENTROPY_BITS(&base_gt2_ctx[ctx_num_gt2], 0);
   }
-  else if (abs_level == 4)
+  else if (abs_level == 3)
   {
     rate += CTX_ENTROPY_BITS(&base_par_ctx[ctx_num_par], 1);
     rate += CTX_ENTROPY_BITS(&base_gt1_ctx[ctx_num_gt1], 1);
     rate += CTX_ENTROPY_BITS(&base_gt2_ctx[ctx_num_gt2], 0);
+  }
+  else
+  {
+    rate = 0;
   }
 
   return rate;
@@ -897,7 +895,7 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
   int32_t best_last_idx_p1 = 0;
 
   if( block_type != CU_INTRA && !type ) {
-    best_cost  = block_uncoded_cost +   state->lambda * CTX_ENTROPY_BITS(&(cabac->ctx.cu_qt_root_cbf_model),0);
+    best_cost  = block_uncoded_cost +  state->lambda * CTX_ENTROPY_BITS(&(cabac->ctx.cu_qt_root_cbf_model),0);
     base_cost +=   state->lambda * CTX_ENTROPY_BITS(&(cabac->ctx.cu_qt_root_cbf_model),1);
   } else {
     // ToDo: update for VVC contexts
