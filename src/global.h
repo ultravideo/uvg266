@@ -306,7 +306,7 @@ typedef int16_t coeff_t;
 #define SCALING_LIST_8x8      1
 #define SCALING_LIST_16x16    2
 #define SCALING_LIST_32x32    3
-#define SCALING_LIST_SIZE_NUM 4
+#define SCALING_LIST_SIZE_NUM 8
 #define SCALING_LIST_NUM      6
 #define MAX_MATRIX_COEF_NUM   64
 #define SCALING_LIST_REM_NUM  6

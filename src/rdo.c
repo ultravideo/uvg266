@@ -29,6 +29,7 @@
 #include "encoder.h"
 #include "imagelist.h"
 #include "inter.h"
+#include "kvz_math.h"
 #include "scalinglist.h"
 #include "strategyselector.h"
 #include "tables.h"
@@ -656,8 +657,9 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
 {
   const encoder_control_t * const encoder = state->encoder_control;
   cabac_data_t * const cabac = &state->cabac;
-  uint32_t log2_tr_size      = kvz_g_convert_to_bit[ width ] + 2;
-  int32_t  transform_shift   = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - log2_tr_size;  // Represents scaling through forward transform
+  uint32_t log2_tr_width      = kvz_math_floor_log2( height );
+  uint32_t log2_tr_height      = kvz_math_floor_log2( width );
+  int32_t  transform_shift   = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - ((log2_tr_height + log2_tr_width) >> 1);  // Represents scaling through forward transform
   uint16_t go_rice_param     = 0;
   uint32_t reg_bins = (width * height * 28) >> 4;
   const uint32_t log2_block_size   = kvz_g_convert_to_bit[ width ] + 2;
@@ -667,8 +669,8 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
   
   int32_t q_bits = QUANT_SHIFT + qp_scaled/6 + transform_shift;
 
-  const int32_t *quant_coeff  = encoder->scaling_list.quant_coeff[log2_tr_size-2][scalinglist_type][qp_scaled%6];
-  const double *err_scale     = encoder->scaling_list.error_scale[log2_tr_size-2][scalinglist_type][qp_scaled%6];
+  const int32_t *quant_coeff  = encoder->scaling_list.quant_coeff[log2_tr_width][log2_tr_height][scalinglist_type][qp_scaled%6];
+  const double *err_scale     = encoder->scaling_list.error_scale[log2_tr_width][log2_tr_height][scalinglist_type][qp_scaled%6];
 
   double block_uncoded_cost = 0;
   

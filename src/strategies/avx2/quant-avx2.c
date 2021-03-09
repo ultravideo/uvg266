@@ -341,6 +341,22 @@ static INLINE int32_t hide_block_sign(__m256i coefs, __m256i q_coefs, __m256i de
   return last_cg;
 }
 
+
+static INLINE unsigned kvz_math_floor_log2(unsigned value)
+{
+  assert(value > 0);
+
+  unsigned result = 0;
+
+  for (int i = 4; i >= 0; --i) {
+    unsigned bits = 1ull << i;
+    unsigned shift = value >= (1 << bits) ? bits : 0;
+    result += shift;
+    value >>= shift;
+  }
+
+  return result;
+}
 /**
  * \brief quantize transformed coefficents
  *
@@ -353,10 +369,11 @@ void kvz_quant_avx2(const encoder_state_t * const state, const coeff_t * __restr
   const uint32_t * const scan = kvz_g_sig_last_scan[scan_idx][log2_block_size - 1];
 
   int32_t qp_scaled = kvz_get_scaled_qp(type, state->qp, (encoder->bitdepth - 8) * 6);
-  const uint32_t log2_tr_size = kvz_g_convert_to_bit[width] + 2;
+  uint32_t log2_tr_width = kvz_math_floor_log2(height);
+  uint32_t log2_tr_height = kvz_math_floor_log2(width);
   const int32_t scalinglist_type = (block_type == CU_INTRA ? 0 : 3) + (int8_t)("\0\3\1\2"[type]);
-  const int32_t *quant_coeff = encoder->scaling_list.quant_coeff[log2_tr_size - 2][scalinglist_type][qp_scaled % 6];
-  const int32_t transform_shift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - log2_tr_size; //!< Represents scaling through forward transform
+  const int32_t *quant_coeff = encoder->scaling_list.quant_coeff[log2_tr_width][log2_tr_height][scalinglist_type][qp_scaled % 6];
+  const int32_t transform_shift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - ((log2_tr_width + log2_tr_height) >> 1); //!< Represents scaling through forward transform
   const int32_t q_bits = QUANT_SHIFT + qp_scaled / 6 + transform_shift;
   const int32_t add = ((state->frame->slicetype == KVZ_SLICE_I) ? 171 : 85) << (q_bits - 9);
   const int32_t q_bits8 = q_bits - 8;
@@ -718,7 +735,8 @@ void kvz_dequant_avx2(const encoder_state_t * const state, coeff_t *q_coef, coef
   const encoder_control_t * const encoder = state->encoder_control;
   int32_t shift,add,coeff_q;
   int32_t n;
-  int32_t transform_shift = 15 - encoder->bitdepth - (kvz_g_convert_to_bit[ width ] + 2);
+  int32_t transform_shift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - ((kvz_math_floor_log2(width) + kvz_math_floor_log2(height)) >> 1); // Represents scaling through forward transform
+
 
   int32_t qp_scaled = kvz_get_scaled_qp(type, state->qp, (encoder->bitdepth-8)*6);
 
@@ -726,10 +744,11 @@ void kvz_dequant_avx2(const encoder_state_t * const state, coeff_t *q_coef, coef
 
   if (encoder->scaling_list.enable)
   {
-    uint32_t log2_tr_size = kvz_g_convert_to_bit[ width ] + 2;
+    uint32_t log2_tr_width = kvz_math_floor_log2(height) + 2;
+    uint32_t log2_tr_height = kvz_math_floor_log2(width) + 2;
     int32_t scalinglist_type = (block_type == CU_INTRA ? 0 : 3) + (int8_t)("\0\3\1\2"[type]);
 
-    const int32_t *dequant_coef = encoder->scaling_list.de_quant_coeff[log2_tr_size-2][scalinglist_type][qp_scaled%6];
+    const int32_t* dequant_coef = encoder->scaling_list.de_quant_coeff[log2_tr_width - 2][log2_tr_height - 2][scalinglist_type][qp_scaled % 6];
     shift += 4;
 
     if (shift >qp_scaled / 6) {
