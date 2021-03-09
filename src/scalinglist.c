@@ -134,7 +134,7 @@ void kvz_scalinglist_destroy(scaling_list_t* const scaling_list) {
 
   for (size_id_x = 0; size_id_x < SCALING_LIST_SIZE_NUM; size_id_x++) {
     for (size_id_y = 0; size_id_y < SCALING_LIST_SIZE_NUM; size_id_y++) {
-      for (list_id = 0; list_id < kvz_g_scaling_list_num[size_id_y]; list_id++) {
+      for (list_id = 0; list_id < SCALING_LIST_NUM; list_id++) {
         for (qp = 0; qp < 6; qp++) {
           FREE_POINTER(scaling_list->quant_coeff[size_id_x][size_id_y][list_id][qp]);
           FREE_POINTER(scaling_list->de_quant_coeff[size_id_x][size_id_y][list_id][qp]);
