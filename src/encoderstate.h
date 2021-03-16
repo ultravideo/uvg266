@@ -314,6 +314,8 @@ typedef struct encoder_state_t {
   //! \brief Quantization parameter for the current LCU
   int8_t qp;
 
+  double c_lambda;
+
   /**
    * \brief Whether a QP delta value must be coded for the current LCU.
    */

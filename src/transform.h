@@ -53,7 +53,7 @@ void kvz_itransform2d(const encoder_control_t * const encoder,
                       const cu_info_t *tu);
 
 
-int32_t kvz_get_scaled_qp(int8_t type, int8_t qp, int8_t qp_offset);
+int32_t kvz_get_scaled_qp(int8_t type, int8_t qp, int8_t qp_offset, int8_t const* const chroma_scale);
 
 void kvz_quantize_lcu_residual(encoder_state_t *state,
                                bool luma,

@@ -135,6 +135,8 @@ typedef struct encoder_control_t
 
   int32_t poc_lsb_bits;
 
+  int8_t* qp_map[3];
+
 } encoder_control_t;
 
 encoder_control_t* kvz_encoder_control_init(const kvz_config *cfg);

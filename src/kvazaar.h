@@ -475,6 +475,12 @@ typedef struct kvz_config
   char *stats_file_prefix;
 
   struct param_set_map *param_set_map;
+
+  int8_t num_used_table;
+  int8_t qp_table_start_minus26[3];
+  int8_t qp_table_length_minus1[3];
+  int8_t* delta_qp_in_val_minus1[3];
+  int8_t* delta_qp_out_val[3];
 } kvz_config;
 
 /**

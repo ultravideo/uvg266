@@ -126,18 +126,19 @@ static void rdpcm(const int width,
  * \brief Get scaled QP used in quantization
  *
  */
-int32_t kvz_get_scaled_qp(int8_t type, int8_t qp, int8_t qp_offset)
+int32_t kvz_get_scaled_qp(int8_t type, int8_t qp, int8_t qp_offset, int8_t const * const chroma_scale)
 {
   int32_t qp_scaled = 0;
   if(type == 0) {
     qp_scaled = qp + qp_offset;
   } else {
     qp_scaled = CLIP(-qp_offset, 57, qp);
-    if(true||qp_scaled < 0) { //TODO: Enable chroma QP scaling in the SPS headers
-      qp_scaled = qp_scaled + qp_offset;
-    } else {
-      qp_scaled = kvz_g_chroma_scale[qp_scaled] + qp_offset;
+    if (chroma_scale) {
+      qp_scaled = chroma_scale[qp] + qp_offset;
     }
+    else {
+      qp_scaled = qp_scaled + qp_offset;
+    } 
   }
   return qp_scaled;
 }

@@ -787,6 +787,9 @@ static double qp_to_lambda(encoder_state_t* const state, int qp)
   state->lambda = est_lambda;
   state->lambda_sqrt = sqrt(est_lambda);
   state->qp = est_qp;
+  int8_t chroma_qp = encoder->qp_map[0][est_qp];
+  double tmpWeight = pow(2.0, (est_qp - chroma_qp) / 3.0);
+  state->c_lambda = est_lambda / tmpWeight;
   ctu->qp = est_qp;
   ctu->lambda = est_lambda;
   ctu->i_cost = 0;
@@ -806,7 +809,7 @@ static double qp_to_lambda(encoder_state_t* const state, int qp)
     state->qp = CLIP_TO_QP(state->qp);
     state->lambda = qp_to_lambda(state, state->qp);
     state->lambda_sqrt = sqrt(state->lambda);
-
+    
     ctu->adjust_lambda = state->lambda;
     ctu->adjust_qp = state->qp;
     //ctu->qp = state->qp;
@@ -1086,7 +1089,6 @@ void kvz_set_lcu_lambda_and_qp(encoder_state_t * const state,
     state->qp = CLIP_TO_QP(state->frame->QP + dqp);
     state->lambda = qp_to_lambda(state, state->qp);
     state->lambda_sqrt = sqrt(state->lambda);
-
   }
   else if (ctrl->cfg.target_bitrate > 0) {
     const uint32_t pixels    = MIN(LCU_WIDTH, state->tile->frame->width  - LCU_WIDTH * pos.x) *
@@ -1133,6 +1135,10 @@ void kvz_set_lcu_lambda_and_qp(encoder_state_t * const state,
 
   lcu->lambda = state->lambda;
   lcu->qp = state->qp;
+
+  int8_t chroma_qp = ctrl->qp_map[0][state->qp];
+  double tmpWeight = pow(2.0, (state->qp - chroma_qp) / 3.0);
+  state->c_lambda = state->lambda / tmpWeight;
 
   // Apply variance adaptive quantization
   if (ctrl->cfg.vaq) {

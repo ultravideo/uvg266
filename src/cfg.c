@@ -175,6 +175,20 @@ int kvz_config_init(kvz_config *cfg)
   cfg->file_format = KVZ_FORMAT_AUTO;
 
   cfg->stats_file_prefix = NULL;
+
+  int8_t in[] = { 17, 27, 32, 44 };
+  int8_t out[] = { 17, 29, 34, 41 };
+
+  cfg->num_used_table = 1;
+  cfg->qp_table_length_minus1[0] = 2;
+  cfg->qp_table_start_minus26[0] = 17 - 26;
+  cfg->delta_qp_in_val_minus1[0] = malloc(cfg->qp_table_length_minus1[0] + 1);
+  cfg->delta_qp_out_val[0] = malloc(cfg->qp_table_length_minus1[0]  +  1);
+  for (int i = 0; i < cfg->qp_table_length_minus1[0] + 1; i++) {
+    cfg->delta_qp_in_val_minus1[0][i] = in[i + 1] - in[i] - (int8_t)1;
+    cfg->delta_qp_out_val[0][i] = out[i + 1] - out[i];
+  }
+
   return 1;
 }
 
@@ -190,6 +204,10 @@ int kvz_config_destroy(kvz_config *cfg)
     if (cfg->param_set_map)
     {
       FREE_POINTER(cfg->param_set_map);
+    }
+    for (int i = 0; i < cfg->num_used_table; i++) {
+      if (cfg->delta_qp_in_val_minus1[i]) FREE_POINTER(cfg->delta_qp_in_val_minus1[i]);
+      if (cfg->delta_qp_out_val[i]) FREE_POINTER(cfg->delta_qp_out_val[i]);
     }
   }
   free(cfg);
