@@ -209,11 +209,11 @@ static double cu_zero_coeff_cost(const encoder_state_t *state, lcu_t *work_tree,
     LCU_WIDTH, LCU_WIDTH, cu_width
     );
   if (x % 8 == 0 && y % 8 == 0 && state->encoder_control->chroma_format != KVZ_CSP_400) {
-    ssd += state->lambda / state->c_lambda * kvz_pixels_calc_ssd(
+    ssd += state->c_lambda / state->lambda * kvz_pixels_calc_ssd(
       &lcu->ref.u[chroma_index], &lcu->rec.u[chroma_index],
       LCU_WIDTH_C, LCU_WIDTH_C, cu_width / 2
       );
-    ssd += state->lambda / state->c_lambda * kvz_pixels_calc_ssd(
+    ssd += state->c_lambda / state->lambda * kvz_pixels_calc_ssd(
       &lcu->ref.v[chroma_index], &lcu->rec.v[chroma_index],
       LCU_WIDTH_C, LCU_WIDTH_C, cu_width / 2
       );
