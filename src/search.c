@@ -49,11 +49,11 @@ static const int INTRA_THRESHOLD = 8;
 
 // Modify weight of luma SSD.
 #ifndef LUMA_MULT
-# define LUMA_MULT 0.8
+# define LUMA_MULT 1
 #endif
 // Modify weight of chroma SSD.
 #ifndef CHROMA_MULT
-# define CHROMA_MULT 1.5
+# define CHROMA_MULT 1
 #endif
 
 static INLINE void copy_cu_info(int x_local, int y_local, int width, lcu_t *from, lcu_t *to)
@@ -209,11 +209,11 @@ static double cu_zero_coeff_cost(const encoder_state_t *state, lcu_t *work_tree,
     LCU_WIDTH, LCU_WIDTH, cu_width
     );
   if (x % 8 == 0 && y % 8 == 0 && state->encoder_control->chroma_format != KVZ_CSP_400) {
-    ssd += CHROMA_MULT * kvz_pixels_calc_ssd(
+    ssd += state->lambda / state->c_lambda * kvz_pixels_calc_ssd(
       &lcu->ref.u[chroma_index], &lcu->rec.u[chroma_index],
       LCU_WIDTH_C, LCU_WIDTH_C, cu_width / 2
       );
-    ssd += CHROMA_MULT * kvz_pixels_calc_ssd(
+    ssd += state->lambda / state->c_lambda * kvz_pixels_calc_ssd(
       &lcu->ref.v[chroma_index], &lcu->rec.v[chroma_index],
       LCU_WIDTH_C, LCU_WIDTH_C, cu_width / 2
       );
@@ -374,7 +374,7 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
   }
 
   double bits = tr_tree_bits + coeff_bits;
-  return (double)ssd * CHROMA_MULT + bits * state->lambda;
+  return (double)ssd + bits * state->c_lambda;
 }
 
 
