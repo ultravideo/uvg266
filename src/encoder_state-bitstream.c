@@ -605,9 +605,9 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
 
   WRITE_U(stream, 0, 1, "sps_lfnst_enabled_flag");
 
-  WRITE_U(stream, 0, 1, "sps_joint_cbcr_enabled_flag");
 
-  if (encoder->chroma_format != KVZ_CSP_400) {    
+  if (encoder->chroma_format != KVZ_CSP_400) {
+    WRITE_U(stream, 0, 1, "sps_joint_cbcr_enabled_flag");
     WRITE_U(stream, 1, 1, "same_qp_table_for_chroma");
 
     for (int i = 0; i < encoder->cfg.num_used_table; i++) {
@@ -685,10 +685,13 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   WRITE_U(stream, 0, 1, "sps_mrl_enabled_flag");
   WRITE_U(stream, 0, 1, "sps_mip_enabled_flag");
   // if(!no_cclm_constraint_flag)
+  if(encoder->chroma_format != KVZ_CSP_400) {
     WRITE_U(stream, 0, 1, "sps_cclm_enabled_flag");
-
-  WRITE_U(stream, 0, 1, "sps_chroma_horizontal_collocated_flag");
-  WRITE_U(stream, 0, 1, "sps_chroma_vertical_collocated_flag");
+  }
+  if (encoder->chroma_format == KVZ_CSP_420) {
+    WRITE_U(stream, 0, 1, "sps_chroma_horizontal_collocated_flag");
+    WRITE_U(stream, 0, 1, "sps_chroma_vertical_collocated_flag");
+  }
 
   WRITE_U(stream, 0, 1, "sps_palette_enabled_flag");
   WRITE_U(stream, 0, 1, "sps_ibc_enabled_flag");
