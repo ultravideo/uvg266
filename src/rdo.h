@@ -37,7 +37,7 @@ extern const uint32_t kvz_g_go_rice_range[5];
 extern const uint32_t kvz_g_go_rice_prefix_len[5];
 
 void  kvz_rdoq(encoder_state_t *state, coeff_t *coef, coeff_t *dest_coeff, int32_t width,
-           int32_t height, int8_t type, int8_t scan_mode, int8_t block_type, int8_t tr_depth);
+           int32_t height, int8_t type, int8_t scan_mode, int8_t block_type, int8_t tr_depth, uint16_t cbf);
 
 uint32_t kvz_get_coeff_cost(const encoder_state_t * const state,
                             const coeff_t *coeff,

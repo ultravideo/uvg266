@@ -398,10 +398,11 @@ static double search_intra_trdepth(encoder_state_t * const state,
       const uint8_t tr_depth = depth - pred_cu->depth;
 
       // ToDo: update for VVC contexts
-      const cabac_ctx_t *ctx = &(state->cabac.ctx.qt_cbf_model_cb[tr_depth]);
+      const cabac_ctx_t* ctx = &(state->cabac.ctx.qt_cbf_model_cb[0]);
       if (tr_depth == 0 || cbf_is_set(pred_cu->cbf, depth - 1, COLOR_U)) {
         cbf_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf, depth, COLOR_U));
       }
+      ctx = &(state->cabac.ctx.qt_cbf_model_cr[cbf_is_set(pred_cu->cbf, depth, COLOR_U)]);
       if (tr_depth == 0 || cbf_is_set(pred_cu->cbf, depth - 1, COLOR_V)) {
         cbf_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf, depth, COLOR_V));
       }

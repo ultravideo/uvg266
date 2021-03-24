@@ -282,7 +282,7 @@ double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
       cbf_is_set(tr_cu->cbf, depth, COLOR_U) ||
       cbf_is_set(tr_cu->cbf, depth, COLOR_V))
   {
-    const cabac_ctx_t *ctx = &(state->cabac.ctx.qt_cbf_model_luma[!tr_depth]);
+    const cabac_ctx_t *ctx = &(state->cabac.ctx.qt_cbf_model_luma[0]);
     tr_tree_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf, depth, COLOR_Y));
   }
 
@@ -331,10 +331,12 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
   if (depth < MAX_PU_DEPTH) {
     const int tr_depth = depth - pred_cu->depth;
     // ToDo: Update for VVC contexts
-    const cabac_ctx_t *ctx = &(state->cabac.ctx.qt_cbf_model_cb[tr_depth]);
+    const cabac_ctx_t *ctx = &(state->cabac.ctx.qt_cbf_model_cb[0]);
     if (tr_depth == 0 || cbf_is_set(pred_cu->cbf, depth - 1, COLOR_U)) {
       tr_tree_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf, depth, COLOR_U));
     }
+    int is_set = cbf_is_set(pred_cu->cbf, depth, COLOR_U);
+    ctx = &(state->cabac.ctx.qt_cbf_model_cr[is_set]);
     if (tr_depth == 0 || cbf_is_set(pred_cu->cbf, depth - 1, COLOR_V)) {
       tr_tree_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf, depth, COLOR_V));
     }

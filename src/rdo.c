@@ -687,7 +687,7 @@ unsigned templateAbsSum(const coeff_t* coeff, int baseLevel, uint32_t  posX, uin
 
 // ToDo: implement new RDOQ
 void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff, int32_t width,
-           int32_t height, int8_t type, int8_t scan_mode, int8_t block_type, int8_t tr_depth)
+           int32_t height, int8_t type, int8_t scan_mode, int8_t block_type, int8_t tr_depth, uint16_t cbf)
 {
   const encoder_control_t * const encoder = state->encoder_control;
   cabac_data_t * const cabac = &state->cabac;
@@ -970,9 +970,21 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
     best_cost  = block_uncoded_cost +  lambda * CTX_ENTROPY_BITS(&(cabac->ctx.cu_qt_root_cbf_model),0);
     base_cost +=   lambda * CTX_ENTROPY_BITS(&(cabac->ctx.cu_qt_root_cbf_model),1);
   } else {
-    // ToDo: update for VVC contexts
-    cabac_ctx_t* base_cbf_model = type?(cabac->ctx.qt_cbf_model_cb):(cabac->ctx.qt_cbf_model_luma);
-    ctx_cbf    = ( type ? tr_depth : !tr_depth);
+    cabac_ctx_t* base_cbf_model = NULL;
+    switch (type) {
+      case COLOR_Y:
+        base_cbf_model = cabac->ctx.qt_cbf_model_luma;
+        break;
+      case COLOR_U:
+        base_cbf_model = cabac->ctx.qt_cbf_model_cb;
+        break;
+      case COLOR_V:
+        base_cbf_model = cabac->ctx.qt_cbf_model_cr;
+        break;
+      default:
+        assert(0);
+    }
+    ctx_cbf    = ( type != COLOR_V ? 0 : cbf_is_set(cbf, 5 - kvz_math_floor_log2(width), COLOR_U));
     best_cost  = block_uncoded_cost +  lambda * CTX_ENTROPY_BITS(&base_cbf_model[ctx_cbf],0);
     base_cost +=   lambda * CTX_ENTROPY_BITS(&base_cbf_model[ctx_cbf],1);
   }

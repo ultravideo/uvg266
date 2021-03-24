@@ -321,7 +321,6 @@ static void quantize_tr_residual(encoder_state_t * const state,
   // Clear coded block flag structures for depths lower than current depth.
   // This should ensure that the CBF data doesn't get corrupted if this function
   // is called more than once.
-  cbf_clear(&cur_pu->cbf, depth, color);
 
   int32_t tr_width;
   if (color == COLOR_Y) {
@@ -420,6 +419,7 @@ static void quantize_tr_residual(encoder_state_t * const state,
                                        early_skip);
   }
 
+  cbf_clear(&cur_pu->cbf, depth, color);
   if (has_coeffs) {
     cbf_set(&cur_pu->cbf, depth, color);
   }
