@@ -484,10 +484,11 @@ static void calc_last_bits(encoder_state_t * const state, int32_t width, int32_t
   cabac_ctx_t *base_ctx_x = (type ? cabac->ctx.cu_ctx_last_x_chroma : cabac->ctx.cu_ctx_last_x_luma);
   cabac_ctx_t *base_ctx_y = (type ? cabac->ctx.cu_ctx_last_y_chroma : cabac->ctx.cu_ctx_last_y_luma);
 
-  blk_size_offset_x = type ? 0: (kvz_g_convert_to_bit[ width ] *3 + ((kvz_g_convert_to_bit[ width ] +1)>>2));
-  blk_size_offset_y = type ? 0: (kvz_g_convert_to_bit[ height ]*3 + ((kvz_g_convert_to_bit[ height ]+1)>>2));
-  shiftX = type ? kvz_g_convert_to_bit[ width  ] :((kvz_g_convert_to_bit[ width  ]+3)>>2);
-  shiftY = type ? kvz_g_convert_to_bit[ height ] :((kvz_g_convert_to_bit[ height ]+3)>>2);
+  static const int prefix_ctx[8] = { 0, 0, 0, 3, 6, 10, 15, 21 };
+  blk_size_offset_x = type ? 0: prefix_ctx[kvz_math_floor_log2(width)];
+  blk_size_offset_y = type ? 0: prefix_ctx[kvz_math_floor_log2(height)];
+  shiftX = type ? CLIP(0, 2, width) :((kvz_math_floor_log2(width) +1)>>2);
+  shiftY = type ? CLIP(0, 2, height) :((kvz_math_floor_log2(height) +1)>>2);
 
 
   for (ctx = 0; ctx < g_group_idx[ width - 1 ]; ctx++) {
@@ -796,7 +797,6 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
   for (; cg_scanpos >= 0; cg_scanpos--) cost_coeffgroup_sig[cg_scanpos] = 0;
 
   int32_t last_x_bits[32], last_y_bits[32];
-  calc_last_bits(state, width, height, type, last_x_bits, last_y_bits);
 
   for (int32_t cg_scanpos = cg_last_scanpos; cg_scanpos >= 0; cg_scanpos--) {
     uint32_t cg_blkpos  = scan_cg[cg_scanpos];
@@ -996,6 +996,7 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
     base_cost +=   lambda * CTX_ENTROPY_BITS(&base_cbf_model[ctx_cbf],1);
   }
 
+  calc_last_bits(state, width, height, type, last_x_bits, last_y_bits);
   for ( int32_t cg_scanpos = cg_last_scanpos; cg_scanpos >= 0; cg_scanpos--) {
     uint32_t cg_blkpos = scan_cg[cg_scanpos];
     base_cost -= cost_coeffgroup_sig[cg_scanpos];
