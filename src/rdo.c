@@ -311,7 +311,8 @@ INLINE int32_t kvz_get_ic_rate(encoder_state_t * const state,
                     uint16_t ctx_num_par,
                     uint16_t abs_go_rice,
                     uint32_t reg_bins,
-                    int8_t type)
+                    int8_t type,
+                    int use_limited_prefix_length)
 {
   cabac_data_t * const cabac = &state->cabac;
   int32_t rate = 1 << CTX_FRAC_BITS; // cost of sign bit
@@ -320,6 +321,7 @@ INLINE int32_t kvz_get_ic_rate(encoder_state_t * const state,
   cabac_ctx_t *base_gt1_ctx = (type == 0) ? &(cabac->ctx.cu_gtx_flag_model_luma[0][0]) : &(cabac->ctx.cu_gtx_flag_model_chroma[0][0]);
   cabac_ctx_t* base_gt2_ctx = (type == 0) ? &(cabac->ctx.cu_gtx_flag_model_luma[1][0]) : &(cabac->ctx.cu_gtx_flag_model_chroma[1][0]);
   uint16_t go_rice_zero = 1 << abs_go_rice;
+  int maxLog2TrDynamicRange = 15;
 
   if (reg_bins < 4)
   {
@@ -330,7 +332,22 @@ INLINE int32_t kvz_get_ic_rate(encoder_state_t * const state,
     {
       length = symbol >> abs_go_rice;
       rate += (length + 1 + abs_go_rice) << CTX_FRAC_BITS;
-    } else {
+    } else if(use_limited_prefix_length) {
+      const uint32_t maximumPrefixLength = (32 - (COEF_REMAIN_BIN_REDUCTION + maxLog2TrDynamicRange));
+
+      uint32_t prefixLength = 0;
+      uint32_t suffix = (symbol >> abs_go_rice) - COEF_REMAIN_BIN_REDUCTION;
+
+      while ((prefixLength < maximumPrefixLength) && (suffix > ((2 << prefixLength) - 2)))
+      {
+        prefixLength++;
+      }
+
+      const uint32_t suffixLength = (prefixLength == maximumPrefixLength) ? (maxLog2TrDynamicRange - abs_go_rice) : (prefixLength + 1/*separator*/);
+
+      rate += (COEF_REMAIN_BIN_REDUCTION + prefixLength + suffixLength + abs_go_rice) << CTX_FRAC_BITS;
+    }
+    else {
       length = abs_go_rice;
       symbol = symbol - (threshold << abs_go_rice);
       while (symbol >= (1 << length))
@@ -348,7 +365,23 @@ INLINE int32_t kvz_get_ic_rate(encoder_state_t * const state,
     if (symbol < (COEF_REMAIN_BIN_REDUCTION << abs_go_rice)) {
       length = symbol>>abs_go_rice;
       rate += (length + 1 + abs_go_rice) << CTX_FRAC_BITS;
-    } else {
+    }
+    else if (use_limited_prefix_length) {
+      const uint32_t maximumPrefixLength = (32 - (COEF_REMAIN_BIN_REDUCTION + maxLog2TrDynamicRange));
+
+      uint32_t prefixLength = 0;
+      uint32_t suffix = (symbol >> abs_go_rice) - COEF_REMAIN_BIN_REDUCTION;
+
+      while ((prefixLength < maximumPrefixLength) && (suffix > ((2 << prefixLength) - 2)))
+      {
+        prefixLength++;
+      }
+
+      const uint32_t suffixLength = (prefixLength == maximumPrefixLength) ? (maxLog2TrDynamicRange - abs_go_rice) : (prefixLength + 1/*separator*/);
+
+      rate += (COEF_REMAIN_BIN_REDUCTION + prefixLength + suffixLength + abs_go_rice) << CTX_FRAC_BITS;
+    }
+    else {
       length = abs_go_rice;
       symbol  = symbol - ( COEF_REMAIN_BIN_REDUCTION << abs_go_rice);
       while (symbol >= (1<<length)) {
@@ -435,7 +468,7 @@ INLINE uint32_t kvz_get_coded_level( encoder_state_t * const state, double *code
     double err       = (double)(level_double - ( abs_level * (1 << q_bits) ) );
     double cur_cost  = err * err * temp + lambda *
                        kvz_get_ic_rate( state, abs_level, ctx_num_gt1, ctx_num_gt2, ctx_num_par,
-                                    abs_go_rice, reg_bins, type);
+                                    abs_go_rice, reg_bins, type, true);
     cur_cost        += cur_cost_sig;
 
     if( cur_cost < *coded_cost ) {
@@ -753,7 +786,7 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
     default: assert(0 && "There should be 1, 4, 16 or 64 coefficient groups");
   }
 
-  cabac_ctx_t *base_coeff_group_ctx = &(cabac->ctx.sig_coeff_group_model[type]);
+  cabac_ctx_t *base_coeff_group_ctx = &(cabac->ctx.sig_coeff_group_model[type ? 2 : 0]);
   cabac_ctx_t *baseCtx              = (type == 0) ? &(cabac->ctx.cu_sig_model_luma[0][0]) : &(cabac->ctx.cu_sig_model_chroma[0][0]);
   cabac_ctx_t* base_gt1_ctx = (type == 0) ? &(cabac->ctx.cu_gtx_flag_model_luma[0][0]) : &(cabac->ctx.cu_gtx_flag_model_chroma[0][0]);
 
@@ -863,13 +896,13 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
       if (encoder->cfg.signhide_enable) {
         sh_rates.quant_delta[blkpos] = (level_double - level * (1 << q_bits)) >> (q_bits - 8);
         if (level > 0) {
-          int32_t rate_now  = kvz_get_ic_rate(state, level, gt1_ctx, gt2_ctx, par_ctx, go_rice_param, reg_bins, type);
-          sh_rates.inc[blkpos] = kvz_get_ic_rate(state, level + 1, gt1_ctx, gt2_ctx, par_ctx, go_rice_param, reg_bins, type) - rate_now;
-          sh_rates.dec[blkpos] = kvz_get_ic_rate(state, level - 1, gt1_ctx, gt2_ctx, par_ctx, go_rice_param, reg_bins, type) - rate_now;
+          int32_t rate_now  = kvz_get_ic_rate(state, level, gt1_ctx, gt2_ctx, par_ctx, go_rice_param, reg_bins, type, false);
+          sh_rates.inc[blkpos] = kvz_get_ic_rate(state, level + 1, gt1_ctx, gt2_ctx, par_ctx, go_rice_param, reg_bins, type, false) - rate_now;
+          sh_rates.dec[blkpos] = kvz_get_ic_rate(state, level - 1, gt1_ctx, gt2_ctx, par_ctx, go_rice_param, reg_bins, type, false) - rate_now;
         } else { // level == 0
           if (reg_bins < 4) {
-            int32_t rate_now = kvz_get_ic_rate(state, level, gt1_ctx, gt2_ctx, par_ctx, go_rice_param, reg_bins, type);
-            sh_rates.inc[blkpos] = kvz_get_ic_rate(state, level + 1, gt1_ctx, gt2_ctx, par_ctx, go_rice_param, reg_bins, type) - rate_now;
+            int32_t rate_now = kvz_get_ic_rate(state, level, gt1_ctx, gt2_ctx, par_ctx, go_rice_param, reg_bins, type, false);
+            sh_rates.inc[blkpos] = kvz_get_ic_rate(state, level + 1, gt1_ctx, gt2_ctx, par_ctx, go_rice_param, reg_bins, type, false) - rate_now;
           } else {
             sh_rates.inc[blkpos] = CTX_ENTROPY_BITS(&base_gt1_ctx[gt1_ctx], 0);
           }
