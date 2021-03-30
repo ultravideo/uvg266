@@ -70,8 +70,8 @@ extern const uint32_t kvz_entropy_bits[512];
 #define CTX_ENTROPY_BITS(ctx, val) kvz_entropy_bits[CTX_STATE(ctx) ^ (val)]
 
 // Floating point fractional bits, derived from kvz_entropy_bits
-extern const float kvz_f_entropy_bits[128];
+extern const float kvz_f_entropy_bits[512];
 // ToDo: generate a new table for VVC?
-#define CTX_ENTROPY_FBITS(ctx, val) kvz_f_entropy_bits[(CTX_STATE(ctx)>>2) ^ (val)]
+#define CTX_ENTROPY_FBITS(ctx, val) kvz_f_entropy_bits[(CTX_STATE(ctx)) ^ (val)]
 
 #endif
