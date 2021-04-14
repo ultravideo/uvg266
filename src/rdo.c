@@ -804,7 +804,7 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
 
   const uint32_t cg_width = (MIN((uint8_t)32, width) >> (log2_cg_size / 2));
 
-  const uint32_t *scan_cg = g_sig_last_scan_cg[log2_block_size - 2][scan_mode];
+  const uint32_t *scan_cg = g_sig_last_scan_cg[log2_block_size - 1][scan_mode];
   const uint32_t cg_size = 16;
   const int32_t  shift = 4 >> 1;
   const uint32_t num_blk_side = width >> shift;

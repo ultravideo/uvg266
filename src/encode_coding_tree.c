@@ -159,8 +159,25 @@ void kvz_encode_last_significant_xy(cabac_data_t * const cabac,
   }
 }
 
+static void encode_chroma_tu(encoder_state_t* const state, int x, int y, int depth, const uint8_t width_c, const cu_info_t* cur_pu, int8_t* scan_idx) {
+  int x_local = (x >> 1) % LCU_WIDTH_C;
+  int y_local = (y >> 1) % LCU_WIDTH_C;
+  *scan_idx = kvz_get_scan_order(cur_pu->type, cur_pu->intra.mode_chroma, depth);
+
+  const coeff_t *coeff_u = &state->coeff->u[xy_to_zorder(LCU_WIDTH_C, x_local, y_local)];
+  const coeff_t *coeff_v = &state->coeff->v[xy_to_zorder(LCU_WIDTH_C, x_local, y_local)];
+
+  if (cbf_is_set(cur_pu->cbf, depth, COLOR_U)) {
+    kvz_encode_coeff_nxn(state, &state->cabac, coeff_u, width_c, 1, *scan_idx, NULL, false);
+  }
+
+  if (cbf_is_set(cur_pu->cbf, depth, COLOR_V)) {
+    kvz_encode_coeff_nxn(state, &state->cabac, coeff_v, width_c, 2, *scan_idx, NULL, false);
+  }
+}
+
 static void encode_transform_unit(encoder_state_t * const state,
-                                  int x, int y, int depth)
+                                  int x, int y, int depth, bool only_chroma)
 {
   assert(depth >= 1 && depth <= MAX_PU_DEPTH);
 
@@ -184,7 +201,7 @@ static void encode_transform_unit(encoder_state_t * const state,
 
   int cbf_y = cbf_is_set(cur_pu->cbf, depth, COLOR_Y);
 
-  if (cbf_y) {
+  if (cbf_y && !only_chroma) {
     int x_local = x % LCU_WIDTH;
     int y_local = y % LCU_WIDTH;
     const coeff_t *coeff_y = &state->coeff->y[xy_to_zorder(LCU_WIDTH, x_local, y_local)];
@@ -202,11 +219,11 @@ static void encode_transform_unit(encoder_state_t * const state,
                          true);
   }
 
-  if (depth == MAX_DEPTH + 1) {
+  if (depth == MAX_DEPTH) {
     // For size 4x4 luma transform the corresponding chroma transforms are
     // also of size 4x4 covering 8x8 luma pixels. The residual is coded in
     // the last transform unit.
-    if (x % 8 == 0 || y % 8 == 0) {
+    if ((x % 8 == 0 || y % 8 == 0) || !only_chroma) {
       // Not the last luma transform block so there is nothing more to do.
       return;
     } else {
@@ -221,20 +238,7 @@ static void encode_transform_unit(encoder_state_t * const state,
   bool chroma_cbf_set = cbf_is_set(cur_pu->cbf, depth, COLOR_U) ||
                         cbf_is_set(cur_pu->cbf, depth, COLOR_V);
   if (chroma_cbf_set) {
-    int x_local = (x >> 1) % LCU_WIDTH_C;
-    int y_local = (y >> 1) % LCU_WIDTH_C;
-    scan_idx = kvz_get_scan_order(cur_pu->type, cur_pu->intra.mode_chroma, depth);
-
-    const coeff_t *coeff_u = &state->coeff->u[xy_to_zorder(LCU_WIDTH_C, x_local, y_local)];
-    const coeff_t *coeff_v = &state->coeff->v[xy_to_zorder(LCU_WIDTH_C, x_local, y_local)];
-
-    if (cbf_is_set(cur_pu->cbf, depth, COLOR_U)) {
-      kvz_encode_coeff_nxn(state, &state->cabac, coeff_u, width_c, 1, scan_idx, NULL, false);
-    }
-
-    if (cbf_is_set(cur_pu->cbf, depth, COLOR_V)) {
-      kvz_encode_coeff_nxn(state, &state->cabac, coeff_v, width_c, 2, scan_idx, NULL, false);
-    }
+    encode_chroma_tu(state, x, y, depth, width_c, cur_pu, &scan_idx);
   }
 }
 
@@ -253,7 +257,8 @@ static void encode_transform_coeff(encoder_state_t * const state,
                                    int8_t depth,
                                    int8_t tr_depth,
                                    uint8_t parent_coeff_u,
-                                   uint8_t parent_coeff_v)
+                                   uint8_t parent_coeff_v,
+                                   bool only_chroma)
 {
   cabac_data_t * const cabac = &state->cabac;
   //const encoder_control_t *const ctrl = state->encoder_control;
@@ -312,7 +317,7 @@ static void encode_transform_coeff(encoder_state_t * const state,
   // - they have already been signaled to 0 previously
   // When they are not present they are inferred to be 0, except for size 4
   // when the flags from previous level are used.
-  if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+  if (state->encoder_control->chroma_format != KVZ_CSP_400 && (depth != 4 || only_chroma)) {
     
     if (!split) {
       if (true) {
@@ -331,10 +336,10 @@ static void encode_transform_coeff(encoder_state_t * const state,
     uint8_t offset = LCU_WIDTH >> (depth + 1);
     int x2 = x + offset;
     int y2 = y + offset;
-    encode_transform_coeff(state, x,  y,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
-    encode_transform_coeff(state, x2, y,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
-    encode_transform_coeff(state, x,  y2, depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
-    encode_transform_coeff(state, x2, y2, depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
+    encode_transform_coeff(state, x,  y,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v, only_chroma);
+    encode_transform_coeff(state, x2, y,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v, only_chroma);
+    encode_transform_coeff(state, x,  y2, depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v, only_chroma);
+    encode_transform_coeff(state, x2, y2, depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v, only_chroma);
     return;
   }
 
@@ -343,7 +348,7 @@ static void encode_transform_coeff(encoder_state_t * const state,
   // - transform depth > 0
   // - we have chroma coefficients at this level
   // When it is not present, it is inferred to be 1.
-  if (cur_cu->type == CU_INTRA || tr_depth > 0 || cb_flag_u || cb_flag_v) {
+  if ((cur_cu->type == CU_INTRA || tr_depth > 0 || cb_flag_u || cb_flag_v) && !only_chroma) {
       cabac->cur_ctx = &(cabac->ctx.qt_cbf_model_luma[0]);
       CABAC_BIN(cabac, cb_flag_y, "cbf_luma");
   }
@@ -374,7 +379,7 @@ static void encode_transform_coeff(encoder_state_t * const state,
       state->must_code_qp_delta = false;
     }
 
-    encode_transform_unit(state, x, y, depth);
+    encode_transform_unit(state, x, y, depth, only_chroma);
   }
 }
 
@@ -477,6 +482,72 @@ static void encode_inter_prediction_unit(encoder_state_t * const state,
 
     } // for ref_list
   } // if !merge
+}
+
+static void encode_chroma_intra_cu(cabac_data_t* const cabac, const cu_info_t* const cur_cu, int x, int y, const videoframe_t* const frame, const int cu_width) {
+  unsigned pred_mode = 0;
+  unsigned chroma_pred_modes[8] = {0, 50, 18, 1, 67, 68, 69, 70};
+  const int pu_x = PU_GET_X(cur_cu->part_size, cu_width, x, 0);
+  const int pu_y = PU_GET_Y(cur_cu->part_size, cu_width, y, 0);
+  const cu_info_t *first_pu = kvz_cu_array_at_const(frame->cu_array, pu_x, pu_y);
+  int8_t chroma_intra_dir = first_pu->intra.mode_chroma;
+  int8_t luma_intra_dir = first_pu->intra.mode;
+
+  bool derived_mode = 1;// chroma_intra_dir == 70;
+  cabac->cur_ctx = &(cabac->ctx.chroma_pred_model);
+  CABAC_BIN(cabac, derived_mode ? 0 : 1, "intra_chroma_pred_mode");
+
+
+  if (false/* !derived_mode*/) {
+    /*for (int i = 0; i < 4; i++) {
+        if (luma_intra_dir == chroma_pred_modes[i]) {
+          chroma_pred_modes[i] = 66;
+          break;
+        }
+      }*/
+    for (; pred_mode < 8; pred_mode++) {
+      if (chroma_intra_dir == chroma_pred_modes[pred_mode]) {
+        break;
+      }
+    }
+    /*else if (intra_pred_mode_chroma == 66) {
+        // Angular 66 mode is possible only if intra pred mode is one of the
+        // possible chroma pred modes, in which case it is signaled with that
+        // duplicate mode.
+        for (int i = 0; i < 4; ++i) {
+          if (intra_pred_mode_actual[0] == chroma_pred_modes[i]) pred_mode = i;
+        }
+      }
+      else {
+        for (int i = 0; i < 4; ++i) {
+          if (intra_pred_mode_chroma == chroma_pred_modes[i]) pred_mode = i;
+        }
+      }
+
+      // pred_mode == 67 mean intra_pred_mode_chroma is something that can't
+      // be coded.
+      assert(pred_mode != 67);
+      */
+    /**
+       * Table 9-35 - Binarization for intra_chroma_pred_mode
+       *   intra_chroma_pred_mode  bin_string
+       *                        4           0
+       *                        0         100
+       *                        1         101
+       *                        2         110
+       *                        3         111
+       * Table 9-37 - Assignment of ctxInc to syntax elements with context coded bins
+       *   intra_chroma_pred_mode[][] = 0, bypass, bypass
+       */
+    /*cabac->cur_ctx = &(cabac->ctx.chroma_pred_model[0]);
+      if (pred_mode == 68) {
+        CABAC_BIN(cabac, 0, "intra_chroma_pred_mode");
+      }
+      else {
+        CABAC_BIN(cabac, 1, "intra_chroma_pred_mode");*/
+    CABAC_BINS_EP(cabac, 0/*pred_mode*/, 2, "intra_chroma_pred_mode");
+    //}
+  }
 }
 
 static void encode_intra_coding_unit(encoder_state_t * const state,
@@ -694,75 +765,19 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
   }
 
   // Code chroma prediction mode.
-  if (state->encoder_control->chroma_format != KVZ_CSP_400) {
-    unsigned pred_mode = 0;
-    unsigned chroma_pred_modes[8] = {0, 50, 18, 1, 67, 68, 69, 70};
-    const int pu_x = PU_GET_X(cur_cu->part_size, cu_width, x, 0);
-    const int pu_y = PU_GET_Y(cur_cu->part_size, cu_width, y, 0);
-    const cu_info_t *first_pu = kvz_cu_array_at_const(frame->cu_array, pu_x, pu_y);
-    int8_t chroma_intra_dir = first_pu->intra.mode_chroma;
-    int8_t luma_intra_dir = first_pu->intra.mode;
-
-    bool derived_mode = 1;// chroma_intra_dir == 70;
-    cabac->cur_ctx = &(cabac->ctx.chroma_pred_model);
-    CABAC_BIN(cabac, derived_mode ? 0 : 1, "intra_chroma_pred_mode");
-
-
-    if (false/* !derived_mode*/) {
-      /*for (int i = 0; i < 4; i++) {
-        if (luma_intra_dir == chroma_pred_modes[i]) {
-          chroma_pred_modes[i] = 66;
-          break;
-        }
-      }*/
-      for (; pred_mode < 8; pred_mode++) {
-        if (chroma_intra_dir == chroma_pred_modes[pred_mode]) {
-          break;
-        }
-      }
-      /*else if (intra_pred_mode_chroma == 66) {
-        // Angular 66 mode is possible only if intra pred mode is one of the
-        // possible chroma pred modes, in which case it is signaled with that
-        // duplicate mode.
-        for (int i = 0; i < 4; ++i) {
-          if (intra_pred_mode_actual[0] == chroma_pred_modes[i]) pred_mode = i;
-        }
-      }
-      else {
-        for (int i = 0; i < 4; ++i) {
-          if (intra_pred_mode_chroma == chroma_pred_modes[i]) pred_mode = i;
-        }
-      }
-
-      // pred_mode == 67 mean intra_pred_mode_chroma is something that can't
-      // be coded.
-      assert(pred_mode != 67);
-      */
-      /**
-       * Table 9-35 - Binarization for intra_chroma_pred_mode
-       *   intra_chroma_pred_mode  bin_string
-       *                        4           0
-       *                        0         100
-       *                        1         101
-       *                        2         110
-       *                        3         111
-       * Table 9-37 - Assignment of ctxInc to syntax elements with context coded bins
-       *   intra_chroma_pred_mode[][] = 0, bypass, bypass
-       */
-      /*cabac->cur_ctx = &(cabac->ctx.chroma_pred_model[0]);
-      if (pred_mode == 68) {
-        CABAC_BIN(cabac, 0, "intra_chroma_pred_mode");
-      }
-      else {
-        CABAC_BIN(cabac, 1, "intra_chroma_pred_mode");*/
-        CABAC_BINS_EP(cabac, 0/*pred_mode*/, 2, "intra_chroma_pred_mode");
-      //}
-    }
+  if (state->encoder_control->chroma_format != KVZ_CSP_400 && depth != 4) {
+    encode_chroma_intra_cu(cabac, cur_cu, x, y, frame, cu_width);
   }
 
-  encode_transform_coeff(state, x, y, depth, 0, 0, 0);
+  encode_transform_coeff(state, x, y, depth, 0, 0, 0, 0);
 
   encode_mts_idx(state, cabac, cur_cu);
+
+  if (state->encoder_control->chroma_format != KVZ_CSP_400 && depth == 4 && x % 8 && y % 8) {
+    encode_chroma_intra_cu(cabac, cur_cu, x, y, frame, cu_width);
+    encode_transform_coeff(state, x, y, depth, 0, 0, 0, 1);
+  }
+
 }
 
 /**
@@ -1153,7 +1168,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
       // Code (possible) coeffs to bitstream
 
       if (cbf) {
-        encode_transform_coeff(state, x, y, depth, 0, 0, 0);
+        encode_transform_coeff(state, x, y, depth, 0, 0, 0, 0);
       }
     }
   } else if (cur_cu->type == CU_INTRA) {

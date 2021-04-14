@@ -182,7 +182,7 @@ static void derive_mts_constraints(cu_info_t *const pred_cu,
   const uint32_t log2_cg_size = kvz_g_log2_sbb_size[log2_block_size][log2_block_size][0]
     + kvz_g_log2_sbb_size[log2_block_size][log2_block_size][1];
   const uint32_t *scan = kvz_g_sig_last_scan[scan_idx][log2_block_size - 1];
-  const uint32_t *scan_cg = g_sig_last_scan_cg[log2_block_size - 2][scan_idx];
+  const uint32_t *scan_cg = g_sig_last_scan_cg[log2_block_size - 1][scan_idx];
   const coeff_t* coeff = &lcu->coeff.y[xy_to_zorder(LCU_WIDTH, lcu_px.x, lcu_px.y)];
 
   signed scan_cg_last = -1;

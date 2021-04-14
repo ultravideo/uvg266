@@ -66,7 +66,7 @@ void kvz_encode_coeff_nxn_generic(encoder_state_t * const state,
   const uint32_t log2_cg_size = kvz_g_log2_sbb_size[log2_block_size][log2_block_size][0] + kvz_g_log2_sbb_size[log2_block_size][log2_block_size][1];
   const uint32_t *scan =
     kvz_g_sig_last_scan[scan_mode][log2_block_size - 1];
-  const uint32_t *scan_cg = g_sig_last_scan_cg[log2_block_size - 2][scan_mode];
+  const uint32_t *scan_cg = g_sig_last_scan_cg[log2_block_size - 1][scan_mode];
   const uint32_t clipped_log2_size = log2_block_size > 4 ? 4 : log2_block_size;
   const uint32_t num_blk_side = width >> log2_cg_size;
 

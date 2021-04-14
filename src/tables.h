@@ -81,11 +81,12 @@ static const uint32_t g_sig_last_scan_32x32[64] = {
 
 /**
  * List of pointers to coefficient group mappings.
- * First index: (log2 - 2) of transform block size
+ * First index: (log2 - 1) of transform block size
  * Second index: scan pattern 0 = diagonal, 1 = horizontal, 2 = vertical
  */
-static const uint32_t * const g_sig_last_scan_cg[4][3] = {
+static const uint32_t * const g_sig_last_scan_cg[5][3] = {
   { g_sig_last_scan_8x8[0], g_sig_last_scan_8x8[1], g_sig_last_scan_8x8[2] },  // 4x4, only first element is used
+  { g_sig_last_scan_8x8[0], g_sig_last_scan_8x8[1], g_sig_last_scan_8x8[2] },  
   { g_sig_last_scan_8x8[0], g_sig_last_scan_8x8[1], g_sig_last_scan_8x8[2] },
   { g_sig_last_scan_16x16, 0, 0 },
   { g_sig_last_scan_32x32, 0, 0 }

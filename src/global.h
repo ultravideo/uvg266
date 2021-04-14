@@ -125,10 +125,10 @@ typedef int16_t coeff_t;
 
 //! Maximum CU depth when descending form LCU level.
 //! spec: log2_diff_max_min_luma_coding_block_size
-#define MAX_DEPTH 3
+#define MAX_DEPTH 4
 //! Minimum log2 size of CUs.
 //! spec: MinCbLog2SizeY
-#define MIN_SIZE 3
+#define MIN_SIZE 2
 //! Minimum log2 size of PUs.
 //! Search is started at depth 0 and goes in Z-order to MAX_PU_DEPTH, see search_cu()
 #define MAX_PU_DEPTH 4

@@ -342,7 +342,7 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
     }
   }
 
-  if (tr_cu->tr_depth > depth) {
+  if (MIN(tr_cu->tr_depth, 3) > depth) {
     int offset = LCU_WIDTH >> (depth + 1);
     int sum = 0;
 
@@ -638,7 +638,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
                          cur_cu->intra.mode, -1, // skip chroma
                          NULL, lcu);
 
-      if (x % 8 == 0 && y % 8 == 0 && state->encoder_control->chroma_format != KVZ_CSP_400) {
+      if (depth != 4 || (x % 8 && y % 8) && state->encoder_control->chroma_format != KVZ_CSP_400) {
         // There is almost no benefit to doing the chroma mode search for
         // rd2. Possibly because the luma mode search already takes chroma
         // into account, so there is less of a chanse of luma mode being
@@ -649,7 +649,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         }
 
         kvz_intra_recon_cu(state,
-                           x, y,
+                           x & ~7, y & ~7,
                            depth,
                            -1, cur_cu->intra.mode_chroma, // skip luma
                            NULL, lcu);
@@ -700,7 +700,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
   if (cur_cu->type == CU_INTRA || cur_cu->type == CU_INTER) {
     cost = kvz_cu_rd_cost_luma(state, x_local, y_local, depth, cur_cu, lcu);
     if (state->encoder_control->chroma_format != KVZ_CSP_400) {
-      cost += kvz_cu_rd_cost_chroma(state, x_local, y_local, depth, cur_cu, lcu);
+      cost += kvz_cu_rd_cost_chroma(state, x_local, y_local, MIN(depth, 3), cur_cu, lcu);
     }
 
     double mode_bits;
