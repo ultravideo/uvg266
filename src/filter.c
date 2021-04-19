@@ -623,7 +623,7 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
 {
   videoframe_t * const frame = state->tile->frame;
   const encoder_control_t * const encoder = state->encoder_control;
-
+  
   {
     int32_t stride = frame->rec->stride;
     int32_t beta_offset_div2 = encoder->cfg.deblock_beta;
@@ -676,7 +676,7 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
           cu_p = kvz_cu_array_at(frame->cu_array, x_coord, y - 1);
           cu_q = kvz_cu_array_at(frame->cu_array, x_coord, y    );
         }
-
+        
         bool nonzero_coeffs = cbf_is_set(cu_q->cbf, cu_q->tr_depth, COLOR_Y)
                            || cbf_is_set(cu_p->cbf, cu_p->tr_depth, COLOR_Y);
 
@@ -949,9 +949,7 @@ static void filter_deblock_edge_chroma(encoder_state_t * const state,
 {
   const encoder_control_t * const encoder = state->encoder_control;
   const videoframe_t * const frame = state->tile->frame;
-
-  if (dir == 0) return;
-  
+   
   // For each subpart
   {
     int32_t stride = frame->rec->stride >> 1;
@@ -1115,7 +1113,8 @@ static void filter_deblock_unit(encoder_state_t * const state,
                                 int width,
                                 int height,
                                 edge_dir dir,
-                                bool tu_boundary)
+                                bool tu_boundary, 
+                                bool previous_ctu)
 {
   // no filtering on borders (where filter would use pixels outside the picture)
   if (x == 0 && dir == EDGE_VER) return;
@@ -1127,10 +1126,10 @@ static void filter_deblock_unit(encoder_state_t * const state,
   if (dir == EDGE_HOR) {
     const videoframe_t* const frame = state->tile->frame;
     const int32_t x_right = x + width;
-    const bool rightmost_8px_of_lcu = x_right % LCU_WIDTH == 0;
+    const bool rightmost_8px_of_lcu = x_right % LCU_WIDTH == 0 || x_right % LCU_WIDTH == LCU_WIDTH - width;
     const bool rightmost_8px_of_frame = x_right == frame->width;
 
-    if (rightmost_8px_of_lcu && !rightmost_8px_of_frame) {
+    if (rightmost_8px_of_lcu && !rightmost_8px_of_frame && !previous_ctu) {
       // The last 8 pixels will be deblocked when processing the next LCU.
       length   = width - 4;
       length_c = (width >> 1) - 2;
@@ -1180,7 +1179,7 @@ static void filter_deblock_lcu_inside(encoder_state_t * const state,
     for (int edge_x = x; edge_x < end_x; edge_x += 4) {
       bool tu_boundary = is_tu_boundary(state, edge_x, edge_y, dir);
       if (tu_boundary || is_pu_boundary(state, edge_x, edge_y, dir)) {
-        filter_deblock_unit(state, edge_x, edge_y, 4, 4, dir, tu_boundary);
+        filter_deblock_unit(state, edge_x, edge_y, 4, 4, dir, tu_boundary, edge_x < x);
       }
     }
   }
@@ -1199,14 +1198,15 @@ static void filter_deblock_lcu_rightmost(encoder_state_t * const state,
                                          int32_t y_px)
 {
   // Luma
-  const int x = x_px - 4;
   const int end = MIN(y_px + LCU_WIDTH, state->tile->frame->height);
-  for (int y = y_px; y < end; y += 4) {
-    // The top edge of the whole frame is not filtered.
-    bool tu_boundary = is_tu_boundary(state, x, y, EDGE_HOR);
-    bool pu_boundary = is_pu_boundary(state, x, y, EDGE_HOR);
-    if (y > 0 && (tu_boundary || pu_boundary)) {
-      filter_deblock_edge_luma(state, x, y, 4, EDGE_HOR, tu_boundary);
+  for (int x = x_px - 8; x < x_px; x += 4) {
+    for (int y = y_px; y < end; y += 4) {
+      // The top edge of the whole frame is not filtered.
+      bool tu_boundary = is_tu_boundary(state, x, y, EDGE_HOR);
+      bool pu_boundary = is_pu_boundary(state, x, y, EDGE_HOR);
+      if (y > 0 && (tu_boundary || pu_boundary)) {
+        filter_deblock_edge_luma(state, x, y, 4, EDGE_HOR, tu_boundary);
+      }
     }
   }
 
