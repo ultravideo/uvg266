@@ -52,7 +52,7 @@ static pthread_mutex_t outfile_mutex[RD_SAMPLING_MAX_LAST_QP + 1];
 
 const uint32_t kvz_g_go_rice_range[5] = { 7, 14, 26, 46, 78 };
 const uint32_t kvz_g_go_rice_prefix_len[5] = { 8, 7, 6, 5, 4 };
-const uint32_t g_auiGoRiceParsCoeff[32] =
+static const uint32_t g_auiGoRiceParsCoeff[32] =
 {
   0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3
 };
@@ -733,7 +733,7 @@ void kvz_rdoq_sign_hiding(
   }
 }
 
-unsigned templateAbsSum(const coeff_t* coeff, int baseLevel, uint32_t  posX, uint32_t  posY, uint32_t width, uint32_t height)
+static unsigned templateAbsSum(const coeff_t* coeff, int baseLevel, uint32_t  posX, uint32_t  posY, uint32_t width, uint32_t height)
 {
   const coeff_t* pData = coeff + posX + posY * width;
   coeff_t          sum = 0;
