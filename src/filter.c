@@ -555,7 +555,7 @@ static INLINE void get_max_filter_length(uint8_t *filt_len_P, uint8_t *filt_len_
   if (pos + 8 < len) transform_edge_8x8[1] = is_tu_boundary(state, x + x_mul * 8, y + y_mul * 8, dir);
 
   if (comp == COLOR_Y) {
-    if (tu_size_P_side <= 4 && tu_size_Q_side <= 4){
+    if (tu_size_P_side <= 4 || tu_size_Q_side <= 4){
       *filt_len_P = 1;
       *filt_len_Q = 1;
     }
@@ -1127,7 +1127,7 @@ static void filter_deblock_unit(encoder_state_t * const state,
     const videoframe_t* const frame = state->tile->frame;
     const int32_t x_right = x + width;
     const bool rightmost_8px_of_lcu = x_right % LCU_WIDTH == 0 || x_right % LCU_WIDTH == LCU_WIDTH - width;
-    const bool rightmost_8px_of_frame = x_right == frame->width;
+    const bool rightmost_8px_of_frame = x_right == frame->width || x_right + width == frame->width;
 
     if (rightmost_8px_of_lcu && !rightmost_8px_of_frame && !previous_ctu) {
       // The last 8 pixels will be deblocked when processing the next LCU.
@@ -1149,7 +1149,8 @@ static void filter_deblock_unit(encoder_state_t * const state,
   // Chroma pixel coordinates.
   const int32_t x_c = x >> 1;
   const int32_t y_c = y >> 1;
-  if (state->encoder_control->chroma_format != KVZ_CSP_400 && is_on_8x8_grid(x_c, y_c, dir) && (x_c + 4) % 32) {
+  if ((state->encoder_control->chroma_format != KVZ_CSP_400 && is_on_8x8_grid(x_c, y_c, dir) && (x_c + 4) % 32) 
+      || (x == state->tile->frame->width - 8 && dir == 1 && y_c % 8 == 0)) {
     filter_deblock_edge_chroma(state, x_c, y_c, length, dir, tu_boundary);
   }
 }
