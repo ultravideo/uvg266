@@ -639,7 +639,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
                          NULL, lcu);
 
       // TODO: This heavily relies to square CUs
-      if (depth != 4 || (x % 8 && y % 8) && state->encoder_control->chroma_format != KVZ_CSP_400) {
+      if ((depth != 4 || (x % 8 && y % 8)) && state->encoder_control->chroma_format != KVZ_CSP_400) {
         // There is almost no benefit to doing the chroma mode search for
         // rd2. Possibly because the luma mode search already takes chroma
         // into account, so there is less of a chanse of luma mode being

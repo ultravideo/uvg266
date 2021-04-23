@@ -1149,8 +1149,8 @@ static void filter_deblock_unit(encoder_state_t * const state,
   // Chroma pixel coordinates.
   const int32_t x_c = x >> 1;
   const int32_t y_c = y >> 1;
-  if ((state->encoder_control->chroma_format != KVZ_CSP_400 && is_on_8x8_grid(x_c, y_c, dir) && (x_c + 4) % 32) 
-      || (x == state->tile->frame->width - 8 && dir == 1 && y_c % 8 == 0)) {
+  if (state->encoder_control->chroma_format != KVZ_CSP_400 && (is_on_8x8_grid(x_c, y_c, dir && (x_c + 4) % 32) 
+                                                               || (x == state->tile->frame->width - 8 && dir == 1 && y_c % 8 == 0))) {
     filter_deblock_edge_chroma(state, x_c, y_c, length, dir, tu_boundary);
   }
 }

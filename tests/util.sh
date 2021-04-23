@@ -22,7 +22,7 @@ prepare() {
     cleanup
     print_and_run \
         ffmpeg -f lavfi -i "mandelbrot=size=${1}" \
-            -vframes "${2}" -pix_fmt yuv420p -f yuv4mpegpipe \
+            -vframes "${2}" -pix_fmt "${3}" -f yuv4mpegpipe \
             "${yuvfile}"
 }
 
@@ -31,8 +31,10 @@ valgrind_test() {
     shift
     frames="$1"
     shift
+    format="$1"
+    shift
 
-    prepare "${dimensions}" "${frames}"
+    prepare "${dimensions}" "${frames}" "${format}"
 
     # If $KVZ_TEST_VALGRIND is defined and equal to "1", run the test with
     # valgrind. Otherwise, run without valgrind.
@@ -59,10 +61,12 @@ encode_test() {
     shift
     frames="$1"
     shift
+    format="$1"
+    shift
     expected_status="$1"
     shift
 
-    prepare "${dimensions}" "${frames}"
+    prepare "${dimensions}" "${frames}" "${format}"
 
     set +e
     print_and_run \
