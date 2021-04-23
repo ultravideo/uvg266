@@ -904,7 +904,7 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
       //===== coefficient level estimation =====
       int32_t  level;
       if (reg_bins < 4) {
-        int  sumAll = templateAbsSum(coef, 4, pos_x, pos_y, width, height);
+        int  sumAll = templateAbsSum(coef, 0, pos_x, pos_y, width, height);
         go_rice_param = g_auiGoRiceParsCoeff[sumAll];
       }
 
