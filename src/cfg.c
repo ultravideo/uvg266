@@ -81,6 +81,7 @@ int kvz_config_init(kvz_config *cfg)
   cfg->vui.chroma_loc  = 0; /* left center */
   cfg->aud_enable      = 0;
   cfg->cqmfile         = NULL;
+  cfg->fast_coeff_table_fn = NULL;
   cfg->ref_frames      = 1;
   cfg->gop_len         = 4;
   cfg->gop_lowdelay    = true;
@@ -176,6 +177,10 @@ int kvz_config_init(kvz_config *cfg)
 
   cfg->stats_file_prefix = NULL;
 
+  cfg->fastrd_sampling_on = 0;
+  cfg->fastrd_accuracy_check_on = 0;
+  cfg->fastrd_learning_outdir_fn = NULL;
+
   int8_t in[] = { 17, 27, 32, 44 };
   int8_t out[] = { 17, 29, 34, 41 };
 
@@ -196,11 +201,13 @@ int kvz_config_destroy(kvz_config *cfg)
 {
   if (cfg) {
     FREE_POINTER(cfg->cqmfile);
+    FREE_POINTER(cfg->fast_coeff_table_fn);
     FREE_POINTER(cfg->tiles_width_split);
     FREE_POINTER(cfg->tiles_height_split);
     FREE_POINTER(cfg->slice_addresses_in_ts);
     FREE_POINTER(cfg->roi.dqps);
     FREE_POINTER(cfg->optional_key);
+    FREE_POINTER(cfg->fastrd_learning_outdir_fn);
     if (cfg->param_set_map)
     {
       FREE_POINTER(cfg->param_set_map);
@@ -903,6 +910,30 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     FREE_POINTER(cfg->cqmfile);
     cfg->cqmfile = cqmfile;
     cfg->scaling_list = KVZ_SCALING_LIST_CUSTOM;
+  }
+  else if OPT("fast-coeff-table") {
+    char* fast_coeff_table_fn = strdup(value);
+    if (!fast_coeff_table_fn) {
+      fprintf(stderr, "Failed to allocate memory for fast coeff table file name.\n");
+      return 0;
+    }
+    FREE_POINTER(cfg->fast_coeff_table_fn);
+    cfg->fast_coeff_table_fn = fast_coeff_table_fn;
+  }
+  else if OPT("fastrd-sampling") {
+    cfg->fastrd_sampling_on = 1;
+  }
+  else if OPT("fastrd-accuracy-check") {
+    cfg->fastrd_accuracy_check_on = 1;
+  }
+  else if OPT("fastrd-outdir") {
+    char *fastrd_learning_outdir_fn = strdup(value);
+    if (!fastrd_learning_outdir_fn) {
+      fprintf(stderr, "Failed to allocate memory for fast RD learning outfile name.\n");
+      return 0;
+    }
+    FREE_POINTER(cfg->fastrd_learning_outdir_fn);
+    cfg->fastrd_learning_outdir_fn = fastrd_learning_outdir_fn;
   }
   else if OPT("scaling-list") {    
     int8_t scaling_list = KVZ_SCALING_LIST_OFF;

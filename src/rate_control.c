@@ -803,9 +803,10 @@ static double qp_to_lambda(encoder_state_t* const state, int qp)
     int id = lcu.x + lcu.y * state->tile->frame->width_in_lcu;
     int aq_offset = round(state->frame->aq_offsets[id]);
     state->qp += aq_offset;
-    // Maximum delta QP is clipped between [-26, 25] according to ITU T-REC-H.265 specification chapter 7.4.9.10 Transform unit semantics
+    // Maximum delta QP is clipped according to ITU T-REC-H.265 specification chapter 7.4.9.10 Transform unit semantics
+    // Clipping range is a function of bit depth
     // Since this value will be later combined with qp_pred, clip to half of that instead to be safe
-    state->qp = CLIP(state->frame->QP - 13, state->frame->QP + 12, state->qp);
+    state->qp = CLIP(state->frame->QP + KVZ_QP_DELTA_MIN / 2, state->frame->QP + KVZ_QP_DELTA_MAX / 2, state->qp);
     state->qp = CLIP_TO_QP(state->qp);
     state->lambda = qp_to_lambda(state, state->qp);
     state->lambda_sqrt = sqrt(state->lambda);
@@ -1149,9 +1150,10 @@ void kvz_set_lcu_lambda_and_qp(encoder_state_t * const state,
     int id = lcu_pos.x + lcu_pos.y * state->tile->frame->width_in_lcu;
     int aq_offset = round(state->frame->aq_offsets[id]);
     state->qp += aq_offset;    
-    // Maximum delta QP is clipped between [-26, 25] according to ITU T-REC-H.265 specification chapter 7.4.9.10 Transform unit semantics
+    // Maximum delta QP is clipped according to ITU T-REC-H.265 specification chapter 7.4.9.10 Transform unit semantics
+    // Clipping range is a function of bit depth
     // Since this value will be later combined with qp_pred, clip to half of that instead to be safe
-    state->qp = CLIP(state->frame->QP - 13, state->frame->QP + 12, state->qp);
+    state->qp = CLIP(state->frame->QP + KVZ_QP_DELTA_MIN / 2, state->frame->QP + KVZ_QP_DELTA_MAX / 2, state->qp);
     state->qp = CLIP_TO_QP(state->qp);
     state->lambda = qp_to_lambda(state, state->qp);
     state->lambda_sqrt = sqrt(state->lambda);

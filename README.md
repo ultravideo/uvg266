@@ -117,6 +117,7 @@ Options:
                                bits, lambda, distortion, and qp for each ctu.
                                These are meant for debugging and are not
                                written unless the prefix is defined.
+
 Video structure:
   -q, --qp <integer>         : Quantization parameter [22]
   -p, --period <integer>     : Period of intra pictures [64]
@@ -148,11 +149,11 @@ Video structure:
                                    - N: Target N bits per second.
       --rc-algorithm <string>: Select used rc-algorithm. [lambda]
                                    - lambda: rate control from:
-                                     DOI: 10.1109/TIP.2014.2336550
+                                     DOI: 10.1109/TIP.2014.2336550 
                                    - oba: DOI: 10.1109/TCSVT.2016.2589878
       --(no-)intra-bits      : Use Hadamard cost based allocation for intra
                                frames. Default on for gop 8 and off for lp-gop
-      --(no-)clip-neighbour  : On oba based rate control whether to clip
+      --(no-)clip-neighbour  : On oba based rate control whether to clip 
                                lambda values to same frame's ctus or previous'.
                                Default on for RA GOPS and disabled for LP.
       --(no-)lossless        : Use lossless coding. [disabled]
@@ -253,6 +254,16 @@ Compression tools:
                                    - sensitive: Terminate even earlier.
       --fast-residual-cost <int> : Skip CABAC cost for residual coefficients
                                    when QP is below the limit. [0]
+      --fast-coeff-table <string> : Read custom weights for residual
+                                    coefficients from a file instead of using
+                                    defaults [default]
+      --fast-rd-sampling : Enable learning data sampling for fast coefficient
+                           table generation
+      --fastrd-accuracy-check : Evaluate the accuracy of fast coefficient
+                                prediction
+      --fastrd-outdir : Directory to which to output sampled data or accuracy
+                        data, into <fastrd-outdir>/0.txt to 50.txt, one file
+                        for each QP that blocks were estimated on
       --(no-)intra-rdo-et    : Check intra modes in rdo stage only until
                                a zero coefficient CU is found. [disabled]
       --(no-)early-skip      : Try to find skip cu from merge candidates.

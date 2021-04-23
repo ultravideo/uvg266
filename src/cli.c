@@ -155,6 +155,10 @@ static const struct option long_options[] = {
   { "no-clip-neighbour",        no_argument, NULL, 0 },
   { "input-file-format",  required_argument, NULL, 0 },
   { "stats-file-prefix",  required_argument, NULL, 0 },
+  { "fast-coeff-table",   required_argument, NULL, 0 },
+  { "fastrd-sampling",          no_argument, NULL, 0 },
+  { "fastrd-accuracy-check",    no_argument, NULL, 0 },
+  { "fastrd-outdir",      required_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 
@@ -577,6 +581,16 @@ void print_help(void)
     "                                   - sensitive: Terminate even earlier.\n"
     "      --fast-residual-cost <int> : Skip CABAC cost for residual coefficients\n"
     "                                   when QP is below the limit. [0]\n"
+    "      --fast-coeff-table <string> : Read custom weights for residual\n"
+    "                                    coefficients from a file instead of using\n"
+    "                                    defaults [default]\n"
+    "      --fast-rd-sampling : Enable learning data sampling for fast coefficient\n"
+    "                           table generation\n"
+    "      --fastrd-accuracy-check : Evaluate the accuracy of fast coefficient\n"
+    "                                prediction\n"
+    "      --fastrd-outdir : Directory to which to output sampled data or accuracy\n"
+    "                        data, into <fastrd-outdir>/0.txt to 50.txt, one file\n"
+    "                        for each QP that blocks were estimated on\n"
     "      --(no-)intra-rdo-et    : Check intra modes in rdo stage only until\n"
     "                               a zero coefficient CU is found. [disabled]\n"
     "      --(no-)early-skip      : Try to find skip cu from merge candidates.\n"
