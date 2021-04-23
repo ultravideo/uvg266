@@ -494,8 +494,11 @@ typedef struct kvz_config
   int8_t num_used_table;
   int8_t qp_table_start_minus26[3];
   int8_t qp_table_length_minus1[3];
-  int8_t* delta_qp_in_val_minus1[3];
-  int8_t* delta_qp_out_val[3];
+  int8_t delta_qp_in_val_minus1[3][16];
+  int8_t delta_qp_out_val[3][16];
+
+  int8_t chroma_scale_in[3][17];
+  int8_t chroma_scale_out[3][17];
 } kvz_config;
 
 /**

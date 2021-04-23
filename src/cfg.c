@@ -29,6 +29,8 @@
 #include <math.h>
 
 
+static void parse_qp_map(kvz_config* cfg, int index);
+
 kvz_config *kvz_config_alloc(void)
 {
   return calloc(1, sizeof(kvz_config));
@@ -184,15 +186,16 @@ int kvz_config_init(kvz_config *cfg)
   int8_t in[] = { 17, 27, 32, 44 };
   int8_t out[] = { 17, 29, 34, 41 };
 
-  cfg->num_used_table = 1;
-  cfg->qp_table_length_minus1[0] = 2;
-  cfg->qp_table_start_minus26[0] = 17 - 26;
-  cfg->delta_qp_in_val_minus1[0] = malloc(cfg->qp_table_length_minus1[0] + 1);
-  cfg->delta_qp_out_val[0] = malloc(cfg->qp_table_length_minus1[0]  +  1);
-  for (int i = 0; i < cfg->qp_table_length_minus1[0] + 1; i++) {
-    cfg->delta_qp_in_val_minus1[0][i] = in[i + 1] - in[i] - (int8_t)1;
-    cfg->delta_qp_out_val[0][i] = out[i + 1] - out[i];
-  }
+  cfg->chroma_scale_out[0][0] = cfg->chroma_scale_in[0][0] = 17;
+  cfg->chroma_scale_out[0][1] = cfg->chroma_scale_in[0][1] = 27;
+  cfg->chroma_scale_out[0][2] = cfg->chroma_scale_in[0][2] = 32;
+  cfg->chroma_scale_out[0][3] = cfg->chroma_scale_in[0][3] = 44;
+  cfg->chroma_scale_out[0][4] = cfg->chroma_scale_in[0][4] = -1;
+  cfg->chroma_scale_out[1][0] = cfg->chroma_scale_in[1][0] = -1;
+  cfg->chroma_scale_out[2][0] = cfg->chroma_scale_in[2][0] = -1;
+
+
+  parse_qp_map(cfg, 0);
 
   return 1;
 }
@@ -211,10 +214,6 @@ int kvz_config_destroy(kvz_config *cfg)
     if (cfg->param_set_map)
     {
       FREE_POINTER(cfg->param_set_map);
-    }
-    for (int i = 0; i < cfg->num_used_table; i++) {
-      if (cfg->delta_qp_in_val_minus1[i]) FREE_POINTER(cfg->delta_qp_in_val_minus1[i]);
-      if (cfg->delta_qp_out_val[i]) FREE_POINTER(cfg->delta_qp_out_val[i]);
     }
   }
   free(cfg);
@@ -328,6 +327,22 @@ static int parse_uint8(const char *numstr,uint8_t* number,int min, int max)
   }
 }
 
+static int parse_int8(const char *numstr,int8_t* number,int min, int max)
+{
+  char *tail;
+  int d = strtol(numstr, &tail, 10);
+  if (*tail || d < min || d > max){
+    fprintf(stderr, "Expected number between %d and %d\n", min, max);
+    if(number)
+      *number = 0;
+    return 0;
+  } else{
+    if (number)
+      *number = (int8_t) d;
+    return 1;
+  }
+}
+
 static int parse_array(const char *array, uint8_t *coeff_key, int size,
                             int min, int max)
 {
@@ -358,6 +373,52 @@ static int parse_array(const char *array, uint8_t *coeff_key, int size,
   }
   free(key);
   return 1;
+}
+
+static int parse_qp_scale_array(const char *array, int8_t *out)
+{
+  const int size = 16;
+  char *key = strdup(array);
+  const char delim[] = ",;:";
+  char *token;
+  int i = 0;
+
+  token = strtok(key, delim);
+  while(token!=NULL&&i<size){
+    if (!parse_int8(token, &out[i], 0, 63))
+    {
+      free(key);
+      return 0;
+    }
+    i++;
+    token = strtok(NULL, delim);
+  }
+
+  if (i>=size){
+    fprintf(stderr, "parsing failed : too many members.\n");
+    free(key);
+    return 0;
+  }
+  out[i] = -1;
+
+  free(key);
+  return 1;
+}
+
+static void parse_qp_map(kvz_config *cfg, int index) {
+  int i = 0;
+  for (; cfg->chroma_scale_in[index][i] != -1; i++);
+  if (cfg->chroma_scale_out[index][i] != -1) return;
+  assert(i < 17);
+
+  // TODO: Move this to somewhere else when we have more than one table
+  cfg->num_used_table = 1;
+  cfg->qp_table_length_minus1[index] = i - 2;
+  cfg->qp_table_start_minus26[index] = cfg->chroma_scale_in[index][0] - 26;
+  for (i = 0; i < cfg->qp_table_length_minus1[0] + 1; i++) {
+    cfg->delta_qp_in_val_minus1[index][i] = cfg->chroma_scale_in[index][i + 1] - cfg->chroma_scale_in[index][i] - (int8_t)1;
+    cfg->delta_qp_out_val[index][i] = cfg->chroma_scale_out[index][i + 1] - cfg->chroma_scale_out[index][i];
+  }
 }
 
 static int parse_pu_depth_list( const char *array, int32_t *depths_min, int32_t *depths_max, int size )
@@ -1458,6 +1519,18 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   else if OPT("stats-file-prefix") {
     cfg->stats_file_prefix = strdup(value);
   }
+  else if OPT("chroma-qp-in") {
+    memset(cfg->chroma_scale_in[0], 0, 17);
+    const bool success = parse_qp_scale_array(value, cfg->chroma_scale_in[0]);
+    parse_qp_map(cfg, 0);
+    return success;
+  }
+  else if OPT("chroma-qp-out") {
+    memset(cfg->chroma_scale_out[0], 0, 17);
+    const bool success = parse_qp_scale_array(value, cfg->chroma_scale_out[0]);
+    parse_qp_map(cfg, 0);
+    return success;
+  }
   else {
     return 0;
   }
@@ -1799,6 +1872,20 @@ int kvz_config_validate(const kvz_config *const cfg)
   if(cfg->target_bitrate == 0 && cfg->rc_algorithm != KVZ_NO_RC) {
     fprintf(stderr, "Rate control algorithm set but bitrate not set.\n");
     error = 1;
+  }
+
+  for (int index = 0; index < 3; index++) {
+    int i = 0;
+    if (cfg->chroma_scale_in[index][i] != cfg->chroma_scale_out[index][i]) {
+      fprintf(stderr, "The starting points of chroma qp scaling list %d do not match. %d != %d",
+        index, cfg->chroma_scale_in[index][i], cfg->chroma_scale_out[index][i]);
+      error = 1;
+    }
+    for (; cfg->chroma_scale_in[index][i] != -1; i++);
+    if (cfg->chroma_scale_out[index][i] != -1) {
+      fprintf(stderr, "The chroma qp scaling lists of index %d are different lengths.\n", index);
+      error = 1;
+    }
   }
 
   return !error;
