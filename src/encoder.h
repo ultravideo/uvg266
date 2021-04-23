@@ -30,7 +30,7 @@
 #include "kvazaar.h"
 #include "scalinglist.h"
 #include "threadqueue.h"
-
+#include "fast_coeff_cost.h"
 
 /* Encoder control options, the main struct */
 typedef struct encoder_control_t
@@ -134,6 +134,10 @@ typedef struct encoder_control_t
   } max_inter_ref_lcu;
 
   int32_t poc_lsb_bits;
+
+  fast_coeff_table_t fast_coeff_table;
+
+  int8_t* qp_map[3];
 
 } encoder_control_t;
 

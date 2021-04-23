@@ -28,9 +28,10 @@
 
 #include "cfg.h"
 #include "gop.h"
+#include "rdo.h"
 #include "strategyselector.h"
 #include "kvz_math.h"
-
+#include "fast_coeff_cost.h"
 
 /**
  * \brief Strength of QP adjustments when using adaptive QP for 360 video.
@@ -199,6 +200,49 @@ static void init_erp_aqp_roi(encoder_control_t* encoder,
 }
 
 
+static int8_t* derive_chroma_QP_mapping_table(const kvz_config* const cfg, int i)
+{
+  const int MAX_QP = 63;
+
+  int8_t qpInVal[16], qpOutVal[16];
+  int8_t* table = calloc(MAX_QP + 1, sizeof(int8_t));
+
+
+  const int qpBdOffsetC = (cfg->input_bitdepth - 8) * 6;
+  const int numPtsInCQPTableMinus1 = cfg->qp_table_length_minus1[i];
+
+  qpInVal[0] = cfg->qp_table_start_minus26[i] + 26;
+  qpOutVal[0] = qpInVal[0];
+  for (int j = 0; j <= cfg->qp_table_length_minus1[i]; j++)
+  {
+    qpInVal[j + 1] = qpInVal[j] + cfg->delta_qp_in_val_minus1[i][j] + 1;
+    qpOutVal[j + 1] = qpOutVal[j] + cfg->delta_qp_out_val[i][j];
+  }
+
+  table[qpInVal[0]] = qpOutVal[0];
+  for (int k = qpInVal[0] - 1; k >= -qpBdOffsetC; k--)
+  {
+    table[k] = CLIP(-qpBdOffsetC, MAX_QP, table[k + 1] - 1);
+  }
+  for (int j = 0; j <= numPtsInCQPTableMinus1; j++)
+  {
+    int sh = (cfg->delta_qp_in_val_minus1[i][j] + 1) >> 1;
+    for (int k = qpInVal[j] + 1, m = 1; k <= qpInVal[j + 1]; k++, m++)
+    {
+      table[k] = table[qpInVal[j]] + ((qpOutVal[j + 1] - qpOutVal[j]) * m + sh) / (cfg->delta_qp_in_val_minus1[i][j] + 1);
+    }
+  }
+  for (int k = qpInVal[numPtsInCQPTableMinus1 + 1] + 1; k <= MAX_QP; k++)
+  {
+    table[k] = CLIP(-qpBdOffsetC, MAX_QP, table[k - 1] + 1);
+  }
+  for(int i = 0; i < MAX_QP; i++) {
+    printf("%3d %3d\n", i, table[i]);
+  }
+  return table;
+}
+
+
 /**
  * \brief Allocate and initialize an encoder control structure.
  *
@@ -232,6 +276,7 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
   encoder->cfg.tiles_width_split = NULL;
   encoder->cfg.tiles_height_split = NULL;
   encoder->cfg.slice_addresses_in_ts = NULL;
+  encoder->cfg.fast_coeff_table_fn = NULL;
 
   if (encoder->cfg.gop_len > 0) {
     if (encoder->cfg.gop_lowdelay) {
@@ -244,7 +289,8 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
   } 
   
   if( encoder->cfg.intra_qp_offset_auto ) {
-      encoder->cfg.intra_qp_offset = encoder->cfg.gop_len > 1 ? -kvz_math_ceil_log2( encoder->cfg.gop_len ) + 1 : 0;
+    // Limit offset to -3 since HM/VTM seems to use it even for 32 frame gop
+    encoder->cfg.intra_qp_offset = encoder->cfg.gop_len > 1 ? MAX(-(int8_t)kvz_math_ceil_log2( encoder->cfg.gop_len ) + 1, -3) : 0;
   }
 
   // Disable GOP and QP offset for all-intra coding
@@ -336,6 +382,31 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
     // Enable scaling lists if default lists are used
     encoder->scaling_list.enable = 1;
     encoder->scaling_list.use_default_list = 1;
+  }
+
+  if (cfg->fast_coeff_table_fn) {
+    FILE *fast_coeff_table_f = fopen(cfg->fast_coeff_table_fn, "rb");
+    if (fast_coeff_table_f == NULL) {
+      fprintf(stderr, "Could not open fast coeff table file.\n");
+      goto init_failed;
+    }
+    if (kvz_fast_coeff_table_parse(&encoder->fast_coeff_table, fast_coeff_table_f) != 0) {
+      fprintf(stderr, "Failed to parse fast coeff table, using default\n");
+      kvz_fast_coeff_use_default_table(&encoder->fast_coeff_table);
+    }
+    fclose(fast_coeff_table_f);
+  } else {
+    kvz_fast_coeff_use_default_table(&encoder->fast_coeff_table);
+  }
+
+  if (cfg->fastrd_sampling_on || cfg->fastrd_accuracy_check_on) {
+    if (cfg->fastrd_learning_outdir_fn == NULL) {
+      fprintf(stderr, "No output file defined for Fast RD sampling or accuracy check.\n");
+      goto init_failed;
+    }
+    if (kvz_init_rdcost_outfiles(cfg->fastrd_learning_outdir_fn) != 0) {
+      goto init_failed;
+    }
   }
 
   kvz_scalinglist_process(&encoder->scaling_list, encoder->bitdepth);
@@ -655,6 +726,10 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
     memcpy(encoder->cfg.optional_key, cfg->optional_key, 16);
   }
 
+  for (int i = 0; i < cfg->num_used_table; i++) {
+    encoder->qp_map[i] = derive_chroma_QP_mapping_table(cfg, i);
+  }
+
   return encoder;
 
 init_failed:
@@ -691,6 +766,11 @@ void kvz_encoder_control_free(encoder_control_t *const encoder)
 
   kvz_threadqueue_free(encoder->threadqueue);
   encoder->threadqueue = NULL;
+  for (int i = 0; i < encoder->cfg.num_used_table; i++) {
+    if (encoder->qp_map[i]) FREE_POINTER(encoder->qp_map[i]);
+  }
+
+  kvz_close_rdcost_outfiles();
 
   free(encoder);
 }

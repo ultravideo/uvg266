@@ -2445,6 +2445,8 @@ static INLINE void get_tr_type(
   const bool explicit_mts = mts_idx == KVZ_MTS_BOTH || (tu->type == CU_INTRA ? mts_idx == KVZ_MTS_INTRA : (mts_idx == KVZ_MTS_INTER && tu->type == CU_INTER));
   const bool implicit_mts = tu->type == CU_INTRA && (mts_idx == KVZ_MTS_IMPLICIT || mts_idx == KVZ_MTS_INTER);
 
+  assert(!(explicit_mts && implicit_mts));
+
   if (implicit_mts)
   {
     bool width_ok = width >= 4 && width <= 16;

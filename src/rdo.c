@@ -20,8 +20,10 @@
 
 #include "rdo.h"
 
+#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
+#include <pthread.h>
 
 #include "cabac.h"
 #include "context.h"
@@ -29,6 +31,7 @@
 #include "encoder.h"
 #include "imagelist.h"
 #include "inter.h"
+#include "kvz_math.h"
 #include "scalinglist.h"
 #include "strategyselector.h"
 #include "tables.h"
@@ -42,8 +45,17 @@
 #define LOG2_SCAN_SET_SIZE    4
 #define SBH_THRESHOLD         4
 
+#define RD_SAMPLING_MAX_LAST_QP     50
+
+static FILE *fastrd_learning_outfile[RD_SAMPLING_MAX_LAST_QP + 1] = {NULL};
+static pthread_mutex_t outfile_mutex[RD_SAMPLING_MAX_LAST_QP + 1];
+
 const uint32_t kvz_g_go_rice_range[5] = { 7, 14, 26, 46, 78 };
 const uint32_t kvz_g_go_rice_prefix_len[5] = { 8, 7, 6, 5, 4 };
+static const uint32_t g_auiGoRiceParsCoeff[32] =
+{
+  0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3
+};
 
 /**
  * Entropy bits to estimate coded bits in RDO / RDOQ (From HM 12.0)
@@ -63,139 +75,75 @@ const uint32_t kvz_entropy_bits[128] =
 
 // ToDo: check all usage
 const uint32_t kvz_entropy_bits[2*256] = {
-   0x0005c, 0x48000, 0x00116, 0x3b520, 0x001d0, 0x356cb, 0x0028b, 0x318a9,
-   0x00346, 0x2ea40, 0x00403, 0x2c531, 0x004c0, 0x2a658, 0x0057e, 0x28beb,
-   0x0063c, 0x274ce, 0x006fc, 0x26044, 0x007bc, 0x24dc9, 0x0087d, 0x23cfc,
-   0x0093f, 0x22d96, 0x00a01, 0x21f60, 0x00ac4, 0x2122e, 0x00b89, 0x205dd,
-   0x00c4e, 0x1fa51, 0x00d13, 0x1ef74, 0x00dda, 0x1e531, 0x00ea2, 0x1db78,
-   0x00f6a, 0x1d23c, 0x01033, 0x1c970, 0x010fd, 0x1c10b, 0x011c8, 0x1b903,
-   0x01294, 0x1b151, 0x01360, 0x1a9ee, 0x0142e, 0x1a2d4, 0x014fc, 0x19bfc,
-   0x015cc, 0x19564, 0x0169c, 0x18f06, 0x0176d, 0x188de, 0x0183f, 0x182e8,
-   0x01912, 0x17d23, 0x019e6, 0x1778a, 0x01abb, 0x1721c, 0x01b91, 0x16cd5,
-   0x01c68, 0x167b4, 0x01d40, 0x162b6, 0x01e19, 0x15dda, 0x01ef3, 0x1591e,
-   0x01fcd, 0x15480, 0x020a9, 0x14fff, 0x02186, 0x14b99, 0x02264, 0x1474e,
-   0x02343, 0x1431b, 0x02423, 0x13f01, 0x02504, 0x13afd, 0x025e6, 0x1370f,
-   0x026ca, 0x13336, 0x027ae, 0x12f71, 0x02894, 0x12bc0, 0x0297a, 0x12821,
-   0x02a62, 0x12494, 0x02b4b, 0x12118, 0x02c35, 0x11dac, 0x02d20, 0x11a51,
-   0x02e0c, 0x11704, 0x02efa, 0x113c7, 0x02fe9, 0x11098, 0x030d9, 0x10d77,
-   0x031ca, 0x10a63, 0x032bc, 0x1075c, 0x033b0, 0x10461, 0x034a5, 0x10173,
-   0x0359b, 0x0fe90, 0x03693, 0x0fbb9, 0x0378c, 0x0f8ed, 0x03886, 0x0f62b,
-   0x03981, 0x0f374, 0x03a7e, 0x0f0c7, 0x03b7c, 0x0ee23, 0x03c7c, 0x0eb89,
-   0x03d7d, 0x0e8f9, 0x03e7f, 0x0e671, 0x03f83, 0x0e3f2, 0x04088, 0x0e17c,
-   0x0418e, 0x0df0e, 0x04297, 0x0dca8, 0x043a0, 0x0da4a, 0x044ab, 0x0d7f3,
-   0x045b8, 0x0d5a5, 0x046c6, 0x0d35d, 0x047d6, 0x0d11c, 0x048e7, 0x0cee3,
-   0x049fa, 0x0ccb0, 0x04b0e, 0x0ca84, 0x04c24, 0x0c85e, 0x04d3c, 0x0c63f,
-   0x04e55, 0x0c426, 0x04f71, 0x0c212, 0x0508d, 0x0c005, 0x051ac, 0x0bdfe,
-   0x052cc, 0x0bbfc, 0x053ee, 0x0b9ff, 0x05512, 0x0b808, 0x05638, 0x0b617,
-   0x0575f, 0x0b42a, 0x05888, 0x0b243, 0x059b4, 0x0b061, 0x05ae1, 0x0ae83,
-   0x05c10, 0x0acaa, 0x05d41, 0x0aad6, 0x05e74, 0x0a907, 0x05fa9, 0x0a73c,
-   0x060e0, 0x0a575, 0x06219, 0x0a3b3, 0x06354, 0x0a1f5, 0x06491, 0x0a03b,
-   0x065d1, 0x09e85, 0x06712, 0x09cd4, 0x06856, 0x09b26, 0x0699c, 0x0997c,
-   0x06ae4, 0x097d6, 0x06c2f, 0x09634, 0x06d7c, 0x09495, 0x06ecb, 0x092fa,
-   0x0701d, 0x09162, 0x07171, 0x08fce, 0x072c7, 0x08e3e, 0x07421, 0x08cb0,
-   0x0757c, 0x08b26, 0x076da, 0x089a0, 0x0783b, 0x0881c, 0x0799f, 0x0869c,
-   0x07b05, 0x0851f, 0x07c6e, 0x083a4, 0x07dd9, 0x0822d, 0x07f48, 0x080b9,
-   0x080b9, 0x07f48, 0x0822d, 0x07dd9, 0x083a4, 0x07c6e, 0x0851f, 0x07b05,
-   0x0869c, 0x0799f, 0x0881c, 0x0783b, 0x089a0, 0x076da, 0x08b26, 0x0757c,
-   0x08cb0, 0x07421, 0x08e3e, 0x072c7, 0x08fce, 0x07171, 0x09162, 0x0701d,
-   0x092fa, 0x06ecb, 0x09495, 0x06d7c, 0x09634, 0x06c2f, 0x097d6, 0x06ae4,
-   0x0997c, 0x0699c, 0x09b26, 0x06856, 0x09cd4, 0x06712, 0x09e85, 0x065d1,
-   0x0a03b, 0x06491, 0x0a1f5, 0x06354, 0x0a3b3, 0x06219, 0x0a575, 0x060e0,
-   0x0a73c, 0x05fa9, 0x0a907, 0x05e74, 0x0aad6, 0x05d41, 0x0acaa, 0x05c10,
-   0x0ae83, 0x05ae1, 0x0b061, 0x059b4, 0x0b243, 0x05888, 0x0b42a, 0x0575f,
-   0x0b617, 0x05638, 0x0b808, 0x05512, 0x0b9ff, 0x053ee, 0x0bbfc, 0x052cc,
-   0x0bdfe, 0x051ac, 0x0c005, 0x0508d, 0x0c212, 0x04f71, 0x0c426, 0x04e55,
-   0x0c63f, 0x04d3c, 0x0c85e, 0x04c24, 0x0ca84, 0x04b0e, 0x0ccb0, 0x049fa,
-   0x0cee3, 0x048e7, 0x0d11c, 0x047d6, 0x0d35d, 0x046c6, 0x0d5a5, 0x045b8,
-   0x0d7f3, 0x044ab, 0x0da4a, 0x043a0, 0x0dca8, 0x04297, 0x0df0e, 0x0418e,
-   0x0e17c, 0x04088, 0x0e3f2, 0x03f83, 0x0e671, 0x03e7f, 0x0e8f9, 0x03d7d,
-   0x0eb89, 0x03c7c, 0x0ee23, 0x03b7c, 0x0f0c7, 0x03a7e, 0x0f374, 0x03981,
-   0x0f62b, 0x03886, 0x0f8ed, 0x0378c, 0x0fbb9, 0x03693, 0x0fe90, 0x0359b,
-   0x10173, 0x034a5, 0x10461, 0x033b0, 0x1075c, 0x032bc, 0x10a63, 0x031ca,
-   0x10d77, 0x030d9, 0x11098, 0x02fe9, 0x113c7, 0x02efa, 0x11704, 0x02e0c,
-   0x11a51, 0x02d20, 0x11dac, 0x02c35, 0x12118, 0x02b4b, 0x12494, 0x02a62,
-   0x12821, 0x0297a, 0x12bc0, 0x02894, 0x12f71, 0x027ae, 0x13336, 0x026ca,
-   0x1370f, 0x025e6, 0x13afd, 0x02504, 0x13f01, 0x02423, 0x1431b, 0x02343,
-   0x1474e, 0x02264, 0x14b99, 0x02186, 0x14fff, 0x020a9, 0x15480, 0x01fcd,
-   0x1591e, 0x01ef3, 0x15dda, 0x01e19, 0x162b6, 0x01d40, 0x167b4, 0x01c68,
-   0x16cd5, 0x01b91, 0x1721c, 0x01abb, 0x1778a, 0x019e6, 0x17d23, 0x01912,
-   0x182e8, 0x0183f, 0x188de, 0x0176d, 0x18f06, 0x0169c, 0x19564, 0x015cc,
-   0x19bfc, 0x014fc, 0x1a2d4, 0x0142e, 0x1a9ee, 0x01360, 0x1b151, 0x01294,
-   0x1b903, 0x011c8, 0x1c10b, 0x010fd, 0x1c970, 0x01033, 0x1d23c, 0x00f6a,
-   0x1db78, 0x00ea2, 0x1e531, 0x00dda, 0x1ef74, 0x00d13, 0x1fa51, 0x00c4e,
-   0x205dd, 0x00b89, 0x2122e, 0x00ac4, 0x21f60, 0x00a01, 0x22d96, 0x0093f,
-   0x23cfc, 0x0087d, 0x24dc9, 0x007bc, 0x26044, 0x006fc, 0x274ce, 0x0063c,
-   0x28beb, 0x0057e, 0x2a658, 0x004c0, 0x2c531, 0x00403, 0x2ea40, 0x00346,
-   0x318a9, 0x0028b, 0x356cb, 0x001d0, 0x3b520, 0x00116, 0x48000, 0x0005c,
+   32584, 32953, 32584, 32953, 32217, 33325, 32217, 33325, 31854, 33700, 31854, 33700, 31493, 34079, 31493, 34079,
+31135, 34460, 31135, 34460, 30779, 34844, 30779, 34844, 30426, 35232, 30426, 35232, 30076, 35622, 30076, 35622,
+29729, 36016, 29729, 36016, 29383, 36414, 29383, 36414, 29041, 36814, 29041, 36814, 28701, 37218, 28701, 37218,
+28363, 37626, 28363, 37626, 28028, 38037, 28028, 38037, 27695, 38452, 27695, 38452, 27364, 38870, 27364, 38870,
+27036, 39292, 27036, 39292, 26710, 39718, 26710, 39718, 26386, 40148, 26386, 40148, 26065, 40581, 26065, 40581,
+25745, 41019, 25745, 41019, 25428, 41461, 25428, 41461, 25113, 41907, 25113, 41907, 24800, 42357, 24800, 42357,
+24489, 42812, 24489, 42812, 24180, 43271, 24180, 43271, 23873, 43734, 23873, 43734, 23568, 44202, 23568, 44202,
+23265, 44675, 23265, 44675, 22964, 45153, 22964, 45153, 22664, 45635, 22664, 45635, 22367, 46122, 22367, 46122,
+22072, 46615, 22072, 46615, 21778, 47112, 21778, 47112, 21486, 47615, 21486, 47615, 21196, 48124, 21196, 48124,
+20908, 48638, 20908, 48638, 20621, 49157, 20621, 49157, 20337, 49682, 20337, 49682, 20053, 50214, 20053, 50214,
+19772, 50751, 19772, 50751, 19492, 51294, 19492, 51294, 19214, 51844, 19214, 51844, 18938, 52400, 18938, 52400,
+18663, 52963, 18663, 52963, 18390, 53532, 18390, 53532, 18118, 54109, 18118, 54109, 17848, 54693, 17848, 54693,
+17579, 55283, 17579, 55283, 17312, 55882, 17312, 55882, 17047, 56488, 17047, 56488, 16782, 57102, 16782, 57102,
+16520, 57724, 16520, 57724, 16259, 58354, 16259, 58354, 15999, 58993, 15999, 58993, 15741, 59641, 15741, 59641,
+15484, 60297, 15484, 60297, 15228, 60963, 15228, 60963, 14974, 61639, 14974, 61639, 14721, 62324, 14721, 62324,
+14470, 63019, 14470, 63019, 14220, 63725, 14220, 63725, 13971, 64441, 13971, 64441, 13723, 65168, 13723, 65168,
+13477, 65907, 13477, 65907, 13232, 66657, 13232, 66657, 12988, 67420, 12988, 67420, 12746, 68195, 12746, 68195,
+12505, 68983, 12505, 68983, 12265, 69784, 12265, 69784, 12026, 70599, 12026, 70599, 11788, 71428, 11788, 71428,
+11552, 72273, 11552, 72273, 11317, 73132, 11317, 73132, 11083, 74008, 11083, 74008, 10850, 74900, 10850, 74900,
+10618, 75809, 10618, 75809, 10388, 76736, 10388, 76736, 10158, 77681, 10158, 77681, 9930, 78646, 9930, 78646,
+9702, 79631, 9702, 79631, 9476, 80637, 9476, 80637, 9251, 81665, 9251, 81665, 9027, 82715, 9027, 82715,
+8804, 83790, 8804, 83790, 8582, 84889, 8582, 84889, 8361, 86015, 8361, 86015, 8141, 87168, 8141, 87168,
+7923, 88350, 7923, 88350, 7705, 89562, 7705, 89562, 7488, 90806, 7488, 90806, 7272, 92084, 7272, 92084,
+7057, 93397, 7057, 93397, 6843, 94748, 6843, 94748, 6630, 96138, 6630, 96138, 6418, 97571, 6418, 97571,
+6207, 99048, 6207, 99048, 5997, 100574, 5997, 100574, 5788, 102150, 5788, 102150, 5580, 103780, 5580, 103780,
+5372, 105468, 5372, 105468, 5166, 107220, 5166, 107220, 4960, 109038, 4960, 109038, 4756, 110929, 4756, 110929,
+4552, 112899, 4552, 112899, 4349, 114955, 4349, 114955, 4147, 117104, 4147, 117104, 3946, 119356, 3946, 119356,
+3746, 121720, 3746, 121720, 3546, 124209, 3546, 124209, 3347, 126836, 3347, 126836, 3150, 129617, 3150, 129617,
+2953, 132573, 2953, 132573, 2756, 135726, 2756, 135726, 2561, 139104, 2561, 139104, 2367, 142742, 2367, 142742,
+2173, 146684, 2173, 146684, 1980, 150985, 1980, 150985, 1788, 155716, 1788, 155716, 1596, 160974, 1596, 160974,
+1406, 166891, 1406, 166891, 1216, 173656, 1216, 173656, 1027, 181553, 1027, 181553, 838, 191040, 838, 191040,
+651, 202921, 651, 202921, 464, 218827, 464, 218827, 278, 242976, 278, 242976, 92, 294912, 92, 294912,
 };
 
 // Entropy bits scaled so that 50% probability yields 1 bit.
-const float kvz_f_entropy_bits[128] =
+const float kvz_f_entropy_bits[256*2] =
 {
-  1.0, 1.0,
-  0.92852783203125, 1.0751953125,
-  0.86383056640625, 1.150390625,
-  0.80499267578125, 1.225555419921875,
-  0.751251220703125, 1.300750732421875,
-  0.702056884765625, 1.375946044921875,
-  0.656829833984375, 1.451141357421875,
-  0.615203857421875, 1.526336669921875,
-  0.576751708984375, 1.601531982421875,
-  0.54119873046875, 1.67669677734375,
-  0.508209228515625, 1.75189208984375,
-  0.47760009765625, 1.82708740234375,
-  0.449127197265625, 1.90228271484375,
-  0.422637939453125, 1.97747802734375,
-  0.39788818359375, 2.05267333984375,
-  0.37481689453125, 2.127838134765625,
-  0.353240966796875, 2.203033447265625,
-  0.33306884765625, 2.278228759765625,
-  0.31414794921875, 2.353424072265625,
-  0.29644775390625, 2.428619384765625,
-  0.279815673828125, 2.5037841796875,
-  0.26422119140625, 2.5789794921875,
-  0.24957275390625, 2.6541748046875,
-  0.235809326171875, 2.7293701171875,
-  0.222869873046875, 2.8045654296875,
-  0.210662841796875, 2.879730224609375,
-  0.199188232421875, 2.954925537109375,
-  0.188385009765625, 3.030120849609375,
-  0.17822265625, 3.105316162109375,
-  0.168609619140625, 3.180511474609375,
-  0.1595458984375, 3.255706787109375,
-  0.1510009765625, 3.33087158203125,
-  0.1429443359375, 3.40606689453125,
-  0.135345458984375, 3.48126220703125,
-  0.128143310546875, 3.55645751953125,
-  0.121368408203125, 3.63165283203125,
-  0.114959716796875, 3.706817626953125,
-  0.10888671875, 3.782012939453125,
-  0.1031494140625, 3.857208251953125,
-  0.09771728515625, 3.932403564453125,
-  0.09259033203125, 4.007598876953125,
-  0.0877685546875, 4.082794189453125,
-  0.083160400390625, 4.157958984375,
-  0.078826904296875, 4.233154296875,
-  0.07470703125, 4.308349609375,
-  0.070831298828125, 4.383544921875,
-  0.067138671875, 4.458740234375,
-  0.06365966796875, 4.533935546875,
-  0.06036376953125, 4.609100341796875,
-  0.057220458984375, 4.684295654296875,
-  0.05426025390625, 4.759490966796875,
-  0.05145263671875, 4.834686279296875,
-  0.048797607421875, 4.909881591796875,
-  0.046295166015625, 4.985076904296875,
-  0.043914794921875, 5.06024169921875,
-  0.0416259765625, 5.13543701171875,
-  0.03948974609375, 5.21063232421875,
-  0.0374755859375, 5.285858154296875,
-  0.035552978515625, 5.360992431640625,
-  0.033721923828125, 5.43621826171875,
-  0.031982421875, 5.51141357421875,
-  0.03033447265625, 5.586578369140625,
-  0.028778076171875, 5.661773681640625,
-  0.027313232421875, 5.736968994140625,
+  0.994384765625, 1.005645751953125, 0.994384765625, 1.005645751953125, 0.983184814453125, 1.016998291015625, 0.983184814453125, 1.016998291015625, 0.97210693359375, 1.0284423828125, 0.97210693359375, 1.0284423828125, 0.961090087890625, 1.040008544921875, 0.961090087890625, 1.040008544921875,
+0.950164794921875, 1.0516357421875, 0.950164794921875, 1.0516357421875, 0.939300537109375, 1.0633544921875, 0.939300537109375, 1.0633544921875, 0.92852783203125, 1.0751953125, 0.92852783203125, 1.0751953125, 0.9178466796875, 1.08709716796875, 0.9178466796875, 1.08709716796875,
+0.907257080078125, 1.09912109375, 0.907257080078125, 1.09912109375, 0.896697998046875, 1.11126708984375, 0.896697998046875, 1.11126708984375, 0.886260986328125, 1.12347412109375, 0.886260986328125, 1.12347412109375, 0.875885009765625, 1.13580322265625, 0.875885009765625, 1.13580322265625,
+0.865570068359375, 1.14825439453125, 0.865570068359375, 1.14825439453125, 0.8553466796875, 1.160797119140625, 0.8553466796875, 1.160797119140625, 0.845184326171875, 1.1734619140625, 0.845184326171875, 1.1734619140625, 0.8350830078125, 1.18621826171875, 0.8350830078125, 1.18621826171875,
+0.8250732421875, 1.1990966796875, 0.8250732421875, 1.1990966796875, 0.81512451171875, 1.21209716796875, 0.81512451171875, 1.21209716796875, 0.80523681640625, 1.2252197265625, 0.80523681640625, 1.2252197265625, 0.795440673828125, 1.238433837890625, 0.795440673828125, 1.238433837890625,
+0.785675048828125, 1.251800537109375, 0.785675048828125, 1.251800537109375, 0.7760009765625, 1.265289306640625, 0.7760009765625, 1.265289306640625, 0.766387939453125, 1.278900146484375, 0.766387939453125, 1.278900146484375, 0.7568359375, 1.292633056640625, 0.7568359375, 1.292633056640625,
+0.747344970703125, 1.3065185546875, 0.747344970703125, 1.3065185546875, 0.7379150390625, 1.320526123046875, 0.7379150390625, 1.320526123046875, 0.728546142578125, 1.33465576171875, 0.728546142578125, 1.33465576171875, 0.71923828125, 1.34893798828125, 0.71923828125, 1.34893798828125,
+0.709991455078125, 1.363372802734375, 0.709991455078125, 1.363372802734375, 0.7008056640625, 1.377960205078125, 0.7008056640625, 1.377960205078125, 0.691650390625, 1.392669677734375, 0.691650390625, 1.392669677734375, 0.682586669921875, 1.40753173828125, 0.682586669921875, 1.40753173828125,
+0.673583984375, 1.422576904296875, 0.673583984375, 1.422576904296875, 0.66461181640625, 1.437744140625, 0.66461181640625, 1.437744140625, 0.65570068359375, 1.453094482421875, 0.65570068359375, 1.453094482421875, 0.6468505859375, 1.4686279296875, 0.6468505859375, 1.4686279296875,
+0.6380615234375, 1.48431396484375, 0.6380615234375, 1.48431396484375, 0.629302978515625, 1.500152587890625, 0.629302978515625, 1.500152587890625, 0.620635986328125, 1.51617431640625, 0.620635986328125, 1.51617431640625, 0.611968994140625, 1.53240966796875, 0.611968994140625, 1.53240966796875,
+0.6033935546875, 1.548797607421875, 0.6033935546875, 1.548797607421875, 0.5948486328125, 1.56536865234375, 0.5948486328125, 1.56536865234375, 0.58636474609375, 1.5821533203125, 0.58636474609375, 1.5821533203125, 0.57794189453125, 1.59912109375, 0.57794189453125, 1.59912109375,
+0.569549560546875, 1.616302490234375, 0.569549560546875, 1.616302490234375, 0.56121826171875, 1.6336669921875, 0.56121826171875, 1.6336669921875, 0.55291748046875, 1.651275634765625, 0.55291748046875, 1.651275634765625, 0.544677734375, 1.669097900390625, 0.544677734375, 1.669097900390625,
+0.536468505859375, 1.687103271484375, 0.536468505859375, 1.687103271484375, 0.5283203125, 1.70538330078125, 0.5283203125, 1.70538330078125, 0.520233154296875, 1.723876953125, 0.520233154296875, 1.723876953125, 0.51214599609375, 1.74261474609375, 0.51214599609375, 1.74261474609375,
+0.504150390625, 1.7615966796875, 0.504150390625, 1.7615966796875, 0.496185302734375, 1.78082275390625, 0.496185302734375, 1.78082275390625, 0.488250732421875, 1.800323486328125, 0.488250732421875, 1.800323486328125, 0.480377197265625, 1.820098876953125, 0.480377197265625, 1.820098876953125,
+0.4725341796875, 1.840118408203125, 0.4725341796875, 1.840118408203125, 0.4647216796875, 1.860443115234375, 0.4647216796875, 1.860443115234375, 0.45697021484375, 1.881072998046875, 0.45697021484375, 1.881072998046875, 0.449249267578125, 1.9019775390625, 0.449249267578125, 1.9019775390625,
+0.44158935546875, 1.923187255859375, 0.44158935546875, 1.923187255859375, 0.4339599609375, 1.944732666015625, 0.4339599609375, 1.944732666015625, 0.426361083984375, 1.966583251953125, 0.426361083984375, 1.966583251953125, 0.418792724609375, 1.98876953125, 0.418792724609375, 1.98876953125,
+0.411285400390625, 2.011322021484375, 0.411285400390625, 2.011322021484375, 0.40380859375, 2.034210205078125, 0.40380859375, 2.034210205078125, 0.3963623046875, 2.0574951171875, 0.3963623046875, 2.0574951171875, 0.38897705078125, 2.081146240234375, 0.38897705078125, 2.081146240234375,
+0.381622314453125, 2.105194091796875, 0.381622314453125, 2.105194091796875, 0.374298095703125, 2.129638671875, 0.374298095703125, 2.129638671875, 0.36700439453125, 2.154510498046875, 0.36700439453125, 2.154510498046875, 0.3597412109375, 2.1798095703125, 0.3597412109375, 2.1798095703125,
+0.3525390625, 2.205596923828125, 0.3525390625, 2.205596923828125, 0.345367431640625, 2.2318115234375, 0.345367431640625, 2.2318115234375, 0.338226318359375, 2.258544921875, 0.338226318359375, 2.258544921875, 0.33111572265625, 2.2857666015625, 0.33111572265625, 2.2857666015625,
+0.32403564453125, 2.313507080078125, 0.32403564453125, 2.313507080078125, 0.3170166015625, 2.341796875, 0.3170166015625, 2.341796875, 0.30999755859375, 2.370635986328125, 0.30999755859375, 2.370635986328125, 0.30303955078125, 2.40008544921875, 0.30303955078125, 2.40008544921875,
+0.29608154296875, 2.430145263671875, 0.29608154296875, 2.430145263671875, 0.2891845703125, 2.460845947265625, 0.2891845703125, 2.460845947265625, 0.282318115234375, 2.492218017578125, 0.282318115234375, 2.492218017578125, 0.275482177734375, 2.524261474609375, 0.275482177734375, 2.524261474609375,
+0.2686767578125, 2.55706787109375, 0.2686767578125, 2.55706787109375, 0.26190185546875, 2.590606689453125, 0.26190185546875, 2.590606689453125, 0.255157470703125, 2.624969482421875, 0.255157470703125, 2.624969482421875, 0.248443603515625, 2.66015625, 0.248443603515625, 2.66015625,
+0.241790771484375, 2.69622802734375, 0.241790771484375, 2.69622802734375, 0.235137939453125, 2.73321533203125, 0.235137939453125, 2.73321533203125, 0.228515625, 2.77117919921875, 0.228515625, 2.77117919921875, 0.221923828125, 2.8101806640625, 0.221923828125, 2.8101806640625,
+0.215362548828125, 2.850250244140625, 0.215362548828125, 2.850250244140625, 0.208831787109375, 2.8914794921875, 0.208831787109375, 2.8914794921875, 0.20233154296875, 2.93389892578125, 0.20233154296875, 2.93389892578125, 0.19586181640625, 2.977630615234375, 0.19586181640625, 2.977630615234375,
+0.189422607421875, 3.022705078125, 0.189422607421875, 3.022705078125, 0.183013916015625, 3.06927490234375, 0.183013916015625, 3.06927490234375, 0.1766357421875, 3.11737060546875, 0.1766357421875, 3.11737060546875, 0.1702880859375, 3.1671142578125, 0.1702880859375, 3.1671142578125,
+0.1639404296875, 3.2186279296875, 0.1639404296875, 3.2186279296875, 0.15765380859375, 3.2720947265625, 0.15765380859375, 3.2720947265625, 0.1513671875, 3.32757568359375, 0.1513671875, 3.32757568359375, 0.1451416015625, 3.385284423828125, 0.1451416015625, 3.385284423828125,
+0.138916015625, 3.445404052734375, 0.138916015625, 3.445404052734375, 0.132720947265625, 3.508148193359375, 0.132720947265625, 3.508148193359375, 0.126556396484375, 3.57373046875, 0.126556396484375, 3.57373046875, 0.12042236328125, 3.6424560546875, 0.12042236328125, 3.6424560546875,
+0.11431884765625, 3.714599609375, 0.11431884765625, 3.714599609375, 0.10821533203125, 3.790557861328125, 0.10821533203125, 3.790557861328125, 0.102142333984375, 3.8707275390625, 0.102142333984375, 3.8707275390625, 0.09613037109375, 3.955596923828125, 0.09613037109375, 3.955596923828125,
+0.090118408203125, 4.045806884765625, 0.090118408203125, 4.045806884765625, 0.0841064453125, 4.14202880859375, 0.0841064453125, 4.14202880859375, 0.078155517578125, 4.2451171875, 0.078155517578125, 4.2451171875, 0.072235107421875, 4.35614013671875, 0.072235107421875, 4.35614013671875,
+0.066314697265625, 4.4764404296875, 0.066314697265625, 4.4764404296875, 0.0604248046875, 4.607696533203125, 0.0604248046875, 4.607696533203125, 0.0545654296875, 4.7520751953125, 0.0545654296875, 4.7520751953125, 0.0487060546875, 4.91253662109375, 0.0487060546875, 4.91253662109375,
+0.04290771484375, 5.093109130859375, 0.04290771484375, 5.093109130859375, 0.037109375, 5.299560546875, 0.037109375, 5.299560546875, 0.031341552734375, 5.540557861328125, 0.031341552734375, 5.540557861328125, 0.02557373046875, 5.830078125, 0.02557373046875, 5.830078125,
+0.019866943359375, 6.192657470703125, 0.019866943359375, 6.192657470703125, 0.01416015625, 6.678070068359375, 0.01416015625, 6.678070068359375, 0.00848388671875, 7.4150390625, 0.00848388671875, 7.4150390625, 0.0028076171875, 9.0, 0.0028076171875, 9.0,
 };
 
 
@@ -210,6 +158,67 @@ struct sh_rates_t {
   // Coeff minus quantized coeff.
   int32_t quant_delta[32 * 32];
 };
+
+int kvz_init_rdcost_outfiles(const char *dir_path)
+{
+#define RD_SAMPLING_MAX_FN_LENGTH 4095
+  static const char *basename_tmpl = "/%02i.txt";
+  char fn_template[RD_SAMPLING_MAX_FN_LENGTH + 1];
+  char fn[RD_SAMPLING_MAX_FN_LENGTH + 1];
+  int rv = 0, qp;
+
+  // As long as QP is a two-digit number, template and produced string should
+  // be equal in length ("%i" -> "22")
+  assert(RD_SAMPLING_MAX_LAST_QP <= 99);
+  assert(strlen(fn_template) <= RD_SAMPLING_MAX_FN_LENGTH);
+
+  strncpy(fn_template, dir_path, RD_SAMPLING_MAX_FN_LENGTH);
+  strncat(fn_template, basename_tmpl, RD_SAMPLING_MAX_FN_LENGTH - strlen(dir_path));
+
+  for (qp = 0; qp <= RD_SAMPLING_MAX_LAST_QP; qp++) {
+    pthread_mutex_t *curr = outfile_mutex + qp;
+
+    if (pthread_mutex_init(curr, NULL) != 0) {
+      fprintf(stderr, "Failed to create mutex\n");
+      rv = -1;
+      qp--;
+      goto out_destroy_mutexes;
+    }
+  }
+
+  for (qp = 0; qp <= RD_SAMPLING_MAX_LAST_QP; qp++) {
+    FILE *curr;
+
+    snprintf(fn, RD_SAMPLING_MAX_FN_LENGTH, fn_template, qp);
+    fn[RD_SAMPLING_MAX_FN_LENGTH] = 0;
+    curr = fopen(fn, "w");
+    if (curr == NULL) {
+      fprintf(stderr, "Failed to open %s: %s\n", fn, strerror(errno));
+      rv = -1;
+      qp--;
+      goto out_close_files;
+    }
+    fastrd_learning_outfile[qp] = curr;
+  }
+  goto out;
+
+out_close_files:
+  for (; qp >= 0; qp--) {
+    fclose(fastrd_learning_outfile[qp]);
+    fastrd_learning_outfile[qp] = NULL;
+  }
+  goto out;
+
+out_destroy_mutexes:
+  for (; qp >= 0; qp--) {
+    pthread_mutex_destroy(outfile_mutex + qp);
+  }
+  goto out;
+
+out:
+  return rv;
+#undef RD_SAMPLING_MAX_FN_LENGTH
+}
 
 
 /**
@@ -264,6 +273,33 @@ static INLINE uint32_t get_coeff_cabac_cost(
   return (23 - cabac_copy.bits_left) + (cabac_copy.num_buffered_bytes << 3);
 }
 
+static INLINE void save_ccc(int qp, const coeff_t *coeff, int32_t size, uint32_t ccc)
+{
+  pthread_mutex_t *mtx = outfile_mutex + qp;
+
+  assert(sizeof(coeff_t) == sizeof(int16_t));
+  assert(qp <= RD_SAMPLING_MAX_LAST_QP);
+
+  pthread_mutex_lock(mtx);
+
+  fwrite(&size,  sizeof(size),     1,    fastrd_learning_outfile[qp]);
+  fwrite(&ccc,   sizeof(ccc),      1,    fastrd_learning_outfile[qp]);
+  fwrite( coeff, sizeof(coeff_t),  size, fastrd_learning_outfile[qp]);
+
+  pthread_mutex_unlock(mtx);
+}
+
+static INLINE void save_accuracy(int qp, uint32_t ccc, uint32_t fast_cost)
+{
+  pthread_mutex_t *mtx = outfile_mutex + qp;
+
+  assert(qp <= RD_SAMPLING_MAX_LAST_QP);
+
+  pthread_mutex_lock(mtx);
+  fprintf(fastrd_learning_outfile[qp], "%u %u\n", fast_cost, ccc);
+  pthread_mutex_unlock(mtx);
+}
+
 /**
  * \brief Estimate bitcost for coding coefficients.
  *
@@ -279,18 +315,36 @@ uint32_t kvz_get_coeff_cost(const encoder_state_t * const state,
                             int32_t type,
                             int8_t scan_mode)
 {
-  if (state->qp >= state->encoder_control->cfg.fast_residual_cost_limit) {
-    return get_coeff_cabac_cost(state, coeff, width, type, scan_mode);
+  uint8_t save_cccs = state->encoder_control->cfg.fastrd_sampling_on;
+  uint8_t check_accuracy = state->encoder_control->cfg.fastrd_accuracy_check_on;
 
+  if (state->qp < state->encoder_control->cfg.fast_residual_cost_limit &&
+      state->qp < MAX_FAST_COEFF_COST_QP) {
+    // TODO: do we need to assert(0) out of the fast-estimation branch if we
+    // are to save block costs, or should we just warn about it somewhere
+    // earlier (configuration validation I guess)?
+    if (save_cccs) {
+      assert(0 && "Fast RD sampling does not work with fast-residual-cost");
+      return UINT32_MAX; // Hush little compiler don't you cry, not really gonna return anything after assert(0)
+    } else {
+      uint64_t weights = kvz_fast_coeff_get_weights(state);
+      uint32_t fast_cost = kvz_fast_coeff_cost(coeff, width, weights);
+      if (check_accuracy) {
+        uint32_t ccc = get_coeff_cabac_cost(state, coeff, width, type, scan_mode);
+        save_accuracy(state->qp, ccc, fast_cost);
+      }
+      return fast_cost;
+    }
   } else {
-    // Estimate coeff coding cost based on QP and sum of absolute coeffs.
-    // const uint32_t sum = kvz_coeff_abs_sum(coeff, width * width);
-    // return (uint32_t)(sum * (state->qp * COEFF_COST_QP_FACTOR + COEFF_COST_BIAS) + 0.5);
-    return kvz_fast_coeff_cost(coeff, width, state->qp);
+    uint32_t ccc = get_coeff_cabac_cost(state, coeff, width, type, scan_mode);
+    if (save_cccs) {
+      save_ccc(state->qp, coeff, width * width, ccc);
+    }
+    return ccc;
   }
 }
 
-#define COEF_REMAIN_BIN_REDUCTION 3
+#define COEF_REMAIN_BIN_REDUCTION 5
 /** Calculates the cost for specific absolute transform level
  * \param abs_level scaled quantized level
  * \param ctx_num_one current ctxInc for coeff_abs_level_greater1 (1st bin of coeff_abs_level_minus1 in AVC)
@@ -305,68 +359,110 @@ INLINE int32_t kvz_get_ic_rate(encoder_state_t * const state,
                     uint16_t ctx_num_gt2,
                     uint16_t ctx_num_par,
                     uint16_t abs_go_rice,
-                    uint32_t c1_idx,
-                    uint32_t c2_idx,
-                    int8_t type)
+                    uint32_t reg_bins,
+                    int8_t type,
+                    int use_limited_prefix_length)
 {
   cabac_data_t * const cabac = &state->cabac;
   int32_t rate = 1 << CTX_FRAC_BITS; // cost of sign bit
-  uint32_t base_level  =  (c1_idx < C1FLAG_NUMBER)? (2 + (c2_idx < C2FLAG_NUMBER)) : 1;
+  uint32_t base_level  =  4;
   cabac_ctx_t *base_par_ctx = (type == 0) ? &(cabac->ctx.cu_parity_flag_model_luma[0]) : &(cabac->ctx.cu_parity_flag_model_chroma[0]);
-  cabac_ctx_t *base_gt1_ctx = (type == 0) ? &(cabac->ctx.cu_gtx_flag_model_luma[0][0]) : &(cabac->ctx.cu_gtx_flag_model_luma[0][0]);
-  cabac_ctx_t* base_gt2_ctx = (type == 0) ? &(cabac->ctx.cu_gtx_flag_model_luma[1][0]) : &(cabac->ctx.cu_gtx_flag_model_luma[1][0]);
+  cabac_ctx_t *base_gt1_ctx = (type == 0) ? &(cabac->ctx.cu_gtx_flag_model_luma[0][0]) : &(cabac->ctx.cu_gtx_flag_model_chroma[0][0]);
+  cabac_ctx_t* base_gt2_ctx = (type == 0) ? &(cabac->ctx.cu_gtx_flag_model_luma[1][0]) : &(cabac->ctx.cu_gtx_flag_model_chroma[1][0]);
+  uint16_t go_rice_zero = 1 << abs_go_rice;
+  int maxLog2TrDynamicRange = 15;
+
+  if (reg_bins < 4)
+  {
+    uint32_t  symbol = (abs_level == 0 ? go_rice_zero : abs_level <= go_rice_zero ? abs_level - 1 : abs_level);
+    uint32_t  length;
+    const int threshold = COEF_REMAIN_BIN_REDUCTION;
+    if (symbol < (threshold << abs_go_rice))
+    {
+      length = symbol >> abs_go_rice;
+      rate += (length + 1 + abs_go_rice) << CTX_FRAC_BITS;
+    } else if(use_limited_prefix_length) {
+      const uint32_t maximumPrefixLength = (32 - (COEF_REMAIN_BIN_REDUCTION + maxLog2TrDynamicRange));
+
+      uint32_t prefixLength = 0;
+      uint32_t suffix = (symbol >> abs_go_rice) - COEF_REMAIN_BIN_REDUCTION;
+
+      while ((prefixLength < maximumPrefixLength) && (suffix > ((2 << prefixLength) - 2)))
+      {
+        prefixLength++;
+      }
+
+      const uint32_t suffixLength = (prefixLength == maximumPrefixLength) ? (maxLog2TrDynamicRange - abs_go_rice) : (prefixLength + 1/*separator*/);
+
+      rate += (COEF_REMAIN_BIN_REDUCTION + prefixLength + suffixLength + abs_go_rice) << CTX_FRAC_BITS;
+    }
+    else {
+      length = abs_go_rice;
+      symbol = symbol - (threshold << abs_go_rice);
+      while (symbol >= (1 << length))
+      {
+        symbol -= (1 << (length++));
+      }
+      rate += (threshold + length + 1 - abs_go_rice + length) << CTX_FRAC_BITS;
+    }
+    return rate;
+  }
 
   if ( abs_level >= base_level ) {
     int32_t symbol     = abs_level - base_level;
     int32_t length;
     if (symbol < (COEF_REMAIN_BIN_REDUCTION << abs_go_rice)) {
       length = symbol>>abs_go_rice;
-      rate += (length+1+abs_go_rice) * (1 << CTX_FRAC_BITS);
-    } else {
+      rate += (length + 1 + abs_go_rice) << CTX_FRAC_BITS;
+    }
+    else if (use_limited_prefix_length) {
+      const uint32_t maximumPrefixLength = (32 - (COEF_REMAIN_BIN_REDUCTION + maxLog2TrDynamicRange));
+
+      uint32_t prefixLength = 0;
+      uint32_t suffix = (symbol >> abs_go_rice) - COEF_REMAIN_BIN_REDUCTION;
+
+      while ((prefixLength < maximumPrefixLength) && (suffix > ((2 << prefixLength) - 2)))
+      {
+        prefixLength++;
+      }
+
+      const uint32_t suffixLength = (prefixLength == maximumPrefixLength) ? (maxLog2TrDynamicRange - abs_go_rice) : (prefixLength + 1/*separator*/);
+
+      rate += (COEF_REMAIN_BIN_REDUCTION + prefixLength + suffixLength + abs_go_rice) << CTX_FRAC_BITS;
+    }
+    else {
       length = abs_go_rice;
       symbol  = symbol - ( COEF_REMAIN_BIN_REDUCTION << abs_go_rice);
       while (symbol >= (1<<length)) {
         symbol -=  (1<<(length++));
       }
-      rate += (COEF_REMAIN_BIN_REDUCTION+length+1-abs_go_rice+length) * (1 << CTX_FRAC_BITS);
+      rate += (COEF_REMAIN_BIN_REDUCTION+length+1-abs_go_rice+length) << CTX_FRAC_BITS;
     }
-    //ToDo: fix for VVC
-    /*
-    rate += CTX_ENTROPY_BITS(&base_one_ctx[ctx_num_one],0);
-    iRate += fracBitsPar.intBits[(uiAbsLevel - 1) & 1];
-    iRate += fracBitsGt1.intBits[1];
-    iRate += fracBitsGt2.intBits[1];
-    */
+
+    rate += CTX_ENTROPY_BITS(&base_par_ctx[ctx_num_par], (abs_level - 2) & 1);
+    rate += CTX_ENTROPY_BITS(&base_gt1_ctx[ctx_num_gt1], 1);
+    rate += CTX_ENTROPY_BITS(&base_gt2_ctx[ctx_num_gt2], 1);
+
   }
   else if (abs_level == 1)
-  {
-    /*
-    iRate += fracBitsPar.intBits[0];
-    iRate += fracBitsGt1.intBits[0];
-    */
+  {    
+    rate += CTX_ENTROPY_BITS(&base_gt1_ctx[ctx_num_gt1], 0);
   }
   else if (abs_level == 2)
   {
-    /*
-    iRate += fracBitsPar.intBits[1];
-    iRate += fracBitsGt1.intBits[0];
-    */
+    rate += CTX_ENTROPY_BITS(&base_par_ctx[ctx_num_par], 0);
+    rate += CTX_ENTROPY_BITS(&base_gt1_ctx[ctx_num_gt1], 1);
+    rate += CTX_ENTROPY_BITS(&base_gt2_ctx[ctx_num_gt2], 0);
   }
   else if (abs_level == 3)
   {
-    /*
-    iRate += fracBitsPar.intBits[0];
-    iRate += fracBitsGt1.intBits[1];
-    iRate += fracBitsGt2.intBits[0];
-    */
+    rate += CTX_ENTROPY_BITS(&base_par_ctx[ctx_num_par], 1);
+    rate += CTX_ENTROPY_BITS(&base_gt1_ctx[ctx_num_gt1], 1);
+    rate += CTX_ENTROPY_BITS(&base_gt2_ctx[ctx_num_gt2], 0);
   }
-  else if (abs_level == 4)
+  else
   {
-    /*
-    iRate += fracBitsPar.intBits[1];
-    iRate += fracBitsGt1.intBits[1];
-    iRate += fracBitsGt2.intBits[0];
-    */
+    rate = 0;
   }
 
   return rate;
@@ -389,11 +485,11 @@ INLINE int32_t kvz_get_ic_rate(encoder_state_t * const state,
  * This method calculates the best quantized transform level for a given scan position.
  * From HM 12.0
  */
-INLINE uint32_t kvz_get_coded_level ( encoder_state_t * const state, double *coded_cost, double *coded_cost0, double *coded_cost_sig,
+INLINE uint32_t kvz_get_coded_level( encoder_state_t * const state, double *coded_cost, double *coded_cost0, double *coded_cost_sig,
                            int32_t level_double, uint32_t max_abs_level,
                            uint16_t ctx_num_sig, uint16_t ctx_num_gt1, uint16_t ctx_num_gt2, uint16_t ctx_num_par,
                            uint16_t abs_go_rice,
-                           uint32_t c1_idx, uint32_t c2_idx,
+                           uint32_t reg_bins,
                            int32_t q_bits,double temp, int8_t last, int8_t type)
 {
   cabac_data_t * const cabac = &state->cabac;
@@ -402,9 +498,10 @@ INLINE uint32_t kvz_get_coded_level ( encoder_state_t * const state, double *cod
   int32_t abs_level;
   int32_t min_abs_level;
   cabac_ctx_t* base_sig_model = type?(cabac->ctx.cu_sig_model_chroma[0]):(cabac->ctx.cu_sig_model_luma[0]);
+  const double lambda = type ? state->c_lambda : state->lambda;
 
   if( !last && max_abs_level < 3 ) {
-    *coded_cost_sig = state->lambda * CTX_ENTROPY_BITS(&base_sig_model[ctx_num_sig], 0);
+    *coded_cost_sig = lambda * CTX_ENTROPY_BITS(&base_sig_model[ctx_num_sig], 0);
     *coded_cost     = *coded_cost0 + *coded_cost_sig;
     if (max_abs_level == 0) return best_abs_level;
   } else {
@@ -412,15 +509,15 @@ INLINE uint32_t kvz_get_coded_level ( encoder_state_t * const state, double *cod
   }
 
   if( !last ) {
-    cur_cost_sig = state->lambda * CTX_ENTROPY_BITS(&base_sig_model[ctx_num_sig], 1);
+    cur_cost_sig = lambda * CTX_ENTROPY_BITS(&base_sig_model[ctx_num_sig], 1);
   }
 
   min_abs_level    = ( max_abs_level > 1 ? max_abs_level - 1 : 1 );
   for (abs_level = max_abs_level; abs_level >= min_abs_level ; abs_level-- ) {
     double err       = (double)(level_double - ( abs_level * (1 << q_bits) ) );
-    double cur_cost  = err * err * temp + state->lambda *
+    double cur_cost  = err * err * temp + lambda *
                        kvz_get_ic_rate( state, abs_level, ctx_num_gt1, ctx_num_gt2, ctx_num_par,
-                                    abs_go_rice, c1_idx, c2_idx, type);
+                                    abs_go_rice, reg_bins, type, true);
     cur_cost        += cur_cost_sig;
 
     if( cur_cost < *coded_cost ) {
@@ -442,7 +539,7 @@ INLINE uint32_t kvz_get_coded_level ( encoder_state_t * const state, double *cod
  *
  * From HM 12.0
 */
-static double get_rate_last(const encoder_state_t * const state,
+static double get_rate_last(double lambda,
                             const uint32_t  pos_x, const uint32_t pos_y,
                             int32_t* last_x_bits, int32_t* last_y_bits)
 {
@@ -455,7 +552,7 @@ static double get_rate_last(const encoder_state_t * const state,
   if( ctx_y > 3 ) {
     uiCost += CTX_FRAC_ONE_BIT * ((ctx_y - 2) >> 1);
   }
-  return state->lambda * uiCost;
+  return lambda * uiCost;
 }
 
 static void calc_last_bits(encoder_state_t * const state, int32_t width, int32_t height, int8_t type,
@@ -469,10 +566,11 @@ static void calc_last_bits(encoder_state_t * const state, int32_t width, int32_t
   cabac_ctx_t *base_ctx_x = (type ? cabac->ctx.cu_ctx_last_x_chroma : cabac->ctx.cu_ctx_last_x_luma);
   cabac_ctx_t *base_ctx_y = (type ? cabac->ctx.cu_ctx_last_y_chroma : cabac->ctx.cu_ctx_last_y_luma);
 
-  blk_size_offset_x = type ? 0: (kvz_g_convert_to_bit[ width ] *3 + ((kvz_g_convert_to_bit[ width ] +1)>>2));
-  blk_size_offset_y = type ? 0: (kvz_g_convert_to_bit[ height ]*3 + ((kvz_g_convert_to_bit[ height ]+1)>>2));
-  shiftX = type ? kvz_g_convert_to_bit[ width  ] :((kvz_g_convert_to_bit[ width  ]+3)>>2);
-  shiftY = type ? kvz_g_convert_to_bit[ height ] :((kvz_g_convert_to_bit[ height ]+3)>>2);
+  static const int prefix_ctx[8] = { 0, 0, 0, 3, 6, 10, 15, 21 };
+  blk_size_offset_x = type ? 0: prefix_ctx[kvz_math_floor_log2(width)];
+  blk_size_offset_y = type ? 0: prefix_ctx[kvz_math_floor_log2(height)];
+  shiftX = type ? CLIP(0, 2, width) :((kvz_math_floor_log2(width) +1)>>2);
+  shiftY = type ? CLIP(0, 2, height) :((kvz_math_floor_log2(height) +1)>>2);
 
 
   for (ctx = 0; ctx < g_group_idx[ width - 1 ]; ctx++) {
@@ -504,16 +602,18 @@ void kvz_rdoq_sign_hiding(
     const struct sh_rates_t *const sh_rates,
     const int32_t last_pos,
     const coeff_t *const coeffs,
-    coeff_t *const quant_coeffs)
+    coeff_t *const quant_coeffs, 
+    const int8_t type)
 {
   const encoder_control_t * const ctrl = state->encoder_control;
+  const double lambda = type ? state->c_lambda : state->lambda;
 
   int inv_quant = kvz_g_inv_quant_scales[qp_scaled % 6];
   // This somehow scales quant_delta into fractional bits. Instead of the bits
   // being multiplied by lambda, the residual is divided by it, or something
   // like that.
   const int64_t rd_factor = (inv_quant * inv_quant * (1 << (2 * (qp_scaled / 6)))
-                      / state->lambda / 16 / (1 << (2 * (ctrl->bitdepth - 8))) + 0.5);
+                      / lambda / 16 / (1 << (2 * (ctrl->bitdepth - 8))) + 0.5);
   const int last_cg = (last_pos - 1) >> LOG2_SCAN_SET_SIZE;
 
   for (int32_t cg_scan = last_cg; cg_scan >= 0; cg_scan--) {
@@ -574,7 +674,7 @@ void kvz_rdoq_sign_hiding(
         int64_t dec_bits = sh_rates->dec[current.pos];
         if (abs_coeff == 1) {
           // We save sign bit and sig_coeff goes to zero.
-          dec_bits -= CTX_FRAC_ONE_BIT + sh_rates->sig_coeff_inc[current.pos];
+          dec_bits -= sh_rates->sig_coeff_inc[current.pos];
         }
         if (cg_scan == last_cg && last_nz_scan == coeff_scan && abs_coeff == 1) {
           // Changing the last non-zero bit in the last cg to zero.
@@ -606,7 +706,7 @@ void kvz_rdoq_sign_hiding(
 
         // Add sign bit, other bits and sig_coeff goes to one.
         int bits = CTX_FRAC_ONE_BIT + sh_rates->inc[current.pos] + sh_rates->sig_coeff_inc[current.pos];
-        current.cost = -llabs(quant_cost_in_bits) + bits * (1 << PRECISION_INC);
+        current.cost = -llabs(quant_cost_in_bits) + bits;
         current.change = 1;
 
         if (coeff_scan < first_nz_scan) {
@@ -633,6 +733,33 @@ void kvz_rdoq_sign_hiding(
   }
 }
 
+static unsigned templateAbsSum(const coeff_t* coeff, int baseLevel, uint32_t  posX, uint32_t  posY, uint32_t width, uint32_t height)
+{
+  const coeff_t* pData = coeff + posX + posY * width;
+  coeff_t          sum = 0;
+  if (posX < width - 1)
+  {
+    sum += abs(pData[1]);
+    if (posX < width - 2)
+    {
+      sum += abs(pData[2]);
+    }
+    if (posY < height - 1)
+    {
+      sum += abs(pData[width + 1]);
+    }
+  }
+  if (posY < height - 1)
+  {
+    sum += abs(pData[width]);
+    if (posY < height - 2)
+    {
+      sum += abs(pData[width << 1]);
+    }
+  }
+  return MAX(MIN(sum - 5 * baseLevel, 31), 0);
+}
+
 
 /** RDOQ with CABAC
  * \returns void
@@ -643,22 +770,26 @@ void kvz_rdoq_sign_hiding(
 
 // ToDo: implement new RDOQ
 void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff, int32_t width,
-           int32_t height, int8_t type, int8_t scan_mode, int8_t block_type, int8_t tr_depth)
+           int32_t height, int8_t type, int8_t scan_mode, int8_t block_type, int8_t tr_depth, uint16_t cbf)
 {
   const encoder_control_t * const encoder = state->encoder_control;
   cabac_data_t * const cabac = &state->cabac;
-  uint32_t log2_tr_size      = kvz_g_convert_to_bit[ width ] + 2;
-  int32_t  transform_shift   = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - log2_tr_size;  // Represents scaling through forward transform
+  uint32_t log2_tr_width      = kvz_math_floor_log2( height );
+  uint32_t log2_tr_height      = kvz_math_floor_log2( width );
+  int32_t  transform_shift   = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - ((log2_tr_height + log2_tr_width) >> 1);  // Represents scaling through forward transform
   uint16_t go_rice_param     = 0;
+  uint32_t reg_bins = (width * height * 28) >> 4;
   const uint32_t log2_block_size   = kvz_g_convert_to_bit[ width ] + 2;
   int32_t  scalinglist_type= (block_type == CU_INTRA ? 0 : 3) + (int8_t)("\0\3\1\2"[type]);
 
-  int32_t qp_scaled = kvz_get_scaled_qp(type, state->qp, (encoder->bitdepth - 8) * 6);
+  int32_t qp_scaled = kvz_get_scaled_qp(type, state->qp, (encoder->bitdepth - 8) * 6, encoder->qp_map[0]);
   
   int32_t q_bits = QUANT_SHIFT + qp_scaled/6 + transform_shift;
 
-  const int32_t *quant_coeff  = encoder->scaling_list.quant_coeff[log2_tr_size-2][scalinglist_type][qp_scaled%6];
-  const double *err_scale     = encoder->scaling_list.error_scale[log2_tr_size-2][scalinglist_type][qp_scaled%6];
+  const double lambda = type ? state->c_lambda : state->lambda;
+
+  const int32_t *quant_coeff  = encoder->scaling_list.quant_coeff[log2_tr_width][log2_tr_height][scalinglist_type][qp_scaled%6];
+  const double *err_scale     = encoder->scaling_list.error_scale[log2_tr_width][log2_tr_height][scalinglist_type][qp_scaled%6];
 
   double block_uncoded_cost = 0;
   
@@ -673,7 +804,7 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
 
   const uint32_t cg_width = (MIN((uint8_t)32, width) >> (log2_cg_size / 2));
 
-  const uint32_t *scan_cg = g_sig_last_scan_cg[log2_block_size - 2][scan_mode];
+  const uint32_t *scan_cg = g_sig_last_scan_cg[log2_block_size - 1][scan_mode];
   const uint32_t cg_size = 16;
   const int32_t  shift = 4 >> 1;
   const uint32_t num_blk_side = width >> shift;
@@ -681,12 +812,10 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
   uint32_t sig_coeffgroup_flag[ 64 ];
 
   uint16_t    ctx_set    = 0;
-  int16_t     c1         = 1;
-  int16_t     c2         = 0;
   double      base_cost  = 0;
+  int32_t temp_diag = -1;
+  int32_t temp_sum = -1;
 
-  uint32_t    c1_idx     = 0;
-  uint32_t    c2_idx     = 0;
   int32_t     base_level;
 
   const uint32_t *scan = kvz_g_sig_last_scan[ scan_mode ][ log2_block_size - 1 ];
@@ -706,8 +835,9 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
     default: assert(0 && "There should be 1, 4, 16 or 64 coefficient groups");
   }
 
-  cabac_ctx_t *base_coeff_group_ctx = &(cabac->ctx.sig_coeff_group_model[type]);
+  cabac_ctx_t *base_coeff_group_ctx = &(cabac->ctx.sig_coeff_group_model[type ? 2 : 0]);
   cabac_ctx_t *baseCtx              = (type == 0) ? &(cabac->ctx.cu_sig_model_luma[0][0]) : &(cabac->ctx.cu_sig_model_chroma[0][0]);
+  cabac_ctx_t* base_gt1_ctx = (type == 0) ? &(cabac->ctx.cu_gtx_flag_model_luma[0][0]) : &(cabac->ctx.cu_gtx_flag_model_chroma[0][0]);
 
   struct {
     double coded_level_and_dist;
@@ -731,8 +861,7 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
       uint32_t max_abs_level  = (level_double + (1 << (q_bits - 1))) >> q_bits;
 
       if (max_abs_level > 0) {
-        last_scanpos    = scanpos;
-        ctx_set         = (scanpos > 0 && type == 0) ? 2 : 0;
+        last_scanpos    = scanpos;        
         cg_last_scanpos = cg_scanpos;
         sh_rates.sig_coeff_inc[blkpos] = 0;
         break;
@@ -746,18 +875,15 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
     return;
   }
 
+
   for (; cg_scanpos >= 0; cg_scanpos--) cost_coeffgroup_sig[cg_scanpos] = 0;
 
   int32_t last_x_bits[32], last_y_bits[32];
-  calc_last_bits(state, width, height, type, last_x_bits, last_y_bits);
 
   for (int32_t cg_scanpos = cg_last_scanpos; cg_scanpos >= 0; cg_scanpos--) {
     uint32_t cg_blkpos  = scan_cg[cg_scanpos];
     uint32_t cg_pos_y   = cg_blkpos / num_blk_side;
     uint32_t cg_pos_x   = cg_blkpos - (cg_pos_y * num_blk_side);
-
-    int32_t pattern_sig_ctx = kvz_context_calc_pattern_sig_ctx(sig_coeffgroup_flag,
-                                                           cg_pos_x, cg_pos_y, width);
 
     FILL(rd_stats, 0);
     for (int32_t scanpos_in_cg = cg_size - 1; scanpos_in_cg >= 0; scanpos_in_cg--)  {
@@ -773,75 +899,84 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
       double err              = (double)level_double;
       cost_coeff0[scanpos]    = err * err * temp; 
       block_uncoded_cost      += cost_coeff0[ scanpos ];
+      uint32_t  pos_y = blkpos >> log2_block_size;
+      uint32_t  pos_x = blkpos - (pos_y << log2_block_size);
       //===== coefficient level estimation =====
       int32_t  level;
-      uint16_t  gt1_ctx = 4 * ctx_set + c1;
-      uint16_t  gt2_ctx = 4 * ctx_set + c1;
-      uint16_t  par_ctx = ctx_set + c2;
+      if (reg_bins < 4) {
+        int  sumAll = templateAbsSum(coef, 0, pos_x, pos_y, width, height);
+        go_rice_param = g_auiGoRiceParsCoeff[sumAll];
+      }
+
+      uint16_t  gt1_ctx = ctx_set;
+      uint16_t  gt2_ctx = ctx_set;
+      uint16_t  par_ctx = ctx_set;
 
       if( scanpos == last_scanpos ) {
         level            = kvz_get_coded_level(state, &cost_coeff[ scanpos ], &cost_coeff0[ scanpos ], &cost_sig[ scanpos ],
                                              level_double, max_abs_level, 0, gt1_ctx, gt2_ctx, par_ctx, go_rice_param,
-                                             c1_idx, c2_idx, q_bits, temp, 1, type );
+                                             reg_bins, q_bits, temp, 1, type );
+
+        kvz_context_get_sig_ctx_idx_abs(coef, pos_x, pos_y, width, height, type, &temp_diag, &temp_sum);
+        if (temp_diag != -1) {
+          ctx_set = (MIN(temp_sum, 4) + 1) + (!temp_diag ? ((type == 0) ? 15 : 5) : (type == 0) ? temp_diag < 3 ? 10 : (temp_diag < 10 ? 5 : 0) : 0);
+        }
+        else ctx_set = 0;
+
       } else {
-        uint32_t  pos_y    = blkpos >> log2_block_size;
-        uint32_t  pos_x    = blkpos - ( pos_y << log2_block_size );
-        uint16_t  ctx_sig  = (uint16_t)kvz_context_get_sig_ctx_inc(pattern_sig_ctx, scan_mode, pos_x, pos_y,
-                                                     log2_block_size, type);
+        uint16_t ctx_sig = kvz_context_get_sig_ctx_idx_abs(coef, pos_x, pos_y, width, height, type, &temp_diag, &temp_sum);
+        if (temp_diag != -1) {
+          ctx_set = (MIN(temp_sum, 4) + 1) + (!temp_diag ? ((type == 0) ? 15 : 5) : (type == 0) ? temp_diag < 3 ? 10 : (temp_diag < 10 ? 5 : 0) : 0);
+        }
+        else ctx_set = 0;
+
         level              = kvz_get_coded_level(state, &cost_coeff[ scanpos ], &cost_coeff0[ scanpos ], &cost_sig[ scanpos ],
                                              level_double, max_abs_level, ctx_sig, gt1_ctx, gt2_ctx, par_ctx, go_rice_param,
-                                             c1_idx, c2_idx, q_bits, temp, 0, type );
+                                             reg_bins, q_bits, temp, 0, type );
         if (encoder->cfg.signhide_enable) {
           int greater_than_zero = CTX_ENTROPY_BITS(&baseCtx[ctx_sig], 1);
           int zero = CTX_ENTROPY_BITS(&baseCtx[ctx_sig], 0);
-          sh_rates.sig_coeff_inc[blkpos] = greater_than_zero - zero;
+          sh_rates.sig_coeff_inc[blkpos] = (reg_bins < 4 ? 0 : greater_than_zero - zero);
         }
       }
+
+
       
       if (encoder->cfg.signhide_enable) {
         sh_rates.quant_delta[blkpos] = (level_double - level * (1 << q_bits)) >> (q_bits - 8);
         if (level > 0) {
-          int32_t rate_now  = kvz_get_ic_rate(state, level, gt1_ctx, gt2_ctx, par_ctx, go_rice_param, c1_idx, c2_idx, type);
-          int32_t rate_up   = kvz_get_ic_rate(state, level + 1, gt1_ctx, gt2_ctx, par_ctx, go_rice_param, c1_idx, c2_idx, type);
-          int32_t rate_down = kvz_get_ic_rate(state, level - 1, gt1_ctx, gt2_ctx, par_ctx, go_rice_param, c1_idx, c2_idx, type);
-          sh_rates.inc[blkpos] = rate_up - rate_now;
-          sh_rates.dec[blkpos] = rate_down - rate_now;
+          int32_t rate_now  = kvz_get_ic_rate(state, level, gt1_ctx, gt2_ctx, par_ctx, go_rice_param, reg_bins, type, false);
+          sh_rates.inc[blkpos] = kvz_get_ic_rate(state, level + 1, gt1_ctx, gt2_ctx, par_ctx, go_rice_param, reg_bins, type, false) - rate_now;
+          sh_rates.dec[blkpos] = kvz_get_ic_rate(state, level - 1, gt1_ctx, gt2_ctx, par_ctx, go_rice_param, reg_bins, type, false) - rate_now;
         } else { // level == 0
-          sh_rates.inc[blkpos] = 1;// CTX_ENTROPY_BITS(&base_one_ctx[one_ctx], 0);
+          if (reg_bins < 4) {
+            int32_t rate_now = kvz_get_ic_rate(state, level, gt1_ctx, gt2_ctx, par_ctx, go_rice_param, reg_bins, type, false);
+            sh_rates.inc[blkpos] = kvz_get_ic_rate(state, level + 1, gt1_ctx, gt2_ctx, par_ctx, go_rice_param, reg_bins, type, false) - rate_now;
+          } else {
+            sh_rates.inc[blkpos] = CTX_ENTROPY_BITS(&base_gt1_ctx[gt1_ctx], 0);
+          }
         }
       }
       dest_coeff[blkpos] = (coeff_t)level;
       base_cost         += cost_coeff[scanpos];
 
-      base_level = (c1_idx < C1FLAG_NUMBER) ? (2 + (c2_idx < C2FLAG_NUMBER)) : 1;
-      if (level >= base_level) {
-        if(level  > 3*(1<<go_rice_param)) {
-          go_rice_param = MIN(go_rice_param + 1, 4);
-        }
-      }
-      if (level >= 1) c1_idx ++;
-
-      //===== update bin model =====
-      if (level > 1) {
-        c1 = 0;
-        c2 += (c2 < 2);
-        c2_idx ++;
-      } else if( (c1 < 3) && (c1 > 0) && level) {
-        c1++;
-      }
-
+      //base_level = 4;
+      //if (level >= base_level) {
+      //  if(level  > 3*(1<<go_rice_param)) {
+      //    go_rice_param = MIN(go_rice_param + 1, 4);
+      //  }
+      //}
       //===== context set update =====
       if ((scanpos % SCAN_SET_SIZE == 0) && scanpos > 0) {
-        c2                = 0;
+
         go_rice_param     = 0;
 
-        c1_idx   = 0;
-        c2_idx   = 0;
-        ctx_set = (scanpos == SCAN_SET_SIZE || type != 0) ? 0 : 2;
-        if( c1 == 0 ) {
-          ctx_set++;
-        }
-        c1 = 1;
+        //ctx_set = (scanpos == SCAN_SET_SIZE || type != 0) ? 0 : 2;
+      }
+      else if (reg_bins >= 4) {
+        reg_bins -= (level < 2 ? level : 3) + (scanpos != last_scanpos);
+        int  sumAll = templateAbsSum(coef, 4, pos_x, pos_y, width, height);
+        go_rice_param = g_auiGoRiceParsCoeff[sumAll];
       }
 
       rd_stats.sig_cost += cost_sig[scanpos];
@@ -862,7 +997,7 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
       if (sig_coeffgroup_flag[cg_blkpos] == 0) {
         uint32_t ctx_sig  = kvz_context_get_sig_coeff_group(sig_coeffgroup_flag, cg_pos_x,
                                                         cg_pos_y, cg_width);
-        cost_coeffgroup_sig[cg_scanpos] = state->lambda *CTX_ENTROPY_BITS(&base_coeff_group_ctx[ctx_sig],0);
+        cost_coeffgroup_sig[cg_scanpos] = lambda *CTX_ENTROPY_BITS(&base_coeff_group_ctx[ctx_sig],0);
         base_cost += cost_coeffgroup_sig[cg_scanpos]  - rd_stats.sig_cost;
       } else {
         if (cg_scanpos < cg_last_scanpos){
@@ -879,9 +1014,9 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
           ctx_sig = kvz_context_get_sig_coeff_group(sig_coeffgroup_flag, cg_pos_x,
             cg_pos_y, cg_width);
 
-          cost_coeffgroup_sig[cg_scanpos] = state->lambda * CTX_ENTROPY_BITS(&base_coeff_group_ctx[ctx_sig], 1);
+          cost_coeffgroup_sig[cg_scanpos] = lambda * CTX_ENTROPY_BITS(&base_coeff_group_ctx[ctx_sig], 1);
           base_cost += cost_coeffgroup_sig[cg_scanpos];
-          cost_zero_cg += state->lambda * CTX_ENTROPY_BITS(&base_coeff_group_ctx[ctx_sig], 0);
+          cost_zero_cg += lambda * CTX_ENTROPY_BITS(&base_coeff_group_ctx[ctx_sig], 0);
 
           // try to convert the current coeff group from non-zero to all-zero
           cost_zero_cg += rd_stats.uncoded_dist;          // distortion for resetting non-zero levels to zero levels
@@ -894,7 +1029,7 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
             sig_coeffgroup_flag[cg_blkpos] = 0;
             base_cost = cost_zero_cg;
 
-            cost_coeffgroup_sig[cg_scanpos] = state->lambda * CTX_ENTROPY_BITS(&base_coeff_group_ctx[ctx_sig], 0);
+            cost_coeffgroup_sig[cg_scanpos] = lambda * CTX_ENTROPY_BITS(&base_coeff_group_ctx[ctx_sig], 0);
 
             // reset coeffs to 0 in this block
             for (int32_t scanpos_in_cg = cg_size - 1; scanpos_in_cg >= 0; scanpos_in_cg--) {
@@ -921,16 +1056,29 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
   int32_t best_last_idx_p1 = 0;
 
   if( block_type != CU_INTRA && !type ) {
-    best_cost  = block_uncoded_cost +   state->lambda * CTX_ENTROPY_BITS(&(cabac->ctx.cu_qt_root_cbf_model),0);
-    base_cost +=   state->lambda * CTX_ENTROPY_BITS(&(cabac->ctx.cu_qt_root_cbf_model),1);
+    best_cost  = block_uncoded_cost +  lambda * CTX_ENTROPY_BITS(&(cabac->ctx.cu_qt_root_cbf_model),0);
+    base_cost +=   lambda * CTX_ENTROPY_BITS(&(cabac->ctx.cu_qt_root_cbf_model),1);
   } else {
-    // ToDo: update for VVC contexts
-    cabac_ctx_t* base_cbf_model = type?(cabac->ctx.qt_cbf_model_cb):(cabac->ctx.qt_cbf_model_luma);
-    ctx_cbf    = ( type ? tr_depth : !tr_depth);
-    best_cost  = block_uncoded_cost +  state->lambda * CTX_ENTROPY_BITS(&base_cbf_model[ctx_cbf],0);
-    base_cost +=   state->lambda * CTX_ENTROPY_BITS(&base_cbf_model[ctx_cbf],1);
+    cabac_ctx_t* base_cbf_model = NULL;
+    switch (type) {
+      case COLOR_Y:
+        base_cbf_model = cabac->ctx.qt_cbf_model_luma;
+        break;
+      case COLOR_U:
+        base_cbf_model = cabac->ctx.qt_cbf_model_cb;
+        break;
+      case COLOR_V:
+        base_cbf_model = cabac->ctx.qt_cbf_model_cr;
+        break;
+      default:
+        assert(0);
+    }
+    ctx_cbf    = ( type != COLOR_V ? 0 : cbf_is_set(cbf, 5 - kvz_math_floor_log2(width), COLOR_U));
+    best_cost  = block_uncoded_cost +  lambda * CTX_ENTROPY_BITS(&base_cbf_model[ctx_cbf],0);
+    base_cost +=   lambda * CTX_ENTROPY_BITS(&base_cbf_model[ctx_cbf],1);
   }
 
+  calc_last_bits(state, width, height, type, last_x_bits, last_y_bits);
   for ( int32_t cg_scanpos = cg_last_scanpos; cg_scanpos >= 0; cg_scanpos--) {
     uint32_t cg_blkpos = scan_cg[cg_scanpos];
     base_cost -= cost_coeffgroup_sig[cg_scanpos];
@@ -945,7 +1093,7 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
           uint32_t   pos_y = blkpos >> log2_block_size;
           uint32_t   pos_x = blkpos - ( pos_y << log2_block_size );
 
-          double cost_last = get_rate_last(state, pos_x, pos_y, last_x_bits,last_y_bits );
+          double cost_last = get_rate_last(lambda, pos_x, pos_y, last_x_bits,last_y_bits );
           double totalCost = base_cost + cost_last - cost_sig[ scanpos ];
 
           if( totalCost < best_cost ) {
@@ -979,7 +1127,7 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
   }
 
   if (encoder->cfg.signhide_enable && abs_sum >= 2) {
-    kvz_rdoq_sign_hiding(state, qp_scaled, scan, &sh_rates, best_last_idx_p1, coef, dest_coeff);
+    kvz_rdoq_sign_hiding(state, qp_scaled, scan, &sh_rates, best_last_idx_p1, coef, dest_coeff, type);
   }
 }
 
@@ -1157,3 +1305,18 @@ uint32_t kvz_calc_mvd_cost_cabac(const encoder_state_t * state,
   return *bitcost * (uint32_t)(state->lambda_sqrt + 0.5);
 }
 
+void kvz_close_rdcost_outfiles(void)
+{
+  int i;
+
+  for (i = 0; i < RD_SAMPLING_MAX_LAST_QP; i++) {
+    FILE *curr = fastrd_learning_outfile[i];
+    pthread_mutex_t *curr_mtx = outfile_mutex + i;
+    if (curr != NULL) {
+      fclose(curr);
+    }
+    if (curr_mtx != NULL) {
+      pthread_mutex_destroy(curr_mtx);
+    }
+  }
+}

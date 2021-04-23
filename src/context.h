@@ -36,13 +36,8 @@ void kvz_ctx_init(cabac_ctx_t* ctx, int32_t qp, int32_t init_value, uint8_t rate
 void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice);
 
 void kvz_context_copy(encoder_state_t * target_state, const encoder_state_t * source_state);
-int32_t kvz_context_calc_pattern_sig_ctx( const uint32_t *sig_coeff_group_flag, uint32_t pos_x, uint32_t pos_y, int32_t width);
 
 uint32_t kvz_context_get_sig_coeff_group( uint32_t *sig_coeff_group_flag,uint32_t pos_x, uint32_t pos_y,int32_t width);
-
-
-int32_t kvz_context_get_sig_ctx_inc(int32_t pattern_sig_ctx,uint32_t scan_idx,int32_t pos_x,
-                                int32_t pos_y,int32_t block_type, int8_t texture_type);
 
 uint32_t kvz_context_get_sig_ctx_idx_abs(const coeff_t* coeff, int32_t pos_x, int32_t pos_y,
                                          uint32_t height, uint32_t width, int8_t type, 

@@ -49,11 +49,11 @@ static const int INTRA_THRESHOLD = 8;
 
 // Modify weight of luma SSD.
 #ifndef LUMA_MULT
-# define LUMA_MULT 0.8
+# define LUMA_MULT 1
 #endif
 // Modify weight of chroma SSD.
 #ifndef CHROMA_MULT
-# define CHROMA_MULT 1.5
+# define CHROMA_MULT 1
 #endif
 
 static INLINE void copy_cu_info(int x_local, int y_local, int width, lcu_t *from, lcu_t *to)
@@ -209,11 +209,11 @@ static double cu_zero_coeff_cost(const encoder_state_t *state, lcu_t *work_tree,
     LCU_WIDTH, LCU_WIDTH, cu_width
     );
   if (x % 8 == 0 && y % 8 == 0 && state->encoder_control->chroma_format != KVZ_CSP_400) {
-    ssd += CHROMA_MULT * kvz_pixels_calc_ssd(
+    ssd += state->c_lambda / state->lambda * kvz_pixels_calc_ssd(
       &lcu->ref.u[chroma_index], &lcu->rec.u[chroma_index],
       LCU_WIDTH_C, LCU_WIDTH_C, cu_width / 2
       );
-    ssd += CHROMA_MULT * kvz_pixels_calc_ssd(
+    ssd += state->c_lambda / state->lambda * kvz_pixels_calc_ssd(
       &lcu->ref.v[chroma_index], &lcu->rec.v[chroma_index],
       LCU_WIDTH_C, LCU_WIDTH_C, cu_width / 2
       );
@@ -282,7 +282,7 @@ double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
       cbf_is_set(tr_cu->cbf, depth, COLOR_U) ||
       cbf_is_set(tr_cu->cbf, depth, COLOR_V))
   {
-    const cabac_ctx_t *ctx = &(state->cabac.ctx.qt_cbf_model_luma[!tr_depth]);
+    const cabac_ctx_t *ctx = &(state->cabac.ctx.qt_cbf_model_luma[0]);
     tr_tree_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf, depth, COLOR_Y));
   }
 
@@ -331,16 +331,18 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
   if (depth < MAX_PU_DEPTH) {
     const int tr_depth = depth - pred_cu->depth;
     // ToDo: Update for VVC contexts
-    const cabac_ctx_t *ctx = &(state->cabac.ctx.qt_cbf_model_cb[tr_depth]);
+    const cabac_ctx_t *ctx = &(state->cabac.ctx.qt_cbf_model_cb[0]);
     if (tr_depth == 0 || cbf_is_set(pred_cu->cbf, depth - 1, COLOR_U)) {
       tr_tree_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf, depth, COLOR_U));
     }
+    int is_set = cbf_is_set(pred_cu->cbf, depth, COLOR_U);
+    ctx = &(state->cabac.ctx.qt_cbf_model_cr[is_set]);
     if (tr_depth == 0 || cbf_is_set(pred_cu->cbf, depth - 1, COLOR_V)) {
       tr_tree_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf, depth, COLOR_V));
     }
   }
 
-  if (tr_cu->tr_depth > depth) {
+  if (MIN(tr_cu->tr_depth, 3) > depth) {
     int offset = LCU_WIDTH >> (depth + 1);
     int sum = 0;
 
@@ -374,7 +376,7 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
   }
 
   double bits = tr_tree_bits + coeff_bits;
-  return (double)ssd * CHROMA_MULT + bits * state->lambda;
+  return (double)ssd + bits * state->c_lambda;
 }
 
 
@@ -636,7 +638,8 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
                          cur_cu->intra.mode, -1, // skip chroma
                          NULL, lcu);
 
-      if (x % 8 == 0 && y % 8 == 0 && state->encoder_control->chroma_format != KVZ_CSP_400) {
+      // TODO: This heavily relies to square CUs
+      if ((depth != 4 || (x % 8 && y % 8)) && state->encoder_control->chroma_format != KVZ_CSP_400) {
         // There is almost no benefit to doing the chroma mode search for
         // rd2. Possibly because the luma mode search already takes chroma
         // into account, so there is less of a chanse of luma mode being
@@ -647,7 +650,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         }
 
         kvz_intra_recon_cu(state,
-                           x, y,
+                           x & ~7, y & ~7, // TODO: as does this
                            depth,
                            -1, cur_cu->intra.mode_chroma, // skip luma
                            NULL, lcu);
@@ -698,7 +701,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
   if (cur_cu->type == CU_INTRA || cur_cu->type == CU_INTER) {
     cost = kvz_cu_rd_cost_luma(state, x_local, y_local, depth, cur_cu, lcu);
     if (state->encoder_control->chroma_format != KVZ_CSP_400) {
-      cost += kvz_cu_rd_cost_chroma(state, x_local, y_local, depth, cur_cu, lcu);
+      cost += kvz_cu_rd_cost_chroma(state, x_local, y_local, MIN(depth, 3), cur_cu, lcu);
     }
 
     double mode_bits;

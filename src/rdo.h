@@ -36,8 +36,11 @@
 extern const uint32_t kvz_g_go_rice_range[5];
 extern const uint32_t kvz_g_go_rice_prefix_len[5];
 
+int kvz_init_rdcost_outfiles(const char *fn_template);
+void kvz_close_rdcost_outfiles(void);
+
 void  kvz_rdoq(encoder_state_t *state, coeff_t *coef, coeff_t *dest_coeff, int32_t width,
-           int32_t height, int8_t type, int8_t scan_mode, int8_t block_type, int8_t tr_depth);
+           int32_t height, int8_t type, int8_t scan_mode, int8_t block_type, int8_t tr_depth, uint16_t cbf);
 
 uint32_t kvz_get_coeff_cost(const encoder_state_t * const state,
                             const coeff_t *coeff,
@@ -46,12 +49,12 @@ uint32_t kvz_get_coeff_cost(const encoder_state_t * const state,
                             int8_t scan_mode);
 
 int32_t kvz_get_ic_rate(encoder_state_t *state, uint32_t abs_level, uint16_t ctx_num_gt1, uint16_t ctx_num_gt2, uint16_t ctx_num_par,
-                    uint16_t abs_go_rice, uint32_t c1_idx, uint32_t c2_idx, int8_t type);
+                    uint16_t abs_go_rice, uint32_t reg_bins, int8_t type, int use_limited_prefix_length);
 uint32_t kvz_get_coded_level(encoder_state_t * state, double* coded_cost, double* coded_cost0, double* coded_cost_sig,
                          int32_t level_double, uint32_t max_abs_level,
                          uint16_t ctx_num_sig, uint16_t ctx_num_gt1, uint16_t ctx_num_gt2, uint16_t ctx_num_par,
                          uint16_t abs_go_rice,
-                         uint32_t c1_idx, uint32_t c2_idx,
+                         uint32_t reg_bins,
                          int32_t q_bits,double temp, int8_t last, int8_t type);
 
 kvz_mvd_cost_func kvz_calc_mvd_cost_cabac;
@@ -70,8 +73,8 @@ extern const uint32_t kvz_entropy_bits[512];
 #define CTX_ENTROPY_BITS(ctx, val) kvz_entropy_bits[CTX_STATE(ctx) ^ (val)]
 
 // Floating point fractional bits, derived from kvz_entropy_bits
-extern const float kvz_f_entropy_bits[128];
+extern const float kvz_f_entropy_bits[512];
 // ToDo: generate a new table for VVC?
-#define CTX_ENTROPY_FBITS(ctx, val) kvz_f_entropy_bits[(CTX_STATE(ctx)>>2) ^ (val)]
+#define CTX_ENTROPY_FBITS(ctx, val) kvz_f_entropy_bits[(CTX_STATE(ctx)) ^ (val)]
 
 #endif

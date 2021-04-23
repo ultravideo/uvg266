@@ -605,16 +605,20 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
 
   WRITE_U(stream, 0, 1, "sps_lfnst_enabled_flag");
 
-  WRITE_U(stream, 0, 1, "sps_joint_cbcr_enabled_flag");
 
-  if (encoder->chroma_format != KVZ_CSP_400) {    
-    WRITE_U(stream, 1, 1, "same_qp_table_for_chroma"); //TODO: Enable chroma QP scaling and fix kvz_get_scaled_qp()
+  if (encoder->chroma_format != KVZ_CSP_400) {
+    WRITE_U(stream, 0, 1, "sps_joint_cbcr_enabled_flag");
+    WRITE_U(stream, 1, 1, "same_qp_table_for_chroma");
 
-    WRITE_SE(stream, 0, "qp_table_starts_minus26");    
-    WRITE_UE(stream, 0, "num_points_in_qp_table_minus1");
+    for (int i = 0; i < encoder->cfg.num_used_table; i++) {
+      WRITE_SE(stream, encoder->cfg.qp_table_start_minus26[i], "qp_table_starts_minus26");    
+      WRITE_UE(stream, encoder->cfg.qp_table_length_minus1[i], "num_points_in_qp_table_minus1");
 
-      WRITE_UE(stream, 0, "delta_qp_in_val_minus1");
-      WRITE_UE(stream, 1, "delta_qp_diff_val");
+      for (int j = 0; j <= encoder->cfg.qp_table_length_minus1[i]; j++) {
+        WRITE_UE(stream, encoder->cfg.delta_qp_in_val_minus1[i][j], "delta_qp_in_val_minus1");
+        WRITE_UE(stream, encoder->cfg.delta_qp_out_val[i][j] ^ encoder->cfg.delta_qp_in_val_minus1[i][j], "delta_qp_diff_val");
+      }
+    }
 
   }
 
@@ -681,10 +685,13 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   WRITE_U(stream, 0, 1, "sps_mrl_enabled_flag");
   WRITE_U(stream, 0, 1, "sps_mip_enabled_flag");
   // if(!no_cclm_constraint_flag)
+  if(encoder->chroma_format != KVZ_CSP_400) {
     WRITE_U(stream, 0, 1, "sps_cclm_enabled_flag");
-
-  WRITE_U(stream, 0, 1, "sps_chroma_horizontal_collocated_flag");
-  WRITE_U(stream, 0, 1, "sps_chroma_vertical_collocated_flag");
+  }
+  if (encoder->chroma_format == KVZ_CSP_420) {
+    WRITE_U(stream, 0, 1, "sps_chroma_horizontal_collocated_flag");
+    WRITE_U(stream, 0, 1, "sps_chroma_vertical_collocated_flag");
+  }
 
   WRITE_U(stream, 0, 1, "sps_palette_enabled_flag");
   WRITE_U(stream, 0, 1, "sps_ibc_enabled_flag");

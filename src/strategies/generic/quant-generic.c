@@ -23,11 +23,13 @@
 #include <stdlib.h>
 
 #include "encoder.h"
+#include "kvz_math.h"
 #include "rdo.h"
 #include "scalinglist.h"
 #include "strategies/strategies-quant.h"
 #include "strategyselector.h"
 #include "transform.h"
+#include "fast_coeff_cost.h"
 
 #define QUANT_SHIFT 14
 /**
@@ -41,11 +43,12 @@ void kvz_quant_generic(const encoder_state_t * const state, coeff_t *coef, coeff
   const uint32_t log2_block_size = kvz_g_convert_to_bit[width] + 2;
   const uint32_t * const scan = kvz_g_sig_last_scan[scan_idx][log2_block_size - 1];
 
-  int32_t qp_scaled = kvz_get_scaled_qp(type, state->qp, (encoder->bitdepth - 8) * 6);
-  const uint32_t log2_tr_size = kvz_g_convert_to_bit[width] + 2;
+  int32_t qp_scaled = kvz_get_scaled_qp(type, state->qp, (encoder->bitdepth - 8) * 6, encoder->qp_map[0]);
+  uint32_t log2_tr_width = kvz_math_floor_log2(height);
+  uint32_t log2_tr_height = kvz_math_floor_log2(width);
   const int32_t scalinglist_type = (block_type == CU_INTRA ? 0 : 3) + (int8_t)("\0\3\1\2"[type]);
-  const int32_t *quant_coeff = encoder->scaling_list.quant_coeff[log2_tr_size - 2][scalinglist_type][qp_scaled % 6];
-  const int32_t transform_shift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - log2_tr_size; //!< Represents scaling through forward transform
+  const int32_t *quant_coeff = encoder->scaling_list.quant_coeff[log2_tr_width][log2_tr_height][scalinglist_type][qp_scaled % 6];
+  const int32_t transform_shift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - ((log2_tr_height + log2_tr_width) >> 1); //!< Represents scaling through forward transform
   const int32_t q_bits = QUANT_SHIFT + qp_scaled / 6 + transform_shift;
   const int32_t add = ((state->frame->slicetype == KVZ_SLICE_I) ? 171 : 85) << (q_bits - 9);
   const int32_t q_bits8 = q_bits - 8;
@@ -225,11 +228,11 @@ int kvz_quantize_residual_generic(encoder_state_t *const state,
   {
     int8_t tr_depth = cur_cu->tr_depth - cur_cu->depth;
     tr_depth += (cur_cu->part_size == SIZE_NxN ? 1 : 0);
-    kvz_rdoq(state, coeff, coeff_out, width, width, (color == COLOR_Y ? 0 : 2),
-      scan_order, cur_cu->type, tr_depth);
+    kvz_rdoq(state, coeff, coeff_out, width, width, color,
+      scan_order, cur_cu->type, tr_depth, cur_cu->cbf);
   } else {
   
-    kvz_quant(state, coeff, coeff_out, width, width, (color == COLOR_Y ? 0 : 2),
+    kvz_quant(state, coeff, coeff_out, width, width, color,
       scan_order, cur_cu->type);
   }
 
@@ -290,18 +293,20 @@ void kvz_dequant_generic(const encoder_state_t * const state, coeff_t *q_coef, c
   const encoder_control_t * const encoder = state->encoder_control;
   int32_t shift,add,coeff_q;
   int32_t n;
-  int32_t transform_shift = 15 - encoder->bitdepth - (kvz_g_convert_to_bit[ width ] + 2);
+  int32_t transform_shift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - ((kvz_math_floor_log2(width) + kvz_math_floor_log2(height)) >> 1); // Represents scaling through forward transform
 
-  int32_t qp_scaled = kvz_get_scaled_qp(type, state->qp, (encoder->bitdepth-8)*6);
+
+  int32_t qp_scaled = kvz_get_scaled_qp(type, state->qp, (encoder->bitdepth-8)*6, encoder->qp_map[0]);
 
   shift = 20 - QUANT_SHIFT - transform_shift;
 
   if (encoder->scaling_list.enable)
   {
-    uint32_t log2_tr_size = kvz_g_convert_to_bit[ width ] + 2;
+    uint32_t log2_tr_width = kvz_math_floor_log2(height) + 2;
+    uint32_t log2_tr_height = kvz_math_floor_log2(width) + 2;
     int32_t scalinglist_type = (block_type == CU_INTRA ? 0 : 3) + (int8_t)("\0\3\1\2"[type]);
 
-    const int32_t *dequant_coef = encoder->scaling_list.de_quant_coeff[log2_tr_size-2][scalinglist_type][qp_scaled%6];
+    const int32_t *dequant_coef = encoder->scaling_list.de_quant_coeff[log2_tr_width -2][log2_tr_height -2][scalinglist_type][qp_scaled%6];
     shift += 4;
 
     if (shift >qp_scaled / 6) {
@@ -338,46 +343,30 @@ static uint32_t coeff_abs_sum_generic(const coeff_t *coeffs, size_t length)
   return sum;
 }
 
-static INLINE int16_t to_q88(float f)
+static INLINE void get_coeff_weights(uint64_t wts_packed, uint16_t *weights)
 {
-  return (int16_t)(f * 256.0f);
+  weights[0] = (wts_packed >>  0) & 0xffff;
+  weights[1] = (wts_packed >> 16) & 0xffff;
+  weights[2] = (wts_packed >> 32) & 0xffff;
+  weights[3] = (wts_packed >> 48) & 0xffff;
 }
 
-static uint32_t fast_coeff_cost_generic(const coeff_t *coeff, int32_t width, int32_t qp)
+static uint32_t fast_coeff_cost_generic(const coeff_t *coeff, int32_t width, uint64_t weights)
 {
   uint32_t sum = 0;
-#define NUM_BUCKETS 5
-  const int16_t wt_m[NUM_BUCKETS] = {
-    to_q88(-0.004916),
-    to_q88(0.010806),
-    to_q88(0.055562),
-    to_q88(0.033436),
-    to_q88(-0.007690),
-  };
-  const int16_t wt_c[NUM_BUCKETS] = {
-    to_q88(0.172024),
-    to_q88(3.421462),
-    to_q88(2.879506),
-    to_q88(5.585471),
-    to_q88(0.256772),
-  };
+  uint16_t weights_unpacked[4];
 
-  int16_t wt[NUM_BUCKETS];
-  for (int32_t i = 0; i < NUM_BUCKETS; i++)
-    wt[i] = wt_m[i] * qp + wt_c[i];
+  get_coeff_weights(weights, weights_unpacked);
 
   for (int32_t i = 0; i < width * width; i++) {
-    int16_t curr = coeff[i];
-    int16_t signmask = curr >> 15;
-    int16_t curr_abs = (curr ^ signmask) - signmask;
-    if (curr_abs > 3)
+     int16_t curr = coeff[i];
+    uint32_t curr_abs = abs(curr);
+    if (curr_abs > 3) {
       curr_abs = 3;
-
-    sum += wt[curr_abs];
+    }
+    sum += weights_unpacked[curr_abs];
   }
-  sum += wt[NUM_BUCKETS - 1] * width;
-  return sum >> 8;
-#undef NUM_BUCKETS
+  return (sum + (1 << 7)) >> 8;
 }
 
 int kvz_strategy_register_quant_generic(void* opaque, uint8_t bitdepth)

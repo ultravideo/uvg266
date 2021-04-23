@@ -34,15 +34,15 @@
 typedef struct {
         int8_t   enable;
         int8_t   use_default_list;
-        int32_t  scaling_list_dc   [SCALING_LIST_SIZE_NUM][SCALING_LIST_NUM];
-  const int32_t *scaling_list_coeff[SCALING_LIST_SIZE_NUM][SCALING_LIST_NUM];
-  const int32_t *quant_coeff[4][6][6];
-  const int32_t *de_quant_coeff  [SCALING_LIST_SIZE_NUM][SCALING_LIST_NUM][SCALING_LIST_REM_NUM];
-  const double *error_scale[4][6][6];
+        int32_t  scaling_list_dc   [SCALING_LIST_SIZE_NUM][SCALING_LIST_SIZE_NUM][SCALING_LIST_NUM];
+  const int32_t *scaling_list_coeff[SCALING_LIST_SIZE_NUM][SCALING_LIST_SIZE_NUM][SCALING_LIST_NUM];
+  const int32_t *quant_coeff[SCALING_LIST_SIZE_NUM][SCALING_LIST_SIZE_NUM][SCALING_LIST_NUM][SCALING_LIST_REM_NUM];
+  const int32_t *de_quant_coeff[SCALING_LIST_SIZE_NUM][SCALING_LIST_SIZE_NUM][SCALING_LIST_NUM][SCALING_LIST_REM_NUM];
+  const double *error_scale[SCALING_LIST_SIZE_NUM][SCALING_LIST_SIZE_NUM][SCALING_LIST_NUM][SCALING_LIST_REM_NUM];
 } scaling_list_t;
 
-extern const uint8_t kvz_g_scaling_list_num[4];
-extern const uint16_t kvz_g_scaling_list_size[4];
+extern const uint8_t kvz_g_scaling_list_num[SCALING_LIST_SIZE_NUM];
+extern const uint16_t kvz_g_scaling_list_size[SCALING_LIST_SIZE_NUM][SCALING_LIST_SIZE_NUM];
 
 const int32_t *kvz_scalinglist_get_default(const uint32_t size_id, const uint32_t list_id);
 

@@ -155,6 +155,12 @@ static const struct option long_options[] = {
   { "no-clip-neighbour",        no_argument, NULL, 0 },
   { "input-file-format",  required_argument, NULL, 0 },
   { "stats-file-prefix",  required_argument, NULL, 0 },
+  { "fast-coeff-table",   required_argument, NULL, 0 },
+  { "fastrd-sampling",          no_argument, NULL, 0 },
+  { "fastrd-accuracy-check",    no_argument, NULL, 0 },
+  { "fastrd-outdir",      required_argument, NULL, 0 },
+  { "chroma-qp-in",       required_argument, NULL, 0 },
+  { "chroma-qp-out",      required_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 
@@ -508,6 +514,13 @@ void print_help(void)
     "      --(no-)vaq <integer>   : Enable variance adaptive quantization with given\n"
     "                               strength, in range 1..20. Recommended: 5.\n"
     "                               [disabled]\n"
+    "      --chroma-qp-in         : List of input values used for mapping the luma\n"
+    "                               QP into chroma qp. [17,27,32,44]\n"
+    "      --chroma-qp-out        : List of output values used for mapping the luma\n"
+    "                               QP into chroma qp. These two lists have to be\n"
+    "                               same length, start with same value, and can\n"
+    "                               contain maximum 16 or 36 - starting value\n"
+    "                               elements. [17,27,32,44]\n"
     "\n"
     /* Word wrap to this width to stay under 80 characters (including ") *************/
     "Compression tools:\n"
@@ -577,6 +590,16 @@ void print_help(void)
     "                                   - sensitive: Terminate even earlier.\n"
     "      --fast-residual-cost <int> : Skip CABAC cost for residual coefficients\n"
     "                                   when QP is below the limit. [0]\n"
+    "      --fast-coeff-table <string> : Read custom weights for residual\n"
+    "                                    coefficients from a file instead of using\n"
+    "                                    defaults [default]\n"
+    "      --fast-rd-sampling : Enable learning data sampling for fast coefficient\n"
+    "                           table generation\n"
+    "      --fastrd-accuracy-check : Evaluate the accuracy of fast coefficient\n"
+    "                                prediction\n"
+    "      --fastrd-outdir : Directory to which to output sampled data or accuracy\n"
+    "                        data, into <fastrd-outdir>/0.txt to 50.txt, one file\n"
+    "                        for each QP that blocks were estimated on\n"
     "      --(no-)intra-rdo-et    : Check intra modes in rdo stage only until\n"
     "                               a zero coefficient CU is found. [disabled]\n"
     "      --(no-)early-skip      : Try to find skip cu from merge candidates.\n"

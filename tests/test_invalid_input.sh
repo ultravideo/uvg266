@@ -5,4 +5,4 @@
 set -eu
 . "${0%/*}/util.sh"
 
-encode_test 1x65 1 1
+encode_test 1x65 1 yuv420p 1
