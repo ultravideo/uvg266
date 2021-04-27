@@ -594,7 +594,11 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
     WRITE_U(stream, (TR_MAX_LOG2_SIZE - 5) ? 1 : 0, 1, "sps_max_luma_transform_size_64_flag");
 
 
-  WRITE_U(stream, 0, 1, "sps_transform_skip_enabled_flag");
+  WRITE_U(stream, encoder->cfg.trskip_enable, 1, "sps_transform_skip_enabled_flag");
+  if (encoder->cfg.trskip_enable) {
+    WRITE_UE(stream, 0, "sps_log2_transform_skip_max_size_minus2"); // Only enable transformskip for 4x4 blocks for now
+    WRITE_U(stream, 0, 1, "sps_bdpcm_enabled_flag");
+  }
 
   const uint8_t mts_selection = encoder->cfg.mts;
   WRITE_U(stream, mts_selection ? 1 : 0, 1, "sps_mts_enabled_flag");
@@ -694,6 +698,11 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   }
 
   WRITE_U(stream, 0, 1, "sps_palette_enabled_flag");
+
+  if (encoder->cfg.trskip_enable /* || pcSPS->getPLTMode()*/) {
+    WRITE_UE(stream, KVZ_BIT_DEPTH, "log2_parallel_merge_level_minus2");    
+  }
+
   WRITE_U(stream, 0, 1, "sps_ibc_enabled_flag");
 
 #if LUMA_ADAPTIVE_DEBLOCKING_FILTER_QP_OFFSET
@@ -1310,7 +1319,10 @@ void kvz_encoder_state_write_bitstream_slice_header(
   if (state->encoder_control->cfg.signhide_enable) {
     WRITE_U(stream, 1, 1, "sh_sign_data_hiding_used_flag");
   }
-
+  if (state->encoder_control->cfg.trskip_enable && !state->encoder_control->cfg.signhide_enable /* && !cfg.dep_quant*/)
+  {
+    WRITE_U(stream, 0, 1, "sh_ts_residual_coding_disabled_flag"); 
+  }
   if (state->frame->slicetype != KVZ_SLICE_I) {
 
     // BT Size set only with non-I-frames, in I-frames the size is 32x32

@@ -43,6 +43,13 @@ uint32_t kvz_context_get_sig_ctx_idx_abs(const coeff_t* coeff, int32_t pos_x, in
                                          uint32_t height, uint32_t width, int8_t type, 
                                          int32_t* temp_diag, int32_t* temp_sum);
 
+uint32_t kvz_context_get_sig_ctx_idx_abs_ts(const coeff_t* coeff, int32_t pos_x, int32_t pos_y,
+                                             uint32_t width);
+uint32_t kvz_sign_ctx_id_abs_ts(const coeff_t* coeff, int32_t pos_x, int32_t pos_y, int32_t width, int bdpcm);
+int32_t kvz_derive_mod_coeff(int rightPixel, int belowPixel, coeff_t absCoeff, int bdpcm);
+unsigned kvz_lrg1_ctx_id_abs_ts(const coeff_t* coeff, int32_t pos_x, int32_t pos_y, int32_t width, int bdpcm);
+
+
 uint32_t kvz_abs_sum(const coeff_t* coeff, int32_t pos_x, int32_t pos_y,
                      uint32_t height, uint32_t width, uint32_t baselevel);
 

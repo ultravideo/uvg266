@@ -85,16 +85,16 @@ static double get_cost(encoder_state_t * const state,
 
     // Add the offset bit costs of signaling 'luma and chroma use trskip',
     // versus signaling 'luma and chroma don't use trskip' to the SAD cost.
-    //const cabac_ctx_t *ctx = &state->cabac.ctx.transform_skip_model_luma;
-    double trskip_bits = 0.0;// CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0);
+    const cabac_ctx_t *ctx = &state->cabac.ctx.transform_skip_model_luma;
+    double trskip_bits = CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0);
 
-    /*
+    
     // ToDo: Check cost
     if (state->encoder_control->chroma_format != KVZ_CSP_400) {
       ctx = &state->cabac.ctx.transform_skip_model_chroma;
       trskip_bits += 2.0 * (CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0));
     }
-    */
+    
 
     double sad_cost = TRSKIP_RATIO * sad_func(pred, orig_block) + state->lambda_sqrt * trskip_bits;
     if (sad_cost < satd_cost) {
@@ -124,6 +124,7 @@ static void get_cost_dual(encoder_state_t * const state,
   costs_out[0] = (double)satd_costs[0];
   costs_out[1] = (double)satd_costs[1];
 
+  // TODO: width and height
   if (TRSKIP_RATIO != 0 && width == 4 && state->encoder_control->cfg.trskip_enable) {
     // If the mode looks better with SAD than SATD it might be a good
     // candidate for transform skip. How much better SAD has to be is
@@ -131,16 +132,16 @@ static void get_cost_dual(encoder_state_t * const state,
 
     // Add the offset bit costs of signaling 'luma and chroma use trskip',
     // versus signaling 'luma and chroma don't use trskip' to the SAD cost.
-    //const cabac_ctx_t *ctx = &state->cabac.ctx.transform_skip_model_luma;
-    double trskip_bits = 0.0;// CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0);
+    const cabac_ctx_t *ctx = &state->cabac.ctx.transform_skip_model_luma;
+    double trskip_bits = CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0);
 
-    /*
+    
     // ToDo: check cost
     if (state->encoder_control->chroma_format != KVZ_CSP_400) {
       ctx = &state->cabac.ctx.transform_skip_model_chroma;
       trskip_bits += 2.0 * (CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0));
     }
-    */
+    
 
     unsigned unsigned_sad_costs[PARALLEL_BLKS] = { 0 };
     double sad_costs[PARALLEL_BLKS] = { 0 };
