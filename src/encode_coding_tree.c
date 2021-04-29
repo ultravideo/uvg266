@@ -341,7 +341,9 @@ static void encode_chroma_tu(encoder_state_t* const state, int x, int y, int dep
   if (cbf_is_set(cur_pu->cbf, depth, COLOR_U)) {
     if(state->encoder_control->cfg.trskip_enable && width_c == 4){
       cabac->cur_ctx = &cabac->ctx.transform_skip_model_chroma;
-      CABAC_BIN(cabac, cur_pu->tr_idx == MTS_SKIP, "transform_skip_flag");
+      // HEVC only supports transform_skip for Luma
+      // TODO: transform skip for chroma blocks
+      CABAC_BIN(cabac, 0, "transform_skip_flag");
     }
     kvz_encode_coeff_nxn(state, &state->cabac, coeff_u, width_c, 1, *scan_idx, NULL, false);
   }
@@ -349,7 +351,7 @@ static void encode_chroma_tu(encoder_state_t* const state, int x, int y, int dep
   if (cbf_is_set(cur_pu->cbf, depth, COLOR_V)) {
     if (state->encoder_control->cfg.trskip_enable && width_c == 4) {
       cabac->cur_ctx = &cabac->ctx.transform_skip_model_chroma;
-      CABAC_BIN(cabac, cur_pu->tr_idx == MTS_SKIP, "transform_skip_flag");
+      CABAC_BIN(cabac, 0, "transform_skip_flag");
     }
     kvz_encode_coeff_nxn(state, &state->cabac, coeff_v, width_c, 2, *scan_idx, NULL, false);
   }
@@ -391,8 +393,11 @@ static void encode_transform_unit(encoder_state_t * const state,
 
     if(state->encoder_control->cfg.trskip_enable && width == 4) {
       cabac->cur_ctx = &cabac->ctx.transform_skip_model_luma;
-      CABAC_BIN(cabac, 1, "transform_skip_flag");
-      encode_ts_residual(state, cabac, coeff_y, width, 0, scan_idx);
+      CABAC_BIN(cabac, cur_pu->tr_idx == MTS_SKIP, "transform_skip_flag");
+
+    }
+    if(cur_pu->tr_idx == MTS_SKIP) {
+      encode_ts_residual(state, cabac, coeff_y, width, 0, scan_idx);      
     }
     else {
       kvz_encode_coeff_nxn(state,

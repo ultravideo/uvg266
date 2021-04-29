@@ -1321,6 +1321,7 @@ void kvz_encoder_state_write_bitstream_slice_header(
   }
   if (state->encoder_control->cfg.trskip_enable && !state->encoder_control->cfg.signhide_enable /* && !cfg.dep_quant*/)
   {
+    // TODO: find out what this is actually about and parametrize it
     WRITE_U(stream, 0, 1, "sh_ts_residual_coding_disabled_flag"); 
   }
   if (state->frame->slicetype != KVZ_SLICE_I) {

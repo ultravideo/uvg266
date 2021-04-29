@@ -286,7 +286,7 @@ static double search_intra_trdepth(encoder_state_t * const state,
     double best_rd_cost = MAX_INT;
     int best_tr_idx = 0;
 
-    int trafo = 0;
+    int trafo;
     int num_transforms = 1;
     if (mts_mode != -1)
     {
@@ -298,6 +298,10 @@ static double search_intra_trdepth(encoder_state_t * const state,
       trafo = 0;
       num_transforms = (mts_enabled ? MTS_TR_NUM : 1);
     }
+    //TODO: height
+    if(state->encoder_control->cfg.trskip_enable && width == 4 /*&& height == 4*/) {
+      num_transforms = MAX(num_transforms, 2);
+    }
     for (; trafo < num_transforms; trafo++) {
       pred_cu->tr_idx = trafo;
       if (mts_enabled)
@@ -305,8 +309,9 @@ static double search_intra_trdepth(encoder_state_t * const state,
         pred_cu->mts_last_scan_pos = 0;
         pred_cu->violates_mts_coeff_constraint = 0;
 
-        if (trafo == MTS_SKIP) {
-          //TODO: Consider tranform skip
+        if (trafo == MTS_SKIP && width != 4) {
+          //TODO: parametrize that this is not hardcoded
+          // TODO: this probably should currently trip for chroma?
           continue;
         }
       }
@@ -317,7 +322,8 @@ static double search_intra_trdepth(encoder_state_t * const state,
         intra_mode, chroma_mode,
         pred_cu, lcu);
 
-      if (pred_cu->tr_idx > 0)
+      // TODO: Not sure if this should be 0 or 1 but at least seems to work with 1
+      if (pred_cu->tr_idx > 1)
       {
         derive_mts_constraints(pred_cu, lcu, depth, lcu_px);
         if (pred_cu->violates_mts_coeff_constraint || !pred_cu->mts_last_scan_pos)
@@ -337,7 +343,7 @@ static double search_intra_trdepth(encoder_state_t * const state,
         best_tr_idx = pred_cu->tr_idx;
       }
     }
-
+    pred_cu->tr_skip = best_tr_idx == MTS_SKIP;
     pred_cu->tr_idx = best_tr_idx;
     nosplit_cost += best_rd_cost;
 
