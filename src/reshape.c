@@ -32,8 +32,8 @@
 
 void kvz_free_lmcs_aps(lmcs_aps* aps)
 {
-  FREE_POINTER(aps->m_invLUT);
-  FREE_POINTER(aps->m_fwdLUT);
+  //FREE_POINTER(aps->m_invLUT);
+  //FREE_POINTER(aps->m_fwdLUT);
 
 }
 
@@ -62,11 +62,12 @@ void kvz_init_lmcs_aps(lmcs_aps* aps, int picWidth, int picHeight, uint32_t maxC
   aps->m_initCWAnalyze = aps->m_reshapeLUTSize / PIC_ANALYZE_CW_BINS;
   aps->m_initCW = aps->m_reshapeLUTSize / PIC_CODE_CW_BINS;
 
-  aps->m_fwdLUT = calloc(1, sizeof(kvz_pixel) * aps->m_reshapeLUTSize);
+  //aps->m_fwdLUT = calloc(1, sizeof(kvz_pixel) * aps->m_reshapeLUTSize);
+  //aps->m_invLUT = calloc(1, sizeof(kvz_pixel) * aps->m_reshapeLUTSize);
+  assert(bitDepth <= 10); // ToDo: support bit depth larger than 10
 
-  aps->m_invLUT = calloc(1, sizeof(kvz_pixel) * aps->m_reshapeLUTSize);
-
-  memset(aps->m_binCW, 0, sizeof(uint16_t) * PIC_ANALYZE_CW_BINS);
+  memset(aps->m_fwdLUT, 0, sizeof(kvz_pixel) * aps->m_reshapeLUTSize);
+  memset(aps->m_invLUT, 0, sizeof(kvz_pixel) * aps->m_reshapeLUTSize);
   memset(aps->m_binImportance, 0, sizeof(uint32_t) * PIC_ANALYZE_CW_BINS);
   memset(aps->m_reshapePivot, 0, sizeof(kvz_pixel) * PIC_CODE_CW_BINS + 1);
   memset(aps->m_inputPivot, 0, sizeof(kvz_pixel) * PIC_CODE_CW_BINS + 1);
@@ -488,9 +489,14 @@ static void deriveReshapeParametersSDR(lmcs_aps* aps, bool* intraAdp, bool* inte
   double percBinVarLessThenVal1 = 0.0;
   double percBinVarLessThenVal2 = 0.0;
   double percBinVarLessThenVal3 = 0.0;
-  int* binIdxSortDsd = malloc(sizeof(int) * aps->m_binNum);
-  double* binVarSortDsd = malloc(sizeof(double) * aps->m_binNum);
-  double* binVarSortDsdCDF = malloc(sizeof(double) * aps->m_binNum);
+  assert(aps->m_binNum <= PIC_ANALYZE_CW_BINS);
+  //int* binIdxSortDsd = malloc(sizeof(int) * aps->m_binNum);
+  //double* binVarSortDsd = malloc(sizeof(double) * aps->m_binNum);
+  //double* binVarSortDsdCDF = malloc(sizeof(double) * aps->m_binNum);
+  int binIdxSortDsd[PIC_ANALYZE_CW_BINS];
+  double binVarSortDsd[PIC_ANALYZE_CW_BINS];
+  double binVarSortDsdCDF[PIC_ANALYZE_CW_BINS];
+
   double ratioWeiVar = 0.0, ratioWeiVarNorm = 0.0;
   int startBinIdx = aps->m_sliceReshapeInfo.reshaperModelMinBinIdx;
   int endBinIdx = aps->m_sliceReshapeInfo.reshaperModelMaxBinIdx;
@@ -524,9 +530,9 @@ static void deriveReshapeParametersSDR(lmcs_aps* aps, bool* intraAdp, bool* inte
   percBinVarLessThenVal1 = binVarSortDsdCDF[firstBinVarLessThanVal1];
   percBinVarLessThenVal2 = binVarSortDsdCDF[firstBinVarLessThanVal2];
   percBinVarLessThenVal3 = binVarSortDsdCDF[firstBinVarLessThanVal3];
-  FREE_POINTER(binIdxSortDsd);
-  FREE_POINTER(binVarSortDsd);
-  FREE_POINTER(binVarSortDsdCDF);
+  //FREE_POINTER(binIdxSortDsd);
+  //FREE_POINTER(binVarSortDsd);
+  //FREE_POINTER(binVarSortDsdCDF);
 
   cwPerturbation(aps, startBinIdx, endBinIdx, (uint16_t)aps->m_reshapeCW.binCW[1]);
   cwReduction(aps, startBinIdx, endBinIdx);

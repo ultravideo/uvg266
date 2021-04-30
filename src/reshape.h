@@ -79,8 +79,8 @@ typedef struct lmcs_aps {
   SliceReshapeInfo        m_sliceReshapeInfo;
   bool                    m_CTUFlag;
   bool                    m_recReshaped;
-  kvz_pixel*              m_invLUT;
-  kvz_pixel*              m_fwdLUT;
+  kvz_pixel               m_invLUT[1024];
+  kvz_pixel               m_fwdLUT[1024];
   int32_t                 m_chromaAdjHelpLUT[PIC_CODE_CW_BINS];
   uint16_t                m_binCW[PIC_ANALYZE_CW_BINS];
   uint16_t                m_initCW;
