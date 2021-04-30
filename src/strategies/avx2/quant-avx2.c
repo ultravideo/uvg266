@@ -370,7 +370,7 @@ void kvz_quant_avx2(const encoder_state_t * const state, const coeff_t * __restr
   const uint32_t * const scan = kvz_g_sig_last_scan[scan_idx][log2_block_size - 1];
 
   int32_t qp_scaled = kvz_get_scaled_qp(type, state->qp, (encoder->bitdepth - 8) * 6, encoder->qp_map[0]);
-  qp_scaled = transform_skip ? MAX(qp_scaled, 4 + 6 * KVZ_BIT_DEPTH) : qp_scaled;
+  qp_scaled = transform_skip ? MAX(qp_scaled, 4 + 6 * MIN_QP_PRIME_TS) : qp_scaled;
   uint32_t log2_tr_width = kvz_math_floor_log2(height);
   uint32_t log2_tr_height = kvz_math_floor_log2(width);
   const int32_t scalinglist_type = (block_type == CU_INTRA ? 0 : 3) + (int8_t)("\0\3\1\2"[type]);
@@ -742,7 +742,7 @@ void kvz_dequant_avx2(const encoder_state_t * const state, coeff_t *q_coef, coef
 
 
   int32_t qp_scaled = kvz_get_scaled_qp(type, state->qp, (encoder->bitdepth-8)*6, encoder->qp_map[0]);
-  qp_scaled = transform_skip ? MAX(qp_scaled, 4 + 6 * KVZ_BIT_DEPTH) : qp_scaled;
+  qp_scaled = transform_skip ? MAX(qp_scaled, 4 + 6 * MIN_QP_PRIME_TS) : qp_scaled;
 
   shift = 20 - QUANT_SHIFT - (transform_skip ? 0 : transform_shift);
 
