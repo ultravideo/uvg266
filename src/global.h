@@ -60,6 +60,11 @@
 #define FP_PREC 11
 #define CSCALE_FP_PREC 11
 
+#define RESHAPE_SIGNAL_SDR 0
+#define RESHAPE_SIGNAL_PQ 1
+#define RESHAPE_SIGNAL_HLG 2
+#define RESHAPE_SIGNAL_NULL 100
+
 /**
  * \defgroup Bitstream
  * HEVC bitstream coding
