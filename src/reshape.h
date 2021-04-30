@@ -61,6 +61,20 @@ typedef struct SliceReshapeInfo {
   int       chrResScalingOffset;
 } SliceReshapeInfo;
 
+typedef struct ReshapeCW
+{
+  uint32_t* binCW;
+  int       updateCtrl;
+  int       adpOption;
+  uint32_t  initialCW;
+  int rspPicSize;
+  int rspFps;
+  int rspBaseQP;
+  int rspTid;
+  int rspSliceQP;
+  int rspFpsToIp;
+} ReshapeCW;
+
 typedef struct lmcs_aps {
   SliceReshapeInfo        m_sliceReshapeInfo;
   bool                    m_CTUFlag;
@@ -87,7 +101,7 @@ typedef struct lmcs_aps {
   int                     m_rateAdpMode;
   bool                    m_useAdpCW;
   uint16_t                m_initCWAnalyze;
-  //ReshapeCW               m_reshapeCW;
+  ReshapeCW               m_reshapeCW;
   kvz_pixel               m_cwLumaWeight[PIC_CODE_CW_BINS];
   double                  m_chromaWeight;
   int                     m_chromaAdj;
@@ -103,3 +117,5 @@ void kvz_free_lmcs_aps(lmcs_aps* aps);
 void kvz_init_lmcs_seq_stats(lmcs_seq_info* stats, int32_t m_binNum);
 
 void kvz_init_lmcs_aps(lmcs_aps* aps, int picWidth, int picHeight, uint32_t maxCUWidth, uint32_t maxCUHeight, int bitDepth);
+
+void kvz_calc_seq_stats(struct encoder_state_t* const state, const videoframe_t* frame, lmcs_seq_info* stats, lmcs_aps* aps);
