@@ -53,6 +53,12 @@
 // VVC related definitions
 #define ENABLE_WPP_PARALLELISM 0
 
+//LMCS
+#define PIC_CODE_CW_BINS 16
+#define PIC_ANALYZE_CW_BINS 32
+#define LMCS_SEG_NUM 32
+#define FP_PREC 11
+#define CSCALE_FP_PREC 11
 
 /**
  * \defgroup Bitstream

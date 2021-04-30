@@ -631,7 +631,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
       WRITE_U(stream, encoder->cfg.alf_type == KVZ_ALF_FULL, 1, "sps_ccalf_enabled_flag");
     }
 
-    WRITE_U(stream, 0, 1, "sps_lmcs_enable_flag");
+    WRITE_U(stream, encoder->cfg.lmcs_enable, 1, "sps_lmcs_enable_flag");
 
     WRITE_U(stream, 0, 1, "sps_weighted_pred_flag");           // Use of Weighting Prediction (P_SLICE)
     WRITE_U(stream, 0, 1, "sps_weighted_bipred_flag");        // Use of Weighting Bi-Prediction (B_SLICE)
@@ -1111,7 +1111,20 @@ static void kvz_encoder_state_write_bitstream_picture_header(
     state->tile->frame->alf_cc_enable_flag[COMPONENT_Cb] = false;
     state->tile->frame->alf_cc_enable_flag[COMPONENT_Cr] = false;*/
   }
+  if (encoder->cfg.lmcs_enable)
+  {
+    WRITE_U(stream, 1, 1, "ph_lmcs_enabled_flag");
+ 
+    //if (picHeader->getLmcsEnabledFlag())
+    {
+      WRITE_U(stream, 0, 2, "ph_lmcs_aps_id");
 
+      if (encoder->chroma_format != KVZ_CSP_400)
+      {
+        WRITE_U(stream, 0, 1, "ph_chroma_residual_scale_flag"); // ToDo: LMCS Enable chroma scaling
+      }
+    }
+  }
   // getDeblockingFilterControlPresentFlag
 
   // END PICTURE HEADER
@@ -1493,6 +1506,15 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
 
   // Adaptation parameter set (APS)
   kvz_encode_alf_adaptive_parameter_set(state);
+
+  if (state->encoder_control->cfg.lmcs_enable) {
+    // ToDo: Write LMCS APS NAL
+    /*
+    kvz_nal_write(stream, NAL_UNIT_PREFIX_APS, 0, state->frame->first_nal);
+    state->frame->first_nal = false;
+    encoder_state_write_adaptation_parameter_set(state, &aps);
+    */
+  }
 
   encoder_state_write_bitstream_children(state);
 

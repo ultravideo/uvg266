@@ -11,6 +11,7 @@
 #include "rdo.h"
 #include "strategies/strategies-sao.h"
 #include "kvz_math.h"
+#include "reshape.h"
 
 #if MAX_NUM_CC_ALF_FILTERS>1
 typedef struct filter_idx_count
@@ -1574,6 +1575,42 @@ static void encode_alf_aps_flags(encoder_state_t * const state,
   }
 }
 
+
+// ToDo: Fill in LMCS APS
+static void encode_lmcs_aps(encoder_state_t* const state, lmcs_aps* aps)
+{
+  bitstream_t* const stream = &state->stream;
+  //SliceReshapeInfo param = pcAPS->getReshaperAPSInfo();
+  WRITE_UE(stream, 0/*param.reshaperModelMinBinIdx*/, "lmcs_min_bin_idx");
+  WRITE_UE(stream, 16 - 1/*16 - 1 - param.reshaperModelMaxBinIdx*/, "lmcs_delta_max_bin_idx");
+
+  WRITE_UE(stream, 7/*param.maxNbitsNeededDeltaCW - 1*/, "lmcs_delta_cw_prec_minus1");
+  /*
+  for (int i = param.reshaperModelMinBinIdx; i <= param.reshaperModelMaxBinIdx; i++)
+  {
+    int deltaCW = param.reshaperModelBinCWDelta[i];
+    int signCW = (deltaCW < 0) ? 1 : 0;
+    int absCW = (deltaCW < 0) ? (-deltaCW) : deltaCW;
+    WRITE_CODE(absCW, param.maxNbitsNeededDeltaCW, "lmcs_delta_abs_cw[ i ]");
+    if (absCW > 0)
+    {
+      WRITE_FLAG(signCW, "lmcs_delta_sign_cw_flag[ i ]");
+    }
+  }
+  int deltaCRS = pcAPS->chromaPresentFlag ? param.chrResScalingOffset : 0;
+  int signCRS = (deltaCRS < 0) ? 1 : 0;
+  int absCRS = (deltaCRS < 0) ? (-deltaCRS) : deltaCRS;
+  if (pcAPS->chromaPresentFlag)
+  {
+    WRITE_CODE(absCRS, 3, "lmcs_delta_abs_crs");
+  }
+  if (absCRS > 0)
+  {
+    WRITE_FLAG(signCRS, "lmcs_delta_sign_crs_flag");
+  }
+  */
+}
+
 static void encoder_state_write_adaptation_parameter_set(encoder_state_t * const state, alf_aps *aps)
 {
 #ifdef KVZ_DEBUG
@@ -1590,10 +1627,10 @@ static void encoder_state_write_adaptation_parameter_set(encoder_state_t * const
   {
     encode_alf_aps_flags(state, aps);
   }
-  /*else if (aps->aps_type == T_LMCS_APS)
+  else if (aps->aps_type == T_LMCS_APS)
   {
-    codeLmcsAps(pcAPS);
-  }*/
+    //encode_lmcs_aps(state);
+  }
   /*else if (aps->aps_type == T_SCALING_LIST_APS)
   {
     codeScalingListAps(pcAPS);
@@ -1606,7 +1643,7 @@ static void encoder_state_write_adaptation_parameter_set(encoder_state_t * const
 //For example, in RA, update is on intra slice, but intra slice may not use reshaper
 static void encode_alf_aps_lmcs(encoder_state_t * const state)
 {
-  if (0 /*pcSlice->getSPS()->getUseLmcs()*/)
+  if (state->encoder_control->cfg.lmcs_enable) // ToDo: do something with LMCS
   {/*
     //only 1 LMCS data for 1 picture
     int apsId = picHeader->getLmcsAPSId();
@@ -1670,18 +1707,11 @@ static void encode_alf_aps(encoder_state_t * const state)
 
       if (write_aps)
       {
-        //actualTotalBits += xWriteAPS(accessUnit, aps);
         kvz_nal_write(stream, NAL_UNIT_PREFIX_APS, 0, state->frame->first_nal);
         state->frame->first_nal = false;
         encoder_state_write_adaptation_parameter_set(state, &aps);
 
-        //apsMap->clearChangedFlag((apsId << NUM_APS_TYPE_LEN) + ALF_APS);
         aps_map[aps_id + T_ALF_APS].b_changed = false;
-
-        //CHECK(aps != pcSlice->getAlfAPSs()[apsId] && apsId != pcSlice->getTileGroupCcAlfCbApsId() && apsId != pcSlice->getTileGroupCcAlfCrApsId(), "Wrong APS pointer in compressGOP");
-        /*assert(!(aps.aps_id != state->slice->apss[aps_id].aps_id
-          && aps_id != state->slice->tile_group_cc_alf_cr_aps_id
-          && aps_id != state->slice->tile_group_cc_alf_cr_aps_id)); //"Wrong APS id");*/
       }
     }
   }
