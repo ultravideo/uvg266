@@ -685,7 +685,12 @@ int kvz_quantize_residual_avx2(encoder_state_t *const state,
     tr_depth += (cur_cu->part_size == SIZE_NxN ? 1 : 0);
     kvz_rdoq(state, coeff, coeff_out, width, width, color,
       scan_order, cur_cu->type, tr_depth, cur_cu->cbf);
-  } else {
+  }
+  else if (state->encoder_control->cfg.rdoq_enable && use_trskip) {
+    kvz_ts_rdoq(state, coeff, coeff_out, width, width, color,
+      scan_order);
+  }
+  else {
     kvz_quant(state, coeff, coeff_out, width, width, color,
       scan_order, cur_cu->type, cur_cu->tr_idx == MTS_SKIP && color == COLOR_Y);
   }

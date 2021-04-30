@@ -760,6 +760,531 @@ static unsigned templateAbsSum(const coeff_t* coeff, int baseLevel, uint32_t  po
   return MAX(MIN(sum - 5 * baseLevel, 31), 0);
 }
 
+static INLINE int x_get_ic_rate_ts(const uint32_t            abs_level,
+  const cabac_ctx_t* frac_bits_par,
+  const cabac_ctx_t* frac_bits_sign,
+  const cabac_ctx_t* frac_bits_gt1,
+  const cabac_ctx_t* frac_bits_gtx_ctx,
+  int* num_ctx_bins,
+  const uint8_t             sign,
+  const uint16_t            rice_par,
+  const bool                use_limited_prefix_length,
+  const int                 max_log2_tr_dynamic_range,
+  int rem_reg_bins)
+{
+
+  if (rem_reg_bins < 4) // Full by-pass coding
+  {
+    int rate = abs_level ? (CTX_FRAC_ONE_BIT) : 0; // 1 bit to signal sign of non-zero
+
+    uint32_t symbol = abs_level;
+
+    uint32_t length;
+    const int threshold = COEF_REMAIN_BIN_REDUCTION;
+    if (symbol < (threshold << rice_par))
+    {
+      length = symbol >> rice_par;
+      rate += (length + 1 + rice_par) << CTX_FRAC_BITS;
+    }
+    else if (use_limited_prefix_length)
+    {
+      const uint32_t maximumPrefixLength = (32 - (COEF_REMAIN_BIN_REDUCTION + max_log2_tr_dynamic_range));
+
+      uint32_t prefixLength = 0;
+      uint32_t suffix = (symbol >> rice_par) - COEF_REMAIN_BIN_REDUCTION;
+
+      while ((prefixLength < maximumPrefixLength) && (suffix > ((2 << prefixLength) - 2)))
+      {
+        prefixLength++;
+      }
+
+      const uint32_t suffixLength = (prefixLength == maximumPrefixLength) ? (max_log2_tr_dynamic_range - rice_par) : (prefixLength + 1/*separator*/);
+
+      rate += (COEF_REMAIN_BIN_REDUCTION + prefixLength + suffixLength + rice_par) << CTX_FRAC_BITS;
+    }
+    else
+    {
+      length = rice_par;
+      symbol = symbol - (threshold << rice_par);
+      while (symbol >= (1 << length))
+      {
+        symbol -= (1 << (length++));
+      }
+      rate += (threshold + length + 1 - rice_par + length) << CTX_FRAC_BITS;
+    }
+
+    return rate;
+  }
+
+  else if (rem_reg_bins >= 4 && rem_reg_bins < 8) // First pass context coding and all by-pass coding ( Sign flag is not counted here)
+  {
+    int rate = CTX_ENTROPY_BITS(frac_bits_sign, sign); // frac_bits_sign.intBits[sign]; // sign bits
+    if (abs_level)
+      (*num_ctx_bins)++;
+
+    if (abs_level > 1)
+    {
+      rate += CTX_ENTROPY_BITS(frac_bits_gt1, 1); // frac_bits_gt1.intBits[1];
+      rate += CTX_ENTROPY_BITS(frac_bits_par, (abs_level - 2) & 1); // frac_bits_par.intBits[(abs_level - 2) & 1];
+
+      (*num_ctx_bins) += 2;
+
+      int cutoffVal = 2;
+
+      if (abs_level >= cutoffVal)
+      {
+        uint32_t symbol = (abs_level - cutoffVal) >> 1;
+        uint32_t length;
+        const int threshold = COEF_REMAIN_BIN_REDUCTION;
+        if (symbol < (threshold << rice_par))
+        {
+          length = symbol >> rice_par;
+          rate += (length + 1 + rice_par) << CTX_FRAC_BITS;
+        }
+        else if (use_limited_prefix_length)
+        {
+          const uint32_t maximumPrefixLength = (32 - (COEF_REMAIN_BIN_REDUCTION + max_log2_tr_dynamic_range));
+
+          uint32_t prefixLength = 0;
+          uint32_t suffix = (symbol >> rice_par) - COEF_REMAIN_BIN_REDUCTION;
+
+          while ((prefixLength < maximumPrefixLength) && (suffix > ((2 << prefixLength) - 2)))
+          {
+            prefixLength++;
+          }
+
+          const uint32_t suffixLength = (prefixLength == maximumPrefixLength) ? (max_log2_tr_dynamic_range - rice_par) : (prefixLength + 1/*separator*/);
+
+          rate += (COEF_REMAIN_BIN_REDUCTION + prefixLength + suffixLength + rice_par) << CTX_FRAC_BITS;
+        }
+        else
+        {
+          length = rice_par;
+          symbol = symbol - (threshold << rice_par);
+          while (symbol >= (1 << length))
+          {
+            symbol -= (1 << (length++));
+          }
+          rate += (threshold + length + 1 - rice_par + length) << CTX_FRAC_BITS;
+        }
+      }
+    }
+    else if (abs_level == 1)
+    {
+      rate += CTX_ENTROPY_BITS(frac_bits_gt1, 0);  // frac_bits_gt1.intBits[0];
+      num_ctx_bins++;
+    }
+    else
+    {
+      rate = 0;
+    }
+    return rate;
+
+  }
+  int rate = CTX_ENTROPY_BITS(frac_bits_sign, sign);
+
+  if (abs_level)
+    num_ctx_bins++;
+
+  if (abs_level > 1)
+  {
+    rate += CTX_ENTROPY_BITS(frac_bits_gt1, 1); // frac_bits_gt1.intBits[1];
+    rate += CTX_ENTROPY_BITS(frac_bits_sign, (abs_level - 2) & 1); // frac_bits_par.intBits[(abs_level - 2) & 1];
+    num_ctx_bins += 2;
+
+    int cutoffVal = 2;
+    const int numGtBins = 4;
+    for (int i = 0; i < numGtBins; i++)
+    {
+      if (abs_level >= cutoffVal)
+      {
+        const uint16_t ctxGtX = cutoffVal >> 1;
+        // const BinFracBits* fracBitsGtX = fracBitsAccess.getFracBitsArray(ctxGtX);
+        unsigned gtX = (abs_level >= (cutoffVal + 2));
+        rate += CTX_ENTROPY_BITS(&frac_bits_gtx_ctx[ctxGtX], gtX);// fracBitsGtX.intBits[gtX];
+        num_ctx_bins++;
+      }
+      cutoffVal += 2;
+    }
+
+    if (abs_level >= cutoffVal)
+    {
+      uint32_t symbol = (abs_level - cutoffVal) >> 1;
+      uint32_t length;
+      const int threshold = COEF_REMAIN_BIN_REDUCTION;
+      if (symbol < (threshold << rice_par))
+      {
+        length = symbol >> rice_par;
+        rate += (length + 1 + rice_par) << CTX_FRAC_BITS;
+      }
+      else if (use_limited_prefix_length)
+      {
+        const uint32_t maximumPrefixLength = (32 - (COEF_REMAIN_BIN_REDUCTION + max_log2_tr_dynamic_range));
+
+        uint32_t prefixLength = 0;
+        uint32_t suffix = (symbol >> rice_par) - COEF_REMAIN_BIN_REDUCTION;
+
+        while ((prefixLength < maximumPrefixLength) && (suffix > ((2 << prefixLength) - 2)))
+        {
+          prefixLength++;
+        }
+
+        const uint32_t suffixLength = (prefixLength == maximumPrefixLength) ? (max_log2_tr_dynamic_range - rice_par) : (prefixLength + 1/*separator*/);
+
+        rate += (COEF_REMAIN_BIN_REDUCTION + prefixLength + suffixLength + rice_par) << CTX_FRAC_BITS;
+      }
+      else
+      {
+        length = rice_par;
+        symbol = symbol - (threshold << rice_par);
+        while (symbol >= (1 << length))
+        {
+          symbol -= (1 << (length++));
+        }
+        rate += (threshold + length + 1 - rice_par + length) << CTX_FRAC_BITS;
+      }
+    }
+  }
+  else if (abs_level == 1)
+  {
+    rate += CTX_ENTROPY_BITS(frac_bits_gt1, 0); // frac_bits_gt1.intBits[0];
+    num_ctx_bins++;
+  }
+  else
+  {
+    rate = 0;
+  }
+  return rate;
+
+}
+
+static inline uint32_t get_coded_level_ts_pred(double* coded_cost,
+  double* coded_cost0,
+  double* coded_cost_sig,
+  int    level_double,
+  int                 q_bits,
+  double              error_scale,
+  uint32_t* coeff_levels,
+  double* coeff_level_error,
+  const cabac_ctx_t* frac_bits_sig,
+  const cabac_ctx_t* frac_bits_par,
+  const cabac_ctx_t* frac_bits_sign,
+  const cabac_ctx_t* frac_bits_gt1,
+  const cabac_ctx_t* frac_bits_gtx_ctx,
+  const uint8_t      sign,
+  int                right_pixel,
+  int                below_pixel,
+  uint16_t           rice_par,
+  bool               is_last,
+  bool               use_limited_prefix_length,
+  const int          max_log2_tr_dynamic_range,
+  int* num_used_ctx_bins,
+  int rem_reg_bins,
+  int tested_levels,
+  double lambda
+)
+{
+  double curr_cost_sig = 0;
+  uint32_t   best_abs_level = 0;
+  *num_used_ctx_bins = 0;
+  int num_best_ctx_bin = 0;
+  int bdpcm = 0;
+  if (!is_last && coeff_levels[0] < 3)
+  {
+    if (rem_reg_bins >= 4)
+      *coded_cost_sig = lambda * CTX_ENTROPY_BITS(frac_bits_sig, 0);
+    else
+      *coded_cost_sig = lambda * (1 << CTX_FRAC_BITS);
+    *coded_cost = *coded_cost0 + *coded_cost_sig;
+    if (rem_reg_bins >= 4)
+      (*num_used_ctx_bins)++;
+    if (coeff_levels[0] == 0)
+    {
+      return best_abs_level;
+    }
+  }
+  else
+  {
+    *coded_cost = MAX_DOUBLE;
+  }
+
+  if (!is_last)
+  {
+    if (rem_reg_bins >= 4)
+      curr_cost_sig = lambda * CTX_ENTROPY_BITS(frac_bits_sig, 1);
+    else
+      curr_cost_sig = lambda * (1 << CTX_FRAC_BITS);
+    if (coeff_levels[0] >= 3 && rem_reg_bins >= 4)
+      (*num_used_ctx_bins)++;
+  }
+
+  for (int errorInd = 1; errorInd <= tested_levels; errorInd++)
+  {
+    int absLevel = coeff_levels[errorInd - 1];
+    double dErr = 0.0;
+    dErr = (double)(level_double - ((absLevel) << q_bits));
+    coeff_level_error[errorInd] = dErr * dErr * error_scale;
+    int modAbsLevel = absLevel;
+    if (rem_reg_bins >= 4)
+    {
+      modAbsLevel = kvz_derive_mod_coeff(right_pixel, below_pixel, absLevel, bdpcm);
+    }
+    int numCtxBins = 0;
+    double dCurrCost = coeff_level_error[errorInd] + lambda * 
+      x_get_ic_rate_ts(modAbsLevel, frac_bits_par,  frac_bits_sign, frac_bits_gt1, frac_bits_gtx_ctx,
+        &numCtxBins, sign, rice_par, use_limited_prefix_length, max_log2_tr_dynamic_range, rem_reg_bins);
+
+    if (rem_reg_bins >= 4)
+      dCurrCost += curr_cost_sig; // if cctx.numCtxBins < 4, xGetICRateTS return rate including sign cost. dont need to add any more
+
+    if (dCurrCost < *coded_cost)
+    {
+      best_abs_level = absLevel;
+      *coded_cost = dCurrCost;
+      *coded_cost_sig = curr_cost_sig;
+      num_best_ctx_bin = numCtxBins;
+    }
+  }
+  *num_used_ctx_bins += num_best_ctx_bin;
+  return best_abs_level;
+}
+
+
+int kvz_ts_rdoq(encoder_state_t* const state, coeff_t* src_coeff, coeff_t* dest_coeff, int32_t width,
+  int32_t height, int8_t type, int8_t scan_mode) {
+  const encoder_control_t* const encoder = state->encoder_control;
+  const cabac_data_t* cabac = &state->cabac;
+  
+
+  const bool extended_precision = false;
+  const int  max_log2_tr_dynamic_range = 15;
+  uint32_t log2_tr_width = kvz_math_floor_log2(height);
+  uint32_t log2_tr_height = kvz_math_floor_log2(width);
+  const uint32_t log2_block_size = kvz_g_convert_to_bit[width] + 2;
+
+  //TODO: Scaling list
+
+  double   block_uncoded_cost = 0;
+  uint32_t cg_num = width * height >> 4;
+  const int32_t  shift = 4 >> 1;
+  const uint32_t num_blk_side = width >> shift;
+
+  int32_t qp_scaled = kvz_get_scaled_qp(type, state->qp, (encoder->bitdepth - 8) * 6, encoder->qp_map[0]);
+  qp_scaled = MAX(qp_scaled, 4 + 6 * MIN_QP_PRIME_TS);
+  int32_t max_num_coeff = width * height;
+
+  // TODO: Scaling list
+  
+  double cost_coeff[32 * 32];
+  double cost_sig[32 * 32];
+  double cost_coeff0[32 * 32];
+
+  double   cost_coeffgroup_sig[64];
+  uint32_t sig_coeffgroup_flag[64];
+
+  switch (cg_num) {
+  case  1: FILL_ARRAY(sig_coeffgroup_flag, 0, 1); FILL_ARRAY(cost_coeffgroup_sig, 0, 1); break;
+  case  4: FILL_ARRAY(sig_coeffgroup_flag, 0, 4); FILL_ARRAY(cost_coeffgroup_sig, 0, 4);  break;
+  case 16: FILL_ARRAY(sig_coeffgroup_flag, 0, 16); FILL_ARRAY(cost_coeffgroup_sig, 0, 16);  break;
+  case 64: FILL_ARRAY(sig_coeffgroup_flag, 0, 64); FILL_ARRAY(cost_coeffgroup_sig, 0, 64); break;
+  default: assert(0 && "There should be 1, 4, 16 or 64 coefficient groups");
+  }
+
+  int bdpcm = 0;
+
+  const bool   needs_sqrt2_scale = false; // from VTM: should always be false - transform-skipped blocks don't require sqrt(2) compensation.
+  const int    q_bits = QUANT_SHIFT + qp_scaled / 6  + (needs_sqrt2_scale ? -1 : 0);  // Right shift of non-RDOQ quantizer;  level = (coeff*uiQ + offset)>>q_bits
+  const int32_t quant_coeff = kvz_g_quant_scales[qp_scaled % 6];
+ 
+  const double error_scale = 1.0 / quant_coeff / quant_coeff;
+
+  double lambda = type == 0 ? state->lambda : state->c_lambda;
+
+  const coeff_t entropy_coding_maximum = (1 << max_log2_tr_dynamic_range) - 1;
+
+  const uint32_t* scan = kvz_g_sig_last_scan[scan_mode][log2_block_size - 1];
+  const uint32_t* scan_cg = g_sig_last_scan_cg[log2_block_size - 1][scan_mode];
+
+  uint32_t coeff_levels[3];
+  double   coeff_level_error[4];
+  
+  uint32_t log2_cg_size = log2_tr_height + log2_tr_width;
+  const int sbSizeM1 = (1 << log2_cg_size) - 1;
+  double    base_cost = 0;
+  uint32_t  go_rice_par = 0;
+    
+  int scan_pos;
+  struct {
+    double coded_level_and_dist;
+    double uncoded_dist;
+    double sig_cost;
+    double sig_cost_0;
+    int32_t nnz_before_pos0;
+    int32_t num_sbb_ctx_bins;
+  } rd_stats;
+
+  bool any_sig_cg = false;
+
+  int rem_reg_bins = (width * height * 7) >> 2;
+
+  for (int sbId = 0; sbId < cg_num; sbId++)
+  {
+    uint32_t cg_blkpos = scan_cg[sbId];
+
+    int no_coeff_coded = 0;
+    base_cost = 0.0;
+    FILL(rd_stats, 0);
+
+    rd_stats.num_sbb_ctx_bins = 0;
+
+    for (int scan_pos_in_sb = 0; scan_pos_in_sb <= sbSizeM1; scan_pos_in_sb++)
+    {
+      scan_pos = sbId << log2_cg_size + scan_pos_in_sb;
+      int last_pos_coded = sbSizeM1;
+      uint32_t blkpos = scan[scan_pos];
+      uint32_t  pos_y = blkpos >> log2_block_size;
+      uint32_t  pos_x = blkpos - (pos_y << log2_block_size);
+      //===== quantization =====
+
+      // set coeff
+      const int64_t          tmp_level = (int64_t)(abs(src_coeff[blkpos])) * quant_coeff;
+      const int level_double = MIN(tmp_level, MAX_INT64 - (1ll << ((long long)q_bits - 1ll)));
+
+      uint32_t roundAbsLevel = MIN((uint32_t)(entropy_coding_maximum), (uint32_t)((level_double + ((1) << (q_bits - 1))) >> q_bits));
+      uint32_t min_abs_level = (roundAbsLevel > 1 ? roundAbsLevel - 1 : 1);
+
+      uint32_t down_abs_level = MIN((uint32_t)(entropy_coding_maximum), (uint32_t)(level_double >> q_bits));
+      uint32_t up_abs_level = MIN((uint32_t)(entropy_coding_maximum), down_abs_level + 1);
+
+      int tested_levels = 0;
+      coeff_levels[tested_levels++] = roundAbsLevel;
+
+      if (min_abs_level != roundAbsLevel)
+        coeff_levels[tested_levels++] = min_abs_level;
+
+      int right_pixel, below_pixel, pred_pixel;
+
+      right_pixel = pos_x > 0 ? src_coeff[pos_x + pos_y * width - 1] : 0;
+      below_pixel = pos_y > 0 ? src_coeff[pos_x + (pos_y - 1) * width] : 0;
+
+      pred_pixel = kvz_derive_mod_coeff(right_pixel, below_pixel, up_abs_level, 0);
+
+      if (up_abs_level != roundAbsLevel && up_abs_level != min_abs_level && pred_pixel == 1)
+        coeff_levels[tested_levels++] = up_abs_level;
+
+      double err = (double)(level_double);
+      coeff_level_error[0] = err * err * error_scale;
+
+      cost_coeff0[scan_pos] = coeff_level_error[0];
+      block_uncoded_cost += cost_coeff0[scan_pos];
+      dest_coeff[blkpos] = coeff_levels[0];
+
+      //===== coefficient level estimation =====
+
+      unsigned    ctx_id_sig = kvz_context_get_sig_ctx_idx_abs_ts(dest_coeff, pos_x, pos_y, width);
+      uint32_t    c_level;
+      const cabac_ctx_t* frac_bits_par = &cabac->ctx.transform_skip_par;
+
+      go_rice_par = 1;
+      unsigned ctx_id_sign = kvz_sign_ctx_id_abs_ts(dest_coeff, pos_x, pos_y, width, 0);
+      const cabac_ctx_t* frac_bits_sign = &cabac->ctx.transform_skip_res_sign[ctx_id_sign];
+      const uint8_t     sign = src_coeff[blkpos] < 0 ? 1 : 0;
+      
+
+      unsigned gt1_ctx_id = kvz_lrg1_ctx_id_abs_ts(dest_coeff, pos_x, pos_y, width, 0);
+      const cabac_ctx_t* frac_bits_gt1 = &cabac->ctx.transform_skip_gt1[gt1_ctx_id];
+
+      const cabac_ctx_t* frac_bits_sig = &cabac->ctx.transform_skip_sig[ctx_id_sig]; 
+      bool is_last = false; //
+      if (scan_pos_in_sb == last_pos_coded && no_coeff_coded == 0)
+      {
+        is_last = true;
+      }
+      int num_used_ctx_bins = 0;
+      c_level = get_coded_level_ts_pred(&cost_coeff[scan_pos], &cost_coeff0[scan_pos], &cost_sig[scan_pos], level_double,
+        q_bits, error_scale, coeff_levels, coeff_level_error,
+        frac_bits_sig, frac_bits_par, frac_bits_sign, frac_bits_gt1, cabac->ctx.transform_skip_gt2,
+        sign, right_pixel, below_pixel, go_rice_par, is_last, extended_precision,
+        max_log2_tr_dynamic_range, &num_used_ctx_bins, rem_reg_bins, tested_levels, lambda);
+
+      rem_reg_bins -= num_used_ctx_bins;
+      rd_stats.num_sbb_ctx_bins += num_used_ctx_bins;
+
+
+      if (c_level > 0)
+      {
+        no_coeff_coded++;
+      }
+
+      coeff_t level = c_level;
+      dest_coeff[blkpos] = (level != 0 && src_coeff[blkpos] < 0) ? -level : level;
+      base_cost += cost_coeff[scan_pos];
+      rd_stats.sig_cost += cost_sig[scan_pos];
+
+      if (dest_coeff[blkpos])
+      {
+        sig_coeffgroup_flag[cg_blkpos] = 1;
+        rd_stats.coded_level_and_dist += cost_coeff[scan_pos] - cost_sig[scan_pos];
+        rd_stats.uncoded_dist += cost_coeff0[scan_pos];
+      }
+    } //end for (iScanPosinCG)
+
+    const cabac_ctx_t* fracBitsSigGroup = &cabac->ctx.sig_coeff_group_model[(type == 0 ? 0 : 1) * 2 + 1];
+    if (sig_coeffgroup_flag[cg_blkpos])
+    {
+      base_cost += lambda*CTX_ENTROPY_BITS(fracBitsSigGroup, 0) - rd_stats.sig_cost;
+      cost_coeffgroup_sig[sbId] = lambda * CTX_ENTROPY_BITS(fracBitsSigGroup, 0);
+
+      rem_reg_bins += rd_stats.num_sbb_ctx_bins; // skip sub-block
+    }
+    else if (sbId != cg_num - 1 || any_sig_cg)
+    {
+      // rd-cost if SigCoeffGroupFlag = 0, initialization
+      double cost_zero_sb = base_cost;
+      
+      base_cost += lambda * CTX_ENTROPY_BITS(fracBitsSigGroup, 1);
+      cost_zero_sb += lambda * CTX_ENTROPY_BITS(fracBitsSigGroup, 0);
+      cost_coeffgroup_sig[sbId] = lambda * CTX_ENTROPY_BITS(fracBitsSigGroup, 1);
+
+      cost_zero_sb += rd_stats.uncoded_dist;         // distortion for resetting non-zero levels to zero levels
+      cost_zero_sb -= rd_stats.coded_level_and_dist;   // distortion and level cost for keeping all non-zero levels
+      cost_zero_sb -= rd_stats.sig_cost;             // sig cost for all coeffs, including zero levels and non-zerl levels
+
+      if (cost_zero_sb < base_cost)
+      {
+        base_cost = cost_zero_sb;
+        cost_coeffgroup_sig[sbId] = lambda * CTX_ENTROPY_BITS(fracBitsSigGroup, 0);
+        rem_reg_bins += rd_stats.num_sbb_ctx_bins; // skip sub-block
+        for (int scanPosInSB = 0; scanPosInSB <= sbSizeM1; scanPosInSB++)
+        {
+          scan_pos = sbId << log2_cg_size + scanPosInSB;
+          uint32_t blkPos = scan[scan_pos];
+
+          if (dest_coeff[blkPos])
+          {
+            dest_coeff[blkPos] = 0;
+            cost_coeff[scan_pos] = cost_coeff0[scan_pos];
+            cost_sig[scan_pos] = 0;
+          }
+        }
+      }
+      else
+      {
+        any_sig_cg = true;
+      }
+    }
+  }
+
+  int abs_sum = 0;
+  //===== estimate last position =====
+  for (int scanPos = 0; scanPos < max_num_coeff; scanPos++)
+  {
+    int blkPos = scan[scanPos];
+    coeff_t level = dest_coeff[blkPos];
+    abs_sum += abs(level);
+  }
+  return abs_sum;
+}
 
 /** RDOQ with CABAC
  * \returns void
