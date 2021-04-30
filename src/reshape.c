@@ -489,6 +489,7 @@ static void deriveReshapeParametersSDR(lmcs_aps* aps, bool* intraAdp, bool* inte
   double percBinVarLessThenVal1 = 0.0;
   double percBinVarLessThenVal2 = 0.0;
   double percBinVarLessThenVal3 = 0.0;
+  assert(aps->m_binNum > 2); // For static analyzer to figure out we are not out-of-bounds
   assert(aps->m_binNum <= PIC_ANALYZE_CW_BINS);
   //int* binIdxSortDsd = malloc(sizeof(int) * aps->m_binNum);
   //double* binVarSortDsd = malloc(sizeof(double) * aps->m_binNum);
