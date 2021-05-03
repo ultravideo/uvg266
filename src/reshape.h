@@ -121,3 +121,5 @@ void kvz_init_lmcs_aps(lmcs_aps* aps, int picWidth, int picHeight, uint32_t maxC
 void kvz_calc_seq_stats(struct encoder_state_t* const state, const videoframe_t* frame, lmcs_seq_info* stats, lmcs_aps* aps);
 
 void kvz_lmcs_preanalyzer(struct encoder_state_t* const state, const videoframe_t* frame, lmcs_seq_info* stats, lmcs_aps* aps, uint32_t signalType);
+
+void kvz_construct_reshaper_lmcs(lmcs_aps* aps);

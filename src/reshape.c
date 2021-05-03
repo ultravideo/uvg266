@@ -1068,3 +1068,184 @@ void kvz_lmcs_preanalyzer(struct encoder_state_t* const state, const videoframe_
     }
   }
 }
+
+
+static void adjust_lmcs_pivot(lmcs_aps* aps)
+{
+  int bdShift = aps->m_lumaBD - 10;
+  int totCW = bdShift != 0 ? (bdShift > 0 ? aps->m_reshapeLUTSize / (1 << bdShift) : aps->m_reshapeLUTSize * (1 << (-bdShift))) : aps->m_reshapeLUTSize;
+  int orgCW = totCW / PIC_CODE_CW_BINS;
+  int log2SegSize = aps->m_lumaBD - 5;//kvz_math_floor_log2(LMCS_SEG_NUM);
+
+  aps->m_reshapePivot[0] = 0;
+  for (int i = 0; i < PIC_CODE_CW_BINS; i++)
+  {
+    aps->m_reshapePivot[i + 1] = aps->m_reshapePivot[i] + aps->m_binCW[i];
+  }
+  int segIdxMax = (aps->m_reshapePivot[aps->m_sliceReshapeInfo.reshaperModelMaxBinIdx + 1] >> log2SegSize);
+  for (int i = aps->m_sliceReshapeInfo.reshaperModelMinBinIdx; i <= aps->m_sliceReshapeInfo.reshaperModelMaxBinIdx; i++)
+  {
+    aps->m_reshapePivot[i + 1] = aps->m_reshapePivot[i] + aps->m_binCW[i];
+    int segIdxCurr = (aps->m_reshapePivot[i] >> log2SegSize);
+    int segIdxNext = (aps->m_reshapePivot[i + 1] >> log2SegSize);
+
+    if ((segIdxCurr == segIdxNext) && (aps->m_reshapePivot[i] != (segIdxCurr << log2SegSize)))
+    {
+      if (segIdxCurr == segIdxMax)
+      {
+        aps->m_reshapePivot[i] = aps->m_reshapePivot[aps->m_sliceReshapeInfo.reshaperModelMaxBinIdx + 1];
+        for (int j = i; j <= aps->m_sliceReshapeInfo.reshaperModelMaxBinIdx; j++)
+        {
+          aps->m_reshapePivot[j + 1] = aps->m_reshapePivot[i];
+          aps->m_binCW[j] = 0;
+        }
+        aps->m_binCW[i - 1] = aps->m_reshapePivot[i] - aps->m_reshapePivot[i - 1];
+        break;
+      }
+      else
+      {
+        int16_t adjustVal = ((segIdxCurr + 1) << log2SegSize) - aps->m_reshapePivot[i + 1];
+        aps->m_reshapePivot[i + 1] += adjustVal;
+        aps->m_binCW[i] += adjustVal;
+
+        for (int j = i + 1; j <= aps->m_sliceReshapeInfo.reshaperModelMaxBinIdx; j++)
+        {
+          if (aps->m_binCW[j] < (adjustVal + (orgCW >> 3)))
+          {
+            adjustVal -= (aps->m_binCW[j] - (orgCW >> 3));
+            aps->m_binCW[j] = (orgCW >> 3);
+          }
+          else
+          {
+            aps->m_binCW[j] -= adjustVal;
+            adjustVal = 0;
+          }
+          if (adjustVal == 0)
+          {
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  for (int i = PIC_CODE_CW_BINS - 1; i >= 0; i--)
+  {
+    if (aps->m_binCW[i] > 0)
+    {
+      aps->m_sliceReshapeInfo.reshaperModelMaxBinIdx = i;
+      break;
+    }
+  }
+}
+
+static int get_pwl_idx_inv(lmcs_aps* aps,int lumaVal)
+{
+  int idxS = 0;
+  for (idxS = aps->m_sliceReshapeInfo.reshaperModelMinBinIdx; (idxS <= aps->m_sliceReshapeInfo.reshaperModelMaxBinIdx); idxS++)
+  {
+    if (lumaVal < aps->m_reshapePivot[idxS + 1])     break;
+  }
+  return MIN(idxS, PIC_CODE_CW_BINS - 1);
+}
+
+void kvz_construct_reshaper_lmcs(lmcs_aps* aps)
+{
+  int bdShift = aps->m_lumaBD - 10;
+  int totCW = bdShift != 0 ? (bdShift > 0 ? aps->m_reshapeLUTSize / (1 << bdShift) : aps->m_reshapeLUTSize * (1 << (-bdShift))) : aps->m_reshapeLUTSize;
+  int histLenth = totCW / aps->m_binNum;
+  int log2HistLenth = kvz_math_floor_log2(histLenth);
+  int i;
+
+  if (aps->m_binNum == PIC_ANALYZE_CW_BINS)
+  {
+    for (int i = 0; i < PIC_CODE_CW_BINS; i++)
+    {
+      aps->m_binCW[i] = aps->m_binCW[2 * i] + aps->m_binCW[2 * i + 1];
+    }
+  }
+  for (int i = 0; i <= PIC_CODE_CW_BINS; i++)
+  {
+    aps->m_inputPivot[i] = aps->m_initCW * i;
+  }
+
+  aps->m_sliceReshapeInfo.reshaperModelMinBinIdx = 0;
+  aps->m_sliceReshapeInfo.reshaperModelMaxBinIdx = PIC_CODE_CW_BINS - 1;
+  for (int i = 0; i < PIC_CODE_CW_BINS; i++)
+  {
+    if (aps->m_binCW[i] > 0)
+    {
+      aps->m_sliceReshapeInfo.reshaperModelMinBinIdx = i;
+      break;
+    }
+  }
+  for (int i = PIC_CODE_CW_BINS - 1; i >= 0; i--)
+  {
+    if (aps->m_binCW[i] > 0)
+    {
+      aps->m_sliceReshapeInfo.reshaperModelMaxBinIdx = i;
+      break;
+    }
+  }
+
+  if (bdShift != 0)
+  {
+    for (int i = 0; i < PIC_ANALYZE_CW_BINS; i++)
+    {
+      aps->m_binCW[i] = bdShift > 0 ? aps->m_binCW[i] * (1 << bdShift) : aps->m_binCW[i] / (1 << (-bdShift));
+    }
+  }
+
+  adjust_lmcs_pivot(aps);
+
+  int maxAbsDeltaCW = 0, absDeltaCW = 0, deltaCW = 0;
+  for (int i = aps->m_sliceReshapeInfo.reshaperModelMinBinIdx; i <= aps->m_sliceReshapeInfo.reshaperModelMaxBinIdx; i++)
+  {
+    deltaCW = (int)aps->m_binCW[i] - (int)aps->m_initCW;
+    aps->m_sliceReshapeInfo.reshaperModelBinCWDelta[i] = deltaCW;
+    absDeltaCW = (deltaCW < 0) ? (-deltaCW) : deltaCW;
+    if (absDeltaCW > maxAbsDeltaCW)
+    {
+      maxAbsDeltaCW = absDeltaCW;
+    }
+  }
+  aps->m_sliceReshapeInfo.maxNbitsNeededDeltaCW = MAX(1, 1 + kvz_math_floor_log2(maxAbsDeltaCW));
+
+  histLenth = aps->m_initCW;
+  log2HistLenth = kvz_math_floor_log2(histLenth);
+
+  int sumBins = 0;
+  for (i = 0; i < PIC_CODE_CW_BINS; i++) { sumBins += aps->m_binCW[i]; }
+  assert(sumBins >= aps->m_reshapeLUTSize && "SDR CW assignment is wrong!!");
+  for (int i = 0; i < PIC_CODE_CW_BINS; i++)
+  {
+    aps->m_reshapePivot[i + 1] = aps->m_reshapePivot[i] + aps->m_binCW[i];
+    aps->m_fwdScaleCoef[i] = ((int32_t)aps->m_binCW[i] * (1 << FP_PREC) + (1 << (log2HistLenth - 1))) >> log2HistLenth;
+    if (aps->m_binCW[i] == 0)
+    {
+      aps->m_invScaleCoef[i] = 0;
+      aps->m_chromaAdjHelpLUT[i] = 1 << CSCALE_FP_PREC;
+    }
+    else
+    {
+      aps->m_invScaleCoef[i] = (int32_t)(aps->m_initCW * (1 << FP_PREC) / aps->m_binCW[i]);
+      aps->m_chromaAdjHelpLUT[i] = (int32_t)(aps->m_initCW * (1 << FP_PREC) / (aps->m_binCW[i] + aps->m_sliceReshapeInfo.chrResScalingOffset));
+    }
+  }
+  for (int lumaSample = 0; lumaSample < aps->m_reshapeLUTSize; lumaSample++)
+  {
+    int idxY = lumaSample / aps->m_initCW;
+    int tempVal = aps->m_reshapePivot[idxY] + ((aps->m_fwdScaleCoef[idxY] * (lumaSample - aps->m_inputPivot[idxY]) + (1 << (FP_PREC - 1))) >> FP_PREC);
+    aps->m_fwdLUT[lumaSample] = CLIP((kvz_pixel)0, (kvz_pixel)((1 << aps->m_lumaBD) - 1), (kvz_pixel)(tempVal));
+
+    int idxYInv = get_pwl_idx_inv(aps,lumaSample);
+    int invSample = aps->m_inputPivot[idxYInv] + ((aps->m_invScaleCoef[idxYInv] * (lumaSample - aps->m_reshapePivot[idxYInv]) + (1 << (FP_PREC - 1))) >> FP_PREC);
+    aps->m_invLUT[lumaSample] = CLIP((kvz_pixel)0, (kvz_pixel)((1 << aps->m_lumaBD) - 1), (kvz_pixel)(invSample));
+  }
+  for (i = 0; i < PIC_CODE_CW_BINS; i++)
+  {
+    int start = i * histLenth;
+    int end = (i + 1) * histLenth - 1;
+    aps->m_cwLumaWeight[i] = aps->m_fwdLUT[end] - aps->m_fwdLUT[start];
+  }
+}
