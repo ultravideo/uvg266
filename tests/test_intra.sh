@@ -11,5 +11,5 @@ valgrind_test $common_args --rd=1
 valgrind_test $common_args --rd=2 --transform-skip --qp 37
 valgrind_test $common_args --rd=2 --transform-skip --qp 37 --rdoq
 valgrind_test $common_args --rd=2 --transform-skip --qp 37 --signhide
+valgrind_test $common_args --rd=2 --transform-skip --qp 37 --signhide --rdoq
 valgrind_test $common_args --rd=2 --no-transform-skip --qp 37 --signhide --rdoq
-valgrind_test $common_args --rd=2 --no-transform-skip --qp 37 --signhide --rdoq 
