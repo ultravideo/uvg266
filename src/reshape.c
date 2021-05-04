@@ -1273,16 +1273,16 @@ static void code_lmcs_aps(encoder_state_t* const state, lmcs_aps* aps)
   }
   // ToDo: LMCS Chroma scaling
   /*  
-  int deltaCRS = aps-> ->chromaPresentFlag ? aps->m_sliceReshapeInfo.chrResScalingOffset : 0;
+  int deltaCRS = aps->chromaPresentFlag ? aps->m_sliceReshapeInfo.chrResScalingOffset : 0;
   int signCRS = (deltaCRS < 0) ? 1 : 0;
   int absCRS = (deltaCRS < 0) ? (-deltaCRS) : deltaCRS;
   if (pcAPS->chromaPresentFlag)
   {
-    WRITE_CODE(absCRS, 3, "lmcs_delta_abs_crs");
+    WRITE_U(stream, absCRS, 3, "lmcs_delta_abs_crs");
   }
   if (absCRS > 0)
   {
-    WRITE_FLAG(signCRS, "lmcs_delta_sign_crs_flag");
+    WRITE_U(stream, signCRS, 1, "lmcs_delta_sign_crs_flag");
   }
   */
 }
@@ -1305,7 +1305,7 @@ void kvz_encode_lmcs_adaptive_parameter_set(encoder_state_t* const state)
 
    WRITE_U(stream, (int)1/*LMCS_APS*/, 3, "aps_params_type");
    WRITE_U(stream, 0, 5, "adaptation_parameter_set_id");
-   WRITE_U(stream, state->encoder_control->chroma_format != KVZ_CSP_400, 1, "aps_chroma_present_flag");
+   WRITE_U(stream, 0/*state->encoder_control->chroma_format != KVZ_CSP_400*/, 1, "aps_chroma_present_flag");
 
    code_lmcs_aps(state, state->slice->lmcs_aps);
 
