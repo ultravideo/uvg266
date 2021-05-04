@@ -754,12 +754,15 @@ void kvz_encoder_state_finalize(encoder_state_t * const state) {
   
   if (!state->parent || (state->parent->slice != state->slice)) {
 
+    if (state->encoder_control->cfg.lmcs_enable) {
+      if (state->slice->lmcs_aps != NULL) {
+        FREE_POINTER(state->slice->lmcs_aps);
+      }
+    }
+
     if (state->encoder_control->cfg.alf_type) {
       if (state->slice->apss != NULL) {
         FREE_POINTER(state->slice->apss);
-      }
-      if (state->slice->lmcs_aps != NULL) {
-        FREE_POINTER(state->slice->lmcs_aps);
       }
       if (state->slice->tile_group_luma_aps_id != NULL) {
         FREE_POINTER(state->slice->tile_group_luma_aps_id);
