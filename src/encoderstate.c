@@ -1585,6 +1585,7 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
   if (state->encoder_control->cfg.lmcs_enable) {
     // ToDo: support other signal types in LMCS
     kvz_lmcs_preanalyzer(state, state->tile->frame, state->slice->lmcs_aps, RESHAPE_SIGNAL_SDR);
+    kvz_construct_reshaper_lmcs(state->slice->lmcs_aps);
   }
  
   encoder_state_init_children(state);

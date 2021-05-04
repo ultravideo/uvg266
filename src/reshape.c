@@ -1216,7 +1216,7 @@ void kvz_construct_reshaper_lmcs(lmcs_aps* aps)
 
   int sumBins = 0;
   for (i = 0; i < PIC_CODE_CW_BINS; i++) { sumBins += aps->m_binCW[i]; }
-  assert(sumBins >= aps->m_reshapeLUTSize && "SDR CW assignment is wrong!!");
+  assert(sumBins < aps->m_reshapeLUTSize && "SDR CW assignment is wrong!!");
   for (int i = 0; i < PIC_CODE_CW_BINS; i++)
   {
     aps->m_reshapePivot[i + 1] = aps->m_reshapePivot[i] + aps->m_binCW[i];
