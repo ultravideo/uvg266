@@ -824,7 +824,7 @@ static void deriveReshapeParameters(double* array, int start, int end, ReshapeCW
   *beta = (maxCW * maxVar - minCW * minVar) / (maxVar - minVar);
 }
 
-void kvz_lmcs_preanalyzer(struct encoder_state_t* const state, const videoframe_t* frame, lmcs_seq_info* stats, lmcs_aps* aps, uint32_t signalType)
+void kvz_lmcs_preanalyzer(struct encoder_state_t* const state, const videoframe_t* frame, lmcs_aps* aps, uint32_t signalType)
 {
 
   enum kvz_slice_type sliceType = state->frame->slicetype;
@@ -1247,5 +1247,70 @@ void kvz_construct_reshaper_lmcs(lmcs_aps* aps)
     int start = i * histLenth;
     int end = (i + 1) * histLenth - 1;
     aps->m_cwLumaWeight[i] = aps->m_fwdLUT[end] - aps->m_fwdLUT[start];
+  }
+}
+
+
+static void code_lmcs_aps(encoder_state_t* const state, lmcs_aps* aps)
+{
+  bitstream_t* const stream = &state->stream;
+
+  WRITE_UE(stream, aps->m_sliceReshapeInfo.reshaperModelMinBinIdx, "lmcs_min_bin_idx");
+  WRITE_UE(stream, PIC_CODE_CW_BINS - 1 - aps->m_sliceReshapeInfo.reshaperModelMaxBinIdx, "lmcs_delta_max_bin_idx");
+  assert(aps->m_sliceReshapeInfo.maxNbitsNeededDeltaCW > 0);
+  WRITE_UE(stream, aps->m_sliceReshapeInfo.maxNbitsNeededDeltaCW - 1, "lmcs_delta_cw_prec_minus1");
+
+  for (int i = aps->m_sliceReshapeInfo.reshaperModelMinBinIdx; i <= aps->m_sliceReshapeInfo.reshaperModelMaxBinIdx; i++)
+  {
+    int deltaCW = aps->m_sliceReshapeInfo.reshaperModelBinCWDelta[i];
+    int signCW = (deltaCW < 0) ? 1 : 0;
+    int absCW = (deltaCW < 0) ? (-deltaCW) : deltaCW;
+    WRITE_U(stream, absCW, aps->m_sliceReshapeInfo.maxNbitsNeededDeltaCW, "lmcs_delta_abs_cw[ i ]");
+    if (absCW > 0)
+    {
+      WRITE_U(stream, signCW, 1, "lmcs_delta_sign_cw_flag[ i ]");
+    }
+  }
+  // ToDo: LMCS Chroma scaling
+  /*  
+  int deltaCRS = aps-> ->chromaPresentFlag ? aps->m_sliceReshapeInfo.chrResScalingOffset : 0;
+  int signCRS = (deltaCRS < 0) ? 1 : 0;
+  int absCRS = (deltaCRS < 0) ? (-deltaCRS) : deltaCRS;
+  if (pcAPS->chromaPresentFlag)
+  {
+    WRITE_CODE(absCRS, 3, "lmcs_delta_abs_crs");
+  }
+  if (absCRS > 0)
+  {
+    WRITE_FLAG(signCRS, "lmcs_delta_sign_crs_flag");
+  }
+  */
+}
+
+
+
+void kvz_encode_lmcs_adaptive_parameter_set(encoder_state_t* const state)
+{
+  bitstream_t* const stream = &state->stream;
+
+  if (state->encoder_control->cfg.lmcs_enable) {
+    // ToDo: Write LMCS APS NAL
+    
+    kvz_nal_write(stream, NAL_UNIT_PREFIX_APS, 0, state->frame->first_nal);
+    state->frame->first_nal = false;
+#ifdef KVZ_DEBUG
+  printf("=========== Adaptation Parameter Set  ===========\n");
+#endif
+   
+
+   WRITE_U(stream, (int)1/*LMCS_APS*/, 3, "aps_params_type");
+   WRITE_U(stream, 0, 5, "adaptation_parameter_set_id");
+   WRITE_U(stream, state->encoder_control->chroma_format != KVZ_CSP_400, 1, "aps_chroma_present_flag");
+
+   code_lmcs_aps(state, state->slice->lmcs_aps);
+
+   WRITE_U(stream, 0, 1, "aps_extension_flag"); //Implementation when this flag is equal to 1 should be added when it is needed. Currently in the spec we don't have case when this flag is equal to 1
+   kvz_bitstream_add_rbsp_trailing_bits(stream);
+    
   }
 }

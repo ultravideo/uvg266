@@ -40,6 +40,7 @@
 #include "tables.h"
 #include "threadqueue.h"
 #include "videoframe.h"
+#include "reshape.h"
 
 #define JVET_S0266_VUI_length 1
 #define LUMA_ADAPTIVE_DEBLOCKING_FILTER_QP_OFFSET 1
@@ -1504,17 +1505,10 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
     kvz_bitstream_add_rbsp_trailing_bits(stream);
   }
 
+  kvz_encode_lmcs_adaptive_parameter_set(state);
   // Adaptation parameter set (APS)
-  kvz_encode_alf_adaptive_parameter_set(state);
 
-  if (state->encoder_control->cfg.lmcs_enable) {
-    // ToDo: Write LMCS APS NAL
-    /*
-    kvz_nal_write(stream, NAL_UNIT_PREFIX_APS, 0, state->frame->first_nal);
-    state->frame->first_nal = false;
-    encoder_state_write_adaptation_parameter_set(state, &aps);
-    */
-  }
+  kvz_encode_alf_adaptive_parameter_set(state);
 
   encoder_state_write_bitstream_children(state);
 

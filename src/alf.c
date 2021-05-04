@@ -1639,50 +1639,6 @@ static void encoder_state_write_adaptation_parameter_set(encoder_state_t * const
   kvz_bitstream_add_rbsp_trailing_bits(stream);
 }
 
-//send LMCS APS when LMCSModel is updated. It can be updated even current slice does not enable reshaper.
-//For example, in RA, update is on intra slice, but intra slice may not use reshaper
-static void encode_alf_aps_lmcs(encoder_state_t * const state)
-{
-  if (state->encoder_control->cfg.lmcs_enable) // ToDo: do something with LMCS
-  {/*
-    //only 1 LMCS data for 1 picture
-    int apsId = picHeader->getLmcsAPSId();
-    ParameterSetMap<APS> *apsMap = m_pcEncLib->getApsMap();
-    APS* aps = apsMap->getPS((apsId << NUM_APS_TYPE_LEN) + LMCS_APS);
-    bool writeAPS = aps && apsMap->getChangedFlag((apsId << NUM_APS_TYPE_LEN) + LMCS_APS);
-    if (writeAPS)
-    {
-#if JVET_R0433
-      aps->chromaPresentFlag = pcSlice->getSPS()->getChromaFormatIdc() != CHROMA_400;
-#endif
-      actualTotalBits += xWriteAPS(accessUnit, aps, m_pcEncLib->getLayerId(), true);
-      apsMap->clearChangedFlag((apsId << NUM_APS_TYPE_LEN) + LMCS_APS);
-      CHECK(aps != picHeader->getLmcsAPS(), "Wrong LMCS APS pointer in compressGOP");
-    }*/
-  }
-}
-
-// only 1 SCALING LIST data for 1 picture
-static void encode_alf_aps_scaling_list(encoder_state_t * const state)
-{
-  if (0/*pcSlice->getSPS()->getScalingListFlag() && (m_pcCfg->getUseScalingListId() == SCALING_LIST_FILE_READ)*/)
-  {/*
-    int apsId = picHeader->getScalingListAPSId();
-    ParameterSetMap<APS> *apsMap = m_pcEncLib->getApsMap();
-    APS* aps = apsMap->getPS((apsId << NUM_APS_TYPE_LEN) + SCALING_LIST_APS);
-    bool writeAPS = aps && apsMap->getChangedFlag((apsId << NUM_APS_TYPE_LEN) + SCALING_LIST_APS);
-    if (writeAPS)
-    {
-#if JVET_R0433
-      aps->chromaPresentFlag = pcSlice->getSPS()->getChromaFormatIdc() != CHROMA_400;
-#endif
-      actualTotalBits += xWriteAPS(accessUnit, aps, m_pcEncLib->getLayerId(), true);
-      apsMap->clearChangedFlag((apsId << NUM_APS_TYPE_LEN) + SCALING_LIST_APS);
-      CHECK(aps != picHeader->getScalingListAPS(), "Wrong SCALING LIST APS pointer in compressGOP");
-    }*/
-  }
-}
-
 static void encode_alf_aps(encoder_state_t * const state)
 {
   const encoder_control_t * const encoder = state->encoder_control;
@@ -1721,10 +1677,10 @@ void kvz_encode_alf_adaptive_parameter_set(encoder_state_t * const state)
 {
   //send LMCS APS when LMCSModel is updated. It can be updated even current slice does not enable reshaper.
   //For example, in RA, update is on intra slice, but intra slice may not use reshaper
-  encode_alf_aps_lmcs(state);
+  //encode_alf_aps_lmcs(state);
 
   // only 1 SCALING LIST data for 1 picture
-  encode_alf_aps_scaling_list(state);
+  //encode_alf_aps_scaling_list(state);
 
   encode_alf_aps(state);
 }

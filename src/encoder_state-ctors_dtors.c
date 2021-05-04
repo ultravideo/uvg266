@@ -36,6 +36,7 @@
 #include "videoframe.h"
 #include "rate_control.h"
 #include "alf.h"
+#include "reshape.h"
 
 
 static int encoder_state_config_frame_init(encoder_state_t * const state) {
@@ -196,8 +197,14 @@ static int encoder_state_config_slice_init(encoder_state_t * const state,
   state->slice->start_in_rs = state->encoder_control->tiles_ctb_addr_ts_to_rs[start_address_in_ts];
   state->slice->end_in_rs = state->encoder_control->tiles_ctb_addr_ts_to_rs[end_address_in_ts];
 
+
+  if (state->encoder_control->cfg.lmcs_enable) {
+    state->slice->lmcs_aps = malloc(sizeof(lmcs_aps));
+    kvz_init_lmcs_aps(state->slice->lmcs_aps, state->encoder_control->cfg.width, state->encoder_control->cfg.height, LCU_CU_WIDTH, LCU_CU_WIDTH, state->encoder_control->bitdepth);
+  }
+
   if (state->encoder_control->cfg.alf_type) {
-    state->slice->apss = malloc(sizeof(alf_aps) * ALF_CTB_MAX_NUM_APS);
+    state->slice->apss = malloc(sizeof(alf_aps) * ALF_CTB_MAX_NUM_APS);    
     state->slice->tile_group_luma_aps_id = malloc(ALF_CTB_MAX_NUM_APS * sizeof(int8_t));
     state->slice->cc_filter_param = malloc(sizeof(*state->slice->cc_filter_param));
     for (int aps_idx = 0; aps_idx < ALF_CTB_MAX_NUM_APS; aps_idx++) {
@@ -750,6 +757,9 @@ void kvz_encoder_state_finalize(encoder_state_t * const state) {
     if (state->encoder_control->cfg.alf_type) {
       if (state->slice->apss != NULL) {
         FREE_POINTER(state->slice->apss);
+      }
+      if (state->slice->lmcs_aps != NULL) {
+        FREE_POINTER(state->slice->lmcs_aps);
       }
       if (state->slice->tile_group_luma_aps_id != NULL) {
         FREE_POINTER(state->slice->tile_group_luma_aps_id);

@@ -37,6 +37,7 @@
 #include "tables.h"
 #include "threadqueue.h"
 #include "alf.h"
+#include "reshape.h"
 
 #include "strategies/strategies-picture.h"
 
@@ -1579,6 +1580,11 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
       break;
     default:
       assert(0);
+  }
+
+  if (state->encoder_control->cfg.lmcs_enable) {
+    // ToDo: support other signal types in LMCS
+    kvz_lmcs_preanalyzer(state, state->tile->frame, state->slice->lmcs_aps, RESHAPE_SIGNAL_SDR);
   }
  
   encoder_state_init_children(state);
