@@ -63,7 +63,7 @@ typedef struct SliceReshapeInfo {
 
 typedef struct ReshapeCW
 {
-  uint32_t* binCW;
+  uint32_t  binCW[3];
   int       updateCtrl;
   int       adpOption;
   uint32_t  initialCW;
