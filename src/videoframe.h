@@ -37,7 +37,9 @@
 typedef struct videoframe
 {
   kvz_picture *source;         //!< \brief Source image.
+  kvz_picture *source_lmcs;    //!< \brief LMCS mapped source image if available, otherwise points to source.
   kvz_picture *rec;            //!< \brief Reconstructed image.
+  kvz_picture *rec_lmcs;       //!< \brief LMCS mapped reconstructed image, if available, otherwise points to source.
 
   int32_t width;          //!< \brief Luma pixel array width.
   int32_t height;         //!< \brief Luma pixel array height.
@@ -49,6 +51,9 @@ typedef struct videoframe
   struct sao_info_t *sao_chroma;   //!< \brief Array of sao parameters for every LCU.
   struct alf_info_t *alf_info;   //!< \brief Array of alf parameters for both luma and chroma.
   int32_t poc;           //!< \brief Picture order count
+
+  bool source_lmcs_mapped; //!< \brief Indicate if source_lmcs is available and mapped to LMCS
+  bool rec_lmcs_mapped; //!< \brief Indicate if rec_lmcs is available and mapped to LMCS
 } videoframe_t;
 
 

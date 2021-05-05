@@ -1305,7 +1305,12 @@ static void encoder_set_source_picture(encoder_state_t * const state, kvz_pictur
   assert(!state->tile->frame->source);
   assert(!state->tile->frame->rec);
 
+  state->tile->frame->source_lmcs_mapped = false;
+  state->tile->frame->rec_lmcs_mapped = false;
+
   state->tile->frame->source = frame;
+  state->tile->frame->source_lmcs = state->tile->frame->source;
+
   if (state->encoder_control->cfg.lossless) {
     // In lossless mode, the reconstruction is equal to the source frame.
     state->tile->frame->rec = kvz_image_copy_ref(frame);
@@ -1313,6 +1318,12 @@ static void encoder_set_source_picture(encoder_state_t * const state, kvz_pictur
     state->tile->frame->rec = kvz_image_alloc(state->encoder_control->chroma_format, frame->width, frame->height);
     state->tile->frame->rec->dts = frame->dts;
     state->tile->frame->rec->pts = frame->pts;
+  }
+  state->tile->frame->rec_lmcs = state->tile->frame->rec;
+
+  if (state->encoder_control->cfg.lmcs_enable) {
+    state->tile->frame->source_lmcs = kvz_image_alloc(state->encoder_control->chroma_format, frame->width, frame->height);
+    state->tile->frame->rec_lmcs = kvz_image_alloc(state->encoder_control->chroma_format, frame->width, frame->height);
   }
 
   kvz_videoframe_set_poc(state->tile->frame, state->frame->poc);
@@ -1586,6 +1597,18 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
     // ToDo: support other signal types in LMCS
     kvz_lmcs_preanalyzer(state, state->tile->frame, state->slice->lmcs_aps, RESHAPE_SIGNAL_SDR);
     kvz_construct_reshaper_lmcs(state->slice->lmcs_aps);
+
+    kvz_pixel* luma = state->tile->frame->source->y;
+    kvz_pixel* luma_lmcs = state->tile->frame->source_lmcs->y;
+    for (int y = 0; y < state->tile->frame->source->height; y++) {
+      for (int x = 0; x < state->tile->frame->source->width; x++) {
+        luma_lmcs[x] = state->slice->lmcs_aps->m_fwdLUT[luma[x]];
+      }
+      luma += state->tile->frame->source->stride;
+      luma_lmcs += state->tile->frame->source->stride;
+    }
+    state->tile->frame->source_lmcs_mapped = true;
+
   }
  
   encoder_state_init_children(state);

@@ -66,6 +66,18 @@ videoframe_t * kvz_videoframe_alloc(int32_t width,
  */
 int kvz_videoframe_free(videoframe_t * const frame)
 {
+
+  // Free LMCS mapped images, they are either pointing to normal or allocated separately
+  if (frame->source_lmcs != frame->source) {
+    kvz_image_free(frame->source_lmcs);
+    frame->source_lmcs = NULL;
+  }
+
+  if (frame->rec_lmcs != frame->rec) {
+    kvz_image_free(frame->rec_lmcs);
+    frame->rec_lmcs = NULL;
+  }
+
   kvz_image_free(frame->source);
   frame->source = NULL;
   kvz_image_free(frame->rec);

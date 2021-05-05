@@ -1294,7 +1294,6 @@ void kvz_encode_lmcs_adaptive_parameter_set(encoder_state_t* const state)
   bitstream_t* const stream = &state->stream;
 
   if (state->encoder_control->cfg.lmcs_enable) {
-    // ToDo: Write LMCS APS NAL
     
     kvz_nal_write(stream, NAL_UNIT_PREFIX_APS, 0, state->frame->first_nal);
     state->frame->first_nal = false;
