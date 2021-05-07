@@ -312,8 +312,8 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
                          const cu_info_t *const pred_cu,
                          lcu_t *const lcu)
 {
-  const vector2d_t lcu_px = { x_px / 2, y_px / 2 };
-  const int width = (depth <= MAX_DEPTH) ? LCU_WIDTH >> (depth + 1) : LCU_WIDTH >> depth;
+  const vector2d_t lcu_px = { (x_px & ~7) / 2, (y_px & ~7) / 2 };
+  const int width = (depth < MAX_DEPTH) ? LCU_WIDTH >> (depth + 1) : LCU_WIDTH >> depth;
   cu_info_t *const tr_cu = LCU_GET_CU_AT_PX(lcu, x_px, y_px);
 
   double tr_tree_bits = 0;
@@ -322,7 +322,7 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
   assert(x_px >= 0 && x_px < LCU_WIDTH);
   assert(y_px >= 0 && y_px < LCU_WIDTH);
 
-  if (x_px % 8 != 0 || y_px % 8 != 0) {
+  if (depth == 4 && (x_px % 8 == 0 || y_px % 8 == 0)) {
     // For MAX_PU_DEPTH calculate chroma for previous depth for the first
     // block and return 0 cost for all others.
     return 0;
@@ -342,7 +342,7 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
     }
   }
 
-  if (MIN(tr_cu->tr_depth, 3) > depth) {
+  if (tr_cu->tr_depth > depth) {
     int offset = LCU_WIDTH >> (depth + 1);
     int sum = 0;
 
@@ -384,7 +384,7 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
 static double calc_mode_bits(const encoder_state_t *state,
                              const lcu_t *lcu,
                              const cu_info_t * cur_cu,
-                             int x, int y)
+                             int x, int y, int depth)
 {
   int x_local = SUB_SCU(x);
   int y_local = SUB_SCU(y);
@@ -400,7 +400,7 @@ static double calc_mode_bits(const encoder_state_t *state,
 
   double mode_bits = kvz_luma_mode_bits(state, cur_cu->intra.mode, candidate_modes);
 
-  if (x % 8 == 0 && y % 8 == 0 && state->encoder_control->chroma_format != KVZ_CSP_400) {
+  if (((depth == 4 && x % 8 && y % 8) || (depth != 4)) && state->encoder_control->chroma_format != KVZ_CSP_400) {
     mode_bits += kvz_chroma_mode_bits(state, cur_cu->intra.mode_chroma, cur_cu->intra.mode);
   }
 
@@ -701,12 +701,12 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
   if (cur_cu->type == CU_INTRA || cur_cu->type == CU_INTER) {
     cost = kvz_cu_rd_cost_luma(state, x_local, y_local, depth, cur_cu, lcu);
     if (state->encoder_control->chroma_format != KVZ_CSP_400) {
-      cost += kvz_cu_rd_cost_chroma(state, x_local, y_local, MIN(depth, 3), cur_cu, lcu);
+      cost += kvz_cu_rd_cost_chroma(state, x_local, y_local, depth, cur_cu, lcu);
     }
 
     double mode_bits;
     if (cur_cu->type == CU_INTRA) {
-      mode_bits = calc_mode_bits(state, lcu, cur_cu, x, y);
+      mode_bits = calc_mode_bits(state, lcu, cur_cu, x, y, depth);
     } else {
       mode_bits = inter_bitcost;
     }
@@ -818,7 +818,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         cost += CTX_ENTROPY_FBITS(ctx, 0) * state->lambda;
 
         // Add the cost of coding intra mode only once.
-        double mode_bits = calc_mode_bits(state, lcu, cur_cu, x, y);
+        double mode_bits = calc_mode_bits(state, lcu, cur_cu, x, y, depth);
         cost += mode_bits * state->lambda;
       }
     }
