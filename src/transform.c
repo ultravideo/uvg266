@@ -27,6 +27,7 @@
 #include "strategies/strategies-quant.h"
 #include "strategies/strategies-picture.h"
 #include "tables.h"
+#include "reshape.h"
 
 /**
  * \brief RDPCM direction.
@@ -363,6 +364,16 @@ static void quantize_tr_residual(encoder_state_t * const state,
       break;
   }
 
+  if (state->encoder_control->cfg.lmcs_enable && color == COLOR_Y) {
+    kvz_pixel* luma = pred;
+    for (int y = 0; y < tr_width; y++) {
+      for (int x = 0; x < tr_width; x++) {
+        luma[x] = state->tile->frame->lmcs_aps->m_fwdLUT[luma[x]];
+      }
+      luma += lcu_width;
+    }
+  }
+
   const bool can_use_trskip = tr_width == 4 &&
                               color == COLOR_Y &&
                               cfg->trskip_enable;
@@ -423,6 +434,16 @@ static void quantize_tr_residual(encoder_state_t * const state,
   if (has_coeffs) {
     cbf_set(&cur_pu->cbf, depth, color);
   }
+  if (state->encoder_control->cfg.lmcs_enable && color == COLOR_Y) {
+    kvz_pixel* luma = pred;
+    for (int y = 0; y < tr_width; y++) {
+      for (int x = 0; x < tr_width; x++) {
+        luma[x] = state->tile->frame->lmcs_aps->m_invLUT[luma[x]];
+      }
+      luma += lcu_width;
+    }
+  }
+
 }
 
 /**

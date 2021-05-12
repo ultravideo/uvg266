@@ -234,7 +234,6 @@ typedef struct encoder_state_config_slice_t {
 
   //ALF adaptation parameter set
   struct alf_aps *apss; //[ALF_CTB_MAX_NUM_APS];
-  struct lmcs_aps* lmcs_aps;
   struct cc_alf_filter_param *cc_filter_param;
   int tile_group_num_aps;
   int8_t *tile_group_luma_aps_id;

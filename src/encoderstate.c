@@ -1056,6 +1056,8 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
         const int width = MIN(sub_state->tile->frame->width_in_lcu * LCU_WIDTH, main_state->tile->frame->width - offset_x);
         const int height = MIN(sub_state->tile->frame->height_in_lcu * LCU_WIDTH, main_state->tile->frame->height - offset_y);
 
+        sub_state->tile->frame->lmcs_aps = main_state->tile->frame->lmcs_aps;
+
         kvz_image_free(sub_state->tile->frame->source);
         sub_state->tile->frame->source = NULL;
 
@@ -1078,6 +1080,26 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
             width,
             height
         );
+        sub_state->tile->frame->source_lmcs = sub_state->tile->frame->source;
+        sub_state->tile->frame->rec_lmcs = sub_state->tile->frame->rec;
+
+        if (sub_state->encoder_control->cfg.lmcs_enable) {
+          sub_state->tile->frame->source_lmcs = kvz_image_make_subimage(
+            main_state->tile->frame->source_lmcs,
+            offset_x,
+            offset_y,
+            width,
+            height
+          );
+          sub_state->tile->frame->rec_lmcs = kvz_image_make_subimage(
+            main_state->tile->frame->rec_lmcs,
+            offset_x,
+            offset_y,
+            width,
+            height
+          );
+        }
+
         sub_state->tile->frame->cu_array = kvz_cu_subarray(
             main_state->tile->frame->cu_array,
             offset_x,
@@ -1324,6 +1346,8 @@ static void encoder_set_source_picture(encoder_state_t * const state, kvz_pictur
   if (state->encoder_control->cfg.lmcs_enable) {
     state->tile->frame->source_lmcs = kvz_image_alloc(state->encoder_control->chroma_format, frame->width, frame->height);
     state->tile->frame->rec_lmcs = kvz_image_alloc(state->encoder_control->chroma_format, frame->width, frame->height);
+    state->tile->frame->lmcs_aps = malloc(sizeof(lmcs_aps));
+    kvz_init_lmcs_aps(state->tile->frame->lmcs_aps, state->encoder_control->cfg.width, state->encoder_control->cfg.height, LCU_CU_WIDTH, LCU_CU_WIDTH, state->encoder_control->bitdepth);
   }
 
   kvz_videoframe_set_poc(state->tile->frame, state->frame->poc);
@@ -1595,14 +1619,14 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
 
   if (state->encoder_control->cfg.lmcs_enable) {
     // ToDo: support other signal types in LMCS
-    kvz_lmcs_preanalyzer(state, state->tile->frame, state->slice->lmcs_aps, RESHAPE_SIGNAL_SDR);
-    kvz_construct_reshaper_lmcs(state->slice->lmcs_aps);
+    kvz_lmcs_preanalyzer(state, state->tile->frame, state->tile->frame->lmcs_aps, RESHAPE_SIGNAL_SDR);
+    kvz_construct_reshaper_lmcs(state->tile->frame->lmcs_aps);
 
     kvz_pixel* luma = state->tile->frame->source->y;
     kvz_pixel* luma_lmcs = state->tile->frame->source_lmcs->y;
     for (int y = 0; y < state->tile->frame->source->height; y++) {
       for (int x = 0; x < state->tile->frame->source->width; x++) {
-        luma_lmcs[x] = state->slice->lmcs_aps->m_fwdLUT[luma[x]];
+        luma[x] = state->tile->frame->lmcs_aps->m_fwdLUT[luma[x]];
       }
       luma += state->tile->frame->source->stride;
       luma_lmcs += state->tile->frame->source->stride;

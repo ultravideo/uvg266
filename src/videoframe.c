@@ -55,6 +55,8 @@ videoframe_t * kvz_videoframe_alloc(int32_t width,
     kvz_alf_create(frame, chroma_format);
   }
 
+  frame->lmcs_aps = NULL;
+
 
   return frame;
 }
@@ -72,6 +74,9 @@ int kvz_videoframe_free(videoframe_t * const frame)
     kvz_image_free(frame->source_lmcs);
     kvz_image_free(frame->rec_lmcs);
     frame->source_lmcs_mapped = false;
+    if (frame->lmcs_aps != NULL) {
+      FREE_POINTER(frame->lmcs_aps);
+    }
   }
 
   kvz_image_free(frame->source);

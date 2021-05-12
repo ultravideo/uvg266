@@ -1306,7 +1306,7 @@ void kvz_encode_lmcs_adaptive_parameter_set(encoder_state_t* const state)
    WRITE_U(stream, 0, 5, "adaptation_parameter_set_id");
    WRITE_U(stream, 0/*state->encoder_control->chroma_format != KVZ_CSP_400*/, 1, "aps_chroma_present_flag");
 
-   code_lmcs_aps(state, state->slice->lmcs_aps);
+   code_lmcs_aps(state, state->tile->frame->lmcs_aps);
 
    WRITE_U(stream, 0, 1, "aps_extension_flag"); //Implementation when this flag is equal to 1 should be added when it is needed. Currently in the spec we don't have case when this flag is equal to 1
    kvz_bitstream_add_rbsp_trailing_bits(stream);
