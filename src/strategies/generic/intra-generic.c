@@ -27,7 +27,7 @@
 #include "kvz_math.h"
 
 
- /**
+/**
  * \brief Generage angular predictions.
  * \param log2_width    Log2 of width, range 2..5.
  * \param intra_mode    Angular mode in range 2..34.
@@ -49,6 +49,7 @@ static void kvz_angular_pred_generic(
 
   static const int16_t modedisp2sampledisp[32] = { 0,    1,    2,    3,    4,    6,     8,   10,   12,   14,   16,   18,   20,   23,   26,   29,   32,   35,   39,  45,  51,  57,  64,  73,  86, 102, 128, 171, 256, 341, 512, 1024 };
   static const int16_t modedisp2invsampledisp[32] = { 0, 16384, 8192, 5461, 4096, 2731, 2048, 1638, 1365, 1170, 1024, 910, 819, 712, 630, 565, 512, 468, 420, 364, 321, 287, 256, 224, 191, 161, 128, 96, 64, 48, 32, 16 }; // (512 * 32) / sampledisp
+  static const int32_t pre_scale[] = { 8, 7, 6, 5, 5, 4, 4, 4, 3, 3, 3, 3, 3, 3, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 0, 0, 0, -1, -1, -2, -3 };
   static const int16_t intraGaussFilter[32][4] = {
   { 16, 32, 16, 0 },
   { 15, 29, 17, 3 },
@@ -136,6 +137,9 @@ static void kvz_angular_pred_generic(
   
   // Sample displacement per column in fractions of 32.
   const int_fast8_t sample_disp = (mode_disp < 0 ? -1 : 1) * modedisp2sampledisp[abs(mode_disp)];
+  
+  // TODO: replace latter width with height
+  int scale = MIN(2, log2_width - pre_scale[abs(mode_disp)]);
 
   // Pointer for the reference we are interpolating from.
   kvz_pixel *ref_main;
@@ -238,7 +242,7 @@ static void kvz_angular_pred_generic(
           kvz_pixel p[4];
           bool use_cubic = true; // Default to cubic filter
           static const int kvz_intra_hor_ver_dist_thres[8] = { 24, 24, 24, 14, 2, 0, 0, 0 };
-          int filter_threshold = kvz_intra_hor_ver_dist_thres[kvz_math_floor_log2(width)];
+          int filter_threshold = kvz_intra_hor_ver_dist_thres[log2_width];
           int dist_from_vert_or_hor = MIN(abs(pred_mode - 50), abs(pred_mode - 18));
           if (dist_from_vert_or_hor > filter_threshold) {
             static const int16_t modedisp2sampledisp[32] = { 0,    1,    2,    3,    4,    6,     8,   10,   12,   14,   16,   18,   20,   23,   26,   29,   32,   35,   39,  45,  51,  57,  64,  73,  86, 102, 128, 171, 256, 341, 512, 1024 };
@@ -279,9 +283,7 @@ static void kvz_angular_pred_generic(
         }
       }
 
-      // TODO: replace latter width with height
-      int scale = MIN(2, log2_width - ((int)kvz_math_floor_log2(3* modedisp2invsampledisp[abs(mode_disp)] - 2 ) - 8));
-
+     
       // PDPC
       bool PDPC_filter = (width >= 4 || channel_type != 0);
       if (pred_mode > 1 && pred_mode < 67) {
