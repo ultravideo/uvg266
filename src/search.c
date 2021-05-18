@@ -37,7 +37,7 @@
 #include "videoframe.h"
 #include "strategies/strategies-picture.h"
 #include "strategies/strategies-quant.h"
-
+#include "reshape.h"
 
 #define IN_FRAME(x, y, width, height, block_width, block_height) \
   ((x) >= 0 && (y) >= 0 \
@@ -909,6 +909,10 @@ static void init_lcu_t(const encoder_state_t * const state, const int x, const i
       int chroma_bytes = (x_max / 2 + (1 - x_min_in_lcu))*sizeof(kvz_pixel);
 
       memcpy(&lcu->top_ref.y[x_min_in_lcu], &hor_buf->y[luma_offset], luma_bytes);
+
+      if(state->encoder_control->cfg.lmcs_enable)
+        for (int i = 0; i < luma_bytes; i++) lcu->top_ref.y[x_min_in_lcu + i] = state->tile->frame->lmcs_aps->m_fwdLUT[lcu->top_ref.y[x_min_in_lcu + i]];
+
       if (state->encoder_control->chroma_format != KVZ_CSP_400) {
         memcpy(&lcu->top_ref.u[x_min_in_lcu], &hor_buf->u[chroma_offset], chroma_bytes);
         memcpy(&lcu->top_ref.v[x_min_in_lcu], &hor_buf->v[chroma_offset], chroma_bytes);
@@ -923,6 +927,10 @@ static void init_lcu_t(const encoder_state_t * const state, const int x, const i
       int chroma_bytes = (LCU_WIDTH / 2 + (1 - y_min_in_lcu)) * sizeof(kvz_pixel);
 
       memcpy(&lcu->left_ref.y[y_min_in_lcu], &ver_buf->y[luma_offset], luma_bytes);
+
+      if (state->encoder_control->cfg.lmcs_enable)
+        for (int i = 0; i < luma_bytes; i++) lcu->left_ref.y[y_min_in_lcu + i] = state->tile->frame->lmcs_aps->m_fwdLUT[lcu->left_ref.y[y_min_in_lcu + i]];
+
       if (state->encoder_control->chroma_format != KVZ_CSP_400) {
         memcpy(&lcu->left_ref.u[y_min_in_lcu], &ver_buf->u[chroma_offset], chroma_bytes);
         memcpy(&lcu->left_ref.v[y_min_in_lcu], &ver_buf->v[chroma_offset], chroma_bytes);
@@ -943,6 +951,8 @@ static void init_lcu_t(const encoder_state_t * const state, const int x, const i
 
     kvz_pixels_blit(&frame->source->y[x + y * frame->source->stride], lcu->ref.y,
                         x_max, y_max, frame->source->stride, LCU_WIDTH);
+    if (state->encoder_control->cfg.lmcs_enable)
+      for (int i = 0; i < LCU_WIDTH * LCU_WIDTH; i++) lcu->ref.y[i] = state->tile->frame->lmcs_aps->m_fwdLUT[lcu->ref.y[i]];
     if (state->encoder_control->chroma_format != KVZ_CSP_400) {
       kvz_pixels_blit(&frame->source->u[x_c + y_c * frame->source->stride / 2], lcu->ref.u,
                       x_max_c, y_max_c, frame->source->stride / 2, LCU_WIDTH / 2);
@@ -1018,6 +1028,8 @@ void kvz_search_lcu(encoder_state_t * const state, const int x, const int y, con
 
   // The best decisions through out the LCU got propagated back to depth 0,
   // so copy those back to the frame.
+  if (state->encoder_control->cfg.lmcs_enable)
+    for (int i = 0; i < LCU_WIDTH * LCU_WIDTH; i++) work_tree[0].rec.y[i] = state->tile->frame->lmcs_aps->m_invLUT[work_tree[0].rec.y[i]];
   copy_lcu_to_cu_data(state, x, y, &work_tree[0]);
 
   // Copy coeffs to encoder state.

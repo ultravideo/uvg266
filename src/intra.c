@@ -28,7 +28,6 @@
 #include "tables.h"
 #include "transform.h"
 #include "videoframe.h"
-#include "reshape.h"
 
 // Tables for looking up the number of intra reference pixels based on
 // prediction units coordinate within an LCU.
@@ -598,16 +597,6 @@ static void intra_recon_tb_leaf(
   kvz_intra_references refs;
   kvz_intra_build_reference(log2width, color, &luma_px, &pic_px, lcu, &refs, cfg->wpp);
 
-  if (0&&color == COLOR_Y && state->encoder_control->cfg.lmcs_enable) {
-    // Map to LMCS
-    for (int i = 0; i < 256 + 3; i++) {
-      refs.ref.left[i] = state->tile->frame->lmcs_aps->m_fwdLUT[refs.ref.left[i]];
-      refs.ref.top[i] = state->tile->frame->lmcs_aps->m_fwdLUT[refs.ref.top[i]];
-      //refs.filtered_ref.left[i] = state->slice->lmcs_aps->m_fwdLUT[refs.filtered_ref.left[i]];
-      //refs.filtered_ref.top[i] = state->slice->lmcs_aps->m_fwdLUT[refs.filtered_ref.top[i]];
-    }
-  }
-
   kvz_pixel pred[32 * 32];
   const bool filter_boundary = color == COLOR_Y && !(cfg->lossless && cfg->implicit_rdpcm);
   kvz_intra_predict(state, &refs, log2width, intra_mode, color, pred, filter_boundary);
@@ -626,30 +615,6 @@ static void intra_recon_tb_leaf(
       break;
   }
 
-  if (0&&color == COLOR_Y && state->encoder_control->cfg.lmcs_enable) {
-    kvz_pixel* lmcs_pix = pred;
-    for (int y = 0; y < width; y++) {
-      for (int x = 0; x < width; x++) {
-        lmcs_pix[x] = state->tile->frame->lmcs_aps->m_fwdLUT[lmcs_pix[x]];
-      }
-      lmcs_pix += width;
-    }
-
-
-    static FILE* lut = NULL;
-    if (lut == NULL) {
-      lut = fopen("LUT_kvz.txt", "wb");
-      for (int i = 0; i < 256; i++) {
-        fprintf(lut, "%d ", state->tile->frame->lmcs_aps->m_fwdLUT[i]);
-      }
-      fprintf(lut, "\r\n");
-      for (int i = 0; i < 256; i++) {
-        fprintf(lut, "%d ", state->tile->frame->lmcs_aps->m_invLUT[i]);
-      }
-      fclose(lut);
-      lut = (FILE*)123;
-    }
-  }
   kvz_pixels_blit(pred, block , width, width, width, lcu_width);
 }
 
