@@ -1346,7 +1346,7 @@ static void encoder_set_source_picture(encoder_state_t * const state, kvz_pictur
   if (state->encoder_control->cfg.lmcs_enable) {
     state->tile->frame->source_lmcs = kvz_image_alloc(state->encoder_control->chroma_format, frame->width, frame->height);
     state->tile->frame->rec_lmcs = kvz_image_alloc(state->encoder_control->chroma_format, frame->width, frame->height);
-    state->tile->frame->lmcs_aps = malloc(sizeof(lmcs_aps));
+    state->tile->frame->lmcs_aps = calloc(1, sizeof(lmcs_aps));
     kvz_init_lmcs_aps(state->tile->frame->lmcs_aps, state->encoder_control->cfg.width, state->encoder_control->cfg.height, LCU_CU_WIDTH, LCU_CU_WIDTH, state->encoder_control->bitdepth);
   }
 
