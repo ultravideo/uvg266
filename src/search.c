@@ -951,8 +951,6 @@ static void init_lcu_t(const encoder_state_t * const state, const int x, const i
 
     kvz_pixels_blit(&frame->source->y[x + y * frame->source->stride], lcu->ref.y,
                         x_max, y_max, frame->source->stride, LCU_WIDTH);
-    if (state->encoder_control->cfg.lmcs_enable)
-      for (int i = 0; i < LCU_WIDTH * LCU_WIDTH; i++) lcu->ref.y[i] = state->tile->frame->lmcs_aps->m_fwdLUT[lcu->ref.y[i]];
     if (state->encoder_control->chroma_format != KVZ_CSP_400) {
       kvz_pixels_blit(&frame->source->u[x_c + y_c * frame->source->stride / 2], lcu->ref.u,
                       x_max_c, y_max_c, frame->source->stride / 2, LCU_WIDTH / 2);
@@ -1031,6 +1029,8 @@ void kvz_search_lcu(encoder_state_t * const state, const int x, const int y, con
   if (state->encoder_control->cfg.lmcs_enable)
     for (int i = 0; i < LCU_WIDTH * LCU_WIDTH; i++) work_tree[0].rec.y[i] = state->tile->frame->lmcs_aps->m_invLUT[work_tree[0].rec.y[i]];
   copy_lcu_to_cu_data(state, x, y, &work_tree[0]);
+  if (state->encoder_control->cfg.lmcs_enable)
+    for (int i = 0; i < LCU_WIDTH * LCU_WIDTH; i++) work_tree[0].rec.y[i] = state->tile->frame->lmcs_aps->m_fwdLUT[work_tree[0].rec.y[i]];
 
   // Copy coeffs to encoder state.
   copy_coeffs(work_tree[0].coeff.y, state->coeff->y, LCU_WIDTH);

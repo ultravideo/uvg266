@@ -1626,7 +1626,7 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
     kvz_pixel* luma_lmcs = state->tile->frame->source_lmcs->y;
     for (int y = 0; y < state->tile->frame->source->height; y++) {
       for (int x = 0; x < state->tile->frame->source->width; x++) {
-        luma[x] = state->tile->frame->lmcs_aps->m_fwdLUT[luma[x]];
+        //luma[x] = state->tile->frame->lmcs_aps->m_fwdLUT[luma[x]];
       }
       luma += state->tile->frame->source->stride;
       luma_lmcs += state->tile->frame->source->stride;
