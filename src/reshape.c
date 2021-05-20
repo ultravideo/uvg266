@@ -831,7 +831,7 @@ void kvz_lmcs_preanalyzer(struct encoder_state_t* const state, const videoframe_
   aps->m_sliceReshapeInfo.sliceReshaperModelPresentFlag = true;
   aps->m_sliceReshapeInfo.sliceReshaperEnableFlag = true;
 
-  int modIP = state->frame->poc - state->frame->poc / aps->m_reshapeCW.rspFpsToIp * aps->m_reshapeCW.rspFpsToIp;
+  int modIP = 0;// state->frame->poc - state->frame->poc / aps->m_reshapeCW.rspFpsToIp * aps->m_reshapeCW.rspFpsToIp;
   if (sliceType == KVZ_SLICE_I || (aps->m_reshapeCW.updateCtrl == 2 && modIP == 0))
   {
     if (aps->m_sliceReshapeInfo.sliceReshaperModelPresentFlag == true)
