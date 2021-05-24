@@ -236,9 +236,7 @@ static int8_t* derive_chroma_QP_mapping_table(const kvz_config* const cfg, int i
   {
     table[k] = CLIP(-qpBdOffsetC, MAX_QP, table[k - 1] + 1);
   }
-  for(int i = 0; i < MAX_QP; i++) {
-    printf("%3d %3d\n", i, table[i]);
-  }
+
   return table;
 }
 

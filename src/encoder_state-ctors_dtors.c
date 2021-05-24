@@ -400,6 +400,7 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
     if (!child_state->slice) child_state->slice = parent_state->slice;
     if (!child_state->wfrow) child_state->wfrow = parent_state->wfrow;
   }
+
   // Intialization of the constraint structure
   child_state->constraint = kvz_init_constraint(child_state->constraint, child_state->encoder_control);
 
@@ -433,6 +434,9 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
         children_allow_tile = 1;
         start_in_ts = 0;
         end_in_ts = child_state->tile->frame->width_in_lcu * child_state->tile->frame->height_in_lcu;
+        if (child_state->encoder_control->cfg.lmcs_enable) {
+          child_state->tile->frame->lmcs_aps = calloc(1, sizeof(lmcs_aps));
+        }
         break;
       case ENCODER_STATE_TYPE_SLICE:
         assert(child_state->parent);
@@ -737,6 +741,10 @@ void kvz_encoder_state_finalize(encoder_state_t * const state) {
     }
 
     FREE_POINTER(state->children);
+  }
+
+  if (state->type == ENCODER_STATE_TYPE_MAIN && state->encoder_control->cfg.lmcs_enable) {
+    FREE_POINTER(state->tile->frame->lmcs_aps);
   }
   
   FREE_POINTER(state->lcu_order);
