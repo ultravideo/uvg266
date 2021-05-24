@@ -41,6 +41,7 @@
 #include "tables.h"
 #include "transform.h"
 #include "fast_coeff_cost.h"
+#include "reshape.h"
 
 static INLINE int32_t hsum32_8x32i(__m256i src)
 {
