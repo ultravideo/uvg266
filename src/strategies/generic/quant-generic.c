@@ -30,6 +30,7 @@
 #include "strategyselector.h"
 #include "transform.h"
 #include "fast_coeff_cost.h"
+#include "reshape.h"
 
 #define QUANT_SHIFT 14
 /**
@@ -206,9 +207,18 @@ int kvz_quantize_residual_generic(encoder_state_t *const state,
   // Get residual. (ref_in - pred_in -> residual)
   {
     int y, x;
-    for (y = 0; y < width; ++y) {
-      for (x = 0; x < width; ++x) {
-        residual[x + y * width] = (int16_t)(ref_in[x + y * in_stride] - pred_in[x + y * in_stride]);
+    if (state->encoder_control->cfg.lmcs_enable && color == COLOR_Y) {
+      for (y = 0; y < width; ++y) {
+        for (x = 0; x < width; ++x) {
+          residual[x + y * width] = (int16_t)(state->tile->frame->lmcs_aps->m_fwdLUT[ref_in[x + y * in_stride]] - pred_in[x + y * in_stride]);
+        }
+      }
+    }
+    else {
+      for (y = 0; y < width; ++y) {
+        for (x = 0; x < width; ++x) {
+          residual[x + y * width] = (int16_t)(ref_in[x + y * in_stride] - pred_in[x + y * in_stride]);
+        }
       }
     }
   }

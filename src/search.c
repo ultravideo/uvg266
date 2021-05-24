@@ -910,9 +910,6 @@ static void init_lcu_t(const encoder_state_t * const state, const int x, const i
 
       memcpy(&lcu->top_ref.y[x_min_in_lcu], &hor_buf->y[luma_offset], luma_bytes);
 
-      if(state->encoder_control->cfg.lmcs_enable)
-        for (int i = 0; i < luma_bytes; i++) lcu->top_ref.y[x_min_in_lcu + i] = state->tile->frame->lmcs_aps->m_fwdLUT[lcu->top_ref.y[x_min_in_lcu + i]];
-
       if (state->encoder_control->chroma_format != KVZ_CSP_400) {
         memcpy(&lcu->top_ref.u[x_min_in_lcu], &hor_buf->u[chroma_offset], chroma_bytes);
         memcpy(&lcu->top_ref.v[x_min_in_lcu], &hor_buf->v[chroma_offset], chroma_bytes);
@@ -927,9 +924,6 @@ static void init_lcu_t(const encoder_state_t * const state, const int x, const i
       int chroma_bytes = (LCU_WIDTH / 2 + (1 - y_min_in_lcu)) * sizeof(kvz_pixel);
 
       memcpy(&lcu->left_ref.y[y_min_in_lcu], &ver_buf->y[luma_offset], luma_bytes);
-
-      if (state->encoder_control->cfg.lmcs_enable)
-        for (int i = 0; i < luma_bytes; i++) lcu->left_ref.y[y_min_in_lcu + i] = state->tile->frame->lmcs_aps->m_fwdLUT[lcu->left_ref.y[y_min_in_lcu + i]];
 
       if (state->encoder_control->chroma_format != KVZ_CSP_400) {
         memcpy(&lcu->left_ref.u[y_min_in_lcu], &ver_buf->u[chroma_offset], chroma_bytes);
@@ -1026,11 +1020,7 @@ void kvz_search_lcu(encoder_state_t * const state, const int x, const int y, con
 
   // The best decisions through out the LCU got propagated back to depth 0,
   // so copy those back to the frame.
-  if (state->encoder_control->cfg.lmcs_enable)
-    for (int i = 0; i < LCU_WIDTH * LCU_WIDTH; i++) work_tree[0].rec.y[i] = state->tile->frame->lmcs_aps->m_invLUT[work_tree[0].rec.y[i]];
   copy_lcu_to_cu_data(state, x, y, &work_tree[0]);
-  if (state->encoder_control->cfg.lmcs_enable)
-    for (int i = 0; i < LCU_WIDTH * LCU_WIDTH; i++) work_tree[0].rec.y[i] = state->tile->frame->lmcs_aps->m_fwdLUT[work_tree[0].rec.y[i]];
 
   // Copy coeffs to encoder state.
   copy_coeffs(work_tree[0].coeff.y, state->coeff->y, LCU_WIDTH);

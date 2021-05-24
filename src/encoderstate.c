@@ -646,6 +646,19 @@ static void encoder_state_worker_encode_lcu(void * opaque)
     set_cu_qps(state, lcu->position_px.x, lcu->position_px.y, 0, &last_qp, &prev_qp);
   }
 
+
+  if (state->encoder_control->cfg.lmcs_enable) {
+    kvz_pixel* luma = &state->tile->frame->rec->y[lcu->position_px.x + lcu->position_px.y * state->tile->frame->rec->stride];
+    for (int y = 0; y < LCU_WIDTH; y++) {
+      if (lcu->position_px.y + y < state->tile->frame->rec->height) {
+        for (int x = 0; x < LCU_WIDTH; x++) {
+          if (lcu->position_px.x + x < state->tile->frame->rec->width) luma[x] = state->tile->frame->lmcs_aps->m_invLUT[luma[x]];
+        }
+      }
+      luma += state->tile->frame->rec->stride;
+    }
+  }
+
   if (encoder->cfg.deblock_enable) {
     kvz_filter_deblock_lcu(state, lcu->position_px.x, lcu->position_px.y);
   }
@@ -769,6 +782,18 @@ static void encoder_state_worker_encode_lcu_search(void * opaque)
     int last_qp = state->last_qp;
     int prev_qp = -1;
     set_cu_qps(state, lcu->position_px.x, lcu->position_px.y, 0, &last_qp, &prev_qp);
+  }
+
+  if (state->encoder_control->cfg.lmcs_enable) {
+    kvz_pixel* luma = &state->tile->frame->rec->y[lcu->position_px.x + lcu->position_px.y * state->tile->frame->rec->stride];
+    for (int y = 0; y < LCU_WIDTH; y++) {
+      if (lcu->position_px.y+y < state->tile->frame->rec->height) {
+        for (int x = 0; x < LCU_WIDTH; x++) {
+          if (lcu->position_px.x+x < state->tile->frame->rec->width) luma[x] = state->tile->frame->lmcs_aps->m_invLUT[luma[x]];
+        }
+      }
+      luma += state->tile->frame->rec->stride;
+    }
   }
 
   if (encoder->cfg.deblock_enable) {
@@ -1343,13 +1368,6 @@ static void encoder_set_source_picture(encoder_state_t * const state, kvz_pictur
   }
   state->tile->frame->rec_lmcs = state->tile->frame->rec;
 
-  if (state->encoder_control->cfg.lmcs_enable) {
-    state->tile->frame->source_lmcs = kvz_image_alloc(state->encoder_control->chroma_format, frame->width, frame->height);
-    state->tile->frame->rec_lmcs = kvz_image_alloc(state->encoder_control->chroma_format, frame->width, frame->height);
-    state->tile->frame->lmcs_aps = calloc(1, sizeof(lmcs_aps));
-    kvz_init_lmcs_aps(state->tile->frame->lmcs_aps, state->encoder_control->cfg.width, state->encoder_control->cfg.height, LCU_CU_WIDTH, LCU_CU_WIDTH, state->encoder_control->bitdepth);
-  }
-
   kvz_videoframe_set_poc(state->tile->frame, state->frame->poc);
 }
 
@@ -1618,6 +1636,9 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
   }
 
   if (state->encoder_control->cfg.lmcs_enable) {
+    state->tile->frame->lmcs_aps = calloc(1, sizeof(lmcs_aps));
+    kvz_init_lmcs_aps(state->tile->frame->lmcs_aps, state->encoder_control->cfg.width, state->encoder_control->cfg.height, LCU_CU_WIDTH, LCU_CU_WIDTH, state->encoder_control->bitdepth);
+
     // ToDo: support other signal types in LMCS
     kvz_lmcs_preanalyzer(state, state->tile->frame, state->tile->frame->lmcs_aps, RESHAPE_SIGNAL_SDR);
     kvz_construct_reshaper_lmcs(state->tile->frame->lmcs_aps);
