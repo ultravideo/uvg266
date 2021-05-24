@@ -665,18 +665,8 @@ int kvz_quantize_residual_avx2(encoder_state_t *const state,
   assert(width <= TR_MAX_WIDTH);
   assert(width >= TR_MIN_WIDTH);
 
-  int y, x;
-  // ToDo: do something with the LMCS for better performance
-  if (state->encoder_control->cfg.lmcs_enable && color == COLOR_Y) {
-    for (y = 0; y < width; ++y) {
-      for (x = 0; x < width; ++x) {
-        residual[x + y * width] = (int16_t)(state->tile->frame->lmcs_aps->m_fwdLUT[ref_in[x + y * in_stride]] - pred_in[x + y * in_stride]);
-      }
-    }
-  } else {
-    // Get residual. (ref_in - pred_in -> residual)
-    get_residual_avx2(ref_in, pred_in, residual, width, in_stride);
-  }
+  // Get residual. (ref_in - pred_in -> residual)
+  get_residual_avx2(ref_in, pred_in, residual, width, in_stride);
 
   // Transform residual. (residual -> coeff)
   if (use_trskip) {

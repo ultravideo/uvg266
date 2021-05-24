@@ -110,7 +110,7 @@ void kvz_calc_seq_stats(struct encoder_state_t* const state, const videoframe_t*
   const encoder_control_t* const encoder = state->encoder_control;
 
   int32_t m_binNum = PIC_CODE_CW_BINS;
-  kvz_pixel* picY = &frame->source->y[CU_TO_PIXEL(0, 0, 0, frame->source->stride)];
+  kvz_pixel* picY = &frame->source->y[0];
   const int width = frame->source->width;
   const int height = frame->source->height;
   const int stride = frame->source->stride;
@@ -134,7 +134,7 @@ void kvz_calc_seq_stats(struct encoder_state_t* const state, const videoframe_t*
   memset(topColSum, 0, width * sizeof(int64_t));
   memset(topColSumSq, 0, width * sizeof(int64_t));
   memset(binCnt, 0, m_binNum * sizeof(uint32_t));
-
+    
   kvz_init_lmcs_seq_stats(stats,m_binNum);
   for (uint32_t y = 0; y < height; y++)
   {
@@ -831,7 +831,7 @@ void kvz_lmcs_preanalyzer(struct encoder_state_t* const state, const videoframe_
   aps->m_sliceReshapeInfo.sliceReshaperModelPresentFlag = true;
   aps->m_sliceReshapeInfo.sliceReshaperEnableFlag = true;
 
-  int modIP = 0;// state->frame->poc - state->frame->poc / aps->m_reshapeCW.rspFpsToIp * aps->m_reshapeCW.rspFpsToIp;
+  int modIP = state->frame->poc - state->frame->poc / aps->m_reshapeCW.rspFpsToIp * aps->m_reshapeCW.rspFpsToIp;
   if (sliceType == KVZ_SLICE_I || (aps->m_reshapeCW.updateCtrl == 2 && modIP == 0))
   {
     if (aps->m_sliceReshapeInfo.sliceReshaperModelPresentFlag == true)

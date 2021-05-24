@@ -1639,6 +1639,11 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
     state->tile->frame->lmcs_aps = calloc(1, sizeof(lmcs_aps));
     kvz_init_lmcs_aps(state->tile->frame->lmcs_aps, state->encoder_control->cfg.width, state->encoder_control->cfg.height, LCU_CU_WIDTH, LCU_CU_WIDTH, state->encoder_control->bitdepth);
 
+
+    state->tile->frame->lmcs_aps->m_reshapeCW.rspPicSize = state->tile->frame->width * state->tile->frame->height;
+    state->tile->frame->lmcs_aps->m_reshapeCW.rspBaseQP = state->encoder_control->cfg.qp;
+    state->tile->frame->lmcs_aps->m_reshapeCW.rspFpsToIp = 16;
+
     // ToDo: support other signal types in LMCS
     kvz_lmcs_preanalyzer(state, state->tile->frame, state->tile->frame->lmcs_aps, RESHAPE_SIGNAL_SDR);
     kvz_construct_reshaper_lmcs(state->tile->frame->lmcs_aps);
@@ -1647,7 +1652,7 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
     kvz_pixel* luma_lmcs = state->tile->frame->source_lmcs->y;
     for (int y = 0; y < state->tile->frame->source->height; y++) {
       for (int x = 0; x < state->tile->frame->source->width; x++) {
-        //luma[x] = state->tile->frame->lmcs_aps->m_fwdLUT[luma[x]];
+        luma_lmcs[x] = state->tile->frame->lmcs_aps->m_fwdLUT[luma[x]];
       }
       luma += state->tile->frame->source->stride;
       luma_lmcs += state->tile->frame->source->stride;
