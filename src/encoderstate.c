@@ -1766,6 +1766,14 @@ void kvz_encoder_prepare(encoder_state_t *state)
     state->tile->frame->cu_array = kvz_cu_array_alloc(width, height);
   }
 
+  if (state->encoder_control->cfg.lmcs_enable) {
+    kvz_image_free(state->tile->frame->source_lmcs);
+    state->tile->frame->source_lmcs = NULL;
+
+    kvz_image_free(state->tile->frame->rec_lmcs);
+    state->tile->frame->rec_lmcs = NULL;
+  }
+
   // Remove source and reconstructed picture.
   kvz_image_free(state->tile->frame->source);
   state->tile->frame->source = NULL;
