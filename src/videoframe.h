@@ -54,6 +54,7 @@ typedef struct videoframe
   int32_t poc;           //!< \brief Picture order count
 
   bool source_lmcs_mapped; //!< \brief Indicate if source_lmcs is available and mapped to LMCS
+  bool lmcs_top_level; //!< \brief Indicate that in this level the LMCS images are allocated
   bool rec_lmcs_mapped; //!< \brief Indicate if rec_lmcs is available and mapped to LMCS
 } videoframe_t;
 

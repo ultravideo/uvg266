@@ -1109,30 +1109,20 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
         sub_state->tile->frame->rec_lmcs = sub_state->tile->frame->rec;
 
         if (sub_state->encoder_control->cfg.lmcs_enable) {
-          sub_state->tile->frame->source_lmcs = MALLOC(kvz_picture, 1);
-
-          sub_state->tile->frame->source_lmcs->width = width;
-          sub_state->tile->frame->source_lmcs->height = height;
-          sub_state->tile->frame->source_lmcs->stride = main_state->tile->frame->source_lmcs->stride;
-          sub_state->tile->frame->source_lmcs->chroma_format = main_state->tile->frame->source_lmcs->chroma_format;
-
-          sub_state->tile->frame->source_lmcs->y = sub_state->tile->frame->source_lmcs->data[COLOR_Y] = &main_state->tile->frame->source_lmcs->y[offset_x + offset_y * main_state->tile->frame->source_lmcs->stride];
-          if (main_state->tile->frame->source_lmcs->chroma_format != KVZ_CSP_400) {
-            sub_state->tile->frame->source_lmcs->u = sub_state->tile->frame->source_lmcs->data[COLOR_U] = &main_state->tile->frame->source_lmcs->u[offset_x / 2 + offset_y / 2 * main_state->tile->frame->source_lmcs->stride / 2];
-            sub_state->tile->frame->source_lmcs->v = sub_state->tile->frame->source_lmcs->data[COLOR_V] = &main_state->tile->frame->source_lmcs->v[offset_x / 2 + offset_y / 2 * main_state->tile->frame->source_lmcs->stride / 2];
-          }
-
-          sub_state->tile->frame->rec_lmcs = MALLOC(kvz_picture, 1);
-          sub_state->tile->frame->rec_lmcs->width = width;
-          sub_state->tile->frame->rec_lmcs->height = height;
-          sub_state->tile->frame->rec_lmcs->stride = main_state->tile->frame->rec_lmcs->stride;
-          sub_state->tile->frame->rec_lmcs->chroma_format = main_state->tile->frame->rec_lmcs->chroma_format;
-
-          sub_state->tile->frame->rec_lmcs->y = sub_state->tile->frame->rec_lmcs->data[COLOR_Y] = &main_state->tile->frame->rec_lmcs->y[offset_x + offset_y * main_state->tile->frame->rec_lmcs->stride];
-          if (main_state->tile->frame->rec_lmcs->chroma_format != KVZ_CSP_400) {
-            sub_state->tile->frame->rec_lmcs->u = sub_state->tile->frame->rec_lmcs->data[COLOR_U] = &main_state->tile->frame->rec_lmcs->u[offset_x / 2 + offset_y / 2 * main_state->tile->frame->rec_lmcs->stride / 2];
-            sub_state->tile->frame->rec_lmcs->v = sub_state->tile->frame->rec_lmcs->data[COLOR_V] = &main_state->tile->frame->rec_lmcs->v[offset_x / 2 + offset_y / 2 * main_state->tile->frame->rec_lmcs->stride / 2];
-          }
+          sub_state->tile->frame->source_lmcs = kvz_image_make_subimage(
+            main_state->tile->frame->source_lmcs,
+            offset_x,
+            offset_y,
+            width,
+            height
+          );
+          sub_state->tile->frame->rec_lmcs = kvz_image_make_subimage(
+            main_state->tile->frame->rec_lmcs,
+            offset_x,
+            offset_y,
+            width,
+            height
+          );
 
           sub_state->tile->frame->source_lmcs_mapped = true;
         }
@@ -1366,6 +1356,7 @@ static void encoder_set_source_picture(encoder_state_t * const state, kvz_pictur
 
   state->tile->frame->source_lmcs_mapped = false;
   state->tile->frame->rec_lmcs_mapped = false;
+  state->tile->frame->lmcs_top_level = false;
 
   state->tile->frame->source = frame;
   state->tile->frame->source_lmcs = state->tile->frame->source;
@@ -1668,6 +1659,7 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
       luma_lmcs += state->tile->frame->source->stride;
     }
     state->tile->frame->source_lmcs_mapped = true;
+    state->tile->frame->lmcs_top_level = true;
 
   }
  

@@ -64,10 +64,13 @@ videoframe_t * kvz_videoframe_alloc(int32_t width,
  */
 int kvz_videoframe_free(videoframe_t * const frame)
 {
-  if (frame->source_lmcs_mapped) {
-    if(frame->source != frame->source_lmcs) FREE_POINTER(frame->source_lmcs);
-    if (frame->rec != frame->rec_lmcs) FREE_POINTER(frame->rec_lmcs);
+  if (frame->lmcs_top_level) {
+    kvz_image_free(frame->source_lmcs);
+    kvz_image_free(frame->rec_lmcs);
     frame->source_lmcs_mapped = false;
+  } else if(frame->source_lmcs_mapped){
+    FREE_POINTER(frame->source_lmcs);
+    FREE_POINTER(frame->rec_lmcs);
   }
 
   kvz_image_free(frame->source);
