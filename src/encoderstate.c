@@ -1371,6 +1371,10 @@ static void encoder_set_source_picture(encoder_state_t * const state, kvz_pictur
   }
   state->tile->frame->rec_lmcs = state->tile->frame->rec;
 
+  if (state->encoder_control->cfg.lmcs_enable) {
+    state->tile->frame->rec_lmcs = kvz_image_alloc(state->encoder_control->chroma_format, frame->width, frame->height);
+    state->tile->frame->source_lmcs = kvz_image_alloc(state->encoder_control->chroma_format, frame->width, frame->height);
+  }
   kvz_videoframe_set_poc(state->tile->frame, state->frame->poc);
 }
 
@@ -1644,7 +1648,8 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
     state->tile->frame->lmcs_aps->m_reshapeCW.rspPicSize = state->tile->frame->width * state->tile->frame->height;
     state->tile->frame->lmcs_aps->m_reshapeCW.rspBaseQP = state->encoder_control->cfg.qp;
     state->tile->frame->lmcs_aps->m_reshapeCW.rspFpsToIp = 16;
-
+    state->tile->frame->lmcs_aps->m_reshapeCW.updateCtrl = 1; //ToDo: change "LMCS model update control: 0:RA, 1:AI, 2:LDB/LDP"
+    
     // ToDo: support other signal types in LMCS
     kvz_lmcs_preanalyzer(state, state->tile->frame, state->tile->frame->lmcs_aps, RESHAPE_SIGNAL_SDR);
     kvz_construct_reshaper_lmcs(state->tile->frame->lmcs_aps);
