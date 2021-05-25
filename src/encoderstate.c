@@ -1105,10 +1105,15 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
             width,
             height
         );
-        sub_state->tile->frame->source_lmcs = sub_state->tile->frame->source;
-        sub_state->tile->frame->rec_lmcs = sub_state->tile->frame->rec;
+        
 
         if (sub_state->encoder_control->cfg.lmcs_enable) {
+          kvz_image_free(sub_state->tile->frame->source_lmcs);
+          sub_state->tile->frame->source_lmcs = NULL;
+
+          kvz_image_free(sub_state->tile->frame->rec_lmcs);
+          sub_state->tile->frame->rec_lmcs = NULL;
+
           sub_state->tile->frame->source_lmcs = kvz_image_make_subimage(
             main_state->tile->frame->source_lmcs,
             offset_x,
@@ -1125,6 +1130,9 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
           );
 
           sub_state->tile->frame->source_lmcs_mapped = true;
+        } else {
+          sub_state->tile->frame->source_lmcs = sub_state->tile->frame->source;
+          sub_state->tile->frame->rec_lmcs = sub_state->tile->frame->rec;
         }
 
         sub_state->tile->frame->cu_array = kvz_cu_subarray(
