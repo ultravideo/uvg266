@@ -1107,7 +1107,7 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
         );
         
 
-        if (sub_state->tile->frame->lmcs_aps->m_sliceReshapeInfo.sliceReshaperEnableFlag) {
+        if (sub_state->encoder_control->cfg.lmcs_enable) {
           kvz_image_free(sub_state->tile->frame->source_lmcs);
           sub_state->tile->frame->source_lmcs = NULL;
 
@@ -1379,7 +1379,7 @@ static void encoder_set_source_picture(encoder_state_t * const state, kvz_pictur
   }
   state->tile->frame->rec_lmcs = state->tile->frame->rec;
 
-  if (state->tile->frame->lmcs_aps->m_sliceReshapeInfo.sliceReshaperEnableFlag) {
+  if (state->encoder_control->cfg.lmcs_enable) {
     state->tile->frame->rec_lmcs = kvz_image_alloc(state->encoder_control->chroma_format, frame->width, frame->height);
     state->tile->frame->source_lmcs = kvz_image_alloc(state->encoder_control->chroma_format, frame->width, frame->height);
   }
@@ -1780,7 +1780,7 @@ void kvz_encoder_prepare(encoder_state_t *state)
     state->tile->frame->cu_array = kvz_cu_array_alloc(width, height);
   }
 
-  if (state->tile->frame->lmcs_aps->m_sliceReshapeInfo.sliceReshaperEnableFlag) {
+  if (state->encoder_control->cfg.lmcs_enable) {
     kvz_image_free(state->tile->frame->source_lmcs);
     state->tile->frame->source_lmcs = NULL;
 
