@@ -1303,7 +1303,7 @@ void kvz_encoder_state_write_bitstream_slice_header(
     }
   }
 
-  if (state->encoder_control->cfg.tmvp_enable) {
+  if (state->frame->slicetype != KVZ_SLICE_I && state->encoder_control->cfg.tmvp_enable) {
     //WRITE_U(stream, ref_negative ? 1 : 0, 1, "slice_temporal_mvp_enabled_flag");
     WRITE_U(stream, 0, 1, "sh_collocated_from_l0_flag");
   }
