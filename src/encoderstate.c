@@ -647,7 +647,7 @@ static void encoder_state_worker_encode_lcu(void * opaque)
   }
 
 
-  if (state->encoder_control->cfg.lmcs_enable) {
+  if (state->tile->frame->lmcs_aps->m_sliceReshapeInfo.sliceReshaperEnableFlag) {
     kvz_pixel* luma = &state->tile->frame->rec->y[lcu->position_px.x + lcu->position_px.y * state->tile->frame->rec->stride];
     for (int y = 0; y < LCU_WIDTH; y++) {
       if (lcu->position_px.y + y < state->tile->frame->rec->height) {
@@ -784,7 +784,7 @@ static void encoder_state_worker_encode_lcu_search(void * opaque)
     set_cu_qps(state, lcu->position_px.x, lcu->position_px.y, 0, &last_qp, &prev_qp);
   }
 
-  if (state->encoder_control->cfg.lmcs_enable) {
+  if (state->tile->frame->lmcs_aps->m_sliceReshapeInfo.sliceReshaperEnableFlag) {
     kvz_pixel* luma = &state->tile->frame->rec->y[lcu->position_px.x + lcu->position_px.y * state->tile->frame->rec->stride];
     for (int y = 0; y < LCU_WIDTH; y++) {
       if (lcu->position_px.y+y < state->tile->frame->rec->height) {
@@ -1107,7 +1107,7 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
         );
         
 
-        if (sub_state->encoder_control->cfg.lmcs_enable) {
+        if (sub_state->tile->frame->lmcs_aps->m_sliceReshapeInfo.sliceReshaperEnableFlag) {
           kvz_image_free(sub_state->tile->frame->source_lmcs);
           sub_state->tile->frame->source_lmcs = NULL;
 
@@ -1379,7 +1379,7 @@ static void encoder_set_source_picture(encoder_state_t * const state, kvz_pictur
   }
   state->tile->frame->rec_lmcs = state->tile->frame->rec;
 
-  if (state->encoder_control->cfg.lmcs_enable) {
+  if (state->tile->frame->lmcs_aps->m_sliceReshapeInfo.sliceReshaperEnableFlag) {
     state->tile->frame->rec_lmcs = kvz_image_alloc(state->encoder_control->chroma_format, frame->width, frame->height);
     state->tile->frame->source_lmcs = kvz_image_alloc(state->encoder_control->chroma_format, frame->width, frame->height);
   }
@@ -1660,20 +1660,21 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
     
     // ToDo: support other signal types in LMCS
     kvz_lmcs_preanalyzer(state, state->tile->frame, state->tile->frame->lmcs_aps, RESHAPE_SIGNAL_SDR);
-    kvz_construct_reshaper_lmcs(state->tile->frame->lmcs_aps);
+    if (state->tile->frame->lmcs_aps->m_sliceReshapeInfo.sliceReshaperEnableFlag) {
+      kvz_construct_reshaper_lmcs(state->tile->frame->lmcs_aps);
 
-    kvz_pixel* luma = state->tile->frame->source->y;
-    kvz_pixel* luma_lmcs = state->tile->frame->source_lmcs->y;
-    for (int y = 0; y < state->tile->frame->source->height; y++) {
-      for (int x = 0; x < state->tile->frame->source->width; x++) {
-        luma_lmcs[x] = state->tile->frame->lmcs_aps->m_fwdLUT[luma[x]];
+      kvz_pixel* luma = state->tile->frame->source->y;
+      kvz_pixel* luma_lmcs = state->tile->frame->source_lmcs->y;
+      for (int y = 0; y < state->tile->frame->source->height; y++) {
+        for (int x = 0; x < state->tile->frame->source->width; x++) {
+          luma_lmcs[x] = state->tile->frame->lmcs_aps->m_fwdLUT[luma[x]];
+        }
+        luma += state->tile->frame->source->stride;
+        luma_lmcs += state->tile->frame->source->stride;
       }
-      luma += state->tile->frame->source->stride;
-      luma_lmcs += state->tile->frame->source->stride;
+      state->tile->frame->source_lmcs_mapped = true;
+      state->tile->frame->lmcs_top_level = true;
     }
-    state->tile->frame->source_lmcs_mapped = true;
-    state->tile->frame->lmcs_top_level = true;
-
   }
  
   encoder_state_init_children(state);
@@ -1779,7 +1780,7 @@ void kvz_encoder_prepare(encoder_state_t *state)
     state->tile->frame->cu_array = kvz_cu_array_alloc(width, height);
   }
 
-  if (state->encoder_control->cfg.lmcs_enable) {
+  if (state->tile->frame->lmcs_aps->m_sliceReshapeInfo.sliceReshaperEnableFlag) {
     kvz_image_free(state->tile->frame->source_lmcs);
     state->tile->frame->source_lmcs = NULL;
 
