@@ -1065,6 +1065,98 @@ void kvz_lmcs_preanalyzer(struct encoder_state_t* const state, const videoframe_
       const int cTid = aps->m_reshapeCW.rspTid;
       bool enableRsp = aps->m_tcase == 5 ? false : (aps->m_tcase < 5 ? (cTid < aps->m_tcase + 1 ? false : true) : (cTid <= 10 - aps->m_tcase ? true : false));
       aps->m_sliceReshapeInfo.sliceReshaperEnableFlag = enableRsp;
+
+      if (aps->m_sliceReshapeInfo.sliceReshaperEnableFlag)
+      {
+        aps->m_binNum = PIC_CODE_CW_BINS;
+        kvz_pixel* picY = &frame->source->y[0];
+        const int width = frame->source->width;
+        const int height = frame->source->height;
+        const int stride = frame->source->stride;
+        uint32_t binCnt[PIC_CODE_CW_BINS] = { 0 };
+        
+        kvz_init_lmcs_seq_stats(&aps->m_srcSeqStats, aps->m_binNum);
+        for (uint32_t y = 0; y < height; y++)
+        {
+          for (uint32_t x = 0; x < width; x++)
+          {
+            const kvz_pixel pxlY = picY[x];
+            int binLen = aps->m_reshapeLUTSize / aps->m_binNum;
+            uint32_t binIdx = (uint32_t)(pxlY / binLen);
+            binCnt[binIdx]++;
+          }
+          picY += stride;
+        }
+
+        for (int b = 0; b < aps->m_binNum; b++)
+        {
+          aps->m_srcSeqStats.binHist[b] = (double)binCnt[b] / (double)(aps->m_reshapeCW.rspPicSize);
+        }
+
+        double avgY = 0.0;
+        double varY = 0.0;
+        picY = &frame->source->y[0];
+        for (int y = 0; y < height; y++)
+        {
+          for (int x = 0; x < width; x++)
+          {
+            avgY += picY[x];
+            varY += (double)picY[x] * (double)picY[x];
+          }
+          picY += stride;
+        }
+        avgY = avgY / (width * height);
+        varY = varY / (width * height) - avgY * avgY;
+
+        if (frame->source->chroma_format != KVZ_CSP_400)
+        {
+          // ToDo: Handle other than YUV 4:2:0
+          assert(frame->source->chroma_format == KVZ_CSP_420);
+
+          kvz_pixel* picU = &frame->source->u[0];
+          kvz_pixel* picV = &frame->source->v[0];
+          const int widthC = frame->source->width>>1;
+          const int heightC = frame->source->height>>1;
+          const int strideC = frame->source->stride>>1;
+          double avgU = 0.0, avgV = 0.0;
+          double varU = 0.0, varV = 0.0;
+          for (int y = 0; y < heightC; y++)
+          {
+            for (int x = 0; x < widthC; x++)
+            {
+              avgU += picU[x];
+              avgV += picV[x];
+              varU += (int64_t)picU[x] * (int64_t)picU[x];
+              varV += (int64_t)picV[x] * (int64_t)picV[x];
+            }
+            picU += strideC;
+            picV += strideC;
+          }
+          avgU = avgU / (widthC * heightC);
+          avgV = avgV / (widthC * heightC);
+          varU = varU / (widthC * heightC) - avgU * avgU;
+          varV = varV / (widthC * heightC) - avgV * avgV;
+          if (varY > 0)
+          {
+            aps->m_srcSeqStats.ratioStdU = sqrt(varU) / sqrt(varY);
+            aps->m_srcSeqStats.ratioStdV = sqrt(varV) / sqrt(varY);
+          }
+        }
+
+        if (aps->m_srcSeqStats.binHist[aps->m_binNum - 1] > 0.0003)
+        {
+          aps->m_sliceReshapeInfo.sliceReshaperEnableFlag = false;
+        }
+        if (aps->m_srcSeqStats.binHist[0] > 0.03)
+        {
+          aps->m_sliceReshapeInfo.sliceReshaperEnableFlag = false;
+        }
+
+        if ((aps->m_srcSeqStats.ratioStdU + aps->m_srcSeqStats.ratioStdV) > 1.5 && aps->m_srcSeqStats.binHist[1] > 0.5)
+        {
+          aps->m_sliceReshapeInfo.sliceReshaperEnableFlag = false;
+        }
+      }
     }
   }
 }
