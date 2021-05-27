@@ -1301,7 +1301,7 @@ void kvz_construct_reshaper_lmcs(lmcs_aps* aps)
       maxAbsDeltaCW = absDeltaCW;
     }
   }
-  aps->m_sliceReshapeInfo.maxNbitsNeededDeltaCW = MAX(1, 1 + kvz_math_floor_log2(maxAbsDeltaCW));
+  aps->m_sliceReshapeInfo.maxNbitsNeededDeltaCW = (maxAbsDeltaCW == 0) ? 1 : MAX(1, 1 + kvz_math_floor_log2(maxAbsDeltaCW));
 
   histLenth = aps->m_initCW;
   log2HistLenth = kvz_math_floor_log2(histLenth);
