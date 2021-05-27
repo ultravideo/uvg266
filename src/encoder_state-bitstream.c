@@ -1116,9 +1116,9 @@ static void kvz_encoder_state_write_bitstream_picture_header(
   }
   if (encoder->cfg.lmcs_enable)
   {
-    WRITE_U(stream, 1, 1, "ph_lmcs_enabled_flag");
- 
-    //if (picHeader->getLmcsEnabledFlag())
+    WRITE_U(stream, state->tile->frame->lmcs_aps->m_sliceReshapeInfo.sliceReshaperEnableFlag, 1, "ph_lmcs_enabled_flag");
+
+    if (state->tile->frame->lmcs_aps->m_sliceReshapeInfo.sliceReshaperEnableFlag)
     {
       WRITE_U(stream, 0, 2, "ph_lmcs_aps_id");
 
