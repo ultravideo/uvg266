@@ -468,8 +468,10 @@ static void encoder_state_write_bitstream_SPS_extension(bitstream_t *stream,
     WRITE_U(stream, 0, 1, "transform_skip_context_enabled_flag");
 
     WRITE_U(stream, 0, 1, "extended_precision_processing_flag");
+    WRITE_U(stream, 0, 1, "sps_ts_residual_coding_rice_present_in_sh_flag");
     WRITE_U(stream, state->encoder_control->cfg.intra_smoothing_disabled, 1, "intra_smoothing_disabled_flag");
     WRITE_U(stream, 0, 1, "high_precision_offsets_enabled_flag");
+    WRITE_U(stream, 0, 1, "rrc_rice_extension_flag");
     WRITE_U(stream, 0, 1, "persistent_rice_adaptation_enabled_flag");
     WRITE_U(stream, 0, 1, "cabac_bypass_alignment_enabled_flag");
  
