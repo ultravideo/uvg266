@@ -811,7 +811,7 @@ int8_t kvz_search_intra_chroma_rdo(encoder_state_t * const state,
                                   int8_t modes[5], int8_t num_modes,
                                   lcu_t *const lcu)
 {
-  const bool reconstruct_chroma = !(x_px & 4 || y_px & 4);
+  const bool reconstruct_chroma = (depth != 4) || (x_px & 4 && y_px & 4);
 
   if (reconstruct_chroma) {
     const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
@@ -860,7 +860,7 @@ int8_t kvz_search_cu_intra_chroma(encoder_state_t * const state,
   int8_t intra_mode = cur_pu->intra.mode;
 
   double costs[5];
-  int8_t modes[5] = { 0, 50, 18, 1, 66 };
+  int8_t modes[5] = { 0, 50, 18, 1, 67 };
   if (intra_mode != 0 && intra_mode != 50 && intra_mode != 18 && intra_mode != 1) {
     modes[4] = intra_mode;
   }
@@ -873,13 +873,13 @@ int8_t kvz_search_cu_intra_chroma(encoder_state_t * const state,
   int num_modes = modes_in_depth[depth];
 
   if (state->encoder_control->cfg.rdo == 3) {
-    num_modes = 5;
+    num_modes = modes[4] == intra_mode ? 5 : 4;
   }
 
   // Don't do rough mode search if all modes are selected.
   // FIXME: It might make more sense to only disable rough search if
   // num_modes is 0.is 0.
-  if (num_modes != 1 && num_modes != 5) {
+  if (num_modes != 1 && num_modes != 5 && num_modes != 4) {
     const int_fast8_t log2_width_c = MAX(LOG2_LCU_WIDTH - depth - 1, 2);
     const vector2d_t pic_px = { state->tile->frame->width, state->tile->frame->height };
     const vector2d_t luma_px = { x_px, y_px };

@@ -678,19 +678,19 @@ static void encode_inter_prediction_unit(encoder_state_t * const state,
 
 static void encode_chroma_intra_cu(cabac_data_t* const cabac, const cu_info_t* const cur_cu, int x, int y, const videoframe_t* const frame, const int cu_width) {
   unsigned pred_mode = 0;
-  unsigned chroma_pred_modes[8] = {0, 50, 18, 1, 67, 68, 69, 70};
+  unsigned chroma_pred_modes[8] = {0, 50, 18, 1, 67, 81, 82, 83};
   const int pu_x = PU_GET_X(cur_cu->part_size, cu_width, x, 0);
   const int pu_y = PU_GET_Y(cur_cu->part_size, cu_width, y, 0);
   const cu_info_t *first_pu = kvz_cu_array_at_const(frame->cu_array, pu_x, pu_y);
   int8_t chroma_intra_dir = first_pu->intra.mode_chroma;
   int8_t luma_intra_dir = first_pu->intra.mode;
 
-  bool derived_mode = 1;// chroma_intra_dir == 70;
+  bool derived_mode = chroma_intra_dir == luma_intra_dir;
   cabac->cur_ctx = &(cabac->ctx.chroma_pred_model);
   CABAC_BIN(cabac, derived_mode ? 0 : 1, "intra_chroma_pred_mode");
 
 
-  if (false/* !derived_mode*/) {
+  if (!derived_mode) {
     /*for (int i = 0; i < 4; i++) {
         if (luma_intra_dir == chroma_pred_modes[i]) {
           chroma_pred_modes[i] = 66;
@@ -737,7 +737,7 @@ static void encode_chroma_intra_cu(cabac_data_t* const cabac, const cu_info_t* c
       }
       else {
         CABAC_BIN(cabac, 1, "intra_chroma_pred_mode");*/
-    CABAC_BINS_EP(cabac, 0/*pred_mode*/, 2, "intra_chroma_pred_mode");
+    CABAC_BINS_EP(cabac, pred_mode, 2, "intra_chroma_pred_mode");
     //}
   }
 }
