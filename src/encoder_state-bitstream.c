@@ -40,6 +40,7 @@
 #include "tables.h"
 #include "threadqueue.h"
 #include "videoframe.h"
+#include "reshape.h"
 
 #define JVET_S0266_VUI_length 1
 #define LUMA_ADAPTIVE_DEBLOCKING_FILTER_QP_OFFSET 1
@@ -451,8 +452,9 @@ static void encoder_state_write_bitstream_VUI(bitstream_t *stream,
 static void encoder_state_write_bitstream_SPS_extension(bitstream_t *stream,
                                                         encoder_state_t * const state)
 {
-    WRITE_U(stream, 1, 1, "sps_extension_present_flag");
-
+  bool extensions_present = state->encoder_control->cfg.intra_smoothing_disabled == 1 ? true : false;
+  WRITE_U(stream, extensions_present, 1, "sps_extension_present_flag");
+  if (extensions_present) {
     WRITE_U(stream, 1, 1, "sps_range_extension_flag");
     WRITE_U(stream, 0, 1, "sps_multilayer_extension_flag");
     WRITE_U(stream, 0, 1, "sps_extension_6bits");
@@ -467,12 +469,13 @@ static void encoder_state_write_bitstream_SPS_extension(bitstream_t *stream,
     WRITE_U(stream, 0, 1, "transform_skip_context_enabled_flag");
 
     WRITE_U(stream, 0, 1, "extended_precision_processing_flag");
+    WRITE_U(stream, 0, 1, "sps_ts_residual_coding_rice_present_in_sh_flag");
     WRITE_U(stream, state->encoder_control->cfg.intra_smoothing_disabled, 1, "intra_smoothing_disabled_flag");
     WRITE_U(stream, 0, 1, "high_precision_offsets_enabled_flag");
+    WRITE_U(stream, 0, 1, "rrc_rice_extension_flag");
     WRITE_U(stream, 0, 1, "persistent_rice_adaptation_enabled_flag");
     WRITE_U(stream, 0, 1, "cabac_bypass_alignment_enabled_flag");
- 
-    
+  }
 }
 
 static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
@@ -631,7 +634,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
       WRITE_U(stream, encoder->cfg.alf_type == KVZ_ALF_FULL, 1, "sps_ccalf_enabled_flag");
     }
 
-    WRITE_U(stream, 0, 1, "sps_lmcs_enable_flag");
+    WRITE_U(stream, encoder->cfg.lmcs_enable, 1, "sps_lmcs_enable_flag");
 
     WRITE_U(stream, 0, 1, "sps_weighted_pred_flag");           // Use of Weighting Prediction (P_SLICE)
     WRITE_U(stream, 0, 1, "sps_weighted_bipred_flag");        // Use of Weighting Bi-Prediction (B_SLICE)
@@ -1111,7 +1114,20 @@ static void kvz_encoder_state_write_bitstream_picture_header(
     state->tile->frame->alf_cc_enable_flag[COMPONENT_Cb] = false;
     state->tile->frame->alf_cc_enable_flag[COMPONENT_Cr] = false;*/
   }
+  if (encoder->cfg.lmcs_enable)
+  {
+    WRITE_U(stream, state->tile->frame->lmcs_aps->m_sliceReshapeInfo.sliceReshaperEnableFlag, 1, "ph_lmcs_enabled_flag");
 
+    if (state->tile->frame->lmcs_aps->m_sliceReshapeInfo.sliceReshaperEnableFlag)
+    {
+      WRITE_U(stream, 0, 2, "ph_lmcs_aps_id");
+
+      if (encoder->chroma_format != KVZ_CSP_400)
+      {
+        WRITE_U(stream, 0, 1, "ph_chroma_residual_scale_flag"); // ToDo: LMCS Enable chroma scaling
+      }
+    }
+  }
   // getDeblockingFilterControlPresentFlag
 
   // END PICTURE HEADER
@@ -1289,7 +1305,7 @@ void kvz_encoder_state_write_bitstream_slice_header(
     }
   }
 
-  if (state->encoder_control->cfg.tmvp_enable) {
+  if (state->frame->slicetype != KVZ_SLICE_I && state->encoder_control->cfg.tmvp_enable) {
     //WRITE_U(stream, ref_negative ? 1 : 0, 1, "slice_temporal_mvp_enabled_flag");
     WRITE_U(stream, 0, 1, "sh_collocated_from_l0_flag");
   }
@@ -1491,7 +1507,9 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
     kvz_bitstream_add_rbsp_trailing_bits(stream);
   }
 
+  kvz_encode_lmcs_adaptive_parameter_set(state);
   // Adaptation parameter set (APS)
+
   kvz_encode_alf_adaptive_parameter_set(state);
 
   encoder_state_write_bitstream_children(state);

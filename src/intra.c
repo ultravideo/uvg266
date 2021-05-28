@@ -614,6 +614,7 @@ static void intra_recon_tb_leaf(
       block = &lcu->rec.v[index];
       break;
   }
+
   kvz_pixels_blit(pred, block , width, width, width, lcu_width);
 }
 

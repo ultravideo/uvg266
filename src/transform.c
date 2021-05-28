@@ -423,6 +423,7 @@ static void quantize_tr_residual(encoder_state_t * const state,
   if (has_coeffs) {
     cbf_set(&cur_pu->cbf, depth, color);
   }
+
 }
 
 /**

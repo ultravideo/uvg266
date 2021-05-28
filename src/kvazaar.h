@@ -299,6 +299,7 @@ typedef struct kvz_config
   double framerate; /*!< \brief Deprecated, will be removed. */
   int32_t framerate_num; /*!< \brief Framerate numerator */
   int32_t framerate_denom; /*!< \brief Framerate denominator */
+  int32_t lmcs_enable;   /*!< \brief Flag to enable luma mapping with chroma scaling - filter */
   int32_t deblock_enable; /*!< \brief Flag to enable deblocking filter */
   enum kvz_sao sao_type;     /*!< \brief Flag to enable sample adaptive offset filter */
   enum kvz_alf alf_type;     /*!< \brief Flag to enable adaptive loop filter */
