@@ -452,8 +452,9 @@ static void encoder_state_write_bitstream_VUI(bitstream_t *stream,
 static void encoder_state_write_bitstream_SPS_extension(bitstream_t *stream,
                                                         encoder_state_t * const state)
 {
-    WRITE_U(stream, 1, 1, "sps_extension_present_flag");
-
+  bool extensions_present = state->encoder_control->cfg.intra_smoothing_disabled == 1 ? true : false;
+  WRITE_U(stream, extensions_present, 1, "sps_extension_present_flag");
+  if (extensions_present) {
     WRITE_U(stream, 1, 1, "sps_range_extension_flag");
     WRITE_U(stream, 0, 1, "sps_multilayer_extension_flag");
     WRITE_U(stream, 0, 1, "sps_extension_6bits");
@@ -474,8 +475,7 @@ static void encoder_state_write_bitstream_SPS_extension(bitstream_t *stream,
     WRITE_U(stream, 0, 1, "rrc_rice_extension_flag");
     WRITE_U(stream, 0, 1, "persistent_rice_adaptation_enabled_flag");
     WRITE_U(stream, 0, 1, "cabac_bypass_alignment_enabled_flag");
- 
-    
+  }
 }
 
 static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
