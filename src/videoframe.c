@@ -26,7 +26,6 @@
 #include "sao.h"
 #include "alf.h"
 
-
 /**
  * \brief Allocate new frame
  * \param pic picture pointer
@@ -55,7 +54,6 @@ videoframe_t * kvz_videoframe_alloc(int32_t width,
     kvz_alf_create(frame, chroma_format);
   }
 
-
   return frame;
 }
 
@@ -66,10 +64,19 @@ videoframe_t * kvz_videoframe_alloc(int32_t width,
  */
 int kvz_videoframe_free(videoframe_t * const frame)
 {
+  if (frame->source_lmcs_mapped) {
+    kvz_image_free(frame->source_lmcs);
+    kvz_image_free(frame->rec_lmcs);
+    frame->source_lmcs_mapped = false;
+  }
+
   kvz_image_free(frame->source);
   frame->source = NULL;
   kvz_image_free(frame->rec);
   frame->rec = NULL;
+
+  frame->source_lmcs = NULL;
+  frame->rec_lmcs = NULL;
 
   kvz_cu_array_free(&frame->cu_array);
 

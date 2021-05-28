@@ -100,6 +100,8 @@ libkvazaar_la_SOURCES = \
 	rate_control.h \
 	rdo.c \
 	rdo.h \
+	reshape.c \
+	reshape.h \
 	sao.c \
 	sao.h \
 	scalinglist.c \

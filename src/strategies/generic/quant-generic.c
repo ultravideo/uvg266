@@ -30,6 +30,7 @@
 #include "strategyselector.h"
 #include "transform.h"
 #include "fast_coeff_cost.h"
+#include "reshape.h"
 
 #define QUANT_SHIFT 14
 /**

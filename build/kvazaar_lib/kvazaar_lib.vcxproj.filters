@@ -195,6 +195,9 @@
     <ClCompile Include="..\..\src\rate_control.c">
       <Filter>Control</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\reshape.c">
+      <Filter>Reconstruction</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\src\sao.c">
       <Filter>Reconstruction</Filter>
     </ClCompile>
@@ -314,6 +317,9 @@
       <Filter>Reconstruction</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\intra.h">
+      <Filter>Reconstruction</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\reshape.h">
       <Filter>Reconstruction</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\sao.h">

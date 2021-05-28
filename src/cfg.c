@@ -48,6 +48,7 @@ int kvz_config_init(kvz_config *cfg)
   cfg->intra_qp_offset_auto = true;
   cfg->intra_period    = 64;
   cfg->vps_period      = 0;
+  cfg->lmcs_enable     = 0;
   cfg->deblock_enable  = 0;
   cfg->deblock_beta    = 0;
   cfg->deblock_tc      = 0;
@@ -882,6 +883,9 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     cfg->vps_period = atoi(value);
   else if OPT("ref")
     cfg->ref_frames = atoi(value);
+  else if OPT("lmcs") {
+    cfg->lmcs_enable = atobool(value);
+  }
   else if OPT("deblock") {
     int beta, tc;
     if (2 == sscanf(value, "%d:%d", &beta, &tc)) {
