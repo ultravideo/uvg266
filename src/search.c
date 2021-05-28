@@ -943,8 +943,15 @@ static void init_lcu_t(const encoder_state_t * const state, const int x, const i
     int x_max_c = x_max / 2;
     int y_max_c = y_max / 2;
 
+    kvz_pixel* source = NULL;
+    if (state->tile->frame->lmcs_aps->m_sliceReshapeInfo.sliceReshaperEnableFlag) {
+      source = frame->source_lmcs->y;
+    } else {
+      source = frame->source->y;
+    }
+
     // Use LMCS pixels for luma if they are available, otherwise source_lmcs is mapped to normal source
-    kvz_pixels_blit(&frame->source_lmcs->y[x + y * frame->source->stride], lcu->ref.y,
+    kvz_pixels_blit(&source[x + y * frame->source->stride], lcu->ref.y,
                         x_max, y_max, frame->source->stride, LCU_WIDTH);
     if (state->encoder_control->chroma_format != KVZ_CSP_400) {
       kvz_pixels_blit(&frame->source->u[x_c + y_c * frame->source->stride / 2], lcu->ref.u,
