@@ -85,16 +85,16 @@ static double get_cost(encoder_state_t * const state,
 
     // Add the offset bit costs of signaling 'luma and chroma use trskip',
     // versus signaling 'luma and chroma don't use trskip' to the SAD cost.
-    //const cabac_ctx_t *ctx = &state->cabac.ctx.transform_skip_model_luma;
-    double trskip_bits = 0.0;// CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0);
+    const cabac_ctx_t *ctx = &state->cabac.ctx.transform_skip_model_luma;
+    double trskip_bits = CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0);
 
-    /*
+    
     // ToDo: Check cost
     if (state->encoder_control->chroma_format != KVZ_CSP_400) {
       ctx = &state->cabac.ctx.transform_skip_model_chroma;
       trskip_bits += 2.0 * (CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0));
     }
-    */
+    
 
     double sad_cost = TRSKIP_RATIO * sad_func(pred, orig_block) + state->lambda_sqrt * trskip_bits;
     if (sad_cost < satd_cost) {
@@ -124,6 +124,7 @@ static void get_cost_dual(encoder_state_t * const state,
   costs_out[0] = (double)satd_costs[0];
   costs_out[1] = (double)satd_costs[1];
 
+  // TODO: width and height
   if (TRSKIP_RATIO != 0 && width == 4 && state->encoder_control->cfg.trskip_enable) {
     // If the mode looks better with SAD than SATD it might be a good
     // candidate for transform skip. How much better SAD has to be is
@@ -131,16 +132,16 @@ static void get_cost_dual(encoder_state_t * const state,
 
     // Add the offset bit costs of signaling 'luma and chroma use trskip',
     // versus signaling 'luma and chroma don't use trskip' to the SAD cost.
-    //const cabac_ctx_t *ctx = &state->cabac.ctx.transform_skip_model_luma;
-    double trskip_bits = 0.0;// CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0);
+    const cabac_ctx_t *ctx = &state->cabac.ctx.transform_skip_model_luma;
+    double trskip_bits = CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0);
 
-    /*
+    
     // ToDo: check cost
     if (state->encoder_control->chroma_format != KVZ_CSP_400) {
       ctx = &state->cabac.ctx.transform_skip_model_chroma;
       trskip_bits += 2.0 * (CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0));
     }
-    */
+    
 
     unsigned unsigned_sad_costs[PARALLEL_BLKS] = { 0 };
     double sad_costs[PARALLEL_BLKS] = { 0 };
@@ -256,7 +257,7 @@ static double search_intra_trdepth(encoder_state_t * const state,
   const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
   cu_info_t *const tr_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
 
-  const bool reconstruct_chroma = !(x_px & 4 || y_px & 4) && state->encoder_control->chroma_format != KVZ_CSP_400;
+  const bool reconstruct_chroma = (depth != 4 || (depth == 4 && (x_px & 4 && y_px & 4))) && state->encoder_control->chroma_format != KVZ_CSP_400;
 
   struct {
     kvz_pixel y[TR_MAX_WIDTH*TR_MAX_WIDTH];
@@ -285,7 +286,7 @@ static double search_intra_trdepth(encoder_state_t * const state,
     double best_rd_cost = MAX_INT;
     int best_tr_idx = 0;
 
-    int trafo = 0;
+    int trafo;
     int num_transforms = 1;
     if (mts_mode != -1)
     {
@@ -297,6 +298,10 @@ static double search_intra_trdepth(encoder_state_t * const state,
       trafo = 0;
       num_transforms = (mts_enabled ? MTS_TR_NUM : 1);
     }
+    //TODO: height
+    if(state->encoder_control->cfg.trskip_enable && width == 4 /*&& height == 4*/) {
+      num_transforms = MAX(num_transforms, 2);
+    }
     for (; trafo < num_transforms; trafo++) {
       pred_cu->tr_idx = trafo;
       if (mts_enabled)
@@ -304,8 +309,9 @@ static double search_intra_trdepth(encoder_state_t * const state,
         pred_cu->mts_last_scan_pos = 0;
         pred_cu->violates_mts_coeff_constraint = 0;
 
-        if (trafo == MTS_SKIP) {
-          //TODO: Consider tranform skip
+        if (trafo == MTS_SKIP && width != 4) {
+          //TODO: parametrize that this is not hardcoded
+          // TODO: this probably should currently trip for chroma?
           continue;
         }
       }
@@ -316,7 +322,8 @@ static double search_intra_trdepth(encoder_state_t * const state,
         intra_mode, chroma_mode,
         pred_cu, lcu);
 
-      if (pred_cu->tr_idx > 0)
+      // TODO: Not sure if this should be 0 or 1 but at least seems to work with 1
+      if (pred_cu->tr_idx > 1)
       {
         derive_mts_constraints(pred_cu, lcu, depth, lcu_px);
         if (pred_cu->violates_mts_coeff_constraint || !pred_cu->mts_last_scan_pos)
@@ -336,7 +343,7 @@ static double search_intra_trdepth(encoder_state_t * const state,
         best_tr_idx = pred_cu->tr_idx;
       }
     }
-
+    pred_cu->tr_skip = best_tr_idx == MTS_SKIP;
     pred_cu->tr_idx = best_tr_idx;
     nosplit_cost += best_rd_cost;
 
@@ -804,7 +811,7 @@ int8_t kvz_search_intra_chroma_rdo(encoder_state_t * const state,
                                   int8_t modes[5], int8_t num_modes,
                                   lcu_t *const lcu)
 {
-  const bool reconstruct_chroma = !(x_px & 4 || y_px & 4);
+  const bool reconstruct_chroma = (depth != 4) || (x_px & 4 && y_px & 4);
 
   if (reconstruct_chroma) {
     const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
@@ -853,7 +860,7 @@ int8_t kvz_search_cu_intra_chroma(encoder_state_t * const state,
   int8_t intra_mode = cur_pu->intra.mode;
 
   double costs[5];
-  int8_t modes[5] = { 0, 50, 18, 1, 66 };
+  int8_t modes[5] = { 0, 50, 18, 1, 67 };
   if (intra_mode != 0 && intra_mode != 50 && intra_mode != 18 && intra_mode != 1) {
     modes[4] = intra_mode;
   }
@@ -866,13 +873,13 @@ int8_t kvz_search_cu_intra_chroma(encoder_state_t * const state,
   int num_modes = modes_in_depth[depth];
 
   if (state->encoder_control->cfg.rdo == 3) {
-    num_modes = 5;
+    num_modes = modes[4] == intra_mode ? 5 : 4;
   }
 
   // Don't do rough mode search if all modes are selected.
   // FIXME: It might make more sense to only disable rough search if
   // num_modes is 0.is 0.
-  if (num_modes != 1 && num_modes != 5) {
+  if (num_modes != 1 && num_modes != 5 && num_modes != 4) {
     const int_fast8_t log2_width_c = MAX(LOG2_LCU_WIDTH - depth - 1, 2);
     const vector2d_t pic_px = { state->tile->frame->width, state->tile->frame->height };
     const vector2d_t luma_px = { x_px, y_px };

@@ -125,6 +125,8 @@ typedef int16_t coeff_t;
 // VVC flags
 #define RDPCM 1
 
+#define MIN_QP_PRIME_TS 2
+
 //! Limits for prediction block sizes. 0 = 64x64, 4 = 4x4.
 #define PU_DEPTH_INTER_MIN 0
 #define PU_DEPTH_INTER_MAX 3

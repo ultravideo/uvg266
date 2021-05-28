@@ -157,7 +157,7 @@ void kvz_transformskip(const encoder_control_t * const encoder, int16_t *block,i
   for (j = 0; j < block_size; j++) {
     for(k = 0; k < block_size; k ++) {
       // Casting back and forth to make UBSan not trigger due to left-shifting negatives
-      coeff[j * block_size + k] = (int16_t)((uint16_t)(block[j * block_size + k]) << shift);
+      coeff[j * block_size + k] = (int16_t)((uint16_t)(block[j * block_size + k]));
     }
   }
 }
@@ -177,7 +177,7 @@ void kvz_itransformskip(const encoder_control_t * const encoder, int16_t *block,
   offset = (1 << (shift -1)); // For rounding
   for ( j = 0; j < block_size; j++ ) {
     for(k = 0; k < block_size; k ++) {
-      block[j * block_size + k] =  (coeff[j * block_size + k] + offset) >> shift;
+      block[j * block_size + k] =  coeff[j * block_size + k];
     }
   }
 }
@@ -259,12 +259,12 @@ int kvz_quantize_residual_trskip(
 
   const int bit_cost = (int)(state->lambda + 0.5);
   
-  noskip.has_coeffs = kvz_quantize_residual(
-      state, cur_cu, width, color, scan_order,
-      0, in_stride, 4,
-      ref_in, pred_in, noskip.rec, noskip.coeff, false);
-  noskip.cost = kvz_pixels_calc_ssd(ref_in, noskip.rec, in_stride, 4, 4);
-  noskip.cost += kvz_get_coeff_cost(state, noskip.coeff, 4, 0, scan_order) * bit_cost;
+  //noskip.has_coeffs = kvz_quantize_residual(
+  //    state, cur_cu, width, color, scan_order,
+  //    0, in_stride, 4,
+  //    ref_in, pred_in, noskip.rec, noskip.coeff, false);
+  //noskip.cost = kvz_pixels_calc_ssd(ref_in, noskip.rec, in_stride, 4, 4);
+  //noskip.cost += kvz_get_coeff_cost(state, noskip.coeff, 4, 0, scan_order) * bit_cost;
 
   skip.has_coeffs = kvz_quantize_residual(
     state, cur_cu, width, color, scan_order,
@@ -273,10 +273,10 @@ int kvz_quantize_residual_trskip(
   skip.cost = kvz_pixels_calc_ssd(ref_in, skip.rec, in_stride, 4, 4);
   skip.cost += kvz_get_coeff_cost(state, skip.coeff, 4, 0, scan_order) * bit_cost;
 
-  if (noskip.cost <= skip.cost) {
+/*  if (noskip.cost <= skip.cost) {
     *trskip_out = 0;
     best = &noskip;
-  } else {
+  } else */{
     *trskip_out = 1;
     best = &skip;
   }
@@ -365,7 +365,8 @@ static void quantize_tr_residual(encoder_state_t * const state,
 
   const bool can_use_trskip = tr_width == 4 &&
                               color == COLOR_Y &&
-                              cfg->trskip_enable;
+                              cfg->trskip_enable && 
+                              cur_pu->tr_idx == 1;
 
   bool has_coeffs;
 

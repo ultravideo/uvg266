@@ -89,6 +89,176 @@ static void encode_mts_idx(encoder_state_t * const state,
   }
 }
 
+static void encode_ts_residual(encoder_state_t* const state,
+  cabac_data_t* const cabac,
+  const coeff_t* coeff,
+  uint8_t width,
+  uint8_t type,
+  int8_t scan_mode) {
+  //const encoder_control_t * const encoder = state->encoder_control;
+  //int c1 = 1;
+  int32_t i;
+  int32_t blk_pos;
+  // ToDo: large block support in VVC?
+  uint32_t sig_coeffgroup_flag[32 * 32] = { 0 };
+  
+
+  // CONSTANTS
+
+  const uint32_t log2_block_size = kvz_g_convert_to_bit[width] + 2;
+  const uint32_t log2_cg_size = kvz_g_log2_sbb_size[log2_block_size][log2_block_size][0] + kvz_g_log2_sbb_size[log2_block_size][log2_block_size][1];
+  const uint32_t* scan =
+    kvz_g_sig_last_scan[scan_mode][log2_block_size - 1];
+  const uint32_t* scan_cg = g_sig_last_scan_cg[log2_block_size - 1][scan_mode];
+
+
+  // Init base contexts according to block type
+  cabac_ctx_t* base_coeff_group_ctx = &(cabac->ctx.sig_coeff_group_model[(type == 0 ? 0 : 1) * 2 + 1]);
+
+  cabac->cur_ctx = base_coeff_group_ctx;
+  
+  int maxCtxBins = (width * width * 7) >> 2;
+  unsigned scan_cg_last = -1;
+  unsigned scan_pos_last = -1;
+
+  for (int i = 0; i < width * width; i++) {
+    if (coeff[scan[i]]) {
+      scan_pos_last = i;
+      sig_coeffgroup_flag[scan_cg[i >> log2_cg_size]] = 1;
+    }
+  }
+  scan_cg_last = scan_pos_last >> log2_cg_size;
+  
+
+  for (i = 0; i <= (width * width - 1) >> log2_cg_size; i++) {
+    if (!(i == 0 || i ==scan_cg_last)) {
+      if(!sig_coeffgroup_flag[scan_cg[i]]) {
+        CABAC_BIN(cabac, 0, "sb_coded_flag");
+        continue;
+      }
+      CABAC_BIN(cabac, 1, "sb_coded_flag");
+    }
+
+    int firstSigPos = i << log2_cg_size;
+    int min_sub_pos = firstSigPos + (1 << log2_cg_size) - 1;
+    int nextSigPos = firstSigPos;
+
+    //===== encode absolute values =====
+    const int inferSigPos = min_sub_pos;
+    int       remAbsLevel = -1;
+    int       numNonZero = 0;
+
+    int rightPixel, belowPixel, modAbsCoeff;
+
+    int lastScanPosPass1 = -1;
+    int lastScanPosPass2 = -1;
+    for (; nextSigPos <= min_sub_pos && maxCtxBins >= 4; nextSigPos++)
+    {
+      blk_pos = scan[nextSigPos];
+      int pos_x = blk_pos % width;
+      int pos_y = blk_pos / width;
+      coeff_t curr_coeff = coeff[blk_pos];
+      unsigned  sigFlag = (curr_coeff != 0);
+      if (numNonZero || nextSigPos != inferSigPos)
+      {
+        cabac->cur_ctx = &cabac->ctx.transform_skip_sig[
+          kvz_context_get_sig_ctx_idx_abs_ts(coeff, pos_x, pos_y, width)
+        ];
+        CABAC_BIN(cabac, sigFlag, "sig_coeff_flag");
+        maxCtxBins--;
+      }
+
+      if (sigFlag)
+      {
+        //===== encode sign's =====
+        int sign = curr_coeff < 0;
+        cabac->cur_ctx = &cabac->ctx.transform_skip_res_sign[
+          kvz_sign_ctx_id_abs_ts(coeff, pos_x, pos_y, width, 0)
+        ];
+        CABAC_BIN(cabac, sign, "coeff_sign_flag");
+        maxCtxBins--;
+        numNonZero++;
+
+        rightPixel = pos_x > 0 ? coeff[pos_x + pos_y * width - 1] : 0;
+        belowPixel = pos_y > 0 ? coeff[pos_x + (pos_y - 1) * width] : 0;
+
+        modAbsCoeff = kvz_derive_mod_coeff(rightPixel, belowPixel, abs(curr_coeff), 0);
+
+        remAbsLevel = modAbsCoeff - 1;
+
+        unsigned gt1 = !!remAbsLevel;
+        cabac->cur_ctx = &cabac->ctx.transform_skip_gt1[
+          kvz_lrg1_ctx_id_abs_ts(coeff, pos_x, pos_y, width, 0)
+        ];
+        CABAC_BIN(cabac, gt1, "abs_level_gtx_flag");
+        maxCtxBins--;
+
+        if (gt1)
+        {
+          remAbsLevel -= 1;
+          cabac->cur_ctx = &cabac->ctx.transform_skip_par;
+          CABAC_BIN(cabac, remAbsLevel & 1, "par_level_flag");
+          maxCtxBins--;
+        }
+      }
+      lastScanPosPass1 = nextSigPos;
+    }
+
+
+    int cutoffVal = 2;
+    int numGtBins = 4;
+    for (int scanPos = firstSigPos; scanPos <= min_sub_pos && maxCtxBins >= 4; scanPos++)
+    {
+      blk_pos = scan[scanPos];
+      int pos_x = blk_pos % width;
+      int pos_y = blk_pos / width;
+      unsigned absLevel;
+      rightPixel = pos_x > 0 ? coeff[pos_x + pos_y * width - 1] : 0;
+      belowPixel = pos_y > 0 ? coeff[pos_x + (pos_y - 1) * width] : 0;
+      absLevel = kvz_derive_mod_coeff(rightPixel, belowPixel, abs(coeff[blk_pos]), 0);
+      cutoffVal = 2;
+      for (int i = 0; i < numGtBins; i++)
+      {
+        if (absLevel >= cutoffVal)
+        {
+          unsigned gt2 = (absLevel >= (cutoffVal + 2));
+          cabac->cur_ctx = &cabac->ctx.transform_skip_gt2[cutoffVal >> 1];
+          CABAC_BIN(cabac, gt2, "abs_level_gtx_flag");
+          maxCtxBins--;
+        }
+        cutoffVal += 2;
+      }
+      lastScanPosPass2 = scanPos;
+    }
+
+    //===== coeff bypass ====
+    for (int scanPos = firstSigPos; scanPos <= min_sub_pos; scanPos++)
+    {
+      blk_pos = scan[scanPos];
+      int pos_x = blk_pos % width;
+      int pos_y = blk_pos / width;
+      unsigned absLevel;
+      rightPixel = pos_x > 0 ? coeff[pos_x + pos_y * width - 1] : 0;
+      belowPixel = pos_y > 0 ? coeff[pos_x + (pos_y - 1) * width] : 0;
+      cutoffVal = (scanPos <= lastScanPosPass2 ? 10 : (scanPos <= lastScanPosPass1 ? 2 : 0));
+      absLevel = kvz_derive_mod_coeff(rightPixel, belowPixel, abs(coeff[blk_pos]), 0 || !cutoffVal);
+      
+      if (absLevel >= cutoffVal)
+      {
+        int       rice = 1;
+        unsigned  rem = scanPos <= lastScanPosPass1 ? (absLevel - cutoffVal) >> 1 : absLevel;
+        kvz_cabac_write_coeff_remain(cabac, rem, rice, 5);
+
+        if (absLevel && scanPos > lastScanPosPass1)
+        {
+          int sign = coeff[blk_pos] < 0;
+          CABAC_BIN_EP(cabac, sign, "coeff_sign_flag");
+        }
+      }
+    }
+  }
+}
+
 /**
  * \brief Encode (X,Y) position of the last significant coefficient
  *
@@ -162,16 +332,27 @@ void kvz_encode_last_significant_xy(cabac_data_t * const cabac,
 static void encode_chroma_tu(encoder_state_t* const state, int x, int y, int depth, const uint8_t width_c, const cu_info_t* cur_pu, int8_t* scan_idx) {
   int x_local = (x >> 1) % LCU_WIDTH_C;
   int y_local = (y >> 1) % LCU_WIDTH_C;
+  cabac_data_t* const cabac = &state->cabac;
   *scan_idx = kvz_get_scan_order(cur_pu->type, cur_pu->intra.mode_chroma, depth);
 
   const coeff_t *coeff_u = &state->coeff->u[xy_to_zorder(LCU_WIDTH_C, x_local, y_local)];
   const coeff_t *coeff_v = &state->coeff->v[xy_to_zorder(LCU_WIDTH_C, x_local, y_local)];
 
   if (cbf_is_set(cur_pu->cbf, depth, COLOR_U)) {
+    if(state->encoder_control->cfg.trskip_enable && width_c == 4){
+      cabac->cur_ctx = &cabac->ctx.transform_skip_model_chroma;
+      // HEVC only supports transform_skip for Luma
+      // TODO: transform skip for chroma blocks
+      CABAC_BIN(cabac, 0, "transform_skip_flag");
+    }
     kvz_encode_coeff_nxn(state, &state->cabac, coeff_u, width_c, 1, *scan_idx, NULL, false);
   }
 
   if (cbf_is_set(cur_pu->cbf, depth, COLOR_V)) {
+    if (state->encoder_control->cfg.trskip_enable && width_c == 4) {
+      cabac->cur_ctx = &cabac->ctx.transform_skip_model_chroma;
+      CABAC_BIN(cabac, 0, "transform_skip_flag");
+    }
     kvz_encode_coeff_nxn(state, &state->cabac, coeff_v, width_c, 2, *scan_idx, NULL, false);
   }
 }
@@ -182,6 +363,7 @@ static void encode_transform_unit(encoder_state_t * const state,
   assert(depth >= 1 && depth <= MAX_PU_DEPTH);
 
   const videoframe_t * const frame = state->tile->frame;
+  cabac_data_t* const cabac = &state->cabac;
   const uint8_t width = LCU_WIDTH >> depth;
   const uint8_t width_c = (depth == MAX_PU_DEPTH ? width : width / 2);
 
@@ -209,14 +391,24 @@ static void encode_transform_unit(encoder_state_t * const state,
     // CoeffNxN
     // Residual Coding
 
-    kvz_encode_coeff_nxn(state,
-                         &state->cabac,
-                         coeff_y,
-                         width,
-                         0,
-                         scan_idx,
-                         cur_pu,
-                         true);
+    if(state->encoder_control->cfg.trskip_enable && width == 4) {
+      cabac->cur_ctx = &cabac->ctx.transform_skip_model_luma;
+      CABAC_BIN(cabac, cur_pu->tr_idx == MTS_SKIP, "transform_skip_flag");
+
+    }
+    if(cur_pu->tr_idx == MTS_SKIP) {
+      encode_ts_residual(state, cabac, coeff_y, width, 0, scan_idx);      
+    }
+    else {
+      kvz_encode_coeff_nxn(state,
+                           cabac,
+                           coeff_y,
+                           width,
+                           0,
+                           scan_idx,
+                           cur_pu,
+                           true);
+    }
   }
 
   if (depth == MAX_DEPTH) {
@@ -486,19 +678,19 @@ static void encode_inter_prediction_unit(encoder_state_t * const state,
 
 static void encode_chroma_intra_cu(cabac_data_t* const cabac, const cu_info_t* const cur_cu, int x, int y, const videoframe_t* const frame, const int cu_width) {
   unsigned pred_mode = 0;
-  unsigned chroma_pred_modes[8] = {0, 50, 18, 1, 67, 68, 69, 70};
+  unsigned chroma_pred_modes[8] = {0, 50, 18, 1, 67, 81, 82, 83};
   const int pu_x = PU_GET_X(cur_cu->part_size, cu_width, x, 0);
   const int pu_y = PU_GET_Y(cur_cu->part_size, cu_width, y, 0);
   const cu_info_t *first_pu = kvz_cu_array_at_const(frame->cu_array, pu_x, pu_y);
   int8_t chroma_intra_dir = first_pu->intra.mode_chroma;
   int8_t luma_intra_dir = first_pu->intra.mode;
 
-  bool derived_mode = 1;// chroma_intra_dir == 70;
+  bool derived_mode = chroma_intra_dir == luma_intra_dir;
   cabac->cur_ctx = &(cabac->ctx.chroma_pred_model);
   CABAC_BIN(cabac, derived_mode ? 0 : 1, "intra_chroma_pred_mode");
 
 
-  if (false/* !derived_mode*/) {
+  if (!derived_mode) {
     /*for (int i = 0; i < 4; i++) {
         if (luma_intra_dir == chroma_pred_modes[i]) {
           chroma_pred_modes[i] = 66;
@@ -545,7 +737,7 @@ static void encode_chroma_intra_cu(cabac_data_t* const cabac, const cu_info_t* c
       }
       else {
         CABAC_BIN(cabac, 1, "intra_chroma_pred_mode");*/
-    CABAC_BINS_EP(cabac, 0/*pred_mode*/, 2, "intra_chroma_pred_mode");
+    CABAC_BINS_EP(cabac, pred_mode, 2, "intra_chroma_pred_mode");
     //}
   }
 }

@@ -314,6 +314,61 @@ static const uint8_t INIT_CU_TRANSQUANT_BYPASS[4][1] = {
   { DWS, },
 };
 
+static const uint8_t INIT_TRANSFORM_SKIP[4][2] = {
+  {  25,  17, },
+  {  25,   9, },
+  {  25,   9, },
+  {   1,   1, },
+};
+
+static const uint8_t INIT_TRANSFORM_SKIP_SIG_COEFF[4][3] =
+{
+  {  18,  35,  45, },
+  {  18,  12,  29, },
+  {  18,  20,  38, },
+  {   5,   8,   8, },
+  };
+
+static const uint8_t INIT_TRANSFORM_SKIP_SIG[4][3] = 
+{
+  {  25,  50,  37, },
+  {  40,  35,  44, },
+  {  25,  28,  38, },
+  {  13,  13,   8, },
+  };
+
+static const uint8_t INIT_TRANSFORM_SKIP_PARITY[4][1] = 
+{
+  {  11, },
+  {   3, },
+  {  11, },
+  {   6, },
+  };
+
+static const uint8_t INIT_TRANSFORM_SKIP_GT2[4][5] = 
+{
+  { CNU,   3,   4,   4,   5, },
+  { CNU,   2,  10,   3,   3, },
+  { CNU,  10,   3,   3,   3, },
+  { DWS,   1,   1,   1,   1, },
+  };
+
+static const uint8_t INIT_TRANSFORM_SKIP_GT1[4][4] = 
+{
+  {  19,  11,   4,   6, },
+  {  18,  11,   4,  28, },
+  {  11,   5,   5,  14, },
+  {   4,   2,   1,   6, },
+  };
+
+static const uint8_t INIT_TRANSFORM_SKIP_RES_SIGN[4][6] = 
+{
+  {  35,  25,  46,  28,  33,  38, },
+  {   5,  10,  53,  43,  25,  46, },
+  {  12,  17,  46,  28,  25,  46, },
+  {   1,   4,   4,   5,   8,   8, },
+  };
+
 static const uint8_t INIT_INTRA_SUBPART_MODE[4][2] = {
   {  33,  43, },
   {  33,  36, },
@@ -387,8 +442,11 @@ void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
   kvz_ctx_init(&cabac->ctx.intra_subpart_model[0], QP, INIT_INTRA_SUBPART_MODE[slice][0], INIT_INTRA_SUBPART_MODE[3][0]);
   kvz_ctx_init(&cabac->ctx.intra_subpart_model[1], QP, INIT_INTRA_SUBPART_MODE[slice][1], INIT_INTRA_SUBPART_MODE[3][1]);
 
-  
+  kvz_ctx_init(&cabac->ctx.transform_skip_model_luma, QP, INIT_TRANSFORM_SKIP[slice][0], INIT_TRANSFORM_SKIP[3][0]);
+  kvz_ctx_init(&cabac->ctx.transform_skip_model_chroma, QP, INIT_TRANSFORM_SKIP[slice][1], INIT_TRANSFORM_SKIP[3][1]);
 
+  kvz_ctx_init(&cabac->ctx.transform_skip_par, QP, INIT_TRANSFORM_SKIP_PARITY[slice][0], INIT_TRANSFORM_SKIP_PARITY[3][0]);
+  
   kvz_ctx_init(&cabac->ctx.multi_ref_line[0], QP, MULTI_REF_LINE_MODE[slice][0], MULTI_REF_LINE_MODE[3][0]);
   kvz_ctx_init(&cabac->ctx.multi_ref_line[1], QP, MULTI_REF_LINE_MODE[slice][1], MULTI_REF_LINE_MODE[3][1]);
 
@@ -398,21 +456,26 @@ void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
   for (i = 0; i < 3; i++) {
     kvz_ctx_init(&cabac->ctx.cu_skip_flag_model[i], QP, INIT_SKIP_FLAG[slice][i], INIT_SKIP_FLAG[3][i]);
     kvz_ctx_init(&cabac->ctx.joint_bc_br[i], QP, INIT_JOINT_CB_CR_FLAG[slice][i], INIT_JOINT_CB_CR_FLAG[3][i]);   
+    kvz_ctx_init(&cabac->ctx.transform_skip_sig_coeff[i], QP, INIT_TRANSFORM_SKIP_SIG_COEFF[slice][i], INIT_TRANSFORM_SKIP_SIG_COEFF[3][i]);
+    kvz_ctx_init(&cabac->ctx.transform_skip_sig[i], QP, INIT_TRANSFORM_SKIP_SIG[slice][i], INIT_TRANSFORM_SKIP_SIG[3][i]);
   }
 
   for (i = 0; i < 4; i++) {
     kvz_ctx_init(&cabac->ctx.sig_coeff_group_model[i], QP, INIT_SIG_COEFF_GROUP[slice][i], INIT_SIG_COEFF_GROUP[3][i]);
     kvz_ctx_init(&cabac->ctx.mts_idx_model[i], QP, INIT_MTS_IDX[slice][i], INIT_MTS_IDX[3][i]);
+    kvz_ctx_init(&cabac->ctx.transform_skip_gt1[i], QP, INIT_TRANSFORM_SKIP_GT1[slice][i], INIT_TRANSFORM_SKIP_GT1[3][i]);
   }
 
+  for (i = 0; i < 5; i++) {
+    kvz_ctx_init(&cabac->ctx.transform_skip_gt2[i], QP, INIT_TRANSFORM_SKIP_GT2[slice][i], INIT_TRANSFORM_SKIP_GT2[3][i]);
+  }
 
   for (i = 0; i < 6; i++) {
     kvz_ctx_init(&cabac->ctx.qt_split_flag_model[i], QP, INIT_QT_SPLIT_FLAG[slice][i], INIT_QT_SPLIT_FLAG[3][i]);
     kvz_ctx_init(&cabac->ctx.alf_cc_filter_control_flag[i], QP, INIT_CC_ALF_FILTER_CONTROL_FLAG[slice][i], INIT_CC_ALF_FILTER_CONTROL_FLAG[3][i]);
+    kvz_ctx_init(&cabac->ctx.transform_skip_res_sign[i], QP, INIT_TRANSFORM_SKIP_RES_SIGN[slice][i], INIT_TRANSFORM_SKIP_RES_SIGN[3][i]);
   }
-
-
-
+ 
   for (i = 0; i < 9; i++) {
     kvz_ctx_init(&cabac->ctx.split_flag_model[i], QP, INIT_SPLIT_FLAG[slice][i], INIT_SPLIT_FLAG[3][i]);
     kvz_ctx_init(&cabac->ctx.alf_ctb_flag_model[i], QP, INIT_CTB_ALF_FLAG[slice][i], INIT_CTB_ALF_FLAG[3][i]);
@@ -553,6 +616,114 @@ uint32_t kvz_context_get_sig_ctx_idx_abs(const coeff_t* coeff, int32_t pos_x, in
   *temp_diag = diag;
   *temp_sum = sum_abs - num_pos;
   return ctx_ofs;
+}
+
+uint32_t kvz_context_get_sig_ctx_idx_abs_ts(const coeff_t* coeff, int32_t pos_x, int32_t pos_y, uint32_t width)
+{
+  const coeff_t* data = coeff + pos_x + pos_y * width;
+  int             numPos = 0;
+#define UPDATE(x) {coeff_t a=abs(x);numPos+=!!a;}
+  if (pos_x > 0)
+  {
+    UPDATE(data[-1]);
+  }
+  if (pos_y > 0)
+  {
+    UPDATE(data[-(int)width]);
+  }
+#undef UPDATE
+
+  return numPos;
+}
+
+uint32_t kvz_sign_ctx_id_abs_ts(const coeff_t* coeff, int32_t pos_x, int32_t pos_y, int32_t width, int bdpcm)
+{
+  const coeff_t* pData = coeff + pos_x + pos_y * width;
+
+  int rightSign = 0, belowSign = 0;
+  unsigned signCtx = 0;
+
+#define SGN(val) ((0 < (val)) - ((val) < 0))
+  if (pos_x > 0)
+  {
+    rightSign = SGN(pData[-1]);
+  }
+  if (pos_y > 0)
+  {
+    belowSign = SGN(pData[-(int)width]);
+  }
+#undef SGN
+
+  if ((rightSign == 0 && belowSign == 0) || ((rightSign * belowSign) < 0))
+  {
+    signCtx = 0;
+  }
+  else if (rightSign >= 0 && belowSign >= 0)
+  {
+    signCtx = 1;
+  }
+  else
+  {
+    signCtx = 2;
+  }
+  if (bdpcm)
+  {
+    signCtx += 3;
+  }
+  return signCtx;
+}
+
+int32_t kvz_derive_mod_coeff(int rightPixel, int belowPixel, coeff_t absCoeff, int bdpcm)
+{
+
+  if (absCoeff == 0)
+    return 0;
+  int pred1, absBelow = abs(belowPixel), absRight = abs(rightPixel);
+
+  int absCoeffMod = absCoeff;
+
+  if (bdpcm == 0)
+  {
+    pred1 = MAX(absBelow, absRight);
+
+    if (absCoeffMod == pred1)
+    {
+      absCoeffMod = 1;
+    }
+    else
+    {
+      absCoeffMod = absCoeffMod < pred1 ? absCoeffMod + 1 : absCoeffMod;
+    }
+  }
+
+  return(absCoeffMod);
+}
+
+unsigned kvz_lrg1_ctx_id_abs_ts(const coeff_t* coeff, int32_t pos_x, int32_t pos_y, int32_t width, int bdpcm)
+{
+  const coeff_t* posC = coeff + pos_x + pos_y * width;
+
+  int             numPos = 0;
+#define UPDATE(x) {coeff_t a=abs(x);numPos+=!!a;}
+
+  if (bdpcm)
+  {
+    numPos = 3;
+  }
+  else
+  {
+    if (pos_x > 0)
+    {
+      UPDATE(posC[-1]);
+    }
+    if (pos_y > 0)
+    {
+      UPDATE(posC[-width]);
+    }
+  }
+
+#undef UPDATE
+  return numPos;
 }
 
 /**

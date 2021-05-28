@@ -96,6 +96,15 @@ typedef struct
     cabac_ctx_t multi_ref_line[2];
     cabac_ctx_t bdpcm_mode[4];
     cabac_ctx_t joint_bc_br[3];
+    cabac_ctx_t transform_skip_model_luma;
+    cabac_ctx_t transform_skip_model_chroma;
+    cabac_ctx_t transform_skip_sig_coeff[3];
+    cabac_ctx_t transform_skip_sig[3];
+    cabac_ctx_t transform_skip_res_sign[6];
+    cabac_ctx_t transform_skip_gt1[4];
+    cabac_ctx_t transform_skip_par;
+    cabac_ctx_t transform_skip_gt2[5];
+
   } ctx;
 } cabac_data_t;
 
