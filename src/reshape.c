@@ -1436,22 +1436,17 @@ static int calculate_lmcs_chroma_adj(lmcs_aps* aps, kvz_pixel avgLuma)
 * \return chroma residue scale
 * From VTM 13.0
 */
-int kvz_calculate_lmcs_chroma_adj_vpdu_nei(encoder_state_t* const state, lmcs_aps* aps, int x, int y, cu_info_t* cur_cu, lcu_t* lcu)
+int kvz_calculate_lmcs_chroma_adj_vpdu_nei(encoder_state_t* const state, lmcs_aps* aps, int x, int y)
 {
   int xPos = x;
   int yPos = y;
 
-  int x_local = SUB_SCU(x);
-  int y_local = SUB_SCU(y);
-
-  int ctuSize = LCU_WIDTH;
-  int numNeighbor = MIN(64, ctuSize);
+  int numNeighbor = MIN(64, LCU_WIDTH);
   int numNeighborLog = kvz_math_floor_log2(numNeighbor);
 
-  xPos = xPos / 64 * 64;
-  yPos = yPos / 64 * 64;
+  xPos = (xPos / LCU_WIDTH) * LCU_WIDTH;
+  yPos = (yPos / LCU_WIDTH) * LCU_WIDTH;
   
-  assert(LCU_WIDTH >= 64);
   /*
   // ToDo: Optimize the calculations by storing already calculated results
   if (isVPDUprocessed(xPos, yPos))
@@ -1464,15 +1459,15 @@ int kvz_calculate_lmcs_chroma_adj_vpdu_nei(encoder_state_t* const state, lmcs_ap
     
     // ToDo: Handle dualtree
 
-    bool left_cu = (x > 0);
-    bool above_cu = (y > 0);
+    bool left_cu = (xPos > 0);
+    bool above_cu = (yPos > 0);
     
    
     int strideY = state->tile->frame->rec_lmcs->stride;
     int chromaScale = (1 << CSCALE_FP_PREC);
     int lumaValue = -1;
 
-    kvz_pixel* recSrc0 = &state->tile->frame->rec_lmcs->y[x+y*strideY];
+    kvz_pixel* recSrc0 = &state->tile->frame->rec_lmcs->y[xPos + yPos * strideY];
 
     const uint32_t picH = state->tile->frame->height;
     const uint32_t picW = state->tile->frame->width;

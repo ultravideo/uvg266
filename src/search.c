@@ -981,6 +981,11 @@ static void copy_lcu_to_cu_data(const encoder_state_t * const state, int x_px, i
     kvz_pixels_blit(lcu->rec.y, &pic->rec->y[x_px + y_px * pic->rec->stride],
                         x_max, y_max, LCU_WIDTH, pic->rec->stride);
 
+    if (state->tile->frame->lmcs_aps->m_sliceReshapeInfo.sliceReshaperEnableFlag) {
+      kvz_pixels_blit(lcu->rec.y, &pic->rec_lmcs->y[x_px + y_px * pic->rec->stride],
+        x_max, y_max, LCU_WIDTH, pic->rec->stride);
+    }
+
     if (state->encoder_control->chroma_format != KVZ_CSP_400) {
       kvz_pixels_blit(lcu->rec.u, &pic->rec->u[(x_px / 2) + (y_px / 2) * (pic->rec->stride / 2)],
                       x_max / 2, y_max / 2, LCU_WIDTH / 2, pic->rec->stride / 2);

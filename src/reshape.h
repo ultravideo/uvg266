@@ -125,3 +125,5 @@ void kvz_lmcs_preanalyzer(struct encoder_state_t* const state, const videoframe_
 void kvz_construct_reshaper_lmcs(lmcs_aps* aps);
 
 void kvz_encode_lmcs_adaptive_parameter_set(encoder_state_t* const state);
+
+int kvz_calculate_lmcs_chroma_adj_vpdu_nei(encoder_state_t* const state, lmcs_aps* aps, int x, int y);
