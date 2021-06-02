@@ -194,7 +194,7 @@ int kvz_quantize_residual_generic(encoder_state_t *const state,
   const int in_stride, const int out_stride,
   const kvz_pixel *const ref_in, const kvz_pixel *const pred_in,
   kvz_pixel *rec_out, coeff_t *coeff_out,
-  bool early_skip)
+  bool early_skip, int lmcs_chroma_adj)
 {
   // Temporary arrays to pass data to and from kvz_quant and transform functions.
   ALIGNED(64) int16_t residual[TR_MAX_WIDTH * TR_MAX_WIDTH];
@@ -211,6 +211,19 @@ int kvz_quantize_residual_generic(encoder_state_t *const state,
     for (y = 0; y < width; ++y) {
       for (x = 0; x < width; ++x) {
         residual[x + y * width] = (int16_t)(ref_in[x + y * in_stride] - pred_in[x + y * in_stride]);
+      }
+    }
+  }
+
+  if (state->tile->frame->lmcs_aps->m_sliceReshapeInfo.enableChromaAdj && color != COLOR_Y) {
+    int y, x;
+    int sign, absval;
+    int maxAbsclipBD = (1 << KVZ_BIT_DEPTH) - 1;
+    for (y = 0; y < width; ++y) {
+      for (x = 0; x < width; ++x) {
+        sign = residual[x + y * width] >= 0 ? 1 : -1;
+        absval = sign * residual[x + y * width];
+        residual[x + y * width] = (int8_t)CLIP(-maxAbsclipBD, maxAbsclipBD, sign * (((absval << CSCALE_FP_PREC) + (lmcs_chroma_adj >> 1)) / lmcs_chroma_adj));
       }
     }
   }
@@ -265,6 +278,25 @@ int kvz_quantize_residual_generic(encoder_state_t *const state,
     }
     else {
       kvz_itransform2d(state->encoder_control, residual, coeff, width, color, cur_cu);
+    }
+
+    if (state->tile->frame->lmcs_aps->m_sliceReshapeInfo.enableChromaAdj && color != COLOR_Y) {
+      int y, x;
+      int sign, absval;
+      int maxAbsclipBD = (1 << KVZ_BIT_DEPTH) - 1;
+      for (y = 0; y < width; ++y) {
+        for (x = 0; x < width; ++x) {
+          residual[x + y * width] = (int16_t)CLIP((int16_t)(-maxAbsclipBD - 1), (int16_t)maxAbsclipBD, residual[x + y * width]);
+          sign = residual[x + y * width] >= 0 ? 1 : -1;
+          absval = sign * residual[x + y * width];
+          int val = sign * ((absval * lmcs_chroma_adj + (1 << (CSCALE_FP_PREC - 1))) >> CSCALE_FP_PREC);
+          if (sizeof(kvz_pixel) == 2) // avoid overflow when storing data
+          {
+            val = CLIP(-32768, 32767, val);
+          }
+          residual[x + y * width] = (int16_t)val;
+        }
+      }
     }
 
     // Get quantized reconstruction. (residual + pred_in -> rec_out)

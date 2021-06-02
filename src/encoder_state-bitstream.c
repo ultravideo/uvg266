@@ -1133,7 +1133,7 @@ static void kvz_encoder_state_write_bitstream_picture_header(
 
       if (encoder->chroma_format != KVZ_CSP_400)
       {
-        WRITE_U(stream, 0, 1, "ph_chroma_residual_scale_flag"); // ToDo: LMCS Enable chroma scaling
+        WRITE_U(stream, state->tile->frame->lmcs_aps->m_sliceReshapeInfo.enableChromaAdj, 1, "ph_chroma_residual_scale_flag");
       }
     }
   }

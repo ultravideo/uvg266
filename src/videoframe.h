@@ -41,6 +41,9 @@ typedef struct videoframe
   kvz_picture *rec;            //!< \brief Reconstructed image.
   kvz_picture *rec_lmcs;       //!< \brief LMCS mapped reconstructed image, if available, otherwise points to source.
 
+  uint8_t* lmcs_avg_processed; //!< \brief For each LCU, indicates if already calculated average of border pixels is available
+  int32_t* lmcs_avg;           //!< \brief Average of LCU border pixels
+
   int32_t width;          //!< \brief Luma pixel array width.
   int32_t height;         //!< \brief Luma pixel array height.
   int32_t height_in_lcu;  //!< \brief Picture width in number of LCU's.

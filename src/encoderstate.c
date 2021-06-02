@@ -1082,6 +1082,8 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
         const int height = MIN(sub_state->tile->frame->height_in_lcu * LCU_WIDTH, main_state->tile->frame->height - offset_y);
 
         sub_state->tile->frame->lmcs_aps = main_state->tile->frame->lmcs_aps;
+        sub_state->tile->frame->lmcs_avg_processed = main_state->tile->frame->lmcs_avg_processed;
+        sub_state->tile->frame->lmcs_avg = main_state->tile->frame->lmcs_avg;
 
         kvz_image_free(sub_state->tile->frame->source);
         sub_state->tile->frame->source = NULL;
@@ -1675,6 +1677,8 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
       state->tile->frame->source_lmcs_mapped = true;
       state->tile->frame->lmcs_top_level = true;
     }
+
+    memset(state->tile->frame->lmcs_avg_processed, 0, state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu);
   }
  
   encoder_state_init_children(state);

@@ -27,6 +27,7 @@
 #include "strategies/strategies-quant.h"
 #include "strategies/strategies-picture.h"
 #include "tables.h"
+#include "reshape.h"
 
 /**
  * \brief RDPCM direction.
@@ -248,7 +249,7 @@ int kvz_quantize_residual_trskip(
     const coeff_scan_order_t scan_order, int8_t *trskip_out, 
     const int in_stride, const int out_stride,
     const kvz_pixel *const ref_in, const kvz_pixel *const pred_in, 
-    kvz_pixel *rec_out, coeff_t *coeff_out)
+    kvz_pixel *rec_out, coeff_t *coeff_out, int lmcs_chroma_adj)
 {
   struct {
     kvz_pixel rec[4*4];
@@ -269,7 +270,7 @@ int kvz_quantize_residual_trskip(
   skip.has_coeffs = kvz_quantize_residual(
     state, cur_cu, width, color, scan_order,
     1, in_stride, 4,
-    ref_in, pred_in, skip.rec, skip.coeff, false);
+    ref_in, pred_in, skip.rec, skip.coeff, false, lmcs_chroma_adj);
   skip.cost = kvz_pixels_calc_ssd(ref_in, skip.rec, in_stride, 4, 4);
   skip.cost += kvz_get_coeff_cost(state, skip.coeff, 4, 0, scan_order) * bit_cost;
 
@@ -370,6 +371,12 @@ static void quantize_tr_residual(encoder_state_t * const state,
 
   bool has_coeffs;
 
+
+  int lmcs_chroma_adj = 0;
+  if (state->tile->frame->lmcs_aps->m_sliceReshapeInfo.enableChromaAdj && color != COLOR_Y) {
+    lmcs_chroma_adj = kvz_calculate_lmcs_chroma_adj_vpdu_nei(state, state->tile->frame->lmcs_aps, x, y);
+  }
+
   if (cfg->lossless) {
     has_coeffs = bypass_transquant(tr_width,
                                    lcu_width, // in stride
@@ -402,7 +409,8 @@ static void quantize_tr_residual(encoder_state_t * const state,
                                               ref,
                                               pred,
                                               pred,
-                                              coeff);
+                                              coeff,
+                                              lmcs_chroma_adj);
     cur_pu->tr_skip = tr_skip;
   } else {
     has_coeffs = kvz_quantize_residual(state,
@@ -417,7 +425,8 @@ static void quantize_tr_residual(encoder_state_t * const state,
                                        pred,
                                        pred,
                                        coeff,
-                                       early_skip);
+                                       early_skip,
+                                       lmcs_chroma_adj);
   }
 
   cbf_clear(&cur_pu->cbf, depth, color);

@@ -1363,20 +1363,18 @@ static void code_lmcs_aps(encoder_state_t* const state, lmcs_aps* aps)
       WRITE_U(stream, signCW, 1, "lmcs_delta_sign_cw_flag[ i ]");
     }
   }
-  // ToDo: LMCS Chroma scaling
-  /*  
-  int deltaCRS = aps->chromaPresentFlag ? aps->m_sliceReshapeInfo.chrResScalingOffset : 0;
+  
+  int deltaCRS = state->encoder_control->chroma_format != KVZ_CSP_400 ? aps->m_sliceReshapeInfo.chrResScalingOffset : 0;
   int signCRS = (deltaCRS < 0) ? 1 : 0;
   int absCRS = (deltaCRS < 0) ? (-deltaCRS) : deltaCRS;
-  if (pcAPS->chromaPresentFlag)
+  if (state->encoder_control->chroma_format != KVZ_CSP_400)
   {
     WRITE_U(stream, absCRS, 3, "lmcs_delta_abs_crs");
   }
   if (absCRS > 0)
   {
     WRITE_U(stream, signCRS, 1, "lmcs_delta_sign_crs_flag");
-  }
-  */
+  }  
 }
 
 
@@ -1396,12 +1394,123 @@ void kvz_encode_lmcs_adaptive_parameter_set(encoder_state_t* const state)
 
    WRITE_U(stream, (int)1/*LMCS_APS*/, 3, "aps_params_type");
    WRITE_U(stream, 0, 5, "adaptation_parameter_set_id");
-   WRITE_U(stream, 0/*state->encoder_control->chroma_format != KVZ_CSP_400*/, 1, "aps_chroma_present_flag");
+   WRITE_U(stream, state->encoder_control->chroma_format != KVZ_CSP_400, 1, "aps_chroma_present_flag");
 
    code_lmcs_aps(state, state->tile->frame->lmcs_aps);
 
    WRITE_U(stream, 0, 1, "aps_extension_flag"); //Implementation when this flag is equal to 1 should be added when it is needed. Currently in the spec we don't have case when this flag is equal to 1
    kvz_bitstream_add_rbsp_trailing_bits(stream);
     
+  }
+}
+
+
+/** find inx of PWL for inverse mapping
+* \param average luma pred of TU
+* \return idx of PWL for inverse mapping
+* From VTM 13.0
+*/
+static int getPWLIdxInv(lmcs_aps* aps, int lumaVal)
+{
+  int idxS = 0;
+  for (idxS = aps->m_sliceReshapeInfo.reshaperModelMinBinIdx; (idxS <= aps->m_sliceReshapeInfo.reshaperModelMaxBinIdx); idxS++)
+  {
+    if (lumaVal < aps->m_reshapePivot[idxS + 1])     break;
+  }
+  return MIN(idxS, PIC_CODE_CW_BINS - 1);
+}
+
+/** compute chroma residuce scale for TU
+* \param average luma pred of TU
+* \return chroma residue scale
+* From VTM 13.0
+*/
+static int calculate_lmcs_chroma_adj(lmcs_aps* aps, kvz_pixel avgLuma)
+{
+  int iAdj = aps->m_chromaAdjHelpLUT[getPWLIdxInv(aps, avgLuma)];
+  return iAdj;
+}
+
+/** compute chroma residuce scale for TU
+* \param average luma pred of TU
+* \return chroma residue scale
+* From VTM 13.0
+*/
+int kvz_calculate_lmcs_chroma_adj_vpdu_nei(encoder_state_t* const state, lmcs_aps* aps, int x, int y)
+{
+  int xPos = x;
+  int yPos = y;
+
+  int x_in_lcu = xPos / LCU_WIDTH;
+  int y_in_lcu = yPos / LCU_WIDTH;
+
+  int numNeighbor = MIN(64, LCU_WIDTH);
+  int numNeighborLog = kvz_math_floor_log2(numNeighbor);
+
+  xPos = (xPos / LCU_WIDTH) * LCU_WIDTH;
+  yPos = (yPos / LCU_WIDTH) * LCU_WIDTH;
+  
+  int avg_array_pos = x_in_lcu + y_in_lcu * state->tile->frame->width_in_lcu;
+  
+  if (state->tile->frame->lmcs_avg_processed[avg_array_pos])
+  {
+    return state->tile->frame->lmcs_avg[avg_array_pos];
+  } else  {
+   
+    // ToDo: Handle dualtree
+
+    bool left_cu = (x_in_lcu > 0);
+    bool above_cu = (y_in_lcu > 0);
+    
+   
+    int strideY = state->tile->frame->rec_lmcs->stride;
+    int chromaScale = (1 << CSCALE_FP_PREC);
+    int lumaValue = -1;
+
+    kvz_pixel* recSrc0 = &state->tile->frame->rec_lmcs->y[xPos + yPos * strideY];
+
+    const uint32_t picH = state->tile->frame->height;
+    const uint32_t picW = state->tile->frame->width;
+    const kvz_pixel valueDC = 1 << (KVZ_BIT_DEPTH - 1);
+    int32_t recLuma = 0;
+    int pelnum = 0;
+    if (left_cu)
+    {
+      for (int i = 0; i < numNeighbor; i++)
+      {
+        int k = (yPos + i) >= picH ? (picH - yPos - 1) : i;
+        recLuma += recSrc0[-1 + k * strideY];
+        pelnum++;
+      }
+    }
+    if (above_cu)
+    {
+      for (int i = 0; i < numNeighbor; i++)
+      {
+        int k = (xPos + i) >= picW ? (picW - xPos - 1) : i;
+        recLuma += recSrc0[-strideY + k];
+        pelnum++;
+      }
+    }
+    if (pelnum == numNeighbor)
+    {
+      lumaValue = (recLuma + (1 << (numNeighborLog - 1))) >> numNeighborLog;
+    }
+    else if (pelnum == (numNeighbor << 1))
+    {
+      lumaValue = (recLuma + (1 << numNeighborLog)) >> (numNeighborLog + 1);
+    }
+    else
+    {
+      assert(pelnum == 0);
+      lumaValue = valueDC;
+    }
+    chromaScale = calculate_lmcs_chroma_adj(aps,lumaValue);    
+    aps->m_chromaScale = chromaScale;
+
+    state->tile->frame->lmcs_avg_processed[avg_array_pos] = 1;
+    state->tile->frame->lmcs_avg[avg_array_pos] = chromaScale;
+
+    return chromaScale;
   }
 }
