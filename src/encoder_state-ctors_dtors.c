@@ -436,6 +436,8 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
         end_in_ts = child_state->tile->frame->width_in_lcu * child_state->tile->frame->height_in_lcu;
 
         child_state->tile->frame->lmcs_aps = calloc(1, sizeof(lmcs_aps));
+        child_state->tile->frame->lmcs_avg_processed = calloc(1, end_in_ts * sizeof(int8_t));
+        child_state->tile->frame->lmcs_avg = calloc(1, end_in_ts * sizeof(int32_t));
 
         break;
       case ENCODER_STATE_TYPE_SLICE:
@@ -745,6 +747,8 @@ void kvz_encoder_state_finalize(encoder_state_t * const state) {
 
   if (state->type == ENCODER_STATE_TYPE_MAIN) {
     FREE_POINTER(state->tile->frame->lmcs_aps);
+    FREE_POINTER(state->tile->frame->lmcs_avg_processed);
+    FREE_POINTER(state->tile->frame->lmcs_avg);
   }
   
   FREE_POINTER(state->lcu_order);

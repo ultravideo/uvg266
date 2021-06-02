@@ -1441,26 +1441,26 @@ int kvz_calculate_lmcs_chroma_adj_vpdu_nei(encoder_state_t* const state, lmcs_ap
   int xPos = x;
   int yPos = y;
 
+  int x_in_lcu = xPos / LCU_WIDTH;
+  int y_in_lcu = yPos / LCU_WIDTH;
+
   int numNeighbor = MIN(64, LCU_WIDTH);
   int numNeighborLog = kvz_math_floor_log2(numNeighbor);
 
   xPos = (xPos / LCU_WIDTH) * LCU_WIDTH;
   yPos = (yPos / LCU_WIDTH) * LCU_WIDTH;
   
-  /*
-  // ToDo: Optimize the calculations by storing already calculated results
-  if (isVPDUprocessed(xPos, yPos))
+  int avg_array_pos = x_in_lcu + y_in_lcu * state->tile->frame->width_in_lcu;
+  
+  if (state->tile->frame->lmcs_avg_processed[avg_array_pos])
   {
-    return getChromaScale();
-  }
-  else*/
-  {
-    //setVPDULoc(xPos, yPos);
-    
+    return state->tile->frame->lmcs_avg[avg_array_pos];
+  } else  {
+   
     // ToDo: Handle dualtree
 
-    bool left_cu = (xPos > 0);
-    bool above_cu = (yPos > 0);
+    bool left_cu = (x_in_lcu > 0);
+    bool above_cu = (y_in_lcu > 0);
     
    
     int strideY = state->tile->frame->rec_lmcs->stride;
@@ -1507,6 +1507,10 @@ int kvz_calculate_lmcs_chroma_adj_vpdu_nei(encoder_state_t* const state, lmcs_ap
     }
     chromaScale = calculate_lmcs_chroma_adj(aps,lumaValue);    
     aps->m_chromaScale = chromaScale;
+
+    state->tile->frame->lmcs_avg_processed[avg_array_pos] = 1;
+    state->tile->frame->lmcs_avg[avg_array_pos] = chromaScale;
+
     return chromaScale;
   }
 }
