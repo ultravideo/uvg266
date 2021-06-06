@@ -233,57 +233,74 @@ static void kvz_angular_pred_avx2(
     // The mode is not horizontal or vertical, we have to do interpolation.
 
     int_fast32_t delta_pos = 0;
-    for (int_fast32_t y = 0; y < width; ++y) {
-      delta_pos += sample_disp;
-      int_fast32_t delta_int = delta_pos >> 5;
-      int_fast32_t delta_fract = delta_pos & (32 - 1);
+    int_fast32_t delta_int[4] = { 0 };
+    int_fast32_t delta_fract[4] = { 0 };
+    for (int_fast32_t y = 0; y + 3 < width; y += 4) {
+
+      for (int yy = 0; yy < 4; ++yy) {
+        delta_pos += sample_disp;
+        delta_int[yy] = delta_pos >> 5;
+        delta_fract[yy] = delta_pos & (32 - 1);
+      }
 
       if ((abs(sample_disp) & 0x1F) != 0) {
         
         // Luma Channel
         if (channel_type == 0) {
-          int32_t ref_main_index = delta_int;
-          kvz_pixel p[4];
-          bool use_cubic = true; // Default to cubic filter
-          static const int kvz_intra_hor_ver_dist_thres[8] = { 24, 24, 24, 14, 2, 0, 0, 0 };
-          int filter_threshold = kvz_intra_hor_ver_dist_thres[log2_width];
-          int dist_from_vert_or_hor = MIN(abs(pred_mode - 50), abs(pred_mode - 18));
-          if (dist_from_vert_or_hor > filter_threshold) {
-            static const int16_t modedisp2sampledisp[32] = { 0,    1,    2,    3,    4,    6,     8,   10,   12,   14,   16,   18,   20,   23,   26,   29,   32,   35,   39,  45,  51,  57,  64,  73,  86, 102, 128, 171, 256, 341, 512, 1024 };
-            const int_fast8_t mode_disp = (pred_mode >= 34) ? pred_mode - 50 : 18 - pred_mode;
-            const int_fast8_t sample_disp = (mode_disp < 0 ? -1 : 1) * modedisp2sampledisp[abs(mode_disp)];
-            if ((abs(sample_disp) & 0x1F) != 0)
-            {
-              use_cubic = false;
-            }
-          }
-          const int16_t filter_coeff[4] = { 16 - (delta_fract >> 1), 32 - (delta_fract >> 1), 16 + (delta_fract >> 1), delta_fract >> 1 };
-          int16_t const * const f = use_cubic ? cubic_filter[delta_fract] : filter_coeff;
-          // Do 4-tap intra interpolation filtering
-          for (int_fast32_t x = 0; x < width; x++, ref_main_index++) {
-            p[0] = ref_main[ref_main_index];
-            p[1] = ref_main[ref_main_index + 1];
-            p[2] = ref_main[ref_main_index + 2];
-            p[3] = ref_main[ref_main_index + 3];
-         
-            dst[y * width + x] = CLIP_TO_PIXEL(((int32_t)(f[0] * p[0]) + (int32_t)(f[1] * p[1]) + (int32_t)(f[2] * p[2]) + (int32_t)(f[3] * p[3]) + 32) >> 6);
 
+          int32_t ref_main_index[4] = { 0 };
+          int16_t f[4][4] = { { 0 } };
+
+          for (int yy = 0; yy < 4; ++yy) {
+
+            ref_main_index[yy] = delta_int[yy];
+            bool use_cubic = true; // Default to cubic filter
+            static const int kvz_intra_hor_ver_dist_thres[8] = { 24, 24, 24, 14, 2, 0, 0, 0 };
+            int filter_threshold = kvz_intra_hor_ver_dist_thres[log2_width];
+            int dist_from_vert_or_hor = MIN(abs(pred_mode - 50), abs(pred_mode - 18));
+            if (dist_from_vert_or_hor > filter_threshold) {
+              static const int16_t modedisp2sampledisp[32] = { 0,    1,    2,    3,    4,    6,     8,   10,   12,   14,   16,   18,   20,   23,   26,   29,   32,   35,   39,  45,  51,  57,  64,  73,  86, 102, 128, 171, 256, 341, 512, 1024 };
+              const int_fast8_t mode_disp = (pred_mode >= 34) ? pred_mode - 50 : 18 - pred_mode;
+              const int_fast8_t sample_disp = (mode_disp < 0 ? -1 : 1) * modedisp2sampledisp[abs(mode_disp)];
+              if ((abs(sample_disp) & 0x1F) != 0)
+              {
+                use_cubic = false;
+              }
+            }
+            const int16_t filter_coeff[4] = { 16 - (delta_fract[yy] >> 1), 32 - (delta_fract[yy] >> 1), 16 + (delta_fract[yy] >> 1), delta_fract[yy] >> 1 };
+            int16_t *temp_f = use_cubic ? cubic_filter[delta_fract[yy]] : filter_coeff;
+            memcpy(f[yy], temp_f, 4 * sizeof(*temp_f));
+          }
+
+          // Do 4-tap intra interpolation filtering
+          for (int_fast32_t x = 0; x < width; x++) {
+
+            for (int yy = 0; yy < 4; ++yy){
+
+              kvz_pixel *p = &ref_main[ref_main_index[yy]];
+              dst[(y + yy) * width + x] = CLIP_TO_PIXEL(((int32_t)(f[yy][0] * p[0]) + (int32_t)(f[yy][1] * p[1]) + (int32_t)(f[yy][2] * p[2]) + (int32_t)(f[yy][3] * p[3]) + 32) >> 6);
+              ref_main_index[yy] += 1;
+            }
           }
         }
         else {
         
           // Do linear filtering
-          for (int_fast32_t x = 0; x < width; ++x) {
-            kvz_pixel ref1 = ref_main[x + delta_int + 1];
-            kvz_pixel ref2 = ref_main[x + delta_int + 2];
-            dst[y * width + x] = ref1 + ((delta_fract * (ref2-ref1) + 16) >> 5);
+          for (int yy = 0; yy < 4; ++yy) {
+            for (int_fast32_t x = 0; x < width; ++x) {
+              kvz_pixel ref1 = ref_main[x + delta_int[yy] + 1];
+              kvz_pixel ref2 = ref_main[x + delta_int[yy] + 2];
+              dst[(y + yy) * width + x] = ref1 + ((delta_fract[yy] * (ref2 - ref1) + 16) >> 5);
+            }
           }
         }
       }
       else {
         // Just copy the integer samples
-        for (int_fast32_t x = 0; x < width; x++) {
-          dst[y * width + x] = ref_main[x + delta_int + 1];
+        for (int yy = 0; yy < 4; ++yy) {
+          for (int_fast32_t x = 0; x < width; x++) {
+            dst[(y + yy) * width + x] = ref_main[x + delta_int[yy] + 1];
+          }
         }
       }
 
@@ -299,13 +316,16 @@ static void kvz_angular_pred_avx2(
         }
       }
       if(PDPC_filter) {
-        int       inv_angle_sum = 256;
-        for (int x = 0; x < MIN(3 << scale, width); x++) {
-          inv_angle_sum += modedisp2invsampledisp[abs(mode_disp)];
+        for (int yy = 0; yy < 4; ++yy) {
 
-          int wL = 32 >> (2 * x >> scale);
-          const kvz_pixel left = ref_side[y + (inv_angle_sum >> 9) + 1];
-          dst[y * width + x] = dst[y * width + x] + ((wL * (left - dst[y * width + x]) + 32) >> 6);
+          int inv_angle_sum = 256;
+          for (int x = 0; x < MIN(3 << scale, width); x++) {
+            inv_angle_sum += modedisp2invsampledisp[abs(mode_disp)];
+
+            int wL = 32 >> (2 * x >> scale);
+            const kvz_pixel left = ref_side[(y + yy) + (inv_angle_sum >> 9) + 1];
+            dst[(y + yy) * width + x] = dst[(y + yy) * width + x] + ((wL * (left - dst[(y + yy) * width + x]) + 32) >> 6);
+          }
         }
       }
 
