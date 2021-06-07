@@ -51,6 +51,34 @@ static void kvz_angular_pred_avx2(
   assert(log2_width >= 2 && log2_width <= 5);
   assert(intra_mode >= 2 && intra_mode <= 66);
 
+  __m256i p_shuf_01 = _mm256_setr_epi8(
+    0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
+    0x08, 0x09, 0x09, 0x0a, 0x0a, 0x0b, 0x0b, 0x0c,
+    0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
+    0x08, 0x09, 0x09, 0x0a, 0x0a, 0x0b, 0x0b, 0x0c
+  );
+
+  __m256i p_shuf_23 = _mm256_setr_epi8(
+    0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x05, 0x06,
+    0x0a, 0x0b, 0x0b, 0x0c, 0x0c, 0x0d, 0x0d, 0x0e,
+    0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x05, 0x06,
+    0x0a, 0x0b, 0x0b, 0x0c, 0x0c, 0x0d, 0x0d, 0x0e
+  );
+
+  __m256i w_shuf_01 = _mm256_setr_epi8(
+    0x00, 0x02, 0x00, 0x02, 0x00, 0x02, 0x00, 0x02,
+    0x08, 0x0a, 0x08, 0x0a, 0x08, 0x0a, 0x08, 0x0a,
+    0x00, 0x02, 0x00, 0x02, 0x00, 0x02, 0x00, 0x02,
+    0x08, 0x0a, 0x08, 0x0a, 0x08, 0x0a, 0x08, 0x0a
+  );
+
+  __m256i w_shuf_23 = _mm256_setr_epi8(
+    0x04, 0x06, 0x04, 0x06, 0x04, 0x06, 0x04, 0x06,
+    0x0c, 0x0e, 0x0c, 0x0e, 0x0c, 0x0e, 0x0c, 0x0e,
+    0x04, 0x06, 0x04, 0x06, 0x04, 0x06, 0x04, 0x06,
+    0x0c, 0x0e, 0x0c, 0x0e, 0x0c, 0x0e, 0x0c, 0x0e
+  );
+
   static const int16_t modedisp2sampledisp[32] = { 0,    1,    2,    3,    4,    6,     8,   10,   12,   14,   16,   18,   20,   23,   26,   29,   32,   35,   39,  45,  51,  57,  64,  73,  86, 102, 128, 171, 256, 341, 512, 1024 };
   static const int16_t modedisp2invsampledisp[32] = { 0, 16384, 8192, 5461, 4096, 2731, 2048, 1638, 1365, 1170, 1024, 910, 819, 712, 630, 565, 512, 468, 420, 364, 321, 287, 256, 224, 191, 161, 128, 96, 64, 48, 32, 16 }; // (512 * 32) / sampledisp
   static const int32_t pre_scale[] = { 8, 7, 6, 5, 5, 4, 4, 4, 3, 3, 3, 3, 3, 3, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 0, 0, 0, -1, -1, -2, -3 };
@@ -248,7 +276,7 @@ static void kvz_angular_pred_avx2(
         // Luma Channel
         if (channel_type == 0) {
 
-          int32_t ref_main_index[4] = { 0 };
+          int64_t ref_main_index[4] = { 0 };
           int16_t f[4][4] = { { 0 } };
 
           for (int yy = 0; yy < 4; ++yy) {
@@ -273,14 +301,32 @@ static void kvz_angular_pred_avx2(
           }
 
           // Do 4-tap intra interpolation filtering
-          for (int_fast32_t x = 0; x < width; x++) {
+          kvz_pixel *p = (kvz_pixel*)ref_main;
+          __m256i vidx = _mm256_loadu_si256((__m256i *)ref_main_index);
+          __m256i all_weights = _mm256_loadu_si256((__m256i *)f);
+          __m256i w01 = _mm256_shuffle_epi8(all_weights, w_shuf_01);
+          __m256i w23 = _mm256_shuffle_epi8(all_weights, w_shuf_23);
 
-            for (int yy = 0; yy < 4; ++yy){
+          for (int_fast32_t x = 0; x + 3 < width; x += 4, p += 4) {
 
-              kvz_pixel *p = &ref_main[ref_main_index[yy]];
-              dst[(y + yy) * width + x] = CLIP_TO_PIXEL(((int32_t)(f[yy][0] * p[0]) + (int32_t)(f[yy][1] * p[1]) + (int32_t)(f[yy][2] * p[2]) + (int32_t)(f[yy][3] * p[3]) + 32) >> 6);
-              ref_main_index[yy] += 1;
-            }
+            __m256i vp = _mm256_i64gather_epi64((uint64_t*)p, vidx, 1);
+            __m256i vp_01 = _mm256_shuffle_epi8(vp, p_shuf_01);
+            __m256i vp_23 = _mm256_shuffle_epi8(vp, p_shuf_23);
+              
+            __m256i dot_01 = _mm256_maddubs_epi16(vp_01, w01);
+            __m256i dot_23 = _mm256_maddubs_epi16(vp_23, w23);
+            __m256i sum = _mm256_add_epi16(dot_01, dot_23);
+            sum = _mm256_add_epi16(sum, _mm256_set1_epi16(32));
+            sum = _mm256_srai_epi16(sum, 6);
+
+            __m128i lo = _mm256_castsi256_si128(sum);
+            __m128i hi = _mm256_extracti128_si256(sum, 1);
+            __m128i filtered = _mm_packus_epi16(lo, hi);
+
+            *(uint32_t*)(dst + (y + 0) * width + x) = _mm_extract_epi32(filtered, 0);
+            *(uint32_t*)(dst + (y + 1) * width + x) = _mm_extract_epi32(filtered, 1);
+            *(uint32_t*)(dst + (y + 2) * width + x) = _mm_extract_epi32(filtered, 2);
+            *(uint32_t*)(dst + (y + 3) * width + x) = _mm_extract_epi32(filtered, 3);
           }
         }
         else {
