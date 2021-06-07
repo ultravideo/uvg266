@@ -236,7 +236,8 @@ static INLINE uint32_t get_coeff_cabac_cost(
     const coeff_t *coeff,
     int32_t width,
     int32_t type,
-    int8_t scan_mode)
+    int8_t scan_mode,
+    int8_t tr_skip)
 {
   // Make sure there are coeffs present
   bool found = false;
@@ -261,14 +262,24 @@ static INLINE uint32_t get_coeff_cabac_cost(
   // Execute the coding function.
   // It is safe to drop the const modifier since state won't be modified
   // when cabac.only_count is set.
-  kvz_encode_coeff_nxn((encoder_state_t*) state,
-                       &cabac_copy,
-                       coeff,
-                       width,
-                       type,
-                       scan_mode,
-                       NULL,                   
-                       false);
+  if(!tr_skip) {
+    kvz_encode_coeff_nxn((encoder_state_t*) state,
+                         &cabac_copy,
+                         coeff,
+                         width,
+                         type,
+                         scan_mode,
+                         NULL,                   
+                         false);
+  }
+  else {
+    kvz_encode_ts_residual(state,
+      &cabac_copy,
+      coeff,
+      width,
+      type,
+      scan_mode);
+  }
 
   return (23 - cabac_copy.bits_left) + (cabac_copy.num_buffered_bytes << 3);
 }
@@ -313,13 +324,14 @@ uint32_t kvz_get_coeff_cost(const encoder_state_t * const state,
                             const coeff_t *coeff,
                             int32_t width,
                             int32_t type,
-                            int8_t scan_mode)
+                            int8_t scan_mode,
+                            int8_t tr_skip)
 {
   uint8_t save_cccs = state->encoder_control->cfg.fastrd_sampling_on;
   uint8_t check_accuracy = state->encoder_control->cfg.fastrd_accuracy_check_on;
 
   if (state->qp < state->encoder_control->cfg.fast_residual_cost_limit &&
-      state->qp < MAX_FAST_COEFF_COST_QP) {
+      state->qp < MAX_FAST_COEFF_COST_QP && !tr_skip) {
     // TODO: do we need to assert(0) out of the fast-estimation branch if we
     // are to save block costs, or should we just warn about it somewhere
     // earlier (configuration validation I guess)?
@@ -330,13 +342,13 @@ uint32_t kvz_get_coeff_cost(const encoder_state_t * const state,
       uint64_t weights = kvz_fast_coeff_get_weights(state);
       uint32_t fast_cost = kvz_fast_coeff_cost(coeff, width, weights);
       if (check_accuracy) {
-        uint32_t ccc = get_coeff_cabac_cost(state, coeff, width, type, scan_mode);
+        uint32_t ccc = get_coeff_cabac_cost(state, coeff, width, type, scan_mode, tr_skip);
         save_accuracy(state->qp, ccc, fast_cost);
       }
       return fast_cost;
     }
   } else {
-    uint32_t ccc = get_coeff_cabac_cost(state, coeff, width, type, scan_mode);
+    uint32_t ccc = get_coeff_cabac_cost(state, coeff, width, type, scan_mode, tr_skip);
     if (save_cccs) {
       save_ccc(state->qp, coeff, width * width, ccc);
     }

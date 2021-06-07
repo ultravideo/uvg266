@@ -89,10 +89,10 @@ static void encode_mts_idx(encoder_state_t * const state,
   }
 }
 
-static void encode_ts_residual(encoder_state_t* const state,
+void kvz_encode_ts_residual(encoder_state_t* const state,
   cabac_data_t* const cabac,
   const coeff_t* coeff,
-  uint8_t width,
+  uint32_t width,
   uint8_t type,
   int8_t scan_mode) {
   //const encoder_control_t * const encoder = state->encoder_control;
@@ -397,7 +397,7 @@ static void encode_transform_unit(encoder_state_t * const state,
 
     }
     if(cur_pu->tr_idx == MTS_SKIP) {
-      encode_ts_residual(state, cabac, coeff_y, width, 0, scan_idx);      
+      kvz_encode_ts_residual(state, cabac, coeff_y, width, 0, scan_idx);      
     }
     else {
       kvz_encode_coeff_nxn(state,

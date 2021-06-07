@@ -299,7 +299,7 @@ double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
     int8_t luma_scan_mode = kvz_get_scan_order(pred_cu->type, pred_cu->intra.mode, depth);
     const coeff_t *coeffs = &lcu->coeff.y[xy_to_zorder(LCU_WIDTH, x_px, y_px)];
 
-    coeff_bits += kvz_get_coeff_cost(state, coeffs, width, 0, luma_scan_mode);
+    coeff_bits += kvz_get_coeff_cost(state, coeffs, width, 0, luma_scan_mode, pred_cu->tr_idx == MTS_SKIP);
   }
 
   double bits = tr_tree_bits + coeff_bits;
@@ -371,8 +371,8 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
     int8_t scan_order = kvz_get_scan_order(pred_cu->type, pred_cu->intra.mode_chroma, depth);
     const int index = xy_to_zorder(LCU_WIDTH_C, lcu_px.x, lcu_px.y);
 
-    coeff_bits += kvz_get_coeff_cost(state, &lcu->coeff.u[index], width, 2, scan_order);
-    coeff_bits += kvz_get_coeff_cost(state, &lcu->coeff.v[index], width, 2, scan_order);
+    coeff_bits += kvz_get_coeff_cost(state, &lcu->coeff.u[index], width, 2, scan_order, 0);
+    coeff_bits += kvz_get_coeff_cost(state, &lcu->coeff.v[index], width, 2, scan_order, 0);
   }
 
   double bits = tr_tree_bits + coeff_bits;

@@ -51,7 +51,8 @@ uint32_t kvz_get_coeff_cost(const encoder_state_t * const state,
                             const coeff_t *coeff,
                             int32_t width,
                             int32_t type,
-                            int8_t scan_mode);
+                            int8_t scan_mode,
+                            int8_t tr_skip);
 
 int32_t kvz_get_ic_rate(encoder_state_t *state, uint32_t abs_level, uint16_t ctx_num_gt1, uint16_t ctx_num_gt2, uint16_t ctx_num_par,
                     uint16_t abs_go_rice, uint32_t reg_bins, int8_t type, int use_limited_prefix_length);

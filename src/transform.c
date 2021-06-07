@@ -272,7 +272,7 @@ int kvz_quantize_residual_trskip(
     1, in_stride, 4,
     ref_in, pred_in, skip.rec, skip.coeff, false, lmcs_chroma_adj);
   skip.cost = kvz_pixels_calc_ssd(ref_in, skip.rec, in_stride, 4, 4);
-  skip.cost += kvz_get_coeff_cost(state, skip.coeff, 4, 0, scan_order) * bit_cost;
+  skip.cost += kvz_get_coeff_cost(state, skip.coeff, 4, 0, scan_order, 1) * bit_cost;
 
 /*  if (noskip.cost <= skip.cost) {
     *trskip_out = 0;
