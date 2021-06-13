@@ -344,8 +344,10 @@ static void kvz_angular_pred_avx2(
       else {
         // Just copy the integer samples
         for (int yy = 0; yy < 4; ++yy) {
-          for (int_fast32_t x = 0; x < width; x++) {
-            dst[(y + yy) * width + x] = ref_main[x + delta_int[yy] + 1];
+          kvz_pixel *dst_row = dst + (y + yy) * width;
+          kvz_pixel *ref_row = ref_main + delta_int[yy] + 1;
+          for (int_fast32_t x = 0; x + 3 < width; x += 4) {
+            memcpy(dst_row + x, ref_row + x, 4 * sizeof(dst[0]));
           }
         }
       }
@@ -365,7 +367,11 @@ static void kvz_angular_pred_avx2(
           
         int16_t wL[4];
         int16_t left[4][4];
-        for (int x = 0; x + 3 < (MIN(3 << scale, width) & ~0x3); x += 4) {
+
+        int limit = MIN(3 << scale, width);
+
+        for (int x = 0; x < limit; x += 4) {
+
           for (int xx = 0; xx < 4; ++xx) {
             int inv_angle_sum = 256 + (x + xx + 1) * modedisp2invsampledisp[abs(mode_disp)];
             wL[xx] = 32 >> (2 * (x + xx) >> scale);
@@ -375,37 +381,36 @@ static void kvz_angular_pred_avx2(
             }
           }
 
-          __m128i vseq = _mm_setr_epi32(0, 1, 2, 3);
-          __m128i vidx = _mm_slli_epi32(vseq, log2_width);
-          __m256i vdst = _mm256_cvtepu8_epi16(_mm_i32gather_epi32((uint32_t*)(dst + y * width + x), vidx, 1));
-          __m256i vleft = _mm256_loadu_si256((__m256i*)left);
-          __m256i vwL   = _mm256_set1_epi64x(*(uint64_t*)wL);
-          __m256i accu = _mm256_sub_epi16(vleft, vdst);
+          __m128i vseq   = _mm_setr_epi32(0, 1, 2, 3);
+          __m128i vidx   = _mm_slli_epi32(vseq, log2_width);
+          __m128i vdst   = _mm_i32gather_epi32((uint32_t*)(dst + y * width + x), vidx, 1);
+          __m256i vdst16 = _mm256_cvtepu8_epi16(vdst);
+          __m256i vleft  = _mm256_loadu_si256((__m256i*)left);
+          uint64_t quad;
+          memcpy(&quad, wL, sizeof(quad));
+          __m256i vwL    = _mm256_set1_epi64x(quad);
+          __m256i accu   = _mm256_sub_epi16(vleft, vdst16);
           accu = _mm256_mullo_epi16(vwL, accu);
           accu = _mm256_add_epi16(accu, _mm256_set1_epi16(32));
           accu = _mm256_srai_epi16(accu, 6);
-          accu = _mm256_add_epi16(vdst, accu);
+          accu = _mm256_add_epi16(vdst16, accu);
             
-          __m128i lo = _mm256_castsi256_si128(accu);
-          __m128i hi = _mm256_extracti128_si256(accu, 1);
+          __m128i lo       = _mm256_castsi256_si128(accu);
+          __m128i hi       = _mm256_extracti128_si256(accu, 1);
           __m128i filtered = _mm_packus_epi16(lo, hi);
 
-          *(uint32_t*)(dst + (y + 0) * width + x) = _mm_extract_epi32(filtered, 0);
-          *(uint32_t*)(dst + (y + 1) * width + x) = _mm_extract_epi32(filtered, 1);
-          *(uint32_t*)(dst + (y + 2) * width + x) = _mm_extract_epi32(filtered, 2);
-          *(uint32_t*)(dst + (y + 3) * width + x) = _mm_extract_epi32(filtered, 3);
-        }
+          // Need to mask remainder samples on the last iteration when limit % 4 != 0
+          int rem_bits     = 8 * (limit - x);
+          __m128i ones     = _mm_set1_epi32(0xFF);
+          __m128i vmask    = _mm_slli_epi32(ones, rem_bits);
 
-        // Remainder
-        int x_rem = MIN(3 << scale, width) & ~0x3;
-        for (int yy = 0; yy < 4; yy++) {
-          for (int x = x_rem; x < MIN(3 << scale, width); x++) {
-            int inv_angle_sum = 256 + (x + 1) * modedisp2invsampledisp[abs(mode_disp)];
+          // 0 selects filtered, 1 vdst (unchanged)
+          vdst = _mm_blendv_epi8(filtered, vdst, vmask);
 
-            int wL = 32 >> (2 * x >> scale);
-            const kvz_pixel left = ref_side[(y + yy) + (inv_angle_sum >> 9) + 1];
-            dst[(y + yy) * width + x] = dst[(y + yy) * width + x] + ((wL * (left - dst[(y + yy) * width + x]) + 32) >> 6);
-          }
+          *(uint32_t*)(dst + (y + 0) * width + x) = _mm_extract_epi32(vdst, 0);
+          *(uint32_t*)(dst + (y + 1) * width + x) = _mm_extract_epi32(vdst, 1);
+          *(uint32_t*)(dst + (y + 2) * width + x) = _mm_extract_epi32(vdst, 2);
+          *(uint32_t*)(dst + (y + 3) * width + x) = _mm_extract_epi32(vdst, 3);
         }
       }
 
