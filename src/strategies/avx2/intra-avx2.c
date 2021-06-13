@@ -465,9 +465,35 @@ static void kvz_angular_pred_avx2(
 
   // Flip the block if this is was a horizontal mode.
   if (!vertical_mode) {
-    for (int_fast32_t y = 0; y < width - 1; ++y) {
-      for (int_fast32_t x = y + 1; x < width; ++x) {
-        SWAP(dst[y * width + x], dst[x * width + y], kvz_pixel);
+    
+    const __m128i vtranspose_mask =_mm_setr_epi8(
+      0, 4,  8, 12,
+      1, 5,  9, 13,
+      2, 6, 10, 14,
+      3, 7, 11, 15
+    );
+
+    const __m128i vseq = _mm_setr_epi32(0, 1, 2, 3);
+    const __m128i vidx = _mm_slli_epi32(vseq, log2_width);
+
+    // Transpose as 4x4 subblocks
+    for (int_fast32_t y = 0; y + 3 < width; y += 4) {
+      for (int_fast32_t x = y; x + 3 < width; x += 4) {
+
+        __m128i vtemp4x4 = _mm_i32gather_epi32((uint32_t*)(dst + x * width + y), vidx, 1);
+        __m128i v4x4     = _mm_i32gather_epi32((uint32_t*)(dst + y * width + x), vidx, 1);
+        vtemp4x4 = _mm_shuffle_epi8(vtemp4x4, vtranspose_mask);
+        v4x4     = _mm_shuffle_epi8(v4x4, vtranspose_mask);
+
+        *(uint32_t*)(dst + (y + 0) * width + x) = _mm_extract_epi32(vtemp4x4, 0);
+        *(uint32_t*)(dst + (y + 1) * width + x) = _mm_extract_epi32(vtemp4x4, 1);
+        *(uint32_t*)(dst + (y + 2) * width + x) = _mm_extract_epi32(vtemp4x4, 2);
+        *(uint32_t*)(dst + (y + 3) * width + x) = _mm_extract_epi32(vtemp4x4, 3);
+
+        *(uint32_t*)(dst + (x + 0) * width + y) = _mm_extract_epi32(v4x4, 0);
+        *(uint32_t*)(dst + (x + 1) * width + y) = _mm_extract_epi32(v4x4, 1);
+        *(uint32_t*)(dst + (x + 2) * width + y) = _mm_extract_epi32(v4x4, 2);
+        *(uint32_t*)(dst + (x + 3) * width + y) = _mm_extract_epi32(v4x4, 3);
       }
     }
   }
