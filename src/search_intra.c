@@ -771,20 +771,23 @@ double kvz_luma_mode_bits(const encoder_state_t *state, int8_t luma_mode, const 
 {
   double mode_bits;
 
-  bool mode_in_preds = false;
-  for (int i = 0; i < 3; ++i) {
+  int8_t mode_in_preds = -1;
+  for (int i = 0; i < INTRA_MPM_COUNT; ++i) {
     if (luma_mode == intra_preds[i]) {
-      mode_in_preds = true;
+      mode_in_preds = i;
+      break;
     }
   }
 
   const cabac_ctx_t *ctx = &(state->cabac.ctx.intra_luma_mpm_flag_model);
-  mode_bits = CTX_ENTROPY_FBITS(ctx, mode_in_preds);
+  mode_bits = CTX_ENTROPY_FBITS(ctx, mode_in_preds!=-1);
 
-  if (mode_in_preds) {
-    mode_bits += ((luma_mode == intra_preds[0]) ? 1 : 2);
+  if (mode_in_preds != -1) {
+    ctx = &(state->cabac.ctx.luma_planar_model[0]);
+    //mode_bits += CTX_ENTROPY_FBITS(ctx, mode_in_preds>0);
+    mode_bits += MIN(4.0,mode_in_preds);
   } else {
-    mode_bits += 5;
+    mode_bits += 6.0;
   }
 
   return mode_bits;
