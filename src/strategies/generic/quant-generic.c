@@ -223,7 +223,7 @@ int kvz_quantize_residual_generic(encoder_state_t *const state,
       for (x = 0; x < width; ++x) {
         sign = residual[x + y * width] >= 0 ? 1 : -1;
         absval = sign * residual[x + y * width];
-        residual[x + y * width] = (int8_t)CLIP(-maxAbsclipBD, maxAbsclipBD, sign * (((absval << CSCALE_FP_PREC) + (lmcs_chroma_adj >> 1)) / lmcs_chroma_adj));
+        residual[x + y * width] = (int16_t)CLIP(-maxAbsclipBD, maxAbsclipBD, sign * (((absval << CSCALE_FP_PREC) + (lmcs_chroma_adj >> 1)) / lmcs_chroma_adj));
       }
     }
   }
