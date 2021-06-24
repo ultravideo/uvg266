@@ -1400,7 +1400,7 @@ static void add_checksum(encoder_state_t * const state)
 
     WRITE_U(stream, 2 + num_colors * 4, 8, "size");
     WRITE_U(stream, 2, 8, "hash_type");  // 2 = checksum
-    WRITE_U(stream, 0, 1, "dph_sei_single_component_flag");
+    WRITE_U(stream, num_colors==1, 1, "dph_sei_single_component_flag");
     WRITE_U(stream, 0, 7, "dph_sei_reserved_zero_7bits");
 
     for (int i = 0; i < num_colors; ++i) {
@@ -1418,7 +1418,7 @@ static void add_checksum(encoder_state_t * const state)
 
     WRITE_U(stream, 2 + num_colors * 16, 8, "size");
     WRITE_U(stream, 0, 8, "hash_type");  // 0 = md5
-    WRITE_U(stream, 0, 1, "dph_sei_single_component_flag");
+    WRITE_U(stream, num_colors==1, 1, "dph_sei_single_component_flag");
     WRITE_U(stream, 0, 7, "dph_sei_reserved_zero_7bits");
 
     for (int i = 0; i < num_colors; ++i) {
