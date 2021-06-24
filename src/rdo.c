@@ -581,8 +581,8 @@ static void calc_last_bits(encoder_state_t * const state, int32_t width, int32_t
   static const int prefix_ctx[8] = { 0, 0, 0, 3, 6, 10, 15, 21 };
   blk_size_offset_x = type ? 0: prefix_ctx[kvz_math_floor_log2(width)];
   blk_size_offset_y = type ? 0: prefix_ctx[kvz_math_floor_log2(height)];
-  shiftX = type ? CLIP(0, 2, width) :((kvz_math_floor_log2(width) +1)>>2);
-  shiftY = type ? CLIP(0, 2, height) :((kvz_math_floor_log2(height) +1)>>2);
+  shiftX = type ? CLIP(0, 2, width>>3) :((kvz_math_floor_log2(width) +1)>>2);
+  shiftY = type ? CLIP(0, 2, height>>3) :((kvz_math_floor_log2(height) +1)>>2);
 
 
   for (ctx = 0; ctx < g_group_idx[ width - 1 ]; ctx++) {
