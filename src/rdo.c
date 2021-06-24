@@ -1440,6 +1440,11 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
       uint32_t  pos_x = blkpos - (pos_y << log2_block_size);
       //===== coefficient level estimation =====
       int32_t  level;
+      if (temp_diag != -1) {
+        ctx_set = (MIN(temp_sum, 4) + 1) + (!temp_diag ? ((type == 0) ? 15 : 5) : (type == 0) ? temp_diag < 3 ? 10 : (temp_diag < 10 ? 5 : 0) : 0);
+      }
+      else ctx_set = 0;
+
       if (reg_bins < 4) {
         int  sumAll = templateAbsSum(coef, 0, pos_x, pos_y, width, height);
         go_rice_param = g_auiGoRiceParsCoeff[sumAll];
@@ -1455,18 +1460,8 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
                                              reg_bins, q_bits, temp, 1, type );
 
         kvz_context_get_sig_ctx_idx_abs(coef, pos_x, pos_y, width, height, type, &temp_diag, &temp_sum);
-        if (temp_diag != -1) {
-          ctx_set = (MIN(temp_sum, 4) + 1) + (!temp_diag ? ((type == 0) ? 15 : 5) : (type == 0) ? temp_diag < 3 ? 10 : (temp_diag < 10 ? 5 : 0) : 0);
-        }
-        else ctx_set = 0;
-
       } else {
         uint16_t ctx_sig = kvz_context_get_sig_ctx_idx_abs(coef, pos_x, pos_y, width, height, type, &temp_diag, &temp_sum);
-        if (temp_diag != -1) {
-          ctx_set = (MIN(temp_sum, 4) + 1) + (!temp_diag ? ((type == 0) ? 15 : 5) : (type == 0) ? temp_diag < 3 ? 10 : (temp_diag < 10 ? 5 : 0) : 0);
-        }
-        else ctx_set = 0;
-
         level              = kvz_get_coded_level(state, &cost_coeff[ scanpos ], &cost_coeff0[ scanpos ], &cost_sig[ scanpos ],
                                              level_double, max_abs_level, ctx_sig, gt1_ctx, gt2_ctx, par_ctx, go_rice_param,
                                              reg_bins, q_bits, temp, 0, type );
