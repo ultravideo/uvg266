@@ -37,7 +37,19 @@ static void array_md5_generic(const kvz_pixel* data,
   kvz_md5_init(&md5_ctx);
   
   unsigned bytes = width * height * sizeof(kvz_pixel);
-  kvz_md5_update(&md5_ctx, (const unsigned char *)data, bytes);
+  uint32_t N = 32;
+  uint32_t width_modN = width % N;
+  uint32_t width_less_modN = width - width_modN;
+
+  for (uint32_t y = 0; y < height; y++)
+  {
+    for (uint32_t x = 0; x < width_less_modN; x += N)
+    {      
+      kvz_md5_update(&md5_ctx, (const unsigned char*)&data[y * stride + x], N);
+    }
+    /* mop up any of the remaining line */
+    kvz_md5_update(&md5_ctx, (const unsigned char*)&data[y * stride + width_less_modN], width_modN);
+  }
 
   kvz_md5_final(checksum_out, &md5_ctx);
 }
