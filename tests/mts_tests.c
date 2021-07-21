@@ -153,7 +153,7 @@ TEST dct(void)
       for (int i = 0; i < LCU_WIDTH * LCU_WIDTH; ++i) {
         ASSERT_EQm(testname, test_result[i], dct_result[trafo][blocksize][i]);
       }
-      fprintf(stderr, "PASS: %s\r\n", testname);
+      //fprintf(stderr, "PASS: %s\r\n", testname);
     }
   }
   
@@ -178,7 +178,7 @@ TEST idct(void)
       for (int i = 0; i < LCU_WIDTH * LCU_WIDTH; ++i) {
         ASSERT_EQm(testname, test_result[i], idct_result[trafo][blocksize][i]);
       }
-      fprintf(stderr, "PASS: %s\r\n", testname);
+      //fprintf(stderr, "PASS: %s\r\n", testname);
     }
   }
 
@@ -207,12 +207,12 @@ SUITE(mts_tests)
     // This allows for selecting a subset of tests with -t parameter.
    if (strcmp(strategy->type, "mts_dct") == 0)
     {
-      fprintf(stderr, "Test: %s\r\n", strategy->strategy_name);
+      //fprintf(stderr, "Test: %s\r\n", strategy->strategy_name);
       RUN_TEST(dct);
     }
     else if (strcmp(strategy->type, "mts_idct") == 0)
     {
-      fprintf(stderr, "Test: %s\r\n", strategy->strategy_name);
+      //fprintf(stderr, "Test: %s\r\n", strategy->strategy_name);
       RUN_TEST(idct);
     }
   }

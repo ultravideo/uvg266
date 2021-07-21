@@ -1528,8 +1528,8 @@ static void mts_idct_32x32_avx2(const int16_t* input, int16_t* output, tr_type_t
   const int skip_width = (type_hor != DCT2) ? 16 : 0;
   const int skip_height = (type_ver != DCT2) ? 16 : 0;
 
-  mul_clip_matrix_32x32_mts_avx2(tdct, input, tmp, shift_1st, skip_width, skip_height);
-  mul_clip_matrix_32x32_mts_avx2(tmp, dct, output, shift_2nd, 0, skip_width);
+  mul_clip_matrix_32x32_mts_avx2(tdct, input, tmp, shift_1st, skip_height,0);
+  mul_clip_matrix_32x32_mts_avx2(tmp, dct, output, shift_2nd, 0, 0);
 }
 
 typedef void tr_func(const int16_t*, int16_t*, tr_type_t , tr_type_t , uint8_t);
