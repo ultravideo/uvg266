@@ -1301,6 +1301,9 @@ static void mts_dct_16x16_avx2(const int16_t* input, int16_t* output, tr_type_t 
   matmul_16x16_a_bt(d_v2, tmp, o_v, shift_2nd);
 }
 
+/**********/
+//ToDo: This function is not optimised! (DCT8/DST7 inverse 16x16)
+/***********/
 static void partial_butterfly_inverse_16_mts_avx2(const int16_t* src, int16_t* dst, int32_t shift, tr_type_t type)
 {
   int j, k;
