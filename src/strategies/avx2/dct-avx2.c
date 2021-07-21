@@ -1194,7 +1194,7 @@ const int16_t* kvz_g_mts_input[2][3][5] = {
   },
   {
     {&kvz_g_dct_4_t[0][0],  &kvz_g_dct_8_t[0][0],  &kvz_g_dct_16_t[0][0],  &kvz_g_dct_32_t[0][0], NULL},
-    {&kvz_g_dct8_4[0][0], &kvz_g_dct8_8[0][0], &kvz_g_dct8_16[0][0], &kvz_g_dct8_32[0][0], NULL},
+    {  &kvz_g_dct8_4[0][0],   &kvz_g_dct8_8[0][0],   &kvz_g_dct8_16[0][0],   &kvz_g_dct8_32[0][0], NULL},
     {&kvz_g_dst7_4_t[0][0], &kvz_g_dst7_8_t[0][0], &kvz_g_dst7_16_t[0][0], &kvz_g_dst7_32_t[0][0], NULL}
   },
 };
@@ -1303,97 +1303,85 @@ static void mts_dct_16x16_avx2(const int16_t* input, int16_t* output, tr_type_t 
 
 static void partial_butterfly_inverse_16_mts_avx2(const int16_t* src, int16_t* dst, int32_t shift, tr_type_t type)
 {
-  __m256i tsrc[16];
+  int j, k;
+  int32_t a[5], b[5], c[5], d[5], t;
+  int32_t add = (shift > 0) ? (1 << (shift - 1)) : 0;
 
-  const uint32_t width = 16;
+  const int16_t* iT = &kvz_g_dst7_16[0][0];
 
-  const int16_t* tdct = kvz_g_mts_input[1][type][2];
+  const int  line = 16;
 
-  const __m256i  eo_signmask = _mm256_setr_epi32(1, 1, 1, 1, -1, -1, -1, -1);
-  const __m256i eeo_signmask = _mm256_setr_epi32(1, 1, -1, -1, -1, -1, 1, 1);
-  const __m256i   o_signmask = _mm256_set1_epi32(-1);
+  if (type == DST7) {
+    for (j = 0; j < 16; j++)
+    {
+      for (k = 0; k < 5; k++)
+      {
+        a[k] = src[k * line] + src[(10 - k) * line];
+        b[k] = src[(11 + k) * line] + src[(10 - k) * line];
+        c[k] = src[k * line] - src[(11 + k) * line];
+        d[k] = src[k * line] + src[(11 + k) * line] - src[(10 - k) * line];
+      }
 
-  const __m256i final_shufmask = _mm256_setr_epi8(0, 1, 2, 3, 4, 5, 6, 7,
-    8, 9, 10, 11, 12, 13, 14, 15,
-    6, 7, 4, 5, 2, 3, 0, 1,
-    14, 15, 12, 13, 10, 11, 8, 9);
-  transpose_16x16(src, (int16_t*)tsrc);
+      t = iT[10] * src[5 * line];
 
-  const __m256i dct_cols[8] = {
-    _mm256_load_si256((const __m256i*)tdct + 0),
-    _mm256_load_si256((const __m256i*)tdct + 1),
-    _mm256_load_si256((const __m256i*)tdct + 2),
-    _mm256_load_si256((const __m256i*)tdct + 3),
-    _mm256_load_si256((const __m256i*)tdct + 4),
-    _mm256_load_si256((const __m256i*)tdct + 5),
-    _mm256_load_si256((const __m256i*)tdct + 6),
-    _mm256_load_si256((const __m256i*)tdct + 7),
-  };
+      dst[2] = (short)CLIP(-32768, 32767, (iT[2] * d[0] + iT[8] * d[1] + iT[14] * d[2] + iT[11] * d[3] + iT[5] * d[4] + add) >> shift);
+      dst[5] = (short)CLIP(-32768, 32767, (iT[5] * d[0] + iT[14] * d[1] + iT[2] * d[2] - iT[8] * d[3] - iT[11] * d[4] + add) >> shift);
+      dst[8] = (short)CLIP(-32768, 32767, (iT[8] * d[0] + iT[5] * d[1] - iT[11] * d[2] - iT[2] * d[3] + iT[14] * d[4] + add) >> shift);
+      dst[11] = (short)CLIP(-32768, 32767, (iT[11] * d[0] - iT[2] * d[1] - iT[5] * d[2] + iT[14] * d[3] - iT[8] * d[4] + add) >> shift);
+      dst[14] = (short)CLIP(-32768, 32767, (iT[14] * d[0] - iT[11] * d[1] + iT[8] * d[2] - iT[5] * d[3] + iT[2] * d[4] + add) >> shift);
 
-  // These contain: D1,0 D3,0 D5,0 D7,0 D9,0 Db,0 Dd,0 Df,0 | D1,4 D3,4 D5,4 D7,4 D9,4 Db,4 Dd,4 Df,4
-  //                D1,1 D3,1 D5,1 D7,1 D9,1 Db,1 Dd,1 Df,1 | D1,5 D3,5 D5,5 D7,5 D9,5 Db,5 Dd,5 Df,5
-  //                D1,2 D3,2 D5,2 D7,2 D9,2 Db,2 Dd,2 Df,2 | D1,6 D3,6 D5,6 D7,6 D9,6 Db,6 Dd,6 Df,6
-  //                D1,3 D3,3 D5,3 D7,3 D9,3 Db,3 Dd,3 Df,3 | D1,7 D3,7 D5,7 D7,7 D9,7 Db,7 Dd,7 Df,7
-  __m256i dct_col_odds[4];
-  for (uint32_t j = 0; j < 4; j++) {
-    dct_col_odds[j] = extract_combine_odds(dct_cols[j + 0], dct_cols[j + 4]);
+      dst[10] = (short)CLIP(-32768, 32767, (iT[10] * (src[0 * line] - src[2 * line] + src[3 * line] - src[5 * line]
+        + src[6 * line] - src[8 * line] + src[9 * line] - src[11 * line]
+        + src[12 * line] - src[14 * line] + src[15 * line]) + add) >> shift);
+
+      dst[0] = (short)CLIP(-32768, 32767, (iT[0] * a[0] + iT[9] * b[0] + iT[2] * a[1] + iT[7] * b[1] + iT[4] * a[2] + iT[5] * b[2] + iT[6] * a[3] + iT[3] * b[3] + iT[8] * a[4] + iT[1] * b[4] + t + add) >> shift);
+      dst[1] = (short)CLIP(-32768, 32767, (iT[1] * c[0] - iT[8] * b[0] + iT[5] * c[1] - iT[4] * b[1] + iT[9] * c[2] - iT[0] * b[2] + iT[2] * a[3] + iT[7] * c[3] + iT[6] * a[4] + iT[3] * c[4] + t + add) >> shift);
+      dst[3] = (short)CLIP(-32768, 32767, (iT[3] * a[0] + iT[6] * b[0] + iT[0] * c[1] + iT[9] * a[1] + iT[1] * a[2] + iT[8] * c[2] + iT[4] * c[3] - iT[5] * b[3] - iT[2] * a[4] - iT[7] * b[4] - t + add) >> shift);
+      dst[4] = (short)CLIP(-32768, 32767, (iT[4] * c[0] - iT[5] * b[0] + iT[6] * c[1] + iT[3] * a[1] + iT[7] * a[2] + iT[2] * b[2] - iT[1] * c[3] + iT[8] * b[3] - iT[9] * c[4] - iT[0] * a[4] - t + add) >> shift);
+      dst[6] = (short)CLIP(-32768, 32767, (iT[6] * a[0] + iT[3] * b[0] + iT[9] * c[1] + iT[0] * a[1] - iT[1] * a[2] - iT[8] * b[2] - iT[4] * c[3] - iT[5] * a[3] - iT[2] * c[4] + iT[7] * b[4] + t + add) >> shift);
+      dst[7] = (short)CLIP(-32768, 32767, (iT[7] * c[0] - iT[2] * b[0] + iT[8] * a[1] + iT[1] * b[1] - iT[6] * c[2] + iT[3] * b[2] - iT[9] * a[3] - iT[0] * b[3] + iT[5] * c[4] - iT[4] * b[4] + t + add) >> shift);
+      dst[9] = (short)CLIP(-32768, 32767, (iT[9] * a[0] + iT[0] * b[0] + iT[2] * c[1] - iT[7] * b[1] - iT[5] * c[2] - iT[4] * a[2] + iT[3] * a[3] + iT[6] * b[3] + iT[8] * c[4] - iT[1] * b[4] - t + add) >> shift);
+      dst[12] = (short)CLIP(-32768, 32767, (iT[1] * c[0] + iT[8] * a[0] - iT[5] * a[1] - iT[4] * b[1] - iT[0] * c[2] + iT[9] * b[2] + iT[7] * c[3] - iT[2] * b[3] - iT[6] * c[4] - iT[3] * a[4] + t + add) >> shift);
+      dst[13] = (short)CLIP(-32768, 32767, (iT[7] * c[0] + iT[2] * a[0] - iT[8] * c[1] + iT[1] * b[1] + iT[3] * c[2] - iT[6] * b[2] + iT[0] * a[3] + iT[9] * b[3] - iT[5] * a[4] - iT[4] * b[4] + t + add) >> shift);
+      dst[15] = (short)CLIP(-32768, 32767, (iT[4] * c[0] + iT[5] * a[0] - iT[3] * c[1] - iT[6] * a[1] + iT[2] * c[2] + iT[7] * a[2] - iT[1] * c[3] - iT[8] * a[3] + iT[0] * c[4] + iT[9] * a[4] - t + add) >> shift);
+      src++;
+      dst += 16;
+    }
   }
-  for (uint32_t j = 0; j < width; j++) {
-    __m256i col = tsrc[j];
-    __m256i odds = extract_odds(col);
+  else {
+    for (j = 0; j < 16; j++)
+    {
+      for (k = 0; k < 5; k++)
+      {
+        a[k] = src[(15 - k) * line] + src[(4 - k) * line];
+        b[k] = src[(6 + k) * line] + src[(4 - k) * line];
+        c[k] = src[(15 - k) * line] - src[(6 + k) * line];
+        d[k] = src[(15 - k) * line] + src[(6 + k) * line] - src[(4 - k) * line];
+      }
 
-    __m256i o04 = _mm256_madd_epi16(odds, dct_col_odds[0]);
-    __m256i o15 = _mm256_madd_epi16(odds, dct_col_odds[1]);
-    __m256i o26 = _mm256_madd_epi16(odds, dct_col_odds[2]);
-    __m256i o37 = _mm256_madd_epi16(odds, dct_col_odds[3]);
+      t = iT[10] * src[5 * line];
 
-    __m256i o0145 = _mm256_hadd_epi32(o04, o15);
-    __m256i o2367 = _mm256_hadd_epi32(o26, o37);
+      dst[1] = (short)CLIP(-32768, 32767, (-iT[2] * d[0] - iT[5] * d[1] - iT[8] * d[2] - iT[11] * d[3] - iT[14] * d[4] + add) >> shift);
+      dst[4] = (short)CLIP(-32768, 32767, (iT[8] * d[0] + iT[14] * d[1] + iT[5] * d[2] - iT[2] * d[3] - iT[11] * d[4] + add) >> shift);
+      dst[7] = (short)CLIP(-32768, 32767, (-iT[14] * d[0] - iT[2] * d[1] + iT[11] * d[2] + iT[5] * d[3] - iT[8] * d[4] + add) >> shift);
+      dst[10] = (short)CLIP(-32768, 32767, (iT[11] * d[0] - iT[8] * d[1] - iT[2] * d[2] + iT[14] * d[3] - iT[5] * d[4] + add) >> shift);
+      dst[13] = (short)CLIP(-32768, 32767, (-iT[5] * d[0] + iT[11] * d[1] - iT[14] * d[2] + iT[8] * d[3] - iT[2] * d[4] + add) >> shift);
 
-    __m256i o = _mm256_hadd_epi32(o0145, o2367);
+      dst[5] = (short)CLIP(-32768, 32767, (-iT[10] * (src[15 * line] + src[14 * line] - src[12 * line] - src[11 * line] + src[9 * line] + src[8 * line] - src[6 * line] - src[5 * line] + src[3 * line] + src[2 * line] - src[0 * line]) + add) >> shift);
 
-    // D0,2 D0,6 D1,2 D1,6 D1,a D1,e D0,a D0,e | D2,2 D2,6 D3,2 D3,6 D3,a D3,e D2,a D2,e
-    __m256i d_db2 = extract_26ae(dct_cols);
-
-    // 2 6 2 6 a e a e | 2 6 2 6 a e a e
-    __m256i t_db2 = extract_26ae_vec(col);
-
-    __m256i eo_parts = _mm256_madd_epi16(d_db2, t_db2);
-    __m256i eo_parts2 = _mm256_shuffle_epi32(eo_parts, _MM_SHUFFLE(0, 1, 2, 3));
-
-    // EO0 EO1 EO1 EO0 | EO2 EO3 EO3 EO2
-    __m256i eo = _mm256_add_epi32(eo_parts, eo_parts2);
-    __m256i eo2 = _mm256_permute4x64_epi64(eo, _MM_SHUFFLE(1, 3, 2, 0));
-    __m256i eo3 = _mm256_sign_epi32(eo2, eo_signmask);
-
-    __m256i d_db4 = extract_d048c(dct_cols);
-    __m256i t_db4 = extract_d048c_vec(col);
-    __m256i eee_eeo = _mm256_madd_epi16(d_db4, t_db4);
-
-    __m256i eee_eee = _mm256_permute4x64_epi64(eee_eeo, _MM_SHUFFLE(3, 0, 3, 0));
-    __m256i eeo_eeo1 = _mm256_permute4x64_epi64(eee_eeo, _MM_SHUFFLE(1, 2, 1, 2));
-
-    __m256i eeo_eeo2 = _mm256_sign_epi32(eeo_eeo1, eeo_signmask);
-
-    // EE0 EE1 EE2 EE3 | EE3 EE2 EE1 EE0
-    __m256i ee = _mm256_add_epi32(eee_eee, eeo_eeo2);
-    __m256i e = _mm256_add_epi32(ee, eo3);
-
-    __m256i o_neg = _mm256_sign_epi32(o, o_signmask);
-    __m256i o_lo = _mm256_blend_epi32(o, o_neg, 0xf0); // 1111 0000
-    __m256i o_hi = _mm256_blend_epi32(o, o_neg, 0x0f); // 0000 1111
-
-    __m256i res_lo = _mm256_add_epi32(e, o_lo);
-    __m256i res_hi = _mm256_add_epi32(e, o_hi);
-    __m256i res_hi2 = _mm256_permute4x64_epi64(res_hi, _MM_SHUFFLE(1, 0, 3, 2));
-
-    __m256i res_lo_t = truncate_inv(res_lo, shift);
-    __m256i res_hi_t = truncate_inv(res_hi2, shift);
-
-    __m256i res_16_1 = _mm256_packs_epi32(res_lo_t, res_hi_t);
-    __m256i final = _mm256_shuffle_epi8(res_16_1, final_shufmask);
-
-    _mm256_store_si256((__m256i*)dst + j, final);
+      dst[0] = (short)CLIP(-32768, 32767, (iT[0] * a[0] + iT[9] * b[0] + iT[1] * a[1] + iT[8] * b[1] + iT[2] * a[2] + iT[7] * b[2] + iT[3] * a[3] + iT[6] * b[3] + iT[4] * a[4] + iT[5] * b[4] + t + add) >> shift);
+      dst[2] = (short)CLIP(-32768, 32767, (iT[4] * c[0] - iT[5] * b[0] + iT[9] * c[1] - iT[0] * b[1] + iT[6] * c[2] + iT[3] * a[2] + iT[1] * c[3] + iT[8] * a[3] + iT[7] * a[4] + iT[2] * b[4] - t + add) >> shift);
+      dst[3] = (short)CLIP(-32768, 32767, (-iT[6] * a[0] - iT[3] * b[0] - iT[2] * c[1] - iT[7] * a[1] - iT[9] * c[2] - iT[0] * a[2] - iT[4] * c[3] + iT[5] * b[3] + iT[1] * a[4] + iT[8] * b[4] - t + add) >> shift);
+      dst[6] = (short)CLIP(-32768, 32767, (iT[8] * a[0] + iT[1] * c[0] + iT[6] * c[1] - iT[3] * b[1] - iT[5] * a[2] - iT[4] * b[2] - iT[7] * c[3] - iT[2] * a[3] - iT[0] * c[4] + iT[9] * b[4] + t + add) >> shift);
+      dst[8] = (short)CLIP(-32768, 32767, (iT[4] * c[0] + iT[5] * a[0] - iT[0] * c[1] + iT[9] * b[1] - iT[3] * c[2] - iT[6] * a[2] + iT[1] * c[3] - iT[8] * b[3] + iT[2] * c[4] + iT[7] * a[4] - t + add) >> shift);
+      dst[9] = (short)CLIP(-32768, 32767, (-iT[7] * c[0] - iT[2] * a[0] + iT[4] * a[1] + iT[5] * b[1] + iT[8] * c[2] - iT[1] * b[2] - iT[9] * a[3] - iT[0] * b[3] - iT[3] * c[4] + iT[6] * b[4] - t + add) >> shift);
+      dst[11] = (short)CLIP(-32768, 32767, (-iT[9] * a[0] - iT[0] * b[0] + iT[8] * c[1] + iT[1] * a[1] - iT[2] * c[2] + iT[7] * b[2] - iT[6] * a[3] - iT[3] * b[3] + iT[5] * c[4] + iT[4] * a[4] + t + add) >> shift);
+      dst[12] = (short)CLIP(-32768, 32767, (iT[7] * c[0] - iT[2] * b[0] - iT[5] * c[1] - iT[4] * a[1] + iT[8] * a[2] + iT[1] * b[2] - iT[0] * a[3] - iT[9] * b[3] - iT[6] * c[4] + iT[3] * b[4] + t + add) >> shift);
+      dst[14] = (short)CLIP(-32768, 32767, (iT[3] * a[0] + iT[6] * b[0] - iT[7] * a[1] - iT[2] * b[1] + iT[0] * c[2] + iT[9] * a[2] - iT[4] * c[3] - iT[5] * a[3] + iT[8] * c[4] + iT[1] * a[4] - t + add) >> shift);
+      dst[15] = (short)CLIP(-32768, 32767, (-iT[1] * c[0] + iT[8] * b[0] + iT[3] * c[1] - iT[6] * b[1] - iT[5] * c[2] + iT[4] * b[2] + iT[7] * c[3] - iT[2] * b[3] - iT[9] * c[4] + iT[0] * b[4] - t + add) >> shift);
+      src++;
+      dst += 16;
+    }
   }
 }
 
