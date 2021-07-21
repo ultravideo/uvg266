@@ -28,6 +28,7 @@ extern SUITE(intra_sad_tests);
 extern SUITE(satd_tests);
 extern SUITE(speed_tests);
 extern SUITE(dct_tests);
+extern SUITE(mts_tests);
 #endif //KVZ_BIT_DEPTH == 8
 
 extern SUITE(coeff_sum_tests);
@@ -44,6 +45,7 @@ int main(int argc, char **argv)
   RUN_SUITE(intra_sad_tests);
   RUN_SUITE(satd_tests);
   RUN_SUITE(dct_tests);
+  RUN_SUITE(mts_tests);
 
   if (greatest_info.suite_filter &&
       greatest_name_match("speed", greatest_info.suite_filter))

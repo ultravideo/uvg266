@@ -23,6 +23,7 @@ check_PROGRAMS = kvazaar_tests
 kvazaar_tests_SOURCES = \
 	coeff_sum_tests.c \
 	dct_tests.c \
+  mts_tests.c \
 	intra_sad_tests.c \
 	mv_cand_tests.c \
 	sad_tests.c \
