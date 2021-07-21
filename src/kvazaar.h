@@ -230,6 +230,16 @@ enum kvz_mts {
   KVZ_MTS_IMPLICIT = 4,
 };
 
+
+//MTS transform tags
+typedef enum tr_type_t {
+  DCT2 = 0,
+  DCT8 = 1,
+  DST7 = 2,
+  NUM_TRANS_TYPE = 3,
+  DCT2_MTS = 4
+} tr_type_t;
+
 enum kvz_scalinglist {
   KVZ_SCALING_LIST_OFF = 0,
   KVZ_SCALING_LIST_CUSTOM = 1,

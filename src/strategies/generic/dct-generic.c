@@ -2413,19 +2413,11 @@ static partial_tr_func* idct_table[3][5] = {
 };
 
 
-//MTS transform tags
-typedef enum tr_type_t {
-  DCT2 = 0,
-  DCT8 = 1,
-  DST7 = 2,
-  NUM_TRANS_TYPE = 3,
-  DCT2_MTS = 4
-} tr_type_t;
-
 static const tr_type_t mts_subset_intra[4][2] = { { DST7, DST7 }, { DCT8, DST7 }, { DST7, DCT8 }, { DCT8, DCT8 } };
 static const tr_type_t mts_subset_inter[2] = { DCT8, DST7 };
 
-static INLINE void get_tr_type(
+
+void kvz_get_tr_type(
   int8_t width,
   color_t color,
   const cu_info_t* tu,
@@ -2485,7 +2477,7 @@ static void mts_dct_generic(
   tr_type_t type_hor;
   tr_type_t type_ver;
 
-  get_tr_type(width, color, tu, &type_hor, &type_ver, mts_idx);
+  kvz_get_tr_type(width, color, tu, &type_hor, &type_ver, mts_idx);
 
   if (type_hor == DCT2 && type_ver == DCT2)
   {
@@ -2524,7 +2516,7 @@ static void mts_idct_generic(
   tr_type_t type_hor;
   tr_type_t type_ver;
 
-  get_tr_type(width, color, tu, &type_hor, &type_ver, mts_idx);
+  kvz_get_tr_type(width, color, tu, &type_hor, &type_ver, mts_idx);
 
   if (type_hor == DCT2 && type_ver == DCT2)
   {
