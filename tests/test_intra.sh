@@ -10,4 +10,5 @@ common_args='256x128 10 yuv420p -p1 --preset=ultrafast --threads=0 --no-wpp --no
 valgrind_test $common_args --rd=1
 valgrind_test $common_args --rd=2 --no-transform-skip --qp 37
 valgrind_test $common_args --rd=2 --no-transform-skip --qp 37 --signhide --rdoq 
+valgrind_test $common_args --wpp --threads=5 --owf=10
 
