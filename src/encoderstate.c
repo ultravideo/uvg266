@@ -1061,6 +1061,11 @@ static void encoder_state_worker_encode_children(void * opaque)
     if (sub_state->tile->wf_jobs[end_of_row]) {
       sub_state->tqj_bitstream_written =
         kvz_threadqueue_copy_ref(sub_state->tile->wf_jobs[end_of_row]);
+      if (sub_state->encoder_control->cfg.alf_type) {
+        encoder_state_t* parent = sub_state->parent;
+        while (parent->parent != NULL) parent = parent->parent;
+        kvz_threadqueue_job_dep_add(parent->tqj_alf_process, sub_state->tile->wf_jobs[end_of_row]);
+      }
     }
   }
 }
@@ -1710,6 +1715,11 @@ void kvz_encode_one_frame(encoder_state_t * const state, kvz_picture* frame)
   if (state->frame->num == 0) kvz_cabac_bins_verbose = true;
   else kvz_cabac_bins_verbose = false;
 #endif
+  // Create a separate job for ALF done after everything else, and only then do final bitstream writing (for ALF parameters)
+  if (state->encoder_control->cfg.alf_type && state->encoder_control->cfg.wpp) {
+    state->tqj_alf_process = kvz_threadqueue_job_create(kvz_alf_enc_process_job, state);
+  }
+
   encoder_state_init_new_frame(state, frame);
   encoder_state_encode(state);
 
@@ -1717,28 +1727,20 @@ void kvz_encode_one_frame(encoder_state_t * const state, kvz_picture* frame)
     kvz_threadqueue_job_create(kvz_encoder_state_worker_write_bitstream, state);
 
 
-  // Create a separate job for ALF done after everything else, and only then do final bitstream writing (for ALF parameters)
   if (state->encoder_control->cfg.alf_type && state->encoder_control->cfg.wpp) {
-    threadqueue_job_t* alf_job = kvz_threadqueue_job_create(kvz_alf_enc_process_job, state);
-    _encode_one_frame_add_bitstream_deps(state, alf_job);
-    if (state->previous_encoder_state != state && state->previous_encoder_state->tqj_bitstream_written) {
-      //We need to depend on previous bitstream generation
-      kvz_threadqueue_job_dep_add(alf_job, state->previous_encoder_state->tqj_bitstream_written);
-    }
-    kvz_threadqueue_submit(state->encoder_control->threadqueue, alf_job);
-    kvz_threadqueue_job_dep_add(job, alf_job);
-  } else {
-    _encode_one_frame_add_bitstream_deps(state, job);
-    if (state->previous_encoder_state != state && state->previous_encoder_state->tqj_bitstream_written) {
-      //We need to depend on previous bitstream generation
-      kvz_threadqueue_job_dep_add(job, state->previous_encoder_state->tqj_bitstream_written);
-    }
+    kvz_threadqueue_submit(state->encoder_control->threadqueue, state->tqj_alf_process);
+    kvz_threadqueue_job_dep_add(job, state->tqj_alf_process);
   }
-  kvz_threadqueue_submit(state->encoder_control->threadqueue, job);
-  assert(!state->tqj_bitstream_written);
-  state->tqj_bitstream_written = job;
 
+  _encode_one_frame_add_bitstream_deps(state, job);
+  if (state->previous_encoder_state != state && state->previous_encoder_state->tqj_bitstream_written) {
+    //We need to depend on previous bitstream generation
+    kvz_threadqueue_job_dep_add(job, state->previous_encoder_state->tqj_bitstream_written);
+  }  
+  assert(!state->tqj_bitstream_written);
+  state->tqj_bitstream_written = job;  
   state->frame->done = 0;
+  kvz_threadqueue_submit(state->encoder_control->threadqueue, job);
 }
 
 

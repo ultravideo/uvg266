@@ -342,6 +342,7 @@ typedef struct encoder_state_t {
   //Jobs to wait for
   threadqueue_job_t * tqj_recon_done; //Reconstruction is done
   threadqueue_job_t * tqj_bitstream_written; //Bitstream is written
+  threadqueue_job_t*  tqj_alf_process; //ALF processed for the slice
 
   //Constraint structure  
   void * constraint;
