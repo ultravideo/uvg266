@@ -900,6 +900,11 @@ static void encoder_state_worker_encode_lcu_bitstream(void * opaque)
   }
 }
 
+
+void kvz_alf_enc_process_job(void* opaque) {
+  kvz_alf_enc_process((encoder_state_t* const)opaque);
+}
+
 static void encoder_state_encode_leaf(encoder_state_t * const state)
 {
   const encoder_control_t * const encoder = state->encoder_control;
@@ -1711,10 +1716,23 @@ void kvz_encode_one_frame(encoder_state_t * const state, kvz_picture* frame)
   threadqueue_job_t *job =
     kvz_threadqueue_job_create(kvz_encoder_state_worker_write_bitstream, state);
 
-  _encode_one_frame_add_bitstream_deps(state, job);
-  if (state->previous_encoder_state != state && state->previous_encoder_state->tqj_bitstream_written) {
-    //We need to depend on previous bitstream generation
-    kvz_threadqueue_job_dep_add(job, state->previous_encoder_state->tqj_bitstream_written);
+
+  // Create a separate job for ALF done after everything else, and only then do final bitstream writing (for ALF parameters)
+  if (state->encoder_control->cfg.alf_type && state->encoder_control->cfg.wpp) {
+    threadqueue_job_t* alf_job = kvz_threadqueue_job_create(kvz_alf_enc_process_job, state);
+    _encode_one_frame_add_bitstream_deps(state, alf_job);
+    if (state->previous_encoder_state != state && state->previous_encoder_state->tqj_bitstream_written) {
+      //We need to depend on previous bitstream generation
+      kvz_threadqueue_job_dep_add(alf_job, state->previous_encoder_state->tqj_bitstream_written);
+    }
+    kvz_threadqueue_submit(state->encoder_control->threadqueue, alf_job);
+    kvz_threadqueue_job_dep_add(job, alf_job);
+  } else {
+    _encode_one_frame_add_bitstream_deps(state, job);
+    if (state->previous_encoder_state != state && state->previous_encoder_state->tqj_bitstream_written) {
+      //We need to depend on previous bitstream generation
+      kvz_threadqueue_job_dep_add(job, state->previous_encoder_state->tqj_bitstream_written);
+    }
   }
   kvz_threadqueue_submit(state->encoder_control->threadqueue, job);
   assert(!state->tqj_bitstream_written);
