@@ -52,6 +52,7 @@ videoframe_t * kvz_videoframe_alloc(int32_t width,
   if (alf_type) {
     frame->alf_info = MALLOC(alf_info_t, 1);
     kvz_alf_create(frame, chroma_format);
+    kvz_set_aps_map(frame, alf_type);
   }
 
   return frame;
@@ -87,6 +88,7 @@ int kvz_videoframe_free(videoframe_t * const frame)
   {
     kvz_alf_destroy(frame);
     FREE_POINTER(frame->alf_info);
+    FREE_POINTER(frame->alf_param_set_map);
   }
   
   free(frame);

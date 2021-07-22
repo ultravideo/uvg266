@@ -499,9 +499,6 @@ typedef struct kvz_config
 
   char *fastrd_learning_outdir_fn;
 
-
-  struct param_set_map *param_set_map;
-
   int8_t num_used_table;
   int8_t qp_table_start_minus26[3];
   int8_t qp_table_length_minus1[3];

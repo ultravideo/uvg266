@@ -212,10 +212,6 @@ int kvz_config_destroy(kvz_config *cfg)
     FREE_POINTER(cfg->roi.dqps);
     FREE_POINTER(cfg->optional_key);
     FREE_POINTER(cfg->fastrd_learning_outdir_fn);
-    if (cfg->param_set_map)
-    {
-      FREE_POINTER(cfg->param_set_map);
-    }
   }
   free(cfg);
 
@@ -905,10 +901,6 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     int8_t alf_type = 0;
     if (!parse_enum(value, alf_names, &alf_type)) alf_type = atobool(value) ? 2 : 0;
     cfg->alf_type = alf_type;
-    if (alf_type)
-    {
-      kvz_set_aps_map(cfg);
-    }
   }
   else if OPT("rdoq")
     cfg->rdoq_enable = atobool(value);
