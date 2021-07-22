@@ -1190,8 +1190,8 @@ static void code_alf_ctu_enable_flag(encoder_state_t * const state,
   {
     int frame_width_in_ctus = state->tile->frame->width_in_lcu;
 
-    bool left_avail = state->lcu_order[ctu_rs_addr].left ? 1 : 0;
-    bool above_avail = state->lcu_order[ctu_rs_addr].above ? 1 : 0;
+    bool left_avail = ctu_rs_addr % frame_width_in_ctus ? 1 : 0;
+    bool above_avail = ctu_rs_addr/ frame_width_in_ctus ? 1 : 0;
 
     int left_ctu_addr = left_avail ? ctu_rs_addr - 1 : -1;
     int above_ctu_addr = above_avail ? ctu_rs_addr - frame_width_in_ctus : -1;
@@ -1212,7 +1212,7 @@ static void code_alf_ctu_enable_flags_component(encoder_state_t * const state,
   alf_component_id component_id,
   alf_aps *aps)
 {
-  const int32_t num_ctus_in_pic = state->lcu_order_count;
+  const int32_t num_ctus_in_pic = state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu;
   for (int ctu_idx = 0; ctu_idx < num_ctus_in_pic; ctu_idx++)
   {
     code_alf_ctu_enable_flag(state, cabac, ctu_idx, component_id, aps);
@@ -1325,7 +1325,7 @@ static void code_alf_ctu_alternatives_component(encoder_state_t * const state,
 {
   if (comp_id == COMPONENT_Y)
     return;
-  uint32_t num_ctus = state->lcu_order_count;
+  uint32_t num_ctus = state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu;
   bool* ctb_alf_flag = state->tile->frame->alf_info->ctu_enable_flag[comp_id];
   for (int ctu_idx = 0; ctu_idx < num_ctus; ctu_idx++)
   {
@@ -1357,9 +1357,10 @@ static void code_cc_alf_filter_control_idc(encoder_state_t * const state,
   const int filter_count)
 {
   assert(!(idc_val > filter_count)); //Filter index is too large
+  int width_in_lcu = state->tile->frame->width_in_lcu;
 
-  bool left_avail = state->lcu_order[ctu_idx].left ? 1 : 0;
-  bool above_avail = state->lcu_order[ctu_idx].above ? 1 : 0;
+  bool left_avail = ctu_idx % width_in_lcu ? 1 : 0;
+  bool above_avail = ctu_idx / width_in_lcu ? 1 : 0;
   int ctxt = 0;
 
   if (left_avail)
@@ -2315,7 +2316,7 @@ static void derive_cc_alf_filter(encoder_state_t * const state, alf_component_id
   int max_ctu_width_log2 = kvz_math_floor_log2(LCU_WIDTH);
   //int max_ctu_width_log2_chrma = kvz_math_floor_log2(LCU_WIDTH) >> scale_x;
   int32_t ctus_in_width = state->tile->frame->width_in_lcu;
-  const uint32_t num_ctus_in_pic = state->lcu_order_count;
+  const uint32_t num_ctus_in_pic = state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu;
   short best_filter_coeff_set[MAX_NUM_CC_ALF_FILTERS][MAX_NUM_CC_ALF_CHROMA_COEFF];
   bool best_filter_idx_enabled[MAX_NUM_CC_ALF_FILTERS];
   uint8_t best_filter_count = 0;
@@ -2483,7 +2484,7 @@ static void derive_cc_alf_filter(encoder_state_t * const state, alf_component_id
           {
             if (!referencing_existing_aps)
             {
-              get_frame_stats_cc_alf(alf_covariance_cc_alf, alf_covariance_frame_cc_alf, (filter_idx + 1), state->lcu_order_count, training_cov_control);
+              get_frame_stats_cc_alf(alf_covariance_cc_alf, alf_covariance_frame_cc_alf, (filter_idx + 1), num_ctus_in_pic, training_cov_control);
               derive_cc_alf_filter_coeff(alf_covariance_frame_cc_alf, cc_alf_filter_coeff, filter_idx);
             }
 
@@ -2850,7 +2851,7 @@ static void derive_stats_for_cc_alf_filtering(encoder_state_t * const state,
 {
   alf_covariance **alf_covariance_cc_alf = state->tile->frame->alf_info->alf_covariance_cc_alf;
   alf_covariance *alf_covariance_frame_cc_alf = state->tile->frame->alf_info->alf_covariance_frame_cc_alf[comp_idx - 1];
-  const int32_t num_ctus_in_pic = state->lcu_order_count;
+  const int32_t num_ctus_in_pic = state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu;
   const int filter_idx = filter_idc - 1;
 
   // init CTU stats buffers
@@ -3069,7 +3070,7 @@ static double alf_derive_ctb_alf_enable_flags(encoder_state_t * const state,
   const kvz_pixel comp_id_last = is_luma ? COMPONENT_Y : COMPONENT_Cr;
   const int num_alts = is_luma ? 1 : alf_param_temp->num_alternatives_chroma;
   const int8_t bit_depth = state->encoder_control->bitdepth;
-  const int32_t num_ctus_in_pic = state->lcu_order_count;
+  const int32_t num_ctus_in_pic = state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu;
   int num_coeff = is_luma ? 13 : 7;
   double cost = 0;
   double lambda = state->frame->lambda;
@@ -3918,7 +3919,7 @@ static double alf_get_filter_coeff_and_cost(encoder_state_t * const state,
   double lambda = state->frame->lambda;
   int clip_merged[MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_LUMA_COEFF];
   const int8_t bit_depth = state->encoder_control->bitdepth;
-  const int32_t num_ctus_in_pic = state->lcu_order_count;
+  const int32_t num_ctus_in_pic = state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu;
   alf_covariance *alf_cov_frame = is_luma ? alf_info->alf_covariance_frame_luma : alf_info->alf_covariance_frame_chroma;
 
   //collect stat based on CTU decision
@@ -4053,7 +4054,7 @@ static void alf_encoder(encoder_state_t * const state,
   unsigned *bits_new_filter = arr_vars->bits_new_filter;
   bits_new_filter[channel] = 0;
   const int num_classes = is_luma ? MAX_NUM_ALF_CLASSES : 1;
-  const int32_t num_ctus_in_pic = state->lcu_order_count;
+  const int32_t num_ctus_in_pic = state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu;
   int ui_coeff_bits = 0;
 
   //m_alfSliceParamTemp = alfSliceParam;
@@ -4523,7 +4524,7 @@ static void alf_derive_stats_for_filtering(encoder_state_t * const state,
   bool chroma_scale_x = (chroma_fmt == KVZ_CSP_444) ? 0 : 1;
   bool chroma_scale_y = (chroma_fmt != KVZ_CSP_420) ? 0 : 1;
 
-  const int32_t num_ctus_in_pic = state->lcu_order_count;
+  const int32_t num_ctus_in_pic = state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu;
   const int alf_vb_luma_ctu_height = LCU_WIDTH;
   const int alf_vb_chma_ctu_height = (LCU_WIDTH >> ((chroma_fmt == KVZ_CSP_420) ? 1 : 0));
   const int alf_vb_luma_pos = LCU_WIDTH - ALF_VB_POS_ABOVE_CTUROW_LUMA;
@@ -4692,7 +4693,7 @@ static void alf_encoder_ctb(encoder_state_t * const state,
   const int8_t bit_depth = state->encoder_control->bitdepth;
   double lambda = state->frame->lambda;
   int size_of_aps_ids = 0;
-  const int32_t num_ctus_in_pic = state->lcu_order_count;
+  const int32_t num_ctus_in_pic = state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu;
   alf_aps alf_aps_temp_nl;
   alf_covariance *alf_cov_chroma;
   int cov_indx = 0;
@@ -6156,7 +6157,7 @@ void kvz_alf_enc_process(encoder_state_t *const state)
   bool chroma_scale_x = (chroma_fmt == KVZ_CSP_444) ? 0 : 1;
   bool chroma_scale_y = (chroma_fmt != KVZ_CSP_420) ? 0 : 1;
   int8_t kvz_bit_depth = state->encoder_control->bitdepth;
-  const int32_t num_ctus_in_pic = state->lcu_order_count;
+  const int32_t num_ctus_in_pic = state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu;
   const int8_t input_bitdepth = state->encoder_control->bitdepth;
   double lambda_chroma_weight = 0.0;
 
@@ -6242,7 +6243,7 @@ void kvz_alf_enc_process(encoder_state_t *const state)
   // get CTB stats for filtering 
   alf_derive_stats_for_filtering(state, arr_vars.alf_clipping_values);
 
-  for (int ctb_iIdx = 0; ctb_iIdx < state->lcu_order_count; ctb_iIdx++)
+  for (int ctb_iIdx = 0; ctb_iIdx < num_ctus_in_pic; ctb_iIdx++)
   {
     alf_info->alf_ctb_filter_index[ctb_iIdx] = ALF_NUM_FIXED_FILTER_SETS;
   }
