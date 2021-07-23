@@ -218,6 +218,7 @@ typedef struct encoder_state_config_tile_t {
 
   //Jobs for each individual LCU of a wavefront row.
   threadqueue_job_t **wf_jobs;
+  threadqueue_job_t **wf_recon_jobs;
 
 } encoder_state_config_tile_t;
 

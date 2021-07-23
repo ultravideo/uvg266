@@ -6133,8 +6133,10 @@ void kvz_alf_enc_process(encoder_state_t *const state)
 {
   alf_info_t *alf_info = state->tile->frame->alf_info;
   alf_create_frame_buffer(state, alf_info);
-
-  if (1 /*!layerIdx*/ && (false/*cs.slice->getPendingRasInit()*/ || (state->frame->pictype == KVZ_NAL_IDR_W_RADL || state->frame->pictype == KVZ_NAL_IDR_N_LP)))
+  /*
+  //if (!layerIdx && cs.slice->getPendingRasInit()
+  if (1 && (false
+  || (state->frame->pictype == KVZ_NAL_IDR_W_RADL || state->frame->pictype == KVZ_NAL_IDR_N_LP)))
   {
     for (int i = 0; i < ALF_CTB_MAX_NUM_APS; i++) {
       reset_aps(&state->slice->apss[i], state->encoder_control->cfg.alf_type == KVZ_ALF_FULL);
@@ -6146,7 +6148,7 @@ void kvz_alf_enc_process(encoder_state_t *const state)
       }
     }
     alf_info->aps_id_start = ALF_CTB_MAX_NUM_APS;
-  }
+  }*/
 
   alf_aps alf_param;
   reset_alf_param(&alf_param);

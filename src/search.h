@@ -35,7 +35,7 @@
 void kvz_sort_modes(int8_t *__restrict modes, double *__restrict costs, uint8_t length);
 void kvz_sort_modes_intra_luma(int8_t *__restrict modes, int8_t *__restrict trafo, double *__restrict costs, uint8_t length);
 
-void kvz_search_lcu(encoder_state_t *state, int x, int y, const yuv_t *hor_buf, const yuv_t *ver_buf);
+void kvz_search_lcu(encoder_state_t *state, int x, int y, const yuv_t *hor_buf, const yuv_t *ver_buf, lcu_coeff_t *coeff);
 
 double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
                        const int x_px, const int y_px, const int depth,

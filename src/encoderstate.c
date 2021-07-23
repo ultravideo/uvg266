@@ -636,7 +636,7 @@ static void encoder_state_worker_encode_lcu(void * opaque)
   state->coeff = &coeff;
 
   //This part doesn't write to bitstream, it's only search, deblock and sao
-  kvz_search_lcu(state, lcu->position_px.x, lcu->position_px.y, state->tile->hor_buf_search, state->tile->ver_buf_search);
+  kvz_search_lcu(state, lcu->position_px.x, lcu->position_px.y, state->tile->hor_buf_search, state->tile->ver_buf_search, &coeff);
 
   encoder_state_recdata_to_bufs(state, lcu, state->tile->hor_buf_search, state->tile->ver_buf_search);
 
@@ -681,9 +681,12 @@ static void encoder_state_worker_encode_lcu(void * opaque)
   if (encoder->cfg.sao_type) {
     encode_sao(state, lcu->position.x, lcu->position.y, &frame->sao_luma[lcu->position.y * frame->width_in_lcu + lcu->position.x], &frame->sao_chroma[lcu->position.y * frame->width_in_lcu + lcu->position.x]);
   }
-
+ 
+  //Encode ALF
+  kvz_encode_alf_bits(state, lcu->index);
+ 
   //Encode coding tree
-  kvz_encode_coding_tree(state, lcu->position.x * LCU_WIDTH, lcu->position.y * LCU_WIDTH, 0);
+  kvz_encode_coding_tree(state, lcu->position.x * LCU_WIDTH, lcu->position.y * LCU_WIDTH, 0, &coeff);
 
   // Coeffs are not needed anymore.
   state->coeff = NULL;
@@ -774,7 +777,7 @@ static void encoder_state_worker_encode_lcu_search(void * opaque)
   state->coeff = lcu->coeff;
 
   //This part doesn't write to bitstream, it's only search, deblock and sao
-  kvz_search_lcu(state, lcu->position_px.x, lcu->position_px.y, state->tile->hor_buf_search, state->tile->ver_buf_search);
+  kvz_search_lcu(state, lcu->position_px.x, lcu->position_px.y, state->tile->hor_buf_search, state->tile->ver_buf_search, lcu->coeff);
 
   encoder_state_recdata_to_bufs(state, lcu, state->tile->hor_buf_search, state->tile->ver_buf_search);
 
@@ -810,6 +813,8 @@ static void encoder_state_worker_encode_lcu_search(void * opaque)
     kvz_sao_search_lcu(state, lcu->position.x, lcu->position.y);
     encoder_sao_reconstruct(state, lcu);
   }
+
+  //fprintf(stderr, "Recon done: %d\r\n", lcu->id);
 }
 
 static void encoder_state_worker_encode_lcu_bitstream(void * opaque)
@@ -820,7 +825,7 @@ static void encoder_state_worker_encode_lcu_bitstream(void * opaque)
   videoframe_t* const frame = state->tile->frame;
   encoder_state_config_slice_t *slice = state->slice;
 
-  kvz_set_lcu_lambda_and_qp(state, lcu->position);
+  //kvz_set_lcu_lambda_and_qp(state, lcu->position);
 
   state->coeff = lcu->coeff;
 
@@ -836,7 +841,7 @@ static void encoder_state_worker_encode_lcu_bitstream(void * opaque)
   kvz_encode_alf_bits(state, lcu->index);
 
   //Encode coding tree
-  kvz_encode_coding_tree(state, lcu->position.x * LCU_WIDTH, lcu->position.y * LCU_WIDTH, 0);
+  kvz_encode_coding_tree(state, lcu->position.x * LCU_WIDTH, lcu->position.y * LCU_WIDTH, 0, lcu->coeff);
 
   // Coeffs are not needed anymore.
   free(lcu->coeff);
@@ -864,7 +869,6 @@ static void encoder_state_worker_encode_lcu_bitstream(void * opaque)
     const bool end_of_tile = lcu->last_column && lcu->last_row;
     const bool end_of_wpp_row = encoder->cfg.wpp && lcu->last_column;
 
-
     if (end_of_tile || end_of_wpp_row) {
       // end_of_sub_stream_one_bit
       kvz_cabac_encode_bin_trm(&state->cabac, 1);
@@ -884,11 +888,30 @@ static void encoder_state_worker_encode_lcu_bitstream(void * opaque)
     }
   }
 
+
+  pthread_mutex_lock(&state->frame->rc_lock);
   const uint32_t bits = kvz_bitstream_tell(&state->stream) - existing_bits;
+  state->frame->cur_frame_bits_coded += bits;
+  // This variable is used differently by intra and inter frames and shouldn't
+  // be touched in intra frames here
+  state->frame->remaining_weight -= !state->frame->is_irap ?
+    kvz_get_lcu_stats(state, lcu->position.x, lcu->position.y)->original_weight :
+    0;
+  pthread_mutex_unlock(&state->frame->rc_lock);
   kvz_get_lcu_stats(state, lcu->position.x, lcu->position.y)->bits = bits;
 
+  uint8_t not_skip = false;
+  for (int y = 0; y < 64 && !not_skip; y += 8) {
+    for (int x = 0; x < 64 && !not_skip; x += 8) {
+      not_skip |= !kvz_cu_array_at_const(state->tile->frame->cu_array,
+        lcu->position_px.x + x,
+        lcu->position_px.y + y)->skipped;
+    }
+  }
+  kvz_get_lcu_stats(state, lcu->position.x, lcu->position.y)->skipped = !not_skip;
+
   //Wavefronts need the context to be copied to the next row
-  if (state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW && lcu->index == 1) {
+  if (state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW && lcu->index == 0) {
     int j;
     //Find next encoder (next row)
     for (j = 0; state->parent->children[j].encoder_control; ++j) {
@@ -898,6 +921,8 @@ static void encoder_state_worker_encode_lcu_bitstream(void * opaque)
       }
     }
   }
+
+  //fprintf(stderr, "Bitstream written: %d\r\n", lcu->id);
 }
 
 
@@ -976,8 +1001,13 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
       const lcu_order_element_t * const lcu = &state->lcu_order[i];
 
       kvz_threadqueue_free_job(&state->tile->wf_jobs[lcu->id]);
-      state->tile->wf_jobs[lcu->id] = kvz_threadqueue_job_create(encoder_state_worker_encode_lcu, (void*)lcu);
-      threadqueue_job_t **job = &state->tile->wf_jobs[lcu->id];
+      kvz_threadqueue_free_job(&state->tile->wf_recon_jobs[lcu->id]);
+      state->tile->wf_jobs[lcu->id] = kvz_threadqueue_job_create(encoder_state_worker_encode_lcu_bitstream, (void*)lcu);
+      threadqueue_job_t **bitstream_job = &state->tile->wf_jobs[lcu->id];
+
+      // Use a separate job for bitstream writing, first process search and recon
+      state->tile->wf_recon_jobs[lcu->id] = kvz_threadqueue_job_create(encoder_state_worker_encode_lcu_search, (void*)lcu);
+      threadqueue_job_t **job = &state->tile->wf_recon_jobs[lcu->id];
 
       // If job object was returned, add dependancies and allow it to run.
       if (job[0]) {
@@ -998,11 +1028,11 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
           for (int i = 0; dep_lcu->right && i < ctrl->max_inter_ref_lcu.right; i++) {
             dep_lcu = dep_lcu->right;
           }
-          kvz_threadqueue_job_dep_add(job[0], ref_state->tile->wf_jobs[dep_lcu->id]);
+          kvz_threadqueue_job_dep_add(job[0], ref_state->tile->wf_recon_jobs[dep_lcu->id]);
 
           //TODO: Preparation for the lock free implementation of the new rc
           if (ref_state->frame->slicetype == KVZ_SLICE_I && ref_state->frame->num != 0 && state->encoder_control->cfg.owf > 1 && true) {
-            kvz_threadqueue_job_dep_add(job[0], ref_state->previous_encoder_state->tile->wf_jobs[dep_lcu->id]);
+            kvz_threadqueue_job_dep_add(job[0], ref_state->previous_encoder_state->tile->wf_recon_jobs[dep_lcu->id]);
           }
 
           // Very spesific bug that happens when owf length is longer than the
@@ -1017,17 +1047,30 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
             while (ref_state->frame->poc != state->frame->poc - state->encoder_control->cfg.gop_len){
               ref_state = ref_state->previous_encoder_state;
             }
-            kvz_threadqueue_job_dep_add(job[0], ref_state->tile->wf_jobs[dep_lcu->id]);
+            kvz_threadqueue_job_dep_add(job[0], ref_state->tile->wf_recon_jobs[dep_lcu->id]);
           }
         }
 
         // Add local WPP dependancy to the LCU on the left.
         if (lcu->left) {
           kvz_threadqueue_job_dep_add(job[0], job[-1]);
+          kvz_threadqueue_job_dep_add(bitstream_job[0], bitstream_job[-1]);
         }
         // Add local WPP dependancy to the LCU on the top.
         if (lcu->above) {
           kvz_threadqueue_job_dep_add(job[0], job[-state->tile->frame->width_in_lcu]);
+          kvz_threadqueue_job_dep_add(bitstream_job[0], bitstream_job[-state->tile->frame->width_in_lcu]);
+        }
+
+        kvz_threadqueue_submit(state->encoder_control->threadqueue, job[0]);
+
+        if (state->encoder_control->cfg.alf_type) {
+          encoder_state_t* parent = state;
+          while (parent->parent) parent = parent->parent;
+          kvz_threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], parent->tqj_alf_process);
+          kvz_threadqueue_job_dep_add(parent->tqj_alf_process, state->tile->wf_recon_jobs[lcu->id]);
+        } else {
+          kvz_threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], state->tile->wf_recon_jobs[lcu->id]);
         }
 
         kvz_threadqueue_submit(state->encoder_control->threadqueue, state->tile->wf_jobs[lcu->id]);
@@ -1061,11 +1104,6 @@ static void encoder_state_worker_encode_children(void * opaque)
     if (sub_state->tile->wf_jobs[end_of_row]) {
       sub_state->tqj_bitstream_written =
         kvz_threadqueue_copy_ref(sub_state->tile->wf_jobs[end_of_row]);
-      if (sub_state->encoder_control->cfg.alf_type) {
-        encoder_state_t* parent = sub_state->parent;
-        while (parent->parent != NULL) parent = parent->parent;
-        kvz_threadqueue_job_dep_add(parent->tqj_alf_process, sub_state->tile->wf_jobs[end_of_row]);
-      }
     }
   }
 }
@@ -1728,8 +1766,7 @@ void kvz_encode_one_frame(encoder_state_t * const state, kvz_picture* frame)
 
 
   if (state->encoder_control->cfg.alf_type && state->encoder_control->cfg.wpp) {
-    kvz_threadqueue_submit(state->encoder_control->threadqueue, state->tqj_alf_process);
-    kvz_threadqueue_job_dep_add(job, state->tqj_alf_process);
+    kvz_threadqueue_submit(state->encoder_control->threadqueue, state->tqj_alf_process);    
   }
 
   _encode_one_frame_add_bitstream_deps(state, job);

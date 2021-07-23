@@ -144,8 +144,10 @@ static int encoder_state_config_tile_init(encoder_state_t * const state,
   if (encoder->cfg.wpp) {
     int num_jobs = state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu;
     state->tile->wf_jobs = MALLOC(threadqueue_job_t*, num_jobs);
+    state->tile->wf_recon_jobs = MALLOC(threadqueue_job_t*, num_jobs);
     for (int i = 0; i < num_jobs; ++i) {
       state->tile->wf_jobs[i] = NULL;
+      state->tile->wf_recon_jobs[i] = NULL;
     }
     if (!state->tile->wf_jobs) {
       printf("Error allocating wf_jobs array!\n");
@@ -153,6 +155,7 @@ static int encoder_state_config_tile_init(encoder_state_t * const state,
     }
   } else {
     state->tile->wf_jobs = NULL;
+    state->tile->wf_recon_jobs = NULL;
   }
   state->tile->id = encoder->tiles_tile_id[state->tile->lcu_offset_in_ts];
   return 1;
@@ -170,12 +173,14 @@ static void encoder_state_config_tile_finalize(encoder_state_t * const state) {
     int num_jobs = state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu;
     for (int i = 0; i < num_jobs; ++i) {
       kvz_threadqueue_free_job(&state->tile->wf_jobs[i]);
+      kvz_threadqueue_free_job(&state->tile->wf_recon_jobs[i]);
     }
   }
 
   kvz_videoframe_free(state->tile->frame);
   state->tile->frame = NULL;
   FREE_POINTER(state->tile->wf_jobs);
+  FREE_POINTER(state->tile->wf_recon_jobs);
 }
 
 static int encoder_state_config_slice_init(encoder_state_t * const state,
