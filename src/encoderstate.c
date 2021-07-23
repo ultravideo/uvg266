@@ -1133,6 +1133,11 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
         sub_state->tile->frame->lmcs_avg_processed = main_state->tile->frame->lmcs_avg_processed;
         sub_state->tile->frame->lmcs_avg = main_state->tile->frame->lmcs_avg;
 
+        if (sub_state->encoder_control->cfg.alf_type) {
+          main_state->slice->alf = sub_state->slice->alf = main_state->parent->slice->alf;
+          main_state->tile->frame->alf_param_set_map = sub_state->tile->frame->alf_param_set_map = main_state->parent->tile->frame->alf_param_set_map;
+          main_state->tile->frame->alf_info = sub_state->tile->frame->alf_info = main_state->parent->tile->frame->alf_info;
+        }
         kvz_image_free(sub_state->tile->frame->source);
         sub_state->tile->frame->source = NULL;
 

@@ -1273,42 +1273,42 @@ void kvz_encoder_state_write_bitstream_slice_header(
   //alf
   if (encoder->cfg.alf_type && !encoder->cfg.alf_info_in_ph_flag)
   {
-    const int alf_enabled = state->slice->tile_group_alf_enabled_flag[COMPONENT_Y];
+    const int alf_enabled = state->slice->alf->tile_group_alf_enabled_flag[COMPONENT_Y];
     WRITE_U(stream, alf_enabled, 1, "slice_alf_enabled_flag");
 
     if (alf_enabled)
     {
-      WRITE_U(stream, state->slice->tile_group_num_aps, 3, "slice_num_alf_aps_ids_luma");
-      const int8_t* aps_ids = state->slice->tile_group_luma_aps_id;
-      for (int i = 0; i < state->slice->tile_group_num_aps; i++)
+      WRITE_U(stream, state->slice->alf->tile_group_num_aps, 3, "slice_num_alf_aps_ids_luma");
+      const int8_t* aps_ids = state->slice->alf->tile_group_luma_aps_id;
+      for (int i = 0; i < state->slice->alf->tile_group_num_aps; i++)
       {
         WRITE_U(stream, aps_ids[i], 3, "slice_alf_aps_id_luma");
       }
-      const int alf_chroma_idc = state->slice->tile_group_alf_enabled_flag[COMPONENT_Cb] + state->slice->tile_group_alf_enabled_flag[COMPONENT_Cr] * 2;
+      const int alf_chroma_idc = state->slice->alf->tile_group_alf_enabled_flag[COMPONENT_Cb] + state->slice->alf->tile_group_alf_enabled_flag[COMPONENT_Cr] * 2;
       if (encoder->chroma_format != KVZ_CSP_400)
       {
-        WRITE_U(stream, state->slice->tile_group_alf_enabled_flag[COMPONENT_Cb], 1, "slice_alf_cb_enabled_flag");
-        WRITE_U(stream, state->slice->tile_group_alf_enabled_flag[COMPONENT_Cr], 1, "slice_alf_cr_enabled_flag");
+        WRITE_U(stream, state->slice->alf->tile_group_alf_enabled_flag[COMPONENT_Cb], 1, "slice_alf_cb_enabled_flag");
+        WRITE_U(stream, state->slice->alf->tile_group_alf_enabled_flag[COMPONENT_Cr], 1, "slice_alf_cr_enabled_flag");
       }
       if (alf_chroma_idc)
       {
-        WRITE_U(stream, state->slice->tile_group_chroma_aps_id, 3, "slice_alf_aps_id_chroma");
+        WRITE_U(stream, state->slice->alf->tile_group_chroma_aps_id, 3, "slice_alf_aps_id_chroma");
       }
 
       if (encoder->cfg.alf_type == KVZ_ALF_FULL)
       {
-        WRITE_U(stream, state->slice->cc_filter_param->cc_alf_filter_enabled[COMPONENT_Cb - 1], 1, "slice_cc_alf_cb_enabled_flag");
-        if (state->slice->cc_filter_param->cc_alf_filter_enabled[COMPONENT_Cb - 1])
+        WRITE_U(stream, state->slice->alf->cc_filter_param->cc_alf_filter_enabled[COMPONENT_Cb - 1], 1, "slice_cc_alf_cb_enabled_flag");
+        if (state->slice->alf->cc_filter_param->cc_alf_filter_enabled[COMPONENT_Cb - 1])
         {
           // write CC ALF Cb APS ID
-          WRITE_U(stream, state->slice->tile_group_cc_alf_cb_aps_id, 3, "slice_cc_alf_cb_aps_id");
+          WRITE_U(stream, state->slice->alf->tile_group_cc_alf_cb_aps_id, 3, "slice_cc_alf_cb_aps_id");
         }
         // Cr
-        WRITE_U(stream, state->slice->cc_filter_param->cc_alf_filter_enabled[COMPONENT_Cr - 1], 1, "slice_cc_alf_cr_enabled_flag");
-        if (state->slice->cc_filter_param->cc_alf_filter_enabled[COMPONENT_Cr - 1])
+        WRITE_U(stream, state->slice->alf->cc_filter_param->cc_alf_filter_enabled[COMPONENT_Cr - 1], 1, "slice_cc_alf_cr_enabled_flag");
+        if (state->slice->alf->cc_filter_param->cc_alf_filter_enabled[COMPONENT_Cr - 1])
         {
           // write CC ALF Cr APS ID
-          WRITE_U(stream, state->slice->tile_group_cc_alf_cr_aps_id, 3, "slice_cc_alf_cr_aps_id");
+          WRITE_U(stream, state->slice->alf->tile_group_cc_alf_cr_aps_id, 3, "slice_cc_alf_cr_aps_id");
         }
       }
     }
