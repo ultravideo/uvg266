@@ -40,8 +40,8 @@
 static int16_t * dct_bufs[NUM_TESTS] = { 0 }; // SIMD aligned pointers.
 static int16_t * dct_actual_bufs[NUM_TESTS] = { 0 }; // pointers returned by malloc.
 
-static int16_t dct_result[NUM_TRANSFORM][NUM_SIZES][LCU_WIDTH*LCU_WIDTH] = { { 0 } };
-static int16_t idct_result[NUM_TRANSFORM][NUM_SIZES][LCU_WIDTH*LCU_WIDTH] = { { 0 } };
+static int16_t dct_result[NUM_TRANSFORM][NUM_SIZES][LCU_WIDTH*LCU_WIDTH] = { { { 0 } } };
+static int16_t idct_result[NUM_TRANSFORM][NUM_SIZES][LCU_WIDTH*LCU_WIDTH] = { { { 0 } } };
 
 static struct test_env_t {
   int log_width; // for selecting dim from bufs

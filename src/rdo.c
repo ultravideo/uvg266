@@ -1078,8 +1078,6 @@ int kvz_ts_rdoq(encoder_state_t* const state, coeff_t* src_coeff, coeff_t* dest_
 
   double   block_uncoded_cost = 0;
   uint32_t cg_num = width * height >> 4;
-  const int32_t  shift = 4 >> 1;
-  const uint32_t num_blk_side = width >> shift;
 
   int32_t qp_scaled = kvz_get_scaled_qp(type, state->qp, (encoder->bitdepth - 8) * 6, encoder->qp_map[0]);
   qp_scaled = MAX(qp_scaled, 4 + 6 * MIN_QP_PRIME_TS);
@@ -1101,8 +1099,6 @@ int kvz_ts_rdoq(encoder_state_t* const state, coeff_t* src_coeff, coeff_t* dest_
   case 64: FILL_ARRAY(sig_coeffgroup_flag, 0, 64); FILL_ARRAY(cost_coeffgroup_sig, 0, 64); break;
   default: assert(0 && "There should be 1, 4, 16 or 64 coefficient groups");
   }
-
-  int bdpcm = 0;
 
   const bool   needs_sqrt2_scale = false; // from VTM: should always be false - transform-skipped blocks don't require sqrt(2) compensation.
   const int    q_bits = QUANT_SHIFT + qp_scaled / 6  + (needs_sqrt2_scale ? -1 : 0);  // Right shift of non-RDOQ quantizer;  level = (coeff*uiQ + offset)>>q_bits
@@ -1151,7 +1147,7 @@ int kvz_ts_rdoq(encoder_state_t* const state, coeff_t* src_coeff, coeff_t* dest_
 
     for (int scan_pos_in_sb = 0; scan_pos_in_sb <= sbSizeM1; scan_pos_in_sb++)
     {
-      scan_pos = sbId << log2_cg_size + scan_pos_in_sb;
+      scan_pos = (sbId << log2_cg_size) + scan_pos_in_sb;
       int last_pos_coded = sbSizeM1;
       uint32_t blkpos = scan[scan_pos];
       uint32_t  pos_y = blkpos >> log2_block_size;
@@ -1269,7 +1265,7 @@ int kvz_ts_rdoq(encoder_state_t* const state, coeff_t* src_coeff, coeff_t* dest_
         rem_reg_bins += rd_stats.num_sbb_ctx_bins; // skip sub-block
         for (int scanPosInSB = 0; scanPosInSB <= sbSizeM1; scanPosInSB++)
         {
-          scan_pos = sbId << log2_cg_size + scanPosInSB;
+          scan_pos = (sbId << log2_cg_size) + scanPosInSB;
           uint32_t blkPos = scan[scan_pos];
 
           if (dest_coeff[blkPos])
@@ -1352,8 +1348,6 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
   double      base_cost  = 0;
   int32_t temp_diag = -1;
   int32_t temp_sum = -1;
-
-  int32_t     base_level;
 
   const uint32_t *scan = kvz_g_sig_last_scan[ scan_mode ][ log2_block_size - 1 ];
 

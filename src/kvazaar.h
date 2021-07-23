@@ -262,7 +262,7 @@ enum kvz_file_format
 
 
 // Map from input format to chroma format.
-#define KVZ_FORMAT2CSP(format) ((enum kvz_chroma_format)"\0\1\2\3"[format])
+#define KVZ_FORMAT2CSP(format) ((enum kvz_chroma_format)format)
 
 /**
  * \brief GoP picture configuration.

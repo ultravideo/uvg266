@@ -633,7 +633,6 @@ static void encoder_state_worker_encode_lcu_search(void * opaque)
   }
 
   lcu->coeff = calloc(1, sizeof(lcu_coeff_t));
-  state->coeff = lcu->coeff;
 
   //This part doesn't write to bitstream, it's only search, deblock and sao
   kvz_search_lcu(state, lcu->position_px.x, lcu->position_px.y, state->tile->hor_buf_search, state->tile->ver_buf_search, lcu->coeff);
@@ -682,8 +681,6 @@ static void encoder_state_worker_encode_lcu_bitstream(void * opaque)
   videoframe_t* const frame = state->tile->frame;
   encoder_state_config_slice_t *slice = state->slice;
 
-  state->coeff = lcu->coeff;
-
   //Now write data to bitstream (required to have a correct CABAC state)
   const uint64_t existing_bits = kvz_bitstream_tell(&state->stream);
 
@@ -701,7 +698,6 @@ static void encoder_state_worker_encode_lcu_bitstream(void * opaque)
   // Coeffs are not needed anymore.
   free(lcu->coeff);
   lcu->coeff = NULL;
-  state->coeff = NULL;
 
   bool end_of_slice_segment_flag;
   if (state->encoder_control->cfg.slices & KVZ_SLICES_WPP) {

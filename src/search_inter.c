@@ -2057,9 +2057,9 @@ void kvz_search_cu_smp(encoder_state_t * const state,
     *inter_cost    += cost;
     *inter_bitcost += bitcost;
 
-    for (int y = y_pu; y < y_pu + height_pu; y += SCU_WIDTH) {
-      for (int x = x_pu; x < x_pu + width_pu; x += SCU_WIDTH) {
-        cu_info_t *scu = LCU_GET_CU_AT_PX(lcu, x, y);
+    for (int y_tmp = y_pu; y_tmp < y_pu + height_pu; y_tmp += SCU_WIDTH) {
+      for (int x_tmp = x_pu; x_tmp < x_pu + width_pu; x_tmp += SCU_WIDTH) {
+        cu_info_t *scu = LCU_GET_CU_AT_PX(lcu, x_tmp, y_tmp);
         scu->type = CU_INTER;
         scu->inter = cur_pu->inter;
       }

@@ -67,8 +67,6 @@ void kvz_encode_coeff_nxn_generic(encoder_state_t * const state,
   const uint32_t *scan =
     kvz_g_sig_last_scan[scan_mode][log2_block_size - 1];
   const uint32_t *scan_cg = g_sig_last_scan_cg[log2_block_size - 1][scan_mode];
-  const uint32_t clipped_log2_size = log2_block_size > 4 ? 4 : log2_block_size;
-  const uint32_t num_blk_side = width >> log2_cg_size;
 
 
   // Init base contexts according to block type
@@ -147,7 +145,6 @@ void kvz_encode_coeff_nxn_generic(encoder_state_t * const state,
 
     if (sig_coeffgroup_flag[cg_blk_pos]) {
 
-      uint32_t next_pass = 0;
       int32_t min_sub_pos = i << log2_cg_size; // LOG2_SCAN_SET_SIZE;
       int32_t first_sig_pos = (i == scan_cg_last) ? scan_pos_last : (min_sub_pos + (1 << log2_cg_size) - 1);
       int32_t next_sig_pos = first_sig_pos;

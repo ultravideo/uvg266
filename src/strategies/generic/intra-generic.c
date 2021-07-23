@@ -122,7 +122,6 @@ static void kvz_angular_pred_generic(
 
                                                     // Temporary buffer for modes 11-25.
                                                     // It only needs to be big enough to hold indices from -width to width-1.
-  kvz_pixel tmp_ref[2 * 128] = { 0 };
   kvz_pixel temp_main[2 * 128] = { 0 };
   kvz_pixel temp_side[2 * 128] = { 0 };
   const int_fast32_t width = 1 << log2_width;
@@ -202,7 +201,6 @@ static void kvz_angular_pred_generic(
       temp_side[i] = (vertical_mode ? in_ref_left[i] : in_ref_above[i]);
     }
 
-    const int log2_ratio = 0;
     const int s = 0;
     const int max_index = (0 << s) + 2;
     const int ref_length = width << 1;
@@ -389,7 +387,6 @@ static void kvz_intra_pred_planar_generic(
   const int_fast8_t width = 1 << log2_width;
   const kvz_pixel top_right = ref_top[width + 1];
   const kvz_pixel bottom_left = ref_left[width + 1];
-  const uint32_t offset = 1 <<(log2_width+ log2_width);
 
 #if 0
   // Unoptimized version for reference.
