@@ -612,157 +612,6 @@ static void set_cu_qps(encoder_state_t *state, int x, int y, int depth, int *las
   }
 }
 
-static void encoder_state_worker_encode_lcu(void * opaque)
-{
-  const lcu_order_element_t * const lcu = opaque;
-  encoder_state_t *state = lcu->encoder_state;
-  const encoder_control_t * const encoder = state->encoder_control;
-  videoframe_t* const frame = state->tile->frame;
-  encoder_state_config_slice_t *slice = state->slice;
-
-  switch (encoder->cfg.rc_algorithm) {
-    case KVZ_NO_RC:
-    case KVZ_LAMBDA:
-      kvz_set_lcu_lambda_and_qp(state, lcu->position);
-      break;
-    case KVZ_OBA:
-      kvz_set_ctu_qp_lambda(state, lcu->position);
-      break;
-    default:
-      assert(0);
-  }
-
-  lcu_coeff_t coeff;
-  state->coeff = &coeff;
-
-  //This part doesn't write to bitstream, it's only search, deblock and sao
-  kvz_search_lcu(state, lcu->position_px.x, lcu->position_px.y, state->tile->hor_buf_search, state->tile->ver_buf_search, &coeff);
-
-  encoder_state_recdata_to_bufs(state, lcu, state->tile->hor_buf_search, state->tile->ver_buf_search);
-
-  if (encoder->max_qp_delta_depth >= 0) {
-    int last_qp = state->last_qp;
-    int prev_qp = -1;
-    set_cu_qps(state, lcu->position_px.x, lcu->position_px.y, 0, &last_qp, &prev_qp);
-  }
-
-
-  if (state->tile->frame->lmcs_aps->m_sliceReshapeInfo.sliceReshaperEnableFlag) {
-    kvz_pixel* luma = &state->tile->frame->rec->y[lcu->position_px.x + lcu->position_px.y * state->tile->frame->rec->stride];
-    for (int y = 0; y < LCU_WIDTH; y++) {
-      if (lcu->position_px.y + y < state->tile->frame->rec->height) {
-        for (int x = 0; x < LCU_WIDTH; x++) {
-          if (lcu->position_px.x + x < state->tile->frame->rec->width) luma[x] = state->tile->frame->lmcs_aps->m_invLUT[luma[x]];
-        }
-      }
-      luma += state->tile->frame->rec->stride;
-    }
-  }
-
-  if (encoder->cfg.deblock_enable) {
-    kvz_filter_deblock_lcu(state, lcu->position_px.x, lcu->position_px.y);
-  }
-
-  if (encoder->cfg.sao_type) {
-    // Save the post-deblocking but pre-SAO pixels of the LCU to a buffer
-    // so that they can be used in SAO reconstruction later.
-    encoder_state_recdata_before_sao_to_bufs(state,
-                                             lcu,
-                                             state->tile->hor_buf_before_sao,
-                                             state->tile->ver_buf_before_sao);
-    kvz_sao_search_lcu(state, lcu->position.x, lcu->position.y);
-    encoder_sao_reconstruct(state, lcu);
-  }
-
-  //Now write data to bitstream (required to have a correct CABAC state)
-  const uint64_t existing_bits = kvz_bitstream_tell(&state->stream);
-
-  //Encode SAO
-  if (encoder->cfg.sao_type) {
-    encode_sao(state, lcu->position.x, lcu->position.y, &frame->sao_luma[lcu->position.y * frame->width_in_lcu + lcu->position.x], &frame->sao_chroma[lcu->position.y * frame->width_in_lcu + lcu->position.x]);
-  }
- 
-  //Encode ALF
-  kvz_encode_alf_bits(state, lcu->index);
- 
-  //Encode coding tree
-  kvz_encode_coding_tree(state, lcu->position.x * LCU_WIDTH, lcu->position.y * LCU_WIDTH, 0, &coeff);
-
-  // Coeffs are not needed anymore.
-  state->coeff = NULL;
-
-  bool end_of_slice_segment_flag;
-  if (state->encoder_control->cfg.slices & KVZ_SLICES_WPP) {
-    // Slice segments end after each WPP row.
-    end_of_slice_segment_flag = lcu->last_column;
-  } else if (state->encoder_control->cfg.slices & KVZ_SLICES_TILES) {
-    // Slices end after each tile.
-    end_of_slice_segment_flag = lcu->last_column && lcu->last_row;
-  } else {
-    // Slice ends after the last row of the last tile.
-    int last_tile_id = -1 + encoder->cfg.tiles_width_count * encoder->cfg.tiles_height_count;
-    bool is_last_tile = state->tile->id == last_tile_id;
-    end_of_slice_segment_flag = is_last_tile && lcu->last_column && lcu->last_row;
-  }
-  //kvz_cabac_encode_bin_trm(&state->cabac, end_of_slice_segment_flag);
-
-  {
-    const bool end_of_tile = lcu->last_column && lcu->last_row;
-    const bool end_of_wpp_row = encoder->cfg.wpp && lcu->last_column;
-
-    if (end_of_tile || end_of_wpp_row) {
-      // end_of_sub_stream_one_bit
-      kvz_cabac_encode_bin_trm(&state->cabac, 1);
-
-      // Finish the substream by writing out remaining state.
-      kvz_cabac_finish(&state->cabac);
-
-      // Write a rbsp_trailing_bits or a byte_alignment. The first one is used
-      // for ending a slice_segment_layer_rbsp and the second one for ending
-      // a substream. They are identical and align the byte stream.
-      kvz_bitstream_put(state->cabac.stream, 1, 1);
-      kvz_bitstream_align_zero(state->cabac.stream);
-
-      kvz_cabac_start(&state->cabac);
-
-      kvz_crypto_delete(&state->crypto_hdl);
-    }
-  }
-
-  pthread_mutex_lock(&state->frame->rc_lock);
-  const uint32_t bits = kvz_bitstream_tell(&state->stream) - existing_bits;
-  state->frame->cur_frame_bits_coded += bits;
-  // This variable is used differently by intra and inter frames and shouldn't
-  // be touched in intra frames here
-  state->frame->remaining_weight -= !state->frame->is_irap ?
-    kvz_get_lcu_stats(state, lcu->position.x, lcu->position.y)->original_weight :
-    0;
-  pthread_mutex_unlock(&state->frame->rc_lock);
-  kvz_get_lcu_stats(state, lcu->position.x, lcu->position.y)->bits = bits;
-
-  uint8_t not_skip = false;
-  for(int y = 0; y < 64 && !not_skip; y+=8) {
-    for(int x = 0; x < 64 && !not_skip; x+=8) {
-      not_skip |= !kvz_cu_array_at_const(state->tile->frame->cu_array,
-        lcu->position_px.x + x,
-        lcu->position_px.y + y)->skipped;
-    }
-  }
-  kvz_get_lcu_stats(state, lcu->position.x, lcu->position.y)->skipped = !not_skip;
-
-  //Wavefronts need the context to be copied to the next row
-  if (state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW && lcu->index == 0) {
-    int j;
-    //Find next encoder (next row)
-    for (j=0; state->parent->children[j].encoder_control; ++j) {
-      if (state->parent->children[j].wfrow->lcu_offset_y == state->wfrow->lcu_offset_y + 1) {
-        //And copy context
-        kvz_context_copy(&state->parent->children[j], state);
-      }
-    }
-  }
-}
-
 static void encoder_state_worker_encode_lcu_search(void * opaque)
 {
   lcu_order_element_t * const lcu = opaque;
@@ -771,7 +620,17 @@ static void encoder_state_worker_encode_lcu_search(void * opaque)
   videoframe_t* const frame = state->tile->frame;
   encoder_state_config_slice_t *slice = state->slice;
 
-  kvz_set_lcu_lambda_and_qp(state, lcu->position);
+  switch (encoder->cfg.rc_algorithm) {
+  case KVZ_NO_RC:
+  case KVZ_LAMBDA:
+    kvz_set_lcu_lambda_and_qp(state, lcu->position);
+    break;
+  case KVZ_OBA:
+    kvz_set_ctu_qp_lambda(state, lcu->position);
+    break;
+  default:
+    assert(0);
+  }
 
   lcu->coeff = calloc(1, sizeof(lcu_coeff_t));
   state->coeff = lcu->coeff;
@@ -824,8 +683,6 @@ static void encoder_state_worker_encode_lcu_bitstream(void * opaque)
   const encoder_control_t * const encoder = state->encoder_control;
   videoframe_t* const frame = state->tile->frame;
   encoder_state_config_slice_t *slice = state->slice;
-
-  //kvz_set_lcu_lambda_and_qp(state, lcu->position);
 
   state->coeff = lcu->coeff;
 
