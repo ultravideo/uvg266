@@ -174,6 +174,8 @@ static const struct option long_options[] = {
   { "fastrd-outdir",      required_argument, NULL, 0 },
   { "chroma-qp-in",       required_argument, NULL, 0 },
   { "chroma-qp-out",      required_argument, NULL, 0 },
+  { "mrl",                      no_argument, NULL, 0 },
+  { "no-mrl",                   no_argument, NULL, 0 },
   { "jccr",                     no_argument, NULL, 0 },
   { "no-jccr",                  no_argument, NULL, 0 },
   { "amvr",                     no_argument, NULL, 0 },
@@ -622,6 +624,8 @@ void print_help(void)
     "      --(no-)implicit-rdpcm  : Implicit residual DPCM. Currently only supported\n"
     "                               with lossless coding. [disabled]\n"
     "      --(no-)tmvp            : Temporal motion vector prediction [enabled]\n"
+    "      --(no-)mrl             : Enable use of multiple reference lines in intra\n"
+    "                               predictions.\n"
     "      --mts <string>         : Multiple Transform Selection [off].\n"
     "                               (Currently only implemented for intra\n"
     "                               and has effect only when rd >= 2)\n"
