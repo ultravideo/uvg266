@@ -695,7 +695,7 @@ static void encoder_state_worker_encode_lcu_bitstream(void * opaque)
   }
 
   //Encode ALF
-  kvz_encode_alf_bits(state, lcu->index);
+  kvz_encode_alf_bits(state, lcu->position.y * frame->width_in_lcu + lcu->position.x);
 
   //Encode coding tree
   kvz_encode_coding_tree(state, lcu->position.x * LCU_WIDTH, lcu->position.y * LCU_WIDTH, 0, lcu->coeff);
@@ -1615,12 +1615,17 @@ void kvz_encode_one_frame(encoder_state_t * const state, kvz_picture* frame)
   if (state->frame->num == 0) kvz_cabac_bins_verbose = true;
   else kvz_cabac_bins_verbose = false;
 #endif
-  // Create a separate job for ALF done after everything else, and only then do final bitstream writing (for ALF parameters)
-  if (state->encoder_control->cfg.alf_type && state->encoder_control->cfg.wpp) {
-    state->tqj_alf_process = kvz_threadqueue_job_create(kvz_alf_enc_process_job, state);
-  }
+
 
   encoder_state_init_new_frame(state, frame);
+  
+  // Create a separate job for ALF done after everything else, and only then do final bitstream writing (for ALF parameters)
+  if (state->encoder_control->cfg.alf_type && state->encoder_control->cfg.wpp) {
+    encoder_state_t* child_state = state;
+    while (child_state->lcu_order == NULL) child_state = &child_state->children[0];
+    state->tqj_alf_process = kvz_threadqueue_job_create(kvz_alf_enc_process_job, child_state);
+  }
+
   encoder_state_encode(state);
 
   threadqueue_job_t *job =

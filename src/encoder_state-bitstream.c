@@ -703,7 +703,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   WRITE_U(stream, 0, 1, "sps_palette_enabled_flag");
 
   if (encoder->cfg.trskip_enable /* || pcSPS->getPLTMode()*/) {
-    WRITE_UE(stream, MIN_QP_PRIME_TS, "sps_min_qp_prime_ts");
+    WRITE_UE(stream, 0, "sps_internal_bit_depth_minus_input_bit_depth");
   }
 
   WRITE_U(stream, 0, 1, "sps_ibc_enabled_flag");

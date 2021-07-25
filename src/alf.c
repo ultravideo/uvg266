@@ -1644,7 +1644,8 @@ static void encode_alf_aps(encoder_state_t * const state)
 {
   const encoder_control_t * const encoder = state->encoder_control;
   bitstream_t * const stream = &state->stream;
-  if (encoder->cfg.alf_type) // && (state->slice->alf->tile_group_alf_enabled_flag[COMPONENT_Y] || state->slice->alf->tile_group_cc_alf_cb_enabled_flag || state->slice->alf->tile_group_cc_alf_cr_enabled_flag))
+
+  if (encoder->cfg.alf_type && (state->slice->alf->tile_group_alf_enabled_flag[COMPONENT_Y] || state->slice->alf->tile_group_cc_alf_cb_enabled_flag || state->slice->alf->tile_group_cc_alf_cr_enabled_flag))
   {
     param_set_map *aps_map = state->tile->frame->alf_param_set_map;
     for (int aps_id = 0; aps_id < ALF_CTB_MAX_NUM_APS; aps_id++)
