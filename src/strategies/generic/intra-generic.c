@@ -41,7 +41,7 @@
 
 
 /**
- * \brief Generage angular predictions.
+ * \brief Generate angular predictions.
  * \param log2_width    Log2 of width, range 2..5.
  * \param intra_mode    Angular mode in range 2..34.
  * \param in_ref_above  Pointer to -1 index of above reference, length=width*2+1.
@@ -102,11 +102,17 @@ static void kvz_angular_pred_generic(
 
                                                     // Temporary buffer for modes 11-25.
                                                     // It only needs to be big enough to hold indices from -width to width-1.
+  
+  // TODO: check the correct size for these arrays when MRL is used
+  kvz_pixel tmp_ref[2 * 128] = { 0 };
   kvz_pixel temp_main[2 * 128] = { 0 };
   kvz_pixel temp_side[2 * 128] = { 0 };
   const int_fast32_t width = 1 << log2_width;
 
   uint32_t pred_mode = intra_mode; // ToDo: handle WAIP
+
+  // TODO: pass the multiRefIdx to this function and assign to this variable
+  uint8_t multiRefIndex = 0;
 
   // Whether to swap references to always project on the left reference row.
   const bool vertical_mode = intra_mode >= 34;
@@ -128,19 +134,21 @@ static void kvz_angular_pred_generic(
   // Set ref_main and ref_side such that, when indexed with 0, they point to
   // index 0 in block coordinates.
   if (sample_disp < 0) {
-    for (int i = 0; i <= width + 1; i++) {
+
+    // TODO: for non-square blocks, separate loops for x and y is needed
+    for (int i = 0; i <= width + 1 + multiRefIndex; i++) {
       temp_main[width + i] = (vertical_mode ? in_ref_above[i] : in_ref_left[i]);
       temp_side[width + i] = (vertical_mode ? in_ref_left[i] : in_ref_above[i]);
     }
 
+    // TODO: take into account non-square blocks
     ref_main = temp_main + width;
     ref_side = temp_side + width;
 
+    // TODO: for non square blocks, need to check if width or height is used for reference extension
     for (int i = -width; i <= -1; i++) {
       ref_main[i] = ref_side[MIN((-i * modedisp2invsampledisp[abs(mode_disp)] + 256) >> 9, width)];
     }
-
-    
 
     //const uint32_t index_offset = width + 1;
     //const int32_t last_index = width;
@@ -176,17 +184,20 @@ static void kvz_angular_pred_generic(
   }
   else {
     
-    for (int i = 0; i <= (width << 1); i++) {
+    // TODO: again, separate loop needed for non-square blocks
+    for (int i = 0; i <= (width << 1) + multiRefIndex; i++) {
       temp_main[i] = (vertical_mode ? in_ref_above[i] : in_ref_left[i]);
       temp_side[i] = (vertical_mode ? in_ref_left[i] : in_ref_above[i]);
     }
 
+    // TODO: this code block will need to change also when non-square blocks are used
+    const int log2_ratio = 0;
     const int s = 0;
-    const int max_index = (0 << s) + 2;
+    const int max_index = (multiRefIndex << s) + 2;
     const int ref_length = width << 1;
-    const kvz_pixel val = temp_main[ref_length];
+    const kvz_pixel val = temp_main[ref_length + multiRefIndex];
     for (int j = 0; j <= max_index; j++) {
-      temp_main[ref_length + j] = val;
+      temp_main[ref_length + multiRefIndex +  j] = val;
     }
 
     ref_main = temp_main;
@@ -203,12 +214,16 @@ static void kvz_angular_pred_generic(
     //tmp_ref[width + last_index] = tmp_ref[width + last_index - 1];
   }
 
+  // compensate for line offset in reference line buffers
+  ref_main += multiRefIndex;
+  ref_side += multiRefIndex;
+
   if (sample_disp != 0) {
     // The mode is not horizontal or vertical, we have to do interpolation.
 
     int_fast32_t delta_pos = 0;
     for (int_fast32_t y = 0; y < width; ++y) {
-      delta_pos += sample_disp;
+      delta_pos += sample_disp * (1 + multiRefIndex);
       int_fast32_t delta_int = delta_pos >> 5;
       int_fast32_t delta_fract = delta_pos & (32 - 1);
 
