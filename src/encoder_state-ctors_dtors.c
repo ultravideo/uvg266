@@ -420,6 +420,7 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
   child_state->must_code_qp_delta = false;
   child_state->tqj_bitstream_written = NULL;
   child_state->tqj_recon_done = NULL;
+  child_state->tqj_alf_process = NULL;
   
   if (!parent_state) {
     const encoder_control_t * const encoder = child_state->encoder_control;
@@ -830,4 +831,9 @@ void kvz_encoder_state_finalize(encoder_state_t * const state) {
 
   kvz_threadqueue_free_job(&state->tqj_recon_done);
   kvz_threadqueue_free_job(&state->tqj_bitstream_written);
+  if (state->encoder_control->cfg.alf_type && state->encoder_control->cfg.wpp) {
+    encoder_state_t* parent = state;
+    while (parent->parent) parent = parent->parent;
+    kvz_threadqueue_free_job(&parent->tqj_alf_process);
+  }
 }
