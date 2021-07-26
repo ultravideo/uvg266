@@ -13,6 +13,8 @@
 #include "kvz_math.h"
 #include "reshape.h"
 
+extern kvz_pixel kvz_fast_clip_32bit_to_pixel(int32_t value);
+
 #if MAX_NUM_CC_ALF_FILTERS>1
 typedef struct filter_idx_count
 {
@@ -99,24 +101,9 @@ static void init_ctu_alternative_chroma(const alf_aps *alf_param, uint8_t* ctu_a
   }
 }
 
-static int16_t alf_clip3(const int16_t minVal, const int16_t maxVal, const int16_t a)
-{
-  return MIN(MAX(minVal, a), maxVal);
-}
-
 static int16_t clip_alf(const int16_t clip, const int16_t ref, const int16_t val0, const int16_t val1)
 {
-  return alf_clip3(-clip, +clip, val0 - ref) + alf_clip3(-clip, +clip, val1 - ref);
-}
-
-static int alf_clip_pixel(const int a, const clp_rng clp_rng)
-{
-  return MIN(MAX(clp_rng.min, a), clp_rng.max);
-}
-
-static int alf_clip3_int(const int minVal, const int maxVal, const int a)
-{
-  return MIN(MAX(minVal, a), maxVal);
+  return CLIP(-clip, +clip, val0 - ref) + CLIP(-clip, +clip, val1 - ref);
 }
 
 static void get_clip_max(const alf_covariance *cov, int *clip_max)
@@ -1778,9 +1765,9 @@ static void filter_blk_cc_alf(encoder_state_t * const state,
 
           sum = (sum + ((1 << 7/*m_scaleBits*/) >> 1)) >> 7/*m_scaleBits*/;
           const int offset = 1 << clp_rngs.comp[comp_id].bd >> 1;
-          sum = alf_clip_pixel(sum + offset, clp_rngs.comp[comp_id]) - offset;
+          sum = kvz_fast_clip_32bit_to_pixel(sum + offset) - offset;
           sum += src_self[jj];
-          src_self[jj] = alf_clip_pixel(sum, clp_rngs.comp[comp_id]);
+          src_self[jj] = kvz_fast_clip_32bit_to_pixel(sum);
         }
       }
     }
@@ -5702,7 +5689,7 @@ static void alf_filter_block(encoder_state_t * const state,
           }
           sum += curr;
 
-          p_rec_1[jj] = alf_clip_pixel(sum, clp_rng);
+          p_rec_1[jj] = kvz_fast_clip_32bit_to_pixel(sum);
 
           p_img_0++;
           p_img_1++;
@@ -5985,11 +5972,11 @@ static void alf_derive_classification_blk(encoder_state_t * const state,
       const int y = (i + blk_dst_y) & (vb_ctu_height - 1);
       if (y == vb_pos - 4 || y == vb_pos)
       {
-        activity = alf_clip3_int(0, max_activity, (temp_act * 96) >> shift);
+        activity = CLIP(0, max_activity, (temp_act * 96) >> shift);
       }
       else
       {
-        activity = alf_clip3_int(0, max_activity, (temp_act * 64) >> shift);
+        activity = CLIP(0, max_activity, (temp_act * 64) >> shift);
       }
 
       int class_idx = th[activity];

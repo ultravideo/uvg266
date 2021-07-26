@@ -672,8 +672,6 @@ static void encoder_state_worker_encode_lcu_search(void * opaque)
     kvz_sao_search_lcu(state, lcu->position.x, lcu->position.y);
     encoder_sao_reconstruct(state, lcu);
   }
-
-  //fprintf(stderr, "Recon done: %d\r\n", lcu->id);
 }
 
 static void encoder_state_worker_encode_lcu_bitstream(void * opaque)
@@ -1621,6 +1619,7 @@ void kvz_encode_one_frame(encoder_state_t * const state, kvz_picture* frame)
   
   // Create a separate job for ALF done after everything else, and only then do final bitstream writing (for ALF parameters)
   if (state->encoder_control->cfg.alf_type && state->encoder_control->cfg.wpp) {
+    kvz_threadqueue_free_job(&state->tqj_alf_process);
     encoder_state_t* child_state = state;
     while (child_state->lcu_order == NULL) child_state = &child_state->children[0];
     state->tqj_alf_process = kvz_threadqueue_job_create(kvz_alf_enc_process_job, child_state);
