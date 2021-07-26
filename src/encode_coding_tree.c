@@ -329,14 +329,14 @@ void kvz_encode_last_significant_xy(cabac_data_t * const cabac,
   }
 }
 
-static void encode_chroma_tu(encoder_state_t* const state, int x, int y, int depth, const uint8_t width_c, const cu_info_t* cur_pu, int8_t* scan_idx) {
+static void encode_chroma_tu(encoder_state_t* const state, int x, int y, int depth, const uint8_t width_c, const cu_info_t* cur_pu, int8_t* scan_idx, lcu_coeff_t* coeff) {
   int x_local = (x >> 1) % LCU_WIDTH_C;
   int y_local = (y >> 1) % LCU_WIDTH_C;
   cabac_data_t* const cabac = &state->cabac;
   *scan_idx = kvz_get_scan_order(cur_pu->type, cur_pu->intra.mode_chroma, depth);
 
-  const coeff_t *coeff_u = &state->coeff->u[xy_to_zorder(LCU_WIDTH_C, x_local, y_local)];
-  const coeff_t *coeff_v = &state->coeff->v[xy_to_zorder(LCU_WIDTH_C, x_local, y_local)];
+  const coeff_t *coeff_u = &coeff->u[xy_to_zorder(LCU_WIDTH_C, x_local, y_local)];
+  const coeff_t *coeff_v = &coeff->v[xy_to_zorder(LCU_WIDTH_C, x_local, y_local)];
 
   if (cbf_is_set(cur_pu->cbf, depth, COLOR_U)) {
     if(state->encoder_control->cfg.trskip_enable && width_c == 4){
@@ -358,7 +358,7 @@ static void encode_chroma_tu(encoder_state_t* const state, int x, int y, int dep
 }
 
 static void encode_transform_unit(encoder_state_t * const state,
-                                  int x, int y, int depth, bool only_chroma)
+                                  int x, int y, int depth, bool only_chroma, lcu_coeff_t* coeff)
 {
   assert(depth >= 1 && depth <= MAX_PU_DEPTH);
 
@@ -386,7 +386,7 @@ static void encode_transform_unit(encoder_state_t * const state,
   if (cbf_y && !only_chroma) {
     int x_local = x % LCU_WIDTH;
     int y_local = y % LCU_WIDTH;
-    const coeff_t *coeff_y = &state->coeff->y[xy_to_zorder(LCU_WIDTH, x_local, y_local)];
+    const coeff_t *coeff_y = &coeff->y[xy_to_zorder(LCU_WIDTH, x_local, y_local)];
 
     // CoeffNxN
     // Residual Coding
@@ -430,7 +430,7 @@ static void encode_transform_unit(encoder_state_t * const state,
   bool chroma_cbf_set = cbf_is_set(cur_pu->cbf, depth, COLOR_U) ||
                         cbf_is_set(cur_pu->cbf, depth, COLOR_V);
   if (chroma_cbf_set) {
-    encode_chroma_tu(state, x, y, depth, width_c, cur_pu, &scan_idx);
+    encode_chroma_tu(state, x, y, depth, width_c, cur_pu, &scan_idx, coeff);
   }
 }
 
@@ -450,7 +450,8 @@ static void encode_transform_coeff(encoder_state_t * const state,
                                    int8_t tr_depth,
                                    uint8_t parent_coeff_u,
                                    uint8_t parent_coeff_v,
-                                   bool only_chroma)
+                                   bool only_chroma,
+                                   lcu_coeff_t* coeff)
 {
   cabac_data_t * const cabac = &state->cabac;
   //const encoder_control_t *const ctrl = state->encoder_control;
@@ -528,10 +529,10 @@ static void encode_transform_coeff(encoder_state_t * const state,
     uint8_t offset = LCU_WIDTH >> (depth + 1);
     int x2 = x + offset;
     int y2 = y + offset;
-    encode_transform_coeff(state, x,  y,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v, only_chroma);
-    encode_transform_coeff(state, x2, y,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v, only_chroma);
-    encode_transform_coeff(state, x,  y2, depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v, only_chroma);
-    encode_transform_coeff(state, x2, y2, depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v, only_chroma);
+    encode_transform_coeff(state, x,  y,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v, only_chroma, coeff);
+    encode_transform_coeff(state, x2, y,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v, only_chroma, coeff);
+    encode_transform_coeff(state, x,  y2, depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v, only_chroma, coeff);
+    encode_transform_coeff(state, x2, y2, depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v, only_chroma, coeff);
     return;
   }
 
@@ -571,7 +572,7 @@ static void encode_transform_coeff(encoder_state_t * const state,
       state->must_code_qp_delta = false;
     }
 
-    encode_transform_unit(state, x, y, depth, only_chroma);
+    encode_transform_unit(state, x, y, depth, only_chroma, coeff);
   }
 }
 
@@ -745,7 +746,7 @@ static void encode_chroma_intra_cu(cabac_data_t* const cabac, const cu_info_t* c
 static void encode_intra_coding_unit(encoder_state_t * const state,
                                      cabac_data_t * const cabac,
                                      const cu_info_t * const cur_cu,
-                                     int x, int y, int depth)
+                                     int x, int y, int depth, lcu_coeff_t* coeff)
 {
   const videoframe_t * const frame = state->tile->frame;
   uint8_t intra_pred_mode_actual[4];
@@ -961,13 +962,13 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
     encode_chroma_intra_cu(cabac, cur_cu, x, y, frame, cu_width);
   }
 
-  encode_transform_coeff(state, x, y, depth, 0, 0, 0, 0);
+  encode_transform_coeff(state, x, y, depth, 0, 0, 0, 0, coeff);
 
   encode_mts_idx(state, cabac, cur_cu);
 
   if (state->encoder_control->chroma_format != KVZ_CSP_400 && depth == 4 && x % 8 && y % 8) {
     encode_chroma_intra_cu(cabac, cur_cu, x, y, frame, cu_width);
-    encode_transform_coeff(state, x, y, depth, 0, 0, 0, 1);
+    encode_transform_coeff(state, x, y, depth, 0, 0, 0, 1, coeff);
   }
 
 }
@@ -1060,7 +1061,8 @@ static void encode_part_mode(encoder_state_t * const state,
 void kvz_encode_coding_tree(encoder_state_t * const state,
                             uint16_t x,
                             uint16_t y,
-                            uint8_t depth)
+                            uint8_t depth,
+                            lcu_coeff_t *coeff)
 {
   cabac_data_t * const cabac = &state->cabac;
   const encoder_control_t * const ctrl = state->encoder_control;
@@ -1212,16 +1214,16 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
 
     if (split_flag || border) {
       // Split blocks and remember to change x and y block positions
-      kvz_encode_coding_tree(state, x, y, depth + 1);
+      kvz_encode_coding_tree(state, x, y, depth + 1, coeff);
 
       if (!border_x || border_split_x) {
-        kvz_encode_coding_tree(state, x + half_cu, y, depth + 1);
+        kvz_encode_coding_tree(state, x + half_cu, y, depth + 1, coeff);
       }
       if (!border_y || border_split_y) {
-        kvz_encode_coding_tree(state, x, y + half_cu, depth + 1);
+        kvz_encode_coding_tree(state, x, y + half_cu, depth + 1, coeff);
       }
       if (!border || (border_split_x && border_split_y)) {
-        kvz_encode_coding_tree(state, x + half_cu, y + half_cu, depth + 1);
+        kvz_encode_coding_tree(state, x + half_cu, y + half_cu, depth + 1, coeff);
       }
       return;
     }
@@ -1360,11 +1362,11 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
       // Code (possible) coeffs to bitstream
 
       if (cbf) {
-        encode_transform_coeff(state, x, y, depth, 0, 0, 0, 0);
+        encode_transform_coeff(state, x, y, depth, 0, 0, 0, 0, coeff);
       }
     }
   } else if (cur_cu->type == CU_INTRA) {
-    encode_intra_coding_unit(state, cabac, cur_cu, x, y, depth);
+    encode_intra_coding_unit(state, cabac, cur_cu, x, y, depth, coeff);
   }
 
   else {

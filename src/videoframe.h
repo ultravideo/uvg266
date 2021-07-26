@@ -54,6 +54,8 @@ typedef struct videoframe
   struct sao_info_t *sao_luma;   //!< \brief Array of sao parameters for every LCU.
   struct sao_info_t *sao_chroma;   //!< \brief Array of sao parameters for every LCU.
   struct alf_info_t *alf_info;   //!< \brief Array of alf parameters for both luma and chroma.
+  struct param_set_map* alf_param_set_map;
+
   int32_t poc;           //!< \brief Picture order count
 
   bool source_lmcs_mapped; //!< \brief Indicate if source_lmcs is available and mapped to LMCS

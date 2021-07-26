@@ -31,7 +31,8 @@
 void kvz_encode_coding_tree(encoder_state_t * const state,
                             uint16_t x_ctb,
                             uint16_t y_ctb,
-                            uint8_t depth);
+                            uint8_t depth,
+                            lcu_coeff_t *coeff);
 
 void kvz_encode_ts_residual(encoder_state_t* const state,
   cabac_data_t* const cabac,

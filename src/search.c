@@ -1000,7 +1000,7 @@ static void copy_lcu_to_cu_data(const encoder_state_t * const state, int x_px, i
  * Search LCU for modes.
  * - Best mode gets copied to current picture.
  */
-void kvz_search_lcu(encoder_state_t * const state, const int x, const int y, const yuv_t * const hor_buf, const yuv_t * const ver_buf)
+void kvz_search_lcu(encoder_state_t * const state, const int x, const int y, const yuv_t * const hor_buf, const yuv_t * const ver_buf, lcu_coeff_t *coeff)
 {
   assert(x % LCU_WIDTH == 0);
   assert(y % LCU_WIDTH == 0);
@@ -1036,7 +1036,7 @@ void kvz_search_lcu(encoder_state_t * const state, const int x, const int y, con
   copy_lcu_to_cu_data(state, x, y, &work_tree[0]);
 
   // Copy coeffs to encoder state.
-  copy_coeffs(work_tree[0].coeff.y, state->coeff->y, LCU_WIDTH);
-  copy_coeffs(work_tree[0].coeff.u, state->coeff->u, LCU_WIDTH_C);
-  copy_coeffs(work_tree[0].coeff.v, state->coeff->v, LCU_WIDTH_C);
+  copy_coeffs(work_tree[0].coeff.y, coeff->y, LCU_WIDTH);
+  copy_coeffs(work_tree[0].coeff.u, coeff->u, LCU_WIDTH_C);
+  copy_coeffs(work_tree[0].coeff.v, coeff->v, LCU_WIDTH_C);
 }

@@ -49,11 +49,6 @@ videoframe_t * kvz_videoframe_alloc(int32_t width,
     frame->sao_chroma = MALLOC(sao_info_t, frame->width_in_lcu * frame->height_in_lcu);
   }
 
-  if (alf_type) {
-    frame->alf_info = MALLOC(alf_info_t, 1);
-    kvz_alf_create(frame, chroma_format);
-  }
-
   return frame;
 }
 
@@ -83,12 +78,6 @@ int kvz_videoframe_free(videoframe_t * const frame)
   FREE_POINTER(frame->sao_luma);
   FREE_POINTER(frame->sao_chroma);
 
-  if (frame->alf_info)
-  {
-    kvz_alf_destroy(frame);
-    FREE_POINTER(frame->alf_info);
-  }
-  
   free(frame);
 
   return 1;

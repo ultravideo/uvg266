@@ -144,8 +144,10 @@ static int encoder_state_config_tile_init(encoder_state_t * const state,
   if (encoder->cfg.wpp) {
     int num_jobs = state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu;
     state->tile->wf_jobs = MALLOC(threadqueue_job_t*, num_jobs);
+    state->tile->wf_recon_jobs = MALLOC(threadqueue_job_t*, num_jobs);
     for (int i = 0; i < num_jobs; ++i) {
       state->tile->wf_jobs[i] = NULL;
+      state->tile->wf_recon_jobs[i] = NULL;
     }
     if (!state->tile->wf_jobs) {
       printf("Error allocating wf_jobs array!\n");
@@ -153,6 +155,7 @@ static int encoder_state_config_tile_init(encoder_state_t * const state,
     }
   } else {
     state->tile->wf_jobs = NULL;
+    state->tile->wf_recon_jobs = NULL;
   }
   state->tile->id = encoder->tiles_tile_id[state->tile->lcu_offset_in_ts];
   return 1;
@@ -170,12 +173,14 @@ static void encoder_state_config_tile_finalize(encoder_state_t * const state) {
     int num_jobs = state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu;
     for (int i = 0; i < num_jobs; ++i) {
       kvz_threadqueue_free_job(&state->tile->wf_jobs[i]);
+      kvz_threadqueue_free_job(&state->tile->wf_recon_jobs[i]);
     }
   }
 
   kvz_videoframe_free(state->tile->frame);
   state->tile->frame = NULL;
   FREE_POINTER(state->tile->wf_jobs);
+  FREE_POINTER(state->tile->wf_recon_jobs);
 }
 
 static int encoder_state_config_slice_init(encoder_state_t * const state,
@@ -196,26 +201,7 @@ static int encoder_state_config_slice_init(encoder_state_t * const state,
   
   state->slice->start_in_rs = state->encoder_control->tiles_ctb_addr_ts_to_rs[start_address_in_ts];
   state->slice->end_in_rs = state->encoder_control->tiles_ctb_addr_ts_to_rs[end_address_in_ts];
-
-  if (state->encoder_control->cfg.alf_type) {
-    state->slice->apss = malloc(sizeof(alf_aps) * ALF_CTB_MAX_NUM_APS);    
-    state->slice->tile_group_luma_aps_id = malloc(ALF_CTB_MAX_NUM_APS * sizeof(int8_t));
-    state->slice->cc_filter_param = malloc(sizeof(*state->slice->cc_filter_param));
-    for (int aps_idx = 0; aps_idx < ALF_CTB_MAX_NUM_APS; aps_idx++) {
-      state->slice->tile_group_luma_aps_id[aps_idx] = -1;
-    }
-    state->slice->tile_group_num_aps = -1;
-    state->slice->tile_group_chroma_aps_id = -1;
-    state->slice->tile_group_cc_alf_cb_enabled_flag = 0;
-    state->slice->tile_group_cc_alf_cr_enabled_flag = 0;
-    state->slice->tile_group_cc_alf_cb_aps_id = -1;
-    state->slice->tile_group_cc_alf_cr_aps_id = -1;
-    state->slice->num_of_param_sets = 0;
-    memset(state->slice->tile_group_alf_enabled_flag, 0, sizeof(state->slice->tile_group_alf_enabled_flag));
-    if (state->encoder_control->cfg.alf_type == KVZ_ALF_FULL) {
-      kvz_reset_cc_alf_aps_param(state->slice->cc_filter_param);
-    }
-  }
+  
   return 1;
 }
 
@@ -349,6 +335,73 @@ static void encoder_state_dump_graphviz(const encoder_state_t * const state) {
 }
 #endif //KVZ_DEBUG_PRINT_THREADING_INFO
 
+/**
+ * \brief Initializer for main thread related things
+   mostly arrays that are only needed one per frame
+ * \param state encoder state
+ * \returns int
+ */
+static int encoder_state_main_init(encoder_state_t* const state) {
+
+  uint32_t lcus_in_frame = state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu;
+  state->tile->frame->lmcs_aps = calloc(1, sizeof(lmcs_aps));
+  state->tile->frame->lmcs_avg_processed = calloc(1, lcus_in_frame * sizeof(int8_t));
+  state->tile->frame->lmcs_avg = calloc(1, lcus_in_frame * sizeof(int32_t));
+
+  if (state->encoder_control->cfg.alf_type) {
+    state->slice->alf = malloc(sizeof(*state->slice->alf));
+
+    state->slice->alf->apss = malloc(sizeof(alf_aps) * ALF_CTB_MAX_NUM_APS);
+    state->slice->alf->tile_group_luma_aps_id = malloc(ALF_CTB_MAX_NUM_APS * sizeof(int8_t));
+    state->slice->alf->cc_filter_param = malloc(sizeof(*state->slice->alf->cc_filter_param));
+    for (int aps_idx = 0; aps_idx < ALF_CTB_MAX_NUM_APS; aps_idx++) {
+      state->slice->alf->tile_group_luma_aps_id[aps_idx] = -1;
+    }
+    state->slice->alf->tile_group_num_aps = -1;
+    state->slice->alf->tile_group_chroma_aps_id = -1;
+    state->slice->alf->tile_group_cc_alf_cb_enabled_flag = 0;
+    state->slice->alf->tile_group_cc_alf_cr_enabled_flag = 0;
+    state->slice->alf->tile_group_cc_alf_cb_aps_id = -1;
+    state->slice->alf->tile_group_cc_alf_cr_aps_id = -1;
+    state->slice->alf->num_of_param_sets = 0;
+    memset(state->slice->alf->tile_group_alf_enabled_flag, 0, sizeof(state->slice->alf->tile_group_alf_enabled_flag));
+    if (state->encoder_control->cfg.alf_type == KVZ_ALF_FULL) {
+      kvz_reset_cc_alf_aps_param(state->slice->alf->cc_filter_param);
+    }
+
+    state->tile->frame->alf_info = MALLOC(alf_info_t, 1);
+    kvz_alf_create(state->tile->frame, state->encoder_control->chroma_format);
+    kvz_set_aps_map(state->tile->frame, state->encoder_control->cfg.alf_type);
+  }
+
+  return 1;
+}
+
+static int encoder_state_main_finalize(encoder_state_t* const state) {
+
+  FREE_POINTER(state->tile->frame->lmcs_aps);
+  FREE_POINTER(state->tile->frame->lmcs_avg_processed);
+  FREE_POINTER(state->tile->frame->lmcs_avg);
+
+  if (state->encoder_control->cfg.alf_type) {
+    if (state->slice->alf->apss != NULL) {
+      FREE_POINTER(state->slice->alf->apss);
+    }
+    if (state->slice->alf->tile_group_luma_aps_id != NULL) {
+      FREE_POINTER(state->slice->alf->tile_group_luma_aps_id);
+    }
+    if (state->slice->alf->cc_filter_param != NULL) {
+      FREE_POINTER(state->slice->alf->cc_filter_param);
+    }
+    FREE_POINTER(state->slice->alf);
+
+    kvz_alf_destroy(state->tile->frame);
+    FREE_POINTER(state->tile->frame->alf_info);
+    FREE_POINTER(state->tile->frame->alf_param_set_map);
+  }
+  return 1;
+}
+
 int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t * const parent_state) {
   //We require that, if parent_state is NULL:
   //child_state->encoder_control is set
@@ -367,6 +420,7 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
   child_state->must_code_qp_delta = false;
   child_state->tqj_bitstream_written = NULL;
   child_state->tqj_recon_done = NULL;
+  child_state->tqj_alf_process = NULL;
   
   if (!parent_state) {
     const encoder_control_t * const encoder = child_state->encoder_control;
@@ -435,9 +489,7 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
         start_in_ts = 0;
         end_in_ts = child_state->tile->frame->width_in_lcu * child_state->tile->frame->height_in_lcu;
 
-        child_state->tile->frame->lmcs_aps = calloc(1, sizeof(lmcs_aps));
-        child_state->tile->frame->lmcs_avg_processed = calloc(1, end_in_ts * sizeof(int8_t));
-        child_state->tile->frame->lmcs_avg = calloc(1, end_in_ts * sizeof(int32_t));
+        encoder_state_main_init(child_state);
 
         break;
       case ENCODER_STATE_TYPE_SLICE:
@@ -746,9 +798,7 @@ void kvz_encoder_state_finalize(encoder_state_t * const state) {
   }
 
   if (state->type == ENCODER_STATE_TYPE_MAIN) {
-    FREE_POINTER(state->tile->frame->lmcs_aps);
-    FREE_POINTER(state->tile->frame->lmcs_avg_processed);
-    FREE_POINTER(state->tile->frame->lmcs_avg);
+    encoder_state_main_finalize(state);
   }
   
   FREE_POINTER(state->lcu_order);
@@ -759,19 +809,6 @@ void kvz_encoder_state_finalize(encoder_state_t * const state) {
   }
   
   if (!state->parent || (state->parent->slice != state->slice)) {
-
-    if (state->encoder_control->cfg.alf_type) {
-      if (state->slice->apss != NULL) {
-        FREE_POINTER(state->slice->apss);
-      }
-      if (state->slice->tile_group_luma_aps_id != NULL) {
-        FREE_POINTER(state->slice->tile_group_luma_aps_id);
-      }
-      if (state->slice->cc_filter_param != NULL) {
-        FREE_POINTER(state->slice->cc_filter_param);
-      }
-    }
-
     FREE_POINTER(state->slice);
   }
   
@@ -794,4 +831,9 @@ void kvz_encoder_state_finalize(encoder_state_t * const state) {
 
   kvz_threadqueue_free_job(&state->tqj_recon_done);
   kvz_threadqueue_free_job(&state->tqj_bitstream_written);
+  if (state->encoder_control->cfg.alf_type && state->encoder_control->cfg.wpp) {
+    encoder_state_t* parent = state;
+    while (parent->parent) parent = parent->parent;
+    kvz_threadqueue_free_job(&parent->tqj_alf_process);
+  }
 }

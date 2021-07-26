@@ -303,8 +303,8 @@ typedef struct array_variables {
 
 } array_variables;
 
-//inits aps parameter set in kvz_config
-void kvz_set_aps_map(kvz_config *const cfg);
+//inits aps parameter set in videoframe
+void kvz_set_aps_map(videoframe_t* frame, enum kvz_alf alf_type);
 
 //resets cc alf parameter
 void kvz_reset_cc_alf_aps_param(cc_alf_filter_param *cc_alf);

@@ -13,6 +13,8 @@
 #include "kvz_math.h"
 #include "reshape.h"
 
+extern kvz_pixel kvz_fast_clip_32bit_to_pixel(int32_t value);
+
 #if MAX_NUM_CC_ALF_FILTERS>1
 typedef struct filter_idx_count
 {
@@ -72,12 +74,12 @@ static void reset_aps(alf_aps *src, bool cc_alf_enabled)
   }
 }
 
-void kvz_set_aps_map(kvz_config *const cfg)
+void kvz_set_aps_map(videoframe_t* frame, enum kvz_alf alf_type)
 {
-  cfg->param_set_map = malloc(ALF_CTB_MAX_NUM_APS * sizeof(param_set_map));
+  frame->alf_param_set_map = malloc(ALF_CTB_MAX_NUM_APS * sizeof(param_set_map));
   for (int aps_idx = 0; aps_idx < ALF_CTB_MAX_NUM_APS; aps_idx++) {
-    cfg->param_set_map[aps_idx + T_ALF_APS].b_changed = false;
-    reset_aps(&cfg->param_set_map[aps_idx + T_ALF_APS].parameter_set, cfg->alf_type == KVZ_ALF_FULL);
+    frame->alf_param_set_map[aps_idx + T_ALF_APS].b_changed = false;
+    reset_aps(&frame->alf_param_set_map[aps_idx + T_ALF_APS].parameter_set, alf_type == KVZ_ALF_FULL);
   }
 }
 
@@ -99,24 +101,9 @@ static void init_ctu_alternative_chroma(const alf_aps *alf_param, uint8_t* ctu_a
   }
 }
 
-static int16_t alf_clip3(const int16_t minVal, const int16_t maxVal, const int16_t a)
-{
-  return MIN(MAX(minVal, a), maxVal);
-}
-
 static int16_t clip_alf(const int16_t clip, const int16_t ref, const int16_t val0, const int16_t val1)
 {
-  return alf_clip3(-clip, +clip, val0 - ref) + alf_clip3(-clip, +clip, val1 - ref);
-}
-
-static int alf_clip_pixel(const int a, const clp_rng clp_rng)
-{
-  return MIN(MAX(clp_rng.min, a), clp_rng.max);
-}
-
-static int alf_clip3_int(const int minVal, const int maxVal, const int a)
-{
-  return MIN(MAX(minVal, a), maxVal);
+  return CLIP(-clip, +clip, val0 - ref) + CLIP(-clip, +clip, val1 - ref);
 }
 
 static void get_clip_max(const alf_covariance *cov, int *clip_max)
@@ -1184,14 +1171,14 @@ static void code_alf_ctu_enable_flag(encoder_state_t * const state,
 {
   const encoder_control_t * const encoder = state->encoder_control;
 
-  const bool alf_component_enabled = (aps != NULL) ? aps->enabled_flag[component_id] : state->slice->tile_group_alf_enabled_flag[component_id];
+  const bool alf_component_enabled = (aps != NULL) ? aps->enabled_flag[component_id] : state->slice->alf->tile_group_alf_enabled_flag[component_id];
 
   if (encoder->cfg.alf_type && alf_component_enabled)
   {
     int frame_width_in_ctus = state->tile->frame->width_in_lcu;
 
-    bool left_avail = state->lcu_order[ctu_rs_addr].left ? 1 : 0;
-    bool above_avail = state->lcu_order[ctu_rs_addr].above ? 1 : 0;
+    bool left_avail = ctu_rs_addr % frame_width_in_ctus ? 1 : 0;
+    bool above_avail = ctu_rs_addr/ frame_width_in_ctus ? 1 : 0;
 
     int left_ctu_addr = left_avail ? ctu_rs_addr - 1 : -1;
     int above_ctu_addr = above_avail ? ctu_rs_addr - frame_width_in_ctus : -1;
@@ -1212,7 +1199,7 @@ static void code_alf_ctu_enable_flags_component(encoder_state_t * const state,
   alf_component_id component_id,
   alf_aps *aps)
 {
-  const int32_t num_ctus_in_pic = state->lcu_order_count;
+  const int32_t num_ctus_in_pic = state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu;
   for (int ctu_idx = 0; ctu_idx < num_ctus_in_pic; ctu_idx++)
   {
     code_alf_ctu_enable_flag(state, cabac, ctu_idx, component_id, aps);
@@ -1256,7 +1243,7 @@ static void code_alf_ctu_filter_index(encoder_state_t * const state,
   }
 
   const unsigned filter_set_idx = state->tile->frame->alf_info->alf_ctb_filter_index[ctu_rs_addr];
-  unsigned num_aps = state->slice->tile_group_num_aps;
+  unsigned num_aps = state->slice->alf->tile_group_num_aps;
   unsigned num_available_filt_sets = num_aps + ALF_NUM_FIXED_FILTER_SETS;
   if (num_available_filt_sets > ALF_NUM_FIXED_FILTER_SETS)
   {
@@ -1293,10 +1280,10 @@ static void code_alf_ctu_alternative_ctu(encoder_state_t * const state,
 
   if (comp_idx == COMPONENT_Y)
     return;
-  int aps_idx = aps ? 0 : state->slice->tile_group_chroma_aps_id;
-  const alf_aps* alf_param_ref = aps ? (aps) : &state->slice->apss[aps_idx];
+  int aps_idx = aps ? 0 : state->slice->alf->tile_group_chroma_aps_id;
+  const alf_aps* alf_param_ref = aps ? (aps) : &state->slice->alf->apss[aps_idx];
 
-  if (aps || (state->encoder_control->cfg.alf_type && state->slice->tile_group_alf_enabled_flag[comp_idx]))
+  if (aps || (state->encoder_control->cfg.alf_type && state->slice->alf->tile_group_alf_enabled_flag[comp_idx]))
   {
     bool* ctb_alf_flag = state->tile->frame->alf_info->ctu_enable_flag[comp_idx];
 
@@ -1325,7 +1312,7 @@ static void code_alf_ctu_alternatives_component(encoder_state_t * const state,
 {
   if (comp_id == COMPONENT_Y)
     return;
-  uint32_t num_ctus = state->lcu_order_count;
+  uint32_t num_ctus = state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu;
   bool* ctb_alf_flag = state->tile->frame->alf_info->ctu_enable_flag[comp_id];
   for (int ctu_idx = 0; ctu_idx < num_ctus; ctu_idx++)
   {
@@ -1357,9 +1344,10 @@ static void code_cc_alf_filter_control_idc(encoder_state_t * const state,
   const int filter_count)
 {
   assert(!(idc_val > filter_count)); //Filter index is too large
+  int width_in_lcu = state->tile->frame->width_in_lcu;
 
-  bool left_avail = state->lcu_order[ctu_idx].left ? 1 : 0;
-  bool above_avail = state->lcu_order[ctu_idx].above ? 1 : 0;
+  bool left_avail = ctu_idx % width_in_lcu ? 1 : 0;
+  bool above_avail = ctu_idx / width_in_lcu ? 1 : 0;
   int ctxt = 0;
 
   if (left_avail)
@@ -1398,7 +1386,7 @@ void kvz_encode_alf_bits(encoder_state_t * const state, const int ctu_idx)
   if (state->encoder_control->cfg.alf_type)
   {
     alf_info_t *alf_info = state->tile->frame->alf_info;
-    cc_alf_filter_param *cc_filter_param = state->slice->cc_filter_param;
+    cc_alf_filter_param *cc_filter_param = state->slice->alf->cc_filter_param;
     bool **ctu_enable_flag = state->tile->frame->alf_info->ctu_enable_flag;
     for (int comp_idx = 0; comp_idx < MAX_NUM_COMPONENT; comp_idx++)
     {
@@ -1406,7 +1394,7 @@ void kvz_encode_alf_bits(encoder_state_t * const state, const int ctu_idx)
       //Pitäisi poistaa//
       /*if (!is_luma)
       {
-        state->slice->tile_group_alf_enabled_flag[comp_idx] = false;
+        state->slice->alf->tile_group_alf_enabled_flag[comp_idx] = false;
       }*/
       //---------------//
       code_alf_ctu_enable_flag(state, &state->cabac, ctu_idx, comp_idx, NULL);
@@ -1414,15 +1402,15 @@ void kvz_encode_alf_bits(encoder_state_t * const state, const int ctu_idx)
       {
         if (ctu_enable_flag[comp_idx][ctu_idx])
         {
-          //int num_aps = state->slice->tile_group_num_aps;
-          //state->slice->tile_group_num_aps = 0;
-          code_alf_ctu_filter_index(state, &state->cabac, ctu_idx, state->slice->tile_group_alf_enabled_flag[COMPONENT_Y]);
-          //state->slice->tile_group_num_aps = num_aps;
+          //int num_aps = state->slice->alf->tile_group_num_aps;
+          //state->slice->alf->tile_group_num_aps = 0;
+          code_alf_ctu_filter_index(state, &state->cabac, ctu_idx, state->slice->alf->tile_group_alf_enabled_flag[COMPONENT_Y]);
+          //state->slice->alf->tile_group_num_aps = num_aps;
         }
       }
       if (!is_luma)
       {
-        bool* ctb_alf_flag = state->slice->tile_group_alf_enabled_flag[comp_idx] ? ctu_enable_flag[comp_idx] : NULL;
+        bool* ctb_alf_flag = state->slice->alf->tile_group_alf_enabled_flag[comp_idx] ? ctu_enable_flag[comp_idx] : NULL;
         if (ctb_alf_flag && ctb_alf_flag[ctu_idx])
         {
           code_alf_ctu_alternative_ctu(state, &state->cabac, ctu_idx, comp_idx, NULL);
@@ -1643,17 +1631,18 @@ static void encode_alf_aps(encoder_state_t * const state)
 {
   const encoder_control_t * const encoder = state->encoder_control;
   bitstream_t * const stream = &state->stream;
-  if (encoder->cfg.alf_type) // && (state->slice->tile_group_alf_enabled_flag[COMPONENT_Y] || state->slice->tile_group_cc_alf_cb_enabled_flag || state->slice->tile_group_cc_alf_cr_enabled_flag))
+
+  if (encoder->cfg.alf_type && (state->slice->alf->tile_group_alf_enabled_flag[COMPONENT_Y] || state->slice->alf->tile_group_cc_alf_cb_enabled_flag || state->slice->alf->tile_group_cc_alf_cr_enabled_flag))
   {
-    param_set_map *aps_map = state->encoder_control->cfg.param_set_map;
+    param_set_map *aps_map = state->tile->frame->alf_param_set_map;
     for (int aps_id = 0; aps_id < ALF_CTB_MAX_NUM_APS; aps_id++)
     {
       alf_aps aps = aps_map[aps_id + T_ALF_APS + NUM_APS_TYPE_LEN].parameter_set;
       bool write_aps = aps_map[aps_id + T_ALF_APS + NUM_APS_TYPE_LEN].b_changed;
-      /*if (!write_aps && state->slice->apss && state->slice->apss[aps_id].aps_id >= 0 && state->slice->apss[aps_id].aps_id < 8)
+      /*if (!write_aps && state->slice->alf->apss && state->slice->alf->apss[aps_id].aps_id >= 0 && state->slice->alf->apss[aps_id].aps_id < 8)
       {
         write_aps = true;
-        aps = state->slice->apss[aps_id]; // use aps from slice header
+        aps = state->slice->alf->apss[aps_id]; // use aps from slice header
 
         //*apsMap->allocatePS(apsId) = *aps; //allocate and cpy
         copy_aps_to_map(aps_map, &aps, aps_id + T_ALF_APS + NUM_APS_TYPE_LEN);
@@ -1776,9 +1765,9 @@ static void filter_blk_cc_alf(encoder_state_t * const state,
 
           sum = (sum + ((1 << 7/*m_scaleBits*/) >> 1)) >> 7/*m_scaleBits*/;
           const int offset = 1 << clp_rngs.comp[comp_id].bd >> 1;
-          sum = alf_clip_pixel(sum + offset, clp_rngs.comp[comp_id]) - offset;
+          sum = kvz_fast_clip_32bit_to_pixel(sum + offset) - offset;
           sum += src_self[jj];
-          src_self[jj] = alf_clip_pixel(sum, clp_rngs.comp[comp_id]);
+          src_self[jj] = kvz_fast_clip_32bit_to_pixel(sum);
         }
       }
     }
@@ -1842,11 +1831,11 @@ static void apply_cc_alf_filter(encoder_state_t * const state, alf_component_id 
 static void setup_cc_alf_aps(encoder_state_t * const state,
   const int *cc_reuse_aps_id)
 {
-  cc_alf_filter_param *cc_filter_param = state->slice->cc_filter_param;
+  cc_alf_filter_param *cc_filter_param = state->slice->alf->cc_filter_param;
   if (cc_filter_param->cc_alf_filter_enabled[COMPONENT_Cb - 1])
   {
-    int cc_alf_cb_aps_id = state->slice->tile_group_cc_alf_cb_aps_id;
-    alf_aps *aps = &state->encoder_control->cfg.param_set_map[cc_alf_cb_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS].parameter_set;
+    int cc_alf_cb_aps_id = state->slice->alf->tile_group_cc_alf_cb_aps_id;
+    alf_aps *aps = &state->tile->frame->alf_param_set_map[cc_alf_cb_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS].parameter_set;
     if (aps->aps_id >= 0 && aps->aps_id < ALF_CTB_MAX_NUM_APS)
     {
       //aps = m_apsMap->allocatePS((cc_alf_cb_aps_id << NUM_APS_TYPE_LEN) + ALF_APS);
@@ -1866,19 +1855,19 @@ static void setup_cc_alf_aps(encoder_state_t * const state,
     if (cc_reuse_aps_id[COMPONENT_Cb - 1] < 0)
     {
       aps->cc_alf_aps_param.new_cc_alf_filter[COMPONENT_Cb - 1] = 1;
-      state->encoder_control->cfg.param_set_map[cc_alf_cb_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS].b_changed = true;
+      state->tile->frame->alf_param_set_map[cc_alf_cb_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS].b_changed = true;
       aps->temporal_id = 0; // cs.slice->getTLayer()
     }
-    state->slice->tile_group_cc_alf_cb_enabled_flag = true;
+    state->slice->alf->tile_group_cc_alf_cb_enabled_flag = true;
   }
   else
   {
-    state->slice->tile_group_cc_alf_cb_enabled_flag = false;
+    state->slice->alf->tile_group_cc_alf_cb_enabled_flag = false;
   }
   if (cc_filter_param->cc_alf_filter_enabled[COMPONENT_Cr - 1])
   {
-    int  cc_alf_cr_aps_id = state->slice->tile_group_cc_alf_cr_aps_id;
-    alf_aps *aps = &state->encoder_control->cfg.param_set_map[cc_alf_cr_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS].parameter_set;
+    int  cc_alf_cr_aps_id = state->slice->alf->tile_group_cc_alf_cr_aps_id;
+    alf_aps *aps = &state->tile->frame->alf_param_set_map[cc_alf_cr_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS].parameter_set;
     if (aps->aps_id >= 0 && aps->aps_id < ALF_CTB_MAX_NUM_APS)
     {
       //aps = m_apsMap->allocatePS((cc_alf_cb_aps_id << NUM_APS_TYPE_LEN) + ALF_APS);
@@ -1898,14 +1887,14 @@ static void setup_cc_alf_aps(encoder_state_t * const state,
     if (cc_reuse_aps_id[COMPONENT_Cr - 1] < 0)
     {
       aps->cc_alf_aps_param.new_cc_alf_filter[COMPONENT_Cr - 1] = 1;
-      state->encoder_control->cfg.param_set_map[cc_alf_cr_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS].b_changed = true;
+      state->tile->frame->alf_param_set_map[cc_alf_cr_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS].b_changed = true;
       aps->temporal_id = 0; // cs.slice->getTLayer()
     }
-    state->slice->tile_group_cc_alf_cr_enabled_flag = true;
+    state->slice->alf->tile_group_cc_alf_cr_enabled_flag = true;
   }
   else
   {
-    state->slice->tile_group_cc_alf_cr_enabled_flag = false;
+    state->slice->alf->tile_group_cc_alf_cr_enabled_flag = false;
   }
 }
 
@@ -2229,9 +2218,9 @@ static void get_available_cc_alf_aps_ids(encoder_state_t *const state, alf_compo
 {
   for (int i = 0; i < ALF_CTB_MAX_NUM_APS; i++)
   {
-    param_set_map* param_set = &state->encoder_control->cfg.param_set_map[i + NUM_APS_TYPE_LEN + T_ALF_APS];
+    param_set_map* param_set = &state->tile->frame->alf_param_set_map[i + NUM_APS_TYPE_LEN + T_ALF_APS];
     if (param_set->b_changed && (param_set->parameter_set.aps_id >= 0 || param_set->parameter_set.aps_id < ALF_CTB_MAX_NUM_APS)) {
-      copy_aps(&state->slice->apss[i], &param_set->parameter_set, true);
+      copy_aps(&state->slice->alf->apss[i], &param_set->parameter_set, true);
     }
   }
 
@@ -2243,7 +2232,7 @@ static void get_available_cc_alf_aps_ids(encoder_state_t *const state, alf_compo
       (*aps_ids_size) < ALF_CTB_MAX_NUM_APS
       /*&& !cs.slice->getPendingRasInit()*/)
     {
-      alf_aps cur_aps = state->slice->apss[cur_aps_id];
+      alf_aps cur_aps = state->slice->alf->apss[cur_aps_id];
       bool aps_found = (0 <= cur_aps.aps_id && cur_aps.aps_id < ALF_CTB_MAX_NUM_APS);
       if (aps_found && cur_aps.temporal_id <= state->slice->id && cur_aps.cc_alf_aps_param.new_cc_alf_filter[compID - 1])
       {
@@ -2279,8 +2268,8 @@ static void derive_cc_alf_filter(encoder_state_t * const state, alf_component_id
   const kvz_picture *org_yuv, const kvz_picture *rec_dst_yuv,
   int *cc_reuse_aps_id)
 {
-  cc_alf_filter_param *cc_filter_param = state->slice->cc_filter_param;
-  if (!state->slice->tile_group_alf_enabled_flag[COMPONENT_Y])
+  cc_alf_filter_param *cc_filter_param = state->slice->alf->cc_filter_param;
+  if (!state->slice->alf->tile_group_alf_enabled_flag[COMPONENT_Y])
   {
     cc_filter_param->cc_alf_filter_enabled[comp_id - 1] = false;
     return;
@@ -2315,7 +2304,7 @@ static void derive_cc_alf_filter(encoder_state_t * const state, alf_component_id
   int max_ctu_width_log2 = kvz_math_floor_log2(LCU_WIDTH);
   //int max_ctu_width_log2_chrma = kvz_math_floor_log2(LCU_WIDTH) >> scale_x;
   int32_t ctus_in_width = state->tile->frame->width_in_lcu;
-  const uint32_t num_ctus_in_pic = state->lcu_order_count;
+  const uint32_t num_ctus_in_pic = state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu;
   short best_filter_coeff_set[MAX_NUM_CC_ALF_FILTERS][MAX_NUM_CC_ALF_CHROMA_COEFF];
   bool best_filter_idx_enabled[MAX_NUM_CC_ALF_FILTERS];
   uint8_t best_filter_count = 0;
@@ -2437,7 +2426,7 @@ static void derive_cc_alf_filter(encoder_state_t * const state, alf_component_id
       if (referencing_existing_aps)
       {
         max_number_of_filters_being_tested =
-          state->encoder_control->cfg.param_set_map[aps_ids[test_filter_idx] + NUM_APS_TYPE_LEN + T_ALF_APS].parameter_set.cc_alf_aps_param.cc_alf_filter_count[comp_id - 1];
+          state->tile->frame->alf_param_set_map[aps_ids[test_filter_idx] + NUM_APS_TYPE_LEN + T_ALF_APS].parameter_set.cc_alf_aps_param.cc_alf_filter_count[comp_id - 1];
         cc_alf_filter_count = max_number_of_filters_being_tested;
         for (int filter_idx = 0; filter_idx < max_number_of_filters_being_tested; filter_idx++)
         {
@@ -2445,7 +2434,7 @@ static void derive_cc_alf_filter(encoder_state_t * const state, alf_component_id
           memcpy(cc_alf_filter_coeff[filter_idx], cc_filter_param->cc_alf_coeff[comp_id - 1][filter_idx],
             sizeof(cc_alf_filter_coeff[filter_idx]));
         }
-        memcpy(cc_alf_filter_coeff, state->encoder_control->cfg.param_set_map[aps_ids[test_filter_idx] + NUM_APS_TYPE_LEN + T_ALF_APS].parameter_set.cc_alf_aps_param.cc_alf_coeff[comp_id - 1], sizeof(cc_alf_filter_coeff));
+        memcpy(cc_alf_filter_coeff, state->tile->frame->alf_param_set_map[aps_ids[test_filter_idx] + NUM_APS_TYPE_LEN + T_ALF_APS].parameter_set.cc_alf_aps_param.cc_alf_coeff[comp_id - 1], sizeof(cc_alf_filter_coeff));
       }
       else
       {
@@ -2483,7 +2472,7 @@ static void derive_cc_alf_filter(encoder_state_t * const state, alf_component_id
           {
             if (!referencing_existing_aps)
             {
-              get_frame_stats_cc_alf(alf_covariance_cc_alf, alf_covariance_frame_cc_alf, (filter_idx + 1), state->lcu_order_count, training_cov_control);
+              get_frame_stats_cc_alf(alf_covariance_cc_alf, alf_covariance_frame_cc_alf, (filter_idx + 1), num_ctus_in_pic, training_cov_control);
               derive_cc_alf_filter_coeff(alf_covariance_frame_cc_alf, cc_alf_filter_coeff, filter_idx);
             }
 
@@ -2626,11 +2615,11 @@ static void derive_cc_alf_filter(encoder_state_t * const state, alf_component_id
       cc_reuse_aps_id[comp_id - 1] = cc_alf_reuse_aps_id;
       if (comp_id == COMPONENT_Cb)
       {
-        state->slice->tile_group_cc_alf_cb_aps_id = cc_alf_reuse_aps_id;
+        state->slice->alf->tile_group_cc_alf_cb_aps_id = cc_alf_reuse_aps_id;
       }
       else
       {
-        state->slice->tile_group_cc_alf_cr_aps_id = cc_alf_reuse_aps_id;
+        state->slice->alf->tile_group_cc_alf_cr_aps_id = cc_alf_reuse_aps_id;
       }
     }
   }
@@ -2850,7 +2839,7 @@ static void derive_stats_for_cc_alf_filtering(encoder_state_t * const state,
 {
   alf_covariance **alf_covariance_cc_alf = state->tile->frame->alf_info->alf_covariance_cc_alf;
   alf_covariance *alf_covariance_frame_cc_alf = state->tile->frame->alf_info->alf_covariance_frame_cc_alf[comp_idx - 1];
-  const int32_t num_ctus_in_pic = state->lcu_order_count;
+  const int32_t num_ctus_in_pic = state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu;
   const int filter_idx = filter_idc - 1;
 
   // init CTU stats buffers
@@ -3069,7 +3058,7 @@ static double alf_derive_ctb_alf_enable_flags(encoder_state_t * const state,
   const kvz_pixel comp_id_last = is_luma ? COMPONENT_Y : COMPONENT_Cr;
   const int num_alts = is_luma ? 1 : alf_param_temp->num_alternatives_chroma;
   const int8_t bit_depth = state->encoder_control->bitdepth;
-  const int32_t num_ctus_in_pic = state->lcu_order_count;
+  const int32_t num_ctus_in_pic = state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu;
   int num_coeff = is_luma ? 13 : 7;
   double cost = 0;
   double lambda = state->frame->lambda;
@@ -3122,7 +3111,7 @@ static double alf_derive_ctb_alf_enable_flags(encoder_state_t * const state,
       {
         // Evaluate cost of signaling filter set index for convergence of filters enabled flag / filter derivation
         assert(alf_ctb_filter_index[ctu_idx] == ALF_NUM_FIXED_FILTER_SETS);
-        assert(state->slice->tile_group_num_aps == 1);
+        assert(state->slice->alf->tile_group_num_aps == 1);
         code_alf_ctu_filter_index(state, cabac_estimator, ctu_idx, alf_param_temp->enabled_flag[COMPONENT_Y]);
       }
       double cost_on = dist_unfilter_ctu + ctu_lambda * (23 - cabac_estimator->bits_left) + (cabac_estimator->num_buffered_bytes << 3);
@@ -3918,7 +3907,7 @@ static double alf_get_filter_coeff_and_cost(encoder_state_t * const state,
   double lambda = state->frame->lambda;
   int clip_merged[MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_CLASSES][MAX_NUM_ALF_LUMA_COEFF];
   const int8_t bit_depth = state->encoder_control->bitdepth;
-  const int32_t num_ctus_in_pic = state->lcu_order_count;
+  const int32_t num_ctus_in_pic = state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu;
   alf_covariance *alf_cov_frame = is_luma ? alf_info->alf_covariance_frame_luma : alf_info->alf_covariance_frame_chroma;
 
   //collect stat based on CTU decision
@@ -4013,7 +4002,7 @@ static double alf_get_filter_coeff_and_cost(encoder_state_t * const state,
     {
       // Evaluate cost of signaling filter set index for convergence of filters enabled flag / filter derivation
       assert(alf_info->alf_ctb_filter_index[ctu_idx] == ALF_NUM_FIXED_FILTER_SETS);
-      assert(state->slice->tile_group_num_aps == 1);
+      assert(state->slice->alf->tile_group_num_aps == 1);
       //m_CABACEstimator->codeAlfCtuFilterIndex(cs, ctu_idx, &m_alfParamTemp.enabledFlag[COMPONENT_Y]);
       code_alf_ctu_filter_index(state, cabac_estimator, ctu_idx, alf_param_temp->enabled_flag[COMPONENT_Y]);
     }
@@ -4053,7 +4042,7 @@ static void alf_encoder(encoder_state_t * const state,
   unsigned *bits_new_filter = arr_vars->bits_new_filter;
   bits_new_filter[channel] = 0;
   const int num_classes = is_luma ? MAX_NUM_ALF_CLASSES : 1;
-  const int32_t num_ctus_in_pic = state->lcu_order_count;
+  const int32_t num_ctus_in_pic = state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu;
   int ui_coeff_bits = 0;
 
   //m_alfSliceParamTemp = alfSliceParam;
@@ -4207,12 +4196,12 @@ static void alf_get_avai_aps_ids_luma(encoder_state_t * const state,
   int *size_of_aps_ids,
   short alf_clipping_values[MAX_NUM_CHANNEL_TYPE][MAX_ALF_NUM_CLIPPING_VALUES])
 {
-  //alf_aps *apss = state->slice->apss;
+  //alf_aps *apss = state->slice->alf->apss;
   for (int i = 0; i < ALF_CTB_MAX_NUM_APS; i++)
   {
-    param_set_map* param_set = &state->encoder_control->cfg.param_set_map[i + NUM_APS_TYPE_LEN + T_ALF_APS];
+    param_set_map* param_set = &state->tile->frame->alf_param_set_map[i + NUM_APS_TYPE_LEN + T_ALF_APS];
     if (param_set->b_changed && (param_set->parameter_set.aps_id >= 0 || param_set->parameter_set.aps_id < ALF_CTB_MAX_NUM_APS)) {
-      copy_aps(&state->slice->apss[i], &param_set->parameter_set, false);
+      copy_aps(&state->slice->alf->apss[i], &param_set->parameter_set, false);
     }
   }
 
@@ -4222,7 +4211,7 @@ static void alf_get_avai_aps_ids_luma(encoder_state_t * const state,
   {
     while ((aps_id_checked < ALF_CTB_MAX_NUM_APS) && !state->frame->is_irap && *size_of_aps_ids < ALF_CTB_MAX_NUM_APS /*&& /*!cs.slice->getPendingRasInit()*/)
     {
-      alf_aps *cur_aps = &state->slice->apss[cur_aps_id];
+      alf_aps *cur_aps = &state->slice->alf->apss[cur_aps_id];
       bool aps_found = (0 <= cur_aps->aps_id && cur_aps->aps_id < ALF_CTB_MAX_NUM_APS);
 
       if (aps_found/*cur_aps*/ && cur_aps->layer_id == 0/*cs.slice->getPic()->layerId*/ && cur_aps->temporal_id <= state->slice->id /*cs.slice->getTLayer(*/ && cur_aps->new_filter_flag[CHANNEL_TYPE_LUMA])
@@ -4241,10 +4230,10 @@ static void alf_get_avai_aps_ids_luma(encoder_state_t * const state,
       cur_aps_id = (cur_aps_id + 1) % ALF_CTB_MAX_NUM_APS;
     }
   }
-  state->slice->tile_group_num_aps = *size_of_aps_ids;
-  for (int i = 0; i < state->slice->tile_group_num_aps; i++)
+  state->slice->alf->tile_group_num_aps = *size_of_aps_ids;
+  for (int i = 0; i < state->slice->alf->tile_group_num_aps; i++)
   {
-    state->slice->tile_group_luma_aps_id[i] = aps_ids[i];
+    state->slice->alf->tile_group_luma_aps_id[i] = aps_ids[i];
   }
 
   //*new_aps_id = g_aps_id_start - 1;
@@ -4523,7 +4512,7 @@ static void alf_derive_stats_for_filtering(encoder_state_t * const state,
   bool chroma_scale_x = (chroma_fmt == KVZ_CSP_444) ? 0 : 1;
   bool chroma_scale_y = (chroma_fmt != KVZ_CSP_420) ? 0 : 1;
 
-  const int32_t num_ctus_in_pic = state->lcu_order_count;
+  const int32_t num_ctus_in_pic = state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu;
   const int alf_vb_luma_ctu_height = LCU_WIDTH;
   const int alf_vb_chma_ctu_height = (LCU_WIDTH >> ((chroma_fmt == KVZ_CSP_420) ? 1 : 0));
   const int alf_vb_luma_pos = LCU_WIDTH - ALF_VB_POS_ABOVE_CTUROW_LUMA;
@@ -4624,7 +4613,7 @@ static void alf_reconstruct_coeff_aps(encoder_state_t * const state, bool luma, 
   array_variables *arr_vars)
 {
   //luma
-  alf_aps* apss = state->slice->apss;
+  alf_aps* apss = state->slice->alf->apss;
   //AlfSliceParam alfSliceParamTmp;
   alf_aps alf_param_tmp;
   //APS* cur_aps;
@@ -4632,8 +4621,8 @@ static void alf_reconstruct_coeff_aps(encoder_state_t * const state, bool luma, 
 
   if (luma)
   {
-    for (int i = 0; i < state->slice->tile_group_num_aps /* 1,  cs.slice->getTileGroupNumAps()*/; i++) {
-      int aps_idx = state->slice->tile_group_luma_aps_id[i];
+    for (int i = 0; i < state->slice->alf->tile_group_num_aps /* 1,  cs.slice->getTileGroupNumAps()*/; i++) {
+      int aps_idx = state->slice->alf->tile_group_luma_aps_id[i];
       cur_aps = &apss[aps_idx];
 
       assert(cur_aps != NULL); // "invalid APS"
@@ -4648,7 +4637,7 @@ static void alf_reconstruct_coeff_aps(encoder_state_t * const state, bool luma, 
   //chroma
   if (chroma)
   {
-    int aps_idx_chroma = state->slice->tile_group_chroma_aps_id;
+    int aps_idx_chroma = state->slice->alf->tile_group_chroma_aps_id;
     cur_aps = &apss[aps_idx_chroma];
     //copy_alf_param(g_alf_aps_chroma, cur_aps);
     //copy_alf_param(&alf_param_tmp, g_alf_aps_chroma);
@@ -4692,7 +4681,7 @@ static void alf_encoder_ctb(encoder_state_t * const state,
   const int8_t bit_depth = state->encoder_control->bitdepth;
   double lambda = state->frame->lambda;
   int size_of_aps_ids = 0;
-  const int32_t num_ctus_in_pic = state->lcu_order_count;
+  const int32_t num_ctus_in_pic = state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu;
   alf_aps alf_aps_temp_nl;
   alf_covariance *alf_cov_chroma;
   int cov_indx = 0;
@@ -4700,7 +4689,7 @@ static void alf_encoder_ctb(encoder_state_t * const state,
   //AlfSliceParam  alfSliceParamNewFiltersBest = alfSliceParamNewFilters;
   alf_aps alf_aps_new_filters_best;
   copy_alf_param(&alf_aps_new_filters_best, aps);
-  alf_aps* apss = state->slice->apss;
+  alf_aps* apss = state->slice->alf->apss;
 
   bool has_new_filters[2] = { aps->enabled_flag[COMPONENT_Y] , aps->enabled_flag[COMPONENT_Cb] || aps->enabled_flag[COMPONENT_Cr] };
 
@@ -4756,7 +4745,7 @@ static void alf_encoder_ctb(encoder_state_t * const state,
         continue;
       }
       //cs.slice->setTileGroupNumAps(numTemporalAps + useNewFilter);
-      state->slice->tile_group_num_aps = num_temporal_aps + use_new_filter;
+      state->slice->alf->tile_group_num_aps = num_temporal_aps + use_new_filter;
 
       int num_filter_set = ALF_NUM_FIXED_FILTER_SETS + num_temporal_aps + use_new_filter;
       if (num_temporal_aps == size_of_aps_ids && num_temporal_aps > 0 && use_new_filter && new_aps_id == aps_ids[size_of_aps_ids - 1] /*apsIds.back()*/) //last temporalAPS is occupied by new filter set and this temporal APS becomes unavailable
@@ -4975,13 +4964,13 @@ static void alf_encoder_ctb(encoder_state_t * const state,
     }// for (int numTemporalAps = 0; numTemporalAps < apsIds.size(); numTemporalAps++)
   }//for (int useNewFilter = 0; useNewFilter <= 1; useNewFilter++)
 
-  state->slice->tile_group_cc_alf_cb_aps_id = new_aps_id;
-  state->slice->tile_group_cc_alf_cr_aps_id = new_aps_id;
+  state->slice->alf->tile_group_cc_alf_cb_aps_id = new_aps_id;
+  state->slice->alf->tile_group_cc_alf_cr_aps_id = new_aps_id;
 
   if (cost_off <= cost_min)
   {
-    memset(state->slice->tile_group_alf_enabled_flag, 0, sizeof(state->slice->tile_group_alf_enabled_flag));
-    state->slice->tile_group_num_aps = 0;
+    memset(state->slice->alf->tile_group_alf_enabled_flag, 0, sizeof(state->slice->alf->tile_group_alf_enabled_flag));
+    state->slice->alf->tile_group_num_aps = 0;
     for (int i = 0; i < MAX_NUM_COMPONENT; i++) {
       memset(ctu_enable_flag[i], 0, sizeof(bool) * num_ctus_in_pic);
     }
@@ -4990,14 +4979,14 @@ static void alf_encoder_ctb(encoder_state_t * const state,
   else
   {
     //cs.slice->setTileGroupAlfEnabledFlag(COMPONENT_Y, true);
-    state->slice->tile_group_alf_enabled_flag[COMPONENT_Y] = true;
+    state->slice->alf->tile_group_alf_enabled_flag[COMPONENT_Y] = true;
     //cs.slice->setTileGroupNumAps((int)bestApsIds.size());
 
-    state->slice->tile_group_num_aps = size_of_best_aps_ids;
+    state->slice->alf->tile_group_num_aps = size_of_best_aps_ids;
     //cs.slice->setAPSs(bestApsIds);
     for (int i = 0; i < size_of_best_aps_ids; i++)
     {
-      state->slice->tile_group_luma_aps_id[i] = best_aps_ids[i];
+      state->slice->alf->tile_group_luma_aps_id[i] = best_aps_ids[i];
     }
 
     //copyCtuEnableFlag(m_ctuEnableFlag, m_ctuEnableFlagTmp, CHANNEL_TYPE_LUMA);
@@ -5010,38 +4999,38 @@ static void alf_encoder_ctb(encoder_state_t * const state,
     if (alf_aps_new_filters_best.new_filter_flag[CHANNEL_TYPE_LUMA])
     {
       //APS* newAPS = m_apsMap->getPS((new_aps_id << NUM_APS_TYPE_LEN) + T_ALF_APS);
-      alf_aps* new_aps = &state->encoder_control->cfg.param_set_map[new_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS].parameter_set;
+      alf_aps* new_aps = &state->tile->frame->alf_param_set_map[new_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS].parameter_set;
       if (new_aps->aps_id < 0 || new_aps->aps_id >= ALF_CTB_MAX_NUM_APS) // new_aps == NULL
       {
         //newAPS = m_apsMap->allocatePS(new_aps_id);
         assert(new_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS < ALF_CTB_MAX_NUM_APS); //Invalid PS id
         bool found = false;
         for (int i = 0; i < ALF_CTB_MAX_NUM_APS; i++) {
-          if (state->encoder_control->cfg.param_set_map[i].parameter_set.aps_id == new_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS) {
+          if (state->tile->frame->alf_param_set_map[i].parameter_set.aps_id == new_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS) {
             found = true;
           }
         }
         if (!found) {
-          state->encoder_control->cfg.param_set_map[new_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS].b_changed = true;
-          //state->encoder_control->cfg.param_set_map[new_aps_id + NUM_APS_TYPE_LEN+ T_ALF_APS].p_nalu_data = 0;
-          //state->encoder_control->cfg.param_set_map[new_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS].parameter_set = malloc(sizeof(alf_aps));
-          state->encoder_control->cfg.param_set_map[new_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS].parameter_set.aps_id = new_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS;
+          state->tile->frame->alf_param_set_map[new_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS].b_changed = true;
+          //state->tile->frame->alf_param_set_map[new_aps_id + NUM_APS_TYPE_LEN+ T_ALF_APS].p_nalu_data = 0;
+          //state->tile->frame->alf_param_set_map[new_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS].parameter_set = malloc(sizeof(alf_aps));
+          state->tile->frame->alf_param_set_map[new_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS].parameter_set.aps_id = new_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS;
         }
-        //copy_alf_param(new_aps, &state->encoder_control->cfg.param_set_map[new_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS].parameter_set);
+        //copy_alf_param(new_aps, &state->tile->frame->alf_param_set_map[new_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS].parameter_set);
         new_aps->aps_id = new_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS;
         new_aps->aps_type = T_ALF_APS;
       }
       copy_alf_param(new_aps, &alf_aps_new_filters_best);
       new_aps->temporal_id = state->slice->id;
       new_aps->new_filter_flag[CHANNEL_TYPE_CHROMA] = false;
-      state->encoder_control->cfg.param_set_map[new_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS].b_changed = true;
+      state->tile->frame->alf_param_set_map[new_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS].b_changed = true;
       alf_info->aps_id_start = new_aps_id;
     }
 
-    int8_t *aps_ids = state->slice->tile_group_luma_aps_id;
-    for (int i = 0; i < state->slice->tile_group_num_aps; i++)
+    int8_t *aps_ids = state->slice->alf->tile_group_luma_aps_id;
+    for (int i = 0; i < state->slice->alf->tile_group_num_aps; i++)
     {
-      copy_aps(&apss[aps_ids[i]], &state->encoder_control->cfg.param_set_map[aps_ids[i] + NUM_APS_TYPE_LEN + T_ALF_APS].parameter_set, false);
+      copy_aps(&apss[aps_ids[i]], &state->tile->frame->alf_param_set_map[aps_ids[i] + NUM_APS_TYPE_LEN + T_ALF_APS].parameter_set, false);
     }
   }
 
@@ -5075,7 +5064,7 @@ static void alf_encoder_ctb(encoder_state_t * const state,
     else if (alf_aps_new_filters_best.enabled_flag[COMPONENT_Cb] || alf_aps_new_filters_best.enabled_flag[COMPONENT_Cr])
     {
       int cur_id = alf_info->aps_id_start;
-      if (size_of_aps_ids < 8 || state->slice->tile_group_num_aps < 8)
+      if (size_of_aps_ids < 8 || state->slice->alf->tile_group_num_aps < 8)
       {
         while (new_aps_id_chroma < 0)
         {
@@ -5108,7 +5097,7 @@ static void alf_encoder_ctb(encoder_state_t * const state,
         continue;
       }
 
-      alf_aps* cur_aps = &state->encoder_control->cfg.param_set_map[cur_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS].parameter_set;
+      alf_aps* cur_aps = &state->tile->frame->alf_param_set_map[cur_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS].parameter_set;
       double cur_cost = lambda * 3;
 
       if (!reuse_existing_aps)
@@ -5236,9 +5225,9 @@ static void alf_encoder_ctb(encoder_state_t * const state,
       if (cur_cost < cost_min)
       {
         cost_min = cur_cost;
-        state->slice->tile_group_chroma_aps_id = cur_aps_id;
-        state->slice->tile_group_alf_enabled_flag[COMPONENT_Cb] = alf_param_temp->enabled_flag[COMPONENT_Cb];
-        state->slice->tile_group_alf_enabled_flag[COMPONENT_Cr] = alf_param_temp->enabled_flag[COMPONENT_Cr];
+        state->slice->alf->tile_group_chroma_aps_id = cur_aps_id;
+        state->slice->alf->tile_group_alf_enabled_flag[COMPONENT_Cb] = alf_param_temp->enabled_flag[COMPONENT_Cb];
+        state->slice->alf->tile_group_alf_enabled_flag[COMPONENT_Cr] = alf_param_temp->enabled_flag[COMPONENT_Cr];
         copy_ctu_enable_flag(ctu_enable_flag_tmp, ctu_enable_flag, CHANNEL_TYPE_CHROMA, num_ctus_in_pic);
 
         for (int ctu_idx = 0; ctu_idx < num_ctus_in_pic; ctu_idx++)
@@ -5251,13 +5240,13 @@ static void alf_encoder_ctb(encoder_state_t * const state,
 
     if (new_aps_id_chroma >= 0)
     {
-      state->slice->tile_group_cc_alf_cb_aps_id = new_aps_id_chroma;
-      state->slice->tile_group_cc_alf_cr_aps_id = new_aps_id_chroma;
+      state->slice->alf->tile_group_cc_alf_cb_aps_id = new_aps_id_chroma;
+      state->slice->alf->tile_group_cc_alf_cr_aps_id = new_aps_id_chroma;
     }
     if (cost_off < cost_min)
     {
-      state->slice->tile_group_alf_enabled_flag[COMPONENT_Cb] = false;
-      state->slice->tile_group_alf_enabled_flag[COMPONENT_Cr] = false;
+      state->slice->alf->tile_group_alf_enabled_flag[COMPONENT_Cb] = false;
+      state->slice->alf->tile_group_alf_enabled_flag[COMPONENT_Cr] = false;
       set_ctu_enable_flag(ctu_enable_flag, CHANNEL_TYPE_CHROMA, 0, num_ctus_in_pic);
     }
     else
@@ -5268,27 +5257,27 @@ static void alf_encoder_ctb(encoder_state_t * const state,
         ctu_alternatives[COMPONENT_Cb][ctu_idx] = ctu_alternatives_tmp[COMPONENT_Cb][ctu_idx];
         ctu_alternatives[COMPONENT_Cr][ctu_idx] = ctu_alternatives_tmp[COMPONENT_Cr][ctu_idx];
       }
-      if (state->slice->tile_group_chroma_aps_id == new_aps_id_chroma)  //new filter
+      if (state->slice->alf->tile_group_chroma_aps_id == new_aps_id_chroma)  //new filter
       {
         //APS* newAPS = m_apsMap->getPS(new_aps_id_chroma);
-        alf_aps* new_aps = &state->encoder_control->cfg.param_set_map[new_aps_id_chroma + NUM_APS_TYPE_LEN + T_ALF_APS].parameter_set;
+        alf_aps* new_aps = &state->tile->frame->alf_param_set_map[new_aps_id_chroma + NUM_APS_TYPE_LEN + T_ALF_APS].parameter_set;
         if (new_aps->aps_id < 0 || new_aps->aps_id >= ALF_CTB_MAX_NUM_APS) //new_aps == NULL
         {
           //newAPS = m_apsMap->allocatePS(new_aps_id);
           assert(new_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS < ALF_CTB_MAX_NUM_APS); //Invalid PS id
           bool found = false;
-          for (int i = 0; i < (sizeof(state->encoder_control->cfg.param_set_map) / sizeof(state->encoder_control->cfg.param_set_map[0])); i++) {
-            if (state->encoder_control->cfg.param_set_map[i].parameter_set.aps_id == new_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS) {
+          for (int i = 0; i < (sizeof(state->tile->frame->alf_param_set_map) / sizeof(state->tile->frame->alf_param_set_map[0])); i++) {
+            if (state->tile->frame->alf_param_set_map[i].parameter_set.aps_id == new_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS) {
               found = true;
             }
           }
           if (!found) {
-            state->encoder_control->cfg.param_set_map[new_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS].b_changed = true;
-            //state->encoder_control->cfg.param_set_map[new_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS].p_nalu_data = 0;
-            //state->encoder_control->cfg.param_set_map[new_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS].parameter_set = malloc(sizeof(alf_aps));
-            state->encoder_control->cfg.param_set_map[new_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS].parameter_set.aps_id = new_aps_id + T_ALF_APS;
+            state->tile->frame->alf_param_set_map[new_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS].b_changed = true;
+            //state->tile->frame->alf_param_set_map[new_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS].p_nalu_data = 0;
+            //state->tile->frame->alf_param_set_map[new_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS].parameter_set = malloc(sizeof(alf_aps));
+            state->tile->frame->alf_param_set_map[new_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS].parameter_set.aps_id = new_aps_id + T_ALF_APS;
           }
-          //copy_alf_param(new_aps, &state->encoder_control->cfg.param_set_map[new_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS].parameter_set);
+          //copy_alf_param(new_aps, &state->tile->frame->alf_param_set_map[new_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS].parameter_set);
           new_aps->aps_id = new_aps_id;
           new_aps->aps_type = T_ALF_APS;
           reset_alf_param(new_aps);
@@ -5309,12 +5298,12 @@ static void alf_encoder_ctb(encoder_state_t * const state,
             new_aps->chroma_clipp[alt_idx][i] = aps->chroma_clipp[alt_idx][i];
           }
         }
-        state->encoder_control->cfg.param_set_map[new_aps_id_chroma + NUM_APS_TYPE_LEN + T_ALF_APS].b_changed = true;
+        state->tile->frame->alf_param_set_map[new_aps_id_chroma + NUM_APS_TYPE_LEN + T_ALF_APS].b_changed = true;
         alf_info->aps_id_start = new_aps_id_chroma;
       }
-      apss[state->slice->tile_group_chroma_aps_id].aps_id = state->encoder_control->cfg.param_set_map[state->slice->tile_group_chroma_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS].parameter_set.aps_id;
-      apss[state->slice->tile_group_chroma_aps_id].aps_type = state->encoder_control->cfg.param_set_map[state->slice->tile_group_chroma_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS].parameter_set.aps_type;
-      copy_alf_param(&apss[state->slice->tile_group_chroma_aps_id], &state->encoder_control->cfg.param_set_map[state->slice->tile_group_chroma_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS].parameter_set);
+      apss[state->slice->alf->tile_group_chroma_aps_id].aps_id = state->tile->frame->alf_param_set_map[state->slice->alf->tile_group_chroma_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS].parameter_set.aps_id;
+      apss[state->slice->alf->tile_group_chroma_aps_id].aps_type = state->tile->frame->alf_param_set_map[state->slice->alf->tile_group_chroma_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS].parameter_set.aps_type;
+      copy_alf_param(&apss[state->slice->alf->tile_group_chroma_aps_id], &state->tile->frame->alf_param_set_map[state->slice->alf->tile_group_chroma_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS].parameter_set);
     }
   }
 }
@@ -5700,7 +5689,7 @@ static void alf_filter_block(encoder_state_t * const state,
           }
           sum += curr;
 
-          p_rec_1[jj] = alf_clip_pixel(sum, clp_rng);
+          p_rec_1[jj] = kvz_fast_clip_32bit_to_pixel(sum);
 
           p_img_0++;
           p_img_1++;
@@ -5729,12 +5718,12 @@ static void alf_filter_block(encoder_state_t * const state,
 static void alf_reconstruct(encoder_state_t * const state,
   array_variables *arr_vars)
 {
-  if (!state->slice->tile_group_alf_enabled_flag[COMPONENT_Y])
+  if (!state->slice->alf->tile_group_alf_enabled_flag[COMPONENT_Y])
   {
     return;
   }
 
-  alf_reconstruct_coeff_aps(state, true, state->slice->tile_group_alf_enabled_flag[COMPONENT_Cb] || state->slice->tile_group_alf_enabled_flag[COMPONENT_Cr], false, arr_vars);
+  alf_reconstruct_coeff_aps(state, true, state->slice->alf->tile_group_alf_enabled_flag[COMPONENT_Cb] || state->slice->alf->tile_group_alf_enabled_flag[COMPONENT_Cr], false, arr_vars);
 
   alf_info_t *alf_info = state->tile->frame->alf_info;
   bool **ctu_enable_flags = alf_info->ctu_enable_flag;
@@ -5983,11 +5972,11 @@ static void alf_derive_classification_blk(encoder_state_t * const state,
       const int y = (i + blk_dst_y) & (vb_ctu_height - 1);
       if (y == vb_pos - 4 || y == vb_pos)
       {
-        activity = alf_clip3_int(0, max_activity, (temp_act * 96) >> shift);
+        activity = CLIP(0, max_activity, (temp_act * 96) >> shift);
       }
       else
       {
-        activity = alf_clip3_int(0, max_activity, (temp_act * 64) >> shift);
+        activity = CLIP(0, max_activity, (temp_act * 64) >> shift);
       }
 
       int class_idx = th[activity];
@@ -6132,31 +6121,33 @@ void kvz_alf_enc_process(encoder_state_t *const state)
 {
   alf_info_t *alf_info = state->tile->frame->alf_info;
   alf_create_frame_buffer(state, alf_info);
-
-  if (1 /*!layerIdx*/ && (false/*cs.slice->getPendingRasInit()*/ || (state->frame->pictype == KVZ_NAL_IDR_W_RADL || state->frame->pictype == KVZ_NAL_IDR_N_LP)))
+  /*
+  //if (!layerIdx && cs.slice->getPendingRasInit()
+  if (1 && (false
+  || (state->frame->pictype == KVZ_NAL_IDR_W_RADL || state->frame->pictype == KVZ_NAL_IDR_N_LP)))
   {
     for (int i = 0; i < ALF_CTB_MAX_NUM_APS; i++) {
-      reset_aps(&state->slice->apss[i], state->encoder_control->cfg.alf_type == KVZ_ALF_FULL);
-      if (state->encoder_control->cfg.param_set_map[i + T_ALF_APS].b_changed)
+      reset_aps(&state->slice->alf->apss[i], state->encoder_control->cfg.alf_type == KVZ_ALF_FULL);
+      if (state->tile->frame->alf_param_set_map[i + T_ALF_APS].b_changed)
       {
-        alf_aps* alf_aps = &state->encoder_control->cfg.param_set_map[i + T_ALF_APS].parameter_set;
-        state->encoder_control->cfg.param_set_map[i + T_ALF_APS].b_changed = false;
+        alf_aps* alf_aps = &state->tile->frame->alf_param_set_map[i + T_ALF_APS].parameter_set;
+        state->tile->frame->alf_param_set_map[i + T_ALF_APS].b_changed = false;
         reset_aps(alf_aps, state->encoder_control->cfg.alf_type == KVZ_ALF_FULL);
       }
     }
     alf_info->aps_id_start = ALF_CTB_MAX_NUM_APS;
-  }
+  }*/
 
   alf_aps alf_param;
   reset_alf_param(&alf_param);
-  cc_alf_filter_param *cc_filter_param = state->slice->cc_filter_param;
+  cc_alf_filter_param *cc_filter_param = state->slice->alf->cc_filter_param;
 
 
   enum kvz_chroma_format chroma_fmt = state->encoder_control->chroma_format;
   bool chroma_scale_x = (chroma_fmt == KVZ_CSP_444) ? 0 : 1;
   bool chroma_scale_y = (chroma_fmt != KVZ_CSP_420) ? 0 : 1;
   int8_t kvz_bit_depth = state->encoder_control->bitdepth;
-  const int32_t num_ctus_in_pic = state->lcu_order_count;
+  const int32_t num_ctus_in_pic = state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu;
   const int8_t input_bitdepth = state->encoder_control->bitdepth;
   double lambda_chroma_weight = 0.0;
 
@@ -6174,8 +6165,8 @@ void kvz_alf_enc_process(encoder_state_t *const state)
   const int luma_height = state->tile->frame->height;
   const int luma_width = state->tile->frame->width;
 
-  static array_variables arr_vars;
-  static bool init_values = false;
+  array_variables arr_vars;
+  bool init_values = false;
 
   if (!init_values)
   {
@@ -6242,7 +6233,7 @@ void kvz_alf_enc_process(encoder_state_t *const state)
   // get CTB stats for filtering 
   alf_derive_stats_for_filtering(state, arr_vars.alf_clipping_values);
 
-  for (int ctb_iIdx = 0; ctb_iIdx < state->lcu_order_count; ctb_iIdx++)
+  for (int ctb_iIdx = 0; ctb_iIdx < num_ctus_in_pic; ctb_iIdx++)
   {
     alf_info->alf_ctb_filter_index[ctb_iIdx] = ALF_NUM_FIXED_FILTER_SETS;
   }
@@ -6250,7 +6241,7 @@ void kvz_alf_enc_process(encoder_state_t *const state)
   // consider using new filter (only)
   alf_param.new_filter_flag[CHANNEL_TYPE_LUMA] = true;
   alf_param.new_filter_flag[CHANNEL_TYPE_CHROMA] = true;
-  state->slice->tile_group_num_aps = 1; // Only new filter for RD cost optimization
+  state->slice->alf->tile_group_num_aps = 1; // Only new filter for RD cost optimization
 
   // derive filter (luma)
   alf_encoder(state,
@@ -6270,7 +6261,7 @@ void kvz_alf_enc_process(encoder_state_t *const state)
   // let alfEncoderCtb decide now
   alf_param.new_filter_flag[CHANNEL_TYPE_LUMA] = false;
   alf_param.new_filter_flag[CHANNEL_TYPE_CHROMA] = false;
-  state->slice->tile_group_num_aps = 0;
+  state->slice->alf->tile_group_num_aps = 0;
 
   //m_CABACEstimator->getCtx() = AlfCtx(ctxStart);
   memcpy(cabac_estimator, &ctx_start, sizeof(*cabac_estimator));
@@ -6298,14 +6289,14 @@ void kvz_alf_enc_process(encoder_state_t *const state)
   }
 
   // Do not transmit CC ALF if it is unchanged
-  if (state->slice->tile_group_alf_enabled_flag[COMPONENT_Y])
+  if (state->slice->alf->tile_group_alf_enabled_flag[COMPONENT_Y])
   {
-    for (int32_t luma_alf_aps_id = 0; luma_alf_aps_id < state->slice->tile_group_num_aps; luma_alf_aps_id++)
+    for (int32_t luma_alf_aps_id = 0; luma_alf_aps_id < state->slice->alf->tile_group_num_aps; luma_alf_aps_id++)
     {
       //APS* aps = (luma_alf_aps_id >= 0) ? m_apsMap->getPS((luma_alf_aps_id << NUM_APS_TYPE_LEN) + ALF_APS) : nullptr;
-      int aps_id = state->slice->tile_group_luma_aps_id[luma_alf_aps_id];
-      alf_aps* aps = (aps_id >= 0) ? &state->encoder_control->cfg.param_set_map[aps_id + T_ALF_APS].parameter_set : NULL;
-      bool changed = state->encoder_control->cfg.param_set_map[aps_id + T_ALF_APS].b_changed;
+      int aps_id = state->slice->alf->tile_group_luma_aps_id[luma_alf_aps_id];
+      alf_aps* aps = (aps_id >= 0) ? &state->tile->frame->alf_param_set_map[aps_id + T_ALF_APS].parameter_set : NULL;
+      bool changed = state->tile->frame->alf_param_set_map[aps_id + T_ALF_APS].b_changed;
       if (aps && changed)
       {
         aps->cc_alf_aps_param.new_cc_alf_filter[0] = false;
@@ -6313,9 +6304,9 @@ void kvz_alf_enc_process(encoder_state_t *const state)
       }
     }
   }
-  int chroma_alf_aps_id = (state->slice->tile_group_alf_enabled_flag[COMPONENT_Cb] || state->slice->tile_group_alf_enabled_flag[COMPONENT_Cr]) ? state->slice->tile_group_chroma_aps_id : -1;
-  alf_aps* aps = (chroma_alf_aps_id >= 0) ? &state->encoder_control->cfg.param_set_map[chroma_alf_aps_id + T_ALF_APS].parameter_set : NULL;
-  bool changed = (chroma_alf_aps_id >= 0) ? state->encoder_control->cfg.param_set_map[chroma_alf_aps_id + T_ALF_APS].b_changed : 0;
+  int chroma_alf_aps_id = (state->slice->alf->tile_group_alf_enabled_flag[COMPONENT_Cb] || state->slice->alf->tile_group_alf_enabled_flag[COMPONENT_Cr]) ? state->slice->alf->tile_group_chroma_aps_id : -1;
+  alf_aps* aps = (chroma_alf_aps_id >= 0) ? &state->tile->frame->alf_param_set_map[chroma_alf_aps_id + T_ALF_APS].parameter_set : NULL;
+  bool changed = (chroma_alf_aps_id >= 0) ? state->tile->frame->alf_param_set_map[chroma_alf_aps_id + T_ALF_APS].b_changed : 0;
   if (aps && changed)
   {
     aps->cc_alf_aps_param.new_cc_alf_filter[0] = false;
