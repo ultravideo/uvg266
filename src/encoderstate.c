@@ -734,8 +734,6 @@ static void encoder_state_worker_encode_lcu_bitstream(void * opaque)
       kvz_bitstream_align_zero(state->cabac.stream);
 
       kvz_cabac_start(&state->cabac);
-
-      kvz_crypto_delete(&state->crypto_hdl);
     }
   }
 
@@ -772,8 +770,6 @@ static void encoder_state_worker_encode_lcu_bitstream(void * opaque)
       }
     }
   }
-
-  //fprintf(stderr, "Bitstream written: %d\r\n", lcu->id);
 }
 
 
@@ -793,11 +789,6 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
 
   // Signaled slice QP may be different to frame QP with set-qp-in-cu enabled.
   state->last_qp = ctrl->cfg.set_qp_in_cu ? 26 : state->frame->QP;
-
-  if (cfg->crypto_features) {
-    state->crypto_hdl = kvz_crypto_create(cfg);
-    state->crypto_prev_pos = 0;
-  }
 
   // Select whether to encode the frame/tile in current thread or to define
   // wavefront jobs for other threads to handle.

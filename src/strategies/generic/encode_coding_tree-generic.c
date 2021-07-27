@@ -73,8 +73,8 @@ void kvz_encode_coeff_nxn_generic(encoder_state_t * const state,
   cabac_ctx_t *base_coeff_group_ctx = &(cabac->ctx.sig_coeff_group_model[(type == 0 ? 0 : 1) * 2]);
   
 
-  unsigned scan_cg_last = -1;
-  unsigned scan_pos_last = -1;
+  unsigned scan_cg_last = (unsigned)-1;
+  unsigned scan_pos_last = (unsigned)-1;
 
   for (int i = 0; i < width * width; i++) {
     if (coeff[scan[i]]) {

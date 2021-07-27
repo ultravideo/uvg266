@@ -24,7 +24,6 @@
 #include "context.h"
 #include "cu.h"
 #include "encoder.h"
-#include "extras/crypto.h"
 #include "global.h"
 #include "imagelist.h"
 #include "inter.h"
@@ -54,7 +53,7 @@ static bool is_mts_allowed(encoder_state_t * const state, cu_info_t *const pred_
 
 static void encode_mts_idx(encoder_state_t * const state,
   cabac_data_t * const cabac,
-  cu_info_t *const pred_cu)
+  const cu_info_t *const pred_cu)
 {
   //TransformUnit &tu = *cu.firstTU;
   int mts_idx = pred_cu->tr_idx;
@@ -118,8 +117,8 @@ void kvz_encode_ts_residual(encoder_state_t* const state,
   cabac->cur_ctx = base_coeff_group_ctx;
   
   int maxCtxBins = (width * width * 7) >> 2;
-  unsigned scan_cg_last = -1;
-  unsigned scan_pos_last = -1;
+  unsigned scan_cg_last = (unsigned )-1;
+  unsigned scan_pos_last = (unsigned )-1;
 
   for (int i = 0; i < width * width; i++) {
     if (coeff[scan[i]]) {
@@ -406,7 +405,7 @@ static void encode_transform_unit(encoder_state_t * const state,
                            width,
                            0,
                            scan_idx,
-                           cur_pu,
+                           (cu_info_t * )cur_pu,
                            true);
     }
   }
@@ -423,7 +422,7 @@ static void encode_transform_unit(encoder_state_t * const state,
       // corner of the block.
       x -= 4;
       y -= 4;
-      cur_pu = kvz_cu_array_at_const(frame->cu_array, x, y);
+      cur_pu = kvz_cu_array_at_const((const cu_array_t *)frame->cu_array, x, y);
     }
   }
 
@@ -1067,18 +1066,18 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
   cabac_data_t * const cabac = &state->cabac;
   const encoder_control_t * const ctrl = state->encoder_control;
   const videoframe_t * const frame = state->tile->frame;
-  cu_info_t *cur_cu   = kvz_cu_array_at_const(frame->cu_array, x, y);
+  const cu_info_t *cur_cu   = kvz_cu_array_at_const((const cu_array_t * )frame->cu_array, x, y);
 
   const int cu_width = LCU_WIDTH >> depth;
   const int half_cu  = cu_width >> 1;
 
   const cu_info_t *left_cu  = NULL;
   if (x > 0) {
-    left_cu = kvz_cu_array_at_const(frame->cu_array, x - 1, y);
+    left_cu = kvz_cu_array_at_const((const cu_array_t*)frame->cu_array, x - 1, y);
   }
   const cu_info_t *above_cu = NULL;
   if (y > 0) {
-    above_cu = kvz_cu_array_at_const(frame->cu_array, x, y - 1);
+    above_cu = kvz_cu_array_at_const((const cu_array_t*)frame->cu_array, x, y - 1);
   }
 
   uint8_t split_flag = GET_SPLITDATA(cur_cu, depth);

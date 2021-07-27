@@ -37,7 +37,6 @@
 #include "tables.h"
 #include "threadqueue.h"
 #include "videoframe.h"
-#include "extras/crypto.h"
 
 struct kvz_rc_data;
 
@@ -304,10 +303,6 @@ typedef struct encoder_state_t {
   
   bitstream_t stream;
   cabac_data_t cabac;
-
-  // Crypto stuff
-  crypto_handle_t *crypto_hdl;
-  uint32_t crypto_prev_pos;
 
   uint32_t stats_bitstream_length; //Bitstream length written in bytes
 

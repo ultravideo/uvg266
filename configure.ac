@@ -80,27 +80,6 @@ AC_SEARCH_LIBS([log], [m c], [], [exit 1])
 AC_SEARCH_LIBS([pow], [m c], [], [exit 1])
 AC_SEARCH_LIBS([sqrt], [m c], [], [exit 1])
 
-AC_ARG_WITH([cryptopp],
-    AS_HELP_STRING([--with-cryptopp],
-        [Build with cryptopp Enables selective encryption.]))
-AS_IF([test "x$with_cryptopp" = "xyes"],
-    [PKG_CHECK_MODULES([cryptopp], [cryptopp],
-        [AC_DEFINE([KVZ_SEL_ENCRYPTION], [1], [With cryptopp])],
-        [PKG_CHECK_MODULES([cryptopp], [libcrypto++],
-            [AC_DEFINE([KVZ_SEL_ENCRYPTION], [1], [With cryptopp])],
-            [PKG_CHECK_MODULES([cryptopp], [libcryptopp],
-                [AC_DEFINE([KVZ_SEL_ENCRYPTION], [1], [With cryptopp])],
-                [AC_MSG_ERROR([neither cryptopp, libcrypto++ nor libcryptopp found with pkg-config])]
-            )]
-        )]
-    )]
-)
-
-AM_CONDITIONAL([USE_CRYPTOPP], [test "x$with_cryptopp" = "xyes"])
-CPPFLAGS="$CPPFLAGS $cryptopp_CFLAGS"
-LIBS="$LIBS $cryptopp_LIBS"
-
-
 CPPFLAGS="-DKVZ_DLL_EXPORTS $CPPFLAGS"
 
 

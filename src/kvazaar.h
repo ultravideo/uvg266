@@ -150,20 +150,6 @@ enum kvz_cu_split_termination
 };
 
 /**
-* \brief Enable and disable crypto features.
-* \since 3.7.0
-*/
-enum kvz_crypto_features {
-  KVZ_CRYPTO_OFF = 0,
-  KVZ_CRYPTO_MVs = (1 << 0),
-  KVZ_CRYPTO_MV_SIGNS = (1 << 1),
-  KVZ_CRYPTO_TRANSF_COEFFS = (1 << 2),
-  KVZ_CRYPTO_TRANSF_COEFF_SIGNS = (1 << 3),
-  KVZ_CRYPTO_INTRA_MODE = (1 << 4),
-  KVZ_CRYPTO_ON = (1 << 5) - 1,
-};
-
-/**
 * \brief me early termination mode
 * \since since 3.8.0
 */
@@ -383,9 +369,6 @@ typedef struct kvz_config
   enum kvz_hash hash;  /*!< \since 3.5.0 \brief What hash algorithm to use. */
 
   enum kvz_cu_split_termination cu_split_termination; /*!< \since 3.8.0 \brief Mode of cu split termination. */
-
-  enum kvz_crypto_features crypto_features; /*!< \since 3.7.0 */
-  uint8_t *optional_key;
 
   enum kvz_me_early_termination me_early_termination; /*!< \since 3.8.0 \brief Mode of me early termination. */
   int32_t intra_rdo_et; /*!< \since 4.1.0 \brief Use early termination in intra rdo. */

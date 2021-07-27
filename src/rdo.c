@@ -273,7 +273,7 @@ static INLINE uint32_t get_coeff_cabac_cost(
                          false);
   }
   else {
-    kvz_encode_ts_residual(state,
+    kvz_encode_ts_residual((encoder_state_t* const)state,
       &cabac_copy,
       coeff,
       width,

@@ -58,7 +58,6 @@ void kvz_nal_write(bitstream_t * const bitstream, const uint8_t nal_type,
   if ((nal_type >= 16) && (nal_type <= 31)) {
     zero_tid_required_flag = 1;
   }
-  uint8_t nal_type_lsb = nal_type - (zero_tid_required_flag << 4);
   
   // forbidden zero (1bit) + reserver zero (1bit) layer_id (6 bits)
   byte = 0; 

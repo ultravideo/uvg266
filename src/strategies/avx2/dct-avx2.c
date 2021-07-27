@@ -1201,7 +1201,7 @@ const int16_t* kvz_g_mts_input[2][3][5] = {
 
 static void mts_dct_4x4_avx2(const int16_t* input, int16_t* output, tr_type_t type_hor, tr_type_t type_ver, uint8_t bitdepth)
 {
-  const int height = 4;
+  //const int height = 4;
   const int width = 4;
 
   const int log2_width_minus2 = kvz_g_convert_to_bit[width];
@@ -1528,7 +1528,7 @@ static void mts_idct_32x32_avx2(const int16_t* input, int16_t* output, tr_type_t
   const int16_t* tdct = kvz_g_mts_input[1][type_ver][3];
   const int16_t* dct = kvz_g_mts_input[0][type_hor][3];
 
-  const int skip_width = (type_hor != DCT2) ? 16 : 0;
+  //const int skip_width = (type_hor != DCT2) ? 16 : 0;
   const int skip_height = (type_ver != DCT2) ? 16 : 0;
 
   mul_clip_matrix_32x32_mts_avx2(tdct, input, tmp, shift_1st, skip_height,0);

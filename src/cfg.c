@@ -126,7 +126,6 @@ int kvz_config_init(kvz_config *cfg)
   cfg->calc_psnr = true;
 
   cfg->mv_constraint = KVZ_MV_CONSTRAIN_NONE;
-  cfg->crypto_features = KVZ_CRYPTO_OFF;
 
   cfg->me_early_termination = 1;
   cfg->intra_rdo_et         = 0;
@@ -146,8 +145,6 @@ int kvz_config_init(kvz_config *cfg)
   cfg->erp_aqp = false;
 
   cfg->slices = KVZ_SLICES_NONE;
-
-  cfg->optional_key = NULL;
 
   cfg->level = 62; // default hevc level, 6.2 (the highest)
   cfg->force_level = true; // don't care about level limits by-default
@@ -210,7 +207,6 @@ int kvz_config_destroy(kvz_config *cfg)
     FREE_POINTER(cfg->tiles_height_split);
     FREE_POINTER(cfg->slice_addresses_in_ts);
     FREE_POINTER(cfg->roi.dqps);
-    FREE_POINTER(cfg->optional_key);
     FREE_POINTER(cfg->fastrd_learning_outdir_fn);
   }
   free(cfg);
@@ -1229,63 +1225,6 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     int result = parse_enum(value, cu_split_termination_names, &mode);
     cfg->cu_split_termination = mode;
     return result;
-  }
-  else if OPT("crypto")
-  {
-    // on, off, feature1+feature2
-
-    const char *token_begin = value;
-    const char *cur = token_begin;
-
-    cfg->crypto_features = KVZ_CRYPTO_OFF;
-
-    // If value is on or off, set all features to on or off.
-    int8_t toggle = 0;
-    if (parse_enum(token_begin, crypto_toggle_names, &toggle)) {
-      if (toggle == 1) {
-        cfg->crypto_features = KVZ_CRYPTO_ON;
-      }
-    } else {
-      // Try and parse "feature1+feature2" type list.
-      for (;;) {
-        if (*cur == '+' || *cur == '\0') {
-          int8_t feature = 0;
-          int num_chars = cur - token_begin;
-          if (parse_enum_n(token_begin, num_chars, crypto_feature_names, &feature)) {
-            cfg->crypto_features |= (1 << feature);
-          } else {
-            cfg->crypto_features = KVZ_CRYPTO_OFF;
-            return 0;
-          }
-          token_begin = cur + 1;
-        }
-
-        if (*cur == '\0') {
-          break;
-        } else {
-          ++cur;
-        }
-      }
-    }
-
-    // Disallow turning on the encryption when it's not compiled in.
-    bool encryption_compiled_in = false;
-#ifdef KVZ_SEL_ENCRYPTION
-    encryption_compiled_in = true;
-#endif
-    if (!encryption_compiled_in && cfg->crypto_features) {
-      fprintf(stderr, "--crypto cannot be enabled because it's not compiled in.\n");
-      cfg->crypto_features = KVZ_CRYPTO_OFF;
-      return 0;
-    }
-
-    return 1;
-  }
-  else if OPT("key"){
-    int size_key = 16;
-    FREE_POINTER(cfg->optional_key);
-    cfg->optional_key = (uint8_t *)malloc(sizeof(uint8_t)*size_key);
-    return parse_array(value, cfg->optional_key, size_key, 0, 255);
   }
   else if OPT("me-early-termination"){
     int8_t mode = 0;

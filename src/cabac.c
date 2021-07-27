@@ -22,7 +22,6 @@
 
 #include "encoder.h"
 #include "encoderstate.h"
-#include "extras/crypto.h"
 #include "kvazaar.h"
 
 #ifdef KVZ_DEBUG_PRINT_CABAC

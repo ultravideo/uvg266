@@ -36,7 +36,6 @@ static void array_md5_generic(const kvz_pixel* data,
   context_md5_t md5_ctx;
   kvz_md5_init(&md5_ctx);
   
-  unsigned bytes = width * height * sizeof(kvz_pixel);
   uint32_t N = 32;
   uint32_t width_modN = width % N;
   uint32_t width_less_modN = width - width_modN;

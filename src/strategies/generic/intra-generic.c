@@ -131,7 +131,7 @@ static void kvz_angular_pred_generic(
   // Whether to swap references to always project on the left reference row.
   const bool vertical_mode = intra_mode >= 34;
   // Modes distance to horizontal or vertical mode.
-  const int_fast8_t mode_disp = vertical_mode ? pred_mode - 50 : -(pred_mode - 18);
+  const int_fast8_t mode_disp = vertical_mode ? pred_mode - 50 : -((int32_t)pred_mode - 18);
   //const int_fast8_t mode_disp = vertical_mode ? intra_mode - 26 : 10 - intra_mode;
   
   // Sample displacement per column in fractions of 32.
