@@ -27,11 +27,11 @@ tmpfile="$(mktemp)"
 readme_file="../README.md"
 
 {
-    sed '/BEGIN KVAZAAR HELP MESSAGE/q' -- "$readme_file";
+    sed '/BEGIN UVG266 HELP MESSAGE/q' -- "$readme_file";
     printf '```\n';
     ../src/kvazaar --help;
     printf '```\n';
-    sed -n '/END KVAZAAR HELP MESSAGE/{:a;p;n;ba}' -- "$readme_file";
+    sed -n '/END UVG266 HELP MESSAGE/{:a;p;n;ba}' -- "$readme_file";
 } >> "$tmpfile"
 
 mv -- "$tmpfile" "../README.md"

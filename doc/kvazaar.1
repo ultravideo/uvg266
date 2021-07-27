@@ -1,8 +1,8 @@
-.TH KVAZAAR "1" "January 2021" "kvazaar v2.0.0" "User Commands"
+.TH KVAZAAR "1" "July 2021" "uvg266 v2.0.0" "User Commands"
 .SH NAME
-kvazaar \- open source HEVC encoder
+uvg266 \- open source VVC encoder
 .SH SYNOPSIS
-\fBkvazaar \fR\-i <input> \-\-input\-res <width>x<height> \-o <output>
+\fBuvg266 \fR\-i <input> \-\-input\-res <width>x<height> \-o <output>
 .SH DESCRIPTION
 .TP
 \fB\-i\fR, \fB\-\-input <filename>    
@@ -84,22 +84,6 @@ Calculate PSNR for frames. [enabled]
 .TP
 \fB\-\-(no\-)info           
 Add encoder info SEI. [enabled]
-.TP
-\fB\-\-crypto <string>     
-Selective encryption. Crypto support must be
-enabled at compile\-time. Can be 'on' or 'off' or
-a list of features separated with a '+'. [off]
-    \- on: Enable all encryption features.
-    \- off: Disable selective encryption.
-    \- mvs: Motion vector magnitudes.
-    \- mv_signs: Motion vector signs.
-    \- trans_coeffs: Coefficient magnitudes.
-    \- trans_coeff_signs: Coefficient signs.
-    \- intra_pred_modes: Intra prediction modes.
-.TP
-\fB\-\-key <string>        
-Encryption key [16,213,27,56,255,127,242,112,
-                97,126,197,204,25,59,38,30]
 .TP
 \fB\-\-stats\-file\-prefix   
 A prefix used for stats files that include
@@ -212,6 +196,17 @@ High tier requires level 4 or higher.
 Enable variance adaptive quantization with given
 strength, in range 1..20. Recommended: 5.
 [disabled]
+.TP
+\fB\-\-chroma\-qp\-in        
+List of input values used for mapping the luma
+QP into chroma qp. [17,27,32,44]
+.TP
+\fB\-\-chroma\-qp\-out       
+List of output values used for mapping the luma
+QP into chroma qp. These two lists have to be
+same length, start with same value, and can
+contain maximum 16 or 36 \- starting value
+elements. [17,27,32,44]
 
 .SS "Compression tools:"
 .TP
@@ -226,6 +221,12 @@ Sample Adaptive Offset [full]
     \- band: Band offset only
     \- edge: Edge offset only
     \- full: Full SAO
+.TP
+\fB\-\-alf <string>        
+Adaptive Loop Filter [off]
+    \- off: ALF disabled
+    \- no\-cc: ALF enabled without cross component refinement
+    \- full: Full ALF
 .TP
 \fB\-\-(no\-)rdoq           
 Rate\-distortion optimized quantization [enabled]
@@ -366,6 +367,17 @@ with lossless coding. [disabled]
 .TP
 \fB\-\-(no\-)tmvp           
 Temporal motion vector prediction [enabled]
+.TP
+\fB\-\-mts <string>        
+Multiple Transform Selection [off].
+(Currently only implemented for intra
+and has effect only when rd >= 2)
+    \- off: MTS disabled
+    \- intra: MTS applied only for intra blocks.
+    \- inter: MTS applied only for inter blocks.
+    \- both: MTS applied for both intra and inter blocks.
+    \- implicit: uses implicit MTS. Applies DST7 instead 
+                of DCT2 to certain intra blocks.
 
 .SS "Parallel processing:"
 .TP

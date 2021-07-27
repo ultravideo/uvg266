@@ -10,11 +10,11 @@ version="$(awk '/#define KVZ_VERSION/ { print $3 }' ../src/global.h)"
 manpage_file=../doc/kvazaar.1
 
 cat <<EOF> $manpage_file
-.TH KVAZAAR "1" "$date" "kvazaar v$version" "User Commands"
+.TH KVAZAAR "1" "$date" "uvg266 v$version" "User Commands"
 .SH NAME
-kvazaar \- open source HEVC encoder
+uvg266 \- open source VVC encoder
 .SH SYNOPSIS
-\fBkvazaar \fR\-i <input> \-\-input\-res <width>x<height> \-o <output>
+\fBuvg266 \fR\-i <input> \-\-input\-res <width>x<height> \-o <output>
 .SH DESCRIPTION
 EOF
 

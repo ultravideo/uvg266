@@ -1,25 +1,25 @@
-Kvazaar
+uvg266
 =======
 An open-source VVC encoder licensed under LGPLv2.1
 
-Join channel #kvazaar_hevc in Freenode IRC network to contact us.
+Join channel [#ultravideo](https://web.libera.chat/#ultravideo) in [Libera.Chat](https://libera.chat/) IRC network to contact us.
 
-Kvazaar is still under development. Speed and RD-quality will continue to improve.
+uvg266 is still under development. Speed and RD-quality will continue to improve.
 
 http://ultravideo.cs.tut.fi/#encoder for more information.
 
-- Linux/Mac [![Build Status](https://travis-ci.org/ultravideo/kvazaar.svg?branch=master)](https://travis-ci.org/ultravideo/kvazaar)
-- Windows [![Build status](https://ci.appveyor.com/api/projects/status/88sg1h25lp0k71pu?svg=true)](https://ci.appveyor.com/project/Ultravideo/kvazaar)
+- Linux/Mac [![Build Status](https://travis-ci.org/ultravideo/uvg266.svg?branch=master)](https://travis-ci.org/ultravideo/uvg266)
+- Windows [![Build status](https://ci.appveyor.com/api/projects/status/88sg1h25lp0k71pu?svg=true)](https://ci.appveyor.com/project/Ultravideo/uvg266)
 
 ## Table of Contents
 
-- [Using Kvazaar](#using-kvazaar)
+- [Using uvg266](#using-uvg266)
   - [Example:](#example)
   - [Parameters](#parameters)
   - [LP-GOP syntax](#lp-gop-syntax)
 - [Presets](#presets)
-- [Kvazaar library](#kvazaar-library)
-- [Compiling Kvazaar](#compiling-kvazaar)
+- [uvg266 library](#uvg266-library)
+- [Compiling uvg266](#compiling-uvg266)
   - [Required libraries](#required-libraries)
   - [Autotools](#autotools)
   - [Autotools on MinGW](#autotools-on-mingw)
@@ -28,24 +28,24 @@ http://ultravideo.cs.tut.fi/#encoder for more information.
   - [Docker](#docker)
   - [Visualization (Windows only)](#visualization-windows-only)
 - [Paper](#paper)
-- [Contributing to Kvazaar](#contributing-to-kvazaar)
+- [Contributing to uvg266](#contributing-to-uvg266)
   - [Code documentation](#code-documentation)
   - [For version control we try to follow these conventions:](#for-version-control-we-try-to-follow-these-conventions)
   - [Testing](#testing)
   - [Unit tests](#unit-tests)
   - [Code style](#code-style)
 
-## Using Kvazaar VVC
+## Using uvg266 VVC
 
 ### Debugging:
 
-    ./kvazaar -i BQMall_832x480_60.yuv -o BQMall.266 -n 10 --no-sao --threads=0 --no-wpp -p 1 --rd=0 --fast-residual-cost=32 --no-deblock > debug.txt
+    ./uvg266 -i BQMall_832x480_60.yuv -o BQMall.266 -n 10 --no-sao --threads=0 --no-wpp -p 1 --rd=0 --fast-residual-cost=32 --no-deblock > debug.txt
     
     ./DecoderAnalyserApp -b BQMall.266 --TraceFile=trace.txt --TraceRule=D_COMMON,D_CABAC,D_SYNTAX,D_NALUNITHEADER,D_HEADER:poc>=0 -o rec.yuv
 
 ### Example:
 
-    kvazaar --input BQMall_832x480_60.yuv --output out.hevc
+    uvg266 --input BQMall_832x480_60.yuv --output out.vvc
 
 The mandatory parameters are input and output. If the resolution of the input file is not in the filename, or when pipe is used, the input resolution must also be given: ```--input-res=1920x1080```.
 
@@ -55,10 +55,10 @@ Speed and compression quality can be selected with ```--preset```, or by setting
 
 ### Parameters
 
-[comment]: # (BEGIN KVAZAAR HELP MESSAGE)
+[comment]: # (BEGIN UVG266 HELP MESSAGE)
 ```
 Usage:
-kvazaar -i <input> --input-res <width>x<height> -o <output>
+uvg266 -i <input> --input-res <width>x<height> -o <output>
 
 Required:
   -i, --input <filename>     : Input file
@@ -101,18 +101,6 @@ Options:
                                    - md5: 56 bytes
       --(no-)psnr            : Calculate PSNR for frames. [enabled]
       --(no-)info            : Add encoder info SEI. [enabled]
-      --crypto <string>      : Selective encryption. Crypto support must be
-                               enabled at compile-time. Can be 'on' or 'off' or
-                               a list of features separated with a '+'. [off]
-                                   - on: Enable all encryption features.
-                                   - off: Disable selective encryption.
-                                   - mvs: Motion vector magnitudes.
-                                   - mv_signs: Motion vector signs.
-                                   - trans_coeffs: Coefficient magnitudes.
-                                   - trans_coeff_signs: Coefficient signs.
-                                   - intra_pred_modes: Intra prediction modes.
-      --key <string>         : Encryption key [16,213,27,56,255,127,242,112,
-                                               97,126,197,204,25,59,38,30]
       --stats-file-prefix    : A prefix used for stats files that include
                                bits, lambda, distortion, and qp for each ctu.
                                These are meant for debugging and are not
@@ -182,6 +170,13 @@ Video structure:
       --(no-)vaq <integer>   : Enable variance adaptive quantization with given
                                strength, in range 1..20. Recommended: 5.
                                [disabled]
+      --chroma-qp-in         : List of input values used for mapping the luma
+                               QP into chroma qp. [17,27,32,44]
+      --chroma-qp-out        : List of output values used for mapping the luma
+                               QP into chroma qp. These two lists have to be
+                               same length, start with same value, and can
+                               contain maximum 16 or 36 - starting value
+                               elements. [17,27,32,44]
 
 Compression tools:
       --(no-)deblock <beta:tc> : Deblocking filter. [0:0]
@@ -347,7 +342,7 @@ Deprecated parameters: (might be removed at some point)
   -w, --width <integer>       : Use --input-res.
   -h, --height <integer>      : Use --input-res.
 ```
-[comment]: # (END KVAZAAR HELP MESSAGE)
+[comment]: # (END UVG266 HELP MESSAGE)
 
 
 ### LP-GOP syntax
@@ -400,30 +395,30 @@ where the names have been abbreviated to fit the layout in GitHub.
 | max-merge            | 5     | 5     | 5     | 5     | 5     | 5     | 5     | 5     | 5     | 5     |
 
 
-## Kvazaar library
+## uvg266 library
 See [kvazaar.h](src/kvazaar.h) for the library API and its
 documentation.
 
-When using the static Kvazaar library on Windows, macro `KVZ_STATIC_LIB`
+When using the static uvg266 library on Windows, macro `KVZ_STATIC_LIB`
 must be defined. On other platforms it's not strictly required.
 
 The needed linker and compiler flags can be obtained with pkg-config.
 
 
-## Compiling Kvazaar
+## Compiling uvg266
 If you have trouble regarding compiling the source code, please make an
-[issue](https://github.com/ultravideo/kvazaar/issues) about in Github.
+[issue](https://github.com/ultravideo/uvg266/issues) about in Github.
 Others might encounter the same problem and there is probably much to
 improve in the build process. We want to make this as simple as
 possible.
 
 
 ### Autotools
-Depending on the platform, some additional tools are required for compiling Kvazaar with autotools.
+Depending on the platform, some additional tools are required for compiling uvg266 with autotools.
 For Ubuntu, the required packages are `automake autoconf libtool m4 build-essential yasm`. Yasm is
 optional, but some of the optimization will not be compiled in if it's missing.
 
-Run the following commands to compile and install Kvazaar.
+Run the following commands to compile and install uvg266.
 
     ./autogen.sh
     ./configure
@@ -437,7 +432,7 @@ It is recommended to use Clang instead of GCC in MinGW environments. GCC also wo
 
     CC=clang ./configure
 
-to build Kvazaar using Clang.
+to build uvg266 using Clang.
 
 ### OS X
 - Install Homebrew
@@ -452,54 +447,14 @@ to build Kvazaar using Clang.
   in %PATH%
 
 
-### Docker
-This project includes a [Dockerfile](./Dockerfile), which enables building for Docker. Kvazaar is also available in the Docker Hub [`ultravideo/kvazaar`](https://hub.docker.com/r/ultravideo/kvazaar/)
-Build using Docker: `docker build -t kvazaar .`
-Example usage: `docker run -i -a STDIN -a STDOUT kvazaar -i - --input-res=320x240 -o - < testfile_320x240.yuv > out.265`
-For other examples, see [Dockerfile](./Dockerfile)
-
-
-### Visualization (Windows only)
-Compiling `kvazaar_cli` project in the `visualizer` branch results in a Kvazaar executable with visualization enabled.
-
-Additional Requirements: [`SDL2`](https://www.libsdl.org/download-2.0.php), [`SDL2-ttf`](https://www.libsdl.org/projects/SDL_ttf/).
-
-Directory `visualizer_extras` has to be added into the same directory level as the kvazaar project directory. Inside should be directories `include` and `lib` found from the development library zip packages.
-
-`SDL2.dll`, `SDL2_ttf.dll`, `libfreetype-6.dll`, and `zlib1.dll` should be placed in the working directory (i.e. the folder the `kvazaar.exe` is in after compiling the `kvazaar_cli` project/solution) when running the visualizer. The required `.dll` can be found in the aforementioned `lib`-folder (`lib\x64`).
-
-Note: The solution should be compiled on the x64 platform in visual studio.
-
-Optional font file `arial.ttf` is to be placed in the working directory, if block info tool is used.
-
-## Paper
-
-Please cite [this paper](https://dl.acm.org/citation.cfm?doid=2964284.2973796) for Kvazaar:
-
-```M. Viitanen, A. Koivula, A. Lemmetti, A. Ylä-Outinen, J. Vanne, and T. D. Hämäläinen, “Kvazaar: open-source HEVC/H.265 encoder,” in Proc. ACM Int. Conf. Multimedia, Amsterdam, The Netherlands, Oct. 2016.```
-
-Or in BibTex:
-
-```
-@inproceedings{Kvazaar2016,
- author = {Viitanen, Marko and Koivula, Ari and Lemmetti, Ari and Yl\"{a}-Outinen, Arttu and Vanne, Jarno and H\"{a}m\"{a}l\"{a}inen, Timo D.},
- title = {Kvazaar: Open-Source HEVC/H.265 Encoder},
- booktitle = {Proceedings of the 24th ACM International Conference on Multimedia},
- year = {2016},
- isbn = {978-1-4503-3603-1},
- location = {Amsterdam, The Netherlands},
- url = {http://doi.acm.org/10.1145/2964284.2973796},
-}
-```
-
-## Contributing to Kvazaar
+## Contributing to uvg266
 We are happy to look at pull requests in Github. There is still lots of work to be done.
 
 
 ### Code documentation
 You can generate Doxygen documentation pages by running the command
 "doxygen docs.doxy". Here is a rough sketch of the module structure:
-![Kvazaar module hierarchy](https://github.com/ultravideo/kvazaar/blob/master/doc/kvazaar_module_hierarchy.png)
+![uvg266 module hierarchy](https://github.com/ultravideo/uvg266/blob/master/doc/uvg266_module_hierarchy.png)
 
 
 ### For version control we try to follow these conventions:
@@ -532,7 +487,7 @@ You can generate Doxygen documentation pages by running the command
   file used by the encoder. There is no Makefile as of yet.
 - The unit tests use "greatest" unit testing framework. It is included
   as a submodule, but getting it requires the following commands to be
-  run in the root directory of kvazaar:
+  run in the root directory of uvg266:
 
         git submodule init
         git submodule update

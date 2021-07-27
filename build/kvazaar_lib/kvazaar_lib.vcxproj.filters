@@ -232,7 +232,6 @@
       <Filter>Optimization\strategies\avx2</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\extras\libmd5.c" />
-    <ClCompile Include="..\..\src\extras\crypto.cpp" />
     <ClCompile Include="..\..\src\strategies\generic\encode_coding_tree-generic.c">
       <Filter>Optimization\strategies\generic</Filter>
     </ClCompile>
@@ -254,6 +253,7 @@
     <ClCompile Include="..\..\src\alf.c">
       <Filter>Reconstruction</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\strategies\strategies-encode.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\bitstream.h">
@@ -446,7 +446,6 @@
       <Filter>Optimization\strategies\avx2</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\extras\libmd5.h" />
-    <ClInclude Include="..\..\src\extras\crypto.h" />
     <ClInclude Include="..\..\src\threadwrapper\include\pthread.h">
       <Filter>Threadwrapper</Filter>
     </ClInclude>
