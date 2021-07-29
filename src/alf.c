@@ -3320,7 +3320,7 @@ void kvz_alf_create(videoframe_t *frame, enum kvz_chroma_format chroma_format)
       init_alf_covariance(&alf_info->alf_covariance_frame_chroma[k], chroma_coeffs);
     }
 
-    alf_info->alf_covariance_cc_alf[MAX_NUM_COMPONENT - 1] = malloc(num_ctus_in_pic * MAX_NUM_CC_ALF_FILTERS * (MAX_NUM_COMPONENT - 1) * sizeof(*alf_info->alf_covariance_cc_alf[MAX_NUM_COMPONENT - 1]));
+    alf_info->alf_covariance_cc_alf[MAX_NUM_COMPONENT - 1] = malloc(num_ctus_in_pic * MAX_NUM_CC_ALF_FILTERS * (MAX_NUM_COMPONENT - 1) * sizeof(alf_covariance));
     for (int comp_idx = 0; comp_idx < (MAX_NUM_COMPONENT - 1); comp_idx++)
     {
       alf_info->alf_covariance_cc_alf[comp_idx] = &alf_info->alf_covariance_cc_alf[MAX_NUM_COMPONENT - 1][comp_idx  * MAX_NUM_CC_ALF_FILTERS * num_ctus_in_pic];
@@ -3355,8 +3355,8 @@ void kvz_alf_create(videoframe_t *frame, enum kvz_chroma_format chroma_format)
   alf_info->best_filter_control = malloc(num_ctus_in_pic * sizeof(*alf_info->best_filter_control));
 
   // Classification
-  alf_info->classifier = malloc(pic_height * sizeof(**alf_info->classifier));
-  alf_info->classifier[0] = malloc(pic_height * pic_width * sizeof(*alf_info->classifier));
+  alf_info->classifier = malloc(pic_height * sizeof(alf_classifier*));
+  alf_info->classifier[0] = malloc(pic_height * pic_width * sizeof(alf_classifier));
 
   for (int i = 1; i < pic_height; i++)
   {
