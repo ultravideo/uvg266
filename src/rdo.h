@@ -76,11 +76,11 @@ uint32_t kvz_get_mvd_coding_cost_cabac(const encoder_state_t *state,
 #define CTX_FRAC_HALF_BIT (1 << (CTX_FRAC_BITS - 1))
 
 extern const uint32_t kvz_entropy_bits[512];
-#define CTX_ENTROPY_BITS(ctx, val) kvz_entropy_bits[CTX_STATE(ctx) ^ (val)]
+#define CTX_ENTROPY_BITS(ctx, val) kvz_entropy_bits[(CTX_STATE(ctx)<<1) ^ (val)]
 
 // Floating point fractional bits, derived from kvz_entropy_bits
 extern const float kvz_f_entropy_bits[512];
 // ToDo: generate a new table for VVC?
-#define CTX_ENTROPY_FBITS(ctx, val) kvz_f_entropy_bits[(CTX_STATE(ctx)) ^ (val)]
+#define CTX_ENTROPY_FBITS(ctx, val) kvz_f_entropy_bits[(CTX_STATE(ctx)<<1) ^ (val)]
 
 #endif
