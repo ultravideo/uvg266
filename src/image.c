@@ -220,6 +220,8 @@ hi_prec_buf_t * kvz_hi_prec_buf_t_alloc(int luma_size)
   yuv->y = (int16_t *)malloc(luma_size * sizeof(*yuv->y));
   yuv->u = (int16_t *)malloc(luma_size / 2 * sizeof(*yuv->u));
   yuv->v = (int16_t *)malloc(luma_size / 2 * sizeof(*yuv->v));
+  yuv->joint_u = (int16_t *)malloc(luma_size / 2 * sizeof(*yuv->u));
+  yuv->joint_v = (int16_t *)malloc(luma_size / 2 * sizeof(*yuv->v));
   yuv->size = luma_size;
 
   return yuv;
@@ -230,6 +232,8 @@ void kvz_hi_prec_buf_t_free(hi_prec_buf_t * yuv)
   free(yuv->y);
   free(yuv->u);
   free(yuv->v);
+  free(yuv->joint_v);
+  free(yuv->joint_u);
   free(yuv);
 }
 

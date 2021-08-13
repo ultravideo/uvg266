@@ -127,10 +127,10 @@ static void rdpcm(const int width,
  * \brief Get scaled QP used in quantization
  *
  */
-int32_t kvz_get_scaled_qp(int8_t type, int8_t qp, int8_t qp_offset, int8_t const * const chroma_scale)
+int32_t kvz_get_scaled_qp(color_t color, int8_t qp, int8_t qp_offset, int8_t const * const chroma_scale)
 {
   int32_t qp_scaled = 0;
-  if(type == 0) {
+  if(color == 0) {
     qp_scaled = qp + qp_offset;
   } else {
     qp_scaled = CLIP(-qp_offset, 57, qp);
@@ -367,7 +367,7 @@ static void quantize_tr_residual(encoder_state_t * const state,
                               cfg->trskip_enable && 
                               cur_pu->tr_idx == 1;
 
-  bool has_coeffs;
+  uint8_t has_coeffs;
 
 
   int lmcs_chroma_adj = 0;
@@ -411,6 +411,25 @@ static void quantize_tr_residual(encoder_state_t * const state,
                                               lmcs_chroma_adj);
     cur_pu->tr_skip = tr_skip;
   } else {
+    if(color == COLOR_UV) {
+      has_coeffs = kvz_quant_cbcr_residual(
+        state,
+        cur_pu,
+        tr_width,
+        scan_idx,
+        lcu_width,
+        lcu_width,
+        &lcu->ref.u[offset], &lcu->ref.v[offset],
+        &lcu->rec.joint_u[offset], &lcu->rec.joint_v[offset],
+        &lcu->rec.joint_u[offset], &lcu->rec.joint_v[offset],
+        &lcu->coeff.joint_uv[z_index],
+        early_skip,
+        lmcs_chroma_adj
+      );
+      cur_pu->joint_cb_cr = has_coeffs;
+      return;
+    }
+
     has_coeffs = kvz_quantize_residual(state,
                                        cur_pu,
                                        tr_width,
@@ -425,6 +444,7 @@ static void quantize_tr_residual(encoder_state_t * const state,
                                        coeff,
                                        early_skip,
                                        lmcs_chroma_adj);
+    
   }
 
   cbf_clear(&cur_pu->cbf, depth, color);
@@ -519,6 +539,7 @@ void kvz_quantize_lcu_residual(encoder_state_t * const state,
     if (chroma) {
       quantize_tr_residual(state, COLOR_U, x, y, depth, cur_pu, lcu, early_skip);
       quantize_tr_residual(state, COLOR_V, x, y, depth, cur_pu, lcu, early_skip);
+      quantize_tr_residual(state, COLOR_UV, x, y, depth, cur_pu, lcu, early_skip);
     }
   }
 }

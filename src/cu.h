@@ -127,15 +127,16 @@ typedef struct {
  */
 typedef struct
 {
-  uint8_t type      : 2; //!< \brief block type, one of cu_type_t values
-  uint8_t depth     : 3; //!< \brief depth / size of this block
-  uint8_t part_size : 3; //!< \brief partition mode, one of part_mode_t values
-  uint8_t tr_depth  : 3; //!< \brief transform depth
-  uint8_t skipped   : 1; //!< \brief flag to indicate this block is skipped
-  uint8_t merged    : 1; //!< \brief flag to indicate this block is merged
-  uint8_t merge_idx : 3; //!< \brief merge index
-  uint8_t tr_skip   : 1; //!< \brief transform skip flag
-  uint8_t tr_idx : 3; //!< \brief transform index
+  uint8_t type        : 2; //!< \brief block type, one of cu_type_t values
+  uint8_t depth       : 3; //!< \brief depth / size of this block
+  uint8_t part_size   : 3; //!< \brief partition mode, one of part_mode_t values
+  uint8_t tr_depth    : 3; //!< \brief transform depth
+  uint8_t skipped     : 1; //!< \brief flag to indicate this block is skipped
+  uint8_t merged      : 1; //!< \brief flag to indicate this block is merged
+  uint8_t merge_idx   : 3; //!< \brief merge index
+  uint8_t tr_skip     : 1; //!< \brief transform skip flag
+  uint8_t tr_idx      : 3; //!< \brief transform index
+  uint8_t joint_cb_cr : 2; //!< \brief joint chroma residual coding 
 
   uint16_t cbf;
 
@@ -299,6 +300,7 @@ typedef ALIGNED(8) struct {
   coeff_t y[LCU_LUMA_SIZE];
   coeff_t u[LCU_CHROMA_SIZE];
   coeff_t v[LCU_CHROMA_SIZE];
+  coeff_t joint_uv[LCU_CHROMA_SIZE];
 } lcu_coeff_t;
 
 

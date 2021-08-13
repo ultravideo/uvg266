@@ -455,7 +455,7 @@ void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
 
   for (i = 0; i < 3; i++) {
     kvz_ctx_init(&cabac->ctx.cu_skip_flag_model[i], QP, INIT_SKIP_FLAG[slice][i], INIT_SKIP_FLAG[3][i]);
-    kvz_ctx_init(&cabac->ctx.joint_bc_br[i], QP, INIT_JOINT_CB_CR_FLAG[slice][i], INIT_JOINT_CB_CR_FLAG[3][i]);   
+    kvz_ctx_init(&cabac->ctx.joint_cb_cr[i], QP, INIT_JOINT_CB_CR_FLAG[slice][i], INIT_JOINT_CB_CR_FLAG[3][i]);   
     kvz_ctx_init(&cabac->ctx.transform_skip_sig_coeff[i], QP, INIT_TRANSFORM_SKIP_SIG_COEFF[slice][i], INIT_TRANSFORM_SKIP_SIG_COEFF[3][i]);
     kvz_ctx_init(&cabac->ctx.transform_skip_sig[i], QP, INIT_TRANSFORM_SKIP_SIG[slice][i], INIT_TRANSFORM_SKIP_SIG[3][i]);
   }

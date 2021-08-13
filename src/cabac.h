@@ -95,7 +95,7 @@ typedef struct
     cabac_ctx_t luma_planar_model[2];
     cabac_ctx_t multi_ref_line[2];
     cabac_ctx_t bdpcm_mode[4];
-    cabac_ctx_t joint_bc_br[3];
+    cabac_ctx_t joint_cb_cr[3];
     cabac_ctx_t transform_skip_model_luma;
     cabac_ctx_t transform_skip_model_chroma;
     cabac_ctx_t transform_skip_sig_coeff[3];

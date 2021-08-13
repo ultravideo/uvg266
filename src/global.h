@@ -65,6 +65,7 @@
 #define RESHAPE_SIGNAL_HLG 2
 #define RESHAPE_SIGNAL_NULL 100
 
+
 /**
  * \defgroup Bitstream
  * HEVC bitstream coding
@@ -327,7 +328,7 @@ typedef int16_t coeff_t;
 #define MAX_TR_DYNAMIC_RANGE 15
 
 //Constants
-typedef enum { COLOR_Y = 0, COLOR_U, COLOR_V } color_t;
+typedef enum { COLOR_Y = 0, COLOR_U, COLOR_V, COLOR_UV } color_t;
 
 
 // Hardware data (abstraction of defines). Extend for other compilers

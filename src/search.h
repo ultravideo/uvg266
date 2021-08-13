@@ -43,7 +43,7 @@ double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
                        lcu_t *const lcu);
 double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
                          const int x_px, const int y_px, const int depth,
-                         const cu_info_t *const pred_cu,
+                         cu_info_t * pred_cu,
                          lcu_t *const lcu);
 void kvz_lcu_fill_trdepth(lcu_t *lcu, int x_px, int y_px, int depth, int tr_depth);
 

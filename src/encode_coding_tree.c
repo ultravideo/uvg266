@@ -328,31 +328,41 @@ void kvz_encode_last_significant_xy(cabac_data_t * const cabac,
   }
 }
 
-static void encode_chroma_tu(encoder_state_t* const state, int x, int y, int depth, const uint8_t width_c, const cu_info_t* cur_pu, int8_t* scan_idx, lcu_coeff_t* coeff) {
+static void encode_chroma_tu(encoder_state_t* const state, int x, int y, int depth, const uint8_t width_c, const cu_info_t* cur_pu, int8_t* scan_idx, lcu_coeff_t* coeff, uint8_t joint_chroma) {
   int x_local = (x >> 1) % LCU_WIDTH_C;
   int y_local = (y >> 1) % LCU_WIDTH_C;
   cabac_data_t* const cabac = &state->cabac;
   *scan_idx = kvz_get_scan_order(cur_pu->type, cur_pu->intra.mode_chroma, depth);
+  if(!joint_chroma){
+    const coeff_t *coeff_u = &coeff->u[xy_to_zorder(LCU_WIDTH_C, x_local, y_local)];
+    const coeff_t *coeff_v = &coeff->v[xy_to_zorder(LCU_WIDTH_C, x_local, y_local)];
 
-  const coeff_t *coeff_u = &coeff->u[xy_to_zorder(LCU_WIDTH_C, x_local, y_local)];
-  const coeff_t *coeff_v = &coeff->v[xy_to_zorder(LCU_WIDTH_C, x_local, y_local)];
-
-  if (cbf_is_set(cur_pu->cbf, depth, COLOR_U)) {
-    if(state->encoder_control->cfg.trskip_enable && width_c == 4){
-      cabac->cur_ctx = &cabac->ctx.transform_skip_model_chroma;
-      // HEVC only supports transform_skip for Luma
-      // TODO: transform skip for chroma blocks
-      CABAC_BIN(cabac, 0, "transform_skip_flag");
+    if (cbf_is_set(cur_pu->cbf, depth, COLOR_U)) {
+      if(state->encoder_control->cfg.trskip_enable && width_c == 4){
+        cabac->cur_ctx = &cabac->ctx.transform_skip_model_chroma;
+        // HEVC only supports transform_skip for Luma
+        // TODO: transform skip for chroma blocks
+        CABAC_BIN(cabac, 0, "transform_skip_flag");
+      }
+      kvz_encode_coeff_nxn(state, &state->cabac, coeff_u, width_c, 1, *scan_idx, NULL, false);
     }
-    kvz_encode_coeff_nxn(state, &state->cabac, coeff_u, width_c, 1, *scan_idx, NULL, false);
-  }
 
-  if (cbf_is_set(cur_pu->cbf, depth, COLOR_V)) {
+    if (cbf_is_set(cur_pu->cbf, depth, COLOR_V)) {
+      if (state->encoder_control->cfg.trskip_enable && width_c == 4) {
+        cabac->cur_ctx = &cabac->ctx.transform_skip_model_chroma;
+        CABAC_BIN(cabac, 0, "transform_skip_flag");
+      }
+      kvz_encode_coeff_nxn(state, &state->cabac, coeff_v, width_c, 2, *scan_idx, NULL, false);
+    }
+  }
+  else {
+    const coeff_t *coeff_uv = &coeff->joint_uv[xy_to_zorder(LCU_WIDTH_C, x_local, y_local)];
     if (state->encoder_control->cfg.trskip_enable && width_c == 4) {
       cabac->cur_ctx = &cabac->ctx.transform_skip_model_chroma;
       CABAC_BIN(cabac, 0, "transform_skip_flag");
     }
-    kvz_encode_coeff_nxn(state, &state->cabac, coeff_v, width_c, 2, *scan_idx, NULL, false);
+    kvz_encode_coeff_nxn(state, &state->cabac, coeff_uv, width_c, 2, *scan_idx, NULL, false);
+    
   }
 }
 
@@ -374,7 +384,7 @@ static void encode_transform_unit(encoder_state_t * const state,
     // joint_cb_cr
     /*
     if (type == 2 && cbf_mask) {
-      cabac->cur_ctx = &(cabac->ctx.joint_bc_br[0]);
+      cabac->cur_ctx = &(cabac->ctx.joint_cb_cr[0]);
       CABAC_BIN(cabac, 0, "joint_cb_cr");
     }
     */
@@ -429,7 +439,7 @@ static void encode_transform_unit(encoder_state_t * const state,
   bool chroma_cbf_set = cbf_is_set(cur_pu->cbf, depth, COLOR_U) ||
                         cbf_is_set(cur_pu->cbf, depth, COLOR_V);
   if (chroma_cbf_set) {
-    encode_chroma_tu(state, x, y, depth, width_c, cur_pu, &scan_idx, coeff);
+    encode_chroma_tu(state, x, y, depth, width_c, cur_pu, &scan_idx, coeff, cur_pu->joint_cb_cr != 0);
   }
 }
 
@@ -483,8 +493,8 @@ static void encode_transform_coeff(encoder_state_t * const state,
  
 
   const int cb_flag_y = cbf_is_set(cur_pu->cbf, depth, COLOR_Y);
-  const int cb_flag_u = cbf_is_set(cur_cu->cbf, depth, COLOR_U);
-  const int cb_flag_v = cbf_is_set(cur_cu->cbf, depth, COLOR_V);
+  const int cb_flag_u = cur_pu->joint_cb_cr ? cur_pu->joint_cb_cr & 1 : cbf_is_set(cur_cu->cbf, depth, COLOR_U);
+  const int cb_flag_v = cur_pu->joint_cb_cr ? ((cur_pu->joint_cb_cr & 2) >> 1) : cbf_is_set(cur_cu->cbf, depth, COLOR_V);
 
   // The split_transform_flag is not signaled when:
   // - transform size is greater than 32 (depth == 0)
@@ -519,7 +529,7 @@ static void encode_transform_coeff(encoder_state_t * const state,
       }
       if (true) {
         cabac->cur_ctx = &(cabac->ctx.qt_cbf_model_cr[cb_flag_u ? 1 : 0]);
-        CABAC_BIN(cabac, cb_flag_v, "cbf_cr");
+        CABAC_BIN(cabac,  cb_flag_v, "cbf_cr");
       }
     }
   }
@@ -570,7 +580,10 @@ static void encode_transform_coeff(encoder_state_t * const state,
 
       state->must_code_qp_delta = false;
     }
-
+    if((cb_flag_u || cb_flag_v ) && (depth != 4 || only_chroma)) {
+      cabac->cur_ctx = &cabac->ctx.joint_cb_cr[cb_flag_u * 2 + cb_flag_v - 1];
+      CABAC_BIN(cabac, cur_pu->joint_cb_cr != 0, "tu_joint_cbcr_residual_flag");
+    }
     encode_transform_unit(state, x, y, depth, only_chroma, coeff);
   }
 }
