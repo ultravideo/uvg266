@@ -1108,7 +1108,7 @@ int kvz_ts_rdoq(encoder_state_t* const state, coeff_t* src_coeff, coeff_t* dest_
   const int    q_bits = QUANT_SHIFT + qp_scaled / 6  + (needs_sqrt2_scale ? -1 : 0);  // Right shift of non-RDOQ quantizer;  level = (coeff*uiQ + offset)>>q_bits
   const int32_t quant_coeff = kvz_g_quant_scales[qp_scaled % 6];
  
-  const double error_scale = 1.0 / quant_coeff / quant_coeff;
+  const double error_scale = (double)(1 << CTX_FRAC_BITS) / quant_coeff / quant_coeff;
 
   double lambda = type == 0 ? state->lambda : state->c_lambda;
 
