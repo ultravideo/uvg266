@@ -784,7 +784,7 @@ double kvz_luma_mode_bits(const encoder_state_t *state, int8_t luma_mode, const 
 
   if (mode_in_preds != -1) {
     ctx = &(state->cabac.ctx.luma_planar_model[0]);
-    //mode_bits += CTX_ENTROPY_FBITS(ctx, mode_in_preds>0);
+    mode_bits += CTX_ENTROPY_FBITS(ctx, mode_in_preds>0);
     mode_bits += MIN(4.0,mode_in_preds);
   } else {
     mode_bits += 6.0;
