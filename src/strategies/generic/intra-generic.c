@@ -39,6 +39,8 @@
 #include "strategyselector.h"
 #include "kvz_math.h"
 
+// TODO: move this define to a more sensible location, keep it here for quick testing for now
+#define MULTI_REF_LINE_IDX 3
 
 /**
  * \brief Generate angular predictions.
@@ -102,11 +104,11 @@ static void kvz_angular_pred_generic(
 
                                                     // Temporary buffer for modes 11-25.
                                                     // It only needs to be big enough to hold indices from -width to width-1.
-  
+
   // TODO: check the correct size for these arrays when MRL is used
-  kvz_pixel tmp_ref[2 * 128] = { 0 };
-  kvz_pixel temp_main[2 * 128] = { 0 };
-  kvz_pixel temp_side[2 * 128] = { 0 };
+  kvz_pixel tmp_ref[2 * 128 + 3 + 33 * MULTI_REF_LINE_IDX] = { 0 };
+  kvz_pixel temp_main[2 * 128 + 3 + 33 * MULTI_REF_LINE_IDX] = { 0 };
+  kvz_pixel temp_side[2 * 128 + 3 + 33 * MULTI_REF_LINE_IDX] = { 0 };
   const int_fast32_t width = 1 << log2_width;
 
   uint32_t pred_mode = intra_mode; // ToDo: handle WAIP
