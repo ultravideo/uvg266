@@ -42,10 +42,6 @@
 #include "global.h" // IWYU pragma: keep
 #include "kvazaar.h"
 
-
-// Maximum additional reference lines for MRL intra
-#define MAX_REF_LINE_IDX 3
-
 typedef struct {
   kvz_pixel left[2 * 128 + 3 + 33 * MAX_REF_LINE_IDX];
   kvz_pixel top[2 * 128 + 3 + 33 * MAX_REF_LINE_IDX];

@@ -213,6 +213,11 @@ typedef int16_t mv_t;
 #define INTRA_MPM_COUNT 6
 
 /**
+ * \brief Maximum reference lines for MRL intra
+*/
+#define MAX_REF_LINE_IDX 3
+
+/**
  * \brief Number of pixels to delay deblocking.
  *
  * Number of pixels at the bottom and right side of the LCU that are not
