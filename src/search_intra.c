@@ -722,6 +722,7 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
 
   kvz_pixel orig_block[LCU_WIDTH * LCU_WIDTH + 1];
 
+  // TODO: height for non-square blocks
   kvz_pixels_blit(orig, orig_block, width, width, origstride, width);
 
   // Check that the predicted modes are in the RDO mode list
@@ -1046,27 +1047,39 @@ void kvz_search_cu_intra(encoder_state_t * const state,
     kvz_intra_build_reference(log2_width, COLOR_Y, &luma_px, &pic_px, lcu, &refs, state->encoder_control->cfg.wpp);
   }
 
-  int8_t modes[67];
-  int8_t trafo[67] = { 0 };
-  double costs[67];
+  int8_t modes[MAX_REF_LINE_IDX][67];
+  int8_t trafo[MAX_REF_LINE_IDX][67] = { 0 };
+  double costs[MAX_REF_LINE_IDX][67];
 
   // Find best intra mode for 2Nx2N.
   kvz_pixel *ref_pixels = &lcu->ref.y[lcu_px.x + lcu_px.y * LCU_WIDTH];
 
-  int8_t number_of_modes = 0;
+  int8_t number_of_modes[MAX_REF_LINE_IDX] = { 0 };
   bool skip_rough_search = (depth == 0 || state->encoder_control->cfg.rdo >= 4);
   if (!skip_rough_search) {
-    number_of_modes = search_intra_rough(state,
+    number_of_modes[0] = search_intra_rough(state,
                                          ref_pixels, LCU_WIDTH,
                                          &refs,
                                          log2_width, candidate_modes,
-                                         modes, costs);
-  } else {
-    number_of_modes = 67;
-    for (int i = 0; i < number_of_modes; ++i) {
-      modes[i] = i;
-      costs[i] = MAX_INT;
+                                         modes[0], costs[0]);
+    // Copy rough results for other reference lines
+    for (int line = 1; line < MAX_REF_LINE_IDX; ++line) {
+      number_of_modes[line] = number_of_modes[0];
     }
+  } else {
+    for(int line = 0; line < MAX_REF_LINE_IDX; ++line) {
+      number_of_modes[line] = 67;
+      for (int i = 0; i < number_of_modes[line]; ++i) {
+        modes[line][i] = i;
+        costs[line][i] = MAX_INT;
+      }
+    }
+  }
+
+  uint8_t lines = 1;
+  // Find modes with multiple reference lines if in use
+  if (state->encoder_control->cfg.mrl) {
+    lines = MAX_REF_LINE_IDX;
   }
 
   // Set transform depth to current depth, meaning no transform splits.
@@ -1083,20 +1096,34 @@ void kvz_search_cu_intra(encoder_state_t * const state,
       // Check only the predicted modes.
       number_of_modes_to_search = 0;
     }
-    int num_modes_to_check = MIN(number_of_modes, number_of_modes_to_search);
-
-    kvz_sort_modes(modes, costs, number_of_modes);
-    number_of_modes = search_intra_rdo(state,
-                      x_px, y_px, depth,
-                      ref_pixels, LCU_WIDTH,
-                      candidate_modes,
-                      num_modes_to_check,
-                      modes, trafo, costs, lcu);
+    
+    for(int line = 0; line < lines; ++line) {
+      int num_modes_to_check = MIN(number_of_modes[line], number_of_modes_to_search);
+      cur_cu->intra.multi_ref_idx = line;
+      kvz_sort_modes(modes[line], costs[line], number_of_modes[line]);
+      number_of_modes[line] = search_intra_rdo(state,
+                            x_px, y_px, depth,
+                            ref_pixels, LCU_WIDTH,
+                            candidate_modes,
+                            num_modes_to_check,
+                            modes[line], trafo[line], costs[line], lcu);
+    }
   }
+  
+  uint8_t best_line = 0;
+  double best_line_mode_cost = costs[0][0];
+  uint8_t best_mode_indices[MAX_REF_LINE_IDX];
+  for (int line = 0; line < lines; ++line) {
+    best_mode_indices[line] = select_best_mode_index(modes[line], costs[line], number_of_modes[line]);
+    if (best_line_mode_cost > costs[line][best_mode_indices[line]]) {
+      best_line_mode_cost = costs[line][best_mode_indices[line]];
+      best_line = line;
+    }
+  }
+  
+  cur_cu->intra.multi_ref_idx = best_line;
 
-  uint8_t best_mode_i = select_best_mode_index(modes, costs, number_of_modes);
-
-  *mode_out = modes[best_mode_i];
-  *trafo_out = trafo[best_mode_i];
-  *cost_out = costs[best_mode_i];
+  *mode_out =  modes[best_line][best_mode_indices[best_line]];
+  *trafo_out = trafo[best_line][best_mode_indices[best_line]];
+  *cost_out =  costs[best_line][best_mode_indices[best_line]];
 }
