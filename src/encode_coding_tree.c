@@ -380,16 +380,6 @@ static void encode_transform_unit(encoder_state_t * const state,
 
   int8_t scan_idx = kvz_get_scan_order(cur_pu->type, cur_pu->intra.mode, depth);
 
-  if (state->encoder_control->chroma_format != KVZ_CSP_400) {
-    // joint_cb_cr
-    /*
-    if (type == 2 && cbf_mask) {
-      cabac->cur_ctx = &(cabac->ctx.joint_cb_cr[0]);
-      CABAC_BIN(cabac, 0, "joint_cb_cr");
-    }
-    */
-  }
-
   int cbf_y = cbf_is_set(cur_pu->cbf, depth, COLOR_Y);
 
   if (cbf_y && !only_chroma) {
@@ -580,7 +570,7 @@ static void encode_transform_coeff(encoder_state_t * const state,
 
       state->must_code_qp_delta = false;
     }
-    if((cb_flag_u || cb_flag_v ) && (depth != 4 || only_chroma)) {
+    if((cb_flag_u || cb_flag_v ) && (depth != 4 || only_chroma) && state->encoder_control->cfg.jccr) {
       cabac->cur_ctx = &cabac->ctx.joint_cb_cr[cb_flag_u * 2 + cb_flag_v - 1];
       CABAC_BIN(cabac, cur_pu->joint_cb_cr != 0, "tu_joint_cbcr_residual_flag");
     }

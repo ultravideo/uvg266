@@ -29,7 +29,6 @@
 #include <stdint.h>
 #include <stdio.h>
 
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -490,6 +489,8 @@ typedef struct kvz_config
 
   int8_t chroma_scale_in[3][17];
   int8_t chroma_scale_out[3][17];
+
+  int8_t jccr;
 } kvz_config;
 
 /**

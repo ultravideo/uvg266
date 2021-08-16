@@ -539,7 +539,9 @@ void kvz_quantize_lcu_residual(encoder_state_t * const state,
     if (chroma) {
       quantize_tr_residual(state, COLOR_U, x, y, depth, cur_pu, lcu, early_skip);
       quantize_tr_residual(state, COLOR_V, x, y, depth, cur_pu, lcu, early_skip);
-      quantize_tr_residual(state, COLOR_UV, x, y, depth, cur_pu, lcu, early_skip);
+      if(state->encoder_control->cfg.jccr){
+        quantize_tr_residual(state, COLOR_UV, x, y, depth, cur_pu, lcu, early_skip);
+      }
     }
   }
 }

@@ -162,6 +162,8 @@ static const struct option long_options[] = {
   { "fastrd-outdir",      required_argument, NULL, 0 },
   { "chroma-qp-in",       required_argument, NULL, 0 },
   { "chroma-qp-out",      required_argument, NULL, 0 },
+  { "jccr",                     no_argument, NULL, 0 },
+  { "no-jccr",                  no_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 
@@ -613,6 +615,8 @@ void print_help(void)
     "                                   - both: MTS applied for both intra and inter blocks.\n"
     "                                   - implicit: uses implicit MTS. Applies DST7 instead \n"
     "                                               of DCT2 to certain intra blocks.\n"
+    "      --(no-)jccr            : Joint coding of chroma residual. "
+    "                               Requires rdo> = 2. [disabled]\n"          
     "\n"
     /* Word wrap to this width to stay under 80 characters (including ") *************/
     "Parallel processing:\n"

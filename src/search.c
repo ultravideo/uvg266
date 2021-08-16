@@ -80,7 +80,7 @@ static INLINE void copy_cu_pixels(int x_local, int y_local, int width, lcu_t *fr
   }
 }
 
-static INLINE void copy_cu_coeffs(int x_local, int y_local, int width, lcu_t *from, lcu_t *to)
+static INLINE void copy_cu_coeffs(int x_local, int y_local, int width, lcu_t *from, lcu_t *to, bool joint)
 {
   const int luma_z = xy_to_zorder(LCU_WIDTH, x_local, y_local);
   copy_coeffs(&from->coeff.y[luma_z], &to->coeff.y[luma_z], width);
@@ -89,19 +89,23 @@ static INLINE void copy_cu_coeffs(int x_local, int y_local, int width, lcu_t *fr
     const int chroma_z = xy_to_zorder(LCU_WIDTH_C, x_local >> 1, y_local >> 1);
     copy_coeffs(&from->coeff.u[chroma_z], &to->coeff.u[chroma_z], width >> 1);
     copy_coeffs(&from->coeff.v[chroma_z], &to->coeff.v[chroma_z], width >> 1);
-    copy_coeffs(&from->coeff.joint_uv[chroma_z], &to->coeff.joint_uv[chroma_z], width >> 1);
+    if (joint) {
+      copy_coeffs(&from->coeff.joint_uv[chroma_z], &to->coeff.joint_uv[chroma_z], width >> 1);
+    }
   }
 }
 
 /**
  * Copy all non-reference CU data from next level to current level.
  */
-static void work_tree_copy_up(int x_local, int y_local, int depth, lcu_t *work_tree)
+static void work_tree_copy_up(int x_local, int y_local, int depth, lcu_t *work_tree, bool joint)
 {
   const int width = LCU_WIDTH >> depth;
   copy_cu_info  (x_local, y_local, width, &work_tree[depth + 1], &work_tree[depth]);
   copy_cu_pixels(x_local, y_local, width, &work_tree[depth + 1], &work_tree[depth]);
-  copy_cu_coeffs(x_local, y_local, width, &work_tree[depth + 1], &work_tree[depth]);
+  if(joint) {
+    copy_cu_coeffs(x_local, y_local, width, &work_tree[depth + 1], &work_tree[depth], joint);
+  }
 }
 
 
@@ -357,13 +361,15 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
                                     width);
     ssd = ssd_u + ssd_v;
 
-    int ssd_u_joint = kvz_pixels_calc_ssd(&lcu->ref.u[index], &lcu->rec.joint_u[index],
-      LCU_WIDTH_C, LCU_WIDTH_C,
-      width);
-    int ssd_v_joint = kvz_pixels_calc_ssd(&lcu->ref.v[index], &lcu->rec.joint_v[index],
-      LCU_WIDTH_C, LCU_WIDTH_C,
-      width);
-    joint_ssd = ssd_u_joint + ssd_v_joint;
+    if(state->encoder_control->cfg.jccr) {
+      int ssd_u_joint = kvz_pixels_calc_ssd(&lcu->ref.u[index], &lcu->rec.joint_u[index],
+        LCU_WIDTH_C, LCU_WIDTH_C,
+        width);
+      int ssd_v_joint = kvz_pixels_calc_ssd(&lcu->ref.v[index], &lcu->rec.joint_v[index],
+        LCU_WIDTH_C, LCU_WIDTH_C,
+        width);
+      joint_ssd = ssd_u_joint + ssd_v_joint;
+    }
   }
 
   {
@@ -373,8 +379,9 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
     coeff_bits += kvz_get_coeff_cost(state, &lcu->coeff.u[index], width, 2, scan_order, 0);
     coeff_bits += kvz_get_coeff_cost(state, &lcu->coeff.v[index], width, 2, scan_order, 0);
 
-    // TODO: Check Joint CBCR cost
-    joint_coeff_bits += kvz_get_coeff_cost(state, &lcu->coeff.joint_uv[index], width, 2, scan_order, 0);
+    if(state->encoder_control->cfg.jccr) {
+      joint_coeff_bits += kvz_get_coeff_cost(state, &lcu->coeff.joint_uv[index], width, 2, scan_order, 0);
+    }
   }
 
   double bits = tr_tree_bits + coeff_bits;
@@ -382,7 +389,7 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
 
   double cost = (double)ssd + bits * state->c_lambda;
   double joint_cost = (double)joint_ssd + joint_bits * state->c_lambda;
-  if ((cost < joint_cost || !pred_cu->joint_cb_cr) && false) {
+  if ((cost < joint_cost || !pred_cu->joint_cb_cr) || !state->encoder_control->cfg.jccr) {
     pred_cu->joint_cb_cr = 0;
     return cost;    
   }
@@ -849,7 +856,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     if (split_cost < cost) {
       // Copy split modes to this depth.
       cost = split_cost;
-      work_tree_copy_up(x_local, y_local, depth, work_tree);
+      work_tree_copy_up(x_local, y_local, depth, work_tree, state->encoder_control->cfg.jccr);
 #if KVZ_DEBUG
       //debug_split = 1;
 #endif
@@ -1062,5 +1069,7 @@ void kvz_search_lcu(encoder_state_t * const state, const int x, const int y, con
   copy_coeffs(work_tree[0].coeff.y, coeff->y, LCU_WIDTH);
   copy_coeffs(work_tree[0].coeff.u, coeff->u, LCU_WIDTH_C);
   copy_coeffs(work_tree[0].coeff.v, coeff->v, LCU_WIDTH_C);
-  copy_coeffs(work_tree[0].coeff.joint_uv, coeff->joint_uv, LCU_WIDTH_C);
+  if (state->encoder_control->cfg.jccr) {
+    copy_coeffs(work_tree[0].coeff.joint_uv, coeff->joint_uv, LCU_WIDTH_C);
+  }
 }

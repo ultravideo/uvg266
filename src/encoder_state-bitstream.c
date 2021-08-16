@@ -614,7 +614,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
 
 
   if (encoder->chroma_format != KVZ_CSP_400) {
-    WRITE_U(stream, 1, 1, "sps_joint_cbcr_enabled_flag");
+    WRITE_U(stream, encoder->cfg.jccr, 1, "sps_joint_cbcr_enabled_flag");
     WRITE_U(stream, 1, 1, "same_qp_table_for_chroma");
 
     for (int i = 0; i < encoder->cfg.num_used_table; i++) {
@@ -1266,7 +1266,7 @@ void kvz_encoder_state_write_bitstream_slice_header(
   }
 
 
-  if (true /*sps_joint_cbcr_enabled*/) {
+  if (encoder->cfg.jccr) {
     WRITE_U(stream, 0, 1, "ph_joint_cbcr_sign_flag");
   }
 
