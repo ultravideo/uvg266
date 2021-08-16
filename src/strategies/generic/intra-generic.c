@@ -114,7 +114,7 @@ static void kvz_angular_pred_generic(
   uint32_t pred_mode = intra_mode; // ToDo: handle WAIP
 
   // TODO: pass the multiRefIdx to this function and assign to this variable
-  uint8_t multiRefIndex = 0;
+  uint8_t multi_ref_index = 0;
 
   // Whether to swap references to always project on the left reference row.
   const bool vertical_mode = intra_mode >= 34;
@@ -138,7 +138,7 @@ static void kvz_angular_pred_generic(
   if (sample_disp < 0) {
 
     // TODO: for non-square blocks, separate loops for x and y is needed
-    for (int i = 0; i <= width + 1 + multiRefIndex; i++) {
+    for (int i = 0; i <= width + 1 + multi_ref_index; i++) {
       temp_main[width + i] = (vertical_mode ? in_ref_above[i] : in_ref_left[i]);
       temp_side[width + i] = (vertical_mode ? in_ref_left[i] : in_ref_above[i]);
     }
@@ -187,7 +187,7 @@ static void kvz_angular_pred_generic(
   else {
     
     // TODO: again, separate loop needed for non-square blocks
-    for (int i = 0; i <= (width << 1) + multiRefIndex; i++) {
+    for (int i = 0; i <= (width << 1) + multi_ref_index; i++) {
       temp_main[i] = (vertical_mode ? in_ref_above[i] : in_ref_left[i]);
       temp_side[i] = (vertical_mode ? in_ref_left[i] : in_ref_above[i]);
     }
@@ -195,11 +195,11 @@ static void kvz_angular_pred_generic(
     // TODO: this code block will need to change also when non-square blocks are used
     const int log2_ratio = 0;
     const int s = 0;
-    const int max_index = (multiRefIndex << s) + 2;
+    const int max_index = (multi_ref_index << s) + 2;
     const int ref_length = width << 1;
-    const kvz_pixel val = temp_main[ref_length + multiRefIndex];
+    const kvz_pixel val = temp_main[ref_length + multi_ref_index];
     for (int j = 0; j <= max_index; j++) {
-      temp_main[ref_length + multiRefIndex +  j] = val;
+      temp_main[ref_length + multi_ref_index +  j] = val;
     }
 
     ref_main = temp_main;
@@ -217,15 +217,15 @@ static void kvz_angular_pred_generic(
   }
 
   // compensate for line offset in reference line buffers
-  ref_main += multiRefIndex;
-  ref_side += multiRefIndex;
+  ref_main += multi_ref_index;
+  ref_side += multi_ref_index;
 
   if (sample_disp != 0) {
     // The mode is not horizontal or vertical, we have to do interpolation.
 
     int_fast32_t delta_pos = 0;
     for (int_fast32_t y = 0; y < width; ++y) {
-      delta_pos += sample_disp * (1 + multiRefIndex);
+      delta_pos += sample_disp * (1 + multi_ref_index);
       int_fast32_t delta_int = delta_pos >> 5;
       int_fast32_t delta_fract = delta_pos & (32 - 1);
 
