@@ -1465,6 +1465,9 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     parse_qp_map(cfg, 0);
     return success;
   }
+  else if OPT("jccr") {
+    cfg->jccr = (bool)atobool(value);
+  }
   else {
     return 0;
   }
@@ -1820,11 +1823,6 @@ int kvz_config_validate(const kvz_config *const cfg)
       fprintf(stderr, "The chroma qp scaling lists of index %d are different lengths.\n", index);
       error = 1;
     }
-  }
-
-  if(cfg->jccr && cfg->rdo < 2) {
-    fprintf(stderr, "RDO level 2 minimum required to enable joint coding of chroma residuals.\n");
-    error = 1;
   }
 
   return !error;

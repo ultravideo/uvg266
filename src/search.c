@@ -103,9 +103,8 @@ static void work_tree_copy_up(int x_local, int y_local, int depth, lcu_t *work_t
   const int width = LCU_WIDTH >> depth;
   copy_cu_info  (x_local, y_local, width, &work_tree[depth + 1], &work_tree[depth]);
   copy_cu_pixels(x_local, y_local, width, &work_tree[depth + 1], &work_tree[depth]);
-  if(joint) {
-    copy_cu_coeffs(x_local, y_local, width, &work_tree[depth + 1], &work_tree[depth], joint);
-  }
+  copy_cu_coeffs(x_local, y_local, width, &work_tree[depth + 1], &work_tree[depth], joint);
+  
 }
 
 
@@ -390,7 +389,7 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
   double cost = (double)ssd + bits * state->c_lambda;
   double joint_cost = (double)joint_ssd + joint_bits * state->c_lambda;
   if ((cost < joint_cost || !pred_cu->joint_cb_cr) || !state->encoder_control->cfg.jccr) {
-    pred_cu->joint_cb_cr = 0;
+    tr_cu->joint_cb_cr = 0;
     return cost;    
   }
   cbf_clear(&pred_cu->cbf, depth, COLOR_U);

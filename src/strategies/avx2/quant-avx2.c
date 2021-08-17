@@ -721,7 +721,7 @@ int kvz_quantize_residual_avx2(encoder_state_t *const state,
   if (has_coeffs && !early_skip) {
 
     // Get quantized residual. (coeff_out -> coeff -> residual)
-    kvz_dequant(state, coeff_out, coeff, width, width, (color == COLOR_Y ? 0 : (color == COLOR_U ? 2 : 3)),
+    kvz_dequant(state, coeff_out, coeff, width, width, color,
       cur_cu->type, cur_cu->tr_idx == MTS_SKIP && color == COLOR_Y);
     if (use_trskip) {
       kvz_itransformskip(state->encoder_control, residual, coeff, width);

@@ -718,6 +718,7 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
     pred_cu.part_size = ((depth == MAX_PU_DEPTH) ? SIZE_NxN : SIZE_2Nx2N);
     pred_cu.intra.mode = modes[rdo_mode];
     pred_cu.intra.mode_chroma = modes[rdo_mode];
+    pred_cu.joint_cb_cr = 0;
     FILL(pred_cu.cbf, 0);
 
     // Reset transform split data in lcu.cu for this area.

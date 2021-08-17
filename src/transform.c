@@ -306,13 +306,13 @@ static void quantize_tr_residual(encoder_state_t * const state,
 {
   const kvz_config *cfg    = &state->encoder_control->cfg;
   const int32_t shift      = color == COLOR_Y ? 0 : 1;
-  const vector2d_t lcu_px  = { SUB_SCU(x) >> shift, SUB_SCU(y) >> shift };
+  const vector2d_t lcu_px  = { SUB_SCU(x) >> shift, SUB_SCU(y) >> shift};
 
   // If luma is 4x4, do chroma for the 8x8 luma area when handling the top
   // left PU because the coordinates are correct.
   bool handled_elsewhere = color != COLOR_Y &&
-                           depth > MAX_DEPTH &&
-                           (lcu_px.x % 4 != 0 || lcu_px.y % 4 != 0);
+                           depth == MAX_DEPTH &&
+                           (x % 4 != 0 || y % 4 != 0);
   if (handled_elsewhere) {
     return;
   }

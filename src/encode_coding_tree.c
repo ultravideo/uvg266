@@ -410,6 +410,7 @@ static void encode_transform_unit(encoder_state_t * const state,
     }
   }
 
+  bool joint_chroma = cur_pu->joint_cb_cr != 0;
   if (depth == MAX_DEPTH) {
     // For size 4x4 luma transform the corresponding chroma transforms are
     // also of size 4x4 covering 8x8 luma pixels. The residual is coded in
@@ -429,7 +430,7 @@ static void encode_transform_unit(encoder_state_t * const state,
   bool chroma_cbf_set = cbf_is_set(cur_pu->cbf, depth, COLOR_U) ||
                         cbf_is_set(cur_pu->cbf, depth, COLOR_V);
   if (chroma_cbf_set) {
-    encode_chroma_tu(state, x, y, depth, width_c, cur_pu, &scan_idx, coeff, cur_pu->joint_cb_cr != 0);
+    encode_chroma_tu(state, x, y, depth, width_c, cur_pu, &scan_idx, coeff, joint_chroma);
   }
 }
 

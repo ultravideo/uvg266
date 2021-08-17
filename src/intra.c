@@ -689,7 +689,7 @@ void kvz_intra_recon_cu(
     }
   } else {
     const bool has_luma = mode_luma != -1;
-    const bool has_chroma = mode_chroma != -1 && (depth != 4 || (x % 8 && y % 8));
+    const bool has_chroma = mode_chroma != -1 &&  (x % 8 == 0 && y % 8 == 0);
     // Process a leaf TU.
     if (has_luma) {
       intra_recon_tb_leaf(state, x, y, depth, mode_luma, lcu, COLOR_Y);
