@@ -253,17 +253,6 @@ double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
 
   const uint8_t tr_depth = tr_cu->tr_depth - depth;
 
-  // Add transform_tree split_transform_flag bit cost.
-  bool intra_split_flag = pred_cu->type == CU_INTRA && pred_cu->part_size == SIZE_NxN && depth == 3;
-  if (width <= TR_MAX_WIDTH
-      && width > TR_MIN_WIDTH
-      && !intra_split_flag)
-  {
-    // ToDo: check cost
-    //const cabac_ctx_t *ctx = &(state->cabac.ctx.trans_subdiv_model[5 - (6 - depth)]);
-    //tr_tree_bits += CTX_ENTROPY_FBITS(ctx, tr_depth > 0);
-  }
-
   if (tr_depth > 0) {
     int offset = width / 2;
     double sum = 0;
@@ -330,7 +319,6 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
 
   if (depth < MAX_PU_DEPTH) {
     const int tr_depth = depth - pred_cu->depth;
-    // ToDo: Update for VVC contexts
     const cabac_ctx_t *ctx = &(state->cabac.ctx.qt_cbf_model_cb[0]);
     if (tr_depth == 0 || cbf_is_set(pred_cu->cbf, depth - 1, COLOR_U)) {
       tr_tree_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf, depth, COLOR_U));

@@ -382,18 +382,7 @@ static double search_intra_trdepth(encoder_state_t * const state,
       split_cost += search_intra_trdepth(state, x_px + offset, y_px + offset, depth + 1, max_depth, intra_mode, nosplit_cost, pred_cu, lcu, -1);
     }
 
-    double tr_split_bit = 0.0;
     double cbf_bits = 0.0;
-
-    // Add bits for split_transform_flag = 1, because transform depth search bypasses
-    // the normal recursion in the cost functions.
-    /*
-    // ToDo: check costs
-    if (depth >= 1 && depth <= 3) {
-      const cabac_ctx_t *ctx = &(state->cabac.ctx.trans_subdiv_model[5 - (6 - depth)]);
-      tr_split_bit += CTX_ENTROPY_FBITS(ctx, 1);
-    }
-    */
 
     // Add cost of cbf chroma bits on transform tree.
     // All cbf bits are accumulated to pred_cu.cbf and cbf_is_set returns true
@@ -404,7 +393,6 @@ static double search_intra_trdepth(encoder_state_t * const state,
     if (state->encoder_control->chroma_format != KVZ_CSP_400) {
       const uint8_t tr_depth = depth - pred_cu->depth;
 
-      // ToDo: update for VVC contexts
       const cabac_ctx_t* ctx = &(state->cabac.ctx.qt_cbf_model_cb[0]);
       if (tr_depth == 0 || cbf_is_set(pred_cu->cbf, depth - 1, COLOR_U)) {
         cbf_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf, depth, COLOR_U));
@@ -415,7 +403,7 @@ static double search_intra_trdepth(encoder_state_t * const state,
       }
     }
 
-    double bits = tr_split_bit + cbf_bits;
+    double bits = cbf_bits;
     split_cost += bits * state->lambda;
   } else {
     assert(width <= TR_MAX_WIDTH);
@@ -784,7 +772,7 @@ double kvz_luma_mode_bits(const encoder_state_t *state, int8_t luma_mode, const 
 
   if (mode_in_preds != -1) {
     ctx = &(state->cabac.ctx.luma_planar_model[0]);
-    //mode_bits += CTX_ENTROPY_FBITS(ctx, mode_in_preds>0);
+    mode_bits += CTX_ENTROPY_FBITS(ctx, mode_in_preds>0);
     mode_bits += MIN(4.0,mode_in_preds);
   } else {
     mode_bits += 6.0;

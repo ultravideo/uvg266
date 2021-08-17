@@ -166,13 +166,22 @@ typedef enum {
 //----------------------------------------------------------------
 
 //-------------------------typedef structs----------------------------
+#if defined(__MINGW32__) || defined(__MINGW64__) || defined(__linux__)
+#define PACK(__Declaration__) __Declaration__ __attribute__((__packed__))
+#else
+#define PACK(__Declaration__) __pragma(pack(push, 1)) __Declaration__ __pragma(pack(pop))
+#endif
+
+
+PACK(
 typedef struct alf_covariance {
+  double pix_acc;  
+  int64_t ee[MAX_ALF_NUM_CLIPPING_VALUES][MAX_ALF_NUM_CLIPPING_VALUES][MAX_NUM_ALF_LUMA_COEFF][MAX_NUM_ALF_LUMA_COEFF];
+  int32_t y[MAX_ALF_NUM_CLIPPING_VALUES][MAX_NUM_ALF_LUMA_COEFF];
   int num_coeff;
   int num_bins;
-  double y[MAX_ALF_NUM_CLIPPING_VALUES][MAX_NUM_ALF_LUMA_COEFF];
-  double ee[MAX_ALF_NUM_CLIPPING_VALUES][MAX_ALF_NUM_CLIPPING_VALUES][MAX_NUM_ALF_LUMA_COEFF][MAX_NUM_ALF_LUMA_COEFF];
-  double pix_acc;
-} alf_covariance;
+} alf_covariance;)
+
 
 typedef struct clp_rng {
   int min;
@@ -188,8 +197,8 @@ typedef struct clp_rngs {
 } clp_rngs;
 
 typedef struct alf_classifier {
-  int class_idx;
-  int transpose_idx;
+  uint8_t class_idx;
+  uint8_t transpose_idx;
 } alf_classifier;
 
 typedef struct cc_alf_filter_param {
