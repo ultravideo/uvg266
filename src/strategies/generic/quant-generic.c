@@ -270,11 +270,11 @@ int kvz_quant_cbcr_residual_generic(
   {
     int8_t tr_depth = cur_cu->tr_depth - cur_cu->depth;
     tr_depth += (cur_cu->part_size == SIZE_NxN ? 1 : 0);
-    kvz_rdoq(state, coeff, coeff_out, width, width, COLOR_UV,
+    kvz_rdoq(state, coeff, coeff_out, width, width, best_cbf_mask == 2 ? COLOR_V : COLOR_U,
       scan_order, cur_cu->type, tr_depth, cur_cu->cbf);
   }
   else if (state->encoder_control->cfg.rdoq_enable && false) {
-    kvz_ts_rdoq(state, coeff, coeff_out, width, width, COLOR_UV,
+    kvz_ts_rdoq(state, coeff, coeff_out, width, width, best_cbf_mask == 2 ? COLOR_V : COLOR_U,
       scan_order);
   }
   else {
