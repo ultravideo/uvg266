@@ -117,6 +117,8 @@ libkvazaar_la_SOURCES = \
 	transform.h \
 	videoframe.c \
 	videoframe.h \
+  strategies/generic/alf-generic.c \
+	strategies/generic/alf-generic.h \
 	strategies/generic/dct-generic.c \
 	strategies/generic/dct-generic.h \
 	strategies/generic/intra-generic.c \
@@ -137,6 +139,8 @@ libkvazaar_la_SOURCES = \
 	strategies/optimized_sad_func_ptr_t.h \
 	strategies/generic/sao_shared_generics.h \
 	strategies/strategies-common.h \
+  strategies/strategies-alf.c \
+	strategies/strategies-alf.h \
 	strategies/strategies-dct.c \
 	strategies/strategies-dct.h \
 	strategies/strategies-intra.c \
