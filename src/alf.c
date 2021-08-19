@@ -5899,7 +5899,7 @@ static void alf_derive_classification(encoder_state_t * const state,
     {
       int n_width = MIN(j + CLASSIFICATION_BLK_SIZE, max_width) - j;
 
-      alf_derive_classification_blk(state, state->encoder_control->cfg.input_bitdepth + 4, n_height, n_width, j, i,
+      kvz_alf_derive_classification_blk(state, state->encoder_control->cfg.input_bitdepth + 4, n_height, n_width, j, i,
         j - x_pos + blk_dst_x, i - y_pos + blk_dst_y,
         alf_vb_luma_ctu_height,
         alf_vb_luma_pos);

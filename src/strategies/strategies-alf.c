@@ -25,7 +25,7 @@
 
 
 // Define function pointers.
-alf_derive_classification_blk_func* alf_derive_classification_blk;
+alf_derive_classification_blk_func* kvz_alf_derive_classification_blk;
 
 
 int kvz_strategy_register_alf(void* opaque, uint8_t bitdepth) {

@@ -45,12 +45,12 @@ typedef void (alf_derive_classification_blk_func)(encoder_state_t * const state,
   int vb_pos);
 
 // Declare function pointers.
-extern alf_derive_classification_blk_func * alf_derive_classification_blk;
+extern alf_derive_classification_blk_func * kvz_alf_derive_classification_blk;
 
 int kvz_strategy_register_alf(void* opaque, uint8_t bitdepth);
 
 
 #define STRATEGIES_ALF_EXPORTS \
-  {"alf_derive_classification_blk", (void**) &alf_derive_classification_blk}, \
+  {"alf_derive_classification_blk", (void**) &kvz_alf_derive_classification_blk}, \
  
 
