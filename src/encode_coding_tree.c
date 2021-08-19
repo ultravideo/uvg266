@@ -429,7 +429,7 @@ static void encode_transform_unit(encoder_state_t * const state,
 
   bool chroma_cbf_set = cbf_is_set(cur_pu->cbf, depth, COLOR_U) ||
                         cbf_is_set(cur_pu->cbf, depth, COLOR_V);
-  if (chroma_cbf_set) {
+  if (chroma_cbf_set || joint_chroma) {
     encode_chroma_tu(state, x, y, depth, width_c, cur_pu, &scan_idx, coeff, joint_chroma);
   }
 }

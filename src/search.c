@@ -310,6 +310,7 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
   cu_info_t *const tr_cu = LCU_GET_CU_AT_PX(lcu, x_px, y_px);
 
   double tr_tree_bits = 0;
+  double joint_cbcr_tr_tree_bits = 0;
   double coeff_bits = 0;
   double joint_coeff_bits = 0;
 
@@ -328,12 +329,20 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
     if (tr_depth == 0 || cbf_is_set(pred_cu->cbf, depth - 1, COLOR_U)) {
       tr_tree_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf, depth, COLOR_U));
     }
+    if(state->encoder_control->cfg.jccr) {
+      joint_cbcr_tr_tree_bits += CTX_ENTROPY_FBITS(ctx, pred_cu->joint_cb_cr & 1);
+    }
     int is_set = cbf_is_set(pred_cu->cbf, depth, COLOR_U);
     ctx = &(state->cabac.ctx.qt_cbf_model_cr[is_set]);
     if (tr_depth == 0 || cbf_is_set(pred_cu->cbf, depth - 1, COLOR_V)) {
       tr_tree_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf, depth, COLOR_V));
     }
+    if(state->encoder_control->cfg.jccr) {
+      ctx = &(state->cabac.ctx.qt_cbf_model_cr[pred_cu->joint_cb_cr & 1]);
+      joint_cbcr_tr_tree_bits += CTX_ENTROPY_FBITS(ctx, (pred_cu->joint_cb_cr & 2) >> 1);
+    }
   }
+
 
   if (tr_cu->tr_depth > depth) {
     int offset = LCU_WIDTH >> (depth + 1);
@@ -345,6 +354,13 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
     sum += kvz_cu_rd_cost_chroma(state, x_px + offset, y_px + offset, depth + 1, pred_cu, lcu);
 
     return sum + tr_tree_bits * state->lambda;
+  }
+
+  if (state->encoder_control->cfg.jccr) {
+    const cabac_ctx_t* ctx = &(state->cabac.ctx.joint_cb_cr[cbf_is_set(pred_cu->cbf, depth, COLOR_U) * 2 + cbf_is_set(pred_cu->cbf, depth, COLOR_V) - 1]);
+    tr_tree_bits += CTX_ENTROPY_FBITS(ctx, 0);
+    ctx = &(state->cabac.ctx.joint_cb_cr[(pred_cu->joint_cb_cr & 1) * 2 + ((pred_cu->joint_cb_cr & 2) >> 1) - 1]);
+    joint_cbcr_tr_tree_bits += CTX_ENTROPY_FBITS(ctx, 1);
   }
 
   // Chroma SSD
@@ -383,21 +399,22 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
     }
   }
 
+
   double bits = tr_tree_bits + coeff_bits;
-  double joint_bits = tr_tree_bits + joint_coeff_bits;
+  double joint_bits = joint_cbcr_tr_tree_bits + joint_coeff_bits;
 
   double cost = (double)ssd + bits * state->c_lambda;
   double joint_cost = (double)joint_ssd + joint_bits * state->c_lambda;
   if ((cost < joint_cost || !pred_cu->joint_cb_cr) || !state->encoder_control->cfg.jccr) {
-    tr_cu->joint_cb_cr = 0;
+    pred_cu->joint_cb_cr = 0;
     return cost;    
   }
   cbf_clear(&pred_cu->cbf, depth, COLOR_U);
   cbf_clear(&pred_cu->cbf, depth, COLOR_V);
-  if (tr_cu->joint_cb_cr & 1) {
+  if (pred_cu->joint_cb_cr & 1) {
     cbf_set(&pred_cu->cbf, depth, COLOR_U);
   }
-  if (tr_cu->joint_cb_cr & 2) {
+  if (pred_cu->joint_cb_cr & 2) {
     cbf_set(&pred_cu->cbf, depth, COLOR_V);
   }
   int lcu_width = LCU_WIDTH_C;

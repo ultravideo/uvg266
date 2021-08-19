@@ -619,7 +619,7 @@ static void intra_recon_tb_leaf(
   }
 
   kvz_pixels_blit(pred, block , width, width, width, lcu_width);
-  if(color != COLOR_Y) {
+  if(color != COLOR_Y && cfg->jccr) {
     kvz_pixels_blit(pred, block2, width, width, width, lcu_width);
   }
 }
