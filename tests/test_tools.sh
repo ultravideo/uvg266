@@ -14,5 +14,3 @@ valgrind_test $common_args --vaq=8
 valgrind_test $common_args --vaq=8 --bitrate 3500
 valgrind_test $common_args --vaq=8 --rc-algorithm oba --bitrate 3500
 valgrind_test $common_args --lmcs
-valgrind_test $common_args --jccr
-valgrind_test $common_args --jccr --rdoq --rd=2 --mts=full
