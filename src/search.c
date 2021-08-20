@@ -357,10 +357,16 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
   }
 
   if (state->encoder_control->cfg.jccr) {
-    const cabac_ctx_t* ctx = &(state->cabac.ctx.joint_cb_cr[cbf_is_set(pred_cu->cbf, depth, COLOR_U) * 2 + cbf_is_set(pred_cu->cbf, depth, COLOR_V) - 1]);
-    tr_tree_bits += CTX_ENTROPY_FBITS(ctx, 0);
-    ctx = &(state->cabac.ctx.joint_cb_cr[(pred_cu->joint_cb_cr & 1) * 2 + ((pred_cu->joint_cb_cr & 2) >> 1) - 1]);
-    joint_cbcr_tr_tree_bits += CTX_ENTROPY_FBITS(ctx, 1);
+    int cbf_mask = cbf_is_set(pred_cu->cbf, depth, COLOR_U) * 2 + cbf_is_set(pred_cu->cbf, depth, COLOR_V) - 1;
+    const cabac_ctx_t* ctx = NULL;
+    if (cbf_mask != -1) {
+      ctx = &(state->cabac.ctx.joint_cb_cr[cbf_mask]);
+      tr_tree_bits += CTX_ENTROPY_FBITS(ctx, 0);      
+    }
+    if(pred_cu->joint_cb_cr) {
+      ctx = &(state->cabac.ctx.joint_cb_cr[(pred_cu->joint_cb_cr & 1) * 2 + ((pred_cu->joint_cb_cr & 2) >> 1) - 1]);
+      joint_cbcr_tr_tree_bits += CTX_ENTROPY_FBITS(ctx, 1);
+    }
   }
 
   // Chroma SSD
