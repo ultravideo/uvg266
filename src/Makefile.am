@@ -117,7 +117,7 @@ libkvazaar_la_SOURCES = \
 	transform.h \
 	videoframe.c \
 	videoframe.h \
-  strategies/generic/alf-generic.c \
+	strategies/generic/alf-generic.c \
 	strategies/generic/alf-generic.h \
 	strategies/generic/dct-generic.c \
 	strategies/generic/dct-generic.h \
@@ -139,7 +139,7 @@ libkvazaar_la_SOURCES = \
 	strategies/optimized_sad_func_ptr_t.h \
 	strategies/generic/sao_shared_generics.h \
 	strategies/strategies-common.h \
-  strategies/strategies-alf.c \
+	strategies/strategies-alf.c \
 	strategies/strategies-alf.h \
 	strategies/strategies-dct.c \
 	strategies/strategies-dct.h \
@@ -207,7 +207,9 @@ libsse2_la_SOURCES = \
 libsse41_la_SOURCES = \
 	strategies/sse41/picture-sse41.c \
 	strategies/sse41/picture-sse41.h \
-	strategies/sse41/reg_sad_pow2_widths-sse41.h
+	strategies/sse41/reg_sad_pow2_widths-sse41.h \
+	strategies/sse41/alf-sse41.c \
+	strategies/sse41/alf-sse41.h
 
 if HAVE_PPC
 

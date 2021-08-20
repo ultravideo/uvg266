@@ -193,6 +193,7 @@
     <ClCompile Include="..\..\src\strategies\generic\intra-generic.c" />
     <ClCompile Include="..\..\src\strategies\generic\quant-generic.c" />
     <ClCompile Include="..\..\src\strategies\generic\sao-generic.c" />
+    <ClCompile Include="..\..\src\strategies\sse41\alf-sse41.c" />
     <ClCompile Include="..\..\src\strategies\strategies-alf.c" />
     <ClCompile Include="..\..\src\strategies\strategies-encode.c" />
     <ClCompile Include="..\..\src\strategies\strategies-intra.c" />
@@ -269,6 +270,7 @@
     <ClInclude Include="..\..\src\strategies\generic\encode_coding_tree-generic.h" />
     <ClInclude Include="..\..\src\strategies\generic\intra-generic.h" />
     <ClInclude Include="..\..\src\strategies\generic\sao-generic.h" />
+    <ClInclude Include="..\..\src\strategies\sse41\alf-sse41.h" />
     <ClInclude Include="..\..\src\strategies\strategies-alf.h" />
     <ClInclude Include="..\..\src\strategies\strategies-common.h" />
     <ClInclude Include="..\..\src\strategies\avx2\quant-avx2.h" />

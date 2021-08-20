@@ -1,3 +1,4 @@
+#pragma once
 /*****************************************************************************
  * This file is part of Kvazaar HEVC encoder.
  *
@@ -18,24 +19,14 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-#include "strategies/strategies-alf.h"
-#include "strategies/sse41/alf-sse41.h"
-#include "strategies/generic/alf-generic.h"
-#include "strategyselector.h"
+/**
+ * \ingroup Optimization
+ * \file
+ * Optimizations for SSE4.1.
+ */
 
+#include "global.h" // IWYU pragma: keep
+#include "kvazaar.h"
 
-// Define function pointers.
-alf_derive_classification_blk_func* kvz_alf_derive_classification_blk;
+int kvz_strategy_register_alf_sse41(void* opaque, uint8_t bitdepth);
 
-
-int kvz_strategy_register_alf(void* opaque, uint8_t bitdepth) {
-  bool success = true;
-
-  success &= kvz_strategy_register_alf_generic(opaque, bitdepth);
-
-  if (kvz_g_hardware_flags.intel_flags.sse41) {
-    success &= kvz_strategy_register_alf_sse41(opaque, bitdepth);
-  }
-
-  return success;
-}
