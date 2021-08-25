@@ -319,7 +319,7 @@ static double search_intra_trdepth(encoder_state_t * const state,
       kvz_intra_recon_cu(state,
         x_px, y_px,
         depth,
-        intra_mode, chroma_mode,
+        intra_mode, -1,
         pred_cu, lcu);
 
       // TODO: Not sure if this should be 0 or 1 but at least seems to work with 1
@@ -334,14 +334,22 @@ static double search_intra_trdepth(encoder_state_t * const state,
       }
 
       double rd_cost = kvz_cu_rd_cost_luma(state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
-      if (reconstruct_chroma) {
-        rd_cost += kvz_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
-      }
+      //if (reconstruct_chroma) {
+      //  rd_cost += kvz_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
+      //}
 
       if (rd_cost < best_rd_cost) {
         best_rd_cost = rd_cost;
         best_tr_idx = pred_cu->tr_idx;
       }
+    }
+    if(reconstruct_chroma) {
+      kvz_intra_recon_cu(state,
+        x_px, y_px,
+        depth,
+        -1, chroma_mode,
+        pred_cu, lcu);
+      best_rd_cost += kvz_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
     }
     pred_cu->tr_skip = best_tr_idx == MTS_SKIP;
     pred_cu->tr_idx = best_tr_idx;
