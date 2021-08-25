@@ -22,7 +22,7 @@
 /**
  * \ingroup Optimization
  * \file
- * Interface for sao functions.
+ * Interface for alf functions.
  */
 
 #include "encoder.h"
@@ -44,13 +44,51 @@ typedef void (alf_derive_classification_blk_func)(encoder_state_t * const state,
   const int vb_ctu_height,
   int vb_pos);
 
+typedef void (alf_filter_5x5_blk_func)(encoder_state_t* const state,
+  const kvz_pixel* src_pixels,
+  kvz_pixel* dst_pixels,
+  const int src_stride,
+  const int dst_stride,
+  const short* filter_set,
+  const int16_t* fClipSet,
+  clp_rng clp_rng,
+  const int width,
+  const int height,
+  int x_pos,
+  int y_pos,
+  int blk_dst_x,
+  int blk_dst_y,
+  int vb_pos,
+  const int vb_ctu_height);
+
+typedef void (alf_filter_7x7_blk_func)(encoder_state_t* const state,
+  const kvz_pixel* src_pixels,
+  kvz_pixel* dst_pixels,
+  const int src_stride,
+  const int dst_stride,
+  const short* filter_set,
+  const int16_t* fClipSet,
+  clp_rng clp_rng,
+  const int width,
+  const int height,
+  int x_pos,
+  int y_pos,
+  int blk_dst_x,
+  int blk_dst_y,
+  int vb_pos,
+  const int vb_ctu_height);
+
 // Declare function pointers.
 extern alf_derive_classification_blk_func * kvz_alf_derive_classification_blk;
+extern alf_filter_5x5_blk_func* kvz_alf_filter_5x5_blk;
+extern alf_filter_7x7_blk_func* kvz_alf_filter_7x7_blk;
 
 int kvz_strategy_register_alf(void* opaque, uint8_t bitdepth);
 
 
 #define STRATEGIES_ALF_EXPORTS \
   {"alf_derive_classification_blk", (void**) &kvz_alf_derive_classification_blk}, \
+  {"alf_filter_5x5_blk", (void**) &kvz_alf_filter_5x5_blk}, \
+  {"alf_filter_7x7_blk", (void**) &kvz_alf_filter_7x7_blk}, \
  
 

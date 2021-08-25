@@ -26,7 +26,8 @@
 
 // Define function pointers.
 alf_derive_classification_blk_func* kvz_alf_derive_classification_blk;
-
+alf_filter_5x5_blk_func* kvz_alf_filter_5x5_blk;
+alf_filter_7x7_blk_func* kvz_alf_filter_7x7_blk;
 
 int kvz_strategy_register_alf(void* opaque, uint8_t bitdepth) {
   bool success = true;

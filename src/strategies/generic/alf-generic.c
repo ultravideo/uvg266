@@ -27,6 +27,12 @@
 #include "alf.h"
 #include "strategyselector.h"
 
+extern kvz_pixel kvz_fast_clip_32bit_to_pixel(int32_t value);
+
+static int16_t clip_alf(const int16_t clip, const int16_t ref, const int16_t val0, const int16_t val1)
+{
+  return CLIP(-clip, +clip, val0 - ref) + CLIP(-clip, +clip, val1 - ref);
+}
 
 static void alf_derive_classification_blk_generic(encoder_state_t * const state,
   const int shift,
@@ -269,13 +275,462 @@ static void alf_derive_classification_blk_generic(encoder_state_t * const state,
   }
 }
 
+static void alf_filter_block_generic(encoder_state_t* const state,
+  const kvz_pixel* src_pixels,
+  kvz_pixel* dst_pixels,
+  const int src_stride,
+  const int dst_stride,
+  const short* filter_set,
+  const int16_t* fClipSet,
+  clp_rng clp_rng,
+  alf_component_id component_id,
+  const int width,
+  const int height,
+  int x_pos,
+  int y_pos,
+  int blk_dst_x,
+  int blk_dst_y,
+  int vb_pos,
+  const int vb_ctu_height)
+{
+  alf_filter_type const filter_type = component_id == COMPONENT_Y ? ALF_FILTER_7X7 : ALF_FILTER_5X5;
+  const bool chroma = component_id == COMPONENT_Y ? 0 : 1;
+  const int8_t bit_depth = state->encoder_control->bitdepth;
 
+  if (chroma)
+  {
+    assert((int)filter_type == 0); //Chroma needs to have filtType == 0
+  }
+
+  const int start_height = y_pos;
+  const int end_height = start_height + height;
+  const int start_width = x_pos;
+  const int end_width = start_width + width;
+
+  const kvz_pixel* src = src_pixels;
+  kvz_pixel* dst = dst_pixels + blk_dst_y * dst_stride;
+
+  const kvz_pixel* p_img_y_pad_0, * p_img_y_pad_1, * p_img_y_pad_2, * p_img_y_pad_3, * p_img_y_pad_4, * p_img_y_pad_5, * p_img_y_pad_6;
+  const kvz_pixel* p_img_0, * p_img_1, * p_img_2, * p_img_3, * p_img_4, * p_img_5, * p_img_6;
+
+  const short* coef = filter_set;
+  const int16_t* clip = fClipSet;
+
+  const int shift = bit_depth - 1;
+
+  const int offset = 1 << (shift - 1);
+
+  int transpose_idx = 0;
+  const int cls_size_y = 4;
+  const int cls_size_x = 4;
+
+  assert((start_height % cls_size_y) == 0); //Wrong startHeight in filtering
+  assert((start_width % cls_size_x) == 0); //Wrong startWidth in filtering
+  assert(((end_height - start_height) % cls_size_y) == 0); //Wrong endHeight in filtering
+  assert(((end_width - start_width) % cls_size_x) == 0); //Wrong endWidth in filtering
+
+  alf_classifier* p_class = NULL;
+
+  int dst_stride2 = dst_stride * cls_size_y;
+  int src_stride2 = src_stride * cls_size_y;
+
+  //std::vector<Pel> filter_coeff(MAX_NUM_ALF_LUMA_COEFF);
+  int filter_coeff[MAX_NUM_ALF_LUMA_COEFF];
+  memset(filter_coeff, 0, MAX_NUM_ALF_LUMA_COEFF * sizeof(int));
+  //std::array<int, MAX_NUM_ALF_LUMA_COEFF> filterClipp;
+  int filter_clipp[MAX_NUM_ALF_LUMA_COEFF];
+  memset(filter_clipp, 0, MAX_NUM_ALF_LUMA_COEFF * sizeof(int));
+
+  p_img_y_pad_0 = src + start_height * src_stride + start_width;
+  p_img_y_pad_1 = p_img_y_pad_0 + src_stride;
+  p_img_y_pad_2 = p_img_y_pad_0 - src_stride;
+  p_img_y_pad_3 = p_img_y_pad_1 + src_stride;
+  p_img_y_pad_4 = p_img_y_pad_2 - src_stride;
+  p_img_y_pad_5 = p_img_y_pad_3 + src_stride;
+  p_img_y_pad_6 = p_img_y_pad_4 - src_stride;
+
+  kvz_pixel* p_rec_0 = dst + blk_dst_x;//start_width;
+  kvz_pixel* p_rec_1 = p_rec_0 + dst_stride;
+
+  for (int i = 0; i < end_height - start_height; i += cls_size_y)
+  {
+    if (!chroma)
+    {
+      p_class = state->tile->frame->alf_info->classifier[blk_dst_y + i] + blk_dst_x;
+    }
+
+    for (int j = 0; j < end_width - start_width; j += cls_size_x)
+    {
+      if (!chroma)
+      {
+        alf_classifier cl = p_class[j];
+        transpose_idx = cl.transpose_idx;
+        coef = filter_set + cl.class_idx * MAX_NUM_ALF_LUMA_COEFF;
+        clip = fClipSet + cl.class_idx * MAX_NUM_ALF_LUMA_COEFF;
+      }
+
+      if (filter_type == ALF_FILTER_7X7)
+      {
+        if (transpose_idx == 1)
+        {
+          filter_coeff[0] = coef[9];
+          filter_coeff[1] = coef[4];
+          filter_coeff[2] = coef[10];
+          filter_coeff[3] = coef[8];
+          filter_coeff[4] = coef[1];
+          filter_coeff[5] = coef[5];
+          filter_coeff[6] = coef[11];
+          filter_coeff[7] = coef[7];
+          filter_coeff[8] = coef[3];
+          filter_coeff[9] = coef[0];
+          filter_coeff[10] = coef[2];
+          filter_coeff[11] = coef[6];
+          filter_coeff[12] = coef[12];
+
+          filter_clipp[0] = clip[9];
+          filter_clipp[1] = clip[4];
+          filter_clipp[2] = clip[10];
+          filter_clipp[3] = clip[8];
+          filter_clipp[4] = clip[1];
+          filter_clipp[5] = clip[5];
+          filter_clipp[6] = clip[11];
+          filter_clipp[7] = clip[7];
+          filter_clipp[8] = clip[3];
+          filter_clipp[9] = clip[0];
+          filter_clipp[10] = clip[2];
+          filter_clipp[11] = clip[6];
+          filter_clipp[12] = clip[12];
+        }
+        else if (transpose_idx == 2)
+        {
+          filter_coeff[0] = coef[0];
+          filter_coeff[1] = coef[3];
+          filter_coeff[2] = coef[2];
+          filter_coeff[3] = coef[1];
+          filter_coeff[4] = coef[8];
+          filter_coeff[5] = coef[7];
+          filter_coeff[6] = coef[6];
+          filter_coeff[7] = coef[5];
+          filter_coeff[8] = coef[4];
+          filter_coeff[9] = coef[9];
+          filter_coeff[10] = coef[10];
+          filter_coeff[11] = coef[11];
+          filter_coeff[12] = coef[12];
+
+          filter_clipp[0] = clip[0];
+          filter_clipp[1] = clip[3];
+          filter_clipp[2] = clip[2];
+          filter_clipp[3] = clip[1];
+          filter_clipp[4] = clip[8];
+          filter_clipp[5] = clip[7];
+          filter_clipp[6] = clip[6];
+          filter_clipp[7] = clip[5];
+          filter_clipp[8] = clip[4];
+          filter_clipp[9] = clip[9];
+          filter_clipp[10] = clip[10];
+          filter_clipp[11] = clip[11];
+          filter_clipp[12] = clip[12];
+
+        }
+        else if (transpose_idx == 3)
+        {
+          filter_coeff[0] = coef[9];
+          filter_coeff[1] = coef[8];
+          filter_coeff[2] = coef[10];
+          filter_coeff[3] = coef[4];
+          filter_coeff[4] = coef[3];
+          filter_coeff[5] = coef[7];
+          filter_coeff[6] = coef[11];
+          filter_coeff[7] = coef[5];
+          filter_coeff[8] = coef[1];
+          filter_coeff[9] = coef[0];
+          filter_coeff[10] = coef[2];
+          filter_coeff[11] = coef[6];
+          filter_coeff[12] = coef[12];
+
+          filter_clipp[0] = clip[9];
+          filter_clipp[1] = clip[8];
+          filter_clipp[2] = clip[10];
+          filter_clipp[3] = clip[4];
+          filter_clipp[4] = clip[3];
+          filter_clipp[5] = clip[7];
+          filter_clipp[6] = clip[11];
+          filter_clipp[7] = clip[5];
+          filter_clipp[8] = clip[1];
+          filter_clipp[9] = clip[0];
+          filter_clipp[10] = clip[2];
+          filter_clipp[11] = clip[6];
+          filter_clipp[12] = clip[12];
+        }
+        else
+        {
+          filter_coeff[0] = coef[0];
+          filter_coeff[1] = coef[1];
+          filter_coeff[2] = coef[2];
+          filter_coeff[3] = coef[3];
+          filter_coeff[4] = coef[4];
+          filter_coeff[5] = coef[5];
+          filter_coeff[6] = coef[6];
+          filter_coeff[7] = coef[7];
+          filter_coeff[8] = coef[8];
+          filter_coeff[9] = coef[9];
+          filter_coeff[10] = coef[10];
+          filter_coeff[11] = coef[11];
+          filter_coeff[12] = coef[12];
+
+          filter_clipp[0] = clip[0];
+          filter_clipp[1] = clip[1];
+          filter_clipp[2] = clip[2];
+          filter_clipp[3] = clip[3];
+          filter_clipp[4] = clip[4];
+          filter_clipp[5] = clip[5];
+          filter_clipp[6] = clip[6];
+          filter_clipp[7] = clip[7];
+          filter_clipp[8] = clip[8];
+          filter_clipp[9] = clip[9];
+          filter_clipp[10] = clip[10];
+          filter_clipp[11] = clip[11];
+          filter_clipp[12] = clip[12];
+        }
+      }
+      else
+      {
+        if (transpose_idx == 1)
+        {
+          filter_coeff[0] = coef[4];
+          filter_coeff[1] = coef[1];
+          filter_coeff[2] = coef[5];
+          filter_coeff[3] = coef[3];
+          filter_coeff[4] = coef[0];
+          filter_coeff[5] = coef[2];
+          filter_coeff[6] = coef[6];
+
+          filter_clipp[0] = clip[4];
+          filter_clipp[1] = clip[1];
+          filter_clipp[2] = clip[5];
+          filter_clipp[3] = clip[3];
+          filter_clipp[4] = clip[0];
+          filter_clipp[5] = clip[2];
+          filter_clipp[6] = clip[6];
+
+        }
+        else if (transpose_idx == 2)
+        {
+          filter_coeff[0] = coef[0];
+          filter_coeff[1] = coef[3];
+          filter_coeff[2] = coef[2];
+          filter_coeff[3] = coef[1];
+          filter_coeff[4] = coef[4];
+          filter_coeff[5] = coef[5];
+          filter_coeff[6] = coef[6];
+
+          filter_clipp[0] = clip[0];
+          filter_clipp[1] = clip[3];
+          filter_clipp[2] = clip[2];
+          filter_clipp[3] = clip[1];
+          filter_clipp[4] = clip[4];
+          filter_clipp[5] = clip[5];
+          filter_clipp[6] = clip[6];
+
+        }
+        else if (transpose_idx == 3)
+        {
+          filter_coeff[0] = coef[4];
+          filter_coeff[1] = coef[3];
+          filter_coeff[2] = coef[5];
+          filter_coeff[3] = coef[1];
+          filter_coeff[4] = coef[0];
+          filter_coeff[5] = coef[2];
+          filter_coeff[6] = coef[6];
+
+          filter_clipp[0] = clip[4];
+          filter_clipp[1] = clip[3];
+          filter_clipp[2] = clip[5];
+          filter_clipp[3] = clip[1];
+          filter_clipp[4] = clip[0];
+          filter_clipp[5] = clip[2];
+          filter_clipp[6] = clip[6];
+
+        }
+        else
+        {
+          filter_coeff[0] = coef[0];
+          filter_coeff[1] = coef[1];
+          filter_coeff[2] = coef[2];
+          filter_coeff[3] = coef[3];
+          filter_coeff[4] = coef[4];
+          filter_coeff[5] = coef[5];
+          filter_coeff[6] = coef[6];
+
+          filter_clipp[0] = clip[0];
+          filter_clipp[1] = clip[1];
+          filter_clipp[2] = clip[2];
+          filter_clipp[3] = clip[3];
+          filter_clipp[4] = clip[4];
+          filter_clipp[5] = clip[5];
+          filter_clipp[6] = clip[6];
+
+        }
+      }
+
+      for (int ii = 0; ii < cls_size_y; ii++)
+      {
+        p_img_0 = p_img_y_pad_0 + j + ii * src_stride;
+        p_img_1 = p_img_y_pad_1 + j + ii * src_stride;
+        p_img_2 = p_img_y_pad_2 + j + ii * src_stride;
+        p_img_3 = p_img_y_pad_3 + j + ii * src_stride;
+        p_img_4 = p_img_y_pad_4 + j + ii * src_stride;
+        p_img_5 = p_img_y_pad_5 + j + ii * src_stride;
+        p_img_6 = p_img_y_pad_6 + j + ii * src_stride;
+
+        p_rec_1 = p_rec_0 + j + ii * dst_stride;
+
+        const int y_vb = (blk_dst_y + i + ii) & (vb_ctu_height - 1);
+
+        if (y_vb < vb_pos && (y_vb >= vb_pos - (chroma ? 2 : 4)))   // above
+        {
+          p_img_1 = (y_vb == vb_pos - 1) ? p_img_0 : p_img_1;
+          p_img_3 = (y_vb >= vb_pos - 2) ? p_img_1 : p_img_3;
+          p_img_5 = (y_vb >= vb_pos - 3) ? p_img_3 : p_img_5;
+
+          p_img_2 = (y_vb == vb_pos - 1) ? p_img_0 : p_img_2;
+          p_img_4 = (y_vb >= vb_pos - 2) ? p_img_2 : p_img_4;
+          p_img_6 = (y_vb >= vb_pos - 3) ? p_img_4 : p_img_6;
+        }
+
+        else if (y_vb >= vb_pos && (y_vb <= vb_pos + (chroma ? 1 : 3)))   // bottom
+        {
+          p_img_2 = (y_vb == vb_pos) ? p_img_0 : p_img_2;
+          p_img_4 = (y_vb <= vb_pos + 1) ? p_img_2 : p_img_4;
+          p_img_6 = (y_vb <= vb_pos + 2) ? p_img_4 : p_img_6;
+
+          p_img_1 = (y_vb == vb_pos) ? p_img_0 : p_img_1;
+          p_img_3 = (y_vb <= vb_pos + 1) ? p_img_1 : p_img_3;
+          p_img_5 = (y_vb <= vb_pos + 2) ? p_img_3 : p_img_5;
+        }
+
+        bool is_near_vb_above = y_vb < vb_pos && (y_vb >= vb_pos - 1);
+        bool is_near_vb_below = y_vb >= vb_pos && (y_vb <= vb_pos);
+        for (int jj = 0; jj < cls_size_x; jj++)
+        {
+          int sum = 0;
+          const kvz_pixel curr = p_img_0[+0];
+
+          if (filter_type == ALF_FILTER_7X7)
+          {
+            sum += filter_coeff[0] * (clip_alf(filter_clipp[0], curr, p_img_5[+0], p_img_6[+0]));
+
+            sum += filter_coeff[1] * (clip_alf(filter_clipp[1], curr, p_img_3[+1], p_img_4[-1]));
+            sum += filter_coeff[2] * (clip_alf(filter_clipp[2], curr, p_img_3[+0], p_img_4[+0]));
+            sum += filter_coeff[3] * (clip_alf(filter_clipp[3], curr, p_img_3[-1], p_img_4[+1]));
+
+            sum += filter_coeff[4] * (clip_alf(filter_clipp[4], curr, p_img_1[+2], p_img_2[-2]));
+            sum += filter_coeff[5] * (clip_alf(filter_clipp[5], curr, p_img_1[+1], p_img_2[-1]));
+            sum += filter_coeff[6] * (clip_alf(filter_clipp[6], curr, p_img_1[+0], p_img_2[+0]));
+            sum += filter_coeff[7] * (clip_alf(filter_clipp[7], curr, p_img_1[-1], p_img_2[+1]));
+            sum += filter_coeff[8] * (clip_alf(filter_clipp[8], curr, p_img_1[-2], p_img_2[+2]));
+
+            sum += filter_coeff[9] * (clip_alf(filter_clipp[9], curr, p_img_0[+3], p_img_0[-3]));
+            sum += filter_coeff[10] * (clip_alf(filter_clipp[10], curr, p_img_0[+2], p_img_0[-2]));
+            sum += filter_coeff[11] * (clip_alf(filter_clipp[11], curr, p_img_0[+1], p_img_0[-1]));
+          }
+          else
+          {
+            sum += filter_coeff[0] * (clip_alf(filter_clipp[0], curr, p_img_3[+0], p_img_4[+0]));
+
+            sum += filter_coeff[1] * (clip_alf(filter_clipp[1], curr, p_img_1[+1], p_img_2[-1]));
+            sum += filter_coeff[2] * (clip_alf(filter_clipp[2], curr, p_img_1[+0], p_img_2[+0]));
+            sum += filter_coeff[3] * (clip_alf(filter_clipp[3], curr, p_img_1[-1], p_img_2[+1]));
+
+            sum += filter_coeff[4] * (clip_alf(filter_clipp[4], curr, p_img_0[+2], p_img_0[-2]));
+            sum += filter_coeff[5] * (clip_alf(filter_clipp[5], curr, p_img_0[+1], p_img_0[-1]));
+          }
+
+          if (!(is_near_vb_above || is_near_vb_below))
+          {
+            sum = (sum + offset) >> shift;
+          }
+          else
+          {
+            sum = (sum + (1 << ((shift + 3) - 1))) >> (shift + 3);
+          }
+          sum += curr;
+
+          p_rec_1[jj] = kvz_fast_clip_32bit_to_pixel(sum);
+
+          p_img_0++;
+          p_img_1++;
+          p_img_2++;
+          p_img_3++;
+          p_img_4++;
+          p_img_5++;
+          p_img_6++;
+        }
+      }
+    }
+
+    p_rec_0 += dst_stride2;
+    p_rec_1 += dst_stride2;
+
+    p_img_y_pad_0 += src_stride2;
+    p_img_y_pad_1 += src_stride2;
+    p_img_y_pad_2 += src_stride2;
+    p_img_y_pad_3 += src_stride2;
+    p_img_y_pad_4 += src_stride2;
+    p_img_y_pad_5 += src_stride2;
+    p_img_y_pad_6 += src_stride2;
+  }
+}
+
+
+static void alf_filter_5x5_block_generic(encoder_state_t* const state,
+  const kvz_pixel* src_pixels,
+  kvz_pixel* dst_pixels,
+  const int src_stride,
+  const int dst_stride,
+  const short* filter_set,
+  const int16_t* fClipSet,
+  clp_rng clp_rng,
+  const int width,
+  const int height,
+  int x_pos,
+  int y_pos,
+  int blk_dst_x,
+  int blk_dst_y,
+  int vb_pos,
+  const int vb_ctu_height)
+{
+  alf_filter_block_generic(state, src_pixels, dst_pixels, src_stride, dst_stride, 
+    filter_set, fClipSet, clp_rng, COMPONENT_Cb, width, height, x_pos, y_pos, blk_dst_x, blk_dst_y, vb_pos, vb_ctu_height);
+}
+
+static void alf_filter_7x7_block_generic(encoder_state_t* const state,
+  const kvz_pixel* src_pixels,
+  kvz_pixel* dst_pixels,
+  const int src_stride,
+  const int dst_stride,
+  const short* filter_set,
+  const int16_t* fClipSet,
+  clp_rng clp_rng,
+  const int width,
+  const int height,
+  int x_pos,
+  int y_pos,
+  int blk_dst_x,
+  int blk_dst_y,
+  int vb_pos,
+  const int vb_ctu_height)
+{
+  alf_filter_block_generic(state, src_pixels, dst_pixels, src_stride, dst_stride, filter_set, fClipSet, clp_rng, COMPONENT_Y, width, height, x_pos, y_pos, blk_dst_x, blk_dst_y, vb_pos, vb_ctu_height);
+}
 
 int kvz_strategy_register_alf_generic(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
 
   success &= kvz_strategyselector_register(opaque, "alf_derive_classification_blk", "generic", 0, &alf_derive_classification_blk_generic);
+  success &= kvz_strategyselector_register(opaque, "alf_filter_5x5_blk", "generic", 0, &alf_filter_5x5_block_generic);
+  success &= kvz_strategyselector_register(opaque, "alf_filter_7x7_blk", "generic", 0, &alf_filter_7x7_block_generic);
 
   return success;
 }
