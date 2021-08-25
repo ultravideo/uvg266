@@ -385,7 +385,7 @@ int kvz_strategy_register_alf_avx2(void* opaque, uint8_t bitdepth) {
 #if COMPILE_INTEL_AVX2
 #if KVZ_BIT_DEPTH == 8
   if (bitdepth == 8){
-    success &= kvz_strategyselector_register(opaque, "alf_get_blk_stats", "generic", 0, &alf_get_blk_stats_avx2);
+    success &= kvz_strategyselector_register(opaque, "alf_get_blk_stats", "avx2", 40, &alf_get_blk_stats_avx2);
   }
 #endif // KVZ_BIT_DEPTH == 8
 #endif
