@@ -263,6 +263,9 @@
     <ClCompile Include="..\..\src\strategies\sse41\alf-sse41.c">
       <Filter>Optimization\strategies\sse41</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\strategies\avx2\alf-avx2.c">
+      <Filter>Optimization\strategies\avx2</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\bitstream.h">
@@ -490,6 +493,9 @@
     </ClInclude>
     <ClInclude Include="..\..\src\strategies\sse41\alf-sse41.h">
       <Filter>Optimization\strategies\sse41</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\strategies\avx2\alf-avx2.h">
+      <Filter>Optimization\strategies\avx2</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

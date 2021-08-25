@@ -1,3 +1,4 @@
+#pragma once
 /*****************************************************************************
  * This file is part of Kvazaar HEVC encoder.
  *
@@ -18,30 +19,14 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-#include "strategies/strategies-alf.h"
-#include "strategies/sse41/alf-sse41.h"
-#include "strategies/avx2/alf-avx2.h"
-#include "strategies/generic/alf-generic.h"
-#include "strategyselector.h"
+/**
+ * \ingroup Optimization
+ * \file
+ * Optimizations for AVX2.
+ */
 
+#include "global.h" // IWYU pragma: keep
+#include "kvazaar.h"
 
-// Define function pointers.
-alf_derive_classification_blk_func* kvz_alf_derive_classification_blk;
-alf_filter_5x5_blk_func* kvz_alf_filter_5x5_blk;
-alf_filter_7x7_blk_func* kvz_alf_filter_7x7_blk;
-alf_get_blk_stats_func* kvz_alf_get_blk_stats;
+int kvz_strategy_register_alf_avx2(void* opaque, uint8_t bitdepth);
 
-int kvz_strategy_register_alf(void* opaque, uint8_t bitdepth) {
-  bool success = true;
-
-  success &= kvz_strategy_register_alf_generic(opaque, bitdepth);
-
-  if (kvz_g_hardware_flags.intel_flags.sse41) {
-    success &= kvz_strategy_register_alf_sse41(opaque, bitdepth);
-  }
-  if (kvz_g_hardware_flags.intel_flags.avx2) {
-    success &= kvz_strategy_register_alf_avx2(opaque, bitdepth);
-  }
-
-  return success;
-}

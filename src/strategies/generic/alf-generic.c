@@ -724,6 +724,269 @@ static void alf_filter_7x7_block_generic(encoder_state_t* const state,
   alf_filter_block_generic(state, src_pixels, dst_pixels, src_stride, dst_stride, filter_set, fClipSet, clp_rng, COMPONENT_Y, width, height, x_pos, y_pos, blk_dst_x, blk_dst_y, vb_pos, vb_ctu_height);
 }
 
+
+
+
+static void alf_calc_covariance_generic(int16_t e_local[MAX_NUM_ALF_LUMA_COEFF][MAX_ALF_NUM_CLIPPING_VALUES],
+  const kvz_pixel* rec,
+  const int stride,
+  const channel_type channel,
+  const int transpose_idx,
+  int vb_distance,
+  short alf_clipping_values[MAX_NUM_CHANNEL_TYPE][MAX_ALF_NUM_CLIPPING_VALUES])
+{
+  static const int alf_pattern_5[13] = {
+              0,
+          1,  2,  3,
+      4,  5,  6,  5,  4,
+          3,  2,  1,
+              0
+  };
+
+  static const int alf_pattern_7[25] = {
+                0,
+            1,  2,  3,
+        4,  5,  6,  7,  8,
+    9, 10, 11, 12, 11, 10, 9,
+        8,  7,  6,  5,  4,
+            3,  2,  1,
+                0
+  };
+
+  int clip_top_row = -4;
+  int clip_bot_row = 4;
+  if (vb_distance >= -3 && vb_distance < 0)
+  {
+    clip_bot_row = -vb_distance - 1;
+    clip_top_row = -clip_bot_row; // symmetric
+  }
+  else if (vb_distance >= 0 && vb_distance < 3)
+  {
+    clip_top_row = -vb_distance;
+    clip_bot_row = -clip_top_row; // symmetric
+  }
+
+  const bool is_luma = channel == CHANNEL_TYPE_LUMA;
+  const int* filter_pattern = is_luma ? alf_pattern_7 : alf_pattern_5;
+  const int half_filter_length = (is_luma ? 7 : 5) >> 1;
+  const short* clip = alf_clipping_values[channel];
+  const int num_bins = MAX_ALF_NUM_CLIPPING_VALUES;
+
+  int k = 0;
+
+  const int16_t curr = rec[0];
+
+  if (transpose_idx == 0)
+  {
+    for (int i = -half_filter_length; i < 0; i++)
+    {
+      const kvz_pixel* rec0 = rec + MAX(i, clip_top_row) * stride;
+      const kvz_pixel* rec1 = rec - MAX(i, -clip_bot_row) * stride;
+      for (int j = -half_filter_length - i; j <= half_filter_length + i; j++, k++)
+      {
+        for (int b = 0; b < num_bins; b++)
+        {
+          e_local[filter_pattern[k]][b] += clip_alf(clip[b], curr, rec0[j], rec1[-j]);
+        }
+      }
+    }
+    for (int j = -half_filter_length; j < 0; j++, k++)
+    {
+      for (int b = 0; b < num_bins; b++)
+      {
+        e_local[filter_pattern[k]][b] += clip_alf(clip[b], curr, rec[j], rec[-j]);
+      }
+    }
+  }
+  else if (transpose_idx == 1)
+  {
+    for (int j = -half_filter_length; j < 0; j++)
+    {
+      const kvz_pixel* rec0 = rec + j;
+      const kvz_pixel* rec1 = rec - j;
+
+      for (int i = -half_filter_length - j; i <= half_filter_length + j; i++, k++)
+      {
+        for (int b = 0; b < num_bins; b++)
+        {
+          e_local[filter_pattern[k]][b] += clip_alf(clip[b], curr, rec0[MAX(i, clip_top_row) * stride], rec1[-MAX(i, -clip_bot_row) * stride]);
+        }
+      }
+    }
+    for (int i = -half_filter_length; i < 0; i++, k++)
+    {
+      for (int b = 0; b < num_bins; b++)
+      {
+        e_local[filter_pattern[k]][b] += clip_alf(clip[b], curr, rec[MAX(i, clip_top_row) * stride], rec[-MAX(i, -clip_bot_row) * stride]);
+      }
+    }
+  }
+  else if (transpose_idx == 2)
+  {
+    for (int i = -half_filter_length; i < 0; i++)
+    {
+      const kvz_pixel* rec0 = rec + MAX(i, clip_top_row) * stride;
+      const kvz_pixel* rec1 = rec - MAX(i, -clip_bot_row) * stride;
+
+      for (int j = half_filter_length + i; j >= -half_filter_length - i; j--, k++)
+      {
+        for (int b = 0; b < num_bins; b++)
+        {
+          e_local[filter_pattern[k]][b] += clip_alf(clip[b], curr, rec0[j], rec1[-j]);
+        }
+      }
+    }
+    for (int j = -half_filter_length; j < 0; j++, k++)
+    {
+      for (int b = 0; b < num_bins; b++)
+      {
+        e_local[filter_pattern[k]][b] += clip_alf(clip[b], curr, rec[j], rec[-j]);
+      }
+    }
+  }
+  else
+  {
+    for (int j = -half_filter_length; j < 0; j++)
+    {
+      const kvz_pixel* rec0 = rec + j;
+      const kvz_pixel* rec1 = rec - j;
+
+      for (int i = half_filter_length + j; i >= -half_filter_length - j; i--, k++)
+      {
+        for (int b = 0; b < num_bins; b++)
+        {
+          e_local[filter_pattern[k]][b] += clip_alf(clip[b], curr, rec0[MAX(i, clip_top_row) * stride], rec1[-MAX(i, -clip_bot_row) * stride]);
+        }
+      }
+    }
+    for (int i = -half_filter_length; i < 0; i++, k++)
+    {
+      for (int b = 0; b < num_bins; b++)
+      {
+        e_local[filter_pattern[k]][b] += clip_alf(clip[b], curr, rec[MAX(i, clip_top_row) * stride], rec[-MAX(i, -clip_bot_row) * stride]);
+      }
+    }
+  }
+  for (int b = 0; b < num_bins; b++)
+  {
+    e_local[filter_pattern[k]][b] += curr;
+  }
+}
+
+static void alf_get_blk_stats_generic(encoder_state_t* const state,
+  channel_type channel,
+  alf_covariance* alf_covariance,
+  alf_classifier** g_classifier,
+  kvz_pixel* org,
+  int32_t org_stride,
+  kvz_pixel* rec,
+  int32_t rec_stride,
+  const int x_pos,
+  const int y_pos,
+  const int x_dst,
+  const int y_dst,
+  const int width,
+  const int height,
+  int vb_ctu_height,
+  int vb_pos,
+  short alf_clipping_values[MAX_NUM_CHANNEL_TYPE][MAX_ALF_NUM_CLIPPING_VALUES])
+{
+  int16_t e_local[MAX_NUM_ALF_LUMA_COEFF][MAX_ALF_NUM_CLIPPING_VALUES];
+
+  const int num_bins = MAX_ALF_NUM_CLIPPING_VALUES;
+
+  int num_coeff = channel == CHANNEL_TYPE_LUMA ? 13 : 7;
+  int transpose_idx = 0;
+  int class_idx = 0;
+
+  for (int i = 0; i < height; i++)
+  {
+    int vb_distance = ((y_dst + i) % vb_ctu_height) - vb_pos;
+    for (int j = 0; j < width; j++)
+    {
+      if (g_classifier && g_classifier[y_dst + i][x_dst + j].class_idx == ALF_UNUSED_CLASS_IDX && g_classifier[y_dst + i][x_dst + j].transpose_idx == ALF_UNUSED_TRANSPOSE_IDX)
+      {
+        continue;
+      }
+      memset(e_local, 0, sizeof(e_local));
+      if (g_classifier)
+      {
+        alf_classifier* cl = &g_classifier[y_dst + i][x_dst + j];
+        transpose_idx = cl->transpose_idx;
+        class_idx = cl->class_idx;
+      }
+
+      double weight = 1.0;
+      if (0/*m_alfWSSD*/)
+      {
+        //weight = g_luma_level_to_weight_plut[org[j]];
+      }
+      int16_t y_local = org[j] - rec[j];
+      alf_calc_covariance_generic(e_local, rec + j, rec_stride, channel, transpose_idx, vb_distance, alf_clipping_values);
+      for (int k = 0; k < num_coeff; k++)
+      {
+        for (int l = k; l < num_coeff; l++)
+        {
+          for (int b0 = 0; b0 < num_bins; b0++)
+          {
+            for (int b1 = 0; b1 < num_bins; b1++)
+            {
+              if (0/*m_alfWSSD*/)
+              {
+                alf_covariance[class_idx].ee[b0][b1][k][l] += weight * (e_local[k][b0] * (double)e_local[l][b1]);
+              }
+              else
+              {
+                alf_covariance[class_idx].ee[b0][b1][k][l] += e_local[k][b0] * (double)e_local[l][b1];
+              }
+            }
+          }
+        }
+        for (int b = 0; b < num_bins; b++)
+        {
+          if (0/*m_alfWSSD*/)
+          {
+            alf_covariance[class_idx].y[b][k] += weight * (e_local[k][b] * (double)y_local);
+          }
+          else
+          {
+            alf_covariance[class_idx].y[b][k] += e_local[k][b] * (double)y_local;
+          }
+        }
+      }
+      if (0/*m_alfWSSD*/)
+      {
+        alf_covariance[class_idx].pix_acc += weight * (y_local * (double)y_local);
+      }
+      else
+      {
+        alf_covariance[class_idx].pix_acc += y_local * (double)y_local;
+      }
+    }
+    org += org_stride;
+    rec += rec_stride;
+  }
+
+  int num_classes = g_classifier ? MAX_NUM_ALF_CLASSES : 1;
+  for (class_idx = 0; class_idx < num_classes; class_idx++)
+  {
+    for (int k = 1; k < num_coeff; k++)
+    {
+      for (int l = 0; l < k; l++)
+      {
+        for (int b0 = 0; b0 < num_bins; b0++)
+        {
+          for (int b1 = 0; b1 < num_bins; b1++)
+          {
+            alf_covariance[class_idx].ee[b0][b1][k][l] = alf_covariance[class_idx].ee[b1][b0][l][k];
+          }
+        }
+      }
+    }
+  }
+}
+
+
 int kvz_strategy_register_alf_generic(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
@@ -731,6 +994,8 @@ int kvz_strategy_register_alf_generic(void* opaque, uint8_t bitdepth)
   success &= kvz_strategyselector_register(opaque, "alf_derive_classification_blk", "generic", 0, &alf_derive_classification_blk_generic);
   success &= kvz_strategyselector_register(opaque, "alf_filter_5x5_blk", "generic", 0, &alf_filter_5x5_block_generic);
   success &= kvz_strategyselector_register(opaque, "alf_filter_7x7_blk", "generic", 0, &alf_filter_7x7_block_generic);
+  success &= kvz_strategyselector_register(opaque, "alf_get_blk_stats", "generic", 0, &alf_get_blk_stats_generic);
+  
 
   return success;
 }

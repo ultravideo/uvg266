@@ -196,7 +196,9 @@ libavx2_la_SOURCES = \
 	strategies/avx2/quant-avx2.h \
 	strategies/avx2/reg_sad_pow2_widths-avx2.h \
 	strategies/avx2/sao-avx2.c \
-	strategies/avx2/sao-avx2.h
+	strategies/avx2/sao-avx2.h \
+	strategies/avx2/alf-avx2.c \
+	strategies/avx2/alf-avx2.h
 #	strategies/avx2/encode_coding_tree-avx2.c \
 #	strategies/avx2/encode_coding_tree-avx2.h
 

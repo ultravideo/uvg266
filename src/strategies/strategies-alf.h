@@ -78,10 +78,29 @@ typedef void (alf_filter_7x7_blk_func)(encoder_state_t* const state,
   int vb_pos,
   const int vb_ctu_height);
 
+typedef void (alf_get_blk_stats_func)(encoder_state_t* const state,
+  channel_type channel,
+  alf_covariance* alf_covariance,
+  alf_classifier** g_classifier,
+  kvz_pixel* org,
+  int32_t org_stride,
+  kvz_pixel* rec,
+  int32_t rec_stride,
+  const int x_pos,
+  const int y_pos,
+  const int x_dst,
+  const int y_dst,
+  const int width,
+  const int height,
+  int vb_ctu_height,
+  int vb_pos,
+  short alf_clipping_values[MAX_NUM_CHANNEL_TYPE][MAX_ALF_NUM_CLIPPING_VALUES]);
+
 // Declare function pointers.
 extern alf_derive_classification_blk_func * kvz_alf_derive_classification_blk;
 extern alf_filter_5x5_blk_func* kvz_alf_filter_5x5_blk;
 extern alf_filter_7x7_blk_func* kvz_alf_filter_7x7_blk;
+extern alf_get_blk_stats_func* kvz_alf_get_blk_stats;
 
 int kvz_strategy_register_alf(void* opaque, uint8_t bitdepth);
 
@@ -90,5 +109,6 @@ int kvz_strategy_register_alf(void* opaque, uint8_t bitdepth);
   {"alf_derive_classification_blk", (void**) &kvz_alf_derive_classification_blk}, \
   {"alf_filter_5x5_blk", (void**) &kvz_alf_filter_5x5_blk}, \
   {"alf_filter_7x7_blk", (void**) &kvz_alf_filter_7x7_blk}, \
+  {"alf_get_blk_stats", (void**) &kvz_alf_get_blk_stats}, \
  
 
