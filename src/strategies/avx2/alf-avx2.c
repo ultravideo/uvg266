@@ -234,22 +234,15 @@ static void alf_get_blk_stats_avx2(encoder_state_t* const state,
             __m256i e_local_b0_d = _mm256_set1_epi32((int32_t)e_local[k][b0]);
             /*for (int b1 = 0; b1 < 4; b1++)
             {
-              alf_covariance[class_idx].ee[b0][b1][k][l] += e_local[k][b0] * (double)e_local[l][b1];
+              alf_covariance[class_idx].ee[k][l][b0][b1] += e_local[k][b0] * (double)e_local[l][b1];
             }*/
             
-            //__m256d _mm256_fmadd_pd (__m256d a, __m256d b, __m256d c)
             __m128i e_local_1 = _mm_loadl_epi64((__m128i*) & e_local[l][0]);
             __m256i e_local_32 = _mm256_cvtepi16_epi64(e_local_1);
             __m256i multiplied = _mm256_mul_epi32(e_local_b0_d, e_local_32);
-            int64_t data[4];
-            _mm256_storeu_si256((__m256i*)data, multiplied);
-
-              
-            alf_covariance[class_idx].ee[b0][0][k][l] += data[0];
-            alf_covariance[class_idx].ee[b0][1][k][l] += data[1];
-            alf_covariance[class_idx].ee[b0][2][k][l] += data[2];
-            alf_covariance[class_idx].ee[b0][3][k][l] += data[3];
-            
+            __m256i orig = _mm256_lddqu_si256((__m256i*)alf_covariance[class_idx].ee[k][l][b0]);
+            _mm256_storeu_si256((__m256i*)alf_covariance[class_idx].ee[k][l][b0], _mm256_add_epi64(multiplied, orig));
+           
           }
         }
         /*
@@ -288,7 +281,7 @@ static void alf_get_blk_stats_avx2(encoder_state_t* const state,
         {
           for (int b1 = 0; b1 < 4; b1++)
           {
-            alf_covariance[class_idx].ee[b0][b1][k][l] = alf_covariance[class_idx].ee[b1][b0][l][k];
+            alf_covariance[class_idx].ee[k][l][b0][b1] = alf_covariance[class_idx].ee[l][k][b1][b0];
           }
         }
       }

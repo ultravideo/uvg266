@@ -119,7 +119,7 @@ static void get_clip_max(const alf_covariance *cov, int *clip_max)
     {
       for (int l = 0; inc && l < num_coeff; ++l)
       {
-        if (cov->ee[clip_max[k]][0][k][l] != cov->ee[clip_max[k] + 1][0][k][l])
+        if (cov->ee[k][l][clip_max[k]][0] != cov->ee[k][l][clip_max[k] + 1][0])
         {
           inc = false;
         }
@@ -142,7 +142,7 @@ static void reduce_clip_cost(const alf_covariance *cov, int *clip)
     {
       for (int l = 0; dec && l < cov->num_coeff; ++l)
       {
-        if (cov->ee[clip[k]][clip[l]][k][l] != cov->ee[clip[k] - 1][clip[l]][k][l])
+        if (cov->ee[k][l][clip[k]][clip[l]] != cov->ee[k][l][clip[k] - 1][clip[l]])
         {
           dec = false;
         }
@@ -162,7 +162,7 @@ static void set_ey_from_clip(const alf_covariance *cov, const int* clip, double 
     y[k] = cov->y[clip[k]][k];
     for (int l = 0; l < size; l++)
     {
-      ee[k][l] = cov->ee[clip[k]][clip[l]][k][l];
+      ee[k][l] = cov->ee[k][l][clip[k]][clip[l]];
     }
   }
 }
@@ -352,8 +352,8 @@ static double optimize_filter(const alf_covariance *cov, int* clip, double *f, b
         ky[k] = cov->y[clip[k]][k];
         for (int l = 0; l < size; l++)
         {
-          ke[k][l] = cov->ee[clip[k]][clip[l]][k][l];
-          ke[l][k] = cov->ee[clip[l]][clip[k]][l][k];
+          ke[k][l] = cov->ee[k][l][clip[k]][clip[l]];
+          ke[l][k] = cov->ee[l][k][clip[l]][clip[k]];
         }
 
         gns_solve_by_chol(ke, ky, f, size);
@@ -373,8 +373,8 @@ static double optimize_filter(const alf_covariance *cov, int* clip, double *f, b
         ky[k] = cov->y[clip[k]][k];
         for (int l = 0; l < size; l++)
         {
-          ke[k][l] = cov->ee[clip[k]][clip[l]][k][l];
-          ke[l][k] = cov->ee[clip[l]][clip[k]][l][k];
+          ke[k][l] = cov->ee[k][l][clip[k]][clip[l]];
+          ke[l][k] = cov->ee[l][k][clip[l]][clip[k]];
         }
 
         gns_solve_by_chol(ke, ky, f, size);
@@ -392,8 +392,8 @@ static double optimize_filter(const alf_covariance *cov, int* clip, double *f, b
       ky[k] = cov->y[clip[k]][k];
       for (int l = 0; l < size; l++)
       {
-        ke[k][l] = cov->ee[clip[k]][clip[l]][k][l];
-        ke[l][k] = cov->ee[clip[l]][clip[k]][l][k];
+        ke[k][l] = cov->ee[k][l][clip[k]][clip[l]];
+        ke[l][k] = cov->ee[l][k][clip[l]][clip[k]];
       }
     }
 
@@ -404,8 +404,8 @@ static double optimize_filter(const alf_covariance *cov, int* clip, double *f, b
       ky[idx_min] = cov->y[clip[idx_min]][idx_min];
       for (int l = 0; l < size; l++)
       {
-        ke[idx_min][l] = cov->ee[clip[idx_min]][clip[l]][idx_min][l];
-        ke[l][idx_min] = cov->ee[clip[l]][clip[idx_min]][l][idx_min];
+        ke[idx_min][l] = cov->ee[idx_min][l][clip[idx_min]][clip[l]];
+        ke[l][idx_min] = cov->ee[l][idx_min][clip[l]][clip[idx_min]];
       }
     }
     else
@@ -469,9 +469,9 @@ static double calc_error_for_coeffs(const alf_covariance *cov, const int *clip, 
     double sum = 0;
     for (int j = i + 1; j < num_coeff; j++)
     {
-      sum += cov->ee[clip[i]][clip[j]][i][j] * coeff[j];
+      sum += cov->ee[i][j][clip[i]][clip[j]] * coeff[j];
     }
-    error += ((cov->ee[clip[i]][clip[i]][i][i] * coeff[i] + sum * 2) / factor - 2 * cov->y[clip[i]][i]) * coeff[i];
+    error += ((cov->ee[i][i][clip[i]][clip[i]] * coeff[i] + sum * 2) / factor - 2 * cov->y[clip[i]][i]) * coeff[i];
   }
 
   return error / factor;
@@ -488,9 +488,9 @@ static double calc_error_for_cc_alf_coeffs(const alf_covariance *cov, const int1
     for (int j = i + 1; j < num_coeff; j++)
     {
       // E[j][i] = E[i][j], sum will be multiplied by 2 later
-      sum += cov->ee[0][0][i][j] * coeff[j];
+      sum += cov->ee[i][j][0][0] * coeff[j];
     }
-    error += ((cov->ee[0][0][i][i] * coeff[i] + sum * 2) / factor - 2 * cov->y[0][i]) * coeff[i];
+    error += ((cov->ee[i][i][0][0] * coeff[i] + sum * 2) / factor - 2 * cov->y[0][i]) * coeff[i];
   }
 
   return error / factor;
@@ -753,7 +753,7 @@ static void add_alf_cov(alf_covariance *dst, alf_covariance *src)
       {
         for (int i = 0; i < num_coeff; i++)
         {
-          dst->ee[b0][b1][j][i] += src->ee[b0][b1][j][i];
+          dst->ee[j][i][b0][b1] += src->ee[j][i][b0][b1];
         }
       }
     }
@@ -780,7 +780,7 @@ static void add_alf_cov_lhs_rhs(alf_covariance *dst, alf_covariance *lhs, alf_co
       {
         for (int i = 0; i < num_coeff; i++)
         {
-          dst->ee[b0][b1][j][i] = lhs->ee[b0][b1][j][i] + rhs->ee[b0][b1][j][i];
+          dst->ee[j][i][b0][b1] = lhs->ee[j][i][b0][b1] + rhs->ee[j][i][b0][b1];
         }
       }
     }
@@ -1972,7 +1972,7 @@ static void derive_cc_alf_filter_coeff(alf_covariance *alf_covariance_frame_cc_a
     ky[k] = alf_covariance_frame_cc_alf[filter_idx].y[0][k];
     for (int l = 0; l < size; l++)
     {
-      k_e[k][l] = alf_covariance_frame_cc_alf[filter_idx].ee[0][0][k][l];
+      k_e[k][l] = alf_covariance_frame_cc_alf[filter_idx].ee[k][l][0][0];
     }
   }
 
@@ -2766,11 +2766,11 @@ static void get_blk_stats_cc_alf(encoder_state_t * const state,
             {
               if (0 /*g_alf_wssd*/)
               {
-                alf_covariance->ee[b0][b1][k][l] += weight * (e_local[k][b0] * (double)e_local[l][b1]);
+                alf_covariance->ee[k][l][b0][b1] += weight * (e_local[k][b0] * (double)e_local[l][b1]);
               }
               else
               {
-                alf_covariance->ee[b0][b1][k][l] += e_local[k][b0] * (double)e_local[l][b1];
+                alf_covariance->ee[k][l][b0][b1] += e_local[k][b0] * (double)e_local[l][b1];
               }
             }
           }
@@ -2826,7 +2826,7 @@ static void get_blk_stats_cc_alf(encoder_state_t * const state,
       {
         for (int b1 = 0; b1 < num_bins; b1++)
         {
-          alf_covariance->ee[b0][b1][k][l] = alf_covariance->ee[b1][b0][l][k];
+          alf_covariance->ee[k][l][b0][b1] = alf_covariance->ee[l][k][b1][b0];
         }
       }
     }
