@@ -36,6 +36,19 @@ static int16_t clip_alf(const int16_t clip, const int16_t ref, const int16_t val
   return CLIP(-clip, +clip, val0 - ref) + CLIP(-clip, +clip, val1 - ref);
 }
 
+#define ALF_CLIP_AND_ADD(VAL0,VAL1) __m128i clips = _mm_loadl_epi64((__m128i*) clip); \
+__m128i neg_clips = _mm_sign_epi16(clips, negate); \
+__m128i val0 = _mm_set1_epi16((VAL0 - curr));\
+__m128i val1 = _mm_set1_epi16((VAL1 - curr));\
+__m128i min_clips_val0 = _mm_min_epi16(clips, val0);\
+__m128i max_clips_val0 = _mm_max_epi16(min_clips_val0, neg_clips);\
+\
+__m128i min_clips_val1 = _mm_min_epi16(clips, val1);\
+__m128i max_clips_val1 = _mm_max_epi16(min_clips_val1, neg_clips);\
+\
+__m128i e_local_original = _mm_loadl_epi64((__m128i*) & e_local[filter_pattern[k]][0]);\
+__m128i result = _mm_add_epi16(e_local_original, _mm_add_epi16(max_clips_val0, max_clips_val1));\
+_mm_storel_epi64((__m128i*)& e_local[filter_pattern[k]][0], result);
 
 static void alf_calc_covariance_avx2(int16_t e_local[MAX_NUM_ALF_LUMA_COEFF][MAX_ALF_NUM_CLIPPING_VALUES],
   const kvz_pixel* rec,
@@ -96,36 +109,12 @@ static void alf_calc_covariance_avx2(int16_t e_local[MAX_NUM_ALF_LUMA_COEFF][MAX
       const kvz_pixel* rec1 = rec - MAX(i, -clip_bot_row) * stride;
       for (int j = -half_filter_length - i; j <= half_filter_length + i; j++, k++)
       {
-        __m128i clips = _mm_loadl_epi64((__m128i*) clip);
-        __m128i neg_clips = _mm_sign_epi16(clips, negate);
-        __m128i val0 = _mm_set1_epi16((rec0[j] - curr));
-        __m128i val1 = _mm_set1_epi16((rec1[-j] - curr));          
-        __m128i min_clips_val0 = _mm_min_epi16(clips, val0);
-        __m128i max_clips_val0 = _mm_max_epi16(min_clips_val0, neg_clips);
-          
-        __m128i min_clips_val1 = _mm_min_epi16(clips, val1);
-        __m128i max_clips_val1 = _mm_max_epi16(min_clips_val1, neg_clips);
-
-        __m128i e_local_original = _mm_loadl_epi64((__m128i*) &e_local[filter_pattern[k]][0]);          
-        __m128i result = _mm_add_epi16(e_local_original, _mm_add_epi16(max_clips_val0, max_clips_val1));
-        _mm_storel_epi64((__m128i*) & e_local[filter_pattern[k]][0], result);
+        ALF_CLIP_AND_ADD(rec0[j], rec1[-j]);
       }
     }
     for (int j = -half_filter_length; j < 0; j++, k++)
     {
-      __m128i clips = _mm_loadl_epi64((__m128i*) clip);
-      __m128i neg_clips = _mm_sign_epi16(clips, negate);
-      __m128i val0 = _mm_set1_epi16((rec[j] - curr));
-      __m128i val1 = _mm_set1_epi16((rec[-j] - curr));
-      __m128i min_clips_val0 = _mm_min_epi16(clips, val0);
-      __m128i max_clips_val0 = _mm_max_epi16(min_clips_val0, neg_clips);
-
-      __m128i min_clips_val1 = _mm_min_epi16(clips, val1);
-      __m128i max_clips_val1 = _mm_max_epi16(min_clips_val1, neg_clips);
-
-      __m128i e_local_original = _mm_loadl_epi64((__m128i*) & e_local[filter_pattern[k]][0]);
-      __m128i result = _mm_add_epi16(e_local_original, _mm_add_epi16(max_clips_val0, max_clips_val1));
-      _mm_storel_epi64((__m128i*) & e_local[filter_pattern[k]][0], result);
+      ALF_CLIP_AND_ADD(rec[j], rec[-j]);
     }
   }
   else if (transpose_idx == 1)
@@ -137,36 +126,12 @@ static void alf_calc_covariance_avx2(int16_t e_local[MAX_NUM_ALF_LUMA_COEFF][MAX
 
       for (int i = -half_filter_length - j; i <= half_filter_length + j; i++, k++)
       {
-        __m128i clips = _mm_loadl_epi64((__m128i*) clip);
-        __m128i neg_clips = _mm_sign_epi16(clips, negate);
-        __m128i val0 = _mm_set1_epi16((rec0[MAX(i, clip_top_row) * stride] - curr));
-        __m128i val1 = _mm_set1_epi16((rec1[-MAX(i, -clip_bot_row) * stride] - curr));
-        __m128i min_clips_val0 = _mm_min_epi16(clips, val0);
-        __m128i max_clips_val0 = _mm_max_epi16(min_clips_val0, neg_clips);
-
-        __m128i min_clips_val1 = _mm_min_epi16(clips, val1);
-        __m128i max_clips_val1 = _mm_max_epi16(min_clips_val1, neg_clips);
-
-        __m128i e_local_original = _mm_loadl_epi64((__m128i*) & e_local[filter_pattern[k]][0]);
-        __m128i result = _mm_add_epi16(e_local_original, _mm_add_epi16(max_clips_val0, max_clips_val1));
-        _mm_storel_epi64((__m128i*) & e_local[filter_pattern[k]][0], result);
+        ALF_CLIP_AND_ADD(rec0[MAX(i, clip_top_row) * stride], rec1[-MAX(i, -clip_bot_row) * stride]);
       }
     }
     for (int i = -half_filter_length; i < 0; i++, k++)
     {
-      __m128i clips = _mm_loadl_epi64((__m128i*) clip);
-      __m128i neg_clips = _mm_sign_epi16(clips, negate);
-      __m128i val0 = _mm_set1_epi16((rec[MAX(i, clip_top_row) * stride] - curr));
-      __m128i val1 = _mm_set1_epi16((rec[-MAX(i, -clip_bot_row) * stride] - curr));
-      __m128i min_clips_val0 = _mm_min_epi16(clips, val0);
-      __m128i max_clips_val0 = _mm_max_epi16(min_clips_val0, neg_clips);
-
-      __m128i min_clips_val1 = _mm_min_epi16(clips, val1);
-      __m128i max_clips_val1 = _mm_max_epi16(min_clips_val1, neg_clips);
-
-      __m128i e_local_original = _mm_loadl_epi64((__m128i*) & e_local[filter_pattern[k]][0]);
-      __m128i result = _mm_add_epi16(e_local_original, _mm_add_epi16(max_clips_val0, max_clips_val1));
-      _mm_storel_epi64((__m128i*)& e_local[filter_pattern[k]][0], result);
+      ALF_CLIP_AND_ADD(rec[MAX(i, clip_top_row) * stride], rec[-MAX(i, -clip_bot_row) * stride]);
     }
   }
   else if (transpose_idx == 2)
@@ -178,36 +143,12 @@ static void alf_calc_covariance_avx2(int16_t e_local[MAX_NUM_ALF_LUMA_COEFF][MAX
 
       for (int j = half_filter_length + i; j >= -half_filter_length - i; j--, k++)
       {
-        __m128i clips = _mm_loadl_epi64((__m128i*) clip);
-        __m128i neg_clips = _mm_sign_epi16(clips, negate);
-        __m128i val0 = _mm_set1_epi16((rec0[j] - curr));
-        __m128i val1 = _mm_set1_epi16((rec1[-j] - curr));
-        __m128i min_clips_val0 = _mm_min_epi16(clips, val0);
-        __m128i max_clips_val0 = _mm_max_epi16(min_clips_val0, neg_clips);
-
-        __m128i min_clips_val1 = _mm_min_epi16(clips, val1);
-        __m128i max_clips_val1 = _mm_max_epi16(min_clips_val1, neg_clips);
-
-        __m128i e_local_original = _mm_loadl_epi64((__m128i*) & e_local[filter_pattern[k]][0]);
-        __m128i result = _mm_add_epi16(e_local_original, _mm_add_epi16(max_clips_val0, max_clips_val1));
-        _mm_storel_epi64((__m128i*) & e_local[filter_pattern[k]][0], result);
+        ALF_CLIP_AND_ADD(rec0[j], rec1[-j]);
       }
     }
     for (int j = -half_filter_length; j < 0; j++, k++)
     {
-      __m128i clips = _mm_loadl_epi64((__m128i*) clip);
-      __m128i neg_clips = _mm_sign_epi16(clips, negate);
-      __m128i val0 = _mm_set1_epi16((rec[j] - curr));
-      __m128i val1 = _mm_set1_epi16((rec[-j] - curr));
-      __m128i min_clips_val0 = _mm_min_epi16(clips, val0);
-      __m128i max_clips_val0 = _mm_max_epi16(min_clips_val0, neg_clips);
-
-      __m128i min_clips_val1 = _mm_min_epi16(clips, val1);
-      __m128i max_clips_val1 = _mm_max_epi16(min_clips_val1, neg_clips);
-
-      __m128i e_local_original = _mm_loadl_epi64((__m128i*) & e_local[filter_pattern[k]][0]);
-      __m128i result = _mm_add_epi16(e_local_original, _mm_add_epi16(max_clips_val0, max_clips_val1));
-      _mm_storel_epi64((__m128i*)& e_local[filter_pattern[k]][0], result);
+      ALF_CLIP_AND_ADD(rec[j], rec[-j]);
     }
   }
   else
@@ -219,36 +160,12 @@ static void alf_calc_covariance_avx2(int16_t e_local[MAX_NUM_ALF_LUMA_COEFF][MAX
 
       for (int i = half_filter_length + j; i >= -half_filter_length - j; i--, k++)
       {
-        __m128i clips = _mm_loadl_epi64((__m128i*) clip);
-        __m128i neg_clips = _mm_sign_epi16(clips, negate);
-        __m128i val0 = _mm_set1_epi16((rec0[MAX(i, clip_top_row) * stride] - curr));
-        __m128i val1 = _mm_set1_epi16((rec1[-MAX(i, -clip_bot_row) * stride] - curr));
-        __m128i min_clips_val0 = _mm_min_epi16(clips, val0);
-        __m128i max_clips_val0 = _mm_max_epi16(min_clips_val0, neg_clips);
-
-        __m128i min_clips_val1 = _mm_min_epi16(clips, val1);
-        __m128i max_clips_val1 = _mm_max_epi16(min_clips_val1, neg_clips);
-
-        __m128i e_local_original = _mm_loadl_epi64((__m128i*) & e_local[filter_pattern[k]][0]);
-        __m128i result = _mm_add_epi16(e_local_original, _mm_add_epi16(max_clips_val0, max_clips_val1));
-        _mm_storel_epi64((__m128i*)& e_local[filter_pattern[k]][0], result);
+        ALF_CLIP_AND_ADD(rec0[MAX(i, clip_top_row) * stride], rec1[-MAX(i, -clip_bot_row) * stride]);
       }
     }
     for (int i = -half_filter_length; i < 0; i++, k++)
     {
-      __m128i clips = _mm_loadl_epi64((__m128i*) clip);
-      __m128i neg_clips = _mm_sign_epi16(clips, negate);
-      __m128i val0 = _mm_set1_epi16((rec[MAX(i, clip_top_row) * stride] - curr));
-      __m128i val1 = _mm_set1_epi16((rec[-MAX(i, -clip_bot_row) * stride] - curr));
-      __m128i min_clips_val0 = _mm_min_epi16(clips, val0);
-      __m128i max_clips_val0 = _mm_max_epi16(min_clips_val0, neg_clips);
-
-      __m128i min_clips_val1 = _mm_min_epi16(clips, val1);
-      __m128i max_clips_val1 = _mm_max_epi16(min_clips_val1, neg_clips);
-
-      __m128i e_local_original = _mm_loadl_epi64((__m128i*) & e_local[filter_pattern[k]][0]);
-      __m128i result = _mm_add_epi16(e_local_original, _mm_add_epi16(max_clips_val0, max_clips_val1));
-      _mm_storel_epi64((__m128i*)& e_local[filter_pattern[k]][0], result);
+      ALF_CLIP_AND_ADD(rec[MAX(i, clip_top_row) * stride], rec[-MAX(i, -clip_bot_row) * stride]);
     }
   }
 
@@ -303,7 +220,9 @@ static void alf_get_blk_stats_avx2(encoder_state_t* const state,
 
       int16_t y_local = org[j] - rec[j];
 
-      __m256d y_local_d = _mm256_set1_pd((double)y_local);
+      //__m256i const perm_mask = _mm256_set_epi32(14, 12, 10, 8, 6, 4, 2, 0);
+
+      __m256i y_local_32 = _mm256_set1_epi32(y_local);
       alf_calc_covariance_avx2(e_local, rec + j, rec_stride, channel, transpose_idx, vb_distance, alf_clipping_values);
       for (int k = 0; k < num_coeff; k++)
       {
@@ -311,45 +230,46 @@ static void alf_get_blk_stats_avx2(encoder_state_t* const state,
         {
           for (int b0 = 0; b0 < 4; b0++)
           {
-            __m256d e_local_b0_d = _mm256_set1_pd((double)e_local[k][b0]);
-            //for (int b1 = 0; b1 < 4; b1++)
+            if (!e_local[k][b0]) continue;
+            __m256i e_local_b0_d = _mm256_set1_epi32((int32_t)e_local[k][b0]);
+            /*for (int b1 = 0; b1 < 4; b1++)
             {
+              alf_covariance[class_idx].ee[b0][b1][k][l] += e_local[k][b0] * (double)e_local[l][b1];
+            }*/
+            
+            //__m256d _mm256_fmadd_pd (__m256d a, __m256d b, __m256d c)
+            __m128i e_local_1 = _mm_loadl_epi64((__m128i*) & e_local[l][0]);
+            __m256i e_local_32 = _mm256_cvtepi16_epi64(e_local_1);
+            __m256i multiplied = _mm256_mul_epi32(e_local_b0_d, e_local_32);
+            int64_t data[4];
+            _mm256_storeu_si256((__m256i*)data, multiplied);
 
-              //__m256d _mm256_fmadd_pd (__m256d a, __m256d b, __m256d c)
-              __m128i e_local_1 = _mm_loadl_epi64((__m128i*) & e_local[l][0]);
-              __m128i e_local_32 = _mm_cvtepi16_epi32(e_local_1);
-              __m256d e_local_b1_d = _mm256_cvtepi32_pd(e_local_32);
               
-              __m256d multiplied = _mm256_mul_pd(e_local_b0_d, e_local_b1_d);
-              double data[4];
-              _mm256_store_pd(data, multiplied);
-
-              //alf_covariance[class_idx].ee[b0][b1][k][l] += e_local[k][b0] * (double)e_local[l][b1];
-              alf_covariance[class_idx].ee[b0][0][k][l] += data[0];
-              alf_covariance[class_idx].ee[b0][1][k][l] += data[1];
-              alf_covariance[class_idx].ee[b0][2][k][l] += data[2];
-              alf_covariance[class_idx].ee[b0][3][k][l] += data[3];
-            }
+            alf_covariance[class_idx].ee[b0][0][k][l] += data[0];
+            alf_covariance[class_idx].ee[b0][1][k][l] += data[1];
+            alf_covariance[class_idx].ee[b0][2][k][l] += data[2];
+            alf_covariance[class_idx].ee[b0][3][k][l] += data[3];
+            
           }
         }
-        //for (int b = 0; b < 4; b++)
+        /*
+        for (int b = 0; b < 4; b++)
         {
-          __m128i e_local_1 = _mm_loadl_epi64((__m128i*) & e_local[k][0]);
-          __m128i e_local_32 = _mm_cvtepi16_epi32(e_local_1);
-          __m256d e_local_b1_d = _mm256_cvtepi32_pd(e_local_32);
-
-          __m256d multiplied = _mm256_mul_pd(y_local_d, e_local_b1_d);
-
-          __m128i output = _mm256_cvtpd_epi32(multiplied);
-
-          int32_t data[4];
-          _mm_storeu_si128((__m128i*)data, output);
-          //alf_covariance[class_idx].y[b][k] += e_local[k][b] * (double)y_local;
-          alf_covariance[class_idx].y[0][k] += data[0];
-          alf_covariance[class_idx].y[1][k] += data[1];
-          alf_covariance[class_idx].y[2][k] += data[2];
-          alf_covariance[class_idx].y[3][k] += data[3];
-        }
+          alf_covariance[class_idx].y[b][k] += e_local[k][b] * (double)y_local;
+        }*/
+        
+        __m128i e_local_1 = _mm_loadl_epi64((__m128i*) & e_local[k][0]);
+        __m256i e_local_32 = _mm256_cvtepi16_epi64(e_local_1);
+        __m256i multiplied = _mm256_mul_epi32(y_local_32, e_local_32);          
+        //__m256i output = _mm256_permutevar8x32_epi32(multiplied, perm_mask);
+          
+        int64_t data[4];
+        _mm256_storeu_si256((__m256i*)data, multiplied);
+          
+        alf_covariance[class_idx].y[0][k] += data[0];
+        alf_covariance[class_idx].y[1][k] += data[1];
+        alf_covariance[class_idx].y[2][k] += data[2];
+        alf_covariance[class_idx].y[3][k] += data[3];
       }
       alf_covariance[class_idx].pix_acc += y_local * (double)y_local;
     }
