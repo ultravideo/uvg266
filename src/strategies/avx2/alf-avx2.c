@@ -240,7 +240,7 @@ static void alf_get_blk_stats_avx2(encoder_state_t* const state,
             __m128i e_local_1 = _mm_loadl_epi64((__m128i*) & e_local[l][0]);
             __m256i e_local_32 = _mm256_cvtepi16_epi64(e_local_1);
             __m256i multiplied = _mm256_mul_epi32(e_local_b0_d, e_local_32);
-            __m256i orig = _mm256_lddqu_si256((__m256i*)alf_covariance[class_idx].ee[k][l][b0]);
+            __m256i orig = _mm256_loadu_si256((__m256i*)alf_covariance[class_idx].ee[k][l][b0]);
             _mm256_storeu_si256((__m256i*)alf_covariance[class_idx].ee[k][l][b0], _mm256_add_epi64(multiplied, orig));
            
           }
@@ -248,21 +248,14 @@ static void alf_get_blk_stats_avx2(encoder_state_t* const state,
         /*
         for (int b = 0; b < 4; b++)
         {
-          alf_covariance[class_idx].y[b][k] += e_local[k][b] * (double)y_local;
+          alf_covariance[class_idx].y[k][b] += e_local[k][b] * (double)y_local;
         }*/
         
         __m128i e_local_1 = _mm_loadl_epi64((__m128i*) & e_local[k][0]);
         __m256i e_local_32 = _mm256_cvtepi16_epi64(e_local_1);
-        __m256i multiplied = _mm256_mul_epi32(y_local_32, e_local_32);          
-        //__m256i output = _mm256_permutevar8x32_epi32(multiplied, perm_mask);
-          
-        int64_t data[4];
-        _mm256_storeu_si256((__m256i*)data, multiplied);
-          
-        alf_covariance[class_idx].y[0][k] += data[0];
-        alf_covariance[class_idx].y[1][k] += data[1];
-        alf_covariance[class_idx].y[2][k] += data[2];
-        alf_covariance[class_idx].y[3][k] += data[3];
+        __m256i multiplied = _mm256_mullo_epi32(y_local_32, e_local_32);
+        __m128i orig = _mm_loadu_si128((__m128i*) &alf_covariance[class_idx].y[k][0]);
+        _mm_store_si128((__m128i*)alf_covariance[class_idx].y[k], _mm_add_epi32(_mm256_castsi256_si128(multiplied),orig));
       }
       alf_covariance[class_idx].pix_acc += y_local * (double)y_local;
     }

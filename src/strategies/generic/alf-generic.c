@@ -946,11 +946,11 @@ static void alf_get_blk_stats_generic(encoder_state_t* const state,
         {
           if (0/*m_alfWSSD*/)
           {
-            alf_covariance[class_idx].y[b][k] += weight * (e_local[k][b] * (double)y_local);
+            alf_covariance[class_idx].y[k][b] += weight * (e_local[k][b] * (double)y_local);
           }
           else
           {
-            alf_covariance[class_idx].y[b][k] += e_local[k][b] * (double)y_local;
+            alf_covariance[class_idx].y[k][b] += e_local[k][b] * (double)y_local;
           }
         }
       }
