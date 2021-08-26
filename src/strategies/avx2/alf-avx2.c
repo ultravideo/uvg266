@@ -255,7 +255,7 @@ static void alf_get_blk_stats_avx2(encoder_state_t* const state,
         __m256i e_local_32 = _mm256_cvtepi16_epi64(e_local_1);
         __m256i multiplied = _mm256_mullo_epi32(y_local_32, e_local_32);
         __m128i orig = _mm_loadu_si128((__m128i*) &alf_covariance[class_idx].y[k][0]);
-        _mm_store_si128((__m128i*)alf_covariance[class_idx].y[k], _mm_add_epi32(_mm256_castsi256_si128(multiplied),orig));
+        _mm_storeu_si128((__m128i*)alf_covariance[class_idx].y[k], _mm_add_epi32(_mm256_castsi256_si128(multiplied),orig));
       }
       alf_covariance[class_idx].pix_acc += y_local * (double)y_local;
     }
