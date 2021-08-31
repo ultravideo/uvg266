@@ -1065,6 +1065,10 @@ void kvz_search_cu_intra(encoder_state_t * const state,
     // Copy rough results for other reference lines
     for (int line = 1; line < MAX_REF_LINE_IDX; ++line) {
       number_of_modes[line] = number_of_modes[0];
+      for (int i = 0; i < number_of_modes[line]; ++i) {
+        modes[line][i] = modes[0][i];
+        costs[line][i] = costs[0][i];
+      }
     }
   } else {
     for(int line = 0; line < MAX_REF_LINE_IDX; ++line) {
@@ -1077,8 +1081,8 @@ void kvz_search_cu_intra(encoder_state_t * const state,
   }
 
   uint8_t lines = 1;
-  // Find modes with multiple reference lines if in use
-  if (state->encoder_control->cfg.mrl) {
+  // Find modes with multiple reference lines if in use. Do not use if CU in first row.
+  if (state->encoder_control->cfg.mrl && (y_px % LCU_WIDTH) != 0) {
     lines = MAX_REF_LINE_IDX;
   }
 
