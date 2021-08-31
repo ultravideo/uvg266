@@ -859,7 +859,7 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
   int multi_ref_idx = cur_cu->intra.multi_ref_idx;
   bool enable_mrl = state->encoder_control->cfg.mrl;
 
-  if (cur_cu->type == 1/*intra*/ && (y % LCU_WIDTH) != 0 && !cur_cu->bdpcmMode && enable_mrl) {
+  if (cur_cu->type == CU_INTRA && (y % LCU_WIDTH) != 0 && !cur_cu->bdpcmMode && enable_mrl) {
     if (MAX_REF_LINE_IDX > 1) {
       cabac->cur_ctx = &(cabac->ctx.multi_ref_line[0]);
       CABAC_BIN(cabac, multi_ref_idx != 0, "multi_ref_line");
@@ -930,7 +930,7 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
     }
     // Is the mode in the MPM array or not
     flag[j] = (mpm_preds[j] == -1) ? 0 : 1;
-    if (true||!(cur_pu->intra.multi_ref_idx || (isp_mode))) {
+    if (!(cur_pu->intra.multi_ref_idx || (isp_mode))) {
       CABAC_BIN(cabac, flag[j], "prev_intra_luma_pred_flag");
     }
   }
