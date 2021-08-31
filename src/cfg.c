@@ -1483,7 +1483,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     return success;
   }
   else if OPT("mrl") {
-    cfg->mrl = true;
+    cfg->mrl = atobool(value);
   }
   else if OPT("jccr") {
     cfg->jccr = (bool)atobool(value);
