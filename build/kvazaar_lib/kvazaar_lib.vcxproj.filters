@@ -254,6 +254,18 @@
       <Filter>Reconstruction</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\strategies\strategies-encode.c" />
+    <ClCompile Include="..\..\src\strategies\generic\alf-generic.c">
+      <Filter>Optimization\strategies\generic</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\strategies\strategies-alf.c">
+      <Filter>Optimization\strategies</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\strategies\sse41\alf-sse41.c">
+      <Filter>Optimization\strategies\sse41</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\strategies\avx2\alf-avx2.c">
+      <Filter>Optimization\strategies\avx2</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\bitstream.h">
@@ -472,6 +484,18 @@
     </ClInclude>
     <ClInclude Include="..\..\src\alf.h">
       <Filter>Reconstruction</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\strategies\generic\alf-generic.h">
+      <Filter>Optimization\strategies\generic</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\strategies\strategies-alf.h">
+      <Filter>Optimization\strategies</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\strategies\sse41\alf-sse41.h">
+      <Filter>Optimization\strategies\sse41</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\strategies\avx2\alf-avx2.h">
+      <Filter>Optimization\strategies\avx2</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

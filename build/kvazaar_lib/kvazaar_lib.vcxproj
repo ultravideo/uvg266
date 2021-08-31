@@ -170,6 +170,12 @@
     <ClCompile Include="..\..\src\search.c" />
     <ClCompile Include="..\..\src\search_inter.c" />
     <ClCompile Include="..\..\src\search_intra.c" />
+    <ClCompile Include="..\..\src\strategies\avx2\alf-avx2.c">
+      <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
+      <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
+      <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
+      <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Release|x64'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
+    </ClCompile>
     <ClCompile Include="..\..\src\strategies\avx2\intra-avx2.c">
       <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
       <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
@@ -188,10 +194,13 @@
       <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
       <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Release|x64'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
     </ClCompile>
+    <ClCompile Include="..\..\src\strategies\generic\alf-generic.c" />
     <ClCompile Include="..\..\src\strategies\generic\encode_coding_tree-generic.c" />
     <ClCompile Include="..\..\src\strategies\generic\intra-generic.c" />
     <ClCompile Include="..\..\src\strategies\generic\quant-generic.c" />
     <ClCompile Include="..\..\src\strategies\generic\sao-generic.c" />
+    <ClCompile Include="..\..\src\strategies\sse41\alf-sse41.c" />
+    <ClCompile Include="..\..\src\strategies\strategies-alf.c" />
     <ClCompile Include="..\..\src\strategies\strategies-encode.c" />
     <ClCompile Include="..\..\src\strategies\strategies-intra.c" />
     <ClCompile Include="..\..\src\strategies\strategies-quant.c" />
@@ -261,11 +270,15 @@
     <ClInclude Include="..\..\src\ml_intra_cu_depth_pred.h" />
     <ClInclude Include="..\..\src\search_inter.h" />
     <ClInclude Include="..\..\src\search_intra.h" />
+    <ClInclude Include="..\..\src\strategies\avx2\alf-avx2.h" />
     <ClInclude Include="..\..\src\strategies\avx2\intra-avx2.h" />
     <ClInclude Include="..\..\src\strategies\avx2\sao-avx2.h" />
+    <ClInclude Include="..\..\src\strategies\generic\alf-generic.h" />
     <ClInclude Include="..\..\src\strategies\generic\encode_coding_tree-generic.h" />
     <ClInclude Include="..\..\src\strategies\generic\intra-generic.h" />
     <ClInclude Include="..\..\src\strategies\generic\sao-generic.h" />
+    <ClInclude Include="..\..\src\strategies\sse41\alf-sse41.h" />
+    <ClInclude Include="..\..\src\strategies\strategies-alf.h" />
     <ClInclude Include="..\..\src\strategies\strategies-common.h" />
     <ClInclude Include="..\..\src\strategies\avx2\quant-avx2.h" />
     <ClInclude Include="..\..\src\strategies\generic\quant-generic.h" />
