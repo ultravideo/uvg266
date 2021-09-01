@@ -72,7 +72,7 @@ void kvz_nal_write(bitstream_t * const bitstream, const uint8_t nal_type,
   // ToDo: Match with the actual bits
   printf("%-50s u(%d) : %d\n", "zero_tid_required_flag", 1, zero_tid_required_flag);
   printf("%-50s u(%d) : %d\n", "nuh_temporal_id_plus1", 3, temporal_id + 1);
-  printf("%-50s u(%d) : %d\n", "nal_unit_type_lsb", 4, nal_type_lsb);
+  printf("%-50s u(%d) : %d\n", "nal_unit_type_lsb", 4, nal_type);
   printf("%-50s u(%d) : %d\n", "nuh_layer_id_plus1", 7, 0);
   printf("%-50s u(%d) : %d\n", "nuh_reserved_zero_bit", 1, 0);
 #endif
