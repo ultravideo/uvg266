@@ -286,8 +286,9 @@ void kvz_intra_predict(
   }
 
   // pdpc
-  //bool pdpcCondition = (mode == 0 || mode == 1 || mode == 18 || mode == 50);
-  //if (pdpcCondition)
+  // bool pdpcCondition = (mode == 0 || mode == 1 || mode == 18 || mode == 50);
+  bool pdpcCondition = (mode == 0 || mode == 1); // Planar and DC
+  if (pdpcCondition)
   {
     kvz_pdpc_planar_dc(mode, width, log2_width, used_ref, dst);
   }

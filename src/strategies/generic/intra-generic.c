@@ -456,7 +456,7 @@ static void kvz_intra_pred_filtered_dc_generic(
   }
 }
 
-// TODO: update all ranges from HEVC to VVC
+// TODO: update all ranges (in comments, etc.) from HEVC to VVC
 
 /**
 * \brief Position Dependent Prediction Combination for Planar and DC modes.
@@ -472,18 +472,18 @@ static void kvz_pdpc_planar_dc_generic(
   const kvz_intra_ref *const used_ref,
   kvz_pixel *const dst)
 {
+  assert(mode == 0 || mode == 1);  // planar or DC
+
   // TODO: replace latter log2_width with log2_height
   const int scale = ((log2_width - 2 + log2_width - 2 + 2) >> 2);
 
-  if (mode == 0 || mode == 1) {  // planar or DC
-    // TODO: replace width with height
-    for (int y = 0; y < width; y++) {
-      int wT = 32 >> MIN(31, ((y << 1) >> scale));
-      for (int x = 0; x < width; x++) {
-        int wL = 32 >> MIN(31, ((x << 1) >> scale));
-        dst[x + y * width] = dst[x + y * width] + ((wL * (used_ref->left[y + 1] - dst[x + y * width])
-          + wT * (used_ref->top[x + 1] - dst[x + y * width]) + 32) >> 6);
-      }
+  // TODO: replace width with height
+  for (int y = 0; y < width; y++) {
+    int wT = 32 >> MIN(31, ((y << 1) >> scale));
+    for (int x = 0; x < width; x++) {
+      int wL = 32 >> MIN(31, ((x << 1) >> scale));
+      dst[x + y * width] = dst[x + y * width] + ((wL * (used_ref->left[y + 1] - dst[x + y * width])
+        + wT * (used_ref->top[x + 1] - dst[x + y * width]) + 32) >> 6);
     }
   }
 }
