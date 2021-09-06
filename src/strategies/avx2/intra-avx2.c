@@ -976,13 +976,25 @@ static void kvz_pdpc_planar_dc_avx2(
   // TODO: replace latter log2_width with log2_height
   const int scale = ((log2_width - 2 + log2_width - 2 + 2) >> 2);
 
+  int16_t wLT[LCU_WIDTH];
+
+  // Same weights regardless of axis, compute once
+  for (int i = 0; i < width; ++i) {
+    wLT[i] = 32 >> MIN(31, ((i << 1) >> scale));
+  }
+
+  // Process in 4x4 blocks
   // TODO: replace width with height
-  for (int y = 0; y < width; y++) {
-    int wT = 32 >> MIN(31, ((y << 1) >> scale));
-    for (int x = 0; x < width; x++) {
-      int wL = 32 >> MIN(31, ((x << 1) >> scale));
-      dst[x + y * width] = dst[x + y * width] + ((wL * (used_ref->left[y + 1] - dst[x + y * width])
-        + wT * (used_ref->top[x + 1] - dst[x + y * width]) + 32) >> 6);
+  for (int y = 0; y < width; y += 4) {
+    for (int x = 0; x < width; x += 4) {
+      for (int yy = 0; yy < 4; ++yy) {
+        for (int xx = 0; xx < 4; ++xx) {
+          dst[(x + xx) + (y + yy) * width] += ((
+            wLT[(x + xx)] * (used_ref->left[(y + yy) + 1] - dst[(x + xx) + (y + yy) * width]) +
+            wLT[(y + yy)] * (used_ref->top [(x + xx) + 1] - dst[(x + xx) + (y + yy) * width]) +
+            32) >> 6);
+        }
+      }
     }
   }
 }
