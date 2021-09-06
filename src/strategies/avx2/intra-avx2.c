@@ -955,6 +955,38 @@ static void kvz_intra_pred_filtered_dc_avx2(
   }
 }
 
+// TODO: update all ranges (in comments, etc.) from HEVC to VVC
+
+/**
+* \brief Position Dependent Prediction Combination for Planar and DC modes.
+* \param log2_width    Log2 of width, range 2..5.
+* \param width         Block width matching log2_width.
+* \param used_ref      Pointer used reference pixel struct.
+* \param dst           Buffer of size width*width.
+*/
+static void kvz_pdpc_planar_dc_avx2(
+  const int mode,
+  const int width,
+  const int log2_width,
+  const kvz_intra_ref *const used_ref,
+  kvz_pixel *const dst)
+{
+  assert(mode == 0 || mode == 1);  // planar or DC
+
+  // TODO: replace latter log2_width with log2_height
+  const int scale = ((log2_width - 2 + log2_width - 2 + 2) >> 2);
+
+  // TODO: replace width with height
+  for (int y = 0; y < width; y++) {
+    int wT = 32 >> MIN(31, ((y << 1) >> scale));
+    for (int x = 0; x < width; x++) {
+      int wL = 32 >> MIN(31, ((x << 1) >> scale));
+      dst[x + y * width] = dst[x + y * width] + ((wL * (used_ref->left[y + 1] - dst[x + y * width])
+        + wT * (used_ref->top[x + 1] - dst[x + y * width]) + 32) >> 6);
+    }
+  }
+}
+
 #endif //KVZ_BIT_DEPTH == 8
 #endif //COMPILE_INTEL_AVX2 && defined X86_64
 
@@ -967,6 +999,7 @@ int kvz_strategy_register_intra_avx2(void* opaque, uint8_t bitdepth)
     success &= kvz_strategyselector_register(opaque, "angular_pred", "avx2", 40, &kvz_angular_pred_avx2);
     success &= kvz_strategyselector_register(opaque, "intra_pred_planar", "avx2", 40, &kvz_intra_pred_planar_avx2);
     success &= kvz_strategyselector_register(opaque, "intra_pred_filtered_dc", "avx2", 40, &kvz_intra_pred_filtered_dc_avx2);
+    success &= kvz_strategyselector_register(opaque, "pdpc_planar_dc", "avx2", 40, &kvz_pdpc_planar_dc_avx2);
   }
 #endif //KVZ_BIT_DEPTH == 8
 #endif //COMPILE_INTEL_AVX2 && defined X86_64
