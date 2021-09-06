@@ -364,17 +364,17 @@ static INLINE unsigned kvz_math_floor_log2(unsigned value)
  *
  */
 void kvz_quant_avx2(const encoder_state_t * const state, const coeff_t * __restrict coef, coeff_t * __restrict q_coef, int32_t width,
-  int32_t height, int8_t type, int8_t scan_idx, int8_t block_type, int8_t transform_skip)
+  int32_t height, color_t color, int8_t scan_idx, int8_t block_type, int8_t transform_skip)
 {
   const encoder_control_t * const encoder = state->encoder_control;
   const uint32_t log2_block_size = kvz_g_convert_to_bit[width] + 2;
   const uint32_t * const scan = kvz_g_sig_last_scan[scan_idx][log2_block_size - 1];
 
-  int32_t qp_scaled = kvz_get_scaled_qp(type, state->qp, (encoder->bitdepth - 8) * 6, encoder->qp_map[0]);
+  int32_t qp_scaled = kvz_get_scaled_qp(color, state->qp, (encoder->bitdepth - 8) * 6, encoder->qp_map[0]);
   qp_scaled = transform_skip ? MAX(qp_scaled, 4 + 6 * MIN_QP_PRIME_TS) : qp_scaled;
   uint32_t log2_tr_width = kvz_math_floor_log2(height);
   uint32_t log2_tr_height = kvz_math_floor_log2(width);
-  const int32_t scalinglist_type = (block_type == CU_INTRA ? 0 : 3) + (int8_t)("\0\3\1\2"[type]);
+  const int32_t scalinglist_type = (block_type == CU_INTRA ? 0 : 3) + (int8_t)("\0\3\1\2"[color]);
   const int32_t *quant_coeff = encoder->scaling_list.quant_coeff[log2_tr_width][log2_tr_height][scalinglist_type][qp_scaled % 6];
   const int32_t transform_shift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - ((log2_tr_width + log2_tr_height) >> 1); //!< Represents scaling through forward transform
   const int32_t q_bits = QUANT_SHIFT + qp_scaled / 6 + (transform_skip ? 0 : transform_shift);
@@ -721,7 +721,7 @@ int kvz_quantize_residual_avx2(encoder_state_t *const state,
   if (has_coeffs && !early_skip) {
 
     // Get quantized residual. (coeff_out -> coeff -> residual)
-    kvz_dequant(state, coeff_out, coeff, width, width, (color == COLOR_Y ? 0 : (color == COLOR_U ? 2 : 3)),
+    kvz_dequant(state, coeff_out, coeff, width, width, color,
       cur_cu->type, cur_cu->tr_idx == MTS_SKIP && color == COLOR_Y);
     if (use_trskip) {
       kvz_itransformskip(state->encoder_control, residual, coeff, width);
@@ -771,7 +771,7 @@ int kvz_quantize_residual_avx2(encoder_state_t *const state,
  * \brief inverse quantize transformed and quantized coefficents
  *
  */
-void kvz_dequant_avx2(const encoder_state_t * const state, coeff_t *q_coef, coeff_t *coef, int32_t width, int32_t height,int8_t type, int8_t block_type, int8_t transform_skip)
+void kvz_dequant_avx2(const encoder_state_t * const state, coeff_t *q_coef, coeff_t *coef, int32_t width, int32_t height,color_t color, int8_t block_type, int8_t transform_skip)
 {
   const encoder_control_t * const encoder = state->encoder_control;
   int32_t shift,add,coeff_q;
@@ -779,7 +779,7 @@ void kvz_dequant_avx2(const encoder_state_t * const state, coeff_t *q_coef, coef
   int32_t transform_shift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - ((kvz_math_floor_log2(width) + kvz_math_floor_log2(height)) >> 1); // Represents scaling through forward transform
 
 
-  int32_t qp_scaled = kvz_get_scaled_qp(type, state->qp, (encoder->bitdepth-8)*6, encoder->qp_map[0]);
+  int32_t qp_scaled = kvz_get_scaled_qp(color, state->qp, (encoder->bitdepth-8)*6, encoder->qp_map[0]);
   qp_scaled = transform_skip ? MAX(qp_scaled, 4 + 6 * MIN_QP_PRIME_TS) : qp_scaled;
 
   shift = 20 - QUANT_SHIFT - (transform_skip ? 0 : transform_shift);
@@ -788,7 +788,7 @@ void kvz_dequant_avx2(const encoder_state_t * const state, coeff_t *q_coef, coef
   {
     uint32_t log2_tr_width = kvz_math_floor_log2(height) + 2;
     uint32_t log2_tr_height = kvz_math_floor_log2(width) + 2;
-    int32_t scalinglist_type = (block_type == CU_INTRA ? 0 : 3) + (int8_t)("\0\3\1\2"[type]);
+    int32_t scalinglist_type = (block_type == CU_INTRA ? 0 : 3) + (int8_t)(color);
 
     const int32_t* dequant_coef = encoder->scaling_list.de_quant_coeff[log2_tr_width - 2][log2_tr_height - 2][scalinglist_type][qp_scaled % 6];
     shift += 4;

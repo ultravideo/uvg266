@@ -38,17 +38,17 @@
 *
 */
 void kvz_quant_generic(const encoder_state_t * const state, coeff_t *coef, coeff_t *q_coef, int32_t width,
-  int32_t height, int8_t type, int8_t scan_idx, int8_t block_type, int8_t transform_skip)
+  int32_t height, color_t color, int8_t scan_idx, int8_t block_type, int8_t transform_skip)
 {
   const encoder_control_t * const encoder = state->encoder_control;
   const uint32_t log2_block_size = kvz_g_convert_to_bit[width] + 2;
   const uint32_t * const scan = kvz_g_sig_last_scan[scan_idx][log2_block_size - 1];
 
-  int32_t qp_scaled = kvz_get_scaled_qp(type, state->qp, (encoder->bitdepth - 8) * 6, encoder->qp_map[0]);
+  int32_t qp_scaled = kvz_get_scaled_qp(color, state->qp, (encoder->bitdepth - 8) * 6, encoder->qp_map[0]);
   qp_scaled = transform_skip ? MAX(qp_scaled, 4 + 6 * MIN_QP_PRIME_TS) : qp_scaled;
   uint32_t log2_tr_width = kvz_math_floor_log2(height);
   uint32_t log2_tr_height = kvz_math_floor_log2(width);
-  const int32_t scalinglist_type = (block_type == CU_INTRA ? 0 : 3) + (int8_t)("\0\3\1\2"[type]);
+  const int32_t scalinglist_type = (block_type == CU_INTRA ? 0 : 3) + (int8_t)("\0\3\1\2"[color]);
   const int32_t *quant_coeff = encoder->scaling_list.quant_coeff[log2_tr_width][log2_tr_height][scalinglist_type][qp_scaled % 6];
   const int32_t transform_shift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - ((log2_tr_height + log2_tr_width) >> 1); //!< Represents scaling through forward transform
   const int32_t q_bits = QUANT_SHIFT + qp_scaled / 6 + (transform_skip ? 0 : transform_shift);
@@ -172,6 +172,214 @@ void kvz_quant_generic(const encoder_state_t * const state, coeff_t *coef, coeff
   }
 }
 
+static INLINE int64_t square(int x) {
+  return x * (int64_t)x;
+}
+
+
+int kvz_quant_cbcr_residual_generic(
+  encoder_state_t* const state, 
+  const cu_info_t* const cur_cu,
+  const int width,
+  const coeff_scan_order_t scan_order,
+  const int in_stride, const int out_stride,
+  const kvz_pixel* const u_ref_in, 
+  const kvz_pixel* const v_ref_in, 
+  const kvz_pixel* const u_pred_in,
+  const kvz_pixel* const v_pred_in,
+  kvz_pixel* u_rec_out,
+  kvz_pixel* v_rec_out,
+  coeff_t* coeff_out,
+  bool early_skip, 
+  int lmcs_chroma_adj
+  ) {
+  ALIGNED(64) int16_t u_residual[TR_MAX_WIDTH * TR_MAX_WIDTH];
+  ALIGNED(64) int16_t v_residual[TR_MAX_WIDTH * TR_MAX_WIDTH];
+  ALIGNED(64) int16_t u1_residual[2][TR_MAX_WIDTH * TR_MAX_WIDTH];
+  ALIGNED(64) int16_t v1_residual[TR_MAX_WIDTH * TR_MAX_WIDTH];
+  ALIGNED(64) coeff_t coeff[TR_MAX_WIDTH * TR_MAX_WIDTH];
+
+  {
+    int y, x;
+    for (y = 0; y < width; ++y) {
+      for (x = 0; x < width; ++x) {
+        u_residual[x + y * width] = (int16_t)(u_ref_in[x + y * in_stride] - u_pred_in[x + y * in_stride]);
+        v_residual[x + y * width] = (int16_t)(v_ref_in[x + y * in_stride] - v_pred_in[x + y * in_stride]);
+      }
+    }
+  }
+
+  int best_cbf_mask = -1;
+  int64_t best_cost = INT64_MAX;
+
+  // This changes the order of the cbf_masks so 2 and 3 are swapped compared with VTM
+  for(int cbf_mask = cur_cu->type == CU_INTRA ? 1 : 3; cbf_mask < 4; cbf_mask++) {
+    int64_t d1 = 0;
+    for (int y = 0; y < width; y++)
+    {
+      for (int x = 0; x < width; x++)
+      {
+        int cbx = u_residual[x + y * width], crx = v_residual[x + y * width];
+        if (cbf_mask == 1)
+        {
+          u1_residual[cbf_mask / 2][x + y * width] = ((4 * cbx + 2 * crx) / 5);
+          d1 += square(cbx - u1_residual[cbf_mask / 2][x + y * width]) + square(crx - (u1_residual[cbf_mask / 2][x + y * width] >> 1));
+        }
+        else if (cbf_mask == -1)
+        {
+          u1_residual[cbf_mask / 2][x + y * width] = ((4 * cbx - 2 * crx) / 5);
+          d1 += square(cbx - u1_residual[cbf_mask / 2][x + y * width]) + square(crx - (-u1_residual[cbf_mask / 2][x + y * width] >> 1));
+        }
+        else if (cbf_mask == 3)
+        {
+          u1_residual[cbf_mask / 2][x + y * width] = ((cbx + crx) / 2);
+          d1 += square(cbx - u1_residual[cbf_mask / 2][x + y * width]) + square(crx - u1_residual[cbf_mask / 2][x + y * width]);
+        }
+        else if (cbf_mask == -3)
+        {
+          u1_residual[cbf_mask / 2][x + y * width] = ((cbx - crx) / 2);
+          d1 += square(cbx - u1_residual[cbf_mask / 2][x + y * width]) + square(crx + u1_residual[cbf_mask / 2][x + y * width]);
+        }
+        else if (cbf_mask == 2)
+        {
+          v1_residual[x + y * width] = ((4 * crx + 2 * cbx) / 5);
+          d1 += square(cbx - (v1_residual[x + y * width] >> 1)) + square(crx - v1_residual[x + y * width]);
+        }
+        else if (cbf_mask == -2)
+        {
+          v1_residual[x + y * width] = ((4 * crx - 2 * cbx) / 5);
+          d1 += square(cbx - (-v1_residual[x + y * width] >> 1)) + square(crx - v1_residual[x + y * width]);
+        }
+        else
+        {
+          d1 += square(cbx);
+          //d2 += square(crx);
+        }
+      }
+    }
+    if (d1 < best_cost) {
+      best_cbf_mask = cbf_mask;
+      best_cost = d1;
+    }
+  }
+
+  kvz_transform2d(state->encoder_control, best_cbf_mask == 2 ? v1_residual : u1_residual[best_cbf_mask / 2], coeff, width, best_cbf_mask == 2 ? COLOR_V : COLOR_U, cur_cu);
+
+  if (state->encoder_control->cfg.rdoq_enable &&
+    (width > 4 || !state->encoder_control->cfg.rdoq_skip))
+  {
+    int8_t tr_depth = cur_cu->tr_depth - cur_cu->depth;
+    tr_depth += (cur_cu->part_size == SIZE_NxN ? 1 : 0);
+    kvz_rdoq(state, coeff, coeff_out, width, width, best_cbf_mask == 2 ? COLOR_V : COLOR_U,
+      scan_order, cur_cu->type, tr_depth, cur_cu->cbf);
+  }
+  else if (state->encoder_control->cfg.rdoq_enable && false) {
+    kvz_ts_rdoq(state, coeff, coeff_out, width, width, best_cbf_mask == 2 ? COLOR_V : COLOR_U,
+      scan_order);
+  }
+  else {
+    kvz_quant(state, coeff, coeff_out, width, width, best_cbf_mask == 2 ? COLOR_V : COLOR_U,
+      scan_order, cur_cu->type, cur_cu->tr_idx == MTS_SKIP && false);
+  }
+
+  int8_t has_coeffs = 0;
+  {
+    int i;
+    for (i = 0; i < width * width; ++i) {
+      if (coeff_out[i] != 0) {
+        has_coeffs = 1;
+        break;
+      }
+    }
+  }
+
+  if (has_coeffs && !early_skip) {
+    int y, x;
+
+    // Get quantized residual. (coeff_out -> coeff -> residual)
+    kvz_dequant(state, coeff_out, coeff, width, width, best_cbf_mask == 2 ? COLOR_V : COLOR_U,
+      cur_cu->type, cur_cu->tr_idx == MTS_SKIP && false);
+    
+    kvz_itransform2d(state->encoder_control, best_cbf_mask == 2 ? v1_residual : u1_residual[best_cbf_mask / 2], coeff, width, best_cbf_mask == 2 ? COLOR_V : COLOR_U, cur_cu);
+    
+
+    //if (state->tile->frame->lmcs_aps->m_sliceReshapeInfo.enableChromaAdj && color != COLOR_Y) {
+    //  int y, x;
+    //  int sign, absval;
+    //  int maxAbsclipBD = (1 << KVZ_BIT_DEPTH) - 1;
+    //  for (y = 0; y < width; ++y) {
+    //    for (x = 0; x < width; ++x) {
+    //      residual[x + y * width] = (int16_t)CLIP((int16_t)(-maxAbsclipBD - 1), (int16_t)maxAbsclipBD, residual[x + y * width]);
+    //      sign = residual[x + y * width] >= 0 ? 1 : -1;
+    //      absval = sign * residual[x + y * width];
+    //      int val = sign * ((absval * lmcs_chroma_adj + (1 << (CSCALE_FP_PREC - 1))) >> CSCALE_FP_PREC);
+    //      if (sizeof(kvz_pixel) == 2) // avoid overflow when storing data
+    //      {
+    //        val = CLIP(-32768, 32767, val);
+    //      }
+    //      residual[x + y * width] = (int16_t)val;
+    //    }
+    //  }
+    //}
+
+    // Get quantized reconstruction. (residual + pred_in -> rec_out)
+    for (int y = 0; y < width; y++) {
+      for (int x = 0; x < width; x++) {
+        if (best_cbf_mask == 1) {
+          u_residual[x + y * width] = u1_residual[best_cbf_mask / 2][x + y * width];
+          v_residual[x + y * width] = u1_residual[best_cbf_mask / 2][x + y * width] >> 1;
+        }
+        else if (best_cbf_mask == -1) {
+          u_residual[x + y * width] = u1_residual[best_cbf_mask / 2][x + y * width];
+          v_residual[x + y * width] = -u1_residual[best_cbf_mask / 2][x + y * width] >> 1;
+        }
+        else if (best_cbf_mask == 3) {
+          u_residual[x + y * width] = u1_residual[best_cbf_mask / 2][x + y * width];
+          v_residual[x + y * width] = u1_residual[best_cbf_mask / 2][x + y * width];
+        }
+        else if (best_cbf_mask == -3) {
+          // non-normative clipping to prevent 16-bit overflow
+          u_residual[x + y * width] = u1_residual[best_cbf_mask / 2][x + y * width]; // == -32768 && sizeof(Pel) == 2) ? 32767 : -v1_residual[best_cbf_mask][x];
+          v_residual[x + y * width] = -u1_residual[best_cbf_mask / 2][x + y * width];
+        }
+        else if (best_cbf_mask == 2) {
+          u_residual[x + y * width] = v1_residual[x + y * width] >> 1;
+          v_residual[x + y * width] = v1_residual[x + y * width];
+        }
+        else if (best_cbf_mask == -2) {
+          u_residual[x + y * width] = v1_residual[x + y * width] >> 1;
+          v_residual[x + y * width] = -v1_residual[x + y * width];
+        }
+      }
+    }
+    for (y = 0; y < width; ++y) {
+      for (x = 0; x < width; ++x) {
+        int16_t u_val = u_residual[x + y * width] + u_pred_in[x + y * in_stride];
+        u_rec_out[x + y * out_stride] = (kvz_pixel)CLIP(0, PIXEL_MAX, u_val);
+        int16_t v_val = v_residual[x + y * width] + v_pred_in[x + y * in_stride];
+        v_rec_out[x + y * out_stride] = (kvz_pixel)CLIP(0, PIXEL_MAX, v_val);
+      }
+    }
+  }
+  else/* if (rec_out != pred_in)*/ {
+    // With no coeffs and rec_out == pred_int we skip copying the coefficients
+    // because the reconstruction is just the prediction.
+    int y, x;
+
+    for (y = 0; y < width; ++y) {
+      for (x = 0; x < width; ++x) {
+        u_rec_out[x + y * out_stride] = u_pred_in[x + y * in_stride];
+        v_rec_out[x + y * out_stride] = v_pred_in[x + y * in_stride];
+      }
+    }
+  }
+
+
+
+
+  return has_coeffs ? best_cbf_mask : 0;
+}
+
 /**
 * \brief Quantize residual and get both the reconstruction and coeffs.
 *
@@ -271,7 +479,7 @@ int kvz_quantize_residual_generic(encoder_state_t *const state,
     int y, x;
 
     // Get quantized residual. (coeff_out -> coeff -> residual)
-    kvz_dequant(state, coeff_out, coeff, width, width, (color == COLOR_Y ? 0 : (color == COLOR_U ? 2 : 3)),
+    kvz_dequant(state, coeff_out, coeff, width, width, color,
       cur_cu->type, cur_cu->tr_idx == MTS_SKIP && color == COLOR_Y);
     if (use_trskip) {
       kvz_itransformskip(state->encoder_control, residual, coeff, width);
@@ -326,7 +534,7 @@ int kvz_quantize_residual_generic(encoder_state_t *const state,
  * \brief inverse quantize transformed and quantized coefficents
  *
  */
-void kvz_dequant_generic(const encoder_state_t * const state, coeff_t *q_coef, coeff_t *coef, int32_t width, int32_t height,int8_t type, int8_t block_type, int8_t transform_skip)
+void kvz_dequant_generic(const encoder_state_t * const state, coeff_t *q_coef, coeff_t *coef, int32_t width, int32_t height,color_t color, int8_t block_type, int8_t transform_skip)
 {
   const encoder_control_t * const encoder = state->encoder_control;
   int32_t shift,add,coeff_q;
@@ -334,7 +542,7 @@ void kvz_dequant_generic(const encoder_state_t * const state, coeff_t *q_coef, c
   int32_t transform_shift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - ((kvz_math_floor_log2(width) + kvz_math_floor_log2(height)) >> 1); // Represents scaling through forward transform
 
 
-  int32_t qp_scaled = kvz_get_scaled_qp(type, state->qp, (encoder->bitdepth-8)*6, encoder->qp_map[0]);
+  int32_t qp_scaled = kvz_get_scaled_qp(color, state->qp, (encoder->bitdepth-8)*6, encoder->qp_map[0]);
   qp_scaled = transform_skip ? MAX(qp_scaled, 4 + 6 * MIN_QP_PRIME_TS) : qp_scaled;
 
   shift = 20 - QUANT_SHIFT - (transform_skip ? 0 : transform_shift);
@@ -343,7 +551,7 @@ void kvz_dequant_generic(const encoder_state_t * const state, coeff_t *q_coef, c
   {
     uint32_t log2_tr_width = kvz_math_floor_log2(height) + 2;
     uint32_t log2_tr_height = kvz_math_floor_log2(width) + 2;
-    int32_t scalinglist_type = (block_type == CU_INTRA ? 0 : 3) + (int8_t)("\0\3\1\2"[type]);
+    int32_t scalinglist_type = (block_type == CU_INTRA ? 0 : 3) + (int8_t)(color);
 
     const int32_t *dequant_coef = encoder->scaling_list.de_quant_coeff[log2_tr_width -2][log2_tr_height -2][scalinglist_type][qp_scaled%6];
     shift += 4;
@@ -413,6 +621,7 @@ int kvz_strategy_register_quant_generic(void* opaque, uint8_t bitdepth)
   bool success = true;
 
   success &= kvz_strategyselector_register(opaque, "quant", "generic", 0, &kvz_quant_generic);
+  success &= kvz_strategyselector_register(opaque, "quant_cbcr_residual", "generic", 0, &kvz_quant_cbcr_residual_generic);
   success &= kvz_strategyselector_register(opaque, "quantize_residual", "generic", 0, &kvz_quantize_residual_generic);
   success &= kvz_strategyselector_register(opaque, "dequant", "generic", 0, &kvz_dequant_generic);
   success &= kvz_strategyselector_register(opaque, "coeff_abs_sum", "generic", 0, &coeff_abs_sum_generic);

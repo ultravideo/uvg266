@@ -603,19 +603,25 @@ static void intra_recon_tb_leaf(
 
   const int index = lcu_px.x + lcu_px.y * lcu_width;
   kvz_pixel *block = NULL;
+  kvz_pixel *block2 = NULL;
   switch (color) {
     case COLOR_Y:
       block = &lcu->rec.y[index];
       break;
     case COLOR_U:
       block = &lcu->rec.u[index];
+      block2 = &lcu->rec.joint_u[index];
       break;
     case COLOR_V:
       block = &lcu->rec.v[index];
+      block2 = &lcu->rec.joint_v[index];
       break;
   }
 
   kvz_pixels_blit(pred, block , width, width, width, lcu_width);
+  if(color != COLOR_Y && cfg->jccr) {
+    kvz_pixels_blit(pred, block2, width, width, width, lcu_width);
+  }
 }
 
 /**
@@ -683,7 +689,7 @@ void kvz_intra_recon_cu(
     }
   } else {
     const bool has_luma = mode_luma != -1;
-    const bool has_chroma = mode_chroma != -1 && x % 8 == 0 && y % 8 == 0;
+    const bool has_chroma = mode_chroma != -1 &&  (x % 8 == 0 && y % 8 == 0);
     // Process a leaf TU.
     if (has_luma) {
       intra_recon_tb_leaf(state, x, y, depth, mode_luma, lcu, COLOR_Y);

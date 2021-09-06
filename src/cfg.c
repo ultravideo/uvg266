@@ -180,10 +180,7 @@ int kvz_config_init(kvz_config *cfg)
   cfg->fastrd_sampling_on = 0;
   cfg->fastrd_accuracy_check_on = 0;
   cfg->fastrd_learning_outdir_fn = NULL;
-
-  int8_t in[] = { 17, 27, 32, 44 };
-  int8_t out[] = { 17, 29, 34, 41 };
-
+  
   cfg->chroma_scale_out[0][0] = cfg->chroma_scale_in[0][0] = 17;
   cfg->chroma_scale_out[0][1] = cfg->chroma_scale_in[0][1] = 27;
   cfg->chroma_scale_out[0][2] = cfg->chroma_scale_in[0][2] = 32;
@@ -194,6 +191,8 @@ int kvz_config_init(kvz_config *cfg)
 
 
   parse_qp_map(cfg, 0);
+
+  cfg->jccr = 0;
 
   return 1;
 }
@@ -1465,6 +1464,9 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     const bool success = parse_qp_scale_array(value, cfg->chroma_scale_out[0]);
     parse_qp_map(cfg, 0);
     return success;
+  }
+  else if OPT("jccr") {
+    cfg->jccr = (bool)atobool(value);
   }
   else {
     return 0;
