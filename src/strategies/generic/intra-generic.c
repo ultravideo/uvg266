@@ -22,6 +22,7 @@
 
 #include <stdlib.h>
 
+#include "intra.h"
 #include "kvazaar.h"
 #include "strategyselector.h"
 #include "kvz_math.h"
@@ -455,6 +456,38 @@ static void kvz_intra_pred_filtered_dc_generic(
   }
 }
 
+// TODO: update all ranges from HEVC to VVC
+
+/**
+* \brief Position Dependent Prediction Combination for Planar and DC modes.
+* \param log2_width    Log2 of width, range 2..5.
+* \param width         Block width matching log2_width.
+* \param used_ref      Pointer used reference pixel struct.
+* \param dst           Buffer of size width*width.
+*/
+static void kvz_pdpc_planar_dc_generic(
+  const int mode,
+  const int width,
+  const int log2_width,
+  const kvz_intra_ref *const used_ref,
+  kvz_pixel *const dst)
+{
+  // TODO: replace latter log2_width with log2_height
+  const int scale = ((log2_width - 2 + log2_width - 2 + 2) >> 2);
+
+  if (mode == 0 || mode == 1) {  // planar or DC
+    // TODO: replace width with height
+    for (int y = 0; y < width; y++) {
+      int wT = 32 >> MIN(31, ((y << 1) >> scale));
+      for (int x = 0; x < width; x++) {
+        int wL = 32 >> MIN(31, ((x << 1) >> scale));
+        dst[x + y * width] = dst[x + y * width] + ((wL * (used_ref->left[y + 1] - dst[x + y * width])
+          + wT * (used_ref->top[x + 1] - dst[x + y * width]) + 32) >> 6);
+      }
+    }
+  }
+}
+
 
 int kvz_strategy_register_intra_generic(void* opaque, uint8_t bitdepth)
 {
@@ -463,6 +496,7 @@ int kvz_strategy_register_intra_generic(void* opaque, uint8_t bitdepth)
   success &= kvz_strategyselector_register(opaque, "angular_pred", "generic", 0, &kvz_angular_pred_generic);
   success &= kvz_strategyselector_register(opaque, "intra_pred_planar", "generic", 0, &kvz_intra_pred_planar_generic);
   success &= kvz_strategyselector_register(opaque, "intra_pred_filtered_dc", "generic", 0, &kvz_intra_pred_filtered_dc_generic);
+  success &= kvz_strategyselector_register(opaque, "pdpc_planar_dc", "generic", 0, &kvz_pdpc_planar_dc_generic);
 
   return success;
 }
