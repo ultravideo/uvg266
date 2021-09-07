@@ -1102,6 +1102,10 @@ void kvz_search_cu_intra(encoder_state_t * const state,
     }
     
     for(int line = 0; line < lines; ++line) {
+      // For extra reference lines, only check predicted modes
+      if (line != 0) {
+        number_of_modes_to_search = 0;
+      }
       int num_modes_to_check = MIN(number_of_modes[line], number_of_modes_to_search);
       cur_cu->intra.multi_ref_idx = line;
       kvz_sort_modes(modes[line], costs[line], number_of_modes[line]);
