@@ -286,23 +286,11 @@ void kvz_intra_predict(
   }
 
   // pdpc
-  //bool pdpcCondition = (mode == 0 || mode == 1 || mode == 18 || mode == 50);
-  //if (pdpcCondition)
+  // bool pdpcCondition = (mode == 0 || mode == 1 || mode == 18 || mode == 50);
+  bool pdpcCondition = (mode == 0 || mode == 1); // Planar and DC
+  if (pdpcCondition)
   {
-    // TODO: replace latter log2_width with log2_height
-    const int scale = ((log2_width - 2 + log2_width - 2 + 2) >> 2);
-    
-    if (mode == 0 || mode == 1) {  // planar or DC
-      // TODO: replace width with height
-      for (int y = 0; y < width; y++) {
-        int wT = 32 >> MIN(31, ((y << 1) >> scale));
-        for (int x = 0; x < width; x++) {
-          int wL = 32 >> MIN(31, ((x << 1) >> scale));
-          dst[x + y * width] = dst[x + y * width] + ((wL * (used_ref->left[y + 1] - dst[x + y * width])
-            + wT * (used_ref->top[x + 1] - dst[x + y * width]) + 32) >> 6);
-        }
-      }
-    }  
+    kvz_pdpc_planar_dc(mode, width, log2_width, used_ref, dst);
   }
 }
 

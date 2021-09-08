@@ -27,6 +27,7 @@
  */
 
 #include "global.h" // IWYU pragma: keep
+#include "intra.h"
 #include "kvazaar.h"
 
 
@@ -50,10 +51,18 @@ typedef void (intra_pred_filtered_dc_func)(
   const kvz_pixel *const ref_left,
   kvz_pixel *const out_block);
 
+typedef void (pdpc_planar_dc_func)(
+  const int mode,
+  const int width,
+  const int log2_width,
+  const kvz_intra_ref *const used_ref,
+  kvz_pixel *const dst);
+
 // Declare function pointers.
 extern angular_pred_func * kvz_angular_pred;
 extern intra_pred_planar_func * kvz_intra_pred_planar;
 extern intra_pred_filtered_dc_func * kvz_intra_pred_filtered_dc;
+extern pdpc_planar_dc_func * kvz_pdpc_planar_dc;
 
 int kvz_strategy_register_intra(void* opaque, uint8_t bitdepth);
 
@@ -62,6 +71,7 @@ int kvz_strategy_register_intra(void* opaque, uint8_t bitdepth);
   {"angular_pred", (void**) &kvz_angular_pred}, \
   {"intra_pred_planar", (void**) &kvz_intra_pred_planar}, \
   {"intra_pred_filtered_dc", (void**) &kvz_intra_pred_filtered_dc}, \
+  {"pdpc_planar_dc", (void**) &kvz_pdpc_planar_dc}, \
 
 
 
