@@ -1263,6 +1263,7 @@ void kvz_encoder_state_write_bitstream_slice_header(
   if (state->frame->pictype != KVZ_NAL_IDR_W_RADL
     && state->frame->pictype != KVZ_NAL_IDR_N_LP) {
     WRITE_UE(stream, state->frame->slicetype, "sh_slice_type");
+    kvz_encoder_state_write_bitstream_ref_pic_list(stream, state);
   }
 
 
