@@ -892,24 +892,39 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
             kvz_threadqueue_job_dep_add(job[0], ref_state->tile->wf_recon_jobs[dep_lcu->id]);
           }
         }
-
-        // Add local WPP dependancy to the LCU on the left.
-        if (lcu->left) {
-          kvz_threadqueue_job_dep_add(job[0], bitstream_job[-1]);
-        }
-        // Add local WPP dependancy to the LCU on the top.
-        if (lcu->above) {
-          kvz_threadqueue_job_dep_add(job[0], bitstream_job[-state->tile->frame->width_in_lcu]);
-        }
-
-        kvz_threadqueue_submit(state->encoder_control->threadqueue, job[0]);
-
+        
         if (state->encoder_control->cfg.alf_type) {
           encoder_state_t* parent = state;
           while (parent->parent) parent = parent->parent;
+
+          // Add local WPP dependancy to the LCU on the left.
+          if (lcu->left) {
+            kvz_threadqueue_job_dep_add(job[0], job[-1]);
+            kvz_threadqueue_job_dep_add(bitstream_job[0], bitstream_job[-1]);
+          }
+          // Add local WPP dependancy to the LCU on the top.
+          if (lcu->above) {
+            kvz_threadqueue_job_dep_add(job[0], job[-state->tile->frame->width_in_lcu]);
+            kvz_threadqueue_job_dep_add(bitstream_job[0], bitstream_job[-state->tile->frame->width_in_lcu]);
+          }
+
+          kvz_threadqueue_submit(state->encoder_control->threadqueue, job[0]);
+
           kvz_threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], parent->tqj_alf_process);
           kvz_threadqueue_job_dep_add(parent->tqj_alf_process, state->tile->wf_recon_jobs[lcu->id]);
         } else {
+
+          // Add local WPP dependancy to the LCU on the left.
+          if (lcu->left) {
+            kvz_threadqueue_job_dep_add(job[0], bitstream_job[-1]);
+          }
+          // Add local WPP dependancy to the LCU on the top.
+          if (lcu->above) {
+            kvz_threadqueue_job_dep_add(job[0], bitstream_job[-state->tile->frame->width_in_lcu]);
+          }
+
+          kvz_threadqueue_submit(state->encoder_control->threadqueue, job[0]);
+
           kvz_threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], state->tile->wf_recon_jobs[lcu->id]);
         }
 
