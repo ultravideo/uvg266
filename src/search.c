@@ -917,6 +917,9 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         cur_cu->type = CU_INTRA;
         cur_cu->part_size = SIZE_2Nx2N;
 
+        // Disable MRL in this case
+        cur_cu->intra.multi_ref_idx = 0;
+
         kvz_lcu_fill_trdepth(lcu, x, y, depth, cur_cu->tr_depth);
         lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
 

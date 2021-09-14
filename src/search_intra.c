@@ -1015,18 +1015,6 @@ int8_t kvz_search_cu_intra_chroma(encoder_state_t * const state,
 }
 
 
-// Debug function to check whether a selected mode is in the MPM list
-bool is_mpm(uint8_t *preds, uint8_t mode)
-{
-  for (int i = 0; i < INTRA_MPM_COUNT; ++i) {
-    if (preds[i] == mode) {
-      return true;
-    }
-  }
-  return false;
-}
-
-
 /**
  * Update lcu to have best modes at this depth.
  * \return Cost of best mode.
@@ -1148,11 +1136,6 @@ void kvz_search_cu_intra(encoder_state_t * const state,
       best_line = line;
     }
   }
-
-  // MRL is not allowed to be used with modes other than MPM
-  //if (best_line != 0) {
-  //  //assert(!is_mpm(candidate_modes, modes[best_line][best_mode_indices[best_line]]) && "Trying to use MRL with non-MPM mode.");
-  //}
   
   cur_cu->intra.multi_ref_idx = best_line;
 

@@ -413,7 +413,7 @@ static void kvz_intra_pred_planar_generic(
 }
 
 /**
-* \brief Generage intra DC prediction with post filtering applied.
+* \brief Generate intra DC prediction with post filtering applied.
 * \param log2_width    Log2 of width, range 2..5.
 * \param in_ref_above  Pointer to -1 index of above reference, length=width*2+1.
 * \param in_ref_left   Pointer to -1 index of left reference, length=width*2+1.
@@ -427,6 +427,7 @@ static void kvz_intra_pred_filtered_dc_generic(
 {
   assert(log2_width >= 2 && log2_width <= 5);
 
+  // TODO: height for non-square block sizes
   const int_fast8_t width = 1 << log2_width;
 
   int_fast16_t sum = 0;
