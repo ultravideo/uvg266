@@ -612,6 +612,8 @@ static void set_cu_qps(encoder_state_t *state, int x, int y, int depth, int *las
   }
 }
 
+static void encoder_state_worker_encode_lcu_bitstream(void* opaque);
+
 static void encoder_state_worker_encode_lcu_search(void * opaque)
 {
   lcu_order_element_t * const lcu = opaque;
@@ -671,6 +673,12 @@ static void encoder_state_worker_encode_lcu_search(void * opaque)
     kvz_sao_search_lcu(state, lcu->position.x, lcu->position.y);
     encoder_sao_reconstruct(state, lcu);
   }
+
+  // Do simulated bitstream writing to update the cabac contexts
+  if (encoder->cfg.alf_type) {
+    state->stream.simulation = true;
+    encoder_state_worker_encode_lcu_bitstream(opaque);
+  }
 }
 
 static void encoder_state_worker_encode_lcu_bitstream(void * opaque)
@@ -695,9 +703,11 @@ static void encoder_state_worker_encode_lcu_bitstream(void * opaque)
   //Encode coding tree
   kvz_encode_coding_tree(state, lcu->position.x * LCU_WIDTH, lcu->position.y * LCU_WIDTH, 0, lcu->coeff);
 
-  // Coeffs are not needed anymore.
-  free(lcu->coeff);
-  lcu->coeff = NULL;
+  if (!state->stream.simulation) {
+    // Coeffs are not needed anymore.
+    free(lcu->coeff);
+    lcu->coeff = NULL;
+  }
 
   bool end_of_slice_segment_flag;
   if (state->encoder_control->cfg.slices & KVZ_SLICES_WPP) {
@@ -772,9 +782,30 @@ static void encoder_state_worker_encode_lcu_bitstream(void * opaque)
   }
 }
 
+static void encoder_state_init_children_after_simulation(encoder_state_t* const state) {
+  kvz_bitstream_clear(&state->stream);
+
+  if (state->is_leaf) {
+    //Leaf states have cabac and context
+    kvz_cabac_start(&state->cabac);
+    kvz_init_contexts(state, state->encoder_control->cfg.set_qp_in_cu ? 26 : state->frame->QP, state->frame->slicetype);
+  }
+
+  for (int i = 0; state->children[i].encoder_control; ++i) {
+    encoder_state_init_children_after_simulation(&state->children[i]);
+  }
+}
 
 void kvz_alf_enc_process_job(void* opaque) {
-  kvz_alf_enc_process((encoder_state_t* const)opaque);
+  encoder_state_t* const state = (encoder_state_t* const)opaque;
+  
+  kvz_alf_enc_process(state);
+
+  encoder_state_t* parent = state;
+  while (parent->parent) parent = parent->parent;
+
+  // If ALF was used the bitstream coding was simulated in search, reset the cabac/stream
+  encoder_state_init_children_after_simulation(parent);
 }
 
 static void encoder_state_encode_leaf(encoder_state_t * const state)
@@ -799,16 +830,24 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
     // frame is encoded. Deblocking and SAO search is done during LCU encoding.
     for (int i = 0; i < state->lcu_order_count; ++i) {
       encoder_state_worker_encode_lcu_search(&state->lcu_order[i]);
+      // Without alf we can code the bitstream right after each LCU to update cabac contexts
+      if (encoder->cfg.alf_type == 0) {
+        encoder_state_worker_encode_lcu_bitstream(&state->lcu_order[i]);
+      }
     }
 
     //Encode ALF
     if (encoder->cfg.alf_type) {
       kvz_alf_enc_process(state);
+      // If ALF was used the bitstream coding was simulated in search, reset the cabac/stream
+      // And write the actual bitstream
+      encoder_state_init_children_after_simulation(state);
+      for (int i = 0; i < state->lcu_order_count; ++i) {
+        encoder_state_worker_encode_lcu_bitstream(&state->lcu_order[i]);
+      }
     }
 
-    for (int i = 0; i < state->lcu_order_count; ++i) {
-      encoder_state_worker_encode_lcu_bitstream(&state->lcu_order[i]);
-    }
+    
   } else {
     // Add each LCU in the wavefront row as it's own job to the queue.
 
@@ -892,26 +931,39 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
             kvz_threadqueue_job_dep_add(job[0], ref_state->tile->wf_recon_jobs[dep_lcu->id]);
           }
         }
-
-        // Add local WPP dependancy to the LCU on the left.
-        if (lcu->left) {
-          kvz_threadqueue_job_dep_add(job[0], job[-1]);
-          kvz_threadqueue_job_dep_add(bitstream_job[0], bitstream_job[-1]);
-        }
-        // Add local WPP dependancy to the LCU on the top.
-        if (lcu->above) {
-          kvz_threadqueue_job_dep_add(job[0], job[-state->tile->frame->width_in_lcu]);
-          kvz_threadqueue_job_dep_add(bitstream_job[0], bitstream_job[-state->tile->frame->width_in_lcu]);
-        }
-
-        kvz_threadqueue_submit(state->encoder_control->threadqueue, job[0]);
-
+        
         if (state->encoder_control->cfg.alf_type) {
           encoder_state_t* parent = state;
           while (parent->parent) parent = parent->parent;
+
+          // Add local WPP dependancy to the LCU on the left.
+          if (lcu->left) {
+            kvz_threadqueue_job_dep_add(job[0], job[-1]);
+            kvz_threadqueue_job_dep_add(bitstream_job[0], bitstream_job[-1]);
+          }
+          // Add local WPP dependancy to the LCU on the top.
+          if (lcu->above) {
+            kvz_threadqueue_job_dep_add(job[0], job[-state->tile->frame->width_in_lcu]);
+            kvz_threadqueue_job_dep_add(bitstream_job[0], bitstream_job[-state->tile->frame->width_in_lcu]);
+          }
+
+          kvz_threadqueue_submit(state->encoder_control->threadqueue, job[0]);
+
           kvz_threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], parent->tqj_alf_process);
           kvz_threadqueue_job_dep_add(parent->tqj_alf_process, state->tile->wf_recon_jobs[lcu->id]);
         } else {
+
+          // Add local WPP dependancy to the LCU on the left.
+          if (lcu->left) {
+            kvz_threadqueue_job_dep_add(job[0], bitstream_job[-1]);
+          }
+          // Add local WPP dependancy to the LCU on the top.
+          if (lcu->above) {
+            kvz_threadqueue_job_dep_add(job[0], bitstream_job[-state->tile->frame->width_in_lcu]);
+          }
+
+          kvz_threadqueue_submit(state->encoder_control->threadqueue, job[0]);
+
           kvz_threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], state->tile->wf_recon_jobs[lcu->id]);
         }
 

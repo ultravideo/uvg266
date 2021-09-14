@@ -52,6 +52,8 @@ typedef struct bitstream_t
   uint8_t cur_bit;
 
   uint8_t zerocount;
+
+  bool simulation;
 } bitstream_t;
 
 typedef struct
