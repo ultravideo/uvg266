@@ -722,12 +722,20 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
 
   kvz_pixel orig_block[LCU_WIDTH * LCU_WIDTH + 1];
 
+  const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
+  cu_info_t* cur_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
+
   // TODO: height for non-square blocks
   kvz_pixels_blit(orig, orig_block, width, width, origstride, width);
 
   // Check that the predicted modes are in the RDO mode list
   if (modes_to_check < 67) {
-    for (int pred_mode = 0; pred_mode < 6; pred_mode++) {
+    int pred_mode = 0;
+    // Skip planar if searching modes for MRL
+    if (cur_cu->intra.multi_ref_idx != 0) {
+      pred_mode = 1;
+    }
+    for (; pred_mode < 6; pred_mode++) {
       int mode_found = 0;
       for (int rdo_mode = 0; rdo_mode < modes_to_check; rdo_mode++) {
         if (intra_preds[pred_mode] == modes[rdo_mode]) {
@@ -1007,6 +1015,18 @@ int8_t kvz_search_cu_intra_chroma(encoder_state_t * const state,
 }
 
 
+// Debug function to check whether a selected mode is in the MPM list
+bool is_mpm(uint8_t *preds, uint8_t mode)
+{
+  for (int i = 0; i < INTRA_MPM_COUNT; ++i) {
+    if (preds[i] == mode) {
+      return true;
+    }
+  }
+  return false;
+}
+
+
 /**
  * Update lcu to have best modes at this depth.
  * \return Cost of best mode.
@@ -1128,6 +1148,11 @@ void kvz_search_cu_intra(encoder_state_t * const state,
       best_line = line;
     }
   }
+
+  // MRL is not allowed to be used with modes other than MPM
+  //if (best_line != 0) {
+  //  //assert(!is_mpm(candidate_modes, modes[best_line][best_mode_indices[best_line]]) && "Trying to use MRL with non-MPM mode.");
+  //}
   
   cur_cu->intra.multi_ref_idx = best_line;
 
