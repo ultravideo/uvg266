@@ -136,24 +136,22 @@ uint64_t kvz_bitstream_tell(const bitstream_t *const stream)
  */
 void kvz_bitstream_writebyte(bitstream_t *const stream, const uint8_t byte)
 {
-  assert(stream->cur_bit == 0 || stream->simulation);
+  assert(stream->cur_bit == 0);
 
-  if (!stream->simulation) {
+  if (stream->last == NULL || stream->last->len == KVZ_DATA_CHUNK_SIZE) {
+    // Need to allocate a new chunk.
+    kvz_data_chunk* new_chunk = kvz_bitstream_alloc_chunk();
+    assert(new_chunk);
 
-    if (stream->last == NULL || stream->last->len == KVZ_DATA_CHUNK_SIZE) {
-      // Need to allocate a new chunk.
-      kvz_data_chunk* new_chunk = kvz_bitstream_alloc_chunk();
-      assert(new_chunk);
-
-      if (!stream->first) stream->first = new_chunk;
-      if (stream->last)   stream->last->next = new_chunk;
-      stream->last = new_chunk;
-    }
-    assert(stream->last->len < KVZ_DATA_CHUNK_SIZE);
-
-    stream->last->data[stream->last->len] = byte;
-    stream->last->len += 1;
+    if (!stream->first) stream->first = new_chunk;
+    if (stream->last)   stream->last->next = new_chunk;
+    stream->last = new_chunk;
   }
+  assert(stream->last->len < KVZ_DATA_CHUNK_SIZE);
+
+  stream->last->data[stream->last->len] = byte;
+  stream->last->len += 1;
+
   stream->len += 1;
 }
 
@@ -164,9 +162,9 @@ void kvz_bitstream_writebyte(bitstream_t *const stream, const uint8_t byte)
  */
 void kvz_bitstream_move(bitstream_t *const dst, bitstream_t *const src)
 {
-  assert(dst->cur_bit == 0 || src->simulation);
+  assert(dst->cur_bit == 0);
 
-  if (src->len > 0 && !src->simulation) {
+  if (src->len > 0) {
     if (dst->first == NULL) {
       dst->first = src->first;
       dst->last = src->last;
@@ -182,7 +180,6 @@ void kvz_bitstream_move(bitstream_t *const dst, bitstream_t *const src)
   dst->data = src->data;
   dst->cur_bit = src->cur_bit;
   dst->zerocount = src->zerocount;
-  dst->simulation = src->simulation;
 
   src->first = src->last = NULL;
   kvz_bitstream_clear(src);
@@ -204,7 +201,7 @@ void kvz_bitstream_clear(bitstream_t *const stream)
  */
 void kvz_bitstream_put_byte(bitstream_t *const stream, uint32_t data)
 {
-  assert(stream->cur_bit == 0 || stream->simulation);
+  assert(stream->cur_bit == 0);
   const uint8_t emulation_prevention_three_byte = 0x03;
 
   if ((stream->zerocount == 2) && (data < 4)) {
@@ -224,10 +221,6 @@ void kvz_bitstream_put_byte(bitstream_t *const stream, uint32_t data)
  */
 void kvz_bitstream_put(bitstream_t *const stream, const uint32_t data, uint8_t bits)
 {
-  if (stream->simulation) {
-    stream->cur_bit += bits;
-    return;
-  }
   while (bits--) {
     stream->data <<= 1;
 

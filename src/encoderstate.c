@@ -676,7 +676,7 @@ static void encoder_state_worker_encode_lcu_search(void * opaque)
 
   // Do simulated bitstream writing to update the cabac contexts
   if (encoder->cfg.alf_type) {
-    state->stream.simulation = true;
+    state->cabac.only_count = 1;
     encoder_state_worker_encode_lcu_bitstream(opaque);
   }
 }
@@ -703,7 +703,7 @@ static void encoder_state_worker_encode_lcu_bitstream(void * opaque)
   //Encode coding tree
   kvz_encode_coding_tree(state, lcu->position.x * LCU_WIDTH, lcu->position.y * LCU_WIDTH, 0, lcu->coeff);
 
-  if (!state->stream.simulation) {
+  if (!state->cabac.only_count) {
     // Coeffs are not needed anymore.
     free(lcu->coeff);
     lcu->coeff = NULL;
