@@ -49,6 +49,7 @@
  * \param in_ref_above  Pointer to -1 index of above reference, length=width*2+1.
  * \param in_ref_left   Pointer to -1 index of left reference, length=width*2+1.
  * \param dst           Buffer of size width*width.
+ * \param multi_ref_idx Multi reference line index for use with MRL.
  */
 static void kvz_angular_pred_generic(
   const int_fast8_t log2_width,
@@ -56,7 +57,8 @@ static void kvz_angular_pred_generic(
   const int_fast8_t channel_type,
   const kvz_pixel *const in_ref_above,
   const kvz_pixel *const in_ref_left,
-  kvz_pixel *const dst)
+  kvz_pixel *const dst,
+  const uint8_t multi_ref_idx)
 {
   
   assert(log2_width >= 2 && log2_width <= 5);
@@ -113,8 +115,7 @@ static void kvz_angular_pred_generic(
 
   uint32_t pred_mode = intra_mode; // ToDo: handle WAIP
 
-  // TODO: pass the multiRefIdx to this function and assign to this variable
-  uint8_t multi_ref_index = 0;
+  uint8_t multi_ref_index = multi_ref_idx;
 
   // Whether to swap references to always project on the left reference row.
   const bool vertical_mode = intra_mode >= 34;
@@ -418,12 +419,14 @@ static void kvz_intra_pred_planar_generic(
 * \param in_ref_above  Pointer to -1 index of above reference, length=width*2+1.
 * \param in_ref_left   Pointer to -1 index of left reference, length=width*2+1.
 * \param dst           Buffer of size width*width.
+* \param multi_ref_idx Reference line index. May be non-zero when MRL is used.
 */
 static void kvz_intra_pred_filtered_dc_generic(
   const int_fast8_t log2_width,
   const kvz_pixel *const ref_top,
   const kvz_pixel *const ref_left,
-  kvz_pixel *const out_block)
+  kvz_pixel *const out_block,
+  const uint8_t multi_ref_idx)
 {
   assert(log2_width >= 2 && log2_width <= 5);
 
@@ -432,8 +435,8 @@ static void kvz_intra_pred_filtered_dc_generic(
 
   int_fast16_t sum = 0;
   for (int_fast8_t i = 0; i < width; ++i) {
-    sum += ref_top[i + 1];
-    sum += ref_left[i + 1];
+    sum += ref_top[i + 1 + multi_ref_idx];
+    sum += ref_left[i + 1 + multi_ref_idx];
   }
 
   const kvz_pixel dc_val = (sum + width) >> (log2_width + 1);

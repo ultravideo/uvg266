@@ -49,7 +49,8 @@ typedef void (angular_pred_func)(
   const int_fast8_t channel_type,
   const kvz_pixel *const in_ref_above,
   const kvz_pixel *const in_ref_left,
-  kvz_pixel *const dst);
+  kvz_pixel *const dst,
+  const uint8_t multi_ref_idx);
 
 typedef void (intra_pred_planar_func)(
   const int_fast8_t log2_width,
@@ -61,7 +62,8 @@ typedef void (intra_pred_filtered_dc_func)(
   const int_fast8_t log2_width,
   const kvz_pixel *const ref_top,
   const kvz_pixel *const ref_left,
-  kvz_pixel *const out_block);
+  kvz_pixel *const out_block,
+  const uint8_t multi_ref_idx);
 
 typedef void (pdpc_planar_dc_func)(
   const int mode,

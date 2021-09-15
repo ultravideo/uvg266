@@ -446,6 +446,25 @@ static void kvz_angular_pred_avx2(
     }
   }
 
+ /**
+ * \brief Generage angular predictions.
+ * \param log2_width    Log2 of width, range 2..5.
+ * \param intra_mode    Angular mode in range 2..34.
+ * \param in_ref_above  Pointer to -1 index of above reference, length=width*2+1.
+ * \param in_ref_left   Pointer to -1 index of left reference, length=width*2+1.
+ * \param dst           Buffer of size width*width.
+ * \param multi_ref_idx Multi reference line index for use with MRL.
+ */
+static void kvz_angular_pred_avx2(
+  const int_fast8_t log2_width,
+  const int_fast8_t intra_mode,
+  const uint8_t *const in_ref_above,
+  const uint8_t *const in_ref_left,
+  uint8_t *const dst,
+  const uint8_t multi_ref_idx)
+{
+  assert(log2_width >= 2 && log2_width <= 5);
+  assert(intra_mode >= 2 && intra_mode <= 34);
   // Flip the block if this is was a horizontal mode.
   if (!vertical_mode) {
     
@@ -459,6 +478,12 @@ static void kvz_angular_pred_avx2(
     const __m128i vseq = _mm_setr_epi32(0, 1, 2, 3);
     const __m128i vidx = _mm_slli_epi32(vseq, log2_width);
 
+  // TODO: implement usage of multi_ref_idx
+
+                                                    // Temporary buffer for modes 11-25.
+                                                    // It only needs to be big enough to hold indices from -width to width-1.
+  uint8_t tmp_ref[2 * 32];
+  const int_fast8_t width = 1 << log2_width;
     // Transpose as 4x4 subblocks
     for (int_fast32_t y = 0; y + 3 < width; y += 4) {
       for (int_fast32_t x = y; x + 3 < width; x += 4) {
@@ -590,7 +615,8 @@ static void kvz_intra_pred_planar_avx2(
 // addends etc can be preinitialized for each position.
 static void pred_filtered_dc_4x4(const uint8_t *ref_top,
                                  const uint8_t *ref_left,
-                                       uint8_t *out_block)
+                                       uint8_t *out_block,
+                                 const uint8_t multi_ref_idx)
 {
   const uint32_t rt_u32 = *(const uint32_t *)(ref_top  + 1);
   const uint32_t rl_u32 = *(const uint32_t *)(ref_left + 1);
@@ -651,7 +677,8 @@ static void pred_filtered_dc_4x4(const uint8_t *ref_top,
 
 static void pred_filtered_dc_8x8(const uint8_t *ref_top,
                                  const uint8_t *ref_left,
-                                       uint8_t *out_block)
+                                       uint8_t *out_block,
+                                 const uint8_t multi_ref_idx)
 {
   const uint64_t rt_u64 = *(const uint64_t *)(ref_top  + 1);
   const uint64_t rl_u64 = *(const uint64_t *)(ref_left + 1);
@@ -755,7 +782,8 @@ static INLINE __m256i cvt_u32_si256(const uint32_t u)
 
 static void pred_filtered_dc_16x16(const uint8_t *ref_top,
                                    const uint8_t *ref_left,
-                                         uint8_t *out_block)
+                                         uint8_t *out_block,
+                                   const uint8_t multi_ref_idx)
 {
   const __m128i rt_128 = _mm_loadu_si128((const __m128i *)(ref_top  + 1));
   const __m128i rl_128 = _mm_loadu_si128((const __m128i *)(ref_left + 1));
@@ -831,7 +859,8 @@ static void pred_filtered_dc_16x16(const uint8_t *ref_top,
 
 static void pred_filtered_dc_32x32(const uint8_t *ref_top,
                                    const uint8_t *ref_left,
-                                         uint8_t *out_block)
+                                         uint8_t *out_block,
+                                   const uint8_t multi_ref_idx)
 {
   const __m256i rt = _mm256_loadu_si256((const __m256i *)(ref_top  + 1));
   const __m256i rl = _mm256_loadu_si256((const __m256i *)(ref_left + 1));
@@ -913,23 +942,26 @@ static void pred_filtered_dc_32x32(const uint8_t *ref_top,
 * \param in_ref_above  Pointer to -1 index of above reference, length=width*2+1.
 * \param in_ref_left   Pointer to -1 index of left reference, length=width*2+1.
 * \param dst           Buffer of size width*width.
+* \param multi_ref_idx Reference line index. May be non-zero when MRL is used.
 */
 static void kvz_intra_pred_filtered_dc_avx2(
   const int_fast8_t log2_width,
   const uint8_t *ref_top,
   const uint8_t *ref_left,
-        uint8_t *out_block)
+        uint8_t *out_block,
+  const uint8_t multi_ref_idx)
 {
   assert(log2_width >= 2 && log2_width <= 5);
 
+  // TODO: implement multi reference index for all subfunctions
   if (log2_width == 2) {
-    pred_filtered_dc_4x4(ref_top, ref_left, out_block);
+    pred_filtered_dc_4x4(ref_top, ref_left, out_block, multi_ref_idx);
   } else if (log2_width == 3) {
-    pred_filtered_dc_8x8(ref_top, ref_left, out_block);
+    pred_filtered_dc_8x8(ref_top, ref_left, out_block, multi_ref_idx);
   } else if (log2_width == 4) {
-    pred_filtered_dc_16x16(ref_top, ref_left, out_block);
+    pred_filtered_dc_16x16(ref_top, ref_left, out_block, multi_ref_idx);
   } else if (log2_width == 5) {
-    pred_filtered_dc_32x32(ref_top, ref_left, out_block);
+    pred_filtered_dc_32x32(ref_top, ref_left, out_block, multi_ref_idx);
   }
 }
 

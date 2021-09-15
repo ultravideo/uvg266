@@ -212,24 +212,26 @@ static void intra_filter_reference(
 
 
 /**
-* \brief Generage planar prediction.
+* \brief Generate dc prediction.
 * \param log2_width    Log2 of width, range 2..5.
-* \param in_ref_above  Pointer to -1 index of above reference, length=width*2+1.
-* \param in_ref_left   Pointer to -1 index of left reference, length=width*2+1.
+* \param ref_top       Pointer to -1 index of above reference, length=width*2+1.
+* \param ref_left      Pointer to -1 index of left reference, length=width*2+1.
 * \param dst           Buffer of size width*width.
+* \param multi_ref_idx Multi reference line index for use with MRL.
 */
 static void intra_pred_dc(
   const int_fast8_t log2_width,
   const kvz_pixel *const ref_top,
   const kvz_pixel *const ref_left,
-  kvz_pixel *const out_block)
+  kvz_pixel *const out_block,
+  const uint8_t multi_ref_idx)
 {
   int_fast8_t width = 1 << log2_width;
 
   int_fast16_t sum = 0;
   for (int_fast8_t i = 0; i < width; ++i) {
-    sum += ref_top[i + 1];
-    sum += ref_left[i + 1];
+    sum += ref_top[i + 1 + multi_ref_idx];
+    sum += ref_left[i + 1 + multi_ref_idx];
   }
   
   // JVET_K0122
@@ -549,10 +551,14 @@ void kvz_intra_predict(
   int_fast8_t mode,
   color_t color,
   kvz_pixel *dst,
-  bool filter_boundary)
+  bool filter_boundary,
+  const uint8_t multi_ref_idx)
 {
   const int_fast8_t width = 1 << log2_width;
   const kvz_config *cfg = &state->encoder_control->cfg;
+
+  // MRL only for luma
+  uint8_t multi_ref_index = color == COLOR_Y ? multi_ref_idx : 0;
 
   const kvz_intra_ref *used_ref = &refs->ref;
   if (cfg->intra_smoothing_disabled || color != COLOR_Y || mode == 1 || width == 4) {
@@ -586,9 +592,9 @@ void kvz_intra_predict(
   if (mode == 0) {
     kvz_intra_pred_planar(log2_width, used_ref->top, used_ref->left, dst);
   } else if (mode == 1) {
-    intra_pred_dc(log2_width, used_ref->top, used_ref->left, dst);
+    intra_pred_dc(log2_width, used_ref->top, used_ref->left, dst, multi_ref_index);
   } else {
-    kvz_angular_pred(log2_width, mode, color, used_ref->top, used_ref->left, dst);
+    kvz_angular_pred(log2_width, mode, color, used_ref->top, used_ref->left, dst, multi_ref_index);
   }
 
   // pdpc
@@ -608,7 +614,7 @@ void kvz_intra_build_reference_any(
   const vector2d_t *const pic_px,
   const lcu_t *const lcu,
   kvz_intra_references *const refs,
-  const uint8_t mri)
+  const uint8_t multi_ref_idx)
 {
   assert(log2_width >= 2 && log2_width <= 5);
 
@@ -621,7 +627,7 @@ void kvz_intra_build_reference_any(
   const int_fast8_t width = 1 << log2_width;
 
   // Get multiRefIdx from CU under prediction. Do not use MRL if not luma
-  const uint8_t multi_ref_index = !is_chroma ? mri : 0;
+  const uint8_t multi_ref_index = !is_chroma ? multi_ref_idx : 0;
 
   // Convert luma coordinates to chroma coordinates for chroma.
   const vector2d_t lcu_px = {
@@ -737,7 +743,7 @@ void kvz_intra_build_reference_inner(
   const lcu_t *const lcu,
   kvz_intra_references *const refs,
   bool entropy_sync,
-  const uint8_t mri)
+  const uint8_t multi_ref_idx)
 {
   assert(log2_width >= 2 && log2_width <= 5);
 
@@ -749,7 +755,7 @@ void kvz_intra_build_reference_inner(
   const int_fast8_t width = 1 << log2_width;
 
   // Get multiRefIdx from CU under prediction. Do not use MRL if not luma
-  const uint8_t multi_ref_index = !is_chroma ? mri : 0;
+  const uint8_t multi_ref_index = !is_chroma ? multi_ref_idx : 0;
 
   // Convert luma coordinates to chroma coordinates for chroma.
   const vector2d_t lcu_px = {
@@ -915,6 +921,7 @@ static void intra_recon_tb_leaf(
   int x_scu = SUB_SCU(x);
   int y_scu = SUB_SCU(y);
   const vector2d_t lcu_px = {x_scu >> shift, y_scu >> shift };
+  cu_info_t* cur_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
 
   kvz_intra_references refs;
   kvz_intra_build_reference(log2width, color, &luma_px, &pic_px, lcu, &refs, cfg->wpp);
@@ -923,7 +930,7 @@ static void intra_recon_tb_leaf(
   int stride = state->tile->frame->source->stride;
   const bool filter_boundary = color == COLOR_Y && !(cfg->lossless && cfg->implicit_rdpcm);
   if(intra_mode < 68) {
-    kvz_intra_predict(state, &refs, log2width, intra_mode, color, pred, filter_boundary);
+    kvz_intra_predict(state, &refs, log2width, intra_mode, color, pred, filter_boundary, cur_cu->intra.multi_ref_idx);
   } else {
     kvz_pixels_blit(&state->tile->frame->cclm_luma_rec[x / 2 + (y * stride) / 4], pred, width, width, stride / 2, width);
     if(cclm_params == NULL) {
