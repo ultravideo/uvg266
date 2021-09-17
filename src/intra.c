@@ -600,7 +600,7 @@ void kvz_intra_predict(
   // pdpc
   // bool pdpcCondition = (mode == 0 || mode == 1 || mode == 18 || mode == 50);
   bool pdpcCondition = (mode == 0 || mode == 1); // Planar and DC
-  if (pdpcCondition)
+  if (pdpcCondition && multi_ref_index == 0) // Cannot be used with MRL.
   {
     kvz_pdpc_planar_dc(mode, width, log2_width, used_ref, dst);
   }

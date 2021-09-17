@@ -44,12 +44,14 @@
 
 
  /**
- * \brief Generage angular predictions.
+ * \brief Generate angular predictions.
  * \param log2_width    Log2 of width, range 2..5.
  * \param intra_mode    Angular mode in range 2..34.
+ * \param channel_type  Color channel.
  * \param in_ref_above  Pointer to -1 index of above reference, length=width*2+1.
  * \param in_ref_left   Pointer to -1 index of left reference, length=width*2+1.
  * \param dst           Buffer of size width*width.
+ * \param multi_ref_idx Reference line index for use with MRL.
  */
 static void kvz_angular_pred_avx2(
   const int_fast8_t log2_width,
@@ -57,11 +59,15 @@ static void kvz_angular_pred_avx2(
   const int_fast8_t channel_type,
   const kvz_pixel *const in_ref_above,
   const kvz_pixel *const in_ref_left,
-  kvz_pixel *const dst)
+  kvz_pixel *const dst,
+  const uint8_t multi_ref_idx)
 {
   
   assert(log2_width >= 2 && log2_width <= 5);
   assert(intra_mode >= 2 && intra_mode <= 66);
+
+  // TODO: implement handling of MRL
+  uint8_t multi_ref_index = channel_type == COLOR_Y ? multi_ref_idx : 0;
 
   __m256i p_shuf_01 = _mm256_setr_epi8(
     0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
@@ -133,9 +139,9 @@ static void kvz_angular_pred_avx2(
 
                                                     // Temporary buffer for modes 11-25.
                                                     // It only needs to be big enough to hold indices from -width to width-1.
-  //kvz_pixel tmp_ref[2 * 128] = { 0 };
-  kvz_pixel temp_main[2 * 128] = { 0 };
-  kvz_pixel temp_side[2 * 128] = { 0 };
+  //kvz_pixel tmp_ref[2 * 128 + 3 + 33 * MAX_REF_LINE:IDX] = { 0 };
+  kvz_pixel temp_main[2 * 128 + 3 + 33 * MAX_REF_LINE_IDX] = { 0 };
+  kvz_pixel temp_side[2 * 128 + 3 + 33 * MAX_REF_LINE_IDX] = { 0 };
   const int_fast32_t width = 1 << log2_width;
 
   uint32_t pred_mode = intra_mode; // ToDo: handle WAIP
@@ -334,7 +340,7 @@ static void kvz_angular_pred_avx2(
       // PDPC
       bool PDPC_filter = (width >= 4 || channel_type != 0);
       if (pred_mode > 1 && pred_mode < 67) {
-        if (mode_disp < 0) {
+        if (mode_disp < 0 || multi_ref_index) { // Cannot be used with MRL.
           PDPC_filter = false;
         }
         else if (mode_disp > 0) {
@@ -446,25 +452,6 @@ static void kvz_angular_pred_avx2(
     }
   }
 
- /**
- * \brief Generage angular predictions.
- * \param log2_width    Log2 of width, range 2..5.
- * \param intra_mode    Angular mode in range 2..34.
- * \param in_ref_above  Pointer to -1 index of above reference, length=width*2+1.
- * \param in_ref_left   Pointer to -1 index of left reference, length=width*2+1.
- * \param dst           Buffer of size width*width.
- * \param multi_ref_idx Multi reference line index for use with MRL.
- */
-static void kvz_angular_pred_avx2(
-  const int_fast8_t log2_width,
-  const int_fast8_t intra_mode,
-  const uint8_t *const in_ref_above,
-  const uint8_t *const in_ref_left,
-  uint8_t *const dst,
-  const uint8_t multi_ref_idx)
-{
-  assert(log2_width >= 2 && log2_width <= 5);
-  assert(intra_mode >= 2 && intra_mode <= 34);
   // Flip the block if this is was a horizontal mode.
   if (!vertical_mode) {
     
@@ -478,12 +465,6 @@ static void kvz_angular_pred_avx2(
     const __m128i vseq = _mm_setr_epi32(0, 1, 2, 3);
     const __m128i vidx = _mm_slli_epi32(vseq, log2_width);
 
-  // TODO: implement usage of multi_ref_idx
-
-                                                    // Temporary buffer for modes 11-25.
-                                                    // It only needs to be big enough to hold indices from -width to width-1.
-  uint8_t tmp_ref[2 * 32];
-  const int_fast8_t width = 1 << log2_width;
     // Transpose as 4x4 subblocks
     for (int_fast32_t y = 0; y + 3 < width; y += 4) {
       for (int_fast32_t x = y; x + 3 < width; x += 4) {
