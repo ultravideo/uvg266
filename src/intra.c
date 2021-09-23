@@ -624,6 +624,7 @@ void kvz_intra_build_reference_any(
 
   const kvz_pixel dc_val = 1 << (KVZ_BIT_DEPTH - 1); //TODO: add used bitdepth as a variable
   const int is_chroma = color != COLOR_Y ? 1 : 0;
+  // TODO: height for non-square blocks
   const int_fast8_t width = 1 << log2_width;
 
   // Get multiRefIdx from CU under prediction. Do not use MRL if not luma
@@ -649,7 +650,7 @@ void kvz_intra_build_reference_any(
   if (px.y) {
     top_border = &rec_ref[px.x + (px.y - 1 - multi_ref_index) * (LCU_WIDTH >> is_chroma)];
   } else {
-    top_border = &top_ref[px.x];
+    top_border = &top_ref[px.x]; // Top row, no need for multi_ref_index
   }
 
   // Init left borders pointer to point to the correct place in the correct reference array.
@@ -657,7 +658,7 @@ void kvz_intra_build_reference_any(
   int left_stride; // Distance between reference samples.
   if (px.x) {
     left_border = &rec_ref[px.x - 1 - multi_ref_index + px.y * (LCU_WIDTH >> is_chroma)];
-    left_stride = LCU_WIDTH >> is_chroma + multi_ref_index;
+    left_stride = LCU_WIDTH >> is_chroma;
   } else {
     left_border = &left_ref[px.y];
     left_stride = 1;
@@ -670,12 +671,14 @@ void kvz_intra_build_reference_any(
 
     // Limit the number of available pixels based on block size and dimensions
     // of the picture.
-    px_available_left = MIN(px_available_left, width * 2);
+    // TODO: height for non-square blocks
+    px_available_left = MIN(px_available_left, width * 2 + multi_ref_index);
     px_available_left = MIN(px_available_left, (pic_px->y - luma_px->y) >> is_chroma);
 
     // Copy pixels from coded CUs.
     for (int i = 0; i < px_available_left; ++i) {
-      out_left_ref[i + 1] = left_border[i * left_stride];
+      // Reserve space for top left reference
+      out_left_ref[i + 1 + multi_ref_index] = left_border[i * left_stride];
     }
     // Extend the last pixel for the rest of the reference values.
     kvz_pixel nearest_pixel = out_left_ref[px_available_left];
@@ -695,11 +698,16 @@ void kvz_intra_build_reference_any(
     // If the block is at an LCU border, the top-left must be copied from
     // the border that points to the LCUs 1D reference buffer.
     if (px.x == 0) {
-      out_left_ref[0] = left_border[-1 * left_stride];
-      out_top_ref[0] = left_border[-1 * left_stride];
+      kvz_pixel nearest = left_border[-1 * left_stride];
+      for (int i = 0; i <= multi_ref_index; ++i) {
+        out_left_ref[i] = nearest;
+        out_top_ref[i] = top_border[i - multi_ref_index - 1];
+      }
     } else {
-      out_left_ref[0] = top_border[-1];
-      out_top_ref[0] = top_border[-1];
+      for (int i = 0; i <= multi_ref_index; ++i) {
+        out_left_ref[i] = left_border[i - multi_ref_index - 1 * left_stride];
+        out_top_ref[i] = top_border[i - multi_ref_index - 1];
+      }
     }
   } else {
     // Copy reference clockwise.
@@ -714,7 +722,7 @@ void kvz_intra_build_reference_any(
 
     // Limit the number of available pixels based on block size and dimensions
     // of the picture.
-    px_available_top = MIN(px_available_top, width * 2);
+    px_available_top = MIN(px_available_top, width * 2 + multi_ref_index);
     px_available_top = MIN(px_available_top, (pic_px->x - luma_px->x) >> is_chroma);
 
     // Copy all the pixels we can.
@@ -752,6 +760,7 @@ void kvz_intra_build_reference_inner(
   kvz_pixel * __restrict out_top_ref = &refs->ref.top[0];
 
   const int is_chroma = color != COLOR_Y ? 1 : 0;
+  // TODO: height for non-sqaure blocks
   const int_fast8_t width = 1 << log2_width;
 
   // Get multiRefIdx from CU under prediction. Do not use MRL if not luma
@@ -791,13 +800,17 @@ void kvz_intra_build_reference_inner(
   if (px.x) {
     left_border = &rec_ref[px.x - 1 - multi_ref_index + px.y * (LCU_WIDTH >> is_chroma)];
     left_stride = LCU_WIDTH >> is_chroma + multi_ref_index;
-    out_left_ref[0] = top_border[-1];
-    out_top_ref[0] = top_border[-1];
+    for (int i = 0; i <= multi_ref_index; ++i) {
+      out_top_ref[i] = top_border[i - multi_ref_index - 1];
+      out_left_ref[i] = left_border[i - multi_ref_index - 1 * left_stride];
+    }
   } else {
     left_border = &left_ref[px.y];
     left_stride = 1;
-    out_left_ref[0] = left_border[-1 * left_stride];
-    out_top_ref[0] = left_border[-1 * left_stride];
+    for (int i = 0; i <= multi_ref_index; ++i) {
+      out_left_ref[0] = left_border[i - multi_ref_index - 1 * left_stride];
+      out_top_ref[0] = top_border[i - multi_ref_index - 1];
+    }
   }
 
   // Generate left reference.
@@ -811,7 +824,7 @@ void kvz_intra_build_reference_inner(
   px_available_left = MIN(px_available_left, (pic_px->y - luma_px->y) >> is_chroma);
 
   // Copy pixels from coded CUs.
-  int i = 0;
+  int i = multi_ref_index;  // Offset by multi_ref_index
   do {
     out_left_ref[i + 1] = left_border[(i + 0) * left_stride];
     out_left_ref[i + 2] = left_border[(i + 1) * left_stride];
@@ -849,7 +862,7 @@ void kvz_intra_build_reference_inner(
   if (entropy_sync && px.y == 0) px_available_top = MIN(px_available_top, ((LCU_WIDTH >> is_chroma) - px.x) -1);
 
   // Copy all the pixels we can.
-  i = 0;
+  i = multi_ref_index;  // Offset by multi_ref_index
   do {
     memcpy(out_top_ref + i + 1, top_border + i, 4 * sizeof(kvz_pixel));
     i += 4;
@@ -884,12 +897,15 @@ void kvz_intra_build_reference(
   const vector2d_t lcu_px = { SUB_SCU(luma_px->x), SUB_SCU(luma_px->y) };
   cu_info_t* cur_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
 
+  // Make this common case work with MRL, implement inner after this one works
+  kvz_intra_build_reference_any(log2_width, color, luma_px, pic_px, lcu, refs, cur_cu->intra.multi_ref_idx);
+
   // Much logic can be discarded if not on the edge
-  if (luma_px->x > 0 && luma_px->y > 0) {
+  /*if (luma_px->x > 0 && luma_px->y > 0) {
     kvz_intra_build_reference_inner(log2_width, color, luma_px, pic_px, lcu, refs, entropy_sync, cur_cu->intra.multi_ref_idx);
   } else {
     kvz_intra_build_reference_any(log2_width, color, luma_px, pic_px, lcu, refs, cur_cu->intra.multi_ref_idx);
-  }
+  }*/
 }
 
 static void intra_recon_tb_leaf(
