@@ -660,7 +660,7 @@ void kvz_intra_build_reference_any(
     left_border = &rec_ref[px.x - 1 - multi_ref_index + px.y * (LCU_WIDTH >> is_chroma)];
     left_stride = LCU_WIDTH >> is_chroma;
   } else {
-    left_border = &left_ref[px.y];
+    left_border = &left_ref[px.y]; // No need for multi_ref_index on the left border
     left_stride = 1;
   }
 
@@ -683,7 +683,7 @@ void kvz_intra_build_reference_any(
     // Extend the last pixel for the rest of the reference values.
     kvz_pixel nearest_pixel = out_left_ref[px_available_left];
     for (int i = px_available_left; i < width * 2 + multi_ref_index; ++i) {
-      out_left_ref[i + 1] = nearest_pixel;
+      out_left_ref[i + 1 + multi_ref_index] = nearest_pixel;
     }
   } else {
     // If we are on the left edge, extend the first pixel of the top row.
@@ -705,7 +705,7 @@ void kvz_intra_build_reference_any(
       }
     } else {
       for (int i = 0; i <= multi_ref_index; ++i) {
-        out_left_ref[i] = left_border[i - multi_ref_index - 1 * left_stride];
+        out_left_ref[i] = left_border[(i - multi_ref_index - 1) * left_stride];
         out_top_ref[i] = top_border[i - multi_ref_index - 1];
       }
     }
@@ -727,12 +727,12 @@ void kvz_intra_build_reference_any(
 
     // Copy all the pixels we can.
     for (int i = 0; i < px_available_top; ++i) {
-      out_top_ref[i + 1] = top_border[i];
+      out_top_ref[i + 1 + multi_ref_index] = top_border[i];
     }
     // Extend the last pixel for the rest of the reference values.
     kvz_pixel nearest_pixel = top_border[px_available_top - 1];
     for (int i = px_available_top; i < width * 2 + multi_ref_index; ++i) {
-      out_top_ref[i + 1] = nearest_pixel;
+      out_top_ref[i + 1 + multi_ref_index] = nearest_pixel;
     }
   } else {
     // Extend nearest pixel.
