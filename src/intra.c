@@ -682,7 +682,7 @@ void kvz_intra_build_reference_any(
     }
     // Extend the last pixel for the rest of the reference values.
     kvz_pixel nearest_pixel = out_left_ref[px_available_left];
-    for (int i = px_available_left; i < width * 2 + multi_ref_index; ++i) {
+    for (int i = px_available_left; i < width * 2 + multi_ref_index * 2; ++i) {
       out_left_ref[i + 1 + multi_ref_index] = nearest_pixel;
     }
   } else {
@@ -710,9 +710,19 @@ void kvz_intra_build_reference_any(
       }
     }
   } else {
-    // Copy reference clockwise.
-    out_left_ref[0] = out_left_ref[1];
-    out_top_ref[0] = out_left_ref[1];
+    if (px.x == 0) {
+      // On left border, no need for multi ref index
+      out_left_ref[0] = out_left_ref[1];
+      // Fill top reference top left pixels with nearest
+      kvz_pixel nearest = top_border[0];
+      for (int i = 0; i <= multi_ref_index; ++i) {
+        out_top_ref[i] = nearest;
+      }
+    } else {
+      // Copy reference clockwise.
+      out_left_ref[0] = out_left_ref[1];
+      out_top_ref[0] = out_left_ref[1];
+    }
   }
 
   // Generate top reference.
@@ -731,7 +741,7 @@ void kvz_intra_build_reference_any(
     }
     // Extend the last pixel for the rest of the reference values.
     kvz_pixel nearest_pixel = top_border[px_available_top - 1];
-    for (int i = px_available_top; i < width * 2 + multi_ref_index; ++i) {
+    for (int i = px_available_top; i < width * 2 + multi_ref_index * 2; ++i) {
       out_top_ref[i + 1 + multi_ref_index] = nearest_pixel;
     }
   } else {
