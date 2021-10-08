@@ -393,22 +393,23 @@ static void inter_recon_unipred(const encoder_state_t * const state,
           width, height,
           mv_param, lcu);
       }
-    }
-  } else {
-    // With an integer MV, copy pixels directly from the reference.
-    const int lcu_pu_index = pu_in_lcu.y * LCU_WIDTH + pu_in_lcu.x;
-    if (mv_is_outside_frame) {
-      inter_cp_with_ext_border(ref->y, ref->stride,
-                               ref->width, ref->height,
-                               &lcu->rec.y[lcu_pu_index], LCU_WIDTH,
-                               width, height,
-                               &mv_in_frame);
     } else {
-      const int frame_mv_index = mv_in_frame.y * ref->stride + mv_in_frame.x;
-      kvz_pixels_blit(&ref->y[frame_mv_index],
-                      &lcu->rec.y[lcu_pu_index],
-                      width, height,
-                      ref->stride, LCU_WIDTH);
+      // With an integer MV, copy pixels directly from the reference.
+      const int lcu_pu_index = pu_in_lcu.y * LCU_WIDTH + pu_in_lcu.x;
+      if (mv_is_outside_frame) {
+        inter_cp_with_ext_border(ref->y, ref->stride,
+                                 ref->width, ref->height,
+                                 &lcu->rec.y[lcu_pu_index], LCU_WIDTH,
+                                 width, height,
+                                 &mv_in_frame);
+      }
+      else {
+        const int frame_mv_index = mv_in_frame.y * ref->stride + mv_in_frame.x;
+        kvz_pixels_blit(&ref->y[frame_mv_index],
+          &lcu->rec.y[lcu_pu_index],
+          width, height,
+          ref->stride, LCU_WIDTH);
+      }
     }
   }
 
