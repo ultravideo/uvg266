@@ -713,10 +713,15 @@ void kvz_intra_build_reference_any(
     if (px.x == 0) {
       // On left border, no need for multi ref index
       out_left_ref[0] = out_left_ref[1];
-      // Fill top reference top left pixels with nearest
-      kvz_pixel nearest = top_border[0];
-      for (int i = 0; i <= multi_ref_index; ++i) {
-        out_top_ref[i] = nearest;
+      if (px.y == 0) {
+        out_top_ref[0] = out_left_ref[1];
+      }
+      else {
+        // Fill top reference top left pixels with nearest
+        kvz_pixel nearest = top_border[0];
+        for (int i = 0; i <= multi_ref_index; ++i) {
+          out_top_ref[i] = nearest;
+        }
       }
     } else {
       // Copy reference clockwise.
