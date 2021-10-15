@@ -561,7 +561,7 @@ void kvz_intra_predict(
   uint8_t multi_ref_index = color == COLOR_Y ? multi_ref_idx : 0;
 
   const kvz_intra_ref *used_ref = &refs->ref;
-  if (cfg->intra_smoothing_disabled || color != COLOR_Y || mode == 1 || width == 4) {
+  if (cfg->intra_smoothing_disabled || color != COLOR_Y || mode == 1 || width == 4 || multi_ref_index) {
     // For chroma, DC and 4x4 blocks, always use unfiltered reference.
   } else if (mode == 0) {
     // Otherwise, use filtered for planar.
