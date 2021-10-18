@@ -701,12 +701,13 @@ void kvz_intra_build_reference_any(
       kvz_pixel nearest = left_border[-1 * left_stride];
       for (int i = 0; i <= multi_ref_index; ++i) {
         out_left_ref[i] = nearest;
-        out_top_ref[i] = top_border[i - multi_ref_index - 1];
+        out_top_ref[i] = nearest;
       }
     } else {
+      kvz_pixel nearest = top_border[-1];
       for (int i = 0; i <= multi_ref_index; ++i) {
-        out_left_ref[i] = left_border[(i - multi_ref_index - 1) * left_stride];
-        out_top_ref[i] = top_border[i - multi_ref_index - 1];
+        out_left_ref[i] = nearest;
+        out_top_ref[i] = nearest;
       }
     }
   } else {
