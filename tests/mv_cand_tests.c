@@ -38,7 +38,7 @@ TEST test_get_spatial_merge_cand(void)
                                1920, 1080,  // picture size
                                &lcu,
                                &cand,
-                               2);
+                               2, 0);
 
   ASSERT_EQ(cand.b[1], &lcu.cu[289]);
   ASSERT_EQ(cand.b[0], &lcu.cu[ 16]);
