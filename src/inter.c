@@ -1367,16 +1367,11 @@ static bool is_duplicate_candidate(const cu_info_t* cu1, const cu_info_t* cu2)
 static bool add_merge_candidate(const cu_info_t *cand,
                                 const cu_info_t *possible_duplicate1,
                                 const cu_info_t *possible_duplicate2,
-                                const cu_info_t *possible_duplicate3,
-                                const cu_info_t *possible_duplicate4,
                                 inter_merge_cand_t *merge_cand_out)
 {
   if (!cand ||
       is_duplicate_candidate(cand, possible_duplicate1) ||
-
-      is_duplicate_candidate(cand, possible_duplicate2) ||
-      is_duplicate_candidate(cand, possible_duplicate3) ||
-      is_duplicate_candidate(cand, possible_duplicate4)) {
+      is_duplicate_candidate(cand, possible_duplicate2)) {
     return false;
   }
 
@@ -1501,12 +1496,12 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
   if (!use_a1) a[0] = NULL;
   if (!use_b1) b[0] = NULL;
 
-  if (add_merge_candidate(b[1], NULL, NULL, NULL, NULL, &mv_cand[candidates])) candidates++;
-  if (add_merge_candidate(a[1], b[1], NULL, NULL, NULL, &mv_cand[candidates])) candidates++;
-  if (add_merge_candidate(b[0], b[1], a[1], NULL, NULL, &mv_cand[candidates])) candidates++;
-  if (add_merge_candidate(a[0], a[1], b[1], b[0], NULL, &mv_cand[candidates])) candidates++;
+  if (add_merge_candidate(b[1], NULL, NULL, &mv_cand[candidates])) candidates++;
+  if (add_merge_candidate(a[1], b[1], NULL, &mv_cand[candidates])) candidates++;
+  if (add_merge_candidate(b[0], b[1], NULL, &mv_cand[candidates])) candidates++;
+  if (add_merge_candidate(a[0], a[1], NULL, &mv_cand[candidates])) candidates++;
   if (candidates < 4 &&
-      add_merge_candidate(b[2], a[1], b[1], a[0], b[0], &mv_cand[candidates])) candidates++;
+      add_merge_candidate(b[2], a[1], b[1], &mv_cand[candidates])) candidates++;
 
   bool can_use_tmvp =
     state->encoder_control->cfg.tmvp_enable &&

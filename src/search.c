@@ -708,7 +708,8 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
                            NULL, lcu);
       }
     } else if (cur_cu->type == CU_INTER) {
-
+      cur_cu->merged = 0;
+      cur_cu->skipped = 0;
       if (!cur_cu->skipped) {
         // Reset transform depth because intra messes with them.
         // This will no longer be necessary if the transform depths are not shared.
