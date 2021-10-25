@@ -674,14 +674,14 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   WRITE_U(stream, 0, 1, "sps_mmvd_enabled_flag");  
 
 
-  WRITE_UE(stream, 6 -  MRG_MAX_NUM_CANDS, "six_minus_max_num_merge_cand");
+  WRITE_UE(stream, 6 - state->encoder_control->cfg.max_merge, "six_minus_max_num_merge_cand");
   WRITE_U(stream, 0, 1, "sps_sbt_enabled_flag");
   WRITE_U(stream, 0, 1, "sps_affine_enabled_flag");
 
   WRITE_U(stream, 0, 1, "sps_bcw_enabled_flag");
 
   WRITE_U(stream, 0, 1, "sps_ciip_enabled_flag");
-  if (MRG_MAX_NUM_CANDS >= 2)
+  if (state->encoder_control->cfg.max_merge >= 2)
   {
     WRITE_U(stream, 0, 1, "sps_gpm_enabled_flag");
   }

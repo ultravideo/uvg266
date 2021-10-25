@@ -589,7 +589,7 @@ static void encode_inter_prediction_unit(encoder_state_t * const state,
   int16_t num_cand = 0;
   cabac->cur_ctx = &(cabac->ctx.cu_merge_flag_ext_model);
   CABAC_BIN(cabac, cur_cu->merged, "MergeFlag");
-  num_cand = MRG_MAX_NUM_CANDS;
+  num_cand = state->encoder_control->cfg.max_merge;
   if (cur_cu->merged) { //merge
     if (num_cand > 1) {
       int32_t ui;
@@ -1263,7 +1263,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
     if (cur_cu->skipped) {
 
       kvz_hmvp_add_mv(state, x, y, cu_width, cu_width, cur_cu);
-      int16_t num_cand = MRG_MAX_NUM_CANDS;
+      int16_t num_cand = state->encoder_control->cfg.max_merge;
       if (num_cand > 1) {
         for (int ui = 0; ui < num_cand - 1; ui++) {
           int32_t symbol = (ui != cur_cu->merge_idx);
