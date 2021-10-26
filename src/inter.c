@@ -1306,7 +1306,7 @@ void kvz_inter_get_mv_cand(const encoder_state_t * const state,
                            lcu_t *lcu,
                            int8_t reflist)
 {
-  merge_candidates_t merge_cand = { {0, 0}, {0, 0, 0}, 0, 0 };
+  merge_candidates_t merge_cand = { 0 };
   const uint8_t parallel_merge_level = state->encoder_control->cfg.log2_parallel_merge_level;
   get_spatial_merge_candidates(x, y, width, height,
                                state->tile->frame->width,
@@ -1338,7 +1338,7 @@ void kvz_inter_get_mv_cand_cua(const encoder_state_t * const state,
                                const cu_info_t* cur_cu,
                                int8_t reflist)
 {
-  merge_candidates_t merge_cand = { {0, 0}, {0, 0, 0}, 0, 0 };
+  merge_candidates_t merge_cand = { 0 };
 
   const cu_array_t *cua = state->tile->frame->cu_array;
   get_spatial_merge_candidates_cua(cua,
@@ -1484,7 +1484,7 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
   uint8_t candidates = 0;
   int8_t zero_idx = 0;
   const uint8_t parallel_merge_level = state->encoder_control->cfg.log2_parallel_merge_level;
-  merge_candidates_t merge_cand = { {0, 0}, {0, 0, 0}, 0, 0 };
+  merge_candidates_t merge_cand = { 0 };
   const uint8_t max_num_cands = state->encoder_control->cfg.max_merge;
   get_spatial_merge_candidates(x, y, width, height,
                                state->tile->frame->width,

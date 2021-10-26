@@ -31,7 +31,7 @@ TEST test_get_spatial_merge_cand(void)
     lcu.cu[i].type = CU_INTER;
   }
 
-  merge_candidates_t cand = { {0, 0}, {0, 0, 0}, 0, 0 };
+  merge_candidates_t cand = { 0 };
 
   get_spatial_merge_candidates(64 + 32, 64, // x, y
                                32, 24,      // width, height
