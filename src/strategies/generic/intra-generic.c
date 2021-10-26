@@ -222,9 +222,7 @@ static void kvz_angular_pred_generic(
   if (sample_disp != 0) {
     // The mode is not horizontal or vertical, we have to do interpolation.
 
-    int_fast32_t delta_pos = 0;
-    for (int_fast32_t y = 0; y < width; ++y) {
-      delta_pos += sample_disp * (1 + multi_ref_index);
+    for (int_fast32_t y = 0, delta_pos = sample_disp * (1 + multi_ref_index); y < width; ++y, delta_pos += sample_disp) {
       int_fast32_t delta_int = delta_pos >> 5;
       int_fast32_t delta_fract = delta_pos & (32 - 1);
 
