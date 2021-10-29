@@ -1062,7 +1062,9 @@ static void kvz_encoder_state_write_bitstream_picture_header(
     || state->frame->pictype == KVZ_NAL_IDR_N_LP) {
   }
   else {
-    //WRITE_U(stream, state->encoder_control->cfg.tmvp_enable, 1, "ph_pic_temporal_mvp_enabled_flag");
+    if (state->encoder_control->cfg.tmvp_enable) {
+      WRITE_U(stream, state->encoder_control->cfg.tmvp_enable, 1, "ph_pic_temporal_mvp_enabled_flag");
+    }
     WRITE_U(stream, 0, 1, "ph_mvd_l1_zero_flag");
   }
 
@@ -1322,7 +1324,9 @@ void kvz_encoder_state_write_bitstream_slice_header(
 
   if (state->frame->slicetype != KVZ_SLICE_I && state->encoder_control->cfg.tmvp_enable) {
     //WRITE_U(stream, ref_negative ? 1 : 0, 1, "slice_temporal_mvp_enabled_flag");
-    WRITE_U(stream, 0, 1, "sh_collocated_from_l0_flag");
+    if (state->frame->slicetype == KVZ_SLICE_B) {
+      WRITE_U(stream, 0, 1, "sh_collocated_from_l0_flag");
+    }
   }
 
   int slice_qp_delta = state->frame->QP - encoder->cfg.qp;
