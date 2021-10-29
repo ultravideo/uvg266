@@ -953,7 +953,7 @@ static void get_spatial_merge_candidates(int32_t x,
     }
 
     cu_info_t *b1 = LCU_GET_CU_AT_PX(lcu, x_local + width - 1, y_local - 1);
-    // Do not check b0->coded because the block to the left is always coded
+    // Do not check b1->coded because the block to the left is always coded
     // before the current one and the flag is not set when searching an SMP
     // block.
     if (b1->type == CU_INTER) {
@@ -1391,7 +1391,7 @@ static bool add_merge_candidate(const cu_info_t *cand,
 
 static void hmvp_shift_lut(cu_info_t* lut, int32_t size, int32_t start, int32_t end) {
 
-  if (end > MAX_NUM_HMVP_CANDS) end = MAX_NUM_HMVP_CANDS;
+  if (end > MAX_NUM_HMVP_CANDS-1) end = MAX_NUM_HMVP_CANDS-1;
   if (end == 0 && size == 1) end = 1;
   for (int i = end-1; i >= start; i--) {
     memcpy(&lut[i + 1], &lut[i], sizeof(cu_info_t));
@@ -1449,11 +1449,11 @@ void kvz_hmvp_add_mv(const encoder_state_t* const state, uint32_t pic_x, uint32_
       if (lut == NULL) lut = fopen("uvg_lut.txt", "w");
       static int   val = 0;
 
-      fprintf(lut, "%d: (%d,%d) Block (%d,%d) -> %d,%d\n", val++, pic_x, pic_y, block_width, block_height, cu->inter.mv[0][0], cu->inter.mv[0][1]);
+      fprintf(lut, "%d: (%d,%d) Block (%d,%d) -> %d,%d\n", val++, pic_x, pic_y, block_width, block_height, cu->inter.mv[0][0]*4, cu->inter.mv[0][1]*4);
 
       for (int i = 0; i < state->frame->hmvp_size[ctu_row]; i++)
       {
-        fprintf(lut, "(%d,%d), ", state->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv[0][0], state->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv[0][1]);
+        fprintf(lut, "(%d,%d), ", state->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv[0][0]*4, state->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv[0][1]*4);
       }
       fprintf(lut, "\n");
     }
@@ -1496,8 +1496,8 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
   const cu_info_t **b = merge_cand.b;
   const uint16_t mer[2] = {(x+width) >> parallel_merge_level, (y+height) >> parallel_merge_level };
 
-  if (!use_a1) a[0] = NULL;
-  if (!use_b1) b[0] = NULL;
+  if (!use_a1) a[1] = NULL;
+  if (!use_b1) b[1] = NULL;
 
   if (add_merge_candidate(b[1], NULL, NULL, &mv_cand[candidates])) candidates++;
   if (add_merge_candidate(a[1], b[1], NULL, &mv_cand[candidates])) candidates++;
