@@ -1591,6 +1591,31 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
     }
   }
 
+  if (candidates != max_num_cands - 1) {
+    const uint32_t ctu_row = (y >> LOG2_LCU_WIDTH);
+    const uint32_t ctu_row_mul_five = ctu_row * MAX_NUM_HMVP_CANDS;
+    int32_t num_cand = state->frame->hmvp_size[ctu_row];
+    // ToDo: VVC: verify B-frames
+    for (int i = 0; i < num_cand; i++) {
+      const cu_info_t* hmvp_cand = &state->frame->hmvp_lut[ctu_row_mul_five + i];
+      // ToDo: Add IBC condition
+      if (i > 1 || ((!is_duplicate_candidate(hmvp_cand, a[1]))
+                 && (!is_duplicate_candidate(hmvp_cand, b[1]))) ) {
+        mv_cand[candidates].mv[0][0] = state->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv[0][0];
+        mv_cand[candidates].mv[0][1] = state->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv[0][1];
+        mv_cand[candidates].dir = state->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv_dir;
+        mv_cand[candidates].ref[0] = state->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv_ref[0];
+        if (state->frame->slicetype == KVZ_SLICE_B) {
+          mv_cand[candidates].mv[1][0] = state->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv[1][0];
+          mv_cand[candidates].mv[1][1] = state->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv[1][1];
+          mv_cand[candidates].ref[1] = state->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv_ref[1];
+        }
+        candidates++;
+        if (candidates == max_num_cands) return candidates;
+      }
+    }
+  }
+
   int num_ref = state->frame->ref->used_size;
 
   if (candidates < max_num_cands && state->frame->slicetype == KVZ_SLICE_B) {
