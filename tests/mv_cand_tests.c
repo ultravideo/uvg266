@@ -40,11 +40,11 @@ TEST test_get_spatial_merge_cand(void)
                                &cand,
                                2, 0);
 
-  ASSERT_EQ(cand.b[1], &lcu.cu[289]);
-  ASSERT_EQ(cand.b[0], &lcu.cu[ 16]);
+  ASSERT_EQ(cand.b[0], &lcu.cu[289]);
+  ASSERT_EQ(cand.b[1], &lcu.cu[ 16]);
   ASSERT_EQ(cand.b[2], &lcu.cu[  8]);
-  ASSERT_EQ(cand.a[1], &lcu.cu[127]);
-  ASSERT_EQ(cand.a[0], &lcu.cu[110]);
+  ASSERT_EQ(cand.a[0], &lcu.cu[127]);
+  ASSERT_EQ(cand.a[1], &lcu.cu[110]);
 
   PASS();
 }
