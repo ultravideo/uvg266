@@ -374,7 +374,7 @@ void kvz_quant_avx2(const encoder_state_t * const state, const coeff_t * __restr
   qp_scaled = transform_skip ? MAX(qp_scaled, 4 + 6 * MIN_QP_PRIME_TS) : qp_scaled;
   uint32_t log2_tr_width = kvz_math_floor_log2(height);
   uint32_t log2_tr_height = kvz_math_floor_log2(width);
-  const int32_t scalinglist_type = (block_type == CU_INTRA ? 0 : 3) + (int8_t)("\0\3\1\2"[color]);
+  const int32_t scalinglist_type = (block_type == CU_INTRA ? 0 : 3) + (int8_t)color;
   const int32_t *quant_coeff = encoder->scaling_list.quant_coeff[log2_tr_width][log2_tr_height][scalinglist_type][qp_scaled % 6];
   const int32_t transform_shift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - ((log2_tr_width + log2_tr_height) >> 1); //!< Represents scaling through forward transform
   const int32_t q_bits = QUANT_SHIFT + qp_scaled / 6 + (transform_skip ? 0 : transform_shift);
