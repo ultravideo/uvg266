@@ -1675,9 +1675,9 @@ static void search_pu_inter(encoder_state_t * const state,
   int num_rdo_cands = 0;
 
   // Check motion vector constraints and perform rough search
-  for (int merge_idx = 0; merge_idx < info.num_merge_cand; ++merge_idx) {
-
+  for (int merge_idx = 0; merge_idx < info.num_merge_cand; ++merge_idx) {    
     inter_merge_cand_t *cur_cand = &info.merge_cand[merge_idx];
+    if (cur_cand->half_pel) continue; // Skip half-pel candidates for now TODO: Fix
     cur_cu->inter.mv_dir = cur_cand->dir;
     cur_cu->inter.mv_ref[0] = cur_cand->ref[0];
     cur_cu->inter.mv_ref[1] = cur_cand->ref[1];

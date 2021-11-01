@@ -34,11 +34,13 @@
 
 
 typedef struct {
-  uint8_t dir;
-  uint8_t ref[2]; // index to L0/L1
   int16_t mv[2][2];
   uint16_t mer[2];
+  uint8_t dir;
+  uint8_t ref[2]; // index to L0/L1
 
+  /// \brief Flag for half-pel mv, otherwise mv is full-pel
+  bool half_pel; 
 } inter_merge_cand_t;
 
 void kvz_inter_recon_cu(const encoder_state_t * const state,
