@@ -197,7 +197,7 @@ static void kvz_angular_pred_generic(
     const int max_index = (multi_ref_index << s) + 2;
     const int ref_length = width << 1;
     const kvz_pixel val = temp_main[ref_length + multi_ref_index];
-    for (int j = 0; j <= max_index; j++) {
+    for (int j = 1; j <= max_index; j++) {
       temp_main[ref_length + multi_ref_index +  j] = val;
     }
 
@@ -244,6 +244,10 @@ static void kvz_angular_pred_generic(
             {
               use_cubic = false;
             }
+          }
+          // Cubic must be used if ref line != 0
+          if (multi_ref_index) {
+            use_cubic = true;
           }
           const int16_t filter_coeff[4] = { 16 - (delta_fract >> 1), 32 - (delta_fract >> 1), 16 + (delta_fract >> 1), delta_fract >> 1 };
           int16_t const * const f = use_cubic ? cubic_filter[delta_fract] : filter_coeff;
@@ -338,7 +342,8 @@ static void kvz_angular_pred_generic(
       for (int_fast32_t x = 0; x < width; ++x) {
         dst[y * width + x] = ref_main[x + 1];
       }
-      if ((width >= 4 || channel_type != 0) && sample_disp >= 0) {
+      // Do not apply PDPC if multi ref line index is other than 0
+      if ((width >= 4 || channel_type != 0) && sample_disp >= 0 && multi_ref_index == 0) {
         int scale = (log2_width + log2_width - 2) >> 2;
         const kvz_pixel top_left = ref_main[0];
         const kvz_pixel left = ref_side[1 + y];

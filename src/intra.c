@@ -681,7 +681,7 @@ void kvz_intra_build_reference_any(
       out_left_ref[i + 1 + multi_ref_index] = left_border[i * left_stride];
     }
     // Extend the last pixel for the rest of the reference values.
-    kvz_pixel nearest_pixel = out_left_ref[px_available_left];
+    kvz_pixel nearest_pixel = left_border[(px_available_left - 1) * left_stride];
     for (int i = px_available_left; i < width * 2 + multi_ref_index * 2; ++i) {
       out_left_ref[i + 1 + multi_ref_index] = nearest_pixel;
     }
@@ -689,42 +689,81 @@ void kvz_intra_build_reference_any(
     // If we are on the left edge, extend the first pixel of the top row.
     kvz_pixel nearest_pixel = luma_px->y > 0 ? top_border[0] : dc_val;
     for (int i = 0; i < width * 2 + multi_ref_index; i++) {
-      out_left_ref[i + 1] = nearest_pixel;
+      // Reserve space for top left reference
+      out_left_ref[i + 1 + multi_ref_index] = nearest_pixel;
     }
   }
 
-  // Generate top-left reference.
-  if (luma_px->x > 0 && luma_px->y > 0) {
-    // If the block is at an LCU border, the top-left must be copied from
-    // the border that points to the LCUs 1D reference buffer.
-    if (px.x == 0) {
-      kvz_pixel nearest = left_border[-1 * left_stride];
-      for (int i = 0; i <= multi_ref_index; ++i) {
-        out_left_ref[i] = nearest;
-        out_top_ref[i] = nearest;
-      }
-    } else {
-      kvz_pixel nearest = top_border[-1];
-      for (int i = 0; i <= multi_ref_index; ++i) {
-        out_left_ref[i] = nearest;
-        out_top_ref[i] = nearest;
-      }
-    }
-  } else {
-    if (px.x == 0) {
-      // On left border, no need for multi ref index
-      out_left_ref[0] = out_left_ref[1];
-      if (px.y == 0) {
+  // Generate top-left reference
+  if (multi_ref_index)
+  {
+    if (luma_px->x > 0 && luma_px->y > 0) {
+      // If the block is at an LCU border, the top-left must be copied from
+      // the border that points to the LCUs 1D reference buffer.
+
+      // Inner picture cases
+      if (px.x == 0 && px.y == 0) {
+        // LCU top left corner case. Multi ref will be 0.
+        out_left_ref[0] = out_left_ref[1];
         out_top_ref[0] = out_left_ref[1];
       }
-      else {
-        // Fill top reference top left pixels with nearest
-        kvz_pixel nearest = top_border[0];
+      else if (px.x == 0) {
+        // LCU left border case
+        kvz_pixel nearest = left_border[-1 * left_stride];
         for (int i = 0; i <= multi_ref_index; ++i) {
+          out_left_ref[i] = left_border[(i - 1 - multi_ref_index) * left_stride];
           out_top_ref[i] = nearest;
         }
       }
-    } else {
+      else if (px.y == 0) {
+        // LCU top border case. Multi ref will be 0.
+        out_left_ref[0] = top_border[-1];
+        out_top_ref[0] = top_border[-1];
+      }
+      else {
+        // Inner case
+        for (int i = 0; i <= multi_ref_index; ++i) {
+          out_left_ref[i] = left_border[(i - 1 - multi_ref_index) * left_stride];
+          out_top_ref[i] = top_border[i - 1 - multi_ref_index];
+        }
+      }
+    }
+    else {
+      // Picture border cases
+      if (px.x == 0 && px.y == 0) {
+        // Top left picture corner case. Multi ref will be 0.
+        out_left_ref[0] = out_left_ref[1];
+        out_top_ref[0] = out_left_ref[1];
+      }
+      else if (px.x == 0) {
+        // Picture left border case. Reference pixel cannot be taken from outside LCU border
+        kvz_pixel nearest = out_left_ref[1 + multi_ref_index];
+        for (int i = 0; i <= multi_ref_index; ++i) {
+          out_left_ref[i] = nearest;
+          out_top_ref[i] = nearest;
+        }
+      }
+      else {
+        // Picture top border case. Multi ref will be 0.
+        out_left_ref[0] = top_border[-1];
+        out_top_ref[0] = top_border[-1];
+      }
+    }
+  }
+  else {
+    if (luma_px->x > 0 && luma_px->y > 0) {
+      // If the block is at an LCU border, the top-left must be copied from
+      // the border that points to the LCUs 1D reference buffer.
+      if (px.x == 0) {
+        out_left_ref[0] = left_border[-1 * left_stride];
+        out_top_ref[0] = left_border[-1 * left_stride];
+      }
+      else {
+        out_left_ref[0] = top_border[-1];
+        out_top_ref[0] = top_border[-1];
+      }
+    }
+    else {
       // Copy reference clockwise.
       out_left_ref[0] = out_left_ref[1];
       out_top_ref[0] = out_left_ref[1];
