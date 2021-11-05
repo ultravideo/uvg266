@@ -538,6 +538,15 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
   uint32_t inter_bitcost = MAX_INT;
   cu_info_t *cur_cu;
 
+  const uint32_t ctu_row = (y >> LOG2_LCU_WIDTH);
+  const uint32_t ctu_row_mul_five = ctu_row * MAX_NUM_HMVP_CANDS;
+
+  cu_info_t hmvp_lut[MAX_NUM_HMVP_CANDS];
+  uint8_t hmvp_lut_size = state->frame->hmvp_size[ctu_row];
+
+  // Store original HMVP lut before search and restore after, since it's modified
+  if (state->frame->slicetype != KVZ_SLICE_I) memcpy(hmvp_lut, &state->frame->hmvp_lut[ctu_row_mul_five], sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
+
   struct {
     int32_t min;
     int32_t max;
@@ -708,8 +717,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
                            NULL, lcu);
       }
     } else if (cur_cu->type == CU_INTER) {
-      cur_cu->merged = 0;
-      cur_cu->skipped = 0;
+
       if (!cur_cu->skipped) {
         // Reset transform depth because intra messes with them.
         // This will no longer be necessary if the transform depths are not shared.
@@ -887,11 +895,25 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       // Copy this CU's mode all the way down for use in adjacent CUs mode
       // search.
       work_tree_copy_down(x_local, y_local, depth, work_tree);
+
+      if (state->frame->slicetype != KVZ_SLICE_I) {
+        // Reset HMVP to the beginning of this CU level search and add this CU as the mvp
+        memcpy(&state->frame->hmvp_lut[ctu_row_mul_five], hmvp_lut, sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
+        state->frame->hmvp_size[ctu_row] = hmvp_lut_size;
+        kvz_hmvp_add_mv(state, x, y, cu_width, cu_width, cur_cu);
+      }
     }
   } else if (depth >= 0 && depth < MAX_PU_DEPTH) {
     // Need to copy modes down since the lower level of the work tree is used
     // when searching SMP and AMP blocks.
     work_tree_copy_down(x_local, y_local, depth, work_tree);
+
+    if (state->frame->slicetype != KVZ_SLICE_I) {
+      // Reset HMVP to the beginning of this CU level search and add this CU as the mvp
+      memcpy(&state->frame->hmvp_lut[ctu_row_mul_five], hmvp_lut, sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
+      state->frame->hmvp_size[ctu_row] = hmvp_lut_size;
+      kvz_hmvp_add_mv(state, x, y, cu_width, cu_width, cur_cu);
+    }
   }
 
   assert(cur_cu->type != CU_NOTSET);

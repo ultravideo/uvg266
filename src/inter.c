@@ -1429,6 +1429,7 @@ static bool hmvp_push_lut_item(cu_info_t* lut, int32_t size, cu_info_t* cu) {
 void kvz_hmvp_add_mv(const encoder_state_t* const state, uint32_t pic_x, uint32_t pic_y, uint32_t block_width, uint32_t block_height, cu_info_t* cu)
 {
   //if (!cu.geoFlag && !cu.affine)
+  if(cu->type == CU_INTER)
   {    
 
     const uint8_t parallel_merge_level = state->encoder_control->cfg.log2_parallel_merge_level;
@@ -1599,7 +1600,7 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
 
   if (candidates == max_num_cands) return candidates;
 
-  if (0 && candidates != max_num_cands - 1) {
+  if (candidates != max_num_cands - 1) {
     const uint32_t ctu_row = (y >> LOG2_LCU_WIDTH);
     const uint32_t ctu_row_mul_five = ctu_row * MAX_NUM_HMVP_CANDS;
     int32_t num_cand = state->frame->hmvp_size[ctu_row];

@@ -636,8 +636,22 @@ static void encoder_state_worker_encode_lcu_search(void * opaque)
 
   lcu->coeff = calloc(1, sizeof(lcu_coeff_t));
 
+  const uint32_t ctu_row = (lcu->position_px.y >> LOG2_LCU_WIDTH);
+  const uint32_t ctu_row_mul_five = ctu_row * MAX_NUM_HMVP_CANDS;
+
+  cu_info_t original_lut[MAX_NUM_HMVP_CANDS];
+  uint8_t original_lut_size = state->frame->hmvp_size[ctu_row];
+
+  // Store original HMVP lut before search and restore after, since it's modified
+  if(state->frame->slicetype != KVZ_SLICE_I) memcpy(original_lut, &state->frame->hmvp_lut[ctu_row_mul_five], sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
+
   //This part doesn't write to bitstream, it's only search, deblock and sao
   kvz_search_lcu(state, lcu->position_px.x, lcu->position_px.y, state->tile->hor_buf_search, state->tile->ver_buf_search, lcu->coeff);
+
+  if(state->frame->slicetype != KVZ_SLICE_I) {
+    memcpy(&state->frame->hmvp_lut[ctu_row_mul_five], original_lut, sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
+    state->frame->hmvp_size[ctu_row] = original_lut_size;
+  }
 
   encoder_state_recdata_to_bufs(state, lcu, state->tile->hor_buf_search, state->tile->ver_buf_search);
 
