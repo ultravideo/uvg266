@@ -1445,18 +1445,6 @@ void kvz_hmvp_add_mv(const encoder_state_t* const state, uint32_t pic_x, uint32_
       if(add_row && state->frame->hmvp_size[ctu_row] < MAX_NUM_HMVP_CANDS) {
         state->frame->hmvp_size[ctu_row]++;
       }
-
-      static FILE* lut = NULL;
-      if (lut == NULL) lut = fopen("uvg_lut.txt", "w");
-      static int   val = 0;
-
-      fprintf(lut, "%d: (%d,%d) Block (%d,%d) -> %d,%d\n", val++, pic_x, pic_y, block_width, block_height, cu->inter.mv[0][0]*4, cu->inter.mv[0][1]*4);
-
-      for (int i = 0; i < state->frame->hmvp_size[ctu_row]; i++)
-      {
-        fprintf(lut, "(%d,%d), ", state->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv[0][0]*4, state->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv[0][1]*4);
-      }
-      fprintf(lut, "\n");
     }
   }
 }
