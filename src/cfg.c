@@ -156,7 +156,7 @@ int kvz_config_init(kvz_config *cfg)
 
   cfg->scaling_list = KVZ_SCALING_LIST_OFF;
 
-  cfg->max_merge = 5;
+  cfg->max_merge = 6;
   cfg->early_skip = true;
 
   cfg->intra_smoothing_disabled = false;
@@ -177,6 +177,7 @@ int kvz_config_init(kvz_config *cfg)
 
   cfg->stats_file_prefix = NULL;
 
+  cfg->log2_parallel_merge_level = 2;
   cfg->fastrd_sampling_on = 0;
   cfg->fastrd_accuracy_check_on = 0;
   cfg->fastrd_learning_outdir_fn = NULL;
@@ -574,7 +575,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "intra-rdo-et", "0",
         "early-skip", "1",
         "fast-residual-cost", "28",
-        "max-merge", "5",
+        "max-merge", "6",
         NULL
       },
       {
@@ -602,7 +603,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "intra-rdo-et", "0",
         "early-skip", "1",
         "fast-residual-cost", "28",
-        "max-merge", "5",
+        "max-merge", "6",
         NULL
       },
       {
@@ -630,7 +631,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "intra-rdo-et", "0",
         "early-skip", "1",
         "fast-residual-cost", "28",
-        "max-merge", "5",
+        "max-merge", "6",
         NULL
       },
       {
@@ -658,7 +659,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "intra-rdo-et", "0",
         "early-skip", "1",
         "fast-residual-cost", "0",
-        "max-merge", "5",
+        "max-merge", "6",
         NULL
       },
       {
@@ -686,7 +687,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "intra-rdo-et", "0",
         "early-skip", "1",
         "fast-residual-cost", "0",
-        "max-merge", "5",
+        "max-merge", "6",
         NULL
       },
       {
@@ -714,7 +715,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "intra-rdo-et", "0",
         "early-skip", "1",
         "fast-residual-cost", "0",
-        "max-merge", "5",
+        "max-merge", "6",
         NULL
       },
       {
@@ -742,7 +743,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "intra-rdo-et", "0",
         "early-skip", "1",
         "fast-residual-cost", "0",
-        "max-merge", "5",
+        "max-merge", "6",
         NULL
       },
       {
@@ -770,7 +771,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "intra-rdo-et", "0",
         "early-skip", "1",
         "fast-residual-cost", "0",
-        "max-merge", "5",
+        "max-merge", "6",
         NULL
       },
       {
@@ -798,7 +799,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "intra-rdo-et", "0",
         "early-skip", "1",
         "fast-residual-cost", "0",
-        "max-merge", "5",
+        "max-merge", "6",
         NULL
       },
       {
@@ -826,7 +827,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "intra-rdo-et", "0",
         "early-skip", "0",
         "fast-residual-cost", "0",
-        "max-merge", "5",
+        "max-merge", "6",
         NULL
       },
       { NULL }
@@ -1392,8 +1393,8 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   }
   else if (OPT("max-merge")) {
     int max_merge = atoi(value);
-    if (max_merge < 1 || max_merge > 5) {
-      fprintf(stderr, "max-merge needs to be between 1 and 5\n");
+    if (max_merge < 1 || max_merge > 6) {
+      fprintf(stderr, "max-merge needs to be between 1 and 6\n");
       return 0;
     }
     cfg->max_merge = (uint8_t)max_merge;

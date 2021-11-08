@@ -589,7 +589,7 @@ static void encode_inter_prediction_unit(encoder_state_t * const state,
   int16_t num_cand = 0;
   cabac->cur_ctx = &(cabac->ctx.cu_merge_flag_ext_model);
   CABAC_BIN(cabac, cur_cu->merged, "MergeFlag");
-  num_cand = MRG_MAX_NUM_CANDS;
+  num_cand = state->encoder_control->cfg.max_merge;
   if (cur_cu->merged) { //merge
     if (num_cand > 1) {
       int32_t ui;
@@ -1246,7 +1246,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
   }
 
   // Encode skip flag
-  if (state->frame->slicetype != KVZ_SLICE_I) {
+  if (state->frame->slicetype != KVZ_SLICE_I && cu_width != 4) {
 
     int8_t ctx_skip = 0;
 
@@ -1261,7 +1261,9 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
     CABAC_BIN(cabac, cur_cu->skipped, "SkipFlag");
 
     if (cur_cu->skipped) {
-      int16_t num_cand = MRG_MAX_NUM_CANDS;
+
+      kvz_hmvp_add_mv(state, x, y, cu_width, cu_width, cur_cu);
+      int16_t num_cand = state->encoder_control->cfg.max_merge;
       if (num_cand > 1) {
         for (int ui = 0; ui < num_cand - 1; ui++) {
           int32_t symbol = (ui != cur_cu->merge_idx);
@@ -1352,6 +1354,8 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
       const cu_info_t *cur_pu = kvz_cu_array_at_const(frame->cu_array, pu_x, pu_y);
 
       encode_inter_prediction_unit(state, cabac, cur_pu, pu_x, pu_y, pu_w, pu_h, depth);
+
+      kvz_hmvp_add_mv(state, x, y, pu_w, pu_h, cur_pu);
     }
 
     {

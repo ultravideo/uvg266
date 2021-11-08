@@ -34,10 +34,13 @@
 
 
 typedef struct {
+  int16_t mv[2][2];
+  uint16_t mer[2];
   uint8_t dir;
   uint8_t ref[2]; // index to L0/L1
-  int16_t mv[2][2];
 
+  /// \brief Flag for half-pel mv, otherwise mv is full-pel
+  bool half_pel; 
 } inter_merge_cand_t;
 
 void kvz_inter_recon_cu(const encoder_state_t * const state,
@@ -56,6 +59,8 @@ void kvz_inter_pred_pu(const encoder_state_t * const state,
   bool predict_luma,
   bool predict_chroma,
   int i_pu);
+
+void kvz_hmvp_add_mv(const encoder_state_t* const state, uint32_t pic_x, uint32_t pic_y, uint32_t block_width, uint32_t block_height, cu_info_t* cu);
 
 void kvz_inter_recon_bipred(const encoder_state_t * const state,
                             const kvz_picture * ref1,

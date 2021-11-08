@@ -674,19 +674,19 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   WRITE_U(stream, 0, 1, "sps_mmvd_enabled_flag");  
 
 
-  WRITE_UE(stream, MRG_MAX_NUM_CANDS - 6, "six_minus_max_num_merge_cand");
+  WRITE_UE(stream, 6 - state->encoder_control->cfg.max_merge, "six_minus_max_num_merge_cand");
   WRITE_U(stream, 0, 1, "sps_sbt_enabled_flag");
   WRITE_U(stream, 0, 1, "sps_affine_enabled_flag");
 
   WRITE_U(stream, 0, 1, "sps_bcw_enabled_flag");
 
   WRITE_U(stream, 0, 1, "sps_ciip_enabled_flag");
-  if (6 /*MAX_NUM_MERGE_CAND*/ >= 2)
+  if (state->encoder_control->cfg.max_merge >= 2)
   {
     WRITE_U(stream, 0, 1, "sps_gpm_enabled_flag");
   }
 
-  WRITE_UE(stream, 0, "log2_parallel_merge_level_minus2");
+  WRITE_UE(stream, encoder->cfg.log2_parallel_merge_level-2, "log2_parallel_merge_level_minus2");
 
   WRITE_U(stream, 0, 1, "sps_isp_enabled_flag");
   WRITE_U(stream, 0, 1, "sps_mrl_enabled_flag");
@@ -1062,7 +1062,9 @@ static void kvz_encoder_state_write_bitstream_picture_header(
     || state->frame->pictype == KVZ_NAL_IDR_N_LP) {
   }
   else {
-    //WRITE_U(stream, state->encoder_control->cfg.tmvp_enable, 1, "ph_pic_temporal_mvp_enabled_flag");
+    if (state->encoder_control->cfg.tmvp_enable) {
+      WRITE_U(stream, state->encoder_control->cfg.tmvp_enable, 1, "ph_pic_temporal_mvp_enabled_flag");
+    }
     WRITE_U(stream, 0, 1, "ph_mvd_l1_zero_flag");
   }
 
@@ -1322,7 +1324,9 @@ void kvz_encoder_state_write_bitstream_slice_header(
 
   if (state->frame->slicetype != KVZ_SLICE_I && state->encoder_control->cfg.tmvp_enable) {
     //WRITE_U(stream, ref_negative ? 1 : 0, 1, "slice_temporal_mvp_enabled_flag");
-    WRITE_U(stream, 0, 1, "sh_collocated_from_l0_flag");
+    if (state->frame->slicetype == KVZ_SLICE_B) {
+      WRITE_U(stream, 0, 1, "sh_collocated_from_l0_flag");
+    }
   }
 
   int slice_qp_delta = state->frame->QP - encoder->cfg.qp;

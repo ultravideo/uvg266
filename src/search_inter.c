@@ -1675,9 +1675,9 @@ static void search_pu_inter(encoder_state_t * const state,
   int num_rdo_cands = 0;
 
   // Check motion vector constraints and perform rough search
-  for (int merge_idx = 0; merge_idx < info.num_merge_cand; ++merge_idx) {
-
+  for (int merge_idx = 0; merge_idx < info.num_merge_cand; ++merge_idx) {    
     inter_merge_cand_t *cur_cand = &info.merge_cand[merge_idx];
+    if (cur_cand->half_pel) continue; // Skip half-pel candidates for now TODO: Fix
     cur_cu->inter.mv_dir = cur_cand->dir;
     cur_cu->inter.mv_ref[0] = cur_cand->ref[0];
     cur_cu->inter.mv_ref[1] = cur_cand->ref[1];
@@ -2057,9 +2057,9 @@ void kvz_search_cu_smp(encoder_state_t * const state,
     *inter_cost    += cost;
     *inter_bitcost += bitcost;
 
-    for (int y_tmp = y_pu; y_tmp < y_pu + height_pu; y_tmp += SCU_WIDTH) {
-      for (int x_tmp = x_pu; x_tmp < x_pu + width_pu; x_tmp += SCU_WIDTH) {
-        cu_info_t *scu = LCU_GET_CU_AT_PX(lcu, x_tmp, y_tmp);
+    for (int y_idx = y_pu; y_idx < y_pu + height_pu; y_idx += SCU_WIDTH) {
+      for (int x_idx = x_pu; x_idx < x_pu + width_pu; x_idx += SCU_WIDTH) {
+        cu_info_t *scu = LCU_GET_CU_AT_PX(lcu, x_idx, y_idx);
         scu->type = CU_INTER;
         scu->inter = cur_pu->inter;
       }

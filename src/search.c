@@ -538,6 +538,15 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
   uint32_t inter_bitcost = MAX_INT;
   cu_info_t *cur_cu;
 
+  const uint32_t ctu_row = (y >> LOG2_LCU_WIDTH);
+  const uint32_t ctu_row_mul_five = ctu_row * MAX_NUM_HMVP_CANDS;
+
+  cu_info_t hmvp_lut[MAX_NUM_HMVP_CANDS];
+  uint8_t hmvp_lut_size = state->frame->hmvp_size[ctu_row];
+
+  // Store original HMVP lut before search and restore after, since it's modified
+  if (state->frame->slicetype != KVZ_SLICE_I) memcpy(hmvp_lut, &state->frame->hmvp_lut[ctu_row_mul_five], sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
+
   struct {
     int32_t min;
     int32_t max;
@@ -886,11 +895,25 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       // Copy this CU's mode all the way down for use in adjacent CUs mode
       // search.
       work_tree_copy_down(x_local, y_local, depth, work_tree);
+
+      if (state->frame->slicetype != KVZ_SLICE_I) {
+        // Reset HMVP to the beginning of this CU level search and add this CU as the mvp
+        memcpy(&state->frame->hmvp_lut[ctu_row_mul_five], hmvp_lut, sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
+        state->frame->hmvp_size[ctu_row] = hmvp_lut_size;
+        kvz_hmvp_add_mv(state, x, y, cu_width, cu_width, cur_cu);
+      }
     }
   } else if (depth >= 0 && depth < MAX_PU_DEPTH) {
     // Need to copy modes down since the lower level of the work tree is used
     // when searching SMP and AMP blocks.
     work_tree_copy_down(x_local, y_local, depth, work_tree);
+
+    if (state->frame->slicetype != KVZ_SLICE_I) {
+      // Reset HMVP to the beginning of this CU level search and add this CU as the mvp
+      memcpy(&state->frame->hmvp_lut[ctu_row_mul_five], hmvp_lut, sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
+      state->frame->hmvp_size[ctu_row] = hmvp_lut_size;
+      kvz_hmvp_add_mv(state, x, y, cu_width, cu_width, cur_cu);
+    }
   }
 
   assert(cur_cu->type != CU_NOTSET);
@@ -939,8 +962,8 @@ static void init_lcu_t(const encoder_state_t * const state, const int x, const i
     memcpy(to_cu, from_cu, sizeof(*to_cu));
   }
 
-  // Copy top-right CU.
-  if (y > 0 && x + LCU_WIDTH < frame->width) {
+  // Copy top-right CU, available only without WPP
+  if (y > 0 && x + LCU_WIDTH < frame->width && !state->encoder_control->cfg.wpp) {
     const cu_info_t *from_cu = kvz_cu_array_at_const(frame->cu_array, x + LCU_WIDTH, y - 1);
     cu_info_t *to_cu = LCU_GET_TOP_RIGHT_CU(lcu);
     memcpy(to_cu, from_cu, sizeof(*to_cu));

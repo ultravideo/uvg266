@@ -467,6 +467,9 @@ typedef struct kvz_config
   enum kvz_file_format file_format;
 
   char *stats_file_prefix;
+
+  uint8_t log2_parallel_merge_level;
+
   char *fast_coeff_table_fn;   /*!< \brief Pointer to fast coeff table filename */
 
   /** \brief whether we're sampling TBs and their costs for fast cost
