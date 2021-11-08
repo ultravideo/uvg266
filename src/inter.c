@@ -1468,6 +1468,16 @@ static void round_avg_mv(int16_t* mvx, int16_t* mvy, int nShift)
   *mvy = (*mvy + nOffset - (*mvy >= 0)) >> nShift;
 }
 
+static bool different_mer(int32_t x, int32_t y, int32_t x2, int32_t y2, uint8_t parallel_merge_level) {
+
+  if ((x >> parallel_merge_level) != (x2 >> parallel_merge_level) || (y >> parallel_merge_level) != (y2 >> parallel_merge_level))
+  {
+    return true;
+  }
+
+  return false;
+}
+
 /**
  * \brief Get merge predictions for current block
  * \param state     the encoder state
@@ -1506,12 +1516,12 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
   if (!use_a1) a[1] = NULL;
   if (!use_b1) b[1] = NULL;
 
-  if (add_merge_candidate(b[1], NULL, NULL, &mv_cand[candidates])) candidates++;
-  if (add_merge_candidate(a[1], b[1], NULL, &mv_cand[candidates])) candidates++;
-  if (add_merge_candidate(b[0], b[1], NULL, &mv_cand[candidates])) candidates++;
-  if (add_merge_candidate(a[0], a[1], NULL, &mv_cand[candidates])) candidates++;
+  if (different_mer(x, y, x, y - 1, parallel_merge_level) && add_merge_candidate(b[1], NULL, NULL, &mv_cand[candidates])) candidates++;
+  if (different_mer(x, y, x - 1, y, parallel_merge_level) && add_merge_candidate(a[1], b[1], NULL, &mv_cand[candidates])) candidates++;
+  if (different_mer(x, y, x + 1, y - 1, parallel_merge_level) && add_merge_candidate(b[0], b[1], NULL, &mv_cand[candidates])) candidates++;
+  if (different_mer(x, y, x - 1, y + 1, parallel_merge_level) && add_merge_candidate(a[0], a[1], NULL, &mv_cand[candidates])) candidates++;
   if (candidates < 4 &&
-      add_merge_candidate(b[2], a[1], b[1], &mv_cand[candidates])) candidates++;
+     different_mer(x, y, x - 1, y - 1, parallel_merge_level) && add_merge_candidate(b[2], a[1], b[1], &mv_cand[candidates])) candidates++;
 
   bool can_use_tmvp =
     state->encoder_control->cfg.tmvp_enable &&
