@@ -962,8 +962,8 @@ static void init_lcu_t(const encoder_state_t * const state, const int x, const i
     memcpy(to_cu, from_cu, sizeof(*to_cu));
   }
 
-  // Copy top-right CU.
-  if (y > 0 && x + LCU_WIDTH < frame->width) {
+  // Copy top-right CU, available only without WPP
+  if (y > 0 && x + LCU_WIDTH < frame->width && !state->encoder_control->cfg.wpp) {
     const cu_info_t *from_cu = kvz_cu_array_at_const(frame->cu_array, x + LCU_WIDTH, y - 1);
     cu_info_t *to_cu = LCU_GET_TOP_RIGHT_CU(lcu);
     memcpy(to_cu, from_cu, sizeof(*to_cu));
