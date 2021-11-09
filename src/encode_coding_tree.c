@@ -633,25 +633,22 @@ static void encode_inter_prediction_unit(encoder_state_t * const state,
         int32_t ref_frame = cur_cu->inter.mv_ref[ref_list_idx];
 
         cabac->cur_ctx = &(cabac->ctx.cu_ref_pic_model[0]);
-        CABAC_BIN(cabac, (ref_frame != 0), "ref_idx_lX");
+        CABAC_BIN(cabac, (ref_frame > 0), "ref_idx_lX");
 
-        if (ref_frame > 0) {
-          ref_frame--;
+        if (ref_frame > 0 && ref_LX_size > 2) {
+          cabac->cur_ctx = &(cabac->ctx.cu_ref_pic_model[1]);
+          CABAC_BIN(cabac, (ref_frame > 1), "ref_idx_lX");
 
-          int32_t ref_num = ref_LX_size - 2;
-
-          for (int32_t i = 0; i < ref_num; ++i) {
-            const uint32_t symbol = (i == ref_frame) ? 0 : 1;
-
-            if (i == 0) {
-              cabac->cur_ctx = &cabac->ctx.cu_ref_pic_model[1];
-              CABAC_BIN(cabac, symbol, "ref_idx_lX");
-            } else {
-              CABAC_BIN_EP(cabac, symbol, "ref_idx_lX");
+          if (ref_frame > 1 && ref_LX_size > 3) {
+            for (int idx = 3; idx < ref_LX_size; idx++)
+            {
+              uint8_t val = (ref_frame > idx - 1) ? 1 : 0;
+              CABAC_BIN_EP(cabac, val, "ref_idx_lX");
+              if (!val) break;
             }
-            if (symbol == 0) break;
           }
         }
+
       }
 
       if (state->frame->ref_list != REF_PIC_LIST_1 || cur_cu->inter.mv_dir != 3) {
@@ -670,11 +667,8 @@ static void encode_inter_prediction_unit(encoder_state_t * const state,
       }
 
       // Signal which candidate MV to use
-      kvz_cabac_write_unary_max_symbol(cabac,
-                                       &cabac->ctx.mvp_idx_model,
-                                       CU_GET_MV_CAND(cur_cu, ref_list_idx),
-                                       1,
-                                       AMVP_MAX_NUM_CANDS - 1);
+      cabac->cur_ctx = &(cabac->ctx.mvp_idx_model);
+      CABAC_BIN(cabac, CU_GET_MV_CAND(cur_cu, ref_list_idx), "mvp_flag");
 
     } // for ref_list
   } // if !merge

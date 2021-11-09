@@ -1236,6 +1236,12 @@ static void kvz_encoder_state_write_bitstream_ref_pic_list(
     last_poc = delta_poc;
   }
 
+  if (ref_negative > 1 || ref_positive > 1) {
+    WRITE_U(stream, 1, 1, "sh_num_ref_idx_active_override_flag");
+    if (ref_negative > 1) WRITE_UE(stream, ref_negative - 1, "sh_num_ref_idx_active_minus1[0]");
+    if (ref_positive > 1) WRITE_UE(stream, ref_positive - 1, "sh_num_ref_idx_active_minus1[1]");
+  }
+
 }
 
 void kvz_encoder_state_write_bitstream_slice_header(
@@ -1262,15 +1268,14 @@ void kvz_encoder_state_write_bitstream_slice_header(
 
   kvz_encoder_state_write_bitstream_picture_header(stream, state);
 
+  if (encoder->cfg.jccr) {
+    WRITE_U(stream, 0, 1, "ph_joint_cbcr_sign_flag");
+  }
+
   if (state->frame->pictype != KVZ_NAL_IDR_W_RADL
     && state->frame->pictype != KVZ_NAL_IDR_N_LP) {
     WRITE_UE(stream, state->frame->slicetype, "sh_slice_type");
     kvz_encoder_state_write_bitstream_ref_pic_list(stream, state);
-  }
-
-
-  if (encoder->cfg.jccr) {
-    WRITE_U(stream, 0, 1, "ph_joint_cbcr_sign_flag");
   }
 
   if (state->frame->pictype == KVZ_NAL_CRA_NUT || state->frame->pictype == KVZ_NAL_IDR_N_LP || state->frame->pictype == KVZ_NAL_IDR_W_RADL || state->frame->pictype == KVZ_NAL_GDR_NUT)
