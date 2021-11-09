@@ -614,7 +614,8 @@ void kvz_intra_build_reference_any(
   const vector2d_t *const pic_px,
   const lcu_t *const lcu,
   kvz_intra_references *const refs,
-  const uint8_t multi_ref_idx)
+  const uint8_t multi_ref_idx,
+  kvz_pixel *extra_ref_lines)
 {
   assert(log2_width >= 2 && log2_width <= 5);
 
@@ -641,7 +642,18 @@ void kvz_intra_build_reference_any(
   };
 
   // Init pointers to LCUs reconstruction buffers, such that index 0 refers to block coordinate 0.
-  const kvz_pixel *left_ref = !color ? &lcu->left_ref.y[1] : (color == 1) ? &lcu->left_ref.u[1] : &lcu->left_ref.v[1];
+  const kvz_pixel *left_ref;
+  bool extra_ref = false;
+  // On the left LCU edge, if left neighboring LCU is available, 
+  // left_ref needs to point to correct extra reference line if MRL is used.
+  if (luma_px->x > 0 && lcu_px.x == 0 && multi_ref_index != 0) {
+    left_ref = &extra_ref_lines[multi_ref_index * 2 * 128];
+    extra_ref = true;
+  }
+  else {
+    left_ref = !color ? &lcu->left_ref.y[1] : (color == 1) ? &lcu->left_ref.u[1] : &lcu->left_ref.v[1];
+  }
+
   const kvz_pixel *top_ref = !color ? &lcu->top_ref.y[1] : (color == 1) ? &lcu->top_ref.u[1] : &lcu->top_ref.v[1];
   const kvz_pixel *rec_ref = !color ? lcu->rec.y : (color == 1) ? lcu->rec.u : lcu->rec.v;
 
@@ -660,7 +672,12 @@ void kvz_intra_build_reference_any(
     left_border = &rec_ref[px.x - 1 - multi_ref_index + px.y * (LCU_WIDTH >> is_chroma)];
     left_stride = LCU_WIDTH >> is_chroma;
   } else {
-    left_border = &left_ref[px.y]; // No need for multi_ref_index on the left border
+    if (extra_ref) {
+      left_border = &left_ref[MAX_REF_LINE_IDX];
+    }
+    else {
+      left_border = &left_ref[px.y]; // No need for multi_ref_index on the left border
+    }
     left_stride = 1;
   }
 
@@ -709,10 +726,10 @@ void kvz_intra_build_reference_any(
       }
       else if (px.x == 0) {
         // LCU left border case
-        kvz_pixel nearest = left_border[-1 * left_stride];
+        kvz_pixel *top_left_corner = &extra_ref_lines[multi_ref_index * 2 * 128];
         for (int i = 0; i <= multi_ref_index; ++i) {
           out_left_ref[i] = left_border[(i - 1 - multi_ref_index) * left_stride];
-          out_top_ref[i] = nearest;
+          out_top_ref[i] = top_left_corner[(2 * 128 * -i) + MAX_REF_LINE_IDX - 1 - multi_ref_index];
         }
       }
       else if (px.y == 0) {
@@ -947,13 +964,14 @@ void kvz_intra_build_reference(
   const vector2d_t *const pic_px,
   const lcu_t *const lcu,
   kvz_intra_references *const refs,
-  bool entropy_sync)
+  bool entropy_sync,
+  kvz_pixel *extra_ref_lines)
 {
   const vector2d_t lcu_px = { SUB_SCU(luma_px->x), SUB_SCU(luma_px->y) };
   cu_info_t* cur_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
 
   // Make this common case work with MRL, implement inner after this one works
-  kvz_intra_build_reference_any(log2_width, color, luma_px, pic_px, lcu, refs, cur_cu->intra.multi_ref_idx);
+  kvz_intra_build_reference_any(log2_width, color, luma_px, pic_px, lcu, refs, cur_cu->intra.multi_ref_idx, extra_ref_lines);
 
   // Much logic can be discarded if not on the edge
   /*if (luma_px->x > 0 && luma_px->y > 0) {
@@ -995,7 +1013,22 @@ static void intra_recon_tb_leaf(
   cu_info_t* cur_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
 
   kvz_intra_references refs;
-  kvz_intra_build_reference(log2width, color, &luma_px, &pic_px, lcu, &refs, cfg->wpp);
+  // Extra reference lines for use with MRL. Extra lines needed only for left edge.
+  kvz_pixel extra_refs[2 * 128 * MAX_REF_LINE_IDX] = { 0 };
+
+  if (x > 0 && lcu_px.x == 0) {
+    videoframe_t* const frame = state->tile->frame;
+
+    // Copy ref lines 2 & 3. Line 1 is stored in LCU ref buffers.
+    for (int i = 0; i < MAX_REF_LINE_IDX; ++i) {
+      int height = (LCU_WIDTH >> depth) * 2 + MAX_REF_LINE_IDX;
+      kvz_pixels_blit(&frame->rec->y[(y - MAX_REF_LINE_IDX) * frame->rec->stride + x - (1 + i)],
+        &extra_refs[i * 2 * 128],
+        1, height,
+        frame->rec->stride, 1);
+    }
+  }
+  kvz_intra_build_reference(log2width, color, &luma_px, &pic_px, lcu, &refs, cfg->wpp, extra_refs);
 
   kvz_pixel pred[32 * 32];
   int stride = state->tile->frame->source->stride;

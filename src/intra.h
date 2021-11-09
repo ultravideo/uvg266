@@ -87,6 +87,7 @@ int8_t kvz_intra_get_dir_luma_predictor(
 * \param lcu           LCU struct.
 * \param refs          Pointer to top and left references.
 * \param entropy_sync  Indicate that top right is not available if WPP is enabled.
+* \param extra_refs    Additional left edge reference lines for use with MRL.
 */
 void kvz_intra_build_reference(
   const int_fast8_t log2_width,
@@ -95,7 +96,8 @@ void kvz_intra_build_reference(
   const vector2d_t *const pic_px,
   const lcu_t *const lcu,
   kvz_intra_references *const refs,
-  bool entropy_sync);
+  bool entropy_sync,
+  kvz_pixel *extra_refs);
 
 /**
  * \brief Generate intra predictions.

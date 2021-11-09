@@ -991,10 +991,10 @@ int8_t kvz_search_cu_intra_chroma(encoder_state_t * const state,
     const vector2d_t luma_px = { x_px, y_px };
 
     kvz_intra_references refs_u;
-    kvz_intra_build_reference(log2_width_c, COLOR_U, &luma_px, &pic_px, lcu, &refs_u, state->encoder_control->cfg.wpp);
+    kvz_intra_build_reference(log2_width_c, COLOR_U, &luma_px, &pic_px, lcu, &refs_u, state->encoder_control->cfg.wpp, NULL);
 
     kvz_intra_references refs_v;
-    kvz_intra_build_reference(log2_width_c, COLOR_V, &luma_px, &pic_px, lcu, &refs_v, state->encoder_control->cfg.wpp);
+    kvz_intra_build_reference(log2_width_c, COLOR_V, &luma_px, &pic_px, lcu, &refs_v, state->encoder_control->cfg.wpp, NULL);
 
     vector2d_t lcu_cpx = { lcu_px.x / 2, lcu_px.y / 2 };
     kvz_pixel *ref_u = &lcu->ref.u[lcu_cpx.x + lcu_cpx.y * LCU_WIDTH_C];
@@ -1052,7 +1052,24 @@ void kvz_search_cu_intra(encoder_state_t * const state,
   if (depth > 0) {
     const vector2d_t luma_px = { x_px, y_px };
     const vector2d_t pic_px = { state->tile->frame->width, state->tile->frame->height };
-    kvz_intra_build_reference(log2_width, COLOR_Y, &luma_px, &pic_px, lcu, &refs, state->encoder_control->cfg.wpp);
+
+    // Extra reference lines for use with MRL. Extra lines needed only for left edge.
+    kvz_pixel extra_refs[2 * 128 * MAX_REF_LINE_IDX] = {0};
+
+    if (x_px > 0 && lcu_px.x == 0) {
+      videoframe_t* const frame = state->tile->frame;
+
+      // Copy extra ref lines, including ref line 1 and top left corner.
+      for (int i = 0; i < MAX_REF_LINE_IDX; ++i) {
+      int height = (LCU_WIDTH >> depth) * 2 + MAX_REF_LINE_IDX;
+        kvz_pixels_blit(&frame->rec->y[(y_px - MAX_REF_LINE_IDX) * frame->rec->stride + x_px - (1 + i)],
+          &extra_refs[i * 2 * 128],
+          1, height,
+          frame->rec->stride, 1);
+      }
+    }
+
+    kvz_intra_build_reference(log2_width, COLOR_Y, &luma_px, &pic_px, lcu, &refs, state->encoder_control->cfg.wpp, extra_refs);
   }
 
   int8_t modes[MAX_REF_LINE_IDX][67];
