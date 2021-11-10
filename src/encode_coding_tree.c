@@ -607,16 +607,17 @@ static void encode_inter_prediction_unit(encoder_state_t * const state,
   } else {
     if (state->frame->slicetype == KVZ_SLICE_B) {
       // Code Inter Dir
-      uint8_t inter_dir = cur_cu->inter.mv_dir-1;
+      uint8_t inter_dir = cur_cu->inter.mv_dir;
 
-      if (cur_cu->part_size == SIZE_2Nx2N || (LCU_WIDTH >> depth) != 8) {
-        // ToDo: large CTU changes this inter_dir context selection
-        cabac->cur_ctx = &(cabac->ctx.inter_dir[depth]);
-        CABAC_BIN(cabac, (inter_dir == 2), "inter_pred_idc");
+      if (cur_cu->part_size == SIZE_2Nx2N || (LCU_WIDTH >> depth) != 4) { // ToDo: limit on 4x8/8x4
+        uint32_t inter_dir_ctx = (7 - ((kvz_math_floor_log2(width) + kvz_math_floor_log2(height) + 1) >> 1));
+
+        cabac->cur_ctx = &(cabac->ctx.inter_dir[inter_dir_ctx]);
+        CABAC_BIN(cabac, (inter_dir == 3), "inter_pred_idc");
       }
-      if (inter_dir < 2) {
-        cabac->cur_ctx = &(cabac->ctx.inter_dir[4]);
-        CABAC_BIN(cabac, inter_dir, "inter_pred_idc");
+      if (inter_dir < 3) {
+        cabac->cur_ctx = &(cabac->ctx.inter_dir[5]);
+        CABAC_BIN(cabac, (inter_dir == 2), "inter_pred_idc");
       }
     }
 
