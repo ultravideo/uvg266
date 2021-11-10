@@ -1168,7 +1168,6 @@ static void kvz_encoder_state_write_bitstream_ref_pic_list(
   int last_poc = 0;
   int poc_shift = 0;
 
-
   WRITE_UE(stream, ref_negative, "num_ref_entries[0]");  
   for (j = 0; j < ref_negative; j++) {
     int8_t delta_poc = 0;
@@ -1196,7 +1195,7 @@ static void kvz_encoder_state_write_bitstream_ref_pic_list(
       WRITE_UE(stream, j, "ilrp_idx");
     }
     */
-    WRITE_UE(stream, delta_poc, "abs_delta_poc_st");
+    WRITE_UE(stream, delta_poc ? delta_poc - last_poc - 1 : 0, "abs_delta_poc_st");
     if (delta_poc+1) WRITE_U(stream, 1, 1, "strp_entry_sign_flag");
     last_poc = delta_poc;
     
@@ -1231,7 +1230,7 @@ static void kvz_encoder_state_write_bitstream_ref_pic_list(
     }
     */
 
-    WRITE_UE(stream, delta_poc, "abs_delta_poc_st");
+    WRITE_UE(stream, delta_poc ? delta_poc - last_poc - 1 : 0, "abs_delta_poc_st");
     if (delta_poc+1) WRITE_U(stream, 0, 1, "strp_entry_sign_flag");
     last_poc = delta_poc;
   }
