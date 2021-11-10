@@ -1184,8 +1184,7 @@ static INLINE bool add_mvp_candidate(const encoder_state_t *state,
       return true;
     }
 
-    if (cand->inter.mv_dir & (1 << cand_list) &&
-        state->frame->ref_LX[cand_list][cand->inter.mv_ref[cand_list]] ==
+    if (state->frame->ref_LX[cand_list][cand->inter.mv_ref[cand_list]] ==
         state->frame->ref_LX[reflist][cur_cu->inter.mv_ref[reflist]])
     {
       mv_cand_out[0] = cand->inter.mv[cand_list][0];
@@ -1266,11 +1265,21 @@ static void get_mv_cand_from_candidates(const encoder_state_t * const state,
     const uint32_t ctu_row = (y >> LOG2_LCU_WIDTH);
     const uint32_t ctu_row_mul_five = ctu_row * MAX_NUM_HMVP_CANDS;
     int32_t num_cand = state->frame->hmvp_size[ctu_row];
-    for (int i = num_cand-1; i >= 0; i--) { // ToDo: VVC: Handle B-frames
-      mv_cand[candidates][0] = state->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv[0][0];
-      mv_cand[candidates][1] = state->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv[0][1];
-      candidates++;
-      if (candidates == AMVP_MAX_NUM_CANDS) return;
+    for (int i = 0; i < MIN(/*MAX_NUM_HMVP_AVMPCANDS*/4,num_cand); i++) {
+      for (int pred_source = 0; pred_source < 2; pred_source++) {
+        const int cand_list = pred_source == 0 ? reflist : !reflist;
+        cu_info_t* cand = &state->frame->hmvp_lut[ctu_row_mul_five + num_cand - 1 - i];
+        if ((cand->inter.mv_dir & (1 << cand_list)) == 0) continue;
+        // Make sure the candidate points to the same reference frame
+        if (state->frame->ref_LX[cand_list][cand->inter.mv_ref[cand_list]] ==
+            state->frame->ref_LX[reflist][cur_cu->inter.mv_ref[reflist]])
+        {
+          mv_cand[candidates][0] = cand->inter.mv[cand_list][0];
+          mv_cand[candidates][1] = cand->inter.mv[cand_list][1];
+          candidates++;
+          if (candidates == AMVP_MAX_NUM_CANDS) return;
+        }
+      }
     }
   }
 
