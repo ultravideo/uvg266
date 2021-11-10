@@ -1570,41 +1570,6 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
     }
   }
 
-  if (candidates < max_num_cands && state->frame->slicetype == KVZ_SLICE_B) {
-    #define NUM_PRIORITY_LIST 12;
-    static const uint8_t priorityList0[] = { 0, 1, 0, 2, 1, 2, 0, 3, 1, 3, 2, 3 };
-    static const uint8_t priorityList1[] = { 1, 0, 2, 0, 2, 1, 3, 0, 3, 1, 3, 2 };
-    uint8_t cutoff = candidates;
-    for (int32_t idx = 0; idx<cutoff*(cutoff - 1) && candidates != max_num_cands; idx++) {
-      uint8_t i = priorityList0[idx];
-      uint8_t j = priorityList1[idx];
-      if (i >= candidates || j >= candidates) break;
-
-      // Find one L0 and L1 candidate according to the priority list
-      if ((mv_cand[i].dir & 0x1) && (mv_cand[j].dir & 0x2)) {
-        mv_cand[candidates].dir = 3;
-
-        // get Mv from cand[i] and cand[j]
-        mv_cand[candidates].mv[0][0]  = mv_cand[i].mv[0][0];
-        mv_cand[candidates].mv[0][1]  = mv_cand[i].mv[0][1];
-        mv_cand[candidates].mv[1][0]  = mv_cand[j].mv[1][0];
-        mv_cand[candidates].mv[1][1]  = mv_cand[j].mv[1][1];
-        mv_cand[candidates].ref[0]    = mv_cand[i].ref[0];
-        mv_cand[candidates].ref[1]    = mv_cand[j].ref[1];
-
-        if (state->frame->ref_LX[0][mv_cand[i].ref[0]] ==
-            state->frame->ref_LX[1][mv_cand[j].ref[1]]
-            &&
-            mv_cand[i].mv[0][0] == mv_cand[j].mv[1][0] && 
-            mv_cand[i].mv[0][1] == mv_cand[j].mv[1][1]) {
-          // Not a candidate
-        } else {
-          candidates++;
-        }
-      }
-    }
-  }
-
   if (candidates == max_num_cands) return candidates;
 
   if (candidates != max_num_cands - 1) {
