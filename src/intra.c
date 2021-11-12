@@ -248,6 +248,244 @@ static void intra_pred_dc(
 }
 
 
+enum lm_mode
+{
+  LM_CHROMA_IDX = 67,
+  LM_CHROMA_L_IDX = 68,
+  LM_CHROMA_T_IDX = 69,
+};
+
+
+static void get_cclm_parameters(
+  encoder_state_t const* const state,
+  int8_t width, int8_t height, int8_t mode,
+  int x0, int y0,
+  kvz_pixel * luma_src, kvz_pixel *chroma_ref,
+  int *a, int *b, int *shift) {
+
+  const int base_unit_size = 1 << (6 - PU_DEPTH_INTRA_MAX);
+
+  // TODO: take into account YUV422
+  const int unit_w = base_unit_size >> 1;
+  const int unit_h = base_unit_size >> 1;
+
+  const int tu_width_in_units = width / unit_w;
+  const int tu_height_in_units = height / unit_h;
+
+  const int c_height = height / 2;
+  const int c_width = width / 2;
+
+  int top_template_samp_num = width; // for MDLM, the template sample number is 2W or 2H;
+  int left_template_samp_num = height;
+
+  int total_above_units = (top_template_samp_num + (unit_w - 1)) / unit_w;
+  int total_left_units = (left_template_samp_num + (unit_h - 1)) / unit_h;
+  int total_units = total_left_units + total_above_units + 1;
+  int above_right_units = total_above_units - tu_width_in_units;
+  int left_below_units = total_left_units - tu_height_in_units;
+  int avai_above_right_units = 0;  // TODO these are non zero only with non-square CUs
+  int avai_left_below_units = 0;
+  int avai_above_units = CLIP(0, tu_height_in_units, y0/base_unit_size);
+  int avai_left_units = CLIP(0, tu_width_in_units, x0 / base_unit_size);
+
+  bool above_available = avai_above_units != 0;
+  bool left_available = avai_left_units != 0;
+  // Not sure if LCU_CU_WIDTH is correct macro here,
+  // should be 16 for 64 CTU width 32 for 128
+
+  int min_luma[2] = { MAX_INT, 0 };
+  int max_luma[2] = { -MAX_INT, 0 };
+
+  kvz_pixel *src_color0 = luma_src;
+  kvz_pixel*  cur_chroma0 = chroma_ref;
+
+  char internal_bit_depth = state->encoder_control->bitdepth;
+
+  int minLuma[2] = { MAX_INT, 0 };
+  int maxLuma[2] = { -MAX_INT, 0 };
+
+  int32_t src_stride = state->tile->frame->source->stride;
+  kvz_pixel* src = src_color0 - src_stride;
+  int actualTopTemplateSampNum = 0;
+  int actualLeftTemplateSampNum = 0;
+  if (mode == LM_CHROMA_T_IDX)
+  {
+    left_available = 0;
+    avai_above_right_units = avai_above_right_units > (c_height / unit_w) ? c_height / unit_w : avai_above_right_units;
+    actualTopTemplateSampNum = unit_w * (avai_above_units + avai_above_right_units);
+  }
+  else if (mode == LM_CHROMA_L_IDX)
+  {
+    above_available = 0;
+    avai_left_below_units = avai_left_below_units > (c_width / unit_h) ? c_width / unit_h : avai_left_below_units;
+    actualLeftTemplateSampNum = unit_h * (avai_left_units + avai_left_below_units);
+  }
+  else if (mode == LM_CHROMA_IDX)
+  {
+    actualTopTemplateSampNum = c_width;
+    actualLeftTemplateSampNum = c_height;
+  }
+  int startPos[2]; //0:Above, 1: Left
+  int pickStep[2];
+
+  int aboveIs4 = left_available ? 0 : 1;
+  int leftIs4 = above_available ? 0 : 1;
+
+  startPos[0] = actualTopTemplateSampNum >> (2 + aboveIs4);
+  pickStep[0] = MAX(1, actualTopTemplateSampNum >> (1 + aboveIs4));
+
+  startPos[1] = actualLeftTemplateSampNum >> (2 + leftIs4);
+  pickStep[1] = MAX(1, actualLeftTemplateSampNum >> (1 + leftIs4));
+
+  kvz_pixel selectLumaPix[4] = { 0, 0, 0, 0 };
+  kvz_pixel selectChromaPix[4] = { 0, 0, 0, 0 };
+
+  int cntT, cntL;
+  cntT = cntL = 0;
+  int cnt = 0;
+  if (above_available)
+  {
+    cntT = MIN(actualTopTemplateSampNum, (1 + aboveIs4) << 1);
+    src = src_color0 - src_stride;
+    const kvz_pixel* cur = cur_chroma0 + 1;
+    for (int pos = startPos[0]; cnt < cntT; pos += pickStep[0], cnt++)
+    {
+      selectLumaPix[cnt] = src[pos];
+      selectChromaPix[cnt] = cur[pos];
+    }
+  }
+
+  if (left_available)
+  {
+    cntL = MIN(actualLeftTemplateSampNum, (1 + leftIs4) << 1);
+    src = src_color0 - 1;
+    const kvz_pixel* cur = cur_chroma0 + src_stride/2 + 1;
+    for (int pos = startPos[1], cnt = 0; cnt < cntL; pos += pickStep[1], cnt++)
+    {
+      selectLumaPix[cnt + cntT] = src[pos * src_stride];
+      selectChromaPix[cnt + cntT] = cur[pos];
+    }
+  }
+  cnt = cntL + cntT;
+
+  if (cnt == 2)
+  {
+    selectLumaPix[3] = selectLumaPix[0]; selectChromaPix[3] = selectChromaPix[0];
+    selectLumaPix[2] = selectLumaPix[1]; selectChromaPix[2] = selectChromaPix[1];
+    selectLumaPix[0] = selectLumaPix[1]; selectChromaPix[0] = selectChromaPix[1];
+    selectLumaPix[1] = selectLumaPix[3]; selectChromaPix[1] = selectChromaPix[3];
+  }
+
+  int minGrpIdx[2] = { 0, 2 };
+  int maxGrpIdx[2] = { 1, 3 };
+  int* tmpMinGrp = minGrpIdx;
+  int* tmpMaxGrp = maxGrpIdx;
+  if (selectLumaPix[tmpMinGrp[0]] > selectLumaPix[tmpMinGrp[1]])
+  {
+    SWAP(tmpMinGrp[0], tmpMinGrp[1], int);
+  }
+  if (selectLumaPix[tmpMaxGrp[0]] > selectLumaPix[tmpMaxGrp[1]])
+  {
+    SWAP(tmpMaxGrp[0], tmpMaxGrp[1], int);
+  }
+  if (selectLumaPix[tmpMinGrp[0]] > selectLumaPix[tmpMaxGrp[1]])
+  {
+    SWAP(tmpMinGrp, tmpMaxGrp, int);
+  }
+  if (selectLumaPix[tmpMinGrp[1]] > selectLumaPix[tmpMaxGrp[0]])
+  {
+    SWAP(tmpMinGrp[1], tmpMaxGrp[0], int);
+  }
+
+  minLuma[0] = (selectLumaPix[tmpMinGrp[0]] + selectLumaPix[tmpMinGrp[1]] + 1) >> 1;
+  minLuma[1] = (selectChromaPix[tmpMinGrp[0]] + selectChromaPix[tmpMinGrp[1]] + 1) >> 1;
+  maxLuma[0] = (selectLumaPix[tmpMaxGrp[0]] + selectLumaPix[tmpMaxGrp[1]] + 1) >> 1;
+  maxLuma[1] = (selectChromaPix[tmpMaxGrp[0]] + selectChromaPix[tmpMaxGrp[1]] + 1) >> 1;
+
+  if (left_available || above_available)
+  {
+    int diff = maxLuma[0] - minLuma[0];
+    if (diff > 0)
+    {
+      int diffC = maxLuma[1] - minLuma[1];
+      int x = kvz_math_floor_log2(diff);
+      static const uint8_t DivSigTable[1 << 4] = {
+        // 4bit significands - 8 ( MSB is omitted )
+        0,  7,  6,  5,  5,  4,  4,  3,  3,  2,  2,  1,  1,  1,  1,  0
+      };
+      int normDiff = (diff << 4 >> x) & 15;
+      int v = DivSigTable[normDiff] | 8;
+      x += normDiff != 0;
+
+      int y = kvz_math_floor_log2(abs(diffC)) + 1;
+      int add = 1 << y >> 1;
+      *a = (diffC * v + add) >> y;
+      *shift = 3 + x - y;
+      if (*shift < 1)
+      {
+        *shift = 1;
+        *a = ((*a == 0) ? 0 : (*a < 0) ? -15 : 15);   // a=Sign(a)*15
+      }
+      *b = minLuma[1] - ((*a * minLuma[0]) >> *shift);
+    }
+    else
+    {
+      *a = 0;
+      *b = minLuma[1];
+      *shift = 0;
+    }
+  }
+  else
+  {
+    *a = 0;
+
+    *b = 1 << (internal_bit_depth - 1);
+
+    *shift = 0;
+  }
+}
+
+static void linear_transform_cclm(int a, int b, int shift, kvz_pixel * dst) {
+
+}
+
+
+void kvz_predict_cclm(
+  encoder_state_t const* const state,
+  const color_t color,
+  const int8_t width,
+  const int8_t height,
+  const int16_t x0,
+  const int16_t y0,
+  const int16_t stride,
+  const int8_t mode,
+  kvz_pixel* const y_rec,
+  kvz_pixel* dst
+)
+{
+  assert(mode == LM_CHROMA_IDX || mode == LM_CHROMA_L_IDX || mode == LM_CHROMA_T_IDX);
+
+  kvz_pixel sampled_luma[(LCU_WIDTH_C+1)*(LCU_WIDTH_C+1)];
+
+  for (int y = MAX(0, y0 -1); y < y0 + height; y++) {
+    for (int x = MAX(0, x0 - 1); x < x0 + width; x++) {
+      int s = 4;
+      s += y_rec[2 * x] * 2;
+      s += y_rec[2 * x + 1];
+      s += y_rec[2 * x - (x + x0 > 0)];
+      s += y_rec[2 * x + stride] * 2;
+      s += y_rec[2 * x + 1 + stride];
+      s += y_rec[2 * x - (x + x0 > 0) + stride];
+      sampled_luma[x + 1 + (y + 1) * 32] = s >> 3;
+    }
+    y += stride;
+  }
+
+  int a, b, shift;
+  get_cclm_parameters(state, width, height, mode,x0, y0, state->tile->frame->rec->y, state->tile->frame->source->u, &a, &b, &shift);
+  linear_transform_cclm(a, b, shift, dst);
+}
+
 void kvz_intra_predict(
   encoder_state_t *const state,
   kvz_intra_references *refs,
