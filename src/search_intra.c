@@ -1056,12 +1056,13 @@ void kvz_search_cu_intra(encoder_state_t * const state,
     // Extra reference lines for use with MRL. Extra lines needed only for left edge.
     kvz_pixel extra_refs[2 * 128 * MAX_REF_LINE_IDX] = {0};
 
-    if (x_px > 0 && lcu_px.x == 0) {
+    if (x_px > 0 && lcu_px.x == 0 && lcu_px.y > 0) {
       videoframe_t* const frame = state->tile->frame;
 
       // Copy extra ref lines, including ref line 1 and top left corner.
       for (int i = 0; i < MAX_REF_LINE_IDX; ++i) {
-      int height = (LCU_WIDTH >> depth) * 2 + MAX_REF_LINE_IDX;
+        int height = (LCU_WIDTH >> depth) * 2 + MAX_REF_LINE_IDX;
+        height = MIN(height, pic_px.y - (y_px - MAX_REF_LINE_IDX));
         kvz_pixels_blit(&frame->rec->y[(y_px - MAX_REF_LINE_IDX) * frame->rec->stride + x_px - (1 + i)],
           &extra_refs[i * 2 * 128],
           1, height,

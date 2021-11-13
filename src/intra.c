@@ -1016,12 +1016,13 @@ static void intra_recon_tb_leaf(
   // Extra reference lines for use with MRL. Extra lines needed only for left edge.
   kvz_pixel extra_refs[2 * 128 * MAX_REF_LINE_IDX] = { 0 };
 
-  if (x > 0 && lcu_px.x == 0) {
+  if (x > 0 && lcu_px.x == 0 && lcu_px.y > 0) {
     videoframe_t* const frame = state->tile->frame;
 
     // Copy ref lines 2 & 3. Line 1 is stored in LCU ref buffers.
     for (int i = 0; i < MAX_REF_LINE_IDX; ++i) {
       int height = (LCU_WIDTH >> depth) * 2 + MAX_REF_LINE_IDX;
+      height = MIN(height, pic_px.y - (y - MAX_REF_LINE_IDX));
       kvz_pixels_blit(&frame->rec->y[(y - MAX_REF_LINE_IDX) * frame->rec->stride + x - (1 + i)],
         &extra_refs[i * 2 * 128],
         1, height,
