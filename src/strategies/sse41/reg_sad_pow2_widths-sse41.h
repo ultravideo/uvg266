@@ -525,7 +525,9 @@ static uint32_t ver_sad_arbitrary(const uint8_t *pic_data, const uint8_t *ref_da
   }
 
   if (width_residual_pixels) {
-    const __m128i ref_row = _mm_loadu_si128((__m128i *)(ref_data + x));
+    kvz_pixel ref_temp[16] = { 0 };
+    memcpy(ref_temp, ref_data + x, width_residual_pixels);
+    const __m128i ref_row = _mm_loadu_si128((__m128i*)(ref_temp));
     for (y = 0; y < height_fourline_groups; y += 4) {
       __m128i a = _mm_loadu_si128((const __m128i *)(pic_data + (y + 0) * stride + x));
       __m128i c = _mm_loadu_si128((const __m128i *)(pic_data + (y + 1) * stride + x));
