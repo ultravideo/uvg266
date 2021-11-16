@@ -516,10 +516,13 @@ void kvz_predict_cclm(
       int s = 4;
       s += y_rec[2 * x] * 2;
       s += y_rec[2 * x + 1];
-      s += x0 && !x ? state->tile->frame->rec->y[x0 - 1 + y0 * stride] : y_rec[2 * x - (x + x0 > 0)];
+      // If we are at the edge of the CTU read the pixel from the frame reconstruct buffer,
+      // *except* when we are also at the edge of the frame, in which case we want to duplicate
+      // the edge pixel
+      s += !x_scu && !x && x0 ? state->tile->frame->rec->y[x0 - 1 + y0 * stride] : y_rec[2 * x - ((x + x0) > 0)];
       s += y_rec[2 * x + LCU_WIDTH] * 2;
       s += y_rec[2 * x + 1 + LCU_WIDTH];
-      s += x0 && !x ? state->tile->frame->rec->y[x0 - 1 + (y0 + 1) * stride] : y_rec[2 * x - (x + x0 > 0) + stride];
+      s += !x_scu && !x && x0 ? state->tile->frame->rec->y[x0 - 1 + (y0 + 1) * stride] : y_rec[2 * x - ((x + x0) > 0) + stride];
       sampled_luma[x + y * width] = s >> 3;
     }
     y_rec += LCU_WIDTH;
