@@ -120,3 +120,17 @@ void kvz_intra_recon_cu(
   cu_info_t *cur_cu,
   lcu_t *lcu);
 
+
+void kvz_predict_cclm(
+  encoder_state_t const* const state,
+  const color_t color,
+  const int8_t width,
+  const int8_t height,
+  const int16_t x0,
+  const int16_t y0,
+  const int16_t stride,
+  const int8_t mode,
+  kvz_pixel const* y_rec,
+  kvz_intra_references* chroma_ref,
+  kvz_pixel* dst
+);

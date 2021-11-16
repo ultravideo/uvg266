@@ -461,7 +461,7 @@ static void search_intra_chroma_rough(encoder_state_t * const state,
   const unsigned width = MAX(LCU_WIDTH_C >> depth, TR_MIN_WIDTH);
   const int_fast8_t log2_width_c = MAX(LOG2_LCU_WIDTH - (depth + 1), 2);
 
-  for (int i = 0; i < 5; ++i) {
+  for (int i = 0; i < 8; ++i) {
     costs[i] = 0;
   }
 
@@ -476,15 +476,20 @@ static void search_intra_chroma_rough(encoder_state_t * const state,
 
   kvz_pixels_blit(orig_u, orig_block, width, width, origstride, width);
   for (int i = 0; i < 5; ++i) {
-    if (modes[i] == luma_mode) continue;
+    if (modes[i] == -1) continue;
     kvz_intra_predict(state, refs_u, log2_width_c, modes[i], COLOR_U, pred, false);
     //costs[i] += get_cost(encoder_state, pred, orig_block, satd_func, sad_func, width);
     costs[i] += satd_func(pred, orig_block);
   }
+  for (int i = 5; i < 8; i++) {
+    kvz_predict_cclm(
+      state,
+      COLOR_U, width, width, x_px, y_px, state->tile->frame->source->stride, modes[i], state->tile->frame->rec->y, refs_u,  _pred);
+  }
 
   kvz_pixels_blit(orig_v, orig_block, width, width, origstride, width);
   for (int i = 0; i < 5; ++i) {
-    if (modes[i] == luma_mode) continue;
+    if (modes[i] == -1) continue;
     kvz_intra_predict(state, refs_v, log2_width_c, modes[i], COLOR_V, pred, false);
     //costs[i] += get_cost(encoder_state, pred, orig_block, satd_func, sad_func, width);
     costs[i] += satd_func(pred, orig_block);
@@ -820,10 +825,19 @@ double kvz_chroma_mode_bits(const encoder_state_t *state, int8_t chroma_mode, in
 int8_t kvz_search_intra_chroma_rdo(encoder_state_t * const state,
                                   int x_px, int y_px, int depth,
                                   int8_t intra_mode,
-                                  int8_t modes[5], int8_t num_modes,
+                                  int8_t modes[8], int8_t num_modes,
                                   lcu_t *const lcu)
 {
   const bool reconstruct_chroma = (depth != 4) || (x_px & 4 && y_px & 4);
+
+
+  kvz_intra_references refs;
+  const vector2d_t luma_px = { x_px, y_px };
+  const vector2d_t pic_px = {
+    state->tile->frame->width,
+    state->tile->frame->height,
+  };
+  kvz_intra_build_reference(6-depth, COLOR_U, &luma_px, &pic_px, lcu, &refs, state->encoder_control->cfg.wpp);
 
   if (reconstruct_chroma) {
     const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
@@ -839,12 +853,18 @@ int8_t kvz_search_intra_chroma_rdo(encoder_state_t * const state,
 
     for (int8_t chroma_mode_i = 0; chroma_mode_i < num_modes; ++chroma_mode_i) {
       chroma.mode = modes[chroma_mode_i];
-
-      kvz_intra_recon_cu(state,
-                         x_px, y_px,
-                         depth,
-                         -1, chroma.mode, // skip luma
-                         NULL, lcu);
+      if (chroma.mode == -1) continue;
+      if(chroma.mode < 67) {
+        kvz_intra_recon_cu(state,
+                           x_px, y_px,
+                           depth,
+                           -1, chroma.mode, // skip luma
+                           NULL, lcu);
+      }
+      else {
+        kvz_predict_cclm(
+          state, COLOR_U, 32 >> (depth), 32 >> (depth), x_px, y_px, state->tile->frame->source->stride, chroma.mode, lcu->rec.y, &refs, NULL);
+      }
       chroma.cost = kvz_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, tr_cu, lcu);
 
       double mode_bits = kvz_chroma_mode_bits(state, chroma.mode, intra_mode);
@@ -871,8 +891,8 @@ int8_t kvz_search_cu_intra_chroma(encoder_state_t * const state,
   cu_info_t *cur_pu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
   int8_t intra_mode = cur_pu->intra.mode;
 
-  double costs[5];
-  int8_t modes[5] = { 0, 50, 18, 1, 67 };
+  double costs[8];
+  int8_t modes[8] = { 0, 50, 18, 1, -1, 67, 68, 69 };
   if (intra_mode != 0 && intra_mode != 50 && intra_mode != 18 && intra_mode != 1) {
     modes[4] = intra_mode;
   }
@@ -885,13 +905,13 @@ int8_t kvz_search_cu_intra_chroma(encoder_state_t * const state,
   int num_modes = modes_in_depth[depth];
 
   if (state->encoder_control->cfg.rdo == 3) {
-    num_modes = modes[4] == intra_mode ? 5 : 4;
+    num_modes = 8;
   }
 
   // Don't do rough mode search if all modes are selected.
   // FIXME: It might make more sense to only disable rough search if
   // num_modes is 0.is 0.
-  if (num_modes != 1 && num_modes != 5 && num_modes != 4) {
+  if (num_modes != 1 && num_modes != 5 && num_modes != 4 && num_modes != 8) {
     const int_fast8_t log2_width_c = MAX(LOG2_LCU_WIDTH - depth - 1, 2);
     const vector2d_t pic_px = { state->tile->frame->width, state->tile->frame->height };
     const vector2d_t luma_px = { x_px, y_px };
