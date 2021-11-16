@@ -1368,8 +1368,9 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
       kvz_hmvp_add_mv(state, x, y, pu_w, pu_h, cur_pu);
     }
 
-    // imv mode, set to quarter-pel resolution
-    if (non_zero_mvd) {
+    // imv mode, select between fullpel, half-pel and quarter-pel resolutions
+    // 0 = off, 1 = fullpel, 2 = quarter-pel, 3 = half-pel
+    if (ctrl->cfg.amvr && non_zero_mvd) {
       cabac->cur_ctx = &(cabac->ctx.imv_flag[0]);
       CABAC_BIN(cabac, (imv_mode > 0), "imv_flag");
       if (imv_mode > 0) {
