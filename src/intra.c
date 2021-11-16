@@ -441,8 +441,16 @@ static void get_cclm_parameters(
   }
 }
 
-static void linear_transform_cclm(int a, int b, int shift, kvz_pixel * dst) {
-
+static void linear_transform_cclm(int scale, int shift, int offset, kvz_pixel * src, kvz_pixel * dst, int stride, int height) {
+  for (int y = 0; y < height; ++y) {
+    for (int x=0; x < stride; ++x) {
+      int val = src[x + y * stride] * scale;
+      val >>= shift;
+      val += offset;
+      val = CLIP_TO_PIXEL(val);
+      dst[x + y * stride] = val;
+    }
+  }
 }
 
 
@@ -463,7 +471,8 @@ void kvz_predict_cclm(
   assert(mode == LM_CHROMA_IDX || mode == LM_CHROMA_L_IDX || mode == LM_CHROMA_T_IDX);
 
   
-  kvz_intra_ref sampled_luma;
+  kvz_intra_ref sampled_luma_ref;
+  kvz_pixel sampled_luma[LCU_CHROMA_SIZE];
 
   int x_scu = SUB_SCU(x0);
   int y_scu = SUB_SCU(y0);
@@ -478,7 +487,7 @@ void kvz_predict_cclm(
       s += x_scu ? y_rec[(y + 1) * LCU_WIDTH - 2]: state->tile->frame->rec->y[x0 - 2 + (y0 + y + 1) * stride];
       s += y_rec[y * LCU_WIDTH];
       s += y_rec[(y + 1) * LCU_WIDTH];
-      sampled_luma.left[y/2] = s >> 3;
+      sampled_luma_ref.left[y/2] = s >> 3;
     }
   }
 
@@ -492,27 +501,27 @@ void kvz_predict_cclm(
       s += y_scu ? y_rec[x - LCU_WIDTH - left_padding] : state->tile->frame->rec->y[x0 + x - left_padding + (y0 - 1) * stride];
       s += y_scu ? y_rec[x - LCU_WIDTH * 2 + 1] : state->tile->frame->rec->y[x0 + x + 1 + (y0 - 2) * stride];
       s += y_scu ? y_rec[x - LCU_WIDTH + 1] : state->tile->frame->rec->y[x0 + x + 1 + (y0 - 1) * stride];
-      sampled_luma.top[x / 2] = s >> 3;
+      sampled_luma_ref.top[x / 2] = s >> 3;
     }
   }
 
-  //for (int y = MAX(0, y0 -1) % 64; y < y0 + height; y++) {
-  //  for (int x = MAX(0, x0 - 1) % 64; x < x0 + width; x++) {
-  //    int s = 4;
-  //    s += y_rec[2 * x] * 2;
-  //    s += y_rec[2 * x + 1];
-  //    s += y_rec[2 * x - (x + x0 > 0)];
-  //    s += y_rec[2 * x + stride] * 2;
-  //    s += y_rec[2 * x + 1 + stride];
-  //    s += y_rec[2 * x - (x + x0 > 0) + stride];
-  //    sampled_luma[x + 1 + (y + 1) * 33] = s >> 3;
-  //  }
-  //  y_rec += 64;
-  //}
+  for (int y = 0; y < height * 2; y+=2) {
+    for (int x = 0; x <  width * 2; x+=2) {
+      int s = 4;
+      s += y_rec[2 * x] * 2;
+      s += y_rec[2 * x + 1];
+      s += x0 && !x ? state->tile->frame->rec->y[x0 - 1 + y0 * stride] : y_rec[2 * x - (x + x0 > 0)];
+      s += y_rec[2 * x + LCU_WIDTH] * 2;
+      s += y_rec[2 * x + 1 + LCU_WIDTH];
+      s += x0 && !x ? state->tile->frame->rec->y[x0 - 1 + (y0 + 1) * stride] : y_rec[2 * x - (x + x0 > 0) + stride];
+      sampled_luma[x + y * width] = s >> 3;
+    }
+    y_rec += LCU_WIDTH;
+  }
 
   int a, b, shift;
-  get_cclm_parameters(state, width, height, mode,x0, y0, &sampled_luma, chroma_ref, &a, &b, &shift);
-  linear_transform_cclm(a, b, shift, dst);
+  get_cclm_parameters(state, width, height, mode,x0, y0, &sampled_luma_ref, chroma_ref, &a, &b, &shift);
+  linear_transform_cclm(a, shift, b,sampled_luma, dst, width, height);
 }
 
 void kvz_intra_predict(
