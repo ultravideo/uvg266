@@ -195,6 +195,8 @@ int kvz_config_init(kvz_config *cfg)
 
   cfg->jccr = 0;
 
+  cfg->amvr = 1;
+
   return 1;
 }
 

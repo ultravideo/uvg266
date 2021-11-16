@@ -494,6 +494,8 @@ typedef struct kvz_config
   int8_t chroma_scale_out[3][17];
 
   int8_t jccr;
+
+  int8_t amvr; /* \brief Adaptive motion vector resolution parameter */
 } kvz_config;
 
 /**

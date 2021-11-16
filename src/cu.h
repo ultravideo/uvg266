@@ -156,9 +156,6 @@ typedef struct
     struct {
       int8_t mode;
       int8_t mode_chroma;
-#if KVZ_SEL_ENCRYPTION
-      int8_t mode_encry;
-#endif
       uint8_t multi_ref_idx;
     } intra;
     struct {

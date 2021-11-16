@@ -579,7 +579,15 @@ static void encode_transform_coeff(encoder_state_t * const state,
   }
 }
 
-static void encode_inter_prediction_unit(encoder_state_t * const state,
+/**
+ * \brief Writes inter block parameters to the bitstream
+ * \param state           Encoder state in use
+ * \param x               Slice x coordinate.
+ * \param y               Slice y coordinate.
+ * \param depth           Depth from LCU.
+ * \return if non-zero mvd is coded
+ */
+static bool encode_inter_prediction_unit(encoder_state_t * const state,
                                          cabac_data_t * const cabac,
                                          const cu_info_t * const cur_cu,
                                          int x, int y, int width, int height,
@@ -587,6 +595,7 @@ static void encode_inter_prediction_unit(encoder_state_t * const state,
 {
   // Mergeflag
   int16_t num_cand = 0;
+  bool non_zero_mvd = false;
   cabac->cur_ctx = &(cabac->ctx.cu_merge_flag_ext_model);
   CABAC_BIN(cabac, cur_cu->merged, "MergeFlag");
   num_cand = state->encoder_control->cfg.max_merge;
@@ -665,6 +674,8 @@ static void encode_inter_prediction_unit(encoder_state_t * const state,
         const int32_t mvd_ver = cur_cu->inter.mv[ref_list_idx][1] - mv_cand[cu_mv_cand][1];
 
         kvz_encode_mvd(state, cabac, mvd_hor, mvd_ver);
+
+        non_zero_mvd |= (mvd_hor != 0) || (mvd_ver != 0);
       }
 
       // Signal which candidate MV to use
@@ -673,6 +684,7 @@ static void encode_inter_prediction_unit(encoder_state_t * const state,
 
     } // for ref_list
   } // if !merge
+  return non_zero_mvd;
 }
 
 static void encode_chroma_intra_cu(cabac_data_t* const cabac, const cu_info_t* const cur_cu, int x, int y, const videoframe_t* const frame, const int cu_width) {
@@ -1339,7 +1351,10 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
 #endif
 
   if (cur_cu->type == CU_INTER) {
+    uint8_t imv_mode = 0;
+
     const int num_pu = kvz_part_mode_num_parts[cur_cu->part_size];
+    bool non_zero_mvd = false;
 
     for (int i = 0; i < num_pu; ++i) {
       const int pu_x = PU_GET_X(cur_cu->part_size, cu_width, x, i);
@@ -1348,9 +1363,23 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
       const int pu_h = PU_GET_H(cur_cu->part_size, cu_width, i);
       const cu_info_t *cur_pu = kvz_cu_array_at_const(frame->cu_array, pu_x, pu_y);
 
-      encode_inter_prediction_unit(state, cabac, cur_pu, pu_x, pu_y, pu_w, pu_h, depth);
+      non_zero_mvd |= encode_inter_prediction_unit(state, cabac, cur_pu, pu_x, pu_y, pu_w, pu_h, depth);
 
       kvz_hmvp_add_mv(state, x, y, pu_w, pu_h, cur_pu);
+    }
+
+    // imv mode, set to quarter-pel resolution
+    if (non_zero_mvd) {
+      cabac->cur_ctx = &(cabac->ctx.imv_flag[0]);
+      CABAC_BIN(cabac, (imv_mode > 0), "imv_flag");
+      if (imv_mode > 0) {
+        cabac->cur_ctx = &(cabac->ctx.imv_flag[4]);
+        CABAC_BIN(cabac, (imv_mode < 3), "imv_flag");
+        if (imv_mode < 3) {
+          cabac->cur_ctx = &(cabac->ctx.imv_flag[1]);
+          CABAC_BIN(cabac, (imv_mode > 1), "imv_flag");
+        }
+      }
     }
 
     {
