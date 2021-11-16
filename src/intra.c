@@ -281,11 +281,12 @@ static void get_cclm_parameters(
   int top_template_samp_num = width; // for MDLM, the template sample number is 2W or 2H;
   int left_template_samp_num = height;
 
-  int total_above_units = (top_template_samp_num + (unit_w - 1)) / unit_w;
-  int total_left_units = (left_template_samp_num + (unit_h - 1)) / unit_h;
-  int total_units = total_left_units + total_above_units + 1;
-  int above_right_units = total_above_units - tu_width_in_units;
-  int left_below_units = total_left_units - tu_height_in_units;
+  // These are used for calculating some stuff for non-square CUs
+  //int total_above_units = (top_template_samp_num + (unit_w - 1)) / unit_w;
+  //int total_left_units = (left_template_samp_num + (unit_h - 1)) / unit_h;
+  //int total_units = total_left_units + total_above_units + 1;
+  //int above_right_units = total_above_units - tu_width_in_units;
+  //int left_below_units = total_left_units - tu_height_in_units;
   int avai_above_right_units = 0;  // TODO these are non zero only with non-square CUs
   int avai_left_below_units = 0;
   int avai_above_units = CLIP(0, tu_height_in_units, y0/base_unit_size);
@@ -293,8 +294,6 @@ static void get_cclm_parameters(
 
   bool above_available = avai_above_units != 0;
   bool left_available = avai_left_units != 0;
-  // Not sure if LCU_CU_WIDTH is correct macro here,
-  // should be 16 for 64 CTU width 32 for 128
     
   char internal_bit_depth = state->encoder_control->bitdepth;
 
@@ -478,15 +477,20 @@ void kvz_predict_cclm(
   int y_scu = SUB_SCU(y0);
   y_rec += x_scu + y_scu * LCU_WIDTH;
 
+  // Essentially what this does is that it uses 6-tap filtering to downsample
+  // the luma intra references down to match the resolution of the chroma channel.
+  // The luma reference is only needed when we are not on the edge of the picture.
+  // Because the reference pixels that are needed on the edge of the ctu this code
+  // is kinda messy but what can you do
   if(x0) {
     for(int y = 0; y < height * 2; y+=2) {
       int s = 4;
-      s += x_scu ? y_rec[y * LCU_WIDTH - 1] * 2 : state->tile->frame->rec->y[x0 - 1 + (y0 + y) * stride] * 2;
-      s += x_scu ? y_rec[y * LCU_WIDTH - 2]: state->tile->frame->rec->y[x0 - 2 + (y0 + y) * stride];
-      s += x_scu ? y_rec[(y + 1) * LCU_WIDTH - 1] * 2: state->tile->frame->rec->y[x0 - 1 + (y0 + y + 1) * stride] * 2;
-      s += x_scu ? y_rec[(y + 1) * LCU_WIDTH - 2]: state->tile->frame->rec->y[x0 - 2 + (y0 + y + 1) * stride];
-      s += y_rec[y * LCU_WIDTH];
-      s += y_rec[(y + 1) * LCU_WIDTH];
+      s += x_scu ? y_rec[y * LCU_WIDTH - 1] * 2       : state->tile->frame->rec->y[x0 - 1 + (y0 + y) * stride] * 2;
+      s += x_scu ? y_rec[y * LCU_WIDTH - 2]           : state->tile->frame->rec->y[x0 - 2 + (y0 + y) * stride];
+      s += x_scu ? y_rec[(y + 1) * LCU_WIDTH - 1] * 2 : state->tile->frame->rec->y[x0 - 1 + (y0 + y + 1) * stride] * 2;
+      s += x_scu ? y_rec[(y + 1) * LCU_WIDTH - 2]     : state->tile->frame->rec->y[x0 - 2 + (y0 + y + 1) * stride];
+      s +=         y_rec[y * LCU_WIDTH];
+      s +=         y_rec[(y + 1) * LCU_WIDTH];
       sampled_luma_ref.left[y/2] = s >> 3;
     }
   }
@@ -495,16 +499,18 @@ void kvz_predict_cclm(
     for(int x = 0; x < width*2; x += 2) {
       bool left_padding = x0 || x;
       int s = 4;
-      s += y_scu ? y_rec[x - LCU_WIDTH * 2] * 2 : state->tile->frame->rec->y[x0 + x +(y0 - 2) * stride] * 2;
-      s += y_scu ? y_rec[x - LCU_WIDTH] * 2 : state->tile->frame->rec->y[x0 + x +(y0 - 1) * stride] * 2;
+      s += y_scu ? y_rec[x - LCU_WIDTH * 2] * 2            : state->tile->frame->rec->y[x0 + x +(y0 - 2) * stride] * 2;
+      s += y_scu ? y_rec[x - LCU_WIDTH] * 2                : state->tile->frame->rec->y[x0 + x +(y0 - 1) * stride] * 2;
       s += y_scu ? y_rec[x - LCU_WIDTH * 2 - left_padding] : state->tile->frame->rec->y[x0 + x - left_padding + (y0 - 2) * stride];
-      s += y_scu ? y_rec[x - LCU_WIDTH - left_padding] : state->tile->frame->rec->y[x0 + x - left_padding + (y0 - 1) * stride];
-      s += y_scu ? y_rec[x - LCU_WIDTH * 2 + 1] : state->tile->frame->rec->y[x0 + x + 1 + (y0 - 2) * stride];
-      s += y_scu ? y_rec[x - LCU_WIDTH + 1] : state->tile->frame->rec->y[x0 + x + 1 + (y0 - 1) * stride];
+      s += y_scu ? y_rec[x - LCU_WIDTH - left_padding]     : state->tile->frame->rec->y[x0 + x - left_padding + (y0 - 1) * stride];
+      s += y_scu ? y_rec[x - LCU_WIDTH * 2 + 1]            : state->tile->frame->rec->y[x0 + x + 1 + (y0 - 2) * stride];
+      s += y_scu ? y_rec[x - LCU_WIDTH + 1]                : state->tile->frame->rec->y[x0 + x + 1 + (y0 - 1) * stride];
       sampled_luma_ref.top[x / 2] = s >> 3;
     }
   }
 
+  // Downsample the reconstructed luma sample so that they can be mapped into the chroma
+  // to generate the chroma prediction
   for (int y = 0; y < height * 2; y+=2) {
     for (int x = 0; x <  width * 2; x+=2) {
       int s = 4;
@@ -521,6 +527,7 @@ void kvz_predict_cclm(
 
   int a, b, shift;
   get_cclm_parameters(state, width, height, mode,x0, y0, &sampled_luma_ref, chroma_ref, &a, &b, &shift);
+
   linear_transform_cclm(a, shift, b,sampled_luma, dst, width, height);
 }
 
