@@ -274,8 +274,8 @@ static void get_cclm_parameters(
   height *= 2;
   width *= 2;
 
-  const int tu_width_in_units = width / unit_w;
-  const int tu_height_in_units = height / unit_h;
+  const int tu_width_in_units = c_width / unit_w;
+  const int tu_height_in_units = c_height / unit_h;
 
 
   int top_template_samp_num = width; // for MDLM, the template sample number is 2W or 2H;
@@ -342,7 +342,7 @@ static void get_cclm_parameters(
   if (above_available)
   {
     cntT = MIN(actualTopTemplateSampNum, (1 + aboveIs4) << 1);
-    src = luma_src->top + 1;
+    src = luma_src->top;
     const kvz_pixel* cur = chroma_ref->ref.top + 1;
     for (int pos = startPos[0]; cnt < cntT; pos += pickStep[0], cnt++)
     {
@@ -354,7 +354,7 @@ static void get_cclm_parameters(
   if (left_available)
   {
     cntL = MIN(actualLeftTemplateSampNum, (1 + leftIs4) << 1);
-    src = luma_src->left + 1;
+    src = luma_src->left;
     const kvz_pixel* cur = chroma_ref->ref.left + 1;
     for (int pos = startPos[1], cnt = 0; cnt < cntL; pos += pickStep[1], cnt++)
     {
@@ -467,6 +467,7 @@ void kvz_predict_cclm(
 
   int x_scu = SUB_SCU(x0);
   int y_scu = SUB_SCU(y0);
+  y_rec += x_scu + y_scu * LCU_WIDTH;
 
   if(x0) {
     for(int y = 0; y < height * 2; y+=2) {

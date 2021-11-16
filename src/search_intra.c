@@ -454,7 +454,7 @@ static void search_intra_chroma_rough(encoder_state_t * const state,
                                       const kvz_pixel *orig_u, const kvz_pixel *orig_v, int16_t origstride,
                                       kvz_intra_references *refs_u, kvz_intra_references *refs_v,
                                       int8_t luma_mode,
-                                      int8_t modes[5], double costs[5])
+                                      int8_t modes[8], double costs[8], lcu_t* lcu)
 {
   assert(!(x_px & 4 || y_px & 4));
 
@@ -484,7 +484,7 @@ static void search_intra_chroma_rough(encoder_state_t * const state,
   for (int i = 5; i < 8; i++) {
     kvz_predict_cclm(
       state,
-      COLOR_U, width, width, x_px, y_px, state->tile->frame->source->stride, modes[i], state->tile->frame->rec->y, refs_u,  _pred);
+      COLOR_U, width, width, x_px, y_px, state->tile->frame->source->stride, modes[i], lcu->rec.y, refs_u,  _pred);
   }
 
   kvz_pixels_blit(orig_v, orig_block, width, width, origstride, width);
@@ -929,7 +929,7 @@ int8_t kvz_search_cu_intra_chroma(encoder_state_t * const state,
     search_intra_chroma_rough(state, x_px, y_px, depth,
                               ref_u, ref_v, LCU_WIDTH_C,
                               &refs_u, &refs_v,
-                              intra_mode, modes, costs);
+                              intra_mode, modes, costs, lcu);
   }
 
   int8_t intra_mode_chroma = intra_mode;
