@@ -472,6 +472,7 @@ void kvz_predict_cclm(
 )
 {
   assert(mode == LM_CHROMA_IDX || mode == LM_CHROMA_L_IDX || mode == LM_CHROMA_T_IDX);
+  assert(state->encoder_control->cfg.cclm);
 
   
   kvz_intra_ref sampled_luma_ref;

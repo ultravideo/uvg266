@@ -485,6 +485,7 @@ static void search_intra_chroma_rough(encoder_state_t * const state,
     costs[i] += satd_func(pred, orig_block);
   }
   for (int i = 5; i < 8; i++) {
+    assert(state->encoder_control->cfg.cclm);
     kvz_predict_cclm(
       state,
       COLOR_U, width, width, x_px, y_px, state->tile->frame->source->stride, modes[i], lcu->rec.y, refs_u,  pred, &cclm_params);
@@ -926,7 +927,7 @@ int8_t kvz_search_cu_intra_chroma(encoder_state_t * const state,
   int num_modes = modes_in_depth[depth];
 
   if (state->encoder_control->cfg.rdo == 3) {
-    num_modes = 8;
+    num_modes = state->encoder_control->cfg.cclm ? 8 : 5;
   }
 
   // Don't do rough mode search if all modes are selected.
