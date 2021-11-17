@@ -258,6 +258,7 @@ static double search_intra_trdepth(encoder_state_t * const state,
                                    int intra_mode, int cost_treshold,
                                    cu_info_t *const pred_cu,
                                    lcu_t *const lcu,
+                                   cclm_parameters_t *cclm_params,
                                    const int mts_mode)
 {
   assert(depth >= 0 && depth <= MAX_PU_DEPTH);
@@ -332,7 +333,7 @@ static double search_intra_trdepth(encoder_state_t * const state,
         x_px, y_px,
         depth,
         intra_mode, -1,
-        pred_cu, lcu);
+        pred_cu, cclm_params, lcu);
 
       // TODO: Not sure if this should be 0 or 1 but at least seems to work with 1
       if (pred_cu->tr_idx > 1)
@@ -360,7 +361,7 @@ static double search_intra_trdepth(encoder_state_t * const state,
         x_px, y_px,
         depth,
         -1, chroma_mode,
-        pred_cu, lcu);
+        pred_cu, cclm_params, lcu);
       best_rd_cost += kvz_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
     }
     pred_cu->tr_skip = best_tr_idx == MTS_SKIP;
@@ -391,15 +392,15 @@ static double search_intra_trdepth(encoder_state_t * const state,
   if (depth < max_depth && depth < MAX_PU_DEPTH) {
     split_cost = 3 * state->lambda;
 
-    split_cost += search_intra_trdepth(state, x_px, y_px, depth + 1, max_depth, intra_mode, nosplit_cost, pred_cu, lcu, -1);
+    split_cost += search_intra_trdepth(state, x_px, y_px, depth + 1, max_depth, intra_mode, nosplit_cost, pred_cu, lcu, cclm_params, -1);
     if (split_cost < nosplit_cost) {
-      split_cost += search_intra_trdepth(state, x_px + offset, y_px, depth + 1, max_depth, intra_mode, nosplit_cost, pred_cu, lcu, -1);
+      split_cost += search_intra_trdepth(state, x_px + offset, y_px, depth + 1, max_depth, intra_mode, nosplit_cost, pred_cu, lcu, cclm_params, -1);
     }
     if (split_cost < nosplit_cost) {
-      split_cost += search_intra_trdepth(state, x_px, y_px + offset, depth + 1, max_depth, intra_mode, nosplit_cost, pred_cu, lcu, -1);
+      split_cost += search_intra_trdepth(state, x_px, y_px + offset, depth + 1, max_depth, intra_mode, nosplit_cost, pred_cu, lcu, cclm_params, -1);
     }
     if (split_cost < nosplit_cost) {
-      split_cost += search_intra_trdepth(state, x_px + offset, y_px + offset, depth + 1, max_depth, intra_mode, nosplit_cost, pred_cu, lcu, -1);
+      split_cost += search_intra_trdepth(state, x_px + offset, y_px + offset, depth + 1, max_depth, intra_mode, nosplit_cost, pred_cu, lcu, cclm_params, -1);
     }
 
     double cbf_bits = 0.0;
@@ -468,6 +469,8 @@ static void search_intra_chroma_rough(encoder_state_t * const state,
   cost_pixel_nxn_func *const satd_func = kvz_pixels_get_satd_func(width);
   //cost_pixel_nxn_func *const sad_func = kvz_pixels_get_sad_func(width);
 
+  cclm_parameters_t cclm_params;
+  
   kvz_pixel _pred[32 * 32 + SIMD_ALIGNMENT];
   kvz_pixel *pred = ALIGNED_POINTER(_pred, SIMD_ALIGNMENT);
 
@@ -484,7 +487,7 @@ static void search_intra_chroma_rough(encoder_state_t * const state,
   for (int i = 5; i < 8; i++) {
     kvz_predict_cclm(
       state,
-      COLOR_U, width, width, x_px, y_px, state->tile->frame->source->stride, modes[i], lcu->rec.y, refs_u,  _pred);
+      COLOR_U, width, width, x_px, y_px, state->tile->frame->source->stride, modes[i], lcu->rec.y, refs_u,  pred, &cclm_params);
   }
 
   kvz_pixels_blit(orig_v, orig_block, width, width, origstride, width);
@@ -749,7 +752,7 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
     // Reset transform split data in lcu.cu for this area.
     kvz_lcu_fill_trdepth(lcu, x_px, y_px, depth, depth);
 
-    double mode_cost = search_intra_trdepth(state, x_px, y_px, depth, tr_depth, modes[rdo_mode], MAX_INT, &pred_cu, lcu, -1);
+    double mode_cost = search_intra_trdepth(state, x_px, y_px, depth, tr_depth, modes[rdo_mode], MAX_INT, &pred_cu, lcu, NULL, -1);
     costs[rdo_mode] += mode_cost;
     trafo[rdo_mode] = pred_cu.tr_idx;
 
@@ -774,7 +777,7 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
     pred_cu.intra.mode = modes[0];
     pred_cu.intra.mode_chroma = modes[0];
     FILL(pred_cu.cbf, 0);
-    search_intra_trdepth(state, x_px, y_px, depth, tr_depth, modes[0], MAX_INT, &pred_cu, lcu, trafo[0]);
+    search_intra_trdepth(state, x_px, y_px, depth, tr_depth, modes[0], MAX_INT, &pred_cu, lcu, NULL, trafo[0]);
   }
 
   return modes_to_check;
@@ -826,18 +829,21 @@ int8_t kvz_search_intra_chroma_rdo(encoder_state_t * const state,
                                   int x_px, int y_px, int depth,
                                   int8_t intra_mode,
                                   int8_t modes[8], int8_t num_modes,
-                                  lcu_t *const lcu)
+                                  lcu_t *const lcu, cclm_parameters_t *best_cclm)
 {
   const bool reconstruct_chroma = (depth != 4) || (x_px & 4 && y_px & 4);
 
 
-  kvz_intra_references refs;
+  kvz_intra_references refs[2];
   const vector2d_t luma_px = { x_px, y_px };
   const vector2d_t pic_px = {
     state->tile->frame->width,
     state->tile->frame->height,
   };
-  kvz_intra_build_reference(6-depth, COLOR_U, &luma_px, &pic_px, lcu, &refs, state->encoder_control->cfg.wpp);
+  kvz_intra_build_reference(6-depth, COLOR_U, &luma_px, &pic_px, lcu, &refs[0], state->encoder_control->cfg.wpp);
+  kvz_intra_build_reference(6-depth, COLOR_V, &luma_px, &pic_px, lcu, &refs[1], state->encoder_control->cfg.wpp);
+
+  cclm_parameters_t cclm_params[2] = {0};
 
   if (reconstruct_chroma) {
     const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
@@ -846,7 +852,10 @@ int8_t kvz_search_intra_chroma_rdo(encoder_state_t * const state,
     struct {
       double cost;
       int8_t mode;
+      cclm_parameters_t cclm[2];
     } chroma, best_chroma;
+
+    // chroma.cclm = cclm_params;
 
     best_chroma.mode = 0;
     best_chroma.cost = MAX_INT;
@@ -856,14 +865,24 @@ int8_t kvz_search_intra_chroma_rdo(encoder_state_t * const state,
       if (chroma.mode == -1) continue;
       if(chroma.mode < 67) {
         kvz_intra_recon_cu(state,
-                           x_px, y_px,
-                           depth,
-                           -1, chroma.mode, // skip luma
-                           NULL, lcu);
+          x_px, y_px,
+          depth,
+          -1, chroma.mode, // skip luma
+          NULL, NULL, lcu);
       }
       else {
         kvz_predict_cclm(
-          state, COLOR_U, 32 >> (depth), 32 >> (depth), x_px, y_px, state->tile->frame->source->stride, chroma.mode, lcu->rec.y, &refs, NULL);
+          state, COLOR_U, 32 >> (depth), 32 >> (depth), x_px, y_px, state->tile->frame->source->stride, chroma.mode, lcu->rec.y, &refs[0], NULL, &cclm_params[0]);
+        chroma.cclm[0] = cclm_params[0];
+        kvz_predict_cclm(
+          state, COLOR_V, 32 >> (depth), 32 >> (depth), x_px, y_px, state->tile->frame->source->stride, chroma.mode, lcu->rec.y, &refs[1], NULL, &cclm_params[1]);
+        chroma.cclm[1] = cclm_params[1];
+
+        kvz_intra_recon_cu(state,
+          x_px, y_px,
+          depth,
+          -1, chroma.mode, // skip luma
+          NULL, cclm_params, lcu);
       }
       chroma.cost = kvz_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, tr_cu, lcu);
 
@@ -874,6 +893,8 @@ int8_t kvz_search_intra_chroma_rdo(encoder_state_t * const state,
         best_chroma = chroma;
       }
     }
+    best_cclm[0] = best_chroma.cclm[0];
+    best_cclm[1] = best_chroma.cclm[1];
 
     return best_chroma.mode;
   }
@@ -884,7 +905,7 @@ int8_t kvz_search_intra_chroma_rdo(encoder_state_t * const state,
 
 int8_t kvz_search_cu_intra_chroma(encoder_state_t * const state,
                               const int x_px, const int y_px,
-                              const int depth, lcu_t *lcu)
+                              const int depth, lcu_t *lcu, cclm_parameters_t *best_cclm)
 {
   const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
 
@@ -892,7 +913,7 @@ int8_t kvz_search_cu_intra_chroma(encoder_state_t * const state,
   int8_t intra_mode = cur_pu->intra.mode;
 
   double costs[8];
-  int8_t modes[8] = { 0, 50, 18, 1, -1, 67, 68, 69 };
+  int8_t modes[8] = { 0, 50, 18, 1, -1, 81, 82, 83 };
   if (intra_mode != 0 && intra_mode != 50 && intra_mode != 18 && intra_mode != 1) {
     modes[4] = intra_mode;
   }
@@ -934,7 +955,7 @@ int8_t kvz_search_cu_intra_chroma(encoder_state_t * const state,
 
   int8_t intra_mode_chroma = intra_mode;
   if (num_modes > 1) {
-    intra_mode_chroma = kvz_search_intra_chroma_rdo(state, x_px, y_px, depth, intra_mode, modes, num_modes, lcu);
+    intra_mode_chroma = kvz_search_intra_chroma_rdo(state, x_px, y_px, depth, intra_mode, modes, num_modes, lcu, best_cclm);
   }
 
   return intra_mode_chroma;

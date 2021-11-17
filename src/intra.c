@@ -250,9 +250,9 @@ static void intra_pred_dc(
 
 enum lm_mode
 {
-  LM_CHROMA_IDX = 67,
-  LM_CHROMA_L_IDX = 68,
-  LM_CHROMA_T_IDX = 69,
+  LM_CHROMA_IDX = 81,
+  LM_CHROMA_L_IDX = 82,
+  LM_CHROMA_T_IDX = 83,
 };
 
 
@@ -261,7 +261,7 @@ static void get_cclm_parameters(
   int8_t width, int8_t height, int8_t mode,
   int x0, int y0,
   kvz_intra_ref* luma_src, kvz_intra_references*chroma_ref,
-  int *a, int *b, int *shift) {
+  int16_t *a, int16_t*b, int16_t*shift) {
 
   const int base_unit_size = 1 << (6 - PU_DEPTH_INTRA_MAX);
 
@@ -412,7 +412,7 @@ static void get_cclm_parameters(
       int v = DivSigTable[normDiff] | 8;
       x += normDiff != 0;
 
-      int y = kvz_math_floor_log2(abs(diffC)) + 1;
+      int y = diffC ? kvz_math_floor_log2(abs(diffC)) + 1 : 0;
       int add = 1 << y >> 1;
       *a = (diffC * v + add) >> y;
       *shift = 3 + x - y;
@@ -440,7 +440,10 @@ static void get_cclm_parameters(
   }
 }
 
-static void linear_transform_cclm(int scale, int shift, int offset, kvz_pixel * src, kvz_pixel * dst, int stride, int height) {
+static void linear_transform_cclm(cclm_parameters_t* cclm_params, kvz_pixel * src, kvz_pixel * dst, int stride, int height) {
+  int scale = cclm_params->a;
+  int shift = cclm_params->shift;
+  int offset = cclm_params->b;
   for (int y = 0; y < height; ++y) {
     for (int x=0; x < stride; ++x) {
       int val = src[x + y * stride] * scale;
@@ -464,7 +467,8 @@ void kvz_predict_cclm(
   const int8_t mode,
   kvz_pixel const *  y_rec,
   kvz_intra_references* chroma_ref,
-  kvz_pixel* dst
+  kvz_pixel* dst,
+  cclm_parameters_t* cclm_params
 )
 {
   assert(mode == LM_CHROMA_IDX || mode == LM_CHROMA_L_IDX || mode == LM_CHROMA_T_IDX);
@@ -523,15 +527,19 @@ void kvz_predict_cclm(
       s += y_rec[2 * x + LCU_WIDTH] * 2;
       s += y_rec[2 * x + 1 + LCU_WIDTH];
       s += !x_scu && !x && x0 ? state->tile->frame->rec->y[x0 - 1 + (y0 + 1) * stride] : y_rec[2 * x - ((x + x0) > 0) + stride];
-      sampled_luma[x + y * width] = s >> 3;
+      sampled_luma[x / 2 + y / 2 * width] = s >> 3;
     }
     y_rec += LCU_WIDTH;
   }
 
-  int a, b, shift;
+  int16_t a, b, shift;
   get_cclm_parameters(state, width, height, mode,x0, y0, &sampled_luma_ref, chroma_ref, &a, &b, &shift);
+  cclm_params->shift = shift;
+  cclm_params->a = a;
+  cclm_params->b = b;
 
-  linear_transform_cclm(a, shift, b,sampled_luma, dst, width, height);
+  if(dst)
+    linear_transform_cclm(cclm_params, sampled_luma, dst, width, height);
 }
 
 void kvz_intra_predict(
@@ -859,6 +867,7 @@ static void intra_recon_tb_leaf(
   int y,
   int depth,
   int8_t intra_mode,
+  cclm_parameters_t *cclm_params,
   lcu_t *lcu,
   color_t color)
 {
@@ -878,14 +887,37 @@ static void intra_recon_tb_leaf(
     state->tile->frame->width,
     state->tile->frame->height,
   };
-  const vector2d_t lcu_px = { SUB_SCU(x) >> shift, SUB_SCU(y) >> shift};
+  int x_scu = SUB_SCU(x);
+  const vector2d_t lcu_px = {x_scu >> shift, SUB_SCU(y) >> shift};
 
   kvz_intra_references refs;
   kvz_intra_build_reference(log2width, color, &luma_px, &pic_px, lcu, &refs, cfg->wpp);
 
   kvz_pixel pred[32 * 32];
+  int stride = state->tile->frame->source->stride;
   const bool filter_boundary = color == COLOR_Y && !(cfg->lossless && cfg->implicit_rdpcm);
-  kvz_intra_predict(state, &refs, log2width, intra_mode, color, pred, filter_boundary);
+  if(intra_mode < 68) {
+    kvz_intra_predict(state, &refs, log2width, intra_mode, color, pred, filter_boundary);
+  } else {
+    kvz_pixel *y_rec = lcu->rec.y;
+    for (int y_ = 0; y_ < width * 2; y_ += 2) {
+      for (int x_ = 0; x_ < width * 2; x_ += 2) {
+        int s = 4;
+        s += y_rec[2 * x_] * 2;
+        s += y_rec[2 * x_ + 1];
+        // If we are at the edge of the CTU read the pixel from the frame reconstruct buffer,
+        // *except* when we are also at the edge of the frame, in which case we want to duplicate
+        // the edge pixel
+        s += !x_scu && !x_ && x ? state->tile->frame->rec->y[x - 1 + y * stride] : y_rec[2 * x_ - ((x_ + x) > 0)];
+        s += y_rec[2 * x_ + LCU_WIDTH] * 2;
+        s += y_rec[2 * x_ + 1 + LCU_WIDTH];
+        s += !x_scu && !x_ && x ? state->tile->frame->rec->y[x - 1 + (y + 1) * stride] : y_rec[2 * x_ - ((x_ + x) > 0) + stride];
+        pred[x_ / 2 + y_ * width / 2] = s >> 3;
+      }
+      y_rec += LCU_WIDTH;
+    }
+    linear_transform_cclm(&cclm_params[color == COLOR_U ? 0 : 1], pred, pred, width, width);
+  }
 
   const int index = lcu_px.x + lcu_px.y * lcu_width;
   kvz_pixel *block = NULL;
@@ -920,6 +952,7 @@ static void intra_recon_tb_leaf(
  * \param mode_luma     intra mode for luma, or -1 to skip luma recon
  * \param mode_chroma   intra mode for chroma, or -1 to skip chroma recon
  * \param cur_cu        pointer to the CU, or NULL to fetch CU from LCU
+ * \param cclm_params   pointer for the cclm_parameters, can be NULL if the mode is not cclm mode
  * \param lcu           containing LCU
  */
 void kvz_intra_recon_cu(
@@ -930,6 +963,7 @@ void kvz_intra_recon_cu(
   int8_t mode_luma,
   int8_t mode_chroma,
   cu_info_t *cur_cu,
+  cclm_parameters_t *cclm_params,
   lcu_t *lcu)
 {
   const vector2d_t lcu_px = { SUB_SCU(x), SUB_SCU(y) };
@@ -954,10 +988,10 @@ void kvz_intra_recon_cu(
     const int32_t x2 = x + offset;
     const int32_t y2 = y + offset;
 
-    kvz_intra_recon_cu(state, x,  y,  depth + 1, mode_luma, mode_chroma, NULL, lcu);
-    kvz_intra_recon_cu(state, x2, y,  depth + 1, mode_luma, mode_chroma, NULL, lcu);
-    kvz_intra_recon_cu(state, x,  y2, depth + 1, mode_luma, mode_chroma, NULL, lcu);
-    kvz_intra_recon_cu(state, x2, y2, depth + 1, mode_luma, mode_chroma, NULL, lcu);
+    kvz_intra_recon_cu(state, x,  y,  depth + 1, mode_luma, mode_chroma, NULL, cclm_params, lcu);
+    kvz_intra_recon_cu(state, x2, y,  depth + 1, mode_luma, mode_chroma, NULL, cclm_params, lcu);
+    kvz_intra_recon_cu(state, x,  y2, depth + 1, mode_luma, mode_chroma, NULL, cclm_params, lcu);
+    kvz_intra_recon_cu(state, x2, y2, depth + 1, mode_luma, mode_chroma, NULL, cclm_params, lcu);
 
     // Propagate coded block flags from child CUs to parent CU.
     uint16_t child_cbfs[3] = {
@@ -978,11 +1012,11 @@ void kvz_intra_recon_cu(
     const bool has_chroma = mode_chroma != -1 &&  (x % 8 == 0 && y % 8 == 0);
     // Process a leaf TU.
     if (has_luma) {
-      intra_recon_tb_leaf(state, x, y, depth, mode_luma, lcu, COLOR_Y);
+      intra_recon_tb_leaf(state, x, y, depth, mode_luma, cclm_params, lcu, COLOR_Y);
     }
     if (has_chroma) {
-      intra_recon_tb_leaf(state, x, y, depth, mode_chroma, lcu, COLOR_U);
-      intra_recon_tb_leaf(state, x, y, depth, mode_chroma, lcu, COLOR_V);
+      intra_recon_tb_leaf(state, x, y, depth, mode_chroma, cclm_params, lcu, COLOR_U);
+      intra_recon_tb_leaf(state, x, y, depth, mode_chroma, cclm_params, lcu, COLOR_V);
     }
 
     kvz_quantize_lcu_residual(state, has_luma, has_chroma, x, y, depth, cur_cu, lcu, false);

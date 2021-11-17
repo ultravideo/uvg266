@@ -709,7 +709,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
                          x, y,
                          depth,
                          cur_cu->intra.mode, -1, // skip chroma
-                         NULL, lcu);
+                         NULL, NULL, lcu);
 
       // TODO: This heavily relies to square CUs
       if ((depth != 4 || (x % 8 && y % 8)) && state->encoder_control->chroma_format != KVZ_CSP_400) {
@@ -717,8 +717,9 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         // rd2. Possibly because the luma mode search already takes chroma
         // into account, so there is less of a chanse of luma mode being
         // really bad for chroma.
+        cclm_parameters_t cclm_params[2];
         if (ctrl->cfg.rdo == 3) {
-          cur_cu->intra.mode_chroma = kvz_search_cu_intra_chroma(state, x, y, depth, lcu);
+          cur_cu->intra.mode_chroma = kvz_search_cu_intra_chroma(state, x, y, depth, lcu, cclm_params);
           lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
         }
 
@@ -726,7 +727,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
                            x & ~7, y & ~7, // TODO: as does this
                            depth,
                            -1, cur_cu->intra.mode_chroma, // skip luma
-                           NULL, lcu);
+                           NULL, cclm_params, lcu);
       }
     } else if (cur_cu->type == CU_INTER) {
 
@@ -883,7 +884,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
                            x, y,
                            depth,
                            cur_cu->intra.mode, mode_chroma,
-                           NULL, lcu);
+                           NULL,NULL, lcu);
 
         cost += kvz_cu_rd_cost_luma(state, x_local, y_local, depth, cur_cu, lcu);
         if (has_chroma) {

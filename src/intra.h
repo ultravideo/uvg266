@@ -54,6 +54,12 @@ typedef struct
   bool filtered_initialized;
 } kvz_intra_references;
 
+typedef struct
+{
+  int16_t a;
+  int16_t shift;
+  int16_t b;
+} cclm_parameters_t;
 
 /**
 * \brief Function for deriving intra luma predictions
@@ -118,6 +124,7 @@ void kvz_intra_recon_cu(
   int8_t mode_luma,
   int8_t mode_chroma,
   cu_info_t *cur_cu,
+  cclm_parameters_t* cclm_params,
   lcu_t *lcu);
 
 
@@ -132,5 +139,6 @@ void kvz_predict_cclm(
   const int8_t mode,
   kvz_pixel const* y_rec,
   kvz_intra_references* chroma_ref,
-  kvz_pixel* dst
+  kvz_pixel* dst,
+  cclm_parameters_t* cclm_params
 );
