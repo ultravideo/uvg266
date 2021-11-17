@@ -395,6 +395,20 @@ static const uint8_t INIT_IMV_FLAG[4][5] = {
   {   0,   5,   0,   0,   4, },
 };
 
+static const uint8_t INIT_CCLM_FLAG[4] = {
+  {  26, },
+  {  34, },
+  {  59, },
+  {   4, },
+};
+
+static const uint8_t INIT_CCLM_MODEL[4] = {
+  {  27, },
+  {  27, },
+  {  27, },
+  {   9, },
+};
+
 /*
 static const uint16_t g_inistateToCount[128] = {
   614,   647,   681,   718,   756,   797,   839,   884,   932,   982,   1034,  1089,  1148,  1209,  1274,  1342,
@@ -470,6 +484,9 @@ void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
   kvz_ctx_init(&cabac->ctx.multi_ref_line[1], QP, MULTI_REF_LINE_MODE[slice][1], MULTI_REF_LINE_MODE[3][1]);
 
   kvz_ctx_init(&cabac->ctx.chroma_pred_model, QP, INIT_CHROMA_PRED_MODE[slice], INIT_CHROMA_PRED_MODE[3]);
+
+  kvz_ctx_init(&cabac->ctx.cclm_flag, QP, INIT_CCLM_FLAG[slice], INIT_CCLM_FLAG[3]);
+  kvz_ctx_init(&cabac->ctx.cclm_model, QP, INIT_CCLM_MODEL[slice], INIT_CCLM_MODEL[3]);
 
 
   for (i = 0; i < 3; i++) {

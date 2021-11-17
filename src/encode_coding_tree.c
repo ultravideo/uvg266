@@ -701,7 +701,7 @@ static bool encode_inter_prediction_unit(encoder_state_t * const state,
   return non_zero_mvd;
 }
 
-static void encode_chroma_intra_cu(cabac_data_t* const cabac, const cu_info_t* const cur_cu, int x, int y, const videoframe_t* const frame, const int cu_width) {
+static void encode_chroma_intra_cu(cabac_data_t* const cabac, const cu_info_t* const cur_cu, int x, int y, const videoframe_t* const frame, const int cu_width, const int cclm_enabled) {
   unsigned pred_mode = 0;
   unsigned chroma_pred_modes[8] = {0, 50, 18, 1, 67, 81, 82, 83};
   const int pu_x = PU_GET_X(cur_cu->part_size, cu_width, x, 0);
@@ -710,7 +710,23 @@ static void encode_chroma_intra_cu(cabac_data_t* const cabac, const cu_info_t* c
   int8_t chroma_intra_dir = first_pu->intra.mode_chroma;
   int8_t luma_intra_dir = first_pu->intra.mode;
 
+
   bool derived_mode = chroma_intra_dir == luma_intra_dir;
+  bool cclm_mode = chroma_intra_dir > 67;
+
+  if (cclm_enabled) {
+    cabac->cur_ctx = &cabac->ctx.cclm_flag;
+    CABAC_BIN(cabac, cclm_mode, "cclm_flag");
+    if(cclm_mode) {
+      cabac->cur_ctx = &cabac->ctx.cclm_model;
+      CABAC_BIN(cabac, chroma_intra_dir != 81, "cclm_model_1");
+      if(chroma_intra_dir != 81) {
+        CABAC_BIN(cabac, chroma_intra_dir == 83, "cclm_model_2");        
+      }
+      return;
+    }
+
+  }
   cabac->cur_ctx = &(cabac->ctx.chroma_pred_model);
   CABAC_BIN(cabac, derived_mode ? 0 : 1, "intra_chroma_pred_mode");
 
@@ -722,7 +738,7 @@ static void encode_chroma_intra_cu(cabac_data_t* const cabac, const cu_info_t* c
           break;
         }
       }*/
-    for (; pred_mode < 8; pred_mode++) {
+    for (; pred_mode < 5; pred_mode++) {
       if (chroma_intra_dir == chroma_pred_modes[pred_mode]) {
         break;
       }
@@ -983,7 +999,7 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
 
   // Code chroma prediction mode.
   if (state->encoder_control->chroma_format != KVZ_CSP_400 && depth != 4) {
-    encode_chroma_intra_cu(cabac, cur_cu, x, y, frame, cu_width);
+    encode_chroma_intra_cu(cabac, cur_cu, x, y, frame, cu_width, state->encoder_control->cfg.cclm);
   }
 
   encode_transform_coeff(state, x, y, depth, 0, 0, 0, 0, coeff);
@@ -991,7 +1007,7 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
   encode_mts_idx(state, cabac, cur_cu);
 
   if (state->encoder_control->chroma_format != KVZ_CSP_400 && depth == 4 && x % 8 && y % 8) {
-    encode_chroma_intra_cu(cabac, cur_cu, x, y, frame, cu_width);
+    encode_chroma_intra_cu(cabac, cur_cu, x, y, frame, cu_width, state->encoder_control->cfg.cclm);
     encode_transform_coeff(state, x, y, depth, 0, 0, 0, 1, coeff);
   }
 
