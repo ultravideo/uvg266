@@ -579,6 +579,25 @@ static void encode_transform_coeff(encoder_state_t * const state,
   }
 }
 
+static void change_precision(int imv, int32_t* hor, int32_t* ver) {
+  int dst = "\4\2\0\3"[imv];
+  int src = 4; // We use quarterpel internal res
+
+  const int shift = (int)dst - (int)src;
+  if (shift >= 0)
+  {
+    *hor <<= shift;
+    *ver <<= shift;
+  }
+  else
+  {
+    const int right_shift = -shift;
+    const int offset = 1 << (right_shift - 1);
+    *hor = *hor >= 0 ? (*hor + offset - 1) >> right_shift : (*hor + offset) >> right_shift;
+    *ver = *ver >= 0 ? (*ver + offset - 1) >> right_shift : (*ver + offset) >> right_shift;
+  }
+}
+
 /**
  * \brief Writes inter block parameters to the bitstream
  * \param state           Encoder state in use
@@ -672,6 +691,9 @@ static bool encode_inter_prediction_unit(encoder_state_t * const state,
         uint8_t cu_mv_cand = CU_GET_MV_CAND(cur_cu, ref_list_idx);
         const int32_t mvd_hor = cur_cu->inter.mv[ref_list_idx][0] - mv_cand[cu_mv_cand][0];
         const int32_t mvd_ver = cur_cu->inter.mv[ref_list_idx][1] - mv_cand[cu_mv_cand][1];
+
+        //change_precision(KVZ_IMV_FPEL, &mvd_hor, &mvd_ver);
+
 
         kvz_encode_mvd(state, cabac, mvd_hor, mvd_ver);
 
@@ -1351,8 +1373,8 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
 #endif
 
   if (cur_cu->type == CU_INTER) {
-    uint8_t imv_mode = 0;
-
+    uint8_t imv_mode = KVZ_IMV_OFF;
+    
     const int num_pu = kvz_part_mode_num_parts[cur_cu->part_size];
     bool non_zero_mvd = false;
 
@@ -1369,16 +1391,16 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
     }
 
     // imv mode, select between fullpel, half-pel and quarter-pel resolutions
-    // 0 = off, 1 = fullpel, 2 = quarter-pel, 3 = half-pel
+    // 0 = off, 1 = fullpel, 2 = 4-pel, 3 = half-pel
     if (ctrl->cfg.amvr && non_zero_mvd) {
       cabac->cur_ctx = &(cabac->ctx.imv_flag[0]);
-      CABAC_BIN(cabac, (imv_mode > 0), "imv_flag");
-      if (imv_mode > 0) {
+      CABAC_BIN(cabac, (imv_mode > KVZ_IMV_OFF), "imv_flag");
+      if (imv_mode > KVZ_IMV_OFF) {
         cabac->cur_ctx = &(cabac->ctx.imv_flag[4]);
-        CABAC_BIN(cabac, (imv_mode < 3), "imv_flag");
-        if (imv_mode < 3) {
+        CABAC_BIN(cabac, (imv_mode < KVZ_IMV_HPEL), "imv_flag");
+        if (imv_mode < KVZ_IMV_HPEL) {
           cabac->cur_ctx = &(cabac->ctx.imv_flag[1]);
-          CABAC_BIN(cabac, (imv_mode > 1), "imv_flag");
+          CABAC_BIN(cabac, (imv_mode > KVZ_IMV_FPEL), "imv_flag"); // 1 indicates 4PEL, 0 FPEL
         }
       }
     }

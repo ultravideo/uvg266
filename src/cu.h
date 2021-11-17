@@ -164,6 +164,7 @@ typedef struct
       uint8_t mv_cand0 : 3; // \brief selected MV candidate
       uint8_t mv_cand1 : 3; // \brief selected MV candidate
       uint8_t mv_dir   : 2; // \brief Probably describes if mv_ref is L0, L1 or both (bi-pred)
+      uint8_t imv      : 2; // \brief Adaptive motion vector resolution for this block
     } inter;
   };
 } cu_info_t;

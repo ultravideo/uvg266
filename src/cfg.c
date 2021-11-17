@@ -1471,6 +1471,9 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   else if OPT("jccr") {
     cfg->jccr = (bool)atobool(value);
   }
+  else if OPT("amvr") {
+    cfg->amvr = (bool)atobool(value);
+  }
   else {
     return 0;
   }

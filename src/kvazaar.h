@@ -245,6 +245,13 @@ enum kvz_file_format
   KVZ_FORMAT_YUV = 2
 };
 
+enum kvz_amvr_resolution
+{
+  KVZ_IMV_OFF     = 0,
+  KVZ_IMV_FPEL    = 1,
+  KVZ_IMV_4PEL    = 2,
+  KVZ_IMV_HPEL    = 3
+};
 
 // Map from input format to chroma format.
 #define KVZ_FORMAT2CSP(format) ((enum kvz_chroma_format)format)
