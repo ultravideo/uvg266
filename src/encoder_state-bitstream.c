@@ -663,7 +663,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   }
 
   // if(!no_amvr_constraint_flag)
-    WRITE_U(stream, 0, 1, "sps_amvr_enabled_flag");
+    WRITE_U(stream, state->encoder_control->cfg.amvr, 1, "sps_amvr_enabled_flag");
   // if(!no_bdof_constraint_flag)
     WRITE_U(stream, 0, 1, "sps_bdof_enabled_flag");
   // if(!no_dmvr_constraint_flag)

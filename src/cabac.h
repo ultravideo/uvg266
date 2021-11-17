@@ -67,6 +67,7 @@ typedef struct
     cabac_ctx_t intra_subpart_model[2];    //!< \brief intra sub part context models
     cabac_ctx_t chroma_pred_model;
     cabac_ctx_t inter_dir[6];
+    cabac_ctx_t imv_flag[5];
     cabac_ctx_t qt_cbf_model_luma[4];
     cabac_ctx_t qt_cbf_model_cr[3];
     cabac_ctx_t qt_cbf_model_cb[2];

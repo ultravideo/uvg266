@@ -376,6 +376,13 @@ static const uint8_t INIT_INTRA_SUBPART_MODE[4][2] = {
   {   9,   2, },
 };
 
+static const uint8_t INIT_IMV_FLAG[4][5] = {
+  {  59,  26,  50,  60,  38, },
+  {  59,  48,  58,  60,  60, },
+  { CNU,  34, CNU, CNU, CNU, },
+  {   0,   5,   0,   0,   4, },
+};
+
 /*
 static const uint16_t g_inistateToCount[128] = {
   614,   647,   681,   718,   756,   797,   839,   884,   932,   982,   1034,  1089,  1148,  1209,  1274,  1342,
@@ -468,6 +475,7 @@ void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
 
   for (i = 0; i < 5; i++) {
     kvz_ctx_init(&cabac->ctx.transform_skip_gt2[i], QP, INIT_TRANSFORM_SKIP_GT2[slice][i], INIT_TRANSFORM_SKIP_GT2[3][i]);
+    kvz_ctx_init(&cabac->ctx.imv_flag[i], QP, INIT_IMV_FLAG[slice][i], INIT_IMV_FLAG[3][i]);    
   }
 
   for (i = 0; i < 6; i++) {
