@@ -178,6 +178,8 @@ static const struct option long_options[] = {
   { "no-jccr",                  no_argument, NULL, 0 },
   { "amvr",                     no_argument, NULL, 0 },
   { "no-amvr",                  no_argument, NULL, 0 },
+  { "cclm",                     no_argument, NULL, 0 },
+  { "no-cclm",                  no_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 
@@ -629,8 +631,12 @@ void print_help(void)
     "                                   - both: MTS applied for both intra and inter blocks.\n"
     "                                   - implicit: uses implicit MTS. Applies DST7 instead \n"
     "                                               of DCT2 to certain intra blocks.\n"
-    "      --(no-)jccr            : Joint coding of chroma residual.\n"
-    "                               Requires rdo> = 2. [disabled]\n"      
+    "      --(no-)jccr            : Joint coding of chroma residual. "
+    "                               Requires rdo> = 2. [disabled]\n"
+    "      --(no-)cclm            : Cross component linear model. \n"
+    "                               Extra chroma prediction modes that are formed\n"
+    "                               via linear transformation from the luma\n"
+    "                               prediction. Requires rdo >=3. [disabled\n"
     "      --(no-)amvr            : Adaptive Motion Vector Resolution.\n"
     "                               Code some mv's with reduced resolution [disabled]\n"
     "\n"

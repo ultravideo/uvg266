@@ -722,7 +722,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   WRITE_U(stream, 0, 1, "sps_mip_enabled_flag");
   // if(!no_cclm_constraint_flag)
   if(encoder->chroma_format != KVZ_CSP_400) {
-    WRITE_U(stream, 0, 1, "sps_cclm_enabled_flag");
+    WRITE_U(stream, encoder->cfg.cclm, 1, "sps_cclm_enabled_flag");
   }
   if (encoder->chroma_format == KVZ_CSP_420) {
     WRITE_U(stream, 0, 1, "sps_chroma_horizontal_collocated_flag");
