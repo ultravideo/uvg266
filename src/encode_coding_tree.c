@@ -579,25 +579,6 @@ static void encode_transform_coeff(encoder_state_t * const state,
   }
 }
 
-static void change_precision(int imv, int32_t* hor, int32_t* ver) {
-  int dst = "\4\2\0\3"[imv];
-  int src = 4; // We use quarterpel internal res
-
-  const int shift = (int)dst - (int)src;
-  if (shift >= 0)
-  {
-    *hor <<= shift;
-    *ver <<= shift;
-  }
-  else
-  {
-    const int right_shift = -shift;
-    const int offset = 1 << (right_shift - 1);
-    *hor = *hor >= 0 ? (*hor + offset - 1) >> right_shift : (*hor + offset) >> right_shift;
-    *ver = *ver >= 0 ? (*ver + offset - 1) >> right_shift : (*ver + offset) >> right_shift;
-  }
-}
-
 /**
  * \brief Writes inter block parameters to the bitstream
  * \param state           Encoder state in use
@@ -692,8 +673,7 @@ static bool encode_inter_prediction_unit(encoder_state_t * const state,
         const int32_t mvd_hor = cur_cu->inter.mv[ref_list_idx][0] - mv_cand[cu_mv_cand][0];
         const int32_t mvd_ver = cur_cu->inter.mv[ref_list_idx][1] - mv_cand[cu_mv_cand][1];
 
-        //change_precision(KVZ_IMV_FPEL, &mvd_hor, &mvd_ver);
-
+        kvz_change_precision(INTERNAL_MV_PREC, kvz_g_imv_to_prec[KVZ_IMV_OFF], &mvd_hor, &mvd_ver);
 
         kvz_encode_mvd(state, cabac, mvd_hor, mvd_ver);
 

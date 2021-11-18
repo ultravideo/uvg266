@@ -115,6 +115,8 @@
 
 typedef int16_t coeff_t;
 
+typedef int16_t mv_t;
+
 //#define VERBOSE 1
 //#define KVZ_DEBUG_PRINT_CABAC 1
 //#define KVZ_DEBUG 1
@@ -127,6 +129,8 @@ typedef int16_t coeff_t;
 #define RDPCM 1
 
 #define MIN_QP_PRIME_TS 2
+
+#define INTERNAL_MV_PREC 4 // Internal motion vector precision, 4 = 1/16 pel
 
 //! Limits for prediction block sizes. 0 = 64x64, 4 = 4x4.
 #define PU_DEPTH_INTER_MIN 0
