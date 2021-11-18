@@ -1660,6 +1660,12 @@ static void search_pu_inter(encoder_state_t * const state,
       lcu
   );
 
+  for (int i = 0; i < info.num_merge_cand; i++) {
+    // ToDo: Adapt to AMVR
+    if (info.merge_cand->dir & 1) kvz_round_precision(INTERNAL_MV_PREC, 2, &info.merge_cand[i].mv[0][0], &info.merge_cand[i].mv[0][1]);
+    if (info.merge_cand->dir & 2) kvz_round_precision(INTERNAL_MV_PREC, 2, &info.merge_cand[i].mv[1][0], &info.merge_cand[i].mv[1][1]);
+  }
+
   // Default to candidate 0
   CU_SET_MV_CAND(cur_cu, 0, 0);
   CU_SET_MV_CAND(cur_cu, 1, 0);

@@ -1603,7 +1603,7 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
     }
   }
 
-  if (candidates == max_num_cands) goto return_with_precision_clamp;
+  if (candidates == max_num_cands) return candidates;
 
   if (candidates != max_num_cands - 1) {
     const uint32_t ctu_row = (y >> LOG2_LCU_WIDTH);
@@ -1689,7 +1689,7 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
     }
   }
 
-  if (candidates == max_num_cands) goto return_with_precision_clamp;
+  if (candidates == max_num_cands) return candidates;
 
 
   int num_ref = state->frame->ref->used_size;
@@ -1722,12 +1722,6 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
     }
     zero_idx++;
     candidates++;
-  }
-
-return_with_precision_clamp:
-  for (int i = 0; i < candidates; i++) {
-    if(mv_cand[i].dir & 1) kvz_round_precision(INTERNAL_MV_PREC, 2, &mv_cand[i].mv[0][0], &mv_cand[i].mv[0][1]);
-    if (mv_cand[i].dir & 2) kvz_round_precision(INTERNAL_MV_PREC, 2, &mv_cand[i].mv[1][0], &mv_cand[i].mv[1][1]);
   }
 
   return candidates;
