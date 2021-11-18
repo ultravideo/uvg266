@@ -366,7 +366,7 @@ static void inter_recon_unipred(const encoder_state_t * const state,
                                 int32_t ypos,
                                 int32_t width,
                                 int32_t height,
-                                const int16_t mv_param[2],
+                                const mv_t mv_param[2],
                                 lcu_t *lcu,
                                 hi_prec_buf_t *hi_prec_out,
                                 bool predict_luma,
@@ -376,7 +376,7 @@ static void inter_recon_unipred(const encoder_state_t * const state,
   const vector2d_t pu_in_tile = { xpos, ypos };
   const vector2d_t pu_in_lcu = { xpos % LCU_WIDTH, ypos % LCU_WIDTH };
 
-  const vector2d_t mv_in_pu = { mv_param_qpel[0] >> INTERNAL_MV_PREC, mv_param_qpel[1] >> INTERNAL_MV_PREC };
+  const vector2d_t mv_in_pu = { mv_param[0] >> INTERNAL_MV_PREC, mv_param[1] >> INTERNAL_MV_PREC };
   const vector2d_t mv_in_frame = {
     mv_in_pu.x + pu_in_tile.x + state->tile->offset_x,
     mv_in_pu.y + pu_in_tile.y + state->tile->offset_y
@@ -497,7 +497,7 @@ void kvz_inter_recon_bipred(const encoder_state_t * const state,
                             int32_t ypos,
                             int32_t width,
                             int32_t height,
-                            int16_t mv_param[2][2],
+                            mv_t mv_param[2][2],
                             lcu_t* lcu,
                             bool predict_luma,
                             bool predict_chroma)
@@ -506,11 +506,11 @@ void kvz_inter_recon_bipred(const encoder_state_t * const state,
   kvz_pixel temp_lcu_u[LCU_WIDTH_C*LCU_WIDTH_C];
   kvz_pixel temp_lcu_v[LCU_WIDTH_C*LCU_WIDTH_C];
 
-  const int hi_prec_luma_rec0 = mv_param[0][0] & 3 || mv_param[0][1] & 3;
-  const int hi_prec_luma_rec1 = mv_param[1][0] & 3 || mv_param[1][1] & 3;
+  const int hi_prec_luma_rec0 = (mv_param[0][0]>>2) & 3 || (mv_param[0][1]>>2) & 3;
+  const int hi_prec_luma_rec1 = (mv_param[1][0]>>2) & 3 || (mv_param[1][1]>>2) & 3;
 
-  const int hi_prec_chroma_rec0 = mv_param[0][0] & 7 || mv_param[0][1] & 7;
-  const int hi_prec_chroma_rec1 = mv_param[1][0] & 7 || mv_param[1][1] & 7;
+  const int hi_prec_chroma_rec0 = (mv_param[0][0]>>2) & 7 || (mv_param[0][1]>>2) & 7;
+  const int hi_prec_chroma_rec1 = (mv_param[1][0]>>2) & 7 || (mv_param[1][1]>>2) & 7;
 
   hi_prec_buf_t* high_precision_rec0 = 0;
   hi_prec_buf_t* high_precision_rec1 = 0;
