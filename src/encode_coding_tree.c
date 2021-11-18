@@ -721,7 +721,7 @@ static void encode_chroma_intra_cu(cabac_data_t* const cabac, const cu_info_t* c
       cabac->cur_ctx = &cabac->ctx.cclm_model;
       CABAC_BIN(cabac, chroma_intra_dir != 81, "cclm_model_1");
       if(chroma_intra_dir != 81) {
-        CABAC_BIN(cabac, chroma_intra_dir == 83, "cclm_model_2");        
+        CABAC_BIN_EP(cabac, chroma_intra_dir == 83, "cclm_model_2");
       }
       return;
     }
