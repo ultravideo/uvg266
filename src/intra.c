@@ -917,7 +917,14 @@ static void intra_recon_tb_leaf(
       }
       y_rec += LCU_WIDTH;
     }
-    linear_transform_cclm(&cclm_params[color == COLOR_U ? 0 : 1], pred, pred, width, width);
+    if(cclm_params == NULL) {
+      cclm_parameters_t temp_params;
+      kvz_predict_cclm(
+        state, color, width, width, x, y, stride, intra_mode, lcu->rec.y, &refs, pred, &temp_params);
+    }
+    else {
+      linear_transform_cclm(&cclm_params[color == COLOR_U ? 0 : 1], pred, pred, width, width);
+    }
   }
 
   const int index = lcu_px.x + lcu_px.y * lcu_width;
