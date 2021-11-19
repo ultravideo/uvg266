@@ -663,15 +663,15 @@ static bool encode_inter_prediction_unit(encoder_state_t * const state,
 
       if (state->frame->ref_list != REF_PIC_LIST_1 || cur_cu->inter.mv_dir != 3) {
 
-        int16_t mv_cand[2][2];
+        mv_t mv_cand[2][2];
         kvz_inter_get_mv_cand_cua(
             state,
             x, y, width, height,
             mv_cand, cur_cu, ref_list_idx);
 
         uint8_t cu_mv_cand = CU_GET_MV_CAND(cur_cu, ref_list_idx);
-        const int32_t mvd_hor = cur_cu->inter.mv[ref_list_idx][0] - mv_cand[cu_mv_cand][0];
-        const int32_t mvd_ver = cur_cu->inter.mv[ref_list_idx][1] - mv_cand[cu_mv_cand][1];
+        const mv_t mvd_hor = cur_cu->inter.mv[ref_list_idx][0] - mv_cand[cu_mv_cand][0];
+        const mv_t mvd_ver = cur_cu->inter.mv[ref_list_idx][1] - mv_cand[cu_mv_cand][1];
 
         kvz_change_precision(INTERNAL_MV_PREC, kvz_g_imv_to_prec[KVZ_IMV_OFF], &mvd_hor, &mvd_ver);
 

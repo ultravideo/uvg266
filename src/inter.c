@@ -372,11 +372,16 @@ static void inter_recon_unipred(const encoder_state_t * const state,
                                 bool predict_luma,
                                 bool predict_chroma)
 {
-  mv_t mv_param_qpel[2] = { mv_param[0] >> 2, mv_param[1] >> 2 };
+  mv_t mv_param_qpel[2] = { mv_param[0], mv_param[1] };
+  mv_t mv_param_fpel[2] = { mv_param[0], mv_param[1] };
+  kvz_change_precision(INTERNAL_MV_PREC, 2, &mv_param_qpel[0], &mv_param_qpel[1]);
+
+  kvz_change_precision(INTERNAL_MV_PREC, 0, &mv_param_fpel[0], &mv_param_fpel[1]);
+
   const vector2d_t pu_in_tile = { xpos, ypos };
   const vector2d_t pu_in_lcu = { xpos % LCU_WIDTH, ypos % LCU_WIDTH };
 
-  const vector2d_t mv_in_pu = { mv_param[0] >> INTERNAL_MV_PREC, mv_param[1] >> INTERNAL_MV_PREC };
+  const vector2d_t mv_in_pu = { mv_param_fpel[0], mv_param_fpel[1] };
   const vector2d_t mv_in_frame = {
     mv_in_pu.x + pu_in_tile.x + state->tile->offset_x,
     mv_in_pu.y + pu_in_tile.y + state->tile->offset_y
@@ -1506,6 +1511,15 @@ void kvz_change_precision(int src, int dst, mv_t* hor, mv_t* ver) {
 void kvz_round_precision(int src, int dst, mv_t* hor, mv_t* ver) {
   kvz_change_precision(src, dst, hor, ver);
   kvz_change_precision(dst, src, hor, ver);
+}
+
+void kvz_round_precision_vector2d(int src, int dst, vector2d_t* mv) {
+  mv_t hor = mv->x;
+  mv_t ver = mv->y;
+  kvz_change_precision(src, dst, &hor, &ver);
+  kvz_change_precision(dst, src, &hor, &ver);
+  mv->x = hor;
+  mv->y = ver;
 }
 
 /**

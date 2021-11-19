@@ -32,7 +32,7 @@
 #include "image.h"
 #include "kvazaar.h"
 
-extern const uint8_t kvz_g_imv_to_prec[4];
+extern const int8_t kvz_g_imv_to_prec[4];
 
 typedef struct {
   mv_t mv[2][2];
@@ -43,6 +43,7 @@ typedef struct {
 
 void kvz_change_precision(int src, int dst, mv_t* hor, mv_t* ver);
 void kvz_round_precision(int src, int dst, mv_t* hor, mv_t* ver);
+void kvz_round_precision_vector2d(int src, int dst, vector2d_t* mv);
 
 void kvz_inter_recon_cu(const encoder_state_t * const state,
                         lcu_t *lcu,

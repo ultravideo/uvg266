@@ -332,7 +332,7 @@ static uint32_t get_mvd_coding_cost(const encoder_state_t *state,
 
 
 static int select_mv_cand(const encoder_state_t *state,
-                          int16_t mv_cand[2][2],
+                          mv_t mv_cand[2][2],
                           int32_t mv_x,
                           int32_t mv_y,
                           uint32_t *cost_out)
@@ -1152,6 +1152,10 @@ static void search_frac(inter_search_info_t *info)
     }
   }
 
+  // To internal MV precision
+  mv.x <<= INTERNAL_MV_PREC - 2;
+  mv.y <<= INTERNAL_MV_PREC - 2;
+
   info->best_mv = mv;
   info->best_cost = best_cost;
   info->best_bitcost = best_bitcost;
@@ -1257,6 +1261,7 @@ static void search_pu_inter_ref(inter_search_info_t *info,
   cur_cu->inter.mv_ref[ref_list] = temp_ref_idx;
 
   vector2d_t mv = { 0, 0 };
+  mv_t amvr_mv[2] = { 0, 0 };
 
   // Take starting point for MV search from previous frame.
   // When temporal motion vector candidates are added, there is probably
@@ -1411,7 +1416,7 @@ static void search_pu_inter_ref(inter_search_info_t *info,
 
   // Update best unipreds for biprediction
   if (info->best_cost < best_LX_cost[ref_list]) {
-    bool valid_mv = fracmv_within_tile(info, mv.x, mv.y);
+    bool valid_mv = fracmv_within_tile(info, mv.x >> (INTERNAL_MV_PREC - 2), mv.y >> (INTERNAL_MV_PREC - 2));
     if (valid_mv) {
       // Map reference index to L0/L1 pictures
       unipred_LX[ref_list].inter.mv_dir = ref_list + 1;
@@ -1696,14 +1701,12 @@ static void search_pu_inter(encoder_state_t * const state,
 
     // Don't try merge candidates that don't satisfy mv constraints.
     // Don't add duplicates to list
-    if (!fracmv_within_tile(&info, cur_cu->inter.mv[0][0], cur_cu->inter.mv[0][1]) ||
-        !fracmv_within_tile(&info, cur_cu->inter.mv[1][0], cur_cu->inter.mv[1][1]) ||
+    if (!fracmv_within_tile(&info, cur_cu->inter.mv[0][0] >> (INTERNAL_MV_PREC - 2), cur_cu->inter.mv[0][1] >> (INTERNAL_MV_PREC - 2)) ||
+        !fracmv_within_tile(&info, cur_cu->inter.mv[1][0] >> (INTERNAL_MV_PREC - 2), cur_cu->inter.mv[1][1] >> (INTERNAL_MV_PREC - 2)) ||
         is_duplicate)
     {
       continue;
     }
-    if (cur_cu->inter.mv_dir & 1) kvz_change_precision(4, 2, &cur_cu->inter.mv[0][0], &cur_cu->inter.mv[0][1]);
-    if (cur_cu->inter.mv_dir & 2) kvz_change_precision(4, 2, &cur_cu->inter.mv[1][0], &cur_cu->inter.mv[1][1]);
     kvz_inter_pred_pu(state, lcu, x_cu, y_cu, width_cu, true, false, i_pu);
     mrg_costs[num_rdo_cands] = kvz_satd_any_size(width, height,
       lcu->rec.y + y_local * LCU_WIDTH + x_local, LCU_WIDTH,
