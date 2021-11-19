@@ -715,7 +715,8 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
                              int8_t *intra_preds,
                              int modes_to_check,
                              int8_t modes[67], int8_t trafo[67], double costs[67],
-                             lcu_t *lcu)
+                             lcu_t *lcu,
+                             int8_t multi_ref_idx)
 {
   const int tr_depth = CLIP(1, MAX_PU_DEPTH, depth + state->encoder_control->cfg.tr_depth_intra);
   const int width = LCU_WIDTH >> depth;
@@ -732,7 +733,7 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
   if (modes_to_check < 67) {
     int pred_mode = 0;
     // Skip planar if searching modes for MRL
-    if (cur_cu->intra.multi_ref_idx != 0) {
+    if (multi_ref_idx != 0) {
       pred_mode = 1;
     }
     for (; pred_mode < 6; pred_mode++) {
@@ -762,6 +763,7 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
     pred_cu.part_size = ((depth == MAX_PU_DEPTH) ? SIZE_NxN : SIZE_2Nx2N);
     pred_cu.intra.mode = modes[rdo_mode];
     pred_cu.intra.mode_chroma = modes[rdo_mode];
+    pred_cu.intra.multi_ref_idx = multi_ref_idx;
     pred_cu.joint_cb_cr = 0;
     FILL(pred_cu.cbf, 0);
 
@@ -991,10 +993,10 @@ int8_t kvz_search_cu_intra_chroma(encoder_state_t * const state,
     const vector2d_t luma_px = { x_px, y_px };
 
     kvz_intra_references refs_u;
-    kvz_intra_build_reference(log2_width_c, COLOR_U, &luma_px, &pic_px, lcu, &refs_u, state->encoder_control->cfg.wpp, NULL);
+    kvz_intra_build_reference(log2_width_c, COLOR_U, &luma_px, &pic_px, lcu, &refs_u, state->encoder_control->cfg.wpp, NULL, 0);
 
     kvz_intra_references refs_v;
-    kvz_intra_build_reference(log2_width_c, COLOR_V, &luma_px, &pic_px, lcu, &refs_v, state->encoder_control->cfg.wpp, NULL);
+    kvz_intra_build_reference(log2_width_c, COLOR_V, &luma_px, &pic_px, lcu, &refs_v, state->encoder_control->cfg.wpp, NULL, 0);
 
     vector2d_t lcu_cpx = { lcu_px.x / 2, lcu_px.y / 2 };
     kvz_pixel *ref_u = &lcu->ref.u[lcu_cpx.x + lcu_cpx.y * LCU_WIDTH_C];
@@ -1024,7 +1026,8 @@ void kvz_search_cu_intra(encoder_state_t * const state,
                          const int depth, lcu_t *lcu,
                          int8_t *mode_out, 
                          int8_t *trafo_out, 
-                         double *cost_out)
+                         double *cost_out,
+                         int8_t *multi_ref_idx_out)
 {
   const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
   const int8_t cu_width = LCU_WIDTH >> depth;
@@ -1054,23 +1057,24 @@ void kvz_search_cu_intra(encoder_state_t * const state,
     const vector2d_t pic_px = { state->tile->frame->width, state->tile->frame->height };
 
     // Extra reference lines for use with MRL. Extra lines needed only for left edge.
-    kvz_pixel extra_refs[2 * 128 * MAX_REF_LINE_IDX] = {0};
+    //kvz_pixel extra_refs[2 * 128 * MAX_REF_LINE_IDX] = {0};
 
-    if (x_px > 0 && lcu_px.x == 0 && lcu_px.y > 0) {
-      videoframe_t* const frame = state->tile->frame;
+    //if (x_px > 0 && lcu_px.x == 0 && lcu_px.y > 0) {
+    //  videoframe_t* const frame = state->tile->frame;
 
-      // Copy extra ref lines, including ref line 1 and top left corner.
-      for (int i = 0; i < MAX_REF_LINE_IDX; ++i) {
-        int height = (LCU_WIDTH >> depth) * 2 + MAX_REF_LINE_IDX;
-        height = MIN(height, pic_px.y - (y_px - MAX_REF_LINE_IDX));
-        kvz_pixels_blit(&frame->rec->y[(y_px - MAX_REF_LINE_IDX) * frame->rec->stride + x_px - (1 + i)],
-          &extra_refs[i * 2 * 128],
-          1, height,
-          frame->rec->stride, 1);
-      }
-    }
+    //  // Copy extra ref lines, including ref line 1 and top left corner.
+    //  for (int i = 0; i < MAX_REF_LINE_IDX; ++i) {
+    //    int height = (LCU_WIDTH >> depth) * 2 + MAX_REF_LINE_IDX;
+    //    height = MIN(height, pic_px.y - (y_px - MAX_REF_LINE_IDX));
+    //    kvz_pixels_blit(&frame->rec->y[(y_px - MAX_REF_LINE_IDX) * frame->rec->stride + x_px - (1 + i)],
+    //      &extra_refs[i * 2 * 128],
+    //      1, height,
+    //      frame->rec->stride, 1);
+    //  }
+    //}
 
-    kvz_intra_build_reference(log2_width, COLOR_Y, &luma_px, &pic_px, lcu, &refs, state->encoder_control->cfg.wpp, extra_refs);
+    // These references will only be used with rough search. No need for MRL stuff here.
+    kvz_intra_build_reference(log2_width, COLOR_Y, &luma_px, &pic_px, lcu, &refs, state->encoder_control->cfg.wpp, NULL, 0);
   }
 
   int8_t modes[MAX_REF_LINE_IDX][67];
@@ -1127,20 +1131,19 @@ void kvz_search_cu_intra(encoder_state_t * const state,
       number_of_modes_to_search = 0;
     }
     
-    for(int line = 0; line < lines; ++line) {
+    for(int8_t line = 0; line < lines; ++line) {
       // For extra reference lines, only check predicted modes
       if (line != 0) {
         number_of_modes_to_search = 0;
       }
       int num_modes_to_check = MIN(number_of_modes[line], number_of_modes_to_search);
-      cur_cu->intra.multi_ref_idx = line;
       kvz_sort_modes(modes[line], costs[line], number_of_modes[line]);
       number_of_modes[line] = search_intra_rdo(state,
                             x_px, y_px, depth,
                             ref_pixels, LCU_WIDTH,
                             candidate_modes,
                             num_modes_to_check,
-                            modes[line], trafo[line], costs[line], lcu);
+                            modes[line], trafo[line], costs[line], lcu, line);
     }
   }
   
@@ -1154,10 +1157,9 @@ void kvz_search_cu_intra(encoder_state_t * const state,
       best_line = line;
     }
   }
-  
-  cur_cu->intra.multi_ref_idx = best_line;
 
   *mode_out =  modes[best_line][best_mode_indices[best_line]];
   *trafo_out = trafo[best_line][best_mode_indices[best_line]];
   *cost_out =  costs[best_line][best_mode_indices[best_line]];
+  *multi_ref_idx_out = best_line;
 }

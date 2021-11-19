@@ -635,7 +635,6 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
   cur_cu->type = CU_NOTSET;
   cur_cu->part_size = SIZE_2Nx2N;
   cur_cu->qp = state->qp;
-  cur_cu->intra.multi_ref_idx = 0;
   cur_cu->bdpcmMode = 0;
   cur_cu->tr_idx = 0;
   cur_cu->violates_mts_coeff_constraint = 0;
@@ -724,13 +723,15 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       int8_t intra_mode;
       int8_t intra_trafo;
       double intra_cost;
+      int8_t multi_ref_index = 0;
       kvz_search_cu_intra(state, x, y, depth, lcu,
-                          &intra_mode, &intra_trafo, &intra_cost);
+                          &intra_mode, &intra_trafo, &intra_cost, &multi_ref_index);
       if (intra_cost < cost) {
         cost = intra_cost;
         cur_cu->type = CU_INTRA;
         cur_cu->part_size = depth > MAX_DEPTH ? SIZE_NxN : SIZE_2Nx2N;
         cur_cu->intra.mode = intra_mode;
+        cur_cu->intra.multi_ref_idx = multi_ref_index;
 
         //If the CU is not split from 64x64 block, the MTS is disabled for that CU.
         cur_cu->tr_idx = (depth > 0) ? intra_trafo : 0;

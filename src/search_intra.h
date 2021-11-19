@@ -59,6 +59,7 @@ void kvz_search_cu_intra(encoder_state_t * const state,
                          const int depth, lcu_t *lcu,
                          int8_t *mode_out,
                          int8_t *trafo_out, 
-                         double *cost_out);
+                         double *cost_out,
+                         int8_t *multi_ref_idx_out);
 
 #endif // SEARCH_INTRA_H_

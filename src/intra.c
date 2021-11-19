@@ -965,13 +965,13 @@ void kvz_intra_build_reference(
   const lcu_t *const lcu,
   kvz_intra_references *const refs,
   bool entropy_sync,
-  kvz_pixel *extra_ref_lines)
+  kvz_pixel *extra_ref_lines,
+  int8_t multi_ref_idx)
 {
-  const vector2d_t lcu_px = { SUB_SCU(luma_px->x), SUB_SCU(luma_px->y) };
-  cu_info_t* cur_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
+  assert(extra_ref_lines == NULL && multi_ref_idx != 0 && "Trying to use MRL with NULL extra references.");
 
   // Make this common case work with MRL, implement inner after this one works
-  kvz_intra_build_reference_any(log2_width, color, luma_px, pic_px, lcu, refs, cur_cu->intra.multi_ref_idx, extra_ref_lines);
+  kvz_intra_build_reference_any(log2_width, color, luma_px, pic_px, lcu, refs, multi_ref_idx, extra_ref_lines);
 
   // Much logic can be discarded if not on the edge
   /*if (luma_px->x > 0 && luma_px->y > 0) {
@@ -1029,7 +1029,7 @@ static void intra_recon_tb_leaf(
         frame->rec->stride, 1);
     }
   }
-  kvz_intra_build_reference(log2width, color, &luma_px, &pic_px, lcu, &refs, cfg->wpp, extra_refs);
+  kvz_intra_build_reference(log2width, color, &luma_px, &pic_px, lcu, &refs, cfg->wpp, extra_refs, cur_cu->intra.multi_ref_idx);
 
   kvz_pixel pred[32 * 32];
   int stride = state->tile->frame->source->stride;
