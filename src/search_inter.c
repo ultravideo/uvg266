@@ -162,8 +162,8 @@ static INLINE bool fracmv_within_tile(const inter_search_info_t *info, int x, in
 
   // TODO implement KVZ_MV_CONSTRAIN_FRAM and KVZ_MV_CONSTRAIN_TILE.
   const vector2d_t abs_mv = {
-    info->origin.x << INTERNAL_MV_PREC + x,
-    info->origin.y << INTERNAL_MV_PREC + y,
+    (info->origin.x << INTERNAL_MV_PREC) + x,
+    (info->origin.y << INTERNAL_MV_PREC) + y,
   };
 
   // Check that both margin constraints are satisfied.
@@ -1261,7 +1261,6 @@ static void search_pu_inter_ref(inter_search_info_t *info,
   cur_cu->inter.mv_ref[ref_list] = temp_ref_idx;
 
   vector2d_t mv = { 0, 0 };
-  mv_t amvr_mv[2] = { 0, 0 };
 
   // Take starting point for MV search from previous frame.
   // When temporal motion vector candidates are added, there is probably
