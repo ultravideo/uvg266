@@ -968,7 +968,7 @@ void kvz_intra_build_reference(
   kvz_pixel *extra_ref_lines,
   int8_t multi_ref_idx)
 {
-  assert(extra_ref_lines == NULL && multi_ref_idx != 0 && "Trying to use MRL with NULL extra references.");
+  assert(!(extra_ref_lines == NULL && multi_ref_idx != 0) && "Trying to use MRL with NULL extra references.");
 
   // Make this common case work with MRL, implement inner after this one works
   kvz_intra_build_reference_any(log2_width, color, luma_px, pic_px, lcu, refs, multi_ref_idx, extra_ref_lines);
