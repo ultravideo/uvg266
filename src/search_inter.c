@@ -1920,7 +1920,7 @@ static void search_pu_inter(encoder_state_t * const state,
   }
 
   if (*inter_cost < INT_MAX && cur_cu->inter.mv_dir == 1) {
-    assert(fracmv_within_tile(&info, cur_cu->inter.mv[0][0], cur_cu->inter.mv[0][1]));
+    assert(fracmv_within_tile(&info, cur_cu->inter.mv[0][0] >> (INTERNAL_MV_PREC - 2), cur_cu->inter.mv[0][1] >> (INTERNAL_MV_PREC - 2)));
   }
 }
 
