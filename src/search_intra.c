@@ -488,7 +488,7 @@ static void search_intra_chroma_rough(encoder_state_t * const state,
     assert(state->encoder_control->cfg.cclm);
     kvz_predict_cclm(
       state,
-      COLOR_U, width, width, x_px, y_px, state->tile->frame->source->stride, modes[i], lcu->rec.y, refs_u,  pred, &cclm_params);
+      COLOR_U, width, width, x_px, y_px, state->tile->frame->source->stride, modes[i], lcu, refs_u,  pred, &cclm_params);
   }
 
   kvz_pixels_blit(orig_v, orig_block, width, width, origstride, width);
@@ -497,6 +497,12 @@ static void search_intra_chroma_rough(encoder_state_t * const state,
     kvz_intra_predict(state, refs_v, log2_width_c, modes[i], COLOR_V, pred, false);
     //costs[i] += get_cost(encoder_state, pred, orig_block, satd_func, sad_func, width);
     costs[i] += satd_func(pred, orig_block);
+  }
+  for (int i = 5; i < 8; i++) {
+    assert(state->encoder_control->cfg.cclm);
+    kvz_predict_cclm(
+      state,
+      COLOR_V, width, width, x_px, y_px, state->tile->frame->source->stride, modes[i], lcu, refs_u, pred, &cclm_params);
   }
 
   kvz_sort_modes(modes, costs, 5);
@@ -836,17 +842,22 @@ int8_t kvz_search_intra_chroma_rdo(encoder_state_t * const state,
 
 
   kvz_intra_references refs[2];
-  const vector2d_t luma_px = { x_px, y_px };
+  const vector2d_t luma_px = { x_px & ~7, y_px & ~7 };
   const vector2d_t pic_px = {
     state->tile->frame->width,
     state->tile->frame->height,
   };
-  kvz_intra_build_reference(MAX(LOG2_LCU_WIDTH - depth - 1, 2), COLOR_U, &luma_px, &pic_px, lcu, &refs[0], state->encoder_control->cfg.wpp);
-  kvz_intra_build_reference(MAX(LOG2_LCU_WIDTH - depth - 1, 2), COLOR_V, &luma_px, &pic_px, lcu, &refs[1], state->encoder_control->cfg.wpp);
 
-  cclm_parameters_t cclm_params[2] = {0};
 
   if (reconstruct_chroma) {
+
+    int c_width = MAX(32 >> (depth), 4);
+
+    kvz_intra_build_reference(MAX(LOG2_LCU_WIDTH - depth - 1, 2), COLOR_U, &luma_px, &pic_px, lcu, &refs[0], state->encoder_control->cfg.wpp);
+    kvz_intra_build_reference(MAX(LOG2_LCU_WIDTH - depth - 1, 2), COLOR_V, &luma_px, &pic_px, lcu, &refs[1], state->encoder_control->cfg.wpp);
+
+    cclm_parameters_t cclm_params[2] = { 0 };
+
     const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
     cu_info_t *const tr_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
 
@@ -864,7 +875,7 @@ int8_t kvz_search_intra_chroma_rdo(encoder_state_t * const state,
     for (int8_t chroma_mode_i = 0; chroma_mode_i < num_modes; ++chroma_mode_i) {
       chroma.mode = modes[chroma_mode_i];
       if (chroma.mode == -1) continue;
-      if(chroma.mode < 67) {
+      if(chroma.mode < 67 || depth == 0) {
         kvz_intra_recon_cu(state,
           x_px, y_px,
           depth,
@@ -872,18 +883,38 @@ int8_t kvz_search_intra_chroma_rdo(encoder_state_t * const state,
           NULL, NULL, lcu);
       }
       else {
+
         kvz_predict_cclm(
-          state, COLOR_U, 32 >> (depth), 32 >> (depth), x_px, y_px, state->tile->frame->source->stride, chroma.mode, lcu->rec.y, &refs[0], NULL, &cclm_params[0]);
+          state, COLOR_U,
+          c_width, c_width,
+          x_px & ~7, y_px & ~7,
+          state->tile->frame->source->stride,
+          chroma.mode, 
+          lcu,
+          &refs[0], NULL,
+          &cclm_params[0]);
+
         chroma.cclm[0] = cclm_params[0];
+
         kvz_predict_cclm(
-          state, COLOR_V, 32 >> (depth), 32 >> (depth), x_px, y_px, state->tile->frame->source->stride, chroma.mode, lcu->rec.y, &refs[1], NULL, &cclm_params[1]);
+          state, COLOR_V,
+          c_width, c_width,
+          x_px & ~7, y_px & ~7,
+          state->tile->frame->source->stride, 
+          chroma.mode, 
+          lcu, 
+          &refs[1], NULL,
+          &cclm_params[1]);
+
         chroma.cclm[1] = cclm_params[1];
 
-        kvz_intra_recon_cu(state,
+        kvz_intra_recon_cu(
+          state,
           x_px, y_px,
           depth,
           -1, chroma.mode, // skip luma
-          NULL, cclm_params, lcu);
+          NULL, cclm_params, lcu
+        );
       }
       chroma.cost = kvz_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, tr_cu, lcu);
 

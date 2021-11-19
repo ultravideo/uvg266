@@ -259,7 +259,7 @@ enum lm_mode
 static void get_cclm_parameters(
   encoder_state_t const* const state,
   int8_t width, int8_t height, int8_t mode,
-  int x0, int y0,
+  int x0, int y0, int avai_above_right_units, int avai_left_below_units,
   kvz_intra_ref* luma_src, kvz_intra_references*chroma_ref,
   int16_t *a, int16_t*b, int16_t*shift) {
 
@@ -287,8 +287,8 @@ static void get_cclm_parameters(
   //int total_units = total_left_units + total_above_units + 1;
   //int above_right_units = total_above_units - tu_width_in_units;
   //int left_below_units = total_left_units - tu_height_in_units;
-  int avai_above_right_units = 0;  // TODO these are non zero only with non-square CUs
-  int avai_left_below_units = 0;
+  //int avai_above_right_units = 0;  // TODO these are non zero only with non-square CUs
+  //int avai_left_below_units = 0;
   int avai_above_units = CLIP(0, tu_height_in_units, y0/base_unit_size);
   int avai_left_units = CLIP(0, tu_width_in_units, x0 / base_unit_size);
 
@@ -465,7 +465,7 @@ void kvz_predict_cclm(
   const int16_t y0,
   const int16_t stride,
   const int8_t mode,
-  kvz_pixel const *  y_rec,
+  lcu_t* const lcu,
   kvz_intra_references* chroma_ref,
   kvz_pixel* dst,
   cclm_parameters_t* cclm_params
@@ -480,61 +480,92 @@ void kvz_predict_cclm(
 
   int x_scu = SUB_SCU(x0);
   int y_scu = SUB_SCU(y0);
-  y_rec += x_scu + y_scu * LCU_WIDTH;
+
+  int available_above_right = 0;
+  int available_left_below = 0;
+
+
+  kvz_pixel *y_rec = lcu->rec.y + x_scu + y_scu * LCU_WIDTH;
 
   // Essentially what this does is that it uses 6-tap filtering to downsample
   // the luma intra references down to match the resolution of the chroma channel.
   // The luma reference is only needed when we are not on the edge of the picture.
   // Because the reference pixels that are needed on the edge of the ctu this code
   // is kinda messy but what can you do
+
+  if (y0) {
+    for (; available_above_right < width / 2; available_above_right++) {
+      int x_extension = x_scu + width * 2 + 4 * available_above_right;
+      cu_info_t* pu = LCU_GET_CU_AT_PX(lcu, x_extension, y_scu - 4);
+      if (pu->type == CU_NOTSET || x_extension > LCU_WIDTH) break;
+    }
+    if(y_scu == 0) {
+      if(!state->encoder_control->cfg.wpp) available_above_right = MIN(width / 2, (state->tile->frame->width - x0 - width * 2) / 4);
+      for (int x = 0; x < width * (available_above_right ? 4 : 2); x += 2) {
+        bool left_padding = x0 || x;
+        sampled_luma_ref.top[x / 2] = (state->tile->frame->rec->y[x0 + x + (y0 - 1) * stride] * 2 +
+          state->tile->frame->rec->y[x0 + x + 1 + (y0 - 1) * stride] +
+          state->tile->frame->rec->y[x0 + x - left_padding + (y0 - 1) * stride] + 
+          2) >> 2;
+      }
+    }
+    else {
+      for (int x = 0; x < width * (available_above_right ? 4 : 2); x += 2) {
+        bool left_padding = x0 || x;
+        int s = 4;
+        s += y_scu ? y_rec[x - LCU_WIDTH * 2] * 2            : state->tile->frame->rec->y[x0 + x + (y0 - 2) * stride] * 2;
+        s += y_scu ? y_rec[x - LCU_WIDTH * 2 + 1]            : state->tile->frame->rec->y[x0 + x + 1 + (y0 - 2) * stride];
+        s += y_scu && !(x0 && !x && !x_scu) ? y_rec[x - LCU_WIDTH * 2 - left_padding] : state->tile->frame->rec->y[x0 + x - left_padding + (y0 - 2) * stride];
+        s += y_scu ? y_rec[x - LCU_WIDTH] * 2                : state->tile->frame->rec->y[x0 + x + (y0 - 1) * stride] * 2;
+        s += y_scu ? y_rec[x - LCU_WIDTH + 1]                : state->tile->frame->rec->y[x0 + x + 1 + (y0 - 1) * stride];
+        s += y_scu && !(x0 && !x && !x_scu) ? y_rec[x - LCU_WIDTH - left_padding]     : state->tile->frame->rec->y[x0 + x - left_padding + (y0 - 1) * stride];
+        sampled_luma_ref.top[x / 2] = s >> 3;
+      }
+    }
+  }
+
   if(x0) {
-    for(int y = 0; y < height * 2; y+=2) {
+    for (; available_left_below < height / 2; available_left_below++) {
+      int y_extension = y_scu + height * 2 + 4 * available_left_below;
+      cu_info_t* pu = LCU_GET_CU_AT_PX(lcu, x_scu - 4, y_extension);
+      if (pu->type == CU_NOTSET || y_extension > LCU_WIDTH) break;
+      if(x_scu == 32 && y_scu == 0 && pu->depth == 0) break;
+    }
+    for(int y = 0; y < height * (available_left_below ? 4 : 2); y+=2) {
       int s = 4;
-      s += x_scu ? y_rec[y * LCU_WIDTH - 1] * 2       : state->tile->frame->rec->y[x0 - 1 + (y0 + y) * stride] * 2;
-      s += x_scu ? y_rec[y * LCU_WIDTH - 2]           : state->tile->frame->rec->y[x0 - 2 + (y0 + y) * stride];
-      s += x_scu ? y_rec[(y + 1) * LCU_WIDTH - 1] * 2 : state->tile->frame->rec->y[x0 - 1 + (y0 + y + 1) * stride] * 2;
-      s += x_scu ? y_rec[(y + 1) * LCU_WIDTH - 2]     : state->tile->frame->rec->y[x0 - 2 + (y0 + y + 1) * stride];
-      s +=         y_rec[y * LCU_WIDTH];
-      s +=         y_rec[(y + 1) * LCU_WIDTH];
+      s += x_scu ? y_rec[y * LCU_WIDTH - 2] * 2       : state->tile->frame->rec->y[x0 - 2 + (y0 + y) * stride] * 2;
+      s += x_scu ? y_rec[y * LCU_WIDTH - 1]           : state->tile->frame->rec->y[x0 - 1 + (y0 + y) * stride];
+      s += x_scu ? y_rec[y * LCU_WIDTH - 3]           : state->tile->frame->rec->y[x0 - 3 + (y0 + y) * stride];
+      s += x_scu ? y_rec[(y + 1) * LCU_WIDTH - 2] * 2 : state->tile->frame->rec->y[x0 - 2 + (y0 + y + 1) * stride] * 2;
+      s += x_scu ? y_rec[(y + 1) * LCU_WIDTH - 1]     : state->tile->frame->rec->y[x0 - 1 + (y0 + y + 1) * stride];
+      s += x_scu ? y_rec[(y + 1) * LCU_WIDTH - 3]     : state->tile->frame->rec->y[x0 - 3 + (y0 + y + 1) * stride];
       sampled_luma_ref.left[y/2] = s >> 3;
     }
   }
 
-  if(y0) {
-    for(int x = 0; x < width*2; x += 2) {
-      bool left_padding = x0 || x;
-      int s = 4;
-      s += y_scu ? y_rec[x - LCU_WIDTH * 2] * 2            : state->tile->frame->rec->y[x0 + x +(y0 - 2) * stride] * 2;
-      s += y_scu ? y_rec[x - LCU_WIDTH] * 2                : state->tile->frame->rec->y[x0 + x +(y0 - 1) * stride] * 2;
-      s += y_scu ? y_rec[x - LCU_WIDTH * 2 - left_padding] : state->tile->frame->rec->y[x0 + x - left_padding + (y0 - 2) * stride];
-      s += y_scu ? y_rec[x - LCU_WIDTH - left_padding]     : state->tile->frame->rec->y[x0 + x - left_padding + (y0 - 1) * stride];
-      s += y_scu ? y_rec[x - LCU_WIDTH * 2 + 1]            : state->tile->frame->rec->y[x0 + x + 1 + (y0 - 2) * stride];
-      s += y_scu ? y_rec[x - LCU_WIDTH + 1]                : state->tile->frame->rec->y[x0 + x + 1 + (y0 - 1) * stride];
-      sampled_luma_ref.top[x / 2] = s >> 3;
-    }
-  }
+
 
   // Downsample the reconstructed luma sample so that they can be mapped into the chroma
   // to generate the chroma prediction
-  for (int y = 0; y < height * 2; y+=2) {
-    for (int x = 0; x <  width * 2; x+=2) {
+  for (int y = 0; y < height; y++) {
+    for (int x = 0; x <  width; x++) {
       int s = 4;
       s += y_rec[2 * x] * 2;
       s += y_rec[2 * x + 1];
       // If we are at the edge of the CTU read the pixel from the frame reconstruct buffer,
       // *except* when we are also at the edge of the frame, in which case we want to duplicate
       // the edge pixel
-      s += !x_scu && !x && x0 ? state->tile->frame->rec->y[x0 - 1 + y0 * stride] : y_rec[2 * x - ((x + x0) > 0)];
+      s += !x_scu && !x && x0 ? state->tile->frame->rec->y[x0 - 1 + (y0 + y*2) * stride] : y_rec[2 * x - ((x + x0) > 0)];
       s += y_rec[2 * x + LCU_WIDTH] * 2;
       s += y_rec[2 * x + 1 + LCU_WIDTH];
-      s += !x_scu && !x && x0 ? state->tile->frame->rec->y[x0 - 1 + (y0 + 1) * stride] : y_rec[2 * x - ((x + x0) > 0) + stride];
-      sampled_luma[x / 2 + y / 2 * width] = s >> 3;
+      s += !x_scu && !x && x0 ? state->tile->frame->rec->y[x0 - 1 + (y0 + y * 2 + 1) * stride] : y_rec[2 * x - ((x + x0) > 0) + LCU_WIDTH];
+      sampled_luma[x + y * width] = s >> 3;
     }
-    y_rec += LCU_WIDTH;
+    y_rec += LCU_WIDTH * 2;
   }
 
   int16_t a, b, shift;
-  get_cclm_parameters(state, width, height, mode,x0, y0, &sampled_luma_ref, chroma_ref, &a, &b, &shift);
+  get_cclm_parameters(state, width, height, mode,x0, y0, available_above_right, available_left_below, &sampled_luma_ref, chroma_ref, &a, &b, &shift);
   cclm_params->shift = shift;
   cclm_params->a = a;
   cclm_params->b = b;
@@ -889,7 +920,8 @@ static void intra_recon_tb_leaf(
     state->tile->frame->height,
   };
   int x_scu = SUB_SCU(x);
-  const vector2d_t lcu_px = {x_scu >> shift, SUB_SCU(y) >> shift};
+  int y_scu = SUB_SCU(y);
+  const vector2d_t lcu_px = {x_scu >> shift, y_scu >> shift };
 
   kvz_intra_references refs;
   kvz_intra_build_reference(log2width, color, &luma_px, &pic_px, lcu, &refs, cfg->wpp);
@@ -901,26 +933,27 @@ static void intra_recon_tb_leaf(
     kvz_intra_predict(state, &refs, log2width, intra_mode, color, pred, filter_boundary);
   } else {
     kvz_pixel *y_rec = lcu->rec.y;
-    for (int y_ = 0; y_ < width * 2; y_ += 2) {
-      for (int x_ = 0; x_ < width * 2; x_ += 2) {
+    y_rec += x_scu + y_scu * LCU_WIDTH;
+    for (int y_ = 0; y_ < width; y_++) {
+      for (int x_ = 0; x_ < width; x_++) {
         int s = 4;
         s += y_rec[2 * x_] * 2;
         s += y_rec[2 * x_ + 1];
         // If we are at the edge of the CTU read the pixel from the frame reconstruct buffer,
         // *except* when we are also at the edge of the frame, in which case we want to duplicate
         // the edge pixel
-        s += !x_scu && !x_ && x ? state->tile->frame->rec->y[x - 1 + y * stride] : y_rec[2 * x_ - ((x_ + x) > 0)];
+        s += !x_scu && !x_ && x ? state->tile->frame->rec->y[x - 1 + (y + y_ * 2) * stride] : y_rec[2 * x_ - ((x_ + x) > 0)];
         s += y_rec[2 * x_ + LCU_WIDTH] * 2;
         s += y_rec[2 * x_ + 1 + LCU_WIDTH];
-        s += !x_scu && !x_ && x ? state->tile->frame->rec->y[x - 1 + (y + 1) * stride] : y_rec[2 * x_ - ((x_ + x) > 0) + stride];
-        pred[x_ / 2 + y_ * width / 2] = s >> 3;
+        s += !x_scu && !x_ && x ? state->tile->frame->rec->y[x - 1 + (y + y_ * 2 + 1) * stride] : y_rec[2 * x_ - ((x_ + x) > 0) + LCU_WIDTH];
+        pred[x_  + y_ * width] = s >> 3;
       }
-      y_rec += LCU_WIDTH;
+      y_rec += LCU_WIDTH * 2;
     }
     if(cclm_params == NULL) {
       cclm_parameters_t temp_params;
       kvz_predict_cclm(
-        state, color, width, width, x, y, stride, intra_mode, lcu->rec.y, &refs, pred, &temp_params);
+        state, color, width, width, x, y, stride, intra_mode, lcu, &refs, pred, &temp_params);
     }
     else {
       linear_transform_cclm(&cclm_params[color == COLOR_U ? 0 : 1], pred, pred, width, width);
@@ -996,10 +1029,10 @@ void kvz_intra_recon_cu(
     const int32_t x2 = x + offset;
     const int32_t y2 = y + offset;
 
-    kvz_intra_recon_cu(state, x,  y,  depth + 1, mode_luma, mode_chroma, NULL, cclm_params, lcu);
-    kvz_intra_recon_cu(state, x2, y,  depth + 1, mode_luma, mode_chroma, NULL, cclm_params, lcu);
-    kvz_intra_recon_cu(state, x,  y2, depth + 1, mode_luma, mode_chroma, NULL, cclm_params, lcu);
-    kvz_intra_recon_cu(state, x2, y2, depth + 1, mode_luma, mode_chroma, NULL, cclm_params, lcu);
+    kvz_intra_recon_cu(state, x,  y,  depth + 1, mode_luma, mode_chroma, NULL, NULL, lcu);
+    kvz_intra_recon_cu(state, x2, y,  depth + 1, mode_luma, mode_chroma, NULL, NULL, lcu);
+    kvz_intra_recon_cu(state, x,  y2, depth + 1, mode_luma, mode_chroma, NULL, NULL, lcu);
+    kvz_intra_recon_cu(state, x2, y2, depth + 1, mode_luma, mode_chroma, NULL, NULL, lcu);
 
     // Propagate coded block flags from child CUs to parent CU.
     uint16_t child_cbfs[3] = {

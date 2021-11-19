@@ -137,7 +137,7 @@ void kvz_predict_cclm(
   const int16_t y0,
   const int16_t stride,
   const int8_t mode,
-  kvz_pixel const* y_rec,
+  lcu_t* const lcu,
   kvz_intra_references* chroma_ref,
   kvz_pixel* dst,
   cclm_parameters_t* cclm_params

@@ -241,6 +241,33 @@ static double cu_zero_coeff_cost(const encoder_state_t *state, lcu_t *work_tree,
 }
 
 
+static void downsample_cclm_rec(encoder_state_t *state, int x, int y, int width, int height, kvz_pixel *y_rec) {
+  if (!state->encoder_control->cfg.cclm) return;
+  int x_scu = SUB_SCU(x);
+  int y_scu = SUB_SCU(y);
+  y_rec += x_scu + y_scu * LCU_WIDTH;
+  int stride = state->tile->frame->source->stride;
+
+  for (int y_ = 0; y_ < height && y_ * 2 + y < state->encoder_control->cfg.height; y_++) {
+    for (int x_ = 0; x_ < width; x_++) {
+      int s = 4;
+      s += y_rec[2 * x_] * 2;
+      s += y_rec[2 * x_ + 1];
+      // If we are at the edge of the CTU read the pixel from the frame reconstruct buffer,
+      // *except* when we are also at the edge of the frame, in which case we want to duplicate
+      // the edge pixel
+      s += !x_scu && !x_ && x ? state->tile->frame->rec->y[x - 1 + (y + y_ * 2) * stride] : y_rec[2 * x_ - ((x_ + x) > 0)];
+      s += y_rec[2 * x_ + LCU_WIDTH] * 2;
+      s += y_rec[2 * x_ + 1 + LCU_WIDTH];
+      s += !x_scu && !x_ && x ? state->tile->frame->rec->y[x - 1 + (y + y_ * 2 + 1) * stride] : y_rec[2 * x_ - ((x_ + x) > 0) + LCU_WIDTH];
+      int index = x / 2 + x_ + (y / 2 + y_ )* stride / 2;
+      state->tile->frame->cclm_luma_rec[index] = s >> 3;
+    }
+    y_rec += LCU_WIDTH * 2;
+  }
+}
+
+
 /**
 * Calculate RD cost for a Coding Unit.
 * \return Cost of block
@@ -711,6 +738,10 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
                          cur_cu->intra.mode, -1, // skip chroma
                          NULL, NULL, lcu);
 
+      downsample_cclm_rec(
+        state, x, y, cu_width / 2, cu_width / 2, lcu->rec.y
+      );
+
       // TODO: This heavily relies to square CUs
       if ((depth != 4 || (x % 8 && y % 8)) && state->encoder_control->chroma_format != KVZ_CSP_400) {
         // There is almost no benefit to doing the chroma mode search for
@@ -863,7 +894,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     // gets used, at least in the most obvious cases, while avoiding any
     // searching.
     if (cur_cu->type == CU_NOTSET && depth < MAX_PU_DEPTH
-        && x + cu_width <= frame->width && y + cu_width <= frame->height)
+        && x + cu_width <= frame->width && y + cu_width <= frame->height && 0)
     {
       cu_info_t *cu_d1 = LCU_GET_CU_AT_PX(&work_tree[depth + 1], x_local, y_local);
 
@@ -913,6 +944,9 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       // Copy this CU's mode all the way down for use in adjacent CUs mode
       // search.
       work_tree_copy_down(x_local, y_local, depth, work_tree);
+      downsample_cclm_rec(
+        state, x, y, cu_width / 2, cu_width / 2, lcu->rec.y
+      );
 
       if (state->frame->slicetype != KVZ_SLICE_I) {
         // Reset HMVP to the beginning of this CU level search and add this CU as the mvp
@@ -925,6 +959,9 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     // Need to copy modes down since the lower level of the work tree is used
     // when searching SMP and AMP blocks.
     work_tree_copy_down(x_local, y_local, depth, work_tree);
+    downsample_cclm_rec(
+      state, x, y, cu_width / 2, cu_width / 2, lcu->rec.y
+    );
 
     if (state->frame->slicetype != KVZ_SLICE_I) {
       // Reset HMVP to the beginning of this CU level search and add this CU as the mvp
