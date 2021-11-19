@@ -1682,6 +1682,10 @@ static void search_pu_inter(encoder_state_t * const state,
   // Check motion vector constraints and perform rough search
   for (int merge_idx = 0; merge_idx < info.num_merge_cand; ++merge_idx) {    
     inter_merge_cand_t *cur_cand = &info.merge_cand[merge_idx];
+
+    if ((cur_cand->dir & 1 && (cur_cand->mv[0][0] & 3 || cur_cand->mv[0][1] & 3)) ||
+      (cur_cand->dir & 2 && (cur_cand->mv[1][0] & 3 || cur_cand->mv[1][1] & 3))) continue;
+
     cur_cu->inter.mv_dir = cur_cand->dir;
     cur_cu->inter.mv_ref[0] = cur_cand->ref[0];
     cur_cu->inter.mv_ref[1] = cur_cand->ref[1];
@@ -1736,6 +1740,10 @@ static void search_pu_inter(encoder_state_t * const state,
       // and chroma exists.
       // Early terminate if merge candidate with zero CBF is found.
       int merge_idx = mrg_cands[merge_rdo_idx];
+      inter_merge_cand_t *cur_cand = &info.merge_cand[merge_idx];
+      if ((cur_cand->dir & 1 && (cur_cand->mv[0][0] & 3 || cur_cand->mv[0][1] & 3)) ||
+        (cur_cand->dir & 2 && (cur_cand->mv[1][0] & 3 || cur_cand->mv[1][1] & 3))) continue;
+
       cur_cu->inter.mv_dir = info.merge_cand[merge_idx].dir;
       cur_cu->inter.mv_ref[0] = info.merge_cand[merge_idx].ref[0];
       cur_cu->inter.mv_ref[1] = info.merge_cand[merge_idx].ref[1];
@@ -1743,6 +1751,7 @@ static void search_pu_inter(encoder_state_t * const state,
       cur_cu->inter.mv[0][1] = info.merge_cand[merge_idx].mv[0][1];
       cur_cu->inter.mv[1][0] = info.merge_cand[merge_idx].mv[1][0];
       cur_cu->inter.mv[1][1] = info.merge_cand[merge_idx].mv[1][1];
+
       kvz_lcu_fill_trdepth(lcu, x, y, depth, MAX(1, depth));
       kvz_inter_recon_cu(state, lcu, x, y, width, true, false);
       kvz_quantize_lcu_residual(state, true, false, x, y, depth, cur_cu, lcu, true);
