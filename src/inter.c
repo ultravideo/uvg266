@@ -59,7 +59,7 @@ static void inter_recon_frac_luma(const encoder_state_t *const state,
   int32_t ypos,
   int32_t block_width,
   int32_t block_height,
-  const int16_t mv_param[2],
+  const mv_t mv_param[2],
   lcu_t *lcu)
 {
   int mv_frac_x = (mv_param[0] & 3);
@@ -114,7 +114,7 @@ static void inter_recon_frac_luma_hi(const encoder_state_t *const state,
   int32_t ypos,
   int32_t block_width,
   int32_t block_height,
-  const int16_t mv_param[2],
+  const mv_t mv_param[2],
   hi_prec_buf_t *hi_prec_out)
 {
   int mv_frac_x = (mv_param[0] & 3);
@@ -169,7 +169,7 @@ static void inter_recon_frac_chroma(const encoder_state_t *const state,
   int32_t ypos,
   int32_t block_width,
   int32_t block_height,
-  const int16_t mv_param[2],
+  const mv_t mv_param[2],
   lcu_t *lcu)
 {
   int mv_frac_x = (mv_param[0] & 7);
@@ -241,7 +241,7 @@ static void inter_recon_frac_chroma_hi(const encoder_state_t *const state,
   int32_t ypos,
   int32_t block_width,
   int32_t block_height,
-  const int16_t mv_param[2],
+  const mv_t mv_param[2],
   hi_prec_buf_t *hi_prec_out)
 {
   int mv_frac_x = (mv_param[0] & 7);
@@ -1071,7 +1071,7 @@ static void apply_mv_scaling_pocs(int32_t current_poc,
                                   int32_t current_ref_poc,
                                   int32_t neighbor_poc,
                                   int32_t neighbor_ref_poc,
-                                  int16_t mv_cand[2])
+                                  mv_t mv_cand[2])
 {
   int32_t diff_current  = current_poc  - current_ref_poc;
   int32_t diff_neighbor = neighbor_poc - neighbor_ref_poc;
@@ -1093,7 +1093,7 @@ static INLINE void apply_mv_scaling(const encoder_state_t *state,
                                     const cu_info_t *neighbor_cu,
                                     int8_t current_reflist,
                                     int8_t neighbor_reflist,
-                                    int16_t mv_cand[2])
+                                    mv_t mv_cand[2])
 {
   apply_mv_scaling_pocs(state->frame->poc,
                         state->frame->ref->pocs[
@@ -1121,7 +1121,7 @@ static bool add_temporal_candidate(const encoder_state_t *state,
                                    uint8_t current_ref,
                                    const cu_info_t *colocated,
                                    int32_t reflist,
-                                   int16_t mv_out[2])
+                                   mv_t mv_out[2])
 {
   if (!colocated) return false;
 
@@ -1174,7 +1174,7 @@ static INLINE bool add_mvp_candidate(const encoder_state_t *state,
                                      const cu_info_t *cand,
                                      int8_t reflist,
                                      bool scaling,
-                                     int16_t mv_cand_out[2])
+                                     mv_t mv_cand_out[2])
 {
   if (!cand) return false;
 
@@ -1215,7 +1215,7 @@ static void get_mv_cand_from_candidates(const encoder_state_t * const state,
                                         const merge_candidates_t *merge_cand,
                                         const cu_info_t *cur_cu,
                                         int8_t reflist,
-                                        int16_t mv_cand[2][2])
+                                        mv_t mv_cand[2][2])
 {
   const cu_info_t *const *a = merge_cand->a;
   const cu_info_t *const *b = merge_cand->b;
@@ -1496,8 +1496,11 @@ void kvz_change_precision(int src, int dst, mv_t* hor, mv_t* ver) {
   const int shift = (int)dst - (int)src;
   if (shift >= 0)
   {
-    *hor <<= shift;
-    *ver <<= shift;
+    uint16_t* hor_unsigned = hor;
+    uint16_t* ver_unsigned = ver;
+
+    *hor_unsigned <<= shift;
+    *ver_unsigned <<= shift;
   }
   else
   {

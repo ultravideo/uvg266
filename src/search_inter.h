@@ -55,7 +55,7 @@ enum hpel_position {
 typedef uint32_t kvz_mvd_cost_func(const encoder_state_t *state,
                                   int x, int y,
                                   int mv_shift,
-                                  int16_t mv_cand[2][2],
+                                  mv_t mv_cand[2][2],
                                   inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
                                   int16_t num_cand,
                                   int32_t ref_idx,

@@ -222,7 +222,7 @@ static bool check_mv_cost(inter_search_info_t *info, int x, int y)
 
   cost += info->mvd_cost_func(
       info->state,
-      x, y, 2,
+      x, y, INTERNAL_MV_PREC,
       info->mv_cand,
       info->merge_cand,
       info->num_merge_cand,
@@ -233,8 +233,8 @@ static bool check_mv_cost(inter_search_info_t *info, int x, int y)
   if (cost >= info->best_cost) return false;
 
   // Set to motion vector in internal pixel precision.
-  info->best_mv.x = x << INTERNAL_MV_PREC;
-  info->best_mv.y = y << INTERNAL_MV_PREC;
+  info->best_mv.x = x * (1 << INTERNAL_MV_PREC);
+  info->best_mv.y = y * (1 << INTERNAL_MV_PREC);
   info->best_cost = cost;
   info->best_bitcost = bitcost;
 
@@ -384,7 +384,7 @@ static uint32_t calc_mvd_cost(const encoder_state_t *state,
                               int x,
                               int y,
                               int mv_shift,
-                              int16_t mv_cand[2][2],
+                              mv_t mv_cand[2][2],
                               inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
                               int16_t num_cand,
                               int32_t ref_idx,
@@ -905,8 +905,8 @@ static void search_mv_full(inter_search_info_t *info,
   }
 
   // Change to integer precision.
-  extra_mv.x >>= 2;
-  extra_mv.y >>= 2;
+  extra_mv.x >>= INTERNAL_MV_PREC;
+  extra_mv.y >>= INTERNAL_MV_PREC;
 
   // Check around extra_mv if it's not one of the merge candidates.
   if (!mv_in_merge(info, extra_mv)) {
@@ -1055,7 +1055,7 @@ static void search_frac(inter_search_info_t *info)
     ext_origin + ext_s + 1, ext_s);
 
   costs[0] += info->mvd_cost_func(state,
-                                  mv.x, mv.y, 2,
+                                  mv.x, mv.y, INTERNAL_MV_PREC,
                                   info->mv_cand,
                                   info->merge_cand,
                                   info->num_merge_cand,
@@ -1155,8 +1155,8 @@ static void search_frac(inter_search_info_t *info)
   }
 
   // To internal MV precision
-  mv.x <<= INTERNAL_MV_PREC - 2;
-  mv.y <<= INTERNAL_MV_PREC - 2;
+  mv.x *= 1 << (INTERNAL_MV_PREC - 2);
+  mv.y *= 1 << (INTERNAL_MV_PREC - 2);
 
   info->best_mv = mv;
   info->best_cost = best_cost;
@@ -1806,7 +1806,7 @@ static void search_pu_inter(encoder_state_t * const state,
 
       inter_merge_cand_t *merge_cand = info.merge_cand;
 
-      int16_t mv[2][2];
+      mv_t mv[2][2];
       mv[0][0] = unipreds[0].inter.mv[0][0];
       mv[0][1] = unipreds[0].inter.mv[0][1];
       mv[1][0] = unipreds[1].inter.mv[1][0];

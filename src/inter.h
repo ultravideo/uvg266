@@ -71,7 +71,7 @@ void kvz_inter_recon_bipred(const encoder_state_t * const state,
                             int32_t ypos,
                             int32_t width,
                             int32_t height,
-                            int16_t mv_param[2][2],
+                            mv_t mv_param[2][2],
                             lcu_t* lcu,
                             bool predict_luma,
                             bool predict_chroma);
