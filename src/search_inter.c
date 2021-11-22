@@ -94,9 +94,11 @@ typedef struct {
 static INLINE bool fracmv_within_tile(const inter_search_info_t *info, int x, int y)
 {
   const encoder_control_t *ctrl = info->state->encoder_control;
+  const int frac_mask = (1 << INTERNAL_MV_PREC) - 1;
+  const int frac_mask_c = (1 << (INTERNAL_MV_PREC + 1)) - 1;
 
-  const bool is_frac_luma   = x % 4 != 0 || y % 4 != 0;
-  const bool is_frac_chroma = x % 8 != 0 || y % 8 != 0;
+  const bool is_frac_luma   = (x & frac_mask) != 0 || (y & frac_mask) != 0;
+  const bool is_frac_chroma = (x & frac_mask_c) != 0 || (y & frac_mask_c) != 0;
 
   if (ctrl->cfg.owf && ctrl->cfg.wpp) {
     // Check that the block does not reference pixels that are not final.
@@ -131,8 +133,8 @@ static INLINE bool fracmv_within_tile(const inter_search_info_t *info, int x, in
     // bottom-left corner of the referenced block and the LCU containing
     // this block.
     const vector2d_t mv_lcu = {
-      ((info->origin.x + info->width  + margin) * 4 + x) / (LCU_WIDTH << 2) - orig_lcu.x,
-      ((info->origin.y + info->height + margin) * 4 + y) / (LCU_WIDTH << 2) - orig_lcu.y,
+      ((info->origin.x + info->width  + margin) * (1 << INTERNAL_MV_PREC) + x) / (LCU_WIDTH << INTERNAL_MV_PREC) - orig_lcu.x,
+      ((info->origin.y + info->height + margin) * (1 << INTERNAL_MV_PREC) + y) / (LCU_WIDTH << INTERNAL_MV_PREC) - orig_lcu.y,
     };
 
     if (mv_lcu.y > ctrl->max_inter_ref_lcu.down) {
@@ -184,7 +186,7 @@ static INLINE bool fracmv_within_tile(const inter_search_info_t *info, int x, in
  */
 static INLINE bool intmv_within_tile(const inter_search_info_t *info, int x, int y)
 {
-  return fracmv_within_tile(info, x * 4, y * 4);
+  return fracmv_within_tile(info, x * (1 << INTERNAL_MV_PREC), y * (1 << INTERNAL_MV_PREC));
 }
 
 
@@ -1077,7 +1079,7 @@ static void search_frac(inter_search_info_t *info)
   int i = 1;
   for (int step = 0; step < fme_level; ++step){
 
-    const int mv_shift = (step < 2) ? 1 : 0;
+    const int mv_shift = (step < 2) ? (INTERNAL_MV_PREC - 1) : (INTERNAL_MV_PREC - 2);
 
     filter_steps[step](state->encoder_control,
       ext_origin,
@@ -1415,7 +1417,7 @@ static void search_pu_inter_ref(inter_search_info_t *info,
 
   // Update best unipreds for biprediction
   if (info->best_cost < best_LX_cost[ref_list]) {
-    bool valid_mv = fracmv_within_tile(info, mv.x >> (INTERNAL_MV_PREC - 2), mv.y >> (INTERNAL_MV_PREC - 2));
+    bool valid_mv = fracmv_within_tile(info, mv.x, mv.y);
     if (valid_mv) {
       // Map reference index to L0/L1 pictures
       unipred_LX[ref_list].inter.mv_dir = ref_list + 1;
@@ -1704,8 +1706,8 @@ static void search_pu_inter(encoder_state_t * const state,
 
     // Don't try merge candidates that don't satisfy mv constraints.
     // Don't add duplicates to list
-    if (!fracmv_within_tile(&info, cur_cu->inter.mv[0][0] >> (INTERNAL_MV_PREC - 2), cur_cu->inter.mv[0][1] >> (INTERNAL_MV_PREC - 2)) ||
-        !fracmv_within_tile(&info, cur_cu->inter.mv[1][0] >> (INTERNAL_MV_PREC - 2), cur_cu->inter.mv[1][1] >> (INTERNAL_MV_PREC - 2)) ||
+    if (!fracmv_within_tile(&info, cur_cu->inter.mv[0][0], cur_cu->inter.mv[0][1]) ||
+        !fracmv_within_tile(&info, cur_cu->inter.mv[1][0], cur_cu->inter.mv[1][1]) ||
         is_duplicate)
     {
       continue;
@@ -1919,7 +1921,7 @@ static void search_pu_inter(encoder_state_t * const state,
   }
 
   if (*inter_cost < INT_MAX && cur_cu->inter.mv_dir == 1) {
-    assert(fracmv_within_tile(&info, cur_cu->inter.mv[0][0] >> (INTERNAL_MV_PREC - 2), cur_cu->inter.mv[0][1] >> (INTERNAL_MV_PREC - 2)));
+    assert(fracmv_within_tile(&info, cur_cu->inter.mv[0][0], cur_cu->inter.mv[0][1]));
   }
 }
 
