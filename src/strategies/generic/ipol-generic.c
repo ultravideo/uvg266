@@ -28,8 +28,8 @@
 #include "strategies/strategies-ipol.h"
 #include "strategyselector.h"
 
-extern int8_t kvz_g_luma_filter[4][8];
-extern int8_t kvz_g_chroma_filter[8][4];
+extern int8_t kvz_g_luma_filter[16][8];
+extern int8_t kvz_g_chroma_filter[32][4];
 
 int32_t kvz_eight_tap_filter_hor_generic(int8_t *filter, kvz_pixel *data)
 {
@@ -133,8 +133,8 @@ void kvz_sample_quarterpel_luma_generic(const encoder_control_t * const encoder,
   int32_t wp_offset1 = 1 << (wp_shift1 - 1);
 
   // Select filters according to the fractional part of the x and y mv components
-  int8_t *hor_filter = kvz_g_luma_filter[mv[0] & 3];
-  int8_t *ver_filter = kvz_g_luma_filter[mv[1] & 3];
+  int8_t *hor_filter = kvz_g_luma_filter[mv[0] & 15];
+  int8_t *ver_filter = kvz_g_luma_filter[mv[1] & 15];
 
   int16_t hor_filtered[KVZ_EXT_BLOCK_W_LUMA][LCU_WIDTH];
   int16_t hor_stride = LCU_WIDTH;
@@ -166,8 +166,8 @@ void kvz_sample_quarterpel_luma_hi_generic(const encoder_control_t * const encod
   int32_t shift2 = 6;
 
   // Select filters according to the fractional part of the x and y mv components
-  int8_t *hor_filter = kvz_g_luma_filter[mv[0] & 3];
-  int8_t *ver_filter = kvz_g_luma_filter[mv[1] & 3];
+  int8_t *hor_filter = kvz_g_luma_filter[mv[0] & 15];
+  int8_t *ver_filter = kvz_g_luma_filter[mv[1] & 15];
 
   int16_t hor_filtered[KVZ_EXT_BLOCK_W_LUMA][LCU_WIDTH];
   int16_t hor_stride = LCU_WIDTH;
@@ -210,7 +210,7 @@ void kvz_filter_hpel_blocks_hor_ver_luma_generic(const encoder_control_t * encod
   int32_t wp_offset1 = 1 << (wp_shift1 - 1);
 
   int8_t *fir0 = kvz_g_luma_filter[0];
-  int8_t *fir2 = kvz_g_luma_filter[2];
+  int8_t *fir2 = kvz_g_luma_filter[8];
 
   int16_t dst_stride = LCU_WIDTH;
   int16_t hor_stride = LCU_WIDTH;
@@ -324,7 +324,7 @@ void kvz_filter_hpel_blocks_diag_luma_generic(const encoder_control_t * encoder,
   int32_t wp_shift1 = 14 - KVZ_BIT_DEPTH;
   int32_t wp_offset1 = 1 << (wp_shift1 - 1);
 
-  int8_t *fir2 = kvz_g_luma_filter[2];
+  int8_t *fir2 = kvz_g_luma_filter[8];
 
   int16_t dst_stride = LCU_WIDTH;
   int16_t hor_stride = LCU_WIDTH;
@@ -407,9 +407,9 @@ void kvz_filter_qpel_blocks_hor_ver_luma_generic(const encoder_control_t * encod
   int32_t wp_offset1 = 1 << (wp_shift1 - 1);
 
   int8_t *fir0 = kvz_g_luma_filter[0];
-  int8_t *fir2 = kvz_g_luma_filter[2];
-  int8_t *fir1 = kvz_g_luma_filter[1];
-  int8_t *fir3 = kvz_g_luma_filter[3];
+  int8_t *fir2 = kvz_g_luma_filter[8];
+  int8_t *fir1 = kvz_g_luma_filter[4];
+  int8_t *fir3 = kvz_g_luma_filter[12];
 
   // Horiziontal positions. Positions 0 and 2 have already been calculated in filtered.
   int16_t *hor_pos0 = hor_intermediate[0];
@@ -565,8 +565,8 @@ void kvz_filter_qpel_blocks_diag_luma_generic(const encoder_control_t * encoder,
   int32_t wp_shift1 = 14 - KVZ_BIT_DEPTH;
   int32_t wp_offset1 = 1 << (wp_shift1 - 1);
 
-  int8_t *fir1 = kvz_g_luma_filter[1];
-  int8_t *fir3 = kvz_g_luma_filter[3];
+  int8_t *fir1 = kvz_g_luma_filter[4];
+  int8_t *fir3 = kvz_g_luma_filter[12];
 
   // Horiziontal positions.
   int16_t *hor_pos_l = hor_intermediate[3];
@@ -671,8 +671,8 @@ void kvz_sample_octpel_chroma_generic(const encoder_control_t * const encoder, k
   int32_t wp_offset1 = 1 << (wp_shift1 - 1);
 
   // Select filters according to the fractional part of the x and y mv components
-  int8_t *hor_filter = kvz_g_chroma_filter[mv[0] & 7];
-  int8_t *ver_filter = kvz_g_chroma_filter[mv[1] & 7];
+  int8_t *hor_filter = kvz_g_chroma_filter[mv[0] & 31];
+  int8_t *ver_filter = kvz_g_chroma_filter[mv[1] & 31];
 
   int16_t hor_filtered[KVZ_EXT_BLOCK_W_CHROMA][LCU_WIDTH_C];
   int16_t hor_stride = LCU_WIDTH_C;
@@ -704,8 +704,8 @@ void kvz_sample_octpel_chroma_hi_generic(const encoder_control_t * const encoder
   int32_t shift2 = 6;
 
   // Select filters according to the fractional part of the x and y mv components
-  int8_t *hor_filter = kvz_g_chroma_filter[mv[0] & 7];
-  int8_t *ver_filter = kvz_g_chroma_filter[mv[1] & 7];
+  int8_t *hor_filter = kvz_g_chroma_filter[mv[0] & 31];
+  int8_t *ver_filter = kvz_g_chroma_filter[mv[1] & 31];
 
   int16_t hor_filtered[KVZ_EXT_BLOCK_W_CHROMA][LCU_WIDTH_C];
   int16_t hor_stride = LCU_WIDTH_C;

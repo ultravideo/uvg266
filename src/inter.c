@@ -62,8 +62,8 @@ static void inter_recon_frac_luma(const encoder_state_t *const state,
   const mv_t mv_param[2],
   lcu_t *lcu)
 {
-  int mv_frac_x = (mv_param[0] & 3);
-  int mv_frac_y = (mv_param[1] & 3);
+  int mv_frac_x = (mv_param[0] & 15);
+  int mv_frac_y = (mv_param[1] & 15);
 
   // Space for extrapolated pixels and the part from the picture.
   // Some extra for AVX2.
@@ -77,8 +77,8 @@ static void inter_recon_frac_luma(const encoder_state_t *const state,
     .src_w = ref->width,
     .src_h = ref->height,
     .src_s = ref->stride,
-    .blk_x = state->tile->offset_x + xpos + (mv_param[0] >> 2),
-    .blk_y = state->tile->offset_y + ypos + (mv_param[1] >> 2),
+    .blk_x = state->tile->offset_x + xpos + (mv_param[0] >> INTERNAL_MV_PREC),
+    .blk_y = state->tile->offset_y + ypos + (mv_param[1] >> INTERNAL_MV_PREC),
     .blk_w = block_width,
     .blk_h = block_height,
     .pad_l = KVZ_LUMA_FILTER_OFFSET,
@@ -117,8 +117,8 @@ static void inter_recon_frac_luma_hi(const encoder_state_t *const state,
   const mv_t mv_param[2],
   hi_prec_buf_t *hi_prec_out)
 {
-  int mv_frac_x = (mv_param[0] & 3);
-  int mv_frac_y = (mv_param[1] & 3);
+  int mv_frac_x = (mv_param[0] & 15);
+  int mv_frac_y = (mv_param[1] & 15);
 
   // Space for extrapolated pixels and the part from the picture.
   // Some extra for AVX2.
@@ -132,8 +132,8 @@ static void inter_recon_frac_luma_hi(const encoder_state_t *const state,
     .src_w = ref->width,
     .src_h = ref->height,
     .src_s = ref->stride,
-    .blk_x = state->tile->offset_x + xpos + (mv_param[0] >> 2),
-    .blk_y = state->tile->offset_y + ypos + (mv_param[1] >> 2),
+    .blk_x = state->tile->offset_x + xpos + (mv_param[0] >> INTERNAL_MV_PREC),
+    .blk_y = state->tile->offset_y + ypos + (mv_param[1] >> INTERNAL_MV_PREC),
     .blk_w = block_width,
     .blk_h = block_height,
     .pad_l = KVZ_LUMA_FILTER_OFFSET,
@@ -172,8 +172,8 @@ static void inter_recon_frac_chroma(const encoder_state_t *const state,
   const mv_t mv_param[2],
   lcu_t *lcu)
 {
-  int mv_frac_x = (mv_param[0] & 7);
-  int mv_frac_y = (mv_param[1] & 7);
+  int mv_frac_x = (mv_param[0] & 31);
+  int mv_frac_y = (mv_param[1] & 31);
 
   // Space for extrapolated pixels and the part from the picture.
   // Some extra for AVX2.
@@ -190,8 +190,8 @@ static void inter_recon_frac_chroma(const encoder_state_t *const state,
     .src_w = ref->width / 2,
     .src_h = ref->height / 2,
     .src_s = ref->stride / 2,
-    .blk_x = (state->tile->offset_x + xpos) / 2 + (mv_param[0] >> 3),
-    .blk_y = (state->tile->offset_y + ypos) / 2 + (mv_param[1] >> 3),
+    .blk_x = (state->tile->offset_x + xpos) / 2 + (mv_param[0] >> (INTERNAL_MV_PREC + 1)),
+    .blk_y = (state->tile->offset_y + ypos) / 2 + (mv_param[1] >> (INTERNAL_MV_PREC + 1)),
     .blk_w = block_width / 2,
     .blk_h = block_height / 2,
     .pad_l = KVZ_CHROMA_FILTER_OFFSET,
@@ -244,8 +244,8 @@ static void inter_recon_frac_chroma_hi(const encoder_state_t *const state,
   const mv_t mv_param[2],
   hi_prec_buf_t *hi_prec_out)
 {
-  int mv_frac_x = (mv_param[0] & 7);
-  int mv_frac_y = (mv_param[1] & 7);
+  int mv_frac_x = (mv_param[0] & 31);
+  int mv_frac_y = (mv_param[1] & 31);
 
   // Space for extrapolated pixels and the part from the picture.
   // Some extra for AVX2.
@@ -262,8 +262,8 @@ static void inter_recon_frac_chroma_hi(const encoder_state_t *const state,
     .src_w = ref->width / 2,
     .src_h = ref->height / 2,
     .src_s = ref->stride / 2,
-    .blk_x = (state->tile->offset_x + xpos) / 2 + (mv_param[0] >> 3),
-    .blk_y = (state->tile->offset_y + ypos) / 2 + (mv_param[1] >> 3),
+    .blk_x = (state->tile->offset_x + xpos) / 2 + (mv_param[0] >> (INTERNAL_MV_PREC + 1) ),
+    .blk_y = (state->tile->offset_y + ypos) / 2 + (mv_param[1] >> (INTERNAL_MV_PREC + 1) ),
     .blk_w = block_width / 2,
     .blk_h = block_height / 2,
     .pad_l = KVZ_CHROMA_FILTER_OFFSET,
@@ -372,9 +372,7 @@ static void inter_recon_unipred(const encoder_state_t * const state,
                                 bool predict_luma,
                                 bool predict_chroma)
 {
-  mv_t mv_param_qpel[2] = { mv_param[0], mv_param[1] };
   mv_t mv_param_fpel[2] = { mv_param[0], mv_param[1] };
-  kvz_change_precision(INTERNAL_MV_PREC, 2, &mv_param_qpel[0], &mv_param_qpel[1]);
 
   kvz_change_precision(INTERNAL_MV_PREC, 0, &mv_param_fpel[0], &mv_param_fpel[1]);
 
@@ -394,7 +392,7 @@ static void inter_recon_unipred(const encoder_state_t * const state,
 
   // With 420, odd coordinates need interpolation.
   const int8_t fractional_chroma = (mv_in_pu.x & 1) || (mv_in_pu.y & 1);
-  const int8_t fractional_luma = ((mv_param_qpel[0] & 3) || (mv_param_qpel[1] & 3));
+  const int8_t fractional_luma = ((mv_param[0] & 15) || (mv_param[1] & 15));
 
   // Generate prediction for luma.
   if (predict_luma) {
@@ -404,13 +402,13 @@ static void inter_recon_unipred(const encoder_state_t * const state,
         inter_recon_frac_luma_hi(state, ref,
           pu_in_tile.x, pu_in_tile.y,
           width, height,
-          mv_param_qpel, hi_prec_out);
+          mv_param, hi_prec_out);
       }
       else {
         inter_recon_frac_luma(state, ref,
           pu_in_tile.x, pu_in_tile.y,
           width, height,
-          mv_param_qpel, lcu);
+          mv_param, lcu);
       }
     } else {
       // With an integer MV, copy pixels directly from the reference.
@@ -443,12 +441,12 @@ static void inter_recon_unipred(const encoder_state_t * const state,
       inter_recon_frac_chroma_hi(state, ref,
                                     pu_in_tile.x, pu_in_tile.y,
                                     width, height,
-                                    mv_param_qpel, hi_prec_out);
+                                    mv_param, hi_prec_out);
     } else {
       inter_recon_frac_chroma(state, ref,
                               pu_in_tile.x, pu_in_tile.y,
                               width, height,
-                              mv_param_qpel, lcu);
+                              mv_param, lcu);
     }
   } else {
     // With an integer MV, copy pixels directly from the reference.
@@ -511,11 +509,11 @@ void kvz_inter_recon_bipred(const encoder_state_t * const state,
   kvz_pixel temp_lcu_u[LCU_WIDTH_C*LCU_WIDTH_C];
   kvz_pixel temp_lcu_v[LCU_WIDTH_C*LCU_WIDTH_C];
 
-  const int hi_prec_luma_rec0 = (mv_param[0][0]>>2) & 3 || (mv_param[0][1]>>2) & 3;
-  const int hi_prec_luma_rec1 = (mv_param[1][0]>>2) & 3 || (mv_param[1][1]>>2) & 3;
+  const int hi_prec_luma_rec0 = (mv_param[0][0] & 15) || (mv_param[0][1] & 15);
+  const int hi_prec_luma_rec1 = (mv_param[1][0] & 15) || (mv_param[1][1] & 15);
 
-  const int hi_prec_chroma_rec0 = (mv_param[0][0]>>2) & 7 || (mv_param[0][1]>>2) & 7;
-  const int hi_prec_chroma_rec1 = (mv_param[1][0]>>2) & 7 || (mv_param[1][1]>>2) & 7;
+  const int hi_prec_chroma_rec0 = (mv_param[0][0] & 31) || (mv_param[0][1] & 31);
+  const int hi_prec_chroma_rec1 = (mv_param[1][0] & 31) || (mv_param[1][1] & 31);
 
   hi_prec_buf_t* high_precision_rec0 = 0;
   hi_prec_buf_t* high_precision_rec1 = 0;
@@ -1508,6 +1506,26 @@ void kvz_change_precision(int src, int dst, mv_t* hor, mv_t* ver) {
     const int offset = 1 << (right_shift - 1);
     *hor = *hor >= 0 ? (*hor + offset - 1) >> right_shift : (*hor + offset) >> right_shift;
     *ver = *ver >= 0 ? (*ver + offset - 1) >> right_shift : (*ver + offset) >> right_shift;
+  }
+}
+
+void kvz_change_precision_vector2d(int src, int dst, vector2d_t *mv) {
+
+  const int shift = (int)dst - (int)src;
+  if (shift >= 0)
+  {
+    int* hor_unsigned = &mv->x;
+    int* ver_unsigned = &mv->y;
+
+    *hor_unsigned <<= shift;
+    *ver_unsigned <<= shift;
+  }
+  else
+  {
+    const int right_shift = -shift;
+    const int offset = 1 << (right_shift - 1);
+    mv->x = mv->x >= 0 ? (mv->x + offset - 1) >> right_shift : (mv->x + offset) >> right_shift;
+    mv->y = mv->y >= 0 ? (mv->y + offset - 1) >> right_shift : (mv->y + offset) >> right_shift;
   }
 }
 

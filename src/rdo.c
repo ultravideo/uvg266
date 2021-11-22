@@ -1753,7 +1753,7 @@ uint32_t kvz_calc_mvd_cost_cabac(const encoder_state_t * state,
                                  int x,
                                  int y,
                                  int mv_shift,
-                                 int16_t mv_cand[2][2],
+                                 mv_t mv_cand[2][2],
                                  inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
                                  int16_t num_cand,
                                  int32_t ref_idx,
@@ -1802,6 +1802,10 @@ uint32_t kvz_calc_mvd_cost_cabac(const encoder_state_t * state,
       x - mv_cand[1][0],
       y - mv_cand[1][1],
     };
+
+    kvz_change_precision_vector2d(INTERNAL_MV_PREC, 2, &mvd1);
+    kvz_change_precision_vector2d(INTERNAL_MV_PREC, 2, &mvd2);
+
     uint32_t cand1_cost = kvz_get_mvd_coding_cost_cabac(state, cabac, mvd1.x, mvd1.y);
     uint32_t cand2_cost = kvz_get_mvd_coding_cost_cabac(state, cabac, mvd2.x, mvd2.y);
 
@@ -1881,12 +1885,8 @@ uint32_t kvz_calc_mvd_cost_cabac(const encoder_state_t * state,
         }
 
         // Signal which candidate MV to use
-        kvz_cabac_write_unary_max_symbol(
-            cabac,
-            &cabac->ctx.mvp_idx_model,
-            cur_mv_cand,
-            1,
-            AMVP_MAX_NUM_CANDS - 1);
+        cabac->cur_ctx = &(cabac->ctx.mvp_idx_model);
+        CABAC_BIN(cabac, cur_mv_cand, "mvp_flag");
       }
     }
   }

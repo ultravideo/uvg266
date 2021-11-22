@@ -38,8 +38,8 @@
 #include "strategies/generic/ipol-generic.h"
 
 
-extern int8_t kvz_g_luma_filter[4][8];
-extern int8_t kvz_g_chroma_filter[8][4];
+extern int8_t kvz_g_luma_filter[16][8];
+extern int8_t kvz_g_chroma_filter[32][4];
 
 static int32_t kvz_eight_tap_filter_hor_avx2(int8_t *filter, kvz_pixel *data)
 {
@@ -635,7 +635,7 @@ static void kvz_filter_hpel_blocks_hor_ver_luma_avx2(const encoder_control_t * e
   int32_t wp_offset1 = 1 << (wp_shift1 - 1);
 
   int8_t *fir0 = kvz_g_luma_filter[0];
-  int8_t *fir2 = kvz_g_luma_filter[2];
+  int8_t *fir2 = kvz_g_luma_filter[8];
 
   int16_t dst_stride = LCU_WIDTH;
   int16_t hor_stride = LCU_WIDTH;
@@ -745,7 +745,7 @@ static void kvz_filter_hpel_blocks_diag_luma_avx2(const encoder_control_t * enco
   int32_t wp_shift1 = 14 - KVZ_BIT_DEPTH;
   int32_t wp_offset1 = 1 << (wp_shift1 - 1);
 
-  int8_t *fir2 = kvz_g_luma_filter[2];
+  int8_t *fir2 = kvz_g_luma_filter[8];
 
   int16_t dst_stride = LCU_WIDTH;
   int16_t hor_stride = LCU_WIDTH;
@@ -826,9 +826,9 @@ static void kvz_filter_qpel_blocks_hor_ver_luma_avx2(const encoder_control_t * e
   int32_t wp_offset1 = 1 << (wp_shift1 - 1);
 
   int8_t *fir0 = kvz_g_luma_filter[0];
-  int8_t *fir2 = kvz_g_luma_filter[2];
-  int8_t *fir1 = kvz_g_luma_filter[1];
-  int8_t *fir3 = kvz_g_luma_filter[3];
+  int8_t *fir2 = kvz_g_luma_filter[8];
+  int8_t *fir1 = kvz_g_luma_filter[4];
+  int8_t *fir3 = kvz_g_luma_filter[12];
 
   // Horiziontal positions. Positions 0 and 2 have already been calculated in filtered.
   int16_t *hor_pos0 = hor_intermediate[0];
@@ -1004,8 +1004,8 @@ static void kvz_filter_qpel_blocks_diag_luma_avx2(const encoder_control_t * enco
   int32_t wp_shift1 = 14 - KVZ_BIT_DEPTH;
   int32_t wp_offset1 = 1 << (wp_shift1 - 1);
 
-  int8_t *fir1 = kvz_g_luma_filter[1];
-  int8_t *fir3 = kvz_g_luma_filter[3];
+  int8_t *fir1 = kvz_g_luma_filter[4];
+  int8_t *fir3 = kvz_g_luma_filter[12];
 
   int16_t *hor_pos_l = hor_intermediate[3];
   int16_t *hor_pos_r = hor_intermediate[4];
@@ -1137,8 +1137,8 @@ static void kvz_sample_quarterpel_luma_avx2(const encoder_control_t * const enco
   const mv_t mv[2])
 {
   // TODO: horizontal and vertical only filtering
-  int8_t *hor_fir = kvz_g_luma_filter[mv[0] & 3];
-  int8_t *ver_fir = kvz_g_luma_filter[mv[1] & 3];
+  int8_t *hor_fir = kvz_g_luma_filter[mv[0] & 15];
+  int8_t *ver_fir = kvz_g_luma_filter[mv[1] & 15];
 
   // Buffer for intermediate values with one extra row 
   // because the loop writes two rows each iteration.
@@ -1162,8 +1162,8 @@ static void kvz_sample_quarterpel_luma_hi_avx2(const encoder_control_t * const e
   const mv_t mv[2])
 {
   // TODO: horizontal and vertical only filtering
-  int8_t *hor_fir = kvz_g_luma_filter[mv[0] & 3];
-  int8_t *ver_fir = kvz_g_luma_filter[mv[1] & 3];
+  int8_t *hor_fir = kvz_g_luma_filter[mv[0] & 15];
+  int8_t *ver_fir = kvz_g_luma_filter[mv[1] & 15];
   
   // Buffer for intermediate values with one extra row 
   // because the loop writes two rows each iteration.
@@ -1191,8 +1191,8 @@ static void kvz_sample_octpel_chroma_avx2(const encoder_control_t *const encoder
     kvz_sample_octpel_chroma_generic(encoder, src, src_stride, width, height, dst, dst_stride, hor_flag, ver_flag, mv);
     return;
   }
-  int8_t *hor_fir = kvz_g_chroma_filter[mv[0] & 7];
-  int8_t *ver_fir = kvz_g_chroma_filter[mv[1] & 7];
+  int8_t *hor_fir = kvz_g_chroma_filter[mv[0] & 31];
+  int8_t *ver_fir = kvz_g_chroma_filter[mv[1] & 31];
 
   // Buffer for intermediate values with 3 extra rows 
   // because the loop writes four rows each iteration.
@@ -1219,8 +1219,8 @@ static void kvz_sample_octpel_chroma_hi_avx2(const encoder_control_t *const enco
     kvz_sample_octpel_chroma_hi_generic(encoder, src, src_stride, width, height, dst, dst_stride, hor_flag, ver_flag, mv);
     return;
   }
-  int8_t *hor_fir = kvz_g_chroma_filter[mv[0] & 7];
-  int8_t *ver_fir = kvz_g_chroma_filter[mv[1] & 7];
+  int8_t *hor_fir = kvz_g_chroma_filter[mv[0] & 31];
+  int8_t *ver_fir = kvz_g_chroma_filter[mv[1] & 31];
 
   // Buffer for intermediate values with 3 extra rows 
   // because the loop writes four rows each iteration.
