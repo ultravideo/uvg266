@@ -295,8 +295,8 @@ static void select_starting_point(inter_search_info_t *info, vector2d_t extra_mv
   check_mv_cost(info, 0, 0);
 
   // Change to integer precision.
-  extra_mv.x >>= 2;
-  extra_mv.y >>= 2;
+  extra_mv.x >>= INTERNAL_MV_PREC;
+  extra_mv.y >>= INTERNAL_MV_PREC;
 
   // Check mv_in if it's not one of the merge candidates.
   if ((extra_mv.x != 0 || extra_mv.y != 0) && !mv_in_merge(info, extra_mv)) {
@@ -307,8 +307,8 @@ static void select_starting_point(inter_search_info_t *info, vector2d_t extra_mv
   for (unsigned i = 0; i < info->num_merge_cand; ++i) {
     if (info->merge_cand[i].dir == 3) continue;
 
-    int x = (info->merge_cand[i].mv[info->merge_cand[i].dir - 1][0] + 2) >> INTERNAL_MV_PREC;
-    int y = (info->merge_cand[i].mv[info->merge_cand[i].dir - 1][1] + 2) >> INTERNAL_MV_PREC;
+    int x = (info->merge_cand[i].mv[info->merge_cand[i].dir - 1][0] + (1 << (INTERNAL_MV_PREC - 1)) ) >> INTERNAL_MV_PREC;
+    int y = (info->merge_cand[i].mv[info->merge_cand[i].dir - 1][1] + (1 << (INTERNAL_MV_PREC - 1)) ) >> INTERNAL_MV_PREC;
 
     if (x == 0 && y == 0) continue;
 
