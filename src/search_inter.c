@@ -60,7 +60,7 @@ typedef struct {
   int32_t width;
   int32_t height;
 
-  int16_t mv_cand[2][2];
+  mv_t mv_cand[2][2];
   inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS];
   int32_t num_merge_cand;
 
@@ -94,9 +94,11 @@ typedef struct {
 static INLINE bool fracmv_within_tile(const inter_search_info_t *info, int x, int y)
 {
   const encoder_control_t *ctrl = info->state->encoder_control;
+  const int frac_mask = (1 << INTERNAL_MV_PREC) - 1;
+  const int frac_mask_c = (1 << (INTERNAL_MV_PREC + 1)) - 1;
 
-  const bool is_frac_luma   = x % 4 != 0 || y % 4 != 0;
-  const bool is_frac_chroma = x % 8 != 0 || y % 8 != 0;
+  const bool is_frac_luma   = (x & frac_mask) != 0 || (y & frac_mask) != 0;
+  const bool is_frac_chroma = (x & frac_mask_c) != 0 || (y & frac_mask_c) != 0;
 
   if (ctrl->cfg.owf && ctrl->cfg.wpp) {
     // Check that the block does not reference pixels that are not final.
@@ -131,8 +133,8 @@ static INLINE bool fracmv_within_tile(const inter_search_info_t *info, int x, in
     // bottom-left corner of the referenced block and the LCU containing
     // this block.
     const vector2d_t mv_lcu = {
-      ((info->origin.x + info->width  + margin) * 4 + x) / (LCU_WIDTH << 2) - orig_lcu.x,
-      ((info->origin.y + info->height + margin) * 4 + y) / (LCU_WIDTH << 2) - orig_lcu.y,
+      ((info->origin.x + info->width  + margin) * (1 << INTERNAL_MV_PREC) + x) / (LCU_WIDTH << INTERNAL_MV_PREC) - orig_lcu.x,
+      ((info->origin.y + info->height + margin) * (1 << INTERNAL_MV_PREC) + y) / (LCU_WIDTH << INTERNAL_MV_PREC) - orig_lcu.y,
     };
 
     if (mv_lcu.y > ctrl->max_inter_ref_lcu.down) {
@@ -150,27 +152,27 @@ static INLINE bool fracmv_within_tile(const inter_search_info_t *info, int x, in
     return true;
   }
 
-  // Margin as luma quater pixels.
+  // Margin as luma in internal resolution (frac pixels).
   int margin = 0;
   if (ctrl->cfg.mv_constraint == KVZ_MV_CONSTRAIN_FRAME_AND_TILE_MARGIN) {
     if (is_frac_luma) {
-      margin = 4 << 2;
+      margin = 4 << INTERNAL_MV_PREC;
     } else if (is_frac_chroma) {
-      margin = 2 << 2;
+      margin = 2 << INTERNAL_MV_PREC;
     }
   }
 
   // TODO implement KVZ_MV_CONSTRAIN_FRAM and KVZ_MV_CONSTRAIN_TILE.
   const vector2d_t abs_mv = {
-    info->origin.x * 4 + x,
-    info->origin.y * 4 + y,
+    (info->origin.x << INTERNAL_MV_PREC) + x,
+    (info->origin.y << INTERNAL_MV_PREC) + y,
   };
 
   // Check that both margin constraints are satisfied.
   const int from_right  =
-    (info->state->tile->frame->width  << 2) - (abs_mv.x + (info->width  << 2));
+    (info->state->tile->frame->width  << INTERNAL_MV_PREC) - (abs_mv.x + (info->width  << INTERNAL_MV_PREC));
   const int from_bottom =
-    (info->state->tile->frame->height << 2) - (abs_mv.y + (info->height << 2));
+    (info->state->tile->frame->height << INTERNAL_MV_PREC) - (abs_mv.y + (info->height << INTERNAL_MV_PREC));
 
   return abs_mv.x >= margin &&
          abs_mv.y >= margin &&
@@ -184,7 +186,7 @@ static INLINE bool fracmv_within_tile(const inter_search_info_t *info, int x, in
  */
 static INLINE bool intmv_within_tile(const inter_search_info_t *info, int x, int y)
 {
-  return fracmv_within_tile(info, x * 4, y * 4);
+  return fracmv_within_tile(info, x * (1 << INTERNAL_MV_PREC), y * (1 << INTERNAL_MV_PREC));
 }
 
 
@@ -220,7 +222,7 @@ static bool check_mv_cost(inter_search_info_t *info, int x, int y)
 
   cost += info->mvd_cost_func(
       info->state,
-      x, y, 2,
+      x, y, INTERNAL_MV_PREC,
       info->mv_cand,
       info->merge_cand,
       info->num_merge_cand,
@@ -230,9 +232,9 @@ static bool check_mv_cost(inter_search_info_t *info, int x, int y)
 
   if (cost >= info->best_cost) return false;
 
-  // Set to motion vector in quarter pixel precision.
-  info->best_mv.x = x * 4;
-  info->best_mv.y = y * 4;
+  // Set to motion vector in internal pixel precision.
+  info->best_mv.x = x * (1 << INTERNAL_MV_PREC);
+  info->best_mv.y = y * (1 << INTERNAL_MV_PREC);
   info->best_cost = cost;
   info->best_bitcost = bitcost;
 
@@ -270,8 +272,8 @@ static bool mv_in_merge(const inter_search_info_t *info, vector2d_t mv)
   for (int i = 0; i < info->num_merge_cand; ++i) {
     if (info->merge_cand[i].dir == 3) continue;
     const vector2d_t merge_mv = {
-      (info->merge_cand[i].mv[info->merge_cand[i].dir - 1][0] + 2) >> 2,
-      (info->merge_cand[i].mv[info->merge_cand[i].dir - 1][1] + 2) >> 2
+      (info->merge_cand[i].mv[info->merge_cand[i].dir - 1][0] + 2) >> INTERNAL_MV_PREC,
+      (info->merge_cand[i].mv[info->merge_cand[i].dir - 1][1] + 2) >> INTERNAL_MV_PREC
     };
     if (merge_mv.x == mv.x && merge_mv.y == mv.y) {
       return true;
@@ -293,8 +295,8 @@ static void select_starting_point(inter_search_info_t *info, vector2d_t extra_mv
   check_mv_cost(info, 0, 0);
 
   // Change to integer precision.
-  extra_mv.x >>= 2;
-  extra_mv.y >>= 2;
+  extra_mv.x >>= INTERNAL_MV_PREC;
+  extra_mv.y >>= INTERNAL_MV_PREC;
 
   // Check mv_in if it's not one of the merge candidates.
   if ((extra_mv.x != 0 || extra_mv.y != 0) && !mv_in_merge(info, extra_mv)) {
@@ -305,8 +307,8 @@ static void select_starting_point(inter_search_info_t *info, vector2d_t extra_mv
   for (unsigned i = 0; i < info->num_merge_cand; ++i) {
     if (info->merge_cand[i].dir == 3) continue;
 
-    int x = (info->merge_cand[i].mv[info->merge_cand[i].dir - 1][0] + 2) >> 2;
-    int y = (info->merge_cand[i].mv[info->merge_cand[i].dir - 1][1] + 2) >> 2;
+    int x = (info->merge_cand[i].mv[info->merge_cand[i].dir - 1][0] + (1 << (INTERNAL_MV_PREC - 1)) ) >> INTERNAL_MV_PREC;
+    int y = (info->merge_cand[i].mv[info->merge_cand[i].dir - 1][1] + (1 << (INTERNAL_MV_PREC - 1)) ) >> INTERNAL_MV_PREC;
 
     if (x == 0 && y == 0) continue;
 
@@ -332,7 +334,7 @@ static uint32_t get_mvd_coding_cost(const encoder_state_t *state,
 
 
 static int select_mv_cand(const encoder_state_t *state,
-                          int16_t mv_cand[2][2],
+                          mv_t mv_cand[2][2],
                           int32_t mv_x,
                           int32_t mv_y,
                           uint32_t *cost_out)
@@ -382,7 +384,7 @@ static uint32_t calc_mvd_cost(const encoder_state_t *state,
                               int x,
                               int y,
                               int mv_shift,
-                              int16_t mv_cand[2][2],
+                              mv_t mv_cand[2][2],
                               inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
                               int16_t num_cand,
                               int32_t ref_idx,
@@ -427,7 +429,7 @@ static bool early_terminate(inter_search_info_t *info)
       { 0, -1 }, { -1, 0 }, { 0, 0 },
   };
 
-  vector2d_t mv = { info->best_mv.x >> 2, info->best_mv.y >> 2 };
+  vector2d_t mv = { info->best_mv.x >> INTERNAL_MV_PREC, info->best_mv.y >> INTERNAL_MV_PREC };
 
   int first_index = 0;
   int last_index = 3;
@@ -589,7 +591,7 @@ void kvz_tz_raster_search(inter_search_info_t *info,
                           int iSearchRange,
                           int iRaster)
 {
-  const vector2d_t mv = { info->best_mv.x >> 2, info->best_mv.y >> 2 };
+  const vector2d_t mv = { info->best_mv.x >> INTERNAL_MV_PREC, info->best_mv.y >> INTERNAL_MV_PREC };
 
   //compute SAD values for every point in the iRaster downsampled version of the current search area
   for (int y = iSearchRange; y >= -iSearchRange; y -= iRaster) {
@@ -625,7 +627,7 @@ static void tz_search(inter_search_info_t *info, vector2d_t extra_mv)
     return;
   }
 
-  vector2d_t start = { info->best_mv.x >> 2, info->best_mv.y >> 2 };
+  vector2d_t start = { info->best_mv.x >> INTERNAL_MV_PREC, info->best_mv.y >> INTERNAL_MV_PREC };
 
   // step 2, grid search
   int rounds_without_improvement = 0;
@@ -661,8 +663,8 @@ static void tz_search(inter_search_info_t *info, vector2d_t extra_mv)
   //raster refinement
   if (use_raster_refinement && best_dist > 0) {
     for (int iDist = best_dist >> 1; iDist > 0; iDist >>= 1) {
-      start.x = info->best_mv.x >> 2;
-      start.y = info->best_mv.y >> 2;
+      start.x = info->best_mv.x >> INTERNAL_MV_PREC;
+      start.y = info->best_mv.y >> INTERNAL_MV_PREC;
       kvz_tz_pattern_search(info, step4_type, iDist, start, &best_dist);
     }
   }
@@ -670,8 +672,8 @@ static void tz_search(inter_search_info_t *info, vector2d_t extra_mv)
   //star refinement (repeat step 2 for the current starting point)
   while (use_star_refinement && best_dist > 0) {
     best_dist = 0;
-    start.x = info->best_mv.x >> 2;
-    start.y = info->best_mv.y >> 2;
+    start.x = info->best_mv.x >> INTERNAL_MV_PREC;
+    start.y = info->best_mv.y >> INTERNAL_MV_PREC;
     for (int iDist = 1; iDist <= iSearchRange; iDist *= 2) {
       kvz_tz_pattern_search(info, step4_type, iDist, start, &best_dist);
     }
@@ -733,7 +735,7 @@ static void hexagon_search(inter_search_info_t *info, vector2d_t extra_mv, uint3
     return;
   }
 
-  vector2d_t mv = { info->best_mv.x >> 2, info->best_mv.y >> 2 };
+  vector2d_t mv = { info->best_mv.x >> INTERNAL_MV_PREC, info->best_mv.y >> INTERNAL_MV_PREC };
 
   // Current best index, either to merge_cands, large_hexbs or small_hexbs.
   int best_index = 0;
@@ -834,7 +836,7 @@ static void diamond_search(inter_search_info_t *info, vector2d_t extra_mv, uint3
   }
   
   // current motion vector
-  vector2d_t mv = { info->best_mv.x >> 2, info->best_mv.y >> 2 };
+  vector2d_t mv = { info->best_mv.x >> INTERNAL_MV_PREC, info->best_mv.y >> INTERNAL_MV_PREC };
 
   // current best index
   enum diapos best_index = DIA_CENTER;
@@ -903,8 +905,8 @@ static void search_mv_full(inter_search_info_t *info,
   }
 
   // Change to integer precision.
-  extra_mv.x >>= 2;
-  extra_mv.y >>= 2;
+  extra_mv.x >>= INTERNAL_MV_PREC;
+  extra_mv.y >>= INTERNAL_MV_PREC;
 
   // Check around extra_mv if it's not one of the merge candidates.
   if (!mv_in_merge(info, extra_mv)) {
@@ -921,8 +923,8 @@ static void search_mv_full(inter_search_info_t *info,
     if (info->merge_cand[i].dir == 3) continue;
 
     vector2d_t mv = {
-      .x = info->merge_cand[i].mv[info->merge_cand[i].dir - 1][0] >> 2,
-      .y = info->merge_cand[i].mv[info->merge_cand[i].dir - 1][1] >> 2,
+      .x = info->merge_cand[i].mv[info->merge_cand[i].dir - 1][0] >> INTERNAL_MV_PREC,
+      .y = info->merge_cand[i].mv[info->merge_cand[i].dir - 1][1] >> INTERNAL_MV_PREC,
     };
 
     // Ignore 0-vector because it has already been checked.
@@ -944,8 +946,8 @@ static void search_mv_full(inter_search_info_t *info,
           int yy = 0;
           if (j >= 0) {
             if (info->merge_cand[j].dir == 3) continue;
-            xx = info->merge_cand[j].mv[info->merge_cand[j].dir - 1][0] >> 2;
-            yy = info->merge_cand[j].mv[info->merge_cand[j].dir - 1][1] >> 2;
+            xx = info->merge_cand[j].mv[info->merge_cand[j].dir - 1][0] >> INTERNAL_MV_PREC;
+            yy = info->merge_cand[j].mv[info->merge_cand[j].dir - 1][1] >> INTERNAL_MV_PREC;
           }
           if (x >= xx - search_range && x <= xx + search_range &&
               y >= yy - search_range && y <= yy + search_range)
@@ -983,7 +985,7 @@ static void search_frac(inter_search_info_t *info)
   };
 
   // Set mv to pixel precision
-  vector2d_t mv = { info->best_mv.x >> 2, info->best_mv.y >> 2 };
+  vector2d_t mv = { info->best_mv.x >> INTERNAL_MV_PREC, info->best_mv.y >> INTERNAL_MV_PREC };
 
   unsigned best_cost = UINT32_MAX;
   uint32_t best_bitcost = 0;
@@ -1053,7 +1055,7 @@ static void search_frac(inter_search_info_t *info)
     ext_origin + ext_s + 1, ext_s);
 
   costs[0] += info->mvd_cost_func(state,
-                                  mv.x, mv.y, 2,
+                                  mv.x, mv.y, INTERNAL_MV_PREC,
                                   info->mv_cand,
                                   info->merge_cand,
                                   info->num_merge_cand,
@@ -1077,7 +1079,7 @@ static void search_frac(inter_search_info_t *info)
   int i = 1;
   for (int step = 0; step < fme_level; ++step){
 
-    const int mv_shift = (step < 2) ? 1 : 0;
+    const int mv_shift = (step < 2) ? (INTERNAL_MV_PREC - 1) : (INTERNAL_MV_PREC - 2);
 
     filter_steps[step](state->encoder_control,
       ext_origin,
@@ -1151,6 +1153,10 @@ static void search_frac(inter_search_info_t *info)
       }
     }
   }
+
+  // To internal MV precision
+  mv.x *= 1 << (INTERNAL_MV_PREC - 2);
+  mv.y *= 1 << (INTERNAL_MV_PREC - 2);
 
   info->best_mv = mv;
   info->best_cost = best_cost;
@@ -1360,8 +1366,8 @@ static void search_pu_inter_ref(inter_search_info_t *info,
         info->ref,
         info->origin.x,
         info->origin.y,
-        info->state->tile->offset_x + info->origin.x + (info->best_mv.x >> 2),
-        info->state->tile->offset_y + info->origin.y + (info->best_mv.y >> 2),
+        info->state->tile->offset_x + info->origin.x + (info->best_mv.x >> INTERNAL_MV_PREC),
+        info->state->tile->offset_y + info->origin.y + (info->best_mv.y >> INTERNAL_MV_PREC),
         info->width,
         info->height);
     info->best_cost += info->best_bitcost * (int)(info->state->lambda_sqrt + 0.5);
@@ -1399,8 +1405,8 @@ static void search_pu_inter_ref(inter_search_info_t *info,
     cur_cu->merged                  = merged;
     cur_cu->merge_idx               = merge_idx;
     cur_cu->inter.mv_ref[ref_list]  = LX_idx;
-    cur_cu->inter.mv[ref_list][0]   = (int16_t)mv.x;
-    cur_cu->inter.mv[ref_list][1]   = (int16_t)mv.y;
+    cur_cu->inter.mv[ref_list][0]   = (mv_t)mv.x;
+    cur_cu->inter.mv[ref_list][1]   = (mv_t)mv.y;
 
     CU_SET_MV_CAND(cur_cu, ref_list, cu_mv_cand);
 
@@ -1416,8 +1422,8 @@ static void search_pu_inter_ref(inter_search_info_t *info,
       // Map reference index to L0/L1 pictures
       unipred_LX[ref_list].inter.mv_dir = ref_list + 1;
       unipred_LX[ref_list].inter.mv_ref[ref_list] = LX_idx;
-      unipred_LX[ref_list].inter.mv[ref_list][0] = (int16_t)mv.x;
-      unipred_LX[ref_list].inter.mv[ref_list][1] = (int16_t)mv.y;
+      unipred_LX[ref_list].inter.mv[ref_list][0] = (mv_t)mv.x;
+      unipred_LX[ref_list].inter.mv[ref_list][1] = (mv_t)mv.y;
 
       CU_SET_MV_CAND(&unipred_LX[ref_list], ref_list, cu_mv_cand);
 
@@ -1466,7 +1472,7 @@ static void search_pu_inter_bipred(inter_search_info_t *info,
       continue;
     }
 
-    int16_t mv[2][2];
+    mv_t mv[2][2];
     mv[0][0] = merge_cand[i].mv[0][0];
     mv[0][1] = merge_cand[i].mv[0][1];
     mv[1][0] = merge_cand[j].mv[1][0];
@@ -1677,7 +1683,10 @@ static void search_pu_inter(encoder_state_t * const state,
   // Check motion vector constraints and perform rough search
   for (int merge_idx = 0; merge_idx < info.num_merge_cand; ++merge_idx) {    
     inter_merge_cand_t *cur_cand = &info.merge_cand[merge_idx];
-    if (cur_cand->half_pel) continue; // Skip half-pel candidates for now TODO: Fix
+
+    if ((cur_cand->dir & 1 && (cur_cand->mv[0][0] & 3 || cur_cand->mv[0][1] & 3)) ||
+      (cur_cand->dir & 2 && (cur_cand->mv[1][0] & 3 || cur_cand->mv[1][1] & 3))) continue;
+
     cur_cu->inter.mv_dir = cur_cand->dir;
     cur_cu->inter.mv_ref[0] = cur_cand->ref[0];
     cur_cu->inter.mv_ref[1] = cur_cand->ref[1];
@@ -1703,7 +1712,6 @@ static void search_pu_inter(encoder_state_t * const state,
     {
       continue;
     }
-
     kvz_inter_pred_pu(state, lcu, x_cu, y_cu, width_cu, true, false, i_pu);
     mrg_costs[num_rdo_cands] = kvz_satd_any_size(width, height,
       lcu->rec.y + y_local * LCU_WIDTH + x_local, LCU_WIDTH,
@@ -1733,6 +1741,10 @@ static void search_pu_inter(encoder_state_t * const state,
       // and chroma exists.
       // Early terminate if merge candidate with zero CBF is found.
       int merge_idx = mrg_cands[merge_rdo_idx];
+      inter_merge_cand_t *cur_cand = &info.merge_cand[merge_idx];
+      if ((cur_cand->dir & 1 && (cur_cand->mv[0][0] & 3 || cur_cand->mv[0][1] & 3)) ||
+        (cur_cand->dir & 2 && (cur_cand->mv[1][0] & 3 || cur_cand->mv[1][1] & 3))) continue;
+
       cur_cu->inter.mv_dir = info.merge_cand[merge_idx].dir;
       cur_cu->inter.mv_ref[0] = info.merge_cand[merge_idx].ref[0];
       cur_cu->inter.mv_ref[1] = info.merge_cand[merge_idx].ref[1];
@@ -1740,6 +1752,7 @@ static void search_pu_inter(encoder_state_t * const state,
       cur_cu->inter.mv[0][1] = info.merge_cand[merge_idx].mv[0][1];
       cur_cu->inter.mv[1][0] = info.merge_cand[merge_idx].mv[1][0];
       cur_cu->inter.mv[1][1] = info.merge_cand[merge_idx].mv[1][1];
+
       kvz_lcu_fill_trdepth(lcu, x, y, depth, MAX(1, depth));
       kvz_inter_recon_cu(state, lcu, x, y, width, true, false);
       kvz_quantize_lcu_residual(state, true, false, x, y, depth, cur_cu, lcu, true);
@@ -1793,7 +1806,7 @@ static void search_pu_inter(encoder_state_t * const state,
 
       inter_merge_cand_t *merge_cand = info.merge_cand;
 
-      int16_t mv[2][2];
+      mv_t mv[2][2];
       mv[0][0] = unipreds[0].inter.mv[0][0];
       mv[0][1] = unipreds[0].inter.mv[0][1];
       mv[1][0] = unipreds[1].inter.mv[1][0];

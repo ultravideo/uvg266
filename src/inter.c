@@ -32,6 +32,8 @@
 #include "strategies/strategies-picture.h"
 
 
+const int8_t kvz_g_imv_to_prec[4] = { 2, 0, -2, 1 }; // Convert AMVR imv to precision
+
 typedef struct {
   const cu_info_t *a[2];
   const cu_info_t *b[3];
@@ -57,7 +59,7 @@ static void inter_recon_frac_luma(const encoder_state_t *const state,
   int32_t ypos,
   int32_t block_width,
   int32_t block_height,
-  const int16_t mv_param[2],
+  const mv_t mv_param[2],
   lcu_t *lcu)
 {
   int mv_frac_x = (mv_param[0] & 3);
@@ -112,7 +114,7 @@ static void inter_recon_frac_luma_hi(const encoder_state_t *const state,
   int32_t ypos,
   int32_t block_width,
   int32_t block_height,
-  const int16_t mv_param[2],
+  const mv_t mv_param[2],
   hi_prec_buf_t *hi_prec_out)
 {
   int mv_frac_x = (mv_param[0] & 3);
@@ -167,7 +169,7 @@ static void inter_recon_frac_chroma(const encoder_state_t *const state,
   int32_t ypos,
   int32_t block_width,
   int32_t block_height,
-  const int16_t mv_param[2],
+  const mv_t mv_param[2],
   lcu_t *lcu)
 {
   int mv_frac_x = (mv_param[0] & 7);
@@ -239,7 +241,7 @@ static void inter_recon_frac_chroma_hi(const encoder_state_t *const state,
   int32_t ypos,
   int32_t block_width,
   int32_t block_height,
-  const int16_t mv_param[2],
+  const mv_t mv_param[2],
   hi_prec_buf_t *hi_prec_out)
 {
   int mv_frac_x = (mv_param[0] & 7);
@@ -364,16 +366,22 @@ static void inter_recon_unipred(const encoder_state_t * const state,
                                 int32_t ypos,
                                 int32_t width,
                                 int32_t height,
-                                const int16_t mv_param[2],
+                                const mv_t mv_param[2],
                                 lcu_t *lcu,
                                 hi_prec_buf_t *hi_prec_out,
                                 bool predict_luma,
                                 bool predict_chroma)
 {
+  mv_t mv_param_qpel[2] = { mv_param[0], mv_param[1] };
+  mv_t mv_param_fpel[2] = { mv_param[0], mv_param[1] };
+  kvz_change_precision(INTERNAL_MV_PREC, 2, &mv_param_qpel[0], &mv_param_qpel[1]);
+
+  kvz_change_precision(INTERNAL_MV_PREC, 0, &mv_param_fpel[0], &mv_param_fpel[1]);
+
   const vector2d_t pu_in_tile = { xpos, ypos };
   const vector2d_t pu_in_lcu = { xpos % LCU_WIDTH, ypos % LCU_WIDTH };
 
-  const vector2d_t mv_in_pu = { mv_param[0] >> 2, mv_param[1] >> 2 };
+  const vector2d_t mv_in_pu = { mv_param_fpel[0], mv_param_fpel[1] };
   const vector2d_t mv_in_frame = {
     mv_in_pu.x + pu_in_tile.x + state->tile->offset_x,
     mv_in_pu.y + pu_in_tile.y + state->tile->offset_y
@@ -386,7 +394,7 @@ static void inter_recon_unipred(const encoder_state_t * const state,
 
   // With 420, odd coordinates need interpolation.
   const int8_t fractional_chroma = (mv_in_pu.x & 1) || (mv_in_pu.y & 1);
-  const int8_t fractional_luma = ((mv_param[0] & 3) || (mv_param[1] & 3));
+  const int8_t fractional_luma = ((mv_param_qpel[0] & 3) || (mv_param_qpel[1] & 3));
 
   // Generate prediction for luma.
   if (predict_luma) {
@@ -396,13 +404,13 @@ static void inter_recon_unipred(const encoder_state_t * const state,
         inter_recon_frac_luma_hi(state, ref,
           pu_in_tile.x, pu_in_tile.y,
           width, height,
-          mv_param, hi_prec_out);
+          mv_param_qpel, hi_prec_out);
       }
       else {
         inter_recon_frac_luma(state, ref,
           pu_in_tile.x, pu_in_tile.y,
           width, height,
-          mv_param, lcu);
+          mv_param_qpel, lcu);
       }
     } else {
       // With an integer MV, copy pixels directly from the reference.
@@ -435,12 +443,12 @@ static void inter_recon_unipred(const encoder_state_t * const state,
       inter_recon_frac_chroma_hi(state, ref,
                                     pu_in_tile.x, pu_in_tile.y,
                                     width, height,
-                                    mv_param, hi_prec_out);
+                                    mv_param_qpel, hi_prec_out);
     } else {
       inter_recon_frac_chroma(state, ref,
                               pu_in_tile.x, pu_in_tile.y,
                               width, height,
-                              mv_param, lcu);
+                              mv_param_qpel, lcu);
     }
   } else {
     // With an integer MV, copy pixels directly from the reference.
@@ -494,7 +502,7 @@ void kvz_inter_recon_bipred(const encoder_state_t * const state,
                             int32_t ypos,
                             int32_t width,
                             int32_t height,
-                            int16_t mv_param[2][2],
+                            mv_t mv_param[2][2],
                             lcu_t* lcu,
                             bool predict_luma,
                             bool predict_chroma)
@@ -503,11 +511,11 @@ void kvz_inter_recon_bipred(const encoder_state_t * const state,
   kvz_pixel temp_lcu_u[LCU_WIDTH_C*LCU_WIDTH_C];
   kvz_pixel temp_lcu_v[LCU_WIDTH_C*LCU_WIDTH_C];
 
-  const int hi_prec_luma_rec0 = mv_param[0][0] & 3 || mv_param[0][1] & 3;
-  const int hi_prec_luma_rec1 = mv_param[1][0] & 3 || mv_param[1][1] & 3;
+  const int hi_prec_luma_rec0 = (mv_param[0][0]>>2) & 3 || (mv_param[0][1]>>2) & 3;
+  const int hi_prec_luma_rec1 = (mv_param[1][0]>>2) & 3 || (mv_param[1][1]>>2) & 3;
 
-  const int hi_prec_chroma_rec0 = mv_param[0][0] & 7 || mv_param[0][1] & 7;
-  const int hi_prec_chroma_rec1 = mv_param[1][0] & 7 || mv_param[1][1] & 7;
+  const int hi_prec_chroma_rec0 = (mv_param[0][0]>>2) & 7 || (mv_param[0][1]>>2) & 7;
+  const int hi_prec_chroma_rec1 = (mv_param[1][0]>>2) & 7 || (mv_param[1][1]>>2) & 7;
 
   hi_prec_buf_t* high_precision_rec0 = 0;
   hi_prec_buf_t* high_precision_rec1 = 0;
@@ -1063,7 +1071,7 @@ static void apply_mv_scaling_pocs(int32_t current_poc,
                                   int32_t current_ref_poc,
                                   int32_t neighbor_poc,
                                   int32_t neighbor_ref_poc,
-                                  int16_t mv_cand[2])
+                                  mv_t mv_cand[2])
 {
   int32_t diff_current  = current_poc  - current_ref_poc;
   int32_t diff_neighbor = neighbor_poc - neighbor_ref_poc;
@@ -1085,7 +1093,7 @@ static INLINE void apply_mv_scaling(const encoder_state_t *state,
                                     const cu_info_t *neighbor_cu,
                                     int8_t current_reflist,
                                     int8_t neighbor_reflist,
-                                    int16_t mv_cand[2])
+                                    mv_t mv_cand[2])
 {
   apply_mv_scaling_pocs(state->frame->poc,
                         state->frame->ref->pocs[
@@ -1113,7 +1121,7 @@ static bool add_temporal_candidate(const encoder_state_t *state,
                                    uint8_t current_ref,
                                    const cu_info_t *colocated,
                                    int32_t reflist,
-                                   int16_t mv_out[2])
+                                   mv_t mv_out[2])
 {
   if (!colocated) return false;
 
@@ -1166,7 +1174,7 @@ static INLINE bool add_mvp_candidate(const encoder_state_t *state,
                                      const cu_info_t *cand,
                                      int8_t reflist,
                                      bool scaling,
-                                     int16_t mv_cand_out[2])
+                                     mv_t mv_cand_out[2])
 {
   if (!cand) return false;
 
@@ -1207,7 +1215,7 @@ static void get_mv_cand_from_candidates(const encoder_state_t * const state,
                                         const merge_candidates_t *merge_cand,
                                         const cu_info_t *cur_cu,
                                         int8_t reflist,
-                                        int16_t mv_cand[2][2])
+                                        mv_t mv_cand[2][2])
 {
   const cu_info_t *const *a = merge_cand->a;
   const cu_info_t *const *b = merge_cand->b;
@@ -1310,7 +1318,7 @@ void kvz_inter_get_mv_cand(const encoder_state_t * const state,
                            int32_t y,
                            int32_t width,
                            int32_t height,
-                           int16_t mv_cand[2][2],
+                           mv_t mv_cand[2][2],
                            cu_info_t* cur_cu,
                            lcu_t *lcu,
                            int8_t reflist)
@@ -1324,6 +1332,9 @@ void kvz_inter_get_mv_cand(const encoder_state_t * const state,
                                &merge_cand, parallel_merge_level,state->encoder_control->cfg.wpp);
   get_temporal_merge_candidates(state, x, y, width, height, 1, 0, &merge_cand);
   get_mv_cand_from_candidates(state, x, y, width, height, &merge_cand, cur_cu, reflist, mv_cand);
+    
+  kvz_round_precision(INTERNAL_MV_PREC, 2, &mv_cand[0][0], &mv_cand[0][1]);
+  kvz_round_precision(INTERNAL_MV_PREC, 2, &mv_cand[1][0], &mv_cand[1][1]);
 }
 
 /**
@@ -1343,7 +1354,7 @@ void kvz_inter_get_mv_cand_cua(const encoder_state_t * const state,
                                int32_t y,
                                int32_t width,
                                int32_t height,
-                               int16_t mv_cand[2][2],
+                               mv_t mv_cand[2][2],
                                const cu_info_t* cur_cu,
                                int8_t reflist)
 {
@@ -1356,6 +1367,9 @@ void kvz_inter_get_mv_cand_cua(const encoder_state_t * const state,
                                    &merge_cand, state->encoder_control->cfg.wpp);
   get_temporal_merge_candidates(state, x, y, width, height, 1, 0, &merge_cand);
   get_mv_cand_from_candidates(state, x, y, width, height, &merge_cand, cur_cu, reflist, mv_cand);
+
+  kvz_round_precision(INTERNAL_MV_PREC, 2, &mv_cand[0][0], &mv_cand[0][1]);
+  kvz_round_precision(INTERNAL_MV_PREC, 2, &mv_cand[1][0], &mv_cand[1][1]);
 }
 
 static bool is_duplicate_candidate(const cu_info_t* cu1, const cu_info_t* cu2)
@@ -1458,7 +1472,7 @@ void kvz_hmvp_add_mv(const encoder_state_t* const state, uint32_t pic_x, uint32_
   }
 }
 
-static void round_avg_mv(int16_t* mvx, int16_t* mvy, int nShift)
+static void round_avg_mv(mv_t* mvx, mv_t* mvy, int nShift)
 {
   const int nOffset = 1 << (nShift - 1);
   *mvx = (*mvx + nOffset - (*mvx >= 0)) >> nShift;
@@ -1473,6 +1487,42 @@ static bool different_mer(int32_t x, int32_t y, int32_t x2, int32_t y2, uint8_t 
   }
 
   return false;
+}
+
+
+
+void kvz_change_precision(int src, int dst, mv_t* hor, mv_t* ver) {
+
+  const int shift = (int)dst - (int)src;
+  if (shift >= 0)
+  {
+    uint16_t* hor_unsigned = hor;
+    uint16_t* ver_unsigned = ver;
+
+    *hor_unsigned <<= shift;
+    *ver_unsigned <<= shift;
+  }
+  else
+  {
+    const int right_shift = -shift;
+    const int offset = 1 << (right_shift - 1);
+    *hor = *hor >= 0 ? (*hor + offset - 1) >> right_shift : (*hor + offset) >> right_shift;
+    *ver = *ver >= 0 ? (*ver + offset - 1) >> right_shift : (*ver + offset) >> right_shift;
+  }
+}
+
+void kvz_round_precision(int src, int dst, mv_t* hor, mv_t* ver) {
+  kvz_change_precision(src, dst, hor, ver);
+  kvz_change_precision(dst, src, hor, ver);
+}
+
+void kvz_round_precision_vector2d(int src, int dst, vector2d_t* mv) {
+  mv_t hor = mv->x;
+  mv_t ver = mv->y;
+  kvz_change_precision(src, dst, &hor, &ver);
+  kvz_change_precision(dst, src, &hor, &ver);
+  mv->x = hor;
+  mv->y = ver;
 }
 
 /**
@@ -1597,8 +1647,6 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
     }
   }
 
-
-
   // pairwise-average candidates
   if (candidates > 1 && candidates < max_num_cands)
   {
@@ -1620,20 +1668,13 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
       // both MVs are valid, average these two MVs
       if ((ref_i != -1) && (ref_j != -1))
       {
-        int16_t mv_i[2] = { mv_cand[0].mv[reflist][0], mv_cand[0].mv[reflist][1] };
-        int16_t mv_j[2] = { mv_cand[1].mv[reflist][0], mv_cand[1].mv[reflist][1] };
+        mv_t mv_i[2] = { mv_cand[0].mv[reflist][0], mv_cand[0].mv[reflist][1] };
+        mv_t mv_j[2] = { mv_cand[1].mv[reflist][0], mv_cand[1].mv[reflist][1] };
 
         // average two MVs
-        int16_t avg_mv[2] = { (mv_i[0] + mv_j[0]) * 2, (mv_i[1] + mv_j[1]) * 2 };
+        mv_t avg_mv[2] = { mv_i[0] + mv_j[0], mv_i[1] + mv_j[1] };
         
         round_avg_mv(&avg_mv[0], &avg_mv[1], 1);
-
-        if (avg_mv[0] & 1 || avg_mv[1] & 1) {
-          mv_cand[candidates].half_pel = true;
-        } else {
-          avg_mv[0] = avg_mv[0] >> 1;
-          avg_mv[1] = avg_mv[1] >> 1;
-        }
 
         mv_cand[candidates].mv[reflist][0] = avg_mv[0];
         mv_cand[candidates].mv[reflist][1] = avg_mv[1];
@@ -1665,7 +1706,7 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
     }
   }
 
-  if (candidates == max_num_cands) return candidates;  
+  if (candidates == max_num_cands) return candidates;
 
 
   int num_ref = state->frame->ref->used_size;

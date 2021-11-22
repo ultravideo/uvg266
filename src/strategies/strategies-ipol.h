@@ -34,18 +34,17 @@
 // AVX2 implementation of horizontal filter reads and
 // writes two rows for luma and four for chroma at a time.
 // Extra vertical padding is added to prevent segfaults.
-// Horizontal padding is not needed even if one extra byte
-// is read because kvz_image_alloc adds enough padding.
-#define KVZ_IPOL_MAX_INPUT_SIZE_LUMA_SIMD ((KVZ_EXT_BLOCK_W_LUMA + 1) * KVZ_EXT_BLOCK_W_LUMA)
-#define KVZ_IPOL_MAX_INPUT_SIZE_CHROMA_SIMD ((KVZ_EXT_BLOCK_W_CHROMA + 3) * KVZ_EXT_BLOCK_W_CHROMA)
-#define KVZ_IPOL_MAX_IM_SIZE_LUMA_SIMD ((KVZ_EXT_BLOCK_W_LUMA + 1) * LCU_WIDTH)
-#define KVZ_IPOL_MAX_IM_SIZE_CHROMA_SIMD ((KVZ_EXT_BLOCK_W_CHROMA + 3) * LCU_WIDTH_C)
+// Needs one extra byte for input buffer to prevent ASAN
+// error because AVX2 reads one extra byte in the end.
+#define KVZ_IPOL_MAX_INPUT_SIZE_LUMA_SIMD   ((KVZ_EXT_BLOCK_W_LUMA   + 1) * KVZ_EXT_BLOCK_W_LUMA   + 1)
+#define KVZ_IPOL_MAX_INPUT_SIZE_CHROMA_SIMD ((KVZ_EXT_BLOCK_W_CHROMA + 3) * KVZ_EXT_BLOCK_W_CHROMA + 1)
+#define KVZ_IPOL_MAX_IM_SIZE_LUMA_SIMD      ((KVZ_EXT_BLOCK_W_LUMA   + 1) * LCU_WIDTH)
+#define KVZ_IPOL_MAX_IM_SIZE_CHROMA_SIMD    ((KVZ_EXT_BLOCK_W_CHROMA + 3) * LCU_WIDTH_C)
 
 // On top of basic interpolation, FME needs one extra
-// column and row for ME (left and up). Adding the
-// extra row happens to satisfy AVX2 requirements for
-// row count. No other extra rows are needed.
-#define KVZ_FME_MAX_INPUT_SIZE_SIMD ((KVZ_EXT_BLOCK_W_LUMA + 1) * (KVZ_EXT_BLOCK_W_LUMA + 1))
+// column and row for ME (left and up). Needs one extra
+// byte to prevent ASAN error because AVX2 reads one extra byte.
+#define KVZ_FME_MAX_INPUT_SIZE_SIMD ((KVZ_EXT_BLOCK_W_LUMA + 1) * (KVZ_EXT_BLOCK_W_LUMA + 1) + 1)
 
 typedef struct { kvz_pixel *buffer; kvz_pixel *orig_topleft; unsigned stride; unsigned malloc_used; } kvz_extended_block;
 
@@ -83,11 +82,11 @@ typedef struct {
 typedef void(epol_func)(kvz_epol_args *args);
 
 
-typedef void(kvz_sample_quarterpel_luma_func)(const encoder_control_t * const encoder, kvz_pixel *src, int16_t src_stride, int width, int height, kvz_pixel *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag, const int16_t mv[2]);
-typedef void(kvz_sample_octpel_chroma_func)(const encoder_control_t * const encoder, kvz_pixel *src, int16_t src_stride, int width, int height, kvz_pixel *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag, const int16_t mv[2]);
+typedef void(kvz_sample_quarterpel_luma_func)(const encoder_control_t * const encoder, kvz_pixel *src, int16_t src_stride, int width, int height, kvz_pixel *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag, const mv_t mv[2]);
+typedef void(kvz_sample_octpel_chroma_func)(const encoder_control_t * const encoder, kvz_pixel *src, int16_t src_stride, int width, int height, kvz_pixel *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag, const mv_t mv[2]);
 
-typedef void(kvz_sample_quarterpel_luma_hi_func)(const encoder_control_t * const encoder, kvz_pixel *src, int16_t src_stride, int width, int height, int16_t *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag, const int16_t mv[2]);
-typedef void(kvz_sample_octpel_chroma_hi_func)(const encoder_control_t * const encoder, kvz_pixel *src, int16_t src_stride, int width, int height, int16_t *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag, const int16_t mv[2]);
+typedef void(kvz_sample_quarterpel_luma_hi_func)(const encoder_control_t * const encoder, kvz_pixel *src, int16_t src_stride, int width, int height, int16_t *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag, const mv_t mv[2]);
+typedef void(kvz_sample_octpel_chroma_hi_func)(const encoder_control_t * const encoder, kvz_pixel *src, int16_t src_stride, int width, int height, int16_t *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag, const mv_t mv[2]);
 
 // Declare function pointers.
 extern ipol_blocks_func * kvz_filter_hpel_blocks_hor_ver_luma;

@@ -723,11 +723,11 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
           const int refP1 = (cu_p->inter.mv_dir & 2) ? state->frame->ref_LX[1][cu_p->inter.mv_ref[1]] : -1;
           const int refQ0 = (cu_q->inter.mv_dir & 1) ? state->frame->ref_LX[0][cu_q->inter.mv_ref[0]] : -1;
           const int refQ1 = (cu_q->inter.mv_dir & 2) ? state->frame->ref_LX[1][cu_q->inter.mv_ref[1]] : -1;
-          const int16_t* mvQ0 = cu_q->inter.mv[0];
-          const int16_t* mvQ1 = cu_q->inter.mv[1];
+          const mv_t* mvQ0 = cu_q->inter.mv[0];
+          const mv_t* mvQ1 = cu_q->inter.mv[1];
 
-          const int16_t* mvP0 = cu_p->inter.mv[0];
-          const int16_t* mvP1 = cu_p->inter.mv[1];
+          const mv_t* mvP0 = cu_p->inter.mv[0];
+          const mv_t* mvP1 = cu_p->inter.mv[1];
 
           if(( refP0 == refQ0 &&  refP1 == refQ1 ) || ( refP0 == refQ1 && refP1==refQ0 ))
           {

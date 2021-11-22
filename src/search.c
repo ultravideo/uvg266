@@ -719,6 +719,11 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     } else if (cur_cu->type == CU_INTER) {
 
       if (!cur_cu->skipped) {
+
+        if (!cur_cu->merged) {
+            if (cur_cu->inter.mv_dir & 1) kvz_round_precision(INTERNAL_MV_PREC, 2, &cur_cu->inter.mv[0][0], &cur_cu->inter.mv[0][1]);
+            if (cur_cu->inter.mv_dir & 2) kvz_round_precision(INTERNAL_MV_PREC, 2, &cur_cu->inter.mv[1][0], &cur_cu->inter.mv[1][1]);
+        }
         // Reset transform depth because intra messes with them.
         // This will no longer be necessary if the transform depths are not shared.
         int tr_depth = MAX(1, depth);

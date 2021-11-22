@@ -32,16 +32,18 @@
 #include "image.h"
 #include "kvazaar.h"
 
+extern const int8_t kvz_g_imv_to_prec[4];
 
 typedef struct {
-  int16_t mv[2][2];
+  mv_t mv[2][2];
   uint16_t mer[2];
   uint8_t dir;
   uint8_t ref[2]; // index to L0/L1
-
-  /// \brief Flag for half-pel mv, otherwise mv is full-pel
-  bool half_pel; 
 } inter_merge_cand_t;
+
+void kvz_change_precision(int src, int dst, mv_t* hor, mv_t* ver);
+void kvz_round_precision(int src, int dst, mv_t* hor, mv_t* ver);
+void kvz_round_precision_vector2d(int src, int dst, vector2d_t* mv);
 
 void kvz_inter_recon_cu(const encoder_state_t * const state,
                         lcu_t *lcu,
@@ -69,7 +71,7 @@ void kvz_inter_recon_bipred(const encoder_state_t * const state,
                             int32_t ypos,
                             int32_t width,
                             int32_t height,
-                            int16_t mv_param[2][2],
+                            mv_t mv_param[2][2],
                             lcu_t* lcu,
                             bool predict_luma,
                             bool predict_chroma);
@@ -80,7 +82,7 @@ void kvz_inter_get_mv_cand(const encoder_state_t * const state,
                            int32_t y,
                            int32_t width,
                            int32_t height,
-                           int16_t mv_cand[2][2],
+                           mv_t mv_cand[2][2],
                            cu_info_t* cur_cu,
                            lcu_t *lcu,
                            int8_t reflist);
@@ -90,7 +92,7 @@ void kvz_inter_get_mv_cand_cua(const encoder_state_t * const state,
                                int32_t y,
                                int32_t width,
                                int32_t height,
-                               int16_t mv_cand[2][2],
+                               mv_t mv_cand[2][2],
                                const cu_info_t* cur_cu,
                                int8_t reflist);
 

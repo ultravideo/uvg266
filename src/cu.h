@@ -159,10 +159,10 @@ typedef struct
       uint8_t multi_ref_idx;
     } intra;
     struct {
-      int16_t mv[2][2];  // \brief Motion vectors for L0 and L1
+      mv_t    mv[2][2];  // \brief Motion vectors for L0 and L1
       uint8_t mv_ref[2]; // \brief Index of the L0 and L1 array.
-      uint8_t mv_cand0 : 3; // \brief selected MV candidate
-      uint8_t mv_cand1 : 3; // \brief selected MV candidate
+      uint8_t mv_cand0 : 1; // \brief selected MV candidate
+      uint8_t mv_cand1 : 1; // \brief selected MV candidate
       uint8_t mv_dir   : 2; // \brief Probably describes if mv_ref is L0, L1 or both (bi-pred)
       uint8_t imv      : 2; // \brief Adaptive motion vector resolution for this block
     } inter;
