@@ -20,7 +20,7 @@ test-kvazaar: &test-template
 test-asan:
   <<: *test-template
   variables:
-    CFLAGS: '-fsanitize=address'
+    CFLAGS: '-fsanitize=address -g'
     # LeakSanitizer doesn't work inside the container because it requires
     # ptrace so we disable it.
     ASAN_OPTIONS: 'detect_leaks=0'
@@ -38,7 +38,7 @@ test-asan:
 test-ubsan:
   <<: *test-template
   variables:
-    CFLAGS: '-fsanitize=undefined -fno-sanitize-recover=all -fno-sanitize=alignment'
+    CFLAGS: '-fsanitize=undefined -fno-sanitize-recover=all -fno-sanitize=alignment -g'
 
 test-valgrind:
   <<: *test-template
