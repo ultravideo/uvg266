@@ -1,15 +1,15 @@
 uvg266
 =======
-An open-source VVC encoder licensed under LGPLv2.1
+An open-source VVC encoder licensed under 3-clause BSD
 
 Join channel [#ultravideo](https://web.libera.chat/#ultravideo) in [Libera.Chat](https://libera.chat/) IRC network to contact us.
 
 uvg266 is still under development. Speed and RD-quality will continue to improve.
 
-http://ultravideo.cs.tut.fi/#encoder for more information.
+http://ultravideo.fi/#encoder for more information.
 
-- Linux/Mac [![Build Status](https://travis-ci.org/ultravideo/uvg266.svg?branch=master)](https://travis-ci.org/ultravideo/uvg266)
-- Windows [![Build status](https://ci.appveyor.com/api/projects/status/88sg1h25lp0k71pu?svg=true)](https://ci.appveyor.com/project/Ultravideo/uvg266)
+- Linux [![Kvazaar_tests](https://github.com/ultravideo/kvazaar/actions/workflows/kvazaar.yml/badge.svg)](https://github.com/ultravideo/kvazaar/actions/workflows/kvazaar.yml)
+- Windows [![Build status](https://ci.appveyor.com/api/projects/status/88sg1h25lp0k71pu?svg=true)](https://ci.appveyor.com/project/Ultravideo/kvazaar)
 
 ## Table of Contents
 

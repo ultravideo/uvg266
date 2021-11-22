@@ -1,21 +1,33 @@
 /*****************************************************************************
  * This file is part of Kvazaar HEVC encoder.
  *
- * Copyright (C) 2013-2015 Tampere University of Technology and others (see
- * COPYING file).
+ * Copyright (c) 2021, Tampere University, ITU/ISO/IEC, project contributors
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * 
+ * * Redistributions of source code must retain the above copyright notice, this
+ *   list of conditions and the following disclaimer.
  *
- * Kvazaar is free software: you can redistribute it and/or modify it under
- * the terms of the GNU Lesser General Public License as published by the
- * Free Software Foundation; either version 2.1 of the License, or (at your
- * option) any later version.
+ * * Redistributions in binary form must reproduce the above copyright notice, this
+ *   list of conditions and the following disclaimer in the documentation and/or
+ *   other materials provided with the distribution.
  *
- * Kvazaar is distributed in the hope that it will be useful, but WITHOUT ANY
- * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
- * FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for
- * more details.
+ * * Neither the name of the Tampere University or ITU/ISO/IEC nor the names of its
+ *   contributors may be used to endorse or promote products derived from
+ *   this software without specific prior written permission.
  *
- * You should have received a copy of the GNU General Public License along
- * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION HOWEVER CAUSED AND ON
+ * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * INCLUDING NEGLIGENCE OR OTHERWISE ARISING IN ANY WAY OUT OF THE USE OF THIS
  ****************************************************************************/
 
 #include "encoder_state-bitstream.h"
@@ -51,23 +63,23 @@
 #define JVET_S0138_GCI_PTL 1
 #define JVET_S_SUB_PROFILE 1
 
-static void encoder_state_write_bitstream_aud(encoder_state_t * const state)
+static void encoder_state_write_bitstream_aud(encoder_state_t *const state)
 {
-  bitstream_t * const stream = &state->stream;
+  bitstream_t *const stream = &state->stream;
   kvz_nal_write(stream, KVZ_NAL_AUD_NUT, 0, 1);
 
   WRITE_U(stream, 1, 1, "aud_irap_or_gdr_au_flag");
 
   uint8_t pic_type = state->frame->slicetype == KVZ_SLICE_I ? 0
-                   : state->frame->slicetype == KVZ_SLICE_P ? 1
-                   :                                       2;
+    : state->frame->slicetype == KVZ_SLICE_P ? 1
+    : 2;
   WRITE_U(stream, pic_type, 3, "pic_type");
 
   kvz_bitstream_add_rbsp_trailing_bits(stream);
 }
 
 static void encoder_state_write_bitstream_PTL(bitstream_t *stream,
-                                              encoder_state_t * const state)
+  encoder_state_t *const state)
 {
   // PTL
   // Profile Tier
@@ -230,6 +242,24 @@ static void encoder_state_write_bitstream_PTL(bitstream_t *stream,
   // end PTL
 }
 
+static uint8_t max_required_dpb_size(const encoder_control_t * const encoder)
+{
+  int max_buffer = 1;
+  for (int g = 0; g < encoder->cfg.gop_len; ++g) {
+    int neg_refs = encoder->cfg.gop[g].ref_neg_count;
+    int pos_refs = encoder->cfg.gop[g].ref_pos_count;
+    if (neg_refs + pos_refs + 1 > max_buffer) max_buffer = neg_refs + pos_refs + 1;
+  }
+
+  if (encoder->cfg.gop_len == 0) max_buffer = encoder->cfg.ref_frames + 1;
+
+  return max_buffer;
+}
+
+static uint8_t max_num_reorder_pics(const encoder_control_t * const encoder)
+{
+  return encoder->cfg.gop_lowdelay ? 0 : MAX(encoder->cfg.gop_len - 1, 0);
+}
 
 static void encoder_state_write_bitstream_vid_parameter_set(bitstream_t* stream,
                                                             encoder_state_t * const state)
@@ -237,6 +267,7 @@ static void encoder_state_write_bitstream_vid_parameter_set(bitstream_t* stream,
 #ifdef KVZ_DEBUG
   printf("=========== Video Parameter Set ID: 0 ===========\n");
 #endif
+  const encoder_control_t* encoder = state->encoder_control;
 
   WRITE_U(stream, 1, 4, "vps_video_parameter_set_id");
   WRITE_U(stream, 0, 6, "vps_max_layers_minus1" );
@@ -245,7 +276,6 @@ static void encoder_state_write_bitstream_vid_parameter_set(bitstream_t* stream,
   //for each layer
   for (int i = 0; i < 1; i++) {
     WRITE_U(stream, 0, 6, "vps_layer_id");
-  }
 
   kvz_bitstream_align_zero(stream);
   encoder_state_write_bitstream_PTL(stream, state);
@@ -544,13 +574,12 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   WRITE_U(stream, 0, 1, "sps_sublayer_dpb_params_flag");
 
   //for each layer
-  if (encoder->cfg.gop_lowdelay) {
-    WRITE_UE(stream, encoder->cfg.ref_frames, "sps_max_dec_pic_buffering_minus1");
-    WRITE_UE(stream, 0, "sps_max_num_reorder_pics");
-  } else {
-    WRITE_UE(stream, encoder->cfg.ref_frames + encoder->cfg.gop_len, "sps_max_dec_pic_buffering_minus1");
-    WRITE_UE(stream, encoder->cfg.gop_len, "sps_max_num_reorder_pics");
-  }
+  int max_buffer  = max_required_dpb_size(encoder);
+  int max_reorder = max_num_reorder_pics(encoder);
+  if (max_buffer - 1 < max_reorder) max_buffer = max_reorder + 1;
+  WRITE_UE(stream, max_buffer - 1, "sps_max_dec_pic_buffering_minus1");
+  WRITE_UE(stream, max_reorder, "sps_max_num_reorder_pics");
+
   WRITE_UE(stream, 0, "sps_max_latency_increase_plus1");
   //end for
 

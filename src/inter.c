@@ -1,21 +1,33 @@
 /*****************************************************************************
  * This file is part of Kvazaar HEVC encoder.
  *
- * Copyright (C) 2013-2015 Tampere University of Technology and others (see
- * COPYING file).
- *
- * Kvazaar is free software: you can redistribute it and/or modify it under
- * the terms of the GNU Lesser General Public License as published by the
- * Free Software Foundation; either version 2.1 of the License, or (at your
- * option) any later version.
- *
- * Kvazaar is distributed in the hope that it will be useful, but WITHOUT ANY
- * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
- * FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
+ * Copyright (c) 2021, Tampere University, ITU/ISO/IEC, project contributors
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * 
+ * * Redistributions of source code must retain the above copyright notice, this
+ *   list of conditions and the following disclaimer.
+ * 
+ * * Redistributions in binary form must reproduce the above copyright notice, this
+ *   list of conditions and the following disclaimer in the documentation and/or
+ *   other materials provided with the distribution.
+ * 
+ * * Neither the name of the Tampere University or ITU/ISO/IEC nor the names of its
+ *   contributors may be used to endorse or promote products derived from
+ *   this software without specific prior written permission.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION HOWEVER CAUSED AND ON
+ * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * INCLUDING NEGLIGENCE OR OTHERWISE ARISING IN ANY WAY OUT OF THE USE OF THIS
  ****************************************************************************/
 
 #include "inter.h"
@@ -53,14 +65,15 @@ typedef struct {
 } merge_candidates_t;
 
 
-static void inter_recon_frac_luma(const encoder_state_t *const state,
-  const kvz_picture *const ref,
-  int32_t xpos,
-  int32_t ypos,
-  int32_t block_width,
-  int32_t block_height,
-  const mv_t mv_param[2],
-  lcu_t *lcu)
+static void inter_recon_frac_luma(const encoder_state_t * const state,
+                                  const kvz_picture * const ref,
+                                  int32_t xpos,
+                                  int32_t ypos,
+                                  int32_t block_width,
+                                  int32_t block_height,
+                                  const mv_t mv_param[2],
+                                  yuv_t *out,
+                                  unsigned out_stride)
 {
   int mv_frac_x = (mv_param[0] & 15);
   int mv_frac_y = (mv_param[1] & 15);
@@ -101,8 +114,8 @@ static void inter_recon_frac_luma(const encoder_state_t *const state,
     ext_s,
     block_width,
     block_height,
-    lcu->rec.y + (ypos % LCU_WIDTH) * LCU_WIDTH + (xpos % LCU_WIDTH),
-    LCU_WIDTH,
+    out->y,
+    out_stride,
     mv_frac_x,
     mv_frac_y,
     mv_param);
@@ -115,7 +128,8 @@ static void inter_recon_frac_luma_hi(const encoder_state_t *const state,
   int32_t block_width,
   int32_t block_height,
   const mv_t mv_param[2],
-  hi_prec_buf_t *hi_prec_out)
+  yuv_im_t *out,
+  const unsigned out_stride)
 {
   int mv_frac_x = (mv_param[0] & 15);
   int mv_frac_y = (mv_param[1] & 15);
@@ -156,8 +170,8 @@ static void inter_recon_frac_luma_hi(const encoder_state_t *const state,
     ext_s,
     block_width,
     block_height,
-    hi_prec_out->y + (ypos % LCU_WIDTH) * LCU_WIDTH + (xpos % LCU_WIDTH),
-    LCU_WIDTH,
+    out->y,
+    out_stride,
     mv_frac_x,
     mv_frac_y,
     mv_param);
@@ -165,15 +179,20 @@ static void inter_recon_frac_luma_hi(const encoder_state_t *const state,
 
 static void inter_recon_frac_chroma(const encoder_state_t *const state,
   const kvz_picture *const ref,
-  int32_t xpos,
-  int32_t ypos,
-  int32_t block_width,
-  int32_t block_height,
+  int32_t pu_x,
+  int32_t pu_y,
+  int32_t pu_w,
+  int32_t pu_h,
   const mv_t mv_param[2],
-  lcu_t *lcu)
+  yuv_t *out,
+  const unsigned out_stride)
 {
   int mv_frac_x = (mv_param[0] & 31);
   int mv_frac_y = (mv_param[1] & 31);
+
+  // Take into account chroma subsampling
+  unsigned pb_w = pu_w / 2;
+  unsigned pb_h = pu_h / 2;
 
   // Space for extrapolated pixels and the part from the picture.
   // Some extra for AVX2.
@@ -190,10 +209,10 @@ static void inter_recon_frac_chroma(const encoder_state_t *const state,
     .src_w = ref->width / 2,
     .src_h = ref->height / 2,
     .src_s = ref->stride / 2,
-    .blk_x = (state->tile->offset_x + xpos) / 2 + (mv_param[0] >> (INTERNAL_MV_PREC + 1)),
-    .blk_y = (state->tile->offset_y + ypos) / 2 + (mv_param[1] >> (INTERNAL_MV_PREC + 1)),
-    .blk_w = block_width / 2,
-    .blk_h = block_height / 2,
+    .blk_x = (state->tile->offset_x + pu_x) / 2 + (mv_param[0] >> (INTERNAL_MV_PREC + 1) ),
+    .blk_y = (state->tile->offset_y + pu_y) / 2 + (mv_param[1] >> (INTERNAL_MV_PREC + 1) ),
+    .blk_w = pb_w,
+    .blk_h = pb_h,
     .pad_l = KVZ_CHROMA_FILTER_OFFSET,
     .pad_r = KVZ_EXT_PADDING_CHROMA - KVZ_CHROMA_FILTER_OFFSET,
     .pad_t = KVZ_CHROMA_FILTER_OFFSET,
@@ -212,10 +231,10 @@ static void inter_recon_frac_chroma(const encoder_state_t *const state,
   kvz_sample_octpel_chroma(state->encoder_control,
     ext_origin,
     ext_s,
-    block_width / 2,
-    block_height / 2,
-    lcu->rec.u + ((ypos / 2) % LCU_WIDTH_C) * LCU_WIDTH_C + ((xpos / 2) % LCU_WIDTH_C),
-    LCU_WIDTH_C,
+    pb_w,
+    pb_h,
+    out->u,
+    out_stride,
     mv_frac_x,
     mv_frac_y,
     mv_param);
@@ -226,10 +245,10 @@ static void inter_recon_frac_chroma(const encoder_state_t *const state,
   kvz_sample_octpel_chroma(state->encoder_control,
     ext_origin,
     ext_s,
-    block_width / 2,
-    block_height / 2,
-    lcu->rec.v + ((ypos / 2) % LCU_WIDTH_C) * LCU_WIDTH_C + ((xpos / 2) % LCU_WIDTH_C),
-    LCU_WIDTH_C,
+    pb_w,
+    pb_h,
+    out->v,
+    out_stride,
     mv_frac_x,
     mv_frac_y,
     mv_param);
@@ -237,15 +256,20 @@ static void inter_recon_frac_chroma(const encoder_state_t *const state,
 
 static void inter_recon_frac_chroma_hi(const encoder_state_t *const state,
   const kvz_picture *const ref,
-  int32_t xpos,
-  int32_t ypos,
-  int32_t block_width,
-  int32_t block_height,
+  int32_t pu_x,
+  int32_t pu_y,
+  int32_t pu_w,
+  int32_t pu_h,
   const mv_t mv_param[2],
-  hi_prec_buf_t *hi_prec_out)
+  yuv_im_t *out,
+  const unsigned out_stride)
 {
   int mv_frac_x = (mv_param[0] & 31);
   int mv_frac_y = (mv_param[1] & 31);
+
+  // Take into account chroma subsampling
+  unsigned pb_w = pu_w / 2;
+  unsigned pb_h = pu_h / 2;
 
   // Space for extrapolated pixels and the part from the picture.
   // Some extra for AVX2.
@@ -262,10 +286,10 @@ static void inter_recon_frac_chroma_hi(const encoder_state_t *const state,
     .src_w = ref->width / 2,
     .src_h = ref->height / 2,
     .src_s = ref->stride / 2,
-    .blk_x = (state->tile->offset_x + xpos) / 2 + (mv_param[0] >> (INTERNAL_MV_PREC + 1) ),
-    .blk_y = (state->tile->offset_y + ypos) / 2 + (mv_param[1] >> (INTERNAL_MV_PREC + 1) ),
-    .blk_w = block_width / 2,
-    .blk_h = block_height / 2,
+    .blk_x = (state->tile->offset_x + pu_x) / 2 + (mv_param[0] >> (INTERNAL_MV_PREC + 1) ),
+    .blk_y = (state->tile->offset_y + pu_y) / 2 + (mv_param[1] >> (INTERNAL_MV_PREC + 1) ),
+    .blk_w = pb_w,
+    .blk_h = pb_h,
     .pad_l = KVZ_CHROMA_FILTER_OFFSET,
     .pad_r = KVZ_EXT_PADDING_CHROMA - KVZ_CHROMA_FILTER_OFFSET,
     .pad_t = KVZ_CHROMA_FILTER_OFFSET,
@@ -284,10 +308,10 @@ static void inter_recon_frac_chroma_hi(const encoder_state_t *const state,
   kvz_sample_octpel_chroma_hi(state->encoder_control,
     ext_origin,
     ext_s,
-    block_width / 2,
-    block_height / 2,
-    hi_prec_out->u + ((ypos / 2) % LCU_WIDTH_C) * LCU_WIDTH_C + ((xpos / 2) % LCU_WIDTH_C),
-    LCU_WIDTH_C,
+    pb_w,
+    pb_h,
+    out->u,
+    out_stride,
     mv_frac_x,
     mv_frac_y,
     mv_param);
@@ -298,10 +322,10 @@ static void inter_recon_frac_chroma_hi(const encoder_state_t *const state,
   kvz_sample_octpel_chroma_hi(state->encoder_control,
     ext_origin,
     ext_s,
-    block_width / 2,
-    block_height / 2,
-    hi_prec_out->v + ((ypos / 2) % LCU_WIDTH_C) * LCU_WIDTH_C + ((xpos / 2) % LCU_WIDTH_C),
-    LCU_WIDTH_C,
+    pb_w,
+    pb_h,
+    out->v,
+    out_stride,
     mv_frac_x,
     mv_frac_y,
     mv_param);
@@ -350,133 +374,131 @@ static void inter_cp_with_ext_border(const kvz_pixel *ref_buf, int ref_stride,
  *
  * \param state          encoder state
  * \param ref            picture to copy the data from
- * \param xpos           PU x position
- * \param ypos           PU y position
+ * \param pu_x           PU x position
+ * \param pu_y           PU y position
  * \param width          PU width
  * \param height         PU height
  * \param mv_param       motion vector
- * \param lcu            destination lcu
- * \param hi_prec_out    destination of high precision output, or NULL if not needed
+ * \param yuv_px         destination buffer for pixel precision
+ * \param yuv_im         destination buffer for high-precision, or NULL if not needed
  * \param predict_luma   Enable or disable luma prediction for this call.
  * \param predict_chroma Enable or disable chroma prediction for this call.
 */
-static void inter_recon_unipred(const encoder_state_t * const state,
-                                const kvz_picture * const ref,
-                                int32_t xpos,
-                                int32_t ypos,
-                                int32_t width,
-                                int32_t height,
-                                const mv_t mv_param[2],
-                                lcu_t *lcu,
-                                hi_prec_buf_t *hi_prec_out,
-                                bool predict_luma,
-                                bool predict_chroma)
+static unsigned inter_recon_unipred(const encoder_state_t * const state,
+                                    const kvz_picture * const ref,
+                                    int32_t pu_x,
+                                    int32_t pu_y,
+                                    int32_t pu_w,
+                                    int32_t pu_h,
+                                    int32_t out_stride_luma,
+                                    const mv_t mv_param[2],
+                                    yuv_t *yuv_px,
+                                    yuv_im_t *yuv_im,
+                                    bool predict_luma,
+                                    bool predict_chroma)
 {
-  mv_t mv_param_fpel[2] = { mv_param[0], mv_param[1] };
+  mv_t int_mv[2] = { mv_param[0], mv_param[1] };
 
-  kvz_change_precision(INTERNAL_MV_PREC, 0, &mv_param_fpel[0], &mv_param_fpel[1]);
-
-  const vector2d_t pu_in_tile = { xpos, ypos };
-  const vector2d_t pu_in_lcu = { xpos % LCU_WIDTH, ypos % LCU_WIDTH };
-
-  const vector2d_t mv_in_pu = { mv_param_fpel[0], mv_param_fpel[1] };
-  const vector2d_t mv_in_frame = {
-    mv_in_pu.x + pu_in_tile.x + state->tile->offset_x,
-    mv_in_pu.y + pu_in_tile.y + state->tile->offset_y
+  kvz_change_precision(INTERNAL_MV_PREC, 0, &int_mv[0], &int_mv[1]);
+  const vector2d_t int_mv_in_frame = {
+    int_mv.x + pu_x + state->tile->offset_x,
+    int_mv.y + pu_y + state->tile->offset_y
   };
 
-  const bool mv_is_outside_frame = mv_in_frame.x < 0 ||
-      mv_in_frame.y < 0 ||
-      mv_in_frame.x + width > ref->width ||
-      mv_in_frame.y + height > ref->height;
+  const bool int_mv_outside_frame = int_mv_in_frame.x < 0 ||
+    int_mv_in_frame.y < 0 ||
+    int_mv_in_frame.x + pu_w > ref->width ||
+    int_mv_in_frame.y + pu_h > ref->height;
 
   // With 420, odd coordinates need interpolation.
-  const int8_t fractional_chroma = (mv_in_pu.x & 1) || (mv_in_pu.y & 1);
-  const int8_t fractional_luma = ((mv_param[0] & 15) || (mv_param[1] & 15));
+  const bool fractional_chroma = (int_mv.x & 1) || (int_mv.y & 1);
+  const bool fractional_luma = ((mv_param[0] & 15) || (mv_param[1] & 15));
 
   // Generate prediction for luma.
   if (predict_luma) {
     if (fractional_luma) {
       // With a fractional MV, do interpolation.
-      if (state->encoder_control->cfg.bipred && hi_prec_out) {
+      if (state->encoder_control->cfg.bipred && yuv_im) {
         inter_recon_frac_luma_hi(state, ref,
-          pu_in_tile.x, pu_in_tile.y,
-          width, height,
-          mv_param, hi_prec_out);
+          pu_x, pu_y,
+          pu_w, pu_h,
+          mv_param, yuv_im, out_stride_luma);
       }
       else {
         inter_recon_frac_luma(state, ref,
-          pu_in_tile.x, pu_in_tile.y,
-          width, height,
-          mv_param, lcu);
+          pu_x, pu_y,
+          pu_w, pu_h,
+          mv_param, yuv_px, out_stride_luma);
       }
     } else {
       // With an integer MV, copy pixels directly from the reference.
-      const int lcu_pu_index = pu_in_lcu.y * LCU_WIDTH + pu_in_lcu.x;
-      if (mv_is_outside_frame) {
-        inter_cp_with_ext_border(ref->y, ref->stride,
-                                 ref->width, ref->height,
-                                 &lcu->rec.y[lcu_pu_index], LCU_WIDTH,
-                                 width, height,
-                                 &mv_in_frame);
+      if (int_mv_outside_frame) {
+        inter_cp_with_ext_border(ref->y, ref->width,
+          ref->width, ref->height,
+          yuv_px->y, out_stride_luma,
+          pu_w, pu_h,
+          &int_mv_in_frame);
       }
       else {
-        const int frame_mv_index = mv_in_frame.y * ref->stride + mv_in_frame.x;
+        const int frame_mv_index = int_mv_in_frame.y * ref->width + int_mv_in_frame.x;
         kvz_pixels_blit(&ref->y[frame_mv_index],
-          &lcu->rec.y[lcu_pu_index],
-          width, height,
-          ref->stride, LCU_WIDTH);
+          yuv_px->y,
+          pu_w, pu_h,
+          ref->width, out_stride_luma);
       }
     }
   }
 
   if (!predict_chroma) {
-    return;
+    return fractional_luma;
   }
+
+  const unsigned out_stride_c = out_stride_luma / 2;
 
   // Generate prediction for chroma.
   if (fractional_luma || fractional_chroma) {
     // With a fractional MV, do interpolation.
-    if (state->encoder_control->cfg.bipred && hi_prec_out) {
+    if (state->encoder_control->cfg.bipred && yuv_im) {
       inter_recon_frac_chroma_hi(state, ref,
-                                    pu_in_tile.x, pu_in_tile.y,
-                                    width, height,
-                                    mv_param, hi_prec_out);
+                                    pu_x, pu_y,
+                                    pu_w, pu_h, 
+                                    mv_param, yuv_im, out_stride_c);
     } else {
       inter_recon_frac_chroma(state, ref,
-                              pu_in_tile.x, pu_in_tile.y,
-                              width, height,
-                              mv_param, lcu);
+                              pu_x, pu_y,
+                              pu_w, pu_h,
+                              mv_param, yuv_px, out_stride_c);
     }
   } else {
     // With an integer MV, copy pixels directly from the reference.
-    const int lcu_pu_index_c = pu_in_lcu.y / 2 * LCU_WIDTH_C + pu_in_lcu.x / 2;
-    const vector2d_t mv_in_frame_c = { mv_in_frame.x / 2, mv_in_frame.y / 2 };
+    const vector2d_t int_mv_in_frame_c = { int_mv_in_frame.x / 2, int_mv_in_frame.y / 2 };
 
-    if (mv_is_outside_frame) {
+    if (int_mv_outside_frame) {
       inter_cp_with_ext_border(ref->u, ref->stride / 2,
                                ref->width / 2, ref->height / 2,
-                               &lcu->rec.u[lcu_pu_index_c], LCU_WIDTH_C,
-                               width / 2, height / 2,
-                               &mv_in_frame_c);
+                               yuv_px->u, out_stride_c,
+                               pu_w / 2, pu_h / 2,
+                               &int_mv_in_frame_c);
       inter_cp_with_ext_border(ref->v, ref->stride / 2,
                                ref->width / 2, ref->height / 2,
-                               &lcu->rec.v[lcu_pu_index_c], LCU_WIDTH_C,
-                               width / 2, height / 2,
-                               &mv_in_frame_c);
+                               yuv_px->v, out_stride_c,
+                               pu_w / 2, pu_h / 2,
+                               &int_mv_in_frame_c);
     } else {
-      const int frame_mv_index = mv_in_frame_c.y * ref->stride / 2 + mv_in_frame_c.x;
+      const int frame_mv_index = int_mv_in_frame_c.y * ref->width / 2 + int_mv_in_frame_c.x;
 
       kvz_pixels_blit(&ref->u[frame_mv_index],
-                      &lcu->rec.u[lcu_pu_index_c],
-                      width / 2, height / 2,
-                      ref->stride / 2, LCU_WIDTH_C);
+                      yuv_px->u,
+                      pu_w / 2, pu_h / 2,
+                      ref->width / 2, out_stride_c);
       kvz_pixels_blit(&ref->v[frame_mv_index],
-                      &lcu->rec.v[lcu_pu_index_c],
-                      width / 2, height / 2,
-                      ref->stride / 2, LCU_WIDTH_C);
+                      yuv_px->v,
+                      pu_w / 2, pu_h / 2,
+                      ref->width / 2, out_stride_c);
     }
   }
+
+  return fractional_luma | ((fractional_luma || fractional_chroma) << 1);
 }
 /**
  * \brief Reconstruct bi-pred inter PU
@@ -484,8 +506,8 @@ static void inter_recon_unipred(const encoder_state_t * const state,
  * \param state          encoder state
  * \param ref1           reference picture to copy the data from
  * \param ref2           other reference picture to copy the data from
- * \param xpos           PU x position
- * \param ypos           PU y position
+ * \param pu_x           PU x position
+ * \param pu_y           PU y position
  * \param width          PU width
  * \param height         PU height
  * \param mv_param       motion vectors
@@ -493,56 +515,60 @@ static void inter_recon_unipred(const encoder_state_t * const state,
  * \param predict_luma   Enable or disable luma prediction for this call.
  * \param predict_chroma Enable or disable chroma prediction for this call.
  */
-void kvz_inter_recon_bipred(const encoder_state_t * const state,
-                            const kvz_picture * ref1,
-                            const kvz_picture * ref2,
-                            int32_t xpos,
-                            int32_t ypos,
-                            int32_t width,
-                            int32_t height,
-                            mv_t mv_param[2][2],
-                            lcu_t* lcu,
-                            bool predict_luma,
-                            bool predict_chroma)
+void kvz_inter_recon_bipred(const encoder_state_t *const state,
+  const kvz_picture *ref1,
+  const kvz_picture *ref2,
+  int32_t pu_x,
+  int32_t pu_y,
+  int32_t pu_w,
+  int32_t pu_h,
+  mv_t mv_param[2][2],
+  lcu_t *lcu,
+  bool predict_luma,
+  bool predict_chroma)
 {
-  kvz_pixel temp_lcu_y[LCU_WIDTH*LCU_WIDTH];
-  kvz_pixel temp_lcu_u[LCU_WIDTH_C*LCU_WIDTH_C];
-  kvz_pixel temp_lcu_v[LCU_WIDTH_C*LCU_WIDTH_C];
+  // Allocate maximum size arrays for interpolated and copied samples
+  ALIGNED(64) kvz_pixel px_buf_L0[LCU_LUMA_SIZE + 2 * LCU_CHROMA_SIZE];
+  ALIGNED(64) kvz_pixel px_buf_L1[LCU_LUMA_SIZE + 2 * LCU_CHROMA_SIZE];
+  ALIGNED(64) kvz_pixel_im im_buf_L0[LCU_LUMA_SIZE + 2 * LCU_CHROMA_SIZE];
+  ALIGNED(64) kvz_pixel_im im_buf_L1[LCU_LUMA_SIZE + 2 * LCU_CHROMA_SIZE];
 
-  const int hi_prec_luma_rec0 = (mv_param[0][0] & 15) || (mv_param[0][1] & 15);
-  const int hi_prec_luma_rec1 = (mv_param[1][0] & 15) || (mv_param[1][1] & 15);
+  yuv_t px_L0;
+  px_L0.size = pu_w * pu_h;
+  px_L0.y = &px_buf_L0[0];
+  px_L0.u = &px_buf_L0[LCU_LUMA_SIZE];
+  px_L0.v = &px_buf_L0[LCU_LUMA_SIZE + LCU_CHROMA_SIZE];
 
-  const int hi_prec_chroma_rec0 = (mv_param[0][0] & 31) || (mv_param[0][1] & 31);
-  const int hi_prec_chroma_rec1 = (mv_param[1][0] & 31) || (mv_param[1][1] & 31);
+  yuv_t px_L1;
+  px_L1.size = pu_w * pu_h;
+  px_L1.y = &px_buf_L1[0];
+  px_L1.u = &px_buf_L1[LCU_LUMA_SIZE];
+  px_L1.v = &px_buf_L1[LCU_LUMA_SIZE + LCU_CHROMA_SIZE];
 
-  hi_prec_buf_t* high_precision_rec0 = 0;
-  hi_prec_buf_t* high_precision_rec1 = 0;
-  if (hi_prec_chroma_rec0) high_precision_rec0 = kvz_hi_prec_buf_t_alloc(LCU_WIDTH*LCU_WIDTH);
-  if (hi_prec_chroma_rec1) high_precision_rec1 = kvz_hi_prec_buf_t_alloc(LCU_WIDTH*LCU_WIDTH);
+  yuv_im_t im_L0;
+  im_L0.size = pu_w * pu_h;
+  im_L0.y = &im_buf_L0[0];
+  im_L0.u = &im_buf_L0[LCU_LUMA_SIZE];
+  im_L0.v = &im_buf_L0[LCU_LUMA_SIZE + LCU_CHROMA_SIZE];
 
+  yuv_im_t im_L1;
+  im_L1.size = pu_w * pu_h;
+  im_L1.y = &im_buf_L1[0];
+  im_L1.u = &im_buf_L1[LCU_LUMA_SIZE];
+  im_L1.v = &im_buf_L1[LCU_LUMA_SIZE + LCU_CHROMA_SIZE];
 
-  //Reconstruct both predictors
-  inter_recon_unipred(state, ref1, xpos, ypos, width, height, mv_param[0], lcu, high_precision_rec0,
-                      predict_luma, predict_chroma);
-  if (!hi_prec_luma_rec0){
-    memcpy(temp_lcu_y, lcu->rec.y, sizeof(kvz_pixel) * 64 * 64); // copy to temp_lcu_y
-  }
-  if (!hi_prec_chroma_rec0){
-    memcpy(temp_lcu_u, lcu->rec.u, sizeof(kvz_pixel) * 32 * 32); // copy to temp_lcu_u
-    memcpy(temp_lcu_v, lcu->rec.v, sizeof(kvz_pixel) * 32 * 32); // copy to temp_lcu_v
-  }
-  inter_recon_unipred(state, ref2, xpos, ypos, width, height, mv_param[1], lcu, high_precision_rec1,
-                      predict_luma, predict_chroma);
+  // Sample blocks from both reference picture lists.
+  // Flags state if the outputs were written to high-precision / interpolated sample buffers.
+  unsigned im_flags_L0 = inter_recon_unipred(state, ref1, pu_x, pu_y, pu_w, pu_h, pu_w, mv_param[0],
+                                             &px_L0, &im_L0, predict_luma, predict_chroma);
+  unsigned im_flags_L1 = inter_recon_unipred(state, ref2, pu_x, pu_y, pu_w, pu_h, pu_w, mv_param[1],
+                                             &px_L1, &im_L1, predict_luma, predict_chroma);
 
   // After reconstruction, merge the predictors by taking an average of each pixel
-  kvz_inter_recon_bipred_blend(hi_prec_luma_rec0, hi_prec_luma_rec1, 
-                               hi_prec_chroma_rec0, hi_prec_chroma_rec1,
-                               height, width, ypos, xpos,
-                               high_precision_rec0, high_precision_rec1,
-                               lcu, temp_lcu_y, temp_lcu_u, temp_lcu_v, predict_luma, predict_chroma);
- 
-  if (high_precision_rec0 != 0) kvz_hi_prec_buf_t_free(high_precision_rec0);
-  if (high_precision_rec1 != 0) kvz_hi_prec_buf_t_free(high_precision_rec1);
+  kvz_bipred_average(lcu, &px_L0, &px_L1, &im_L0, &im_L1,
+                     pu_x, pu_y, pu_w, pu_h,
+                     im_flags_L0, im_flags_L1,
+                     predict_luma, predict_chroma);
 }
 
 
@@ -630,12 +656,21 @@ void kvz_inter_pred_pu(const encoder_state_t * const state,
         state->frame->ref_LX[mv_idx][
           pu->inter.mv_ref[mv_idx]]];
 
+    const unsigned offset_luma = SUB_SCU(pu_y) * LCU_WIDTH + SUB_SCU(pu_x);
+    const unsigned offset_chroma = SUB_SCU(pu_y) / 2 * LCU_WIDTH_C + SUB_SCU(pu_x) / 2;
+    yuv_t lcu_adapter;
+    lcu_adapter.size = pu_w * pu_h;
+    lcu_adapter.y = lcu->rec.y + offset_luma,
+    lcu_adapter.u = lcu->rec.u + offset_chroma,
+    lcu_adapter.v = lcu->rec.v + offset_chroma,
+
     inter_recon_unipred(state,
       ref,
       pu_x, pu_y,
       pu_w, pu_h,
+      LCU_WIDTH,
       pu->inter.mv[mv_idx],
-      lcu,
+      &lcu_adapter,
       NULL,
       predict_luma, predict_chroma);
   }

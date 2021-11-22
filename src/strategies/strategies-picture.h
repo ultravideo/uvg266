@@ -3,21 +3,33 @@
 /*****************************************************************************
  * This file is part of Kvazaar HEVC encoder.
  *
- * Copyright (C) 2013-2015 Tampere University of Technology and others (see
- * COPYING file).
- *
- * Kvazaar is free software: you can redistribute it and/or modify it under
- * the terms of the GNU Lesser General Public License as published by the
- * Free Software Foundation; either version 2.1 of the License, or (at your
- * option) any later version.
- *
- * Kvazaar is distributed in the hope that it will be useful, but WITHOUT ANY
- * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
- * FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
+ * Copyright (c) 2021, Tampere University, ITU/ISO/IEC, project contributors
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * 
+ * * Redistributions of source code must retain the above copyright notice, this
+ *   list of conditions and the following disclaimer.
+ * 
+ * * Redistributions in binary form must reproduce the above copyright notice, this
+ *   list of conditions and the following disclaimer in the documentation and/or
+ *   other materials provided with the distribution.
+ * 
+ * * Neither the name of the Tampere University or ITU/ISO/IEC nor the names of its
+ *   contributors may be used to endorse or promote products derived from
+ *   this software without specific prior written permission.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION HOWEVER CAUSED AND ON
+ * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * INCLUDING NEGLIGENCE OR OTHERWISE ARISING IN ANY WAY OUT OF THE USE OF THIS
  ****************************************************************************/
 
 /**
@@ -121,22 +133,19 @@ typedef uint32_t (hor_sad_func)(const kvz_pixel *pic_data, const kvz_pixel *ref_
                                 int32_t width, int32_t height, uint32_t pic_stride,
                                 uint32_t ref_stride, uint32_t left, uint32_t right);
 
-typedef void (inter_recon_bipred_func)(const int hi_prec_luma_rec0,
-    const int hi_prec_luma_rec1,
-    const int hi_prec_chroma_rec0,
-    const int hi_prec_chroma_rec1,
-    int height,
-    int width,
-    int ypos,
-    int xpos,
-    const hi_prec_buf_t*high_precision_rec0,
-    const hi_prec_buf_t*high_precision_rec1,
-    lcu_t* lcu,
-    kvz_pixel temp_lcu_y[LCU_WIDTH*LCU_WIDTH],
-    kvz_pixel temp_lcu_u[LCU_WIDTH_C*LCU_WIDTH_C],
-    kvz_pixel temp_lcu_v[LCU_WIDTH_C*LCU_WIDTH_C],
-    bool predict_luma,
-    bool predict_chroma);  
+typedef void (inter_recon_bipred_func)(lcu_t * const lcu,
+  const yuv_t *const px_L0,
+  const yuv_t *const px_L1,
+  const yuv_im_t *const im_L0,
+  const yuv_im_t *const im_L1,
+  const unsigned pu_x,
+  const unsigned pu_y,
+  const unsigned pu_w,
+  const unsigned pu_h,
+  const unsigned im_flags_L0,
+  const unsigned im_flags_L1,
+  const bool predict_luma,
+  const bool predict_chroma);
 
 typedef double (pixel_var_func)(const kvz_pixel *buf, const uint32_t len);
 
@@ -172,7 +181,7 @@ extern cost_pixel_any_size_multi_func *kvz_satd_any_size_quad;
 
 extern pixels_calc_ssd_func *kvz_pixels_calc_ssd;
 
-extern inter_recon_bipred_func * kvz_inter_recon_bipred_blend;
+extern inter_recon_bipred_func * kvz_bipred_average;
 
 extern get_optimized_sad_func *kvz_get_optimized_sad;
 extern ver_sad_func *kvz_ver_sad;
@@ -211,7 +220,7 @@ cost_pixel_nxn_multi_func * kvz_pixels_get_sad_dual_func(unsigned n);
   {"satd_64x64_dual", (void**) &kvz_satd_64x64_dual}, \
   {"satd_any_size_quad", (void**) &kvz_satd_any_size_quad}, \
   {"pixels_calc_ssd", (void**) &kvz_pixels_calc_ssd}, \
-  {"inter_recon_bipred", (void**) &kvz_inter_recon_bipred_blend}, \
+  {"bipred_average", (void**) &kvz_bipred_average}, \
   {"get_optimized_sad", (void**) &kvz_get_optimized_sad}, \
   {"ver_sad", (void**) &kvz_ver_sad}, \
   {"hor_sad", (void**) &kvz_hor_sad}, \
