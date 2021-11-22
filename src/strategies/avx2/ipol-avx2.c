@@ -1004,8 +1004,8 @@ static void kvz_filter_qpel_blocks_diag_luma_avx2(const encoder_control_t * enco
   int32_t wp_shift1 = 14 - KVZ_BIT_DEPTH;
   int32_t wp_offset1 = 1 << (wp_shift1 - 1);
 
-  int8_t *fir1 = kvz_g_luma_filter[1];
-  int8_t *fir3 = kvz_g_luma_filter[3];
+  int8_t *fir1 = kvz_g_luma_filter[4];
+  int8_t *fir3 = kvz_g_luma_filter[12];
 
   int16_t *hor_pos_l = hor_intermediate[3];
   int16_t *hor_pos_r = hor_intermediate[4];
