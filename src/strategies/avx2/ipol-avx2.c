@@ -1242,7 +1242,7 @@ int kvz_strategy_register_ipol_avx2(void* opaque, uint8_t bitdepth)
     success &= kvz_strategyselector_register(opaque, "filter_hpel_blocks_diag_luma", "avx2", 40, &kvz_filter_hpel_blocks_diag_luma_avx2);
     success &= kvz_strategyselector_register(opaque, "filter_qpel_blocks_hor_ver_luma", "avx2", 40, &kvz_filter_qpel_blocks_hor_ver_luma_avx2);
     success &= kvz_strategyselector_register(opaque, "filter_qpel_blocks_diag_luma", "avx2", 40, &kvz_filter_qpel_blocks_diag_luma_avx2);
-    success &= kvz_strategyselector_register(opaque, "sample_quarterpel_luma", "avx2", 40, &kvz_sample_quarterpel_luma_avx2);
+    //success &= kvz_strategyselector_register(opaque, "sample_quarterpel_luma", "avx2", 40, &kvz_sample_quarterpel_luma_avx2);
     success &= kvz_strategyselector_register(opaque, "sample_octpel_chroma", "avx2", 40, &kvz_sample_octpel_chroma_avx2);
     success &= kvz_strategyselector_register(opaque, "sample_quarterpel_luma_hi", "avx2", 40, &kvz_sample_quarterpel_luma_hi_avx2);
     success &= kvz_strategyselector_register(opaque, "sample_octpel_chroma_hi", "avx2", 40, &kvz_sample_octpel_chroma_hi_avx2);
