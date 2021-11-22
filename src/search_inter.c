@@ -356,19 +356,25 @@ static int select_mv_cand(const encoder_state_t *state,
     mvd_coding_cost = get_mvd_coding_cost;
   }
 
+  vector2d_t mvd = { mv_x - mv_cand[0][0], mv_y - mv_cand[0][1] };
+
+  kvz_change_precision_vector2d(INTERNAL_MV_PREC, 2, &mvd);
+
   uint32_t cand1_cost = mvd_coding_cost(
       state, &state->cabac,
-      mv_x - mv_cand[0][0],
-      mv_y - mv_cand[0][1]);
+      mvd.x,
+      mvd.y);
 
   uint32_t cand2_cost;
   if (same_cand) {
     cand2_cost = cand1_cost;
   } else {
+    vector2d_t mvd2 = { mv_x - mv_cand[1][0], mv_y - mv_cand[1][1] };
+    kvz_change_precision_vector2d(INTERNAL_MV_PREC, 2, &mvd2);
     cand2_cost = mvd_coding_cost(
       state, &state->cabac,
-      mv_x - mv_cand[1][0],
-      mv_y - mv_cand[1][1]);
+      mvd2.x,
+      mvd2.y);
   }
 
   if (cost_out) {

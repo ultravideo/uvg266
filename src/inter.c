@@ -1509,6 +1509,26 @@ void kvz_change_precision(int src, int dst, mv_t* hor, mv_t* ver) {
   }
 }
 
+void kvz_change_precision_vector2d(int src, int dst, vector2d_t *mv) {
+
+  const int shift = (int)dst - (int)src;
+  if (shift >= 0)
+  {
+    int* hor_unsigned = &mv->x;
+    int* ver_unsigned = &mv->y;
+
+    *hor_unsigned <<= shift;
+    *ver_unsigned <<= shift;
+  }
+  else
+  {
+    const int right_shift = -shift;
+    const int offset = 1 << (right_shift - 1);
+    mv->x = mv->x >= 0 ? (mv->x + offset - 1) >> right_shift : (mv->x + offset) >> right_shift;
+    mv->y = mv->y >= 0 ? (mv->y + offset - 1) >> right_shift : (mv->y + offset) >> right_shift;
+  }
+}
+
 void kvz_round_precision(int src, int dst, mv_t* hor, mv_t* ver) {
   kvz_change_precision(src, dst, hor, ver);
   kvz_change_precision(dst, src, hor, ver);

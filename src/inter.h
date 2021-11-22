@@ -42,6 +42,7 @@ typedef struct {
 } inter_merge_cand_t;
 
 void kvz_change_precision(int src, int dst, mv_t* hor, mv_t* ver);
+void kvz_change_precision_vector2d(int src, int dst, vector2d_t* mv);
 void kvz_round_precision(int src, int dst, mv_t* hor, mv_t* ver);
 void kvz_round_precision_vector2d(int src, int dst, vector2d_t* mv);
 
