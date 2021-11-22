@@ -522,7 +522,7 @@ void kvz_predict_cclm(
     for (; available_left_below < height / 2; available_left_below++) {
       int y_extension = y_scu + height * 2 + 4 * available_left_below;
       cu_info_t* pu = LCU_GET_CU_AT_PX(lcu, x_scu - 4, y_extension);
-      if (pu->type == CU_NOTSET || y_extension > LCU_WIDTH) break;
+      if (y_extension >= LCU_WIDTH || pu->type == CU_NOTSET) break;
       if(x_scu == 32 && y_scu == 0 && pu->depth == 0) break;
     }
     for(int y = 0; y < height * (available_left_below ? 4 : 2); y+=2) {
