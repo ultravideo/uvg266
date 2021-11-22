@@ -825,7 +825,19 @@ double kvz_chroma_mode_bits(const encoder_state_t *state, int8_t chroma_mode, in
   if (chroma_mode == luma_mode) {
     mode_bits = CTX_ENTROPY_FBITS(ctx, 0);
   } else {
-    mode_bits = 2.0 + CTX_ENTROPY_FBITS(ctx, 1);
+    if(chroma_mode > 67) {
+      mode_bits = 2.0 + CTX_ENTROPY_FBITS(ctx, 1);
+    }
+    else {
+      ctx = &(state->cabac.ctx.cclm_model);
+      mode_bits = CTX_ENTROPY_FBITS(ctx, chroma_mode != 81);
+      if (chroma_mode != 81) mode_bits += 1;
+    }
+  }
+  // Technically this is encoded first but for this method of counting bits it does not matter
+  if(state->encoder_control->cfg.cclm) {
+    ctx = &(state->cabac.ctx.cclm_flag);
+    mode_bits += CTX_ENTROPY_FBITS(ctx, chroma_mode > 67);
   }
 
   return mode_bits;
