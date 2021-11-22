@@ -272,10 +272,10 @@ static bool mv_in_merge(const inter_search_info_t *info, vector2d_t mv)
   for (int i = 0; i < info->num_merge_cand; ++i) {
     if (info->merge_cand[i].dir == 3) continue;
     const vector2d_t merge_mv = {
-      (info->merge_cand[i].mv[info->merge_cand[i].dir - 1][0] + 2) >> INTERNAL_MV_PREC,
-      (info->merge_cand[i].mv[info->merge_cand[i].dir - 1][1] + 2) >> INTERNAL_MV_PREC
+      info->merge_cand[i].mv[info->merge_cand[i].dir - 1][0],
+      info->merge_cand[i].mv[info->merge_cand[i].dir - 1][1]
     };
-    if (merge_mv.x == mv.x && merge_mv.y == mv.y) {
+    if (merge_mv.x == mv.x * (1 << (INTERNAL_MV_PREC)) && merge_mv.y == mv.y * (1 << (INTERNAL_MV_PREC))) {
       return true;
     }
   }
@@ -1683,9 +1683,6 @@ static void search_pu_inter(encoder_state_t * const state,
   // Check motion vector constraints and perform rough search
   for (int merge_idx = 0; merge_idx < info.num_merge_cand; ++merge_idx) {    
     inter_merge_cand_t *cur_cand = &info.merge_cand[merge_idx];
-
-    if ((cur_cand->dir & 1 && (cur_cand->mv[0][0] & 3 || cur_cand->mv[0][1] & 3)) ||
-      (cur_cand->dir & 2 && (cur_cand->mv[1][0] & 3 || cur_cand->mv[1][1] & 3))) continue;
 
     cur_cu->inter.mv_dir = cur_cand->dir;
     cur_cu->inter.mv_ref[0] = cur_cand->ref[0];
