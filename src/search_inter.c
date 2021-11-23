@@ -335,10 +335,35 @@ static uint32_t get_mvd_coding_cost(const encoder_state_t *state,
                                     const int32_t mvd_ver)
 {
   unsigned bitcost = 0;
-  const vector2d_t abs_mvd = { abs(mvd_hor), abs(mvd_ver) };
 
-  bitcost += get_ep_ex_golomb_bitcost(abs_mvd.x) << CTX_FRAC_BITS;
-  bitcost += get_ep_ex_golomb_bitcost(abs_mvd.y) << CTX_FRAC_BITS;
+  const int8_t hor_abs_gr0 = mvd_hor != 0;
+  const int8_t ver_abs_gr0 = mvd_ver != 0;
+  const uint32_t mvd_hor_abs = abs(mvd_hor);
+  const uint32_t mvd_ver_abs = abs(mvd_ver);
+
+  bitcost += CTX_ENTROPY_BITS(&cabac->ctx.cu_mvd_model[0], (mvd_hor != 0));
+  bitcost += CTX_ENTROPY_BITS(&cabac->ctx.cu_mvd_model[0], (mvd_ver != 0));
+
+  if (hor_abs_gr0) {
+    bitcost += CTX_ENTROPY_BITS(&cabac->ctx.cu_mvd_model[1], (mvd_hor_abs > 1));
+  }
+  if (ver_abs_gr0) {
+    bitcost += CTX_ENTROPY_BITS(&cabac->ctx.cu_mvd_model[1], (mvd_ver_abs > 1));
+  }
+
+  if (hor_abs_gr0) {
+    if (mvd_hor_abs > 1) {
+      bitcost += get_ep_ex_golomb_bitcost(mvd_hor_abs - 2) << CTX_FRAC_BITS;
+    }
+    bitcost += CTX_FRAC_ONE_BIT;
+  }
+  if (ver_abs_gr0) {
+    if (mvd_ver_abs > 1) {
+      bitcost += get_ep_ex_golomb_bitcost(mvd_ver_abs - 2) << CTX_FRAC_BITS;
+    }
+    bitcost += CTX_FRAC_ONE_BIT;
+  }
+
 
   // Round and shift back to integer bits.
   return (bitcost + CTX_FRAC_HALF_BIT) >> CTX_FRAC_BITS;
