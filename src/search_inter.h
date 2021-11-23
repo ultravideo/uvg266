@@ -1,7 +1,7 @@
 #ifndef SEARCH_INTER_H_
 #define SEARCH_INTER_H_
 /*****************************************************************************
- * This file is part of Kvazaar HEVC encoder.
+ * This file is part of uvg266 VVC encoder.
  *
  * Copyright (c) 2021, Tampere University, ITU/ISO/IEC, project contributors
  * All rights reserved.

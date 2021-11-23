@@ -1,5 +1,5 @@
 /*****************************************************************************
- * This file is part of Kvazaar HEVC encoder.
+ * This file is part of uvg266 VVC encoder.
  *
  * Copyright (c) 2021, Tampere University, ITU/ISO/IEC, project contributors
  * All rights reserved.
@@ -71,15 +71,15 @@ static void encoder_state_write_bitstream_aud(encoder_state_t *const state)
   WRITE_U(stream, 1, 1, "aud_irap_or_gdr_au_flag");
 
   uint8_t pic_type = state->frame->slicetype == KVZ_SLICE_I ? 0
-    : state->frame->slicetype == KVZ_SLICE_P ? 1
-    : 2;
+                   : state->frame->slicetype == KVZ_SLICE_P ? 1
+                   : 2;
   WRITE_U(stream, pic_type, 3, "pic_type");
 
   kvz_bitstream_add_rbsp_trailing_bits(stream);
 }
 
 static void encoder_state_write_bitstream_PTL(bitstream_t *stream,
-  encoder_state_t *const state)
+                                              encoder_state_t *const state)
 {
   // PTL
   // Profile Tier
@@ -276,7 +276,7 @@ static void encoder_state_write_bitstream_vid_parameter_set(bitstream_t* stream,
   //for each layer
   for (int i = 0; i < 1; i++) {
     WRITE_U(stream, 0, 6, "vps_layer_id");
-
+  }
   kvz_bitstream_align_zero(stream);
   encoder_state_write_bitstream_PTL(stream, state);
   WRITE_U(stream, 0, 1, "vps_extension_flag")

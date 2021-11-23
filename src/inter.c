@@ -1,5 +1,5 @@
 /*****************************************************************************
- * This file is part of Kvazaar HEVC encoder.
+ * This file is part of uvg266 VVC encoder.
  *
  * Copyright (c) 2021, Tampere University, ITU/ISO/IEC, project contributors
  * All rights reserved.
@@ -397,9 +397,10 @@ static unsigned inter_recon_unipred(const encoder_state_t * const state,
                                     bool predict_luma,
                                     bool predict_chroma)
 {
-  mv_t int_mv[2] = { mv_param[0], mv_param[1] };
+  vector2d_t int_mv = { mv_param[0], mv_param[1] };
 
-  kvz_change_precision(INTERNAL_MV_PREC, 0, &int_mv[0], &int_mv[1]);
+  kvz_change_precision_vector2d(INTERNAL_MV_PREC, 0, &int_mv);
+
   const vector2d_t int_mv_in_frame = {
     int_mv.x + pu_x + state->tile->offset_x,
     int_mv.y + pu_y + state->tile->offset_y
@@ -433,18 +434,18 @@ static unsigned inter_recon_unipred(const encoder_state_t * const state,
     } else {
       // With an integer MV, copy pixels directly from the reference.
       if (int_mv_outside_frame) {
-        inter_cp_with_ext_border(ref->y, ref->width,
+        inter_cp_with_ext_border(ref->y, ref->stride,
           ref->width, ref->height,
           yuv_px->y, out_stride_luma,
           pu_w, pu_h,
           &int_mv_in_frame);
       }
       else {
-        const int frame_mv_index = int_mv_in_frame.y * ref->width + int_mv_in_frame.x;
+        const int frame_mv_index = int_mv_in_frame.y * ref->stride + int_mv_in_frame.x;
         kvz_pixels_blit(&ref->y[frame_mv_index],
           yuv_px->y,
           pu_w, pu_h,
-          ref->width, out_stride_luma);
+          ref->stride, out_stride_luma);
       }
     }
   }
@@ -485,16 +486,16 @@ static unsigned inter_recon_unipred(const encoder_state_t * const state,
                                pu_w / 2, pu_h / 2,
                                &int_mv_in_frame_c);
     } else {
-      const int frame_mv_index = int_mv_in_frame_c.y * ref->width / 2 + int_mv_in_frame_c.x;
+      const int frame_mv_index = int_mv_in_frame_c.y * ref->stride / 2 + int_mv_in_frame_c.x;
 
       kvz_pixels_blit(&ref->u[frame_mv_index],
                       yuv_px->u,
                       pu_w / 2, pu_h / 2,
-                      ref->width / 2, out_stride_c);
+                      ref->stride / 2, out_stride_c);
       kvz_pixels_blit(&ref->v[frame_mv_index],
                       yuv_px->v,
                       pu_w / 2, pu_h / 2,
-                      ref->width / 2, out_stride_c);
+                      ref->stride / 2, out_stride_c);
     }
   }
 

@@ -1,7 +1,7 @@
 """This is a script that generates tables for Kvazaar HEVC encoder.
 
 /*****************************************************************************
- * This file is part of Kvazaar HEVC encoder.
+ * This file is part of uvg266 VVC encoder.
  *
  * Copyright (c) 2021, Tampere University, ITU/ISO/IEC, project contributors
  * All rights reserved.
