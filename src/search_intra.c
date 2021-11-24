@@ -794,6 +794,7 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
     pred_cu.part_size = ((depth == MAX_PU_DEPTH) ? SIZE_NxN : SIZE_2Nx2N);
     pred_cu.intra.mode = modes[0];
     pred_cu.intra.mode_chroma = modes[0];
+    pred_cu.intra.multi_ref_idx = multi_ref_idx;
     FILL(pred_cu.cbf, 0);
     search_intra_trdepth(state, x_px, y_px, depth, tr_depth, modes[0], MAX_INT, &pred_cu, lcu, NULL, trafo[0]);
   }
@@ -1055,23 +1056,6 @@ void kvz_search_cu_intra(encoder_state_t * const state,
   if (depth > 0) {
     const vector2d_t luma_px = { x_px, y_px };
     const vector2d_t pic_px = { state->tile->frame->width, state->tile->frame->height };
-
-    // Extra reference lines for use with MRL. Extra lines needed only for left edge.
-    //kvz_pixel extra_refs[2 * 128 * MAX_REF_LINE_IDX] = {0};
-
-    //if (x_px > 0 && lcu_px.x == 0 && lcu_px.y > 0) {
-    //  videoframe_t* const frame = state->tile->frame;
-
-    //  // Copy extra ref lines, including ref line 1 and top left corner.
-    //  for (int i = 0; i < MAX_REF_LINE_IDX; ++i) {
-    //    int height = (LCU_WIDTH >> depth) * 2 + MAX_REF_LINE_IDX;
-    //    height = MIN(height, pic_px.y - (y_px - MAX_REF_LINE_IDX));
-    //    kvz_pixels_blit(&frame->rec->y[(y_px - MAX_REF_LINE_IDX) * frame->rec->stride + x_px - (1 + i)],
-    //      &extra_refs[i * 2 * 128],
-    //      1, height,
-    //      frame->rec->stride, 1);
-    //  }
-    //}
 
     // These references will only be used with rough search. No need for MRL stuff here.
     kvz_intra_build_reference(log2_width, COLOR_Y, &luma_px, &pic_px, lcu, &refs, state->encoder_control->cfg.wpp, NULL, 0);

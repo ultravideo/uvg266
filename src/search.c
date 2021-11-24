@@ -160,6 +160,7 @@ static void lcu_fill_cu_info(lcu_t *lcu, int x_local, int y_local, int width, in
       if (cu->type == CU_INTRA) {
         to->intra.mode        = cu->intra.mode;
         to->intra.mode_chroma = cu->intra.mode_chroma;
+        to->intra.multi_ref_idx = cu->intra.multi_ref_idx;
       } else {
         to->skipped   = cu->skipped;
         to->merged    = cu->merged;

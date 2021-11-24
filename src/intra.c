@@ -628,8 +628,9 @@ void kvz_intra_build_reference_any(
   // TODO: height for non-square blocks
   const int_fast8_t width = 1 << log2_width;
 
-  // Get multiRefIdx from CU under prediction. Do not use MRL if not luma
+  // Get multi ref index from CU under prediction or reconstrcution. Do not use MRL if not luma
   const uint8_t multi_ref_index = !is_chroma ? multi_ref_idx : 0;
+  assert(multi_ref_index < MAX_REF_LINE_IDX);
 
   // Convert luma coordinates to chroma coordinates for chroma.
   const vector2d_t lcu_px = {
@@ -647,7 +648,7 @@ void kvz_intra_build_reference_any(
   // On the left LCU edge, if left neighboring LCU is available, 
   // left_ref needs to point to correct extra reference line if MRL is used.
   if (luma_px->x > 0 && lcu_px.x == 0 && multi_ref_index != 0) {
-    left_ref = &extra_ref_lines[multi_ref_index * 2 * 128];
+    left_ref = &extra_ref_lines[multi_ref_index * 128];
     extra_ref = true;
   }
   else {
@@ -676,7 +677,7 @@ void kvz_intra_build_reference_any(
       left_border = &left_ref[MAX_REF_LINE_IDX];
     }
     else {
-      left_border = &left_ref[px.y]; // No need for multi_ref_index on the left border
+      left_border = &left_ref[px.y];
     }
     left_stride = 1;
   }
@@ -726,10 +727,10 @@ void kvz_intra_build_reference_any(
       }
       else if (px.x == 0) {
         // LCU left border case
-        kvz_pixel *top_left_corner = &extra_ref_lines[multi_ref_index * 2 * 128];
+        kvz_pixel *top_left_corner = &extra_ref_lines[multi_ref_index * 128];
         for (int i = 0; i <= multi_ref_index; ++i) {
           out_left_ref[i] = left_border[(i - 1 - multi_ref_index) * left_stride];
-          out_top_ref[i] = top_left_corner[(2 * 128 * -i) + MAX_REF_LINE_IDX - 1 - multi_ref_index];
+          out_top_ref[i] = top_left_corner[(128 * -i) + MAX_REF_LINE_IDX - 1 - multi_ref_index];
         }
       }
       else if (px.y == 0) {
@@ -989,7 +990,8 @@ static void intra_recon_tb_leaf(
   int8_t intra_mode,
   cclm_parameters_t *cclm_params,
   lcu_t *lcu,
-  color_t color)
+  color_t color,
+  uint8_t multi_ref_idx)
 {
   const kvz_config *cfg = &state->encoder_control->cfg;
   const int shift = color == COLOR_Y ? 0 : 1;
@@ -1011,31 +1013,32 @@ static void intra_recon_tb_leaf(
   int y_scu = SUB_SCU(y);
   const vector2d_t lcu_px = {x_scu >> shift, y_scu >> shift };
   cu_info_t* cur_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
+  uint8_t multi_ref_index = multi_ref_idx;
 
   kvz_intra_references refs;
   // Extra reference lines for use with MRL. Extra lines needed only for left edge.
-  kvz_pixel extra_refs[2 * 128 * MAX_REF_LINE_IDX] = { 0 };
+  kvz_pixel extra_refs[128 * MAX_REF_LINE_IDX] = { 0 };
 
-  if (x > 0 && lcu_px.x == 0 && lcu_px.y > 0) {
+  if (luma_px.x > 0 && lcu_px.x == 0 && lcu_px.y > 0 && multi_ref_index != 0) {
     videoframe_t* const frame = state->tile->frame;
 
-    // Copy ref lines 2 & 3. Line 1 is stored in LCU ref buffers.
+    // Copy extra ref lines, including ref line 1 and top left corner.
     for (int i = 0; i < MAX_REF_LINE_IDX; ++i) {
       int height = (LCU_WIDTH >> depth) * 2 + MAX_REF_LINE_IDX;
       height = MIN(height, pic_px.y - (y - MAX_REF_LINE_IDX));
       kvz_pixels_blit(&frame->rec->y[(y - MAX_REF_LINE_IDX) * frame->rec->stride + x - (1 + i)],
-        &extra_refs[i * 2 * 128],
+        &extra_refs[i * 128],
         1, height,
         frame->rec->stride, 1);
     }
   }
-  kvz_intra_build_reference(log2width, color, &luma_px, &pic_px, lcu, &refs, cfg->wpp, extra_refs, cur_cu->intra.multi_ref_idx);
+  kvz_intra_build_reference(log2width, color, &luma_px, &pic_px, lcu, &refs, cfg->wpp, extra_refs, multi_ref_index);
 
   kvz_pixel pred[32 * 32];
   int stride = state->tile->frame->source->stride;
   const bool filter_boundary = color == COLOR_Y && !(cfg->lossless && cfg->implicit_rdpcm);
   if(intra_mode < 68) {
-    kvz_intra_predict(state, &refs, log2width, intra_mode, color, pred, filter_boundary, cur_cu->intra.multi_ref_idx);
+    kvz_intra_predict(state, &refs, log2width, intra_mode, color, pred, filter_boundary, multi_ref_index);
   } else {
     kvz_pixels_blit(&state->tile->frame->cclm_luma_rec[x / 2 + (y * stride) / 4], pred, width, width, stride / 2, width);
     if(cclm_params == NULL) {
@@ -1101,6 +1104,7 @@ void kvz_intra_recon_cu(
   if (cur_cu == NULL) {
     cur_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
   }
+  uint8_t multi_ref_index = cur_cu->intra.multi_ref_idx;
 
   // Reset CBFs because CBFs might have been set
   // for depth earlier
@@ -1142,11 +1146,11 @@ void kvz_intra_recon_cu(
     const bool has_chroma = mode_chroma != -1 &&  (x % 8 == 0 && y % 8 == 0);
     // Process a leaf TU.
     if (has_luma) {
-      intra_recon_tb_leaf(state, x, y, depth, mode_luma, cclm_params, lcu, COLOR_Y);
+      intra_recon_tb_leaf(state, x, y, depth, mode_luma, cclm_params, lcu, COLOR_Y, multi_ref_index);
     }
     if (has_chroma) {
-      intra_recon_tb_leaf(state, x, y, depth, mode_chroma, cclm_params, lcu, COLOR_U);
-      intra_recon_tb_leaf(state, x, y, depth, mode_chroma, cclm_params, lcu, COLOR_V);
+      intra_recon_tb_leaf(state, x, y, depth, mode_chroma, cclm_params, lcu, COLOR_U, 0);
+      intra_recon_tb_leaf(state, x, y, depth, mode_chroma, cclm_params, lcu, COLOR_V, 0);
     }
 
     kvz_quantize_lcu_residual(state, has_luma, has_chroma, x, y, depth, cur_cu, lcu, false);
