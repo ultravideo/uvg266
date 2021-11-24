@@ -241,7 +241,7 @@ static double cu_zero_coeff_cost(const encoder_state_t *state, lcu_t *work_tree,
 }
 
 
-static void downsample_cclm_rec(encoder_state_t *state, int x, int y, int width, int height, kvz_pixel *y_rec) {
+static void downsample_cclm_rec(encoder_state_t *state, int x, int y, int width, int height, kvz_pixel *y_rec, kvz_pixel extra_pixel) {
   if (!state->encoder_control->cfg.cclm) return;
   int x_scu = SUB_SCU(x);
   int y_scu = SUB_SCU(y);
@@ -264,6 +264,17 @@ static void downsample_cclm_rec(encoder_state_t *state, int x, int y, int width,
       state->tile->frame->cclm_luma_rec[index] = s >> 3;
     }
     y_rec += LCU_WIDTH * 2;
+  }
+  if((y + height * 2) % 64 == 0) {
+    int line = y / 64 * stride / 2;
+    y_rec -= LCU_WIDTH;
+    for (int i = 0; i < width; ++i) {
+      int s = 2;
+      s += y_rec[i * 2] * 2;
+      s += y_rec[i * 2 + 1];
+      s += !x_scu && !i && x ? extra_pixel : y_rec[i * 2 - ((i + x) > 0)] ;
+      state->tile->frame->cclm_luma_rec_top_line[i + x / 2 + line] = s >> 2;
+    }
   }
 }
 
@@ -739,7 +750,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
                          NULL, NULL, lcu);
 
       downsample_cclm_rec(
-        state, x, y, cu_width / 2, cu_width / 2, lcu->rec.y
+        state, x, y, cu_width / 2, cu_width / 2, lcu->rec.y, lcu->left_ref.y[64]
       );
 
       // TODO: This heavily relies to square CUs
@@ -945,7 +956,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       // search.
       work_tree_copy_down(x_local, y_local, depth, work_tree);
       downsample_cclm_rec(
-        state, x, y, cu_width / 2, cu_width / 2, lcu->rec.y
+        state, x, y, cu_width / 2, cu_width / 2, lcu->rec.y, lcu->left_ref.y[64]
       );
 
       if (state->frame->slicetype != KVZ_SLICE_I) {
@@ -960,7 +971,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     // when searching SMP and AMP blocks.
     work_tree_copy_down(x_local, y_local, depth, work_tree);
     downsample_cclm_rec(
-      state, x, y, cu_width / 2, cu_width / 2, lcu->rec.y
+      state, x, y, cu_width / 2, cu_width / 2, lcu->rec.y, lcu->left_ref.y[64]
     );
 
     if (state->frame->slicetype != KVZ_SLICE_I) {

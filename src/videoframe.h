@@ -54,6 +54,7 @@ typedef struct videoframe
   kvz_picture *rec_lmcs;       //!< \brief LMCS mapped reconstructed image, if available, otherwise points to source.
 
   kvz_pixel *cclm_luma_rec;    //!< \brief buffer for the downsampled luma reconstruction for cclm
+  kvz_pixel *cclm_luma_rec_top_line;    //!< \brief buffer for the downsampled luma reconstruction for cclm
 
   uint8_t* lmcs_avg_processed; //!< \brief For each LCU, indicates if already calculated average of border pixels is available
   int32_t* lmcs_avg;           //!< \brief Average of LCU border pixels

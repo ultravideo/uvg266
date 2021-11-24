@@ -62,6 +62,7 @@ videoframe_t * kvz_videoframe_alloc(int32_t width,
     if (cclm) {
       assert(chroma_format == KVZ_CSP_420);
       frame->cclm_luma_rec = MALLOC(kvz_pixel, (((width + 7) & ~7) + FRAME_PADDING_LUMA) * (((height + 7) & ~7) + FRAME_PADDING_LUMA) / 4);
+      frame->cclm_luma_rec_top_line = MALLOC(kvz_pixel, (((width + 7) & ~7) + FRAME_PADDING_LUMA) / 2 * CEILDIV(height, 64));
     }
   }
   
@@ -82,6 +83,9 @@ int kvz_videoframe_free(videoframe_t * const frame)
   }
   if(frame->cclm_luma_rec) {
     FREE_POINTER(frame->cclm_luma_rec);
+  }
+  if(frame->cclm_luma_rec_top_line) {
+    FREE_POINTER(frame->cclm_luma_rec_top_line);
   }
 
   kvz_image_free(frame->source);

@@ -497,17 +497,11 @@ void kvz_predict_cclm(
     for (; available_above_right < width / 2; available_above_right++) {
       int x_extension = x_scu + width * 2 + 4 * available_above_right;
       cu_info_t* pu = LCU_GET_CU_AT_PX(lcu, x_extension, y_scu - 4);
-      if (pu->type == CU_NOTSET || x_extension > LCU_WIDTH) break;
+      if (x_extension >= LCU_WIDTH || pu->type == CU_NOTSET) break;
     }
     if(y_scu == 0) {
       if(!state->encoder_control->cfg.wpp) available_above_right = MIN(width / 2, (state->tile->frame->width - x0 - width * 2) / 4);
-      for (int x = 0; x < width * (available_above_right ? 4 : 2); x += 2) {
-        bool left_padding = x0 || x;
-        sampled_luma_ref.top[x / 2] = (state->tile->frame->rec->y[x0 + x + (y0 - 1) * stride] * 2 +
-          state->tile->frame->rec->y[x0 + x + 1 + (y0 - 1) * stride] +
-          state->tile->frame->rec->y[x0 + x - left_padding + (y0 - 1) * stride] + 
-          2) >> 2;
-      }
+      memcpy(sampled_luma_ref.top, &state->tile->frame->cclm_luma_rec_top_line[x0 / 2 + (y0 / 64 - 1) * (stride / 2)], sizeof(kvz_pixel) * (width + available_above_right * 2));
     }
     else {
       for (int x = 0; x < width * (available_above_right ? 4 : 2); x += 2) {
