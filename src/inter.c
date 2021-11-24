@@ -1651,23 +1651,9 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
         mv_cand[candidates].dir |= (1 << reflist);
       }
     }
-
     
     if (mv_cand[candidates].dir != 0) {
-      bool add_tmvp = true;
-      // Check for duplicate entries
-      for (int i = 0; i < candidates; i++) {
-        if (mv_cand[i].dir == mv_cand[candidates].dir &&
-          (!(mv_cand[i].dir & 1) || (mv_cand[i].mv[0][0] == mv_cand[candidates].mv[0][0] &&
-                                     mv_cand[i].mv[0][1] == mv_cand[candidates].mv[0][1])) &&
-          (!(mv_cand[i].dir & 2) || (mv_cand[i].mv[1][0] == mv_cand[candidates].mv[1][0] &&
-                                     mv_cand[i].mv[1][1] == mv_cand[candidates].mv[1][1]))) {
-          add_tmvp = false;
-          break;
-        }
-      }
-      // No duplicates found, continue adding the candidate
-      if(add_tmvp) candidates++;
+      candidates++;
     }
   }
 
