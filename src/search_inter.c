@@ -1212,7 +1212,7 @@ static void search_frac(inter_search_info_t *info)
 static INLINE int16_t get_scaled_mv(int16_t mv, int scale)
 {
   int32_t scaled = scale * mv;
-  return CLIP(-32768, 32767, (scaled + 127 + (scaled < 0)) >> 8);
+  return CLIP(-131072, 131071, (scaled + 127 + (scaled < 0)) >> 8);
 }
 /**
 * \brief Scale the MV according to the POC difference
