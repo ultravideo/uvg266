@@ -525,38 +525,12 @@ void kvz_predict_cclm(
       if (y_extension >= LCU_WIDTH || pu->type == CU_NOTSET) break;
       if(x_scu == 32 && y_scu == 0 && pu->depth == 0) break;
     }
-    for(int y = 0; y < height * (available_left_below ? 4 : 2); y+=2) {
-      int s = 4;
-      s += x_scu ? y_rec[y * LCU_WIDTH - 2] * 2       : state->tile->frame->rec->y[x0 - 2 + (y0 + y) * stride] * 2;
-      s += x_scu ? y_rec[y * LCU_WIDTH - 1]           : state->tile->frame->rec->y[x0 - 1 + (y0 + y) * stride];
-      s += x_scu ? y_rec[y * LCU_WIDTH - 3]           : state->tile->frame->rec->y[x0 - 3 + (y0 + y) * stride];
-      s += x_scu ? y_rec[(y + 1) * LCU_WIDTH - 2] * 2 : state->tile->frame->rec->y[x0 - 2 + (y0 + y + 1) * stride] * 2;
-      s += x_scu ? y_rec[(y + 1) * LCU_WIDTH - 1]     : state->tile->frame->rec->y[x0 - 1 + (y0 + y + 1) * stride];
-      s += x_scu ? y_rec[(y + 1) * LCU_WIDTH - 3]     : state->tile->frame->rec->y[x0 - 3 + (y0 + y + 1) * stride];
-      sampled_luma_ref.left[y/2] = s >> 3;
-    }
+    for(int i = 0; i < height + available_left_below * 2; i++) {
+      sampled_luma_ref.left[i] = state->tile->frame->cclm_luma_rec[(y0/2 + i) * (stride/2) + x0 / 2 - 1];
+    }    
   }
 
-
-
-  // Downsample the reconstructed luma sample so that they can be mapped into the chroma
-  // to generate the chroma prediction
-  for (int y = 0; y < height; y++) {
-    for (int x = 0; x <  width; x++) {
-      int s = 4;
-      s += y_rec[2 * x] * 2;
-      s += y_rec[2 * x + 1];
-      // If we are at the edge of the CTU read the pixel from the frame reconstruct buffer,
-      // *except* when we are also at the edge of the frame, in which case we want to duplicate
-      // the edge pixel
-      s += !x_scu && !x && x0 ? state->tile->frame->rec->y[x0 - 1 + (y0 + y*2) * stride] : y_rec[2 * x - ((x + x0) > 0)];
-      s += y_rec[2 * x + LCU_WIDTH] * 2;
-      s += y_rec[2 * x + 1 + LCU_WIDTH];
-      s += !x_scu && !x && x0 ? state->tile->frame->rec->y[x0 - 1 + (y0 + y * 2 + 1) * stride] : y_rec[2 * x - ((x + x0) > 0) + LCU_WIDTH];
-      sampled_luma[x + y * width] = s >> 3;
-    }
-    y_rec += LCU_WIDTH * 2;
-  }
+  kvz_pixels_blit(&state->tile->frame->cclm_luma_rec[x0 / 2 + (y0 * stride) / 4], sampled_luma, width, height, stride / 2, width);
 
   int16_t a, b, shift;
   get_cclm_parameters(state, width, height, mode,x0, y0, available_above_right, available_left_below, &sampled_luma_ref, chroma_ref, &a, &b, &shift);
@@ -926,24 +900,7 @@ static void intra_recon_tb_leaf(
   if(intra_mode < 68) {
     kvz_intra_predict(state, &refs, log2width, intra_mode, color, pred, filter_boundary);
   } else {
-    kvz_pixel *y_rec = lcu->rec.y;
-    y_rec += x_scu + y_scu * LCU_WIDTH;
-    for (int y_ = 0; y_ < width; y_++) {
-      for (int x_ = 0; x_ < width; x_++) {
-        int s = 4;
-        s += y_rec[2 * x_] * 2;
-        s += y_rec[2 * x_ + 1];
-        // If we are at the edge of the CTU read the pixel from the frame reconstruct buffer,
-        // *except* when we are also at the edge of the frame, in which case we want to duplicate
-        // the edge pixel
-        s += !x_scu && !x_ && x ? state->tile->frame->rec->y[x - 1 + (y + y_ * 2) * stride] : y_rec[2 * x_ - ((x_ + x) > 0)];
-        s += y_rec[2 * x_ + LCU_WIDTH] * 2;
-        s += y_rec[2 * x_ + 1 + LCU_WIDTH];
-        s += !x_scu && !x_ && x ? state->tile->frame->rec->y[x - 1 + (y + y_ * 2 + 1) * stride] : y_rec[2 * x_ - ((x_ + x) > 0) + LCU_WIDTH];
-        pred[x_  + y_ * width] = s >> 3;
-      }
-      y_rec += LCU_WIDTH * 2;
-    }
+    kvz_pixels_blit(&state->tile->frame->cclm_luma_rec[x / 2 + (y * stride) / 4], pred, width, width, stride / 2, width);
     if(cclm_params == NULL) {
       cclm_parameters_t temp_params;
       kvz_predict_cclm(
