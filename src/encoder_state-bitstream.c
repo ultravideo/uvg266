@@ -1356,9 +1356,26 @@ void kvz_encoder_state_write_bitstream_slice_header(
   }
 
   if (state->frame->slicetype != KVZ_SLICE_I && state->encoder_control->cfg.tmvp_enable) {
-    //WRITE_U(stream, ref_negative ? 1 : 0, 1, "slice_temporal_mvp_enabled_flag");
+    int ref_negative = 0;
+    int ref_positive = 0;
+    const encoder_control_t* const encoder = state->encoder_control;    
+    if (encoder->cfg.gop_len) {
+      for (int j = 0; j < state->frame->ref->used_size; j++) {
+        if (state->frame->ref->pocs[j] < state->frame->poc) {
+          ref_negative++;
+        }
+        else {
+          ref_positive++;
+        }
+      }
+    }
+    else ref_negative = state->frame->ref->used_size;
+    
     if (state->frame->slicetype == KVZ_SLICE_B) {
-      WRITE_U(stream, 0, 1, "sh_collocated_from_l0_flag");
+      WRITE_U(stream, 1, 1, "sh_collocated_from_l0_flag");
+    }
+    if (ref_negative > 1) { // collocated_from_l0_flag == 0
+      WRITE_UE(stream, 0, "sh_collocated_ref_idx");
     }
   }
 
