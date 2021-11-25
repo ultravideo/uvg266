@@ -1211,15 +1211,15 @@ static bool add_temporal_candidate(const encoder_state_t *state,
   // in L0 or L1, the primary list for the colocated PU is the inverse of
   // collocated_from_l0_flag. Otherwise it is equal to reflist.
   //
-  // Kvazaar always sets collocated_from_l0_flag so the list is L1 when
+  // uvg266 always sets collocated_from_l0_flag so the list is L1 when
   // there are future references.
   int col_list = reflist;
-  /*for (int i = 0; i < state->frame->ref->used_size; i++) {
+  for (int i = 0; i < state->frame->ref->used_size; i++) {
     if (state->frame->ref->pocs[i] > state->frame->poc) {
       col_list = 1;
       break;
     }
-  }*/
+  }
   
   if ((colocated->inter.mv_dir & (col_list + 1)) == 0) {
     // Use the other list if the colocated PU does not have a MV for the
@@ -1573,8 +1573,8 @@ void kvz_change_precision(int src, int dst, mv_t* hor, mv_t* ver) {
   const int shift = (int)dst - (int)src;
   if (shift >= 0)
   {
-    uint16_t* hor_unsigned = hor;
-    uint16_t* ver_unsigned = ver;
+    uint16_t* hor_unsigned = (uint16_t *)hor;
+    uint16_t* ver_unsigned = (uint16_t *)ver;
 
     *hor_unsigned <<= shift;
     *ver_unsigned <<= shift;
@@ -1695,6 +1695,11 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
                                  mv_cand[candidates].mv[reflist])) {
         mv_cand[candidates].ref[reflist] = 0;
         mv_cand[candidates].dir |= (1 << reflist);
+
+        if (reflist) {
+          mv_cand[candidates].mv[1][0] *= -1;
+          mv_cand[candidates].mv[1][1] *= -1;
+        }
       }
     }
     
