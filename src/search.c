@@ -760,7 +760,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         // into account, so there is less of a chanse of luma mode being
         // really bad for chroma.
         cclm_parameters_t cclm_params[2];
-        if (ctrl->cfg.rdo == 3) {
+        if (ctrl->cfg.rdo >= 3) {
           cur_cu->intra.mode_chroma = kvz_search_cu_intra_chroma(state, x, y, depth, lcu, cclm_params);
           lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
         }

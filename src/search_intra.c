@@ -969,7 +969,7 @@ int8_t kvz_search_cu_intra_chroma(encoder_state_t * const state,
   const int8_t modes_in_depth[5] = { 1, 1, 1, 1, 2 };
   int num_modes = modes_in_depth[depth];
 
-  if (state->encoder_control->cfg.rdo == 3) {
+  if (state->encoder_control->cfg.rdo >= 3) {
     num_modes = state->encoder_control->cfg.cclm ? 8 : 5;
   }
 
@@ -1054,7 +1054,7 @@ void kvz_search_cu_intra(encoder_state_t * const state,
   kvz_pixel *ref_pixels = &lcu->ref.y[lcu_px.x + lcu_px.y * LCU_WIDTH];
 
   int8_t number_of_modes = 0;
-  bool skip_rough_search = (depth == 0 || state->encoder_control->cfg.rdo >= 3);
+  bool skip_rough_search = (depth == 0 || state->encoder_control->cfg.rdo >= 4);
   if (!skip_rough_search) {
     number_of_modes = search_intra_rough(state,
                                          ref_pixels, LCU_WIDTH,
@@ -1075,9 +1075,9 @@ void kvz_search_cu_intra(encoder_state_t * const state,
   const int32_t rdo_level = state->encoder_control->cfg.rdo;
   if (rdo_level >= 2 || skip_rough_search) {
     int number_of_modes_to_search;
-    if (rdo_level == 3) {
+    if (rdo_level == 4) {
       number_of_modes_to_search = 67;
-    } else if (rdo_level == 2) {
+    } else if (rdo_level == 2 || rdo_level == 3) {
       number_of_modes_to_search = (cu_width == 4) ? 3 : 2;
     } else {
       // Check only the predicted modes.
