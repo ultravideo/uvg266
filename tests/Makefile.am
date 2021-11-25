@@ -5,7 +5,8 @@ TESTS = $(check_PROGRAMS) \
     test_invalid_input.sh \
     test_monochrome.sh \
     test_lmcs.sh \
-    test_tools.sh
+    test_tools.sh \
+    test_slices.sh
     #test_weird_shapes.sh
 
 EXTRA_DIST = \
@@ -15,6 +16,7 @@ EXTRA_DIST = \
     test_monochrome.sh \
     test_lmcs.sh \
     test_tools.sh \
+    test_slices.sh \
     #test_weird_shapes.sh \
     util.sh
 
