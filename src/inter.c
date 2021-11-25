@@ -1107,11 +1107,11 @@ static INLINE int16_t get_scaled_mv(int16_t mv, int scale)
 
 static int convert_mv_fixed_to_float(int32_t val)
 {
-  int sign = val >> 31;
+  uint32_t sign = val >> 31;
   int scale = kvz_math_floor_log2((val ^ sign) | MV_MANTISSA_UPPER_LIMIT) - (MV_MANTISSA_BITCOUNT - 1);
 
   int exponent;
-  int mantissa;
+  uint32_t mantissa;
   if (scale >= 0)
   {
     int round = (1 << scale) >> 1;
@@ -1131,7 +1131,7 @@ static int convert_mv_fixed_to_float(int32_t val)
 static int convert_mv_float_to_fixed(int val)
 {
   int exponent = val & MV_EXPONENT_MASK;
-  int mantissa = val >> MV_EXPONENT_BITCOUNT;
+  uint32_t mantissa = val >> MV_EXPONENT_BITCOUNT;
   return exponent == 0 ? mantissa : (mantissa ^ MV_MANTISSA_LIMIT) << (exponent - 1);
 }
 
