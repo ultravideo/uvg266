@@ -554,10 +554,10 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
   const uint32_t ctu_row_mul_five = ctu_row * MAX_NUM_HMVP_CANDS;
 
   cu_info_t hmvp_lut[MAX_NUM_HMVP_CANDS];
-  uint8_t hmvp_lut_size = state->frame->hmvp_size[ctu_row];
+  uint8_t hmvp_lut_size = state->tile->frame->hmvp_size[ctu_row];
 
   // Store original HMVP lut before search and restore after, since it's modified
-  if (state->frame->slicetype != KVZ_SLICE_I) memcpy(hmvp_lut, &state->frame->hmvp_lut[ctu_row_mul_five], sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
+  if (state->frame->slicetype != KVZ_SLICE_I) memcpy(hmvp_lut, &state->tile->frame->hmvp_lut[ctu_row_mul_five], sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
 
   struct {
     int32_t min;
@@ -915,8 +915,8 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
 
       if (state->frame->slicetype != KVZ_SLICE_I) {
         // Reset HMVP to the beginning of this CU level search and add this CU as the mvp
-        memcpy(&state->frame->hmvp_lut[ctu_row_mul_five], hmvp_lut, sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
-        state->frame->hmvp_size[ctu_row] = hmvp_lut_size;
+        memcpy(&state->tile->frame->hmvp_lut[ctu_row_mul_five], hmvp_lut, sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
+        state->tile->frame->hmvp_size[ctu_row] = hmvp_lut_size;
         kvz_hmvp_add_mv(state, x, y, cu_width, cu_width, cur_cu);
       }
     }
@@ -927,8 +927,8 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
 
     if (state->frame->slicetype != KVZ_SLICE_I) {
       // Reset HMVP to the beginning of this CU level search and add this CU as the mvp
-      memcpy(&state->frame->hmvp_lut[ctu_row_mul_five], hmvp_lut, sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
-      state->frame->hmvp_size[ctu_row] = hmvp_lut_size;
+      memcpy(&state->tile->frame->hmvp_lut[ctu_row_mul_five], hmvp_lut, sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
+      state->tile->frame->hmvp_size[ctu_row] = hmvp_lut_size;
       kvz_hmvp_add_mv(state, x, y, cu_width, cu_width, cur_cu);
     }
   }
