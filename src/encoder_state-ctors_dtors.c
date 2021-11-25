@@ -118,8 +118,8 @@ static int encoder_state_config_tile_init(encoder_state_t * const state,
   const encoder_control_t * const encoder = state->encoder_control;
   state->tile->frame = kvz_videoframe_alloc(width, height, state->encoder_control->chroma_format, encoder->cfg.alf_type);
   
-  state->tile->frame->hmvp_lut = malloc(sizeof(cu_info_t) * encoder->in.height_in_lcu * MAX_NUM_HMVP_CANDS);
-  state->tile->frame->hmvp_size = malloc(sizeof(uint8_t) * encoder->in.height_in_lcu);
+  state->tile->frame->hmvp_lut = malloc(sizeof(cu_info_t) * height_in_lcu * MAX_NUM_HMVP_CANDS);
+  state->tile->frame->hmvp_size = malloc(sizeof(uint8_t) * height_in_lcu);
 
   state->tile->frame->rec = NULL;
   

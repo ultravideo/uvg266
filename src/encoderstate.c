@@ -852,6 +852,8 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
   bool wavefront = state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW;
   bool use_parallel_encoding = (wavefront && state->parent->children[1].encoder_control);
   if (!use_parallel_encoding) {
+    memset(state->tile->frame->hmvp_size, 0, sizeof(uint8_t) * state->tile->frame->height_in_lcu);
+    
     // Encode every LCU in order and perform SAO reconstruction after every
     // frame is encoded. Deblocking and SAO search is done during LCU encoding.
     for (int i = 0; i < state->lcu_order_count; ++i) {
@@ -1428,7 +1430,9 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
       state->tile->frame->width,
       state->tile->frame->height
   );
-  memset(state->tile->frame->hmvp_size, 0, sizeof(uint8_t) * state->encoder_control->in.height_in_lcu);
+  if (!state->encoder_control->tiles_enable) {
+    memset(state->tile->frame->hmvp_size, 0, sizeof(uint8_t) * state->tile->frame->height_in_lcu);
+  }
 
   // Variance adaptive quantization
   if (cfg->vaq) {
