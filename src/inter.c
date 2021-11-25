@@ -38,6 +38,7 @@
 
 #include "encoder.h"
 #include "imagelist.h"
+#include "kvz_math.h"
 #include "strategies/generic/picture-generic.h"
 #include "strategies/strategies-ipol.h"
 #include "videoframe.h"
@@ -49,8 +50,8 @@ const int8_t kvz_g_imv_to_prec[4] = { 2, 0, -2, 1 }; // Convert AMVR imv to prec
 typedef struct {
   const cu_info_t *a[2];
   const cu_info_t *b[3];
-  const cu_info_t *c3;
-  const cu_info_t *h;
+  const cu_info_t *c0;
+  const cu_info_t *c1;
 
   uint16_t mer_a0[2];
   uint16_t mer_a1[2];
@@ -58,9 +59,6 @@ typedef struct {
   uint16_t mer_b0[2];
   uint16_t mer_b1[2];
   uint16_t mer_b2[2];
-
-  uint16_t mer_c3[2];
-  uint16_t mer_h[2];
 
 } merge_candidates_t;
 
@@ -846,7 +844,7 @@ static bool is_b0_cand_coded(int x, int y, int width, int height)
  * \param height    current block height
  * \param ref_list  which reference list, L0 is 1 and L1 is 2
  * \param ref_idx   index in the reference list
- * \param cand_out  will be filled with C3 and H candidates
+ * \param cand_out  will be filled with C0 and C1 candidates
  */
 static void get_temporal_merge_candidates(const encoder_state_t * const state,
                                           int32_t x,
@@ -861,13 +859,13 @@ static void get_temporal_merge_candidates(const encoder_state_t * const state,
   Predictor block locations
   _________
   |CurrentPU|
-  | |C0|__  |
-  |    |C3| |
+  |     __  |
+  |    |C1| |
   |_________|_
-            |H|
+            |C0|
   */
 
-  cand_out->c3 = cand_out->h = NULL;
+  cand_out->c0 = cand_out->c1 = NULL;
 
   // Find temporal reference
   if (state->frame->ref->used_size) {
@@ -887,32 +885,32 @@ static void get_temporal_merge_candidates(const encoder_state_t * const state,
     uint32_t xColBr = x + width;
     uint32_t yColBr = y + height;
 
-    // H must be available
+    // C0 must be available
     if (xColBr < state->encoder_control->in.width &&
         yColBr < state->encoder_control->in.height) {
-      int32_t H_offset = -1;
+      int32_t C0_offset = -1;
 
       // Y inside the current CTU / LCU
       if (yColBr % LCU_WIDTH != 0) {
-        H_offset = ((xColBr >> 3) << 3) / SCU_WIDTH +
+        C0_offset = ((xColBr >> 3) << 3) / SCU_WIDTH +
                   (((yColBr >> 3) << 3) / SCU_WIDTH) * cu_per_width;
       }
 
-      if (H_offset >= 0) {
+      if (C0_offset >= 0) {
         // Only use when it's inter block
-        if (ref_cu_array->data[H_offset].type == CU_INTER) {
-          cand_out->h = &ref_cu_array->data[H_offset];
+        if (ref_cu_array->data[C0_offset].type == CU_INTER) {
+          cand_out->c0 = &ref_cu_array->data[C0_offset];
         }
       }
     }
     uint32_t xColCtr = x + (width / 2);
     uint32_t yColCtr = y + (height / 2);
 
-    // C3 must be inside the LCU, in the center position of current CU
+    // C1 must be inside the LCU, in the center position of current CU
     if (xColCtr < state->encoder_control->in.width && yColCtr < state->encoder_control->in.height) {
-      uint32_t C3_offset = ((xColCtr >> 3) << 3) / SCU_WIDTH + ((((yColCtr >> 3) << 3) / SCU_WIDTH) * cu_per_width);
-      if (ref_cu_array->data[C3_offset].type == CU_INTER) {
-        cand_out->c3 = &ref_cu_array->data[C3_offset];
+      uint32_t C1_offset = ((xColCtr >> 3) << 3) / SCU_WIDTH + ((((yColCtr >> 3) << 3) / SCU_WIDTH) * cu_per_width);
+      if (ref_cu_array->data[C1_offset].type == CU_INTER) {
+        cand_out->c1 = &ref_cu_array->data[C1_offset];
       }
     }
   }
@@ -1101,6 +1099,47 @@ static INLINE int16_t get_scaled_mv(int16_t mv, int scale)
   return CLIP(-32768, 32767, (scaled + 127 + (scaled < 0)) >> 8);
 }
 
+#define MV_EXPONENT_BITCOUNT 4
+#define MV_MANTISSA_BITCOUNT 6
+#define MV_MANTISSA_UPPER_LIMIT ((1 << (MV_MANTISSA_BITCOUNT - 1)) - 1)
+#define MV_MANTISSA_LIMIT (1 << (MV_MANTISSA_BITCOUNT - 1))
+#define MV_EXPONENT_MASK ((1 << MV_EXPONENT_BITCOUNT) - 1)
+
+static int convert_mv_fixed_to_float(int32_t val)
+{
+  uint32_t sign = val >> 31;
+  int scale = kvz_math_floor_log2((val ^ sign) | MV_MANTISSA_UPPER_LIMIT) - (MV_MANTISSA_BITCOUNT - 1);
+
+  int exponent;
+  uint32_t mantissa;
+  if (scale >= 0)
+  {
+    int round = (1 << scale) >> 1;
+    int n = (val + round) >> scale;
+    exponent = scale + ((n ^ sign) >> (MV_MANTISSA_BITCOUNT - 1));
+    mantissa = (n & MV_MANTISSA_UPPER_LIMIT) | (sign << (MV_MANTISSA_BITCOUNT - 1));
+  }
+  else
+  {
+    exponent = 0;
+    mantissa = val;
+  }
+
+  return exponent | (mantissa << MV_EXPONENT_BITCOUNT);
+}
+
+static int convert_mv_float_to_fixed(int val)
+{
+  int exponent = val & MV_EXPONENT_MASK;
+  uint32_t mantissa = val >> MV_EXPONENT_BITCOUNT;
+  return exponent == 0 ? mantissa : (mantissa ^ MV_MANTISSA_LIMIT) << (exponent - 1);
+}
+
+static int round_mv_comp(int x)
+{
+  return convert_mv_float_to_fixed(convert_mv_fixed_to_float(x));
+}
+
 static void apply_mv_scaling_pocs(int32_t current_poc,
                                   int32_t current_ref_poc,
                                   int32_t neighbor_poc,
@@ -1172,15 +1211,15 @@ static bool add_temporal_candidate(const encoder_state_t *state,
   // in L0 or L1, the primary list for the colocated PU is the inverse of
   // collocated_from_l0_flag. Otherwise it is equal to reflist.
   //
-  // Kvazaar always sets collocated_from_l0_flag so the list is L1 when
+  // uvg266 always sets collocated_from_l0_flag so the list is L1 when
   // there are future references.
   int col_list = reflist;
-  /*for (int i = 0; i < state->frame->ref->used_size; i++) {
+  for (int i = 0; i < state->frame->ref->used_size; i++) {
     if (state->frame->ref->pocs[i] > state->frame->poc) {
       col_list = 1;
       break;
     }
-  }*/
+  }
   
   if ((colocated->inter.mv_dir & (col_list + 1)) == 0) {
     // Use the other list if the colocated PU does not have a MV for the
@@ -1190,6 +1229,10 @@ static bool add_temporal_candidate(const encoder_state_t *state,
 
   mv_out[0] = colocated->inter.mv[col_list][0];
   mv_out[1] = colocated->inter.mv[col_list][1];
+
+  mv_out[0] = round_mv_comp(mv_out[0]);
+  mv_out[1] = round_mv_comp(mv_out[1]);
+
   apply_mv_scaling_pocs(
     state->frame->poc,
     state->frame->ref->pocs[current_ref],
@@ -1253,8 +1296,8 @@ static void get_mv_cand_from_candidates(const encoder_state_t * const state,
 {
   const cu_info_t *const *a = merge_cand->a;
   const cu_info_t *const *b = merge_cand->b;
-  const cu_info_t *c3 = merge_cand->c3;
-  const cu_info_t *h  = merge_cand->h;
+  const cu_info_t *c0 = merge_cand->c0;
+  const cu_info_t *c1  = merge_cand->c1;
 
   uint8_t candidates = 0;
   uint8_t b_candidates = 0;
@@ -1291,11 +1334,11 @@ static void get_mv_cand_from_candidates(const encoder_state_t * const state,
     state->frame->poc > 1 &&
     state->frame->ref->used_size &&
     candidates < AMVP_MAX_NUM_CANDS &&
-    (h != NULL || c3 != NULL);
+    (c0 != NULL || c1 != NULL);
 
   if (can_use_tmvp && add_temporal_candidate(state,
                                              state->frame->ref_LX[reflist][cur_cu->inter.mv_ref[reflist]],
-                                             (h != NULL) ? h : c3,
+                                             (c0 != NULL) ? c0 : c1,
                                              reflist,
                                              mv_cand[candidates]))
   {
@@ -1530,8 +1573,8 @@ void kvz_change_precision(int src, int dst, mv_t* hor, mv_t* ver) {
   const int shift = (int)dst - (int)src;
   if (shift >= 0)
   {
-    uint16_t* hor_unsigned = hor;
-    uint16_t* ver_unsigned = ver;
+    uint16_t* hor_unsigned = (uint16_t *)hor;
+    uint16_t* ver_unsigned = (uint16_t *)ver;
 
     *hor_unsigned <<= shift;
     *ver_unsigned <<= shift;
@@ -1641,7 +1684,7 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
       // get_temporal_merge_candidates(state, x, y, width, height, 2, 0, &merge_cand);
 
       const cu_info_t *temporal_cand =
-        (merge_cand.h != NULL) ? merge_cand.h : merge_cand.c3;
+        (merge_cand.c0 != NULL) ? merge_cand.c0 : merge_cand.c1;
 
       if (add_temporal_candidate(state,
                                  // Reference index 0 is always used for
@@ -1652,25 +1695,16 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
                                  mv_cand[candidates].mv[reflist])) {
         mv_cand[candidates].ref[reflist] = 0;
         mv_cand[candidates].dir |= (1 << reflist);
-      }
-    }
 
-    
-    if (mv_cand[candidates].dir != 0) {
-      bool add_tmvp = true;
-      // Check for duplicate entries
-      for (int i = 0; i < candidates; i++) {
-        if (mv_cand[i].dir == mv_cand[candidates].dir &&
-          (!(mv_cand[i].dir & 1) || (mv_cand[i].mv[0][0] == mv_cand[candidates].mv[0][0] &&
-                                     mv_cand[i].mv[0][1] == mv_cand[candidates].mv[0][1])) &&
-          (!(mv_cand[i].dir & 2) || (mv_cand[i].mv[1][0] == mv_cand[candidates].mv[1][0] &&
-                                     mv_cand[i].mv[1][1] == mv_cand[candidates].mv[1][1]))) {
-          add_tmvp = false;
-          break;
+        if (reflist) {
+          mv_cand[candidates].mv[1][0] *= -1;
+          mv_cand[candidates].mv[1][1] *= -1;
         }
       }
-      // No duplicates found, continue adding the candidate
-      if(add_tmvp) candidates++;
+    }
+    
+    if (mv_cand[candidates].dir != 0) {
+      candidates++;
     }
   }
 
