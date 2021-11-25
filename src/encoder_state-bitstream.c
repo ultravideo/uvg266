@@ -834,7 +834,9 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
     if (encoder->cfg.tiles_width_count * encoder->cfg.tiles_height_count > 1) 
     {
       WRITE_U(stream, 0, 1, "pps_loop_filter_across_tiles_enabled_flag");
-      WRITE_U(stream, 0, 1, "pps_rect_slice_flag");
+      WRITE_U(stream, 1, 1, "pps_rect_slice_flag");
+      WRITE_U(stream, 1, 1, "pps_single_slice_per_subpic_flag");
+
       WRITE_U(stream, 0, 1, "pps_loop_filter_across_slices_enabled_flag");
     }
   }
