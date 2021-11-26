@@ -1022,7 +1022,6 @@ static void encoder_state_write_picture_timing_sei_message(encoder_state_t * con
 }
 
 
-// ToDo: Enable tiles/wpp
 static void encoder_state_entry_points_explore(const encoder_state_t * const state, int * const r_count, int * const r_max_length) {
   int i;
   for (i = 0; state->children[i].encoder_control; ++i) {
@@ -1198,78 +1197,87 @@ static void kvz_encoder_state_write_bitstream_ref_pic_list(
 
   int last_poc = 0;
   int poc_shift = 0;
+  // We don't need to signal L1 list if it's copied from L0
+  bool copy_rpl1_from_rpl0 = (encoder->cfg.gop_lowdelay || encoder->cfg.gop_len == 0) && encoder->cfg.bipred;
 
-  WRITE_UE(stream, ref_negative, "num_ref_entries[0]");  
-  for (j = 0; j < ref_negative; j++) {
-    int8_t delta_poc = 0;
 
-    if (encoder->cfg.gop_len) {
-      int8_t found = 0;
-      do {
-        delta_poc = encoder->cfg.gop[state->frame->gop_offset].ref_neg[j + poc_shift];
-        for (int i = 0; i < state->frame->ref->used_size; i++) {
-          if (state->frame->ref->pocs[i] == state->frame->poc - delta_poc) {
-            found = 1;
-            break;
+  for (int list = 0; list < 1 + copy_rpl1_from_rpl0; list++) {
+
+    WRITE_UE(stream, ref_negative, "num_ref_entries[0]");
+    for (j = 0; j < ref_negative; j++) {
+      int8_t delta_poc = 0;
+
+      if (encoder->cfg.gop_len) {
+        int8_t found = 0;
+        do {
+          delta_poc = encoder->cfg.gop[state->frame->gop_offset].ref_neg[j + poc_shift];
+          for (int i = 0; i < state->frame->ref->used_size; i++) {
+            if (state->frame->ref->pocs[i] == state->frame->poc - delta_poc) {
+              found = 1;
+              break;
+            }
           }
-        }
-        if (!found) poc_shift++;
-        if (j + poc_shift == ref_negative) {
-          fprintf(stderr, "Failure, reference not found!");
-          exit(EXIT_FAILURE);
-        }
-      } while (!found);
+          if (!found) poc_shift++;
+          if (j + poc_shift == ref_negative) {
+            fprintf(stderr, "Failure, reference not found!");
+            exit(EXIT_FAILURE);
+          }
+        } while (!found);
+      }
+      /*
+      WRITE_U(stream, j, 1, "inter_layer_ref_pic_flag");
+      if (j) {
+        WRITE_UE(stream, j, "ilrp_idx");
+      }
+      */
+      WRITE_UE(stream, delta_poc ? delta_poc - last_poc - 1 : 0, "abs_delta_poc_st");
+      if (delta_poc + 1) WRITE_U(stream, 1, 1, "strp_entry_sign_flag");
+      last_poc = delta_poc;
+
     }
-    /*
-    WRITE_U(stream, j, 1, "inter_layer_ref_pic_flag");
-    if (j) {
-      WRITE_UE(stream, j, "ilrp_idx");
-    }
-    */
-    WRITE_UE(stream, delta_poc ? delta_poc - last_poc - 1 : 0, "abs_delta_poc_st");
-    if (delta_poc+1) WRITE_U(stream, 1, 1, "strp_entry_sign_flag");
-    last_poc = delta_poc;
-    
+    last_poc = 0;
+    poc_shift = 0;
   }
-  last_poc = 0;
-  poc_shift = 0;
-  WRITE_UE(stream, ref_positive, "num_ref_entries[1]");
-  for (j = 0; j < ref_positive; j++) {
-    int8_t delta_poc = 0;
 
-    if (encoder->cfg.gop_len) {
-      int8_t found = 0;
-      do {
-        delta_poc = encoder->cfg.gop[state->frame->gop_offset].ref_pos[j + poc_shift];
-        for (int i = 0; i < state->frame->ref->used_size; i++) {
-          if (state->frame->ref->pocs[i] == state->frame->poc + delta_poc) {
-            found = 1;
-            break;
+  if (!copy_rpl1_from_rpl0) {
+    WRITE_UE(stream, ref_positive, "num_ref_entries[1]");
+    for (j = 0; j < ref_positive; j++) {
+      int8_t delta_poc = 0;
+
+      if (encoder->cfg.gop_len) {
+        int8_t found = 0;
+        do {
+          delta_poc = encoder->cfg.gop[state->frame->gop_offset].ref_pos[j + poc_shift];
+          for (int i = 0; i < state->frame->ref->used_size; i++) {
+            if (state->frame->ref->pocs[i] == state->frame->poc + delta_poc) {
+              found = 1;
+              break;
+            }
           }
-        }
-        if (!found) poc_shift++;
-        if (j + poc_shift == ref_positive) {
-          fprintf(stderr, "Failure, reference not found!");
-          exit(EXIT_FAILURE);
-        }
-      } while (!found);
-    }
-    /*
-    WRITE_U(stream, j, 1, "inter_layer_ref_pic_flag");
-    if (j) {
-      WRITE_UE(stream, j, "ilrp_idx");
-    }
-    */
+          if (!found) poc_shift++;
+          if (j + poc_shift == ref_positive) {
+            fprintf(stderr, "Failure, reference not found!");
+            exit(EXIT_FAILURE);
+          }
+        } while (!found);
+      }
+      /*
+      WRITE_U(stream, j, 1, "inter_layer_ref_pic_flag");
+      if (j) {
+        WRITE_UE(stream, j, "ilrp_idx");
+      }
+      */
 
-    WRITE_UE(stream, delta_poc ? delta_poc - last_poc - 1 : 0, "abs_delta_poc_st");
-    if (delta_poc+1) WRITE_U(stream, 0, 1, "strp_entry_sign_flag");
-    last_poc = delta_poc;
+      WRITE_UE(stream, delta_poc ? delta_poc - last_poc - 1 : 0, "abs_delta_poc_st");
+      if (delta_poc + 1) WRITE_U(stream, 0, 1, "strp_entry_sign_flag");
+      last_poc = delta_poc;
+    }
   }
 
   if (ref_negative > 1 || ref_positive > 1) {
     WRITE_U(stream, 1, 1, "sh_num_ref_idx_active_override_flag");
-    if (ref_negative > 1) WRITE_UE(stream, ref_negative - 1, "sh_num_ref_idx_active_minus1[0]");
-    if (ref_positive > 1) WRITE_UE(stream, ref_positive - 1, "sh_num_ref_idx_active_minus1[1]");
+    if (ref_negative > 1) for(int list = 0; list < 1 + copy_rpl1_from_rpl0; list++) WRITE_UE(stream, ref_negative - 1, "sh_num_ref_idx_active_minus1[0]");
+    if (!copy_rpl1_from_rpl0 && ref_positive > 1) WRITE_UE(stream, ref_positive - 1, "sh_num_ref_idx_active_minus1[1]");
   }
 
 }
