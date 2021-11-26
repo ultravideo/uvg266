@@ -652,17 +652,17 @@ static void encoder_state_worker_encode_lcu_search(void * opaque)
   const uint32_t ctu_row_mul_five = ctu_row * MAX_NUM_HMVP_CANDS;
 
   cu_info_t original_lut[MAX_NUM_HMVP_CANDS];
-  uint8_t original_lut_size = state->frame->hmvp_size[ctu_row];
+  uint8_t original_lut_size = state->tile->frame->hmvp_size[ctu_row];
 
   // Store original HMVP lut before search and restore after, since it's modified
-  if(state->frame->slicetype != KVZ_SLICE_I) memcpy(original_lut, &state->frame->hmvp_lut[ctu_row_mul_five], sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
+  if(state->frame->slicetype != KVZ_SLICE_I) memcpy(original_lut, &state->tile->frame->hmvp_lut[ctu_row_mul_five], sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
 
   //This part doesn't write to bitstream, it's only search, deblock and sao
   kvz_search_lcu(state, lcu->position_px.x, lcu->position_px.y, state->tile->hor_buf_search, state->tile->ver_buf_search, lcu->coeff);
 
   if(state->frame->slicetype != KVZ_SLICE_I) {
-    memcpy(&state->frame->hmvp_lut[ctu_row_mul_five], original_lut, sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
-    state->frame->hmvp_size[ctu_row] = original_lut_size;
+    memcpy(&state->tile->frame->hmvp_lut[ctu_row_mul_five], original_lut, sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
+    state->tile->frame->hmvp_size[ctu_row] = original_lut_size;
   }
 
   encoder_state_recdata_to_bufs(state, lcu, state->tile->hor_buf_search, state->tile->ver_buf_search);
@@ -850,8 +850,14 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
   // Select whether to encode the frame/tile in current thread or to define
   // wavefront jobs for other threads to handle.
   bool wavefront = state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW;
+
+  // Clear hmvp lut size before each leaf
+  if (!wavefront) memset(state->tile->frame->hmvp_size, 0, sizeof(uint8_t) * state->tile->frame->height_in_lcu);
+  else state->tile->frame->hmvp_size[state->wfrow->lcu_offset_y] = 0;
+
   bool use_parallel_encoding = (wavefront && state->parent->children[1].encoder_control);
   if (!use_parallel_encoding) {
+    
     // Encode every LCU in order and perform SAO reconstruction after every
     // frame is encoded. Deblocking and SAO search is done during LCU encoding.
     for (int i = 0; i < state->lcu_order_count; ++i) {
@@ -1428,7 +1434,9 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
       state->tile->frame->width,
       state->tile->frame->height
   );
-  memset(state->frame->hmvp_size, 0, sizeof(uint8_t) * state->encoder_control->in.height_in_lcu);
+  if (!state->encoder_control->tiles_enable) {
+    memset(state->tile->frame->hmvp_size, 0, sizeof(uint8_t) * state->tile->frame->height_in_lcu);
+  }
 
   // Variance adaptive quantization
   if (cfg->vaq) {

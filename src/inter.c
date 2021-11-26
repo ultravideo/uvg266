@@ -1349,11 +1349,11 @@ static void get_mv_cand_from_candidates(const encoder_state_t * const state,
   {
     const uint32_t ctu_row = (y >> LOG2_LCU_WIDTH);
     const uint32_t ctu_row_mul_five = ctu_row * MAX_NUM_HMVP_CANDS;
-    int32_t num_cand = state->frame->hmvp_size[ctu_row];
+    int32_t num_cand = state->tile->frame->hmvp_size[ctu_row];
     for (int i = 0; i < MIN(/*MAX_NUM_HMVP_AVMPCANDS*/4,num_cand); i++) {
       for (int pred_source = 0; pred_source < 2; pred_source++) {
         const int cand_list = pred_source == 0 ? reflist : !reflist;
-        cu_info_t* cand = &state->frame->hmvp_lut[ctu_row_mul_five + num_cand - 1 - i];
+        cu_info_t* cand = &state->tile->frame->hmvp_lut[ctu_row_mul_five + num_cand - 1 - i];
         if ((cand->inter.mv_dir & (1 << cand_list)) == 0) continue;
         // Make sure the candidate points to the same reference frame
         if (state->frame->ref_LX[cand_list][cand->inter.mv_ref[cand_list]] ==
@@ -1541,9 +1541,9 @@ void kvz_hmvp_add_mv(const encoder_state_t* const state, uint32_t pic_x, uint32_
       const uint32_t ctu_row_mul_five = ctu_row * MAX_NUM_HMVP_CANDS;
 
       
-      bool add_row = hmvp_push_lut_item(&state->frame->hmvp_lut[ctu_row_mul_five], state->frame->hmvp_size[ctu_row], cu);
-      if(add_row && state->frame->hmvp_size[ctu_row] < MAX_NUM_HMVP_CANDS) {
-        state->frame->hmvp_size[ctu_row]++;
+      bool add_row = hmvp_push_lut_item(&state->tile->frame->hmvp_lut[ctu_row_mul_five], state->tile->frame->hmvp_size[ctu_row], cu);
+      if(add_row && state->tile->frame->hmvp_size[ctu_row] < MAX_NUM_HMVP_CANDS) {
+        state->tile->frame->hmvp_size[ctu_row]++;
       }
     }
   }
@@ -1713,21 +1713,21 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
   if (candidates != max_num_cands - 1) {
     const uint32_t ctu_row = (y >> LOG2_LCU_WIDTH);
     const uint32_t ctu_row_mul_five = ctu_row * MAX_NUM_HMVP_CANDS;
-    int32_t num_cand = state->frame->hmvp_size[ctu_row];
-    // ToDo: VVC: verify B-frames
+    int32_t num_cand = state->tile->frame->hmvp_size[ctu_row];
+
     for (int i = 0; i < num_cand; i++) {
-      const cu_info_t* hmvp_cand = &state->frame->hmvp_lut[ctu_row_mul_five + i];
+      const cu_info_t* hmvp_cand = &state->tile->frame->hmvp_lut[ctu_row_mul_five + i];
       // ToDo: Add IBC condition
       if (i > 1 || ((!is_duplicate_candidate(hmvp_cand, a[1]))
                  && (!is_duplicate_candidate(hmvp_cand, b[1]))) ) {
-        mv_cand[candidates].mv[0][0] = state->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv[0][0];
-        mv_cand[candidates].mv[0][1] = state->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv[0][1];
-        mv_cand[candidates].dir = state->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv_dir;
-        mv_cand[candidates].ref[0] = state->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv_ref[0];
+        mv_cand[candidates].mv[0][0] = state->tile->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv[0][0];
+        mv_cand[candidates].mv[0][1] = state->tile->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv[0][1];
+        mv_cand[candidates].dir = state->tile->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv_dir;
+        mv_cand[candidates].ref[0] = state->tile->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv_ref[0];
         if (state->frame->slicetype == KVZ_SLICE_B) {
-          mv_cand[candidates].mv[1][0] = state->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv[1][0];
-          mv_cand[candidates].mv[1][1] = state->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv[1][1];
-          mv_cand[candidates].ref[1] = state->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv_ref[1];
+          mv_cand[candidates].mv[1][0] = state->tile->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv[1][0];
+          mv_cand[candidates].mv[1][1] = state->tile->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv[1][1];
+          mv_cand[candidates].ref[1] = state->tile->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv_ref[1];
         }
         candidates++;
         if (candidates == max_num_cands - 1) break;

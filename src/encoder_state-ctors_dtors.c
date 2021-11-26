@@ -95,10 +95,6 @@ static int encoder_state_config_frame_init(encoder_state_t * const state) {
 
   state->frame->new_ratecontrol = kvz_get_rc_data(NULL);
 
-
-  state->frame->hmvp_lut = malloc(sizeof(cu_info_t) * encoder->in.height_in_lcu * MAX_NUM_HMVP_CANDS);
-  state->frame->hmvp_size = malloc(sizeof(uint8_t) * encoder->in.height_in_lcu);
-
   return 1;
 }
 
@@ -113,8 +109,6 @@ static void encoder_state_config_frame_finalize(encoder_state_t * const state) {
   FREE_POINTER(state->frame->lcu_stats);
   FREE_POINTER(state->frame->aq_offsets);
 
-  FREE_POINTER(state->frame->hmvp_lut);
-  FREE_POINTER(state->frame->hmvp_size);
 }
 
 static int encoder_state_config_tile_init(encoder_state_t * const state, 
@@ -124,6 +118,9 @@ static int encoder_state_config_tile_init(encoder_state_t * const state,
   const encoder_control_t * const encoder = state->encoder_control;
   state->tile->frame = kvz_videoframe_alloc(width, height, state->encoder_control->chroma_format, encoder->cfg.alf_type, encoder->cfg.cclm);
   
+  state->tile->frame->hmvp_lut = malloc(sizeof(cu_info_t) * height_in_lcu * MAX_NUM_HMVP_CANDS);
+  state->tile->frame->hmvp_size = calloc(1, sizeof(uint8_t) * height_in_lcu);
+
   state->tile->frame->rec = NULL;
   
   state->tile->frame->source = NULL;
@@ -195,6 +192,9 @@ static void encoder_state_config_tile_finalize(encoder_state_t * const state) {
       kvz_threadqueue_free_job(&state->tile->wf_recon_jobs[i]);
     }
   }
+
+  FREE_POINTER(state->tile->frame->hmvp_lut);
+  FREE_POINTER(state->tile->frame->hmvp_size);
 
   kvz_videoframe_free(state->tile->frame);
   state->tile->frame = NULL;
