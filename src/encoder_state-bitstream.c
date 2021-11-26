@@ -1198,7 +1198,7 @@ static void kvz_encoder_state_write_bitstream_ref_pic_list(
   int last_poc = 0;
   int poc_shift = 0;
   // We don't need to signal L1 list if it's copied from L0
-  bool copy_rpl1_from_rpl0 = (encoder->cfg.gop_len == 0 && encoder->cfg.bipred);
+  bool copy_rpl1_from_rpl0 = (encoder->cfg.gop_lowdelay || encoder->cfg.gop_len == 0) && encoder->cfg.bipred;
 
 
   for (int list = 0; list < 1 + copy_rpl1_from_rpl0; list++) {
