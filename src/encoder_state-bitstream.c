@@ -1276,8 +1276,8 @@ static void kvz_encoder_state_write_bitstream_ref_pic_list(
 
   if (ref_negative > 1 || ref_positive > 1) {
     WRITE_U(stream, 1, 1, "sh_num_ref_idx_active_override_flag");
-    if (ref_negative > 1) WRITE_UE(stream, ref_negative - 1, "sh_num_ref_idx_active_minus1[0]");
-    if (ref_positive > 1) WRITE_UE(stream, ref_positive - 1, "sh_num_ref_idx_active_minus1[1]");
+    if (ref_negative > 1) for(int list = 0; list < 1 + copy_rpl1_from_rpl0; list++) WRITE_UE(stream, ref_negative - 1, "sh_num_ref_idx_active_minus1[0]");
+    if (!copy_rpl1_from_rpl0 && ref_positive > 1) WRITE_UE(stream, ref_positive - 1, "sh_num_ref_idx_active_minus1[1]");
   }
 
 }
