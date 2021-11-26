@@ -566,7 +566,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   WRITE_U(stream, encoder->cfg.wpp, 1, "sps_entropy_coding_sync_enabled_flag");
   WRITE_U(stream, encoder->tiles_enable || encoder->cfg.wpp, 1, "sps_entry_point_offsets_present_flag");
 
-  WRITE_U(stream, 1, 4, "log2_max_pic_order_cnt_lsb_minus4");
+  WRITE_U(stream, encoder->poc_lsb_bits - 4, 4, "log2_max_pic_order_cnt_lsb_minus4");
   WRITE_U(stream, 0, 1, "sps_poc_msb_flag");
   WRITE_U(stream, 0, 2, "num_extra_ph_bits_bytes");
   WRITE_U(stream, 0, 2, "num_extra_sh_bits_bytes");
@@ -1085,8 +1085,8 @@ static void kvz_encoder_state_write_bitstream_picture_header(
   WRITE_U(stream, 0, 1, "non_reference_picture_flag");
 #endif
   WRITE_UE(stream, 0, "ph_pic_parameter_set_id");
-
-  WRITE_U(stream, state->frame->poc & 0x1f, 5, "ph_pic_order_cnt_lsb");
+  const int poc_lsb = state->frame->poc & ((1 << encoder->poc_lsb_bits) - 1);
+  WRITE_U(stream, poc_lsb, encoder->poc_lsb_bits, "ph_pic_order_cnt_lsb");
 
   // alf enable flags and aps IDs
   if (encoder->cfg.alf_type)
