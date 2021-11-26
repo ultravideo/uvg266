@@ -850,9 +850,13 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
   // Select whether to encode the frame/tile in current thread or to define
   // wavefront jobs for other threads to handle.
   bool wavefront = state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW;
+
+  // Clear hmvp lut size before each leaf
+  if (!wavefront) memset(state->tile->frame->hmvp_size, 0, sizeof(uint8_t) * state->tile->frame->height_in_lcu);
+  else state->tile->frame->hmvp_size[state->wfrow->lcu_offset_y] = 0;
+
   bool use_parallel_encoding = (wavefront && state->parent->children[1].encoder_control);
   if (!use_parallel_encoding) {
-    memset(state->tile->frame->hmvp_size, 0, sizeof(uint8_t) * state->tile->frame->height_in_lcu);
     
     // Encode every LCU in order and perform SAO reconstruction after every
     // frame is encoded. Deblocking and SAO search is done during LCU encoding.
