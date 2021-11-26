@@ -53,6 +53,9 @@ typedef struct videoframe
   kvz_picture *rec;            //!< \brief Reconstructed image.
   kvz_picture *rec_lmcs;       //!< \brief LMCS mapped reconstructed image, if available, otherwise points to source.
 
+  kvz_pixel *cclm_luma_rec;    //!< \brief buffer for the downsampled luma reconstruction for cclm
+  kvz_pixel *cclm_luma_rec_top_line;    //!< \brief buffer for the downsampled luma reconstruction for cclm
+
   uint8_t* lmcs_avg_processed; //!< \brief For each LCU, indicates if already calculated average of border pixels is available
   int32_t* lmcs_avg;           //!< \brief Average of LCU border pixels
 
@@ -78,7 +81,7 @@ typedef struct videoframe
 } videoframe_t;
 
 
-videoframe_t *kvz_videoframe_alloc(int32_t width, int32_t height, enum kvz_chroma_format chroma_format, enum kvz_alf alf_type);
+videoframe_t *kvz_videoframe_alloc(int32_t width, int32_t height, enum kvz_chroma_format chroma_format, enum kvz_alf alf_type, bool cclm);
 int kvz_videoframe_free(videoframe_t * const frame);
 
 void kvz_videoframe_set_poc(videoframe_t * frame, int32_t poc);

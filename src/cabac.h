@@ -117,6 +117,8 @@ typedef struct
     cabac_ctx_t transform_skip_gt1[4];
     cabac_ctx_t transform_skip_par;
     cabac_ctx_t transform_skip_gt2[5];
+    cabac_ctx_t cclm_flag;
+    cabac_ctx_t cclm_model;
 
   } ctx;
 } cabac_data_t;

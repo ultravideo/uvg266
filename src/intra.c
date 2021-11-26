@@ -248,6 +248,300 @@ static void intra_pred_dc(
 }
 
 
+enum lm_mode
+{
+  LM_CHROMA_IDX = 81,
+  LM_CHROMA_L_IDX = 82,
+  LM_CHROMA_T_IDX = 83,
+};
+
+
+static void get_cclm_parameters(
+  encoder_state_t const* const state,
+  int8_t width, int8_t height, int8_t mode,
+  int x0, int y0, int avai_above_right_units, int avai_left_below_units,
+  kvz_intra_ref* luma_src, kvz_intra_references*chroma_ref,
+  int16_t *a, int16_t*b, int16_t*shift) {
+
+  const int base_unit_size = 1 << (6 - PU_DEPTH_INTRA_MAX);
+
+  // TODO: take into account YUV422
+  const int unit_w = base_unit_size >> 1;
+  const int unit_h = base_unit_size >> 1;
+
+  const int c_height = height;
+  const int c_width = width;
+  height *= 2;
+  width *= 2;
+
+  const int tu_width_in_units = c_width / unit_w;
+  const int tu_height_in_units = c_height / unit_h;
+
+
+  int top_template_samp_num = width; // for MDLM, the template sample number is 2W or 2H;
+  int left_template_samp_num = height;
+
+  // These are used for calculating some stuff for non-square CUs
+  //int total_above_units = (top_template_samp_num + (unit_w - 1)) / unit_w;
+  //int total_left_units = (left_template_samp_num + (unit_h - 1)) / unit_h;
+  //int total_units = total_left_units + total_above_units + 1;
+  //int above_right_units = total_above_units - tu_width_in_units;
+  //int left_below_units = total_left_units - tu_height_in_units;
+  //int avai_above_right_units = 0;  // TODO these are non zero only with non-square CUs
+  //int avai_left_below_units = 0;
+  int avai_above_units = CLIP(0, tu_height_in_units, y0/base_unit_size);
+  int avai_left_units = CLIP(0, tu_width_in_units, x0 / base_unit_size);
+
+  bool above_available = avai_above_units != 0;
+  bool left_available = avai_left_units != 0;
+    
+  char internal_bit_depth = state->encoder_control->bitdepth;
+
+  int min_luma[2] = { MAX_INT, 0 };
+  int max_luma[2] = { -MAX_INT, 0 };
+  
+  kvz_pixel* src;
+  int actualTopTemplateSampNum = 0;
+  int actualLeftTemplateSampNum = 0;
+  if (mode == LM_CHROMA_T_IDX)
+  {
+    left_available = 0;
+    avai_above_right_units = avai_above_right_units > (c_height / unit_w) ? c_height / unit_w : avai_above_right_units;
+    actualTopTemplateSampNum = unit_w * (avai_above_units + avai_above_right_units);
+  }
+  else if (mode == LM_CHROMA_L_IDX)
+  {
+    above_available = 0;
+    avai_left_below_units = avai_left_below_units > (c_width / unit_h) ? c_width / unit_h : avai_left_below_units;
+    actualLeftTemplateSampNum = unit_h * (avai_left_units + avai_left_below_units);
+  }
+  else if (mode == LM_CHROMA_IDX)
+  {
+    actualTopTemplateSampNum = c_width;
+    actualLeftTemplateSampNum = c_height;
+  }
+  int startPos[2]; //0:Above, 1: Left
+  int pickStep[2];
+
+  int aboveIs4 = left_available ? 0 : 1;
+  int leftIs4 = above_available ? 0 : 1;
+
+  startPos[0] = actualTopTemplateSampNum >> (2 + aboveIs4);
+  pickStep[0] = MAX(1, actualTopTemplateSampNum >> (1 + aboveIs4));
+
+  startPos[1] = actualLeftTemplateSampNum >> (2 + leftIs4);
+  pickStep[1] = MAX(1, actualLeftTemplateSampNum >> (1 + leftIs4));
+
+  kvz_pixel selectLumaPix[4] = { 0, 0, 0, 0 };
+  kvz_pixel selectChromaPix[4] = { 0, 0, 0, 0 };
+
+  int cntT, cntL;
+  cntT = cntL = 0;
+  int cnt = 0;
+  if (above_available)
+  {
+    cntT = MIN(actualTopTemplateSampNum, (1 + aboveIs4) << 1);
+    src = luma_src->top;
+    const kvz_pixel* cur = chroma_ref->ref.top + 1;
+    for (int pos = startPos[0]; cnt < cntT; pos += pickStep[0], cnt++)
+    {
+      selectLumaPix[cnt] = src[pos];
+      selectChromaPix[cnt] = cur[pos];
+    }
+  }
+
+  if (left_available)
+  {
+    cntL = MIN(actualLeftTemplateSampNum, (1 + leftIs4) << 1);
+    src = luma_src->left;
+    const kvz_pixel* cur = chroma_ref->ref.left + 1;
+    for (int pos = startPos[1], cnt = 0; cnt < cntL; pos += pickStep[1], cnt++)
+    {
+      selectLumaPix[cnt + cntT] = src[pos];
+      selectChromaPix[cnt + cntT] = cur[pos];
+    }
+  }
+  cnt = cntL + cntT;
+
+  if (cnt == 2)
+  {
+    selectLumaPix[3] = selectLumaPix[0]; selectChromaPix[3] = selectChromaPix[0];
+    selectLumaPix[2] = selectLumaPix[1]; selectChromaPix[2] = selectChromaPix[1];
+    selectLumaPix[0] = selectLumaPix[1]; selectChromaPix[0] = selectChromaPix[1];
+    selectLumaPix[1] = selectLumaPix[3]; selectChromaPix[1] = selectChromaPix[3];
+  }
+
+  int minGrpIdx[2] = { 0, 2 };
+  int maxGrpIdx[2] = { 1, 3 };
+  int* tmpMinGrp = minGrpIdx;
+  int* tmpMaxGrp = maxGrpIdx;
+  if (selectLumaPix[tmpMinGrp[0]] > selectLumaPix[tmpMinGrp[1]])
+  {
+    SWAP(tmpMinGrp[0], tmpMinGrp[1], int);
+  }
+  if (selectLumaPix[tmpMaxGrp[0]] > selectLumaPix[tmpMaxGrp[1]])
+  {
+    SWAP(tmpMaxGrp[0], tmpMaxGrp[1], int);
+  }
+  if (selectLumaPix[tmpMinGrp[0]] > selectLumaPix[tmpMaxGrp[1]])
+  {
+    SWAP(tmpMinGrp, tmpMaxGrp, int*);
+  }
+  if (selectLumaPix[tmpMinGrp[1]] > selectLumaPix[tmpMaxGrp[0]])
+  {
+    SWAP(tmpMinGrp[1], tmpMaxGrp[0], int);
+  }
+
+  min_luma[0] = (selectLumaPix[tmpMinGrp[0]] + selectLumaPix[tmpMinGrp[1]] + 1) >> 1;
+  min_luma[1] = (selectChromaPix[tmpMinGrp[0]] + selectChromaPix[tmpMinGrp[1]] + 1) >> 1;
+  max_luma[0] = (selectLumaPix[tmpMaxGrp[0]] + selectLumaPix[tmpMaxGrp[1]] + 1) >> 1;
+  max_luma[1] = (selectChromaPix[tmpMaxGrp[0]] + selectChromaPix[tmpMaxGrp[1]] + 1) >> 1;
+
+  if (left_available || above_available)
+  {
+    int diff = max_luma[0] - min_luma[0];
+    if (diff > 0)
+    {
+      int diffC = max_luma[1] - min_luma[1];
+      int x = kvz_math_floor_log2(diff);
+      static const uint8_t DivSigTable[1 << 4] = {
+        // 4bit significands - 8 ( MSB is omitted )
+        0,  7,  6,  5,  5,  4,  4,  3,  3,  2,  2,  1,  1,  1,  1,  0
+      };
+      int normDiff = (diff << 4 >> x) & 15;
+      int v = DivSigTable[normDiff] | 8;
+      x += normDiff != 0;
+
+      int y = diffC ? kvz_math_floor_log2(abs(diffC)) + 1 : 0;
+      int add = 1 << y >> 1;
+      *a = (diffC * v + add) >> y;
+      *shift = 3 + x - y;
+      if (*shift < 1)
+      {
+        *shift = 1;
+        *a = ((*a == 0) ? 0 : (*a < 0) ? -15 : 15);   // a=Sign(a)*15
+      }
+      *b = min_luma[1] - ((*a * min_luma[0]) >> *shift);
+    }
+    else
+    {
+      *a = 0;
+      *b = min_luma[1];
+      *shift = 0;
+    }
+  }
+  else
+  {
+    *a = 0;
+
+    *b = 1 << (internal_bit_depth - 1);
+
+    *shift = 0;
+  }
+}
+
+static void linear_transform_cclm(cclm_parameters_t* cclm_params, kvz_pixel * src, kvz_pixel * dst, int stride, int height) {
+  int scale = cclm_params->a;
+  int shift = cclm_params->shift;
+  int offset = cclm_params->b;
+  for (int y = 0; y < height; ++y) {
+    for (int x=0; x < stride; ++x) {
+      int val = src[x + y * stride] * scale;
+      val >>= shift;
+      val += offset;
+      val = CLIP_TO_PIXEL(val);
+      dst[x + y * stride] = val;
+    }
+  }
+}
+
+
+void kvz_predict_cclm(
+  encoder_state_t const* const state,
+  const color_t color,
+  const int8_t width,
+  const int8_t height,
+  const int16_t x0,
+  const int16_t y0,
+  const int16_t stride,
+  const int8_t mode,
+  lcu_t* const lcu,
+  kvz_intra_references* chroma_ref,
+  kvz_pixel* dst,
+  cclm_parameters_t* cclm_params
+)
+{
+  assert(mode == LM_CHROMA_IDX || mode == LM_CHROMA_L_IDX || mode == LM_CHROMA_T_IDX);
+  assert(state->encoder_control->cfg.cclm);
+
+  
+  kvz_intra_ref sampled_luma_ref;
+  kvz_pixel sampled_luma[LCU_CHROMA_SIZE];
+
+  int x_scu = SUB_SCU(x0);
+  int y_scu = SUB_SCU(y0);
+
+  int available_above_right = 0;
+  int available_left_below = 0;
+
+
+  kvz_pixel *y_rec = lcu->rec.y + x_scu + y_scu * LCU_WIDTH;
+
+  // Essentially what this does is that it uses 6-tap filtering to downsample
+  // the luma intra references down to match the resolution of the chroma channel.
+  // The luma reference is only needed when we are not on the edge of the picture.
+  // Because the reference pixels that are needed on the edge of the ctu this code
+  // is kinda messy but what can you do
+
+  if (y0) {
+    for (; available_above_right < width / 2; available_above_right++) {
+      int x_extension = x_scu + width * 2 + 4 * available_above_right;
+      cu_info_t* pu = LCU_GET_CU_AT_PX(lcu, x_extension, y_scu - 4);
+      if (x_extension >= LCU_WIDTH || pu->type == CU_NOTSET) break;
+    }
+    if(y_scu == 0) {
+      if(!state->encoder_control->cfg.wpp) available_above_right = MIN(width / 2, (state->tile->frame->width - x0 - width * 2) / 4);
+      memcpy(sampled_luma_ref.top, &state->tile->frame->cclm_luma_rec_top_line[x0 / 2 + (y0 / 64 - 1) * (stride / 2)], sizeof(kvz_pixel) * (width + available_above_right * 2));
+    }
+    else {
+      for (int x = 0; x < width * (available_above_right ? 4 : 2); x += 2) {
+        bool left_padding = x0 || x;
+        int s = 4;
+        s += y_scu ? y_rec[x - LCU_WIDTH * 2] * 2            : state->tile->frame->rec->y[x0 + x + (y0 - 2) * stride] * 2;
+        s += y_scu ? y_rec[x - LCU_WIDTH * 2 + 1]            : state->tile->frame->rec->y[x0 + x + 1 + (y0 - 2) * stride];
+        s += y_scu && !(x0 && !x && !x_scu) ? y_rec[x - LCU_WIDTH * 2 - left_padding] : state->tile->frame->rec->y[x0 + x - left_padding + (y0 - 2) * stride];
+        s += y_scu ? y_rec[x - LCU_WIDTH] * 2                : state->tile->frame->rec->y[x0 + x + (y0 - 1) * stride] * 2;
+        s += y_scu ? y_rec[x - LCU_WIDTH + 1]                : state->tile->frame->rec->y[x0 + x + 1 + (y0 - 1) * stride];
+        s += y_scu && !(x0 && !x && !x_scu) ? y_rec[x - LCU_WIDTH - left_padding]     : state->tile->frame->rec->y[x0 + x - left_padding + (y0 - 1) * stride];
+        sampled_luma_ref.top[x / 2] = s >> 3;
+      }
+    }
+  }
+
+  if(x0) {
+    for (; available_left_below < height / 2; available_left_below++) {
+      int y_extension = y_scu + height * 2 + 4 * available_left_below;
+      cu_info_t* pu = LCU_GET_CU_AT_PX(lcu, x_scu - 4, y_extension);
+      if (y_extension >= LCU_WIDTH || pu->type == CU_NOTSET) break;
+      if(x_scu == 32 && y_scu == 0 && pu->depth == 0) break;
+    }
+    for(int i = 0; i < height + available_left_below * 2; i++) {
+      sampled_luma_ref.left[i] = state->tile->frame->cclm_luma_rec[(y0/2 + i) * (stride/2) + x0 / 2 - 1];
+    }    
+  }
+
+  kvz_pixels_blit(&state->tile->frame->cclm_luma_rec[x0 / 2 + (y0 * stride) / 4], sampled_luma, width, height, stride / 2, width);
+
+  int16_t a, b, shift;
+  get_cclm_parameters(state, width, height, mode,x0, y0, available_above_right, available_left_below, &sampled_luma_ref, chroma_ref, &a, &b, &shift);
+  cclm_params->shift = shift;
+  cclm_params->a = a;
+  cclm_params->b = b;
+
+  if(dst)
+    linear_transform_cclm(cclm_params, sampled_luma, dst, width, height);
+}
+
 void kvz_intra_predict(
   encoder_state_t *const state,
   kvz_intra_references *refs,
@@ -573,6 +867,7 @@ static void intra_recon_tb_leaf(
   int y,
   int depth,
   int8_t intra_mode,
+  cclm_parameters_t *cclm_params,
   lcu_t *lcu,
   color_t color)
 {
@@ -592,14 +887,29 @@ static void intra_recon_tb_leaf(
     state->tile->frame->width,
     state->tile->frame->height,
   };
-  const vector2d_t lcu_px = { SUB_SCU(x) >> shift, SUB_SCU(y) >> shift};
+  int x_scu = SUB_SCU(x);
+  int y_scu = SUB_SCU(y);
+  const vector2d_t lcu_px = {x_scu >> shift, y_scu >> shift };
 
   kvz_intra_references refs;
   kvz_intra_build_reference(log2width, color, &luma_px, &pic_px, lcu, &refs, cfg->wpp);
 
   kvz_pixel pred[32 * 32];
+  int stride = state->tile->frame->source->stride;
   const bool filter_boundary = color == COLOR_Y && !(cfg->lossless && cfg->implicit_rdpcm);
-  kvz_intra_predict(state, &refs, log2width, intra_mode, color, pred, filter_boundary);
+  if(intra_mode < 68) {
+    kvz_intra_predict(state, &refs, log2width, intra_mode, color, pred, filter_boundary);
+  } else {
+    kvz_pixels_blit(&state->tile->frame->cclm_luma_rec[x / 2 + (y * stride) / 4], pred, width, width, stride / 2, width);
+    if(cclm_params == NULL) {
+      cclm_parameters_t temp_params;
+      kvz_predict_cclm(
+        state, color, width, width, x, y, stride, intra_mode, lcu, &refs, pred, &temp_params);
+    }
+    else {
+      linear_transform_cclm(&cclm_params[color == COLOR_U ? 0 : 1], pred, pred, width, width);
+    }
+  }
 
   const int index = lcu_px.x + lcu_px.y * lcu_width;
   kvz_pixel *block = NULL;
@@ -634,6 +944,7 @@ static void intra_recon_tb_leaf(
  * \param mode_luma     intra mode for luma, or -1 to skip luma recon
  * \param mode_chroma   intra mode for chroma, or -1 to skip chroma recon
  * \param cur_cu        pointer to the CU, or NULL to fetch CU from LCU
+ * \param cclm_params   pointer for the cclm_parameters, can be NULL if the mode is not cclm mode
  * \param lcu           containing LCU
  */
 void kvz_intra_recon_cu(
@@ -644,6 +955,7 @@ void kvz_intra_recon_cu(
   int8_t mode_luma,
   int8_t mode_chroma,
   cu_info_t *cur_cu,
+  cclm_parameters_t *cclm_params,
   lcu_t *lcu)
 {
   const vector2d_t lcu_px = { SUB_SCU(x), SUB_SCU(y) };
@@ -668,10 +980,10 @@ void kvz_intra_recon_cu(
     const int32_t x2 = x + offset;
     const int32_t y2 = y + offset;
 
-    kvz_intra_recon_cu(state, x,  y,  depth + 1, mode_luma, mode_chroma, NULL, lcu);
-    kvz_intra_recon_cu(state, x2, y,  depth + 1, mode_luma, mode_chroma, NULL, lcu);
-    kvz_intra_recon_cu(state, x,  y2, depth + 1, mode_luma, mode_chroma, NULL, lcu);
-    kvz_intra_recon_cu(state, x2, y2, depth + 1, mode_luma, mode_chroma, NULL, lcu);
+    kvz_intra_recon_cu(state, x,  y,  depth + 1, mode_luma, mode_chroma, NULL, NULL, lcu);
+    kvz_intra_recon_cu(state, x2, y,  depth + 1, mode_luma, mode_chroma, NULL, NULL, lcu);
+    kvz_intra_recon_cu(state, x,  y2, depth + 1, mode_luma, mode_chroma, NULL, NULL, lcu);
+    kvz_intra_recon_cu(state, x2, y2, depth + 1, mode_luma, mode_chroma, NULL, NULL, lcu);
 
     // Propagate coded block flags from child CUs to parent CU.
     uint16_t child_cbfs[3] = {
@@ -692,11 +1004,11 @@ void kvz_intra_recon_cu(
     const bool has_chroma = mode_chroma != -1 &&  (x % 8 == 0 && y % 8 == 0);
     // Process a leaf TU.
     if (has_luma) {
-      intra_recon_tb_leaf(state, x, y, depth, mode_luma, lcu, COLOR_Y);
+      intra_recon_tb_leaf(state, x, y, depth, mode_luma, cclm_params, lcu, COLOR_Y);
     }
     if (has_chroma) {
-      intra_recon_tb_leaf(state, x, y, depth, mode_chroma, lcu, COLOR_U);
-      intra_recon_tb_leaf(state, x, y, depth, mode_chroma, lcu, COLOR_V);
+      intra_recon_tb_leaf(state, x, y, depth, mode_chroma, cclm_params, lcu, COLOR_U);
+      intra_recon_tb_leaf(state, x, y, depth, mode_chroma, cclm_params, lcu, COLOR_V);
     }
 
     kvz_quantize_lcu_residual(state, has_luma, has_chroma, x, y, depth, cur_cu, lcu, false);

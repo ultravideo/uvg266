@@ -1937,7 +1937,7 @@ static void search_pu_inter(encoder_state_t * const state,
     }
 
     // TODO: this probably should have a separate command line option
-    if (cfg->rdo == 3) {
+    if (cfg->rdo >= 3) {
       search_pu_inter_bipred(&info, depth, lcu, cur_cu, inter_cost, inter_bitcost);
     }
   }

@@ -178,6 +178,8 @@ static const struct option long_options[] = {
   { "no-jccr",                  no_argument, NULL, 0 },
   { "amvr",                     no_argument, NULL, 0 },
   { "no-amvr",                  no_argument, NULL, 0 },
+  { "cclm",                     no_argument, NULL, 0 },
+  { "no-cclm",                  no_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 
@@ -550,8 +552,8 @@ void print_help(void)
     "                                   - 0: Skip intra if inter is good enough.\n"
     "                                   - 1: Rough intra mode search with SATD.\n"
     "                                   - 2: Refine intra mode search with SSE.\n"
-    "                                   - 3: Try all intra modes and enable intra\n"
-    "                                        chroma mode search.\n"
+    "                                   - 3: Enable intra chroma mode search.\n"
+    "                                   - 4: Try all intra modes.\n"
     "      --(no-)mv-rdo          : Rate-distortion optimized motion vector costs\n"
     "                               [disabled]\n"
     "      --(no-)zero-coeff-rdo  : If a CU is set inter, check if forcing zero\n"
@@ -629,8 +631,12 @@ void print_help(void)
     "                                   - both: MTS applied for both intra and inter blocks.\n"
     "                                   - implicit: uses implicit MTS. Applies DST7 instead \n"
     "                                               of DCT2 to certain intra blocks.\n"
-    "      --(no-)jccr            : Joint coding of chroma residual.\n"
-    "                               Requires rdo> = 2. [disabled]\n"      
+    "      --(no-)jccr            : Joint coding of chroma residual. "
+    "                               Requires rdo> = 2. [disabled]\n"
+    "      --(no-)cclm            : Cross component linear model. \n"
+    "                               Extra chroma prediction modes that are formed\n"
+    "                               via linear transformation from the luma\n"
+    "                               prediction. Requires rdo >=3. [disabled\n"
     "      --(no-)amvr            : Adaptive Motion Vector Resolution.\n"
     "                               Code some mv's with reduced resolution [disabled]\n"
     "\n"

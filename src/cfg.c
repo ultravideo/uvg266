@@ -209,6 +209,8 @@ int kvz_config_init(kvz_config *cfg)
 
   cfg->amvr = 0;
 
+  cfg->cclm = 0;
+
   return 1;
 }
 
@@ -1485,6 +1487,9 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   }
   else if OPT("amvr") {
     cfg->amvr = (bool)atobool(value);
+  }
+  else if OPT("cclm") {
+    cfg->cclm = (bool)atobool(value);
   }
   else {
     return 0;

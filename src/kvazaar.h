@@ -516,6 +516,8 @@ typedef struct kvz_config
 
   int8_t jccr;
 
+  int8_t cclm;
+
   int8_t amvr; /* \brief Adaptive motion vector resolution parameter */
 } kvz_config;
 
