@@ -877,8 +877,8 @@ int8_t kvz_search_intra_chroma_rdo(encoder_state_t * const state,
 
     int c_width = MAX(32 >> (depth), 4);
 
-    kvz_intra_build_reference(MAX(LOG2_LCU_WIDTH - depth - 1, 2), COLOR_U, &luma_px, &pic_px, lcu, &refs[0], state->encoder_control->cfg.wpp);
-    kvz_intra_build_reference(MAX(LOG2_LCU_WIDTH - depth - 1, 2), COLOR_V, &luma_px, &pic_px, lcu, &refs[1], state->encoder_control->cfg.wpp);
+    kvz_intra_build_reference(MAX(LOG2_LCU_WIDTH - depth - 1, 2), COLOR_U, &luma_px, &pic_px, lcu, &refs[0], state->encoder_control->cfg.wpp, NULL, 0);
+    kvz_intra_build_reference(MAX(LOG2_LCU_WIDTH - depth - 1, 2), COLOR_V, &luma_px, &pic_px, lcu, &refs[1], state->encoder_control->cfg.wpp, NULL, 0);
 
     cclm_parameters_t cclm_params[2] = { 0 };
 
