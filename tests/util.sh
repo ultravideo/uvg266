@@ -39,7 +39,7 @@ valgrind_test() {
     # If $KVZ_TEST_VALGRIND is defined and equal to "1", run the test with
     # valgrind. Otherwise, run without valgrind.
     if [ "${KVZ_TEST_VALGRIND:-0}" = '1' ]; then
-        valgrind='valgrind --leak-check=full --track-origins=yes --error-exitcode=1 --'
+        valgrind='valgrind --leak-check=full --error-exitcode=1 --'
     else
         valgrind=''
     fi

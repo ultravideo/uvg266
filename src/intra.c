@@ -1025,8 +1025,9 @@ static void intra_recon_tb_leaf(
     // Copy extra ref lines, including ref line 1 and top left corner.
     for (int i = 0; i < MAX_REF_LINE_IDX; ++i) {
       int height = (LCU_WIDTH >> depth) * 2 + MAX_REF_LINE_IDX;
-      height = MIN(height, pic_px.y - (y - MAX_REF_LINE_IDX));
-      kvz_pixels_blit(&frame->rec->y[(y - MAX_REF_LINE_IDX) * frame->rec->stride + x - (1 + i)],
+      height = MIN(height, (LCU_WIDTH - lcu_px.y + MAX_REF_LINE_IDX)); // Cut short if on bottom LCU edge. Cannot take references from below since they don't exist.
+      height = MIN(height, pic_px.y - luma_px.y + MAX_REF_LINE_IDX);
+      kvz_pixels_blit(&frame->rec->y[(luma_px.y - MAX_REF_LINE_IDX) * frame->rec->stride + luma_px.x - (1 + i)],
         &extra_refs[i * 128],
         1, height,
         frame->rec->stride, 1);
