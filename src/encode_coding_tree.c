@@ -70,7 +70,7 @@ static void encode_mts_idx(encoder_state_t * const state,
   //TransformUnit &tu = *cu.firstTU;
   int mts_idx = pred_cu->tr_idx;
 
-  if (is_mts_allowed(state, pred_cu) && mts_idx != MTS_SKIP
+  if (is_mts_allowed(state, (cu_info_t* const )pred_cu) && mts_idx != MTS_SKIP
        && !pred_cu->violates_mts_coeff_constraint
        && pred_cu->mts_last_scan_pos
        //&& cu.lfnstIdx == 0
@@ -682,8 +682,8 @@ static bool encode_inter_prediction_unit(encoder_state_t * const state,
             mv_cand, cur_cu, ref_list_idx);
 
         uint8_t cu_mv_cand = CU_GET_MV_CAND(cur_cu, ref_list_idx);
-        const mv_t mvd_hor = cur_cu->inter.mv[ref_list_idx][0] - mv_cand[cu_mv_cand][0];
-        const mv_t mvd_ver = cur_cu->inter.mv[ref_list_idx][1] - mv_cand[cu_mv_cand][1];
+        mv_t mvd_hor = cur_cu->inter.mv[ref_list_idx][0] - mv_cand[cu_mv_cand][0];
+        mv_t mvd_ver = cur_cu->inter.mv[ref_list_idx][1] - mv_cand[cu_mv_cand][1];
 
         kvz_change_precision(INTERNAL_MV_PREC, kvz_g_imv_to_prec[KVZ_IMV_OFF], &mvd_hor, &mvd_ver);
 
@@ -792,7 +792,7 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
   uint8_t intra_pred_mode_actual[4];
   uint8_t *intra_pred_mode = intra_pred_mode_actual;
 
-  uint8_t intra_pred_mode_chroma = cur_cu->intra.mode_chroma;
+  //uint8_t intra_pred_mode_chroma = cur_cu->intra.mode_chroma;
   int8_t intra_preds[4][INTRA_MPM_COUNT] = {{-1, -1, -1, -1, -1, -1},{-1, -1, -1, -1, -1, -1},{-1, -1, -1, -1, -1, -1},{-1, -1, -1, -1, -1, -1}};
   int8_t mpm_preds[4] = {-1, -1, -1, -1};
   uint32_t flag[4];
@@ -823,7 +823,7 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
   const int num_pred_units = kvz_part_mode_num_parts[cur_cu->part_size];
 
   //ToDo: update multi_ref_lines variable when it's something else than constant 3
-  int multi_ref_lines = 3;
+  //int multi_ref_lines = 3;
   /*
   if(isp_enable_flag){ //ToDo: implement flag value to be something else than constant zero
     for (int i = 0; i < num_pred_units; i++) {
@@ -1156,8 +1156,8 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
 
     uint8_t implicit_split_mode = KVZ_NO_SPLIT;
     //bool implicit_split = border;
-    bool bottom_left_available = (abs_x >= 0) && ((abs_y + cu_width - 1) < ctrl->in.height);
-    bool top_right_available = ((abs_x + cu_width - 1) < ctrl->in.width) && (abs_y >= 0);
+    bool bottom_left_available = ((abs_y + cu_width - 1) < ctrl->in.height);
+    bool top_right_available = ((abs_x + cu_width - 1) < ctrl->in.width);
 
     /*
     if((depth >= 1 && (border_x != border_y))) implicit_split = false;
@@ -1299,7 +1299,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
 
     if (cur_cu->skipped) {
 
-      kvz_hmvp_add_mv(state, x, y, cu_width, cu_width, cur_cu);
+      kvz_hmvp_add_mv(state, x, y, (uint32_t)cu_width, (uint32_t)cu_width, cur_cu);
       int16_t num_cand = state->encoder_control->cfg.max_merge;
       if (num_cand > 1) {
         for (int ui = 0; ui < num_cand - 1; ui++) {

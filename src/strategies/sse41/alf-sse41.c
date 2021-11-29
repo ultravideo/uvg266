@@ -63,7 +63,7 @@ static void alf_derive_classification_blk_sse41(encoder_state_t * const state,
   const int posX = blk_pos_x;
   const int posY = blk_pos_y;
 
-  alf_classifier** classifier = state->tile->frame->alf_info->classifier;
+  //alf_classifier** classifier = state->tile->frame->alf_info->classifier;
 
   // 18x40 array
   uint16_t colSums[(CLASSIFICATION_BLK_SIZE + 4) >> 1]
@@ -407,7 +407,7 @@ static void alf_filter_5x5_block_sse41(encoder_state_t* const state,
 
   assert((vb_ctu_height & (vb_ctu_height - 1)) == 0 && "vb_ctu_height must be a power of 2");
   
-  alf_component_id compId = COMPONENT_Cb;
+  //alf_component_id compId = COMPONENT_Cb;
 
   const size_t srcStride = src_stride;
   const size_t dstStride = dst_stride;
@@ -603,7 +603,7 @@ static void alf_filter_7x7_block_sse41(encoder_state_t* const state,
   const int vb_ctu_height)
 {
   assert((vb_ctu_height & (vb_ctu_height - 1)) == 0 && "vb_ctu_height must be a power of 2");
-  alf_component_id compId = COMPONENT_Y;
+  //alf_component_id compId = COMPONENT_Y;
 
 
   const size_t srcStride = src_stride;

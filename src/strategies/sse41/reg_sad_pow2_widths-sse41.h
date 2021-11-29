@@ -429,7 +429,7 @@ static uint32_t ver_sad_w8(const uint8_t *pic_data, const uint8_t *ref_data,
 
   return _mm_cvtsi128_si32(sad);
 }
-
+/*
 static uint32_t ver_sad_w12(const uint8_t *pic_data, const uint8_t *ref_data,
                             int32_t height, uint32_t stride)
 {
@@ -448,7 +448,7 @@ static uint32_t ver_sad_w12(const uint8_t *pic_data, const uint8_t *ref_data,
   __m128i sad       = _mm_add_epi64    (sse_inc, sse_inc_2);
   return _mm_cvtsi128_si32(sad);
 }
-
+*/
 static uint32_t ver_sad_w16(const uint8_t *pic_data, const uint8_t *ref_data,
                             int32_t height, uint32_t stride)
 {
@@ -860,21 +860,21 @@ static INLINE uint32_t hor_sad_sse41_arbitrary(const uint8_t *pic_data, const ui
   int32_t  outside_width, inside_width, border_off,  invec_lstart,
            invec_lend,    invec_linc;
   if (left) {
-    outside_vecs  =    left                              >> vec_width_log2;
-    inside_vecs   = (( width           + vecwid_bitmask) >> vec_width_log2) - outside_vecs;
-    outside_width =    outside_vecs * vec_width;
-    inside_width  =    inside_vecs  * vec_width;
+    outside_vecs  =    (uint32_t)(left                                 >> vec_width_log2);
+    inside_vecs   =    (uint32_t)((( width           + vecwid_bitmask) >> vec_width_log2) - outside_vecs);
+    outside_width =    (int32_t)(outside_vecs * vec_width);
+    inside_width  =    (int32_t)(inside_vecs  * vec_width);
     left_offset   =    left;
     border_off    =    left;
     invec_lstart  =    0;
     invec_lend    =    inside_vecs;
     invec_linc    =    1;
-    is_left_bm    =    -1;
+    is_left_bm    =    (uint32_t)-1;
   } else {
-    inside_vecs   =  ((width - right) + vecwid_bitmask)  >> vec_width_log2;
-    outside_vecs  = (( width          + vecwid_bitmask)  >> vec_width_log2) - inside_vecs;
-    outside_width =    outside_vecs * vec_width;
-    inside_width  =    inside_vecs  * vec_width;
+    inside_vecs   =    (uint32_t)(((width - right) + vecwid_bitmask)  >> vec_width_log2);
+    outside_vecs  =    (uint32_t)((( width          + vecwid_bitmask)  >> vec_width_log2) - inside_vecs);
+    outside_width =    (uint32_t)(outside_vecs * vec_width);
+    inside_width  =    (uint32_t)(inside_vecs  * vec_width);
     left_offset   =    right - width;
     border_off    =    width - 1 - right;
     invec_lstart  =    inside_vecs - 1;

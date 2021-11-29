@@ -43,11 +43,6 @@
 
 #include "strategyselector.h"
 
-static int16_t clip_alf(const int16_t clip, const int16_t ref, const int16_t val0, const int16_t val1)
-{
-  return CLIP(-clip, +clip, val0 - ref) + CLIP(-clip, +clip, val1 - ref);
-}
-
 #define ALF_CLIP_AND_ADD(VAL0,VAL1) __m128i clips = _mm_loadl_epi64((__m128i*) clip); \
 __m128i neg_clips = _mm_sign_epi16(clips, negate); \
 __m128i val0 = _mm_set1_epi16((VAL0 - curr));\
@@ -105,7 +100,7 @@ static void alf_calc_covariance_avx2(int16_t e_local[MAX_NUM_ALF_LUMA_COEFF][MAX
   const int* filter_pattern = is_luma ? alf_pattern_7 : alf_pattern_5;
   const int half_filter_length = (is_luma ? 7 : 5) >> 1;
   const short* clip = alf_clipping_values[channel];
-  const int num_bins = MAX_ALF_NUM_CLIPPING_VALUES;
+  //const int num_bins = MAX_ALF_NUM_CLIPPING_VALUES;
 
   int k = 0;
 
@@ -207,7 +202,7 @@ static void alf_get_blk_stats_avx2(encoder_state_t* const state,
 {
   int16_t e_local[MAX_NUM_ALF_LUMA_COEFF][MAX_ALF_NUM_CLIPPING_VALUES];
 
-  const int num_bins = MAX_ALF_NUM_CLIPPING_VALUES;
+  //const int num_bins = MAX_ALF_NUM_CLIPPING_VALUES;
 
   int num_coeff = channel == CHANNEL_TYPE_LUMA ? 13 : 7;
   int transpose_idx = 0;

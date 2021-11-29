@@ -90,8 +90,8 @@ static uint32_t ver_sad_sse41(const uint8_t *pic_data, const uint8_t *ref_data,
     return ver_sad_w4(pic_data, ref_data, height, stride);
   if (width == 8)
     return ver_sad_w8(pic_data, ref_data, height, stride);
-  if (width == 12)
-    return ver_sad_w12(pic_data, ref_data, height, stride);
+  //if (width == 12)
+    //return ver_sad_w12(pic_data, ref_data, height, stride);
   if (width == 16)
     return ver_sad_w16(pic_data, ref_data, height, stride);
   else

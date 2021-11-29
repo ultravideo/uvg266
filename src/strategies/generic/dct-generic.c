@@ -2426,7 +2426,7 @@ static partial_tr_func* idct_table[3][5] = {
 
 
 static const tr_type_t mts_subset_intra[4][2] = { { DST7, DST7 }, { DCT8, DST7 }, { DST7, DCT8 }, { DCT8, DCT8 } };
-static const tr_type_t mts_subset_inter[2] = { DCT8, DST7 };
+//static const tr_type_t mts_subset_inter[2] = { DCT8, DST7 };
 
 
 void kvz_get_tr_type(
