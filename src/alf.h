@@ -167,21 +167,19 @@ typedef enum {
 
 //-------------------------typedef structs----------------------------
 #if defined(__MINGW32__) || defined(__MINGW64__) || defined(__linux__)
-#define PACK(__Declaration__) __Declaration__ __attribute__((__packed__))
+#define PACK(__Type__, __Declaration__) __Type__ __attribute__((__packed__)) __Declaration__ ;
 #else
-#define PACK(__Declaration__) __pragma(pack(push, 1)) __Declaration__ __pragma(pack(pop))
+#define PACK(__Type__,__Declaration__) __pragma(pack(push, 1)) __Type__ __Declaration__ __pragma(pack(pop));
 #endif
 
 
-PACK(
-typedef struct alf_covariance {
-  double pix_acc;  
+PACK(typedef struct, alf_covariance {
+  double pix_acc;
   int64_t ee[MAX_NUM_ALF_LUMA_COEFF][MAX_NUM_ALF_LUMA_COEFF][MAX_ALF_NUM_CLIPPING_VALUES][MAX_ALF_NUM_CLIPPING_VALUES];
   int32_t y[MAX_NUM_ALF_LUMA_COEFF][MAX_ALF_NUM_CLIPPING_VALUES];
   int num_coeff;
   int num_bins;
-} alf_covariance;)
-
+} alf_covariance)
 
 typedef struct clp_rng {
   int min;

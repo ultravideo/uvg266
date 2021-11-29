@@ -221,7 +221,7 @@ static void kvz_angular_pred_generic(
           bool use_cubic = true; // Default to cubic filter
           static const int kvz_intra_hor_ver_dist_thres[8] = { 24, 24, 24, 14, 2, 0, 0, 0 };
           int filter_threshold = kvz_intra_hor_ver_dist_thres[log2_width];
-          int dist_from_vert_or_hor = MIN(abs(pred_mode - 50), abs(pred_mode - 18));
+          int dist_from_vert_or_hor = MIN(abs((int32_t)pred_mode - 50), abs((int32_t)pred_mode - 18));
           if (dist_from_vert_or_hor > filter_threshold) {
             static const int16_t modedisp2sampledisp[32] = { 0,    1,    2,    3,    4,    6,     8,   10,   12,   14,   16,   18,   20,   23,   26,   29,   32,   35,   39,  45,  51,  57,  64,  73,  86, 102, 128, 171, 256, 341, 512, 1024 };
             const int_fast8_t mode_disp = (pred_mode >= 34) ? pred_mode - 50 : 18 - pred_mode;

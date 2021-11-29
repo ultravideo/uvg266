@@ -278,8 +278,8 @@ static void get_cclm_parameters(
   const int tu_height_in_units = c_height / unit_h;
 
 
-  int top_template_samp_num = width; // for MDLM, the template sample number is 2W or 2H;
-  int left_template_samp_num = height;
+  //int top_template_samp_num = width; // for MDLM, the template sample number is 2W or 2H;
+  //int left_template_samp_num = height;
 
   // These are used for calculating some stuff for non-square CUs
   //int total_above_units = (top_template_samp_num + (unit_w - 1)) / unit_w;
@@ -926,6 +926,7 @@ static void intra_recon_tb_leaf(
       block = &lcu->rec.v[index];
       block2 = &lcu->rec.joint_v[index];
       break;
+    default: break;
   }
 
   kvz_pixels_blit(pred, block , width, width, width, lcu_width);

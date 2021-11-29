@@ -133,7 +133,7 @@ static void kvz_angular_pred_avx2(
 
                                                     // Temporary buffer for modes 11-25.
                                                     // It only needs to be big enough to hold indices from -width to width-1.
-  kvz_pixel tmp_ref[2 * 128] = { 0 };
+  //kvz_pixel tmp_ref[2 * 128] = { 0 };
   kvz_pixel temp_main[2 * 128] = { 0 };
   kvz_pixel temp_side[2 * 128] = { 0 };
   const int_fast32_t width = 1 << log2_width;
@@ -213,7 +213,6 @@ static void kvz_angular_pred_avx2(
       temp_side[i] = (vertical_mode ? in_ref_left[i] : in_ref_above[i]);
     }
 
-    const int log2_ratio = 0;
     const int s = 0;
     const int max_index = (0 << s) + 2;
     const int ref_length = width << 1;
@@ -264,7 +263,7 @@ static void kvz_angular_pred_avx2(
             bool use_cubic = true; // Default to cubic filter
             static const int kvz_intra_hor_ver_dist_thres[8] = { 24, 24, 24, 14, 2, 0, 0, 0 };
             int filter_threshold = kvz_intra_hor_ver_dist_thres[log2_width];
-            int dist_from_vert_or_hor = MIN(abs(pred_mode - 50), abs(pred_mode - 18));
+            int dist_from_vert_or_hor = MIN(abs((int32_t)pred_mode - 50), abs((int32_t)pred_mode - 18));
             if (dist_from_vert_or_hor > filter_threshold) {
               static const int16_t modedisp2sampledisp[32] = { 0,    1,    2,    3,    4,    6,     8,   10,   12,   14,   16,   18,   20,   23,   26,   29,   32,   35,   39,  45,  51,  57,  64,  73,  86, 102, 128, 171, 256, 341, 512, 1024 };
               const int_fast8_t mode_disp = (pred_mode >= 34) ? pred_mode - 50 : 18 - pred_mode;
@@ -275,7 +274,7 @@ static void kvz_angular_pred_avx2(
               }
             }
             const int16_t filter_coeff[4] = { 16 - (delta_fract[yy] >> 1), 32 - (delta_fract[yy] >> 1), 16 + (delta_fract[yy] >> 1), delta_fract[yy] >> 1 };
-            int16_t *temp_f = use_cubic ? cubic_filter[delta_fract[yy]] : filter_coeff;
+            const int16_t *temp_f = use_cubic ? cubic_filter[delta_fract[yy]] : filter_coeff;
             memcpy(f[yy], temp_f, 4 * sizeof(*temp_f));
           }
 
@@ -288,7 +287,7 @@ static void kvz_angular_pred_avx2(
 
           for (int_fast32_t x = 0; x + 3 < width; x += 4, p += 4) {
 
-            __m256i vp = _mm256_i64gather_epi64((uint64_t*)p, vidx, 1);
+            __m256i vp = _mm256_i64gather_epi64((const long long int*)p, vidx, 1);
             __m256i vp_01 = _mm256_shuffle_epi8(vp, p_shuf_01);
             __m256i vp_23 = _mm256_shuffle_epi8(vp, p_shuf_23);
               
@@ -362,7 +361,7 @@ static void kvz_angular_pred_avx2(
 
           __m128i vseq   = _mm_setr_epi32(0, 1, 2, 3);
           __m128i vidx   = _mm_slli_epi32(vseq, log2_width);
-          __m128i vdst   = _mm_i32gather_epi32((uint32_t*)(dst + y * width + x), vidx, 1);
+          __m128i vdst   = _mm_i32gather_epi32((const int32_t*)(dst + y * width + x), vidx, 1);
           __m256i vdst16 = _mm256_cvtepu8_epi16(vdst);
           __m256i vleft  = _mm256_loadu_si256((__m256i*)left);
           uint64_t quad;
@@ -464,8 +463,8 @@ static void kvz_angular_pred_avx2(
     for (int_fast32_t y = 0; y + 3 < width; y += 4) {
       for (int_fast32_t x = y; x + 3 < width; x += 4) {
 
-        __m128i vtemp4x4 = _mm_i32gather_epi32((uint32_t*)(dst + x * width + y), vidx, 1);
-        __m128i v4x4     = _mm_i32gather_epi32((uint32_t*)(dst + y * width + x), vidx, 1);
+        __m128i vtemp4x4 = _mm_i32gather_epi32((const int32_t*)(dst + x * width + y), vidx, 1);
+        __m128i v4x4     = _mm_i32gather_epi32((const int32_t*)(dst + y * width + x), vidx, 1);
         vtemp4x4 = _mm_shuffle_epi8(vtemp4x4, vtranspose_mask);
         v4x4     = _mm_shuffle_epi8(v4x4, vtranspose_mask);
 
@@ -999,7 +998,7 @@ static void kvz_pdpc_planar_dc_avx2(
 
       __m128i vseq = _mm_setr_epi32(0, 1, 2, 3);
       __m128i vidx = _mm_slli_epi32(vseq, log2_width);
-      __m128i vdst = _mm_i32gather_epi32((uint32_t*)(dst + y * width + x), vidx, 1);
+      __m128i vdst = _mm_i32gather_epi32((const int32_t*)(dst + y * width + x), vidx, 1);
       __m256i vdst16 = _mm256_cvtepu8_epi16(vdst);
       uint64_t quad_wL;
       uint64_t quad_wT;

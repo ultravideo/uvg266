@@ -872,8 +872,8 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
         kvz_pixel bL[4][8];
 
         if (is_side_P_large) {
-          gather_deblock_pixels(edge_src - 6 * x_stride, x_stride, 0 * y_stride, 2, &bL[0][0] - 2);
-          gather_deblock_pixels(edge_src - 6 * x_stride, x_stride, 3 * y_stride, 2, &bL[3][0] - 2);
+          gather_deblock_pixels(edge_src - 6 * x_stride, x_stride, 0 * y_stride, 2, &bL[0][0]/* - 2 */);
+          gather_deblock_pixels(edge_src - 6 * x_stride, x_stride, 3 * y_stride, 2, &bL[3][0]/* - 2 */);
           dp0L = (dp0L + abs(bL[0][2] - 2 * bL[0][3] + b[0][0]) + 1) >> 1;
           dp3L = (dp3L + abs(bL[3][2] - 2 * bL[3][3] + b[3][0]) + 1) >> 1;
         }
@@ -1170,7 +1170,6 @@ static void filter_deblock_unit(encoder_state_t * const state,
 
   // Length of luma and chroma edges.
   int32_t length;
-  int32_t length_c;
   if (dir == EDGE_HOR) {
     const videoframe_t* const frame = state->tile->frame;
     const int32_t x_right = x + width;
@@ -1180,16 +1179,13 @@ static void filter_deblock_unit(encoder_state_t * const state,
     if (rightmost_8px_of_lcu && !rightmost_8px_of_frame && !previous_ctu) {
       // The last 8 pixels will be deblocked when processing the next LCU.
       length   = width - 4;
-      length_c = (width >> 1) - 2;
       if (length == 0) return;
 
     } else {
       length   = width;
-      length_c = width >> 1;
     }
   } else {
     length   = height;
-    length_c = height >> 1;
   }
 
   filter_deblock_edge_luma(state, x, y, length, dir, tu_boundary);

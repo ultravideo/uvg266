@@ -631,8 +631,6 @@ static void encoder_state_worker_encode_lcu_search(void * opaque)
   lcu_order_element_t * const lcu = opaque;
   encoder_state_t *state = lcu->encoder_state;
   const encoder_control_t * const encoder = state->encoder_control;
-  videoframe_t* const frame = state->tile->frame;
-  encoder_state_config_slice_t *slice = state->slice;
 
   switch (encoder->cfg.rc_algorithm) {
   case KVZ_NO_RC:
@@ -713,7 +711,6 @@ static void encoder_state_worker_encode_lcu_bitstream(void * opaque)
   encoder_state_t *state = lcu->encoder_state;
   const encoder_control_t * const encoder = state->encoder_control;
   videoframe_t* const frame = state->tile->frame;
-  encoder_state_config_slice_t *slice = state->slice;
 
   //Now write data to bitstream (required to have a correct CABAC state)
   const uint64_t existing_bits = kvz_bitstream_tell(&state->stream);
@@ -735,6 +732,7 @@ static void encoder_state_worker_encode_lcu_bitstream(void * opaque)
     lcu->coeff = NULL;
   }
 
+  /*
   bool end_of_slice_segment_flag;
   if (state->encoder_control->cfg.slices & KVZ_SLICES_WPP) {
     // Slice segments end after each WPP row.
@@ -751,6 +749,7 @@ static void encoder_state_worker_encode_lcu_bitstream(void * opaque)
     end_of_slice_segment_flag = is_last_tile && lcu->last_column && lcu->last_row;
   }
   //kvz_cabac_encode_bin_trm(&state->cabac, end_of_slice_segment_flag);
+  */
 
   {
     const bool end_of_tile = lcu->last_column && lcu->last_row;

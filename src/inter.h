@@ -75,7 +75,7 @@ void kvz_inter_pred_pu(const encoder_state_t * const state,
   bool predict_chroma,
   int i_pu);
 
-void kvz_hmvp_add_mv(const encoder_state_t* const state, uint32_t pic_x, uint32_t pic_y, uint32_t block_width, uint32_t block_height, cu_info_t* cu);
+void kvz_hmvp_add_mv(const encoder_state_t* const state, uint32_t pic_x, uint32_t pic_y, uint32_t block_width, uint32_t block_height, const cu_info_t* cu);
 
 void kvz_inter_recon_bipred(const encoder_state_t * const state,
                             const kvz_picture * ref1,

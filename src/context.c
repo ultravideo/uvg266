@@ -306,10 +306,10 @@ static const uint8_t INIT_CTB_ALF_ALTERNATIVE[4][2] = {
 };
 
 static const uint8_t INIT_USE_TEMPORAL_ALF_FILT[4] = {
-  {  46, },
-  {  46, },
-  {  46, },
-  {   0, },
+   46,
+   46,
+   46,
+    0,
 };
 
 static const uint8_t INIT_CC_ALF_FILTER_CONTROL_FLAG[4][6] = {
@@ -396,17 +396,17 @@ static const uint8_t INIT_IMV_FLAG[4][5] = {
 };
 
 static const uint8_t INIT_CCLM_FLAG[4] = {
-  {  26, },
-  {  34, },
-  {  59, },
-  {   4, },
+    26, 
+    34, 
+    59, 
+     4, 
 };
 
 static const uint8_t INIT_CCLM_MODEL[4] = {
-  {  27, },
-  {  27, },
-  {  27, },
-  {   9, },
+    27, 
+    27, 
+    27, 
+     9, 
 };
 
 /*

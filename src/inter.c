@@ -1498,12 +1498,12 @@ static void hmvp_shift_lut(cu_info_t* lut, int32_t size, int32_t start, int32_t 
   }
 }
 
-static bool hmvp_push_lut_item(cu_info_t* lut, int32_t size, cu_info_t* cu) {
+static bool hmvp_push_lut_item(cu_info_t* lut, int32_t size, const cu_info_t* cu) {
 
   int8_t duplicate = -1;
 
   for (int i = 0; i < size; i++) {
-    if (is_duplicate_candidate(cu, &lut[i])) {
+    if (is_duplicate_candidate(cu, (const cu_info_t*)&lut[i])) {
       duplicate = i;
       break;
     }
@@ -1526,7 +1526,7 @@ static bool hmvp_push_lut_item(cu_info_t* lut, int32_t size, cu_info_t* cu) {
  * \param block_height  block height in pixels
  * \param cu            current CU
  */
-void kvz_hmvp_add_mv(const encoder_state_t* const state, uint32_t pic_x, uint32_t pic_y, uint32_t block_width, uint32_t block_height, cu_info_t* cu)
+void kvz_hmvp_add_mv(const encoder_state_t* const state, uint32_t pic_x, uint32_t pic_y, uint32_t block_width, uint32_t block_height, const cu_info_t* cu)
 {
   //if (!cu.geoFlag && !cu.affine)
   if(cu->type == CU_INTER)
@@ -1655,7 +1655,6 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
 
   const cu_info_t **a = merge_cand.a;
   const cu_info_t **b = merge_cand.b;
-  const uint16_t mer[2] = {(x+width) >> parallel_merge_level, (y+height) >> parallel_merge_level };
 
   if (!use_a1) a[1] = NULL;
   if (!use_b1) b[1] = NULL;

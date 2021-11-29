@@ -101,12 +101,6 @@ static void init_ctu_alternative_chroma(const alf_aps *alf_param, uint8_t* ctu_a
       ++alt_idx;
   }
 }
-
-static int16_t clip_alf(const int16_t clip, const int16_t ref, const int16_t val0, const int16_t val1)
-{
-  return CLIP(-clip, +clip, val0 - ref) + CLIP(-clip, +clip, val1 - ref);
-}
-
 static void get_clip_max(const alf_covariance *cov, int *clip_max)
 {
   const int num_coeff = cov->num_coeff;
@@ -904,6 +898,7 @@ static void copy_aps(alf_aps *dst, alf_aps *src, bool cc_alf_enabled)
   }
 }
 
+/*
 static void copy_aps_to_map(param_set_map *dst, alf_aps *src, int8_t aps_id, bool cc_alf_enabled)
 {
   assert(0 <= aps_id && aps_id < ALF_CTB_MAX_NUM_APS);
@@ -928,6 +923,7 @@ static void copy_aps_to_map(param_set_map *dst, alf_aps *src, int8_t aps_id, boo
     }
   }
 }
+*/
 
 static void init_alf_covariance(alf_covariance *alf, int num_coeffs) {
   alf->num_coeff = num_coeffs;
@@ -937,22 +933,6 @@ static void init_alf_covariance(alf_covariance *alf, int num_coeffs) {
   memset(alf->ee, 0, sizeof(alf->ee));
 }
 
-static void copy_pixels(kvz_pixel *src, int x_src_start, int y_src_start, int src_stride,
-  kvz_pixel *dst, int x_dst_start, int y_dst_start, int dst_stride,
-  int width, int height)
-{
-  for (int y = 0; y < height; y++)
-  {
-    int src_y = y_src_start + y;
-    int dst_y = y_dst_start + y;
-    for (int x = 0; x < width; x++)
-    {
-      int src_x = x_src_start + x;
-      int dst_x = x_dst_start + x;
-      dst[dst_y*dst_stride + dst_x] = src[src_y*src_stride + src_x];
-    }
-  }
-}
 
 static void adjust_pixels(kvz_pixel *src, int x_start, int x_end, int y_start, int y_end, int stride, int pic_width, int pic_height)
 {
@@ -1564,42 +1544,6 @@ static void encode_alf_aps_flags(encoder_state_t * const state,
   }
 }
 
-
-// ToDo: Fill in LMCS APS
-static void encode_lmcs_aps(encoder_state_t* const state, lmcs_aps* aps)
-{
-  bitstream_t* const stream = &state->stream;
-  //SliceReshapeInfo param = pcAPS->getReshaperAPSInfo();
-  WRITE_UE(stream, 0/*param.reshaperModelMinBinIdx*/, "lmcs_min_bin_idx");
-  WRITE_UE(stream, 16 - 1/*16 - 1 - param.reshaperModelMaxBinIdx*/, "lmcs_delta_max_bin_idx");
-
-  WRITE_UE(stream, 7/*param.maxNbitsNeededDeltaCW - 1*/, "lmcs_delta_cw_prec_minus1");
-  /*
-  for (int i = param.reshaperModelMinBinIdx; i <= param.reshaperModelMaxBinIdx; i++)
-  {
-    int deltaCW = param.reshaperModelBinCWDelta[i];
-    int signCW = (deltaCW < 0) ? 1 : 0;
-    int absCW = (deltaCW < 0) ? (-deltaCW) : deltaCW;
-    WRITE_CODE(absCW, param.maxNbitsNeededDeltaCW, "lmcs_delta_abs_cw[ i ]");
-    if (absCW > 0)
-    {
-      WRITE_FLAG(signCW, "lmcs_delta_sign_cw_flag[ i ]");
-    }
-  }
-  int deltaCRS = pcAPS->chromaPresentFlag ? param.chrResScalingOffset : 0;
-  int signCRS = (deltaCRS < 0) ? 1 : 0;
-  int absCRS = (deltaCRS < 0) ? (-deltaCRS) : deltaCRS;
-  if (pcAPS->chromaPresentFlag)
-  {
-    WRITE_CODE(absCRS, 3, "lmcs_delta_abs_crs");
-  }
-  if (absCRS > 0)
-  {
-    WRITE_FLAG(signCRS, "lmcs_delta_sign_crs_flag");
-  }
-  */
-}
-
 static void encoder_state_write_adaptation_parameter_set(encoder_state_t * const state, alf_aps *aps)
 {
 #ifdef KVZ_DEBUG
@@ -1645,7 +1589,7 @@ static void encode_alf_aps(encoder_state_t * const state)
         write_aps = true;
         aps = state->slice->alf->apss[aps_id]; // use aps from slice header
 
-        //*apsMap->allocatePS(apsId) = *aps; //allocate and cpy
+        // *apsMap->allocatePS(apsId) = *aps; //allocate and cpy
         copy_aps_to_map(aps_map, &aps, aps_id + T_ALF_APS + NUM_APS_TYPE_LEN);
         //m_pcALF->setApsIdStart(apsId);
         g_aps_id_start = aps_id;
@@ -2872,7 +2816,7 @@ static void derive_stats_for_cc_alf_filtering(encoder_state_t * const state,
     }
   }
 }
-
+/*
 static void count_luma_swing_greater_than_threshold(const kvz_pixel* luma,
   int luma_stride, int height, int width,
   int log2_block_width, int log2_block_height,
@@ -2927,7 +2871,9 @@ static void count_luma_swing_greater_than_threshold(const kvz_pixel* luma,
     luma += (luma_stride << log2_block_height);
   }
 }
+*/
 
+/*
 static void count_chroma_sample_value_near_mid_point(const kvz_pixel* chroma, int chroma_stride, int height, int width,
   int log2_block_width, int log2_block_height,
   uint64_t* chroma_sample_count_near_mid_point,
@@ -2963,6 +2909,7 @@ static void count_chroma_sample_value_near_mid_point(const kvz_pixel* chroma, in
     chroma += (chroma_stride << log2_block_height);
   }
 }
+*/
 
 static void init_distortion_cc_alf(alf_covariance* alf_covariance_cc_alf[MAX_NUM_COMPONENT], double **ctb_distortion_unfilter, const int num_ctus)
 {
@@ -3333,11 +3280,11 @@ static void alf_init_covariance(videoframe_t* frame, enum kvz_chroma_format chro
 void kvz_alf_create(videoframe_t *frame, enum kvz_chroma_format chroma_format)
 {
   const int num_ctus_in_pic = frame->width_in_lcu * frame->height_in_lcu;
-  const int pic_width = frame->width;
-  const int pic_height = frame->height;
-  const int luma_coeffs = 13;
-  const int chroma_coeffs = 7;
-  const int cc_alf_coeff = 8;
+  //const int pic_width = frame->width;
+  //const int pic_height = frame->height;
+  //const int luma_coeffs = 13;
+  //const int chroma_coeffs = 7;
+  //const int cc_alf_coeff = 8;
   int num_classes = 0;
 
   alf_info_t *alf_info = frame->alf_info;
@@ -4240,7 +4187,7 @@ static void alf_get_avai_aps_ids_luma(encoder_state_t * const state,
   int aps_id_checked = 0, cur_aps_id = state->tile->frame->alf_info->aps_id_start;
   if (cur_aps_id < ALF_CTB_MAX_NUM_APS)
   {
-    while ((aps_id_checked < ALF_CTB_MAX_NUM_APS) && !state->frame->is_irap && *size_of_aps_ids < ALF_CTB_MAX_NUM_APS /*&& /*!cs.slice->getPendingRasInit()*/)
+    while ((aps_id_checked < ALF_CTB_MAX_NUM_APS) && !state->frame->is_irap && *size_of_aps_ids < ALF_CTB_MAX_NUM_APS /*&& !cs.slice->getPendingRasInit()*/)
     {
       alf_aps *cur_aps = &state->slice->alf->apss[cur_aps_id];
       bool aps_found = (0 <= cur_aps->aps_id && cur_aps->aps_id < ALF_CTB_MAX_NUM_APS);
@@ -5039,7 +4986,7 @@ static void alf_encoder_ctb(encoder_state_t * const state,
           //newAPS = m_apsMap->allocatePS(new_aps_id);
           assert(new_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS < ALF_CTB_MAX_NUM_APS); //Invalid PS id
           bool found = false;
-          for (int i = 0; i < (sizeof(state->tile->frame->alf_param_set_map) / sizeof(state->tile->frame->alf_param_set_map[0])); i++) {
+          for (int i = 0; i < ALF_CTB_MAX_NUM_APS; i++) {
             if (state->tile->frame->alf_param_set_map[i].parameter_set.aps_id == new_aps_id + NUM_APS_TYPE_LEN + T_ALF_APS) {
               found = true;
             }

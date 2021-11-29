@@ -319,7 +319,7 @@ static int parse_tiles_specification(const char* const arg, int32_t * const ntil
 
   return 1;
 }
-
+/*
 static int parse_uint8(const char *numstr,uint8_t* number,int min, int max)
 {
   char *tail;
@@ -335,7 +335,7 @@ static int parse_uint8(const char *numstr,uint8_t* number,int min, int max)
     return 1;
   }
 }
-
+*/
 static int parse_int8(const char *numstr,int8_t* number,int min, int max)
 {
   char *tail;
@@ -351,7 +351,7 @@ static int parse_int8(const char *numstr,int8_t* number,int min, int max)
     return 1;
   }
 }
-
+/*
 static int parse_array(const char *array, uint8_t *coeff_key, int size,
                             int min, int max)
 {
@@ -383,6 +383,7 @@ static int parse_array(const char *array, uint8_t *coeff_key, int size,
   free(key);
   return 1;
 }
+*/
 
 static int parse_qp_scale_array(const char *array, int8_t *out)
 {
@@ -436,7 +437,7 @@ static int parse_pu_depth_list( const char *array, int32_t *depths_min, int32_t 
     char *token;
     int i = 0;
     int ptr = -1;
-    int len = strlen( list );
+    int len = (int)strlen( list );
     int retval = 1;
 
     //Reset depths in case multiple pu depth parameters are given
@@ -549,8 +550,6 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   static const char * const hash_names[] = { "none", "checksum", "md5", NULL };
 
   static const char * const cu_split_termination_names[] = { "zero", "off", NULL };
-  static const char * const crypto_toggle_names[] = { "off", "on", NULL };
-  static const char * const crypto_feature_names[] = { "mvs", "mv_signs", "trans_coeffs", "trans_coeff_signs", "intra_pred_modes", NULL };
 
   static const char * const me_early_termination_names[] = { "off", "on", "sensitive", NULL };
 

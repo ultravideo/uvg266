@@ -153,7 +153,7 @@ static void encoder_state_write_bitstream_PTL(bitstream_t *stream,
 
   // end Profile Tier
 
-  uint8_t level = state->encoder_control->cfg.level;
+  //uint8_t level = state->encoder_control->cfg.level;
   // ToDo: level hardcoded to 5.2
   WRITE_U(stream, 86, 8, "general_level_idc");
 
@@ -260,14 +260,13 @@ static uint8_t max_num_reorder_pics(const encoder_control_t * const encoder)
 {
   return encoder->cfg.gop_lowdelay ? 0 : MAX(encoder->cfg.gop_len - 1, 0);
 }
-
+/*
 static void encoder_state_write_bitstream_vid_parameter_set(bitstream_t* stream,
                                                             encoder_state_t * const state)
 {
 #ifdef KVZ_DEBUG
   printf("=========== Video Parameter Set ID: 0 ===========\n");
 #endif
-  const encoder_control_t* encoder = state->encoder_control;
 
   WRITE_U(stream, 1, 4, "vps_video_parameter_set_id");
   WRITE_U(stream, 0, 6, "vps_max_layers_minus1" );
@@ -283,6 +282,7 @@ static void encoder_state_write_bitstream_vid_parameter_set(bitstream_t* stream,
 
   kvz_bitstream_add_rbsp_trailing_bits(stream);
 }
+*/
 
 /*
 static void encoder_state_write_bitstream_scaling_list(bitstream_t *stream,
@@ -342,7 +342,7 @@ static void encoder_state_write_bitstream_scaling_list(bitstream_t *stream,
   }
 }
 */
-
+/*
 static void encoder_state_write_bitstream_VUI(bitstream_t *stream,
                                               encoder_state_t * const state)
 {
@@ -418,65 +418,8 @@ static void encoder_state_write_bitstream_VUI(bitstream_t *stream,
   //IF overscan info
   //ENDIF
 
-  /*
-  if (encoder->cfg.vui.videoformat != 5 ||
-      encoder->cfg.vui.fullrange   != 0 ||
-      encoder->cfg.vui.colorprim   != 2 ||
-      encoder->cfg.vui.transfer    != 2 ||
-      encoder->cfg.vui.colormatrix != 2) {
-    WRITE_U(stream, 1, 1, "video_signal_type_present_flag");
-    WRITE_U(stream, encoder->cfg.vui.videoformat, 3, "chroma_format");
-    WRITE_U(stream, encoder->cfg.vui.fullrange, 1, "video_full_range_flag");
-
-    if (encoder->cfg.vui.colorprim   != 2 ||
-        encoder->cfg.vui.transfer    != 2 ||
-        encoder->cfg.vui.colormatrix != 2) {
-      WRITE_U(stream, 1, 1, "colour_description_present_flag");
-      WRITE_U(stream, encoder->cfg.vui.colorprim, 8, "colour_primaries");
-      WRITE_U(stream, encoder->cfg.vui.transfer, 8, "transfer_characteristics");
-      WRITE_U(stream, encoder->cfg.vui.colormatrix, 8, "matrix_coeffs");
-    } else
-      WRITE_U(stream, 0, 1, "colour_description_present_flag");
-  } else
-    WRITE_U(stream, 0, 1, "video_signal_type_present_flag");
-
-  //IF video type
-  //ENDIF
-
-  if (encoder->cfg.vui.chroma_loc > 0) {
-    WRITE_U(stream, 1, 1, "chroma_loc_info_present_flag");
-    WRITE_UE(stream, encoder->cfg.vui.chroma_loc, "chroma_sample_loc_type_top_field");
-    WRITE_UE(stream, encoder->cfg.vui.chroma_loc, "chroma_sample_loc_type_bottom_field");
-  } else
-    WRITE_U(stream, 0, 1, "chroma_loc_info_present_flag");
-
-  //IF chroma loc info
-  //ENDIF
-
-  WRITE_U(stream, 0, 1, "neutral_chroma_indication_flag");
-  WRITE_U(stream, encoder->vui.field_seq_flag, 1, "field_seq_flag"); // 0: frames, 1: fields
-  WRITE_U(stream, encoder->vui.frame_field_info_present_flag, 1, "frame_field_info_present_flag");
-  WRITE_U(stream, 0, 1, "default_display_window_flag");
-
-  //IF default display window
-  //ENDIF
-
-  WRITE_U(stream, encoder->vui.timing_info_present_flag, 1, "vui_timing_info_present_flag");
-  if (encoder->vui.timing_info_present_flag) {
-    WRITE_U(stream, encoder->vui.num_units_in_tick, 32, "vui_num_units_in_tick");
-    WRITE_U(stream, encoder->vui.time_scale, 32, "vui_time_scale");
-
-    WRITE_U(stream, 0, 1, "vui_poc_proportional_to_timing_flag");
-    WRITE_U(stream, 0, 1, "vui_hrd_parameters_present_flag");    
-  }
-  
-  WRITE_U(stream, 0, 1, "bitstream_restriction_flag");
-
-  //IF bitstream restriction
-  //ENDIF
-
-  */
 }
+*/
 
 
 static void encoder_state_write_bitstream_SPS_extension(bitstream_t *stream,
@@ -1292,7 +1235,7 @@ void kvz_encoder_state_write_bitstream_slice_header(
 #ifdef KVZ_DEBUG
   printf("=========== Slice ===========\n");
 #endif
-
+  /*
   bool first_slice_segment_in_pic = (state->slice->start_in_rs == 0);
   if ((state->encoder_control->cfg.slices & KVZ_SLICES_WPP)
       && state->wfrow->lcu_offset_y > 0)
@@ -1301,6 +1244,7 @@ void kvz_encoder_state_write_bitstream_slice_header(
   }
 
   //WRITE_U(stream, first_slice_segment_in_pic, 1, "first_slice_segment_in_pic_flag");
+  */
 
   WRITE_U(stream, 1, 1, "picture_header_in_slice_header_flag");
 

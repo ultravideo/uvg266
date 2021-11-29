@@ -295,7 +295,7 @@ int yuv_io_seek(FILE* file, unsigned frames,
                 unsigned input_width, unsigned input_height,
                 unsigned file_format)
 {
-    const size_t frame_bytes = input_width * input_height * 3 / 2;
+    const size_t frame_bytes = (size_t)(input_width * input_height * 3 / 2);
 
     if (file_format == KVZ_FORMAT_Y4M) {
       for (unsigned i = 0; i < frames; i++) {

@@ -181,11 +181,7 @@ void kvz_transformskip(const encoder_control_t * const encoder, int16_t *block,i
  */
 void kvz_itransformskip(const encoder_control_t * const encoder, int16_t *block,int16_t *coeff, int8_t block_size)
 {
-  uint32_t log2_tr_size =  kvz_g_convert_to_bit[block_size] + 2;
-  int32_t  shift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - log2_tr_size;
   int32_t  j,k;
-  int32_t offset;
-  offset = (1 << (shift -1)); // For rounding
   for ( j = 0; j < block_size; j++ ) {
     for(k = 0; k < block_size; k ++) {
       block[j * block_size + k] =  coeff[j * block_size + k];
@@ -371,6 +367,8 @@ static void quantize_tr_residual(encoder_state_t * const state,
       pred = &lcu->rec.v[offset];
       ref  = &lcu->ref.v[offset];
       coeff = &lcu->coeff.v[z_index];
+      break;
+    default:
       break;
   }
 
