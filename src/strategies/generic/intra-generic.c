@@ -106,7 +106,7 @@ static void kvz_angular_pred_generic(
                                                     // It only needs to be big enough to hold indices from -width to width-1.
 
   // TODO: check the correct size for these arrays when MRL is used
-  kvz_pixel tmp_ref[2 * 128 + 3 + 33 * MAX_REF_LINE_IDX] = { 0 };
+  //kvz_pixel tmp_ref[2 * 128 + 3 + 33 * MAX_REF_LINE_IDX] = { 0 };
   kvz_pixel temp_main[2 * 128 + 3 + 33 * MAX_REF_LINE_IDX] = { 0 };
   kvz_pixel temp_side[2 * 128 + 3 + 33 * MAX_REF_LINE_IDX] = { 0 };
   const int_fast32_t width = 1 << log2_width;
@@ -192,7 +192,7 @@ static void kvz_angular_pred_generic(
     }
 
     // TODO: this code block will need to change also when non-square blocks are used
-    const int log2_ratio = 0;
+    // const int log2_ratio = 0;
     const int s = 0;
     const int max_index = (multi_ref_index << s) + 2;
     const int ref_length = width << 1;

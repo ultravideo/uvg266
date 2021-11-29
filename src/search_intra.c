@@ -723,9 +723,6 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
 
   kvz_pixel orig_block[LCU_WIDTH * LCU_WIDTH + 1];
 
-  const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
-  cu_info_t* cur_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
-
   // TODO: height for non-square blocks
   kvz_pixels_blit(orig, orig_block, width, width, origstride, width);
 

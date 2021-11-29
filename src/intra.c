@@ -872,7 +872,7 @@ void kvz_intra_build_reference_inner(
   // the border that points to the LCUs 1D reference buffer.
   if (px.x) {
     left_border = &rec_ref[px.x - 1 - multi_ref_index + px.y * (LCU_WIDTH >> is_chroma)];
-    left_stride = LCU_WIDTH >> is_chroma + multi_ref_index;
+    left_stride = (LCU_WIDTH >> is_chroma) + multi_ref_index;
     for (int i = 0; i <= multi_ref_index; ++i) {
       out_top_ref[i] = top_border[i - multi_ref_index - 1];
       out_left_ref[i] = left_border[i - multi_ref_index - 1 * left_stride];
@@ -1012,7 +1012,6 @@ static void intra_recon_tb_leaf(
   int x_scu = SUB_SCU(x);
   int y_scu = SUB_SCU(y);
   const vector2d_t lcu_px = {x_scu >> shift, y_scu >> shift };
-  cu_info_t* cur_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
   uint8_t multi_ref_index = multi_ref_idx;
 
   kvz_intra_references refs;
