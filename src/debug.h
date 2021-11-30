@@ -58,16 +58,16 @@ typedef struct encoder_state_t encoder_state_t;
 typedef struct encoder_control_t encoder_control_t;
 
 void kvz_dbg_yuview_init(const encoder_control_t* const encoder, char* filename, char* sequence);
-void kvz_dbg_yuview_add_vector(const encoder_state_t* const state, int x, int y, int width, int height, int type, int x_vec, int y_vec);
+void kvz_dbg_yuview_add_vector(int poc, int x, int y, int width, int height, int type, int x_vec, int y_vec);
 void kvz_dbg_yuview_add(const encoder_state_t* const state, int x, int y, int width, int height, int type, int val);
 void kvz_dbg_yuview_cleanup();
 
 #define DBG_YUVIEW_INIT(_encoder, _filename, _sequence) kvz_dbg_yuview_init(_encoder, _filename, _sequence);
-#define DBG_YUVIEW_MV(_type, _x, _y, _width, _height, _x_vec, _y_vec) kvz_dbg_yuview_add_vector(state, _type, _x, _y, _width, _height, _x_vec, _y_vec);
+#define DBG_YUVIEW_MV(_poc, _type, _x, _y, _width, _height, _x_vec, _y_vec) kvz_dbg_yuview_add_vector(_poc, _x, _y, _width, _height, _type, _x_vec, _y_vec);
 #define DBG_YUVIEW_CLEANUP() kvz_dbg_yuview_cleanup();
 #else
-#define DBG_YUVIEW_INIT(_filename, _sequence)
-#define DBG_YUVIEW_MV(_type, _x, _y, _width, _height, _x_vec, _y_vec)
+#define DBG_YUVIEW_INIT(_encoder, _filename, _sequence)
+#define DBG_YUVIEW_MV(_poc, _type, _x, _y, _width, _height, _x_vec, _y_vec)
 #define DBG_YUVIEW_CLEANUP()
 #endif //KVZ_DEBUG_PRINT_YUVIEW_CSV
 
