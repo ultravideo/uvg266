@@ -49,63 +49,63 @@ void kvz_dbg_yuview_init(const encoder_control_t* const encoder, char* filename,
 
   yuview_output = fopen(buf, "wb");
 
-  fprintf(yuview_output, "%%	syntax-version	v1.22\r\n");
-  fprintf(yuview_output, "%%	%%width and height of Chroma TUs are scaled to luma resolution\r\n");
-  fprintf(yuview_output, "%%	seq-specs		%s	layer2		%d	%d	%d\r\n", sequence, encoder->in.width, encoder->in.height, (int)encoder->cfg.framerate);
-  fprintf(yuview_output, "%%	type	0	PCM	map\r\n");
-  fprintf(yuview_output, "%%	mapColor	0	0	0	0	120\r\n");
-  fprintf(yuview_output, "%%	type	1	IntraDirLuma	range\r\n");
-  fprintf(yuview_output, "%%	defaultRange	0	35	Autumn\r\n");
-  fprintf(yuview_output, "%%	type	2	IntraDirChroma	range\r\n");
-  fprintf(yuview_output, "%%	defaultRange	0	36	Autumn\r\n");
-  fprintf(yuview_output, "%%	type	3	RefIdxSkipL0	range\r\n");
-  fprintf(yuview_output, "%%	range	0	4	0	65	75	154	160	255	255	255\r\n");
-  fprintf(yuview_output, "%%	type	4	RefIdxSkipL1	range\r\n");
-  fprintf(yuview_output, "%%	range	0	4	53	128	0	66	160	255	255	255\r\n");
-  fprintf(yuview_output, "%%	type	5	RefIdxMergeL0	range\r\n");
-  fprintf(yuview_output, "%%	range	0	4	75	154	160	255	0	65	255	255\r\n");
-  fprintf(yuview_output, "%%	type	6	RefIdxMergeL1	range\r\n");
-  fprintf(yuview_output, "%%	range	0	4	0	65	160	255	56	132	255	255\r\n");
-  fprintf(yuview_output, "%%	type	7	RefIdxInterL0	range\r\n");
-  fprintf(yuview_output, "%%	range	0	4	160	255	113	199	0	65	255	255\r\n");
-  fprintf(yuview_output, "%%	type	8	RefIdxInterL1	range\r\n");
-  fprintf(yuview_output, "%%	range	0	4	146	239	160	255	0	65	255	255\r\n");
-  fprintf(yuview_output, "%%	type	9	MVSkipL0	vector\r\n");
-  fprintf(yuview_output, "%%	vectorColor	0	0	0	255\r\n");
-  fprintf(yuview_output, "%%	scaleFactor	4\r\n");
-  fprintf(yuview_output, "%%	type	10	MVSkipL1	vector\r\n");
-  fprintf(yuview_output, "%%	vectorColor	255	255	255	255\r\n");
-  fprintf(yuview_output, "%%	scaleFactor	4\r\n");
-  fprintf(yuview_output, "%%	type	11	MVMergeL0	vector\r\n");
-  fprintf(yuview_output, "%%	vectorColor	0	0	0	255\r\n");
-  fprintf(yuview_output, "%%	scaleFactor	4\r\n");
-  fprintf(yuview_output, "%%	type	12	MVMergeL1	vector\r\n");
-  fprintf(yuview_output, "%%	vectorColor	255	255	255	255\r\n");
-  fprintf(yuview_output, "%%	scaleFactor	4\r\n");
-  fprintf(yuview_output, "%%	type	13	MVInterL0	vector\r\n");
-  fprintf(yuview_output, "%%	vectorColor	0	0	0	255\r\n");
-  fprintf(yuview_output, "%%	scaleFactor	4\r\n");
-  fprintf(yuview_output, "%%	type	14	MVInterL1	vector\r\n");
-  fprintf(yuview_output, "%%	vectorColor	255	255	255	255\r\n");
-  fprintf(yuview_output, "%%	scaleFactor	4\r\n");
-  fprintf(yuview_output, "%%	type	15	NumSigCoeffY	range\r\n");
-  fprintf(yuview_output, "%%	range	0	1024	0	255	0	255	0	255	255	255\r\n");
-  fprintf(yuview_output, "%%	scaleToBlockSize	1\r\n");
-  fprintf(yuview_output, "%%	type	16	NumSigCoeffU	range\r\n");
-  fprintf(yuview_output, "%%	range	0	1024	0	255	0	255	0	255	255	255\r\n");
-  fprintf(yuview_output, "%%	scaleToBlockSize	1\r\n");
-  fprintf(yuview_output, "%%	type	17	NumSigCoeffV	range\r\n");
-  fprintf(yuview_output, "%%	range	0	1024	0	255	0	255	0	255	255	255\r\n");
-  fprintf(yuview_output, "%%	scaleToBlockSize	1\r\n");
+  fprintf(yuview_output, "%%;syntax-version;v1.22\r\n");
+  fprintf(yuview_output, "%%;%%width and height of Chroma TUs are scaled to luma resolution\r\n");
+  fprintf(yuview_output, "%%;seq-specs;;%s;layer2;;%d;%d;%d\r\n", sequence, encoder->in.width, encoder->in.height, (int)encoder->cfg.framerate);
+  fprintf(yuview_output, "%%;type;0;PCM;map\r\n");
+  fprintf(yuview_output, "%%;mapColor;0;0;0;0;120\r\n");
+  fprintf(yuview_output, "%%;type;1;IntraDirLuma;range\r\n");
+  fprintf(yuview_output, "%%;defaultRange;0;35;Autumn\r\n");
+  fprintf(yuview_output, "%%;type;2;IntraDirChroma;range\r\n");
+  fprintf(yuview_output, "%%;defaultRange;0;36;Autumn\r\n");
+  fprintf(yuview_output, "%%;type;3;RefIdxSkipL0;range\r\n");
+  fprintf(yuview_output, "%%;range;0;4;0;65;75;154;160;255;255;255\r\n");
+  fprintf(yuview_output, "%%;type;4;RefIdxSkipL1;range\r\n");
+  fprintf(yuview_output, "%%;range;0;4;53;128;0;66;160;255;255;255\r\n");
+  fprintf(yuview_output, "%%;type;5;RefIdxMergeL0;range\r\n");
+  fprintf(yuview_output, "%%;range;0;4;75;154;160;255;0;65;255;255\r\n");
+  fprintf(yuview_output, "%%;type;6;RefIdxMergeL1;range\r\n");
+  fprintf(yuview_output, "%%;range;0;4;0;65;160;255;56;132;255;255\r\n");
+  fprintf(yuview_output, "%%;type;7;RefIdxInterL0;range\r\n");
+  fprintf(yuview_output, "%%;range;0;4;160;255;113;199;0;65;255;255\r\n");
+  fprintf(yuview_output, "%%;type;8;RefIdxInterL1;range\r\n");
+  fprintf(yuview_output, "%%;range;0;4;146;239;160;255;0;65;255;255\r\n");
+  fprintf(yuview_output, "%%;type;9;MVSkipL0;vector\r\n");
+  fprintf(yuview_output, "%%;vectorColor;0;0;0;255\r\n");
+  fprintf(yuview_output, "%%;scaleFactor;4\r\n");
+  fprintf(yuview_output, "%%;type;10;MVSkipL1;vector\r\n");
+  fprintf(yuview_output, "%%;vectorColor;255;255;255;255\r\n");
+  fprintf(yuview_output, "%%;scaleFactor;4\r\n");
+  fprintf(yuview_output, "%%;type;11;MVMergeL0;vector\r\n");
+  fprintf(yuview_output, "%%;vectorColor;0;0;0;255\r\n");
+  fprintf(yuview_output, "%%;scaleFactor;4\r\n");
+  fprintf(yuview_output, "%%;type;12;MVMergeL1;vector\r\n");
+  fprintf(yuview_output, "%%;vectorColor;255;255;255;255\r\n");
+  fprintf(yuview_output, "%%;scaleFactor;4\r\n");
+  fprintf(yuview_output, "%%;type;13;MVInterL0;vector\r\n");
+  fprintf(yuview_output, "%%;vectorColor;0;0;0;255\r\n");
+  fprintf(yuview_output, "%%;scaleFactor;4\r\n");
+  fprintf(yuview_output, "%%;type;14;MVInterL1;vector\r\n");
+  fprintf(yuview_output, "%%;vectorColor;255;255;255;255\r\n");
+  fprintf(yuview_output, "%%;scaleFactor;4\r\n");
+  fprintf(yuview_output, "%%;type;15;NumSigCoeffY;range\r\n");
+  fprintf(yuview_output, "%%;range;0;1024;0;255;0;255;0;255;255;255\r\n");
+  fprintf(yuview_output, "%%;scaleToBlockSize;1\r\n");
+  fprintf(yuview_output, "%%;type;16;NumSigCoeffU;range\r\n");
+  fprintf(yuview_output, "%%;range;0;1024;0;255;0;255;0;255;255;255\r\n");
+  fprintf(yuview_output, "%%;scaleToBlockSize;1\r\n");
+  fprintf(yuview_output, "%%;type;17;NumSigCoeffV;range\r\n");
+  fprintf(yuview_output, "%%;range;0;1024;0;255;0;255;0;255;255;255\r\n");
+  fprintf(yuview_output, "%%;scaleToBlockSize;1\r\n");
   
 }
 
 void kvz_dbg_yuview_add_vector(const encoder_state_t* const state, int x, int y, int width, int height, int type, int x_vec, int y_vec) {
-  fprintf(yuview_output, "%d	%d	%d	%d	%d	%d	%d	%d\r\n", state->tile->frame->poc, x, y, width, height, type, x_vec, y_vec);
+  fprintf(yuview_output, "%d;%d;%d;%d;%d;%d;%d;%d\r\n", state->tile->frame->poc, x, y, width, height, type, x_vec, y_vec);
 }
 
 void kvz_dbg_yuview_add(const encoder_state_t* const state, int x, int y, int width, int height, int type, int val) {
-  fprintf(yuview_output, "%d	%d	%d	%d	%d	%d	%d\r\n", state->tile->frame->poc, x, y, width, height, type, val);
+  fprintf(yuview_output, "%d;%d;%d;%d;%d;%d;%d\r\n", state->tile->frame->poc, x, y, width, height, type, val);
 }
 
 void kvz_dbg_yuview_cleanup() {
