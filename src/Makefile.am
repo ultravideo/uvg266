@@ -57,6 +57,8 @@ libkvazaar_la_SOURCES = \
 	context.h \
 	cu.c \
 	cu.h \
+	debug.c \
+	debug.h \
 	encoder.c \
 	encoder.h \
 	encoderstate.c \

@@ -266,6 +266,7 @@
     <ClCompile Include="..\..\src\strategies\avx2\alf-avx2.c">
       <Filter>Optimization\strategies\avx2</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\debug.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\bitstream.h">
@@ -497,6 +498,7 @@
     <ClInclude Include="..\..\src\strategies\avx2\alf-avx2.h">
       <Filter>Optimization\strategies\avx2</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\debug.h" />
   </ItemGroup>
   <ItemGroup>
     <YASM Include="..\..\src\extras\x86inc.asm">
@@ -508,5 +510,8 @@
     <YASM Include="..\..\src\strategies\x86_asm\picture-x86-asm-satd.asm">
       <Filter>Optimization\strategies\x86_asm</Filter>
     </YASM>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="ClassDiagram.cd" />
   </ItemGroup>
 </Project>

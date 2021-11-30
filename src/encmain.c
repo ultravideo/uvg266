@@ -55,6 +55,7 @@
 
 #include "checkpoint.h"
 #include "cli.h"
+#include "debug.h"
 #include "encoder.h"
 #include "kvazaar.h"
 #include "kvazaar_internal.h"
@@ -549,6 +550,10 @@ int main(int argc, char *argv[])
     goto exit_failure;
   }
 
+#ifdef KVZ_DEBUG_PRINT_YUVIEW_CSV
+  if (opts->debug != NULL) DBG_YUVIEW_INIT(encoder, opts->debug, opts->input);
+#endif
+
   //Now, do the real stuff
   {
 
@@ -819,6 +824,7 @@ done:
   if (output) fclose(output);
   if (recout) fclose(recout);
 
+  DBG_YUVIEW_CLEANUP();
   CHECKPOINTS_FINALIZE();
 
   return retval;

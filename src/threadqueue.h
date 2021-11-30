@@ -1,5 +1,3 @@
-#ifndef THREADQUEUE_H_
-#define THREADQUEUE_H_
 /*****************************************************************************
  * This file is part of uvg266 VVC encoder.
  *
@@ -31,6 +29,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  ****************************************************************************/
+#pragma once
 
 /**
  * \ingroup Threading
@@ -59,5 +58,3 @@ void kvz_threadqueue_free_job(threadqueue_job_t **job_ptr);
 int kvz_threadqueue_waitfor(threadqueue_queue_t * threadqueue, threadqueue_job_t * job);
 int kvz_threadqueue_stop(threadqueue_queue_t * threadqueue);
 void kvz_threadqueue_free(threadqueue_queue_t * threadqueue);
-
-#endif // THREADQUEUE_H_

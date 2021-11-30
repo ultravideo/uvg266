@@ -129,18 +129,6 @@ void kvz_encode_coeff_nxn_generic(encoder_state_t * const state,
     int32_t cg_pos_y = cg_blk_pos / (MIN((uint8_t)32, width) >> (log2_cg_size / 2));
     int32_t cg_pos_x = cg_blk_pos - (cg_pos_y * (MIN((uint8_t)32, width) >> (log2_cg_size / 2)));
 
-
-    /*if (type == 0 && width <= 32) {
-      if ((width == 32 && (cg_pos_x >= (16 >> clipped_log2_size))) || (width == 32 && (cg_pos_y >= (16 >> clipped_log2_size)))) {
-        continue;
-      }
-    }*/
-
-
-
-
-
-
     // !!! residual_coding_subblock() !!!
 
     // Encode significant coeff group flag when not the last or the first

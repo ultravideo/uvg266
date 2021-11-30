@@ -62,9 +62,6 @@
 #include <string.h>
 
 
-// VVC related definitions
-#define ENABLE_WPP_PARALLELISM 0
-
 //LMCS
 #define PIC_CODE_CW_BINS 16
 #define PIC_ANALYZE_CW_BINS 32
@@ -132,6 +129,8 @@ typedef int16_t mv_t;
 //#define VERBOSE 1
 //#define KVZ_DEBUG_PRINT_CABAC 1
 //#define KVZ_DEBUG 1
+
+//#define KVZ_DEBUG_PRINT_YUVIEW_CSV 1
 
 /* CONFIG VARIABLES */
 

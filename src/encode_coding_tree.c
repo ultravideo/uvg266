@@ -35,6 +35,7 @@
 #include "cabac.h"
 #include "context.h"
 #include "cu.h"
+#include "debug.h"
 #include "encoder.h"
 #include "global.h"
 #include "imagelist.h"
@@ -625,6 +626,10 @@ static bool encode_inter_prediction_unit(encoder_state_t * const state,
         if (symbol == 0) break;
       }
     }
+#ifdef KVZ_DEBUG_PRINT_YUVIEW_CSV
+    if (cur_cu->inter.mv_dir & 1) DBG_YUVIEW_MV(DBG_YUVIEW_MVMERGE_L0, x, y, width, height, cur_cu->inter.mv[0][0] >> INTERNAL_MV_PREC, cur_cu->inter.mv[0][1] >> INTERNAL_MV_PREC);
+    if (cur_cu->inter.mv_dir & 2) DBG_YUVIEW_MV(DBG_YUVIEW_MVMERGE_L1, x, y, width, height, cur_cu->inter.mv[1][0] >> INTERNAL_MV_PREC, cur_cu->inter.mv[1][1] >> INTERNAL_MV_PREC);
+#endif
   } else {
     if (state->frame->slicetype == KVZ_SLICE_B) {
       // Code Inter Dir
@@ -640,13 +645,13 @@ static bool encode_inter_prediction_unit(encoder_state_t * const state,
         cabac->cur_ctx = &(cabac->ctx.inter_dir[5]);
         CABAC_BIN(cabac, (inter_dir == 2), "inter_pred_idc");
       }
-    }
+   }
 
     for (uint32_t ref_list_idx = 0; ref_list_idx < 2; ref_list_idx++) {
       if (!(cur_cu->inter.mv_dir & (1 << ref_list_idx))) {
         continue;
       }
-
+      DBG_YUVIEW_MV(ref_list_idx ? DBG_YUVIEW_MVINTER_L0 : DBG_YUVIEW_MVINTER_L1, x, y, width, height, cur_cu->inter.mv[ref_list_idx][0] >> INTERNAL_MV_PREC, cur_cu->inter.mv[ref_list_idx][1] >> INTERNAL_MV_PREC);
       // size of the current reference index list (L0/L1)
       uint8_t ref_LX_size = state->frame->ref_LX_size[ref_list_idx];
 
@@ -1315,6 +1320,11 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
           }
         }
       }
+#ifdef KVZ_DEBUG_PRINT_YUVIEW_CSV
+      if (cur_cu->inter.mv_dir & 1) DBG_YUVIEW_MV(DBG_YUVIEW_MVSKIP_L0, abs_x, abs_y, cu_width, cu_width, cur_cu->inter.mv[0][0] >> INTERNAL_MV_PREC, cur_cu->inter.mv[0][1] >> INTERNAL_MV_PREC);
+      if (cur_cu->inter.mv_dir & 2) DBG_YUVIEW_MV(DBG_YUVIEW_MVSKIP_L1, abs_x, abs_y, cu_width, cu_width, cur_cu->inter.mv[1][0] >> INTERNAL_MV_PREC, cur_cu->inter.mv[1][1] >> INTERNAL_MV_PREC);
+#endif
+
       goto end;
     }
   }
