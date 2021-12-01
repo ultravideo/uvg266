@@ -653,9 +653,11 @@ static bool encode_inter_prediction_unit(encoder_state_t * const state,
       if (!(cur_cu->inter.mv_dir & (1 << ref_list_idx))) {
         continue;
       }
+#ifdef KVZ_DEBUG_PRINT_YUVIEW_CSV
       int abs_x = x + state->tile->offset_x;
       int abs_y = y + state->tile->offset_y;
       DBG_YUVIEW_MV(state->frame->poc, ref_list_idx ? DBG_YUVIEW_MVINTER_L1 : DBG_YUVIEW_MVINTER_L0, abs_x, abs_y, width, height, cur_cu->inter.mv[ref_list_idx][0], cur_cu->inter.mv[ref_list_idx][1]);
+#endif
       // size of the current reference index list (L0/L1)
       uint8_t ref_LX_size = state->frame->ref_LX_size[ref_list_idx];
 
@@ -1309,7 +1311,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
     CABAC_BIN(cabac, cur_cu->skipped, "SkipFlag");
 
     if (cur_cu->skipped) {
-
+      DBG_PRINT_MV(state, x, y, (uint32_t)cu_width, (uint32_t)cu_width, cur_cu);
       kvz_hmvp_add_mv(state, x, y, (uint32_t)cu_width, (uint32_t)cu_width, cur_cu);
       int16_t num_cand = state->encoder_control->cfg.max_merge;
       if (num_cand > 1) {
@@ -1410,7 +1412,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
       const cu_info_t *cur_pu = kvz_cu_array_at_const(frame->cu_array, pu_x, pu_y);
 
       non_zero_mvd |= encode_inter_prediction_unit(state, cabac, cur_pu, pu_x, pu_y, pu_w, pu_h, depth);
-
+      DBG_PRINT_MV(state, pu_x, pu_y, pu_w, pu_h, cur_pu);
       kvz_hmvp_add_mv(state, x, y, pu_w, pu_h, cur_pu);
     }
 

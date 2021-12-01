@@ -82,3 +82,10 @@ void kvz_dbg_yuview_cleanup();
 #ifdef KVZ_DEBUG_PRINT_THREADING_INFO
 void kvz_dbg_encoder_state_dump_graphviz(const encoder_state_t* const state)
 #endif //KVZ_DEBUG_PRINT_THREADING_INFO
+
+#ifdef KVZ_DEBUG_PRINT_MV_INFO
+void kvz_print_merge_vectors(const encoder_state_t* const state, uint32_t pic_x, uint32_t pic_y, uint32_t block_width, uint32_t block_height, cu_info_t* cu);
+#define DBG_PRINT_MV(_state, _pic_x, _pic_y, _block_width, _block_height, _cu) kvz_print_merge_vectors(_state, _pic_x, _pic_y, _block_width, _block_height, _cu);
+#else
+#define DBG_PRINT_MV(_state, _pic_x, _pic_y, _block_width, _block_height, _cu)
+#endif // KVZ_DEBUG_PRINT_MV_INFO

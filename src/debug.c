@@ -38,6 +38,7 @@
 
 #include "debug.h"
 #include "encoderstate.h"
+#include "inter.h"
 
 
 #ifdef KVZ_DEBUG_PRINT_YUVIEW_CSV
@@ -342,3 +343,74 @@ void kvz_dbg_encoder_state_dump_graphviz(const encoder_state_t* const state) {
   }
 }
 #endif //KVZ_DEBUG_PRINT_THREADING_INFO
+
+
+#ifdef KVZ_DEBUG_PRINT_MV_INFO
+static void lcu_from_cu_array(cu_array_t* src, int src_x, int src_y, lcu_t* dst)
+{
+  // ToDo: Fix invalid memory access outside of src->data
+  const int dst_stride = src->stride >> 2;
+  for (int y = src_y ? -4 : 0; y < LCU_WIDTH; y += SCU_WIDTH) {
+    for (int x = src_x ? -4 : 0; x < LCU_WIDTH; x += SCU_WIDTH) {
+      const cu_info_t* to_cu = LCU_GET_CU_AT_PX(dst, x, y);
+      const int x_scu = (src_x + x) >> 2;
+      const int y_scu = (src_y + y) >> 2;
+      cu_info_t* from_cu = &src->data[x_scu + y_scu * dst_stride];
+      memcpy(to_cu, from_cu, sizeof(*to_cu));
+    }
+  }
+  if (src_x) {
+    const cu_info_t* to_cu = LCU_GET_CU_AT_PX(dst, -1, 64);
+    const int x_scu = (src_x + -1) >> 2;
+    const int y_scu = (src_y + 64) >> 2;
+    cu_info_t* from_cu = &src->data[x_scu + y_scu * dst_stride];
+    memcpy(to_cu, from_cu, sizeof(*to_cu));
+  }
+  if (src_y) {
+    const cu_info_t* to_cu = LCU_GET_TOP_RIGHT_CU(dst);
+    const int x_scu = (src_x + 64) >> 2;
+    const int y_scu = (src_y + -1) >> 2;
+    cu_info_t* from_cu = &src->data[x_scu + y_scu * dst_stride];
+    memcpy(to_cu, from_cu, sizeof(*to_cu));
+  }
+
+
+}
+
+void kvz_print_merge_vectors(const encoder_state_t* const state, uint32_t pic_x, uint32_t pic_y, uint32_t block_width, uint32_t block_height, cu_info_t* cu) {
+
+  lcu_t lcu;
+  lcu_from_cu_array(state->tile->frame->cu_array, pic_x - SUB_SCU(pic_x), pic_y - SUB_SCU(pic_y), &lcu);
+  static int   val = 0;
+  inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS] = { 0 };
+  // Search for merge mode candidates
+  uint8_t num_merge_cand = kvz_inter_get_merge_cand(state,
+    pic_x, pic_y,
+    block_width, block_height,
+    true, true,
+    merge_cand,
+    &lcu
+  );
+  static FILE* lut = NULL;
+  if (lut == NULL) lut = fopen("uvg_merge2.txt", "w");
+
+
+  fprintf(lut, "%d: (%d,%d) Block (%d,%d) -> %d (", val++, pic_x, pic_y, block_width, block_height, cu->inter.mv_dir);
+
+  if (cu->inter.mv_dir & 1) fprintf(lut, "%d,%d ", cu->inter.mv[0][0], cu->inter.mv[0][1]);
+  if (cu->inter.mv_dir & 2) fprintf(lut, "%d,%d ", cu->inter.mv[1][0], cu->inter.mv[1][1]);
+  fprintf(lut, ") -> (");
+  for (int i = 0; i < num_merge_cand; i++)
+  {
+    mv_t mv[2] = { merge_cand[i].mv[0][0], merge_cand[i].mv[0][1] };
+    mv_t mv2[2] = { merge_cand[i].mv[1][0], merge_cand[i].mv[1][1] };
+    //kvz_change_precision(4, 2, &mv[0], &mv[1]);
+    fprintf(lut, "{ %d: ", merge_cand[i].dir);
+    if (merge_cand[i].dir & 1) fprintf(lut, "%d,%d, ", mv[0], mv[1]);
+    if (merge_cand[i].dir & 2) fprintf(lut, "%d,%d ", mv2[0], mv2[1]);
+    fprintf(lut, "} ");
+  }
+  fprintf(lut, "%d, %d)\n", cu->merged | cu->skipped, (cu->merged | cu->skipped) ? cu->merge_idx : 0);
+}
+
+#endif // KVZ_DEBUG_PRINT_MV_INFO
