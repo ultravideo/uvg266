@@ -38,6 +38,7 @@
 #include "bitstream.h"
 #include "cabac.h"
 #include "cu.h"
+#include "debug.h"
 #include "encoder.h"
 #include "encoder_state-geometry.h"
 #include "encoderstate.h"
@@ -230,129 +231,6 @@ static int encoder_state_config_wfrow_init(encoder_state_t * const state,
   state->wfrow->lcu_offset_y = lcu_offset_y;
   return 1;
 }
-
-#ifdef KVZ_DEBUG_PRINT_THREADING_INFO
-static void encoder_state_dump_graphviz(const encoder_state_t * const state) {
-  int i;
-  
-  if (!state->parent) {
-    const encoder_control_t * const encoder = state->encoder_control;
-    int y,x;
-    //Empty lines (easier to copy-paste)
-    printf("\n\n\n\n\n");
-    //Some styling...
-    printf("digraph EncoderStates {\n");
-    printf(" fontname = \"Bitstream Vera Sans\"\n");
-    printf(" fontsize = 8\n\n");
-    printf(" node [\n");
-    printf("  fontname = \"Bitstream Vera Sans\"\n");
-    printf("  fontsize = 8\n");
-    printf("  shape = \"record\"\n");
-    printf(" ]\n\n");
-    printf(" edge [\n");
-    printf("  arrowtail = \"empty\"\n");
-    printf(" ]\n\n");
-    
-    printf(" \"Map\" [\n");
-    printf("  shape=plaintext\n");
-    printf("  label = <<table cellborder=\"1\" cellspacing=\"0\" border=\"0\">");
-    printf("<tr><td colspan=\"%d\" height=\"20\" valign=\"bottom\"><b>RS Map</b></td></tr>", encoder->in.width_in_lcu);
-    for (y = 0; y < encoder->in.height_in_lcu; ++y) {
-      printf("<tr>");
-      for (x = 0; x < encoder->in.width_in_lcu; ++x) {
-        const int lcu_id_rs = y * encoder->in.width_in_lcu + x;
-        
-        printf("<td>%d</td>", lcu_id_rs);
-      }
-      printf("</tr>");
-    }
-    printf("<tr><td colspan=\"%d\" height=\"20\" valign=\"bottom\"><b>TS Map</b></td></tr>", encoder->in.width_in_lcu);
-    for (y = 0; y < encoder->in.height_in_lcu; ++y) {
-      printf("<tr>");
-      for (x = 0; x < encoder->in.width_in_lcu; ++x) {
-        const int lcu_id_rs = y * encoder->in.width_in_lcu + x;
-        const int lcu_id_ts = encoder->tiles_ctb_addr_rs_to_ts[lcu_id_rs];
-        
-        printf("<td>%d</td>", lcu_id_ts);
-      }
-      printf("</tr>");
-    }
-    printf("<tr><td colspan=\"%d\" height=\"20\" valign=\"bottom\"><b>Tile map</b></td></tr>", encoder->in.width_in_lcu);
-    for (y = 0; y < encoder->in.height_in_lcu; ++y) {
-      printf("<tr>");
-      for (x = 0; x < encoder->in.width_in_lcu; ++x) {
-        const int lcu_id_rs = y * encoder->in.width_in_lcu + x;
-        const int lcu_id_ts = encoder->tiles_ctb_addr_rs_to_ts[lcu_id_rs];
-        
-        printf("<td>%d</td>", encoder->tiles_tile_id[lcu_id_ts]);
-      }
-      printf("</tr>");
-    }
-    printf("<tr><td colspan=\"%d\" height=\"20\" valign=\"bottom\"><b>Slice map</b></td></tr>", encoder->in.width_in_lcu);
-    for (y = 0; y < encoder->in.height_in_lcu; ++y) {
-      printf("<tr>");
-      for (x = 0; x < encoder->in.width_in_lcu; ++x) {
-        const int lcu_id_rs = y * encoder->in.width_in_lcu + x;
-        const int lcu_id_ts = encoder->tiles_ctb_addr_rs_to_ts[lcu_id_rs];
-        int slice_id = 0;
-        
-        //Not efficient, but who cares
-        for (i=0; i < encoder->slice_count; ++i) {
-          if (encoder->slice_addresses_in_ts[i] <= lcu_id_ts) {
-            slice_id = i;
-          }
-        }
-        
-        printf("<td>%d</td>", slice_id);
-      }
-      printf("</tr>");
-    }
-    printf("</table>>\n ]\n");
-  }
-  
-  printf(" \"%p\" [\n", state);
-  printf("  label = \"{encoder_state|");
-  printf("+ type=%c\\l", state->type);
-  if (!state->parent || state->frame != state->parent->global) {
-    printf("|+ global\\l");
-  }
-  if (!state->parent || state->tile != state->parent->tile) {
-    printf("|+ tile\\l");
-    printf(" - id = %d\\l", state->tile->id);
-    printf(" - lcu_offset_x = %d\\l", state->tile->lcu_offset_x);
-    printf(" - lcu_offset_y = %d\\l", state->tile->lcu_offset_y);
-    printf(" - lcu_offset_in_ts = %d\\l", state->tile->lcu_offset_in_ts);
-  }
-  if (!state->parent || state->slice != state->parent->slice) {
-    printf("|+ slice\\l");
-    printf(" - id = %d\\l", state->slice->id);
-    printf(" - start_in_ts = %d\\l", state->slice->start_in_ts);
-    printf(" - end_in_ts = %d\\l", state->slice->end_in_ts);
-    printf(" - start_in_rs = %d\\l", state->slice->start_in_rs);
-    printf(" - end_in_rs = %d\\l", state->slice->end_in_rs);
-  }
-  if (!state->parent || state->wfrow != state->parent->wfrow) {
-    printf("|+ wfrow\\l");
-    printf(" - lcu_offset_y = %d\\l", state->wfrow->lcu_offset_y);
-  }
-  printf("}\"\n");
-  printf(" ]\n");
-  
-  if (state->parent) {
-    printf(" \"%p\" -> \"%p\"\n", state->parent, state);
-  }
-  
-  for (i = 0; state->children[i].encoder_control; ++i) {
-    encoder_state_dump_graphviz(&state->children[i]);
-  }
-  
-  if (!state->parent) {
-    printf("}\n");
-    //Empty lines (easier to copy-paste)
-    printf("\n\n\n\n\n");
-  }
-}
-#endif //KVZ_DEBUG_PRINT_THREADING_INFO
 
 /**
  * \brief Initializer for main thread related things
@@ -800,7 +678,7 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
   }
   
 #ifdef KVZ_DEBUG_PRINT_THREADING_INFO
-  if (!parent_state) encoder_state_dump_graphviz(child_state);
+  if (!parent_state) kvz_dbg_encoder_state_dump_graphviz(child_state);
 #endif //KVZ_DEBUG_PRINT_THREADING_INFO
   return 1;
 }

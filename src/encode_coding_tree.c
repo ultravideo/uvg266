@@ -35,6 +35,7 @@
 #include "cabac.h"
 #include "context.h"
 #include "cu.h"
+#include "debug.h"
 #include "encoder.h"
 #include "global.h"
 #include "imagelist.h"
@@ -625,6 +626,12 @@ static bool encode_inter_prediction_unit(encoder_state_t * const state,
         if (symbol == 0) break;
       }
     }
+#ifdef KVZ_DEBUG_PRINT_YUVIEW_CSV
+    int abs_x = x + state->tile->offset_x;
+    int abs_y = y + state->tile->offset_y;
+    if (cur_cu->inter.mv_dir & 1) DBG_YUVIEW_MV(state->frame->poc, DBG_YUVIEW_MVMERGE_L0, abs_x, abs_y, width, height, cur_cu->inter.mv[0][0], cur_cu->inter.mv[0][1]);
+    if (cur_cu->inter.mv_dir & 2) DBG_YUVIEW_MV(state->frame->poc, DBG_YUVIEW_MVMERGE_L1, abs_x, abs_y, width, height, cur_cu->inter.mv[1][0], cur_cu->inter.mv[1][1]);
+#endif
   } else {
     if (state->frame->slicetype == KVZ_SLICE_B) {
       // Code Inter Dir
@@ -640,13 +647,17 @@ static bool encode_inter_prediction_unit(encoder_state_t * const state,
         cabac->cur_ctx = &(cabac->ctx.inter_dir[5]);
         CABAC_BIN(cabac, (inter_dir == 2), "inter_pred_idc");
       }
-    }
+   }
 
     for (uint32_t ref_list_idx = 0; ref_list_idx < 2; ref_list_idx++) {
       if (!(cur_cu->inter.mv_dir & (1 << ref_list_idx))) {
         continue;
       }
-
+#ifdef KVZ_DEBUG_PRINT_YUVIEW_CSV
+      int abs_x = x + state->tile->offset_x;
+      int abs_y = y + state->tile->offset_y;
+      DBG_YUVIEW_MV(state->frame->poc, ref_list_idx ? DBG_YUVIEW_MVINTER_L1 : DBG_YUVIEW_MVINTER_L0, abs_x, abs_y, width, height, cur_cu->inter.mv[ref_list_idx][0], cur_cu->inter.mv[ref_list_idx][1]);
+#endif
       // size of the current reference index list (L0/L1)
       uint8_t ref_LX_size = state->frame->ref_LX_size[ref_list_idx];
 
@@ -1277,6 +1288,8 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
    // CABAC_BIN(cabac, 0, "split_transform_flag");
   }
 
+  DBG_YUVIEW_VALUE(state->frame->poc, DBG_YUVIEW_CU_TYPE, abs_x, abs_y, cu_width, cu_width, (cur_cu->type == CU_INTRA)?0:1);
+
   if (ctrl->cfg.lossless) {
     cabac->cur_ctx = &cabac->ctx.cu_transquant_bypass;
     CABAC_BIN(cabac, 1, "cu_transquant_bypass_flag");
@@ -1298,7 +1311,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
     CABAC_BIN(cabac, cur_cu->skipped, "SkipFlag");
 
     if (cur_cu->skipped) {
-
+      DBG_PRINT_MV(state, x, y, (uint32_t)cu_width, (uint32_t)cu_width, cur_cu);
       kvz_hmvp_add_mv(state, x, y, (uint32_t)cu_width, (uint32_t)cu_width, cur_cu);
       int16_t num_cand = state->encoder_control->cfg.max_merge;
       if (num_cand > 1) {
@@ -1315,6 +1328,11 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
           }
         }
       }
+#ifdef KVZ_DEBUG_PRINT_YUVIEW_CSV
+      if (cur_cu->inter.mv_dir & 1) DBG_YUVIEW_MV(state->frame->poc, DBG_YUVIEW_MVSKIP_L0, abs_x, abs_y, cu_width, cu_width, cur_cu->inter.mv[0][0], cur_cu->inter.mv[0][1]);
+      if (cur_cu->inter.mv_dir & 2) DBG_YUVIEW_MV(state->frame->poc, DBG_YUVIEW_MVSKIP_L1, abs_x, abs_y, cu_width, cu_width, cur_cu->inter.mv[1][0], cur_cu->inter.mv[1][1]);
+#endif
+
       goto end;
     }
   }
@@ -1394,7 +1412,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
       const cu_info_t *cur_pu = kvz_cu_array_at_const(frame->cu_array, pu_x, pu_y);
 
       non_zero_mvd |= encode_inter_prediction_unit(state, cabac, cur_pu, pu_x, pu_y, pu_w, pu_h, depth);
-
+      DBG_PRINT_MV(state, pu_x, pu_y, pu_w, pu_h, cur_pu);
       kvz_hmvp_add_mv(state, x, y, pu_w, pu_h, cur_pu);
     }
 

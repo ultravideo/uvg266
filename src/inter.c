@@ -1690,14 +1690,14 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
                                  // the temporal merge candidate.
                                  state->frame->ref_LX[0][0],
                                  temporal_cand,
-                                 0,
+                                 reflist,
                                  mv_cand[candidates].mv[reflist])) {
         mv_cand[candidates].ref[reflist] = 0;
         mv_cand[candidates].dir |= (1 << reflist);
 
-        if (reflist) {
-          mv_cand[candidates].mv[1][0] *= -1;
-          mv_cand[candidates].mv[1][1] *= -1;
+        if (state->frame->ref->pocs[state->frame->ref_LX[reflist][0]] > state->frame->poc) {
+          mv_cand[candidates].mv[reflist][0] *= -1;
+          mv_cand[candidates].mv[reflist][1] *= -1;
         }
       }
     }
