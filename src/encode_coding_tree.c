@@ -627,8 +627,10 @@ static bool encode_inter_prediction_unit(encoder_state_t * const state,
       }
     }
 #ifdef KVZ_DEBUG_PRINT_YUVIEW_CSV
-    if (cur_cu->inter.mv_dir & 1) DBG_YUVIEW_MV(state->frame->poc, DBG_YUVIEW_MVMERGE_L0, x, y, width, height, cur_cu->inter.mv[0][0], cur_cu->inter.mv[0][1]);
-    if (cur_cu->inter.mv_dir & 2) DBG_YUVIEW_MV(state->frame->poc, DBG_YUVIEW_MVMERGE_L1, x, y, width, height, cur_cu->inter.mv[1][0], cur_cu->inter.mv[1][1]);
+    int abs_x = x + state->tile->offset_x;
+    int abs_y = y + state->tile->offset_y;
+    if (cur_cu->inter.mv_dir & 1) DBG_YUVIEW_MV(state->frame->poc, DBG_YUVIEW_MVMERGE_L0, abs_x, abs_y, width, height, cur_cu->inter.mv[0][0], cur_cu->inter.mv[0][1]);
+    if (cur_cu->inter.mv_dir & 2) DBG_YUVIEW_MV(state->frame->poc, DBG_YUVIEW_MVMERGE_L1, abs_x, abs_y, width, height, cur_cu->inter.mv[1][0], cur_cu->inter.mv[1][1]);
 #endif
   } else {
     if (state->frame->slicetype == KVZ_SLICE_B) {
@@ -651,7 +653,9 @@ static bool encode_inter_prediction_unit(encoder_state_t * const state,
       if (!(cur_cu->inter.mv_dir & (1 << ref_list_idx))) {
         continue;
       }
-      DBG_YUVIEW_MV(state->frame->poc, ref_list_idx ? DBG_YUVIEW_MVINTER_L1 : DBG_YUVIEW_MVINTER_L0, x, y, width, height, cur_cu->inter.mv[ref_list_idx][0], cur_cu->inter.mv[ref_list_idx][1]);
+      int abs_x = x + state->tile->offset_x;
+      int abs_y = y + state->tile->offset_y;
+      DBG_YUVIEW_MV(state->frame->poc, ref_list_idx ? DBG_YUVIEW_MVINTER_L1 : DBG_YUVIEW_MVINTER_L0, abs_x, abs_y, width, height, cur_cu->inter.mv[ref_list_idx][0], cur_cu->inter.mv[ref_list_idx][1]);
       // size of the current reference index list (L0/L1)
       uint8_t ref_LX_size = state->frame->ref_LX_size[ref_list_idx];
 

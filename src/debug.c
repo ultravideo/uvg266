@@ -189,7 +189,7 @@ void kvz_dbg_yuview_finish_frame(int poc) {
   for (int i = 0; i < DBG_YUVIEW_NUM_ITEMS; i++) {
     if (data->last_pos[i] == 0) continue;
     data->items[i][data->last_pos[i]] = '\0';
-    fprintf(yuview_output, data->items[i]);
+    fprintf(yuview_output, "%s", data->items[i]);
 
     free(data->items[i]);
   }
@@ -210,10 +210,6 @@ void kvz_dbg_yuview_cleanup() {
     struct yuview_data* data = yuview_frame_data[idx];
 
     for (int i = 0; i < DBG_YUVIEW_NUM_ITEMS; i++) {
-      if (data->last_pos[i] == 0) continue;
-      data->items[i][data->last_pos[i]] = '\0';
-      fprintf(yuview_output, data->items[i]);
-
       free(data->items[i]);
     }
     free(yuview_frame_data[idx]);
