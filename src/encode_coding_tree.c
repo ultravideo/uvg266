@@ -1282,6 +1282,8 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
    // CABAC_BIN(cabac, 0, "split_transform_flag");
   }
 
+  DBG_YUVIEW_VALUE(state->frame->poc, DBG_YUVIEW_CU_TYPE, abs_x, abs_y, cu_width, cu_width, (cur_cu->type == CU_INTRA)?0:1);
+
   if (ctrl->cfg.lossless) {
     cabac->cur_ctx = &cabac->ctx.cu_transquant_bypass;
     CABAC_BIN(cabac, 1, "cu_transquant_bypass_flag");

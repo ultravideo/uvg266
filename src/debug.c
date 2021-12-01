@@ -34,13 +34,56 @@
   * \file
   * Functions for debugging purposes.
   */
-
-#include "encoderstate.h"
 #include "global.h"
+
+#include "debug.h"
+#include "encoderstate.h"
+
 
 #ifdef KVZ_DEBUG_PRINT_YUVIEW_CSV
 
+#define INITIAL_ALLOC 10000
 FILE* yuview_output;
+
+struct yuview_data {
+  int poc;
+  int bytes_allocated[DBG_YUVIEW_NUM_ITEMS];
+  int last_pos[DBG_YUVIEW_NUM_ITEMS];
+  char* items[DBG_YUVIEW_NUM_ITEMS];
+};
+
+struct yuview_data** yuview_frame_data;
+int yuview_frames;
+
+static int yuview_find_poc(int poc) {
+  for (int i = 0; i < yuview_frames; i++) {
+    if (yuview_frame_data[i]->poc == poc) return i;
+  }
+
+  return -1;
+}
+
+
+static void yuview_alloc_frame(int poc) {
+  assert(yuview_frame_data != NULL);
+
+  yuview_frame_data = realloc(yuview_frame_data, (yuview_frames + 1) * sizeof(struct yuview_data*));
+
+  struct yuview_data* data = malloc(sizeof(struct yuview_data));
+
+  memset(data->last_pos, 0, sizeof(data->last_pos[0]) * DBG_YUVIEW_NUM_ITEMS);
+  for (int i = 0; i < DBG_YUVIEW_NUM_ITEMS; i++) {
+    data->bytes_allocated[i] = INITIAL_ALLOC;
+    data->items[i] = malloc(INITIAL_ALLOC);
+  }
+
+  data->poc = poc;
+
+  yuview_frame_data[yuview_frames] = data;
+
+  yuview_frames++;
+  
+}
 
 void kvz_dbg_yuview_init(const encoder_control_t* const encoder, char* filename, char* sequence) {
 
@@ -49,14 +92,18 @@ void kvz_dbg_yuview_init(const encoder_control_t* const encoder, char* filename,
 
   yuview_output = fopen(buf, "wb");
 
+  yuview_frame_data = malloc(1);
+
+  yuview_frames = 0;
+
   fprintf(yuview_output, "%%;syntax-version;v1.22\r\n");
   fprintf(yuview_output, "%%;seq-specs;%s;layer2;%d;%d;%f\r\n", sequence, encoder->in.width, encoder->in.height, encoder->cfg.framerate);
-  fprintf(yuview_output, "%%;type;0;PCM;map\r\n");
-  fprintf(yuview_output, "%%;mapColor;0;0;0;0;120\r\n");
+  fprintf(yuview_output, "%%;type;0;CU-type;range\r\n");
+  fprintf(yuview_output, "%%;defaultRange;0;2;jet\r\n");
   fprintf(yuview_output, "%%;type;1;IntraDirLuma;range\r\n");
-  fprintf(yuview_output, "%%;defaultRange;0;35;Autumn\r\n");
+  fprintf(yuview_output, "%%;defaultRange;0;67;autumn\r\n");
   fprintf(yuview_output, "%%;type;2;IntraDirChroma;range\r\n");
-  fprintf(yuview_output, "%%;defaultRange;0;36;Autumn\r\n");
+  fprintf(yuview_output, "%%;defaultRange;0;67;autumn\r\n");
   fprintf(yuview_output, "%%;type;3;RefIdxSkipL0;range\r\n");
   fprintf(yuview_output, "%%;range;0;4;0;65;75;154;160;255;255;255\r\n");
   fprintf(yuview_output, "%%;type;4;RefIdxSkipL1;range\r\n");
@@ -99,17 +146,80 @@ void kvz_dbg_yuview_init(const encoder_control_t* const encoder, char* filename,
   
 }
 
-void kvz_dbg_yuview_add_vector(int poc, int x, int y, int width, int height, int type, int x_vec, int y_vec) {
-  fprintf(yuview_output, "%d;%d;%d;%d;%d;%d;%d;%d\r\n", poc, x, y, width, height, type, x_vec, y_vec);
+static int yuview_check_allocated_memory(int poc, int type) {
+  int idx = yuview_find_poc(poc);
+  if (idx == -1) yuview_alloc_frame(poc);
+  idx = yuview_frames - 1;
+
+  if (yuview_frame_data[idx]->bytes_allocated[type] - yuview_frame_data[idx]->last_pos[type] < 1000) {
+    yuview_frame_data[idx]->items[type] = realloc(yuview_frame_data[idx]->items[type], yuview_frame_data[idx]->bytes_allocated[type] * 2);
+    yuview_frame_data[idx]->bytes_allocated[type] *= 2;
+  }
+
+  return idx;
 }
 
-void kvz_dbg_yuview_add(const encoder_state_t* const state, int x, int y, int width, int height, int type, int val) {
-  fprintf(yuview_output, "%d;%d;%d;%d;%d;%d;%d\r\n", state->tile->frame->poc, x, y, width, height, type, val);
+void kvz_dbg_yuview_add_vector(int poc, int x, int y, int width, int height, int type, int x_vec, int y_vec) {
+  int idx = yuview_check_allocated_memory(poc, type);
+
+  char* buffer = &yuview_frame_data[idx]->items[type][ yuview_frame_data[idx]->last_pos[type] ];
+  int space_left = yuview_frame_data[idx]->bytes_allocated[type] - yuview_frame_data[idx]->last_pos[type];
+
+  yuview_frame_data[idx]->last_pos[type] += snprintf(buffer, space_left,
+           "%d;%d;%d;%d;%d;%d;%d;%d\r\n", poc, x, y, width, height, type, x_vec, y_vec);  
+}
+
+void kvz_dbg_yuview_add(int poc, int x, int y, int width, int height, int type, int val) {
+  int idx = yuview_check_allocated_memory(poc, type);
+
+  char* buffer = &yuview_frame_data[idx]->items[type][ yuview_frame_data[idx]->last_pos[type] ];
+  int space_left = yuview_frame_data[idx]->bytes_allocated[type] - yuview_frame_data[idx]->last_pos[type];
+
+  yuview_frame_data[idx]->last_pos[type] += snprintf(buffer, space_left,
+    "%d;%d;%d;%d;%d;%d;%d\r\n", poc, x, y, width, height, type, val);
+}
+
+void kvz_dbg_yuview_finish_frame(int poc) {
+
+  int idx = yuview_find_poc(poc);
+  if (idx == -1) return;
+
+  struct yuview_data* data = yuview_frame_data[idx];
+
+  for (int i = 0; i < DBG_YUVIEW_NUM_ITEMS; i++) {
+    if (data->last_pos[i] == 0) continue;
+    data->items[i][data->last_pos[i]] = '\0';
+    fprintf(yuview_output, data->items[i]);
+
+    free(data->items[i]);
+  }
+  free(yuview_frame_data[idx]);
+
+  for (int i = idx + 1; i < yuview_frames; i++) {
+    yuview_frame_data[i - 1] = yuview_frame_data[i];
+  }
+
+  yuview_frames--;
 }
 
 void kvz_dbg_yuview_cleanup() {
   fclose(yuview_output);
   yuview_output = NULL;
+  for (int idx = 0; idx < yuview_frames; idx++) {
+
+    struct yuview_data* data = yuview_frame_data[idx];
+
+    for (int i = 0; i < DBG_YUVIEW_NUM_ITEMS; i++) {
+      if (data->last_pos[i] == 0) continue;
+      data->items[i][data->last_pos[i]] = '\0';
+      fprintf(yuview_output, data->items[i]);
+
+      free(data->items[i]);
+    }
+    free(yuview_frame_data[idx]);
+  }
+
+  free(yuview_frame_data);
 }
 
 #endif //KVZ_DEBUG_PRINT_YUVIEW_CSV

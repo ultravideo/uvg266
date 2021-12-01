@@ -714,6 +714,8 @@ int main(int argc, char *argv[])
           // Since chunks_out was not NULL, img_rec should have been set.
           assert(img_rec);
 
+          DBG_YUVIEW_FINISH_FRAME(info_out.poc);
+
           // Move img_rec to the recon buffer.
           assert(recon_buffer_size < KVZ_MAX_GOP_LENGTH);
           recon_buffer[recon_buffer_size++] = img_rec;
