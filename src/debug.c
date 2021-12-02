@@ -98,7 +98,7 @@ void kvz_dbg_yuview_init(const encoder_control_t* const encoder, char* filename,
   yuview_frames = 0;
 
   fprintf(yuview_output, "%%;syntax-version;v1.22\r\n");
-  fprintf(yuview_output, "%%;seq-specs;%s;layer2;%d;%d;%f\r\n", sequence, encoder->in.width, encoder->in.height, encoder->cfg.framerate);
+  fprintf(yuview_output, "%%;seq-specs;%s;layer2;%d;%d;%f\r\n", sequence, encoder->in.width, encoder->in.height, (double)encoder->cfg.framerate_num / (double)encoder->cfg.framerate_denom);
   fprintf(yuview_output, "%%;type;0;CU-type;range\r\n");
   fprintf(yuview_output, "%%;defaultRange;0;2;jet\r\n");
   fprintf(yuview_output, "%%;type;1;IntraDirLuma;range\r\n");

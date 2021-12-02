@@ -52,7 +52,6 @@ int kvz_config_init(kvz_config *cfg)
 {
   cfg->width           = 0;
   cfg->height          = 0;
-  cfg->framerate       = 25; // deprecated and will be removed.
   cfg->framerate_num   = 25;
   cfg->framerate_denom = 1;
   cfg->qp              = 22;
@@ -862,11 +861,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   }
 
 #define OPT(STR) (!strcmp(name, STR))
-  if OPT("width")
-    cfg->width = atoi(value);
-  else if OPT("height")
-    cfg->height = atoi(value);
-  else if OPT("input-res")
+  if OPT("input-res")
     if (!strcmp(value, "auto")) {
       return 1;
     } else {
@@ -1650,10 +1645,6 @@ int kvz_config_validate(const kvz_config *const cfg)
     }
   }
 
-  if (cfg->framerate < 0.0) {
-    fprintf(stderr, "Input error: --input-fps must be positive\n");
-    error = 1;
-  }
   if (cfg->framerate_num < 0) {
     fprintf(stderr, "Input error: --input-fps must >=0\n");
     error = 1;

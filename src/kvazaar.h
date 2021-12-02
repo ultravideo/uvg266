@@ -312,7 +312,6 @@ typedef struct kvz_config
 
   int32_t width;   /*!< \brief frame width, must be a multiple of 8 */
   int32_t height;  /*!< \brief frame height, must be a multiple of 8 */
-  double framerate; /*!< \brief Deprecated, will be removed. */
   int32_t framerate_num; /*!< \brief Framerate numerator */
   int32_t framerate_denom; /*!< \brief Framerate denominator */
   int32_t lmcs_enable;   /*!< \brief Flag to enable luma mapping with chroma scaling - filter */
