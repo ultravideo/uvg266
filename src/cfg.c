@@ -79,6 +79,7 @@ int kvz_config_init(kvz_config *cfg)
   cfg->mv_rdo          = 0;
   cfg->full_intra_search = 0;
   cfg->trskip_enable   = 0;
+  cfg->trskip_max_size = 2; //Default to 4x4
   cfg->mts             = 0;
   cfg->mts_implicit    = 0;
   cfg->tr_depth_intra  = 0;
@@ -927,6 +928,13 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     cfg->full_intra_search = atobool(value);
   else if OPT("transform-skip")
     cfg->trskip_enable = atobool(value);
+  else if OPT("tr-skip-max-size") {
+    cfg->trskip_max_size = atoi(value);
+    if (cfg->trskip_max_size < 2 || cfg->trskip_max_size > 5) {
+      fprintf(stderr, "tr-skip-max-size not between 2 and 5.\n");
+      return 0;
+    }
+  }
   else if OPT("mts") {
     int8_t mts_type = 0;
     if (!parse_enum(value, mts_names, &mts_type)) mts_type = atobool(value) ? 3 : 0;

@@ -351,7 +351,7 @@ static void encode_chroma_tu(encoder_state_t* const state, int x, int y, int dep
     const coeff_t *coeff_v = &coeff->v[xy_to_zorder(LCU_WIDTH_C, x_local, y_local)];
 
     if (cbf_is_set(cur_pu->cbf, depth, COLOR_U)) {
-      if(state->encoder_control->cfg.trskip_enable && width_c == 4){
+      if(state->encoder_control->cfg.trskip_enable && width_c <= (1 << state->encoder_control->cfg.trskip_max_size)){
         cabac->cur_ctx = &cabac->ctx.transform_skip_model_chroma;
         // HEVC only supports transform_skip for Luma
         // TODO: transform skip for chroma blocks
@@ -361,7 +361,7 @@ static void encode_chroma_tu(encoder_state_t* const state, int x, int y, int dep
     }
 
     if (cbf_is_set(cur_pu->cbf, depth, COLOR_V)) {
-      if (state->encoder_control->cfg.trskip_enable && width_c == 4) {
+      if (state->encoder_control->cfg.trskip_enable && width_c <= (1 << state->encoder_control->cfg.trskip_max_size)) {
         cabac->cur_ctx = &cabac->ctx.transform_skip_model_chroma;
         CABAC_BIN(cabac, 0, "transform_skip_flag");
       }
@@ -370,7 +370,7 @@ static void encode_chroma_tu(encoder_state_t* const state, int x, int y, int dep
   }
   else {
     const coeff_t *coeff_uv = &coeff->joint_uv[xy_to_zorder(LCU_WIDTH_C, x_local, y_local)];
-    if (state->encoder_control->cfg.trskip_enable && width_c == 4) {
+    if (state->encoder_control->cfg.trskip_enable && width_c <= (1 << state->encoder_control->cfg.trskip_max_size)) {
       cabac->cur_ctx = &cabac->ctx.transform_skip_model_chroma;
       CABAC_BIN(cabac, 0, "transform_skip_flag");
     }
@@ -403,7 +403,7 @@ static void encode_transform_unit(encoder_state_t * const state,
     // CoeffNxN
     // Residual Coding
 
-    if(state->encoder_control->cfg.trskip_enable && width == 4) {
+    if(state->encoder_control->cfg.trskip_enable && width <= (1 << state->encoder_control->cfg.trskip_max_size)) {
       cabac->cur_ctx = &cabac->ctx.transform_skip_model_luma;
       CABAC_BIN(cabac, cur_pu->tr_idx == MTS_SKIP, "transform_skip_flag");
 

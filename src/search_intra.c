@@ -90,7 +90,7 @@ static double get_cost(encoder_state_t * const state,
                        int width)
 {
   double satd_cost = satd_func(pred, orig_block);
-  if (TRSKIP_RATIO != 0 && width == 4 && state->encoder_control->cfg.trskip_enable) {
+  if (TRSKIP_RATIO != 0 && width <= (1 << state->encoder_control->cfg.trskip_max_size) && state->encoder_control->cfg.trskip_enable) {
     // If the mode looks better with SAD than SATD it might be a good
     // candidate for transform skip. How much better SAD has to be is
     // controlled by TRSKIP_RATIO.
@@ -137,7 +137,7 @@ static void get_cost_dual(encoder_state_t * const state,
   costs_out[1] = (double)satd_costs[1];
 
   // TODO: width and height
-  if (TRSKIP_RATIO != 0 && width == 4 && state->encoder_control->cfg.trskip_enable) {
+  if (TRSKIP_RATIO != 0 && width <= (1 << state->encoder_control->cfg.trskip_max_size) && state->encoder_control->cfg.trskip_enable) {
     // If the mode looks better with SAD than SATD it might be a good
     // candidate for transform skip. How much better SAD has to be is
     // controlled by TRSKIP_RATIO.
@@ -312,7 +312,7 @@ static double search_intra_trdepth(encoder_state_t * const state,
       num_transforms = (mts_enabled ? MTS_TR_NUM : 1);
     }
     //TODO: height
-    if(state->encoder_control->cfg.trskip_enable && width == 4 /*&& height == 4*/) {
+    if(state->encoder_control->cfg.trskip_enable && width <= (1 << state->encoder_control->cfg.trskip_max_size) /*&& height == 4*/) {
       num_transforms = MAX(num_transforms, 2);
     }
     for (; trafo < num_transforms; trafo++) {
@@ -322,7 +322,7 @@ static double search_intra_trdepth(encoder_state_t * const state,
         pred_cu->mts_last_scan_pos = 0;
         pred_cu->violates_mts_coeff_constraint = 0;
 
-        if (trafo == MTS_SKIP && width != 4) {
+        if (trafo == MTS_SKIP && width > (1 << state->encoder_control->cfg.trskip_max_size)) {
           //TODO: parametrize that this is not hardcoded
           // TODO: this probably should currently trip for chroma?
           continue;

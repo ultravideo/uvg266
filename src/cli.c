@@ -77,6 +77,7 @@ static const struct option long_options[] = {
   { "no-full-intra-search",     no_argument, NULL, 0 },
   { "transform-skip",           no_argument, NULL, 0 },
   { "no-transform-skip",        no_argument, NULL, 0 },
+  { "tr-skip-max-size",   required_argument, NULL, 0 },
   { "mts",                required_argument, NULL, 0 },
   { "no-mts",                   no_argument, NULL, 0 },
   { "tr-depth-intra",     required_argument, NULL, 0 },
@@ -561,6 +562,7 @@ void print_help(void)
     "      --(no-)full-intra-search : Try all intra modes during rough search.\n"
     "                               [disabled]\n"
     "      --(no-)transform-skip  : Try transform skip [disabled]\n"
+    "      --tr-skip-max-size     : Max log2 size of transform skip 2..5 [2]\n"
     "      --me <string>          : Integer motion estimation algorithm [hexbs]\n"
     "                                   - hexbs: Hexagon Based Search\n"
     "                                   - tz:    Test Zone Search\n"
