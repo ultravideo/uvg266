@@ -119,13 +119,12 @@ void kvz_encode_ts_residual(encoder_state_t* const state,
 
   const uint32_t log2_block_size = kvz_g_convert_to_bit[width] + 2;
   const uint32_t log2_cg_size = kvz_g_log2_sbb_size[log2_block_size][log2_block_size][0] + kvz_g_log2_sbb_size[log2_block_size][log2_block_size][1];
-  const uint32_t* scan =
-    kvz_g_sig_last_scan[scan_mode][log2_block_size - 1];
+  const uint32_t* scan =    kvz_g_sig_last_scan[scan_mode][log2_block_size - 1];
   const uint32_t* scan_cg = g_sig_last_scan_cg[log2_block_size - 1][scan_mode];
 
 
   // Init base contexts according to block type
-  cabac_ctx_t* base_coeff_group_ctx = &(cabac->ctx.sig_coeff_group_model[(type == 0 ? 0 : 1) * 2 + 1]);
+  cabac_ctx_t* base_coeff_group_ctx = &(cabac->ctx.transform_skip_sig_coeff_group[0]);
 
   cabac->cur_ctx = base_coeff_group_ctx;
   
@@ -139,16 +138,27 @@ void kvz_encode_ts_residual(encoder_state_t* const state,
       sig_coeffgroup_flag[scan_cg[i >> log2_cg_size]] = 1;
     }
   }
-  scan_cg_last = scan_pos_last >> log2_cg_size;
-  
+  scan_cg_last = (width * width - 1) >> log2_cg_size;
+  const uint32_t cg_width = (MIN((uint8_t)32, width) >> (log2_cg_size / 2));
 
-  for (i = 0; i <= (width * width - 1) >> log2_cg_size; i++) {
-    if (!(i == 0 || i ==scan_cg_last)) {
+  bool no_sig_group_before_last = true;
+
+  for (i = 0; i <= scan_cg_last; i++) {
+    if (!(width == 4 || (i ==scan_cg_last && no_sig_group_before_last))) {
+      uint32_t cg_blkpos = scan_cg[i];
+      uint32_t cg_pos_y = cg_blkpos / cg_width;
+      uint32_t cg_pos_x = cg_blkpos - (cg_pos_y * cg_width);
+
+      uint32_t ctx_sig = kvz_context_get_sig_coeff_group_ts(sig_coeffgroup_flag, cg_pos_x, cg_pos_y, cg_width);
+
+      cabac->cur_ctx = &base_coeff_group_ctx[ctx_sig];
+
       if(!sig_coeffgroup_flag[scan_cg[i]]) {
-        CABAC_BIN(cabac, 0, "sb_coded_flag");
+        CABAC_BIN(cabac, 0, "ts_sigGroup");
         continue;
       }
-      CABAC_BIN(cabac, 1, "sb_coded_flag");
+      CABAC_BIN(cabac, 1, "ts_sigGroup");
+      no_sig_group_before_last = false;
     }
 
     int firstSigPos = i << log2_cg_size;

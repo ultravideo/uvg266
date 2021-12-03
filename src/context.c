@@ -333,7 +333,7 @@ static const uint8_t INIT_TRANSFORM_SKIP[4][2] = {
   {   1,   1, },
 };
 
-static const uint8_t INIT_TRANSFORM_SKIP_SIG_COEFF[4][3] =
+static const uint8_t INIT_TRANSFORM_SKIP_SIG_COEFF_GROUP[4][3] =
 {
   {  18,  35,  45, },
   {  18,  12,  29, },
@@ -492,7 +492,7 @@ void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
   for (i = 0; i < 3; i++) {
     kvz_ctx_init(&cabac->ctx.cu_skip_flag_model[i], QP, INIT_SKIP_FLAG[slice][i], INIT_SKIP_FLAG[3][i]);
     kvz_ctx_init(&cabac->ctx.joint_cb_cr[i], QP, INIT_JOINT_CB_CR_FLAG[slice][i], INIT_JOINT_CB_CR_FLAG[3][i]);   
-    kvz_ctx_init(&cabac->ctx.transform_skip_sig_coeff[i], QP, INIT_TRANSFORM_SKIP_SIG_COEFF[slice][i], INIT_TRANSFORM_SKIP_SIG_COEFF[3][i]);
+    kvz_ctx_init(&cabac->ctx.transform_skip_sig_coeff_group[i], QP, INIT_TRANSFORM_SKIP_SIG_COEFF_GROUP[slice][i], INIT_TRANSFORM_SKIP_SIG_COEFF_GROUP[3][i]);
     kvz_ctx_init(&cabac->ctx.transform_skip_sig[i], QP, INIT_TRANSFORM_SKIP_SIG[slice][i], INIT_TRANSFORM_SKIP_SIG[3][i]);
   }
 
@@ -601,6 +601,19 @@ uint32_t kvz_context_get_sig_coeff_group( uint32_t *sig_coeff_group_flag,
   return uiRight || uiLower;
 }
 
+uint32_t kvz_context_get_sig_coeff_group_ts(uint32_t* sig_coeff_group_flag,
+  uint32_t pos_x,
+  uint32_t pos_y,
+  int32_t width)
+{
+  uint32_t uiLeft = 0;
+  uint32_t uiAbove = 0;
+  uint32_t position = pos_y * width + pos_x;
+  if (pos_x > 0) uiLeft = sig_coeff_group_flag[position - 1];
+  if (pos_y > 0) uiAbove = sig_coeff_group_flag[position - width];
+
+  return uiLeft + uiAbove;
+}
 
 /**
 * \brief Context derivation process of coeff_abs_significant_flag
