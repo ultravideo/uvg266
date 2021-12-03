@@ -1181,11 +1181,6 @@ int kvz_ts_rdoq(encoder_state_t* const state, coeff_t* src_coeff, coeff_t* dest_
 
   uint32_t coeff_levels[3];
   double   coeff_level_error[4];
-  
-  const uint32_t cg_size = 1 << log2_cg_size;
-  const int32_t  shift = 4 >> 1;
-  const uint32_t num_blk_side = width >> shift;
-
 
   const int sbSizeM1 = (1 << log2_cg_size) - 1;
   double    base_cost = 0;

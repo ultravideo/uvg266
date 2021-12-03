@@ -130,11 +130,11 @@ void kvz_encode_ts_residual(encoder_state_t* const state,
   
   int maxCtxBins = (width * width * 7) >> 2;
   unsigned scan_cg_last = (unsigned )-1;
-  unsigned scan_pos_last = (unsigned )-1;
+  //unsigned scan_pos_last = (unsigned )-1;
 
   for (int i = 0; i < width * width; i++) {
     if (coeff[scan[i]]) {
-      scan_pos_last = i;
+      //scan_pos_last = i;
       sig_coeffgroup_flag[scan_cg[i >> log2_cg_size]] = 1;
     }
   }
