@@ -1444,6 +1444,9 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
       if (cbf) {
         encode_transform_coeff(state, x, y, depth, 0, 0, 0, 0, coeff);
       }
+
+      encode_mts_idx(state, cabac, cur_cu);
+
     }
   } else if (cur_cu->type == CU_INTRA) {
     encode_intra_coding_unit(state, cabac, cur_cu, x, y, depth, coeff);
