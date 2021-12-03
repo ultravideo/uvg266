@@ -11,3 +11,4 @@ valgrind_test $common_args --no-rdoq --no-deblock --no-sao --no-signhide --subme
 valgrind_test $common_args --no-rdoq --no-signhide --subme=0 --bipred
 valgrind_test $common_args --rdoq --no-deblock --no-sao --subme=0
 valgrind_test $common_args --gop=8 --subme=4 --bipred --tmvp
+valgrind_test $common_args --transform-skip --tr-skip-max-size=5
