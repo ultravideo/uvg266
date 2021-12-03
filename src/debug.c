@@ -144,6 +144,8 @@ void kvz_dbg_yuview_init(const encoder_control_t* const encoder, char* filename,
   fprintf(yuview_output, "%%;type;17;NumSigCoeffV;range\r\n");
   fprintf(yuview_output, "%%;range;0;1024;0;255;0;255;0;255;255;255\r\n");
   fprintf(yuview_output, "%%;scaleToBlockSize;1\r\n");
+  fprintf(yuview_output, "%%;type;18;TR-Skip;range\r\n");
+  fprintf(yuview_output, "%%;defaultRange;0;2;heat\r\n");
   
 }
 
