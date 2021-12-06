@@ -333,7 +333,7 @@ static double search_intra_trdepth(encoder_state_t * const state,
         x_px, y_px,
         depth,
         intra_mode, -1,
-        pred_cu, cclm_params, lcu);
+        pred_cu, cclm_params, pred_cu->intra.multi_ref_idx, lcu);
 
       // TODO: Not sure if this should be 0 or 1 but at least seems to work with 1
       if (pred_cu->tr_idx > 1)
@@ -361,7 +361,7 @@ static double search_intra_trdepth(encoder_state_t * const state,
         x_px, y_px,
         depth,
         -1, chroma_mode,
-        pred_cu, cclm_params, lcu);
+        pred_cu, cclm_params, 0, lcu);
       best_rd_cost += kvz_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
     }
     pred_cu->tr_skip = best_tr_idx == MTS_SKIP;
@@ -716,7 +716,7 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
                              int modes_to_check,
                              int8_t modes[67], int8_t trafo[67], double costs[67],
                              lcu_t *lcu,
-                             int8_t multi_ref_idx)
+                             uint8_t multi_ref_idx)
 {
   const int tr_depth = CLIP(1, MAX_PU_DEPTH, depth + state->encoder_control->cfg.tr_depth_intra);
   const int width = LCU_WIDTH >> depth;
@@ -901,7 +901,7 @@ int8_t kvz_search_intra_chroma_rdo(encoder_state_t * const state,
           x_px, y_px,
           depth,
           -1, chroma.mode, // skip luma
-          NULL, NULL, lcu);
+          NULL, NULL, 0, lcu);
       }
       else {
 
@@ -934,8 +934,7 @@ int8_t kvz_search_intra_chroma_rdo(encoder_state_t * const state,
           x_px, y_px,
           depth,
           -1, chroma.mode, // skip luma
-          NULL, cclm_params, lcu
-        );
+          NULL, cclm_params, 0, lcu);
       }
       chroma.cost = kvz_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, tr_cu, lcu);
 
@@ -1025,7 +1024,7 @@ void kvz_search_cu_intra(encoder_state_t * const state,
                          int8_t *mode_out, 
                          int8_t *trafo_out, 
                          double *cost_out,
-                         int8_t *multi_ref_idx_out)
+                         uint8_t *multi_ref_idx_out)
 {
   const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
   const int8_t cu_width = LCU_WIDTH >> depth;

@@ -99,7 +99,7 @@ void kvz_intra_build_reference(
   kvz_intra_references *const refs,
   bool entropy_sync,
   kvz_pixel *extra_refs,
-  int8_t multi_ref_idx);
+  uint8_t multi_ref_idx);
 
 /**
  * \brief Generate intra predictions.
@@ -129,6 +129,7 @@ void kvz_intra_recon_cu(
   int8_t mode_chroma,
   cu_info_t *cur_cu,
   cclm_parameters_t* cclm_params,
+  uint8_t multi_ref_idx,
   lcu_t *lcu);
 
 

@@ -967,7 +967,7 @@ void kvz_intra_build_reference(
   kvz_intra_references *const refs,
   bool entropy_sync,
   kvz_pixel *extra_ref_lines,
-  int8_t multi_ref_idx)
+  uint8_t multi_ref_idx)
 {
   assert(!(extra_ref_lines == NULL && multi_ref_idx != 0) && "Trying to use MRL with NULL extra references.");
 
@@ -1012,7 +1012,7 @@ static void intra_recon_tb_leaf(
   int x_scu = SUB_SCU(x);
   int y_scu = SUB_SCU(y);
   const vector2d_t lcu_px = {x_scu >> shift, y_scu >> shift };
-  uint8_t multi_ref_index = multi_ref_idx;
+  uint8_t multi_ref_index = color == COLOR_Y ? multi_ref_idx : 0;
 
   kvz_intra_references refs;
   // Extra reference lines for use with MRL. Extra lines needed only for left edge.
@@ -1097,6 +1097,7 @@ void kvz_intra_recon_cu(
   int8_t mode_chroma,
   cu_info_t *cur_cu,
   cclm_parameters_t *cclm_params,
+  uint8_t multi_ref_idx,
   lcu_t *lcu)
 {
   const vector2d_t lcu_px = { SUB_SCU(x), SUB_SCU(y) };
@@ -1104,7 +1105,7 @@ void kvz_intra_recon_cu(
   if (cur_cu == NULL) {
     cur_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
   }
-  uint8_t multi_ref_index = cur_cu->intra.multi_ref_idx;
+  uint8_t multi_ref_index = multi_ref_idx;
 
   // Reset CBFs because CBFs might have been set
   // for depth earlier
@@ -1122,10 +1123,10 @@ void kvz_intra_recon_cu(
     const int32_t x2 = x + offset;
     const int32_t y2 = y + offset;
 
-    kvz_intra_recon_cu(state, x,  y,  depth + 1, mode_luma, mode_chroma, NULL, NULL, lcu);
-    kvz_intra_recon_cu(state, x2, y,  depth + 1, mode_luma, mode_chroma, NULL, NULL, lcu);
-    kvz_intra_recon_cu(state, x,  y2, depth + 1, mode_luma, mode_chroma, NULL, NULL, lcu);
-    kvz_intra_recon_cu(state, x2, y2, depth + 1, mode_luma, mode_chroma, NULL, NULL, lcu);
+    kvz_intra_recon_cu(state, x,  y,  depth + 1, mode_luma, mode_chroma, NULL, NULL, multi_ref_index, lcu);
+    kvz_intra_recon_cu(state, x2, y,  depth + 1, mode_luma, mode_chroma, NULL, NULL, multi_ref_index, lcu);
+    kvz_intra_recon_cu(state, x,  y2, depth + 1, mode_luma, mode_chroma, NULL, NULL, multi_ref_index, lcu);
+    kvz_intra_recon_cu(state, x2, y2, depth + 1, mode_luma, mode_chroma, NULL, NULL, multi_ref_index, lcu);
 
     // Propagate coded block flags from child CUs to parent CU.
     uint16_t child_cbfs[3] = {

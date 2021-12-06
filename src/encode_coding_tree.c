@@ -856,7 +856,7 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
   bool allow_isp = enough_samples;
 
   // Code MRL related bits
-  int multi_ref_idx = cur_cu->intra.multi_ref_idx;
+  int multi_ref_idx = cur_cu->type == CU_INTRA ? cur_cu->intra.multi_ref_idx : 0;
   bool enable_mrl = state->encoder_control->cfg.mrl;
 
   if (cur_cu->type == CU_INTRA && (y % LCU_WIDTH) != 0 && !cur_cu->bdpcmMode && enable_mrl) {

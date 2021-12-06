@@ -724,7 +724,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       int8_t intra_mode;
       int8_t intra_trafo;
       double intra_cost;
-      int8_t multi_ref_index = 0;
+      uint8_t multi_ref_index = 0;
       kvz_search_cu_intra(state, x, y, depth, lcu,
                           &intra_mode, &intra_trafo, &intra_cost, &multi_ref_index);
       if (intra_cost < cost) {
@@ -749,7 +749,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
                          x, y,
                          depth,
                          cur_cu->intra.mode, -1, // skip chroma
-                         NULL, NULL, lcu);
+                         NULL, NULL, cur_cu->intra.multi_ref_idx, lcu);
 
       downsample_cclm_rec(
         state, x, y, cu_width / 2, cu_width / 2, lcu->rec.y, lcu->left_ref.y[64]
@@ -771,7 +771,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
                            x & ~7, y & ~7, // TODO: as does this
                            depth,
                            -1, cur_cu->intra.mode_chroma, // skip luma
-                           NULL, cclm_params, lcu);
+                           NULL, cclm_params, 0, lcu);
       }
     } else if (cur_cu->type == CU_INTER) {
 
@@ -931,7 +931,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
                            x, y,
                            depth,
                            cur_cu->intra.mode, mode_chroma,
-                           NULL,NULL, lcu);
+                           NULL,NULL, 0, lcu);
 
         cost += kvz_cu_rd_cost_luma(state, x_local, y_local, depth, cur_cu, lcu);
         if (has_chroma) {
