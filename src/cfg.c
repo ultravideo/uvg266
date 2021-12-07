@@ -52,7 +52,6 @@ int kvz_config_init(kvz_config *cfg)
 {
   cfg->width           = 0;
   cfg->height          = 0;
-  cfg->framerate       = 25; // deprecated and will be removed.
   cfg->framerate_num   = 25;
   cfg->framerate_denom = 1;
   cfg->qp              = 22;
@@ -79,6 +78,7 @@ int kvz_config_init(kvz_config *cfg)
   cfg->mv_rdo          = 0;
   cfg->full_intra_search = 0;
   cfg->trskip_enable   = 0;
+  cfg->trskip_max_size = 2; //Default to 4x4
   cfg->mts             = 0;
   cfg->mts_implicit    = 0;
   cfg->tr_depth_intra  = 0;
@@ -861,11 +861,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   }
 
 #define OPT(STR) (!strcmp(name, STR))
-  if OPT("width")
-    cfg->width = atoi(value);
-  else if OPT("height")
-    cfg->height = atoi(value);
-  else if OPT("input-res")
+  if OPT("input-res")
     if (!strcmp(value, "auto")) {
       return 1;
     } else {
@@ -927,6 +923,13 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     cfg->full_intra_search = atobool(value);
   else if OPT("transform-skip")
     cfg->trskip_enable = atobool(value);
+  else if OPT("tr-skip-max-size") {
+    cfg->trskip_max_size = atoi(value);
+    if (cfg->trskip_max_size < 2 || cfg->trskip_max_size > 5) {
+      fprintf(stderr, "tr-skip-max-size not between 2 and 5.\n");
+      return 0;
+    }
+  }
   else if OPT("mts") {
     int8_t mts_type = 0;
     if (!parse_enum(value, mts_names, &mts_type)) mts_type = atobool(value) ? 3 : 0;
@@ -1642,10 +1645,6 @@ int kvz_config_validate(const kvz_config *const cfg)
     }
   }
 
-  if (cfg->framerate < 0.0) {
-    fprintf(stderr, "Input error: --input-fps must be positive\n");
-    error = 1;
-  }
   if (cfg->framerate_num < 0) {
     fprintf(stderr, "Input error: --input-fps must >=0\n");
     error = 1;

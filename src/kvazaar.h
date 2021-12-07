@@ -312,7 +312,6 @@ typedef struct kvz_config
 
   int32_t width;   /*!< \brief frame width, must be a multiple of 8 */
   int32_t height;  /*!< \brief frame height, must be a multiple of 8 */
-  double framerate; /*!< \brief Deprecated, will be removed. */
   int32_t framerate_num; /*!< \brief Framerate numerator */
   int32_t framerate_denom; /*!< \brief Framerate denominator */
   int32_t lmcs_enable;   /*!< \brief Flag to enable luma mapping with chroma scaling - filter */
@@ -330,7 +329,8 @@ typedef struct kvz_config
   int32_t amp_enable;   /*!< \brief Flag to enable AMP blocks. */
   int32_t rdo;            /*!< \brief RD-calculation level (0..2) */
   int32_t full_intra_search; /*!< \brief If true, don't skip modes in intra search. */
-  int32_t trskip_enable;    /*!< \brief Flag to enable transform skip (for 4x4 blocks). */
+  int32_t trskip_enable;    /*!< \brief Flag to enable transform skip. */
+  int32_t trskip_max_size;    /*!< \brief Transform skip max block size. */
   enum kvz_mts mts;        /*< \brief flag to enable multiple transform selection*/
   int32_t mts_implicit;        /*< \brief flag to enable implicit multiple transform selection*/
   int32_t tr_depth_intra; /*!< \brief Maximum transform depth for intra. */

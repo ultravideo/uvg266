@@ -426,8 +426,6 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
   if (encoder->cfg.framerate_num != 0) {
     double framerate = encoder->cfg.framerate_num / (double)encoder->cfg.framerate_denom;
     encoder->target_avg_bppic = encoder->cfg.target_bitrate / framerate;
-  } else {
-    encoder->target_avg_bppic = encoder->cfg.target_bitrate / encoder->cfg.framerate;
   }
   encoder->target_avg_bpp = encoder->target_avg_bppic / encoder->in.pixels_per_pic;
 

@@ -571,7 +571,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
 
   WRITE_U(stream, encoder->cfg.trskip_enable, 1, "sps_transform_skip_enabled_flag");
   if (encoder->cfg.trskip_enable) {
-    WRITE_UE(stream, 0, "sps_log2_transform_skip_max_size_minus2"); // Only enable transformskip for 4x4 blocks for now
+    WRITE_UE(stream, encoder->cfg.trskip_max_size-2, "sps_log2_transform_skip_max_size_minus2");
     WRITE_U(stream, 0, 1, "sps_bdpcm_enabled_flag");
   }
 

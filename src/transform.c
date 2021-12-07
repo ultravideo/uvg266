@@ -258,8 +258,8 @@ int kvz_quantize_residual_trskip(
     kvz_pixel *rec_out, coeff_t *coeff_out, int lmcs_chroma_adj)
 {
   struct {
-    kvz_pixel rec[4*4];
-    coeff_t coeff[4*4];
+    kvz_pixel rec[LCU_WIDTH * LCU_WIDTH];
+    coeff_t coeff[LCU_WIDTH * LCU_WIDTH];
     uint32_t cost;
     int has_coeffs;
   } skip, *best;
@@ -275,10 +275,10 @@ int kvz_quantize_residual_trskip(
 
   skip.has_coeffs = kvz_quantize_residual(
     state, cur_cu, width, color, scan_order,
-    1, in_stride, 4,
+    1, in_stride, width,
     ref_in, pred_in, skip.rec, skip.coeff, false, lmcs_chroma_adj);
-  skip.cost = kvz_pixels_calc_ssd(ref_in, skip.rec, in_stride, 4, 4);
-  skip.cost += kvz_get_coeff_cost(state, skip.coeff, 4, 0, scan_order, 1) * bit_cost;
+  skip.cost = kvz_pixels_calc_ssd(ref_in, skip.rec, in_stride, width, width);
+  skip.cost += kvz_get_coeff_cost(state, skip.coeff, width, 0, scan_order, 1) * bit_cost;
 
 /*  if (noskip.cost <= skip.cost) {
     *trskip_out = 0;
@@ -291,7 +291,7 @@ int kvz_quantize_residual_trskip(
   if (best->has_coeffs || rec_out != pred_in) {
     // If there is no residual and reconstruction is already in rec_out, 
     // we can skip this.
-    kvz_pixels_blit(best->rec, rec_out, width, width, 4, out_stride);
+    kvz_pixels_blit(best->rec, rec_out, width, width, width, out_stride);
   }
   copy_coeffs(best->coeff, coeff_out, width);
 
@@ -372,7 +372,7 @@ static void quantize_tr_residual(encoder_state_t * const state,
       break;
   }
 
-  const bool can_use_trskip = tr_width == 4 &&
+  const bool can_use_trskip = tr_width <= (1 << state->encoder_control->cfg.trskip_max_size) &&
                               color == COLOR_Y &&
                               cfg->trskip_enable && 
                               cur_pu->tr_idx == 1;

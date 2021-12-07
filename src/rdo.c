@@ -1126,21 +1126,24 @@ static inline uint32_t get_coded_level_ts_pred(double* coded_cost,
 
 
 int kvz_ts_rdoq(encoder_state_t* const state, coeff_t* src_coeff, coeff_t* dest_coeff, int32_t width,
-  int32_t height, int8_t type, int8_t scan_mode) {
+                int32_t height, int8_t type, int8_t scan_mode) {
   const encoder_control_t* const encoder = state->encoder_control;
   const cabac_data_t* cabac = &state->cabac;
   
 
   const bool extended_precision = false;
   const int  max_log2_tr_dynamic_range = 15;
-  uint32_t log2_tr_width = kvz_math_floor_log2(height);
-  uint32_t log2_tr_height = kvz_math_floor_log2(width);
+  uint32_t log2_tr_width = kvz_math_floor_log2(width);
+  uint32_t log2_tr_height = kvz_math_floor_log2(height);
   const uint32_t log2_block_size = kvz_g_convert_to_bit[width] + 2;
+  const uint32_t log2_cg_width = g_log2_sbb_size[log2_tr_width][log2_tr_height][0];
+  const uint32_t log2_cg_height = g_log2_sbb_size[log2_tr_width][log2_tr_height][1];
 
+  const uint32_t log2_cg_size = log2_cg_width + log2_cg_height;
   //TODO: Scaling list
 
   double   block_uncoded_cost = 0;
-  uint32_t cg_num = width * height >> 4;
+  uint32_t cg_num = width * height >> log2_cg_size;
 
   int32_t qp_scaled = kvz_get_scaled_qp(type, state->qp, (encoder->bitdepth - 8) * 6, encoder->qp_map[0]);
   qp_scaled = MAX(qp_scaled, 4 + 6 * MIN_QP_PRIME_TS);
@@ -1178,8 +1181,7 @@ int kvz_ts_rdoq(encoder_state_t* const state, coeff_t* src_coeff, coeff_t* dest_
 
   uint32_t coeff_levels[3];
   double   coeff_level_error[4];
-  
-  uint32_t log2_cg_size = log2_tr_height + log2_tr_width;
+
   const int sbSizeM1 = (1 << log2_cg_size) - 1;
   double    base_cost = 0;
   uint32_t  go_rice_par = 0;

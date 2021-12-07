@@ -111,7 +111,7 @@ typedef struct
     cabac_ctx_t joint_cb_cr[3];
     cabac_ctx_t transform_skip_model_luma;
     cabac_ctx_t transform_skip_model_chroma;
-    cabac_ctx_t transform_skip_sig_coeff[3];
+    cabac_ctx_t transform_skip_sig_coeff_group[3];
     cabac_ctx_t transform_skip_sig[3];
     cabac_ctx_t transform_skip_res_sign[6];
     cabac_ctx_t transform_skip_gt1[4];
