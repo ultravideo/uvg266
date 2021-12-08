@@ -839,6 +839,7 @@ void kvz_intra_build_reference_inner(
 
   // Get multiRefIdx from CU under prediction. Do not use MRL if not luma
   const uint8_t multi_ref_index = !is_chroma ? multi_ref_idx : 0;
+  assert(multi_ref_index < MAX_REF_LINE_IDX);
 
   // Convert luma coordinates to chroma coordinates for chroma.
   const vector2d_t lcu_px = {
@@ -855,7 +856,7 @@ void kvz_intra_build_reference_inner(
   bool extra_ref = false;
   // On the left LCU edge, if left neighboring LCU is available, 
   // left_ref needs to point to correct extra reference line if MRL is used.
-  if (luma_px->x > 0 && lcu_px.x == 0 && multi_ref_index != 0) {
+  if (lcu_px.x == 0 && multi_ref_index != 0) {
     left_ref = &extra_ref_lines[multi_ref_index * 128];
     extra_ref = true;
   }
@@ -872,7 +873,6 @@ void kvz_intra_build_reference_inner(
     top_border = &rec_ref[px.x + (px.y - 1 - multi_ref_index) * (LCU_WIDTH >> is_chroma)];
   } else {
     top_border = &top_ref[px.x]; // At the top line. No need for multi_ref_index
-
   }
 
   // Init left borders pointer to point to the correct place in the correct reference array.
@@ -881,8 +881,7 @@ void kvz_intra_build_reference_inner(
   if (px.x) {
     left_border = &rec_ref[px.x - 1 - multi_ref_index + px.y * (LCU_WIDTH >> is_chroma)];
     left_stride = LCU_WIDTH >> is_chroma;
-  }
-  else {
+  } else {
     if (extra_ref) {
       left_border = &left_ref[MAX_REF_LINE_IDX];
     }
@@ -895,82 +894,48 @@ void kvz_intra_build_reference_inner(
 // Generate top-left reference
   if (multi_ref_index)
   {
-    if (luma_px->x > 0 && luma_px->y > 0) {
-      // If the block is at an LCU border, the top-left must be copied from
-      // the border that points to the LCUs 1D reference buffer.
-
-      // Inner picture cases
-      if (px.x == 0 && px.y == 0) {
-        // LCU top left corner case. Multi ref will be 0.
-        out_left_ref[0] = out_left_ref[1];
-        out_top_ref[0] = out_left_ref[1];
-      }
-      else if (px.x == 0) {
-        // LCU left border case
-        kvz_pixel* top_left_corner = &extra_ref_lines[multi_ref_index * 128];
-        for (int i = 0; i <= multi_ref_index; ++i) {
-          out_left_ref[i] = left_border[(i - 1 - multi_ref_index) * left_stride];
-          out_top_ref[i] = top_left_corner[(128 * -i) + MAX_REF_LINE_IDX - 1 - multi_ref_index];
-        }
-      }
-      else if (px.y == 0) {
-        // LCU top border case. Multi ref will be 0.
-        out_left_ref[0] = top_border[-1];
-        out_top_ref[0] = top_border[-1];
-      }
-      else {
-        // Inner case
-        for (int i = 0; i <= multi_ref_index; ++i) {
-          out_left_ref[i] = left_border[(i - 1 - multi_ref_index) * left_stride];
-          out_top_ref[i] = top_border[i - 1 - multi_ref_index];
-        }
+    // Inner picture cases
+    if (px.x == 0 && px.y == 0) {
+      // LCU top left corner case. Multi ref will be 0.
+      out_left_ref[0] = out_left_ref[1];
+      out_top_ref[0] = out_left_ref[1];
+    }
+    else if (px.x == 0) {
+      // LCU left border case
+      kvz_pixel* top_left_corner = &extra_ref_lines[multi_ref_index * 128];
+      for (int i = 0; i <= multi_ref_index; ++i) {
+        out_left_ref[i] = left_border[(i - 1 - multi_ref_index) * left_stride];
+        out_top_ref[i] = top_left_corner[(128 * -i) + MAX_REF_LINE_IDX - 1 - multi_ref_index];
       }
     }
+    else if (px.y == 0) {
+      // LCU top border case. Multi ref will be 0.
+      out_left_ref[0] = top_border[-1];
+      out_top_ref[0] = top_border[-1];
+    }
     else {
-      // Picture border cases
-      if (px.x == 0 && px.y == 0) {
-        // Top left picture corner case. Multi ref will be 0.
-        out_left_ref[0] = out_left_ref[1];
-        out_top_ref[0] = out_left_ref[1];
-      }
-      else if (px.x == 0) {
-        // Picture left border case. Reference pixel cannot be taken from outside LCU border
-        kvz_pixel nearest = out_left_ref[1 + multi_ref_index];
-        for (int i = 0; i <= multi_ref_index; ++i) {
-          out_left_ref[i] = nearest;
-          out_top_ref[i] = nearest;
-        }
-      }
-      else {
-        // Picture top border case. Multi ref will be 0.
-        out_left_ref[0] = top_border[-1];
-        out_top_ref[0] = top_border[-1];
+      // Inner case
+      for (int i = 0; i <= multi_ref_index; ++i) {
+        out_left_ref[i] = left_border[(i - 1 - multi_ref_index) * left_stride];
+        out_top_ref[i] = top_border[i - 1 - multi_ref_index];
       }
     }
   }
   else {
-    if (luma_px->x > 0 && luma_px->y > 0) {
-      // If the block is at an LCU border, the top-left must be copied from
-      // the border that points to the LCUs 1D reference buffer.
-      if (px.x == 0) {
-        out_left_ref[0] = left_border[-1 * left_stride];
-        out_top_ref[0] = left_border[-1 * left_stride];
-      }
-      else {
-        out_left_ref[0] = top_border[-1];
-        out_top_ref[0] = top_border[-1];
-      }
+    // If the block is at an LCU border, the top-left must be copied from
+    // the border that points to the LCUs 1D reference buffer.
+    if (px.x == 0) {
+      out_left_ref[0] = left_border[-1 * left_stride];
+      out_top_ref[0] = left_border[-1 * left_stride];
     }
     else {
-      // Copy reference clockwise.
-      out_left_ref[0] = out_left_ref[1];
-      out_top_ref[0] = out_left_ref[1];
+      out_left_ref[0] = top_border[-1];
+      out_top_ref[0] = top_border[-1];
     }
   }
-
   // Generate left reference.
 
-  // Get the number of reference pixels based on the PU coordinate within the LCU.
+// Get the number of reference pixels based on the PU coordinate within the LCU.
   int px_available_left = num_ref_pixels_left[lcu_px.y / 4][lcu_px.x / 4] >> is_chroma;
 
   // Limit the number of available pixels based on block size and dimensions
@@ -981,10 +946,10 @@ void kvz_intra_build_reference_inner(
   // Copy pixels from coded CUs.
   int i = multi_ref_index;  // Offset by multi_ref_index
   do {
-    out_left_ref[i + 1] = left_border[(i + 0) * left_stride];
-    out_left_ref[i + 2] = left_border[(i + 1) * left_stride];
-    out_left_ref[i + 3] = left_border[(i + 2) * left_stride];
-    out_left_ref[i + 4] = left_border[(i + 3) * left_stride];
+    out_left_ref[i + 1] = left_border[(i + 0 - multi_ref_index) * left_stride];
+    out_left_ref[i + 2] = left_border[(i + 1 - multi_ref_index) * left_stride];
+    out_left_ref[i + 3] = left_border[(i + 2 - multi_ref_index) * left_stride];
+    out_left_ref[i + 4] = left_border[(i + 3 - multi_ref_index) * left_stride];
     i += 4;
   } while (i < px_available_left);
 
@@ -1011,32 +976,20 @@ void kvz_intra_build_reference_inner(
 
   // Limit the number of available pixels based on block size and dimensions
   // of the picture.
-  px_available_top = MIN(px_available_top, width * 2);
+  px_available_top = MIN(px_available_top, width * 2 + multi_ref_index);
   px_available_top = MIN(px_available_top, (pic_px->x - luma_px->x) >> is_chroma);
 
   if (entropy_sync && px.y == 0) px_available_top = MIN(px_available_top, ((LCU_WIDTH >> is_chroma) - px.x) -1);
 
   // Copy all the pixels we can.
-  i = multi_ref_index;  // Offset by multi_ref_index
-  do {
-    memcpy(out_top_ref + i + 1, top_border + i, 4 * sizeof(kvz_pixel));
-    i += 4;
-  } while (i < px_available_top);
-
-  // Extend the last pixel for the rest of the reference values.
-  nearest_pixel = out_top_ref[i];
-  for (; i < width * 2; i += 4) {
-    out_top_ref[i + 1] = nearest_pixel;
-    out_top_ref[i + 2] = nearest_pixel;
-    out_top_ref[i + 3] = nearest_pixel;
-    out_top_ref[i + 4] = nearest_pixel;
+  for (int i = 0; i < px_available_top; ++i) {
+    out_top_ref[i + 1 + multi_ref_index] = top_border[i];
   }
 
-  // Extend for MRL
-  if (multi_ref_index) {
-    for (; i < width * 2 + multi_ref_index; ++i) {
-      out_top_ref[i + 1] = nearest_pixel;
-    }
+  // Extend the last pixel for the rest of the reference values.
+  nearest_pixel = out_top_ref[px_available_top + multi_ref_index];
+  for (int i = px_available_top; i < (width + multi_ref_index) * 2; i++) {
+    out_top_ref[i + 1 + multi_ref_index] = nearest_pixel;
   }
 }
 
