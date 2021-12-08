@@ -824,7 +824,8 @@ void kvz_intra_build_reference_inner(
   const lcu_t *const lcu,
   kvz_intra_references *const refs,
   bool entropy_sync,
-  const uint8_t multi_ref_idx)
+  const uint8_t multi_ref_idx,
+  kvz_pixel* extra_ref_lines)
 {
   assert(log2_width >= 2 && log2_width <= 5);
 
@@ -850,7 +851,18 @@ void kvz_intra_build_reference_inner(
   };
 
   // Init pointers to LCUs reconstruction buffers, such that index 0 refers to block coordinate 0.
-  const kvz_pixel * __restrict left_ref = !color ? &lcu->left_ref.y[1] : (color == 1) ? &lcu->left_ref.u[1] : &lcu->left_ref.v[1];
+  const kvz_pixel* left_ref;
+  bool extra_ref = false;
+  // On the left LCU edge, if left neighboring LCU is available, 
+  // left_ref needs to point to correct extra reference line if MRL is used.
+  if (luma_px->x > 0 && lcu_px.x == 0 && multi_ref_index != 0) {
+    left_ref = &extra_ref_lines[multi_ref_index * 128];
+    extra_ref = true;
+  }
+  else {
+    left_ref = !color ? &lcu->left_ref.y[1] : (color == 1) ? &lcu->left_ref.u[1] : &lcu->left_ref.v[1];
+  }
+
   const kvz_pixel * __restrict top_ref = !color ? &lcu->top_ref.y[1] : (color == 1) ? &lcu->top_ref.u[1] : &lcu->top_ref.v[1];
   const kvz_pixel * __restrict rec_ref = !color ? lcu->rec.y : (color == 1) ? lcu->rec.u : lcu->rec.v;
 
@@ -866,23 +878,93 @@ void kvz_intra_build_reference_inner(
   // Init left borders pointer to point to the correct place in the correct reference array.
   const kvz_pixel * __restrict left_border;
   int left_stride; // Distance between reference samples.
-
-  // Generate top-left reference.
-  // If the block is at an LCU border, the top-left must be copied from
-  // the border that points to the LCUs 1D reference buffer.
   if (px.x) {
     left_border = &rec_ref[px.x - 1 - multi_ref_index + px.y * (LCU_WIDTH >> is_chroma)];
-    left_stride = (LCU_WIDTH >> is_chroma) + multi_ref_index;
-    for (int i = 0; i <= multi_ref_index; ++i) {
-      out_top_ref[i] = top_border[i - multi_ref_index - 1];
-      out_left_ref[i] = left_border[i - multi_ref_index - 1 * left_stride];
+    left_stride = LCU_WIDTH >> is_chroma;
+  }
+  else {
+    if (extra_ref) {
+      left_border = &left_ref[MAX_REF_LINE_IDX];
     }
-  } else {
-    left_border = &left_ref[px.y];
+    else {
+      left_border = &left_ref[px.y];
+    }
     left_stride = 1;
-    for (int i = 0; i <= multi_ref_index; ++i) {
-      out_left_ref[0] = left_border[i - multi_ref_index - 1 * left_stride];
-      out_top_ref[0] = top_border[i - multi_ref_index - 1];
+  }
+
+// Generate top-left reference
+  if (multi_ref_index)
+  {
+    if (luma_px->x > 0 && luma_px->y > 0) {
+      // If the block is at an LCU border, the top-left must be copied from
+      // the border that points to the LCUs 1D reference buffer.
+
+      // Inner picture cases
+      if (px.x == 0 && px.y == 0) {
+        // LCU top left corner case. Multi ref will be 0.
+        out_left_ref[0] = out_left_ref[1];
+        out_top_ref[0] = out_left_ref[1];
+      }
+      else if (px.x == 0) {
+        // LCU left border case
+        kvz_pixel* top_left_corner = &extra_ref_lines[multi_ref_index * 128];
+        for (int i = 0; i <= multi_ref_index; ++i) {
+          out_left_ref[i] = left_border[(i - 1 - multi_ref_index) * left_stride];
+          out_top_ref[i] = top_left_corner[(128 * -i) + MAX_REF_LINE_IDX - 1 - multi_ref_index];
+        }
+      }
+      else if (px.y == 0) {
+        // LCU top border case. Multi ref will be 0.
+        out_left_ref[0] = top_border[-1];
+        out_top_ref[0] = top_border[-1];
+      }
+      else {
+        // Inner case
+        for (int i = 0; i <= multi_ref_index; ++i) {
+          out_left_ref[i] = left_border[(i - 1 - multi_ref_index) * left_stride];
+          out_top_ref[i] = top_border[i - 1 - multi_ref_index];
+        }
+      }
+    }
+    else {
+      // Picture border cases
+      if (px.x == 0 && px.y == 0) {
+        // Top left picture corner case. Multi ref will be 0.
+        out_left_ref[0] = out_left_ref[1];
+        out_top_ref[0] = out_left_ref[1];
+      }
+      else if (px.x == 0) {
+        // Picture left border case. Reference pixel cannot be taken from outside LCU border
+        kvz_pixel nearest = out_left_ref[1 + multi_ref_index];
+        for (int i = 0; i <= multi_ref_index; ++i) {
+          out_left_ref[i] = nearest;
+          out_top_ref[i] = nearest;
+        }
+      }
+      else {
+        // Picture top border case. Multi ref will be 0.
+        out_left_ref[0] = top_border[-1];
+        out_top_ref[0] = top_border[-1];
+      }
+    }
+  }
+  else {
+    if (luma_px->x > 0 && luma_px->y > 0) {
+      // If the block is at an LCU border, the top-left must be copied from
+      // the border that points to the LCUs 1D reference buffer.
+      if (px.x == 0) {
+        out_left_ref[0] = left_border[-1 * left_stride];
+        out_top_ref[0] = left_border[-1 * left_stride];
+      }
+      else {
+        out_left_ref[0] = top_border[-1];
+        out_top_ref[0] = top_border[-1];
+      }
+    }
+    else {
+      // Copy reference clockwise.
+      out_left_ref[0] = out_left_ref[1];
+      out_top_ref[0] = out_left_ref[1];
     }
   }
 
@@ -971,15 +1053,12 @@ void kvz_intra_build_reference(
 {
   assert(!(extra_ref_lines == NULL && multi_ref_idx != 0) && "Trying to use MRL with NULL extra references.");
 
-  // Make this common case work with MRL, implement inner after this one works
-  kvz_intra_build_reference_any(log2_width, color, luma_px, pic_px, lcu, refs, multi_ref_idx, extra_ref_lines);
-
   // Much logic can be discarded if not on the edge
-  /*if (luma_px->x > 0 && luma_px->y > 0) {
-    kvz_intra_build_reference_inner(log2_width, color, luma_px, pic_px, lcu, refs, entropy_sync, cur_cu->intra.multi_ref_idx);
+  if (luma_px->x > 0 && luma_px->y > 0) {
+    kvz_intra_build_reference_inner(log2_width, color, luma_px, pic_px, lcu, refs, entropy_sync, multi_ref_idx, extra_ref_lines);
   } else {
-    kvz_intra_build_reference_any(log2_width, color, luma_px, pic_px, lcu, refs, cur_cu->intra.multi_ref_idx);
-  }*/
+    kvz_intra_build_reference_any(log2_width, color, luma_px, pic_px, lcu, refs, multi_ref_idx, extra_ref_lines);
+  }
 }
 
 static void intra_recon_tb_leaf(
