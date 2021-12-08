@@ -821,28 +821,6 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
   */
 
   const int num_pred_units = kvz_part_mode_num_parts[cur_cu->part_size];
-
-  //ToDo: update multi_ref_lines variable when it's something else than constant 3
-  /*
-  int multi_ref_lines = 3;
-  
-  if(isp_enable_flag){ //ToDo: implement flag value to be something else than constant zero
-    for (int i = 0; i < num_pred_units; i++) {
-      if (multi_ref_lines > 1) {
-        cabac->cur_ctx = &(cabac->ctx.multi_ref_line[0]);
-        CABAC_BIN(cabac, cur_cu->intra.multi_ref_idx != 0, "multi_ref_line_0");
-        if (multi_ref_lines > 2 && cur_cu->intra.multi_ref_idx != 0) {
-          cabac->cur_ctx = &(cabac->ctx.multi_ref_line[1]);
-          CABAC_BIN(cabac, cur_cu->intra.multi_ref_idx != 1, "multi_ref_line_1");
-          if (multi_ref_lines > 3 && cur_cu->intra.multi_ref_idx != 1) {
-            cabac->cur_ctx = &(cabac->ctx.multi_ref_line[2]);
-            CABAC_BIN(cabac, cur_cu->intra.multi_ref_idx != 3, "multi_ref_line_2");
-          }
-        }
-      }
-    }
-  }
-  */
   
   // Intra Subpartition mode
   uint32_t width = (LCU_WIDTH >> depth);
