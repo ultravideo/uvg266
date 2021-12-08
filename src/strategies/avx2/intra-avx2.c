@@ -166,7 +166,7 @@ static void kvz_angular_pred_avx2(
   // Set ref_main and ref_side such that, when indexed with 0, they point to
   // index 0 in block coordinates.
   if (sample_disp < 0) {
-    for (int i = 0; i <= width + 1; i++) {
+    for (int i = 0; i <= width + 1 + multi_ref_index; i++) {
       temp_main[width + i] = (vertical_mode ? in_ref_above[i] : in_ref_left[i]);
       temp_side[width + i] = (vertical_mode ? in_ref_left[i] : in_ref_above[i]);
     }
@@ -214,17 +214,17 @@ static void kvz_angular_pred_avx2(
   }
   else {
     
-    for (int i = 0; i <= (width << 1); i++) {
+    for (int i = 0; i <= (width << 1) + multi_ref_index; i++) {
       temp_main[i] = (vertical_mode ? in_ref_above[i] : in_ref_left[i]);
       temp_side[i] = (vertical_mode ? in_ref_left[i] : in_ref_above[i]);
     }
 
     const int s = 0;
-    const int max_index = (0 << s) + 2;
+    const int max_index = (multi_ref_index << s) + 2;
     const int ref_length = width << 1;
-    const kvz_pixel val = temp_main[ref_length];
+    const kvz_pixel val = temp_main[ref_length + multi_ref_index];
     for (int j = 0; j <= max_index; j++) {
-      temp_main[ref_length + j] = val;
+      temp_main[ref_length + multi_ref_index + j] = val;
     }
 
     ref_main = temp_main;
@@ -241,10 +241,14 @@ static void kvz_angular_pred_avx2(
     //tmp_ref[width + last_index] = tmp_ref[width + last_index - 1];
   }
 
+  // compensate for line offset in reference line buffers
+  ref_main += multi_ref_index;
+  ref_side += multi_ref_index;
+
   if (sample_disp != 0) {
     // The mode is not horizontal or vertical, we have to do interpolation.
 
-    int_fast32_t delta_pos = 0;
+    int_fast32_t delta_pos = sample_disp * multi_ref_index;
     int_fast32_t delta_int[4] = { 0 };
     int_fast32_t delta_fract[4] = { 0 };
     for (int_fast32_t y = 0; y + 3 < width; y += 4) {
@@ -278,6 +282,10 @@ static void kvz_angular_pred_avx2(
               {
                 use_cubic = false;
               }
+            }
+            // Cubic must be used if ref line != 0
+            if (multi_ref_index) {
+              use_cubic = true;
             }
             const int16_t filter_coeff[4] = { 16 - (delta_fract[yy] >> 1), 32 - (delta_fract[yy] >> 1), 16 + (delta_fract[yy] >> 1), delta_fract[yy] >> 1 };
             const int16_t *temp_f = use_cubic ? cubic_filter[delta_fract[yy]] : filter_coeff;
@@ -439,7 +447,7 @@ static void kvz_angular_pred_avx2(
       for (int_fast32_t x = 0; x < width; ++x) {
         dst[y * width + x] = ref_main[x + 1];
       }
-      if ((width >= 4 || channel_type != 0) && sample_disp >= 0) {
+      if ((width >= 4 || channel_type != 0) && sample_disp >= 0 && multi_ref_index == 0) {
         int scale = (log2_width + log2_width - 2) >> 2;
         const kvz_pixel top_left = ref_main[0];
         const kvz_pixel left = ref_side[1 + y];
