@@ -982,14 +982,19 @@ void kvz_intra_build_reference_inner(
   if (entropy_sync && px.y == 0) px_available_top = MIN(px_available_top, ((LCU_WIDTH >> is_chroma) - px.x) -1);
 
   // Copy all the pixels we can.
-  for (int i = 0; i < px_available_top; ++i) {
-    out_top_ref[i + 1 + multi_ref_index] = top_border[i];
-  }
+  i = 0;
+  do {
+    memcpy(out_top_ref + i + 1 + multi_ref_index, top_border + i, 4 * sizeof(kvz_pixel));
+    i += 4;
+  } while (i < px_available_top);
 
   // Extend the last pixel for the rest of the reference values.
-  nearest_pixel = out_top_ref[px_available_top + multi_ref_index];
-  for (int i = px_available_top; i < (width + multi_ref_index) * 2; i++) {
+  nearest_pixel = out_top_ref[i + multi_ref_index];
+  for (; i < (width + multi_ref_index) * 2; i += 4) {
     out_top_ref[i + 1 + multi_ref_index] = nearest_pixel;
+    out_top_ref[i + 2 + multi_ref_index] = nearest_pixel;
+    out_top_ref[i + 3 + multi_ref_index] = nearest_pixel;
+    out_top_ref[i + 4 + multi_ref_index] = nearest_pixel;
   }
 }
 
