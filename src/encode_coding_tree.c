@@ -842,28 +842,7 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
   */
 
   const int num_pred_units = kvz_part_mode_num_parts[cur_cu->part_size];
-
-  //ToDo: update multi_ref_lines variable when it's something else than constant 3
-  //int multi_ref_lines = 3;
-  /*
-  if(isp_enable_flag){ //ToDo: implement flag value to be something else than constant zero
-    for (int i = 0; i < num_pred_units; i++) {
-      if (multi_ref_lines > 1) {
-        cabac->cur_ctx = &(cabac->ctx.multi_ref_line[0]);
-        CABAC_BIN(cabac, cur_cu->intra.multi_ref_idx != 0, "multi_ref_line_0");
-        if (multi_ref_lines > 2 && cur_cu->intra.multi_ref_idx != 0) {
-          cabac->cur_ctx = &(cabac->ctx.multi_ref_line[1]);
-          CABAC_BIN(cabac, cur_cu->intra.multi_ref_idx != 1, "multi_ref_line_1");
-          if (multi_ref_lines > 3 && cur_cu->intra.multi_ref_idx != 1) {
-            cabac->cur_ctx = &(cabac->ctx.multi_ref_line[2]);
-            CABAC_BIN(cabac, cur_cu->intra.multi_ref_idx != 3, "multi_ref_line_2");
-          }
-        }
-      }
-    }
-  }
-  */
-
+  
   // Intra Subpartition mode
   uint32_t width = (LCU_WIDTH >> depth);
   uint32_t height = (LCU_WIDTH >> depth);
@@ -875,14 +854,25 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
   //isp_mode += ((height > TR_MAX_WIDTH) || !enough_samples) ? 2 : 0;
   bool allow_isp = enough_samples;
 
-  if (0 && cur_cu->type == 1/*intra*/ && (y % LCU_WIDTH) != 0) {
-    cabac->cur_ctx = &(cabac->ctx.multi_ref_line[0]);
-    CABAC_BIN(cabac, 0, "multi_ref_line");
+  // Code MRL related bits
+  bool enable_mrl = state->encoder_control->cfg.mrl;
+  int multi_ref_idx = enable_mrl ? cur_cu->intra.multi_ref_idx : 0;
+  
+
+  if (cur_cu->type == CU_INTRA && (y % LCU_WIDTH) != 0 && !cur_cu->bdpcmMode && enable_mrl) {
+    if (MAX_REF_LINE_IDX > 1) {
+      cabac->cur_ctx = &(cabac->ctx.multi_ref_line[0]);
+      CABAC_BIN(cabac, multi_ref_idx != 0, "multi_ref_line");
+      if (MAX_REF_LINE_IDX > 2 && multi_ref_idx != 0) {
+        cabac->cur_ctx = &(cabac->ctx.multi_ref_line[1]);
+        CABAC_BIN(cabac, multi_ref_idx != 1, "multi_ref_line")
+      }
+    }
   }
 
 
   // ToDo: update real usage, these if clauses as such don't make any sense
-  if (isp_mode != 0) {
+  if (isp_mode != 0 && multi_ref_idx == 0) {
     if (isp_mode) {
       cabac->cur_ctx = &(cabac->ctx.intra_subpart_model[0]);
       CABAC_BIN(cabac, 0, "intra_subPartitions");
@@ -940,13 +930,10 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
     }
     // Is the mode in the MPM array or not
     flag[j] = (mpm_preds[j] == -1) ? 0 : 1;
-    if (true||!(cur_pu->intra.multi_ref_idx || (isp_mode))) {
+    if (!(cur_pu->intra.multi_ref_idx || (isp_mode))) {
       CABAC_BIN(cabac, flag[j], "prev_intra_luma_pred_flag");
     }
   }
-
-  
-
 
   for (int j = 0; j < num_pred_units; ++j) {
     // Signal index of the prediction mode in the prediction list, if it is there
@@ -956,7 +943,7 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
       const int pu_y = PU_GET_Y(cur_cu->part_size, cu_width, y, j);
       const cu_info_t *cur_pu = kvz_cu_array_at_const(frame->cu_array, pu_x, pu_y);
       cabac->cur_ctx = &(cabac->ctx.luma_planar_model[(isp_mode ? 0 : 1)]);
-      if (true||cur_pu->intra.multi_ref_idx == 0) {
+      if (cur_pu->intra.multi_ref_idx == 0) {
         CABAC_BIN(cabac, (mpm_preds[j] > 0 ? 1 : 0), "mpm_idx_luma_planar");
       }
       //CABAC_BIN_EP(cabac, (mpm_preds[j] > 0 ? 1 : 0), "mpm_idx");

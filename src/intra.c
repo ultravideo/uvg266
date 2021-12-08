@@ -212,24 +212,26 @@ static void intra_filter_reference(
 
 
 /**
-* \brief Generage planar prediction.
+* \brief Generate dc prediction.
 * \param log2_width    Log2 of width, range 2..5.
-* \param in_ref_above  Pointer to -1 index of above reference, length=width*2+1.
-* \param in_ref_left   Pointer to -1 index of left reference, length=width*2+1.
+* \param ref_top       Pointer to -1 index of above reference, length=width*2+1.
+* \param ref_left      Pointer to -1 index of left reference, length=width*2+1.
 * \param dst           Buffer of size width*width.
+* \param multi_ref_idx Multi reference line index for use with MRL.
 */
 static void intra_pred_dc(
   const int_fast8_t log2_width,
   const kvz_pixel *const ref_top,
   const kvz_pixel *const ref_left,
-  kvz_pixel *const out_block)
+  kvz_pixel *const out_block,
+  const uint8_t multi_ref_idx)
 {
   int_fast8_t width = 1 << log2_width;
 
   int_fast16_t sum = 0;
   for (int_fast8_t i = 0; i < width; ++i) {
-    sum += ref_top[i + 1];
-    sum += ref_left[i + 1];
+    sum += ref_top[i + 1 + multi_ref_idx];
+    sum += ref_left[i + 1 + multi_ref_idx];
   }
   
   // JVET_K0122
@@ -549,13 +551,17 @@ void kvz_intra_predict(
   int_fast8_t mode,
   color_t color,
   kvz_pixel *dst,
-  bool filter_boundary)
+  bool filter_boundary,
+  const uint8_t multi_ref_idx)
 {
   const int_fast8_t width = 1 << log2_width;
   const kvz_config *cfg = &state->encoder_control->cfg;
 
+  // MRL only for luma
+  uint8_t multi_ref_index = color == COLOR_Y ? multi_ref_idx : 0;
+
   const kvz_intra_ref *used_ref = &refs->ref;
-  if (cfg->intra_smoothing_disabled || color != COLOR_Y || mode == 1 || width == 4) {
+  if (cfg->intra_smoothing_disabled || color != COLOR_Y || mode == 1 || width == 4 || multi_ref_index) {
     // For chroma, DC and 4x4 blocks, always use unfiltered reference.
   } else if (mode == 0) {
     // Otherwise, use filtered for planar.
@@ -586,15 +592,15 @@ void kvz_intra_predict(
   if (mode == 0) {
     kvz_intra_pred_planar(log2_width, used_ref->top, used_ref->left, dst);
   } else if (mode == 1) {
-    intra_pred_dc(log2_width, used_ref->top, used_ref->left, dst);
+    intra_pred_dc(log2_width, used_ref->top, used_ref->left, dst, multi_ref_index);
   } else {
-    kvz_angular_pred(log2_width, mode, color, used_ref->top, used_ref->left, dst);
+    kvz_angular_pred(log2_width, mode, color, used_ref->top, used_ref->left, dst, multi_ref_index);
   }
 
   // pdpc
   // bool pdpcCondition = (mode == 0 || mode == 1 || mode == 18 || mode == 50);
   bool pdpcCondition = (mode == 0 || mode == 1); // Planar and DC
-  if (pdpcCondition)
+  if (pdpcCondition && multi_ref_index == 0) // Cannot be used with MRL.
   {
     kvz_pdpc_planar_dc(mode, width, log2_width, used_ref, dst);
   }
@@ -607,7 +613,9 @@ void kvz_intra_build_reference_any(
   const vector2d_t *const luma_px,
   const vector2d_t *const pic_px,
   const lcu_t *const lcu,
-  kvz_intra_references *const refs)
+  kvz_intra_references *const refs,
+  const uint8_t multi_ref_idx,
+  kvz_pixel *extra_ref_lines)
 {
   assert(log2_width >= 2 && log2_width <= 5);
 
@@ -617,7 +625,12 @@ void kvz_intra_build_reference_any(
 
   const kvz_pixel dc_val = 1 << (KVZ_BIT_DEPTH - 1); //TODO: add used bitdepth as a variable
   const int is_chroma = color != COLOR_Y ? 1 : 0;
+  // TODO: height for non-square blocks
   const int_fast8_t width = 1 << log2_width;
+
+  // Get multi ref index from CU under prediction or reconstrcution. Do not use MRL if not luma
+  const uint8_t multi_ref_index = !is_chroma ? multi_ref_idx : 0;
+  assert(multi_ref_index < MAX_REF_LINE_IDX);
 
   // Convert luma coordinates to chroma coordinates for chroma.
   const vector2d_t lcu_px = {
@@ -630,26 +643,42 @@ void kvz_intra_build_reference_any(
   };
 
   // Init pointers to LCUs reconstruction buffers, such that index 0 refers to block coordinate 0.
-  const kvz_pixel *left_ref = !color ? &lcu->left_ref.y[1] : (color == 1) ? &lcu->left_ref.u[1] : &lcu->left_ref.v[1];
+  const kvz_pixel *left_ref;
+  bool extra_ref = false;
+  // On the left LCU edge, if left neighboring LCU is available, 
+  // left_ref needs to point to correct extra reference line if MRL is used.
+  if (luma_px->x > 0 && lcu_px.x == 0 && multi_ref_index != 0) {
+    left_ref = &extra_ref_lines[multi_ref_index * 128];
+    extra_ref = true;
+  }
+  else {
+    left_ref = !color ? &lcu->left_ref.y[1] : (color == 1) ? &lcu->left_ref.u[1] : &lcu->left_ref.v[1];
+  }
+
   const kvz_pixel *top_ref = !color ? &lcu->top_ref.y[1] : (color == 1) ? &lcu->top_ref.u[1] : &lcu->top_ref.v[1];
   const kvz_pixel *rec_ref = !color ? lcu->rec.y : (color == 1) ? lcu->rec.u : lcu->rec.v;
 
   // Init top borders pointer to point to the correct place in the correct reference array.
   const kvz_pixel *top_border;
   if (px.y) {
-    top_border = &rec_ref[px.x + (px.y - 1) * (LCU_WIDTH >> is_chroma)];
+    top_border = &rec_ref[px.x + (px.y - 1 - multi_ref_index) * (LCU_WIDTH >> is_chroma)];
   } else {
-    top_border = &top_ref[px.x];
+    top_border = &top_ref[px.x]; // Top row, no need for multi_ref_index
   }
 
   // Init left borders pointer to point to the correct place in the correct reference array.
   const kvz_pixel *left_border;
   int left_stride; // Distance between reference samples.
   if (px.x) {
-    left_border = &rec_ref[px.x - 1 + px.y * (LCU_WIDTH >> is_chroma)];
+    left_border = &rec_ref[px.x - 1 - multi_ref_index + px.y * (LCU_WIDTH >> is_chroma)];
     left_stride = LCU_WIDTH >> is_chroma;
   } else {
-    left_border = &left_ref[px.y];
+    if (extra_ref) {
+      left_border = &left_ref[MAX_REF_LINE_IDX];
+    }
+    else {
+      left_border = &left_ref[px.y];
+    }
     left_stride = 1;
   }
 
@@ -660,41 +689,103 @@ void kvz_intra_build_reference_any(
 
     // Limit the number of available pixels based on block size and dimensions
     // of the picture.
-    px_available_left = MIN(px_available_left, width * 2);
+    // TODO: height for non-square blocks
+    px_available_left = MIN(px_available_left, width * 2 + multi_ref_index);
     px_available_left = MIN(px_available_left, (pic_px->y - luma_px->y) >> is_chroma);
 
     // Copy pixels from coded CUs.
     for (int i = 0; i < px_available_left; ++i) {
-      out_left_ref[i + 1] = left_border[i * left_stride];
+      // Reserve space for top left reference
+      out_left_ref[i + 1 + multi_ref_index] = left_border[i * left_stride];
     }
     // Extend the last pixel for the rest of the reference values.
-    kvz_pixel nearest_pixel = out_left_ref[px_available_left];
-    for (int i = px_available_left; i < width * 2; ++i) {
-      out_left_ref[i + 1] = nearest_pixel;
+    kvz_pixel nearest_pixel = left_border[(px_available_left - 1) * left_stride];
+    for (int i = px_available_left; i < width * 2 + multi_ref_index * 2; ++i) {
+      out_left_ref[i + 1 + multi_ref_index] = nearest_pixel;
     }
   } else {
     // If we are on the left edge, extend the first pixel of the top row.
     kvz_pixel nearest_pixel = luma_px->y > 0 ? top_border[0] : dc_val;
-    for (int i = 0; i < width * 2; i++) {
-      out_left_ref[i + 1] = nearest_pixel;
+    for (int i = 0; i < width * 2 + multi_ref_index; i++) {
+      // Reserve space for top left reference
+      out_left_ref[i + 1 + multi_ref_index] = nearest_pixel;
     }
   }
 
-  // Generate top-left reference.
-  if (luma_px->x > 0 && luma_px->y > 0) {
-    // If the block is at an LCU border, the top-left must be copied from
-    // the border that points to the LCUs 1D reference buffer.
-    if (px.x == 0) {
-      out_left_ref[0] = left_border[-1 * left_stride];
-      out_top_ref[0] = left_border[-1 * left_stride];
-    } else {
-      out_left_ref[0] = top_border[-1];
-      out_top_ref[0] = top_border[-1];
+  // Generate top-left reference
+  if (multi_ref_index)
+  {
+    if (luma_px->x > 0 && luma_px->y > 0) {
+      // If the block is at an LCU border, the top-left must be copied from
+      // the border that points to the LCUs 1D reference buffer.
+
+      // Inner picture cases
+      if (px.x == 0 && px.y == 0) {
+        // LCU top left corner case. Multi ref will be 0.
+        out_left_ref[0] = out_left_ref[1];
+        out_top_ref[0] = out_left_ref[1];
+      }
+      else if (px.x == 0) {
+        // LCU left border case
+        kvz_pixel *top_left_corner = &extra_ref_lines[multi_ref_index * 128];
+        for (int i = 0; i <= multi_ref_index; ++i) {
+          out_left_ref[i] = left_border[(i - 1 - multi_ref_index) * left_stride];
+          out_top_ref[i] = top_left_corner[(128 * -i) + MAX_REF_LINE_IDX - 1 - multi_ref_index];
+        }
+      }
+      else if (px.y == 0) {
+        // LCU top border case. Multi ref will be 0.
+        out_left_ref[0] = top_border[-1];
+        out_top_ref[0] = top_border[-1];
+      }
+      else {
+        // Inner case
+        for (int i = 0; i <= multi_ref_index; ++i) {
+          out_left_ref[i] = left_border[(i - 1 - multi_ref_index) * left_stride];
+          out_top_ref[i] = top_border[i - 1 - multi_ref_index];
+        }
+      }
     }
-  } else {
-    // Copy reference clockwise.
-    out_left_ref[0] = out_left_ref[1];
-    out_top_ref[0] = out_left_ref[1];
+    else {
+      // Picture border cases
+      if (px.x == 0 && px.y == 0) {
+        // Top left picture corner case. Multi ref will be 0.
+        out_left_ref[0] = out_left_ref[1];
+        out_top_ref[0] = out_left_ref[1];
+      }
+      else if (px.x == 0) {
+        // Picture left border case. Reference pixel cannot be taken from outside LCU border
+        kvz_pixel nearest = out_left_ref[1 + multi_ref_index];
+        for (int i = 0; i <= multi_ref_index; ++i) {
+          out_left_ref[i] = nearest;
+          out_top_ref[i] = nearest;
+        }
+      }
+      else {
+        // Picture top border case. Multi ref will be 0.
+        out_left_ref[0] = top_border[-1];
+        out_top_ref[0] = top_border[-1];
+      }
+    }
+  }
+  else {
+    if (luma_px->x > 0 && luma_px->y > 0) {
+      // If the block is at an LCU border, the top-left must be copied from
+      // the border that points to the LCUs 1D reference buffer.
+      if (px.x == 0) {
+        out_left_ref[0] = left_border[-1 * left_stride];
+        out_top_ref[0] = left_border[-1 * left_stride];
+      }
+      else {
+        out_left_ref[0] = top_border[-1];
+        out_top_ref[0] = top_border[-1];
+      }
+    }
+    else {
+      // Copy reference clockwise.
+      out_left_ref[0] = out_left_ref[1];
+      out_top_ref[0] = out_left_ref[1];
+    }
   }
 
   // Generate top reference.
@@ -704,22 +795,22 @@ void kvz_intra_build_reference_any(
 
     // Limit the number of available pixels based on block size and dimensions
     // of the picture.
-    px_available_top = MIN(px_available_top, width * 2);
+    px_available_top = MIN(px_available_top, width * 2 + multi_ref_index);
     px_available_top = MIN(px_available_top, (pic_px->x - luma_px->x) >> is_chroma);
 
     // Copy all the pixels we can.
     for (int i = 0; i < px_available_top; ++i) {
-      out_top_ref[i + 1] = top_border[i];
+      out_top_ref[i + 1 + multi_ref_index] = top_border[i];
     }
     // Extend the last pixel for the rest of the reference values.
     kvz_pixel nearest_pixel = top_border[px_available_top - 1];
-    for (int i = px_available_top; i < width * 2; ++i) {
-      out_top_ref[i + 1] = nearest_pixel;
+    for (int i = px_available_top; i < width * 2 + multi_ref_index * 2; ++i) {
+      out_top_ref[i + 1 + multi_ref_index] = nearest_pixel;
     }
   } else {
     // Extend nearest pixel.
     kvz_pixel nearest_pixel = luma_px->x > 0 ? left_border[0] : dc_val;
-    for (int i = 0; i < width * 2; i++) {
+    for (int i = 0; i < width * 2 + multi_ref_index; i++) {
       out_top_ref[i + 1] = nearest_pixel;
     }
   }
@@ -732,7 +823,9 @@ void kvz_intra_build_reference_inner(
   const vector2d_t *const pic_px,
   const lcu_t *const lcu,
   kvz_intra_references *const refs,
-  bool entropy_sync)
+  bool entropy_sync,
+  const uint8_t multi_ref_idx,
+  kvz_pixel* extra_ref_lines)
 {
   assert(log2_width >= 2 && log2_width <= 5);
 
@@ -741,7 +834,12 @@ void kvz_intra_build_reference_inner(
   kvz_pixel * __restrict out_top_ref = &refs->ref.top[0];
 
   const int is_chroma = color != COLOR_Y ? 1 : 0;
+  // TODO: height for non-sqaure blocks
   const int_fast8_t width = 1 << log2_width;
+
+  // Get multiRefIdx from CU under prediction. Do not use MRL if not luma
+  const uint8_t multi_ref_index = !is_chroma ? multi_ref_idx : 0;
+  assert(multi_ref_index < MAX_REF_LINE_IDX);
 
   // Convert luma coordinates to chroma coordinates for chroma.
   const vector2d_t lcu_px = {
@@ -754,41 +852,90 @@ void kvz_intra_build_reference_inner(
   };
 
   // Init pointers to LCUs reconstruction buffers, such that index 0 refers to block coordinate 0.
-  const kvz_pixel * __restrict left_ref = !color ? &lcu->left_ref.y[1] : (color == 1) ? &lcu->left_ref.u[1] : &lcu->left_ref.v[1];
+  const kvz_pixel* left_ref;
+  bool extra_ref = false;
+  // On the left LCU edge, if left neighboring LCU is available, 
+  // left_ref needs to point to correct extra reference line if MRL is used.
+  if (lcu_px.x == 0 && multi_ref_index != 0) {
+    left_ref = &extra_ref_lines[multi_ref_index * 128];
+    extra_ref = true;
+  }
+  else {
+    left_ref = !color ? &lcu->left_ref.y[1] : (color == 1) ? &lcu->left_ref.u[1] : &lcu->left_ref.v[1];
+  }
+
   const kvz_pixel * __restrict top_ref = !color ? &lcu->top_ref.y[1] : (color == 1) ? &lcu->top_ref.u[1] : &lcu->top_ref.v[1];
   const kvz_pixel * __restrict rec_ref = !color ? lcu->rec.y : (color == 1) ? lcu->rec.u : lcu->rec.v;
 
   // Init top borders pointer to point to the correct place in the correct reference array.
   const kvz_pixel * __restrict top_border;
   if (px.y) {
-    top_border = &rec_ref[px.x + (px.y - 1) * (LCU_WIDTH >> is_chroma)];
+    top_border = &rec_ref[px.x + (px.y - 1 - multi_ref_index) * (LCU_WIDTH >> is_chroma)];
   } else {
-    top_border = &top_ref[px.x];
-
+    top_border = &top_ref[px.x]; // At the top line. No need for multi_ref_index
   }
 
   // Init left borders pointer to point to the correct place in the correct reference array.
   const kvz_pixel * __restrict left_border;
   int left_stride; // Distance between reference samples.
-
-  // Generate top-left reference.
-  // If the block is at an LCU border, the top-left must be copied from
-  // the border that points to the LCUs 1D reference buffer.
   if (px.x) {
-    left_border = &rec_ref[px.x - 1 + px.y * (LCU_WIDTH >> is_chroma)];
+    left_border = &rec_ref[px.x - 1 - multi_ref_index + px.y * (LCU_WIDTH >> is_chroma)];
     left_stride = LCU_WIDTH >> is_chroma;
-    out_left_ref[0] = top_border[-1];
-    out_top_ref[0] = top_border[-1];
   } else {
-    left_border = &left_ref[px.y];
+    if (extra_ref) {
+      left_border = &left_ref[MAX_REF_LINE_IDX];
+    }
+    else {
+      left_border = &left_ref[px.y];
+    }
     left_stride = 1;
-    out_left_ref[0] = left_border[-1 * left_stride];
-    out_top_ref[0] = left_border[-1 * left_stride];
   }
 
+// Generate top-left reference
+  if (multi_ref_index)
+  {
+    // Inner picture cases
+    if (px.x == 0 && px.y == 0) {
+      // LCU top left corner case. Multi ref will be 0.
+      out_left_ref[0] = out_left_ref[1];
+      out_top_ref[0] = out_left_ref[1];
+    }
+    else if (px.x == 0) {
+      // LCU left border case
+      kvz_pixel* top_left_corner = &extra_ref_lines[multi_ref_index * 128];
+      for (int i = 0; i <= multi_ref_index; ++i) {
+        out_left_ref[i] = left_border[(i - 1 - multi_ref_index) * left_stride];
+        out_top_ref[i] = top_left_corner[(128 * -i) + MAX_REF_LINE_IDX - 1 - multi_ref_index];
+      }
+    }
+    else if (px.y == 0) {
+      // LCU top border case. Multi ref will be 0.
+      out_left_ref[0] = top_border[-1];
+      out_top_ref[0] = top_border[-1];
+    }
+    else {
+      // Inner case
+      for (int i = 0; i <= multi_ref_index; ++i) {
+        out_left_ref[i] = left_border[(i - 1 - multi_ref_index) * left_stride];
+        out_top_ref[i] = top_border[i - 1 - multi_ref_index];
+      }
+    }
+  }
+  else {
+    // If the block is at an LCU border, the top-left must be copied from
+    // the border that points to the LCUs 1D reference buffer.
+    if (px.x == 0) {
+      out_left_ref[0] = left_border[-1 * left_stride];
+      out_top_ref[0] = left_border[-1 * left_stride];
+    }
+    else {
+      out_left_ref[0] = top_border[-1];
+      out_top_ref[0] = top_border[-1];
+    }
+  }
   // Generate left reference.
 
-  // Get the number of reference pixels based on the PU coordinate within the LCU.
+// Get the number of reference pixels based on the PU coordinate within the LCU.
   int px_available_left = num_ref_pixels_left[lcu_px.y / 4][lcu_px.x / 4] >> is_chroma;
 
   // Limit the number of available pixels based on block size and dimensions
@@ -797,12 +944,12 @@ void kvz_intra_build_reference_inner(
   px_available_left = MIN(px_available_left, (pic_px->y - luma_px->y) >> is_chroma);
 
   // Copy pixels from coded CUs.
-  int i = 0;
+  int i = multi_ref_index;  // Offset by multi_ref_index
   do {
-    out_left_ref[i + 1] = left_border[(i + 0) * left_stride];
-    out_left_ref[i + 2] = left_border[(i + 1) * left_stride];
-    out_left_ref[i + 3] = left_border[(i + 2) * left_stride];
-    out_left_ref[i + 4] = left_border[(i + 3) * left_stride];
+    out_left_ref[i + 1] = left_border[(i + 0 - multi_ref_index) * left_stride];
+    out_left_ref[i + 2] = left_border[(i + 1 - multi_ref_index) * left_stride];
+    out_left_ref[i + 3] = left_border[(i + 2 - multi_ref_index) * left_stride];
+    out_left_ref[i + 4] = left_border[(i + 3 - multi_ref_index) * left_stride];
     i += 4;
   } while (i < px_available_left);
 
@@ -815,6 +962,13 @@ void kvz_intra_build_reference_inner(
     out_left_ref[i + 4] = nearest_pixel;
   }
 
+  // Extend for MRL
+  if (multi_ref_index) {
+    for (; i < width * 2 + multi_ref_index; ++i) {
+      out_left_ref[i + 1] = nearest_pixel;
+    }
+  }
+
   // Generate top reference.
 
   // Get the number of reference pixels based on the PU coordinate within the LCU.
@@ -822,7 +976,7 @@ void kvz_intra_build_reference_inner(
 
   // Limit the number of available pixels based on block size and dimensions
   // of the picture.
-  px_available_top = MIN(px_available_top, width * 2);
+  px_available_top = MIN(px_available_top, width * 2 + multi_ref_index);
   px_available_top = MIN(px_available_top, (pic_px->x - luma_px->x) >> is_chroma);
 
   if (entropy_sync && px.y == 0) px_available_top = MIN(px_available_top, ((LCU_WIDTH >> is_chroma) - px.x) -1);
@@ -830,17 +984,17 @@ void kvz_intra_build_reference_inner(
   // Copy all the pixels we can.
   i = 0;
   do {
-    memcpy(out_top_ref + i + 1, top_border + i, 4 * sizeof(kvz_pixel));
+    memcpy(out_top_ref + i + 1 + multi_ref_index, top_border + i, 4 * sizeof(kvz_pixel));
     i += 4;
   } while (i < px_available_top);
 
   // Extend the last pixel for the rest of the reference values.
-  nearest_pixel = out_top_ref[i];
-  for (; i < width * 2; i += 4) {
-    out_top_ref[i + 1] = nearest_pixel;
-    out_top_ref[i + 2] = nearest_pixel;
-    out_top_ref[i + 3] = nearest_pixel;
-    out_top_ref[i + 4] = nearest_pixel;
+  nearest_pixel = out_top_ref[i + multi_ref_index];
+  for (; i < (width + multi_ref_index) * 2; i += 4) {
+    out_top_ref[i + 1 + multi_ref_index] = nearest_pixel;
+    out_top_ref[i + 2 + multi_ref_index] = nearest_pixel;
+    out_top_ref[i + 3 + multi_ref_index] = nearest_pixel;
+    out_top_ref[i + 4 + multi_ref_index] = nearest_pixel;
   }
 }
 
@@ -851,13 +1005,17 @@ void kvz_intra_build_reference(
   const vector2d_t *const pic_px,
   const lcu_t *const lcu,
   kvz_intra_references *const refs,
-  bool entropy_sync)
+  bool entropy_sync,
+  kvz_pixel *extra_ref_lines,
+  uint8_t multi_ref_idx)
 {
+  assert(!(extra_ref_lines == NULL && multi_ref_idx != 0) && "Trying to use MRL with NULL extra references.");
+
   // Much logic can be discarded if not on the edge
   if (luma_px->x > 0 && luma_px->y > 0) {
-    kvz_intra_build_reference_inner(log2_width, color, luma_px, pic_px, lcu, refs, entropy_sync);
+    kvz_intra_build_reference_inner(log2_width, color, luma_px, pic_px, lcu, refs, entropy_sync, multi_ref_idx, extra_ref_lines);
   } else {
-    kvz_intra_build_reference_any(log2_width, color, luma_px, pic_px, lcu, refs);
+    kvz_intra_build_reference_any(log2_width, color, luma_px, pic_px, lcu, refs, multi_ref_idx, extra_ref_lines);
   }
 }
 
@@ -869,7 +1027,8 @@ static void intra_recon_tb_leaf(
   int8_t intra_mode,
   cclm_parameters_t *cclm_params,
   lcu_t *lcu,
-  color_t color)
+  color_t color,
+  uint8_t multi_ref_idx)
 {
   const kvz_config *cfg = &state->encoder_control->cfg;
   const int shift = color == COLOR_Y ? 0 : 1;
@@ -890,15 +1049,33 @@ static void intra_recon_tb_leaf(
   int x_scu = SUB_SCU(x);
   int y_scu = SUB_SCU(y);
   const vector2d_t lcu_px = {x_scu >> shift, y_scu >> shift };
+  uint8_t multi_ref_index = color == COLOR_Y ? multi_ref_idx : 0;
 
   kvz_intra_references refs;
-  kvz_intra_build_reference(log2width, color, &luma_px, &pic_px, lcu, &refs, cfg->wpp);
+  // Extra reference lines for use with MRL. Extra lines needed only for left edge.
+  kvz_pixel extra_refs[128 * MAX_REF_LINE_IDX] = { 0 };
+
+  if (luma_px.x > 0 && lcu_px.x == 0 && lcu_px.y > 0 && multi_ref_index != 0) {
+    videoframe_t* const frame = state->tile->frame;
+
+    // Copy extra ref lines, including ref line 1 and top left corner.
+    for (int i = 0; i < MAX_REF_LINE_IDX; ++i) {
+      int height = (LCU_WIDTH >> depth) * 2 + MAX_REF_LINE_IDX;
+      height = MIN(height, (LCU_WIDTH - lcu_px.y + MAX_REF_LINE_IDX)); // Cut short if on bottom LCU edge. Cannot take references from below since they don't exist.
+      height = MIN(height, pic_px.y - luma_px.y + MAX_REF_LINE_IDX);
+      kvz_pixels_blit(&frame->rec->y[(luma_px.y - MAX_REF_LINE_IDX) * frame->rec->stride + luma_px.x - (1 + i)],
+        &extra_refs[i * 128],
+        1, height,
+        frame->rec->stride, 1);
+    }
+  }
+  kvz_intra_build_reference(log2width, color, &luma_px, &pic_px, lcu, &refs, cfg->wpp, extra_refs, multi_ref_index);
 
   kvz_pixel pred[32 * 32];
   int stride = state->tile->frame->source->stride;
   const bool filter_boundary = color == COLOR_Y && !(cfg->lossless && cfg->implicit_rdpcm);
   if(intra_mode < 68) {
-    kvz_intra_predict(state, &refs, log2width, intra_mode, color, pred, filter_boundary);
+    kvz_intra_predict(state, &refs, log2width, intra_mode, color, pred, filter_boundary, multi_ref_index);
   } else {
     kvz_pixels_blit(&state->tile->frame->cclm_luma_rec[x / 2 + (y * stride) / 4], pred, width, width, stride / 2, width);
     if(cclm_params == NULL) {
@@ -957,6 +1134,7 @@ void kvz_intra_recon_cu(
   int8_t mode_chroma,
   cu_info_t *cur_cu,
   cclm_parameters_t *cclm_params,
+  uint8_t multi_ref_idx,
   lcu_t *lcu)
 {
   const vector2d_t lcu_px = { SUB_SCU(x), SUB_SCU(y) };
@@ -964,6 +1142,7 @@ void kvz_intra_recon_cu(
   if (cur_cu == NULL) {
     cur_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
   }
+  uint8_t multi_ref_index = multi_ref_idx;
 
   // Reset CBFs because CBFs might have been set
   // for depth earlier
@@ -981,10 +1160,10 @@ void kvz_intra_recon_cu(
     const int32_t x2 = x + offset;
     const int32_t y2 = y + offset;
 
-    kvz_intra_recon_cu(state, x,  y,  depth + 1, mode_luma, mode_chroma, NULL, NULL, lcu);
-    kvz_intra_recon_cu(state, x2, y,  depth + 1, mode_luma, mode_chroma, NULL, NULL, lcu);
-    kvz_intra_recon_cu(state, x,  y2, depth + 1, mode_luma, mode_chroma, NULL, NULL, lcu);
-    kvz_intra_recon_cu(state, x2, y2, depth + 1, mode_luma, mode_chroma, NULL, NULL, lcu);
+    kvz_intra_recon_cu(state, x,  y,  depth + 1, mode_luma, mode_chroma, NULL, NULL, multi_ref_index, lcu);
+    kvz_intra_recon_cu(state, x2, y,  depth + 1, mode_luma, mode_chroma, NULL, NULL, multi_ref_index, lcu);
+    kvz_intra_recon_cu(state, x,  y2, depth + 1, mode_luma, mode_chroma, NULL, NULL, multi_ref_index, lcu);
+    kvz_intra_recon_cu(state, x2, y2, depth + 1, mode_luma, mode_chroma, NULL, NULL, multi_ref_index, lcu);
 
     // Propagate coded block flags from child CUs to parent CU.
     uint16_t child_cbfs[3] = {
@@ -1005,11 +1184,11 @@ void kvz_intra_recon_cu(
     const bool has_chroma = mode_chroma != -1 &&  (x % 8 == 0 && y % 8 == 0);
     // Process a leaf TU.
     if (has_luma) {
-      intra_recon_tb_leaf(state, x, y, depth, mode_luma, cclm_params, lcu, COLOR_Y);
+      intra_recon_tb_leaf(state, x, y, depth, mode_luma, cclm_params, lcu, COLOR_Y, multi_ref_index);
     }
     if (has_chroma) {
-      intra_recon_tb_leaf(state, x, y, depth, mode_chroma, cclm_params, lcu, COLOR_U);
-      intra_recon_tb_leaf(state, x, y, depth, mode_chroma, cclm_params, lcu, COLOR_V);
+      intra_recon_tb_leaf(state, x, y, depth, mode_chroma, cclm_params, lcu, COLOR_U, 0);
+      intra_recon_tb_leaf(state, x, y, depth, mode_chroma, cclm_params, lcu, COLOR_V, 0);
     }
 
     kvz_quantize_lcu_residual(state, has_luma, has_chroma, x, y, depth, cur_cu, lcu, false);

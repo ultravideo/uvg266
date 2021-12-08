@@ -44,12 +44,14 @@
 
 
  /**
- * \brief Generage angular predictions.
+ * \brief Generate angular predictions.
  * \param log2_width    Log2 of width, range 2..5.
  * \param intra_mode    Angular mode in range 2..34.
+ * \param channel_type  Color channel.
  * \param in_ref_above  Pointer to -1 index of above reference, length=width*2+1.
  * \param in_ref_left   Pointer to -1 index of left reference, length=width*2+1.
  * \param dst           Buffer of size width*width.
+ * \param multi_ref_idx Reference line index for use with MRL.
  */
 static void kvz_angular_pred_avx2(
   const int_fast8_t log2_width,
@@ -57,11 +59,15 @@ static void kvz_angular_pred_avx2(
   const int_fast8_t channel_type,
   const kvz_pixel *const in_ref_above,
   const kvz_pixel *const in_ref_left,
-  kvz_pixel *const dst)
+  kvz_pixel *const dst,
+  const uint8_t multi_ref_idx)
 {
   
   assert(log2_width >= 2 && log2_width <= 5);
   assert(intra_mode >= 2 && intra_mode <= 66);
+
+  // TODO: implement handling of MRL
+  uint8_t multi_ref_index = channel_type == COLOR_Y ? multi_ref_idx : 0;
 
   __m256i p_shuf_01 = _mm256_setr_epi8(
     0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
@@ -133,9 +139,9 @@ static void kvz_angular_pred_avx2(
 
                                                     // Temporary buffer for modes 11-25.
                                                     // It only needs to be big enough to hold indices from -width to width-1.
-  //kvz_pixel tmp_ref[2 * 128] = { 0 };
-  kvz_pixel temp_main[2 * 128] = { 0 };
-  kvz_pixel temp_side[2 * 128] = { 0 };
+  //kvz_pixel tmp_ref[2 * 128 + 3 + 33 * MAX_REF_LINE:IDX] = { 0 };
+  kvz_pixel temp_main[2 * 128 + 3 + 33 * MAX_REF_LINE_IDX] = { 0 };
+  kvz_pixel temp_side[2 * 128 + 3 + 33 * MAX_REF_LINE_IDX] = { 0 };
   const int_fast32_t width = 1 << log2_width;
 
   uint32_t pred_mode = intra_mode; // ToDo: handle WAIP
@@ -160,7 +166,7 @@ static void kvz_angular_pred_avx2(
   // Set ref_main and ref_side such that, when indexed with 0, they point to
   // index 0 in block coordinates.
   if (sample_disp < 0) {
-    for (int i = 0; i <= width + 1; i++) {
+    for (int i = 0; i <= width + 1 + multi_ref_index; i++) {
       temp_main[width + i] = (vertical_mode ? in_ref_above[i] : in_ref_left[i]);
       temp_side[width + i] = (vertical_mode ? in_ref_left[i] : in_ref_above[i]);
     }
@@ -208,17 +214,17 @@ static void kvz_angular_pred_avx2(
   }
   else {
     
-    for (int i = 0; i <= (width << 1); i++) {
+    for (int i = 0; i <= (width << 1) + multi_ref_index; i++) {
       temp_main[i] = (vertical_mode ? in_ref_above[i] : in_ref_left[i]);
       temp_side[i] = (vertical_mode ? in_ref_left[i] : in_ref_above[i]);
     }
 
     const int s = 0;
-    const int max_index = (0 << s) + 2;
+    const int max_index = (multi_ref_index << s) + 2;
     const int ref_length = width << 1;
-    const kvz_pixel val = temp_main[ref_length];
+    const kvz_pixel val = temp_main[ref_length + multi_ref_index];
     for (int j = 0; j <= max_index; j++) {
-      temp_main[ref_length + j] = val;
+      temp_main[ref_length + multi_ref_index + j] = val;
     }
 
     ref_main = temp_main;
@@ -235,10 +241,14 @@ static void kvz_angular_pred_avx2(
     //tmp_ref[width + last_index] = tmp_ref[width + last_index - 1];
   }
 
+  // compensate for line offset in reference line buffers
+  ref_main += multi_ref_index;
+  ref_side += multi_ref_index;
+
   if (sample_disp != 0) {
     // The mode is not horizontal or vertical, we have to do interpolation.
 
-    int_fast32_t delta_pos = 0;
+    int_fast32_t delta_pos = sample_disp * multi_ref_index;
     int_fast32_t delta_int[4] = { 0 };
     int_fast32_t delta_fract[4] = { 0 };
     for (int_fast32_t y = 0; y + 3 < width; y += 4) {
@@ -272,6 +282,10 @@ static void kvz_angular_pred_avx2(
               {
                 use_cubic = false;
               }
+            }
+            // Cubic must be used if ref line != 0
+            if (multi_ref_index) {
+              use_cubic = true;
             }
             const int16_t filter_coeff[4] = { 16 - (delta_fract[yy] >> 1), 32 - (delta_fract[yy] >> 1), 16 + (delta_fract[yy] >> 1), delta_fract[yy] >> 1 };
             const int16_t *temp_f = use_cubic ? cubic_filter[delta_fract[yy]] : filter_coeff;
@@ -334,7 +348,7 @@ static void kvz_angular_pred_avx2(
       // PDPC
       bool PDPC_filter = (width >= 4 || channel_type != 0);
       if (pred_mode > 1 && pred_mode < 67) {
-        if (mode_disp < 0) {
+        if (mode_disp < 0 || multi_ref_index) { // Cannot be used with MRL.
           PDPC_filter = false;
         }
         else if (mode_disp > 0) {
@@ -433,7 +447,7 @@ static void kvz_angular_pred_avx2(
       for (int_fast32_t x = 0; x < width; ++x) {
         dst[y * width + x] = ref_main[x + 1];
       }
-      if ((width >= 4 || channel_type != 0) && sample_disp >= 0) {
+      if ((width >= 4 || channel_type != 0) && sample_disp >= 0 && multi_ref_index == 0) {
         int scale = (log2_width + log2_width - 2) >> 2;
         const kvz_pixel top_left = ref_main[0];
         const kvz_pixel left = ref_side[1 + y];
@@ -590,7 +604,8 @@ static void kvz_intra_pred_planar_avx2(
 // addends etc can be preinitialized for each position.
 static void pred_filtered_dc_4x4(const uint8_t *ref_top,
                                  const uint8_t *ref_left,
-                                       uint8_t *out_block)
+                                       uint8_t *out_block,
+                                 const uint8_t multi_ref_idx)
 {
   const uint32_t rt_u32 = *(const uint32_t *)(ref_top  + 1);
   const uint32_t rl_u32 = *(const uint32_t *)(ref_left + 1);
@@ -651,7 +666,8 @@ static void pred_filtered_dc_4x4(const uint8_t *ref_top,
 
 static void pred_filtered_dc_8x8(const uint8_t *ref_top,
                                  const uint8_t *ref_left,
-                                       uint8_t *out_block)
+                                       uint8_t *out_block,
+                                 const uint8_t multi_ref_idx)
 {
   const uint64_t rt_u64 = *(const uint64_t *)(ref_top  + 1);
   const uint64_t rl_u64 = *(const uint64_t *)(ref_left + 1);
@@ -755,7 +771,8 @@ static INLINE __m256i cvt_u32_si256(const uint32_t u)
 
 static void pred_filtered_dc_16x16(const uint8_t *ref_top,
                                    const uint8_t *ref_left,
-                                         uint8_t *out_block)
+                                         uint8_t *out_block,
+                                   const uint8_t multi_ref_idx)
 {
   const __m128i rt_128 = _mm_loadu_si128((const __m128i *)(ref_top  + 1));
   const __m128i rl_128 = _mm_loadu_si128((const __m128i *)(ref_left + 1));
@@ -831,7 +848,8 @@ static void pred_filtered_dc_16x16(const uint8_t *ref_top,
 
 static void pred_filtered_dc_32x32(const uint8_t *ref_top,
                                    const uint8_t *ref_left,
-                                         uint8_t *out_block)
+                                         uint8_t *out_block,
+                                   const uint8_t multi_ref_idx)
 {
   const __m256i rt = _mm256_loadu_si256((const __m256i *)(ref_top  + 1));
   const __m256i rl = _mm256_loadu_si256((const __m256i *)(ref_left + 1));
@@ -913,23 +931,26 @@ static void pred_filtered_dc_32x32(const uint8_t *ref_top,
 * \param in_ref_above  Pointer to -1 index of above reference, length=width*2+1.
 * \param in_ref_left   Pointer to -1 index of left reference, length=width*2+1.
 * \param dst           Buffer of size width*width.
+* \param multi_ref_idx Reference line index. May be non-zero when MRL is used.
 */
 static void kvz_intra_pred_filtered_dc_avx2(
   const int_fast8_t log2_width,
   const uint8_t *ref_top,
   const uint8_t *ref_left,
-        uint8_t *out_block)
+        uint8_t *out_block,
+  const uint8_t multi_ref_idx)
 {
   assert(log2_width >= 2 && log2_width <= 5);
 
+  // TODO: implement multi reference index for all subfunctions
   if (log2_width == 2) {
-    pred_filtered_dc_4x4(ref_top, ref_left, out_block);
+    pred_filtered_dc_4x4(ref_top, ref_left, out_block, multi_ref_idx);
   } else if (log2_width == 3) {
-    pred_filtered_dc_8x8(ref_top, ref_left, out_block);
+    pred_filtered_dc_8x8(ref_top, ref_left, out_block, multi_ref_idx);
   } else if (log2_width == 4) {
-    pred_filtered_dc_16x16(ref_top, ref_left, out_block);
+    pred_filtered_dc_16x16(ref_top, ref_left, out_block, multi_ref_idx);
   } else if (log2_width == 5) {
-    pred_filtered_dc_32x32(ref_top, ref_left, out_block);
+    pred_filtered_dc_32x32(ref_top, ref_left, out_block, multi_ref_idx);
   }
 }
 

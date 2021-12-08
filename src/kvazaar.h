@@ -514,6 +514,10 @@ typedef struct kvz_config
   int8_t chroma_scale_in[3][17];
   int8_t chroma_scale_out[3][17];
 
+  /** \brief enable use of multiple reference lines in intra prediction */
+  int8_t mrl; 
+
+
   int8_t jccr;
 
   int8_t cclm;

@@ -42,10 +42,9 @@
 #include "global.h" // IWYU pragma: keep
 #include "kvazaar.h"
 
-
 typedef struct {
-  kvz_pixel left[2 * 128 + 3];
-  kvz_pixel top[2 * 128 + 3];
+  kvz_pixel left[2 * 128 + 3 + 33 * MAX_REF_LINE_IDX];
+  kvz_pixel top[2 * 128 + 3 + 33 * MAX_REF_LINE_IDX];
 } kvz_intra_ref;
 typedef struct
 {
@@ -80,14 +79,16 @@ int8_t kvz_intra_get_dir_luma_predictor(
   const cu_info_t *const above_pu);
 
 /**
-* \brief Generage angular predictions.
-* \param width    Width in pixels, range 4..32.
-* \param color    What color pixels to use.
-* \param luma_px  Luma coordinates of the prediction block.
-* \param pic_px   Picture dimensions in luma pixels.
-* \param lcu      LCU struct.
-* \param out_left_ref  Left reference pixels, index 0 is the top-left.
-* \param out_top_ref   Top reference pixels, index 0 is the top-left.
+* \brief Build intra prediction reference buffers.
+* \param log2_width    Log2 of width, range 2..5.
+* \param color         What color pixels to use.
+* \param luma_px       Luma coordinates of the prediction block.
+* \param pic_px        Picture dimensions in luma pixels.
+* \param lcu           LCU struct.
+* \param refs          Pointer to top and left references.
+* \param entropy_sync  Indicate that top right is not available if WPP is enabled.
+* \param extra_refs    Additional left edge reference lines for use with MRL.
+* \param multi_ref_idx Multi reference line index for the prediction block.
 */
 void kvz_intra_build_reference(
   const int_fast8_t log2_width,
@@ -96,7 +97,9 @@ void kvz_intra_build_reference(
   const vector2d_t *const pic_px,
   const lcu_t *const lcu,
   kvz_intra_references *const refs,
-  bool entropy_sync);
+  bool entropy_sync,
+  kvz_pixel *extra_refs,
+  uint8_t multi_ref_idx);
 
 /**
  * \brief Generate intra predictions.
@@ -114,7 +117,8 @@ void kvz_intra_predict(
   int_fast8_t mode,
   color_t color,
   kvz_pixel *dst,
-  bool filter_boundary);
+  bool filter_boundary,
+  const uint8_t multi_ref_idx);
 
 void kvz_intra_recon_cu(
   encoder_state_t *const state,
@@ -125,6 +129,7 @@ void kvz_intra_recon_cu(
   int8_t mode_chroma,
   cu_info_t *cur_cu,
   cclm_parameters_t* cclm_params,
+  uint8_t multi_ref_idx,
   lcu_t *lcu);
 
 

@@ -41,12 +41,13 @@
 
 
 /**
- * \brief Generage angular predictions.
+ * \brief Generate angular predictions.
  * \param log2_width    Log2 of width, range 2..5.
  * \param intra_mode    Angular mode in range 2..34.
  * \param in_ref_above  Pointer to -1 index of above reference, length=width*2+1.
  * \param in_ref_left   Pointer to -1 index of left reference, length=width*2+1.
  * \param dst           Buffer of size width*width.
+ * \param multi_ref_idx Multi reference line index for use with MRL.
  */
 static void kvz_angular_pred_generic(
   const int_fast8_t log2_width,
@@ -54,7 +55,8 @@ static void kvz_angular_pred_generic(
   const int_fast8_t channel_type,
   const kvz_pixel *const in_ref_above,
   const kvz_pixel *const in_ref_left,
-  kvz_pixel *const dst)
+  kvz_pixel *const dst,
+  const uint8_t multi_ref_idx)
 {
   
   assert(log2_width >= 2 && log2_width <= 5);
@@ -102,11 +104,16 @@ static void kvz_angular_pred_generic(
 
                                                     // Temporary buffer for modes 11-25.
                                                     // It only needs to be big enough to hold indices from -width to width-1.
-  kvz_pixel temp_main[2 * 128] = { 0 };
-  kvz_pixel temp_side[2 * 128] = { 0 };
+
+  // TODO: check the correct size for these arrays when MRL is used
+  //kvz_pixel tmp_ref[2 * 128 + 3 + 33 * MAX_REF_LINE_IDX] = { 0 };
+  kvz_pixel temp_main[2 * 128 + 3 + 33 * MAX_REF_LINE_IDX] = { 0 };
+  kvz_pixel temp_side[2 * 128 + 3 + 33 * MAX_REF_LINE_IDX] = { 0 };
   const int_fast32_t width = 1 << log2_width;
 
   uint32_t pred_mode = intra_mode; // ToDo: handle WAIP
+
+  uint8_t multi_ref_index = multi_ref_idx;
 
   // Whether to swap references to always project on the left reference row.
   const bool vertical_mode = intra_mode >= 34;
@@ -128,19 +135,21 @@ static void kvz_angular_pred_generic(
   // Set ref_main and ref_side such that, when indexed with 0, they point to
   // index 0 in block coordinates.
   if (sample_disp < 0) {
-    for (int i = 0; i <= width + 1; i++) {
+
+    // TODO: for non-square blocks, separate loops for x and y is needed
+    for (int i = 0; i <= width + 1 + multi_ref_index; i++) {
       temp_main[width + i] = (vertical_mode ? in_ref_above[i] : in_ref_left[i]);
       temp_side[width + i] = (vertical_mode ? in_ref_left[i] : in_ref_above[i]);
     }
 
+    // TODO: take into account non-square blocks
     ref_main = temp_main + width;
     ref_side = temp_side + width;
 
+    // TODO: for non square blocks, need to check if width or height is used for reference extension
     for (int i = -width; i <= -1; i++) {
       ref_main[i] = ref_side[MIN((-i * modedisp2invsampledisp[abs(mode_disp)] + 256) >> 9, width)];
     }
-
-    
 
     //const uint32_t index_offset = width + 1;
     //const int32_t last_index = width;
@@ -176,17 +185,20 @@ static void kvz_angular_pred_generic(
   }
   else {
     
-    for (int i = 0; i <= (width << 1); i++) {
+    // TODO: again, separate loop needed for non-square blocks
+    for (int i = 0; i <= (width << 1) + multi_ref_index; i++) {
       temp_main[i] = (vertical_mode ? in_ref_above[i] : in_ref_left[i]);
       temp_side[i] = (vertical_mode ? in_ref_left[i] : in_ref_above[i]);
     }
 
+    // TODO: this code block will need to change also when non-square blocks are used
+    // const int log2_ratio = 0;
     const int s = 0;
-    const int max_index = (0 << s) + 2;
+    const int max_index = (multi_ref_index << s) + 2;
     const int ref_length = width << 1;
-    const kvz_pixel val = temp_main[ref_length];
-    for (int j = 0; j <= max_index; j++) {
-      temp_main[ref_length + j] = val;
+    const kvz_pixel val = temp_main[ref_length + multi_ref_index];
+    for (int j = 1; j <= max_index; j++) {
+      temp_main[ref_length + multi_ref_index +  j] = val;
     }
 
     ref_main = temp_main;
@@ -203,12 +215,14 @@ static void kvz_angular_pred_generic(
     //tmp_ref[width + last_index] = tmp_ref[width + last_index - 1];
   }
 
+  // compensate for line offset in reference line buffers
+  ref_main += multi_ref_index;
+  ref_side += multi_ref_index;
+
   if (sample_disp != 0) {
     // The mode is not horizontal or vertical, we have to do interpolation.
 
-    int_fast32_t delta_pos = 0;
-    for (int_fast32_t y = 0; y < width; ++y) {
-      delta_pos += sample_disp;
+    for (int_fast32_t y = 0, delta_pos = sample_disp * (1 + multi_ref_index); y < width; ++y, delta_pos += sample_disp) {
       int_fast32_t delta_int = delta_pos >> 5;
       int_fast32_t delta_fract = delta_pos & (32 - 1);
 
@@ -230,6 +244,10 @@ static void kvz_angular_pred_generic(
             {
               use_cubic = false;
             }
+          }
+          // Cubic must be used if ref line != 0
+          if (multi_ref_index) {
+            use_cubic = true;
           }
           const int16_t filter_coeff[4] = { 16 - (delta_fract >> 1), 32 - (delta_fract >> 1), 16 + (delta_fract >> 1), delta_fract >> 1 };
           int16_t const * const f = use_cubic ? cubic_filter[delta_fract] : filter_coeff;
@@ -265,7 +283,7 @@ static void kvz_angular_pred_generic(
       // PDPC
       bool PDPC_filter = (width >= 4 || channel_type != 0);
       if (pred_mode > 1 && pred_mode < 67) {
-        if (mode_disp < 0) {
+        if (mode_disp < 0 || multi_ref_index) { // Cannot be used with MRL.
           PDPC_filter = false;
         }
         else if (mode_disp > 0) {
@@ -324,7 +342,8 @@ static void kvz_angular_pred_generic(
       for (int_fast32_t x = 0; x < width; ++x) {
         dst[y * width + x] = ref_main[x + 1];
       }
-      if ((width >= 4 || channel_type != 0) && sample_disp >= 0) {
+      // Do not apply PDPC if multi ref line index is other than 0
+      if ((width >= 4 || channel_type != 0) && sample_disp >= 0 && multi_ref_index == 0) {
         int scale = (log2_width + log2_width - 2) >> 2;
         const kvz_pixel top_left = ref_main[0];
         const kvz_pixel left = ref_side[1 + y];
@@ -396,26 +415,29 @@ static void kvz_intra_pred_planar_generic(
 }
 
 /**
-* \brief Generage intra DC prediction with post filtering applied.
+* \brief Generate intra DC prediction with post filtering applied.
 * \param log2_width    Log2 of width, range 2..5.
 * \param in_ref_above  Pointer to -1 index of above reference, length=width*2+1.
 * \param in_ref_left   Pointer to -1 index of left reference, length=width*2+1.
 * \param dst           Buffer of size width*width.
+* \param multi_ref_idx Reference line index. May be non-zero when MRL is used.
 */
 static void kvz_intra_pred_filtered_dc_generic(
   const int_fast8_t log2_width,
   const kvz_pixel *const ref_top,
   const kvz_pixel *const ref_left,
-  kvz_pixel *const out_block)
+  kvz_pixel *const out_block,
+  const uint8_t multi_ref_idx)
 {
   assert(log2_width >= 2 && log2_width <= 5);
 
+  // TODO: height for non-square block sizes
   const int_fast8_t width = 1 << log2_width;
 
   int_fast16_t sum = 0;
   for (int_fast8_t i = 0; i < width; ++i) {
-    sum += ref_top[i + 1];
-    sum += ref_left[i + 1];
+    sum += ref_top[i + 1 + multi_ref_idx];
+    sum += ref_left[i + 1 + multi_ref_idx];
   }
 
   const kvz_pixel dc_val = (sum + width) >> (log2_width + 1);

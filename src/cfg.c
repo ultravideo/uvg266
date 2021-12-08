@@ -202,6 +202,7 @@ int kvz_config_init(kvz_config *cfg)
   cfg->chroma_scale_out[1][0] = cfg->chroma_scale_in[1][0] = -1;
   cfg->chroma_scale_out[2][0] = cfg->chroma_scale_in[2][0] = -1;
 
+  cfg->mrl = false;
 
   parse_qp_map(cfg, 0);
 
@@ -1483,6 +1484,9 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     const bool success = parse_qp_scale_array(value, cfg->chroma_scale_out[0]);
     parse_qp_map(cfg, 0);
     return success;
+  }
+  else if OPT("mrl") {
+    cfg->mrl = atobool(value);
   }
   else if OPT("jccr") {
     cfg->jccr = (bool)atobool(value);
