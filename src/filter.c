@@ -1305,6 +1305,7 @@ static void filter_deblock_lcu_rightmost(encoder_state_t * const state,
 // - Luma deblocking on a 4x4 grid
 // - Deblocking filter for subblock boundaries
 // - Allow loop filtering across slice/tile boundaries?
+// - Account for bi-pred and multi ref P frames
 void kvz_filter_deblock_lcu(encoder_state_t * const state, int x_px, int y_px)
 {
   assert(!state->encoder_control->cfg.lossless);
