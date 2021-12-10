@@ -375,6 +375,21 @@ static INLINE void gather_deblock_pixels(
 }
 
 /**
+* \brief Gather pixels from src to dst using a custom stride and step for src
+*/
+static INLINE void gather_pixels(
+    const kvz_pixel *src,
+    int step,
+    int stride,
+    int numel,
+    kvz_pixel *dst)
+{
+  for (int i = 0; i < numel; ++i) {
+    dst[i] = src[i * step + stride];
+  }
+}
+
+/**
 * \brief Scatter pixels
 */
 static INLINE void scatter_deblock_pixels(
@@ -867,19 +882,20 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
         int_fast32_t dp3L = dp3;
         int_fast32_t dq3L = dq3;
         
+        //In case of large blocks, need to gather extra pixels
         //bL:
         //line0 p7 p6 p5 p4 q4 q5 q6 q7
         kvz_pixel bL[4][8];
 
         if (is_side_P_large) {
-          gather_deblock_pixels(edge_src - 6 * x_stride, x_stride, 0 * y_stride, 2, &bL[0][0]/* - 2 */);
-          gather_deblock_pixels(edge_src - 6 * x_stride, x_stride, 3 * y_stride, 2, &bL[3][0]/* - 2 */);
+          gather_pixels(edge_src - 8 * x_stride, x_stride, 0 * y_stride, 4, &bL[0][0]);
+          gather_pixels(edge_src - 8 * x_stride, x_stride, 3 * y_stride, 4, &bL[3][0]);
           dp0L = (dp0L + abs(bL[0][2] - 2 * bL[0][3] + b[0][0]) + 1) >> 1;
           dp3L = (dp3L + abs(bL[3][2] - 2 * bL[3][3] + b[3][0]) + 1) >> 1;
         }
         if (is_side_Q_large) {
-          gather_deblock_pixels(edge_src + 6 * x_stride, x_stride, 0 * y_stride, 2, &bL[0][2]);
-          gather_deblock_pixels(edge_src + 6 * x_stride, x_stride, 3 * y_stride, 2, &bL[3][2]);
+          gather_pixels(edge_src + 4 * x_stride, x_stride, 0 * y_stride, 4, &bL[0][4]);
+          gather_pixels(edge_src + 4 * x_stride, x_stride, 3 * y_stride, 4, &bL[3][4]);
           dq0L = (dq0L + abs(b[0][7] - 2 * bL[0][4] + bL[0][5]) + 1) >> 1;
           dq3L = (dq3L + abs(b[3][7] - 2 * bL[3][4] + bL[3][5]) + 1) >> 1;
         }
@@ -897,13 +913,13 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
             gather_deblock_pixels(edge_src, x_stride, 2 * y_stride, 4, &b[2][0]);
             if (is_side_P_large)
             {
-              gather_deblock_pixels(edge_src - 6 * x_stride, x_stride, 1 * y_stride, 2, &bL[1][0] - 2);
-              gather_deblock_pixels(edge_src - 6 * x_stride, x_stride, 2 * y_stride, 2, &bL[2][0] - 2);
+              gather_pixels(edge_src - 8 * x_stride, x_stride, 1 * y_stride, 4, &bL[1][0]);
+              gather_pixels(edge_src - 8 * x_stride, x_stride, 2 * y_stride, 4, &bL[2][0]);
             }
             if (is_side_Q_large)
             {
-              gather_deblock_pixels(edge_src + 6 * x_stride, x_stride, 1 * y_stride, 2, &bL[1][2]);
-              gather_deblock_pixels(edge_src + 6 * x_stride, x_stride, 2 * y_stride, 2, &bL[2][2]);
+              gather_pixels(edge_src + 4 * x_stride, x_stride, 1 * y_stride, 4, &bL[1][4]);
+              gather_pixels(edge_src + 4 * x_stride, x_stride, 2 * y_stride, 4, &bL[2][4]);
             }
 
             for (int i = 0; i < 4; ++i) {
