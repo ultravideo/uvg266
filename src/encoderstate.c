@@ -937,7 +937,7 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
           for (int i = 0; dep_lcu->below && i < ctrl->max_inter_ref_lcu.down; i++) {
             dep_lcu = dep_lcu->below;
           }
-          for (int i = 0; dep_lcu->right && i < ctrl->max_inter_ref_lcu.right; i++) {
+          for (int i = 0; dep_lcu->right && i < ctrl->max_inter_ref_lcu.right + 1; i++) {
             dep_lcu = dep_lcu->right;
           }
           kvz_threadqueue_job_dep_add(job[0], ref_state->tile->wf_recon_jobs[dep_lcu->id]);
