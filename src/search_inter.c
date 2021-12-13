@@ -116,15 +116,15 @@ static INLINE bool fracmv_within_tile(const inter_search_info_t *info, int x, in
     // Check that the block does not reference pixels that are not final.
 
     // Margin as luma pixels.
-    int margin = 0;
+    int margin = 2; // Added two-pixel margin since some nondeterministic behaviour happens otherwise
     if (is_frac_luma) {
       // Fractional motion estimation needs up to 4 pixels outside the
       // block.
-      margin = 4;
+      margin += 4;
     } else if (is_frac_chroma) {
       // Odd chroma interpolation needs up to 2 luma pixels outside the
       // block.
-      margin = 2;
+      margin += 2;
     }
 
     if (ctrl->cfg.sao_type) {
