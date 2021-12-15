@@ -203,6 +203,8 @@ int kvz_config_init(kvz_config *cfg)
   cfg->chroma_scale_out[2][0] = cfg->chroma_scale_in[2][0] = -1;
 
   cfg->mrl = false;
+  
+  cfg->mip = false;
 
   parse_qp_map(cfg, 0);
 
@@ -1487,6 +1489,9 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   }
   else if OPT("mrl") {
     cfg->mrl = atobool(value);
+  }
+  else if OPT("mip") {
+    cfg->mip = atobool(value);
   }
   else if OPT("jccr") {
     cfg->jccr = (bool)atobool(value);

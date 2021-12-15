@@ -517,6 +517,9 @@ typedef struct kvz_config
   /** \brief enable use of multiple reference lines in intra prediction */
   int8_t mrl; 
 
+  /** \brief enable matrix weighted intra prediction */
+  int8_t mip;
+
 
   int8_t jccr;
 
