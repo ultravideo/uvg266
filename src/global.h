@@ -131,7 +131,7 @@ typedef int16_t mv_t;
 //#define KVZ_DEBUG 1
 
 //#define KVZ_DEBUG_PRINT_YUVIEW_CSV 1
-
+//#define KVZ_DEBUG_PRINT_MV_INFO 1
 /* CONFIG VARIABLES */
 
 //spec: references to variables defined in Rec. ITU-T H.265 (04/2013)

@@ -54,7 +54,8 @@ enum {
   DBG_YUVIEW_NUM_SIG_COEFF_U  = 16,
   DBG_YUVIEW_NUM_SIG_COEFF_V  = 17,
   DBG_YUVIEW_TR_SKIP          = 18,
-  DBG_YUVIEW_NUM_ITEMS        = 19,
+  DBG_YUVIEW_MRL              = 19,
+  DBG_YUVIEW_NUM_ITEMS        = 20,
   
 };
 
