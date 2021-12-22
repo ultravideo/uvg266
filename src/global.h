@@ -216,6 +216,11 @@ typedef int16_t mv_t;
 */
 #define MAX_REF_LINE_IDX 3
 
+#define MIP_MAX_INPUT_SIZE 8
+#define MIP_MAX_REDUCED_OUTPUT_SAMPLES 64
+#define MIP_MAX_WIDTH 64
+#define MIP_MAX_HEIGHT 64
+
 /**
  * \brief Number of pixels to delay deblocking.
  *
