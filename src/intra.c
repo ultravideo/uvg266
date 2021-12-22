@@ -36,6 +36,7 @@
 
 #include "image.h"
 #include "kvz_math.h"
+#include "mip_data.h"
 #include "strategies/strategies-intra.h"
 #include "tables.h"
 #include "transform.h"
