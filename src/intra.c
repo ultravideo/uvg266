@@ -544,6 +544,235 @@ void kvz_predict_cclm(
     linear_transform_cclm(cclm_params, sampled_luma, dst, width, height);
 }
 
+
+void kvz_mip_boundary_downsampling(int* reduced_dst, const kvz_pixel* const ref_src, int src_len, int dst_len)
+{
+  if (dst_len < src_len)
+  {
+    // Create reduced boundary by downsampling
+    uint16_t down_smp_factor = src_len / dst_len;
+
+    // Calculate floor log2. TODO: find a better / faster solution
+    int tmp = 0;
+    if (down_smp_factor & 0xffff0000) {
+      down_smp_factor >>= 16;
+      tmp += 16;
+    }
+    if (down_smp_factor & 0xff00) {
+      down_smp_factor >>= 8;
+      tmp += 8;
+    }
+    if (down_smp_factor & 0xf0) {
+      down_smp_factor >>= 4;
+      tmp += 4;
+    }
+    if (down_smp_factor & 0xc) {
+      down_smp_factor >>= 2;
+      tmp += 2;
+    }
+    if (down_smp_factor & 0x2) {
+      down_smp_factor >>= 1;
+      tmp += 1;
+    }
+
+    const int log2_factor = tmp;
+    const int rounding_offset = (1 << (log2_factor - 1));
+
+    uint16_t src_idx = 0;
+    for (uint16_t dst_idx = 0; dst_idx < dst_len; dst_idx++)
+    {
+      int sum = 0;
+      for (int k = 0; k < down_smp_factor; k++)
+      {
+        sum += ref_src[src_idx++];
+      }
+      reduced_dst[dst_idx] = (sum + rounding_offset) >> log2_factor;
+    }
+  }
+  else
+  {
+    // Copy boundary if no downsampling is needed
+    for (uint16_t i = 0; i < dst_len; ++i)
+    {
+      reduced_dst[i] = ref_src[i];
+    }
+  }
+}
+
+
+void kvz_mip_reduced_pred(kvz_pixel* const output,
+                          const kvz_pixel* const input,
+                          const uint8_t* matrix,
+                          const bool transpose,
+                          const int red_bdry_size,
+                          const int red_pred_size,
+                          const int size_id)
+{
+  const int input_size = 2 * red_bdry_size;
+
+  // Use local buffer for transposed result
+  kvz_pixel* out_buf_transposed = MALLOC(kvz_pixel, red_pred_size * red_pred_size); // TODO: get rid of MALLOC & FREE
+  kvz_pixel* const out_ptr = transpose ? out_buf_transposed : output;
+
+  int sum = 0;
+  for (int i = 0; i < input_size; i++) { 
+    sum += input[i];
+  }
+  const int offset = (1 << (MIP_SHIFT_MATRIX - 1)) - MIP_OFFSET_MATRIX * sum;
+  assert((input_size == 4 * (input_size >> 2)) && "MIP input size must be divisible by four");
+
+  const uint8_t* weight = matrix;
+  const int input_offset = transpose ? m_inputOffsetTransp : m_inputOffset;
+
+  const bool red_size = (size_id == 2);
+  int pos_res = 0;
+  for (int y = 0; y < m_reducedPredSize; y++)
+  {
+    for (int x = 0; x < m_reducedPredSize; x++)
+    {
+      if (red_size) weight -= 1;
+      int tmp0 = red_size ? 0 : (input[0] * weight[0]);
+      int tmp1 = input[1] * weight[1];
+      int tmp2 = input[2] * weight[2];
+      int tmp3 = input[3] * weight[3];
+      for (int i = 4; i < input_size; i += 4)
+      {
+        tmp0 += input[i] * weight[i];
+        tmp1 += input[i + 1] * weight[i + 1];
+        tmp2 += input[i + 2] * weight[i + 2];
+        tmp3 += input[i + 3] * weight[i + 3];
+      }
+      out_ptr[posRes++] = ClipBD<int>(((tmp0 + tmp1 + tmp2 + tmp3 + offset) >> MIP_SHIFT_MATRIX) + inputOffset, bitDepth);
+
+      weight += inputSize;
+    }
+  }
+
+  if (transpose)
+  {
+    for (int y = 0; y < m_reducedPredSize; y++)
+    {
+      for (int x = 0; x < m_reducedPredSize; x++)
+      {
+        result[y * m_reducedPredSize + x] = resPtr[x * m_reducedPredSize + y];
+      }
+    }
+  }
+
+  FREE_POINTER(out_buf_transposed);
+}
+
+
+void kvz_mip_pred_upsampling()
+{
+
+}
+
+
+/** \brief Matrix weighted intra prediction.
+*/
+void kvz_mip_predict(encoder_state_t const* const state,
+                     kvz_intra_references* const refs,
+                     const uint16_t pred_block_width,
+                     const uint16_t pred_block_height)
+{
+  // Separate this function into smaller bits if needed
+  
+  int* result; // TODO: pass the dst buffer to this function
+
+  // *** INPUT PREP ***
+
+  // Initialize prediction parameters START
+  uint16_t width = pred_block_width;
+  uint16_t height = pred_block_height;
+
+  int size_id; // Prediction block type
+  if (width == 4 && height == 4) {
+    size_id = 0;
+  }
+  else if (width == 4 || height == 4 || (width == 8 && height == 8)) {
+    size_id = 1;
+  }
+  else {
+    size_id = 2;
+  }
+
+  // Reduced boundary and prediction sizes
+  int red_bdry_size = (size_id == 0) ? 2 : 4;
+  int red_pred_size = (size_id < 2) ? 4 : 8;
+
+  // Upsampling factors
+  unsigned int ups_hor_factor = width / red_pred_size;
+  unsigned int ups_ver_factor = height / red_pred_size;
+
+  // Upsampling factors must be powers of two
+  assert((ups_hor_factor < 1) || ((ups_hor_factor & (ups_hor_factor - 1)) != 0) && "Horizontal upsampling factor must be power of two.");
+  assert((ups_ver_factor < 1) || ((ups_ver_factor & (ups_ver_factor - 1)) != 0) && "Vertical upsampling factor must be power of two.");
+
+  // Initialize prediction parameters END
+
+  kvz_pixel* ref_samples_top = refs->ref.top; // NOTE: in VTM code these are indexed as x + 1 & y + 1 during init
+  kvz_pixel* ref_samples_left = refs->ref.left;
+
+  // Compute reduced boundary with Haar-downsampling
+  const int input_size = 2 * red_bdry_size;
+
+  kvz_pixel red_bdry[MIP_MAX_INPUT_SIZE];
+  kvz_pixel red_bdry_trans[MIP_MAX_INPUT_SIZE];
+
+  kvz_pixel* const top_reduced = red_bdry[0];
+  kvz_pixel* const left_reduced = red_bdry[red_bdry_size];
+
+  kvz_mip_boundary_downsampling(top_reduced, ref_samples_top, width, red_bdry_size);
+  kvz_mip_boundary_downsampling(left_reduced, ref_samples_left, height, red_bdry_size);
+
+  // Transposed reduced boundaries
+  int* const left_reduced_trans = red_bdry_trans[0];
+  int* const top_reduced_trans = red_bdry_trans[red_bdry_size];
+
+  for (int x = 0; x < red_bdry_size; x++) {
+    top_reduced_trans[x] = top_reduced[x];
+  }
+  for (int y = 0; y < red_bdry_size; y++) {
+    left_reduced_trans[y] = left_reduced[y];
+  }
+
+  int input_offset = red_bdry[0];
+  int input_offset_trans = red_bdry_trans[0];
+
+  const bool has_first_col = (size_id < 2);
+  // First column of matrix not needed for large blocks
+  red_bdry[0] = has_first_col ? ((1 << (KVZ_BIT_DEPTH - 1)) - input_offset) : 0;
+  red_bdry_trans[0] = has_first_col ? ((1 << (KVZ_BIT_DEPTH - 1)) - input_offset_trans) : 0;
+
+  for (int i = 1; i < input_size; ++i) {
+    red_bdry[i] -= input_offset;
+    red_bdry_trans[i] -= input_offset_trans;
+  }
+
+  // *** INPUT PREP *** END
+
+  // *** BLOCK PREDICT ***
+
+  const bool need_upsampling = (ups_hor_factor > 1) || (ups_ver_factor > 1);
+  const bool transpose = 0; // TODO: pass transpose
+
+  const uint8_t* matrix = 0; // TODO: function for fetching correct matrix
+  kvz_pixel* red_pred_buffer = MALLOC(kvz_pixel, red_pred_size * red_pred_size); // TODO: get rid of MALLOC and FREE
+  kvz_pixel* const reduced_pred = need_upsampling ? red_pred_buffer[0] : result;
+
+  const int* const reduced_bdry = transpose ? red_bdry_trans[0] : red_bdry[0];
+
+  kvz_mip_reduced_pred(reduced_pred, reduced_bdry, matrix, transpose, red_bdry_size, red_pred_size, size_id);
+  if (need_upsampling) {
+    kvz_mip_pred_upsampling(result, reduced_pred);
+  }
+
+  FREE_POINTER(red_pred_buffer);
+  // *** BLOCK PREDITC *** END
+}
+
+
 void kvz_intra_predict(
   encoder_state_t *const state,
   kvz_intra_references *refs,
