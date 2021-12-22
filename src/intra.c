@@ -607,7 +607,9 @@ void kvz_mip_reduced_pred(kvz_pixel* const output,
                           const bool transpose,
                           const int red_bdry_size,
                           const int red_pred_size,
-                          const int size_id)
+                          const int size_id,
+                          const int in_offset,
+                          const int in_offset_tr)
 {
   const int input_size = 2 * red_bdry_size;
 
@@ -623,39 +625,35 @@ void kvz_mip_reduced_pred(kvz_pixel* const output,
   assert((input_size == 4 * (input_size >> 2)) && "MIP input size must be divisible by four");
 
   const uint8_t* weight = matrix;
-  const int input_offset = transpose ? m_inputOffsetTransp : m_inputOffset;
+  const int input_offset = transpose ? in_offset_tr : in_offset;
 
   const bool red_size = (size_id == 2);
   int pos_res = 0;
-  for (int y = 0; y < m_reducedPredSize; y++)
-  {
-    for (int x = 0; x < m_reducedPredSize; x++)
-    {
-      if (red_size) weight -= 1;
+  for (int y = 0; y < red_pred_size; y++) {
+    for (int x = 0; x < red_pred_size; x++) {
+      if (red_size) {
+        weight -= 1;
+      }
       int tmp0 = red_size ? 0 : (input[0] * weight[0]);
       int tmp1 = input[1] * weight[1];
       int tmp2 = input[2] * weight[2];
       int tmp3 = input[3] * weight[3];
-      for (int i = 4; i < input_size; i += 4)
-      {
+      for (int i = 4; i < input_size; i += 4) {
         tmp0 += input[i] * weight[i];
         tmp1 += input[i + 1] * weight[i + 1];
         tmp2 += input[i + 2] * weight[i + 2];
         tmp3 += input[i + 3] * weight[i + 3];
       }
-      out_ptr[posRes++] = ClipBD<int>(((tmp0 + tmp1 + tmp2 + tmp3 + offset) >> MIP_SHIFT_MATRIX) + inputOffset, bitDepth);
-
-      weight += inputSize;
+      out_ptr[pos_res] = CLIP_TO_PIXEL(((tmp0 + tmp1 + tmp2 + tmp3 + offset) >> MIP_SHIFT_MATRIX) + input_offset);
+      pos_res++;
+      weight += input_size;
     }
   }
 
-  if (transpose)
-  {
-    for (int y = 0; y < m_reducedPredSize; y++)
-    {
-      for (int x = 0; x < m_reducedPredSize; x++)
-      {
-        result[y * m_reducedPredSize + x] = resPtr[x * m_reducedPredSize + y];
+  if (transpose) {
+    for (int y = 0; y < red_pred_size; y++) {
+      for (int x = 0; x < red_pred_size; x++) {
+        output[y * red_pred_size + x] = out_ptr[x * red_pred_size + y];
       }
     }
   }
@@ -680,6 +678,7 @@ void kvz_mip_predict(encoder_state_t const* const state,
   // Separate this function into smaller bits if needed
   
   int* result; // TODO: pass the dst buffer to this function
+  const int mode_idx = 0; // TODO: pass mode
 
   // *** INPUT PREP ***
 
@@ -758,19 +757,33 @@ void kvz_mip_predict(encoder_state_t const* const state,
   const bool need_upsampling = (ups_hor_factor > 1) || (ups_ver_factor > 1);
   const bool transpose = 0; // TODO: pass transpose
 
-  const uint8_t* matrix = 0; // TODO: function for fetching correct matrix
+  uint8_t* matrix;
+  switch (size_id) {
+    case 0: 
+      matrix = &mip_matrix_4x4[mode_idx][0][0];
+      break;
+    case 1: 
+      matrix = &mip_matrix_8x8[mode_idx][0][0];
+      break;
+    case 2: 
+      matrix = &mip_matrix_16x16[mode_idx][0][0];
+      break;
+    default:
+      assert(false && "Invalid MIP size id.");
+  }
+
   kvz_pixel* red_pred_buffer = MALLOC(kvz_pixel, red_pred_size * red_pred_size); // TODO: get rid of MALLOC and FREE
   kvz_pixel* const reduced_pred = need_upsampling ? red_pred_buffer[0] : result;
 
   const int* const reduced_bdry = transpose ? red_bdry_trans[0] : red_bdry[0];
 
-  kvz_mip_reduced_pred(reduced_pred, reduced_bdry, matrix, transpose, red_bdry_size, red_pred_size, size_id);
+  kvz_mip_reduced_pred(reduced_pred, reduced_bdry, matrix, transpose, red_bdry_size, red_pred_size, size_id, input_offset, input_offset_trans);
   if (need_upsampling) {
     kvz_mip_pred_upsampling(result, reduced_pred);
   }
 
   FREE_POINTER(red_pred_buffer);
-  // *** BLOCK PREDITC *** END
+  // *** BLOCK PREDICT *** END
 }
 
 
