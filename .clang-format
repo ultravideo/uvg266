@@ -1,0 +1,46 @@
+# Format Style Options - Created with Clang Power Tools
+---
+AlignAfterOpenBracket: AlwaysBreak
+AlignConsecutiveAssignments: AcrossEmptyLinesAndComments
+AlignConsecutiveDeclarations: AcrossEmptyLinesAndComments
+AlignConsecutiveMacros: AcrossEmptyLines
+AlignOperands: AlignAfterOperator
+AlignTrailingComments: true
+AllowAllArgumentsOnNextLine: false
+AllowShortCaseLabelsOnASingleLine: true
+AllowShortFunctionsOnASingleLine: None
+AllowShortLoopsOnASingleLine: true
+BasedOnStyle: Google
+BinPackArguments: false
+BinPackParameters: false
+BraceWrapping: 
+  AfterCaseLabel: false
+  AfterClass: false
+  AfterControlStatement: true
+  AfterEnum: false
+  AfterFunction: false
+  AfterNamespace: false
+  AfterObjCDeclaration: false
+  AfterStruct: false
+  AfterUnion: false
+  AfterExternBlock: false
+  BeforeCatch: false
+  BeforeElse: true
+  IndentBraces: false
+  SplitEmptyFunction: false
+  SplitEmptyRecord: false
+  SplitEmptyNamespace: false
+  BeforeLambdaBody: false
+  BeforeWhile: false
+BreakBeforeBraces: Linux
+BreakBeforeTernaryOperators: false
+ConstructorInitializerIndentWidth : 2
+ContinuationIndentWidth: 2
+IncludeBlocks: Preserve
+KeepEmptyLinesAtTheStartOfBlocks: true
+MaxEmptyLinesToKeep: 2
+ReflowComments: false
+SpaceAroundPointerQualifiers: Before
+SpacesBeforeTrailingComments: 1
+TabWidth: 2
+...
