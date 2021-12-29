@@ -708,8 +708,8 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
     int32_t tc_index;
     int32_t tc;
 
-    //Deblock adapted to halve pixel mvd. TODO: Tie into actual number of fractional mv bits
-    const int16_t mvdThreashold = 2; //(1 << (MV_INTERNAL_FRACTIONAL_BITS - 1))
+    //Deblock adapted to halve pixel mvd.
+    const int16_t mvdThreashold = 1 << (INTERNAL_MV_PREC - 1);
 
     uint32_t num_4px_parts  = length / 4;
 
@@ -732,37 +732,28 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
         if (dir == EDGE_VER) {
           y_coord = y + 4 * block_idx;
           cu_p = kvz_cu_array_at(frame->cu_array, x - 1, y_coord);
-          cu_q = kvz_cu_array_at(frame->cu_array, x,     y_coord);
+          cu_q = kvz_cu_array_at(frame->cu_array, x, y_coord);
 
         } else {
           x_coord = x + 4 * block_idx;
           cu_p = kvz_cu_array_at(frame->cu_array, x_coord, y - 1);
-          cu_q = kvz_cu_array_at(frame->cu_array, x_coord, y    );
+          cu_q = kvz_cu_array_at(frame->cu_array, x_coord, y);
         }
-        
+
         bool nonzero_coeffs = cbf_is_set(cu_q->cbf, cu_q->tr_depth, COLOR_Y)
-                           || cbf_is_set(cu_p->cbf, cu_p->tr_depth, COLOR_Y);
+          || cbf_is_set(cu_p->cbf, cu_p->tr_depth, COLOR_Y);
 
         // Filter strength
         strength = 0;
-        if (cu_q->type == CU_INTRA || cu_p->type == CU_INTRA) {
+        if (cu_q->type == CU_INTRA || cu_p->type == CU_INTRA) { // Intra is used
           strength = 2;
-        } else if (tu_boundary && nonzero_coeffs) {
+        }
+        else if (tu_boundary && nonzero_coeffs) {
           // Non-zero residual/coeffs and transform boundary
           // Neither CU is intra so tr_depth <= MAX_DEPTH.
-          strength = 1;       
-        } else if (cu_p->inter.mv_dir != 3 && cu_q->inter.mv_dir != 3 &&
-                 ((abs(cu_q->inter.mv[cu_q->inter.mv_dir - 1][0] - cu_p->inter.mv[cu_p->inter.mv_dir - 1][0]) >= mvdThreashold) ||
-                  (abs(cu_q->inter.mv[cu_q->inter.mv_dir - 1][1] - cu_p->inter.mv[cu_p->inter.mv_dir - 1][1]) >= mvdThreashold))) {
-          // Absolute motion vector diff between blocks >= 0.5 (Integer pixel)
-          strength = 1;
-        } else if (cu_p->inter.mv_dir != 3 && cu_q->inter.mv_dir != 3 &&
-                   cu_q->inter.mv_ref[cu_q->inter.mv_dir - 1] != cu_p->inter.mv_ref[cu_p->inter.mv_dir - 1]) {
           strength = 1;
         }
-        
-        // B-slice related checks
-        if(!strength && state->frame->slicetype == KVZ_SLICE_B) {
+        else if(cu_p->inter.mv_dir == 3 || cu_q->inter.mv_dir == 3/*state->frame->slicetype == KVZ_SLICE_B*/) { // B-slice related checks
 
           // Zero all undefined motion vectors for easier usage
           if(!(cu_q->inter.mv_dir & 1)) {
@@ -822,7 +813,18 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
             strength = 1;
           }
         }
-
+        else /*if (cu_p->inter.mv_dir != 3 && cu_q->inter.mv_dir != 3)*/ { //is P-slice
+          if (cu_q->inter.mv_ref[cu_q->inter.mv_dir - 1] != cu_p->inter.mv_ref[cu_p->inter.mv_dir - 1]) {
+            // Reference pictures are different
+            strength = 1;
+          } else if (
+            ((abs(cu_q->inter.mv[cu_q->inter.mv_dir - 1][0] - cu_p->inter.mv[cu_p->inter.mv_dir - 1][0]) >= mvdThreashold) ||
+            (abs(cu_q->inter.mv[cu_q->inter.mv_dir - 1][1] - cu_p->inter.mv[cu_p->inter.mv_dir - 1][1]) >= mvdThreashold))) {
+            // Absolute motion vector diff between blocks >= 0.5 (Integer pixel)
+            strength = 1;
+          }
+        }
+      
         tc_index        = CLIP(0, MAX_QP + 2, (int32_t)(qp + 2*(strength - 1) + (tc_offset_div2 << 1)));
         tc              = lumaBitdepth < 10 ? ((kvz_g_tc_table_8x8[tc_index] + (1 << (9 - lumaBitdepth))) >> (10 - lumaBitdepth))
                                             : ((kvz_g_tc_table_8x8[tc_index] << (lumaBitdepth - 10)));
