@@ -753,7 +753,7 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
           // Neither CU is intra so tr_depth <= MAX_DEPTH.
           strength = 1;
         }
-        else if(cu_p->inter.mv_dir == 3 || cu_q->inter.mv_dir == 3/*state->frame->slicetype == KVZ_SLICE_B*/) { // B-slice related checks
+        else if(cu_p->inter.mv_dir == 3 || cu_q->inter.mv_dir == 3 || state->frame->slicetype == KVZ_SLICE_B) { // B-slice related checks. TODO: Need to account for cu_p being in another slice?
 
           // Zero all undefined motion vectors for easier usage
           if(!(cu_q->inter.mv_dir & 1)) {
@@ -1320,10 +1320,8 @@ static void filter_deblock_lcu_rightmost(encoder_state_t * const state,
 // - Strength calculation to include average Luma level (Luma Adaptive Deblocing Filter LADF) (optional)
 // - Deblocking strength for CIIP and IBC modes (CIIP/IBC not currently used)
 // - Handle new prediction modes (i.e. PLT) (PLT not currently used)
-// - Luma deblocking on a 4x4 grid
 // - Deblocking filter for subblock boundaries
 // - Allow loop filtering across slice/tile boundaries?
-// - Account for bi-pred and multi ref P frames
 void kvz_filter_deblock_lcu(encoder_state_t * const state, int x_px, int y_px)
 {
   assert(!state->encoder_control->cfg.lossless);
