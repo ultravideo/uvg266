@@ -375,6 +375,21 @@ static INLINE void gather_deblock_pixels(
 }
 
 /**
+* \brief Gather pixels from src to dst using a custom stride and step for src
+*/
+static INLINE void gather_pixels(
+    const kvz_pixel *src,
+    int step,
+    int stride,
+    int numel,
+    kvz_pixel *dst)
+{
+  for (int i = 0; i < numel; ++i) {
+    dst[i] = src[i * step + stride];
+  }
+}
+
+/**
 * \brief Scatter pixels
 */
 static INLINE void scatter_deblock_pixels(
@@ -693,8 +708,8 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
     int32_t tc_index;
     int32_t tc;
 
-    //Deblock adapted to halve pixel mvd. TODO: Tie into actual number of fractional mv bits
-    const int16_t mvdThreashold = 2; //(1 << (MV_INTERNAL_FRACTIONAL_BITS - 1))
+    //Deblock adapted to halve pixel mvd.
+    const int16_t mvdThreashold = 1 << (INTERNAL_MV_PREC - 1);
 
     uint32_t num_4px_parts  = length / 4;
 
@@ -717,37 +732,28 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
         if (dir == EDGE_VER) {
           y_coord = y + 4 * block_idx;
           cu_p = kvz_cu_array_at(frame->cu_array, x - 1, y_coord);
-          cu_q = kvz_cu_array_at(frame->cu_array, x,     y_coord);
+          cu_q = kvz_cu_array_at(frame->cu_array, x, y_coord);
 
         } else {
           x_coord = x + 4 * block_idx;
           cu_p = kvz_cu_array_at(frame->cu_array, x_coord, y - 1);
-          cu_q = kvz_cu_array_at(frame->cu_array, x_coord, y    );
+          cu_q = kvz_cu_array_at(frame->cu_array, x_coord, y);
         }
-        
+
         bool nonzero_coeffs = cbf_is_set(cu_q->cbf, cu_q->tr_depth, COLOR_Y)
-                           || cbf_is_set(cu_p->cbf, cu_p->tr_depth, COLOR_Y);
+          || cbf_is_set(cu_p->cbf, cu_p->tr_depth, COLOR_Y);
 
         // Filter strength
         strength = 0;
-        if (cu_q->type == CU_INTRA || cu_p->type == CU_INTRA) {
+        if (cu_q->type == CU_INTRA || cu_p->type == CU_INTRA) { // Intra is used
           strength = 2;
-        } else if (tu_boundary && nonzero_coeffs) {
+        }
+        else if (tu_boundary && nonzero_coeffs) {
           // Non-zero residual/coeffs and transform boundary
           // Neither CU is intra so tr_depth <= MAX_DEPTH.
-          strength = 1;       
-        } else if (cu_p->inter.mv_dir != 3 && cu_q->inter.mv_dir != 3 &&
-                 ((abs(cu_q->inter.mv[cu_q->inter.mv_dir - 1][0] - cu_p->inter.mv[cu_p->inter.mv_dir - 1][0]) >= mvdThreashold) ||
-                  (abs(cu_q->inter.mv[cu_q->inter.mv_dir - 1][1] - cu_p->inter.mv[cu_p->inter.mv_dir - 1][1]) >= mvdThreashold))) {
-          // Absolute motion vector diff between blocks >= 0.5 (Integer pixel)
-          strength = 1;
-        } else if (cu_p->inter.mv_dir != 3 && cu_q->inter.mv_dir != 3 &&
-                   cu_q->inter.mv_ref[cu_q->inter.mv_dir - 1] != cu_p->inter.mv_ref[cu_p->inter.mv_dir - 1]) {
           strength = 1;
         }
-        
-        // B-slice related checks
-        if(!strength && state->frame->slicetype == KVZ_SLICE_B) {
+        else if(cu_p->inter.mv_dir == 3 || cu_q->inter.mv_dir == 3 || state->frame->slicetype == KVZ_SLICE_B) { // B-slice related checks. TODO: Need to account for cu_p being in another slice?
 
           // Zero all undefined motion vectors for easier usage
           if(!(cu_q->inter.mv_dir & 1)) {
@@ -807,7 +813,18 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
             strength = 1;
           }
         }
-
+        else /*if (cu_p->inter.mv_dir != 3 && cu_q->inter.mv_dir != 3)*/ { //is P-slice
+          if (cu_q->inter.mv_ref[cu_q->inter.mv_dir - 1] != cu_p->inter.mv_ref[cu_p->inter.mv_dir - 1]) {
+            // Reference pictures are different
+            strength = 1;
+          } else if (
+            ((abs(cu_q->inter.mv[cu_q->inter.mv_dir - 1][0] - cu_p->inter.mv[cu_p->inter.mv_dir - 1][0]) >= mvdThreashold) ||
+            (abs(cu_q->inter.mv[cu_q->inter.mv_dir - 1][1] - cu_p->inter.mv[cu_p->inter.mv_dir - 1][1]) >= mvdThreashold))) {
+            // Absolute motion vector diff between blocks >= 0.5 (Integer pixel)
+            strength = 1;
+          }
+        }
+      
         tc_index        = CLIP(0, MAX_QP + 2, (int32_t)(qp + 2*(strength - 1) + (tc_offset_div2 << 1)));
         tc              = lumaBitdepth < 10 ? ((kvz_g_tc_table_8x8[tc_index] + (1 << (9 - lumaBitdepth))) >> (10 - lumaBitdepth))
                                             : ((kvz_g_tc_table_8x8[tc_index] << (lumaBitdepth - 10)));
@@ -867,19 +884,20 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
         int_fast32_t dp3L = dp3;
         int_fast32_t dq3L = dq3;
         
+        //In case of large blocks, need to gather extra pixels
         //bL:
         //line0 p7 p6 p5 p4 q4 q5 q6 q7
         kvz_pixel bL[4][8];
 
         if (is_side_P_large) {
-          gather_deblock_pixels(edge_src - 6 * x_stride, x_stride, 0 * y_stride, 2, &bL[0][0]/* - 2 */);
-          gather_deblock_pixels(edge_src - 6 * x_stride, x_stride, 3 * y_stride, 2, &bL[3][0]/* - 2 */);
+          gather_pixels(edge_src - 8 * x_stride, x_stride, 0 * y_stride, 4, &bL[0][0]);
+          gather_pixels(edge_src - 8 * x_stride, x_stride, 3 * y_stride, 4, &bL[3][0]);
           dp0L = (dp0L + abs(bL[0][2] - 2 * bL[0][3] + b[0][0]) + 1) >> 1;
           dp3L = (dp3L + abs(bL[3][2] - 2 * bL[3][3] + b[3][0]) + 1) >> 1;
         }
         if (is_side_Q_large) {
-          gather_deblock_pixels(edge_src + 6 * x_stride, x_stride, 0 * y_stride, 2, &bL[0][2]);
-          gather_deblock_pixels(edge_src + 6 * x_stride, x_stride, 3 * y_stride, 2, &bL[3][2]);
+          gather_pixels(edge_src + 4 * x_stride, x_stride, 0 * y_stride, 4, &bL[0][4]);
+          gather_pixels(edge_src + 4 * x_stride, x_stride, 3 * y_stride, 4, &bL[3][4]);
           dq0L = (dq0L + abs(b[0][7] - 2 * bL[0][4] + bL[0][5]) + 1) >> 1;
           dq3L = (dq3L + abs(b[3][7] - 2 * bL[3][4] + bL[3][5]) + 1) >> 1;
         }
@@ -897,13 +915,13 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
             gather_deblock_pixels(edge_src, x_stride, 2 * y_stride, 4, &b[2][0]);
             if (is_side_P_large)
             {
-              gather_deblock_pixels(edge_src - 6 * x_stride, x_stride, 1 * y_stride, 2, &bL[1][0] - 2);
-              gather_deblock_pixels(edge_src - 6 * x_stride, x_stride, 2 * y_stride, 2, &bL[2][0] - 2);
+              gather_pixels(edge_src - 8 * x_stride, x_stride, 1 * y_stride, 4, &bL[1][0]);
+              gather_pixels(edge_src - 8 * x_stride, x_stride, 2 * y_stride, 4, &bL[2][0]);
             }
             if (is_side_Q_large)
             {
-              gather_deblock_pixels(edge_src + 6 * x_stride, x_stride, 1 * y_stride, 2, &bL[1][2]);
-              gather_deblock_pixels(edge_src + 6 * x_stride, x_stride, 2 * y_stride, 2, &bL[2][2]);
+              gather_pixels(edge_src + 4 * x_stride, x_stride, 1 * y_stride, 4, &bL[1][4]);
+              gather_pixels(edge_src + 4 * x_stride, x_stride, 2 * y_stride, 4, &bL[2][4]);
             }
 
             for (int i = 0; i < 4; ++i) {
@@ -1302,7 +1320,6 @@ static void filter_deblock_lcu_rightmost(encoder_state_t * const state,
 // - Strength calculation to include average Luma level (Luma Adaptive Deblocing Filter LADF) (optional)
 // - Deblocking strength for CIIP and IBC modes (CIIP/IBC not currently used)
 // - Handle new prediction modes (i.e. PLT) (PLT not currently used)
-// - Luma deblocking on a 4x4 grid
 // - Deblocking filter for subblock boundaries
 // - Allow loop filtering across slice/tile boundaries?
 void kvz_filter_deblock_lcu(encoder_state_t * const state, int x_px, int y_px)
