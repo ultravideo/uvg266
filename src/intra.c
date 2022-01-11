@@ -546,7 +546,7 @@ void kvz_predict_cclm(
 }
 
 
-void kvz_mip_boundary_downsampling(int* reduced_dst, const kvz_pixel* const ref_src, int src_len, int dst_len)
+void kvz_mip_boundary_downsampling(kvz_pixel* reduced_dst, const kvz_pixel* const ref_src, int src_len, int dst_len)
 {
   if (dst_len < src_len)
   {
@@ -662,9 +662,76 @@ void kvz_mip_reduced_pred(kvz_pixel* const output,
 }
 
 
-void kvz_mip_pred_upsampling()
+void kvz_mip_pred_upsampling_1D(kvz_pixel* const dst, const kvz_pixel* const src, const kvz_pixel* const boundary,
+                                const uint16_t src_size_ups_dim, const uint16_t src_size_orth_dim,
+                                const uint16_t src_step, const uint16_t src_stride,
+                                const uint16_t dst_step, const uint16_t dst_stride,
+                                const uint16_t boundary_step,
+                                const uint16_t ups_factor)
 {
+  // Calculate floor log2. TODO: find a better / faster solution
+  uint16_t upsample_factor = ups_factor;
+  int tmp = 0;
+  if (upsample_factor & 0xffff0000) {
+    upsample_factor >>= 16;
+    tmp += 16;
+  }
+  if (upsample_factor & 0xff00) {
+    upsample_factor >>= 8;
+    tmp += 8;
+  }
+  if (upsample_factor & 0xf0) {
+    upsample_factor >>= 4;
+    tmp += 4;
+  }
+  if (upsample_factor & 0xc) {
+    upsample_factor >>= 2;
+    tmp += 2;
+  }
+  if (upsample_factor & 0x2) {
+    upsample_factor >>= 1;
+    tmp += 1;
+  }
 
+  const int log2_factor = tmp;
+  assert(ups_factor >= 2 && "Upsampling factor must be at least 2.");
+  const int rounding_offset = 1 << (log2_factor - 1);
+
+  uint16_t idx_orth_dim = 0;
+  const kvz_pixel* src_line = src;
+  kvz_pixel* dst_line = dst;
+  const kvz_pixel* boundary_line = boundary + boundary_step - 1;
+  while (idx_orth_dim < src_size_orth_dim)
+  {
+    uint16_t idx_upsample_dim = 0;
+    const kvz_pixel* before = boundary_line;
+    const kvz_pixel* behind = src_line;
+    kvz_pixel* cur_dst = dst_line;
+    while (idx_upsample_dim < src_size_ups_dim)
+    {
+      uint16_t pos = 1;
+      int scaled_before = (*before) << log2_factor;
+      int scaled_behind = 0;
+      while (pos <= ups_factor)
+      {
+        scaled_before -= *before;
+        scaled_behind += *behind;
+        *cur_dst = (scaled_before + scaled_behind + rounding_offset) >> log2_factor;
+
+        pos++;
+        cur_dst += dst_step;
+      }
+
+      idx_upsample_dim++;
+      before = behind;
+      behind += src_step;
+    }
+
+    idx_orth_dim++;
+    src_line += src_stride;
+    dst_line += dst_stride;
+    boundary_line += boundary_step;
+  }
 }
 
 
@@ -677,7 +744,7 @@ void kvz_mip_predict(encoder_state_t const* const state,
 {
   // Separate this function into smaller bits if needed
   
-  int* result; // TODO: pass the dst buffer to this function
+  kvz_pixel* result; // TODO: pass the dst buffer to this function
   const int mode_idx = 0; // TODO: pass mode
 
   // *** INPUT PREP ***
@@ -702,8 +769,8 @@ void kvz_mip_predict(encoder_state_t const* const state,
   int red_pred_size = (size_id < 2) ? 4 : 8;
 
   // Upsampling factors
-  unsigned int ups_hor_factor = width / red_pred_size;
-  unsigned int ups_ver_factor = height / red_pred_size;
+  uint16_t ups_hor_factor = width / red_pred_size;
+  uint16_t ups_ver_factor = height / red_pred_size;
 
   // Upsampling factors must be powers of two
   assert((ups_hor_factor < 1) || ((ups_hor_factor & (ups_hor_factor - 1)) != 0) && "Horizontal upsampling factor must be power of two.");
@@ -720,15 +787,15 @@ void kvz_mip_predict(encoder_state_t const* const state,
   kvz_pixel red_bdry[MIP_MAX_INPUT_SIZE];
   kvz_pixel red_bdry_trans[MIP_MAX_INPUT_SIZE];
 
-  kvz_pixel* const top_reduced = red_bdry[0];
-  kvz_pixel* const left_reduced = red_bdry[red_bdry_size];
+  kvz_pixel* const top_reduced = &red_bdry[0];
+  kvz_pixel* const left_reduced = &red_bdry[red_bdry_size];
 
   kvz_mip_boundary_downsampling(top_reduced, ref_samples_top, width, red_bdry_size);
   kvz_mip_boundary_downsampling(left_reduced, ref_samples_left, height, red_bdry_size);
 
   // Transposed reduced boundaries
-  int* const left_reduced_trans = red_bdry_trans[0];
-  int* const top_reduced_trans = red_bdry_trans[red_bdry_size];
+  kvz_pixel* const left_reduced_trans = &red_bdry_trans[0];
+  kvz_pixel* const top_reduced_trans = &red_bdry_trans[red_bdry_size];
 
   for (int x = 0; x < red_bdry_size; x++) {
     top_reduced_trans[x] = top_reduced[x];
@@ -773,13 +840,32 @@ void kvz_mip_predict(encoder_state_t const* const state,
   }
 
   kvz_pixel* red_pred_buffer = MALLOC(kvz_pixel, red_pred_size * red_pred_size); // TODO: get rid of MALLOC and FREE
-  kvz_pixel* const reduced_pred = need_upsampling ? red_pred_buffer[0] : result;
+  kvz_pixel* const reduced_pred = need_upsampling ? red_pred_buffer : result;
 
-  const int* const reduced_bdry = transpose ? red_bdry_trans[0] : red_bdry[0];
+  const kvz_pixel* const reduced_bdry = transpose ? red_bdry_trans : red_bdry;
 
   kvz_mip_reduced_pred(reduced_pred, reduced_bdry, matrix, transpose, red_bdry_size, red_pred_size, size_id, input_offset, input_offset_trans);
   if (need_upsampling) {
-    kvz_mip_pred_upsampling(result, reduced_pred);
+    const kvz_pixel* ver_src = reduced_pred;
+    uint16_t ver_src_step = width;
+    
+    if (ups_hor_factor > 1) {
+      kvz_pixel* const hor_dst = result + (ups_ver_factor - 1) * width;
+      ver_src = hor_dst;
+      ver_src_step *= ups_ver_factor;
+
+      kvz_mip_pred_upsampling_1D(hor_dst, reduced_pred, ref_samples_left,
+        red_pred_size, red_pred_size,
+        1, red_pred_size, 1, ver_src_step,
+        ups_ver_factor, ups_hor_factor);
+    }
+
+    if (ups_ver_factor > 1) {
+      kvz_mip_pred_upsampling_1D(result, ver_src, ref_samples_top,
+        red_pred_size, width,
+        ver_src_step, 1, width, 1,
+        1, ups_ver_factor);
+    }
   }
 
   FREE_POINTER(red_pred_buffer);
