@@ -266,6 +266,7 @@
     <ClCompile Include="..\..\src\strategies\avx2\alf-avx2.c">
       <Filter>Optimization\strategies\avx2</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\debug.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\bitstream.h">
@@ -500,6 +501,7 @@
     <ClInclude Include="..\..\src\mip_data.h">
       <Filter>Reconstruction</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\debug.h" />
   </ItemGroup>
   <ItemGroup>
     <YASM Include="..\..\src\extras\x86inc.asm">
