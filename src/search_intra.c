@@ -333,7 +333,9 @@ static double search_intra_trdepth(encoder_state_t * const state,
         x_px, y_px,
         depth,
         intra_mode, -1,
-        pred_cu, cclm_params, pred_cu->intra.multi_ref_idx, lcu);
+        pred_cu, cclm_params, pred_cu->intra.multi_ref_idx, 
+        pred_cu->intra.mip_flag, pred_cu->intra.mip_is_transposed,
+        lcu);
 
       // TODO: Not sure if this should be 0 or 1 but at least seems to work with 1
       if (pred_cu->tr_idx > 1)
@@ -361,7 +363,9 @@ static double search_intra_trdepth(encoder_state_t * const state,
         x_px, y_px,
         depth,
         -1, chroma_mode,
-        pred_cu, cclm_params, 0, lcu);
+        pred_cu, cclm_params, 0, 
+        pred_cu->intra.mip_flag, pred_cu->intra.mip_is_transposed,
+        lcu);
       best_rd_cost += kvz_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
     }
     pred_cu->tr_skip = best_tr_idx == MTS_SKIP;
@@ -715,6 +719,8 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
                              int8_t *intra_preds,
                              int modes_to_check,
                              int8_t modes[67], int8_t trafo[67], double costs[67],
+                             int num_mip_modes,
+                             int8_t mip_modes[32], int8_t mip_trafo[32], double mip_costs[32],
                              lcu_t *lcu,
                              uint8_t multi_ref_idx)
 {
@@ -749,6 +755,47 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
     }
   }
 
+  // MIP_TODO: implement this inside the standard intra for loop. Code duplication is bad.
+  // MIP search
+  const int transp_off = num_mip_modes >> 1;
+  for (int mip_mode = 0; mip_mode < num_mip_modes; ++mip_mode) {
+    int rdo_bitcost = 0; // MIP_TODO: MIP needs own bit cost calculation
+
+    mip_costs[mip_mode] = rdo_bitcost * (int)(state->lambda + 0.5); // MIP_TODO: check if this is also correct in the case when MIP is used.
+
+    const bool is_transposed = (mip_modes[mip_mode] >= transp_off ? true : false);
+    // There can be 32 MIP modes, but only mode numbers [0, 15] are ever written to bitstream.
+    // Modes [16, 31] are indicated with the separate transpose flag.
+    int8_t pred_mode = (is_transposed ? mip_modes[mip_mode] - transp_off : mip_modes[mip_mode]);
+
+    // Perform transform split search and save mode RD cost for the best one.
+    cu_info_t pred_cu;
+    pred_cu.depth = depth;
+    pred_cu.type = CU_INTRA;
+    pred_cu.part_size = ((depth == MAX_PU_DEPTH) ? SIZE_NxN : SIZE_2Nx2N); // TODO: non-square blocks
+    pred_cu.intra.mode = pred_mode;
+    pred_cu.intra.mode_chroma = pred_mode;
+    pred_cu.intra.multi_ref_idx = 0;
+    pred_cu.intra.mip_is_transposed = is_transposed;
+    pred_cu.intra.mip_flag = true;
+    pred_cu.joint_cb_cr = 0;
+    FILL(pred_cu.cbf, 0);
+
+    // Reset transform split data in lcu.cu for this area.
+    kvz_lcu_fill_trdepth(lcu, x_px, y_px, depth, depth);
+
+    double mode_cost = search_intra_trdepth(state, x_px, y_px, depth, tr_depth, pred_mode, MAX_INT, &pred_cu, lcu, NULL, -1);
+    mip_costs[mip_mode] += mode_cost;
+    mip_trafo[mip_mode] = pred_cu.tr_idx;
+
+    // MIP_TODO: check if ET is viable when MIP is used
+    // Early termination if no coefficients has to be coded
+    if (state->encoder_control->cfg.intra_rdo_et && !cbf_is_set_any(pred_cu.cbf, depth)) {
+      modes_to_check = mip_mode + 1;
+      break;
+    }
+  }
+
   for(int rdo_mode = 0; rdo_mode < modes_to_check; rdo_mode ++) {
     int rdo_bitcost = kvz_luma_mode_bits(state, modes[rdo_mode], intra_preds, multi_ref_idx);
 
@@ -762,6 +809,8 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
     pred_cu.intra.mode = modes[rdo_mode];
     pred_cu.intra.mode_chroma = modes[rdo_mode];
     pred_cu.intra.multi_ref_idx = multi_ref_idx;
+    pred_cu.intra.mip_is_transposed = false;
+    pred_cu.intra.mip_flag = false;
     pred_cu.joint_cb_cr = 0;
     FILL(pred_cu.cbf, 0);
 
@@ -780,6 +829,9 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
   }
 
   // Update order according to new costs
+  if (num_mip_modes) {
+    kvz_sort_modes_intra_luma(mip_modes, mip_trafo, mip_costs, num_mip_modes);
+  }
   kvz_sort_modes_intra_luma(modes, trafo, costs, modes_to_check);
 
   // The best transform split hierarchy is not saved anywhere, so to get the
@@ -921,7 +973,7 @@ int8_t kvz_search_intra_chroma_rdo(encoder_state_t * const state,
           x_px, y_px,
           depth,
           -1, chroma.mode, // skip luma
-          NULL, NULL, 0, lcu);
+          NULL, NULL, 0, false, false, lcu);
       }
       else {
 
@@ -954,7 +1006,7 @@ int8_t kvz_search_intra_chroma_rdo(encoder_state_t * const state,
           x_px, y_px,
           depth,
           -1, chroma.mode, // skip luma
-          NULL, cclm_params, 0, lcu);
+          NULL, cclm_params, 0, false, false, lcu);
       }
       chroma.cost = kvz_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, tr_cu, lcu);
 
@@ -1044,7 +1096,9 @@ void kvz_search_cu_intra(encoder_state_t * const state,
                          int8_t *mode_out, 
                          int8_t *trafo_out, 
                          double *cost_out,
-                         uint8_t *multi_ref_idx_out)
+                         uint8_t *multi_ref_idx_out,
+                         bool *mip_flag_out,
+                         bool * mip_transposed_out)
 {
   const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
   const int8_t cu_width = LCU_WIDTH >> depth;
@@ -1080,6 +1134,38 @@ void kvz_search_cu_intra(encoder_state_t * const state,
   int8_t modes[MAX_REF_LINE_IDX][67];
   int8_t trafo[MAX_REF_LINE_IDX][67] = { 0 };
   double costs[MAX_REF_LINE_IDX][67];
+
+  bool enable_mip = state->encoder_control->cfg.mip;
+  int8_t mip_modes[32]; // Modes [0, 15] are non-transposed. Modes [16,31] are transposed.
+  int8_t mip_trafo[32];
+  double mip_costs[32];
+
+  if (enable_mip) {
+    for (int i = 0; i < 32; ++i) {
+      mip_modes[i] = i;
+      mip_costs[i] = MAX_INT;
+    }
+  }
+
+  // The maximum number of possible MIP modes depend on block size & shape
+  int width = LCU_WIDTH >> depth;
+  int height = width; // TODO: proper height for non-square blocks.
+  int tmp_modes;
+  // MIP_TODO: check for illegal block sizes.
+  if (width == 4 && height == 4) {
+    // Mip size_id = 0. Num modes = 32
+    tmp_modes = 32;
+  }
+  else if (width == 4 || height == 4 || (width == 8 && height == 8)) {
+    // Mip size_id = 0. Num modes = 16
+    tmp_modes = 16;
+  }
+  else {
+    // Mip size_id = 0. Num modes = 12
+    tmp_modes = 12;
+  }
+  
+  uint8_t num_mip_modes = enable_mip ? tmp_modes : 0;
 
   // Find best intra mode for 2Nx2N.
   kvz_pixel *ref_pixels = &lcu->ref.y[lcu_px.x + lcu_px.y * LCU_WIDTH];
@@ -1132,24 +1218,37 @@ void kvz_search_cu_intra(encoder_state_t * const state,
     }
     
     for(int8_t line = 0; line < lines; ++line) {
-      // For extra reference lines, only check predicted modes
+      // For extra reference lines, only check predicted modes & no MIP search.
       if (line != 0) {
         number_of_modes_to_search = 0;
+        num_mip_modes = 0;
       }
       int num_modes_to_check = MIN(number_of_modes[line], number_of_modes_to_search);
       kvz_sort_modes(modes[line], costs[line], number_of_modes[line]);
+      // TODO: if rough search is implemented for MIP, sort mip_modes here.
       number_of_modes[line] = search_intra_rdo(state,
                             x_px, y_px, depth,
                             ref_pixels, LCU_WIDTH,
                             candidate_modes,
                             num_modes_to_check,
-                            modes[line], trafo[line], costs[line], lcu, line);
+                            modes[line], trafo[line], costs[line],
+                            num_mip_modes,
+                            mip_modes, mip_trafo, mip_costs,
+                            lcu, line);
     }
   }
   
   uint8_t best_line = 0;
   double best_line_mode_cost = costs[0][0];
+  uint8_t best_mip_mode_idx = 0;
   uint8_t best_mode_indices[MAX_REF_LINE_IDX];
+
+  int8_t tmp_best_mode;
+  int8_t tmp_best_trafo;
+  double tmp_best_cost;
+  bool tmp_mip_flag = false;
+  bool tmp_mip_transp = false;
+
   for (int line = 0; line < lines; ++line) {
     best_mode_indices[line] = select_best_mode_index(modes[line], costs[line], number_of_modes[line]);
     if (best_line_mode_cost > costs[line][best_mode_indices[line]]) {
@@ -1158,8 +1257,25 @@ void kvz_search_cu_intra(encoder_state_t * const state,
     }
   }
 
-  *mode_out =  modes[best_line][best_mode_indices[best_line]];
-  *trafo_out = trafo[best_line][best_mode_indices[best_line]];
-  *cost_out =  costs[best_line][best_mode_indices[best_line]];
-  *multi_ref_idx_out = best_line;
+  tmp_best_mode = modes[best_line][best_mode_indices[best_line]];
+  tmp_best_trafo = trafo[best_line][best_mode_indices[best_line]];
+  tmp_best_cost = costs[best_line][best_mode_indices[best_line]];
+
+  if (num_mip_modes) {
+    best_mip_mode_idx = select_best_mode_index(mip_modes, mip_costs, num_mip_modes);
+    if (tmp_best_cost > mip_costs[best_mip_mode_idx]) {
+      tmp_best_mode = mip_modes[best_mip_mode_idx];
+      tmp_best_trafo = mip_trafo[best_mip_mode_idx];
+      tmp_best_cost = mip_costs[best_mip_mode_idx];
+      tmp_mip_flag = true;
+      tmp_mip_transp = (tmp_best_mode >= (num_mip_modes >> 1)) ? 1 : 0;
+    }
+  }
+
+  *mode_out =  tmp_best_mode;
+  *trafo_out = tmp_best_trafo;
+  *cost_out =  tmp_best_cost;
+  *mip_flag_out = tmp_mip_flag;
+  *mip_transposed_out = tmp_mip_transp;
+  *multi_ref_idx_out = tmp_mip_flag ? 0 : best_line;
 }

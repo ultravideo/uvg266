@@ -727,14 +727,18 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       int8_t intra_trafo;
       double intra_cost;
       uint8_t multi_ref_index = 0;
+      bool mip_flag;
+      bool mip_transposed;
       kvz_search_cu_intra(state, x, y, depth, lcu,
-                          &intra_mode, &intra_trafo, &intra_cost, &multi_ref_index);
+                          &intra_mode, &intra_trafo, &intra_cost, &multi_ref_index, &mip_flag, &mip_transposed);
       if (intra_cost < cost) {
         cost = intra_cost;
         cur_cu->type = CU_INTRA;
         cur_cu->part_size = depth > MAX_DEPTH ? SIZE_NxN : SIZE_2Nx2N;
         cur_cu->intra.mode = intra_mode;
         cur_cu->intra.multi_ref_idx = multi_ref_index;
+        cur_cu->intra.mip_flag = mip_flag;
+        cur_cu->intra.mip_is_transposed = mip_transposed;
 
         //If the CU is not split from 64x64 block, the MTS is disabled for that CU.
         cur_cu->tr_idx = (depth > 0) ? intra_trafo : 0;
@@ -751,7 +755,9 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
                          x, y,
                          depth,
                          cur_cu->intra.mode, -1, // skip chroma
-                         NULL, NULL, cur_cu->intra.multi_ref_idx, lcu);
+                         NULL, NULL, cur_cu->intra.multi_ref_idx, 
+                         cur_cu->intra.mip_flag, cur_cu->intra.mip_is_transposed, 
+                         lcu);
 
       downsample_cclm_rec(
         state, x, y, cu_width / 2, cu_width / 2, lcu->rec.y, lcu->left_ref.y[64]
@@ -773,7 +779,8 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
                            x & ~7, y & ~7, // TODO: as does this
                            depth,
                            -1, cur_cu->intra.mode_chroma, // skip luma
-                           NULL, cclm_params, 0, lcu);
+                           NULL, cclm_params, 0, cur_cu->intra.mip_flag, cur_cu->intra.mip_is_transposed,
+                           lcu);
       }
     } else if (cur_cu->type == CU_INTER) {
 
@@ -933,7 +940,8 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
                            x, y,
                            depth,
                            cur_cu->intra.mode, mode_chroma,
-                           NULL,NULL, 0, lcu);
+                           NULL,NULL, 0, cur_cu->intra.mip_flag, cur_cu->intra.mip_is_transposed,
+                           lcu);
 
         cost += kvz_cu_rd_cost_luma(state, x_local, y_local, depth, cur_cu, lcu);
         if (has_chroma) {

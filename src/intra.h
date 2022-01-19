@@ -130,6 +130,8 @@ void kvz_intra_recon_cu(
   cu_info_t *cur_cu,
   cclm_parameters_t* cclm_params,
   uint8_t multi_ref_idx,
+  bool mip_flag,
+  bool mip_transp,
   lcu_t *lcu);
 
 
@@ -146,4 +148,15 @@ void kvz_predict_cclm(
   kvz_intra_references* chroma_ref,
   kvz_pixel* dst,
   cclm_parameters_t* cclm_params
+);
+
+void kvz_mip_predict(
+  encoder_state_t const * const state,
+  kvz_intra_references * refs,
+  const uint16_t width,
+  const uint16_t height,
+  const color_t color,
+  kvz_pixel* dst,
+  const int mip_mode,
+  const bool mip_transp
 );

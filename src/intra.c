@@ -546,14 +546,14 @@ void kvz_predict_cclm(
 }
 
 
-void kvz_mip_boundary_downsampling(kvz_pixel* reduced_dst, const kvz_pixel* const ref_src, int src_len, int dst_len)
+void kvz_mip_boundary_downsampling_1D(kvz_pixel* reduced_dst, const kvz_pixel* const ref_src, int src_len, int dst_len)
 {
   if (dst_len < src_len)
   {
     // Create reduced boundary by downsampling
     uint16_t down_smp_factor = src_len / dst_len;
 
-    // Calculate floor log2. TODO: find a better / faster solution
+    // Calculate floor log2. MIP_TODO: find a better / faster solution
     int tmp = 0;
     if (down_smp_factor & 0xffff0000) {
       down_smp_factor >>= 16;
@@ -614,7 +614,7 @@ void kvz_mip_reduced_pred(kvz_pixel* const output,
   const int input_size = 2 * red_bdry_size;
 
   // Use local buffer for transposed result
-  kvz_pixel* out_buf_transposed = MALLOC(kvz_pixel, red_pred_size * red_pred_size); // TODO: get rid of MALLOC & FREE
+  kvz_pixel* out_buf_transposed = MALLOC(kvz_pixel, red_pred_size * red_pred_size); // MIP_TODO: get rid of MALLOC & FREE
   kvz_pixel* const out_ptr = transpose ? out_buf_transposed : output;
 
   int sum = 0;
@@ -669,7 +669,7 @@ void kvz_mip_pred_upsampling_1D(kvz_pixel* const dst, const kvz_pixel* const src
                                 const uint16_t boundary_step,
                                 const uint16_t ups_factor)
 {
-  // Calculate floor log2. TODO: find a better / faster solution
+  // Calculate floor log2. MIP_TODO: find a better / faster solution
   uint16_t upsample_factor = ups_factor;
   int tmp = 0;
   if (upsample_factor & 0xffff0000) {
@@ -737,15 +737,16 @@ void kvz_mip_pred_upsampling_1D(kvz_pixel* const dst, const kvz_pixel* const src
 
 /** \brief Matrix weighted intra prediction.
 */
-void kvz_mip_predict(encoder_state_t const* const state,
-                     kvz_intra_references* const refs,
-                     const uint16_t pred_block_width,
-                     const uint16_t pred_block_height)
+void kvz_mip_predict(encoder_state_t const* const state, kvz_intra_references* const refs,
+                     const uint16_t pred_block_width, const uint16_t pred_block_height,
+                     const color_t color,
+                     kvz_pixel* dst,
+                     const int mip_mode, const bool mip_transp)
 {
   // Separate this function into smaller bits if needed
   
-  kvz_pixel* result; // TODO: pass the dst buffer to this function
-  const int mode_idx = 0; // TODO: pass mode
+  kvz_pixel* result = dst;
+  const int mode_idx = mip_mode;
 
   // *** INPUT PREP ***
 
@@ -790,8 +791,8 @@ void kvz_mip_predict(encoder_state_t const* const state,
   kvz_pixel* const top_reduced = &red_bdry[0];
   kvz_pixel* const left_reduced = &red_bdry[red_bdry_size];
 
-  kvz_mip_boundary_downsampling(top_reduced, ref_samples_top, width, red_bdry_size);
-  kvz_mip_boundary_downsampling(left_reduced, ref_samples_left, height, red_bdry_size);
+  kvz_mip_boundary_downsampling_1D(top_reduced, ref_samples_top, width, red_bdry_size);
+  kvz_mip_boundary_downsampling_1D(left_reduced, ref_samples_left, height, red_bdry_size);
 
   // Transposed reduced boundaries
   kvz_pixel* const left_reduced_trans = &red_bdry_trans[0];
@@ -822,7 +823,7 @@ void kvz_mip_predict(encoder_state_t const* const state,
   // *** BLOCK PREDICT ***
 
   const bool need_upsampling = (ups_hor_factor > 1) || (ups_ver_factor > 1);
-  const bool transpose = 0; // TODO: pass transpose
+  const bool transpose = mip_transp;
 
   uint8_t* matrix;
   switch (size_id) {
@@ -839,7 +840,7 @@ void kvz_mip_predict(encoder_state_t const* const state,
       assert(false && "Invalid MIP size id.");
   }
 
-  kvz_pixel* red_pred_buffer = MALLOC(kvz_pixel, red_pred_size * red_pred_size); // TODO: get rid of MALLOC and FREE
+  kvz_pixel* red_pred_buffer = MALLOC(kvz_pixel, red_pred_size * red_pred_size); // MIP_TODO: get rid of MALLOC and FREE
   kvz_pixel* const reduced_pred = need_upsampling ? red_pred_buffer : result;
 
   const kvz_pixel* const reduced_bdry = transpose ? red_bdry_trans : red_bdry;
@@ -1357,7 +1358,9 @@ static void intra_recon_tb_leaf(
   cclm_parameters_t *cclm_params,
   lcu_t *lcu,
   color_t color,
-  uint8_t multi_ref_idx)
+  uint8_t multi_ref_idx,
+  bool use_mip,
+  bool mip_transp)
 {
   const kvz_config *cfg = &state->encoder_control->cfg;
   const int shift = color == COLOR_Y ? 0 : 1;
@@ -1368,6 +1371,7 @@ static void intra_recon_tb_leaf(
     log2width -= 1;
   }
   const int width = 1 << log2width;
+  const int height = width; // TODO: proper height for non-square blocks
   const int lcu_width = LCU_WIDTH >> shift;
 
   const vector2d_t luma_px = { x, y };
@@ -1404,7 +1408,13 @@ static void intra_recon_tb_leaf(
   int stride = state->tile->frame->source->stride;
   const bool filter_boundary = color == COLOR_Y && !(cfg->lossless && cfg->implicit_rdpcm);
   if(intra_mode < 68) {
-    kvz_intra_predict(state, &refs, log2width, intra_mode, color, pred, filter_boundary, multi_ref_index);
+    if (use_mip) {
+      assert(intra_mode < 16 && "MIP mode must be between [0, 16]");
+      kvz_mip_predict(state, &refs, width, height, color, pred, intra_mode, mip_transp);
+    }
+    else {
+      kvz_intra_predict(state, &refs, log2width, intra_mode, color, pred, filter_boundary, multi_ref_index);
+    }
   } else {
     kvz_pixels_blit(&state->tile->frame->cclm_luma_rec[x / 2 + (y * stride) / 4], pred, width, width, stride / 2, width);
     if(cclm_params == NULL) {
@@ -1464,6 +1474,8 @@ void kvz_intra_recon_cu(
   cu_info_t *cur_cu,
   cclm_parameters_t *cclm_params,
   uint8_t multi_ref_idx,
+  bool mip_flag,
+  bool mip_transp,
   lcu_t *lcu)
 {
   const vector2d_t lcu_px = { SUB_SCU(x), SUB_SCU(y) };
@@ -1472,6 +1484,8 @@ void kvz_intra_recon_cu(
     cur_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
   }
   uint8_t multi_ref_index = multi_ref_idx;
+  bool use_mip = mip_flag;
+  bool mip_transposed = mip_transp;
 
   // Reset CBFs because CBFs might have been set
   // for depth earlier
@@ -1489,10 +1503,10 @@ void kvz_intra_recon_cu(
     const int32_t x2 = x + offset;
     const int32_t y2 = y + offset;
 
-    kvz_intra_recon_cu(state, x,  y,  depth + 1, mode_luma, mode_chroma, NULL, NULL, multi_ref_index, lcu);
-    kvz_intra_recon_cu(state, x2, y,  depth + 1, mode_luma, mode_chroma, NULL, NULL, multi_ref_index, lcu);
-    kvz_intra_recon_cu(state, x,  y2, depth + 1, mode_luma, mode_chroma, NULL, NULL, multi_ref_index, lcu);
-    kvz_intra_recon_cu(state, x2, y2, depth + 1, mode_luma, mode_chroma, NULL, NULL, multi_ref_index, lcu);
+    kvz_intra_recon_cu(state, x,  y,  depth + 1, mode_luma, mode_chroma, NULL, NULL, multi_ref_index, use_mip, mip_transposed, lcu);
+    kvz_intra_recon_cu(state, x2, y,  depth + 1, mode_luma, mode_chroma, NULL, NULL, multi_ref_index, use_mip, mip_transposed, lcu);
+    kvz_intra_recon_cu(state, x,  y2, depth + 1, mode_luma, mode_chroma, NULL, NULL, multi_ref_index, use_mip, mip_transposed, lcu);
+    kvz_intra_recon_cu(state, x2, y2, depth + 1, mode_luma, mode_chroma, NULL, NULL, multi_ref_index, use_mip, mip_transposed, lcu);
 
     // Propagate coded block flags from child CUs to parent CU.
     uint16_t child_cbfs[3] = {
@@ -1513,11 +1527,11 @@ void kvz_intra_recon_cu(
     const bool has_chroma = mode_chroma != -1 &&  (x % 8 == 0 && y % 8 == 0);
     // Process a leaf TU.
     if (has_luma) {
-      intra_recon_tb_leaf(state, x, y, depth, mode_luma, cclm_params, lcu, COLOR_Y, multi_ref_index);
+      intra_recon_tb_leaf(state, x, y, depth, mode_luma, cclm_params, lcu, COLOR_Y, multi_ref_index, use_mip, mip_transposed);
     }
     if (has_chroma) {
-      intra_recon_tb_leaf(state, x, y, depth, mode_chroma, cclm_params, lcu, COLOR_U, 0);
-      intra_recon_tb_leaf(state, x, y, depth, mode_chroma, cclm_params, lcu, COLOR_V, 0);
+      intra_recon_tb_leaf(state, x, y, depth, mode_chroma, cclm_params, lcu, COLOR_U, 0, use_mip, mip_transposed);
+      intra_recon_tb_leaf(state, x, y, depth, mode_chroma, cclm_params, lcu, COLOR_V, 0, use_mip, mip_transposed);
     }
 
     kvz_quantize_lcu_residual(state, has_luma, has_chroma, x, y, depth, cur_cu, lcu, false);
