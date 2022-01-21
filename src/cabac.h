@@ -107,6 +107,7 @@ typedef struct
     cabac_ctx_t sig_coeff_group_model[4];
     cabac_ctx_t luma_planar_model[2];
     cabac_ctx_t multi_ref_line[2];
+    cabac_ctx_t mip_flag;
     cabac_ctx_t bdpcm_mode[4];
     cabac_ctx_t joint_cb_cr[3];
     cabac_ctx_t transform_skip_model_luma;
