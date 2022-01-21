@@ -364,7 +364,7 @@ static double search_intra_trdepth(encoder_state_t * const state,
         depth,
         -1, chroma_mode,
         pred_cu, cclm_params, 0, 
-        pred_cu->intra.mip_flag, pred_cu->intra.mip_is_transposed,
+        false, false,
         lcu);
       best_rd_cost += kvz_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
     }
@@ -758,8 +758,8 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
   // MIP_TODO: implement this inside the standard intra for loop. Code duplication is bad.
   // MIP search
   const int transp_off = num_mip_modes >> 1;
-  for (int mip_mode = 0; mip_mode < num_mip_modes; ++mip_mode) {
-    int rdo_bitcost = 0; // MIP_TODO: MIP needs own bit cost calculation
+  for (uint8_t mip_mode = 0; mip_mode < num_mip_modes; ++mip_mode) {
+    int rdo_bitcost = kvz_mip_mode_bits(state, mip_mode, num_mip_modes);
 
     mip_costs[mip_mode] = rdo_bitcost * (int)(state->lambda + 0.5); // MIP_TODO: check if this is also correct in the case when MIP is used.
 
@@ -850,6 +850,16 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
   }
 
   return modes_to_check;
+}
+
+
+double kvz_mip_mode_bits(const encoder_state_t *state, int mip_mode, int num_mip_modes)
+{
+  double mode_bits = 0.0;
+
+  // MIP_TODO: calculate bit costs of writing the following: mip_flag, mip_transpose_flag & mip_mode
+
+  return mode_bits;
 }
 
 

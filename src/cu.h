@@ -169,8 +169,8 @@ typedef struct
       int8_t mode;
       int8_t mode_chroma;
       uint8_t multi_ref_idx;
-      bool mip_flag;
-      bool mip_is_transposed;
+      uint8_t mip_flag;
+      uint8_t mip_is_transposed;
     } intra;
     struct {
       mv_t    mv[2][2];  // \brief Motion vectors for L0 and L1

@@ -614,7 +614,7 @@ void kvz_mip_reduced_pred(kvz_pixel* const output,
   const int input_size = 2 * red_bdry_size;
 
   // Use local buffer for transposed result
-  kvz_pixel* out_buf_transposed = MALLOC(kvz_pixel, red_pred_size * red_pred_size); // MIP_TODO: get rid of MALLOC & FREE
+  kvz_pixel out_buf_transposed[LCU_WIDTH * LCU_WIDTH];
   kvz_pixel* const out_ptr = transpose ? out_buf_transposed : output;
 
   int sum = 0;
@@ -657,8 +657,6 @@ void kvz_mip_reduced_pred(kvz_pixel* const output,
       }
     }
   }
-
-  FREE_POINTER(out_buf_transposed);
 }
 
 
@@ -774,8 +772,8 @@ void kvz_mip_predict(encoder_state_t const* const state, kvz_intra_references* c
   uint16_t ups_ver_factor = height / red_pred_size;
 
   // Upsampling factors must be powers of two
-  assert((ups_hor_factor < 1) || ((ups_hor_factor & (ups_hor_factor - 1)) != 0) && "Horizontal upsampling factor must be power of two.");
-  assert((ups_ver_factor < 1) || ((ups_ver_factor & (ups_ver_factor - 1)) != 0) && "Vertical upsampling factor must be power of two.");
+  assert(!(ups_hor_factor < 1) || ((ups_hor_factor & (ups_hor_factor - 1)) != 0) && "Horizontal upsampling factor must be power of two.");
+  assert(!(ups_ver_factor < 1) || ((ups_ver_factor & (ups_ver_factor - 1)) != 0) && "Vertical upsampling factor must be power of two.");
 
   // Initialize prediction parameters END
 
@@ -840,7 +838,8 @@ void kvz_mip_predict(encoder_state_t const* const state, kvz_intra_references* c
       assert(false && "Invalid MIP size id.");
   }
 
-  kvz_pixel* red_pred_buffer = MALLOC(kvz_pixel, red_pred_size * red_pred_size); // MIP_TODO: get rid of MALLOC and FREE
+  // Max possible size is red_pred_size * red_pred_size, red_pred_size can be either 4 or 8
+  kvz_pixel red_pred_buffer[8*8];
   kvz_pixel* const reduced_pred = need_upsampling ? red_pred_buffer : result;
 
   const kvz_pixel* const reduced_bdry = transpose ? red_bdry_trans : red_bdry;
@@ -868,8 +867,6 @@ void kvz_mip_predict(encoder_state_t const* const state, kvz_intra_references* c
         1, ups_ver_factor);
     }
   }
-
-  FREE_POINTER(red_pred_buffer);
   // *** BLOCK PREDICT *** END
 }
 
@@ -1409,7 +1406,7 @@ static void intra_recon_tb_leaf(
   const bool filter_boundary = color == COLOR_Y && !(cfg->lossless && cfg->implicit_rdpcm);
   if(intra_mode < 68) {
     if (use_mip) {
-      assert(intra_mode < 16 && "MIP mode must be between [0, 16]");
+      assert(intra_mode >= 0 && intra_mode < 16 && "MIP mode must be between [0, 15]");
       kvz_mip_predict(state, &refs, width, height, color, pred, intra_mode, mip_transp);
     }
     else {
@@ -1530,8 +1527,8 @@ void kvz_intra_recon_cu(
       intra_recon_tb_leaf(state, x, y, depth, mode_luma, cclm_params, lcu, COLOR_Y, multi_ref_index, use_mip, mip_transposed);
     }
     if (has_chroma) {
-      intra_recon_tb_leaf(state, x, y, depth, mode_chroma, cclm_params, lcu, COLOR_U, 0, use_mip, mip_transposed);
-      intra_recon_tb_leaf(state, x, y, depth, mode_chroma, cclm_params, lcu, COLOR_V, 0, use_mip, mip_transposed);
+      intra_recon_tb_leaf(state, x, y, depth, mode_chroma, cclm_params, lcu, COLOR_U, 0, false, false);
+      intra_recon_tb_leaf(state, x, y, depth, mode_chroma, cclm_params, lcu, COLOR_V, 0, false, false);
     }
 
     kvz_quantize_lcu_residual(state, has_luma, has_chroma, x, y, depth, cur_cu, lcu, false);
