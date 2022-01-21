@@ -882,7 +882,7 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
     CABAC_BIN(cabac, mip_flag, "mip_flag");
     if (mip_flag) {
       // Write MIP transpose flag & mode
-      CABAC_BIN_EP(cabac, (cur_cu->intra.mip_is_transposed), "mip_transposed");
+      CABAC_BIN_EP(cabac, mip_transpose, "mip_transposed");
       kvz_cabac_encode_trunc_bin(cabac, mip_mode, num_mip_modes);
     }
   }

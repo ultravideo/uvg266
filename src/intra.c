@@ -772,8 +772,8 @@ void kvz_mip_predict(encoder_state_t const* const state, kvz_intra_references* c
   uint16_t ups_ver_factor = height / red_pred_size;
 
   // Upsampling factors must be powers of two
-  assert(!(ups_hor_factor < 1) || ((ups_hor_factor & (ups_hor_factor - 1)) != 0) && "Horizontal upsampling factor must be power of two.");
-  assert(!(ups_ver_factor < 1) || ((ups_ver_factor & (ups_ver_factor - 1)) != 0) && "Vertical upsampling factor must be power of two.");
+  assert(!((ups_hor_factor < 1) || ((ups_hor_factor & (ups_hor_factor - 1))) != 0) && "Horizontal upsampling factor must be power of two.");
+  assert(!((ups_ver_factor < 1) || ((ups_ver_factor & (ups_ver_factor - 1))) != 0) && "Vertical upsampling factor must be power of two.");
 
   // Initialize prediction parameters END
 
@@ -823,16 +823,16 @@ void kvz_mip_predict(encoder_state_t const* const state, kvz_intra_references* c
   const bool need_upsampling = (ups_hor_factor > 1) || (ups_ver_factor > 1);
   const bool transpose = mip_transp;
 
-  uint8_t* matrix;
+  const uint8_t* matrix;
   switch (size_id) {
     case 0: 
-      matrix = &mip_matrix_4x4[mode_idx][0][0];
+      matrix = &kvz_mip_matrix_4x4[mode_idx][0][0];
       break;
     case 1: 
-      matrix = &mip_matrix_8x8[mode_idx][0][0];
+      matrix = &kvz_mip_matrix_8x8[mode_idx][0][0];
       break;
     case 2: 
-      matrix = &mip_matrix_16x16[mode_idx][0][0];
+      matrix = &kvz_mip_matrix_16x16[mode_idx][0][0];
       break;
     default:
       assert(false && "Invalid MIP size id.");

@@ -44,7 +44,7 @@
 #define MIP_OFFSET_MATRIX 32
 
 // NOTE: these matrices need to be aligned if used with avx2
-const uint8_t mip_matrix_4x4[16][16][4] =
+const uint8_t kvz_mip_matrix_4x4[16][16][4] =
 {
   {
     {   32,   30,   90,   28},
@@ -336,7 +336,7 @@ const uint8_t mip_matrix_4x4[16][16][4] =
   }
 };
 
-const uint8_t mip_matrix_8x8[8][16][8] =
+const uint8_t kvz_mip_matrix_8x8[8][16][8] =
 {
   {
     {   30,   63,   46,   37,   25,   33,   33,   34},
@@ -484,7 +484,7 @@ const uint8_t mip_matrix_8x8[8][16][8] =
   }
 };
 
-const uint8_t mip_matrix_16x16[6][64][7] =
+const uint8_t kvz_mip_matrix_16x16[6][64][7] =
 {
   {
     {   42,   37,   33,   27,   44,   33,   35},
