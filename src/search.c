@@ -161,6 +161,8 @@ static void lcu_fill_cu_info(lcu_t *lcu, int x_local, int y_local, int width, in
         to->intra.mode        = cu->intra.mode;
         to->intra.mode_chroma = cu->intra.mode_chroma;
         to->intra.multi_ref_idx = cu->intra.multi_ref_idx;
+        to->intra.mip_flag = cu->intra.mip_flag;
+        to->intra.mip_is_transposed = cu->intra.mip_is_transposed;
       } else {
         to->skipped   = cu->skipped;
         to->merged    = cu->merged;
@@ -728,8 +730,8 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       int8_t intra_trafo;
       double intra_cost;
       uint8_t multi_ref_index = 0;
-      bool mip_flag;
-      bool mip_transposed;
+      bool mip_flag = false;
+      bool mip_transposed = false;
       kvz_search_cu_intra(state, x, y, depth, lcu,
                           &intra_mode, &intra_trafo, &intra_cost, &multi_ref_index, &mip_flag, &mip_transposed);
       if (intra_cost < cost) {
@@ -754,7 +756,10 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     // mode search of adjacent CUs.
     if (cur_cu->type == CU_INTRA) {
       assert(cur_cu->part_size == SIZE_2Nx2N || cur_cu->part_size == SIZE_NxN);
-      cur_cu->intra.mode_chroma = cur_cu->intra.mode;
+      // Chroma mode must be planar if mip_flag is set.
+      if (!cur_cu->intra.mip_flag) {
+        cur_cu->intra.mode_chroma = cur_cu->intra.mode;
+      }
       lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
       kvz_intra_recon_cu(state,
                          x, y,

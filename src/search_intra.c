@@ -829,10 +829,15 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
   }
 
   // Update order according to new costs
+  kvz_sort_modes_intra_luma(modes, trafo, costs, modes_to_check);
+  bool use_mip = false;
   if (num_mip_modes) {
     kvz_sort_modes_intra_luma(mip_modes, mip_trafo, mip_costs, num_mip_modes);
+    if (costs[0] > mip_costs[0]) {
+      use_mip = true;
+    }
   }
-  kvz_sort_modes_intra_luma(modes, trafo, costs, modes_to_check);
+  
 
   // The best transform split hierarchy is not saved anywhere, so to get the
   // transform split hierarchy the search has to be performed again with the
@@ -842,9 +847,25 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
     pred_cu.depth = depth;
     pred_cu.type = CU_INTRA;
     pred_cu.part_size = ((depth == MAX_PU_DEPTH) ? SIZE_NxN : SIZE_2Nx2N);
-    pred_cu.intra.mode = modes[0];
-    pred_cu.intra.mode_chroma = modes[0];
-    pred_cu.intra.multi_ref_idx = multi_ref_idx;
+    if (use_mip) {
+      pred_cu.intra.mode = mip_modes[0];
+      pred_cu.intra.mode_chroma = 0;
+      pred_cu.intra.multi_ref_idx = 0;
+      int transp_off = num_mip_modes >> 1;
+      bool is_transposed = (mip_modes[0] >= transp_off ? true : false);
+      int8_t pred_mode = (is_transposed ? mip_modes[0] - transp_off : mip_modes[0]);
+      pred_cu.intra.mode = pred_mode;
+      pred_cu.intra.mode_chroma = 0;
+      pred_cu.intra.mip_flag = true;
+      pred_cu.intra.mip_is_transposed = is_transposed;
+    }
+    else {
+      pred_cu.intra.mode = modes[0];
+      pred_cu.intra.mode_chroma = modes[0];
+      pred_cu.intra.multi_ref_idx = multi_ref_idx;
+      pred_cu.intra.mip_flag = false;
+      pred_cu.intra.mip_is_transposed = false;
+    }
     FILL(pred_cu.cbf, 0);
     search_intra_trdepth(state, x_px, y_px, depth, tr_depth, modes[0], MAX_INT, &pred_cu, lcu, NULL, trafo[0]);
   }
@@ -1170,36 +1191,36 @@ void kvz_search_cu_intra(encoder_state_t * const state,
   double costs[MAX_REF_LINE_IDX][67];
 
   bool enable_mip = state->encoder_control->cfg.mip;
-  int8_t mip_modes[32]; // Modes [0, 15] are non-transposed. Modes [16,31] are transposed.
+  // The maximum number of mip modes is 32. Max modes can be less depending on block size.
+  // Half of the possible modes are transposed, which is indicated by a separate transpose flag
+  int8_t mip_modes[32]; 
   int8_t mip_trafo[32];
   double mip_costs[32];
+
+  // The maximum number of possible MIP modes depend on block size & shape
+  int width = LCU_WIDTH >> depth;
+  int height = width; // TODO: proper height for non-square blocks.
+  int num_mip_modes = 0;
 
   if (enable_mip) {
     for (int i = 0; i < 32; ++i) {
       mip_modes[i] = i;
       mip_costs[i] = MAX_INT;
     }
+    // MIP_TODO: check for illegal block sizes.
+    if (width == 4 && height == 4) {
+      // Mip size_id = 0. Num modes = 32
+      num_mip_modes = 32;
+    }
+    else if (width == 4 || height == 4 || (width == 8 && height == 8)) {
+      // Mip size_id = 0. Num modes = 16
+      num_mip_modes = 16;
+    }
+    else {
+      // Mip size_id = 0. Num modes = 12
+      num_mip_modes = 12;
+    }
   }
-
-  // The maximum number of possible MIP modes depend on block size & shape
-  int width = LCU_WIDTH >> depth;
-  int height = width; // TODO: proper height for non-square blocks.
-  int tmp_modes;
-  // MIP_TODO: check for illegal block sizes.
-  if (width == 4 && height == 4) {
-    // Mip size_id = 0. Num modes = 32
-    tmp_modes = 32;
-  }
-  else if (width == 4 || height == 4 || (width == 8 && height == 8)) {
-    // Mip size_id = 0. Num modes = 16
-    tmp_modes = 16;
-  }
-  else {
-    // Mip size_id = 0. Num modes = 12
-    tmp_modes = 12;
-  }
-  
-  uint8_t num_mip_modes = enable_mip ? tmp_modes : 0;
 
   // Find best intra mode for 2Nx2N.
   kvz_pixel *ref_pixels = &lcu->ref.y[lcu_px.x + lcu_px.y * LCU_WIDTH];
