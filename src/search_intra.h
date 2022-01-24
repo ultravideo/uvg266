@@ -43,10 +43,8 @@
 #include "global.h" // IWYU pragma: keep
 #include "intra.h"
 
-double kvz_mip_mode_bits(const encoder_state_t *state, int mip_mode, int num_mip_modes);
-
 double kvz_luma_mode_bits(const encoder_state_t *state, 
-                          int8_t luma_mode, const int8_t *intra_preds, uint8_t multi_ref_idx);
+                          int8_t luma_mode, const int8_t *intra_preds, uint8_t multi_ref_idx, const uint8_t num_mip_modes);
                        
 double kvz_chroma_mode_bits(const encoder_state_t *state,
                         int8_t chroma_mode, int8_t luma_mode);
