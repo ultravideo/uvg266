@@ -44,7 +44,7 @@
 #include "intra.h"
 
 double kvz_luma_mode_bits(const encoder_state_t *state, 
-                          int8_t luma_mode, const int8_t *intra_preds, uint8_t multi_ref_idx, const uint8_t num_mip_modes);
+                          int8_t luma_mode, const int8_t *intra_preds, uint8_t multi_ref_idx, const uint8_t num_mip_modes, int mip_flag_ctx_id);
                        
 double kvz_chroma_mode_bits(const encoder_state_t *state,
                         int8_t chroma_mode, int8_t luma_mode);
