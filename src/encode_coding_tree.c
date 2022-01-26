@@ -856,7 +856,7 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
 
   // Code MIP related bits
   bool enable_mip = state->encoder_control->cfg.mip;
-  bool mip_flag = enable_mip ? cur_cu->intra.mip_flag : false;
+  int8_t mip_flag = enable_mip ? cur_cu->intra.mip_flag : false;
   bool mip_transpose = enable_mip ? cur_cu->intra.mip_is_transposed : false;
   int8_t mip_mode = enable_mip ? cur_cu->intra.mode : 0;
   uint8_t num_mip_modes;
@@ -877,8 +877,34 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
   }
 
   if (cur_cu->type == CU_INTRA && !cur_cu->bdpcmMode && enable_mip) {
+    // Derive mip flag context id
+    uint8_t ctx_id = 0;
+    const int cu_width = LCU_WIDTH >> depth;
+    const int cu_height = cu_width; // TODO: height for non-square blocks
+    const int pu_x = PU_GET_X(cur_cu->part_size, cu_width, x, 0);
+    const int pu_y = PU_GET_Y(cur_cu->part_size, cu_width, y, 0);
+    const cu_info_t* left_pu = NULL;
+    const cu_info_t* above_pu = NULL;
+
+    if (pu_x > 0) {
+      assert(pu_x >> 2 > 0);
+      left_pu = kvz_cu_array_at_const(frame->cu_array, pu_x - 1, pu_y + cu_width - 1);
+    }
+    if (left_pu != NULL) {
+      ctx_id = left_pu->intra.mip_flag ? 1 : 0;
+    } 
+    // Don't take the above PU across the LCU boundary.
+    if (pu_y % LCU_WIDTH > 0 && pu_y > 0) {
+      assert(pu_y >> 2 > 0);
+      above_pu = kvz_cu_array_at_const(frame->cu_array, pu_x + cu_width - 1, pu_y - 1);
+    }
+    if (above_pu != NULL) {
+      ctx_id += above_pu->intra.mip_flag ? 1 : 0;
+    }
+    ctx_id = (cu_width > 2 * cu_height || cu_height > 2 * cu_width) ? 3 : ctx_id;
+
     // Write MIP flag
-    cabac->cur_ctx = &(cabac->ctx.mip_flag);
+    cabac->cur_ctx = &(cabac->ctx.mip_flag[ctx_id]);
     CABAC_BIN(cabac, mip_flag, "mip_flag");
     if (mip_flag) {
       // Write MIP transpose flag & mode
@@ -1050,7 +1076,7 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
   }
 
   // Code chroma prediction mode.
-  if (state->encoder_control->chroma_format != KVZ_CSP_400 && depth != 4 && !mip_flag) {
+  if (state->encoder_control->chroma_format != KVZ_CSP_400 && depth != 4) {
     encode_chroma_intra_cu(cabac, cur_cu, x, y, frame, cu_width, state->encoder_control->cfg.cclm);
   }
 
@@ -1058,7 +1084,7 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
 
   encode_mts_idx(state, cabac, cur_cu);
 
-  if (state->encoder_control->chroma_format != KVZ_CSP_400 && depth == 4 && x % 8 && y % 8 && !mip_flag) {
+  if (state->encoder_control->chroma_format != KVZ_CSP_400 && depth == 4 && x % 8 && y % 8) {
     encode_chroma_intra_cu(cabac, cur_cu, x, y, frame, cu_width, state->encoder_control->cfg.cclm);
     encode_transform_coeff(state, x, y, depth, 0, 0, 0, 1, coeff);
   }

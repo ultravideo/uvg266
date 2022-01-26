@@ -93,6 +93,13 @@ static const uint8_t MULTI_REF_LINE_MODE[4][2] = {
   {   5,   8, },
 };
 
+static const uint8_t MIP_FLAG[4][4] = {
+  {  56,  57,  50,  26, },
+  {  41,  57,  58,  26, },
+  {  33,  49,  50,  25, },
+  {   9,  10,   9,   6, },
+};
+
 static const uint8_t INIT_INTRA_LUMA_MPM_FLAG[4] = {
   44, 36, 45, 6
 };
@@ -482,6 +489,10 @@ void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
   
   kvz_ctx_init(&cabac->ctx.multi_ref_line[0], QP, MULTI_REF_LINE_MODE[slice][0], MULTI_REF_LINE_MODE[3][0]);
   kvz_ctx_init(&cabac->ctx.multi_ref_line[1], QP, MULTI_REF_LINE_MODE[slice][1], MULTI_REF_LINE_MODE[3][1]);
+
+  for (i = 0; i < 4; i++) {
+    kvz_ctx_init(&cabac->ctx.mip_flag[i], QP, MIP_FLAG[slice][i], MIP_FLAG[3][i]);
+  }
 
   kvz_ctx_init(&cabac->ctx.chroma_pred_model, QP, INIT_CHROMA_PRED_MODE[slice], INIT_CHROMA_PRED_MODE[3]);
 
