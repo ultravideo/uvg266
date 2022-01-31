@@ -777,8 +777,8 @@ void kvz_mip_predict(encoder_state_t const* const state, kvz_intra_references* c
 
   // Initialize prediction parameters END
 
-  kvz_pixel* ref_samples_top = refs->ref.top; // NOTE: in VTM code these are indexed as x + 1 & y + 1 during init
-  kvz_pixel* ref_samples_left = refs->ref.left;
+  kvz_pixel* ref_samples_top = &refs->ref.top[1]; // NOTE: in VTM code these are indexed as x + 1 & y + 1 during init
+  kvz_pixel* ref_samples_left = &refs->ref.left[1];
 
   // Compute reduced boundary with Haar-downsampling
   const int input_size = 2 * red_bdry_size;
