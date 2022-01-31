@@ -882,24 +882,17 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
     const int cu_width = LCU_WIDTH >> depth;
     const int cu_height = cu_width; // TODO: height for non-square blocks
     const int pu_x = PU_GET_X(cur_cu->part_size, cu_width, x, 0);
-    const int pu_y = PU_GET_Y(cur_cu->part_size, cu_width, y, 0);
-    const cu_info_t* left_pu = NULL;
-    const cu_info_t* above_pu = NULL;
+    const int pu_y = PU_GET_Y(cur_cu->part_size, cu_height, y, 0);
 
     if (pu_x > 0) {
       assert(pu_x >> 2 > 0);
-      left_pu = kvz_cu_array_at_const(frame->cu_array, pu_x - 1, pu_y + cu_width - 1);
+      // Get mip flag from left PU
+      ctx_id = kvz_cu_array_at_const(frame->cu_array, pu_x - 1, pu_y)->intra.mip_flag ? 1 : 0;
     }
-    if (left_pu != NULL) {
-      ctx_id = left_pu->intra.mip_flag ? 1 : 0;
-    } 
-    // Don't take the above PU across the LCU boundary.
     if (pu_y % LCU_WIDTH > 0 && pu_y > 0) {
       assert(pu_y >> 2 > 0);
-      above_pu = kvz_cu_array_at_const(frame->cu_array, pu_x + cu_width - 1, pu_y - 1);
-    }
-    if (above_pu != NULL) {
-      ctx_id += above_pu->intra.mip_flag ? 1 : 0;
+      // Get mip flag from above PU
+      ctx_id += kvz_cu_array_at_const(frame->cu_array, pu_x, pu_y - 1)->intra.mip_flag ? 1 : 0;
     }
     ctx_id = (cu_width > 2 * cu_height || cu_height > 2 * cu_width) ? 3 : ctx_id;
 
