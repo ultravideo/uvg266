@@ -546,37 +546,41 @@ void kvz_predict_cclm(
 }
 
 
+int kvz_get_mip_flag_context(int x, int y, int width, int height, lcu_t* const lcu, cu_array_t* const cu_a) {
+  assert(!(lcu && cu_a));
+  int context = 0;
+  
+  if (lcu) {
+    int x_local = SUB_SCU(x);
+    int y_local = SUB_SCU(y);
+    if (x) {
+      context += LCU_GET_CU_AT_PX(lcu, x_local - 1, y_local)->intra.mip_flag;
+    }
+    if (y) {
+      context += LCU_GET_CU_AT_PX(lcu, x_local, y_local - 1)->intra.mip_flag;
+    }
+    context = (width > 2 * height || height > 2 * width) ? 3 : context;
+  }
+  else {
+    if (x > 0) {
+      context += kvz_cu_array_at_const(cu_a, x - 1, y)->intra.mip_flag;
+    }
+    if (y > 0) {
+      context += kvz_cu_array_at_const(cu_a, x, y - 1)->intra.mip_flag;
+    }
+    context = (width > 2 * height || height > 2 * width) ? 3 : context;
+  }
+  return context;
+}
+
+
 void kvz_mip_boundary_downsampling_1D(kvz_pixel* reduced_dst, const kvz_pixel* const ref_src, int src_len, int dst_len)
 {
   if (dst_len < src_len)
   {
     // Create reduced boundary by downsampling
     uint16_t down_smp_factor = src_len / dst_len;
-
-    // Calculate floor log2. MIP_TODO: find a better / faster solution
-    int tmp = 0;
-    if (down_smp_factor & 0xffff0000) {
-      down_smp_factor >>= 16;
-      tmp += 16;
-    }
-    if (down_smp_factor & 0xff00) {
-      down_smp_factor >>= 8;
-      tmp += 8;
-    }
-    if (down_smp_factor & 0xf0) {
-      down_smp_factor >>= 4;
-      tmp += 4;
-    }
-    if (down_smp_factor & 0xc) {
-      down_smp_factor >>= 2;
-      tmp += 2;
-    }
-    if (down_smp_factor & 0x2) {
-      down_smp_factor >>= 1;
-      tmp += 1;
-    }
-
-    const int log2_factor = tmp;
+    const int log2_factor = kvz_math_floor_log2(down_smp_factor);
     const int rounding_offset = (1 << (log2_factor - 1));
 
     uint16_t src_idx = 0;
@@ -667,31 +671,7 @@ void kvz_mip_pred_upsampling_1D(kvz_pixel* const dst, const kvz_pixel* const src
                                 const uint16_t boundary_step,
                                 const uint16_t ups_factor)
 {
-  // Calculate floor log2. MIP_TODO: find a better / faster solution
-  uint16_t upsample_factor = ups_factor;
-  int tmp = 0;
-  if (upsample_factor & 0xffff0000) {
-    upsample_factor >>= 16;
-    tmp += 16;
-  }
-  if (upsample_factor & 0xff00) {
-    upsample_factor >>= 8;
-    tmp += 8;
-  }
-  if (upsample_factor & 0xf0) {
-    upsample_factor >>= 4;
-    tmp += 4;
-  }
-  if (upsample_factor & 0xc) {
-    upsample_factor >>= 2;
-    tmp += 2;
-  }
-  if (upsample_factor & 0x2) {
-    upsample_factor >>= 1;
-    tmp += 1;
-  }
-
-  const int log2_factor = tmp;
+  const int log2_factor = kvz_math_floor_log2(ups_factor);
   assert(ups_factor >= 2 && "Upsampling factor must be at least 2.");
   const int rounding_offset = 1 << (log2_factor - 1);
 

@@ -726,11 +726,11 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
 {
   const int tr_depth = CLIP(1, MAX_PU_DEPTH, depth + state->encoder_control->cfg.tr_depth_intra);
   const int width = LCU_WIDTH >> depth;
+  const int height = width; // TODO: proper height for non-square blocks
 
   kvz_pixel orig_block[LCU_WIDTH * LCU_WIDTH + 1];
 
-  // TODO: height for non-square blocks
-  kvz_pixels_blit(orig, orig_block, width, width, origstride, width);
+  kvz_pixels_blit(orig, orig_block, width, height, origstride, width);
 
   // Check that the predicted modes are in the RDO mode list
   if (modes_to_check < 67) {
@@ -756,46 +756,19 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
   }
 
   // MIP_TODO: implement this inside the standard intra for loop. Code duplication is bad.
-  // MIP_TODO: deriving mip flag context id could be done in it's own function since the exact same code is used in encode_coding_tree.c
   // MIP search
   const int transp_off = num_mip_modes >> 1;
   for (uint8_t mip_mode = 0; mip_mode < num_mip_modes; ++mip_mode) {
     // Derive mip flag context id
-    uint8_t ctx_id = 0;
-    const videoframe_t* const frame = state->tile->frame;
-    const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
-    cu_info_t* cur_cu;
-    cur_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
-    const int cu_width = width;
-    const int cu_height = cu_width; // TODO: height for non-square blocks
-    const int pu_x = PU_GET_X(cur_cu->part_size, cu_width, x_px, 0);
-    const int pu_y = PU_GET_Y(cur_cu->part_size, cu_width, y_px, 0);
-    const cu_info_t* left_pu = NULL;
-    const cu_info_t* above_pu = NULL;
-
-    if (pu_x > 0) {
-      assert(pu_x >> 2 > 0);
-      left_pu = kvz_cu_array_at_const(frame->cu_array, pu_x - 1, pu_y + cu_width - 1);
-    }
-    if (left_pu != NULL) {
-      ctx_id = left_pu->intra.mip_flag ? 1 : 0;
-    }
-    // Don't take the above PU across the LCU boundary.
-    if (pu_y % LCU_WIDTH > 0 && pu_y > 0) {
-      assert(pu_y >> 2 > 0);
-      above_pu = kvz_cu_array_at_const(frame->cu_array, pu_x + cu_width - 1, pu_y - 1);
-    }
-    if (above_pu != NULL) {
-      ctx_id += above_pu->intra.mip_flag ? 1 : 0;
-    }
-    ctx_id = (cu_width > 2 * cu_height || cu_height > 2 * cu_width) ? 3 : ctx_id;
+    uint8_t ctx_id = kvz_get_mip_flag_context(x_px, y_px, width, height, lcu, NULL);
     int rdo_bitcost = kvz_luma_mode_bits(state, mip_modes[mip_mode], intra_preds, 0, num_mip_modes, ctx_id);
 
     mip_costs[mip_mode] = rdo_bitcost * (int)(state->lambda + 0.5); // MIP_TODO: check if this is also correct in the case when MIP is used.
 
     const bool is_transposed = (mip_modes[mip_mode] >= transp_off ? true : false);
     // There can be 32 MIP modes, but only mode numbers [0, 15] are ever written to bitstream.
-    // Modes [16, 31] are indicated with the separate transpose flag.
+    // Half of the modes [16, 31] are indicated with the separate transpose flag.
+    // Number of possible modes is less for larger blocks.
     int8_t pred_mode = (is_transposed ? mip_modes[mip_mode] - transp_off : mip_modes[mip_mode]);
 
     // Perform transform split search and save mode RD cost for the best one.
@@ -1244,11 +1217,11 @@ void kvz_search_cu_intra(encoder_state_t * const state,
       num_mip_modes = 32;
     }
     else if (width == 4 || height == 4 || (width == 8 && height == 8)) {
-      // Mip size_id = 0. Num modes = 16
+      // Mip size_id = 1. Num modes = 16
       num_mip_modes = 16;
     }
     else {
-      // Mip size_id = 0. Num modes = 12
+      // Mip size_id = 2. Num modes = 12
       num_mip_modes = 12;
     }
   }
@@ -1356,6 +1329,12 @@ void kvz_search_cu_intra(encoder_state_t * const state,
       tmp_mip_flag = true;
       tmp_mip_transp = (tmp_best_mode >= (num_mip_modes >> 1)) ? 1 : 0;
     }
+  }
+
+  if (tmp_mip_flag) {
+    // Transform best mode index to proper form.
+    // Max mode index is half of max number of modes - 1 (i. e. for size id 2, max mode id is 5)
+    tmp_best_mode = (tmp_mip_transp ? tmp_best_mode - (num_mip_modes >> 1) : tmp_best_mode);
   }
 
   *mode_out =  tmp_best_mode;

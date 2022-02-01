@@ -873,28 +873,13 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
   }
 
   if (mip_flag) {
-    assert(mip_mode >= 0 && mip_mode < 16 && "MIP mode must be between [0, 15]");
+    assert(mip_mode >= 0 && mip_mode < num_mip_modes && "Invalid MIP mode.");
   }
 
   if (cur_cu->type == CU_INTRA && !cur_cu->bdpcmMode && enable_mip) {
-    // Derive mip flag context id
-    uint8_t ctx_id = 0;
     const int cu_width = LCU_WIDTH >> depth;
     const int cu_height = cu_width; // TODO: height for non-square blocks
-    const int pu_x = PU_GET_X(cur_cu->part_size, cu_width, x, 0);
-    const int pu_y = PU_GET_Y(cur_cu->part_size, cu_height, y, 0);
-
-    if (pu_x > 0) {
-      assert(pu_x >> 2 > 0);
-      // Get mip flag from left PU
-      ctx_id = kvz_cu_array_at_const(frame->cu_array, pu_x - 1, pu_y)->intra.mip_flag ? 1 : 0;
-    }
-    if (pu_y % LCU_WIDTH > 0 && pu_y > 0) {
-      assert(pu_y >> 2 > 0);
-      // Get mip flag from above PU
-      ctx_id += kvz_cu_array_at_const(frame->cu_array, pu_x, pu_y - 1)->intra.mip_flag ? 1 : 0;
-    }
-    ctx_id = (cu_width > 2 * cu_height || cu_height > 2 * cu_width) ? 3 : ctx_id;
+    uint8_t ctx_id = kvz_get_mip_flag_context(x, y, cu_width, cu_height, NULL, frame->cu_array);
 
     // Write MIP flag
     cabac->cur_ctx = &(cabac->ctx.mip_flag[ctx_id]);

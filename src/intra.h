@@ -150,6 +150,8 @@ void kvz_predict_cclm(
   cclm_parameters_t* cclm_params
 );
 
+int kvz_get_mip_flag_context(int x, int y, int width, int height, lcu_t* const lcu, cu_array_t* const cu_a);
+
 void kvz_mip_predict(
   encoder_state_t const * const state,
   kvz_intra_references * refs,
