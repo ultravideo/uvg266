@@ -328,7 +328,7 @@ static double search_intra_trdepth(encoder_state_t * const state,
           continue;
         }
       }
-
+     
       kvz_intra_recon_cu(state,
         x_px, y_px,
         depth,
@@ -870,7 +870,7 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
       pred_cu.intra.mip_is_transposed = false;
     }
     FILL(pred_cu.cbf, 0);
-    search_intra_trdepth(state, x_px, y_px, depth, tr_depth, modes[0], MAX_INT, &pred_cu, lcu, NULL, trafo[0]);
+    search_intra_trdepth(state, x_px, y_px, depth, tr_depth, pred_cu.intra.mode, MAX_INT, &pred_cu, lcu, NULL, trafo[0]);
   }
 
   return modes_to_check;

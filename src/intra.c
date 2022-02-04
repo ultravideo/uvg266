@@ -574,7 +574,7 @@ int kvz_get_mip_flag_context(int x, int y, int width, int height, lcu_t* const l
 }
 
 
-void kvz_mip_boundary_downsampling_1D(kvz_pixel* reduced_dst, const kvz_pixel* const ref_src, int src_len, int dst_len)
+void kvz_mip_boundary_downsampling_1D(int* reduced_dst, const int* const ref_src, int src_len, int dst_len)
 {
   if (dst_len < src_len)
   {
@@ -605,8 +605,8 @@ void kvz_mip_boundary_downsampling_1D(kvz_pixel* reduced_dst, const kvz_pixel* c
 }
 
 
-void kvz_mip_reduced_pred(kvz_pixel* const output,
-                          const kvz_pixel* const input,
+void kvz_mip_reduced_pred(int* const output,
+                          const int* const input,
                           const uint8_t* matrix,
                           const bool transpose,
                           const int red_bdry_size,
@@ -618,8 +618,8 @@ void kvz_mip_reduced_pred(kvz_pixel* const output,
   const int input_size = 2 * red_bdry_size;
 
   // Use local buffer for transposed result
-  kvz_pixel out_buf_transposed[LCU_WIDTH * LCU_WIDTH];
-  kvz_pixel* const out_ptr = transpose ? out_buf_transposed : output;
+  int out_buf_transposed[LCU_WIDTH * LCU_WIDTH];
+  int* const out_ptr = transpose ? out_buf_transposed : output;
 
   int sum = 0;
   for (int i = 0; i < input_size; i++) { 
@@ -664,7 +664,7 @@ void kvz_mip_reduced_pred(kvz_pixel* const output,
 }
 
 
-void kvz_mip_pred_upsampling_1D(kvz_pixel* const dst, const kvz_pixel* const src, const kvz_pixel* const boundary,
+void kvz_mip_pred_upsampling_1D(int* const dst, const int* const src, const int* const boundary,
                                 const uint16_t src_size_ups_dim, const uint16_t src_size_orth_dim,
                                 const uint16_t src_step, const uint16_t src_stride,
                                 const uint16_t dst_step, const uint16_t dst_stride,
@@ -676,15 +676,15 @@ void kvz_mip_pred_upsampling_1D(kvz_pixel* const dst, const kvz_pixel* const src
   const int rounding_offset = 1 << (log2_factor - 1);
 
   uint16_t idx_orth_dim = 0;
-  const kvz_pixel* src_line = src;
-  kvz_pixel* dst_line = dst;
-  const kvz_pixel* boundary_line = boundary + boundary_step - 1;
+  const int* src_line = src;
+  int* dst_line = dst;
+  const int* boundary_line = boundary + boundary_step - 1;
   while (idx_orth_dim < src_size_orth_dim)
   {
     uint16_t idx_upsample_dim = 0;
-    const kvz_pixel* before = boundary_line;
-    const kvz_pixel* behind = src_line;
-    kvz_pixel* cur_dst = dst_line;
+    const int* before = boundary_line;
+    const int* behind = src_line;
+    int* cur_dst = dst_line;
     while (idx_upsample_dim < src_size_ups_dim)
     {
       uint16_t pos = 1;
@@ -721,9 +721,10 @@ void kvz_mip_predict(encoder_state_t const* const state, kvz_intra_references* c
                      kvz_pixel* dst,
                      const int mip_mode, const bool mip_transp)
 {
-  // Separate this function into smaller bits if needed
+  // MIP prediction uses int values instead of kvz_pixel as some temp values may be negative
   
-  kvz_pixel* result = dst;
+  kvz_pixel* out = dst;
+  int result[32*32] = {0};
   const int mode_idx = mip_mode;
 
   // *** INPUT PREP ***
@@ -757,24 +758,29 @@ void kvz_mip_predict(encoder_state_t const* const state, kvz_intra_references* c
 
   // Initialize prediction parameters END
 
-  kvz_pixel* ref_samples_top = &refs->ref.top[1]; // NOTE: in VTM code these are indexed as x + 1 & y + 1 during init
-  kvz_pixel* ref_samples_left = &refs->ref.left[1];
+  int ref_samples_top[INTRA_REF_LENGTH]; 
+  int ref_samples_left[INTRA_REF_LENGTH];
+
+  for (int i = 0; i < INTRA_REF_LENGTH; i++) {
+    ref_samples_top[i] =  (int)refs->ref.top[i+1]; // NOTE: in VTM code these are indexed as x + 1 & y + 1 during init
+    ref_samples_left[i] = (int)refs->ref.left[i+1];
+  }
 
   // Compute reduced boundary with Haar-downsampling
   const int input_size = 2 * red_bdry_size;
 
-  kvz_pixel red_bdry[MIP_MAX_INPUT_SIZE];
-  kvz_pixel red_bdry_trans[MIP_MAX_INPUT_SIZE];
+  int red_bdry[MIP_MAX_INPUT_SIZE];
+  int red_bdry_trans[MIP_MAX_INPUT_SIZE];
 
-  kvz_pixel* const top_reduced = &red_bdry[0];
-  kvz_pixel* const left_reduced = &red_bdry[red_bdry_size];
+  int* const top_reduced = &red_bdry[0];
+  int* const left_reduced = &red_bdry[red_bdry_size];
 
   kvz_mip_boundary_downsampling_1D(top_reduced, ref_samples_top, width, red_bdry_size);
   kvz_mip_boundary_downsampling_1D(left_reduced, ref_samples_left, height, red_bdry_size);
 
   // Transposed reduced boundaries
-  kvz_pixel* const left_reduced_trans = &red_bdry_trans[0];
-  kvz_pixel* const top_reduced_trans = &red_bdry_trans[red_bdry_size];
+  int* const left_reduced_trans = &red_bdry_trans[0];
+  int* const top_reduced_trans = &red_bdry_trans[red_bdry_size];
 
   for (int x = 0; x < red_bdry_size; x++) {
     top_reduced_trans[x] = top_reduced[x];
@@ -819,18 +825,18 @@ void kvz_mip_predict(encoder_state_t const* const state, kvz_intra_references* c
   }
 
   // Max possible size is red_pred_size * red_pred_size, red_pred_size can be either 4 or 8
-  kvz_pixel red_pred_buffer[8*8];
-  kvz_pixel* const reduced_pred = need_upsampling ? red_pred_buffer : result;
+  int red_pred_buffer[8*8];
+  int* const reduced_pred = need_upsampling ? red_pred_buffer : result;
 
-  const kvz_pixel* const reduced_bdry = transpose ? red_bdry_trans : red_bdry;
+  const int* const reduced_bdry = transpose ? red_bdry_trans : red_bdry;
 
   kvz_mip_reduced_pred(reduced_pred, reduced_bdry, matrix, transpose, red_bdry_size, red_pred_size, size_id, input_offset, input_offset_trans);
   if (need_upsampling) {
-    const kvz_pixel* ver_src = reduced_pred;
+    const int* ver_src = reduced_pred;
     uint16_t ver_src_step = width;
     
     if (ups_hor_factor > 1) {
-      kvz_pixel* const hor_dst = result + (ups_ver_factor - 1) * width;
+      int* const hor_dst = result + (ups_ver_factor - 1) * width;
       ver_src = hor_dst;
       ver_src_step *= ups_ver_factor;
 
@@ -846,6 +852,11 @@ void kvz_mip_predict(encoder_state_t const* const state, kvz_intra_references* c
         ver_src_step, 1, width, 1,
         1, ups_ver_factor);
     }
+  }
+
+  // Assign and cast values from temp array to output
+  for (int i = 0; i < 32 * 32; i++) {
+    out[i] = (kvz_pixel)result[i];
   }
   // *** BLOCK PREDICT *** END
 }
@@ -1439,6 +1450,8 @@ static void intra_recon_tb_leaf(
  * \param mode_chroma   intra mode for chroma, or -1 to skip chroma recon
  * \param cur_cu        pointer to the CU, or NULL to fetch CU from LCU
  * \param cclm_params   pointer for the cclm_parameters, can be NULL if the mode is not cclm mode
+ * \param mip_flag      indicates whether the passed mode_luma is a MIP mode
+ * \param mip_transp    indicates whether the used MIP mode is transposed
  * \param lcu           containing LCU
  */
 void kvz_intra_recon_cu(
@@ -1502,6 +1515,7 @@ void kvz_intra_recon_cu(
   } else {
     const bool has_luma = mode_luma != -1;
     const bool has_chroma = mode_chroma != -1 &&  (x % 8 == 0 && y % 8 == 0);
+   
     // Process a leaf TU.
     if (has_luma) {
       intra_recon_tb_leaf(state, x, y, depth, mode_luma, cclm_params, lcu, COLOR_Y, multi_ref_index, use_mip, mip_transposed);

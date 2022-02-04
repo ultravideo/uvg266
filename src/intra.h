@@ -42,9 +42,12 @@
 #include "global.h" // IWYU pragma: keep
 #include "kvazaar.h"
 
+// Maximum possible reference line length for intra blocks
+#define INTRA_REF_LENGTH (2 * 128 + 3 + 33 * MAX_REF_LINE_IDX)
+
 typedef struct {
-  kvz_pixel left[2 * 128 + 3 + 33 * MAX_REF_LINE_IDX];
-  kvz_pixel top[2 * 128 + 3 + 33 * MAX_REF_LINE_IDX];
+  kvz_pixel left[INTRA_REF_LENGTH];
+  kvz_pixel top[INTRA_REF_LENGTH];
 } kvz_intra_ref;
 typedef struct
 {
