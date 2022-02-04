@@ -761,9 +761,9 @@ void kvz_mip_predict(encoder_state_t const* const state, kvz_intra_references* c
   int ref_samples_top[INTRA_REF_LENGTH]; 
   int ref_samples_left[INTRA_REF_LENGTH];
 
-  for (int i = 0; i < INTRA_REF_LENGTH; i++) {
-    ref_samples_top[i] =  (int)refs->ref.top[i+1]; // NOTE: in VTM code these are indexed as x + 1 & y + 1 during init
-    ref_samples_left[i] = (int)refs->ref.left[i+1];
+  for (int i = 1; i < INTRA_REF_LENGTH; i++) {
+    ref_samples_top[i-1] =  (int)refs->ref.top[i]; // NOTE: in VTM code these are indexed as x + 1 & y + 1 during init
+    ref_samples_left[i-1] = (int)refs->ref.left[i];
   }
 
   // Compute reduced boundary with Haar-downsampling
