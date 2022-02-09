@@ -364,7 +364,7 @@ static double search_intra_trdepth(encoder_state_t * const state,
         depth,
         -1, chroma_mode,
         pred_cu, cclm_params, 0, 
-        false, false,
+        pred_cu->intra.mip_flag, pred_cu->intra.mip_is_transposed,
         lcu);
       best_rd_cost += kvz_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
     }

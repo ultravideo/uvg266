@@ -742,10 +742,6 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         cur_cu->intra.multi_ref_idx = multi_ref_index;
         cur_cu->intra.mip_flag = mip_flag;
         cur_cu->intra.mip_is_transposed = mip_transposed;
-        // If a MIP mode is selected, set chroma mode to planar and skip further chroma search
-        if (mip_flag) {
-          cur_cu->intra.mode_chroma = 0;
-        }
 
         //If the CU is not split from 64x64 block, the MTS is disabled for that CU.
         cur_cu->tr_idx = (depth > 0) ? intra_trafo : 0;
@@ -756,10 +752,8 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     // mode search of adjacent CUs.
     if (cur_cu->type == CU_INTRA) {
       assert(cur_cu->part_size == SIZE_2Nx2N || cur_cu->part_size == SIZE_NxN);
-      // Chroma mode must be planar if mip_flag is set.
-      if (!cur_cu->intra.mip_flag) {
-        cur_cu->intra.mode_chroma = cur_cu->intra.mode;
-      }
+      cur_cu->intra.mode_chroma = cur_cu->intra.mode;
+      
       lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
       kvz_intra_recon_cu(state,
                          x, y,
@@ -789,7 +783,8 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
                            x & ~7, y & ~7, // TODO: as does this
                            depth,
                            -1, cur_cu->intra.mode_chroma, // skip luma
-                           NULL, cclm_params, 0, false, false,
+                           NULL, cclm_params, 0, 
+                           cur_cu->intra.mip_flag, cur_cu->intra.mip_is_transposed,
                            lcu);
       }
     } else if (cur_cu->type == CU_INTER) {
@@ -925,6 +920,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     // of the top left CU from the next depth. This should ensure that 64x64
     // gets used, at least in the most obvious cases, while avoiding any
     // searching.
+    
     if (cur_cu->type == CU_NOTSET && depth < MAX_PU_DEPTH
         && x + cu_width <= frame->width && y + cu_width <= frame->height && 0)
     {

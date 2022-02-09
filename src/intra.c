@@ -100,14 +100,23 @@ int8_t kvz_intra_get_dir_luma_predictor(
   int8_t number_of_candidates = 0;
 
   // The default mode if block is not coded yet is INTRA_PLANAR.
+  // If the neighboring blocks were MIP blocks, intra mode is set to planar.
   int8_t left_intra_dir  = 0;
   if (left_pu && left_pu->type == CU_INTRA) {
-    left_intra_dir = left_pu->intra.mode;
+    if (left_pu->intra.mip_flag) {
+      left_intra_dir = PLANAR_IDX;
+    } else {
+      left_intra_dir = left_pu->intra.mode;
+    }
   }
 
   int8_t above_intra_dir = 0;
   if (above_pu && above_pu->type == CU_INTRA && y % LCU_WIDTH != 0) {
-    above_intra_dir = above_pu->intra.mode;
+    if (above_pu->intra.mip_flag) {
+      above_intra_dir = PLANAR_IDX;
+    } else {
+      above_intra_dir = above_pu->intra.mode;
+    }
   }
 
   const int offset = 61;
@@ -715,6 +724,7 @@ void kvz_mip_pred_upsampling_1D(int* const dst, const int* const src, const int*
 
 /** \brief Matrix weighted intra prediction.
 */
+// MIP_TODO: remove color parameter if it is not used
 void kvz_mip_predict(encoder_state_t const* const state, kvz_intra_references* const refs,
                      const uint16_t pred_block_width, const uint16_t pred_block_height,
                      const color_t color,
@@ -1347,7 +1357,7 @@ static void intra_recon_tb_leaf(
   lcu_t *lcu,
   color_t color,
   uint8_t multi_ref_idx,
-  bool use_mip,
+  bool mip_flag,
   bool mip_transp)
 {
   const kvz_config *cfg = &state->encoder_control->cfg;
@@ -1395,6 +1405,21 @@ static void intra_recon_tb_leaf(
   kvz_pixel pred[32 * 32];
   int stride = state->tile->frame->source->stride;
   const bool filter_boundary = color == COLOR_Y && !(cfg->lossless && cfg->implicit_rdpcm);
+  bool use_mip = false;
+  if (mip_flag) {
+    if (color == COLOR_Y) {
+      use_mip = true;
+    } else {
+      // MIP can be used for chroma if the chroma scheme is 444
+      if (state->encoder_control->chroma_format == KVZ_CSP_444) {
+        use_mip = true;
+      } else {
+        // If MIP cannot be used for chroma, set mode to planar
+        intra_mode = 0;
+      }
+    }
+  }
+
   if(intra_mode < 68) {
     if (use_mip) {
       assert(intra_mode >= 0 && intra_mode < 16 && "MIP mode must be between [0, 15]");
@@ -1476,6 +1501,12 @@ void kvz_intra_recon_cu(
   uint8_t multi_ref_index = multi_ref_idx;
   bool use_mip = mip_flag;
   bool mip_transposed = mip_transp;
+  
+  if (mode_luma != -1 && mode_chroma != -1) {
+    if (use_mip) {
+      assert(mode_luma == mode_chroma && "Chroma mode must be derived from luma mode if block uses MIP.");
+    }
+  }
 
   // Reset CBFs because CBFs might have been set
   // for depth earlier
@@ -1521,8 +1552,8 @@ void kvz_intra_recon_cu(
       intra_recon_tb_leaf(state, x, y, depth, mode_luma, cclm_params, lcu, COLOR_Y, multi_ref_index, use_mip, mip_transposed);
     }
     if (has_chroma) {
-      intra_recon_tb_leaf(state, x, y, depth, mode_chroma, cclm_params, lcu, COLOR_U, 0, false, false);
-      intra_recon_tb_leaf(state, x, y, depth, mode_chroma, cclm_params, lcu, COLOR_V, 0, false, false);
+      intra_recon_tb_leaf(state, x, y, depth, mode_chroma, cclm_params, lcu, COLOR_U, 0, use_mip, mip_transposed);
+      intra_recon_tb_leaf(state, x, y, depth, mode_chroma, cclm_params, lcu, COLOR_V, 0, use_mip, mip_transposed);
     }
 
     kvz_quantize_lcu_residual(state, has_luma, has_chroma, x, y, depth, cur_cu, lcu, false);
