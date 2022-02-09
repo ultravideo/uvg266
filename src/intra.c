@@ -557,8 +557,11 @@ void kvz_predict_cclm(
 
 int kvz_get_mip_flag_context(int x, int y, int width, int height, lcu_t* const lcu, cu_array_t* const cu_a) {
   assert(!(lcu && cu_a));
-  int context = 0;
+  if (width > 2 * height || height > 2 * width) {
+    return 3;
+  }
   
+  int context = 0;
   if (lcu) {
     int x_local = SUB_SCU(x);
     int y_local = SUB_SCU(y);
@@ -568,7 +571,6 @@ int kvz_get_mip_flag_context(int x, int y, int width, int height, lcu_t* const l
     if (y) {
       context += LCU_GET_CU_AT_PX(lcu, x_local, y_local - 1)->intra.mip_flag;
     }
-    context = (width > 2 * height || height > 2 * width) ? 3 : context;
   }
   else {
     if (x > 0) {
@@ -577,7 +579,6 @@ int kvz_get_mip_flag_context(int x, int y, int width, int height, lcu_t* const l
     if (y > 0) {
       context += kvz_cu_array_at_const(cu_a, x, y - 1)->intra.mip_flag;
     }
-    context = (width > 2 * height || height > 2 * width) ? 3 : context;
   }
   return context;
 }
