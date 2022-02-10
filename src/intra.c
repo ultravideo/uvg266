@@ -725,10 +725,8 @@ void kvz_mip_pred_upsampling_1D(int* const dst, const int* const src, const int*
 
 /** \brief Matrix weighted intra prediction.
 */
-// MIP_TODO: remove color parameter if it is not used
 void kvz_mip_predict(encoder_state_t const* const state, kvz_intra_references* const refs,
                      const uint16_t pred_block_width, const uint16_t pred_block_height,
-                     const color_t color,
                      kvz_pixel* dst,
                      const int mip_mode, const bool mip_transp)
 {

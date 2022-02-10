@@ -160,7 +160,6 @@ void kvz_mip_predict(
   kvz_intra_references * refs,
   const uint16_t width,
   const uint16_t height,
-  const color_t color,
   kvz_pixel* dst,
   const int mip_mode,
   const bool mip_transp
