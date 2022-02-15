@@ -1422,7 +1422,7 @@ static void intra_recon_tb_leaf(
   if(intra_mode < 68) {
     if (use_mip) {
       assert(intra_mode >= 0 && intra_mode < 16 && "MIP mode must be between [0, 15]");
-      kvz_mip_predict(state, &refs, width, height, color, pred, intra_mode, mip_transp);
+      kvz_mip_predict(state, &refs, width, height, pred, intra_mode, mip_transp);
     }
     else {
       kvz_intra_predict(state, &refs, log2width, intra_mode, color, pred, filter_boundary, multi_ref_index);
