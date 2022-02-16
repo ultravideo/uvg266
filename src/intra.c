@@ -555,7 +555,7 @@ void kvz_predict_cclm(
 }
 
 
-int kvz_get_mip_flag_context(int x, int y, int width, int height, lcu_t* const lcu, cu_array_t* const cu_a) {
+int kvz_get_mip_flag_context(int x, int y, int width, int height, const lcu_t* lcu, cu_array_t* const cu_a) {
   assert(!(lcu && cu_a));
   if (width > 2 * height || height > 2 * width) {
     return 3;
