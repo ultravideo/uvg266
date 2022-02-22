@@ -667,6 +667,12 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   } else {
     WRITE_U(stream, 0, 1, "sps_mrl_enabled_flag");
   }
+
+  if (state->encoder_control->cfg.lfnst) {
+    WRITE_U(stream, 1, 1, "sps_lfnst_enabled_flag");
+  } else {
+    WRITE_U(stream, 0, 1, "sps_lfnst_enabled_flag");
+  }
   
   if (state->encoder_control->cfg.mip) {
     WRITE_U(stream, 1, 1, "sps_mip_enabled_flag");

@@ -174,6 +174,8 @@ static const struct option long_options[] = {
   { "no-mrl",                   no_argument, NULL, 0 },
   { "mip",                      no_argument, NULL, 0 },
   { "no-mip",                   no_argument, NULL, 0 },
+  { "lfnst",                    no_argument, NULL, 0 },
+  { "no-lfnst",                 no_argument, NULL, 0 },
   { "jccr",                     no_argument, NULL, 0 },
   { "no-jccr",                  no_argument, NULL, 0 },
   { "amvr",                     no_argument, NULL, 0 },
@@ -647,6 +649,7 @@ void print_help(void)
     "      --(no-)mrl             : Enable use of multiple reference lines in intra\n"
     "                               predictions.\n"
     "      --(no-)mip             : Enable matrix weighted intra prediction.\n"
+    "      --(no-)lfnst           : Enable low frequency non-separable transform. [disabled]"
     "      --mts <string>         : Multiple Transform Selection [off].\n"
     "                               (Currently only implemented for intra\n"
     "                               and has effect only when rd >= 2)\n"

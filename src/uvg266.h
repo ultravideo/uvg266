@@ -518,10 +518,12 @@ typedef struct uvg_config
   int8_t chroma_scale_out[3][17];
 
   /** \brief enable use of multiple reference lines in intra prediction */
-  int8_t mrl; 
+  int8_t mrl;
 
   /** \brief enable matrix weighted intra prediction */
   int8_t mip;
+  /** \brief enable low frequency non-separable transform */
+  int8_t lfnst;
 
 
   int8_t jccr;

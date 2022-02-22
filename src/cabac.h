@@ -73,6 +73,7 @@ typedef struct
     cabac_ctx_t alf_cc_filter_control_flag[6];
     cabac_ctx_t sao_merge_flag_model;
     cabac_ctx_t sao_type_idx_model;
+    cabac_ctx_t lfnst_idx[3];
     cabac_ctx_t mts_idx_model[4];
     cabac_ctx_t split_flag_model[9]; //!< \brief split flag context models
     cabac_ctx_t qt_split_flag_model[6]; //!< \brief qt split flag context models
