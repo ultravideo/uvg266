@@ -457,6 +457,8 @@ int uvg_quantize_residual_generic(encoder_state_t *const state,
     uvg_transform2d(state->encoder_control, residual, coeff, width, color, cur_cu);
   }
 
+  // LFNST_TODO: low freq non-linear transform is applied here, between forward transform and quantization
+
   // Quantize coeffs. (coeff -> coeff_out)
   
   if (state->encoder_control->cfg.rdoq_enable &&
