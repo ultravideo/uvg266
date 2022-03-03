@@ -44,8 +44,8 @@
 #include "image.h"
 #include "constraint.h"
 
-#define NUM_MIP_MODES_FULL(width, height) (width == 4 && height == 4) ? 32 : (width == 4 || height == 4 || (width == 8 && height == 8) ? 16 : 12)
-#define NUM_MIP_MODES_HALF(width, height) NUM_MIP_MODES_FULL(width, height) >> 1
+#define NUM_MIP_MODES_FULL(width, height) ((width) == 4 && (height) == 4) ? 32 : ((width) == 4 || (height) == 4 || ((width) == 8 && (height) == 8) ? 16 : 12)
+#define NUM_MIP_MODES_HALF(width, height) NUM_MIP_MODES_FULL((width), (height)) >> 1
 
 void kvz_sort_modes(int8_t *__restrict modes, double *__restrict costs, uint8_t length);
 void kvz_sort_modes_intra_luma(int8_t *__restrict modes, int8_t *__restrict trafo, double *__restrict costs, uint8_t length);
