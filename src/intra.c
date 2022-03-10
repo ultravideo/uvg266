@@ -562,24 +562,28 @@ int kvz_get_mip_flag_context(int x, int y, int width, int height, const lcu_t* l
   }
   
   int context = 0;
+  const cu_info_t* left = NULL;
+  const cu_info_t* top = NULL;
   if (lcu) {
     int x_local = SUB_SCU(x);
     int y_local = SUB_SCU(y);
     if (x) {
-      context += LCU_GET_CU_AT_PX(lcu, x_local - 1, y_local)->intra.mip_flag;
+      left = LCU_GET_CU_AT_PX(lcu, x_local - 1, y_local); 
     }
     if (y) {
-      context += LCU_GET_CU_AT_PX(lcu, x_local, y_local - 1)->intra.mip_flag;
+      top = LCU_GET_CU_AT_PX(lcu, x_local - 1, y_local); 
     }
   }
   else {
     if (x > 0) {
-      context += kvz_cu_array_at_const(cu_a, x - 1, y)->intra.mip_flag;
+      left = kvz_cu_array_at_const(cu_a, x - 1, y);
     }
     if (y > 0) {
-      context += kvz_cu_array_at_const(cu_a, x, y - 1)->intra.mip_flag;
+      top = kvz_cu_array_at_const(cu_a, x, y - 1);
     }
   }
+  context += left && left->type == CU_INTRA ? left->intra.mip_flag : 0;
+  context += top && top->type == CU_INTRA ? top->intra.mip_flag : 0;
   return context;
 }
 
