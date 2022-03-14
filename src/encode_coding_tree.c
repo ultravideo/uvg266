@@ -1338,7 +1338,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
   }
 
   // Prediction mode
-  if (state->frame->slicetype != KVZ_SLICE_I) {
+  if (state->frame->slicetype != KVZ_SLICE_I && cu_width != 4) {
 
     int8_t ctx_predmode = 0;
 

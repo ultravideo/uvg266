@@ -1120,6 +1120,9 @@ static void kvz_encoder_state_write_bitstream_picture_header(
     WRITE_U(stream, 0, 1, "ph_mvd_l1_zero_flag");
   }
 
+  if (encoder->cfg.jccr) {
+    WRITE_U(stream, 0, 1, "ph_joint_cbcr_sign_flag");
+  }
   // END PICTURE HEADER
 
 }
@@ -1223,7 +1226,7 @@ static void kvz_encoder_state_write_bitstream_ref_pic_list(
     }
   }
 
-  if (ref_negative > 1 || ref_positive > 1) {
+  if ( (state->frame->slicetype != KVZ_SLICE_I && ref_negative > 1 )|| ref_positive > 1) {
     WRITE_U(stream, 1, 1, "sh_num_ref_idx_active_override_flag");
     if (ref_negative > 1) for(int list = 0; list < 1 + copy_rpl1_from_rpl0; list++) WRITE_UE(stream, ref_negative - 1, "sh_num_ref_idx_active_minus1[0]");
     if (!copy_rpl1_from_rpl0 && ref_positive > 1) WRITE_UE(stream, ref_positive - 1, "sh_num_ref_idx_active_minus1[1]");
@@ -1239,7 +1242,7 @@ void kvz_encoder_state_write_bitstream_slice_header(
   const encoder_control_t * const encoder = state->encoder_control;
 
 #ifdef KVZ_DEBUG
-  printf("=========== Slice ===========\n");
+  printf("=========== Slice =========== %d\n", state->frame->poc);
 #endif
   /*
   bool first_slice_segment_in_pic = (state->slice->start_in_rs == 0);
@@ -1254,16 +1257,11 @@ void kvz_encoder_state_write_bitstream_slice_header(
 
   WRITE_U(stream, 1, 1, "picture_header_in_slice_header_flag");
 
-  kvz_encoder_state_write_bitstream_picture_header(stream, state);
-
-  if (encoder->cfg.jccr) {
-    WRITE_U(stream, 0, 1, "ph_joint_cbcr_sign_flag");
-  }
+  kvz_encoder_state_write_bitstream_picture_header(stream, state); 
 
   if (state->frame->pictype != KVZ_NAL_IDR_W_RADL
     && state->frame->pictype != KVZ_NAL_IDR_N_LP) {
     WRITE_UE(stream, state->frame->slicetype, "sh_slice_type");
-    kvz_encoder_state_write_bitstream_ref_pic_list(stream, state);
   }
 
   if (state->frame->pictype == KVZ_NAL_CRA_NUT || state->frame->pictype == KVZ_NAL_IDR_N_LP || state->frame->pictype == KVZ_NAL_IDR_W_RADL || state->frame->pictype == KVZ_NAL_GDR_NUT)
@@ -1313,6 +1311,11 @@ void kvz_encoder_state_write_bitstream_slice_header(
         }
       }
     }
+  }
+
+  if (state->frame->pictype != KVZ_NAL_IDR_W_RADL
+    && state->frame->pictype != KVZ_NAL_IDR_N_LP) {
+    kvz_encoder_state_write_bitstream_ref_pic_list(stream, state);
   }
 
   if (state->frame->slicetype != KVZ_SLICE_I && state->encoder_control->cfg.tmvp_enable) {
