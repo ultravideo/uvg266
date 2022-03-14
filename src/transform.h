@@ -85,4 +85,10 @@ void kvz_fwd_lfnst(const cu_info_t* const cur_cu,
                    const uint16_t lfnst_idx,
                    coeff_t *coeffs);
 
+void kvz_inv_lfnst(const cu_info_t* cur_cu,
+                   const int width, const int height,
+                   const uint8_t color,
+                   const uint16_t lfnst_idx,
+                   coeff_t* coeffs);
+
 #endif

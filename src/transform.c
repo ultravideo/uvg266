@@ -274,7 +274,7 @@ void kvz_fwd_lfnst(const cu_info_t* const cur_cu,
   bool mts_skip = false; // LFNST_TODO: get proper mts skip value
   bool is_cclm_mode = (intra_mode >= 67 && intra_mode <= 69);
 
-  bool is_mip = false; // LFNST_TODO: get mip flag after mip is meged to master
+  bool is_mip = false; // LFNST_TODO: get mip flag after mip is merged to master
   bool is_wide_angle = false; // TODO: get wide angle mode when implemented
 
   // TODO: add check if separate tree structure. Original vtm check: (tu.cu->isSepTree() ? true : isLuma(compID))
@@ -362,6 +362,130 @@ void kvz_fwd_lfnst(const cu_info_t* const cur_cu,
       for (y = 0; y < lfnst_coeff_num; y++) {
         coeff_tmp[*scanPtr] = *lfnst_tmp++;
         scanPtr++;
+      }
+    }
+  }
+}
+
+void kvz_inv_lfnst_NxN(coeff_t *src, coeff_t *dst, const uint32_t mode, const uint32_t index, const uint32_t size, int zero_out_size, const int max_log2_tr_dyn_range)
+{
+  const coeff_t output_min = -(1 << max_log2_tr_dyn_range);
+  const coeff_t output_max = (1 << max_log2_tr_dyn_range) - 1;
+  const int8_t *tr_mat = (size > 4) ? lfnst_8x8[mode][index][0] : lfnst_4x4[mode][index][0];
+  const int tr_size = (size > 4) ? 48 : 16;
+  coeff_t resi;
+  coeff_t *out = dst;
+  assert(index < 3);
+
+  for (int j = 0; j < tr_size; j++)
+  {
+    resi = 0;
+    const int8_t* tr_mat_tmp = tr_mat;
+    coeff_t *src_ptr = src;
+    for (int i = 0; i < zero_out_size; i++)
+    {
+      resi += *src_ptr++ * *tr_mat_tmp;
+      tr_mat_tmp += tr_size;
+    }
+    *out++ = CLIP(output_min, output_max, (resi + 64) >> 7);
+    tr_mat++;
+  }
+}
+
+void kvz_inv_lfnst(const cu_info_t *cur_cu, 
+                   const int width, const int height,
+                   const uint8_t color,
+                   const uint16_t lfnst_idx,
+                   coeff_t *coeffs)
+{
+  // In VTM, max log2 dynamic range is something in range [15, 20] depending on whether extended precision processing is enabled
+  // Such is not yet present in uvg266 so use 15 for now
+  const int max_log2_dyn_range = 15;
+  const uint32_t  lfnst_index = lfnst_idx;
+  int8_t intra_mode = (color == COLOR_Y) ? cur_cu->intra.mode : cur_cu->intra.mode_chroma;
+  bool mts_skip = false; // LFNST_TODO: get proper mts skip value
+  bool is_cclm_mode = (intra_mode >= 67 && intra_mode <= 69);
+
+  bool is_mip = false; // LFNST_TODO: get mip flag after mip is merged to master
+  bool is_wide_angle = false; // TODO: get wide angle mode when implemented
+
+  if (lfnst_index && !mts_skip && color == COLOR_Y) {
+    const uint32_t log2_block_size = kvz_g_convert_to_bit[width] + 2;
+    const bool whge3 = width >= 8 && height >= 8;
+    const uint32_t* scan = whge3 ? coef_top_left_diag_scan_8x8[log2_block_size - 1] : g_sig_last_scan_cg[log2_block_size - 1][SCAN_DIAG];
+    
+    if (is_cclm_mode) {
+      intra_mode = cur_cu->intra.mode;
+    }
+    if (is_mip) {
+      intra_mode = 0; // Set to planar mode
+    }
+    assert(intra_mode < NUM_INTRA_MODE && "LFNST: Invalid intra mode.");
+
+    if (lfnst_index < 3) {
+      if (is_wide_angle) {
+        // Transform wide angle mode to intra mode
+        intra_mode = intra_mode; // TODO: wide angle modes not implemented yet. Do nothing.
+      }
+
+      bool          transpose_flag = get_transpose_flag(intra_mode);
+      const int     sb_size = whge3 ? 8 : 4;
+      bool          tu_4x4_flag = (width == 4 && height == 4);
+      bool          tu_8x8_flag = (width == 8 && height == 8);
+      coeff_t tmp_in_matrix[48];
+      coeff_t tmp_out_matrix[48];
+      coeff_t *lfnst_tmp;
+      coeff_t *coeff_tmp;
+      int           y;
+      lfnst_tmp = tmp_in_matrix;   // inverse spectral rearrangement
+      coeff_tmp = coeffs;
+      coeff_t *dst = lfnst_tmp;
+
+      const uint32_t *scan_ptr = scan;
+      for (y = 0; y < 16; y++) {
+        *dst++ = coeff_tmp[*scan_ptr];
+        scan_ptr++;
+      }
+
+      kvz_inv_lfnst_NxN(tmp_in_matrix, tmp_out_matrix, lfnst_lut[intra_mode], lfnst_index - 1, sb_size,
+        (tu_4x4_flag || tu_8x8_flag) ? 8 : 16, max_log2_dyn_range);
+      lfnst_tmp = tmp_out_matrix;   // inverse low frequency non-separale transform
+
+      if (transpose_flag) {
+        if (sb_size == 4) {
+          for (y = 0; y < 4; y++) {
+            coeff_tmp[0] = lfnst_tmp[0];
+            coeff_tmp[1] = lfnst_tmp[4];
+            coeff_tmp[2] = lfnst_tmp[8];
+            coeff_tmp[3] = lfnst_tmp[12];
+            lfnst_tmp++;
+            coeff_tmp += width;
+          }
+        }
+        else { // ( sb_size == 8 )
+          for (y = 0; y < 8; y++) {
+            coeff_tmp[0] = lfnst_tmp[0];
+            coeff_tmp[1] = lfnst_tmp[8];
+            coeff_tmp[2] = lfnst_tmp[16];
+            coeff_tmp[3] = lfnst_tmp[24];
+            if (y < 4) {
+              coeff_tmp[4] = lfnst_tmp[32];
+              coeff_tmp[5] = lfnst_tmp[36];
+              coeff_tmp[6] = lfnst_tmp[40];
+              coeff_tmp[7] = lfnst_tmp[44];
+            }
+            lfnst_tmp++;
+            coeff_tmp += width;
+          }
+        }
+      }
+      else {
+        for (y = 0; y < sb_size; y++) {
+          uint32_t uiStride = (y < 4) ? sb_size : 4;
+          memcpy(coeff_tmp, lfnst_tmp, uiStride * sizeof(coeff_t));
+          lfnst_tmp += uiStride;
+          coeff_tmp += width;
+        }
       }
     }
   }
