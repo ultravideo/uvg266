@@ -267,6 +267,7 @@
     <ClInclude Include="..\..\src\input_frame_buffer.h" />
     <ClInclude Include="..\..\src\kvazaar_internal.h" />
     <ClInclude Include="..\..\src\kvz_math.h" />
+    <ClInclude Include="..\..\src\mip_data.h" />
     <ClInclude Include="..\..\src\ml_intra_cu_depth_pred.h" />
     <ClInclude Include="..\..\src\search_inter.h" />
     <ClInclude Include="..\..\src\search_intra.h" />

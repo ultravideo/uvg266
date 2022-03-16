@@ -854,6 +854,43 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
   //isp_mode += ((height > TR_MAX_WIDTH) || !enough_samples) ? 2 : 0;
   bool allow_isp = enough_samples;
 
+  // Code MIP related bits
+  bool enable_mip = state->encoder_control->cfg.mip;
+  int8_t mip_flag = enable_mip ? cur_cu->intra.mip_flag : false;
+  bool mip_transpose = enable_mip ? cur_cu->intra.mip_is_transposed : false;
+  int8_t mip_mode = enable_mip ? cur_cu->intra.mode : 0;
+  uint8_t num_mip_modes;
+  
+  // Number of MIP modes for this block
+  if (width == 4 && height == 4) {
+    num_mip_modes = 16;
+  }
+  else if (width == 4 || height == 4 || (width == 8 && height == 8)) {
+    num_mip_modes = 8;
+  }
+  else {
+    num_mip_modes = 6;
+  }
+
+  if (mip_flag) {
+    assert(mip_mode >= 0 && mip_mode < num_mip_modes && "Invalid MIP mode.");
+  }
+
+  if (cur_cu->type == CU_INTRA && !cur_cu->bdpcmMode && enable_mip) {
+    const int cu_width = LCU_WIDTH >> depth;
+    const int cu_height = cu_width; // TODO: height for non-square blocks
+    uint8_t ctx_id = kvz_get_mip_flag_context(x, y, cu_width, cu_height, NULL, frame->cu_array);
+
+    // Write MIP flag
+    cabac->cur_ctx = &(cabac->ctx.mip_flag[ctx_id]);
+    CABAC_BIN(cabac, mip_flag, "mip_flag");
+    if (mip_flag) {
+      // Write MIP transpose flag & mode
+      CABAC_BIN_EP(cabac, mip_transpose, "mip_transposed");
+      kvz_cabac_encode_trunc_bin(cabac, mip_mode, num_mip_modes);
+    }
+  }
+
   // Code MRL related bits
   bool enable_mrl = state->encoder_control->cfg.mrl;
   int multi_ref_idx = enable_mrl ? cur_cu->intra.multi_ref_idx : 0;
@@ -862,7 +899,7 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
   if(multi_ref_idx) DBG_YUVIEW_VALUE(state->frame->poc, DBG_YUVIEW_MRL, x, y, width, width, multi_ref_idx);
 #endif
 
-  if (cur_cu->type == CU_INTRA && (y % LCU_WIDTH) != 0 && !cur_cu->bdpcmMode && enable_mrl) {
+  if (cur_cu->type == CU_INTRA && (y % LCU_WIDTH) != 0 && !cur_cu->bdpcmMode && enable_mrl && !mip_flag) {
     if (MAX_REF_LINE_IDX > 1) {
       cabac->cur_ctx = &(cabac->ctx.multi_ref_line[0]);
       CABAC_BIN(cabac, multi_ref_idx != 0, "multi_ref_line");
@@ -875,7 +912,7 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
 
 
   // ToDo: update real usage, these if clauses as such don't make any sense
-  if (isp_mode != 0 && multi_ref_idx == 0) {
+  if (isp_mode != 0 && multi_ref_idx == 0 && !mip_flag) {
     if (isp_mode) {
       cabac->cur_ctx = &(cabac->ctx.intra_subpart_model[0]);
       CABAC_BIN(cabac, 0, "intra_subPartitions");
@@ -890,121 +927,129 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
     }
   }
 
-  // PREDINFO CODING
-  // If intra prediction mode is found from the predictors,
-  // it can be signaled with two EP's. Otherwise we can send
-  // 5 EP bins with the full predmode
-  // ToDo: fix comments for VVC
   const int cu_width = LCU_WIDTH >> depth;
-
-  cabac->cur_ctx = &(cabac->ctx.intra_luma_mpm_flag_model);
-  for (int j = 0; j < num_pred_units; ++j) {
-    const int pu_x = PU_GET_X(cur_cu->part_size, cu_width, x, j);
-    const int pu_y = PU_GET_Y(cur_cu->part_size, cu_width, y, j);
-    const cu_info_t *cur_pu = kvz_cu_array_at_const(frame->cu_array, pu_x, pu_y);
-
-    const cu_info_t *left_pu = NULL;
-    const cu_info_t *above_pu = NULL;
-
-    if (pu_x > 0) {
-      assert(pu_x >> 2 > 0);
-      left_pu = kvz_cu_array_at_const(frame->cu_array, pu_x - 1, pu_y + cu_width - 1);
-    }
-    // Don't take the above PU across the LCU boundary.
-    if (pu_y % LCU_WIDTH > 0 && pu_y > 0) {
-      assert(pu_y >> 2 > 0);
-      above_pu = kvz_cu_array_at_const(frame->cu_array, pu_x + cu_width - 1, pu_y - 1);
-    }
-
-
-    kvz_intra_get_dir_luma_predictor(pu_x, pu_y,
-                                      intra_preds[j],
-                                      cur_pu,
-                                      left_pu, above_pu);
-
-
-    intra_pred_mode_actual[j] = cur_pu->intra.mode;
-
-    for (int i = 0; i < INTRA_MPM_COUNT; i++) {
-      if (intra_preds[j][i] == intra_pred_mode[j]) {
-        mpm_preds[j] = (int8_t)i;
-        break;
-      }
-    }
-    // Is the mode in the MPM array or not
-    flag[j] = (mpm_preds[j] == -1) ? 0 : 1;
-    if (!(cur_pu->intra.multi_ref_idx || (isp_mode))) {
-      CABAC_BIN(cabac, flag[j], "prev_intra_luma_pred_flag");
-    }
-  }
-
-  for (int j = 0; j < num_pred_units; ++j) {
-    // Signal index of the prediction mode in the prediction list, if it is there
-    if (flag[j]) {
-      
+  // If MIP is used, skip writing normal intra modes
+  if (!mip_flag) {
+    // PREDINFO CODING
+    // If intra prediction mode is found from the predictors,
+    // it can be signaled with two EP's. Otherwise we can send
+    // 5 EP bins with the full predmode
+    // ToDo: fix comments for VVC
+    
+    cabac->cur_ctx = &(cabac->ctx.intra_luma_mpm_flag_model);
+    for (int j = 0; j < num_pred_units; ++j) {
       const int pu_x = PU_GET_X(cur_cu->part_size, cu_width, x, j);
       const int pu_y = PU_GET_Y(cur_cu->part_size, cu_width, y, j);
-      const cu_info_t *cur_pu = kvz_cu_array_at_const(frame->cu_array, pu_x, pu_y);
-      cabac->cur_ctx = &(cabac->ctx.luma_planar_model[(isp_mode ? 0 : 1)]);
-      if (cur_pu->intra.multi_ref_idx == 0) {
-        CABAC_BIN(cabac, (mpm_preds[j] > 0 ? 1 : 0), "mpm_idx_luma_planar");
-      }
-      //CABAC_BIN_EP(cabac, (mpm_preds[j] > 0 ? 1 : 0), "mpm_idx");
-      if (mpm_preds[j] > 0) {
-        CABAC_BIN_EP(cabac, (mpm_preds[j] > 1 ? 1 : 0), "mpm_idx");
-      }
-      if (mpm_preds[j] > 1) {
-        CABAC_BIN_EP(cabac, (mpm_preds[j] > 2 ? 1 : 0), "mpm_idx");
-      }
-      if (mpm_preds[j] > 2) {
-        CABAC_BIN_EP(cabac, (mpm_preds[j] > 3 ? 1 : 0), "mpm_idx");
-      }
-      if (mpm_preds[j] > 3) {
-        CABAC_BIN_EP(cabac, (mpm_preds[j] > 4 ? 1 : 0), "mpm_idx");
-      }
-    } else {
-      // Signal the actual prediction mode.
-      int32_t tmp_pred = intra_pred_mode[j];
+      const cu_info_t* cur_pu = kvz_cu_array_at_const(frame->cu_array, pu_x, pu_y);
 
-      uint8_t intra_preds_temp[INTRA_MPM_COUNT+2];
-      memcpy(intra_preds_temp, intra_preds[j], sizeof(int8_t)*3);
-      memcpy(intra_preds_temp+4, &intra_preds[j][3], sizeof(int8_t)*3);
-      intra_preds_temp[3] = 255;
-      intra_preds_temp[7] = 255;
+      const cu_info_t* left_pu = NULL;
+      const cu_info_t* above_pu = NULL;
 
-      // Improvised merge sort
-      // Sort prediction list from lowest to highest.
-      if (intra_preds_temp[0] > intra_preds_temp[1]) SWAP(intra_preds_temp[0], intra_preds_temp[1], uint8_t);
-      if (intra_preds_temp[0] > intra_preds_temp[2]) SWAP(intra_preds_temp[0], intra_preds_temp[2], uint8_t);
-      if (intra_preds_temp[1] > intra_preds_temp[2]) SWAP(intra_preds_temp[1], intra_preds_temp[2], uint8_t);
+      if (pu_x > 0) {
+        assert(pu_x >> 2 > 0);
+        left_pu = kvz_cu_array_at_const(frame->cu_array, pu_x - 1, pu_y + cu_width - 1);
+      }
+      // Don't take the above PU across the LCU boundary.
+      if (pu_y % LCU_WIDTH > 0 && pu_y > 0) {
+        assert(pu_y >> 2 > 0);
+        above_pu = kvz_cu_array_at_const(frame->cu_array, pu_x + cu_width - 1, pu_y - 1);
+      }
 
-      if (intra_preds_temp[4] > intra_preds_temp[5]) SWAP(intra_preds_temp[4], intra_preds_temp[5], uint8_t);
-      if (intra_preds_temp[4] > intra_preds_temp[6]) SWAP(intra_preds_temp[4], intra_preds_temp[6], uint8_t);
-      if (intra_preds_temp[5] > intra_preds_temp[6]) SWAP(intra_preds_temp[5], intra_preds_temp[6], uint8_t);
 
-      // Merge two subarrays
-      int32_t array1 = 0;
-      int32_t array2 = 4;
-      for (int item = 0; item < INTRA_MPM_COUNT; item++) {
-        if (intra_preds_temp[array1] < intra_preds_temp[array2]) {
-          intra_preds[j][item] = intra_preds_temp[array1];
-          array1++;
-        } else {
-          intra_preds[j][item] = intra_preds_temp[array2];
-          array2++;
+      kvz_intra_get_dir_luma_predictor(pu_x, pu_y,
+        intra_preds[j],
+        cur_pu,
+        left_pu, above_pu);
+
+
+      intra_pred_mode_actual[j] = cur_pu->intra.mode;
+
+      for (int i = 0; i < INTRA_MPM_COUNT; i++) {
+        if (intra_preds[j][i] == intra_pred_mode[j]) {
+          mpm_preds[j] = (int8_t)i;
+          break;
         }
       }
+      // Is the mode in the MPM array or not
+      flag[j] = (mpm_preds[j] == -1) ? 0 : 1;
+      if (!(cur_pu->intra.multi_ref_idx || (isp_mode))) {
+        CABAC_BIN(cabac, flag[j], "prev_intra_luma_pred_flag");
+      }
+    }
 
-      // Reduce the index of the signaled prediction mode according to the
-      // prediction list, as it has been already signaled that it's not one
-      // of the prediction modes.
-      for (int i = INTRA_MPM_COUNT-1; i >= 0; i--) {
-        if (tmp_pred > intra_preds[j][i]) {
-          tmp_pred--;
+    for (int j = 0; j < num_pred_units; ++j) {
+      // TODO: this loop is unnecessary in VVC. Remove in future
+      assert(j == 0 && "In VVC this loop should be run only once.");
+
+      // Signal index of the prediction mode in the prediction list, if it is there
+      if (flag[j]) {
+
+        const int pu_x = PU_GET_X(cur_cu->part_size, cu_width, x, j);
+        const int pu_y = PU_GET_Y(cur_cu->part_size, cu_width, y, j);
+        const cu_info_t* cur_pu = kvz_cu_array_at_const(frame->cu_array, pu_x, pu_y);
+        cabac->cur_ctx = &(cabac->ctx.luma_planar_model[(isp_mode ? 0 : 1)]);
+        if (cur_pu->intra.multi_ref_idx == 0) {
+          CABAC_BIN(cabac, (mpm_preds[j] > 0 ? 1 : 0), "mpm_idx_luma_planar");
+        }
+        //CABAC_BIN_EP(cabac, (mpm_preds[j] > 0 ? 1 : 0), "mpm_idx");
+        if (mpm_preds[j] > 0) {
+          CABAC_BIN_EP(cabac, (mpm_preds[j] > 1 ? 1 : 0), "mpm_idx");
+        }
+        if (mpm_preds[j] > 1) {
+          CABAC_BIN_EP(cabac, (mpm_preds[j] > 2 ? 1 : 0), "mpm_idx");
+        }
+        if (mpm_preds[j] > 2) {
+          CABAC_BIN_EP(cabac, (mpm_preds[j] > 3 ? 1 : 0), "mpm_idx");
+        }
+        if (mpm_preds[j] > 3) {
+          CABAC_BIN_EP(cabac, (mpm_preds[j] > 4 ? 1 : 0), "mpm_idx");
         }
       }
-      
-      kvz_cabac_encode_trunc_bin(cabac, tmp_pred, 67 - INTRA_MPM_COUNT);
+      else {
+        // Signal the actual prediction mode.
+        int32_t tmp_pred = intra_pred_mode[j];
+
+        uint8_t intra_preds_temp[INTRA_MPM_COUNT + 2];
+        memcpy(intra_preds_temp, intra_preds[j], sizeof(int8_t) * 3);
+        memcpy(intra_preds_temp + 4, &intra_preds[j][3], sizeof(int8_t) * 3);
+        intra_preds_temp[3] = 255;
+        intra_preds_temp[7] = 255;
+
+        // Improvised merge sort
+        // Sort prediction list from lowest to highest.
+        if (intra_preds_temp[0] > intra_preds_temp[1]) SWAP(intra_preds_temp[0], intra_preds_temp[1], uint8_t);
+        if (intra_preds_temp[0] > intra_preds_temp[2]) SWAP(intra_preds_temp[0], intra_preds_temp[2], uint8_t);
+        if (intra_preds_temp[1] > intra_preds_temp[2]) SWAP(intra_preds_temp[1], intra_preds_temp[2], uint8_t);
+
+        if (intra_preds_temp[4] > intra_preds_temp[5]) SWAP(intra_preds_temp[4], intra_preds_temp[5], uint8_t);
+        if (intra_preds_temp[4] > intra_preds_temp[6]) SWAP(intra_preds_temp[4], intra_preds_temp[6], uint8_t);
+        if (intra_preds_temp[5] > intra_preds_temp[6]) SWAP(intra_preds_temp[5], intra_preds_temp[6], uint8_t);
+
+        // Merge two subarrays
+        int32_t array1 = 0;
+        int32_t array2 = 4;
+        for (int item = 0; item < INTRA_MPM_COUNT; item++) {
+          if (intra_preds_temp[array1] < intra_preds_temp[array2]) {
+            intra_preds[j][item] = intra_preds_temp[array1];
+            array1++;
+          }
+          else {
+            intra_preds[j][item] = intra_preds_temp[array2];
+            array2++;
+          }
+        }
+
+        // Reduce the index of the signaled prediction mode according to the
+        // prediction list, as it has been already signaled that it's not one
+        // of the prediction modes.
+        for (int i = INTRA_MPM_COUNT - 1; i >= 0; i--) {
+          if (tmp_pred > intra_preds[j][i]) {
+            tmp_pred--;
+          }
+        }
+
+        kvz_cabac_encode_trunc_bin(cabac, tmp_pred, 67 - INTRA_MPM_COUNT);
+      }
     }
   }
 

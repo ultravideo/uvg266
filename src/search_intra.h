@@ -43,9 +43,8 @@
 #include "global.h" // IWYU pragma: keep
 #include "intra.h"
 
-
 double kvz_luma_mode_bits(const encoder_state_t *state, 
-                          int8_t luma_mode, const int8_t *intra_preds, uint8_t multi_ref_idx);
+                          int8_t luma_mode, const int8_t *intra_preds, uint8_t multi_ref_idx, const uint8_t num_mip_modes, int mip_flag_ctx_id);
                        
 double kvz_chroma_mode_bits(const encoder_state_t *state,
                         int8_t chroma_mode, int8_t luma_mode);
@@ -60,6 +59,8 @@ void kvz_search_cu_intra(encoder_state_t * const state,
                          int8_t *mode_out,
                          int8_t *trafo_out, 
                          double *cost_out,
-                         uint8_t *multi_ref_idx_out);
+                         uint8_t *multi_ref_idx_out,
+                         bool *mip_flag,
+                         bool *mip_transp);
 
 #endif // SEARCH_INTRA_H_

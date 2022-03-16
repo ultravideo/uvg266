@@ -161,6 +161,8 @@ static void lcu_fill_cu_info(lcu_t *lcu, int x_local, int y_local, int width, in
         to->intra.mode        = cu->intra.mode;
         to->intra.mode_chroma = cu->intra.mode_chroma;
         to->intra.multi_ref_idx = cu->intra.multi_ref_idx;
+        to->intra.mip_flag = cu->intra.mip_flag;
+        to->intra.mip_is_transposed = cu->intra.mip_is_transposed;
       } else {
         to->skipped   = cu->skipped;
         to->merged    = cu->merged;
@@ -502,7 +504,11 @@ static double calc_mode_bits(const encoder_state_t *state,
     kvz_intra_get_dir_luma_predictor(x, y, candidate_modes, cur_cu, left_cu, above_cu);
   }
 
-  double mode_bits = kvz_luma_mode_bits(state, cur_cu->intra.mode, candidate_modes, cur_cu->intra.multi_ref_idx);
+  int width = LCU_WIDTH >> depth;
+  int height = width; // TODO: height for non-square blocks
+  int num_mip_modes_half = NUM_MIP_MODES_HALF(width, height);
+  int mip_flag_ctx_id = kvz_get_mip_flag_context(x, y, width, height, lcu, NULL);
+  double mode_bits = kvz_luma_mode_bits(state, cur_cu->intra.mode, candidate_modes, cur_cu->intra.multi_ref_idx, num_mip_modes_half, mip_flag_ctx_id);
 
   if (((depth == 4 && x % 8 && y % 8) || (depth != 4)) && state->encoder_control->chroma_format != KVZ_CSP_400) {
     mode_bits += kvz_chroma_mode_bits(state, cur_cu->intra.mode_chroma, cur_cu->intra.mode);
@@ -727,14 +733,18 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       int8_t intra_trafo;
       double intra_cost;
       uint8_t multi_ref_index = 0;
+      bool mip_flag = false;
+      bool mip_transposed = false;
       kvz_search_cu_intra(state, x, y, depth, lcu,
-                          &intra_mode, &intra_trafo, &intra_cost, &multi_ref_index);
+                          &intra_mode, &intra_trafo, &intra_cost, &multi_ref_index, &mip_flag, &mip_transposed);
       if (intra_cost < cost) {
         cost = intra_cost;
         cur_cu->type = CU_INTRA;
         cur_cu->part_size = depth > MAX_DEPTH ? SIZE_NxN : SIZE_2Nx2N;
         cur_cu->intra.mode = intra_mode;
         cur_cu->intra.multi_ref_idx = multi_ref_index;
+        cur_cu->intra.mip_flag = mip_flag;
+        cur_cu->intra.mip_is_transposed = mip_transposed;
 
         //If the CU is not split from 64x64 block, the MTS is disabled for that CU.
         cur_cu->tr_idx = (depth > 0) ? intra_trafo : 0;
@@ -746,12 +756,15 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     if (cur_cu->type == CU_INTRA) {
       assert(cur_cu->part_size == SIZE_2Nx2N || cur_cu->part_size == SIZE_NxN);
       cur_cu->intra.mode_chroma = cur_cu->intra.mode;
+      
       lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
       kvz_intra_recon_cu(state,
                          x, y,
                          depth,
                          cur_cu->intra.mode, -1, // skip chroma
-                         NULL, NULL, cur_cu->intra.multi_ref_idx, lcu);
+                         NULL, NULL, cur_cu->intra.multi_ref_idx, 
+                         cur_cu->intra.mip_flag, cur_cu->intra.mip_is_transposed, 
+                         lcu);
 
       downsample_cclm_rec(
         state, x, y, cu_width / 2, cu_width / 2, lcu->rec.y, lcu->left_ref.y[64]
@@ -764,7 +777,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         // into account, so there is less of a chanse of luma mode being
         // really bad for chroma.
         cclm_parameters_t cclm_params[2];
-        if (ctrl->cfg.rdo >= 3) {
+        if (ctrl->cfg.rdo >= 3 && !cur_cu->intra.mip_flag) {
           cur_cu->intra.mode_chroma = kvz_search_cu_intra_chroma(state, x, y, depth, lcu, cclm_params);
           lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
         }
@@ -773,7 +786,9 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
                            x & ~7, y & ~7, // TODO: as does this
                            depth,
                            -1, cur_cu->intra.mode_chroma, // skip luma
-                           NULL, cclm_params, 0, lcu);
+                           NULL, cclm_params, 0, 
+                           cur_cu->intra.mip_flag, cur_cu->intra.mip_is_transposed,
+                           lcu);
       }
     } else if (cur_cu->type == CU_INTER) {
 
@@ -908,6 +923,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     // of the top left CU from the next depth. This should ensure that 64x64
     // gets used, at least in the most obvious cases, while avoiding any
     // searching.
+    
     if (cur_cu->type == CU_NOTSET && depth < MAX_PU_DEPTH
         && x + cu_width <= frame->width && y + cu_width <= frame->height && 0)
     {
@@ -933,7 +949,8 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
                            x, y,
                            depth,
                            cur_cu->intra.mode, mode_chroma,
-                           NULL,NULL, 0, lcu);
+                           NULL,NULL, 0, cur_cu->intra.mip_flag, cur_cu->intra.mip_is_transposed,
+                           lcu);
 
         cost += kvz_cu_rd_cost_luma(state, x_local, y_local, depth, cur_cu, lcu);
         if (has_chroma) {

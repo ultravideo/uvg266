@@ -42,9 +42,12 @@
 #include "global.h" // IWYU pragma: keep
 #include "kvazaar.h"
 
+// Maximum possible reference line length for intra blocks
+#define INTRA_REF_LENGTH (2 * 128 + 3 + 33 * MAX_REF_LINE_IDX)
+
 typedef struct {
-  kvz_pixel left[2 * 128 + 3 + 33 * MAX_REF_LINE_IDX];
-  kvz_pixel top[2 * 128 + 3 + 33 * MAX_REF_LINE_IDX];
+  kvz_pixel left[INTRA_REF_LENGTH];
+  kvz_pixel top[INTRA_REF_LENGTH];
 } kvz_intra_ref;
 typedef struct
 {
@@ -130,6 +133,8 @@ void kvz_intra_recon_cu(
   cu_info_t *cur_cu,
   cclm_parameters_t* cclm_params,
   uint8_t multi_ref_idx,
+  bool mip_flag,
+  bool mip_transp,
   lcu_t *lcu);
 
 
@@ -146,4 +151,16 @@ void kvz_predict_cclm(
   kvz_intra_references* chroma_ref,
   kvz_pixel* dst,
   cclm_parameters_t* cclm_params
+);
+
+int kvz_get_mip_flag_context(int x, int y, int width, int height, const lcu_t* lcu, cu_array_t* const cu_a);
+
+void kvz_mip_predict(
+  encoder_state_t const * const state,
+  kvz_intra_references * refs,
+  const uint16_t width,
+  const uint16_t height,
+  kvz_pixel* dst,
+  const int mip_mode,
+  const bool mip_transp
 );
