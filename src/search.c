@@ -870,6 +870,10 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
   cur_cu->tr_idx = 0;
   cur_cu->violates_mts_coeff_constraint = 0;
   cur_cu->mts_last_scan_pos = 0;
+  cur_cu->violates_lfnst_constrained[0] = 0;
+  cur_cu->violates_lfnst_constrained[1] = 0;
+  cur_cu->lfnst_last_scan_pos = 0;
+  cur_cu->lfnst_idx = 0;
   cur_cu->joint_cb_cr = 0;
 
   // If the CU is completely inside the frame at this depth, search for

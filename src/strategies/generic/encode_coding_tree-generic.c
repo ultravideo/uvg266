@@ -74,6 +74,7 @@ void uvg_encode_coeff_nxn_generic(encoder_state_t * const state,
 
   // CONSTANTS
 
+  const int height = width; // TODO: height for non-square blocks.
   const uint32_t log2_block_size = uvg_g_convert_to_bit[width]+2;
   const uint32_t log2_cg_size = uvg_g_log2_sbb_size[log2_block_size][log2_block_size][0] + uvg_g_log2_sbb_size[log2_block_size][log2_block_size][1];
   const uint32_t *scan =
@@ -100,7 +101,13 @@ void uvg_encode_coeff_nxn_generic(encoder_state_t * const state,
 
   last_coeff_y = (uint8_t)(pos_last / width);
   last_coeff_x = (uint8_t)(pos_last - (last_coeff_y * width));
+  bool is_chroma = !is_luma;
 
+  if (cur_cu->tr_idx != MTS_SKIP && height >= 4 && width >= 4) {
+    const int max_lfnst_pos = ((height == 4 && width == 4) || (height == 8 && width == 8)) ? 7 : 15;
+    cur_cu->violates_lfnst_constrained[is_chroma] |= scan_pos_last > max_lfnst_pos;
+    cur_cu->lfnst_last_scan_pos |= scan_pos_last >= 1;
+  }
 
   // Code last_coeff_x and last_coeff_y
   uvg_encode_last_significant_xy(cabac,

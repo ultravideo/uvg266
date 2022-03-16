@@ -164,6 +164,10 @@ typedef struct
   bool violates_mts_coeff_constraint;
   bool mts_last_scan_pos;
 
+  bool violates_lfnst_constrained[2]; // Two types, luma and chroma. Luma index is 0.
+  bool lfnst_last_scan_pos;
+  uint8_t lfnst_idx;
+
   union {
     struct {
       int8_t mode;

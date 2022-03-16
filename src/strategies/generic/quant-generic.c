@@ -426,6 +426,8 @@ int uvg_quantize_residual_generic(encoder_state_t *const state,
   assert(width <= TR_MAX_WIDTH);
   assert(width >= TR_MIN_WIDTH);
 
+  const int height = width; // TODO: height for non-square blocks
+
   // Get residual. (ref_in - pred_in -> residual)
   {
     int y, x;
@@ -457,7 +459,14 @@ int uvg_quantize_residual_generic(encoder_state_t *const state,
     uvg_transform2d(state->encoder_control, residual, coeff, width, color, cur_cu);
   }
 
-  // LFNST_TODO: low freq non-linear transform is applied here, between forward transform and quantization
+  // LFNST_TODO: lfnst index must be derived by performing search, like MTS index. Search is performed during intra search, inside search_tr_depth.
+  const uint16_t lfnst_index = 0;
+
+  if (state->encoder_control->cfg.lfnst) {
+    // Forward low frequency non-separable transform
+    kvz_fwd_lfnst(cur_cu, width, height, color, lfnst_index, coeff);
+  }
+  
 
   // Quantize coeffs. (coeff -> coeff_out)
   
@@ -503,6 +512,11 @@ int uvg_quantize_residual_generic(encoder_state_t *const state,
       uvg_itransform2d(state->encoder_control, residual, coeff, width, color, cur_cu);
     }
 
+    if (state->encoder_control->cfg.lfnst) {
+      // Inverse low frequency non-separable transform
+      kvz_inv_lfnst(cur_cu, width, height, color, lfnst_index, coeff);
+    }
+    
     if (state->tile->frame->lmcs_aps->m_sliceReshapeInfo.enableChromaAdj && color != COLOR_Y) {
       int y, x;
       int sign, absval;

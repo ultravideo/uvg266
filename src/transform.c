@@ -277,6 +277,8 @@ void kvz_fwd_lfnst(const cu_info_t* const cur_cu,
   bool is_mip = false; // LFNST_TODO: get mip flag after mip is merged to master
   bool is_wide_angle = false; // TODO: get wide angle mode when implemented
 
+  // LFNST_TODO: use kvz_get_scan_order to get scan mode instead of using SCAN_DIAG define.
+
   // TODO: add check if separate tree structure. Original vtm check: (tu.cu->isSepTree() ? true : isLuma(compID))
   if (lfnst_index && !mts_skip && color == COLOR_Y)
   {
@@ -284,8 +286,6 @@ void kvz_fwd_lfnst(const cu_info_t* const cur_cu,
     assert(log2_block_size != -1 && "LFNST: invalid block width.");
     const bool whge3 = width >= 8 && height >= 8;
     const uint32_t *scan = whge3 ? coef_top_left_diag_scan_8x8[log2_block_size - 1] : g_sig_last_scan_cg[log2_block_size - 1][SCAN_DIAG];
-
-    uint32_t* scan_ptr = NULL;
 
     if (is_cclm_mode) {
       intra_mode = cur_cu->intra.mode;
@@ -407,7 +407,9 @@ void kvz_inv_lfnst(const cu_info_t *cur_cu,
   bool is_cclm_mode = (intra_mode >= 67 && intra_mode <= 69);
 
   bool is_mip = false; // LFNST_TODO: get mip flag after mip is merged to master
-  bool is_wide_angle = false; // TODO: get wide angle mode when implemented
+  bool is_wide_angle = false; // LFNST_TODO: get wide angle mode when implemented
+
+  // LFNST_TODO: use kvz_get_scan_order to get scan mode instead of using SCAN_DIAG define.
 
   if (lfnst_index && !mts_skip && color == COLOR_Y) {
     const uint32_t log2_block_size = kvz_g_convert_to_bit[width] + 2;
@@ -425,7 +427,7 @@ void kvz_inv_lfnst(const cu_info_t *cur_cu,
     if (lfnst_index < 3) {
       if (is_wide_angle) {
         // Transform wide angle mode to intra mode
-        intra_mode = intra_mode; // TODO: wide angle modes not implemented yet. Do nothing.
+        intra_mode = intra_mode; // LFNST_TODO: wide angle modes not implemented yet. Do nothing.
       }
 
       bool          transpose_flag = get_transpose_flag(intra_mode);

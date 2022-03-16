@@ -74,7 +74,7 @@ static void encode_mts_idx(encoder_state_t * const state,
   if (is_mts_allowed(state, (cu_info_t* const )pred_cu) && mts_idx != MTS_SKIP
        && !pred_cu->violates_mts_coeff_constraint
        && pred_cu->mts_last_scan_pos
-       //&& cu.lfnstIdx == 0
+       && pred_cu->lfnst_idx == 0
     )
   {
     int symbol = mts_idx != MTS_DCT2_DCT2 ? 1 : 0;
@@ -97,6 +97,76 @@ static void encode_mts_idx(encoder_state_t * const state,
           break;
         }
       }
+    }
+  }
+}
+
+// TODO: move these defines to a proper place when ISP is implemented
+#define NOT_INTRA_SUBPARTITIONS 0
+#define HOR_INTRA_SUBPARTITIONS 1
+#define VER_INTRA_SUBPARTITIONS 2
+#define NUM_INTRA_SUBPARTITIONS_MODES 3
+#define INTRA_SUBPARTITIONS_RESERVED 4
+
+static bool is_lfnst_allowed(encoder_state_t* const state, const cu_info_t* const pred_cu, const int color,
+                             const int width, const int height) 
+{
+  if (!state->encoder_control->cfg.lfnst && pred_cu->type != CU_INTRA) {
+    return false;
+  }
+  int isp_mode = 0; // LFNST_TODO: assign proper ISP mode when ISP is implemented
+  int isp_split_type = 0;
+  const int chroma_width = width >> 1;
+  const int chroma_height = height >> 1;
+  bool can_use_lfnst_with_isp = color == COLOR_Y;
+  bool can_use_lfnst_with_mip = (width >= 16 && height >= 16);
+  const int max_tb_size = 64; // LFNST_TODO: use define instead for max transform block size
+
+  if (can_use_lfnst_with_isp) {
+    if (isp_split_type == NOT_INTRA_SUBPARTITIONS || width < 4 || height < 4) {
+      can_use_lfnst_with_isp = false;
+    }
+  }
+
+  if ((isp_mode && !can_use_lfnst_with_isp) ||                                 
+      (pred_cu->type == CU_INTRA && false && !can_use_lfnst_with_mip) || // LFNST_TODO: replace 'false' with intra mip flag when MIP is merged
+      (false && color != COLOR_Y && MIN(chroma_width, chroma_height) < 4) || // LFNST_TODO: if separate tree structure is implemented, replace 'false' with is_separate_tree check
+      (width > max_tb_size || height > max_tb_size)) {
+    return false;
+  }
+
+  return true;
+}
+
+static void encode_lfnst_idx(encoder_state_t * const state, cabac_data_t * const cabac,
+                             const cu_info_t * const pred_cu, const int color,
+                             const int width, const int height)
+{
+  
+  if (is_lfnst_allowed(state, pred_cu, color, width, height)) {
+    bool is_separate_tree = false; // LFNST_TODO: if/when separate/dual tree structure is implemented, get proper value for this 
+    bool luma_flag = is_separate_tree ? (color == COLOR_Y ? true: false) : true;
+    bool chroma_flag = is_separate_tree ? (color != COLOR_Y ? true : false) : true;
+    bool non_zero_coeff_non_ts_corner_8x8 = (luma_flag && pred_cu->violates_lfnst_constrained[0]) || (chroma_flag && pred_cu->violates_lfnst_constrained[1]);
+    bool is_tr_skip = (pred_cu->cbf && pred_cu->tr_idx == MTS_SKIP) ? true : false;
+    
+    // LFNST_TODO:                        replace this false with !pred_cu->isp_mode when ISP is implemented
+    if ((!pred_cu->lfnst_last_scan_pos && false) || non_zero_coeff_non_ts_corner_8x8 || is_tr_skip) {
+      return;
+    }
+
+    const int lfnst_index = pred_cu->lfnst_idx;
+    assert(lfnst_index < 3 && "Invalid LFNST index.");
+
+    uint16_t ctx_idx = 0;
+    if (is_separate_tree) ctx_idx++;
+
+    cabac->cur_ctx = &(cabac->ctx.lfnst_idx_model[ctx_idx]);
+    CABAC_BIN(cabac, lfnst_index ? 1 : 0, "lfnst_idx");
+
+    if (lfnst_index) {
+      cabac->cur_ctx = &(cabac->ctx.lfnst_idx_model[2]);
+      CABAC_BIN(cabac, (lfnst_index - 1) ? 1 : 0, "lfnst_idx");
     }
   }
 }
@@ -1056,11 +1126,11 @@ void uvg_encode_intra_luma_coding_unit(const encoder_state_t * const state,
       if (tmp_pred > intra_preds[i]) {
         tmp_pred--;
       }
+      kvz_cabac_encode_trunc_bin(cabac, tmp_pred, 67 - INTRA_MPM_COUNT, bits_out);
     }
+    if (cabac->only_count && bits_out) *bits_out += bits;
 
-    uvg_cabac_encode_trunc_bin(cabac, tmp_pred, 67 - INTRA_MPM_COUNT, bits_out);
-  }    
-  if (cabac->only_count && bits_out) *bits_out += bits;
+  }
 }
 
 /**
@@ -1498,6 +1568,8 @@ void uvg_encode_coding_tree(encoder_state_t * const state,
     }
 
     encode_transform_coeff(state, x, y, depth, 0, 0, 0, 0, coeff);
+
+    encode_lfnst_idx(state, cabac, cur_cu, COLOR_Y, width, height);
 
     encode_mts_idx(state, cabac, cur_cu);
 
