@@ -200,8 +200,8 @@ Compression tools:
                                    - 0: Skip intra if inter is good enough.
                                    - 1: Rough intra mode search with SATD.
                                    - 2: Refine intra mode search with SSE.
-                                   - 3: Try all intra modes and enable intra
-                                        chroma mode search.
+                                   - 3: Enable intra chroma mode search.
+                                   - 4: Try all intra modes.
       --(no-)mv-rdo          : Rate-distortion optimized motion vector costs
                                [disabled]
       --(no-)zero-coeff-rdo  : If a CU is set inter, check if forcing zero
@@ -209,6 +209,7 @@ Compression tools:
       --(no-)full-intra-search : Try all intra modes during rough search.
                                [disabled]
       --(no-)transform-skip  : Try transform skip [disabled]
+      --tr-skip-max-size     : Max log2 size of transform skip 2..5 [2]
       --me <string>          : Integer motion estimation algorithm [hexbs]
                                    - hexbs: Hexagon Based Search
                                    - tz:    Test Zone Search
@@ -266,11 +267,13 @@ Compression tools:
                                For rd=0..1: Try the first candidate.
                                For rd=2.. : Try the best candidate based
                                             on luma satd cost. [enabled]
-      --max-merge <integer>  : Maximum number of merge candidates, 1..5 [5]
+      --max-merge <integer>  : Maximum number of merge candidates, 1..6 [6]
       --(no-)implicit-rdpcm  : Implicit residual DPCM. Currently only supported
                                with lossless coding. [disabled]
       --(no-)tmvp            : Temporal motion vector prediction [enabled]
-      --mts <string>         : Multiple Transform Selection [off].
+      --(no-)mrl             : Enable use of multiple reference lines in intra
+                               predictions.
+      --(no-)mip             : Enable matrix weighted intra prediction.      --mts <string>         : Multiple Transform Selection [off].
                                (Currently only implemented for intra
                                and has effect only when rd >= 2)
                                    - off: MTS disabled
@@ -279,6 +282,13 @@ Compression tools:
                                    - both: MTS applied for both intra and inter blocks.
                                    - implicit: uses implicit MTS. Applies DST7 instead 
                                                of DCT2 to certain intra blocks.
+      --(no-)jccr            : Joint coding of chroma residual.                                Requires rdo> = 2. [disabled]
+      --(no-)cclm            : Cross component linear model. 
+                               Extra chroma prediction modes that are formed
+                               via linear transformation from the luma
+                               prediction. Requires rdo >=3. [disabled
+      --(no-)amvr            : Adaptive Motion Vector Resolution.
+                               Code some mv's with reduced resolution [disabled]
 
 Parallel processing:
       --threads <integer>    : Number of threads to use [auto]

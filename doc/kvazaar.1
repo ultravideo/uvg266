@@ -1,4 +1,4 @@
-.TH KVAZAAR "1" "July 2021" "uvg266 v2.0.0" "User Commands"
+.TH KVAZAAR "1" "March 2022" "uvg266 v2.1.0" "User Commands"
 .SH NAME
 uvg266 \- open source VVC encoder
 .SH SYNOPSIS
@@ -248,8 +248,8 @@ Intra mode search complexity [0]
     \- 0: Skip intra if inter is good enough.
     \- 1: Rough intra mode search with SATD.
     \- 2: Refine intra mode search with SSE.
-    \- 3: Try all intra modes and enable intra
-         chroma mode search.
+    \- 3: Enable intra chroma mode search.
+    \- 4: Try all intra modes.
 .TP
 \fB\-\-(no\-)mv\-rdo         
 Rate\-distortion optimized motion vector costs
@@ -265,6 +265,9 @@ Try all intra modes during rough search.
 .TP
 \fB\-\-(no\-)transform\-skip 
 Try transform skip [disabled]
+.TP
+\fB\-\-tr\-skip\-max\-size    
+Max log2 size of transform skip 2..5 [2]
 .TP
 \fB\-\-me <string>         
 Integer motion estimation algorithm [hexbs]
@@ -359,7 +362,7 @@ Try the best candidate based
              on luma satd cost. [enabled]
 .TP
 \fB\-\-max\-merge <integer> 
-Maximum number of merge candidates, 1..5 [5]
+Maximum number of merge candidates, 1..6 [6]
 .TP
 \fB\-\-(no\-)implicit\-rdpcm 
 Implicit residual DPCM. Currently only supported
@@ -368,7 +371,12 @@ with lossless coding. [disabled]
 \fB\-\-(no\-)tmvp           
 Temporal motion vector prediction [enabled]
 .TP
-\fB\-\-mts <string>        
+\fB\-\-(no\-)mrl            
+Enable use of multiple reference lines in intra
+predictions.
+.TP
+\fB\-\-(no\-)mip            
+Enable matrix weighted intra prediction.      \-\-mts <string>        
 Multiple Transform Selection [off].
 (Currently only implemented for intra
 and has effect only when rd >= 2)
@@ -378,6 +386,19 @@ and has effect only when rd >= 2)
     \- both: MTS applied for both intra and inter blocks.
     \- implicit: uses implicit MTS. Applies DST7 instead 
                 of DCT2 to certain intra blocks.
+.TP
+\fB\-\-(no\-)jccr           
+Joint coding of chroma residual.                                Requires rdo> = 2. [disabled]
+.TP
+\fB\-\-(no\-)cclm           
+Cross component linear model. 
+Extra chroma prediction modes that are formed
+via linear transformation from the luma
+prediction. Requires rdo >=3. [disabled
+.TP
+\fB\-\-(no\-)amvr           
+Adaptive Motion Vector Resolution.
+Code some mv's with reduced resolution [disabled]
 
 .SS "Parallel processing:"
 .TP
