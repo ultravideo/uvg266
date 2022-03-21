@@ -315,12 +315,12 @@ static INLINE uint32_t get_coeff_cabac_cost(
   // Take a copy of the CABAC so that we don't overwrite the contexts when
   // counting the bits.
   cabac_data_t cabac_copy;
-  memcpy(&cabac_copy, &state->cabac, sizeof(cabac_copy));
+  memcpy(&cabac_copy, &state->search_cabac, sizeof(cabac_copy));
 
   // Clear bytes and bits and set mode to "count"
   cabac_copy.only_count = 1;
-  cabac_copy.num_buffered_bytes = 0;
-  cabac_copy.bits_left = 23;
+  int num_buffered_bytes = cabac_copy.num_buffered_bytes;
+  int bits_left = cabac_copy.bits_left;
 
   // Execute the coding function.
   // It is safe to drop the const modifier since state won't be modified
@@ -343,8 +343,10 @@ static INLINE uint32_t get_coeff_cabac_cost(
       type,
       scan_mode);
   }
-
-  return (23 - cabac_copy.bits_left) + (cabac_copy.num_buffered_bytes << 3);
+  if(cabac_copy.update) {
+    memcpy((cabac_data_t *)&state->search_cabac, &cabac_copy, sizeof(cabac_copy));
+  }
+  return (bits_left - cabac_copy.bits_left) + ((cabac_copy.num_buffered_bytes - num_buffered_bytes) << 3);
 }
 
 static INLINE void save_ccc(int qp, const coeff_t *coeff, int32_t size, uint32_t ccc)
@@ -1741,37 +1743,33 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
 /**
  * Calculate cost of actual motion vectors using CABAC coding
  */
-uint32_t kvz_get_mvd_coding_cost_cabac(const encoder_state_t *state,
-                                       const cabac_data_t* cabac,
-                                       const int32_t mvd_hor,
-                                       const int32_t mvd_ver)
+double kvz_get_mvd_coding_cost_cabac(const encoder_state_t* state,
+                                     const cabac_data_t* cabac,
+                                     const int32_t mvd_hor,
+                                     const int32_t mvd_ver)
 {
   cabac_data_t cabac_copy = *cabac;
   cabac_copy.only_count = 1;
-
+  double bits = 0;
   // It is safe to drop const here because cabac->only_count is set.
-  kvz_encode_mvd((encoder_state_t*) state, &cabac_copy, mvd_hor, mvd_ver);
+  kvz_encode_mvd((encoder_state_t*) state, &cabac_copy, mvd_hor, mvd_ver, &bits);
 
-  uint32_t bitcost =
-    ((23 - cabac_copy.bits_left) + (cabac_copy.num_buffered_bytes << 3)) -
-    ((23 - cabac->bits_left)     + (cabac->num_buffered_bytes << 3));
-
-  return bitcost;
+  return bits;
 }
 
 /** MVD cost calculation with CABAC
 * \returns int
 * Calculates Motion Vector cost and related costs using CABAC coding
 */
-uint32_t kvz_calc_mvd_cost_cabac(const encoder_state_t * state,
-                                 int x,
-                                 int y,
-                                 int mv_shift,
-                                 mv_t mv_cand[2][2],
-                                 inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
-                                 int16_t num_cand,
-                                 int32_t ref_idx,
-                                 uint32_t *bitcost)
+double kvz_calc_mvd_cost_cabac(const encoder_state_t * state,
+                               int x,
+                               int y,
+                               int mv_shift,
+                               mv_t mv_cand[2][2],
+                               inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
+                               int16_t num_cand,
+                               int32_t ref_idx,
+                               double* bitcost)
 {
   cabac_data_t state_cabac_copy;
   cabac_data_t* cabac;
@@ -1798,14 +1796,13 @@ uint32_t kvz_calc_mvd_cost_cabac(const encoder_state_t * state,
   }
 
   // Store cabac state and contexts
-  memcpy(&state_cabac_copy, &state->cabac, sizeof(cabac_data_t));
+  memcpy(&state_cabac_copy, &state->search_cabac, sizeof(cabac_data_t));
 
   // Clear bytes and bits and set mode to "count"
   state_cabac_copy.only_count = 1;
-  state_cabac_copy.num_buffered_bytes = 0;
-  state_cabac_copy.bits_left = 23;
 
   cabac = &state_cabac_copy;
+  double bits = 0;
 
   if (!merged) {
     vector2d_t mvd1 = {
@@ -1820,8 +1817,8 @@ uint32_t kvz_calc_mvd_cost_cabac(const encoder_state_t * state,
     kvz_change_precision_vector2d(INTERNAL_MV_PREC, 2, &mvd1);
     kvz_change_precision_vector2d(INTERNAL_MV_PREC, 2, &mvd2);
 
-    uint32_t cand1_cost = kvz_get_mvd_coding_cost_cabac(state, cabac, mvd1.x, mvd1.y);
-    uint32_t cand2_cost = kvz_get_mvd_coding_cost_cabac(state, cabac, mvd2.x, mvd2.y);
+    double cand1_cost = kvz_get_mvd_coding_cost_cabac(state, cabac, mvd1.x, mvd1.y);
+    double cand2_cost = kvz_get_mvd_coding_cost_cabac(state, cabac, mvd2.x, mvd2.y);
 
     // Select candidate 1 if it has lower cost
     if (cand2_cost < cand1_cost) {
@@ -1834,7 +1831,7 @@ uint32_t kvz_calc_mvd_cost_cabac(const encoder_state_t * state,
 
   cabac->cur_ctx = &(cabac->ctx.cu_merge_flag_ext_model);
 
-  CABAC_BIN(cabac, merged, "MergeFlag");
+  CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.cu_merge_flag_ext_model), merged, bits, "MergeFlag");
   num_cand = state->encoder_control->cfg.max_merge;
   if (merged) {
     if (num_cand > 1) {
@@ -1842,10 +1839,10 @@ uint32_t kvz_calc_mvd_cost_cabac(const encoder_state_t * state,
       for (ui = 0; ui < num_cand - 1; ui++) {
         int32_t symbol = (ui != merge_idx);
         if (ui == 0) {
-          cabac->cur_ctx = &(cabac->ctx.cu_merge_idx_ext_model);
-          CABAC_BIN(cabac, symbol, "MergeIndex");
+          CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.cu_merge_idx_ext_model), symbol, bits, "MergeIndex");
         } else {
           CABAC_BIN_EP(cabac, symbol, "MergeIndex");
+          bits += 1;
         }
         if (symbol == 0) break;
       }
@@ -1868,24 +1865,23 @@ uint32_t kvz_calc_mvd_cost_cabac(const encoder_state_t * state,
         if (ref_list[ref_list_idx] > 1) {
           // parseRefFrmIdx
           int32_t ref_frame = ref_idx;
-
-          cabac->cur_ctx = &(cabac->ctx.cu_ref_pic_model[0]);
-          CABAC_BIN(cabac, (ref_frame != 0), "ref_idx_lX");
+          
+          CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.cu_ref_pic_model[0]), (ref_frame != 0), bits, "ref_idx_lX");
 
           if (ref_frame > 0) {
             int32_t i;
             int32_t ref_num = ref_list[ref_list_idx] - 2;
-
-            cabac->cur_ctx = &(cabac->ctx.cu_ref_pic_model[1]);
+            
             ref_frame--;
 
             for (i = 0; i < ref_num; ++i) {
               const uint32_t symbol = (i == ref_frame) ? 0 : 1;
 
               if (i == 0) {
-                CABAC_BIN(cabac, symbol, "ref_idx_lX");
+                CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.cu_ref_pic_model[1]), symbol, bits, "ref_idx_lX");
               } else {
                 CABAC_BIN_EP(cabac, symbol, "ref_idx_lX");
+                bits += 1;
               }
               if (symbol == 0) break;
             }
@@ -1895,7 +1891,7 @@ uint32_t kvz_calc_mvd_cost_cabac(const encoder_state_t * state,
         // ToDo: Bidir vector support
         if (!(state->frame->ref_list == REF_PIC_LIST_1 && /*cur_cu->inter.mv_dir == 3*/ 0)) {
           // It is safe to drop const here because cabac->only_count is set.
-          kvz_encode_mvd((encoder_state_t*) state, cabac, mvd.x, mvd.y);
+          kvz_encode_mvd((encoder_state_t*) state, cabac, mvd.x, mvd.y, &bits);
         }
 
         // Signal which candidate MV to use
@@ -1905,10 +1901,10 @@ uint32_t kvz_calc_mvd_cost_cabac(const encoder_state_t * state,
     }
   }
 
-  *bitcost = (23 - state_cabac_copy.bits_left) + (state_cabac_copy.num_buffered_bytes << 3);
+  *bitcost = bits;
 
   // Store bitcost before restoring cabac
-  return *bitcost * (uint32_t)(state->lambda_sqrt + 0.5);
+  return *bitcost * state->lambda_sqrt;
 }
 
 void kvz_close_rdcost_outfiles(void)

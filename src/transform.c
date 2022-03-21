@@ -260,11 +260,9 @@ int kvz_quantize_residual_trskip(
   struct {
     kvz_pixel rec[LCU_WIDTH * LCU_WIDTH];
     coeff_t coeff[LCU_WIDTH * LCU_WIDTH];
-    uint32_t cost;
+    double cost;
     int has_coeffs;
   } skip, *best;
-
-  const int bit_cost = (int)(state->lambda + 0.5);
   
   //noskip.has_coeffs = kvz_quantize_residual(
   //    state, cur_cu, width, color, scan_order,
@@ -278,7 +276,7 @@ int kvz_quantize_residual_trskip(
     1, in_stride, width,
     ref_in, pred_in, skip.rec, skip.coeff, false, lmcs_chroma_adj);
   skip.cost = kvz_pixels_calc_ssd(ref_in, skip.rec, in_stride, width, width);
-  skip.cost += kvz_get_coeff_cost(state, skip.coeff, width, 0, scan_order, 1) * bit_cost;
+  skip.cost += kvz_get_coeff_cost(state, skip.coeff, width, 0, scan_order, 1) * state->frame->lambda;
 
 /*  if (noskip.cost <= skip.cost) {
     *trskip_out = 0;

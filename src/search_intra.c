@@ -97,13 +97,13 @@ static double get_cost(encoder_state_t * const state,
 
     // Add the offset bit costs of signaling 'luma and chroma use trskip',
     // versus signaling 'luma and chroma don't use trskip' to the SAD cost.
-    const cabac_ctx_t *ctx = &state->cabac.ctx.transform_skip_model_luma;
+    const cabac_ctx_t *ctx = &state->search_cabac.ctx.transform_skip_model_luma;
     double trskip_bits = CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0);
 
     
     // ToDo: Check cost
     if (state->encoder_control->chroma_format != KVZ_CSP_400) {
-      ctx = &state->cabac.ctx.transform_skip_model_chroma;
+      ctx = &state->search_cabac.ctx.transform_skip_model_chroma;
       trskip_bits += 2.0 * (CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0));
     }
     
@@ -394,7 +394,7 @@ static double search_intra_trdepth(encoder_state_t * const state,
   //     max_depth.
   // - Min transform size hasn't been reached (MAX_PU_DEPTH).
   if (depth < max_depth && depth < MAX_PU_DEPTH) {
-    split_cost = 3 * state->lambda;
+    split_cost = 0;
 
     split_cost += search_intra_trdepth(state, x_px, y_px, depth + 1, max_depth, intra_mode, nosplit_cost, pred_cu, lcu, cclm_params, -1);
     if (split_cost < nosplit_cost) {
@@ -417,14 +417,15 @@ static double search_intra_trdepth(encoder_state_t * const state,
     // so this will code cbf as 0 and not code the cbf at all for descendants.
     if (state->encoder_control->chroma_format != KVZ_CSP_400) {
       const uint8_t tr_depth = depth - pred_cu->depth;
+      cabac_data_t* cabac = (cabac_data_t *)&state->search_cabac;
 
-      const cabac_ctx_t* ctx = &(state->cabac.ctx.qt_cbf_model_cb[0]);
+      cabac_ctx_t* ctx = &(cabac->ctx.qt_cbf_model_cb[0]);
       if (tr_depth == 0 || cbf_is_set(pred_cu->cbf, depth - 1, COLOR_U)) {
-        cbf_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf, depth, COLOR_U));
+        CABAC_FBITS_UPDATE(cabac, ctx, cbf_is_set(pred_cu->cbf, depth, COLOR_U), cbf_bits, "cbf_cb");
       }
       ctx = &(state->cabac.ctx.qt_cbf_model_cr[cbf_is_set(pred_cu->cbf, depth, COLOR_U)]);
       if (tr_depth == 0 || cbf_is_set(pred_cu->cbf, depth - 1, COLOR_V)) {
-        cbf_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf, depth, COLOR_V));
+        CABAC_FBITS_UPDATE(cabac, ctx, cbf_is_set(pred_cu->cbf, depth, COLOR_V), cbf_bits, "cbf_cr");
       }
     }
 
@@ -677,9 +678,8 @@ static int8_t search_intra_rough(encoder_state_t * const state,
 
   // Add prediction mode coding cost as the last thing. We don't want this
   // affecting the halving search.
-  int lambda_cost = (int)(state->lambda_sqrt + 0.5);
   for (int mode_i = 0; mode_i < modes_selected; ++mode_i) {
-    costs[mode_i] += lambda_cost * kvz_luma_mode_bits(state, modes[mode_i], intra_preds, 0, 0, 0);
+    costs[mode_i] += state->lambda_sqrt * kvz_luma_mode_bits(state, modes[mode_i], intra_preds, 0, 0, 0);
   }
 
   #undef PARALLEL_BLKS
@@ -771,7 +771,7 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
       int rdo_bitcost = kvz_luma_mode_bits(state, mode, intra_preds, multi_ref_index, transp_off, ctx_id);
 
       *mode_cost_p = rdo_bitcost * (int)(state->lambda + 0.5);
-
+    
       // Mip related stuff
       // There can be 32 MIP modes, but only mode numbers [0, 15] are ever written to bitstream.
       // Half of the modes [16, 31] are indicated with the separate transpose flag.
@@ -818,6 +818,7 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
   }
   
 
+
   // The best transform split hierarchy is not saved anywhere, so to get the
   // transform split hierarchy the search has to be performed again with the
   // best mode.
@@ -854,7 +855,8 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
 
 double kvz_luma_mode_bits(const encoder_state_t *state, int8_t luma_mode, const int8_t *intra_preds, const uint8_t multi_ref_idx, const uint8_t num_mip_modes_half, int mip_flag_ctx_id)
 {
-  double mode_bits = 0.0;
+  cabac_data_t* cabac = (cabac_data_t *)&state->search_cabac;
+  double mode_bits = 0;
 
   bool enable_mip = state->encoder_control->cfg.mip;
   bool mip_flag = enable_mip ? (num_mip_modes_half > 0 ? true : false) : false;
@@ -899,11 +901,26 @@ double kvz_luma_mode_bits(const encoder_state_t *state, int8_t luma_mode, const 
         break;
       }
     }
+  cabac_ctx_t *ctx = &(cabac->ctx.luma_planar_model[1]);
+  CABAC_FBITS_UPDATE(cabac, ctx, mode_in_preds, mode_bits, "prev_intra_luma_pred_flag_search");
+  if (state->search_cabac.update) {
+    if(mode_in_preds) {
+      CABAC_BIN_EP(cabac, !(luma_mode == intra_preds[0]), "mpm_idx");
+      if(luma_mode != intra_preds[0]) {
+        CABAC_BIN_EP(cabac, !(luma_mode == intra_preds[1]), "mpm_idx");        
+      }
+    }
+    else {
+      // This value should be transformed for actual coding,
+      // but here the value does not actually matter, just that we write 5 bits
+      CABAC_BINS_EP(cabac, luma_mode, 5, "rem_intra_luma_pred_mode");
+    }
+  }
 
     bool enable_mrl = state->encoder_control->cfg.mrl;
     uint8_t multi_ref_index = enable_mrl ? multi_ref_idx : 0;
 
-    const cabac_ctx_t* ctx = &(state->cabac.ctx.intra_luma_mpm_flag_model);
+    ctx = &(cabac->ctx.intra_luma_mpm_flag_model);
 
     if (multi_ref_index == 0) {
       mode_bits += CTX_ENTROPY_FBITS(ctx, mode_in_preds != -1);
@@ -911,17 +928,17 @@ double kvz_luma_mode_bits(const encoder_state_t *state, int8_t luma_mode, const 
 
     // Add MRL bits.
     if (enable_mrl && MAX_REF_LINE_IDX > 1) {
-      ctx = &(state->cabac.ctx.multi_ref_line[0]);
+      ctx = &(cabac->ctx.multi_ref_line[0]);
       mode_bits += CTX_ENTROPY_FBITS(ctx, multi_ref_index != 0);
 
       if (multi_ref_index != 0 && MAX_REF_LINE_IDX > 2) {
-        ctx = &(state->cabac.ctx.multi_ref_line[1]);
+        ctx = &(cabac->ctx.multi_ref_line[1]);
         mode_bits += CTX_ENTROPY_FBITS(ctx, multi_ref_index != 1);
       }
     }
 
     if (mode_in_preds != -1 || multi_ref_index != 0) {
-      ctx = &(state->cabac.ctx.luma_planar_model[0]);
+      ctx = &(cabac->ctx.luma_planar_model[0]);
       if (multi_ref_index == 0) {
         mode_bits += CTX_ENTROPY_FBITS(ctx, mode_in_preds > 0);
       }
@@ -938,7 +955,8 @@ double kvz_luma_mode_bits(const encoder_state_t *state, int8_t luma_mode, const 
 
 double kvz_chroma_mode_bits(const encoder_state_t *state, int8_t chroma_mode, int8_t luma_mode)
 {
-  const cabac_ctx_t *ctx = &(state->cabac.ctx.chroma_pred_model);
+  cabac_data_t* cabac = (cabac_data_t*)&state->search_cabac;
+  const cabac_ctx_t *ctx = &(cabac->ctx.chroma_pred_model);
   double mode_bits;
   if (chroma_mode == luma_mode) {
     mode_bits = CTX_ENTROPY_FBITS(ctx, 0);
@@ -956,6 +974,13 @@ double kvz_chroma_mode_bits(const encoder_state_t *state, int8_t chroma_mode, in
   if(state->encoder_control->cfg.cclm) {
     ctx = &(state->cabac.ctx.cclm_flag);
     mode_bits += CTX_ENTROPY_FBITS(ctx, chroma_mode > 67);
+  }
+
+  if(cabac->update) {
+    if(chroma_mode != luma_mode) {
+      // Again it does not matter what we actually write here
+      CABAC_BINS_EP(cabac, 0, 2, "intra_chroma_pred_mode");      
+    }
   }
 
   return mode_bits;
@@ -1045,9 +1070,11 @@ int8_t kvz_search_intra_chroma_rdo(encoder_state_t * const state,
           -1, chroma.mode, // skip luma
           NULL, cclm_params, 0, false, false, lcu);
       }
+      double bits = 0;
       chroma.cost = kvz_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, tr_cu, lcu);
 
       double mode_bits = kvz_chroma_mode_bits(state, chroma.mode, intra_mode);
+      bits += mode_bits;
       chroma.cost += mode_bits * state->lambda;
 
       if (chroma.cost < best_chroma.cost) {

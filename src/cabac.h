@@ -59,7 +59,8 @@ typedef struct
   uint32_t   buffered_byte;
   int32_t    num_buffered_bytes;
   int32_t    bits_left;
-  int8_t     only_count;
+  int8_t     only_count : 4;
+  int8_t     update : 4;
   bitstream_t *stream;
 
   // CONTEXTS
@@ -140,11 +141,11 @@ void kvz_cabac_write(cabac_data_t *data);
 void kvz_cabac_finish(cabac_data_t *data);
 void kvz_cabac_write_coeff_remain(cabac_data_t *cabac, uint32_t symbol,
                               uint32_t r_param, const unsigned int cutoff);
-void kvz_cabac_write_ep_ex_golomb(struct encoder_state_t * const state, cabac_data_t *data,
+uint32_t kvz_cabac_write_ep_ex_golomb(struct encoder_state_t * const state, cabac_data_t *data,
                 uint32_t symbol, uint32_t count);
 void kvz_cabac_write_unary_max_symbol(cabac_data_t *data, cabac_ctx_t *ctx,
-                                  uint32_t symbol, int32_t offset,
-                                  uint32_t max_symbol);
+                                      uint32_t symbol, int32_t offset,
+                                      uint32_t max_symbol, double* bits_out);
 void kvz_cabac_write_unary_max_symbol_ep(cabac_data_t *data, unsigned int symbol, unsigned int max_symbol);
 
 #define CTX_PROB_BITS 15
@@ -152,6 +153,18 @@ void kvz_cabac_write_unary_max_symbol_ep(cabac_data_t *data, unsigned int symbol
 #define CTX_PROB_BITS_1 14
 #define CTX_MASK_0 (~(~0u << CTX_PROB_BITS_0) << (CTX_PROB_BITS - CTX_PROB_BITS_0))
 #define CTX_MASK_1 (~(~0u << CTX_PROB_BITS_1) << (CTX_PROB_BITS - CTX_PROB_BITS_1))
+
+// Floating point fractional bits, derived from kvz_entropy_bits
+extern const float kvz_f_entropy_bits[512];
+#define CTX_ENTROPY_FBITS(ctx, val) kvz_f_entropy_bits[(CTX_STATE(ctx)<<1) ^ (val)]
+
+#define CABAC_FBITS_UPDATE(cabac, ctx, val, bits, name) do { \
+  if((cabac)->only_count) (bits) += kvz_f_entropy_bits[(CTX_STATE(ctx)<<1) ^ (val)]; \
+  if((cabac)->update) {\
+    (cabac)->cur_ctx = ctx;\
+    CABAC_BIN((cabac), (val), (name));\
+  } \
+} while(0)
 
 // Macros
 #define CTX_GET_STATE(ctx) ( (ctx)->state[0]+(ctx)->state[1] )

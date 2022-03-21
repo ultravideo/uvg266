@@ -145,6 +145,7 @@ static const struct option long_options[] = {
   { "force-level",        required_argument, NULL, 0 },
   { "high-tier",                no_argument, NULL, 0 },
   { "me-steps",           required_argument, NULL, 0 },
+  { "roi-file",           required_argument, NULL, 0 },
   { "fast-residual-cost", required_argument, NULL, 0 },
   { "set-qp-in-cu",             no_argument, NULL, 0 },
   { "open-gop",                 no_argument, NULL, 0 },
@@ -183,6 +184,10 @@ static const struct option long_options[] = {
   { "no-amvr",                  no_argument, NULL, 0 },
   { "cclm",                     no_argument, NULL, 0 },
   { "no-cclm",                  no_argument, NULL, 0 },
+  { "combine-intra-cus",        no_argument, NULL, 0 },
+  { "no-combine-intra-cus",     no_argument, NULL, 0 },
+  { "force-inter",              no_argument, NULL, 0 },
+  { "no-force-inter",           no_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 
@@ -504,11 +509,20 @@ void print_help(void)
     "                                   - frametile: Constrain within the tile.\n"
     "                                   - frametilemargin: Constrain even more.\n"
     "      --roi <filename>       : Use a delta QP map for region of interest.\n"
-    "                               Reads an array of delta QP values from a text\n"
-    "                               file. The file format is: width and height of\n"
-    "                               the QP delta map followed by width*height delta\n"
-    "                               QP values in raster order. The map can be of any\n"
-    "                               size and will be scaled to the video size.\n"
+    "                               Reads an array of delta QP values from a file.\n"
+    "                               Text and binary files are supported and detected\n"
+    "                               from the file extension (.txt/.bin). If a known\n"
+    "                               extension is not found, the file is treated as\n"
+    "                               a text file. The file can include one or many\n"
+    "                               ROI frames each in the following format:\n"
+    "                               width and height of the QP delta map followed\n"
+    "                               by width * height delta QP values in raster\n"
+    "                               order. In binary format, width and height are\n"
+    "                               32-bit integers whereas the delta QP values are\n"
+    "                               signed 8-bit values. The map can be of any size\n"
+    "                               and will be scaled to the video size. The file\n"
+    "                               reading will loop if end of the file is reached.\n"
+    "                               See roi.txt in the examples folder.\n"
     "      --set-qp-in-cu         : Set QP at CU level keeping pic_init_qp_minus26.\n"
     "                               in PPS and slice_qp_delta in slize header zero.\n"
     "      --(no-)erp-aqp         : Use adaptive QP for 360 degree video with\n"
@@ -594,6 +608,16 @@ void print_help(void)
     "      --ml-pu-depth-intra    : Predict the pu-depth-intra using machine\n"
     "                                learning trees, overrides the\n"
     "                                --pu-depth-intra parameter. [disabled]\n"
+    "      --(no-)combine-intra-cus: Whether the encoder tries to code a cu\n"
+    "                                   on lower depth even when search is not\n"
+    "                                   performed on said depth. Should only\n"
+    "                                   be disabled if cus absolutely must not\n"
+    "                                   be larger than limited by the search.\n"
+    "                                   [enabled]"
+    "      --force-inter          : Force the encoder to use inter always.\n"
+    "                               This is mostly for debugging and is not\n"
+    "                               guaranteed to produce sensible bitstream or\n"
+    "                               work at all. [disabled]"
     "      --tr-depth-intra <int> : Transform split depth for intra blocks [0]\n"
     "      --(no-)bipred          : Bi-prediction [disabled]\n"
     "      --cu-split-termination <string> : CU split search termination [zero]\n"
