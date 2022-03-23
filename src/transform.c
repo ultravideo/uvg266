@@ -479,15 +479,17 @@ static void quantize_tr_residual(encoder_state_t * const state,
  * - lcu->cbf               coded block flags for the area
  * - lcu->cu.intra.tr_skip  tr skip flags for the area (in case of luma)
  */
-void kvz_quantize_lcu_residual(encoder_state_t * const state,
-                               const bool luma,
-                               const bool chroma,
-                               const int32_t x,
-                               const int32_t y,
-                               const uint8_t depth,
-                               cu_info_t *cur_pu,
-                               lcu_t* lcu,
-                               bool early_skip)
+void kvz_quantize_lcu_residual(
+  encoder_state_t * const state,
+  const bool luma,
+  const bool chroma,
+  const bool jccr,
+  const int32_t x,
+  const int32_t y,
+  const uint8_t depth,
+  cu_info_t *cur_pu,
+  lcu_t* lcu,
+  bool early_skip)
 {
   const int32_t width = LCU_WIDTH >> depth;
   const vector2d_t lcu_px  = { SUB_SCU(x), SUB_SCU(y) };
@@ -509,7 +511,7 @@ void kvz_quantize_lcu_residual(encoder_state_t * const state,
   if (luma) {
     cbf_clear(&cur_pu->cbf, depth, COLOR_Y);
   }
-  if (chroma) {
+  if (chroma || jccr) {
     cbf_clear(&cur_pu->cbf, depth, COLOR_U);
     cbf_clear(&cur_pu->cbf, depth, COLOR_V);
   }
@@ -521,10 +523,11 @@ void kvz_quantize_lcu_residual(encoder_state_t * const state,
     const int32_t x2 = x + offset;
     const int32_t y2 = y + offset;
 
-    kvz_quantize_lcu_residual(state, luma, chroma, x,  y,  depth + 1, NULL, lcu, early_skip);
-    kvz_quantize_lcu_residual(state, luma, chroma, x2, y,  depth + 1, NULL, lcu, early_skip);
-    kvz_quantize_lcu_residual(state, luma, chroma, x,  y2, depth + 1, NULL, lcu, early_skip);
-    kvz_quantize_lcu_residual(state, luma, chroma, x2, y2, depth + 1, NULL, lcu, early_skip);
+    // jccr is currently not supported if transform is split
+    kvz_quantize_lcu_residual(state, luma, chroma, 0,  x,  y, depth + 1, NULL, lcu, early_skip);
+    kvz_quantize_lcu_residual(state, luma, chroma, 0, x2,  y, depth + 1, NULL, lcu, early_skip);
+    kvz_quantize_lcu_residual(state, luma, chroma, 0,  x, y2, depth + 1, NULL, lcu, early_skip);
+    kvz_quantize_lcu_residual(state, luma, chroma, 0, x2, y2, depth + 1, NULL, lcu, early_skip);
 
     // Propagate coded block flags from child CUs to parent CU.
     uint16_t child_cbfs[3] = {
@@ -546,10 +549,10 @@ void kvz_quantize_lcu_residual(encoder_state_t * const state,
     }
     if (chroma) {
       quantize_tr_residual(state, COLOR_U, x, y, depth, cur_pu, lcu, early_skip);
-      quantize_tr_residual(state, COLOR_V, x, y, depth, cur_pu, lcu, early_skip);
-      if(state->encoder_control->cfg.jccr && cur_pu->tr_depth == cur_pu->depth){
-        quantize_tr_residual(state, COLOR_UV, x, y, depth, cur_pu, lcu, early_skip);
-      }
+      quantize_tr_residual(state, COLOR_V, x, y, depth, cur_pu, lcu, early_skip);   
+    }
+    if (jccr && cur_pu->tr_depth == cur_pu->depth) {
+      quantize_tr_residual(state, COLOR_UV, x, y, depth, cur_pu, lcu, early_skip);
     }
   }
 }

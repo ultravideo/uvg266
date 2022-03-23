@@ -1800,14 +1800,16 @@ static void search_pu_inter(encoder_state_t * const state,
         cur_pu->inter.mv[1][1]  = info->merge_cand[merge_idx].mv[1][1];
         kvz_lcu_fill_trdepth(lcu, x, y, depth, MAX(1, depth));
         kvz_inter_recon_cu(state, lcu, x, y, width, true, false);
-        kvz_quantize_lcu_residual(state, true, false, x, y, depth, cur_pu, lcu, true);
+        kvz_quantize_lcu_residual(state, true, false, false, x, y, depth, cur_pu, lcu, true);
 
         if (cbf_is_set(cur_pu->cbf, depth, COLOR_Y)) {
           continue;
         }
         else if (has_chroma) {
           kvz_inter_recon_cu(state, lcu, x, y, width, false, has_chroma);
-          kvz_quantize_lcu_residual(state, false, has_chroma, x, y, depth, cur_pu, lcu, true);
+          kvz_quantize_lcu_residual(state, false, has_chroma, 
+            false, /*we are only checking for lack of coeffs so no need to check jccr*/
+            x, y, depth, cur_pu, lcu, true);
           if (!cbf_is_set_any(cur_pu->cbf, depth)) {
             cur_pu->type = CU_INTER;
             cur_pu->merge_idx = merge_idx;
@@ -2159,8 +2161,10 @@ void kvz_cu_cost_inter_rd2(encoder_state_t * const state,
   }
   double no_cbf_cost = ssd + no_cbf_bits * state->lambda;
 
-  kvz_quantize_lcu_residual(state, true, reconstruct_chroma,
-                            x, y, depth,
+  kvz_quantize_lcu_residual(state,
+                            true, reconstruct_chroma,
+                            reconstruct_chroma && state->encoder_control->cfg.jccr, x, y,
+                            depth,
                             cur_cu,
                             lcu,
                             false);
@@ -2170,7 +2174,12 @@ void kvz_cu_cost_inter_rd2(encoder_state_t * const state,
   if(cbf) {
     *inter_cost = kvz_cu_rd_cost_luma(state, x_px, y_px, depth, cur_cu, lcu);
     if (reconstruct_chroma) {
-      *inter_cost += kvz_cu_rd_cost_chroma(state, x_px, y_px, depth, cur_cu, lcu);
+      if (cur_cu->depth != cur_cu->tr_depth) {
+        *inter_cost += kvz_cu_rd_cost_chroma(state, x_px, y_px, depth, cur_cu, lcu);
+      }
+      else {
+        kvz_select_jccr_mode(state, x_px, y_px, depth, cur_cu, lcu, inter_cost);        
+      }
     }
   }
   else {

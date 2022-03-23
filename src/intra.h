@@ -63,6 +63,17 @@ typedef struct
   int16_t b;
 } cclm_parameters_t;
 
+typedef struct {
+  int8_t luma_mode;
+  int8_t chroma_mode;
+  cclm_parameters_t cclm_parameters[2];
+  uint8_t multi_ref_idx;
+  bool mip_flag;
+  bool mip_transp;
+  int8_t mts_idx;
+  int8_t jccr;
+} intra_parameters_t;
+
 /**
 * \brief Function for deriving intra luma predictions
 * \param x          x-coordinate of the PU in pixels
@@ -128,13 +139,8 @@ void kvz_intra_recon_cu(
   int x,
   int y,
   int depth,
-  int8_t mode_luma,
-  int8_t mode_chroma,
+  const intra_parameters_t * intra_parameters,
   cu_info_t *cur_cu,
-  cclm_parameters_t* cclm_params,
-  uint8_t multi_ref_idx,
-  bool mip_flag,
-  bool mip_transp,
   lcu_t *lcu);
 
 

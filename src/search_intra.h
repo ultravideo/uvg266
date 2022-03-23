@@ -53,14 +53,13 @@ int8_t kvz_search_cu_intra_chroma(encoder_state_t * const state,
                               const int x_px, const int y_px,
                               const int depth, lcu_t *lcu, cclm_parameters_t* best_cclm);
 
-void kvz_search_cu_intra(encoder_state_t * const state,
-                         const int x_px, const int y_px,
-                         const int depth, lcu_t *lcu,
-                         int8_t *mode_out,
-                         int8_t *trafo_out, 
-                         double *cost_out,
-                         uint8_t *multi_ref_idx_out,
-                         bool *mip_flag,
-                         bool *mip_transp);
+void kvz_search_cu_intra(
+  encoder_state_t * const state,
+  const int x_px,
+  const int y_px,
+  const int depth,
+  lcu_t *lcu,
+  double *cost_out,
+  intra_parameters_t* intra_parameters);
 
 #endif // SEARCH_INTRA_H_
