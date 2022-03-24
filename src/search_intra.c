@@ -900,7 +900,7 @@ double kvz_luma_mode_bits(const encoder_state_t *state, int8_t luma_mode, const 
     if (mip_flag) {
       // Write MIP transpose flag & mode
       CABAC_BIN_EP(cabac, is_transposed, "mip_transposed");
-      kvz_cabac_encode_trunc_bin(cabac, mip_mode, transp_off);
+      kvz_cabac_encode_trunc_bin(cabac, mip_mode, transp_off, NULL);
     }
     
     // Write is done. Get bit cost out of cabac

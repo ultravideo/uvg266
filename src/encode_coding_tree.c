@@ -817,16 +817,17 @@ static void encode_chroma_intra_cu(cabac_data_t* const cabac, const cu_info_t* c
 static void encode_intra_luma_coding_unit(encoder_state_t * const state,
                                      cabac_data_t * const cabac,
                                      const cu_info_t * const cur_cu,
-                                     int x, int y, int depth, lcu_t* lcu, lcu_coeff_t* coeff, double* bits_out)
+                                     int x, int y, int depth, lcu_t* lcu, double* bits_out)
 {
   const videoframe_t * const frame = state->tile->frame;
-  uint8_t intra_pred_mode_actual[4];
-  uint8_t *intra_pred_mode = intra_pred_mode_actual;
+  uint8_t intra_pred_mode_actual;
+  uint8_t *intra_pred_mode = &intra_pred_mode_actual;
 
   //uint8_t intra_pred_mode_chroma = cur_cu->intra.mode_chroma;
-  int8_t intra_preds[4][INTRA_MPM_COUNT] = {{-1, -1, -1, -1, -1, -1},{-1, -1, -1, -1, -1, -1},{-1, -1, -1, -1, -1, -1},{-1, -1, -1, -1, -1, -1}};
-  int8_t mpm_preds[4] = {-1, -1, -1, -1};
-  uint32_t flag[4];
+  int8_t intra_preds[INTRA_MPM_COUNT] = {-1, -1, -1, -1, -1, -1};
+  int8_t mpm_preds = -1;
+  uint32_t flag;
+  double bits = 0;
 
   /*
   if ((cur_cu->type == CU_INTRA && (LCU_WIDTH >> cur_cu->depth <= 32))) {
@@ -850,8 +851,6 @@ static void encode_intra_luma_coding_unit(encoder_state_t * const state,
     CABAC_BIN(cabac, 0, "bdpcm_mode");
   }
   */
-
-  const int num_pred_units = kvz_part_mode_num_parts[cur_cu->part_size];
   
   // Intra Subpartition mode
   uint32_t width = (LCU_WIDTH >> depth);
@@ -889,15 +888,17 @@ static void encode_intra_luma_coding_unit(encoder_state_t * const state,
   if (cur_cu->type == CU_INTRA && !cur_cu->bdpcmMode && enable_mip) {
     const int cu_width = LCU_WIDTH >> depth;
     const int cu_height = cu_width; // TODO: height for non-square blocks
-    uint8_t ctx_id = kvz_get_mip_flag_context(x, y, cu_width, cu_height, NULL, frame->cu_array);
+    uint8_t ctx_id = kvz_get_mip_flag_context(x, y, cu_width, cu_height, lcu, lcu ? NULL : frame->cu_array);
 
     // Write MIP flag
-    cabac->cur_ctx = &(cabac->ctx.mip_flag[ctx_id]);
-    CABAC_BIN(cabac, mip_flag, "mip_flag");
+    CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.mip_flag[ctx_id]), mip_flag, bits, "mip_flag");
     if (mip_flag) {
       // Write MIP transpose flag & mode
       CABAC_BIN_EP(cabac, mip_transpose, "mip_transposed");
-      kvz_cabac_encode_trunc_bin(cabac, mip_mode, num_mip_modes);
+      if (cabac->only_count) bits += 1;
+      kvz_cabac_encode_trunc_bin(cabac, mip_mode, num_mip_modes, bits_out);
+      if (cabac->only_count) *bits_out += bits;
+      return;
     }
   }
 
@@ -911,158 +912,155 @@ static void encode_intra_luma_coding_unit(encoder_state_t * const state,
 
   if (cur_cu->type == CU_INTRA && (y % LCU_WIDTH) != 0 && !cur_cu->bdpcmMode && enable_mrl && !mip_flag) {
     if (MAX_REF_LINE_IDX > 1) {
-      cabac->cur_ctx = &(cabac->ctx.multi_ref_line[0]);
-      CABAC_BIN(cabac, multi_ref_idx != 0, "multi_ref_line");
+      CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.multi_ref_line[0]), multi_ref_idx != 0, bits, "multi_ref_line");
       if (MAX_REF_LINE_IDX > 2 && multi_ref_idx != 0) {
-        cabac->cur_ctx = &(cabac->ctx.multi_ref_line[1]);
-        CABAC_BIN(cabac, multi_ref_idx != 1, "multi_ref_line")
+        CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.multi_ref_line[1]), multi_ref_idx != 1, bits, "multi_ref_line");
       }
     }
   }
 
 
   // ToDo: update real usage, these if clauses as such don't make any sense
-  if (isp_mode != 0 && multi_ref_idx == 0 && !mip_flag) {
+  if (isp_mode != 0 && multi_ref_idx == 0) {
     if (isp_mode) {
-      cabac->cur_ctx = &(cabac->ctx.intra_subpart_model[0]);
-      CABAC_BIN(cabac, 0, "intra_subPartitions");
+      CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.intra_subpart_model[0]),  0, bits, "intra_subPartitions");
     } else {
-      cabac->cur_ctx = &(cabac->ctx.intra_subpart_model[0]);
-      CABAC_BIN(cabac, 1, "intra_subPartitions");
+      CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.intra_subpart_model[0]), 1, bits, "intra_subPartitions");
       // ToDo: complete this if-clause
       if (isp_mode == 3) {
-        cabac->cur_ctx = &(cabac->ctx.intra_subpart_model[1]);
-        CABAC_BIN(cabac, allow_isp - 1, "intra_subPart_ver_hor");
+        CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.intra_subpart_model[0]), allow_isp - 1, bits, "intra_subPart_ver_hor");
       }
     }
   }
 
   const int cu_width = LCU_WIDTH >> depth;
-  // If MIP is used, skip writing normal intra modes
-  if (!mip_flag) {
     // PREDINFO CODING
     // If intra prediction mode is found from the predictors,
     // it can be signaled with two EP's. Otherwise we can send
     // 5 EP bins with the full predmode
     // ToDo: fix comments for VVC
     
-    cabac->cur_ctx = &(cabac->ctx.intra_luma_mpm_flag_model);
-    for (int j = 0; j < num_pred_units; ++j) {
-      const int pu_x = PU_GET_X(cur_cu->part_size, cu_width, x, j);
-      const int pu_y = PU_GET_Y(cur_cu->part_size, cu_width, y, j);
-      const cu_info_t* cur_pu = kvz_cu_array_at_const(frame->cu_array, pu_x, pu_y);
+  const cu_info_t* cur_pu = cur_cu; // kvz_cu_array_at_const(frame->cu_array, pu_x, pu_y);
 
-      const cu_info_t* left_pu = NULL;
-      const cu_info_t* above_pu = NULL;
+  const cu_info_t* left_pu = NULL;
+  const cu_info_t* above_pu = NULL;
 
-      if (pu_x > 0) {
-        assert(pu_x >> 2 > 0);
-        left_pu = kvz_cu_array_at_const(frame->cu_array, pu_x - 1, pu_y + cu_width - 1);
-      }
-      // Don't take the above PU across the LCU boundary.
-      if (pu_y % LCU_WIDTH > 0 && pu_y > 0) {
-        assert(pu_y >> 2 > 0);
-        above_pu = kvz_cu_array_at_const(frame->cu_array, pu_x + cu_width - 1, pu_y - 1);
-      }
+  if (x > 0) {
+    assert(x >> 2 > 0);
+    left_pu = lcu ?
+                LCU_GET_CU_AT_PX(
+                  lcu,
+                  SUB_SCU(x - 1),
+                  SUB_SCU(y + cu_width - 1)) :
+                kvz_cu_array_at_const(
+                  frame->cu_array,
+                  x - 1,
+                  y + cu_width - 1);
+  }
+  // Don't take the above PU across the LCU boundary.
+  if (y % LCU_WIDTH > 0 && y > 0) {
+    assert(y >> 2 > 0);
+    above_pu = lcu ?
+                 LCU_GET_CU_AT_PX(
+                   lcu,
+                   SUB_SCU(x + cu_width - 1),
+                   SUB_SCU(y -1)) :
+                 kvz_cu_array_at_const(
+                   frame->cu_array,
+                   x + cu_width - 1,
+                   y - 1);
+  }
+  
+  kvz_intra_get_dir_luma_predictor(x, y,
+    intra_preds,
+    cur_pu,
+    left_pu, above_pu);
 
+  intra_pred_mode_actual = cur_pu->intra.mode;
 
-      kvz_intra_get_dir_luma_predictor(pu_x, pu_y,
-        intra_preds[j],
-        cur_pu,
-        left_pu, above_pu);
-
-
-      intra_pred_mode_actual[j] = cur_pu->intra.mode;
-
-      for (int i = 0; i < INTRA_MPM_COUNT; i++) {
-        if (intra_preds[j][i] == intra_pred_mode[j]) {
-          mpm_preds[j] = (int8_t)i;
-          break;
-        }
-      }
-      // Is the mode in the MPM array or not
-      flag[j] = (mpm_preds[j] == -1) ? 0 : 1;
-      if (!(cur_pu->intra.multi_ref_idx || (isp_mode))) {
-        CABAC_BIN(cabac, flag[j], "prev_intra_luma_pred_flag");
-      }
-    }
-
-    for (int j = 0; j < num_pred_units; ++j) {
-      // TODO: this loop is unnecessary in VVC. Remove in future
-      assert(j == 0 && "In VVC this loop should be run only once.");
-
-      // Signal index of the prediction mode in the prediction list, if it is there
-      if (flag[j]) {
-
-        const int pu_x = PU_GET_X(cur_cu->part_size, cu_width, x, j);
-        const int pu_y = PU_GET_Y(cur_cu->part_size, cu_width, y, j);
-        const cu_info_t* cur_pu = kvz_cu_array_at_const(frame->cu_array, pu_x, pu_y);
-        cabac->cur_ctx = &(cabac->ctx.luma_planar_model[(isp_mode ? 0 : 1)]);
-        if (cur_pu->intra.multi_ref_idx == 0) {
-          CABAC_BIN(cabac, (mpm_preds[j] > 0 ? 1 : 0), "mpm_idx_luma_planar");
-        }
-        //CABAC_BIN_EP(cabac, (mpm_preds[j] > 0 ? 1 : 0), "mpm_idx");
-        if (mpm_preds[j] > 0) {
-          CABAC_BIN_EP(cabac, (mpm_preds[j] > 1 ? 1 : 0), "mpm_idx");
-        }
-        if (mpm_preds[j] > 1) {
-          CABAC_BIN_EP(cabac, (mpm_preds[j] > 2 ? 1 : 0), "mpm_idx");
-        }
-        if (mpm_preds[j] > 2) {
-          CABAC_BIN_EP(cabac, (mpm_preds[j] > 3 ? 1 : 0), "mpm_idx");
-        }
-        if (mpm_preds[j] > 3) {
-          CABAC_BIN_EP(cabac, (mpm_preds[j] > 4 ? 1 : 0), "mpm_idx");
-        }
-      }
-      else {
-        // Signal the actual prediction mode.
-        int32_t tmp_pred = intra_pred_mode[j];
-
-        uint8_t intra_preds_temp[INTRA_MPM_COUNT + 2];
-        memcpy(intra_preds_temp, intra_preds[j], sizeof(int8_t) * 3);
-        memcpy(intra_preds_temp + 4, &intra_preds[j][3], sizeof(int8_t) * 3);
-        intra_preds_temp[3] = 255;
-        intra_preds_temp[7] = 255;
-
-        // Improvised merge sort
-        // Sort prediction list from lowest to highest.
-        if (intra_preds_temp[0] > intra_preds_temp[1]) SWAP(intra_preds_temp[0], intra_preds_temp[1], uint8_t);
-        if (intra_preds_temp[0] > intra_preds_temp[2]) SWAP(intra_preds_temp[0], intra_preds_temp[2], uint8_t);
-        if (intra_preds_temp[1] > intra_preds_temp[2]) SWAP(intra_preds_temp[1], intra_preds_temp[2], uint8_t);
-
-        if (intra_preds_temp[4] > intra_preds_temp[5]) SWAP(intra_preds_temp[4], intra_preds_temp[5], uint8_t);
-        if (intra_preds_temp[4] > intra_preds_temp[6]) SWAP(intra_preds_temp[4], intra_preds_temp[6], uint8_t);
-        if (intra_preds_temp[5] > intra_preds_temp[6]) SWAP(intra_preds_temp[5], intra_preds_temp[6], uint8_t);
-
-        // Merge two subarrays
-        int32_t array1 = 0;
-        int32_t array2 = 4;
-        for (int item = 0; item < INTRA_MPM_COUNT; item++) {
-          if (intra_preds_temp[array1] < intra_preds_temp[array2]) {
-            intra_preds[j][item] = intra_preds_temp[array1];
-            array1++;
-          }
-          else {
-            intra_preds[j][item] = intra_preds_temp[array2];
-            array2++;
-          }
-        }
-
-        // Reduce the index of the signaled prediction mode according to the
-        // prediction list, as it has been already signaled that it's not one
-        // of the prediction modes.
-        for (int i = INTRA_MPM_COUNT - 1; i >= 0; i--) {
-          if (tmp_pred > intra_preds[j][i]) {
-            tmp_pred--;
-          }
-        }
-
-        kvz_cabac_encode_trunc_bin(cabac, tmp_pred, 67 - INTRA_MPM_COUNT);
-      }
-      if (cabac->only_count && bits_out) *bits_out += 5;
+  for (int i = 0; i < INTRA_MPM_COUNT; i++) {
+    if (intra_preds[i] == *intra_pred_mode) {
+      mpm_preds = (int8_t)i;
+      break;
     }
   }
+  // Is the mode in the MPM array or not
+  flag = (mpm_preds == -1) ? 0 : 1;
+  if (!(cur_pu->intra.multi_ref_idx || (isp_mode))) {
+    CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.intra_luma_mpm_flag_model), flag, bits, "prev_intra_luma_pred_flag");
+  }
+    
+  // Signal index of the prediction mode in the prediction list, if it is there
+  if (flag) {
+    
+    const cu_info_t* cur_pu = cur_cu;
+    if (cur_pu->intra.multi_ref_idx == 0) {
+      CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.luma_planar_model[(isp_mode ? 0 : 1)]), (mpm_preds > 0 ? 1 : 0), bits, "mpm_idx_luma_planar");
+    }
+
+    if (mpm_preds > 0) {
+      CABAC_BIN_EP(cabac, (mpm_preds > 1 ? 1 : 0), "mpm_idx");
+      if (cabac->only_count) bits += 1;
+    }
+    if (mpm_preds > 1) {
+      CABAC_BIN_EP(cabac, (mpm_preds > 2 ? 1 : 0), "mpm_idx");
+      if (cabac->only_count) bits += 1;
+    }
+    if (mpm_preds > 2) {
+      CABAC_BIN_EP(cabac, (mpm_preds > 3 ? 1 : 0), "mpm_idx");
+      if (cabac->only_count) bits += 1;
+    }
+    if (mpm_preds > 3) {
+      CABAC_BIN_EP(cabac, (mpm_preds > 4 ? 1 : 0), "mpm_idx");
+      if (cabac->only_count) bits += 1;
+    }
+  }
+  else {
+    // Signal the actual prediction mode.
+    int32_t tmp_pred = *intra_pred_mode;
+
+    uint8_t intra_preds_temp[INTRA_MPM_COUNT + 2];
+    memcpy(intra_preds_temp, intra_preds, sizeof(int8_t) * 3);
+    memcpy(intra_preds_temp + 4, &intra_preds[3], sizeof(int8_t) * 3);
+    intra_preds_temp[3] = 255;
+    intra_preds_temp[7] = 255;
+
+    // Improvised merge sort
+    // Sort prediction list from lowest to highest.
+    if (intra_preds_temp[0] > intra_preds_temp[1]) SWAP(intra_preds_temp[0], intra_preds_temp[1], uint8_t);
+    if (intra_preds_temp[0] > intra_preds_temp[2]) SWAP(intra_preds_temp[0], intra_preds_temp[2], uint8_t);
+    if (intra_preds_temp[1] > intra_preds_temp[2]) SWAP(intra_preds_temp[1], intra_preds_temp[2], uint8_t);
+
+    if (intra_preds_temp[4] > intra_preds_temp[5]) SWAP(intra_preds_temp[4], intra_preds_temp[5], uint8_t);
+    if (intra_preds_temp[4] > intra_preds_temp[6]) SWAP(intra_preds_temp[4], intra_preds_temp[6], uint8_t);
+    if (intra_preds_temp[5] > intra_preds_temp[6]) SWAP(intra_preds_temp[5], intra_preds_temp[6], uint8_t);
+
+    // Merge two subarrays
+    int32_t array1 = 0;
+    int32_t array2 = 4;
+    for (int item = 0; item < INTRA_MPM_COUNT; item++) {
+      if (intra_preds_temp[array1] < intra_preds_temp[array2]) {
+        intra_preds[item] = intra_preds_temp[array1];
+        array1++;
+      }
+      else {
+        intra_preds[item] = intra_preds_temp[array2];
+        array2++;
+      }
+    }
+
+    // Reduce the index of the signaled prediction mode according to the
+    // prediction list, as it has been already signaled that it's not one
+    // of the prediction modes.
+    for (int i = INTRA_MPM_COUNT - 1; i >= 0; i--) {
+      if (tmp_pred > intra_preds[i]) {
+        tmp_pred--;
+      }
+    }
+
+    kvz_cabac_encode_trunc_bin(cabac, tmp_pred, 67 - INTRA_MPM_COUNT, bits_out);
+  }    
+  if (cabac->only_count && bits_out) *bits_out += bits;
 }
 
 /**
@@ -1493,7 +1491,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
 
     }
   } else if (cur_cu->type == CU_INTRA) {
-    encode_intra_luma_coding_unit(state, cabac, cur_cu, x, y, depth, NULL, coeff, NULL);
+    encode_intra_luma_coding_unit(state, cabac, cur_cu, x, y, depth, NULL, NULL);
 
     // Code chroma prediction mode.
     if (state->encoder_control->chroma_format != KVZ_CSP_400 && depth != 4) {
@@ -1638,7 +1636,7 @@ double kvz_mock_encode_coding_unit(
     }
   }
   else if (cur_cu->type == CU_INTRA) {
-    encode_intra_luma_coding_unit(state, cabac, cur_cu, x, y, depth, lcu, NULL, &bits);
+    encode_intra_luma_coding_unit(state, cabac, cur_cu, x, y, depth, lcu, &bits);
   }
   return bits;
 }

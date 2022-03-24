@@ -200,7 +200,7 @@ void kvz_cabac_encode_bin_trm(cabac_data_t * const data, const uint8_t bin_value
 /**
  * \brief encode truncated binary code
  */
-void kvz_cabac_encode_trunc_bin(cabac_data_t * const data, const uint32_t bin_value, const uint32_t max_value) {
+void kvz_cabac_encode_trunc_bin(cabac_data_t * const data, const uint32_t bin_value, const uint32_t max_value, double* bits_out) {
   int thresh;
   int symbol = bin_value;
   if (max_value > 256) {
@@ -220,9 +220,11 @@ void kvz_cabac_encode_trunc_bin(cabac_data_t * const data, const uint32_t bin_va
   int b = max_value - val;
   if (symbol < val - b) {
     CABAC_BINS_EP(data, symbol, thresh, "TruncSymbols");
+    if (bits_out) *bits_out += 1;
   } else {
     symbol += val - b;
     CABAC_BINS_EP(data, symbol, thresh + 1, "TruncSymbols");
+    if (bits_out) *bits_out += 1;
   }
 }
 
