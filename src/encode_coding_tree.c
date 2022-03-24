@@ -814,10 +814,10 @@ static void encode_chroma_intra_cu(cabac_data_t* const cabac, const cu_info_t* c
   }
 }
 
-static void encode_intra_luma_coding_unit(encoder_state_t * const state,
+void kvz_encode_intra_luma_coding_unit(const encoder_state_t * const state,
                                      cabac_data_t * const cabac,
                                      const cu_info_t * const cur_cu,
-                                     int x, int y, int depth, lcu_t* lcu, double* bits_out)
+                                     int x, int y, int depth, const lcu_t* lcu, double* bits_out)
 {
   const videoframe_t * const frame = state->tile->frame;
   uint8_t intra_pred_mode_actual;
@@ -1491,7 +1491,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
 
     }
   } else if (cur_cu->type == CU_INTRA) {
-    encode_intra_luma_coding_unit(state, cabac, cur_cu, x, y, depth, NULL, NULL);
+    kvz_encode_intra_luma_coding_unit(state, cabac, cur_cu, x, y, depth, NULL, NULL);
 
     // Code chroma prediction mode.
     if (state->encoder_control->chroma_format != KVZ_CSP_400 && depth != 4) {
@@ -1636,7 +1636,7 @@ double kvz_mock_encode_coding_unit(
     }
   }
   else if (cur_cu->type == CU_INTRA) {
-    encode_intra_luma_coding_unit(state, cabac, cur_cu, x, y, depth, lcu, &bits);
+    kvz_encode_intra_luma_coding_unit(state, cabac, cur_cu, x, y, depth, lcu, &bits);
   }
   return bits;
 }

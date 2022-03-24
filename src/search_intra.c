@@ -37,6 +37,7 @@
 #include "cabac.h"
 #include "encoder.h"
 #include "encoderstate.h"
+#include "encode_coding_tree.h"
 #include "image.h"
 #include "intra.h"
 #include "kvazaar.h"
@@ -692,12 +693,35 @@ static int8_t search_intra_rough(encoder_state_t * const state,
 
   // Add prediction mode coding cost as the last thing. We don't want this
   // affecting the halving search.
+  const double mpm_mode_bit = CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.intra_luma_mpm_flag_model), 1);
+  const double not_mpm_mode_bit = CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.intra_luma_mpm_flag_model), 0);
+  const double planar_mode_flag = CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.luma_planar_model[1]), 1);
+  const double not_planar_mode_flag = CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.luma_planar_model[1]), 0);
   for (int mode_i = 0; mode_i < modes_selected; ++mode_i) {
-    costs[mode_i] += state->lambda_sqrt * kvz_luma_mode_bits(state, modes[mode_i], intra_preds, 0, 0, 0);
+    int i = 0;
+    int smaller_than_pred = 0;
+    double bits;
+    for(; i < INTRA_MPM_COUNT; i++) {
+      if (intra_preds[i] == mode_i) {
+        break;
+      }
+      if(mode_i > intra_preds[i]) {
+        smaller_than_pred += 1;
+      }
+    }
+    if (i == 0) {
+      bits = planar_mode_flag + mpm_mode_bit;
+    }
+    else if (i < INTRA_MPM_COUNT) {
+      bits = not_planar_mode_flag + mpm_mode_bit + MAX(i, 3);
+    }
+    else {
+      bits = not_mpm_mode_bit + 5 + (mode_i - smaller_than_pred > 3);
+    }
+    costs[mode_i] += state->lambda_sqrt * bits;
   }
 
   #undef PARALLEL_BLKS
-
   return modes_selected;
 }
 
@@ -774,7 +798,6 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
   
   for (int mip = 0; mip <= 1; mip++) {
     const int transp_off = mip ? num_mip_modes_full >> 1 : 0;
-    uint8_t ctx_id = mip ? kvz_get_mip_flag_context(x_px, y_px, width, height, lcu, NULL) : 0;
     uint8_t multi_ref_index = mip ? 0 : multi_ref_idx;
     int *num_modes = mip ? &num_mip_modes_full : &modes_to_check;
 
@@ -782,9 +805,6 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
       int8_t mode = mip ? mip_modes[i] : modes[i];
       double *mode_cost_p = mip ? &mip_costs[i] : &costs[i];
       int8_t *mode_trafo_p = mip ? &mip_trafo[i] : &trafo[i];
-      int rdo_bitcost = kvz_luma_mode_bits(state, mode, intra_preds, multi_ref_index, transp_off, ctx_id);
-
-      *mode_cost_p = rdo_bitcost * (int)(state->lambda + 0.5);
     
       // Mip related stuff
       // There can be 32 MIP modes, but only mode numbers [0, 15] are ever written to bitstream.
@@ -805,6 +825,9 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
       pred_cu.intra.mip_flag = mip ? true : false;
       pred_cu.joint_cb_cr = 0;
       FILL(pred_cu.cbf, 0);
+
+      int rdo_bitcost = kvz_luma_mode_bits(state, &pred_cu, x_px, y_px, depth, lcu);
+      *mode_cost_p = rdo_bitcost * (int)(state->lambda + 0.5);
 
       // Reset transform split data in lcu.cu for this area.
       kvz_lcu_fill_trdepth(lcu, x_px, y_px, depth, depth);
@@ -867,105 +890,17 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
 }
 
 
-double kvz_luma_mode_bits(const encoder_state_t *state, int8_t luma_mode, const int8_t *intra_preds, const uint8_t multi_ref_idx, const uint8_t num_mip_modes_half, int mip_flag_ctx_id)
+double kvz_luma_mode_bits(const encoder_state_t *state, const cu_info_t* const cur_cu, int x, int y, int8_t depth, const lcu_t* lcu)
 {
   cabac_data_t* cabac = (cabac_data_t *)&state->search_cabac;
   double mode_bits = 0;
-
-  bool enable_mip = state->encoder_control->cfg.mip;
-  bool mip_flag = enable_mip ? (num_mip_modes_half > 0 ? true : false) : false;
-
-  // Mip flag cost must be calculated even if mip is not used in this block
-  if (enable_mip) {
-    // Make a copy of state->cabac for bit cost estimation.
-    cabac_data_t state_cabac_copy;
-    cabac_data_t* cabac;
-    memcpy(&state_cabac_copy, &state->cabac, sizeof(cabac_data_t));
-    // Clear data and set mode to count only
-    state_cabac_copy.only_count = 1;
-    state_cabac_copy.num_buffered_bytes = 0;
-    state_cabac_copy.bits_left = 23;
-
-    cabac = &state_cabac_copy;
-
-    // Do cabac writes as normal
-    const int transp_off = num_mip_modes_half;
-    const bool is_transposed = luma_mode >= transp_off ? true : false;
-    int8_t mip_mode = is_transposed ? luma_mode - transp_off : luma_mode;
-
-    // Write MIP flag
-    cabac->cur_ctx = &(cabac->ctx.mip_flag[mip_flag_ctx_id]);
-    CABAC_BIN(cabac, mip_flag, "mip_flag");
-    
-    if (mip_flag) {
-      // Write MIP transpose flag & mode
-      CABAC_BIN_EP(cabac, is_transposed, "mip_transposed");
-      kvz_cabac_encode_trunc_bin(cabac, mip_mode, transp_off, NULL);
-    }
-    
-    // Write is done. Get bit cost out of cabac
-    mode_bits += (23 - state_cabac_copy.bits_left) + (state_cabac_copy.num_buffered_bytes << 3);
-  }
-
-  if (!mip_flag) {
-    int8_t mode_in_preds = -1;
-    for (int i = 0; i < INTRA_MPM_COUNT; ++i) {
-      if (luma_mode == intra_preds[i]) {
-        mode_in_preds = i;
-        break;
-      }
-    }
-    cabac_ctx_t* ctx = &(cabac->ctx.luma_planar_model[1]);
-    CABAC_FBITS_UPDATE(
-      cabac,
-      ctx,
-      mode_in_preds != -1,
-      mode_bits,
-      "prev_intra_luma_pred_flag_search");
-    if (state->search_cabac.update) {
-      if (mode_in_preds) {
-        CABAC_BIN_EP(cabac, !(luma_mode == intra_preds[0]), "mpm_idx");
-        if (luma_mode != intra_preds[0]) {
-          CABAC_BIN_EP(cabac, !(luma_mode == intra_preds[1]), "mpm_idx");
-        }
-      } else {
-        // This value should be transformed for actual coding,
-        // but here the value does not actually matter, just that we write 5 bits
-        CABAC_BINS_EP(cabac, luma_mode, 5, "rem_intra_luma_pred_mode");
-      }
-    }
-
-    bool enable_mrl = state->encoder_control->cfg.mrl;
-    uint8_t multi_ref_index = enable_mrl ? multi_ref_idx : 0;
-
-    ctx = &(cabac->ctx.intra_luma_mpm_flag_model);
-
-    if (multi_ref_index == 0) {
-      mode_bits += CTX_ENTROPY_FBITS(ctx, mode_in_preds != -1);
-    }
-
-    // Add MRL bits.
-    if (enable_mrl && MAX_REF_LINE_IDX > 1) {
-      ctx = &(cabac->ctx.multi_ref_line[0]);
-      mode_bits += CTX_ENTROPY_FBITS(ctx, multi_ref_index != 0);
-
-      if (multi_ref_index != 0 && MAX_REF_LINE_IDX > 2) {
-        ctx = &(cabac->ctx.multi_ref_line[1]);
-        mode_bits += CTX_ENTROPY_FBITS(ctx, multi_ref_index != 1);
-      }
-    }
-
-    if (mode_in_preds != -1 || multi_ref_index != 0) {
-      ctx = &(cabac->ctx.luma_planar_model[0]);
-      if (multi_ref_index == 0) {
-        mode_bits += CTX_ENTROPY_FBITS(ctx, mode_in_preds > 0);
-      }
-      mode_bits += MIN(4.0, mode_in_preds);
-    }
-    else {
-      mode_bits += 6.0;
-    }
-  }
+  cabac_data_t cabac_copy;
+  memcpy(&cabac_copy, cabac, sizeof cabac_copy);
+  kvz_encode_intra_luma_coding_unit(
+    state,
+    &cabac_copy, cur_cu,
+    x, y, depth, lcu, &mode_bits
+  );
 
   return mode_bits;
 }

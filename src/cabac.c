@@ -220,11 +220,11 @@ void kvz_cabac_encode_trunc_bin(cabac_data_t * const data, const uint32_t bin_va
   int b = max_value - val;
   if (symbol < val - b) {
     CABAC_BINS_EP(data, symbol, thresh, "TruncSymbols");
-    if (bits_out) *bits_out += 1;
+    if (bits_out) *bits_out += thresh;
   } else {
     symbol += val - b;
     CABAC_BINS_EP(data, symbol, thresh + 1, "TruncSymbols");
-    if (bits_out) *bits_out += 1;
+    if (bits_out) *bits_out += thresh + 1;
   }
 }
 

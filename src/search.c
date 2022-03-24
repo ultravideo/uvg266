@@ -714,23 +714,9 @@ static double calc_mode_bits(const encoder_state_t *state,
                              const cu_info_t * cur_cu,
                              int x, int y, int depth)
 {
-  int x_local = SUB_SCU(x);
-  int y_local = SUB_SCU(y);
-
   assert(cur_cu->type == CU_INTRA);
 
-  int8_t candidate_modes[INTRA_MPM_COUNT];
-  {
-    const cu_info_t *left_cu  = ((x >= SCU_WIDTH) ? LCU_GET_CU_AT_PX(lcu, x_local - SCU_WIDTH, y_local) : NULL);
-    const cu_info_t *above_cu = ((y >= SCU_WIDTH) ? LCU_GET_CU_AT_PX(lcu, x_local, y_local - SCU_WIDTH) : NULL);
-    kvz_intra_get_dir_luma_predictor(x, y, candidate_modes, cur_cu, left_cu, above_cu);
-  }
-
-  int width = LCU_WIDTH >> depth;
-  int height = width; // TODO: height for non-square blocks
-  int num_mip_modes_half = NUM_MIP_MODES_HALF(width, height);
-  int mip_flag_ctx_id = kvz_get_mip_flag_context(x, y, width, height, lcu, NULL);
-  double mode_bits = kvz_luma_mode_bits(state, cur_cu->intra.mode, candidate_modes, cur_cu->intra.multi_ref_idx, num_mip_modes_half, mip_flag_ctx_id);
+  double mode_bits = kvz_luma_mode_bits(state, cur_cu, x, y, depth, lcu);
 
   if (((depth == 4 && x % 8 && y % 8) || (depth != 4)) && state->encoder_control->chroma_format != KVZ_CSP_400) {
     mode_bits += kvz_chroma_mode_bits(state, cur_cu->intra.mode_chroma, cur_cu->intra.mode);
