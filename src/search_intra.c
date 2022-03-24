@@ -915,21 +915,25 @@ double kvz_luma_mode_bits(const encoder_state_t *state, int8_t luma_mode, const 
         break;
       }
     }
-  cabac_ctx_t *ctx = &(cabac->ctx.luma_planar_model[1]);
-  CABAC_FBITS_UPDATE(cabac, ctx, mode_in_preds, mode_bits, "prev_intra_luma_pred_flag_search");
-  if (state->search_cabac.update) {
-    if(mode_in_preds) {
-      CABAC_BIN_EP(cabac, !(luma_mode == intra_preds[0]), "mpm_idx");
-      if(luma_mode != intra_preds[0]) {
-        CABAC_BIN_EP(cabac, !(luma_mode == intra_preds[1]), "mpm_idx");        
+    cabac_ctx_t* ctx = &(cabac->ctx.luma_planar_model[1]);
+    CABAC_FBITS_UPDATE(
+      cabac,
+      ctx,
+      mode_in_preds != -1,
+      mode_bits,
+      "prev_intra_luma_pred_flag_search");
+    if (state->search_cabac.update) {
+      if (mode_in_preds) {
+        CABAC_BIN_EP(cabac, !(luma_mode == intra_preds[0]), "mpm_idx");
+        if (luma_mode != intra_preds[0]) {
+          CABAC_BIN_EP(cabac, !(luma_mode == intra_preds[1]), "mpm_idx");
+        }
+      } else {
+        // This value should be transformed for actual coding,
+        // but here the value does not actually matter, just that we write 5 bits
+        CABAC_BINS_EP(cabac, luma_mode, 5, "rem_intra_luma_pred_mode");
       }
     }
-    else {
-      // This value should be transformed for actual coding,
-      // but here the value does not actually matter, just that we write 5 bits
-      CABAC_BINS_EP(cabac, luma_mode, 5, "rem_intra_luma_pred_mode");
-    }
-  }
 
     bool enable_mrl = state->encoder_control->cfg.mrl;
     uint8_t multi_ref_index = enable_mrl ? multi_ref_idx : 0;

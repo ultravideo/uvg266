@@ -814,7 +814,7 @@ static void encode_chroma_intra_cu(cabac_data_t* const cabac, const cu_info_t* c
   }
 }
 
-static void encode_intra_coding_unit(encoder_state_t * const state,
+static void encode_intra_luma_coding_unit(encoder_state_t * const state,
                                      cabac_data_t * const cabac,
                                      const cu_info_t * const cur_cu,
                                      int x, int y, int depth, lcu_t* lcu, lcu_coeff_t* coeff, double* bits_out)
@@ -1063,24 +1063,6 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
       if (cabac->only_count && bits_out) *bits_out += 5;
     }
   }
-
-  // Code chroma prediction mode.
-  if (state->encoder_control->chroma_format != KVZ_CSP_400 && depth != 4) {
-    encode_chroma_intra_cu(cabac, cur_cu, x, y, frame, cu_width, state->encoder_control->cfg.cclm);
-  }
-  // if we are counting bits, the cost for transform coeffs is done separately
-  // To get the distortion at the same time
-  if (!cabac->only_count) {
-    encode_transform_coeff(state, x, y, depth, 0, 0, 0, 0, coeff);
-
-    encode_mts_idx(state, cabac, cur_cu);
-
-    if (state->encoder_control->chroma_format != KVZ_CSP_400 && depth == 4 && x % 8 && y % 8) {
-      encode_chroma_intra_cu(cabac, cur_cu, x, y, frame, cu_width, state->encoder_control->cfg.cclm);
-      encode_transform_coeff(state, x, y, depth, 0, 0, 0, 1, coeff);
-    }
-  }
-
 }
 
 /**
@@ -1511,7 +1493,23 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
 
     }
   } else if (cur_cu->type == CU_INTRA) {
-    encode_intra_coding_unit(state, cabac, cur_cu, x, y, depth, NULL, coeff, NULL);
+    encode_intra_luma_coding_unit(state, cabac, cur_cu, x, y, depth, NULL, coeff, NULL);
+
+    // Code chroma prediction mode.
+    if (state->encoder_control->chroma_format != KVZ_CSP_400 && depth != 4) {
+      encode_chroma_intra_cu(cabac, cur_cu, x, y, frame, cu_width, state->encoder_control->cfg.cclm);
+    }
+
+    encode_transform_coeff(state, x, y, depth, 0, 0, 0, 0, coeff);
+
+    encode_mts_idx(state, cabac, cur_cu);
+
+    // For 4x4 the chroma PU/TU is coded after the last 
+    if (state->encoder_control->chroma_format != KVZ_CSP_400 && depth == 4 && x % 8 && y % 8) {
+      encode_chroma_intra_cu(cabac, cur_cu, x, y, frame, cu_width, state->encoder_control->cfg.cclm);
+      encode_transform_coeff(state, x, y, depth, 0, 0, 0, 1, coeff);
+    
+    }
   }
 
   else {
@@ -1640,7 +1638,7 @@ double kvz_mock_encode_coding_unit(
     }
   }
   else if (cur_cu->type == CU_INTRA) {
-    encode_intra_coding_unit(state, cabac, cur_cu, x, y, depth, lcu, NULL, &bits);
+    encode_intra_luma_coding_unit(state, cabac, cur_cu, x, y, depth, lcu, NULL, &bits);
   }
   return bits;
 }
