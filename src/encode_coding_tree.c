@@ -1529,6 +1529,7 @@ double kvz_mock_encode_coding_unit(
   int x, int y, int depth,
   lcu_t* lcu, cu_info_t* cur_cu) {
   double bits = 0;
+  const encoder_control_t* const ctrl = state->encoder_control;
 
   int x_local = SUB_SCU(x);
   int y_local = SUB_SCU(y);
@@ -1553,7 +1554,7 @@ double kvz_mock_encode_coding_unit(
   }
 
   // Encode skip flag
-  if (state->frame->slicetype != KVZ_SLICE_I) {
+  if (state->frame->slicetype != KVZ_SLICE_I && cu_width != 4) {
     int8_t ctx_skip = 0;
 
     if (left_cu && left_cu->skipped) {
@@ -1598,20 +1599,23 @@ double kvz_mock_encode_coding_unit(
   }
   
   if (cur_cu->type == CU_INTER) {
-    const int num_pu = kvz_part_mode_num_parts[cur_cu->part_size];
-
-    for (int i = 0; i < num_pu; ++i) {
-      const int pu_x = PU_GET_X(cur_cu->part_size, cu_width, x, i);
-      const int pu_y = PU_GET_Y(cur_cu->part_size, cu_width, y, i);
-      const int pu_w = PU_GET_W(cur_cu->part_size, cu_width, i);
-      const int pu_h = PU_GET_H(cur_cu->part_size, cu_width, i);
-      const cu_info_t* cur_pu = LCU_GET_CU_AT_PX(lcu, SUB_SCU(pu_x), SUB_SCU(pu_y));
-
-      kvz_encode_inter_prediction_unit(state, cabac, cur_pu, pu_x, pu_y, pu_w, pu_h, depth, lcu, &bits);
+    const uint8_t imv_mode = KVZ_IMV_OFF;
+    const int non_zero_mvd = kvz_encode_inter_prediction_unit(state, cabac, cur_cu, x, y, cu_width, cu_width, depth, lcu, &bits);
+    if (ctrl->cfg.amvr && non_zero_mvd) {
+      CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.imv_flag[0]), imv_mode, bits, "imv_flag");
+      if (imv_mode > KVZ_IMV_OFF) {
+        CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.imv_flag[4]), imv_mode, bits, "imv_flag");
+        if (imv_mode < KVZ_IMV_HPEL) {
+          CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.imv_flag[1]), imv_mode, bits, "imv_flag"); // 1 indicates 4PEL, 0 FPEL
+        }
+      }
     }
   }
   else if (cur_cu->type == CU_INTRA) {
     kvz_encode_intra_luma_coding_unit(state, cabac, cur_cu, x, y, depth, lcu, &bits);
+  }
+  else {
+    assert(0 && "Unset cu type");
   }
   return bits;
 }
