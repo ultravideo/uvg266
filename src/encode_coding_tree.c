@@ -1152,7 +1152,7 @@ static void encode_part_mode(encoder_state_t * const state,
 **/
 
 
-static bool write_split_flag(const encoder_state_t * const state, cabac_data_t* cabac,
+bool kvz_write_split_flag(const encoder_state_t * const state, cabac_data_t* cabac,
   const cu_info_t * left_cu, const cu_info_t * above_cu,
   uint8_t split_flag,
   int depth, int cu_width, int x, int y, double* bits_out)
@@ -1302,7 +1302,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
   // When not in MAX_DEPTH, insert split flag and split the blocks if needed
   if (depth != MAX_DEPTH) {
 
-    const int split_flag = write_split_flag(state, cabac, left_cu, above_cu, GET_SPLITDATA(cur_cu, depth), depth, cu_width, x, y, NULL);
+    const int split_flag = kvz_write_split_flag(state, cabac, left_cu, above_cu, GET_SPLITDATA(cur_cu, depth), depth, cu_width, x, y, NULL);
     
     if (split_flag || border) {
       // Split blocks and remember to change x and y block positions
@@ -1550,7 +1550,7 @@ double kvz_mock_encode_coding_unit(
 
   // When not in MAX_DEPTH, insert split flag and split the blocks if needed
   if (depth != MAX_DEPTH) {
-    write_split_flag(state, cabac, left_cu, above_cu, 0, depth, cu_width, x, y, &bits);
+    kvz_write_split_flag(state, cabac, left_cu, above_cu, 0, depth, cu_width, x, y, &bits);
   }
 
   // Encode skip flag

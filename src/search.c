@@ -796,14 +796,6 @@ void kvz_sort_keys_by_cost(unit_stats_map_t *__restrict map)
 }
 
 
-static uint8_t get_ctx_cu_split_model(const lcu_t *lcu, int x, int y, int depth)
-{
-  vector2d_t lcu_cu = { SUB_SCU(x), SUB_SCU(y) };
-  bool condA = x >= 8 && LCU_GET_CU_AT_PX(lcu, lcu_cu.x - 1, lcu_cu.y    )->depth > depth;
-  bool condL = y >= 8 && LCU_GET_CU_AT_PX(lcu, lcu_cu.x,     lcu_cu.y - 1)->depth > depth;
-  return condA + condL;
-}
-
 /**
  * Search every mode from 0 to MAX_PU_DEPTH and return cost of best mode.
  * - The recursion is started at depth 0 and goes in Z-order to MAX_PU_DEPTH.
@@ -1152,16 +1144,12 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
 
     if (depth < MAX_DEPTH) {
       // Add cost of cu_split_flag.
-      uint8_t split_model = get_ctx_cu_split_model(lcu, x, y, depth);
-      cabac_ctx_t *ctx = &(state->search_cabac.ctx.split_flag_model[split_model]);
-      CABAC_FBITS_UPDATE(&state->search_cabac, ctx, 1, split_bits, "split_search");
+      kvz_write_split_flag(state, &state->search_cabac, 
+        x > 0 ? LCU_GET_CU_AT_PX(lcu, x -1, y ): NULL, 
+        y > 0 ? LCU_GET_CU_AT_PX(lcu, x, y - 1) : NULL,
+        1, depth, cu_width, x, y, &split_bits);
     }
 
-    if (cur_cu->type == CU_INTRA && depth == MAX_DEPTH) {
-      // Add cost of intra part_size.
-      cabac_ctx_t *ctx = &(state->search_cabac.ctx.part_size_model[0]);
-      CABAC_FBITS_UPDATE(&state->search_cabac, ctx, 0, split_bits, "split_search");
-    }
     state->search_cabac.update = 0;
     split_cost += split_bits * state->lambda;
 
@@ -1198,16 +1186,10 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         memcpy(&state->search_cabac, &pre_search_cabac, sizeof(pre_search_cabac));
         cost = 0;
         double bits = 0;
-        if (depth < MAX_DEPTH) {
-          uint8_t split_model = get_ctx_cu_split_model(lcu, x, y, depth);
-          cabac_ctx_t* ctx = &(state->search_cabac.ctx.split_flag_model[split_model]);
-          CABAC_FBITS_UPDATE(&state->search_cabac, ctx, 0, bits, "no_split_search");
-        }
-        else if (depth == MAX_DEPTH && cur_cu->type == CU_INTRA) {
-          // Add cost of intra part_size.
-          cabac_ctx_t* ctx = &(state->search_cabac.ctx.part_size_model[0]);
-          CABAC_FBITS_UPDATE(&state->search_cabac, ctx, 1, bits, "no_split_search");
-        }
+        kvz_write_split_flag(state, &state->search_cabac,
+          x > 0 ? LCU_GET_CU_AT_PX(lcu, x - 1, y) : NULL,
+          y > 0 ? LCU_GET_CU_AT_PX(lcu, x, y - 1) : NULL,
+          0, depth, cu_width, x, y, & split_bits);
 
         cur_cu->intra = cu_d1->intra;
         cur_cu->type = CU_INTRA;
