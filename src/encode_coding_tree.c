@@ -1151,6 +1151,115 @@ static void encode_part_mode(encoder_state_t * const state,
 }
 **/
 
+
+static bool write_split_flag(const encoder_state_t * const state, cabac_data_t* cabac,
+  const cu_info_t * left_cu, const cu_info_t * above_cu,
+  uint8_t split_flag,
+  int depth, int cu_width, int x, int y, double* bits_out)
+{
+  uint16_t abs_x = x + state->tile->offset_x;
+  uint16_t abs_y = y + state->tile->offset_y;
+  double bits = 0;
+  const encoder_control_t* const ctrl = state->encoder_control;
+  // Implisit split flag when on border
+  // Exception made in VVC with flag not being implicit if the BT can be used for
+  // horizontal or vertical split, then this flag tells if QT or BT is used
+
+  bool no_split, allow_qt, bh_split, bv_split, th_split, tv_split;
+  no_split = allow_qt = bh_split = bv_split = th_split = tv_split = true;
+  if (depth > MAX_DEPTH) allow_qt = false;
+  // ToDo: update this when btt is actually used
+  bool allow_btt = false;// when mt_depth < MAX_BT_DEPTH
+  
+
+  uint8_t implicit_split_mode = KVZ_NO_SPLIT;
+  //bool implicit_split = border;
+  bool bottom_left_available = ((abs_y + cu_width - 1) < ctrl->in.height);
+  bool top_right_available = ((abs_x + cu_width - 1) < ctrl->in.width);
+
+  if (!bottom_left_available && !top_right_available && allow_qt) {
+    implicit_split_mode = KVZ_QUAD_SPLIT;
+  }
+  else if (!bottom_left_available && allow_btt) {
+    implicit_split_mode = KVZ_HORZ_SPLIT;
+  }
+  else if (!top_right_available && allow_btt) {
+    implicit_split_mode = KVZ_VERT_SPLIT;
+  }
+  else if (!bottom_left_available || !top_right_available) {
+    implicit_split_mode = KVZ_QUAD_SPLIT;
+  }
+  
+  // Check split conditions
+  if (implicit_split_mode != KVZ_NO_SPLIT) {
+    no_split = th_split = tv_split = false;
+    bh_split = (implicit_split_mode == KVZ_HORZ_SPLIT);
+    bv_split = (implicit_split_mode == KVZ_VERT_SPLIT);
+  }
+
+  if (!allow_btt) {
+    bh_split = bv_split = th_split = tv_split = false;
+  }
+
+  bool allow_split = allow_qt | bh_split | bv_split | th_split | tv_split;
+
+  split_flag |= implicit_split_mode != KVZ_NO_SPLIT;
+
+  int split_model = 0;
+  if (no_split && allow_split) {
+    // Get left and top block split_flags and if they are present and true, increase model number
+    // ToDo: should use height and width to increase model, PU_GET_W() ?
+    if (left_cu && PU_GET_H(left_cu->part_size, LCU_WIDTH >> left_cu->depth, 0) < LCU_WIDTH >> depth) {
+      split_model++;
+    }
+
+    if (above_cu && PU_GET_W(above_cu->part_size, LCU_WIDTH >> above_cu->depth, 0) < LCU_WIDTH >> depth) {
+      split_model++;
+    }
+
+    uint32_t split_num = 0;
+    if (allow_qt) split_num += 2;
+    if (bh_split) split_num++;
+    if (bv_split) split_num++;
+    if (th_split) split_num++;
+    if (tv_split) split_num++;
+
+    if (split_num > 0) split_num--;
+
+    split_model += 3 * (split_num >> 1);
+
+    cabac->cur_ctx = &(cabac->ctx.split_flag_model[split_model]);
+    CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.split_flag_model[split_model]), split_flag, bits, "split_flag");
+  }
+
+  bool qt_split = split_flag || implicit_split_mode == KVZ_QUAD_SPLIT;
+
+  if (!(implicit_split_mode == KVZ_NO_SPLIT) && (allow_qt && allow_btt)) {
+    split_model = (left_cu && GET_SPLITDATA(left_cu, depth)) + (above_cu && GET_SPLITDATA(above_cu, depth)) + (depth < 2 ? 0 : 3);
+    CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.qt_split_flag_model[split_model]), qt_split, bits, "QT_split_flag");
+  }
+
+  // Only signal split when it is not implicit, currently only Qt split supported
+  if (!(implicit_split_mode == KVZ_NO_SPLIT) && !qt_split && (bh_split | bv_split | th_split | tv_split)) {
+
+    split_model = 0;
+
+    // Get left and top block split_flags and if they are present and true, increase model number
+    if (left_cu && GET_SPLITDATA(left_cu, depth) == 1) {
+      split_model++;
+    }
+
+    if (above_cu && GET_SPLITDATA(above_cu, depth) == 1) {
+      split_model++;
+    }
+
+    split_model += (depth > 2 ? 0 : 3);
+    CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.qt_split_flag_model[split_model]), split_flag, bits, "split_cu_mode");
+  }
+  if (bits_out) *bits_out += bits;
+  return split_flag;
+}
+
 void kvz_encode_coding_tree(encoder_state_t * const state,
                             uint16_t x,
                             uint16_t y,
@@ -1174,8 +1283,6 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
     above_cu = kvz_cu_array_at_const((const cu_array_t*)frame->cu_array, x, y - 1);
   }
 
-  uint8_t split_flag = GET_SPLITDATA(cur_cu, depth);
-  uint8_t split_model = 0;
 
   // Absolute coordinates
   uint16_t abs_x = x + state->tile->offset_x;
@@ -1195,116 +1302,8 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
   // When not in MAX_DEPTH, insert split flag and split the blocks if needed
   if (depth != MAX_DEPTH) {
 
-    // Implisit split flag when on border
-    // Exception made in VVC with flag not being implicit if the BT can be used for
-    // horizontal or vertical split, then this flag tells if QT or BT is used
-
-    bool no_split, allow_qt, bh_split, bv_split, th_split, tv_split;
-    no_split = allow_qt = bh_split = bv_split = th_split = tv_split = true;
-    if(depth > MAX_DEPTH) allow_qt = false;
-    // ToDo: update this when btt is actually used
-    bool allow_btt = false;// when mt_depth < MAX_BT_DEPTH
-
+    const int split_flag = write_split_flag(state, cabac, left_cu, above_cu, GET_SPLITDATA(cur_cu, depth), depth, cu_width, x, y, NULL);
     
-
-    uint8_t implicit_split_mode = KVZ_NO_SPLIT;
-    //bool implicit_split = border;
-    bool bottom_left_available = ((abs_y + cu_width - 1) < ctrl->in.height);
-    bool top_right_available = ((abs_x + cu_width - 1) < ctrl->in.width);
-
-    /*
-    if((depth >= 1 && (border_x != border_y))) implicit_split = false;
-    if (state->frame->slicetype != KVZ_SLICE_I) {
-      if (border_x != border_y) implicit_split = false;
-      if (!bottom_left_available && top_right_available) implicit_split = false;
-      if (!top_right_available && bottom_left_available) implicit_split = false;
-    }
-    */
-
-
-    if (!bottom_left_available && !top_right_available && allow_qt) {
-      implicit_split_mode = KVZ_QUAD_SPLIT;
-    } else if (!bottom_left_available && allow_btt) {
-      implicit_split_mode = KVZ_HORZ_SPLIT;
-    } else if (!top_right_available && allow_btt) {
-      implicit_split_mode = KVZ_VERT_SPLIT;
-    } else if (!bottom_left_available || !top_right_available) {
-      implicit_split_mode = KVZ_QUAD_SPLIT;
-    }
-
-    //split_flag = implicit_split_mode != KVZ_NO_SPLIT;
-
-    // Check split conditions
-    if (implicit_split_mode != KVZ_NO_SPLIT) {
-      no_split = th_split = tv_split = false;
-      bh_split = (implicit_split_mode == KVZ_HORZ_SPLIT);
-      bv_split = (implicit_split_mode == KVZ_VERT_SPLIT);
-    }
-
-    if (!allow_btt) {
-      bh_split = bv_split = th_split = tv_split = false;
-    }
-
-    bool allow_split = allow_qt | bh_split | bv_split | th_split | tv_split;
-
-    split_flag |= implicit_split_mode != KVZ_NO_SPLIT;
-
-    if (no_split && allow_split) {
-      split_model = 0;
-      
-      // Get left and top block split_flags and if they are present and true, increase model number
-      // ToDo: should use height and width to increase model, PU_GET_W() ?
-      if (left_cu && PU_GET_H(left_cu->part_size,LCU_WIDTH>>left_cu->depth,0) < LCU_WIDTH>>depth) {
-        split_model++;
-      }
-
-      if (above_cu && PU_GET_W(above_cu->part_size, LCU_WIDTH >> above_cu->depth, 0) < LCU_WIDTH >> depth) {
-        split_model++;
-      }
-
-      uint32_t split_num = 0;
-      if (allow_qt) split_num+=2;
-      if (bh_split) split_num++;
-      if (bv_split) split_num++;
-      if (th_split) split_num++;
-      if (tv_split) split_num++;
-
-      if (split_num > 0) split_num--;
-
-      split_model += 3 * (split_num >> 1);
-
-      cabac->cur_ctx = &(cabac->ctx.split_flag_model[split_model]);
-      CABAC_BIN(cabac, split_flag, "SplitFlag");
-      //fprintf(stdout, "split_model=%d  %d / %d / %d / %d / %d\n", split_model, allow_qt, bh_split, bv_split, th_split, tv_split);
-    }
-
-    bool qt_split = split_flag || implicit_split_mode == KVZ_QUAD_SPLIT;
-
-    if (!(implicit_split_mode == KVZ_NO_SPLIT) && (allow_qt && allow_btt)) {
-      split_model = (left_cu && GET_SPLITDATA(left_cu, depth)) + (above_cu && GET_SPLITDATA(above_cu, depth)) + (depth < 2 ? 0 : 3);
-      cabac->cur_ctx = &(cabac->ctx.qt_split_flag_model[split_model]);
-      CABAC_BIN(cabac, qt_split, "QT_SplitFlag");
-    }
-
-    // Only signal split when it is not implicit, currently only Qt split supported
-    if (!(implicit_split_mode == KVZ_NO_SPLIT) && !qt_split && (bh_split | bv_split | th_split | tv_split)) {
-
-      split_model = 0;
-
-      // Get left and top block split_flags and if they are present and true, increase model number
-      if (left_cu && GET_SPLITDATA(left_cu, depth) == 1) {
-        split_model++;
-      }
-
-      if (above_cu && GET_SPLITDATA(above_cu, depth) == 1) {
-        split_model++;
-      }
-      split_model += (depth > 2 ? 0 : 3);
-
-      cabac->cur_ctx = &(cabac->ctx.qt_split_flag_model[split_model]);
-      CABAC_BIN(cabac, split_flag, "split_cu_mode");
-    }
-
     if (split_flag || border) {
       // Split blocks and remember to change x and y block positions
       kvz_encode_coding_tree(state, x, y, depth + 1, coeff);
@@ -1530,7 +1529,6 @@ double kvz_mock_encode_coding_unit(
   int x, int y, int depth,
   lcu_t* lcu, cu_info_t* cur_cu) {
   double bits = 0;
-  const encoder_control_t* const ctrl = state->encoder_control;
 
   int x_local = SUB_SCU(x);
   int y_local = SUB_SCU(y);
@@ -1544,37 +1542,14 @@ double kvz_mock_encode_coding_unit(
   if (y) {
     above_cu = LCU_GET_CU_AT_PX(lcu, x_local, y_local-1);
   }
-  uint8_t split_model = 0;
-
-  // Absolute coordinates
-  uint16_t abs_x = x + state->tile->offset_x;
-  uint16_t abs_y = y + state->tile->offset_y;
-
-  // Check for slice border
-  bool border_x = ctrl->in.width < abs_x + cu_width;
-  bool border_y = ctrl->in.height < abs_y + cu_width;
-  bool border = border_x || border_y; /*!< are we in any border CU */
-
+  
   if (depth <= state->frame->max_qp_delta_depth) {
     state->must_code_qp_delta = true;
   }
 
   // When not in MAX_DEPTH, insert split flag and split the blocks if needed
   if (depth != MAX_DEPTH) {
-    // Implicit split flag when on border
-    if (!border) {
-      // Get left and top block split_flags and if they are present and true, increase model number
-      if (left_cu && GET_SPLITDATA(left_cu, depth) == 1) {
-        split_model++;
-      }
-
-      if (above_cu && GET_SPLITDATA(above_cu, depth) == 1) {
-        split_model++;
-      }
-
-      // This mocks encoding the current CU so it should be never split
-      CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.split_flag_model[split_model]), 0, bits, "SplitFlag");
-    }
+    write_split_flag(state, cabac, left_cu, above_cu, 0, depth, cu_width, x, y, &bits);
   }
 
   // Encode skip flag
