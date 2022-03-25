@@ -1145,8 +1145,8 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     if (depth < MAX_DEPTH) {
       // Add cost of cu_split_flag.
       kvz_write_split_flag(state, &state->search_cabac, 
-        x > 0 ? LCU_GET_CU_AT_PX(lcu, x -1, y ): NULL, 
-        y > 0 ? LCU_GET_CU_AT_PX(lcu, x, y - 1) : NULL,
+        x > 0 ? LCU_GET_CU_AT_PX(lcu,SUB_SCU(x) -1, SUB_SCU(y)): NULL,
+        y > 0 ? LCU_GET_CU_AT_PX(lcu, SUB_SCU(x), SUB_SCU(y) - 1) : NULL,
         1, depth, cu_width, x, y, &split_bits);
     }
 
@@ -1187,8 +1187,8 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         cost = 0;
         double bits = 0;
         kvz_write_split_flag(state, &state->search_cabac,
-          x > 0 ? LCU_GET_CU_AT_PX(lcu, x - 1, y) : NULL,
-          y > 0 ? LCU_GET_CU_AT_PX(lcu, x, y - 1) : NULL,
+          x > 0 ? LCU_GET_CU_AT_PX(lcu, SUB_SCU(x) - 1, SUB_SCU(y)) : NULL,
+          y > 0 ? LCU_GET_CU_AT_PX(lcu, SUB_SCU(x), SUB_SCU(y) - 1) : NULL,
           0, depth, cu_width, x, y, & split_bits);
 
         cur_cu->intra = cu_d1->intra;
