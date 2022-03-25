@@ -818,6 +818,9 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
       pred_cu.depth = depth;
       pred_cu.type = CU_INTRA;
       pred_cu.part_size = ((depth == MAX_PU_DEPTH) ? SIZE_NxN : SIZE_2Nx2N); // TODO: non-square blocks
+      pred_cu.skipped = 0;
+      pred_cu.merged = 0;
+      pred_cu.bdpcmMode = 0;
       pred_cu.intra.mode = pred_mode;
       pred_cu.intra.mode_chroma = pred_mode;
       pred_cu.intra.multi_ref_idx = multi_ref_index;
@@ -864,6 +867,9 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
     pred_cu.depth = depth;
     pred_cu.type = CU_INTRA;
     pred_cu.part_size = ((depth == MAX_PU_DEPTH) ? SIZE_NxN : SIZE_2Nx2N);
+    pred_cu.skipped = 0;
+    pred_cu.merged = 0;
+    pred_cu.bdpcmMode = 0;
     if (use_mip) {
       int transp_off = num_mip_modes_full >> 1;
       bool is_transposed = (mip_modes[0] >= transp_off ? true : false);
