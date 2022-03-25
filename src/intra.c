@@ -1430,8 +1430,15 @@ static void intra_recon_tb_leaf(
     }
   } else {
     kvz_pixels_blit(&state->tile->frame->cclm_luma_rec[x / 2 + (y * stride) / 4], pred, width, width, stride / 2, width);
+    if (LCU_GET_CU_AT_PX(lcu, x_scu, y_scu)->depth != depth) {
+      cclm_parameters_t temp_params;
+      kvz_predict_cclm(
+        state, color, width, width, x, y, stride, intra_mode, lcu, &refs, pred, &temp_params);
+    }
+    else {
+      linear_transform_cclm(&intra_paramas->cclm_parameters[color == COLOR_U ? 0 : 1], pred, pred, width, width);
+    }
 
-    linear_transform_cclm(&intra_paramas->cclm_parameters[color == COLOR_U ? 0 : 1], pred, pred, width, width);    
   }
 
   const int index = lcu_px.x + lcu_px.y * lcu_width;
