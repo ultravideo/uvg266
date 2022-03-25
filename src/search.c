@@ -244,7 +244,8 @@ static void downsample_cclm_rec(encoder_state_t *state, int x, int y, int width,
   int x_scu = SUB_SCU(x);
   int y_scu = SUB_SCU(y);
   y_rec += x_scu + y_scu * LCU_WIDTH;
-  int stride = state->tile->frame->source->stride;
+  const int stride = state->tile->frame->rec->stride;
+  const int stride2 = (((state->tile->frame->width + 7) & ~7) + FRAME_PADDING_LUMA);
 
   for (int y_ = 0; y_ < height && y_ * 2 + y < state->encoder_control->cfg.height; y_++) {
     for (int x_ = 0; x_ < width; x_++) {
@@ -258,13 +259,13 @@ static void downsample_cclm_rec(encoder_state_t *state, int x, int y, int width,
       s += y_rec[2 * x_ + LCU_WIDTH] * 2;
       s += y_rec[2 * x_ + 1 + LCU_WIDTH];
       s += !x_scu && !x_ && x ? state->tile->frame->rec->y[x - 1 + (y + y_ * 2 + 1) * stride] : y_rec[2 * x_ - ((x_ + x) > 0) + LCU_WIDTH];
-      int index = x / 2 + x_ + (y / 2 + y_ )* stride / 2;
+      int index = x / 2 + x_ + (y / 2 + y_ )* stride2 / 2;
       state->tile->frame->cclm_luma_rec[index] = s >> 3;
     }
     y_rec += LCU_WIDTH * 2;
   }
   if((y + height * 2) % 64 == 0) {
-    int line = y / 64 * stride / 2;
+    int line = y / 64 * stride2 / 2;
     y_rec -= LCU_WIDTH;
     for (int i = 0; i < width; ++i) {
       int s = 2;

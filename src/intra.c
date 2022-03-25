@@ -498,6 +498,7 @@ void kvz_predict_cclm(
 
 
   kvz_pixel *y_rec = lcu->rec.y + x_scu + y_scu * LCU_WIDTH;
+  const int stride2 = (((state->tile->frame->width + 7) & ~7) + FRAME_PADDING_LUMA);
 
   // Essentially what this does is that it uses 6-tap filtering to downsample
   // the luma intra references down to match the resolution of the chroma channel.
@@ -513,7 +514,7 @@ void kvz_predict_cclm(
     }
     if(y_scu == 0) {
       if(!state->encoder_control->cfg.wpp) available_above_right = MIN(width / 2, (state->tile->frame->width - x0 - width * 2) / 4);
-      memcpy(sampled_luma_ref.top, &state->tile->frame->cclm_luma_rec_top_line[x0 / 2 + (y0 / 64 - 1) * (stride / 2)], sizeof(kvz_pixel) * (width + available_above_right * 2));
+      memcpy(sampled_luma_ref.top, &state->tile->frame->cclm_luma_rec_top_line[x0 / 2 + (y0 / 64 - 1) * (stride2 / 2)], sizeof(kvz_pixel) * (width + available_above_right * 2));
     }
     else {
       for (int x = 0; x < width * (available_above_right ? 4 : 2); x += 2) {
@@ -538,11 +539,11 @@ void kvz_predict_cclm(
       if(x_scu == 32 && y_scu == 0 && pu->depth == 0) break;
     }
     for(int i = 0; i < height + available_left_below * 2; i++) {
-      sampled_luma_ref.left[i] = state->tile->frame->cclm_luma_rec[(y0/2 + i) * (stride/2) + x0 / 2 - 1];
+      sampled_luma_ref.left[i] = state->tile->frame->cclm_luma_rec[(y0/2 + i) * (stride2/2) + x0 / 2 - 1];
     }    
   }
 
-  kvz_pixels_blit(&state->tile->frame->cclm_luma_rec[x0 / 2 + (y0 * stride) / 4], sampled_luma, width, height, stride / 2, width);
+  kvz_pixels_blit(&state->tile->frame->cclm_luma_rec[x0 / 2 + (y0 * stride2) / 4], sampled_luma, width, height, stride2 / 2, width);
 
   int16_t a, b, shift;
   get_cclm_parameters(state, width, height, mode,x0, y0, available_above_right, available_left_below, &sampled_luma_ref, chroma_ref, &a, &b, &shift);
@@ -1402,7 +1403,7 @@ static void intra_recon_tb_leaf(
   kvz_intra_build_reference(log2width, color, &luma_px, &pic_px, lcu, &refs, cfg->wpp, extra_refs, multi_ref_index);
 
   kvz_pixel pred[32 * 32];
-  int stride = state->tile->frame->source->stride;
+  const int stride = (((state->tile->frame->width + 7) & ~7) + FRAME_PADDING_LUMA);
   const bool filter_boundary = color == COLOR_Y && !(cfg->lossless && cfg->implicit_rdpcm);
   bool use_mip = false;
   int8_t intra_mode = color == COLOR_Y ? intra_paramas->luma_mode : intra_paramas->chroma_mode;
