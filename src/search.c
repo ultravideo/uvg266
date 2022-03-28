@@ -563,7 +563,7 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
     const int chroma_width = (depth <= MAX_DEPTH) ? LCU_WIDTH >> (depth + 1) : LCU_WIDTH >> depth;
     int8_t scan_order = kvz_get_scan_order(pred_cu->type, pred_cu->intra.mode_chroma, depth);
     const unsigned index = xy_to_zorder(LCU_WIDTH_C, lcu_px.x, lcu_px.y);
-    if(pred_cu->joint_cb_cr != 0) {
+    if(pred_cu->joint_cb_cr == 0) {
       if (!state->encoder_control->cfg.lossless) {
         int index = lcu_px.y * LCU_WIDTH_C + lcu_px.x;
         unsigned ssd_u = kvz_pixels_calc_ssd(&lcu->ref.u[index], &lcu->rec.u[index],
