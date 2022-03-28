@@ -376,7 +376,7 @@ static double search_intra_trdepth(encoder_state_t * const state,
       intra_parameters.chroma_mode = chroma_mode;
       intra_parameters.jccr = -1; // TODO: Maybe check the jccr mode here also but holy shit is the interface of search_intra_rdo bad currently
       kvz_intra_recon_cu(state,
-        x_px, y_px,
+        x_px & ~7, y_px & ~7,
         depth,
         &intra_parameters,
         pred_cu, 
