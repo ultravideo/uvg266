@@ -558,9 +558,9 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
   }
 
   unsigned chroma_ssd = 0;
-  if(state->encoder_control->chroma_format != KVZ_CSP_400 && x_px % 8 == 0 && y_px % 8 == 0) {
-    const vector2d_t lcu_px = { x_px / 2, y_px / 2 };
-    const int chroma_width = (depth <= MAX_DEPTH) ? LCU_WIDTH >> (depth + 1) : LCU_WIDTH >> depth;
+  if(state->encoder_control->chroma_format != KVZ_CSP_400 && (depth != 4 || (x_px % 8 != 0 && y_px % 8 != 0))) {
+    const vector2d_t lcu_px = { (x_px & ~7 ) / 2, (y_px & ~7) / 2 };
+    const int chroma_width = MAX(4, LCU_WIDTH >> (depth + 1));
     int8_t scan_order = kvz_get_scan_order(pred_cu->type, pred_cu->intra.mode_chroma, depth);
     const unsigned index = xy_to_zorder(LCU_WIDTH_C, lcu_px.x, lcu_px.y);
     if(pred_cu->joint_cb_cr == 0) {
