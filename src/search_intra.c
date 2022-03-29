@@ -321,6 +321,12 @@ static double search_intra_trdepth(
     }
     pred_cu->intra.mode_chroma = -1;
     pred_cu->joint_cb_cr = 4;
+    // LFNST_TODO: do lfnst search somewhere around here, maybe after MTS search
+    // For now, initialize lfnst variables here
+    pred_cu->lfnst_last_scan_pos = 0;
+    pred_cu->violates_lfnst_constrained[0] = 0;
+    pred_cu->violates_lfnst_constrained[1] = 0;
+    pred_cu->lfnst_idx = 0;
     for (; trafo < num_transforms; trafo++) {
       pred_cu->tr_idx = trafo;
       if (mts_enabled)

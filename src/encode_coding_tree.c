@@ -111,36 +111,39 @@ static void encode_mts_idx(encoder_state_t * const state,
 static bool is_lfnst_allowed(encoder_state_t* const state, const cu_info_t* const pred_cu, const int color,
                              const int width, const int height) 
 {
-  if (!state->encoder_control->cfg.lfnst && pred_cu->type != CU_INTRA) {
-    return false;
-  }
-  int isp_mode = 0; // LFNST_TODO: assign proper ISP mode when ISP is implemented
-  int isp_split_type = 0;
-  const int chroma_width = width >> 1;
-  const int chroma_height = height >> 1;
-  bool can_use_lfnst_with_isp = color == COLOR_Y;
-  bool can_use_lfnst_with_mip = (width >= 16 && height >= 16);
-  const int max_tb_size = 64; // LFNST_TODO: use define instead for max transform block size
+  if (state->encoder_control->cfg.lfnst && pred_cu->type == CU_INTRA) {
+    int isp_mode = 0; // LFNST_TODO: assign proper ISP mode when ISP is implemented
+    int isp_split_type = 0;
+    const int chroma_width = width >> 1;
+    const int chroma_height = height >> 1;
+    bool can_use_lfnst_with_isp = color == COLOR_Y;
+    bool can_use_lfnst_with_mip = (width >= 16 && height >= 16);
+    const int max_tb_size = 64; // LFNST_TODO: use define instead for max transform block size
 
-  if (can_use_lfnst_with_isp) {
-    if (isp_split_type == NOT_INTRA_SUBPARTITIONS || width < 4 || height < 4) {
-      can_use_lfnst_with_isp = false;
+    if (can_use_lfnst_with_isp) {
+      if (isp_split_type == NOT_INTRA_SUBPARTITIONS || width < 4 || height < 4) {
+        can_use_lfnst_with_isp = false;
+      }
     }
-  }
 
-  if ((isp_mode && !can_use_lfnst_with_isp) ||                                 
+    if ((isp_mode && !can_use_lfnst_with_isp) ||
       (pred_cu->type == CU_INTRA && false && !can_use_lfnst_with_mip) || // LFNST_TODO: replace 'false' with intra mip flag when MIP is merged
       (false && color != COLOR_Y && MIN(chroma_width, chroma_height) < 4) || // LFNST_TODO: if separate tree structure is implemented, replace 'false' with is_separate_tree check
       (width > max_tb_size || height > max_tb_size)) {
+      return false;
+    }
+
+    return true;
+  }
+  else {
     return false;
   }
-
-  return true;
+  
 }
 
 static void encode_lfnst_idx(encoder_state_t * const state, cabac_data_t * const cabac,
-                             const cu_info_t * const pred_cu, const int color,
-                             const int width, const int height)
+                             const cu_info_t * const pred_cu, const int x, const int y,
+                             const int depth, const int color, const int width, const int height)
 {
   
   if (is_lfnst_allowed(state, pred_cu, color, width, height)) {
@@ -148,10 +151,33 @@ static void encode_lfnst_idx(encoder_state_t * const state, cabac_data_t * const
     bool luma_flag = is_separate_tree ? (color == COLOR_Y ? true: false) : true;
     bool chroma_flag = is_separate_tree ? (color != COLOR_Y ? true : false) : true;
     bool non_zero_coeff_non_ts_corner_8x8 = (luma_flag && pred_cu->violates_lfnst_constrained[0]) || (chroma_flag && pred_cu->violates_lfnst_constrained[1]);
-    bool is_tr_skip = (pred_cu->cbf && pred_cu->tr_idx == MTS_SKIP) ? true : false;
+    bool is_tr_skip = false;
+
+    const videoframe_t* const frame = state->tile->frame;
+    //const int num_pred_units = kvz_part_mode_num_parts[pred_cu->part_size];
+    const int cu_width = LCU_WIDTH >> depth;
+    const int tr_depth = pred_cu->tr_depth;
+    assert(depth <= tr_depth && "Depth greater than transform depth. This should never trigger.");
+    const int num_transform_units = 1 << (2 * (tr_depth - depth));
+    const int tu_row_length = 1 << (tr_depth - depth);
+    const int tu_width = cu_width >> (tr_depth - depth);
+    const int tu_height = tu_width; // TODO: height for non-square blocks
+
+    for (int i = 0; i < num_transform_units; i++) {
+      // TODO: this works only for square blocks
+      const int pu_x = x + ((i % tu_row_length) * tu_width);
+      const int pu_y = y + ((i / tu_row_length) * tu_height);
+      const cu_info_t* cur_tu = kvz_cu_array_at_const(frame->cu_array, pu_x, pu_y);
+      assert(cur_tu != NULL && "NULL transform unit.");
+      bool cbf_set = cbf_is_set_any(cur_tu->cbf, tr_depth);
+
+      if (cur_tu != NULL && cbf_set && cur_tu->tr_idx == MTS_SKIP) {
+        is_tr_skip = true;
+      }
+    }
     
-    // LFNST_TODO:                        replace this false with !pred_cu->isp_mode when ISP is implemented
-    if ((!pred_cu->lfnst_last_scan_pos && false) || non_zero_coeff_non_ts_corner_8x8 || is_tr_skip) {
+    // LFNST_TODO:                        replace this 'true' with !pred_cu->isp_mode when ISP is implemented
+    if ((!pred_cu->lfnst_last_scan_pos && true) || non_zero_coeff_non_ts_corner_8x8 || is_tr_skip) {
       return;
     }
 
