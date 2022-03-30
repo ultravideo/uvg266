@@ -472,7 +472,7 @@ static bool early_terminate(inter_search_info_t *info,
       { 0, -1 }, { -1, 0 }, { 0, 0 },
   };
 
-  vector2d_t mv = { best_mv->x >> 2, best_mv->y >> 2 };
+  vector2d_t mv = { best_mv->x >> INTERNAL_MV_PREC, best_mv->y >> INTERNAL_MV_PREC };
 
   int first_index = 0;
   int last_index = 3;
@@ -668,7 +668,7 @@ static void tz_search(inter_search_info_t *info,
 
   int best_dist = 0;
   
-  vector2d_t start = { best_mv->x >> 2, best_mv->y >> 2 };
+  vector2d_t start = { best_mv->x >> INTERNAL_MV_PREC, best_mv->y >> INTERNAL_MV_PREC };
 
   // step 2, grid search
   int rounds_without_improvement = 0;
@@ -768,7 +768,7 @@ static void hexagon_search(inter_search_info_t *info,
       { -1, -1 }, { 1, -1 }, { -1, 1 }, { 1, 1 }
   };
 
-  vector2d_t mv = { best_mv->x >> 2, best_mv->y >> 2 };
+  vector2d_t mv = { best_mv->x >> INTERNAL_MV_PREC, best_mv->y >> INTERNAL_MV_PREC };
 
   // Current best index, either to merge_cands, large_hexbs or small_hexbs.
   int best_index = 0;
