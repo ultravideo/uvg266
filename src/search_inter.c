@@ -350,20 +350,18 @@ static double get_mvd_coding_cost(const encoder_state_t* state,
 
   if (hor_abs_gr0) {
     if (mvd_hor_abs > 1) {
-      bitcost += get_ep_ex_golomb_bitcost(mvd_hor_abs - 2) << CTX_FRAC_BITS;
+      bitcost += get_ep_ex_golomb_bitcost(mvd_hor_abs - 2);
     }
-    bitcost += CTX_FRAC_ONE_BIT;
+    bitcost += 1;
   }
   if (ver_abs_gr0) {
     if (mvd_ver_abs > 1) {
-      bitcost += get_ep_ex_golomb_bitcost(mvd_ver_abs - 2) << CTX_FRAC_BITS;
+      bitcost += get_ep_ex_golomb_bitcost(mvd_ver_abs - 2) ;
     }
-    bitcost += CTX_FRAC_ONE_BIT;
+    bitcost += 1;
   }
-
-
-  // Round and shift back to integer bits.
-  return bitcost / (1 << CTX_FRAC_BITS);
+  
+  return bitcost;
 }
 
 
