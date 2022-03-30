@@ -1253,6 +1253,11 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         kvz_hmvp_add_mv(state, x, y, cu_width, cu_width, cur_cu);
       }
     }
+    else {
+      downsample_cclm_rec(
+        state, x, y, cu_width / 2, cu_width / 2, lcu->rec.y, lcu->left_ref.y[64]
+      );      
+    }
   } else if (depth >= 0 && depth < MAX_PU_DEPTH) {
     // Need to copy modes down since the lower level of the work tree is used
     // when searching SMP and AMP blocks.
