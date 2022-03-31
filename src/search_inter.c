@@ -2172,7 +2172,7 @@ void kvz_cu_cost_inter_rd2(encoder_state_t * const state,
   if(cbf) {
     *inter_cost = kvz_cu_rd_cost_luma(state, x_px, y_px, depth, cur_cu, lcu);
     if (reconstruct_chroma) {
-      if (cur_cu->depth != cur_cu->tr_depth) {
+      if (cur_cu->depth != cur_cu->tr_depth || !state->encoder_control->cfg.jccr) {
         *inter_cost += kvz_cu_rd_cost_chroma(state, x_px, y_px, depth, cur_cu, lcu);
       }
       else {

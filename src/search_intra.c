@@ -1043,7 +1043,7 @@ int8_t kvz_search_intra_chroma_rdo(encoder_state_t * const state,
           lcu);
       }
       double bits = 0;
-      if(tr_cu->depth != tr_cu->tr_depth) {
+      if(tr_cu->depth != tr_cu->tr_depth || !state->encoder_control->cfg.jccr) {
         chroma.cost = kvz_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, tr_cu, lcu);
       } else {
         chroma.cost = 0;
