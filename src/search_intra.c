@@ -829,8 +829,8 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
       pred_cu.joint_cb_cr = 0;
       FILL(pred_cu.cbf, 0);
 
-      int rdo_bitcost = kvz_luma_mode_bits(state, &pred_cu, x_px, y_px, depth, lcu);
-      *mode_cost_p = rdo_bitcost * (int)(state->lambda + 0.5);
+      double rdo_bitcost = kvz_luma_mode_bits(state, &pred_cu, x_px, y_px, depth, lcu);
+      *mode_cost_p = rdo_bitcost * state->lambda;
 
       // Reset transform split data in lcu.cu for this area.
       kvz_lcu_fill_trdepth(lcu, x_px, y_px, depth, depth);

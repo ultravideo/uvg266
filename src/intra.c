@@ -1429,7 +1429,8 @@ static void intra_recon_tb_leaf(
     else {
       kvz_intra_predict(state, &refs, log2width, intra_mode, color, pred, filter_boundary, multi_ref_index);
     }
-  } else {
+  }
+  else {
     kvz_pixels_blit(&state->tile->frame->cclm_luma_rec[x / 2 + (y * stride) / 4], pred, width, width, stride / 2, width);
     if (LCU_GET_CU_AT_PX(lcu, x_scu, y_scu)->depth != depth) {
       cclm_parameters_t temp_params;
@@ -1439,7 +1440,6 @@ static void intra_recon_tb_leaf(
     else {
       linear_transform_cclm(&intra_paramas->cclm_parameters[color == COLOR_U ? 0 : 1], pred, pred, width, width);
     }
-
   }
 
   const int index = lcu_px.x + lcu_px.y * lcu_width;
