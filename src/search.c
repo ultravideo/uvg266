@@ -638,7 +638,7 @@ void kvz_select_jccr_mode(
   CABAC_FBITS_UPDATE(cabac, ctx, v_is_set, tr_tree_bits, "cbf_cr_search");
 
   int cbf_mask = cbf_is_set(pred_cu->cbf, depth, COLOR_U) * 2 + cbf_is_set(pred_cu->cbf, depth, COLOR_V) - 1;
-  if(cbf_mask != -1)
+  if((cbf_mask != -1 && pred_cu->type == CU_INTRA) || cbf_mask == 2)
     CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.joint_cb_cr[cbf_mask]), 0, tr_tree_bits, "jccr_flag");
 
   if(pred_cu->joint_cb_cr) {
