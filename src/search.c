@@ -1059,6 +1059,14 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
                                   NULL,
                                   lcu,
                                   false);
+        if (cur_cu->depth == cur_cu->tr_depth && state->encoder_control->cfg.jccr && cur_cu->joint_cb_cr) {
+          kvz_select_jccr_mode(state,
+            x & ~7, y & ~7,
+            depth,
+            NULL,
+            lcu,
+            NULL);
+        }
 
         int cbf = cbf_is_set_any(cur_cu->cbf, depth);
 

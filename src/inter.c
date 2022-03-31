@@ -624,7 +624,9 @@ void kvz_inter_pred_pu(const encoder_state_t * const state,
                        int i_pu)
 
 {
-  cu_info_t *cu = LCU_GET_CU_AT_PX(lcu, SUB_SCU(x), SUB_SCU(y));
+  const int x_scu = SUB_SCU(x);
+  const int y_scu = SUB_SCU(y);
+  cu_info_t *cu = LCU_GET_CU_AT_PX(lcu, x_scu, y_scu);
   const int pu_x = PU_GET_X(cu->part_size, width, x, i_pu);
   const int pu_y = PU_GET_Y(cu->part_size, width, y, i_pu);
   const int pu_w = PU_GET_W(cu->part_size, width, i_pu);
@@ -672,6 +674,12 @@ void kvz_inter_pred_pu(const encoder_state_t * const state,
       &lcu_adapter,
       NULL,
       predict_luma, predict_chroma);
+  }
+
+  if (predict_chroma && state->encoder_control->cfg.jccr) {
+    const int offset = x_scu / 2 + y_scu / 2 * LCU_WIDTH_C;
+    kvz_pixels_blit(lcu->rec.u + offset, lcu->rec.joint_u + offset, width / 2, width / 2, LCU_WIDTH_C, LCU_WIDTH_C);
+    kvz_pixels_blit(lcu->rec.v + offset, lcu->rec.joint_v + offset, width / 2, width / 2, LCU_WIDTH_C, LCU_WIDTH_C);
   }
 }
 
