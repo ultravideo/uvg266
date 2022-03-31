@@ -732,14 +732,11 @@ int kvz_encode_inter_prediction_unit(encoder_state_t * const state,
   return non_zero_mvd;
 }
 
-static void encode_chroma_intra_cu(cabac_data_t* const cabac, const cu_info_t* const cur_cu, int x, int y, const videoframe_t* const frame, const int cu_width, const int cclm_enabled) {
+static void encode_chroma_intra_cu(cabac_data_t* const cabac, const cu_info_t* const cur_cu, const int cclm_enabled) {
   unsigned pred_mode = 0;
   unsigned chroma_pred_modes[8] = {0, 50, 18, 1, 67, 81, 82, 83};
-  const int pu_x = PU_GET_X(cur_cu->part_size, cu_width, x, 0);
-  const int pu_y = PU_GET_Y(cur_cu->part_size, cu_width, y, 0);
-  const cu_info_t *first_pu = kvz_cu_array_at_const(frame->cu_array, pu_x, pu_y);
-  int8_t chroma_intra_dir = first_pu->intra.mode_chroma;
-  int8_t luma_intra_dir = first_pu->intra.mode;
+  int8_t chroma_intra_dir = cur_cu->intra.mode_chroma;
+  int8_t luma_intra_dir = cur_cu->intra.mode;
 
 
   bool derived_mode = chroma_intra_dir == luma_intra_dir;
@@ -1494,7 +1491,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
 
     // Code chroma prediction mode.
     if (state->encoder_control->chroma_format != KVZ_CSP_400 && depth != 4) {
-      encode_chroma_intra_cu(cabac, cur_cu, x, y, frame, cu_width, state->encoder_control->cfg.cclm);
+      encode_chroma_intra_cu(cabac, cur_cu, state->encoder_control->cfg.cclm);
     }
 
     encode_transform_coeff(state, x, y, depth, 0, 0, 0, 0, coeff);
@@ -1503,7 +1500,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
 
     // For 4x4 the chroma PU/TU is coded after the last 
     if (state->encoder_control->chroma_format != KVZ_CSP_400 && depth == 4 && x % 8 && y % 8) {
-      encode_chroma_intra_cu(cabac, cur_cu, x, y, frame, cu_width, state->encoder_control->cfg.cclm);
+      encode_chroma_intra_cu(cabac, cur_cu, state->encoder_control->cfg.cclm);
       encode_transform_coeff(state, x, y, depth, 0, 0, 0, 1, coeff);
     
     }
@@ -1613,6 +1610,9 @@ double kvz_mock_encode_coding_unit(
   }
   else if (cur_cu->type == CU_INTRA) {
     kvz_encode_intra_luma_coding_unit(state, cabac, cur_cu, x, y, depth, lcu, &bits);
+    if((depth != 4 || (x % 8 != 0 && y % 8 != 0)) && state->encoder_control->chroma_format != KVZ_CSP_400) {
+      encode_chroma_intra_cu(cabac, cur_cu, state->encoder_control->cfg.cclm);
+    }
   }
   else {
     assert(0 && "Unset cu type");
