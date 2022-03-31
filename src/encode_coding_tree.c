@@ -594,7 +594,13 @@ static void encode_transform_coeff(encoder_state_t * const state,
 
       state->must_code_qp_delta = false;
     }
-    if((cb_flag_u || cb_flag_v ) && (depth != 4 || only_chroma) && state->encoder_control->cfg.jccr) {
+    if((
+        ((cb_flag_u || cb_flag_v ) 
+          && cur_cu->type == CU_INTRA)
+        || (cb_flag_u && cb_flag_v)) 
+      && (depth != 4 || only_chroma) 
+      && state->encoder_control->cfg.jccr
+      ) {
       cabac->cur_ctx = &cabac->ctx.joint_cb_cr[cb_flag_u * 2 + cb_flag_v - 1];
       CABAC_BIN(cabac, cur_pu->joint_cb_cr != 0, "tu_joint_cbcr_residual_flag");
     }
