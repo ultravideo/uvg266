@@ -51,7 +51,8 @@ void uvg_encode_ts_residual(encoder_state_t* const state,
   const coeff_t* coeff,
   uint32_t width,
   uint8_t type,
-  int8_t scan_mode);
+  int8_t scan_mode,
+  double* bits);
 
 void uvg_encode_mvd(encoder_state_t * const state,
                     cabac_data_t *cabac,
@@ -87,4 +88,4 @@ bool uvg_write_split_flag(const encoder_state_t* const state, cabac_data_t* caba
 void uvg_encode_last_significant_xy(cabac_data_t * const cabac,
   uint8_t lastpos_x, uint8_t lastpos_y,
   uint8_t width, uint8_t height,
-  uint8_t type, uint8_t scan);
+  uint8_t type, uint8_t scan, double* bits_out);

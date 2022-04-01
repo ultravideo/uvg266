@@ -59,7 +59,7 @@ int uvg_ts_rdoq(encoder_state_t* const state, coeff_t* src_coeff, coeff_t* dest_
                 int32_t height, int8_t type, int8_t scan_mode);
 
 
-uint32_t uvg_get_coeff_cost(const encoder_state_t * const state,
+double uvg_get_coeff_cost(const encoder_state_t * const state,
                             const coeff_t *coeff,
                             int32_t width,
                             int32_t type,

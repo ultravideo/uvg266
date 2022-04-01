@@ -47,7 +47,8 @@ void uvg_encode_coeff_nxn_avx2(encoder_state_t * const state,
                                uint8_t width,
                                uint8_t type,
                                int8_t scan_mode,
-                               int8_t tr_skip);
+                               int8_t tr_skip,
+                               double* bits_out);
 
 int uvg_strategy_register_encode_avx2(void* opaque, uint8_t bitdepth);
 

@@ -256,7 +256,8 @@ void uvg_encode_ts_residual(encoder_state_t* const state,
   const coeff_t* coeff,
   uint32_t width,
   uint8_t type,
-  int8_t scan_mode) {
+  int8_t scan_mode,
+  double* bits_out) {
   //const encoder_control_t * const encoder = state->encoder_control;
   //int c1 = 1;
   uint32_t i;
@@ -271,7 +272,7 @@ void uvg_encode_ts_residual(encoder_state_t* const state,
   const uint32_t log2_cg_size = uvg_g_log2_sbb_size[log2_block_size][log2_block_size][0] + uvg_g_log2_sbb_size[log2_block_size][log2_block_size][1];
   const uint32_t* scan =    uvg_g_sig_last_scan[scan_mode][log2_block_size - 1];
   const uint32_t* scan_cg = g_sig_last_scan_cg[log2_block_size - 1][scan_mode];
-
+  double bits = 0;
 
   // Init base contexts according to block type
   cabac_ctx_t* base_coeff_group_ctx = &(cabac->ctx.transform_skip_sig_coeff_group[0]);
@@ -304,10 +305,10 @@ void uvg_encode_ts_residual(encoder_state_t* const state,
       cabac->cur_ctx = &base_coeff_group_ctx[ctx_sig];
 
       if(!sig_coeffgroup_flag[scan_cg[i]]) {
-        CABAC_BIN(cabac, 0, "ts_sigGroup");
+        CABAC_FBITS_UPDATE(cabac, &base_coeff_group_ctx[ctx_sig], 0, bits, "ts_sigGroup");
         continue;
       }
-      CABAC_BIN(cabac, 1, "ts_sigGroup");
+      CABAC_FBITS_UPDATE(cabac, &base_coeff_group_ctx[ctx_sig], 1, bits, "ts_sigGroup");
       no_sig_group_before_last = false;
     }
 
@@ -333,10 +334,9 @@ void uvg_encode_ts_residual(encoder_state_t* const state,
       unsigned  sigFlag = (curr_coeff != 0);
       if (numNonZero || nextSigPos != inferSigPos)
       {
-        cabac->cur_ctx = &cabac->ctx.transform_skip_sig[
+        CABAC_FBITS_UPDATE(cabac, &cabac->ctx.transform_skip_sig[
           uvg_context_get_sig_ctx_idx_abs_ts(coeff, pos_x, pos_y, width)
-        ];
-        CABAC_BIN(cabac, sigFlag, "sig_coeff_flag");
+        ], sigFlag, bits, "sig_coeff_flag");
         maxCtxBins--;
       }
 
@@ -344,10 +344,10 @@ void uvg_encode_ts_residual(encoder_state_t* const state,
       {
         //===== encode sign's =====
         int sign = curr_coeff < 0;
-        cabac->cur_ctx = &cabac->ctx.transform_skip_res_sign[
-          uvg_sign_ctx_id_abs_ts(coeff, pos_x, pos_y, width, 0)
-        ];
         CABAC_BIN(cabac, sign, "coeff_sign_flag");
+        CABAC_FBITS_UPDATE(cabac, &cabac->ctx.transform_skip_sig[
+          uvg_sign_ctx_id_abs_ts(coeff, pos_x, pos_y, width, 0)
+        ], sign, bits, "coeff_sign_flag");
         maxCtxBins--;
         numNonZero++;
 
@@ -359,17 +359,15 @@ void uvg_encode_ts_residual(encoder_state_t* const state,
         remAbsLevel = modAbsCoeff - 1;
 
         unsigned gt1 = !!remAbsLevel;
-        cabac->cur_ctx = &cabac->ctx.transform_skip_gt1[
+        CABAC_FBITS_UPDATE(cabac, &cabac->ctx.transform_skip_sig[
           uvg_lrg1_ctx_id_abs_ts(coeff, pos_x, pos_y, width, 0)
-        ];
-        CABAC_BIN(cabac, gt1, "abs_level_gtx_flag");
+        ], remAbsLevel & 1, bits, "abs_level_gtx_flag");
         maxCtxBins--;
 
         if (gt1)
         {
           remAbsLevel -= 1;
-          cabac->cur_ctx = &cabac->ctx.transform_skip_par;
-          CABAC_BIN(cabac, remAbsLevel & 1, "par_level_flag");
+          CABAC_FBITS_UPDATE(cabac, &cabac->ctx.transform_skip_par, gt1, bits, "par_level_flag");
           maxCtxBins--;
         }
       }
@@ -396,6 +394,9 @@ void uvg_encode_ts_residual(encoder_state_t* const state,
           unsigned gt2 = (absLevel >= (cutoffVal + 2));
           cabac->cur_ctx = &cabac->ctx.transform_skip_gt2[cutoffVal >> 1];
           CABAC_BIN(cabac, gt2, "abs_level_gtx_flag");
+          CABAC_FBITS_UPDATE(cabac, &cabac->ctx.transform_skip_sig[
+            kvz_lrg1_ctx_id_abs_ts(coeff, pos_x, pos_y, width, 0)
+          ], gt2, bits, "abs_level_gtx_flag");
           maxCtxBins--;
         }
         cutoffVal += 2;
@@ -419,16 +420,18 @@ void uvg_encode_ts_residual(encoder_state_t* const state,
       {
         int       rice = 1;
         unsigned  rem = scanPos <= lastScanPosPass1 ? (absLevel - cutoffVal) >> 1 : absLevel;
-        uvg_cabac_write_coeff_remain(cabac, rem, rice, 5);
+        bits += uvg_cabac_write_coeff_remain(cabac, rem, rice, 5);
 
         if (absLevel && scanPos > lastScanPosPass1)
         {
           int sign = coeff[blk_pos] < 0;
           CABAC_BIN_EP(cabac, sign, "coeff_sign_flag");
+          bits += 1;
         }
       }
     }
   }
+  if (bits_out && cabac->only_count) *bits_out += bits;
 }
 
 /**
@@ -445,9 +448,9 @@ void uvg_encode_ts_residual(encoder_state_t* const state,
  * significant coefficient.
  */
 void uvg_encode_last_significant_xy(cabac_data_t * const cabac,
-                                       uint8_t lastpos_x, uint8_t lastpos_y,
-                                       uint8_t width, uint8_t height,
-                                       uint8_t type, uint8_t scan)
+                                    uint8_t lastpos_x, uint8_t lastpos_y,
+                                    uint8_t width, uint8_t height,
+                                    uint8_t type, uint8_t scan, double* bits_out)
 {
   const int index_x = uvg_math_floor_log2(width);
   const int index_y = uvg_math_floor_log2(width);
@@ -457,6 +460,7 @@ void uvg_encode_last_significant_xy(cabac_data_t * const cabac,
   uint8_t ctx_offset_y = type ? 0 : prefix_ctx[index_y];
   uint8_t shift_x = type ? CLIP(0, 2, width>>3) : (index_x+1)>>2;
   uint8_t shift_y = type ? CLIP(0, 2, width >> 3) : (index_y + 1) >> 2;
+  double bits = 0;
 
   cabac_ctx_t *base_ctx_x = (type ? cabac->ctx.cu_ctx_last_x_chroma : cabac->ctx.cu_ctx_last_x_luma);
   cabac_ctx_t *base_ctx_y = (type ? cabac->ctx.cu_ctx_last_y_chroma : cabac->ctx.cu_ctx_last_y_luma);
@@ -466,39 +470,38 @@ void uvg_encode_last_significant_xy(cabac_data_t * const cabac,
 
   // x prefix
   int last_x = 0;
-  for (last_x = 0; last_x < group_idx_x; last_x++) {
-    cabac->cur_ctx = &base_ctx_x[ctx_offset_x + (last_x >> shift_x)];
-    CABAC_BIN(cabac, 1, "last_sig_coeff_x_prefix");
+  for (; last_x < group_idx_x; last_x++) {
+    CABAC_FBITS_UPDATE(cabac, &base_ctx_x[ctx_offset_x + (last_x >> shift_x)], 1, bits, "last_sig_coeff_x_prefix");
   }
   if (group_idx_x < ( /*width == 32 ? g_group_idx[15] : */g_group_idx[MIN(32, (int32_t)width) - 1])) {
-    cabac->cur_ctx = &base_ctx_x[ctx_offset_x + (last_x >> shift_x)];
-    CABAC_BIN(cabac, 0, "last_sig_coeff_x_prefix");
+    CABAC_FBITS_UPDATE(cabac, &base_ctx_x[ctx_offset_x + (last_x >> shift_x)], 0, bits, "last_sig_coeff_x_prefix");
   }
 
   // y prefix
   int last_y = 0;
-  for (last_y = 0; last_y < group_idx_y; last_y++) {
-    cabac->cur_ctx = &base_ctx_y[ctx_offset_y + (last_y >> shift_y)];
-    CABAC_BIN(cabac, 1, "last_sig_coeff_y_prefix");
+  for (; last_y < group_idx_y; last_y++) {
+    CABAC_FBITS_UPDATE(cabac, &base_ctx_y[ctx_offset_y + (last_y >> shift_y)], 1, bits, "last_sig_coeff_y_prefix");
   }
   if (group_idx_y < (/* height == 32 ? g_group_idx[15] : */g_group_idx[MIN(32, (int32_t)height) - 1])) {
-    cabac->cur_ctx = &base_ctx_y[ctx_offset_y + (last_y >> shift_y)];
-    CABAC_BIN(cabac, 0, "last_sig_coeff_y_prefix");
+    CABAC_FBITS_UPDATE(cabac, &base_ctx_y[ctx_offset_y + (last_y >> shift_y)], 0, bits, "last_sig_coeff_y_prefix");
   }
 
   // last_sig_coeff_x_suffix
   if (group_idx_x > 3) {
     const int suffix = lastpos_x - g_min_in_group[group_idx_x];
-    const int bits = (group_idx_x - 2) / 2;
-    CABAC_BINS_EP(cabac, suffix, bits, "last_sig_coeff_x_suffix");
+    const int write_bits = (group_idx_x - 2) / 2;
+    CABAC_BINS_EP(cabac, suffix, write_bits, "last_sig_coeff_x_suffix");
+    if (cabac->only_count) bits += write_bits;
   }
 
   // last_sig_coeff_y_suffix
   if (group_idx_y > 3) {
     const int suffix = lastpos_y - g_min_in_group[group_idx_y];
-    const int bits = (group_idx_y - 2) / 2;
-    CABAC_BINS_EP(cabac, suffix, bits, "last_sig_coeff_y_suffix");
+    const int write_bits = (group_idx_y - 2) / 2;
+    CABAC_BINS_EP(cabac, suffix, write_bits, "last_sig_coeff_y_suffix");
+    if (cabac->only_count) bits += write_bits;
   }
+  if (cabac->only_count && bits_out) *bits_out += bits;
 }
 
 static void encode_chroma_tu(encoder_state_t* const state, int x, int y, int depth, const uint8_t width_c, cu_info_t* cur_pu, int8_t* scan_idx, lcu_coeff_t* coeff, uint8_t joint_chroma) {
@@ -517,7 +520,7 @@ static void encode_chroma_tu(encoder_state_t* const state, int x, int y, int dep
         // TODO: transform skip for chroma blocks
         CABAC_BIN(cabac, 0, "transform_skip_flag");
       }
-      uvg_encode_coeff_nxn(state, &state->cabac, coeff_u, width_c, COLOR_U, *scan_idx, cur_pu);
+      uvg_encode_coeff_nxn(state, &state->cabac, coeff_u, width_c, COLOR_U, *scan_idx, NULL, cur_pu);
     }
 
     if (cbf_is_set(cur_pu->cbf, depth, COLOR_V)) {
@@ -525,7 +528,7 @@ static void encode_chroma_tu(encoder_state_t* const state, int x, int y, int dep
         cabac->cur_ctx = &cabac->ctx.transform_skip_model_chroma;
         CABAC_BIN(cabac, 0, "transform_skip_flag");
       }
-      uvg_encode_coeff_nxn(state, &state->cabac, coeff_v, width_c, COLOR_V, *scan_idx, cur_pu);
+      uvg_encode_coeff_nxn(state, &state->cabac, coeff_v, width_c, COLOR_V, *scan_idx, NULL, cur_pu);
     }
   }
   else {
@@ -534,7 +537,7 @@ static void encode_chroma_tu(encoder_state_t* const state, int x, int y, int dep
       cabac->cur_ctx = &cabac->ctx.transform_skip_model_chroma;
       CABAC_BIN(cabac, 0, "transform_skip_flag");
     }
-    uvg_encode_coeff_nxn(state, &state->cabac, coeff_uv, width_c, COLOR_V, *scan_idx, cur_pu);
+    uvg_encode_coeff_nxn(state, &state->cabac, coeff_uv, width_c, COLOR_V, *scan_idx, NULL, cur_pu);
     
   }
 }
@@ -569,7 +572,7 @@ static void encode_transform_unit(encoder_state_t * const state,
       DBG_YUVIEW_VALUE(state->frame->poc, DBG_YUVIEW_TR_SKIP, x, y, width, width, (cur_pu->tr_idx == MTS_SKIP) ? 1 : 0);
     }
     if(cur_pu->tr_idx == MTS_SKIP) {
-      uvg_encode_ts_residual(state, cabac, coeff_y, width, 0, scan_idx);      
+      uvg_encode_ts_residual(state, cabac, coeff_y, width, 0, scan_idx, NULL);      
     }
     else {
       uvg_encode_coeff_nxn(state,
@@ -578,7 +581,8 @@ static void encode_transform_unit(encoder_state_t * const state,
                            width,
                            0,
                            scan_idx,
-                           (cu_info_t * )cur_pu);
+                           (cu_info_t * )cur_pu,
+                           NULL);
     }
   }
 

@@ -294,7 +294,7 @@ out:
  *
  * \returns bits needed to code input coefficients
  */
-static INLINE uint32_t get_coeff_cabac_cost(
+static INLINE double get_coeff_cabac_cost(
     const encoder_state_t * const state,
     const coeff_t *coeff,
     int32_t width,
@@ -319,8 +319,8 @@ static INLINE uint32_t get_coeff_cabac_cost(
 
   // Clear bytes and bits and set mode to "count"
   cabac_copy.only_count = 1;
-  int num_buffered_bytes = cabac_copy.num_buffered_bytes;
-  int bits_left = cabac_copy.bits_left;
+  cabac_copy.update = 1;
+  double bits = 0;
 
   // Execute the coding function.
   // It is safe to drop the const modifier since state won't be modified
@@ -332,7 +332,8 @@ static INLINE uint32_t get_coeff_cabac_cost(
                          width,
                          type,
                          scan_mode,
-                         NULL);
+                         NULL,                   
+                         &bits);
   }
   else {
     uvg_encode_ts_residual((encoder_state_t* const)state,
@@ -340,15 +341,16 @@ static INLINE uint32_t get_coeff_cabac_cost(
       coeff,
       width,
       type,
-      scan_mode);
+      scan_mode,
+      &bits);
   }
-  if(cabac_copy.update) {
+  if(state->search_cabac.update) {
     memcpy((cabac_data_t *)&state->search_cabac, &cabac_copy, sizeof(cabac_copy));
   }
-  return (bits_left - cabac_copy.bits_left) + ((cabac_copy.num_buffered_bytes - num_buffered_bytes) << 3);
+  return bits;
 }
 
-static INLINE void save_ccc(int qp, const coeff_t *coeff, int32_t size, uint32_t ccc)
+static INLINE void save_ccc(int qp, const coeff_t *coeff, int32_t size, double ccc)
 {
   pthread_mutex_t *mtx = outfile_mutex + qp;
 
@@ -364,14 +366,14 @@ static INLINE void save_ccc(int qp, const coeff_t *coeff, int32_t size, uint32_t
   pthread_mutex_unlock(mtx);
 }
 
-static INLINE void save_accuracy(int qp, uint32_t ccc, uint32_t fast_cost)
+static INLINE void save_accuracy(int qp, double ccc, uint32_t fast_cost)
 {
   pthread_mutex_t *mtx = outfile_mutex + qp;
 
   assert(qp <= RD_SAMPLING_MAX_LAST_QP);
 
   pthread_mutex_lock(mtx);
-  fprintf(fastrd_learning_outfile[qp], "%u %u\n", fast_cost, ccc);
+  fprintf(fastrd_learning_outfile[qp], "%u %f\n", fast_cost, ccc);
   pthread_mutex_unlock(mtx);
 }
 
@@ -384,7 +386,7 @@ static INLINE void save_accuracy(int qp, uint32_t ccc, uint32_t fast_cost)
  *
  * \returns       number of bits needed to code coefficients
  */
-uint32_t uvg_get_coeff_cost(const encoder_state_t * const state,
+double uvg_get_coeff_cost(const encoder_state_t * const state,
                             const coeff_t *coeff,
                             int32_t width,
                             int32_t type,
@@ -406,13 +408,13 @@ uint32_t uvg_get_coeff_cost(const encoder_state_t * const state,
       uint64_t weights = uvg_fast_coeff_get_weights(state);
       uint32_t fast_cost = uvg_fast_coeff_cost(coeff, width, weights);
       if (check_accuracy) {
-        uint32_t ccc = get_coeff_cabac_cost(state, coeff, width, type, scan_mode, tr_skip);
+        double ccc = get_coeff_cabac_cost(state, coeff, width, type, scan_mode, tr_skip);
         save_accuracy(state->qp, ccc, fast_cost);
       }
       return fast_cost;
     }
   } else {
-    uint32_t ccc = get_coeff_cabac_cost(state, coeff, width, type, scan_mode, tr_skip);
+    double ccc = get_coeff_cabac_cost(state, coeff, width, type, scan_mode, tr_skip);
     if (save_cccs) {
       save_ccc(state->qp, coeff, width * width, ccc);
     }

@@ -140,7 +140,7 @@ void uvg_cabac_encode_bins_ep(cabac_data_t *data, uint32_t bin_values, int num_b
 void uvg_cabac_encode_bin_trm(cabac_data_t *data, uint8_t bin_value);
 void uvg_cabac_write(cabac_data_t *data);
 void uvg_cabac_finish(cabac_data_t *data);
-void uvg_cabac_write_coeff_remain(cabac_data_t *cabac, uint32_t symbol,
+int uvg_cabac_write_coeff_remain(cabac_data_t *cabac, uint32_t symbol,
                               uint32_t r_param, const unsigned int cutoff);
 uint32_t uvg_cabac_write_ep_ex_golomb(struct encoder_state_t * const state, cabac_data_t *data,
                 uint32_t symbol, uint32_t count);
