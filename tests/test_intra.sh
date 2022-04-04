@@ -17,4 +17,4 @@ valgrind_test $common_args --alf=full --no-wpp --threads=0 --owf=0
 valgrind_test $common_args --alf=full --wpp --threads=1
 valgrind_test $common_args --jccr --rdoq --rd=2 --mts=intra
 valgrind_test $common_args --rd=3 --cclm --jccr
-
+valgrind_test $common_args --lfnst
