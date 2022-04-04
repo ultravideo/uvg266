@@ -102,34 +102,81 @@ static void encode_mts_idx(encoder_state_t * const state,
 }
 
 // TODO: move these defines to a proper place when ISP is implemented
+// As of now, these are only needed in lfnst checks
 #define NOT_INTRA_SUBPARTITIONS 0
 #define HOR_INTRA_SUBPARTITIONS 1
 #define VER_INTRA_SUBPARTITIONS 2
 #define NUM_INTRA_SUBPARTITIONS_MODES 3
 #define INTRA_SUBPARTITIONS_RESERVED 4
+#define TU_1D_HOR_SPLIT 8
+#define TU_1D_VER_SPLIT 9
+
+// TODO: check if these are defined somewhere else
+#define MIN_TB_SIZE_X 4
+#define MIN_TB_SIZE_Y 4
+
+static int get_isp_split_dim(const int width, const int height, const int isp_split_type)
+{
+  bool divide_tu_in_rows = isp_split_type == TU_1D_HOR_SPLIT;
+  uint32_t split_dim_size, non_split_dim_size, partition_size, div_shift = 2;
+
+  if (divide_tu_in_rows)
+  {
+    split_dim_size = height;
+    non_split_dim_size = width;
+  }
+  else
+  {
+    split_dim_size = width;
+    non_split_dim_size = height;
+  }
+  
+  const int min_num_samples_cu = 1 << ((kvz_math_floor_log2(MIN_TB_SIZE_Y) << 1));
+  const int factor_to_min_samples = non_split_dim_size < min_num_samples_cu ? min_num_samples_cu >> kvz_math_floor_log2(non_split_dim_size) : 1;
+  partition_size = (split_dim_size >> div_shift) < factor_to_min_samples ? factor_to_min_samples : (split_dim_size >> div_shift);
+
+  assert(!(kvz_math_floor_log2(partition_size) + kvz_math_floor_log2(non_split_dim_size) < kvz_math_floor_log2(min_num_samples_cu)) && "Partition has less than minimum amount of samples.");
+  return partition_size;
+}
+
+static bool can_use_lfnst_with_isp(const int width, const int height, const int isp_split_type, const int color)
+{
+  if (color != COLOR_Y) {
+    return false;
+  }
+  if (isp_split_type == NOT_INTRA_SUBPARTITIONS) {
+    return false;
+  }
+
+  const int tu_width = (isp_split_type == HOR_INTRA_SUBPARTITIONS) ? width : get_isp_split_dim(width, height, TU_1D_VER_SPLIT);
+  const int tu_height = (isp_split_type == HOR_INTRA_SUBPARTITIONS) ? get_isp_split_dim(width, height, TU_1D_HOR_SPLIT) : height;
+
+  if (!(tu_width >= MIN_TB_SIZE_Y && tu_height >= MIN_TB_SIZE_Y))
+  {
+    return false;
+  }
+  return true;
+}
 
 static bool is_lfnst_allowed(encoder_state_t* const state, const cu_info_t* const pred_cu, const int color,
                              const int width, const int height) 
 {
   if (state->encoder_control->cfg.lfnst && pred_cu->type == CU_INTRA) {
-    int isp_mode = 0; // LFNST_TODO: assign proper ISP mode when ISP is implemented
-    int isp_split_type = 0;
+    const int isp_mode = 0; // LFNST_TODO: assign proper ISP mode when ISP is implemented
+    const int isp_split_type = 0;
     const int chroma_width = width >> 1;
     const int chroma_height = height >> 1;
-    bool can_use_lfnst_with_isp = color == COLOR_Y;
+    const int cu_width = color == COLOR_Y ? width : chroma_width;
+    const int cu_height = color == COLOR_Y ? height : chroma_height;
     bool can_use_lfnst_with_mip = (width >= 16 && height >= 16);
+    bool is_sep_tree = false; // LFNST_TODO: if/when separate tree structure is implemented, add proper boolean here
+    bool mip_flag = false; // LFNST_TODO: add proper boolean when MIP is merged
     const int max_tb_size = 64; // LFNST_TODO: use define instead for max transform block size
 
-    if (can_use_lfnst_with_isp) {
-      if (isp_split_type == NOT_INTRA_SUBPARTITIONS || width < 4 || height < 4) {
-        can_use_lfnst_with_isp = false;
-      }
-    }
-
-    if ((isp_mode && !can_use_lfnst_with_isp) ||
-      (pred_cu->type == CU_INTRA && false && !can_use_lfnst_with_mip) || // LFNST_TODO: replace 'false' with intra mip flag when MIP is merged
-      (false && color != COLOR_Y && MIN(chroma_width, chroma_height) < 4) || // LFNST_TODO: if separate tree structure is implemented, replace 'false' with is_separate_tree check
-      (width > max_tb_size || height > max_tb_size)) {
+    if ((isp_mode && !can_use_lfnst_with_isp(width, height, isp_split_type, color)) ||
+      (pred_cu->type == CU_INTRA && mip_flag && !can_use_lfnst_with_mip) || 
+      (is_sep_tree && color != COLOR_Y && MIN(chroma_width, chroma_height) < 4) || 
+      (cu_width > max_tb_size || cu_height > max_tb_size)) {
       return false;
     }
 
@@ -138,7 +185,6 @@ static bool is_lfnst_allowed(encoder_state_t* const state, const cu_info_t* cons
   else {
     return false;
   }
-  
 }
 
 static void encode_lfnst_idx(encoder_state_t * const state, cabac_data_t * const cabac,
