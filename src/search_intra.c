@@ -271,7 +271,7 @@ static double search_intra_trdepth(encoder_state_t * const state,
   const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
   cu_info_t *const tr_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
 
-  const bool reconstruct_chroma = (depth != 4 || (depth == 4 && (x_px & 4 && y_px & 4))) && state->encoder_control->chroma_format != KVZ_CSP_400;
+  const bool reconstruct_chroma = false; // (depth != 4 || (depth == 4 && (x_px & 4 && y_px & 4))) && state->encoder_control->chroma_format != KVZ_CSP_400;
 
   struct {
     kvz_pixel y[TR_MAX_WIDTH*TR_MAX_WIDTH];
