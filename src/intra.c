@@ -730,10 +730,14 @@ void kvz_mip_pred_upsampling_1D(int* const dst, const int* const src, const int*
 
 /** \brief Matrix weighted intra prediction.
 */
-void kvz_mip_predict(encoder_state_t const* const state, kvz_intra_references* const refs,
-                     const uint16_t pred_block_width, const uint16_t pred_block_height,
-                     kvz_pixel* dst,
-                     const int mip_mode, const bool mip_transp)
+void kvz_mip_predict(
+  const encoder_state_t* const state,
+  kvz_intra_references* const refs,
+  const uint16_t pred_block_width,
+  const uint16_t pred_block_height,
+  kvz_pixel* dst,
+  const int mip_mode,
+  const bool mip_transp)
 {
   // MIP prediction uses int values instead of kvz_pixel as some temp values may be negative
   
@@ -877,7 +881,7 @@ void kvz_mip_predict(encoder_state_t const* const state, kvz_intra_references* c
 
 
 void kvz_intra_predict(
-  encoder_state_t *const state,
+  const encoder_state_t* const state,
   kvz_intra_references *refs,
   int_fast8_t log2_width,
   int_fast8_t mode,
@@ -1352,7 +1356,7 @@ void kvz_intra_build_reference(
 }
 
 static void intra_recon_tb_leaf(
-  encoder_state_t *const state,
+  const encoder_state_t* const state,
   int x,
   int y,
   int depth,
@@ -1482,7 +1486,7 @@ static void intra_recon_tb_leaf(
  * \param lcu           containing LCU
  */
 void kvz_intra_recon_cu(
-  encoder_state_t *const state,
+  const encoder_state_t* const state,
   int x,
   int y,
   int depth,

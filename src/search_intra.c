@@ -171,6 +171,23 @@ static void get_cost_dual(encoder_state_t * const state,
 }
 
 
+void INLINE rough_cost_prediction_mode(const encoder_state_t * const state,
+  const int x_px,
+  const int y_px,
+  const int depth,
+  intra_search_data_t * data,
+  lcu_t* lcu) 
+{
+  kvz_intra_recon_cu(
+    state,
+    x_px, y_px,
+    depth,
+    &data,
+    &data->pred_cu,
+    lcu);
+}
+
+
 /**
 * \brief Derives mts_last_scan_pos and violates_mts_coeff_constraint for pred_cu.
 *
@@ -271,7 +288,7 @@ static double search_intra_trdepth(encoder_state_t * const state,
   const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
   cu_info_t *const tr_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
 
-  const bool reconstruct_chroma = false; // (depth != 4 || (depth == 4 && (x_px & 4 && y_px & 4))) && state->encoder_control->chroma_format != KVZ_CSP_400;
+  const bool reconstruct_chroma =  (depth != 4 || (depth == 4 && (x_px & 4 && y_px & 4))) && state->encoder_control->chroma_format != KVZ_CSP_400;
 
   struct {
     kvz_pixel y[TR_MAX_WIDTH*TR_MAX_WIDTH];
@@ -344,11 +361,11 @@ static double search_intra_trdepth(encoder_state_t * const state,
       }
      
       kvz_intra_recon_cu(state,
-        x_px, y_px,
-        depth,
-        &intra_parameters,
-        pred_cu,
-        lcu);
+                         x_px, y_px,
+                         depth,
+                         &intra_parameters,
+                         pred_cu,
+                         lcu);
 
       // TODO: Not sure if this should be 0 or 1 but at least seems to work with 1
       if (pred_cu->tr_idx > 1)
@@ -376,11 +393,11 @@ static double search_intra_trdepth(encoder_state_t * const state,
       intra_parameters.chroma_mode = chroma_mode;
       intra_parameters.jccr = -1; // TODO: Maybe check the jccr mode here also but holy shit is the interface of search_intra_rdo bad currently
       kvz_intra_recon_cu(state,
-        x_px & ~7, y_px & ~7,
-        depth,
-        &intra_parameters,
-        pred_cu, 
-        lcu);
+                         x_px & ~7, y_px & ~7,
+                         depth,
+                         &intra_parameters,
+                         pred_cu, 
+                         lcu);
       best_rd_cost += kvz_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
     }
     pred_cu->tr_skip = best_tr_idx == MTS_SKIP;
@@ -1000,11 +1017,11 @@ int8_t kvz_search_intra_chroma_rdo(encoder_state_t * const state,
       intra_parameters.chroma_mode = modes[chroma_mode_i];
       if(chroma.mode < 67 || depth == 0) {
         kvz_intra_recon_cu(state,
-          x_px, y_px,
-          depth,
-          &intra_parameters, 
-          NULL,
-          lcu);
+                           x_px, y_px,
+                           depth,
+                           &intra_parameters,
+                           NULL,
+                           lcu);
       }
       else {
 
@@ -1038,7 +1055,7 @@ int8_t kvz_search_intra_chroma_rdo(encoder_state_t * const state,
           state,
           x_px, y_px,
           depth,
-          &intra_parameters, 
+          &intra_parameters,
           NULL,
           lcu);
       }

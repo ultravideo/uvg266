@@ -74,6 +74,15 @@ typedef struct {
   int8_t jccr;
 } intra_parameters_t;
 
+typedef struct {
+  cu_info_t pred_cu;
+  cclm_parameters_t cclm_parameters[2];
+  double cost;
+  double bits;
+  double coeff_bits;
+  double distortion;
+} intra_search_data_t ;
+
 /**
 * \brief Function for deriving intra luma predictions
 * \param x          x-coordinate of the PU in pixels
@@ -125,7 +134,7 @@ void kvz_intra_build_reference(
  * \param filter_boundary Whether to filter the boundary on modes 10 and 26.
  */
 void kvz_intra_predict(
-  encoder_state_t *const state,
+  const encoder_state_t* const state,
   kvz_intra_references *refs,
   int_fast8_t log2_width,
   int_fast8_t mode,
@@ -135,7 +144,7 @@ void kvz_intra_predict(
   const uint8_t multi_ref_idx);
 
 void kvz_intra_recon_cu(
-  encoder_state_t *const state,
+  const encoder_state_t* const state,
   int x,
   int y,
   int depth,
@@ -162,11 +171,11 @@ void kvz_predict_cclm(
 int kvz_get_mip_flag_context(int x, int y, int width, int height, const lcu_t* lcu, cu_array_t* const cu_a);
 
 void kvz_mip_predict(
-  encoder_state_t const * const state,
+  const encoder_state_t* const state,
   kvz_intra_references * refs,
   const uint16_t width,
   const uint16_t height,
   kvz_pixel* dst,
   const int mip_mode,
   const bool mip_transp
-);
+  );

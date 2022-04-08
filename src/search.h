@@ -48,11 +48,11 @@
 
  // Modify weight of luma SSD.
 #ifndef KVZ_LUMA_MULT
-# define KVZ_LUMA_MULT 0.8
+#define KVZ_LUMA_MULT 0.8
 #endif
 // Modify weight of chroma SSD.
 #ifndef KVZ_CHROMA_MULT
-# define KVZ_CHROMA_MULT 1.5
+#define KVZ_CHROMA_MULT 1.5
 #endif
 
  /**

@@ -1015,7 +1015,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         kvz_intra_recon_cu(state,
                            x & ~7, y & ~7, // TODO: as does this
                            depth,
-                           &intra_parameters, 
+                           &intra_parameters,
                            NULL,
                            lcu);
         if(depth != 0 && state->encoder_control->cfg.jccr) {
