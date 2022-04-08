@@ -183,6 +183,16 @@ typedef struct
   };
 } cu_info_t;
 
+typedef struct {
+  int16_t x;
+  int16_t y;
+  int8_t width;
+  int8_t height;
+  int8_t chroma_width;
+  int8_t chroma_height;
+} cu_loc_t;
+
+
 #define CU_GET_MV_CAND(cu_info_ptr, reflist) \
   (((reflist) == 0) ? (cu_info_ptr)->inter.mv_cand0 : (cu_info_ptr)->inter.mv_cand1)
 

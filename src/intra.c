@@ -82,6 +82,17 @@ static const uint8_t num_ref_pixels_left[16][16] = {
   { 4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4 }
 };
 
+
+void static mip_predict(
+  const encoder_state_t* const state,
+  kvz_intra_references* const refs,
+  const uint16_t pred_block_width,
+  const uint16_t pred_block_height,
+  kvz_pixel* dst,
+  const int mip_mode,
+  const bool mip_transp);
+
+
 int8_t kvz_intra_get_dir_luma_predictor(
   const uint32_t x,
   const uint32_t y,
@@ -728,9 +739,10 @@ void kvz_mip_pred_upsampling_1D(int* const dst, const int* const src, const int*
 }
 
 
+
 /** \brief Matrix weighted intra prediction.
 */
-void kvz_mip_predict(
+void static mip_predict(
   const encoder_state_t* const state,
   kvz_intra_references* const refs,
   const uint16_t pred_block_width,
@@ -880,14 +892,13 @@ void kvz_mip_predict(
 }
 
 
-void kvz_intra_predict(
+void static intra_predict_regular(
   const encoder_state_t* const state,
   kvz_intra_references *refs,
   int_fast8_t log2_width,
   int_fast8_t mode,
   color_t color,
   kvz_pixel *dst,
-  bool filter_boundary,
   const uint8_t multi_ref_idx)
 {
   const int_fast8_t width = 1 << log2_width;
@@ -1355,6 +1366,58 @@ void kvz_intra_build_reference(
   }
 }
 
+
+void kvz_intra_predict(
+  const encoder_state_t* const state,
+  kvz_intra_references* const refs,
+  const cu_loc_t* const cu_loc,
+  const color_t color,
+  kvz_pixel* dst,
+  intra_search_data_t* data,
+  lcu_t* lcu
+)
+{
+  const kvz_config* cfg = &state->encoder_control->cfg;
+  const int stride = (((state->tile->frame->width + 7) & ~7) + FRAME_PADDING_LUMA);
+  // TODO: what is this used for?
+  // const bool filter_boundary = color == COLOR_Y && !(cfg->lossless && cfg->implicit_rdpcm);
+  bool use_mip = false;
+  const int width = color == COLOR_Y ? cu_loc->width : cu_loc->chroma_width;
+  const int height = color == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
+  const int x = cu_loc->x;
+  const int y = cu_loc->y;
+  int8_t intra_mode = color == COLOR_Y ? data->pred_cu.intra.mode : data->pred_cu.intra.mode_chroma;
+  if (data->pred_cu.intra.mip_flag) {
+    if (color == COLOR_Y) {
+      use_mip = true;
+    }
+    else {
+      use_mip = state->encoder_control->chroma_format == KVZ_CSP_444;
+    }
+  }
+  if (intra_mode < 68) {
+    if (use_mip) {
+      assert(intra_mode >= 0 && intra_mode < 16 && "MIP mode must be between [0, 15]");
+      mip_predict(state, refs, width, height, dst, intra_mode, data->pred_cu.intra.mip_is_transposed);
+    }
+    else {
+      intra_predict_regular(state, refs, kvz_g_convert_to_bit[width] + 2, intra_mode, color, dst, data->pred_cu.intra.multi_ref_idx);
+    }
+  }
+  else {
+    kvz_pixels_blit(&state->tile->frame->cclm_luma_rec[x / 2 + (y * stride) / 4], dst, width, width, stride / 2, width);
+    if (data->pred_cu.depth != data->pred_cu.tr_depth) {
+      cclm_parameters_t temp_params;
+      kvz_predict_cclm(
+        state, color, width, width, x, y, stride, intra_mode, lcu, refs, dst, &temp_params);
+    }
+    else {
+      linear_transform_cclm(&data->cclm_parameters[color == COLOR_U ? 0 : 1], dst, dst, width, width);
+    }
+  }
+}
+
+
 static void intra_recon_tb_leaf(
   const encoder_state_t* const state,
   int x,
@@ -1407,44 +1470,20 @@ static void intra_recon_tb_leaf(
   kvz_intra_build_reference(log2width, color, &luma_px, &pic_px, lcu, &refs, cfg->wpp, extra_refs, multi_ref_index);
 
   kvz_pixel pred[32 * 32];
-  const int stride = (((state->tile->frame->width + 7) & ~7) + FRAME_PADDING_LUMA);
-  const bool filter_boundary = color == COLOR_Y && !(cfg->lossless && cfg->implicit_rdpcm);
-  bool use_mip = false;
-  int8_t intra_mode = color == COLOR_Y ? intra_paramas->luma_mode : intra_paramas->chroma_mode;
-  if (intra_paramas->mip_flag) {
-    if (color == COLOR_Y) {
-      use_mip = true;
-    } else {
-      // MIP can be used for chroma if the chroma scheme is 444
-      if (state->encoder_control->chroma_format == KVZ_CSP_444) {
-        use_mip = true;
-      } else {
-        // If MIP cannot be used for chroma, set mode to planar
-        intra_mode = 0;
-      }
-    }
-  }
 
-  if(intra_mode < 68) {
-    if (use_mip) {
-      assert(intra_mode >= 0 && intra_mode < 16 && "MIP mode must be between [0, 15]");
-      kvz_mip_predict(state, &refs, width, height, pred, intra_mode, intra_paramas->mip_transp);
-    }
-    else {
-      kvz_intra_predict(state, &refs, log2width, intra_mode, color, pred, filter_boundary, multi_ref_index);
-    }
-  }
-  else {
-    kvz_pixels_blit(&state->tile->frame->cclm_luma_rec[x / 2 + (y * stride) / 4], pred, width, width, stride / 2, width);
-    if (LCU_GET_CU_AT_PX(lcu, x_scu, y_scu)->depth != depth) {
-      cclm_parameters_t temp_params;
-      kvz_predict_cclm(
-        state, color, width, width, x, y, stride, intra_mode, lcu, &refs, pred, &temp_params);
-    }
-    else {
-      linear_transform_cclm(&intra_paramas->cclm_parameters[color == COLOR_U ? 0 : 1], pred, pred, width, width);
-    }
-  }
+  cu_loc_t loc = {
+    x, y,
+    width, width,
+    width, width,
+  };
+  intra_search_data_t search_data;
+  search_data.pred_cu.intra.mip_flag = intra_paramas->mip_flag;
+  search_data.pred_cu.intra.multi_ref_idx = intra_paramas->multi_ref_idx;
+  search_data.pred_cu.intra.mode = intra_paramas->luma_mode;
+  search_data.pred_cu.intra.mode_chroma = intra_paramas->chroma_mode;
+  search_data.pred_cu.tr_depth = depth;
+  search_data.pred_cu.depth = depth;
+  kvz_intra_predict(state, &refs, &loc, color, pred, &search_data, lcu);
 
   const int index = lcu_px.x + lcu_px.y * lcu_width;
   kvz_pixel *block = NULL;

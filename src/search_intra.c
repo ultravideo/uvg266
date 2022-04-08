@@ -171,20 +171,18 @@ static void get_cost_dual(encoder_state_t * const state,
 }
 
 
-void INLINE rough_cost_prediction_mode(const encoder_state_t * const state,
-  const int x_px,
-  const int y_px,
+void INLINE rough_cost_prediction_mode(const encoder_state_t* const state,
+  kvz_intra_references* const references,
+  const cu_loc_t* const cu_loc,
   const int depth,
+  const color_t color,
   intra_search_data_t * data,
   lcu_t* lcu) 
 {
-  kvz_intra_recon_cu(
-    state,
-    x_px, y_px,
-    depth,
-    &data,
-    &data->pred_cu,
-    lcu);
+  const int width = MAX(4, (color == COLOR_Y ? LCU_WIDTH : LCU_WIDTH_C) >> depth);
+  const int height= MAX(4, (color == COLOR_Y ? LCU_WIDTH : LCU_WIDTH_C) >> depth);
+  kvz_pixel pred[TR_MAX_WIDTH * TR_MAX_WIDTH + SIMD_ALIGNMENT];
+  // kvz_intra_predict(state, references, width, height, pred, data);
 }
 
 
@@ -497,7 +495,6 @@ static void search_intra_chroma_rough(encoder_state_t * const state,
   assert(!(x_px & 4 || y_px & 4));
 
   const unsigned width = MAX(LCU_WIDTH_C >> depth, TR_MIN_WIDTH);
-  const int_fast8_t log2_width_c = MAX(LOG2_LCU_WIDTH - (depth + 1), 2);
 
   for (int i = 0; i < 8; ++i) {
     costs[i] = 0;
@@ -505,6 +502,7 @@ static void search_intra_chroma_rough(encoder_state_t * const state,
 
   cost_pixel_nxn_func *const satd_func = kvz_pixels_get_satd_func(width);
   //cost_pixel_nxn_func *const sad_func = kvz_pixels_get_sad_func(width);
+  cu_loc_t loc = { x_px, y_px, width, width, width, width };
 
   cclm_parameters_t cclm_params;
   
@@ -515,31 +513,21 @@ static void search_intra_chroma_rough(encoder_state_t * const state,
   kvz_pixel *orig_block = ALIGNED_POINTER(_orig_block, SIMD_ALIGNMENT);
 
   kvz_pixels_blit(orig_u, orig_block, width, width, origstride, width);
-  for (int i = 0; i < 5; ++i) {
+  for (int i = 0; i < (state->encoder_control->cfg.cclm ? 8 : 5); ++i) {
     if (modes[i] == -1) continue;
-    kvz_intra_predict(state, refs_u, log2_width_c, modes[i], COLOR_U, pred, false, 0);
+    kvz_intra_predict(state, refs_u, &loc, COLOR_U, pred, NULL, lcu);
+    // kvz_intra_predict_regular(state, refs_u, log2_width_c, modes[i], COLOR_U, pred, false, 0);
     //costs[i] += get_cost(encoder_state, pred, orig_block, satd_func, sad_func, width);
     costs[i] += satd_func(pred, orig_block);
-  }
-  for (int i = 5; i < 8; i++) {
-    assert(state->encoder_control->cfg.cclm);
-    kvz_predict_cclm(
-      state,
-      COLOR_U, width, width, x_px, y_px, state->tile->frame->source->stride, modes[i], lcu, refs_u,  pred, &cclm_params);
   }
 
   kvz_pixels_blit(orig_v, orig_block, width, width, origstride, width);
-  for (int i = 0; i < 5; ++i) {
+  for (int i = 0; i < (state->encoder_control->cfg.cclm ? 8 : 5); ++i) {
     if (modes[i] == -1) continue;
-    kvz_intra_predict(state, refs_v, log2_width_c, modes[i], COLOR_V, pred, false, 0);
+    kvz_intra_predict(state, refs_u, &loc, COLOR_V, pred, NULL, lcu);
+    //kvz_intra_predict_regular(state, refs_v, log2_width_c, modes[i], COLOR_V, pred, false, 0);
     //costs[i] += get_cost(encoder_state, pred, orig_block, satd_func, sad_func, width);
     costs[i] += satd_func(pred, orig_block);
-  }
-  for (int i = 5; i < 8; i++) {
-    assert(state->encoder_control->cfg.cclm);
-    kvz_predict_cclm(
-      state,
-      COLOR_V, width, width, x_px, y_px, state->tile->frame->source->stride, modes[i], lcu, refs_u, pred, &cclm_params);
   }
 
   kvz_sort_modes(modes, costs, 5);
@@ -620,12 +608,17 @@ static int8_t search_intra_rough(encoder_state_t * const state,
 
   // Calculate SAD for evenly spaced modes to select the starting point for 
   // the recursive search.
+  cu_loc_t loc = { 0, 0, width, width, width, width };
+  intra_search_data_t search_proxy;
+  FILL(search_proxy, 0);
+
   for (int mode = 2; mode <= 66; mode += PARALLEL_BLKS * offset) {
     
     double costs_out[PARALLEL_BLKS] = { 0 };
     for (int i = 0; i < PARALLEL_BLKS; ++i) {
       if (mode + i * offset <= 66) {
-        kvz_intra_predict(state, refs, log2_width, mode + i * offset, COLOR_Y, preds[i], filter_boundary, 0);
+        search_proxy.pred_cu.intra.mode = mode + i*offset;
+        kvz_intra_predict(state, refs, &loc, COLOR_Y, preds[i], &search_proxy, NULL);
       }
     }
     
@@ -664,7 +657,8 @@ static int8_t search_intra_rough(encoder_state_t * const state,
       if (mode_in_range) {
         for (int i = 0; i < PARALLEL_BLKS; ++i) {
           if (test_modes[i] >= 2 && test_modes[i] <= 66) {
-            kvz_intra_predict(state, refs, log2_width, test_modes[i], COLOR_Y, preds[i], filter_boundary, 0);
+            search_proxy.pred_cu.intra.mode = test_modes[i];
+            kvz_intra_predict(state, refs, &loc, COLOR_Y, preds[i], &search_proxy, NULL);
           }
         }
 
@@ -701,7 +695,8 @@ static int8_t search_intra_rough(encoder_state_t * const state,
     }
 
     if (!has_mode) {
-      kvz_intra_predict(state, refs, log2_width, mode, COLOR_Y, preds[0], filter_boundary, 0);
+      search_proxy.pred_cu.intra.mode = mode;
+      kvz_intra_predict(state, refs, &loc, COLOR_Y, preds[0], &search_proxy, NULL);
       costs[modes_selected] = get_cost(state, preds[0], orig_block, satd_func, sad_func, width);
       modes[modes_selected] = mode;
       ++modes_selected;
