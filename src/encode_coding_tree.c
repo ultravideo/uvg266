@@ -208,6 +208,7 @@ static void encode_lfnst_idx(encoder_state_t * const state, cabac_data_t * const
     const int tu_row_length = 1 << (tr_depth - depth);
     const int tu_width = cu_width >> (tr_depth - depth);
     const int tu_height = tu_width; // TODO: height for non-square blocks
+    const int isp_mode = 0; // LFNST_TODO:get isp_mode from cu when ISP is implemented
 
     for (int i = 0; i < num_transform_units; i++) {
       // TODO: this works only for square blocks
@@ -222,13 +223,13 @@ static void encode_lfnst_idx(encoder_state_t * const state, cabac_data_t * const
       }
     }
     
-    // LFNST_TODO:                        replace this 'true' with !pred_cu->isp_mode when ISP is implemented
-    if ((!pred_cu->lfnst_last_scan_pos && true) || non_zero_coeff_non_ts_corner_8x8 || is_tr_skip) {
+    
+    if ((!pred_cu->lfnst_last_scan_pos && !isp_mode) || non_zero_coeff_non_ts_corner_8x8 || is_tr_skip) {
       return;
     }
 
     const int lfnst_index = pred_cu->lfnst_idx;
-    assert(lfnst_index < 3 && "Invalid LFNST index.");
+    assert((lfnst_index >= 0 && lfnst_index < 3) && "Invalid LFNST index.");
 
     uint16_t ctx_idx = 0;
     if (is_separate_tree) ctx_idx++;
@@ -509,7 +510,7 @@ static void encode_chroma_tu(encoder_state_t* const state, int x, int y, int dep
         // TODO: transform skip for chroma blocks
         CABAC_BIN(cabac, 0, "transform_skip_flag");
       }
-      uvg_encode_coeff_nxn(state, &state->cabac, coeff_u, width_c, COLOR_U, *scan_idx, NULL, false);
+      uvg_encode_coeff_nxn(state, &state->cabac, coeff_u, width_c, COLOR_U, *scan_idx, cur_pu);
     }
 
     if (cbf_is_set(cur_pu->cbf, depth, COLOR_V)) {
@@ -517,7 +518,7 @@ static void encode_chroma_tu(encoder_state_t* const state, int x, int y, int dep
         cabac->cur_ctx = &cabac->ctx.transform_skip_model_chroma;
         CABAC_BIN(cabac, 0, "transform_skip_flag");
       }
-      uvg_encode_coeff_nxn(state, &state->cabac, coeff_v, width_c, COLOR_V, *scan_idx, NULL, false);
+      uvg_encode_coeff_nxn(state, &state->cabac, coeff_v, width_c, COLOR_V, *scan_idx, cur_pu);
     }
   }
   else {
@@ -526,7 +527,7 @@ static void encode_chroma_tu(encoder_state_t* const state, int x, int y, int dep
       cabac->cur_ctx = &cabac->ctx.transform_skip_model_chroma;
       CABAC_BIN(cabac, 0, "transform_skip_flag");
     }
-    uvg_encode_coeff_nxn(state, &state->cabac, coeff_uv, width_c, COLOR_V, *scan_idx, NULL, false);
+    uvg_encode_coeff_nxn(state, &state->cabac, coeff_uv, width_c, COLOR_V, *scan_idx, cur_pu);
     
   }
 }
@@ -570,8 +571,7 @@ static void encode_transform_unit(encoder_state_t * const state,
                            width,
                            0,
                            scan_idx,
-                           (cu_info_t * )cur_pu,
-                           true);
+                           (cu_info_t * )cur_pu);
     }
   }
 

@@ -332,8 +332,7 @@ static INLINE uint32_t get_coeff_cabac_cost(
                          width,
                          type,
                          scan_mode,
-                         NULL,                   
-                         false);
+                         NULL);
   }
   else {
     uvg_encode_ts_residual((encoder_state_t* const)state,

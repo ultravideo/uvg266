@@ -55,10 +55,9 @@ void uvg_encode_coeff_nxn_generic(encoder_state_t * const state,
   cabac_data_t * const cabac,
   const coeff_t *coeff,
   uint8_t width,
-  uint8_t type,
+  uint8_t color,
   int8_t scan_mode,
-  cu_info_t* cur_cu,
-  bool is_luma) {
+  cu_info_t* cur_cu) {
 
   //const encoder_control_t * const encoder = state->encoder_control;
   //int c1 = 1;
@@ -83,7 +82,7 @@ void uvg_encode_coeff_nxn_generic(encoder_state_t * const state,
 
 
   // Init base contexts according to block type
-  cabac_ctx_t *base_coeff_group_ctx = &(cabac->ctx.sig_coeff_group_model[(type == 0 ? 0 : 1) * 2]);
+  cabac_ctx_t *base_coeff_group_ctx = &(cabac->ctx.sig_coeff_group_model[(color == 0 ? 0 : 1) * 2]);
   
 
   unsigned scan_cg_last = (unsigned)-1;
@@ -101,7 +100,7 @@ void uvg_encode_coeff_nxn_generic(encoder_state_t * const state,
 
   last_coeff_y = (uint8_t)(pos_last / width);
   last_coeff_x = (uint8_t)(pos_last - (last_coeff_y * width));
-  bool is_chroma = !is_luma;
+  bool is_chroma = color != COLOR_Y;
 
   if (cur_cu != NULL && cur_cu->tr_idx != MTS_SKIP && height >= 4 && width >= 4) {
     const int max_lfnst_pos = ((height == 4 && width == 4) || (height == 8 && width == 8)) ? 7 : 15;
@@ -115,7 +114,7 @@ void uvg_encode_coeff_nxn_generic(encoder_state_t * const state,
     last_coeff_y,
     width,
     width,
-    type,
+    color,
     scan_mode);
 
 
@@ -176,16 +175,16 @@ void uvg_encode_coeff_nxn_generic(encoder_state_t * const state,
 
         sig = (coeff[blk_pos] != 0) ? 1 : 0;
         if (num_non_zero || next_sig_pos != infer_sig_pos) {
-          ctx_sig = uvg_context_get_sig_ctx_idx_abs(coeff, pos_x, pos_y, width, width, type, &temp_diag, &temp_sum);
+          ctx_sig = uvg_context_get_sig_ctx_idx_abs(coeff, pos_x, pos_y, width, width, color, &temp_diag, &temp_sum);
           cabac_ctx_t* sig_ctx_luma = &(cabac->ctx.cu_sig_model_luma[MAX(0, (quant_state - 1))][ctx_sig]);
           cabac_ctx_t* sig_ctx_chroma = &(cabac->ctx.cu_sig_model_chroma[MAX(0, (quant_state - 1))][MIN(ctx_sig,7)]);
-          cabac->cur_ctx = (type == 0 ? sig_ctx_luma : sig_ctx_chroma);
+          cabac->cur_ctx = (color == COLOR_Y ? sig_ctx_luma : sig_ctx_chroma);
 
           CABAC_BIN(cabac, sig, "sig_coeff_flag");
           reg_bins--;
 
         } else if (next_sig_pos != scan_pos_last) {
-          ctx_sig = uvg_context_get_sig_ctx_idx_abs(coeff, pos_x, pos_y, width, width, type, &temp_diag, &temp_sum);
+          ctx_sig = uvg_context_get_sig_ctx_idx_abs(coeff, pos_x, pos_y, width, width, color, &temp_diag, &temp_sum);
         }
 
 
@@ -198,7 +197,7 @@ void uvg_encode_coeff_nxn_generic(encoder_state_t * const state,
             *offset = 0;
             if (temp_diag != -1) {
               *offset = MIN(temp_sum, 4) + 1;
-              *offset += (!temp_diag ? (type == 0 /* luma channel*/ ? 15 : 5) : type == 0 /* luma channel*/ ? temp_diag < 3 ? 10 : (temp_diag < 10 ? 5 : 0) : 0);
+              *offset += (!temp_diag ? (color == COLOR_Y ? 15 : 5) : color == COLOR_Y ? temp_diag < 3 ? 10 : (temp_diag < 10 ? 5 : 0) : 0);
             }
           }
 
@@ -215,7 +214,7 @@ void uvg_encode_coeff_nxn_generic(encoder_state_t * const state,
 
           // Code "greater than 1" flag
           uint8_t gt1 = remainder_abs_coeff ? 1 : 0;
-          cabac->cur_ctx = (type == 0) ? &(cabac->ctx.cu_gtx_flag_model_luma[1][*offset]) :
+          cabac->cur_ctx = (color == COLOR_Y) ? &(cabac->ctx.cu_gtx_flag_model_luma[1][*offset]) :
             &(cabac->ctx.cu_gtx_flag_model_chroma[1][*offset]);
           CABAC_BIN(cabac, gt1, "gt1_flag");
           reg_bins--;
@@ -224,14 +223,14 @@ void uvg_encode_coeff_nxn_generic(encoder_state_t * const state,
             remainder_abs_coeff -= 1;
 
             // Code coeff parity
-            cabac->cur_ctx = (type == 0) ? &(cabac->ctx.cu_parity_flag_model_luma[*offset]) :
+            cabac->cur_ctx = (color == COLOR_Y) ? &(cabac->ctx.cu_parity_flag_model_luma[*offset]) :
               &(cabac->ctx.cu_parity_flag_model_chroma[*offset]);
             CABAC_BIN(cabac, remainder_abs_coeff & 1, "par_flag");
             remainder_abs_coeff >>= 1;
 
             reg_bins--;
             uint8_t gt2 = remainder_abs_coeff ? 1 : 0;
-            cabac->cur_ctx = (type == 0) ? &(cabac->ctx.cu_gtx_flag_model_luma[0][*offset]) :
+            cabac->cur_ctx = (color == COLOR_Y) ? &(cabac->ctx.cu_gtx_flag_model_luma[0][*offset]) :
               &(cabac->ctx.cu_gtx_flag_model_chroma[0][*offset]);
             CABAC_BIN(cabac, gt2, "gt2_flag");
             reg_bins--;
@@ -291,7 +290,7 @@ void uvg_encode_coeff_nxn_generic(encoder_state_t * const state,
         coeff_signs >>= 1;
       }
 
-      if (is_luma && cur_cu != NULL && cur_cu->tr_idx != MTS_SKIP)
+      if (color == COLOR_Y && cur_cu != NULL && cur_cu->tr_idx != MTS_SKIP)
       {
         cur_cu->mts_last_scan_pos |= first_sig_pos > 0;
       }
@@ -299,7 +298,7 @@ void uvg_encode_coeff_nxn_generic(encoder_state_t * const state,
       CABAC_BINS_EP(cabac, coeff_signs, num_signs, "coeff_signs");
     }
 
-    if (is_luma && (cg_pos_y > 3 || cg_pos_x > 3) && sig_coeffgroup_flag[cg_blk_pos] != 0)
+    if (color == COLOR_Y && cur_cu != NULL && (cg_pos_y > 3 || cg_pos_x > 3) && sig_coeffgroup_flag[cg_blk_pos] != 0)
     {
       cur_cu->violates_mts_coeff_constraint = true;
     }
