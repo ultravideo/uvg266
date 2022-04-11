@@ -950,12 +950,12 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         (y & ~(cu_width_intra_min - 1)) + cu_width_intra_min > frame->height) &&
       !(state->encoder_control->cfg.force_inter && state->frame->slicetype != KVZ_SLICE_I);
 
-    intra_parameters_t intra_parameters;
+    intra_search_data_t intra_search;
     if (can_use_intra && !skip_intra) {
-      double intra_cost;
-      intra_parameters.jccr = -1;
-      kvz_search_cu_intra(state, x, y, depth, lcu,
-                           &intra_cost, &intra_parameters);
+      intra_search.pred_cu = *cur_cu;
+      intra_search.pred_cu.joint_cb_cr = 4;
+      kvz_search_cu_intra(state, x, y, depth, &intra_search,
+                          lcu);
 #ifdef COMPLETE_PRED_MODE_BITS
       // Technically counting these bits would be correct, however counting
       // them universally degrades quality so this block is disabled by default
@@ -966,17 +966,10 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         intra_cost += pred_mode_type_bits * state->lambda;
       }
 #endif
-      if (intra_cost < cost) {
-        cost = intra_cost;
+      if (intra_search.cost < cost) {
+        cost = intra_search.cost;
+        *cur_cu = intra_search.pred_cu;
         cur_cu->type = CU_INTRA;
-        cur_cu->part_size = depth > MAX_DEPTH ? SIZE_NxN : SIZE_2Nx2N;
-        cur_cu->intra.mode = intra_parameters.luma_mode;
-        cur_cu->intra.multi_ref_idx = intra_parameters.multi_ref_idx;
-        cur_cu->intra.mip_flag = intra_parameters.mip_flag;
-        cur_cu->intra.mip_is_transposed = intra_parameters.mip_transp;
-
-        //If the CU is not split from 64x64 block, the MTS is disabled for that CU.
-        cur_cu->tr_idx = (depth > 0) ? intra_parameters.mts_idx : 0;
       }
     }
 
@@ -984,14 +977,12 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     // mode search of adjacent CUs.
     if (cur_cu->type == CU_INTRA) {
       assert(cur_cu->part_size == SIZE_2Nx2N || cur_cu->part_size == SIZE_NxN);
-      cur_cu->intra.mode_chroma = cur_cu->intra.mode;
-      
+
+      intra_search.pred_cu.intra.mode_chroma = -1; // don't reconstruct chroma before search is performed for it
       lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
-      intra_parameters.chroma_mode = -1;
       kvz_intra_recon_cu(state,
                          x, y,
-                         depth,
-                         &intra_parameters,
+                         depth, &intra_search,
                          NULL, 
                          lcu);
 
@@ -1006,16 +997,15 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         // into account, so there is less of a chanse of luma mode being
         // really bad for chroma.
         if (ctrl->cfg.rdo >= 3 && !cur_cu->intra.mip_flag) {
-          cur_cu->intra.mode_chroma = kvz_search_cu_intra_chroma(state, x, y, depth, lcu, intra_parameters.cclm_parameters);
+          cur_cu->intra.mode_chroma = kvz_search_cu_intra_chroma(state, x, y, depth, lcu, intra_search.cclm_parameters);
           lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
         }
-        intra_parameters.chroma_mode = cur_cu->intra.mode_chroma;
-        intra_parameters.luma_mode = -1; // skip luma
-        intra_parameters.jccr = 0;
+        intra_search.pred_cu.intra.mode_chroma = intra_search.pred_cu.intra.mode;
+        intra_search.pred_cu.intra.mode = -1; // skip luma
+        intra_search.pred_cu.joint_cb_cr = 0;
         kvz_intra_recon_cu(state,
                            x & ~7, y & ~7, // TODO: as does this
-                           depth,
-                           &intra_parameters,
+                           depth, &intra_search,
                            NULL,
                            lcu);
         if(depth != 0 && state->encoder_control->cfg.jccr) {
@@ -1223,8 +1213,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         };
         kvz_intra_recon_cu(state,
                            x, y,
-                           depth,
-                           &intra_parameters,
+                           depth, ,
                            NULL,
                            lcu);
 

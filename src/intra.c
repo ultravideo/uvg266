@@ -1369,13 +1369,13 @@ void kvz_intra_build_reference(
 
 void kvz_intra_predict(
   const encoder_state_t* const state,
-  kvz_intra_references* const refs,
+  const kvz_intra_references* const refs,
   const cu_loc_t* const cu_loc,
   const color_t color,
   kvz_pixel* dst,
   intra_search_data_t* data,
-  lcu_t* lcu
-)
+  const lcu_t* lcu
+  )
 {
   const kvz_config* cfg = &state->encoder_control->cfg;
   const int stride = (((state->tile->frame->width + 7) & ~7) + FRAME_PADDING_LUMA);
@@ -1406,10 +1406,9 @@ void kvz_intra_predict(
   }
   else {
     kvz_pixels_blit(&state->tile->frame->cclm_luma_rec[x / 2 + (y * stride) / 4], dst, width, width, stride / 2, width);
-    if (data->pred_cu.depth != data->pred_cu.tr_depth) {
-      cclm_parameters_t temp_params;
+    if (data->pred_cu.depth != data->pred_cu.tr_depth || data->cclm_parameters[color == COLOR_U ? 0 : 1].b <= 0) {
       kvz_predict_cclm(
-        state, color, width, width, x, y, stride, intra_mode, lcu, refs, dst, &temp_params);
+        state, color, width, width, x, y, stride, intra_mode, lcu, refs, dst, &data->cclm_parameters[color == COLOR_U ? 0 : 1]);
     }
     else {
       linear_transform_cclm(&data->cclm_parameters[color == COLOR_U ? 0 : 1], dst, dst, width, width);
@@ -1425,7 +1424,7 @@ static void intra_recon_tb_leaf(
   int depth,
   lcu_t *lcu,
   color_t color,
-  const intra_parameters_t* intra_paramas)
+  const intra_search_data_t* search_data)
 {
   const kvz_config *cfg = &state->encoder_control->cfg;
   const int shift = color == COLOR_Y ? 0 : 1;
@@ -1447,7 +1446,7 @@ static void intra_recon_tb_leaf(
   int x_scu = SUB_SCU(x);
   int y_scu = SUB_SCU(y);
   const vector2d_t lcu_px = {x_scu >> shift, y_scu >> shift };
-  uint8_t multi_ref_index = color == COLOR_Y ? intra_paramas->multi_ref_idx : 0;
+  uint8_t multi_ref_index = color == COLOR_Y ? search_data->pred_cu.intra.multi_ref_idx: 0;
 
   kvz_intra_references refs;
   // Extra reference lines for use with MRL. Extra lines needed only for left edge.
@@ -1476,14 +1475,8 @@ static void intra_recon_tb_leaf(
     width, width,
     width, width,
   };
-  intra_search_data_t search_data;
-  search_data.pred_cu.intra.mip_flag = intra_paramas->mip_flag;
-  search_data.pred_cu.intra.multi_ref_idx = intra_paramas->multi_ref_idx;
-  search_data.pred_cu.intra.mode = intra_paramas->luma_mode;
-  search_data.pred_cu.intra.mode_chroma = intra_paramas->chroma_mode;
-  search_data.pred_cu.tr_depth = depth;
-  search_data.pred_cu.depth = depth;
-  kvz_intra_predict(state, &refs, &loc, color, pred, &search_data, lcu);
+
+  kvz_intra_predict(state, &refs, &loc, color, pred, search_data, lcu);
 
   const int index = lcu_px.x + lcu_px.y * lcu_width;
   kvz_pixel *block = NULL;
@@ -1529,7 +1522,7 @@ void kvz_intra_recon_cu(
   int x,
   int y,
   int depth,
-  const intra_parameters_t* intra_parameters,
+  intra_search_data_t* search_data,
   cu_info_t *cur_cu,
   lcu_t *lcu)
 {
@@ -1538,12 +1531,11 @@ void kvz_intra_recon_cu(
   if (cur_cu == NULL) {
     cur_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
   }
-  bool use_mip = intra_parameters->mip_flag;
-  const int8_t mode_luma = intra_parameters->luma_mode;
-  const int8_t mode_chroma= intra_parameters->chroma_mode;
+  const int8_t mode_luma = search_data->pred_cu.intra.mode;
+  const int8_t mode_chroma= search_data->pred_cu.intra.mode_chroma;
   
   if (mode_luma != -1 && mode_chroma != -1) {
-    if (use_mip) {
+    if (search_data->pred_cu.intra.mip_flag) {
       assert(mode_luma == mode_chroma && "Chroma mode must be derived from luma mode if block uses MIP.");
     }
   }
@@ -1564,10 +1556,10 @@ void kvz_intra_recon_cu(
     const int32_t x2 = x + offset;
     const int32_t y2 = y + offset;
 
-    kvz_intra_recon_cu(state, x,   y,   depth + 1, intra_parameters, NULL, lcu);
-    kvz_intra_recon_cu(state, x2,  y,   depth + 1, intra_parameters, NULL, lcu);
-    kvz_intra_recon_cu(state, x,   y2,  depth + 1, intra_parameters, NULL, lcu);
-    kvz_intra_recon_cu(state, x2,  y2,  depth + 1, intra_parameters, NULL, lcu);
+    kvz_intra_recon_cu(state, x,   y,   depth + 1, search_data, NULL, lcu);
+    kvz_intra_recon_cu(state, x2,  y,   depth + 1, search_data, NULL, lcu);
+    kvz_intra_recon_cu(state, x,   y2,  depth + 1, search_data, NULL, lcu);
+    kvz_intra_recon_cu(state, x2,  y2,  depth + 1, search_data, NULL, lcu);
 
     // Propagate coded block flags from child CUs to parent CU.
     uint16_t child_cbfs[3] = {
@@ -1589,13 +1581,13 @@ void kvz_intra_recon_cu(
    
     // Process a leaf TU.
     if (has_luma) {
-      intra_recon_tb_leaf(state, x, y, depth, lcu, COLOR_Y, intra_parameters);
+      intra_recon_tb_leaf(state, x, y, depth, lcu, COLOR_Y, search_data);
     }
     if (has_chroma) {
-      intra_recon_tb_leaf(state, x, y, depth, lcu, COLOR_U, intra_parameters);
-      intra_recon_tb_leaf(state, x, y, depth, lcu, COLOR_V, intra_parameters);
+      intra_recon_tb_leaf(state, x, y, depth, lcu, COLOR_U, search_data);
+      intra_recon_tb_leaf(state, x, y, depth, lcu, COLOR_V, search_data);
     }
 
-    kvz_quantize_lcu_residual(state, has_luma, has_chroma, intra_parameters->jccr != -1 && state->encoder_control->cfg.jccr && (x % 8 == 0 && y % 8 == 0), x, y, depth, cur_cu, lcu, false);
+    kvz_quantize_lcu_residual(state, has_luma, has_chroma, search_data->pred_cu.joint_cb_cr != 4, x, y, depth, cur_cu, lcu, false);
   }
 }

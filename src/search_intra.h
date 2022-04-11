@@ -57,8 +57,7 @@ void kvz_search_cu_intra(
   const int x_px,
   const int y_px,
   const int depth,
-  lcu_t *lcu,
-  double *cost_out,
-  intra_parameters_t* intra_parameters);
+  intra_search_data_t* search_data,
+  lcu_t *lcu);
 
 #endif // SEARCH_INTRA_H_

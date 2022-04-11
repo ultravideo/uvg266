@@ -64,17 +64,6 @@ typedef struct
 } cclm_parameters_t;
 
 typedef struct {
-  int8_t luma_mode;
-  int8_t chroma_mode;
-  cclm_parameters_t cclm_parameters[2];
-  uint8_t multi_ref_idx;
-  bool mip_flag;
-  bool mip_transp;
-  int8_t mts_idx;
-  int8_t jccr;
-} intra_parameters_t;
-
-typedef struct {
   cu_info_t pred_cu;
   cclm_parameters_t cclm_parameters[2];
   double cost;
@@ -135,19 +124,19 @@ void kvz_intra_build_reference(
  */
 void kvz_intra_predict(
   const encoder_state_t* const state,
-  kvz_intra_references* const refs,
+  const kvz_intra_references* const refs,
   const cu_loc_t* const cu_loc,
   const color_t color,
   kvz_pixel* dst,
   intra_search_data_t* data,
-  lcu_t* lcu);
+  const lcu_t* lcu);
 
 void kvz_intra_recon_cu(
   const encoder_state_t* const state,
   int x,
   int y,
   int depth,
-  const intra_parameters_t * intra_parameters,
+  intra_search_data_t* search_data,
   cu_info_t *cur_cu,
   lcu_t *lcu);
 
