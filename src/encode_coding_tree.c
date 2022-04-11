@@ -494,7 +494,7 @@ void uvg_encode_last_significant_xy(cabac_data_t * const cabac,
   }
 }
 
-static void encode_chroma_tu(encoder_state_t* const state, int x, int y, int depth, const uint8_t width_c, const cu_info_t* cur_pu, int8_t* scan_idx, lcu_coeff_t* coeff, uint8_t joint_chroma) {
+static void encode_chroma_tu(encoder_state_t* const state, int x, int y, int depth, const uint8_t width_c, cu_info_t* cur_pu, int8_t* scan_idx, lcu_coeff_t* coeff, uint8_t joint_chroma) {
   int x_local = ((x & ~7) >> 1) % LCU_WIDTH_C;
   int y_local = ((y & ~7) >> 1) % LCU_WIDTH_C;
   cabac_data_t* const cabac = &state->cabac;
@@ -542,7 +542,7 @@ static void encode_transform_unit(encoder_state_t * const state,
   const uint8_t width = LCU_WIDTH >> depth;
   const uint8_t width_c = (depth == MAX_PU_DEPTH ? width : width / 2);
 
-  const cu_info_t *cur_pu = uvg_cu_array_at_const(frame->cu_array, x, y);
+  cu_info_t *cur_pu = uvg_cu_array_at(frame->cu_array, x, y);
 
   int8_t scan_idx = uvg_get_scan_order(cur_pu->type, cur_pu->intra.mode, depth);
 
@@ -586,7 +586,7 @@ static void encode_transform_unit(encoder_state_t * const state,
     } else {
       // Time to to code the chroma transform blocks. Move to the top-left
       // corner of the block.
-      cur_pu = uvg_cu_array_at_const((const cu_array_t *)frame->cu_array, x, y);
+      cur_pu = uvg_cu_array_at(frame->cu_array, x, y);
     }
   }
 
