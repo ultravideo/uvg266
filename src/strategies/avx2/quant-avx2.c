@@ -673,6 +673,7 @@ int uvg_quantize_residual_avx2(encoder_state_t *const state,
   ALIGNED(64) int16_t residual[TR_MAX_WIDTH * TR_MAX_WIDTH];
   ALIGNED(64) coeff_t coeff[TR_MAX_WIDTH * TR_MAX_WIDTH];
 
+  const int height = width; // TODO: height for non-square blocks
   int has_coeffs = 0;
 
   assert(width <= TR_MAX_WIDTH);
@@ -700,6 +701,14 @@ int uvg_quantize_residual_avx2(encoder_state_t *const state,
   }
   else {
     uvg_transform2d(state->encoder_control, residual, coeff, width, color, cur_cu);
+  }
+
+  // LFNST_TODO: lfnst index must be derived by performing search, like MTS index. Search is performed during intra search, inside search_tr_depth.
+  const uint16_t lfnst_index = 0;
+
+  if (state->encoder_control->cfg.lfnst) {
+    // Forward low frequency non-separable transform
+    kvz_fwd_lfnst(cur_cu, width, height, color, lfnst_index, coeff);
   }
 
   // Quantize coeffs. (coeff -> coeff_out)
@@ -731,6 +740,11 @@ int uvg_quantize_residual_avx2(encoder_state_t *const state,
   // Do the inverse quantization and transformation and the reconstruction to
   // rec_out.
   if (has_coeffs && !early_skip) {
+
+    if (state->encoder_control->cfg.lfnst) {
+      // Inverse low frequency non-separable transform
+      kvz_inv_lfnst(cur_cu, width, height, color, lfnst_index, coeff);
+    }
 
     // Get quantized residual. (coeff_out -> coeff -> residual)
     uvg_dequant(state, coeff_out, coeff, width, width, color,

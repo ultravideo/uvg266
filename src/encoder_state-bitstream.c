@@ -582,13 +582,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
     WRITE_U(stream, mts_selection == UVG_MTS_INTER || mts_selection == UVG_MTS_BOTH ? 1 : 0, 1, "sps_explicit_mts_inter_enabled_flag");
   }
 
-  if (state->encoder_control->cfg.lfnst) {
-    WRITE_U(stream, 1, 1, "sps_lfnst_enabled_flag");
-  }
-  else {
-    WRITE_U(stream, 0, 1, "sps_lfnst_enabled_flag");
-  }
-
+  WRITE_U(stream, encoder->cfg.lfnst, 1, "sps_lfnst_enabled_flag");
 
   if (encoder->chroma_format != UVG_CSP_400) {
     WRITE_U(stream, encoder->cfg.jccr, 1, "sps_joint_cbcr_enabled_flag");

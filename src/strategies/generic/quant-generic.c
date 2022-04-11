@@ -502,6 +502,11 @@ int uvg_quantize_residual_generic(encoder_state_t *const state,
   if (has_coeffs && !early_skip) {
     int y, x;
 
+    if (state->encoder_control->cfg.lfnst) {
+      // Inverse low frequency non-separable transform
+      kvz_inv_lfnst(cur_cu, width, height, color, lfnst_index, coeff);
+    }
+
     // Get quantized residual. (coeff_out -> coeff -> residual)
     uvg_dequant(state, coeff_out, coeff, width, width, color,
       cur_cu->type, cur_cu->tr_idx == MTS_SKIP && color == COLOR_Y);
@@ -510,11 +515,6 @@ int uvg_quantize_residual_generic(encoder_state_t *const state,
     }
     else {
       uvg_itransform2d(state->encoder_control, residual, coeff, width, color, cur_cu);
-    }
-
-    if (state->encoder_control->cfg.lfnst) {
-      // Inverse low frequency non-separable transform
-      kvz_inv_lfnst(cur_cu, width, height, color, lfnst_index, coeff);
     }
     
     if (state->tile->frame->lmcs_aps->m_sliceReshapeInfo.enableChromaAdj && color != COLOR_Y) {
