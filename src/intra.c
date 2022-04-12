@@ -1588,6 +1588,8 @@ void kvz_intra_recon_cu(
       intra_recon_tb_leaf(state, x, y, depth, lcu, COLOR_V, search_data);
     }
 
-    kvz_quantize_lcu_residual(state, has_luma, has_chroma, search_data->pred_cu.joint_cb_cr != 4, x, y, depth, cur_cu, lcu, false);
+    kvz_quantize_lcu_residual(state, has_luma, has_chroma, 
+      search_data->pred_cu.joint_cb_cr != 4 && state->encoder_control->cfg.jccr && (x % 8 == 0 && y % 8 == 0),
+      x, y, depth, cur_cu, lcu, false);
   }
 }

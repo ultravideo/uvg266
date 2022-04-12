@@ -1008,6 +1008,8 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
                            depth, &intra_search,
                            NULL,
                            lcu);
+        cur_cu->intra.mode_chroma = intra_search.pred_cu.intra.mode_chroma;
+        cur_cu->joint_cb_cr = intra_search.pred_cu.joint_cb_cr;
         if(depth != 0 && state->encoder_control->cfg.jccr) {
           kvz_select_jccr_mode(state,
                                x & ~7, y & ~7,
@@ -1201,19 +1203,10 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
 
         const bool has_chroma = state->encoder_control->chroma_format != KVZ_CSP_400;
         const int8_t mode_chroma = has_chroma ? cur_cu->intra.mode_chroma : -1;
-        intra_parameters_t intra_parameters = {
-          .luma_mode = cur_cu->intra.mode,
-          .chroma_mode = mode_chroma,
-          .cclm_parameters ={{0, 0, 0}, {0, 0 ,0}},
-          0,
-          0,
-          0,
-          0,
-          -1,
-        };
+
         kvz_intra_recon_cu(state,
                            x, y,
-                           depth, ,
+                           depth, NULL,
                            NULL,
                            lcu);
 

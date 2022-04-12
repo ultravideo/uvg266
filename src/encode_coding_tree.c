@@ -1507,8 +1507,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
     // For 4x4 the chroma PU/TU is coded after the last 
     if (state->encoder_control->chroma_format != KVZ_CSP_400 && depth == 4 && x % 8 && y % 8) {
       encode_chroma_intra_cu(cabac, cur_cu, state->encoder_control->cfg.cclm);
-      encode_transform_coeff(state, x, y, depth, 0, 0, 0, 1, coeff);
-    
+      encode_transform_coeff(state, x, y, depth, 0, 0, 0, 1, coeff);    
     }
   }
 

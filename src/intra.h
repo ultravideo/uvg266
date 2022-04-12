@@ -72,6 +72,9 @@ typedef struct {
   double distortion;
 } intra_search_data_t ;
 
+
+#define KVZ_NUM_INTRA_MODES 67
+
 /**
 * \brief Function for deriving intra luma predictions
 * \param x          x-coordinate of the PU in pixels
