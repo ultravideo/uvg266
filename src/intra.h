@@ -127,36 +127,21 @@ void kvz_intra_build_reference(
  */
 void kvz_intra_predict(
   const encoder_state_t* const state,
-  const kvz_intra_references* const refs,
+  kvz_intra_references* const refs,
   const cu_loc_t* const cu_loc,
   const color_t color,
   kvz_pixel* dst,
-  intra_search_data_t* data,
-  const lcu_t* lcu);
+  const intra_search_data_t* data,
+  const lcu_t* lcu
+);
 
 void kvz_intra_recon_cu(
-  const encoder_state_t* const state,
+  encoder_state_t* const state,
   int x,
   int y,
   int depth,
   intra_search_data_t* search_data,
   cu_info_t *cur_cu,
   lcu_t *lcu);
-
-
-void kvz_predict_cclm(
-  encoder_state_t const* const state,
-  const color_t color,
-  const int8_t width,
-  const int8_t height,
-  const int16_t x0,
-  const int16_t y0,
-  const int16_t stride,
-  const int8_t mode,
-  lcu_t* const lcu,
-  kvz_intra_references* chroma_ref,
-  kvz_pixel* dst,
-  cclm_parameters_t* cclm_params
-);
 
 int kvz_get_mip_flag_context(int x, int y, int width, int height, const lcu_t* lcu, cu_array_t* const cu_a);

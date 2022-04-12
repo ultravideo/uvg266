@@ -83,9 +83,9 @@ static const uint8_t num_ref_pixels_left[16][16] = {
 };
 
 
-void static mip_predict(
+static void mip_predict(
   const encoder_state_t* const state,
-  kvz_intra_references* const refs,
+  const kvz_intra_references* const refs,
   const uint16_t pred_block_width,
   const uint16_t pred_block_height,
   kvz_pixel* dst,
@@ -479,7 +479,7 @@ static void linear_transform_cclm(const cclm_parameters_t* cclm_params, kvz_pixe
 }
 
 
-void kvz_predict_cclm(
+void predict_cclm(
   encoder_state_t const* const state,
   const color_t color,
   const int8_t width,
@@ -488,7 +488,7 @@ void kvz_predict_cclm(
   const int16_t y0,
   const int16_t stride,
   const int8_t mode,
-  lcu_t* const lcu,
+  const lcu_t* const lcu,
   kvz_intra_references* chroma_ref,
   kvz_pixel* dst,
   cclm_parameters_t* cclm_params
@@ -508,7 +508,7 @@ void kvz_predict_cclm(
   int available_left_below = 0;
 
 
-  kvz_pixel *y_rec = lcu->rec.y + x_scu + y_scu * LCU_WIDTH;
+  const kvz_pixel *y_rec = lcu->rec.y + x_scu + y_scu * LCU_WIDTH;
   const int stride2 = (((state->tile->frame->width + 7) & ~7) + FRAME_PADDING_LUMA);
 
   // Essentially what this does is that it uses 6-tap filtering to downsample
@@ -520,7 +520,7 @@ void kvz_predict_cclm(
   if (y0) {
     for (; available_above_right < width / 2; available_above_right++) {
       int x_extension = x_scu + width * 2 + 4 * available_above_right;
-      cu_info_t* pu = LCU_GET_CU_AT_PX(lcu, x_extension, y_scu - 4);
+      const cu_info_t* pu = LCU_GET_CU_AT_PX(lcu, x_extension, y_scu - 4);
       if (x_extension >= LCU_WIDTH || pu->type == CU_NOTSET) break;
     }
     if(y_scu == 0) {
@@ -545,7 +545,7 @@ void kvz_predict_cclm(
   if(x0) {
     for (; available_left_below < height / 2; available_left_below++) {
       int y_extension = y_scu + height * 2 + 4 * available_left_below;
-      cu_info_t* pu = LCU_GET_CU_AT_PX(lcu, x_scu - 4, y_extension);
+      const cu_info_t* pu = LCU_GET_CU_AT_PX(lcu, x_scu - 4, y_extension);
       if (y_extension >= LCU_WIDTH || pu->type == CU_NOTSET) break;
       if(x_scu == 32 && y_scu == 0 && pu->depth == 0) break;
     }
@@ -742,9 +742,9 @@ void kvz_mip_pred_upsampling_1D(int* const dst, const int* const src, const int*
 
 /** \brief Matrix weighted intra prediction.
 */
-void static mip_predict(
+static void mip_predict(
   const encoder_state_t* const state,
-  kvz_intra_references* const refs,
+  const kvz_intra_references* const refs,
   const uint16_t pred_block_width,
   const uint16_t pred_block_height,
   kvz_pixel* dst,
@@ -892,7 +892,7 @@ void static mip_predict(
 }
 
 
-void static intra_predict_regular(
+static void intra_predict_regular(
   const encoder_state_t* const state,
   kvz_intra_references *refs,
   int_fast8_t log2_width,
@@ -1369,15 +1369,14 @@ void kvz_intra_build_reference(
 
 void kvz_intra_predict(
   const encoder_state_t* const state,
-  const kvz_intra_references* const refs,
+  kvz_intra_references* const refs,
   const cu_loc_t* const cu_loc,
   const color_t color,
   kvz_pixel* dst,
-  intra_search_data_t* data,
+  const intra_search_data_t* data,
   const lcu_t* lcu
   )
 {
-  const kvz_config* cfg = &state->encoder_control->cfg;
   const int stride = (((state->tile->frame->width + 7) & ~7) + FRAME_PADDING_LUMA);
   // TODO: what is this used for?
   // const bool filter_boundary = color == COLOR_Y && !(cfg->lossless && cfg->implicit_rdpcm);
@@ -1407,8 +1406,9 @@ void kvz_intra_predict(
   else {
     kvz_pixels_blit(&state->tile->frame->cclm_luma_rec[x / 2 + (y * stride) / 4], dst, width, width, stride / 2, width);
     if (data->pred_cu.depth != data->pred_cu.tr_depth || data->cclm_parameters[color == COLOR_U ? 0 : 1].b <= 0) {
-      kvz_predict_cclm(
-        state, color, width, width, x, y, stride, intra_mode, lcu, refs, dst, &data->cclm_parameters[color == COLOR_U ? 0 : 1]);
+      predict_cclm(
+        state, color, width, width, x, y, stride, intra_mode, lcu, refs, dst, 
+        (cclm_parameters_t*)&data->cclm_parameters[color == COLOR_U ? 0 : 1]);
     }
     else {
       linear_transform_cclm(&data->cclm_parameters[color == COLOR_U ? 0 : 1], dst, dst, width, width);
@@ -1418,7 +1418,7 @@ void kvz_intra_predict(
 
 
 static void intra_recon_tb_leaf(
-  const encoder_state_t* const state,
+  encoder_state_t* const state,
   int x,
   int y,
   int depth,
@@ -1472,8 +1472,8 @@ static void intra_recon_tb_leaf(
 
   cu_loc_t loc = {
     x, y,
-    width, width,
-    width, width,
+    width, height,
+    width, height,
   };
 
   kvz_intra_predict(state, &refs, &loc, color, pred, search_data, lcu);
@@ -1518,7 +1518,7 @@ static void intra_recon_tb_leaf(
  * \param lcu           containing LCU
  */
 void kvz_intra_recon_cu(
-  const encoder_state_t* const state,
+  encoder_state_t* const state,
   int x,
   int y,
   int depth,

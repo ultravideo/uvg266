@@ -1200,13 +1200,15 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
 
         kvz_lcu_fill_trdepth(lcu, x, y, depth, cur_cu->tr_depth);
         lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
-
-        const bool has_chroma = state->encoder_control->chroma_format != KVZ_CSP_400;
-        const int8_t mode_chroma = has_chroma ? cur_cu->intra.mode_chroma : -1;
+        
+        intra_search_data_t proxy;
+        FILL(proxy, 0);
+        proxy.pred_cu = *cur_cu;
 
         kvz_intra_recon_cu(state,
                            x, y,
-                           depth, NULL,
+                           depth,
+                           &proxy,
                            NULL,
                            lcu);
 

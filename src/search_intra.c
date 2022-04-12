@@ -171,7 +171,7 @@ static void get_cost_dual(encoder_state_t * const state,
 }
 
 
-double static INLINE rough_cost_prediction_mode(const encoder_state_t* const state,
+ static INLINE double rough_cost_prediction_mode(encoder_state_t* const state,
   kvz_intra_references* const references,
   const cu_loc_t* const cu_loc,
   kvz_pixel *ref_pixels,
@@ -188,6 +188,7 @@ double static INLINE rough_cost_prediction_mode(const encoder_state_t* const sta
   kvz_intra_predict(state, references, cu_loc, color, pred, data, lcu);
 
   double cost = get_cost(state, pred, ref_pixels, satd_func, sad_func, width);
+  return cost;
 }
 
 
@@ -596,8 +597,8 @@ static int8_t search_intra_rough(
   int8_t modes[KVZ_NUM_INTRA_MODES];
   double costs[KVZ_NUM_INTRA_MODES];
 
-  const kvz_config *cfg = &state->encoder_control->cfg;
-  const bool filter_boundary = !(cfg->lossless && cfg->implicit_rdpcm);
+  // const kvz_config *cfg = &state->encoder_control->cfg;
+  // const bool filter_boundary = !(cfg->lossless && cfg->implicit_rdpcm);
 
   // Temporary block arrays
   kvz_pixel _preds[PARALLEL_BLKS * 32 * 32 + SIMD_ALIGNMENT];
@@ -821,7 +822,7 @@ static int8_t search_intra_rdo(
 
   // Update order according to new costs
   double best_cost = MAX_INT;
-  int best_mode;
+  int best_mode = 0;
   for (int mode = 0; mode < modes_to_check; mode++) {
     if(search_data[mode].cost < best_cost) {
       best_cost = search_data[mode].cost;
@@ -905,9 +906,6 @@ int8_t kvz_search_intra_chroma_rdo(
 
 
   if (reconstruct_chroma) {
-
-    int c_width = MAX(32 >> (depth), 4);
-
     kvz_intra_build_reference(MAX(LOG2_LCU_WIDTH - depth - 1, 2), COLOR_U, &luma_px, &pic_px, lcu, &refs[0], state->encoder_control->cfg.wpp, NULL, 0);
     kvz_intra_build_reference(MAX(LOG2_LCU_WIDTH - depth - 1, 2), COLOR_V, &luma_px, &pic_px, lcu, &refs[1], state->encoder_control->cfg.wpp, NULL, 0);
     
@@ -924,7 +922,6 @@ int8_t kvz_search_intra_chroma_rdo(
                            lcu);
       }
       
-      double bits = 0;
       if(tr_cu->depth != tr_cu->tr_depth || !state->encoder_control->cfg.jccr) {
         chroma_data[i].cost = kvz_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, tr_cu, lcu);
       } else {
@@ -1119,13 +1116,20 @@ void kvz_search_cu_intra(
     }
 
   }
+  number_of_modes += num_mip_modes;
 
-
+  int num_mrl_modes = 0;
   uint8_t lines = 1;
   // Find modes with multiple reference lines if in use. Do not use if CU in first row.
   if (state->encoder_control->cfg.mrl && (y_px % LCU_WIDTH) != 0) {
     lines = MAX_REF_LINE_IDX;
   }
+  for(int line = 1; line < lines; ++line) {
+    for(int i = 1; i < INTRA_MPM_COUNT; i++) {
+      num_mrl_modes++;
+    }
+  }
+  number_of_modes += num_mrl_modes;
 
   // Set transform depth to current depth, meaning no transform splits.
   kvz_lcu_fill_trdepth(lcu, x_px, y_px, depth, depth);
