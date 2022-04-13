@@ -479,7 +479,7 @@ static void linear_transform_cclm(const cclm_parameters_t* cclm_params, kvz_pixe
 }
 
 
-void predict_cclm(
+static void predict_cclm(
   encoder_state_t const* const state,
   const color_t color,
   const int8_t width,

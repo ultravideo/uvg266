@@ -457,7 +457,7 @@ static double search_intra_trdepth(
     return nosplit_cost;
   }
 }
-void sort_modes(intra_search_data_t* __restrict modes, uint8_t length)
+static void sort_modes(intra_search_data_t* __restrict modes, uint8_t length)
 {
   // Length for intra is always between 5 and 23, and is either 21, 17, 9 or 8 about
   // 60% of the time, so there should be no need for anything more complex
