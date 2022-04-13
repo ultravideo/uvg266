@@ -1118,7 +1118,7 @@ void kvz_search_cu_intra(
           search_data[index].pred_cu.intra.mip_flag = 1;
           search_data[index].pred_cu.intra.mode = i;
           search_data[index].pred_cu.intra.mip_is_transposed = transpose;
-          search_data[index].pred_cu.intra.mode_chroma = 0;
+          search_data[index].pred_cu.intra.mode_chroma = i;
           search_data[index].cost = MAX_INT;
         }
       }
