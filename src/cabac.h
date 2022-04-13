@@ -159,7 +159,7 @@ extern const float kvz_f_entropy_bits[512];
 #define CTX_ENTROPY_FBITS(ctx, val) kvz_f_entropy_bits[(CTX_STATE(ctx)<<1) ^ (val)]
 
 #define CABAC_FBITS_UPDATE(cabac, ctx, val, bits, name) do { \
-  if((cabac)->only_count || 1) (bits) += kvz_f_entropy_bits[(CTX_STATE(ctx)<<1) ^ (val)]; \
+  if((cabac)->only_count) (bits) += kvz_f_entropy_bits[(CTX_STATE(ctx)<<1) ^ (val)]; \
   if((cabac)->update) {\
     (cabac)->cur_ctx = ctx;\
     CABAC_BIN((cabac), (val), (name));\
