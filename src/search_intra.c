@@ -274,6 +274,7 @@ static double search_intra_trdepth(
 
   const bool reconstruct_chroma =  (depth != 4 || (depth == 4 && (x_px & 4 && y_px & 4))) && state->encoder_control->chroma_format != KVZ_CSP_400;
   cu_info_t* pred_cu = &search_data->pred_cu;
+  cu_info_t* const tr_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
 
   struct {
     kvz_pixel y[TR_MAX_WIDTH*TR_MAX_WIDTH];
@@ -287,6 +288,7 @@ static double search_intra_trdepth(
 
   if (depth > 0) {
     const bool mts_enabled = state->encoder_control->cfg.mts == KVZ_MTS_INTRA || state->encoder_control->cfg.mts == KVZ_MTS_BOTH;
+    tr_cu->tr_depth = depth;
     pred_cu->tr_depth = depth;
 
     nosplit_cost = 0.0;
@@ -1078,9 +1080,9 @@ void kvz_search_cu_intra(
 
   // Need to set some data for all cus
   cu_info_t temp_pred_cu;
-  FILL(temp_pred_cu, 0);
-  temp_pred_cu.depth = depth;
+  temp_pred_cu = *cur_cu;
   temp_pred_cu.type = CU_INTRA;
+  FILL(temp_pred_cu.intra, 0);
 
   int16_t number_of_modes;
   bool skip_rough_search = (depth == 0 || state->encoder_control->cfg.rdo >= 4);
@@ -1139,7 +1141,7 @@ void kvz_search_cu_intra(
       search_data[index].pred_cu = temp_pred_cu;
       search_data[index].pred_cu.intra.mode = candidate_modes[i];
       search_data[index].pred_cu.intra.multi_ref_idx = line;
-      search_data[index].pred_cu.intra.mode_chroma = 0;
+      search_data[index].pred_cu.intra.mode_chroma = candidate_modes[i];
       search_data[index].cost = MAX_INT;
     }
     if (!skip_rough_search) {
@@ -1163,8 +1165,25 @@ void kvz_search_cu_intra(
       // Check only the predicted modes.
       number_of_modes_to_search = 0;
     }
-    sort_modes(search_data, number_of_modes);
+    if(!skip_rough_search) {
+      sort_modes(search_data, number_of_modes);
+    }
 
+    for(int pred_mode = 0; pred_mode < INTRA_MPM_COUNT; ++pred_mode) {
+      bool mode_found = false;
+      for(int i = 0; i < number_of_modes_to_search; i++) {
+        if(search_data[i].pred_cu.intra.mode == candidate_modes[pred_mode]) {
+          mode_found = true;
+          break;
+        }
+      }
+      if(!mode_found) {
+        search_data[number_of_modes_to_search].pred_cu = temp_pred_cu;
+        search_data[number_of_modes_to_search].pred_cu.intra.mode = candidate_modes[pred_mode];
+        search_data[number_of_modes_to_search].pred_cu.intra.mode_chroma = candidate_modes[pred_mode];
+        number_of_modes_to_search++;
+      }
+    }
 
     // TODO: if rough search is implemented for MIP, sort mip_modes here.
     search_intra_rdo(
