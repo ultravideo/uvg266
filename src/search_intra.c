@@ -171,27 +171,6 @@ static void get_cost_dual(encoder_state_t * const state,
 }
 
 
- static INLINE double rough_cost_prediction_mode(encoder_state_t* const state,
-  kvz_intra_references* const references,
-  const cu_loc_t* const cu_loc,
-  kvz_pixel *ref_pixels,
-  const color_t color,
-  intra_search_data_t * data,
-  lcu_t* lcu) 
-{
-  const int width = color == COLOR_Y ? cu_loc->width : cu_loc->chroma_width;
-  cost_pixel_nxn_func* satd_func = kvz_pixels_get_satd_func(width);
-  cost_pixel_nxn_func* sad_func = kvz_pixels_get_sad_func(width);
-
-  kvz_pixel _pred[TR_MAX_WIDTH * TR_MAX_WIDTH + SIMD_ALIGNMENT];
-  kvz_pixel* pred = ALIGNED_POINTER(_pred, SIMD_ALIGNMENT);
-  kvz_intra_predict(state, references, cu_loc, color, pred, data, lcu);
-
-  double cost = get_cost(state, pred, ref_pixels, satd_func, sad_func, width);
-  return cost;
-}
-
-
 /**
 * \brief Derives mts_last_scan_pos and violates_mts_coeff_constraint for pred_cu.
 *
@@ -577,7 +556,7 @@ static void search_intra_chroma_rough(
  *
  * \return  Number of prediction modes in param modes.
  */
-static int8_t search_intra_rough(
+static int16_t search_intra_rough(
   encoder_state_t * const state,
   kvz_pixel *orig,
   int32_t origstride,
@@ -762,11 +741,39 @@ static int8_t search_intra_rough(
 }
 
 
-void search_mip_rough(
-  encoder_state_t* const state, 
-  cu_loc_t* const cu_loc)
+static void get_rough_cost_for_n_modes(
+  encoder_state_t* const state,
+  kvz_intra_references* refs,
+  const cu_loc_t* const cu_loc,
+  kvz_pixel *orig,
+  int orig_stride,
+  intra_search_data_t *search_data,
+  int num_modes)
 {
+#define PARALLEL_BLKS 2
+  assert(num_modes % 2 == 0 && "passing odd number of modes to get_rough_cost_for_n_modes");
+  const int width = cu_loc->width;
+  cost_pixel_nxn_multi_func* satd_dual_func = kvz_pixels_get_satd_dual_func(width);
+  cost_pixel_nxn_multi_func* sad_dual_func = kvz_pixels_get_sad_dual_func(width);
+
+  kvz_pixel _preds[PARALLEL_BLKS * MIN(LCU_WIDTH, 64)* MIN(LCU_WIDTH, 64)+ SIMD_ALIGNMENT];
+  pred_buffer preds = ALIGNED_POINTER(_preds, SIMD_ALIGNMENT);
+
+  kvz_pixel _orig_block[MIN(LCU_WIDTH, 64) * MIN(LCU_WIDTH, 64) + SIMD_ALIGNMENT];
+  kvz_pixel* orig_block = ALIGNED_POINTER(_orig_block, SIMD_ALIGNMENT);
+
+  kvz_pixels_blit(orig, orig_block, width, width, orig_stride, width);
   
+  double costs_out[PARALLEL_BLKS] = { 0 };
+  for(int mode = 0; mode < num_modes; mode += PARALLEL_BLKS) {
+    for (int i = 0; i < PARALLEL_BLKS; ++i) {
+      kvz_intra_predict(state, refs, cu_loc, COLOR_Y, preds[i], &search_data[mode + i], NULL);
+    }
+    get_cost_dual(state, preds, orig_block, satd_dual_func, sad_dual_func, width, costs_out);
+    search_data[mode].cost = costs_out[0];
+    search_data[mode + 1].cost = costs_out[1];
+  }
+#undef PARALLEL_BLKS
 }
 
 
@@ -1029,6 +1036,8 @@ void kvz_search_cu_intra(
 {
   const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
   const int8_t cu_width = LCU_WIDTH >> depth;
+  const cu_loc_t cu_loc = { x_px, y_px, cu_width, cu_width,
+    MAX(cu_width >> 1, TR_MIN_WIDTH), MAX(cu_width >> 1, TR_MIN_WIDTH) };
   const int_fast8_t log2_width = LOG2_LCU_WIDTH - depth;
 
   cu_info_t *cur_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
@@ -1073,7 +1082,7 @@ void kvz_search_cu_intra(
   temp_pred_cu.depth = depth;
   temp_pred_cu.type = CU_INTRA;
 
-  int8_t number_of_modes;
+  int16_t number_of_modes;
   bool skip_rough_search = (depth == 0 || state->encoder_control->cfg.rdo >= 4);
   if (!skip_rough_search) {
     number_of_modes = search_intra_rough(state,
@@ -1098,38 +1107,47 @@ void kvz_search_cu_intra(
     // MIP is not allowed for 64 x 4 or 4 x 64 blocks
     if (!((width == 64 && height == 4) || (width == 4 && height == 64))) {
       num_mip_modes = NUM_MIP_MODES_FULL(width, height);
-    }
-    for (int transpose = 0; transpose < 2; transpose++) {
-      const int half_mip_modes = NUM_MIP_MODES_HALF(width, height);
-      for (int i = 0; i < half_mip_modes; ++i) {
-        const int index = i + number_of_modes + transpose * half_mip_modes;
-        search_data[index].pred_cu = temp_pred_cu;
-        search_data[index].pred_cu.intra.mip_flag = 1;
-        search_data[index].pred_cu.intra.mode = i;
-        search_data[index].pred_cu.intra.mip_is_transposed = transpose;
-        search_data[index].pred_cu.intra.mode_chroma = 0;
-        search_data[index].cost = MAX_INT;
+
+      for (int transpose = 0; transpose < 2; transpose++) {
+        const int half_mip_modes = NUM_MIP_MODES_HALF(width, height);
+        for (int i = 0; i < half_mip_modes; ++i) {
+          const int index = i + number_of_modes + transpose * half_mip_modes;
+          search_data[index].pred_cu = temp_pred_cu;
+          search_data[index].pred_cu.intra.mip_flag = 1;
+          search_data[index].pred_cu.intra.mode = i;
+          search_data[index].pred_cu.intra.mip_is_transposed = transpose;
+          search_data[index].pred_cu.intra.mode_chroma = 0;
+          search_data[index].cost = MAX_INT;
+        }
+      }
+      if(!skip_rough_search) {
+        get_rough_cost_for_n_modes(state, &refs, &cu_loc,
+          ref_pixels, LCU_WIDTH, search_data + number_of_modes, num_mip_modes);
       }
     }
-    if(!skip_rough_search) {
-
-    }
-
+    number_of_modes += num_mip_modes;
   }
-  number_of_modes += num_mip_modes;
 
   int num_mrl_modes = 0;
-  uint8_t lines = 1;
   // Find modes with multiple reference lines if in use. Do not use if CU in first row.
-  if (state->encoder_control->cfg.mrl && (y_px % LCU_WIDTH) != 0) {
-    lines = MAX_REF_LINE_IDX;
-  }
+  uint8_t lines = state->encoder_control->cfg.mrl && (y_px % LCU_WIDTH) != 0 ? MAX_REF_LINE_IDX : 1;
+
   for(int line = 1; line < lines; ++line) {
     for(int i = 1; i < INTRA_MPM_COUNT; i++) {
       num_mrl_modes++;
+      const int index = (i - 1) + (INTRA_MPM_COUNT -1)*(line-1) + number_of_modes;
+      search_data[index].pred_cu = temp_pred_cu;
+      search_data[index].pred_cu.intra.mode = candidate_modes[i];
+      search_data[index].pred_cu.intra.multi_ref_idx = line;
+      search_data[index].pred_cu.intra.mode_chroma = 0;
+      search_data[index].cost = MAX_INT;
     }
+    if (!skip_rough_search) {
+      get_rough_cost_for_n_modes(state, &refs, &cu_loc,
+        ref_pixels, LCU_WIDTH, search_data + number_of_modes, num_mrl_modes);
+    }
+    number_of_modes += num_mrl_modes;
   }
-  number_of_modes += num_mrl_modes;
 
   // Set transform depth to current depth, meaning no transform splits.
   kvz_lcu_fill_trdepth(lcu, x_px, y_px, depth, depth);
@@ -1138,7 +1156,7 @@ void kvz_search_cu_intra(
   if (rdo_level >= 2 || skip_rough_search) {
     int number_of_modes_to_search;
     if (rdo_level == 4) {
-      number_of_modes_to_search = 67;
+      number_of_modes_to_search = number_of_modes;
     } else if (rdo_level == 2 || rdo_level == 3) {
       number_of_modes_to_search = (cu_width == 4) ? 3 : 2;
     } else {
