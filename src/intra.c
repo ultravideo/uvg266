@@ -1392,6 +1392,7 @@ void kvz_intra_predict(
     }
     else {
       use_mip = state->encoder_control->chroma_format == KVZ_CSP_444;
+      intra_mode = use_mip ? intra_mode : 0;
     }
   }
   if (intra_mode < 68) {
