@@ -1144,12 +1144,12 @@ void kvz_search_cu_intra(
       search_data[index].pred_cu.intra.mode_chroma = candidate_modes[i];
       search_data[index].cost = MAX_INT;
     }
-    if (!skip_rough_search) {
-      get_rough_cost_for_n_modes(state, &refs, &cu_loc,
-        ref_pixels, LCU_WIDTH, search_data + number_of_modes, num_mrl_modes);
-    }
-    number_of_modes += num_mrl_modes;
   }
+  if (!skip_rough_search && lines != 1) {
+    get_rough_cost_for_n_modes(state, &refs, &cu_loc,
+      ref_pixels, LCU_WIDTH, search_data + number_of_modes, num_mrl_modes);
+  }
+  number_of_modes += num_mrl_modes;
 
   // Set transform depth to current depth, meaning no transform splits.
   kvz_lcu_fill_trdepth(lcu, x_px, y_px, depth, depth);
