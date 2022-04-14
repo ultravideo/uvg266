@@ -346,7 +346,6 @@ static double search_intra_trdepth(
         derive_mts_constraints(pred_cu, lcu, depth, lcu_px);
         if (pred_cu->violates_mts_coeff_constraint || !pred_cu->mts_last_scan_pos)
         {
-          assert(pred_cu->tr_idx == MTS_TR_NUM); //mts mode should not be decided and then not allowed to be used. (might be some exception here)
           continue;
         }
       }
@@ -1195,8 +1194,12 @@ void kvz_search_cu_intra(
       number_of_modes_to_search,
       search_data,
       lcu);
-    
+    // Reset these
+    search_data[0].pred_cu.violates_mts_coeff_constraint = false;
+    search_data[0].pred_cu.mts_last_scan_pos = false;    
   }
-  
+  else {
+    sort_modes(search_data, number_of_modes);    
+  }
   *mode_out = search_data[0];
 }
