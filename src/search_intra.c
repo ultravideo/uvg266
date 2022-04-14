@@ -319,7 +319,7 @@ static double search_intra_trdepth(
     if(state->encoder_control->cfg.trskip_enable && width <= (1 << state->encoder_control->cfg.trskip_max_size) /*&& height == 4*/) {
       num_transforms = MAX(num_transforms, 2);
     }
-
+    pred_cu->intra.mode_chroma = -1;
     for (; trafo < num_transforms; trafo++) {
       pred_cu->tr_idx = trafo;
       if (mts_enabled)
@@ -818,6 +818,7 @@ static int8_t search_intra_rdo(
   
   for (int mode = 0; mode < modes_to_check; mode++) {
     double rdo_bitcost = kvz_luma_mode_bits(state, &search_data[mode].pred_cu, x_px, y_px, depth, lcu);
+    search_data[mode].pred_cu.tr_idx = MTS_TR_NUM;
     search_data[mode].bits = rdo_bitcost;
     search_data[mode].cost = rdo_bitcost * state->lambda;
 
