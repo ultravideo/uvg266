@@ -996,27 +996,39 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         // rd2. Possibly because the luma mode search already takes chroma
         // into account, so there is less of a chanse of luma mode being
         // really bad for chroma.
+        cur_cu->joint_cb_cr = 0;
+        intra_search.pred_cu.intra.mode_chroma = cur_cu->intra.mode_chroma; // skip luma
         if (ctrl->cfg.rdo >= 3 && !cur_cu->intra.mip_flag) {
-          cur_cu->intra.mode_chroma = kvz_search_cu_intra_chroma(state, x, y, depth, lcu, intra_search.cclm_parameters);
+          cur_cu->intra.mode_chroma = kvz_search_cu_intra_chroma(state, x, y, depth, lcu, &intra_search);
+
+          if (intra_search.pred_cu.joint_cb_cr == 0) intra_search.pred_cu.joint_cb_cr = 4;
+          else cur_cu->joint_cb_cr = intra_search.pred_cu.joint_cb_cr;
+
           lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
         }
-        intra_search.pred_cu.intra.mode_chroma = intra_search.pred_cu.intra.mode;
         intra_search.pred_cu.intra.mode = -1; // skip luma
-        intra_search.pred_cu.joint_cb_cr = 0;
         kvz_intra_recon_cu(state,
                            x & ~7, y & ~7, // TODO: as does this
                            depth, &intra_search,
                            NULL,
                            lcu);
-        cur_cu->intra.mode_chroma = intra_search.pred_cu.intra.mode_chroma;
-        cur_cu->joint_cb_cr = intra_search.pred_cu.joint_cb_cr;
-        if(depth != 0 && state->encoder_control->cfg.jccr) {
+        if(depth != 0 && state->encoder_control->cfg.jccr && ctrl->cfg.rdo < 3) {
           kvz_select_jccr_mode(state,
                                x & ~7, y & ~7,
                                depth,
                                NULL,
                                lcu,
                                NULL);
+        }
+        else if(depth != 0 && state->encoder_control->cfg.jccr && cur_cu->joint_cb_cr & 3) {
+          assert(cur_cu->joint_cb_cr < 4);
+          const vector2d_t lcu_px = { (x_local & ~7) / 2, (y_local & ~7) / 2 };
+          int lcu_width = LCU_WIDTH_C;
+          const int index = lcu_px.x + lcu_px.y * lcu_width;
+          const int width = (depth < MAX_DEPTH) ? LCU_WIDTH >> (depth + 1) : LCU_WIDTH >> depth;
+          kvz_pixels_blit(&lcu->rec.joint_u[index], &lcu->rec.u[index], width, width, lcu_width, lcu_width);
+          kvz_pixels_blit(&lcu->rec.joint_v[index], &lcu->rec.v[index], width, width, lcu_width, lcu_width);
+
         }
       }
     } else if (cur_cu->type == CU_INTER) {

@@ -927,14 +927,14 @@ int8_t kvz_search_intra_chroma_rdo(
         kvz_intra_recon_cu(state,
                            x_px, y_px,
                            depth, &chroma_data[i],
-                           NULL,
+          &chroma_data[i].pred_cu,
                            lcu);
       }
       
       if(tr_cu->depth != tr_cu->tr_depth || !state->encoder_control->cfg.jccr) {
-        chroma_data[i].cost = kvz_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, tr_cu, lcu);
+        chroma_data[i].cost = kvz_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, &chroma_data[i].pred_cu, lcu);
       } else {
-        kvz_select_jccr_mode(state, lcu_px.x, lcu_px.y, depth, tr_cu, lcu, &chroma_data[i].cost);
+        kvz_select_jccr_mode(state, lcu_px.x, lcu_px.y, depth, &chroma_data[i].pred_cu, lcu, &chroma_data[i].cost);
       }
 
       double mode_bits = kvz_chroma_mode_bits(state, mode, chroma_data[i].pred_cu.intra.mode);
@@ -951,7 +951,7 @@ int8_t kvz_search_intra_chroma_rdo(
 
 int8_t kvz_search_cu_intra_chroma(encoder_state_t * const state,
                               const int x_px, const int y_px,
-                              const int depth, lcu_t *lcu, cclm_parameters_t *best_cclm)
+                              const int depth, lcu_t *lcu, intra_search_data_t *search_data)
 {
   const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
 
@@ -987,6 +987,7 @@ int8_t kvz_search_cu_intra_chroma(encoder_state_t * const state,
   for (int i = 0; i < num_modes; i++) {
     chroma_data[i].pred_cu = *cur_pu;
     chroma_data[i].pred_cu.intra.mode_chroma = modes[i];
+    chroma_data[i].pred_cu.intra.mode = -1;
   }
   // Don't do rough mode search if all modes are selected.
   // FIXME: It might make more sense to only disable rough search if
@@ -1019,7 +1020,7 @@ int8_t kvz_search_cu_intra_chroma(encoder_state_t * const state,
   if (num_modes > 1) {
     intra_mode_chroma = kvz_search_intra_chroma_rdo(state, x_px, y_px, depth, num_modes, lcu, chroma_data);
   }
-
+  *search_data = chroma_data[0];
   return intra_mode_chroma;
 }
 
@@ -1199,7 +1200,15 @@ void kvz_search_cu_intra(
     search_data[0].pred_cu.mts_last_scan_pos = false;    
   }
   else {
-    sort_modes(search_data, number_of_modes);    
+    double best_cost = MAX_INT;
+    int best_mode = 0;
+    for (int mode = 0; mode < number_of_modes; mode++) {
+      if (search_data[mode].cost < best_cost) {
+        best_cost = search_data[mode].cost;
+        best_mode = mode;
+      }
+    }
+    search_data[0] = search_data[best_mode];
   }
   *mode_out = search_data[0];
 }
