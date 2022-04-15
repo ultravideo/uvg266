@@ -768,7 +768,7 @@ static void get_rough_cost_for_n_modes(
   double costs_out[PARALLEL_BLKS] = { 0 };
   for(int mode = 0; mode < num_modes; mode += PARALLEL_BLKS) {
     for (int i = 0; i < PARALLEL_BLKS; ++i) {
-      kvz_intra_predict(state, refs, cu_loc, COLOR_Y, preds[i], &search_data[mode + i], NULL);
+      kvz_intra_predict(state, &refs[search_data[mode + i].pred_cu.intra.multi_ref_idx], cu_loc, COLOR_Y, preds[i], &search_data[mode + i], NULL);
     }
     get_cost_dual(state, preds, orig_block, satd_dual_func, sad_dual_func, width, costs_out);
     search_data[mode].cost = costs_out[0];
@@ -1042,10 +1042,12 @@ void kvz_search_cu_intra(
   const cu_loc_t cu_loc = { x_px, y_px, cu_width, cu_width,
     MAX(cu_width >> 1, TR_MIN_WIDTH), MAX(cu_width >> 1, TR_MIN_WIDTH) };
   const int_fast8_t log2_width = LOG2_LCU_WIDTH - depth;
+  const vector2d_t luma_px = { x_px, y_px };
+  const vector2d_t pic_px = { state->tile->frame->width, state->tile->frame->height };
 
   cu_info_t *cur_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
 
-  kvz_intra_references refs;
+  kvz_intra_references refs[MAX_REF_LINE_IDX];
 
   int8_t candidate_modes[INTRA_MPM_COUNT];
   // Normal intra modes + mrl modes + mip modes
@@ -1065,11 +1067,7 @@ void kvz_search_cu_intra(
   kvz_intra_get_dir_luma_predictor(x_px, y_px, candidate_modes, cur_cu, left_cu, above_cu);
 
   if (depth > 0) {
-    const vector2d_t luma_px = { x_px, y_px };
-    const vector2d_t pic_px = { state->tile->frame->width, state->tile->frame->height };
-
-    // These references will only be used with rough search. No need for MRL stuff here.
-    kvz_intra_build_reference(log2_width, COLOR_Y, &luma_px, &pic_px, lcu, &refs, state->encoder_control->cfg.wpp, NULL, 0);
+    kvz_intra_build_reference(log2_width, COLOR_Y, &luma_px, &pic_px, lcu, refs, state->encoder_control->cfg.wpp, NULL, 0);
   }
 
   // The maximum number of possible MIP modes depend on block size & shape
@@ -1091,7 +1089,7 @@ void kvz_search_cu_intra(
     number_of_modes = search_intra_rough(state,
                                          ref_pixels,
                                          LCU_WIDTH,
-                                         &refs,
+                                         refs,
                                          log2_width, candidate_modes,
                                          search_data, &temp_pred_cu);
 
@@ -1124,7 +1122,7 @@ void kvz_search_cu_intra(
         }
       }
       if(!skip_rough_search) {
-        get_rough_cost_for_n_modes(state, &refs, &cu_loc,
+        get_rough_cost_for_n_modes(state, refs, &cu_loc,
           ref_pixels, LCU_WIDTH, search_data + number_of_modes, num_mip_modes);
       }
     }
@@ -1136,6 +1134,23 @@ void kvz_search_cu_intra(
   uint8_t lines = state->encoder_control->cfg.mrl && (y_px % LCU_WIDTH) != 0 ? MAX_REF_LINE_IDX : 1;
 
   for(int line = 1; line < lines; ++line) {
+    kvz_pixel extra_refs[128 * MAX_REF_LINE_IDX] = { 0 };
+
+    if (luma_px.x > 0 && lcu_px.x == 0 && lcu_px.y > 0) {
+      videoframe_t* const frame = state->tile->frame;
+
+      // Copy extra ref lines, including ref line 1 and top left corner.
+      for (int i = 0; i < MAX_REF_LINE_IDX; ++i) {
+        int height = (LCU_WIDTH >> depth) * 2 + MAX_REF_LINE_IDX;
+        height = MIN(height, (LCU_WIDTH - lcu_px.y + MAX_REF_LINE_IDX)); // Cut short if on bottom LCU edge. Cannot take references from below since they don't exist.
+        height = MIN(height, pic_px.y - luma_px.y + MAX_REF_LINE_IDX);
+        kvz_pixels_blit(&frame->rec->y[(luma_px.y - MAX_REF_LINE_IDX) * frame->rec->stride + luma_px.x - (1 + i)],
+          &extra_refs[i * 128],
+          1, height,
+          frame->rec->stride, 1);
+      }
+    }
+    kvz_intra_build_reference(log2_width, COLOR_Y, &luma_px, &pic_px, lcu, &refs[line], state->encoder_control->cfg.wpp, extra_refs, line);
     for(int i = 1; i < INTRA_MPM_COUNT; i++) {
       num_mrl_modes++;
       const int index = (i - 1) + (INTRA_MPM_COUNT -1)*(line-1) + number_of_modes;
@@ -1147,7 +1162,7 @@ void kvz_search_cu_intra(
     }
   }
   if (!skip_rough_search && lines != 1) {
-    get_rough_cost_for_n_modes(state, &refs, &cu_loc,
+    get_rough_cost_for_n_modes(state, refs, &cu_loc,
       ref_pixels, LCU_WIDTH, search_data + number_of_modes, num_mrl_modes);
   }
   number_of_modes += num_mrl_modes;
