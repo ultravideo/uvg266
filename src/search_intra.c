@@ -713,11 +713,11 @@ static int16_t search_intra_rough(
     int i = 0;
     int smaller_than_pred = 0;
     double bits;
-    for(; i < INTRA_MPM_COUNT; i++) {
+    for (; i < INTRA_MPM_COUNT; i++) {
       if (intra_preds[i] == modes[mode_i]) {
         break;
       }
-      if(modes[mode_i] > intra_preds[i]) {
+      if (modes[mode_i] > intra_preds[i]) {
         smaller_than_pred += 1;
       }
     }
@@ -728,7 +728,7 @@ static int16_t search_intra_rough(
       bits = not_planar_mode_flag + mpm_mode_bit + MAX(i, 3);
     }
     else {
-      bits = not_mpm_mode_bit + 5 + (mode_i - smaller_than_pred > 3);
+      bits = not_mpm_mode_bit + 5 + (modes[mode_i] - smaller_than_pred > 3);
     }
     costs[mode_i] += state->lambda_sqrt * bits;
     modes_out[mode_i].cost = costs[mode_i];
