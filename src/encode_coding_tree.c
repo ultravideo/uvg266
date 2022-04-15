@@ -900,7 +900,7 @@ void kvz_encode_intra_luma_coding_unit(const encoder_state_t * const state,
       CABAC_BIN_EP(cabac, mip_transpose, "mip_transposed");
       if (cabac->only_count) bits += 1;
       kvz_cabac_encode_trunc_bin(cabac, mip_mode, num_mip_modes, bits_out);
-      if (cabac->only_count) *bits_out += bits;
+      if (cabac->only_count && bits_out) *bits_out += bits;
       return;
     }
   }
