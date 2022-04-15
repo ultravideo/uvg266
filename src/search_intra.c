@@ -951,13 +951,11 @@ int8_t kvz_search_intra_chroma_rdo(
     
     for (int8_t i = 0; i < num_modes; ++i) {
       const uint8_t mode = chroma_data[i].pred_cu.intra.mode_chroma;
-      if(mode < 67 || depth == 0) {
-        kvz_intra_recon_cu(state,
-                           x_px, y_px,
-                           depth, &chroma_data[i],
-          &chroma_data[i].pred_cu,
-                           lcu);
-      }
+      kvz_intra_recon_cu(state,
+                         x_px, y_px,
+                         depth, &chroma_data[i],
+        &chroma_data[i].pred_cu,
+                         lcu);      
       
       if(tr_cu->depth != tr_cu->tr_depth || !state->encoder_control->cfg.jccr) {
         chroma_data[i].cost = kvz_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, &chroma_data[i].pred_cu, lcu);
