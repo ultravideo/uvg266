@@ -565,7 +565,8 @@ static int16_t search_intra_rough(
   int log2_width,
   int8_t *intra_preds,
   intra_search_data_t* modes_out,
-  cu_info_t* const pred_cu)
+  cu_info_t* const pred_cu,
+  uint8_t mip_ctx)
 {
   #define PARALLEL_BLKS 2 // TODO: use 4 for AVX-512 in the future?
   assert(log2_width >= 2 && log2_width <= 5);
@@ -705,6 +706,8 @@ static int16_t search_intra_rough(
 
   // Add prediction mode coding cost as the last thing. We don't want this
   // affecting the halving search.
+  const double not_mrl = state->encoder_control->cfg.mrl ? CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.multi_ref_line[0]), 0) : 0;
+  const double not_mip = state->encoder_control->cfg.mip ? CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.mip_flag[mip_ctx]), 0) : 0;
   const double mpm_mode_bit = CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.intra_luma_mpm_flag_model), 1);
   const double not_mpm_mode_bit = CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.intra_luma_mpm_flag_model), 0);
   const double planar_mode_flag = CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.luma_planar_model[1]), 1);
@@ -725,11 +728,12 @@ static int16_t search_intra_rough(
       bits = planar_mode_flag + mpm_mode_bit;
     }
     else if (i < INTRA_MPM_COUNT) {
-      bits = not_planar_mode_flag + mpm_mode_bit + MAX(i, 3);
+      bits = not_planar_mode_flag + mpm_mode_bit + MAX(i, 4);
     }
     else {
       bits = not_mpm_mode_bit + 5 + (modes[mode_i] - smaller_than_pred > 3);
     }
+    bits += not_mrl + not_mip;
     costs[mode_i] += state->lambda_sqrt * bits;
     modes_out[mode_i].cost = costs[mode_i];
     modes_out[mode_i].pred_cu = *pred_cu;
@@ -742,17 +746,18 @@ static int16_t search_intra_rough(
 }
 
 
-static void get_rough_cost_for_n_modes(
+static void get_rough_cost_for_2n_modes(
   encoder_state_t* const state,
   kvz_intra_references* refs,
   const cu_loc_t* const cu_loc,
   kvz_pixel *orig,
   int orig_stride,
   intra_search_data_t *search_data,
-  int num_modes)
+  int num_modes,
+  uint8_t mip_ctx)
 {
 #define PARALLEL_BLKS 2
-  assert(num_modes % 2 == 0 && "passing odd number of modes to get_rough_cost_for_n_modes");
+  assert(num_modes % 2 == 0 && "passing odd number of modes to get_rough_cost_for_2n_modes");
   const int width = cu_loc->width;
   cost_pixel_nxn_multi_func* satd_dual_func = kvz_pixels_get_satd_dual_func(width);
   cost_pixel_nxn_multi_func* sad_dual_func = kvz_pixels_get_sad_dual_func(width);
@@ -765,14 +770,37 @@ static void get_rough_cost_for_n_modes(
 
   kvz_pixels_blit(orig, orig_block, width, width, orig_stride, width);
   
+  const double mrl = state->encoder_control->cfg.mrl ? CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.multi_ref_line[0]), 1) : 0;
+  const double not_mip = state->encoder_control->cfg.mip ? CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.mip_flag[mip_ctx]), 0) : 0;
+  const double mip = state->encoder_control->cfg.mip ? CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.mip_flag[mip_ctx]), 1) : 0;
   double costs_out[PARALLEL_BLKS] = { 0 };
+  double bits[PARALLEL_BLKS] = { 0 };
   for(int mode = 0; mode < num_modes; mode += PARALLEL_BLKS) {
     for (int i = 0; i < PARALLEL_BLKS; ++i) {
       kvz_intra_predict(state, &refs[search_data[mode + i].pred_cu.intra.multi_ref_idx], cu_loc, COLOR_Y, preds[i], &search_data[mode + i], NULL);
     }
     get_cost_dual(state, preds, orig_block, satd_dual_func, sad_dual_func, width, costs_out);
+
+    for(int i = 0; i < PARALLEL_BLKS; ++i) {
+      uint8_t multi_ref_idx = search_data[mode + i].pred_cu.intra.multi_ref_idx;
+      if(multi_ref_idx) {
+        bits[i] = mrl + not_mip;
+        bits[i] += CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.multi_ref_line[1]), multi_ref_idx != 1);
+        bits[i] += MIN((mode + i + 1) % 6, 4);
+      }
+      else if(search_data[mode + i].pred_cu.intra.mip_flag) {
+        bits[i] = mip + 1;
+        bits[i] += num_modes == 32 ? 4 : (num_modes == 16 ? 3 : (((mode + i) % 6) < 2 ? 2 : 3));
+      }
+      else {
+        assert(0 && "get_rough_cost_for_2n_modes supports only mrl and mip mode cost calculation");
+      }
+    }
     search_data[mode].cost = costs_out[0];
     search_data[mode + 1].cost = costs_out[1];
+
+    search_data[mode].cost += bits[0] * state->lambda_sqrt;
+    search_data[mode + 1].cost += bits[1] * state->lambda_sqrt;
   }
 #undef PARALLEL_BLKS
 }
@@ -1074,6 +1102,10 @@ void kvz_search_cu_intra(
   int width = LCU_WIDTH >> depth;
   int height = width; // TODO: proper height for non-square blocks.
 
+  // This is needed for bit cost calculation and requires too many parameters to be
+  // calculated inside the rough search functions
+  uint8_t mip_ctx = kvz_get_mip_flag_context(x_px, y_px, cu_width, cu_width, lcu, NULL);
+
   // Find best intra mode for 2Nx2N.
   kvz_pixel *ref_pixels = &lcu->ref.y[lcu_px.x + lcu_px.y * LCU_WIDTH];
 
@@ -1091,7 +1123,8 @@ void kvz_search_cu_intra(
                                          LCU_WIDTH,
                                          refs,
                                          log2_width, candidate_modes,
-                                         search_data, &temp_pred_cu);
+                                         search_data, &temp_pred_cu,
+                                         mip_ctx);
 
   } else {
     for (int8_t i = 0; i < KVZ_NUM_INTRA_MODES; i++) {
@@ -1122,8 +1155,10 @@ void kvz_search_cu_intra(
         }
       }
       if(!skip_rough_search) {
-        get_rough_cost_for_n_modes(state, refs, &cu_loc,
-          ref_pixels, LCU_WIDTH, search_data + number_of_modes, num_mip_modes);
+        get_rough_cost_for_2n_modes(state, refs, &cu_loc,
+                                    ref_pixels,
+                                    LCU_WIDTH, search_data + number_of_modes, num_mip_modes,
+                                    mip_ctx);
       }
     }
     number_of_modes += num_mip_modes;
@@ -1162,8 +1197,10 @@ void kvz_search_cu_intra(
     }
   }
   if (!skip_rough_search && lines != 1) {
-    get_rough_cost_for_n_modes(state, refs, &cu_loc,
-      ref_pixels, LCU_WIDTH, search_data + number_of_modes, num_mrl_modes);
+    get_rough_cost_for_2n_modes(state, refs, &cu_loc,
+                                ref_pixels,
+                                LCU_WIDTH, search_data + number_of_modes, num_mrl_modes,
+                                mip_ctx);
   }
   number_of_modes += num_mrl_modes;
 
