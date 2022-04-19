@@ -187,13 +187,15 @@ static bool is_lfnst_allowed(encoder_state_t* const state, const cu_info_t* cons
   }
 }
 
-static void encode_lfnst_idx(encoder_state_t * const state, cabac_data_t * const cabac,
+static bool encode_lfnst_idx(encoder_state_t * const state, cabac_data_t * const cabac,
                              const cu_info_t * const pred_cu, const int x, const int y,
                              const int depth, const int color, const int width, const int height)
 {
   
   if (is_lfnst_allowed(state, pred_cu, color, width, height)) {
-    bool is_separate_tree = false; // LFNST_TODO: if/when separate/dual tree structure is implemented, get proper value for this 
+    // Getting separate tree bool from block size is a temporary fix until a proper dual tree check is possible (there is no dual tree structure at time of writing this).
+    // VTM seems to force explicit dual tree structure for small 4x4 blocks
+    bool is_separate_tree = (width == 4 && height == 4) ? true : false; // LFNST_TODO: if/when separate/dual tree structure is implemented, get proper value for this
     bool luma_flag = is_separate_tree ? (color == COLOR_Y ? true: false) : true;
     bool chroma_flag = is_separate_tree ? (color != COLOR_Y ? true : false) : true;
     bool non_zero_coeff_non_ts_corner_8x8 = (luma_flag && pred_cu->violates_lfnst_constrained[0]) || (chroma_flag && pred_cu->violates_lfnst_constrained[1]);
@@ -210,22 +212,24 @@ static void encode_lfnst_idx(encoder_state_t * const state, cabac_data_t * const
     const int tu_height = tu_width; // TODO: height for non-square blocks
     const int isp_mode = 0; // LFNST_TODO:get isp_mode from cu when ISP is implemented
 
-    for (int i = 0; i < num_transform_units; i++) {
-      // TODO: this works only for square blocks
-      const int pu_x = x + ((i % tu_row_length) * tu_width);
-      const int pu_y = y + ((i / tu_row_length) * tu_height);
-      const cu_info_t* cur_tu = kvz_cu_array_at_const(frame->cu_array, pu_x, pu_y);
-      assert(cur_tu != NULL && "NULL transform unit.");
-      bool cbf_set = cbf_is_set_any(cur_tu->cbf, tr_depth);
+    // TODO: chroma transform skip
+    if (color != COLOR_Y) {
+      for (int i = 0; i < num_transform_units; i++) {
+        // TODO: this works only for square blocks
+        const int pu_x = x + ((i % tu_row_length) * tu_width);
+        const int pu_y = y + ((i / tu_row_length) * tu_height);
+        const cu_info_t* cur_tu = kvz_cu_array_at_const(frame->cu_array, pu_x, pu_y);
+        assert(cur_tu != NULL && "NULL transform unit.");
+        bool cbf_set = cbf_is_set_any(cur_tu->cbf, tr_depth);
 
-      if (cur_tu != NULL && cbf_set && cur_tu->tr_idx == MTS_SKIP) {
-        is_tr_skip = true;
+        if (cur_tu != NULL && cbf_set && cur_tu->tr_idx == MTS_SKIP) {
+          is_tr_skip = true;
+        }
       }
     }
     
-    
     if ((!pred_cu->lfnst_last_scan_pos && !isp_mode) || non_zero_coeff_non_ts_corner_8x8 || is_tr_skip) {
-      return;
+      return false;
     }
 
     const int lfnst_index = pred_cu->lfnst_idx;
@@ -241,6 +245,10 @@ static void encode_lfnst_idx(encoder_state_t * const state, cabac_data_t * const
       cabac->cur_ctx = &(cabac->ctx.lfnst_idx_model[2]);
       CABAC_BIN(cabac, (lfnst_index - 1) ? 1 : 0, "lfnst_idx");
     }
+    return true;
+  }
+  else {
+    return false;
   }
 }
 
@@ -1641,14 +1649,28 @@ void uvg_encode_coding_tree(encoder_state_t * const state,
 
     encode_transform_coeff(state, x, y, depth, 0, 0, 0, 0, coeff);
 
-    encode_lfnst_idx(state, cabac, cur_cu, COLOR_Y, width, height);
+    bool lfnst_written = encode_lfnst_idx(state, cabac, cur_cu, x, y, depth, COLOR_Y, width, height);
+    bool is_dual_tree = depth == 4; // TODO: proper value for dual tree when dual tree structure is implemented
 
     encode_mts_idx(state, cabac, cur_cu);
 
     // For 4x4 the chroma PU/TU is coded after the last 
     if (state->encoder_control->chroma_format != UVG_CSP_400 && depth == 4 && x % 8 && y % 8) {
       encode_chroma_intra_cu(cabac, cur_cu, state->encoder_control->cfg.cclm);
-      encode_transform_coeff(state, x, y, depth, 0, 0, 0, 1, coeff);    
+      // LFNST constraints must be reset here. Otherwise the left over values will interfere when calculating new constraints
+      // This is called only for bottom right 4x4 blocks. Coordinates must be shifted by -4 to point to correct chroma block
+      // Chroma related lfnst constraints are written to the top left block.
+      const int tmp_x = x - 4;
+      const int tmp_y = y - 4;
+      cu_info_t* tmp = kvz_cu_array_at(frame->cu_array, tmp_x, tmp_y);
+      tmp->violates_lfnst_constrained[0] = false;
+      tmp->violates_lfnst_constrained[1] = false;
+      tmp->lfnst_last_scan_pos = false;
+      encode_transform_coeff(state, x, y, depth, 0, 0, 0, 1, coeff);
+      // Write LFNST only once for single tree structure
+      if (!lfnst_written || is_dual_tree) {
+        encode_lfnst_idx(state, cabac, tmp, tmp_x, tmp_y, depth, COLOR_UV, width, height);
+      }
     }
   }
 

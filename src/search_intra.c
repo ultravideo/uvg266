@@ -384,6 +384,8 @@ static double search_intra_trdepth(
     pred_cu->tr_idx = best_tr_idx;
     nosplit_cost += best_rd_cost;
 
+    // LFNST_TODO: lfnst search here. Do search only if tr_depth is same as depth
+
     // Early stop codition for the recursive search.
     // If the cost of any 1/4th of the transform is already larger than the
     // whole transform, assume that splitting further is a bad idea.
