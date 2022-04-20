@@ -634,6 +634,38 @@ static void set_cu_qps(encoder_state_t *state, int x, int y, int depth, int *las
   }
 }
 
+
+static void set_joint_cb_cr_modes(encoder_state_t* state, kvz_picture* pic)
+{
+  bool              sgnFlag = true;
+
+  if (state->encoder_control->chroma_format != KVZ_CSP_400)
+  {
+    const int       x1 = pic->width / 2 - 1;
+    const int       y1 = pic->height / 2 - 1;
+    const int       cbs = pic->stride / 2;
+    const int       crs = pic->stride / 2;
+    const kvz_pixel* p_cb = pic->u + 1 * cbs;
+    const kvz_pixel* p_cr = pic->v + 1 * crs;
+    int64_t         sum_cb_cr = 0;
+
+    // determine inter-chroma transform sign from correlation between high-pass filtered (i.e., zero-mean) Cb and Cr planes
+    for (int y = 1; y < y1; y++, p_cb += cbs, p_cr += crs)
+    {
+      for (int x = 1; x < x1; x++)
+      {
+        int cb = (12 * (int)p_cb[x] - 2 * ((int)p_cb[x - 1] + (int)p_cb[x + 1] + (int)p_cb[x - cbs] + (int)p_cb[x + cbs]) - ((int)p_cb[x - 1 - cbs] + (int)p_cb[x + 1 - cbs] + (int)p_cb[x - 1 + cbs] + (int)p_cb[x + 1 + cbs]));
+        int cr = (12 * (int)p_cr[x] - 2 * ((int)p_cr[x - 1] + (int)p_cr[x + 1] + (int)p_cr[x - crs] + (int)p_cr[x + crs]) - ((int)p_cr[x - 1 - crs] + (int)p_cr[x + 1 - crs] + (int)p_cr[x - 1 + crs] + (int)p_cr[x + 1 + crs]));
+        sum_cb_cr += cb * cr;
+      }
+    }
+
+    sgnFlag = (sum_cb_cr < 0);
+  }
+
+  state->frame->jccr_sign = sgnFlag;
+}
+
 static void encoder_state_worker_encode_lcu_bitstream(void* opaque);
 
 static void encoder_state_worker_encode_lcu_search(void * opaque)
@@ -1870,6 +1902,7 @@ void kvz_encode_one_frame(encoder_state_t * const state, kvz_picture* frame)
 
 
   encoder_state_init_new_frame(state, frame);
+  if(state->encoder_control->cfg.jccr) set_joint_cb_cr_modes(state, frame);
   
   // Create a separate job for ALF done after everything else, and only then do final bitstream writing (for ALF parameters)
   if (state->encoder_control->cfg.alf_type && state->encoder_control->cfg.wpp) {

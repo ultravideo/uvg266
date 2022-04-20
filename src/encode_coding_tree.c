@@ -507,8 +507,8 @@ static void encode_transform_coeff(encoder_state_t * const state,
  
 
   const int cb_flag_y = cbf_is_set(cur_pu->cbf, depth, COLOR_Y);
-  const int cb_flag_u = cur_pu->joint_cb_cr ? cur_pu->joint_cb_cr & 1 : cbf_is_set(cur_cu->cbf, depth, COLOR_U);
-  const int cb_flag_v = cur_pu->joint_cb_cr ? ((cur_pu->joint_cb_cr & 2) >> 1) : cbf_is_set(cur_cu->cbf, depth, COLOR_V);
+  const int cb_flag_u = cur_pu->joint_cb_cr ? (cur_pu->joint_cb_cr >> 1) & 1 : cbf_is_set(cur_cu->cbf, depth, COLOR_U);
+  const int cb_flag_v = cur_pu->joint_cb_cr ? cur_pu->joint_cb_cr & 1 : cbf_is_set(cur_cu->cbf, depth, COLOR_V);
 
   // The split_transform_flag is not signaled when:
   // - transform size is greater than 32 (depth == 0)

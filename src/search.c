@@ -637,16 +637,17 @@ void kvz_select_jccr_mode(
   int v_is_set = cbf_is_set(pred_cu->cbf, depth, COLOR_V);
   CABAC_FBITS_UPDATE(cabac, ctx, v_is_set, tr_tree_bits, "cbf_cr_search");
 
-  int cbf_mask = cbf_is_set(pred_cu->cbf, depth, COLOR_U) * 2 + cbf_is_set(pred_cu->cbf, depth, COLOR_V) - 1;
+  int cbf_mask = u_is_set * 2 + v_is_set - 1;
   if((cbf_mask != -1 && pred_cu->type == CU_INTRA) || cbf_mask == 2)
     CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.joint_cb_cr[cbf_mask]), 0, tr_tree_bits, "jccr_flag");
 
   if(pred_cu->joint_cb_cr) {
+    const int u_jccr = (pred_cu->joint_cb_cr >> 1) & 1;
     ctx = &(cabac->ctx.qt_cbf_model_cb[0]);
-    CABAC_FBITS_UPDATE(cabac, ctx, pred_cu->joint_cb_cr & 1, joint_cbcr_tr_tree_bits, "cbf_cb_search");
-    ctx = &(cabac->ctx.qt_cbf_model_cr[pred_cu->joint_cb_cr & 1]);
-    CABAC_FBITS_UPDATE(cabac, ctx, (pred_cu->joint_cb_cr & 2) >> 1, joint_cbcr_tr_tree_bits, "cbf_cr_search");
-    cbf_mask = (pred_cu->joint_cb_cr & 1) * 2 + ((pred_cu->joint_cb_cr & 2) >> 1) - 1;
+    CABAC_FBITS_UPDATE(cabac, ctx, u_jccr, joint_cbcr_tr_tree_bits, "cbf_cb_search");
+    ctx = &(cabac->ctx.qt_cbf_model_cr[u_jccr]);
+    CABAC_FBITS_UPDATE(cabac, ctx, pred_cu->joint_cb_cr & 1, joint_cbcr_tr_tree_bits, "cbf_cr_search");
+    cbf_mask = pred_cu->joint_cb_cr - 1;
     CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.joint_cb_cr[cbf_mask]), 1, joint_cbcr_tr_tree_bits, "jccr_flag");
   }
   int ssd = 0;
@@ -695,10 +696,10 @@ void kvz_select_jccr_mode(
   }
   cbf_clear(&pred_cu->cbf, depth, COLOR_U);
   cbf_clear(&pred_cu->cbf, depth, COLOR_V);
-  if (pred_cu->joint_cb_cr & 1) {
+  if (pred_cu->joint_cb_cr & 2) {
     cbf_set(&pred_cu->cbf, depth, COLOR_U);
   }
-  if (pred_cu->joint_cb_cr & 2) {
+  if (pred_cu->joint_cb_cr & 1) {
     cbf_set(&pred_cu->cbf, depth, COLOR_V);
   }
   int lcu_width = LCU_WIDTH_C;
@@ -989,6 +990,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       downsample_cclm_rec(
         state, x, y, cu_width / 2, cu_width / 2, lcu->rec.y, lcu->left_ref.y[64]
       );
+      cur_cu->joint_cb_cr = 0;
 
       // TODO: This heavily relies to square CUs
       if ((depth != 4 || (x % 8 && y % 8)) && state->encoder_control->chroma_format != KVZ_CSP_400) {
@@ -996,7 +998,6 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         // rd2. Possibly because the luma mode search already takes chroma
         // into account, so there is less of a chanse of luma mode being
         // really bad for chroma.
-        cur_cu->joint_cb_cr = 0;
         intra_search.pred_cu.intra.mode_chroma = cur_cu->intra.mode_chroma; // skip luma
         if (ctrl->cfg.rdo >= 3 && !cur_cu->intra.mip_flag) {
           cur_cu->intra.mode_chroma = kvz_search_cu_intra_chroma(state, x, y, depth, lcu, &intra_search);
@@ -1022,6 +1023,14 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         }
         else if(depth != 0 && state->encoder_control->cfg.jccr && cur_cu->joint_cb_cr & 3) {
           assert(cur_cu->joint_cb_cr < 4);
+          cbf_clear(&cur_cu->cbf, depth, COLOR_U);
+          cbf_clear(&cur_cu->cbf, depth, COLOR_V);
+          if (cur_cu->joint_cb_cr & 2) {
+            cbf_set(&cur_cu->cbf, depth, COLOR_U);
+          }
+          if (cur_cu->joint_cb_cr & 1) {
+            cbf_set(&cur_cu->cbf, depth, COLOR_V);
+          }
           const vector2d_t lcu_px = { (x_local & ~7) / 2, (y_local & ~7) / 2 };
           int lcu_width = LCU_WIDTH_C;
           const int index = lcu_px.x + lcu_px.y * lcu_width;

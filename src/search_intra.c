@@ -320,6 +320,7 @@ static double search_intra_trdepth(
       num_transforms = MAX(num_transforms, 2);
     }
     pred_cu->intra.mode_chroma = -1;
+    pred_cu->joint_cb_cr = 4;
     for (; trafo < num_transforms; trafo++) {
       pred_cu->tr_idx = trafo;
       if (mts_enabled)

@@ -225,39 +225,40 @@ int kvz_quant_cbcr_residual_generic(
   int64_t best_cost = INT64_MAX;
 
   // This changes the order of the cbf_masks so 2 and 3 are swapped compared with VTM
-  for(int cbf_mask = cur_cu->type == CU_INTRA ? 1 : 3; cbf_mask < 4; cbf_mask++) {
+  for(int i = cur_cu->type == CU_INTRA ? 1 : 3; i < 4; i++) {
     int64_t d1 = 0;
+    const int cbf_mask = i * (state->frame->jccr_sign ? -1 : 1);
     for (int y = 0; y < width; y++)
     {
       for (int x = 0; x < width; x++)
       {
         int cbx = u_residual[x + y * width], crx = v_residual[x + y * width];
-        if (cbf_mask == 1)
+        if (cbf_mask == 2)
         {
-          u1_residual[cbf_mask / 2][x + y * width] = ((4 * cbx + 2 * crx) / 5);
-          d1 += square(cbx - u1_residual[cbf_mask / 2][x + y * width]) + square(crx - (u1_residual[cbf_mask / 2][x + y * width] >> 1));
+          u1_residual[i - 2][x + y * width] = ((4 * cbx + 2 * crx) / 5);
+          d1 += square(cbx - u1_residual[i - 2][x + y * width]) + square(crx - (u1_residual[i - 2][x + y * width] >> 1));
         }
-        else if (cbf_mask == -1)
+        else if (cbf_mask == -2)
         {
-          u1_residual[cbf_mask / 2][x + y * width] = ((4 * cbx - 2 * crx) / 5);
-          d1 += square(cbx - u1_residual[cbf_mask / 2][x + y * width]) + square(crx - (-u1_residual[cbf_mask / 2][x + y * width] >> 1));
+          u1_residual[i - 2][x + y * width] = ((4 * cbx - 2 * crx) / 5);
+          d1 += square(cbx - u1_residual[i - 2][x + y * width]) + square(crx - (-u1_residual[i - 2][x + y * width] >> 1));
         }
         else if (cbf_mask == 3)
         {
-          u1_residual[cbf_mask / 2][x + y * width] = ((cbx + crx) / 2);
-          d1 += square(cbx - u1_residual[cbf_mask / 2][x + y * width]) + square(crx - u1_residual[cbf_mask / 2][x + y * width]);
+          u1_residual[i - 2][x + y * width] = ((cbx + crx) / 2);
+          d1 += square(cbx - u1_residual[i - 2][x + y * width]) + square(crx - u1_residual[i - 2][x + y * width]);
         }
         else if (cbf_mask == -3)
         {
-          u1_residual[cbf_mask / 2][x + y * width] = ((cbx - crx) / 2);
-          d1 += square(cbx - u1_residual[cbf_mask / 2][x + y * width]) + square(crx + u1_residual[cbf_mask / 2][x + y * width]);
+          u1_residual[i - 2][x + y * width] = ((cbx - crx) / 2);
+          d1 += square(cbx - u1_residual[i - 2][x + y * width]) + square(crx + u1_residual[i - 2][x + y * width]);
         }
-        else if (cbf_mask == 2)
+        else if (cbf_mask == 1)
         {
           v1_residual[x + y * width] = ((4 * crx + 2 * cbx) / 5);
           d1 += square(cbx - (v1_residual[x + y * width] >> 1)) + square(crx - v1_residual[x + y * width]);
         }
-        else if (cbf_mask == -2)
+        else if (cbf_mask == -1)
         {
           v1_residual[x + y * width] = ((4 * crx - 2 * cbx) / 5);
           d1 += square(cbx - (-v1_residual[x + y * width] >> 1)) + square(crx - v1_residual[x + y * width]);
@@ -270,19 +271,19 @@ int kvz_quant_cbcr_residual_generic(
       }
     }
     if (d1 < best_cost) {
-      best_cbf_mask = cbf_mask;
+      best_cbf_mask = i;
       best_cost = d1;
     }
   }
 
-  kvz_transform2d(state->encoder_control, best_cbf_mask == 2 ? v1_residual : u1_residual[best_cbf_mask / 2], coeff, width, best_cbf_mask == 2 ? COLOR_V : COLOR_U, cur_cu);
+  kvz_transform2d(state->encoder_control, best_cbf_mask == 1 ? v1_residual : u1_residual[best_cbf_mask - 2], coeff, width, best_cbf_mask == 1 ? COLOR_V : COLOR_U, cur_cu);
 
   if (state->encoder_control->cfg.rdoq_enable &&
     (width > 4 || !state->encoder_control->cfg.rdoq_skip))
   {
     int8_t tr_depth = cur_cu->tr_depth - cur_cu->depth;
     tr_depth += (cur_cu->part_size == SIZE_NxN ? 1 : 0);
-    kvz_rdoq(state, coeff, coeff_out, width, width, best_cbf_mask == 2 ? COLOR_V : COLOR_U,
+    kvz_rdoq(state, coeff, coeff_out, width, width, best_cbf_mask == 1 ? COLOR_V : COLOR_U,
       scan_order, cur_cu->type, tr_depth, cur_cu->cbf);
   }
   else if (state->encoder_control->cfg.rdoq_enable && false) {
@@ -290,7 +291,7 @@ int kvz_quant_cbcr_residual_generic(
       scan_order);
   }
   else {
-    kvz_quant(state, coeff, coeff_out, width, width, best_cbf_mask == 2 ? COLOR_V : COLOR_U,
+    kvz_quant(state, coeff, coeff_out, width, width, best_cbf_mask == 1 ? COLOR_V : COLOR_U,
       scan_order, cur_cu->type, cur_cu->tr_idx == MTS_SKIP && false);
   }
 
@@ -309,10 +310,10 @@ int kvz_quant_cbcr_residual_generic(
     int y, x;
 
     // Get quantized residual. (coeff_out -> coeff -> residual)
-    kvz_dequant(state, coeff_out, coeff, width, width, best_cbf_mask == 2 ? COLOR_V : COLOR_U,
+    kvz_dequant(state, coeff_out, coeff, width, width, best_cbf_mask == 1 ? COLOR_V : COLOR_U,
       cur_cu->type, cur_cu->tr_idx == MTS_SKIP && false);
     
-    kvz_itransform2d(state->encoder_control, best_cbf_mask == 2 ? v1_residual : u1_residual[best_cbf_mask / 2], coeff, width, best_cbf_mask == 2 ? COLOR_V : COLOR_U, cur_cu);
+    kvz_itransform2d(state->encoder_control, best_cbf_mask == 1 ? v1_residual : u1_residual[best_cbf_mask - 2], coeff, width, best_cbf_mask == 1 ? COLOR_V : COLOR_U, cur_cu);
     
 
     //if (state->tile->frame->lmcs_aps->m_sliceReshapeInfo.enableChromaAdj && color != COLOR_Y) {
@@ -333,32 +334,32 @@ int kvz_quant_cbcr_residual_generic(
     //    }
     //  }
     //}
-
+    const int temp = best_cbf_mask * (state->frame->jccr_sign ? -1 : 1);
     // Get quantized reconstruction. (residual + pred_in -> rec_out)
     for (int y = 0; y < width; y++) {
       for (int x = 0; x < width; x++) {
-        if (best_cbf_mask == 1) {
-          u_residual[x + y * width] = u1_residual[best_cbf_mask / 2][x + y * width];
-          v_residual[x + y * width] = u1_residual[best_cbf_mask / 2][x + y * width] >> 1;
+        if (temp == 2) {
+          u_residual[x + y * width] = u1_residual[best_cbf_mask - 2][x + y * width];
+          v_residual[x + y * width] = u1_residual[best_cbf_mask - 2][x + y * width] >> 1;
         }
-        else if (best_cbf_mask == -1) {
-          u_residual[x + y * width] = u1_residual[best_cbf_mask / 2][x + y * width];
-          v_residual[x + y * width] = -u1_residual[best_cbf_mask / 2][x + y * width] >> 1;
+        else if (temp == -2) {
+          u_residual[x + y * width] = u1_residual[best_cbf_mask - 2][x + y * width];
+          v_residual[x + y * width] = -u1_residual[best_cbf_mask - 2][x + y * width] >> 1;
         }
-        else if (best_cbf_mask == 3) {
-          u_residual[x + y * width] = u1_residual[best_cbf_mask / 2][x + y * width];
-          v_residual[x + y * width] = u1_residual[best_cbf_mask / 2][x + y * width];
+        else if (temp == 3) {
+          u_residual[x + y * width] = u1_residual[best_cbf_mask - 2][x + y * width];
+          v_residual[x + y * width] = u1_residual[best_cbf_mask - 2][x + y * width];
         }
-        else if (best_cbf_mask == -3) {
+        else if (temp == -3) {
           // non-normative clipping to prevent 16-bit overflow
-          u_residual[x + y * width] = u1_residual[best_cbf_mask / 2][x + y * width]; // == -32768 && sizeof(Pel) == 2) ? 32767 : -v1_residual[best_cbf_mask][x];
-          v_residual[x + y * width] = -u1_residual[best_cbf_mask / 2][x + y * width];
+          u_residual[x + y * width] = u1_residual[best_cbf_mask - 2][x + y * width]; // == -32768 && sizeof(Pel) == 2) ? 32767 : -v1_residual[best_cbf_mask][x];
+          v_residual[x + y * width] = -u1_residual[best_cbf_mask - 2][x + y * width];
         }
-        else if (best_cbf_mask == 2) {
+        else if (temp == 1) {
           u_residual[x + y * width] = v1_residual[x + y * width] >> 1;
           v_residual[x + y * width] = v1_residual[x + y * width];
         }
-        else if (best_cbf_mask == -2) {
+        else if (temp == -1) {
           u_residual[x + y * width] = v1_residual[x + y * width] >> 1;
           v_residual[x + y * width] = -v1_residual[x + y * width];
         }

@@ -1125,7 +1125,7 @@ static void kvz_encoder_state_write_bitstream_picture_header(
   }
 
   if (encoder->cfg.jccr) {
-    WRITE_U(stream, 0, 1, "ph_joint_cbcr_sign_flag");
+    WRITE_U(stream, state->frame->jccr_sign, 1, "ph_joint_cbcr_sign_flag");
   }
   // END PICTURE HEADER
 
