@@ -1206,11 +1206,11 @@ void uvg_encode_intra_luma_coding_unit(const encoder_state_t * const state,
       if (tmp_pred > intra_preds[i]) {
         tmp_pred--;
       }
-      kvz_cabac_encode_trunc_bin(cabac, tmp_pred, 67 - INTRA_MPM_COUNT, bits_out);
     }
-    if (cabac->only_count && bits_out) *bits_out += bits;
 
+    kvz_cabac_encode_trunc_bin(cabac, tmp_pred, 67 - INTRA_MPM_COUNT, bits_out);
   }
+  if (cabac->only_count && bits_out) *bits_out += bits;
 }
 
 /**
@@ -1422,6 +1422,7 @@ void uvg_encode_coding_tree(encoder_state_t * const state,
   const cu_info_t *cur_cu   = uvg_cu_array_at_const((const cu_array_t * )frame->cu_array, x, y);
 
   const int cu_width = LCU_WIDTH >> depth;
+  const int cu_height = cu_width; // TODO: height for non-square blocks
   const int half_cu  = cu_width >> 1;
 
   const cu_info_t *left_cu  = NULL;
@@ -1649,7 +1650,7 @@ void uvg_encode_coding_tree(encoder_state_t * const state,
 
     encode_transform_coeff(state, x, y, depth, 0, 0, 0, 0, coeff);
 
-    bool lfnst_written = encode_lfnst_idx(state, cabac, cur_cu, x, y, depth, COLOR_Y, width, height);
+    bool lfnst_written = encode_lfnst_idx(state, cabac, cur_cu, x, y, depth, COLOR_Y, cu_width, cu_height);
     bool is_dual_tree = depth == 4; // TODO: proper value for dual tree when dual tree structure is implemented
 
     encode_mts_idx(state, cabac, cur_cu);
@@ -1669,7 +1670,7 @@ void uvg_encode_coding_tree(encoder_state_t * const state,
       encode_transform_coeff(state, x, y, depth, 0, 0, 0, 1, coeff);
       // Write LFNST only once for single tree structure
       if (!lfnst_written || is_dual_tree) {
-        encode_lfnst_idx(state, cabac, tmp, tmp_x, tmp_y, depth, COLOR_UV, width, height);
+        encode_lfnst_idx(state, cabac, tmp, tmp_x, tmp_y, depth, COLOR_UV, cu_width, cu_height);
       }
     }
   }
