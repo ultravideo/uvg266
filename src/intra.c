@@ -1534,6 +1534,11 @@ void kvz_intra_recon_cu(
   }
   const int8_t mode_luma = search_data->pred_cu.intra.mode;
   const int8_t mode_chroma= search_data->pred_cu.intra.mode_chroma;
+
+  if(mode_chroma != -1 && mode_luma == -1) {
+    x &= ~7;
+    y &= ~7;
+  }
   
   if (mode_luma != -1 && mode_chroma != -1) {
     if (search_data->pred_cu.intra.mip_flag) {

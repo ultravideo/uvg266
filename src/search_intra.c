@@ -367,7 +367,7 @@ static double search_intra_trdepth(
       pred_cu->intra.mode_chroma = chroma_mode;
       pred_cu->joint_cb_cr= 4; // TODO: Maybe check the jccr mode here also but holy shit is the interface of search_intra_rdo bad currently
       kvz_intra_recon_cu(state,
-                         x_px & ~7, y_px & ~7,
+                         x_px, y_px,
                          depth, search_data,
                          pred_cu, 
                          lcu);

@@ -608,7 +608,7 @@ void kvz_select_jccr_mode(
 {
   const vector2d_t lcu_px = { (SUB_SCU(x_px) & ~7) / 2, (SUB_SCU(y_px) & ~7) / 2 };
   const int width = (depth < MAX_DEPTH) ? LCU_WIDTH >> (depth + 1) : LCU_WIDTH >> depth;
-  if (pred_cu == NULL) pred_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x * 2, lcu_px.y * 2);
+  if (pred_cu == NULL) pred_cu = LCU_GET_CU_AT_PX(lcu, SUB_SCU(x_px), SUB_SCU(y_px));
   assert(pred_cu->depth == pred_cu->tr_depth && "jccr does not support transform splitting");
   if (cost_out == NULL && pred_cu->joint_cb_cr == 0) {
     return;
@@ -650,23 +650,23 @@ void kvz_select_jccr_mode(
     cbf_mask = pred_cu->joint_cb_cr - 1;
     CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.joint_cb_cr[cbf_mask]), 1, joint_cbcr_tr_tree_bits, "jccr_flag");
   }
-  int ssd = 0;
-  int joint_ssd = 0;
+  unsigned ssd = 0;
+  unsigned joint_ssd = 0;
   if (!state->encoder_control->cfg.lossless) {
-    int index = lcu_px.y * LCU_WIDTH_C + lcu_px.x;
-    int ssd_u = kvz_pixels_calc_ssd(&lcu->ref.u[index], &lcu->rec.u[index],
+    const int index = lcu_px.y * LCU_WIDTH_C + lcu_px.x;
+    const unsigned ssd_u = kvz_pixels_calc_ssd(&lcu->ref.u[index], &lcu->rec.u[index],
       LCU_WIDTH_C, LCU_WIDTH_C,
       width);
-    int ssd_v = kvz_pixels_calc_ssd(&lcu->ref.v[index], &lcu->rec.v[index],
+    const unsigned ssd_v = kvz_pixels_calc_ssd(&lcu->ref.v[index], &lcu->rec.v[index],
       LCU_WIDTH_C, LCU_WIDTH_C,
       width);
     ssd = ssd_u + ssd_v;
 
     if (pred_cu->joint_cb_cr) {
-      int ssd_u_joint = kvz_pixels_calc_ssd(&lcu->ref.u[index], &lcu->rec.joint_u[index],
+      const unsigned ssd_u_joint = kvz_pixels_calc_ssd(&lcu->ref.u[index], &lcu->rec.joint_u[index],
         LCU_WIDTH_C, LCU_WIDTH_C,
         width);
-      int ssd_v_joint = kvz_pixels_calc_ssd(&lcu->ref.v[index], &lcu->rec.joint_v[index],
+      const unsigned ssd_v_joint = kvz_pixels_calc_ssd(&lcu->ref.v[index], &lcu->rec.joint_v[index],
         LCU_WIDTH_C, LCU_WIDTH_C,
         width);
       joint_ssd = ssd_u_joint + ssd_v_joint;      
@@ -1009,13 +1009,13 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         }
         intra_search.pred_cu.intra.mode = -1; // skip luma
         kvz_intra_recon_cu(state,
-                           x & ~7, y & ~7, // TODO: as does this
+                           x, y, // TODO: as does this
                            depth, &intra_search,
                            NULL,
                            lcu);
         if(depth != 0 && state->encoder_control->cfg.jccr && ctrl->cfg.rdo < 3) {
           kvz_select_jccr_mode(state,
-                               x & ~7, y & ~7,
+                               x, y,
                                depth,
                                NULL,
                                lcu,
@@ -1074,7 +1074,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
                                   false);
         if (cur_cu->depth == cur_cu->tr_depth && state->encoder_control->cfg.jccr && cur_cu->joint_cb_cr) {
           kvz_select_jccr_mode(state,
-            x & ~7, y & ~7,
+            x, y,
             depth,
             NULL,
             lcu,

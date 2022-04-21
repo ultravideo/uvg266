@@ -352,8 +352,8 @@ void kvz_encode_last_significant_xy(cabac_data_t * const cabac,
 }
 
 static void encode_chroma_tu(encoder_state_t* const state, int x, int y, int depth, const uint8_t width_c, const cu_info_t* cur_pu, int8_t* scan_idx, lcu_coeff_t* coeff, uint8_t joint_chroma) {
-  int x_local = (x >> 1) % LCU_WIDTH_C;
-  int y_local = (y >> 1) % LCU_WIDTH_C;
+  int x_local = ((x & ~7) >> 1) % LCU_WIDTH_C;
+  int y_local = ((y & ~7) >> 1) % LCU_WIDTH_C;
   cabac_data_t* const cabac = &state->cabac;
   *scan_idx = kvz_get_scan_order(cur_pu->type, cur_pu->intra.mode_chroma, depth);
   if(!joint_chroma){
@@ -367,7 +367,7 @@ static void encode_chroma_tu(encoder_state_t* const state, int x, int y, int dep
         // TODO: transform skip for chroma blocks
         CABAC_BIN(cabac, 0, "transform_skip_flag");
       }
-      kvz_encode_coeff_nxn(state, &state->cabac, coeff_u, width_c, 1, *scan_idx, NULL, false);
+      kvz_encode_coeff_nxn(state, &state->cabac, coeff_u, width_c, COLOR_U, *scan_idx, NULL, false);
     }
 
     if (cbf_is_set(cur_pu->cbf, depth, COLOR_V)) {
@@ -375,7 +375,7 @@ static void encode_chroma_tu(encoder_state_t* const state, int x, int y, int dep
         cabac->cur_ctx = &cabac->ctx.transform_skip_model_chroma;
         CABAC_BIN(cabac, 0, "transform_skip_flag");
       }
-      kvz_encode_coeff_nxn(state, &state->cabac, coeff_v, width_c, 2, *scan_idx, NULL, false);
+      kvz_encode_coeff_nxn(state, &state->cabac, coeff_v, width_c, COLOR_V, *scan_idx, NULL, false);
     }
   }
   else {
@@ -384,7 +384,7 @@ static void encode_chroma_tu(encoder_state_t* const state, int x, int y, int dep
       cabac->cur_ctx = &cabac->ctx.transform_skip_model_chroma;
       CABAC_BIN(cabac, 0, "transform_skip_flag");
     }
-    kvz_encode_coeff_nxn(state, &state->cabac, coeff_uv, width_c, 2, *scan_idx, NULL, false);
+    kvz_encode_coeff_nxn(state, &state->cabac, coeff_uv, width_c, COLOR_V, *scan_idx, NULL, false);
     
   }
 }
@@ -444,8 +444,6 @@ static void encode_transform_unit(encoder_state_t * const state,
     } else {
       // Time to to code the chroma transform blocks. Move to the top-left
       // corner of the block.
-      x -= 4;
-      y -= 4;
       cur_pu = kvz_cu_array_at_const((const cu_array_t *)frame->cu_array, x, y);
     }
   }
@@ -485,7 +483,7 @@ static void encode_transform_coeff(encoder_state_t * const state,
   // containing CU.
   const int x_cu = 8 * (x / 8);
   const int y_cu = 8 * (y / 8);
-  const cu_info_t *cur_cu = kvz_cu_array_at_const(frame->cu_array, x_cu, y_cu);
+  const cu_info_t *cur_cu = kvz_cu_array_at_const(frame->cu_array, x, y);
 
   // NxN signifies implicit transform split at the first transform level.
   // There is a similar implicit split for inter, but it is only used when
