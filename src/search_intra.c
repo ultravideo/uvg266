@@ -930,7 +930,8 @@ int8_t kvz_search_intra_chroma_rdo(
   int depth,
   int8_t num_modes,
   lcu_t *const lcu,
-  intra_search_data_t* chroma_data)
+  intra_search_data_t* chroma_data,
+  int8_t luma_mode)
 {
   const bool reconstruct_chroma = (depth != 4) || (x_px & 4 && y_px & 4);
 
@@ -964,7 +965,7 @@ int8_t kvz_search_intra_chroma_rdo(
         kvz_select_jccr_mode(state, lcu_px.x, lcu_px.y, depth, &chroma_data[i].pred_cu, lcu, &chroma_data[i].cost);
       }
 
-      double mode_bits = kvz_chroma_mode_bits(state, mode, chroma_data[i].pred_cu.intra.mode);
+      double mode_bits = kvz_chroma_mode_bits(state, mode, luma_mode);
       chroma_data[i].cost += mode_bits * state->lambda;
     }
     sort_modes(chroma_data, num_modes);
@@ -1045,7 +1046,7 @@ int8_t kvz_search_cu_intra_chroma(encoder_state_t * const state,
 
   int8_t intra_mode_chroma = intra_mode;
   if (num_modes > 1) {
-    intra_mode_chroma = kvz_search_intra_chroma_rdo(state, x_px, y_px, depth, num_modes, lcu, chroma_data);
+    intra_mode_chroma = kvz_search_intra_chroma_rdo(state, x_px, y_px, depth, num_modes, lcu, chroma_data, intra_mode);
   }
   *search_data = chroma_data[0];
   return intra_mode_chroma;
