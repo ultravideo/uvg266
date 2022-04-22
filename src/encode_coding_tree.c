@@ -1659,18 +1659,14 @@ void uvg_encode_coding_tree(encoder_state_t * const state,
     if (state->encoder_control->chroma_format != UVG_CSP_400 && depth == 4 && x % 8 && y % 8) {
       encode_chroma_intra_cu(cabac, cur_cu, state->encoder_control->cfg.cclm);
       // LFNST constraints must be reset here. Otherwise the left over values will interfere when calculating new constraints
-      // This is called only for bottom right 4x4 blocks. Coordinates must be shifted by -4 to point to correct chroma block
-      // Chroma related lfnst constraints are written to the top left block.
-      const int tmp_x = x - 4;
-      const int tmp_y = y - 4;
-      cu_info_t* tmp = kvz_cu_array_at(frame->cu_array, tmp_x, tmp_y);
+      cu_info_t* tmp = kvz_cu_array_at(frame->cu_array, x, y);
       tmp->violates_lfnst_constrained[0] = false;
       tmp->violates_lfnst_constrained[1] = false;
       tmp->lfnst_last_scan_pos = false;
       encode_transform_coeff(state, x, y, depth, 0, 0, 0, 1, coeff);
       // Write LFNST only once for single tree structure
       if (!lfnst_written || is_dual_tree) {
-        encode_lfnst_idx(state, cabac, tmp, tmp_x, tmp_y, depth, COLOR_UV, cu_width, cu_height);
+        encode_lfnst_idx(state, cabac, tmp, x, y, depth, COLOR_UV, cu_width, cu_height);
       }
     }
   }
