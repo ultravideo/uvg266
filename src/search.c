@@ -435,8 +435,9 @@ double uvg_cu_rd_cost_chroma(const encoder_state_t *const state,
     int cbf_mask = cbf_is_set(pred_cu->cbf, depth, COLOR_U) * 2 + cbf_is_set(pred_cu->cbf, depth, COLOR_V) - 1;
     const cabac_ctx_t* ctx = NULL;
     if (cbf_mask != -1) {
-      ctx = &(state->cabac.ctx.joint_cb_cr[cbf_mask]);
-      tr_tree_bits += CTX_ENTROPY_FBITS(ctx, 0);      
+      cabac_data_t* cabac = (cabac_data_t*)&state->search_cabac;
+      ctx = &(cabac->ctx.joint_cb_cr[cbf_mask]);
+      CABAC_FBITS_UPDATE(cabac, ctx, 0, tr_tree_bits, "cbf_cb_search");
     }
   }
 
@@ -978,8 +979,8 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         // rd2. Possibly because the luma mode search already takes chroma
         // into account, so there is less of a chanse of luma mode being
         // really bad for chroma.
-        intra_search.pred_cu.intra.mode_chroma = cur_cu->intra.mode_chroma; // skip luma
-        if (ctrl->cfg.rdo >= 3 && !cur_cu->intra.mip_flag) {
+        intra_search.pred_cu.intra.mode_chroma = cur_cu->intra.mode; // skip luma
+        if (ctrl->cfg.rdo >= 3) {
           cur_cu->intra.mode_chroma = uvg_search_cu_intra_chroma(state, x, y, depth, lcu, &intra_search);
 
           if (intra_search.pred_cu.joint_cb_cr == 0) intra_search.pred_cu.joint_cb_cr = 4;

@@ -33,6 +33,8 @@
 #include "search_intra.h"
 
 #include <limits.h>
+#include <math.h>
+
 
 #include "cabac.h"
 #include "encoder.h"
@@ -331,7 +333,7 @@ static double search_intra_trdepth(
   const int offset = width / 2;
   const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
 
-  const bool reconstruct_chroma = (depth != 4 || (depth == 4 && (x_px & 4 && y_px & 4))) && state->encoder_control->chroma_format != UVG_CSP_400;
+  const bool reconstruct_chroma = false;// (depth != 4 || (depth == 4 && (x_px & 4 && y_px & 4))) && state->encoder_control->chroma_format != UVG_CSP_400;
   cu_info_t* pred_cu = &search_data->pred_cu;
   cu_info_t* const tr_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
 
@@ -358,7 +360,7 @@ static double search_intra_trdepth(
       cbf_clear(&pred_cu->cbf, depth, COLOR_V);
     }
 
-    const int8_t chroma_mode = reconstruct_chroma ? pred_cu->intra.mode : -1;
+    const int8_t chroma_mode = reconstruct_chroma ? (!pred_cu->intra.mip_flag ? pred_cu->intra.mode : 0) : -1;
     double best_rd_cost = MAX_INT;
     int best_tr_idx = 0;
     int best_lfnst_idx = 0;
@@ -824,8 +826,8 @@ static int16_t search_intra_rough(
   const double not_mip = state->encoder_control->cfg.mip ? CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.mip_flag[mip_ctx]), 0) : 0;
   const double mpm_mode_bit = CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.intra_luma_mpm_flag_model), 1);
   const double not_mpm_mode_bit = CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.intra_luma_mpm_flag_model), 0);
-  const double planar_mode_flag = CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.luma_planar_model[1]), 1);
-  const double not_planar_mode_flag = CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.luma_planar_model[1]), 0);
+  const double planar_mode_flag = CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.luma_planar_model[1]), 0);
+  const double not_planar_mode_flag = CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.luma_planar_model[1]), 1);
   for (int mode_i = 0; mode_i < modes_selected; ++mode_i) {
     int i = 0;
     int smaller_than_pred = 0;
@@ -834,7 +836,7 @@ static int16_t search_intra_rough(
       if (intra_preds[i] == modes[mode_i]) {
         break;
       }
-      if (modes[mode_i] > intra_preds[i]) {
+      if (modes[mode_i] < intra_preds[i]) {
         smaller_than_pred += 1;
       }
     }
@@ -842,7 +844,7 @@ static int16_t search_intra_rough(
       bits = planar_mode_flag + mpm_mode_bit;
     }
     else if (i < INTRA_MPM_COUNT) {
-      bits = not_planar_mode_flag + mpm_mode_bit + MAX(i, 4);
+      bits = not_planar_mode_flag + mpm_mode_bit + MIN(i, 4);
     }
     else {
       bits = not_mpm_mode_bit + 5 + (modes[mode_i] - smaller_than_pred > 3);
@@ -857,6 +859,285 @@ static int16_t search_intra_rough(
 
   #undef PARALLEL_BLKS
   return modes_selected;
+}
+
+
+static double count_bits(
+  encoder_state_t* const state,
+  int8_t* intra_preds,
+  const double not_mrl,
+  const double not_mip,
+  const double mpm_mode_bit,
+  const double not_mpm_mode_bit,
+  const double planar_mode_flag,
+  const double not_planar_mode_flag,
+  int8_t mode
+  )
+{
+  int i = 0;
+  int smaller_than_pred = 0;
+  double bits;
+  for (; i < INTRA_MPM_COUNT; i++) {
+    if (intra_preds[i] == mode) {
+      break;
+    }
+    if (mode > intra_preds[i]) {
+      smaller_than_pred += 1;
+    }
+  }
+  if (i == 0) {
+    bits = planar_mode_flag + mpm_mode_bit;
+  }
+  else if (i < INTRA_MPM_COUNT) {
+    bits = not_planar_mode_flag + mpm_mode_bit + MIN(i, 4);
+  }
+  else {
+    bits = not_mpm_mode_bit + 5 + (mode - smaller_than_pred > 2);
+  }
+  bits += not_mrl + not_mip;
+  return bits;
+}
+
+static int16_t search_intra_rough(
+  encoder_state_t * const state,
+  kvz_pixel *orig,
+  int32_t origstride,
+  kvz_intra_references *refs,
+  int log2_width,
+  int8_t *intra_preds,
+  intra_search_data_t* modes_out,
+  cu_info_t* const pred_cu,
+  uint8_t mip_ctx)
+{
+  #define PARALLEL_BLKS 2 // TODO: use 4 for AVX-512 in the future?
+  assert(log2_width >= 2 && log2_width <= 5);
+  int_fast8_t width = 1 << log2_width;
+  cost_pixel_nxn_func *satd_func = kvz_pixels_get_satd_func(width);
+  cost_pixel_nxn_func *sad_func = kvz_pixels_get_sad_func(width);
+  cost_pixel_nxn_multi_func *satd_dual_func = kvz_pixels_get_satd_dual_func(width);
+  cost_pixel_nxn_multi_func *sad_dual_func = kvz_pixels_get_sad_dual_func(width);
+  bool mode_checked[KVZ_NUM_INTRA_MODES] = {0};
+  double costs[KVZ_NUM_INTRA_MODES];
+
+  // const kvz_config *cfg = &state->encoder_control->cfg;
+  // const bool filter_boundary = !(cfg->lossless && cfg->implicit_rdpcm);
+
+  // Temporary block arrays
+  kvz_pixel _preds[PARALLEL_BLKS * 32 * 32 + SIMD_ALIGNMENT];
+  pred_buffer preds = ALIGNED_POINTER(_preds, SIMD_ALIGNMENT);
+  
+  kvz_pixel _orig_block[32 * 32 + SIMD_ALIGNMENT];
+  kvz_pixel *orig_block = ALIGNED_POINTER(_orig_block, SIMD_ALIGNMENT);
+
+  // Store original block for SAD computation
+  kvz_pixels_blit(orig, orig_block, width, width, origstride, width);
+
+  int8_t modes_selected = 0;
+  // Note: get_cost and get_cost_dual may return negative costs.
+  double min_cost;
+  double max_cost;
+
+  struct mode_cost {
+    int8_t mode;
+    double cost;
+  };
+
+  const double not_mrl = state->encoder_control->cfg.mrl ? CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.multi_ref_line[0]), 0) : 0;
+  const double not_mip = state->encoder_control->cfg.mip ? CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.mip_flag[mip_ctx]), 0) : 0;
+  const double mpm_mode_bit = CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.intra_luma_mpm_flag_model), 1);
+  const double not_mpm_mode_bit = CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.intra_luma_mpm_flag_model), 0);
+  const double planar_mode_flag = CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.luma_planar_model[1]), 0);
+  const double not_planar_mode_flag = CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.luma_planar_model[1]), 1);
+
+  struct mode_cost best_six_modes[6];
+  // Initial offset decides how many modes are tried before moving on to the
+  // recursive search.
+
+  // Calculate SAD for evenly spaced modes to select the starting point for 
+  // the recursive search.
+  cu_loc_t loc = { 0, 0, width, width, width, width };
+  intra_search_data_t search_proxy;
+  FILL(search_proxy, 0);
+  search_proxy.pred_cu = *pred_cu;
+
+  int offset = 4;
+  search_proxy.pred_cu.intra.mode = 0;
+  kvz_intra_predict(state, refs, &loc, COLOR_Y, preds[0], &search_proxy, NULL);
+  search_proxy.pred_cu.intra.mode = 1;
+  kvz_intra_predict(state, refs, &loc, COLOR_Y, preds[1], &search_proxy, NULL);
+  get_cost_dual(state, preds, orig_block, satd_dual_func, sad_dual_func, width, costs);
+  mode_checked[0] = true;
+  mode_checked[1] = true;
+  costs[0] += count_bits(
+    state,
+    intra_preds,
+    not_mrl,
+    not_mip,
+    mpm_mode_bit,
+    not_mpm_mode_bit,
+    planar_mode_flag,
+    not_planar_mode_flag,
+    0) * state->lambda_sqrt;
+  costs[1] += count_bits(
+    state,
+    intra_preds,
+    not_mrl,
+    not_mip,
+    mpm_mode_bit,
+    not_mpm_mode_bit,
+    planar_mode_flag,
+    not_planar_mode_flag,
+    1) * state->lambda_sqrt;
+  if(costs[0] < costs[1]) {
+    min_cost = costs[0];
+    max_cost = costs[1];
+    best_six_modes[0].mode = 0;
+    best_six_modes[0].cost = costs[0];
+    best_six_modes[1].mode = 1;
+    best_six_modes[1].cost = costs[1];
+  }
+  else {
+    min_cost = costs[1];
+    max_cost = costs[0];
+    best_six_modes[1].mode = 0;
+    best_six_modes[1].cost = costs[0];
+    best_six_modes[0].mode = 1;
+    best_six_modes[0].cost = costs[1];    
+  }
+  best_six_modes[2].cost = MAX_DOUBLE;
+  best_six_modes[3].cost = MAX_DOUBLE;
+  best_six_modes[4].cost = MAX_DOUBLE;
+  best_six_modes[5].cost = MAX_DOUBLE;
+  for (int mode = 4; mode <= 66; mode += PARALLEL_BLKS * offset) {
+    
+    double costs_out[PARALLEL_BLKS] = { 0 };
+    for (int i = 0; i < PARALLEL_BLKS; ++i) {
+      if (mode + i * offset <= 66) {
+        search_proxy.pred_cu.intra.mode = mode + i*offset;
+        kvz_intra_predict(state, refs, &loc, COLOR_Y, preds[i], &search_proxy, NULL);
+      }
+    }
+    
+    //TODO: add generic version of get cost  multi
+    get_cost_dual(state, preds, orig_block, satd_dual_func, sad_dual_func, width, costs_out);
+    for (int i = 0; i < PARALLEL_BLKS; ++i) {
+      if (mode + i * offset <= 66) {
+        costs_out[i] += count_bits(
+          state,
+          intra_preds,
+          not_mrl,
+          not_mip,
+          mpm_mode_bit,
+          not_mpm_mode_bit,
+          planar_mode_flag,
+          not_planar_mode_flag,
+          mode + i * offset) * state->lambda_sqrt;
+      }
+    }
+
+    for (int i = 0; i < PARALLEL_BLKS; ++i) {
+      int8_t mode_i = mode + i* offset;
+      if (mode_i <= 66) {
+        costs[mode_i] = costs_out[i];
+        mode_checked[mode_i] = true;
+        min_cost = MIN(min_cost, costs[mode_i]);
+        max_cost = MAX(max_cost, costs[mode_i]);
+        ++modes_selected;
+        for (int j = 0; j < 6; j++) {
+          if (costs[mode_i] < best_six_modes[j].cost) {
+            for(int k = 5; k > j; k--) {
+              best_six_modes[k] = best_six_modes[k - 1];
+            }
+            best_six_modes[j].cost = costs[mode_i];
+            best_six_modes[j].mode = mode_i;
+            break;
+          }
+        }
+      }
+    }
+  }
+  offset >>= 1;
+  // Skip recursive search if all modes have the same cost.
+  if (min_cost != max_cost) {
+    // Do a recursive search to find the best mode, always centering on the
+    // current best mode.
+    for (; offset > 0; offset >>= 1) {
+
+      struct mode_cost temp_best_six_modes[6];
+      memcpy(temp_best_six_modes, best_six_modes, sizeof(temp_best_six_modes));
+      int8_t modes_to_check[12];
+      int num_modes_to_check = 0;
+      for(int i = 0; i < 6; i++) {
+        int8_t center_node = best_six_modes[i].mode;
+        int8_t test_modes[] = { center_node - offset, center_node + offset };
+        for(int j = 0; j < 2; j++) {
+          if((test_modes[j] >= 2 && test_modes[j] <= 66) && mode_checked[test_modes[j]] == false) {
+            modes_to_check[num_modes_to_check++] = test_modes[j];
+            mode_checked[test_modes[j]] = true;
+          }
+        }
+      }
+      while (num_modes_to_check & (PARALLEL_BLKS - 1)) {
+        modes_to_check[num_modes_to_check++] = 1;
+      } 
+      for (int i = 0; i < num_modes_to_check; i += PARALLEL_BLKS) {
+        double costs_out[PARALLEL_BLKS] = { 0 };        
+      
+        for (int block = 0; block < PARALLEL_BLKS; ++block) {
+          search_proxy.pred_cu.intra.mode = modes_to_check[block + i];
+          kvz_intra_predict(state, refs, &loc, COLOR_Y, preds[block], &search_proxy, NULL);
+        
+        }
+
+        //TODO: add generic version of get cost multi
+        get_cost_dual(state, preds, orig_block, satd_dual_func, sad_dual_func, width, costs_out);
+        for (int block = 0; block < PARALLEL_BLKS; ++block) {
+            costs_out[block] += count_bits(
+              state,
+              intra_preds,
+              not_mrl,
+              not_mip,
+              mpm_mode_bit,
+              not_mpm_mode_bit,
+              planar_mode_flag,
+              not_planar_mode_flag,
+              modes_to_check[block + i]) * state->lambda_sqrt;
+          
+        }
+
+        for (int block = 0; block < PARALLEL_BLKS; ++block) {
+          int8_t mode = modes_to_check[i + block];
+          if (mode == 1) continue;
+          costs[mode] = costs_out[block];
+          for (int j = 0; j < 6; j++) {
+            if (costs[mode] < best_six_modes[j].cost) {
+              for (int k = 5; k > j; k--) {
+                best_six_modes[k] = best_six_modes[k - 1];
+              }
+              best_six_modes[j].cost = costs[mode];
+              best_six_modes[j].mode = mode;
+              break;
+            }
+          }          
+          
+        }
+      }
+    }
+  }
+
+  // Add prediction mode coding cost as the last thing. We don't want this
+  // affecting the halving search.
+  for(int i=0; i < 6; i++) {
+    const int8_t mode = best_six_modes[i].mode;
+    modes_out[i].cost = costs[mode];
+    modes_out[i].pred_cu = *pred_cu;
+    modes_out[i].pred_cu.intra.mode = mode;
+    modes_out[i].pred_cu.intra.mode_chroma = mode;
+
+  }
+  
+  #undef PARALLEL_BLKS
+  return 6;
 }
 
 
@@ -1010,7 +1291,7 @@ double uvg_chroma_mode_bits(const encoder_state_t *state, int8_t chroma_mode, in
   if (chroma_mode == luma_mode) {
     mode_bits = CTX_ENTROPY_FBITS(ctx, 0);
   } else {
-    if(chroma_mode > 67) {
+    if(chroma_mode < 67) {
       mode_bits = 2.0 + CTX_ENTROPY_FBITS(ctx, 1);
     }
     else {
@@ -1063,9 +1344,12 @@ int8_t uvg_search_intra_chroma_rdo(
     
     const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
     cu_info_t *const tr_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
+    cabac_data_t temp_cabac;
+    memcpy(&temp_cabac, &state->search_cabac, sizeof(cabac_data_t));
     
     for (int8_t i = 0; i < num_modes; ++i) {
       const uint8_t mode = chroma_data[i].pred_cu.intra.mode_chroma;
+      state->search_cabac.update = 1;
       uvg_intra_recon_cu(state,
                          x_px, y_px,
                          depth, &chroma_data[i],
@@ -1080,6 +1364,8 @@ int8_t uvg_search_intra_chroma_rdo(
 
       double mode_bits = uvg_chroma_mode_bits(state, mode, luma_mode);
       chroma_data[i].cost += mode_bits * state->lambda;
+      memcpy(&state->search_cabac, &temp_cabac,  sizeof(cabac_data_t));
+      
     }
     sort_modes(chroma_data, num_modes);
 
@@ -1097,20 +1383,16 @@ int8_t uvg_search_cu_intra_chroma(encoder_state_t * const state,
   const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
 
   cu_info_t *cur_pu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
-  int8_t intra_mode = cur_pu->intra.mode;
+  int8_t intra_mode = !cur_pu->intra.mip_flag ? cur_pu->intra.mode : 0;
   
-  int8_t modes[8] = { 0, 50, 18, 1, -1, 81, 82, 83 };
+  int8_t modes[8] = { 0, 50, 18, 1, intra_mode, 81, 82, 83 };
   uint8_t total_modes = (state->encoder_control->cfg.cclm ? 8 : 5);
-  if (intra_mode != 0 && intra_mode != 50 && intra_mode != 18 && intra_mode != 1) {
-    modes[4] = intra_mode;
+  for(int i = 0; i < 4; i++) {
+    if (modes[i] == intra_mode) {
+      modes[i] = 66;
+      break;
+    }
   }
-  else {
-    total_modes -= 1;
-    modes[4] = modes[5];
-    modes[5] = modes[6];
-    modes[6] = modes[7];
-  }
-
 
   // The number of modes to select for slower chroma search. Luma mode
   // is always one of the modes, so 2 means the final decision is made
@@ -1166,6 +1448,86 @@ int8_t uvg_search_cu_intra_chroma(encoder_state_t * const state,
 }
 
 
+static int select_candidates_for_further_search(const encoder_state_t * const state,
+  intra_search_data_t *search_data,
+  uint8_t regular_modes,
+  uint8_t mip_modes,
+  int width,
+  int height
+)
+{
+  const double threshold_cost = 1.0 + 1.4 / sqrt(width * height);
+  const int max_cand_per_type = regular_modes >> 1;
+  const double minCost = MIN(search_data[0].cost, search_data[regular_modes].cost);
+  bool keepOneMip = search_data[regular_modes - 1].cost < search_data[regular_modes].cost;
+  const int maxNumConv = 3;
+
+  intra_search_data_t temp_mip_modes[3];
+  const int transp_offset = mip_modes / 2;
+  for(int i = 0; i <3; i++) {
+    const bool     is_transp = search_data[regular_modes + i].cost > search_data[regular_modes + i + transp_offset].cost;
+    temp_mip_modes[i] = search_data[regular_modes + i + (is_transp ? transp_offset : 0)];
+  }
+  sort_modes(search_data, regular_modes + mip_modes);
+  
+  intra_search_data_t temp_list_out[9];
+  int selected_modes = 0;
+  int numConv = 0;
+  int numMip = 0;
+  for (int idx = 0; idx < regular_modes + keepOneMip; idx++)
+  {
+    bool addMode = false;
+
+    if (!search_data[idx].pred_cu.intra.mip_flag)
+    {
+      addMode = (numConv < maxNumConv);
+      numConv += addMode ? 1 : 0;
+    }
+    else
+    {
+      addMode = (numMip < max_cand_per_type || (search_data[idx].cost < threshold_cost * minCost) || keepOneMip);
+      keepOneMip = false;
+      numMip += addMode ? 1 : 0;
+    }
+    if (addMode)
+    {
+      temp_list_out[selected_modes++] = search_data[idx];
+    }
+  }
+
+  if (width> 8 && height > 8)
+  {
+    // Sort MIP candidates by Hadamard cost
+    // Append MIP mode to RD mode list
+    for (int idx = 0; idx < 3; idx++)
+    {
+      bool alreadyIncluded = false;
+      for (int list_idx = 0; list_idx < selected_modes; list_idx++)
+      {
+        if (temp_list_out[list_idx].pred_cu.intra.mip_flag &&
+          temp_list_out[list_idx].pred_cu.intra.mip_is_transposed == temp_mip_modes[idx].pred_cu.intra.mip_is_transposed &&
+          temp_list_out[list_idx].pred_cu.intra.mode == idx
+          )
+        {
+          alreadyIncluded = true;
+          break;
+        }
+      }
+
+      if (!alreadyIncluded)
+      {
+        temp_list_out[selected_modes++] = temp_mip_modes[idx];
+        // if (fastMip) break;
+      }
+    }
+  }
+
+  memcpy(search_data, temp_list_out, selected_modes * sizeof(intra_search_data_t));
+  return selected_modes;
+}
+
+
+
 /**
  * Update lcu to have best modes at this depth.
  * \return Cost of best mode.
@@ -1205,7 +1567,7 @@ void uvg_search_cu_intra(
   if (y_px >= SCU_WIDTH && lcu_px.y > 0) {
     above_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x+ cu_width-1, lcu_px.y - 1);
   }
-  uvg_intra_get_dir_luma_predictor(x_px, y_px, candidate_modes, cur_cu, left_cu, above_cu);
+  int8_t num_cand = uvg_intra_get_dir_luma_predictor(x_px, y_px, candidate_modes, cur_cu, left_cu, above_cu);
 
   if (depth > 0) {
     uvg_intra_build_reference(log2_width, COLOR_Y, &luma_px, &pic_px, lcu, refs, state->encoder_control->cfg.wpp, NULL, 0);
@@ -1227,17 +1589,24 @@ void uvg_search_cu_intra(
   temp_pred_cu = *cur_cu;
   temp_pred_cu.type = CU_INTRA;
   FILL(temp_pred_cu.intra, 0);
+  // Find modes with multiple reference lines if in use. Do not use if CU in first row.
+  uint8_t lines = state->encoder_control->cfg.mrl && (y_px % LCU_WIDTH) != 0 ? MAX_REF_LINE_IDX : 1;
 
   int16_t number_of_modes;
+  int16_t num_regular_modes;
   bool skip_rough_search = (depth == 0 || state->encoder_control->cfg.rdo >= 4);
   if (!skip_rough_search) {
-    number_of_modes = search_intra_rough(state,
-                                         ref_pixels,
-                                         LCU_WIDTH,
-                                         refs,
-                                         log2_width, candidate_modes,
-                                         search_data, &temp_pred_cu,
-                                         mip_ctx);
+    num_regular_modes = number_of_modes = search_intra_rough(
+      state,
+      ref_pixels,
+      LCU_WIDTH,
+      refs,
+      log2_width,
+      candidate_modes,
+      search_data,
+      &temp_pred_cu,
+      mip_ctx);
+     // if(lines == 1) sort_modes(search_data, number_of_modes);
 
   } else {
     for (int8_t i = 0; i < UVG_NUM_INTRA_MODES; i++) {
@@ -1249,38 +1618,7 @@ void uvg_search_cu_intra(
     number_of_modes = UVG_NUM_INTRA_MODES;
   }
 
-  int num_mip_modes = 0;
-  if (state->encoder_control->cfg.mip) {
-    // MIP is not allowed for 64 x 4 or 4 x 64 blocks
-    if (!((width == 64 && height == 4) || (width == 4 && height == 64))) {
-      num_mip_modes = NUM_MIP_MODES_FULL(width, height);
-
-      for (int transpose = 0; transpose < 2; transpose++) {
-        const int half_mip_modes = NUM_MIP_MODES_HALF(width, height);
-        for (int i = 0; i < half_mip_modes; ++i) {
-          const int index = i + number_of_modes + transpose * half_mip_modes;
-          search_data[index].pred_cu = temp_pred_cu;
-          search_data[index].pred_cu.intra.mip_flag = 1;
-          search_data[index].pred_cu.intra.mode = i;
-          search_data[index].pred_cu.intra.mip_is_transposed = transpose;
-          search_data[index].pred_cu.intra.mode_chroma = i;
-          search_data[index].cost = MAX_INT;
-        }
-      }
-      if(!skip_rough_search) {
-        get_rough_cost_for_2n_modes(state, refs, &cu_loc,
-                                    ref_pixels,
-                                    LCU_WIDTH, search_data + number_of_modes, num_mip_modes,
-                                    mip_ctx);
-      }
-    }
-    number_of_modes += num_mip_modes;
-  }
-
   int num_mrl_modes = 0;
-  // Find modes with multiple reference lines if in use. Do not use if CU in first row.
-  uint8_t lines = state->encoder_control->cfg.mrl && (y_px % LCU_WIDTH) != 0 ? MAX_REF_LINE_IDX : 1;
-
   for(int line = 1; line < lines; ++line) {
     uvg_pixel extra_refs[128 * MAX_REF_LINE_IDX] = { 0 };
 
@@ -1314,8 +1652,39 @@ void uvg_search_cu_intra(
                                 ref_pixels,
                                 LCU_WIDTH, search_data + number_of_modes, num_mrl_modes,
                                 mip_ctx);
+    sort_modes(search_data, number_of_modes);
   }
   number_of_modes += num_mrl_modes;
+  num_regular_modes += num_mrl_modes;
+
+  int num_mip_modes = 0;
+  if (state->encoder_control->cfg.mip) {
+    // MIP is not allowed for 64 x 4 or 4 x 64 blocks
+    if (!((width == 64 && height == 4) || (width == 4 && height == 64))) {
+      num_mip_modes = NUM_MIP_MODES_FULL(width, height);
+
+      for (int transpose = 0; transpose < 2; transpose++) {
+        const int half_mip_modes = NUM_MIP_MODES_HALF(width, height);
+        for (int i = 0; i < half_mip_modes; ++i) {
+          const int index = i + number_of_modes + transpose * half_mip_modes;
+          search_data[index].pred_cu = temp_pred_cu;
+          search_data[index].pred_cu.intra.mip_flag = 1;
+          search_data[index].pred_cu.intra.mode = i;
+          search_data[index].pred_cu.intra.mip_is_transposed = transpose;
+          search_data[index].pred_cu.intra.mode_chroma = 0;
+          search_data[index].cost = MAX_INT;
+        }
+      }
+      if (!skip_rough_search) {
+        get_rough_cost_for_2n_modes(state, refs, &cu_loc,
+          ref_pixels,
+          LCU_WIDTH, search_data + number_of_modes, num_mip_modes,
+          mip_ctx);
+      }
+    }
+    number_of_modes += num_mip_modes;
+  }
+
 
   // Set transform depth to current depth, meaning no transform splits.
   uvg_lcu_fill_trdepth(lcu, x_px, y_px, depth, depth);
@@ -1326,19 +1695,39 @@ void uvg_search_cu_intra(
     if (rdo_level == 4) {
       number_of_modes_to_search = number_of_modes;
     } else if (rdo_level == 2 || rdo_level == 3) {
-      number_of_modes_to_search = (cu_width == 4) ? 3 : 2;
+      const uint8_t g_aucIntraModeNumFast_UseMPM_2D[7 - 2 + 1][7 - 2 + 1] =
+      {
+        {3, 3, 3, 3, 2, 2},  //   4x4,   4x8,   4x16,   4x32,   4x64,   4x128,
+        {3, 3, 3, 3, 3, 2},  //   8x4,   8x8,   8x16,   8x32,   8x64,   8x128,
+        {3, 3, 3, 3, 3, 2},  //  16x4,  16x8,  16x16,  16x32,  16x64,  16x128,
+        {3, 3, 3, 3, 3, 2},  //  32x4,  32x8,  32x16,  32x32,  32x64,  32x128,
+        {2, 3, 3, 3, 3, 2},  //  64x4,  64x8,  64x16,  64x32,  64x64,  64x128,
+        {2, 2, 2, 2, 2, 3},  // 128x4, 128x8, 128x16, 128x32, 128x64, 128x128,
+      };
+      number_of_modes_to_search = g_aucIntraModeNumFast_UseMPM_2D[7- depth - 3][7 - depth - 3];
     } else {
       // Check only the predicted modes.
       number_of_modes_to_search = 0;
     }
     if(!skip_rough_search) {
-      sort_modes(search_data, (uint8_t)number_of_modes);
+      if(state->encoder_control->cfg.mip) {
+        number_of_modes_to_search = select_candidates_for_further_search(
+          state,
+          search_data,
+          num_regular_modes,
+          num_mip_modes,
+          width,
+          height
+        );
+      }
     }
 
-    for(int pred_mode = 0; pred_mode < INTRA_MPM_COUNT; ++pred_mode) {
+    for(int pred_mode = 0; pred_mode < num_cand; ++pred_mode) {
       bool mode_found = false;
       for(int i = 0; i < number_of_modes_to_search; i++) {
-        if(search_data[i].pred_cu.intra.mode == candidate_modes[pred_mode]) {
+        if(search_data[i].pred_cu.intra.mip_flag == 0 &&
+          search_data[i].pred_cu.intra.multi_ref_idx == 0 &&
+          search_data[i].pred_cu.intra.mode == candidate_modes[pred_mode]) {
           mode_found = true;
           break;
         }
@@ -1363,17 +1752,6 @@ void uvg_search_cu_intra(
     // Reset these
     search_data[0].pred_cu.violates_mts_coeff_constraint = false;
     search_data[0].pred_cu.mts_last_scan_pos = false;    
-  }
-  else {
-    double best_cost = MAX_INT;
-    int best_mode = 0;
-    for (int mode = 0; mode < number_of_modes; mode++) {
-      if (search_data[mode].cost < best_cost) {
-        best_cost = search_data[mode].cost;
-        best_mode = mode;
-      }
-    }
-    search_data[0] = search_data[best_mode];
   }
   *mode_out = search_data[0];
 }

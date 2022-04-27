@@ -583,7 +583,7 @@ int uvg_get_mip_flag_context(int x, int y, int width, int height, const lcu_t* l
       left = LCU_GET_CU_AT_PX(lcu, x_local - 1, y_local); 
     }
     if (y) {
-      top = LCU_GET_CU_AT_PX(lcu, x_local - 1, y_local); 
+      top = LCU_GET_CU_AT_PX(lcu, x_local, y_local - 1); 
     }
   }
   else {
@@ -1392,7 +1392,6 @@ void uvg_intra_predict(
     }
     else {
       use_mip = state->encoder_control->chroma_format == UVG_CSP_444;
-      intra_mode = use_mip ? intra_mode : 0;
     }
   }
   if (intra_mode < 68) {

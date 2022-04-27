@@ -48,11 +48,11 @@
 
  // Modify weight of luma SSD.
 #ifndef UVG_LUMA_MULT
-#define UVG_LUMA_MULT 0.8
+#define UVG_LUMA_MULT 1.0
 #endif
 // Modify weight of chroma SSD.
 #ifndef UVG_CHROMA_MULT
-#define UVG_CHROMA_MULT 1.5
+#define UVG_CHROMA_MULT 1.0
 #endif
 
  /**

@@ -888,7 +888,12 @@ static void encode_chroma_intra_cu(cabac_data_t* const cabac, const cu_info_t* c
   unsigned pred_mode = 0;
   unsigned chroma_pred_modes[8] = {0, 50, 18, 1, 67, 81, 82, 83};
   int8_t chroma_intra_dir = cur_cu->intra.mode_chroma;
-  int8_t luma_intra_dir = cur_cu->intra.mode;
+  int8_t luma_intra_dir = !cur_cu->intra.mip_flag ? cur_cu->intra.mode : 0;
+  for(int i = 0; i < 4; i++) {
+    if(chroma_pred_modes[i] == luma_intra_dir) {
+      chroma_pred_modes[i] = 66;
+    }
+  }
 
 
   bool derived_mode = chroma_intra_dir == luma_intra_dir;
@@ -1096,11 +1101,13 @@ void uvg_encode_intra_luma_coding_unit(const encoder_state_t * const state,
 
   if (x > 0) {
     assert(x >> 2 > 0);
+    const int x_scu = SUB_SCU(x) - 1;
+    const int y_scu = SUB_SCU(y + cu_width) - 1;
     left_pu = lcu ?
                 LCU_GET_CU_AT_PX(
                   lcu,
-                  SUB_SCU(x - 1),
-                  SUB_SCU(y + cu_width - 1)) :
+                  x_scu,
+                  y_scu) :
                 uvg_cu_array_at_const(
                   frame->cu_array,
                   x - 1,
@@ -1112,8 +1119,8 @@ void uvg_encode_intra_luma_coding_unit(const encoder_state_t * const state,
     above_pu = lcu ?
                  LCU_GET_CU_AT_PX(
                    lcu,
-                   SUB_SCU(x + cu_width - 1),
-                   SUB_SCU(y -1)) :
+                   SUB_SCU(x + cu_width) - 1,
+                   SUB_SCU(y) - 1) :
                  uvg_cu_array_at_const(
                    frame->cu_array,
                    x + cu_width - 1,
