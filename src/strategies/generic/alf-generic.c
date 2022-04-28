@@ -35,7 +35,7 @@
 #include "cu.h"
 #include "encoder.h"
 #include "encoderstate.h"
-#include "kvazaar.h"
+#include "uvg266.h"
 #include "alf.h"
 #include "strategyselector.h"
 

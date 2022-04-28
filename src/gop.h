@@ -32,7 +32,7 @@
  * INCLUDING NEGLIGENCE OR OTHERWISE ARISING IN ANY WAY OUT OF THE USE OF THIS
  ****************************************************************************/
 
-#include <kvazaar.h>
+#include <uvg266.h>
 
 
 static const uvg_gop_config uvg_gop_lowdelay4[4] = {

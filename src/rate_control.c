@@ -35,7 +35,7 @@
 #include <math.h>
 
 #include "encoder.h"
-#include "kvazaar.h"
+#include "uvg266.h"
 #include "pthread.h"
 
 

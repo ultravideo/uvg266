@@ -39,7 +39,7 @@
  */
 
 #include "global.h" // IWYU pragma: keep
-#include "kvazaar.h"
+#include "uvg266.h"
 
 int uvg_strategy_register_picture_generic(void* opaque, uint8_t bitdepth);
 

@@ -1,7 +1,7 @@
 #ifndef OPTIMIZED_SAD_FUNC_T_H_
 #define OPTIMIZED_SAD_FUNC_T_H_
 
-#include "kvazaar.h"
+#include "uvg266.h"
 
 /**
  * \param data1: Picture block pointer

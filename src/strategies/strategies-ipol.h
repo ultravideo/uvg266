@@ -40,7 +40,7 @@
 
 #include "encoder.h"
 #include "global.h" // IWYU pragma: keep
-#include "kvazaar.h"
+#include "uvg266.h"
 #include "search_inter.h"
 
  // AVX2 implementation of horizontal filter reads and

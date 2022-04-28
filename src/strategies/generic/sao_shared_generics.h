@@ -35,7 +35,7 @@
 
 // #include "encoder.h"
 #include "encoderstate.h"
-#include "kvazaar.h"
+#include "uvg266.h"
 #include "sao.h"
 
 // Mapping of edge_idx values to eo-classes.

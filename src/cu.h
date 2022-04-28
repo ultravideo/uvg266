@@ -40,7 +40,7 @@
 
 #include "global.h" // IWYU pragma: keep
 #include "image.h"
-#include "kvazaar.h"
+#include "uvg266.h"
 
 
 //Cu stuff

@@ -45,7 +45,7 @@
 #include "encoder_state-geometry.h"
 #include "encoderstate.h"
 #include "imagelist.h"
-#include "kvazaar.h"
+#include "uvg266.h"
 #include "uvg_math.h"
 #include "nal.h"
 #include "scalinglist.h"

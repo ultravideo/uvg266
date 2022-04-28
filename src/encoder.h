@@ -39,7 +39,7 @@
  */
 
 #include "global.h" // IWYU pragma: keep
-#include "kvazaar.h"
+#include "uvg266.h"
 #include "scalinglist.h"
 #include "threadqueue.h"
 #include "fast_coeff_cost.h"

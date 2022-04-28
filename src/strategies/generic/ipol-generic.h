@@ -40,7 +40,7 @@
 
 #include "encoder.h"
 #include "global.h" // IWYU pragma: keep
-#include "kvazaar.h"
+#include "uvg266.h"
 
 int uvg_strategy_register_ipol_generic(void* opaque, uint8_t bitdepth);
 void uvg_sample_quarterpel_luma_generic(const encoder_control_t * const encoder, uvg_pixel *src, int16_t src_stride, int width, int height, uvg_pixel *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag, const int16_t mv[2]);

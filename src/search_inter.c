@@ -40,7 +40,7 @@
 #include "image.h"
 #include "imagelist.h"
 #include "inter.h"
-#include "kvazaar.h"
+#include "uvg266.h"
 #include "rdo.h"
 #include "search.h"
 #include "strategies/strategies-ipol.h"

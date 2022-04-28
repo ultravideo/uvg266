@@ -40,7 +40,7 @@
 
 #include "global.h" // IWYU pragma: keep
 
-#include "kvazaar.h"
+#include "uvg266.h"
 #include "strategies/optimized_sad_func_ptr_t.h"
 
 

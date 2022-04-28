@@ -40,7 +40,7 @@
 
 #include "global.h" // IWYU pragma: keep
 
-#include "kvazaar.h"
+#include "uvg266.h"
 
 /* Function definitions */
 uvg_config *uvg_config_alloc(void);

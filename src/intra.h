@@ -40,7 +40,7 @@
 #include "cu.h"
 #include "encoderstate.h"
 #include "global.h" // IWYU pragma: keep
-#include "kvazaar.h"
+#include "uvg266.h"
 
 // Maximum possible reference line length for intra blocks
 #define INTRA_REF_LENGTH (2 * 128 + 3 + 33 * MAX_REF_LINE_IDX)

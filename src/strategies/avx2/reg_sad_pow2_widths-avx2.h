@@ -33,7 +33,7 @@
 #ifndef REG_SAD_POW2_WIDTHS_AVX2_H_
 #define REG_SAD_POW2_WIDTHS_AVX2_H_
 
-#include "kvazaar.h"
+#include "uvg266.h"
 
 #if UVG_BIT_DEPTH == 8
 

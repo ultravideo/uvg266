@@ -30,7 +30,7 @@
  * INCLUDING NEGLIGENCE OR OTHERWISE ARISING IN ANY WAY OUT OF THE USE OF THIS
  ****************************************************************************/
 
-#include "kvazaar.h"
+#include "uvg266.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -46,7 +46,7 @@
 #include "global.h"
 #include "image.h"
 #include "input_frame_buffer.h"
-#include "kvazaar_internal.h"
+#include "uvg266_internal.h"
 #include "strategyselector.h"
 #include "threadqueue.h"
 #include "videoframe.h"

@@ -6,7 +6,7 @@ HOMEPAGE_URL https://github.com/ultravideo/uvg266
 DESCRIPTION "An open-source VVC encoder licensed under 3-clause BSD"
 VERSION 0.2.3)
 
-configure_file("${PROJECT_SOURCE_DIR}/src/kvazaar.pc.in" "${PROJECT_SOURCE_DIR}/src/kvazaar.pc" @ONLY) 
+configure_file("${PROJECT_SOURCE_DIR}/src/uvg266.pc.in" "${PROJECT_SOURCE_DIR}/src/uvg266.pc" @ONLY) 
 
 option(USE_SHARED_LIB "Build using shared uvg266 library" ON)
 

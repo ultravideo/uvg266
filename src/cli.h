@@ -38,7 +38,7 @@
  */
 
 #include "global.h" // IWYU pragma: keep
-#include "kvazaar.h"
+#include "uvg266.h"
 
 typedef struct cmdline_opts_t {
   /** \brief Input filename */

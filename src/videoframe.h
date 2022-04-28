@@ -40,7 +40,7 @@
 
 #include "cu.h"
 #include "global.h" // IWYU pragma: keep
-#include "kvazaar.h"
+#include "uvg266.h"
 
 
 /**

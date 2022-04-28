@@ -33,7 +33,7 @@
 #include "global.h"
 
 #if COMPILE_INTEL_SSE41
-#include "kvazaar.h"
+#include "uvg266.h"
 #if UVG_BIT_DEPTH == 8
 #include "strategies/sse41/alf-sse41.h"
 

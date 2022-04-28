@@ -40,7 +40,7 @@
 
 #include "bitstream.h"
 #include "global.h" // IWYU pragma: keep
-#include "kvazaar.h"
+#include "uvg266.h"
 
 
 #define SEI_HASH_MAX_LENGTH 16

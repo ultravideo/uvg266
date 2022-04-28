@@ -40,7 +40,7 @@
 #include "imagelist.h"
 #include "inter.h"
 #include "intra.h"
-#include "kvazaar.h"
+#include "uvg266.h"
 #include "rdo.h"
 #include "search_inter.h"
 #include "search_intra.h"

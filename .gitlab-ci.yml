@@ -7,13 +7,13 @@ test-kvazaar: &test-template
   script:
     - bash .travis-install.bash
     - export PATH="${HOME}/bin:${PATH}"
-    - ./autogen.sh
+    - cmake .
     - ./configure --enable-werror || (cat config.log && false)
     - make --jobs=8
     - make check --jobs=8 VERBOSE=1
   artifacts:
     paths:
-    - src/kvazaar
+    - src/uvg266
     - src/.libs
     expire_in: 1 week
 

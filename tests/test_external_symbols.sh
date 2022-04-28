@@ -1,10 +1,10 @@
 #!/bin/sh
 
-# Check for external symbols without kvz_ prefix.
+# Check for external symbols without uvg_ prefix.
 
 set -eu${BASH+o pipefail}
 
-if nm -go --defined-only ../src/.libs/libkvazaar.a | grep -v ' kvz_'; then
-    printf '%s\n' 'Only symbols prefixed with "kvz_" should be exported from libkvazaar.'
+if nm -go --defined-only ../src/.libs/libuvg266.a | grep -v ' uvg_'; then
+    printf '%s\n' 'Only symbols prefixed with "uvg_" should be exported from libuvg266.'
     false
 fi

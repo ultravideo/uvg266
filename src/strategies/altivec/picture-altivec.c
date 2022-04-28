@@ -38,7 +38,7 @@
 #define bool _Bool
 #include <stdlib.h>
 
-#include "kvazaar.h"
+#include "uvg266.h"
 #include "strategyselector.h"
 
 

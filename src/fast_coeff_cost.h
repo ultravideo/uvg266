@@ -34,7 +34,7 @@
 #define FAST_COEFF_COST_H_
 
 #include <stdio.h>
-#include "kvazaar.h"
+#include "uvg266.h"
 // #include "encoderstate.h"
 
 #define MAX_FAST_COEFF_COST_QP 50

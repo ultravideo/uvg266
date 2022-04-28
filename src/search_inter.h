@@ -42,7 +42,7 @@
 #include "encoderstate.h"
 #include "global.h" // IWYU pragma: keep
 #include "inter.h"
-#include "kvazaar.h"
+#include "uvg266.h"
 
 #define UVG_LUMA_FILTER_TAPS 8
 #define UVG_LUMA_FILTER_OFFSET 3

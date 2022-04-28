@@ -34,7 +34,7 @@
 
 #include "encoder.h"
 #include "encoderstate.h"
-#include "kvazaar.h"
+#include "uvg266.h"
 
 #ifdef UVG_DEBUG_PRINT_CABAC
 uint32_t uvg_cabac_bins_count = 0;

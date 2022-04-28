@@ -39,7 +39,7 @@
  */
 
 #include "global.h" // IWYU pragma: keep
-#include "kvazaar.h"
+#include "uvg266.h"
 
 unsigned uvg_reg_sad_sse41(const uvg_pixel * const data1, const uvg_pixel * const data2,
                            const int width, const int height, const unsigned stride1, const unsigned stride2);

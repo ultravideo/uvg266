@@ -33,7 +33,7 @@
 #include "global.h"
 
 #if COMPILE_INTEL_SSE41
-#include "kvazaar.h"
+#include "uvg266.h"
 #if UVG_BIT_DEPTH == 8
 #include "strategies/sse41/picture-sse41.h"
 #include "strategies/sse41/reg_sad_pow2_widths-sse41.h"

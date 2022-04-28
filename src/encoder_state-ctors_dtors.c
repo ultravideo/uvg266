@@ -44,7 +44,7 @@
 #include "encoderstate.h"
 #include "image.h"
 #include "imagelist.h"
-#include "kvazaar.h"
+#include "uvg266.h"
 #include "threadqueue.h"
 #include "videoframe.h"
 #include "rate_control.h"

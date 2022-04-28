@@ -40,7 +40,7 @@
 
 #include "global.h" // IWYU pragma: keep
 #include "intra.h"
-#include "kvazaar.h"
+#include "uvg266.h"
 
 
 typedef void (angular_pred_func)(

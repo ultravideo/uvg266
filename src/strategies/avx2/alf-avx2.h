@@ -38,7 +38,7 @@
  */
 
 #include "global.h" // IWYU pragma: keep
-#include "kvazaar.h"
+#include "uvg266.h"
 
 int uvg_strategy_register_alf_avx2(void* opaque, uint8_t bitdepth);
 

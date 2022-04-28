@@ -39,7 +39,7 @@
 #include "encoderstate.h"
 #include "image.h"
 #include "intra.h"
-#include "kvazaar.h"
+#include "uvg266.h"
 #include "rdo.h"
 #include "search.h"
 #include "strategies/strategies-picture.h"

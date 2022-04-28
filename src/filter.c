@@ -36,7 +36,7 @@
 
 #include "cu.h"
 #include "encoder.h"
-#include "kvazaar.h"
+#include "uvg266.h"
 #include "transform.h"
 #include "videoframe.h"
 

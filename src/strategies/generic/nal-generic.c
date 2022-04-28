@@ -33,7 +33,7 @@
 #include "strategies/generic/nal-generic.h"
 
 #include "extras/libmd5.h"
-#include "kvazaar.h"
+#include "uvg266.h"
 #include "nal.h"
 #include "strategyselector.h"
 

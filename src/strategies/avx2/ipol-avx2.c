@@ -42,7 +42,7 @@
 #include <string.h>
 
 #include "encoder.h"
-#include "kvazaar.h"
+#include "uvg266.h"
 #include "search_inter.h"
 #include "strategies/generic/picture-generic.h"
 #include "strategies/strategies-ipol.h"

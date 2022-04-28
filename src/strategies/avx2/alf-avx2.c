@@ -35,7 +35,7 @@
 #include "strategies/avx2/alf-avx2.h"
 
 #if COMPILE_INTEL_AVX2
-#include "kvazaar.h"
+#include "uvg266.h"
 #if UVG_BIT_DEPTH == 8
 
 #include <immintrin.h>

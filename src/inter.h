@@ -42,7 +42,7 @@
 #include "encoderstate.h"
 #include "global.h" // IWYU pragma: keep
 #include "image.h"
-#include "kvazaar.h"
+#include "uvg266.h"
 
 extern const int8_t uvg_g_imv_to_prec[4];
 

@@ -40,7 +40,7 @@
 #include "encoder.h"
 #include "encoderstate.h"
 #include "global.h" // IWYU pragma: keep
-#include "kvazaar.h"
+#include "uvg266.h"
 #include "alf.h"
 
 

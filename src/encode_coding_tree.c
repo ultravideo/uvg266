@@ -41,7 +41,7 @@
 #include "imagelist.h"
 #include "inter.h"
 #include "intra.h"
-#include "kvazaar.h"
+#include "uvg266.h"
 #include "uvg_math.h"
 #include "strategyselector.h"
 #include "tables.h"

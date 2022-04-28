@@ -57,8 +57,8 @@
 #include "cli.h"
 #include "debug.h"
 #include "encoder.h"
-#include "kvazaar.h"
-#include "kvazaar_internal.h"
+#include "uvg266.h"
+#include "uvg266_internal.h"
 #include "threads.h"
 #include "yuv_io.h"
 

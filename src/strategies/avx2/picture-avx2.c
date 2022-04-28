@@ -37,7 +37,7 @@
 #include "global.h"
 
 #if COMPILE_INTEL_AVX2
-#include "kvazaar.h"
+#include "uvg266.h"
 #if UVG_BIT_DEPTH == 8
 #include "strategies/avx2/picture-avx2.h"
 #include "strategies/avx2/reg_sad_pow2_widths-avx2.h"

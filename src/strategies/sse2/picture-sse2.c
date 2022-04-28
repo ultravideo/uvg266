@@ -33,7 +33,7 @@
 #include "strategies/sse2/picture-sse2.h"
 
 #if COMPILE_INTEL_SSE2
-#include "kvazaar.h"
+#include "uvg266.h"
 #if UVG_BIT_DEPTH == 8
 #include <immintrin.h>
 #include <stdlib.h>
