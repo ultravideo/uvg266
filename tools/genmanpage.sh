@@ -6,11 +6,11 @@ set -e
 cd "$(dirname "$0")"
 
 date="$(date +"%B %Y")"
-version="$(awk '/#define KVZ_VERSION/ { print $3 }' ../src/global.h)"
-manpage_file=../doc/kvazaar.1
+version="$(awk '/VERSION/ {print $2}' ../CMakeLists.txt)"
+manpage_file=../doc/uvg266.1
 
 cat <<EOF> $manpage_file
-.TH KVAZAAR "1" "$date" "uvg266 v$version" "User Commands"
+.TH UVG266 "1" "$date" "uvg266 v$version" "User Commands"
 .SH NAME
 uvg266 \- open source VVC encoder
 .SH SYNOPSIS
@@ -18,7 +18,7 @@ uvg266 \- open source VVC encoder
 .SH DESCRIPTION
 EOF
 
-../src/kvazaar --help 2>&1 | tail -n+5 | head -n-4 | \
+../bin/uvg266 --help 2>&1 | tail -n+5 | head -n-4 | \
   sed 's| : |\n|g;
        s| :$||g;
        s|^      --|.TP\n\\fB--|g;
