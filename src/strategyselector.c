@@ -286,8 +286,8 @@ static void* strategyselector_choose_for(const strategy_list_t * const strategie
   // Because VS doesn't support snprintf, let's assert that there is
   // enough room in the buffer. Max length for strategy type is
   // buffersize (256) - prefix including terminating zero.
-  assert(strlen(strategy_type) < 256 - sizeof("KVAZAAR_OVERRIDE_") );
-  sprintf(buffer, "KVAZAAR_OVERRIDE_%s", strategy_type);
+  assert(strlen(strategy_type) < 256 - sizeof("UVG266_OVERRIDE_") );
+  sprintf(buffer, "UVG266_OVERRIDE_%s", strategy_type);
 
   override = getenv(buffer);
   

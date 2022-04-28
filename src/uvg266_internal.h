@@ -1,5 +1,5 @@
-#ifndef KVAZAAR_INTERNAL_H_
-#define KVAZAAR_INTERNAL_H_
+#ifndef UVG266_INTERNAL_H_
+#define UVG266_INTERNAL_H_
 /*****************************************************************************
  * This file is part of uvg266 VVC encoder.
  *
@@ -75,4 +75,4 @@ struct uvg_encoder {
   unsigned frames_done;
 };
 
-#endif // KVAZAAR_INTERNAL_H_
+#endif // UVG266_INTERNAL_H_

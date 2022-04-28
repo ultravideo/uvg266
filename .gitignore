@@ -1,8 +1,8 @@
 # Build files
 /bin
 /build/*
-!/build/kvazaar_lib
-/build/kvazaar_lib/*
+!/build/uvg266_lib
+/build/uvg266_lib/*
 !/build/uvg266_lib/uvg266_lib.vcxproj
 !/build/uvg266_lib/uvg266_lib.vcxproj.filters
 /scons_build_*

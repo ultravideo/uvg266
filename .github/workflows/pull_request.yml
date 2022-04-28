@@ -87,7 +87,7 @@ jobs:
     if: contains(github.event.pull_request.labels.*.name, 'safe to test')
     
     env:
-      KVAZAAR_OVERRIDE_angular_pred: generic
+      UVG266_OVERRIDE_angular_pred: generic
       
     steps:
     - uses: actions/checkout@v2

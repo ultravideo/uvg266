@@ -1,5 +1,5 @@
-#ifndef KVAZAAR_H_
-#define KVAZAAR_H_
+#ifndef UVG266_H_
+#define UVG266_H_
 /*****************************************************************************
  * This file is part of uvg266 VVC encoder.
  *
@@ -834,4 +834,4 @@ UVG_PUBLIC const uvg_api * uvg_api_get(int bit_depth);
 }
 #endif
 
-#endif // KVAZAAR_H_
+#endif // UVG266_H_

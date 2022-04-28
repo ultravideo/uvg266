@@ -53,7 +53,7 @@
 #include "rate_control.h"
 
 
-static void kvazaar_close(uvg_encoder *encoder)
+static void uvg266_close(uvg_encoder *encoder)
 {
   if (encoder) {
     // The threadqueue must be stopped before freeing states.
@@ -87,7 +87,7 @@ static void kvazaar_close(uvg_encoder *encoder)
 }
 
 
-static uvg_encoder * kvazaar_open(const uvg_config *cfg)
+static uvg_encoder * uvg266_open(const uvg_config *cfg)
 {
   uvg_encoder *encoder = NULL;
 
@@ -95,17 +95,17 @@ static uvg_encoder * kvazaar_open(const uvg_config *cfg)
   // TODO: Make strategies non-global
   if (!uvg_strategyselector_init(cfg->cpuid, UVG_BIT_DEPTH)) {
     fprintf(stderr, "Failed to initialize strategies.\n");
-    goto kvazaar_open_failure;
+    goto uvg266_open_failure;
   }
 
   encoder = calloc(1, sizeof(uvg_encoder));
   if (!encoder) {
-    goto kvazaar_open_failure;
+    goto uvg266_open_failure;
   }
 
   encoder->control = uvg_encoder_control_init(cfg);
   if (!encoder->control) {
-    goto kvazaar_open_failure;
+    goto uvg266_open_failure;
   }
 
   encoder->num_encoder_states = encoder->control->cfg.owf + 1;
@@ -116,20 +116,20 @@ static uvg_encoder * kvazaar_open(const uvg_config *cfg)
 
   // Assure that the rc data allocation was successful
   if(!uvg_get_rc_data(encoder->control)) {
-    goto kvazaar_open_failure;
+    goto uvg266_open_failure;
   }
 
   uvg_init_input_frame_buffer(&encoder->input_buffer);
 
   encoder->states = calloc(encoder->num_encoder_states, sizeof(encoder_state_t));
   if (!encoder->states) {
-    goto kvazaar_open_failure;
+    goto uvg266_open_failure;
   }
 
   for (unsigned i = 0; i < encoder->num_encoder_states; ++i) {
     encoder->states[i].encoder_control = encoder->control;
     if (!uvg_encoder_state_init(&encoder->states[i], NULL)) {
-      goto kvazaar_open_failure;
+      goto uvg266_open_failure;
     }
 
     encoder->states[i].frame->QP = (int8_t)cfg->qp;
@@ -148,8 +148,8 @@ static uvg_encoder * kvazaar_open(const uvg_config *cfg)
 
   return encoder;
 
-kvazaar_open_failure:
-  kvazaar_close(encoder);
+uvg266_open_failure:
+  uvg266_close(encoder);
   return NULL;
 }
 
@@ -177,7 +177,7 @@ static void set_frame_info(uvg_frame_info *const info, const encoder_state_t *co
 }
 
 
-static int kvazaar_headers(uvg_encoder *enc,
+static int uvg266_headers(uvg_encoder *enc,
                            uvg_data_chunk **data_out,
                            uint32_t *len_out)
 {
@@ -241,7 +241,7 @@ static int yuv_io_extract_field(const uvg_picture *frame_in, unsigned source_sca
 }
 
 
-static int kvazaar_encode(uvg_encoder *enc,
+static int uvg266_encode(uvg_encoder *enc,
                           uvg_picture *pic_in,
                           uvg_data_chunk **data_out,
                           uint32_t *len_out,
@@ -314,7 +314,7 @@ static int kvazaar_encode(uvg_encoder *enc,
 }
 
 
-static int kvazaar_field_encoding_adapter(uvg_encoder *enc,
+static int uvg266_field_encoding_adapter(uvg_encoder *enc,
                                           uvg_picture *pic_in,
                                           uvg_data_chunk **data_out,
                                           uint32_t *len_out,
@@ -324,7 +324,7 @@ static int kvazaar_field_encoding_adapter(uvg_encoder *enc,
 {
   if (enc->control->cfg.source_scan_type == UVG_INTERLACING_NONE) {
     // For progressive, simply call the normal encoding function.
-    return kvazaar_encode(enc, pic_in, data_out, len_out, pic_out, src_out, info_out);
+    return uvg266_encode(enc, pic_in, data_out, len_out, pic_out, src_out, info_out);
   }
 
   // For interlaced, make two fields out of the input frame and call encode on them separately.
@@ -338,11 +338,11 @@ static int kvazaar_field_encoding_adapter(uvg_encoder *enc,
   if (pic_in != NULL) {
     first_field = uvg_image_alloc(state->encoder_control->chroma_format, state->encoder_control->in.width, state->encoder_control->in.height);
     if (first_field == NULL) {
-      goto kvazaar_field_encoding_adapter_failure;
+      goto uvg266_field_encoding_adapter_failure;
     }
     second_field = uvg_image_alloc(state->encoder_control->chroma_format, state->encoder_control->in.width, state->encoder_control->in.height);
     if (second_field == NULL) {
-      goto kvazaar_field_encoding_adapter_failure;
+      goto uvg266_field_encoding_adapter_failure;
     }
 
     yuv_io_extract_field(pic_in, pic_in->interlacing, 0, first_field);
@@ -358,11 +358,11 @@ static int kvazaar_field_encoding_adapter(uvg_encoder *enc,
     second_field->interlacing = pic_in->interlacing;
   }
 
-  if (!kvazaar_encode(enc, first_field, &first.data_out, &first.len_out, pic_out, NULL, info_out)) {
-    goto kvazaar_field_encoding_adapter_failure;
+  if (!uvg266_encode(enc, first_field, &first.data_out, &first.len_out, pic_out, NULL, info_out)) {
+    goto uvg266_field_encoding_adapter_failure;
   }
-  if (!kvazaar_encode(enc, second_field, &second.data_out, &second.len_out, NULL, NULL, NULL)) {
-    goto kvazaar_field_encoding_adapter_failure;
+  if (!uvg266_encode(enc, second_field, &second.data_out, &second.len_out, NULL, NULL, NULL)) {
+    goto uvg266_field_encoding_adapter_failure;
   }
 
   uvg_image_free(first_field);
@@ -389,7 +389,7 @@ static int kvazaar_field_encoding_adapter(uvg_encoder *enc,
 
   return 1;
 
-kvazaar_field_encoding_adapter_failure:
+uvg266_field_encoding_adapter_failure:
   uvg_image_free(first_field);
   uvg_image_free(second_field);
   uvg_bitstream_free_chunks(first.data_out);
@@ -409,10 +409,10 @@ static const uvg_api uvg_8bit_api = {
 
   .chunk_free = uvg_bitstream_free_chunks,
 
-  .encoder_open = kvazaar_open,
-  .encoder_close = kvazaar_close,
-  .encoder_headers = kvazaar_headers,
-  .encoder_encode = kvazaar_field_encoding_adapter,
+  .encoder_open = uvg266_open,
+  .encoder_close = uvg266_close,
+  .encoder_headers = uvg266_headers,
+  .encoder_encode = uvg266_field_encoding_adapter,
 
   .picture_alloc_csp = uvg_image_alloc,
 };
