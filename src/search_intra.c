@@ -1069,6 +1069,7 @@ static int16_t search_intra_rough(
       int num_modes_to_check = 0;
       for(int i = 0; i < 6; i++) {
         int8_t center_node = best_six_modes[i].mode;
+        if(offset != 0 && (center_node < 3 || center_node > 65)) continue;
         int8_t test_modes[] = { center_node - offset, center_node + offset };
         for(int j = 0; j < 2; j++) {
           if((test_modes[j] >= 2 && test_modes[j] <= 66) && mode_checked[test_modes[j]] == false) {
@@ -1458,7 +1459,6 @@ static int select_candidates_for_further_search(const encoder_state_t * const st
 {
   const double threshold_cost = 1.0 + 1.4 / sqrt(width * height);
   const int max_cand_per_type = regular_modes >> 1;
-  const double minCost = MIN(search_data[0].cost, search_data[regular_modes].cost);
   bool keepOneMip = search_data[regular_modes - 1].cost < search_data[regular_modes].cost;
   const int maxNumConv = 3;
 
@@ -1469,6 +1469,7 @@ static int select_candidates_for_further_search(const encoder_state_t * const st
     temp_mip_modes[i] = search_data[regular_modes + i + (is_transp ? transp_offset : 0)];
   }
   sort_modes(search_data, regular_modes + mip_modes);
+  const double minCost = search_data[0].cost;
   
   intra_search_data_t temp_list_out[9];
   int selected_modes = 0;

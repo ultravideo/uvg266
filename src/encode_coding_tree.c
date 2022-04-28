@@ -1106,7 +1106,7 @@ void uvg_encode_intra_luma_coding_unit(const encoder_state_t * const state,
   if (x > 0) {
     assert(x >> 2 > 0);
     const int x_scu = SUB_SCU(x) - 1;
-    const int y_scu = SUB_SCU(y + cu_width) - 1;
+    const int y_scu = SUB_SCU(y + cu_width - 1);
     left_pu = lcu ?
                 LCU_GET_CU_AT_PX(
                   lcu,
@@ -1123,7 +1123,7 @@ void uvg_encode_intra_luma_coding_unit(const encoder_state_t * const state,
     above_pu = lcu ?
                  LCU_GET_CU_AT_PX(
                    lcu,
-                   SUB_SCU(x + cu_width) - 1,
+                   SUB_SCU(x + cu_width - 1),
                    SUB_SCU(y) - 1) :
                  uvg_cu_array_at_const(
                    frame->cu_array,
