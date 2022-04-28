@@ -76,13 +76,17 @@ file(GLOB LIB_SOURCES_STRATEGIES_AVX2 "src/strategies/avx2/*.c")
 
 set(CLI_SOURCES "src/encmain.c" "src/cli.c" "src/yuv_io.c")
 
+# Add the getopt and pthread for visual studio
+if(MSVC) 
+  list(APPEND CLI_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/extras/getopt.c ${CMAKE_CURRENT_SOURCE_DIR}/src/threadwrapper/src/pthread.cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/threadwrapper/src/semaphore.cpp)
+endif()
+
 add_executable(uvg266 ${CLI_SOURCES})
 target_link_libraries(uvg266 PUBLIC libuvg266)
 
 if(MSVC)
   target_include_directories(libuvg266 PUBLIC src/threadwrapper/include)
-  set_property( SOURCE ${LIB_SOURCES_STRATEGIES_AVX2} APPEND PROPERTY COMPILE_FLAGS "/arch:AVX2" )
-  list(APPEND CLI_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/extras/getopt.c ${CMAKE_CURRENT_SOURCE_DIR}/src/threadwrapper/src/pthread.cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/threadwrapper/src/semaphore.cpp)
+  set_property( SOURCE ${LIB_SOURCES_STRATEGIES_AVX2} APPEND PROPERTY COMPILE_FLAGS "/arch:AVX2" )  
 else()
   set_property( SOURCE ${LIB_SOURCES_STRATEGIES_AVX2} APPEND PROPERTY COMPILE_FLAGS "-mavx2 -mbmi -mpopcnt -mlzcnt -mbmi2" )
   set(THREADS_PREFER_PTHREAD_FLAG ON)
@@ -100,9 +104,18 @@ else()
   target_link_libraries(uvg266 PUBLIC ${EXTRA_LIBS})
 endif()
 
+# INSTALL
 
-#source_group( "Header Files"   FILES ${INC_FILES} )
-#source_group( "Resource Files" FILES ${RESOURCE_FILE} )
+# ToDo: make configurable
+
+install(FILES ${PROJECT_SOURCE_DIR}/src/uvg266.pc DESTINATION ${CMAKE_INSTALL_PREFIX}/share/pkgconfig)
+install(TARGETS uvg266 DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
+install(TARGETS libuvg266 DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
+if(USE_SHARED_LIB) # Just add the lib to the bin directory for now
+  install(TARGETS libuvg266 DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
+endif()
+install(FILES ${PROJECT_SOURCE_DIR}/src/uvg266.h DESTINATION ${CMAKE_INSTALL_PREFIX}/include)
+install(FILES ${PROJECT_SOURCE_DIR}/doc/uvg266.1 DESTINATION ${CMAKE_INSTALL_PREFIX}/share/man)
 
 # TESTS
 if(EXISTS "${PROJECT_SOURCE_DIR}/greatest/greatest.h")
