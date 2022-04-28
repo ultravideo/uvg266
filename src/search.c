@@ -433,7 +433,7 @@ double uvg_cu_rd_cost_chroma(const encoder_state_t *const state,
 
   if (state->encoder_control->cfg.jccr) {
     int cbf_mask = cbf_is_set(pred_cu->cbf, depth, COLOR_U) * 2 + cbf_is_set(pred_cu->cbf, depth, COLOR_V) - 1;
-    const cabac_ctx_t* ctx = NULL;
+    cabac_ctx_t* ctx = NULL;
     if (cbf_mask != -1) {
       cabac_data_t* cabac = (cabac_data_t*)&state->search_cabac;
       ctx = &(cabac->ctx.joint_cb_cr[cbf_mask]);

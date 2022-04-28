@@ -86,38 +86,38 @@ static INLINE uint8_t select_best_mode_index(const int8_t *modes, const double *
  * \return  Estimated RD cost of the reconstruction and signaling the
  *     coefficients of the residual.
  */
-static double get_cost(encoder_state_t * const state, 
-                       uvg_pixel *pred, uvg_pixel *orig_block,
-                       cost_pixel_nxn_func *satd_func,
-                       cost_pixel_nxn_func *sad_func,
-                       int width)
-{
-  double satd_cost = satd_func(pred, orig_block);
-  if (TRSKIP_RATIO != 0 && width <= (1 << state->encoder_control->cfg.trskip_max_size) && state->encoder_control->cfg.trskip_enable) {
-    // If the mode looks better with SAD than SATD it might be a good
-    // candidate for transform skip. How much better SAD has to be is
-    // controlled by TRSKIP_RATIO.
-
-    // Add the offset bit costs of signaling 'luma and chroma use trskip',
-    // versus signaling 'luma and chroma don't use trskip' to the SAD cost.
-    const cabac_ctx_t *ctx = &state->search_cabac.ctx.transform_skip_model_luma;
-    double trskip_bits = CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0);
-
-    
-    // ToDo: Check cost
-    if (state->encoder_control->chroma_format != UVG_CSP_400) {
-      ctx = &state->search_cabac.ctx.transform_skip_model_chroma;
-      trskip_bits += 2.0 * (CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0));
-    }
-    
-
-    double sad_cost = TRSKIP_RATIO * sad_func(pred, orig_block) + state->lambda_sqrt * trskip_bits;
-    if (sad_cost < satd_cost) {
-      return sad_cost;
-    }
-  }
-  return satd_cost;
-}
+// static double get_cost(encoder_state_t * const state, 
+//                        uvg_pixel *pred, uvg_pixel *orig_block,
+//                        cost_pixel_nxn_func *satd_func,
+//                        cost_pixel_nxn_func *sad_func,
+//                        int width)
+// {
+//   double satd_cost = satd_func(pred, orig_block);
+//   if (TRSKIP_RATIO != 0 && width <= (1 << state->encoder_control->cfg.trskip_max_size) && state->encoder_control->cfg.trskip_enable) {
+//     // If the mode looks better with SAD than SATD it might be a good
+//     // candidate for transform skip. How much better SAD has to be is
+//     // controlled by TRSKIP_RATIO.
+//
+//     // Add the offset bit costs of signaling 'luma and chroma use trskip',
+//     // versus signaling 'luma and chroma don't use trskip' to the SAD cost.
+//     const cabac_ctx_t *ctx = &state->search_cabac.ctx.transform_skip_model_luma;
+//     double trskip_bits = CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0);
+//
+//     
+//     // ToDo: Check cost
+//     if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+//       ctx = &state->search_cabac.ctx.transform_skip_model_chroma;
+//       trskip_bits += 2.0 * (CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0));
+//     }
+//     
+//
+//     double sad_cost = TRSKIP_RATIO * sad_func(pred, orig_block) + state->lambda_sqrt * trskip_bits;
+//     if (sad_cost < satd_cost) {
+//       return sad_cost;
+//     }
+//   }
+//   return satd_cost;
+// }
 
 
 /**
@@ -673,6 +673,7 @@ static void search_intra_chroma_rough(
  *
  * \return  Number of prediction modes in param modes.
  */
+/*
 static int16_t search_intra_rough(
   encoder_state_t * const state,
   uvg_pixel *orig,
@@ -859,7 +860,7 @@ static int16_t search_intra_rough(
 
   #undef PARALLEL_BLKS
   return modes_selected;
-}
+}*/
 
 
 static double count_bits(
@@ -912,8 +913,8 @@ static int16_t search_intra_rough(
   #define PARALLEL_BLKS 2 // TODO: use 4 for AVX-512 in the future?
   assert(log2_width >= 2 && log2_width <= 5);
   int_fast8_t width = 1 << log2_width;
-  cost_pixel_nxn_func *satd_func = kvz_pixels_get_satd_func(width);
-  cost_pixel_nxn_func *sad_func = kvz_pixels_get_sad_func(width);
+  // cost_pixel_nxn_func *satd_func = kvz_pixels_get_satd_func(width);
+  // cost_pixel_nxn_func *sad_func = kvz_pixels_get_sad_func(width);
   cost_pixel_nxn_multi_func *satd_dual_func = kvz_pixels_get_satd_dual_func(width);
   cost_pixel_nxn_multi_func *sad_dual_func = kvz_pixels_get_sad_dual_func(width);
   bool mode_checked[KVZ_NUM_INTRA_MODES] = {0};
