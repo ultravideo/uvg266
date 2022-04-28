@@ -149,6 +149,10 @@ static void lcu_fill_cu_info(lcu_t *lcu, int x_local, int y_local, int width, in
       to->part_size = cu->part_size;
       to->qp        = cu->qp;
       //to->tr_idx    = cu->tr_idx;
+      to->lfnst_idx = cu->lfnst_idx;
+      to->lfnst_last_scan_pos = cu->lfnst_last_scan_pos;
+      to->violates_lfnst_constrained[0] = cu->violates_lfnst_constrained[0];
+      to->violates_lfnst_constrained[1] = cu->violates_lfnst_constrained[1];
 
       if (cu->type == CU_INTRA) {
         to->intra.mode        = cu->intra.mode;

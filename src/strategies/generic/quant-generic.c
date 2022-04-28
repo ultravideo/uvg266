@@ -459,8 +459,7 @@ int uvg_quantize_residual_generic(encoder_state_t *const state,
     uvg_transform2d(state->encoder_control, residual, coeff, width, color, cur_cu);
   }
 
-  // LFNST_TODO: lfnst index must be derived by performing search, like MTS index. Search is performed during intra search, inside search_tr_depth.
-  const uint16_t lfnst_index = 0;
+  const uint16_t lfnst_index = cur_cu->lfnst_idx;
 
   if (state->encoder_control->cfg.lfnst) {
     // Forward low frequency non-separable transform

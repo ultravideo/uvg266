@@ -170,7 +170,7 @@ static bool is_lfnst_allowed(encoder_state_t* const state, const cu_info_t* cons
     const int cu_height = color == COLOR_Y ? height : chroma_height;
     bool can_use_lfnst_with_mip = (width >= 16 && height >= 16);
     bool is_sep_tree = false; // LFNST_TODO: if/when separate tree structure is implemented, add proper boolean here
-    bool mip_flag = false; // LFNST_TODO: add proper boolean when MIP is merged
+    bool mip_flag = pred_cu->type == CU_INTRA ? pred_cu->intra.mip_flag : false;
     const int max_tb_size = 64; // LFNST_TODO: use define instead for max transform block size
 
     if ((isp_mode && !can_use_lfnst_with_isp(width, height, isp_split_type, color)) ||

@@ -267,6 +267,7 @@ static double search_intra_trdepth(
   assert(depth >= 0 && depth <= MAX_PU_DEPTH);
 
   const int width = LCU_WIDTH >> depth;
+  const int height = width; // TODO: height for non-square blocks
   const int width_c = width > TR_MIN_WIDTH ? width / 2 : width;
 
   const int offset = width / 2;
@@ -302,6 +303,7 @@ static double search_intra_trdepth(
     const int8_t chroma_mode = reconstruct_chroma ? pred_cu->intra.mode : -1;
     double best_rd_cost = MAX_INT;
     int best_tr_idx = 0;
+    int best_lfnst_idx = 0;
 
     int trafo;
     int num_transforms = 1;
@@ -321,8 +323,7 @@ static double search_intra_trdepth(
     }
     pred_cu->intra.mode_chroma = -1;
     pred_cu->joint_cb_cr = 4;
-    // LFNST_TODO: do lfnst search somewhere around here, maybe after MTS search
-    // For now, initialize lfnst variables here
+    // Initialize lfnst variables
     pred_cu->lfnst_last_scan_pos = 0;
     pred_cu->violates_lfnst_constrained[0] = 0;
     pred_cu->violates_lfnst_constrained[1] = 0;
@@ -340,31 +341,48 @@ static double search_intra_trdepth(
           continue;
         }
       }
-     
-      uvg_intra_recon_cu(state,
-                         x_px, y_px,
-                         depth, search_data,
-                         pred_cu,
-                         lcu);
+      
+      const int max_tb_size = 64; // LFNST_TODO: use define instead for max transform block size
+      // LFNST search params
+      // bool is_separate_tree = (width == 4 && height == 4) ? true : false; // LFNST_TODO: if/when separate/dual tree structure is implemented, get proper value for this
+      // const int max_lfnst_idx = (is_separate_tree /*&& color != COLOR_Y*/ && (width < 8 || height < 8)) || (width > max_tb_size || height > max_tb_size) ? 0 : 2;
+      const int max_lfnst_idx = width > max_tb_size || height > max_tb_size ? 0 : 2;
+        
+      int start_idx = 0;
+      int end_idx = state->encoder_control->cfg.lfnst && depth == pred_cu->tr_depth ? max_lfnst_idx : 0;
 
-      // TODO: Not sure if this should be 0 or 1 but at least seems to work with 1
-      if (pred_cu->tr_idx > 1)
-      {
-        derive_mts_constraints(pred_cu, lcu, depth, lcu_px);
-        if (pred_cu->violates_mts_coeff_constraint || !pred_cu->mts_last_scan_pos)
+      for (int lfnst_idx = start_idx; lfnst_idx <= end_idx; lfnst_idx++) {
+        pred_cu->lfnst_idx = lfnst_idx;
+        pred_cu->violates_lfnst_constrained[0] = false;
+        pred_cu->violates_lfnst_constrained[1] = false;
+        pred_cu->lfnst_last_scan_pos = false;
+
+        uvg_intra_recon_cu(state,
+          x_px, y_px,
+          depth, search_data,
+          pred_cu,
+          lcu);
+
+        // TODO: Not sure if this should be 0 or 1 but at least seems to work with 1
+        if (pred_cu->tr_idx > 1)
         {
-          continue;
+          derive_mts_constraints(pred_cu, lcu, depth, lcu_px);
+          if (pred_cu->violates_mts_coeff_constraint || !pred_cu->mts_last_scan_pos)
+          {
+            continue;
+          }
         }
-      }
 
       double rd_cost = uvg_cu_rd_cost_luma(state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
       //if (reconstruct_chroma) {
       //  rd_cost += uvg_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
       //}
 
-      if (rd_cost < best_rd_cost) {
-        best_rd_cost = rd_cost;
-        best_tr_idx = pred_cu->tr_idx;
+        if (rd_cost < best_rd_cost) {
+          best_rd_cost = rd_cost;
+          best_lfnst_idx = pred_cu->lfnst_idx;
+          best_tr_idx = pred_cu->tr_idx;
+        }
       }
     }
     if(reconstruct_chroma) {
@@ -382,11 +400,13 @@ static double search_intra_trdepth(
     }
     pred_cu->tr_skip = best_tr_idx == MTS_SKIP;
     pred_cu->tr_idx = best_tr_idx;
+    // pred_cu->lfnst_idx = best_lfnst_idx;
+    pred_cu->lfnst_idx = 1; // LFNST_TODO: remove this after testing
     nosplit_cost += best_rd_cost;
+    
+    
 
-    // LFNST_TODO: lfnst search here. Do search only if tr_depth is same as depth
-
-    // Early stop codition for the recursive search.
+    // Early stop condition for the recursive search.
     // If the cost of any 1/4th of the transform is already larger than the
     // whole transform, assume that splitting further is a bad idea.
     if (nosplit_cost >= cost_treshold) {
@@ -467,6 +487,7 @@ static double search_intra_trdepth(
     return nosplit_cost;
   }
 }
+
 static void sort_modes(intra_search_data_t* __restrict modes, uint8_t length)
 {
   // Length for intra is always between 5 and 23, and is either 21, 17, 9 or 8 about
