@@ -9,7 +9,7 @@ test-kvazaar: &test-template
     - export PATH="${HOME}/bin:${PATH}"
     - cmake -DUSE_SHARED_LIB=OFF -DCMAKE_INSTALL_PREFIX=./ . || (cat config.log && false)
     - make install --jobs=8
-    - make check --jobs=8 VERBOSE=1
+    - env CTEST_OUTPUT_ON_FAILURE=1 make test --jobs=8
   artifacts:
     paths:
     - bin/uvg266
