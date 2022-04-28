@@ -591,7 +591,7 @@ static void sort_modes(intra_search_data_t* __restrict modes, uint8_t length)
   }
 }
 
-static void search_intra_chroma_rough(
+static int search_intra_chroma_rough(
   encoder_state_t * const state,
   int x_px,
   int y_px,
@@ -602,7 +602,8 @@ static void search_intra_chroma_rough(
   uvg_intra_references *refs_u,
   uvg_intra_references *refs_v,
   intra_search_data_t* chroma_data,
-  lcu_t* lcu)
+  lcu_t* lcu,
+  int8_t luma_mode)
 {
   assert(!(x_px & 4 || y_px & 4));
 
@@ -621,7 +622,8 @@ static void search_intra_chroma_rough(
   uvg_pixels_blit(orig_u, orig_block, width, width, origstride, width);
   int modes_count = (state->encoder_control->cfg.cclm ? 8 : 5);
   for (int i = 0; i < modes_count; ++i) {
-    if (chroma_data[i].pred_cu.intra.mode_chroma == -1) continue;
+    const int8_t mode_chroma = chroma_data[i].pred_cu.intra.mode_chroma;
+    if (mode_chroma == luma_mode || mode_chroma == 0 || mode_chroma == 81) continue;
     uvg_intra_predict(state, refs_u, &loc, COLOR_U, pred, &chroma_data[i], lcu);
     //costs[i] += get_cost(encoder_state, pred, orig_block, satd_func, sad_func, width);
     chroma_data[i].cost += satd_func(pred, orig_block);
@@ -629,17 +631,21 @@ static void search_intra_chroma_rough(
 
   uvg_pixels_blit(orig_v, orig_block, width, width, origstride, width);
   for (int i = 0; i < modes_count; ++i) {
-    if (chroma_data[i].pred_cu.intra.mode_chroma == -1) continue;
+    const int8_t mode_chroma = chroma_data[i].pred_cu.intra.mode_chroma;
+    if (mode_chroma == luma_mode || mode_chroma == 0 || mode_chroma == 81) continue;
     uvg_intra_predict(state, refs_v, &loc, COLOR_V, pred, &chroma_data[i], lcu);
     //costs[i] += get_cost(encoder_state, pred, orig_block, satd_func, sad_func, width);
     chroma_data[i].cost += satd_func(pred, orig_block);
   }
-
-  for (int i = 0; i < modes_count; ++i) {
-    const double bits = uvg_chroma_mode_bits(state, chroma_data[i].pred_cu.intra.mode_chroma, chroma_data[i].pred_cu.intra.mode);
-    chroma_data[i].bits = bits;
-    chroma_data[i].cost = bits * state->lambda_sqrt;
-  }
+  sort_modes(chroma_data, modes_count);
+  if (modes_count > 5 && chroma_data[7].pred_cu.intra.mode_chroma > 81) modes_count--;
+  if (modes_count > 5 && chroma_data[6].pred_cu.intra.mode_chroma > 81) modes_count--;
+  return modes_count;
+  // for (int i = 0; i < modes_count; ++i) {
+  //   const double bits = kvz_chroma_mode_bits(state, chroma_data[i].pred_cu.intra.mode_chroma, chroma_data[i].pred_cu.intra.mode);
+  //   chroma_data[i].bits = bits;
+  //   chroma_data[i].cost = bits * state->lambda_sqrt;
+  // }
 }
 
 
@@ -1356,16 +1362,16 @@ int8_t uvg_search_intra_chroma_rdo(
                          x_px, y_px,
                          depth, &chroma_data[i],
         &chroma_data[i].pred_cu,
-                         lcu);      
+                         lcu);
+      double mode_bits = uvg_chroma_mode_bits(state, mode, luma_mode);
+      chroma_data[i].cost = mode_bits * state->lambda;
       
       if(tr_cu->depth != tr_cu->tr_depth || !state->encoder_control->cfg.jccr) {
-        chroma_data[i].cost = uvg_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, &chroma_data[i].pred_cu, lcu);
+        chroma_data[i].cost += uvg_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, &chroma_data[i].pred_cu, lcu);
       } else {
         uvg_select_jccr_mode(state, lcu_px.x, lcu_px.y, depth, &chroma_data[i].pred_cu, lcu, &chroma_data[i].cost);
       }
 
-      double mode_bits = uvg_chroma_mode_bits(state, mode, luma_mode);
-      chroma_data[i].cost += mode_bits * state->lambda;
       memcpy(&state->search_cabac, &temp_cabac,  sizeof(cabac_data_t));
       
     }
@@ -1413,12 +1419,13 @@ int8_t uvg_search_cu_intra_chroma(encoder_state_t * const state,
     chroma_data[i].pred_cu = *cur_pu;
     chroma_data[i].pred_cu.intra.mode_chroma = modes[i];
     chroma_data[i].pred_cu.intra.mode = -1;
+    chroma_data[i].cost = 0;
   }
   // Don't do rough mode search if all modes are selected.
   // FIXME: It might make more sense to only disable rough search if
   // num_modes is 0.is 0.
 
-  if (total_modes != num_modes) {
+  {
     const int_fast8_t log2_width_c = MAX(LOG2_LCU_WIDTH - depth - 1, 2);
     const vector2d_t pic_px = { state->tile->frame->width, state->tile->frame->height };
     const vector2d_t luma_px = { x_px, y_px };
@@ -1433,12 +1440,15 @@ int8_t uvg_search_cu_intra_chroma(encoder_state_t * const state,
     uvg_pixel *ref_u = &lcu->ref.u[lcu_cpx.x + lcu_cpx.y * LCU_WIDTH_C];
     uvg_pixel *ref_v = &lcu->ref.v[lcu_cpx.x + lcu_cpx.y * LCU_WIDTH_C];
 
-    search_intra_chroma_rough(state, x_px, y_px, depth,
-                              ref_u, ref_v,
-                              LCU_WIDTH_C,
-                              &refs_u, &refs_v,
-      chroma_data, lcu);
-    sort_modes(chroma_data, total_modes);
+    num_modes = search_intra_chroma_rough(state, x_px, y_px, depth,
+                                          ref_u,
+                                          ref_v,
+                                          LCU_WIDTH_C,
+                                          &refs_u,
+                                          &refs_v,
+                                          chroma_data,
+                                          lcu,
+                                          intra_mode);
   }
 
   int8_t intra_mode_chroma = intra_mode;
@@ -1446,7 +1456,7 @@ int8_t uvg_search_cu_intra_chroma(encoder_state_t * const state,
     intra_mode_chroma = uvg_search_intra_chroma_rdo(state, x_px, y_px, depth, num_modes, lcu, chroma_data, intra_mode);
   }
   *search_data = chroma_data[0];
-  return intra_mode_chroma;
+  return chroma_data[0].pred_cu.intra.mode_chroma;
 }
 
 
