@@ -62,10 +62,10 @@ endif()
 # ToDo: allow compiling on other than x86
 add_definitions(-DCOMPILE_INTEL)
 
-if(USE_SHARED_LIB)
-  add_library(libuvg266 SHARED ${LIB_SOURCES})
+if(USE_SHARED_LIB) 
+  add_library(uvg266 SHARED ${LIB_SOURCES})
 else()
-  add_library(libuvg266 STATIC ${LIB_SOURCES})
+  add_library(uvg266 STATIC ${LIB_SOURCES})
 endif()
 
 target_include_directories(libuvg266 PUBLIC src)
@@ -84,9 +84,14 @@ endif()
 add_executable(uvg266 ${CLI_SOURCES})
 target_link_libraries(uvg266 PUBLIC libuvg266)
 
+set_target_properties(uvg266-bin PROPERTIES OUTPUT_NAME uvg266)
+set_target_properties(uvg266-bin PROPERTIES RUNTIME_OUTPUT_NAME uvg266)
+
+target_link_libraries(uvg266-bin PUBLIC uvg266)
+
 if(MSVC)
-  target_include_directories(libuvg266 PUBLIC src/threadwrapper/include)
-  set_property( SOURCE ${LIB_SOURCES_STRATEGIES_AVX2} APPEND PROPERTY COMPILE_FLAGS "/arch:AVX2" )  
+  target_include_directories(uvg266 PUBLIC src/threadwrapper/include)
+  set_property( SOURCE ${LIB_SOURCES_STRATEGIES_AVX2} APPEND PROPERTY COMPILE_FLAGS "/arch:AVX2" )
 else()
   set_property( SOURCE ${LIB_SOURCES_STRATEGIES_AVX2} APPEND PROPERTY COMPILE_FLAGS "-mavx2 -mbmi -mpopcnt -mlzcnt -mbmi2" )
   set(THREADS_PREFER_PTHREAD_FLAG ON)
@@ -101,7 +106,7 @@ else()
       set(EXTRA_LIBS ${EXTRA_LIBS} m)
   endif (HAVE_LIB_M)
 
-  target_link_libraries(uvg266 PUBLIC ${EXTRA_LIBS})
+  target_link_libraries(uvg266-bin PUBLIC ${EXTRA_LIBS})
 endif()
 
 # INSTALL
@@ -109,8 +114,8 @@ endif()
 # ToDo: make configurable
 
 install(FILES ${PROJECT_SOURCE_DIR}/src/uvg266.pc DESTINATION ${CMAKE_INSTALL_PREFIX}/share/pkgconfig)
-install(TARGETS uvg266 DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
-install(TARGETS libuvg266 DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
+install(TARGETS uvg266-bin DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
+install(TARGETS uvg266 DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
 if(USE_SHARED_LIB) # Just add the lib to the bin directory for now
   install(TARGETS libuvg266 DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
 endif()
@@ -120,8 +125,14 @@ install(FILES ${PROJECT_SOURCE_DIR}/doc/uvg266.1 DESTINATION ${CMAKE_INSTALL_PRE
 # TESTS
 if(EXISTS "${PROJECT_SOURCE_DIR}/greatest/greatest.h")
   add_subdirectory( "tests/" )
-
-  #enable_testing()
-
   add_test( NAME Test_uvg266 COMMAND uvg266_tests )
+endif()
+
+if(NOT DEFINED MSVC)
+add_custom_target(
+    check
+    COMMAND ${PROJECT_SOURCE_DIR}/tests/test_external_symbols.sh
+    COMMENT "Building and running test..."
+    VERBATIM
+  )
 endif()
