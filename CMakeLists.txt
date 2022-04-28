@@ -68,9 +68,9 @@ else()
   add_library(uvg266 STATIC ${LIB_SOURCES})
 endif()
 
-target_include_directories(libuvg266 PUBLIC src)
-target_include_directories(libuvg266 PUBLIC src/extras)
-target_include_directories(libuvg266 PUBLIC src/strategies)
+target_include_directories(uvg266 PUBLIC src)
+target_include_directories(uvg266 PUBLIC src/extras)
+target_include_directories(uvg266 PUBLIC src/strategies)
 
 file(GLOB LIB_SOURCES_STRATEGIES_AVX2 "src/strategies/avx2/*.c")
 
@@ -81,8 +81,7 @@ if(MSVC)
   list(APPEND CLI_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/extras/getopt.c ${CMAKE_CURRENT_SOURCE_DIR}/src/threadwrapper/src/pthread.cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/threadwrapper/src/semaphore.cpp)
 endif()
 
-add_executable(uvg266 ${CLI_SOURCES})
-target_link_libraries(uvg266 PUBLIC libuvg266)
+add_executable(uvg266-bin ${CLI_SOURCES})
 
 set_target_properties(uvg266-bin PROPERTIES OUTPUT_NAME uvg266)
 set_target_properties(uvg266-bin PROPERTIES RUNTIME_OUTPUT_NAME uvg266)
@@ -90,7 +89,7 @@ set_target_properties(uvg266-bin PROPERTIES RUNTIME_OUTPUT_NAME uvg266)
 target_link_libraries(uvg266-bin PUBLIC uvg266)
 
 if(MSVC)
-  target_include_directories(uvg266 PUBLIC src/threadwrapper/include)
+  target_include_directories(uvg266-bin PUBLIC src/threadwrapper/include)
   set_property( SOURCE ${LIB_SOURCES_STRATEGIES_AVX2} APPEND PROPERTY COMPILE_FLAGS "/arch:AVX2" )
 else()
   set_property( SOURCE ${LIB_SOURCES_STRATEGIES_AVX2} APPEND PROPERTY COMPILE_FLAGS "-mavx2 -mbmi -mpopcnt -mlzcnt -mbmi2" )
@@ -117,10 +116,21 @@ install(FILES ${PROJECT_SOURCE_DIR}/src/uvg266.pc DESTINATION ${CMAKE_INSTALL_PR
 install(TARGETS uvg266-bin DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
 install(TARGETS uvg266 DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
 if(USE_SHARED_LIB) # Just add the lib to the bin directory for now
-  install(TARGETS libuvg266 DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
+  install(TARGETS uvg266 DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
 endif()
 install(FILES ${PROJECT_SOURCE_DIR}/src/uvg266.h DESTINATION ${CMAKE_INSTALL_PREFIX}/include)
 install(FILES ${PROJECT_SOURCE_DIR}/doc/uvg266.1 DESTINATION ${CMAKE_INSTALL_PREFIX}/share/man)
+
+# DIST
+
+file(GLOB_RECURSE DIST_SOURCES "*.c" "*.h" "*.sh" "*.py" "*.md" "*.yml" "*.in" "placeholder.txt" "CMakeLists.txt" "doc/*" "greatest/*")
+list(APPEND DIST_SOURCES ".clang-format" ".gitignore" ".gitmodules" "tests/tsan_suppressions.txt" ".travis-install.bash" "CREDITS" "Dockerfile" "docs.doxy" "LICENSE" "LICENSE.EXT.greatest")
+
+add_custom_target(dist
+                COMMAND tar -zcvf "${PROJECT_NAME}-${PROJECT_VERSION}.tar.gz" --transform 's,^,${PROJECT_NAME}-${PROJECT_VERSION}/,' -- ${DIST_SOURCES}
+                COMMENT "Make distribution ${PROJECT_NAME}-${PROJECT_VERSION}.tar.gz"
+                WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+            )
 
 # TESTS
 if(EXISTS "${PROJECT_SOURCE_DIR}/greatest/greatest.h")
