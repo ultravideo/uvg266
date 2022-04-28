@@ -40,7 +40,7 @@
 #include "global.h" // IWYU pragma: keep
 
 
-static INLINE unsigned kvz_math_floor_log2(unsigned value)
+static INLINE unsigned uvg_math_floor_log2(unsigned value)
 {
   assert(value > 0);
 
@@ -56,12 +56,12 @@ static INLINE unsigned kvz_math_floor_log2(unsigned value)
   return result;
 }
 
-static INLINE unsigned kvz_math_ceil_log2(unsigned value)
+static INLINE unsigned uvg_math_ceil_log2(unsigned value)
 {
   assert(value > 0);
 
   // The ceil_log2 is just floor_log2 + 1, except for exact powers of 2.
-  return kvz_math_floor_log2(value) + ((value & (value - 1)) ? 1 : 0);
+  return uvg_math_floor_log2(value) + ((value & (value - 1)) ? 1 : 0);
 }
 
 #endif //CHECKPOINT_H_

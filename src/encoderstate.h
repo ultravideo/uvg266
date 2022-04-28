@@ -50,7 +50,7 @@
 #include "threadqueue.h"
 #include "videoframe.h"
 
-struct kvz_rc_data;
+struct uvg_rc_data;
 
 typedef enum {
   ENCODER_STATE_TYPE_INVALID = 'i',
@@ -127,7 +127,7 @@ typedef struct encoder_state_config_frame_t {
 
   bool is_irap;
   uint8_t pictype;
-  enum kvz_slice_type slicetype;
+  enum uvg_slice_type slicetype;
 
   //! Total number of bits written.
   uint64_t total_bits_coded;
@@ -150,7 +150,7 @@ typedef struct encoder_state_config_frame_t {
 
   /**
    * \brief Indicates that this encoder state is ready for encoding the
-   * next frame i.e. kvz_encoder_prepare has been called.
+   * next frame i.e. uvg_encoder_prepare has been called.
    */
   bool prepared;
 
@@ -170,7 +170,7 @@ typedef struct encoder_state_config_frame_t {
 
   pthread_mutex_t rc_lock;
 
-  struct kvz_rc_data *new_ratecontrol;
+  struct uvg_rc_data *new_ratecontrol;
 
   struct encoder_state_t const *previous_layer_state;
 
@@ -361,21 +361,21 @@ typedef struct encoder_state_t {
 
 } encoder_state_t;
 
-void kvz_encode_one_frame(encoder_state_t * const state, kvz_picture* frame);
+void uvg_encode_one_frame(encoder_state_t * const state, uvg_picture* frame);
 
-void kvz_encoder_prepare(encoder_state_t *state);
-
-
-int kvz_encoder_state_match_children_of_previous_frame(encoder_state_t * const state);
-
-coeff_scan_order_t kvz_get_scan_order(int8_t cu_type, int intra_mode, int depth);
-
-void kvz_encoder_create_ref_lists(const encoder_state_t *const state);
-
-lcu_stats_t* kvz_get_lcu_stats(encoder_state_t *state, int lcu_x, int lcu_y);
+void uvg_encoder_prepare(encoder_state_t *state);
 
 
-int kvz_get_cu_ref_qp(const encoder_state_t *state, int x, int y, int last_qp);
+int uvg_encoder_state_match_children_of_previous_frame(encoder_state_t * const state);
+
+coeff_scan_order_t uvg_get_scan_order(int8_t cu_type, int intra_mode, int depth);
+
+void uvg_encoder_create_ref_lists(const encoder_state_t *const state);
+
+lcu_stats_t* uvg_get_lcu_stats(encoder_state_t *state, int lcu_x, int lcu_y);
+
+
+int uvg_get_cu_ref_qp(const encoder_state_t *state, int x, int y, int last_qp);
 
 /**
  * Whether the parameter sets should be written with the current frame.

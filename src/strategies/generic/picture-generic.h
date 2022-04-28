@@ -41,24 +41,24 @@
 #include "global.h" // IWYU pragma: keep
 #include "kvazaar.h"
 
-int kvz_strategy_register_picture_generic(void* opaque, uint8_t bitdepth);
+int uvg_strategy_register_picture_generic(void* opaque, uint8_t bitdepth);
 
 // Function to clip int16_t to pixel. (0-255 or 0-1023)
 // Assumes PIXEL_MAX to be 2^n-1
-kvz_pixel kvz_fast_clip_16bit_to_pixel(int16_t value);
+uvg_pixel uvg_fast_clip_16bit_to_pixel(int16_t value);
 
 // Function to clip int32_t to pixel. (0-255 or 0-1023)
 // Assumes PIXEL_MAX to be 2^n-1
-kvz_pixel kvz_fast_clip_32bit_to_pixel(int32_t value);
+uvg_pixel uvg_fast_clip_32bit_to_pixel(int32_t value);
 
-unsigned kvz_satd_4x4_subblock_generic(const kvz_pixel * buf1,
+unsigned uvg_satd_4x4_subblock_generic(const uvg_pixel * buf1,
                                        const int32_t     stride1,
-                                       const kvz_pixel * buf2,
+                                       const uvg_pixel * buf2,
                                        const int32_t     stride2);
 
-void kvz_satd_4x4_subblock_quad_generic(const kvz_pixel *preds[4],
+void uvg_satd_4x4_subblock_quad_generic(const uvg_pixel *preds[4],
                                         const int stride,
-                                        const kvz_pixel *orig,
+                                        const uvg_pixel *orig,
                                         const int orig_stride,
                                         unsigned costs[4]);
 

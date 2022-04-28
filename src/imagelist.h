@@ -48,7 +48,7 @@
  */
 typedef struct
 {
-  struct kvz_picture* *images;          //!< \brief Pointer to array of picture pointers.
+  struct uvg_picture* *images;          //!< \brief Pointer to array of picture pointers.
   cu_array_t* *cu_arrays;
   int32_t *pocs;
   uint8_t (*ref_LXs)[2][16]; //!< L0 and L1 reference index list for each image
@@ -58,13 +58,13 @@ typedef struct
 
 } image_list_t;
 
-image_list_t * kvz_image_list_alloc(int size);
-int kvz_image_list_resize(image_list_t *list, unsigned size);
-int kvz_image_list_destroy(image_list_t *list);
-int kvz_image_list_add(image_list_t *list, kvz_picture *im, cu_array_t* cua, int32_t poc, uint8_t ref_LX[2][16]);
-int kvz_image_list_rem(image_list_t *list, unsigned n);
+image_list_t * uvg_image_list_alloc(int size);
+int uvg_image_list_resize(image_list_t *list, unsigned size);
+int uvg_image_list_destroy(image_list_t *list);
+int uvg_image_list_add(image_list_t *list, uvg_picture *im, cu_array_t* cua, int32_t poc, uint8_t ref_LX[2][16]);
+int uvg_image_list_rem(image_list_t *list, unsigned n);
 
-int kvz_image_list_copy_contents(image_list_t *target, image_list_t *source);
+int uvg_image_list_copy_contents(image_list_t *target, image_list_t *source);
 
 enum { REF_PIC_LIST_0 = 0, REF_PIC_LIST_1 = 1, REF_PIC_LIST_X = 100 };
 

@@ -8,8 +8,8 @@
  * This code has been tested against that, and is functionally equivalent,
  *
  * To compute the message digest of a chunk of bytes, declare an MD5Context
- * structure, pass it to kvz_md5_init, call kvz_md5_update as needed on buffers full of
- * bytes, and then call kvz_md5_final, which will fill a supplied 16-byte array with
+ * structure, pass it to uvg_md5_init, call uvg_md5_update as needed on buffers full of
+ * bytes, and then call uvg_md5_final, which will fill a supplied 16-byte array with
  * the digest.
  */
 
@@ -48,7 +48,7 @@ void byteReverse(uint32_t *buf, unsigned len)
  * Start MD5 accumulation.  Set bit count to 0 and buffer to mysterious
  * initialization constants.
  */
-void kvz_md5_init(context_md5_t *ctx)
+void uvg_md5_init(context_md5_t *ctx)
 {
   ctx->buf[0] = 0x67452301;
   ctx->buf[1] = 0xefcdab89;
@@ -63,7 +63,7 @@ void kvz_md5_init(context_md5_t *ctx)
  * Update context to reflect the concatenation of another buffer full
  * of bytes.
  */
-void kvz_md5_update(context_md5_t *ctx, const unsigned char *buf, unsigned len)
+void uvg_md5_update(context_md5_t *ctx, const unsigned char *buf, unsigned len)
 {
   uint32_t t;
 
@@ -111,7 +111,7 @@ void kvz_md5_update(context_md5_t *ctx, const unsigned char *buf, unsigned len)
  * Final wrapup - pad to 64-byte boundary with the bit pattern
  * 1 0* (64-bit count of bits processed, MSB-first)
  */
-void kvz_md5_final(unsigned char digest[16], context_md5_t *ctx)
+void uvg_md5_final(unsigned char digest[16], context_md5_t *ctx)
 {
   unsigned count;
   unsigned char *p;
@@ -171,7 +171,7 @@ void kvz_md5_final(unsigned char digest[16], context_md5_t *ctx)
 
 /*
  * The core of the MD5 algorithm, this alters an existing MD5 hash to
- * reflect the addition of 16 longwords of new data.  kvz_md5_update blocks
+ * reflect the addition of 16 longwords of new data.  uvg_md5_update blocks
  * the data and converts bytes into longwords for this routine.
  */
 static void MD5Transform(uint32_t buf[4], uint32_t const in[16])

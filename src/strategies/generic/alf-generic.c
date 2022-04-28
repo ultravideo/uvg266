@@ -39,7 +39,7 @@
 #include "alf.h"
 #include "strategyselector.h"
 
-extern kvz_pixel kvz_fast_clip_32bit_to_pixel(int32_t value);
+extern uvg_pixel uvg_fast_clip_32bit_to_pixel(int32_t value);
 
 static int16_t clip_alf(const int16_t clip, const int16_t ref, const int16_t val0, const int16_t val1)
 {
@@ -68,7 +68,7 @@ static void alf_derive_classification_blk_generic(encoder_state_t * const state,
   alf_classifier **classifier = state->tile->frame->alf_info->classifier;
 
   const int stride = frame->rec->stride;
-  kvz_pixel *src = state->tile->frame->rec->y;
+  uvg_pixel *src = state->tile->frame->rec->y;
   const int max_activity = 15;
 
   int fl = 2;
@@ -87,10 +87,10 @@ static void alf_derive_classification_blk_generic(encoder_state_t * const state,
   for (int i = 0; i < height; i += 2)
   {
     int yoffset = (i + 1 + start_height) * stride - fl_p1;
-    const kvz_pixel *src0 = &src[yoffset - stride];
-    const kvz_pixel *src1 = &src[yoffset];
-    const kvz_pixel *src2 = &src[yoffset + stride];
-    const kvz_pixel *src3 = &src[yoffset + stride * 2];
+    const uvg_pixel *src0 = &src[yoffset - stride];
+    const uvg_pixel *src1 = &src[yoffset];
+    const uvg_pixel *src2 = &src[yoffset + stride];
+    const uvg_pixel *src3 = &src[yoffset + stride * 2];
 
     const int y = blk_dst_y - 2 + i;
     if (y > 0 && (y & (vb_ctu_height - 1)) == vb_pos - 2)
@@ -110,10 +110,10 @@ static void alf_derive_classification_blk_generic(encoder_state_t * const state,
     for (int j = 0; j < width; j += 2)
     {
       pix_y = j + 1 + pos_x;
-      const kvz_pixel *p_y = src1 + pix_y;
-      const kvz_pixel *p_y_down = src0 + pix_y;
-      const kvz_pixel *p_y_up = src2 + pix_y;
-      const kvz_pixel *p_y_up2 = src3 + pix_y;
+      const uvg_pixel *p_y = src1 + pix_y;
+      const uvg_pixel *p_y_down = src0 + pix_y;
+      const uvg_pixel *p_y_up = src2 + pix_y;
+      const uvg_pixel *p_y_up2 = src3 + pix_y;
 
       const int16_t y0 = p_y[0] << 1;
       const int16_t y_up1 = p_y_up[1] << 1;
@@ -288,8 +288,8 @@ static void alf_derive_classification_blk_generic(encoder_state_t * const state,
 }
 
 static void alf_filter_block_generic(encoder_state_t* const state,
-  const kvz_pixel* src_pixels,
-  kvz_pixel* dst_pixels,
+  const uvg_pixel* src_pixels,
+  uvg_pixel* dst_pixels,
   const int src_stride,
   const int dst_stride,
   const short* filter_set,
@@ -319,11 +319,11 @@ static void alf_filter_block_generic(encoder_state_t* const state,
   const int start_width = x_pos;
   const int end_width = start_width + width;
 
-  const kvz_pixel* src = src_pixels;
-  kvz_pixel* dst = dst_pixels + blk_dst_y * dst_stride;
+  const uvg_pixel* src = src_pixels;
+  uvg_pixel* dst = dst_pixels + blk_dst_y * dst_stride;
 
-  const kvz_pixel* p_img_y_pad_0, * p_img_y_pad_1, * p_img_y_pad_2, * p_img_y_pad_3, * p_img_y_pad_4, * p_img_y_pad_5, * p_img_y_pad_6;
-  const kvz_pixel* p_img_0, * p_img_1, * p_img_2, * p_img_3, * p_img_4, * p_img_5, * p_img_6;
+  const uvg_pixel* p_img_y_pad_0, * p_img_y_pad_1, * p_img_y_pad_2, * p_img_y_pad_3, * p_img_y_pad_4, * p_img_y_pad_5, * p_img_y_pad_6;
+  const uvg_pixel* p_img_0, * p_img_1, * p_img_2, * p_img_3, * p_img_4, * p_img_5, * p_img_6;
 
   const short* coef = filter_set;
   const int16_t* clip = fClipSet;
@@ -361,8 +361,8 @@ static void alf_filter_block_generic(encoder_state_t* const state,
   p_img_y_pad_5 = p_img_y_pad_3 + src_stride;
   p_img_y_pad_6 = p_img_y_pad_4 - src_stride;
 
-  kvz_pixel* p_rec_0 = dst + blk_dst_x;//start_width;
-  kvz_pixel* p_rec_1 = p_rec_0 + dst_stride;
+  uvg_pixel* p_rec_0 = dst + blk_dst_x;//start_width;
+  uvg_pixel* p_rec_1 = p_rec_0 + dst_stride;
 
   for (int i = 0; i < end_height - start_height; i += cls_size_y)
   {
@@ -626,7 +626,7 @@ static void alf_filter_block_generic(encoder_state_t* const state,
         for (int jj = 0; jj < cls_size_x; jj++)
         {
           int sum = 0;
-          const kvz_pixel curr = p_img_0[+0];
+          const uvg_pixel curr = p_img_0[+0];
 
           if (filter_type == ALF_FILTER_7X7)
           {
@@ -668,7 +668,7 @@ static void alf_filter_block_generic(encoder_state_t* const state,
           }
           sum += curr;
 
-          p_rec_1[jj] = kvz_fast_clip_32bit_to_pixel(sum);
+          p_rec_1[jj] = uvg_fast_clip_32bit_to_pixel(sum);
 
           p_img_0++;
           p_img_1++;
@@ -696,8 +696,8 @@ static void alf_filter_block_generic(encoder_state_t* const state,
 
 
 static void alf_filter_5x5_block_generic(encoder_state_t* const state,
-  const kvz_pixel* src_pixels,
-  kvz_pixel* dst_pixels,
+  const uvg_pixel* src_pixels,
+  uvg_pixel* dst_pixels,
   const int src_stride,
   const int dst_stride,
   const short* filter_set,
@@ -717,8 +717,8 @@ static void alf_filter_5x5_block_generic(encoder_state_t* const state,
 }
 
 static void alf_filter_7x7_block_generic(encoder_state_t* const state,
-  const kvz_pixel* src_pixels,
-  kvz_pixel* dst_pixels,
+  const uvg_pixel* src_pixels,
+  uvg_pixel* dst_pixels,
   const int src_stride,
   const int dst_stride,
   const short* filter_set,
@@ -740,7 +740,7 @@ static void alf_filter_7x7_block_generic(encoder_state_t* const state,
 
 
 static void alf_calc_covariance_generic(int16_t e_local[MAX_NUM_ALF_LUMA_COEFF][MAX_ALF_NUM_CLIPPING_VALUES],
-  const kvz_pixel* rec,
+  const uvg_pixel* rec,
   const int stride,
   const channel_type channel,
   const int transpose_idx,
@@ -792,8 +792,8 @@ static void alf_calc_covariance_generic(int16_t e_local[MAX_NUM_ALF_LUMA_COEFF][
   {
     for (int i = -half_filter_length; i < 0; i++)
     {
-      const kvz_pixel* rec0 = rec + MAX(i, clip_top_row) * stride;
-      const kvz_pixel* rec1 = rec - MAX(i, -clip_bot_row) * stride;
+      const uvg_pixel* rec0 = rec + MAX(i, clip_top_row) * stride;
+      const uvg_pixel* rec1 = rec - MAX(i, -clip_bot_row) * stride;
       for (int j = -half_filter_length - i; j <= half_filter_length + i; j++, k++)
       {
         for (int b = 0; b < num_bins; b++)
@@ -814,8 +814,8 @@ static void alf_calc_covariance_generic(int16_t e_local[MAX_NUM_ALF_LUMA_COEFF][
   {
     for (int j = -half_filter_length; j < 0; j++)
     {
-      const kvz_pixel* rec0 = rec + j;
-      const kvz_pixel* rec1 = rec - j;
+      const uvg_pixel* rec0 = rec + j;
+      const uvg_pixel* rec1 = rec - j;
 
       for (int i = -half_filter_length - j; i <= half_filter_length + j; i++, k++)
       {
@@ -837,8 +837,8 @@ static void alf_calc_covariance_generic(int16_t e_local[MAX_NUM_ALF_LUMA_COEFF][
   {
     for (int i = -half_filter_length; i < 0; i++)
     {
-      const kvz_pixel* rec0 = rec + MAX(i, clip_top_row) * stride;
-      const kvz_pixel* rec1 = rec - MAX(i, -clip_bot_row) * stride;
+      const uvg_pixel* rec0 = rec + MAX(i, clip_top_row) * stride;
+      const uvg_pixel* rec1 = rec - MAX(i, -clip_bot_row) * stride;
 
       for (int j = half_filter_length + i; j >= -half_filter_length - i; j--, k++)
       {
@@ -860,8 +860,8 @@ static void alf_calc_covariance_generic(int16_t e_local[MAX_NUM_ALF_LUMA_COEFF][
   {
     for (int j = -half_filter_length; j < 0; j++)
     {
-      const kvz_pixel* rec0 = rec + j;
-      const kvz_pixel* rec1 = rec - j;
+      const uvg_pixel* rec0 = rec + j;
+      const uvg_pixel* rec1 = rec - j;
 
       for (int i = half_filter_length + j; i >= -half_filter_length - j; i--, k++)
       {
@@ -889,9 +889,9 @@ static void alf_get_blk_stats_generic(encoder_state_t* const state,
   channel_type channel,
   alf_covariance* alf_covariance,
   alf_classifier** g_classifier,
-  kvz_pixel* org,
+  uvg_pixel* org,
   int32_t org_stride,
-  kvz_pixel* rec,
+  uvg_pixel* rec,
   int32_t rec_stride,
   const int x_pos,
   const int y_pos,
@@ -999,14 +999,14 @@ static void alf_get_blk_stats_generic(encoder_state_t* const state,
 }
 
 
-int kvz_strategy_register_alf_generic(void* opaque, uint8_t bitdepth)
+int uvg_strategy_register_alf_generic(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
 
-  success &= kvz_strategyselector_register(opaque, "alf_derive_classification_blk", "generic", 0, &alf_derive_classification_blk_generic);
-  success &= kvz_strategyselector_register(opaque, "alf_filter_5x5_blk", "generic", 0, &alf_filter_5x5_block_generic);
-  success &= kvz_strategyselector_register(opaque, "alf_filter_7x7_blk", "generic", 0, &alf_filter_7x7_block_generic);
-  success &= kvz_strategyselector_register(opaque, "alf_get_blk_stats", "generic", 0, &alf_get_blk_stats_generic);
+  success &= uvg_strategyselector_register(opaque, "alf_derive_classification_blk", "generic", 0, &alf_derive_classification_blk_generic);
+  success &= uvg_strategyselector_register(opaque, "alf_filter_5x5_blk", "generic", 0, &alf_filter_5x5_block_generic);
+  success &= uvg_strategyselector_register(opaque, "alf_filter_7x7_blk", "generic", 0, &alf_filter_7x7_block_generic);
+  success &= uvg_strategyselector_register(opaque, "alf_get_blk_stats", "generic", 0, &alf_get_blk_stats_generic);
   
 
   return success;

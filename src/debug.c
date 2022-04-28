@@ -41,7 +41,7 @@
 #include "inter.h"
 
 
-#ifdef KVZ_DEBUG_PRINT_YUVIEW_CSV
+#ifdef UVG_DEBUG_PRINT_YUVIEW_CSV
 
 #define INITIAL_ALLOC 10000
 FILE* yuview_output;
@@ -86,7 +86,7 @@ static void yuview_alloc_frame(int poc) {
   
 }
 
-void kvz_dbg_yuview_init(const encoder_control_t* const encoder, char* filename, char* sequence) {
+void uvg_dbg_yuview_init(const encoder_control_t* const encoder, char* filename, char* sequence) {
 
   char buf[100];
   snprintf(buf, 100, "%s.csv", filename);
@@ -163,7 +163,7 @@ static int yuview_check_allocated_memory(int poc, int type) {
   return idx;
 }
 
-void kvz_dbg_yuview_add_vector(int poc, int x, int y, int width, int height, int type, int x_vec, int y_vec) {
+void uvg_dbg_yuview_add_vector(int poc, int x, int y, int width, int height, int type, int x_vec, int y_vec) {
   int idx = yuview_check_allocated_memory(poc, type);
 
   char* buffer = &yuview_frame_data[idx]->items[type][ yuview_frame_data[idx]->last_pos[type] ];
@@ -173,7 +173,7 @@ void kvz_dbg_yuview_add_vector(int poc, int x, int y, int width, int height, int
            "%d;%d;%d;%d;%d;%d;%d;%d\r\n", poc, x, y, width, height, type, x_vec, y_vec);  
 }
 
-void kvz_dbg_yuview_add(int poc, int x, int y, int width, int height, int type, int val) {
+void uvg_dbg_yuview_add(int poc, int x, int y, int width, int height, int type, int val) {
   int idx = yuview_check_allocated_memory(poc, type);
 
   char* buffer = &yuview_frame_data[idx]->items[type][ yuview_frame_data[idx]->last_pos[type] ];
@@ -183,7 +183,7 @@ void kvz_dbg_yuview_add(int poc, int x, int y, int width, int height, int type, 
     "%d;%d;%d;%d;%d;%d;%d\r\n", poc, x, y, width, height, type, val);
 }
 
-void kvz_dbg_yuview_finish_frame(int poc) {
+void uvg_dbg_yuview_finish_frame(int poc) {
 
   int idx = yuview_find_poc(poc);
   if (idx == -1) return;
@@ -206,7 +206,7 @@ void kvz_dbg_yuview_finish_frame(int poc) {
   yuview_frames--;
 }
 
-void kvz_dbg_yuview_cleanup() {
+void uvg_dbg_yuview_cleanup() {
   fclose(yuview_output);
   yuview_output = NULL;
   for (int idx = 0; idx < yuview_frames; idx++) {
@@ -222,10 +222,10 @@ void kvz_dbg_yuview_cleanup() {
   free(yuview_frame_data);
 }
 
-#endif //KVZ_DEBUG_PRINT_YUVIEW_CSV
+#endif //UVG_DEBUG_PRINT_YUVIEW_CSV
 
-#ifdef KVZ_DEBUG_PRINT_THREADING_INFO
-void kvz_dbg_encoder_state_dump_graphviz(const encoder_state_t* const state) {
+#ifdef UVG_DEBUG_PRINT_THREADING_INFO
+void uvg_dbg_encoder_state_dump_graphviz(const encoder_state_t* const state) {
   int i;
 
   if (!state->parent) {
@@ -345,10 +345,10 @@ void kvz_dbg_encoder_state_dump_graphviz(const encoder_state_t* const state) {
     printf("\n\n\n\n\n");
   }
 }
-#endif //KVZ_DEBUG_PRINT_THREADING_INFO
+#endif //UVG_DEBUG_PRINT_THREADING_INFO
 
 
-#ifdef KVZ_DEBUG_PRINT_MV_INFO
+#ifdef UVG_DEBUG_PRINT_MV_INFO
 static void lcu_from_cu_array(cu_array_t* src, int src_x, int src_y, lcu_t* dst)
 {
   // ToDo: Fix invalid memory access outside of src->data
@@ -380,14 +380,14 @@ static void lcu_from_cu_array(cu_array_t* src, int src_x, int src_y, lcu_t* dst)
 
 }
 
-void kvz_print_merge_vectors(const encoder_state_t* const state, uint32_t pic_x, uint32_t pic_y, uint32_t block_width, uint32_t block_height, cu_info_t* cu) {
+void uvg_print_merge_vectors(const encoder_state_t* const state, uint32_t pic_x, uint32_t pic_y, uint32_t block_width, uint32_t block_height, cu_info_t* cu) {
 
   lcu_t lcu;
   lcu_from_cu_array(state->tile->frame->cu_array, pic_x - SUB_SCU(pic_x), pic_y - SUB_SCU(pic_y), &lcu);
   static int   val = 0;
   inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS] = { 0 };
   // Search for merge mode candidates
-  uint8_t num_merge_cand = kvz_inter_get_merge_cand(state,
+  uint8_t num_merge_cand = uvg_inter_get_merge_cand(state,
     pic_x, pic_y,
     block_width, block_height,
     true, true,
@@ -407,7 +407,7 @@ void kvz_print_merge_vectors(const encoder_state_t* const state, uint32_t pic_x,
   {
     mv_t mv[2] = { merge_cand[i].mv[0][0], merge_cand[i].mv[0][1] };
     mv_t mv2[2] = { merge_cand[i].mv[1][0], merge_cand[i].mv[1][1] };
-    //kvz_change_precision(4, 2, &mv[0], &mv[1]);
+    //uvg_change_precision(4, 2, &mv[0], &mv[1]);
     fprintf(lut, "{ %d: ", merge_cand[i].dir);
     if (merge_cand[i].dir & 1) fprintf(lut, "%d,%d, ", mv[0], mv[1]);
     if (merge_cand[i].dir & 2) fprintf(lut, "%d,%d ", mv2[0], mv2[1]);
@@ -416,4 +416,4 @@ void kvz_print_merge_vectors(const encoder_state_t* const state, uint32_t pic_x,
   fprintf(lut, "%d, %d)\n", cu->merged | cu->skipped, (cu->merged | cu->skipped) ? cu->merge_idx : 0);
 }
 
-#endif // KVZ_DEBUG_PRINT_MV_INFO
+#endif // UVG_DEBUG_PRINT_MV_INFO

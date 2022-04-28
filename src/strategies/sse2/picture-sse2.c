@@ -34,7 +34,7 @@
 
 #if COMPILE_INTEL_SSE2
 #include "kvazaar.h"
-#if KVZ_BIT_DEPTH == 8
+#if UVG_BIT_DEPTH == 8
 #include <immintrin.h>
 #include <stdlib.h>
 
@@ -78,18 +78,18 @@ static unsigned sad_8bit_4x4_sse2(const uint8_t *buf1, const uint8_t *buf2)
   return result[0] + result[2];
 }
 
-#endif // KVZ_BIT_DEPTH == 8
+#endif // UVG_BIT_DEPTH == 8
 #endif //COMPILE_INTEL_SSE2
 
-int kvz_strategy_register_picture_sse2(void* opaque, uint8_t bitdepth) {
+int uvg_strategy_register_picture_sse2(void* opaque, uint8_t bitdepth) {
   bool success = true;
 #if COMPILE_INTEL_SSE2
-#if KVZ_BIT_DEPTH == 8
+#if UVG_BIT_DEPTH == 8
   if (bitdepth == 8){
-    success &= kvz_strategyselector_register(opaque, "reg_sad", "sse2", 10, &reg_sad_sse2);
-    success &= kvz_strategyselector_register(opaque, "sad_4x4", "sse2", 10, &sad_8bit_4x4_sse2);
+    success &= uvg_strategyselector_register(opaque, "reg_sad", "sse2", 10, &reg_sad_sse2);
+    success &= uvg_strategyselector_register(opaque, "sad_4x4", "sse2", 10, &sad_8bit_4x4_sse2);
   }
-#endif // KVZ_BIT_DEPTH == 8
+#endif // UVG_BIT_DEPTH == 8
 #endif
   return success;
 }

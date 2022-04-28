@@ -111,21 +111,21 @@ static const double MAX_SQUARED_ERROR = (double)PIXEL_MAX * (double)PIXEL_MAX;
  * \param rec   reconstructed picture
  * \prama psnr  returns the PSNR
  */
-static void compute_psnr(const kvz_picture *const src,
-                         const kvz_picture *const rec,
+static void compute_psnr(const uvg_picture *const src,
+                         const uvg_picture *const rec,
                          double psnr[3])
 {
   assert(src->width  == rec->width);
   assert(src->height == rec->height);
 
   int32_t pixels = src->width * src->height;
-  int colors = rec->chroma_format == KVZ_CSP_400 ? 1 : 3;
+  int colors = rec->chroma_format == UVG_CSP_400 ? 1 : 3;
   double sse[3] = { 0.0 };
 
   for (int32_t c = 0; c < colors; ++c) {
 
-    kvz_pixel* src_ptr = src->data[c];
-    kvz_pixel* rec_ptr = rec->data[c];
+    uvg_pixel* src_ptr = src->data[c];
+    uvg_pixel* rec_ptr = rec->data[c];
     int32_t width = src->width;
     int32_t height = src->height;
     int32_t stride = src->stride;
@@ -156,19 +156,19 @@ static void compute_psnr(const kvz_picture *const src,
 
 typedef struct {
   // Semaphores for synchronization.
-  kvz_sem_t* available_input_slots;
-  kvz_sem_t* filled_input_slots;
+  uvg_sem_t* available_input_slots;
+  uvg_sem_t* filled_input_slots;
 
   // Parameters passed from main thread to input thread.
   FILE* input;
-  const kvz_api *api;
+  const uvg_api *api;
   const cmdline_opts_t *opts;
   const encoder_control_t *encoder;
   const uint8_t padding_x;
   const uint8_t padding_y;
 
   // Picture and thread status passed from input thread to main thread.
-  kvz_picture *img_in;
+  uvg_picture *img_in;
   int retval;
 } input_handler_args;
 
@@ -192,7 +192,7 @@ static void* input_read_thread(void* in_args)
   // - deallocate the initial full frame
 
   input_handler_args* args = (input_handler_args*)in_args;
-  kvz_picture *frame_in = NULL;
+  uvg_picture *frame_in = NULL;
   int retval = RETVAL_RUNNING;
   int frames_read = 0;
 
@@ -207,7 +207,7 @@ static void* input_read_thread(void* in_args)
       goto done;
     }
 
-    enum kvz_chroma_format csp = KVZ_FORMAT2CSP(args->opts->config->input_format);
+    enum uvg_chroma_format csp = UVG_FORMAT2CSP(args->opts->config->input_format);
     frame_in = args->api->picture_alloc_csp(csp,
                                             args->opts->config->width  + args->padding_x,
                                             args->opts->config->height + args->padding_y);
@@ -270,24 +270,24 @@ static void* input_read_thread(void* in_args)
     }
 
     // Wait until main thread is ready to receive the next frame.
-    kvz_sem_wait(args->available_input_slots);
+    uvg_sem_wait(args->available_input_slots);
     args->img_in = frame_in;
     args->retval = retval;
     // Unlock main_thread_mutex to notify main thread that the new img_in
     // and retval have been placed to args.
-    kvz_sem_post(args->filled_input_slots);
+    uvg_sem_post(args->filled_input_slots);
 
     frame_in = NULL;
   }
 
 done:
   // Wait until main thread is ready to receive the next frame.
-  kvz_sem_wait(args->available_input_slots);
+  uvg_sem_wait(args->available_input_slots);
   args->img_in = NULL;
   args->retval = retval;
   // Unlock main_thread_mutex to notify main thread that the new img_in
   // and retval have been placed to args.
-  kvz_sem_post(args->filled_input_slots);
+  uvg_sem_post(args->filled_input_slots);
 
   // Do some cleaning up.
   args->api->picture_free(frame_in);
@@ -301,9 +301,9 @@ done:
 }
 
 
-void output_recon_pictures(const kvz_api *const api,
+void output_recon_pictures(const uvg_api *const api,
                            FILE *recout,
-                           kvz_picture *buffer[KVZ_MAX_GOP_LENGTH],
+                           uvg_picture *buffer[UVG_MAX_GOP_LENGTH],
                            int *buffer_size,
                            uint64_t *next_pts,
                            unsigned width,
@@ -314,7 +314,7 @@ void output_recon_pictures(const kvz_api *const api,
     picture_written = false;
     for (int i = 0; i < *buffer_size; i++) {
 
-      kvz_picture *pic = buffer[i];
+      uvg_picture *pic = buffer[i];
       if (pic->pts == *next_pts) {
         // Output the picture and remove it.
         if (!yuv_io_write(recout, pic, width, height)) {
@@ -346,7 +346,7 @@ static double calc_avg_qp(uint64_t qp_sum, uint32_t frames_done)
 * \param input  Pointer to the input file
 * \param config Pointer to the config struct
 */
-static bool read_header(FILE* input, kvz_config* config) {
+static bool read_header(FILE* input, uvg_config* config) {
   char buffer[256];
   bool end_of_header = false;
 
@@ -437,16 +437,16 @@ int main(int argc, char *argv[])
   int retval = EXIT_SUCCESS;
 
   cmdline_opts_t *opts = NULL; //!< Command line options
-  kvz_encoder* enc = NULL;
+  uvg_encoder* enc = NULL;
   FILE *input  = NULL; //!< input file (YUV)
   FILE *output = NULL; //!< output file (HEVC NAL stream)
   FILE *recout = NULL; //!< reconstructed YUV output, --debug
   clock_t start_time = clock();
   clock_t encoding_start_cpu_time;
-  KVZ_CLOCK_T encoding_start_real_time;
+  UVG_CLOCK_T encoding_start_real_time;
 
   clock_t encoding_end_cpu_time;
-  KVZ_CLOCK_T encoding_end_real_time;
+  UVG_CLOCK_T encoding_end_real_time;
 
   // PTS of the reconstructed picture that should be output next.
   // Only used with --debug.
@@ -454,7 +454,7 @@ int main(int argc, char *argv[])
   // Buffer for storing reconstructed pictures that are not to be output
   // yet (i.e. in wrong order because GOP is used).
   // Only used with --debug.
-  kvz_picture *recon_buffer[KVZ_MAX_GOP_LENGTH] = { NULL };
+  uvg_picture *recon_buffer[UVG_MAX_GOP_LENGTH] = { NULL };
   int recon_buffer_size = 0;
 
   // Semaphores for synchronizing the input reader thread and the main
@@ -467,8 +467,8 @@ int main(int argc, char *argv[])
   // if the input has ended) in input_handler_args.img_in placed by the
   // input reader thread. (0 = no new image, 1 = one new image)
   //
-  kvz_sem_t *available_input_slots = NULL;
-  kvz_sem_t *filled_input_slots = NULL;
+  uvg_sem_t *available_input_slots = NULL;
+  uvg_sem_t *filled_input_slots = NULL;
 
 #ifdef _WIN32
   // Stderr needs to be text mode to convert \n to \r\n in Windows.
@@ -477,7 +477,7 @@ int main(int argc, char *argv[])
 
   CHECKPOINTS_INIT();
 
-  const kvz_api * const api = kvz_api_get(8);
+  const uvg_api * const api = uvg_api_get(8);
 
   opts = cmdline_opts_parse(api, argc, argv);
   // If problem with command line options, print banner and shutdown.
@@ -526,7 +526,7 @@ int main(int argc, char *argv[])
   }
 
   // Parse headers if input data is in y4m container
-  if (opts->config->file_format == KVZ_FORMAT_Y4M) {
+  if (opts->config->file_format == UVG_FORMAT_Y4M) {
     if (!read_header(input, opts->config)) {
       goto exit_failure;
     }
@@ -550,14 +550,14 @@ int main(int argc, char *argv[])
     goto exit_failure;
   }
 
-#ifdef KVZ_DEBUG_PRINT_YUVIEW_CSV
+#ifdef UVG_DEBUG_PRINT_YUVIEW_CSV
   if (opts->debug != NULL) DBG_YUVIEW_INIT(encoder, opts->debug, opts->input);
 #endif
 
   //Now, do the real stuff
   {
 
-    KVZ_GET_TIME(&encoding_start_real_time);
+    UVG_GET_TIME(&encoding_start_real_time);
     encoding_start_cpu_time = clock();
 
     uint64_t bitstream_length = 0;
@@ -576,10 +576,10 @@ int main(int argc, char *argv[])
 
     pthread_t input_thread;
 
-    available_input_slots = calloc(1, sizeof(kvz_sem_t));
-    filled_input_slots    = calloc(1, sizeof(kvz_sem_t));
-    kvz_sem_init(available_input_slots, 0);
-    kvz_sem_init(filled_input_slots,    0);
+    available_input_slots = calloc(1, sizeof(uvg_sem_t));
+    filled_input_slots    = calloc(1, sizeof(uvg_sem_t));
+    uvg_sem_init(available_input_slots, 0);
+    uvg_sem_init(filled_input_slots,    0);
 
     // Give arguments via struct to the input thread
     input_handler_args in_args = {
@@ -604,17 +604,17 @@ int main(int argc, char *argv[])
       assert(0);
       return 0;
     }
-    kvz_picture *cur_in_img;
+    uvg_picture *cur_in_img;
     for (;;) {
 
       // Skip mutex locking if the input thread does not exist.
       if (in_args.retval == RETVAL_RUNNING) {
         // Increase available_input_slots so that the input thread can
         // write the new img_in and retval to in_args.
-        kvz_sem_post(available_input_slots);
+        uvg_sem_post(available_input_slots);
         // Wait until the input thread has updated in_args and then
         // decrease filled_input_slots.
-        kvz_sem_wait(filled_input_slots);
+        uvg_sem_wait(filled_input_slots);
 
         cur_in_img = in_args.img_in;
         in_args.img_in = NULL;
@@ -627,11 +627,11 @@ int main(int argc, char *argv[])
         goto exit_failure;
       }
 
-      kvz_data_chunk* chunks_out = NULL;
-      kvz_picture *img_rec = NULL;
-      kvz_picture *img_src = NULL;
+      uvg_data_chunk* chunks_out = NULL;
+      uvg_picture *img_rec = NULL;
+      uvg_picture *img_src = NULL;
       uint32_t len_out = 0;
-      kvz_frame_info info_out;
+      uvg_frame_info info_out;
       if (!api->encoder_encode(enc,
                                cur_in_img,
                                &chunks_out,
@@ -652,7 +652,7 @@ int main(int argc, char *argv[])
       if (chunks_out != NULL) {
         uint64_t written = 0;
         // Write data into the output file.
-        for (kvz_data_chunk *chunk = chunks_out;
+        for (uvg_data_chunk *chunk = chunks_out;
              chunk != NULL;
              chunk = chunk->next) {
           assert(written + chunk->len <= len_out);
@@ -704,7 +704,7 @@ int main(int argc, char *argv[])
         // Compute and print stats.
 
         double frame_psnr[3] = { 0.0, 0.0, 0.0 };
-        if (encoder->cfg.calc_psnr && encoder->cfg.source_scan_type == KVZ_INTERLACING_NONE) {
+        if (encoder->cfg.calc_psnr && encoder->cfg.source_scan_type == UVG_INTERLACING_NONE) {
           // Do not compute PSNR for interlaced frames, because img_rec does not contain
           // the deinterlaced frame yet.
           compute_psnr(img_src, img_rec, frame_psnr);
@@ -717,7 +717,7 @@ int main(int argc, char *argv[])
           DBG_YUVIEW_FINISH_FRAME(info_out.poc);
 
           // Move img_rec to the recon buffer.
-          assert(recon_buffer_size < KVZ_MAX_GOP_LENGTH);
+          assert(recon_buffer_size < UVG_MAX_GOP_LENGTH);
           recon_buffer[recon_buffer_size++] = img_rec;
           img_rec = NULL;
 
@@ -748,7 +748,7 @@ int main(int argc, char *argv[])
       api->picture_free(img_src);
     }
 
-    KVZ_GET_TIME(&encoding_end_real_time);
+    UVG_GET_TIME(&encoding_end_real_time);
     encoding_end_cpu_time = clock();
     // Coding finished
 
@@ -772,7 +772,7 @@ int main(int argc, char *argv[])
       const double mega = (double)(1 << 20);
 
       double encoding_time = ( (double)(encoding_end_cpu_time - encoding_start_cpu_time) ) / (double) CLOCKS_PER_SEC;
-      double wall_time = KVZ_CLOCK_T_AS_DOUBLE(encoding_end_real_time) - KVZ_CLOCK_T_AS_DOUBLE(encoding_start_real_time);
+      double wall_time = UVG_CLOCK_T_AS_DOUBLE(encoding_end_real_time) - UVG_CLOCK_T_AS_DOUBLE(encoding_start_real_time);
 
       double encoding_cpu = 100.0 * encoding_time / wall_time;
       double encoding_fps = (double)frames_done   / wall_time;
@@ -812,8 +812,8 @@ exit_failure:
 
 done:
   // destroy semaphores
-  if (available_input_slots) kvz_sem_destroy(available_input_slots);
-  if (filled_input_slots)    kvz_sem_destroy(filled_input_slots);
+  if (available_input_slots) uvg_sem_destroy(available_input_slots);
+  if (filled_input_slots)    uvg_sem_destroy(filled_input_slots);
   FREE_POINTER(available_input_slots);
   FREE_POINTER(filled_input_slots);
 

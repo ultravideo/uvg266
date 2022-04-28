@@ -38,21 +38,21 @@
 
 
 // Define function pointers.
-alf_derive_classification_blk_func* kvz_alf_derive_classification_blk;
-alf_filter_5x5_blk_func* kvz_alf_filter_5x5_blk;
-alf_filter_7x7_blk_func* kvz_alf_filter_7x7_blk;
-alf_get_blk_stats_func* kvz_alf_get_blk_stats;
+alf_derive_classification_blk_func* uvg_alf_derive_classification_blk;
+alf_filter_5x5_blk_func* uvg_alf_filter_5x5_blk;
+alf_filter_7x7_blk_func* uvg_alf_filter_7x7_blk;
+alf_get_blk_stats_func* uvg_alf_get_blk_stats;
 
-int kvz_strategy_register_alf(void* opaque, uint8_t bitdepth) {
+int uvg_strategy_register_alf(void* opaque, uint8_t bitdepth) {
   bool success = true;
 
-  success &= kvz_strategy_register_alf_generic(opaque, bitdepth);
+  success &= uvg_strategy_register_alf_generic(opaque, bitdepth);
 
-  if (kvz_g_hardware_flags.intel_flags.sse41) {
-    success &= kvz_strategy_register_alf_sse41(opaque, bitdepth);
+  if (uvg_g_hardware_flags.intel_flags.sse41) {
+    success &= uvg_strategy_register_alf_sse41(opaque, bitdepth);
   }
-  if (kvz_g_hardware_flags.intel_flags.avx2) {
-    success &= kvz_strategy_register_alf_avx2(opaque, bitdepth);
+  if (uvg_g_hardware_flags.intel_flags.avx2) {
+    success &= uvg_strategy_register_alf_avx2(opaque, bitdepth);
   }
 
   return success;

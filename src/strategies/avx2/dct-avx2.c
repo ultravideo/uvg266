@@ -38,23 +38,23 @@
 
 #if COMPILE_INTEL_AVX2
 #include "kvazaar.h"
-#if KVZ_BIT_DEPTH == 8
+#if UVG_BIT_DEPTH == 8
 #include <immintrin.h>
 
 #include "strategyselector.h"
 #include "tables.h"
 
-extern const int16_t kvz_g_dst_4[4][4];
-extern const int16_t kvz_g_dct_4[4][4];
-extern const int16_t kvz_g_dct_8[8][8];
-extern const int16_t kvz_g_dct_16[16][16];
-extern const int16_t kvz_g_dct_32[32][32];
+extern const int16_t uvg_g_dst_4[4][4];
+extern const int16_t uvg_g_dct_4[4][4];
+extern const int16_t uvg_g_dct_8[8][8];
+extern const int16_t uvg_g_dct_16[16][16];
+extern const int16_t uvg_g_dct_32[32][32];
 
-extern const int16_t kvz_g_dst_4_t[4][4];
-extern const int16_t kvz_g_dct_4_t[4][4];
-extern const int16_t kvz_g_dct_8_t[8][8];
-extern const int16_t kvz_g_dct_16_t[16][16];
-extern const int16_t kvz_g_dct_32_t[32][32];
+extern const int16_t uvg_g_dst_4_t[4][4];
+extern const int16_t uvg_g_dct_4_t[4][4];
+extern const int16_t uvg_g_dct_8_t[8][8];
+extern const int16_t uvg_g_dct_16_t[16][16];
+extern const int16_t uvg_g_dct_32_t[32][32];
 
 
 
@@ -110,10 +110,10 @@ static __m256i mul_clip_matrix_4x4_avx2(const __m256i left, const __m256i right,
 
 static void matrix_dst_4x4_avx2(int8_t bitdepth, const int16_t *input, int16_t *output)
 {
-  int32_t shift_1st = kvz_g_convert_to_bit[4] + 1 + (bitdepth - 8);
-  int32_t shift_2nd = kvz_g_convert_to_bit[4] + 8;
-  const int16_t *tdst = &kvz_g_dst_4_t[0][0];
-  const int16_t *dst  = &kvz_g_dst_4  [0][0];
+  int32_t shift_1st = uvg_g_convert_to_bit[4] + 1 + (bitdepth - 8);
+  int32_t shift_2nd = uvg_g_convert_to_bit[4] + 8;
+  const int16_t *tdst = &uvg_g_dst_4_t[0][0];
+  const int16_t *dst  = &uvg_g_dst_4  [0][0];
 
   __m256i tdst_v = _mm256_load_si256((const __m256i *) tdst);
   __m256i  dst_v = _mm256_load_si256((const __m256i *)  dst);
@@ -130,8 +130,8 @@ static void matrix_idst_4x4_avx2(int8_t bitdepth, const int16_t *input, int16_t 
   int32_t shift_1st = 7;
   int32_t shift_2nd = 12 - (bitdepth - 8);
 
-  const int16_t *tdst = &kvz_g_dst_4_t[0][0];
-  const int16_t *dst  = &kvz_g_dst_4  [0][0];
+  const int16_t *tdst = &uvg_g_dst_4_t[0][0];
+  const int16_t *dst  = &uvg_g_dst_4  [0][0];
 
   __m256i tdst_v = _mm256_load_si256((const __m256i *)tdst);
   __m256i  dst_v = _mm256_load_si256((const __m256i *) dst);
@@ -145,10 +145,10 @@ static void matrix_idst_4x4_avx2(int8_t bitdepth, const int16_t *input, int16_t 
 
 static void matrix_dct_4x4_avx2(int8_t bitdepth, const int16_t *input, int16_t *output)
 {
-  int32_t shift_1st = kvz_g_convert_to_bit[4] + 1 + (bitdepth - 8);
-  int32_t shift_2nd = kvz_g_convert_to_bit[4] + 8;
-  const int16_t *tdct = &kvz_g_dct_4_t[0][0];
-  const int16_t *dct  = &kvz_g_dct_4  [0][0];
+  int32_t shift_1st = uvg_g_convert_to_bit[4] + 1 + (bitdepth - 8);
+  int32_t shift_2nd = uvg_g_convert_to_bit[4] + 8;
+  const int16_t *tdct = &uvg_g_dct_4_t[0][0];
+  const int16_t *dct  = &uvg_g_dct_4  [0][0];
 
   __m256i tdct_v = _mm256_load_si256((const __m256i *) tdct);
   __m256i  dct_v = _mm256_load_si256((const __m256i *)  dct);
@@ -165,8 +165,8 @@ static void matrix_idct_4x4_avx2(int8_t bitdepth, const int16_t *input, int16_t 
   int32_t shift_1st = 7;
   int32_t shift_2nd = 12 - (bitdepth - 8);
 
-  const int16_t *tdct = &kvz_g_dct_4_t[0][0];
-  const int16_t *dct  = &kvz_g_dct_4  [0][0];
+  const int16_t *tdct = &uvg_g_dct_4_t[0][0];
+  const int16_t *dct  = &uvg_g_dct_4  [0][0];
 
   __m256i tdct_v = _mm256_load_si256((const __m256i *)tdct);
   __m256i  dct_v = _mm256_load_si256((const __m256i *) dct);
@@ -366,10 +366,10 @@ static void matmul_8x8_a_bt(const int16_t *a, const __m256i *b_t,
 
 static void matrix_dct_8x8_avx2(int8_t bitdepth, const int16_t *input, int16_t *output)
 {
-  int32_t shift_1st = kvz_g_convert_to_bit[8] + 1 + (bitdepth - 8);
-  int32_t shift_2nd = kvz_g_convert_to_bit[8] + 8;
+  int32_t shift_1st = uvg_g_convert_to_bit[8] + 1 + (bitdepth - 8);
+  int32_t shift_2nd = uvg_g_convert_to_bit[8] + 8;
 
-  const int16_t *dct  = &kvz_g_dct_8[0][0];
+  const int16_t *dct  = &uvg_g_dct_8[0][0];
 
   /*
    * Multiply input by the tranpose of DCT matrix into tmpres, and DCT matrix
@@ -396,8 +396,8 @@ static void matrix_idct_8x8_avx2(int8_t bitdepth, const int16_t *input, int16_t 
   int32_t shift_2nd = 12 - (bitdepth - 8);
   ALIGNED(64) int16_t tmp[8 * 8];
 
-  const int16_t *tdct = &kvz_g_dct_8_t[0][0];
-  const int16_t *dct  = &kvz_g_dct_8  [0][0];
+  const int16_t *tdct = &uvg_g_dct_8_t[0][0];
+  const int16_t *dct  = &uvg_g_dct_8  [0][0];
 
   mul_clip_matrix_8x8_avx2(tdct, input, tmp,    shift_1st);
   mul_clip_matrix_8x8_avx2(tmp,  dct,   output, shift_2nd);
@@ -677,7 +677,7 @@ static void partial_butterfly_inverse_16_avx2(const int16_t *src, int16_t *dst, 
 
   const uint32_t width = 16;
 
-  const int16_t *tdct = &kvz_g_dct_16_t[0][0];
+  const int16_t *tdct = &uvg_g_dct_16_t[0][0];
 
   const __m256i  eo_signmask = _mm256_setr_epi32( 1,  1,  1,  1, -1, -1, -1, -1);
   const __m256i eeo_signmask = _mm256_setr_epi32( 1,  1, -1, -1, -1, -1,  1,  1);
@@ -779,10 +779,10 @@ static void matrix_idct_16x16_avx2(int8_t bitdepth, const int16_t *input, int16_
 
 static void matrix_dct_16x16_avx2(int8_t bitdepth, const int16_t *input, int16_t *output)
 {
-  int32_t shift_1st = kvz_g_convert_to_bit[16] + 1 + (bitdepth - 8);
-  int32_t shift_2nd = kvz_g_convert_to_bit[16] + 8;
+  int32_t shift_1st = uvg_g_convert_to_bit[16] + 1 + (bitdepth - 8);
+  int32_t shift_2nd = uvg_g_convert_to_bit[16] + 8;
 
-  const int16_t *dct  = &kvz_g_dct_16[0][0];
+  const int16_t *dct  = &uvg_g_dct_16[0][0];
 
   /*
    * Multiply input by the tranpose of DCT matrix into tmpres, and DCT matrix
@@ -899,11 +899,11 @@ static void mul_clip_matrix_32x32_avx2(const int16_t *left,
 // block size. Performs matrix multiplication horizontally and vertically.
 #define TRANSFORM(type, n) static void matrix_ ## type ## _ ## n ## x ## n ## _avx2(int8_t bitdepth, const int16_t *input, int16_t *output)\
 {\
-  int32_t shift_1st = kvz_g_convert_to_bit[n] + 1 + (bitdepth - 8); \
-  int32_t shift_2nd = kvz_g_convert_to_bit[n] + 8; \
+  int32_t shift_1st = uvg_g_convert_to_bit[n] + 1 + (bitdepth - 8); \
+  int32_t shift_2nd = uvg_g_convert_to_bit[n] + 8; \
   ALIGNED(64) int16_t tmp[n * n];\
-  const int16_t *tdct = &kvz_g_ ## type ## _ ## n ## _t[0][0];\
-  const int16_t *dct = &kvz_g_ ## type ## _ ## n [0][0];\
+  const int16_t *tdct = &uvg_g_ ## type ## _ ## n ## _t[0][0];\
+  const int16_t *dct = &uvg_g_ ## type ## _ ## n [0][0];\
 \
   mul_clip_matrix_ ## n ## x ## n ## _avx2(input, tdct, tmp, shift_1st);\
   mul_clip_matrix_ ## n ## x ## n ## _avx2(dct, tmp, output, shift_2nd);\
@@ -918,8 +918,8 @@ static void matrix_i ## type ## _## n ## x ## n ## _avx2(int8_t bitdepth, const 
   int32_t shift_1st = 7; \
   int32_t shift_2nd = 12 - (bitdepth - 8); \
   ALIGNED(64) int16_t tmp[n * n];\
-  const int16_t *tdct = &kvz_g_ ## type ## _ ## n ## _t[0][0];\
-  const int16_t *dct = &kvz_g_ ## type ## _ ## n [0][0];\
+  const int16_t *tdct = &uvg_g_ ## type ## _ ## n ## _t[0][0];\
+  const int16_t *dct = &uvg_g_ ## type ## _ ## n [0][0];\
 \
   mul_clip_matrix_ ## n ## x ## n ## _avx2(tdct, input, tmp, shift_1st);\
   mul_clip_matrix_ ## n ## x ## n ## _avx2(tmp, dct, output, shift_2nd);\
@@ -940,7 +940,7 @@ static void matrix_i ## type ## _## n ## x ## n ## _avx2(int8_t bitdepth, const 
 TRANSFORM(dct, 32);
 ITRANSFORM(dct, 32);
 
-#endif // KVZ_BIT_DEPTH == 8
+#endif // UVG_BIT_DEPTH == 8
 #endif //COMPILE_INTEL_AVX2
 
 
@@ -1182,32 +1182,32 @@ ITRANSFORM(dct, 32);
 
 
 // DST-7
-ALIGNED(64) const int16_t kvz_g_dst7_4[4][4] = DEFINE_DST7_P4_MATRIX(29, 55, 74, 84);
-ALIGNED(64) const int16_t kvz_g_dst7_8[8][8] = DEFINE_DST7_P8_MATRIX(17, 32, 46, 60, 71, 78, 85, 86);
-ALIGNED(64) const int16_t kvz_g_dst7_16[16][16] = DEFINE_DST7_P16_MATRIX(8, 17, 25, 33, 40, 48, 55, 62, 68, 73, 77, 81, 85, 87, 88, 88);
-ALIGNED(64) const int16_t kvz_g_dst7_32[32][32] = DEFINE_DST7_P32_MATRIX(4, 9, 13, 17, 21, 26, 30, 34, 38, 42, 46, 50, 53, 56, 60, 63, 66, 68, 72, 74, 77, 78, 80, 82, 84, 85, 86, 87, 88, 89, 90, 90);
+ALIGNED(64) const int16_t uvg_g_dst7_4[4][4] = DEFINE_DST7_P4_MATRIX(29, 55, 74, 84);
+ALIGNED(64) const int16_t uvg_g_dst7_8[8][8] = DEFINE_DST7_P8_MATRIX(17, 32, 46, 60, 71, 78, 85, 86);
+ALIGNED(64) const int16_t uvg_g_dst7_16[16][16] = DEFINE_DST7_P16_MATRIX(8, 17, 25, 33, 40, 48, 55, 62, 68, 73, 77, 81, 85, 87, 88, 88);
+ALIGNED(64) const int16_t uvg_g_dst7_32[32][32] = DEFINE_DST7_P32_MATRIX(4, 9, 13, 17, 21, 26, 30, 34, 38, 42, 46, 50, 53, 56, 60, 63, 66, 68, 72, 74, 77, 78, 80, 82, 84, 85, 86, 87, 88, 89, 90, 90);
 
-ALIGNED(64) const int16_t kvz_g_dst7_4_t[4][4] = DEFINE_DST7_P4_MATRIX_T(29, 55, 74, 84);
-ALIGNED(64) const int16_t kvz_g_dst7_8_t[8][8] = DEFINE_DST7_P8_MATRIX_T(17, 32, 46, 60, 71, 78, 85, 86);
-ALIGNED(64) const int16_t kvz_g_dst7_16_t[16][16] = DEFINE_DST7_P16_MATRIX_T(8, 17, 25, 33, 40, 48, 55, 62, 68, 73, 77, 81, 85, 87, 88, 88);
-ALIGNED(64) const int16_t kvz_g_dst7_32_t[32][32] = DEFINE_DST7_P32_MATRIX_T(4, 9, 13, 17, 21, 26, 30, 34, 38, 42, 46, 50, 53, 56, 60, 63, 66, 68, 72, 74, 77, 78, 80, 82, 84, 85, 86, 87, 88, 89, 90, 90);
+ALIGNED(64) const int16_t uvg_g_dst7_4_t[4][4] = DEFINE_DST7_P4_MATRIX_T(29, 55, 74, 84);
+ALIGNED(64) const int16_t uvg_g_dst7_8_t[8][8] = DEFINE_DST7_P8_MATRIX_T(17, 32, 46, 60, 71, 78, 85, 86);
+ALIGNED(64) const int16_t uvg_g_dst7_16_t[16][16] = DEFINE_DST7_P16_MATRIX_T(8, 17, 25, 33, 40, 48, 55, 62, 68, 73, 77, 81, 85, 87, 88, 88);
+ALIGNED(64) const int16_t uvg_g_dst7_32_t[32][32] = DEFINE_DST7_P32_MATRIX_T(4, 9, 13, 17, 21, 26, 30, 34, 38, 42, 46, 50, 53, 56, 60, 63, 66, 68, 72, 74, 77, 78, 80, 82, 84, 85, 86, 87, 88, 89, 90, 90);
 
 // DCT-8
-ALIGNED(64) const int16_t kvz_g_dct8_4[4][4] = DEFINE_DCT8_P4_MATRIX(84, 74, 55, 29);
-ALIGNED(64) const int16_t kvz_g_dct8_8[8][8] = DEFINE_DCT8_P8_MATRIX(86, 85, 78, 71, 60, 46, 32, 17);
-ALIGNED(64) const int16_t kvz_g_dct8_16[16][16] = DEFINE_DCT8_P16_MATRIX(88, 88, 87, 85, 81, 77, 73, 68, 62, 55, 48, 40, 33, 25, 17, 8);
-ALIGNED(64) const int16_t kvz_g_dct8_32[32][32] = DEFINE_DCT8_P32_MATRIX(90, 90, 89, 88, 87, 86, 85, 84, 82, 80, 78, 77, 74, 72, 68, 66, 63, 60, 56, 53, 50, 46, 42, 38, 34, 30, 26, 21, 17, 13, 9, 4);
+ALIGNED(64) const int16_t uvg_g_dct8_4[4][4] = DEFINE_DCT8_P4_MATRIX(84, 74, 55, 29);
+ALIGNED(64) const int16_t uvg_g_dct8_8[8][8] = DEFINE_DCT8_P8_MATRIX(86, 85, 78, 71, 60, 46, 32, 17);
+ALIGNED(64) const int16_t uvg_g_dct8_16[16][16] = DEFINE_DCT8_P16_MATRIX(88, 88, 87, 85, 81, 77, 73, 68, 62, 55, 48, 40, 33, 25, 17, 8);
+ALIGNED(64) const int16_t uvg_g_dct8_32[32][32] = DEFINE_DCT8_P32_MATRIX(90, 90, 89, 88, 87, 86, 85, 84, 82, 80, 78, 77, 74, 72, 68, 66, 63, 60, 56, 53, 50, 46, 42, 38, 34, 30, 26, 21, 17, 13, 9, 4);
 
-const int16_t* kvz_g_mts_input[2][3][5] = {
+const int16_t* uvg_g_mts_input[2][3][5] = {
   {
-    {&kvz_g_dct_4[0][0],  &kvz_g_dct_8[0][0],  &kvz_g_dct_16[0][0],  &kvz_g_dct_32[0][0], NULL},
-    {&kvz_g_dct8_4[0][0], &kvz_g_dct8_8[0][0], &kvz_g_dct8_16[0][0], &kvz_g_dct8_32[0][0], NULL},
-    {&kvz_g_dst7_4[0][0], &kvz_g_dst7_8[0][0], &kvz_g_dst7_16[0][0], &kvz_g_dst7_32[0][0], NULL}
+    {&uvg_g_dct_4[0][0],  &uvg_g_dct_8[0][0],  &uvg_g_dct_16[0][0],  &uvg_g_dct_32[0][0], NULL},
+    {&uvg_g_dct8_4[0][0], &uvg_g_dct8_8[0][0], &uvg_g_dct8_16[0][0], &uvg_g_dct8_32[0][0], NULL},
+    {&uvg_g_dst7_4[0][0], &uvg_g_dst7_8[0][0], &uvg_g_dst7_16[0][0], &uvg_g_dst7_32[0][0], NULL}
   },
   {
-    {&kvz_g_dct_4_t[0][0],  &kvz_g_dct_8_t[0][0],  &kvz_g_dct_16_t[0][0],  &kvz_g_dct_32_t[0][0], NULL},
-    {  &kvz_g_dct8_4[0][0],   &kvz_g_dct8_8[0][0],   &kvz_g_dct8_16[0][0],   &kvz_g_dct8_32[0][0], NULL},
-    {&kvz_g_dst7_4_t[0][0], &kvz_g_dst7_8_t[0][0], &kvz_g_dst7_16_t[0][0], &kvz_g_dst7_32_t[0][0], NULL}
+    {&uvg_g_dct_4_t[0][0],  &uvg_g_dct_8_t[0][0],  &uvg_g_dct_16_t[0][0],  &uvg_g_dct_32_t[0][0], NULL},
+    {  &uvg_g_dct8_4[0][0],   &uvg_g_dct8_8[0][0],   &uvg_g_dct8_16[0][0],   &uvg_g_dct8_32[0][0], NULL},
+    {&uvg_g_dst7_4_t[0][0], &uvg_g_dst7_8_t[0][0], &uvg_g_dst7_16_t[0][0], &uvg_g_dst7_32_t[0][0], NULL}
   },
 };
 
@@ -1216,13 +1216,13 @@ static void mts_dct_4x4_avx2(const int16_t* input, int16_t* output, tr_type_t ty
   //const int height = 4;
   const int width = 4;
 
-  const int log2_width_minus2 = kvz_g_convert_to_bit[width];
+  const int log2_width_minus2 = uvg_g_convert_to_bit[width];
 
   const int32_t shift_1st = log2_width_minus2 + bitdepth - 7;
   const int32_t shift_2nd = log2_width_minus2 + 8;
 
-  const int16_t* tdct = kvz_g_mts_input[1][type_hor][0];
-  const int16_t* dct = kvz_g_mts_input[0][type_ver][0];
+  const int16_t* tdct = uvg_g_mts_input[1][type_hor][0];
+  const int16_t* dct = uvg_g_mts_input[0][type_ver][0];
 
   __m256i tdct_v = _mm256_load_si256((const __m256i*) tdct);
   __m256i  dct_v = _mm256_load_si256((const __m256i*)  dct);
@@ -1239,8 +1239,8 @@ static void mts_idct_4x4_avx2(const int16_t* input, int16_t* output, tr_type_t t
   int32_t shift_1st = 7;
   int32_t shift_2nd = 12 - (bitdepth - 8);
 
-  const int16_t* tdct = kvz_g_mts_input[1][type_ver][0];
-  const int16_t* dct = kvz_g_mts_input[0][type_hor][0];
+  const int16_t* tdct = uvg_g_mts_input[1][type_ver][0];
+  const int16_t* dct = uvg_g_mts_input[0][type_hor][0];
 
   __m256i tdct_v = _mm256_load_si256((const __m256i*)tdct);
   __m256i  dct_v = _mm256_load_si256((const __m256i*) dct);
@@ -1254,11 +1254,11 @@ static void mts_idct_4x4_avx2(const int16_t* input, int16_t* output, tr_type_t t
 
 static void mts_dct_8x8_avx2(const int16_t* input, int16_t* output, tr_type_t type_hor, tr_type_t type_ver, uint8_t bitdepth)
 {
-  int32_t shift_1st = kvz_g_convert_to_bit[8] + 1 + (bitdepth - 8);
-  int32_t shift_2nd = kvz_g_convert_to_bit[8] + 8;
+  int32_t shift_1st = uvg_g_convert_to_bit[8] + 1 + (bitdepth - 8);
+  int32_t shift_2nd = uvg_g_convert_to_bit[8] + 8;
 
-  const int16_t* dct1 = kvz_g_mts_input[0][type_hor][1];
-  const int16_t* dct2 = kvz_g_mts_input[0][type_ver][1];
+  const int16_t* dct1 = uvg_g_mts_input[0][type_hor][1];
+  const int16_t* dct2 = uvg_g_mts_input[0][type_ver][1];
 
   __m256i tmpres[4];
 
@@ -1272,8 +1272,8 @@ static void mts_idct_8x8_avx2(const int16_t* input, int16_t* output, tr_type_t t
   int32_t shift_2nd = 12 - (bitdepth - 8);
   ALIGNED(64) int16_t tmp[8 * 8];
 
-  const int16_t* tdct = kvz_g_mts_input[1][type_ver][1];
-  const int16_t* dct = kvz_g_mts_input[0][type_hor][1];
+  const int16_t* tdct = uvg_g_mts_input[1][type_ver][1];
+  const int16_t* dct = uvg_g_mts_input[0][type_hor][1];
 
   mul_clip_matrix_8x8_avx2(tdct, input, tmp, shift_1st);
   mul_clip_matrix_8x8_avx2(tmp, dct, output, shift_2nd);
@@ -1282,11 +1282,11 @@ static void mts_idct_8x8_avx2(const int16_t* input, int16_t* output, tr_type_t t
 
 static void mts_dct_16x16_avx2(const int16_t* input, int16_t* output, tr_type_t type_hor, tr_type_t type_ver, uint8_t bitdepth)
 {
-  int32_t shift_1st = kvz_g_convert_to_bit[16] + 1 + (bitdepth - 8);
-  int32_t shift_2nd = kvz_g_convert_to_bit[16] + 8;
+  int32_t shift_1st = uvg_g_convert_to_bit[16] + 1 + (bitdepth - 8);
+  int32_t shift_2nd = uvg_g_convert_to_bit[16] + 8;
 
-  const int16_t* dct1 = kvz_g_mts_input[0][type_hor][2];
-  const int16_t* dct2 = kvz_g_mts_input[0][type_ver][2];
+  const int16_t* dct1 = uvg_g_mts_input[0][type_hor][2];
+  const int16_t* dct2 = uvg_g_mts_input[0][type_ver][2];
 
   /*
    * Multiply input by the tranpose of DCT matrix into tmpres, and DCT matrix
@@ -1322,7 +1322,7 @@ static void partial_butterfly_inverse_16_mts_avx2(const int16_t* src, int16_t* d
   int32_t a[5], b[5], c[5], d[5], t;
   int32_t add = (shift > 0) ? (1 << (shift - 1)) : 0;
 
-  const int16_t* iT = &kvz_g_dst7_16[0][0];
+  const int16_t* iT = &uvg_g_dst7_16[0][0];
 
   const int  line = 16;
 
@@ -1517,12 +1517,12 @@ static void mul_clip_matrix_32x32_mts_avx2(const int16_t* left,
 
 static void mts_dct_32x32_avx2(const int16_t* input, int16_t* output, tr_type_t type_hor, tr_type_t type_ver, uint8_t bitdepth)
 {
-  int32_t shift_1st = kvz_g_convert_to_bit[32] + 1 + (bitdepth - 8); 
-  int32_t shift_2nd = kvz_g_convert_to_bit[32] + 8; 
+  int32_t shift_1st = uvg_g_convert_to_bit[32] + 1 + (bitdepth - 8); 
+  int32_t shift_2nd = uvg_g_convert_to_bit[32] + 8; 
   ALIGNED(64) int16_t tmp[32 * 32];
 
-  const int16_t* tdct = kvz_g_mts_input[1][type_hor][3];
-  const int16_t* dct = kvz_g_mts_input[0][type_ver][3];
+  const int16_t* tdct = uvg_g_mts_input[1][type_hor][3];
+  const int16_t* dct = uvg_g_mts_input[0][type_ver][3];
 
   const int skip_width = (type_hor != DCT2) ? 16 : 0;
   const int skip_height = (type_ver != DCT2) ? 16 : 0;
@@ -1537,8 +1537,8 @@ static void mts_idct_32x32_avx2(const int16_t* input, int16_t* output, tr_type_t
   int32_t shift_1st = 7; 
   int32_t shift_2nd = 12 - (bitdepth - 8); 
   ALIGNED(64) int16_t tmp[32 * 32];
-  const int16_t* tdct = kvz_g_mts_input[1][type_ver][3];
-  const int16_t* dct = kvz_g_mts_input[0][type_hor][3];
+  const int16_t* tdct = uvg_g_mts_input[1][type_ver][3];
+  const int16_t* dct = uvg_g_mts_input[0][type_hor][3];
 
   //const int skip_width = (type_hor != DCT2) ? 16 : 0;
   const int skip_height = (type_ver != DCT2) ? 16 : 0;
@@ -1559,7 +1559,7 @@ static tr_func* idct_table[5] = {
 };
 
 
-extern void kvz_get_tr_type(
+extern void uvg_get_tr_type(
   int8_t width,
   color_t color,
   const cu_info_t* tu,
@@ -1579,16 +1579,16 @@ static void mts_dct_avx2(
   tr_type_t type_hor;
   tr_type_t type_ver;
 
-  kvz_get_tr_type(width, color, tu, &type_hor, &type_ver, mts_idx);
+  uvg_get_tr_type(width, color, tu, &type_hor, &type_ver, mts_idx);
 
   if (type_hor == DCT2 && type_ver == DCT2)
   {
-    dct_func* dct_func = kvz_get_dct_func(width, color, tu->type);
+    dct_func* dct_func = uvg_get_dct_func(width, color, tu->type);
     dct_func(bitdepth, input, output);
   }
   else
   {
-    const int log2_width_minus2 = kvz_g_convert_to_bit[width];
+    const int log2_width_minus2 = uvg_g_convert_to_bit[width];
 
     tr_func* dct = dct_table[log2_width_minus2];
 
@@ -1609,16 +1609,16 @@ static void mts_idct_avx2(
   tr_type_t type_hor;
   tr_type_t type_ver;
 
-  kvz_get_tr_type(width, color, tu, &type_hor, &type_ver, mts_idx);
+  uvg_get_tr_type(width, color, tu, &type_hor, &type_ver, mts_idx);
 
   if (type_hor == DCT2 && type_ver == DCT2)
   {
-    dct_func* idct_func = kvz_get_idct_func(width, color, tu->type);
+    dct_func* idct_func = uvg_get_idct_func(width, color, tu->type);
     idct_func(bitdepth, input, output);
   }
   else
   {
-    const int log2_width_minus2 = kvz_g_convert_to_bit[width];
+    const int log2_width_minus2 = uvg_g_convert_to_bit[width];
 
     tr_func* idct = idct_table[log2_width_minus2];
 
@@ -1627,31 +1627,31 @@ static void mts_idct_avx2(
 }
 
 
-int kvz_strategy_register_dct_avx2(void* opaque, uint8_t bitdepth)
+int uvg_strategy_register_dct_avx2(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
 #if COMPILE_INTEL_AVX2
-#if KVZ_BIT_DEPTH == 8
+#if UVG_BIT_DEPTH == 8
   if (bitdepth == 8){
-    success &= kvz_strategyselector_register(opaque, "fast_forward_dst_4x4", "avx2", 40, &matrix_dst_4x4_avx2);
+    success &= uvg_strategyselector_register(opaque, "fast_forward_dst_4x4", "avx2", 40, &matrix_dst_4x4_avx2);
 
-    success &= kvz_strategyselector_register(opaque, "dct_4x4", "avx2", 40, &matrix_dct_4x4_avx2);
-    success &= kvz_strategyselector_register(opaque, "dct_8x8", "avx2", 40, &matrix_dct_8x8_avx2);
-    success &= kvz_strategyselector_register(opaque, "dct_16x16", "avx2", 40, &matrix_dct_16x16_avx2);
-    success &= kvz_strategyselector_register(opaque, "dct_32x32", "avx2", 40, &matrix_dct_32x32_avx2);
+    success &= uvg_strategyselector_register(opaque, "dct_4x4", "avx2", 40, &matrix_dct_4x4_avx2);
+    success &= uvg_strategyselector_register(opaque, "dct_8x8", "avx2", 40, &matrix_dct_8x8_avx2);
+    success &= uvg_strategyselector_register(opaque, "dct_16x16", "avx2", 40, &matrix_dct_16x16_avx2);
+    success &= uvg_strategyselector_register(opaque, "dct_32x32", "avx2", 40, &matrix_dct_32x32_avx2);
 
-    success &= kvz_strategyselector_register(opaque, "fast_inverse_dst_4x4", "avx2", 40, &matrix_idst_4x4_avx2);
+    success &= uvg_strategyselector_register(opaque, "fast_inverse_dst_4x4", "avx2", 40, &matrix_idst_4x4_avx2);
 
-    success &= kvz_strategyselector_register(opaque, "idct_4x4", "avx2", 40, &matrix_idct_4x4_avx2);
-    success &= kvz_strategyselector_register(opaque, "idct_8x8", "avx2", 40, &matrix_idct_8x8_avx2);
-    success &= kvz_strategyselector_register(opaque, "idct_16x16", "avx2", 40, &matrix_idct_16x16_avx2);
-    success &= kvz_strategyselector_register(opaque, "idct_32x32", "avx2", 40, &matrix_idct_32x32_avx2);
+    success &= uvg_strategyselector_register(opaque, "idct_4x4", "avx2", 40, &matrix_idct_4x4_avx2);
+    success &= uvg_strategyselector_register(opaque, "idct_8x8", "avx2", 40, &matrix_idct_8x8_avx2);
+    success &= uvg_strategyselector_register(opaque, "idct_16x16", "avx2", 40, &matrix_idct_16x16_avx2);
+    success &= uvg_strategyselector_register(opaque, "idct_32x32", "avx2", 40, &matrix_idct_32x32_avx2);
 
-    success &= kvz_strategyselector_register(opaque, "mts_dct", "avx2", 40, &mts_dct_avx2);
-    success &= kvz_strategyselector_register(opaque, "mts_idct", "avx2", 40, &mts_idct_avx2);
+    success &= uvg_strategyselector_register(opaque, "mts_dct", "avx2", 40, &mts_dct_avx2);
+    success &= uvg_strategyselector_register(opaque, "mts_idct", "avx2", 40, &mts_idct_avx2);
 
   }
-#endif // KVZ_BIT_DEPTH == 8
+#endif // UVG_BIT_DEPTH == 8
 #endif //COMPILE_INTEL_AVX2  
   return success;
 }

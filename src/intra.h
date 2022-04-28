@@ -46,15 +46,15 @@
 #define INTRA_REF_LENGTH (2 * 128 + 3 + 33 * MAX_REF_LINE_IDX)
 
 typedef struct {
-  kvz_pixel left[INTRA_REF_LENGTH];
-  kvz_pixel top[INTRA_REF_LENGTH];
-} kvz_intra_ref;
+  uvg_pixel left[INTRA_REF_LENGTH];
+  uvg_pixel top[INTRA_REF_LENGTH];
+} uvg_intra_ref;
 typedef struct
 {
-  kvz_intra_ref ref;
-  kvz_intra_ref filtered_ref;
+  uvg_intra_ref ref;
+  uvg_intra_ref filtered_ref;
   bool filtered_initialized;
-} kvz_intra_references;
+} uvg_intra_references;
 
 typedef struct
 {
@@ -73,7 +73,7 @@ typedef struct
 * \param above_pu   PU above cur_pu
 * \returns          1 if predictions are found, otherwise 0
 */
-int8_t kvz_intra_get_dir_luma_predictor(
+int8_t uvg_intra_get_dir_luma_predictor(
   const uint32_t x,
   const uint32_t y,
   int8_t *preds,
@@ -93,15 +93,15 @@ int8_t kvz_intra_get_dir_luma_predictor(
 * \param extra_refs    Additional left edge reference lines for use with MRL.
 * \param multi_ref_idx Multi reference line index for the prediction block.
 */
-void kvz_intra_build_reference(
+void uvg_intra_build_reference(
   const int_fast8_t log2_width,
   const color_t color,
   const vector2d_t *const luma_px,
   const vector2d_t *const pic_px,
   const lcu_t *const lcu,
-  kvz_intra_references *const refs,
+  uvg_intra_references *const refs,
   bool entropy_sync,
-  kvz_pixel *extra_refs,
+  uvg_pixel *extra_refs,
   uint8_t multi_ref_idx);
 
 /**
@@ -113,17 +113,17 @@ void kvz_intra_build_reference(
  * \param dst             Buffer for the predicted pixels.
  * \param filter_boundary Whether to filter the boundary on modes 10 and 26.
  */
-void kvz_intra_predict(
+void uvg_intra_predict(
   encoder_state_t *const state,
-  kvz_intra_references *refs,
+  uvg_intra_references *refs,
   int_fast8_t log2_width,
   int_fast8_t mode,
   color_t color,
-  kvz_pixel *dst,
+  uvg_pixel *dst,
   bool filter_boundary,
   const uint8_t multi_ref_idx);
 
-void kvz_intra_recon_cu(
+void uvg_intra_recon_cu(
   encoder_state_t *const state,
   int x,
   int y,
@@ -138,7 +138,7 @@ void kvz_intra_recon_cu(
   lcu_t *lcu);
 
 
-void kvz_predict_cclm(
+void uvg_predict_cclm(
   encoder_state_t const* const state,
   const color_t color,
   const int8_t width,
@@ -148,19 +148,19 @@ void kvz_predict_cclm(
   const int16_t stride,
   const int8_t mode,
   lcu_t* const lcu,
-  kvz_intra_references* chroma_ref,
-  kvz_pixel* dst,
+  uvg_intra_references* chroma_ref,
+  uvg_pixel* dst,
   cclm_parameters_t* cclm_params
 );
 
-int kvz_get_mip_flag_context(int x, int y, int width, int height, const lcu_t* lcu, cu_array_t* const cu_a);
+int uvg_get_mip_flag_context(int x, int y, int width, int height, const lcu_t* lcu, cu_array_t* const cu_a);
 
-void kvz_mip_predict(
+void uvg_mip_predict(
   encoder_state_t const * const state,
-  kvz_intra_references * refs,
+  uvg_intra_references * refs,
   const uint16_t width,
   const uint16_t height,
-  kvz_pixel* dst,
+  uvg_pixel* dst,
   const int mip_mode,
   const bool mip_transp
 );

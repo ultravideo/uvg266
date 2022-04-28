@@ -52,10 +52,10 @@ typedef struct bitstream_t
   uint32_t len;
 
   /// \brief Pointer to the first chunk, or NULL.
-  kvz_data_chunk *first;
+  uvg_data_chunk *first;
 
   /// \brief Pointer to the last chunk, or NULL.
-  kvz_data_chunk *last;
+  uvg_data_chunk *last;
 
   /// \brief The incomplete byte.
   uint8_t data;
@@ -73,38 +73,38 @@ typedef struct
   uint32_t value;
 } bit_table_t;
 
-void kvz_bitstream_init(bitstream_t * stream);
-kvz_data_chunk * kvz_bitstream_alloc_chunk();
-kvz_data_chunk * kvz_bitstream_take_chunks(bitstream_t *stream);
-void kvz_bitstream_free_chunks(kvz_data_chunk *chunk);
-void kvz_bitstream_finalize(bitstream_t * stream);
+void uvg_bitstream_init(bitstream_t * stream);
+uvg_data_chunk * uvg_bitstream_alloc_chunk();
+uvg_data_chunk * uvg_bitstream_take_chunks(bitstream_t *stream);
+void uvg_bitstream_free_chunks(uvg_data_chunk *chunk);
+void uvg_bitstream_finalize(bitstream_t * stream);
 
-uint64_t kvz_bitstream_tell(const bitstream_t * stream);
+uint64_t uvg_bitstream_tell(const bitstream_t * stream);
 
-void kvz_bitstream_writebyte(bitstream_t *stream, uint8_t byte);
-void kvz_bitstream_move(bitstream_t *dst, bitstream_t *src);
-void kvz_bitstream_clear(bitstream_t *stream);
+void uvg_bitstream_writebyte(bitstream_t *stream, uint8_t byte);
+void uvg_bitstream_move(bitstream_t *dst, bitstream_t *src);
+void uvg_bitstream_clear(bitstream_t *stream);
 
-void kvz_bitstream_put(bitstream_t *stream, uint32_t data, uint8_t bits);
-void kvz_bitstream_put_byte(bitstream_t *const stream, const uint32_t data);
+void uvg_bitstream_put(bitstream_t *stream, uint32_t data, uint8_t bits);
+void uvg_bitstream_put_byte(bitstream_t *const stream, const uint32_t data);
 
-void kvz_bitstream_put_ue(bitstream_t *stream, uint32_t data);
-void kvz_bitstream_put_se(bitstream_t *stream, int32_t data);
+void uvg_bitstream_put_ue(bitstream_t *stream, uint32_t data);
+void uvg_bitstream_put_se(bitstream_t *stream, int32_t data);
 
-void kvz_bitstream_add_rbsp_trailing_bits(bitstream_t *stream);
-void kvz_bitstream_align(bitstream_t *stream);
-void kvz_bitstream_align_zero(bitstream_t *stream);
+void uvg_bitstream_add_rbsp_trailing_bits(bitstream_t *stream);
+void uvg_bitstream_align(bitstream_t *stream);
+void uvg_bitstream_align_zero(bitstream_t *stream);
 
 /* In debug mode print out some extra info */
 #ifdef VERBOSE
 /* Counter to keep up with bits written */
-#define WRITE_U(stream, data, bits, name) { printf("%-50s u(%d) : %d\n", name,bits,data); kvz_bitstream_put(stream,data,bits);}
-#define WRITE_UE(stream, data, name) { printf("%-50s ue(v): %d\n", name,data); kvz_bitstream_put_ue(stream,data);}
-#define WRITE_SE(stream, data, name) { printf("%-50s se(v): %d\n", name,data); kvz_bitstream_put_se(stream,(data));}
+#define WRITE_U(stream, data, bits, name) { printf("%-50s u(%d) : %d\n", name,bits,data); uvg_bitstream_put(stream,data,bits);}
+#define WRITE_UE(stream, data, name) { printf("%-50s ue(v): %d\n", name,data); uvg_bitstream_put_ue(stream,data);}
+#define WRITE_SE(stream, data, name) { printf("%-50s se(v): %d\n", name,data); uvg_bitstream_put_se(stream,(data));}
 #else
-#define WRITE_U(stream, data, bits, name) { kvz_bitstream_put(stream,data,bits); }
-#define WRITE_UE(stream, data, name) { kvz_bitstream_put_ue(stream,data); }
-#define WRITE_SE(stream, data, name) { kvz_bitstream_put_se(stream,data); }
+#define WRITE_U(stream, data, bits, name) { uvg_bitstream_put(stream,data,bits); }
+#define WRITE_UE(stream, data, name) { uvg_bitstream_put_ue(stream,data); }
+#define WRITE_SE(stream, data, name) { uvg_bitstream_put_se(stream,data); }
 #endif
 
 

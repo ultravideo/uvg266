@@ -39,14 +39,14 @@
 
 // Function to clip int16_t to pixel. (0-255 or 0-1023)
 // Assumes PIXEL_MAX to be 2^n-1
-kvz_pixel kvz_fast_clip_16bit_to_pixel(int16_t value)
+uvg_pixel uvg_fast_clip_16bit_to_pixel(int16_t value)
 {
   // Ensure that compiler generates arithmetic shift from ">>" 
 #if defined(_MSC_VER) || defined(__GNUC__) || defined(__clang__)
 
   if (value & ~PIXEL_MAX) {
     int16_t temp = (-value) >> 15;
-#if KVZ_BIT_DEPTH == 10
+#if UVG_BIT_DEPTH == 10
     temp &= PIXEL_MAX;
 #endif
     return temp;
@@ -61,14 +61,14 @@ kvz_pixel kvz_fast_clip_16bit_to_pixel(int16_t value)
 
 // Function to clip int32_t to pixel. (0-255 or 0-1023)
 // Assumes PIXEL_MAX to be 2^n-1
-kvz_pixel kvz_fast_clip_32bit_to_pixel(int32_t value)
+uvg_pixel uvg_fast_clip_32bit_to_pixel(int32_t value)
 {
   // Ensure that compiler generates arithmetic shift from ">>" 
 #if defined(_MSC_VER) || defined(__GNUC__) || defined(__clang__)
 
   if (value & ~PIXEL_MAX) {
     int32_t temp = (-value) >> 31;
-#if KVZ_BIT_DEPTH == 10
+#if UVG_BIT_DEPTH == 10
     temp &= PIXEL_MAX;
 #endif
     return temp;
@@ -95,7 +95,7 @@ kvz_pixel kvz_fast_clip_32bit_to_pixel(int32_t value)
  *
  * \returns Sum of Absolute Differences
  */
-static unsigned reg_sad_generic(const kvz_pixel * const data1, const kvz_pixel * const data2,
+static unsigned reg_sad_generic(const uvg_pixel * const data1, const uvg_pixel * const data2,
                          const int width, const int height, const unsigned stride1, const unsigned stride2)
 {
   int y, x;
@@ -198,7 +198,7 @@ static int32_t hadamard_4x4_generic(int32_t diff[4*4])
 /**
  * \brief  Calculate SATD between two 4x4 blocks.
  */
-static unsigned satd_4x4_generic(const kvz_pixel *piOrg, const kvz_pixel *piCur)
+static unsigned satd_4x4_generic(const uvg_pixel *piOrg, const uvg_pixel *piCur)
 {
   int32_t diff[4 * 4];
   for (int i = 0; i < 4 * 4; i++) {
@@ -210,9 +210,9 @@ static unsigned satd_4x4_generic(const kvz_pixel *piOrg, const kvz_pixel *piCur)
 /**
 * \brief  Calculate SATD between two 4x4 blocks inside bigger arrays.
 */
-unsigned kvz_satd_4x4_subblock_generic(const kvz_pixel * buf1,
+unsigned uvg_satd_4x4_subblock_generic(const uvg_pixel * buf1,
                                        const int32_t     stride1,
-                                       const kvz_pixel * buf2,
+                                       const uvg_pixel * buf2,
                                        const int32_t     stride2)
 {
   int32_t diff[4 * 4];
@@ -224,9 +224,9 @@ unsigned kvz_satd_4x4_subblock_generic(const kvz_pixel * buf1,
   return hadamard_4x4_generic(diff);
 }
 
-void kvz_satd_4x4_subblock_quad_generic(const kvz_pixel *preds[4],
+void uvg_satd_4x4_subblock_quad_generic(const uvg_pixel *preds[4],
                                        const int stride,
-                                       const kvz_pixel *orig,
+                                       const uvg_pixel *orig,
                                        const int orig_stride,
                                        unsigned costs[4])
 {
@@ -249,8 +249,8 @@ void kvz_satd_4x4_subblock_quad_generic(const kvz_pixel *preds[4],
 /**
 * \brief  Calculate SATD between two 8x8 blocks inside bigger arrays.
 */
-static unsigned satd_8x8_subblock_generic(const kvz_pixel * piOrg, const int32_t iStrideOrg,
-  const kvz_pixel * piCur, const int32_t iStrideCur)
+static unsigned satd_8x8_subblock_generic(const uvg_pixel * piOrg, const int32_t iStrideOrg,
+  const uvg_pixel * piCur, const int32_t iStrideCur)
 {
   int32_t k, i, j, jj, sad = 0;
   int32_t diff[64], m1[8][8], m2[8][8], m3[8][8];
@@ -339,9 +339,9 @@ static unsigned satd_8x8_subblock_generic(const kvz_pixel * piOrg, const int32_t
   return sad;
 }
 
-static void satd_8x8_subblock_quad_generic(const kvz_pixel **preds,
+static void satd_8x8_subblock_quad_generic(const uvg_pixel **preds,
                                        const int stride,
-                                       const kvz_pixel *orig,
+                                       const uvg_pixel *orig,
                                        const int orig_stride,
                                        unsigned *costs)
 {
@@ -378,7 +378,7 @@ static void satd_ ## n ## x ## n ## _dual_generic( \
   sum += satd_8x8_subblock_generic(&preds[0][row + x], (n), &orig[row + x], (n)); \
   } \
   } \
-  costs_out[0] = sum>>(KVZ_BIT_DEPTH-8); \
+  costs_out[0] = sum>>(UVG_BIT_DEPTH-8); \
   \
   sum = 0; \
   for (y = 0; y < (n); y += 8) { \
@@ -387,40 +387,40 @@ static void satd_ ## n ## x ## n ## _dual_generic( \
   sum += satd_8x8_subblock_generic(&preds[1][row + x], (n), &orig[row + x], (n)); \
   } \
   } \
-  costs_out[1] = sum>>(KVZ_BIT_DEPTH-8); \
+  costs_out[1] = sum>>(UVG_BIT_DEPTH-8); \
 }
 
-static void satd_4x4_dual_generic(const pred_buffer preds, const kvz_pixel * const orig, unsigned num_modes, unsigned *costs_out)
+static void satd_4x4_dual_generic(const pred_buffer preds, const uvg_pixel * const orig, unsigned num_modes, unsigned *costs_out)
 {
   costs_out[0] = satd_4x4_generic(orig, preds[0]);
   costs_out[1] = satd_4x4_generic(orig, preds[1]);
 }
 
-SATD_DUAL_NXN(8, kvz_pixel)
-SATD_DUAL_NXN(16, kvz_pixel)
-SATD_DUAL_NXN(32, kvz_pixel)
-SATD_DUAL_NXN(64, kvz_pixel)
+SATD_DUAL_NXN(8, uvg_pixel)
+SATD_DUAL_NXN(16, uvg_pixel)
+SATD_DUAL_NXN(32, uvg_pixel)
+SATD_DUAL_NXN(64, uvg_pixel)
 
 #define SATD_ANY_SIZE_MULTI_GENERIC(suffix, num_parallel_blocks) \
   static cost_pixel_any_size_multi_func satd_any_size_## suffix; \
   static void satd_any_size_ ## suffix ( \
       int width, int height, \
-      const kvz_pixel **preds, \
+      const uvg_pixel **preds, \
       const int stride, \
-      const kvz_pixel *orig, \
+      const uvg_pixel *orig, \
       const int orig_stride, \
       unsigned num_modes, \
       unsigned *costs_out, \
       int8_t *valid) \
   { \
     unsigned sums[num_parallel_blocks] = { 0 }; \
-    const kvz_pixel *pred_ptrs[4] = { preds[0], preds[1], preds[2], preds[3] };\
-    const kvz_pixel *orig_ptr = orig; \
+    const uvg_pixel *pred_ptrs[4] = { preds[0], preds[1], preds[2], preds[3] };\
+    const uvg_pixel *orig_ptr = orig; \
     costs_out[0] = 0; costs_out[1] = 0; costs_out[2] = 0; costs_out[3] = 0; \
     if (width % 8 != 0) { \
       /* Process the first column using 4x4 blocks. */ \
       for (int y = 0; y < height; y += 4) { \
-        kvz_satd_4x4_subblock_ ## suffix(preds, stride, orig, orig_stride, sums); \
+        uvg_satd_4x4_subblock_ ## suffix(preds, stride, orig, orig_stride, sums); \
             } \
       orig_ptr += 4; \
       for(int blk = 0; blk < num_parallel_blocks; ++blk){\
@@ -431,7 +431,7 @@ SATD_DUAL_NXN(64, kvz_pixel)
     if (height % 8 != 0) { \
       /* Process the first row using 4x4 blocks. */ \
       for (int x = 0; x < width; x += 4 ) { \
-        kvz_satd_4x4_subblock_ ## suffix(pred_ptrs, stride, orig_ptr, orig_stride, sums); \
+        uvg_satd_4x4_subblock_ ## suffix(pred_ptrs, stride, orig_ptr, orig_stride, sums); \
             } \
       orig_ptr += 4 * orig_stride; \
       for(int blk = 0; blk < num_parallel_blocks; ++blk){\
@@ -460,7 +460,7 @@ SATD_DUAL_NXN(64, kvz_pixel)
       } \
     } \
     for(int i = 0; i < num_parallel_blocks; ++i){\
-      costs_out[i] = costs_out[i] >> (KVZ_BIT_DEPTH - 8);\
+      costs_out[i] = costs_out[i] >> (UVG_BIT_DEPTH - 8);\
     } \
     return; \
   }
@@ -478,7 +478,7 @@ static unsigned sad_ ##  n ## x ## n ## _generic( \
   for (i = 0; i < (n)*(n); ++i) { \
   sum += abs(block1[i] - block2[i]); \
   } \
-  return sum>>(KVZ_BIT_DEPTH-8); \
+  return sum>>(UVG_BIT_DEPTH-8); \
 }
 
 // Declare these functions to make sure the signature of the macro matches.
@@ -491,11 +491,11 @@ static cost_pixel_nxn_func sad_64x64_generic;
 // These macros define sad_16bit_nxn functions for n = 4, 8, 16, 32, 64
 // with function signatures of cost_16bit_nxn_func.
 // They are used through get_pixel_sad_func.
-SAD_NXN(4, kvz_pixel)
-SAD_NXN(8, kvz_pixel)
-SAD_NXN(16, kvz_pixel)
-SAD_NXN(32, kvz_pixel)
-SAD_NXN(64, kvz_pixel)
+SAD_NXN(4, uvg_pixel)
+SAD_NXN(8, uvg_pixel)
+SAD_NXN(16, uvg_pixel)
+SAD_NXN(32, uvg_pixel)
+SAD_NXN(64, uvg_pixel)
 
 // Declare these functions to make sure the signature of the macro matches.
 static cost_pixel_nxn_multi_func sad_4x4_dual_generic;
@@ -515,22 +515,22 @@ static void sad_ ##  n ## x ## n ## _dual_generic( \
   for (i = 0; i < (n)*(n); ++i) { \
   sum += abs(preds[0][i] - orig[i]); \
   } \
-  costs_out[0] = sum>>(KVZ_BIT_DEPTH-8); \
+  costs_out[0] = sum>>(UVG_BIT_DEPTH-8); \
   \
   sum = 0; \
   for (i = 0; i < (n)*(n); ++i) { \
   sum += abs(preds[1][i] - orig[i]); \
   } \
-  costs_out[1] = sum>>(KVZ_BIT_DEPTH-8); \
+  costs_out[1] = sum>>(UVG_BIT_DEPTH-8); \
 }
 
-SAD_DUAL_NXN(4, kvz_pixel)
-SAD_DUAL_NXN(8, kvz_pixel)
-SAD_DUAL_NXN(16, kvz_pixel)
-SAD_DUAL_NXN(32, kvz_pixel)
-SAD_DUAL_NXN(64, kvz_pixel)
+SAD_DUAL_NXN(4, uvg_pixel)
+SAD_DUAL_NXN(8, uvg_pixel)
+SAD_DUAL_NXN(16, uvg_pixel)
+SAD_DUAL_NXN(32, uvg_pixel)
+SAD_DUAL_NXN(64, uvg_pixel)
 
-static unsigned pixels_calc_ssd_generic(const kvz_pixel *const ref, const kvz_pixel *const rec,
+static unsigned pixels_calc_ssd_generic(const uvg_pixel *const ref, const uvg_pixel *const rec,
                  const int ref_stride, const int rec_stride,
                  const int width)
 {
@@ -544,38 +544,38 @@ static unsigned pixels_calc_ssd_generic(const kvz_pixel *const ref, const kvz_pi
     }
   }
 
-  return ssd >> (2*(KVZ_BIT_DEPTH-8));
+  return ssd >> (2*(UVG_BIT_DEPTH-8));
 }
 
-static void bipred_average_px_px(kvz_pixel *dst,
-  kvz_pixel *px_L0,
-  kvz_pixel *px_L1,
+static void bipred_average_px_px(uvg_pixel *dst,
+  uvg_pixel *px_L0,
+  uvg_pixel *px_L1,
   unsigned pu_w,
   unsigned pu_h,
   unsigned dst_stride)
 {
-  int32_t shift = 15 - KVZ_BIT_DEPTH; // TODO: defines
+  int32_t shift = 15 - UVG_BIT_DEPTH; // TODO: defines
   int32_t offset = 1 << (shift - 1);
 
   for (int i = 0; i < pu_w * pu_h; ++i)
   {
     int y = i / pu_w;
     int x = i % pu_w;
-    int16_t sample_L0 = px_L0[i] << (14 - KVZ_BIT_DEPTH);
-    int16_t sample_L1 = px_L1[i] << (14 - KVZ_BIT_DEPTH);
+    int16_t sample_L0 = px_L0[i] << (14 - UVG_BIT_DEPTH);
+    int16_t sample_L1 = px_L1[i] << (14 - UVG_BIT_DEPTH);
     int32_t rounded = (sample_L0 + sample_L1 + offset) >> shift;
-    dst[y * dst_stride + x] = kvz_fast_clip_32bit_to_pixel(rounded);
+    dst[y * dst_stride + x] = uvg_fast_clip_32bit_to_pixel(rounded);
   }
 }
 
-static void bipred_average_im_im(kvz_pixel *dst,
-  kvz_pixel_im *im_L0,
-  kvz_pixel_im *im_L1,
+static void bipred_average_im_im(uvg_pixel *dst,
+  uvg_pixel_im *im_L0,
+  uvg_pixel_im *im_L1,
   unsigned pu_w,
   unsigned pu_h,
   unsigned dst_stride)
 {
-  int32_t shift = 15 - KVZ_BIT_DEPTH; // TODO: defines
+  int32_t shift = 15 - UVG_BIT_DEPTH; // TODO: defines
   int32_t offset = 1 << (shift - 1);
 
   for (int i = 0; i < pu_w * pu_h; ++i)
@@ -585,28 +585,28 @@ static void bipred_average_im_im(kvz_pixel *dst,
     int16_t sample_L0 = im_L0[i];
     int16_t sample_L1 = im_L1[i];
     int32_t rounded = (sample_L0 + sample_L1 + offset) >> shift;
-    dst[y * dst_stride + x] = kvz_fast_clip_32bit_to_pixel(rounded);
+    dst[y * dst_stride + x] = uvg_fast_clip_32bit_to_pixel(rounded);
   }
 }
 
-static void bipred_average_px_im(kvz_pixel *dst,
-  kvz_pixel *px,
-  kvz_pixel_im *im,
+static void bipred_average_px_im(uvg_pixel *dst,
+  uvg_pixel *px,
+  uvg_pixel_im *im,
   unsigned pu_w,
   unsigned pu_h,
   unsigned dst_stride)
 {
-  int32_t shift = 15 - KVZ_BIT_DEPTH; // TODO: defines
+  int32_t shift = 15 - UVG_BIT_DEPTH; // TODO: defines
   int32_t offset = 1 << (shift - 1);
 
   for (int i = 0; i < pu_w * pu_h; ++i)
   {
     int y = i / pu_w;
     int x = i % pu_w;
-    int16_t sample_px = px[i] << (14 - KVZ_BIT_DEPTH);
+    int16_t sample_px = px[i] << (14 - UVG_BIT_DEPTH);
     int16_t sample_im = im[i];
     int32_t rounded = (sample_px + sample_im + offset) >> shift;
-    dst[y * dst_stride + x] = kvz_fast_clip_32bit_to_pixel(rounded);
+    dst[y * dst_stride + x] = uvg_fast_clip_32bit_to_pixel(rounded);
   }
 }
 
@@ -635,8 +635,8 @@ static void bipred_average_generic(lcu_t *const lcu,
       bipred_average_im_im(lcu->rec.y + pb_offset, im_L0->y, im_L1->y, pu_w, pu_h, LCU_WIDTH);
 
     } else {
-      kvz_pixel    *src_px = (im_flags_L0 & 1) ? px_L1->y : px_L0->y;
-      kvz_pixel_im *src_im = (im_flags_L0 & 1) ? im_L0->y : im_L1->y;
+      uvg_pixel    *src_px = (im_flags_L0 & 1) ? px_L1->y : px_L0->y;
+      uvg_pixel_im *src_im = (im_flags_L0 & 1) ? im_L0->y : im_L1->y;
       bipred_average_px_im(lcu->rec.y + pb_offset, src_px, src_im, pu_w, pu_h, LCU_WIDTH);
     }
   }
@@ -654,10 +654,10 @@ static void bipred_average_generic(lcu_t *const lcu,
       bipred_average_im_im(lcu->rec.v + pb_offset, im_L0->v, im_L1->v, pb_w, pb_h, LCU_WIDTH_C);
 
     } else {
-      kvz_pixel    *src_px_u = (im_flags_L0 & 2) ? px_L1->u : px_L0->u;
-      kvz_pixel_im *src_im_u = (im_flags_L0 & 2) ? im_L0->u : im_L1->u;
-      kvz_pixel    *src_px_v = (im_flags_L0 & 2) ? px_L1->v : px_L0->v;
-      kvz_pixel_im *src_im_v = (im_flags_L0 & 2) ? im_L0->v : im_L1->v;
+      uvg_pixel    *src_px_u = (im_flags_L0 & 2) ? px_L1->u : px_L0->u;
+      uvg_pixel_im *src_im_u = (im_flags_L0 & 2) ? im_L0->u : im_L1->u;
+      uvg_pixel    *src_px_v = (im_flags_L0 & 2) ? px_L1->v : px_L0->v;
+      uvg_pixel_im *src_im_v = (im_flags_L0 & 2) ? im_L0->v : im_L1->v;
       bipred_average_px_im(lcu->rec.u + pb_offset, src_px_u, src_im_u, pb_w, pb_h, LCU_WIDTH_C);
       bipred_average_px_im(lcu->rec.v + pb_offset, src_px_v, src_im_v, pb_w, pb_h, LCU_WIDTH_C);
     }
@@ -681,7 +681,7 @@ static optimized_sad_func_ptr_t get_optimized_sad_generic(int32_t width)
  *
  * \returns Sum of Absolute Differences
  */
-static uint32_t ver_sad_generic(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
+static uint32_t ver_sad_generic(const uvg_pixel *pic_data, const uvg_pixel *ref_data,
                                 int block_width, int block_height, unsigned pic_stride)
 {
   int x, y;
@@ -707,7 +707,7 @@ static uint32_t ver_sad_generic(const kvz_pixel *pic_data, const kvz_pixel *ref_
  *
  * \returns Sum of Absolute Differences
  */
-static unsigned hor_sad(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
+static unsigned hor_sad(const uvg_pixel *pic_data, const uvg_pixel *ref_data,
                         int block_width, int block_height, unsigned pic_stride, unsigned ref_stride)
 {
   int x, y;
@@ -723,7 +723,7 @@ static unsigned hor_sad(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
 }
 
 
-static uint32_t hor_sad_generic(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
+static uint32_t hor_sad_generic(const uvg_pixel *pic_data, const uvg_pixel *ref_data,
                                 int32_t width, int32_t height, uint32_t pic_stride,
                                 uint32_t ref_stride, uint32_t left, uint32_t right)
 {
@@ -732,24 +732,24 @@ static uint32_t hor_sad_generic(const kvz_pixel *pic_data, const kvz_pixel *ref_
     result += hor_sad    (pic_data, ref_data + left, left,
                           height, pic_stride, ref_stride);
 
-    result += kvz_reg_sad(pic_data + left, ref_data + left, width - left,
+    result += uvg_reg_sad(pic_data + left, ref_data + left, width - left,
                           height, pic_stride, ref_stride);
   } else if (right) {
-    result += kvz_reg_sad(pic_data, ref_data, width - right,
+    result += uvg_reg_sad(pic_data, ref_data, width - right,
                           height, pic_stride, ref_stride);
 
     result += hor_sad    (pic_data + width - right,
                           ref_data + width - right - 1,
                           right, height, pic_stride, ref_stride);
   } else {
-    result += kvz_reg_sad(pic_data, ref_data, width,
+    result += uvg_reg_sad(pic_data, ref_data, width,
                           height, pic_stride, ref_stride);
   }
   return result;
 }
 
-// Calculate pixel value variance. Takes in arrays of kvz_pixel
-static double pixel_var_generic(const kvz_pixel *arr, const uint32_t len)
+// Calculate pixel value variance. Takes in arrays of uvg_pixel
+static double pixel_var_generic(const uvg_pixel *arr, const uint32_t len)
 {
   double var = 0;
   double arr_mean = 0;
@@ -774,46 +774,46 @@ static double pixel_var_generic(const kvz_pixel *arr, const uint32_t len)
   return var;
 }
 
-int kvz_strategy_register_picture_generic(void* opaque, uint8_t bitdepth)
+int uvg_strategy_register_picture_generic(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
 
-  success &= kvz_strategyselector_register(opaque, "reg_sad", "generic", 0, &reg_sad_generic);
+  success &= uvg_strategyselector_register(opaque, "reg_sad", "generic", 0, &reg_sad_generic);
 
-  success &= kvz_strategyselector_register(opaque, "sad_4x4", "generic", 0, &sad_4x4_generic);
-  success &= kvz_strategyselector_register(opaque, "sad_8x8", "generic", 0, &sad_8x8_generic);
-  success &= kvz_strategyselector_register(opaque, "sad_16x16", "generic", 0, &sad_16x16_generic);
-  success &= kvz_strategyselector_register(opaque, "sad_32x32", "generic", 0, &sad_32x32_generic);
-  success &= kvz_strategyselector_register(opaque, "sad_64x64", "generic", 0, &sad_64x64_generic);
+  success &= uvg_strategyselector_register(opaque, "sad_4x4", "generic", 0, &sad_4x4_generic);
+  success &= uvg_strategyselector_register(opaque, "sad_8x8", "generic", 0, &sad_8x8_generic);
+  success &= uvg_strategyselector_register(opaque, "sad_16x16", "generic", 0, &sad_16x16_generic);
+  success &= uvg_strategyselector_register(opaque, "sad_32x32", "generic", 0, &sad_32x32_generic);
+  success &= uvg_strategyselector_register(opaque, "sad_64x64", "generic", 0, &sad_64x64_generic);
 
-  success &= kvz_strategyselector_register(opaque, "satd_4x4", "generic", 0, &satd_4x4_generic);
-  success &= kvz_strategyselector_register(opaque, "satd_8x8", "generic", 0, &satd_8x8_generic);
-  success &= kvz_strategyselector_register(opaque, "satd_16x16", "generic", 0, &satd_16x16_generic);
-  success &= kvz_strategyselector_register(opaque, "satd_32x32", "generic", 0, &satd_32x32_generic);
-  success &= kvz_strategyselector_register(opaque, "satd_64x64", "generic", 0, &satd_64x64_generic);
+  success &= uvg_strategyselector_register(opaque, "satd_4x4", "generic", 0, &satd_4x4_generic);
+  success &= uvg_strategyselector_register(opaque, "satd_8x8", "generic", 0, &satd_8x8_generic);
+  success &= uvg_strategyselector_register(opaque, "satd_16x16", "generic", 0, &satd_16x16_generic);
+  success &= uvg_strategyselector_register(opaque, "satd_32x32", "generic", 0, &satd_32x32_generic);
+  success &= uvg_strategyselector_register(opaque, "satd_64x64", "generic", 0, &satd_64x64_generic);
 
-  success &= kvz_strategyselector_register(opaque, "sad_4x4_dual", "generic", 0, &sad_4x4_dual_generic);
-  success &= kvz_strategyselector_register(opaque, "sad_8x8_dual", "generic", 0, &sad_8x8_dual_generic);
-  success &= kvz_strategyselector_register(opaque, "sad_16x16_dual", "generic", 0, &sad_16x16_dual_generic);
-  success &= kvz_strategyselector_register(opaque, "sad_32x32_dual", "generic", 0, &sad_32x32_dual_generic);
-  success &= kvz_strategyselector_register(opaque, "sad_64x64_dual", "generic", 0, &sad_64x64_dual_generic);
+  success &= uvg_strategyselector_register(opaque, "sad_4x4_dual", "generic", 0, &sad_4x4_dual_generic);
+  success &= uvg_strategyselector_register(opaque, "sad_8x8_dual", "generic", 0, &sad_8x8_dual_generic);
+  success &= uvg_strategyselector_register(opaque, "sad_16x16_dual", "generic", 0, &sad_16x16_dual_generic);
+  success &= uvg_strategyselector_register(opaque, "sad_32x32_dual", "generic", 0, &sad_32x32_dual_generic);
+  success &= uvg_strategyselector_register(opaque, "sad_64x64_dual", "generic", 0, &sad_64x64_dual_generic);
 
-  success &= kvz_strategyselector_register(opaque, "satd_4x4_dual", "generic", 0, &satd_4x4_dual_generic);
-  success &= kvz_strategyselector_register(opaque, "satd_8x8_dual", "generic", 0, &satd_8x8_dual_generic);
-  success &= kvz_strategyselector_register(opaque, "satd_16x16_dual", "generic", 0, &satd_16x16_dual_generic);
-  success &= kvz_strategyselector_register(opaque, "satd_32x32_dual", "generic", 0, &satd_32x32_dual_generic);
-  success &= kvz_strategyselector_register(opaque, "satd_64x64_dual", "generic", 0, &satd_64x64_dual_generic);
-  success &= kvz_strategyselector_register(opaque, "satd_any_size", "generic", 0, &satd_any_size_generic);
-  success &= kvz_strategyselector_register(opaque, "satd_any_size_quad", "generic", 0, &satd_any_size_quad_generic);
+  success &= uvg_strategyselector_register(opaque, "satd_4x4_dual", "generic", 0, &satd_4x4_dual_generic);
+  success &= uvg_strategyselector_register(opaque, "satd_8x8_dual", "generic", 0, &satd_8x8_dual_generic);
+  success &= uvg_strategyselector_register(opaque, "satd_16x16_dual", "generic", 0, &satd_16x16_dual_generic);
+  success &= uvg_strategyselector_register(opaque, "satd_32x32_dual", "generic", 0, &satd_32x32_dual_generic);
+  success &= uvg_strategyselector_register(opaque, "satd_64x64_dual", "generic", 0, &satd_64x64_dual_generic);
+  success &= uvg_strategyselector_register(opaque, "satd_any_size", "generic", 0, &satd_any_size_generic);
+  success &= uvg_strategyselector_register(opaque, "satd_any_size_quad", "generic", 0, &satd_any_size_quad_generic);
 
-  success &= kvz_strategyselector_register(opaque, "pixels_calc_ssd", "generic", 0, &pixels_calc_ssd_generic);
-  success &= kvz_strategyselector_register(opaque, "bipred_average", "generic", 0, &bipred_average_generic);
+  success &= uvg_strategyselector_register(opaque, "pixels_calc_ssd", "generic", 0, &pixels_calc_ssd_generic);
+  success &= uvg_strategyselector_register(opaque, "bipred_average", "generic", 0, &bipred_average_generic);
 
-  success &= kvz_strategyselector_register(opaque, "get_optimized_sad", "generic", 0, &get_optimized_sad_generic);
-  success &= kvz_strategyselector_register(opaque, "ver_sad", "generic", 0, &ver_sad_generic);
-  success &= kvz_strategyselector_register(opaque, "hor_sad", "generic", 0, &hor_sad_generic);
+  success &= uvg_strategyselector_register(opaque, "get_optimized_sad", "generic", 0, &get_optimized_sad_generic);
+  success &= uvg_strategyselector_register(opaque, "ver_sad", "generic", 0, &ver_sad_generic);
+  success &= uvg_strategyselector_register(opaque, "hor_sad", "generic", 0, &hor_sad_generic);
 
-  success &= kvz_strategyselector_register(opaque, "pixel_var", "generic", 0, &pixel_var_generic);
+  success &= uvg_strategyselector_register(opaque, "pixel_var", "generic", 0, &pixel_var_generic);
 
   return success;
 }

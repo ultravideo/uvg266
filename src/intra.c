@@ -35,7 +35,7 @@
 #include <stdlib.h>
 
 #include "image.h"
-#include "kvz_math.h"
+#include "uvg_math.h"
 #include "mip_data.h"
 #include "strategies/strategies-intra.h"
 #include "tables.h"
@@ -82,7 +82,7 @@ static const uint8_t num_ref_pixels_left[16][16] = {
   { 4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4 }
 };
 
-int8_t kvz_intra_get_dir_luma_predictor(
+int8_t uvg_intra_get_dir_luma_predictor(
   const uint32_t x,
   const uint32_t y,
   int8_t *preds,
@@ -186,7 +186,7 @@ int8_t kvz_intra_get_dir_luma_predictor(
 
 static void intra_filter_reference(
   int_fast8_t log2_width,
-  kvz_intra_references *refs)
+  uvg_intra_references *refs)
 {
   if (refs->filtered_initialized) {
     return;
@@ -195,8 +195,8 @@ static void intra_filter_reference(
   }
 
   const int_fast8_t ref_width = 2 * (1 << log2_width) + 1;
-  kvz_intra_ref *ref = &refs->ref;
-  kvz_intra_ref *filtered_ref = &refs->filtered_ref;
+  uvg_intra_ref *ref = &refs->ref;
+  uvg_intra_ref *filtered_ref = &refs->filtered_ref;
 
   // Starting point at top left for both iterations
   filtered_ref->left[0] = (ref->left[1] + 2 * ref->left[0] + ref->top[1] + 2) >> 2;
@@ -205,7 +205,7 @@ static void intra_filter_reference(
   // TODO: use block height here instead of ref_width
   // Top to bottom
   for (int_fast8_t y = 1; y < ref_width - 1; ++y) {
-    kvz_pixel *p = &ref->left[y];
+    uvg_pixel *p = &ref->left[y];
     filtered_ref->left[y] = (p[-1] + 2 * p[0] + p[1] + 2) >> 2;
   }
   // Bottom left (not filtered) 
@@ -213,7 +213,7 @@ static void intra_filter_reference(
 
   // Left to right
   for (int_fast8_t x = 1; x < ref_width - 1; ++x) {
-    kvz_pixel *p = &ref->top[x];
+    uvg_pixel *p = &ref->top[x];
     filtered_ref->top[x] = (p[-1] + 2 * p[0] + p[1] + 2) >> 2;
   }
   // Top right (not filtered)
@@ -231,9 +231,9 @@ static void intra_filter_reference(
 */
 static void intra_pred_dc(
   const int_fast8_t log2_width,
-  const kvz_pixel *const ref_top,
-  const kvz_pixel *const ref_left,
-  kvz_pixel *const out_block,
+  const uvg_pixel *const ref_top,
+  const uvg_pixel *const ref_left,
+  uvg_pixel *const out_block,
   const uint8_t multi_ref_idx)
 {
   int_fast8_t width = 1 << log2_width;
@@ -247,11 +247,11 @@ static void intra_pred_dc(
   // JVET_K0122
   // TODO: take non-square blocks into account
   const int denom     = width << 1;
-  const int divShift  = kvz_math_floor_log2(denom);
+  const int divShift  = uvg_math_floor_log2(denom);
   const int divOffset = denom >> 1;
   
-  const kvz_pixel dc_val = (sum + divOffset) >> divShift;
-  //const kvz_pixel dc_val = (sum + width) >> (log2_width + 1);
+  const uvg_pixel dc_val = (sum + divOffset) >> divShift;
+  //const uvg_pixel dc_val = (sum + width) >> (log2_width + 1);
   const int_fast16_t block_size = 1 << (log2_width * 2);
 
   for (int_fast16_t i = 0; i < block_size; ++i) {
@@ -272,7 +272,7 @@ static void get_cclm_parameters(
   encoder_state_t const* const state,
   int8_t width, int8_t height, int8_t mode,
   int x0, int y0, int avai_above_right_units, int avai_left_below_units,
-  kvz_intra_ref* luma_src, kvz_intra_references*chroma_ref,
+  uvg_intra_ref* luma_src, uvg_intra_references*chroma_ref,
   int16_t *a, int16_t*b, int16_t*shift) {
 
   const int base_unit_size = 1 << (6 - PU_DEPTH_INTRA_MAX);
@@ -312,7 +312,7 @@ static void get_cclm_parameters(
   int min_luma[2] = { MAX_INT, 0 };
   int max_luma[2] = { -MAX_INT, 0 };
   
-  kvz_pixel* src;
+  uvg_pixel* src;
   int actualTopTemplateSampNum = 0;
   int actualLeftTemplateSampNum = 0;
   if (mode == LM_CHROMA_T_IDX)
@@ -344,8 +344,8 @@ static void get_cclm_parameters(
   startPos[1] = actualLeftTemplateSampNum >> (2 + leftIs4);
   pickStep[1] = MAX(1, actualLeftTemplateSampNum >> (1 + leftIs4));
 
-  kvz_pixel selectLumaPix[4] = { 0, 0, 0, 0 };
-  kvz_pixel selectChromaPix[4] = { 0, 0, 0, 0 };
+  uvg_pixel selectLumaPix[4] = { 0, 0, 0, 0 };
+  uvg_pixel selectChromaPix[4] = { 0, 0, 0, 0 };
 
   int cntT, cntL;
   cntT = cntL = 0;
@@ -354,7 +354,7 @@ static void get_cclm_parameters(
   {
     cntT = MIN(actualTopTemplateSampNum, (1 + aboveIs4) << 1);
     src = luma_src->top;
-    const kvz_pixel* cur = chroma_ref->ref.top + 1;
+    const uvg_pixel* cur = chroma_ref->ref.top + 1;
     for (int pos = startPos[0]; cnt < cntT; pos += pickStep[0], cnt++)
     {
       selectLumaPix[cnt] = src[pos];
@@ -366,7 +366,7 @@ static void get_cclm_parameters(
   {
     cntL = MIN(actualLeftTemplateSampNum, (1 + leftIs4) << 1);
     src = luma_src->left;
-    const kvz_pixel* cur = chroma_ref->ref.left + 1;
+    const uvg_pixel* cur = chroma_ref->ref.left + 1;
     for (int pos = startPos[1], cnt = 0; cnt < cntL; pos += pickStep[1], cnt++)
     {
       selectLumaPix[cnt + cntT] = src[pos];
@@ -415,7 +415,7 @@ static void get_cclm_parameters(
     if (diff > 0)
     {
       int diffC = max_luma[1] - min_luma[1];
-      int x = kvz_math_floor_log2(diff);
+      int x = uvg_math_floor_log2(diff);
       static const uint8_t DivSigTable[1 << 4] = {
         // 4bit significands - 8 ( MSB is omitted )
         0,  7,  6,  5,  5,  4,  4,  3,  3,  2,  2,  1,  1,  1,  1,  0
@@ -424,7 +424,7 @@ static void get_cclm_parameters(
       int v = DivSigTable[normDiff] | 8;
       x += normDiff != 0;
 
-      int y = diffC ? kvz_math_floor_log2(abs(diffC)) + 1 : 0;
+      int y = diffC ? uvg_math_floor_log2(abs(diffC)) + 1 : 0;
       int add = 1 << y >> 1;
       *a = (diffC * v + add) >> y;
       *shift = 3 + x - y;
@@ -452,7 +452,7 @@ static void get_cclm_parameters(
   }
 }
 
-static void linear_transform_cclm(cclm_parameters_t* cclm_params, kvz_pixel * src, kvz_pixel * dst, int stride, int height) {
+static void linear_transform_cclm(cclm_parameters_t* cclm_params, uvg_pixel * src, uvg_pixel * dst, int stride, int height) {
   int scale = cclm_params->a;
   int shift = cclm_params->shift;
   int offset = cclm_params->b;
@@ -468,7 +468,7 @@ static void linear_transform_cclm(cclm_parameters_t* cclm_params, kvz_pixel * sr
 }
 
 
-void kvz_predict_cclm(
+void uvg_predict_cclm(
   encoder_state_t const* const state,
   const color_t color,
   const int8_t width,
@@ -478,8 +478,8 @@ void kvz_predict_cclm(
   const int16_t stride,
   const int8_t mode,
   lcu_t* const lcu,
-  kvz_intra_references* chroma_ref,
-  kvz_pixel* dst,
+  uvg_intra_references* chroma_ref,
+  uvg_pixel* dst,
   cclm_parameters_t* cclm_params
 )
 {
@@ -487,8 +487,8 @@ void kvz_predict_cclm(
   assert(state->encoder_control->cfg.cclm);
 
   
-  kvz_intra_ref sampled_luma_ref;
-  kvz_pixel sampled_luma[LCU_CHROMA_SIZE];
+  uvg_intra_ref sampled_luma_ref;
+  uvg_pixel sampled_luma[LCU_CHROMA_SIZE];
 
   int x_scu = SUB_SCU(x0);
   int y_scu = SUB_SCU(y0);
@@ -497,7 +497,7 @@ void kvz_predict_cclm(
   int available_left_below = 0;
 
 
-  kvz_pixel *y_rec = lcu->rec.y + x_scu + y_scu * LCU_WIDTH;
+  uvg_pixel *y_rec = lcu->rec.y + x_scu + y_scu * LCU_WIDTH;
 
   // Essentially what this does is that it uses 6-tap filtering to downsample
   // the luma intra references down to match the resolution of the chroma channel.
@@ -513,7 +513,7 @@ void kvz_predict_cclm(
     }
     if(y_scu == 0) {
       if(!state->encoder_control->cfg.wpp) available_above_right = MIN(width / 2, (state->tile->frame->width - x0 - width * 2) / 4);
-      memcpy(sampled_luma_ref.top, &state->tile->frame->cclm_luma_rec_top_line[x0 / 2 + (y0 / 64 - 1) * (stride / 2)], sizeof(kvz_pixel) * (width + available_above_right * 2));
+      memcpy(sampled_luma_ref.top, &state->tile->frame->cclm_luma_rec_top_line[x0 / 2 + (y0 / 64 - 1) * (stride / 2)], sizeof(uvg_pixel) * (width + available_above_right * 2));
     }
     else {
       for (int x = 0; x < width * (available_above_right ? 4 : 2); x += 2) {
@@ -542,7 +542,7 @@ void kvz_predict_cclm(
     }    
   }
 
-  kvz_pixels_blit(&state->tile->frame->cclm_luma_rec[x0 / 2 + (y0 * stride) / 4], sampled_luma, width, height, stride / 2, width);
+  uvg_pixels_blit(&state->tile->frame->cclm_luma_rec[x0 / 2 + (y0 * stride) / 4], sampled_luma, width, height, stride / 2, width);
 
   int16_t a, b, shift;
   get_cclm_parameters(state, width, height, mode,x0, y0, available_above_right, available_left_below, &sampled_luma_ref, chroma_ref, &a, &b, &shift);
@@ -555,7 +555,7 @@ void kvz_predict_cclm(
 }
 
 
-int kvz_get_mip_flag_context(int x, int y, int width, int height, const lcu_t* lcu, cu_array_t* const cu_a) {
+int uvg_get_mip_flag_context(int x, int y, int width, int height, const lcu_t* lcu, cu_array_t* const cu_a) {
   assert(!(lcu && cu_a));
   if (width > 2 * height || height > 2 * width) {
     return 3;
@@ -576,10 +576,10 @@ int kvz_get_mip_flag_context(int x, int y, int width, int height, const lcu_t* l
   }
   else {
     if (x > 0) {
-      left = kvz_cu_array_at_const(cu_a, x - 1, y);
+      left = uvg_cu_array_at_const(cu_a, x - 1, y);
     }
     if (y > 0) {
-      top = kvz_cu_array_at_const(cu_a, x, y - 1);
+      top = uvg_cu_array_at_const(cu_a, x, y - 1);
     }
   }
   context += left && left->type == CU_INTRA ? left->intra.mip_flag : 0;
@@ -588,13 +588,13 @@ int kvz_get_mip_flag_context(int x, int y, int width, int height, const lcu_t* l
 }
 
 
-void kvz_mip_boundary_downsampling_1D(int* reduced_dst, const int* const ref_src, int src_len, int dst_len)
+void uvg_mip_boundary_downsampling_1D(int* reduced_dst, const int* const ref_src, int src_len, int dst_len)
 {
   if (dst_len < src_len)
   {
     // Create reduced boundary by downsampling
     uint16_t down_smp_factor = src_len / dst_len;
-    const int log2_factor = kvz_math_floor_log2(down_smp_factor);
+    const int log2_factor = uvg_math_floor_log2(down_smp_factor);
     const int rounding_offset = (1 << (log2_factor - 1));
 
     uint16_t src_idx = 0;
@@ -619,7 +619,7 @@ void kvz_mip_boundary_downsampling_1D(int* reduced_dst, const int* const ref_src
 }
 
 
-void kvz_mip_reduced_pred(int* const output,
+void uvg_mip_reduced_pred(int* const output,
                           const int* const input,
                           const uint8_t* matrix,
                           const bool transpose,
@@ -678,14 +678,14 @@ void kvz_mip_reduced_pred(int* const output,
 }
 
 
-void kvz_mip_pred_upsampling_1D(int* const dst, const int* const src, const int* const boundary,
+void uvg_mip_pred_upsampling_1D(int* const dst, const int* const src, const int* const boundary,
                                 const uint16_t src_size_ups_dim, const uint16_t src_size_orth_dim,
                                 const uint16_t src_step, const uint16_t src_stride,
                                 const uint16_t dst_step, const uint16_t dst_stride,
                                 const uint16_t boundary_step,
                                 const uint16_t ups_factor)
 {
-  const int log2_factor = kvz_math_floor_log2(ups_factor);
+  const int log2_factor = uvg_math_floor_log2(ups_factor);
   assert(ups_factor >= 2 && "Upsampling factor must be at least 2.");
   const int rounding_offset = 1 << (log2_factor - 1);
 
@@ -729,14 +729,14 @@ void kvz_mip_pred_upsampling_1D(int* const dst, const int* const src, const int*
 
 /** \brief Matrix weighted intra prediction.
 */
-void kvz_mip_predict(encoder_state_t const* const state, kvz_intra_references* const refs,
+void uvg_mip_predict(encoder_state_t const* const state, uvg_intra_references* const refs,
                      const uint16_t pred_block_width, const uint16_t pred_block_height,
-                     kvz_pixel* dst,
+                     uvg_pixel* dst,
                      const int mip_mode, const bool mip_transp)
 {
-  // MIP prediction uses int values instead of kvz_pixel as some temp values may be negative
+  // MIP prediction uses int values instead of uvg_pixel as some temp values may be negative
   
-  kvz_pixel* out = dst;
+  uvg_pixel* out = dst;
   int result[32*32] = {0};
   const int mode_idx = mip_mode;
 
@@ -788,8 +788,8 @@ void kvz_mip_predict(encoder_state_t const* const state, kvz_intra_references* c
   int* const top_reduced = &red_bdry[0];
   int* const left_reduced = &red_bdry[red_bdry_size];
 
-  kvz_mip_boundary_downsampling_1D(top_reduced, ref_samples_top, width, red_bdry_size);
-  kvz_mip_boundary_downsampling_1D(left_reduced, ref_samples_left, height, red_bdry_size);
+  uvg_mip_boundary_downsampling_1D(top_reduced, ref_samples_top, width, red_bdry_size);
+  uvg_mip_boundary_downsampling_1D(left_reduced, ref_samples_left, height, red_bdry_size);
 
   // Transposed reduced boundaries
   int* const left_reduced_trans = &red_bdry_trans[0];
@@ -807,8 +807,8 @@ void kvz_mip_predict(encoder_state_t const* const state, kvz_intra_references* c
 
   const bool has_first_col = (size_id < 2);
   // First column of matrix not needed for large blocks
-  red_bdry[0] = has_first_col ? ((1 << (KVZ_BIT_DEPTH - 1)) - input_offset) : 0;
-  red_bdry_trans[0] = has_first_col ? ((1 << (KVZ_BIT_DEPTH - 1)) - input_offset_trans) : 0;
+  red_bdry[0] = has_first_col ? ((1 << (UVG_BIT_DEPTH - 1)) - input_offset) : 0;
+  red_bdry_trans[0] = has_first_col ? ((1 << (UVG_BIT_DEPTH - 1)) - input_offset_trans) : 0;
 
   for (int i = 1; i < input_size; ++i) {
     red_bdry[i] -= input_offset;
@@ -825,13 +825,13 @@ void kvz_mip_predict(encoder_state_t const* const state, kvz_intra_references* c
   const uint8_t* matrix;
   switch (size_id) {
     case 0: 
-      matrix = &kvz_mip_matrix_4x4[mode_idx][0][0];
+      matrix = &uvg_mip_matrix_4x4[mode_idx][0][0];
       break;
     case 1: 
-      matrix = &kvz_mip_matrix_8x8[mode_idx][0][0];
+      matrix = &uvg_mip_matrix_8x8[mode_idx][0][0];
       break;
     case 2: 
-      matrix = &kvz_mip_matrix_16x16[mode_idx][0][0];
+      matrix = &uvg_mip_matrix_16x16[mode_idx][0][0];
       break;
     default:
       assert(false && "Invalid MIP size id.");
@@ -843,7 +843,7 @@ void kvz_mip_predict(encoder_state_t const* const state, kvz_intra_references* c
 
   const int* const reduced_bdry = transpose ? red_bdry_trans : red_bdry;
 
-  kvz_mip_reduced_pred(reduced_pred, reduced_bdry, matrix, transpose, red_bdry_size, red_pred_size, size_id, input_offset, input_offset_trans);
+  uvg_mip_reduced_pred(reduced_pred, reduced_bdry, matrix, transpose, red_bdry_size, red_pred_size, size_id, input_offset, input_offset_trans);
   if (need_upsampling) {
     const int* ver_src = reduced_pred;
     uint16_t ver_src_step = width;
@@ -853,14 +853,14 @@ void kvz_mip_predict(encoder_state_t const* const state, kvz_intra_references* c
       ver_src = hor_dst;
       ver_src_step *= ups_ver_factor;
 
-      kvz_mip_pred_upsampling_1D(hor_dst, reduced_pred, ref_samples_left,
+      uvg_mip_pred_upsampling_1D(hor_dst, reduced_pred, ref_samples_left,
         red_pred_size, red_pred_size,
         1, red_pred_size, 1, ver_src_step,
         ups_ver_factor, ups_hor_factor);
     }
 
     if (ups_ver_factor > 1) {
-      kvz_mip_pred_upsampling_1D(result, ver_src, ref_samples_top,
+      uvg_mip_pred_upsampling_1D(result, ver_src, ref_samples_top,
         red_pred_size, width,
         ver_src_step, 1, width, 1,
         1, ups_ver_factor);
@@ -869,29 +869,29 @@ void kvz_mip_predict(encoder_state_t const* const state, kvz_intra_references* c
 
   // Assign and cast values from temp array to output
   for (int i = 0; i < 32 * 32; i++) {
-    out[i] = (kvz_pixel)result[i];
+    out[i] = (uvg_pixel)result[i];
   }
   // *** BLOCK PREDICT *** END
 }
 
 
-void kvz_intra_predict(
+void uvg_intra_predict(
   encoder_state_t *const state,
-  kvz_intra_references *refs,
+  uvg_intra_references *refs,
   int_fast8_t log2_width,
   int_fast8_t mode,
   color_t color,
-  kvz_pixel *dst,
+  uvg_pixel *dst,
   bool filter_boundary,
   const uint8_t multi_ref_idx)
 {
   const int_fast8_t width = 1 << log2_width;
-  const kvz_config *cfg = &state->encoder_control->cfg;
+  const uvg_config *cfg = &state->encoder_control->cfg;
 
   // MRL only for luma
   uint8_t multi_ref_index = color == COLOR_Y ? multi_ref_idx : 0;
 
-  const kvz_intra_ref *used_ref = &refs->ref;
+  const uvg_intra_ref *used_ref = &refs->ref;
   if (cfg->intra_smoothing_disabled || color != COLOR_Y || mode == 1 || width == 4 || multi_ref_index) {
     // For chroma, DC and 4x4 blocks, always use unfiltered reference.
   } else if (mode == 0) {
@@ -902,8 +902,8 @@ void kvz_intra_predict(
   } else {
     // Angular modes use smoothed reference pixels, unless the mode is close
     // to being either vertical or horizontal.
-    static const int kvz_intra_hor_ver_dist_thres[8] = {24, 24, 24, 14, 2, 0, 0, 0 };
-    int filter_threshold = kvz_intra_hor_ver_dist_thres[(log2_width + log2_width) >> 1];
+    static const int uvg_intra_hor_ver_dist_thres[8] = {24, 24, 24, 14, 2, 0, 0, 0 };
+    int filter_threshold = uvg_intra_hor_ver_dist_thres[(log2_width + log2_width) >> 1];
     int dist_from_vert_or_hor = MIN(abs(mode - 50), abs(mode - 18));
     if (dist_from_vert_or_hor > filter_threshold) {
 
@@ -921,11 +921,11 @@ void kvz_intra_predict(
   }
 
   if (mode == 0) {
-    kvz_intra_pred_planar(log2_width, used_ref->top, used_ref->left, dst);
+    uvg_intra_pred_planar(log2_width, used_ref->top, used_ref->left, dst);
   } else if (mode == 1) {
     intra_pred_dc(log2_width, used_ref->top, used_ref->left, dst, multi_ref_index);
   } else {
-    kvz_angular_pred(log2_width, mode, color, used_ref->top, used_ref->left, dst, multi_ref_index);
+    uvg_angular_pred(log2_width, mode, color, used_ref->top, used_ref->left, dst, multi_ref_index);
   }
 
   // pdpc
@@ -933,28 +933,28 @@ void kvz_intra_predict(
   bool pdpcCondition = (mode == 0 || mode == 1); // Planar and DC
   if (pdpcCondition && multi_ref_index == 0) // Cannot be used with MRL.
   {
-    kvz_pdpc_planar_dc(mode, width, log2_width, used_ref, dst);
+    uvg_pdpc_planar_dc(mode, width, log2_width, used_ref, dst);
   }
 }
 
 
-void kvz_intra_build_reference_any(
+void uvg_intra_build_reference_any(
   const int_fast8_t log2_width,
   const color_t color,
   const vector2d_t *const luma_px,
   const vector2d_t *const pic_px,
   const lcu_t *const lcu,
-  kvz_intra_references *const refs,
+  uvg_intra_references *const refs,
   const uint8_t multi_ref_idx,
-  kvz_pixel *extra_ref_lines)
+  uvg_pixel *extra_ref_lines)
 {
   assert(log2_width >= 2 && log2_width <= 5);
 
   refs->filtered_initialized = false;
-  kvz_pixel *out_left_ref = &refs->ref.left[0];
-  kvz_pixel *out_top_ref = &refs->ref.top[0];
+  uvg_pixel *out_left_ref = &refs->ref.left[0];
+  uvg_pixel *out_top_ref = &refs->ref.top[0];
 
-  const kvz_pixel dc_val = 1 << (KVZ_BIT_DEPTH - 1); //TODO: add used bitdepth as a variable
+  const uvg_pixel dc_val = 1 << (UVG_BIT_DEPTH - 1); //TODO: add used bitdepth as a variable
   const int is_chroma = color != COLOR_Y ? 1 : 0;
   // TODO: height for non-square blocks
   const int_fast8_t width = 1 << log2_width;
@@ -974,7 +974,7 @@ void kvz_intra_build_reference_any(
   };
 
   // Init pointers to LCUs reconstruction buffers, such that index 0 refers to block coordinate 0.
-  const kvz_pixel *left_ref;
+  const uvg_pixel *left_ref;
   bool extra_ref = false;
   // On the left LCU edge, if left neighboring LCU is available, 
   // left_ref needs to point to correct extra reference line if MRL is used.
@@ -986,11 +986,11 @@ void kvz_intra_build_reference_any(
     left_ref = !color ? &lcu->left_ref.y[1] : (color == 1) ? &lcu->left_ref.u[1] : &lcu->left_ref.v[1];
   }
 
-  const kvz_pixel *top_ref = !color ? &lcu->top_ref.y[1] : (color == 1) ? &lcu->top_ref.u[1] : &lcu->top_ref.v[1];
-  const kvz_pixel *rec_ref = !color ? lcu->rec.y : (color == 1) ? lcu->rec.u : lcu->rec.v;
+  const uvg_pixel *top_ref = !color ? &lcu->top_ref.y[1] : (color == 1) ? &lcu->top_ref.u[1] : &lcu->top_ref.v[1];
+  const uvg_pixel *rec_ref = !color ? lcu->rec.y : (color == 1) ? lcu->rec.u : lcu->rec.v;
 
   // Init top borders pointer to point to the correct place in the correct reference array.
-  const kvz_pixel *top_border;
+  const uvg_pixel *top_border;
   if (px.y) {
     top_border = &rec_ref[px.x + (px.y - 1 - multi_ref_index) * (LCU_WIDTH >> is_chroma)];
   } else {
@@ -998,7 +998,7 @@ void kvz_intra_build_reference_any(
   }
 
   // Init left borders pointer to point to the correct place in the correct reference array.
-  const kvz_pixel *left_border;
+  const uvg_pixel *left_border;
   int left_stride; // Distance between reference samples.
   if (px.x) {
     left_border = &rec_ref[px.x - 1 - multi_ref_index + px.y * (LCU_WIDTH >> is_chroma)];
@@ -1030,13 +1030,13 @@ void kvz_intra_build_reference_any(
       out_left_ref[i + 1 + multi_ref_index] = left_border[i * left_stride];
     }
     // Extend the last pixel for the rest of the reference values.
-    kvz_pixel nearest_pixel = left_border[(px_available_left - 1) * left_stride];
+    uvg_pixel nearest_pixel = left_border[(px_available_left - 1) * left_stride];
     for (int i = px_available_left; i < width * 2 + multi_ref_index * 2; ++i) {
       out_left_ref[i + 1 + multi_ref_index] = nearest_pixel;
     }
   } else {
     // If we are on the left edge, extend the first pixel of the top row.
-    kvz_pixel nearest_pixel = luma_px->y > 0 ? top_border[0] : dc_val;
+    uvg_pixel nearest_pixel = luma_px->y > 0 ? top_border[0] : dc_val;
     for (int i = 0; i < width * 2 + multi_ref_index; i++) {
       // Reserve space for top left reference
       out_left_ref[i + 1 + multi_ref_index] = nearest_pixel;
@@ -1058,7 +1058,7 @@ void kvz_intra_build_reference_any(
       }
       else if (px.x == 0) {
         // LCU left border case
-        kvz_pixel *top_left_corner = &extra_ref_lines[multi_ref_index * 128];
+        uvg_pixel *top_left_corner = &extra_ref_lines[multi_ref_index * 128];
         for (int i = 0; i <= multi_ref_index; ++i) {
           out_left_ref[i] = left_border[(i - 1 - multi_ref_index) * left_stride];
           out_top_ref[i] = top_left_corner[(128 * -i) + MAX_REF_LINE_IDX - 1 - multi_ref_index];
@@ -1086,7 +1086,7 @@ void kvz_intra_build_reference_any(
       }
       else if (px.x == 0) {
         // Picture left border case. Reference pixel cannot be taken from outside LCU border
-        kvz_pixel nearest = out_left_ref[1 + multi_ref_index];
+        uvg_pixel nearest = out_left_ref[1 + multi_ref_index];
         for (int i = 0; i <= multi_ref_index; ++i) {
           out_left_ref[i] = nearest;
           out_top_ref[i] = nearest;
@@ -1134,35 +1134,35 @@ void kvz_intra_build_reference_any(
       out_top_ref[i + 1 + multi_ref_index] = top_border[i];
     }
     // Extend the last pixel for the rest of the reference values.
-    kvz_pixel nearest_pixel = top_border[px_available_top - 1];
+    uvg_pixel nearest_pixel = top_border[px_available_top - 1];
     for (int i = px_available_top; i < width * 2 + multi_ref_index * 2; ++i) {
       out_top_ref[i + 1 + multi_ref_index] = nearest_pixel;
     }
   } else {
     // Extend nearest pixel.
-    kvz_pixel nearest_pixel = luma_px->x > 0 ? left_border[0] : dc_val;
+    uvg_pixel nearest_pixel = luma_px->x > 0 ? left_border[0] : dc_val;
     for (int i = 0; i < width * 2 + multi_ref_index; i++) {
       out_top_ref[i + 1] = nearest_pixel;
     }
   }
 }
 
-void kvz_intra_build_reference_inner(
+void uvg_intra_build_reference_inner(
   const int_fast8_t log2_width,
   const color_t color,
   const vector2d_t *const luma_px,
   const vector2d_t *const pic_px,
   const lcu_t *const lcu,
-  kvz_intra_references *const refs,
+  uvg_intra_references *const refs,
   bool entropy_sync,
   const uint8_t multi_ref_idx,
-  kvz_pixel* extra_ref_lines)
+  uvg_pixel* extra_ref_lines)
 {
   assert(log2_width >= 2 && log2_width <= 5);
 
   refs->filtered_initialized = false;
-  kvz_pixel * __restrict out_left_ref = &refs->ref.left[0];
-  kvz_pixel * __restrict out_top_ref = &refs->ref.top[0];
+  uvg_pixel * __restrict out_left_ref = &refs->ref.left[0];
+  uvg_pixel * __restrict out_top_ref = &refs->ref.top[0];
 
   const int is_chroma = color != COLOR_Y ? 1 : 0;
   // TODO: height for non-sqaure blocks
@@ -1183,7 +1183,7 @@ void kvz_intra_build_reference_inner(
   };
 
   // Init pointers to LCUs reconstruction buffers, such that index 0 refers to block coordinate 0.
-  const kvz_pixel* left_ref;
+  const uvg_pixel* left_ref;
   bool extra_ref = false;
   // On the left LCU edge, if left neighboring LCU is available, 
   // left_ref needs to point to correct extra reference line if MRL is used.
@@ -1195,11 +1195,11 @@ void kvz_intra_build_reference_inner(
     left_ref = !color ? &lcu->left_ref.y[1] : (color == 1) ? &lcu->left_ref.u[1] : &lcu->left_ref.v[1];
   }
 
-  const kvz_pixel * __restrict top_ref = !color ? &lcu->top_ref.y[1] : (color == 1) ? &lcu->top_ref.u[1] : &lcu->top_ref.v[1];
-  const kvz_pixel * __restrict rec_ref = !color ? lcu->rec.y : (color == 1) ? lcu->rec.u : lcu->rec.v;
+  const uvg_pixel * __restrict top_ref = !color ? &lcu->top_ref.y[1] : (color == 1) ? &lcu->top_ref.u[1] : &lcu->top_ref.v[1];
+  const uvg_pixel * __restrict rec_ref = !color ? lcu->rec.y : (color == 1) ? lcu->rec.u : lcu->rec.v;
 
   // Init top borders pointer to point to the correct place in the correct reference array.
-  const kvz_pixel * __restrict top_border;
+  const uvg_pixel * __restrict top_border;
   if (px.y) {
     top_border = &rec_ref[px.x + (px.y - 1 - multi_ref_index) * (LCU_WIDTH >> is_chroma)];
   } else {
@@ -1207,7 +1207,7 @@ void kvz_intra_build_reference_inner(
   }
 
   // Init left borders pointer to point to the correct place in the correct reference array.
-  const kvz_pixel * __restrict left_border;
+  const uvg_pixel * __restrict left_border;
   int left_stride; // Distance between reference samples.
   if (px.x) {
     left_border = &rec_ref[px.x - 1 - multi_ref_index + px.y * (LCU_WIDTH >> is_chroma)];
@@ -1233,7 +1233,7 @@ void kvz_intra_build_reference_inner(
     }
     else if (px.x == 0) {
       // LCU left border case
-      kvz_pixel* top_left_corner = &extra_ref_lines[multi_ref_index * 128];
+      uvg_pixel* top_left_corner = &extra_ref_lines[multi_ref_index * 128];
       for (int i = 0; i <= multi_ref_index; ++i) {
         out_left_ref[i] = left_border[(i - 1 - multi_ref_index) * left_stride];
         out_top_ref[i] = top_left_corner[(128 * -i) + MAX_REF_LINE_IDX - 1 - multi_ref_index];
@@ -1285,7 +1285,7 @@ void kvz_intra_build_reference_inner(
   } while (i < px_available_left);
 
   // Extend the last pixel for the rest of the reference values.
-  kvz_pixel nearest_pixel = out_left_ref[i];
+  uvg_pixel nearest_pixel = out_left_ref[i];
   for (; i < width * 2; i += 4) {
     out_left_ref[i + 1] = nearest_pixel;
     out_left_ref[i + 2] = nearest_pixel;
@@ -1315,7 +1315,7 @@ void kvz_intra_build_reference_inner(
   // Copy all the pixels we can.
   i = 0;
   do {
-    memcpy(out_top_ref + i + 1 + multi_ref_index, top_border + i, 4 * sizeof(kvz_pixel));
+    memcpy(out_top_ref + i + 1 + multi_ref_index, top_border + i, 4 * sizeof(uvg_pixel));
     i += 4;
   } while (i < px_available_top);
 
@@ -1329,24 +1329,24 @@ void kvz_intra_build_reference_inner(
   }
 }
 
-void kvz_intra_build_reference(
+void uvg_intra_build_reference(
   const int_fast8_t log2_width,
   const color_t color,
   const vector2d_t *const luma_px,
   const vector2d_t *const pic_px,
   const lcu_t *const lcu,
-  kvz_intra_references *const refs,
+  uvg_intra_references *const refs,
   bool entropy_sync,
-  kvz_pixel *extra_ref_lines,
+  uvg_pixel *extra_ref_lines,
   uint8_t multi_ref_idx)
 {
   assert(!(extra_ref_lines == NULL && multi_ref_idx != 0) && "Trying to use MRL with NULL extra references.");
 
   // Much logic can be discarded if not on the edge
   if (luma_px->x > 0 && luma_px->y > 0) {
-    kvz_intra_build_reference_inner(log2_width, color, luma_px, pic_px, lcu, refs, entropy_sync, multi_ref_idx, extra_ref_lines);
+    uvg_intra_build_reference_inner(log2_width, color, luma_px, pic_px, lcu, refs, entropy_sync, multi_ref_idx, extra_ref_lines);
   } else {
-    kvz_intra_build_reference_any(log2_width, color, luma_px, pic_px, lcu, refs, multi_ref_idx, extra_ref_lines);
+    uvg_intra_build_reference_any(log2_width, color, luma_px, pic_px, lcu, refs, multi_ref_idx, extra_ref_lines);
   }
 }
 
@@ -1363,7 +1363,7 @@ static void intra_recon_tb_leaf(
   bool mip_flag,
   bool mip_transp)
 {
-  const kvz_config *cfg = &state->encoder_control->cfg;
+  const uvg_config *cfg = &state->encoder_control->cfg;
   const int shift = color == COLOR_Y ? 0 : 1;
 
   int log2width = LOG2_LCU_WIDTH - depth;
@@ -1385,9 +1385,9 @@ static void intra_recon_tb_leaf(
   const vector2d_t lcu_px = {x_scu >> shift, y_scu >> shift };
   uint8_t multi_ref_index = color == COLOR_Y ? multi_ref_idx : 0;
 
-  kvz_intra_references refs;
+  uvg_intra_references refs;
   // Extra reference lines for use with MRL. Extra lines needed only for left edge.
-  kvz_pixel extra_refs[128 * MAX_REF_LINE_IDX] = { 0 };
+  uvg_pixel extra_refs[128 * MAX_REF_LINE_IDX] = { 0 };
 
   if (luma_px.x > 0 && lcu_px.x == 0 && lcu_px.y > 0 && multi_ref_index != 0) {
     videoframe_t* const frame = state->tile->frame;
@@ -1397,15 +1397,15 @@ static void intra_recon_tb_leaf(
       int height = (LCU_WIDTH >> depth) * 2 + MAX_REF_LINE_IDX;
       height = MIN(height, (LCU_WIDTH - lcu_px.y + MAX_REF_LINE_IDX)); // Cut short if on bottom LCU edge. Cannot take references from below since they don't exist.
       height = MIN(height, pic_px.y - luma_px.y + MAX_REF_LINE_IDX);
-      kvz_pixels_blit(&frame->rec->y[(luma_px.y - MAX_REF_LINE_IDX) * frame->rec->stride + luma_px.x - (1 + i)],
+      uvg_pixels_blit(&frame->rec->y[(luma_px.y - MAX_REF_LINE_IDX) * frame->rec->stride + luma_px.x - (1 + i)],
         &extra_refs[i * 128],
         1, height,
         frame->rec->stride, 1);
     }
   }
-  kvz_intra_build_reference(log2width, color, &luma_px, &pic_px, lcu, &refs, cfg->wpp, extra_refs, multi_ref_index);
+  uvg_intra_build_reference(log2width, color, &luma_px, &pic_px, lcu, &refs, cfg->wpp, extra_refs, multi_ref_index);
 
-  kvz_pixel pred[32 * 32];
+  uvg_pixel pred[32 * 32];
   int stride = state->tile->frame->source->stride;
   const bool filter_boundary = color == COLOR_Y && !(cfg->lossless && cfg->implicit_rdpcm);
   bool use_mip = false;
@@ -1414,7 +1414,7 @@ static void intra_recon_tb_leaf(
       use_mip = true;
     } else {
       // MIP can be used for chroma if the chroma scheme is 444
-      if (state->encoder_control->chroma_format == KVZ_CSP_444) {
+      if (state->encoder_control->chroma_format == UVG_CSP_444) {
         use_mip = true;
       } else {
         // If MIP cannot be used for chroma, set mode to planar
@@ -1426,16 +1426,16 @@ static void intra_recon_tb_leaf(
   if(intra_mode < 68) {
     if (use_mip) {
       assert(intra_mode >= 0 && intra_mode < 16 && "MIP mode must be between [0, 15]");
-      kvz_mip_predict(state, &refs, width, height, pred, intra_mode, mip_transp);
+      uvg_mip_predict(state, &refs, width, height, pred, intra_mode, mip_transp);
     }
     else {
-      kvz_intra_predict(state, &refs, log2width, intra_mode, color, pred, filter_boundary, multi_ref_index);
+      uvg_intra_predict(state, &refs, log2width, intra_mode, color, pred, filter_boundary, multi_ref_index);
     }
   } else {
-    kvz_pixels_blit(&state->tile->frame->cclm_luma_rec[x / 2 + (y * stride) / 4], pred, width, width, stride / 2, width);
+    uvg_pixels_blit(&state->tile->frame->cclm_luma_rec[x / 2 + (y * stride) / 4], pred, width, width, stride / 2, width);
     if(cclm_params == NULL) {
       cclm_parameters_t temp_params;
-      kvz_predict_cclm(
+      uvg_predict_cclm(
         state, color, width, width, x, y, stride, intra_mode, lcu, &refs, pred, &temp_params);
     }
     else {
@@ -1444,8 +1444,8 @@ static void intra_recon_tb_leaf(
   }
 
   const int index = lcu_px.x + lcu_px.y * lcu_width;
-  kvz_pixel *block = NULL;
-  kvz_pixel *block2 = NULL;
+  uvg_pixel *block = NULL;
+  uvg_pixel *block2 = NULL;
   switch (color) {
     case COLOR_Y:
       block = &lcu->rec.y[index];
@@ -1461,9 +1461,9 @@ static void intra_recon_tb_leaf(
     default: break;
   }
 
-  kvz_pixels_blit(pred, block , width, width, width, lcu_width);
+  uvg_pixels_blit(pred, block , width, width, width, lcu_width);
   if(color != COLOR_Y && cfg->jccr) {
-    kvz_pixels_blit(pred, block2, width, width, width, lcu_width);
+    uvg_pixels_blit(pred, block2, width, width, width, lcu_width);
   }
 }
 
@@ -1482,7 +1482,7 @@ static void intra_recon_tb_leaf(
  * \param mip_transp    indicates whether the used MIP mode is transposed
  * \param lcu           containing LCU
  */
-void kvz_intra_recon_cu(
+void uvg_intra_recon_cu(
   encoder_state_t *const state,
   int x,
   int y,
@@ -1527,10 +1527,10 @@ void kvz_intra_recon_cu(
     const int32_t x2 = x + offset;
     const int32_t y2 = y + offset;
 
-    kvz_intra_recon_cu(state, x,  y,  depth + 1, mode_luma, mode_chroma, NULL, NULL, multi_ref_index, use_mip, mip_transposed, lcu);
-    kvz_intra_recon_cu(state, x2, y,  depth + 1, mode_luma, mode_chroma, NULL, NULL, multi_ref_index, use_mip, mip_transposed, lcu);
-    kvz_intra_recon_cu(state, x,  y2, depth + 1, mode_luma, mode_chroma, NULL, NULL, multi_ref_index, use_mip, mip_transposed, lcu);
-    kvz_intra_recon_cu(state, x2, y2, depth + 1, mode_luma, mode_chroma, NULL, NULL, multi_ref_index, use_mip, mip_transposed, lcu);
+    uvg_intra_recon_cu(state, x,  y,  depth + 1, mode_luma, mode_chroma, NULL, NULL, multi_ref_index, use_mip, mip_transposed, lcu);
+    uvg_intra_recon_cu(state, x2, y,  depth + 1, mode_luma, mode_chroma, NULL, NULL, multi_ref_index, use_mip, mip_transposed, lcu);
+    uvg_intra_recon_cu(state, x,  y2, depth + 1, mode_luma, mode_chroma, NULL, NULL, multi_ref_index, use_mip, mip_transposed, lcu);
+    uvg_intra_recon_cu(state, x2, y2, depth + 1, mode_luma, mode_chroma, NULL, NULL, multi_ref_index, use_mip, mip_transposed, lcu);
 
     // Propagate coded block flags from child CUs to parent CU.
     uint16_t child_cbfs[3] = {
@@ -1559,6 +1559,6 @@ void kvz_intra_recon_cu(
       intra_recon_tb_leaf(state, x, y, depth, mode_chroma, cclm_params, lcu, COLOR_V, 0, use_mip, mip_transposed);
     }
 
-    kvz_quantize_lcu_residual(state, has_luma, has_chroma, x, y, depth, cur_cu, lcu, false);
+    uvg_quantize_lcu_residual(state, has_luma, has_chroma, x, y, depth, cur_cu, lcu, false);
   }
 }

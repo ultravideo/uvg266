@@ -53,57 +53,57 @@
 #include "rate_control.h"
 
 
-static void kvazaar_close(kvz_encoder *encoder)
+static void kvazaar_close(uvg_encoder *encoder)
 {
   if (encoder) {
     // The threadqueue must be stopped before freeing states.
     if (encoder->control) {
-      kvz_threadqueue_stop(encoder->control->threadqueue);
+      uvg_threadqueue_stop(encoder->control->threadqueue);
     }
 
     if (encoder->states) {
       // Flush input frame buffer.
-      kvz_picture *pic = NULL;
-      while ((pic = kvz_encoder_feed_frame(&encoder->input_buffer,
+      uvg_picture *pic = NULL;
+      while ((pic = uvg_encoder_feed_frame(&encoder->input_buffer,
                                            &encoder->states[0],
                                            NULL,
                                            1)) != NULL) {
-        kvz_image_free(pic);
+        uvg_image_free(pic);
         pic = NULL;
       }
 
       for (unsigned i = 0; i < encoder->num_encoder_states; ++i) {
-        kvz_encoder_state_finalize(&encoder->states[i]);
+        uvg_encoder_state_finalize(&encoder->states[i]);
       }
     }
     FREE_POINTER(encoder->states);
 
-    kvz_free_rc_data();
+    uvg_free_rc_data();
     // Discard const from the pointer.
-    kvz_encoder_control_free((void*) encoder->control);
+    uvg_encoder_control_free((void*) encoder->control);
     encoder->control = NULL;
   }
   FREE_POINTER(encoder);
 }
 
 
-static kvz_encoder * kvazaar_open(const kvz_config *cfg)
+static uvg_encoder * kvazaar_open(const uvg_config *cfg)
 {
-  kvz_encoder *encoder = NULL;
+  uvg_encoder *encoder = NULL;
 
   //Initialize strategies
   // TODO: Make strategies non-global
-  if (!kvz_strategyselector_init(cfg->cpuid, KVZ_BIT_DEPTH)) {
+  if (!uvg_strategyselector_init(cfg->cpuid, UVG_BIT_DEPTH)) {
     fprintf(stderr, "Failed to initialize strategies.\n");
     goto kvazaar_open_failure;
   }
 
-  encoder = calloc(1, sizeof(kvz_encoder));
+  encoder = calloc(1, sizeof(uvg_encoder));
   if (!encoder) {
     goto kvazaar_open_failure;
   }
 
-  encoder->control = kvz_encoder_control_init(cfg);
+  encoder->control = uvg_encoder_control_init(cfg);
   if (!encoder->control) {
     goto kvazaar_open_failure;
   }
@@ -115,11 +115,11 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
   encoder->frames_done = 0;
 
   // Assure that the rc data allocation was successful
-  if(!kvz_get_rc_data(encoder->control)) {
+  if(!uvg_get_rc_data(encoder->control)) {
     goto kvazaar_open_failure;
   }
 
-  kvz_init_input_frame_buffer(&encoder->input_buffer);
+  uvg_init_input_frame_buffer(&encoder->input_buffer);
 
   encoder->states = calloc(encoder->num_encoder_states, sizeof(encoder_state_t));
   if (!encoder->states) {
@@ -128,7 +128,7 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
 
   for (unsigned i = 0; i < encoder->num_encoder_states; ++i) {
     encoder->states[i].encoder_control = encoder->control;
-    if (!kvz_encoder_state_init(&encoder->states[i], NULL)) {
+    if (!uvg_encoder_state_init(&encoder->states[i], NULL)) {
       goto kvazaar_open_failure;
     }
 
@@ -141,7 +141,7 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
     } else {
       encoder->states[i].previous_encoder_state = &encoder->states[(i - 1) % encoder->num_encoder_states];
     }
-    kvz_encoder_state_match_children_of_previous_frame(&encoder->states[i]);
+    uvg_encoder_state_match_children_of_previous_frame(&encoder->states[i]);
   }
 
   encoder->states[encoder->cur_state_num].frame->num = -1;
@@ -154,7 +154,7 @@ kvazaar_open_failure:
 }
 
 
-static void set_frame_info(kvz_frame_info *const info, const encoder_state_t *const state)
+static void set_frame_info(uvg_frame_info *const info, const encoder_state_t *const state)
 {
   info->poc = state->frame->poc,
   info->qp = state->frame->QP;
@@ -177,23 +177,23 @@ static void set_frame_info(kvz_frame_info *const info, const encoder_state_t *co
 }
 
 
-static int kvazaar_headers(kvz_encoder *enc,
-                           kvz_data_chunk **data_out,
+static int kvazaar_headers(uvg_encoder *enc,
+                           uvg_data_chunk **data_out,
                            uint32_t *len_out)
 {
   if (data_out) *data_out = NULL;
   if (len_out) *len_out = 0;
 
   bitstream_t stream;
-  kvz_bitstream_init(&stream);
+  uvg_bitstream_init(&stream);
 
-  kvz_encoder_state_write_parameter_sets(&stream, &enc->states[enc->cur_state_num]);
+  uvg_encoder_state_write_parameter_sets(&stream, &enc->states[enc->cur_state_num]);
 
   // Get stream length before taking chunks since that clears the stream.
-  if (len_out) *len_out = kvz_bitstream_tell(&stream) / 8;
-  if (data_out) *data_out = kvz_bitstream_take_chunks(&stream);
+  if (len_out) *len_out = uvg_bitstream_tell(&stream) / 8;
+  if (data_out) *data_out = uvg_bitstream_take_chunks(&stream);
 
-  kvz_bitstream_finalize(&stream);
+  uvg_bitstream_finalize(&stream);
   return 1;
 }
 
@@ -208,7 +208,7 @@ static int kvazaar_headers(kvz_encoder *enc,
 *
 * \return              1 on success, 0 on failure
 */
-static int yuv_io_extract_field(const kvz_picture *frame_in, unsigned source_scan_type, unsigned field_parity, kvz_picture *field_out)
+static int yuv_io_extract_field(const uvg_picture *frame_in, unsigned source_scan_type, unsigned field_parity, uvg_picture *field_out)
 {
   if ((source_scan_type != 1) && (source_scan_type != 2)) return 0;
   if ((field_parity != 0)     && (field_parity != 1))     return 0;
@@ -219,35 +219,35 @@ static int yuv_io_extract_field(const kvz_picture *frame_in, unsigned source_sca
 
   //Luma
   for (int i = 0; i < field_out->height; ++i){
-    kvz_pixel *row_in  = frame_in->y + MIN(frame_in->height - 1, 2 * i + offset) * frame_in->stride;
-    kvz_pixel *row_out = field_out->y + i * field_out->stride;
-    memcpy(row_out, row_in, sizeof(kvz_pixel) * frame_in->stride);
+    uvg_pixel *row_in  = frame_in->y + MIN(frame_in->height - 1, 2 * i + offset) * frame_in->stride;
+    uvg_pixel *row_out = field_out->y + i * field_out->stride;
+    memcpy(row_out, row_in, sizeof(uvg_pixel) * frame_in->stride);
   }
 
   //Chroma
   for (int i = 0; i < field_out->height / 2; ++i){
-    kvz_pixel *row_in = frame_in->u + MIN(frame_in->height / 2 - 1, 2 * i + offset) * frame_in->stride / 2;
-    kvz_pixel *row_out = field_out->u + i * field_out->stride / 2;
-    memcpy(row_out, row_in, sizeof(kvz_pixel) * frame_in->stride / 2);
+    uvg_pixel *row_in = frame_in->u + MIN(frame_in->height / 2 - 1, 2 * i + offset) * frame_in->stride / 2;
+    uvg_pixel *row_out = field_out->u + i * field_out->stride / 2;
+    memcpy(row_out, row_in, sizeof(uvg_pixel) * frame_in->stride / 2);
   }
 
   for (int i = 0; i < field_out->height / 2; ++i){
-    kvz_pixel *row_in = frame_in->v + MIN(frame_in->height / 2 - 1, 2 * i + offset) * frame_in->stride / 2;
-    kvz_pixel *row_out = field_out->v + i * field_out->stride / 2;
-    memcpy(row_out, row_in, sizeof(kvz_pixel) * frame_in->stride / 2);
+    uvg_pixel *row_in = frame_in->v + MIN(frame_in->height / 2 - 1, 2 * i + offset) * frame_in->stride / 2;
+    uvg_pixel *row_out = field_out->v + i * field_out->stride / 2;
+    memcpy(row_out, row_in, sizeof(uvg_pixel) * frame_in->stride / 2);
   }
 
   return 1;
 }
 
 
-static int kvazaar_encode(kvz_encoder *enc,
-                          kvz_picture *pic_in,
-                          kvz_data_chunk **data_out,
+static int kvazaar_encode(uvg_encoder *enc,
+                          uvg_picture *pic_in,
+                          uvg_data_chunk **data_out,
                           uint32_t *len_out,
-                          kvz_picture **pic_out,
-                          kvz_picture **src_out,
-                          kvz_frame_info *info_out)
+                          uvg_picture **pic_out,
+                          uvg_picture **src_out,
+                          uvg_frame_info *info_out)
 {
   if (data_out) *data_out = NULL;
   if (len_out) *len_out = 0;
@@ -257,7 +257,7 @@ static int kvazaar_encode(kvz_encoder *enc,
   encoder_state_t *state = &enc->states[enc->cur_state_num];
 
   if (!state->frame->prepared) {
-    kvz_encoder_prepare(state);
+    uvg_encoder_prepare(state);
   }
 
   if (pic_in != NULL) {
@@ -265,14 +265,14 @@ static int kvazaar_encode(kvz_encoder *enc,
     CHECKPOINT_MARK("read source frame: %d", state->frame->num + enc->control->cfg.seek);
   }
 
-  kvz_picture* frame = kvz_encoder_feed_frame(
+  uvg_picture* frame = uvg_encoder_feed_frame(
     &enc->input_buffer, state, pic_in,
-    enc->frames_done || state->encoder_control->cfg.rc_algorithm != KVZ_OBA
+    enc->frames_done || state->encoder_control->cfg.rc_algorithm != UVG_OBA
   );
   if (frame) {
     assert(state->frame->num == enc->frames_started);
     // Start encoding.
-    kvz_encode_one_frame(state, frame);
+    uvg_encode_one_frame(state, frame);
     enc->frames_started += 1;
   }
 
@@ -289,18 +289,18 @@ static int kvazaar_encode(kvz_encoder *enc,
   encoder_state_t *output_state = &enc->states[enc->out_state_num];
   if ((!output_state->frame->done &&
        (pic_in == NULL || enc->cur_state_num == enc->out_state_num)) ||
-       (state->frame->num == 0  && state->encoder_control->cfg.rc_algorithm == KVZ_OBA)) {
+       (state->frame->num == 0  && state->encoder_control->cfg.rc_algorithm == UVG_OBA)) {
 
-    kvz_threadqueue_waitfor(enc->control->threadqueue, output_state->tqj_bitstream_written);
+    uvg_threadqueue_waitfor(enc->control->threadqueue, output_state->tqj_bitstream_written);
     // The job pointer must be set to NULL here since it won't be usable after
     // the next frame is done.
-    kvz_threadqueue_free_job(&output_state->tqj_bitstream_written);
+    uvg_threadqueue_free_job(&output_state->tqj_bitstream_written);
 
     // Get stream length before taking chunks since that clears the stream.
-    if (len_out) *len_out = kvz_bitstream_tell(&output_state->stream) / 8;
-    if (data_out) *data_out = kvz_bitstream_take_chunks(&output_state->stream);
-    if (pic_out) *pic_out = kvz_image_copy_ref(output_state->tile->frame->rec);
-    if (src_out) *src_out = kvz_image_copy_ref(output_state->tile->frame->source);
+    if (len_out) *len_out = uvg_bitstream_tell(&output_state->stream) / 8;
+    if (data_out) *data_out = uvg_bitstream_take_chunks(&output_state->stream);
+    if (pic_out) *pic_out = uvg_image_copy_ref(output_state->tile->frame->rec);
+    if (src_out) *src_out = uvg_image_copy_ref(output_state->tile->frame->source);
     if (info_out) set_frame_info(info_out, output_state);
 
     output_state->frame->done = 1;
@@ -314,33 +314,33 @@ static int kvazaar_encode(kvz_encoder *enc,
 }
 
 
-static int kvazaar_field_encoding_adapter(kvz_encoder *enc,
-                                          kvz_picture *pic_in,
-                                          kvz_data_chunk **data_out,
+static int kvazaar_field_encoding_adapter(uvg_encoder *enc,
+                                          uvg_picture *pic_in,
+                                          uvg_data_chunk **data_out,
                                           uint32_t *len_out,
-                                          kvz_picture **pic_out,
-                                          kvz_picture **src_out,
-                                          kvz_frame_info *info_out)
+                                          uvg_picture **pic_out,
+                                          uvg_picture **src_out,
+                                          uvg_frame_info *info_out)
 {
-  if (enc->control->cfg.source_scan_type == KVZ_INTERLACING_NONE) {
+  if (enc->control->cfg.source_scan_type == UVG_INTERLACING_NONE) {
     // For progressive, simply call the normal encoding function.
     return kvazaar_encode(enc, pic_in, data_out, len_out, pic_out, src_out, info_out);
   }
 
   // For interlaced, make two fields out of the input frame and call encode on them separately.
   encoder_state_t *state = &enc->states[enc->cur_state_num];
-  kvz_picture *first_field = NULL, *second_field = NULL;
+  uvg_picture *first_field = NULL, *second_field = NULL;
   struct {
-    kvz_data_chunk* data_out;
+    uvg_data_chunk* data_out;
     uint32_t len_out;
   } first = { 0, 0 }, second = { 0, 0 };
 
   if (pic_in != NULL) {
-    first_field = kvz_image_alloc(state->encoder_control->chroma_format, state->encoder_control->in.width, state->encoder_control->in.height);
+    first_field = uvg_image_alloc(state->encoder_control->chroma_format, state->encoder_control->in.width, state->encoder_control->in.height);
     if (first_field == NULL) {
       goto kvazaar_field_encoding_adapter_failure;
     }
-    second_field = kvz_image_alloc(state->encoder_control->chroma_format, state->encoder_control->in.width, state->encoder_control->in.height);
+    second_field = uvg_image_alloc(state->encoder_control->chroma_format, state->encoder_control->in.width, state->encoder_control->in.height);
     if (second_field == NULL) {
       goto kvazaar_field_encoding_adapter_failure;
     }
@@ -365,8 +365,8 @@ static int kvazaar_field_encoding_adapter(kvz_encoder *enc,
     goto kvazaar_field_encoding_adapter_failure;
   }
 
-  kvz_image_free(first_field);
-  kvz_image_free(second_field);
+  uvg_image_free(first_field);
+  uvg_image_free(second_field);
 
   // Concatenate bitstreams.
   if (len_out != NULL) {
@@ -375,7 +375,7 @@ static int kvazaar_field_encoding_adapter(kvz_encoder *enc,
   if (data_out != NULL) {
     *data_out = first.data_out;
     if (first.data_out != NULL) {
-      kvz_data_chunk *chunk = first.data_out;
+      uvg_data_chunk *chunk = first.data_out;
       while (chunk->next != NULL) {
         chunk = chunk->next;
       }
@@ -390,35 +390,35 @@ static int kvazaar_field_encoding_adapter(kvz_encoder *enc,
   return 1;
 
 kvazaar_field_encoding_adapter_failure:
-  kvz_image_free(first_field);
-  kvz_image_free(second_field);
-  kvz_bitstream_free_chunks(first.data_out);
-  kvz_bitstream_free_chunks(second.data_out);
+  uvg_image_free(first_field);
+  uvg_image_free(second_field);
+  uvg_bitstream_free_chunks(first.data_out);
+  uvg_bitstream_free_chunks(second.data_out);
   return 0;
 }
 
 
-static const kvz_api kvz_8bit_api = {
-  .config_alloc = kvz_config_alloc,
-  .config_init = kvz_config_init,
-  .config_destroy = kvz_config_destroy,
-  .config_parse = kvz_config_parse,
+static const uvg_api uvg_8bit_api = {
+  .config_alloc = uvg_config_alloc,
+  .config_init = uvg_config_init,
+  .config_destroy = uvg_config_destroy,
+  .config_parse = uvg_config_parse,
 
-  .picture_alloc = kvz_image_alloc_420,
-  .picture_free = kvz_image_free,
+  .picture_alloc = uvg_image_alloc_420,
+  .picture_free = uvg_image_free,
 
-  .chunk_free = kvz_bitstream_free_chunks,
+  .chunk_free = uvg_bitstream_free_chunks,
 
   .encoder_open = kvazaar_open,
   .encoder_close = kvazaar_close,
   .encoder_headers = kvazaar_headers,
   .encoder_encode = kvazaar_field_encoding_adapter,
 
-  .picture_alloc_csp = kvz_image_alloc,
+  .picture_alloc_csp = uvg_image_alloc,
 };
 
 
-const kvz_api * kvz_api_get(int bit_depth)
+const uvg_api * uvg_api_get(int bit_depth)
 {
-  return &kvz_8bit_api;
+  return &uvg_8bit_api;
 }

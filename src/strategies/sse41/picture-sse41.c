@@ -34,7 +34,7 @@
 
 #if COMPILE_INTEL_SSE41
 #include "kvazaar.h"
-#if KVZ_BIT_DEPTH == 8
+#if UVG_BIT_DEPTH == 8
 #include "strategies/sse41/picture-sse41.h"
 #include "strategies/sse41/reg_sad_pow2_widths-sse41.h"
 
@@ -43,7 +43,7 @@
 
 #include "strategyselector.h"
 
-uint32_t kvz_reg_sad_sse41(const uint8_t * const data1, const uint8_t * const data2,
+uint32_t uvg_reg_sad_sse41(const uint8_t * const data1, const uint8_t * const data2,
                            const int32_t width, const int32_t height, const uint32_t stride1,
                            const uint32_t stride2)
 {
@@ -228,21 +228,21 @@ static uint32_t hor_sad_sse41(const uint8_t *pic_data, const uint8_t *ref_data,
                                    pic_stride, ref_stride, left, right);
 }
 
-#endif // KVZ_BIT_DEPTH == 8
+#endif // UVG_BIT_DEPTH == 8
 #endif //COMPILE_INTEL_SSE41
 
 
-int kvz_strategy_register_picture_sse41(void* opaque, uint8_t bitdepth) {
+int uvg_strategy_register_picture_sse41(void* opaque, uint8_t bitdepth) {
   bool success = true;
 #if COMPILE_INTEL_SSE41
-#if KVZ_BIT_DEPTH == 8
+#if UVG_BIT_DEPTH == 8
   if (bitdepth == 8){
-    success &= kvz_strategyselector_register(opaque, "reg_sad", "sse41", 20, &kvz_reg_sad_sse41);
-    success &= kvz_strategyselector_register(opaque, "get_optimized_sad", "sse41", 20, &get_optimized_sad_sse41);
-    success &= kvz_strategyselector_register(opaque, "ver_sad", "sse41", 20, &ver_sad_sse41);
-    success &= kvz_strategyselector_register(opaque, "hor_sad", "sse41", 20, &hor_sad_sse41);
+    success &= uvg_strategyselector_register(opaque, "reg_sad", "sse41", 20, &uvg_reg_sad_sse41);
+    success &= uvg_strategyselector_register(opaque, "get_optimized_sad", "sse41", 20, &get_optimized_sad_sse41);
+    success &= uvg_strategyselector_register(opaque, "ver_sad", "sse41", 20, &ver_sad_sse41);
+    success &= uvg_strategyselector_register(opaque, "hor_sad", "sse41", 20, &hor_sad_sse41);
   }
-#endif // KVZ_BIT_DEPTH == 8
+#endif // UVG_BIT_DEPTH == 8
 #endif
   return success;
 }

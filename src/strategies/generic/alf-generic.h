@@ -39,5 +39,5 @@
 
 #include "global.h" // IWYU pragma: keep
 
-int kvz_strategy_register_alf_generic(void* opaque, uint8_t bitdepth);
+int uvg_strategy_register_alf_generic(void* opaque, uint8_t bitdepth);
 

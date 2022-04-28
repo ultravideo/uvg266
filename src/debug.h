@@ -32,7 +32,7 @@
 #pragma once
 
 
-#ifdef KVZ_DEBUG_PRINT_YUVIEW_CSV
+#ifdef UVG_DEBUG_PRINT_YUVIEW_CSV
 
 enum {
   DBG_YUVIEW_CU_TYPE          =  0,
@@ -62,32 +62,32 @@ enum {
 typedef struct encoder_state_t encoder_state_t;
 typedef struct encoder_control_t encoder_control_t;
 
-void kvz_dbg_yuview_init(const encoder_control_t* const encoder, char* filename, char* sequence);
-void kvz_dbg_yuview_add_vector(int poc, int x, int y, int width, int height, int type, int x_vec, int y_vec);
-void kvz_dbg_yuview_add(int poc, int x, int y, int width, int height, int type, int val);
-void kvz_dbg_yuview_finish_frame(int poc);
-void kvz_dbg_yuview_cleanup();
+void uvg_dbg_yuview_init(const encoder_control_t* const encoder, char* filename, char* sequence);
+void uvg_dbg_yuview_add_vector(int poc, int x, int y, int width, int height, int type, int x_vec, int y_vec);
+void uvg_dbg_yuview_add(int poc, int x, int y, int width, int height, int type, int val);
+void uvg_dbg_yuview_finish_frame(int poc);
+void uvg_dbg_yuview_cleanup();
 
-#define DBG_YUVIEW_INIT(_encoder, _filename, _sequence) kvz_dbg_yuview_init(_encoder, _filename, _sequence);
-#define DBG_YUVIEW_MV(_poc, _type, _x, _y, _width, _height, _x_vec, _y_vec) kvz_dbg_yuview_add_vector(_poc, _x, _y, _width, _height, _type, _x_vec, _y_vec);
-#define DBG_YUVIEW_VALUE(_poc, _type, _x, _y, _width, _height, _val) kvz_dbg_yuview_add(_poc, _x, _y, _width, _height, _type, _val);
-#define DBG_YUVIEW_FINISH_FRAME(_poc) kvz_dbg_yuview_finish_frame(_poc);
-#define DBG_YUVIEW_CLEANUP() kvz_dbg_yuview_cleanup();
+#define DBG_YUVIEW_INIT(_encoder, _filename, _sequence) uvg_dbg_yuview_init(_encoder, _filename, _sequence);
+#define DBG_YUVIEW_MV(_poc, _type, _x, _y, _width, _height, _x_vec, _y_vec) uvg_dbg_yuview_add_vector(_poc, _x, _y, _width, _height, _type, _x_vec, _y_vec);
+#define DBG_YUVIEW_VALUE(_poc, _type, _x, _y, _width, _height, _val) uvg_dbg_yuview_add(_poc, _x, _y, _width, _height, _type, _val);
+#define DBG_YUVIEW_FINISH_FRAME(_poc) uvg_dbg_yuview_finish_frame(_poc);
+#define DBG_YUVIEW_CLEANUP() uvg_dbg_yuview_cleanup();
 #else
 #define DBG_YUVIEW_INIT(_encoder, _filename, _sequence)
 #define DBG_YUVIEW_MV(_poc, _type, _x, _y, _width, _height, _x_vec, _y_vec)
 #define DBG_YUVIEW_VALUE(_poc, _type, _x, _y, _width, _height, _val)
 #define DBG_YUVIEW_FINISH_FRAME(_poc)
 #define DBG_YUVIEW_CLEANUP()
-#endif //KVZ_DEBUG_PRINT_YUVIEW_CSV
+#endif //UVG_DEBUG_PRINT_YUVIEW_CSV
 
-#ifdef KVZ_DEBUG_PRINT_THREADING_INFO
-void kvz_dbg_encoder_state_dump_graphviz(const encoder_state_t* const state)
-#endif //KVZ_DEBUG_PRINT_THREADING_INFO
+#ifdef UVG_DEBUG_PRINT_THREADING_INFO
+void uvg_dbg_encoder_state_dump_graphviz(const encoder_state_t* const state)
+#endif //UVG_DEBUG_PRINT_THREADING_INFO
 
-#ifdef KVZ_DEBUG_PRINT_MV_INFO
-void kvz_print_merge_vectors(const encoder_state_t* const state, uint32_t pic_x, uint32_t pic_y, uint32_t block_width, uint32_t block_height, cu_info_t* cu);
-#define DBG_PRINT_MV(_state, _pic_x, _pic_y, _block_width, _block_height, _cu) kvz_print_merge_vectors(_state, _pic_x, _pic_y, _block_width, _block_height, _cu);
+#ifdef UVG_DEBUG_PRINT_MV_INFO
+void uvg_print_merge_vectors(const encoder_state_t* const state, uint32_t pic_x, uint32_t pic_y, uint32_t block_width, uint32_t block_height, cu_info_t* cu);
+#define DBG_PRINT_MV(_state, _pic_x, _pic_y, _block_width, _block_height, _cu) uvg_print_merge_vectors(_state, _pic_x, _pic_y, _block_width, _block_height, _cu);
 #else
 #define DBG_PRINT_MV(_state, _pic_x, _pic_y, _block_width, _block_height, _cu)
-#endif // KVZ_DEBUG_PRINT_MV_INFO
+#endif // UVG_DEBUG_PRINT_MV_INFO

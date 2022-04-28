@@ -54,7 +54,7 @@ typedef enum rdpcm_dir {
 //
 
 
-const uint8_t kvz_g_chroma_scale[58]=
+const uint8_t uvg_g_chroma_scale[58]=
 {
    0, 1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,15,16,
   17,18,19,20,21,22,23,24,25,26,27,28,29,29,30,31,32,
@@ -86,9 +86,9 @@ const uint8_t kvz_g_chroma_scale[58]=
 static bool bypass_transquant(const int width,
                               const int in_stride,
                               const int out_stride,
-                              const kvz_pixel *const ref_in,
-                              const kvz_pixel *const pred_in,
-                              kvz_pixel *rec_out,
+                              const uvg_pixel *const ref_in,
+                              const uvg_pixel *const pred_in,
+                              uvg_pixel *rec_out,
                               coeff_t *coeff_out)
 {
   bool nonzero_coeffs = false;
@@ -139,7 +139,7 @@ static void rdpcm(const int width,
  * \brief Get scaled QP used in quantization
  *
  */
-int32_t kvz_get_scaled_qp(color_t color, int8_t qp, int8_t qp_offset, int8_t const * const chroma_scale)
+int32_t uvg_get_scaled_qp(color_t color, int8_t qp, int8_t qp_offset, int8_t const * const chroma_scale)
 {
   int32_t qp_scaled = 0;
   if(color == 0) {
@@ -162,7 +162,7 @@ int32_t kvz_get_scaled_qp(color_t color, int8_t qp, int8_t qp_offset, int8_t con
  * \param block output data (residual)
  * \param block_size input data (width of transform)
  */
-void kvz_transformskip(const encoder_control_t * const encoder, int16_t *block,int16_t *coeff, int8_t block_size)
+void uvg_transformskip(const encoder_control_t * const encoder, int16_t *block,int16_t *coeff, int8_t block_size)
 {
   int32_t  j,k;
   for (j = 0; j < block_size; j++) {
@@ -179,7 +179,7 @@ void kvz_transformskip(const encoder_control_t * const encoder, int16_t *block,i
  * \param block output data (residual)
  * \param block_size width of transform
  */
-void kvz_itransformskip(const encoder_control_t * const encoder, int16_t *block,int16_t *coeff, int8_t block_size)
+void uvg_itransformskip(const encoder_control_t * const encoder, int16_t *block,int16_t *coeff, int8_t block_size)
 {
   int32_t  j,k;
   for ( j = 0; j < block_size; j++ ) {
@@ -195,7 +195,7 @@ void kvz_itransformskip(const encoder_control_t * const encoder, int16_t *block,
  * \param coeff transform coefficients
  * \param block_size width of transform
  */
-void kvz_transform2d(const encoder_control_t * const encoder,
+void uvg_transform2d(const encoder_control_t * const encoder,
                      int16_t *block,
                      int16_t *coeff,
                      int8_t block_size,
@@ -204,16 +204,16 @@ void kvz_transform2d(const encoder_control_t * const encoder,
 {
   if (encoder->cfg.mts)
   {
-    kvz_mts_dct(encoder->bitdepth, color, tu, block_size, block, coeff, encoder->cfg.mts);
+    uvg_mts_dct(encoder->bitdepth, color, tu, block_size, block, coeff, encoder->cfg.mts);
   }
   else
   {
-    dct_func *dct_func = kvz_get_dct_func(block_size, color, tu->type);
+    dct_func *dct_func = uvg_get_dct_func(block_size, color, tu->type);
     dct_func(encoder->bitdepth, block, coeff);
   }
 }
 
-void kvz_itransform2d(const encoder_control_t * const encoder,
+void uvg_itransform2d(const encoder_control_t * const encoder,
                       int16_t *block,
                       int16_t *coeff,
                       int8_t block_size,
@@ -222,17 +222,17 @@ void kvz_itransform2d(const encoder_control_t * const encoder,
 {
   if (encoder->cfg.mts)
   {
-    kvz_mts_idct(encoder->bitdepth, color, tu, block_size, coeff, block, encoder->cfg.mts);
+    uvg_mts_idct(encoder->bitdepth, color, tu, block_size, coeff, block, encoder->cfg.mts);
   }
   else
   {
-    dct_func *idct_func = kvz_get_idct_func(block_size, color, tu->type);
+    dct_func *idct_func = uvg_get_idct_func(block_size, color, tu->type);
     idct_func(encoder->bitdepth, coeff, block);
   }
 }
 
 /**
- * \brief Like kvz_quantize_residual except that this uses trskip if that is better.
+ * \brief Like uvg_quantize_residual except that this uses trskip if that is better.
  *
  * Using this function saves one step of quantization and inverse quantization
  * compared to doing the decision separately from the actual operation.
@@ -249,16 +249,16 @@ void kvz_itransform2d(const encoder_control_t * const encoder,
  *
  * \returns  Whether coeff_out contains any non-zero coefficients.
  */
-int kvz_quantize_residual_trskip(
+int uvg_quantize_residual_trskip(
     encoder_state_t *const state,
     const cu_info_t *const cur_cu, const int width, const color_t color,
     const coeff_scan_order_t scan_order, int8_t *trskip_out, 
     const int in_stride, const int out_stride,
-    const kvz_pixel *const ref_in, const kvz_pixel *const pred_in, 
-    kvz_pixel *rec_out, coeff_t *coeff_out, int lmcs_chroma_adj)
+    const uvg_pixel *const ref_in, const uvg_pixel *const pred_in, 
+    uvg_pixel *rec_out, coeff_t *coeff_out, int lmcs_chroma_adj)
 {
   struct {
-    kvz_pixel rec[LCU_WIDTH * LCU_WIDTH];
+    uvg_pixel rec[LCU_WIDTH * LCU_WIDTH];
     coeff_t coeff[LCU_WIDTH * LCU_WIDTH];
     uint32_t cost;
     int has_coeffs;
@@ -266,19 +266,19 @@ int kvz_quantize_residual_trskip(
 
   const int bit_cost = (int)(state->lambda + 0.5);
   
-  //noskip.has_coeffs = kvz_quantize_residual(
+  //noskip.has_coeffs = uvg_quantize_residual(
   //    state, cur_cu, width, color, scan_order,
   //    0, in_stride, 4,
   //    ref_in, pred_in, noskip.rec, noskip.coeff, false);
-  //noskip.cost = kvz_pixels_calc_ssd(ref_in, noskip.rec, in_stride, 4, 4);
-  //noskip.cost += kvz_get_coeff_cost(state, noskip.coeff, 4, 0, scan_order) * bit_cost;
+  //noskip.cost = uvg_pixels_calc_ssd(ref_in, noskip.rec, in_stride, 4, 4);
+  //noskip.cost += uvg_get_coeff_cost(state, noskip.coeff, 4, 0, scan_order) * bit_cost;
 
-  skip.has_coeffs = kvz_quantize_residual(
+  skip.has_coeffs = uvg_quantize_residual(
     state, cur_cu, width, color, scan_order,
     1, in_stride, width,
     ref_in, pred_in, skip.rec, skip.coeff, false, lmcs_chroma_adj);
-  skip.cost = kvz_pixels_calc_ssd(ref_in, skip.rec, in_stride, width, width);
-  skip.cost += kvz_get_coeff_cost(state, skip.coeff, width, 0, scan_order, 1) * bit_cost;
+  skip.cost = uvg_pixels_calc_ssd(ref_in, skip.rec, in_stride, width, width);
+  skip.cost += uvg_get_coeff_cost(state, skip.coeff, width, 0, scan_order, 1) * bit_cost;
 
 /*  if (noskip.cost <= skip.cost) {
     *trskip_out = 0;
@@ -291,7 +291,7 @@ int kvz_quantize_residual_trskip(
   if (best->has_coeffs || rec_out != pred_in) {
     // If there is no residual and reconstruction is already in rec_out, 
     // we can skip this.
-    kvz_pixels_blit(best->rec, rec_out, width, width, width, out_stride);
+    uvg_pixels_blit(best->rec, rec_out, width, width, width, out_stride);
   }
   copy_coeffs(best->coeff, coeff_out, width);
 
@@ -312,7 +312,7 @@ static void quantize_tr_residual(encoder_state_t * const state,
                                  lcu_t* lcu,
                                  bool early_skip)
 {
-  const kvz_config *cfg    = &state->encoder_control->cfg;
+  const uvg_config *cfg    = &state->encoder_control->cfg;
   const int32_t shift      = color == COLOR_Y ? 0 : 1;
   const vector2d_t lcu_px  = { SUB_SCU(x) >> shift, SUB_SCU(y) >> shift};
 
@@ -340,15 +340,15 @@ static void quantize_tr_residual(encoder_state_t * const state,
   const int8_t mode =
     (color == COLOR_Y) ? cur_pu->intra.mode : cur_pu->intra.mode_chroma;
   const coeff_scan_order_t scan_idx =
-    kvz_get_scan_order(cur_pu->type, mode, depth);
+    uvg_get_scan_order(cur_pu->type, mode, depth);
   const int offset = lcu_px.x + lcu_px.y * lcu_width;
   const int z_index = xy_to_zorder(lcu_width, lcu_px.x, lcu_px.y);
 
   // Pointers to current location in arrays with prediction. The
   // reconstruction will be written to this array.
-  kvz_pixel *pred = NULL;
+  uvg_pixel *pred = NULL;
   // Pointers to current location in arrays with reference.
-  const kvz_pixel *ref = NULL;
+  const uvg_pixel *ref = NULL;
   // Pointers to current location in arrays with quantized coefficients.
   coeff_t *coeff = NULL;
 
@@ -382,7 +382,7 @@ static void quantize_tr_residual(encoder_state_t * const state,
 
   int lmcs_chroma_adj = 0;
   if (state->tile->frame->lmcs_aps->m_sliceReshapeInfo.enableChromaAdj && color != COLOR_Y) {
-    lmcs_chroma_adj = kvz_calculate_lmcs_chroma_adj_vpdu_nei(state, state->tile->frame->lmcs_aps, x, y);
+    lmcs_chroma_adj = uvg_calculate_lmcs_chroma_adj_vpdu_nei(state, state->tile->frame->lmcs_aps, x, y);
   }
 
   if (cfg->lossless) {
@@ -406,7 +406,7 @@ static void quantize_tr_residual(encoder_state_t * const state,
     int8_t tr_skip = 0;
 
     // Try quantization with trskip and use it if it's better.
-    has_coeffs = kvz_quantize_residual_trskip(state,
+    has_coeffs = uvg_quantize_residual_trskip(state,
                                               cur_pu,
                                               tr_width,
                                               color,
@@ -422,7 +422,7 @@ static void quantize_tr_residual(encoder_state_t * const state,
     cur_pu->tr_skip = tr_skip;
   } else {
     if(color == COLOR_UV) {
-      has_coeffs = kvz_quant_cbcr_residual(
+      has_coeffs = uvg_quant_cbcr_residual(
         state,
         cur_pu,
         tr_width,
@@ -440,7 +440,7 @@ static void quantize_tr_residual(encoder_state_t * const state,
       return;
     }
 
-    has_coeffs = kvz_quantize_residual(state,
+    has_coeffs = uvg_quantize_residual(state,
                                        cur_pu,
                                        tr_width,
                                        color,
@@ -481,7 +481,7 @@ static void quantize_tr_residual(encoder_state_t * const state,
  * - lcu->cbf               coded block flags for the area
  * - lcu->cu.intra.tr_skip  tr skip flags for the area (in case of luma)
  */
-void kvz_quantize_lcu_residual(encoder_state_t * const state,
+void uvg_quantize_lcu_residual(encoder_state_t * const state,
                                const bool luma,
                                const bool chroma,
                                const int32_t x,
@@ -523,10 +523,10 @@ void kvz_quantize_lcu_residual(encoder_state_t * const state,
     const int32_t x2 = x + offset;
     const int32_t y2 = y + offset;
 
-    kvz_quantize_lcu_residual(state, luma, chroma, x,  y,  depth + 1, NULL, lcu, early_skip);
-    kvz_quantize_lcu_residual(state, luma, chroma, x2, y,  depth + 1, NULL, lcu, early_skip);
-    kvz_quantize_lcu_residual(state, luma, chroma, x,  y2, depth + 1, NULL, lcu, early_skip);
-    kvz_quantize_lcu_residual(state, luma, chroma, x2, y2, depth + 1, NULL, lcu, early_skip);
+    uvg_quantize_lcu_residual(state, luma, chroma, x,  y,  depth + 1, NULL, lcu, early_skip);
+    uvg_quantize_lcu_residual(state, luma, chroma, x2, y,  depth + 1, NULL, lcu, early_skip);
+    uvg_quantize_lcu_residual(state, luma, chroma, x,  y2, depth + 1, NULL, lcu, early_skip);
+    uvg_quantize_lcu_residual(state, luma, chroma, x2, y2, depth + 1, NULL, lcu, early_skip);
 
     // Propagate coded block flags from child CUs to parent CU.
     uint16_t child_cbfs[3] = {

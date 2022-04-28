@@ -37,19 +37,19 @@
 
 
 // Define function pointers.
-sao_edge_ddistortion_func * kvz_sao_edge_ddistortion;
-calc_sao_edge_dir_func * kvz_calc_sao_edge_dir;
-sao_reconstruct_color_func * kvz_sao_reconstruct_color;
-sao_band_ddistortion_func * kvz_sao_band_ddistortion;
+sao_edge_ddistortion_func * uvg_sao_edge_ddistortion;
+calc_sao_edge_dir_func * uvg_calc_sao_edge_dir;
+sao_reconstruct_color_func * uvg_sao_reconstruct_color;
+sao_band_ddistortion_func * uvg_sao_band_ddistortion;
 
 
-int kvz_strategy_register_sao(void* opaque, uint8_t bitdepth) {
+int uvg_strategy_register_sao(void* opaque, uint8_t bitdepth) {
   bool success = true;
 
-  success &= kvz_strategy_register_sao_generic(opaque, bitdepth);
+  success &= uvg_strategy_register_sao_generic(opaque, bitdepth);
 
-  if (kvz_g_hardware_flags.intel_flags.avx2) {
-    success &= kvz_strategy_register_sao_avx2(opaque, bitdepth);
+  if (uvg_g_hardware_flags.intel_flags.avx2) {
+    success &= uvg_strategy_register_sao_avx2(opaque, bitdepth);
   }
 
   return success;

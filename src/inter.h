@@ -44,7 +44,7 @@
 #include "image.h"
 #include "kvazaar.h"
 
-extern const int8_t kvz_g_imv_to_prec[4];
+extern const int8_t uvg_g_imv_to_prec[4];
 
 typedef struct {
   mv_t mv[2][2];
@@ -53,12 +53,12 @@ typedef struct {
   uint8_t ref[2]; // index to L0/L1
 } inter_merge_cand_t;
 
-void kvz_change_precision(int src, int dst, mv_t* hor, mv_t* ver);
-void kvz_change_precision_vector2d(int src, int dst, vector2d_t* mv);
-void kvz_round_precision(int src, int dst, mv_t* hor, mv_t* ver);
-void kvz_round_precision_vector2d(int src, int dst, vector2d_t* mv);
+void uvg_change_precision(int src, int dst, mv_t* hor, mv_t* ver);
+void uvg_change_precision_vector2d(int src, int dst, vector2d_t* mv);
+void uvg_round_precision(int src, int dst, mv_t* hor, mv_t* ver);
+void uvg_round_precision_vector2d(int src, int dst, vector2d_t* mv);
 
-void kvz_inter_recon_cu(const encoder_state_t * const state,
+void uvg_inter_recon_cu(const encoder_state_t * const state,
                         lcu_t *lcu,
                         int32_t x,
                         int32_t y,
@@ -66,7 +66,7 @@ void kvz_inter_recon_cu(const encoder_state_t * const state,
                         bool predict_luma,
                         bool predict_chroma);
 
-void kvz_inter_pred_pu(const encoder_state_t * const state,
+void uvg_inter_pred_pu(const encoder_state_t * const state,
   lcu_t *lcu,
   int32_t x,
   int32_t y,
@@ -75,11 +75,11 @@ void kvz_inter_pred_pu(const encoder_state_t * const state,
   bool predict_chroma,
   int i_pu);
 
-void kvz_hmvp_add_mv(const encoder_state_t* const state, uint32_t pic_x, uint32_t pic_y, uint32_t block_width, uint32_t block_height, const cu_info_t* cu);
+void uvg_hmvp_add_mv(const encoder_state_t* const state, uint32_t pic_x, uint32_t pic_y, uint32_t block_width, uint32_t block_height, const cu_info_t* cu);
 
-void kvz_inter_recon_bipred(const encoder_state_t * const state,
-                            const kvz_picture * ref1,
-                            const kvz_picture * ref2,
+void uvg_inter_recon_bipred(const encoder_state_t * const state,
+                            const uvg_picture * ref1,
+                            const uvg_picture * ref2,
                             int32_t xpos,
                             int32_t ypos,
                             int32_t width,
@@ -90,7 +90,7 @@ void kvz_inter_recon_bipred(const encoder_state_t * const state,
                             bool predict_chroma);
 
 
-void kvz_inter_get_mv_cand(const encoder_state_t * const state,
+void uvg_inter_get_mv_cand(const encoder_state_t * const state,
                            int32_t x,
                            int32_t y,
                            int32_t width,
@@ -100,7 +100,7 @@ void kvz_inter_get_mv_cand(const encoder_state_t * const state,
                            lcu_t *lcu,
                            int8_t reflist);
 
-void kvz_inter_get_mv_cand_cua(const encoder_state_t * const state,
+void uvg_inter_get_mv_cand_cua(const encoder_state_t * const state,
                                int32_t x,
                                int32_t y,
                                int32_t width,
@@ -109,7 +109,7 @@ void kvz_inter_get_mv_cand_cua(const encoder_state_t * const state,
                                const cu_info_t* cur_cu,
                                int8_t reflist);
 
-uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
+uint8_t uvg_inter_get_merge_cand(const encoder_state_t * const state,
                                  int32_t x, int32_t y,
                                  int32_t width, int32_t height,
                                  bool use_a1, bool use_b1,

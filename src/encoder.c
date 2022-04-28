@@ -42,7 +42,7 @@
 #include "gop.h"
 #include "rdo.h"
 #include "strategyselector.h"
-#include "kvz_math.h"
+#include "uvg_math.h"
 #include "fast_coeff_cost.h"
 
 /**
@@ -57,12 +57,12 @@ static int encoder_control_init_gop_layer_weights(encoder_control_t * const);
 
 static unsigned cfg_num_threads(void)
 {
-  if (kvz_g_hardware_flags.logical_cpu_count == 0) {
+  if (uvg_g_hardware_flags.logical_cpu_count == 0) {
     // Default to 4 if we don't know the number of CPUs.
     return 4;
   }
 
-  return kvz_g_hardware_flags.logical_cpu_count;
+  return uvg_g_hardware_flags.logical_cpu_count;
 }
 
 
@@ -212,7 +212,7 @@ static void init_erp_aqp_roi(encoder_control_t* encoder,
 }
 
 
-static int8_t* derive_chroma_QP_mapping_table(const kvz_config* const cfg, int i)
+static int8_t* derive_chroma_QP_mapping_table(const uvg_config* const cfg, int i)
 {
   const int MAX_QP = 63;
 
@@ -259,7 +259,7 @@ static int8_t* derive_chroma_QP_mapping_table(const kvz_config* const cfg, int i
  * \param cfg   encoder configuration
  * \return      initialized encoder control or NULL on failure
  */
-encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
+encoder_control_t* uvg_encoder_control_init(const uvg_config *const cfg)
 {
   encoder_control_t *encoder = NULL;
 
@@ -269,7 +269,7 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
   }
 
   // Make sure that the parameters make sense.
-  if (!kvz_config_validate(cfg)) {
+  if (!uvg_config_validate(cfg)) {
     goto init_failed;
   }
 
@@ -291,16 +291,16 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
   if (encoder->cfg.gop_len > 0) {
     if (encoder->cfg.gop_lowdelay) {
       if (encoder->cfg.gop_len == 4 && encoder->cfg.ref_frames == 4) {
-        memcpy(encoder->cfg.gop, kvz_gop_lowdelay4, sizeof(kvz_gop_lowdelay4));
+        memcpy(encoder->cfg.gop, uvg_gop_lowdelay4, sizeof(uvg_gop_lowdelay4));
       } else {
-        kvz_config_process_lp_gop(&encoder->cfg);
+        uvg_config_process_lp_gop(&encoder->cfg);
       }
     }
   } 
   
   if( encoder->cfg.intra_qp_offset_auto ) {
     // Limit offset to -3 since HM/VTM seems to use it even for 32 frame gop
-    encoder->cfg.intra_qp_offset = encoder->cfg.gop_len > 1 ? MAX(-(int8_t)kvz_math_ceil_log2( encoder->cfg.gop_len ) + 1, -3) : 0;
+    encoder->cfg.intra_qp_offset = encoder->cfg.gop_len > 1 ? MAX(-(int8_t)uvg_math_ceil_log2( encoder->cfg.gop_len ) + 1, -3) : 0;
   }
 
   // Disable GOP and QP offset for all-intra coding
@@ -309,7 +309,7 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
     encoder->cfg.intra_qp_offset = 0;
   }
 
-  encoder->poc_lsb_bits = MAX(4, kvz_math_ceil_log2(encoder->cfg.gop_len * 2 + 1));
+  encoder->poc_lsb_bits = MAX(4, uvg_math_ceil_log2(encoder->cfg.gop_len * 2 + 1));
 
   encoder->max_inter_ref_lcu.right = 1;
   encoder->max_inter_ref_lcu.down  = 1;
@@ -352,7 +352,7 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
     fprintf(stderr, "--threads=auto value set to %d.\n", encoder->cfg.threads);
   }
 
-  if (encoder->cfg.source_scan_type != KVZ_INTERLACING_NONE) {
+  if (encoder->cfg.source_scan_type != UVG_INTERLACING_NONE) {
     // If using interlaced coding with OWF, the OWF has to be an even number
     // to ensure that the pair of fields will be output for the same picture.
     if (encoder->cfg.owf % 2 == 1) {
@@ -360,15 +360,15 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
     }
   }
 
-  encoder->threadqueue = kvz_threadqueue_init(encoder->cfg.threads);
+  encoder->threadqueue = uvg_threadqueue_init(encoder->cfg.threads);
   if (!encoder->threadqueue) {
     fprintf(stderr, "Could not initialize threadqueue.\n");
     goto init_failed;
   }
 
-  encoder->bitdepth = KVZ_BIT_DEPTH;
+  encoder->bitdepth = UVG_BIT_DEPTH;
 
-  encoder->chroma_format = KVZ_FORMAT2CSP(encoder->cfg.input_format);
+  encoder->chroma_format = UVG_FORMAT2CSP(encoder->cfg.input_format);
 
   // Interlacing
   encoder->in.source_scan_type = (int8_t)encoder->cfg.source_scan_type;
@@ -376,19 +376,19 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
   encoder->vui.frame_field_info_present_flag = encoder->cfg.source_scan_type != 0;
 
   // Initialize the scaling list
-  kvz_scalinglist_init(&encoder->scaling_list);
+  uvg_scalinglist_init(&encoder->scaling_list);
 
   // CQM
-  if (cfg->scaling_list == KVZ_SCALING_LIST_CUSTOM && cfg->cqmfile) {
+  if (cfg->scaling_list == UVG_SCALING_LIST_CUSTOM && cfg->cqmfile) {
     FILE* cqmfile = fopen(cfg->cqmfile, "rb");
     if (cqmfile) {
-      kvz_scalinglist_parse(&encoder->scaling_list, cqmfile);
+      uvg_scalinglist_parse(&encoder->scaling_list, cqmfile);
       fclose(cqmfile);
     } else {
       fprintf(stderr, "Could not open CQM file.\n");
       goto init_failed;
     }
-  } else if (cfg->scaling_list == KVZ_SCALING_LIST_DEFAULT) {
+  } else if (cfg->scaling_list == UVG_SCALING_LIST_DEFAULT) {
     // Enable scaling lists if default lists are used
     encoder->scaling_list.enable = 1;
     encoder->scaling_list.use_default_list = 1;
@@ -400,13 +400,13 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
       fprintf(stderr, "Could not open fast coeff table file.\n");
       goto init_failed;
     }
-    if (kvz_fast_coeff_table_parse(&encoder->fast_coeff_table, fast_coeff_table_f) != 0) {
+    if (uvg_fast_coeff_table_parse(&encoder->fast_coeff_table, fast_coeff_table_f) != 0) {
       fprintf(stderr, "Failed to parse fast coeff table, using default\n");
-      kvz_fast_coeff_use_default_table(&encoder->fast_coeff_table);
+      uvg_fast_coeff_use_default_table(&encoder->fast_coeff_table);
     }
     fclose(fast_coeff_table_f);
   } else {
-    kvz_fast_coeff_use_default_table(&encoder->fast_coeff_table);
+    uvg_fast_coeff_use_default_table(&encoder->fast_coeff_table);
   }
 
   if (cfg->fastrd_sampling_on || cfg->fastrd_accuracy_check_on) {
@@ -414,14 +414,14 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
       fprintf(stderr, "No output file defined for Fast RD sampling or accuracy check.\n");
       goto init_failed;
     }
-    if (kvz_init_rdcost_outfiles(cfg->fastrd_learning_outdir_fn) != 0) {
+    if (uvg_init_rdcost_outfiles(cfg->fastrd_learning_outdir_fn) != 0) {
       goto init_failed;
     }
   }
 
-  kvz_scalinglist_process(&encoder->scaling_list, encoder->bitdepth);
+  uvg_scalinglist_process(&encoder->scaling_list, encoder->bitdepth);
 
-  kvz_encoder_control_input_init(encoder, encoder->cfg.width, encoder->cfg.height);
+  uvg_encoder_control_input_init(encoder, encoder->cfg.width, encoder->cfg.height);
 
   if (encoder->cfg.framerate_num != 0) {
     double framerate = encoder->cfg.framerate_num / (double)encoder->cfg.framerate_denom;
@@ -603,13 +603,13 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
       }
     }
 
-    if (encoder->cfg.slices & KVZ_SLICES_WPP) {
+    if (encoder->cfg.slices & UVG_SLICES_WPP) {
       // Each WPP row will be put into a dependent slice.
       encoder->pps.dependent_slice_segments_enabled_flag = 1;
     }
 
     //Slices
-    if (encoder->cfg.slices & KVZ_SLICES_TILES) {
+    if (encoder->cfg.slices & UVG_SLICES_TILES) {
       // Configure a single independent slice per tile.
 
       int *slice_addresses_in_ts;
@@ -674,8 +674,8 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
       for (int x = 0; x < encoder->in.width_in_lcu; ++x) {
         const int lcu_id_rs = y * encoder->in.width_in_lcu + x;
         const int lcu_id_ts = encoder->tiles_ctb_addr_rs_to_ts[lcu_id_rs];
-        const char slice_start = kvz_lcu_at_slice_start(encoder, lcu_id_ts) ? '|' : ' ';
-        const char slice_end = kvz_lcu_at_slice_end(encoder, lcu_id_ts)  ? '|' : ' ';
+        const char slice_start = uvg_lcu_at_slice_start(encoder, lcu_id_ts) ? '|' : ' ';
+        const char slice_end = uvg_lcu_at_slice_end(encoder, lcu_id_ts)  ? '|' : ' ';
 
         printf("%c%03d%c", slice_start, encoder->tiles_tile_id[lcu_id_ts], slice_end);
       }
@@ -688,10 +688,10 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
       printf("Wavefront Parallel Processing: disabled\n");
     }
     printf("\n");
-#endif //KVZ_DEBUG
+#endif //UVG_DEBUG
   }
 
-  for( size_t i = 0; i < KVZ_MAX_GOP_LAYERS; i++ )
+  for( size_t i = 0; i < UVG_MAX_GOP_LAYERS; i++ )
   {
       if( encoder->cfg.pu_depth_inter.min[i] < 0 || cfg->pu_depth_inter.max[i] < 0 ) continue;
       assert( WITHIN( encoder->cfg.pu_depth_inter.min[i], PU_DEPTH_INTER_MIN, PU_DEPTH_INTER_MAX ) );
@@ -715,7 +715,7 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
     encoder->vui.timing_info_present_flag = 1;
     encoder->vui.num_units_in_tick = encoder->cfg.framerate_denom;
     encoder->vui.time_scale = encoder->cfg.framerate_num;
-    if (encoder->cfg.source_scan_type != KVZ_INTERLACING_NONE) {
+    if (encoder->cfg.source_scan_type != UVG_INTERLACING_NONE) {
       // when field_seq_flag=1, the time_scale and num_units_in_tick refer to
       // field rate rather than frame rate.
       encoder->vui.time_scale *= 2;
@@ -735,14 +735,14 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
   return encoder;
 
 init_failed:
-  kvz_encoder_control_free(encoder);
+  uvg_encoder_control_free(encoder);
   return NULL;
 }
 
 /**
  * \brief Free an encoder control structure.
  */
-void kvz_encoder_control_free(encoder_control_t *const encoder)
+void uvg_encoder_control_free(encoder_control_t *const encoder)
 {
   if (!encoder) return;
 
@@ -763,20 +763,20 @@ void kvz_encoder_control_free(encoder_control_t *const encoder)
 
   FREE_POINTER(encoder->cfg.roi.dqps);
 
-  kvz_scalinglist_destroy(&encoder->scaling_list);
+  uvg_scalinglist_destroy(&encoder->scaling_list);
 
-  kvz_threadqueue_free(encoder->threadqueue);
+  uvg_threadqueue_free(encoder->threadqueue);
   encoder->threadqueue = NULL;
   for (int i = 0; i < encoder->cfg.num_used_table; i++) {
     if (encoder->qp_map[i]) FREE_POINTER(encoder->qp_map[i]);
   }
 
-  kvz_close_rdcost_outfiles();
+  uvg_close_rdcost_outfiles();
 
   free(encoder);
 }
 
-void kvz_encoder_control_input_init(encoder_control_t * const encoder,
+void uvg_encoder_control_input_init(encoder_control_t * const encoder,
                         const int32_t width, int32_t height)
 {
   // Halve for interlaced content
@@ -814,7 +814,7 @@ void kvz_encoder_control_input_init(encoder_control_t * const encoder,
   encoder->in.pixels_per_pic = encoder->in.width * encoder->in.height;
 
 
-  #ifdef KVZ_DEBUG
+  #ifdef UVG_DEBUG
   if (width != encoder->in.width || height != encoder->in.height) {
     printf("Picture buffer has been extended to be a multiple of the smallest block size:\r\n");
     printf("  Width = %d (%d), Height = %d (%d)\r\n", width, encoder->in.width, height,
@@ -834,7 +834,7 @@ void kvz_encoder_control_input_init(encoder_control_t * const encoder,
 static int encoder_control_init_gop_layer_weights(encoder_control_t * const encoder)
 {
 
-  kvz_gop_config const * const gop = encoder->cfg.gop;
+  uvg_gop_config const * const gop = encoder->cfg.gop;
   const int8_t gop_len = encoder->cfg.gop_len;
 
   int num_layers = 0;

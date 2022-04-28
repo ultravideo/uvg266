@@ -126,26 +126,26 @@ typedef struct
 
 
 // Globals
-extern const uint8_t kvz_g_auc_renorm_table[32];
+extern const uint8_t uvg_g_auc_renorm_table[32];
 
 
 // Functions
-void kvz_cabac_start(cabac_data_t *data);
-void kvz_cabac_encode_bin(cabac_data_t *data, uint32_t bin_value);
-void kvz_cabac_encode_bin_ep(cabac_data_t *data, uint32_t bin_value);
-void kvz_cabac_encode_trunc_bin(cabac_data_t *data, uint32_t bin_value, uint32_t max_value);
-void kvz_cabac_encode_bins_ep(cabac_data_t *data, uint32_t bin_values, int num_bins);
-void kvz_cabac_encode_bin_trm(cabac_data_t *data, uint8_t bin_value);
-void kvz_cabac_write(cabac_data_t *data);
-void kvz_cabac_finish(cabac_data_t *data);
-void kvz_cabac_write_coeff_remain(cabac_data_t *cabac, uint32_t symbol,
+void uvg_cabac_start(cabac_data_t *data);
+void uvg_cabac_encode_bin(cabac_data_t *data, uint32_t bin_value);
+void uvg_cabac_encode_bin_ep(cabac_data_t *data, uint32_t bin_value);
+void uvg_cabac_encode_trunc_bin(cabac_data_t *data, uint32_t bin_value, uint32_t max_value);
+void uvg_cabac_encode_bins_ep(cabac_data_t *data, uint32_t bin_values, int num_bins);
+void uvg_cabac_encode_bin_trm(cabac_data_t *data, uint8_t bin_value);
+void uvg_cabac_write(cabac_data_t *data);
+void uvg_cabac_finish(cabac_data_t *data);
+void uvg_cabac_write_coeff_remain(cabac_data_t *cabac, uint32_t symbol,
                               uint32_t r_param, const unsigned int cutoff);
-void kvz_cabac_write_ep_ex_golomb(struct encoder_state_t * const state, cabac_data_t *data,
+void uvg_cabac_write_ep_ex_golomb(struct encoder_state_t * const state, cabac_data_t *data,
                 uint32_t symbol, uint32_t count);
-void kvz_cabac_write_unary_max_symbol(cabac_data_t *data, cabac_ctx_t *ctx,
+void uvg_cabac_write_unary_max_symbol(cabac_data_t *data, cabac_ctx_t *ctx,
                                   uint32_t symbol, int32_t offset,
                                   uint32_t max_symbol);
-void kvz_cabac_write_unary_max_symbol_ep(cabac_data_t *data, unsigned int symbol, unsigned int max_symbol);
+void uvg_cabac_write_unary_max_symbol_ep(cabac_data_t *data, unsigned int symbol, unsigned int max_symbol);
 
 #define CTX_PROB_BITS 15
 #define CTX_PROB_BITS_0 10
@@ -180,35 +180,35 @@ void kvz_cabac_write_unary_max_symbol_ep(cabac_data_t *data, unsigned int symbol
  (ctx)->rate = 16 * rate0 + rate1;\
 }
 
-#ifdef KVZ_DEBUG_PRINT_CABAC
-extern uint32_t kvz_cabac_bins_count;
-extern bool kvz_cabac_bins_verbose;
+#ifdef UVG_DEBUG_PRINT_CABAC
+extern uint32_t uvg_cabac_bins_count;
+extern bool uvg_cabac_bins_verbose;
 #define CABAC_BIN(data, value, name) { \
     uint32_t prev_state = CTX_STATE(data->cur_ctx); \
-    if(kvz_cabac_bins_verbose && !data->only_count) {printf("%d %d  [%d:%d]  %s = %u, range = %u LPS = %u state = %u -> ", \
-           kvz_cabac_bins_count++, (data)->range, (data)->range-CTX_LPS(data->cur_ctx,(data)->range), CTX_LPS(data->cur_ctx,(data)->range), (name), (uint32_t)(value), (data)->range, CTX_LPS(data->cur_ctx,(data)->range), prev_state); }\
-    kvz_cabac_encode_bin((data), (value)); \
-    if(kvz_cabac_bins_verbose && !data->only_count) printf("%u\n", CTX_STATE(data->cur_ctx)); }
+    if(uvg_cabac_bins_verbose && !data->only_count) {printf("%d %d  [%d:%d]  %s = %u, range = %u LPS = %u state = %u -> ", \
+           uvg_cabac_bins_count++, (data)->range, (data)->range-CTX_LPS(data->cur_ctx,(data)->range), CTX_LPS(data->cur_ctx,(data)->range), (name), (uint32_t)(value), (data)->range, CTX_LPS(data->cur_ctx,(data)->range), prev_state); }\
+    uvg_cabac_encode_bin((data), (value)); \
+    if(uvg_cabac_bins_verbose && !data->only_count) printf("%u\n", CTX_STATE(data->cur_ctx)); }
     
 
   #define CABAC_BINS_EP(data, value, bins, name) { \
     uint32_t prev_state = CTX_STATE(data->cur_ctx); \
-    kvz_cabac_encode_bins_ep((data), (value), (bins)); \
-    if(kvz_cabac_bins_verbose && !data->only_count) { printf("%d %s = %u(%u bins), state = %u -> %u\n", \
-           kvz_cabac_bins_count, (name), (uint32_t)(value), (bins), prev_state, CTX_STATE(data->cur_ctx));  kvz_cabac_bins_count+=bins;}}
+    uvg_cabac_encode_bins_ep((data), (value), (bins)); \
+    if(uvg_cabac_bins_verbose && !data->only_count) { printf("%d %s = %u(%u bins), state = %u -> %u\n", \
+           uvg_cabac_bins_count, (name), (uint32_t)(value), (bins), prev_state, CTX_STATE(data->cur_ctx));  uvg_cabac_bins_count+=bins;}}
 
   #define CABAC_BIN_EP(data, value, name) { \
     uint32_t prev_state = CTX_STATE(data->cur_ctx); \
-    kvz_cabac_encode_bin_ep((data), (value)); \
-    if(kvz_cabac_bins_verbose && !data->only_count) {printf("%d %s = %u, state = %u -> %u\n", \
-           kvz_cabac_bins_count++, (name), (uint32_t)(value), prev_state, CTX_STATE(data->cur_ctx)); }}
+    uvg_cabac_encode_bin_ep((data), (value)); \
+    if(uvg_cabac_bins_verbose && !data->only_count) {printf("%d %s = %u, state = %u -> %u\n", \
+           uvg_cabac_bins_count++, (name), (uint32_t)(value), prev_state, CTX_STATE(data->cur_ctx)); }}
 #else
   #define CABAC_BIN(data, value, name) \
-    kvz_cabac_encode_bin((data), (value));
+    uvg_cabac_encode_bin((data), (value));
   #define CABAC_BINS_EP(data, value, bins, name) \
-    kvz_cabac_encode_bins_ep((data), (value), (bins));
+    uvg_cabac_encode_bins_ep((data), (value), (bins));
   #define CABAC_BIN_EP(data, value, name) \
-    kvz_cabac_encode_bin_ep((data), (value));
+    uvg_cabac_encode_bin_ep((data), (value));
 #endif
 
 #endif

@@ -41,7 +41,7 @@
 #include "encoderstate.h"
 #include "global.h"
 
-void kvz_encode_coeff_nxn_generic(encoder_state_t * const state,
+void uvg_encode_coeff_nxn_generic(encoder_state_t * const state,
                                   cabac_data_t * const cabac,
                                   const coeff_t *coeff,
                                   uint8_t width,
@@ -50,6 +50,6 @@ void kvz_encode_coeff_nxn_generic(encoder_state_t * const state,
                                   cu_info_t* cur_cu,
                                   bool is_luma);
 
-int kvz_strategy_register_encode_generic(void* opaque, uint8_t bitdepth);
+int uvg_strategy_register_encode_generic(void* opaque, uint8_t bitdepth);
 
 #endif // ENCODE_CODING_TREE_GENERIC_H_

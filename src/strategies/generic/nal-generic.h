@@ -40,6 +40,6 @@
 
 #include "global.h" // IWYU pragma: keep
 
-int kvz_strategy_register_nal_generic(void* opaque, uint8_t bitdepth);
+int uvg_strategy_register_nal_generic(void* opaque, uint8_t bitdepth);
 
 #endif //STRATEGIES_NAL_GENERIC_H_

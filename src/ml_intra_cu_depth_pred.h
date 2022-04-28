@@ -95,9 +95,9 @@ typedef struct {
 
 typedef int (*tree_predict)(features_s*, double*, double*);
 
-ml_intra_ctu_pred_t* kvz_init_ml_intra_depth_const(void);
-void kvz_end_ml_intra_depth_const(ml_intra_ctu_pred_t * ml_intra_depth_ctu);
+ml_intra_ctu_pred_t* uvg_init_ml_intra_depth_const(void);
+void uvg_end_ml_intra_depth_const(ml_intra_ctu_pred_t * ml_intra_depth_ctu);
 
-void kvz_lcu_luma_depth_pred(ml_intra_ctu_pred_t* ml_intra_depth_ctu, kvz_pixel* luma_px, int8_t qp);
+void uvg_lcu_luma_depth_pred(ml_intra_ctu_pred_t* ml_intra_depth_ctu, uvg_pixel* luma_px, int8_t qp);
 
 #endif

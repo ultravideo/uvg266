@@ -76,9 +76,9 @@ typedef enum {
   MTS_TR_NUM    = 6,
 } mts_idx;
 
-extern const uint8_t kvz_part_mode_num_parts[];
-extern const uint8_t kvz_part_mode_offsets[][4][2];
-extern const uint8_t kvz_part_mode_sizes[][4][2];
+extern const uint8_t uvg_part_mode_num_parts[];
+extern const uint8_t uvg_part_mode_offsets[][4][2];
+extern const uint8_t uvg_part_mode_sizes[][4][2];
 
 /**
  * \brief Get the x coordinate of a PU.
@@ -90,7 +90,7 @@ extern const uint8_t kvz_part_mode_sizes[][4][2];
  * \return            location of the left edge of the PU
  */
 #define PU_GET_X(part_mode, cu_width, cu_x, i) \
-  ((cu_x) + kvz_part_mode_offsets[(part_mode)][(i)][0] * (cu_width) / 4)
+  ((cu_x) + uvg_part_mode_offsets[(part_mode)][(i)][0] * (cu_width) / 4)
 
 /**
  * \brief Get the y coordinate of a PU.
@@ -102,7 +102,7 @@ extern const uint8_t kvz_part_mode_sizes[][4][2];
  * \return            location of the top edge of the PU
  */
 #define PU_GET_Y(part_mode, cu_width, cu_y, i) \
-  ((cu_y) + kvz_part_mode_offsets[(part_mode)][(i)][1] * (cu_width) / 4)
+  ((cu_y) + uvg_part_mode_offsets[(part_mode)][(i)][1] * (cu_width) / 4)
 
 /**
  * \brief Get the width of a PU.
@@ -113,7 +113,7 @@ extern const uint8_t kvz_part_mode_sizes[][4][2];
  * \return            width of the PU
  */
 #define PU_GET_W(part_mode, cu_width, i) \
-  (kvz_part_mode_sizes[(part_mode)][(i)][0] * (cu_width) / 4)
+  (uvg_part_mode_sizes[(part_mode)][(i)][0] * (cu_width) / 4)
 
 /**
  * \brief Get the height of a PU.
@@ -124,7 +124,7 @@ extern const uint8_t kvz_part_mode_sizes[][4][2];
  * \return            height of the PU
  */
 #define PU_GET_H(part_mode, cu_width, i) \
-  (kvz_part_mode_sizes[(part_mode)][(i)][1] * (cu_width) / 4)
+  (uvg_part_mode_sizes[(part_mode)][(i)][1] * (cu_width) / 4)
 
 //////////////////////////////////////////////////////////////////////////
 // TYPES
@@ -221,17 +221,17 @@ typedef struct cu_array_t {
   int32_t refcount; //!< \brief number of references to this cu_array
 } cu_array_t;
 
-cu_info_t* kvz_cu_array_at(cu_array_t *cua, unsigned x_px, unsigned y_px);
-const cu_info_t* kvz_cu_array_at_const(const cu_array_t *cua, unsigned x_px, unsigned y_px);
+cu_info_t* uvg_cu_array_at(cu_array_t *cua, unsigned x_px, unsigned y_px);
+const cu_info_t* uvg_cu_array_at_const(const cu_array_t *cua, unsigned x_px, unsigned y_px);
 
-cu_array_t * kvz_cu_array_alloc(const int width, const int height);
-cu_array_t * kvz_cu_subarray(cu_array_t *base,
+cu_array_t * uvg_cu_array_alloc(const int width, const int height);
+cu_array_t * uvg_cu_subarray(cu_array_t *base,
                              const unsigned x_offset,
                              const unsigned y_offset,
                              const unsigned width,
                              const unsigned height);
-void kvz_cu_array_free(cu_array_t **cua_ptr);
-cu_array_t * kvz_cu_array_copy_ref(cu_array_t* cua);
+void uvg_cu_array_free(cu_array_t **cua_ptr);
+cu_array_t * uvg_cu_array_copy_ref(cu_array_t* cua);
 
 
 /**
@@ -256,9 +256,9 @@ cu_array_t * kvz_cu_array_copy_ref(cu_array_t* cua);
  * - First pixel is the top-left pixel.
  */
 typedef struct {
-  kvz_pixel y[LCU_REF_PX_WIDTH + 1];
-  kvz_pixel u[LCU_REF_PX_WIDTH / 2 + 1];
-  kvz_pixel v[LCU_REF_PX_WIDTH / 2 + 1];
+  uvg_pixel y[LCU_REF_PX_WIDTH + 1];
+  uvg_pixel u[LCU_REF_PX_WIDTH / 2 + 1];
+  uvg_pixel v[LCU_REF_PX_WIDTH / 2 + 1];
 } lcu_ref_px_t;
 
 /**
@@ -356,7 +356,7 @@ typedef struct {
   cu_info_t cu[LCU_T_CU_WIDTH * LCU_T_CU_WIDTH + 1];
 } lcu_t;
 
-void kvz_cu_array_copy_from_lcu(cu_array_t* dst, int dst_x, int dst_y, const lcu_t *src);
+void uvg_cu_array_copy_from_lcu(cu_array_t* dst, int dst_x, int dst_y, const lcu_t *src);
 
 /**
  * \brief Return pointer to the top right reference CU.

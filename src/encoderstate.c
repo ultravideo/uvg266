@@ -54,13 +54,13 @@
 #include "strategies/strategies-picture.h"
 
 
-int kvz_encoder_state_match_children_of_previous_frame(encoder_state_t * const state) {
+int uvg_encoder_state_match_children_of_previous_frame(encoder_state_t * const state) {
   int i;
   for (i = 0; state->children[i].encoder_control; ++i) {
     //Child should also exist for previous encoder
     assert(state->previous_encoder_state->children[i].encoder_control);
     state->children[i].previous_encoder_state = &state->previous_encoder_state->children[i];
-    kvz_encoder_state_match_children_of_previous_frame(&state->children[i]);
+    uvg_encoder_state_match_children_of_previous_frame(&state->children[i]);
   }
   return 1;
 }
@@ -111,22 +111,22 @@ static void encoder_state_recdata_before_sao_to_bufs(
     // where x_px is in pixels and y_lcu in number of LCUs.
     const unsigned to_index = pos.x + lcu->position.y * frame->width;
 
-    kvz_pixels_blit(&frame->rec->y[from_index],
+    uvg_pixels_blit(&frame->rec->y[from_index],
                     &hor_buf->y[to_index],
                     length, 1,
                     frame->rec->stride,
                     frame->width);
 
-    if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+    if (state->encoder_control->chroma_format != UVG_CSP_400) {
       const unsigned from_index_c = (pos.x / 2) + (pos.y / 2) * frame->rec->stride / 2;
       const unsigned to_index_c = (pos.x / 2) + lcu->position.y * frame->width / 2;
 
-      kvz_pixels_blit(&frame->rec->u[from_index_c],
+      uvg_pixels_blit(&frame->rec->u[from_index_c],
                       &hor_buf->u[to_index_c],
                       length / 2, 1,
                       frame->rec->stride / 2,
                       frame->width / 2);
-      kvz_pixels_blit(&frame->rec->v[from_index_c],
+      uvg_pixels_blit(&frame->rec->v[from_index_c],
                       &hor_buf->v[to_index_c],
                       length / 2, 1,
                       frame->rec->stride / 2,
@@ -160,20 +160,20 @@ static void encoder_state_recdata_before_sao_to_bufs(
     // where x_lcu is in number of LCUs and y_px in pixels.
     const unsigned to_index = lcu->position.x * frame->height + pos.y;
 
-    kvz_pixels_blit(&frame->rec->y[from_index],
+    uvg_pixels_blit(&frame->rec->y[from_index],
                     &ver_buf->y[to_index],
                     1, length,
                     frame->rec->stride, 1);
 
-    if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+    if (state->encoder_control->chroma_format != UVG_CSP_400) {
       const unsigned from_index_c = (pos.x / 2) + (pos.y / 2) * frame->rec->stride / 2;
       const unsigned to_index_c = lcu->position.x * frame->height / 2 + pos.y / 2;
 
-      kvz_pixels_blit(&frame->rec->u[from_index_c],
+      uvg_pixels_blit(&frame->rec->u[from_index_c],
                       &ver_buf->u[to_index_c],
                       1, length / 2,
                       frame->rec->stride / 2, 1);
-      kvz_pixels_blit(&frame->rec->v[from_index_c],
+      uvg_pixels_blit(&frame->rec->v[from_index_c],
                       &ver_buf->v[to_index_c],
                       1, length / 2,
                       frame->rec->stride / 2, 1);
@@ -196,20 +196,20 @@ static void encoder_state_recdata_to_bufs(encoder_state_t * const state,
     unsigned from_index = bottom.y * frame->rec->stride + bottom.x;
     unsigned to_index = lcu->position_px.x + lcu_row * frame->width;
     
-    kvz_pixels_blit(&frame->rec->y[from_index],
+    uvg_pixels_blit(&frame->rec->y[from_index],
                     &hor_buf->y[to_index],
                     lcu->size.x, 1,
                     frame->rec->stride, frame->width);
 
-    if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+    if (state->encoder_control->chroma_format != UVG_CSP_400) {
       unsigned from_index_c = (bottom.y / 2) * frame->rec->stride / 2 + (bottom.x / 2);
       unsigned to_index_c = lcu->position_px.x / 2 + lcu_row * frame->width / 2;
 
-      kvz_pixels_blit(&frame->rec->u[from_index_c],
+      uvg_pixels_blit(&frame->rec->u[from_index_c],
                       &hor_buf->u[to_index_c],
                       lcu->size.x / 2, 1, 
                       frame->rec->stride / 2, frame->width / 2);
-      kvz_pixels_blit(&frame->rec->v[from_index_c],
+      uvg_pixels_blit(&frame->rec->v[from_index_c],
                       &hor_buf->v[to_index_c],
                       lcu->size.x / 2, 1,
                       frame->rec->stride / 2, frame->width / 2);
@@ -222,20 +222,20 @@ static void encoder_state_recdata_to_bufs(encoder_state_t * const state,
     const int lcu_col = lcu->position.x;
     vector2d_t left = { lcu->position_px.x + lcu->size.x - 1, lcu->position_px.y };
     
-    kvz_pixels_blit(&frame->rec->y[left.y * frame->rec->stride + left.x],
+    uvg_pixels_blit(&frame->rec->y[left.y * frame->rec->stride + left.x],
                     &ver_buf->y[lcu->position_px.y + lcu_col * frame->height],
                     1, lcu->size.y,
                     frame->rec->stride, 1);
 
-    if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+    if (state->encoder_control->chroma_format != UVG_CSP_400) {
       unsigned from_index = (left.y / 2) * frame->rec->stride / 2 + (left.x / 2);
       unsigned to_index = lcu->position_px.y / 2 + lcu_col * frame->height / 2;
 
-      kvz_pixels_blit(&frame->rec->u[from_index],
+      uvg_pixels_blit(&frame->rec->u[from_index],
                       &ver_buf->u[to_index],
                       1, lcu->size.y / 2,
                       frame->rec->stride / 2, 1);
-      kvz_pixels_blit(&frame->rec->v[from_index],
+      uvg_pixels_blit(&frame->rec->v[from_index],
                       &ver_buf->v[to_index],
                       1, lcu->size.y / 2,
                       frame->rec->stride / 2, 1);
@@ -272,14 +272,14 @@ static void encoder_sao_reconstruct(const encoder_state_t *const state,
   // horizontal direction.
 #define SAO_BUF_WIDTH   (1 + SAO_DELAY_PX   + LCU_WIDTH)
 #define SAO_BUF_WIDTH_C (1 + SAO_DELAY_PX/2 + LCU_WIDTH_C)
-  kvz_pixel sao_buf_y_array[SAO_BUF_WIDTH   * SAO_BUF_WIDTH   + 2];
-  kvz_pixel sao_buf_u_array[SAO_BUF_WIDTH_C * SAO_BUF_WIDTH_C + 2];
-  kvz_pixel sao_buf_v_array[SAO_BUF_WIDTH_C * SAO_BUF_WIDTH_C + 2];
+  uvg_pixel sao_buf_y_array[SAO_BUF_WIDTH   * SAO_BUF_WIDTH   + 2];
+  uvg_pixel sao_buf_u_array[SAO_BUF_WIDTH_C * SAO_BUF_WIDTH_C + 2];
+  uvg_pixel sao_buf_v_array[SAO_BUF_WIDTH_C * SAO_BUF_WIDTH_C + 2];
 
   // Pointers to the top-left pixel of the LCU in the buffers.
-  kvz_pixel *const sao_buf_y = &sao_buf_y_array[(SAO_DELAY_PX + 1) * (SAO_BUF_WIDTH + 1)];
-  kvz_pixel *const sao_buf_u = &sao_buf_u_array[(SAO_DELAY_PX/2 + 1) * (SAO_BUF_WIDTH_C + 1)];
-  kvz_pixel *const sao_buf_v = &sao_buf_v_array[(SAO_DELAY_PX/2 + 1) * (SAO_BUF_WIDTH_C + 1)];
+  uvg_pixel *const sao_buf_y = &sao_buf_y_array[(SAO_DELAY_PX + 1) * (SAO_BUF_WIDTH + 1)];
+  uvg_pixel *const sao_buf_u = &sao_buf_u_array[(SAO_DELAY_PX/2 + 1) * (SAO_BUF_WIDTH_C + 1)];
+  uvg_pixel *const sao_buf_v = &sao_buf_v_array[(SAO_DELAY_PX/2 + 1) * (SAO_BUF_WIDTH_C + 1)];
 
   const int x_offsets[3] = {
     // If there is an lcu to the left, we need to filter its rightmost
@@ -320,22 +320,22 @@ static void encoder_sao_reconstruct(const encoder_state_t *const state,
   if (lcu->above) {
     const int from_index = (lcu->position_px.x + x_offsets[0] - border_left) +
                            (lcu->position.y - 1) * frame->width;
-    kvz_pixels_blit(&state->tile->hor_buf_before_sao->y[from_index],
+    uvg_pixels_blit(&state->tile->hor_buf_before_sao->y[from_index],
                     &sao_buf_y[border_index],
                     width + border_left + border_right,
                     1,
                     frame->width,
                     SAO_BUF_WIDTH);
-    if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+    if (state->encoder_control->chroma_format != UVG_CSP_400) {
       const int from_index_c = (lcu->position_px.x + x_offsets[0])/2 - border_left +
                                (lcu->position.y - 1) * frame->width/2;
-      kvz_pixels_blit(&state->tile->hor_buf_before_sao->u[from_index_c],
+      uvg_pixels_blit(&state->tile->hor_buf_before_sao->u[from_index_c],
                       &sao_buf_u[border_index_c],
                       width/2 + border_left + border_right,
                       1,
                       frame->width/2,
                       SAO_BUF_WIDTH_C);
-      kvz_pixels_blit(&state->tile->hor_buf_before_sao->v[from_index_c],
+      uvg_pixels_blit(&state->tile->hor_buf_before_sao->v[from_index_c],
                       &sao_buf_v[border_index_c],
                       width/2 + border_left + border_right,
                       1,
@@ -346,22 +346,22 @@ static void encoder_sao_reconstruct(const encoder_state_t *const state,
   if (lcu->left) {
     const int from_index = (lcu->position.x - 1) * frame->height +
                            (lcu->position_px.y + y_offsets[0] - border_above);
-    kvz_pixels_blit(&state->tile->ver_buf_before_sao->y[from_index],
+    uvg_pixels_blit(&state->tile->ver_buf_before_sao->y[from_index],
                     &sao_buf_y[border_index],
                     1,
                     height + border_above + border_below,
                     1,
                     SAO_BUF_WIDTH);
-    if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+    if (state->encoder_control->chroma_format != UVG_CSP_400) {
       const int from_index_c = (lcu->position.x - 1) * frame->height/2 +
                                (lcu->position_px.y + y_offsets[0])/2 - border_above;
-      kvz_pixels_blit(&state->tile->ver_buf_before_sao->u[from_index_c],
+      uvg_pixels_blit(&state->tile->ver_buf_before_sao->u[from_index_c],
                       &sao_buf_u[border_index_c],
                       1,
                       height/2 + border_above + border_below,
                       1,
                       SAO_BUF_WIDTH_C);
-      kvz_pixels_blit(&state->tile->ver_buf_before_sao->v[from_index_c],
+      uvg_pixels_blit(&state->tile->ver_buf_before_sao->v[from_index_c],
                       &sao_buf_v[border_index_c],
                       1,
                       height/2 + border_above + border_below,
@@ -374,23 +374,23 @@ static void encoder_sao_reconstruct(const encoder_state_t *const state,
   const int from_index = (lcu->position_px.x + x_offsets[0]) +
                          (lcu->position_px.y + y_offsets[0]) * frame->rec->stride;
   const int to_index = x_offsets[0] + y_offsets[0] * SAO_BUF_WIDTH;
-  kvz_pixels_blit(&frame->rec->y[from_index],
+  uvg_pixels_blit(&frame->rec->y[from_index],
                   &sao_buf_y[to_index],
                   width + border_right,
                   height + border_below,
                   frame->rec->stride,
                   SAO_BUF_WIDTH);
-  if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+  if (state->encoder_control->chroma_format != UVG_CSP_400) {
     const int from_index_c = (lcu->position_px.x + x_offsets[0])/2 +
                              (lcu->position_px.y + y_offsets[0])/2 * frame->rec->stride/2;
     const int to_index_c = x_offsets[0]/2 + y_offsets[0]/2 * SAO_BUF_WIDTH_C;
-    kvz_pixels_blit(&frame->rec->u[from_index_c],
+    uvg_pixels_blit(&frame->rec->u[from_index_c],
                     &sao_buf_u[to_index_c],
                     width/2 + border_right,
                     height/2 + border_below,
                     frame->rec->stride/2,
                     SAO_BUF_WIDTH_C);
-    kvz_pixels_blit(&frame->rec->v[from_index_c],
+    uvg_pixels_blit(&frame->rec->v[from_index_c],
                     &sao_buf_v[to_index_c],
                     width/2 + border_right,
                     height/2 + border_below,
@@ -418,7 +418,7 @@ static void encoder_sao_reconstruct(const encoder_state_t *const state,
       const sao_info_t *sao_luma   = &frame->sao_luma[lcu_index];
       const sao_info_t *sao_chroma = &frame->sao_chroma[lcu_index];
 
-      kvz_sao_reconstruct(state,
+      uvg_sao_reconstruct(state,
                           &sao_buf_y[x + y * SAO_BUF_WIDTH],
                           SAO_BUF_WIDTH,
                           lcu->position_px.x + x,
@@ -428,12 +428,12 @@ static void encoder_sao_reconstruct(const encoder_state_t *const state,
                           sao_luma,
                           COLOR_Y);
 
-      if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+      if (state->encoder_control->chroma_format != UVG_CSP_400) {
         // Coordinates in chroma pixels.
         int x_c = x >> 1;
         int y_c = y >> 1;
 
-        kvz_sao_reconstruct(state,
+        uvg_sao_reconstruct(state,
                             &sao_buf_u[x_c + y_c * SAO_BUF_WIDTH_C],
                             SAO_BUF_WIDTH_C,
                             lcu->position_px.x / 2 + x_c,
@@ -442,7 +442,7 @@ static void encoder_sao_reconstruct(const encoder_state_t *const state,
                             height / 2,
                             sao_chroma,
                             COLOR_U);
-        kvz_sao_reconstruct(state,
+        uvg_sao_reconstruct(state,
                             &sao_buf_v[x_c + y_c * SAO_BUF_WIDTH_C],
                             SAO_BUF_WIDTH_C,
                             lcu->position_px.x / 2 + x_c,
@@ -486,7 +486,7 @@ static void encode_sao_color(encoder_state_t * const state, sao_info_t *sao,
   /// sao_offset_abs[][][][]: TR, cMax = (1 << (Min(bitDepth, 10) - 5)) - 1,
   ///                         cRiceParam = 0, bins = {bypass x N}
   for (i = SAO_EO_CAT1; i <= SAO_EO_CAT4; ++i) {
-    kvz_cabac_write_unary_max_symbol_ep(cabac, abs(sao->offsets[i + offset_index]), SAO_ABS_OFFSET_MAX);
+    uvg_cabac_write_unary_max_symbol_ep(cabac, abs(sao->offsets[i + offset_index]), SAO_ABS_OFFSET_MAX);
   }
 
   /// sao_offset_sign[][][][]: FL, cMax = 1, bins = {bypass}
@@ -536,7 +536,7 @@ static void encode_sao(encoder_state_t * const state,
   // If SAO is merged, nothing else needs to be coded.
   if (!sao_luma->merge_left_flag && !sao_luma->merge_up_flag) {
     encode_sao_color(state, sao_luma, COLOR_Y);
-    if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+    if (state->encoder_control->chroma_format != UVG_CSP_400) {
       encode_sao_color(state, sao_chroma, COLOR_U);
       encode_sao_color(state, sao_chroma, COLOR_V);
     }
@@ -569,7 +569,7 @@ static void set_cu_qps(encoder_state_t *state, int x, int y, int depth, int *las
   // Stop recursion if the CU is completely outside the frame.
   if (x >= state->tile->frame->width || y >= state->tile->frame->height) return;
 
-  cu_info_t *cu = kvz_cu_array_at(state->tile->frame->cu_array, x, y);
+  cu_info_t *cu = uvg_cu_array_at(state->tile->frame->cu_array, x, y);
   const int cu_width = LCU_WIDTH >> depth;
 
   if (depth <= state->encoder_control->max_qp_delta_depth) {
@@ -593,7 +593,7 @@ static void set_cu_qps(encoder_state_t *state, int x, int y, int depth, int *las
       const int tu_width = LCU_WIDTH >> cu->tr_depth;
       for (int y_scu = y; !cbf_found && y_scu < y + cu_width; y_scu += tu_width) {
         for (int x_scu = x; !cbf_found && x_scu < x + cu_width; x_scu += tu_width) {
-          cu_info_t *tu = kvz_cu_array_at(state->tile->frame->cu_array, x_scu, y_scu);
+          cu_info_t *tu = uvg_cu_array_at(state->tile->frame->cu_array, x_scu, y_scu);
           if (cbf_is_set_any(tu->cbf, cu->depth)) {
             cbf_found = true;
           }
@@ -607,14 +607,14 @@ static void set_cu_qps(encoder_state_t *state, int x, int y, int depth, int *las
     if (cbf_found) {
       *prev_qp = qp = cu->qp;
     } else {
-      qp = kvz_get_cu_ref_qp(state, x, y, *last_qp);
+      qp = uvg_get_cu_ref_qp(state, x, y, *last_qp);
     }
 
     // Set the correct QP for all state->tile->frame->cu_array elements in
     // the area covered by the CU.
     for (int y_scu = y; y_scu < y + cu_width; y_scu += SCU_WIDTH) {
       for (int x_scu = x; x_scu < x + cu_width; x_scu += SCU_WIDTH) {
-        kvz_cu_array_at(state->tile->frame->cu_array, x_scu, y_scu)->qp = qp;
+        uvg_cu_array_at(state->tile->frame->cu_array, x_scu, y_scu)->qp = qp;
       }
     }
 
@@ -633,12 +633,12 @@ static void encoder_state_worker_encode_lcu_search(void * opaque)
   const encoder_control_t * const encoder = state->encoder_control;
 
   switch (encoder->cfg.rc_algorithm) {
-  case KVZ_NO_RC:
-  case KVZ_LAMBDA:
-    kvz_set_lcu_lambda_and_qp(state, lcu->position);
+  case UVG_NO_RC:
+  case UVG_LAMBDA:
+    uvg_set_lcu_lambda_and_qp(state, lcu->position);
     break;
-  case KVZ_OBA:
-    kvz_set_ctu_qp_lambda(state, lcu->position);
+  case UVG_OBA:
+    uvg_set_ctu_qp_lambda(state, lcu->position);
     break;
   default:
     assert(0);
@@ -653,12 +653,12 @@ static void encoder_state_worker_encode_lcu_search(void * opaque)
   uint8_t original_lut_size = state->tile->frame->hmvp_size[ctu_row];
 
   // Store original HMVP lut before search and restore after, since it's modified
-  if(state->frame->slicetype != KVZ_SLICE_I) memcpy(original_lut, &state->tile->frame->hmvp_lut[ctu_row_mul_five], sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
+  if(state->frame->slicetype != UVG_SLICE_I) memcpy(original_lut, &state->tile->frame->hmvp_lut[ctu_row_mul_five], sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
 
   //This part doesn't write to bitstream, it's only search, deblock and sao
-  kvz_search_lcu(state, lcu->position_px.x, lcu->position_px.y, state->tile->hor_buf_search, state->tile->ver_buf_search, lcu->coeff);
+  uvg_search_lcu(state, lcu->position_px.x, lcu->position_px.y, state->tile->hor_buf_search, state->tile->ver_buf_search, lcu->coeff);
 
-  if(state->frame->slicetype != KVZ_SLICE_I) {
+  if(state->frame->slicetype != UVG_SLICE_I) {
     memcpy(&state->tile->frame->hmvp_lut[ctu_row_mul_five], original_lut, sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
     state->tile->frame->hmvp_size[ctu_row] = original_lut_size;
   }
@@ -672,7 +672,7 @@ static void encoder_state_worker_encode_lcu_search(void * opaque)
   }
 
   if (state->tile->frame->lmcs_aps->m_sliceReshapeInfo.sliceReshaperEnableFlag) {
-    kvz_pixel* luma = &state->tile->frame->rec->y[lcu->position_px.x + lcu->position_px.y * state->tile->frame->rec->stride];
+    uvg_pixel* luma = &state->tile->frame->rec->y[lcu->position_px.x + lcu->position_px.y * state->tile->frame->rec->stride];
     for (int y = 0; y < LCU_WIDTH; y++) {
       if (lcu->position_px.y+y < state->tile->frame->rec->height) {
         for (int x = 0; x < LCU_WIDTH; x++) {
@@ -684,7 +684,7 @@ static void encoder_state_worker_encode_lcu_search(void * opaque)
   }
 
   if (encoder->cfg.deblock_enable) {
-    kvz_filter_deblock_lcu(state, lcu->position_px.x, lcu->position_px.y);
+    uvg_filter_deblock_lcu(state, lcu->position_px.x, lcu->position_px.y);
   }
 
   if (encoder->cfg.sao_type) {
@@ -694,7 +694,7 @@ static void encoder_state_worker_encode_lcu_search(void * opaque)
       lcu,
       state->tile->hor_buf_before_sao,
       state->tile->ver_buf_before_sao);
-    kvz_sao_search_lcu(state, lcu->position.x, lcu->position.y);
+    uvg_sao_search_lcu(state, lcu->position.x, lcu->position.y);
     encoder_sao_reconstruct(state, lcu);
   }
 
@@ -713,7 +713,7 @@ static void encoder_state_worker_encode_lcu_bitstream(void * opaque)
   videoframe_t* const frame = state->tile->frame;
 
   //Now write data to bitstream (required to have a correct CABAC state)
-  const uint64_t existing_bits = kvz_bitstream_tell(&state->stream);
+  const uint64_t existing_bits = uvg_bitstream_tell(&state->stream);
 
   //Encode SAO
   if (encoder->cfg.sao_type) {
@@ -721,10 +721,10 @@ static void encoder_state_worker_encode_lcu_bitstream(void * opaque)
   }
 
   //Encode ALF
-  kvz_encode_alf_bits(state, lcu->position.y * frame->width_in_lcu + lcu->position.x);
+  uvg_encode_alf_bits(state, lcu->position.y * frame->width_in_lcu + lcu->position.x);
 
   //Encode coding tree
-  kvz_encode_coding_tree(state, lcu->position.x * LCU_WIDTH, lcu->position.y * LCU_WIDTH, 0, lcu->coeff);
+  uvg_encode_coding_tree(state, lcu->position.x * LCU_WIDTH, lcu->position.y * LCU_WIDTH, 0, lcu->coeff);
 
   if (!state->cabac.only_count) {
     // Coeffs are not needed anymore.
@@ -734,11 +734,11 @@ static void encoder_state_worker_encode_lcu_bitstream(void * opaque)
 
   /*
   bool end_of_slice_segment_flag;
-  if (state->encoder_control->cfg.slices & KVZ_SLICES_WPP) {
+  if (state->encoder_control->cfg.slices & UVG_SLICES_WPP) {
     // Slice segments end after each WPP row.
     end_of_slice_segment_flag = lcu->last_column;
   }
-  else if (state->encoder_control->cfg.slices & KVZ_SLICES_TILES) {
+  else if (state->encoder_control->cfg.slices & UVG_SLICES_TILES) {
     // Slices end after each tile.
     end_of_slice_segment_flag = lcu->last_column && lcu->last_row;
   }
@@ -748,7 +748,7 @@ static void encoder_state_worker_encode_lcu_bitstream(void * opaque)
     bool is_last_tile = state->tile->id == last_tile_id;
     end_of_slice_segment_flag = is_last_tile && lcu->last_column && lcu->last_row;
   }
-  //kvz_cabac_encode_bin_trm(&state->cabac, end_of_slice_segment_flag);
+  //uvg_cabac_encode_bin_trm(&state->cabac, end_of_slice_segment_flag);
   */
 
   {
@@ -757,42 +757,42 @@ static void encoder_state_worker_encode_lcu_bitstream(void * opaque)
 
     if (end_of_tile || end_of_wpp_row) {
       // end_of_sub_stream_one_bit
-      kvz_cabac_encode_bin_trm(&state->cabac, 1);
+      uvg_cabac_encode_bin_trm(&state->cabac, 1);
 
       // Finish the substream by writing out remaining state.
-      kvz_cabac_finish(&state->cabac);
+      uvg_cabac_finish(&state->cabac);
 
       // Write a rbsp_trailing_bits or a byte_alignment. The first one is used
       // for ending a slice_segment_layer_rbsp and the second one for ending
       // a substream. They are identical and align the byte stream.
-      kvz_bitstream_put(state->cabac.stream, 1, 1);
-      kvz_bitstream_align_zero(state->cabac.stream);
+      uvg_bitstream_put(state->cabac.stream, 1, 1);
+      uvg_bitstream_align_zero(state->cabac.stream);
 
-      kvz_cabac_start(&state->cabac);
+      uvg_cabac_start(&state->cabac);
     }
   }
 
 
   pthread_mutex_lock(&state->frame->rc_lock);
-  const uint32_t bits = kvz_bitstream_tell(&state->stream) - existing_bits;
+  const uint32_t bits = uvg_bitstream_tell(&state->stream) - existing_bits;
   state->frame->cur_frame_bits_coded += bits;
   // This variable is used differently by intra and inter frames and shouldn't
   // be touched in intra frames here
   state->frame->remaining_weight -= !state->frame->is_irap ?
-    kvz_get_lcu_stats(state, lcu->position.x, lcu->position.y)->original_weight :
+    uvg_get_lcu_stats(state, lcu->position.x, lcu->position.y)->original_weight :
     0;
   pthread_mutex_unlock(&state->frame->rc_lock);
-  kvz_get_lcu_stats(state, lcu->position.x, lcu->position.y)->bits = bits;
+  uvg_get_lcu_stats(state, lcu->position.x, lcu->position.y)->bits = bits;
 
   uint8_t not_skip = false;
   for (int y = 0; y < 64 && !not_skip; y += 8) {
     for (int x = 0; x < 64 && !not_skip; x += 8) {
-      not_skip |= !kvz_cu_array_at_const(state->tile->frame->cu_array,
+      not_skip |= !uvg_cu_array_at_const(state->tile->frame->cu_array,
         lcu->position_px.x + x,
         lcu->position_px.y + y)->skipped;
     }
   }
-  kvz_get_lcu_stats(state, lcu->position.x, lcu->position.y)->skipped = !not_skip;
+  uvg_get_lcu_stats(state, lcu->position.x, lcu->position.y)->skipped = !not_skip;
 
   //Wavefronts need the context to be copied to the next row
   if (state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW && lcu->index == 0) {
@@ -801,19 +801,19 @@ static void encoder_state_worker_encode_lcu_bitstream(void * opaque)
     for (j = 0; state->parent->children[j].encoder_control; ++j) {
       if (state->parent->children[j].wfrow->lcu_offset_y == state->wfrow->lcu_offset_y + 1) {
         //And copy context
-        kvz_context_copy(&state->parent->children[j], state);
+        uvg_context_copy(&state->parent->children[j], state);
       }
     }
   }
 }
 
 static void encoder_state_init_children_after_simulation(encoder_state_t* const state) {
-  kvz_bitstream_clear(&state->stream);
+  uvg_bitstream_clear(&state->stream);
 
   if (state->is_leaf) {
     //Leaf states have cabac and context
-    kvz_cabac_start(&state->cabac);
-    kvz_init_contexts(state, state->encoder_control->cfg.set_qp_in_cu ? 26 : state->frame->QP, state->frame->slicetype);
+    uvg_cabac_start(&state->cabac);
+    uvg_init_contexts(state, state->encoder_control->cfg.set_qp_in_cu ? 26 : state->frame->QP, state->frame->slicetype);
   }
 
   for (int i = 0; state->children[i].encoder_control; ++i) {
@@ -821,10 +821,10 @@ static void encoder_state_init_children_after_simulation(encoder_state_t* const 
   }
 }
 
-void kvz_alf_enc_process_job(void* opaque) {
+void uvg_alf_enc_process_job(void* opaque) {
   encoder_state_t* const state = (encoder_state_t* const)opaque;
   
-  kvz_alf_enc_process(state);
+  uvg_alf_enc_process(state);
 
   encoder_state_t* parent = state;
   while (parent->parent) parent = parent->parent;
@@ -841,7 +841,7 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
   assert(state->lcu_order_count > 0);
 
   const encoder_control_t *ctrl = state->encoder_control;
-  const kvz_config *cfg = &ctrl->cfg;
+  const uvg_config *cfg = &ctrl->cfg;
 
   // Signaled slice QP may be different to frame QP with set-qp-in-cu enabled.
   state->last_qp = ctrl->cfg.set_qp_in_cu ? 26 : state->frame->QP;
@@ -869,7 +869,7 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
 
     //Encode ALF
     if (encoder->cfg.alf_type) {
-      kvz_alf_enc_process(state);
+      uvg_alf_enc_process(state);
       // If ALF was used the bitstream coding was simulated in search, reset the cabac/stream
       // And write the actual bitstream
       encoder_state_init_children_after_simulation(state);
@@ -885,7 +885,7 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
     // Select which frame dependancies should be set to.
     const encoder_state_t * ref_state = NULL;
 
-    if (state->frame->slicetype == KVZ_SLICE_I) {
+    if (state->frame->slicetype == UVG_SLICE_I) {
       // I-frames have no references.
       ref_state = NULL;
     } else if (cfg->gop_lowdelay &&
@@ -912,13 +912,13 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
     for (int i = 0; i < state->lcu_order_count; ++i) {
       const lcu_order_element_t * const lcu = &state->lcu_order[i];
 
-      kvz_threadqueue_free_job(&state->tile->wf_jobs[lcu->id]);
-      kvz_threadqueue_free_job(&state->tile->wf_recon_jobs[lcu->id]);
-      state->tile->wf_jobs[lcu->id] = kvz_threadqueue_job_create(encoder_state_worker_encode_lcu_bitstream, (void*)lcu);
+      uvg_threadqueue_free_job(&state->tile->wf_jobs[lcu->id]);
+      uvg_threadqueue_free_job(&state->tile->wf_recon_jobs[lcu->id]);
+      state->tile->wf_jobs[lcu->id] = uvg_threadqueue_job_create(encoder_state_worker_encode_lcu_bitstream, (void*)lcu);
       threadqueue_job_t **bitstream_job = &state->tile->wf_jobs[lcu->id];
 
       // Use a separate job for bitstream writing, first process search and recon
-      state->tile->wf_recon_jobs[lcu->id] = kvz_threadqueue_job_create(encoder_state_worker_encode_lcu_search, (void*)lcu);
+      state->tile->wf_recon_jobs[lcu->id] = uvg_threadqueue_job_create(encoder_state_worker_encode_lcu_search, (void*)lcu);
       threadqueue_job_t **job = &state->tile->wf_recon_jobs[lcu->id];
 
       // If job object was returned, add dependancies and allow it to run.
@@ -929,7 +929,7 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
         // previous frame.
         if (ref_state != NULL &&
             state->previous_encoder_state->tqj_recon_done &&
-            state->frame->slicetype != KVZ_SLICE_I)
+            state->frame->slicetype != UVG_SLICE_I)
         {
           // We need to wait until the CTUs whose pixels we refer to are
           // done before we can start this CTU.
@@ -940,11 +940,11 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
           for (int i = 0; dep_lcu->right && i < ctrl->max_inter_ref_lcu.right + 1; i++) {
             dep_lcu = dep_lcu->right;
           }
-          kvz_threadqueue_job_dep_add(job[0], ref_state->tile->wf_recon_jobs[dep_lcu->id]);
+          uvg_threadqueue_job_dep_add(job[0], ref_state->tile->wf_recon_jobs[dep_lcu->id]);
 
           //TODO: Preparation for the lock free implementation of the new rc
-          if (ref_state->frame->slicetype == KVZ_SLICE_I && ref_state->frame->num != 0 && state->encoder_control->cfg.owf > 1 && true) {
-            kvz_threadqueue_job_dep_add(job[0], ref_state->previous_encoder_state->tile->wf_recon_jobs[dep_lcu->id]);
+          if (ref_state->frame->slicetype == UVG_SLICE_I && ref_state->frame->num != 0 && state->encoder_control->cfg.owf > 1 && true) {
+            uvg_threadqueue_job_dep_add(job[0], ref_state->previous_encoder_state->tile->wf_recon_jobs[dep_lcu->id]);
           }
 
           // Very spesific bug that happens when owf length is longer than the
@@ -953,13 +953,13 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
              state->encoder_control->cfg.open_gop &&
              state->encoder_control->cfg.gop_len != 0 &&
              state->encoder_control->cfg.owf > state->encoder_control->cfg.gop_len &&
-             ref_state->frame->slicetype == KVZ_SLICE_I &&
+             ref_state->frame->slicetype == UVG_SLICE_I &&
              ref_state->frame->num != 0){
 
             while (ref_state->frame->poc != state->frame->poc - state->encoder_control->cfg.gop_len){
               ref_state = ref_state->previous_encoder_state;
             }
-            kvz_threadqueue_job_dep_add(job[0], ref_state->tile->wf_recon_jobs[dep_lcu->id]);
+            uvg_threadqueue_job_dep_add(job[0], ref_state->tile->wf_recon_jobs[dep_lcu->id]);
           }
         }
         
@@ -969,42 +969,42 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
 
           // Add local WPP dependancy to the LCU on the left.
           if (lcu->left) {
-            kvz_threadqueue_job_dep_add(job[0], job[-1]);
-            kvz_threadqueue_job_dep_add(bitstream_job[0], bitstream_job[-1]);
+            uvg_threadqueue_job_dep_add(job[0], job[-1]);
+            uvg_threadqueue_job_dep_add(bitstream_job[0], bitstream_job[-1]);
           }
           // Add local WPP dependancy to the LCU on the top.
           if (lcu->above) {
-            kvz_threadqueue_job_dep_add(job[0], job[-state->tile->frame->width_in_lcu]);
-            kvz_threadqueue_job_dep_add(bitstream_job[0], bitstream_job[-state->tile->frame->width_in_lcu]);
+            uvg_threadqueue_job_dep_add(job[0], job[-state->tile->frame->width_in_lcu]);
+            uvg_threadqueue_job_dep_add(bitstream_job[0], bitstream_job[-state->tile->frame->width_in_lcu]);
           }
 
-          kvz_threadqueue_submit(state->encoder_control->threadqueue, job[0]);
+          uvg_threadqueue_submit(state->encoder_control->threadqueue, job[0]);
 
-          kvz_threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], parent->tqj_alf_process);
-          kvz_threadqueue_job_dep_add(parent->tqj_alf_process, state->tile->wf_recon_jobs[lcu->id]);
+          uvg_threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], parent->tqj_alf_process);
+          uvg_threadqueue_job_dep_add(parent->tqj_alf_process, state->tile->wf_recon_jobs[lcu->id]);
         } else {
 
           // Add local WPP dependancy to the LCU on the left.
           if (lcu->left) {
-            kvz_threadqueue_job_dep_add(job[0], bitstream_job[-1]);
+            uvg_threadqueue_job_dep_add(job[0], bitstream_job[-1]);
           }
           // Add local WPP dependancy to the LCU on the top.
           if (lcu->above) {
-            kvz_threadqueue_job_dep_add(job[0], bitstream_job[-state->tile->frame->width_in_lcu]);
+            uvg_threadqueue_job_dep_add(job[0], bitstream_job[-state->tile->frame->width_in_lcu]);
           }
 
-          kvz_threadqueue_submit(state->encoder_control->threadqueue, job[0]);
+          uvg_threadqueue_submit(state->encoder_control->threadqueue, job[0]);
 
-          kvz_threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], state->tile->wf_recon_jobs[lcu->id]);
+          uvg_threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], state->tile->wf_recon_jobs[lcu->id]);
         }
 
-        kvz_threadqueue_submit(state->encoder_control->threadqueue, state->tile->wf_jobs[lcu->id]);
+        uvg_threadqueue_submit(state->encoder_control->threadqueue, state->tile->wf_jobs[lcu->id]);
 
         // The wavefront row is done when the last LCU in the row is done.
         if (i + 1 == state->lcu_order_count) {
           assert(!state->tqj_recon_done);
           state->tqj_recon_done =
-            kvz_threadqueue_copy_ref(state->tile->wf_jobs[lcu->id]);
+            uvg_threadqueue_copy_ref(state->tile->wf_jobs[lcu->id]);
         }
       }
     }
@@ -1028,7 +1028,7 @@ static void encoder_state_worker_encode_children(void * opaque)
     assert(!sub_state->tqj_bitstream_written);
     if (sub_state->tile->wf_jobs[end_of_row]) {
       sub_state->tqj_bitstream_written =
-        kvz_threadqueue_copy_ref(sub_state->tile->wf_jobs[end_of_row]);
+        uvg_threadqueue_copy_ref(sub_state->tile->wf_jobs[end_of_row]);
     }
   }
 }
@@ -1063,22 +1063,22 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
           sub_state->tile->frame->alf_param_set_map = main_state->tile->frame->alf_param_set_map;
           sub_state->tile->frame->alf_info = main_state->tile->frame->alf_info;
         }
-        kvz_image_free(sub_state->tile->frame->source);
+        uvg_image_free(sub_state->tile->frame->source);
         sub_state->tile->frame->source = NULL;
 
-        kvz_image_free(sub_state->tile->frame->rec);
+        uvg_image_free(sub_state->tile->frame->rec);
         sub_state->tile->frame->rec = NULL;
 
-        kvz_cu_array_free(&sub_state->tile->frame->cu_array);
+        uvg_cu_array_free(&sub_state->tile->frame->cu_array);
 
-        sub_state->tile->frame->source = kvz_image_make_subimage(
+        sub_state->tile->frame->source = uvg_image_make_subimage(
             main_state->tile->frame->source,
             offset_x,
             offset_y,
             width,
             height
         );
-        sub_state->tile->frame->rec = kvz_image_make_subimage(
+        sub_state->tile->frame->rec = uvg_image_make_subimage(
             main_state->tile->frame->rec,
             offset_x,
             offset_y,
@@ -1088,20 +1088,20 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
         
 
         if (sub_state->encoder_control->cfg.lmcs_enable) {
-          kvz_image_free(sub_state->tile->frame->source_lmcs);
+          uvg_image_free(sub_state->tile->frame->source_lmcs);
           sub_state->tile->frame->source_lmcs = NULL;
 
-          kvz_image_free(sub_state->tile->frame->rec_lmcs);
+          uvg_image_free(sub_state->tile->frame->rec_lmcs);
           sub_state->tile->frame->rec_lmcs = NULL;
 
-          sub_state->tile->frame->source_lmcs = kvz_image_make_subimage(
+          sub_state->tile->frame->source_lmcs = uvg_image_make_subimage(
             main_state->tile->frame->source_lmcs,
             offset_x,
             offset_y,
             width,
             height
           );
-          sub_state->tile->frame->rec_lmcs = kvz_image_make_subimage(
+          sub_state->tile->frame->rec_lmcs = uvg_image_make_subimage(
             main_state->tile->frame->rec_lmcs,
             offset_x,
             offset_y,
@@ -1115,7 +1115,7 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
           sub_state->tile->frame->rec_lmcs = sub_state->tile->frame->rec;
         }
 
-        sub_state->tile->frame->cu_array = kvz_cu_subarray(
+        sub_state->tile->frame->cu_array = uvg_cu_subarray(
             main_state->tile->frame->cu_array,
             offset_x,
             offset_y,
@@ -1134,29 +1134,29 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
       for (int i = 0; main_state->children[i].encoder_control; ++i) {
         //If we don't have wavefronts, parallelize encoding of children.
         if (main_state->children[i].type != ENCODER_STATE_TYPE_WAVEFRONT_ROW) {
-          kvz_threadqueue_free_job(&main_state->children[i].tqj_recon_done);
+          uvg_threadqueue_free_job(&main_state->children[i].tqj_recon_done);
           main_state->children[i].tqj_recon_done =
-            kvz_threadqueue_job_create(encoder_state_worker_encode_children, &main_state->children[i]);
+            uvg_threadqueue_job_create(encoder_state_worker_encode_children, &main_state->children[i]);
           if (main_state->children[i].previous_encoder_state != &main_state->children[i] &&
               main_state->children[i].previous_encoder_state->tqj_recon_done &&
               !main_state->children[i].frame->is_irap)
           {
 #if 0
             // Disabled due to non-determinism.
-            if (main_state->encoder_control->cfg->mv_constraint == KVZ_MV_CONSTRAIN_FRAME_AND_TILE_MARGIN)
+            if (main_state->encoder_control->cfg->mv_constraint == UVG_MV_CONSTRAIN_FRAME_AND_TILE_MARGIN)
             {
               // When MV's don't cross tile boundaries, add dependancy only to the same tile.
-              kvz_threadqueue_job_dep_add(main_state->children[i].tqj_recon_done, main_state->children[i].previous_encoder_state->tqj_recon_done);
+              uvg_threadqueue_job_dep_add(main_state->children[i].tqj_recon_done, main_state->children[i].previous_encoder_state->tqj_recon_done);
             } else 
 #endif      
             {
               // Add dependancy to each child in the previous frame.
               for (int child_id = 0; main_state->children[child_id].encoder_control; ++child_id) {
-                kvz_threadqueue_job_dep_add(main_state->children[i].tqj_recon_done, main_state->children[child_id].previous_encoder_state->tqj_recon_done);
+                uvg_threadqueue_job_dep_add(main_state->children[i].tqj_recon_done, main_state->children[child_id].previous_encoder_state->tqj_recon_done);
               }
             }
           }
-          kvz_threadqueue_submit(main_state->encoder_control->threadqueue, main_state->children[i].tqj_recon_done);
+          uvg_threadqueue_submit(main_state->encoder_control->threadqueue, main_state->children[i].tqj_recon_done);
         } else {
           //Wavefront rows have parallelism at LCU level, so we should not launch multiple threads here!
           //FIXME: add an assert: we can only have wavefront children
@@ -1208,9 +1208,9 @@ static void encoder_ref_insertion_sort(const encoder_state_t *const state,
  *
  * \param state             main encoder state
  */
-void kvz_encoder_create_ref_lists(const encoder_state_t *const state)
+void uvg_encoder_create_ref_lists(const encoder_state_t *const state)
 {
-  const kvz_config *cfg = &state->encoder_control->cfg;
+  const uvg_config *cfg = &state->encoder_control->cfg;
 
   FILL_ARRAY(state->frame->ref_LX_size, 0, 2);
 
@@ -1276,8 +1276,8 @@ static void encoder_state_remove_refs(encoder_state_t *state) {
     target_ref_num = encoder->cfg.ref_frames;
   }
 
-  if (state->frame->pictype == KVZ_NAL_IDR_W_RADL ||
-      state->frame->pictype == KVZ_NAL_IDR_N_LP)
+  if (state->frame->pictype == UVG_NAL_IDR_W_RADL ||
+      state->frame->pictype == UVG_NAL_IDR_N_LP)
   {
     target_ref_num = 0;
   }
@@ -1323,21 +1323,21 @@ static void encoder_state_remove_refs(encoder_state_t *state) {
 
       if (!is_referenced) {
         // This reference is not referred to by this frame, it must be removed.
-        kvz_image_list_rem(state->frame->ref, ref);
+        uvg_image_list_rem(state->frame->ref, ref);
       }
     }
   } else {
     // Without GOP, remove the oldest picture.
     while (state->frame->ref->used_size > target_ref_num) {
       int8_t oldest_ref = state->frame->ref->used_size - 1;
-      kvz_image_list_rem(state->frame->ref, oldest_ref);
+      uvg_image_list_rem(state->frame->ref, oldest_ref);
     }
   }
 
   assert(state->frame->ref->used_size <= target_ref_num);
 }
 
-static void encoder_set_source_picture(encoder_state_t * const state, kvz_picture* frame)
+static void encoder_set_source_picture(encoder_state_t * const state, uvg_picture* frame)
 {
   assert(!state->tile->frame->source);
   assert(!state->tile->frame->rec);
@@ -1351,33 +1351,33 @@ static void encoder_set_source_picture(encoder_state_t * const state, kvz_pictur
 
   if (state->encoder_control->cfg.lossless) {
     // In lossless mode, the reconstruction is equal to the source frame.
-    state->tile->frame->rec = kvz_image_copy_ref(frame);
+    state->tile->frame->rec = uvg_image_copy_ref(frame);
   } else {
-    state->tile->frame->rec = kvz_image_alloc(state->encoder_control->chroma_format, frame->width, frame->height);
+    state->tile->frame->rec = uvg_image_alloc(state->encoder_control->chroma_format, frame->width, frame->height);
     state->tile->frame->rec->dts = frame->dts;
     state->tile->frame->rec->pts = frame->pts;
   }
   state->tile->frame->rec_lmcs = state->tile->frame->rec;
 
   if (state->encoder_control->cfg.lmcs_enable) {
-    state->tile->frame->rec_lmcs = kvz_image_alloc(state->encoder_control->chroma_format, frame->width, frame->height);
-    state->tile->frame->source_lmcs = kvz_image_alloc(state->encoder_control->chroma_format, frame->width, frame->height);
+    state->tile->frame->rec_lmcs = uvg_image_alloc(state->encoder_control->chroma_format, frame->width, frame->height);
+    state->tile->frame->source_lmcs = uvg_image_alloc(state->encoder_control->chroma_format, frame->width, frame->height);
   }
-  kvz_videoframe_set_poc(state->tile->frame, state->frame->poc);
+  uvg_videoframe_set_poc(state->tile->frame, state->frame->poc);
 }
 
 static void encoder_state_init_children(encoder_state_t * const state) {
-  kvz_bitstream_clear(&state->stream);
+  uvg_bitstream_clear(&state->stream);
 
   if (state->is_leaf) {
     //Leaf states have cabac and context
-    kvz_cabac_start(&state->cabac);
-    kvz_init_contexts(state, state->encoder_control->cfg.set_qp_in_cu ? 26 : state->frame->QP, state->frame->slicetype);
+    uvg_cabac_start(&state->cabac);
+    uvg_init_contexts(state, state->encoder_control->cfg.set_qp_in_cu ? 26 : state->frame->QP, state->frame->slicetype);
   }
 
   //Clear the jobs
-  kvz_threadqueue_free_job(&state->tqj_bitstream_written);
-  kvz_threadqueue_free_job(&state->tqj_recon_done);
+  uvg_threadqueue_free_job(&state->tqj_bitstream_written);
+  uvg_threadqueue_free_job(&state->tqj_recon_done);
 
   //Copy the constraint pointer
   // TODO: Try to do it in the if (state->is_leaf)
@@ -1421,15 +1421,15 @@ static bool edge_lcu(int id, int lcus_x, int lcus_y, bool xdiv64, bool ydiv64)
   }
 }
 
-static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_picture* frame) {
+static void encoder_state_init_new_frame(encoder_state_t * const state, uvg_picture* frame) {
   assert(state->type == ENCODER_STATE_TYPE_MAIN);
 
-  const kvz_config * const cfg = &state->encoder_control->cfg;
+  const uvg_config * const cfg = &state->encoder_control->cfg;
 
   encoder_set_source_picture(state, frame);
 
   assert(!state->tile->frame->cu_array);
-  state->tile->frame->cu_array = kvz_cu_array_alloc(
+  state->tile->frame->cu_array = uvg_cu_array_alloc(
       state->tile->frame->width,
       state->tile->frame->height
   );
@@ -1439,16 +1439,16 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
 
   // Variance adaptive quantization
   if (cfg->vaq) {
-    const bool has_chroma = state->encoder_control->chroma_format != KVZ_CSP_400;
+    const bool has_chroma = state->encoder_control->chroma_format != UVG_CSP_400;
     double d = cfg->vaq * 0.1; // Empirically decided constant. Affects delta-QP strength
     
     // Calculate frame pixel variance
     uint32_t len = state->tile->frame->width * state->tile->frame->height;
     uint32_t c_len = len / 4;
-    double frame_var = kvz_pixel_var(state->tile->frame->source->y, len);
+    double frame_var = uvg_pixel_var(state->tile->frame->source->y, len);
     if (has_chroma) {
-      frame_var += kvz_pixel_var(state->tile->frame->source->u, c_len);
-      frame_var += kvz_pixel_var(state->tile->frame->source->v, c_len);
+      frame_var += uvg_pixel_var(state->tile->frame->source->u, c_len);
+      frame_var += uvg_pixel_var(state->tile->frame->source->v, c_len);
     }
 
     // Loop through LCUs
@@ -1459,7 +1459,7 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
     unsigned id = 0;
     for (int y = 0; y < y_lim; ++y) {
       for (int x = 0; x < x_lim; ++x) {
-        kvz_pixel tmp[LCU_LUMA_SIZE];
+        uvg_pixel tmp[LCU_LUMA_SIZE];
         int pxl_x = x * LCU_WIDTH;
         int pxl_y = y * LCU_WIDTH;
         int x_max = MIN(pxl_x + LCU_WIDTH, frame->width) - pxl_x;
@@ -1472,7 +1472,7 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
 
         // Luma variance
         if (!edge_lcu(id, x_lim, y_lim, xdiv64, ydiv64)) {
-          kvz_pixels_blit(&state->tile->frame->source->y[pxl_x + pxl_y * state->tile->frame->source->stride], tmp,
+          uvg_pixels_blit(&state->tile->frame->source->y[pxl_x + pxl_y * state->tile->frame->source->stride], tmp,
             x_max, y_max, state->tile->frame->source->stride, LCU_WIDTH);
         } else {
           // Extend edge pixels for edge lcus
@@ -1485,13 +1485,13 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
           }
         }
         
-        double lcu_var = kvz_pixel_var(tmp, LCU_LUMA_SIZE);
+        double lcu_var = uvg_pixel_var(tmp, LCU_LUMA_SIZE);
 
         if (has_chroma) {
           // Add chroma variance if not monochrome
           int32_t c_stride = state->tile->frame->source->stride >> 1;
-          kvz_pixel chromau_tmp[LCU_CHROMA_SIZE];
-          kvz_pixel chromav_tmp[LCU_CHROMA_SIZE];
+          uvg_pixel chromau_tmp[LCU_CHROMA_SIZE];
+          uvg_pixel chromav_tmp[LCU_CHROMA_SIZE];
           int lcu_chroma_width = LCU_WIDTH >> 1;
           int c_pxl_x = x * lcu_chroma_width;
           int c_pxl_y = y * lcu_chroma_width;
@@ -1499,8 +1499,8 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
           int c_y_max = MIN(c_pxl_y + lcu_chroma_width, frame->height >> 1) - c_pxl_y;
 
           if (!edge_lcu(id, x_lim, y_lim, xdiv64, ydiv64)) {
-            kvz_pixels_blit(&state->tile->frame->source->u[c_pxl_x + c_pxl_y * c_stride], chromau_tmp, c_x_max, c_y_max, c_stride, lcu_chroma_width);
-            kvz_pixels_blit(&state->tile->frame->source->v[c_pxl_x + c_pxl_y * c_stride], chromav_tmp, c_x_max, c_y_max, c_stride, lcu_chroma_width);
+            uvg_pixels_blit(&state->tile->frame->source->u[c_pxl_x + c_pxl_y * c_stride], chromau_tmp, c_x_max, c_y_max, c_stride, lcu_chroma_width);
+            uvg_pixels_blit(&state->tile->frame->source->v[c_pxl_x + c_pxl_y * c_stride], chromav_tmp, c_x_max, c_y_max, c_stride, lcu_chroma_width);
           }
           else {
             for (int y = 0; y < lcu_chroma_width; y++) {
@@ -1512,8 +1512,8 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
               }
             }
           }
-          lcu_var += kvz_pixel_var(chromau_tmp, LCU_CHROMA_SIZE);
-          lcu_var += kvz_pixel_var(chromav_tmp, LCU_CHROMA_SIZE);
+          lcu_var += uvg_pixel_var(chromau_tmp, LCU_CHROMA_SIZE);
+          lcu_var += uvg_pixel_var(chromav_tmp, LCU_CHROMA_SIZE);
         }
                 
         state->frame->aq_offsets[id] = d * (log(lcu_var) - log(frame_var));
@@ -1566,7 +1566,7 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
       state->frame->poc = framenum - framenum % cfg->gop_len + poc_offset;
     }
     
-    kvz_videoframe_set_poc(state->tile->frame, state->frame->poc);
+    uvg_videoframe_set_poc(state->tile->frame, state->frame->poc);
   } else if (cfg->intra_period > 1) {
     state->frame->poc = state->frame->num % cfg->intra_period;
   } else {
@@ -1593,27 +1593,27 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
         cfg->gop_lowdelay ||
         !cfg->open_gop) // Closed GOP uses IDR pictures
     {
-      state->frame->pictype = KVZ_NAL_IDR_N_LP;
-      if (cfg->intra_period == 1 && state->frame->num > 0) state->frame->pictype = KVZ_NAL_IDR_W_RADL;
+      state->frame->pictype = UVG_NAL_IDR_N_LP;
+      if (cfg->intra_period == 1 && state->frame->num > 0) state->frame->pictype = UVG_NAL_IDR_W_RADL;
     } else {
-      state->frame->pictype = KVZ_NAL_CRA_NUT;
+      state->frame->pictype = UVG_NAL_CRA_NUT;
     }
   } else if (state->frame->poc < state->frame->irap_poc) {
-    state->frame->pictype = KVZ_NAL_RASL;
+    state->frame->pictype = UVG_NAL_RASL;
   } else {
-    state->frame->pictype = KVZ_NAL_TRAIL;
+    state->frame->pictype = UVG_NAL_TRAIL;
   }
 
   encoder_state_remove_refs(state);
-  kvz_encoder_create_ref_lists(state);
+  uvg_encoder_create_ref_lists(state);
 
   // Set slicetype.
   if (state->frame->is_irap) {
-    state->frame->slicetype = KVZ_SLICE_I;
+    state->frame->slicetype = UVG_SLICE_I;
   } else if (state->frame->ref_LX_size[1] > 0) {
-    state->frame->slicetype = KVZ_SLICE_B;
+    state->frame->slicetype = UVG_SLICE_B;
   } else {
-    state->frame->slicetype = KVZ_SLICE_P;
+    state->frame->slicetype = UVG_SLICE_P;
   }
 
   if (cfg->target_bitrate > 0 && state->frame->num > cfg->owf) {
@@ -1622,19 +1622,19 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
   state->frame->cur_frame_bits_coded = 0;
 
   switch (state->encoder_control->cfg.rc_algorithm) {
-    case KVZ_NO_RC:
-    case KVZ_LAMBDA:
-      kvz_set_picture_lambda_and_qp(state);
+    case UVG_NO_RC:
+    case UVG_LAMBDA:
+      uvg_set_picture_lambda_and_qp(state);
       break;
-    case KVZ_OBA:
-      kvz_estimate_pic_lambda(state);
+    case UVG_OBA:
+      uvg_estimate_pic_lambda(state);
       break;
     default:
       assert(0);
   }
 
   if (state->encoder_control->cfg.lmcs_enable) {
-    kvz_init_lmcs_aps(state->tile->frame->lmcs_aps, state->encoder_control->cfg.width, state->encoder_control->cfg.height, LCU_CU_WIDTH, LCU_CU_WIDTH, state->encoder_control->bitdepth);
+    uvg_init_lmcs_aps(state->tile->frame->lmcs_aps, state->encoder_control->cfg.width, state->encoder_control->cfg.height, LCU_CU_WIDTH, LCU_CU_WIDTH, state->encoder_control->bitdepth);
 
     state->tile->frame->lmcs_aps->m_reshapeCW.rspPicSize = state->tile->frame->width * state->tile->frame->height;
     state->tile->frame->lmcs_aps->m_reshapeCW.rspBaseQP = state->encoder_control->cfg.qp;
@@ -1642,12 +1642,12 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
     state->tile->frame->lmcs_aps->m_reshapeCW.updateCtrl = 1; //ToDo: change "LMCS model update control: 0:RA, 1:AI, 2:LDB/LDP"
     
     // ToDo: support other signal types in LMCS
-    kvz_lmcs_preanalyzer(state, state->tile->frame, state->tile->frame->lmcs_aps, RESHAPE_SIGNAL_SDR);
+    uvg_lmcs_preanalyzer(state, state->tile->frame, state->tile->frame->lmcs_aps, RESHAPE_SIGNAL_SDR);
     if (state->tile->frame->lmcs_aps->m_sliceReshapeInfo.sliceReshaperEnableFlag) {
-      kvz_construct_reshaper_lmcs(state->tile->frame->lmcs_aps);
+      uvg_construct_reshaper_lmcs(state->tile->frame->lmcs_aps);
 
-      kvz_pixel* luma = state->tile->frame->source->y;
-      kvz_pixel* luma_lmcs = state->tile->frame->source_lmcs->y;
+      uvg_pixel* luma = state->tile->frame->source->y;
+      uvg_pixel* luma_lmcs = state->tile->frame->source_lmcs->y;
       for (int y = 0; y < state->tile->frame->source->height; y++) {
         for (int x = 0; x < state->tile->frame->source->width; x++) {
           luma_lmcs[x] = state->tile->frame->lmcs_aps->m_fwdLUT[luma[x]];
@@ -1671,20 +1671,20 @@ static void _encode_one_frame_add_bitstream_deps(const encoder_state_t * const s
     _encode_one_frame_add_bitstream_deps(&state->children[i], job);
   }
   if (state->tqj_bitstream_written) {
-    kvz_threadqueue_job_dep_add(job, state->tqj_bitstream_written);
+    uvg_threadqueue_job_dep_add(job, state->tqj_bitstream_written);
   }
   if (state->tqj_recon_done) {
-    kvz_threadqueue_job_dep_add(job, state->tqj_recon_done);
+    uvg_threadqueue_job_dep_add(job, state->tqj_recon_done);
   }
 }
 
 
-void kvz_encode_one_frame(encoder_state_t * const state, kvz_picture* frame)
+void uvg_encode_one_frame(encoder_state_t * const state, uvg_picture* frame)
 {
-#if KVZ_DEBUG_PRINT_CABAC == 1
-  kvz_cabac_bins_count = 0;
-  if (state->frame->num == 0) kvz_cabac_bins_verbose = true;
-  else kvz_cabac_bins_verbose = false;
+#if UVG_DEBUG_PRINT_CABAC == 1
+  uvg_cabac_bins_count = 0;
+  if (state->frame->num == 0) uvg_cabac_bins_verbose = true;
+  else uvg_cabac_bins_verbose = false;
 #endif
 
 
@@ -1692,31 +1692,31 @@ void kvz_encode_one_frame(encoder_state_t * const state, kvz_picture* frame)
   
   // Create a separate job for ALF done after everything else, and only then do final bitstream writing (for ALF parameters)
   if (state->encoder_control->cfg.alf_type && state->encoder_control->cfg.wpp) {
-    kvz_threadqueue_free_job(&state->tqj_alf_process);
+    uvg_threadqueue_free_job(&state->tqj_alf_process);
     encoder_state_t* child_state = state;
     while (child_state->lcu_order == NULL) child_state = &child_state->children[0];
-    state->tqj_alf_process = kvz_threadqueue_job_create(kvz_alf_enc_process_job, child_state);
+    state->tqj_alf_process = uvg_threadqueue_job_create(uvg_alf_enc_process_job, child_state);
   }
 
   encoder_state_encode(state);
 
   threadqueue_job_t *job =
-    kvz_threadqueue_job_create(kvz_encoder_state_worker_write_bitstream, state);
+    uvg_threadqueue_job_create(uvg_encoder_state_worker_write_bitstream, state);
 
 
   if (state->encoder_control->cfg.alf_type && state->encoder_control->cfg.wpp) {
-    kvz_threadqueue_submit(state->encoder_control->threadqueue, state->tqj_alf_process);    
+    uvg_threadqueue_submit(state->encoder_control->threadqueue, state->tqj_alf_process);    
   }
 
   _encode_one_frame_add_bitstream_deps(state, job);
   if (state->previous_encoder_state != state && state->previous_encoder_state->tqj_bitstream_written) {
     //We need to depend on previous bitstream generation
-    kvz_threadqueue_job_dep_add(job, state->previous_encoder_state->tqj_bitstream_written);
+    uvg_threadqueue_job_dep_add(job, state->previous_encoder_state->tqj_bitstream_written);
   }  
   assert(!state->tqj_bitstream_written);
   state->tqj_bitstream_written = job;  
   state->frame->done = 0;
-  kvz_threadqueue_submit(state->encoder_control->threadqueue, job);
+  uvg_threadqueue_submit(state->encoder_control->threadqueue, job);
 }
 
 
@@ -1728,7 +1728,7 @@ void kvz_encode_one_frame(encoder_state_t * const state, kvz_picture* frame)
  * - Create a new cu array, if needed.
  * - Update frame count and POC.
  */
-void kvz_encoder_prepare(encoder_state_t *state)
+void uvg_encoder_prepare(encoder_state_t *state)
 {
   const encoder_control_t * const encoder = state->encoder_control;
 
@@ -1752,13 +1752,13 @@ void kvz_encoder_prepare(encoder_state_t *state)
   encoder_state_t *prev_state = state->previous_encoder_state;
 
   if (state->previous_encoder_state != state) {
-    kvz_cu_array_free(&state->tile->frame->cu_array);
+    uvg_cu_array_free(&state->tile->frame->cu_array);
     unsigned width  = state->tile->frame->width_in_lcu  * LCU_WIDTH;
     unsigned height = state->tile->frame->height_in_lcu * LCU_WIDTH;
-    state->tile->frame->cu_array = kvz_cu_array_alloc(width, height);
+    state->tile->frame->cu_array = uvg_cu_array_alloc(width, height);
 
-    kvz_image_list_copy_contents(state->frame->ref, prev_state->frame->ref);
-    kvz_encoder_create_ref_lists(state);
+    uvg_image_list_copy_contents(state->frame->ref, prev_state->frame->ref);
+    uvg_encoder_create_ref_lists(state);
   }
 
   if (!encoder->cfg.gop_len ||
@@ -1769,33 +1769,33 @@ void kvz_encoder_prepare(encoder_state_t *state)
     memcpy(prev_state->tile->frame->rec->ref_pocs, state->frame->ref->pocs, sizeof(int32_t)*state->frame->ref->used_size);
 
     // Add previous reconstructed picture as a reference
-    kvz_image_list_add(state->frame->ref,
+    uvg_image_list_add(state->frame->ref,
                    prev_state->tile->frame->rec,
                    prev_state->tile->frame->cu_array,
                    prev_state->frame->poc,
                    prev_state->frame->ref_LX);
-    kvz_cu_array_free(&state->tile->frame->cu_array);
+    uvg_cu_array_free(&state->tile->frame->cu_array);
     unsigned height = state->tile->frame->height_in_lcu * LCU_WIDTH;
     unsigned width  = state->tile->frame->width_in_lcu  * LCU_WIDTH;
-    state->tile->frame->cu_array = kvz_cu_array_alloc(width, height);
+    state->tile->frame->cu_array = uvg_cu_array_alloc(width, height);
   }
 
   if (state->encoder_control->cfg.lmcs_enable) {
-    kvz_image_free(state->tile->frame->source_lmcs);
+    uvg_image_free(state->tile->frame->source_lmcs);
     state->tile->frame->source_lmcs = NULL;
 
-    kvz_image_free(state->tile->frame->rec_lmcs);
+    uvg_image_free(state->tile->frame->rec_lmcs);
     state->tile->frame->rec_lmcs = NULL;
   }
 
   // Remove source and reconstructed picture.
-  kvz_image_free(state->tile->frame->source);
+  uvg_image_free(state->tile->frame->source);
   state->tile->frame->source = NULL;
 
-  kvz_image_free(state->tile->frame->rec);
+  uvg_image_free(state->tile->frame->rec);
   state->tile->frame->rec = NULL;
 
-  kvz_cu_array_free(&state->tile->frame->cu_array);
+  uvg_cu_array_free(&state->tile->frame->cu_array);
 
   // Update POC and frame count.
   state->frame->num = prev_state->frame->num + 1;
@@ -1807,7 +1807,7 @@ void kvz_encoder_prepare(encoder_state_t *state)
 
 }
 
-coeff_scan_order_t kvz_get_scan_order(int8_t cu_type, int intra_mode, int depth)
+coeff_scan_order_t uvg_get_scan_order(int8_t cu_type, int intra_mode, int depth)
 {
   // Scan mode is diagonal, except for 4x4+8x8 luma and 4x4 chroma, where:
   // - angular 6-14 = vertical
@@ -1824,7 +1824,7 @@ coeff_scan_order_t kvz_get_scan_order(int8_t cu_type, int intra_mode, int depth)
   return SCAN_DIAG;
 }
 
-lcu_stats_t* kvz_get_lcu_stats(encoder_state_t *state, int lcu_x, int lcu_y)
+lcu_stats_t* uvg_get_lcu_stats(encoder_state_t *state, int lcu_x, int lcu_y)
 {
   const int index = lcu_x + state->tile->lcu_offset_x +
                     (lcu_y + state->tile->lcu_offset_y) *
@@ -1832,12 +1832,12 @@ lcu_stats_t* kvz_get_lcu_stats(encoder_state_t *state, int lcu_x, int lcu_y)
   return &state->frame->lcu_stats[index];
 }
 
-int kvz_get_cu_ref_qp(const encoder_state_t *state, int x, int y, int last_qp)
+int uvg_get_cu_ref_qp(const encoder_state_t *state, int x, int y, int last_qp)
 {
   const encoder_control_t *ctrl = state->encoder_control;
   const cu_array_t *cua = state->tile->frame->cu_array;
   // Quantization group width
-  const int qg_width = LCU_WIDTH >> MIN(ctrl->max_qp_delta_depth, kvz_cu_array_at_const(cua, x, y)->depth);
+  const int qg_width = LCU_WIDTH >> MIN(ctrl->max_qp_delta_depth, uvg_cu_array_at_const(cua, x, y)->depth);
 
   // Coordinates of the top-left corner of the quantization group
   const int x_qg = x & ~(qg_width - 1);
@@ -1845,12 +1845,12 @@ int kvz_get_cu_ref_qp(const encoder_state_t *state, int x, int y, int last_qp)
 
   int qp_pred_a = last_qp;
   if (x_qg % LCU_WIDTH > 0) {
-    qp_pred_a = kvz_cu_array_at_const(cua, x_qg - 1, y_qg)->qp;
+    qp_pred_a = uvg_cu_array_at_const(cua, x_qg - 1, y_qg)->qp;
   }
 
   int qp_pred_b = last_qp;
   if (y_qg % LCU_WIDTH > 0) {
-    qp_pred_b = kvz_cu_array_at_const(cua, x_qg, y_qg - 1)->qp;
+    qp_pred_b = uvg_cu_array_at_const(cua, x_qg, y_qg - 1)->qp;
   }
 
   return ((qp_pred_a + qp_pred_b + 1) >> 1);

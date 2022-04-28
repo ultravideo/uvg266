@@ -175,7 +175,7 @@ static float sao_mode_bits_band(const encoder_state_t * const state,
 // NOTE: There's also an AVX2 variant of this in strategies/avx2/sao-avx2.c.
 // It has to be separate, because it returns the offset array in different
 // format (an array of YMM vectors).
-void kvz_calc_sao_offset_array(const encoder_control_t * const encoder, const sao_info_t *sao, int *offset, color_t color_i)
+void uvg_calc_sao_offset_array(const encoder_control_t * const encoder, const sao_info_t *sao, int *offset, color_t color_i)
 {
   int32_t val;
   const int32_t values = (1<<encoder->bitdepth);
@@ -263,7 +263,7 @@ static int calc_sao_band_offsets(int sao_bands[2][32], int offsets[4],
  * \param rec_data  Reconstructed pixel data. 64x64 for luma, 32x32 for chroma.
  * \param sao_bands an array of bands for original and reconstructed block
  */
-static void calc_sao_bands(const encoder_state_t * const state, const kvz_pixel *orig_data, const kvz_pixel *rec_data,
+static void calc_sao_bands(const encoder_state_t * const state, const uvg_pixel *orig_data, const uvg_pixel *rec_data,
                            int block_width, int block_height,
                            int sao_bands[2][32])
 {
@@ -275,7 +275,7 @@ static void calc_sao_bands(const encoder_state_t * const state, const kvz_pixel 
     for (x = 0; x < block_width; ++x) {
       int32_t curr_pos = y * block_width + x;
 
-      kvz_pixel sb_index = rec_data[curr_pos] >> shift;
+      uvg_pixel sb_index = rec_data[curr_pos] >> shift;
       sao_bands[0][sb_index] += orig_data[curr_pos] - rec_data[curr_pos];
       sao_bands[1][sb_index]++;
     }
@@ -297,8 +297,8 @@ static void calc_sao_bands(const encoder_state_t * const state, const kvz_pixel 
  * \param sao             SAO information
  * \param color           color plane index
  */
-void kvz_sao_reconstruct(const encoder_state_t *state,
-                         const kvz_pixel *buffer,
+void uvg_sao_reconstruct(const encoder_state_t *state,
+                         const uvg_pixel *buffer,
                          int stride,
                          int frame_x,
                          int frame_y,
@@ -314,7 +314,7 @@ void kvz_sao_reconstruct(const encoder_state_t *state,
   const int frame_width = frame->width >> shift;
   const int frame_height = frame->height >> shift;
   const int frame_stride = frame->rec->stride >> shift;
-  kvz_pixel *output = &frame->rec->data[color][frame_x + frame_y * frame_stride];
+  uvg_pixel *output = &frame->rec->data[color][frame_x + frame_y * frame_stride];
 
   if (sao->type == SAO_TYPE_EDGE) {
     const vector2d_t *offset = g_sao_edge_offsets[sao->eo_class];
@@ -346,7 +346,7 @@ void kvz_sao_reconstruct(const encoder_state_t *state,
   }
 
   if (sao->type != SAO_TYPE_NONE) {
-    kvz_sao_reconstruct_color(ctrl,
+    uvg_sao_reconstruct_color(ctrl,
                               buffer,
                               output,
                               sao,
@@ -360,7 +360,7 @@ void kvz_sao_reconstruct(const encoder_state_t *state,
 
 
 static void sao_search_edge_sao(const encoder_state_t * const state, 
-                                const kvz_pixel * data[], const kvz_pixel * recdata[],
+                                const uvg_pixel * data[], const uvg_pixel * recdata[],
                                 int block_width, int block_height,
                                 unsigned buf_cnt,
                                 sao_info_t *sao_out, sao_info_t *sao_top,
@@ -383,7 +383,7 @@ static void sao_search_edge_sao(const encoder_state_t * const state,
     // Call calc_sao_edge_dir once for luma and twice for chroma.
     for (i = 0; i < buf_cnt; ++i) {
       FILL(cat_sum_cnt, 0);
-      kvz_calc_sao_edge_dir(data[i], recdata[i], edge_class,
+      uvg_calc_sao_edge_dir(data[i], recdata[i], edge_class,
                         block_width, block_height, cat_sum_cnt);
     
 
@@ -438,7 +438,7 @@ static void sao_search_edge_sao(const encoder_state_t * const state,
 }
 
 
-static void sao_search_band_sao(const encoder_state_t * const state, const kvz_pixel * data[], const kvz_pixel * recdata[],
+static void sao_search_band_sao(const encoder_state_t * const state, const uvg_pixel * data[], const uvg_pixel * recdata[],
                                int block_width, int block_height,
                                unsigned buf_cnt,
                                sao_info_t *sao_out, sao_info_t *sao_top,
@@ -486,7 +486,7 @@ static void sao_search_band_sao(const encoder_state_t * const state, const kvz_p
  * \param buf_cnt  Number of pointers data and recdata have.
  * \param sao_out  Output parameter for the best sao parameters.
  */
-static void sao_search_best_mode(const encoder_state_t * const state, const kvz_pixel * data[], const kvz_pixel * recdata[],
+static void sao_search_best_mode(const encoder_state_t * const state, const uvg_pixel * data[], const uvg_pixel * recdata[],
                                  int block_width, int block_height,
                                  unsigned buf_cnt,
                                  sao_info_t *sao_out, sao_info_t *sao_top,
@@ -512,7 +512,7 @@ static void sao_search_best_mode(const encoder_state_t * const state, const kvz_
     unsigned buf_i;
     
     for (buf_i = 0; buf_i < buf_cnt; ++buf_i) {
-      ddistortion += kvz_sao_edge_ddistortion(data[buf_i], recdata[buf_i], 
+      ddistortion += uvg_sao_edge_ddistortion(data[buf_i], recdata[buf_i], 
                                           block_width, block_height,
                                           edge_sao.eo_class, &edge_sao.offsets[5 * buf_i]);
     }
@@ -530,7 +530,7 @@ static void sao_search_best_mode(const encoder_state_t * const state, const kvz_
     unsigned buf_i;
     
     for (buf_i = 0; buf_i < buf_cnt; ++buf_i) {
-      ddistortion += kvz_sao_band_ddistortion(state, data[buf_i], recdata[buf_i], 
+      ddistortion += uvg_sao_band_ddistortion(state, data[buf_i], recdata[buf_i], 
                                           block_width, block_height, 
                                           band_sao.band_position[buf_i], &band_sao.offsets[1 + 5 * buf_i]);
     }
@@ -574,7 +574,7 @@ static void sao_search_best_mode(const encoder_state_t * const state, const kvz_
         switch (merge_cand->type) {
           case SAO_TYPE_EDGE:
                 for (buf_i = 0; buf_i < buf_cnt; ++buf_i) {
-                  ddistortion += kvz_sao_edge_ddistortion(data[buf_i], recdata[buf_i],
+                  ddistortion += uvg_sao_edge_ddistortion(data[buf_i], recdata[buf_i],
                     block_width, block_height,
                     merge_cand->eo_class, &merge_cand->offsets[5 * buf_i]);
                 }
@@ -582,7 +582,7 @@ static void sao_search_best_mode(const encoder_state_t * const state, const kvz_
             break;
           case SAO_TYPE_BAND:
               for (buf_i = 0; buf_i < buf_cnt; ++buf_i) {
-                ddistortion += kvz_sao_band_ddistortion(state, data[buf_i], recdata[buf_i],
+                ddistortion += uvg_sao_band_ddistortion(state, data[buf_i], recdata[buf_i],
                   block_width, block_height,
                   merge_cand->band_position[buf_i], &merge_cand->offsets[1 + 5 * buf_i]);
               }
@@ -603,10 +603,10 @@ static void sao_search_chroma(const encoder_state_t * const state, const videofr
 {
   int block_width  = (LCU_WIDTH / 2);
   int block_height = (LCU_WIDTH / 2);
-  const kvz_pixel *orig_list[2];
-  const kvz_pixel *rec_list[2];
-  kvz_pixel orig[2][LCU_CHROMA_SIZE];
-  kvz_pixel rec[2][LCU_CHROMA_SIZE];
+  const uvg_pixel *orig_list[2];
+  const uvg_pixel *rec_list[2];
+  uvg_pixel orig[2][LCU_CHROMA_SIZE];
+  uvg_pixel rec[2][LCU_CHROMA_SIZE];
   color_t color_i;
 
   // Check for right and bottom boundaries.
@@ -621,11 +621,11 @@ static void sao_search_chroma(const encoder_state_t * const state, const videofr
 
   // Copy data to temporary buffers and init orig and rec lists to point to those buffers.
   for (color_i = COLOR_U; color_i <= COLOR_V; ++color_i) {
-    kvz_pixel *data = &frame->source->data[color_i][CU_TO_PIXEL(x_ctb, y_ctb, 1, frame->source->stride / 2)];
-    kvz_pixel *recdata = &frame->rec->data[color_i][CU_TO_PIXEL(x_ctb, y_ctb, 1, frame->rec->stride / 2)];
-    kvz_pixels_blit(data, orig[color_i - 1], block_width, block_height,
+    uvg_pixel *data = &frame->source->data[color_i][CU_TO_PIXEL(x_ctb, y_ctb, 1, frame->source->stride / 2)];
+    uvg_pixel *recdata = &frame->rec->data[color_i][CU_TO_PIXEL(x_ctb, y_ctb, 1, frame->rec->stride / 2)];
+    uvg_pixels_blit(data, orig[color_i - 1], block_width, block_height,
                         frame->source->stride / 2, block_width);
-    kvz_pixels_blit(recdata, rec[color_i - 1], block_width, block_height,
+    uvg_pixels_blit(recdata, rec[color_i - 1], block_width, block_height,
                         frame->rec->stride / 2, block_width);
     orig_list[color_i - 1] = &orig[color_i - 1][0];
     rec_list[color_i - 1] = &rec[color_i - 1][0];
@@ -637,12 +637,12 @@ static void sao_search_chroma(const encoder_state_t * const state, const videofr
 
 static void sao_search_luma(const encoder_state_t * const state, const videoframe_t *frame, unsigned x_ctb, unsigned y_ctb, sao_info_t *sao, sao_info_t *sao_top, sao_info_t *sao_left, int32_t merge_cost[3])
 {
-  kvz_pixel orig[LCU_LUMA_SIZE];
-  kvz_pixel rec[LCU_LUMA_SIZE];
-  const kvz_pixel * orig_list[1] = { NULL };
-  const kvz_pixel * rec_list[1] = { NULL };
-  kvz_pixel *data = &frame->source->y[CU_TO_PIXEL(x_ctb, y_ctb, 0, frame->source->stride)];
-  kvz_pixel *recdata = &frame->rec->y[CU_TO_PIXEL(x_ctb, y_ctb, 0, frame->rec->stride)];
+  uvg_pixel orig[LCU_LUMA_SIZE];
+  uvg_pixel rec[LCU_LUMA_SIZE];
+  const uvg_pixel * orig_list[1] = { NULL };
+  const uvg_pixel * rec_list[1] = { NULL };
+  uvg_pixel *data = &frame->source->y[CU_TO_PIXEL(x_ctb, y_ctb, 0, frame->source->stride)];
+  uvg_pixel *recdata = &frame->rec->y[CU_TO_PIXEL(x_ctb, y_ctb, 0, frame->rec->stride)];
   int block_width = LCU_WIDTH;
   int block_height = LCU_WIDTH;
 
@@ -657,15 +657,15 @@ static void sao_search_luma(const encoder_state_t * const state, const videofram
   sao->type = SAO_TYPE_EDGE;
 
   // Fill temporary buffers with picture data.
-  kvz_pixels_blit(data, orig, block_width, block_height, frame->source->stride, block_width);
-  kvz_pixels_blit(recdata, rec, block_width, block_height, frame->rec->stride, block_width);
+  uvg_pixels_blit(data, orig, block_width, block_height, frame->source->stride, block_width);
+  uvg_pixels_blit(recdata, rec, block_width, block_height, frame->rec->stride, block_width);
 
   orig_list[0] = orig;
   rec_list[0] = rec;
   sao_search_best_mode(state, orig_list, rec_list, block_width, block_height, 1, sao, sao_top, sao_left, merge_cost);
 }
 
-void kvz_sao_search_lcu(const encoder_state_t* const state, int lcu_x, int lcu_y)
+void uvg_sao_search_lcu(const encoder_state_t* const state, int lcu_x, int lcu_y)
 {
   assert(!state->encoder_control->cfg.lossless);
 
@@ -675,7 +675,7 @@ void kvz_sao_search_lcu(const encoder_state_t* const state, int lcu_x, int lcu_y
   int32_t merge_cost_chroma[3] = { INT32_MAX };
   sao_info_t *sao_luma = &frame->sao_luma[lcu_y * stride + lcu_x];
   sao_info_t *sao_chroma = NULL;
-  int enable_chroma = state->encoder_control->chroma_format != KVZ_CSP_400;
+  int enable_chroma = state->encoder_control->chroma_format != UVG_CSP_400;
   if (enable_chroma) {
     sao_chroma = &frame->sao_chroma[lcu_y * stride + lcu_x];
   }

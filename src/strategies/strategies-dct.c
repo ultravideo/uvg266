@@ -38,28 +38,28 @@
 
 
 // Define function pointers.
-dct_func * kvz_fast_forward_dst_4x4 = 0;
+dct_func * uvg_fast_forward_dst_4x4 = 0;
 
-dct_func * kvz_dct_4x4 = 0;
-dct_func * kvz_dct_8x8 = 0;
-dct_func * kvz_dct_16x16 = 0;
-dct_func * kvz_dct_32x32 = 0;
+dct_func * uvg_dct_4x4 = 0;
+dct_func * uvg_dct_8x8 = 0;
+dct_func * uvg_dct_16x16 = 0;
+dct_func * uvg_dct_32x32 = 0;
 
-dct_func * kvz_fast_inverse_dst_4x4 = 0;
+dct_func * uvg_fast_inverse_dst_4x4 = 0;
 
-dct_func * kvz_idct_4x4 = 0;
-dct_func * kvz_idct_8x8= 0;
-dct_func * kvz_idct_16x16 = 0;
-dct_func * kvz_idct_32x32 = 0;
+dct_func * uvg_idct_4x4 = 0;
+dct_func * uvg_idct_8x8= 0;
+dct_func * uvg_idct_16x16 = 0;
+dct_func * uvg_idct_32x32 = 0;
 
-void(*kvz_mts_dct)(int8_t bitdepth,
+void(*uvg_mts_dct)(int8_t bitdepth,
   color_t color,
   const cu_info_t *tu,
   int8_t width,
   const int16_t *input,
   int16_t *output,
   const int8_t mts_idx);
-void(*kvz_mts_idct)(int8_t bitdepth,
+void(*uvg_mts_idct)(int8_t bitdepth,
   color_t color,
   const cu_info_t *tu,
   int8_t width,
@@ -68,13 +68,13 @@ void(*kvz_mts_idct)(int8_t bitdepth,
   const int8_t mts_idx);
 
 
-int kvz_strategy_register_dct(void* opaque, uint8_t bitdepth) {
+int uvg_strategy_register_dct(void* opaque, uint8_t bitdepth) {
   bool success = true;
 
-  success &= kvz_strategy_register_dct_generic(opaque, bitdepth);
+  success &= uvg_strategy_register_dct_generic(opaque, bitdepth);
 
-  if (kvz_g_hardware_flags.intel_flags.avx2) {
-    success &= kvz_strategy_register_dct_avx2(opaque, bitdepth);
+  if (uvg_g_hardware_flags.intel_flags.avx2) {
+    success &= uvg_strategy_register_dct_avx2(opaque, bitdepth);
   }
 
   return success;
@@ -90,21 +90,21 @@ int kvz_strategy_register_dct(void* opaque, uint8_t bitdepth) {
  *
  * \returns Pointer to the function.
  */
-dct_func * kvz_get_dct_func(int8_t width, color_t color, cu_type_t type)
+dct_func * uvg_get_dct_func(int8_t width, color_t color, cu_type_t type)
 {
   switch (width) {
   case 4:
     //if (color == COLOR_Y && type == CU_INTRA) {
-    //  return kvz_fast_forward_dst_4x4;
+    //  return uvg_fast_forward_dst_4x4;
     //} else {
-      return kvz_dct_4x4;
+      return uvg_dct_4x4;
     //}
   case 8:
-    return kvz_dct_8x8;
+    return uvg_dct_8x8;
   case 16:
-    return kvz_dct_16x16;
+    return uvg_dct_16x16;
   case 32:
-    return kvz_dct_32x32;
+    return uvg_dct_32x32;
   default:
     return NULL;
   }
@@ -119,21 +119,21 @@ dct_func * kvz_get_dct_func(int8_t width, color_t color, cu_type_t type)
  *
  * \returns Pointer to the function.
  */
-dct_func * kvz_get_idct_func(int8_t width, color_t color, cu_type_t type)
+dct_func * uvg_get_idct_func(int8_t width, color_t color, cu_type_t type)
 {
   switch (width) {
   case 4:
     //if (color == COLOR_Y && type == CU_INTRA) {
-    //  return kvz_fast_inverse_dst_4x4;
+    //  return uvg_fast_inverse_dst_4x4;
     //} else {
-      return kvz_idct_4x4;
+      return uvg_idct_4x4;
     //}
   case 8:
-    return kvz_idct_8x8;
+    return uvg_idct_8x8;
   case 16:
-    return kvz_idct_16x16;
+    return uvg_idct_16x16;
   case 32:
-    return kvz_idct_32x32;
+    return uvg_idct_32x32;
   default:
     return NULL;
   }

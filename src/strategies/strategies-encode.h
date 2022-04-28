@@ -56,13 +56,13 @@ typedef unsigned (encode_coeff_nxn_func)(encoder_state_t * const state,
                                          bool is_luma);
 
 // Declare function pointers.
-extern encode_coeff_nxn_func *kvz_encode_coeff_nxn;
+extern encode_coeff_nxn_func *uvg_encode_coeff_nxn;
 
-int kvz_strategy_register_encode(void* opaque, uint8_t bitdepth);
+int uvg_strategy_register_encode(void* opaque, uint8_t bitdepth);
 
 
 #define STRATEGIES_ENCODE_EXPORTS \
-  {"encode_coeff_nxn", (void**) &kvz_encode_coeff_nxn}, \
+  {"encode_coeff_nxn", (void**) &uvg_encode_coeff_nxn}, \
 
 
 

@@ -38,7 +38,7 @@
 
 #if COMPILE_INTEL_AVX2
 #include "kvazaar.h"
-#if KVZ_BIT_DEPTH == 8
+#if UVG_BIT_DEPTH == 8
 #include "strategies/avx2/picture-avx2.h"
 #include "strategies/avx2/reg_sad_pow2_widths-avx2.h"
 
@@ -65,7 +65,7 @@
  *
  * \returns Sum of Absolute Differences
  */
-uint32_t kvz_reg_sad_avx2(const uint8_t * const data1, const uint8_t * const data2,
+uint32_t uvg_reg_sad_avx2(const uint8_t * const data1, const uint8_t * const data2,
                           const int width, const int height, const unsigned stride1, const unsigned stride2)
 {
   if (width == 0)
@@ -509,7 +509,7 @@ INLINE static void hor_transform_block_dual_avx2(__m256i (*row_diff)[8])
   hor_transform_row_dual_avx2((*row_diff) + 7);
 }
 
-static void kvz_satd_8bit_8x8_general_dual_avx2(const uint8_t * buf1, unsigned stride1,
+static void uvg_satd_8bit_8x8_general_dual_avx2(const uint8_t * buf1, unsigned stride1,
                                                 const uint8_t * buf2, unsigned stride2,
                                                 const uint8_t * orig, unsigned stride_orig,
                                                 unsigned *sum0, unsigned *sum1)
@@ -529,23 +529,23 @@ static void kvz_satd_8bit_8x8_general_dual_avx2(const uint8_t * buf1, unsigned s
 /**
 * \brief  Calculate SATD between two 4x4 blocks inside bigger arrays.
 */
-static unsigned kvz_satd_4x4_subblock_8bit_avx2(const uint8_t * buf1,
+static unsigned uvg_satd_4x4_subblock_8bit_avx2(const uint8_t * buf1,
                                                 const int32_t     stride1,
                                                 const uint8_t * buf2,
                                                 const int32_t     stride2)
 {
   // TODO: AVX2 implementation
-  return kvz_satd_4x4_subblock_generic(buf1, stride1, buf2, stride2);
+  return uvg_satd_4x4_subblock_generic(buf1, stride1, buf2, stride2);
 }
 
-static void kvz_satd_4x4_subblock_quad_avx2(const uint8_t *preds[4],
+static void uvg_satd_4x4_subblock_quad_avx2(const uint8_t *preds[4],
                                        const int stride,
                                        const uint8_t *orig,
                                        const int orig_stride,
                                        unsigned costs[4])
 {
   // TODO: AVX2 implementation
-  kvz_satd_4x4_subblock_quad_generic(preds, stride, orig, orig_stride, costs);
+  uvg_satd_4x4_subblock_quad_generic(preds, stride, orig, orig_stride, costs);
 }
 
 static unsigned satd_8x8_subblock_8bit_avx2(const uint8_t * buf1, unsigned stride1, const uint8_t * buf2, unsigned stride2)
@@ -568,8 +568,8 @@ static void satd_8x8_subblock_quad_avx2(const uint8_t **preds,
   const int orig_stride,
   unsigned *costs)
 {
-  kvz_satd_8bit_8x8_general_dual_avx2(preds[0], stride, preds[1], stride, orig, orig_stride, &costs[0], &costs[1]);
-  kvz_satd_8bit_8x8_general_dual_avx2(preds[2], stride, preds[3], stride, orig, orig_stride, &costs[2], &costs[3]);
+  uvg_satd_8bit_8x8_general_dual_avx2(preds[0], stride, preds[1], stride, orig, orig_stride, &costs[0], &costs[1]);
+  uvg_satd_8bit_8x8_general_dual_avx2(preds[2], stride, preds[3], stride, orig, orig_stride, &costs[2], &costs[3]);
 }
 
 SATD_NxN(8bit_avx2,  8)
@@ -593,13 +593,13 @@ static void satd_8bit_ ## n ## x ## n ## _dual_avx2( \
   for (y = 0; y < (n); y += 8) { \
   unsigned row = y * (n); \
   for (x = 0; x < (n); x += 8) { \
-  kvz_satd_8bit_8x8_general_dual_avx2(&preds[0][row + x], (n), &preds[1][row + x], (n), &orig[row + x], (n), &sum1, &sum2); \
+  uvg_satd_8bit_8x8_general_dual_avx2(&preds[0][row + x], (n), &preds[1][row + x], (n), &orig[row + x], (n), &sum1, &sum2); \
   satds_out[0] += sum1; \
   satds_out[1] += sum2; \
     } \
     } \
-  satds_out[0] >>= (KVZ_BIT_DEPTH-8); \
-  satds_out[1] >>= (KVZ_BIT_DEPTH-8); \
+  satds_out[0] >>= (UVG_BIT_DEPTH-8); \
+  satds_out[1] >>= (UVG_BIT_DEPTH-8); \
 }
 
 static void satd_8bit_8x8_dual_avx2(
@@ -613,13 +613,13 @@ static void satd_8bit_8x8_dual_avx2(
   for (y = 0; y < (8); y += 8) { 
   unsigned row = y * (8); 
   for (x = 0; x < (8); x += 8) { 
-  kvz_satd_8bit_8x8_general_dual_avx2(&preds[0][row + x], (8), &preds[1][row + x], (8), &orig[row + x], (8), &sum1, &sum2); 
+  uvg_satd_8bit_8x8_general_dual_avx2(&preds[0][row + x], (8), &preds[1][row + x], (8), &orig[row + x], (8), &sum1, &sum2); 
   satds_out[0] += sum1;
   satds_out[1] += sum2;
       } 
       } 
-  satds_out[0] >>= (KVZ_BIT_DEPTH-8);
-  satds_out[1] >>= (KVZ_BIT_DEPTH-8);
+  satds_out[0] >>= (UVG_BIT_DEPTH-8);
+  satds_out[1] >>= (UVG_BIT_DEPTH-8);
 }
 
 //SATD_NXN_DUAL_AVX2(8) //Use the non-macro version
@@ -646,7 +646,7 @@ SATD_NXN_DUAL_AVX2(64)
     if (width % 8 != 0) { \
       /* Process the first column using 4x4 blocks. */ \
       for (int y = 0; y < height; y += 4) { \
-        kvz_satd_4x4_subblock_ ## suffix(preds, stride, orig, orig_stride, sums); \
+        uvg_satd_4x4_subblock_ ## suffix(preds, stride, orig, orig_stride, sums); \
             } \
       orig_ptr += 4; \
       for(int blk = 0; blk < num_parallel_blocks; ++blk){\
@@ -657,7 +657,7 @@ SATD_NXN_DUAL_AVX2(64)
     if (height % 8 != 0) { \
       /* Process the first row using 4x4 blocks. */ \
       for (int x = 0; x < width; x += 4 ) { \
-        kvz_satd_4x4_subblock_ ## suffix(pred_ptrs, stride, orig_ptr, orig_stride, sums); \
+        uvg_satd_4x4_subblock_ ## suffix(pred_ptrs, stride, orig_ptr, orig_stride, sums); \
             } \
       orig_ptr += 4 * orig_stride; \
       for(int blk = 0; blk < num_parallel_blocks; ++blk){\
@@ -686,7 +686,7 @@ SATD_NXN_DUAL_AVX2(64)
       } \
     } \
     for(int i = 0; i < num_parallel_blocks; ++i){\
-      costs_out[i] = costs_out[i] >> (KVZ_BIT_DEPTH - 8);\
+      costs_out[i] = costs_out[i] >> (UVG_BIT_DEPTH - 8);\
     } \
     return; \
   }
@@ -741,7 +741,7 @@ static unsigned pixels_calc_ssd_avx2(const uint8_t *const ref, const uint8_t *co
 
     ssd = _mm_cvtsi128_si32(sum);
 
-    return ssd >> (2*(KVZ_BIT_DEPTH-8));
+    return ssd >> (2*(UVG_BIT_DEPTH-8));
     break;
 
   default:
@@ -764,12 +764,12 @@ static unsigned pixels_calc_ssd_avx2(const uint8_t *const ref, const uint8_t *co
 
     ssd = _mm_cvtsi128_si32(sum);
 
-    return ssd >> (2*(KVZ_BIT_DEPTH-8));
+    return ssd >> (2*(UVG_BIT_DEPTH-8));
     break;
   }
 }
 
-static INLINE void scatter_ymm_4x8_8bit(kvz_pixel * dst, __m256i ymm, unsigned dst_stride)
+static INLINE void scatter_ymm_4x8_8bit(uvg_pixel * dst, __m256i ymm, unsigned dst_stride)
 {
   __m128i ymm_lo = _mm256_castsi256_si128(ymm);
   __m128i ymm_hi = _mm256_extracti128_si256(ymm, 1);
@@ -783,7 +783,7 @@ static INLINE void scatter_ymm_4x8_8bit(kvz_pixel * dst, __m256i ymm, unsigned d
   *(uint32_t *)dst = _mm_extract_epi32(ymm_hi, 3);
 }
 
-static INLINE void scatter_ymm_8x4_8bit(kvz_pixel *dst, __m256i ymm, unsigned dst_stride)
+static INLINE void scatter_ymm_8x4_8bit(uvg_pixel *dst, __m256i ymm, unsigned dst_stride)
 {
   __m256d ymm_as_m256d = _mm256_castsi256_pd(ymm);
   __m128d ymm_lo = _mm256_castpd256_pd128(ymm_as_m256d);
@@ -794,7 +794,7 @@ static INLINE void scatter_ymm_8x4_8bit(kvz_pixel *dst, __m256i ymm, unsigned ds
   _mm_storeh_pd((double*)dst, ymm_hi);
 }
 
-static INLINE void scatter_ymm_16x2_8bit(kvz_pixel *dst, __m256i ymm, unsigned dst_stride)
+static INLINE void scatter_ymm_16x2_8bit(uvg_pixel *dst, __m256i ymm, unsigned dst_stride)
 {
   __m128i ymm_lo = _mm256_castsi256_si128(ymm);
   __m128i ymm_hi = _mm256_extracti128_si256(ymm, 1);
@@ -802,7 +802,7 @@ static INLINE void scatter_ymm_16x2_8bit(kvz_pixel *dst, __m256i ymm, unsigned d
   _mm_storeu_si128((__m128i *)dst, ymm_hi);
 }
 
-static INLINE void scatter_ymm_12x2_8bit(kvz_pixel *dst, __m256i ymm, unsigned dst_stride)
+static INLINE void scatter_ymm_12x2_8bit(uvg_pixel *dst, __m256i ymm, unsigned dst_stride)
 {
   __m256i mask_a = _mm256_setr_epi32(-1, -1, -1, 0, 0, 0, 0, 0);
   __m256i mask_b = _mm256_setr_epi32(0, 0, 0, -1, -1, -1, 0, 0);
@@ -810,9 +810,9 @@ static INLINE void scatter_ymm_12x2_8bit(kvz_pixel *dst, __m256i ymm, unsigned d
   _mm256_maskstore_epi32((int32_t*)dst, mask_b, ymm);
 }
 
-static INLINE void bipred_average_px_px_template_avx2(kvz_pixel *dst,
-  kvz_pixel *px_L0,
-  kvz_pixel *px_L1,
+static INLINE void bipred_average_px_px_template_avx2(uvg_pixel *dst,
+  uvg_pixel *px_L0,
+  uvg_pixel *px_L1,
   unsigned pu_w,
   unsigned pu_h,
   unsigned dst_stride)
@@ -907,9 +907,9 @@ static INLINE void bipred_average_px_px_template_avx2(kvz_pixel *dst,
   }
 }
 
-static INLINE void bipred_average_px_px_avx2(kvz_pixel *dst,
-  kvz_pixel *px_L0,
-  kvz_pixel *px_L1,
+static INLINE void bipred_average_px_px_avx2(uvg_pixel *dst,
+  uvg_pixel *px_L0,
+  uvg_pixel *px_L1,
   unsigned pu_w,
   unsigned pu_h,
   unsigned dst_stride)
@@ -932,29 +932,29 @@ static INLINE void bipred_average_px_px_avx2(kvz_pixel *dst,
         break;
     }
   } else {
-    int32_t shift = 15 - KVZ_BIT_DEPTH; // TODO: defines
+    int32_t shift = 15 - UVG_BIT_DEPTH; // TODO: defines
     int32_t offset = 1 << (shift - 1);
 
     for (int i = 0; i < pu_w * pu_h; ++i)
     {
       int y = i / pu_w;
       int x = i % pu_w;
-      int16_t sample_L0 = px_L0[i] << (14 - KVZ_BIT_DEPTH);
-      int16_t sample_L1 = px_L1[i] << (14 - KVZ_BIT_DEPTH);
+      int16_t sample_L0 = px_L0[i] << (14 - UVG_BIT_DEPTH);
+      int16_t sample_L1 = px_L1[i] << (14 - UVG_BIT_DEPTH);
       int32_t rounded = (sample_L0 + sample_L1 + offset) >> shift;
-      dst[y * dst_stride + x] = kvz_fast_clip_32bit_to_pixel(rounded);
+      dst[y * dst_stride + x] = uvg_fast_clip_32bit_to_pixel(rounded);
     }
   }
 }
 
-static INLINE void bipred_average_im_im_template_avx2(kvz_pixel *dst,
-  kvz_pixel_im *im_L0,
-  kvz_pixel_im *im_L1,
+static INLINE void bipred_average_im_im_template_avx2(uvg_pixel *dst,
+  uvg_pixel_im *im_L0,
+  uvg_pixel_im *im_L1,
   unsigned pu_w,
   unsigned pu_h,
   unsigned dst_stride)
 {
-  int32_t shift = 15 - KVZ_BIT_DEPTH; // TODO: defines
+  int32_t shift = 15 - UVG_BIT_DEPTH; // TODO: defines
   int32_t scalar_offset = 1 << (shift - 1);
   __m256i offset = _mm256_set1_epi32(scalar_offset);
 
@@ -1135,9 +1135,9 @@ static INLINE void bipred_average_im_im_template_avx2(kvz_pixel *dst,
   }
 }
 
-static void bipred_average_im_im_avx2(kvz_pixel *dst,
-  kvz_pixel_im *im_L0,
-  kvz_pixel_im *im_L1,
+static void bipred_average_im_im_avx2(uvg_pixel *dst,
+  uvg_pixel_im *im_L0,
+  uvg_pixel_im *im_L1,
   unsigned pu_w,
   unsigned pu_h,
   unsigned dst_stride)
@@ -1160,7 +1160,7 @@ static void bipred_average_im_im_avx2(kvz_pixel *dst,
         break;
     }
   } else {
-    int32_t shift = 15 - KVZ_BIT_DEPTH; // TODO: defines
+    int32_t shift = 15 - UVG_BIT_DEPTH; // TODO: defines
     int32_t offset = 1 << (shift - 1);
 
     for (int i = 0; i < pu_w * pu_h; ++i)
@@ -1170,19 +1170,19 @@ static void bipred_average_im_im_avx2(kvz_pixel *dst,
       int16_t sample_L0 = im_L0[i];
       int16_t sample_L1 = im_L1[i];
       int32_t rounded = (sample_L0 + sample_L1 + offset) >> shift;
-      dst[y * dst_stride + x] = kvz_fast_clip_32bit_to_pixel(rounded);
+      dst[y * dst_stride + x] = uvg_fast_clip_32bit_to_pixel(rounded);
     }
   }
 }
 
-static INLINE void bipred_average_px_im_template_avx2(kvz_pixel *dst,
-  kvz_pixel *px,
-  kvz_pixel_im *im,
+static INLINE void bipred_average_px_im_template_avx2(uvg_pixel *dst,
+  uvg_pixel *px,
+  uvg_pixel_im *im,
   unsigned pu_w,
   unsigned pu_h,
   unsigned dst_stride)
 {
-  int32_t shift = 15 - KVZ_BIT_DEPTH; // TODO: defines
+  int32_t shift = 15 - UVG_BIT_DEPTH; // TODO: defines
   int32_t scalar_offset = 1 << (shift - 1);
   __m256i offset = _mm256_set1_epi32(scalar_offset);
 
@@ -1199,8 +1199,8 @@ static INLINE void bipred_average_px_im_template_avx2(kvz_pixel *dst,
 
       __m256i sample_px_a_16bit = _mm256_cvtepu8_epi16(_mm_loadu_si128((__m128i*)&px[i]));
       __m256i sample_px_b_16bit = _mm256_cvtepu8_epi16(_mm_loadu_si128((__m128i*)&px[i + 16]));
-      sample_px_a_16bit         = _mm256_slli_epi16(sample_px_a_16bit, 14 - KVZ_BIT_DEPTH);
-      sample_px_b_16bit         = _mm256_slli_epi16(sample_px_b_16bit, 14 - KVZ_BIT_DEPTH);
+      sample_px_a_16bit         = _mm256_slli_epi16(sample_px_a_16bit, 14 - UVG_BIT_DEPTH);
+      sample_px_b_16bit         = _mm256_slli_epi16(sample_px_b_16bit, 14 - UVG_BIT_DEPTH);
       __m256i sample_im_a_16bit = _mm256_loadu_si256((__m256i*)&im[i]);
       __m256i sample_im_b_16bit = _mm256_loadu_si256((__m256i*)&im[i + 16]);
 
@@ -1253,8 +1253,8 @@ static INLINE void bipred_average_px_im_template_avx2(kvz_pixel *dst,
       __m128i sample_px_b_8bit  = _mm_loadl_epi64((__m128i*)&px[i + 16]);
       __m256i sample_px_a_16bit = _mm256_cvtepu8_epi16(sample_px_a_8bit);
       __m256i sample_px_b_16bit = _mm256_cvtepu8_epi16(sample_px_b_8bit);
-      sample_px_a_16bit         = _mm256_slli_epi16(sample_px_a_16bit, 14 - KVZ_BIT_DEPTH);
-      sample_px_b_16bit         = _mm256_slli_epi16(sample_px_b_16bit, 14 - KVZ_BIT_DEPTH);
+      sample_px_a_16bit         = _mm256_slli_epi16(sample_px_a_16bit, 14 - UVG_BIT_DEPTH);
+      sample_px_b_16bit         = _mm256_slli_epi16(sample_px_b_16bit, 14 - UVG_BIT_DEPTH);
       __m256i sample_im_a_16bit = _mm256_loadu_si256((__m256i*)&im[i]);
       __m256i sample_im_b_16bit = _mm256_castsi128_si256(_mm_loadu_si128((__m128i*)&im[i + 16]));
 
@@ -1303,7 +1303,7 @@ static INLINE void bipred_average_px_im_template_avx2(kvz_pixel *dst,
 
           __m128i sample_px_8bit  = _mm_loadu_si128((__m128i*)&px[i]);
           __m256i sample_px_16bit = _mm256_cvtepu8_epi16(sample_px_8bit);
-          sample_px_16bit         = _mm256_slli_epi16(sample_px_16bit, 14 - KVZ_BIT_DEPTH);
+          sample_px_16bit         = _mm256_slli_epi16(sample_px_16bit, 14 - UVG_BIT_DEPTH);
           __m256i sample_im_16bit = _mm256_loadu_si256((__m256i*)&im[i]);
 
           __m256i sample_px_im_lo = _mm256_unpacklo_epi16(sample_px_16bit, sample_im_16bit);
@@ -1338,7 +1338,7 @@ static INLINE void bipred_average_px_im_template_avx2(kvz_pixel *dst,
 
           __m256i mask            = _mm256_setr_epi64x(-1, -1, -1, 0);
           __m256i sample_px_16bit = _mm256_cvtepu8_epi16(sample_px_8bit);
-          sample_px_16bit         = _mm256_slli_epi16(sample_px_16bit, 14 - KVZ_BIT_DEPTH);
+          sample_px_16bit         = _mm256_slli_epi16(sample_px_16bit, 14 - UVG_BIT_DEPTH);
           __m256i sample_im_16bit = _mm256_maskload_epi64((const long long*)(&im[i]), mask);
 
           __m256i sample_px_im_lo = _mm256_unpacklo_epi16(sample_px_16bit, sample_im_16bit);
@@ -1376,9 +1376,9 @@ static INLINE void bipred_average_px_im_template_avx2(kvz_pixel *dst,
   }
 }
 
-static void bipred_average_px_im_avx2(kvz_pixel *dst,
-  kvz_pixel *px,
-  kvz_pixel_im *im,
+static void bipred_average_px_im_avx2(uvg_pixel *dst,
+  uvg_pixel *px,
+  uvg_pixel_im *im,
   unsigned pu_w,
   unsigned pu_h,
   unsigned dst_stride)
@@ -1401,17 +1401,17 @@ static void bipred_average_px_im_avx2(kvz_pixel *dst,
         break;
     }
   } else {
-    int32_t shift = 15 - KVZ_BIT_DEPTH; // TODO: defines
+    int32_t shift = 15 - UVG_BIT_DEPTH; // TODO: defines
     int32_t offset = 1 << (shift - 1);
 
     for (int i = 0; i < pu_w * pu_h; ++i)
     {
       int y = i / pu_w;
       int x = i % pu_w;
-      int16_t sample_px = px[i] << (14 - KVZ_BIT_DEPTH);
+      int16_t sample_px = px[i] << (14 - UVG_BIT_DEPTH);
       int16_t sample_im = im[i];
       int32_t rounded = (sample_px + sample_im + offset) >> shift;
-      dst[y * dst_stride + x] = kvz_fast_clip_32bit_to_pixel(rounded);
+      dst[y * dst_stride + x] = uvg_fast_clip_32bit_to_pixel(rounded);
     }
   }
 }
@@ -1441,8 +1441,8 @@ static void bipred_average_avx2(lcu_t *const lcu,
       bipred_average_im_im_avx2(lcu->rec.y + pb_offset, im_L0->y, im_L1->y, pu_w, pu_h, LCU_WIDTH);
 
     } else {
-      kvz_pixel *src_px    = (im_flags_L0 & 1) ? px_L1->y : px_L0->y;
-      kvz_pixel_im *src_im = (im_flags_L0 & 1) ? im_L0->y : im_L1->y;
+      uvg_pixel *src_px    = (im_flags_L0 & 1) ? px_L1->y : px_L0->y;
+      uvg_pixel_im *src_im = (im_flags_L0 & 1) ? im_L0->y : im_L1->y;
       bipred_average_px_im_avx2(lcu->rec.y + pb_offset, src_px, src_im, pu_w, pu_h, LCU_WIDTH);
     }
   }
@@ -1460,10 +1460,10 @@ static void bipred_average_avx2(lcu_t *const lcu,
       bipred_average_im_im_avx2(lcu->rec.v + pb_offset, im_L0->v, im_L1->v, pb_w, pb_h, LCU_WIDTH_C);
 
     } else {
-      kvz_pixel    *src_px_u = (im_flags_L0 & 2) ? px_L1->u : px_L0->u;
-      kvz_pixel_im *src_im_u = (im_flags_L0 & 2) ? im_L0->u : im_L1->u;
-      kvz_pixel    *src_px_v = (im_flags_L0 & 2) ? px_L1->v : px_L0->v;
-      kvz_pixel_im *src_im_v = (im_flags_L0 & 2) ? im_L0->v : im_L1->v;
+      uvg_pixel    *src_px_u = (im_flags_L0 & 2) ? px_L1->u : px_L0->u;
+      uvg_pixel_im *src_im_u = (im_flags_L0 & 2) ? im_L0->u : im_L1->u;
+      uvg_pixel    *src_px_v = (im_flags_L0 & 2) ? px_L1->v : px_L0->v;
+      uvg_pixel_im *src_im_v = (im_flags_L0 & 2) ? im_L0->v : im_L1->v;
       bipred_average_px_im_avx2(lcu->rec.u + pb_offset, src_px_u, src_im_u, pb_w, pb_h, LCU_WIDTH_C);
       bipred_average_px_im_avx2(lcu->rec.v + pb_offset, src_px_v, src_im_v, pb_w, pb_h, LCU_WIDTH_C);
     }
@@ -1709,50 +1709,50 @@ static double pixel_var_avx2(const uint8_t *buf, const uint32_t len)
 
 #endif // !INACCURATE_VARIANCE_CALCULATION
 
-#endif // KVZ_BIT_DEPTH == 8
+#endif // UVG_BIT_DEPTH == 8
 #endif //COMPILE_INTEL_AVX2
 
-int kvz_strategy_register_picture_avx2(void* opaque, uint8_t bitdepth)
+int uvg_strategy_register_picture_avx2(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
 #if COMPILE_INTEL_AVX2
-#if KVZ_BIT_DEPTH == 8
+#if UVG_BIT_DEPTH == 8
   // We don't actually use SAD for intra right now, other than 4x4 for
   // transform skip, but we might again one day and this is some of the
   // simplest code to look at for anyone interested in doing more
   // optimizations, so it's worth it to keep this maintained.
   if (bitdepth == 8){
 
-    success &= kvz_strategyselector_register(opaque, "reg_sad", "avx2", 40, &kvz_reg_sad_avx2);
-    success &= kvz_strategyselector_register(opaque, "sad_8x8", "avx2", 40, &sad_8bit_8x8_avx2);
-    success &= kvz_strategyselector_register(opaque, "sad_16x16", "avx2", 40, &sad_8bit_16x16_avx2);
-    success &= kvz_strategyselector_register(opaque, "sad_32x32", "avx2", 40, &sad_8bit_32x32_avx2);
-    success &= kvz_strategyselector_register(opaque, "sad_64x64", "avx2", 40, &sad_8bit_64x64_avx2);
+    success &= uvg_strategyselector_register(opaque, "reg_sad", "avx2", 40, &uvg_reg_sad_avx2);
+    success &= uvg_strategyselector_register(opaque, "sad_8x8", "avx2", 40, &sad_8bit_8x8_avx2);
+    success &= uvg_strategyselector_register(opaque, "sad_16x16", "avx2", 40, &sad_8bit_16x16_avx2);
+    success &= uvg_strategyselector_register(opaque, "sad_32x32", "avx2", 40, &sad_8bit_32x32_avx2);
+    success &= uvg_strategyselector_register(opaque, "sad_64x64", "avx2", 40, &sad_8bit_64x64_avx2);
 
-    success &= kvz_strategyselector_register(opaque, "satd_4x4", "avx2", 40, &satd_4x4_8bit_avx2);
-    success &= kvz_strategyselector_register(opaque, "satd_8x8", "avx2", 40, &satd_8x8_8bit_avx2);
-    success &= kvz_strategyselector_register(opaque, "satd_16x16", "avx2", 40, &satd_16x16_8bit_avx2);
-    success &= kvz_strategyselector_register(opaque, "satd_32x32", "avx2", 40, &satd_32x32_8bit_avx2);
-    success &= kvz_strategyselector_register(opaque, "satd_64x64", "avx2", 40, &satd_64x64_8bit_avx2);
+    success &= uvg_strategyselector_register(opaque, "satd_4x4", "avx2", 40, &satd_4x4_8bit_avx2);
+    success &= uvg_strategyselector_register(opaque, "satd_8x8", "avx2", 40, &satd_8x8_8bit_avx2);
+    success &= uvg_strategyselector_register(opaque, "satd_16x16", "avx2", 40, &satd_16x16_8bit_avx2);
+    success &= uvg_strategyselector_register(opaque, "satd_32x32", "avx2", 40, &satd_32x32_8bit_avx2);
+    success &= uvg_strategyselector_register(opaque, "satd_64x64", "avx2", 40, &satd_64x64_8bit_avx2);
 
-    success &= kvz_strategyselector_register(opaque, "satd_4x4_dual", "avx2", 40, &satd_8bit_4x4_dual_avx2);
-    success &= kvz_strategyselector_register(opaque, "satd_8x8_dual", "avx2", 40, &satd_8bit_8x8_dual_avx2);
-    success &= kvz_strategyselector_register(opaque, "satd_16x16_dual", "avx2", 40, &satd_8bit_16x16_dual_avx2);
-    success &= kvz_strategyselector_register(opaque, "satd_32x32_dual", "avx2", 40, &satd_8bit_32x32_dual_avx2);
-    success &= kvz_strategyselector_register(opaque, "satd_64x64_dual", "avx2", 40, &satd_8bit_64x64_dual_avx2);
-    success &= kvz_strategyselector_register(opaque, "satd_any_size", "avx2", 40, &satd_any_size_8bit_avx2);
-    success &= kvz_strategyselector_register(opaque, "satd_any_size_quad", "avx2", 40, &satd_any_size_quad_avx2);
+    success &= uvg_strategyselector_register(opaque, "satd_4x4_dual", "avx2", 40, &satd_8bit_4x4_dual_avx2);
+    success &= uvg_strategyselector_register(opaque, "satd_8x8_dual", "avx2", 40, &satd_8bit_8x8_dual_avx2);
+    success &= uvg_strategyselector_register(opaque, "satd_16x16_dual", "avx2", 40, &satd_8bit_16x16_dual_avx2);
+    success &= uvg_strategyselector_register(opaque, "satd_32x32_dual", "avx2", 40, &satd_8bit_32x32_dual_avx2);
+    success &= uvg_strategyselector_register(opaque, "satd_64x64_dual", "avx2", 40, &satd_8bit_64x64_dual_avx2);
+    success &= uvg_strategyselector_register(opaque, "satd_any_size", "avx2", 40, &satd_any_size_8bit_avx2);
+    success &= uvg_strategyselector_register(opaque, "satd_any_size_quad", "avx2", 40, &satd_any_size_quad_avx2);
 
-    success &= kvz_strategyselector_register(opaque, "pixels_calc_ssd", "avx2", 40, &pixels_calc_ssd_avx2);
-    success &= kvz_strategyselector_register(opaque, "bipred_average", "avx2", 40, &bipred_average_avx2);
-    success &= kvz_strategyselector_register(opaque, "get_optimized_sad", "avx2", 40, &get_optimized_sad_avx2);
-    success &= kvz_strategyselector_register(opaque, "ver_sad", "avx2", 40, &ver_sad_avx2);
-    success &= kvz_strategyselector_register(opaque, "hor_sad", "avx2", 40, &hor_sad_avx2);
+    success &= uvg_strategyselector_register(opaque, "pixels_calc_ssd", "avx2", 40, &pixels_calc_ssd_avx2);
+    success &= uvg_strategyselector_register(opaque, "bipred_average", "avx2", 40, &bipred_average_avx2);
+    success &= uvg_strategyselector_register(opaque, "get_optimized_sad", "avx2", 40, &get_optimized_sad_avx2);
+    success &= uvg_strategyselector_register(opaque, "ver_sad", "avx2", 40, &ver_sad_avx2);
+    success &= uvg_strategyselector_register(opaque, "hor_sad", "avx2", 40, &hor_sad_avx2);
 
-    success &= kvz_strategyselector_register(opaque, "pixel_var", "avx2", 40, &pixel_var_avx2);
+    success &= uvg_strategyselector_register(opaque, "pixel_var", "avx2", 40, &pixel_var_avx2);
 
   }
-#endif // KVZ_BIT_DEPTH == 8
+#endif // UVG_BIT_DEPTH == 8
 #endif
   return success;
 }

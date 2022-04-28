@@ -432,7 +432,7 @@ static const uint16_t g_inistateToCount[128] = {
 /**
  * \brief Initialize struct cabac_ctx.
  */
-void kvz_ctx_init(cabac_ctx_t *ctx, int32_t qp, int32_t init_value, uint8_t rate)
+void uvg_ctx_init(cabac_ctx_t *ctx, int32_t qp, int32_t init_value, uint8_t rate)
 {
 
   int slope = (init_value >> 3) - 4;
@@ -461,134 +461,134 @@ void kvz_ctx_init(cabac_ctx_t *ctx, int32_t qp, int32_t init_value, uint8_t rate
  * \param slice type of slice we are coding (P/B/I)
  */
 
-void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
+void uvg_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
 {
   cabac_data_t * const cabac = &state->cabac;
   uint16_t i, ii;
 
   // Initialize contexts
-  kvz_ctx_init(&cabac->ctx.sao_merge_flag_model, QP, INIT_SAO_MERGE_FLAG[slice], INIT_SAO_MERGE_FLAG[3]);
-  kvz_ctx_init(&cabac->ctx.sao_type_idx_model, QP, INIT_SAO_TYPE_IDX[slice], INIT_SAO_TYPE_IDX[3]);
-  kvz_ctx_init(&cabac->ctx.alf_temporal_filt, QP, INIT_USE_TEMPORAL_ALF_FILT[slice], INIT_USE_TEMPORAL_ALF_FILT[3]);
+  uvg_ctx_init(&cabac->ctx.sao_merge_flag_model, QP, INIT_SAO_MERGE_FLAG[slice], INIT_SAO_MERGE_FLAG[3]);
+  uvg_ctx_init(&cabac->ctx.sao_type_idx_model, QP, INIT_SAO_TYPE_IDX[slice], INIT_SAO_TYPE_IDX[3]);
+  uvg_ctx_init(&cabac->ctx.alf_temporal_filt, QP, INIT_USE_TEMPORAL_ALF_FILT[slice], INIT_USE_TEMPORAL_ALF_FILT[3]);
 
-  kvz_ctx_init(&cabac->ctx.cu_merge_flag_ext_model, QP, INIT_MERGE_FLAG_EXT[slice][0], INIT_MERGE_FLAG_EXT[3][0]);
-  kvz_ctx_init(&cabac->ctx.cu_merge_idx_ext_model, QP, INIT_MERGE_IDX_EXT[slice][0], INIT_MERGE_IDX_EXT[3][0]);
+  uvg_ctx_init(&cabac->ctx.cu_merge_flag_ext_model, QP, INIT_MERGE_FLAG_EXT[slice][0], INIT_MERGE_FLAG_EXT[3][0]);
+  uvg_ctx_init(&cabac->ctx.cu_merge_idx_ext_model, QP, INIT_MERGE_IDX_EXT[slice][0], INIT_MERGE_IDX_EXT[3][0]);
   
-  kvz_ctx_init(&cabac->ctx.cu_transquant_bypass, QP, INIT_CU_TRANSQUANT_BYPASS[slice][0], INIT_CU_TRANSQUANT_BYPASS[3][0]);
+  uvg_ctx_init(&cabac->ctx.cu_transquant_bypass, QP, INIT_CU_TRANSQUANT_BYPASS[slice][0], INIT_CU_TRANSQUANT_BYPASS[3][0]);
   
-  kvz_ctx_init(&cabac->ctx.intra_luma_mpm_flag_model, QP, INIT_INTRA_LUMA_MPM_FLAG[slice], INIT_INTRA_LUMA_MPM_FLAG[3]);
+  uvg_ctx_init(&cabac->ctx.intra_luma_mpm_flag_model, QP, INIT_INTRA_LUMA_MPM_FLAG[slice], INIT_INTRA_LUMA_MPM_FLAG[3]);
 
 
-  kvz_ctx_init(&cabac->ctx.intra_subpart_model[0], QP, INIT_INTRA_SUBPART_MODE[slice][0], INIT_INTRA_SUBPART_MODE[3][0]);
-  kvz_ctx_init(&cabac->ctx.intra_subpart_model[1], QP, INIT_INTRA_SUBPART_MODE[slice][1], INIT_INTRA_SUBPART_MODE[3][1]);
+  uvg_ctx_init(&cabac->ctx.intra_subpart_model[0], QP, INIT_INTRA_SUBPART_MODE[slice][0], INIT_INTRA_SUBPART_MODE[3][0]);
+  uvg_ctx_init(&cabac->ctx.intra_subpart_model[1], QP, INIT_INTRA_SUBPART_MODE[slice][1], INIT_INTRA_SUBPART_MODE[3][1]);
 
-  kvz_ctx_init(&cabac->ctx.transform_skip_model_luma, QP, INIT_TRANSFORM_SKIP[slice][0], INIT_TRANSFORM_SKIP[3][0]);
-  kvz_ctx_init(&cabac->ctx.transform_skip_model_chroma, QP, INIT_TRANSFORM_SKIP[slice][1], INIT_TRANSFORM_SKIP[3][1]);
+  uvg_ctx_init(&cabac->ctx.transform_skip_model_luma, QP, INIT_TRANSFORM_SKIP[slice][0], INIT_TRANSFORM_SKIP[3][0]);
+  uvg_ctx_init(&cabac->ctx.transform_skip_model_chroma, QP, INIT_TRANSFORM_SKIP[slice][1], INIT_TRANSFORM_SKIP[3][1]);
 
-  kvz_ctx_init(&cabac->ctx.transform_skip_par, QP, INIT_TRANSFORM_SKIP_PARITY[slice][0], INIT_TRANSFORM_SKIP_PARITY[3][0]);
+  uvg_ctx_init(&cabac->ctx.transform_skip_par, QP, INIT_TRANSFORM_SKIP_PARITY[slice][0], INIT_TRANSFORM_SKIP_PARITY[3][0]);
   
-  kvz_ctx_init(&cabac->ctx.multi_ref_line[0], QP, MULTI_REF_LINE_MODE[slice][0], MULTI_REF_LINE_MODE[3][0]);
-  kvz_ctx_init(&cabac->ctx.multi_ref_line[1], QP, MULTI_REF_LINE_MODE[slice][1], MULTI_REF_LINE_MODE[3][1]);
+  uvg_ctx_init(&cabac->ctx.multi_ref_line[0], QP, MULTI_REF_LINE_MODE[slice][0], MULTI_REF_LINE_MODE[3][0]);
+  uvg_ctx_init(&cabac->ctx.multi_ref_line[1], QP, MULTI_REF_LINE_MODE[slice][1], MULTI_REF_LINE_MODE[3][1]);
 
   for (i = 0; i < 4; i++) {
-    kvz_ctx_init(&cabac->ctx.mip_flag[i], QP, MIP_FLAG[slice][i], MIP_FLAG[3][i]);
+    uvg_ctx_init(&cabac->ctx.mip_flag[i], QP, MIP_FLAG[slice][i], MIP_FLAG[3][i]);
   }
 
-  kvz_ctx_init(&cabac->ctx.chroma_pred_model, QP, INIT_CHROMA_PRED_MODE[slice], INIT_CHROMA_PRED_MODE[3]);
+  uvg_ctx_init(&cabac->ctx.chroma_pred_model, QP, INIT_CHROMA_PRED_MODE[slice], INIT_CHROMA_PRED_MODE[3]);
 
-  kvz_ctx_init(&cabac->ctx.cclm_flag, QP, INIT_CCLM_FLAG[slice], INIT_CCLM_FLAG[3]);
-  kvz_ctx_init(&cabac->ctx.cclm_model, QP, INIT_CCLM_MODEL[slice], INIT_CCLM_MODEL[3]);
+  uvg_ctx_init(&cabac->ctx.cclm_flag, QP, INIT_CCLM_FLAG[slice], INIT_CCLM_FLAG[3]);
+  uvg_ctx_init(&cabac->ctx.cclm_model, QP, INIT_CCLM_MODEL[slice], INIT_CCLM_MODEL[3]);
 
 
   for (i = 0; i < 3; i++) {
-    kvz_ctx_init(&cabac->ctx.cu_skip_flag_model[i], QP, INIT_SKIP_FLAG[slice][i], INIT_SKIP_FLAG[3][i]);
-    kvz_ctx_init(&cabac->ctx.joint_cb_cr[i], QP, INIT_JOINT_CB_CR_FLAG[slice][i], INIT_JOINT_CB_CR_FLAG[3][i]);   
-    kvz_ctx_init(&cabac->ctx.transform_skip_sig_coeff_group[i], QP, INIT_TRANSFORM_SKIP_SIG_COEFF_GROUP[slice][i], INIT_TRANSFORM_SKIP_SIG_COEFF_GROUP[3][i]);
-    kvz_ctx_init(&cabac->ctx.transform_skip_sig[i], QP, INIT_TRANSFORM_SKIP_SIG[slice][i], INIT_TRANSFORM_SKIP_SIG[3][i]);
+    uvg_ctx_init(&cabac->ctx.cu_skip_flag_model[i], QP, INIT_SKIP_FLAG[slice][i], INIT_SKIP_FLAG[3][i]);
+    uvg_ctx_init(&cabac->ctx.joint_cb_cr[i], QP, INIT_JOINT_CB_CR_FLAG[slice][i], INIT_JOINT_CB_CR_FLAG[3][i]);   
+    uvg_ctx_init(&cabac->ctx.transform_skip_sig_coeff_group[i], QP, INIT_TRANSFORM_SKIP_SIG_COEFF_GROUP[slice][i], INIT_TRANSFORM_SKIP_SIG_COEFF_GROUP[3][i]);
+    uvg_ctx_init(&cabac->ctx.transform_skip_sig[i], QP, INIT_TRANSFORM_SKIP_SIG[slice][i], INIT_TRANSFORM_SKIP_SIG[3][i]);
   }
 
   for (i = 0; i < 4; i++) {
-    kvz_ctx_init(&cabac->ctx.sig_coeff_group_model[i], QP, INIT_SIG_COEFF_GROUP[slice][i], INIT_SIG_COEFF_GROUP[3][i]);
-    kvz_ctx_init(&cabac->ctx.mts_idx_model[i], QP, INIT_MTS_IDX[slice][i], INIT_MTS_IDX[3][i]);
-    kvz_ctx_init(&cabac->ctx.transform_skip_gt1[i], QP, INIT_TRANSFORM_SKIP_GT1[slice][i], INIT_TRANSFORM_SKIP_GT1[3][i]);
+    uvg_ctx_init(&cabac->ctx.sig_coeff_group_model[i], QP, INIT_SIG_COEFF_GROUP[slice][i], INIT_SIG_COEFF_GROUP[3][i]);
+    uvg_ctx_init(&cabac->ctx.mts_idx_model[i], QP, INIT_MTS_IDX[slice][i], INIT_MTS_IDX[3][i]);
+    uvg_ctx_init(&cabac->ctx.transform_skip_gt1[i], QP, INIT_TRANSFORM_SKIP_GT1[slice][i], INIT_TRANSFORM_SKIP_GT1[3][i]);
   }
 
   for (i = 0; i < 5; i++) {
-    kvz_ctx_init(&cabac->ctx.transform_skip_gt2[i], QP, INIT_TRANSFORM_SKIP_GT2[slice][i], INIT_TRANSFORM_SKIP_GT2[3][i]);
-    kvz_ctx_init(&cabac->ctx.imv_flag[i], QP, INIT_IMV_FLAG[slice][i], INIT_IMV_FLAG[3][i]);    
+    uvg_ctx_init(&cabac->ctx.transform_skip_gt2[i], QP, INIT_TRANSFORM_SKIP_GT2[slice][i], INIT_TRANSFORM_SKIP_GT2[3][i]);
+    uvg_ctx_init(&cabac->ctx.imv_flag[i], QP, INIT_IMV_FLAG[slice][i], INIT_IMV_FLAG[3][i]);    
   }
 
   for (i = 0; i < 6; i++) {
-    kvz_ctx_init(&cabac->ctx.qt_split_flag_model[i], QP, INIT_QT_SPLIT_FLAG[slice][i], INIT_QT_SPLIT_FLAG[3][i]);
-    kvz_ctx_init(&cabac->ctx.alf_cc_filter_control_flag[i], QP, INIT_CC_ALF_FILTER_CONTROL_FLAG[slice][i], INIT_CC_ALF_FILTER_CONTROL_FLAG[3][i]);
-    kvz_ctx_init(&cabac->ctx.transform_skip_res_sign[i], QP, INIT_TRANSFORM_SKIP_RES_SIGN[slice][i], INIT_TRANSFORM_SKIP_RES_SIGN[3][i]);
+    uvg_ctx_init(&cabac->ctx.qt_split_flag_model[i], QP, INIT_QT_SPLIT_FLAG[slice][i], INIT_QT_SPLIT_FLAG[3][i]);
+    uvg_ctx_init(&cabac->ctx.alf_cc_filter_control_flag[i], QP, INIT_CC_ALF_FILTER_CONTROL_FLAG[slice][i], INIT_CC_ALF_FILTER_CONTROL_FLAG[3][i]);
+    uvg_ctx_init(&cabac->ctx.transform_skip_res_sign[i], QP, INIT_TRANSFORM_SKIP_RES_SIGN[slice][i], INIT_TRANSFORM_SKIP_RES_SIGN[3][i]);
   }
  
   for (i = 0; i < 9; i++) {
-    kvz_ctx_init(&cabac->ctx.split_flag_model[i], QP, INIT_SPLIT_FLAG[slice][i], INIT_SPLIT_FLAG[3][i]);
-    kvz_ctx_init(&cabac->ctx.alf_ctb_flag_model[i], QP, INIT_CTB_ALF_FLAG[slice][i], INIT_CTB_ALF_FLAG[3][i]);
+    uvg_ctx_init(&cabac->ctx.split_flag_model[i], QP, INIT_SPLIT_FLAG[slice][i], INIT_SPLIT_FLAG[3][i]);
+    uvg_ctx_init(&cabac->ctx.alf_ctb_flag_model[i], QP, INIT_CTB_ALF_FLAG[slice][i], INIT_CTB_ALF_FLAG[3][i]);
   }
   
 
   //TODO: ignore P/B contexts on intra frame
-  kvz_ctx_init(&cabac->ctx.cu_pred_mode_model[0], QP, INIT_PRED_MODE[slice][0], INIT_PRED_MODE[3][0]);
-  kvz_ctx_init(&cabac->ctx.cu_pred_mode_model[1], QP, INIT_PRED_MODE[slice][1], INIT_PRED_MODE[3][1]);
+  uvg_ctx_init(&cabac->ctx.cu_pred_mode_model[0], QP, INIT_PRED_MODE[slice][0], INIT_PRED_MODE[3][0]);
+  uvg_ctx_init(&cabac->ctx.cu_pred_mode_model[1], QP, INIT_PRED_MODE[slice][1], INIT_PRED_MODE[3][1]);
 
-  kvz_ctx_init(&cabac->ctx.cu_qt_root_cbf_model, QP, INIT_QT_ROOT_CBF[slice][0], INIT_QT_ROOT_CBF[3][0]);
-  kvz_ctx_init(&cabac->ctx.mvp_idx_model, QP, INIT_MVP_IDX[slice][0], INIT_MVP_IDX[3][0]);
+  uvg_ctx_init(&cabac->ctx.cu_qt_root_cbf_model, QP, INIT_QT_ROOT_CBF[slice][0], INIT_QT_ROOT_CBF[3][0]);
+  uvg_ctx_init(&cabac->ctx.mvp_idx_model, QP, INIT_MVP_IDX[slice][0], INIT_MVP_IDX[3][0]);
 
   for (i = 0; i < 2; i++) {   
-    kvz_ctx_init(&cabac->ctx.qt_cbf_model_cb[i], QP, INIT_QT_CBF[slice][i+4], INIT_QT_CBF[3][i+4]);
-    kvz_ctx_init(&cabac->ctx.cu_mvd_model[i], QP, INIT_MVD[slice][i], INIT_MVD[3][i]);
-    kvz_ctx_init(&cabac->ctx.cu_ref_pic_model[i], QP, INIT_REF_PIC[slice][i], INIT_REF_PIC[3][i]);    
-    kvz_ctx_init(&cabac->ctx.luma_planar_model[i], QP, INIT_INTRA_LUMA_PLANAR_MODE[slice][i], INIT_INTRA_LUMA_PLANAR_MODE[3][i]);
-    kvz_ctx_init(&cabac->ctx.cu_qp_delta_abs[i], QP, INIT_CU_QP_DELTA_ABS[slice][i], INIT_CU_QP_DELTA_ABS[3][i]);
-    kvz_ctx_init(&cabac->ctx.alf_ctb_alternatives[i], QP, INIT_CTB_ALF_ALTERNATIVE[slice][i], INIT_CTB_ALF_ALTERNATIVE[3][i]);
+    uvg_ctx_init(&cabac->ctx.qt_cbf_model_cb[i], QP, INIT_QT_CBF[slice][i+4], INIT_QT_CBF[3][i+4]);
+    uvg_ctx_init(&cabac->ctx.cu_mvd_model[i], QP, INIT_MVD[slice][i], INIT_MVD[3][i]);
+    uvg_ctx_init(&cabac->ctx.cu_ref_pic_model[i], QP, INIT_REF_PIC[slice][i], INIT_REF_PIC[3][i]);    
+    uvg_ctx_init(&cabac->ctx.luma_planar_model[i], QP, INIT_INTRA_LUMA_PLANAR_MODE[slice][i], INIT_INTRA_LUMA_PLANAR_MODE[3][i]);
+    uvg_ctx_init(&cabac->ctx.cu_qp_delta_abs[i], QP, INIT_CU_QP_DELTA_ABS[slice][i], INIT_CU_QP_DELTA_ABS[3][i]);
+    uvg_ctx_init(&cabac->ctx.alf_ctb_alternatives[i], QP, INIT_CTB_ALF_ALTERNATIVE[slice][i], INIT_CTB_ALF_ALTERNATIVE[3][i]);
   }
 
   for (i = 0; i < 3; i++) {
-    kvz_ctx_init(&cabac->ctx.qt_cbf_model_cr[i], QP, INIT_QT_CBF[slice][i + 6], INIT_QT_CBF[3][i + 6]);
-    kvz_ctx_init(&cabac->ctx.cu_ctx_last_y_chroma[i], QP, INIT_LAST_Y[slice][i + 20], INIT_LAST_Y[3][i + 20]);
-    kvz_ctx_init(&cabac->ctx.cu_ctx_last_x_chroma[i], QP, INIT_LAST_X[slice][i + 20], INIT_LAST_X[3][i + 20]);
+    uvg_ctx_init(&cabac->ctx.qt_cbf_model_cr[i], QP, INIT_QT_CBF[slice][i + 6], INIT_QT_CBF[3][i + 6]);
+    uvg_ctx_init(&cabac->ctx.cu_ctx_last_y_chroma[i], QP, INIT_LAST_Y[slice][i + 20], INIT_LAST_Y[3][i + 20]);
+    uvg_ctx_init(&cabac->ctx.cu_ctx_last_x_chroma[i], QP, INIT_LAST_X[slice][i + 20], INIT_LAST_X[3][i + 20]);
   }
 
   for (i = 0; i < 4; i++) {
     
-    kvz_ctx_init(&cabac->ctx.part_size_model[i], QP, INIT_PART_SIZE[slice][i], INIT_PART_SIZE[3][i]);
-    kvz_ctx_init(&cabac->ctx.bdpcm_mode[i], QP, BDPCM_MODE_INIT[slice][i], BDPCM_MODE_INIT[3][i]);
-    kvz_ctx_init(&cabac->ctx.qt_cbf_model_luma[i], QP, INIT_QT_CBF[slice][i], INIT_QT_CBF[3][i]);
+    uvg_ctx_init(&cabac->ctx.part_size_model[i], QP, INIT_PART_SIZE[slice][i], INIT_PART_SIZE[3][i]);
+    uvg_ctx_init(&cabac->ctx.bdpcm_mode[i], QP, BDPCM_MODE_INIT[slice][i], BDPCM_MODE_INIT[3][i]);
+    uvg_ctx_init(&cabac->ctx.qt_cbf_model_luma[i], QP, INIT_QT_CBF[slice][i], INIT_QT_CBF[3][i]);
   }
 
   for (i = 0; i < 6; i++) {  
 
-    kvz_ctx_init(&cabac->ctx.inter_dir[i], QP, INIT_INTER_DIR[slice][i], INIT_INTER_DIR[3][i]);
+    uvg_ctx_init(&cabac->ctx.inter_dir[i], QP, INIT_INTER_DIR[slice][i], INIT_INTER_DIR[3][i]);
   }
 
   for (i = 0; i < 20; i++) {
-    kvz_ctx_init(&cabac->ctx.cu_ctx_last_y_luma[i], QP, INIT_LAST_Y[slice][i], INIT_LAST_Y[3][i]);
-    kvz_ctx_init(&cabac->ctx.cu_ctx_last_x_luma[i], QP, INIT_LAST_X[slice][i], INIT_LAST_X[3][i]);
+    uvg_ctx_init(&cabac->ctx.cu_ctx_last_y_luma[i], QP, INIT_LAST_Y[slice][i], INIT_LAST_Y[3][i]);
+    uvg_ctx_init(&cabac->ctx.cu_ctx_last_x_luma[i], QP, INIT_LAST_X[slice][i], INIT_LAST_X[3][i]);
   }
 
   for (ii = 0; ii < 3; ii++) {
     for (i = 0; i < 12; i++) {
-      kvz_ctx_init(&cabac->ctx.cu_sig_model_luma[ii][i], QP, INIT_SIG_FLAG[ii*2][slice][i], INIT_SIG_FLAG[ii * 2][3][i]);
-      if (i < 8) kvz_ctx_init(&cabac->ctx.cu_sig_model_chroma[ii][i], QP, INIT_SIG_FLAG[ii*2+1][slice][i], INIT_SIG_FLAG[ii * 2 + 1][3][i]);
+      uvg_ctx_init(&cabac->ctx.cu_sig_model_luma[ii][i], QP, INIT_SIG_FLAG[ii*2][slice][i], INIT_SIG_FLAG[ii * 2][3][i]);
+      if (i < 8) uvg_ctx_init(&cabac->ctx.cu_sig_model_chroma[ii][i], QP, INIT_SIG_FLAG[ii*2+1][slice][i], INIT_SIG_FLAG[ii * 2 + 1][3][i]);
     }
   }
 
   for (i = 0; i < 21; i++) {
-    kvz_ctx_init(&cabac->ctx.cu_parity_flag_model_luma[i], QP, INIT_PARITY_FLAG[0][slice][i], INIT_PARITY_FLAG[0][3][i]);
-    if (i < 11) kvz_ctx_init(&cabac->ctx.cu_parity_flag_model_chroma[i], QP, INIT_PARITY_FLAG[1][slice][i], INIT_PARITY_FLAG[1][3][i]);
+    uvg_ctx_init(&cabac->ctx.cu_parity_flag_model_luma[i], QP, INIT_PARITY_FLAG[0][slice][i], INIT_PARITY_FLAG[0][3][i]);
+    if (i < 11) uvg_ctx_init(&cabac->ctx.cu_parity_flag_model_chroma[i], QP, INIT_PARITY_FLAG[1][slice][i], INIT_PARITY_FLAG[1][3][i]);
   }
   for (ii = 0; ii < 2; ii++) {
     for (i = 0; i < 21; i++) {
-      kvz_ctx_init(&cabac->ctx.cu_gtx_flag_model_luma[ii][i], QP, INIT_GTX_FLAG[ii * 2][slice][i], INIT_GTX_FLAG[ii * 2][3][i]);
-      if (i < 11) kvz_ctx_init(&cabac->ctx.cu_gtx_flag_model_chroma[ii][i], QP, INIT_GTX_FLAG[ii * 2 + 1][slice][i], INIT_GTX_FLAG[ii * 2 + 1][3][i]);
+      uvg_ctx_init(&cabac->ctx.cu_gtx_flag_model_luma[ii][i], QP, INIT_GTX_FLAG[ii * 2][slice][i], INIT_GTX_FLAG[ii * 2][3][i]);
+      if (i < 11) uvg_ctx_init(&cabac->ctx.cu_gtx_flag_model_chroma[ii][i], QP, INIT_GTX_FLAG[ii * 2 + 1][slice][i], INIT_GTX_FLAG[ii * 2 + 1][3][i]);
     }
   }
 }
 
-void kvz_context_copy(encoder_state_t * const target_state, const encoder_state_t * const source_state) {
+void uvg_context_copy(encoder_state_t * const target_state, const encoder_state_t * const source_state) {
   cabac_data_t * const target_cabac = &target_state->cabac;
   const cabac_data_t * const source_cabac = &source_state->cabac;
   
@@ -598,7 +598,7 @@ void kvz_context_copy(encoder_state_t * const target_state, const encoder_state_
 }
 
 
-uint32_t kvz_context_get_sig_coeff_group( uint32_t *sig_coeff_group_flag,
+uint32_t uvg_context_get_sig_coeff_group( uint32_t *sig_coeff_group_flag,
                                       uint32_t pos_x,
                                       uint32_t pos_y,
                                       int32_t width)
@@ -612,7 +612,7 @@ uint32_t kvz_context_get_sig_coeff_group( uint32_t *sig_coeff_group_flag,
   return uiRight || uiLower;
 }
 
-uint32_t kvz_context_get_sig_coeff_group_ts(uint32_t* sig_coeff_group_flag,
+uint32_t uvg_context_get_sig_coeff_group_ts(uint32_t* sig_coeff_group_flag,
   uint32_t pos_x,
   uint32_t pos_y,
   int32_t width)
@@ -638,7 +638,7 @@ uint32_t kvz_context_get_sig_coeff_group_ts(uint32_t* sig_coeff_group_flag,
 * \param temp_sum  temporary output value used in the next steps
 * \returns context index for current scan position
 */
-uint32_t kvz_context_get_sig_ctx_idx_abs(const coeff_t* coeff, int32_t pos_x, int32_t pos_y,
+uint32_t uvg_context_get_sig_ctx_idx_abs(const coeff_t* coeff, int32_t pos_x, int32_t pos_y,
                                          uint32_t height, uint32_t width, int8_t type,
                                          int32_t* temp_diag, int32_t* temp_sum)
 {
@@ -679,7 +679,7 @@ uint32_t kvz_context_get_sig_ctx_idx_abs(const coeff_t* coeff, int32_t pos_x, in
   return ctx_ofs;
 }
 
-uint32_t kvz_context_get_sig_ctx_idx_abs_ts(const coeff_t* coeff, int32_t pos_x, int32_t pos_y, uint32_t width)
+uint32_t uvg_context_get_sig_ctx_idx_abs_ts(const coeff_t* coeff, int32_t pos_x, int32_t pos_y, uint32_t width)
 {
   const coeff_t* data = coeff + pos_x + pos_y * width;
   int             numPos = 0;
@@ -697,7 +697,7 @@ uint32_t kvz_context_get_sig_ctx_idx_abs_ts(const coeff_t* coeff, int32_t pos_x,
   return numPos;
 }
 
-uint32_t kvz_sign_ctx_id_abs_ts(const coeff_t* coeff, int32_t pos_x, int32_t pos_y, int32_t width, int bdpcm)
+uint32_t uvg_sign_ctx_id_abs_ts(const coeff_t* coeff, int32_t pos_x, int32_t pos_y, int32_t width, int bdpcm)
 {
   const coeff_t* pData = coeff + pos_x + pos_y * width;
 
@@ -734,7 +734,7 @@ uint32_t kvz_sign_ctx_id_abs_ts(const coeff_t* coeff, int32_t pos_x, int32_t pos
   return signCtx;
 }
 
-int32_t kvz_derive_mod_coeff(int rightPixel, int belowPixel, coeff_t absCoeff, int bdpcm)
+int32_t uvg_derive_mod_coeff(int rightPixel, int belowPixel, coeff_t absCoeff, int bdpcm)
 {
 
   if (absCoeff == 0)
@@ -760,7 +760,7 @@ int32_t kvz_derive_mod_coeff(int rightPixel, int belowPixel, coeff_t absCoeff, i
   return(absCoeffMod);
 }
 
-unsigned kvz_lrg1_ctx_id_abs_ts(const coeff_t* coeff, int32_t pos_x, int32_t pos_y, int32_t width, int bdpcm)
+unsigned uvg_lrg1_ctx_id_abs_ts(const coeff_t* coeff, int32_t pos_x, int32_t pos_y, int32_t width, int bdpcm)
 {
   const coeff_t* posC = coeff + pos_x + pos_y * width;
 
@@ -796,7 +796,7 @@ unsigned kvz_lrg1_ctx_id_abs_ts(const coeff_t* coeff, int32_t pos_x, int32_t pos
 * \param height    height of the block
 * \returns context go rice parameter
 */
-uint32_t kvz_abs_sum(const coeff_t* coeff, int32_t pos_x, int32_t pos_y,
+uint32_t uvg_abs_sum(const coeff_t* coeff, int32_t pos_x, int32_t pos_y,
                              uint32_t height, uint32_t width, uint32_t baselevel)
 {
 #define UPDATE(x) sum+=abs(x)/*-(x?1:0)*/
@@ -838,7 +838,7 @@ uint32_t kvz_abs_sum(const coeff_t* coeff, int32_t pos_x, int32_t pos_y,
 * \param height    height of the block
 * \returns context go rice parameter
 */
-uint32_t kvz_go_rice_par_abs(const coeff_t* coeff, int32_t pos_x, int32_t pos_y,
+uint32_t uvg_go_rice_par_abs(const coeff_t* coeff, int32_t pos_x, int32_t pos_y,
   uint32_t height, uint32_t width, uint32_t baselevel)
 {
 //#define UPDATE(x) sum+=abs(x)/*-(x?1:0)*/
@@ -866,7 +866,7 @@ uint32_t kvz_go_rice_par_abs(const coeff_t* coeff, int32_t pos_x, int32_t pos_y,
 //    }
 //  }
 //#undef UPDATE
-  uint32_t check = kvz_abs_sum(coeff, pos_x, pos_y, height, width, baselevel);
+  uint32_t check = uvg_abs_sum(coeff, pos_x, pos_y, height, width, baselevel);
   return  g_go_rice_pars[check];
-  /*return  g_go_rice_pars[kvz_abs_sum(coeff, pos_x, pos_y, height, width, baselevel)];*/
+  /*return  g_go_rice_pars[uvg_abs_sum(coeff, pos_x, pos_y, height, width, baselevel)];*/
 }

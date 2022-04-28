@@ -35,14 +35,14 @@
 #include "test_strategies.h"
 
 GREATEST_MAIN_DEFS();
-#if KVZ_BIT_DEPTH == 8
+#if UVG_BIT_DEPTH == 8
 extern SUITE(sad_tests);
 extern SUITE(intra_sad_tests);
 extern SUITE(satd_tests);
 extern SUITE(speed_tests);
 extern SUITE(dct_tests);
 extern SUITE(mts_tests);
-#endif //KVZ_BIT_DEPTH == 8
+#endif //UVG_BIT_DEPTH == 8
 
 extern SUITE(coeff_sum_tests);
 extern SUITE(mv_cand_tests);
@@ -53,7 +53,7 @@ int main(int argc, char **argv)
   GREATEST_MAIN_BEGIN();
 
   init_test_strategies(1);
-#if KVZ_BIT_DEPTH == 8
+#if UVG_BIT_DEPTH == 8
   RUN_SUITE(sad_tests);
   RUN_SUITE(intra_sad_tests);
   RUN_SUITE(satd_tests);
@@ -67,7 +67,7 @@ int main(int argc, char **argv)
   }
 #else
   printf("10-bit tests are not yet supported\n");
-#endif //KVZ_BIT_DEPTH == 8
+#endif //UVG_BIT_DEPTH == 8
 
   RUN_SUITE(coeff_sum_tests);
 

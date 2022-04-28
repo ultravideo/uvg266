@@ -40,7 +40,7 @@
 /**
  * \brief Write a Network Abstraction Layer (NAL) packet to the output.
  */
-void kvz_nal_write(bitstream_t * const bitstream, const uint8_t nal_type,
+void uvg_nal_write(bitstream_t * const bitstream, const uint8_t nal_type,
                const uint8_t temporal_id, const int long_start_code)
 {
   uint8_t byte;
@@ -49,27 +49,27 @@ void kvz_nal_write(bitstream_t * const bitstream, const uint8_t nal_type,
   const uint8_t start_code_prefix_one_3bytes = 0x01;
   const uint8_t zero = 0x00;
 
-#ifdef KVZ_DEBUG
+#ifdef UVG_DEBUG
   printf("=========== NAL unit  ===========\n");
 #endif
 
   // zero_byte (0x00) shall be present in the byte stream NALU of VPS, SPS
   // and PPS, or the first NALU of an access unit
   if(long_start_code)
-    kvz_bitstream_writebyte(bitstream, zero);
+    uvg_bitstream_writebyte(bitstream, zero);
 
   // start_code_prefix_one_3bytes
-  kvz_bitstream_writebyte(bitstream, zero);
-  kvz_bitstream_writebyte(bitstream, zero);
-  kvz_bitstream_writebyte(bitstream, start_code_prefix_one_3bytes);
+  uvg_bitstream_writebyte(bitstream, zero);
+  uvg_bitstream_writebyte(bitstream, zero);
+  uvg_bitstream_writebyte(bitstream, start_code_prefix_one_3bytes);
 
   // forbidden zero (1bit) + reserver zero (1bit) layer_id (6 bits)
   byte = 0; 
-  kvz_bitstream_writebyte(bitstream, byte);
+  uvg_bitstream_writebyte(bitstream, byte);
 
   // nal_unit_type (5bits) + temporal_id_plus1 (3 bits)
   byte = (nal_type<<3)+(temporal_id + 1);
-  kvz_bitstream_writebyte(bitstream, byte);
+  uvg_bitstream_writebyte(bitstream, byte);
 
 
 #if VERBOSE
@@ -88,14 +88,14 @@ void kvz_nal_write(bitstream_t * const bitstream, const uint8_t nal_type,
  \param checksum_out Result of the calculation.
  \returns Void
 */
-void kvz_image_checksum(const kvz_picture *im, unsigned char checksum_out[][SEI_HASH_MAX_LENGTH], const uint8_t bitdepth)
+void uvg_image_checksum(const uvg_picture *im, unsigned char checksum_out[][SEI_HASH_MAX_LENGTH], const uint8_t bitdepth)
 {
-  kvz_array_checksum(im->y, im->height, im->width, im->stride, checksum_out[0], bitdepth);
+  uvg_array_checksum(im->y, im->height, im->width, im->stride, checksum_out[0], bitdepth);
 
   /* The number of chroma pixels is half that of luma. */
-  if (im->chroma_format != KVZ_CSP_400) {
-    kvz_array_checksum(im->u, im->height >> 1, im->width >> 1, im->stride >> 1, checksum_out[1], bitdepth);
-    kvz_array_checksum(im->v, im->height >> 1, im->width >> 1, im->stride >> 1, checksum_out[2], bitdepth);
+  if (im->chroma_format != UVG_CSP_400) {
+    uvg_array_checksum(im->u, im->height >> 1, im->width >> 1, im->stride >> 1, checksum_out[1], bitdepth);
+    uvg_array_checksum(im->v, im->height >> 1, im->width >> 1, im->stride >> 1, checksum_out[2], bitdepth);
   }
 }
 
@@ -105,13 +105,13 @@ void kvz_image_checksum(const kvz_picture *im, unsigned char checksum_out[][SEI_
 \param checksum_out Result of the calculation.
 \returns Void
 */
-void kvz_image_md5(const kvz_picture *im, unsigned char checksum_out[][SEI_HASH_MAX_LENGTH], const uint8_t bitdepth)
+void uvg_image_md5(const uvg_picture *im, unsigned char checksum_out[][SEI_HASH_MAX_LENGTH], const uint8_t bitdepth)
 {
-  kvz_array_md5(im->y, im->height, im->width, im->stride, checksum_out[0], bitdepth);
+  uvg_array_md5(im->y, im->height, im->width, im->stride, checksum_out[0], bitdepth);
 
   /* The number of chroma pixels is half that of luma. */
-  if (im->chroma_format != KVZ_CSP_400) {
-    kvz_array_md5(im->u, im->height >> 1, im->width >> 1, im->stride >> 1, checksum_out[1], bitdepth);
-    kvz_array_md5(im->v, im->height >> 1, im->width >> 1, im->stride >> 1, checksum_out[2], bitdepth);
+  if (im->chroma_format != UVG_CSP_400) {
+    uvg_array_md5(im->u, im->height >> 1, im->width >> 1, im->stride >> 1, checksum_out[1], bitdepth);
+    uvg_array_md5(im->v, im->height >> 1, im->width >> 1, im->stride >> 1, checksum_out[2], bitdepth);
   }
 }

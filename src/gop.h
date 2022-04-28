@@ -35,7 +35,7 @@
 #include <kvazaar.h>
 
 
-static const kvz_gop_config kvz_gop_lowdelay4[4] = {
+static const uvg_gop_config uvg_gop_lowdelay4[4] = {
   {
     .poc_offset = 1,
     .layer      = 1,
@@ -91,7 +91,7 @@ static const kvz_gop_config kvz_gop_lowdelay4[4] = {
 };
 
 
-static const kvz_gop_config kvz_gop_ra8[8] = {
+static const uvg_gop_config uvg_gop_ra8[8] = {
   {
     .poc_offset = 8,
     .layer      = 1,
@@ -198,7 +198,7 @@ static const kvz_gop_config kvz_gop_ra8[8] = {
   },
 };
 
-static const kvz_gop_config kvz_gop_ra16[16] = {
+static const uvg_gop_config uvg_gop_ra16[16] = {
   {
     .poc_offset = 16,
     .layer      = 1,

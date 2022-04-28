@@ -34,7 +34,7 @@
 
 #if COMPILE_INTEL_AVX2 && defined X86_64
 #include "kvazaar.h"
-#if KVZ_BIT_DEPTH == 8
+#if UVG_BIT_DEPTH == 8
 
 #include <immintrin.h>
 #include <stdlib.h>
@@ -53,13 +53,13 @@
  * \param dst           Buffer of size width*width.
  * \param multi_ref_idx Reference line index for use with MRL.
  */
-static void kvz_angular_pred_avx2(
+static void uvg_angular_pred_avx2(
   const int_fast8_t log2_width,
   const int_fast8_t intra_mode,
   const int_fast8_t channel_type,
-  const kvz_pixel *const in_ref_above,
-  const kvz_pixel *const in_ref_left,
-  kvz_pixel *const dst,
+  const uvg_pixel *const in_ref_above,
+  const uvg_pixel *const in_ref_left,
+  uvg_pixel *const dst,
   const uint8_t multi_ref_idx)
 {
   
@@ -139,9 +139,9 @@ static void kvz_angular_pred_avx2(
 
                                                     // Temporary buffer for modes 11-25.
                                                     // It only needs to be big enough to hold indices from -width to width-1.
-  //kvz_pixel tmp_ref[2 * 128 + 3 + 33 * MAX_REF_LINE:IDX] = { 0 };
-  kvz_pixel temp_main[2 * 128 + 3 + 33 * MAX_REF_LINE_IDX] = { 0 };
-  kvz_pixel temp_side[2 * 128 + 3 + 33 * MAX_REF_LINE_IDX] = { 0 };
+  //uvg_pixel tmp_ref[2 * 128 + 3 + 33 * MAX_REF_LINE:IDX] = { 0 };
+  uvg_pixel temp_main[2 * 128 + 3 + 33 * MAX_REF_LINE_IDX] = { 0 };
+  uvg_pixel temp_side[2 * 128 + 3 + 33 * MAX_REF_LINE_IDX] = { 0 };
   const int_fast32_t width = 1 << log2_width;
 
   uint32_t pred_mode = intra_mode; // ToDo: handle WAIP
@@ -159,9 +159,9 @@ static void kvz_angular_pred_avx2(
   int scale = MIN(2, log2_width - pre_scale[abs(mode_disp)]);
 
   // Pointer for the reference we are interpolating from.
-  kvz_pixel *ref_main;
+  uvg_pixel *ref_main;
   // Pointer for the other reference.
-  const kvz_pixel *ref_side;
+  const uvg_pixel *ref_side;
 
   // Set ref_main and ref_side such that, when indexed with 0, they point to
   // index 0 in block coordinates.
@@ -222,7 +222,7 @@ static void kvz_angular_pred_avx2(
     const int s = 0;
     const int max_index = (multi_ref_index << s) + 2;
     const int ref_length = width << 1;
-    const kvz_pixel val = temp_main[ref_length + multi_ref_index];
+    const uvg_pixel val = temp_main[ref_length + multi_ref_index];
     for (int j = 0; j <= max_index; j++) {
       temp_main[ref_length + multi_ref_index + j] = val;
     }
@@ -234,7 +234,7 @@ static void kvz_angular_pred_avx2(
     //ref_main = (vertical_mode ? in_ref_above : in_ref_left) + 1;
     //ref_side = (vertical_mode ? in_ref_left : in_ref_above) + 1;
 
-    //memcpy(tmp_ref + width, ref_main, (width*2) * sizeof(kvz_pixel));
+    //memcpy(tmp_ref + width, ref_main, (width*2) * sizeof(uvg_pixel));
     //ref_main = &tmp_ref[width];
     //tmp_ref[width-1] = tmp_ref[width];
     //int8_t last_index = 1 + width*2;
@@ -271,8 +271,8 @@ static void kvz_angular_pred_avx2(
 
             ref_main_index[yy] = delta_int[yy];
             bool use_cubic = true; // Default to cubic filter
-            static const int kvz_intra_hor_ver_dist_thres[8] = { 24, 24, 24, 14, 2, 0, 0, 0 };
-            int filter_threshold = kvz_intra_hor_ver_dist_thres[log2_width];
+            static const int uvg_intra_hor_ver_dist_thres[8] = { 24, 24, 24, 14, 2, 0, 0, 0 };
+            int filter_threshold = uvg_intra_hor_ver_dist_thres[log2_width];
             int dist_from_vert_or_hor = MIN(abs((int32_t)pred_mode - 50), abs((int32_t)pred_mode - 18));
             if (dist_from_vert_or_hor > filter_threshold) {
               static const int16_t modedisp2sampledisp[32] = { 0,    1,    2,    3,    4,    6,     8,   10,   12,   14,   16,   18,   20,   23,   26,   29,   32,   35,   39,  45,  51,  57,  64,  73,  86, 102, 128, 171, 256, 341, 512, 1024 };
@@ -293,7 +293,7 @@ static void kvz_angular_pred_avx2(
           }
 
           // Do 4-tap intra interpolation filtering
-          kvz_pixel *p = (kvz_pixel*)ref_main;
+          uvg_pixel *p = (uvg_pixel*)ref_main;
           __m256i vidx = _mm256_loadu_si256((__m256i *)ref_main_index);
           __m256i all_weights = _mm256_loadu_si256((__m256i *)f);
           __m256i w01 = _mm256_shuffle_epi8(all_weights, w_shuf_01);
@@ -326,8 +326,8 @@ static void kvz_angular_pred_avx2(
           // Do linear filtering
           for (int yy = 0; yy < 4; ++yy) {
             for (int_fast32_t x = 0; x < width; ++x) {
-              kvz_pixel ref1 = ref_main[x + delta_int[yy] + 1];
-              kvz_pixel ref2 = ref_main[x + delta_int[yy] + 2];
+              uvg_pixel ref1 = ref_main[x + delta_int[yy] + 1];
+              uvg_pixel ref2 = ref_main[x + delta_int[yy] + 2];
               dst[(y + yy) * width + x] = ref1 + ((delta_fract[yy] * (ref2 - ref1) + 16) >> 5);
             }
           }
@@ -336,8 +336,8 @@ static void kvz_angular_pred_avx2(
       else {
         // Just copy the integer samples
         for (int yy = 0; yy < 4; ++yy) {
-          kvz_pixel *dst_row = dst + (y + yy) * width;
-          kvz_pixel *ref_row = ref_main + delta_int[yy] + 1;
+          uvg_pixel *dst_row = dst + (y + yy) * width;
+          uvg_pixel *ref_row = ref_main + delta_int[yy] + 1;
           for (int_fast32_t x = 0; x + 3 < width; x += 4) {
             memcpy(dst_row + x, ref_row + x, 4 * sizeof(dst[0]));
           }
@@ -415,8 +415,8 @@ static void kvz_angular_pred_avx2(
           int c = x + y + 1;
           if (c >= 2 * width) { wL = 0; }
           if (c >= 2 * width) { wT = 0; }
-          const kvz_pixel left = (wL != 0) ? ref_side[c] : 0;
-          const kvz_pixel top  = (wT != 0) ? ref_main[c] : 0;
+          const uvg_pixel left = (wL != 0) ? ref_side[c] : 0;
+          const uvg_pixel top  = (wT != 0) ? ref_main[c] : 0;
           dst[y * width + x] = CLIP_TO_PIXEL((wL * left + wT * top + (64 - wL - wT) * dst[y * width + x] + 32) >> 6);
         }
       } else if (sample_disp == 0 || sample_disp >= 12) {
@@ -432,8 +432,8 @@ static void kvz_angular_pred_avx2(
 
           int wL = 32 >> MIN(31, ((x << 1) >> scale));
           if (wL == 0) break;
-          const kvz_pixel *p = ref_side + delta_y - 1;
-          kvz_pixel left = p[delta_frac_0 >> 5];
+          const uvg_pixel *p = ref_side + delta_y - 1;
+          uvg_pixel left = p[delta_frac_0 >> 5];
           dst[y * width + x] = CLIP_TO_PIXEL((wL * left + (64 - wL) * dst[y * width + x] + 32) >> 6);
         }
       }*/
@@ -449,11 +449,11 @@ static void kvz_angular_pred_avx2(
       }
       if ((width >= 4 || channel_type != 0) && sample_disp >= 0 && multi_ref_index == 0) {
         int scale = (log2_width + log2_width - 2) >> 2;
-        const kvz_pixel top_left = ref_main[0];
-        const kvz_pixel left = ref_side[1 + y];
+        const uvg_pixel top_left = ref_main[0];
+        const uvg_pixel left = ref_side[1 + y];
         for (int i = 0; i < MIN(3 << scale, width); i++) {
           const int wL = 32 >> (2 * i >> scale);
-          const kvz_pixel val = dst[y * width + i];
+          const uvg_pixel val = dst[y * width + i];
           dst[y * width + i] = CLIP_TO_PIXEL(val + ((wL * (left - top_left) + 32) >> 6));
         }
       }
@@ -503,7 +503,7 @@ static void kvz_angular_pred_avx2(
  * \param in_ref_left   Pointer to -1 index of left reference, length=width*2+1.
  * \param dst           Buffer of size width*width.
  */
-static void kvz_intra_pred_planar_avx2(
+static void uvg_intra_pred_planar_avx2(
   const int_fast8_t log2_width,
   const uint8_t *const ref_top,
   const uint8_t *const ref_left,
@@ -933,7 +933,7 @@ static void pred_filtered_dc_32x32(const uint8_t *ref_top,
 * \param dst           Buffer of size width*width.
 * \param multi_ref_idx Reference line index. May be non-zero when MRL is used.
 */
-static void kvz_intra_pred_filtered_dc_avx2(
+static void uvg_intra_pred_filtered_dc_avx2(
   const int_fast8_t log2_width,
   const uint8_t *ref_top,
   const uint8_t *ref_left,
@@ -963,12 +963,12 @@ static void kvz_intra_pred_filtered_dc_avx2(
 * \param used_ref      Pointer used reference pixel struct.
 * \param dst           Buffer of size width*width.
 */
-static void kvz_pdpc_planar_dc_avx2(
+static void uvg_pdpc_planar_dc_avx2(
   const int mode,
   const int width,
   const int log2_width,
-  const kvz_intra_ref *const used_ref,
-  kvz_pixel *const dst)
+  const uvg_intra_ref *const used_ref,
+  uvg_pixel *const dst)
 {
   assert(mode == 0 || mode == 1);  // planar or DC
 
@@ -1049,21 +1049,21 @@ static void kvz_pdpc_planar_dc_avx2(
   }
 }
 
-#endif //KVZ_BIT_DEPTH == 8
+#endif //UVG_BIT_DEPTH == 8
 #endif //COMPILE_INTEL_AVX2 && defined X86_64
 
-int kvz_strategy_register_intra_avx2(void* opaque, uint8_t bitdepth)
+int uvg_strategy_register_intra_avx2(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
 #if COMPILE_INTEL_AVX2 && defined X86_64
-#if KVZ_BIT_DEPTH == 8
+#if UVG_BIT_DEPTH == 8
   if (bitdepth == 8) {
-    success &= kvz_strategyselector_register(opaque, "angular_pred", "avx2", 40, &kvz_angular_pred_avx2);
-    success &= kvz_strategyselector_register(opaque, "intra_pred_planar", "avx2", 40, &kvz_intra_pred_planar_avx2);
-    success &= kvz_strategyselector_register(opaque, "intra_pred_filtered_dc", "avx2", 40, &kvz_intra_pred_filtered_dc_avx2);
-    success &= kvz_strategyselector_register(opaque, "pdpc_planar_dc", "avx2", 40, &kvz_pdpc_planar_dc_avx2);
+    success &= uvg_strategyselector_register(opaque, "angular_pred", "avx2", 40, &uvg_angular_pred_avx2);
+    success &= uvg_strategyselector_register(opaque, "intra_pred_planar", "avx2", 40, &uvg_intra_pred_planar_avx2);
+    success &= uvg_strategyselector_register(opaque, "intra_pred_filtered_dc", "avx2", 40, &uvg_intra_pred_filtered_dc_avx2);
+    success &= uvg_strategyselector_register(opaque, "pdpc_planar_dc", "avx2", 40, &uvg_pdpc_planar_dc_avx2);
   }
-#endif //KVZ_BIT_DEPTH == 8
+#endif //UVG_BIT_DEPTH == 8
 #endif //COMPILE_INTEL_AVX2 && defined X86_64
   return success;
 }

@@ -40,25 +40,25 @@
 #include "encoderstate.h"
 #include "global.h"
 
-void kvz_encode_coding_tree(encoder_state_t * const state,
+void uvg_encode_coding_tree(encoder_state_t * const state,
                             uint16_t x_ctb,
                             uint16_t y_ctb,
                             uint8_t depth,
                             lcu_coeff_t *coeff);
 
-void kvz_encode_ts_residual(encoder_state_t* const state,
+void uvg_encode_ts_residual(encoder_state_t* const state,
   cabac_data_t* const cabac,
   const coeff_t* coeff,
   uint32_t width,
   uint8_t type,
   int8_t scan_mode);
 
-void kvz_encode_mvd(encoder_state_t * const state,
+void uvg_encode_mvd(encoder_state_t * const state,
                     cabac_data_t *cabac,
                     int32_t mvd_hor,
                     int32_t mvd_ver);
 
-void kvz_encode_last_significant_xy(cabac_data_t * const cabac,
+void uvg_encode_last_significant_xy(cabac_data_t * const cabac,
   uint8_t lastpos_x, uint8_t lastpos_y,
   uint8_t width, uint8_t height,
   uint8_t type, uint8_t scan);

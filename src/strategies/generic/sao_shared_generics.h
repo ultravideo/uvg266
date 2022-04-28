@@ -39,7 +39,7 @@
 #include "sao.h"
 
 // Mapping of edge_idx values to eo-classes.
-static int sao_calc_eo_cat(kvz_pixel a, kvz_pixel b, kvz_pixel c)
+static int sao_calc_eo_cat(uvg_pixel a, uvg_pixel b, uvg_pixel c)
 {
   // Mapping relationships between a, b and c to eo_idx.
   static const int sao_eo_idx_to_eo_category[] = { 1, 2, 0, 3, 4 };
@@ -49,8 +49,8 @@ static int sao_calc_eo_cat(kvz_pixel a, kvz_pixel b, kvz_pixel c)
   return sao_eo_idx_to_eo_category[eo_idx];
 }
 
-static int sao_edge_ddistortion_generic(const kvz_pixel *orig_data,
-                                        const kvz_pixel *rec_data,
+static int sao_edge_ddistortion_generic(const uvg_pixel *orig_data,
+                                        const uvg_pixel *rec_data,
                                               int32_t    block_width,
                                               int32_t    block_height,
                                               int32_t    eo_class,
@@ -88,8 +88,8 @@ static int sao_edge_ddistortion_generic(const kvz_pixel *orig_data,
 }
 
 static int sao_band_ddistortion_generic(const encoder_state_t * const state,
-                                        const kvz_pixel *orig_data,
-                                        const kvz_pixel *rec_data,
+                                        const uvg_pixel *orig_data,
+                                        const uvg_pixel *rec_data,
                                         int block_width,
                                         int block_height,
                                         int band_pos,
@@ -102,8 +102,8 @@ static int sao_band_ddistortion_generic(const encoder_state_t * const state,
     for (x = 0; x < block_width; ++x) {
       const int32_t curr_pos = y * block_width + x;
 
-      kvz_pixel rec  =  rec_data[curr_pos];
-      kvz_pixel orig = orig_data[curr_pos];
+      uvg_pixel rec  =  rec_data[curr_pos];
+      uvg_pixel orig = orig_data[curr_pos];
 
       int32_t band = (rec >> shift) - band_pos;
       int32_t offset = 0;

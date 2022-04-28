@@ -35,7 +35,7 @@
 #include "strategyselector.h"
 #include "tables.h"
 
-ALIGNED(32) const int16_t kvz_g_dst_4[4][4] =
+ALIGNED(32) const int16_t uvg_g_dst_4[4][4] =
 {
   { 29, 55, 74, 84 },
   { 74, 74, 0, -74 },
@@ -43,13 +43,13 @@ ALIGNED(32) const int16_t kvz_g_dst_4[4][4] =
   { 55, -84, 74, -29 }
 };
 
-ALIGNED(32) const int16_t kvz_g_dct_2[2][2] =
+ALIGNED(32) const int16_t uvg_g_dct_2[2][2] =
 {
   {64, 64,  },
   {64, -64,  },
 };
 
-ALIGNED(32) const int16_t kvz_g_dct_4[4][4] =
+ALIGNED(32) const int16_t uvg_g_dct_4[4][4] =
 {
   { 64, 64, 64, 64 },
   { 83, 36, -36, -83 },
@@ -57,7 +57,7 @@ ALIGNED(32) const int16_t kvz_g_dct_4[4][4] =
   { 36, -83, 83, -36 }
 };
 
-ALIGNED(64) const int16_t kvz_g_dct_8[8][8] =
+ALIGNED(64) const int16_t uvg_g_dct_8[8][8] =
 {
   { 64, 64, 64, 64, 64, 64, 64, 64 },
   { 89, 75, 50, 18, -18, -50, -75, -89 },
@@ -69,7 +69,7 @@ ALIGNED(64) const int16_t kvz_g_dct_8[8][8] =
   { 18, -50, 75, -89, 89, -75, 50, -18 }
 };
 
-ALIGNED(64) const int16_t kvz_g_dct_16[16][16] =
+ALIGNED(64) const int16_t uvg_g_dct_16[16][16] =
 {
   { 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64 },
   { 90, 87, 80, 70, 57, 43, 25, 9, -9, -25, -43, -57, -70, -80, -87, -90 },
@@ -89,7 +89,7 @@ ALIGNED(64) const int16_t kvz_g_dct_16[16][16] =
   { 9, -25, 43, -57, 70, -80, 87, -90, 90, -87, 80, -70, 57, -43, 25, -9 }
 };
 
-ALIGNED(64) const int16_t kvz_g_dct_32[32][32] =
+ALIGNED(64) const int16_t uvg_g_dct_32[32][32] =
 {
   { 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64 },
   { 90, 90, 88, 85, 82, 78, 73, 67, 61, 54, 46, 38, 31, 22, 13, 4, -4, -13, -22, -31, -38, -46, -54, -61, -67, -73, -78, -82, -85, -88, -90, -90 },
@@ -125,7 +125,7 @@ ALIGNED(64) const int16_t kvz_g_dct_32[32][32] =
   { 4, -13, 22, -31, 38, -46, 54, -61, 67, -73, 78, -82, 85, -88, 90, -90, 90, -90, 88, -85, 82, -78, 73, -67, 61, -54, 46, -38, 31, -22, 13, -4 }
 };
 
-ALIGNED(64) const int16_t kvz_g_dct_64[64][64] =
+ALIGNED(64) const int16_t uvg_g_dct_64[64][64] =
 {
    { 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, },
    { 91, 90, 90, 90, 88, 87, 86, 84, 83, 81, 79, 77, 73, 71, 69, 65, 62, 59, 56, 52, 48, 44, 41, 37, 33, 28, 24, 20, 15, 11, 7, 2, -2, -7, -11, -15, -20, -24, -28, -33, -37, -41, -44, -48, -52, -56, -59, -62, -65, -69, -71, -73, -77, -79, -81, -83, -84, -86, -87, -88, -90, -90, -90, -91, },
@@ -193,7 +193,7 @@ ALIGNED(64) const int16_t kvz_g_dct_64[64][64] =
    { 2, -7, 11, -15, 20, -24, 28, -33, 37, -41, 44, -48, 52, -56, 59, -62, 65, -69, 71, -73, 77, -79, 81, -83, 84, -86, 87, -88, 90, -90, 90, -91, 91, -90, 90, -90, 88, -87, 86, -84, 83, -81, 79, -77, 73, -71, 69, -65, 62, -59, 56, -52, 48, -44, 41, -37, 33, -28, 24, -20, 15, -11, 7, -2, },
 };
 
-ALIGNED(64) const int16_t kvz_g_dst_4_t[4][4] =
+ALIGNED(64) const int16_t uvg_g_dst_4_t[4][4] =
 {
   { 29, 74, 84, 55 },
   { 55, 74, -29, -84 },
@@ -201,7 +201,7 @@ ALIGNED(64) const int16_t kvz_g_dst_4_t[4][4] =
   { 84, -74, 55, -29 }
 };
 
-ALIGNED(32) const int16_t kvz_g_dct_4_t[4][4] =
+ALIGNED(32) const int16_t uvg_g_dct_4_t[4][4] =
 {
   { 64, 83, 64, 36, },
   { 64, 36, -64, -83, },
@@ -209,7 +209,7 @@ ALIGNED(32) const int16_t kvz_g_dct_4_t[4][4] =
   { 64, -83, 64, -36 }
 };
 
-ALIGNED(64) const int16_t kvz_g_dct_8_t[8][8] =
+ALIGNED(64) const int16_t uvg_g_dct_8_t[8][8] =
 {
   { 64, 89, 83, 75, 64, 50, 36, 18, },
   { 64, 75, 36, -18, -64, -89, -83, -50, },
@@ -221,7 +221,7 @@ ALIGNED(64) const int16_t kvz_g_dct_8_t[8][8] =
   { 64, -89, 83, -75, 64, -50, 36, -18 }
 };
 
-ALIGNED(64) const int16_t kvz_g_dct_16_t[16][16] =
+ALIGNED(64) const int16_t uvg_g_dct_16_t[16][16] =
 {
   { 64, 90, 89, 87, 83, 80, 75, 70, 64, 57, 50, 43, 36, 25, 18, 9, },
   { 64, 87, 75, 57, 36, 9, -18, -43, -64, -80, -89, -90, -83, -70, -50, -25, },
@@ -241,7 +241,7 @@ ALIGNED(64) const int16_t kvz_g_dct_16_t[16][16] =
   { 64, -90, 89, -87, 83, -80, 75, -70, 64, -57, 50, -43, 36, -25, 18, -9 }
 };
 
-ALIGNED(64) const int16_t kvz_g_dct_32_t[32][32] =
+ALIGNED(64) const int16_t uvg_g_dct_32_t[32][32] =
 {
   { 64, 90, 90, 90, 89, 88, 87, 85, 83, 82, 80, 78, 75, 73, 70, 67, 64, 61, 57, 54, 50, 46, 43, 38, 36, 31, 25, 22, 18, 13, 9, 4, },
   { 64, 90, 87, 82, 75, 67, 57, 46, 36, 22, 9, -4, -18, -31, -43, -54, -64, -73, -80, -85, -89, -90, -90, -88, -83, -78, -70, -61, -50, -38, -25, -13, },
@@ -277,7 +277,7 @@ ALIGNED(64) const int16_t kvz_g_dct_32_t[32][32] =
   { 64, -90, 90, -90, 89, -88, 87, -85, 83, -82, 80, -78, 75, -73, 70, -67, 64, -61, 57, -54, 50, -46, 43, -38, 36, -31, 25, -22, 18, -13, 9, -4 }
 };
 
-const int16_t kvz_g_dct_64_t[64][64] =
+const int16_t uvg_g_dct_64_t[64][64] =
 {
   { 64, 91, 90, 90, 90, 90, 90, 90, 89, 88, 88, 87, 87, 86, 85, 84, 83, 83, 82, 81, 80, 79, 78, 77, 75, 73, 73, 71, 70, 69, 67, 65, 64, 62, 61, 59, 57, 56, 54, 52, 50, 48, 46, 44, 43, 41, 38, 37, 36, 33, 31, 28, 25, 24, 22, 20, 18, 15, 13, 11, 9, 7, 4, 2, },
   { 64, 90, 90, 88, 87, 84, 82, 79, 75, 71, 67, 62, 57, 52, 46, 41, 36, 28, 22, 15, 9, 2, -4, -11, -18, -24, -31, -37, -43, -48, -54, -59, -64, -69, -73, -77, -80, -83, -85, -87, -89, -90, -90, -91, -90, -90, -88, -86, -83, -81, -78, -73, -70, -65, -61, -56, -50, -44, -38, -33, -25, -20, -13, -7, },
@@ -408,10 +408,10 @@ static void partial_butterfly_4_generic(const short* src, short* dst,
     e[1] = src[1] + src[2];
     o[1] = src[1] - src[2];
 
-    dst[0] = (short)((kvz_g_dct_4[0][0] * e[0] + kvz_g_dct_4[0][1] * e[1] + add) >> shift);
-    dst[2 * line] = (short)((kvz_g_dct_4[2][0] * e[0] + kvz_g_dct_4[2][1] * e[1] + add) >> shift);
-    dst[line] = (short)((kvz_g_dct_4[1][0] * o[0] + kvz_g_dct_4[1][1] * o[1] + add) >> shift);
-    dst[3 * line] = (short)((kvz_g_dct_4[3][0] * o[0] + kvz_g_dct_4[3][1] * o[1] + add) >> shift);
+    dst[0] = (short)((uvg_g_dct_4[0][0] * e[0] + uvg_g_dct_4[0][1] * e[1] + add) >> shift);
+    dst[2 * line] = (short)((uvg_g_dct_4[2][0] * e[0] + uvg_g_dct_4[2][1] * e[1] + add) >> shift);
+    dst[line] = (short)((uvg_g_dct_4[1][0] * o[0] + uvg_g_dct_4[1][1] * o[1] + add) >> shift);
+    dst[3 * line] = (short)((uvg_g_dct_4[3][0] * o[0] + uvg_g_dct_4[3][1] * o[1] + add) >> shift);
 
     src += 4;
     dst++;
@@ -429,10 +429,10 @@ static void partial_butterfly_inverse_4_generic(const short* src, short* dst,
 
   for (j = 0; j < line; j++) {
     // Utilizing symmetry properties to the maximum to minimize the number of multiplications
-    o[0] = kvz_g_dct_4[1][0] * src[line] + kvz_g_dct_4[3][0] * src[3 * line];
-    o[1] = kvz_g_dct_4[1][1] * src[line] + kvz_g_dct_4[3][1] * src[3 * line];
-    e[0] = kvz_g_dct_4[0][0] * src[0] + kvz_g_dct_4[2][0] * src[2 * line];
-    e[1] = kvz_g_dct_4[0][1] * src[0] + kvz_g_dct_4[2][1] * src[2 * line];
+    o[0] = uvg_g_dct_4[1][0] * src[line] + uvg_g_dct_4[3][0] * src[3 * line];
+    o[1] = uvg_g_dct_4[1][1] * src[line] + uvg_g_dct_4[3][1] * src[3 * line];
+    e[0] = uvg_g_dct_4[0][0] * src[0] + uvg_g_dct_4[2][0] * src[2 * line];
+    e[1] = uvg_g_dct_4[0][1] * src[0] + uvg_g_dct_4[2][1] * src[2 * line];
 
     // Combining even and odd terms at each hierarchy levels to calculate the final spatial domain vector
     dst[0] = (short)CLIP(-32768, 32767, (e[0] + o[0] + add) >> shift);
@@ -467,15 +467,15 @@ static void partial_butterfly_8_generic(const short* src, short* dst,
     ee[1] = e[1] + e[2];
     eo[1] = e[1] - e[2];
 
-    dst[0] = (short)((kvz_g_dct_8[0][0] * ee[0] + kvz_g_dct_8[0][1] * ee[1] + add) >> shift);
-    dst[4 * line] = (short)((kvz_g_dct_8[4][0] * ee[0] + kvz_g_dct_8[4][1] * ee[1] + add) >> shift);
-    dst[2 * line] = (short)((kvz_g_dct_8[2][0] * eo[0] + kvz_g_dct_8[2][1] * eo[1] + add) >> shift);
-    dst[6 * line] = (short)((kvz_g_dct_8[6][0] * eo[0] + kvz_g_dct_8[6][1] * eo[1] + add) >> shift);
+    dst[0] = (short)((uvg_g_dct_8[0][0] * ee[0] + uvg_g_dct_8[0][1] * ee[1] + add) >> shift);
+    dst[4 * line] = (short)((uvg_g_dct_8[4][0] * ee[0] + uvg_g_dct_8[4][1] * ee[1] + add) >> shift);
+    dst[2 * line] = (short)((uvg_g_dct_8[2][0] * eo[0] + uvg_g_dct_8[2][1] * eo[1] + add) >> shift);
+    dst[6 * line] = (short)((uvg_g_dct_8[6][0] * eo[0] + uvg_g_dct_8[6][1] * eo[1] + add) >> shift);
 
-    dst[line] = (short)((kvz_g_dct_8[1][0] * o[0] + kvz_g_dct_8[1][1] * o[1] + kvz_g_dct_8[1][2] * o[2] + kvz_g_dct_8[1][3] * o[3] + add) >> shift);
-    dst[3 * line] = (short)((kvz_g_dct_8[3][0] * o[0] + kvz_g_dct_8[3][1] * o[1] + kvz_g_dct_8[3][2] * o[2] + kvz_g_dct_8[3][3] * o[3] + add) >> shift);
-    dst[5 * line] = (short)((kvz_g_dct_8[5][0] * o[0] + kvz_g_dct_8[5][1] * o[1] + kvz_g_dct_8[5][2] * o[2] + kvz_g_dct_8[5][3] * o[3] + add) >> shift);
-    dst[7 * line] = (short)((kvz_g_dct_8[7][0] * o[0] + kvz_g_dct_8[7][1] * o[1] + kvz_g_dct_8[7][2] * o[2] + kvz_g_dct_8[7][3] * o[3] + add) >> shift);
+    dst[line] = (short)((uvg_g_dct_8[1][0] * o[0] + uvg_g_dct_8[1][1] * o[1] + uvg_g_dct_8[1][2] * o[2] + uvg_g_dct_8[1][3] * o[3] + add) >> shift);
+    dst[3 * line] = (short)((uvg_g_dct_8[3][0] * o[0] + uvg_g_dct_8[3][1] * o[1] + uvg_g_dct_8[3][2] * o[2] + uvg_g_dct_8[3][3] * o[3] + add) >> shift);
+    dst[5 * line] = (short)((uvg_g_dct_8[5][0] * o[0] + uvg_g_dct_8[5][1] * o[1] + uvg_g_dct_8[5][2] * o[2] + uvg_g_dct_8[5][3] * o[3] + add) >> shift);
+    dst[7 * line] = (short)((uvg_g_dct_8[7][0] * o[0] + uvg_g_dct_8[7][1] * o[1] + uvg_g_dct_8[7][2] * o[2] + uvg_g_dct_8[7][3] * o[3] + add) >> shift);
 
     src += 8;
     dst++;
@@ -495,13 +495,13 @@ static void partial_butterfly_inverse_8_generic(const int16_t* src, int16_t* dst
   for (j = 0; j < line; j++) {
     // Utilizing symmetry properties to the maximum to minimize the number of multiplications
     for (k = 0; k < 4; k++) {
-      o[k] = kvz_g_dct_8[1][k] * src[line] + kvz_g_dct_8[3][k] * src[3 * line] + kvz_g_dct_8[5][k] * src[5 * line] + kvz_g_dct_8[7][k] * src[7 * line];
+      o[k] = uvg_g_dct_8[1][k] * src[line] + uvg_g_dct_8[3][k] * src[3 * line] + uvg_g_dct_8[5][k] * src[5 * line] + uvg_g_dct_8[7][k] * src[7 * line];
     }
 
-    eo[0] = kvz_g_dct_8[2][0] * src[2 * line] + kvz_g_dct_8[6][0] * src[6 * line];
-    eo[1] = kvz_g_dct_8[2][1] * src[2 * line] + kvz_g_dct_8[6][1] * src[6 * line];
-    ee[0] = kvz_g_dct_8[0][0] * src[0] + kvz_g_dct_8[4][0] * src[4 * line];
-    ee[1] = kvz_g_dct_8[0][1] * src[0] + kvz_g_dct_8[4][1] * src[4 * line];
+    eo[0] = uvg_g_dct_8[2][0] * src[2 * line] + uvg_g_dct_8[6][0] * src[6 * line];
+    eo[1] = uvg_g_dct_8[2][1] * src[2 * line] + uvg_g_dct_8[6][1] * src[6 * line];
+    ee[0] = uvg_g_dct_8[0][0] * src[0] + uvg_g_dct_8[4][0] * src[4 * line];
+    ee[1] = uvg_g_dct_8[0][1] * src[0] + uvg_g_dct_8[4][1] * src[4 * line];
 
     // Combining even and odd terms at each hierarchy levels to calculate the final spatial domain vector
     e[0] = ee[0] + eo[0];
@@ -545,18 +545,18 @@ static void partial_butterfly_16_generic(const short* src, short* dst,
     eee[1] = ee[1] + ee[2];
     eeo[1] = ee[1] - ee[2];
 
-    dst[0] = (short)((kvz_g_dct_16[0][0] * eee[0] + kvz_g_dct_16[0][1] * eee[1] + add) >> shift);
-    dst[8 * line] = (short)((kvz_g_dct_16[8][0] * eee[0] + kvz_g_dct_16[8][1] * eee[1] + add) >> shift);
-    dst[4 * line] = (short)((kvz_g_dct_16[4][0] * eeo[0] + kvz_g_dct_16[4][1] * eeo[1] + add) >> shift);
-    dst[12 * line] = (short)((kvz_g_dct_16[12][0] * eeo[0] + kvz_g_dct_16[12][1] * eeo[1] + add) >> shift);
+    dst[0] = (short)((uvg_g_dct_16[0][0] * eee[0] + uvg_g_dct_16[0][1] * eee[1] + add) >> shift);
+    dst[8 * line] = (short)((uvg_g_dct_16[8][0] * eee[0] + uvg_g_dct_16[8][1] * eee[1] + add) >> shift);
+    dst[4 * line] = (short)((uvg_g_dct_16[4][0] * eeo[0] + uvg_g_dct_16[4][1] * eeo[1] + add) >> shift);
+    dst[12 * line] = (short)((uvg_g_dct_16[12][0] * eeo[0] + uvg_g_dct_16[12][1] * eeo[1] + add) >> shift);
 
     for (k = 2; k < 16; k += 4) {
-      dst[k * line] = (short)((kvz_g_dct_16[k][0] * eo[0] + kvz_g_dct_16[k][1] * eo[1] + kvz_g_dct_16[k][2] * eo[2] + kvz_g_dct_16[k][3] * eo[3] + add) >> shift);
+      dst[k * line] = (short)((uvg_g_dct_16[k][0] * eo[0] + uvg_g_dct_16[k][1] * eo[1] + uvg_g_dct_16[k][2] * eo[2] + uvg_g_dct_16[k][3] * eo[3] + add) >> shift);
     }
 
     for (k = 1; k < 16; k += 2) {
-      dst[k * line] = (short)((kvz_g_dct_16[k][0] * o[0] + kvz_g_dct_16[k][1] * o[1] + kvz_g_dct_16[k][2] * o[2] + kvz_g_dct_16[k][3] * o[3] +
-        kvz_g_dct_16[k][4] * o[4] + kvz_g_dct_16[k][5] * o[5] + kvz_g_dct_16[k][6] * o[6] + kvz_g_dct_16[k][7] * o[7] + add) >> shift);
+      dst[k * line] = (short)((uvg_g_dct_16[k][0] * o[0] + uvg_g_dct_16[k][1] * o[1] + uvg_g_dct_16[k][2] * o[2] + uvg_g_dct_16[k][3] * o[3] +
+        uvg_g_dct_16[k][4] * o[4] + uvg_g_dct_16[k][5] * o[5] + uvg_g_dct_16[k][6] * o[6] + uvg_g_dct_16[k][7] * o[7] + add) >> shift);
     }
 
     src += 16;
@@ -578,16 +578,16 @@ static void partial_butterfly_inverse_16_generic(const int16_t* src, int16_t* ds
   for (j = 0; j < line; j++) {
     // Utilizing symmetry properties to the maximum to minimize the number of multiplications
     for (k = 0; k < 8; k++) {
-      o[k] = kvz_g_dct_16[1][k] * src[line] + kvz_g_dct_16[3][k] * src[3 * line] + kvz_g_dct_16[5][k] * src[5 * line] + kvz_g_dct_16[7][k] * src[7 * line] +
-        kvz_g_dct_16[9][k] * src[9 * line] + kvz_g_dct_16[11][k] * src[11 * line] + kvz_g_dct_16[13][k] * src[13 * line] + kvz_g_dct_16[15][k] * src[15 * line];
+      o[k] = uvg_g_dct_16[1][k] * src[line] + uvg_g_dct_16[3][k] * src[3 * line] + uvg_g_dct_16[5][k] * src[5 * line] + uvg_g_dct_16[7][k] * src[7 * line] +
+        uvg_g_dct_16[9][k] * src[9 * line] + uvg_g_dct_16[11][k] * src[11 * line] + uvg_g_dct_16[13][k] * src[13 * line] + uvg_g_dct_16[15][k] * src[15 * line];
     }
     for (k = 0; k < 4; k++) {
-      eo[k] = kvz_g_dct_16[2][k] * src[2 * line] + kvz_g_dct_16[6][k] * src[6 * line] + kvz_g_dct_16[10][k] * src[10 * line] + kvz_g_dct_16[14][k] * src[14 * line];
+      eo[k] = uvg_g_dct_16[2][k] * src[2 * line] + uvg_g_dct_16[6][k] * src[6 * line] + uvg_g_dct_16[10][k] * src[10 * line] + uvg_g_dct_16[14][k] * src[14 * line];
     }
-    eeo[0] = kvz_g_dct_16[4][0] * src[4 * line] + kvz_g_dct_16[12][0] * src[12 * line];
-    eee[0] = kvz_g_dct_16[0][0] * src[0] + kvz_g_dct_16[8][0] * src[8 * line];
-    eeo[1] = kvz_g_dct_16[4][1] * src[4 * line] + kvz_g_dct_16[12][1] * src[12 * line];
-    eee[1] = kvz_g_dct_16[0][1] * src[0] + kvz_g_dct_16[8][1] * src[8 * line];
+    eeo[0] = uvg_g_dct_16[4][0] * src[4 * line] + uvg_g_dct_16[12][0] * src[12 * line];
+    eee[0] = uvg_g_dct_16[0][0] * src[0] + uvg_g_dct_16[8][0] * src[8 * line];
+    eeo[1] = uvg_g_dct_16[4][1] * src[4 * line] + uvg_g_dct_16[12][1] * src[12 * line];
+    eee[1] = uvg_g_dct_16[0][1] * src[0] + uvg_g_dct_16[8][1] * src[8 * line];
 
     // Combining even and odd terms at each hierarchy levels to calculate the final spatial domain vector
     for (k = 0; k < 2; k++) {
@@ -641,22 +641,22 @@ static void partial_butterfly_32_generic(const short* src, short* dst,
     eeee[1] = eee[1] + eee[2];
     eeeo[1] = eee[1] - eee[2];
 
-    dst[0] = (short)((kvz_g_dct_32[0][0] * eeee[0] + kvz_g_dct_32[0][1] * eeee[1] + add) >> shift);
-    dst[16 * line] = (short)((kvz_g_dct_32[16][0] * eeee[0] + kvz_g_dct_32[16][1] * eeee[1] + add) >> shift);
-    dst[8 * line] = (short)((kvz_g_dct_32[8][0] * eeeo[0] + kvz_g_dct_32[8][1] * eeeo[1] + add) >> shift);
-    dst[24 * line] = (short)((kvz_g_dct_32[24][0] * eeeo[0] + kvz_g_dct_32[24][1] * eeeo[1] + add) >> shift);
+    dst[0] = (short)((uvg_g_dct_32[0][0] * eeee[0] + uvg_g_dct_32[0][1] * eeee[1] + add) >> shift);
+    dst[16 * line] = (short)((uvg_g_dct_32[16][0] * eeee[0] + uvg_g_dct_32[16][1] * eeee[1] + add) >> shift);
+    dst[8 * line] = (short)((uvg_g_dct_32[8][0] * eeeo[0] + uvg_g_dct_32[8][1] * eeeo[1] + add) >> shift);
+    dst[24 * line] = (short)((uvg_g_dct_32[24][0] * eeeo[0] + uvg_g_dct_32[24][1] * eeeo[1] + add) >> shift);
     for (k = 4; k < 32; k += 8) {
-      dst[k * line] = (short)((kvz_g_dct_32[k][0] * eeo[0] + kvz_g_dct_32[k][1] * eeo[1] + kvz_g_dct_32[k][2] * eeo[2] + kvz_g_dct_32[k][3] * eeo[3] + add) >> shift);
+      dst[k * line] = (short)((uvg_g_dct_32[k][0] * eeo[0] + uvg_g_dct_32[k][1] * eeo[1] + uvg_g_dct_32[k][2] * eeo[2] + uvg_g_dct_32[k][3] * eeo[3] + add) >> shift);
     }
     for (k = 2; k < 32; k += 4) {
-      dst[k * line] = (short)((kvz_g_dct_32[k][0] * eo[0] + kvz_g_dct_32[k][1] * eo[1] + kvz_g_dct_32[k][2] * eo[2] + kvz_g_dct_32[k][3] * eo[3] +
-        kvz_g_dct_32[k][4] * eo[4] + kvz_g_dct_32[k][5] * eo[5] + kvz_g_dct_32[k][6] * eo[6] + kvz_g_dct_32[k][7] * eo[7] + add) >> shift);
+      dst[k * line] = (short)((uvg_g_dct_32[k][0] * eo[0] + uvg_g_dct_32[k][1] * eo[1] + uvg_g_dct_32[k][2] * eo[2] + uvg_g_dct_32[k][3] * eo[3] +
+        uvg_g_dct_32[k][4] * eo[4] + uvg_g_dct_32[k][5] * eo[5] + uvg_g_dct_32[k][6] * eo[6] + uvg_g_dct_32[k][7] * eo[7] + add) >> shift);
     }
     for (k = 1; k < 32; k += 2) {
-      dst[k * line] = (short)((kvz_g_dct_32[k][0] * o[0] + kvz_g_dct_32[k][1] * o[1] + kvz_g_dct_32[k][2] * o[2] + kvz_g_dct_32[k][3] * o[3] +
-        kvz_g_dct_32[k][4] * o[4] + kvz_g_dct_32[k][5] * o[5] + kvz_g_dct_32[k][6] * o[6] + kvz_g_dct_32[k][7] * o[7] +
-        kvz_g_dct_32[k][8] * o[8] + kvz_g_dct_32[k][9] * o[9] + kvz_g_dct_32[k][10] * o[10] + kvz_g_dct_32[k][11] * o[11] +
-        kvz_g_dct_32[k][12] * o[12] + kvz_g_dct_32[k][13] * o[13] + kvz_g_dct_32[k][14] * o[14] + kvz_g_dct_32[k][15] * o[15] + add) >> shift);
+      dst[k * line] = (short)((uvg_g_dct_32[k][0] * o[0] + uvg_g_dct_32[k][1] * o[1] + uvg_g_dct_32[k][2] * o[2] + uvg_g_dct_32[k][3] * o[3] +
+        uvg_g_dct_32[k][4] * o[4] + uvg_g_dct_32[k][5] * o[5] + uvg_g_dct_32[k][6] * o[6] + uvg_g_dct_32[k][7] * o[7] +
+        uvg_g_dct_32[k][8] * o[8] + uvg_g_dct_32[k][9] * o[9] + uvg_g_dct_32[k][10] * o[10] + uvg_g_dct_32[k][11] * o[11] +
+        uvg_g_dct_32[k][12] * o[12] + uvg_g_dct_32[k][13] * o[13] + uvg_g_dct_32[k][14] * o[14] + uvg_g_dct_32[k][15] * o[15] + add) >> shift);
     }
     src += 32;
     dst++;
@@ -678,22 +678,22 @@ static void partial_butterfly_inverse_32_generic(const int16_t* src, int16_t* ds
   for (j = 0; j < line; j++) {
     // Utilizing symmetry properties to the maximum to minimize the number of multiplications
     for (k = 0; k < 16; k++) {
-      o[k] = kvz_g_dct_32[1][k] * src[line] + kvz_g_dct_32[3][k] * src[3 * line] + kvz_g_dct_32[5][k] * src[5 * line] + kvz_g_dct_32[7][k] * src[7 * line] +
-        kvz_g_dct_32[9][k] * src[9 * line] + kvz_g_dct_32[11][k] * src[11 * line] + kvz_g_dct_32[13][k] * src[13 * line] + kvz_g_dct_32[15][k] * src[15 * line] +
-        kvz_g_dct_32[17][k] * src[17 * line] + kvz_g_dct_32[19][k] * src[19 * line] + kvz_g_dct_32[21][k] * src[21 * line] + kvz_g_dct_32[23][k] * src[23 * line] +
-        kvz_g_dct_32[25][k] * src[25 * line] + kvz_g_dct_32[27][k] * src[27 * line] + kvz_g_dct_32[29][k] * src[29 * line] + kvz_g_dct_32[31][k] * src[31 * line];
+      o[k] = uvg_g_dct_32[1][k] * src[line] + uvg_g_dct_32[3][k] * src[3 * line] + uvg_g_dct_32[5][k] * src[5 * line] + uvg_g_dct_32[7][k] * src[7 * line] +
+        uvg_g_dct_32[9][k] * src[9 * line] + uvg_g_dct_32[11][k] * src[11 * line] + uvg_g_dct_32[13][k] * src[13 * line] + uvg_g_dct_32[15][k] * src[15 * line] +
+        uvg_g_dct_32[17][k] * src[17 * line] + uvg_g_dct_32[19][k] * src[19 * line] + uvg_g_dct_32[21][k] * src[21 * line] + uvg_g_dct_32[23][k] * src[23 * line] +
+        uvg_g_dct_32[25][k] * src[25 * line] + uvg_g_dct_32[27][k] * src[27 * line] + uvg_g_dct_32[29][k] * src[29 * line] + uvg_g_dct_32[31][k] * src[31 * line];
     }
     for (k = 0; k < 8; k++) {
-      eo[k] = kvz_g_dct_32[2][k] * src[2 * line] + kvz_g_dct_32[6][k] * src[6 * line] + kvz_g_dct_32[10][k] * src[10 * line] + kvz_g_dct_32[14][k] * src[14 * line] +
-        kvz_g_dct_32[18][k] * src[18 * line] + kvz_g_dct_32[22][k] * src[22 * line] + kvz_g_dct_32[26][k] * src[26 * line] + kvz_g_dct_32[30][k] * src[30 * line];
+      eo[k] = uvg_g_dct_32[2][k] * src[2 * line] + uvg_g_dct_32[6][k] * src[6 * line] + uvg_g_dct_32[10][k] * src[10 * line] + uvg_g_dct_32[14][k] * src[14 * line] +
+        uvg_g_dct_32[18][k] * src[18 * line] + uvg_g_dct_32[22][k] * src[22 * line] + uvg_g_dct_32[26][k] * src[26 * line] + uvg_g_dct_32[30][k] * src[30 * line];
     }
     for (k = 0; k < 4; k++) {
-      eeo[k] = kvz_g_dct_32[4][k] * src[4 * line] + kvz_g_dct_32[12][k] * src[12 * line] + kvz_g_dct_32[20][k] * src[20 * line] + kvz_g_dct_32[28][k] * src[28 * line];
+      eeo[k] = uvg_g_dct_32[4][k] * src[4 * line] + uvg_g_dct_32[12][k] * src[12 * line] + uvg_g_dct_32[20][k] * src[20 * line] + uvg_g_dct_32[28][k] * src[28 * line];
     }
-    eeeo[0] = kvz_g_dct_32[8][0] * src[8 * line] + kvz_g_dct_32[24][0] * src[24 * line];
-    eeeo[1] = kvz_g_dct_32[8][1] * src[8 * line] + kvz_g_dct_32[24][1] * src[24 * line];
-    eeee[0] = kvz_g_dct_32[0][0] * src[0] + kvz_g_dct_32[16][0] * src[16 * line];
-    eeee[1] = kvz_g_dct_32[0][1] * src[0] + kvz_g_dct_32[16][1] * src[16 * line];
+    eeeo[0] = uvg_g_dct_32[8][0] * src[8 * line] + uvg_g_dct_32[24][0] * src[24 * line];
+    eeeo[1] = uvg_g_dct_32[8][1] * src[8 * line] + uvg_g_dct_32[24][1] * src[24 * line];
+    eeee[0] = uvg_g_dct_32[0][0] * src[0] + uvg_g_dct_32[16][0] * src[16 * line];
+    eeee[1] = uvg_g_dct_32[0][1] * src[0] + uvg_g_dct_32[16][1] * src[16 * line];
 
     // Combining even and odd terms at each hierarchy levels to calculate the final spatial domain vector
     eee[0] = eeee[0] + eeeo[0];
@@ -721,8 +721,8 @@ static void partial_butterfly_inverse_32_generic(const int16_t* src, int16_t* ds
 static void dct_ ## n ## x ## n ## _generic(int8_t bitdepth, const int16_t *input, int16_t *output) { \
 \
   int16_t tmp[ n * n ]; \
-  int32_t shift_1st = kvz_g_convert_to_bit[ n ] + 1 + (bitdepth - 8); \
-  int32_t shift_2nd = kvz_g_convert_to_bit[ n ] + 8; \
+  int32_t shift_1st = uvg_g_convert_to_bit[ n ] + 1 + (bitdepth - 8); \
+  int32_t shift_2nd = uvg_g_convert_to_bit[ n ] + 8; \
 \
   partial_butterfly_ ## n ## _generic(input, tmp, shift_1st); \
   partial_butterfly_ ## n ## _generic(tmp, output, shift_2nd); \
@@ -752,8 +752,8 @@ IDCT_NXN_GENERIC(32);
 static void fast_forward_dst_4x4_generic(int8_t bitdepth, const int16_t* input, int16_t* output)
 {
   int16_t tmp[4 * 4];
-  int32_t shift_1st = kvz_g_convert_to_bit[4] + 1 + (bitdepth - 8);
-  int32_t shift_2nd = kvz_g_convert_to_bit[4] + 8;
+  int32_t shift_1st = uvg_g_convert_to_bit[4] + 1 + (bitdepth - 8);
+  int32_t shift_2nd = uvg_g_convert_to_bit[4] + 8;
 
   fast_forward_dst_4_generic(input, tmp, shift_1st);
   fast_forward_dst_4_generic(tmp, output, shift_2nd);
@@ -1002,22 +1002,22 @@ static void fast_inverse_dst_4x4_generic(int8_t bitdepth, const int16_t* input, 
 }
 
 // DCT-2
-const int16_t kvz_g_DCT2P4[16] = DEFINE_DCT2_P4_MATRIX(64, 83, 36);
-const int16_t kvz_g_DCT2P8[64] = DEFINE_DCT2_P8_MATRIX(64, 83, 36, 89, 75, 50, 18);
-const int16_t kvz_g_DCT2P16[256] = DEFINE_DCT2_P16_MATRIX(64, 83, 36, 89, 75, 50, 18, 90, 87, 80, 70, 57, 43, 25, 9);
-const int16_t kvz_g_DCT2P32[1024] = DEFINE_DCT2_P32_MATRIX(64, 83, 36, 89, 75, 50, 18, 90, 87, 80, 70, 57, 43, 25, 9, 90, 90, 88, 85, 82, 78, 73, 67, 61, 54, 46, 38, 31, 22, 13, 4);
+const int16_t uvg_g_DCT2P4[16] = DEFINE_DCT2_P4_MATRIX(64, 83, 36);
+const int16_t uvg_g_DCT2P8[64] = DEFINE_DCT2_P8_MATRIX(64, 83, 36, 89, 75, 50, 18);
+const int16_t uvg_g_DCT2P16[256] = DEFINE_DCT2_P16_MATRIX(64, 83, 36, 89, 75, 50, 18, 90, 87, 80, 70, 57, 43, 25, 9);
+const int16_t uvg_g_DCT2P32[1024] = DEFINE_DCT2_P32_MATRIX(64, 83, 36, 89, 75, 50, 18, 90, 87, 80, 70, 57, 43, 25, 9, 90, 90, 88, 85, 82, 78, 73, 67, 61, 54, 46, 38, 31, 22, 13, 4);
 
 // DST-7
-const int16_t kvz_g_DST7P4[16] = DEFINE_DST7_P4_MATRIX(29, 55, 74, 84);
-const int16_t kvz_g_DST7P8[64] = DEFINE_DST7_P8_MATRIX(17, 32, 46, 60, 71, 78, 85, 86);
-const int16_t kvz_g_DST7P16[256] = DEFINE_DST7_P16_MATRIX(8, 17, 25, 33, 40, 48, 55, 62, 68, 73, 77, 81, 85, 87, 88, 88);
-const int16_t kvz_g_DST7P32[1024] = DEFINE_DST7_P32_MATRIX(4, 9, 13, 17, 21, 26, 30, 34, 38, 42, 46, 50, 53, 56, 60, 63, 66, 68, 72, 74, 77, 78, 80, 82, 84, 85, 86, 87, 88, 89, 90, 90);
+const int16_t uvg_g_DST7P4[16] = DEFINE_DST7_P4_MATRIX(29, 55, 74, 84);
+const int16_t uvg_g_DST7P8[64] = DEFINE_DST7_P8_MATRIX(17, 32, 46, 60, 71, 78, 85, 86);
+const int16_t uvg_g_DST7P16[256] = DEFINE_DST7_P16_MATRIX(8, 17, 25, 33, 40, 48, 55, 62, 68, 73, 77, 81, 85, 87, 88, 88);
+const int16_t uvg_g_DST7P32[1024] = DEFINE_DST7_P32_MATRIX(4, 9, 13, 17, 21, 26, 30, 34, 38, 42, 46, 50, 53, 56, 60, 63, 66, 68, 72, 74, 77, 78, 80, 82, 84, 85, 86, 87, 88, 89, 90, 90);
 
 // DCT-8
-const int16_t kvz_g_DCT8P4[64] = DEFINE_DCT8_P4_MATRIX(84, 74, 55, 29);
-const int16_t kvz_g_DCT8P8[256] = DEFINE_DCT8_P8_MATRIX(86, 85, 78, 71, 60, 46, 32, 17);
-const int16_t kvz_g_DCT8P16[256] = DEFINE_DCT8_P16_MATRIX(88, 88, 87, 85, 81, 77, 73, 68, 62, 55, 48, 40, 33, 25, 17, 8);
-const int16_t kvz_g_DCT8P32[1024] = DEFINE_DCT8_P32_MATRIX(90, 90, 89, 88, 87, 86, 85, 84, 82, 80, 78, 77, 74, 72, 68, 66, 63, 60, 56, 53, 50, 46, 42, 38, 34, 30, 26, 21, 17, 13, 9, 4);
+const int16_t uvg_g_DCT8P4[64] = DEFINE_DCT8_P4_MATRIX(84, 74, 55, 29);
+const int16_t uvg_g_DCT8P8[256] = DEFINE_DCT8_P8_MATRIX(86, 85, 78, 71, 60, 46, 32, 17);
+const int16_t uvg_g_DCT8P16[256] = DEFINE_DCT8_P16_MATRIX(88, 88, 87, 85, 81, 77, 73, 68, 62, 55, 48, 40, 33, 25, 17, 8);
+const int16_t uvg_g_DCT8P32[1024] = DEFINE_DCT8_P32_MATRIX(90, 90, 89, 88, 87, 86, 85, 84, 82, 80, 78, 77, 74, 72, 68, 66, 63, 60, 56, 53, 50, 46, 42, 38, 34, 30, 26, 21, 17, 13, 9, 4);
 
 // ********************************** DCT-2 **********************************
 static void fastForwardDCT2_B4(const int16_t* src, int16_t* dst, int32_t shift, int line, int skip_line, int skip_line2)
@@ -1025,7 +1025,7 @@ static void fastForwardDCT2_B4(const int16_t* src, int16_t* dst, int32_t shift, 
   int32_t j;
   int32_t E[2], O[2];
   int32_t add = (shift > 0) ? (1 << (shift - 1)) : 0;
-  const int16_t *iT = kvz_g_DCT2P4;
+  const int16_t *iT = uvg_g_DCT2P4;
 
   int16_t *p_coef = dst;
   const int  reduced_line = line - skip_line;
@@ -1061,7 +1061,7 @@ static void fastInverseDCT2_B4(const int16_t* src, int16_t* dst, int32_t shift, 
   int32_t j;
   int32_t E[2], O[2];
   int32_t add = 1 << (shift - 1);
-  const int16_t *iT = kvz_g_DCT2P4;
+  const int16_t *iT = uvg_g_DCT2P4;
   const int  reduced_line = line - skip_line;
 
   for (j = 0; j < reduced_line; j++)
@@ -1093,7 +1093,7 @@ static void fastForwardDCT2_B8(const int16_t* src, int16_t* dst, int32_t shift, 
   int32_t E[4], O[4];
   int32_t EE[2], EO[2];
   int32_t add = (shift > 0) ? (1 << (shift - 1)) : 0;
-  const int16_t *iT = kvz_g_DCT2P8;
+  const int16_t *iT = uvg_g_DCT2P8;
 
   int16_t *p_coef = dst;
   const int  reduced_line = line - skip_line;
@@ -1142,7 +1142,7 @@ static void fastInverseDCT2_B8(const int16_t* src, int16_t* dst, int32_t shift, 
   int32_t EE[2], EO[2];
   int32_t add = 1 << (shift - 1);
 
-  const int16_t *iT = kvz_g_DCT2P8;
+  const int16_t *iT = uvg_g_DCT2P8;
 
   const int  reduced_line = line - skip_line;
   for (j = 0; j < reduced_line; j++)
@@ -1186,7 +1186,7 @@ static void fastForwardDCT2_B16(const int16_t* src, int16_t* dst, int32_t shift,
   int32_t EEE[2], EEO[2];
   int32_t add = (shift > 0) ? (1 << (shift - 1)) : 0;
 
-  const int16_t *iT = kvz_g_DCT2P16;
+  const int16_t *iT = uvg_g_DCT2P16;
 
   int16_t *p_coef = dst;
   const int  reduced_line = line - skip_line;
@@ -1249,7 +1249,7 @@ static void fastInverseDCT2_B16(const int16_t* src, int16_t* dst, int32_t shift,
   int32_t EEE[2], EEO[2];
   int32_t add = 1 << (shift - 1);
 
-  const int16_t *iT = kvz_g_DCT2P16;
+  const int16_t *iT = uvg_g_DCT2P16;
 
   const int  reduced_line = line - skip_line;
 
@@ -1304,7 +1304,7 @@ static void fastForwardDCT2_B32(const int16_t* src, int16_t* dst, int32_t shift,
   int32_t EEEE[2], EEEO[2];
   int32_t add = (shift > 0) ? (1 << (shift - 1)) : 0;
 
-  const int16_t *iT = kvz_g_DCT2P32;
+  const int16_t *iT = uvg_g_DCT2P32;
 
   int16_t *p_coef = dst;
   const int  reduced_line = line - skip_line;
@@ -1377,7 +1377,7 @@ static void fastInverseDCT2_B32(const int16_t* src, int16_t* dst, int32_t shift,
   int32_t EEEE[2], EEEO[2];
   int32_t add = 1 << (shift - 1);
 
-  const int16_t *iT = kvz_g_DCT2P32;
+  const int16_t *iT = uvg_g_DCT2P32;
 
   const int  reduced_line = line - skip_line;
   for (j = 0; j < reduced_line; j++)
@@ -1439,7 +1439,7 @@ static void fastForwardDST7_B4(const int16_t* src, int16_t* dst, int32_t shift, 
   int i;
   int32_t rnd_factor = (shift > 0) ? (1 << (shift - 1)) : 0;
 
-  const int16_t *iT = kvz_g_DST7P4;
+  const int16_t *iT = uvg_g_DST7P4;
 
   int32_t c[4];
   int16_t *pCoeff = dst;
@@ -1477,7 +1477,7 @@ static void fastInverseDST7_B4(const int16_t* src, int16_t* dst, int32_t shift, 
   int32_t c[4];
   int32_t rnd_factor = (shift > 0) ? (1 << (shift - 1)) : 0;
 
-  const int16_t *iT = kvz_g_DST7P4;
+  const int16_t *iT = uvg_g_DST7P4;
 
   const int  reduced_line = line - skip_line;
   for (i = 0; i < reduced_line; i++)
@@ -1508,7 +1508,7 @@ static void fastForwardDST7_B16(const int16_t *src, int16_t *dst, int32_t shift,
   int32_t a[5], b[5], c[5], d[5], t;
   int32_t add = (shift > 0) ? (1 << (shift - 1)) : 0;
 
-  const int16_t *iT = kvz_g_DST7P16;
+  const int16_t *iT = uvg_g_DST7P16;
 
   int16_t *p_coef = dst;
   const int  reduced_line = line - skip_line;
@@ -1572,7 +1572,7 @@ static void fastInverseDST7_B16(const int16_t *src, int16_t *dst, int32_t shift,
   int32_t a[5], b[5], c[5], d[5], t;
   int32_t add = (shift > 0) ? (1 << (shift - 1)) : 0;
 
-  const int16_t *iT = kvz_g_DST7P16;
+  const int16_t *iT = uvg_g_DST7P16;
 
   const int  reduced_line = line - skip_line;
 
@@ -1627,7 +1627,7 @@ static void fastForwardDST7_B32(const int16_t *src, int16_t *dst, int32_t shift,
   int32_t c[2];
 
   int32_t add = (shift > 0) ? (1 << (shift - 1)) : 0;
-  const int16_t *iT = kvz_g_DST7P32;
+  const int16_t *iT = uvg_g_DST7P32;
   int16_t *p_coef = dst;
   const int  reduced_line = line - skip_line;
   const int  cutoff = 32 - skip_line2;
@@ -1722,7 +1722,7 @@ static void fastInverseDST7_B32(const int16_t *src, int16_t *dst, int32_t shift,
   int32_t c[2];
 
   int32_t add = (shift > 0) ? (1 << (shift - 1)) : 0;
-  const int16_t *iT = kvz_g_DST7P32;
+  const int16_t *iT = uvg_g_DST7P32;
   const int  reduced_line = line - skip_line;
 
   for (j = 0; j < reduced_line; j++)
@@ -1800,7 +1800,7 @@ static void fastForwardDCT8_B4(const int16_t *src, int16_t *dst, int32_t shift, 
 {
   int i;
   int rnd_factor = 1 << (shift - 1);
-  const int16_t *iT = kvz_g_DCT8P4;
+  const int16_t *iT = uvg_g_DCT8P4;
 
   int32_t c[4];
   int16_t *pCoeff = dst;
@@ -1837,7 +1837,7 @@ static void fastInverseDCT8_B4(const int16_t *src, int16_t *dst, int32_t shift, 
   int i;
   int rnd_factor = 1 << (shift - 1);
 
-  const int16_t *iT = kvz_g_DCT8P4;
+  const int16_t *iT = uvg_g_DCT8P4;
 
   int32_t c[4];
   const int  reduced_line = line - skip_line;
@@ -1868,7 +1868,7 @@ static void fastForwardDCT8_B16(const int16_t *src, int16_t *dst, int32_t shift,
   int32_t a[5], b[5], c[5], d[5], t;
   int32_t add = (shift > 0) ? (1 << (shift - 1)) : 0;
 
-  const int16_t *iT = kvz_g_DST7P16;
+  const int16_t *iT = uvg_g_DST7P16;
 
   int16_t *p_coef = dst;
   const int  reduced_line = line - skip_line;
@@ -1933,7 +1933,7 @@ static void fastInverseDCT8_B16(const int16_t *src, int16_t *dst, int32_t shift,
 
   int32_t add = (shift > 0) ? (1 << (shift - 1)) : 0;
 
-  const int16_t *iT = kvz_g_DST7P16;
+  const int16_t *iT = uvg_g_DST7P16;
 
   const int reduced_line = line - skip_line;
 
@@ -1987,7 +1987,7 @@ static void fastForwardDCT8_B32(const int16_t *src, int16_t *dst, int32_t shift,
   int32_t c[2];
 
   int32_t add = (shift > 0) ? (1 << (shift - 1)) : 0;
-  const int16_t *iT = kvz_g_DST7P32;
+  const int16_t *iT = uvg_g_DST7P32;
   int16_t *p_coef = dst;
   const int  reduced_line = line - skip_line;
   const int  cutoff = 32 - skip_line2;
@@ -2083,7 +2083,7 @@ static void fastInverseDCT8_B32(const int16_t *src, int16_t *dst, int32_t shift,
   int32_t c[2];
   int32_t add = (shift > 0) ? (1 << (shift - 1)) : 0;
 
-  const int16_t *iT = kvz_g_DST7P32;
+  const int16_t *iT = uvg_g_DST7P32;
 
   const int  reduced_line = line - skip_line;
 
@@ -2168,7 +2168,7 @@ static void fastForwardDCT8_B8(const int16_t *src, int16_t *dst, int32_t shift, 
   for (int i = 0; i < reduced_line; i++)
   {
     p_coef = dst;
-    const int16_t *iT = kvz_g_DCT8P8;
+    const int16_t *iT = uvg_g_DCT8P8;
     for (int j = 0; j < cutoff; j++)
     {
       int32_t sum = 0;
@@ -2206,7 +2206,7 @@ static void fastInverseDCT8_B8(const int16_t *src, int16_t *dst, int32_t shift, 
   const int32_t rnd_factor = 1 << (shift - 1);
   const int  reduced_line = line - skip_line;
   const int  cutoff = tr_size - skip_line2;
-  const int16_t *iT = kvz_g_DCT8P8;
+  const int16_t *iT = uvg_g_DCT8P8;
 
   for (int i = 0; i < reduced_line; i++)
   {
@@ -2239,7 +2239,7 @@ static void fastForwardDST7_B8(const int16_t *src, int16_t *dst, int32_t shift, 
   for (int i = 0; i < reduced_line; i++)
   {
     p_coef = dst;
-    const int16_t *iT = kvz_g_DST7P8;
+    const int16_t *iT = uvg_g_DST7P8;
     for (int j = 0; j < cutoff; j++)
     {
       int32_t sum = 0;
@@ -2277,7 +2277,7 @@ static void fastInverseDST7_B8(const int16_t *src, int16_t *dst, int32_t shift, 
   const int32_t rnd_factor = 1 << (shift - 1);
   const int  reduced_line = line - skip_line;
   const int  cutoff = tr_size - skip_line2;
-  const int16_t *iT = kvz_g_DST7P8;
+  const int16_t *iT = uvg_g_DST7P8;
 
   for (int i = 0; i < reduced_line; i++)
   {
@@ -2314,7 +2314,7 @@ static void fastForward ## t ## _B ## n (const int16_t *src, int16_t *dst, int32
   for (int i = 0; i < reduced_line; i++) \
   {\
     p_coef = dst;\
-    const int16_t* iT = kvz_g_ ## t ## P ## n ;\
+    const int16_t* iT = uvg_g_ ## t ## P ## n ;\
     for (int j = 0; j < cutoff; j++) \
     {\
       int32_t sum = 0;\
@@ -2348,7 +2348,7 @@ static void fastInverse ## t ## _B ## n (const int16_t *src, int16_t *dst, int32
   const int32_t rnd_factor = 1 << (shift - 1);\
   const int reduced_line = line - skip_line;\
   const int cutoff = tr_size - skip_line2;\
-  const int16_t* iT = kvz_g_ ## t ## P ## n ;\
+  const int16_t* iT = uvg_g_ ## t ## P ## n ;\
 \
   for (int i = 0; i < reduced_line; i++)\
   {\
@@ -2429,7 +2429,7 @@ static const tr_type_t mts_subset_intra[4][2] = { { DST7, DST7 }, { DCT8, DST7 }
 //static const tr_type_t mts_subset_inter[2] = { DCT8, DST7 };
 
 
-void kvz_get_tr_type(
+void uvg_get_tr_type(
   int8_t width,
   color_t color,
   const cu_info_t* tu,
@@ -2446,8 +2446,8 @@ void kvz_get_tr_type(
   }
 
   const int height = width;
-  const bool explicit_mts = mts_idx == KVZ_MTS_BOTH || (tu->type == CU_INTRA ? mts_idx == KVZ_MTS_INTRA : (mts_idx == KVZ_MTS_INTER && tu->type == CU_INTER));
-  const bool implicit_mts = tu->type == CU_INTRA && (mts_idx == KVZ_MTS_IMPLICIT || mts_idx == KVZ_MTS_INTER);
+  const bool explicit_mts = mts_idx == UVG_MTS_BOTH || (tu->type == CU_INTRA ? mts_idx == UVG_MTS_INTRA : (mts_idx == UVG_MTS_INTER && tu->type == CU_INTER));
+  const bool implicit_mts = tu->type == CU_INTRA && (mts_idx == UVG_MTS_IMPLICIT || mts_idx == UVG_MTS_INTER);
 
   assert(!(explicit_mts && implicit_mts));
 
@@ -2489,11 +2489,11 @@ static void mts_dct_generic(
   tr_type_t type_hor;
   tr_type_t type_ver;
 
-  kvz_get_tr_type(width, color, tu, &type_hor, &type_ver, mts_idx);
+  uvg_get_tr_type(width, color, tu, &type_hor, &type_ver, mts_idx);
 
   if (type_hor == DCT2 && type_ver == DCT2)
   {
-    dct_func *dct_func = kvz_get_dct_func(width, color, tu->type);
+    dct_func *dct_func = uvg_get_dct_func(width, color, tu->type);
     dct_func(bitdepth, input, output);
   }
   else
@@ -2501,7 +2501,7 @@ static void mts_dct_generic(
     const int height = width;
     const int skip_width = (type_hor != DCT2 && width == 32) ? 16 : (width > 32 ? width - 32 : 0);
     const int skip_height = (type_ver != DCT2 && height == 32) ? 16 : (height > 32 ? height - 32 : 0);
-    const int log2_width_minus2 = kvz_g_convert_to_bit[width];
+    const int log2_width_minus2 = uvg_g_convert_to_bit[width];
 
     partial_tr_func* dct_hor = dct_table[type_hor][log2_width_minus2];
     partial_tr_func* dct_ver = dct_table[type_ver][log2_width_minus2];
@@ -2528,11 +2528,11 @@ static void mts_idct_generic(
   tr_type_t type_hor;
   tr_type_t type_ver;
 
-  kvz_get_tr_type(width, color, tu, &type_hor, &type_ver, mts_idx);
+  uvg_get_tr_type(width, color, tu, &type_hor, &type_ver, mts_idx);
 
   if (type_hor == DCT2 && type_ver == DCT2)
   {
-    dct_func *idct_func = kvz_get_idct_func(width, color, tu->type);
+    dct_func *idct_func = uvg_get_idct_func(width, color, tu->type);
     idct_func(bitdepth, input, output);
   }
   else
@@ -2540,7 +2540,7 @@ static void mts_idct_generic(
     const int height = width;
     const int skip_width = (type_hor != DCT2 && width == 32) ? 16 : width > 32 ? width - 32 : 0;
     const int skip_height = (type_ver != DCT2 && height == 32) ? 16 : height > 32 ? height - 32 : 0;
-    const int log2_width_minus2 = kvz_g_convert_to_bit[width];
+    const int log2_width_minus2 = uvg_g_convert_to_bit[width];
 
     partial_tr_func* idct_hor = idct_table[type_hor][log2_width_minus2];
     partial_tr_func* idct_ver = idct_table[type_ver][log2_width_minus2];
@@ -2555,26 +2555,26 @@ static void mts_idct_generic(
 }
 
 
-int kvz_strategy_register_dct_generic(void* opaque, uint8_t bitdepth)
+int uvg_strategy_register_dct_generic(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
 
-  success &= kvz_strategyselector_register(opaque, "fast_forward_dst_4x4", "generic", 0, &fast_forward_dst_4x4_generic);
+  success &= uvg_strategyselector_register(opaque, "fast_forward_dst_4x4", "generic", 0, &fast_forward_dst_4x4_generic);
 
-  success &= kvz_strategyselector_register(opaque, "dct_4x4", "generic", 0, &dct_4x4_generic);
-  success &= kvz_strategyselector_register(opaque, "dct_8x8", "generic", 0, &dct_8x8_generic);
-  success &= kvz_strategyselector_register(opaque, "dct_16x16", "generic", 0, &dct_16x16_generic);
-  success &= kvz_strategyselector_register(opaque, "dct_32x32", "generic", 0, &dct_32x32_generic);
+  success &= uvg_strategyselector_register(opaque, "dct_4x4", "generic", 0, &dct_4x4_generic);
+  success &= uvg_strategyselector_register(opaque, "dct_8x8", "generic", 0, &dct_8x8_generic);
+  success &= uvg_strategyselector_register(opaque, "dct_16x16", "generic", 0, &dct_16x16_generic);
+  success &= uvg_strategyselector_register(opaque, "dct_32x32", "generic", 0, &dct_32x32_generic);
 
-  success &= kvz_strategyselector_register(opaque, "fast_inverse_dst_4x4", "generic", 0, &fast_inverse_dst_4x4_generic);
+  success &= uvg_strategyselector_register(opaque, "fast_inverse_dst_4x4", "generic", 0, &fast_inverse_dst_4x4_generic);
 
-  success &= kvz_strategyselector_register(opaque, "idct_4x4", "generic", 0, &idct_4x4_generic);
-  success &= kvz_strategyselector_register(opaque, "idct_8x8", "generic", 0, &idct_8x8_generic);
-  success &= kvz_strategyselector_register(opaque, "idct_16x16", "generic", 0, &idct_16x16_generic);
-  success &= kvz_strategyselector_register(opaque, "idct_32x32", "generic", 0, &idct_32x32_generic);
+  success &= uvg_strategyselector_register(opaque, "idct_4x4", "generic", 0, &idct_4x4_generic);
+  success &= uvg_strategyselector_register(opaque, "idct_8x8", "generic", 0, &idct_8x8_generic);
+  success &= uvg_strategyselector_register(opaque, "idct_16x16", "generic", 0, &idct_16x16_generic);
+  success &= uvg_strategyselector_register(opaque, "idct_32x32", "generic", 0, &idct_32x32_generic);
 
-  success &= kvz_strategyselector_register(opaque, "mts_dct", "generic", 0, &mts_dct_generic);
-  success &= kvz_strategyselector_register(opaque, "mts_idct", "generic", 0, &mts_idct_generic);
+  success &= uvg_strategyselector_register(opaque, "mts_dct", "generic", 0, &mts_dct_generic);
+  success &= uvg_strategyselector_register(opaque, "mts_idct", "generic", 0, &mts_idct_generic);
 
   return success;
 }

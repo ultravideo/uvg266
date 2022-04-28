@@ -44,16 +44,16 @@
 * This function signature is part of the libkvz API.
 * \return image pointer or NULL on failure
 */
-kvz_picture * kvz_image_alloc_420(const int32_t width, const int32_t height)
+uvg_picture * uvg_image_alloc_420(const int32_t width, const int32_t height)
 {
-  return kvz_image_alloc(KVZ_CSP_420, width, height);
+  return uvg_image_alloc(UVG_CSP_420, width, height);
 }
 
 /**
  * \brief Allocate a new image.
  * \return image pointer or NULL on failure
  */
-kvz_picture * kvz_image_alloc(enum kvz_chroma_format chroma_format, const int32_t width, const int32_t height)
+uvg_picture * uvg_image_alloc(enum uvg_chroma_format chroma_format, const int32_t width, const int32_t height)
 {
   //Assert that we have a well defined image
   assert((width % 2) == 0);
@@ -61,7 +61,7 @@ kvz_picture * kvz_image_alloc(enum kvz_chroma_format chroma_format, const int32_
 
   const size_t simd_padding_width = 64;
 
-  kvz_picture *im = MALLOC(kvz_picture, 1);
+  uvg_picture *im = MALLOC(uvg_picture, 1);
   if (!im) return NULL;
 
   //Add 4 pixel boundary to each side of luma for ALF
@@ -74,7 +74,7 @@ kvz_picture * kvz_image_alloc(enum kvz_chroma_format chroma_format, const int32_
   im->chroma_format = chroma_format;
 
   //Allocate memory, pad the full data buffer from both ends
-  im->fulldata_buf = MALLOC_SIMD_PADDED(kvz_pixel, (luma_size + 2 * chroma_size), simd_padding_width * 2);
+  im->fulldata_buf = MALLOC_SIMD_PADDED(uvg_pixel, (luma_size + 2 * chroma_size), simd_padding_width * 2);
   if (!im->fulldata_buf) {
     free(im);
     return NULL;
@@ -88,12 +88,12 @@ kvz_picture * kvz_image_alloc(enum kvz_chroma_format chroma_format, const int32_
   im->chroma_format = chroma_format;
   const int padding_before_first_pixel_luma = (FRAME_PADDING_LUMA / 2) * (im->stride) + FRAME_PADDING_LUMA / 2;
   const int padding_before_first_pixel_chroma = (FRAME_PADDING_CHROMA / 2) * (im->stride/2) + FRAME_PADDING_CHROMA / 2;
-  im->fulldata = &im->fulldata_buf[padding_before_first_pixel_luma] + simd_padding_width / sizeof(kvz_pixel);
+  im->fulldata = &im->fulldata_buf[padding_before_first_pixel_luma] + simd_padding_width / sizeof(uvg_pixel);
   im->base_image = im;
 
   im->y = im->data[COLOR_Y] = &im->fulldata[0];
 
-  if (chroma_format == KVZ_CSP_400) {
+  if (chroma_format == UVG_CSP_400) {
     im->u = im->data[COLOR_U] = NULL;
     im->v = im->data[COLOR_V] = NULL;
   } else {
@@ -104,7 +104,7 @@ kvz_picture * kvz_image_alloc(enum kvz_chroma_format chroma_format, const int32_
   im->pts = 0;
   im->dts = 0;
 
-  im->interlacing = KVZ_INTERLACING_NONE;
+  im->interlacing = UVG_INTERLACING_NONE;
 
   return im;
 }
@@ -117,11 +117,11 @@ kvz_picture * kvz_image_alloc(enum kvz_chroma_format chroma_format, const int32_
  *
  * \param im image to free
  */
-void kvz_image_free(kvz_picture *const im)
+void uvg_image_free(uvg_picture *const im)
 {
   if (im == NULL) return;
 
-  int32_t new_refcount = KVZ_ATOMIC_DEC(&(im->refcount));
+  int32_t new_refcount = UVG_ATOMIC_DEC(&(im->refcount));
   if (new_refcount > 0) {
     // There are still references so we don't free the data yet.
     return;
@@ -129,7 +129,7 @@ void kvz_image_free(kvz_picture *const im)
 
   if (im->base_image != im) {
     // Free our reference to the base image.
-    kvz_image_free(im->base_image);
+    uvg_image_free(im->base_image);
   } else {
     free(im->fulldata_buf);
   }
@@ -148,16 +148,16 @@ void kvz_image_free(kvz_picture *const im)
  *
  * Increment reference count and return the image.
  */
-kvz_picture *kvz_image_copy_ref(kvz_picture *im)
+uvg_picture *uvg_image_copy_ref(uvg_picture *im)
 {
-  int32_t new_refcount = KVZ_ATOMIC_INC(&im->refcount);
+  int32_t new_refcount = UVG_ATOMIC_INC(&im->refcount);
   // The caller should have had another reference and we added one
   // reference so refcount should be at least 2.
   assert(new_refcount >= 2);
   return im;
 }
 
-kvz_picture *kvz_image_make_subimage(kvz_picture *const orig_image,
+uvg_picture *uvg_image_make_subimage(uvg_picture *const orig_image,
                              const unsigned x_offset,
                              const unsigned y_offset,
                              const unsigned width,
@@ -173,10 +173,10 @@ kvz_picture *kvz_image_make_subimage(kvz_picture *const orig_image,
   assert(x_offset + width <= orig_image->width);
   assert(y_offset + height <= orig_image->height);
 
-  kvz_picture *im = MALLOC(kvz_picture, 1);
+  uvg_picture *im = MALLOC(uvg_picture, 1);
   if (!im) return NULL;
 
-  im->base_image = kvz_image_copy_ref(orig_image->base_image);
+  im->base_image = uvg_image_copy_ref(orig_image->base_image);
   im->refcount = 1; // We give a reference to caller
   im->width = width;
   im->height = height;
@@ -184,7 +184,7 @@ kvz_picture *kvz_image_make_subimage(kvz_picture *const orig_image,
   im->chroma_format = orig_image->chroma_format;
 
   im->y = im->data[COLOR_Y] = &orig_image->y[x_offset + y_offset * orig_image->stride];
-  if (orig_image->chroma_format != KVZ_CSP_400) {
+  if (orig_image->chroma_format != UVG_CSP_400) {
     im->u = im->data[COLOR_U] = &orig_image->u[x_offset / 2 + y_offset / 2 * orig_image->stride / 2];
     im->v = im->data[COLOR_V] = &orig_image->v[x_offset / 2 + y_offset / 2 * orig_image->stride / 2];
   }
@@ -195,26 +195,26 @@ kvz_picture *kvz_image_make_subimage(kvz_picture *const orig_image,
   return im;
 }
 
-yuv_t * kvz_yuv_t_alloc(int luma_size, int chroma_size)
+yuv_t * uvg_yuv_t_alloc(int luma_size, int chroma_size)
 {
   yuv_t *yuv = (yuv_t *)malloc(sizeof(*yuv));
   yuv->size = luma_size;
 
   // Get buffers with separate mallocs in order to take advantage of
   // automatic buffer overrun checks.
-  yuv->y = (kvz_pixel *)malloc(luma_size * sizeof(*yuv->y));
+  yuv->y = (uvg_pixel *)malloc(luma_size * sizeof(*yuv->y));
   if (chroma_size == 0) {
     yuv->u = NULL;
     yuv->v = NULL;
   } else {
-    yuv->u = (kvz_pixel *)malloc(chroma_size * sizeof(*yuv->u));
-    yuv->v = (kvz_pixel *)malloc(chroma_size * sizeof(*yuv->v));
+    yuv->u = (uvg_pixel *)malloc(chroma_size * sizeof(*yuv->u));
+    yuv->v = (uvg_pixel *)malloc(chroma_size * sizeof(*yuv->v));
   }
   
   return yuv;
 }
 
-void kvz_yuv_t_free(yuv_t *yuv)
+void uvg_yuv_t_free(yuv_t *yuv)
 {
   if (yuv) {
     FREE_POINTER(yuv->y);
@@ -224,7 +224,7 @@ void kvz_yuv_t_free(yuv_t *yuv)
   FREE_POINTER(yuv);
 }
 
-hi_prec_buf_t * kvz_hi_prec_buf_t_alloc(int luma_size)
+hi_prec_buf_t * uvg_hi_prec_buf_t_alloc(int luma_size)
 {
   // Get buffers with separate mallocs in order to take advantage of
   // automatic buffer overrun checks.
@@ -239,7 +239,7 @@ hi_prec_buf_t * kvz_hi_prec_buf_t_alloc(int luma_size)
   return yuv;
 }
 
-void kvz_hi_prec_buf_t_free(hi_prec_buf_t * yuv)
+void uvg_hi_prec_buf_t_free(hi_prec_buf_t * yuv)
 {
   free(yuv->y);
   free(yuv->u);
@@ -249,14 +249,14 @@ void kvz_hi_prec_buf_t_free(hi_prec_buf_t * yuv)
   free(yuv);
 }
 
-static INLINE uint32_t reg_sad_maybe_optimized(const kvz_pixel * const data1, const kvz_pixel * const data2,
+static INLINE uint32_t reg_sad_maybe_optimized(const uvg_pixel * const data1, const uvg_pixel * const data2,
                                   const int32_t width, const int32_t height, const uint32_t stride1,
                                   const uint32_t stride2, optimized_sad_func_ptr_t optimized_sad)
 {
   if (optimized_sad != NULL)
     return optimized_sad(data1, data2, height, stride1, stride2);
   else
-    return kvz_reg_sad(data1, data2, width, height, stride1, stride2);
+    return uvg_reg_sad(data1, data2, width, height, stride1, stride2);
 }
 
 /**
@@ -270,10 +270,10 @@ static INLINE uint32_t reg_sad_maybe_optimized(const kvz_pixel * const data1, co
  *
  * \returns Sum of Absolute Differences
  */
-static unsigned cor_sad(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
+static unsigned cor_sad(const uvg_pixel *pic_data, const uvg_pixel *ref_data,
                         int block_width, int block_height, unsigned pic_stride)
 {
-  kvz_pixel ref = *ref_data;
+  uvg_pixel ref = *ref_data;
   int x, y;
   unsigned sad = 0;
 
@@ -300,12 +300,12 @@ static unsigned cor_sad(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
  * \param block_width  Width of the blocks.
  * \param block_height  Height of the blocks.
  */
-static unsigned image_interpolated_sad(const kvz_picture *pic, const kvz_picture *ref,
+static unsigned image_interpolated_sad(const uvg_picture *pic, const uvg_picture *ref,
                                  int pic_x, int pic_y, int ref_x, int ref_y,
                                  int block_width, int block_height,
                                  optimized_sad_func_ptr_t optimized_sad)
 {
-  kvz_pixel *pic_data, *ref_data;
+  uvg_pixel *pic_data, *ref_data;
 
   int left, right, top, bottom;
   int result = 0;
@@ -347,52 +347,52 @@ static unsigned image_interpolated_sad(const kvz_picture *pic, const kvz_picture
     result += cor_sad(pic_data,
                       &ref_data[top * ref->stride + left],
                       left, top, pic->stride);
-    result += kvz_ver_sad(&pic_data[left],
+    result += uvg_ver_sad(&pic_data[left],
                       &ref_data[top * ref->stride + left],
                       block_width - left, top, pic->stride);
 
-    result += kvz_hor_sad(pic_data + top * pic->stride,
+    result += uvg_hor_sad(pic_data + top * pic->stride,
                           ref_data + top * ref->stride,
                           block_width, block_height - top,
                           pic->stride, ref->stride,
                           left, right);
 
   } else if (top && right) {
-    result += kvz_ver_sad(pic_data,
+    result += uvg_ver_sad(pic_data,
                       &ref_data[top * ref->stride],
                       block_width - right, top, pic->stride);
     result += cor_sad(&pic_data[block_width - right],
                       &ref_data[top * ref->stride + (block_width - right - 1)],
                       right, top, pic->stride);
 
-    result += kvz_hor_sad(pic_data + top * pic->stride,
+    result += uvg_hor_sad(pic_data + top * pic->stride,
                           ref_data + top * ref->stride,
                           block_width, block_height - top,
                           pic->stride, ref->stride,
                           left, right);
 
   } else if (bottom && left) {
-    result += kvz_hor_sad(pic_data, ref_data, block_width, block_height - bottom,
+    result += uvg_hor_sad(pic_data, ref_data, block_width, block_height - bottom,
                           pic->stride, ref->stride, left, right);
 
     result += cor_sad(&pic_data[(block_height - bottom) * pic->stride],
                       &ref_data[(block_height - bottom - 1) * ref->stride + left],
                       left, bottom, pic->stride);
-    result += kvz_ver_sad(&pic_data[(block_height - bottom) * pic->stride + left],
+    result += uvg_ver_sad(&pic_data[(block_height - bottom) * pic->stride + left],
                       &ref_data[(block_height - bottom - 1) * ref->stride + left],
                       block_width - left, bottom, pic->stride);
   } else if (bottom && right) {
-    result += kvz_hor_sad(pic_data, ref_data, block_width, block_height - bottom,
+    result += uvg_hor_sad(pic_data, ref_data, block_width, block_height - bottom,
                           pic->stride, ref->stride, left, right);
 
-    result += kvz_ver_sad(&pic_data[(block_height - bottom) * pic->stride],
+    result += uvg_ver_sad(&pic_data[(block_height - bottom) * pic->stride],
                       &ref_data[(block_height - bottom - 1) * ref->stride],
                       block_width - right, bottom, pic->stride);
     result += cor_sad(&pic_data[(block_height - bottom) * pic->stride + block_width - right],
                       &ref_data[(block_height - bottom - 1) * ref->stride + block_width - right - 1],
                       right, bottom, pic->stride);
   } else if (top) {
-    result += kvz_ver_sad(pic_data,
+    result += uvg_ver_sad(pic_data,
                       &ref_data[top * ref->stride],
                       block_width, top, pic->stride);
     result += reg_sad_maybe_optimized(&pic_data[top * pic->stride],
@@ -404,11 +404,11 @@ static unsigned image_interpolated_sad(const kvz_picture *pic, const kvz_picture
                       ref_data,
                       block_width, block_height - bottom, pic->stride, ref->stride,
                       optimized_sad);
-    result += kvz_ver_sad(&pic_data[(block_height - bottom) * pic->stride],
+    result += uvg_ver_sad(&pic_data[(block_height - bottom) * pic->stride],
                       &ref_data[(block_height - bottom - 1) * ref->stride],
                       block_width, bottom, pic->stride);
   } else if (left | right) {
-    result += kvz_hor_sad(pic_data, ref_data,
+    result += uvg_hor_sad(pic_data, ref_data,
                           block_width, block_height, pic->stride,
                           ref->stride, left, right);
   } else {
@@ -428,8 +428,8 @@ static unsigned image_interpolated_sad(const kvz_picture *pic, const kvz_picture
 *
 * \returns          Sum of absolute differences
 */
-unsigned kvz_image_calc_sad(const kvz_picture *pic,
-                            const kvz_picture *ref,
+unsigned uvg_image_calc_sad(const uvg_picture *pic,
+                            const uvg_picture *ref,
                             int pic_x,
                             int pic_y,
                             int ref_x,
@@ -448,8 +448,8 @@ unsigned kvz_image_calc_sad(const kvz_picture *pic,
   {
     // Reference block is completely inside the frame, so just calculate the
     // SAD directly. This is the most common case, which is why it's first.
-    const kvz_pixel *pic_data = &pic->y[pic_y * pic->stride + pic_x];
-    const kvz_pixel *ref_data = &ref->y[ref_y * ref->stride + ref_x];
+    const uvg_pixel *pic_data = &pic->y[pic_y * pic->stride + pic_x];
+    const uvg_pixel *ref_data = &ref->y[ref_y * ref->stride + ref_x];
 
     res = reg_sad_maybe_optimized(pic_data,
                                   ref_data,
@@ -462,7 +462,7 @@ unsigned kvz_image_calc_sad(const kvz_picture *pic,
     // Call a routine that knows how to interpolate pixels outside the frame.
     res = image_interpolated_sad(pic, ref, pic_x, pic_y, ref_x, ref_y, block_width, block_height, optimized_sad);
   }
-  return res >> (KVZ_BIT_DEPTH - 8);
+  return res >> (UVG_BIT_DEPTH - 8);
 }
 
 
@@ -472,8 +472,8 @@ unsigned kvz_image_calc_sad(const kvz_picture *pic,
 * \param pic        Image for the block we are trying to find.
 * \param ref        Image where we are trying to find the block.
 */
-unsigned kvz_image_calc_satd(const kvz_picture *pic,
-                             const kvz_picture *ref,
+unsigned uvg_image_calc_satd(const uvg_picture *pic,
+                             const uvg_picture *ref,
                              int pic_x,
                              int pic_y,
                              int ref_x,
@@ -489,24 +489,24 @@ unsigned kvz_image_calc_satd(const kvz_picture *pic,
   {
     // Reference block is completely inside the frame, so just calculate the
     // SAD directly. This is the most common case, which is why it's first.
-    const kvz_pixel *pic_data = &pic->y[pic_y * pic->stride + pic_x];
-    const kvz_pixel *ref_data = &ref->y[ref_y * ref->stride + ref_x];
-    return kvz_satd_any_size(block_width,
+    const uvg_pixel *pic_data = &pic->y[pic_y * pic->stride + pic_x];
+    const uvg_pixel *ref_data = &ref->y[ref_y * ref->stride + ref_x];
+    return uvg_satd_any_size(block_width,
                              block_height,
                              pic_data,
                              pic->stride,
                              ref_data,
-                             ref->stride) >> (KVZ_BIT_DEPTH - 8);
+                             ref->stride) >> (UVG_BIT_DEPTH - 8);
   } else {
     // Extrapolate pixels from outside the frame.
 
     // Space for extrapolated pixels and the part from the picture
     // The extrapolation function will set the pointers and stride.
-    kvz_pixel ext_buffer[LCU_LUMA_SIZE];
-    kvz_pixel *ext = NULL;
-    kvz_pixel *ext_origin = NULL;
+    uvg_pixel ext_buffer[LCU_LUMA_SIZE];
+    uvg_pixel *ext = NULL;
+    uvg_pixel *ext_origin = NULL;
     int ext_s = 0;
-    kvz_epol_args epol_args = {
+    uvg_epol_args epol_args = {
       .src = ref->y,
       .src_w = ref->width,
       .src_h = ref->height,
@@ -529,16 +529,16 @@ unsigned kvz_image_calc_satd(const kvz_picture *pic,
     epol_args.ext_origin = &ext_origin;
     epol_args.ext_s = &ext_s;
 
-    kvz_get_extended_block(&epol_args);
+    uvg_get_extended_block(&epol_args);
 
-    const kvz_pixel *pic_data = &pic->y[pic_y * pic->stride + pic_x];
+    const uvg_pixel *pic_data = &pic->y[pic_y * pic->stride + pic_x];
 
-    unsigned satd = kvz_satd_any_size(block_width,
+    unsigned satd = uvg_satd_any_size(block_width,
       block_height,
       pic_data,
       pic->stride,
       ext_origin,
-      ext_s) >> (KVZ_BIT_DEPTH - 8);
+      ext_s) >> (UVG_BIT_DEPTH - 8);
 
     return satd;
   }
@@ -564,11 +564,11 @@ unsigned kvz_image_calc_satd(const kvz_picture *pic,
  */
 #define BLIT_PIXELS_CASE(n) case n:\
   for (y = 0; y < n; ++y) {\
-    memcpy(&dst[y*dst_stride], &orig[y*orig_stride], n * sizeof(kvz_pixel));\
+    memcpy(&dst[y*dst_stride], &orig[y*orig_stride], n * sizeof(uvg_pixel));\
   }\
   break;
 
-void kvz_pixels_blit(const kvz_pixel * const orig, kvz_pixel * const dst,
+void uvg_pixels_blit(const uvg_pixel * const orig, uvg_pixel * const dst,
                          const unsigned width, const unsigned height,
                          const unsigned orig_stride, const unsigned dst_stride)
 {
@@ -585,13 +585,13 @@ void kvz_pixels_blit(const kvz_pixel * const orig, kvz_pixel * const dst,
       sprintf((buffer + 3*p), "%02X ", orig[y*orig_stride]);
     }
     buffer[3*width] = 0;
-    CHECKPOINT("kvz_pixels_blit_avx2: %04d: %s", y, buffer);
+    CHECKPOINT("uvg_pixels_blit_avx2: %04d: %s", y, buffer);
   }
   FREE_POINTER(buffer);
 #endif //CHECKPOINTS
 
   if (width == orig_stride && width == dst_stride) {
-    memcpy(dst, orig, width * height * sizeof(kvz_pixel));
+    memcpy(dst, orig, width * height * sizeof(uvg_pixel));
     return;
   }
 
@@ -612,7 +612,7 @@ void kvz_pixels_blit(const kvz_pixel * const orig, kvz_pixel * const dst,
     assert(orig != dst || orig_stride == dst_stride);
 
     for (y = 0; y < height; ++y) {
-      memcpy(&dst[y*dst_stride], &orig[y*orig_stride], width * sizeof(kvz_pixel));
+      memcpy(&dst[y*dst_stride], &orig[y*orig_stride], width * sizeof(uvg_pixel));
     }
     break;
   }

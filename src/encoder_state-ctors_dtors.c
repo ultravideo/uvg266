@@ -53,7 +53,7 @@
 
 
 static int encoder_state_config_frame_init(encoder_state_t * const state) {
-  state->frame->ref = kvz_image_list_alloc(MAX_REF_PIC_COUNT);
+  state->frame->ref = uvg_image_list_alloc(MAX_REF_PIC_COUNT);
   if(!state->frame->ref) {
     fprintf(stderr, "Failed to allocate the picture list!\n");
     return 0;
@@ -94,7 +94,7 @@ static int encoder_state_config_frame_init(encoder_state_t * const state) {
 
   pthread_mutex_init(&state->frame->rc_lock, NULL);
 
-  state->frame->new_ratecontrol = kvz_get_rc_data(NULL);
+  state->frame->new_ratecontrol = uvg_get_rc_data(NULL);
 
   return 1;
 }
@@ -106,7 +106,7 @@ static void encoder_state_config_frame_finalize(encoder_state_t * const state) {
   if (state->frame->c_para) FREE_POINTER(state->frame->c_para);
   if (state->frame->k_para) FREE_POINTER(state->frame->k_para);
 
-  kvz_image_list_destroy(state->frame->ref);
+  uvg_image_list_destroy(state->frame->ref);
   FREE_POINTER(state->frame->lcu_stats);
   FREE_POINTER(state->frame->aq_offsets);
 
@@ -117,7 +117,7 @@ static int encoder_state_config_tile_init(encoder_state_t * const state,
                                           const int width, const int height, const int width_in_lcu, const int height_in_lcu) {
   
   const encoder_control_t * const encoder = state->encoder_control;
-  state->tile->frame = kvz_videoframe_alloc(width, height, state->encoder_control->chroma_format, encoder->cfg.alf_type, encoder->cfg.cclm);
+  state->tile->frame = uvg_videoframe_alloc(width, height, state->encoder_control->chroma_format, encoder->cfg.alf_type, encoder->cfg.cclm);
   
   state->tile->frame->hmvp_lut = malloc(sizeof(cu_info_t) * height_in_lcu * MAX_NUM_HMVP_CANDS);
   state->tile->frame->hmvp_size = calloc(1, sizeof(uint8_t) * height_in_lcu);
@@ -147,12 +147,12 @@ static int encoder_state_config_tile_init(encoder_state_t * const state,
   unsigned chroma_size_hor = chroma_sizes_hor[state->encoder_control->chroma_format];
   unsigned chroma_size_ver = chroma_sizes_ver[state->encoder_control->chroma_format];
 
-  state->tile->hor_buf_search = kvz_yuv_t_alloc(luma_size, chroma_size_hor);
-  state->tile->ver_buf_search = kvz_yuv_t_alloc(luma_size, chroma_size_ver);
+  state->tile->hor_buf_search = uvg_yuv_t_alloc(luma_size, chroma_size_hor);
+  state->tile->ver_buf_search = uvg_yuv_t_alloc(luma_size, chroma_size_ver);
 
   if (encoder->cfg.sao_type) {
-    state->tile->hor_buf_before_sao = kvz_yuv_t_alloc(luma_size, chroma_size_hor);
-    state->tile->ver_buf_before_sao = kvz_yuv_t_alloc(luma_size, chroma_size_ver);
+    state->tile->hor_buf_before_sao = uvg_yuv_t_alloc(luma_size, chroma_size_hor);
+    state->tile->ver_buf_before_sao = uvg_yuv_t_alloc(luma_size, chroma_size_ver);
   } else {
     state->tile->hor_buf_before_sao = NULL;
     state->tile->ver_buf_before_sao = NULL;
@@ -181,23 +181,23 @@ static int encoder_state_config_tile_init(encoder_state_t * const state,
 static void encoder_state_config_tile_finalize(encoder_state_t * const state) {
   if (state->tile == NULL) return;
 
-  kvz_yuv_t_free(state->tile->hor_buf_search);
-  kvz_yuv_t_free(state->tile->ver_buf_search);
-  kvz_yuv_t_free(state->tile->hor_buf_before_sao);
-  kvz_yuv_t_free(state->tile->ver_buf_before_sao);
+  uvg_yuv_t_free(state->tile->hor_buf_search);
+  uvg_yuv_t_free(state->tile->ver_buf_search);
+  uvg_yuv_t_free(state->tile->hor_buf_before_sao);
+  uvg_yuv_t_free(state->tile->ver_buf_before_sao);
 
   if (state->encoder_control->cfg.wpp) {
     int num_jobs = state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu;
     for (int i = 0; i < num_jobs; ++i) {
-      kvz_threadqueue_free_job(&state->tile->wf_jobs[i]);
-      kvz_threadqueue_free_job(&state->tile->wf_recon_jobs[i]);
+      uvg_threadqueue_free_job(&state->tile->wf_jobs[i]);
+      uvg_threadqueue_free_job(&state->tile->wf_recon_jobs[i]);
     }
   }
 
   FREE_POINTER(state->tile->frame->hmvp_lut);
   FREE_POINTER(state->tile->frame->hmvp_size);
 
-  kvz_videoframe_free(state->tile->frame);
+  uvg_videoframe_free(state->tile->frame);
   state->tile->frame = NULL;
   FREE_POINTER(state->tile->wf_jobs);
   FREE_POINTER(state->tile->wf_recon_jobs);
@@ -262,13 +262,13 @@ static int encoder_state_main_init(encoder_state_t* const state) {
     state->slice->alf->tile_group_cc_alf_cr_aps_id = -1;
     state->slice->alf->num_of_param_sets = 0;
     memset(state->slice->alf->tile_group_alf_enabled_flag, 0, sizeof(state->slice->alf->tile_group_alf_enabled_flag));
-    if (state->encoder_control->cfg.alf_type == KVZ_ALF_FULL) {
-      kvz_reset_cc_alf_aps_param(state->slice->alf->cc_filter_param);
+    if (state->encoder_control->cfg.alf_type == UVG_ALF_FULL) {
+      uvg_reset_cc_alf_aps_param(state->slice->alf->cc_filter_param);
     }
 
     state->tile->frame->alf_info = MALLOC(alf_info_t, 1);
-    kvz_alf_create(state->tile->frame, state->encoder_control->chroma_format);
-    kvz_set_aps_map(state->tile->frame, state->encoder_control->cfg.alf_type);
+    uvg_alf_create(state->tile->frame, state->encoder_control->chroma_format);
+    uvg_set_aps_map(state->tile->frame, state->encoder_control->cfg.alf_type);
   }
 
   return 1;
@@ -292,14 +292,14 @@ static int encoder_state_main_finalize(encoder_state_t* const state) {
     }
     FREE_POINTER(state->slice->alf);
 
-    kvz_alf_destroy(state->tile->frame);
+    uvg_alf_destroy(state->tile->frame);
     FREE_POINTER(state->tile->frame->alf_info);
     FREE_POINTER(state->tile->frame->alf_param_set_map);
   }
   return 1;
 }
 
-int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t * const parent_state) {
+int uvg_encoder_state_init(encoder_state_t * const child_state, encoder_state_t * const parent_state) {
   //We require that, if parent_state is NULL:
   //child_state->encoder_control is set
   //
@@ -352,9 +352,9 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
   }
 
   // Intialization of the constraint structure
-  child_state->constraint = kvz_init_constraint(child_state->constraint, child_state->encoder_control);
+  child_state->constraint = uvg_init_constraint(child_state->constraint, child_state->encoder_control);
 
-  kvz_bitstream_init(&child_state->stream);
+  uvg_bitstream_init(&child_state->stream);
   
   // Set CABAC output bitstream
   child_state->cabac.stream = &child_state->stream;
@@ -422,18 +422,18 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
       int range_end_slice = range_start; //Will be incremented to get the range of the "thing"
       int range_end_tile = range_start; //Will be incremented to get the range of the "thing"
       
-      int tile_allowed = kvz_lcu_at_tile_start(encoder, range_start) && children_allow_tile;
-      int slice_allowed = kvz_lcu_at_slice_start(encoder, range_start) && children_allow_slice;
+      int tile_allowed = uvg_lcu_at_tile_start(encoder, range_start) && children_allow_tile;
+      int slice_allowed = uvg_lcu_at_slice_start(encoder, range_start) && children_allow_slice;
       
       //Find the smallest structure following the cursor
       if (slice_allowed) {
-        while(!kvz_lcu_at_slice_end(encoder, range_end_slice)) {
+        while(!uvg_lcu_at_slice_end(encoder, range_end_slice)) {
           ++range_end_slice;
         }
       }
       
       if (tile_allowed) {
-        while(!kvz_lcu_at_tile_end(encoder, range_end_tile)) {
+        while(!uvg_lcu_at_tile_end(encoder, range_end_tile)) {
           ++range_end_tile;
         }
       }
@@ -505,7 +505,7 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
           }
         }
         
-        if (!kvz_encoder_state_init(&child_state->children[child_count], child_state)) {
+        if (!uvg_encoder_state_init(&child_state->children[child_count], child_state)) {
           fprintf(stderr, "Unable to init child...\n");
           return 0;
         }
@@ -565,7 +565,7 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
           return 0;
         }
         
-        if (!kvz_encoder_state_init(new_child, child_state)) {
+        if (!uvg_encoder_state_init(new_child, child_state)) {
           fprintf(stderr, "Unable to init child...\n");
           return 0;
         }
@@ -610,10 +610,10 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
         child_state->lcu_order[i].position_px.y = child_state->lcu_order[i].position.y * LCU_WIDTH;
         child_state->lcu_order[i].size.x = MIN(LCU_WIDTH, encoder->in.width - (child_state->tile->lcu_offset_x * LCU_WIDTH + child_state->lcu_order[i].position_px.x));
         child_state->lcu_order[i].size.y = MIN(LCU_WIDTH, encoder->in.height - (child_state->tile->lcu_offset_y * LCU_WIDTH + child_state->lcu_order[i].position_px.y));
-        child_state->lcu_order[i].first_row = kvz_lcu_in_first_row(child_state, child_state->tile->lcu_offset_in_ts + lcu_id);
-        child_state->lcu_order[i].last_row = kvz_lcu_in_last_row(child_state, child_state->tile->lcu_offset_in_ts + lcu_id);
-        child_state->lcu_order[i].first_column = kvz_lcu_in_first_column(child_state, child_state->tile->lcu_offset_in_ts + lcu_id);
-        child_state->lcu_order[i].last_column = kvz_lcu_in_last_column(child_state, child_state->tile->lcu_offset_in_ts + lcu_id);
+        child_state->lcu_order[i].first_row = uvg_lcu_in_first_row(child_state, child_state->tile->lcu_offset_in_ts + lcu_id);
+        child_state->lcu_order[i].last_row = uvg_lcu_in_last_row(child_state, child_state->tile->lcu_offset_in_ts + lcu_id);
+        child_state->lcu_order[i].first_column = uvg_lcu_in_first_column(child_state, child_state->tile->lcu_offset_in_ts + lcu_id);
+        child_state->lcu_order[i].last_column = uvg_lcu_in_last_column(child_state, child_state->tile->lcu_offset_in_ts + lcu_id);
         
         child_state->lcu_order[i].above = NULL;
         child_state->lcu_order[i].below = NULL;
@@ -677,17 +677,17 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
     }
   }
   
-#ifdef KVZ_DEBUG_PRINT_THREADING_INFO
-  if (!parent_state) kvz_dbg_encoder_state_dump_graphviz(child_state);
-#endif //KVZ_DEBUG_PRINT_THREADING_INFO
+#ifdef UVG_DEBUG_PRINT_THREADING_INFO
+  if (!parent_state) uvg_dbg_encoder_state_dump_graphviz(child_state);
+#endif //UVG_DEBUG_PRINT_THREADING_INFO
   return 1;
 }
 
-void kvz_encoder_state_finalize(encoder_state_t * const state) {
+void uvg_encoder_state_finalize(encoder_state_t * const state) {
   if (state->children) {
     int i=0;
     for (i = 0; state->children[i].encoder_control; ++i) {
-      kvz_encoder_state_finalize(&state->children[i]);
+      uvg_encoder_state_finalize(&state->children[i]);
     }
 
     FREE_POINTER(state->children);
@@ -720,16 +720,16 @@ void kvz_encoder_state_finalize(encoder_state_t * const state) {
   
   if (state->constraint) {
     // End of the constraint structure
-    kvz_constraint_free(state);
+    uvg_constraint_free(state);
   }
 
-  kvz_bitstream_finalize(&state->stream);
+  uvg_bitstream_finalize(&state->stream);
 
-  kvz_threadqueue_free_job(&state->tqj_recon_done);
-  kvz_threadqueue_free_job(&state->tqj_bitstream_written);
+  uvg_threadqueue_free_job(&state->tqj_recon_done);
+  uvg_threadqueue_free_job(&state->tqj_bitstream_written);
   if (state->encoder_control->cfg.alf_type && state->encoder_control->cfg.wpp) {
     encoder_state_t* parent = state;
     while (parent->parent) parent = parent->parent;
-    kvz_threadqueue_free_job(&parent->tqj_alf_process);
+    uvg_threadqueue_free_job(&parent->tqj_alf_process);
   }
 }

@@ -44,11 +44,11 @@
  * \param size  initial array size
  * \return image_list pointer, NULL on failure
  */
-image_list_t * kvz_image_list_alloc(int size)
+image_list_t * uvg_image_list_alloc(int size)
 {
   image_list_t *list = (image_list_t *)malloc(sizeof(image_list_t));
   list->size      = size;
-  list->images    = malloc(sizeof(kvz_picture*)  * size);
+  list->images    = malloc(sizeof(uvg_picture*)  * size);
   list->cu_arrays = malloc(sizeof(cu_array_t*)   * size);
   list->pocs      = malloc(sizeof(int32_t)       * size);
   list->ref_LXs   = malloc(sizeof(*list->ref_LXs) * size);
@@ -63,9 +63,9 @@ image_list_t * kvz_image_list_alloc(int size)
  * \param size  new array size
  * \return 1 on success, 0 on failure
  */
-int kvz_image_list_resize(image_list_t *list, unsigned size)
+int uvg_image_list_resize(image_list_t *list, unsigned size)
 {
-  list->images = (kvz_picture**)realloc(list->images, sizeof(kvz_picture*) * size);
+  list->images = (uvg_picture**)realloc(list->images, sizeof(uvg_picture*) * size);
   list->cu_arrays = (cu_array_t**)realloc(list->cu_arrays, sizeof(cu_array_t*) * size);
   list->pocs = realloc(list->pocs, sizeof(int32_t) * size);
   list->ref_LXs = realloc(list->ref_LXs, sizeof(*list->ref_LXs) * size);
@@ -78,14 +78,14 @@ int kvz_image_list_resize(image_list_t *list, unsigned size)
  * \param list image_list pointer
  * \return 1 on success, 0 on failure
  */
-int kvz_image_list_destroy(image_list_t *list)
+int uvg_image_list_destroy(image_list_t *list)
 {
   unsigned int i;
   if (list->used_size > 0) {
     for (i = 0; i < list->used_size; ++i) {
-      kvz_image_free(list->images[i]);
+      uvg_image_free(list->images[i]);
       list->images[i] = NULL;
-      kvz_cu_array_free(&list->cu_arrays[i]);
+      uvg_cu_array_free(&list->cu_arrays[i]);
       list->cu_arrays[i] = NULL;
       list->pocs[i] = 0;
       for (int j = 0; j < 16; j++) {
@@ -115,16 +115,16 @@ int kvz_image_list_destroy(image_list_t *list)
  * \param picture_list list to use
  * \return 1 on success
  */
-int kvz_image_list_add(image_list_t *list, kvz_picture *im, cu_array_t *cua, int32_t poc, uint8_t ref_LX[2][16])
+int uvg_image_list_add(image_list_t *list, uvg_picture *im, cu_array_t *cua, int32_t poc, uint8_t ref_LX[2][16])
 {
   int i = 0;
-  if (KVZ_ATOMIC_INC(&(im->refcount)) == 1) {
+  if (UVG_ATOMIC_INC(&(im->refcount)) == 1) {
     fprintf(stderr, "Tried to add an unreferenced picture. This is a bug!\n");
     assert(0); //Stop for debugging
     return 0;
   }
   
-  if (KVZ_ATOMIC_INC(&(cua->refcount)) == 1) {
+  if (UVG_ATOMIC_INC(&(cua->refcount)) == 1) {
     fprintf(stderr, "Tried to add an unreferenced cu_array. This is a bug!\n");
     assert(0); //Stop for debugging
     return 0;
@@ -132,7 +132,7 @@ int kvz_image_list_add(image_list_t *list, kvz_picture *im, cu_array_t *cua, int
 
   if (list->size == list->used_size) {
     unsigned new_size = MAX(list->size + 1, list->size * 2);
-    if (!kvz_image_list_resize(list, new_size)) return 0;
+    if (!uvg_image_list_resize(list, new_size)) return 0;
   }
   
   for (i = list->used_size; i > 0; i--) {
@@ -163,7 +163,7 @@ int kvz_image_list_add(image_list_t *list, kvz_picture *im, cu_array_t *cua, int
  * \param n index to remove
  * \return 1 on success
  */
-int kvz_image_list_rem(image_list_t * const list, const unsigned n)
+int uvg_image_list_rem(image_list_t * const list, const unsigned n)
 {
   // Must be within list boundaries
   if (n >= list->used_size)
@@ -171,9 +171,9 @@ int kvz_image_list_rem(image_list_t * const list, const unsigned n)
     return 0;
   }
 
-  kvz_image_free(list->images[n]);
+  uvg_image_free(list->images[n]);
 
-  kvz_cu_array_free(&list->cu_arrays[n]);
+  uvg_cu_array_free(&list->cu_arrays[n]);
 
   // The last item is easy to remove
   if (n == list->used_size - 1) {
@@ -210,14 +210,14 @@ int kvz_image_list_rem(image_list_t * const list, const unsigned n)
   return 1;
 }
 
-int kvz_image_list_copy_contents(image_list_t *target, image_list_t *source) {
+int uvg_image_list_copy_contents(image_list_t *target, image_list_t *source) {
   int i;
   while (target->used_size > 0) {
-    kvz_image_list_rem(target, 0);
+    uvg_image_list_rem(target, 0);
   }
   
   for (i = source->used_size - 1; i >= 0; --i) {
-    kvz_image_list_add(target, source->images[i], source->cu_arrays[i], source->pocs[i], source->ref_LXs[i]);
+    uvg_image_list_add(target, source->images[i], source->cu_arrays[i], source->pocs[i], source->ref_LXs[i]);
   }
   return 1;
 }

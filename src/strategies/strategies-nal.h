@@ -43,7 +43,7 @@
 #include "nal.h"
 
 
-//Function pointer to kvz_array_checksum
+//Function pointer to uvg_array_checksum
 /**
  * \brief Calculate checksum for one color of the picture.
  * \param data Beginning of the pixel data for the picture.
@@ -51,19 +51,19 @@
  * \param width Width of the picture.
  * \param stride Width of one row in the pixel array.
  */
-typedef void (*array_checksum_func)(const kvz_pixel* data,
+typedef void (*array_checksum_func)(const uvg_pixel* data,
                                     const int height, const int width,
                                     const int stride,
                                     unsigned char checksum_out[SEI_HASH_MAX_LENGTH], const uint8_t bitdepth);
-extern array_checksum_func kvz_array_checksum;
-extern array_checksum_func kvz_array_md5;
+extern array_checksum_func uvg_array_checksum;
+extern array_checksum_func uvg_array_md5;
 
 
-int kvz_strategy_register_nal(void* opaque, uint8_t bitdepth);
+int uvg_strategy_register_nal(void* opaque, uint8_t bitdepth);
 
 
 #define STRATEGIES_NAL_EXPORTS \
-  {"array_checksum", (void**) &kvz_array_checksum},\
-  {"array_md5", (void**) &kvz_array_md5},
+  {"array_checksum", (void**) &uvg_array_checksum},\
+  {"array_md5", (void**) &uvg_array_md5},
 
 #endif //STRATEGIES_NAL_H_

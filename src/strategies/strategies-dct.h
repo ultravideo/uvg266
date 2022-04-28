@@ -45,19 +45,19 @@ typedef unsigned (dct_func)(int8_t bitdepth, const int16_t *input, int16_t *outp
 
 
 // Declare function pointers.
-extern dct_func * kvz_fast_forward_dst_4x4;
+extern dct_func * uvg_fast_forward_dst_4x4;
 
-extern dct_func * kvz_dct_4x4;
-extern dct_func * kvz_dct_8x8;
-extern dct_func * kvz_dct_16x16;
-extern dct_func * kvz_dct_32x32;
+extern dct_func * uvg_dct_4x4;
+extern dct_func * uvg_dct_8x8;
+extern dct_func * uvg_dct_16x16;
+extern dct_func * uvg_dct_32x32;
 
-extern dct_func * kvz_fast_inverse_dst_4x4;
+extern dct_func * uvg_fast_inverse_dst_4x4;
 
-extern dct_func * kvz_idct_4x4;
-extern dct_func * kvz_idct_8x8;
-extern dct_func * kvz_idct_16x16;
-extern dct_func * kvz_idct_32x32;
+extern dct_func * uvg_idct_4x4;
+extern dct_func * uvg_idct_8x8;
+extern dct_func * uvg_idct_16x16;
+extern dct_func * uvg_idct_32x32;
 
 typedef void (mts_dct_func)(
   int8_t bitdepth,
@@ -68,7 +68,7 @@ typedef void (mts_dct_func)(
   int16_t* output,
   const int8_t mts_idx);
 
-extern mts_dct_func* kvz_mts_dct;
+extern mts_dct_func* uvg_mts_dct;
 
 typedef void (mts_idct_func)(
   int8_t bitdepth,
@@ -79,30 +79,30 @@ typedef void (mts_idct_func)(
   int16_t* output,
   const int8_t mts_idx);
 
-extern mts_idct_func* kvz_mts_idct;
+extern mts_idct_func* uvg_mts_idct;
 
-int kvz_strategy_register_dct(void* opaque, uint8_t bitdepth);
-dct_func * kvz_get_dct_func(int8_t width, color_t color, cu_type_t type);
-dct_func * kvz_get_idct_func(int8_t width, color_t color, cu_type_t type);
+int uvg_strategy_register_dct(void* opaque, uint8_t bitdepth);
+dct_func * uvg_get_dct_func(int8_t width, color_t color, cu_type_t type);
+dct_func * uvg_get_idct_func(int8_t width, color_t color, cu_type_t type);
 
 
 
 #define STRATEGIES_DCT_EXPORTS \
-  {"fast_forward_dst_4x4", (void**) &kvz_fast_forward_dst_4x4}, \
+  {"fast_forward_dst_4x4", (void**) &uvg_fast_forward_dst_4x4}, \
   \
-  {"dct_4x4", (void**) &kvz_dct_4x4}, \
-  {"dct_8x8", (void**) &kvz_dct_8x8}, \
-  {"dct_16x16", (void**) &kvz_dct_16x16}, \
-  {"dct_32x32", (void**) &kvz_dct_32x32}, \
+  {"dct_4x4", (void**) &uvg_dct_4x4}, \
+  {"dct_8x8", (void**) &uvg_dct_8x8}, \
+  {"dct_16x16", (void**) &uvg_dct_16x16}, \
+  {"dct_32x32", (void**) &uvg_dct_32x32}, \
   \
-  {"fast_inverse_dst_4x4", (void**) &kvz_fast_inverse_dst_4x4}, \
+  {"fast_inverse_dst_4x4", (void**) &uvg_fast_inverse_dst_4x4}, \
   \
-  {"idct_4x4", (void**)&kvz_idct_4x4}, \
-  {"idct_8x8", (void**)&kvz_idct_8x8}, \
-  {"idct_16x16", (void**)&kvz_idct_16x16}, \
-  {"idct_32x32", (void**)&kvz_idct_32x32}, \
-  {"mts_dct",  (void**)&kvz_mts_dct }, \
-  {"mts_idct", (void**)&kvz_mts_idct }, \
+  {"idct_4x4", (void**)&uvg_idct_4x4}, \
+  {"idct_8x8", (void**)&uvg_idct_8x8}, \
+  {"idct_16x16", (void**)&uvg_idct_16x16}, \
+  {"idct_32x32", (void**)&uvg_idct_32x32}, \
+  {"mts_dct",  (void**)&uvg_mts_dct }, \
+  {"mts_idct", (void**)&uvg_mts_idct }, \
 
 
 

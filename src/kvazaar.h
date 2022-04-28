@@ -45,132 +45,132 @@
 extern "C" {
 #endif
 
-#if defined(KVZ_DLL_EXPORTS)
+#if defined(UVG_DLL_EXPORTS)
   #if !defined(PIC)
     // Building static kvazaar library.
-    #define KVZ_PUBLIC
+    #define UVG_PUBLIC
   #elif defined(_WIN32) || defined(__CYGWIN__)
     // Building kvazaar DLL on Windows.
-    #define KVZ_PUBLIC __declspec(dllexport)
+    #define UVG_PUBLIC __declspec(dllexport)
   #elif defined(__GNUC__)
     // Building kvazaar shared library with GCC.
-    #define KVZ_PUBLIC __attribute__ ((visibility ("default")))
+    #define UVG_PUBLIC __attribute__ ((visibility ("default")))
   #else
-    #define KVZ_PUBLIC
+    #define UVG_PUBLIC
   #endif
 #else
-  #if defined(KVZ_STATIC_LIB)
+  #if defined(UVG_STATIC_LIB)
     // Using static kvazaar library.
-    #define KVZ_PUBLIC
+    #define UVG_PUBLIC
   #elif defined(_WIN32) || defined(__CYGWIN__)
     // Using kvazaar DLL on Windows.
-    #define KVZ_PUBLIC __declspec(dllimport)
+    #define UVG_PUBLIC __declspec(dllimport)
   #else
     // Using kvazaar shared library and not on Windows.
-    #define KVZ_PUBLIC
+    #define UVG_PUBLIC
   #endif
 #endif
 
 /**
  * Maximum length of a GoP structure.
  */
-#define KVZ_MAX_GOP_LENGTH 32
+#define UVG_MAX_GOP_LENGTH 32
 
  /**
  * Maximum amount of GoP layers.
  */
-#define KVZ_MAX_GOP_LAYERS 6
+#define UVG_MAX_GOP_LAYERS 6
 
 /**
  * Size of data chunks.
  */
-#define KVZ_DATA_CHUNK_SIZE 4096
+#define UVG_DATA_CHUNK_SIZE 4096
 
-#ifndef KVZ_BIT_DEPTH
-#define KVZ_BIT_DEPTH 8
+#ifndef UVG_BIT_DEPTH
+#define UVG_BIT_DEPTH 8
 #endif
 
-#if KVZ_BIT_DEPTH == 8
-typedef uint8_t kvz_pixel;
+#if UVG_BIT_DEPTH == 8
+typedef uint8_t uvg_pixel;
 #else
-typedef uint16_t kvz_pixel;
+typedef uint16_t uvg_pixel;
 #endif
 
-typedef int16_t kvz_pixel_im;  // For intermediate precision (interpolation/bipred).
+typedef int16_t uvg_pixel_im;  // For intermediate precision (interpolation/bipred).
 
 /**
  * \brief Opaque data structure representing one instance of the encoder.
  */
-typedef struct kvz_encoder kvz_encoder;
+typedef struct uvg_encoder uvg_encoder;
 
 /**
  * \brief Integer motion estimation algorithms.
  */
-enum kvz_ime_algorithm {
-  KVZ_IME_HEXBS = 0,
-  KVZ_IME_TZ = 1,
-  KVZ_IME_FULL = 2,
-  KVZ_IME_FULL8 = 3, //! \since 3.6.0
-  KVZ_IME_FULL16 = 4, //! \since 3.6.0
-  KVZ_IME_FULL32 = 5, //! \since 3.6.0
-  KVZ_IME_FULL64 = 6, //! \since 3.6.0
-  KVZ_IME_DIA = 7, // Experimental. TODO: change into a proper doc comment
+enum uvg_ime_algorithm {
+  UVG_IME_HEXBS = 0,
+  UVG_IME_TZ = 1,
+  UVG_IME_FULL = 2,
+  UVG_IME_FULL8 = 3, //! \since 3.6.0
+  UVG_IME_FULL16 = 4, //! \since 3.6.0
+  UVG_IME_FULL32 = 5, //! \since 3.6.0
+  UVG_IME_FULL64 = 6, //! \since 3.6.0
+  UVG_IME_DIA = 7, // Experimental. TODO: change into a proper doc comment
 };
 
 /**
  * \brief Interlacing methods.
  * \since 3.2.0
  */
-enum kvz_interlacing
+enum uvg_interlacing
 {
-  KVZ_INTERLACING_NONE = 0,
-  KVZ_INTERLACING_TFF = 1, // top field first
-  KVZ_INTERLACING_BFF = 2, // bottom field first
+  UVG_INTERLACING_NONE = 0,
+  UVG_INTERLACING_TFF = 1, // top field first
+  UVG_INTERLACING_BFF = 2, // bottom field first
 };
 
 /**
 * \brief Constrain movement vectors.
 * \since 3.3.0
 */
-enum kvz_mv_constraint
+enum uvg_mv_constraint
 {
-  KVZ_MV_CONSTRAIN_NONE = 0,
-  KVZ_MV_CONSTRAIN_FRAME = 1,  // Don't refer outside the frame.
-  KVZ_MV_CONSTRAIN_TILE = 2,  // Don't refer to other tiles.
-  KVZ_MV_CONSTRAIN_FRAME_AND_TILE = 3,  // Don't refer outside the tile.
-  KVZ_MV_CONSTRAIN_FRAME_AND_TILE_MARGIN = 4,  // Keep enough margin for fractional pixel margins not to refer outside the tile.
+  UVG_MV_CONSTRAIN_NONE = 0,
+  UVG_MV_CONSTRAIN_FRAME = 1,  // Don't refer outside the frame.
+  UVG_MV_CONSTRAIN_TILE = 2,  // Don't refer to other tiles.
+  UVG_MV_CONSTRAIN_FRAME_AND_TILE = 3,  // Don't refer outside the tile.
+  UVG_MV_CONSTRAIN_FRAME_AND_TILE_MARGIN = 4,  // Keep enough margin for fractional pixel margins not to refer outside the tile.
 };
 
 /**
 * \brief Constrain movement vectors.
 * \since 3.5.0
 */
-enum kvz_hash
+enum uvg_hash
 {
-  KVZ_HASH_NONE = 0,
-  KVZ_HASH_CHECKSUM = 1,
-  KVZ_HASH_MD5 = 2,
+  UVG_HASH_NONE = 0,
+  UVG_HASH_CHECKSUM = 1,
+  UVG_HASH_MD5 = 2,
 };
 
 /**
 * \brief cu split termination mode
 * \since since 3.8.0
 */
-enum kvz_cu_split_termination
+enum uvg_cu_split_termination
 {
-  KVZ_CU_SPLIT_TERMINATION_ZERO = 0,
-  KVZ_CU_SPLIT_TERMINATION_OFF = 1
+  UVG_CU_SPLIT_TERMINATION_ZERO = 0,
+  UVG_CU_SPLIT_TERMINATION_OFF = 1
 };
 
 /**
 * \brief me early termination mode
 * \since since 3.8.0
 */
-enum kvz_me_early_termination
+enum uvg_me_early_termination
 {
-  KVZ_ME_EARLY_TERMINATION_OFF = 0,
-  KVZ_ME_EARLY_TERMINATION_ON = 1,
-  KVZ_ME_EARLY_TERMINATION_SENSITIVE = 2
+  UVG_ME_EARLY_TERMINATION_OFF = 0,
+  UVG_ME_EARLY_TERMINATION_ON = 1,
+  UVG_ME_EARLY_TERMINATION_SENSITIVE = 2
 };
 
 
@@ -180,53 +180,53 @@ enum kvz_me_early_termination
  * interleaved formats in the future.
  * \since 3.12.0
  */
-enum kvz_input_format {
-  KVZ_FORMAT_P400 = 0,
-  KVZ_FORMAT_P420 = 1,
-  KVZ_FORMAT_P422 = 2,
-  KVZ_FORMAT_P444 = 3,
+enum uvg_input_format {
+  UVG_FORMAT_P400 = 0,
+  UVG_FORMAT_P420 = 1,
+  UVG_FORMAT_P422 = 2,
+  UVG_FORMAT_P444 = 3,
 };
 
 /**
 * \brief Chroma subsampling format used for encoding.
 * \since 3.12.0
 */
-enum kvz_chroma_format {
-  KVZ_CSP_400 = 0,
-  KVZ_CSP_420 = 1,
-  KVZ_CSP_422 = 2,
-  KVZ_CSP_444 = 3,
+enum uvg_chroma_format {
+  UVG_CSP_400 = 0,
+  UVG_CSP_420 = 1,
+  UVG_CSP_422 = 2,
+  UVG_CSP_444 = 3,
 };
 
 /**
  * \brief Chroma subsampling format used for encoding.
  * \since 3.15.0
  */
-enum kvz_slices {
-  KVZ_SLICES_NONE,
-  KVZ_SLICES_TILES = (1 << 0), /*!< \brief Put each tile in a slice. */
-  KVZ_SLICES_WPP   = (1 << 1), /*!< \brief Put each row in a slice. */
+enum uvg_slices {
+  UVG_SLICES_NONE,
+  UVG_SLICES_TILES = (1 << 0), /*!< \brief Put each tile in a slice. */
+  UVG_SLICES_WPP   = (1 << 1), /*!< \brief Put each row in a slice. */
 };
 
-enum kvz_sao {
-  KVZ_SAO_OFF = 0,
-  KVZ_SAO_EDGE = 1,
-  KVZ_SAO_BAND = 2,
-  KVZ_SAO_FULL = 3
+enum uvg_sao {
+  UVG_SAO_OFF = 0,
+  UVG_SAO_EDGE = 1,
+  UVG_SAO_BAND = 2,
+  UVG_SAO_FULL = 3
 };
 
-enum kvz_alf {
-  KVZ_ALF_OFF = 0,
-  KVZ_ALF_NO_CC_ALF = 1,
-  KVZ_ALF_FULL = 2
+enum uvg_alf {
+  UVG_ALF_OFF = 0,
+  UVG_ALF_NO_CC_ALF = 1,
+  UVG_ALF_FULL = 2
 };
 
-enum kvz_mts {
-  KVZ_MTS_OFF = 0,
-  KVZ_MTS_INTRA = 1,
-  KVZ_MTS_INTER = 2,
-  KVZ_MTS_BOTH = 3,
-  KVZ_MTS_IMPLICIT = 4,
+enum uvg_mts {
+  UVG_MTS_OFF = 0,
+  UVG_MTS_INTRA = 1,
+  UVG_MTS_INTER = 2,
+  UVG_MTS_BOTH = 3,
+  UVG_MTS_IMPLICIT = 4,
 };
 
 
@@ -239,41 +239,41 @@ typedef enum tr_type_t {
   DCT2_MTS = 4
 } tr_type_t;
 
-enum kvz_scalinglist {
-  KVZ_SCALING_LIST_OFF = 0,
-  KVZ_SCALING_LIST_CUSTOM = 1,
-  KVZ_SCALING_LIST_DEFAULT = 2,  
+enum uvg_scalinglist {
+  UVG_SCALING_LIST_OFF = 0,
+  UVG_SCALING_LIST_CUSTOM = 1,
+  UVG_SCALING_LIST_DEFAULT = 2,  
 };
 
-enum kvz_rc_algorithm
+enum uvg_rc_algorithm
 {
-  KVZ_NO_RC = 0,
-  KVZ_LAMBDA = 1,
-  KVZ_OBA = 2,
+  UVG_NO_RC = 0,
+  UVG_LAMBDA = 1,
+  UVG_OBA = 2,
 };
 
-enum kvz_file_format
+enum uvg_file_format
 {
-  KVZ_FORMAT_AUTO = 0,
-  KVZ_FORMAT_Y4M = 1,
-  KVZ_FORMAT_YUV = 2
+  UVG_FORMAT_AUTO = 0,
+  UVG_FORMAT_Y4M = 1,
+  UVG_FORMAT_YUV = 2
 };
 
-enum kvz_amvr_resolution
+enum uvg_amvr_resolution
 {
-  KVZ_IMV_OFF     = 0,
-  KVZ_IMV_FPEL    = 1,
-  KVZ_IMV_4PEL    = 2,
-  KVZ_IMV_HPEL    = 3
+  UVG_IMV_OFF     = 0,
+  UVG_IMV_FPEL    = 1,
+  UVG_IMV_4PEL    = 2,
+  UVG_IMV_HPEL    = 3
 };
 
 // Map from input format to chroma format.
-#define KVZ_FORMAT2CSP(format) ((enum kvz_chroma_format)format)
+#define UVG_FORMAT2CSP(format) ((enum uvg_chroma_format)format)
 
 /**
  * \brief GoP picture configuration.
  */
-typedef struct kvz_gop_config {
+typedef struct uvg_gop_config {
   double qp_factor;
   int8_t qp_offset;    /*!< \brief QP offset */
   int8_t poc_offset;   /*!< \brief POC offset */
@@ -285,7 +285,7 @@ typedef struct kvz_gop_config {
   int8_t ref_neg[16];  /*!< \brief reference picture offset list */
   double qp_model_offset;
   double qp_model_scale;
-} kvz_gop_config;
+} uvg_gop_config;
 
 /**
  * \brief Struct which contains all configuration data
@@ -294,7 +294,7 @@ typedef struct kvz_gop_config {
  * maintain ABI compatibility. Do not copy this struct, as the size might
  * change.
  */
-typedef struct kvz_config
+typedef struct uvg_config
 {
   int32_t qp;        /*!< \brief Quantization parameter */
   int32_t intra_period; /*!< \brief the period of intra frames in stream */
@@ -316,8 +316,8 @@ typedef struct kvz_config
   int32_t framerate_denom; /*!< \brief Framerate denominator */
   int32_t lmcs_enable;   /*!< \brief Flag to enable luma mapping with chroma scaling - filter */
   int32_t deblock_enable; /*!< \brief Flag to enable deblocking filter */
-  enum kvz_sao sao_type;     /*!< \brief Flag to enable sample adaptive offset filter */
-  enum kvz_alf alf_type;     /*!< \brief Flag to enable adaptive loop filter */
+  enum uvg_sao sao_type;     /*!< \brief Flag to enable sample adaptive offset filter */
+  enum uvg_alf alf_type;     /*!< \brief Flag to enable adaptive loop filter */
   int32_t alf_info_in_ph_flag; /*!< \brief Flag to enable if ALF is applied to all slices in picture */
   int32_t alf_slice_enable_flag[3/*MAX_NUM_COMPONENT*/];
   int32_t alf_non_linear_luma;    /*!< \brief Flag to enable non linear alf for luma */
@@ -331,10 +331,10 @@ typedef struct kvz_config
   int32_t full_intra_search; /*!< \brief If true, don't skip modes in intra search. */
   int32_t trskip_enable;    /*!< \brief Flag to enable transform skip. */
   int32_t trskip_max_size;    /*!< \brief Transform skip max block size. */
-  enum kvz_mts mts;        /*< \brief flag to enable multiple transform selection*/
+  enum uvg_mts mts;        /*< \brief flag to enable multiple transform selection*/
   int32_t mts_implicit;        /*< \brief flag to enable implicit multiple transform selection*/
   int32_t tr_depth_intra; /*!< \brief Maximum transform depth for intra. */
-  enum kvz_ime_algorithm ime_algorithm;  /*!< \brief Integer motion estimation algorithm. */
+  enum uvg_ime_algorithm ime_algorithm;  /*!< \brief Integer motion estimation algorithm. */
   int32_t fme_level;      /*!< \brief Fractional pixel motion estimation level (0: disabled, 1: enabled). */
   int8_t source_scan_type; /*!< \brief Source scan type (0: progressive, 1: top field first, 2: bottom field first).*/
   int32_t bipred;         /*!< \brief Bi-prediction (0: disabled, 1: enabled). */
@@ -371,26 +371,26 @@ typedef struct kvz_config
   int32_t cpuid;
 
   struct {
-    int32_t min[KVZ_MAX_GOP_LAYERS];
-    int32_t max[KVZ_MAX_GOP_LAYERS];
+    int32_t min[UVG_MAX_GOP_LAYERS];
+    int32_t max[UVG_MAX_GOP_LAYERS];
   } pu_depth_inter, pu_depth_intra;
 
   int32_t add_encoder_info;
   int8_t gop_len;            /*!< \brief length of GOP for the video sequence */
   int8_t gop_lowdelay;       /*!< \brief specifies that the GOP does not use future pictures */
-  kvz_gop_config gop[KVZ_MAX_GOP_LENGTH];  /*!< \brief Array of GOP settings */
+  uvg_gop_config gop[UVG_MAX_GOP_LENGTH];  /*!< \brief Array of GOP settings */
 
   int32_t target_bitrate;
 
   int8_t mv_rdo;            /*!< \brief MV RDO calculation in search (0: estimation, 1: RDO). */
   int8_t calc_psnr;         /*!< \since 3.1.0 \brief Print PSNR in CLI. */
 
-  enum kvz_mv_constraint mv_constraint;  /*!< \since 3.3.0 \brief Constrain movement vectors. */
-  enum kvz_hash hash;  /*!< \since 3.5.0 \brief What hash algorithm to use. */
+  enum uvg_mv_constraint mv_constraint;  /*!< \since 3.3.0 \brief Constrain movement vectors. */
+  enum uvg_hash hash;  /*!< \since 3.5.0 \brief What hash algorithm to use. */
 
-  enum kvz_cu_split_termination cu_split_termination; /*!< \since 3.8.0 \brief Mode of cu split termination. */
+  enum uvg_cu_split_termination cu_split_termination; /*!< \since 3.8.0 \brief Mode of cu split termination. */
 
-  enum kvz_me_early_termination me_early_termination; /*!< \since 3.8.0 \brief Mode of me early termination. */
+  enum uvg_me_early_termination me_early_termination; /*!< \since 3.8.0 \brief Mode of me early termination. */
   int32_t intra_rdo_et; /*!< \since 4.1.0 \brief Use early termination in intra rdo. */
 
   int32_t lossless; /*!< \brief Use lossless coding. */
@@ -399,7 +399,7 @@ typedef struct kvz_config
 
   int32_t rdoq_skip; /*!< \brief Mode of rdoq skip */
 
-  enum kvz_input_format input_format; /*!< \brief Use Temporal Motion Vector Predictors. */
+  enum uvg_input_format input_format; /*!< \brief Use Temporal Motion Vector Predictors. */
   int32_t input_bitdepth; /*!< \brief Use Temporal Motion Vector Predictors. */
 
   struct {
@@ -485,7 +485,7 @@ typedef struct kvz_config
 
   uint8_t clip_neighbour;
 
-  enum kvz_file_format file_format;
+  enum uvg_file_format file_format;
 
   char *stats_file_prefix;
 
@@ -526,94 +526,94 @@ typedef struct kvz_config
   int8_t cclm;
 
   int8_t amvr; /* \brief Adaptive motion vector resolution parameter */
-} kvz_config;
+} uvg_config;
 
 /**
  * \brief Struct which contains all picture data
  *
- * Function picture_alloc in kvz_api must be used for allocation.
+ * Function picture_alloc in uvg_api must be used for allocation.
  */
-typedef struct kvz_picture {
-  kvz_pixel *fulldata_buf;     //!< \brief Allocated buffer with padding (only used in the base_image)
-  kvz_pixel *fulldata;         //!< \brief Allocated buffer portion that's actually used
+typedef struct uvg_picture {
+  uvg_pixel *fulldata_buf;     //!< \brief Allocated buffer with padding (only used in the base_image)
+  uvg_pixel *fulldata;         //!< \brief Allocated buffer portion that's actually used
 
-  kvz_pixel *y;                //!< \brief Pointer to luma pixel array.
-  kvz_pixel *u;                //!< \brief Pointer to chroma U pixel array.
-  kvz_pixel *v;                //!< \brief Pointer to chroma V pixel array.
-  kvz_pixel *data[3]; //!< \brief Alternate access method to same data.
+  uvg_pixel *y;                //!< \brief Pointer to luma pixel array.
+  uvg_pixel *u;                //!< \brief Pointer to chroma U pixel array.
+  uvg_pixel *v;                //!< \brief Pointer to chroma V pixel array.
+  uvg_pixel *data[3]; //!< \brief Alternate access method to same data.
 
   int32_t width;           //!< \brief Luma pixel array width.
   int32_t height;          //!< \brief Luma pixel array height.
 
   int32_t stride;          //!< \brief Luma pixel array width for the full picture (should be used as stride)
 
-  struct kvz_picture *base_image; //!< \brief Pointer to the picture which owns the pixels
+  struct uvg_picture *base_image; //!< \brief Pointer to the picture which owns the pixels
   int32_t refcount;        //!< \brief Number of references to the picture
 
   int64_t pts;             //!< \brief Presentation timestamp. Should be set for input frames.
   int64_t dts;             //!< \brief Decompression timestamp.
 
-  enum kvz_interlacing interlacing; //!< \since 3.2.0 \brief Field order for interlaced pictures.
-  enum kvz_chroma_format chroma_format;
+  enum uvg_interlacing interlacing; //!< \since 3.2.0 \brief Field order for interlaced pictures.
+  enum uvg_chroma_format chroma_format;
 
   int32_t ref_pocs[16];
-} kvz_picture;
+} uvg_picture;
 
 /**
  * \brief NAL unit type codes.
  *
  * These are the nal_unit_type codes from Table 7-1 ITU-T H.265 v1.0.
  */
-enum kvz_nal_unit_type {
+enum uvg_nal_unit_type {
 
   // Coded slices
 
-  KVZ_NAL_TRAIL = 0,
-  KVZ_NAL_STSA = 1,
-  KVZ_NAL_RADL = 2,
-  KVZ_NAL_RASL = 3,
+  UVG_NAL_TRAIL = 0,
+  UVG_NAL_STSA = 1,
+  UVG_NAL_RADL = 2,
+  UVG_NAL_RASL = 3,
 
   // Intra random access point pictures
-  KVZ_NAL_IDR_W_RADL = 7,
-  KVZ_NAL_IDR_N_LP = 8,
-  KVZ_NAL_CRA_NUT = 9,
-  KVZ_NAL_GDR_NUT = 10,
+  UVG_NAL_IDR_W_RADL = 7,
+  UVG_NAL_IDR_N_LP = 8,
+  UVG_NAL_CRA_NUT = 9,
+  UVG_NAL_GDR_NUT = 10,
 
 
   // non-VCL  
-  KVZ_NAL_VPS_NUT = 14,
-  KVZ_NAL_SPS_NUT = 15,
-  KVZ_NAL_PPS_NUT = 16,
+  UVG_NAL_VPS_NUT = 14,
+  UVG_NAL_SPS_NUT = 15,
+  UVG_NAL_PPS_NUT = 16,
   NAL_UNIT_PREFIX_APS = 17,
   NAL_UNIT_SUFFIX_APS = 18,
 
-  KVZ_NAL_AUD_NUT = 20,
+  UVG_NAL_AUD_NUT = 20,
 
-  KVZ_NAL_EOS_NUT = 21,
-  KVZ_NAL_EOB_NUT = 22,
-  KVZ_NAL_PREFIX_SEI_NUT = 23,
-  KVZ_NAL_SUFFIX_SEI_NUT = 24,
+  UVG_NAL_EOS_NUT = 21,
+  UVG_NAL_EOB_NUT = 22,
+  UVG_NAL_PREFIX_SEI_NUT = 23,
+  UVG_NAL_SUFFIX_SEI_NUT = 24,
   
 
 };
 
-enum kvz_slice_type {
-  KVZ_SLICE_B = 0,
-  KVZ_SLICE_P = 1,
-  KVZ_SLICE_I = 2,
+enum uvg_slice_type {
+  UVG_SLICE_B = 0,
+  UVG_SLICE_P = 1,
+  UVG_SLICE_I = 2,
 };
 
-enum kvz_split_mode {
-  KVZ_NO_SPLIT = 0,
-  KVZ_QUAD_SPLIT = 1,
-  KVZ_HORZ_SPLIT = 2,
-  KVZ_VERT_SPLIT = 3,
+enum uvg_split_mode {
+  UVG_NO_SPLIT = 0,
+  UVG_QUAD_SPLIT = 1,
+  UVG_HORZ_SPLIT = 2,
+  UVG_VERT_SPLIT = 3,
 };
 
 /**
  * \brief Other information about an encoded frame
  */
-typedef struct kvz_frame_info {
+typedef struct uvg_frame_info {
 
   /**
    * \brief Picture order count
@@ -628,12 +628,12 @@ typedef struct kvz_frame_info {
   /**
    * \brief Type of the NAL VCL unit
    */
-  enum kvz_nal_unit_type nal_unit_type;
+  enum uvg_nal_unit_type nal_unit_type;
 
   /**
    * \brief Type of the slice
    */
-  enum kvz_slice_type slice_type;
+  enum uvg_slice_type slice_type;
 
   /**
    * \brief Reference picture lists
@@ -648,37 +648,37 @@ typedef struct kvz_frame_info {
    */
   int ref_list_len[2];
 
-} kvz_frame_info;
+} uvg_frame_info;
 
 /**
  * \brief A linked list of chunks of data.
  *
  * Used for returning the encoded data.
  */
-typedef struct kvz_data_chunk {
+typedef struct uvg_data_chunk {
   /// \brief Buffer for the data.
-  uint8_t data[KVZ_DATA_CHUNK_SIZE];
+  uint8_t data[UVG_DATA_CHUNK_SIZE];
 
   /// \brief Number of bytes filled in this chunk.
   uint32_t len;
 
   /// \brief Next chunk in the list.
-  struct kvz_data_chunk *next;
-} kvz_data_chunk;
+  struct uvg_data_chunk *next;
+} uvg_data_chunk;
 
-typedef struct kvz_api {
+typedef struct uvg_api {
 
   /**
-   * \brief Allocate a kvz_config structure.
+   * \brief Allocate a uvg_config structure.
    *
    * The returned structure should be deallocated by calling config_destroy.
    *
    * \return allocated config, or NULL if allocation failed.
    */
-  kvz_config *  (*config_alloc)(void);
+  uvg_config *  (*config_alloc)(void);
 
   /**
-   * \brief Deallocate a kvz_config structure.
+   * \brief Deallocate a uvg_config structure.
    *
    * If cfg is NULL, do nothing. Otherwise, the given structure must have been
    * returned from config_alloc.
@@ -686,7 +686,7 @@ typedef struct kvz_api {
    * \param cfg   configuration
    * \return      1 on success, 0 on failure
    */
-  int           (*config_destroy)(kvz_config *cfg);
+  int           (*config_destroy)(uvg_config *cfg);
 
   /**
    * \brief Initialize a config structure
@@ -696,7 +696,7 @@ typedef struct kvz_api {
    * \param cfg   configuration
    * \return      1 on success, 0 on failure
    */
-  int           (*config_init)(kvz_config *cfg);
+  int           (*config_init)(uvg_config *cfg);
 
   /**
    * \brief Set an option.
@@ -706,26 +706,26 @@ typedef struct kvz_api {
    * \param value value to set
    * \return      1 on success, 0 on failure
    */
-  int           (*config_parse)(kvz_config *cfg, const char *name, const char *value);
+  int           (*config_parse)(uvg_config *cfg, const char *name, const char *value);
 
   /**
-   * \brief Allocate a kvz_picture.
+   * \brief Allocate a uvg_picture.
    *
-   * The returned kvz_picture should be deallocated by calling picture_free.
+   * The returned uvg_picture should be deallocated by calling picture_free.
    *
    * \param width   width of luma pixel array to allocate
    * \param height  height of luma pixel array to allocate
    * \return        allocated picture, or NULL if allocation failed.
    */
-  kvz_picture * (*picture_alloc)(int32_t width, int32_t height);
+  uvg_picture * (*picture_alloc)(int32_t width, int32_t height);
 
   /**
-   * \brief Deallocate a kvz_picture.
+   * \brief Deallocate a uvg_picture.
    *
    * If pic is NULL, do nothing. Otherwise, the picture must have been returned
    * from picture_alloc.
    */
-  void          (*picture_free)(kvz_picture *pic);
+  void          (*picture_free)(uvg_picture *pic);
 
   /**
    * \brief Deallocate a list of data chunks.
@@ -733,7 +733,7 @@ typedef struct kvz_api {
    * Deallocates the given chunk and all chunks that follow it in the linked
    * list.
    */
-  void          (*chunk_free)(kvz_data_chunk *chunk);
+  void          (*chunk_free)(uvg_data_chunk *chunk);
 
   /**
    * \brief Create an encoder.
@@ -745,7 +745,7 @@ typedef struct kvz_api {
    * \param cfg   encoder configuration
    * \return      g_created encoder, or NULL if creation failed.
    */
-  kvz_encoder * (*encoder_open)(const kvz_config *cfg);
+  uvg_encoder * (*encoder_open)(const uvg_config *cfg);
 
   /**
    * \brief Deallocate an encoder.
@@ -753,7 +753,7 @@ typedef struct kvz_api {
    * If encoder is NULL, do nothing. Otherwise, the encoder must have been
    * returned from encoder_open.
    */
-  void          (*encoder_close)(kvz_encoder *encoder);
+  void          (*encoder_close)(uvg_encoder *encoder);
 
   /**
    * \brief Get parameter sets.
@@ -771,8 +771,8 @@ typedef struct kvz_api {
    * \param len_out   Returns number of bytes in the encoded data.
    * \return          1 on success, 0 on error.
    */
-  int           (*encoder_headers)(kvz_encoder *encoder,
-                                   kvz_data_chunk **data_out,
+  int           (*encoder_headers)(uvg_encoder *encoder,
+                                   uvg_data_chunk **data_out,
                                    uint32_t *len_out);
 
   /**
@@ -805,18 +805,18 @@ typedef struct kvz_api {
    * \param info_out  Returns information about the encoded picture.
    * \return          1 on success, 0 on error.
    */
-  int           (*encoder_encode)(kvz_encoder *encoder,
-                                  kvz_picture *pic_in,
-                                  kvz_data_chunk **data_out,
+  int           (*encoder_encode)(uvg_encoder *encoder,
+                                  uvg_picture *pic_in,
+                                  uvg_data_chunk **data_out,
                                   uint32_t *len_out,
-                                  kvz_picture **pic_out,
-                                  kvz_picture **src_out,
-                                  kvz_frame_info *info_out);
+                                  uvg_picture **pic_out,
+                                  uvg_picture **src_out,
+                                  uvg_frame_info *info_out);
 
   /**
-   * \brief Allocate a kvz_picture.
+   * \brief Allocate a uvg_picture.
    *
-   * The returned kvz_picture should be deallocated by calling picture_free.
+   * The returned uvg_picture should be deallocated by calling picture_free.
    *
    * \since 3.12.0
    * \param chroma_fomat  Chroma subsampling to use.
@@ -824,11 +824,11 @@ typedef struct kvz_api {
    * \param height  height of luma pixel array to allocate
    * \return        allocated picture, or NULL if allocation failed.
    */
-  kvz_picture * (*picture_alloc_csp)(enum kvz_chroma_format chroma_fomat, int32_t width, int32_t height);
-} kvz_api;
+  uvg_picture * (*picture_alloc_csp)(enum uvg_chroma_format chroma_fomat, int32_t width, int32_t height);
+} uvg_api;
 
 
-KVZ_PUBLIC const kvz_api * kvz_api_get(int bit_depth);
+UVG_PUBLIC const uvg_api * uvg_api_get(int bit_depth);
 
 #ifdef __cplusplus
 }

@@ -38,14 +38,14 @@
 
 #include "encoder.h"
 #include "imagelist.h"
-#include "kvz_math.h"
+#include "uvg_math.h"
 #include "strategies/generic/picture-generic.h"
 #include "strategies/strategies-ipol.h"
 #include "videoframe.h"
 #include "strategies/strategies-picture.h"
 
 
-const int8_t kvz_g_imv_to_prec[4] = { 2, 0, -2, 1 }; // Convert AMVR imv to precision
+const int8_t uvg_g_imv_to_prec[4] = { 2, 0, -2, 1 }; // Convert AMVR imv to precision
 
 typedef struct {
   const cu_info_t *a[2];
@@ -64,7 +64,7 @@ typedef struct {
 
 
 static void inter_recon_frac_luma(const encoder_state_t * const state,
-                                  const kvz_picture * const ref,
+                                  const uvg_picture * const ref,
                                   int32_t xpos,
                                   int32_t ypos,
                                   int32_t block_width,
@@ -79,11 +79,11 @@ static void inter_recon_frac_luma(const encoder_state_t * const state,
   // Space for extrapolated pixels and the part from the picture.
   // Some extra for AVX2.
   // The extrapolation function will set the pointers and stride.
-  kvz_pixel ext_buffer[KVZ_IPOL_MAX_INPUT_SIZE_LUMA_SIMD];
-  kvz_pixel *ext = NULL;
-  kvz_pixel *ext_origin = NULL;
+  uvg_pixel ext_buffer[UVG_IPOL_MAX_INPUT_SIZE_LUMA_SIMD];
+  uvg_pixel *ext = NULL;
+  uvg_pixel *ext_origin = NULL;
   int ext_s = 0;
-  kvz_epol_args epol_args = {
+  uvg_epol_args epol_args = {
     .src = ref->y,
     .src_w = ref->width,
     .src_h = ref->height,
@@ -92,10 +92,10 @@ static void inter_recon_frac_luma(const encoder_state_t * const state,
     .blk_y = state->tile->offset_y + ypos + (mv_param[1] >> INTERNAL_MV_PREC),
     .blk_w = block_width,
     .blk_h = block_height,
-    .pad_l = KVZ_LUMA_FILTER_OFFSET,
-    .pad_r = KVZ_EXT_PADDING_LUMA - KVZ_LUMA_FILTER_OFFSET,
-    .pad_t = KVZ_LUMA_FILTER_OFFSET,
-    .pad_b = KVZ_EXT_PADDING_LUMA - KVZ_LUMA_FILTER_OFFSET,
+    .pad_l = UVG_LUMA_FILTER_OFFSET,
+    .pad_r = UVG_EXT_PADDING_LUMA - UVG_LUMA_FILTER_OFFSET,
+    .pad_t = UVG_LUMA_FILTER_OFFSET,
+    .pad_b = UVG_EXT_PADDING_LUMA - UVG_LUMA_FILTER_OFFSET,
     .pad_b_simd = 1 // One row for AVX2
   };
 
@@ -106,8 +106,8 @@ static void inter_recon_frac_luma(const encoder_state_t * const state,
   epol_args.ext_origin = &ext_origin;
   epol_args.ext_s = &ext_s;
 
-  kvz_get_extended_block(&epol_args);
-  kvz_sample_quarterpel_luma(state->encoder_control,
+  uvg_get_extended_block(&epol_args);
+  uvg_sample_quarterpel_luma(state->encoder_control,
     ext_origin,
     ext_s,
     block_width,
@@ -120,7 +120,7 @@ static void inter_recon_frac_luma(const encoder_state_t * const state,
 }
 
 static void inter_recon_frac_luma_hi(const encoder_state_t *const state,
-  const kvz_picture *const ref,
+  const uvg_picture *const ref,
   int32_t xpos,
   int32_t ypos,
   int32_t block_width,
@@ -135,11 +135,11 @@ static void inter_recon_frac_luma_hi(const encoder_state_t *const state,
   // Space for extrapolated pixels and the part from the picture.
   // Some extra for AVX2.
   // The extrapolation function will set the pointers and stride.
-  kvz_pixel ext_buffer[KVZ_IPOL_MAX_INPUT_SIZE_LUMA_SIMD];
-  kvz_pixel *ext = NULL;
-  kvz_pixel *ext_origin = NULL;
+  uvg_pixel ext_buffer[UVG_IPOL_MAX_INPUT_SIZE_LUMA_SIMD];
+  uvg_pixel *ext = NULL;
+  uvg_pixel *ext_origin = NULL;
   int ext_s = 0;
-  kvz_epol_args epol_args = {
+  uvg_epol_args epol_args = {
     .src = ref->y,
     .src_w = ref->width,
     .src_h = ref->height,
@@ -148,10 +148,10 @@ static void inter_recon_frac_luma_hi(const encoder_state_t *const state,
     .blk_y = state->tile->offset_y + ypos + (mv_param[1] >> INTERNAL_MV_PREC),
     .blk_w = block_width,
     .blk_h = block_height,
-    .pad_l = KVZ_LUMA_FILTER_OFFSET,
-    .pad_r = KVZ_EXT_PADDING_LUMA - KVZ_LUMA_FILTER_OFFSET,
-    .pad_t = KVZ_LUMA_FILTER_OFFSET,
-    .pad_b = KVZ_EXT_PADDING_LUMA - KVZ_LUMA_FILTER_OFFSET,
+    .pad_l = UVG_LUMA_FILTER_OFFSET,
+    .pad_r = UVG_EXT_PADDING_LUMA - UVG_LUMA_FILTER_OFFSET,
+    .pad_t = UVG_LUMA_FILTER_OFFSET,
+    .pad_b = UVG_EXT_PADDING_LUMA - UVG_LUMA_FILTER_OFFSET,
     .pad_b_simd = 1 // One row for AVX2
   };
 
@@ -162,8 +162,8 @@ static void inter_recon_frac_luma_hi(const encoder_state_t *const state,
   epol_args.ext_origin = &ext_origin;
   epol_args.ext_s = &ext_s;
 
-  kvz_get_extended_block(&epol_args);
-  kvz_sample_quarterpel_luma_hi(state->encoder_control,
+  uvg_get_extended_block(&epol_args);
+  uvg_sample_quarterpel_luma_hi(state->encoder_control,
     ext_origin,
     ext_s,
     block_width,
@@ -176,7 +176,7 @@ static void inter_recon_frac_luma_hi(const encoder_state_t *const state,
 }
 
 static void inter_recon_frac_chroma(const encoder_state_t *const state,
-  const kvz_picture *const ref,
+  const uvg_picture *const ref,
   int32_t pu_x,
   int32_t pu_y,
   int32_t pu_w,
@@ -195,14 +195,14 @@ static void inter_recon_frac_chroma(const encoder_state_t *const state,
   // Space for extrapolated pixels and the part from the picture.
   // Some extra for AVX2.
   // The extrapolation function will set the pointers and stride.
-  kvz_pixel ext_buffer[KVZ_IPOL_MAX_INPUT_SIZE_CHROMA_SIMD];
-  kvz_pixel *ext = NULL;
-  kvz_pixel *ext_origin = NULL;
+  uvg_pixel ext_buffer[UVG_IPOL_MAX_INPUT_SIZE_CHROMA_SIMD];
+  uvg_pixel *ext = NULL;
+  uvg_pixel *ext_origin = NULL;
   int ext_s = 0;
 
   // Chroma U
   // Divisions by 2 due to 4:2:0 chroma subsampling
-  kvz_epol_args epol_args = {
+  uvg_epol_args epol_args = {
     .src = ref->u,
     .src_w = ref->width / 2,
     .src_h = ref->height / 2,
@@ -211,10 +211,10 @@ static void inter_recon_frac_chroma(const encoder_state_t *const state,
     .blk_y = (state->tile->offset_y + pu_y) / 2 + (mv_param[1] >> (INTERNAL_MV_PREC + 1) ),
     .blk_w = pb_w,
     .blk_h = pb_h,
-    .pad_l = KVZ_CHROMA_FILTER_OFFSET,
-    .pad_r = KVZ_EXT_PADDING_CHROMA - KVZ_CHROMA_FILTER_OFFSET,
-    .pad_t = KVZ_CHROMA_FILTER_OFFSET,
-    .pad_b = KVZ_EXT_PADDING_CHROMA - KVZ_CHROMA_FILTER_OFFSET,
+    .pad_l = UVG_CHROMA_FILTER_OFFSET,
+    .pad_r = UVG_EXT_PADDING_CHROMA - UVG_CHROMA_FILTER_OFFSET,
+    .pad_t = UVG_CHROMA_FILTER_OFFSET,
+    .pad_b = UVG_EXT_PADDING_CHROMA - UVG_CHROMA_FILTER_OFFSET,
     .pad_b_simd = 3 // Three rows for AVX2
   };
 
@@ -225,8 +225,8 @@ static void inter_recon_frac_chroma(const encoder_state_t *const state,
   epol_args.ext_origin = &ext_origin;
   epol_args.ext_s = &ext_s;
 
-  kvz_get_extended_block(&epol_args);
-  kvz_sample_octpel_chroma(state->encoder_control,
+  uvg_get_extended_block(&epol_args);
+  uvg_sample_octpel_chroma(state->encoder_control,
     ext_origin,
     ext_s,
     pb_w,
@@ -239,8 +239,8 @@ static void inter_recon_frac_chroma(const encoder_state_t *const state,
 
   // Chroma V
   epol_args.src = ref->v;
-  kvz_get_extended_block(&epol_args);
-  kvz_sample_octpel_chroma(state->encoder_control,
+  uvg_get_extended_block(&epol_args);
+  uvg_sample_octpel_chroma(state->encoder_control,
     ext_origin,
     ext_s,
     pb_w,
@@ -253,7 +253,7 @@ static void inter_recon_frac_chroma(const encoder_state_t *const state,
 }
 
 static void inter_recon_frac_chroma_hi(const encoder_state_t *const state,
-  const kvz_picture *const ref,
+  const uvg_picture *const ref,
   int32_t pu_x,
   int32_t pu_y,
   int32_t pu_w,
@@ -272,14 +272,14 @@ static void inter_recon_frac_chroma_hi(const encoder_state_t *const state,
   // Space for extrapolated pixels and the part from the picture.
   // Some extra for AVX2.
   // The extrapolation function will set the pointers and stride.
-  kvz_pixel ext_buffer[KVZ_IPOL_MAX_INPUT_SIZE_CHROMA_SIMD];
-  kvz_pixel *ext = NULL;
-  kvz_pixel *ext_origin = NULL;
+  uvg_pixel ext_buffer[UVG_IPOL_MAX_INPUT_SIZE_CHROMA_SIMD];
+  uvg_pixel *ext = NULL;
+  uvg_pixel *ext_origin = NULL;
   int ext_s = 0;
 
   // Chroma U
   // Divisions by 2 due to 4:2:0 chroma subsampling
-  kvz_epol_args epol_args = {
+  uvg_epol_args epol_args = {
     .src = ref->u,
     .src_w = ref->width / 2,
     .src_h = ref->height / 2,
@@ -288,10 +288,10 @@ static void inter_recon_frac_chroma_hi(const encoder_state_t *const state,
     .blk_y = (state->tile->offset_y + pu_y) / 2 + (mv_param[1] >> (INTERNAL_MV_PREC + 1) ),
     .blk_w = pb_w,
     .blk_h = pb_h,
-    .pad_l = KVZ_CHROMA_FILTER_OFFSET,
-    .pad_r = KVZ_EXT_PADDING_CHROMA - KVZ_CHROMA_FILTER_OFFSET,
-    .pad_t = KVZ_CHROMA_FILTER_OFFSET,
-    .pad_b = KVZ_EXT_PADDING_CHROMA - KVZ_CHROMA_FILTER_OFFSET,
+    .pad_l = UVG_CHROMA_FILTER_OFFSET,
+    .pad_r = UVG_EXT_PADDING_CHROMA - UVG_CHROMA_FILTER_OFFSET,
+    .pad_t = UVG_CHROMA_FILTER_OFFSET,
+    .pad_b = UVG_EXT_PADDING_CHROMA - UVG_CHROMA_FILTER_OFFSET,
     .pad_b_simd = 3 // Three rows for AVX2
   };
 
@@ -302,8 +302,8 @@ static void inter_recon_frac_chroma_hi(const encoder_state_t *const state,
   epol_args.ext_origin = &ext_origin;
   epol_args.ext_s = &ext_s;
 
-  kvz_get_extended_block(&epol_args);
-  kvz_sample_octpel_chroma_hi(state->encoder_control,
+  uvg_get_extended_block(&epol_args);
+  uvg_sample_octpel_chroma_hi(state->encoder_control,
     ext_origin,
     ext_s,
     pb_w,
@@ -316,8 +316,8 @@ static void inter_recon_frac_chroma_hi(const encoder_state_t *const state,
 
   // Chroma V
   epol_args.src = ref->v;
-  kvz_get_extended_block(&epol_args);
-  kvz_sample_octpel_chroma_hi(state->encoder_control,
+  uvg_get_extended_block(&epol_args);
+  uvg_sample_octpel_chroma_hi(state->encoder_control,
     ext_origin,
     ext_s,
     pb_w,
@@ -343,9 +343,9 @@ static void inter_recon_frac_chroma_hi(const encoder_state_t *const state,
 * \param height       height of copied block
 * \param mv_in_frame  coordinates of copied block in frame coordinates
 */
-static void inter_cp_with_ext_border(const kvz_pixel *ref_buf, int ref_stride,
+static void inter_cp_with_ext_border(const uvg_pixel *ref_buf, int ref_stride,
                                      int ref_width, int ref_height,
-                                     kvz_pixel *rec_buf, int rec_stride,
+                                     uvg_pixel *rec_buf, int rec_stride,
                                      int width, int height,
                                      const vector2d_t *mv_in_frame)
 {
@@ -383,7 +383,7 @@ static void inter_cp_with_ext_border(const kvz_pixel *ref_buf, int ref_stride,
  * \param predict_chroma Enable or disable chroma prediction for this call.
 */
 static unsigned inter_recon_unipred(const encoder_state_t * const state,
-                                    const kvz_picture * const ref,
+                                    const uvg_picture * const ref,
                                     int32_t pu_x,
                                     int32_t pu_y,
                                     int32_t pu_w,
@@ -397,7 +397,7 @@ static unsigned inter_recon_unipred(const encoder_state_t * const state,
 {
   vector2d_t int_mv = { mv_param[0], mv_param[1] };
 
-  kvz_change_precision_vector2d(INTERNAL_MV_PREC, 0, &int_mv);
+  uvg_change_precision_vector2d(INTERNAL_MV_PREC, 0, &int_mv);
 
   const vector2d_t int_mv_in_frame = {
     int_mv.x + pu_x + state->tile->offset_x,
@@ -440,7 +440,7 @@ static unsigned inter_recon_unipred(const encoder_state_t * const state,
       }
       else {
         const int frame_mv_index = int_mv_in_frame.y * ref->stride + int_mv_in_frame.x;
-        kvz_pixels_blit(&ref->y[frame_mv_index],
+        uvg_pixels_blit(&ref->y[frame_mv_index],
           yuv_px->y,
           pu_w, pu_h,
           ref->stride, out_stride_luma);
@@ -486,11 +486,11 @@ static unsigned inter_recon_unipred(const encoder_state_t * const state,
     } else {
       const int frame_mv_index = int_mv_in_frame_c.y * ref->stride / 2 + int_mv_in_frame_c.x;
 
-      kvz_pixels_blit(&ref->u[frame_mv_index],
+      uvg_pixels_blit(&ref->u[frame_mv_index],
                       yuv_px->u,
                       pu_w / 2, pu_h / 2,
                       ref->stride / 2, out_stride_c);
-      kvz_pixels_blit(&ref->v[frame_mv_index],
+      uvg_pixels_blit(&ref->v[frame_mv_index],
                       yuv_px->v,
                       pu_w / 2, pu_h / 2,
                       ref->stride / 2, out_stride_c);
@@ -514,9 +514,9 @@ static unsigned inter_recon_unipred(const encoder_state_t * const state,
  * \param predict_luma   Enable or disable luma prediction for this call.
  * \param predict_chroma Enable or disable chroma prediction for this call.
  */
-void kvz_inter_recon_bipred(const encoder_state_t *const state,
-  const kvz_picture *ref1,
-  const kvz_picture *ref2,
+void uvg_inter_recon_bipred(const encoder_state_t *const state,
+  const uvg_picture *ref1,
+  const uvg_picture *ref2,
   int32_t pu_x,
   int32_t pu_y,
   int32_t pu_w,
@@ -527,10 +527,10 @@ void kvz_inter_recon_bipred(const encoder_state_t *const state,
   bool predict_chroma)
 {
   // Allocate maximum size arrays for interpolated and copied samples
-  ALIGNED(64) kvz_pixel px_buf_L0[LCU_LUMA_SIZE + 2 * LCU_CHROMA_SIZE];
-  ALIGNED(64) kvz_pixel px_buf_L1[LCU_LUMA_SIZE + 2 * LCU_CHROMA_SIZE];
-  ALIGNED(64) kvz_pixel_im im_buf_L0[LCU_LUMA_SIZE + 2 * LCU_CHROMA_SIZE];
-  ALIGNED(64) kvz_pixel_im im_buf_L1[LCU_LUMA_SIZE + 2 * LCU_CHROMA_SIZE];
+  ALIGNED(64) uvg_pixel px_buf_L0[LCU_LUMA_SIZE + 2 * LCU_CHROMA_SIZE];
+  ALIGNED(64) uvg_pixel px_buf_L1[LCU_LUMA_SIZE + 2 * LCU_CHROMA_SIZE];
+  ALIGNED(64) uvg_pixel_im im_buf_L0[LCU_LUMA_SIZE + 2 * LCU_CHROMA_SIZE];
+  ALIGNED(64) uvg_pixel_im im_buf_L1[LCU_LUMA_SIZE + 2 * LCU_CHROMA_SIZE];
 
   yuv_t px_L0;
   px_L0.size = pu_w * pu_h;
@@ -564,7 +564,7 @@ void kvz_inter_recon_bipred(const encoder_state_t *const state,
                                              &px_L1, &im_L1, predict_luma, predict_chroma);
 
   // After reconstruction, merge the predictors by taking an average of each pixel
-  kvz_bipred_average(lcu, &px_L0, &px_L1, &im_L0, &im_L1,
+  uvg_bipred_average(lcu, &px_L0, &px_L1, &im_L0, &im_L1,
                      pu_x, pu_y, pu_w, pu_h,
                      im_flags_L0, im_flags_L1,
                      predict_luma, predict_chroma);
@@ -585,7 +585,7 @@ void kvz_inter_recon_bipred(const encoder_state_t *const state,
  * \param predict_luma   Enable or disable luma prediction for this call.
  * \param predict_chroma Enable or disable chroma prediction for this call.
  */
-void kvz_inter_recon_cu(const encoder_state_t * const state,
+void uvg_inter_recon_cu(const encoder_state_t * const state,
                         lcu_t *lcu,
                         int32_t x,
                         int32_t y,
@@ -594,9 +594,9 @@ void kvz_inter_recon_cu(const encoder_state_t * const state,
                         bool predict_chroma)
 {
   cu_info_t *cu = LCU_GET_CU_AT_PX(lcu, SUB_SCU(x), SUB_SCU(y));
-  const int num_pu = kvz_part_mode_num_parts[cu->part_size];
+  const int num_pu = uvg_part_mode_num_parts[cu->part_size];
   for (int i = 0; i < num_pu; ++i) {
-    kvz_inter_pred_pu(state, lcu, x, y, width, predict_luma, predict_chroma, i);
+    uvg_inter_pred_pu(state, lcu, x, y, width, predict_luma, predict_chroma, i);
   }
 }
 
@@ -614,7 +614,7 @@ void kvz_inter_recon_cu(const encoder_state_t * const state,
  * \param predict_chroma Enable or disable chroma prediction for this call.
  * \param i_pu           Index of the PU. Always zero for 2Nx2N. Used for SMP+AMP.
  */
-void kvz_inter_pred_pu(const encoder_state_t * const state,
+void uvg_inter_pred_pu(const encoder_state_t * const state,
                        lcu_t *lcu,
                        int32_t x,
                        int32_t y,
@@ -632,7 +632,7 @@ void kvz_inter_pred_pu(const encoder_state_t * const state,
   cu_info_t *pu = LCU_GET_CU_AT_PX(lcu, SUB_SCU(pu_x), SUB_SCU(pu_y));
 
   if (pu->inter.mv_dir == 3) {
-    const kvz_picture *const refs[2] = {
+    const uvg_picture *const refs[2] = {
       state->frame->ref->images[
         state->frame->ref_LX[0][
           pu->inter.mv_ref[0]]],
@@ -640,7 +640,7 @@ void kvz_inter_pred_pu(const encoder_state_t * const state,
         state->frame->ref_LX[1][
           pu->inter.mv_ref[1]]],
     };
-    kvz_inter_recon_bipred(state,
+    uvg_inter_recon_bipred(state,
       refs[0], refs[1],
       pu_x, pu_y,
       pu_w, pu_h,
@@ -650,7 +650,7 @@ void kvz_inter_pred_pu(const encoder_state_t * const state,
   }
   else {
     const int mv_idx = pu->inter.mv_dir - 1;
-    const kvz_picture *const ref =
+    const uvg_picture *const ref =
       state->frame->ref->images[
         state->frame->ref_LX[mv_idx][
           pu->inter.mv_ref[mv_idx]]];
@@ -1053,14 +1053,14 @@ static void get_spatial_merge_candidates_cua(const cu_array_t *cua,
   int32_t y_local = SUB_SCU(y);
   // A0 and A1 availability testing
   if (x != 0) {
-    const cu_info_t *a1 = kvz_cu_array_at_const(cua, x - 1, y + height - 1);
+    const cu_info_t *a1 = uvg_cu_array_at_const(cua, x - 1, y + height - 1);
     // The block above is always coded before the current one.
     if (a1->type == CU_INTER) {
       cand_out->a[1] = a1;
     }
 
     if (y_local + height < LCU_WIDTH && y + height < picture_height) {
-      const cu_info_t *a0 = kvz_cu_array_at_const(cua, x - 1, y + height);
+      const cu_info_t *a0 = uvg_cu_array_at_const(cua, x - 1, y + height);
       if (a0->type == CU_INTER && is_a0_cand_coded(x, y, width, height)) {
         cand_out->a[0] = a0;
       }
@@ -1070,20 +1070,20 @@ static void get_spatial_merge_candidates_cua(const cu_array_t *cua,
   // B0, B1 and B2 availability testing
   if (y != 0) {
     if (x + width < picture_width && (x_local + width < LCU_WIDTH || (!wpp && y_local == 0))) {
-      const cu_info_t *b0 = kvz_cu_array_at_const(cua, x + width, y - 1);
+      const cu_info_t *b0 = uvg_cu_array_at_const(cua, x + width, y - 1);
       if (b0->type == CU_INTER && is_b0_cand_coded(x, y, width, height)) {
         cand_out->b[0] = b0;
       }
     }
 
-    const cu_info_t* b1 = kvz_cu_array_at_const(cua, x + width - 1, y - 1);
+    const cu_info_t* b1 = uvg_cu_array_at_const(cua, x + width - 1, y - 1);
     // The block to the left is always coded before the current one.
     if (b1->type == CU_INTER) {
       cand_out->b[1] = b1;
     }
 
     if (x != 0) {
-      const cu_info_t *b2 = kvz_cu_array_at_const(cua, x - 1, y - 1);
+      const cu_info_t *b2 = uvg_cu_array_at_const(cua, x - 1, y - 1);
       // The block above and to the left is always coded before the current
       // one.
       if (b2->type == CU_INTER) {
@@ -1108,7 +1108,7 @@ static INLINE int16_t get_scaled_mv(int16_t mv, int scale)
 static int convert_mv_fixed_to_float(int32_t val)
 {
   uint32_t sign = val >> 31;
-  int scale = kvz_math_floor_log2((val ^ sign) | MV_MANTISSA_UPPER_LIMIT) - (MV_MANTISSA_BITCOUNT - 1);
+  int scale = uvg_math_floor_log2((val ^ sign) | MV_MANTISSA_UPPER_LIMIT) - (MV_MANTISSA_BITCOUNT - 1);
 
   int exponent;
   uint32_t mantissa;
@@ -1390,7 +1390,7 @@ static void get_mv_cand_from_candidates(const encoder_state_t * const state,
  * \param lcu       current LCU
  * \param reflist   reflist index (either 0 or 1)
  */
-void kvz_inter_get_mv_cand(const encoder_state_t * const state,
+void uvg_inter_get_mv_cand(const encoder_state_t * const state,
                            int32_t x,
                            int32_t y,
                            int32_t width,
@@ -1410,8 +1410,8 @@ void kvz_inter_get_mv_cand(const encoder_state_t * const state,
   get_temporal_merge_candidates(state, x, y, width, height, 1, 0, &merge_cand);
   get_mv_cand_from_candidates(state, x, y, width, height, &merge_cand, cur_cu, reflist, mv_cand);
     
-  kvz_round_precision(INTERNAL_MV_PREC, 2, &mv_cand[0][0], &mv_cand[0][1]);
-  kvz_round_precision(INTERNAL_MV_PREC, 2, &mv_cand[1][0], &mv_cand[1][1]);
+  uvg_round_precision(INTERNAL_MV_PREC, 2, &mv_cand[0][0], &mv_cand[0][1]);
+  uvg_round_precision(INTERNAL_MV_PREC, 2, &mv_cand[1][0], &mv_cand[1][1]);
 }
 
 /**
@@ -1426,7 +1426,7 @@ void kvz_inter_get_mv_cand(const encoder_state_t * const state,
  * \param cur_cu    current CU
  * \param reflist   reflist index (either 0 or 1)
  */
-void kvz_inter_get_mv_cand_cua(const encoder_state_t * const state,
+void uvg_inter_get_mv_cand_cua(const encoder_state_t * const state,
                                int32_t x,
                                int32_t y,
                                int32_t width,
@@ -1445,8 +1445,8 @@ void kvz_inter_get_mv_cand_cua(const encoder_state_t * const state,
   get_temporal_merge_candidates(state, x, y, width, height, 1, 0, &merge_cand);
   get_mv_cand_from_candidates(state, x, y, width, height, &merge_cand, cur_cu, reflist, mv_cand);
 
-  kvz_round_precision(INTERNAL_MV_PREC, 2, &mv_cand[0][0], &mv_cand[0][1]);
-  kvz_round_precision(INTERNAL_MV_PREC, 2, &mv_cand[1][0], &mv_cand[1][1]);
+  uvg_round_precision(INTERNAL_MV_PREC, 2, &mv_cand[0][0], &mv_cand[0][1]);
+  uvg_round_precision(INTERNAL_MV_PREC, 2, &mv_cand[1][0], &mv_cand[1][1]);
 }
 
 static bool is_duplicate_candidate(const cu_info_t* cu1, const cu_info_t* cu2)
@@ -1526,7 +1526,7 @@ static bool hmvp_push_lut_item(cu_info_t* lut, int32_t size, const cu_info_t* cu
  * \param block_height  block height in pixels
  * \param cu            current CU
  */
-void kvz_hmvp_add_mv(const encoder_state_t* const state, uint32_t pic_x, uint32_t pic_y, uint32_t block_width, uint32_t block_height, const cu_info_t* cu)
+void uvg_hmvp_add_mv(const encoder_state_t* const state, uint32_t pic_x, uint32_t pic_y, uint32_t block_width, uint32_t block_height, const cu_info_t* cu)
 {
   //if (!cu.geoFlag && !cu.affine)
   if(cu->type == CU_INTER)
@@ -1568,7 +1568,7 @@ static bool different_mer(int32_t x, int32_t y, int32_t x2, int32_t y2, uint8_t 
 
 
 
-void kvz_change_precision(int src, int dst, mv_t* hor, mv_t* ver) {
+void uvg_change_precision(int src, int dst, mv_t* hor, mv_t* ver) {
 
   const int shift = (int)dst - (int)src;
   if (shift >= 0)
@@ -1588,7 +1588,7 @@ void kvz_change_precision(int src, int dst, mv_t* hor, mv_t* ver) {
   }
 }
 
-void kvz_change_precision_vector2d(int src, int dst, vector2d_t *mv) {
+void uvg_change_precision_vector2d(int src, int dst, vector2d_t *mv) {
 
   const int shift = (int)dst - (int)src;
   if (shift >= 0)
@@ -1608,16 +1608,16 @@ void kvz_change_precision_vector2d(int src, int dst, vector2d_t *mv) {
   }
 }
 
-void kvz_round_precision(int src, int dst, mv_t* hor, mv_t* ver) {
-  kvz_change_precision(src, dst, hor, ver);
-  kvz_change_precision(dst, src, hor, ver);
+void uvg_round_precision(int src, int dst, mv_t* hor, mv_t* ver) {
+  uvg_change_precision(src, dst, hor, ver);
+  uvg_change_precision(dst, src, hor, ver);
 }
 
-void kvz_round_precision_vector2d(int src, int dst, vector2d_t* mv) {
+void uvg_round_precision_vector2d(int src, int dst, vector2d_t* mv) {
   mv_t hor = mv->x;
   mv_t ver = mv->y;
-  kvz_change_precision(src, dst, &hor, &ver);
-  kvz_change_precision(dst, src, &hor, &ver);
+  uvg_change_precision(src, dst, &hor, &ver);
+  uvg_change_precision(dst, src, &hor, &ver);
   mv->x = hor;
   mv->y = ver;
 }
@@ -1635,7 +1635,7 @@ void kvz_round_precision_vector2d(int src, int dst, vector2d_t* mv) {
  * \param lcu       lcu containing the block
  * \return          number of merge candidates
  */
-uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
+uint8_t uvg_inter_get_merge_cand(const encoder_state_t * const state,
                                  int32_t x, int32_t y,
                                  int32_t width, int32_t height,
                                  bool use_a1, bool use_b1,
@@ -1674,7 +1674,7 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
   if (can_use_tmvp) {
     mv_cand[candidates].dir = 0;
 
-    const int max_reflist = (state->frame->slicetype == KVZ_SLICE_B ? 1 : 0);
+    const int max_reflist = (state->frame->slicetype == UVG_SLICE_B ? 1 : 0);
     for (int reflist = 0; reflist <= max_reflist; reflist++) {
       // Fetch temporal candidates for the current CU
       // ToDo: change collocated_from_l0_flag to allow L1 ref
@@ -1723,7 +1723,7 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
         mv_cand[candidates].mv[0][1] = state->tile->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv[0][1];
         mv_cand[candidates].dir = state->tile->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv_dir;
         mv_cand[candidates].ref[0] = state->tile->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv_ref[0];
-        if (state->frame->slicetype == KVZ_SLICE_B) {
+        if (state->frame->slicetype == UVG_SLICE_B) {
           mv_cand[candidates].mv[1][0] = state->tile->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv[1][0];
           mv_cand[candidates].mv[1][1] = state->tile->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv[1][1];
           mv_cand[candidates].ref[1] = state->tile->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv_ref[1];
@@ -1740,7 +1740,7 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
     // calculate average MV for L0 and L1 seperately
     uint8_t inter_dir = 0;
 
-    for (int reflist = 0; reflist < (state->frame->slicetype == KVZ_SLICE_B ? 2 : 1); reflist++)
+    for (int reflist = 0; reflist < (state->frame->slicetype == UVG_SLICE_B ? 2 : 1); reflist++)
     {
       const int16_t ref_i = mv_cand[0].dir & (reflist + 1) ? mv_cand[0].ref[reflist] : -1;
       const int16_t ref_j = mv_cand[1].dir & (reflist + 1) ? mv_cand[1].ref[reflist] : -1;
@@ -1798,7 +1798,7 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
 
   int num_ref = state->frame->ref->used_size;
 
-  if (candidates < max_num_cands && state->frame->slicetype == KVZ_SLICE_B) {
+  if (candidates < max_num_cands && state->frame->slicetype == UVG_SLICE_B) {
     int j;
     int ref_negative = 0;
     int ref_positive = 0;
@@ -1818,7 +1818,7 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
     mv_cand[candidates].mv[0][1] = 0;
     mv_cand[candidates].ref[0] = (zero_idx >= num_ref - 1) ? 0 : zero_idx;
     mv_cand[candidates].dir = 1;
-    if (state->frame->slicetype == KVZ_SLICE_B) {
+    if (state->frame->slicetype == UVG_SLICE_B) {
       mv_cand[candidates].ref[1] = mv_cand[candidates].ref[0];
       mv_cand[candidates].mv[1][0] = 0;
       mv_cand[candidates].mv[1][1] = 0;

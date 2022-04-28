@@ -41,62 +41,62 @@
 
 
 // Define function pointers.
-reg_sad_func * kvz_reg_sad = 0;
+reg_sad_func * uvg_reg_sad = 0;
 
-cost_pixel_nxn_func * kvz_sad_4x4 = 0;
-cost_pixel_nxn_func * kvz_sad_8x8 = 0;
-cost_pixel_nxn_func * kvz_sad_16x16 = 0;
-cost_pixel_nxn_func * kvz_sad_32x32 = 0;
-cost_pixel_nxn_func * kvz_sad_64x64 = 0;
+cost_pixel_nxn_func * uvg_sad_4x4 = 0;
+cost_pixel_nxn_func * uvg_sad_8x8 = 0;
+cost_pixel_nxn_func * uvg_sad_16x16 = 0;
+cost_pixel_nxn_func * uvg_sad_32x32 = 0;
+cost_pixel_nxn_func * uvg_sad_64x64 = 0;
 
-cost_pixel_nxn_func * kvz_satd_4x4 = 0;
-cost_pixel_nxn_func * kvz_satd_8x8 = 0;
-cost_pixel_nxn_func * kvz_satd_16x16 = 0;
-cost_pixel_nxn_func * kvz_satd_32x32 = 0;
-cost_pixel_nxn_func * kvz_satd_64x64 = 0;
+cost_pixel_nxn_func * uvg_satd_4x4 = 0;
+cost_pixel_nxn_func * uvg_satd_8x8 = 0;
+cost_pixel_nxn_func * uvg_satd_16x16 = 0;
+cost_pixel_nxn_func * uvg_satd_32x32 = 0;
+cost_pixel_nxn_func * uvg_satd_64x64 = 0;
 
-cost_pixel_nxn_multi_func * kvz_sad_4x4_dual = 0;
-cost_pixel_nxn_multi_func * kvz_sad_8x8_dual = 0;
-cost_pixel_nxn_multi_func * kvz_sad_16x16_dual = 0;
-cost_pixel_nxn_multi_func * kvz_sad_32x32_dual = 0;
-cost_pixel_nxn_multi_func * kvz_sad_64x64_dual = 0;
+cost_pixel_nxn_multi_func * uvg_sad_4x4_dual = 0;
+cost_pixel_nxn_multi_func * uvg_sad_8x8_dual = 0;
+cost_pixel_nxn_multi_func * uvg_sad_16x16_dual = 0;
+cost_pixel_nxn_multi_func * uvg_sad_32x32_dual = 0;
+cost_pixel_nxn_multi_func * uvg_sad_64x64_dual = 0;
 
-cost_pixel_nxn_multi_func * kvz_satd_4x4_dual = 0;
-cost_pixel_nxn_multi_func * kvz_satd_8x8_dual = 0;
-cost_pixel_nxn_multi_func * kvz_satd_16x16_dual = 0;
-cost_pixel_nxn_multi_func * kvz_satd_32x32_dual = 0;
-cost_pixel_nxn_multi_func * kvz_satd_64x64_dual = 0;
+cost_pixel_nxn_multi_func * uvg_satd_4x4_dual = 0;
+cost_pixel_nxn_multi_func * uvg_satd_8x8_dual = 0;
+cost_pixel_nxn_multi_func * uvg_satd_16x16_dual = 0;
+cost_pixel_nxn_multi_func * uvg_satd_32x32_dual = 0;
+cost_pixel_nxn_multi_func * uvg_satd_64x64_dual = 0;
 
-cost_pixel_any_size_func * kvz_satd_any_size = 0;
-cost_pixel_any_size_multi_func * kvz_satd_any_size_quad = 0;
+cost_pixel_any_size_func * uvg_satd_any_size = 0;
+cost_pixel_any_size_multi_func * uvg_satd_any_size_quad = 0;
 
-pixels_calc_ssd_func * kvz_pixels_calc_ssd = 0;
+pixels_calc_ssd_func * uvg_pixels_calc_ssd = 0;
 
-inter_recon_bipred_func * kvz_bipred_average = 0;
+inter_recon_bipred_func * uvg_bipred_average = 0;
 
-get_optimized_sad_func *kvz_get_optimized_sad = 0;
-ver_sad_func *kvz_ver_sad = 0;
-hor_sad_func *kvz_hor_sad = 0;
+get_optimized_sad_func *uvg_get_optimized_sad = 0;
+ver_sad_func *uvg_ver_sad = 0;
+hor_sad_func *uvg_hor_sad = 0;
 
-pixel_var_func *kvz_pixel_var = 0;
+pixel_var_func *uvg_pixel_var = 0;
 
 
-int kvz_strategy_register_picture(void* opaque, uint8_t bitdepth) {
+int uvg_strategy_register_picture(void* opaque, uint8_t bitdepth) {
   bool success = true;
 
-  success &= kvz_strategy_register_picture_generic(opaque, bitdepth);
+  success &= uvg_strategy_register_picture_generic(opaque, bitdepth);
 
-  if (kvz_g_hardware_flags.intel_flags.sse2) {
-    success &= kvz_strategy_register_picture_sse2(opaque, bitdepth);
+  if (uvg_g_hardware_flags.intel_flags.sse2) {
+    success &= uvg_strategy_register_picture_sse2(opaque, bitdepth);
   }
-  if (kvz_g_hardware_flags.intel_flags.sse41) {
-    success &= kvz_strategy_register_picture_sse41(opaque, bitdepth);
+  if (uvg_g_hardware_flags.intel_flags.sse41) {
+    success &= uvg_strategy_register_picture_sse41(opaque, bitdepth);
   }
-  if (kvz_g_hardware_flags.intel_flags.avx2) {
-    success &= kvz_strategy_register_picture_avx2(opaque, bitdepth);
+  if (uvg_g_hardware_flags.intel_flags.avx2) {
+    success &= uvg_strategy_register_picture_avx2(opaque, bitdepth);
   }
-  if (kvz_g_hardware_flags.powerpc_flags.altivec) {
-    success &= kvz_strategy_register_picture_altivec(opaque, bitdepth);
+  if (uvg_g_hardware_flags.powerpc_flags.altivec) {
+    success &= uvg_strategy_register_picture_altivec(opaque, bitdepth);
   }
 
   return success;
@@ -110,19 +110,19 @@ int kvz_strategy_register_picture(void* opaque, uint8_t bitdepth) {
 *
 * \returns  Pointer to cost_16bit_nxn_func.
 */
-cost_pixel_nxn_func * kvz_pixels_get_satd_func(unsigned n)
+cost_pixel_nxn_func * uvg_pixels_get_satd_func(unsigned n)
 {
   switch (n) {
   case 4:
-    return kvz_satd_4x4;
+    return uvg_satd_4x4;
   case 8:
-    return kvz_satd_8x8;
+    return uvg_satd_8x8;
   case 16:
-    return kvz_satd_16x16;
+    return uvg_satd_16x16;
   case 32:
-    return kvz_satd_32x32;
+    return uvg_satd_32x32;
   case 64:
-    return kvz_satd_64x64;
+    return uvg_satd_64x64;
   default:
     return NULL;
   }
@@ -136,19 +136,19 @@ cost_pixel_nxn_func * kvz_pixels_get_satd_func(unsigned n)
 *
 * \returns  Pointer to cost_16bit_nxn_func.
 */
-cost_pixel_nxn_func * kvz_pixels_get_sad_func(unsigned n)
+cost_pixel_nxn_func * uvg_pixels_get_sad_func(unsigned n)
 {
   switch (n) {
   case 4:
-    return kvz_sad_4x4;
+    return uvg_sad_4x4;
   case 8:
-    return kvz_sad_8x8;
+    return uvg_sad_8x8;
   case 16:
-    return kvz_sad_16x16;
+    return uvg_sad_16x16;
   case 32:
-    return kvz_sad_32x32;
+    return uvg_sad_32x32;
   case 64:
-    return kvz_sad_64x64;
+    return uvg_sad_64x64;
   default:
     return NULL;
   }
@@ -161,19 +161,19 @@ cost_pixel_nxn_func * kvz_pixels_get_sad_func(unsigned n)
 *
 * \returns  Pointer to cost_pixel_nxn_multi_func.
 */
-cost_pixel_nxn_multi_func * kvz_pixels_get_satd_dual_func(unsigned n)
+cost_pixel_nxn_multi_func * uvg_pixels_get_satd_dual_func(unsigned n)
 {
   switch (n) {
   case 4:
-    return kvz_satd_4x4_dual;
+    return uvg_satd_4x4_dual;
   case 8:
-    return kvz_satd_8x8_dual;
+    return uvg_satd_8x8_dual;
   case 16:
-    return kvz_satd_16x16_dual;
+    return uvg_satd_16x16_dual;
   case 32:
-    return kvz_satd_32x32_dual;
+    return uvg_satd_32x32_dual;
   case 64:
-    return kvz_satd_64x64_dual;
+    return uvg_satd_64x64_dual;
   default:
     return NULL;
   }
@@ -187,19 +187,19 @@ cost_pixel_nxn_multi_func * kvz_pixels_get_satd_dual_func(unsigned n)
 *
 * \returns  Pointer to cost_pixel_nxn_multi_func.
 */
-cost_pixel_nxn_multi_func * kvz_pixels_get_sad_dual_func(unsigned n)
+cost_pixel_nxn_multi_func * uvg_pixels_get_sad_dual_func(unsigned n)
 {
   switch (n) {
   case 4:
-    return kvz_sad_4x4_dual;
+    return uvg_sad_4x4_dual;
   case 8:
-    return kvz_sad_8x8_dual;
+    return uvg_sad_8x8_dual;
   case 16:
-    return kvz_sad_16x16_dual;
+    return uvg_sad_16x16_dual;
   case 32:
-    return kvz_sad_32x32_dual;
+    return uvg_sad_32x32_dual;
   case 64:
-    return kvz_sad_64x64_dual;
+    return uvg_sad_64x64_dual;
   default:
     return NULL;
   }

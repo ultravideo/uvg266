@@ -120,18 +120,18 @@
 #endif
 
 #define PIXEL_MIN 0
-#define PIXEL_MAX ((1 << KVZ_BIT_DEPTH) - 1)
+#define PIXEL_MAX ((1 << UVG_BIT_DEPTH) - 1)
 
 typedef int16_t coeff_t;
 
 typedef int16_t mv_t;
 
 //#define VERBOSE 1
-//#define KVZ_DEBUG_PRINT_CABAC 1
-//#define KVZ_DEBUG 1
+//#define UVG_DEBUG_PRINT_CABAC 1
+//#define UVG_DEBUG 1
 
-//#define KVZ_DEBUG_PRINT_YUVIEW_CSV 1
-//#define KVZ_DEBUG_PRINT_MV_INFO 1
+//#define UVG_DEBUG_PRINT_YUVIEW_CSV 1
+//#define UVG_DEBUG_PRINT_MV_INFO 1
 /* CONFIG VARIABLES */
 
 //spec: references to variables defined in Rec. ITU-T H.265 (04/2013)
@@ -276,14 +276,14 @@ typedef int16_t mv_t;
 
 // NOTE: When making a release, check to see if incrementing libversion in 
 // configure.ac is necessary.
-#ifndef KVZ_VERSION
-#define KVZ_VERSION 2.1.0
+#ifndef UVG_VERSION
+#define UVG_VERSION 2.1.0
 #endif
-#define VERSION_STRING QUOTE_EXPAND(KVZ_VERSION)
+#define VERSION_STRING QUOTE_EXPAND(UVG_VERSION)
 
 //#define VERBOSE 1
 
-#define SAO_ABS_OFFSET_MAX ((1 << (MIN(KVZ_BIT_DEPTH, 10) - 5)) - 1)
+#define SAO_ABS_OFFSET_MAX ((1 << (MIN(UVG_BIT_DEPTH, 10) - 5)) - 1)
 
 #define MAX_TILES_PER_DIM 48
 #define MAX_SLICES 16
@@ -421,7 +421,7 @@ typedef enum { COLOR_Y = 0, COLOR_U, COLOR_V, COLOR_UV } color_t;
 #endif
 
 // Min & max delta QP limits based on bit depth
-#define KVZ_QP_DELTA_MIN -(26 + 3 * (KVZ_BIT_DEPTH - 8))
-#define KVZ_QP_DELTA_MAX 25 + 3 * (KVZ_BIT_DEPTH - 8)
+#define UVG_QP_DELTA_MIN -(26 + 3 * (UVG_BIT_DEPTH - 8))
+#define UVG_QP_DELTA_MAX 25 + 3 * (UVG_BIT_DEPTH - 8)
 
 #endif

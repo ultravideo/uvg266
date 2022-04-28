@@ -11,10 +11,10 @@
 #include "cabac.h"
 #include "rdo.h"
 #include "strategies/strategies-alf.h"
-#include "kvz_math.h"
+#include "uvg_math.h"
 #include "reshape.h"
 
-extern kvz_pixel kvz_fast_clip_32bit_to_pixel(int32_t value);
+extern uvg_pixel uvg_fast_clip_32bit_to_pixel(int32_t value);
 
 #if MAX_NUM_CC_ALF_FILTERS>1
 typedef struct filter_idx_count
@@ -38,7 +38,7 @@ static void reset_alf_covariance(alf_covariance *alf, int num_bins) {
   memset(alf->ee, 0, sizeof(alf->ee));
 }
 
-void kvz_reset_cc_alf_aps_param(cc_alf_filter_param *cc_alf) {
+void uvg_reset_cc_alf_aps_param(cc_alf_filter_param *cc_alf) {
   memset(cc_alf->cc_alf_filter_enabled, false, sizeof(cc_alf->cc_alf_filter_enabled));
   memset(cc_alf->cc_alf_filter_idx_enabled, false, sizeof(cc_alf->cc_alf_filter_idx_enabled));
   memset(cc_alf->cc_alf_coeff, 0, sizeof(cc_alf->cc_alf_coeff));
@@ -71,16 +71,16 @@ static void reset_aps(alf_aps *src, bool cc_alf_enabled)
   src->layer_id = 0;
   reset_alf_param(src);
   if (cc_alf_enabled) {
-    kvz_reset_cc_alf_aps_param(&src->cc_alf_aps_param);
+    uvg_reset_cc_alf_aps_param(&src->cc_alf_aps_param);
   }
 }
 
-void kvz_set_aps_map(videoframe_t* frame, enum kvz_alf alf_type)
+void uvg_set_aps_map(videoframe_t* frame, enum uvg_alf alf_type)
 {
   frame->alf_param_set_map = malloc(ALF_CTB_MAX_NUM_APS * sizeof(param_set_map));
   for (int aps_idx = 0; aps_idx < ALF_CTB_MAX_NUM_APS; aps_idx++) {
     frame->alf_param_set_map[aps_idx + T_ALF_APS].b_changed = false;
-    reset_aps(&frame->alf_param_set_map[aps_idx + T_ALF_APS].parameter_set, alf_type == KVZ_ALF_FULL);
+    reset_aps(&frame->alf_param_set_map[aps_idx + T_ALF_APS].parameter_set, alf_type == UVG_ALF_FULL);
   }
 }
 
@@ -657,7 +657,7 @@ static int get_non_filter_coeff_rate(alf_aps *aps)
 
   if (aps->num_luma_filters > 1)
   {
-    const int coeff_length = kvz_math_ceil_log2(aps->num_luma_filters); //#if JVET_O0491_HLS_CLEANUP
+    const int coeff_length = uvg_math_ceil_log2(aps->num_luma_filters); //#if JVET_O0491_HLS_CLEANUP
     for (int i = 0; i < MAX_NUM_ALF_CLASSES; i++)
     {
       len += coeff_length;
@@ -934,7 +934,7 @@ static void init_alf_covariance(alf_covariance *alf, int num_coeffs) {
 }
 
 
-static void adjust_pixels(kvz_pixel *src, int x_start, int x_end, int y_start, int y_end, int stride, int pic_width, int pic_height)
+static void adjust_pixels(uvg_pixel *src, int x_start, int x_end, int y_start, int y_end, int stride, int pic_width, int pic_height)
 {
   assert(x_start <= x_end);
   assert(y_start <= y_end);
@@ -1031,7 +1031,7 @@ static void adjust_pixels(kvz_pixel *src, int x_start, int x_end, int y_start, i
   }
 }
 
-static void adjust_pixels_chroma(kvz_pixel *src, int x_start, int x_end, int y_start, int y_end, int stride, int pic_width, int pic_height)
+static void adjust_pixels_chroma(uvg_pixel *src, int x_start, int x_end, int y_start, int y_end, int stride, int pic_width, int pic_height)
 {
   assert(x_start <= x_end);
   assert(y_start <= y_end);
@@ -1236,19 +1236,19 @@ static void code_alf_ctu_filter_index(encoder_state_t * const state,
       assert(filter_set_idx < num_available_filt_sets); //"temporal non-latest set"
       if (num_aps > 1)
       {
-        kvz_cabac_encode_trunc_bin(cabac, filter_set_idx - ALF_NUM_FIXED_FILTER_SETS, num_available_filt_sets - ALF_NUM_FIXED_FILTER_SETS);
+        uvg_cabac_encode_trunc_bin(cabac, filter_set_idx - ALF_NUM_FIXED_FILTER_SETS, num_available_filt_sets - ALF_NUM_FIXED_FILTER_SETS);
       }
     }
     else
     {
       assert(filter_set_idx < ALF_NUM_FIXED_FILTER_SETS); //"fixed set larger than temporal"
-      kvz_cabac_encode_trunc_bin(cabac, filter_set_idx, ALF_NUM_FIXED_FILTER_SETS);
+      uvg_cabac_encode_trunc_bin(cabac, filter_set_idx, ALF_NUM_FIXED_FILTER_SETS);
     }
   }
   else
   {
     assert(filter_set_idx < ALF_NUM_FIXED_FILTER_SETS); //Fixed set numavail < num_fixed
-    kvz_cabac_encode_trunc_bin(cabac, filter_set_idx, ALF_NUM_FIXED_FILTER_SETS);
+    uvg_cabac_encode_trunc_bin(cabac, filter_set_idx, ALF_NUM_FIXED_FILTER_SETS);
   }
 }
 
@@ -1362,7 +1362,7 @@ static void code_cc_alf_filter_control_idc(encoder_state_t * const state,
   }
 }
 
-void kvz_encode_alf_bits(encoder_state_t * const state, const int ctu_idx)
+void uvg_encode_alf_bits(encoder_state_t * const state, const int ctu_idx)
 {
   if (state->encoder_control->cfg.alf_type)
   {
@@ -1399,8 +1399,8 @@ void kvz_encode_alf_bits(encoder_state_t * const state, const int ctu_idx)
       }
     }
 
-    if (state->encoder_control->cfg.alf_type == KVZ_ALF_FULL) {
-      int num_components = state->encoder_control->chroma_format == KVZ_CSP_400 ? 1 : MAX_NUM_COMPONENT;
+    if (state->encoder_control->cfg.alf_type == UVG_ALF_FULL) {
+      int num_components = state->encoder_control->chroma_format == UVG_CSP_400 ? 1 : MAX_NUM_COMPONENT;
       for (int comp_idx = 1; comp_idx < num_components; comp_idx++) {
         if (cc_filter_param->cc_alf_filter_enabled[comp_idx - 1]) {
           const int filter_count = cc_filter_param->cc_alf_filter_count[comp_idx - 1];
@@ -1453,15 +1453,15 @@ static void encode_alf_aps_flags(encoder_state_t * const state,
   alf_aps* aps)
 {
   bitstream_t * const stream = &state->stream;
-  const bool cc_alf_enabled = state->encoder_control->cfg.alf_type == KVZ_ALF_FULL;
+  const bool cc_alf_enabled = state->encoder_control->cfg.alf_type == UVG_ALF_FULL;
 
   WRITE_U(stream, aps->new_filter_flag[CHANNEL_TYPE_LUMA], 1, "alf_luma_new_filter");
-  if (state->encoder_control->chroma_format != KVZ_CSP_400)
+  if (state->encoder_control->chroma_format != UVG_CSP_400)
   {
     WRITE_U(stream, aps->new_filter_flag[CHANNEL_TYPE_CHROMA], 1, "alf_chroma_new_filter")
   }
 
-  if (state->encoder_control->chroma_format != KVZ_CSP_400)
+  if (state->encoder_control->chroma_format != UVG_CSP_400)
   {
     if (cc_alf_enabled) {
       WRITE_U(stream, aps->cc_alf_aps_param.new_cc_alf_filter[COMPONENT_Cb - 1], 1, "alf_cc_cb_filter_signal_flag");
@@ -1480,7 +1480,7 @@ static void encode_alf_aps_flags(encoder_state_t * const state,
     if (aps->num_luma_filters > 1)
     {
       //const int length = ceilLog2(param.numLumaFilters);
-      const int length = kvz_math_ceil_log2(aps->num_luma_filters);
+      const int length = uvg_math_ceil_log2(aps->num_luma_filters);
       for (int i = 0; i < MAX_NUM_ALF_CLASSES; i++)
       {
         WRITE_U(stream, aps->filter_coeff_delta_idx[i], length, "alf_luma_coeff_delta_idx");
@@ -1533,7 +1533,7 @@ static void encode_alf_aps_flags(encoder_state_t * const state,
             }
             else
             {
-              WRITE_U(stream, 1 + kvz_math_floor_log2(abs(coeff[i])), 3,
+              WRITE_U(stream, 1 + uvg_math_floor_log2(abs(coeff[i])), 3,
                 cc_idx == 0 ? "alf_cc_cb_mapped_coeff_abs" : "alf_cc_cr_mapped_coeff_abs");
               WRITE_U(stream, coeff[i] < 0 ? 1 : 0, 1, cc_idx == 0 ? "alf_cc_cb_coeff_sign" : "alf_cc_cr_coeff_sign");
             }
@@ -1546,7 +1546,7 @@ static void encode_alf_aps_flags(encoder_state_t * const state,
 
 static void encoder_state_write_adaptation_parameter_set(encoder_state_t * const state, alf_aps *aps)
 {
-#ifdef KVZ_DEBUG
+#ifdef UVG_DEBUG
   printf("=========== Adaptation Parameter Set  ===========\n");
 #endif
 
@@ -1554,7 +1554,7 @@ static void encoder_state_write_adaptation_parameter_set(encoder_state_t * const
 
   WRITE_U(stream, (int)aps->aps_type, 3, "aps_params_type");
   WRITE_U(stream, aps->aps_id, 5, "adaptation_parameter_set_id");
-  WRITE_U(stream, state->encoder_control->chroma_format != KVZ_CSP_400, 1, "aps_chroma_present_flag");
+  WRITE_U(stream, state->encoder_control->chroma_format != UVG_CSP_400, 1, "aps_chroma_present_flag");
 
   if (aps->aps_type == T_ALF_APS)
   {
@@ -1569,7 +1569,7 @@ static void encoder_state_write_adaptation_parameter_set(encoder_state_t * const
     codeScalingListAps(pcAPS);
   }*/
   WRITE_U(stream, 0, 1, "aps_extension_flag"); //Implementation when this flag is equal to 1 should be added when it is needed. Currently in the spec we don't have case when this flag is equal to 1
-  kvz_bitstream_add_rbsp_trailing_bits(stream);
+  uvg_bitstream_add_rbsp_trailing_bits(stream);
 }
 
 static void encode_alf_aps(encoder_state_t * const state)
@@ -1597,7 +1597,7 @@ static void encode_alf_aps(encoder_state_t * const state)
 
       if (write_aps)
       {
-        kvz_nal_write(stream, NAL_UNIT_PREFIX_APS, 0, state->frame->first_nal);
+        uvg_nal_write(stream, NAL_UNIT_PREFIX_APS, 0, state->frame->first_nal);
         state->frame->first_nal = false;
         encoder_state_write_adaptation_parameter_set(state, &aps);
 
@@ -1607,7 +1607,7 @@ static void encode_alf_aps(encoder_state_t * const state)
   }
 }
 
-void kvz_encode_alf_adaptive_parameter_set(encoder_state_t * const state)
+void uvg_encode_alf_adaptive_parameter_set(encoder_state_t * const state)
 {
   //send LMCS APS when LMCSModel is updated. It can be updated even current slice does not enable reshaper.
   //For example, in RA, update is on intra slice, but intra slice may not use reshaper
@@ -1624,7 +1624,7 @@ void kvz_encode_alf_adaptive_parameter_set(encoder_state_t * const state)
 //-------------------------CC ALF encoding functions------------------------
 
 static void filter_blk_cc_alf(encoder_state_t * const state,
-  kvz_pixel *dst_buf, const kvz_pixel *rec_src,
+  uvg_pixel *dst_buf, const uvg_pixel *rec_src,
   const int rec_luma_stride,
   const alf_component_id comp_id, const int16_t *filter_coeff,
   const clp_rngs clp_rngs, int vb_ctu_height, int vb_pos,
@@ -1633,13 +1633,13 @@ static void filter_blk_cc_alf(encoder_state_t * const state,
   const int blk_height)
 {
 
-  assert(!(1 << kvz_math_floor_log2(vb_ctu_height) != vb_ctu_height)); //Not a power of 2
+  assert(!(1 << uvg_math_floor_log2(vb_ctu_height) != vb_ctu_height)); //Not a power of 2
 
   assert(comp_id != COMPONENT_Y); //Must be chroma
 
-  enum kvz_chroma_format chroma_format = state->encoder_control->chroma_format;
-  uint8_t scale_y = (comp_id == COMPONENT_Y || chroma_format != KVZ_CSP_420) ? 0 : 1;
-  uint8_t scale_x = (comp_id == COMPONENT_Y || chroma_format == KVZ_CSP_444) ? 0 : 1;
+  enum uvg_chroma_format chroma_format = state->encoder_control->chroma_format;
+  uint8_t scale_y = (comp_id == COMPONENT_Y || chroma_format != UVG_CSP_420) ? 0 : 1;
+  uint8_t scale_x = (comp_id == COMPONENT_Y || chroma_format == UVG_CSP_444) ? 0 : 1;
   const int cls_size_y = 4;
   const int cls_size_x = 4;
   const int start_height = y_pos;
@@ -1654,11 +1654,11 @@ static void filter_blk_cc_alf(encoder_state_t * const state,
   assert(!((end_height - start_height) % cls_size_y)); //Wrong end_height in filtering
   assert(!((end_width - start_width) % cls_size_x)); //Wrong end_width in filtering
 
-  const kvz_pixel* src_buf = rec_src;
-  const kvz_pixel* luma_ptr = src_buf + luma_start_height * rec_luma_stride + luma_start_width;
+  const uvg_pixel* src_buf = rec_src;
+  const uvg_pixel* luma_ptr = src_buf + luma_start_height * rec_luma_stride + luma_start_width;
 
   const int chroma_stride = rec_luma_stride >> scale_x;
-  kvz_pixel* chroma_ptr = dst_buf + start_height * chroma_stride + start_width;
+  uvg_pixel* chroma_ptr = dst_buf + start_height * chroma_stride + start_width;
 
   for (int i = 0; i < end_height - start_height; i += cls_size_y)
   {
@@ -1668,14 +1668,14 @@ static void filter_blk_cc_alf(encoder_state_t * const state,
       {
         int row = ii;
         int col = j;
-        kvz_pixel *src_self = chroma_ptr + col + row * chroma_stride;
+        uvg_pixel *src_self = chroma_ptr + col + row * chroma_stride;
 
         int offset1 = rec_luma_stride;
         int offset2 = -rec_luma_stride;
         int offset3 = 2 * rec_luma_stride;
         row <<= scale_y;
         col <<= scale_x;
-        const kvz_pixel *src_cross = luma_ptr + col + row * rec_luma_stride;
+        const uvg_pixel *src_cross = luma_ptr + col + row * rec_luma_stride;
 
         int pos = ((start_height + i + ii) << scale_y) & (vb_ctu_height - 1);
         if (scale_y == 0 && (pos == vb_pos || pos == vb_pos + 1))
@@ -1699,7 +1699,7 @@ static void filter_blk_cc_alf(encoder_state_t * const state,
           const int offset0 = 0;
 
           int sum = 0;
-          const kvz_pixel curr_src_cross = src_cross[offset0 + jj2];
+          const uvg_pixel curr_src_cross = src_cross[offset0 + jj2];
           sum += filter_coeff[0] * (src_cross[offset2 + jj2] - curr_src_cross);
           sum += filter_coeff[1] * (src_cross[offset0 + jj2 - 1] - curr_src_cross);
           sum += filter_coeff[2] * (src_cross[offset0 + jj2 + 1] - curr_src_cross);
@@ -1710,9 +1710,9 @@ static void filter_blk_cc_alf(encoder_state_t * const state,
 
           sum = (sum + ((1 << 7/*m_scaleBits*/) >> 1)) >> 7/*m_scaleBits*/;
           const int offset = 1 << clp_rngs.comp[comp_id].bd >> 1;
-          sum = kvz_fast_clip_32bit_to_pixel(sum + offset) - offset;
+          sum = uvg_fast_clip_32bit_to_pixel(sum + offset) - offset;
           sum += src_self[jj];
-          src_self[jj] = kvz_fast_clip_32bit_to_pixel(sum);
+          src_self[jj] = uvg_fast_clip_32bit_to_pixel(sum);
         }
       }
     }
@@ -1723,19 +1723,19 @@ static void filter_blk_cc_alf(encoder_state_t * const state,
   }
 }
 
-static void apply_cc_alf_filter(encoder_state_t * const state, alf_component_id comp_id, kvz_pixel *dst_buf,
-  const kvz_pixel *rec_yuv_ext, const int luma_stride, uint8_t *filter_control,
+static void apply_cc_alf_filter(encoder_state_t * const state, alf_component_id comp_id, uvg_pixel *dst_buf,
+  const uvg_pixel *rec_yuv_ext, const int luma_stride, uint8_t *filter_control,
   const short filter_set[MAX_NUM_CC_ALF_FILTERS][MAX_NUM_CC_ALF_CHROMA_COEFF],
   const int   selected_filter_idx,
   array_variables *arr_vars)
 {
-  enum kvz_chroma_format chroma_format = state->encoder_control->chroma_format;
-  uint8_t component_scale_y = (comp_id == COMPONENT_Y || chroma_format != KVZ_CSP_420) ? 0 : 1;
-  uint8_t component_scale_x = (comp_id == COMPONENT_Y || chroma_format == KVZ_CSP_444) ? 0 : 1;
+  enum uvg_chroma_format chroma_format = state->encoder_control->chroma_format;
+  uint8_t component_scale_y = (comp_id == COMPONENT_Y || chroma_format != UVG_CSP_420) ? 0 : 1;
+  uint8_t component_scale_x = (comp_id == COMPONENT_Y || chroma_format == UVG_CSP_444) ? 0 : 1;
   const int pic_height = state->tile->frame->height;
   const int pic_width = state->tile->frame->width;
-  const int max_ctu_height_log2 = kvz_math_floor_log2(LCU_WIDTH);
-  const int max_ctu_width_log2 = kvz_math_floor_log2(LCU_WIDTH);
+  const int max_ctu_height_log2 = uvg_math_floor_log2(LCU_WIDTH);
+  const int max_ctu_width_log2 = uvg_math_floor_log2(LCU_WIDTH);
   const int width_in_ctus = state->tile->frame->width_in_lcu;
   const int alf_vb_luma_ctu_height = LCU_WIDTH;
   const int alf_vb_luma_pos = LCU_WIDTH - ALF_VB_POS_ABOVE_CTUROW_LUMA;
@@ -2024,7 +2024,7 @@ static void determine_control_idc_values(encoder_state_t *const state, const alf
   ctx_best.only_count = 1;
   ctx_start.only_count = 1;
 
-  //enum kvz_chroma_format chroma_format = state->encoder_control->chroma_format;
+  //enum uvg_chroma_format chroma_format = state->encoder_control->chroma_format;
   double lambda = state->frame->lambda;
   bool limit_cc_alf = state->encoder_control->cfg.qp >= 37;
 
@@ -2042,7 +2042,7 @@ static void determine_control_idc_values(encoder_state_t *const state, const alf
       double   best_cost = MAX_DOUBLE;
       uint8_t  best_filter_idc = 0;
       uint8_t  best_filter_idx = 0;
-      //const uint32_t threshold_s = MIN(pic_height_c - y_ctu, ctu_height_c) << (chroma_format != KVZ_CSP_420 ? 0 : 1);
+      //const uint32_t threshold_s = MIN(pic_height_c - y_ctu, ctu_height_c) << (chroma_format != UVG_CSP_420 ? 0 : 1);
       //const uint32_t number_of_chroma_samples = MIN(pic_height_c - y_ctu, ctu_height_c) * MIN(pic_height_c - x_ctu, ctu_width_c);
       //const uint32_t threshold_c = (number_of_chroma_samples >> 2);
 
@@ -2210,7 +2210,7 @@ static void get_frame_stats_cc_alf(alf_covariance* alf_covariance_cc_alf,
 }
 
 static void derive_cc_alf_filter(encoder_state_t * const state, alf_component_id comp_id,
-  const kvz_picture *org_yuv, const kvz_picture *rec_dst_yuv,
+  const uvg_picture *org_yuv, const uvg_picture *rec_dst_yuv,
   int *cc_reuse_aps_id)
 {
   cc_alf_filter_param *cc_filter_param = state->slice->alf->cc_filter_param;
@@ -2233,10 +2233,10 @@ static void derive_cc_alf_filter(encoder_state_t * const state, alf_component_id
   uint8_t* training_cov_control = alf_info->training_cov_control;
   uint8_t* filter_control = alf_info->filter_control;
   uint8_t* best_filter_control = alf_info->best_filter_control;
-  enum kvz_chroma_format chroma_fmt = state->encoder_control->chroma_format;
+  enum uvg_chroma_format chroma_fmt = state->encoder_control->chroma_format;
   uint8_t best_map_filter_idx_to_filter_idc[MAX_NUM_CC_ALF_FILTERS + 1];
-  bool scale_x = (comp_id == COMPONENT_Y || chroma_fmt == KVZ_CSP_444) ? 0 : 1;
-  bool scale_y = (comp_id == COMPONENT_Y || chroma_fmt != KVZ_CSP_420) ? 0 : 1;
+  bool scale_x = (comp_id == COMPONENT_Y || chroma_fmt == UVG_CSP_444) ? 0 : 1;
+  bool scale_y = (comp_id == COMPONENT_Y || chroma_fmt != UVG_CSP_420) ? 0 : 1;
   const int ctu_width_c = LCU_WIDTH >> scale_x;
   const int ctu_height_c = LCU_WIDTH >> scale_y;
   const int pic_width_c = state->tile->frame->width >> scale_x;
@@ -2244,10 +2244,10 @@ static void derive_cc_alf_filter(encoder_state_t * const state, alf_component_id
   //const int pic_stride_c = rec_dst_yuv->stride >> scale_x;
   //const int8_t bit_depth = state->encoder_control->bitdepth;
   const int max_training_iter_count = 15;
-  int max_ctu_height_log2 = kvz_math_floor_log2(LCU_WIDTH);
-  //int max_ctu_height_log2_chrma = kvz_math_floor_log2(LCU_WIDTH) >> scale_y;
-  int max_ctu_width_log2 = kvz_math_floor_log2(LCU_WIDTH);
-  //int max_ctu_width_log2_chrma = kvz_math_floor_log2(LCU_WIDTH) >> scale_x;
+  int max_ctu_height_log2 = uvg_math_floor_log2(LCU_WIDTH);
+  //int max_ctu_height_log2_chrma = uvg_math_floor_log2(LCU_WIDTH) >> scale_y;
+  int max_ctu_width_log2 = uvg_math_floor_log2(LCU_WIDTH);
+  //int max_ctu_width_log2_chrma = uvg_math_floor_log2(LCU_WIDTH) >> scale_x;
   int32_t ctus_in_width = state->tile->frame->width_in_lcu;
   const uint32_t num_ctus_in_pic = state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu;
   short best_filter_coeff_set[MAX_NUM_CC_ALF_FILTERS][MAX_NUM_CC_ALF_CHROMA_COEFF];
@@ -2503,7 +2503,7 @@ static void derive_cc_alf_filter(encoder_state_t * const state, alf_component_id
       break;
     }
   }
-  cc_filter_param->number_valid_components = (chroma_fmt == KVZ_CSP_400) ? 1 : MAX_NUM_COMPONENT;
+  cc_filter_param->number_valid_components = (chroma_fmt == UVG_CSP_400) ? 1 : MAX_NUM_COMPONENT;
   cc_filter_param->cc_alf_filter_enabled[comp_id - 1] = atleast_one_block_undergoes_fitlering;
   if (atleast_one_block_undergoes_fitlering)
   {
@@ -2580,12 +2580,12 @@ static void derive_cc_alf_filter(encoder_state_t * const state, alf_component_id
 
 }
 
-static void calc_covariance_cc_alf(int32_t e_local[MAX_NUM_CC_ALF_CHROMA_COEFF][1], const kvz_pixel *rec, const int stride, int vb_distance)
+static void calc_covariance_cc_alf(int32_t e_local[MAX_NUM_CC_ALF_CHROMA_COEFF][1], const uvg_pixel *rec, const int stride, int vb_distance)
 {
-  const kvz_pixel *rec_y_m1 = rec - 1 * stride;
-  const kvz_pixel *rec_y_0 = rec;
-  const kvz_pixel *rec_y_p1 = rec + 1 * stride;
-  const kvz_pixel *rec_y_p2 = rec + 2 * stride;
+  const uvg_pixel *rec_y_m1 = rec - 1 * stride;
+  const uvg_pixel *rec_y_0 = rec;
+  const uvg_pixel *rec_y_p1 = rec + 1 * stride;
+  const uvg_pixel *rec_y_p2 = rec + 2 * stride;
 
   if (vb_distance == -2 || vb_distance == +1)
   {
@@ -2597,7 +2597,7 @@ static void calc_covariance_cc_alf(int32_t e_local[MAX_NUM_CC_ALF_CHROMA_COEFF][
     rec_y_p2 = rec_y_p1 = rec_y_0;
   }
 
-  const kvz_pixel center_value = rec_y_0[+0];
+  const uvg_pixel center_value = rec_y_0[+0];
   for (int b = 0; b < 1; b++)
   {
     e_local[0][b] += rec_y_m1[+0] - center_value;
@@ -2612,15 +2612,15 @@ static void calc_covariance_cc_alf(int32_t e_local[MAX_NUM_CC_ALF_CHROMA_COEFF][
 
 static void get_blk_stats_cc_alf(encoder_state_t * const state,
   alf_covariance *alf_covariance,
-  const kvz_picture *org_yuv,
+  const uvg_picture *org_yuv,
   const alf_component_id comp_id,
   const int x_pos, const int y_pos,
   const int width, const int height)
 {
   alf_info_t *alf_info = state->tile->frame->alf_info;
-  enum kvz_chroma_format chroma_fmt = state->encoder_control->chroma_format;
-  bool chroma_scale_x = (chroma_fmt == KVZ_CSP_444) ? 0 : 1;
-  bool chroma_scale_y = (chroma_fmt != KVZ_CSP_420) ? 0 : 1;
+  enum uvg_chroma_format chroma_fmt = state->encoder_control->chroma_format;
+  bool chroma_scale_x = (chroma_fmt == UVG_CSP_444) ? 0 : 1;
+  bool chroma_scale_y = (chroma_fmt != UVG_CSP_420) ? 0 : 1;
 
   const int frame_height = state->tile->frame->height;
   const int alf_vb_luma_pos = LCU_WIDTH - ALF_VB_POS_ABOVE_CTUROW_LUMA;
@@ -2634,15 +2634,15 @@ static void get_blk_stats_cc_alf(encoder_state_t * const state,
   const int num_coeff = 8;
   const channel_type channel = (comp_id == COMPONENT_Y) ? CHANNEL_TYPE_LUMA : CHANNEL_TYPE_CHROMA;
 
-  enum kvz_chroma_format chroma_format = state->encoder_control->chroma_format;
-  const int number_of_components = (chroma_format == KVZ_CSP_400) ? 1 : MAX_NUM_COMPONENT;;
+  enum uvg_chroma_format chroma_format = state->encoder_control->chroma_format;
+  const int number_of_components = (chroma_format == UVG_CSP_400) ? 1 : MAX_NUM_COMPONENT;;
   int rec_stride[MAX_NUM_COMPONENT];
   int rec_pixel_idx[MAX_NUM_COMPONENT];
   const int luma_rec_pos = y_pos * state->tile->frame->rec->stride + x_pos;
   const int chroma_rec_pos = y_pos_c * (state->tile->frame->rec->stride >> chroma_scale_x) + x_pos_c;
-  kvz_pixel *rec_y = &alf_info->alf_tmp_y[luma_rec_pos];
-  kvz_pixel *rec_u = &alf_info->alf_tmp_u[chroma_rec_pos];
-  kvz_pixel *rec_v = &alf_info->alf_tmp_v[chroma_rec_pos];
+  uvg_pixel *rec_y = &alf_info->alf_tmp_y[luma_rec_pos];
+  uvg_pixel *rec_u = &alf_info->alf_tmp_u[chroma_rec_pos];
+  uvg_pixel *rec_v = &alf_info->alf_tmp_v[chroma_rec_pos];
 
   for (int c_idx = 0; c_idx < number_of_components; c_idx++)
   {
@@ -2652,7 +2652,7 @@ static void get_blk_stats_cc_alf(encoder_state_t * const state,
   }
 
   int org_stride = 0;
-  const kvz_pixel *org = 0;
+  const uvg_pixel *org = 0;
   if (comp_id == COMPONENT_Y)
   {
     org_stride = org_yuv->stride;
@@ -2678,9 +2678,9 @@ static void get_blk_stats_cc_alf(encoder_state_t * const state,
   }
 
   int32_t e_local[MAX_NUM_CC_ALF_CHROMA_COEFF][1];
-  kvz_pixel *rec_pixels = (comp_id == COMPONENT_Y ? rec_y : (comp_id == COMPONENT_Cb ? rec_u : rec_v));
-  uint8_t component_scale_y = (comp_id == COMPONENT_Y || chroma_format != KVZ_CSP_420) ? 0 : 1;
-  uint8_t component_scale_x = (comp_id == COMPONENT_Y || chroma_format == KVZ_CSP_444) ? 0 : 1;
+  uvg_pixel *rec_pixels = (comp_id == COMPONENT_Y ? rec_y : (comp_id == COMPONENT_Cb ? rec_u : rec_v));
+  uint8_t component_scale_y = (comp_id == COMPONENT_Y || chroma_format != UVG_CSP_420) ? 0 : 1;
+  uint8_t component_scale_x = (comp_id == COMPONENT_Y || chroma_format == UVG_CSP_444) ? 0 : 1;
   int16_t y_local = 0;
 
   for (int i = 0; i < (comp_id == COMPONENT_Y ? height : c_height); i++)
@@ -2752,11 +2752,11 @@ static void get_blk_stats_cc_alf(encoder_state_t * const state,
       {
         if (comp_id == COMPONENT_Y)
         {
-          rec_pixel_idx[src_c_idx] += rec_stride[src_c_idx] >> ((src_c_idx == COMPONENT_Y || chroma_format != KVZ_CSP_420) ? 0 : 1);
+          rec_pixel_idx[src_c_idx] += rec_stride[src_c_idx] >> ((src_c_idx == COMPONENT_Y || chroma_format != UVG_CSP_420) ? 0 : 1);
         }
         else
         {
-          rec_pixel_idx[src_c_idx] += rec_stride[src_c_idx] << ((comp_id == COMPONENT_Y || chroma_format != KVZ_CSP_420) ? 0 : 1);
+          rec_pixel_idx[src_c_idx] += rec_stride[src_c_idx] << ((comp_id == COMPONENT_Y || chroma_format != UVG_CSP_420) ? 0 : 1);
         }
       }
     }
@@ -2778,7 +2778,7 @@ static void get_blk_stats_cc_alf(encoder_state_t * const state,
 }
 
 static void derive_stats_for_cc_alf_filtering(encoder_state_t * const state,
-  const kvz_picture *org_yuv,
+  const uvg_picture *org_yuv,
   const int comp_idx, const int mask_stride,
   const uint8_t filter_idc)
 {
@@ -2817,7 +2817,7 @@ static void derive_stats_for_cc_alf_filtering(encoder_state_t * const state,
   }
 }
 /*
-static void count_luma_swing_greater_than_threshold(const kvz_pixel* luma,
+static void count_luma_swing_greater_than_threshold(const uvg_pixel* luma,
   int luma_stride, int height, int width,
   int log2_block_width, int log2_block_height,
   uint64_t* luma_swing_greater_than_threshold_count,
@@ -2849,7 +2849,7 @@ static void count_luma_swing_greater_than_threshold(const kvz_pixel* luma,
           int max_val = 0;
           for (int i = 0; i < 8; i++)
           {
-            kvz_pixel p = luma[(y_off + y_support[i]) * luma_stride + x + x_off + x_support[i]];
+            uvg_pixel p = luma[(y_off + y_support[i]) * luma_stride + x + x_off + x_support[i]];
 
             if (p < min_val)
             {
@@ -2874,7 +2874,7 @@ static void count_luma_swing_greater_than_threshold(const kvz_pixel* luma,
 */
 
 /*
-static void count_chroma_sample_value_near_mid_point(const kvz_pixel* chroma, int chroma_stride, int height, int width,
+static void count_chroma_sample_value_near_mid_point(const uvg_pixel* chroma, int chroma_stride, int height, int width,
   int log2_block_width, int log2_block_height,
   uint64_t* chroma_sample_count_near_mid_point,
   int chroma_sample_count_near_mid_point_stride,
@@ -3002,8 +3002,8 @@ static double alf_derive_ctb_alf_enable_flags(encoder_state_t * const state,
   bool is_luma = channel == CHANNEL_TYPE_LUMA ? 1 : 0;
 
   alf_aps *alf_param_temp = &alf_info->alf_param_temp;
-  const kvz_pixel comp_id_first = is_luma ? COMPONENT_Y : COMPONENT_Cb;
-  const kvz_pixel comp_id_last = is_luma ? COMPONENT_Y : COMPONENT_Cr;
+  const uvg_pixel comp_id_first = is_luma ? COMPONENT_Y : COMPONENT_Cb;
+  const uvg_pixel comp_id_last = is_luma ? COMPONENT_Y : COMPONENT_Cr;
   const int num_alts = is_luma ? 1 : alf_param_temp->num_alternatives_chroma;
   const int8_t bit_depth = state->encoder_control->bitdepth;
   const int32_t num_ctus_in_pic = state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu;
@@ -3157,7 +3157,7 @@ static void alf_create_frame_buffer(encoder_state_t * const state, alf_info_t *a
 {
   if (!alf_info->alf_fulldata_buf)
   {
-    enum kvz_chroma_format chroma_format = state->encoder_control->chroma_format;
+    enum uvg_chroma_format chroma_format = state->encoder_control->chroma_format;
     const size_t simd_padding_width = 64;
     int width = state->tile->frame->width;
     int height = state->tile->frame->height;
@@ -3166,11 +3166,11 @@ static void alf_create_frame_buffer(encoder_state_t * const state, alf_info_t *a
     unsigned chroma_sizes[] = { 0, luma_size / 4, luma_size / 2, luma_size };
     unsigned chroma_size = chroma_sizes[chroma_format];
 
-    alf_info->alf_fulldata_buf = MALLOC_SIMD_PADDED(kvz_pixel, (luma_size + 2 * chroma_size), simd_padding_width * 2);
-    alf_info->alf_fulldata = &alf_info->alf_fulldata_buf[4 * (width + 8) + 4] + simd_padding_width / sizeof(kvz_pixel);
+    alf_info->alf_fulldata_buf = MALLOC_SIMD_PADDED(uvg_pixel, (luma_size + 2 * chroma_size), simd_padding_width * 2);
+    alf_info->alf_fulldata = &alf_info->alf_fulldata_buf[4 * (width + 8) + 4] + simd_padding_width / sizeof(uvg_pixel);
     alf_info->alf_tmp_y = &alf_info->alf_fulldata[0];
 
-    if (chroma_format == KVZ_CSP_400) {
+    if (chroma_format == UVG_CSP_400) {
       alf_info->alf_tmp_u = NULL;
       alf_info->alf_tmp_v = NULL;
     }
@@ -3182,7 +3182,7 @@ static void alf_create_frame_buffer(encoder_state_t * const state, alf_info_t *a
 
 }
 
-static void alf_init_covariance(videoframe_t* frame, enum kvz_chroma_format chroma_format) {
+static void alf_init_covariance(videoframe_t* frame, enum uvg_chroma_format chroma_format) {
 
   const int num_ctus_in_pic = frame->width_in_lcu * frame->height_in_lcu;
   const int pic_width = frame->width;
@@ -3191,7 +3191,7 @@ static void alf_init_covariance(videoframe_t* frame, enum kvz_chroma_format chro
   const int chroma_coeffs = 7;
   const int cc_alf_coeff = 8;
   int num_classes = 0;
-  if (chroma_format != KVZ_CSP_400) {
+  if (chroma_format != UVG_CSP_400) {
     for (int comp_idx = 0; comp_idx < MAX_NUM_COMPONENT; comp_idx++)
     {
       num_classes += comp_idx ? 1 : MAX_NUM_ALF_CLASSES;
@@ -3218,7 +3218,7 @@ static void alf_init_covariance(videoframe_t* frame, enum kvz_chroma_format chro
     init_alf_covariance(&alf_info->alf_covariance_frame_luma[k], luma_coeffs);
   }
 
-  if (chroma_format != KVZ_CSP_400) {
+  if (chroma_format != UVG_CSP_400) {
     const int num_chroma_covs = num_ctus_in_pic;
     alf_info->alf_covariance_u = &alf_info->alf_covariance[num_luma_covs];
     alf_info->alf_covariance_v = &alf_info->alf_covariance[num_luma_covs + num_chroma_covs];
@@ -3277,7 +3277,7 @@ static void alf_init_covariance(videoframe_t* frame, enum kvz_chroma_format chro
   }
 }
 
-void kvz_alf_create(videoframe_t *frame, enum kvz_chroma_format chroma_format)
+void uvg_alf_create(videoframe_t *frame, enum uvg_chroma_format chroma_format)
 {
   const int num_ctus_in_pic = frame->width_in_lcu * frame->height_in_lcu;
   //const int pic_width = frame->width;
@@ -3321,7 +3321,7 @@ void kvz_alf_create(videoframe_t *frame, enum kvz_chroma_format chroma_format)
     }
   }
 
-  if (chroma_format != KVZ_CSP_400) {
+  if (chroma_format != UVG_CSP_400) {
     for (int comp_idx = 0; comp_idx < MAX_NUM_COMPONENT; comp_idx++)
     {
       num_classes += comp_idx ? 1 : MAX_NUM_ALF_CLASSES;
@@ -3418,7 +3418,7 @@ static void alf_covariance_destroy(videoframe_t* const frame)
 
 }
 
-void kvz_alf_destroy(videoframe_t * const frame)
+void uvg_alf_destroy(videoframe_t * const frame)
 {
   alf_info_t *alf_info = frame->alf_info;
 
@@ -4013,7 +4013,7 @@ static void alf_encoder(encoder_state_t * const state,
 
   bool is_luma = channel == CHANNEL_TYPE_LUMA ? 1 : 0;
   alf_covariance *alf_cov_frame = is_luma ? alf_info->alf_covariance_frame_luma : alf_info->alf_covariance_frame_chroma;
-  kvz_config cfg = state->encoder_control->cfg;
+  uvg_config cfg = state->encoder_control->cfg;
 
   double cost_min = MAX_DOUBLE;
   double lambda = state->frame->lambda;
@@ -4228,20 +4228,20 @@ static void alf_derive_stats_for_filtering(encoder_state_t * const state,
   short alf_clipping_values[MAX_NUM_CHANNEL_TYPE][MAX_ALF_NUM_CLIPPING_VALUES])
 {
   alf_info_t *alf_info = state->tile->frame->alf_info;
-  enum kvz_chroma_format chroma_fmt = state->encoder_control->chroma_format;
-  bool chroma_scale_x = (chroma_fmt == KVZ_CSP_444) ? 0 : 1;
-  bool chroma_scale_y = (chroma_fmt != KVZ_CSP_420) ? 0 : 1;
+  enum uvg_chroma_format chroma_fmt = state->encoder_control->chroma_format;
+  bool chroma_scale_x = (chroma_fmt == UVG_CSP_444) ? 0 : 1;
+  bool chroma_scale_y = (chroma_fmt != UVG_CSP_420) ? 0 : 1;
 
   const int32_t num_ctus_in_pic = state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu;
   const int alf_vb_luma_ctu_height = LCU_WIDTH;
-  const int alf_vb_chma_ctu_height = (LCU_WIDTH >> ((chroma_fmt == KVZ_CSP_420) ? 1 : 0));
+  const int alf_vb_chma_ctu_height = (LCU_WIDTH >> ((chroma_fmt == UVG_CSP_420) ? 1 : 0));
   const int alf_vb_luma_pos = LCU_WIDTH - ALF_VB_POS_ABOVE_CTUROW_LUMA;
-  const int alf_vb_chma_pos = (LCU_WIDTH >> ((chroma_fmt == KVZ_CSP_420) ? 1 : 0)) - ALF_VB_POS_ABOVE_CTUROW_CHMA;
+  const int alf_vb_chma_pos = (LCU_WIDTH >> ((chroma_fmt == UVG_CSP_420) ? 1 : 0)) - ALF_VB_POS_ABOVE_CTUROW_CHMA;
   int32_t pic_width = state->tile->frame->width;
   int32_t pic_height = state->tile->frame->height;
   int ctu_rs_addr = 0;
 
-  const int number_of_components = (chroma_fmt == KVZ_CSP_400) ? 1 : MAX_NUM_COMPONENT;
+  const int number_of_components = (chroma_fmt == UVG_CSP_400) ? 1 : MAX_NUM_COMPONENT;
 
   // init CTU stats buffers
   {
@@ -4261,7 +4261,7 @@ static void alf_derive_stats_for_filtering(encoder_state_t * const state,
   }
 
   // init Frame stats buffers
-  const int number_of_channels = (chroma_fmt == KVZ_CSP_400) ? 1 : MAX_NUM_CHANNEL_TYPE;
+  const int number_of_channels = (chroma_fmt == UVG_CSP_400) ? 1 : MAX_NUM_CHANNEL_TYPE;
   for (int channel_idx = 0; channel_idx < number_of_channels; channel_idx++)
   {
     const channel_type channel_id = channel_idx;
@@ -4303,12 +4303,12 @@ static void alf_derive_stats_for_filtering(encoder_state_t * const state,
         int32_t org_stride = is_luma ? state->tile->frame->source->stride : state->tile->frame->source->stride >> chroma_scale_x;
         int32_t rec_stride = is_luma ? state->tile->frame->rec->stride : state->tile->frame->rec->stride >> chroma_scale_x;
 
-        kvz_pixel *org = comp_idx ? (comp_idx - 1 ? &state->tile->frame->source->v[pos_x + pos_y * org_stride] : &state->tile->frame->source->u[pos_x + pos_y * org_stride]) : &state->tile->frame->source->y[pos_x + pos_y * org_stride];
-        kvz_pixel *rec = comp_idx ? (comp_idx - 1 ? &state->tile->frame->rec->v[pos_x + pos_y * rec_stride] : &state->tile->frame->rec->u[pos_x + pos_y * rec_stride]) : &state->tile->frame->rec->y[pos_x + pos_y * rec_stride];
+        uvg_pixel *org = comp_idx ? (comp_idx - 1 ? &state->tile->frame->source->v[pos_x + pos_y * org_stride] : &state->tile->frame->source->u[pos_x + pos_y * org_stride]) : &state->tile->frame->source->y[pos_x + pos_y * org_stride];
+        uvg_pixel *rec = comp_idx ? (comp_idx - 1 ? &state->tile->frame->rec->v[pos_x + pos_y * rec_stride] : &state->tile->frame->rec->u[pos_x + pos_y * rec_stride]) : &state->tile->frame->rec->y[pos_x + pos_y * rec_stride];
 
         const int num_classes = is_luma ? MAX_NUM_ALF_CLASSES : 1;
         const int cov_index = ctu_rs_addr * num_classes;
-        kvz_alf_get_blk_stats(state, ch_type,
+        uvg_alf_get_blk_stats(state, ch_type,
           &alf_cov[cov_index],
           comp_idx ? NULL : alf_info->classifier,
           org, org_stride, rec, rec_stride, pos_x, pos_y, pos_x, pos_y, blk_w, blk_h,
@@ -4755,7 +4755,7 @@ static void alf_encoder_ctb(encoder_state_t * const state,
   }
 
   //chroma
-  if (state->encoder_control->chroma_format != KVZ_CSP_400)
+  if (state->encoder_control->chroma_format != UVG_CSP_400)
   {
     copy_alf_param(alf_param_temp, &alf_aps_new_filters_best);
     if (alf_param_temp->num_alternatives_chroma < 1)
@@ -5041,14 +5041,14 @@ static void alf_reconstruct(encoder_state_t * const state,
 
   alf_info_t *alf_info = state->tile->frame->alf_info;
   bool **ctu_enable_flags = alf_info->ctu_enable_flag;
-  enum kvz_chroma_format chroma_fmt = state->encoder_control->chroma_format;
-  bool chroma_scale_x = (chroma_fmt == KVZ_CSP_444) ? 0 : 1;
-  bool chroma_scale_y = (chroma_fmt != KVZ_CSP_420) ? 0 : 1;
+  enum uvg_chroma_format chroma_fmt = state->encoder_control->chroma_format;
+  bool chroma_scale_x = (chroma_fmt == UVG_CSP_444) ? 0 : 1;
+  bool chroma_scale_y = (chroma_fmt != UVG_CSP_420) ? 0 : 1;
 
   const int alf_vb_luma_ctu_height = LCU_WIDTH;
-  const int alf_vb_chma_ctu_height = (LCU_WIDTH >> ((chroma_fmt == KVZ_CSP_420) ? 1 : 0));
+  const int alf_vb_chma_ctu_height = (LCU_WIDTH >> ((chroma_fmt == UVG_CSP_420) ? 1 : 0));
   const int alf_vb_luma_pos = LCU_WIDTH - ALF_VB_POS_ABOVE_CTUROW_LUMA;
-  const int alf_vb_chma_pos = (LCU_WIDTH >> ((chroma_fmt == KVZ_CSP_420) ? 1 : 0)) - ALF_VB_POS_ABOVE_CTUROW_CHMA;
+  const int alf_vb_chma_pos = (LCU_WIDTH >> ((chroma_fmt == UVG_CSP_420) ? 1 : 0)) - ALF_VB_POS_ABOVE_CTUROW_CHMA;
   const int luma_height = state->tile->frame->height;
   const int luma_width = state->tile->frame->width;
   const int max_cu_width = LCU_WIDTH;
@@ -5066,11 +5066,11 @@ static void alf_reconstruct(encoder_state_t * const state,
 
   //Copy reconstructed samples to a buffer.
   memcpy(&alf_info->alf_tmp_y[index_luma], &state->tile->frame->rec->y[index_luma],
-    sizeof(kvz_pixel) * luma_stride * (luma_height + MAX_ALF_PADDING_SIZE * 2));
+    sizeof(uvg_pixel) * luma_stride * (luma_height + MAX_ALF_PADDING_SIZE * 2));
   memcpy(&alf_info->alf_tmp_u[index_chroma], &state->tile->frame->rec->u[index_chroma],
-    sizeof(kvz_pixel) * chroma_stride * (chroma_height + chroma_padding * 2));
+    sizeof(uvg_pixel) * chroma_stride * (chroma_height + chroma_padding * 2));
   memcpy(&alf_info->alf_tmp_v[index_chroma], &state->tile->frame->rec->v[index_chroma],
-    sizeof(kvz_pixel) * chroma_stride * (chroma_height + chroma_padding * 2));
+    sizeof(uvg_pixel) * chroma_stride * (chroma_height + chroma_padding * 2));
 
   for (int y_pos = 0; y_pos < luma_height; y_pos += max_cu_height)
   {
@@ -5102,7 +5102,7 @@ static void alf_reconstruct(encoder_state_t * const state,
             coeff = arr_vars->fixed_filter_set_coeff_dec[filter_set_index];
             clip = arr_vars->clip_default;
           }
-          kvz_alf_filter_7x7_blk(state,
+          uvg_alf_filter_7x7_blk(state,
             alf_info->alf_tmp_y, state->tile->frame->rec->y,
             luma_stride, luma_stride,
             coeff, clip, arr_vars->clp_rngs.comp[COMPONENT_Y],
@@ -5115,11 +5115,11 @@ static void alf_reconstruct(encoder_state_t * const state,
 
           if (ctu_enable_flags[comp_idx][ctu_idx])
           {
-            kvz_pixel *dst_pixels = comp_id - 1 ? state->tile->frame->rec->v : state->tile->frame->rec->u;
-            const kvz_pixel *src_pixels = comp_id - 1 ? alf_info->alf_tmp_v : alf_info->alf_tmp_u;
+            uvg_pixel *dst_pixels = comp_id - 1 ? state->tile->frame->rec->v : state->tile->frame->rec->u;
+            const uvg_pixel *src_pixels = comp_id - 1 ? alf_info->alf_tmp_v : alf_info->alf_tmp_u;
 
             const int alt_num = alf_info->ctu_alternative[comp_id][ctu_idx];
-            kvz_alf_filter_5x5_blk(state,
+            uvg_alf_filter_5x5_blk(state,
               src_pixels, dst_pixels,
               chroma_stride, chroma_stride,
               arr_vars->chroma_coeff_final[alt_num], arr_vars->chroma_clipp_final[alt_num], arr_vars->clp_rngs.comp[comp_idx],
@@ -5143,9 +5143,9 @@ static void alf_derive_classification(encoder_state_t * const state,
   const int blk_dst_x,
   const int blk_dst_y)
 {
-  enum kvz_chroma_format chroma_fmt = state->encoder_control->chroma_format;
-  bool chroma_scale_x = (chroma_fmt == KVZ_CSP_444) ? 0 : 1;
-  bool chroma_scale_y = (chroma_fmt != KVZ_CSP_420) ? 0 : 1;
+  enum uvg_chroma_format chroma_fmt = state->encoder_control->chroma_format;
+  bool chroma_scale_x = (chroma_fmt == UVG_CSP_444) ? 0 : 1;
+  bool chroma_scale_y = (chroma_fmt != UVG_CSP_420) ? 0 : 1;
 
   const int alf_vb_luma_ctu_height = LCU_WIDTH;
   const int alf_vb_luma_pos = LCU_WIDTH - ALF_VB_POS_ABOVE_CTUROW_LUMA;
@@ -5182,7 +5182,7 @@ static void alf_derive_classification(encoder_state_t * const state,
     {
       int n_width = MIN(j + CLASSIFICATION_BLK_SIZE, max_width) - j;
 
-      kvz_alf_derive_classification_blk(state, state->encoder_control->cfg.input_bitdepth + 4, n_height, n_width, j, i,
+      uvg_alf_derive_classification_blk(state, state->encoder_control->cfg.input_bitdepth + 4, n_height, n_width, j, i,
         j - x_pos + blk_dst_x, i - y_pos + blk_dst_y,
         alf_vb_luma_ctu_height,
         alf_vb_luma_pos);
@@ -5190,7 +5190,7 @@ static void alf_derive_classification(encoder_state_t * const state,
   }
 }
 
-void kvz_alf_enc_process(encoder_state_t *const state)
+void uvg_alf_enc_process(encoder_state_t *const state)
 {
   alf_init_covariance(state->tile->frame, state->encoder_control->chroma_format);
   alf_info_t *alf_info = state->tile->frame->alf_info;
@@ -5198,15 +5198,15 @@ void kvz_alf_enc_process(encoder_state_t *const state)
   /*
   //if (!layerIdx && cs.slice->getPendingRasInit()
   if (1 && (false
-  || (state->frame->pictype == KVZ_NAL_IDR_W_RADL || state->frame->pictype == KVZ_NAL_IDR_N_LP)))
+  || (state->frame->pictype == UVG_NAL_IDR_W_RADL || state->frame->pictype == UVG_NAL_IDR_N_LP)))
   {
     for (int i = 0; i < ALF_CTB_MAX_NUM_APS; i++) {
-      reset_aps(&state->slice->alf->apss[i], state->encoder_control->cfg.alf_type == KVZ_ALF_FULL);
+      reset_aps(&state->slice->alf->apss[i], state->encoder_control->cfg.alf_type == UVG_ALF_FULL);
       if (state->tile->frame->alf_param_set_map[i + T_ALF_APS].b_changed)
       {
         alf_aps* alf_aps = &state->tile->frame->alf_param_set_map[i + T_ALF_APS].parameter_set;
         state->tile->frame->alf_param_set_map[i + T_ALF_APS].b_changed = false;
-        reset_aps(alf_aps, state->encoder_control->cfg.alf_type == KVZ_ALF_FULL);
+        reset_aps(alf_aps, state->encoder_control->cfg.alf_type == UVG_ALF_FULL);
       }
     }
     alf_info->aps_id_start = ALF_CTB_MAX_NUM_APS;
@@ -5217,10 +5217,10 @@ void kvz_alf_enc_process(encoder_state_t *const state)
   cc_alf_filter_param *cc_filter_param = state->slice->alf->cc_filter_param;
 
 
-  enum kvz_chroma_format chroma_fmt = state->encoder_control->chroma_format;
-  bool chroma_scale_x = (chroma_fmt == KVZ_CSP_444) ? 0 : 1;
-  bool chroma_scale_y = (chroma_fmt != KVZ_CSP_420) ? 0 : 1;
-  int8_t kvz_bit_depth = state->encoder_control->bitdepth;
+  enum uvg_chroma_format chroma_fmt = state->encoder_control->chroma_format;
+  bool chroma_scale_x = (chroma_fmt == UVG_CSP_444) ? 0 : 1;
+  bool chroma_scale_y = (chroma_fmt != UVG_CSP_420) ? 0 : 1;
+  int8_t uvg_bit_depth = state->encoder_control->bitdepth;
   const int32_t num_ctus_in_pic = state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu;
   const int8_t input_bitdepth = state->encoder_control->bitdepth;
   double lambda_chroma_weight = 0.0;
@@ -5280,11 +5280,11 @@ void kvz_alf_enc_process(encoder_state_t *const state)
 
     //Default clp_rng
     arr_vars.clp_rngs.comp[COMPONENT_Y].min = arr_vars.clp_rngs.comp[COMPONENT_Cb].min = arr_vars.clp_rngs.comp[COMPONENT_Cr].min = 0;
-    arr_vars.clp_rngs.comp[COMPONENT_Y].max = (1 << kvz_bit_depth) - 1;
-    arr_vars.clp_rngs.comp[COMPONENT_Y].bd = kvz_bit_depth;
+    arr_vars.clp_rngs.comp[COMPONENT_Y].max = (1 << uvg_bit_depth) - 1;
+    arr_vars.clp_rngs.comp[COMPONENT_Y].bd = uvg_bit_depth;
     arr_vars.clp_rngs.comp[COMPONENT_Y].n = 0;
-    arr_vars.clp_rngs.comp[COMPONENT_Cb].max = arr_vars.clp_rngs.comp[COMPONENT_Cr].max = (1 << kvz_bit_depth) - 1;
-    arr_vars.clp_rngs.comp[COMPONENT_Cb].bd = arr_vars.clp_rngs.comp[COMPONENT_Cr].bd = kvz_bit_depth;
+    arr_vars.clp_rngs.comp[COMPONENT_Cb].max = arr_vars.clp_rngs.comp[COMPONENT_Cr].max = (1 << uvg_bit_depth) - 1;
+    arr_vars.clp_rngs.comp[COMPONENT_Cb].bd = arr_vars.clp_rngs.comp[COMPONENT_Cr].bd = uvg_bit_depth;
     arr_vars.clp_rngs.comp[COMPONENT_Cb].n = arr_vars.clp_rngs.comp[COMPONENT_Cr].n = 0;
     arr_vars.clp_rngs.used = arr_vars.clp_rngs.chroma = false;
 
@@ -5325,7 +5325,7 @@ void kvz_alf_enc_process(encoder_state_t *const state)
   );
 
   // derive filter (chroma)
-  if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+  if (state->encoder_control->chroma_format != UVG_CSP_400) {
     alf_encoder(state,
       &alf_param, CHANNEL_TYPE_CHROMA,
       lambda_chroma_weight,
@@ -5357,7 +5357,7 @@ void kvz_alf_enc_process(encoder_state_t *const state)
 
   alf_reconstruct(state, &arr_vars);
 
-  if (state->encoder_control->cfg.alf_type != KVZ_ALF_FULL)
+  if (state->encoder_control->cfg.alf_type != UVG_ALF_FULL)
   {
     return;
   }
@@ -5387,8 +5387,8 @@ void kvz_alf_enc_process(encoder_state_t *const state)
     aps->cc_alf_aps_param.new_cc_alf_filter[1] = false;
   }
 
-  const kvz_picture *org_yuv = state->tile->frame->source;
-  const kvz_picture *rec_yuv = state->tile->frame->rec;
+  const uvg_picture *org_yuv = state->tile->frame->source;
+  const uvg_picture *rec_yuv = state->tile->frame->rec;
 
   const int luma_stride = state->tile->frame->rec->stride;
   const int chroma_stride = luma_stride >> chroma_scale_x;
@@ -5399,9 +5399,9 @@ void kvz_alf_enc_process(encoder_state_t *const state)
 
   //Copy reconstructed samples to a buffer.
   memcpy(&alf_info->alf_tmp_u[index_chroma], &state->tile->frame->rec->u[index_chroma],
-    sizeof(kvz_pixel) * chroma_stride * (chroma_height + chroma_padding * 2));
+    sizeof(uvg_pixel) * chroma_stride * (chroma_height + chroma_padding * 2));
   memcpy(&alf_info->alf_tmp_v[index_chroma], &state->tile->frame->rec->v[index_chroma],
-    sizeof(kvz_pixel) * chroma_stride * (chroma_height + chroma_padding * 2));
+    sizeof(uvg_pixel) * chroma_stride * (chroma_height + chroma_padding * 2));
 
   adjust_pixels_chroma(alf_info->alf_tmp_u,
     0,
@@ -5432,11 +5432,11 @@ void kvz_alf_enc_process(encoder_state_t *const state)
 
   setup_cc_alf_aps(state, arr_vars.cc_reuse_aps_id);
 
-  for (alf_component_id comp_idx = 1; comp_idx < (state->encoder_control->chroma_format == KVZ_CSP_400 ? 1 : MAX_NUM_COMPONENT); comp_idx++)
+  for (alf_component_id comp_idx = 1; comp_idx < (state->encoder_control->chroma_format == UVG_CSP_400 ? 1 : MAX_NUM_COMPONENT); comp_idx++)
   {
     if (cc_filter_param->cc_alf_filter_enabled[comp_idx - 1])
     {
-      kvz_pixel* rec_uv = comp_idx == COMPONENT_Cb ? rec_yuv->u : rec_yuv->v;
+      uvg_pixel* rec_uv = comp_idx == COMPONENT_Cb ? rec_yuv->u : rec_yuv->v;
       const int luma_stride = rec_yuv->stride;
       apply_cc_alf_filter(state, comp_idx, rec_uv, alf_info->alf_tmp_y, luma_stride, alf_info->cc_alf_filter_control[comp_idx - 1],
         cc_filter_param->cc_alf_coeff[comp_idx - 1], -1, &arr_vars);

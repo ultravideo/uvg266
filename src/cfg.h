@@ -43,11 +43,11 @@
 #include "kvazaar.h"
 
 /* Function definitions */
-kvz_config *kvz_config_alloc(void);
-int kvz_config_init(kvz_config *cfg);
-int kvz_config_destroy(kvz_config *cfg);
-int kvz_config_parse(kvz_config *cfg, const char *name, const char *value);
-void kvz_config_process_lp_gop(kvz_config *cfg);
-int kvz_config_validate(const kvz_config *cfg);
+uvg_config *uvg_config_alloc(void);
+int uvg_config_init(uvg_config *cfg);
+int uvg_config_destroy(uvg_config *cfg);
+int uvg_config_parse(uvg_config *cfg, const char *name, const char *value);
+void uvg_config_process_lp_gop(uvg_config *cfg);
+int uvg_config_validate(const uvg_config *cfg);
 
 #endif

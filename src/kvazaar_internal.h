@@ -48,7 +48,7 @@
 struct encoder_state_t;
 struct encoder_control_t;
 
-struct kvz_encoder {
+struct uvg_encoder {
   const struct encoder_control_t* control;
   struct encoder_state_t* states;
   unsigned num_encoder_states;

@@ -37,7 +37,7 @@
 #include "videoframe.h"
 
 
-int kvz_lcu_at_slice_start(const encoder_control_t * const encoder, int lcu_addr_in_ts) {
+int uvg_lcu_at_slice_start(const encoder_control_t * const encoder, int lcu_addr_in_ts) {
   int i;
   assert(lcu_addr_in_ts >= 0 && lcu_addr_in_ts < encoder->in.height_in_lcu * encoder->in.width_in_lcu);
   if (lcu_addr_in_ts == 0) return 1;
@@ -47,7 +47,7 @@ int kvz_lcu_at_slice_start(const encoder_control_t * const encoder, int lcu_addr
   return 0;
 }
 
-int kvz_lcu_at_slice_end(const encoder_control_t * const encoder, int lcu_addr_in_ts) {
+int uvg_lcu_at_slice_end(const encoder_control_t * const encoder, int lcu_addr_in_ts) {
   int i;
   assert(lcu_addr_in_ts >= 0 && lcu_addr_in_ts < encoder->in.height_in_lcu * encoder->in.width_in_lcu);
   if (lcu_addr_in_ts == encoder->in.height_in_lcu * encoder->in.width_in_lcu - 1) return 1;
@@ -57,7 +57,7 @@ int kvz_lcu_at_slice_end(const encoder_control_t * const encoder, int lcu_addr_i
   return 0;
 }
 
-int kvz_lcu_at_tile_start(const encoder_control_t * const encoder, int lcu_addr_in_ts) {
+int uvg_lcu_at_tile_start(const encoder_control_t * const encoder, int lcu_addr_in_ts) {
   assert(lcu_addr_in_ts >= 0 && lcu_addr_in_ts < encoder->in.height_in_lcu * encoder->in.width_in_lcu);
   if (lcu_addr_in_ts == 0) return 1;
   if (encoder->tiles_tile_id[lcu_addr_in_ts - 1] != encoder->tiles_tile_id[lcu_addr_in_ts]) {
@@ -66,7 +66,7 @@ int kvz_lcu_at_tile_start(const encoder_control_t * const encoder, int lcu_addr_
   return 0;
 }
 
-int kvz_lcu_at_tile_end(const encoder_control_t * const encoder, int lcu_addr_in_ts) {
+int uvg_lcu_at_tile_end(const encoder_control_t * const encoder, int lcu_addr_in_ts) {
   assert(lcu_addr_in_ts >= 0 && lcu_addr_in_ts < encoder->in.height_in_lcu * encoder->in.width_in_lcu);
   if (lcu_addr_in_ts == encoder->in.height_in_lcu * encoder->in.width_in_lcu - 1) return 1;
   if (encoder->tiles_tile_id[lcu_addr_in_ts + 1] != encoder->tiles_tile_id[lcu_addr_in_ts]) {
@@ -76,7 +76,7 @@ int kvz_lcu_at_tile_end(const encoder_control_t * const encoder, int lcu_addr_in
 }
 
 //Return 1 if the LCU is at the first row of a structure (tile or slice)
-int kvz_lcu_in_first_row(const encoder_state_t * const state, int lcu_addr_in_ts) {
+int uvg_lcu_in_first_row(const encoder_state_t * const state, int lcu_addr_in_ts) {
   const int lcu_addr_in_rs = state->encoder_control->tiles_ctb_addr_ts_to_rs[lcu_addr_in_ts];
 
   if (lcu_addr_in_rs / state->encoder_control->in.width_in_lcu == state->tile->lcu_offset_y) {
@@ -96,7 +96,7 @@ int kvz_lcu_in_first_row(const encoder_state_t * const state, int lcu_addr_in_ts
 }
 
 //Return 1 if the LCU is at the first row of a structure (tile or slice)
-int kvz_lcu_in_last_row(const encoder_state_t * const state, int lcu_addr_in_ts) {
+int uvg_lcu_in_last_row(const encoder_state_t * const state, int lcu_addr_in_ts) {
   const int lcu_addr_in_rs = state->encoder_control->tiles_ctb_addr_ts_to_rs[lcu_addr_in_ts];
 
   if (lcu_addr_in_rs / state->encoder_control->in.width_in_lcu == state->tile->lcu_offset_y + state->tile->frame->height_in_lcu - 1) {
@@ -117,7 +117,7 @@ int kvz_lcu_in_last_row(const encoder_state_t * const state, int lcu_addr_in_ts)
 
 
 //Return 1 if the LCU is at the first column of a structure (tile or slice)
-int kvz_lcu_in_first_column(const encoder_state_t * const state, int lcu_addr_in_ts) {
+int uvg_lcu_in_first_column(const encoder_state_t * const state, int lcu_addr_in_ts) {
   const int lcu_addr_in_rs = state->encoder_control->tiles_ctb_addr_ts_to_rs[lcu_addr_in_ts];
 
   //First column of tile?
@@ -134,7 +134,7 @@ int kvz_lcu_in_first_column(const encoder_state_t * const state, int lcu_addr_in
 }
 
 //Return 1 if the LCU is at the last column of a structure (tile or slice)
-int kvz_lcu_in_last_column(const encoder_state_t * const state, int lcu_addr_in_ts) {
+int uvg_lcu_in_last_column(const encoder_state_t * const state, int lcu_addr_in_ts) {
   const int lcu_addr_in_rs = state->encoder_control->tiles_ctb_addr_ts_to_rs[lcu_addr_in_ts];
 
   //First column of tile?
