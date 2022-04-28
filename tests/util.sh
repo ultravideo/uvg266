@@ -47,8 +47,8 @@ valgrind_test() {
     # No quotes for $valgrind because it expands to multiple (or zero)
     # arguments.
     print_and_run \
-        ../libtool execute $valgrind \
-            ../src/kvazaar -i "${yuvfile}" "--input-res=${dimensions}" -o "${vvcfile}" "$@"
+        $valgrind \
+            ../bin/uvg266 -i "${yuvfile}" "--input-res=${dimensions}" -o "${vvcfile}" "$@"
 
     print_and_run \
         DecoderAppStatic -b "${vvcfile}"
@@ -69,9 +69,8 @@ encode_test() {
     prepare "${dimensions}" "${frames}" "${format}"
 
     set +e
-    print_and_run \
-        ../libtool execute \
-            ../src/kvazaar -i "${yuvfile}" "--input-res=${dimensions}" -o "${vvcfile}" "$@"
+    print_and_run \        
+            ../bin/uvg266 -i "${yuvfile}" "--input-res=${dimensions}" -o "${vvcfile}" "$@"
     actual_status="$?"
     set -e
     [ ${actual_status} -eq ${expected_status} ]
