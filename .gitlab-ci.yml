@@ -8,8 +8,8 @@ test-kvazaar: &test-template
     - bash .travis-install.bash
     - export PATH="${HOME}/bin:${PATH}"
     - cmake -DUSE_SHARED_LIB=OFF -DCMAKE_INSTALL_PREFIX=./ . || (cat config.log && false)
-    - make install --jobs=8
-    - env CTEST_OUTPUT_ON_FAILURE=1 make test --jobs=8
+    - make install
+    - env CTEST_PARALLEL_LEVEL=8 CTEST_OUTPUT_ON_FAILURE=1 make test
   artifacts:
     paths:
     - bin/uvg266
@@ -41,7 +41,7 @@ test-ubsan:
 test-valgrind:
   <<: *test-template
   variables:
-    KVZ_TEST_VALGRIND: 1
+    UVG_TEST_VALGRIND: 1
 
 # TODO: If someone knows YAML better, there has to be some better way to
 # concatenate stuff into the test-template script than just manually copy

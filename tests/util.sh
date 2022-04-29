@@ -36,9 +36,9 @@ valgrind_test() {
 
     prepare "${dimensions}" "${frames}" "${format}"
 
-    # If $KVZ_TEST_VALGRIND is defined and equal to "1", run the test with
+    # If $UVG_TEST_VALGRIND is defined and equal to "1", run the test with
     # valgrind. Otherwise, run without valgrind.
-    if [ "${KVZ_TEST_VALGRIND:-0}" = '1' ]; then
+    if [ "${UVG_TEST_VALGRIND:-0}" = '1' ]; then
         valgrind='valgrind --leak-check=full --error-exitcode=1 --'
     else
         valgrind=''
