@@ -52,20 +52,20 @@ jobs:
     - name: Run tests
       run: export PATH="/home/docker/bin:${PATH}" && CTEST_PARALLEL_LEVEL=8 CTEST_OUTPUT_ON_FAILURE=1 make test
       
-  test-tsan:
-    runs-on: self-hosted
-    env:
-      CC: gcc
-      CFLAGS: -fsanitize=thread
+  # test-tsan:
+    # runs-on: self-hosted
+    # env:
+      # CC: gcc
+      # CFLAGS: -fsanitize=thread
       
-    steps:
-    - uses: actions/checkout@v2
-    - name: cmake
-      run: cmake -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=./ . || (cat config.log && false)
-    - name: make
-      run: make install -j
-    - name: Run tests
-      run: export PATH="/home/docker/bin:${PATH}" && CTEST_PARALLEL_LEVEL=8 CTEST_OUTPUT_ON_FAILURE=1 make test
+    # steps:
+    # - uses: actions/checkout@v2
+    # - name: cmake
+      # run: cmake -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=./ . || (cat config.log && false)
+    # - name: make
+      # run: make install -j
+    # - name: Run tests
+      # run: export PATH="/home/docker/bin:${PATH}" && CTEST_PARALLEL_LEVEL=8 CTEST_OUTPUT_ON_FAILURE=1 make test
       
   test-valgrind:
     runs-on: self-hosted

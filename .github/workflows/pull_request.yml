@@ -63,24 +63,24 @@ jobs:
     - name: Run tests
       run: export PATH="/home/docker/bin:${PATH}" && CTEST_PARALLEL_LEVEL=8 CTEST_OUTPUT_ON_FAILURE=1 make test
       
-  test-tsan:
-    runs-on: self-hosted
-    if: contains(github.event.pull_request.labels.*.name, 'safe to test')
-    env:
-      CC: gcc
-      CFLAGS: -fsanitize=thread
+  # test-tsan:
+    # runs-on: self-hosted
+    # if: contains(github.event.pull_request.labels.*.name, 'safe to test')
+    # env:
+      # CC: gcc
+      # CFLAGS: -fsanitize=thread
       
-    steps:
-    - uses: actions/checkout@v2
-      with:
-        ref: ${{github.event.pull_request.head.ref}}
-        repository: ${{github.event.pull_request.head.repo.full_name}}
-    - name: cmake
-      run: cmake -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=./ . || (cat config.log && false)
-    - name: make
-      run: make install -j
-    - name: Run tests
-      run: export PATH="/home/docker/bin:${PATH}" && CTEST_PARALLEL_LEVEL=8 CTEST_OUTPUT_ON_FAILURE=1 make test
+    # steps:
+    # - uses: actions/checkout@v2
+      # with:
+        # ref: ${{github.event.pull_request.head.ref}}
+        # repository: ${{github.event.pull_request.head.repo.full_name}}
+    # - name: cmake
+      # run: cmake -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=./ . || (cat config.log && false)
+    # - name: make
+      # run: make install -j
+    # - name: Run tests
+      # run: export PATH="/home/docker/bin:${PATH}" && CTEST_PARALLEL_LEVEL=8 CTEST_OUTPUT_ON_FAILURE=1 make test
       
   test-valgrind:
     runs-on: self-hosted
