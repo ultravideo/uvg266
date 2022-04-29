@@ -10,7 +10,7 @@ VERSION 0.2.3 )
 configure_file("${PROJECT_SOURCE_DIR}/src/uvg266.pc.in" "${PROJECT_SOURCE_DIR}/src/uvg266.pc" @ONLY)
 configure_file("${PROJECT_SOURCE_DIR}/src/version.h.in" "${PROJECT_SOURCE_DIR}/src/version.h" @ONLY)
 
-option(USE_SHARED_LIB "Build using shared uvg266 library" ON)
+option(BUILD_SHARED_LIBS "Build using shared uvg266 library" ON)
 
 
 find_package(Git QUIET)
@@ -49,8 +49,10 @@ list(APPEND LIB_SOURCES ${LIB_SOURCES_STRATEGIES})
 # We also need the libmd5
 list(APPEND LIB_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/extras/libmd5.c)
 
-if(NOT USE_SHARED_LIB)
-  add_definitions(-DPIC -DKVZ_DLL_EXPORTS)
+add_definitions(-DUVG_DLL_EXPORTS)
+
+if(BUILD_SHARED_LIBS)
+  add_definitions(-DPIC)
 endif()
 
 # For visual studio / windows we also need our own pthread implementation and getopt
@@ -62,10 +64,16 @@ endif()
 # ToDo: allow compiling on other than x86
 add_definitions(-DCOMPILE_INTEL)
 
-if(USE_SHARED_LIB) 
+if(BUILD_SHARED_LIBS)
+  list( APPEND CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib" "./" "../lib" )  
+  set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
   add_library(uvg266 SHARED ${LIB_SOURCES})
 else()
   add_library(uvg266 STATIC ${LIB_SOURCES})
+  if(MSVC) # Fix a linking problem with visual studio when the library is the same name as the binary
+    set_target_properties(uvg266 PROPERTIES OUTPUT_NAME libuvg266)
+  endif()
+  
 endif()
 
 target_include_directories(uvg266 PUBLIC src)
@@ -83,10 +91,11 @@ endif()
 
 add_executable(uvg266-bin ${CLI_SOURCES})
 
+target_link_libraries(uvg266-bin PUBLIC uvg266)
+
 set_target_properties(uvg266-bin PROPERTIES OUTPUT_NAME uvg266)
 set_target_properties(uvg266-bin PROPERTIES RUNTIME_OUTPUT_NAME uvg266)
 
-target_link_libraries(uvg266-bin PUBLIC uvg266)
 
 if(MSVC)
   target_include_directories(uvg266 PUBLIC src/threadwrapper/include)
@@ -115,8 +124,10 @@ endif()
 install(FILES ${PROJECT_SOURCE_DIR}/src/uvg266.pc DESTINATION ${CMAKE_INSTALL_PREFIX}/share/pkgconfig)
 install(TARGETS uvg266-bin DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
 install(TARGETS uvg266 DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
-if(USE_SHARED_LIB) # Just add the lib to the bin directory for now
-  install(TARGETS uvg266 DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
+if(BUILD_SHARED_LIBS) # Just add the lib to the bin directory for now
+  if(MSVC)
+    install(TARGETS uvg266 DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
+  endif()
 endif()
 install(FILES ${PROJECT_SOURCE_DIR}/src/uvg266.h DESTINATION ${CMAKE_INSTALL_PREFIX}/include)
 install(FILES ${PROJECT_SOURCE_DIR}/doc/uvg266.1 DESTINATION ${CMAKE_INSTALL_PREFIX}/share/man)

@@ -9,12 +9,16 @@ target_include_directories(uvg266_tests PUBLIC ${PROJECT_SOURCE_DIR})
 target_include_directories(uvg266_tests PUBLIC ${PROJECT_SOURCE_DIR}/src)
 target_include_directories(uvg266_tests PUBLIC ${PROJECT_SOURCE_DIR}/src/extras)
 
-if(USE_SHARED_LIB)
-  message(INFO " tests do not work with shared lib at the moment")
-  add_definitions(-DPIC -DKVZ_DLL_EXPORTS)
+add_definitions(-DUVG_DLL_EXPORTS)
+
+if(BUILD_SHARED_LIBS)
+  add_definitions(-DPIC)
 endif()
 
 if(MSVC)
+  if(BUILD_SHARED_LIBS) 
+    message(INFO " tests do not work with shared lib at the moment")
+  endif()
   target_include_directories(uvg266_tests PUBLIC ../src/threadwrapper/include)
 
   set_property( SOURCE ${TEST_SOURCES}  APPEND PROPERTY COMPILE_FLAGS "/arch:AVX2" )
