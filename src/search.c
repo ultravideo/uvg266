@@ -681,34 +681,6 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         inter_bitcost = mode_bitcost;
         cur_cu->type = CU_INTER;
       }
-
-      if (!(ctrl->cfg.early_skip && cur_cu->skipped)) {
-        // Try SMP and AMP partitioning.
-        static const part_mode_t mp_modes[] = {
-          // SMP
-          SIZE_2NxN, SIZE_Nx2N,
-          // AMP
-          SIZE_2NxnU, SIZE_2NxnD,
-          SIZE_nLx2N, SIZE_nRx2N,
-        };
-
-        const int first_mode = ctrl->cfg.smp_enable ? 0 : 2;
-        const int last_mode = (ctrl->cfg.amp_enable && cu_width >= 16) ? 5 : 1;
-        for (int i = first_mode; i <= last_mode; ++i) {
-          uvg_search_cu_smp(state,
-                            x, y,
-                            depth,
-                            mp_modes[i],
-                            &work_tree[depth + 1],
-                            &mode_cost, &mode_bitcost);
-          if (mode_cost < cost) {
-            cost = mode_cost;
-            inter_bitcost = mode_bitcost;
-            // Copy inter prediction info to current level.
-            copy_cu_info(x_local, y_local, cu_width, &work_tree[depth + 1], lcu);
-          }
-        }
-      }
     }
 
     // Try to skip intra search in rd==0 mode.

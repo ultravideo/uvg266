@@ -392,8 +392,6 @@ where the names have been abbreviated to fit the layout in GitHub.
 | transform-skip       | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 1     | 1     |
 | mv-rdo               | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 1     |
 | full-intra-search    | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     |
-| smp                  | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 1     | 1     |
-| amp                  | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 1     |
 | cu-split-termination | zero  | zero  | zero  | zero  | zero  | zero  | zero  | zero  | zero  | off   |
 | me-early-termination | sens. | sens. | sens. | sens. | sens. | on    | on    | off   | off   | off   |
 | intra-rdo-et         | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     |

@@ -72,8 +72,6 @@ int uvg_config_init(uvg_config *cfg)
   cfg->rdoq_enable     = 1;
   cfg->rdoq_skip       = 1;
   cfg->signhide_enable = true;
-  cfg->smp_enable      = false;
-  cfg->amp_enable      = false;
   cfg->rdo             = 1;
   cfg->mv_rdo          = 0;
   cfg->full_intra_search = 0;
@@ -586,8 +584,6 @@ int uvg_config_parse(uvg_config *cfg, const char *name, const char *value)
         "transform-skip", "0",
         "mv-rdo", "0",
         "full-intra-search", "0",
-        "smp", "0",
-        "amp", "0",
         "cu-split-termination", "zero",
         "me-early-termination", "sensitive",
         "intra-rdo-et", "0",
@@ -614,8 +610,6 @@ int uvg_config_parse(uvg_config *cfg, const char *name, const char *value)
         "transform-skip", "0",
         "mv-rdo", "0",
         "full-intra-search", "0",
-        "smp", "0",
-        "amp", "0",
         "cu-split-termination", "zero",
         "me-early-termination", "sensitive",
         "intra-rdo-et", "0",
@@ -642,8 +636,6 @@ int uvg_config_parse(uvg_config *cfg, const char *name, const char *value)
         "transform-skip", "0",
         "mv-rdo", "0",
         "full-intra-search", "0",
-        "smp", "0",
-        "amp", "0",
         "cu-split-termination", "zero",
         "me-early-termination", "sensitive",
         "intra-rdo-et", "0",
@@ -670,8 +662,6 @@ int uvg_config_parse(uvg_config *cfg, const char *name, const char *value)
         "transform-skip", "0",
         "mv-rdo", "0",
         "full-intra-search", "0",
-        "smp", "0",
-        "amp", "0",
         "cu-split-termination", "zero",
         "me-early-termination", "sensitive",
         "intra-rdo-et", "0",
@@ -698,8 +688,6 @@ int uvg_config_parse(uvg_config *cfg, const char *name, const char *value)
         "transform-skip", "0",
         "mv-rdo", "0",
         "full-intra-search", "0",
-        "smp", "0",
-        "amp", "0",
         "cu-split-termination", "zero",
         "me-early-termination", "sensitive",
         "intra-rdo-et", "0",
@@ -726,8 +714,6 @@ int uvg_config_parse(uvg_config *cfg, const char *name, const char *value)
         "transform-skip", "0",
         "mv-rdo", "0",
         "full-intra-search", "0",
-        "smp", "0",
-        "amp", "0",
         "cu-split-termination", "zero",
         "me-early-termination", "on",
         "intra-rdo-et", "0",
@@ -754,8 +740,6 @@ int uvg_config_parse(uvg_config *cfg, const char *name, const char *value)
         "transform-skip", "0",
         "mv-rdo", "0",
         "full-intra-search", "0",
-        "smp", "0",
-        "amp", "0",
         "cu-split-termination", "zero",
         "me-early-termination", "on",
         "intra-rdo-et", "0",
@@ -782,8 +766,6 @@ int uvg_config_parse(uvg_config *cfg, const char *name, const char *value)
         "transform-skip", "0",
         "mv-rdo", "0",
         "full-intra-search", "0",
-        "smp", "0",
-        "amp", "0",
         "cu-split-termination", "zero",
         "me-early-termination", "off",
         "intra-rdo-et", "0",
@@ -810,8 +792,6 @@ int uvg_config_parse(uvg_config *cfg, const char *name, const char *value)
         "transform-skip", "1",
         "mv-rdo", "0",
         "full-intra-search", "0",
-        "smp", "1",
-        "amp", "0",
         "cu-split-termination", "zero",
         "me-early-termination", "off",
         "intra-rdo-et", "0",
@@ -838,8 +818,6 @@ int uvg_config_parse(uvg_config *cfg, const char *name, const char *value)
         "transform-skip", "1",
         "mv-rdo", "1",
         "full-intra-search", "0",
-        "smp", "1",
-        "amp", "1",
         "cu-split-termination", "off",
         "me-early-termination", "off",
         "intra-rdo-et", "0",
@@ -916,10 +894,6 @@ int uvg_config_parse(uvg_config *cfg, const char *name, const char *value)
     cfg->rdoq_enable = atobool(value);
   else if OPT("signhide")
     cfg->signhide_enable = (bool)atobool(value);
-  else if OPT("smp")
-    cfg->smp_enable = (bool)atobool(value);
-  else if OPT("amp")
-    cfg->amp_enable = (bool)atobool(value);
   else if OPT("rd")
     cfg->rdo = atoi(value);
   else if OPT("full-intra-search")

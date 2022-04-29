@@ -66,10 +66,6 @@ static const struct option long_options[] = {
   { "no-rdoq",                  no_argument, NULL, 0 },
   { "signhide",                 no_argument, NULL, 0 },
   { "no-signhide",              no_argument, NULL, 0 },
-  { "smp",                      no_argument, NULL, 0 },
-  { "no-smp",                   no_argument, NULL, 0 },
-  { "amp",                      no_argument, NULL, 0 },
-  { "no-amp",                   no_argument, NULL, 0 },
   { "rd",                 required_argument, NULL, 0 },
   { "full-intra-search",        no_argument, NULL, 0 },
   { "no-full-intra-search",     no_argument, NULL, 0 },
@@ -549,8 +545,6 @@ void print_help(void)
     "      --(no-)rdoq            : Rate-distortion optimized quantization [enabled]\n"
     "      --(no-)rdoq-skip       : Skip RDOQ for 4x4 blocks. [disabled]\n"
     "      --(no-)signhide        : Sign hiding [disabled]\n"
-    "      --(no-)smp             : Symmetric motion partition [disabled]\n"
-    "      --(no-)amp             : Asymmetric motion partition [disabled]\n"
     "      --rd <integer>         : Intra mode search complexity [0]\n"
     "                                   - 0: Skip intra if inter is good enough.\n"
     "                                   - 1: Rough intra mode search with SATD.\n"
