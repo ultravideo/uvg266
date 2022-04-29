@@ -166,10 +166,10 @@ typedef enum {
 //----------------------------------------------------------------
 
 //-------------------------typedef structs----------------------------
-#if defined(__MINGW32__) || defined(__MINGW64__) || defined(__linux__)
-#define PACK(__Type__, __Declaration__) __Type__ __attribute__((__packed__)) __Declaration__ ;
-#else
+#if _MSC_VER
 #define PACK(__Type__,__Declaration__) __pragma(pack(push, 1)) __Type__ __Declaration__ __pragma(pack(pop));
+#else
+#define PACK(__Type__, __Declaration__) __Type__ __attribute__((__packed__)) __Declaration__ ;
 #endif
 
 
