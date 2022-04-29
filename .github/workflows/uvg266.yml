@@ -1,4 +1,4 @@
-name: Kvazaar_tests
+name: uvg266_tests
 
 on:
   push:
@@ -11,12 +11,12 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-    - name: configure
-      run: ./autogen.sh && ./configure --enable-werror || (cat config.log && false)
+    - name: cmake
+      run: cmake -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=./ . || (cat config.log && false)
     - name: make
-      run: make -j
+      run: make install -j
     - name: Run tests
-      run: export PATH="/home/docker/bin:${PATH}" && make check -j VERBOSE=1
+      run: export PATH="/home/docker/bin:${PATH}" && CTEST_PARALLEL_LEVEL=8 CTEST_OUTPUT_ON_FAILURE=1 make test
       
   test-ubsan:
     runs-on: self-hosted
@@ -26,12 +26,12 @@ jobs:
       
     steps:
     - uses: actions/checkout@v2
-    - name: configure
-      run: ./autogen.sh && ./configure --enable-werror || (cat config.log && false)
+    - name: cmake
+      run: cmake -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=./ . || (cat config.log && false)
     - name: make
-      run: make -j
+      run: make install -j
     - name: Run tests
-      run: export PATH="/home/docker/bin:${PATH}" && make check -j4 VERBOSE=1
+      run: export PATH="/home/docker/bin:${PATH}" && CTEST_PARALLEL_LEVEL=8 CTEST_OUTPUT_ON_FAILURE=1 make test
       
   test-asan:
     runs-on: self-hosted
@@ -41,16 +41,16 @@ jobs:
       ASAN_OPTIONS: detect_leaks=0
       # AddressSanitizer adds some extra symbols so we expect a failure from
       # the external symbols test.
-      XFAIL_TESTS: test_external_symbols.sh
+      XFAIL_TESTS: test_external_symbols
       
     steps:
     - uses: actions/checkout@v2
-    - name: configure
-      run: ./autogen.sh && ./configure --enable-werror || (cat config.log && false)
+    - name: cmake
+      run: cmake -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=./ . || (cat config.log && false)
     - name: make
-      run: make -j
+      run: make install -j
     - name: Run tests
-      run: export PATH="/home/docker/bin:${PATH}" && make check -j4 VERBOSE=1
+      run: export PATH="/home/docker/bin:${PATH}" && CTEST_PARALLEL_LEVEL=8 CTEST_OUTPUT_ON_FAILURE=1 make test
       
   test-tsan:
     runs-on: self-hosted
@@ -60,12 +60,12 @@ jobs:
       
     steps:
     - uses: actions/checkout@v2
-    - name: configure
-      run: ./autogen.sh && ./configure --enable-werror || (cat config.log && false)
+    - name: cmake
+      run: cmake -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=./ . || (cat config.log && false)
     - name: make
-      run: make -j
+      run: make install -j
     - name: Run tests
-      run: export PATH="/home/docker/bin:${PATH}" && make check -j4 VERBOSE=1
+      run: export PATH="/home/docker/bin:${PATH}" && CTEST_PARALLEL_LEVEL=8 CTEST_OUTPUT_ON_FAILURE=1 make test
       
   test-valgrind:
     runs-on: self-hosted
@@ -75,9 +75,9 @@ jobs:
       
     steps:
     - uses: actions/checkout@v2
-    - name: configure
-      run: ./autogen.sh && ./configure --enable-werror || (cat config.log && false)
+    - name: cmake
+      run: cmake -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=./ . || (cat config.log && false)
     - name: make
-      run: make -j
+      run: make install -j
     - name: Run tests
-      run: export PATH="/home/docker/bin:${PATH}" && KVZ_TEST_VALGRIND=1 make check -j4 VERBOSE=1
+      run: export PATH="/home/docker/bin:${PATH}" && CTEST_PARALLEL_LEVEL=8 CTEST_OUTPUT_ON_FAILURE=1 make test
