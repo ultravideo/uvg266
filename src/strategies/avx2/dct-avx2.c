@@ -36,10 +36,6 @@
 
 #include "strategies/avx2/dct-avx2.h"
 
-#if COMPILE_INTEL_AVX2
-#include "uvg266.h"
-#if UVG_BIT_DEPTH == 8
-#include <immintrin.h>
 
 #include "strategyselector.h"
 #include "tables.h"
@@ -56,7 +52,10 @@ extern const int16_t uvg_g_dct_8_t[8][8];
 extern const int16_t uvg_g_dct_16_t[16][16];
 extern const int16_t uvg_g_dct_32_t[32][32];
 
-
+#if COMPILE_INTEL_AVX2
+#include "uvg266.h"
+#if UVG_BIT_DEPTH == 8
+#include <immintrin.h>
 
 /*
 * \file
@@ -940,10 +939,6 @@ static void matrix_i ## type ## _## n ## x ## n ## _avx2(int8_t bitdepth, const 
 TRANSFORM(dct, 32);
 ITRANSFORM(dct, 32);
 
-#endif // UVG_BIT_DEPTH == 8
-#endif //COMPILE_INTEL_AVX2
-
-
 
 /*****************************************************/
 /********************** M T S ************************/
@@ -1626,6 +1621,8 @@ static void mts_idct_avx2(
   }
 }
 
+#endif // UVG_BIT_DEPTH == 8
+#endif //COMPILE_INTEL_AVX2
 
 int uvg_strategy_register_dct_avx2(void* opaque, uint8_t bitdepth)
 {

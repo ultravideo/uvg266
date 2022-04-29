@@ -419,10 +419,11 @@ Others might encounter the same problem and there is probably much to
 improve in the build process. We want to make this as simple as
 possible.
 
+**CMakeLists.txt assumes that the x86 based CPUs are 64bit and support AVX2**
 
 ### CMake
 Depending on the platform, some additional tools are required for compiling uvg266 with CMake.
-For Ubuntu, the required packages are `automake autoconf build-essential`.
+For Ubuntu, the required packages are `build-essential cmake`.
 
 Run the following commands to compile and install uvg266.
 
@@ -433,6 +434,7 @@ Run the following commands to compile and install uvg266.
 
 Visual Studio natively supports opening the `CMakeLists.txt` of the CMake build package has been installed.
 Otherwise CMake-CLI can be used to generate the Visual Studio project files.
+**When building shared library with visual studio the tests will fail to link, the main binary will still work**
 
 ### Docker
 This project includes a [Dockerfile](./Dockerfile), which enables building for Docker.
@@ -441,6 +443,8 @@ Example usage: `docker run -i -a STDIN -a STDOUT uvg266 -i - --input-res=320x240
 For other examples, see [Dockerfile](./Dockerfile)
 
 ## Paper
+
+**The paper is open access**
 
 Please cite [this paper](https://ieeexplore.ieee.org/document/9690938) for uvg266:
 
@@ -484,7 +488,7 @@ You can generate Doxygen documentation pages by running the command
 - Main automatic way of testing is with Github Actions. Commits, branches
   and pull requests are tested automatically.
   - Uninitialized variables and such are checked with Valgrind.
-  - Bitstream validity is checked with HM.
+  - Bitstream validity is checked with VTM.
   - Compilation is checked on GCC and Clang on Linux, and Clang on OSX.
 - Windows msys2 and msvc builds are checked automatically on Appveyor.
 - If your changes change the bitstream, decode with VTM to check that
