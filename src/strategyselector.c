@@ -42,9 +42,9 @@
 #include <unistd.h>
 #endif
 
-hardware_flags_t kvz_g_hardware_flags;
-hardware_flags_t kvz_g_strategies_in_use;
-hardware_flags_t kvz_g_strategies_available;
+hardware_flags_t uvg_g_hardware_flags;
+hardware_flags_t uvg_g_strategies_in_use;
+hardware_flags_t uvg_g_strategies_available;
 
 static void set_hardware_flags(int32_t cpuid);
 static void* strategyselector_choose_for(const strategy_list_t * const strategies, const char * const strategy_type);
@@ -52,7 +52,7 @@ static void* strategyselector_choose_for(const strategy_list_t * const strategie
 //Strategies to include (add new file here)
 
 //Returns 1 if successful
-int kvz_strategyselector_init(int32_t cpuid, uint8_t bitdepth) {
+int uvg_strategyselector_init(int32_t cpuid, uint8_t bitdepth) {
   const strategy_to_select_t *cur_strategy_to_select = strategies_to_select;
   strategy_list_t strategies;
   
@@ -63,48 +63,48 @@ int kvz_strategyselector_init(int32_t cpuid, uint8_t bitdepth) {
   set_hardware_flags(cpuid);
   
   //Add new register function here
-  if (!kvz_strategy_register_picture(&strategies, bitdepth)) {
-    fprintf(stderr, "kvz_strategy_register_picture failed!\n");
+  if (!uvg_strategy_register_picture(&strategies, bitdepth)) {
+    fprintf(stderr, "uvg_strategy_register_picture failed!\n");
     return 0;
   }
   
-  if (!kvz_strategy_register_nal(&strategies, bitdepth)) {
-    fprintf(stderr, "kvz_strategy_register_nal failed!\n");
+  if (!uvg_strategy_register_nal(&strategies, bitdepth)) {
+    fprintf(stderr, "uvg_strategy_register_nal failed!\n");
     return 0;
   }
 
-  if (!kvz_strategy_register_dct(&strategies, bitdepth)) {
-    fprintf(stderr, "kvz_strategy_register_dct failed!\n");
+  if (!uvg_strategy_register_dct(&strategies, bitdepth)) {
+    fprintf(stderr, "uvg_strategy_register_dct failed!\n");
     return 0;
   }
 
-  if (!kvz_strategy_register_ipol(&strategies, bitdepth)) {
-    fprintf(stderr, "kvz_strategy_register_ipol failed!\n");
+  if (!uvg_strategy_register_ipol(&strategies, bitdepth)) {
+    fprintf(stderr, "uvg_strategy_register_ipol failed!\n");
     return 0;
   }
 
-  if (!kvz_strategy_register_quant(&strategies, bitdepth)) {
-    fprintf(stderr, "kvz_strategy_register_quant failed!\n");
+  if (!uvg_strategy_register_quant(&strategies, bitdepth)) {
+    fprintf(stderr, "uvg_strategy_register_quant failed!\n");
     return 0;
   }
 
-  if (!kvz_strategy_register_intra(&strategies, bitdepth)) {
-    fprintf(stderr, "kvz_strategy_register_intra failed!\n");
+  if (!uvg_strategy_register_intra(&strategies, bitdepth)) {
+    fprintf(stderr, "uvg_strategy_register_intra failed!\n");
     return 0;
   }
 
-  if (!kvz_strategy_register_sao(&strategies, bitdepth)) {
-    fprintf(stderr, "kvz_strategy_register_sao failed!\n");
+  if (!uvg_strategy_register_sao(&strategies, bitdepth)) {
+    fprintf(stderr, "uvg_strategy_register_sao failed!\n");
     return 0;
   }
   
-  if (!kvz_strategy_register_encode(&strategies, bitdepth)) {
-    fprintf(stderr, "kvz_strategy_register_encode failed!\n");
+  if (!uvg_strategy_register_encode(&strategies, bitdepth)) {
+    fprintf(stderr, "uvg_strategy_register_encode failed!\n");
     return 0;
   }
 
-  if (!kvz_strategy_register_alf(&strategies, bitdepth)) {
-    fprintf(stderr, "kvz_strategy_register_encode failed!\n");
+  if (!uvg_strategy_register_alf(&strategies, bitdepth)) {
+    fprintf(stderr, "uvg_strategy_register_encode failed!\n");
     return 0;
   }
   
@@ -124,48 +124,48 @@ int kvz_strategyselector_init(int32_t cpuid, uint8_t bitdepth) {
     //SIMD optimizations available
     bool strategies_available = false;
     fprintf(stderr, "Available: ");
-    if (kvz_g_strategies_available.intel_flags.avx != 0){
-      fprintf(stderr, "avx(%d) ", kvz_g_strategies_available.intel_flags.avx);
+    if (uvg_g_strategies_available.intel_flags.avx != 0){
+      fprintf(stderr, "avx(%d) ", uvg_g_strategies_available.intel_flags.avx);
       strategies_available = true;
     }
-    if (kvz_g_strategies_available.intel_flags.avx2 != 0){
-      fprintf(stderr, "avx2(%d) ", kvz_g_strategies_available.intel_flags.avx2);
+    if (uvg_g_strategies_available.intel_flags.avx2 != 0){
+      fprintf(stderr, "avx2(%d) ", uvg_g_strategies_available.intel_flags.avx2);
       strategies_available = true;
     }
-    if (kvz_g_strategies_available.intel_flags.mmx != 0) {
-      fprintf(stderr, "mmx(%d) ", kvz_g_strategies_available.intel_flags.mmx);
+    if (uvg_g_strategies_available.intel_flags.mmx != 0) {
+      fprintf(stderr, "mmx(%d) ", uvg_g_strategies_available.intel_flags.mmx);
       strategies_available = true;
     }
-    if (kvz_g_strategies_available.intel_flags.sse != 0) {
-      fprintf(stderr, "sse(%d) ", kvz_g_strategies_available.intel_flags.sse);
+    if (uvg_g_strategies_available.intel_flags.sse != 0) {
+      fprintf(stderr, "sse(%d) ", uvg_g_strategies_available.intel_flags.sse);
       strategies_available = true;
     }
-    if (kvz_g_strategies_available.intel_flags.sse2 != 0) {
-      fprintf(stderr, "sse2(%d) ", kvz_g_strategies_available.intel_flags.sse2);
+    if (uvg_g_strategies_available.intel_flags.sse2 != 0) {
+      fprintf(stderr, "sse2(%d) ", uvg_g_strategies_available.intel_flags.sse2);
       strategies_available = true;
     }
-    if (kvz_g_strategies_available.intel_flags.sse3 != 0) {
-      fprintf(stderr, "sse3(%d) ", kvz_g_strategies_available.intel_flags.sse3);
+    if (uvg_g_strategies_available.intel_flags.sse3 != 0) {
+      fprintf(stderr, "sse3(%d) ", uvg_g_strategies_available.intel_flags.sse3);
       strategies_available = true;
     }
-    if (kvz_g_strategies_available.intel_flags.sse41 != 0) {
-      fprintf(stderr, "sse41(%d) ", kvz_g_strategies_available.intel_flags.sse41);
+    if (uvg_g_strategies_available.intel_flags.sse41 != 0) {
+      fprintf(stderr, "sse41(%d) ", uvg_g_strategies_available.intel_flags.sse41);
       strategies_available = true;
     }
-    if (kvz_g_strategies_available.intel_flags.sse42 != 0) {
-      fprintf(stderr, "sse42(%d) ", kvz_g_strategies_available.intel_flags.sse42);
+    if (uvg_g_strategies_available.intel_flags.sse42 != 0) {
+      fprintf(stderr, "sse42(%d) ", uvg_g_strategies_available.intel_flags.sse42);
       strategies_available = true;
     }
-    if (kvz_g_strategies_available.intel_flags.ssse3 != 0) {
-      fprintf(stderr, "ssse3(%d) ", kvz_g_strategies_available.intel_flags.ssse3);
+    if (uvg_g_strategies_available.intel_flags.ssse3 != 0) {
+      fprintf(stderr, "ssse3(%d) ", uvg_g_strategies_available.intel_flags.ssse3);
       strategies_available = true;
     }
-    if (kvz_g_strategies_available.arm_flags.neon != 0) {
-      fprintf(stderr, "neon(%d) ", kvz_g_strategies_available.arm_flags.neon);
+    if (uvg_g_strategies_available.arm_flags.neon != 0) {
+      fprintf(stderr, "neon(%d) ", uvg_g_strategies_available.arm_flags.neon);
       strategies_available = true;
     }
-    if (kvz_g_strategies_available.powerpc_flags.altivec != 0) {
-      fprintf(stderr, "altivec(%d) ", kvz_g_strategies_available.powerpc_flags.altivec);
+    if (uvg_g_strategies_available.powerpc_flags.altivec != 0) {
+      fprintf(stderr, "altivec(%d) ", uvg_g_strategies_available.powerpc_flags.altivec);
       strategies_available = true;
     }
     //If there is no strategies available
@@ -177,48 +177,48 @@ int kvz_strategyselector_init(int32_t cpuid, uint8_t bitdepth) {
     //SIMD optimizations in use
     bool strategies_in_use = false;
     fprintf(stderr, "In use: ");
-    if (kvz_g_strategies_in_use.intel_flags.avx != 0){
-      fprintf(stderr, "avx(%d) ", kvz_g_strategies_in_use.intel_flags.avx);
+    if (uvg_g_strategies_in_use.intel_flags.avx != 0){
+      fprintf(stderr, "avx(%d) ", uvg_g_strategies_in_use.intel_flags.avx);
       strategies_in_use = true;
     }
-    if (kvz_g_strategies_in_use.intel_flags.avx2 != 0){ 
-      fprintf(stderr, "avx2(%d) ", kvz_g_strategies_in_use.intel_flags.avx2);
+    if (uvg_g_strategies_in_use.intel_flags.avx2 != 0){ 
+      fprintf(stderr, "avx2(%d) ", uvg_g_strategies_in_use.intel_flags.avx2);
       strategies_in_use = true;
     }
-    if (kvz_g_strategies_in_use.intel_flags.mmx != 0) {
-      fprintf(stderr, "mmx(%d) ", kvz_g_strategies_in_use.intel_flags.mmx);
+    if (uvg_g_strategies_in_use.intel_flags.mmx != 0) {
+      fprintf(stderr, "mmx(%d) ", uvg_g_strategies_in_use.intel_flags.mmx);
       strategies_in_use = true;
     }
-    if (kvz_g_strategies_in_use.intel_flags.sse != 0) {
-      fprintf(stderr, "sse(%d) ", kvz_g_strategies_in_use.intel_flags.sse);
+    if (uvg_g_strategies_in_use.intel_flags.sse != 0) {
+      fprintf(stderr, "sse(%d) ", uvg_g_strategies_in_use.intel_flags.sse);
       strategies_in_use = true;
     }
-    if (kvz_g_strategies_in_use.intel_flags.sse2 != 0) {
-      fprintf(stderr, "sse2(%d) ", kvz_g_strategies_in_use.intel_flags.sse2);
+    if (uvg_g_strategies_in_use.intel_flags.sse2 != 0) {
+      fprintf(stderr, "sse2(%d) ", uvg_g_strategies_in_use.intel_flags.sse2);
       strategies_in_use = true;
     }
-    if (kvz_g_strategies_in_use.intel_flags.sse3 != 0) {
-      fprintf(stderr, "sse3(%d) ", kvz_g_strategies_in_use.intel_flags.sse3);
+    if (uvg_g_strategies_in_use.intel_flags.sse3 != 0) {
+      fprintf(stderr, "sse3(%d) ", uvg_g_strategies_in_use.intel_flags.sse3);
       strategies_in_use = true;
     }
-    if (kvz_g_strategies_in_use.intel_flags.sse41 != 0) {
-      fprintf(stderr, "sse41(%d) ", kvz_g_strategies_in_use.intel_flags.sse41);
+    if (uvg_g_strategies_in_use.intel_flags.sse41 != 0) {
+      fprintf(stderr, "sse41(%d) ", uvg_g_strategies_in_use.intel_flags.sse41);
       strategies_in_use = true;
     }
-    if (kvz_g_strategies_in_use.intel_flags.sse42 != 0) {
-      fprintf(stderr, "sse42(%d) ", kvz_g_strategies_in_use.intel_flags.sse42);
+    if (uvg_g_strategies_in_use.intel_flags.sse42 != 0) {
+      fprintf(stderr, "sse42(%d) ", uvg_g_strategies_in_use.intel_flags.sse42);
       strategies_in_use = true;
     }
-    if (kvz_g_strategies_in_use.intel_flags.ssse3 != 0) {
-      fprintf(stderr, "ssse3(%d) ", kvz_g_strategies_in_use.intel_flags.ssse3);
+    if (uvg_g_strategies_in_use.intel_flags.ssse3 != 0) {
+      fprintf(stderr, "ssse3(%d) ", uvg_g_strategies_in_use.intel_flags.ssse3);
       strategies_in_use = true;
     }
-    if (kvz_g_strategies_in_use.arm_flags.neon != 0) {
-      fprintf(stderr, "neon(%d) ", kvz_g_strategies_in_use.arm_flags.neon);
+    if (uvg_g_strategies_in_use.arm_flags.neon != 0) {
+      fprintf(stderr, "neon(%d) ", uvg_g_strategies_in_use.arm_flags.neon);
       strategies_in_use = true;
     }
-    if (kvz_g_strategies_in_use.powerpc_flags.altivec != 0) {
-      fprintf(stderr, "altivec(%d) ", kvz_g_strategies_in_use.powerpc_flags.altivec);
+    if (uvg_g_strategies_in_use.powerpc_flags.altivec != 0) {
+      fprintf(stderr, "altivec(%d) ", uvg_g_strategies_in_use.powerpc_flags.altivec);
       strategies_in_use = true;
     }
     //If there is no strategies in use
@@ -235,7 +235,7 @@ int kvz_strategyselector_init(int32_t cpuid, uint8_t bitdepth) {
 }
 
 //Returns 1 if successful, 0 otherwise
-int kvz_strategyselector_register(void * const opaque, const char * const type, const char * const strategy_name, int priority, void * const fptr) {
+int uvg_strategyselector_register(void * const opaque, const char * const type, const char * const strategy_name, int priority, void * const fptr) {
   strategy_list_t * const strategies = opaque;
   
   if (strategies->allocated == strategies->count) {
@@ -257,18 +257,17 @@ int kvz_strategyselector_register(void * const opaque, const char * const type, 
   }
 
   //Check what strategies are available when they are registered
-  if (strcmp(strategy_name, "avx") == 0) kvz_g_strategies_available.intel_flags.avx++;
-  if (strcmp(strategy_name, "x86_asm_avx") == 0) kvz_g_strategies_available.intel_flags.avx++;
-  if (strcmp(strategy_name, "avx2") == 0) kvz_g_strategies_available.intel_flags.avx2++;
-  if (strcmp(strategy_name, "mmx") == 0) kvz_g_strategies_available.intel_flags.mmx++;
-  if (strcmp(strategy_name, "sse") == 0) kvz_g_strategies_available.intel_flags.sse++;
-  if (strcmp(strategy_name, "sse2") == 0) kvz_g_strategies_available.intel_flags.sse2++;
-  if (strcmp(strategy_name, "sse3") == 0) kvz_g_strategies_available.intel_flags.sse3++;
-  if (strcmp(strategy_name, "sse41") == 0) kvz_g_strategies_available.intel_flags.sse41++;
-  if (strcmp(strategy_name, "sse42") == 0) kvz_g_strategies_available.intel_flags.sse42++;
-  if (strcmp(strategy_name, "ssse3") == 0) kvz_g_strategies_available.intel_flags.ssse3++;
-  if (strcmp(strategy_name, "altivec") == 0) kvz_g_strategies_available.powerpc_flags.altivec++;
-  if (strcmp(strategy_name, "neon") == 0) kvz_g_strategies_available.arm_flags.neon++;
+  if (strcmp(strategy_name, "avx") == 0) uvg_g_strategies_available.intel_flags.avx++;  
+  if (strcmp(strategy_name, "avx2") == 0) uvg_g_strategies_available.intel_flags.avx2++;
+  if (strcmp(strategy_name, "mmx") == 0) uvg_g_strategies_available.intel_flags.mmx++;
+  if (strcmp(strategy_name, "sse") == 0) uvg_g_strategies_available.intel_flags.sse++;
+  if (strcmp(strategy_name, "sse2") == 0) uvg_g_strategies_available.intel_flags.sse2++;
+  if (strcmp(strategy_name, "sse3") == 0) uvg_g_strategies_available.intel_flags.sse3++;
+  if (strcmp(strategy_name, "sse41") == 0) uvg_g_strategies_available.intel_flags.sse41++;
+  if (strcmp(strategy_name, "sse42") == 0) uvg_g_strategies_available.intel_flags.sse42++;
+  if (strcmp(strategy_name, "ssse3") == 0) uvg_g_strategies_available.intel_flags.ssse3++;
+  if (strcmp(strategy_name, "altivec") == 0) uvg_g_strategies_available.powerpc_flags.altivec++;
+  if (strcmp(strategy_name, "neon") == 0) uvg_g_strategies_available.arm_flags.neon++;
 
 #ifdef DEBUG_STRATEGYSELECTOR
   fprintf(stderr, "Registered strategy %s:%s with priority %d (%p)\n", type, strategy_name, priority, fptr);
@@ -287,8 +286,8 @@ static void* strategyselector_choose_for(const strategy_list_t * const strategie
   // Because VS doesn't support snprintf, let's assert that there is
   // enough room in the buffer. Max length for strategy type is
   // buffersize (256) - prefix including terminating zero.
-  assert(strlen(strategy_type) < 256 - sizeof("KVAZAAR_OVERRIDE_") );
-  sprintf(buffer, "KVAZAAR_OVERRIDE_%s", strategy_type);
+  assert(strlen(strategy_type) < 256 - sizeof("UVG266_OVERRIDE_") );
+  sprintf(buffer, "UVG266_OVERRIDE_%s", strategy_type);
 
   override = getenv(buffer);
   
@@ -329,18 +328,17 @@ static void* strategyselector_choose_for(const strategy_list_t * const strategie
   }
 
   //Check what strategy we are going to use
-  if (strcmp(strategies->strategies[max_priority_i].strategy_name, "avx") == 0) kvz_g_strategies_in_use.intel_flags.avx++;
-  if (strcmp(strategies->strategies[max_priority_i].strategy_name, "x86_asm_avx") == 0) kvz_g_strategies_in_use.intel_flags.avx++;
-  if (strcmp(strategies->strategies[max_priority_i].strategy_name, "avx2") == 0) kvz_g_strategies_in_use.intel_flags.avx2++;
-  if (strcmp(strategies->strategies[max_priority_i].strategy_name, "mmx") == 0) kvz_g_strategies_in_use.intel_flags.mmx++;
-  if (strcmp(strategies->strategies[max_priority_i].strategy_name, "sse") == 0) kvz_g_strategies_in_use.intel_flags.sse++;
-  if (strcmp(strategies->strategies[max_priority_i].strategy_name, "sse2") == 0) kvz_g_strategies_in_use.intel_flags.sse2++;
-  if (strcmp(strategies->strategies[max_priority_i].strategy_name, "sse3") == 0) kvz_g_strategies_in_use.intel_flags.sse3++;
-  if (strcmp(strategies->strategies[max_priority_i].strategy_name, "sse41") == 0) kvz_g_strategies_in_use.intel_flags.sse41++;
-  if (strcmp(strategies->strategies[max_priority_i].strategy_name, "sse42") == 0) kvz_g_strategies_in_use.intel_flags.sse42++;
-  if (strcmp(strategies->strategies[max_priority_i].strategy_name, "ssse3") == 0) kvz_g_strategies_in_use.intel_flags.ssse3++;
-  if (strcmp(strategies->strategies[max_priority_i].strategy_name, "altivec") == 0) kvz_g_strategies_in_use.powerpc_flags.altivec++;
-  if (strcmp(strategies->strategies[max_priority_i].strategy_name, "neon") == 0) kvz_g_strategies_in_use.arm_flags.neon++;
+  if (strcmp(strategies->strategies[max_priority_i].strategy_name, "avx") == 0) uvg_g_strategies_in_use.intel_flags.avx++;  
+  if (strcmp(strategies->strategies[max_priority_i].strategy_name, "avx2") == 0) uvg_g_strategies_in_use.intel_flags.avx2++;
+  if (strcmp(strategies->strategies[max_priority_i].strategy_name, "mmx") == 0) uvg_g_strategies_in_use.intel_flags.mmx++;
+  if (strcmp(strategies->strategies[max_priority_i].strategy_name, "sse") == 0) uvg_g_strategies_in_use.intel_flags.sse++;
+  if (strcmp(strategies->strategies[max_priority_i].strategy_name, "sse2") == 0) uvg_g_strategies_in_use.intel_flags.sse2++;
+  if (strcmp(strategies->strategies[max_priority_i].strategy_name, "sse3") == 0) uvg_g_strategies_in_use.intel_flags.sse3++;
+  if (strcmp(strategies->strategies[max_priority_i].strategy_name, "sse41") == 0) uvg_g_strategies_in_use.intel_flags.sse41++;
+  if (strcmp(strategies->strategies[max_priority_i].strategy_name, "sse42") == 0) uvg_g_strategies_in_use.intel_flags.sse42++;
+  if (strcmp(strategies->strategies[max_priority_i].strategy_name, "ssse3") == 0) uvg_g_strategies_in_use.intel_flags.ssse3++;
+  if (strcmp(strategies->strategies[max_priority_i].strategy_name, "altivec") == 0) uvg_g_strategies_in_use.powerpc_flags.altivec++;
+  if (strcmp(strategies->strategies[max_priority_i].strategy_name, "neon") == 0) uvg_g_strategies_in_use.arm_flags.neon++;
   
   return strategies->strategies[max_priority_i].fptr;
 }
@@ -455,7 +453,7 @@ static int altivec_available(void)
 #endif //COMPILE_POWERPC
 
 static void set_hardware_flags(int32_t cpuid) {
-  FILL(kvz_g_hardware_flags, 0);
+  FILL(uvg_g_hardware_flags, 0);
 
 #if COMPILE_INTEL
   if (cpuid) {
@@ -491,26 +489,26 @@ static void set_hardware_flags(int32_t cpuid) {
     SYSTEM_INFO systeminfo;
     GetSystemInfo(&systeminfo);
 
-    kvz_g_hardware_flags.logical_cpu_count = systeminfo.dwNumberOfProcessors;
+    uvg_g_hardware_flags.logical_cpu_count = systeminfo.dwNumberOfProcessors;
 #else
-    kvz_g_hardware_flags.logical_cpu_count = sysconf(_SC_NPROCESSORS_ONLN);
+    uvg_g_hardware_flags.logical_cpu_count = sysconf(_SC_NPROCESSORS_ONLN);
 #endif
 
-    kvz_g_hardware_flags.physical_cpu_count = kvz_g_hardware_flags.logical_cpu_count;
-    kvz_g_hardware_flags.intel_flags.hyper_threading = cpuid1.edx & CPUID1_EDX_HYPER_THREADING;
-    if (kvz_g_hardware_flags.intel_flags.hyper_threading) {
-      kvz_g_hardware_flags.physical_cpu_count /= 2;
+    uvg_g_hardware_flags.physical_cpu_count = uvg_g_hardware_flags.logical_cpu_count;
+    uvg_g_hardware_flags.intel_flags.hyper_threading = cpuid1.edx & CPUID1_EDX_HYPER_THREADING;
+    if (uvg_g_hardware_flags.intel_flags.hyper_threading) {
+      uvg_g_hardware_flags.physical_cpu_count /= 2;
     }
     
     // EDX
-    if (cpuid1.edx & CPUID1_EDX_MMX)   kvz_g_hardware_flags.intel_flags.mmx = 1;
-    if (cpuid1.edx & CPUID1_EDX_SSE)   kvz_g_hardware_flags.intel_flags.sse = 1;
-    if (cpuid1.edx & CPUID1_EDX_SSE2)  kvz_g_hardware_flags.intel_flags.sse2 = 1;
+    if (cpuid1.edx & CPUID1_EDX_MMX)   uvg_g_hardware_flags.intel_flags.mmx = 1;
+    if (cpuid1.edx & CPUID1_EDX_SSE)   uvg_g_hardware_flags.intel_flags.sse = 1;
+    if (cpuid1.edx & CPUID1_EDX_SSE2)  uvg_g_hardware_flags.intel_flags.sse2 = 1;
     // ECX
-    if (cpuid1.ecx & CPUID1_ECX_SSE3)  kvz_g_hardware_flags.intel_flags.sse3 = 1;;
-    if (cpuid1.ecx & CPUID1_ECX_SSSE3) kvz_g_hardware_flags.intel_flags.ssse3 = 1;
-    if (cpuid1.ecx & CPUID1_ECX_SSE41) kvz_g_hardware_flags.intel_flags.sse41 = 1;
-    if (cpuid1.ecx & CPUID1_ECX_SSE42) kvz_g_hardware_flags.intel_flags.sse42 = 1;
+    if (cpuid1.ecx & CPUID1_ECX_SSE3)  uvg_g_hardware_flags.intel_flags.sse3 = 1;;
+    if (cpuid1.ecx & CPUID1_ECX_SSSE3) uvg_g_hardware_flags.intel_flags.ssse3 = 1;
+    if (cpuid1.ecx & CPUID1_ECX_SSE41) uvg_g_hardware_flags.intel_flags.sse41 = 1;
+    if (cpuid1.ecx & CPUID1_ECX_SSE42) uvg_g_hardware_flags.intel_flags.sse42 = 1;
     
     // Check hardware and OS support for xsave and xgetbv.
     if (cpuid1.ecx & (CPUID1_ECX_XSAVE | CPUID1_ECX_OSXSAVE)) {
@@ -529,13 +527,13 @@ static void set_hardware_flags(int32_t cpuid) {
       bool ymm_support = xcr0 & XGETBV_XCR0_YMM || false;
 
       if (avx_support && xmm_support && ymm_support) {
-        kvz_g_hardware_flags.intel_flags.avx = 1;
+        uvg_g_hardware_flags.intel_flags.avx = 1;
       }
 
-      if (kvz_g_hardware_flags.intel_flags.avx) {
+      if (uvg_g_hardware_flags.intel_flags.avx) {
         cpuid_t cpuid7 = { 0, 0, 0, 0 };
         get_cpuid(7, 0, &cpuid7);
-        if (cpuid7.ebx & CPUID7_EBX_AVX2)  kvz_g_hardware_flags.intel_flags.avx2 = 1;
+        if (cpuid7.ebx & CPUID7_EBX_AVX2)  uvg_g_hardware_flags.intel_flags.avx2 = 1;
       }
     }
   }
@@ -569,21 +567,21 @@ static void set_hardware_flags(int32_t cpuid) {
   fprintf(stderr, " AVX2");
 #endif
   fprintf(stderr, "\nDetected: INTEL, flags:");
-  if (kvz_g_hardware_flags.intel_flags.mmx) fprintf(stderr, " MMX");
-  if (kvz_g_hardware_flags.intel_flags.sse) fprintf(stderr, " SSE");
-  if (kvz_g_hardware_flags.intel_flags.sse2) fprintf(stderr, " SSE2");
-  if (kvz_g_hardware_flags.intel_flags.sse3) fprintf(stderr, " SSE3");
-  if (kvz_g_hardware_flags.intel_flags.ssse3) fprintf(stderr, " SSSE3");
-  if (kvz_g_hardware_flags.intel_flags.sse41) fprintf(stderr, " SSE41");
-  if (kvz_g_hardware_flags.intel_flags.sse42) fprintf(stderr, " SSE42");
-  if (kvz_g_hardware_flags.intel_flags.avx) fprintf(stderr, " AVX");
-  if (kvz_g_hardware_flags.intel_flags.avx2) fprintf(stderr, " AVX2");
+  if (uvg_g_hardware_flags.intel_flags.mmx) fprintf(stderr, " MMX");
+  if (uvg_g_hardware_flags.intel_flags.sse) fprintf(stderr, " SSE");
+  if (uvg_g_hardware_flags.intel_flags.sse2) fprintf(stderr, " SSE2");
+  if (uvg_g_hardware_flags.intel_flags.sse3) fprintf(stderr, " SSE3");
+  if (uvg_g_hardware_flags.intel_flags.ssse3) fprintf(stderr, " SSSE3");
+  if (uvg_g_hardware_flags.intel_flags.sse41) fprintf(stderr, " SSE41");
+  if (uvg_g_hardware_flags.intel_flags.sse42) fprintf(stderr, " SSE42");
+  if (uvg_g_hardware_flags.intel_flags.avx) fprintf(stderr, " AVX");
+  if (uvg_g_hardware_flags.intel_flags.avx2) fprintf(stderr, " AVX2");
   fprintf(stderr, "\n");
 #endif //COMPILE_INTEL
 
 #if COMPILE_POWERPC
   if (cpuid) {
-    kvz_g_hardware_flags.powerpc_flags.altivec = altivec_available();
+    uvg_g_hardware_flags.powerpc_flags.altivec = altivec_available();
   }
   
   fprintf(stderr, "Compiled: PowerPC, flags:");
@@ -591,7 +589,7 @@ static void set_hardware_flags(int32_t cpuid) {
   fprintf(stderr, " AltiVec");
 #endif
   fprintf(stderr, "\nDetected: PowerPC, flags:");
-  if (kvz_g_hardware_flags.powerpc_flags.altivec) fprintf(stderr, " AltiVec");
+  if (uvg_g_hardware_flags.powerpc_flags.altivec) fprintf(stderr, " AltiVec");
   fprintf(stderr, "\n");
 #endif
   

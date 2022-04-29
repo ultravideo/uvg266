@@ -34,7 +34,7 @@
 #define FAST_COEFF_COST_H_
 
 #include <stdio.h>
-#include "kvazaar.h"
+#include "uvg266.h"
 // #include "encoderstate.h"
 
 #define MAX_FAST_COEFF_COST_QP 50
@@ -103,8 +103,8 @@ static const float default_fast_coeff_cost_wts[][4] = {
 
 typedef struct encoder_state_t encoder_state_t;
 
-int kvz_fast_coeff_table_parse(fast_coeff_table_t *fast_coeff_table, FILE *fast_coeff_table_f);
-void kvz_fast_coeff_use_default_table(fast_coeff_table_t *fast_coeff_table);
-uint64_t kvz_fast_coeff_get_weights(const encoder_state_t *state);
+int uvg_fast_coeff_table_parse(fast_coeff_table_t *fast_coeff_table, FILE *fast_coeff_table_f);
+void uvg_fast_coeff_use_default_table(fast_coeff_table_t *fast_coeff_table);
+uint64_t uvg_fast_coeff_get_weights(const encoder_state_t *state);
 
 #endif // FAST_COEFF_COST_H_

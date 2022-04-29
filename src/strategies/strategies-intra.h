@@ -40,52 +40,52 @@
 
 #include "global.h" // IWYU pragma: keep
 #include "intra.h"
-#include "kvazaar.h"
+#include "uvg266.h"
 
 
 typedef void (angular_pred_func)(
   const int_fast8_t log2_width,
   const int_fast8_t intra_mode,
   const int_fast8_t channel_type,
-  const kvz_pixel *const in_ref_above,
-  const kvz_pixel *const in_ref_left,
-  kvz_pixel *const dst,
+  const uvg_pixel *const in_ref_above,
+  const uvg_pixel *const in_ref_left,
+  uvg_pixel *const dst,
   const uint8_t multi_ref_idx);
 
 typedef void (intra_pred_planar_func)(
   const int_fast8_t log2_width,
-  const kvz_pixel *const ref_top,
-  const kvz_pixel *const ref_left,
-  kvz_pixel *const dst);
+  const uvg_pixel *const ref_top,
+  const uvg_pixel *const ref_left,
+  uvg_pixel *const dst);
 
 typedef void (intra_pred_filtered_dc_func)(
   const int_fast8_t log2_width,
-  const kvz_pixel *const ref_top,
-  const kvz_pixel *const ref_left,
-  kvz_pixel *const out_block,
+  const uvg_pixel *const ref_top,
+  const uvg_pixel *const ref_left,
+  uvg_pixel *const out_block,
   const uint8_t multi_ref_idx);
 
 typedef void (pdpc_planar_dc_func)(
   const int mode,
   const int width,
   const int log2_width,
-  const kvz_intra_ref *const used_ref,
-  kvz_pixel *const dst);
+  const uvg_intra_ref *const used_ref,
+  uvg_pixel *const dst);
 
 // Declare function pointers.
-extern angular_pred_func * kvz_angular_pred;
-extern intra_pred_planar_func * kvz_intra_pred_planar;
-extern intra_pred_filtered_dc_func * kvz_intra_pred_filtered_dc;
-extern pdpc_planar_dc_func * kvz_pdpc_planar_dc;
+extern angular_pred_func * uvg_angular_pred;
+extern intra_pred_planar_func * uvg_intra_pred_planar;
+extern intra_pred_filtered_dc_func * uvg_intra_pred_filtered_dc;
+extern pdpc_planar_dc_func * uvg_pdpc_planar_dc;
 
-int kvz_strategy_register_intra(void* opaque, uint8_t bitdepth);
+int uvg_strategy_register_intra(void* opaque, uint8_t bitdepth);
 
 
 #define STRATEGIES_INTRA_EXPORTS \
-  {"angular_pred", (void**) &kvz_angular_pred}, \
-  {"intra_pred_planar", (void**) &kvz_intra_pred_planar}, \
-  {"intra_pred_filtered_dc", (void**) &kvz_intra_pred_filtered_dc}, \
-  {"pdpc_planar_dc", (void**) &kvz_pdpc_planar_dc}, \
+  {"angular_pred", (void**) &uvg_angular_pred}, \
+  {"intra_pred_planar", (void**) &uvg_intra_pred_planar}, \
+  {"intra_pred_filtered_dc", (void**) &uvg_intra_pred_filtered_dc}, \
+  {"pdpc_planar_dc", (void**) &uvg_pdpc_planar_dc}, \
 
 
 

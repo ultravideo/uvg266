@@ -45,8 +45,8 @@
 #include "encoder_state-geometry.h"
 #include "encoderstate.h"
 #include "imagelist.h"
-#include "kvazaar.h"
-#include "kvz_math.h"
+#include "uvg266.h"
+#include "uvg_math.h"
 #include "nal.h"
 #include "scalinglist.h"
 #include "tables.h"
@@ -66,16 +66,16 @@
 static void encoder_state_write_bitstream_aud(encoder_state_t *const state)
 {
   bitstream_t *const stream = &state->stream;
-  kvz_nal_write(stream, KVZ_NAL_AUD_NUT, 0, 1);
+  uvg_nal_write(stream, UVG_NAL_AUD_NUT, 0, 1);
 
   WRITE_U(stream, 1, 1, "aud_irap_or_gdr_au_flag");
 
-  uint8_t pic_type = state->frame->slicetype == KVZ_SLICE_I ? 0
-                   : state->frame->slicetype == KVZ_SLICE_P ? 1
+  uint8_t pic_type = state->frame->slicetype == UVG_SLICE_I ? 0
+                   : state->frame->slicetype == UVG_SLICE_P ? 1
                    : 2;
   WRITE_U(stream, pic_type, 3, "pic_type");
 
-  kvz_bitstream_add_rbsp_trailing_bits(stream);
+  uvg_bitstream_add_rbsp_trailing_bits(stream);
 }
 
 static void encoder_state_write_bitstream_PTL(bitstream_t *stream,
@@ -148,7 +148,7 @@ static void encoder_state_write_bitstream_PTL(bitstream_t *stream,
 #endif
   }
 
-  kvz_bitstream_align_zero(stream);
+  uvg_bitstream_align_zero(stream);
 #endif
 
   // end Profile Tier
@@ -222,7 +222,7 @@ static void encoder_state_write_bitstream_PTL(bitstream_t *stream,
 #endif
   }
 
-  kvz_bitstream_align_zero(stream);
+  uvg_bitstream_align_zero(stream);
 #endif
 
 #if !JVET_S_SUB_PROFILE
@@ -232,7 +232,7 @@ static void encoder_state_write_bitstream_PTL(bitstream_t *stream,
 
   WRITE_U(stream, 0, 1, "sub_layer_level_present_flag");
 
-  kvz_bitstream_align_zero(stream);
+  uvg_bitstream_align_zero(stream);
 
 
   WRITE_U(stream, 1, 8, "ptl_num_sub_profiles");
@@ -264,7 +264,7 @@ static uint8_t max_num_reorder_pics(const encoder_control_t * const encoder)
 static void encoder_state_write_bitstream_vid_parameter_set(bitstream_t* stream,
                                                             encoder_state_t * const state)
 {
-#ifdef KVZ_DEBUG
+#ifdef UVG_DEBUG
   printf("=========== Video Parameter Set ID: 0 ===========\n");
 #endif
 
@@ -276,11 +276,11 @@ static void encoder_state_write_bitstream_vid_parameter_set(bitstream_t* stream,
   for (int i = 0; i < 1; i++) {
     WRITE_U(stream, 0, 6, "vps_layer_id");
   }
-  kvz_bitstream_align_zero(stream);
+  uvg_bitstream_align_zero(stream);
   encoder_state_write_bitstream_PTL(stream, state);
   WRITE_U(stream, 0, 1, "vps_extension_flag")
 
-  kvz_bitstream_add_rbsp_trailing_bits(stream);
+  uvg_bitstream_add_rbsp_trailing_bits(stream);
 }
 */
 
@@ -292,7 +292,7 @@ static void encoder_state_write_bitstream_scaling_list(bitstream_t *stream,
   uint32_t size_id;
   for (size_id = 0; size_id < SCALING_LIST_SIZE_NUM; size_id++) {
     int32_t list_id;
-    for (list_id = 0; list_id < kvz_g_scaling_list_num[size_id]; list_id++) {
+    for (list_id = 0; list_id < uvg_g_scaling_list_num[size_id]; list_id++) {
       uint8_t scaling_list_pred_mode_flag = 1;
       int32_t pred_list_idx;
       int32_t i;
@@ -300,10 +300,10 @@ static void encoder_state_write_bitstream_scaling_list(bitstream_t *stream,
 
       for (pred_list_idx = list_id; pred_list_idx >= 0; pred_list_idx--) {
         const int32_t * const pred_list  = (list_id == pred_list_idx) ?
-                                     kvz_scalinglist_get_default(size_id, pred_list_idx) :
+                                     uvg_scalinglist_get_default(size_id, pred_list_idx) :
                                      encoder->scaling_list.scaling_list_coeff[size_id][pred_list_idx];
 
-        if (!memcmp(encoder->scaling_list.scaling_list_coeff[size_id][list_id], pred_list, sizeof(int32_t) * MIN(8, kvz_g_scaling_list_size[size_id])) &&
+        if (!memcmp(encoder->scaling_list.scaling_list_coeff[size_id][list_id], pred_list, sizeof(int32_t) * MIN(8, uvg_g_scaling_list_size[size_id])) &&
             ((size_id < SCALING_LIST_16x16) ||
              (encoder->scaling_list.scaling_list_dc[size_id][list_id] == encoder->scaling_list.scaling_list_dc[size_id][pred_list_idx]))) {
           ref_matrix_id = pred_list_idx;
@@ -317,7 +317,7 @@ static void encoder_state_write_bitstream_scaling_list(bitstream_t *stream,
         WRITE_UE(stream, list_id - ref_matrix_id, "scaling_list_pred_matrix_id_delta");
       } else {
         int32_t delta;
-        const int32_t coef_num = MIN(MAX_MATRIX_COEF_NUM, kvz_g_scaling_list_size[size_id]);
+        const int32_t coef_num = MIN(MAX_MATRIX_COEF_NUM, uvg_g_scaling_list_size[size_id]);
         const uint32_t * const scan_cg = (size_id == 0) ? g_sig_last_scan_16x16 : g_sig_last_scan_32x32;
         int32_t next_coef = 8;
         const int32_t * const coef_list = encoder->scaling_list.scaling_list_coeff[size_id][list_id];
@@ -347,7 +347,7 @@ static void encoder_state_write_bitstream_VUI(bitstream_t *stream,
                                               encoder_state_t * const state)
 {
   const encoder_control_t * const encoder = state->encoder_control;
-#ifdef KVZ_DEBUG
+#ifdef UVG_DEBUG
   printf("=========== VUI Set ID: 0 ===========\n");
 #endif
 
@@ -456,7 +456,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
 {
   const encoder_control_t * encoder = state->encoder_control;
 
-#ifdef KVZ_DEBUG
+#ifdef UVG_DEBUG
   printf("=========== Sequence Parameter Set ID: 0 ===========\n");
 #endif
   /*
@@ -470,7 +470,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   WRITE_U(stream, 1, 3, "sps_max_sub_layers_minus1");
 
   WRITE_U(stream, encoder->chroma_format, 2, "chroma_format_idc");
-  WRITE_U(stream, kvz_math_floor_log2(LCU_WIDTH) - 5, 2, "sps_log2_ctu_size_minus5");
+  WRITE_U(stream, uvg_math_floor_log2(LCU_WIDTH) - 5, 2, "sps_log2_ctu_size_minus5");
 
 
   WRITE_U(stream, 1, 1, "sps_ptl_dpb_hrd_params_present_flag");
@@ -532,7 +532,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   WRITE_UE(stream, 0, "sps_log2_diff_min_qt_min_cb_intra_slice_luma");
   WRITE_UE(stream, 0, "sps_max_mtt_hierarchy_depth_intra_slice_luma");  
 
-  if (encoder->chroma_format != KVZ_CSP_400)
+  if (encoder->chroma_format != UVG_CSP_400)
   {
     WRITE_U(stream, 0, 1, "qtbtt_dual_tree_intra_flag");
   }
@@ -578,14 +578,14 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   const uint8_t mts_selection = encoder->cfg.mts;
   WRITE_U(stream, mts_selection ? 1 : 0, 1, "sps_mts_enabled_flag");
   if (mts_selection){
-    WRITE_U(stream, mts_selection == KVZ_MTS_INTRA || mts_selection == KVZ_MTS_BOTH ? 1 : 0, 1, "sps_explicit_mts_intra_enabled_flag");
-    WRITE_U(stream, mts_selection == KVZ_MTS_INTER || mts_selection == KVZ_MTS_BOTH ? 1 : 0, 1, "sps_explicit_mts_inter_enabled_flag");
+    WRITE_U(stream, mts_selection == UVG_MTS_INTRA || mts_selection == UVG_MTS_BOTH ? 1 : 0, 1, "sps_explicit_mts_intra_enabled_flag");
+    WRITE_U(stream, mts_selection == UVG_MTS_INTER || mts_selection == UVG_MTS_BOTH ? 1 : 0, 1, "sps_explicit_mts_inter_enabled_flag");
   }
 
   WRITE_U(stream, 0, 1, "sps_lfnst_enabled_flag");
 
 
-  if (encoder->chroma_format != KVZ_CSP_400) {
+  if (encoder->chroma_format != UVG_CSP_400) {
     WRITE_U(stream, encoder->cfg.jccr, 1, "sps_joint_cbcr_enabled_flag");
     WRITE_U(stream, 1, 1, "same_qp_table_for_chroma");
 
@@ -605,9 +605,9 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
     WRITE_U(stream, encoder->cfg.sao_type ? 1 : 0, 1, "sps_sao_enabled_flag");
   // if(!no_alf_constraint_flag)
     WRITE_U(stream, encoder->cfg.alf_type ? 1 : 0, 1, "sps_alf_enable_flag");
-    if (encoder->cfg.alf_type && encoder->chroma_format != KVZ_CSP_400)
+    if (encoder->cfg.alf_type && encoder->chroma_format != UVG_CSP_400)
     {
-      WRITE_U(stream, encoder->cfg.alf_type == KVZ_ALF_FULL, 1, "sps_ccalf_enabled_flag");
+      WRITE_U(stream, encoder->cfg.alf_type == UVG_ALF_FULL, 1, "sps_ccalf_enabled_flag");
     }
 
     WRITE_U(stream, encoder->cfg.lmcs_enable, 1, "sps_lmcs_enable_flag");
@@ -674,10 +674,10 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
     WRITE_U(stream, 0, 1, "sps_mip_enabled_flag");
   }
   // if(!no_cclm_constraint_flag)
-  if(encoder->chroma_format != KVZ_CSP_400) {
+  if(encoder->chroma_format != UVG_CSP_400) {
     WRITE_U(stream, encoder->cfg.cclm, 1, "sps_cclm_enabled_flag");
   }
-  if (encoder->chroma_format == KVZ_CSP_420) {
+  if (encoder->chroma_format == UVG_CSP_420) {
     WRITE_U(stream, 0, 1, "sps_chroma_horizontal_collocated_flag");
     WRITE_U(stream, 0, 1, "sps_chroma_vertical_collocated_flag");
   }
@@ -729,14 +729,14 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
 
   encoder_state_write_bitstream_SPS_extension(stream, state);
 
-  kvz_bitstream_add_rbsp_trailing_bits(stream);
+  uvg_bitstream_add_rbsp_trailing_bits(stream);
 }
 
 static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
                                                             encoder_state_t * const state)
 {
   const encoder_control_t * const encoder = state->encoder_control;
-#ifdef KVZ_DEBUG
+#ifdef UVG_DEBUG
   printf("=========== Picture Parameter Set ID: 0 ===========\n");
 #endif
   WRITE_U(stream, 0, 6, "pps_pic_parameter_set_id");
@@ -771,7 +771,7 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
 
   if (encoder->tiles_enable) {
 
-    WRITE_U(stream, kvz_math_floor_log2(LCU_WIDTH) - 5,  2, "pps_log2_ctu_size_minus5");
+    WRITE_U(stream, uvg_math_floor_log2(LCU_WIDTH) - 5,  2, "pps_log2_ctu_size_minus5");
 
     WRITE_UE(stream, encoder->cfg.tiles_width_count - 1, "pps_num_exp_tile_columns_minus1");
     WRITE_UE(stream, encoder->cfg.tiles_height_count - 1, "pps_num_exp_tile_rows_minus1");
@@ -848,7 +848,7 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
   WRITE_U(stream, 0, 1, "pps_slice_header_extension_present_flag");
   WRITE_U(stream, 0, 1, "pps_extension_flag");
 
-  kvz_bitstream_add_rbsp_trailing_bits(stream);
+  uvg_bitstream_add_rbsp_trailing_bits(stream);
 }
 
 static void encoder_state_write_bitstream_prefix_sei_version(encoder_state_t * const state)
@@ -858,7 +858,7 @@ static void encoder_state_write_bitstream_prefix_sei_version(encoder_state_t * c
   int i, length;
   char buf[STR_BUF_LEN] = { 0 };
   char *s = buf + 16;
-  const kvz_config * const cfg = &state->encoder_control->cfg;
+  const uvg_config * const cfg = &state->encoder_control->cfg;
 
   // random uuid_iso_iec_11578 generated with www.famkruithof.net/uuid/uuidgen
   static const uint8_t uuid[16] = {
@@ -896,7 +896,7 @@ static void encoder_state_write_bitstream_prefix_sei_version(encoder_state_t * c
     WRITE_U(stream, ((uint8_t *)buf)[i], 8, "sei_payload");
 
   // The bitstream is already aligned, but align it anyway.
-  kvz_bitstream_align(stream);
+  uvg_bitstream_align(stream);
 
 #undef STR_BUF_LEN
 }
@@ -932,7 +932,7 @@ static void encoder_state_write_active_parameter_sets_sei_message(encoder_state_
   WRITE_UE(stream, layer_sps_idx, "layer_sps_idx");
   //}
 
-  kvz_bitstream_rbsp_trailing_bits(stream); //rbsp_trailing_bits
+  uvg_bitstream_rbsp_trailing_bits(stream); //rbsp_trailing_bits
 }
 */
 
@@ -970,7 +970,7 @@ static void encoder_state_write_picture_timing_sei_message(encoder_state_t * con
     WRITE_U(stream, source_scan_type, 2, "source_scan_type");
     WRITE_U(stream, 0, 1, "duplicate_flag");
 
-    kvz_bitstream_align(stream);
+    uvg_bitstream_align(stream);
   }
 }
 
@@ -979,7 +979,7 @@ static void encoder_state_entry_points_explore(const encoder_state_t * const sta
   int i;
   for (i = 0; state->children[i].encoder_control; ++i) {
     if (state->children[i].is_leaf) {
-      const int my_length = kvz_bitstream_tell(&state->children[i].stream)/8;
+      const int my_length = uvg_bitstream_tell(&state->children[i].stream)/8;
       ++(*r_count);
       if (my_length > *r_max_length) {
         *r_max_length = my_length;
@@ -994,7 +994,7 @@ static void encoder_state_write_bitstream_entry_points_write(bitstream_t * const
   int i;
   for (i = 0; state->children[i].encoder_control; ++i) {
     if (state->children[i].is_leaf) {
-      const int my_length = kvz_bitstream_tell(&state->children[i].stream)/8;
+      const int my_length = uvg_bitstream_tell(&state->children[i].stream)/8;
       ++(*r_count);
       //Don't write the last one
       if (*r_count < num_entry_points) {
@@ -1006,18 +1006,18 @@ static void encoder_state_write_bitstream_entry_points_write(bitstream_t * const
   }
 }
 
-static void kvz_encoder_state_write_bitstream_picture_header(
+static void uvg_encoder_state_write_bitstream_picture_header(
     struct bitstream_t * const stream,
     struct encoder_state_t * const state)
 {
   const encoder_control_t * const encoder = state->encoder_control;
 
-#ifdef KVZ_DEBUG
+#ifdef UVG_DEBUG
   printf("=========== Picture Header ===========\n");
 #endif
 
-  if (state->frame->pictype == KVZ_NAL_IDR_W_RADL
-    || state->frame->pictype == KVZ_NAL_IDR_N_LP) {
+  if (state->frame->pictype == UVG_NAL_IDR_W_RADL
+    || state->frame->pictype == UVG_NAL_IDR_N_LP) {
     WRITE_U(stream, 1, 1, "ph_gdr_or_irap_pic_flag");
 #if JVET_S0076_ASPECT1
     WRITE_U(stream, 0, 1, "ph_non_ref_pic_flag");
@@ -1106,7 +1106,7 @@ static void kvz_encoder_state_write_bitstream_picture_header(
     {
       WRITE_U(stream, 0, 2, "ph_lmcs_aps_id");
 
-      if (encoder->chroma_format != KVZ_CSP_400)
+      if (encoder->chroma_format != UVG_CSP_400)
       {
         WRITE_U(stream, state->tile->frame->lmcs_aps->m_sliceReshapeInfo.enableChromaAdj, 1, "ph_chroma_residual_scale_flag");
       }
@@ -1114,8 +1114,8 @@ static void kvz_encoder_state_write_bitstream_picture_header(
   }
   // getDeblockingFilterControlPresentFlag
 
-  if (state->frame->pictype == KVZ_NAL_IDR_W_RADL
-    || state->frame->pictype == KVZ_NAL_IDR_N_LP) {
+  if (state->frame->pictype == UVG_NAL_IDR_W_RADL
+    || state->frame->pictype == UVG_NAL_IDR_N_LP) {
   }
   else {
     if (state->encoder_control->cfg.tmvp_enable) {
@@ -1131,7 +1131,7 @@ static void kvz_encoder_state_write_bitstream_picture_header(
 
 }
 
-static void kvz_encoder_state_write_bitstream_ref_pic_list(
+static void uvg_encoder_state_write_bitstream_ref_pic_list(
   struct bitstream_t* const stream,
   struct encoder_state_t* const state)
 {
@@ -1230,7 +1230,7 @@ static void kvz_encoder_state_write_bitstream_ref_pic_list(
     }
   }
 
-  if ( (state->frame->slicetype != KVZ_SLICE_I && ref_negative > 1 )|| ref_positive > 1) {
+  if ( (state->frame->slicetype != UVG_SLICE_I && ref_negative > 1 )|| ref_positive > 1) {
     WRITE_U(stream, 1, 1, "sh_num_ref_idx_active_override_flag");
     if (ref_negative > 1) for(int list = 0; list < 1 + copy_rpl1_from_rpl0; list++) WRITE_UE(stream, ref_negative - 1, "sh_num_ref_idx_active_minus1[0]");
     if (!copy_rpl1_from_rpl0 && ref_positive > 1) WRITE_UE(stream, ref_positive - 1, "sh_num_ref_idx_active_minus1[1]");
@@ -1238,19 +1238,19 @@ static void kvz_encoder_state_write_bitstream_ref_pic_list(
 
 }
 
-void kvz_encoder_state_write_bitstream_slice_header(
+void uvg_encoder_state_write_bitstream_slice_header(
     struct bitstream_t * const stream,
     struct encoder_state_t * const state,
     bool independent)
 {
   const encoder_control_t * const encoder = state->encoder_control;
 
-#ifdef KVZ_DEBUG
+#ifdef UVG_DEBUG
   printf("=========== Slice =========== %d\n", state->frame->poc);
 #endif
   /*
   bool first_slice_segment_in_pic = (state->slice->start_in_rs == 0);
-  if ((state->encoder_control->cfg.slices & KVZ_SLICES_WPP)
+  if ((state->encoder_control->cfg.slices & UVG_SLICES_WPP)
       && state->wfrow->lcu_offset_y > 0)
   {
     first_slice_segment_in_pic = false;
@@ -1261,14 +1261,14 @@ void kvz_encoder_state_write_bitstream_slice_header(
 
   WRITE_U(stream, 1, 1, "picture_header_in_slice_header_flag");
 
-  kvz_encoder_state_write_bitstream_picture_header(stream, state); 
+  uvg_encoder_state_write_bitstream_picture_header(stream, state); 
 
-  if (state->frame->pictype != KVZ_NAL_IDR_W_RADL
-    && state->frame->pictype != KVZ_NAL_IDR_N_LP) {
+  if (state->frame->pictype != UVG_NAL_IDR_W_RADL
+    && state->frame->pictype != UVG_NAL_IDR_N_LP) {
     WRITE_UE(stream, state->frame->slicetype, "sh_slice_type");
   }
 
-  if (state->frame->pictype == KVZ_NAL_CRA_NUT || state->frame->pictype == KVZ_NAL_IDR_N_LP || state->frame->pictype == KVZ_NAL_IDR_W_RADL || state->frame->pictype == KVZ_NAL_GDR_NUT)
+  if (state->frame->pictype == UVG_NAL_CRA_NUT || state->frame->pictype == UVG_NAL_IDR_N_LP || state->frame->pictype == UVG_NAL_IDR_W_RADL || state->frame->pictype == UVG_NAL_GDR_NUT)
   {
     WRITE_U(stream, 0, 1, "sh_no_output_of_prior_pics_flag");
   }
@@ -1288,7 +1288,7 @@ void kvz_encoder_state_write_bitstream_slice_header(
         WRITE_U(stream, aps_ids[i], 3, "slice_alf_aps_id_luma");
       }
       const int alf_chroma_idc = state->slice->alf->tile_group_alf_enabled_flag[COMPONENT_Cb] + state->slice->alf->tile_group_alf_enabled_flag[COMPONENT_Cr] * 2;
-      if (encoder->chroma_format != KVZ_CSP_400)
+      if (encoder->chroma_format != UVG_CSP_400)
       {
         WRITE_U(stream, state->slice->alf->tile_group_alf_enabled_flag[COMPONENT_Cb], 1, "slice_alf_cb_enabled_flag");
         WRITE_U(stream, state->slice->alf->tile_group_alf_enabled_flag[COMPONENT_Cr], 1, "slice_alf_cr_enabled_flag");
@@ -1298,7 +1298,7 @@ void kvz_encoder_state_write_bitstream_slice_header(
         WRITE_U(stream, state->slice->alf->tile_group_chroma_aps_id, 3, "slice_alf_aps_id_chroma");
       }
 
-      if (encoder->cfg.alf_type == KVZ_ALF_FULL)
+      if (encoder->cfg.alf_type == UVG_ALF_FULL)
       {
         WRITE_U(stream, state->slice->alf->cc_filter_param->cc_alf_filter_enabled[COMPONENT_Cb - 1], 1, "slice_cc_alf_cb_enabled_flag");
         if (state->slice->alf->cc_filter_param->cc_alf_filter_enabled[COMPONENT_Cb - 1])
@@ -1317,12 +1317,12 @@ void kvz_encoder_state_write_bitstream_slice_header(
     }
   }
 
-  if (state->frame->pictype != KVZ_NAL_IDR_W_RADL
-    && state->frame->pictype != KVZ_NAL_IDR_N_LP) {
-    kvz_encoder_state_write_bitstream_ref_pic_list(stream, state);
+  if (state->frame->pictype != UVG_NAL_IDR_W_RADL
+    && state->frame->pictype != UVG_NAL_IDR_N_LP) {
+    uvg_encoder_state_write_bitstream_ref_pic_list(stream, state);
   }
 
-  if (state->frame->slicetype != KVZ_SLICE_I && state->encoder_control->cfg.tmvp_enable) {
+  if (state->frame->slicetype != UVG_SLICE_I && state->encoder_control->cfg.tmvp_enable) {
     int ref_negative = 0;
     int ref_positive = 0;
     const encoder_control_t* const encoder = state->encoder_control;    
@@ -1338,7 +1338,7 @@ void kvz_encoder_state_write_bitstream_slice_header(
     }
     else ref_negative = state->frame->ref->used_size;
     
-    if (state->frame->slicetype == KVZ_SLICE_B) {
+    if (state->frame->slicetype == UVG_SLICE_B) {
       WRITE_U(stream, 1, 1, "sh_collocated_from_l0_flag");
     }
     if (ref_negative > 1) { // collocated_from_l0_flag == 0
@@ -1351,7 +1351,7 @@ void kvz_encoder_state_write_bitstream_slice_header(
 
   if (encoder->cfg.sao_type) {
     WRITE_U(stream, 1, 1, "sh_sao_luma_flag");
-    if (encoder->chroma_format != KVZ_CSP_400) {
+    if (encoder->chroma_format != UVG_CSP_400) {
       WRITE_U(stream, 1, 1, "sh_sao_chroma_flag");
     }
   }
@@ -1366,7 +1366,7 @@ void kvz_encoder_state_write_bitstream_slice_header(
     // TODO: find out what this is actually about and parametrize it
     WRITE_U(stream, 0, 1, "sh_ts_residual_coding_disabled_flag"); 
   }
-  if (state->frame->slicetype != KVZ_SLICE_I) {
+  if (state->frame->slicetype != UVG_SLICE_I) {
 
     // BT Size set only with non-I-frames, in I-frames the size is 32x32
     // but in other frames it is CTU size >> <this value>
@@ -1390,7 +1390,7 @@ void kvz_encoder_state_write_bitstream_slice_header(
     //WRITE_UE(stream, num_offsets, "num_entry_point_offsets");
     if (num_offsets > 0) {
       int entry_points_written = 0;
-      int offset_len = kvz_math_floor_log2(max_length_seen) + 1;
+      int offset_len = uvg_math_floor_log2(max_length_seen) + 1;
       WRITE_UE(stream, offset_len - 1, "offset_len_minus1");
       encoder_state_write_bitstream_entry_points_write(stream, state, num_entry_points, offset_len, &entry_points_written);
     }
@@ -1398,7 +1398,7 @@ void kvz_encoder_state_write_bitstream_slice_header(
 
   //WRITE_U(stream, 0, 1, "slice_ts_residual_coding_disabled_flag");
 
-  //kvz_bitstream_align(stream);
+  //uvg_bitstream_align(stream);
 }
 
 
@@ -1413,16 +1413,16 @@ static void add_checksum(encoder_state_t * const state)
   const videoframe_t * const frame = state->tile->frame;
   unsigned char checksum[3][SEI_HASH_MAX_LENGTH];
 
-  kvz_nal_write(stream, KVZ_NAL_SUFFIX_SEI_NUT, 0, 0);
+  uvg_nal_write(stream, UVG_NAL_SUFFIX_SEI_NUT, 0, 0);
 
   WRITE_U(stream, 132, 8, "sei_type");
 
-  int num_colors = (state->encoder_control->chroma_format == KVZ_CSP_400 ? 1 : 3);
+  int num_colors = (state->encoder_control->chroma_format == UVG_CSP_400 ? 1 : 3);
 
   switch (state->encoder_control->cfg.hash)
   {
-  case KVZ_HASH_CHECKSUM:
-    kvz_image_checksum(frame->rec, checksum, state->encoder_control->bitdepth);
+  case UVG_HASH_CHECKSUM:
+    uvg_image_checksum(frame->rec, checksum, state->encoder_control->bitdepth);
 
     WRITE_U(stream, 2 + num_colors * 4, 8, "size");
     WRITE_U(stream, 2, 8, "hash_type");  // 2 = checksum
@@ -1439,8 +1439,8 @@ static void add_checksum(encoder_state_t * const state)
 
     break;
 
-  case KVZ_HASH_MD5:
-    kvz_image_md5(frame->rec, checksum, state->encoder_control->bitdepth);
+  case UVG_HASH_MD5:
+    uvg_image_md5(frame->rec, checksum, state->encoder_control->bitdepth);
 
     WRITE_U(stream, 2 + num_colors * 16, 8, "size");
     WRITE_U(stream, 0, 8, "hash_type");  // 0 = md5
@@ -1455,15 +1455,15 @@ static void add_checksum(encoder_state_t * const state)
 
     break;
 
-  case KVZ_HASH_NONE:
+  case UVG_HASH_NONE:
     // Means we shouldn't be writing this SEI.
     assert(0);
   }
 
-  kvz_bitstream_align(stream);
+  uvg_bitstream_align(stream);
 
   // spec:sei_rbsp() rbsp_trailing_bits
-  kvz_bitstream_add_rbsp_trailing_bits(stream);
+  uvg_bitstream_add_rbsp_trailing_bits(stream);
 }
 
 static void encoder_state_write_slice_header(
@@ -1471,11 +1471,11 @@ static void encoder_state_write_slice_header(
   encoder_state_t * state,
   bool independent)
 {
-  kvz_nal_write(stream, state->frame->pictype, (state->frame->pictype==KVZ_NAL_STSA)?1:0, state->frame->first_nal);
+  uvg_nal_write(stream, state->frame->pictype, (state->frame->pictype==UVG_NAL_STSA)?1:0, state->frame->first_nal);
   state->frame->first_nal = false;
 
-  kvz_encoder_state_write_bitstream_slice_header(stream, state, independent);
-  kvz_bitstream_add_rbsp_trailing_bits(stream);
+  uvg_encoder_state_write_bitstream_slice_header(stream, state, independent);
+  uvg_bitstream_add_rbsp_trailing_bits(stream);
 }
 
 /**
@@ -1489,13 +1489,13 @@ static void encoder_state_write_bitstream_children(encoder_state_t * const state
     if (state->children[i].type == ENCODER_STATE_TYPE_SLICE) {
       encoder_state_write_slice_header(&state->stream, &state->children[i], true);
     } else if (state->children[i].type == ENCODER_STATE_TYPE_WAVEFRONT_ROW) {
-      if ((state->encoder_control->cfg.slices & KVZ_SLICES_WPP) && i != 0) {
+      if ((state->encoder_control->cfg.slices & UVG_SLICES_WPP) && i != 0) {
         // Add header for dependent WPP row slice.
         encoder_state_write_slice_header(&state->stream, &state->children[i], false);
       }
     }
-    kvz_encoder_state_write_bitstream(&state->children[i]);
-    kvz_bitstream_move(&state->stream, &state->children[i].stream);
+    uvg_encoder_state_write_bitstream(&state->children[i]);
+    uvg_bitstream_move(&state->stream, &state->children[i].stream);
   }
   
 }
@@ -1504,7 +1504,7 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
 {
   const encoder_control_t * const encoder = state->encoder_control;
   bitstream_t * const stream = &state->stream;
-  uint64_t curpos = kvz_bitstream_tell(stream);
+  uint64_t curpos = uvg_bitstream_tell(stream);
 
   // The first NAL unit of the access unit must use a long start code.
   state->frame->first_nal = true;
@@ -1517,53 +1517,53 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
 
   if (encoder_state_must_write_vps(state)) {
     state->frame->first_nal = false;
-    kvz_encoder_state_write_parameter_sets(&state->stream, state);
+    uvg_encoder_state_write_parameter_sets(&state->stream, state);
   }
 
   // Send Kvazaar version information only in the first frame.
   if (state->frame->num == 0 && encoder->cfg.add_encoder_info) {
-    kvz_nal_write(stream, KVZ_NAL_PREFIX_SEI_NUT, 0, state->frame->first_nal);
+    uvg_nal_write(stream, UVG_NAL_PREFIX_SEI_NUT, 0, state->frame->first_nal);
     state->frame->first_nal = false;
     encoder_state_write_bitstream_prefix_sei_version(state);
 
     // spec:sei_rbsp() rbsp_trailing_bits
-    kvz_bitstream_add_rbsp_trailing_bits(stream);
+    uvg_bitstream_add_rbsp_trailing_bits(stream);
   }
 
   //SEI messages for interlacing
   if (encoder->vui.frame_field_info_present_flag) {
     // These should be optional, needed for earlier versions
     // of HM decoder to accept bitstream
-    //kvz_nal_write(stream, KVZ_NAL_PREFIX_SEI_NUT, 0, 0);
+    //uvg_nal_write(stream, UVG_NAL_PREFIX_SEI_NUT, 0, 0);
     //encoder_state_write_active_parameter_sets_sei_message(state);
-    //kvz_bitstream_rbsp_trailing_bits(stream);
+    //uvg_bitstream_rbsp_trailing_bits(stream);
 
-    kvz_nal_write(stream, KVZ_NAL_PREFIX_SEI_NUT, 0, state->frame->first_nal);
+    uvg_nal_write(stream, UVG_NAL_PREFIX_SEI_NUT, 0, state->frame->first_nal);
     state->frame->first_nal = false;
     encoder_state_write_picture_timing_sei_message(state);
 
     // spec:sei_rbsp() rbsp_trailing_bits
-    kvz_bitstream_add_rbsp_trailing_bits(stream);
+    uvg_bitstream_add_rbsp_trailing_bits(stream);
   }
 
-  kvz_encode_lmcs_adaptive_parameter_set(state);
+  uvg_encode_lmcs_adaptive_parameter_set(state);
   // Adaptation parameter set (APS)
 
-  kvz_encode_alf_adaptive_parameter_set(state);
+  uvg_encode_alf_adaptive_parameter_set(state);
 
   encoder_state_write_bitstream_children(state);
 
-  if (state->encoder_control->cfg.hash != KVZ_HASH_NONE) {
+  if (state->encoder_control->cfg.hash != UVG_HASH_NONE) {
     // Calculate checksum
     add_checksum(state);
   }
 
-  //kvz_nal_write(stream, KVZ_NAL_EOS_NUT, 0, 1);
-  //kvz_nal_write(stream, KVZ_NAL_EOS_NUT, 0, 1);
+  //uvg_nal_write(stream, UVG_NAL_EOS_NUT, 0, 1);
+  //uvg_nal_write(stream, UVG_NAL_EOS_NUT, 0, 1);
   
 
   //Get bitstream length for stats
-  uint64_t newpos = kvz_bitstream_tell(stream);
+  uint64_t newpos = uvg_bitstream_tell(stream);
   state->stats_bitstream_length = (newpos >> 3) - (curpos >> 3);
 
   if (state->frame->num > 0) {
@@ -1575,7 +1575,7 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
   state->frame->cur_gop_bits_coded += newpos - curpos;
 }
 
-void kvz_encoder_state_write_bitstream(encoder_state_t * const state)
+void uvg_encoder_state_write_bitstream(encoder_state_t * const state)
 {
   if (!state->is_leaf) {
     switch (state->type) {
@@ -1593,25 +1593,25 @@ void kvz_encoder_state_write_bitstream(encoder_state_t * const state)
   }
 }
 
-void kvz_encoder_state_worker_write_bitstream(void * opaque)
+void uvg_encoder_state_worker_write_bitstream(void * opaque)
 {
-  kvz_encoder_state_write_bitstream((encoder_state_t *) opaque);
+  uvg_encoder_state_write_bitstream((encoder_state_t *) opaque);
 }
 
-void kvz_encoder_state_write_parameter_sets(bitstream_t *stream,
+void uvg_encoder_state_write_parameter_sets(bitstream_t *stream,
                                             encoder_state_t * const state)
 {
   // Video Parameter Set (VPS)  
-  //kvz_nal_write(stream, KVZ_NAL_VPS_NUT, 0, 1);
+  //uvg_nal_write(stream, UVG_NAL_VPS_NUT, 0, 1);
   //encoder_state_write_bitstream_vid_parameter_set(stream, state);
   
 
   // Sequence Parameter Set (SPS)
-  kvz_nal_write(stream, KVZ_NAL_SPS_NUT, 0, 1);
+  uvg_nal_write(stream, UVG_NAL_SPS_NUT, 0, 1);
   encoder_state_write_bitstream_seq_parameter_set(stream, state);
 
   // Picture Parameter Set (PPS)
-  kvz_nal_write(stream, KVZ_NAL_PPS_NUT, 0, 1);
+  uvg_nal_write(stream, UVG_NAL_PPS_NUT, 0, 1);
   encoder_state_write_bitstream_pic_parameter_set(stream, state);
 }
 

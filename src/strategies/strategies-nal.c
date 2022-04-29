@@ -35,20 +35,20 @@
 #include "strategies/generic/nal-generic.h"
 
 
-void (*kvz_array_checksum)(const kvz_pixel* data,
+void (*uvg_array_checksum)(const uvg_pixel* data,
                        const int height, const int width,
                        const int stride,
                        unsigned char checksum_out[SEI_HASH_MAX_LENGTH], const uint8_t bitdepth);
-void (*kvz_array_md5)(const kvz_pixel* data,
+void (*uvg_array_md5)(const uvg_pixel* data,
                       const int height, const int width,
                       const int stride,
                       unsigned char checksum_out[SEI_HASH_MAX_LENGTH], const uint8_t bitdepth);
 
 
-int kvz_strategy_register_nal(void* opaque, uint8_t bitdepth) {
+int uvg_strategy_register_nal(void* opaque, uint8_t bitdepth) {
   bool success = true;
 
-  success &= kvz_strategy_register_nal_generic(opaque, bitdepth);
+  success &= uvg_strategy_register_nal_generic(opaque, bitdepth);
   
   return success;
 }

@@ -33,12 +33,12 @@
 #include "strategies/generic/nal-generic.h"
 
 #include "extras/libmd5.h"
-#include "kvazaar.h"
+#include "uvg266.h"
 #include "nal.h"
 #include "strategyselector.h"
 
 
-static void array_md5_generic(const kvz_pixel* data,
+static void array_md5_generic(const uvg_pixel* data,
                               const int height, const int width,
                               const int stride,
                               unsigned char checksum_out[SEI_HASH_MAX_LENGTH], const uint8_t bitdepth)
@@ -46,7 +46,7 @@ static void array_md5_generic(const kvz_pixel* data,
   assert(SEI_HASH_MAX_LENGTH >= 16);
 
   context_md5_t md5_ctx;
-  kvz_md5_init(&md5_ctx);
+  uvg_md5_init(&md5_ctx);
   
   uint32_t N = 32;
   uint32_t width_modN = width % N;
@@ -56,16 +56,16 @@ static void array_md5_generic(const kvz_pixel* data,
   {
     for (uint32_t x = 0; x < width_less_modN; x += N)
     {      
-      kvz_md5_update(&md5_ctx, (const unsigned char*)&data[y * stride + x], N);
+      uvg_md5_update(&md5_ctx, (const unsigned char*)&data[y * stride + x], N);
     }
     /* mop up any of the remaining line */
-    kvz_md5_update(&md5_ctx, (const unsigned char*)&data[y * stride + width_less_modN], width_modN);
+    uvg_md5_update(&md5_ctx, (const unsigned char*)&data[y * stride + width_less_modN], width_modN);
   }
 
-  kvz_md5_final(checksum_out, &md5_ctx);
+  uvg_md5_final(checksum_out, &md5_ctx);
 }
 
-static void array_checksum_generic(const kvz_pixel* data,
+static void array_checksum_generic(const uvg_pixel* data,
                                    const int height, const int width,
                                    const int stride,
                                    unsigned char checksum_out[SEI_HASH_MAX_LENGTH], const uint8_t bitdepth) {
@@ -78,7 +78,7 @@ static void array_checksum_generic(const kvz_pixel* data,
     for (x = 0; x < width; ++x) {
       const uint8_t mask = (uint8_t)((x & 0xff) ^ (y & 0xff) ^ (x >> 8) ^ (y >> 8));
       checksum += (data[(y * stride) + x] & 0xff) ^ mask;
-#if KVZ_BIT_DEPTH > 8
+#if UVG_BIT_DEPTH > 8
       checksum += ((data[(y * stride) + x] >> 8) & 0xff) ^ mask;
 #endif
     }
@@ -91,7 +91,7 @@ static void array_checksum_generic(const kvz_pixel* data,
   checksum_out[3] = (checksum) & 0xff;
 }
 
-static void array_checksum_generic4(const kvz_pixel* data,
+static void array_checksum_generic4(const uvg_pixel* data,
                                    const int height, const int width,
                                    const int stride,
                                    unsigned char checksum_out[SEI_HASH_MAX_LENGTH], const uint8_t bitdepth) {
@@ -139,7 +139,7 @@ static void array_checksum_generic4(const kvz_pixel* data,
   checksum_out[3] = (checksum) & 0xff;
 }
 
-static void array_checksum_generic8(const kvz_pixel* data,
+static void array_checksum_generic8(const uvg_pixel* data,
                                    const int height, const int width,
                                    const int stride,
                                    unsigned char checksum_out[SEI_HASH_MAX_LENGTH], const uint8_t bitdepth) {
@@ -187,13 +187,13 @@ static void array_checksum_generic8(const kvz_pixel* data,
   checksum_out[3] = (checksum) & 0xff;
 }
 
-int kvz_strategy_register_nal_generic(void* opaque, uint8_t bitdepth) {
+int uvg_strategy_register_nal_generic(void* opaque, uint8_t bitdepth) {
   bool success = true;
 
-  success &= kvz_strategyselector_register(opaque, "array_md5", "generic", 0, &array_md5_generic);
-  success &= kvz_strategyselector_register(opaque, "array_checksum", "generic", 0, &array_checksum_generic);
-  success &= kvz_strategyselector_register(opaque, "array_checksum", "generic4", 1, &array_checksum_generic4);
-  success &= kvz_strategyselector_register(opaque, "array_checksum", "generic8", 2, &array_checksum_generic8);
+  success &= uvg_strategyselector_register(opaque, "array_md5", "generic", 0, &array_md5_generic);
+  success &= uvg_strategyselector_register(opaque, "array_checksum", "generic", 0, &array_checksum_generic);
+  success &= uvg_strategyselector_register(opaque, "array_checksum", "generic4", 1, &array_checksum_generic4);
+  success &= uvg_strategyselector_register(opaque, "array_checksum", "generic8", 2, &array_checksum_generic8);
   
   return success;
 }

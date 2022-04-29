@@ -1,19 +1,16 @@
-name: uvg266_pr_tests
+name: uvg266_tests
 
 on:
-  pull_request_target:
-    types: [labeled]
+  push:
+  pull_request:
+    types: [closed]
 
 jobs:
-      
   basic-test:
     runs-on: self-hosted
-    if: contains(github.event.pull_request.labels.*.name, 'safe to test')
+
     steps:
     - uses: actions/checkout@v2
-      with:
-        ref: ${{github.event.pull_request.head.ref}}
-        repository: ${{github.event.pull_request.head.repo.full_name}}
     - name: cmake
       run: cmake -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=./ . || (cat config.log && false)
     - name: make
@@ -23,16 +20,12 @@ jobs:
       
   test-ubsan:
     runs-on: self-hosted
-    if: contains(github.event.pull_request.labels.*.name, 'safe to test')
     env:
       CC: gcc
       CFLAGS: -fsanitize=undefined -fno-sanitize-recover=all -fno-sanitize=alignment
       
     steps:
     - uses: actions/checkout@v2
-      with:
-        ref: ${{github.event.pull_request.head.ref}}
-        repository: ${{github.event.pull_request.head.repo.full_name}}
     - name: cmake
       run: cmake -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=./ . || (cat config.log && false)
     - name: make
@@ -42,20 +35,16 @@ jobs:
       
   test-asan:
     runs-on: self-hosted
-    if: contains(github.event.pull_request.labels.*.name, 'safe to test')
     env:
       CC: gcc
       CFLAGS: -fsanitize=address
       ASAN_OPTIONS: detect_leaks=0
       # AddressSanitizer adds some extra symbols so we expect a failure from
       # the external symbols test.
-      XFAIL_TESTS: test_external_symbols.sh
+      XFAIL_TESTS: test_external_symbols
       
     steps:
     - uses: actions/checkout@v2
-      with:
-        ref: ${{github.event.pull_request.head.ref}}
-        repository: ${{github.event.pull_request.head.repo.full_name}}
     - name: cmake
       run: cmake -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=./ . || (cat config.log && false)
     - name: make
@@ -65,16 +54,12 @@ jobs:
       
   test-tsan:
     runs-on: self-hosted
-    if: contains(github.event.pull_request.labels.*.name, 'safe to test')
     env:
       CC: gcc
       CFLAGS: -fsanitize=thread
       
     steps:
     - uses: actions/checkout@v2
-      with:
-        ref: ${{github.event.pull_request.head.ref}}
-        repository: ${{github.event.pull_request.head.repo.full_name}}
     - name: cmake
       run: cmake -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=./ . || (cat config.log && false)
     - name: make
@@ -84,16 +69,12 @@ jobs:
       
   test-valgrind:
     runs-on: self-hosted
-    if: contains(github.event.pull_request.labels.*.name, 'safe to test')
     
     env:
       UVG266_OVERRIDE_angular_pred: generic
       
     steps:
     - uses: actions/checkout@v2
-      with:
-        ref: ${{github.event.pull_request.head.ref}}
-        repository: ${{github.event.pull_request.head.repo.full_name}}
     - name: cmake
       run: cmake -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=./ . || (cat config.log && false)
     - name: make

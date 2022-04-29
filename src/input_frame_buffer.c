@@ -37,7 +37,7 @@
 #include "image.h"
 
 
-void kvz_init_input_frame_buffer(input_frame_buffer_t *input_buffer)
+void uvg_init_input_frame_buffer(input_frame_buffer_t *input_buffer)
 {
   FILL(input_buffer->pic_buffer, 0);
   FILL(input_buffer->pts_buffer, 0);
@@ -63,13 +63,13 @@ void kvz_init_input_frame_buffer(input_frame_buffer_t *input_buffer)
  * \return        pointer to the next picture, or NULL if no picture is
  *                available
  */
-kvz_picture* kvz_encoder_feed_frame(input_frame_buffer_t *buf,
+uvg_picture* uvg_encoder_feed_frame(input_frame_buffer_t *buf,
                                     encoder_state_t *const state,
-                                    kvz_picture *const img_in, 
+                                    uvg_picture *const img_in, 
                                     int first_done)
 {
   const encoder_control_t* const encoder = state->encoder_control;
-  const kvz_config* const cfg = &encoder->cfg;
+  const uvg_config* const cfg = &encoder->cfg;
 
   const int gop_buf_size = 3 * cfg->gop_len;
 
@@ -95,7 +95,7 @@ kvz_picture* kvz_encoder_feed_frame(input_frame_buffer_t *buf,
     }
     buf->num_in++;
     buf->num_out++;
-    return kvz_image_copy_ref(img_in);
+    return uvg_image_copy_ref(img_in);
   }
   
   if (img_in != NULL) {
@@ -110,7 +110,7 @@ kvz_picture* kvz_encoder_feed_frame(input_frame_buffer_t *buf,
     // Save the input image in the buffer.
     assert(buf_idx >= 0 && buf_idx < gop_buf_size);
     assert(buf->pic_buffer[buf_idx] == NULL);
-    buf->pic_buffer[buf_idx] = kvz_image_copy_ref(img_in);
+    buf->pic_buffer[buf_idx] = uvg_image_copy_ref(img_in);
     buf->pts_buffer[buf_idx] = img_in->pts;
     buf->num_in++;
 
@@ -205,7 +205,7 @@ kvz_picture* kvz_encoder_feed_frame(input_frame_buffer_t *buf,
   // Index in buf->pic_buffer and buf->pts_buffer.
   int buf_idx = (idx_out + gop_buf_size) % gop_buf_size;
 
-  kvz_picture* next_pic = buf->pic_buffer[buf_idx];
+  uvg_picture* next_pic = buf->pic_buffer[buf_idx];
   assert(next_pic != NULL);
   next_pic->dts = dts_out;
   buf->pic_buffer[buf_idx] = NULL;

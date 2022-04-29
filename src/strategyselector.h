@@ -40,7 +40,7 @@
 
 #include "global.h" // IWYU pragma: keep
 
-#if defined(KVZ_DEBUG) && !defined(DEBUG_STRATEGYSELECTOR)
+#if defined(UVG_DEBUG) && !defined(DEBUG_STRATEGYSELECTOR)
 # define DEBUG_STRATEGYSELECTOR
 #endif
 
@@ -91,12 +91,12 @@ typedef struct {
   int physical_cpu_count;
 } hardware_flags_t;
 
-extern hardware_flags_t kvz_g_hardware_flags;
-extern hardware_flags_t kvz_g_strategies_in_use;
-extern hardware_flags_t kvz_g_strategies_available;
+extern hardware_flags_t uvg_g_hardware_flags;
+extern hardware_flags_t uvg_g_strategies_in_use;
+extern hardware_flags_t uvg_g_strategies_available;
 
-int kvz_strategyselector_init(int32_t cpuid, uint8_t bitdepth);
-int kvz_strategyselector_register(void *opaque, const char *type, const char *strategy_name, int priority, void *fptr);
+int uvg_strategyselector_init(int32_t cpuid, uint8_t bitdepth);
+int uvg_strategyselector_register(void *opaque, const char *type, const char *strategy_name, int priority, void *fptr);
 
 
 //Strategy to include

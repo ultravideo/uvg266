@@ -33,8 +33,8 @@
 #include "global.h"
 
 #if COMPILE_INTEL_SSE41
-#include "kvazaar.h"
-#if KVZ_BIT_DEPTH == 8
+#include "uvg266.h"
+#if UVG_BIT_DEPTH == 8
 #include "strategies/sse41/alf-sse41.h"
 
 #include <immintrin.h>
@@ -55,7 +55,7 @@ static void alf_derive_classification_blk_sse41(encoder_state_t * const state,
 {
   videoframe_t* const frame = state->tile->frame;
   const size_t imgStride = frame->rec->stride;
-  const kvz_pixel *  srcExt    = state->tile->frame->rec->y;
+  const uvg_pixel *  srcExt    = state->tile->frame->rec->y;
 
   const int imgHExtended = n_height + 4;
   const int imgWExtended = n_width + 4;
@@ -73,10 +73,10 @@ static void alf_derive_classification_blk_sse41(encoder_state_t * const state,
   {
     const size_t offset = (i + posY - 3) * imgStride + posX - 3;
 
-    const kvz_pixel*imgY0 = &srcExt[offset];
-    const kvz_pixel*imgY1 = &srcExt[offset + imgStride];
-    const kvz_pixel*imgY2 = &srcExt[offset + imgStride * 2];
-    const kvz_pixel*imgY3 = &srcExt[offset + imgStride * 3];
+    const uvg_pixel*imgY0 = &srcExt[offset];
+    const uvg_pixel*imgY1 = &srcExt[offset + imgStride];
+    const uvg_pixel*imgY2 = &srcExt[offset + imgStride * 2];
+    const uvg_pixel*imgY3 = &srcExt[offset + imgStride * 3];
 
     // pixel padding for gradient calculation
     int pos      = blk_dst_y - 2 + i;
@@ -352,7 +352,7 @@ static void alf_derive_classification_blk_sse41(encoder_state_t * const state,
 }
 
 
-INLINE static void process2coeffs_5x5(__m128i params[2][3], __m128i *cur, __m128i *accumA, __m128i *accumB, const int i, const kvz_pixel* ptr0, const kvz_pixel* ptr1, const kvz_pixel* ptr2, const kvz_pixel* ptr3) {
+INLINE static void process2coeffs_5x5(__m128i params[2][3], __m128i *cur, __m128i *accumA, __m128i *accumB, const int i, const uvg_pixel* ptr0, const uvg_pixel* ptr1, const uvg_pixel* ptr2, const uvg_pixel* ptr3) {
   const __m128i val00 = _mm_sub_epi16(_mm_unpacklo_epi8(_mm_loadu_si128((const __m128i*) ptr0), _mm_setzero_si128()), *cur);
   const __m128i val10 = _mm_sub_epi16(_mm_unpacklo_epi8(_mm_loadu_si128((const __m128i*) ptr2), _mm_setzero_si128()), *cur);
   const __m128i val01 = _mm_sub_epi16(_mm_unpacklo_epi8(_mm_loadu_si128((const __m128i*) ptr1), _mm_setzero_si128()), *cur);
@@ -387,8 +387,8 @@ INLINE static void process2coeffs_5x5(__m128i params[2][3], __m128i *cur, __m128
 
 
 static void alf_filter_5x5_block_sse41(encoder_state_t* const state,
-  const kvz_pixel* src_pixels,
-  kvz_pixel* dst_pixels,
+  const uvg_pixel* src_pixels,
+  uvg_pixel* dst_pixels,
   const int src_stride,
   const int dst_stride,
   const short* filter_set,
@@ -424,8 +424,8 @@ static void alf_filter_5x5_block_sse41(encoder_state_t* const state,
   assert(height % STEP_Y == 0 && "Wrong endHeight in filtering");
   assert(width % 4 == 0 && "Wrong endWidth in filtering");
 
-  const kvz_pixel* src = src_pixels + y_pos * srcStride + x_pos;
-  kvz_pixel* dst = dst_pixels + blk_dst_y * dstStride + blk_dst_x;
+  const uvg_pixel* src = src_pixels + y_pos * srcStride + x_pos;
+  uvg_pixel* dst = dst_pixels + blk_dst_y * dstStride + blk_dst_x;
 
 
 
@@ -452,7 +452,7 @@ static void alf_filter_5x5_block_sse41(encoder_state_t* const state,
 
       for (size_t ii = 0; ii < STEP_Y; ii++)
       {
-        const kvz_pixel* pImg0, * pImg1, * pImg2, * pImg3, * pImg4;
+        const uvg_pixel* pImg0, * pImg1, * pImg2, * pImg3, * pImg4;
 
         pImg0 = src + j + ii * srcStride;
         pImg1 = pImg0 + srcStride;
@@ -545,7 +545,7 @@ static const uint16_t shuffleTab[4][2][8] = {
 
 
 
-INLINE static void process2coeffs_7x7(__m128i params[2][2][6], __m128i *cur, __m128i *accumA, __m128i *accumB, const int i, const kvz_pixel* ptr0, const kvz_pixel* ptr1, const kvz_pixel* ptr2, const kvz_pixel* ptr3) {
+INLINE static void process2coeffs_7x7(__m128i params[2][2][6], __m128i *cur, __m128i *accumA, __m128i *accumB, const int i, const uvg_pixel* ptr0, const uvg_pixel* ptr1, const uvg_pixel* ptr2, const uvg_pixel* ptr3) {
   const __m128i val00 = _mm_sub_epi16(_mm_unpacklo_epi8(_mm_loadu_si128((const __m128i*) ptr0), _mm_setzero_si128()), *cur);
   const __m128i val10 = _mm_sub_epi16(_mm_unpacklo_epi8(_mm_loadu_si128((const __m128i*) ptr2), _mm_setzero_si128()), *cur);
   const __m128i val01 = _mm_sub_epi16(_mm_unpacklo_epi8(_mm_loadu_si128((const __m128i*) ptr1), _mm_setzero_si128()), *cur);
@@ -586,8 +586,8 @@ INLINE static void process2coeffs_7x7(__m128i params[2][2][6], __m128i *cur, __m
 
 
 static void alf_filter_7x7_block_sse41(encoder_state_t* const state,
-  const kvz_pixel* src_pixels,
-  kvz_pixel* dst_pixels,
+  const uvg_pixel* src_pixels,
+  uvg_pixel* dst_pixels,
   const int src_stride,
   const int dst_stride,
   const short* filter_set,
@@ -620,8 +620,8 @@ static void alf_filter_7x7_block_sse41(encoder_state_t* const state,
   assert(height % STEP_Y == 0 && "Wrong endHeight in filtering");
   assert(width % STEP_X == 0 && "Wrong endWidth in filtering");
 
-  const kvz_pixel* src = src_pixels + y_pos * srcStride + x_pos;
-  kvz_pixel* dst = dst_pixels + blk_dst_y * dstStride + blk_dst_x;
+  const uvg_pixel* src = src_pixels + y_pos * srcStride + x_pos;
+  uvg_pixel* dst = dst_pixels + blk_dst_y * dstStride + blk_dst_x;
 
   const __m128i mmOffset = _mm_set1_epi32(ROUND);
   const __m128i mmOffset1 = _mm_set1_epi32((1 << ((SHIFT + 3) - 1)) - ROUND);
@@ -683,7 +683,7 @@ static void alf_filter_7x7_block_sse41(encoder_state_t* const state,
 
       for (size_t ii = 0; ii < STEP_Y; ii++)
       {
-        const kvz_pixel* pImg0, * pImg1, * pImg2, * pImg3, * pImg4, * pImg5, * pImg6;
+        const uvg_pixel* pImg0, * pImg1, * pImg2, * pImg3, * pImg4, * pImg5, * pImg6;
 
         pImg0 = src + j + ii * srcStride;
         pImg1 = pImg0 + srcStride;
@@ -755,20 +755,20 @@ static void alf_filter_7x7_block_sse41(encoder_state_t* const state,
 
 
 
-#endif // KVZ_BIT_DEPTH == 8
+#endif // UVG_BIT_DEPTH == 8
 #endif //COMPILE_INTEL_SSE41
 
 
-int kvz_strategy_register_alf_sse41(void* opaque, uint8_t bitdepth) {
+int uvg_strategy_register_alf_sse41(void* opaque, uint8_t bitdepth) {
   bool success = true;
 #if COMPILE_INTEL_SSE41
-#if KVZ_BIT_DEPTH == 8
+#if UVG_BIT_DEPTH == 8
   if (bitdepth == 8){
-    success &= kvz_strategyselector_register(opaque, "alf_derive_classification_blk", "sse41", 20, &alf_derive_classification_blk_sse41);
-    success &= kvz_strategyselector_register(opaque, "alf_filter_5x5_blk", "sse41", 0, &alf_filter_5x5_block_sse41);
-    success &= kvz_strategyselector_register(opaque, "alf_filter_7x7_blk", "sse41", 0, &alf_filter_7x7_block_sse41);
+    success &= uvg_strategyselector_register(opaque, "alf_derive_classification_blk", "sse41", 20, &alf_derive_classification_blk_sse41);
+    success &= uvg_strategyselector_register(opaque, "alf_filter_5x5_blk", "sse41", 0, &alf_filter_5x5_block_sse41);
+    success &= uvg_strategyselector_register(opaque, "alf_filter_7x7_blk", "sse41", 0, &alf_filter_7x7_block_sse41);
   }
-#endif // KVZ_BIT_DEPTH == 8
+#endif // UVG_BIT_DEPTH == 8
 #endif
   return success;
 }

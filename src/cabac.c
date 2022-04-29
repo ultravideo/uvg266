@@ -34,20 +34,20 @@
 
 #include "encoder.h"
 #include "encoderstate.h"
-#include "kvazaar.h"
+#include "uvg266.h"
 
-#ifdef KVZ_DEBUG_PRINT_CABAC
-uint32_t kvz_cabac_bins_count = 0;
-bool kvz_cabac_bins_verbose = true;
+#ifdef UVG_DEBUG_PRINT_CABAC
+uint32_t uvg_cabac_bins_count = 0;
+bool uvg_cabac_bins_verbose = true;
 #endif
 
-const uint8_t kvz_g_auc_renorm_table[32] =
+const uint8_t uvg_g_auc_renorm_table[32] =
 {
   6, 5, 4, 4, 3, 3, 3, 3, 2, 2, 2, 2, 2, 2, 2, 2,
   1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
 };
 
-static const uint8_t kvz_tb_max[257] = { 0, 0, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+static const uint8_t uvg_tb_max[257] = { 0, 0, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
@@ -62,7 +62,7 @@ static const uint8_t kvz_tb_max[257] = { 0, 0, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 
 /**
  * \brief Initialize struct cabac_data.
  */
-void kvz_cabac_start(cabac_data_t * const data)
+void uvg_cabac_start(cabac_data_t * const data)
 {
   data->low = 0;
   data->range = 510;
@@ -75,7 +75,7 @@ void kvz_cabac_start(cabac_data_t * const data)
 /**
  * \brief
  */
-void kvz_cabac_encode_bin(cabac_data_t * const data, const uint32_t bin_value)
+void uvg_cabac_encode_bin(cabac_data_t * const data, const uint32_t bin_value)
 {
   uint32_t lps = CTX_LPS(data->cur_ctx, data->range);
 
@@ -83,13 +83,13 @@ void kvz_cabac_encode_bin(cabac_data_t * const data, const uint32_t bin_value)
 
   // Not the Most Probable Symbol?
   if ((bin_value ? 1 : 0) != CTX_MPS(data->cur_ctx)) {
-    int num_bits = kvz_g_auc_renorm_table[lps >> 3];
+    int num_bits = uvg_g_auc_renorm_table[lps >> 3];
     data->low = (data->low + data->range) << num_bits;
     data->range = lps << num_bits;
     
     data->bits_left -= num_bits;
     if (data->bits_left < 12) {
-      kvz_cabac_write(data);
+      uvg_cabac_write(data);
     }
   } else {    
     if (data->range < 256) {
@@ -98,7 +98,7 @@ void kvz_cabac_encode_bin(cabac_data_t * const data, const uint32_t bin_value)
       data->bits_left--;
 
       if (data->bits_left < 12) {
-        kvz_cabac_write(data);
+        uvg_cabac_write(data);
       }
     }
   }
@@ -108,7 +108,7 @@ void kvz_cabac_encode_bin(cabac_data_t * const data, const uint32_t bin_value)
 /**
  * \brief
  */
-void kvz_cabac_write(cabac_data_t * const data)
+void uvg_cabac_write(cabac_data_t * const data)
 {
   uint32_t lead_byte = data->low >> (24 - data->bits_left);
   data->bits_left += 8;
@@ -127,11 +127,11 @@ void kvz_cabac_write(cabac_data_t * const data)
       uint32_t carry = lead_byte >> 8;
       uint32_t byte = data->buffered_byte + carry;
       data->buffered_byte = lead_byte & 0xff;
-      kvz_bitstream_put_byte(data->stream, byte);
+      uvg_bitstream_put_byte(data->stream, byte);
 
       byte = (0xff + carry) & 0xff;
       while (data->num_buffered_bytes > 1) {
-        kvz_bitstream_put_byte(data->stream, byte);
+        uvg_bitstream_put_byte(data->stream, byte);
         data->num_buffered_bytes--;
       }
     } else {
@@ -144,30 +144,30 @@ void kvz_cabac_write(cabac_data_t * const data)
 /**
  * \brief
  */
-void kvz_cabac_finish(cabac_data_t * const data)
+void uvg_cabac_finish(cabac_data_t * const data)
 {
   assert(data->bits_left <= 32);
 
   if (data->low >> (32 - data->bits_left)) {
-    kvz_bitstream_put_byte(data->stream, data->buffered_byte + 1);
+    uvg_bitstream_put_byte(data->stream, data->buffered_byte + 1);
     while (data->num_buffered_bytes > 1) {
-      kvz_bitstream_put_byte(data->stream, 0);
+      uvg_bitstream_put_byte(data->stream, 0);
       data->num_buffered_bytes--;
     }
     data->low -= 1 << (32 - data->bits_left);
   } else {
     if (data->num_buffered_bytes > 0) {
-      kvz_bitstream_put_byte(data->stream, data->buffered_byte);
+      uvg_bitstream_put_byte(data->stream, data->buffered_byte);
     }
     while (data->num_buffered_bytes > 1) {
-      kvz_bitstream_put_byte(data->stream, 0xff);
+      uvg_bitstream_put_byte(data->stream, 0xff);
       data->num_buffered_bytes--;
     }
   }
 
   {
     uint8_t bits = (uint8_t)(24 - data->bits_left);
-    kvz_bitstream_put(data->stream, data->low >> 8, bits);
+    uvg_bitstream_put(data->stream, data->low >> 8, bits);
   }
 }
 
@@ -175,7 +175,7 @@ void kvz_cabac_finish(cabac_data_t * const data)
   \brief Encode terminating bin
   \param binValue bin value
 */
-void kvz_cabac_encode_bin_trm(cabac_data_t * const data, const uint8_t bin_value)
+void uvg_cabac_encode_bin_trm(cabac_data_t * const data, const uint8_t bin_value)
 {
   data->range -= 2;
   if(bin_value) {
@@ -192,14 +192,14 @@ void kvz_cabac_encode_bin_trm(cabac_data_t * const data, const uint8_t bin_value
   }
 
   if (data->bits_left < 12) {
-    kvz_cabac_write(data);
+    uvg_cabac_write(data);
   }
 }
 
 /**
  * \brief encode truncated binary code
  */
-void kvz_cabac_encode_trunc_bin(cabac_data_t * const data, const uint32_t bin_value, const uint32_t max_value) {
+void uvg_cabac_encode_trunc_bin(cabac_data_t * const data, const uint32_t bin_value, const uint32_t max_value) {
   int thresh;
   int symbol = bin_value;
   if (max_value > 256) {
@@ -211,7 +211,7 @@ void kvz_cabac_encode_trunc_bin(cabac_data_t * const data, const uint32_t bin_va
     }
     thresh--;
   } else {
-    thresh = kvz_tb_max[max_value];
+    thresh = uvg_tb_max[max_value];
   }
 
   int val = 1 << thresh;
@@ -229,7 +229,7 @@ void kvz_cabac_encode_trunc_bin(cabac_data_t * const data, const uint32_t bin_va
 /**
  * \brief
  */
-void kvz_cabac_encode_bin_ep(cabac_data_t * const data, const uint32_t bin_value)
+void uvg_cabac_encode_bin_ep(cabac_data_t * const data, const uint32_t bin_value)
 {
   data->low <<= 1;
   if (bin_value) {
@@ -238,12 +238,12 @@ void kvz_cabac_encode_bin_ep(cabac_data_t * const data, const uint32_t bin_value
   data->bits_left--;
 
   if (data->bits_left < 12) {
-    kvz_cabac_write(data);
+    uvg_cabac_write(data);
   }
 }
 
 // Import from VTM 4.0
-void kvz_cabac_encode_aligned_bins_ep(cabac_data_t * const data, uint32_t bin_values, int num_bins) 
+void uvg_cabac_encode_aligned_bins_ep(cabac_data_t * const data, uint32_t bin_values, int num_bins) 
 {
   uint32_t rem_bins = num_bins;
   while (rem_bins > 0) {
@@ -269,7 +269,7 @@ void kvz_cabac_encode_aligned_bins_ep(cabac_data_t * const data, uint32_t bin_va
     rem_bins -= bins_to_code;
     data->bits_left -= bins_to_code;
     if (data->bits_left < 12) {
-      kvz_cabac_write(data);
+      uvg_cabac_write(data);
     }
   }
 }
@@ -277,12 +277,12 @@ void kvz_cabac_encode_aligned_bins_ep(cabac_data_t * const data, uint32_t bin_va
 /**
  * \brief
  */
-void kvz_cabac_encode_bins_ep(cabac_data_t * const data, uint32_t bin_values, int num_bins)
+void uvg_cabac_encode_bins_ep(cabac_data_t * const data, uint32_t bin_values, int num_bins)
 {
   uint32_t pattern;
   
   if (data->range == 256) {
-    kvz_cabac_encode_aligned_bins_ep(data, bin_values, num_bins);
+    uvg_cabac_encode_aligned_bins_ep(data, bin_values, num_bins);
     return;
   }
   while (num_bins > 8) {
@@ -294,7 +294,7 @@ void kvz_cabac_encode_bins_ep(cabac_data_t * const data, uint32_t bin_values, in
     data->bits_left -= 8;
 
     if(data->bits_left < 12) {
-      kvz_cabac_write(data);
+      uvg_cabac_write(data);
     }
   }
 
@@ -303,7 +303,7 @@ void kvz_cabac_encode_bins_ep(cabac_data_t * const data, uint32_t bin_values, in
   data->bits_left -= num_bins;
 
   if (data->bits_left < 12) {
-    kvz_cabac_write(data);
+    uvg_cabac_write(data);
   }
 }
 
@@ -312,7 +312,7 @@ void kvz_cabac_encode_bins_ep(cabac_data_t * const data, uint32_t bin_values, in
  * \param remainder Value of remaining abs coeff
  * \param rice_param Reference to Rice parameter.
  */
-void kvz_cabac_write_coeff_remain(cabac_data_t * const cabac, const uint32_t remainder, const uint32_t rice_param, const unsigned int cutoff)
+void uvg_cabac_write_coeff_remain(cabac_data_t * const cabac, const uint32_t remainder, const uint32_t rice_param, const unsigned int cutoff)
 {
   const unsigned threshold = cutoff << rice_param;
   uint32_t bins = remainder;
@@ -349,7 +349,7 @@ void kvz_cabac_write_coeff_remain(cabac_data_t * const cabac, const uint32_t rem
 /**
  * \brief
  */
-void kvz_cabac_write_unary_max_symbol(cabac_data_t * const data, cabac_ctx_t * const ctx, uint32_t symbol, const int32_t offset, const uint32_t max_symbol)
+void uvg_cabac_write_unary_max_symbol(cabac_data_t * const data, cabac_ctx_t * const ctx, uint32_t symbol, const int32_t offset, const uint32_t max_symbol)
 {
   int8_t code_last = max_symbol > symbol;
 
@@ -375,7 +375,7 @@ void kvz_cabac_write_unary_max_symbol(cabac_data_t * const data, cabac_ctx_t * c
 /**
  * This can be used for Truncated Rice binarization with cRiceParam=0.
  */
-void kvz_cabac_write_unary_max_symbol_ep(cabac_data_t * const data, unsigned int symbol, const unsigned int max_symbol)
+void uvg_cabac_write_unary_max_symbol_ep(cabac_data_t * const data, unsigned int symbol, const unsigned int max_symbol)
 {
   /*if (symbol == 0) {
     CABAC_BIN_EP(data, 0, "ums_ep");
@@ -405,7 +405,7 @@ void kvz_cabac_write_unary_max_symbol_ep(cabac_data_t * const data, unsigned int
 /**
  * \brief
  */
-void kvz_cabac_write_ep_ex_golomb(encoder_state_t * const state,
+void uvg_cabac_write_ep_ex_golomb(encoder_state_t * const state,
                                   cabac_data_t * const data,
                                   uint32_t symbol,
                                   uint32_t count)

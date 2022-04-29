@@ -6,7 +6,7 @@
 #include "encoder.h"
 #include "encoderstate.h"
 #include "global.h" // IWYU pragma: keep
-#include "kvazaar.h"
+#include "uvg266.h"
 #include "videoframe.h"
 #include "image.h"
 #include "nal.h"
@@ -238,11 +238,11 @@ typedef struct alf_aps {
 typedef struct alf_info_t {
   cabac_data_t cabac_estimator;
 
-  kvz_pixel *alf_fulldata_buf;
-  kvz_pixel *alf_fulldata;
-  kvz_pixel *alf_tmp_y;
-  kvz_pixel *alf_tmp_u;
-  kvz_pixel *alf_tmp_v;
+  uvg_pixel *alf_fulldata_buf;
+  uvg_pixel *alf_fulldata;
+  uvg_pixel *alf_tmp_y;
+  uvg_pixel *alf_tmp_u;
+  uvg_pixel *alf_tmp_v;
 
   alf_covariance* alf_covariance; //Covariances of each CTU for luma and chroma components //[ctu_idx][class_idx]
   alf_covariance* alf_covariance_y; //Pointer to the first luma covaraince //[ctu_idx][class_idx]
@@ -311,23 +311,23 @@ typedef struct array_variables {
 } array_variables;
 
 //inits aps parameter set in videoframe
-void kvz_set_aps_map(videoframe_t* frame, enum kvz_alf alf_type);
+void uvg_set_aps_map(videoframe_t* frame, enum uvg_alf alf_type);
 
 //resets cc alf parameter
-void kvz_reset_cc_alf_aps_param(cc_alf_filter_param *cc_alf);
+void uvg_reset_cc_alf_aps_param(cc_alf_filter_param *cc_alf);
 
 //starts alf encoding process
-void kvz_alf_enc_process(encoder_state_t *const state);
+void uvg_alf_enc_process(encoder_state_t *const state);
 
 //creates variables for alf_info_t structure in videoframe_t 
-void kvz_alf_create(videoframe_t *frame, enum kvz_chroma_format chroma_format);
+void uvg_alf_create(videoframe_t *frame, enum uvg_chroma_format chroma_format);
 //frees allocated memory in alf_info_t structure
-void kvz_alf_destroy(videoframe_t * const frame);
+void uvg_alf_destroy(videoframe_t * const frame);
 
 //writes alf bits to bitstream
-void kvz_encode_alf_bits(encoder_state_t * const state, const int ctu_idx);
+void uvg_encode_alf_bits(encoder_state_t * const state, const int ctu_idx);
 
 //writes apss to header
-void kvz_encode_alf_adaptive_parameter_set(encoder_state_t * const state);
+void uvg_encode_alf_adaptive_parameter_set(encoder_state_t * const state);
 
 #endif //ALF_H_

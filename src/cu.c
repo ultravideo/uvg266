@@ -42,7 +42,7 @@
  *
  * Indexed by part_mode_t values.
  */
-const uint8_t kvz_part_mode_num_parts[] = {
+const uint8_t uvg_part_mode_num_parts[] = {
   1, // 2Nx2N
   2, // 2NxN
   2, // Nx2N
@@ -60,7 +60,7 @@ const uint8_t kvz_part_mode_num_parts[] = {
  *
  * Units are 1/4 of the width of the CU.
  */
-const uint8_t kvz_part_mode_offsets[][4][2] = {
+const uint8_t uvg_part_mode_offsets[][4][2] = {
   { {0, 0}                         }, // 2Nx2N
   { {0, 0}, {0, 2}                 }, // 2NxN
   { {0, 0}, {2, 0}                 }, // Nx2N
@@ -78,7 +78,7 @@ const uint8_t kvz_part_mode_offsets[][4][2] = {
  *
  * Units are 1/4 of the width of the CU.
  */
-const uint8_t kvz_part_mode_sizes[][4][2] = {
+const uint8_t uvg_part_mode_sizes[][4][2] = {
   { {4, 4}                         }, // 2Nx2N
   { {4, 2}, {4, 2}                 }, // 2NxN
   { {2, 4}, {2, 4}                 }, // Nx2N
@@ -90,13 +90,13 @@ const uint8_t kvz_part_mode_sizes[][4][2] = {
 };
 
 
-cu_info_t* kvz_cu_array_at(cu_array_t *cua, unsigned x_px, unsigned y_px)
+cu_info_t* uvg_cu_array_at(cu_array_t *cua, unsigned x_px, unsigned y_px)
 {
-  return (cu_info_t*) kvz_cu_array_at_const(cua, x_px, y_px);
+  return (cu_info_t*) uvg_cu_array_at_const(cua, x_px, y_px);
 }
 
 
-const cu_info_t* kvz_cu_array_at_const(const cu_array_t *cua, unsigned x_px, unsigned y_px)
+const cu_info_t* uvg_cu_array_at_const(const cu_array_t *cua, unsigned x_px, unsigned y_px)
 {
   assert(x_px < cua->width);
   assert(y_px < cua->height);
@@ -110,7 +110,7 @@ const cu_info_t* kvz_cu_array_at_const(const cu_array_t *cua, unsigned x_px, uns
  * \param width   width of the array in luma pixels
  * \param height  height of the array in luma pixels
  */
-cu_array_t * kvz_cu_array_alloc(const int width, const int height)
+cu_array_t * uvg_cu_array_alloc(const int width, const int height)
 {
   cu_array_t *cua = MALLOC(cu_array_t, 1);
 
@@ -130,7 +130,7 @@ cu_array_t * kvz_cu_array_alloc(const int width, const int height)
 }
 
 
-cu_array_t * kvz_cu_subarray(cu_array_t *base,
+cu_array_t * uvg_cu_subarray(cu_array_t *base,
                              const unsigned x_offset,
                              const unsigned y_offset,
                              const unsigned width,
@@ -144,7 +144,7 @@ cu_array_t * kvz_cu_subarray(cu_array_t *base,
       width == base->width &&
       height == base->height)
   {
-    return kvz_cu_array_copy_ref(base);
+    return uvg_cu_array_copy_ref(base);
   }
 
   cu_array_t *cua = MALLOC(cu_array_t, 1);
@@ -154,8 +154,8 @@ cu_array_t * kvz_cu_subarray(cu_array_t *base,
   while (real_base->base) {
     real_base = real_base->base;
   }
-  cua->base     = kvz_cu_array_copy_ref(real_base);
-  cua->data     = kvz_cu_array_at(base, x_offset, y_offset);
+  cua->base     = uvg_cu_array_copy_ref(real_base);
+  cua->data     = uvg_cu_array_at(base, x_offset, y_offset);
   cua->width    = width;
   cua->height   = height;
   cua->stride   = base->stride;
@@ -164,13 +164,13 @@ cu_array_t * kvz_cu_subarray(cu_array_t *base,
   return cua;
 }
 
-void kvz_cu_array_free(cu_array_t **cua_ptr)
+void uvg_cu_array_free(cu_array_t **cua_ptr)
 {
   cu_array_t *cua = *cua_ptr;
   if (cua == NULL) return;
   *cua_ptr = NULL;
 
-  int new_refcount = KVZ_ATOMIC_DEC(&cua->refcount);
+  int new_refcount = UVG_ATOMIC_DEC(&cua->refcount);
   if (new_refcount > 0) {
     // Still we have some references, do nothing.
     return;
@@ -181,7 +181,7 @@ void kvz_cu_array_free(cu_array_t **cua_ptr)
   if (!cua->base) {
     FREE_POINTER(cua->data);
   } else {
-    kvz_cu_array_free(&cua->base);
+    uvg_cu_array_free(&cua->base);
     cua->data = NULL;
   }
 
@@ -194,9 +194,9 @@ void kvz_cu_array_free(cu_array_t **cua_ptr)
  *
  * Increment reference count and return the cu array.
  */
-cu_array_t * kvz_cu_array_copy_ref(cu_array_t* cua)
+cu_array_t * uvg_cu_array_copy_ref(cu_array_t* cua)
 {
-  int32_t new_refcount = KVZ_ATOMIC_INC(&cua->refcount);
+  int32_t new_refcount = UVG_ATOMIC_INC(&cua->refcount);
   // The caller should have had another reference and we added one
   // reference so refcount should be at least 2.
   assert(new_refcount >= 2);
@@ -214,7 +214,7 @@ cu_array_t * kvz_cu_array_copy_ref(cu_array_t* cua)
  * \param dst_y   y-coordinate of the top edge of the copied area in dst
  * \param src     source lcu
  */
-void kvz_cu_array_copy_from_lcu(cu_array_t* dst, int dst_x, int dst_y, const lcu_t *src)
+void uvg_cu_array_copy_from_lcu(cu_array_t* dst, int dst_x, int dst_y, const lcu_t *src)
 {
   const int dst_stride = dst->stride >> 2;
   for (int y = 0; y < LCU_WIDTH; y += SCU_WIDTH) {

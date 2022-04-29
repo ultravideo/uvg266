@@ -1,5 +1,5 @@
-#ifndef _PICTURE_X86_ASM_SATD_H_
-#define _PICTURE_X86_ASM_SATD_H_
+#ifndef UVG266_INTERNAL_H_
+#define UVG266_INTERNAL_H_
 /*****************************************************************************
  * This file is part of uvg266 VVC encoder.
  *
@@ -33,18 +33,46 @@
  ****************************************************************************/
 
 /**
- * \ingroup Optimization
+ * \ingroup Control
  * \file
- * Optimizations for AVX, utilizing ASM implementations.
+ * \brief Definitions for opaque structs in kvazaar.h
  */
 
 #include "global.h" // IWYU pragma: keep
 
+#include "uvg266.h"
+#include "input_frame_buffer.h"
 
-unsigned kvz_satd_4x4_avx(const kvz_pixel *org, const kvz_pixel *cur);
-unsigned kvz_satd_8x8_avx(const kvz_pixel *org, const kvz_pixel *cur);
-unsigned kvz_satd_16x16_avx(const kvz_pixel *org, const kvz_pixel *cur);
-unsigned kvz_satd_32x32_avx(const kvz_pixel *org, const kvz_pixel *cur);
-unsigned kvz_satd_64x64_avx(const kvz_pixel *org, const kvz_pixel *cur);
 
-#endif
+// Forward declarations.
+struct encoder_state_t;
+struct encoder_control_t;
+
+struct uvg_encoder {
+  const struct encoder_control_t* control;
+  struct encoder_state_t* states;
+  unsigned num_encoder_states;
+
+  /**
+   * \brief Number of the current encoder state.
+   *
+   * The current state is the one that will be used for encoding the frame
+   * that is started next.
+   */
+  unsigned cur_state_num;
+
+  /**
+   * \brief Number of the next encoder state to be finished.
+   */
+  unsigned out_state_num;
+
+  /**
+   * \brief Buffer for input frames.
+   */
+  input_frame_buffer_t input_buffer;
+
+  unsigned frames_started;
+  unsigned frames_done;
+};
+
+#endif // UVG266_INTERNAL_H_

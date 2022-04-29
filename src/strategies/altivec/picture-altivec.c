@@ -38,11 +38,11 @@
 #define bool _Bool
 #include <stdlib.h>
 
-#include "kvazaar.h"
+#include "uvg266.h"
 #include "strategyselector.h"
 
 
-static unsigned reg_sad_altivec(const kvz_pixel * const data1, const kvz_pixel * const data2,
+static unsigned reg_sad_altivec(const uvg_pixel * const data1, const uvg_pixel * const data2,
                         const int width, const int height, const unsigned stride1, const unsigned stride2)
 {
   vector unsigned int vsad = {0,0,0,0}, vzero = {0,0,0,0}; 
@@ -88,11 +88,11 @@ static unsigned reg_sad_altivec(const kvz_pixel * const data1, const kvz_pixel *
 
 #endif //COMPILE_POWERPC_ALTIVEC
 
-int kvz_strategy_register_picture_altivec(void* opaque, uint8_t bitdepth) {
+int uvg_strategy_register_picture_altivec(void* opaque, uint8_t bitdepth) {
   bool success = true;
 #if COMPILE_POWERPC_ALTIVEC
   if(bitdepth == 8){
-    success &= kvz_strategyselector_register(opaque, "reg_sad", "altivec", 10, &reg_sad_altivec);
+    success &= uvg_strategyselector_register(opaque, "reg_sad", "altivec", 10, &reg_sad_altivec);
   }
 #endif
   return success;

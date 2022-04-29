@@ -51,7 +51,7 @@
  * This method encodes coefficients of a block
  *
  */
-void kvz_encode_coeff_nxn_generic(encoder_state_t * const state,
+void uvg_encode_coeff_nxn_generic(encoder_state_t * const state,
   cabac_data_t * const cabac,
   const coeff_t *coeff,
   uint8_t width,
@@ -74,10 +74,10 @@ void kvz_encode_coeff_nxn_generic(encoder_state_t * const state,
 
   // CONSTANTS
 
-  const uint32_t log2_block_size = kvz_g_convert_to_bit[width]+2;
-  const uint32_t log2_cg_size = kvz_g_log2_sbb_size[log2_block_size][log2_block_size][0] + kvz_g_log2_sbb_size[log2_block_size][log2_block_size][1];
+  const uint32_t log2_block_size = uvg_g_convert_to_bit[width]+2;
+  const uint32_t log2_cg_size = uvg_g_log2_sbb_size[log2_block_size][log2_block_size][0] + uvg_g_log2_sbb_size[log2_block_size][log2_block_size][1];
   const uint32_t *scan =
-    kvz_g_sig_last_scan[scan_mode][log2_block_size - 1];
+    uvg_g_sig_last_scan[scan_mode][log2_block_size - 1];
   const uint32_t *scan_cg = g_sig_last_scan_cg[log2_block_size - 1][scan_mode];
 
 
@@ -103,7 +103,7 @@ void kvz_encode_coeff_nxn_generic(encoder_state_t * const state,
 
 
   // Code last_coeff_x and last_coeff_y
-  kvz_encode_last_significant_xy(cabac,
+  uvg_encode_last_significant_xy(cabac,
     last_coeff_x,
     last_coeff_y,
     width,
@@ -136,7 +136,7 @@ void kvz_encode_coeff_nxn_generic(encoder_state_t * const state,
       sig_coeffgroup_flag[cg_blk_pos] = 1;
     } else {
       uint32_t sig_coeff_group = (sig_coeffgroup_flag[cg_blk_pos] != 0);
-      uint32_t ctx_sig = kvz_context_get_sig_coeff_group(sig_coeffgroup_flag, cg_pos_x,
+      uint32_t ctx_sig = uvg_context_get_sig_coeff_group(sig_coeffgroup_flag, cg_pos_x,
         cg_pos_y, (MIN((uint8_t)32, width) >> (log2_cg_size / 2)));
       cabac->cur_ctx = &base_coeff_group_ctx[ctx_sig];
       CABAC_BIN(cabac, sig_coeff_group, "significant_coeffgroup_flag");
@@ -169,7 +169,7 @@ void kvz_encode_coeff_nxn_generic(encoder_state_t * const state,
 
         sig = (coeff[blk_pos] != 0) ? 1 : 0;
         if (num_non_zero || next_sig_pos != infer_sig_pos) {
-          ctx_sig = kvz_context_get_sig_ctx_idx_abs(coeff, pos_x, pos_y, width, width, type, &temp_diag, &temp_sum);
+          ctx_sig = uvg_context_get_sig_ctx_idx_abs(coeff, pos_x, pos_y, width, width, type, &temp_diag, &temp_sum);
           cabac_ctx_t* sig_ctx_luma = &(cabac->ctx.cu_sig_model_luma[MAX(0, (quant_state - 1))][ctx_sig]);
           cabac_ctx_t* sig_ctx_chroma = &(cabac->ctx.cu_sig_model_chroma[MAX(0, (quant_state - 1))][MIN(ctx_sig,7)]);
           cabac->cur_ctx = (type == 0 ? sig_ctx_luma : sig_ctx_chroma);
@@ -178,7 +178,7 @@ void kvz_encode_coeff_nxn_generic(encoder_state_t * const state,
           reg_bins--;
 
         } else if (next_sig_pos != scan_pos_last) {
-          ctx_sig = kvz_context_get_sig_ctx_idx_abs(coeff, pos_x, pos_y, width, width, type, &temp_diag, &temp_sum);
+          ctx_sig = uvg_context_get_sig_ctx_idx_abs(coeff, pos_x, pos_y, width, width, type, &temp_diag, &temp_sum);
         }
 
 
@@ -244,13 +244,13 @@ void kvz_encode_coeff_nxn_generic(encoder_state_t * const state,
         blk_pos = scan[scan_pos];
         pos_y = blk_pos / width;
         pos_x = blk_pos - (pos_y * width);
-        int32_t abs_sum = kvz_abs_sum(coeff, pos_x, pos_y, width, width, 4);
+        int32_t abs_sum = uvg_abs_sum(coeff, pos_x, pos_y, width, width, 4);
 
         rice_param = g_go_rice_pars[abs_sum];
         uint32_t second_pass_abs_coeff = abs(coeff[blk_pos]);
         if (second_pass_abs_coeff >= 4) {
           uint32_t remainder = (second_pass_abs_coeff - 4) >> 1;
-          kvz_cabac_write_coeff_remain(cabac, remainder, rice_param, 5);
+          uvg_cabac_write_coeff_remain(cabac, remainder, rice_param, 5);
         }
       }
 
@@ -262,11 +262,11 @@ void kvz_encode_coeff_nxn_generic(encoder_state_t * const state,
         pos_y = blk_pos / width;
         pos_x = blk_pos - (pos_y * width);
         uint32_t coeff_abs = abs(coeff[blk_pos]);
-        int32_t abs_sum = kvz_abs_sum(coeff, pos_x, pos_y, width, width, 0);
+        int32_t abs_sum = uvg_abs_sum(coeff, pos_x, pos_y, width, width, 0);
         rice_param = g_go_rice_pars[abs_sum];        
         pos0 = ((quant_state<2)?1:2) << rice_param;
         uint32_t remainder = (coeff_abs == 0 ? pos0 : coeff_abs <= pos0 ? coeff_abs - 1 : coeff_abs);
-        kvz_cabac_write_coeff_remain(cabac, remainder, rice_param, 5);
+        uvg_cabac_write_coeff_remain(cabac, remainder, rice_param, 5);
         quant_state = (quant_state_transition_table >> ((quant_state << 2) + ((coeff_abs & 1) << 1))) & 3;
         if (coeff_abs) {
           num_non_zero++;
@@ -300,11 +300,11 @@ void kvz_encode_coeff_nxn_generic(encoder_state_t * const state,
 }
 
 
-int kvz_strategy_register_encode_generic(void* opaque, uint8_t bitdepth)
+int uvg_strategy_register_encode_generic(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
 
-  success &= kvz_strategyselector_register(opaque, "encode_coeff_nxn", "generic", 0, &kvz_encode_coeff_nxn_generic);
+  success &= uvg_strategyselector_register(opaque, "encode_coeff_nxn", "generic", 0, &uvg_encode_coeff_nxn_generic);
 
   return success;
 }

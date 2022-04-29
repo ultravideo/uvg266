@@ -47,8 +47,8 @@
 struct encoder_state_t;
 
 
-int kvz_encoder_state_init(struct encoder_state_t * child_state, struct encoder_state_t * parent_state);
-void kvz_encoder_state_finalize(struct encoder_state_t *state);
+int uvg_encoder_state_init(struct encoder_state_t * child_state, struct encoder_state_t * parent_state);
+void uvg_encoder_state_finalize(struct encoder_state_t *state);
 
 
 #endif // ENCODER_STATE_CTORS_DTORS_H_

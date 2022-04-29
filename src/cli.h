@@ -38,7 +38,7 @@
  */
 
 #include "global.h" // IWYU pragma: keep
-#include "kvazaar.h"
+#include "uvg266.h"
 
 typedef struct cmdline_opts_t {
   /** \brief Input filename */
@@ -52,7 +52,7 @@ typedef struct cmdline_opts_t {
   /** \brief Number of frames to encode */
   int32_t frames;
   /** \brief Encoder configuration */
-  kvz_config *config;
+  uvg_config *config;
   /** \brief Encoder configuration */
   bool help;
   /** \brief Encoder configuration */
@@ -61,13 +61,13 @@ typedef struct cmdline_opts_t {
   bool loop_input;
 } cmdline_opts_t;
 
-cmdline_opts_t* cmdline_opts_parse(const kvz_api *api, int argc, char *argv[]);
-void cmdline_opts_free(const kvz_api *api, cmdline_opts_t *opts);
+cmdline_opts_t* cmdline_opts_parse(const uvg_api *api, int argc, char *argv[]);
+void cmdline_opts_free(const uvg_api *api, cmdline_opts_t *opts);
 
 void print_usage(void);
 void print_version(void);
 void print_help(void);
-void print_frame_info(const kvz_frame_info *const info,
+void print_frame_info(const uvg_frame_info *const info,
                       const double frame_psnr[3],
                       const uint32_t bytes,
                       const bool print_psnr,

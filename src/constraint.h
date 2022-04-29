@@ -46,7 +46,7 @@ typedef struct {
 } constraint_t;
 
 
-void * kvz_init_constraint(encoder_state_t* state, const encoder_control_t * const);
-void kvz_constraint_free(encoder_state_t* state);
+void * uvg_init_constraint(encoder_state_t* state, const encoder_control_t * const);
+void uvg_constraint_free(encoder_state_t* state);
 
 #endif

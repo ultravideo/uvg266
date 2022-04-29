@@ -40,7 +40,7 @@
 #include "encoder.h"
 #include "encoderstate.h"
 #include "global.h" // IWYU pragma: keep
-#include "kvazaar.h"
+#include "uvg266.h"
 #include "alf.h"
 
 
@@ -57,8 +57,8 @@ typedef void (alf_derive_classification_blk_func)(encoder_state_t * const state,
   int vb_pos);
 
 typedef void (alf_filter_5x5_blk_func)(encoder_state_t* const state,
-  const kvz_pixel* src_pixels,
-  kvz_pixel* dst_pixels,
+  const uvg_pixel* src_pixels,
+  uvg_pixel* dst_pixels,
   const int src_stride,
   const int dst_stride,
   const short* filter_set,
@@ -74,8 +74,8 @@ typedef void (alf_filter_5x5_blk_func)(encoder_state_t* const state,
   const int vb_ctu_height);
 
 typedef void (alf_filter_7x7_blk_func)(encoder_state_t* const state,
-  const kvz_pixel* src_pixels,
-  kvz_pixel* dst_pixels,
+  const uvg_pixel* src_pixels,
+  uvg_pixel* dst_pixels,
   const int src_stride,
   const int dst_stride,
   const short* filter_set,
@@ -94,9 +94,9 @@ typedef void (alf_get_blk_stats_func)(encoder_state_t* const state,
   channel_type channel,
   alf_covariance* alf_covariance,
   alf_classifier** g_classifier,
-  kvz_pixel* org,
+  uvg_pixel* org,
   int32_t org_stride,
-  kvz_pixel* rec,
+  uvg_pixel* rec,
   int32_t rec_stride,
   const int x_pos,
   const int y_pos,
@@ -109,18 +109,18 @@ typedef void (alf_get_blk_stats_func)(encoder_state_t* const state,
   short alf_clipping_values[MAX_NUM_CHANNEL_TYPE][MAX_ALF_NUM_CLIPPING_VALUES]);
 
 // Declare function pointers.
-extern alf_derive_classification_blk_func * kvz_alf_derive_classification_blk;
-extern alf_filter_5x5_blk_func* kvz_alf_filter_5x5_blk;
-extern alf_filter_7x7_blk_func* kvz_alf_filter_7x7_blk;
-extern alf_get_blk_stats_func* kvz_alf_get_blk_stats;
+extern alf_derive_classification_blk_func * uvg_alf_derive_classification_blk;
+extern alf_filter_5x5_blk_func* uvg_alf_filter_5x5_blk;
+extern alf_filter_7x7_blk_func* uvg_alf_filter_7x7_blk;
+extern alf_get_blk_stats_func* uvg_alf_get_blk_stats;
 
-int kvz_strategy_register_alf(void* opaque, uint8_t bitdepth);
+int uvg_strategy_register_alf(void* opaque, uint8_t bitdepth);
 
 
 #define STRATEGIES_ALF_EXPORTS \
-  {"alf_derive_classification_blk", (void**) &kvz_alf_derive_classification_blk}, \
-  {"alf_filter_5x5_blk", (void**) &kvz_alf_filter_5x5_blk}, \
-  {"alf_filter_7x7_blk", (void**) &kvz_alf_filter_7x7_blk}, \
-  {"alf_get_blk_stats", (void**) &kvz_alf_get_blk_stats}, \
+  {"alf_derive_classification_blk", (void**) &uvg_alf_derive_classification_blk}, \
+  {"alf_filter_5x5_blk", (void**) &uvg_alf_filter_5x5_blk}, \
+  {"alf_filter_7x7_blk", (void**) &uvg_alf_filter_7x7_blk}, \
+  {"alf_get_blk_stats", (void**) &uvg_alf_get_blk_stats}, \
  
 

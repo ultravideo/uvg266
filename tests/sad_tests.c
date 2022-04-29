@@ -44,11 +44,11 @@
 
 //////////////////////////////////////////////////////////////////////////
 // DEFINES
-#define TEST_SAD(X, Y) kvz_image_calc_sad(g_pic, g_ref, 0, 0, (X), (Y), 8, 8, NULL)
+#define TEST_SAD(X, Y) uvg_image_calc_sad(g_pic, g_ref, 0, 0, (X), (Y), 8, 8, NULL)
 
 //////////////////////////////////////////////////////////////////////////
 // GLOBALS
-static const kvz_pixel ref_data[64] = {
+static const uvg_pixel ref_data[64] = {
   1,2,2,2,2,2,2,3,
   4,5,5,5,5,5,5,6,
   4,5,5,5,5,5,5,6,
@@ -59,7 +59,7 @@ static const kvz_pixel ref_data[64] = {
   7,8,8,8,8,8,8,9
 };
 
-static const kvz_pixel pic_data[64] = {
+static const uvg_pixel pic_data[64] = {
   1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,
@@ -70,12 +70,12 @@ static const kvz_pixel pic_data[64] = {
   1,1,1,1,1,1,1,1
 };
 
-static kvz_picture *g_pic = 0;
-static kvz_picture *g_ref = 0;
-static kvz_picture *g_big_pic = 0;
-static kvz_picture *g_big_ref = 0;
-static kvz_picture *g_64x64_zero = 0;
-static kvz_picture *g_64x64_max = 0;
+static uvg_picture *g_pic = 0;
+static uvg_picture *g_ref = 0;
+static uvg_picture *g_big_pic = 0;
+static uvg_picture *g_big_ref = 0;
+static uvg_picture *g_64x64_zero = 0;
+static uvg_picture *g_64x64_max = 0;
 
 static struct sad_test_env_t {
   int width;
@@ -89,14 +89,14 @@ static struct sad_test_env_t {
 // SETUP, TEARDOWN AND HELPER FUNCTIONS
 static void setup_tests()
 {
-  g_pic = kvz_image_alloc(KVZ_CSP_420, 8, 8);
+  g_pic = uvg_image_alloc(UVG_CSP_420, 8, 8);
   for (int y = 0; y < 8; ++y) {
     for (int x = 0; x < 8; ++x) {
       g_pic->y[y*g_pic->stride + x] = pic_data[8*y + x] + 48;
     }
   }
 
-  g_ref = kvz_image_alloc(KVZ_CSP_420, 8, 8);
+  g_ref = uvg_image_alloc(UVG_CSP_420, 8, 8);
   for (int y = 0; y < 8; ++y) {
     for (int x = 0; x < 8; ++x) {
       g_ref->y[y*g_ref->stride + x] = ref_data[8*y + x] + 48;
@@ -104,7 +104,7 @@ static void setup_tests()
   }
 
   int i = 0;
-  g_big_pic = kvz_image_alloc(KVZ_CSP_420, 64, 64);
+  g_big_pic = uvg_image_alloc(UVG_CSP_420, 64, 64);
   for (int y = 0; y < 64; ++y) {
     for (int x = 0; x < 64; ++x) {
       i = ((64 * y) + x);
@@ -113,7 +113,7 @@ static void setup_tests()
   }
 
   i = 0;
-  g_big_ref = kvz_image_alloc(KVZ_CSP_420, 64, 64);
+  g_big_ref = uvg_image_alloc(UVG_CSP_420, 64, 64);
   for (int y = 0; y < 64; ++y) {
     for (int x = 0; x < 64; ++x) {
       i = ((64 * y) + x);
@@ -121,21 +121,21 @@ static void setup_tests()
     }
   }
 
-  g_64x64_zero = kvz_image_alloc(KVZ_CSP_420, 64, 64);
-  memset(g_64x64_zero->y, 0, 64 * 64 * sizeof(kvz_pixel));
+  g_64x64_zero = uvg_image_alloc(UVG_CSP_420, 64, 64);
+  memset(g_64x64_zero->y, 0, 64 * 64 * sizeof(uvg_pixel));
   
-  g_64x64_max = kvz_image_alloc(KVZ_CSP_420, 64, 64);
-  memset(g_64x64_max->y, PIXEL_MAX, 64 * 64 * sizeof(kvz_pixel));
+  g_64x64_max = uvg_image_alloc(UVG_CSP_420, 64, 64);
+  memset(g_64x64_max->y, PIXEL_MAX, 64 * 64 * sizeof(uvg_pixel));
 }
 
 static void tear_down_tests()
 {
-  kvz_image_free(g_pic);
-  kvz_image_free(g_ref);
-  kvz_image_free(g_big_pic);
-  kvz_image_free(g_big_ref);
-  kvz_image_free(g_64x64_zero);
-  kvz_image_free(g_64x64_max);
+  uvg_image_free(g_pic);
+  uvg_image_free(g_ref);
+  uvg_image_free(g_big_pic);
+  uvg_image_free(g_big_ref);
+  uvg_image_free(g_64x64_zero);
+  uvg_image_free(g_64x64_max);
 }
 
 
@@ -281,7 +281,7 @@ TEST test_bottomright_out(void)
   PASS();
 }
 
-static unsigned simple_sad(const kvz_pixel* buf1, const kvz_pixel* buf2, unsigned stride,
+static unsigned simple_sad(const uvg_pixel* buf1, const uvg_pixel* buf2, unsigned stride,
                            unsigned width, unsigned height)
 {
   unsigned sum = 0;
@@ -301,7 +301,7 @@ TEST test_reg_sad(void)
 
   unsigned correct_result = simple_sad(g_big_pic->y, g_big_ref->y, stride, width, height);
   
-  unsigned(*tested_func)(const kvz_pixel *, const kvz_pixel *, int, int, unsigned, unsigned) = sad_test_env.tested_func;
+  unsigned(*tested_func)(const uvg_pixel *, const uvg_pixel *, int, int, unsigned, unsigned) = sad_test_env.tested_func;
   unsigned result = tested_func(g_big_pic->y, g_big_ref->y, width, height, stride, stride);
   
   sprintf(sad_test_env.msg, "%s(%ux%u):%s",
@@ -326,7 +326,7 @@ TEST test_reg_sad_overflow(void)
 
   unsigned correct_result = simple_sad(g_64x64_zero->y, g_64x64_max->y, stride, width, height);
 
-  unsigned(*tested_func)(const kvz_pixel *, const kvz_pixel *, int, int, unsigned, unsigned) = sad_test_env.tested_func;
+  unsigned(*tested_func)(const uvg_pixel *, const uvg_pixel *, int, int, unsigned, unsigned) = sad_test_env.tested_func;
   unsigned result = tested_func(g_64x64_zero->y, g_64x64_max->y, width, height, stride, stride);
 
   sprintf(sad_test_env.msg, "overflow %s(%ux%u):%s",
@@ -358,7 +358,7 @@ SUITE(sad_tests)
     }
 
     // Change the global reg_sad function pointer.
-    kvz_reg_sad = strategies.strategies[i].fptr;
+    uvg_reg_sad = strategies.strategies[i].fptr;
 
     // Tests for movement vectors that overlap frame.
     RUN_TEST(test_topleft);

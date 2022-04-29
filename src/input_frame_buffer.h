@@ -39,7 +39,7 @@
  */
 
 #include "global.h" // IWYU pragma: keep
-#include "kvazaar.h"
+#include "uvg266.h"
 
 
 // Forward declaration.
@@ -47,10 +47,10 @@ struct encoder_state_t;
 
 typedef struct input_frame_buffer_t {
   /** \brief An array for stroring the input frames. */
-  struct kvz_picture *pic_buffer[3 * KVZ_MAX_GOP_LENGTH];
+  struct uvg_picture *pic_buffer[3 * UVG_MAX_GOP_LENGTH];
 
   /** \brief An array for stroring the timestamps. */
-  int64_t pts_buffer[3 * KVZ_MAX_GOP_LENGTH];
+  int64_t pts_buffer[3 * UVG_MAX_GOP_LENGTH];
 
   /** \brief Number of pictures input. */
   uint64_t num_in;
@@ -74,11 +74,11 @@ typedef struct input_frame_buffer_t {
 
 } input_frame_buffer_t;
 
-void kvz_init_input_frame_buffer(input_frame_buffer_t *input_buffer);
+void uvg_init_input_frame_buffer(input_frame_buffer_t *input_buffer);
 
-kvz_picture* kvz_encoder_feed_frame(input_frame_buffer_t *buf,
+uvg_picture* uvg_encoder_feed_frame(input_frame_buffer_t *buf,
                                     struct encoder_state_t *const state,
-                                    struct kvz_picture *const img_in,
+                                    struct uvg_picture *const img_in,
                                     int first_done);
 
 #endif // INPUT_FRAME_BUFFER_H_

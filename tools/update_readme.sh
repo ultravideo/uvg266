@@ -42,7 +42,7 @@ readme_file="../README.md"
 {
     sed '/BEGIN UVG266 HELP MESSAGE/q' -- "$readme_file";
     printf '```\n';
-    ../src/kvazaar --help;
+    ../bin/uvg266 --help;
     printf '```\n';
     sed -n '/END UVG266 HELP MESSAGE/{:a;p;n;ba}' -- "$readme_file";
 } >> "$tmpfile"

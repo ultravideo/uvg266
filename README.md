@@ -8,8 +8,8 @@ uvg266 is still under development. Speed and RD-quality will continue to improve
 
 http://ultravideo.fi/#encoder for more information.
 
-- Linux [![Kvazaar_tests](https://github.com/ultravideo/kvazaar/actions/workflows/kvazaar.yml/badge.svg)](https://github.com/ultravideo/kvazaar/actions/workflows/kvazaar.yml)
-- Windows [![Build status](https://ci.appveyor.com/api/projects/status/88sg1h25lp0k71pu?svg=true)](https://ci.appveyor.com/project/Ultravideo/kvazaar)
+- Linux [![uvg266_tests](https://github.com/ultravideo/uvg266/actions/workflows/uvg266.yml/badge.svg)](https://github.com/ultravideo/uvg266/actions/workflows/uvg266.yml)
+- Windows [![Build status](https://ci.appveyor.com/api/projects/status/88sg1h25lp0k71pu?svg=true)](https://ci.appveyor.com/project/Ultravideo/uvg266)
 
 ## Table of Contents
 
@@ -20,13 +20,8 @@ http://ultravideo.fi/#encoder for more information.
 - [Presets](#presets)
 - [uvg266 library](#uvg266-library)
 - [Compiling uvg266](#compiling-uvg266)
-  - [Required libraries](#required-libraries)
-  - [Autotools](#autotools)
-  - [Autotools on MinGW](#autotools-on-mingw)
-  - [OS X](#os-x)
-  - [Visual Studio](#visual-studio)
+  - [CMake](#cmake)
   - [Docker](#docker)
-  - [Visualization (Windows only)](#visualization-windows-only)
 - [Paper](#paper)
 - [Contributing to uvg266](#contributing-to-uvg266)
   - [Code documentation](#code-documentation)
@@ -273,7 +268,8 @@ Compression tools:
       --(no-)tmvp            : Temporal motion vector prediction [enabled]
       --(no-)mrl             : Enable use of multiple reference lines in intra
                                predictions.
-      --(no-)mip             : Enable matrix weighted intra prediction.      --mts <string>         : Multiple Transform Selection [off].
+      --(no-)mip             : Enable matrix weighted intra prediction.
+      --mts <string>         : Multiple Transform Selection [off].
                                (Currently only implemented for intra
                                and has effect only when rd >= 2)
                                    - off: MTS disabled
@@ -282,7 +278,8 @@ Compression tools:
                                    - both: MTS applied for both intra and inter blocks.
                                    - implicit: uses implicit MTS. Applies DST7 instead 
                                                of DCT2 to certain intra blocks.
-      --(no-)jccr            : Joint coding of chroma residual.                                Requires rdo> = 2. [disabled]
+      --(no-)jccr            : Joint coding of chroma residual.
+                               Requires rdo> = 2. [disabled]
       --(no-)cclm            : Cross component linear model. 
                                Extra chroma prediction modes that are formed
                                via linear transformation from the luma
@@ -406,10 +403,10 @@ where the names have been abbreviated to fit the layout in GitHub.
 
 
 ## uvg266 library
-See [kvazaar.h](src/kvazaar.h) for the library API and its
+See [uvg266.h](src/uvg266.h) for the library API and its
 documentation.
 
-When using the static uvg266 library on Windows, macro `KVZ_STATIC_LIB`
+When using the static uvg266 library on Windows, macro `UVG_STATIC_LIB`
 must be defined. On other platforms it's not strictly required.
 
 The needed linker and compiler flags can be obtained with pkg-config.
@@ -422,40 +419,50 @@ Others might encounter the same problem and there is probably much to
 improve in the build process. We want to make this as simple as
 possible.
 
+**CMakeLists.txt assumes that the x86 based CPUs are 64bit and support AVX2**
 
-### Autotools
-Depending on the platform, some additional tools are required for compiling uvg266 with autotools.
-For Ubuntu, the required packages are `automake autoconf libtool m4 build-essential yasm`. Yasm is
-optional, but some of the optimization will not be compiled in if it's missing.
+### CMake
+Depending on the platform, some additional tools are required for compiling uvg266 with CMake.
+For Ubuntu, the required packages are `build-essential cmake`.
 
 Run the following commands to compile and install uvg266.
 
-    ./autogen.sh
-    ./configure
+    cd build
+    cmake ..
     make
     sudo make install
 
-See `./configure --help` for more options.
+Visual Studio natively supports opening the `CMakeLists.txt` of the CMake build package has been installed.
+Otherwise CMake-CLI can be used to generate the Visual Studio project files.
+**When building shared library with visual studio the tests will fail to link, the main binary will still work**
 
-### Autotools on MinGW
-It is recommended to use Clang instead of GCC in MinGW environments. GCC also works, but AVX2 optimizations will be disabled because of a known GCC issue from 2012, so performance will suffer badly. Instead of `./configure`, run
+### Docker
+This project includes a [Dockerfile](./Dockerfile), which enables building for Docker.
+Build using Docker: `docker build -t uvg266 .`
+Example usage: `docker run -i -a STDIN -a STDOUT uvg266 -i - --input-res=320x240 -o - < testfile_320x240.yuv > out.266`
+For other examples, see [Dockerfile](./Dockerfile)
 
-    CC=clang ./configure
+## Paper
 
-to build uvg266 using Clang.
+**The paper is open access**
 
-### OS X
-- Install Homebrew
-- run ```brew install automake libtool yasm```
-- Refer to Autotools instructions
+Please cite [this paper](https://ieeexplore.ieee.org/document/9690938) for uvg266:
 
+```M. Viitanen, J. Sainio, A. Mercat, A. Lemmetti, and J. Vanne, “From HEVC to VVC: the First Development Steps of a Practical Intra Video Encoder,” Accepted to IEEE Transactions on Consumer Electronics```
 
-### Visual Studio
-- At least VisualStudio 2015.2 is required.
-- Project files can be found under build/.
-- Requires external [vsyasm.exe](http://yasm.tortall.net/Download.html)
-  in %PATH%
+Or in BibTex:
 
+```
+@ARTICLE{uvg266_2022, 
+  author={Viitanen, Marko and Sainio, Joose and Mercat, Alexandre and Lemmetti, Ari and Vanne, Jarno},
+  journal={IEEE Transactions on Consumer Electronics}, 
+  title={From HEVC to VVC: the First Development Steps of a Practical Intra Video Encoder}, 
+  year={2022},
+  volume={},
+  number={},
+  doi={10.1109/TCE.2022.3146016}}
+}
+```
 
 ## Contributing to uvg266
 We are happy to look at pull requests in Github. There is still lots of work to be done.
@@ -469,7 +476,7 @@ You can generate Doxygen documentation pages by running the command
 
 ### For version control we try to follow these conventions:
 - Master branch always produces a working bitstream (can be decoded with
-  HM).
+  VTM).
 - Commits for new features and major changes/fixes put to a sensibly
   named feature branch first and later merged to the master branch.
 - Always merge the feature branch to the master branch, not the other
@@ -478,13 +485,13 @@ You can generate Doxygen documentation pages by running the command
 
 
 ### Testing
-- Main automatic way of testing is with Travis CI. Commits, branches
+- Main automatic way of testing is with Github Actions. Commits, branches
   and pull requests are tested automatically.
   - Uninitialized variables and such are checked with Valgrind.
-  - Bitstream validity is checked with HM.
+  - Bitstream validity is checked with VTM.
   - Compilation is checked on GCC and Clang on Linux, and Clang on OSX.
 - Windows msys2 and msvc builds are checked automatically on Appveyor.
-- If your changes change the bitstream, decode with HM to check that
+- If your changes change the bitstream, decode with VTM to check that
   it doesn't throw checksum errors or asserts.
 - If your changes shouldn't alter the bitstream, check that they don't.
 - Automatic compression quality testing is in the works.
@@ -518,5 +525,5 @@ We try to follow the following conventions:
 - Functions only used inside the module shouldn't be defined in the
   module header. They can be defined in the beginning of the .c file if
   necessary.
-- Symbols defined in headers prefixed with kvz_ or KVZ_.
+- Symbols defined in headers prefixed with uvg_ or UVG_.
 - Includes in alphabetic order.

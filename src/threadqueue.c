@@ -313,7 +313,7 @@ static void* threadqueue_worker(void* threadqueue_opaque)
     for (int i = 0; i < job->rdepends_count; ++i) {
       threadqueue_job_t * const depjob = job->rdepends[i];
       // The dependency (job) is locked before the job depending on it.
-      // This must be the same order as in kvz_threadqueue_job_dep_add.
+      // This must be the same order as in uvg_threadqueue_job_dep_add.
       PTHREAD_LOCK(&depjob->lock);
 
       assert(depjob->state == THREADQUEUE_JOB_STATE_WAITING ||
@@ -323,18 +323,18 @@ static void* threadqueue_worker(void* threadqueue_opaque)
 
       if (depjob->ndepends == 0 && depjob->state == THREADQUEUE_JOB_STATE_WAITING) {
         // Move the job to ready jobs.
-        threadqueue_push_job(threadqueue, kvz_threadqueue_copy_ref(depjob));
+        threadqueue_push_job(threadqueue, uvg_threadqueue_copy_ref(depjob));
         num_new_jobs++;
       }
 
       // Clear this reference to the job.
       PTHREAD_UNLOCK(&depjob->lock);
-      kvz_threadqueue_free_job(&job->rdepends[i]);
+      uvg_threadqueue_free_job(&job->rdepends[i]);
     }
     job->rdepends_count = 0;
 
     PTHREAD_UNLOCK(&job->lock);
-    kvz_threadqueue_free_job(&job);
+    uvg_threadqueue_free_job(&job);
 
     // The current thread will process one of the new jobs so we wake up
     // one threads less than the the number of new jobs.
@@ -354,7 +354,7 @@ static void* threadqueue_worker(void* threadqueue_opaque)
  *
  * \return 1 on success, 0 on failure
  */
-threadqueue_queue_t * kvz_threadqueue_init(int thread_count)
+threadqueue_queue_t * uvg_threadqueue_init(int thread_count)
 {
   threadqueue_queue_t *threadqueue = MALLOC(threadqueue_queue_t, 1);
   if (!threadqueue) {
@@ -404,7 +404,7 @@ threadqueue_queue_t * kvz_threadqueue_init(int thread_count)
   return threadqueue;
 
 failed:
-  kvz_threadqueue_free(threadqueue);
+  uvg_threadqueue_free(threadqueue);
   return NULL;
 }
 
@@ -412,12 +412,12 @@ failed:
 /**
  * \brief Create a job and return a pointer to it.
  *
- * The job is g_created in a paused state. Function kvz_threadqueue_submit
+ * The job is g_created in a paused state. Function uvg_threadqueue_submit
  * must be called on the job in order to have it run.
  *
  * \return pointer to the job, or NULL on failure
  */
-threadqueue_job_t * kvz_threadqueue_job_create(void (*fptr)(void *arg), void *arg)
+threadqueue_job_t * uvg_threadqueue_job_create(void (*fptr)(void *arg), void *arg)
 {
   threadqueue_job_t *job = MALLOC(threadqueue_job_t, 1);
   if (!job) {
@@ -443,7 +443,7 @@ threadqueue_job_t * kvz_threadqueue_job_create(void (*fptr)(void *arg), void *ar
 }
 
 
-int kvz_threadqueue_submit(threadqueue_queue_t * const threadqueue, threadqueue_job_t *job)
+int uvg_threadqueue_submit(threadqueue_queue_t * const threadqueue, threadqueue_job_t *job)
 {
   PTHREAD_LOCK(&threadqueue->lock);
   PTHREAD_LOCK(&job->lock);
@@ -454,7 +454,7 @@ int kvz_threadqueue_submit(threadqueue_queue_t * const threadqueue, threadqueue_
     job->fptr(job->arg);
     job->state = THREADQUEUE_JOB_STATE_DONE;
   } else if (job->ndepends == 0) {
-    threadqueue_push_job(threadqueue, kvz_threadqueue_copy_ref(job));
+    threadqueue_push_job(threadqueue, uvg_threadqueue_copy_ref(job));
     pthread_cond_signal(&threadqueue->job_available);
   } else {
     job->state = THREADQUEUE_JOB_STATE_WAITING;
@@ -475,7 +475,7 @@ int kvz_threadqueue_submit(threadqueue_queue_t * const threadqueue, threadqueue_
  * \return 1 on success, 0 on failure
  *
  */
-int kvz_threadqueue_job_dep_add(threadqueue_job_t *job, threadqueue_job_t *dependency)
+int uvg_threadqueue_job_dep_add(threadqueue_job_t *job, threadqueue_job_t *dependency)
 {
   // Lock the dependency first and then the job depending on it.
   // This must be the same order as in threadqueue_worker.
@@ -497,7 +497,7 @@ int kvz_threadqueue_job_dep_add(threadqueue_job_t *job, threadqueue_job_t *depen
     size_t bytes = dependency->rdepends_size * sizeof(threadqueue_job_t*);
     dependency->rdepends = realloc(dependency->rdepends, bytes);
   }
-  dependency->rdepends[dependency->rdepends_count++] = kvz_threadqueue_copy_ref(job);
+  dependency->rdepends[dependency->rdepends_count++] = uvg_threadqueue_copy_ref(job);
 
   PTHREAD_UNLOCK(&dependency->lock);
 
@@ -510,9 +510,9 @@ int kvz_threadqueue_job_dep_add(threadqueue_job_t *job, threadqueue_job_t *depen
  *
  * Increment reference count and return the job.
  */
-threadqueue_job_t *kvz_threadqueue_copy_ref(threadqueue_job_t *job)
+threadqueue_job_t *uvg_threadqueue_copy_ref(threadqueue_job_t *job)
 {
-  int32_t new_refcount = KVZ_ATOMIC_INC(&job->refcount);
+  int32_t new_refcount = UVG_ATOMIC_INC(&job->refcount);
   // The caller should have had another reference and we added one
   // reference so refcount should be at least 2.
   assert(new_refcount >= 2);
@@ -528,13 +528,13 @@ threadqueue_job_t *kvz_threadqueue_copy_ref(threadqueue_job_t *job)
  *
  * Sets the job pointer to NULL.
  */
-void kvz_threadqueue_free_job(threadqueue_job_t **job_ptr)
+void uvg_threadqueue_free_job(threadqueue_job_t **job_ptr)
 {
   threadqueue_job_t *job = *job_ptr;
   if (job == NULL) return;
   *job_ptr = NULL;
 
-  int new_refcount = KVZ_ATOMIC_DEC(&job->refcount);
+  int new_refcount = UVG_ATOMIC_DEC(&job->refcount);
   if (new_refcount > 0) {
     // There are still references so we don't free the data yet.
     return;
@@ -543,7 +543,7 @@ void kvz_threadqueue_free_job(threadqueue_job_t **job_ptr)
   assert(new_refcount == 0);
 
   for (int i = 0; i < job->rdepends_count; i++) {
-    kvz_threadqueue_free_job(&job->rdepends[i]);
+    uvg_threadqueue_free_job(&job->rdepends[i]);
   }
   job->rdepends_count = 0;
 
@@ -558,7 +558,7 @@ void kvz_threadqueue_free_job(threadqueue_job_t **job_ptr)
  *
  * \return 1 on success, 0 on failure
  */
-int kvz_threadqueue_waitfor(threadqueue_queue_t * threadqueue, threadqueue_job_t * job)
+int uvg_threadqueue_waitfor(threadqueue_queue_t * threadqueue, threadqueue_job_t * job)
 {
   PTHREAD_LOCK(&job->lock);
   while (job->state != THREADQUEUE_JOB_STATE_DONE) {
@@ -577,7 +577,7 @@ int kvz_threadqueue_waitfor(threadqueue_queue_t * threadqueue, threadqueue_job_t
  *
  * \return 1 on success, 0 on failure
  */
-int kvz_threadqueue_stop(threadqueue_queue_t * const threadqueue)
+int uvg_threadqueue_stop(threadqueue_queue_t * const threadqueue)
 {
   PTHREAD_LOCK(&threadqueue->lock);
 
@@ -610,16 +610,16 @@ int kvz_threadqueue_stop(threadqueue_queue_t * const threadqueue)
  *
  * \return 1 on success, 0 on failure
  */
-void kvz_threadqueue_free(threadqueue_queue_t *threadqueue)
+void uvg_threadqueue_free(threadqueue_queue_t *threadqueue)
 {
   if (threadqueue == NULL) return;
 
-  kvz_threadqueue_stop(threadqueue);
+  uvg_threadqueue_stop(threadqueue);
 
   // Free all jobs.
   while (threadqueue->first) {
     threadqueue_job_t *next = threadqueue->first->next;
-    kvz_threadqueue_free_job(&threadqueue->first);
+    uvg_threadqueue_free_job(&threadqueue->first);
     threadqueue->first = next;
   }
   threadqueue->last = NULL;

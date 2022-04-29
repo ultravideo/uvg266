@@ -42,7 +42,7 @@
 #include "encoder.h"
 #include "encoderstate.h"
 #include "global.h" // IWYU pragma: keep
-#include "kvazaar.h"
+#include "uvg266.h"
 #include "videoframe.h"
 #include "image.h"
 #include "nal.h"
@@ -91,14 +91,14 @@ typedef struct lmcs_aps {
   SliceReshapeInfo        m_sliceReshapeInfo;
   bool                    m_CTUFlag;
   bool                    m_recReshaped;
-  kvz_pixel               m_invLUT[1024];
-  kvz_pixel               m_fwdLUT[1024];
+  uvg_pixel               m_invLUT[1024];
+  uvg_pixel               m_fwdLUT[1024];
   int32_t                 m_chromaAdjHelpLUT[PIC_CODE_CW_BINS];
   uint16_t                m_binCW[PIC_ANALYZE_CW_BINS];
   uint16_t                m_initCW;
   bool                    m_reshape;
-  kvz_pixel               m_reshapePivot[PIC_CODE_CW_BINS + 1];
-  kvz_pixel               m_inputPivot[PIC_CODE_CW_BINS + 1];
+  uvg_pixel               m_reshapePivot[PIC_CODE_CW_BINS + 1];
+  uvg_pixel               m_inputPivot[PIC_CODE_CW_BINS + 1];
   int32_t                 m_fwdScaleCoef[PIC_CODE_CW_BINS];
   int32_t                 m_invScaleCoef[PIC_CODE_CW_BINS];
   int                     m_lumaBD;
@@ -114,7 +114,7 @@ typedef struct lmcs_aps {
   bool                    m_useAdpCW;
   uint16_t                m_initCWAnalyze;
   ReshapeCW               m_reshapeCW;
-  kvz_pixel               m_cwLumaWeight[PIC_CODE_CW_BINS];
+  uvg_pixel               m_cwLumaWeight[PIC_CODE_CW_BINS];
   double                  m_chromaWeight;
   int                     m_chromaAdj;
   int                     m_binNum;
@@ -124,18 +124,18 @@ typedef struct lmcs_aps {
 } lmcs_aps;
 
 
-void kvz_free_lmcs_aps(lmcs_aps* aps);
+void uvg_free_lmcs_aps(lmcs_aps* aps);
 
-void kvz_init_lmcs_seq_stats(lmcs_seq_info* stats, int32_t m_binNum);
+void uvg_init_lmcs_seq_stats(lmcs_seq_info* stats, int32_t m_binNum);
 
-void kvz_init_lmcs_aps(lmcs_aps* aps, int picWidth, int picHeight, uint32_t maxCUWidth, uint32_t maxCUHeight, int bitDepth);
+void uvg_init_lmcs_aps(lmcs_aps* aps, int picWidth, int picHeight, uint32_t maxCUWidth, uint32_t maxCUHeight, int bitDepth);
 
-void kvz_calc_seq_stats(struct encoder_state_t* const state, const videoframe_t* frame, lmcs_seq_info* stats, lmcs_aps* aps);
+void uvg_calc_seq_stats(struct encoder_state_t* const state, const videoframe_t* frame, lmcs_seq_info* stats, lmcs_aps* aps);
 
-void kvz_lmcs_preanalyzer(struct encoder_state_t* const state, const videoframe_t* frame, lmcs_aps* aps, uint32_t signalType);
+void uvg_lmcs_preanalyzer(struct encoder_state_t* const state, const videoframe_t* frame, lmcs_aps* aps, uint32_t signalType);
 
-void kvz_construct_reshaper_lmcs(lmcs_aps* aps);
+void uvg_construct_reshaper_lmcs(lmcs_aps* aps);
 
-void kvz_encode_lmcs_adaptive_parameter_set(encoder_state_t* const state);
+void uvg_encode_lmcs_adaptive_parameter_set(encoder_state_t* const state);
 
-int kvz_calculate_lmcs_chroma_adj_vpdu_nei(encoder_state_t* const state, lmcs_aps* aps, int x, int y);
+int uvg_calculate_lmcs_chroma_adj_vpdu_nei(encoder_state_t* const state, lmcs_aps* aps, int x, int y);

@@ -1,4 +1,4 @@
-.TH KVAZAAR "1" "March 2022" "uvg266 v2.1.0" "User Commands"
+.TH UVG266 "1" "April 2022" "uvg266 v0.2.3" "User Commands"
 .SH NAME
 uvg266 \- open source VVC encoder
 .SH SYNOPSIS
@@ -376,7 +376,8 @@ Enable use of multiple reference lines in intra
 predictions.
 .TP
 \fB\-\-(no\-)mip            
-Enable matrix weighted intra prediction.      \-\-mts <string>        
+Enable matrix weighted intra prediction.
+\fB\-\-mts <string>        
 Multiple Transform Selection [off].
 (Currently only implemented for intra
 and has effect only when rd >= 2)
@@ -388,7 +389,8 @@ and has effect only when rd >= 2)
                 of DCT2 to certain intra blocks.
 .TP
 \fB\-\-(no\-)jccr           
-Joint coding of chroma residual.                                Requires rdo> = 2. [disabled]
+Joint coding of chroma residual. 
+                               Requires rdo> = 2. [disabled]
 .TP
 \fB\-\-(no\-)cclm           
 Cross component linear model. 

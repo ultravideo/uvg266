@@ -38,16 +38,16 @@
 
 
 // Define function pointers.
-encode_coeff_nxn_func *kvz_encode_coeff_nxn;
+encode_coeff_nxn_func *uvg_encode_coeff_nxn;
 
 
-int kvz_strategy_register_encode(void* opaque, uint8_t bitdepth) {
+int uvg_strategy_register_encode(void* opaque, uint8_t bitdepth) {
   bool success = true;
 
-  success &= kvz_strategy_register_encode_generic(opaque, bitdepth);
+  success &= uvg_strategy_register_encode_generic(opaque, bitdepth);
 
-  if (kvz_g_hardware_flags.intel_flags.avx2) {
-    //success &= kvz_strategy_register_encode_avx2(opaque, bitdepth);
+  if (uvg_g_hardware_flags.intel_flags.avx2) {
+    //success &= uvg_strategy_register_encode_avx2(opaque, bitdepth);
   }
   return success;
 }

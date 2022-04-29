@@ -41,14 +41,14 @@
 #include <math.h>
 
 
-static void parse_qp_map(kvz_config* cfg, int index);
+static void parse_qp_map(uvg_config* cfg, int index);
 
-kvz_config *kvz_config_alloc(void)
+uvg_config *uvg_config_alloc(void)
 {
-  return calloc(1, sizeof(kvz_config));
+  return calloc(1, sizeof(uvg_config));
 }
 
-int kvz_config_init(kvz_config *cfg)
+int uvg_config_init(uvg_config *cfg)
 {
   cfg->width           = 0;
   cfg->height          = 0;
@@ -102,13 +102,13 @@ int kvz_config_init(kvz_config *cfg)
   cfg->gop_lowdelay    = true;
   cfg->bipred          = 0;
   cfg->target_bitrate  = 0;
-  cfg->hash            = KVZ_HASH_CHECKSUM;
+  cfg->hash            = UVG_HASH_CHECKSUM;
   cfg->lossless        = false;
   cfg->tmvp_enable     = true;
   cfg->implicit_rdpcm  = false;
   cfg->fast_residual_cost_limit = 0;
 
-  cfg->cu_split_termination = KVZ_CU_SPLIT_TERMINATION_ZERO;
+  cfg->cu_split_termination = UVG_CU_SPLIT_TERMINATION_ZERO;
 
   cfg->tiles_width_count  = 1;
   cfg->tiles_height_count = 1;
@@ -137,12 +137,12 @@ int kvz_config_init(kvz_config *cfg)
   cfg->add_encoder_info = true;
   cfg->calc_psnr = true;
 
-  cfg->mv_constraint = KVZ_MV_CONSTRAIN_NONE;
+  cfg->mv_constraint = UVG_MV_CONSTRAIN_NONE;
 
   cfg->me_early_termination = 1;
   cfg->intra_rdo_et         = 0;
 
-  cfg->input_format = KVZ_FORMAT_P420;
+  cfg->input_format = UVG_FORMAT_P420;
   cfg->input_bitdepth = 8;
 
   cfg->gop_lp_definition.d = 3;
@@ -156,7 +156,7 @@ int kvz_config_init(kvz_config *cfg)
 
   cfg->erp_aqp = false;
 
-  cfg->slices = KVZ_SLICES_NONE;
+  cfg->slices = UVG_SLICES_NONE;
 
   cfg->level = 62; // default hevc level, 6.2 (the highest)
   cfg->force_level = true; // don't care about level limits by-default
@@ -166,7 +166,7 @@ int kvz_config_init(kvz_config *cfg)
 
   cfg->vaq = 0;
 
-  cfg->scaling_list = KVZ_SCALING_LIST_OFF;
+  cfg->scaling_list = UVG_SCALING_LIST_OFF;
 
   cfg->max_merge = 6;
   cfg->early_skip = true;
@@ -181,11 +181,11 @@ int kvz_config_init(kvz_config *cfg)
 
   cfg->zero_coeff_rdo = true;
 
-  cfg->rc_algorithm = KVZ_NO_RC;
+  cfg->rc_algorithm = UVG_NO_RC;
   cfg->intra_bit_allocation = false;
   cfg->clip_neighbour = true;
 
-  cfg->file_format = KVZ_FORMAT_AUTO;
+  cfg->file_format = UVG_FORMAT_AUTO;
 
   cfg->stats_file_prefix = NULL;
 
@@ -217,7 +217,7 @@ int kvz_config_init(kvz_config *cfg)
   return 1;
 }
 
-int kvz_config_destroy(kvz_config *cfg)
+int uvg_config_destroy(uvg_config *cfg)
 {
   if (cfg) {
     FREE_POINTER(cfg->cqmfile);
@@ -418,7 +418,7 @@ static int parse_qp_scale_array(const char *array, int8_t *out)
   return 1;
 }
 
-static void parse_qp_map(kvz_config *cfg, int index) {
+static void parse_qp_map(uvg_config *cfg, int index) {
   int i = 0;
   for (; cfg->chroma_scale_in[index][i] != -1; i++);
   if (cfg->chroma_scale_out[index][i] != -1) return;
@@ -534,7 +534,7 @@ static int parse_slice_specification(const char* const arg, int32_t * const nsli
   return 1;
 }
 
-int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
+int uvg_config_parse(uvg_config *cfg, const char *name, const char *value)
 {
   static const char * const me_names[]          = { "hexbs", "tz", "full", "full8", "full16", "full32", "full64", "dia", NULL };
   static const char * const source_scan_type_names[] = { "progressive", "tff", "bff", NULL };
@@ -937,7 +937,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     int8_t mts_type = 0;
     if (!parse_enum(value, mts_names, &mts_type)) mts_type = atobool(value) ? 3 : 0;
     cfg->mts = mts_type;
-    cfg->mts_implicit = (mts_type == KVZ_MTS_IMPLICIT);
+    cfg->mts_implicit = (mts_type == UVG_MTS_IMPLICIT);
   }
   else if OPT("tr-depth-intra")
     cfg->tr_depth_intra = atoi(value);
@@ -952,7 +952,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     return parse_enum(value, source_scan_type_names, &cfg->source_scan_type);
   else if OPT("mv-constraint")
   {
-    int8_t constraint = KVZ_MV_CONSTRAIN_NONE;
+    int8_t constraint = UVG_MV_CONSTRAIN_NONE;
     int result = parse_enum(value, mv_constraint_names, &constraint);
     cfg->mv_constraint = constraint;
     return result;
@@ -983,7 +983,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     }
     FREE_POINTER(cfg->cqmfile);
     cfg->cqmfile = cqmfile;
-    cfg->scaling_list = KVZ_SCALING_LIST_CUSTOM;
+    cfg->scaling_list = UVG_SCALING_LIST_CUSTOM;
   }
   else if OPT("fast-coeff-table") {
     char* fast_coeff_table_fn = strdup(value);
@@ -1010,7 +1010,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     cfg->fastrd_learning_outdir_fn = fastrd_learning_outdir_fn;
   }
   else if OPT("scaling-list") {    
-    int8_t scaling_list = KVZ_SCALING_LIST_OFF;
+    int8_t scaling_list = UVG_SCALING_LIST_OFF;
     int result = parse_enum(value, scaling_list_names, &scaling_list);
     cfg->scaling_list = scaling_list;
     return result;
@@ -1092,13 +1092,13 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     }
   } else if OPT("slices") {
     if (!strcmp(value, "tiles")) {
-      cfg->slices = KVZ_SLICES_TILES;
+      cfg->slices = UVG_SLICES_TILES;
       return 1;
     } else if (!strcmp(value, "wpp")) {
-      cfg->slices = KVZ_SLICES_WPP;
+      cfg->slices = UVG_SLICES_WPP;
       return 1;
     } else if (!strcmp(value, "tiles+wpp")) {
-      cfg->slices = KVZ_SLICES_TILES | KVZ_SLICES_WPP;
+      cfg->slices = UVG_SLICES_TILES | UVG_SLICES_WPP;
       return 1;
     } else {
       return parse_slice_specification(value, &cfg->slice_count, &cfg->slice_addresses_in_ts);
@@ -1114,9 +1114,9 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   else if OPT("cpuid")
     cfg->cpuid = atobool(value);
   else if OPT("pu-depth-inter")
-    return parse_pu_depth_list(value, cfg->pu_depth_inter.min, cfg->pu_depth_inter.max, KVZ_MAX_GOP_LAYERS);
+    return parse_pu_depth_list(value, cfg->pu_depth_inter.min, cfg->pu_depth_inter.max, UVG_MAX_GOP_LAYERS);
   else if OPT("pu-depth-intra")
-    return parse_pu_depth_list(value, cfg->pu_depth_intra.min, cfg->pu_depth_intra.max, KVZ_MAX_GOP_LAYERS);
+    return parse_pu_depth_list(value, cfg->pu_depth_intra.min, cfg->pu_depth_intra.max, UVG_MAX_GOP_LAYERS);
   else if OPT("info")
     cfg->add_encoder_info = atobool(value);
   else if OPT("gop") {
@@ -1155,15 +1155,15 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
       cfg->clip_neighbour = false;
     } else if (atoi(value) == 8) {
       cfg->gop_lowdelay = 0;
-      cfg->gop_len = sizeof(kvz_gop_ra8) / sizeof(kvz_gop_ra8[0]);
-      memcpy(cfg->gop, kvz_gop_ra8, sizeof(kvz_gop_ra8));
+      cfg->gop_len = sizeof(uvg_gop_ra8) / sizeof(uvg_gop_ra8[0]);
+      memcpy(cfg->gop, uvg_gop_ra8, sizeof(uvg_gop_ra8));
       cfg->intra_bit_allocation = false;
       cfg->clip_neighbour = true;
 
     } else if (atoi(value) == 16) {
       cfg->gop_lowdelay = 0;
-      cfg->gop_len = sizeof(kvz_gop_ra16) / sizeof(kvz_gop_ra16[0]);
-      memcpy(cfg->gop, kvz_gop_ra16, sizeof(kvz_gop_ra16));
+      cfg->gop_len = sizeof(uvg_gop_ra16) / sizeof(uvg_gop_ra16[0]);
+      memcpy(cfg->gop, uvg_gop_ra16, sizeof(uvg_gop_ra16));
       cfg->intra_bit_allocation = false;
       cfg->clip_neighbour = true;
 
@@ -1195,7 +1195,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   else if OPT("bitrate") {
     cfg->target_bitrate = atoi(value);
     if (!cfg->rc_algorithm) {
-      cfg->rc_algorithm = KVZ_LAMBDA;
+      cfg->rc_algorithm = UVG_LAMBDA;
     }
   }
   else if OPT("preset") {
@@ -1219,7 +1219,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
       // Loop all the name and value pairs and push to the config parser
       for (int preset_value = 1; preset_values[preset_line][preset_value] != NULL; preset_value += 2) {
         fprintf(stderr, "--%s=%s ", preset_values[preset_line][preset_value], preset_values[preset_line][preset_value + 1]);
-        kvz_config_parse(cfg, preset_values[preset_line][preset_value], preset_values[preset_line][preset_value + 1]);
+        uvg_config_parse(cfg, preset_values[preset_line][preset_value], preset_values[preset_line][preset_value + 1]);
       }
       fprintf(stderr, "\n");
     } else {
@@ -1242,7 +1242,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   }
   else if OPT("cu-split-termination")
   {
-    int8_t mode = KVZ_CU_SPLIT_TERMINATION_ZERO;
+    int8_t mode = UVG_CU_SPLIT_TERMINATION_ZERO;
     int result = parse_enum(value, cu_split_termination_names, &mode);
     cfg->cu_split_termination = mode;
     return result;
@@ -1268,7 +1268,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     cfg->rdoq_skip = atobool(value);
   }
   else if OPT("input-format") {
-    static enum kvz_input_format const formats[] = { KVZ_FORMAT_P400, KVZ_FORMAT_P420 };
+    static enum uvg_input_format const formats[] = { UVG_FORMAT_P400, UVG_FORMAT_P420 };
     static const char * const format_names[] = { "P400", "P420", NULL };
 
     int8_t format = 0;
@@ -1285,11 +1285,11 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
       fprintf(stderr, "input-bitdepth not between 8 and 16.\n");
       return 0;
     }
-    if (cfg->input_bitdepth > 8 && KVZ_BIT_DEPTH == 8) {
+    if (cfg->input_bitdepth > 8 && UVG_BIT_DEPTH == 8) {
       // Because the image is read straight into the reference buffers,
-      // reading >8 bit samples doesn't work when sizeof(kvz_pixel)==1.
+      // reading >8 bit samples doesn't work when sizeof(uvg_pixel)==1.
       fprintf(stderr, "input-bitdepth can't be set to larger than 8 because"
-                      " Kvazaar is compiled with KVZ_BIT_DEPTH=8.\n");
+                      " Kvazaar is compiled with UVG_BIT_DEPTH=8.\n");
       return 0;
     }
   }
@@ -1510,7 +1510,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   return 1;
 }
 
-void kvz_config_process_lp_gop(kvz_config *cfg)
+void uvg_config_process_lp_gop(uvg_config *cfg)
 {
   struct {
     unsigned g;
@@ -1533,7 +1533,7 @@ void kvz_config_process_lp_gop(kvz_config *cfg)
   cfg->gop_lowdelay = 1;
   cfg->gop_len = gop.g;
   for (int g = 1; g <= gop.g; ++g) {
-    kvz_gop_config *gop_pic = &cfg->gop[g - 1];
+    uvg_gop_config *gop_pic = &cfg->gop[g - 1];
 
     // Find gop depth for picture.
     int gop_layer = 1;
@@ -1590,7 +1590,7 @@ void kvz_config_process_lp_gop(kvz_config *cfg)
   }
 
   for (int g = 0; g < gop.g; ++g) {
-    kvz_gop_config *gop_pic = &cfg->gop[g];
+    uvg_gop_config *gop_pic = &cfg->gop[g];
     if (!gop_pic->is_ref) {
       gop_pic->qp_factor = 0.68 * 1.31;  // derived from HM
     }
@@ -1602,7 +1602,7 @@ void kvz_config_process_lp_gop(kvz_config *cfg)
 }
 
 // forward declaration
-static int validate_hevc_level(kvz_config *const cfg);
+static int validate_hevc_level(uvg_config *const cfg);
 
 /**
  * \brief Check that configuration is sensible.
@@ -1610,7 +1610,7 @@ static int validate_hevc_level(kvz_config *const cfg);
  * \param cfg   config to check
  * \return      1 if the config is ok, otherwise 1
  */
-int kvz_config_validate(const kvz_config *const cfg)
+int uvg_config_validate(const uvg_config *const cfg)
 {
   int error = 0;
 
@@ -1730,7 +1730,7 @@ int kvz_config_validate(const kvz_config *const cfg)
       error = 1;
   }
 
-  for( size_t i = 0; i < KVZ_MAX_GOP_LAYERS; i++ )
+  for( size_t i = 0; i < UVG_MAX_GOP_LAYERS; i++ )
   {
       if( cfg->pu_depth_inter.min[i] < 0 || cfg->pu_depth_inter.max[i] < 0 ) continue;
 
@@ -1816,27 +1816,27 @@ int kvz_config_validate(const kvz_config *const cfg)
     error = 1;
   }
 
-  if ((cfg->slices & KVZ_SLICES_WPP) && !cfg->wpp) {
+  if ((cfg->slices & UVG_SLICES_WPP) && !cfg->wpp) {
     fprintf(stderr, "Input error: --slices=wpp does not work without --wpp.\n");
     error = 1;
   }
 
-  if ((cfg->scaling_list == KVZ_SCALING_LIST_CUSTOM) && !cfg->cqmfile) {
+  if ((cfg->scaling_list == UVG_SCALING_LIST_CUSTOM) && !cfg->cqmfile) {
     fprintf(stderr, "Input error: --scaling-list=custom does not work without --cqmfile=<FILE>.\n");
     error = 1;
   }
 
-  if (validate_hevc_level((kvz_config *const) cfg)) {
+  if (validate_hevc_level((uvg_config *const) cfg)) {
     // a level error found and it's not okay
     error = 1;
   }
 
-  if(cfg->target_bitrate > 0 && cfg->rc_algorithm == KVZ_NO_RC) {
+  if(cfg->target_bitrate > 0 && cfg->rc_algorithm == UVG_NO_RC) {
     fprintf(stderr, "Bitrate set but rc-algorithm is turned off.\n");
     error = 1;
   }
 
-  if(cfg->target_bitrate == 0 && cfg->rc_algorithm != KVZ_NO_RC) {
+  if(cfg->target_bitrate == 0 && cfg->rc_algorithm != UVG_NO_RC) {
     fprintf(stderr, "Rate control algorithm set but bitrate not set.\n");
     error = 1;
   }
@@ -1858,7 +1858,7 @@ int kvz_config_validate(const kvz_config *const cfg)
   return !error;
 }
 
-static int validate_hevc_level(kvz_config *const cfg) {
+static int validate_hevc_level(uvg_config *const cfg) {
   static const struct { uint32_t lsr; uint32_t lps; uint32_t main_bitrate; } LEVEL_CONSTRAINTS[13] = {
     { 552960, 36864, 128 }, // 1
 

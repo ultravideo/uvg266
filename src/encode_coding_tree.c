@@ -41,8 +41,8 @@
 #include "imagelist.h"
 #include "inter.h"
 #include "intra.h"
-#include "kvazaar.h"
-#include "kvz_math.h"
+#include "uvg266.h"
+#include "uvg_math.h"
 #include "strategyselector.h"
 #include "tables.h"
 #include "videoframe.h"
@@ -56,7 +56,7 @@ static bool is_mts_allowed(encoder_state_t * const state, cu_info_t *const pred_
   //bool mts_allowed = cu.chType == CHANNEL_TYPE_LUMA && compID == COMPONENT_Y;
 
   uint8_t mts_type = state->encoder_control->cfg.mts;
-  bool mts_allowed = mts_type == KVZ_MTS_BOTH || (pred_cu->type == CU_INTRA ? mts_type == KVZ_MTS_INTRA : pred_cu->type == CU_INTER && mts_type == KVZ_MTS_INTER);
+  bool mts_allowed = mts_type == UVG_MTS_BOTH || (pred_cu->type == CU_INTRA ? mts_type == UVG_MTS_INTRA : pred_cu->type == CU_INTER && mts_type == UVG_MTS_INTER);
   mts_allowed &= cu_width <= max_size && cu_height <= max_size;
   //mts_allowed &= !cu.ispMode;
   //mts_allowed &= !cu.sbtInfo;
@@ -101,7 +101,7 @@ static void encode_mts_idx(encoder_state_t * const state,
   }
 }
 
-void kvz_encode_ts_residual(encoder_state_t* const state,
+void uvg_encode_ts_residual(encoder_state_t* const state,
   cabac_data_t* const cabac,
   const coeff_t* coeff,
   uint32_t width,
@@ -117,9 +117,9 @@ void kvz_encode_ts_residual(encoder_state_t* const state,
 
   // CONSTANTS
 
-  const uint32_t log2_block_size = kvz_g_convert_to_bit[width] + 2;
-  const uint32_t log2_cg_size = kvz_g_log2_sbb_size[log2_block_size][log2_block_size][0] + kvz_g_log2_sbb_size[log2_block_size][log2_block_size][1];
-  const uint32_t* scan =    kvz_g_sig_last_scan[scan_mode][log2_block_size - 1];
+  const uint32_t log2_block_size = uvg_g_convert_to_bit[width] + 2;
+  const uint32_t log2_cg_size = uvg_g_log2_sbb_size[log2_block_size][log2_block_size][0] + uvg_g_log2_sbb_size[log2_block_size][log2_block_size][1];
+  const uint32_t* scan =    uvg_g_sig_last_scan[scan_mode][log2_block_size - 1];
   const uint32_t* scan_cg = g_sig_last_scan_cg[log2_block_size - 1][scan_mode];
 
 
@@ -149,7 +149,7 @@ void kvz_encode_ts_residual(encoder_state_t* const state,
       uint32_t cg_pos_y = cg_blkpos / cg_width;
       uint32_t cg_pos_x = cg_blkpos - (cg_pos_y * cg_width);
 
-      uint32_t ctx_sig = kvz_context_get_sig_coeff_group_ts(sig_coeffgroup_flag, cg_pos_x, cg_pos_y, cg_width);
+      uint32_t ctx_sig = uvg_context_get_sig_coeff_group_ts(sig_coeffgroup_flag, cg_pos_x, cg_pos_y, cg_width);
 
       cabac->cur_ctx = &base_coeff_group_ctx[ctx_sig];
 
@@ -184,7 +184,7 @@ void kvz_encode_ts_residual(encoder_state_t* const state,
       if (numNonZero || nextSigPos != inferSigPos)
       {
         cabac->cur_ctx = &cabac->ctx.transform_skip_sig[
-          kvz_context_get_sig_ctx_idx_abs_ts(coeff, pos_x, pos_y, width)
+          uvg_context_get_sig_ctx_idx_abs_ts(coeff, pos_x, pos_y, width)
         ];
         CABAC_BIN(cabac, sigFlag, "sig_coeff_flag");
         maxCtxBins--;
@@ -195,7 +195,7 @@ void kvz_encode_ts_residual(encoder_state_t* const state,
         //===== encode sign's =====
         int sign = curr_coeff < 0;
         cabac->cur_ctx = &cabac->ctx.transform_skip_res_sign[
-          kvz_sign_ctx_id_abs_ts(coeff, pos_x, pos_y, width, 0)
+          uvg_sign_ctx_id_abs_ts(coeff, pos_x, pos_y, width, 0)
         ];
         CABAC_BIN(cabac, sign, "coeff_sign_flag");
         maxCtxBins--;
@@ -204,13 +204,13 @@ void kvz_encode_ts_residual(encoder_state_t* const state,
         rightPixel = pos_x > 0 ? coeff[pos_x + pos_y * width - 1] : 0;
         belowPixel = pos_y > 0 ? coeff[pos_x + (pos_y - 1) * width] : 0;
 
-        modAbsCoeff = kvz_derive_mod_coeff(rightPixel, belowPixel, abs(curr_coeff), 0);
+        modAbsCoeff = uvg_derive_mod_coeff(rightPixel, belowPixel, abs(curr_coeff), 0);
 
         remAbsLevel = modAbsCoeff - 1;
 
         unsigned gt1 = !!remAbsLevel;
         cabac->cur_ctx = &cabac->ctx.transform_skip_gt1[
-          kvz_lrg1_ctx_id_abs_ts(coeff, pos_x, pos_y, width, 0)
+          uvg_lrg1_ctx_id_abs_ts(coeff, pos_x, pos_y, width, 0)
         ];
         CABAC_BIN(cabac, gt1, "abs_level_gtx_flag");
         maxCtxBins--;
@@ -237,7 +237,7 @@ void kvz_encode_ts_residual(encoder_state_t* const state,
       unsigned absLevel;
       rightPixel = pos_x > 0 ? coeff[pos_x + pos_y * width - 1] : 0;
       belowPixel = pos_y > 0 ? coeff[pos_x + (pos_y - 1) * width] : 0;
-      absLevel = kvz_derive_mod_coeff(rightPixel, belowPixel, abs(coeff[blk_pos]), 0);
+      absLevel = uvg_derive_mod_coeff(rightPixel, belowPixel, abs(coeff[blk_pos]), 0);
       cutoffVal = 2;
       for (int i = 0; i < numGtBins; i++)
       {
@@ -263,13 +263,13 @@ void kvz_encode_ts_residual(encoder_state_t* const state,
       rightPixel = pos_x > 0 ? coeff[pos_x + pos_y * width - 1] : 0;
       belowPixel = pos_y > 0 ? coeff[pos_x + (pos_y - 1) * width] : 0;
       cutoffVal = (scanPos <= lastScanPosPass2 ? 10 : (scanPos <= lastScanPosPass1 ? 2 : 0));
-      absLevel = kvz_derive_mod_coeff(rightPixel, belowPixel, abs(coeff[blk_pos]), 0 || !cutoffVal);
+      absLevel = uvg_derive_mod_coeff(rightPixel, belowPixel, abs(coeff[blk_pos]), 0 || !cutoffVal);
       
       if (absLevel >= cutoffVal)
       {
         int       rice = 1;
         unsigned  rem = scanPos <= lastScanPosPass1 ? (absLevel - cutoffVal) >> 1 : absLevel;
-        kvz_cabac_write_coeff_remain(cabac, rem, rice, 5);
+        uvg_cabac_write_coeff_remain(cabac, rem, rice, 5);
 
         if (absLevel && scanPos > lastScanPosPass1)
         {
@@ -294,13 +294,13 @@ void kvz_encode_ts_residual(encoder_state_t* const state,
  * This method encodes the X and Y component within a block of the last
  * significant coefficient.
  */
-void kvz_encode_last_significant_xy(cabac_data_t * const cabac,
+void uvg_encode_last_significant_xy(cabac_data_t * const cabac,
                                        uint8_t lastpos_x, uint8_t lastpos_y,
                                        uint8_t width, uint8_t height,
                                        uint8_t type, uint8_t scan)
 {
-  const int index_x = kvz_math_floor_log2(width);
-  const int index_y = kvz_math_floor_log2(width);
+  const int index_x = uvg_math_floor_log2(width);
+  const int index_y = uvg_math_floor_log2(width);
   const int prefix_ctx[8] = { 0, 0, 0, 3, 6, 10, 15, 21 };
   //ToDo: own ctx_offset and shift for X and Y 
   uint8_t ctx_offset_x = type ? 0 : prefix_ctx[index_x];
@@ -355,7 +355,7 @@ static void encode_chroma_tu(encoder_state_t* const state, int x, int y, int dep
   int x_local = (x >> 1) % LCU_WIDTH_C;
   int y_local = (y >> 1) % LCU_WIDTH_C;
   cabac_data_t* const cabac = &state->cabac;
-  *scan_idx = kvz_get_scan_order(cur_pu->type, cur_pu->intra.mode_chroma, depth);
+  *scan_idx = uvg_get_scan_order(cur_pu->type, cur_pu->intra.mode_chroma, depth);
   if(!joint_chroma){
     const coeff_t *coeff_u = &coeff->u[xy_to_zorder(LCU_WIDTH_C, x_local, y_local)];
     const coeff_t *coeff_v = &coeff->v[xy_to_zorder(LCU_WIDTH_C, x_local, y_local)];
@@ -367,7 +367,7 @@ static void encode_chroma_tu(encoder_state_t* const state, int x, int y, int dep
         // TODO: transform skip for chroma blocks
         CABAC_BIN(cabac, 0, "transform_skip_flag");
       }
-      kvz_encode_coeff_nxn(state, &state->cabac, coeff_u, width_c, 1, *scan_idx, NULL, false);
+      uvg_encode_coeff_nxn(state, &state->cabac, coeff_u, width_c, 1, *scan_idx, NULL, false);
     }
 
     if (cbf_is_set(cur_pu->cbf, depth, COLOR_V)) {
@@ -375,7 +375,7 @@ static void encode_chroma_tu(encoder_state_t* const state, int x, int y, int dep
         cabac->cur_ctx = &cabac->ctx.transform_skip_model_chroma;
         CABAC_BIN(cabac, 0, "transform_skip_flag");
       }
-      kvz_encode_coeff_nxn(state, &state->cabac, coeff_v, width_c, 2, *scan_idx, NULL, false);
+      uvg_encode_coeff_nxn(state, &state->cabac, coeff_v, width_c, 2, *scan_idx, NULL, false);
     }
   }
   else {
@@ -384,7 +384,7 @@ static void encode_chroma_tu(encoder_state_t* const state, int x, int y, int dep
       cabac->cur_ctx = &cabac->ctx.transform_skip_model_chroma;
       CABAC_BIN(cabac, 0, "transform_skip_flag");
     }
-    kvz_encode_coeff_nxn(state, &state->cabac, coeff_uv, width_c, 2, *scan_idx, NULL, false);
+    uvg_encode_coeff_nxn(state, &state->cabac, coeff_uv, width_c, 2, *scan_idx, NULL, false);
     
   }
 }
@@ -399,9 +399,9 @@ static void encode_transform_unit(encoder_state_t * const state,
   const uint8_t width = LCU_WIDTH >> depth;
   const uint8_t width_c = (depth == MAX_PU_DEPTH ? width : width / 2);
 
-  const cu_info_t *cur_pu = kvz_cu_array_at_const(frame->cu_array, x, y);
+  const cu_info_t *cur_pu = uvg_cu_array_at_const(frame->cu_array, x, y);
 
-  int8_t scan_idx = kvz_get_scan_order(cur_pu->type, cur_pu->intra.mode, depth);
+  int8_t scan_idx = uvg_get_scan_order(cur_pu->type, cur_pu->intra.mode, depth);
 
   int cbf_y = cbf_is_set(cur_pu->cbf, depth, COLOR_Y);
 
@@ -419,10 +419,10 @@ static void encode_transform_unit(encoder_state_t * const state,
       DBG_YUVIEW_VALUE(state->frame->poc, DBG_YUVIEW_TR_SKIP, x, y, width, width, (cur_pu->tr_idx == MTS_SKIP) ? 1 : 0);
     }
     if(cur_pu->tr_idx == MTS_SKIP) {
-      kvz_encode_ts_residual(state, cabac, coeff_y, width, 0, scan_idx);      
+      uvg_encode_ts_residual(state, cabac, coeff_y, width, 0, scan_idx);      
     }
     else {
-      kvz_encode_coeff_nxn(state,
+      uvg_encode_coeff_nxn(state,
                            cabac,
                            coeff_y,
                            width,
@@ -446,7 +446,7 @@ static void encode_transform_unit(encoder_state_t * const state,
       // corner of the block.
       x -= 4;
       y -= 4;
-      cur_pu = kvz_cu_array_at_const((const cu_array_t *)frame->cu_array, x, y);
+      cur_pu = uvg_cu_array_at_const((const cu_array_t *)frame->cu_array, x, y);
     }
   }
 
@@ -480,12 +480,12 @@ static void encode_transform_coeff(encoder_state_t * const state,
   //const encoder_control_t *const ctrl = state->encoder_control;
   const videoframe_t * const frame = state->tile->frame;
 
-  const cu_info_t *cur_pu = kvz_cu_array_at_const(frame->cu_array, x, y);
+  const cu_info_t *cur_pu = uvg_cu_array_at_const(frame->cu_array, x, y);
   // Round coordinates down to a multiple of 8 to get the location of the
   // containing CU.
   const int x_cu = 8 * (x / 8);
   const int y_cu = 8 * (y / 8);
-  const cu_info_t *cur_cu = kvz_cu_array_at_const(frame->cu_array, x_cu, y_cu);
+  const cu_info_t *cur_cu = uvg_cu_array_at_const(frame->cu_array, x_cu, y_cu);
 
   // NxN signifies implicit transform split at the first transform level.
   // There is a similar implicit split for inter, but it is only used when
@@ -523,7 +523,7 @@ static void encode_transform_coeff(encoder_state_t * const state,
       tr_depth < max_tr_depth &&
       !(intra_split_flag && tr_depth == 0))
   {
-    cabac->cur_ctx = &(cabac->ctx.trans_subdiv_model[5 - ((kvz_g_convert_to_bit[LCU_WIDTH] + 2) - depth)]);
+    cabac->cur_ctx = &(cabac->ctx.trans_subdiv_model[5 - ((uvg_g_convert_to_bit[LCU_WIDTH] + 2) - depth)]);
     CABAC_BIN(cabac, split, "split_transform_flag");
   }
   */
@@ -533,7 +533,7 @@ static void encode_transform_coeff(encoder_state_t * const state,
   // - they have already been signaled to 0 previously
   // When they are not present they are inferred to be 0, except for size 4
   // when the flags from previous level are used.
-  if (state->encoder_control->chroma_format != KVZ_CSP_400 && (depth != 4 || only_chroma)) {
+  if (state->encoder_control->chroma_format != UVG_CSP_400 && (depth != 4 || only_chroma)) {
     
     if (!split) {
       if (true) {
@@ -571,21 +571,21 @@ static void encode_transform_coeff(encoder_state_t * const state,
 
   if (cb_flag_y | cb_flag_u | cb_flag_v) {
     if (state->must_code_qp_delta) {
-      const int qp_pred      = kvz_get_cu_ref_qp(state, x_cu, y_cu, state->last_qp);
+      const int qp_pred      = uvg_get_cu_ref_qp(state, x_cu, y_cu, state->last_qp);
       const int qp_delta     = cur_cu->qp - qp_pred;
       // Possible deltaQP range depends on bit depth as stated in HEVC specification.
-      assert(qp_delta >= KVZ_QP_DELTA_MIN && qp_delta <= KVZ_QP_DELTA_MAX && "QP delta not in valid range.");
+      assert(qp_delta >= UVG_QP_DELTA_MIN && qp_delta <= UVG_QP_DELTA_MAX && "QP delta not in valid range.");
 
       const int qp_delta_abs = ABS(qp_delta);
       cabac_data_t* cabac    = &state->cabac;
 
       // cu_qp_delta_abs prefix
       cabac->cur_ctx = &cabac->ctx.cu_qp_delta_abs[0];
-      kvz_cabac_write_unary_max_symbol(cabac, cabac->ctx.cu_qp_delta_abs, MIN(qp_delta_abs, 5), 1, 5);
+      uvg_cabac_write_unary_max_symbol(cabac, cabac->ctx.cu_qp_delta_abs, MIN(qp_delta_abs, 5), 1, 5);
 
       if (qp_delta_abs >= 5) {
         // cu_qp_delta_abs suffix
-        kvz_cabac_write_ep_ex_golomb(state, cabac, qp_delta_abs - 5, 0);
+        uvg_cabac_write_ep_ex_golomb(state, cabac, qp_delta_abs - 5, 0);
       }
 
       if (qp_delta != 0) {
@@ -636,19 +636,19 @@ static bool encode_inter_prediction_unit(encoder_state_t * const state,
         if (symbol == 0) break;
       }
     }
-#ifdef KVZ_DEBUG_PRINT_YUVIEW_CSV
+#ifdef UVG_DEBUG_PRINT_YUVIEW_CSV
     int abs_x = x + state->tile->offset_x;
     int abs_y = y + state->tile->offset_y;
     if (cur_cu->inter.mv_dir & 1) DBG_YUVIEW_MV(state->frame->poc, DBG_YUVIEW_MVMERGE_L0, abs_x, abs_y, width, height, cur_cu->inter.mv[0][0], cur_cu->inter.mv[0][1]);
     if (cur_cu->inter.mv_dir & 2) DBG_YUVIEW_MV(state->frame->poc, DBG_YUVIEW_MVMERGE_L1, abs_x, abs_y, width, height, cur_cu->inter.mv[1][0], cur_cu->inter.mv[1][1]);
 #endif
   } else {
-    if (state->frame->slicetype == KVZ_SLICE_B) {
+    if (state->frame->slicetype == UVG_SLICE_B) {
       // Code Inter Dir
       uint8_t inter_dir = cur_cu->inter.mv_dir;
 
       if (cur_cu->part_size == SIZE_2Nx2N || (LCU_WIDTH >> depth) != 4) { // ToDo: limit on 4x8/8x4
-        uint32_t inter_dir_ctx = (7 - ((kvz_math_floor_log2(width) + kvz_math_floor_log2(height) + 1) >> 1));
+        uint32_t inter_dir_ctx = (7 - ((uvg_math_floor_log2(width) + uvg_math_floor_log2(height) + 1) >> 1));
 
         cabac->cur_ctx = &(cabac->ctx.inter_dir[inter_dir_ctx]);
         CABAC_BIN(cabac, (inter_dir == 3), "inter_pred_idc");
@@ -663,7 +663,7 @@ static bool encode_inter_prediction_unit(encoder_state_t * const state,
       if (!(cur_cu->inter.mv_dir & (1 << ref_list_idx))) {
         continue;
       }
-#ifdef KVZ_DEBUG_PRINT_YUVIEW_CSV
+#ifdef UVG_DEBUG_PRINT_YUVIEW_CSV
       int abs_x = x + state->tile->offset_x;
       int abs_y = y + state->tile->offset_y;
       DBG_YUVIEW_MV(state->frame->poc, ref_list_idx ? DBG_YUVIEW_MVINTER_L1 : DBG_YUVIEW_MVINTER_L0, abs_x, abs_y, width, height, cur_cu->inter.mv[ref_list_idx][0], cur_cu->inter.mv[ref_list_idx][1]);
@@ -697,7 +697,7 @@ static bool encode_inter_prediction_unit(encoder_state_t * const state,
       if (state->frame->ref_list != REF_PIC_LIST_1 || cur_cu->inter.mv_dir != 3) {
 
         mv_t mv_cand[2][2];
-        kvz_inter_get_mv_cand_cua(
+        uvg_inter_get_mv_cand_cua(
             state,
             x, y, width, height,
             mv_cand, cur_cu, ref_list_idx);
@@ -706,9 +706,9 @@ static bool encode_inter_prediction_unit(encoder_state_t * const state,
         mv_t mvd_hor = cur_cu->inter.mv[ref_list_idx][0] - mv_cand[cu_mv_cand][0];
         mv_t mvd_ver = cur_cu->inter.mv[ref_list_idx][1] - mv_cand[cu_mv_cand][1];
 
-        kvz_change_precision(INTERNAL_MV_PREC, kvz_g_imv_to_prec[KVZ_IMV_OFF], &mvd_hor, &mvd_ver);
+        uvg_change_precision(INTERNAL_MV_PREC, uvg_g_imv_to_prec[UVG_IMV_OFF], &mvd_hor, &mvd_ver);
 
-        kvz_encode_mvd(state, cabac, mvd_hor, mvd_ver);
+        uvg_encode_mvd(state, cabac, mvd_hor, mvd_ver);
 
         non_zero_mvd |= (mvd_hor != 0) || (mvd_ver != 0);
       }
@@ -727,7 +727,7 @@ static void encode_chroma_intra_cu(cabac_data_t* const cabac, const cu_info_t* c
   unsigned chroma_pred_modes[8] = {0, 50, 18, 1, 67, 81, 82, 83};
   const int pu_x = PU_GET_X(cur_cu->part_size, cu_width, x, 0);
   const int pu_y = PU_GET_Y(cur_cu->part_size, cu_width, y, 0);
-  const cu_info_t *first_pu = kvz_cu_array_at_const(frame->cu_array, pu_x, pu_y);
+  const cu_info_t *first_pu = uvg_cu_array_at_const(frame->cu_array, pu_x, pu_y);
   int8_t chroma_intra_dir = first_pu->intra.mode_chroma;
   int8_t luma_intra_dir = first_pu->intra.mode;
 
@@ -831,7 +831,7 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
 
   #if ENABLE_PCM == 1
   // Code must start after variable initialization
-  kvz_cabac_encode_bin_trm(cabac, 0); // IPCMFlag == 0
+  uvg_cabac_encode_bin_trm(cabac, 0); // IPCMFlag == 0
   #endif
 
   /*
@@ -841,13 +841,13 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
   }
   */
 
-  const int num_pred_units = kvz_part_mode_num_parts[cur_cu->part_size];
+  const int num_pred_units = uvg_part_mode_num_parts[cur_cu->part_size];
   
   // Intra Subpartition mode
   uint32_t width = (LCU_WIDTH >> depth);
   uint32_t height = (LCU_WIDTH >> depth);
 
-  bool enough_samples = kvz_g_convert_to_bit[width] + kvz_g_convert_to_bit[height] > (kvz_g_convert_to_bit[4 /* MIN_TB_SIZEY*/] << 1);
+  bool enough_samples = uvg_g_convert_to_bit[width] + uvg_g_convert_to_bit[height] > (uvg_g_convert_to_bit[4 /* MIN_TB_SIZEY*/] << 1);
   uint8_t isp_mode = 0;
   // ToDo: add height comparison
   //isp_mode += ((width > TR_MAX_WIDTH) || !enough_samples) ? 1 : 0;
@@ -879,7 +879,7 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
   if (cur_cu->type == CU_INTRA && !cur_cu->bdpcmMode && enable_mip) {
     const int cu_width = LCU_WIDTH >> depth;
     const int cu_height = cu_width; // TODO: height for non-square blocks
-    uint8_t ctx_id = kvz_get_mip_flag_context(x, y, cu_width, cu_height, NULL, frame->cu_array);
+    uint8_t ctx_id = uvg_get_mip_flag_context(x, y, cu_width, cu_height, NULL, frame->cu_array);
 
     // Write MIP flag
     cabac->cur_ctx = &(cabac->ctx.mip_flag[ctx_id]);
@@ -887,7 +887,7 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
     if (mip_flag) {
       // Write MIP transpose flag & mode
       CABAC_BIN_EP(cabac, mip_transpose, "mip_transposed");
-      kvz_cabac_encode_trunc_bin(cabac, mip_mode, num_mip_modes);
+      uvg_cabac_encode_trunc_bin(cabac, mip_mode, num_mip_modes);
     }
   }
 
@@ -895,7 +895,7 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
   bool enable_mrl = state->encoder_control->cfg.mrl;
   int multi_ref_idx = enable_mrl ? cur_cu->intra.multi_ref_idx : 0;
   
-#ifdef KVZ_DEBUG_PRINT_YUVIEW_CSV
+#ifdef UVG_DEBUG_PRINT_YUVIEW_CSV
   if(multi_ref_idx) DBG_YUVIEW_VALUE(state->frame->poc, DBG_YUVIEW_MRL, x, y, width, width, multi_ref_idx);
 #endif
 
@@ -940,23 +940,23 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
     for (int j = 0; j < num_pred_units; ++j) {
       const int pu_x = PU_GET_X(cur_cu->part_size, cu_width, x, j);
       const int pu_y = PU_GET_Y(cur_cu->part_size, cu_width, y, j);
-      const cu_info_t* cur_pu = kvz_cu_array_at_const(frame->cu_array, pu_x, pu_y);
+      const cu_info_t* cur_pu = uvg_cu_array_at_const(frame->cu_array, pu_x, pu_y);
 
       const cu_info_t* left_pu = NULL;
       const cu_info_t* above_pu = NULL;
 
       if (pu_x > 0) {
         assert(pu_x >> 2 > 0);
-        left_pu = kvz_cu_array_at_const(frame->cu_array, pu_x - 1, pu_y + cu_width - 1);
+        left_pu = uvg_cu_array_at_const(frame->cu_array, pu_x - 1, pu_y + cu_width - 1);
       }
       // Don't take the above PU across the LCU boundary.
       if (pu_y % LCU_WIDTH > 0 && pu_y > 0) {
         assert(pu_y >> 2 > 0);
-        above_pu = kvz_cu_array_at_const(frame->cu_array, pu_x + cu_width - 1, pu_y - 1);
+        above_pu = uvg_cu_array_at_const(frame->cu_array, pu_x + cu_width - 1, pu_y - 1);
       }
 
 
-      kvz_intra_get_dir_luma_predictor(pu_x, pu_y,
+      uvg_intra_get_dir_luma_predictor(pu_x, pu_y,
         intra_preds[j],
         cur_pu,
         left_pu, above_pu);
@@ -986,7 +986,7 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
 
         const int pu_x = PU_GET_X(cur_cu->part_size, cu_width, x, j);
         const int pu_y = PU_GET_Y(cur_cu->part_size, cu_width, y, j);
-        const cu_info_t* cur_pu = kvz_cu_array_at_const(frame->cu_array, pu_x, pu_y);
+        const cu_info_t* cur_pu = uvg_cu_array_at_const(frame->cu_array, pu_x, pu_y);
         cabac->cur_ctx = &(cabac->ctx.luma_planar_model[(isp_mode ? 0 : 1)]);
         if (cur_pu->intra.multi_ref_idx == 0) {
           CABAC_BIN(cabac, (mpm_preds[j] > 0 ? 1 : 0), "mpm_idx_luma_planar");
@@ -1048,13 +1048,13 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
           }
         }
 
-        kvz_cabac_encode_trunc_bin(cabac, tmp_pred, 67 - INTRA_MPM_COUNT);
+        uvg_cabac_encode_trunc_bin(cabac, tmp_pred, 67 - INTRA_MPM_COUNT);
       }
     }
   }
 
   // Code chroma prediction mode.
-  if (state->encoder_control->chroma_format != KVZ_CSP_400 && depth != 4) {
+  if (state->encoder_control->chroma_format != UVG_CSP_400 && depth != 4) {
     encode_chroma_intra_cu(cabac, cur_cu, x, y, frame, cu_width, state->encoder_control->cfg.cclm);
   }
 
@@ -1062,7 +1062,7 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
 
   encode_mts_idx(state, cabac, cur_cu);
 
-  if (state->encoder_control->chroma_format != KVZ_CSP_400 && depth == 4 && x % 8 && y % 8) {
+  if (state->encoder_control->chroma_format != UVG_CSP_400 && depth == 4 && x % 8 && y % 8) {
     encode_chroma_intra_cu(cabac, cur_cu, x, y, frame, cu_width, state->encoder_control->cfg.cclm);
     encode_transform_coeff(state, x, y, depth, 0, 0, 0, 1, coeff);
   }
@@ -1154,7 +1154,7 @@ static void encode_part_mode(encoder_state_t * const state,
 }
 **/
 
-void kvz_encode_coding_tree(encoder_state_t * const state,
+void uvg_encode_coding_tree(encoder_state_t * const state,
                             uint16_t x,
                             uint16_t y,
                             uint8_t depth,
@@ -1163,18 +1163,18 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
   cabac_data_t * const cabac = &state->cabac;
   const encoder_control_t * const ctrl = state->encoder_control;
   const videoframe_t * const frame = state->tile->frame;
-  const cu_info_t *cur_cu   = kvz_cu_array_at_const((const cu_array_t * )frame->cu_array, x, y);
+  const cu_info_t *cur_cu   = uvg_cu_array_at_const((const cu_array_t * )frame->cu_array, x, y);
 
   const int cu_width = LCU_WIDTH >> depth;
   const int half_cu  = cu_width >> 1;
 
   const cu_info_t *left_cu  = NULL;
   if (x > 0) {
-    left_cu = kvz_cu_array_at_const((const cu_array_t*)frame->cu_array, x - 1, y);
+    left_cu = uvg_cu_array_at_const((const cu_array_t*)frame->cu_array, x - 1, y);
   }
   const cu_info_t *above_cu = NULL;
   if (y > 0) {
-    above_cu = kvz_cu_array_at_const((const cu_array_t*)frame->cu_array, x, y - 1);
+    above_cu = uvg_cu_array_at_const((const cu_array_t*)frame->cu_array, x, y - 1);
   }
 
   uint8_t split_flag = GET_SPLITDATA(cur_cu, depth);
@@ -1210,14 +1210,14 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
 
     
 
-    uint8_t implicit_split_mode = KVZ_NO_SPLIT;
+    uint8_t implicit_split_mode = UVG_NO_SPLIT;
     //bool implicit_split = border;
     bool bottom_left_available = ((abs_y + cu_width - 1) < ctrl->in.height);
     bool top_right_available = ((abs_x + cu_width - 1) < ctrl->in.width);
 
     /*
     if((depth >= 1 && (border_x != border_y))) implicit_split = false;
-    if (state->frame->slicetype != KVZ_SLICE_I) {
+    if (state->frame->slicetype != UVG_SLICE_I) {
       if (border_x != border_y) implicit_split = false;
       if (!bottom_left_available && top_right_available) implicit_split = false;
       if (!top_right_available && bottom_left_available) implicit_split = false;
@@ -1226,22 +1226,22 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
 
 
     if (!bottom_left_available && !top_right_available && allow_qt) {
-      implicit_split_mode = KVZ_QUAD_SPLIT;
+      implicit_split_mode = UVG_QUAD_SPLIT;
     } else if (!bottom_left_available && allow_btt) {
-      implicit_split_mode = KVZ_HORZ_SPLIT;
+      implicit_split_mode = UVG_HORZ_SPLIT;
     } else if (!top_right_available && allow_btt) {
-      implicit_split_mode = KVZ_VERT_SPLIT;
+      implicit_split_mode = UVG_VERT_SPLIT;
     } else if (!bottom_left_available || !top_right_available) {
-      implicit_split_mode = KVZ_QUAD_SPLIT;
+      implicit_split_mode = UVG_QUAD_SPLIT;
     }
 
-    //split_flag = implicit_split_mode != KVZ_NO_SPLIT;
+    //split_flag = implicit_split_mode != UVG_NO_SPLIT;
 
     // Check split conditions
-    if (implicit_split_mode != KVZ_NO_SPLIT) {
+    if (implicit_split_mode != UVG_NO_SPLIT) {
       no_split = th_split = tv_split = false;
-      bh_split = (implicit_split_mode == KVZ_HORZ_SPLIT);
-      bv_split = (implicit_split_mode == KVZ_VERT_SPLIT);
+      bh_split = (implicit_split_mode == UVG_HORZ_SPLIT);
+      bv_split = (implicit_split_mode == UVG_VERT_SPLIT);
     }
 
     if (!allow_btt) {
@@ -1250,7 +1250,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
 
     bool allow_split = allow_qt | bh_split | bv_split | th_split | tv_split;
 
-    split_flag |= implicit_split_mode != KVZ_NO_SPLIT;
+    split_flag |= implicit_split_mode != UVG_NO_SPLIT;
 
     if (no_split && allow_split) {
       split_model = 0;
@@ -1281,16 +1281,16 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
       //fprintf(stdout, "split_model=%d  %d / %d / %d / %d / %d\n", split_model, allow_qt, bh_split, bv_split, th_split, tv_split);
     }
 
-    bool qt_split = split_flag || implicit_split_mode == KVZ_QUAD_SPLIT;
+    bool qt_split = split_flag || implicit_split_mode == UVG_QUAD_SPLIT;
 
-    if (!(implicit_split_mode == KVZ_NO_SPLIT) && (allow_qt && allow_btt)) {
+    if (!(implicit_split_mode == UVG_NO_SPLIT) && (allow_qt && allow_btt)) {
       split_model = (left_cu && GET_SPLITDATA(left_cu, depth)) + (above_cu && GET_SPLITDATA(above_cu, depth)) + (depth < 2 ? 0 : 3);
       cabac->cur_ctx = &(cabac->ctx.qt_split_flag_model[split_model]);
       CABAC_BIN(cabac, qt_split, "QT_SplitFlag");
     }
 
     // Only signal split when it is not implicit, currently only Qt split supported
-    if (!(implicit_split_mode == KVZ_NO_SPLIT) && !qt_split && (bh_split | bv_split | th_split | tv_split)) {
+    if (!(implicit_split_mode == UVG_NO_SPLIT) && !qt_split && (bh_split | bv_split | th_split | tv_split)) {
 
       split_model = 0;
 
@@ -1310,16 +1310,16 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
 
     if (split_flag || border) {
       // Split blocks and remember to change x and y block positions
-      kvz_encode_coding_tree(state, x, y, depth + 1, coeff);
+      uvg_encode_coding_tree(state, x, y, depth + 1, coeff);
 
       if (!border_x || border_split_x) {
-        kvz_encode_coding_tree(state, x + half_cu, y, depth + 1, coeff);
+        uvg_encode_coding_tree(state, x + half_cu, y, depth + 1, coeff);
       }
       if (!border_y || border_split_y) {
-        kvz_encode_coding_tree(state, x, y + half_cu, depth + 1, coeff);
+        uvg_encode_coding_tree(state, x, y + half_cu, depth + 1, coeff);
       }
       if (!border || (border_split_x && border_split_y)) {
-        kvz_encode_coding_tree(state, x + half_cu, y + half_cu, depth + 1, coeff);
+        uvg_encode_coding_tree(state, x + half_cu, y + half_cu, depth + 1, coeff);
       }
       return;
     }
@@ -1329,7 +1329,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
   //ToDo: Implement MT split
   if (depth < MAX_PU_DEPTH)
   {
-   // cabac->cur_ctx = &(cabac->ctx.trans_subdiv_model[5 - ((kvz_g_convert_to_bit[LCU_WIDTH] + 2) - depth)]);
+   // cabac->cur_ctx = &(cabac->ctx.trans_subdiv_model[5 - ((uvg_g_convert_to_bit[LCU_WIDTH] + 2) - depth)]);
    // CABAC_BIN(cabac, 0, "split_transform_flag");
   }
 
@@ -1341,7 +1341,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
   }
 
   // Encode skip flag
-  if (state->frame->slicetype != KVZ_SLICE_I && cu_width != 4) {
+  if (state->frame->slicetype != UVG_SLICE_I && cu_width != 4) {
 
     int8_t ctx_skip = 0;
 
@@ -1357,7 +1357,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
 
     if (cur_cu->skipped) {
       DBG_PRINT_MV(state, x, y, (uint32_t)cu_width, (uint32_t)cu_width, cur_cu);
-      kvz_hmvp_add_mv(state, x, y, (uint32_t)cu_width, (uint32_t)cu_width, cur_cu);
+      uvg_hmvp_add_mv(state, x, y, (uint32_t)cu_width, (uint32_t)cu_width, cur_cu);
       int16_t num_cand = state->encoder_control->cfg.max_merge;
       if (num_cand > 1) {
         for (int ui = 0; ui < num_cand - 1; ui++) {
@@ -1373,7 +1373,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
           }
         }
       }
-#ifdef KVZ_DEBUG_PRINT_YUVIEW_CSV
+#ifdef UVG_DEBUG_PRINT_YUVIEW_CSV
       if (cur_cu->inter.mv_dir & 1) DBG_YUVIEW_MV(state->frame->poc, DBG_YUVIEW_MVSKIP_L0, abs_x, abs_y, cu_width, cu_width, cur_cu->inter.mv[0][0], cur_cu->inter.mv[0][1]);
       if (cur_cu->inter.mv_dir & 2) DBG_YUVIEW_MV(state->frame->poc, DBG_YUVIEW_MVSKIP_L1, abs_x, abs_y, cu_width, cu_width, cur_cu->inter.mv[1][0], cur_cu->inter.mv[1][1]);
 #endif
@@ -1383,7 +1383,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
   }
 
   // Prediction mode
-  if (state->frame->slicetype != KVZ_SLICE_I && cu_width != 4) {
+  if (state->frame->slicetype != UVG_SLICE_I && cu_width != 4) {
 
     int8_t ctx_predmode = 0;
 
@@ -1403,50 +1403,50 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
 #if ENABLE_PCM
   // Code IPCM block
   if (FORCE_PCM || cur_cu->type == CU_PCM) {
-    kvz_cabac_encode_bin_trm(cabac, 1); // IPCMFlag == 1
-    kvz_cabac_finish(cabac);
-    kvz_bitstream_add_rbsp_trailing_bits(cabac->stream);
+    uvg_cabac_encode_bin_trm(cabac, 1); // IPCMFlag == 1
+    uvg_cabac_finish(cabac);
+    uvg_bitstream_add_rbsp_trailing_bits(cabac->stream);
     
     // PCM sample
-    kvz_pixel *base_y = &frame->source->y[x + y * ctrl->in.width];
-    kvz_pixel *base_u = &frame->source->u[x / 2 + y / 2 * ctrl->in.width / 2];
-    kvz_pixel *base_v = &frame->source->v[x / 2 + y / 2 * ctrl->in.width / 2];
+    uvg_pixel *base_y = &frame->source->y[x + y * ctrl->in.width];
+    uvg_pixel *base_u = &frame->source->u[x / 2 + y / 2 * ctrl->in.width / 2];
+    uvg_pixel *base_v = &frame->source->v[x / 2 + y / 2 * ctrl->in.width / 2];
 
-    kvz_pixel *rec_base_y = &frame->rec->y[x + y * ctrl->in.width];
-    kvz_pixel *rec_base_u = &frame->rec->u[x / 2 + y / 2 * ctrl->in.width / 2];
-    kvz_pixel *rec_base_v = &frame->rec->v[x / 2 + y / 2 * ctrl->in.width / 2];
+    uvg_pixel *rec_base_y = &frame->rec->y[x + y * ctrl->in.width];
+    uvg_pixel *rec_base_u = &frame->rec->u[x / 2 + y / 2 * ctrl->in.width / 2];
+    uvg_pixel *rec_base_v = &frame->rec->v[x / 2 + y / 2 * ctrl->in.width / 2];
 
     // Luma
     for (unsigned y_px = 0; y_px < LCU_WIDTH >> depth; y_px++) {
       for (unsigned x_px = 0; x_px < LCU_WIDTH >> depth; x_px++) {
-        kvz_bitstream_put(cabac->stream, base_y[x_px + y_px * ctrl->in.width], 8);
+        uvg_bitstream_put(cabac->stream, base_y[x_px + y_px * ctrl->in.width], 8);
         rec_base_y[x_px + y_px * ctrl->in.width] = base_y[x_px + y_px * ctrl->in.width];
       }
     }
 
     // Chroma
-    if (ctrl->chroma_format != KVZ_CSP_400) {
+    if (ctrl->chroma_format != UVG_CSP_400) {
       for (unsigned y_px = 0; y_px < LCU_WIDTH >> (depth + 1); y_px++) {
         for (unsigned x_px = 0; x_px < LCU_WIDTH >> (depth + 1); x_px++) {
-          kvz_bitstream_put(cabac->stream, base_u[x_px + y_px * (ctrl->in.width >> 1)], 8);
+          uvg_bitstream_put(cabac->stream, base_u[x_px + y_px * (ctrl->in.width >> 1)], 8);
           rec_base_u[x_px + y_px * (ctrl->in.width >> 1)] = base_u[x_px + y_px * (ctrl->in.width >> 1)];
         }
       }
       for (unsigned y_px = 0; y_px < LCU_WIDTH >> (depth + 1); y_px++) {
         for (unsigned x_px = 0; x_px < LCU_WIDTH >> (depth + 1); x_px++) {
-          kvz_bitstream_put(cabac->stream, base_v[x_px + y_px * (ctrl->in.width >> 1)], 8);
+          uvg_bitstream_put(cabac->stream, base_v[x_px + y_px * (ctrl->in.width >> 1)], 8);
           rec_base_v[x_px + y_px * (ctrl->in.width >> 1)] = base_v[x_px + y_px * (ctrl->in.width >> 1)];
         }
       }
     }
-    kvz_cabac_start(cabac);
+    uvg_cabac_start(cabac);
   } else 
 #endif
 
   if (cur_cu->type == CU_INTER) {
-    uint8_t imv_mode = KVZ_IMV_OFF;
+    uint8_t imv_mode = UVG_IMV_OFF;
     
-    const int num_pu = kvz_part_mode_num_parts[cur_cu->part_size];
+    const int num_pu = uvg_part_mode_num_parts[cur_cu->part_size];
     bool non_zero_mvd = false;
 
     for (int i = 0; i < num_pu; ++i) {
@@ -1454,24 +1454,24 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
       const int pu_y = PU_GET_Y(cur_cu->part_size, cu_width, y, i);
       const int pu_w = PU_GET_W(cur_cu->part_size, cu_width, i);
       const int pu_h = PU_GET_H(cur_cu->part_size, cu_width, i);
-      const cu_info_t *cur_pu = kvz_cu_array_at_const(frame->cu_array, pu_x, pu_y);
+      const cu_info_t *cur_pu = uvg_cu_array_at_const(frame->cu_array, pu_x, pu_y);
 
       non_zero_mvd |= encode_inter_prediction_unit(state, cabac, cur_pu, pu_x, pu_y, pu_w, pu_h, depth);
       DBG_PRINT_MV(state, pu_x, pu_y, pu_w, pu_h, cur_pu);
-      kvz_hmvp_add_mv(state, x, y, pu_w, pu_h, cur_pu);
+      uvg_hmvp_add_mv(state, x, y, pu_w, pu_h, cur_pu);
     }
 
     // imv mode, select between fullpel, half-pel and quarter-pel resolutions
     // 0 = off, 1 = fullpel, 2 = 4-pel, 3 = half-pel
     if (ctrl->cfg.amvr && non_zero_mvd) {
       cabac->cur_ctx = &(cabac->ctx.imv_flag[0]);
-      CABAC_BIN(cabac, (imv_mode > KVZ_IMV_OFF), "imv_flag");
-      if (imv_mode > KVZ_IMV_OFF) {
+      CABAC_BIN(cabac, (imv_mode > UVG_IMV_OFF), "imv_flag");
+      if (imv_mode > UVG_IMV_OFF) {
         cabac->cur_ctx = &(cabac->ctx.imv_flag[4]);
-        CABAC_BIN(cabac, (imv_mode < KVZ_IMV_HPEL), "imv_flag");
-        if (imv_mode < KVZ_IMV_HPEL) {
+        CABAC_BIN(cabac, (imv_mode < UVG_IMV_HPEL), "imv_flag");
+        if (imv_mode < UVG_IMV_HPEL) {
           cabac->cur_ctx = &(cabac->ctx.imv_flag[1]);
-          CABAC_BIN(cabac, (imv_mode > KVZ_IMV_FPEL), "imv_flag"); // 1 indicates 4PEL, 0 FPEL
+          CABAC_BIN(cabac, (imv_mode > UVG_IMV_FPEL), "imv_flag"); // 1 indicates 4PEL, 0 FPEL
         }
       }
     }
@@ -1512,7 +1512,7 @@ end:
 }
 
 
-void kvz_encode_mvd(encoder_state_t * const state,
+void uvg_encode_mvd(encoder_state_t * const state,
                     cabac_data_t *cabac,
                     int32_t mvd_hor,
                     int32_t mvd_ver)
@@ -1536,14 +1536,14 @@ void kvz_encode_mvd(encoder_state_t * const state,
 
   if (hor_abs_gr0) {
     if (mvd_hor_abs > 1) {
-      kvz_cabac_write_ep_ex_golomb(state, cabac, mvd_hor_abs - 2, 1);
+      uvg_cabac_write_ep_ex_golomb(state, cabac, mvd_hor_abs - 2, 1);
     }
     uint32_t mvd_hor_sign = (mvd_hor > 0) ? 0 : 1;
     CABAC_BIN_EP(cabac, mvd_hor_sign, "mvd_sign_flag_hor");
   }
   if (ver_abs_gr0) {
     if (mvd_ver_abs > 1) {
-      kvz_cabac_write_ep_ex_golomb(state, cabac, mvd_ver_abs - 2, 1);
+      uvg_cabac_write_ep_ex_golomb(state, cabac, mvd_ver_abs - 2, 1);
     }
     uint32_t mvd_ver_sign = mvd_ver > 0 ? 0 : 1;
     CABAC_BIN_EP(cabac, mvd_ver_sign, "mvd_sign_flag_ver");

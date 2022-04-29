@@ -38,18 +38,18 @@
 
 
 // Define function pointers.
-angular_pred_func *kvz_angular_pred;
-intra_pred_planar_func *kvz_intra_pred_planar;
-intra_pred_filtered_dc_func *kvz_intra_pred_filtered_dc;
-pdpc_planar_dc_func *kvz_pdpc_planar_dc;
+angular_pred_func *uvg_angular_pred;
+intra_pred_planar_func *uvg_intra_pred_planar;
+intra_pred_filtered_dc_func *uvg_intra_pred_filtered_dc;
+pdpc_planar_dc_func *uvg_pdpc_planar_dc;
 
-int kvz_strategy_register_intra(void* opaque, uint8_t bitdepth) {
+int uvg_strategy_register_intra(void* opaque, uint8_t bitdepth) {
   bool success = true;
 
-  success &= kvz_strategy_register_intra_generic(opaque, bitdepth);
+  success &= uvg_strategy_register_intra_generic(opaque, bitdepth);
 
-  if (kvz_g_hardware_flags.intel_flags.avx2) {
-    success &= kvz_strategy_register_intra_avx2(opaque, bitdepth);
+  if (uvg_g_hardware_flags.intel_flags.avx2) {
+    success &= uvg_strategy_register_intra_avx2(opaque, bitdepth);
   }
 
   return success;

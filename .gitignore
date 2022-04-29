@@ -1,10 +1,10 @@
 # Build files
 /bin
 /build/*
-!/build/kvazaar_lib
-/build/kvazaar_lib/*
-!/build/kvazaar_lib/kvazaar_lib.vcxproj
-!/build/kvazaar_lib/kvazaar_lib.vcxproj.filters
+!/build/uvg266_lib
+/build/uvg266_lib/*
+!/build/uvg266_lib/uvg266_lib.vcxproj
+!/build/uvg266_lib/uvg266_lib.vcxproj.filters
 /scons_build_*
 
 # Generated documentation
@@ -15,6 +15,7 @@
 .deps
 .dirstamp
 .libs
+.vs
 Makefile
 Makefile.in
 /aclocal.m4
@@ -50,8 +51,9 @@ Makefile.in
 *.log
 .kdev4
 configure.scan
-src/kvazaar
-src/libkvazaar.so.*
-src/kvazaar.pc
-tests/kvazaar_tests
-tests/kvazaar_tests.trs
+src/uvg266
+src/libuvg266.so.*
+src/uvg266.pc
+src/version.h
+tests/uvg266_tests
+tests/uvg266_tests.trs

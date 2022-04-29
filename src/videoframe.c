@@ -43,10 +43,10 @@
  * \param pic picture pointer
  * \return picture pointer
  */
-videoframe_t * kvz_videoframe_alloc(int32_t width,
+videoframe_t * uvg_videoframe_alloc(int32_t width,
                                     int32_t height,
-                                    enum kvz_chroma_format chroma_format,
-                                    enum kvz_alf alf_type, bool cclm)
+                                    enum uvg_chroma_format chroma_format,
+                                    enum uvg_alf alf_type, bool cclm)
 {
   videoframe_t *frame = calloc(1, sizeof(videoframe_t));
   if (!frame) return 0;
@@ -57,12 +57,12 @@ videoframe_t * kvz_videoframe_alloc(int32_t width,
   frame->height_in_lcu = CEILDIV(frame->height, LCU_WIDTH);
 
   frame->sao_luma = MALLOC(sao_info_t, frame->width_in_lcu * frame->height_in_lcu);
-  if (chroma_format != KVZ_CSP_400) {
+  if (chroma_format != UVG_CSP_400) {
     frame->sao_chroma = MALLOC(sao_info_t, frame->width_in_lcu * frame->height_in_lcu);
     if (cclm) {
-      assert(chroma_format == KVZ_CSP_420);
-      frame->cclm_luma_rec = MALLOC(kvz_pixel, (((width + 7) & ~7) + FRAME_PADDING_LUMA) * (((height + 7) & ~7) + FRAME_PADDING_LUMA) / 4);
-      frame->cclm_luma_rec_top_line = MALLOC(kvz_pixel, (((width + 7) & ~7) + FRAME_PADDING_LUMA) / 2 * CEILDIV(height, 64));
+      assert(chroma_format == UVG_CSP_420);
+      frame->cclm_luma_rec = MALLOC(uvg_pixel, (((width + 7) & ~7) + FRAME_PADDING_LUMA) * (((height + 7) & ~7) + FRAME_PADDING_LUMA) / 4);
+      frame->cclm_luma_rec_top_line = MALLOC(uvg_pixel, (((width + 7) & ~7) + FRAME_PADDING_LUMA) / 2 * CEILDIV(height, 64));
     }
   }
   
@@ -74,11 +74,11 @@ videoframe_t * kvz_videoframe_alloc(int32_t width,
  * \param pic picture pointer
  * \return 1 on success, 0 on failure
  */
-int kvz_videoframe_free(videoframe_t * const frame)
+int uvg_videoframe_free(videoframe_t * const frame)
 {
   if (frame->source_lmcs_mapped) {
-    kvz_image_free(frame->source_lmcs);
-    kvz_image_free(frame->rec_lmcs);
+    uvg_image_free(frame->source_lmcs);
+    uvg_image_free(frame->rec_lmcs);
     frame->source_lmcs_mapped = false;
   }
   if(frame->cclm_luma_rec) {
@@ -88,15 +88,15 @@ int kvz_videoframe_free(videoframe_t * const frame)
     FREE_POINTER(frame->cclm_luma_rec_top_line);
   }
 
-  kvz_image_free(frame->source);
+  uvg_image_free(frame->source);
   frame->source = NULL;
-  kvz_image_free(frame->rec);
+  uvg_image_free(frame->rec);
   frame->rec = NULL;
 
   frame->source_lmcs = NULL;
   frame->rec_lmcs = NULL;
 
-  kvz_cu_array_free(&frame->cu_array);
+  uvg_cu_array_free(&frame->cu_array);
 
   FREE_POINTER(frame->sao_luma);
   FREE_POINTER(frame->sao_chroma);
@@ -106,6 +106,6 @@ int kvz_videoframe_free(videoframe_t * const frame)
   return 1;
 }
 
-void kvz_videoframe_set_poc(videoframe_t * const frame, const int32_t poc) {
+void uvg_videoframe_set_poc(videoframe_t * const frame, const int32_t poc) {
   frame->poc = poc;
 }

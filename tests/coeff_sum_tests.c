@@ -56,7 +56,7 @@ static void setup()
 
 TEST test_coeff_abs_sum()
 {
-  uint32_t sum = kvz_coeff_abs_sum(coeff_test_data, 64 * 64);
+  uint32_t sum = uvg_coeff_abs_sum(coeff_test_data, 64 * 64);
   ASSERT_EQ(sum, expected_test_result);
   PASS();
 }
@@ -70,7 +70,7 @@ SUITE(coeff_sum_tests)
       continue;
     }
 
-    kvz_coeff_abs_sum = strategies.strategies[i].fptr;
+    uvg_coeff_abs_sum = strategies.strategies[i].fptr;
     RUN_TEST(test_coeff_abs_sum);
   }
 }

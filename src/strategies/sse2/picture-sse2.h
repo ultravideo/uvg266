@@ -41,6 +41,6 @@
 #include "global.h" // IWYU pragma: keep
 
 
-int kvz_strategy_register_picture_sse2(void* opaque, unsigned char bitdepth);
+int uvg_strategy_register_picture_sse2(void* opaque, unsigned char bitdepth);
 
 #endif //STRATEGIES_PICTURE_SSE2_H_

@@ -33,9 +33,9 @@
 #ifndef REG_SAD_POW2_WIDTHS_SSE41_H_
 #define REG_SAD_POW2_WIDTHS_SSE41_H_
 
-#include "kvazaar.h"
+#include "uvg266.h"
 
-#if KVZ_BIT_DEPTH == 8
+#if UVG_BIT_DEPTH == 8
 
 #include "strategies/missing-intel-intrinsics.h"
 #include <immintrin.h>
@@ -537,7 +537,7 @@ static uint32_t ver_sad_arbitrary(const uint8_t *pic_data, const uint8_t *ref_da
   }
 
   if (width_residual_pixels) {
-    kvz_pixel ref_temp[16] = { 0 };
+    uvg_pixel ref_temp[16] = { 0 };
     memcpy(ref_temp, ref_data + x, width_residual_pixels);
     const __m128i ref_row = _mm_loadu_si128((__m128i*)(ref_temp));
     for (y = 0; y < height_fourline_groups; y += 4) {
@@ -1041,6 +1041,6 @@ static INLINE uint32_t hor_sad_sse41_arbitrary(const uint8_t *pic_data, const ui
   return _mm_cvtsi128_si32(sad);
 }
 
-#endif // KVZ_BIT_DEPTH == 8
+#endif // UVG_BIT_DEPTH == 8
 
 #endif

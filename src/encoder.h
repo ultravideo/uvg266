@@ -39,7 +39,7 @@
  */
 
 #include "global.h" // IWYU pragma: keep
-#include "kvazaar.h"
+#include "uvg266.h"
 #include "scalinglist.h"
 #include "threadqueue.h"
 #include "fast_coeff_cost.h"
@@ -51,14 +51,14 @@ typedef struct encoder_control_t
    * \brief Configuration.
    *
    * NOTE: The following fields are not copied from the config passed to
-   * kvz_encoder_control_init and must not be accessed:
+   * uvg_encoder_control_init and must not be accessed:
    *    - cqmfile
    *    - tiles_width_split
    *    - tiles_height_split
    *    - slice_addresses_in_ts
    * Use appropriate fields in encoder_control_t instead.
    */
-  kvz_config cfg;
+  uvg_config cfg;
 
   /* Input */
   struct {
@@ -80,7 +80,7 @@ typedef struct encoder_control_t
   } me;
 
   int8_t bitdepth;
-  enum kvz_chroma_format chroma_format;
+  enum uvg_chroma_format chroma_format;
 
   /* VUI */
   struct
@@ -153,8 +153,8 @@ typedef struct encoder_control_t
 
 } encoder_control_t;
 
-encoder_control_t* kvz_encoder_control_init(const kvz_config *cfg);
-void kvz_encoder_control_free(encoder_control_t *encoder);
+encoder_control_t* uvg_encoder_control_init(const uvg_config *cfg);
+void uvg_encoder_control_free(encoder_control_t *encoder);
 
-void kvz_encoder_control_input_init(encoder_control_t *encoder, int32_t width, int32_t height);
+void uvg_encoder_control_input_init(encoder_control_t *encoder, int32_t width, int32_t height);
 #endif

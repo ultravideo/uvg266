@@ -40,7 +40,7 @@
 #include "image.h"
 #include "imagelist.h"
 #include "inter.h"
-#include "kvazaar.h"
+#include "uvg266.h"
 #include "rdo.h"
 #include "search.h"
 #include "strategies/strategies-ipol.h"
@@ -54,11 +54,11 @@ typedef struct {
   /**
    * \brief Current frame
    */
-  const kvz_picture *pic;
+  const uvg_picture *pic;
   /**
    * \brief Reference frame
    */
-  const kvz_picture *ref;
+  const uvg_picture *ref;
 
   /**
    * \brief Index of the reference frame
@@ -76,7 +76,7 @@ typedef struct {
   inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS];
   int32_t num_merge_cand;
 
-  kvz_mvd_cost_func *mvd_cost_func;
+  uvg_mvd_cost_func *mvd_cost_func;
 
   /**
    * \brief Best motion vector among the ones tested so far
@@ -160,13 +160,13 @@ static INLINE bool fracmv_within_tile(const inter_search_info_t *info, int x, in
     }
   }
 
-  if (ctrl->cfg.mv_constraint == KVZ_MV_CONSTRAIN_NONE) {
+  if (ctrl->cfg.mv_constraint == UVG_MV_CONSTRAIN_NONE) {
     return true;
   }
 
   // Margin as luma in internal resolution (frac pixels).
   int margin = 0;
-  if (ctrl->cfg.mv_constraint == KVZ_MV_CONSTRAIN_FRAME_AND_TILE_MARGIN) {
+  if (ctrl->cfg.mv_constraint == UVG_MV_CONSTRAIN_FRAME_AND_TILE_MARGIN) {
     if (is_frac_luma) {
       margin = 4 << INTERNAL_MV_PREC;
     } else if (is_frac_chroma) {
@@ -174,7 +174,7 @@ static INLINE bool fracmv_within_tile(const inter_search_info_t *info, int x, in
     }
   }
 
-  // TODO implement KVZ_MV_CONSTRAIN_FRAM and KVZ_MV_CONSTRAIN_TILE.
+  // TODO implement UVG_MV_CONSTRAIN_FRAM and UVG_MV_CONSTRAIN_TILE.
   const vector2d_t abs_mv = {
     (info->origin.x << INTERNAL_MV_PREC) + x,
     (info->origin.y << INTERNAL_MV_PREC) + y,
@@ -218,7 +218,7 @@ static bool check_mv_cost(inter_search_info_t *info, int x, int y)
   if (!intmv_within_tile(info, x, y)) return false;
 
   uint32_t bitcost = 0;
-  uint32_t cost = kvz_image_calc_sad(
+  uint32_t cost = uvg_image_calc_sad(
       info->pic,
       info->ref,
       info->origin.x,
@@ -388,14 +388,14 @@ static int select_mv_cand(const encoder_state_t *state,
                               const cabac_data_t*,
                               int32_t, int32_t);
   if (state->encoder_control->cfg.mv_rdo) {
-    mvd_coding_cost = kvz_get_mvd_coding_cost_cabac;
+    mvd_coding_cost = uvg_get_mvd_coding_cost_cabac;
   } else {
     mvd_coding_cost = get_mvd_coding_cost;
   }
 
   vector2d_t mvd = { mv_x - mv_cand[0][0], mv_y - mv_cand[0][1] };
 
-  kvz_change_precision_vector2d(INTERNAL_MV_PREC, 2, &mvd);
+  uvg_change_precision_vector2d(INTERNAL_MV_PREC, 2, &mvd);
 
   uint32_t cand1_cost = mvd_coding_cost(
       state, &state->cabac,
@@ -407,7 +407,7 @@ static int select_mv_cand(const encoder_state_t *state,
     cand2_cost = cand1_cost;
   } else {
     vector2d_t mvd2 = { mv_x - mv_cand[1][0], mv_y - mv_cand[1][1] };
-    kvz_change_precision_vector2d(INTERNAL_MV_PREC, 2, &mvd2);
+    uvg_change_precision_vector2d(INTERNAL_MV_PREC, 2, &mvd2);
     cand2_cost = mvd_coding_cost(
       state, &state->cabac,
       mvd2.x,
@@ -480,7 +480,7 @@ static bool early_terminate(inter_search_info_t *info)
   for (int k = 0; k < 2; ++k) {
     double threshold;
     if (info->state->encoder_control->cfg.me_early_termination ==
-        KVZ_ME_EARLY_TERMINATION_SENSITIVE)
+        UVG_ME_EARLY_TERMINATION_SENSITIVE)
     {
       threshold = info->best_cost * 0.95;
     } else {
@@ -513,7 +513,7 @@ static bool early_terminate(inter_search_info_t *info)
 }
 
 
-void kvz_tz_pattern_search(inter_search_info_t *info,
+void uvg_tz_pattern_search(inter_search_info_t *info,
                            unsigned pattern_type,
                            const int iDist,
                            vector2d_t mv,
@@ -630,7 +630,7 @@ void kvz_tz_pattern_search(inter_search_info_t *info,
 }
 
 
-void kvz_tz_raster_search(inter_search_info_t *info,
+void uvg_tz_raster_search(inter_search_info_t *info,
                           int iSearchRange,
                           int iRaster)
 {
@@ -675,7 +675,7 @@ static void tz_search(inter_search_info_t *info, vector2d_t extra_mv)
   // step 2, grid search
   int rounds_without_improvement = 0;
   for (int iDist = 1; iDist <= iSearchRange; iDist *= 2) {
-    kvz_tz_pattern_search(info, step2_type, iDist, start, &best_dist);
+    uvg_tz_pattern_search(info, step2_type, iDist, start, &best_dist);
 
     // Break the loop if the last three rounds didn't produce a better MV.
     if (best_dist != iDist) rounds_without_improvement++;
@@ -688,7 +688,7 @@ static void tz_search(inter_search_info_t *info, vector2d_t extra_mv)
     start.y = 0;
     rounds_without_improvement = 0;
     for (int iDist = 1; iDist <= iSearchRange/2; iDist *= 2) {
-      kvz_tz_pattern_search(info, step2_type, iDist, start, &best_dist);
+      uvg_tz_pattern_search(info, step2_type, iDist, start, &best_dist);
 
       if (best_dist != iDist) rounds_without_improvement++;
       if (rounds_without_improvement >= 3) break;
@@ -698,7 +698,7 @@ static void tz_search(inter_search_info_t *info, vector2d_t extra_mv)
   //step 3, raster scan
   if (use_raster_scan && best_dist > iRaster) {
     best_dist = iRaster;
-    kvz_tz_raster_search(info, iSearchRange, iRaster);
+    uvg_tz_raster_search(info, iSearchRange, iRaster);
   }
 
   //step 4
@@ -708,7 +708,7 @@ static void tz_search(inter_search_info_t *info, vector2d_t extra_mv)
     for (int iDist = best_dist >> 1; iDist > 0; iDist >>= 1) {
       start.x = info->best_mv.x >> INTERNAL_MV_PREC;
       start.y = info->best_mv.y >> INTERNAL_MV_PREC;
-      kvz_tz_pattern_search(info, step4_type, iDist, start, &best_dist);
+      uvg_tz_pattern_search(info, step4_type, iDist, start, &best_dist);
     }
   }
 
@@ -718,7 +718,7 @@ static void tz_search(inter_search_info_t *info, vector2d_t extra_mv)
     start.x = info->best_mv.x >> INTERNAL_MV_PREC;
     start.y = info->best_mv.y >> INTERNAL_MV_PREC;
     for (int iDist = 1; iDist <= iSearchRange; iDist *= 2) {
-      kvz_tz_pattern_search(info, step4_type, iDist, start, &best_dist);
+      uvg_tz_pattern_search(info, step4_type, iDist, start, &best_dist);
     }
   }
 }
@@ -1037,15 +1037,15 @@ static void search_frac(inter_search_info_t *info)
 
   unsigned costs[4] = { 0 };
 
-  ALIGNED(64) kvz_pixel filtered[4][LCU_LUMA_SIZE];
+  ALIGNED(64) uvg_pixel filtered[4][LCU_LUMA_SIZE];
 
   // Storage buffers for intermediate horizontally filtered results.
   // Have the first columns in contiguous memory for vectorization.
-  ALIGNED(64) int16_t intermediate[5][KVZ_IPOL_MAX_IM_SIZE_LUMA_SIMD];
-  int16_t hor_first_cols[5][KVZ_EXT_BLOCK_W_LUMA + 1];
+  ALIGNED(64) int16_t intermediate[5][UVG_IPOL_MAX_IM_SIZE_LUMA_SIMD];
+  int16_t hor_first_cols[5][UVG_EXT_BLOCK_W_LUMA + 1];
 
-  const kvz_picture *ref = info->ref;
-  const kvz_picture *pic = info->pic;
+  const uvg_picture *ref = info->ref;
+  const uvg_picture *pic = info->pic;
   vector2d_t orig = info->origin;
   const int width = info->width;
   const int height = info->height;
@@ -1060,11 +1060,11 @@ static void search_frac(inter_search_info_t *info)
   // Space for (possibly) extrapolated pixels and the part from the picture
   // One extra row and column compared to normal interpolation and some extra for AVX2.
   // The extrapolation function will set the pointers and stride.
-  kvz_pixel ext_buffer[KVZ_FME_MAX_INPUT_SIZE_SIMD];
-  kvz_pixel *ext = NULL;
-  kvz_pixel *ext_origin = NULL;
+  uvg_pixel ext_buffer[UVG_FME_MAX_INPUT_SIZE_SIMD];
+  uvg_pixel *ext = NULL;
+  uvg_pixel *ext_origin = NULL;
   int ext_s = 0;
-  kvz_epol_args epol_args = {
+  uvg_epol_args epol_args = {
     .src = ref->y,
     .src_w = ref->width,
     .src_h = ref->height,
@@ -1073,10 +1073,10 @@ static void search_frac(inter_search_info_t *info)
     .blk_y = state->tile->offset_y + orig.y + mv.y - 1,
     .blk_w = internal_width + 1,  // TODO: real width
     .blk_h = internal_height + 1, // TODO: real height
-    .pad_l = KVZ_LUMA_FILTER_OFFSET,
-    .pad_r = KVZ_EXT_PADDING_LUMA - KVZ_LUMA_FILTER_OFFSET,
-    .pad_t = KVZ_LUMA_FILTER_OFFSET,
-    .pad_b = KVZ_EXT_PADDING_LUMA - KVZ_LUMA_FILTER_OFFSET,
+    .pad_l = UVG_LUMA_FILTER_OFFSET,
+    .pad_r = UVG_EXT_PADDING_LUMA - UVG_LUMA_FILTER_OFFSET,
+    .pad_t = UVG_LUMA_FILTER_OFFSET,
+    .pad_b = UVG_EXT_PADDING_LUMA - UVG_LUMA_FILTER_OFFSET,
     .pad_b_simd = 0 // AVX2 padding unnecessary because of blk_h
   };
 
@@ -1087,13 +1087,13 @@ static void search_frac(inter_search_info_t *info)
   epol_args.ext_origin = &ext_origin;
   epol_args.ext_s = &ext_s;
 
-  kvz_get_extended_block(&epol_args);
+  uvg_get_extended_block(&epol_args);
 
-  kvz_pixel *tmp_pic = pic->y + orig.y * pic->stride + orig.x;
+  uvg_pixel *tmp_pic = pic->y + orig.y * pic->stride + orig.x;
   int tmp_stride = pic->stride;
                   
   // Search integer position
-  costs[0] = kvz_satd_any_size(width, height,
+  costs[0] = uvg_satd_any_size(width, height,
     tmp_pic, tmp_stride,
     ext_origin + ext_s + 1, ext_s);
 
@@ -1112,10 +1112,10 @@ static void search_frac(inter_search_info_t *info)
   mv.y *= 2;
 
   ipol_blocks_func * filter_steps[4] = {
-    kvz_filter_hpel_blocks_hor_ver_luma,
-    kvz_filter_hpel_blocks_diag_luma,
-    kvz_filter_qpel_blocks_hor_ver_luma,
-    kvz_filter_qpel_blocks_diag_luma,
+    uvg_filter_hpel_blocks_hor_ver_luma,
+    uvg_filter_hpel_blocks_diag_luma,
+    uvg_filter_qpel_blocks_hor_ver_luma,
+    uvg_filter_qpel_blocks_diag_luma,
   };
 
   // Search halfpel positions around best integer mv
@@ -1144,13 +1144,13 @@ static void search_frac(inter_search_info_t *info)
         fracmv_within_tile(info, (mv.x + pattern[j]->x) * (1 << mv_shift), (mv.y + pattern[j]->y) * (1 << mv_shift));
     };
 
-    kvz_pixel *filtered_pos[4] = { 0 };
+    uvg_pixel *filtered_pos[4] = { 0 };
     filtered_pos[0] = &filtered[0][0];
     filtered_pos[1] = &filtered[1][0];
     filtered_pos[2] = &filtered[2][0];
     filtered_pos[3] = &filtered[3][0];
 
-    kvz_satd_any_size_quad(width, height, (const kvz_pixel **)filtered_pos, LCU_WIDTH, tmp_pic, tmp_stride, 4, costs, within_tile);
+    uvg_satd_any_size_quad(width, height, (const uvg_pixel **)filtered_pos, LCU_WIDTH, tmp_pic, tmp_stride, 4, costs, within_tile);
 
     for (int j = 0; j < 4; j++) {
       if (within_tile[j]) {
@@ -1257,7 +1257,7 @@ static void search_pu_inter_ref(inter_search_info_t *info,
   double *best_LX_cost,
   cu_info_t *unipred_LX)
 {
-  const kvz_config *cfg = &info->state->encoder_control->cfg;
+  const uvg_config *cfg = &info->state->encoder_control->cfg;
 
   // which list, L0 or L1, ref_idx is in and in what index
   int8_t ref_list = -1;
@@ -1292,7 +1292,7 @@ static void search_pu_inter_ref(inter_search_info_t *info,
   // Get MV candidates
   cur_cu->inter.mv_ref[ref_list] = LX_idx;
 
-  kvz_inter_get_mv_cand(info->state,
+  uvg_inter_get_mv_cand(info->state,
     info->origin.x,
     info->origin.y,
     info->width,
@@ -1313,7 +1313,7 @@ static void search_pu_inter_ref(inter_search_info_t *info,
   const int mid_x = info->state->tile->offset_x + info->origin.x + (info->width >> 1);
   const int mid_y = info->state->tile->offset_y + info->origin.y + (info->height >> 1);
   const cu_array_t* ref_array = info->state->frame->ref->cu_arrays[info->ref_idx];
-  const cu_info_t* ref_cu = kvz_cu_array_at_const(ref_array, mid_x, mid_y);
+  const cu_info_t* ref_cu = uvg_cu_array_at_const(ref_array, mid_x, mid_y);
   if (ref_cu->type == CU_INTER) {
     vector2d_t mv_previous = { 0, 0 };
     if (ref_cu->inter.mv_dir & 1) {
@@ -1368,29 +1368,29 @@ static void search_pu_inter_ref(inter_search_info_t *info,
 
   int search_range = 32;
   switch (cfg->ime_algorithm) {
-    case KVZ_IME_FULL64: search_range = 64; break;
-    case KVZ_IME_FULL32: search_range = 32; break;
-    case KVZ_IME_FULL16: search_range = 16; break;
-    case KVZ_IME_FULL8: search_range = 8; break;
+    case UVG_IME_FULL64: search_range = 64; break;
+    case UVG_IME_FULL32: search_range = 32; break;
+    case UVG_IME_FULL16: search_range = 16; break;
+    case UVG_IME_FULL8: search_range = 8; break;
     default: break;
   }
 
   info->best_cost = UINT32_MAX;
 
   switch (cfg->ime_algorithm) {
-    case KVZ_IME_TZ:
+    case UVG_IME_TZ:
       tz_search(info, mv);
       break;
 
-    case KVZ_IME_FULL64:
-    case KVZ_IME_FULL32:
-    case KVZ_IME_FULL16:
-    case KVZ_IME_FULL8:
-    case KVZ_IME_FULL:
+    case UVG_IME_FULL64:
+    case UVG_IME_FULL32:
+    case UVG_IME_FULL16:
+    case UVG_IME_FULL8:
+    case UVG_IME_FULL:
       search_mv_full(info, search_range, mv);
       break;
 
-    case KVZ_IME_DIA:
+    case UVG_IME_DIA:
       diamond_search(info, mv, info->state->encoder_control->cfg.me_max_steps);
       break;
 
@@ -1404,7 +1404,7 @@ static void search_pu_inter_ref(inter_search_info_t *info,
 
   } else if (info->best_cost < UINT32_MAX) {
     // Recalculate inter cost with SATD.
-    info->best_cost = kvz_image_calc_satd(
+    info->best_cost = uvg_image_calc_satd(
         info->state->tile->frame->source,
         info->ref,
         info->origin.x,
@@ -1528,7 +1528,7 @@ static void search_pu_inter_bipred(inter_search_info_t *info,
       continue;
     }
 
-    kvz_inter_recon_bipred(info->state,
+    uvg_inter_recon_bipred(info->state,
                            ref->images[ref_LX[0][merge_cand[i].ref[0]]],
                            ref->images[ref_LX[1][merge_cand[j].ref[1]]],
                            x, y,
@@ -1539,10 +1539,10 @@ static void search_pu_inter_bipred(inter_search_info_t *info,
                            true,
                            false);
 
-    const kvz_pixel *rec = &lcu->rec.y[SUB_SCU(y) * LCU_WIDTH + SUB_SCU(x)];
-    const kvz_pixel *src = &frame->source->y[x + y * frame->source->stride];
+    const uvg_pixel *rec = &lcu->rec.y[SUB_SCU(y) * LCU_WIDTH + SUB_SCU(x)];
+    const uvg_pixel *src = &frame->source->y[x + y * frame->source->stride];
     uint32_t cost =
-      kvz_satd_any_size(width, height, rec, LCU_WIDTH, src, frame->source->stride);
+      uvg_satd_any_size(width, height, rec, LCU_WIDTH, src, frame->source->stride);
 
     uint32_t bitcost[2] = { 0, 0 };
 
@@ -1598,7 +1598,7 @@ static void search_pu_inter_bipred(inter_search_info_t *info,
 
       // Each motion vector has its own candidate
       for (int reflist = 0; reflist < 2; reflist++) {
-        kvz_inter_get_mv_cand(info->state, x, y, width, height, info->mv_cand, cur_cu, lcu, reflist);
+        uvg_inter_get_mv_cand(info->state, x, y, width, height, info->mv_cand, cur_cu, lcu, reflist);
         int cu_mv_cand = select_mv_cand(
             info->state,
             info->mv_cand,
@@ -1671,7 +1671,7 @@ static void search_pu_inter(encoder_state_t * const state,
   *inter_cost = MAX_INT;
   *inter_bitcost = MAX_INT;
 
-  const kvz_config *cfg = &state->encoder_control->cfg;
+  const uvg_config *cfg = &state->encoder_control->cfg;
   const videoframe_t * const frame = state->tile->frame;
   const int width_cu  = LCU_WIDTH >> depth;
   const int x         = PU_GET_X(part_mode, width_cu, x_cu, i_pu);
@@ -1696,12 +1696,12 @@ static void search_pu_inter(encoder_state_t * const state,
     .origin         = { x, y },
     .width          = width,
     .height         = height,
-    .mvd_cost_func  = cfg->mv_rdo ? kvz_calc_mvd_cost_cabac : calc_mvd_cost,
-    .optimized_sad  = kvz_get_optimized_sad(width),
+    .mvd_cost_func  = cfg->mv_rdo ? uvg_calc_mvd_cost_cabac : calc_mvd_cost,
+    .optimized_sad  = uvg_get_optimized_sad(width),
   };
 
   // Search for merge mode candidates
-  info.num_merge_cand = kvz_inter_get_merge_cand(
+  info.num_merge_cand = uvg_inter_get_merge_cand(
       state,
       x, y,
       width, height,
@@ -1753,8 +1753,8 @@ static void search_pu_inter(encoder_state_t * const state,
     {
       continue;
     }
-    kvz_inter_pred_pu(state, lcu, x_cu, y_cu, width_cu, true, false, i_pu);
-    mrg_costs[num_rdo_cands] = kvz_satd_any_size(width, height,
+    uvg_inter_pred_pu(state, lcu, x_cu, y_cu, width_cu, true, false, i_pu);
+    mrg_costs[num_rdo_cands] = uvg_satd_any_size(width, height,
       lcu->rec.y + y_local * LCU_WIDTH + x_local, LCU_WIDTH,
       lcu->ref.y + y_local * LCU_WIDTH + x_local, LCU_WIDTH);
     
@@ -1766,14 +1766,14 @@ static void search_pu_inter(encoder_state_t * const state,
   }
 
   // Sort candidates by cost
-  kvz_sort_modes(mrg_cands, mrg_costs, num_rdo_cands);
+  uvg_sort_modes(mrg_cands, mrg_costs, num_rdo_cands);
 
   // Limit by availability
   // TODO: Do not limit to just 1
   num_rdo_cands = MIN(1, num_rdo_cands);
     
   // Early Skip Mode Decision
-  bool has_chroma = state->encoder_control->chroma_format != KVZ_CSP_400;
+  bool has_chroma = state->encoder_control->chroma_format != UVG_CSP_400;
   if (cfg->early_skip && cur_cu->part_size == SIZE_2Nx2N) {
     for (int merge_rdo_idx = 0; merge_rdo_idx < num_rdo_cands; ++merge_rdo_idx) {
 
@@ -1792,16 +1792,16 @@ static void search_pu_inter(encoder_state_t * const state,
       cur_cu->inter.mv[1][0]  = cur_cand->mv[1][0];
       cur_cu->inter.mv[1][1]  = cur_cand->mv[1][1];
 
-      kvz_lcu_fill_trdepth(lcu, x, y, depth, MAX(1, depth));
-      kvz_inter_recon_cu(state, lcu, x, y, width, true, false);
-      kvz_quantize_lcu_residual(state, true, false, x, y, depth, cur_cu, lcu, true);
+      uvg_lcu_fill_trdepth(lcu, x, y, depth, MAX(1, depth));
+      uvg_inter_recon_cu(state, lcu, x, y, width, true, false);
+      uvg_quantize_lcu_residual(state, true, false, x, y, depth, cur_cu, lcu, true);
 
       if (cbf_is_set(cur_cu->cbf, depth, COLOR_Y)) {
         continue;
       }
       else if (has_chroma) {
-        kvz_inter_recon_cu(state, lcu, x, y, width, false, has_chroma);
-        kvz_quantize_lcu_residual(state, false, has_chroma, x, y, depth, cur_cu, lcu, true);
+        uvg_inter_recon_cu(state, lcu, x, y, width, false, has_chroma);
+        uvg_quantize_lcu_residual(state, false, has_chroma, x, y, depth, cur_cu, lcu, true);
         if (!cbf_is_set_any(cur_cu->cbf, depth)) {
           cur_cu->type = CU_INTER;
           cur_cu->merge_idx = merge_idx;
@@ -1829,7 +1829,7 @@ static void search_pu_inter(encoder_state_t * const state,
   }
 
   // Search bi-pred positions
-  bool can_use_bipred = state->frame->slicetype == KVZ_SLICE_B
+  bool can_use_bipred = state->frame->slicetype == UVG_SLICE_B
     && cfg->bipred
     && width + height >= 16; // 4x8 and 8x4 PBs are restricted to unipred
 
@@ -1851,7 +1851,7 @@ static void search_pu_inter(encoder_state_t * const state,
       mv[1][0] = unipreds[1].inter.mv[1][0];
       mv[1][1] = unipreds[1].inter.mv[1][1];
 
-      kvz_inter_recon_bipred(info.state,
+      uvg_inter_recon_bipred(info.state,
         ref->images[ref_LX[0][unipreds[0].inter.mv_ref[0]]],
         ref->images[ref_LX[1][unipreds[1].inter.mv_ref[1]]],
         x, y,
@@ -1862,10 +1862,10 @@ static void search_pu_inter(encoder_state_t * const state,
         true,
         false);
 
-      const kvz_pixel *rec = &lcu->rec.y[SUB_SCU(y) * LCU_WIDTH + SUB_SCU(x)];
-      const kvz_pixel *src = &lcu->ref.y[SUB_SCU(y) * LCU_WIDTH + SUB_SCU(x)];
+      const uvg_pixel *rec = &lcu->rec.y[SUB_SCU(y) * LCU_WIDTH + SUB_SCU(x)];
+      const uvg_pixel *src = &lcu->ref.y[SUB_SCU(y) * LCU_WIDTH + SUB_SCU(x)];
       uint32_t cost =
-        kvz_satd_any_size(width, height, rec, LCU_WIDTH, src, LCU_WIDTH);
+        uvg_satd_any_size(width, height, rec, LCU_WIDTH, src, LCU_WIDTH);
 
       uint32_t bitcost[2] = { 0, 0 };
 
@@ -1921,7 +1921,7 @@ static void search_pu_inter(encoder_state_t * const state,
 
         // Each motion vector has its own candidate
         for (int reflist = 0; reflist < 2; reflist++) {
-          kvz_inter_get_mv_cand(info.state, x, y, width, height, info.mv_cand, cur_cu, lcu, reflist);
+          uvg_inter_get_mv_cand(info.state, x, y, width, height, info.mv_cand, cur_cu, lcu, reflist);
           int cu_mv_cand = select_mv_cand(
             info.state,
             info.mv_cand,
@@ -1984,7 +1984,7 @@ static void search_pu_inter(encoder_state_t * const state,
 * \param inter_cost    Return inter cost
 * \param inter_bitcost Return inter bitcost
 */
-void kvz_cu_cost_inter_rd2(encoder_state_t * const state,
+void uvg_cu_cost_inter_rd2(encoder_state_t * const state,
   int x, int y, int depth,
   lcu_t *lcu,
   double   *inter_cost,
@@ -1995,19 +1995,19 @@ void kvz_cu_cost_inter_rd2(encoder_state_t * const state,
   if (cur_cu->part_size != SIZE_2Nx2N) {
     tr_depth = depth + 1;
   }
-  kvz_lcu_fill_trdepth(lcu, x, y, depth, tr_depth);
+  uvg_lcu_fill_trdepth(lcu, x, y, depth, tr_depth);
 
-  const bool reconstruct_chroma = state->encoder_control->chroma_format != KVZ_CSP_400;
-  kvz_inter_recon_cu(state, lcu, x, y, CU_WIDTH_FROM_DEPTH(depth), true, reconstruct_chroma);
-  kvz_quantize_lcu_residual(state, true, reconstruct_chroma,
+  const bool reconstruct_chroma = state->encoder_control->chroma_format != UVG_CSP_400;
+  uvg_inter_recon_cu(state, lcu, x, y, CU_WIDTH_FROM_DEPTH(depth), true, reconstruct_chroma);
+  uvg_quantize_lcu_residual(state, true, reconstruct_chroma,
     x, y, depth,
     NULL,
     lcu,
     false);
 
-  *inter_cost = kvz_cu_rd_cost_luma(state, SUB_SCU(x), SUB_SCU(y), depth, cur_cu, lcu);
+  *inter_cost = uvg_cu_rd_cost_luma(state, SUB_SCU(x), SUB_SCU(y), depth, cur_cu, lcu);
   if (reconstruct_chroma) {
-    *inter_cost += kvz_cu_rd_cost_chroma(state, SUB_SCU(x), SUB_SCU(y), depth, cur_cu, lcu);
+    *inter_cost += uvg_cu_rd_cost_chroma(state, SUB_SCU(x), SUB_SCU(y), depth, cur_cu, lcu);
   }
 
   *inter_cost += *inter_bitcost * state->lambda;
@@ -2028,7 +2028,7 @@ void kvz_cu_cost_inter_rd2(encoder_state_t * const state,
  * \param inter_cost    Return inter cost
  * \param inter_bitcost Return inter bitcost
  */
-void kvz_search_cu_inter(encoder_state_t * const state,
+void uvg_search_cu_inter(encoder_state_t * const state,
                          int x, int y, int depth,
                          lcu_t *lcu,
                          double   *inter_cost,
@@ -2043,7 +2043,7 @@ void kvz_search_cu_inter(encoder_state_t * const state,
 
   // Calculate more accurate cost when needed
   if (state->encoder_control->cfg.rdo >= 2) {
-    kvz_cu_cost_inter_rd2(state,
+    uvg_cu_cost_inter_rd2(state,
       x, y, depth,
       lcu,
       inter_cost,
@@ -2067,7 +2067,7 @@ void kvz_search_cu_inter(encoder_state_t * const state,
  * \param inter_cost    Return inter cost
  * \param inter_bitcost Return inter bitcost
  */
-void kvz_search_cu_smp(encoder_state_t * const state,
+void uvg_search_cu_smp(encoder_state_t * const state,
                        int x, int y,
                        int depth,
                        part_mode_t part_mode,
@@ -2075,7 +2075,7 @@ void kvz_search_cu_smp(encoder_state_t * const state,
                        double *inter_cost,
                        uint32_t *inter_bitcost)
 {
-  const int num_pu  = kvz_part_mode_num_parts[part_mode];
+  const int num_pu  = uvg_part_mode_num_parts[part_mode];
   const int width   = LCU_WIDTH >> depth;
   const int y_local = SUB_SCU(y);
   const int x_local = SUB_SCU(x);
@@ -2121,7 +2121,7 @@ void kvz_search_cu_smp(encoder_state_t * const state,
 
   // Calculate more accurate cost when needed
   if (state->encoder_control->cfg.rdo >= 2) {
-    kvz_cu_cost_inter_rd2(state,
+    uvg_cu_cost_inter_rd2(state,
       x, y, depth,
       lcu,
       inter_cost,

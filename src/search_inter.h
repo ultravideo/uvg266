@@ -42,21 +42,21 @@
 #include "encoderstate.h"
 #include "global.h" // IWYU pragma: keep
 #include "inter.h"
-#include "kvazaar.h"
+#include "uvg266.h"
 
-#define KVZ_LUMA_FILTER_TAPS 8
-#define KVZ_LUMA_FILTER_OFFSET 3
-#define KVZ_CHROMA_FILTER_TAPS 4
-#define KVZ_CHROMA_FILTER_OFFSET 1
+#define UVG_LUMA_FILTER_TAPS 8
+#define UVG_LUMA_FILTER_OFFSET 3
+#define UVG_CHROMA_FILTER_TAPS 4
+#define UVG_CHROMA_FILTER_OFFSET 1
 
  // Maximum extra width a block needs to filter 
  // a fractional pixel with positive fractional mv.x and mv.y
-#define KVZ_EXT_PADDING_LUMA (KVZ_LUMA_FILTER_TAPS - 1)
-#define KVZ_EXT_PADDING_CHROMA (KVZ_CHROMA_FILTER_TAPS - 1)
+#define UVG_EXT_PADDING_LUMA (UVG_LUMA_FILTER_TAPS - 1)
+#define UVG_EXT_PADDING_CHROMA (UVG_CHROMA_FILTER_TAPS - 1)
 
  // Maximum block width for extended block
-#define KVZ_EXT_BLOCK_W_LUMA (LCU_WIDTH + KVZ_EXT_PADDING_LUMA)
-#define KVZ_EXT_BLOCK_W_CHROMA (LCU_WIDTH_C + KVZ_EXT_PADDING_CHROMA)
+#define UVG_EXT_BLOCK_W_LUMA (LCU_WIDTH + UVG_EXT_PADDING_LUMA)
+#define UVG_EXT_BLOCK_W_CHROMA (LCU_WIDTH_C + UVG_EXT_PADDING_CHROMA)
 
 enum hpel_position {
   HPEL_POS_HOR = 0,
@@ -64,7 +64,7 @@ enum hpel_position {
   HPEL_POS_DIA = 2
 };
 
-typedef uint32_t kvz_mvd_cost_func(const encoder_state_t *state,
+typedef uint32_t uvg_mvd_cost_func(const encoder_state_t *state,
                                   int x, int y,
                                   int mv_shift,
                                   mv_t mv_cand[2][2],
@@ -73,13 +73,13 @@ typedef uint32_t kvz_mvd_cost_func(const encoder_state_t *state,
                                   int32_t ref_idx,
                                   uint32_t *bitcost);
 
-void kvz_search_cu_inter(encoder_state_t * const state,
+void uvg_search_cu_inter(encoder_state_t * const state,
                          int x, int y, int depth,
                          lcu_t *lcu,
                          double *inter_cost,
                          uint32_t *inter_bitcost);
 
-void kvz_search_cu_smp(encoder_state_t * const state,
+void uvg_search_cu_smp(encoder_state_t * const state,
                        int x, int y,
                        int depth,
                        part_mode_t part_mode,
@@ -88,7 +88,7 @@ void kvz_search_cu_smp(encoder_state_t * const state,
                        uint32_t *inter_bitcost);
 
 
-unsigned kvz_inter_satd_cost(const encoder_state_t* state,
+unsigned uvg_inter_satd_cost(const encoder_state_t* state,
                              const lcu_t *lcu,
                              int x,
                              int y);

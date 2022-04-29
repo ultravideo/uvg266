@@ -35,9 +35,9 @@
 #include <stdlib.h>
 
 #include "intra.h"
-#include "kvazaar.h"
+#include "uvg266.h"
 #include "strategyselector.h"
-#include "kvz_math.h"
+#include "uvg_math.h"
 
 
 /**
@@ -49,13 +49,13 @@
  * \param dst           Buffer of size width*width.
  * \param multi_ref_idx Multi reference line index for use with MRL.
  */
-static void kvz_angular_pred_generic(
+static void uvg_angular_pred_generic(
   const int_fast8_t log2_width,
   const int_fast8_t intra_mode,
   const int_fast8_t channel_type,
-  const kvz_pixel *const in_ref_above,
-  const kvz_pixel *const in_ref_left,
-  kvz_pixel *const dst,
+  const uvg_pixel *const in_ref_above,
+  const uvg_pixel *const in_ref_left,
+  uvg_pixel *const dst,
   const uint8_t multi_ref_idx)
 {
   
@@ -106,9 +106,9 @@ static void kvz_angular_pred_generic(
                                                     // It only needs to be big enough to hold indices from -width to width-1.
 
   // TODO: check the correct size for these arrays when MRL is used
-  //kvz_pixel tmp_ref[2 * 128 + 3 + 33 * MAX_REF_LINE_IDX] = { 0 };
-  kvz_pixel temp_main[2 * 128 + 3 + 33 * MAX_REF_LINE_IDX] = { 0 };
-  kvz_pixel temp_side[2 * 128 + 3 + 33 * MAX_REF_LINE_IDX] = { 0 };
+  //uvg_pixel tmp_ref[2 * 128 + 3 + 33 * MAX_REF_LINE_IDX] = { 0 };
+  uvg_pixel temp_main[2 * 128 + 3 + 33 * MAX_REF_LINE_IDX] = { 0 };
+  uvg_pixel temp_side[2 * 128 + 3 + 33 * MAX_REF_LINE_IDX] = { 0 };
   const int_fast32_t width = 1 << log2_width;
 
   uint32_t pred_mode = intra_mode; // ToDo: handle WAIP
@@ -128,9 +128,9 @@ static void kvz_angular_pred_generic(
   int scale = MIN(2, log2_width - pre_scale[abs(mode_disp)]);
 
   // Pointer for the reference we are interpolating from.
-  kvz_pixel *ref_main;
+  uvg_pixel *ref_main;
   // Pointer for the other reference.
-  const kvz_pixel *ref_side;
+  const uvg_pixel *ref_side;
 
   // Set ref_main and ref_side such that, when indexed with 0, they point to
   // index 0 in block coordinates.
@@ -196,7 +196,7 @@ static void kvz_angular_pred_generic(
     const int s = 0;
     const int max_index = (multi_ref_index << s) + 2;
     const int ref_length = width << 1;
-    const kvz_pixel val = temp_main[ref_length + multi_ref_index];
+    const uvg_pixel val = temp_main[ref_length + multi_ref_index];
     for (int j = 1; j <= max_index; j++) {
       temp_main[ref_length + multi_ref_index +  j] = val;
     }
@@ -208,7 +208,7 @@ static void kvz_angular_pred_generic(
     //ref_main = (vertical_mode ? in_ref_above : in_ref_left) + 1;
     //ref_side = (vertical_mode ? in_ref_left : in_ref_above) + 1;
 
-    //memcpy(tmp_ref + width, ref_main, (width*2) * sizeof(kvz_pixel));
+    //memcpy(tmp_ref + width, ref_main, (width*2) * sizeof(uvg_pixel));
     //ref_main = &tmp_ref[width];
     //tmp_ref[width-1] = tmp_ref[width];
     //int8_t last_index = 1 + width*2;
@@ -231,10 +231,10 @@ static void kvz_angular_pred_generic(
         // Luma Channel
         if (channel_type == 0) {
           int32_t ref_main_index = delta_int;
-          kvz_pixel p[4];
+          uvg_pixel p[4];
           bool use_cubic = true; // Default to cubic filter
-          static const int kvz_intra_hor_ver_dist_thres[8] = { 24, 24, 24, 14, 2, 0, 0, 0 };
-          int filter_threshold = kvz_intra_hor_ver_dist_thres[log2_width];
+          static const int uvg_intra_hor_ver_dist_thres[8] = { 24, 24, 24, 14, 2, 0, 0, 0 };
+          int filter_threshold = uvg_intra_hor_ver_dist_thres[log2_width];
           int dist_from_vert_or_hor = MIN(abs((int32_t)pred_mode - 50), abs((int32_t)pred_mode - 18));
           if (dist_from_vert_or_hor > filter_threshold) {
             static const int16_t modedisp2sampledisp[32] = { 0,    1,    2,    3,    4,    6,     8,   10,   12,   14,   16,   18,   20,   23,   26,   29,   32,   35,   39,  45,  51,  57,  64,  73,  86, 102, 128, 171, 256, 341, 512, 1024 };
@@ -266,8 +266,8 @@ static void kvz_angular_pred_generic(
         
           // Do linear filtering
           for (int_fast32_t x = 0; x < width; ++x) {
-            kvz_pixel ref1 = ref_main[x + delta_int + 1];
-            kvz_pixel ref2 = ref_main[x + delta_int + 2];
+            uvg_pixel ref1 = ref_main[x + delta_int + 1];
+            uvg_pixel ref2 = ref_main[x + delta_int + 2];
             dst[y * width + x] = ref1 + ((delta_fract * (ref2-ref1) + 16) >> 5);
           }
         }
@@ -296,7 +296,7 @@ static void kvz_angular_pred_generic(
           inv_angle_sum += modedisp2invsampledisp[abs(mode_disp)];
 
           int wL = 32 >> (2 * x >> scale);
-          const kvz_pixel left = ref_side[y + (inv_angle_sum >> 9) + 1];
+          const uvg_pixel left = ref_side[y + (inv_angle_sum >> 9) + 1];
           dst[y * width + x] = dst[y * width + x] + ((wL * (left - dst[y * width + x]) + 32) >> 6);
         }
       }
@@ -310,8 +310,8 @@ static void kvz_angular_pred_generic(
           int c = x + y + 1;
           if (c >= 2 * width) { wL = 0; }
           if (c >= 2 * width) { wT = 0; }
-          const kvz_pixel left = (wL != 0) ? ref_side[c] : 0;
-          const kvz_pixel top  = (wT != 0) ? ref_main[c] : 0;
+          const uvg_pixel left = (wL != 0) ? ref_side[c] : 0;
+          const uvg_pixel top  = (wT != 0) ? ref_main[c] : 0;
           dst[y * width + x] = CLIP_TO_PIXEL((wL * left + wT * top + (64 - wL - wT) * dst[y * width + x] + 32) >> 6);
         }
       } else if (sample_disp == 0 || sample_disp >= 12) {
@@ -327,8 +327,8 @@ static void kvz_angular_pred_generic(
 
           int wL = 32 >> MIN(31, ((x << 1) >> scale));
           if (wL == 0) break;
-          const kvz_pixel *p = ref_side + delta_y - 1;
-          kvz_pixel left = p[delta_frac_0 >> 5];
+          const uvg_pixel *p = ref_side + delta_y - 1;
+          uvg_pixel left = p[delta_frac_0 >> 5];
           dst[y * width + x] = CLIP_TO_PIXEL((wL * left + (64 - wL) * dst[y * width + x] + 32) >> 6);
         }
       }*/
@@ -345,11 +345,11 @@ static void kvz_angular_pred_generic(
       // Do not apply PDPC if multi ref line index is other than 0
       if ((width >= 4 || channel_type != 0) && sample_disp >= 0 && multi_ref_index == 0) {
         int scale = (log2_width + log2_width - 2) >> 2;
-        const kvz_pixel top_left = ref_main[0];
-        const kvz_pixel left = ref_side[1 + y];
+        const uvg_pixel top_left = ref_main[0];
+        const uvg_pixel left = ref_side[1 + y];
         for (int i = 0; i < MIN(3 << scale, width); i++) {
           const int wL = 32 >> (2 * i >> scale);
-          const kvz_pixel val = dst[y * width + i];
+          const uvg_pixel val = dst[y * width + i];
           dst[y * width + i] = CLIP_TO_PIXEL(val + ((wL * (left - top_left) + 32) >> 6));
         }
       }
@@ -360,7 +360,7 @@ static void kvz_angular_pred_generic(
   if (!vertical_mode) {
     for (int_fast32_t y = 0; y < width - 1; ++y) {
       for (int_fast32_t x = y + 1; x < width; ++x) {
-        SWAP(dst[y * width + x], dst[x * width + y], kvz_pixel);
+        SWAP(dst[y * width + x], dst[x * width + y], uvg_pixel);
       }
     }
   }
@@ -374,18 +374,18 @@ static void kvz_angular_pred_generic(
  * \param in_ref_left   Pointer to -1 index of left reference, length=width*2+1.
  * \param dst           Buffer of size width*width.
  */
-static void kvz_intra_pred_planar_generic(
+static void uvg_intra_pred_planar_generic(
   const int_fast8_t log2_width,
-  const kvz_pixel *const ref_top,
-  const kvz_pixel *const ref_left,
-  kvz_pixel *const dst)
+  const uvg_pixel *const ref_top,
+  const uvg_pixel *const ref_left,
+  uvg_pixel *const dst)
 {
   // TODO: Add height
   assert(log2_width >= 2 && log2_width <= 5);
 
   const int_fast8_t width = 1 << log2_width;
-  const kvz_pixel top_right = ref_top[width + 1];
-  const kvz_pixel bottom_left = ref_left[width + 1];
+  const uvg_pixel top_right = ref_top[width + 1];
+  const uvg_pixel bottom_left = ref_left[width + 1];
 
 #if 0
   // Unoptimized version for reference.
@@ -422,11 +422,11 @@ static void kvz_intra_pred_planar_generic(
 * \param dst           Buffer of size width*width.
 * \param multi_ref_idx Reference line index. May be non-zero when MRL is used.
 */
-static void kvz_intra_pred_filtered_dc_generic(
+static void uvg_intra_pred_filtered_dc_generic(
   const int_fast8_t log2_width,
-  const kvz_pixel *const ref_top,
-  const kvz_pixel *const ref_left,
-  kvz_pixel *const out_block,
+  const uvg_pixel *const ref_top,
+  const uvg_pixel *const ref_left,
+  uvg_pixel *const out_block,
   const uint8_t multi_ref_idx)
 {
   assert(log2_width >= 2 && log2_width <= 5);
@@ -440,7 +440,7 @@ static void kvz_intra_pred_filtered_dc_generic(
     sum += ref_left[i + 1 + multi_ref_idx];
   }
 
-  const kvz_pixel dc_val = (sum + width) >> (log2_width + 1);
+  const uvg_pixel dc_val = (sum + width) >> (log2_width + 1);
 
   // Filter top-left with ([1 2 1] / 4)
   out_block[0] = (ref_left[1] + 2 * dc_val + ref_top[1] + 2) / 4;
@@ -466,12 +466,12 @@ static void kvz_intra_pred_filtered_dc_generic(
 * \param used_ref      Pointer used reference pixel struct.
 * \param dst           Buffer of size width*width.
 */
-static void kvz_pdpc_planar_dc_generic(
+static void uvg_pdpc_planar_dc_generic(
   const int mode,
   const int width,
   const int log2_width,
-  const kvz_intra_ref *const used_ref,
-  kvz_pixel *const dst)
+  const uvg_intra_ref *const used_ref,
+  uvg_pixel *const dst)
 {
   assert(mode == 0 || mode == 1);  // planar or DC
 
@@ -490,14 +490,14 @@ static void kvz_pdpc_planar_dc_generic(
 }
 
 
-int kvz_strategy_register_intra_generic(void* opaque, uint8_t bitdepth)
+int uvg_strategy_register_intra_generic(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
 
-  success &= kvz_strategyselector_register(opaque, "angular_pred", "generic", 0, &kvz_angular_pred_generic);
-  success &= kvz_strategyselector_register(opaque, "intra_pred_planar", "generic", 0, &kvz_intra_pred_planar_generic);
-  success &= kvz_strategyselector_register(opaque, "intra_pred_filtered_dc", "generic", 0, &kvz_intra_pred_filtered_dc_generic);
-  success &= kvz_strategyselector_register(opaque, "pdpc_planar_dc", "generic", 0, &kvz_pdpc_planar_dc_generic);
+  success &= uvg_strategyselector_register(opaque, "angular_pred", "generic", 0, &uvg_angular_pred_generic);
+  success &= uvg_strategyselector_register(opaque, "intra_pred_planar", "generic", 0, &uvg_intra_pred_planar_generic);
+  success &= uvg_strategyselector_register(opaque, "intra_pred_filtered_dc", "generic", 0, &uvg_intra_pred_filtered_dc_generic);
+  success &= uvg_strategyselector_register(opaque, "pdpc_planar_dc", "generic", 0, &uvg_pdpc_planar_dc_generic);
 
   return success;
 }

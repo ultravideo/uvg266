@@ -53,16 +53,16 @@ typedef struct {
   const double *error_scale[SCALING_LIST_SIZE_NUM][SCALING_LIST_SIZE_NUM][SCALING_LIST_NUM][SCALING_LIST_REM_NUM];
 } scaling_list_t;
 
-extern const uint8_t kvz_g_scaling_list_num[SCALING_LIST_SIZE_NUM];
-extern const uint16_t kvz_g_scaling_list_size[SCALING_LIST_SIZE_NUM][SCALING_LIST_SIZE_NUM];
+extern const uint8_t uvg_g_scaling_list_num[SCALING_LIST_SIZE_NUM];
+extern const uint16_t uvg_g_scaling_list_size[SCALING_LIST_SIZE_NUM][SCALING_LIST_SIZE_NUM];
 
-const int32_t *kvz_scalinglist_get_default(const uint32_t size_id, const uint32_t list_id);
+const int32_t *uvg_scalinglist_get_default(const uint32_t size_id, const uint32_t list_id);
 
-void kvz_scalinglist_init(scaling_list_t * const scaling_list);
-void kvz_scalinglist_destroy(scaling_list_t * const scaling_list);
+void uvg_scalinglist_init(scaling_list_t * const scaling_list);
+void uvg_scalinglist_destroy(scaling_list_t * const scaling_list);
 
-int  kvz_scalinglist_parse(scaling_list_t * const scaling_list, FILE *fp);
-void kvz_scalinglist_process(scaling_list_t *scaling_list, uint8_t bitdepth);
+int  uvg_scalinglist_parse(scaling_list_t * const scaling_list, FILE *fp);
+void uvg_scalinglist_process(scaling_list_t *scaling_list, uint8_t bitdepth);
 
 
 

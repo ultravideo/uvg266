@@ -33,9 +33,9 @@
 #ifndef REG_SAD_POW2_WIDTHS_AVX2_H_
 #define REG_SAD_POW2_WIDTHS_AVX2_H_
 
-#include "kvazaar.h"
+#include "uvg266.h"
 
-#if KVZ_BIT_DEPTH == 8
+#if UVG_BIT_DEPTH == 8
 
 #include "strategies/sse41/reg_sad_pow2_widths-sse41.h"
 
@@ -221,6 +221,6 @@ static uint32_t hor_sad_avx2_w32(const uint8_t *pic_data, const uint8_t *ref_dat
   return _mm_cvtsi128_si32(sad);
 }
 
-#endif // KVZ_BIT_DEPTH == 8
+#endif // UVG_BIT_DEPTH == 8
 
 #endif

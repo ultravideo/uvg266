@@ -1,5 +1,5 @@
-#ifndef _PICTURE_X86_ASM_SAD_H_
-#define _PICTURE_X86_ASM_SAD_H_
+#ifndef MATH_H_
+#define MATH_H_
 /*****************************************************************************
  * This file is part of uvg266 VVC encoder.
  *
@@ -33,24 +33,35 @@
  ****************************************************************************/
 
 /**
- * \ingroup Optimization
- * \file
- * Optimizations for AVX, utilizing ASM implementations.
- */
+* \file
+* Generic math functions
+*/
 
 #include "global.h" // IWYU pragma: keep
-#include "kvazaar.h"
 
-#if KVZ_BIT_DEPTH == 8
-unsigned kvz_sad_4x4_avx(const uint8_t*, const uint8_t*);
-unsigned kvz_sad_8x8_avx(const uint8_t*, const uint8_t*);
-unsigned kvz_sad_16x16_avx(const uint8_t*, const uint8_t*);
 
-unsigned kvz_sad_4x4_stride_avx(const uint8_t *data1, const uint8_t *data2, unsigned stride);
-unsigned kvz_sad_8x8_stride_avx(const uint8_t *data1, const uint8_t *data2, unsigned stride);
-unsigned kvz_sad_16x16_stride_avx(const uint8_t *data1, const uint8_t *data2, unsigned stride);
-unsigned kvz_sad_32x32_stride_avx(const uint8_t *data1, const uint8_t *data2, unsigned stride);
-unsigned kvz_sad_64x64_stride_avx(const uint8_t *data1, const uint8_t *data2, unsigned stride);
-#endif // KVZ_BIT_DEPTH == 8
+static INLINE unsigned uvg_math_floor_log2(unsigned value)
+{
+  assert(value > 0);
 
-#endif
+  unsigned result = 0;
+
+  for (int i = 4; i >= 0; --i) {
+    unsigned bits = 1ull << i;
+    unsigned shift = value >= (1 << bits) ? bits : 0;
+    result += shift;
+    value >>= shift;
+  }
+
+  return result;
+}
+
+static INLINE unsigned uvg_math_ceil_log2(unsigned value)
+{
+  assert(value > 0);
+
+  // The ceil_log2 is just floor_log2 + 1, except for exact powers of 2.
+  return uvg_math_floor_log2(value) + ((value & (value - 1)) ? 1 : 0);
+}
+
+#endif //CHECKPOINT_H_

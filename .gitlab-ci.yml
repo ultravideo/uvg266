@@ -7,14 +7,12 @@ test-kvazaar: &test-template
   script:
     - bash .travis-install.bash
     - export PATH="${HOME}/bin:${PATH}"
-    - ./autogen.sh
-    - ./configure --enable-werror || (cat config.log && false)
-    - make --jobs=8
-    - make check --jobs=8 VERBOSE=1
+    - cmake -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=./ . || (cat config.log && false)
+    - make install
+    - env CTEST_PARALLEL_LEVEL=8 CTEST_OUTPUT_ON_FAILURE=1 make test
   artifacts:
     paths:
-    - src/kvazaar
-    - src/.libs
+    - bin/uvg266
     expire_in: 1 week
 
 test-asan:
@@ -26,7 +24,7 @@ test-asan:
     ASAN_OPTIONS: 'detect_leaks=0'
     # AddressSanitizer adds some extra symbols so we expect a failure from
     # the external symbols test.
-    XFAIL_TESTS: test_external_symbols.sh
+    XFAIL_TESTS: test_external_symbols
 
 #test-tsan:
 #  <<: *test-template
@@ -43,7 +41,7 @@ test-ubsan:
 test-valgrind:
   <<: *test-template
   variables:
-    KVZ_TEST_VALGRIND: 1
+    UVG_TEST_VALGRIND: 1
 
 # TODO: If someone knows YAML better, there has to be some better way to
 # concatenate stuff into the test-template script than just manually copy

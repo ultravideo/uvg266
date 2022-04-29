@@ -237,7 +237,7 @@ static int detect_file_format(const char *file_name) {
     ending_lower_case[i] = tolower(sub_str[i]);
   }
 
-  // KVZ_FILE_FORMAT
+  // UVG_FILE_FORMAT
   if (strncmp(ending_lower_case, ".y4m", 4) == 0) return 1;
   else if (strncmp(ending_lower_case, ".yuv", 4) == 0) return 2;
 
@@ -250,7 +250,7 @@ static int detect_file_format(const char *file_name) {
  * \param argv  Argument list
  * \return      Pointer to the parsed options, or NULL on failure.
  */
-cmdline_opts_t* cmdline_opts_parse(const kvz_api *const api, int argc, char *argv[])
+cmdline_opts_t* cmdline_opts_parse(const uvg_api *const api, int argc, char *argv[])
 {
   int ok = 1;
   cmdline_opts_t *opts = calloc(1, sizeof(cmdline_opts_t));
@@ -350,12 +350,12 @@ cmdline_opts_t* cmdline_opts_parse(const kvz_api *const api, int argc, char *arg
   }
 
   // Check the file name for format
-  if (opts->config->file_format == KVZ_FORMAT_AUTO) {
+  if (opts->config->file_format == UVG_FORMAT_AUTO) {
     opts->config->file_format = detect_file_format(opts->input);
   }
 
   // Set resolution automatically if necessary
-  if ((opts->config->file_format == KVZ_FORMAT_AUTO || opts->config->file_format == KVZ_FORMAT_YUV)
+  if ((opts->config->file_format == UVG_FORMAT_AUTO || opts->config->file_format == UVG_FORMAT_YUV)
       && opts->config->width == 0 && opts->config->height == 0) {
     ok = select_input_res_auto(opts->input, &opts->config->width, &opts->config->height);
     goto done;
@@ -374,7 +374,7 @@ done:
 /**
  * \brief Deallocate a cmdline_opts_t structure.
  */
-void cmdline_opts_free(const kvz_api *const api, cmdline_opts_t *opts)
+void cmdline_opts_free(const uvg_api *const api, cmdline_opts_t *opts)
 {
   if (opts) {
     FREE_POINTER(opts->input);
@@ -628,7 +628,7 @@ void print_help(void)
     "      --(no-)tmvp            : Temporal motion vector prediction [enabled]\n"
     "      --(no-)mrl             : Enable use of multiple reference lines in intra\n"
     "                               predictions.\n"
-    "      --(no-)mip             : Enable matrix weighted intra prediction."
+    "      --(no-)mip             : Enable matrix weighted intra prediction.\n"
     "      --mts <string>         : Multiple Transform Selection [off].\n"
     "                               (Currently only implemented for intra\n"
     "                               and has effect only when rd >= 2)\n"
@@ -638,7 +638,7 @@ void print_help(void)
     "                                   - both: MTS applied for both intra and inter blocks.\n"
     "                                   - implicit: uses implicit MTS. Applies DST7 instead \n"
     "                                               of DCT2 to certain intra blocks.\n"
-    "      --(no-)jccr            : Joint coding of chroma residual. "
+    "      --(no-)jccr            : Joint coding of chroma residual.\n"
     "                               Requires rdo> = 2. [disabled]\n"
     "      --(no-)cclm            : Cross component linear model. \n"
     "                               Extra chroma prediction modes that are formed\n"
@@ -714,7 +714,7 @@ void print_help(void)
 }
 
 
-void print_frame_info(const kvz_frame_info *const info,
+void print_frame_info(const uvg_frame_info *const info,
                       const double frame_psnr[3],
                       const uint32_t bytes,
                       const bool print_psnr,
@@ -732,7 +732,7 @@ void print_frame_info(const kvz_frame_info *const info,
             frame_psnr[0], frame_psnr[1], frame_psnr[2]);
   }
 
-  if (info->slice_type != KVZ_SLICE_I) {
+  if (info->slice_type != UVG_SLICE_I) {
     // Print reference picture lists
     fprintf(stderr, " [L0 ");
     for (int j = 0; j < info->ref_list_len[0]; j++) {

@@ -132,8 +132,8 @@ typedef enum
  * First index: scan pattern 0 = diagonal, 1 = horizontal, 2 = vertical
  * Second index: (log2 - 1) size of transform block. 2x2 .. 32x32
  */
-extern const uint32_t* const kvz_g_sig_last_scan[3][5];
-extern const int8_t kvz_g_convert_to_bit[LCU_WIDTH + 1];
-extern const uint32_t kvz_g_log2_sbb_size[7 + 1][7 + 1][2];
+extern const uint32_t* const uvg_g_sig_last_scan[3][5];
+extern const int8_t uvg_g_convert_to_bit[LCU_WIDTH + 1];
+extern const uint32_t uvg_g_log2_sbb_size[7 + 1][7 + 1][2];
 
 #endif //TABLES_H_

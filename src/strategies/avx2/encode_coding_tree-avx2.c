@@ -97,7 +97,7 @@ static INLINE uint32_t pack_16x16b_to_16x2b(__m256i src)
  * \param texture_type texture type (TEXT_LUMA...)
  * \returns ctx_inc for current scan position
  */
-static INLINE __m256i kvz_context_get_sig_ctx_inc_16x16b(int32_t pattern_sig_ctx, uint32_t scan_idx, __m256i pos_xs,
+static INLINE __m256i uvg_context_get_sig_ctx_inc_16x16b(int32_t pattern_sig_ctx, uint32_t scan_idx, __m256i pos_xs,
                                 __m256i pos_ys, int32_t block_type, int8_t texture_type)
 {
   const __m256i zero   = _mm256_set1_epi8(0);
@@ -246,7 +246,7 @@ static INLINE __m256i kvz_context_get_sig_ctx_inc_16x16b(int32_t pattern_sig_ctx
   return rv;
 }
 
-void kvz_encode_coeff_nxn_avx2(encoder_state_t * const state,
+void uvg_encode_coeff_nxn_avx2(encoder_state_t * const state,
                                cabac_data_t * const cabac,
                                const coeff_t *coeff,
                                uint8_t width,
@@ -268,9 +268,9 @@ void kvz_encode_coeff_nxn_avx2(encoder_state_t * const state,
 
   // CONSTANTS
   const uint32_t num_blk_side    = width >> TR_MIN_LOG2_SIZE;
-  const uint32_t log2_block_size = kvz_g_convert_to_bit[width] + 2;
+  const uint32_t log2_block_size = uvg_g_convert_to_bit[width] + 2;
   const uint32_t *scan           =
-    kvz_g_sig_last_scan[scan_mode][log2_block_size - 1];
+    uvg_g_sig_last_scan[scan_mode][log2_block_size - 1];
   const uint32_t *scan_cg = g_sig_last_scan_cg[log2_block_size - 2][scan_mode];
   const uint32_t num_blocks = num_blk_side * num_blk_side;
 
@@ -368,7 +368,7 @@ void kvz_encode_coeff_nxn_avx2(encoder_state_t * const state,
   last_coeff_y = (uint8_t)(pos_last >> log2_block_size);
 
   // Code last_coeff_x and last_coeff_y
-  kvz_encode_last_significant_xy(cabac,
+  uvg_encode_last_significant_xy(cabac,
                                  last_coeff_x,
                                  last_coeff_y,
                                  width,
@@ -404,14 +404,14 @@ void kvz_encode_coeff_nxn_avx2(encoder_state_t * const state,
       sig_coeffgroup_nzs[cg_blk_pos] = 1;
     } else {
       uint32_t sig_coeff_group   = (sig_coeffgroup_nzs[cg_blk_pos] != 0);
-      uint32_t ctx_sig  = kvz_context_get_sig_coeff_group(sig_coeffgroup_nzs, cg_pos_x,
+      uint32_t ctx_sig  = uvg_context_get_sig_coeff_group(sig_coeffgroup_nzs, cg_pos_x,
                                                       cg_pos_y, width);
       cabac->cur_ctx = &base_coeff_group_ctx[ctx_sig];
       CABAC_BIN(cabac, sig_coeff_group, "coded_sub_block_flag");
     }
 
     if (sig_coeffgroup_nzs[cg_blk_pos]) {
-      int32_t pattern_sig_ctx = kvz_context_calc_pattern_sig_ctx(sig_coeffgroup_nzs,
+      int32_t pattern_sig_ctx = uvg_context_calc_pattern_sig_ctx(sig_coeffgroup_nzs,
                                                              cg_pos_x, cg_pos_y, width);
 
       // A mask with the first 16-bit word unmasked (bits set ie. 0xffff)
@@ -445,7 +445,7 @@ void kvz_encode_coeff_nxn_avx2(encoder_state_t * const state,
       get_first_last_nz_int16(masked_coeffs, &first_nz_pos_in_cg, &last_nz_pos_in_cg);
       _mm256_store_si256((__m256i *)abs_coeff_buf_sb, abs_coeffs);
 
-      __m256i ctx_sigs = kvz_context_get_sig_ctx_inc_16x16b(pattern_sig_ctx, scan_mode, pos_xs, pos_ys,
+      __m256i ctx_sigs = uvg_context_get_sig_ctx_inc_16x16b(pattern_sig_ctx, scan_mode, pos_xs, pos_ys,
                                              log2_block_size, type);
 
       _mm256_store_si256((__m256i *)ctx_sig_buf, ctx_sigs);
@@ -541,8 +541,8 @@ void kvz_encode_coeff_nxn_avx2(encoder_state_t * const state,
       int32_t nnz = num_non_zero - shiftamt;
       coeff_signs >>= shiftamt;
       if (!cabac->only_count) {
-        if (encoder->cfg.crypto_features & KVZ_CRYPTO_TRANSF_COEFF_SIGNS) {
-          coeff_signs ^= kvz_crypto_get_key(state->crypto_hdl, nnz);
+        if (encoder->cfg.crypto_features & UVG_CRYPTO_TRANSF_COEFF_SIGNS) {
+          coeff_signs ^= uvg_crypto_get_key(state->crypto_hdl, nnz);
         }
       }
       CABAC_BINS_EP(cabac, coeff_signs, nnz, "coeff_sign_flag");
@@ -583,10 +583,10 @@ void kvz_encode_coeff_nxn_avx2(encoder_state_t * const state,
 
           if (!(dont_encode_curr & 2)) {
             uint16_t level_diff = curr_abs_coeff - base_level;
-            if (!cabac->only_count && (encoder->cfg.crypto_features & KVZ_CRYPTO_TRANSF_COEFFS)) {
-              kvz_cabac_write_coeff_remain_encry(state, cabac, level_diff, go_rice_param, base_level);
+            if (!cabac->only_count && (encoder->cfg.crypto_features & UVG_CRYPTO_TRANSF_COEFFS)) {
+              uvg_cabac_write_coeff_remain_encry(state, cabac, level_diff, go_rice_param, base_level);
             } else {
-              kvz_cabac_write_coeff_remain(cabac, level_diff, go_rice_param);
+              uvg_cabac_write_coeff_remain(cabac, level_diff, go_rice_param);
             }
 
             if (curr_abs_coeff > 3 * (1 << go_rice_param)) {
@@ -605,12 +605,12 @@ void kvz_encode_coeff_nxn_avx2(encoder_state_t * const state,
 }
 #endif // COMPILE_INTEL_AVX2
 
-int kvz_strategy_register_encode_avx2(void* opaque, uint8_t bitdepth)
+int uvg_strategy_register_encode_avx2(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
 
 #if COMPILE_INTEL_AVX2
-  success &= kvz_strategyselector_register(opaque, "encode_coeff_nxn", "avx2", 40, &kvz_encode_coeff_nxn_avx2);
+  success &= uvg_strategyselector_register(opaque, "encode_coeff_nxn", "avx2", 40, &uvg_encode_coeff_nxn_avx2);
 #endif
 
   return success;

@@ -41,16 +41,16 @@
 #include "cabac.h"
 #include "rdo.h"
 #include "strategies/strategies-sao.h"
-#include "kvz_math.h"
+#include "uvg_math.h"
 
-void kvz_free_lmcs_aps(lmcs_aps* aps)
+void uvg_free_lmcs_aps(lmcs_aps* aps)
 {
   //FREE_POINTER(aps->m_invLUT);
   //FREE_POINTER(aps->m_fwdLUT);
 
 }
 
-void kvz_init_lmcs_seq_stats(lmcs_seq_info* stats, int32_t m_binNum)
+void uvg_init_lmcs_seq_stats(lmcs_seq_info* stats, int32_t m_binNum)
 {
   for (int i = 0; i < m_binNum; i++)
   {
@@ -68,22 +68,22 @@ void kvz_init_lmcs_seq_stats(lmcs_seq_info* stats, int32_t m_binNum)
   stats->ratioStdV = 0.0;
 }
 
-void kvz_init_lmcs_aps(lmcs_aps* aps, int picWidth, int picHeight, uint32_t maxCUWidth, uint32_t maxCUHeight, int bitDepth)
+void uvg_init_lmcs_aps(lmcs_aps* aps, int picWidth, int picHeight, uint32_t maxCUWidth, uint32_t maxCUHeight, int bitDepth)
 {
   aps->m_lumaBD = bitDepth;
   aps->m_reshapeLUTSize = 1 << aps->m_lumaBD;
   aps->m_initCWAnalyze = aps->m_reshapeLUTSize / PIC_ANALYZE_CW_BINS;
   aps->m_initCW = aps->m_reshapeLUTSize / PIC_CODE_CW_BINS;
 
-  //aps->m_fwdLUT = calloc(1, sizeof(kvz_pixel) * aps->m_reshapeLUTSize);
-  //aps->m_invLUT = calloc(1, sizeof(kvz_pixel) * aps->m_reshapeLUTSize);
+  //aps->m_fwdLUT = calloc(1, sizeof(uvg_pixel) * aps->m_reshapeLUTSize);
+  //aps->m_invLUT = calloc(1, sizeof(uvg_pixel) * aps->m_reshapeLUTSize);
   assert(bitDepth <= 10); // ToDo: support bit depth larger than 10
 
-  memset(aps->m_fwdLUT, 0, sizeof(kvz_pixel) * aps->m_reshapeLUTSize);
-  memset(aps->m_invLUT, 0, sizeof(kvz_pixel) * aps->m_reshapeLUTSize);
+  memset(aps->m_fwdLUT, 0, sizeof(uvg_pixel) * aps->m_reshapeLUTSize);
+  memset(aps->m_invLUT, 0, sizeof(uvg_pixel) * aps->m_reshapeLUTSize);
   memset(aps->m_binImportance, 0, sizeof(uint32_t) * PIC_ANALYZE_CW_BINS);
-  memset(aps->m_reshapePivot, 0, sizeof(kvz_pixel) * PIC_CODE_CW_BINS + 1);
-  memset(aps->m_inputPivot, 0, sizeof(kvz_pixel) * PIC_CODE_CW_BINS + 1);
+  memset(aps->m_reshapePivot, 0, sizeof(uvg_pixel) * PIC_CODE_CW_BINS + 1);
+  memset(aps->m_inputPivot, 0, sizeof(uvg_pixel) * PIC_CODE_CW_BINS + 1);
 
   for (int i = 0; i < PIC_CODE_CW_BINS; i++) {
     aps->m_fwdScaleCoef[i] = 1 << FP_PREC;
@@ -106,8 +106,8 @@ void kvz_init_lmcs_aps(lmcs_aps* aps, int picWidth, int picHeight, uint32_t maxC
   aps->m_sliceReshapeInfo.chrResScalingOffset = 0;
 
   aps->m_binNum = PIC_CODE_CW_BINS;
-  kvz_init_lmcs_seq_stats(&aps->m_srcSeqStats, aps->m_binNum);
-  kvz_init_lmcs_seq_stats(&aps->m_rspSeqStats, aps->m_binNum);
+  uvg_init_lmcs_seq_stats(&aps->m_srcSeqStats, aps->m_binNum);
+  uvg_init_lmcs_seq_stats(&aps->m_rspSeqStats, aps->m_binNum);
 }
 
 /**
@@ -118,12 +118,12 @@ void kvz_init_lmcs_aps(lmcs_aps* aps, int picWidth, int picHeight, uint32_t maxC
 From VTM 12.1
 */
 
-void kvz_calc_seq_stats(struct encoder_state_t* const state, const videoframe_t* frame, lmcs_seq_info* stats, lmcs_aps* aps)
+void uvg_calc_seq_stats(struct encoder_state_t* const state, const videoframe_t* frame, lmcs_seq_info* stats, lmcs_aps* aps)
 {
   const encoder_control_t* const encoder = state->encoder_control;
 
   int32_t m_binNum = PIC_CODE_CW_BINS;
-  kvz_pixel* picY = &frame->source->y[0];
+  uvg_pixel* picY = &frame->source->y[0];
   const int width = frame->source->width;
   const int height = frame->source->height;
   const int stride = frame->source->stride;
@@ -148,12 +148,12 @@ void kvz_calc_seq_stats(struct encoder_state_t* const state, const videoframe_t*
   memset(topColSumSq, 0, width * sizeof(int64_t));
   memset(binCnt, 0, m_binNum * sizeof(uint32_t));
     
-  kvz_init_lmcs_seq_stats(stats,m_binNum);
+  uvg_init_lmcs_seq_stats(stats,m_binNum);
   for (uint32_t y = 0; y < height; y++)
   {
     for (uint32_t x = 0; x < width; x++)
     {
-      const kvz_pixel pxlY = picY[x];
+      const uvg_pixel pxlY = picY[x];
       int64_t sum = 0, sumSq = 0;
       uint32_t numPixInPart = 0;
       uint32_t y1 = MAX((int)(y - winLens), 0);
@@ -161,7 +161,7 @@ void kvz_calc_seq_stats(struct encoder_state_t* const state, const videoframe_t*
       uint32_t x1 = MAX((int)(x - winLens), 0);
       uint32_t x2 = MIN((int)(x + winLens), (width - 1));
       uint32_t bx = 0, by = 0;
-      const kvz_pixel* pWinY = &picY[0];
+      const uvg_pixel* pWinY = &picY[0];
       numPixInPart = (x2 - x1 + 1) * (y2 - y1 + 1);
 
       if (x == 0 && y == 0)
@@ -348,13 +348,13 @@ void kvz_calc_seq_stats(struct encoder_state_t* const state, const videoframe_t*
   avgY = avgY / (width * height);
   varY = varY / (width * height) - avgY * avgY;
 
-  if (encoder->chroma_format != KVZ_CSP_400)
+  if (encoder->chroma_format != UVG_CSP_400)
   {
     // ToDo: Handle other than YUV 4:2:0
-    assert(encoder->chroma_format == KVZ_CSP_420);
+    assert(encoder->chroma_format == UVG_CSP_420);
 
-    kvz_pixel* picU = &frame->source->u[CU_TO_PIXEL(0, 0, 0, frame->source->stride/2)];
-    kvz_pixel* picV = &frame->source->v[CU_TO_PIXEL(0, 0, 0, frame->source->stride / 2)];
+    uvg_pixel* picU = &frame->source->u[CU_TO_PIXEL(0, 0, 0, frame->source->stride/2)];
+    uvg_pixel* picV = &frame->source->v[CU_TO_PIXEL(0, 0, 0, frame->source->stride / 2)];
     const int widthC = frame->source->width/2;
     const int heightC = frame->source->height/2;
     const int strideC = frame->source->stride/2;
@@ -550,7 +550,7 @@ static void deriveReshapeParametersSDR(lmcs_aps* aps, bool* intraAdp, bool* inte
 
   cwPerturbation(aps, startBinIdx, endBinIdx, (uint16_t)aps->m_reshapeCW.binCW[1]);
   cwReduction(aps, startBinIdx, endBinIdx);
-  kvz_init_lmcs_seq_stats(&aps->m_rspSeqStats, aps->m_binNum);
+  uvg_init_lmcs_seq_stats(&aps->m_rspSeqStats, aps->m_binNum);
 
   for (int b = 0; b < aps->m_binNum; b++)
   {
@@ -837,15 +837,15 @@ static void deriveReshapeParameters(double* array, int start, int end, ReshapeCW
   *beta = (maxCW * maxVar - minCW * minVar) / (maxVar - minVar);
 }
 
-void kvz_lmcs_preanalyzer(struct encoder_state_t* const state, const videoframe_t* frame, lmcs_aps* aps, uint32_t signalType)
+void uvg_lmcs_preanalyzer(struct encoder_state_t* const state, const videoframe_t* frame, lmcs_aps* aps, uint32_t signalType)
 {
 
-  enum kvz_slice_type sliceType = state->frame->slicetype;
+  enum uvg_slice_type sliceType = state->frame->slicetype;
   aps->m_sliceReshapeInfo.sliceReshaperModelPresentFlag = true;
   aps->m_sliceReshapeInfo.sliceReshaperEnableFlag = true;
 
   int modIP = state->frame->poc - state->frame->poc / aps->m_reshapeCW.rspFpsToIp * aps->m_reshapeCW.rspFpsToIp;
-  if (sliceType == KVZ_SLICE_I || (aps->m_reshapeCW.updateCtrl == 2 && modIP == 0))
+  if (sliceType == UVG_SLICE_I || (aps->m_reshapeCW.updateCtrl == 2 && modIP == 0))
   {
     if (aps->m_sliceReshapeInfo.sliceReshaperModelPresentFlag == true)
     {
@@ -871,7 +871,7 @@ void kvz_lmcs_preanalyzer(struct encoder_state_t* const state, const videoframe_
       aps->m_rateAdpMode = 0;  aps->m_tcase = 0;
       bool intraAdp = true, interAdp = true;
 
-      kvz_calc_seq_stats(state, frame, &aps->m_srcSeqStats, aps);
+      uvg_calc_seq_stats(state, frame, &aps->m_srcSeqStats, aps);
 
       bool isFlat = true;
       for (int b = 0; b < aps->m_binNum; b++)
@@ -1041,7 +1041,7 @@ void kvz_lmcs_preanalyzer(struct encoder_state_t* const state, const videoframe_
           aps->m_binNum = PIC_ANALYZE_CW_BINS;
           startBinIdx = startBinIdx * 2;
           endBinIdx = endBinIdx * 2 + 1;
-          kvz_calc_seq_stats(state, frame, &aps->m_srcSeqStats, aps);
+          uvg_calc_seq_stats(state, frame, &aps->m_srcSeqStats, aps);
         }
         double alpha = 1.0, beta = 0.0;
         deriveReshapeParameters(aps->m_srcSeqStats.binVar, startBinIdx, endBinIdx, &aps->m_reshapeCW, &alpha, &beta);
@@ -1082,18 +1082,18 @@ void kvz_lmcs_preanalyzer(struct encoder_state_t* const state, const videoframe_
       if (aps->m_sliceReshapeInfo.sliceReshaperEnableFlag)
       {
         aps->m_binNum = PIC_CODE_CW_BINS;
-        kvz_pixel* picY = &frame->source->y[0];
+        uvg_pixel* picY = &frame->source->y[0];
         const int width = frame->source->width;
         const int height = frame->source->height;
         const int stride = frame->source->stride;
         uint32_t binCnt[PIC_CODE_CW_BINS] = { 0 };
         
-        kvz_init_lmcs_seq_stats(&aps->m_srcSeqStats, aps->m_binNum);
+        uvg_init_lmcs_seq_stats(&aps->m_srcSeqStats, aps->m_binNum);
         for (uint32_t y = 0; y < height; y++)
         {
           for (uint32_t x = 0; x < width; x++)
           {
-            const kvz_pixel pxlY = picY[x];
+            const uvg_pixel pxlY = picY[x];
             int binLen = aps->m_reshapeLUTSize / aps->m_binNum;
             uint32_t binIdx = (uint32_t)(pxlY / binLen);
             binCnt[binIdx]++;
@@ -1121,13 +1121,13 @@ void kvz_lmcs_preanalyzer(struct encoder_state_t* const state, const videoframe_
         avgY = avgY / (width * height);
         varY = varY / (width * height) - avgY * avgY;
 
-        if (frame->source->chroma_format != KVZ_CSP_400)
+        if (frame->source->chroma_format != UVG_CSP_400)
         {
           // ToDo: Handle other than YUV 4:2:0
-          assert(frame->source->chroma_format == KVZ_CSP_420);
+          assert(frame->source->chroma_format == UVG_CSP_420);
 
-          kvz_pixel* picU = &frame->source->u[0];
-          kvz_pixel* picV = &frame->source->v[0];
+          uvg_pixel* picU = &frame->source->u[0];
+          uvg_pixel* picV = &frame->source->v[0];
           const int widthC = frame->source->width>>1;
           const int heightC = frame->source->height>>1;
           const int strideC = frame->source->stride>>1;
@@ -1180,7 +1180,7 @@ static void adjust_lmcs_pivot(lmcs_aps* aps)
   int bdShift = aps->m_lumaBD - 10;
   int totCW = bdShift != 0 ? (bdShift > 0 ? aps->m_reshapeLUTSize / (1 << bdShift) : aps->m_reshapeLUTSize * (1 << (-bdShift))) : aps->m_reshapeLUTSize;
   int orgCW = totCW / PIC_CODE_CW_BINS;
-  int log2SegSize = aps->m_lumaBD - 5;//kvz_math_floor_log2(LMCS_SEG_NUM);
+  int log2SegSize = aps->m_lumaBD - 5;//uvg_math_floor_log2(LMCS_SEG_NUM);
 
   aps->m_reshapePivot[0] = 0;
   for (int i = 0; i < PIC_CODE_CW_BINS; i++)
@@ -1254,12 +1254,12 @@ static int get_pwl_idx_inv(lmcs_aps* aps,int lumaVal)
   return MIN(idxS, PIC_CODE_CW_BINS - 1);
 }
 
-void kvz_construct_reshaper_lmcs(lmcs_aps* aps)
+void uvg_construct_reshaper_lmcs(lmcs_aps* aps)
 {
   int bdShift = aps->m_lumaBD - 10;
   int totCW = bdShift != 0 ? (bdShift > 0 ? aps->m_reshapeLUTSize / (1 << bdShift) : aps->m_reshapeLUTSize * (1 << (-bdShift))) : aps->m_reshapeLUTSize;
   int histLenth = totCW / aps->m_binNum;
-  int log2HistLenth = kvz_math_floor_log2(histLenth);
+  int log2HistLenth = uvg_math_floor_log2(histLenth);
   int i;
 
   if (aps->m_binNum == PIC_ANALYZE_CW_BINS)
@@ -1314,10 +1314,10 @@ void kvz_construct_reshaper_lmcs(lmcs_aps* aps)
       maxAbsDeltaCW = absDeltaCW;
     }
   }
-  aps->m_sliceReshapeInfo.maxNbitsNeededDeltaCW = (maxAbsDeltaCW == 0) ? 1 : MAX(1, 1 + kvz_math_floor_log2(maxAbsDeltaCW));
+  aps->m_sliceReshapeInfo.maxNbitsNeededDeltaCW = (maxAbsDeltaCW == 0) ? 1 : MAX(1, 1 + uvg_math_floor_log2(maxAbsDeltaCW));
 
   histLenth = aps->m_initCW;
-  log2HistLenth = kvz_math_floor_log2(histLenth);
+  log2HistLenth = uvg_math_floor_log2(histLenth);
 
   int sumBins = 0;
   for (i = 0; i < PIC_CODE_CW_BINS; i++) { sumBins += aps->m_binCW[i]; }
@@ -1341,11 +1341,11 @@ void kvz_construct_reshaper_lmcs(lmcs_aps* aps)
   {
     int idxY = lumaSample / aps->m_initCW;
     int tempVal = aps->m_reshapePivot[idxY] + ((aps->m_fwdScaleCoef[idxY] * (lumaSample - aps->m_inputPivot[idxY]) + (1 << (FP_PREC - 1))) >> FP_PREC);
-    aps->m_fwdLUT[lumaSample] = CLIP((kvz_pixel)0, (kvz_pixel)((1 << aps->m_lumaBD) - 1), (kvz_pixel)(tempVal));
+    aps->m_fwdLUT[lumaSample] = CLIP((uvg_pixel)0, (uvg_pixel)((1 << aps->m_lumaBD) - 1), (uvg_pixel)(tempVal));
 
     int idxYInv = get_pwl_idx_inv(aps,lumaSample);
     int invSample = aps->m_inputPivot[idxYInv] + ((aps->m_invScaleCoef[idxYInv] * (lumaSample - aps->m_reshapePivot[idxYInv]) + (1 << (FP_PREC - 1))) >> FP_PREC);
-    aps->m_invLUT[lumaSample] = CLIP((kvz_pixel)0, (kvz_pixel)((1 << aps->m_lumaBD) - 1), (kvz_pixel)(invSample));
+    aps->m_invLUT[lumaSample] = CLIP((uvg_pixel)0, (uvg_pixel)((1 << aps->m_lumaBD) - 1), (uvg_pixel)(invSample));
   }
   for (i = 0; i < PIC_CODE_CW_BINS; i++)
   {
@@ -1377,10 +1377,10 @@ static void code_lmcs_aps(encoder_state_t* const state, lmcs_aps* aps)
     }
   }
   
-  int deltaCRS = state->encoder_control->chroma_format != KVZ_CSP_400 ? aps->m_sliceReshapeInfo.chrResScalingOffset : 0;
+  int deltaCRS = state->encoder_control->chroma_format != UVG_CSP_400 ? aps->m_sliceReshapeInfo.chrResScalingOffset : 0;
   int signCRS = (deltaCRS < 0) ? 1 : 0;
   int absCRS = (deltaCRS < 0) ? (-deltaCRS) : deltaCRS;
-  if (state->encoder_control->chroma_format != KVZ_CSP_400)
+  if (state->encoder_control->chroma_format != UVG_CSP_400)
   {
     WRITE_U(stream, absCRS, 3, "lmcs_delta_abs_crs");
   }
@@ -1392,27 +1392,27 @@ static void code_lmcs_aps(encoder_state_t* const state, lmcs_aps* aps)
 
 
 
-void kvz_encode_lmcs_adaptive_parameter_set(encoder_state_t* const state)
+void uvg_encode_lmcs_adaptive_parameter_set(encoder_state_t* const state)
 {
   bitstream_t* const stream = &state->stream;
 
   if (state->tile->frame->lmcs_aps->m_sliceReshapeInfo.sliceReshaperEnableFlag) {
     
-    kvz_nal_write(stream, NAL_UNIT_PREFIX_APS, 0, state->frame->first_nal);
+    uvg_nal_write(stream, NAL_UNIT_PREFIX_APS, 0, state->frame->first_nal);
     state->frame->first_nal = false;
-#ifdef KVZ_DEBUG
+#ifdef UVG_DEBUG
   printf("=========== Adaptation Parameter Set  ===========\n");
 #endif
    
 
    WRITE_U(stream, (int)1/*LMCS_APS*/, 3, "aps_params_type");
    WRITE_U(stream, 0, 5, "adaptation_parameter_set_id");
-   WRITE_U(stream, state->encoder_control->chroma_format != KVZ_CSP_400, 1, "aps_chroma_present_flag");
+   WRITE_U(stream, state->encoder_control->chroma_format != UVG_CSP_400, 1, "aps_chroma_present_flag");
 
    code_lmcs_aps(state, state->tile->frame->lmcs_aps);
 
    WRITE_U(stream, 0, 1, "aps_extension_flag"); //Implementation when this flag is equal to 1 should be added when it is needed. Currently in the spec we don't have case when this flag is equal to 1
-   kvz_bitstream_add_rbsp_trailing_bits(stream);
+   uvg_bitstream_add_rbsp_trailing_bits(stream);
     
   }
 }
@@ -1438,7 +1438,7 @@ static int getPWLIdxInv(lmcs_aps* aps, int lumaVal)
 * \return chroma residue scale
 * From VTM 13.0
 */
-static int calculate_lmcs_chroma_adj(lmcs_aps* aps, kvz_pixel avgLuma)
+static int calculate_lmcs_chroma_adj(lmcs_aps* aps, uvg_pixel avgLuma)
 {
   int iAdj = aps->m_chromaAdjHelpLUT[getPWLIdxInv(aps, avgLuma)];
   return iAdj;
@@ -1449,7 +1449,7 @@ static int calculate_lmcs_chroma_adj(lmcs_aps* aps, kvz_pixel avgLuma)
 * \return chroma residue scale
 * From VTM 13.0
 */
-int kvz_calculate_lmcs_chroma_adj_vpdu_nei(encoder_state_t* const state, lmcs_aps* aps, int x, int y)
+int uvg_calculate_lmcs_chroma_adj_vpdu_nei(encoder_state_t* const state, lmcs_aps* aps, int x, int y)
 {
   int xPos = x;
   int yPos = y;
@@ -1458,7 +1458,7 @@ int kvz_calculate_lmcs_chroma_adj_vpdu_nei(encoder_state_t* const state, lmcs_ap
   int y_in_lcu = yPos / LCU_WIDTH;
 
   int numNeighbor = MIN(64, LCU_WIDTH);
-  int numNeighborLog = kvz_math_floor_log2(numNeighbor);
+  int numNeighborLog = uvg_math_floor_log2(numNeighbor);
 
   xPos = (xPos / LCU_WIDTH) * LCU_WIDTH;
   yPos = (yPos / LCU_WIDTH) * LCU_WIDTH;
@@ -1480,11 +1480,11 @@ int kvz_calculate_lmcs_chroma_adj_vpdu_nei(encoder_state_t* const state, lmcs_ap
     int chromaScale = (1 << CSCALE_FP_PREC);
     int lumaValue = -1;
 
-    kvz_pixel* recSrc0 = &state->tile->frame->rec_lmcs->y[xPos + yPos * strideY];
+    uvg_pixel* recSrc0 = &state->tile->frame->rec_lmcs->y[xPos + yPos * strideY];
 
     const uint32_t picH = state->tile->frame->height;
     const uint32_t picW = state->tile->frame->width;
-    const kvz_pixel valueDC = 1 << (KVZ_BIT_DEPTH - 1);
+    const uvg_pixel valueDC = 1 << (UVG_BIT_DEPTH - 1);
     int32_t recLuma = 0;
     int pelnum = 0;
     if (left_cu)

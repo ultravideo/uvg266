@@ -33,8 +33,8 @@
 #include "strategies/avx2/sao-avx2.h"
 
 #if COMPILE_INTEL_AVX2
-#include "kvazaar.h"
-#if KVZ_BIT_DEPTH == 8
+#include "uvg266.h"
+#if UVG_BIT_DEPTH == 8
 #include <immintrin.h>
 #include <nmmintrin.h>
 
@@ -897,21 +897,21 @@ use_generic:
       block_height, band_pos, sao_bands);
 }
 
-#endif // KVZ_BIT_DEPTH == 8
+#endif // UVG_BIT_DEPTH == 8
 #endif //COMPILE_INTEL_AVX2
 
-int kvz_strategy_register_sao_avx2(void* opaque, uint8_t bitdepth)
+int uvg_strategy_register_sao_avx2(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
 #if COMPILE_INTEL_AVX2
-#if KVZ_BIT_DEPTH == 8
+#if UVG_BIT_DEPTH == 8
   if (bitdepth == 8) {
-    success &= kvz_strategyselector_register(opaque, "sao_edge_ddistortion", "avx2", 40, &sao_edge_ddistortion_avx2);
-    success &= kvz_strategyselector_register(opaque, "calc_sao_edge_dir", "avx2", 40, &calc_sao_edge_dir_avx2);
-    success &= kvz_strategyselector_register(opaque, "sao_reconstruct_color", "avx2", 40, &sao_reconstruct_color_avx2);
-    success &= kvz_strategyselector_register(opaque, "sao_band_ddistortion", "avx2", 40, &sao_band_ddistortion_avx2);
+    success &= uvg_strategyselector_register(opaque, "sao_edge_ddistortion", "avx2", 40, &sao_edge_ddistortion_avx2);
+    success &= uvg_strategyselector_register(opaque, "calc_sao_edge_dir", "avx2", 40, &calc_sao_edge_dir_avx2);
+    success &= uvg_strategyselector_register(opaque, "sao_reconstruct_color", "avx2", 40, &sao_reconstruct_color_avx2);
+    success &= uvg_strategyselector_register(opaque, "sao_band_ddistortion", "avx2", 40, &sao_band_ddistortion_avx2);
   }
-#endif // KVZ_BIT_DEPTH == 8
+#endif // UVG_BIT_DEPTH == 8
 #endif //COMPILE_INTEL_AVX2
   return success;
 }

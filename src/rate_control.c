@@ -35,7 +35,7 @@
 #include <math.h>
 
 #include "encoder.h"
-#include "kvazaar.h"
+#include "uvg266.h"
 #include "pthread.h"
 
 
@@ -45,7 +45,7 @@ static const double MIN_LAMBDA    = 0.1;
 static const double MAX_LAMBDA    = 10000;
 #define BETA1 1.2517
 
-static kvz_rc_data *data;
+static uvg_rc_data *data;
 
 static FILE *dist_file;
 static FILE *bits_file;
@@ -60,22 +60,22 @@ static double clip_lambda(double lambda) {
   return CLIP(MIN_LAMBDA, MAX_LAMBDA, lambda);
 }
 
-kvz_rc_data * kvz_get_rc_data(const encoder_control_t * const encoder) {
+uvg_rc_data * uvg_get_rc_data(const encoder_control_t * const encoder) {
   if (data != NULL || encoder == NULL) return data;
 
-  data = calloc(1, sizeof(kvz_rc_data));
+  data = calloc(1, sizeof(uvg_rc_data));
 
   if (data == NULL) return NULL;
   if (pthread_mutex_init(&data->ck_frame_lock, NULL) != 0) return NULL;
   if (pthread_mutex_init(&data->lambda_lock, NULL) != 0) return NULL;
   if (pthread_mutex_init(&data->intra_lock, NULL) != 0) return NULL;
-  for (int (i) = 0; (i) < KVZ_MAX_GOP_LAYERS; ++(i)) {
+  for (int (i) = 0; (i) < UVG_MAX_GOP_LAYERS; ++(i)) {
     if (pthread_rwlock_init(&data->ck_ctu_lock[i], NULL) != 0) return NULL;
   }
 
   const int num_lcus = encoder->in.width_in_lcu * encoder->in.height_in_lcu;
 
-  for (int i = 0; i < KVZ_MAX_GOP_LAYERS; i++) {
+  for (int i = 0; i < UVG_MAX_GOP_LAYERS; i++) {
     data->c_para[i] = malloc(sizeof(double) * num_lcus);
     if (data->c_para[i] == NULL) return NULL;
 
@@ -118,19 +118,19 @@ kvz_rc_data * kvz_get_rc_data(const encoder_control_t * const encoder) {
   return data;
 }
 
-void kvz_free_rc_data() {
+void uvg_free_rc_data() {
   if (data == NULL) return;
 
   pthread_mutex_destroy(&data->ck_frame_lock);
   pthread_mutex_destroy(&data->lambda_lock);
   pthread_mutex_destroy(&data->intra_lock);
-  for (int i = 0; i < KVZ_MAX_GOP_LAYERS; ++i) {
+  for (int i = 0; i < UVG_MAX_GOP_LAYERS; ++i) {
     pthread_rwlock_destroy(&data->ck_ctu_lock[i]);
   }
 
   if (data->intra_bpp) FREE_POINTER(data->intra_bpp);
   if (data->intra_dis) FREE_POINTER(data->intra_dis);
-  for (int i = 0; i < KVZ_MAX_GOP_LAYERS; i++) {
+  for (int i = 0; i < UVG_MAX_GOP_LAYERS; i++) {
     if (data->c_para[i]) FREE_POINTER(data->c_para[i]);
     if (data->k_para[i]) FREE_POINTER(data->k_para[i]);
   }
@@ -205,7 +205,7 @@ static double gop_allocate_bits(encoder_state_t * const state)
   return MAX(200, gop_target_bits);
 }
 
-static int xCalcHADs8x8_ISlice(kvz_pixel * piOrg, int y, int iStrideOrg)
+static int xCalcHADs8x8_ISlice(uvg_pixel * piOrg, int y, int iStrideOrg)
 {
   piOrg += y * iStrideOrg;
   int i, j;
@@ -302,7 +302,7 @@ static int xCalcHADs8x8_ISlice(kvz_pixel * piOrg, int y, int iStrideOrg)
  */
 static uint64_t pic_header_bits(encoder_state_t * const state)
 {
-  const kvz_config* cfg = &state->encoder_control->cfg;
+  const uvg_config* cfg = &state->encoder_control->cfg;
 
   // nal type and slice header
   uint64_t bits = 48 + 24;
@@ -311,15 +311,15 @@ static uint64_t pic_header_bits(encoder_state_t * const state)
   bits += 12 * state->encoder_control->in.height_in_lcu;
 
   switch (cfg->hash) {
-    case KVZ_HASH_CHECKSUM:
+    case UVG_HASH_CHECKSUM:
       bits += 168;
       break;
 
-    case KVZ_HASH_MD5:
+    case UVG_HASH_MD5:
       bits += 456;
       break;
 
-    case KVZ_HASH_NONE:
+    case UVG_HASH_NONE:
       break;
   }
 
@@ -361,7 +361,7 @@ static double pic_allocate_bits(encoder_state_t * const state)
       for (int x = 0; x < encoder->cfg.width; x += 8) {
         int cost = xCalcHADs8x8_ISlice(state->tile->frame->source->y + x, y, state->tile->frame->source->stride);
         total_cost += cost;
-        kvz_get_lcu_stats(state, x / 64, y / 64)->i_cost += cost;
+        uvg_get_lcu_stats(state, x / 64, y / 64)->i_cost += cost;
       }
     }
     state->frame->icost = total_cost;
@@ -489,7 +489,7 @@ static INLINE double calculate_weights(encoder_state_t* const state, const int c
 }
 
 
-void kvz_estimate_pic_lambda(encoder_state_t * const state) {
+void uvg_estimate_pic_lambda(encoder_state_t * const state) {
   const encoder_control_t * const encoder = state->encoder_control;
 
   const int layer = encoder->cfg.gop[state->frame->gop_offset].layer - (state->frame->is_irap ? 1 : 0);
@@ -608,7 +608,7 @@ static double get_ctu_bits(encoder_state_t * const state, vector2d_t pos) {
     if(encoder->cfg.intra_bit_allocation) {
       int cus_left = num_ctu - index + 1;
       int window = MIN(4, cus_left);
-      double mad = kvz_get_lcu_stats(state, pos.x, pos.y)->i_cost;
+      double mad = uvg_get_lcu_stats(state, pos.x, pos.y)->i_cost;
 
       pthread_mutex_lock(&state->frame->rc_lock);
       double bits_left = state->frame->cur_pic_target_bits - state->frame->cur_frame_bits_coded;
@@ -643,7 +643,7 @@ static double get_ctu_bits(encoder_state_t * const state, vector2d_t pos) {
     target_bits = MAX(target_bits + state->frame->cur_pic_target_bits - state->frame->cur_frame_bits_coded - (int)total_weight, 10);
     pthread_mutex_unlock(&state->frame->rc_lock);
 
-    //just similar with the process at frame level, details can refer to the function kvz_estimate_pic_lambda
+    //just similar with the process at frame level, details can refer to the function uvg_estimate_pic_lambda
     do {
       taylor_e3 = 0.0;
       best_lambda = solve_cubic_equation(state->frame, index, last_ctu, temp_lambda, target_bits);
@@ -683,14 +683,14 @@ static double qp_to_lambda(encoder_state_t* const state, int qp)
   // NOTE: HM adjusts lambda for inter according to Hadamard usage in ME.
   //       SATD is currently always enabled for ME, so this has no effect.
   // bool hadamard_me = true;
-  // if (!hadamard_me && state->frame->slicetype != KVZ_SLICE_I) {
+  // if (!hadamard_me && state->frame->slicetype != UVG_SLICE_I) {
   //   lambda *= 0.95;
   // }
 
   return lambda;
 }
 
- void kvz_set_ctu_qp_lambda(encoder_state_t * const state, vector2d_t pos) {
+ void uvg_set_ctu_qp_lambda(encoder_state_t * const state, vector2d_t pos) {
   double bits = get_ctu_bits(state, pos);
 
   const encoder_control_t * const encoder = state->encoder_control;
@@ -818,7 +818,7 @@ static double qp_to_lambda(encoder_state_t* const state, int qp)
     // Maximum delta QP is clipped according to ITU T-REC-H.265 specification chapter 7.4.9.10 Transform unit semantics
     // Clipping range is a function of bit depth
     // Since this value will be later combined with qp_pred, clip to half of that instead to be safe
-    state->qp = CLIP(state->frame->QP + KVZ_QP_DELTA_MIN / 2, state->frame->QP + KVZ_QP_DELTA_MAX / 2, state->qp);
+    state->qp = CLIP(state->frame->QP + UVG_QP_DELTA_MIN / 2, state->frame->QP + UVG_QP_DELTA_MAX / 2, state->qp);
     state->qp = CLIP_TO_QP(state->qp);
     state->lambda = qp_to_lambda(state, state->qp);
     state->lambda_sqrt = sqrt(state->lambda);
@@ -904,7 +904,7 @@ static int calc_poc(encoder_state_t * const state) {
 }
 
 
-void kvz_update_after_picture(encoder_state_t * const state) {
+void uvg_update_after_picture(encoder_state_t * const state) {
   double total_distortion = 0;
   double lambda = 0;
   int32_t pixels = (state->encoder_control->in.width * state->encoder_control->in.height);
@@ -936,7 +936,7 @@ void kvz_update_after_picture(encoder_state_t * const state) {
   for(int y_ctu = 0; y_ctu < state->encoder_control->in.height_in_lcu; y_ctu++) {
     for (int x_ctu = 0; x_ctu < state->encoder_control->in.width_in_lcu; x_ctu++) {
       int ctu_distortion = 0;
-      lcu_stats_t *ctu = kvz_get_lcu_stats(state, x_ctu, y_ctu);
+      lcu_stats_t *ctu = uvg_get_lcu_stats(state, x_ctu, y_ctu);
       for (int y = y_ctu * 64; y < MIN((y_ctu + 1) * 64, state->tile->frame->height); y++) {
         for (int x = x_ctu * 64; x < MIN((x_ctu + 1) * 64, state->tile->frame->width); x++) {
           int temp = (int)state->tile->frame->source->y[x + y * state->encoder_control->in.width] -
@@ -962,14 +962,14 @@ void kvz_update_after_picture(encoder_state_t * const state) {
     }
   }
 
-  if(encoder->cfg.stats_file_prefix && encoder->cfg.rc_algorithm != KVZ_OBA) return;
+  if(encoder->cfg.stats_file_prefix && encoder->cfg.rc_algorithm != UVG_OBA) return;
 
   total_distortion /= (state->encoder_control->in.height_in_lcu * state->encoder_control->in.width_in_lcu);
   if (state->frame->is_irap) {
     pthread_mutex_lock(&state->frame->new_ratecontrol->intra_lock);
     for (int y_ctu = 0; y_ctu < state->encoder_control->in.height_in_lcu; y_ctu++) {
       for (int x_ctu = 0; x_ctu < state->encoder_control->in.width_in_lcu; x_ctu++) {
-        lcu_stats_t *ctu = kvz_get_lcu_stats(state, x_ctu, y_ctu);
+        lcu_stats_t *ctu = uvg_get_lcu_stats(state, x_ctu, y_ctu);
         state->frame->new_ratecontrol->intra_dis[x_ctu + y_ctu * state->encoder_control->in.width_in_lcu] =
           ctu->distortion;
         state->frame->new_ratecontrol->intra_bpp[x_ctu + y_ctu * state->encoder_control->in.width_in_lcu] =
@@ -1012,7 +1012,7 @@ void kvz_update_after_picture(encoder_state_t * const state) {
  * \brief Allocate bits and set lambda and QP for the current picture.
  * \param state the main encoder state
  */
-void kvz_set_picture_lambda_and_qp(encoder_state_t * const state)
+void uvg_set_picture_lambda_and_qp(encoder_state_t * const state)
 {
   const encoder_control_t * const ctrl = state->encoder_control;
 
@@ -1039,10 +1039,10 @@ void kvz_set_picture_lambda_and_qp(encoder_state_t * const state)
 
   } else {
     // Rate control disabled
-    kvz_gop_config const * const gop = &ctrl->cfg.gop[state->frame->gop_offset];
+    uvg_gop_config const * const gop = &ctrl->cfg.gop[state->frame->gop_offset];
     const int gop_len = ctrl->cfg.gop_len;
 
-    if (gop_len > 0 && state->frame->slicetype != KVZ_SLICE_I) {
+    if (gop_len > 0 && state->frame->slicetype != UVG_SLICE_I) {
       double qp = ctrl->cfg.qp;
       qp += gop->qp_offset;
       qp += CLIP(0.0, 3.0, qp * gop->qp_model_scale + gop->qp_model_offset);
@@ -1068,7 +1068,7 @@ static double lcu_allocate_bits(encoder_state_t * const state,
 {
   double lcu_weight;
   if (state->frame->num > state->encoder_control->cfg.owf) {
-    lcu_weight = kvz_get_lcu_stats(state, pos.x, pos.y)->weight;
+    lcu_weight = uvg_get_lcu_stats(state, pos.x, pos.y)->weight;
   } else {
     const uint32_t num_lcus = state->encoder_control->in.width_in_lcu *
                               state->encoder_control->in.height_in_lcu;
@@ -1082,11 +1082,11 @@ static double lcu_allocate_bits(encoder_state_t * const state,
   return MAX(1, lcu_target_bits);
 }
 
-void kvz_set_lcu_lambda_and_qp(encoder_state_t * const state,
+void uvg_set_lcu_lambda_and_qp(encoder_state_t * const state,
                                vector2d_t pos)
 {
   const encoder_control_t * const ctrl = state->encoder_control;
-  lcu_stats_t *lcu = kvz_get_lcu_stats(state, pos.x, pos.y);
+  lcu_stats_t *lcu = uvg_get_lcu_stats(state, pos.x, pos.y);
 
   if (ctrl->cfg.roi.dqps != NULL) {
     vector2d_t lcu = {
@@ -1165,7 +1165,7 @@ void kvz_set_lcu_lambda_and_qp(encoder_state_t * const state,
     // Maximum delta QP is clipped according to ITU T-REC-H.265 specification chapter 7.4.9.10 Transform unit semantics
     // Clipping range is a function of bit depth
     // Since this value will be later combined with qp_pred, clip to half of that instead to be safe
-    state->qp = CLIP(state->frame->QP + KVZ_QP_DELTA_MIN / 2, state->frame->QP + KVZ_QP_DELTA_MAX / 2, state->qp);
+    state->qp = CLIP(state->frame->QP + UVG_QP_DELTA_MIN / 2, state->frame->QP + UVG_QP_DELTA_MAX / 2, state->qp);
     state->qp = CLIP_TO_QP(state->qp);
     state->lambda = qp_to_lambda(state, state->qp);
     state->lambda_sqrt = sqrt(state->lambda);

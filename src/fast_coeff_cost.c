@@ -31,7 +31,7 @@
  ****************************************************************************/
  
 #include "fast_coeff_cost.h"
-#include "kvazaar.h"
+#include "uvg266.h"
 #include "encoderstate.h"
 
 // Note: Assumes that costs are non-negative, for pretty obvious reasons
@@ -52,7 +52,7 @@ static uint64_t to_4xq88(const float f[4])
   return result;
 }
 
-int kvz_fast_coeff_table_parse(fast_coeff_table_t *fast_coeff_table, FILE *fast_coeff_table_f)
+int uvg_fast_coeff_table_parse(fast_coeff_table_t *fast_coeff_table, FILE *fast_coeff_table_f)
 {
   int i;
   uint64_t *wts_by_qp = fast_coeff_table->wts_by_qp;
@@ -71,7 +71,7 @@ int kvz_fast_coeff_table_parse(fast_coeff_table_t *fast_coeff_table, FILE *fast_
   return 0;
 }
 
-void kvz_fast_coeff_use_default_table(fast_coeff_table_t *fast_coeff_table)
+void uvg_fast_coeff_use_default_table(fast_coeff_table_t *fast_coeff_table)
 {
   int i;
   uint64_t *wts_by_qp = fast_coeff_table->wts_by_qp;
@@ -81,7 +81,7 @@ void kvz_fast_coeff_use_default_table(fast_coeff_table_t *fast_coeff_table)
   }
 }
 
-uint64_t kvz_fast_coeff_get_weights(const encoder_state_t *state)
+uint64_t uvg_fast_coeff_get_weights(const encoder_state_t *state)
 {
   const fast_coeff_table_t *table = &(state->encoder_control->fast_coeff_table);
   return table->wts_by_qp[state->qp];

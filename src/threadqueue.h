@@ -44,17 +44,17 @@
 typedef struct threadqueue_job_t threadqueue_job_t;
 typedef struct threadqueue_queue_t threadqueue_queue_t;
 
-threadqueue_queue_t * kvz_threadqueue_init(int thread_count);
+threadqueue_queue_t * uvg_threadqueue_init(int thread_count);
 
-threadqueue_job_t * kvz_threadqueue_job_create(void (*fptr)(void *arg), void *arg);
-int kvz_threadqueue_submit(threadqueue_queue_t * threadqueue, threadqueue_job_t *job);
+threadqueue_job_t * uvg_threadqueue_job_create(void (*fptr)(void *arg), void *arg);
+int uvg_threadqueue_submit(threadqueue_queue_t * threadqueue, threadqueue_job_t *job);
 
-int kvz_threadqueue_job_dep_add(threadqueue_job_t *job, threadqueue_job_t *dependency);
+int uvg_threadqueue_job_dep_add(threadqueue_job_t *job, threadqueue_job_t *dependency);
 
-threadqueue_job_t *kvz_threadqueue_copy_ref(threadqueue_job_t *job);
+threadqueue_job_t *uvg_threadqueue_copy_ref(threadqueue_job_t *job);
 
-void kvz_threadqueue_free_job(threadqueue_job_t **job_ptr);
+void uvg_threadqueue_free_job(threadqueue_job_t **job_ptr);
 
-int kvz_threadqueue_waitfor(threadqueue_queue_t * threadqueue, threadqueue_job_t * job);
-int kvz_threadqueue_stop(threadqueue_queue_t * threadqueue);
-void kvz_threadqueue_free(threadqueue_queue_t * threadqueue);
+int uvg_threadqueue_waitfor(threadqueue_queue_t * threadqueue, threadqueue_job_t * job);
+int uvg_threadqueue_stop(threadqueue_queue_t * threadqueue);
+void uvg_threadqueue_free(threadqueue_queue_t * threadqueue);

@@ -35,8 +35,8 @@
 #include "strategies/avx2/alf-avx2.h"
 
 #if COMPILE_INTEL_AVX2
-#include "kvazaar.h"
-#if KVZ_BIT_DEPTH == 8
+#include "uvg266.h"
+#if UVG_BIT_DEPTH == 8
 
 #include <immintrin.h>
 #include <stdlib.h>
@@ -58,7 +58,7 @@ __m128i result = _mm_add_epi16(e_local_original, _mm_add_epi16(max_clips_val0, m
 _mm_storel_epi64((__m128i*)& e_local[filter_pattern[k]][0], result);
 
 static void alf_calc_covariance_avx2(int16_t e_local[MAX_NUM_ALF_LUMA_COEFF][MAX_ALF_NUM_CLIPPING_VALUES],
-  const kvz_pixel* rec,
+  const uvg_pixel* rec,
   const int stride,
   const channel_type channel,
   const int transpose_idx,
@@ -112,8 +112,8 @@ static void alf_calc_covariance_avx2(int16_t e_local[MAX_NUM_ALF_LUMA_COEFF][MAX
   {
     for (int i = -half_filter_length; i < 0; i++)
     {
-      const kvz_pixel* rec0 = rec + MAX(i, clip_top_row) * stride;
-      const kvz_pixel* rec1 = rec - MAX(i, -clip_bot_row) * stride;
+      const uvg_pixel* rec0 = rec + MAX(i, clip_top_row) * stride;
+      const uvg_pixel* rec1 = rec - MAX(i, -clip_bot_row) * stride;
       for (int j = -half_filter_length - i; j <= half_filter_length + i; j++, k++)
       {
         ALF_CLIP_AND_ADD(rec0[j], rec1[-j]);
@@ -128,8 +128,8 @@ static void alf_calc_covariance_avx2(int16_t e_local[MAX_NUM_ALF_LUMA_COEFF][MAX
   {
     for (int j = -half_filter_length; j < 0; j++)
     {
-      const kvz_pixel* rec0 = rec + j;
-      const kvz_pixel* rec1 = rec - j;
+      const uvg_pixel* rec0 = rec + j;
+      const uvg_pixel* rec1 = rec - j;
 
       for (int i = -half_filter_length - j; i <= half_filter_length + j; i++, k++)
       {
@@ -145,8 +145,8 @@ static void alf_calc_covariance_avx2(int16_t e_local[MAX_NUM_ALF_LUMA_COEFF][MAX
   {
     for (int i = -half_filter_length; i < 0; i++)
     {
-      const kvz_pixel* rec0 = rec + MAX(i, clip_top_row) * stride;
-      const kvz_pixel* rec1 = rec - MAX(i, -clip_bot_row) * stride;
+      const uvg_pixel* rec0 = rec + MAX(i, clip_top_row) * stride;
+      const uvg_pixel* rec1 = rec - MAX(i, -clip_bot_row) * stride;
 
       for (int j = half_filter_length + i; j >= -half_filter_length - i; j--, k++)
       {
@@ -162,8 +162,8 @@ static void alf_calc_covariance_avx2(int16_t e_local[MAX_NUM_ALF_LUMA_COEFF][MAX
   {
     for (int j = -half_filter_length; j < 0; j++)
     {
-      const kvz_pixel* rec0 = rec + j;
-      const kvz_pixel* rec1 = rec - j;
+      const uvg_pixel* rec0 = rec + j;
+      const uvg_pixel* rec1 = rec - j;
 
       for (int i = half_filter_length + j; i >= -half_filter_length - j; i--, k++)
       {
@@ -186,9 +186,9 @@ static void alf_get_blk_stats_avx2(encoder_state_t* const state,
   channel_type channel,
   alf_covariance* alf_covariance,
   alf_classifier** g_classifier,
-  kvz_pixel* org,
+  uvg_pixel* org,
   int32_t org_stride,
-  kvz_pixel* rec,
+  uvg_pixel* rec,
   int32_t rec_stride,
   const int x_pos,
   const int y_pos,
@@ -298,18 +298,18 @@ static void alf_get_blk_stats_avx2(encoder_state_t* const state,
   }
 }
 
-#endif // KVZ_BIT_DEPTH == 8
+#endif // UVG_BIT_DEPTH == 8
 #endif //COMPILE_INTEL_AVX2
 
 
-int kvz_strategy_register_alf_avx2(void* opaque, uint8_t bitdepth) {
+int uvg_strategy_register_alf_avx2(void* opaque, uint8_t bitdepth) {
   bool success = true;
 #if COMPILE_INTEL_AVX2
-#if KVZ_BIT_DEPTH == 8
+#if UVG_BIT_DEPTH == 8
   if (bitdepth == 8){
-    success &= kvz_strategyselector_register(opaque, "alf_get_blk_stats", "avx2", 40, &alf_get_blk_stats_avx2);
+    success &= uvg_strategyselector_register(opaque, "alf_get_blk_stats", "avx2", 40, &alf_get_blk_stats_avx2);
   }
-#endif // KVZ_BIT_DEPTH == 8
+#endif // UVG_BIT_DEPTH == 8
 #endif
   return success;
 }
