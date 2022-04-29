@@ -24,7 +24,7 @@ test-asan:
     ASAN_OPTIONS: 'detect_leaks=0'
     # AddressSanitizer adds some extra symbols so we expect a failure from
     # the external symbols test.
-    XFAIL_TESTS: test_external_symbols.sh
+    XFAIL_TESTS: test_external_symbols
 
 #test-tsan:
 #  <<: *test-template
