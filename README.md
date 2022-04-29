@@ -448,7 +448,7 @@ For other examples, see [Dockerfile](./Dockerfile)
 
 Please cite [this paper](https://ieeexplore.ieee.org/document/9690938) for uvg266:
 
-```M. Viitanen, J. Sainio, A. Mercat, A. Lemmetti, and J. Vanne, ìFrom HEVC to VVC: the First Development Steps of a Practical Intra Video Encoder,î Accepted to IEEE Transactions on Consumer Electronics```
+```M. Viitanen, J. Sainio, A. Mercat, A. Lemmetti, and J. Vanne, ‚ÄúFrom HEVC to VVC: the First Development Steps of a Practical Intra Video Encoder,‚Äù Accepted to IEEE Transactions on Consumer Electronics```
 
 Or in BibTex:
 
