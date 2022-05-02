@@ -701,11 +701,8 @@ void print_help(void)
     "                                   - undef, bt709, fcc, bt470bg, smpte170m,\n"
     "                                     smpte240m, GBR, YCgCo, bt2020nc, bt2020c\n"
     "      --chromaloc <integer>  : Specify chroma sample location (0 to 5) [0]\n"
-    "\n"
     /* Word wrap to this width to stay under 80 characters (including ") *************/
-    "Deprecated parameters: (might be removed at some point)\n"
-    "  -w, --width <integer>       : Use --input-res.\n"
-    "  -h, --height <integer>      : Use --input-res.\n");
+    );
 }
 
 

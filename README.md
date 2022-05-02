@@ -344,10 +344,6 @@ Video Usability Information:
                                    - undef, bt709, fcc, bt470bg, smpte170m,
                                      smpte240m, GBR, YCgCo, bt2020nc, bt2020c
       --chromaloc <integer>  : Specify chroma sample location (0 to 5) [0]
-
-Deprecated parameters: (might be removed at some point)
-  -w, --width <integer>       : Use --input-res.
-  -h, --height <integer>      : Use --input-res.
 ```
 [comment]: # (END UVG266 HELP MESSAGE)
 
