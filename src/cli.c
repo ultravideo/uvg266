@@ -385,8 +385,9 @@ void cmdline_opts_free(const uvg_api *const api, cmdline_opts_t *opts)
 
 void print_usage(void)
 {
+  print_version();
   fprintf(stdout,
-    "uvg266 usage: -i and --input-res to set input, -o to set output\n"
+    "usage: -i and --input-res to set input, -o to set output\n"
     "              --help for more information\n");
 }
 
@@ -394,13 +395,13 @@ void print_usage(void)
 void print_version(void)
 {
   fprintf(stdout,
-    "uvg266 " VERSION_STRING "\n"
-    "uvg266 license: 3-clause BSD\n");
+    "uvg266 " VERSION_STRING " [" UVG_COMPILER_STRING "] " UVG_COMPILE_DATE "\n");
 }
 
 
 void print_help(void)
 {
+  print_version();
   fprintf(stdout,
     "Usage:\n"
     "uvg266 -i <input> --input-res <width>x<height> -o <output>\n"
