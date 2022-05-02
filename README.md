@@ -423,16 +423,24 @@ possible.
 Depending on the platform, some additional tools are required for compiling uvg266 with CMake.
 For Ubuntu, the required packages are `build-essential cmake`.
 
-Run the following commands to compile and install uvg266.
+Run the following commands to generate the build scripts
 
     cd build
     cmake ..
+    
+Then depending on your generator settings you might want to use Make to compile and install uvg266, force with `-G 'Unix Makefiles'` in CMake command
+
     make
     sudo make install
+    
+or Ninja, force with `-G Ninja` in the CMake command
+
+    ninja
+    sudo ninja install
 
 Visual Studio natively supports opening the `CMakeLists.txt` of the CMake build package has been installed.
 Otherwise CMake-CLI can be used to generate the Visual Studio project files.
-**When building shared library with visual studio the tests will fail to link, the main binary will still work**
+**When building shared library with visual studio/MSys2/MinGW the tests will fail to link, so they are disabled**
 
 ### Docker
 This project includes a [Dockerfile](./Dockerfile), which enables building for Docker.
