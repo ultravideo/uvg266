@@ -12,6 +12,8 @@ configure_file("${PROJECT_SOURCE_DIR}/src/version.h.in" "${PROJECT_SOURCE_DIR}/s
 
 option(BUILD_SHARED_LIBS "Build using shared uvg266 library" ON)
 
+option(BUILD_TESTS "Build tests" ON)
+
 
 find_package(Git QUIET)
 if(GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
@@ -78,6 +80,7 @@ target_include_directories(uvg266 PUBLIC src/extras)
 target_include_directories(uvg266 PUBLIC src/strategies)
 
 file(GLOB LIB_SOURCES_STRATEGIES_AVX2 RELATIVE ${PROJECT_SOURCE_DIR} "src/strategies/avx2/*.c")
+file(GLOB LIB_SOURCES_STRATEGIES_SSE41 RELATIVE ${PROJECT_SOURCE_DIR} "src/strategies/sse41/*.c")
 
 set(CLI_SOURCES "src/encmain.c" "src/cli.c" "src/cli.h" "src/yuv_io.c" "src/yuv_io.h")
 
@@ -101,6 +104,7 @@ else()
   list(APPEND ALLOW_AVX2 "x86_64" "AMD64")
   if(${CMAKE_SYSTEM_PROCESSOR} IN_LIST ALLOW_AVX2) 
     set_property( SOURCE ${LIB_SOURCES_STRATEGIES_AVX2} APPEND PROPERTY COMPILE_FLAGS "-mavx2 -mbmi -mpopcnt -mlzcnt -mbmi2" )
+    set_property( SOURCE ${LIB_SOURCES_STRATEGIES_SSE41} APPEND PROPERTY COMPILE_FLAGS "-msse4.1" )    
   endif()
   set(THREADS_PREFER_PTHREAD_FLAG ON)
   find_package(Threads REQUIRED)
@@ -189,7 +193,14 @@ add_custom_target(dist
 
 enable_testing()
 
-if(EXISTS "${PROJECT_SOURCE_DIR}/greatest/greatest.h")
+if(MSVC OR MINGW OR MSYS)
+  if(BUILD_SHARED_LIBS) 
+    set(BUILD_TESTS OFF)
+    message(INFO " Disable test building, fails in MSVC/MINGW/MSYS2 when building shared binaries")
+  endif()
+endif()
+
+if(EXISTS "${PROJECT_SOURCE_DIR}/greatest/greatest.h" AND BUILD_TESTS)
   add_subdirectory( "tests/" )
   add_test( NAME Test_uvg266 COMMAND uvg266_tests )
 endif()
