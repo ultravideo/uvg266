@@ -479,6 +479,8 @@ int main(int argc, char *argv[])
 
   const uvg_api * const api = uvg_api_get(8);
 
+  print_version();
+
   opts = cmdline_opts_parse(api, argc, argv);
   // If problem with command line options, print banner and shutdown.
   if (!opts) {

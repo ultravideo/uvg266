@@ -385,7 +385,6 @@ void cmdline_opts_free(const uvg_api *const api, cmdline_opts_t *opts)
 
 void print_usage(void)
 {
-  print_version();
   fprintf(stdout,
     "usage: -i and --input-res to set input, -o to set output\n"
     "              --help for more information\n");
@@ -401,7 +400,6 @@ void print_version(void)
 
 void print_help(void)
 {
-  print_version();
   fprintf(stdout,
     "Usage:\n"
     "uvg266 -i <input> --input-res <width>x<height> -o <output>\n"

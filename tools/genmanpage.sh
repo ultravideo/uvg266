@@ -18,7 +18,7 @@ uvg266 \- open source VVC encoder
 .SH DESCRIPTION
 EOF
 
-../bin/uvg266 --help 2>&1 | tail -n+5 | head -n-4 | \
+../bin/uvg266 --help 2>&1 | tail -n+5 | \
   sed 's| : |\n|g;
        s| :$||g;
        s|^      --|.TP\n\\fB--|g;
