@@ -10,6 +10,19 @@ option(BUILD_SHARED_LIBS "Build using shared uvg266 library" ON)
 
 option(BUILD_TESTS "Build tests" ON)
 
+# https://www.kitware.com/cmake-and-the-default-build-type/
+# Set a default build type if none was specified
+set(UVG_DEFAULT_BUILD_TYPE "RelWithDebInfo")
+
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+  message(STATUS "No build type specified, setting to '${UVG_DEFAULT_BUILD_TYPE}'.")
+  set(CMAKE_BUILD_TYPE "${UVG_DEFAULT_BUILD_TYPE}" CACHE
+      STRING "Choose the type of build." FORCE)
+  # Set the possible values of build type for cmake-gui
+  set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
+    "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
+endif()
+
 
 find_package(Git QUIET)
 if(GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
