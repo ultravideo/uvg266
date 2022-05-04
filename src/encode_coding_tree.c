@@ -580,7 +580,6 @@ static void encode_transform_coeff(encoder_state_t * const state,
       cabac_data_t* cabac    = &state->cabac;
 
       // cu_qp_delta_abs prefix
-      cabac->cur_ctx = &cabac->ctx.cu_qp_delta_abs[0];
       uvg_cabac_write_unary_max_symbol(cabac, cabac->ctx.cu_qp_delta_abs, MIN(qp_delta_abs, 5), 1, 5);
 
       if (qp_delta_abs >= 5) {

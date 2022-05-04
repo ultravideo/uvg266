@@ -362,12 +362,12 @@ void uvg_cabac_write_unary_max_symbol(cabac_data_t * const data, cabac_ctx_t * c
 
   if (!symbol) return;
 
+  data->cur_ctx = &ctx[offset];
+
   while (--symbol) {
-    //data->cur_ctx = &ctx[offset];
     CABAC_BIN(data, 1, "ums");
   }
   if (code_last) {
-    //data->cur_ctx = &ctx[offset];
     CABAC_BIN(data, 0, "ums");
   }
 }
