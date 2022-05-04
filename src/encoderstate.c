@@ -1842,6 +1842,9 @@ int uvg_get_cu_ref_qp(const encoder_state_t *state, int x, int y, int last_qp)
   // Coordinates of the top-left corner of the quantization group
   const int x_qg = x & ~(qg_width - 1);
   const int y_qg = y & ~(qg_width - 1);
+  if(x_qg == 0 && y_qg > 0 && y_qg % LCU_WIDTH == 0) {
+    return uvg_cu_array_at_const(cua, x_qg, y_qg - 1)->qp;
+  }
 
   int qp_pred_a = last_qp;
   if (x_qg % LCU_WIDTH > 0) {
