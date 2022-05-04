@@ -492,7 +492,7 @@ static INLINE double calculate_weights(encoder_state_t* const state, const int c
 void uvg_estimate_pic_lambda(encoder_state_t * const state) {
   const encoder_control_t * const encoder = state->encoder_control;
 
-  const int layer = encoder->cfg.gop[state->frame->gop_offset].layer - (state->frame->is_irap ? 1 : 0);
+  const int layer = MAX(encoder->cfg.gop[state->frame->gop_offset].layer - (state->frame->is_irap ? 1 : 0), 0);
   const int ctu_count = state->tile->frame->height_in_lcu * state->tile->frame->width_in_lcu;
 
   double alpha;
