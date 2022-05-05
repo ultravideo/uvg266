@@ -479,23 +479,24 @@ int main(int argc, char *argv[])
 
   const uvg_api * const api = uvg_api_get(8);
 
-  print_version();
 
   opts = cmdline_opts_parse(api, argc, argv);
   // If problem with command line options, print banner and shutdown.
   if (!opts) {
+    print_version(false);
     print_usage();
 
     goto exit_failure;
   }
   if (opts->version) {
-    print_version();
+    print_version(false);
     goto done;
   }
   if (opts->help) {
     print_help();
     goto done;
   }
+  print_version(true);
 
   input = open_input_file(opts->input);
   if (input == NULL) {

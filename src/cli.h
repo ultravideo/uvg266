@@ -65,7 +65,7 @@ cmdline_opts_t* cmdline_opts_parse(const uvg_api *api, int argc, char *argv[]);
 void cmdline_opts_free(const uvg_api *api, cmdline_opts_t *opts);
 
 void print_usage(void);
-void print_version(void);
+void print_version(bool);
 void print_help(void);
 void print_frame_info(const uvg_frame_info *const info,
                       const double frame_psnr[3],
