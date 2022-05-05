@@ -570,7 +570,7 @@ static void encode_transform_coeff(encoder_state_t * const state,
   }
 
   if (cb_flag_y | cb_flag_u | cb_flag_v) {
-    if (state->must_code_qp_delta) {
+    if (state->must_code_qp_delta && (only_chroma || cb_flag_y || depth != 4) ) {
       const int qp_pred      = uvg_get_cu_ref_qp(state, x_cu, y_cu, state->last_qp);
       const int qp_delta     = cur_cu->qp - qp_pred;
       // Possible deltaQP range depends on bit depth as stated in HEVC specification.

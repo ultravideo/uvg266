@@ -373,7 +373,7 @@ where the names have been abbreviated to fit the layout in GitHub.
 |                      | 0-uf  | 1-sf  | 2-vf  | 3-fr  | 4-f   | 5-m   | 6-s   | 7-sr  | 8-vs  | 9-p   |
 | -------------------- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- |
 | rd                   | 0     | 0     | 0     | 0     | 0     | 0     | 1     | 2     | 2     | 2     |
-| pu-depth-intra       | 2-3   | 2-3   | 2-3   | 2-3   | 1-3   | 1-3   | 1-3   | 1-3   | 1-3   | 1-3   |
+| pu-depth-intra       | 2-3   | 2-3   | 2-3   | 2-3   | 1-3   | 1-4   | 1-4   | 1-4   | 1-4   | 1-4   |
 | pu-depth-inter       | 1-2   | 1-2   | 1-3   | 1-3   | 1-3   | 0-3   | 0-3   | 0-3   | 0-3   | 0-3   |
 | me                   | hexbs | hexbs | hexbs | hexbs | hexbs | hexbs | hexbs | hexbs | tz    | tz    |
 | gop                  | 8     | 8     | 8     | 8     | 8     | 16    | 16    | 16    | 16    | 16    |

@@ -699,7 +699,7 @@ int uvg_config_parse(uvg_config *cfg, const char *name, const char *value)
       {
         "medium",
         "rd", "0",
-        "pu-depth-intra", "1-3",
+        "pu-depth-intra", "1-4",
         "pu-depth-inter", "0-3",
         "me", "hexbs",
         "gop", "16",
@@ -725,7 +725,7 @@ int uvg_config_parse(uvg_config *cfg, const char *name, const char *value)
       {
         "slow",
         "rd", "1",
-        "pu-depth-intra", "1-3",
+        "pu-depth-intra", "1-4",
         "pu-depth-inter", "0-3",
         "me", "hexbs",
         "gop", "16",
@@ -751,7 +751,7 @@ int uvg_config_parse(uvg_config *cfg, const char *name, const char *value)
       {
         "slower",
         "rd", "2",
-        "pu-depth-intra", "1-3",
+        "pu-depth-intra", "1-4",
         "pu-depth-inter", "0-3",
         "me", "hexbs",
         "gop", "16",
@@ -777,7 +777,7 @@ int uvg_config_parse(uvg_config *cfg, const char *name, const char *value)
       {
         "veryslow",
         "rd", "2",
-        "pu-depth-intra", "1-3",
+        "pu-depth-intra", "1-4",
         "pu-depth-inter", "0-3",
         "me", "tz",
         "gop", "16",
@@ -803,7 +803,7 @@ int uvg_config_parse(uvg_config *cfg, const char *name, const char *value)
       {
         "placebo",
         "rd", "2",
-        "pu-depth-intra", "1-3",
+        "pu-depth-intra", "1-4",
         "pu-depth-inter", "0-3",
         "me", "tz",
         "gop", "16",
