@@ -236,9 +236,9 @@ void kvz_fwd_lfnst_NxN(coeff_t *src, coeff_t *dst, const int8_t mode, const int8
 {
   const int8_t *tr_mat = (size > 4) ? kvz_lfnst_8x8[mode][index][0] : kvz_lfnst_4x4[mode][index][0];
   const int     tr_size = (size > 4) ? 48 : 16;
-  coeff_t coef;
+  int coef;
   coeff_t *out = dst;
-  assert(index < 3 && "LFNST index must be in [0, 3]");
+  assert(index < 3 && "LFNST index must be in [0, 2]");
 
   for (int j = 0; j < zero_out_size; j++)
   {
@@ -249,7 +249,7 @@ void kvz_fwd_lfnst_NxN(coeff_t *src, coeff_t *dst, const int8_t mode, const int8
     {
       coef += *src_ptr++ * *tr_mat_tmp++;
     }
-    *out++ = (coef + 64) >> 7;
+    *out++ = (coeff_t)((coef + 64) >> 7);
     tr_mat += tr_size;
   }
 
@@ -272,7 +272,7 @@ void kvz_fwd_lfnst(const cu_info_t* const cur_cu,
   const uint16_t lfnst_index = lfnst_idx;
   int8_t intra_mode = (color == COLOR_Y) ? cur_cu->intra.mode : cur_cu->intra.mode_chroma;
   bool mts_skip = cur_cu->tr_skip;
-  bool is_separate_tree = width == 4 && height == 4; // LFST_TODO: proper dual tree check when that structure is implemented
+  bool is_separate_tree = width == 4 && height == 4; // LFNST_TODO: proper dual tree check when that structure is implemented
   bool is_cclm_mode = (intra_mode >= 67 && intra_mode <= 69);
 
   bool is_mip = cur_cu->type == CU_INTRA ? cur_cu->intra.mip_flag : false;
@@ -280,13 +280,12 @@ void kvz_fwd_lfnst(const cu_info_t* const cur_cu,
 
   // LFNST_TODO: use kvz_get_scan_order to get scan mode instead of using SCAN_DIAG define.
 
-  // TODO: add check if separate tree structure. Original vtm check: (tu.cu->isSepTree() ? true : isLuma(compID))
   if (lfnst_index && !mts_skip && (is_separate_tree ? true : color == COLOR_Y))
   {
     const uint32_t log2_block_size = kvz_g_convert_to_bit[width] + 2;
     assert(log2_block_size != -1 && "LFNST: invalid block width.");
     const bool whge3 = width >= 8 && height >= 8;
-    const uint32_t *scan = whge3 ? kvz_coef_top_left_diag_scan_8x8[log2_block_size - 1] : g_sig_last_scan_cg[log2_block_size - 1][SCAN_DIAG];
+    const uint32_t* scan = whge3 ? kvz_coef_top_left_diag_scan_8x8[log2_block_size - 1] : kvz_g_sig_last_scan[SCAN_DIAG][log2_block_size - 1];
 
     if (is_cclm_mode) {
       intra_mode = cur_cu->intra.mode;
@@ -358,11 +357,11 @@ void kvz_fwd_lfnst(const cu_info_t* const cur_cu,
       coeff_tmp = coeffs;
       int lfnst_coeff_num = (sb_size == 4) ? sb_size * sb_size : 48;
 
-      const uint32_t *scanPtr = scan;
+      const uint32_t *scan_ptr = scan;
 
       for (y = 0; y < lfnst_coeff_num; y++) {
-        coeff_tmp[*scanPtr] = *lfnst_tmp++;
-        scanPtr++;
+        coeff_tmp[*scan_ptr] = *lfnst_tmp++;
+        scan_ptr++;
       }
     }
   }
@@ -374,7 +373,7 @@ void kvz_inv_lfnst_NxN(coeff_t *src, coeff_t *dst, const uint32_t mode, const ui
   const coeff_t output_max = (1 << max_log2_tr_dyn_range) - 1;
   const int8_t *tr_mat = (size > 4) ? kvz_lfnst_8x8[mode][index][0] : kvz_lfnst_4x4[mode][index][0];
   const int tr_size = (size > 4) ? 48 : 16;
-  coeff_t resi;
+  int resi;
   coeff_t *out = dst;
   assert(index < 3);
 
@@ -388,7 +387,7 @@ void kvz_inv_lfnst_NxN(coeff_t *src, coeff_t *dst, const uint32_t mode, const ui
       resi += *src_ptr++ * *tr_mat_tmp;
       tr_mat_tmp += tr_size;
     }
-    *out++ = CLIP(output_min, output_max, (resi + 64) >> 7);
+    *out++ = CLIP(output_min, output_max, (coeff_t)((resi + 64) >> 7));
     tr_mat++;
   }
 }
@@ -405,6 +404,7 @@ void kvz_inv_lfnst(const cu_info_t *cur_cu,
   const uint32_t  lfnst_index = lfnst_idx;
   int8_t intra_mode = (color == COLOR_Y) ? cur_cu->intra.mode : cur_cu->intra.mode_chroma;
   bool mts_skip = cur_cu->tr_skip;
+  bool is_separate_tree = width == 4 && height == 4; // LFNST_TODO: proper dual tree check when that structure is implemented
   bool is_cclm_mode = (intra_mode >= 67 && intra_mode <= 69);
 
   bool is_mip = cur_cu->type == CU_INTRA ? cur_cu->intra.mip_flag : false;
@@ -412,10 +412,10 @@ void kvz_inv_lfnst(const cu_info_t *cur_cu,
 
   // LFNST_TODO: use kvz_get_scan_order to get scan mode instead of using SCAN_DIAG define.
 
-  if (lfnst_index && !mts_skip && color == COLOR_Y) {
+  if (lfnst_index && !mts_skip && (is_separate_tree ? true : color == COLOR_Y)) {
     const uint32_t log2_block_size = kvz_g_convert_to_bit[width] + 2;
     const bool whge3 = width >= 8 && height >= 8;
-    const uint32_t* scan = whge3 ? kvz_coef_top_left_diag_scan_8x8[log2_block_size - 1] : g_sig_last_scan_cg[log2_block_size - 1][SCAN_DIAG];
+    const uint32_t* scan = whge3 ? kvz_coef_top_left_diag_scan_8x8[log2_block_size - 1] : kvz_g_sig_last_scan[SCAN_DIAG][log2_block_size - 1];
     
     if (is_cclm_mode) {
       intra_mode = cur_cu->intra.mode;

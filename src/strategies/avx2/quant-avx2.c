@@ -739,15 +739,14 @@ int uvg_quantize_residual_avx2(encoder_state_t *const state,
   // Do the inverse quantization and transformation and the reconstruction to
   // rec_out.
   if (has_coeffs && !early_skip) {
+    // Get quantized residual. (coeff_out -> coeff -> residual)
+    uvg_dequant(state, coeff_out, coeff, width, width, color,
+      cur_cu->type, cur_cu->tr_idx == MTS_SKIP && color == COLOR_Y);
 
     if (state->encoder_control->cfg.lfnst) {
       // Inverse low frequency non-separable transform
       kvz_inv_lfnst(cur_cu, width, height, color, lfnst_index, coeff);
     }
-
-    // Get quantized residual. (coeff_out -> coeff -> residual)
-    uvg_dequant(state, coeff_out, coeff, width, width, color,
-      cur_cu->type, cur_cu->tr_idx == MTS_SKIP && color == COLOR_Y);
     if (use_trskip) {
       uvg_itransformskip(state->encoder_control, residual, coeff, width);
     }
