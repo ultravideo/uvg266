@@ -1664,10 +1664,11 @@ void uvg_search_cu_intra(
                                 ref_pixels,
                                 LCU_WIDTH, search_data + number_of_modes, num_mrl_modes,
                                 mip_ctx);
-    sort_modes(search_data, number_of_modes);
+    sort_modes(search_data, number_of_modes + num_mrl_modes);
+    number_of_modes = 6;
   }
-  number_of_modes += num_mrl_modes;
-  num_regular_modes += num_mrl_modes;
+  // number_of_modes += num_mrl_modes;
+  // num_regular_modes += num_mrl_modes;
 
   int num_mip_modes = 0;
   if (state->encoder_control->cfg.mip) {
