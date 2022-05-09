@@ -605,13 +605,13 @@ static int search_intra_chroma_rough(
   lcu_t* lcu,
   int8_t luma_mode)
 {
-  assert(!(x_px & 4 || y_px & 4));
+  assert(depth != 4 || (x_px & 4 && y_px & 4));
 
   const unsigned width = MAX(LCU_WIDTH_C >> depth, TR_MIN_WIDTH);
 
   cost_pixel_nxn_func *const satd_func = uvg_pixels_get_satd_func(width);
   //cost_pixel_nxn_func *const sad_func = uvg_pixels_get_sad_func(width);
-  cu_loc_t loc = { x_px, y_px, width, width, width, width };
+  cu_loc_t loc = { x_px & ~7, y_px & ~7, width, width, width, width };
     
   uvg_pixel _pred[32 * 32 + SIMD_ALIGNMENT];
   uvg_pixel *pred = ALIGNED_POINTER(_pred, SIMD_ALIGNMENT);
@@ -907,6 +907,7 @@ static double count_bits(
 
 static int16_t search_intra_rough(
   encoder_state_t * const state,
+  const cu_loc_t* const cu_loc,
   kvz_pixel *orig,
   int32_t origstride,
   kvz_intra_references *refs,
@@ -949,7 +950,7 @@ static int16_t search_intra_rough(
     double cost;
   };
 
-  const double not_mrl = state->encoder_control->cfg.mrl ? CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.multi_ref_line[0]), 0) : 0;
+  const double not_mrl = state->encoder_control->cfg.mrl && (cu_loc->y % LCU_WIDTH) ? CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.multi_ref_line[0]), 0) : 0;
   const double not_mip = state->encoder_control->cfg.mip ? CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.mip_flag[mip_ctx]), 0) : 0;
   const double mpm_mode_bit = CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.intra_luma_mpm_flag_model), 1);
   const double not_mpm_mode_bit = CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.intra_luma_mpm_flag_model), 0);
@@ -1173,7 +1174,7 @@ static void get_rough_cost_for_2n_modes(
 
   uvg_pixels_blit(orig, orig_block, width, width, orig_stride, width);
   
-  const double mrl = state->encoder_control->cfg.mrl ? CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.multi_ref_line[0]), 1) : 0;
+  const double mrl = state->encoder_control->cfg.mrl && (cu_loc->y % LCU_WIDTH) ? CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.multi_ref_line[0]), 1) : 0;
   const double not_mip = state->encoder_control->cfg.mip ? CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.mip_flag[mip_ctx]), 0) : 0;
   const double mip = state->encoder_control->cfg.mip ? CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.mip_flag[mip_ctx]), 1) : 0;
   double costs_out[PARALLEL_BLKS] = { 0 };
@@ -1428,7 +1429,7 @@ int8_t uvg_search_cu_intra_chroma(encoder_state_t * const state,
   {
     const int_fast8_t log2_width_c = MAX(LOG2_LCU_WIDTH - depth - 1, 2);
     const vector2d_t pic_px = { state->tile->frame->width, state->tile->frame->height };
-    const vector2d_t luma_px = { x_px, y_px };
+    const vector2d_t luma_px = { x_px & ~7, y_px & ~7};
 
     uvg_intra_references refs_u;
     uvg_intra_build_reference(log2_width_c, COLOR_U, &luma_px, &pic_px, lcu, &refs_u, state->encoder_control->cfg.wpp, NULL, 0);
@@ -1436,7 +1437,7 @@ int8_t uvg_search_cu_intra_chroma(encoder_state_t * const state,
     uvg_intra_references refs_v;
     uvg_intra_build_reference(log2_width_c, COLOR_V, &luma_px, &pic_px, lcu, &refs_v, state->encoder_control->cfg.wpp, NULL, 0);
 
-    vector2d_t lcu_cpx = { lcu_px.x / 2, lcu_px.y / 2 };
+    vector2d_t lcu_cpx = { (lcu_px.x & ~7) / 2, (lcu_px.y & ~7) / 2 };
     uvg_pixel *ref_u = &lcu->ref.u[lcu_cpx.x + lcu_cpx.y * LCU_WIDTH_C];
     uvg_pixel *ref_v = &lcu->ref.v[lcu_cpx.x + lcu_cpx.y * LCU_WIDTH_C];
 
@@ -1450,10 +1451,9 @@ int8_t uvg_search_cu_intra_chroma(encoder_state_t * const state,
                                           lcu,
                                           intra_mode);
   }
-
-  int8_t intra_mode_chroma = intra_mode;
+  
   if (num_modes > 1) {
-    intra_mode_chroma = uvg_search_intra_chroma_rdo(state, x_px, y_px, depth, num_modes, lcu, chroma_data, intra_mode);
+    uvg_search_intra_chroma_rdo(state, x_px, y_px, depth, num_modes, lcu, chroma_data, intra_mode);
   }
   *search_data = chroma_data[0];
   return chroma_data[0].pred_cu.intra.mode_chroma;
@@ -1610,6 +1610,7 @@ void uvg_search_cu_intra(
   if (!skip_rough_search) {
     num_regular_modes = number_of_modes = search_intra_rough(
       state,
+      &cu_loc,
       ref_pixels,
       LCU_WIDTH,
       refs,
@@ -1630,7 +1631,7 @@ void uvg_search_cu_intra(
     number_of_modes = UVG_NUM_INTRA_MODES;
   }
 
-  int num_mrl_modes = 0;
+  int16_t num_mrl_modes = 0;
   for(int line = 1; line < lines; ++line) {
     uvg_pixel extra_refs[128 * MAX_REF_LINE_IDX] = { 0 };
 

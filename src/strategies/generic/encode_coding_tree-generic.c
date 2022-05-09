@@ -305,7 +305,7 @@ void uvg_encode_coeff_nxn_generic(encoder_state_t * const state,
       cur_cu->violates_mts_coeff_constraint = true;
     }
   }
-  if (cabac->only_count) *bits_out += bits;
+  if (cabac->only_count && bits_out) *bits_out += bits;
 }
 
 

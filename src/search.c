@@ -988,6 +988,14 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
 
           lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
         }
+        else if(!cur_cu->intra.mip_flag) {
+          cur_cu->intra.mode_chroma = cur_cu->intra.mode;
+          intra_search.pred_cu.intra.mode_chroma = cur_cu->intra.mode;
+        }
+        else {
+          cur_cu->intra.mode_chroma = 0;
+          intra_search.pred_cu.intra.mode_chroma = 0;
+        }
         intra_search.pred_cu.intra.mode = -1; // skip luma
         uvg_intra_recon_cu(state,
                            x, y, // TODO: as does this
