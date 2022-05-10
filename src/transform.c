@@ -285,7 +285,7 @@ void kvz_fwd_lfnst(const cu_info_t* const cur_cu,
     const uint32_t log2_block_size = kvz_g_convert_to_bit[width] + 2;
     assert(log2_block_size != -1 && "LFNST: invalid block width.");
     const bool whge3 = width >= 8 && height >= 8;
-    const uint32_t* scan = whge3 ? kvz_coef_top_left_diag_scan_8x8[log2_block_size - 1] : kvz_g_sig_last_scan[SCAN_DIAG][log2_block_size - 1];
+    const uint32_t* scan = whge3 ? kvz_coef_top_left_diag_scan_8x8[log2_block_size] : kvz_g_sig_last_scan[SCAN_DIAG][log2_block_size - 1];
 
     if (is_cclm_mode) {
       intra_mode = cur_cu->intra.mode;
@@ -415,7 +415,7 @@ void kvz_inv_lfnst(const cu_info_t *cur_cu,
   if (lfnst_index && !mts_skip && (is_separate_tree ? true : color == COLOR_Y)) {
     const uint32_t log2_block_size = kvz_g_convert_to_bit[width] + 2;
     const bool whge3 = width >= 8 && height >= 8;
-    const uint32_t* scan = whge3 ? kvz_coef_top_left_diag_scan_8x8[log2_block_size - 1] : kvz_g_sig_last_scan[SCAN_DIAG][log2_block_size - 1];
+    const uint32_t* scan = whge3 ? kvz_coef_top_left_diag_scan_8x8[log2_block_size] : kvz_g_sig_last_scan[SCAN_DIAG][log2_block_size - 1];
     
     if (is_cclm_mode) {
       intra_mode = cur_cu->intra.mode;
