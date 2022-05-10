@@ -888,7 +888,8 @@ int uvg_encode_inter_prediction_unit(encoder_state_t * const state,
   return non_zero_mvd;
 }
 
-static void encode_chroma_intra_cu(cabac_data_t* const cabac, const cu_info_t* const cur_cu, const int cclm_enabled) {
+static void encode_chroma_intra_cu(cabac_data_t* const cabac, const cu_info_t* const cur_cu, const int cclm_enabled, double
+                                   * bits_out) {
   unsigned pred_mode = 0;
   unsigned chroma_pred_modes[8] = {0, 50, 18, 1, 67, 81, 82, 83};
   int8_t chroma_intra_dir = cur_cu->intra.mode_chroma;
@@ -902,22 +903,21 @@ static void encode_chroma_intra_cu(cabac_data_t* const cabac, const cu_info_t* c
 
   bool derived_mode = chroma_intra_dir == luma_intra_dir;
   bool cclm_mode = chroma_intra_dir > 67;
+  double bits = 0;
 
   if (cclm_enabled) {
-    cabac->cur_ctx = &cabac->ctx.cclm_flag;
-    CABAC_BIN(cabac, cclm_mode, "cclm_flag");
+    CABAC_FBITS_UPDATE(cabac, &cabac->ctx.cclm_flag, cclm_mode, bits, "cclm_flag");
     if(cclm_mode) {
-      cabac->cur_ctx = &cabac->ctx.cclm_model;
-      CABAC_BIN(cabac, chroma_intra_dir != 81, "cclm_model_1");
+      CABAC_FBITS_UPDATE(cabac, &cabac->ctx.cclm_model, chroma_intra_dir != 81, bits, "cclm_model_1");
       if(chroma_intra_dir != 81) {
         CABAC_BIN_EP(cabac, chroma_intra_dir == 83, "cclm_model_2");
+        if(cabac->only_count && bits_out) *bits_out += 1 + bits;
       }
       return;
     }
 
   }
-  cabac->cur_ctx = &(cabac->ctx.chroma_pred_model);
-  CABAC_BIN(cabac, derived_mode ? 0 : 1, "intra_chroma_pred_mode");
+  CABAC_FBITS_UPDATE(cabac, &cabac->ctx.chroma_pred_model, derived_mode ? 0 : 1, bits, "intra_chroma_pred_mode");
 
 
   if (!derived_mode) {
@@ -968,6 +968,7 @@ static void encode_chroma_intra_cu(cabac_data_t* const cabac, const cu_info_t* c
       else {
         CABAC_BIN(cabac, 1, "intra_chroma_pred_mode");*/
     CABAC_BINS_EP(cabac, pred_mode, 2, "intra_chroma_pred_mode");
+    if (cabac->only_count && bits_out) *bits_out += 2 + bits;
     //}
   }
 }
@@ -1655,7 +1656,7 @@ void uvg_encode_coding_tree(encoder_state_t * const state,
 
     // Code chroma prediction mode.
     if (state->encoder_control->chroma_format != UVG_CSP_400 && depth != 4) {
-      encode_chroma_intra_cu(cabac, cur_cu, state->encoder_control->cfg.cclm);
+      encode_chroma_intra_cu(cabac, cur_cu, state->encoder_control->cfg.cclm, NULL);
     }
 
     encode_transform_coeff(state, x, y, depth, 0, 0, 0, 0, coeff);
@@ -1667,7 +1668,7 @@ void uvg_encode_coding_tree(encoder_state_t * const state,
 
     // For 4x4 the chroma PU/TU is coded after the last 
     if (state->encoder_control->chroma_format != UVG_CSP_400 && depth == 4 && x % 8 && y % 8) {
-      encode_chroma_intra_cu(cabac, cur_cu, state->encoder_control->cfg.cclm);
+      encode_chroma_intra_cu(cabac, cur_cu, state->encoder_control->cfg.cclm, NULL);
       // LFNST constraints must be reset here. Otherwise the left over values will interfere when calculating new constraints
       cu_info_t* tmp = uvg_cu_array_at(frame->cu_array, x, y);
       tmp->violates_lfnst_constrained[0] = false;
@@ -1786,7 +1787,7 @@ double uvg_mock_encode_coding_unit(
   else if (cur_cu->type == CU_INTRA) {
     uvg_encode_intra_luma_coding_unit(state, cabac, cur_cu, x, y, depth, lcu, &bits);
     if((depth != 4 || (x % 8 != 0 && y % 8 != 0)) && state->encoder_control->chroma_format != UVG_CSP_400) {
-      encode_chroma_intra_cu(cabac, cur_cu, state->encoder_control->cfg.cclm);
+      encode_chroma_intra_cu(cabac, cur_cu, state->encoder_control->cfg.cclm, &bits);
     }
   }
   else {
