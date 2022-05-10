@@ -136,8 +136,10 @@ static void get_cost_dual(encoder_state_t * const state,
   #define PARALLEL_BLKS 2
   unsigned satd_costs[PARALLEL_BLKS] = { 0 };
   satd_twin_func(preds, orig_block, PARALLEL_BLKS, satd_costs);
-  costs_out[0] = (double)satd_costs[0];
-  costs_out[1] = (double)satd_costs[1];
+  unsigned unsigned_sad_costs[PARALLEL_BLKS] = { 0 };
+  sad_twin_func(preds, orig_block, PARALLEL_BLKS, unsigned_sad_costs);
+  costs_out[0] = (double)MIN(satd_costs[0], unsigned_sad_costs[0] * 2);
+  costs_out[1] = (double)MIN(satd_costs[1], unsigned_sad_costs[1] * 2);
 
   // TODO: width and height
   if (TRSKIP_RATIO != 0 && width <= (1 << state->encoder_control->cfg.trskip_max_size) && state->encoder_control->cfg.trskip_enable) {
