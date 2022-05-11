@@ -718,6 +718,7 @@ static void encode_transform_coeff(encoder_state_t * const state,
   if ((cur_cu->type == CU_INTRA || tr_depth > 0 || cb_flag_u || cb_flag_v) && !only_chroma) {
       cabac->cur_ctx = &(cabac->ctx.qt_cbf_model_luma[0]);
       CABAC_BIN(cabac, cb_flag_y, "cbf_luma");
+      // printf("%hu %hu %d %d\n", cabac->ctx.qt_cbf_model_luma[0].state[0], cabac->ctx.qt_cbf_model_luma[0].state[1], x, y);
   }
 
   if (cb_flag_y | cb_flag_u | cb_flag_v) {
@@ -888,8 +889,11 @@ int uvg_encode_inter_prediction_unit(encoder_state_t * const state,
   return non_zero_mvd;
 }
 
-static void encode_chroma_intra_cu(cabac_data_t* const cabac, const cu_info_t* const cur_cu, const int cclm_enabled, double
-                                   * bits_out) {
+static void encode_chroma_intra_cu(
+  cabac_data_t* const cabac, 
+  const cu_info_t* const cur_cu, 
+  const int cclm_enabled, 
+  double* bits_out) {
   unsigned pred_mode = 0;
   unsigned chroma_pred_modes[8] = {0, 50, 18, 1, 67, 81, 82, 83};
   int8_t chroma_intra_dir = cur_cu->intra.mode_chroma;
@@ -900,10 +904,9 @@ static void encode_chroma_intra_cu(cabac_data_t* const cabac, const cu_info_t* c
     }
   }
 
-
+  double bits = 0;
   bool derived_mode = chroma_intra_dir == luma_intra_dir;
   bool cclm_mode = chroma_intra_dir > 67;
-  double bits = 0;
 
   if (cclm_enabled) {
     CABAC_FBITS_UPDATE(cabac, &cabac->ctx.cclm_flag, cclm_mode, bits, "cclm_flag");
@@ -971,6 +974,7 @@ static void encode_chroma_intra_cu(cabac_data_t* const cabac, const cu_info_t* c
     if (cabac->only_count && bits_out) *bits_out += 2 + bits;
     //}
   }
+  else if (cabac->only_count && bits_out)*bits_out += bits;
 }
 
 void uvg_encode_intra_luma_coding_unit(const encoder_state_t * const state,

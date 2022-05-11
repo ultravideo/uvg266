@@ -1192,7 +1192,7 @@ static void get_rough_cost_for_2n_modes(
       if(multi_ref_idx) {
         bits[i] = mrl + not_mip;
         bits[i] += CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.multi_ref_line[1]), multi_ref_idx != 1);
-        bits[i] += MIN((mode + i + 1) % 6, 4);
+        bits[i] += MIN(((mode + i) % 5) + 1, 4);
       }
       else if(search_data[mode + i].pred_cu.intra.mip_flag) {
         bits[i] = mip + 1;
@@ -1250,6 +1250,9 @@ static int8_t search_intra_rdo(
   const int tr_depth = CLIP(1, MAX_PU_DEPTH, depth + state->encoder_control->cfg.tr_depth_intra);
   
   for (int mode = 0; mode < modes_to_check; mode++) {
+    if(mode == 0) {
+      printf("%hu %hu %d %d\n", state->search_cabac.ctx.qt_cbf_model_luma[0].state[0], state->search_cabac.ctx.qt_cbf_model_luma[0].state[1], x_px, y_px);
+    }
     double rdo_bitcost = uvg_luma_mode_bits(state, &search_data[mode].pred_cu, x_px, y_px, depth, lcu);
     search_data[mode].pred_cu.tr_idx = MTS_TR_NUM;
     search_data[mode].bits = rdo_bitcost;

@@ -401,7 +401,7 @@ double uvg_cu_rd_cost_chroma(const encoder_state_t *const state,
   }
 
   // See luma for why the second condition
-  if (depth < MAX_PU_DEPTH && !skip_residual_coding) {
+  if (!skip_residual_coding) {
     const int tr_depth = depth - pred_cu->depth;
     cabac_data_t* cabac = (cabac_data_t*)&state->search_cabac;
     cabac_ctx_t *ctx = &(cabac->ctx.qt_cbf_model_cb[0]);
@@ -503,7 +503,7 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
 
   }
 
-  if(state->encoder_control->chroma_format != UVG_CSP_400 && !skip_residual_coding) {
+  if(state->encoder_control->chroma_format != UVG_CSP_400 && !skip_residual_coding && (depth != 4 || (x_px % 8 && y_px % 8))) {
     if(tr_cu->depth == depth || cbf_is_set(pred_cu->cbf, depth - 1, COLOR_U)) {
       CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.qt_cbf_model_cb[0]), cb_flag_u, tr_tree_bits, "cbf_cb");
     } 
@@ -532,7 +532,7 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
     cb_flag_v) 
       && !skip_residual_coding)
   {
-    cabac_ctx_t* ctx = &(cabac->ctx.qt_cbf_model_luma[!is_tr_split]);
+    cabac_ctx_t* ctx = &(cabac->ctx.qt_cbf_model_luma[0]);
 
     CABAC_FBITS_UPDATE(cabac, ctx, cb_flag_y, tr_tree_bits, "cbf_y_search");
   }
@@ -1170,9 +1170,9 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     // the split costs at least as much as not splitting.
     if (cur_cu->type == CU_NOTSET || cbf || state->encoder_control->cfg.cu_split_termination == UVG_CU_SPLIT_TERMINATION_OFF) {
       if (split_cost < cost) split_cost += search_cu(state, x,           y,           depth + 1, work_tree);
-      if (split_cost < cost) split_cost += search_cu(state, x + half_cu, y,           depth + 1, work_tree);
-      if (split_cost < cost) split_cost += search_cu(state, x,           y + half_cu, depth + 1, work_tree);
-      if (split_cost < cost) split_cost += search_cu(state, x + half_cu, y + half_cu, depth + 1, work_tree);
+      if (split_cost < cost || 1) split_cost += search_cu(state, x + half_cu, y,           depth + 1, work_tree);
+      if (split_cost < cost || 1) split_cost += search_cu(state, x,           y + half_cu, depth + 1, work_tree);
+      if (split_cost < cost || 1) split_cost += search_cu(state, x + half_cu, y + half_cu, depth + 1, work_tree);
     } else {
       split_cost = INT_MAX;
     }
