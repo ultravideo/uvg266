@@ -240,6 +240,52 @@ static void derive_mts_constraints(cu_info_t *const pred_cu,
   }
 }
 
+/**
+* \brief Derives lfnst constraints.
+*
+* \param pred_cu  Current prediction coding unit.
+* \param lcu      Current lcu.
+* \param depth    Current transform depth.
+* \param lcu_px   Position of the top left pixel of current CU within current LCU.
+*/
+static void derive_lfnst_constraints(cu_info_t* const pred_cu,
+                                     lcu_t* const lcu, const int depth,
+                                     const vector2d_t lcu_px, const int color)
+{
+  const int width = LCU_WIDTH >> depth;
+  const int height = width; // TODO: height for non-square blocks.
+  int8_t scan_idx = kvz_get_scan_order(pred_cu->type, pred_cu->intra.mode, depth);
+  // ToDo: large block support in VVC?
+  uint32_t sig_coeffgroup_flag[32 * 32] = { 0 };
+
+  const uint32_t log2_block_size = kvz_g_convert_to_bit[width] + 2;
+  const uint32_t log2_cg_size = kvz_g_log2_sbb_size[log2_block_size][log2_block_size][0]
+    + kvz_g_log2_sbb_size[log2_block_size][log2_block_size][1];
+  const uint32_t* scan = kvz_g_sig_last_scan[scan_idx][log2_block_size - 1];
+  const uint32_t* scan_cg = g_sig_last_scan_cg[log2_block_size - 1][scan_idx];
+  const coeff_t* coeff = &lcu->coeff.y[xy_to_zorder(LCU_WIDTH, lcu_px.x, lcu_px.y)];
+
+  signed scan_cg_last = -1;
+  signed scan_pos_last = -1;
+
+  for (int i = 0; i < width * width; i++) {
+    if (coeff[scan[i]]) {
+      scan_pos_last = i;
+      sig_coeffgroup_flag[scan_cg[i >> log2_cg_size]] = 1;
+    }
+  }
+  if (scan_pos_last < 0) return;
+
+  scan_cg_last = scan_pos_last >> log2_cg_size;
+  bool is_chroma = color != COLOR_Y;
+
+  if (pred_cu != NULL && pred_cu->tr_idx != MTS_SKIP && height >= 4 && width >= 4) {
+    const int max_lfnst_pos = ((height == 4 && width == 4) || (height == 8 && width == 8)) ? 7 : 15;
+    pred_cu->violates_lfnst_constrained[is_chroma] |= scan_pos_last > max_lfnst_pos;
+    pred_cu->lfnst_last_scan_pos |= scan_pos_last >= 1;
+  }
+}
+
 
 /**
 * \brief Perform search for best intra transform split configuration.
@@ -363,6 +409,7 @@ static double search_intra_trdepth(
           pred_cu,
           lcu);
 
+        bool is_chroma = false; // (color != COLOR_Y) TODO: fix this when color is passed into this function in the future. 
         // TODO: Not sure if this should be 0 or 1 but at least seems to work with 1
         if (pred_cu->tr_idx > 1)
         {
@@ -371,6 +418,10 @@ static double search_intra_trdepth(
           {
             continue;
           }
+        }
+        derive_lfnst_constraints(pred_cu, lcu, depth, lcu_px, COLOR_Y); // TODO: pass proper color if it is passed into search_trdepth in the future
+        if (pred_cu->violates_lfnst_constrained[is_chroma] || !pred_cu->lfnst_last_scan_pos) {
+          continue;
         }
 
       double rd_cost = uvg_cu_rd_cost_luma(state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
@@ -400,12 +451,9 @@ static double search_intra_trdepth(
     }
     pred_cu->tr_skip = best_tr_idx == MTS_SKIP;
     pred_cu->tr_idx = best_tr_idx;
-    // pred_cu->lfnst_idx = best_lfnst_idx;
-    pred_cu->lfnst_idx = 1; // LFNST_TODO: remove this after testing
+    pred_cu->lfnst_idx = best_lfnst_idx;
     nosplit_cost += best_rd_cost;
     
-    
-
     // Early stop condition for the recursive search.
     // If the cost of any 1/4th of the transform is already larger than the
     // whole transform, assume that splitting further is a bad idea.
