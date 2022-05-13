@@ -959,6 +959,7 @@ static int16_t search_intra_rough(
   const double planar_mode_flag = CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.luma_planar_model[1]), 0);
   const double not_planar_mode_flag = CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.luma_planar_model[1]), 1);
 
+  const int mode_list_size = state->encoder_control->cfg.mip ? 6 : 3;
   struct mode_cost best_six_modes[6];
   // Initial offset decides how many modes are tried before moving on to the
   // recursive search.
@@ -1053,9 +1054,9 @@ static int16_t search_intra_rough(
         min_cost = MIN(min_cost, costs[mode_i]);
         max_cost = MAX(max_cost, costs[mode_i]);
         ++modes_selected;
-        for (int j = 0; j < 6; j++) {
+        for (int j = 0; j < mode_list_size; j++) {
           if (costs[mode_i] < best_six_modes[j].cost) {
-            for(int k = 5; k > j; k--) {
+            for(int k = mode_list_size - 1; k > j; k--) {
               best_six_modes[k] = best_six_modes[k - 1];
             }
             best_six_modes[j].cost = costs[mode_i];
@@ -1077,7 +1078,7 @@ static int16_t search_intra_rough(
       memcpy(temp_best_six_modes, best_six_modes, sizeof(temp_best_six_modes));
       int8_t modes_to_check[12];
       int num_modes_to_check = 0;
-      for(int i = 0; i < 6; i++) {
+      for(int i = 0; i < mode_list_size; i++) {
         int8_t center_node = best_six_modes[i].mode;
         if(offset != 0 && (center_node < 3 || center_node > 65)) continue;
         int8_t test_modes[] = { center_node - offset, center_node + offset };
@@ -1120,9 +1121,9 @@ static int16_t search_intra_rough(
           int8_t mode = modes_to_check[i + block];
           if (mode == 1) continue;
           costs[mode] = costs_out[block];
-          for (int j = 0; j < 6; j++) {
+          for (int j = 0; j < mode_list_size; j++) {
             if (costs[mode] < best_six_modes[j].cost) {
-              for (int k = 5; k > j; k--) {
+              for (int k = mode_list_size - 1; k > j; k--) {
                 best_six_modes[k] = best_six_modes[k - 1];
               }
               best_six_modes[j].cost = costs[mode];
@@ -1138,7 +1139,7 @@ static int16_t search_intra_rough(
 
   // Add prediction mode coding cost as the last thing. We don't want this
   // affecting the halving search.
-  for(int i=0; i < 6; i++) {
+  for(int i=0; i < mode_list_size; i++) {
     const int8_t mode = best_six_modes[i].mode;
     modes_out[i].cost = costs[mode];
     modes_out[i].pred_cu = *pred_cu;
@@ -1148,7 +1149,7 @@ static int16_t search_intra_rough(
   }
   
   #undef PARALLEL_BLKS
-  return 6;
+  return mode_list_size;
 }
 
 
