@@ -324,36 +324,21 @@ double uvg_cu_rd_cost_luma(const encoder_state_t *const state,
     return sum + tr_tree_bits * state->lambda;
   }
 
-
-  if (cabac->update && tr_cu->tr_depth == tr_cu->depth && !skip_residual_coding) {
-    // Because these need to be coded before the luma cbf they also need to be counted
-    // before the cabac state changes. However, since this branch is only executed when
-    // calculating the last RD cost it is not problem to include the chroma cbf costs in
-    // luma, because the chroma cost is calculated right after the luma cost.
-    // However, if we have different tr_depth, the bits cannot be written in correct
-    // order anyways so do not touch the chroma cbf here.
-    if (state->encoder_control->chroma_format != UVG_CSP_400) {
-      cabac_ctx_t* cr_ctx = &(cabac->ctx.qt_cbf_model_cb[0]);
-      cabac->cur_ctx = cr_ctx;
-      int u_is_set = cbf_is_set(pred_cu->cbf, depth, COLOR_U);
-      int v_is_set = cbf_is_set(pred_cu->cbf, depth, COLOR_V);
-      CABAC_FBITS_UPDATE(cabac, cr_ctx, u_is_set, tr_tree_bits, "cbf_cb_search");
-      cr_ctx = &(cabac->ctx.qt_cbf_model_cr[u_is_set]);
-      CABAC_FBITS_UPDATE(cabac, cr_ctx, v_is_set, tr_tree_bits, "cbf_cb_search");
-    }
-  }
-
   // Add transform_tree cbf_luma bit cost.
   const int is_tr_split = tr_cu->tr_depth - tr_cu->depth;
+  int is_set = cbf_is_set(pred_cu->cbf, depth, COLOR_Y);
   if (pred_cu->type == CU_INTRA ||
       is_tr_split ||
       cbf_is_set(tr_cu->cbf, depth, COLOR_U) ||
       cbf_is_set(tr_cu->cbf, depth, COLOR_V))
   {
     cabac_ctx_t *ctx = &(cabac->ctx.qt_cbf_model_luma[0]);
-    int is_set = cbf_is_set(pred_cu->cbf, depth, COLOR_Y);
 
     CABAC_FBITS_UPDATE(cabac, ctx, is_set, tr_tree_bits, "cbf_y_search");
+  }
+
+  if (is_set && state->encoder_control->cfg.trskip_enable && width <= (1 << state->encoder_control->cfg.trskip_max_size)) {
+    CABAC_FBITS_UPDATE(cabac, &cabac->ctx.transform_skip_model_luma, tr_cu->tr_idx == MTS_SKIP, tr_tree_bits, "transform_skip_flag");
   }
 
   // SSD between reconstruction and original
@@ -555,7 +540,10 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
       width);
   }
 
-  {
+  if(cb_flag_y){
+    if (state->encoder_control->cfg.trskip_enable && width <= (1 << state->encoder_control->cfg.trskip_max_size)) {
+      CABAC_FBITS_UPDATE(cabac, &cabac->ctx.transform_skip_model_luma, tr_cu->tr_idx == MTS_SKIP, tr_tree_bits, "transform_skip_flag");
+    }
     int8_t luma_scan_mode = uvg_get_scan_order(pred_cu->type, pred_cu->intra.mode, depth);
     const coeff_t* coeffs = &lcu->coeff.y[xy_to_zorder(LCU_WIDTH, x_px, y_px)];
 
@@ -595,6 +583,20 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
       chroma_ssd = ssd_u_joint + ssd_v_joint;
       coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.joint_uv[index], width, 2, scan_order, 0);
     }
+  }
+  if (kvz_is_mts_allowed(state, tr_cu)) {
+
+    bool symbol = tr_cu->tr_idx != 0;
+    int ctx_idx = 0;
+    CABAC_FBITS_UPDATE(cabac, &state->search_cabac.ctx.mts_idx_model[ctx_idx], symbol, tr_tree_bits, "mts_idx");
+
+    ctx_idx++;
+    for (int i = 0; i < 3 && symbol; i++, ctx_idx++)
+    {
+      symbol = tr_cu->tr_idx > i + MTS_DST7_DST7 ? 1 : 0;
+      CABAC_FBITS_UPDATE(cabac, &state->search_cabac.ctx.mts_idx_model[ctx_idx], symbol, tr_tree_bits, "mts_idx");
+    }
+
   }
 
   double bits = tr_tree_bits + coeff_bits;

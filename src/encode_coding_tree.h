@@ -40,7 +40,9 @@
 #include "encoderstate.h"
 #include "global.h"
 
-void uvg_encode_coding_tree(encoder_state_t * const state,
+bool uvg_is_mts_allowed(encoder_state_t* const state, cu_info_t* const pred_cu);
+
+void kvz_encode_coding_tree(encoder_state_t * const state,
                             uint16_t x_ctb,
                             uint16_t y_ctb,
                             uint8_t depth,

@@ -47,9 +47,9 @@
 #include "tables.h"
 #include "videoframe.h"
 
-static bool is_mts_allowed(encoder_state_t * const state, cu_info_t *const pred_cu)
+bool uvg_is_mts_allowed(encoder_state_t * const state, cu_info_t *const pred_cu)
 {
-  uint32_t ts_max_size = 1 << 2; //cu.cs->sps->getLog2MaxTransformSkipBlockSize();
+  uint32_t ts_max_size = 1 << state->encoder_control->cfg.trskip_max_size; 
   const uint32_t max_size = 32; // CU::isIntra(cu) ? MTS_INTRA_MAX_CU_SIZE : MTS_INTER_MAX_CU_SIZE;
   const uint32_t cu_width    = LCU_WIDTH >> pred_cu->depth;
   const uint32_t cu_height   = LCU_WIDTH >> pred_cu->depth;
@@ -61,6 +61,7 @@ static bool is_mts_allowed(encoder_state_t * const state, cu_info_t *const pred_
   //mts_allowed &= !cu.ispMode; // ISP_TODO: Uncomment this when ISP is implemented.
   //mts_allowed &= !cu.sbtInfo;
   mts_allowed &= !(pred_cu->bdpcmMode && cu_width <= ts_max_size && cu_height <= ts_max_size);
+  mts_allowed &= pred_cu->tr_idx != MTS_SKIP && !pred_cu->violates_mts_coeff_constraint && pred_cu->mts_last_scan_pos;
   return mts_allowed;
 }
 
@@ -71,7 +72,7 @@ static void encode_mts_idx(encoder_state_t * const state,
   //TransformUnit &tu = *cu.firstTU;
   int mts_idx = pred_cu->tr_idx;
 
-  if (is_mts_allowed(state, (cu_info_t* const )pred_cu) && mts_idx != MTS_SKIP
+  if (uvg_is_mts_allowed(state, (cu_info_t* const )pred_cu) && mts_idx != MTS_SKIP
        && !pred_cu->violates_mts_coeff_constraint
        && pred_cu->mts_last_scan_pos
        && pred_cu->lfnst_idx == 0
@@ -718,7 +719,7 @@ static void encode_transform_coeff(encoder_state_t * const state,
   if ((cur_cu->type == CU_INTRA || tr_depth > 0 || cb_flag_u || cb_flag_v) && !only_chroma) {
       cabac->cur_ctx = &(cabac->ctx.qt_cbf_model_luma[0]);
       CABAC_BIN(cabac, cb_flag_y, "cbf_luma");
-      // printf("%hu %hu %d %d\n", cabac->ctx.qt_cbf_model_luma[0].state[0], cabac->ctx.qt_cbf_model_luma[0].state[1], x, y);
+      printf("%hu %hu %d %d\n", cabac->ctx.qt_cbf_model_luma[0].state[0], cabac->ctx.qt_cbf_model_luma[0].state[1], x, y);
   }
 
   if (cb_flag_y | cb_flag_u | cb_flag_v) {
