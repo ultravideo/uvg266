@@ -1250,9 +1250,6 @@ static int8_t search_intra_rdo(
   const int tr_depth = CLIP(1, MAX_PU_DEPTH, depth + state->encoder_control->cfg.tr_depth_intra);
   
   for (int mode = 0; mode < modes_to_check; mode++) {
-    if(mode == 0) {
-      printf("%hu %hu %d %d\n", state->search_cabac.ctx.qt_cbf_model_luma[0].state[0], state->search_cabac.ctx.qt_cbf_model_luma[0].state[1], x_px, y_px);
-    }
     double rdo_bitcost = uvg_luma_mode_bits(state, &search_data[mode].pred_cu, x_px, y_px, depth, lcu);
     search_data[mode].pred_cu.tr_idx = MTS_TR_NUM;
     search_data[mode].bits = rdo_bitcost;
@@ -1431,7 +1428,7 @@ int8_t uvg_search_cu_intra_chroma(encoder_state_t * const state,
   // FIXME: It might make more sense to only disable rough search if
   // num_modes is 0.is 0.
 
-  {
+  if(state->encoder_control->cfg.cclm){
     const int_fast8_t log2_width_c = MAX(LOG2_LCU_WIDTH - depth - 1, 2);
     const vector2d_t pic_px = { state->tile->frame->width, state->tile->frame->height };
     const vector2d_t luma_px = { x_px & ~7, y_px & ~7};

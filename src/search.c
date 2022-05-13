@@ -1148,20 +1148,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     cabac_data_t post_seach_cabac;
     memcpy(&post_seach_cabac, &state->search_cabac, sizeof(post_seach_cabac));
     memcpy(&state->search_cabac, &pre_search_cabac, sizeof(post_seach_cabac));
-    state->search_cabac.update = 1;
 
-    double split_bits = 0;
-
-    if (depth < MAX_DEPTH) {
-      // Add cost of cu_split_flag.
-      uvg_write_split_flag(state, &state->search_cabac, 
-        x > 0 ? LCU_GET_CU_AT_PX(lcu,SUB_SCU(x) -1, SUB_SCU(y)): NULL,
-        y > 0 ? LCU_GET_CU_AT_PX(lcu, SUB_SCU(x), SUB_SCU(y) - 1) : NULL,
-        1, depth, cu_width, x, y, &split_bits);
-    }
-
-    state->search_cabac.update = 0;
-    split_cost += split_bits * state->lambda;
 
     // If skip mode was selected for the block, skip further search.
     // Skip mode means there's no coefficients in the block, so splitting
@@ -1176,6 +1163,21 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     } else {
       split_cost = INT_MAX;
     }
+
+    state->search_cabac.update = 1;
+
+    double split_bits = 0;
+
+    if (depth < MAX_DEPTH) {
+      // Add cost of cu_split_flag.
+      uvg_write_split_flag(state, &state->search_cabac,
+        x > 0 ? LCU_GET_CU_AT_PX(lcu, SUB_SCU(x) - 1, SUB_SCU(y)) : NULL,
+        y > 0 ? LCU_GET_CU_AT_PX(lcu, SUB_SCU(x), SUB_SCU(y) - 1) : NULL,
+        1, depth, cu_width, x, y, &split_bits);
+    }
+
+    state->search_cabac.update = 0;
+    split_cost += split_bits * state->lambda;
 
     // If no search is not performed for this depth, try just the best mode
     // of the top left CU from the next depth. This should ensure that 64x64
