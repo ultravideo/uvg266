@@ -47,7 +47,7 @@
 #include "tables.h"
 #include "videoframe.h"
 
-bool uvg_is_mts_allowed(encoder_state_t * const state, cu_info_t *const pred_cu)
+bool uvg_is_mts_allowed(const encoder_state_t * const state, cu_info_t *const pred_cu)
 {
   uint32_t ts_max_size = 1 << state->encoder_control->cfg.trskip_max_size; 
   const uint32_t max_size = 32; // CU::isIntra(cu) ? MTS_INTRA_MAX_CU_SIZE : MTS_INTER_MAX_CU_SIZE;

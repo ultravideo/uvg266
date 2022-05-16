@@ -588,13 +588,13 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
 
     bool symbol = tr_cu->tr_idx != 0;
     int ctx_idx = 0;
-    CABAC_FBITS_UPDATE(cabac, &state->search_cabac.ctx.mts_idx_model[ctx_idx], symbol, tr_tree_bits, "mts_idx");
+    CABAC_FBITS_UPDATE(cabac, &cabac->ctx.mts_idx_model[ctx_idx], symbol, tr_tree_bits, "mts_idx");
 
     ctx_idx++;
     for (int i = 0; i < 3 && symbol; i++, ctx_idx++)
     {
       symbol = tr_cu->tr_idx > i + MTS_DST7_DST7 ? 1 : 0;
-      CABAC_FBITS_UPDATE(cabac, &state->search_cabac.ctx.mts_idx_model[ctx_idx], symbol, tr_tree_bits, "mts_idx");
+      CABAC_FBITS_UPDATE(cabac, &cabac->ctx.mts_idx_model[ctx_idx], symbol, tr_tree_bits, "mts_idx");
     }
 
   }
