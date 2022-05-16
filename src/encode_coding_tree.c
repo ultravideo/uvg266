@@ -719,7 +719,6 @@ static void encode_transform_coeff(encoder_state_t * const state,
   if ((cur_cu->type == CU_INTRA || tr_depth > 0 || cb_flag_u || cb_flag_v) && !only_chroma) {
       cabac->cur_ctx = &(cabac->ctx.qt_cbf_model_luma[0]);
       CABAC_BIN(cabac, cb_flag_y, "cbf_luma");
-      printf("%hu %hu %d %d\n", cabac->ctx.qt_cbf_model_luma[0].state[0], cabac->ctx.qt_cbf_model_luma[0].state[1], x, y);
   }
 
   if (cb_flag_y | cb_flag_u | cb_flag_v) {
