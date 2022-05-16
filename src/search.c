@@ -596,7 +596,8 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
       symbol = tr_cu->tr_idx > i + MTS_DST7_DST7 ? 1 : 0;
       CABAC_FBITS_UPDATE(cabac, &cabac->ctx.mts_idx_model[ctx_idx], symbol, tr_tree_bits, "mts_idx");
     }
-
+    tr_cu->mts_last_scan_pos = false;
+    tr_cu->violates_mts_coeff_constraint = false;
   }
 
   double bits = tr_tree_bits + coeff_bits;
