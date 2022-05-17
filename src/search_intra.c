@@ -512,6 +512,9 @@ static double search_intra_trdepth(
       // whole transform, assume that splitting further is a bad idea.
       if (nosplit_cost >= cost_treshold) {
         return nosplit_cost;
+        if(trafo == 0&& !cbf_is_set(pred_cu->cbf, depth, COLOR_Y)) {
+          break;
+        }
       }
 
       nosplit_cbf = pred_cu->cbf;
@@ -1779,7 +1782,9 @@ void uvg_search_cu_intra(
       depth,
       number_of_modes_to_search,
       search_data,
-      lcu); 
+      lcu);
+    search_data[0].pred_cu.mts_last_scan_pos = false;
+    search_data[0].pred_cu.violates_mts_coeff_constraint = false;
   }
   *mode_out = search_data[0];
 }

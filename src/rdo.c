@@ -295,12 +295,13 @@ out:
  * \returns bits needed to code input coefficients
  */
 static INLINE double get_coeff_cabac_cost(
-    const encoder_state_t * const state,
-    const coeff_t *coeff,
-    int32_t width,
-    int32_t type,
-    int8_t scan_mode,
-    int8_t tr_skip)
+  const encoder_state_t * const state,
+  const coeff_t *coeff,
+  int32_t width,
+  int32_t type,
+  int8_t scan_mode,
+  int8_t tr_skip,
+  cu_info_t* cur_tu)
 {
   // Make sure there are coeffs present
   bool found = false;
@@ -332,7 +333,7 @@ static INLINE double get_coeff_cabac_cost(
                          width,
                          type,
                          scan_mode,
-                         NULL,                   
+                         cur_tu,                   
                          &bits);
   }
   else {
@@ -386,12 +387,14 @@ static INLINE void save_accuracy(int qp, double ccc, uint32_t fast_cost)
  *
  * \returns       number of bits needed to code coefficients
  */
-double uvg_get_coeff_cost(const encoder_state_t * const state,
-                            const coeff_t *coeff,
-                            int32_t width,
-                            int32_t type,
-                            int8_t scan_mode,
-                            int8_t tr_skip)
+double uvg_get_coeff_cost(
+  const encoder_state_t * const state,
+  const coeff_t *coeff,
+  cu_info_t* cur_tu,
+  int32_t width,
+  int32_t type,
+  int8_t scan_mode,
+  int8_t tr_skip)
 {
   uint8_t save_cccs = state->encoder_control->cfg.fastrd_sampling_on;
   uint8_t check_accuracy = state->encoder_control->cfg.fastrd_accuracy_check_on;
@@ -408,13 +411,13 @@ double uvg_get_coeff_cost(const encoder_state_t * const state,
       uint64_t weights = uvg_fast_coeff_get_weights(state);
       uint32_t fast_cost = uvg_fast_coeff_cost(coeff, width, weights);
       if (check_accuracy) {
-        double ccc = get_coeff_cabac_cost(state, coeff, width, type, scan_mode, tr_skip);
+        double ccc = get_coeff_cabac_cost(state, coeff, width, type, scan_mode, tr_skip, cur_tu);
         save_accuracy(state->qp, ccc, fast_cost);
       }
       return fast_cost;
     }
   } else {
-    double ccc = get_coeff_cabac_cost(state, coeff, width, type, scan_mode, tr_skip);
+    double ccc = get_coeff_cabac_cost(state, coeff, width, type, scan_mode, tr_skip, cur_tu);
     if (save_cccs) {
       save_ccc(state->qp, coeff, width * width, ccc);
     }

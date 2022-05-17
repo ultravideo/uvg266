@@ -557,7 +557,7 @@ int uvg_quantize_residual_trskip(
     1, in_stride, width,
     ref_in, pred_in, skip.rec, skip.coeff, false, lmcs_chroma_adj);
   skip.cost = uvg_pixels_calc_ssd(ref_in, skip.rec, in_stride, width, width);
-  skip.cost += uvg_get_coeff_cost(state, skip.coeff, width, 0, scan_order, 1) * state->frame->lambda;
+  skip.cost += uvg_get_coeff_cost(state, skip.coeff, NULL, width, 0, scan_order, 1) * state->frame->lambda;
 
 /*  if (noskip.cost <= skip.cost) {
     *trskip_out = 0;

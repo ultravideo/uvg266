@@ -355,7 +355,7 @@ double uvg_cu_rd_cost_luma(const encoder_state_t *const state,
     int8_t luma_scan_mode = uvg_get_scan_order(pred_cu->type, pred_cu->intra.mode, depth);
     const coeff_t *coeffs = &lcu->coeff.y[xy_to_zorder(LCU_WIDTH, x_px, y_px)];
 
-    coeff_bits += uvg_get_coeff_cost(state, coeffs, width, 0, luma_scan_mode, pred_cu->tr_idx == MTS_SKIP);
+    coeff_bits += uvg_get_coeff_cost(state, coeffs, NULL, width, 0, luma_scan_mode, pred_cu->tr_idx == MTS_SKIP);
   }
 
   double bits = tr_tree_bits + coeff_bits;
@@ -444,8 +444,8 @@ double uvg_cu_rd_cost_chroma(const encoder_state_t *const state,
     int8_t scan_order = uvg_get_scan_order(pred_cu->type, pred_cu->intra.mode_chroma, depth);
     const int index = xy_to_zorder(LCU_WIDTH_C, lcu_px.x, lcu_px.y);
 
-    coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.u[index], width, 2, scan_order, 0);
-    coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.v[index], width, 2, scan_order, 0);
+    coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.u[index], NULL, width, 2, scan_order, 0);
+    coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.v[index], NULL, width, 2, scan_order, 0);
   }
 
 
@@ -547,7 +547,7 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
     int8_t luma_scan_mode = uvg_get_scan_order(pred_cu->type, pred_cu->intra.mode, depth);
     const coeff_t* coeffs = &lcu->coeff.y[xy_to_zorder(LCU_WIDTH, x_px, y_px)];
 
-    coeff_bits += uvg_get_coeff_cost(state, coeffs, width, 0, luma_scan_mode, tr_cu->tr_skip);
+    coeff_bits += uvg_get_coeff_cost(state, coeffs, tr_cu, width, 0, luma_scan_mode, tr_cu->tr_skip);
   }
 
   unsigned chroma_ssd = 0;
@@ -570,8 +570,8 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
 
       {
 
-        coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.u[index], chroma_width, 2, scan_order, 0);
-        coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.v[index], chroma_width, 2, scan_order, 0);
+        coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.u[index], NULL, chroma_width, 2, scan_order, 0);
+        coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.v[index], NULL, chroma_width, 2, scan_order, 0);
       }
     } else {
       int ssd_u_joint = uvg_pixels_calc_ssd(&lcu->ref.u[index], &lcu->rec.joint_u[index],
@@ -581,7 +581,7 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
         LCU_WIDTH_C, LCU_WIDTH_C,
         chroma_width);
       chroma_ssd = ssd_u_joint + ssd_v_joint;
-      coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.joint_uv[index], width, 2, scan_order, 0);
+      coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.joint_uv[index], NULL, width, 2, scan_order, 0);
     }
   }
   if (kvz_is_mts_allowed(state, tr_cu)) {
@@ -685,10 +685,10 @@ void uvg_select_jccr_mode(
     int8_t scan_order = uvg_get_scan_order(pred_cu->type, pred_cu->intra.mode_chroma, depth);
     const int index = xy_to_zorder(LCU_WIDTH_C, lcu_px.x, lcu_px.y);
 
-    coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.u[index], width, 2, scan_order, 0);
-    coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.v[index], width, 2, scan_order, 0);
+    if (u_is_set) coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.u[index], NULL, width, 2, scan_order, 0);
+    if (v_is_set) coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.v[index], NULL, width, 2, scan_order, 0);
     
-    joint_coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.joint_uv[index], width, 2, scan_order, 0);    
+    joint_coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.joint_uv[index], NULL, width, 2, scan_order, 0);
   }
 
 
