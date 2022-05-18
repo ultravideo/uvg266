@@ -422,6 +422,7 @@ static double search_intra_trdepth(
           depth, search_data,
           pred_cu,
           lcu);
+      if(trafo != 0 && !cbf_is_set(pred_cu->cbf, depth, COLOR_Y)) continue;
 
         // TODO: Not sure if this should be 0 or 1 but at least seems to work with 1
         derive_mts_constraints(pred_cu, lcu, depth, lcu_px);
