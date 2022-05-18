@@ -142,34 +142,34 @@ static void get_cost_dual(encoder_state_t * const state,
   costs_out[1] = (double)MIN(satd_costs[1], unsigned_sad_costs[1] * 2);
 
   // TODO: width and height
-  if (TRSKIP_RATIO != 0 && width <= (1 << state->encoder_control->cfg.trskip_max_size) && state->encoder_control->cfg.trskip_enable) {
-    // If the mode looks better with SAD than SATD it might be a good
-    // candidate for transform skip. How much better SAD has to be is
-    // controlled by TRSKIP_RATIO.
+  //if (TRSKIP_RATIO != 0 && width <= (1 << state->encoder_control->cfg.trskip_max_size) && state->encoder_control->cfg.trskip_enable) {
+  //  // If the mode looks better with SAD than SATD it might be a good
+  //  // candidate for transform skip. How much better SAD has to be is
+  //  // controlled by TRSKIP_RATIO.
 
-    // Add the offset bit costs of signaling 'luma and chroma use trskip',
-    // versus signaling 'luma and chroma don't use trskip' to the SAD cost.
-    const cabac_ctx_t *ctx = &state->cabac.ctx.transform_skip_model_luma;
-    double trskip_bits = CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0);
+  //  // Add the offset bit costs of signaling 'luma and chroma use trskip',
+  //  // versus signaling 'luma and chroma don't use trskip' to the SAD cost.
+  //  const cabac_ctx_t *ctx = &state->cabac.ctx.transform_skip_model_luma;
+  //  double trskip_bits = CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0);
 
-    
-    // ToDo: check cost
-    if (state->encoder_control->chroma_format != UVG_CSP_400) {
-      ctx = &state->cabac.ctx.transform_skip_model_chroma;
-      trskip_bits += 2.0 * (CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0));
-    }
-    
+  //  
+  //  // ToDo: check cost
+  //  if (state->encoder_control->chroma_format != UVG_CSP_400) {
+  //    ctx = &state->cabac.ctx.transform_skip_model_chroma;
+  //    trskip_bits += 2.0 * (CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0));
+  //  }
+  //  
 
-    unsigned unsigned_sad_costs[PARALLEL_BLKS] = { 0 };
-    double sad_costs[PARALLEL_BLKS] = { 0 };
-    sad_twin_func(preds, orig_block, PARALLEL_BLKS, unsigned_sad_costs);
-    for (int i = 0; i < PARALLEL_BLKS; ++i) {
-      sad_costs[i] = TRSKIP_RATIO * (double)unsigned_sad_costs[i] + state->lambda_sqrt * trskip_bits;
-      if (sad_costs[i] < (double)satd_costs[i]) {
-        costs_out[i] = sad_costs[i];
-      }
-    }
-  }
+  //  unsigned unsigned_sad_costs[PARALLEL_BLKS] = { 0 };
+  //  double sad_costs[PARALLEL_BLKS] = { 0 };
+  //  sad_twin_func(preds, orig_block, PARALLEL_BLKS, unsigned_sad_costs);
+  //  for (int i = 0; i < PARALLEL_BLKS; ++i) {
+  //    sad_costs[i] = TRSKIP_RATIO * (double)unsigned_sad_costs[i] + state->lambda_sqrt * trskip_bits;
+  //    if (sad_costs[i] < (double)satd_costs[i]) {
+  //      costs_out[i] = sad_costs[i];
+  //    }
+  //  }
+  //}
 
   #undef PARALLEL_BLKS
 }
