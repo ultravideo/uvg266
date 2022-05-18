@@ -338,7 +338,7 @@ double uvg_cu_rd_cost_luma(const encoder_state_t *const state,
   }
 
   if (is_set && state->encoder_control->cfg.trskip_enable && width <= (1 << state->encoder_control->cfg.trskip_max_size)) {
-    CABAC_FBITS_UPDATE(cabac, &cabac->ctx.transform_skip_model_luma, tr_cu->tr_idx == MTS_SKIP, tr_tree_bits, "transform_skip_flag");
+    CABAC_FBITS_UPDATE(cabac, &cabac->ctx.transform_skip_model_luma, pred_cu->tr_idx == MTS_SKIP, tr_tree_bits, "transform_skip_flag");
   }
 
   // SSD between reconstruction and original

@@ -345,8 +345,7 @@ void uvg_encode_ts_residual(encoder_state_t* const state,
       {
         //===== encode sign's =====
         int sign = curr_coeff < 0;
-        CABAC_BIN(cabac, sign, "coeff_sign_flag");
-        CABAC_FBITS_UPDATE(cabac, &cabac->ctx.transform_skip_sig[
+        CABAC_FBITS_UPDATE(cabac, &cabac->ctx.transform_skip_res_sign[
           uvg_sign_ctx_id_abs_ts(coeff, pos_x, pos_y, width, 0)
         ], sign, bits, "coeff_sign_flag");
         maxCtxBins--;
@@ -360,15 +359,15 @@ void uvg_encode_ts_residual(encoder_state_t* const state,
         remAbsLevel = modAbsCoeff - 1;
 
         unsigned gt1 = !!remAbsLevel;
-        CABAC_FBITS_UPDATE(cabac, &cabac->ctx.transform_skip_sig[
+        CABAC_FBITS_UPDATE(cabac, &cabac->ctx.transform_skip_gt1[
           uvg_lrg1_ctx_id_abs_ts(coeff, pos_x, pos_y, width, 0)
-        ], remAbsLevel & 1, bits, "abs_level_gtx_flag");
+        ], gt1, bits, "abs_level_gtx_flag");
         maxCtxBins--;
 
         if (gt1)
         {
           remAbsLevel -= 1;
-          CABAC_FBITS_UPDATE(cabac, &cabac->ctx.transform_skip_par, gt1, bits, "par_level_flag");
+          CABAC_FBITS_UPDATE(cabac, &cabac->ctx.transform_skip_par, remAbsLevel & 1, bits, "par_level_flag");
           maxCtxBins--;
         }
       }
@@ -393,11 +392,7 @@ void uvg_encode_ts_residual(encoder_state_t* const state,
         if (absLevel >= cutoffVal)
         {
           unsigned gt2 = (absLevel >= (cutoffVal + 2));
-          cabac->cur_ctx = &cabac->ctx.transform_skip_gt2[cutoffVal >> 1];
-          CABAC_BIN(cabac, gt2, "abs_level_gtx_flag");
-          CABAC_FBITS_UPDATE(cabac, &cabac->ctx.transform_skip_sig[
-            kvz_lrg1_ctx_id_abs_ts(coeff, pos_x, pos_y, width, 0)
-          ], gt2, bits, "abs_level_gtx_flag");
+          CABAC_FBITS_UPDATE(cabac, &cabac->ctx.transform_skip_gt2[cutoffVal >> 1], gt2, bits, "abs_level_gtx_flag");
           maxCtxBins--;
         }
         cutoffVal += 2;
@@ -1394,6 +1389,11 @@ bool uvg_write_split_flag(const encoder_state_t * const state, cabac_data_t* cab
     split_model += 3 * (split_num >> 1);
 
     cabac->cur_ctx = &(cabac->ctx.split_flag_model[split_model]);
+    if(cabac->only_count && !split_flag) {
+
+      //printf("%hu %hu %d %d %d\n", state->search_cabac.ctx.split_flag_model[split_model].state[0], state->search_cabac.ctx.split_flag_model[split_model].state[1],
+      //  split_model, x, y);
+    }
     CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.split_flag_model[split_model]), split_flag, bits, "split_flag");
   }
 
