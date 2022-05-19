@@ -909,8 +909,9 @@ static void encode_chroma_intra_cu(
       CABAC_FBITS_UPDATE(cabac, &cabac->ctx.cclm_model, chroma_intra_dir != 81, bits, "cclm_model_1");
       if(chroma_intra_dir != 81) {
         CABAC_BIN_EP(cabac, chroma_intra_dir == 83, "cclm_model_2");
-        if(cabac->only_count && bits_out) *bits_out += 1 + bits;
+        bits += 1;
       }
+      if (cabac->only_count && bits_out) *bits_out += bits;
       return;
     }
 

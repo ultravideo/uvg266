@@ -643,7 +643,7 @@ static int search_intra_chroma_rough(
   int modes_count = (state->encoder_control->cfg.cclm ? 8 : 5);
   for (int i = 0; i < modes_count; ++i) {
     const int8_t mode_chroma = chroma_data[i].pred_cu.intra.mode_chroma;
-    if (mode_chroma == luma_mode || mode_chroma == 0 || mode_chroma == 81) continue;
+    if (mode_chroma == luma_mode || mode_chroma == 0 || mode_chroma >= 81) continue;
     uvg_intra_predict(state, refs_u, &loc, COLOR_U, pred, &chroma_data[i], lcu);
     //costs[i] += get_cost(encoder_state, pred, orig_block, satd_func, sad_func, width);
     chroma_data[i].cost += satd_func(pred, orig_block);
@@ -652,7 +652,7 @@ static int search_intra_chroma_rough(
   uvg_pixels_blit(orig_v, orig_block, width, width, origstride, width);
   for (int i = 0; i < modes_count; ++i) {
     const int8_t mode_chroma = chroma_data[i].pred_cu.intra.mode_chroma;
-    if (mode_chroma == luma_mode || mode_chroma == 0 || mode_chroma == 81) continue;
+    if (mode_chroma == luma_mode || mode_chroma == 0 || mode_chroma >= 81) continue;
     uvg_intra_predict(state, refs_v, &loc, COLOR_V, pred, &chroma_data[i], lcu);
     //costs[i] += get_cost(encoder_state, pred, orig_block, satd_func, sad_func, width);
     chroma_data[i].cost += satd_func(pred, orig_block);
@@ -1316,24 +1316,25 @@ double uvg_luma_mode_bits(const encoder_state_t *state, const cu_info_t* const c
 double uvg_chroma_mode_bits(const encoder_state_t *state, int8_t chroma_mode, int8_t luma_mode)
 {
   cabac_data_t* cabac = (cabac_data_t*)&state->search_cabac;
-  const cabac_ctx_t *ctx = &(cabac->ctx.chroma_pred_model);
-  double mode_bits;
+  const cabac_ctx_t* ctx;
+  double mode_bits = 0;
+
+  if (state->encoder_control->cfg.cclm) {
+    ctx = &(cabac->ctx.cclm_flag);
+    mode_bits += CTX_ENTROPY_FBITS(ctx, chroma_mode > 67);
+  }
+  ctx = &(cabac->ctx.chroma_pred_model);
   if (chroma_mode == luma_mode) {
-    mode_bits = CTX_ENTROPY_FBITS(ctx, 0);
+    mode_bits += CTX_ENTROPY_FBITS(ctx, 0);
   } else {
     if(chroma_mode < 67) {
-      mode_bits = 2.0 + CTX_ENTROPY_FBITS(ctx, 1);
+      mode_bits += 2.0 + CTX_ENTROPY_FBITS(ctx, 1);
     }
     else {
-      ctx = &(state->cabac.ctx.cclm_model);
-      mode_bits = CTX_ENTROPY_FBITS(ctx, chroma_mode != 81);
+      ctx = &(cabac->ctx.cclm_model);
+      mode_bits += CTX_ENTROPY_FBITS(ctx, chroma_mode != 81);
       if (chroma_mode != 81) mode_bits += 1;
     }
-  }
-  // Technically this is encoded first but for this method of counting bits it does not matter
-  if(state->encoder_control->cfg.cclm) {
-    ctx = &(state->cabac.ctx.cclm_flag);
-    mode_bits += CTX_ENTROPY_FBITS(ctx, chroma_mode > 67);
   }
 
   if(cabac->update) {
@@ -1376,6 +1377,7 @@ int8_t uvg_search_intra_chroma_rdo(
     cu_info_t *const tr_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
     cabac_data_t temp_cabac;
     memcpy(&temp_cabac, &state->search_cabac, sizeof(cabac_data_t));
+    printf("%hu %hu %d %d\n", temp_cabac.ctx.cclm_flag.state[0], temp_cabac.ctx.cclm_flag.state[1], x_px &~7, y_px & ~7);
     
     for (int8_t i = 0; i < num_modes; ++i) {
       const uint8_t mode = chroma_data[i].pred_cu.intra.mode_chroma;
@@ -1447,7 +1449,7 @@ int8_t uvg_search_cu_intra_chroma(encoder_state_t * const state,
   // FIXME: It might make more sense to only disable rough search if
   // num_modes is 0.is 0.
 
-  if(state->encoder_control->cfg.cclm){
+  if(state->encoder_control->cfg.cclm && 0){
     const int_fast8_t log2_width_c = MAX(LOG2_LCU_WIDTH - depth - 1, 2);
     const vector2d_t pic_px = { state->tile->frame->width, state->tile->frame->height };
     const vector2d_t luma_px = { x_px & ~7, y_px & ~7};
