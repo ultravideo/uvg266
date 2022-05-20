@@ -272,15 +272,16 @@ void kvz_fwd_lfnst(const cu_info_t* const cur_cu,
   const uint16_t lfnst_index = lfnst_idx;
   int8_t intra_mode = (color == COLOR_Y) ? cur_cu->intra.mode : cur_cu->intra.mode_chroma;
   bool mts_skip = cur_cu->tr_skip;
-  bool is_separate_tree = width == 4 && height == 4; // LFNST_TODO: proper dual tree check when that structure is implemented
-  bool is_cclm_mode = (intra_mode >= 67 && intra_mode <= 69);
+  //                                                                     this should probably never trigger
+  bool is_separate_tree = color == COLOR_Y ? width == 4 && height == 4 : width == 2 && height == 2; // LFNST_TODO: proper dual tree check when that structure is implemented
+  bool is_cclm_mode = (intra_mode >= 81 && intra_mode <= 83); // CCLM modes are in [81, 83]
 
   bool is_mip = cur_cu->type == CU_INTRA ? cur_cu->intra.mip_flag : false;
   bool is_wide_angle = false; // TODO: get wide angle mode when implemented
 
   // LFNST_TODO: use kvz_get_scan_order to get scan mode instead of using SCAN_DIAG define.
 
-  if (lfnst_index && !mts_skip && (is_separate_tree ? true : color == COLOR_Y))
+  if (lfnst_index && !mts_skip && (is_separate_tree || color == COLOR_Y))
   {
     const uint32_t log2_block_size = kvz_g_convert_to_bit[width] + 2;
     assert(log2_block_size != -1 && "LFNST: invalid block width.");
@@ -404,15 +405,16 @@ void kvz_inv_lfnst(const cu_info_t *cur_cu,
   const uint32_t  lfnst_index = lfnst_idx;
   int8_t intra_mode = (color == COLOR_Y) ? cur_cu->intra.mode : cur_cu->intra.mode_chroma;
   bool mts_skip = cur_cu->tr_skip;
-  bool is_separate_tree = width == 4 && height == 4; // LFNST_TODO: proper dual tree check when that structure is implemented
-  bool is_cclm_mode = (intra_mode >= 67 && intra_mode <= 69);
+  //                                                                     this should probably never trigger
+  bool is_separate_tree = color == COLOR_Y ? width == 4 && height == 4 : width == 2 && height == 2; // LFNST_TODO: proper dual tree check when that structure is implemented
+  bool is_cclm_mode = (intra_mode >= 81 && intra_mode <= 83); // CCLM modes are in [81, 83]
 
   bool is_mip = cur_cu->type == CU_INTRA ? cur_cu->intra.mip_flag : false;
   bool is_wide_angle = false; // TODO: get wide angle mode when implemented
 
   // LFNST_TODO: use kvz_get_scan_order to get scan mode instead of using SCAN_DIAG define.
 
-  if (lfnst_index && !mts_skip && (is_separate_tree ? true : color == COLOR_Y)) {
+  if (lfnst_index && !mts_skip && (is_separate_tree || color == COLOR_Y)) {
     const uint32_t log2_block_size = kvz_g_convert_to_bit[width] + 2;
     const bool whge3 = width >= 8 && height >= 8;
     const uint32_t* scan = whge3 ? kvz_coef_top_left_diag_scan_8x8[log2_block_size] : kvz_g_sig_last_scan[SCAN_DIAG][log2_block_size - 1];

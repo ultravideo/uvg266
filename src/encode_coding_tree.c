@@ -115,6 +115,8 @@ static void encode_mts_idx(encoder_state_t * const state,
 #define MIN_TB_SIZE_X 4
 #define MIN_TB_SIZE_Y 4
 
+#define MAX_TB_SIZE 32
+
 static int get_isp_split_dim(const int width, const int height, const int isp_split_type)
 {
   bool divide_tu_in_rows = isp_split_type == TU_1D_HOR_SPLIT;
@@ -171,12 +173,11 @@ static bool is_lfnst_allowed(encoder_state_t* const state, const cu_info_t* cons
     bool can_use_lfnst_with_mip = (width >= 16 && height >= 16);
     bool is_sep_tree = false; // LFNST_TODO: if/when separate tree structure is implemented, add proper boolean here
     bool mip_flag = pred_cu->type == CU_INTRA ? pred_cu->intra.mip_flag : false;
-    const int max_tb_size = 64; // LFNST_TODO: use define instead for max transform block size
 
     if ((isp_mode && !can_use_lfnst_with_isp(width, height, isp_split_type, color)) ||
       (pred_cu->type == CU_INTRA && mip_flag && !can_use_lfnst_with_mip) || 
       (is_sep_tree && color != COLOR_Y && MIN(chroma_width, chroma_height) < 4) || 
-      (cu_width > max_tb_size || cu_height > max_tb_size)) {
+      (cu_width > MAX_TB_SIZE || cu_height > MAX_TB_SIZE)) {
       return false;
     }
 
@@ -195,7 +196,7 @@ static bool encode_lfnst_idx(encoder_state_t * const state, cabac_data_t * const
   if (is_lfnst_allowed(state, pred_cu, color, width, height)) {
     // Getting separate tree bool from block size is a temporary fix until a proper dual tree check is possible (there is no dual tree structure at time of writing this).
     // VTM seems to force explicit dual tree structure for small 4x4 blocks
-    bool is_separate_tree = (width == 4 && height == 4) ? true : false; // LFNST_TODO: if/when separate/dual tree structure is implemented, get proper value for this
+    bool is_separate_tree = depth == 4; // LFNST_TODO: if/when separate/dual tree structure is implemented, get proper value for this
     bool luma_flag = is_separate_tree ? (color == COLOR_Y ? true: false) : true;
     bool chroma_flag = is_separate_tree ? (color != COLOR_Y ? true : false) : true;
     bool non_zero_coeff_non_ts_corner_8x8 = (luma_flag && pred_cu->violates_lfnst_constrained[0]) || (chroma_flag && pred_cu->violates_lfnst_constrained[1]);
@@ -213,6 +214,7 @@ static bool encode_lfnst_idx(encoder_state_t * const state, cabac_data_t * const
     const int isp_mode = 0; // LFNST_TODO:get isp_mode from cu when ISP is implemented
 
     // TODO: chroma transform skip
+    // LFNST_TODO: this is skipping luma instead of chroma?
     if (color != COLOR_Y) {
       for (int i = 0; i < num_transform_units; i++) {
         // TODO: this works only for square blocks
@@ -1651,7 +1653,7 @@ void uvg_encode_coding_tree(encoder_state_t * const state,
     encode_transform_coeff(state, x, y, depth, 0, 0, 0, 0, coeff);
 
     bool lfnst_written = encode_lfnst_idx(state, cabac, cur_cu, x, y, depth, COLOR_Y, cu_width, cu_height);
-    bool is_dual_tree = depth == 4; // TODO: proper value for dual tree when dual tree structure is implemented
+    bool is_separate_tree = depth == 4; // TODO: proper value for dual tree when dual tree structure is implemented
 
     encode_mts_idx(state, cabac, cur_cu);
 
@@ -1665,7 +1667,7 @@ void uvg_encode_coding_tree(encoder_state_t * const state,
       tmp->lfnst_last_scan_pos = false;
       encode_transform_coeff(state, x, y, depth, 0, 0, 0, 1, coeff);
       // Write LFNST only once for single tree structure
-      if (!lfnst_written || is_dual_tree) {
+      if (!lfnst_written || is_separate_tree) {
         encode_lfnst_idx(state, cabac, tmp, x, y, depth, COLOR_UV, cu_width, cu_height);
       }
     }
