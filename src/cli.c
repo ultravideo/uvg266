@@ -649,7 +649,7 @@ void print_help(void)
     "      --(no-)mrl             : Enable use of multiple reference lines in intra\n"
     "                               predictions.\n"
     "      --(no-)mip             : Enable matrix weighted intra prediction.\n"
-    "      --(no-)lfnst           : Enable low frequency non-separable transform. [disabled]"
+    "      --(no-)lfnst           : Enable low frequency non-separable transform. [disabled]\n"
     "      --mts <string>         : Multiple Transform Selection [off].\n"
     "                               (Currently only implemented for intra\n"
     "                               and has effect only when rd >= 2)\n"

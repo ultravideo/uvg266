@@ -214,8 +214,7 @@ static bool encode_lfnst_idx(encoder_state_t * const state, cabac_data_t * const
     const int isp_mode = 0; // LFNST_TODO:get isp_mode from cu when ISP is implemented
 
     // TODO: chroma transform skip
-    // LFNST_TODO: this is skipping luma instead of chroma?
-    if (color != COLOR_Y) {
+    if (color == COLOR_Y) {
       for (int i = 0; i < num_transform_units; i++) {
         // TODO: this works only for square blocks
         const int pu_x = x + ((i % tu_row_length) * tu_width);
