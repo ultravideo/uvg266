@@ -149,6 +149,8 @@ typedef void (inter_recon_bipred_func)(lcu_t * const lcu,
 
 typedef double (pixel_var_func)(const uvg_pixel *buf, const uint32_t len);
 
+typedef void (generate_residual_func)(const kvz_pixel* ref_in, const kvz_pixel* pred_in, int16_t* residual, int width, int in_stride);
+
 // Declare function pointers.
 extern reg_sad_func * uvg_reg_sad;
 
@@ -189,11 +191,13 @@ extern hor_sad_func *uvg_hor_sad;
 
 extern pixel_var_func *uvg_pixel_var;
 
+extern generate_residual_func* kvz_generate_residual;
+
 int uvg_strategy_register_picture(void* opaque, uint8_t bitdepth);
-cost_pixel_nxn_func * uvg_pixels_get_satd_func(unsigned n);
-cost_pixel_nxn_func * uvg_pixels_get_sad_func(unsigned n);
 cost_pixel_nxn_multi_func * uvg_pixels_get_satd_dual_func(unsigned n);
 cost_pixel_nxn_multi_func * uvg_pixels_get_sad_dual_func(unsigned n);
+cost_pixel_nxn_multi_func * kvz_pixels_get_satd_dual_func(unsigned n);
+cost_pixel_nxn_multi_func * kvz_pixels_get_sad_dual_func(unsigned n);
 
 #define STRATEGIES_PICTURE_EXPORTS \
   {"reg_sad", (void**) &uvg_reg_sad}, \

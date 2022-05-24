@@ -781,6 +781,17 @@ static double pixel_var_generic(const uvg_pixel *arr, const uint32_t len)
   return var;
 }
 
+
+void generate_residual_generic(const kvz_pixel* ref_in, const kvz_pixel* pred_in, int16_t* residual, int width, int in_stride)
+{
+  int y, x;
+  for (y = 0; y < width; ++y) {
+    for (x = 0; x < width; ++x) {
+      residual[x + y * width] = (int16_t)(ref_in[x + y * in_stride] - pred_in[x + y * in_stride]);
+    }
+  }
+}
+
 int uvg_strategy_register_picture_generic(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
@@ -821,6 +832,8 @@ int uvg_strategy_register_picture_generic(void* opaque, uint8_t bitdepth)
   success &= uvg_strategyselector_register(opaque, "hor_sad", "generic", 0, &hor_sad_generic);
 
   success &= uvg_strategyselector_register(opaque, "pixel_var", "generic", 0, &pixel_var_generic);
+
+  success &= kvz_strategyselector_register(opaque, "generate_residual", "generic", 0, &generate_residual_generic);
 
   return success;
 }

@@ -80,6 +80,8 @@ hor_sad_func *uvg_hor_sad = 0;
 
 pixel_var_func *uvg_pixel_var = 0;
 
+generate_residual_func *kvz_generate_residual = 0;
+
 
 int uvg_strategy_register_picture(void* opaque, uint8_t bitdepth) {
   bool success = true;
