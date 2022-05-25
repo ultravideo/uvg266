@@ -101,7 +101,7 @@ static void encode_mts_idx(encoder_state_t * const state,
   }
 }
 
-// TODO: move these defines to a proper place when ISP is implemented
+// ISP_TODO: move these defines to a proper place when ISP is implemented
 // As of now, these are only needed in lfnst checks
 #define NOT_INTRA_SUBPARTITIONS 0
 #define HOR_INTRA_SUBPARTITIONS 1
@@ -111,11 +111,8 @@ static void encode_mts_idx(encoder_state_t * const state,
 #define TU_1D_HOR_SPLIT 8
 #define TU_1D_VER_SPLIT 9
 
-// TODO: check if these are defined somewhere else
 #define MIN_TB_SIZE_X 4
 #define MIN_TB_SIZE_Y 4
-
-#define MAX_TB_SIZE 32
 
 static int get_isp_split_dim(const int width, const int height, const int isp_split_type)
 {
@@ -164,20 +161,21 @@ static bool is_lfnst_allowed(encoder_state_t* const state, const cu_info_t* cons
                              const int width, const int height) 
 {
   if (state->encoder_control->cfg.lfnst && pred_cu->type == CU_INTRA) {
-    const int isp_mode = 0; // LFNST_TODO: assign proper ISP mode when ISP is implemented
+    const int isp_mode = 0; // ISP_TODO: assign proper ISP mode when ISP is implemented
     const int isp_split_type = 0;
     const int chroma_width = width >> 1;
     const int chroma_height = height >> 1;
     const int cu_width = color == COLOR_Y ? width : chroma_width;
     const int cu_height = color == COLOR_Y ? height : chroma_height;
     bool can_use_lfnst_with_mip = (width >= 16 && height >= 16);
-    bool is_sep_tree = false; // LFNST_TODO: if/when separate tree structure is implemented, add proper boolean here
+    const int depth = pred_cu->depth;
+    bool is_sep_tree = depth == 4; // TODO: if/when separate tree structure is implemented, add proper boolean here
     bool mip_flag = pred_cu->type == CU_INTRA ? pred_cu->intra.mip_flag : false;
 
     if ((isp_mode && !can_use_lfnst_with_isp(width, height, isp_split_type, color)) ||
       (pred_cu->type == CU_INTRA && mip_flag && !can_use_lfnst_with_mip) || 
       (is_sep_tree && color != COLOR_Y && MIN(chroma_width, chroma_height) < 4) || 
-      (cu_width > MAX_TB_SIZE || cu_height > MAX_TB_SIZE)) {
+      (cu_width > TR_MAX_WIDTH || cu_height > TR_MAX_WIDTH)) {
       return false;
     }
 
@@ -196,7 +194,7 @@ static bool encode_lfnst_idx(encoder_state_t * const state, cabac_data_t * const
   if (is_lfnst_allowed(state, pred_cu, color, width, height)) {
     // Getting separate tree bool from block size is a temporary fix until a proper dual tree check is possible (there is no dual tree structure at time of writing this).
     // VTM seems to force explicit dual tree structure for small 4x4 blocks
-    bool is_separate_tree = depth == 4; // LFNST_TODO: if/when separate/dual tree structure is implemented, get proper value for this
+    bool is_separate_tree = depth == 4; // TODO: if/when separate/dual tree structure is implemented, get proper value for this
     bool luma_flag = is_separate_tree ? (color == COLOR_Y ? true: false) : true;
     bool chroma_flag = is_separate_tree ? (color != COLOR_Y ? true : false) : true;
     bool non_zero_coeff_non_ts_corner_8x8 = (luma_flag && pred_cu->violates_lfnst_constrained[0]) || (chroma_flag && pred_cu->violates_lfnst_constrained[1]);
@@ -211,7 +209,7 @@ static bool encode_lfnst_idx(encoder_state_t * const state, cabac_data_t * const
     const int tu_row_length = 1 << (tr_depth - depth);
     const int tu_width = cu_width >> (tr_depth - depth);
     const int tu_height = tu_width; // TODO: height for non-square blocks
-    const int isp_mode = 0; // LFNST_TODO:get isp_mode from cu when ISP is implemented
+    const int isp_mode = 0; // ISP_TODO:get isp_mode from cu when ISP is implemented
 
     // TODO: chroma transform skip
     if (color == COLOR_Y) {

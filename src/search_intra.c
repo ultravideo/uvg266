@@ -383,10 +383,8 @@ static double search_intra_trdepth(
     pred_cu->intra.mode_chroma = -1;
     pred_cu->joint_cb_cr = 4;
 
-    const int max_tb_size = 32; // LFNST_TODO: use define instead for max transform block size
+    const int max_tb_size = TR_MAX_WIDTH;
     // LFNST search params
-    // bool is_separate_tree = (width == 4 && height == 4) ? true : false; // LFNST_TODO: if/when separate/dual tree structure is implemented, get proper value for this
-    // const int max_lfnst_idx = (is_separate_tree /*&& color != COLOR_Y*/ && (width < 8 || height < 8)) || (width > max_tb_size || height > max_tb_size) ? 0 : 2;
     const int max_lfnst_idx = width > max_tb_size || height > max_tb_size ? 0 : 2;
 
     int start_idx = 0;
@@ -449,8 +447,9 @@ static double search_intra_trdepth(
           best_rd_cost = rd_cost;
           best_lfnst_idx = pred_cu->lfnst_idx;
           best_tr_idx = pred_cu->tr_idx;
+          if (best_tr_idx == MTS_SKIP) break; // Very unlikely that further search is necessary if skip seems best option
         }
-      }
+      } // end mts index loop (tr_idx)
       if (reconstruct_chroma) {
         int8_t luma_mode = pred_cu->intra.mode;
         pred_cu->intra.mode = -1;
@@ -481,7 +480,8 @@ static double search_intra_trdepth(
           }
         }
       }
-    }
+      if (best_tr_idx == MTS_SKIP) break; // Very unlikely that further search is necessary if skip seems best option
+    } // end lfnst_index loop
     
     pred_cu->tr_skip = best_tr_idx == MTS_SKIP;
     pred_cu->tr_idx = best_tr_idx;
