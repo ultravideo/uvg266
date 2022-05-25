@@ -514,7 +514,7 @@ static void encode_chroma_tu(encoder_state_t* const state, int x, int y, int dep
         cabac->cur_ctx = &cabac->ctx.transform_skip_model_chroma;
         // HEVC only supports transform_skip for Luma
         // TODO: transform skip for chroma blocks
-        CABAC_BIN(cabac, 0, "transform_skip_flag");
+        CABAC_BIN(cabac, (cur_pu->tr_skip >> COLOR_U) & 1, "transform_skip_flag");
       }
       uvg_encode_coeff_nxn(state, &state->cabac, coeff_u, width_c, COLOR_U, *scan_idx, NULL, cur_pu);
     }
@@ -522,7 +522,7 @@ static void encode_chroma_tu(encoder_state_t* const state, int x, int y, int dep
     if (cbf_is_set(cur_pu->cbf, depth, COLOR_V)) {
       if (state->encoder_control->cfg.trskip_enable && width_c <= (1 << state->encoder_control->cfg.trskip_max_size)) {
         cabac->cur_ctx = &cabac->ctx.transform_skip_model_chroma;
-        CABAC_BIN(cabac, 0, "transform_skip_flag");
+        CABAC_BIN(cabac, (cur_pu->tr_skip >> COLOR_V) & 1, "transform_skip_flag");
       }
       uvg_encode_coeff_nxn(state, &state->cabac, coeff_v, width_c, COLOR_V, *scan_idx, NULL, cur_pu);
     }

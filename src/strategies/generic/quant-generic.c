@@ -207,8 +207,7 @@ int uvg_quant_cbcr_residual_generic(
   ) {
   ALIGNED(64) int16_t u_residual[TR_MAX_WIDTH * TR_MAX_WIDTH];
   ALIGNED(64) int16_t v_residual[TR_MAX_WIDTH * TR_MAX_WIDTH];
-  ALIGNED(64) int16_t u1_residual[2][TR_MAX_WIDTH * TR_MAX_WIDTH];
-  ALIGNED(64) int16_t v1_residual[TR_MAX_WIDTH * TR_MAX_WIDTH];
+  ALIGNED(64) int16_t combined_residual[TR_MAX_WIDTH * TR_MAX_WIDTH];
   ALIGNED(64) coeff_t coeff[TR_MAX_WIDTH * TR_MAX_WIDTH];
 
   {
@@ -220,80 +219,64 @@ int uvg_quant_cbcr_residual_generic(
       }
     }
   }
-  kvz_generate_residual(u_ref_in, u_pred_in, u_residual, width, in_stride);
-  kvz_generate_residual(v_ref_in, v_pred_in, v_residual, width, in_stride);
-
-  int best_cbf_mask = -1;
-  int64_t best_cost = INT64_MAX;
-
-  // This changes the order of the cbf_masks so 2 and 3 are swapped compared with VTM
-  for(int i = cur_cu->type == CU_INTRA ? 1 : 3; i < 4; i++) {
-    int64_t d1 = 0;
-    const int cbf_mask = i * (state->frame->jccr_sign ? -1 : 1);
-    for (int y = 0; y < width; y++)
+  kvz_generate_residual(u_ref_in, u_pred_in, u_residual, width, in_stride, in_stride);
+  kvz_generate_residual(v_ref_in, v_pred_in, v_residual, width, in_stride, in_stride);
+  
+  
+  const int cbf_mask = cur_cu->joint_cb_cr * (state->frame->jccr_sign ? -1 : 1);
+  for (int y = 0; y < width; y++)
+  {
+    for (int x = 0; x < width; x++)
     {
-      for (int x = 0; x < width; x++)
+      const int16_t cbx = u_residual[x + y * width], crx = v_residual[x + y * width];
+      if (cbf_mask == 2)
       {
-        int cbx = u_residual[x + y * width], crx = v_residual[x + y * width];
-        if (cbf_mask == 2)
-        {
-          u1_residual[i - 2][x + y * width] = ((4 * cbx + 2 * crx) / 5);
-          d1 += square(cbx - u1_residual[i - 2][x + y * width]) + square(crx - (u1_residual[i - 2][x + y * width] >> 1));
-        }
-        else if (cbf_mask == -2)
-        {
-          u1_residual[i - 2][x + y * width] = ((4 * cbx - 2 * crx) / 5);
-          d1 += square(cbx - u1_residual[i - 2][x + y * width]) + square(crx - (-u1_residual[i - 2][x + y * width] >> 1));
-        }
-        else if (cbf_mask == 3)
-        {
-          u1_residual[i - 2][x + y * width] = ((cbx + crx) / 2);
-          d1 += square(cbx - u1_residual[i - 2][x + y * width]) + square(crx - u1_residual[i - 2][x + y * width]);
-        }
-        else if (cbf_mask == -3)
-        {
-          u1_residual[i - 2][x + y * width] = ((cbx - crx) / 2);
-          d1 += square(cbx - u1_residual[i - 2][x + y * width]) + square(crx + u1_residual[i - 2][x + y * width]);
-        }
-        else if (cbf_mask == 1)
-        {
-          v1_residual[x + y * width] = ((4 * crx + 2 * cbx) / 5);
-          d1 += square(cbx - (v1_residual[x + y * width] >> 1)) + square(crx - v1_residual[x + y * width]);
-        }
-        else if (cbf_mask == -1)
-        {
-          v1_residual[x + y * width] = ((4 * crx - 2 * cbx) / 5);
-          d1 += square(cbx - (-v1_residual[x + y * width] >> 1)) + square(crx - v1_residual[x + y * width]);
-        }
-        else
-        {
-          d1 += square(cbx);
-          //d2 += square(crx);
-        }
+        combined_residual[x + y * width] = (4 * cbx + 2 * crx) / 5;
       }
-    }
-    if (d1 < best_cost) {
-      best_cbf_mask = i;
-      best_cost = d1;
+      else if (cbf_mask == -2)
+      {
+        combined_residual[x + y * width] = (4 * cbx - 2 * crx) / 5;
+      }
+      else if (cbf_mask == 3)
+      {
+        combined_residual[x + y * width] = (cbx + crx) / 2;
+      }
+      else if (cbf_mask == -3)
+      {
+        combined_residual[x + y * width] = (cbx - crx) / 2;
+      }
+      else if (cbf_mask == 1)
+      {
+        combined_residual[x + y * width] = (4 * crx + 2 * cbx) / 5;
+      }
+      else if (cbf_mask == -1)
+      {
+        combined_residual[x + y * width] = (4 * crx - 2 * cbx) / 5;
+      }
+      else
+      {
+        assert(0);
+      }
     }
   }
 
-  uvg_transform2d(state->encoder_control, best_cbf_mask == 1 ? v1_residual : u1_residual[best_cbf_mask - 2], coeff, width, best_cbf_mask == 1 ? COLOR_V : COLOR_U, cur_cu);
+
+  uvg_transform2d(state->encoder_control, combined_residual, coeff, width, cur_cu->joint_cb_cr == 1 ? COLOR_V : COLOR_U, cur_cu);
 
   if (state->encoder_control->cfg.rdoq_enable &&
     (width > 4 || !state->encoder_control->cfg.rdoq_skip))
   {
     int8_t tr_depth = cur_cu->tr_depth - cur_cu->depth;
     tr_depth += (cur_cu->part_size == SIZE_NxN ? 1 : 0);
-    uvg_rdoq(state, coeff, coeff_out, width, width, best_cbf_mask == 1 ? COLOR_V : COLOR_U,
+    uvg_rdoq(state, coeff, coeff_out, width, width, cur_cu->joint_cb_cr == 1 ? COLOR_V : COLOR_U,
       scan_order, cur_cu->type, tr_depth, cur_cu->cbf);
   }
   else if (state->encoder_control->cfg.rdoq_enable && false) {
-    uvg_ts_rdoq(state, coeff, coeff_out, width, width, best_cbf_mask == 2 ? COLOR_V : COLOR_U,
+    uvg_ts_rdoq(state, coeff, coeff_out, width, width, cur_cu->joint_cb_cr == 2 ? COLOR_V : COLOR_U,
       scan_order);
   }
   else {
-    uvg_quant(state, coeff, coeff_out, width, width, best_cbf_mask == 1 ? COLOR_V : COLOR_U,
+    uvg_quant(state, coeff, coeff_out, width, width, cur_cu->joint_cb_cr == 1 ? COLOR_V : COLOR_U,
       scan_order, cur_cu->type, cur_cu->tr_idx == MTS_SKIP && false);
   }
 
@@ -309,13 +292,12 @@ int uvg_quant_cbcr_residual_generic(
   }
 
   if (has_coeffs && !early_skip) {
-    int y, x;
 
     // Get quantized residual. (coeff_out -> coeff -> residual)
-    uvg_dequant(state, coeff_out, coeff, width, width, best_cbf_mask == 1 ? COLOR_V : COLOR_U,
+    uvg_dequant(state, coeff_out, coeff, width, width, cur_cu->joint_cb_cr == 1 ? COLOR_V : COLOR_U,
       cur_cu->type, cur_cu->tr_idx == MTS_SKIP && false);
     
-    uvg_itransform2d(state->encoder_control, best_cbf_mask == 1 ? v1_residual : u1_residual[best_cbf_mask - 2], coeff, width, best_cbf_mask == 1 ? COLOR_V : COLOR_U, cur_cu);
+    uvg_itransform2d(state->encoder_control, combined_residual, coeff, width, cur_cu->joint_cb_cr == 1 ? COLOR_V : COLOR_U, cur_cu);
     
 
     //if (state->tile->frame->lmcs_aps->m_sliceReshapeInfo.enableChromaAdj && color != COLOR_Y) {
@@ -336,39 +318,39 @@ int uvg_quant_cbcr_residual_generic(
     //    }
     //  }
     //}
-    const int temp = best_cbf_mask * (state->frame->jccr_sign ? -1 : 1);
+    const int temp = cur_cu->joint_cb_cr * (state->frame->jccr_sign ? -1 : 1);
     // Get quantized reconstruction. (residual + pred_in -> rec_out)
     for (int y = 0; y < width; y++) {
       for (int x = 0; x < width; x++) {
         if (temp == 2) {
-          u_residual[x + y * width] = u1_residual[best_cbf_mask - 2][x + y * width];
-          v_residual[x + y * width] = u1_residual[best_cbf_mask - 2][x + y * width] >> 1;
+          u_residual[x + y * width] = combined_residual[x + y * width];
+          v_residual[x + y * width] = combined_residual[x + y * width] >> 1;
         }
         else if (temp == -2) {
-          u_residual[x + y * width] = u1_residual[best_cbf_mask - 2][x + y * width];
-          v_residual[x + y * width] = -u1_residual[best_cbf_mask - 2][x + y * width] >> 1;
+          u_residual[x + y * width] = combined_residual[x + y * width];
+          v_residual[x + y * width] = -combined_residual[x + y * width] >> 1;
         }
         else if (temp == 3) {
-          u_residual[x + y * width] = u1_residual[best_cbf_mask - 2][x + y * width];
-          v_residual[x + y * width] = u1_residual[best_cbf_mask - 2][x + y * width];
+          u_residual[x + y * width] = combined_residual[x + y * width];
+          v_residual[x + y * width] = combined_residual[x + y * width];
         }
         else if (temp == -3) {
           // non-normative clipping to prevent 16-bit overflow
-          u_residual[x + y * width] = u1_residual[best_cbf_mask - 2][x + y * width]; // == -32768 && sizeof(Pel) == 2) ? 32767 : -v1_residual[best_cbf_mask][x];
-          v_residual[x + y * width] = -u1_residual[best_cbf_mask - 2][x + y * width];
+          u_residual[x + y * width] = combined_residual[x + y * width]; // == -32768 && sizeof(Pel) == 2) ? 32767 : -v1_residual[best_cbf_mask][x];
+          v_residual[x + y * width] = -combined_residual[x + y * width];
         }
         else if (temp == 1) {
-          u_residual[x + y * width] = v1_residual[x + y * width] >> 1;
-          v_residual[x + y * width] = v1_residual[x + y * width];
+          u_residual[x + y * width] = combined_residual[x + y * width] >> 1;
+          v_residual[x + y * width] = combined_residual[x + y * width];
         }
         else if (temp == -1) {
-          u_residual[x + y * width] = v1_residual[x + y * width] >> 1;
-          v_residual[x + y * width] = -v1_residual[x + y * width];
+          u_residual[x + y * width] = -combined_residual[x + y * width] >> 1;
+          v_residual[x + y * width] = combined_residual[x + y * width];
         }
       }
     }
-    for (y = 0; y < width; ++y) {
-      for (x = 0; x < width; ++x) {
+    for (int y = 0; y < width; ++y) {
+      for (int x = 0; x < width; ++x) {
         int16_t u_val = u_residual[x + y * width] + u_pred_in[x + y * in_stride];
         u_rec_out[x + y * out_stride] = (uvg_pixel)CLIP(0, PIXEL_MAX, u_val);
         int16_t v_val = v_residual[x + y * width] + v_pred_in[x + y * in_stride];
@@ -379,20 +361,16 @@ int uvg_quant_cbcr_residual_generic(
   else/* if (rec_out != pred_in)*/ {
     // With no coeffs and rec_out == pred_int we skip copying the coefficients
     // because the reconstruction is just the prediction.
-    int y, x;
 
-    for (y = 0; y < width; ++y) {
-      for (x = 0; x < width; ++x) {
+    for (int y = 0; y < width; ++y) {
+      for (int x = 0; x < width; ++x) {
         u_rec_out[x + y * out_stride] = u_pred_in[x + y * in_stride];
         v_rec_out[x + y * out_stride] = v_pred_in[x + y * in_stride];
       }
     }
   }
-
-
-
-
-  return has_coeffs ? best_cbf_mask : 0;
+  
+  return has_coeffs ? cur_cu->joint_cb_cr : 0;
 }
 
 /**
@@ -431,7 +409,7 @@ int uvg_quantize_residual_generic(encoder_state_t *const state,
   const int height = width; // TODO: height for non-square blocks
 
   // Get residual. (ref_in - pred_in -> residual)
-  kvz_generate_residual(ref_in, pred_in, residual, width, in_stride);
+  kvz_generate_residual(ref_in, pred_in, residual, width, in_stride, in_stride);
 
   if (state->tile->frame->lmcs_aps->m_sliceReshapeInfo.enableChromaAdj && color != COLOR_Y) {
     int y, x;

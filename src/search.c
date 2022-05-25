@@ -473,8 +473,8 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
 
   const uint8_t tr_depth = tr_cu->tr_depth - depth;
 
-  const int cb_flag_u = cbf_is_set(tr_cu->cbf, depth, COLOR_U);
-  const int cb_flag_v = cbf_is_set(tr_cu->cbf, depth, COLOR_V);
+  const int cb_flag_u = tr_cu->joint_cb_cr ? tr_cu->joint_cb_cr >> 1 : cbf_is_set(tr_cu->cbf, depth, COLOR_U);
+  const int cb_flag_v = tr_cu->joint_cb_cr ? tr_cu->joint_cb_cr & 1 : cbf_is_set(tr_cu->cbf, depth, COLOR_V);
 
   cabac_data_t* cabac = (cabac_data_t*)&state->search_cabac;
 
@@ -488,7 +488,8 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
 
   }
 
-  if(state->encoder_control->chroma_format != UVG_CSP_400 && !skip_residual_coding && (depth != 4 || (x_px % 8 && y_px % 8))) {
+  bool has_chroma = state->encoder_control->chroma_format != UVG_CSP_400 && (depth != 4 || (x_px % 8 && y_px % 8));
+  if( !skip_residual_coding && has_chroma) {
     if(tr_cu->depth == depth || cbf_is_set(pred_cu->cbf, depth - 1, COLOR_U)) {
       CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.qt_cbf_model_cb[0]), cb_flag_u, tr_tree_bits, "cbf_cb");
     } 
@@ -522,10 +523,10 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
     CABAC_FBITS_UPDATE(cabac, ctx, cb_flag_y, tr_tree_bits, "cbf_y_search");
   }
 
-  if (cb_flag_y | cb_flag_u | cb_flag_v) {
+  if (cb_flag_y || cb_flag_u || cb_flag_v) {
     // TODO qp_delta_sign_flag
 
-    if ((cb_flag_u | cb_flag_v) && x_px % 8 == 0 && y_px % 8 == 0 && state->encoder_control->cfg.jccr) {
+    if ((cb_flag_u || cb_flag_v) && has_chroma && state->encoder_control->cfg.jccr) {
       CABAC_FBITS_UPDATE(cabac, &cabac->ctx.joint_cb_cr[cb_flag_u * 2 + cb_flag_v - 1], tr_cu->joint_cb_cr != 0, tr_tree_bits, "tu_joint_cbcr_residual_flag");
     }
   }
@@ -547,11 +548,11 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
     int8_t luma_scan_mode = uvg_get_scan_order(pred_cu->type, pred_cu->intra.mode, depth);
     const coeff_t* coeffs = &lcu->coeff.y[xy_to_zorder(LCU_WIDTH, x_px, y_px)];
 
-    coeff_bits += uvg_get_coeff_cost(state, coeffs, tr_cu, width, 0, luma_scan_mode, tr_cu->tr_skip);
+    coeff_bits += uvg_get_coeff_cost(state, coeffs, tr_cu, width, 0, luma_scan_mode, tr_cu->tr_skip & 1);
   }
 
   unsigned chroma_ssd = 0;
-  if(state->encoder_control->chroma_format != UVG_CSP_400 && (depth != 4 || (x_px % 8 != 0 && y_px % 8 != 0))) {
+  if(has_chroma) {
     const vector2d_t lcu_px = { (x_px & ~7 ) / 2, (y_px & ~7) / 2 };
     const int chroma_width = MAX(4, LCU_WIDTH >> (depth + 1));
     int8_t scan_order = uvg_get_scan_order(pred_cu->type, pred_cu->intra.mode_chroma, depth);
@@ -566,22 +567,23 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
           LCU_WIDTH_C, LCU_WIDTH_C,
           chroma_width);
         chroma_ssd = ssd_u + ssd_v;
-      }
-
+      }    
+      coeff_bits += kvz_get_coeff_cost(state, &lcu->coeff.u[index], NULL, chroma_width, COLOR_U, scan_order, tr_cu->tr_skip & 2);
+      coeff_bits += kvz_get_coeff_cost(state, &lcu->coeff.v[index], NULL, chroma_width, COLOR_V, scan_order, tr_cu->tr_skip & 4);
+      
+    }
+    else {
       {
-
-        coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.u[index], NULL, chroma_width, 2, scan_order, 0);
-        coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.v[index], NULL, chroma_width, 2, scan_order, 0);
+        int index = lcu_px.y * LCU_WIDTH_C + lcu_px.x;
+        int ssd_u_joint = uvg_pixels_calc_ssd(&lcu->ref.u[index], &lcu->rec.joint_u[index],
+          LCU_WIDTH_C, LCU_WIDTH_C,
+          chroma_width);
+        int ssd_v_joint = uvg_pixels_calc_ssd(&lcu->ref.v[index], &lcu->rec.joint_v[index],
+          LCU_WIDTH_C, LCU_WIDTH_C,
+          chroma_width);
+        chroma_ssd = ssd_u_joint + ssd_v_joint;
       }
-    } else {
-      int ssd_u_joint = uvg_pixels_calc_ssd(&lcu->ref.u[index], &lcu->rec.joint_u[index],
-        LCU_WIDTH_C, LCU_WIDTH_C,
-        width);
-      int ssd_v_joint = uvg_pixels_calc_ssd(&lcu->ref.v[index], &lcu->rec.joint_v[index],
-        LCU_WIDTH_C, LCU_WIDTH_C,
-        chroma_width);
-      chroma_ssd = ssd_u_joint + ssd_v_joint;
-      coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.joint_uv[index], NULL, width, 2, scan_order, 0);
+      coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.joint_uv[index], NULL, chroma_width, COLOR_U, scan_order, 0);
     }
   }
   if (kvz_is_mts_allowed(state, tr_cu)) {
@@ -986,7 +988,10 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         if (ctrl->cfg.rdo >= 3) {
           cur_cu->intra.mode_chroma = uvg_search_cu_intra_chroma(state, x, y, depth, lcu, &intra_search);
 
-          if (intra_search.pred_cu.joint_cb_cr == 0) intra_search.pred_cu.joint_cb_cr = 4;
+          if (intra_search.pred_cu.joint_cb_cr == 0) {
+            intra_search.pred_cu.joint_cb_cr = 4;
+            cur_cu->tr_skip |= intra_search.pred_cu.tr_skip;
+          }
           else cur_cu->joint_cb_cr = intra_search.pred_cu.joint_cb_cr;
 
           lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);

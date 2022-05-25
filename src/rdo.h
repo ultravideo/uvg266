@@ -64,7 +64,7 @@ double uvg_get_coeff_cost(
   const coeff_t *coeff,
   cu_info_t* cur_tu,
   int32_t width,
-  int32_t type,
+  color_t color,
   int8_t scan_mode,
   int8_t tr_skip);
 

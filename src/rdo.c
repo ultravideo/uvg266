@@ -233,10 +233,10 @@ int uvg_init_rdcost_outfiles(const char *dir_path)
   // As long as QP is a two-digit number, template and produced string should
   // be equal in length ("%i" -> "22")
   assert(RD_SAMPLING_MAX_LAST_QP <= 99);
-  assert(strlen(fn_template) <= RD_SAMPLING_MAX_FN_LENGTH);
 
   strncpy(fn_template, dir_path, RD_SAMPLING_MAX_FN_LENGTH);
   strncat(fn_template, basename_tmpl, RD_SAMPLING_MAX_FN_LENGTH - strlen(dir_path));
+  assert(strlen(fn_template) <= RD_SAMPLING_MAX_FN_LENGTH);
 
   for (qp = 0; qp <= RD_SAMPLING_MAX_LAST_QP; qp++) {
     pthread_mutex_t *curr = outfile_mutex + qp;
@@ -290,7 +290,7 @@ out:
  *
  * \param coeff coefficient array
  * \param width coeff block width
- * \param type data type (0 == luma)
+ * \param color data type (0 == luma)
  *
  * \returns bits needed to code input coefficients
  */
@@ -298,7 +298,7 @@ static INLINE double get_coeff_cabac_cost(
   const encoder_state_t * const state,
   const coeff_t *coeff,
   int32_t width,
-  int32_t type,
+  color_t color,
   int8_t scan_mode,
   int8_t tr_skip,
   cu_info_t* cur_tu)
@@ -331,7 +331,7 @@ static INLINE double get_coeff_cabac_cost(
                          &cabac_copy,
                          coeff,
                          width,
-                         type,
+                         color,
                          scan_mode,
                          cur_tu,                   
                          &bits);
@@ -341,7 +341,7 @@ static INLINE double get_coeff_cabac_cost(
       &cabac_copy,
       coeff,
       width,
-      type,
+      color,
       scan_mode,
       &bits);
   }
@@ -383,7 +383,7 @@ static INLINE void save_accuracy(int qp, double ccc, uint32_t fast_cost)
  *
  * \param coeff   coefficient array
  * \param width   coeff block width
- * \param type    data type (0 == luma)
+ * \param color    data type (0 == luma)
  *
  * \returns       number of bits needed to code coefficients
  */
@@ -392,7 +392,7 @@ double uvg_get_coeff_cost(
   const coeff_t *coeff,
   cu_info_t* cur_tu,
   int32_t width,
-  int32_t type,
+  color_t color,
   int8_t scan_mode,
   int8_t tr_skip)
 {
@@ -411,13 +411,13 @@ double uvg_get_coeff_cost(
       uint64_t weights = uvg_fast_coeff_get_weights(state);
       uint32_t fast_cost = uvg_fast_coeff_cost(coeff, width, weights);
       if (check_accuracy) {
-        double ccc = get_coeff_cabac_cost(state, coeff, width, type, scan_mode, tr_skip, cur_tu);
+        double ccc = get_coeff_cabac_cost(state, coeff, width, color, scan_mode, tr_skip, cur_tu);
         save_accuracy(state->qp, ccc, fast_cost);
       }
       return fast_cost;
     }
   } else {
-    double ccc = get_coeff_cabac_cost(state, coeff, width, type, scan_mode, tr_skip, cur_tu);
+    double ccc = get_coeff_cabac_cost(state, coeff, width, color, scan_mode, tr_skip, cur_tu);
     if (save_cccs) {
       save_ccc(state->qp, coeff, width * width, ccc);
     }

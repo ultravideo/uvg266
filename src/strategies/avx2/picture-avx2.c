@@ -1723,44 +1723,44 @@ static INLINE __m128i get_residual_8x1_avx2(const uint8_t* a_in, const uint8_t* 
   return diff;
 }
 
-void generate_residual_avx2(const uint8_t* ref_in, const uint8_t* pred_in, int16_t* residual, int width, int in_stride) {
+static void generate_residual_avx2(const uint8_t* ref_in, const uint8_t* pred_in, int16_t* residual, int width, int ref_stride, int pred_stride) {
 
   __m128i diff = _mm_setzero_si128();
   switch (width) {
   case 4:
-    diff = get_residual_4x1_avx2(ref_in + 0 * in_stride, pred_in + 0 * in_stride);
+    diff = get_residual_4x1_avx2(ref_in + 0 * ref_stride, pred_in + 0 * pred_stride);
     _mm_storel_epi64((__m128i*) & (residual[0]), diff);
-    diff = get_residual_4x1_avx2(ref_in + 1 * in_stride, pred_in + 1 * in_stride);
+    diff = get_residual_4x1_avx2(ref_in + 1 * ref_stride, pred_in + 1 * pred_stride);
     _mm_storel_epi64((__m128i*) & (residual[4]), diff);
-    diff = get_residual_4x1_avx2(ref_in + 2 * in_stride, pred_in + 2 * in_stride);
+    diff = get_residual_4x1_avx2(ref_in + 2 * ref_stride, pred_in + 2 * pred_stride);
     _mm_storel_epi64((__m128i*) & (residual[8]), diff);
-    diff = get_residual_4x1_avx2(ref_in + 3 * in_stride, pred_in + 3 * in_stride);
+    diff = get_residual_4x1_avx2(ref_in + 3 * ref_stride, pred_in + 3 * pred_stride);
     _mm_storel_epi64((__m128i*) & (residual[12]), diff);
     break;
   case 8:
-    diff = get_residual_8x1_avx2(&ref_in[0 * in_stride], &pred_in[0 * in_stride]);
+    diff = get_residual_8x1_avx2(&ref_in[0 * ref_stride], &pred_in[0 * pred_stride]);
     _mm_storeu_si128((__m128i*) & (residual[0]), diff);
-    diff = get_residual_8x1_avx2(&ref_in[1 * in_stride], &pred_in[1 * in_stride]);
+    diff = get_residual_8x1_avx2(&ref_in[1 * ref_stride], &pred_in[1 * pred_stride]);
     _mm_storeu_si128((__m128i*) & (residual[8]), diff);
-    diff = get_residual_8x1_avx2(&ref_in[2 * in_stride], &pred_in[2 * in_stride]);
+    diff = get_residual_8x1_avx2(&ref_in[2 * ref_stride], &pred_in[2 * pred_stride]);
     _mm_storeu_si128((__m128i*) & (residual[16]), diff);
-    diff = get_residual_8x1_avx2(&ref_in[3 * in_stride], &pred_in[3 * in_stride]);
+    diff = get_residual_8x1_avx2(&ref_in[3 * ref_stride], &pred_in[3 * pred_stride]);
     _mm_storeu_si128((__m128i*) & (residual[24]), diff);
-    diff = get_residual_8x1_avx2(&ref_in[4 * in_stride], &pred_in[4 * in_stride]);
+    diff = get_residual_8x1_avx2(&ref_in[4 * ref_stride], &pred_in[4 * pred_stride]);
     _mm_storeu_si128((__m128i*) & (residual[32]), diff);
-    diff = get_residual_8x1_avx2(&ref_in[5 * in_stride], &pred_in[5 * in_stride]);
+    diff = get_residual_8x1_avx2(&ref_in[5 * ref_stride], &pred_in[5 * pred_stride]);
     _mm_storeu_si128((__m128i*) & (residual[40]), diff);
-    diff = get_residual_8x1_avx2(&ref_in[6 * in_stride], &pred_in[6 * in_stride]);
+    diff = get_residual_8x1_avx2(&ref_in[6 * ref_stride], &pred_in[6 * pred_stride]);
     _mm_storeu_si128((__m128i*) & (residual[48]), diff);
-    diff = get_residual_8x1_avx2(&ref_in[7 * in_stride], &pred_in[7 * in_stride]);
+    diff = get_residual_8x1_avx2(&ref_in[7 * ref_stride], &pred_in[7 * pred_stride]);
     _mm_storeu_si128((__m128i*) & (residual[56]), diff);
     break;
   default:
     for (int y = 0; y < width; ++y) {
       for (int x = 0; x < width; x += 16) {
-        diff = get_residual_8x1_avx2(&ref_in[x + y * in_stride], &pred_in[x + y * in_stride]);
+        diff = get_residual_8x1_avx2(&ref_in[x + y * ref_stride], &pred_in[x + y * pred_stride]);
         _mm_storeu_si128((__m128i*) & residual[x + y * width], diff);
-        diff = get_residual_8x1_avx2(&ref_in[(x + 8) + y * in_stride], &pred_in[(x + 8) + y * in_stride]);
+        diff = get_residual_8x1_avx2(&ref_in[(x + 8) + y * ref_stride], &pred_in[(x + 8) + y * pred_stride]);
         _mm_storeu_si128((__m128i*) & residual[(x + 8) + y * width], diff);
       }
     }

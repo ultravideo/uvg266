@@ -650,9 +650,8 @@ static void quantize_tr_residual(encoder_state_t * const state,
   }
 
   const bool can_use_trskip = tr_width <= (1 << state->encoder_control->cfg.trskip_max_size) &&
-                              color == COLOR_Y &&
                               cfg->trskip_enable && 
-                              cur_pu->tr_idx == 1;
+                              cur_pu->tr_skip & (1 << color);
 
   uint8_t has_coeffs;
 
@@ -696,7 +695,6 @@ static void quantize_tr_residual(encoder_state_t * const state,
                                               pred,
                                               coeff,
                                               lmcs_chroma_adj);
-    cur_pu->tr_skip = tr_skip;
   } else {
     if(color == COLOR_UV) {
       has_coeffs = uvg_quant_cbcr_residual(
