@@ -311,7 +311,7 @@ void kvz_fwd_lfnst(const cu_info_t* const cur_cu,
       intra_mode = 0; // Set to planar mode
     }
     assert(intra_mode < NUM_INTRA_MODE && "LFNST: Invalid intra mode.");
-    assert(lfnst_index < 3 && lfnst_index >= 0 && "LFNST: Invalid LFNST index. Must be in [0, 2]");
+    assert(lfnst_index < 3 && "LFNST: Invalid LFNST index. Must be in [0, 2]");
 
     if (is_wide_angle) {
       // Transform wide angle mode to intra mode
@@ -443,7 +443,7 @@ void kvz_inv_lfnst(const cu_info_t *cur_cu,
       intra_mode = 0; // Set to planar mode
     }
     assert(intra_mode < NUM_INTRA_MODE && "LFNST: Invalid intra mode.");
-    assert(lfnst_index < 3 && lfnst_index >= 0 && "LFNST: Invalid LFNST index. Must be in [0, 2]");
+    assert(lfnst_index < 3 && "LFNST: Invalid LFNST index. Must be in [0, 2]");
 
     if (is_wide_angle) {
       // Transform wide angle mode to intra mode
