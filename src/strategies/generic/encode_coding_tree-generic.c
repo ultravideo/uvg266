@@ -45,7 +45,7 @@
  * \param cabac     current cabac state
  * \param coeff     Input coefficients
  * \param width     Block width
- * \param type      plane type / luminance or chrominance
+ * \param color     plane type / luminance or chrominance
  * \param scan_mode    scan type (diag, hor, ver) DEPRECATED?
  *
  * This method encodes coefficients of a block

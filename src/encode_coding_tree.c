@@ -58,7 +58,7 @@ static bool is_mts_allowed(encoder_state_t * const state, cu_info_t *const pred_
   uint8_t mts_type = state->encoder_control->cfg.mts;
   bool mts_allowed = mts_type == UVG_MTS_BOTH || (pred_cu->type == CU_INTRA ? mts_type == UVG_MTS_INTRA : pred_cu->type == CU_INTER && mts_type == UVG_MTS_INTER);
   mts_allowed &= cu_width <= max_size && cu_height <= max_size;
-  //mts_allowed &= !cu.ispMode;
+  //mts_allowed &= !cu.ispMode; // ISP_TODO: Uncomment this when ISP is implemented.
   //mts_allowed &= !cu.sbtInfo;
   mts_allowed &= !(pred_cu->bdpcmMode && cu_width <= ts_max_size && cu_height <= ts_max_size);
   return mts_allowed;
@@ -163,18 +163,18 @@ static bool is_lfnst_allowed(encoder_state_t* const state, const cu_info_t* cons
   if (state->encoder_control->cfg.lfnst && pred_cu->type == CU_INTRA) {
     const int isp_mode = 0; // ISP_TODO: assign proper ISP mode when ISP is implemented
     const int isp_split_type = 0;
+    const int depth = pred_cu->depth;
     const int chroma_width = width >> 1;
     const int chroma_height = height >> 1;
-    const int cu_width = color == COLOR_Y ? width : chroma_width;
-    const int cu_height = color == COLOR_Y ? height : chroma_height;
+    const int cu_width = color == COLOR_Y || depth == 4 ? width : chroma_width;
+    const int cu_height = color == COLOR_Y || depth == 4 ? height : chroma_height;
     bool can_use_lfnst_with_mip = (width >= 16 && height >= 16);
-    const int depth = pred_cu->depth;
     bool is_sep_tree = depth == 4; // TODO: if/when separate tree structure is implemented, add proper boolean here
     bool mip_flag = pred_cu->type == CU_INTRA ? pred_cu->intra.mip_flag : false;
 
     if ((isp_mode && !can_use_lfnst_with_isp(width, height, isp_split_type, color)) ||
       (pred_cu->type == CU_INTRA && mip_flag && !can_use_lfnst_with_mip) || 
-      (is_sep_tree && color != COLOR_Y && MIN(chroma_width, chroma_height) < 4) || 
+      (is_sep_tree && color != COLOR_Y && MIN(cu_width, cu_height) < 4) || 
       (cu_width > TR_MAX_WIDTH || cu_height > TR_MAX_WIDTH)) {
       return false;
     }
