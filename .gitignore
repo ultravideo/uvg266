@@ -57,3 +57,4 @@ src/uvg266.pc
 src/version.h
 tests/uvg266_tests
 tests/uvg266_tests.trs
+out
