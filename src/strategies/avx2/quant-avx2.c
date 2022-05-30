@@ -705,7 +705,7 @@ int uvg_quantize_residual_avx2(encoder_state_t *const state,
 
   const uint16_t lfnst_index = cur_cu->lfnst_idx;
 
-  if (state->encoder_control->cfg.lfnst) {
+  if (state->encoder_control->cfg.lfnst && cur_cu->type == CU_INTRA) {
     // Forward low frequency non-separable transform
     kvz_fwd_lfnst(cur_cu, width, height, color, lfnst_index, coeff);
   }
@@ -743,7 +743,7 @@ int uvg_quantize_residual_avx2(encoder_state_t *const state,
     uvg_dequant(state, coeff_out, coeff, width, width, color,
       cur_cu->type, cur_cu->tr_idx == MTS_SKIP && color == COLOR_Y);
 
-    if (state->encoder_control->cfg.lfnst) {
+    if (state->encoder_control->cfg.lfnst && cur_cu->type == CU_INTRA) {
       // Inverse low frequency non-separable transform
       kvz_inv_lfnst(cur_cu, width, height, color, lfnst_index, coeff);
     }
