@@ -67,14 +67,16 @@ void uvg_itransform2d(const encoder_control_t * const encoder,
 
 int32_t uvg_get_scaled_qp(color_t color, int8_t qp, int8_t qp_offset, int8_t const* const chroma_scale);
 
-void uvg_quantize_lcu_residual(encoder_state_t *state,
-                               bool luma,
-                               bool chroma,
-                               int32_t x,
-                               int32_t y,
-                               uint8_t depth,
-                               cu_info_t *cur_cu,
-                               lcu_t* lcu,
-                               bool early_skip);
+void uvg_quantize_lcu_residual(
+  encoder_state_t *state,
+  bool luma,
+  bool chroma,
+  const bool jccr,
+  int32_t x,
+  int32_t y,
+  uint8_t depth,
+  cu_info_t *cur_cu,
+  lcu_t* lcu,
+  bool early_skip);
 
 #endif

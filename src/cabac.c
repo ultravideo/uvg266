@@ -70,6 +70,7 @@ void uvg_cabac_start(cabac_data_t * const data)
   data->num_buffered_bytes = 0;
   data->buffered_byte = 0xff;
   data->only_count = 0; // By default, write bits out
+  data->update = 0; 
 }
 
 /**
@@ -199,7 +200,7 @@ void uvg_cabac_encode_bin_trm(cabac_data_t * const data, const uint8_t bin_value
 /**
  * \brief encode truncated binary code
  */
-void uvg_cabac_encode_trunc_bin(cabac_data_t * const data, const uint32_t bin_value, const uint32_t max_value) {
+void uvg_cabac_encode_trunc_bin(cabac_data_t * const data, const uint32_t bin_value, const uint32_t max_value, double* bits_out) {
   int thresh;
   int symbol = bin_value;
   if (max_value > 256) {
@@ -219,9 +220,11 @@ void uvg_cabac_encode_trunc_bin(cabac_data_t * const data, const uint32_t bin_va
   int b = max_value - val;
   if (symbol < val - b) {
     CABAC_BINS_EP(data, symbol, thresh, "TruncSymbols");
+    if (bits_out) *bits_out += thresh;
   } else {
     symbol += val - b;
     CABAC_BINS_EP(data, symbol, thresh + 1, "TruncSymbols");
+    if (bits_out) *bits_out += thresh + 1;
   }
 }
 
@@ -349,26 +352,30 @@ void uvg_cabac_write_coeff_remain(cabac_data_t * const cabac, const uint32_t rem
 /**
  * \brief
  */
-void uvg_cabac_write_unary_max_symbol(cabac_data_t * const data, cabac_ctx_t * const ctx, uint32_t symbol, const int32_t offset, const uint32_t max_symbol)
+void uvg_cabac_write_unary_max_symbol(cabac_data_t * const data, 
+  cabac_ctx_t * const ctx, 
+  uint32_t symbol,
+  const int32_t offset,
+  const uint32_t max_symbol, 
+  double* bits_out)
 {
   int8_t code_last = max_symbol > symbol;
 
   assert(symbol <= max_symbol);
 
   if (!max_symbol) return;
-
-  data->cur_ctx = ctx;
-  CABAC_BIN(data, symbol, "ums");
+  
+  CABAC_FBITS_UPDATE(data, ctx, symbol, *bits_out, "ums");
 
   if (!symbol) return;
 
   data->cur_ctx = &ctx[offset];
 
   while (--symbol) {
-    CABAC_BIN(data, 1, "ums");
+    CABAC_FBITS_UPDATE(data, &ctx[offset], 1, *bits_out, "ums");
   }
   if (code_last) {
-    CABAC_BIN(data, 0, "ums");
+    CABAC_FBITS_UPDATE(data, &ctx[offset], 0,*bits_out, "ums");
   }
 }
 
@@ -405,7 +412,7 @@ void uvg_cabac_write_unary_max_symbol_ep(cabac_data_t * const data, unsigned int
 /**
  * \brief
  */
-void uvg_cabac_write_ep_ex_golomb(encoder_state_t * const state,
+uint32_t uvg_cabac_write_ep_ex_golomb(encoder_state_t * const state,
                                   cabac_data_t * const data,
                                   uint32_t symbol,
                                   uint32_t count)
@@ -426,4 +433,5 @@ void uvg_cabac_write_ep_ex_golomb(encoder_state_t * const state,
   num_bins += count;
 
   CABAC_BINS_EP(data, bins, num_bins, "ep_ex_golomb");
+  return num_bins;
 }

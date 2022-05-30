@@ -148,7 +148,7 @@ typedef struct
   uint8_t merge_idx   : 3; //!< \brief merge index
   uint8_t tr_skip     : 1; //!< \brief transform skip flag
   uint8_t tr_idx      : 3; //!< \brief transform index
-  uint8_t joint_cb_cr : 2; //!< \brief joint chroma residual coding 
+  uint8_t joint_cb_cr : 3; //!< \brief joint chroma residual coding 
 
   uint16_t cbf;
 
@@ -182,6 +182,16 @@ typedef struct
     } inter;
   };
 } cu_info_t;
+
+typedef struct {
+  int16_t x;
+  int16_t y;
+  int8_t width;
+  int8_t height;
+  int8_t chroma_width;
+  int8_t chroma_height;
+} cu_loc_t;
+
 
 #define CU_GET_MV_CAND(cu_info_ptr, reflist) \
   (((reflist) == 0) ? (cu_info_ptr)->inter.mv_cand0 : (cu_info_ptr)->inter.mv_cand1)

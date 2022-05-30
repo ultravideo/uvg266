@@ -805,7 +805,7 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
   WRITE_U(stream, 0, 1, "pps_ref_wraparound_enabled_flag");
 
   WRITE_SE(stream, ((int8_t)encoder->cfg.qp) - 26, "pps_init_qp_minus26");
-  WRITE_U(stream, encoder->max_qp_delta_depth >= 0 ? 1:0, 1, "pps_cu_qp_delta_enabled_flag");
+  WRITE_U(stream, state->frame->max_qp_delta_depth >= 0 ? 1:0, 1, "pps_cu_qp_delta_enabled_flag");
 
   WRITE_U(stream, 0,1, "pps_chroma_tool_offsets_present_flag");
   /* // If chroma_tool_offsets_present
@@ -1037,8 +1037,8 @@ static void uvg_encoder_state_write_bitstream_picture_header(
   const int poc_lsb = state->frame->poc & ((1 << encoder->poc_lsb_bits) - 1);
   WRITE_U(stream, poc_lsb, encoder->poc_lsb_bits, "ph_pic_order_cnt_lsb");
 
-  if (encoder->max_qp_delta_depth >= 0) {
-    WRITE_UE(stream, encoder->max_qp_delta_depth, "ph_cu_qp_delta_subdiv_intra_slice");
+  if (state->frame->max_qp_delta_depth >= 0) {
+    WRITE_UE(stream, state->frame->max_qp_delta_depth, "ph_cu_qp_delta_subdiv_intra_slice");
   }
 
   // alf enable flags and aps IDs
@@ -1118,8 +1118,8 @@ static void uvg_encoder_state_write_bitstream_picture_header(
     || state->frame->pictype == UVG_NAL_IDR_N_LP) {
   }
   else {
-    if (encoder->max_qp_delta_depth >= 0) {
-      WRITE_UE(stream, encoder->max_qp_delta_depth, "ph_cu_qp_delta_subdiv_inter_slice");
+    if (state->frame->max_qp_delta_depth >= 0) {
+      WRITE_UE(stream, state->frame->max_qp_delta_depth, "ph_cu_qp_delta_subdiv_inter_slice");
     }
     if (state->encoder_control->cfg.tmvp_enable) {
       WRITE_U(stream, state->encoder_control->cfg.tmvp_enable, 1, "ph_pic_temporal_mvp_enabled_flag");
@@ -1128,7 +1128,7 @@ static void uvg_encoder_state_write_bitstream_picture_header(
   }
 
   if (encoder->cfg.jccr) {
-    WRITE_U(stream, 0, 1, "ph_joint_cbcr_sign_flag");
+    WRITE_U(stream, state->frame->jccr_sign, 1, "ph_joint_cbcr_sign_flag");
   }
   // END PICTURE HEADER
 

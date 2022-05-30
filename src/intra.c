@@ -82,6 +82,17 @@ static const uint8_t num_ref_pixels_left[16][16] = {
   { 4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4 }
 };
 
+
+static void mip_predict(
+  const encoder_state_t* const state,
+  const uvg_intra_references* const refs,
+  const uint16_t pred_block_width,
+  const uint16_t pred_block_height,
+  uvg_pixel* dst,
+  const int mip_mode,
+  const bool mip_transp);
+
+
 int8_t uvg_intra_get_dir_luma_predictor(
   const uint32_t x,
   const uint32_t y,
@@ -452,7 +463,7 @@ static void get_cclm_parameters(
   }
 }
 
-static void linear_transform_cclm(cclm_parameters_t* cclm_params, uvg_pixel * src, uvg_pixel * dst, int stride, int height) {
+static void linear_transform_cclm(const cclm_parameters_t* cclm_params, uvg_pixel * src, uvg_pixel * dst, int stride, int height) {
   int scale = cclm_params->a;
   int shift = cclm_params->shift;
   int offset = cclm_params->b;
@@ -468,7 +479,7 @@ static void linear_transform_cclm(cclm_parameters_t* cclm_params, uvg_pixel * sr
 }
 
 
-void uvg_predict_cclm(
+static void predict_cclm(
   encoder_state_t const* const state,
   const color_t color,
   const int8_t width,
@@ -477,7 +488,7 @@ void uvg_predict_cclm(
   const int16_t y0,
   const int16_t stride,
   const int8_t mode,
-  lcu_t* const lcu,
+  const lcu_t* const lcu,
   uvg_intra_references* chroma_ref,
   uvg_pixel* dst,
   cclm_parameters_t* cclm_params
@@ -498,6 +509,7 @@ void uvg_predict_cclm(
 
 
   uvg_pixel *y_rec = lcu->rec.y + x_scu + y_scu * LCU_WIDTH;
+  const int stride2 = (((state->tile->frame->width + 7) & ~7) + FRAME_PADDING_LUMA);
 
   // Essentially what this does is that it uses 6-tap filtering to downsample
   // the luma intra references down to match the resolution of the chroma channel.
@@ -508,12 +520,12 @@ void uvg_predict_cclm(
   if (y0) {
     for (; available_above_right < width / 2; available_above_right++) {
       int x_extension = x_scu + width * 2 + 4 * available_above_right;
-      cu_info_t* pu = LCU_GET_CU_AT_PX(lcu, x_extension, y_scu - 4);
+      const cu_info_t* pu = LCU_GET_CU_AT_PX(lcu, x_extension, y_scu - 4);
       if (x_extension >= LCU_WIDTH || pu->type == CU_NOTSET) break;
     }
     if(y_scu == 0) {
       if(!state->encoder_control->cfg.wpp) available_above_right = MIN(width / 2, (state->tile->frame->width - x0 - width * 2) / 4);
-      memcpy(sampled_luma_ref.top, &state->tile->frame->cclm_luma_rec_top_line[x0 / 2 + (y0 / 64 - 1) * (stride / 2)], sizeof(uvg_pixel) * (width + available_above_right * 2));
+      memcpy(sampled_luma_ref.top, &state->tile->frame->cclm_luma_rec_top_line[x0 / 2 + (y0 / 64 - 1) * (stride2 / 2)], sizeof(uvg_pixel) * (width + available_above_right * 2));
     }
     else {
       for (int x = 0; x < width * (available_above_right ? 4 : 2); x += 2) {
@@ -533,16 +545,16 @@ void uvg_predict_cclm(
   if(x0) {
     for (; available_left_below < height / 2; available_left_below++) {
       int y_extension = y_scu + height * 2 + 4 * available_left_below;
-      cu_info_t* pu = LCU_GET_CU_AT_PX(lcu, x_scu - 4, y_extension);
+      const cu_info_t* pu = LCU_GET_CU_AT_PX(lcu, x_scu - 4, y_extension);
       if (y_extension >= LCU_WIDTH || pu->type == CU_NOTSET) break;
       if(x_scu == 32 && y_scu == 0 && pu->depth == 0) break;
     }
     for(int i = 0; i < height + available_left_below * 2; i++) {
-      sampled_luma_ref.left[i] = state->tile->frame->cclm_luma_rec[(y0/2 + i) * (stride/2) + x0 / 2 - 1];
+      sampled_luma_ref.left[i] = state->tile->frame->cclm_luma_rec[(y0/2 + i) * (stride2/2) + x0 / 2 - 1];
     }    
   }
 
-  uvg_pixels_blit(&state->tile->frame->cclm_luma_rec[x0 / 2 + (y0 * stride) / 4], sampled_luma, width, height, stride / 2, width);
+  uvg_pixels_blit(&state->tile->frame->cclm_luma_rec[x0 / 2 + (y0 * stride2) / 4], sampled_luma, width, height, stride2 / 2, width);
 
   int16_t a, b, shift;
   get_cclm_parameters(state, width, height, mode,x0, y0, available_above_right, available_left_below, &sampled_luma_ref, chroma_ref, &a, &b, &shift);
@@ -727,12 +739,17 @@ void uvg_mip_pred_upsampling_1D(int* const dst, const int* const src, const int*
 }
 
 
+
 /** \brief Matrix weighted intra prediction.
 */
-void uvg_mip_predict(encoder_state_t const* const state, uvg_intra_references* const refs,
-                     const uint16_t pred_block_width, const uint16_t pred_block_height,
-                     uvg_pixel* dst,
-                     const int mip_mode, const bool mip_transp)
+static void mip_predict(
+  const encoder_state_t* const state,
+  const uvg_intra_references* const refs,
+  const uint16_t pred_block_width,
+  const uint16_t pred_block_height,
+  uvg_pixel* dst,
+  const int mip_mode,
+  const bool mip_transp)
 {
   // MIP prediction uses int values instead of uvg_pixel as some temp values may be negative
   
@@ -875,14 +892,13 @@ void uvg_mip_predict(encoder_state_t const* const state, uvg_intra_references* c
 }
 
 
-void uvg_intra_predict(
-  encoder_state_t *const state,
+static void intra_predict_regular(
+  const encoder_state_t* const state,
   uvg_intra_references *refs,
   int_fast8_t log2_width,
   int_fast8_t mode,
   color_t color,
   uvg_pixel *dst,
-  bool filter_boundary,
   const uint8_t multi_ref_idx)
 {
   const int_fast8_t width = 1 << log2_width;
@@ -1350,18 +1366,66 @@ void uvg_intra_build_reference(
   }
 }
 
+
+void uvg_intra_predict(
+  const encoder_state_t* const state,
+  uvg_intra_references* const refs,
+  const cu_loc_t* const cu_loc,
+  const color_t color,
+  uvg_pixel* dst,
+  const intra_search_data_t* data,
+  const lcu_t* lcu
+  )
+{
+  const int stride = (((state->tile->frame->width + 7) & ~7) + FRAME_PADDING_LUMA);
+  // TODO: what is this used for?
+  // const bool filter_boundary = color == COLOR_Y && !(cfg->lossless && cfg->implicit_rdpcm);
+  bool use_mip = false;
+  const int width = color == COLOR_Y ? cu_loc->width : cu_loc->chroma_width;
+  const int height = color == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
+  const int x = cu_loc->x;
+  const int y = cu_loc->y;
+  int8_t intra_mode = color == COLOR_Y ? data->pred_cu.intra.mode : data->pred_cu.intra.mode_chroma;
+  if (data->pred_cu.intra.mip_flag) {
+    if (color == COLOR_Y) {
+      use_mip = true;
+    }
+    else {
+      use_mip = state->encoder_control->chroma_format == UVG_CSP_444;
+      intra_mode = use_mip ? intra_mode : 0;
+    }
+  }
+  if (intra_mode < 68) {
+    if (use_mip) {
+      assert(intra_mode >= 0 && intra_mode < 16 && "MIP mode must be between [0, 15]");
+      mip_predict(state, refs, width, height, dst, intra_mode, data->pred_cu.intra.mip_is_transposed);
+    }
+    else {
+      intra_predict_regular(state, refs, uvg_g_convert_to_bit[width] + 2, intra_mode, color, dst, data->pred_cu.intra.multi_ref_idx);
+    }
+  }
+  else {
+    uvg_pixels_blit(&state->tile->frame->cclm_luma_rec[x / 2 + (y * stride) / 4], dst, width, width, stride / 2, width);
+    if (data->pred_cu.depth != data->pred_cu.tr_depth || data->cclm_parameters[color == COLOR_U ? 0 : 1].b <= 0) {
+      predict_cclm(
+        state, color, width, width, x, y, stride, intra_mode, lcu, refs, dst, 
+        (cclm_parameters_t*)&data->cclm_parameters[color == COLOR_U ? 0 : 1]);
+    }
+    else {
+      linear_transform_cclm(&data->cclm_parameters[color == COLOR_U ? 0 : 1], dst, dst, width, width);
+    }
+  }
+}
+
+
 static void intra_recon_tb_leaf(
-  encoder_state_t *const state,
+  encoder_state_t* const state,
   int x,
   int y,
   int depth,
-  int8_t intra_mode,
-  cclm_parameters_t *cclm_params,
   lcu_t *lcu,
   color_t color,
-  uint8_t multi_ref_idx,
-  bool mip_flag,
-  bool mip_transp)
+  const intra_search_data_t* search_data)
 {
   const uvg_config *cfg = &state->encoder_control->cfg;
   const int shift = color == COLOR_Y ? 0 : 1;
@@ -1383,7 +1447,7 @@ static void intra_recon_tb_leaf(
   int x_scu = SUB_SCU(x);
   int y_scu = SUB_SCU(y);
   const vector2d_t lcu_px = {x_scu >> shift, y_scu >> shift };
-  uint8_t multi_ref_index = color == COLOR_Y ? multi_ref_idx : 0;
+  uint8_t multi_ref_index = color == COLOR_Y ? search_data->pred_cu.intra.multi_ref_idx: 0;
 
   uvg_intra_references refs;
   // Extra reference lines for use with MRL. Extra lines needed only for left edge.
@@ -1406,42 +1470,14 @@ static void intra_recon_tb_leaf(
   uvg_intra_build_reference(log2width, color, &luma_px, &pic_px, lcu, &refs, cfg->wpp, extra_refs, multi_ref_index);
 
   uvg_pixel pred[32 * 32];
-  int stride = state->tile->frame->source->stride;
-  const bool filter_boundary = color == COLOR_Y && !(cfg->lossless && cfg->implicit_rdpcm);
-  bool use_mip = false;
-  if (mip_flag) {
-    if (color == COLOR_Y) {
-      use_mip = true;
-    } else {
-      // MIP can be used for chroma if the chroma scheme is 444
-      if (state->encoder_control->chroma_format == UVG_CSP_444) {
-        use_mip = true;
-      } else {
-        // If MIP cannot be used for chroma, set mode to planar
-        intra_mode = 0;
-      }
-    }
-  }
 
-  if(intra_mode < 68) {
-    if (use_mip) {
-      assert(intra_mode >= 0 && intra_mode < 16 && "MIP mode must be between [0, 15]");
-      uvg_mip_predict(state, &refs, width, height, pred, intra_mode, mip_transp);
-    }
-    else {
-      uvg_intra_predict(state, &refs, log2width, intra_mode, color, pred, filter_boundary, multi_ref_index);
-    }
-  } else {
-    uvg_pixels_blit(&state->tile->frame->cclm_luma_rec[x / 2 + (y * stride) / 4], pred, width, width, stride / 2, width);
-    if(cclm_params == NULL) {
-      cclm_parameters_t temp_params;
-      uvg_predict_cclm(
-        state, color, width, width, x, y, stride, intra_mode, lcu, &refs, pred, &temp_params);
-    }
-    else {
-      linear_transform_cclm(&cclm_params[color == COLOR_U ? 0 : 1], pred, pred, width, width);
-    }
-  }
+  cu_loc_t loc = {
+    x, y,
+    width, height,
+    width, height,
+  };
+
+  uvg_intra_predict(state, &refs, &loc, color, pred, search_data, lcu);
 
   const int index = lcu_px.x + lcu_px.y * lcu_width;
   uvg_pixel *block = NULL;
@@ -1483,17 +1519,12 @@ static void intra_recon_tb_leaf(
  * \param lcu           containing LCU
  */
 void uvg_intra_recon_cu(
-  encoder_state_t *const state,
+  encoder_state_t* const state,
   int x,
   int y,
   int depth,
-  int8_t mode_luma,
-  int8_t mode_chroma,
+  intra_search_data_t* search_data,
   cu_info_t *cur_cu,
-  cclm_parameters_t *cclm_params,
-  uint8_t multi_ref_idx,
-  bool mip_flag,
-  bool mip_transp,
   lcu_t *lcu)
 {
   const vector2d_t lcu_px = { SUB_SCU(x), SUB_SCU(y) };
@@ -1501,12 +1532,16 @@ void uvg_intra_recon_cu(
   if (cur_cu == NULL) {
     cur_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
   }
-  uint8_t multi_ref_index = multi_ref_idx;
-  bool use_mip = mip_flag;
-  bool mip_transposed = mip_transp;
+  const int8_t mode_luma = search_data->pred_cu.intra.mode;
+  const int8_t mode_chroma= search_data->pred_cu.intra.mode_chroma;
+
+  if(mode_chroma != -1 && mode_luma == -1) {
+    x &= ~7;
+    y &= ~7;
+  }
   
   if (mode_luma != -1 && mode_chroma != -1) {
-    if (use_mip) {
+    if (search_data->pred_cu.intra.mip_flag) {
       assert(mode_luma == mode_chroma && "Chroma mode must be derived from luma mode if block uses MIP.");
     }
   }
@@ -1527,10 +1562,10 @@ void uvg_intra_recon_cu(
     const int32_t x2 = x + offset;
     const int32_t y2 = y + offset;
 
-    uvg_intra_recon_cu(state, x,  y,  depth + 1, mode_luma, mode_chroma, NULL, NULL, multi_ref_index, use_mip, mip_transposed, lcu);
-    uvg_intra_recon_cu(state, x2, y,  depth + 1, mode_luma, mode_chroma, NULL, NULL, multi_ref_index, use_mip, mip_transposed, lcu);
-    uvg_intra_recon_cu(state, x,  y2, depth + 1, mode_luma, mode_chroma, NULL, NULL, multi_ref_index, use_mip, mip_transposed, lcu);
-    uvg_intra_recon_cu(state, x2, y2, depth + 1, mode_luma, mode_chroma, NULL, NULL, multi_ref_index, use_mip, mip_transposed, lcu);
+    uvg_intra_recon_cu(state, x,   y,   depth + 1, search_data, NULL, lcu);
+    uvg_intra_recon_cu(state, x2,  y,   depth + 1, search_data, NULL, lcu);
+    uvg_intra_recon_cu(state, x,   y2,  depth + 1, search_data, NULL, lcu);
+    uvg_intra_recon_cu(state, x2,  y2,  depth + 1, search_data, NULL, lcu);
 
     // Propagate coded block flags from child CUs to parent CU.
     uint16_t child_cbfs[3] = {
@@ -1552,13 +1587,15 @@ void uvg_intra_recon_cu(
    
     // Process a leaf TU.
     if (has_luma) {
-      intra_recon_tb_leaf(state, x, y, depth, mode_luma, cclm_params, lcu, COLOR_Y, multi_ref_index, use_mip, mip_transposed);
+      intra_recon_tb_leaf(state, x, y, depth, lcu, COLOR_Y, search_data);
     }
     if (has_chroma) {
-      intra_recon_tb_leaf(state, x, y, depth, mode_chroma, cclm_params, lcu, COLOR_U, 0, use_mip, mip_transposed);
-      intra_recon_tb_leaf(state, x, y, depth, mode_chroma, cclm_params, lcu, COLOR_V, 0, use_mip, mip_transposed);
+      intra_recon_tb_leaf(state, x, y, depth, lcu, COLOR_U, search_data);
+      intra_recon_tb_leaf(state, x, y, depth, lcu, COLOR_V, search_data);
     }
 
-    uvg_quantize_lcu_residual(state, has_luma, has_chroma, x, y, depth, cur_cu, lcu, false);
+    uvg_quantize_lcu_residual(state, has_luma, has_chroma && !(search_data->pred_cu.joint_cb_cr & 3),
+      search_data->pred_cu.joint_cb_cr != 4 && state->encoder_control->cfg.jccr && (x % 8 == 0 && y % 8 == 0),
+      x, y, depth, cur_cu, lcu, false);
   }
 }

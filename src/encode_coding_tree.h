@@ -56,7 +56,33 @@ void uvg_encode_ts_residual(encoder_state_t* const state,
 void uvg_encode_mvd(encoder_state_t * const state,
                     cabac_data_t *cabac,
                     int32_t mvd_hor,
-                    int32_t mvd_ver);
+                    int32_t mvd_ver,
+                    double* bits_out);
+
+double uvg_mock_encode_coding_unit(
+  encoder_state_t* const state,
+  cabac_data_t* cabac,
+  int x, int y, int depth,
+  lcu_t* lcu, cu_info_t* cur_cu);
+
+int uvg_encode_inter_prediction_unit(encoder_state_t* const state,
+                                      cabac_data_t* const cabac,
+                                      const cu_info_t* const cur_cu,
+                                      int x, int y, int width, int height,
+                                      int depth, 
+                                      lcu_t* lcu,
+                                      double* bits_out);
+
+void uvg_encode_intra_luma_coding_unit(const encoder_state_t* const state,
+  cabac_data_t* const cabac,
+  const cu_info_t* const cur_cu,
+  int x, int y, int depth, const lcu_t* lcu, double* bits_out);
+
+
+bool uvg_write_split_flag(const encoder_state_t* const state, cabac_data_t* cabac,
+  const cu_info_t* left_cu, const cu_info_t* above_cu,
+  uint8_t split_flag,
+  int depth, int cu_width, int x, int y, double* bits_out);
 
 void uvg_encode_last_significant_xy(cabac_data_t * const cabac,
   uint8_t lastpos_x, uint8_t lastpos_y,

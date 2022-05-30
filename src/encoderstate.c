@@ -32,6 +32,9 @@
 
 #include "encoderstate.h"
 
+ // This define is required for M_PI on Windows.
+#define _USE_MATH_DEFINES
+#include <ctype.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -53,6 +56,12 @@
 
 #include "strategies/strategies-picture.h"
 
+/**
+ * \brief Strength of QP adjustments when using adaptive QP for 360 video.
+ *
+ * Determined empirically.
+ */
+static const double ERP_AQP_STRENGTH = 3.0;
 
 int uvg_encoder_state_match_children_of_previous_frame(encoder_state_t * const state) {
   int i;
@@ -572,7 +581,7 @@ static void set_cu_qps(encoder_state_t *state, int x, int y, int depth, int *las
   cu_info_t *cu = uvg_cu_array_at(state->tile->frame->cu_array, x, y);
   const int cu_width = LCU_WIDTH >> depth;
 
-  if (depth <= state->encoder_control->max_qp_delta_depth) {
+  if (depth <= state->frame->max_qp_delta_depth) {
     *prev_qp = -1;
   }
 
@@ -624,6 +633,38 @@ static void set_cu_qps(encoder_state_t *state, int x, int y, int depth, int *las
   }
 }
 
+
+static void set_joint_cb_cr_modes(encoder_state_t* state, uvg_picture* pic)
+{
+  bool              sgnFlag = true;
+
+  if (state->encoder_control->chroma_format != UVG_CSP_400)
+  {
+    const int       x1 = pic->width / 2 - 1;
+    const int       y1 = pic->height / 2 - 1;
+    const int       cbs = pic->stride / 2;
+    const int       crs = pic->stride / 2;
+    const uvg_pixel* p_cb = pic->u + 1 * cbs;
+    const uvg_pixel* p_cr = pic->v + 1 * crs;
+    int64_t         sum_cb_cr = 0;
+
+    // determine inter-chroma transform sign from correlation between high-pass filtered (i.e., zero-mean) Cb and Cr planes
+    for (int y = 1; y < y1; y++, p_cb += cbs, p_cr += crs)
+    {
+      for (int x = 1; x < x1; x++)
+      {
+        int cb = (12 * (int)p_cb[x] - 2 * ((int)p_cb[x - 1] + (int)p_cb[x + 1] + (int)p_cb[x - cbs] + (int)p_cb[x + cbs]) - ((int)p_cb[x - 1 - cbs] + (int)p_cb[x + 1 - cbs] + (int)p_cb[x - 1 + cbs] + (int)p_cb[x + 1 + cbs]));
+        int cr = (12 * (int)p_cr[x] - 2 * ((int)p_cr[x - 1] + (int)p_cr[x + 1] + (int)p_cr[x - crs] + (int)p_cr[x + crs]) - ((int)p_cr[x - 1 - crs] + (int)p_cr[x + 1 - crs] + (int)p_cr[x - 1 + crs] + (int)p_cr[x + 1 + crs]));
+        sum_cb_cr += cb * cr;
+      }
+    }
+
+    sgnFlag = (sum_cb_cr < 0);
+  }
+
+  state->frame->jccr_sign = sgnFlag;
+}
+
 static void encoder_state_worker_encode_lcu_bitstream(void* opaque);
 
 static void encoder_state_worker_encode_lcu_search(void * opaque)
@@ -665,7 +706,7 @@ static void encoder_state_worker_encode_lcu_search(void * opaque)
 
   encoder_state_recdata_to_bufs(state, lcu, state->tile->hor_buf_search, state->tile->ver_buf_search);
 
-  if (encoder->max_qp_delta_depth >= 0) {
+  if (state->frame->max_qp_delta_depth >= 0) {
     int last_qp = state->last_qp;
     int prev_qp = -1;
     set_cu_qps(state, lcu->position_px.x, lcu->position_px.y, 0, &last_qp, &prev_qp);
@@ -716,6 +757,7 @@ static void encoder_state_worker_encode_lcu_bitstream(void * opaque)
   const uint64_t existing_bits = uvg_bitstream_tell(&state->stream);
 
   //Encode SAO
+  state->cabac.update = 1;
   if (encoder->cfg.sao_type) {
     encode_sao(state, lcu->position.x, lcu->position.y, &frame->sao_luma[lcu->position.y * frame->width_in_lcu + lcu->position.x], &frame->sao_chroma[lcu->position.y * frame->width_in_lcu + lcu->position.x]);
   }
@@ -771,6 +813,7 @@ static void encoder_state_worker_encode_lcu_bitstream(void * opaque)
       uvg_cabac_start(&state->cabac);
     }
   }
+  state->cabac.update = 0;
 
 
   pthread_mutex_lock(&state->frame->rc_lock);
@@ -1421,6 +1464,154 @@ static bool edge_lcu(int id, int lcus_x, int lcus_y, bool xdiv64, bool ydiv64)
   }
 }
 
+
+/**
+ * \brief Return weight for 360 degree ERP video
+ *
+ * Returns the scaling factor of area from equirectangular projection to
+ * spherical surface.
+ *
+ * \param y   y-coordinate of the pixel
+ * \param h   height of the picture
+ */
+static double ws_weight(int y, int h)
+{
+  return cos((y - 0.5 * h + 0.5) * (M_PI / h));
+}
+
+
+/**
+ * \brief Update ROI QPs for 360 video with equirectangular projection.
+ *
+ * Updates the ROI parameters in frame->roi.
+ *
+ * \param encoder       encoder control
+ * \param frame         frame that will have the ROI map
+ */
+static void init_erp_aqp_roi(const encoder_control_t *encoder, uvg_picture *frame)
+{
+  int8_t *orig_roi    = frame->roi.roi_array;
+  int32_t orig_width  = frame->roi.width;
+  int32_t orig_height = frame->roi.height;
+
+  // Update ROI with WS-PSNR delta QPs.
+  int new_height = encoder->in.height_in_lcu;
+  int new_width = orig_roi ? orig_width : 1;
+  int8_t *new_array = calloc(new_width * new_height, sizeof(orig_roi[0]));
+
+  int frame_height = encoder->in.real_height;
+
+  double total_weight = 0.0;
+  for (int y = 0; y < frame_height; y++) {
+    total_weight += ws_weight(y, frame_height);
+  }
+
+  for (int y_lcu = 0; y_lcu < new_height; y_lcu++) {
+    int y_orig = LCU_WIDTH * y_lcu;
+    int lcu_height = MIN(LCU_WIDTH, frame_height - y_orig);
+
+    double lcu_weight = 0.0;
+    for (int y = y_orig; y < y_orig + lcu_height; y++) {
+      lcu_weight += ws_weight(y, frame_height);
+    }
+    // Normalize.
+    lcu_weight = (lcu_weight * frame_height) / (total_weight * lcu_height);
+
+    int8_t qp_delta = round(-ERP_AQP_STRENGTH * log2(lcu_weight));
+
+    if (orig_roi) {
+      // If a ROI array already exists, we copy the existing values to the
+      // new array while adding qp_delta to each.
+      int y_roi = y_lcu * orig_height / new_height;
+      for (int x = 0; x < new_width; x++) {
+        new_array[x + y_lcu * new_width] =
+          CLIP(-51, 51, orig_roi[x + y_roi * new_width] + qp_delta);
+      }
+
+    } else {
+      // Otherwise, simply write qp_delta to the ROI array.
+      new_array[y_lcu] = qp_delta;
+    }
+  }
+
+  // Update new values
+  frame->roi.width = new_width;
+  frame->roi.height = new_height;
+  frame->roi.roi_array = new_array;
+  FREE_POINTER(orig_roi);
+}
+
+
+static void next_roi_frame_from_file(uvg_picture *frame, FILE *file, enum uvg_roi_format format) {
+  // The ROI description is as follows:
+  // First number is width, second number is height,
+  // then follows width * height number of dqp values.
+
+  // Rewind the (seekable) ROI file when end of file is reached.
+  // Allows a single ROI frame to be used for a whole sequence
+  // and looping with --loop-input. Skips possible whitespace.
+  if (ftell(file) != -1L) {
+    int c = fgetc(file);
+    while (format == UVG_ROI_TXT && isspace(c)) c = fgetc(file);
+    ungetc(c, file);
+    if (c == EOF) rewind(file);
+  }
+
+  int *width  = &frame->roi.width;
+  int *height = &frame->roi.height;
+
+  bool failed = false;
+
+  if (format == UVG_ROI_TXT) failed = !fscanf(file, "%d", width) || !fscanf(file, "%d", height);
+  if (format == UVG_ROI_BIN) failed = fread(&frame->roi, 4, 2, file) != 2;
+  
+  if (failed) {
+    fprintf(stderr, "Failed to read ROI size.\n");
+    fclose(file);
+    assert(0);
+  }
+
+  if (*width <= 0 || *height <= 0) {
+    fprintf(stderr, "Invalid ROI size: %dx%d.\n", *width, *height);
+    fclose(file);
+    assert(0);
+  }
+
+  if (*width > 10000 || *height > 10000) {
+    fprintf(stderr, "ROI dimensions exceed arbitrary value of 10000.\n");
+    fclose(file);
+    assert(0);
+  }
+
+  const unsigned size = (*width) * (*height);
+  int8_t *dqp_array = calloc((size_t)size, sizeof(frame->roi.roi_array[0]));
+  if (!dqp_array) {
+    fprintf(stderr, "Failed to allocate memory for ROI table.\n");
+    fclose(file);
+    assert(0);
+  }
+
+  FREE_POINTER(frame->roi.roi_array);
+  frame->roi.roi_array = dqp_array;
+
+  if (format == UVG_ROI_TXT) {
+    for (int i = 0; i < size; ++i) {
+      int number; // Need a pointer to int for fscanf
+      if (fscanf(file, "%d", &number) != 1) {
+        fprintf(stderr, "Reading ROI file failed.\n");
+        fclose(file);
+        assert(0);
+      }
+      dqp_array[i] = CLIP(-51, 51, number);
+    }
+  } else if (format == UVG_ROI_BIN) {
+    if (fread(dqp_array, 1, size, file) != size) {
+      fprintf(stderr, "Reading ROI file failed.\n");
+      assert(0);
+    }
+  }
+}
+
 static void encoder_state_init_new_frame(encoder_state_t * const state, uvg_picture* frame) {
   assert(state->type == ENCODER_STATE_TYPE_MAIN);
 
@@ -1435,6 +1626,21 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, uvg_pict
   );
   if (!state->encoder_control->tiles_enable) {
     memset(state->tile->frame->hmvp_size, 0, sizeof(uint8_t) * state->tile->frame->height_in_lcu);
+  }
+
+  // ROI / delta QP maps
+  if (frame->roi.roi_array && cfg->roi.file_path) {
+    assert(0 && "Conflict: Other ROI data was supplied when a ROI file was specified.");
+  }
+
+  // Read frame from the file. If no file is specified,
+  // ROI data should be already set by the application.
+  if (cfg->roi.file_path) {
+    next_roi_frame_from_file(frame, state->encoder_control->roi_file, cfg->roi.format);
+  }
+  
+  if (cfg->erp_aqp) {
+    init_erp_aqp_roi(state->encoder_control, state->tile->frame->source);
   }
 
   // Variance adaptive quantization
@@ -1522,6 +1728,12 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, uvg_pict
     }
   }
   // Variance adaptive quantization - END
+
+  if (cfg->target_bitrate > 0 || frame->roi.roi_array || cfg->set_qp_in_cu || cfg->vaq) {
+    state->frame->max_qp_delta_depth = 0;
+  } else {
+    state->frame->max_qp_delta_depth = -1;
+  }
 
   // Use this flag to handle closed gop irap picture selection.
   // If set to true, irap is already set and we avoid
@@ -1689,6 +1901,7 @@ void uvg_encode_one_frame(encoder_state_t * const state, uvg_picture* frame)
 
 
   encoder_state_init_new_frame(state, frame);
+  if(state->encoder_control->cfg.jccr) set_joint_cb_cr_modes(state, frame);
   
   // Create a separate job for ALF done after everything else, and only then do final bitstream writing (for ALF parameters)
   if (state->encoder_control->cfg.alf_type && state->encoder_control->cfg.wpp) {
@@ -1834,10 +2047,9 @@ lcu_stats_t* uvg_get_lcu_stats(encoder_state_t *state, int lcu_x, int lcu_y)
 
 int uvg_get_cu_ref_qp(const encoder_state_t *state, int x, int y, int last_qp)
 {
-  const encoder_control_t *ctrl = state->encoder_control;
   const cu_array_t *cua = state->tile->frame->cu_array;
   // Quantization group width
-  const int qg_width = LCU_WIDTH >> MIN(ctrl->max_qp_delta_depth, uvg_cu_array_at_const(cua, x, y)->depth);
+  const int qg_width = LCU_WIDTH >> MIN(state->frame->max_qp_delta_depth, uvg_cu_array_at_const(cua, x, y)->depth);
 
   // Coordinates of the top-left corner of the quantization group
   const int x_qg = x & ~(qg_width - 1);

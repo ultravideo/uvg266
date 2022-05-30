@@ -106,6 +106,10 @@ uvg_picture * uvg_image_alloc(enum uvg_chroma_format chroma_format, const int32_
 
   im->interlacing = UVG_INTERLACING_NONE;
 
+  im->roi.roi_array = NULL;
+  im->roi.width = 0;
+  im->roi.height = 0;
+
   return im;
 }
 
@@ -132,6 +136,7 @@ void uvg_image_free(uvg_picture *const im)
     uvg_image_free(im->base_image);
   } else {
     free(im->fulldata_buf);
+    if (im->roi.roi_array) FREE_POINTER(im->roi.roi_array);
   }
 
   // Make sure freed data won't be used.
@@ -191,6 +196,8 @@ uvg_picture *uvg_image_make_subimage(uvg_picture *const orig_image,
 
   im->pts = 0;
   im->dts = 0;
+
+  im->roi = orig_image->roi;
 
   return im;
 }

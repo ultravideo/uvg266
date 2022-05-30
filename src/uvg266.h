@@ -267,6 +267,12 @@ enum uvg_amvr_resolution
   UVG_IMV_HPEL    = 3
 };
 
+enum uvg_roi_format
+{
+  UVG_ROI_TXT = 0,
+  UVG_ROI_BIN = 1
+};
+
 // Map from input format to chroma format.
 #define UVG_FORMAT2CSP(format) ((enum uvg_chroma_format)format)
 
@@ -408,10 +414,9 @@ typedef struct uvg_config
   int32_t implicit_rdpcm; /*!< \brief Enable implicit residual DPCM. */
 
   struct {
-    int32_t width;
-    int32_t height;
-    int8_t *dqps;
-  } roi; /*!< \since 3.14.0 \brief Map of delta QPs for region of interest coding. */
+    char *file_path;
+    enum uvg_roi_format format;
+  } roi; /*!< \brief Specify delta QPs for region of interest coding. */
 
   unsigned slices; /*!< \since 3.15.0 \brief How to map slices to frame. */
 
@@ -524,6 +529,12 @@ typedef struct uvg_config
   int8_t cclm;
 
   int8_t amvr; /* \brief Adaptive motion vector resolution parameter */
+
+  /** \brief whether to try combining intra cus at the lower depth when search
+   *         is not performed at said depth*/
+  uint8_t combine_intra_cus;
+
+  uint8_t force_inter;
 } uvg_config;
 
 /**
@@ -555,6 +566,14 @@ typedef struct uvg_picture {
   enum uvg_chroma_format chroma_format;
 
   int32_t ref_pocs[16];
+
+  struct
+  {
+    int width;
+    int height;
+    int8_t *roi_array;
+  } roi;
+
 } uvg_picture;
 
 /**
@@ -780,6 +799,9 @@ typedef struct uvg_api {
    * the bitstream, length of the bitstream, the reconstructed frame, the
    * original frame and frame info in data_out, len_out, pic_out, src_out and
    * info_out, respectively. Otherwise, set the output parameters to NULL.
+   * 
+   * Region of interest (ROI) / delta QP map can be specified in the input
+   * picture's ROI field but only when a ROI file is not used.
    *
    * After passing all of the input frames, the caller should keep calling this
    * function with pic_in set to NULL, until no more data is returned in the

@@ -260,11 +260,9 @@ int uvg_quantize_residual_trskip(
   struct {
     uvg_pixel rec[LCU_WIDTH * LCU_WIDTH];
     coeff_t coeff[LCU_WIDTH * LCU_WIDTH];
-    uint32_t cost;
+    double cost;
     int has_coeffs;
   } skip, *best;
-
-  const int bit_cost = (int)(state->lambda + 0.5);
   
   //noskip.has_coeffs = uvg_quantize_residual(
   //    state, cur_cu, width, color, scan_order,
@@ -278,7 +276,7 @@ int uvg_quantize_residual_trskip(
     1, in_stride, width,
     ref_in, pred_in, skip.rec, skip.coeff, false, lmcs_chroma_adj);
   skip.cost = uvg_pixels_calc_ssd(ref_in, skip.rec, in_stride, width, width);
-  skip.cost += uvg_get_coeff_cost(state, skip.coeff, width, 0, scan_order, 1) * bit_cost;
+  skip.cost += uvg_get_coeff_cost(state, skip.coeff, width, 0, scan_order, 1) * state->frame->lambda;
 
 /*  if (noskip.cost <= skip.cost) {
     *trskip_out = 0;
@@ -481,15 +479,17 @@ static void quantize_tr_residual(encoder_state_t * const state,
  * - lcu->cbf               coded block flags for the area
  * - lcu->cu.intra.tr_skip  tr skip flags for the area (in case of luma)
  */
-void uvg_quantize_lcu_residual(encoder_state_t * const state,
-                               const bool luma,
-                               const bool chroma,
-                               const int32_t x,
-                               const int32_t y,
-                               const uint8_t depth,
-                               cu_info_t *cur_pu,
-                               lcu_t* lcu,
-                               bool early_skip)
+void uvg_quantize_lcu_residual(
+  encoder_state_t * const state,
+  const bool luma,
+  const bool chroma,
+  const bool jccr,
+  const int32_t x,
+  const int32_t y,
+  const uint8_t depth,
+  cu_info_t *cur_pu,
+  lcu_t* lcu,
+  bool early_skip)
 {
   const int32_t width = LCU_WIDTH >> depth;
   const vector2d_t lcu_px  = { SUB_SCU(x), SUB_SCU(y) };
@@ -511,7 +511,7 @@ void uvg_quantize_lcu_residual(encoder_state_t * const state,
   if (luma) {
     cbf_clear(&cur_pu->cbf, depth, COLOR_Y);
   }
-  if (chroma) {
+  if (chroma || jccr) {
     cbf_clear(&cur_pu->cbf, depth, COLOR_U);
     cbf_clear(&cur_pu->cbf, depth, COLOR_V);
   }
@@ -523,10 +523,11 @@ void uvg_quantize_lcu_residual(encoder_state_t * const state,
     const int32_t x2 = x + offset;
     const int32_t y2 = y + offset;
 
-    uvg_quantize_lcu_residual(state, luma, chroma, x,  y,  depth + 1, NULL, lcu, early_skip);
-    uvg_quantize_lcu_residual(state, luma, chroma, x2, y,  depth + 1, NULL, lcu, early_skip);
-    uvg_quantize_lcu_residual(state, luma, chroma, x,  y2, depth + 1, NULL, lcu, early_skip);
-    uvg_quantize_lcu_residual(state, luma, chroma, x2, y2, depth + 1, NULL, lcu, early_skip);
+    // jccr is currently not supported if transform is split
+    uvg_quantize_lcu_residual(state, luma, chroma, 0,  x,  y, depth + 1, NULL, lcu, early_skip);
+    uvg_quantize_lcu_residual(state, luma, chroma, 0, x2,  y, depth + 1, NULL, lcu, early_skip);
+    uvg_quantize_lcu_residual(state, luma, chroma, 0,  x, y2, depth + 1, NULL, lcu, early_skip);
+    uvg_quantize_lcu_residual(state, luma, chroma, 0, x2, y2, depth + 1, NULL, lcu, early_skip);
 
     // Propagate coded block flags from child CUs to parent CU.
     uint16_t child_cbfs[3] = {
@@ -548,10 +549,10 @@ void uvg_quantize_lcu_residual(encoder_state_t * const state,
     }
     if (chroma) {
       quantize_tr_residual(state, COLOR_U, x, y, depth, cur_pu, lcu, early_skip);
-      quantize_tr_residual(state, COLOR_V, x, y, depth, cur_pu, lcu, early_skip);
-      if(state->encoder_control->cfg.jccr && cur_pu->tr_depth == cur_pu->depth){
-        quantize_tr_residual(state, COLOR_UV, x, y, depth, cur_pu, lcu, early_skip);
-      }
+      quantize_tr_residual(state, COLOR_V, x, y, depth, cur_pu, lcu, early_skip);   
+    }
+    if (jccr && cur_pu->tr_depth == cur_pu->depth) {
+      quantize_tr_residual(state, COLOR_UV, x, y, depth, cur_pu, lcu, early_skip);
     }
   }
 }

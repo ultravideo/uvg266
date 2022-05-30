@@ -43,24 +43,21 @@
 #include "global.h" // IWYU pragma: keep
 #include "intra.h"
 
-double uvg_luma_mode_bits(const encoder_state_t *state, 
-                          int8_t luma_mode, const int8_t *intra_preds, uint8_t multi_ref_idx, const uint8_t num_mip_modes, int mip_flag_ctx_id);
+double uvg_luma_mode_bits(const encoder_state_t *state, const cu_info_t* const cur_cu, int x, int y, int8_t depth, const lcu_t* lcu);
                        
 double uvg_chroma_mode_bits(const encoder_state_t *state,
                         int8_t chroma_mode, int8_t luma_mode);
 
 int8_t uvg_search_cu_intra_chroma(encoder_state_t * const state,
                               const int x_px, const int y_px,
-                              const int depth, lcu_t *lcu, cclm_parameters_t* best_cclm);
+                              const int depth, lcu_t *lcu, intra_search_data_t* best_cclm);
 
-void uvg_search_cu_intra(encoder_state_t * const state,
-                         const int x_px, const int y_px,
-                         const int depth, lcu_t *lcu,
-                         int8_t *mode_out,
-                         int8_t *trafo_out, 
-                         double *cost_out,
-                         uint8_t *multi_ref_idx_out,
-                         bool *mip_flag,
-                         bool *mip_transp);
+void uvg_search_cu_intra(
+  encoder_state_t * const state,
+  const int x_px,
+  const int y_px,
+  const int depth,
+  intra_search_data_t* search_data,
+  lcu_t *lcu);
 
 #endif // SEARCH_INTRA_H_

@@ -63,6 +63,18 @@ typedef struct
   int16_t b;
 } cclm_parameters_t;
 
+typedef struct {
+  cu_info_t pred_cu;
+  cclm_parameters_t cclm_parameters[2];
+  double cost;
+  double bits;
+  double coeff_bits;
+  double distortion;
+} intra_search_data_t ;
+
+
+#define UVG_NUM_INTRA_MODES 67
+
 /**
 * \brief Function for deriving intra luma predictions
 * \param x          x-coordinate of the PU in pixels
@@ -114,53 +126,22 @@ void uvg_intra_build_reference(
  * \param filter_boundary Whether to filter the boundary on modes 10 and 26.
  */
 void uvg_intra_predict(
-  encoder_state_t *const state,
-  uvg_intra_references *refs,
-  int_fast8_t log2_width,
-  int_fast8_t mode,
-  color_t color,
-  uvg_pixel *dst,
-  bool filter_boundary,
-  const uint8_t multi_ref_idx);
+  const encoder_state_t* const state,
+  uvg_intra_references* const refs,
+  const cu_loc_t* const cu_loc,
+  const color_t color,
+  uvg_pixel* dst,
+  const intra_search_data_t* data,
+  const lcu_t* lcu
+);
 
 void uvg_intra_recon_cu(
-  encoder_state_t *const state,
+  encoder_state_t* const state,
   int x,
   int y,
   int depth,
-  int8_t mode_luma,
-  int8_t mode_chroma,
+  intra_search_data_t* search_data,
   cu_info_t *cur_cu,
-  cclm_parameters_t* cclm_params,
-  uint8_t multi_ref_idx,
-  bool mip_flag,
-  bool mip_transp,
   lcu_t *lcu);
 
-
-void uvg_predict_cclm(
-  encoder_state_t const* const state,
-  const color_t color,
-  const int8_t width,
-  const int8_t height,
-  const int16_t x0,
-  const int16_t y0,
-  const int16_t stride,
-  const int8_t mode,
-  lcu_t* const lcu,
-  uvg_intra_references* chroma_ref,
-  uvg_pixel* dst,
-  cclm_parameters_t* cclm_params
-);
-
 int uvg_get_mip_flag_context(int x, int y, int width, int height, const lcu_t* lcu, cu_array_t* const cu_a);
-
-void uvg_mip_predict(
-  encoder_state_t const * const state,
-  uvg_intra_references * refs,
-  const uint16_t width,
-  const uint16_t height,
-  uvg_pixel* dst,
-  const int mip_mode,
-  const bool mip_transp
-);

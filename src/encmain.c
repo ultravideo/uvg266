@@ -441,6 +441,7 @@ int main(int argc, char *argv[])
   FILE *input  = NULL; //!< input file (YUV)
   FILE *output = NULL; //!< output file (HEVC NAL stream)
   FILE *recout = NULL; //!< reconstructed YUV output, --debug
+  FILE *roifile = NULL;
   clock_t start_time = clock();
   clock_t encoding_start_cpu_time;
   UVG_CLOCK_T encoding_start_real_time;
@@ -587,7 +588,7 @@ int main(int argc, char *argv[])
     // Give arguments via struct to the input thread
     input_handler_args in_args = {
       .available_input_slots = available_input_slots,
-      .filled_input_slots    = filled_input_slots,
+      .filled_input_slots = filled_input_slots,
 
       .input = input,
       .api = api,
@@ -828,6 +829,7 @@ done:
   if (input)  fclose(input);
   if (output) fclose(output);
   if (recout) fclose(recout);
+  if (roifile) fclose(roifile);
 
   DBG_YUVIEW_CLEANUP();
   CHECKPOINTS_FINALIZE();
