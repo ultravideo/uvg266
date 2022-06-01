@@ -219,7 +219,7 @@ static bool encode_lfnst_idx(encoder_state_t * const state, cabac_data_t * const
         const int pu_y = y + ((i / tu_row_length) * tu_height);
         const cu_info_t* cur_tu = kvz_cu_array_at_const(frame->cu_array, pu_x, pu_y);
         assert(cur_tu != NULL && "NULL transform unit.");
-        bool cbf_set = cbf_is_set_any(cur_tu->cbf, tr_depth);
+        bool cbf_set = cbf_is_set(cur_tu->cbf, tr_depth, COLOR_Y);
 
         if (cur_tu != NULL && cbf_set && cur_tu->tr_idx == MTS_SKIP) {
           is_tr_skip = true;
