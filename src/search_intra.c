@@ -443,6 +443,8 @@ static double search_intra_trdepth(
       //  rd_cost += uvg_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
       //}
 
+        // TODO: there is an error in this cost calculation. This will be fixed when merged into current master
+        // This is compared to the previous best, which may have chroma cost included
         if (rd_cost < best_rd_cost) {
           best_rd_cost = rd_cost;
           best_lfnst_idx = pred_cu->lfnst_idx;
