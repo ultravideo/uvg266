@@ -285,7 +285,7 @@ void kvz_fwd_lfnst(const cu_info_t* const cur_cu,
 {
   const uint16_t lfnst_index = lfnst_idx;
   int8_t intra_mode = (color == COLOR_Y) ? cur_cu->intra.mode : cur_cu->intra.mode_chroma;
-  bool mts_skip = cur_cu->tr_skip;
+  bool mts_skip = cur_cu->tr_idx == MTS_SKIP;
   const int depth = cur_cu->depth;
   bool is_separate_tree = depth == 4; // TODO: proper dual tree check when that structure is implemented
   bool is_cclm_mode = (intra_mode >= 81 && intra_mode <= 83); // CCLM modes are in [81, 83]
@@ -419,7 +419,7 @@ void kvz_inv_lfnst(const cu_info_t *cur_cu,
   const int max_log2_dyn_range = 15;
   const uint32_t  lfnst_index = lfnst_idx;
   int8_t intra_mode = (color == COLOR_Y) ? cur_cu->intra.mode : cur_cu->intra.mode_chroma;
-  bool mts_skip = cur_cu->tr_skip;
+  bool mts_skip = cur_cu->tr_idx == MTS_SKIP;
   const int depth = cur_cu->depth;
   bool is_separate_tree = depth == 4; // TODO: proper dual tree check when that structure is implemented
   bool is_cclm_mode = (intra_mode >= 81 && intra_mode <= 83); // CCLM modes are in [81, 83]
