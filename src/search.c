@@ -540,9 +540,10 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
       LCU_WIDTH, LCU_WIDTH,
       width);
   }
+  const bool can_use_tr_skip = state->encoder_control->cfg.trskip_enable && width <= (1 << state->encoder_control->cfg.trskip_max_size);
 
   if(cb_flag_y){
-    if (state->encoder_control->cfg.trskip_enable && width <= (1 << state->encoder_control->cfg.trskip_max_size)) {
+    if (can_use_tr_skip) {
       CABAC_FBITS_UPDATE(cabac, &cabac->ctx.transform_skip_model_luma, tr_cu->tr_idx == MTS_SKIP, tr_tree_bits, "transform_skip_flag");
     }
     int8_t luma_scan_mode = uvg_get_scan_order(pred_cu->type, pred_cu->intra.mode, depth);
@@ -567,7 +568,13 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
           LCU_WIDTH_C, LCU_WIDTH_C,
           chroma_width);
         chroma_ssd = ssd_u + ssd_v;
-      }    
+      }
+      if(can_use_tr_skip && cb_flag_u) {
+        CABAC_FBITS_UPDATE(cabac, &cabac->ctx.transform_skip_model_chroma, tr_cu->tr_skip & 2, tr_tree_bits, "transform_skip_flag");        
+      }
+      if(can_use_tr_skip && cb_flag_v) {
+        CABAC_FBITS_UPDATE(cabac, &cabac->ctx.transform_skip_model_chroma, tr_cu->tr_skip & 4, tr_tree_bits, "transform_skip_flag");        
+      }
       coeff_bits += kvz_get_coeff_cost(state, &lcu->coeff.u[index], NULL, chroma_width, COLOR_U, scan_order, tr_cu->tr_skip & 2);
       coeff_bits += kvz_get_coeff_cost(state, &lcu->coeff.v[index], NULL, chroma_width, COLOR_V, scan_order, tr_cu->tr_skip & 4);
       
