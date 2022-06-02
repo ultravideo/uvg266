@@ -703,15 +703,15 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
 
   WRITE_U(stream, 0, 1, "sps_virtual_boundaries_enabled_flag");
 
-  WRITE_U(stream, 0, 1, "general_hrd_parameters_present_flag");
-  /*
-  WRITE_U(stream, encoder->vui.timing_info_present_flag, 1, "general_hrd_parameters_present_flag");
+  WRITE_U(stream, encoder->vui.timing_info_present_flag, 1, "sps_timing_hrd_params_present_flag");
+
   if (encoder->vui.timing_info_present_flag) {
     WRITE_U(stream, encoder->vui.num_units_in_tick, 32, "num_units_in_tick");
     WRITE_U(stream, encoder->vui.time_scale, 32, "time_scale");
 
     WRITE_U(stream, 0, 1, "general_nal_hrd_parameters_present_flag");
     WRITE_U(stream, 0, 1, "general_vcl_hrd_parameters_present_flag");
+    /* if(general_nal_hrd_parameters_present_flag || general_vcl_hrd_parameters_present_flag) {
     WRITE_U(stream, 0, 1, "general_same_pic_timing_in_all_ols_flag");
     WRITE_U(stream, 0, 1, "general_decoding_unit_hrd_params_present_flag");
     
@@ -719,10 +719,16 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
     WRITE_U(stream, 0, 4, "cpb_size_scale");
 
     WRITE_UE(stream, 0, "hrd_cpb_cnt_minus1");
+    }
+    */
+    WRITE_U(stream, 0, 1, "sps_sublayer_cpb_params_present_flag");
+
+    WRITE_U(stream, 1, 1, "fixed_pic_rate_general_flag");
+    WRITE_UE(stream, 0, "elemental_duration_in_tc_minus1");
   }
-  */
-  WRITE_U(stream, 0, 1, "field_seq_flag");
-  WRITE_U(stream, 0, 1, "vui_parameters_present_flag");
+
+  WRITE_U(stream, 0, 1, "sps_field_seq_flag");
+  WRITE_U(stream, 0, 1, "sps_vui_parameters_present_flag");
   
   // ToDo: Check and enable
   //encoder_state_write_bitstream_VUI(stream, state);
