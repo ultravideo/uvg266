@@ -1585,10 +1585,7 @@ int8_t uvg_search_intra_chroma_rdo(
       const uint8_t mode = chroma_data[mode_i].pred_cu.intra.mode_chroma;
       double mode_bits = kvz_chroma_mode_bits(state, mode, luma_mode);
       chroma_data[mode_i].cost = mode_bits * state->lambda;
-      if ((state->encoder_control->cfg.jccr ||
-           (state->encoder_control->cfg.trskip_enable &&
-            (1 << state->encoder_control->cfg.trskip_max_size) >= width)) &&
-          chroma_data[mode_i].pred_cu.tr_depth == chroma_data[mode_i].pred_cu.depth) {
+      if (chroma_data[mode_i].pred_cu.tr_depth == chroma_data[mode_i].pred_cu.depth) {
         ALIGNED(64) kvz_pixel u_pred[LCU_WIDTH_C * LCU_WIDTH_C];
         ALIGNED(64) kvz_pixel v_pred[LCU_WIDTH_C * LCU_WIDTH_C];
         ALIGNED(64) int16_t u_resi[LCU_WIDTH_C * LCU_WIDTH_C];
@@ -1849,13 +1846,9 @@ int8_t uvg_search_intra_chroma_rdo(
         uvg_intra_recon_cu(state,
                            x_px, y_px,
                            depth, &chroma_data[mode_i],
-          &chroma_data[mode_i].pred_cu,
+                           &chroma_data[mode_i].pred_cu,
                            lcu);
-        if(tr_cu->depth != tr_cu->tr_depth || !state->encoder_control->cfg.jccr) {
-          chroma_data[mode_i].cost += uvg_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, &chroma_data[mode_i].pred_cu, lcu);
-        } else {
-          uvg_select_jccr_mode(state, lcu_px.x, lcu_px.y, depth, &chroma_data[mode_i].pred_cu, lcu, &chroma_data[mode_i].cost);
-        }
+        chroma_data[mode_i].cost += uvg_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, &chroma_data[mode_i].pred_cu, lcu);
         memcpy(&state->search_cabac, &temp_cabac, sizeof(cabac_data_t));
       }
 
@@ -2252,6 +2245,6 @@ void uvg_search_cu_intra(
     search_data[0].pred_cu.mts_last_scan_pos = false;
     search_data[0].pred_cu.violates_mts_coeff_constraint = false;
   }
-  printf("%f\n", search_data[0].cost);
+  printf("%f %d %d %d\n", search_data[0].cost, x_px, y_px, depth);
   *mode_out = search_data[0];
 }
