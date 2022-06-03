@@ -2244,6 +2244,6 @@ void uvg_search_cu_intra(
     search_data[0].pred_cu.mts_last_scan_pos = false;
     search_data[0].pred_cu.violates_mts_coeff_constraint = false;
   }
-  printf("%f %d %d %d\n", search_data[0].cost, x_px, y_px, depth);
+
   *mode_out = search_data[0];
 }

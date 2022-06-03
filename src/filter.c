@@ -1046,8 +1046,6 @@ static void filter_deblock_edge_chroma(encoder_state_t * const state,
     const int32_t offset = (dir == EDGE_HOR) ? stride :      1;
     const int32_t step   = (dir == EDGE_HOR) ?      1 : stride;
 
-    //printf("%d %d %d %d\n", x << 1, y << 1, num_parts, dir);
-
     for (uint32_t blk_idx = 0; blk_idx < num_parts; ++blk_idx)
     {
       // CUs on both sides of the edge
