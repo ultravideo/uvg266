@@ -186,6 +186,7 @@ static const struct option long_options[] = {
   { "no-combine-intra-cus",     no_argument, NULL, 0 },
   { "force-inter",              no_argument, NULL, 0 },
   { "no-force-inter",           no_argument, NULL, 0 },
+  { "cabac-debug-file",   required_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 
@@ -460,6 +461,8 @@ void print_help(void)
     "                               bits, lambda, distortion, and qp for each ctu.\n"
     "                               These are meant for debugging and are not\n"
     "                               written unless the prefix is defined.\n"
+    "      --cabac-debug-file     : A debug file for cabac context.\n"
+    "                               Ignore this, it is only for tests.\n"
     "\n"
     /* Word wrap to this width to stay under 80 characters (including ") *************/
     "Video structure:\n"

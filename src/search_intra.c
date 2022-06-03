@@ -1573,7 +1573,6 @@ int8_t uvg_search_intra_chroma_rdo(
     uvg_intra_build_reference(log2_width, COLOR_V, &luma_px, &pic_px, lcu, &refs[1], state->encoder_control->cfg.wpp, NULL, 0);
     
     const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
-    cu_info_t *const tr_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
     cabac_data_t temp_cabac;
     memcpy(&temp_cabac, &state->search_cabac, sizeof(cabac_data_t));
     int8_t width = 1 << log2_width;

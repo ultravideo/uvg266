@@ -1539,12 +1539,6 @@ void uvg_intra_recon_cu(
     y &= ~7;
   }
   
-  if (mode_luma != -1 && mode_chroma != -1) {
-    if (search_data->pred_cu.intra.mip_flag) {
-      assert(mode_luma == mode_chroma && "Chroma mode must be derived from luma mode if block uses MIP.");
-    }
-  }
-
   // Reset CBFs because CBFs might have been set
   // for depth earlier
   if (mode_luma >= 0) {

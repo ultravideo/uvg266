@@ -558,6 +558,8 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
     const int chroma_width = MAX(4, LCU_WIDTH >> (depth + 1));
     int8_t scan_order = uvg_get_scan_order(pred_cu->type, pred_cu->intra.mode_chroma, depth);
     const unsigned index = xy_to_zorder(LCU_WIDTH_C, lcu_px.x, lcu_px.y);
+
+    const bool chroma_can_use_tr_skip = state->encoder_control->cfg.trskip_enable && chroma_width <= (1 << state->encoder_control->cfg.trskip_max_size);
     if(pred_cu->joint_cb_cr == 0) {
       if (!state->encoder_control->cfg.lossless) {
         int index = lcu_px.y * LCU_WIDTH_C + lcu_px.x;
@@ -569,10 +571,10 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
           chroma_width);
         chroma_ssd = ssd_u + ssd_v;
       }
-      if(can_use_tr_skip && cb_flag_u) {
+      if(chroma_can_use_tr_skip && cb_flag_u) {
         CABAC_FBITS_UPDATE(cabac, &cabac->ctx.transform_skip_model_chroma, tr_cu->tr_skip & 2, tr_tree_bits, "transform_skip_flag");        
       }
-      if(can_use_tr_skip && cb_flag_v) {
+      if(chroma_can_use_tr_skip && cb_flag_v) {
         CABAC_FBITS_UPDATE(cabac, &cabac->ctx.transform_skip_model_chroma, tr_cu->tr_skip & 4, tr_tree_bits, "transform_skip_flag");        
       }
       coeff_bits += kvz_get_coeff_cost(state, &lcu->coeff.u[index], NULL, chroma_width, COLOR_U, scan_order, tr_cu->tr_skip & 2);
@@ -1155,6 +1157,11 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     (state->frame->slicetype != UVG_SLICE_I &&
       depth < pu_depth_inter.max);
 
+  if(state->encoder_control->cabac_debug_file) {
+    fprintf(state->encoder_control->cabac_debug_file, "S %4d %4d %d", x, y, depth);
+    fwrite(&state->search_cabac.ctx, 1,  sizeof(state->search_cabac.ctx), state->encoder_control->cabac_debug_file);
+  }
+
   // Recursively split all the way to max search depth.
   if (can_split_cu) {
     int half_cu = cu_width / 2;
@@ -1164,6 +1171,21 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     memcpy(&post_seach_cabac, &state->search_cabac, sizeof(post_seach_cabac));
     memcpy(&state->search_cabac, &pre_search_cabac, sizeof(post_seach_cabac));
 
+
+    state->search_cabac.update = 1;
+
+    double split_bits = 0;
+
+    if (depth < MAX_DEPTH) {
+      // Add cost of cu_split_flag.
+      kvz_write_split_flag(state, &state->search_cabac,
+        x > 0 ? LCU_GET_CU_AT_PX(lcu, SUB_SCU(x) - 1, SUB_SCU(y)) : NULL,
+        y > 0 ? LCU_GET_CU_AT_PX(lcu, SUB_SCU(x), SUB_SCU(y) - 1) : NULL,
+        1, depth, cu_width, x, y, &split_bits);
+    }
+
+    state->search_cabac.update = 0;
+    split_cost += split_bits * state->lambda;
 
     // If skip mode was selected for the block, skip further search.
     // Skip mode means there's no coefficients in the block, so splitting
@@ -1179,20 +1201,6 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       split_cost = INT_MAX;
     }
 
-    state->search_cabac.update = 1;
-
-    double split_bits = 0;
-
-    if (depth < MAX_DEPTH) {
-      // Add cost of cu_split_flag.
-      uvg_write_split_flag(state, &state->search_cabac,
-        x > 0 ? LCU_GET_CU_AT_PX(lcu, SUB_SCU(x) - 1, SUB_SCU(y)) : NULL,
-        y > 0 ? LCU_GET_CU_AT_PX(lcu, SUB_SCU(x), SUB_SCU(y) - 1) : NULL,
-        1, depth, cu_width, x, y, &split_bits);
-    }
-
-    state->search_cabac.update = 0;
-    split_cost += split_bits * state->lambda;
 
     // If no search is not performed for this depth, try just the best mode
     // of the top left CU from the next depth. This should ensure that 64x64

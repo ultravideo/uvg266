@@ -213,10 +213,11 @@ int uvg_config_init(uvg_config *cfg)
   cfg->amvr = 0;
 
   cfg->cclm = 0;
-
-
+  
   cfg->combine_intra_cus = 1;
   cfg->force_inter = 0;
+
+  cfg->cabac_debug_file_name = NULL;
   return 1;
 }
 
@@ -1459,6 +1460,13 @@ int uvg_config_parse(uvg_config *cfg, const char *name, const char *value)
   else if OPT("force-inter") {
     cfg->force_inter = atobool(value);
   }
+  else if OPT("cabac-debug-file") {
+    cfg->cabac_debug_file_name = strdup(value);
+    if(cfg->cabac_debug_file_name == NULL) {
+      fprintf(stderr, "Failed to allocate memory for cabac debug file name.\n");
+      return 0;      
+    }
+  }
   else {
     return 0;
   }
@@ -1810,6 +1818,11 @@ int uvg_config_validate(const uvg_config *const cfg)
       fprintf(stderr, "The chroma qp scaling lists of index %d are different lengths.\n", index);
       error = 1;
     }
+  }
+
+  if(cfg->owf != 0 && cfg->cabac_debug_file_name) {
+    fprintf(stderr, "OWF and cabac debugging are not supported at the same time.\n");
+    error = 1;
   }
 
   return !error;

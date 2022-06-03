@@ -537,6 +537,7 @@ typedef struct uvg_config
   uint8_t combine_intra_cus;
 
   uint8_t force_inter;
+  char* cabac_debug_file_name;
 } uvg_config;
 
 /**

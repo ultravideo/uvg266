@@ -1692,6 +1692,10 @@ void uvg_encode_coding_tree(encoder_state_t * const state,
     assert(0);
     exit(1);
   }
+  if (state->encoder_control->cabac_debug_file) {
+    fprintf(state->encoder_control->cabac_debug_file, "E %4d %4d %d", x, y, depth);
+    fwrite(&cabac->ctx, 1, sizeof(cabac->ctx), state->encoder_control->cabac_debug_file);
+  }
 
 end:
 
