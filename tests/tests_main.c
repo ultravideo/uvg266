@@ -38,7 +38,7 @@ GREATEST_MAIN_DEFS();
 #if UVG_BIT_DEPTH == 8
 extern SUITE(sad_tests);
 extern SUITE(intra_sad_tests);
-extern SUITE(satd_tests);
+// extern SUITE(satd_tests);
 extern SUITE(speed_tests);
 extern SUITE(dct_tests);
 extern SUITE(mts_tests);
@@ -56,7 +56,7 @@ int main(int argc, char **argv)
 #if UVG_BIT_DEPTH == 8
   RUN_SUITE(sad_tests);
   RUN_SUITE(intra_sad_tests);
-  RUN_SUITE(satd_tests);
+  // RUN_SUITE(satd_tests);
   RUN_SUITE(dct_tests);
   RUN_SUITE(mts_tests);
 
