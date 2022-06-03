@@ -355,9 +355,6 @@ static bool read_header(FILE* input, uvg_config* config) {
       buffer[i] = getc(input);
       // Start code of frame data
       if (buffer[i] == 0x0A) {
-        for (; i > 0; i--) {
-          ungetc(buffer[i], input);
-        }
         end_of_header = true;
         break;
       }
@@ -381,10 +378,7 @@ static bool read_header(FILE* input, uvg_config* config) {
         // Framerate (or start code of frame)
         case 'F':
           // The header has no ending signature other than the start code of a frame
-          if (i > 5 && strncmp(buffer, "FRAME", 5) == 0) {
-            for (; i > 0; i--) {
-              ungetc(buffer[i], input);
-            }
+          if (i >= 4 && strncmp(buffer, "FRAME", 5) == 0) {
             end_of_header = true;
             break;
           }
