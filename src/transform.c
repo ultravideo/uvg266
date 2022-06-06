@@ -256,7 +256,7 @@ static void generate_jccr_transforms(
     int64_t d1 = 0;
     int64_t d2 = 0;
     const int cbf_mask = jccr * (state->frame->jccr_sign ? -1 : 1);
-    int16_t* current_resi = &temp_resi[(jccr - 1) * trans_offset];
+    int16_t* current_resi = &temp_resi[MAX((jccr - 1) , 0) * trans_offset];
     for (int y = 0; y < height; y++)
     {
       for (int x = 0; x < width; x++)
@@ -428,7 +428,7 @@ void kvz_chroma_transform_search(
   encoder_state_t* const state,
   int depth,
   lcu_t* const lcu,
-  cabac_data_t temp_cabac,
+  cabac_data_t* temp_cabac,
   int8_t width,
   int8_t height,
   const int offset,
@@ -634,11 +634,11 @@ void kvz_chroma_transform_search(
       double v_cost = KVZ_CHROMA_MULT * ssd_v + v_bits * state->frame->lambda;
       if (u_cost < chorma_ts_out->best_u_cost) {
         chorma_ts_out->best_u_cost = u_cost;
-        chorma_ts_out->best_u_index = transforms[i];
+        chorma_ts_out->best_u_index = u_has_coeffs ? transforms[i] : NO_RESIDUAL;
       }
       if (v_cost < chorma_ts_out->best_v_cost) {
         chorma_ts_out->best_v_cost = v_cost;
-        chorma_ts_out->best_v_index = transforms[i];
+        chorma_ts_out->best_v_index = v_has_coeffs ? transforms[i] : NO_RESIDUAL;
       }
     }
     else {
@@ -648,7 +648,7 @@ void kvz_chroma_transform_search(
         chorma_ts_out->best_combined_index = transforms[i];
       }
     }
-    memcpy(&state->search_cabac, &temp_cabac, sizeof(cabac_data_t));
+    memcpy(&state->search_cabac, temp_cabac, sizeof(cabac_data_t));
   }
 }
 

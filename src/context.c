@@ -471,6 +471,7 @@ void uvg_ctx_init(cabac_ctx_t *ctx, int32_t qp, int32_t init_value, uint8_t rate
 void uvg_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
 {
   cabac_data_t * const cabac = &state->cabac;
+  memset(&state->cabac.ctx, 0, sizeof(state->cabac.ctx));
   uint16_t i, ii;
 
   // Initialize contexts

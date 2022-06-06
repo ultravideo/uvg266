@@ -92,7 +92,7 @@ void kvz_chroma_transform_search(
   encoder_state_t* const state,
   int depth,
   lcu_t* const lcu,
-  cabac_data_t temp_cabac,
+  cabac_data_t* temp_cabac,
   int8_t width,
   int8_t height,
   const int offset,
@@ -107,6 +107,7 @@ void kvz_chroma_transform_search(
 enum kvz_chroma_transforms {
   DCT7_CHROMA = 0,
   CHROMA_TS = 4,
+  NO_RESIDUAL = 8,
   JCCR_1 = 1,
   JCCR_2 = 2,
   JCCR_3 = 3,

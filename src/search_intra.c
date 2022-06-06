@@ -1436,7 +1436,7 @@ int8_t uvg_search_intra_chroma_rdo(
           state,
           depth,
           lcu,
-          temp_cabac,
+          &temp_cabac,
           width,
           height,
           offset,

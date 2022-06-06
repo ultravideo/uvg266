@@ -1077,20 +1077,12 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         }
 
         uvg_quantize_lcu_residual(state,
-                                  true, has_chroma,
-                                  state->encoder_control->cfg.jccr, x, y,
+                                  true, has_chroma && !cur_cu->joint_cb_cr,
+                                  cur_cu->joint_cb_cr, x, y,
                                   depth,
                                   NULL,
                                   lcu,
                                   false);
-        if (cur_cu->depth == cur_cu->tr_depth && state->encoder_control->cfg.jccr && cur_cu->joint_cb_cr) {
-          uvg_select_jccr_mode(state,
-            x, y,
-            depth,
-            NULL,
-            lcu,
-            NULL);
-        }
 
         int cbf = cbf_is_set_any(cur_cu->cbf, depth);
 
