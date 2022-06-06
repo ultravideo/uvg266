@@ -1126,8 +1126,8 @@ static void quantize_tr_residual(encoder_state_t * const state,
         lcu_width,
         lcu_width,
         &lcu->ref.u[offset], &lcu->ref.v[offset],
-        &lcu->rec.joint_u[offset], &lcu->rec.joint_v[offset],
-        &lcu->rec.joint_u[offset], &lcu->rec.joint_v[offset],
+        &lcu->rec.u[offset], &lcu->rec.v[offset],
+        &lcu->rec.u[offset], &lcu->rec.v[offset],
         &lcu->coeff.joint_uv[z_index],
         early_skip,
         lmcs_chroma_adj
@@ -1251,6 +1251,9 @@ void uvg_quantize_lcu_residual(
     }
     if (jccr && cur_pu->tr_depth == cur_pu->depth) {
       quantize_tr_residual(state, COLOR_UV, x, y, depth, cur_pu, lcu, early_skip);
+    }
+    if(chroma && jccr && cur_pu->tr_depth == cur_pu->depth) {
+      assert( 0 && "Trying to quantize both jccr and regular at the same time.\n");
     }
   }
 }
