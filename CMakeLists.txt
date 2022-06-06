@@ -10,6 +10,13 @@ option(BUILD_SHARED_LIBS "Build using shared uvg266 library" ON)
 
 option(BUILD_TESTS "Build tests" ON)
 
+include(GNUInstallDirs) #Helps to define correct distro specific install directories
+
+set(UVG266_INSTALL_LIBDIR "${CMAKE_INSTALL_LIBDIR}" CACHE PATH "uvg266 library install path")
+set(UVG266_INSTALL_BINDIR "${CMAKE_INSTALL_BINDIR}" CACHE PATH "uvg266 binary install path")
+set(UVG266_INSTALL_INCLUDEDIR "${CMAKE_INSTALL_INCLUDEDIR}" CACHE PATH "uvg266 include install path")
+set(UVG266_INSTALL_MANDIR "${CMAKE_INSTALL_MANDIR}/man1" CACHE PATH "uvg266 manual page file install path")
+
 # https://www.kitware.com/cmake-and-the-default-build-type/
 # Set a default build type if none was specified
 set(UVG_DEFAULT_BUILD_TYPE "RelWithDebInfo")
@@ -121,7 +128,7 @@ if(MSVC)
 endif()
 
 if(BUILD_SHARED_LIBS)
-  list( APPEND CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib" "./" "../lib" )  
+  list( APPEND CMAKE_INSTALL_RPATH "${UVG266_INSTALL_LIBDIR}" "./" "../lib" )
   set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
   add_library(uvg266 SHARED ${LIB_SOURCES})
 else()
@@ -222,18 +229,16 @@ source_group( "" FILES ${SOURCE_GROUP_TOPLEVEL})
 
 # INSTALL
 
-# ToDo: make configurable
-
-install(FILES ${PROJECT_SOURCE_DIR}/src/uvg266.pc DESTINATION ${CMAKE_INSTALL_PREFIX}/share/pkgconfig)
-install(TARGETS uvg266-bin DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
-install(TARGETS uvg266 DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
+install(FILES ${PROJECT_SOURCE_DIR}/src/uvg266.pc DESTINATION ${UVG266_INSTALL_LIBDIR}/pkgconfig)
+install(TARGETS uvg266-bin DESTINATION ${UVG266_INSTALL_BINDIR})
+install(TARGETS uvg266 DESTINATION ${UVG266_INSTALL_LIBDIR})
 if(BUILD_SHARED_LIBS) # Just add the lib to the bin directory for now
   if(MSVC)
-    install(TARGETS uvg266 DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
+    install(TARGETS uvg266 DESTINATION ${UVG266_INSTALL_BINDIR})
   endif()
 endif()
-install(FILES ${PROJECT_SOURCE_DIR}/src/uvg266.h DESTINATION ${CMAKE_INSTALL_PREFIX}/include)
-install(FILES ${PROJECT_SOURCE_DIR}/doc/uvg266.1 DESTINATION ${CMAKE_INSTALL_PREFIX}/share/man)
+install(FILES ${PROJECT_SOURCE_DIR}/src/uvg266.h DESTINATION ${UVG266_INSTALL_INCLUDEDIR})
+install(FILES ${PROJECT_SOURCE_DIR}/doc/uvg266.1 DESTINATION ${UVG266_INSTALL_MANDIR})
 
 IF(UNIX)
 # DIST
@@ -289,8 +294,8 @@ add_custom_target(distcheck
                   && echo \"\\033[0;32mTests ok\\033[m\"
                   && make install >> ${PROJECT_SOURCE_DIR}/distcheck.log || { echo \"\\033[0;31mmake install failed.\\033[m\"$<SEMICOLON> exit 1$<SEMICOLON> }
                   && echo \"\\033[0;32mInstall ok\\033[m\"
-                  && bin/uvg266 --help >> ${PROJECT_SOURCE_DIR}/distcheck.log || { echo \"\\033[0;31muvg266 binary failed to run.\\033[m\"$<SEMICOLON> exit 1$<SEMICOLON> }
-                  && echo \"\\033[0;32mbin/uvg266 ok\\033[m\"
+                  && ${CMAKE_INSTALL_BINDIR}/uvg266 --help >> ${PROJECT_SOURCE_DIR}/distcheck.log || { echo \"\\033[0;31muvg266 binary failed to run.\\033[m\"$<SEMICOLON> exit 1$<SEMICOLON> }
+                  && echo \"\\033[0;32m${CMAKE_INSTALL_BINDIR}/uvg266 ok\\033[m\"
                   && make clean >> ${PROJECT_SOURCE_DIR}/distcheck.log || { echo \"\\033[0;31mmake clean failed.\\033[m\"$<SEMICOLON> exit 1$<SEMICOLON> }
                   && echo \"\\033[0;32mmake clean ok\\033[m\"
                   && cd ${PROJECT_SOURCE_DIR}
