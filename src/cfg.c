@@ -76,6 +76,7 @@ int uvg_config_init(uvg_config *cfg)
   cfg->mv_rdo          = 0;
   cfg->full_intra_search = 0;
   cfg->trskip_enable   = 0;
+  cfg->chroma_trskip_enable = 0;
   cfg->trskip_max_size = 2; //Default to 4x4
   cfg->mts             = 0;
   cfg->mts_implicit    = 0;
@@ -906,6 +907,8 @@ int uvg_config_parse(uvg_config *cfg, const char *name, const char *value)
     cfg->full_intra_search = atobool(value);
   else if OPT("transform-skip")
     cfg->trskip_enable = atobool(value);
+  else if OPT("chroma-transform-skip")
+    cfg->chroma_trskip_enable = atobool(value);
   else if OPT("tr-skip-max-size") {
     cfg->trskip_max_size = atoi(value);
     if (cfg->trskip_max_size < 2 || cfg->trskip_max_size > 5) {
@@ -1822,6 +1825,11 @@ int uvg_config_validate(const uvg_config *const cfg)
 
   if(cfg->owf != 0 && cfg->cabac_debug_file_name) {
     fprintf(stderr, "OWF and cabac debugging are not supported at the same time.\n");
+    error = 1;
+  }
+
+  if(cfg->chroma_trskip_enable && !cfg->trskip_enable) {
+    fprintf(stderr, "Transform skip has to be enabled when chroma transform skip is enabled.\n");
     error = 1;
   }
 

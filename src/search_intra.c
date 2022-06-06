@@ -1634,7 +1634,8 @@ int8_t uvg_search_intra_chroma_rdo(
         const int trans_offset = width * height;
         int num_transforms = 1;
         const int can_use_tr_skip = state->encoder_control->cfg.trskip_enable &&
-          (1 << state->encoder_control->cfg.trskip_max_size) >= width;
+          (1 << state->encoder_control->cfg.trskip_max_size) >= width && 
+          state->encoder_control->cfg.chroma_trskip_enable;
         if(can_use_tr_skip) {
           uvg_transformskip(state->encoder_control, u_resi, u_coeff + num_transforms * trans_offset, width);
           uvg_transformskip(state->encoder_control, v_resi, v_coeff + num_transforms * trans_offset, width);
@@ -1777,7 +1778,7 @@ int8_t uvg_search_intra_chroma_rdo(
           }
 
           if (cbf_u || (transforms[i] == JCCR_1 && u_has_coeffs)) {
-            if(can_use_tr_skip && !IS_JCCR_MODE(transforms[i])) {
+            if(can_use_tr_skip) {
               CABAC_FBITS_UPDATE(&state->search_cabac, &state->search_cabac.ctx.transform_skip_model_chroma,
                 transforms[i] == CHROMA_TS, u_bits, "tr_skip_u"
               );

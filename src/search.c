@@ -540,6 +540,8 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
       LCU_WIDTH, LCU_WIDTH,
       width);
   }
+  // Chroma transform skip enable/disable is non-normative, so we need to count the chroma
+  // tr-skip bits even when we are never using it.
   const bool can_use_tr_skip = state->encoder_control->cfg.trskip_enable && width <= (1 << state->encoder_control->cfg.trskip_max_size);
 
   if(cb_flag_y){
