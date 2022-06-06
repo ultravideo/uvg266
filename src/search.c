@@ -760,7 +760,14 @@ void uvg_sort_keys_by_cost(unit_stats_map_t *__restrict map)
  * - All the final data for the LCU gets eventually copied to depth 0, which
  *   will be the final output of the recursion.
  */
-static double search_cu(encoder_state_t * const state, int x, int y, int depth, lcu_t *work_tree)
+static double search_cu(
+  encoder_state_t* const state,
+  int x,
+  int y,
+  int depth,
+  lcu_t* work_tree,
+  enum kvz_tree_type
+  tree_type)
 {
   const encoder_control_t* ctrl = state->encoder_control;
   const videoframe_t * const frame = state->tile->frame;
@@ -1119,10 +1126,10 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     // It is ok to interrupt the search as soon as it is known that
     // the split costs at least as much as not splitting.
     if (cur_cu->type == CU_NOTSET || cbf || state->encoder_control->cfg.cu_split_termination == UVG_CU_SPLIT_TERMINATION_OFF) {
-      if (split_cost < cost) split_cost += search_cu(state, x,           y,           depth + 1, work_tree);
-      if (split_cost < cost) split_cost += search_cu(state, x + half_cu, y,           depth + 1, work_tree);
-      if (split_cost < cost) split_cost += search_cu(state, x,           y + half_cu, depth + 1, work_tree);
-      if (split_cost < cost) split_cost += search_cu(state, x + half_cu, y + half_cu, depth + 1, work_tree);
+      if (split_cost < cost) split_cost += search_cu(state, x,           y,           depth + 1, work_tree, tree_type);
+      if (split_cost < cost) split_cost += search_cu(state, x + half_cu, y,           depth + 1, work_tree, tree_type);
+      if (split_cost < cost) split_cost += search_cu(state, x,           y + half_cu, depth + 1, work_tree, tree_type);
+      if (split_cost < cost) split_cost += search_cu(state, x + half_cu, y + half_cu, depth + 1, work_tree, tree_type);
     } else {
       split_cost = INT_MAX;
     }
@@ -1352,10 +1359,16 @@ static void init_lcu_t(const encoder_state_t * const state, const int x, const i
 /**
  * Copy CU and pixel data to it's place in picture datastructure.
  */
-static void copy_lcu_to_cu_data(const encoder_state_t * const state, int x_px, int y_px, const lcu_t *lcu)
+static void copy_lcu_to_cu_data(const encoder_state_t * const state, int x_px, int y_px, const lcu_t *lcu, enum
+                                kvz_tree_type tree_type)
 {
   // Copy non-reference CUs to picture.
-  uvg_cu_array_copy_from_lcu(state->tile->frame->cu_array, x_px, y_px, lcu);
+  uvg_cu_array_copy_from_lcu(
+    tree_type != KVZ_CHROMA_T ? state->tile->frame->cu_array : state->tile->frame->chroma_cu_array, 
+    tree_type != KVZ_CHROMA_T ? x_px : x_px / 2,
+    tree_type != KVZ_CHROMA_T ? y_px : y_px / 2,
+    lcu, 
+    tree_type);
 
   // Copy pixels to picture.
   {
@@ -1364,15 +1377,17 @@ static void copy_lcu_to_cu_data(const encoder_state_t * const state, int x_px, i
     const int x_max = MIN(x_px + LCU_WIDTH, pic_width) - x_px;
     const int y_max = MIN(y_px + LCU_WIDTH, pic->height) - y_px;
 
-    uvg_pixels_blit(lcu->rec.y, &pic->rec->y[x_px + y_px * pic->rec->stride],
-                        x_max, y_max, LCU_WIDTH, pic->rec->stride);
+    if(tree_type != KVZ_CHROMA_T) {
+      uvg_pixels_blit(lcu->rec.y, &pic->rec->y[x_px + y_px * pic->rec->stride],
+                          x_max, y_max, LCU_WIDTH, pic->rec->stride);
+    }
 
     if (state->tile->frame->lmcs_aps->m_sliceReshapeInfo.sliceReshaperEnableFlag) {
       uvg_pixels_blit(lcu->rec.y, &pic->rec_lmcs->y[x_px + y_px * pic->rec->stride],
         x_max, y_max, LCU_WIDTH, pic->rec->stride);
     }
 
-    if (state->encoder_control->chroma_format != UVG_CSP_400) {
+    if (state->encoder_control->chroma_format != UVG_CSP_400 && tree_type != KVZ_LUMA_T) {
       uvg_pixels_blit(lcu->rec.u, &pic->rec->u[(x_px / 2) + (y_px / 2) * (pic->rec->stride / 2)],
                       x_max / 2, y_max / 2, LCU_WIDTH / 2, pic->rec->stride / 2);
       uvg_pixels_blit(lcu->rec.v, &pic->rec->v[(x_px / 2) + (y_px / 2) * (pic->rec->stride / 2)],
@@ -1411,8 +1426,16 @@ void uvg_search_lcu(encoder_state_t * const state, const int x, const int y, con
     uvg_lcu_luma_depth_pred(constr->ml_intra_depth_ctu, work_tree[0].ref.y, state->qp);
   }
 
+  int tree_type = state->frame->slicetype == UVG_SLICE_I
+  && state->encoder_control->cfg.dual_tree ? KVZ_LUMA_T : KVZ_BOTH_T;
   // Start search from depth 0.
-  double cost = search_cu(state, x, y, 0, work_tree);
+  double cost = search_cu(
+    state,
+    x,
+    y,
+    0,
+    work_tree,
+    tree_type);
 
   // Save squared cost for rate control.
   if(state->encoder_control->cfg.rc_algorithm == UVG_LAMBDA) {
@@ -1421,10 +1444,25 @@ void uvg_search_lcu(encoder_state_t * const state, const int x, const int y, con
 
   // The best decisions through out the LCU got propagated back to depth 0,
   // so copy those back to the frame.
-  copy_lcu_to_cu_data(state, x, y, &work_tree[0]);
+  copy_lcu_to_cu_data(state, x, y, &work_tree[0], tree_type);
 
   // Copy coeffs to encoder state.
   copy_coeffs(work_tree[0].coeff.y, coeff->y, LCU_WIDTH);
+
+  if(state->frame->slicetype == UVG_SLICE_I && state->encoder_control->cfg.dual_tree) {
+    search_cu(
+      state,
+      x,
+      y,
+      0,
+      work_tree,
+      KVZ_CHROMA_T);
+
+    if (state->encoder_control->cfg.rc_algorithm == UVG_LAMBDA) {
+      uvg_get_lcu_stats(state, x / LCU_WIDTH, y / LCU_WIDTH)->weight += cost * cost;
+    }
+  }
+
   copy_coeffs(work_tree[0].coeff.u, coeff->u, LCU_WIDTH_C);
   copy_coeffs(work_tree[0].coeff.v, coeff->v, LCU_WIDTH_C);
   if (state->encoder_control->cfg.jccr) {

@@ -624,26 +624,29 @@ static void encode_transform_unit(encoder_state_t * const state,
  * \param parent_coeff_u  What was signaled at previous level for cbf_cb.
  * \param parent_coeff_v  What was signlaed at previous level for cbf_cr.
  */
-static void encode_transform_coeff(encoder_state_t * const state,
-                                   int32_t x,
-                                   int32_t y,
-                                   int8_t depth,
-                                   int8_t tr_depth,
-                                   uint8_t parent_coeff_u,
-                                   uint8_t parent_coeff_v,
-                                   bool only_chroma,
-                                   lcu_coeff_t* coeff)
+static void encode_transform_coeff(
+  encoder_state_t * const state,
+  int32_t x,
+  int32_t y,
+  int8_t depth,
+  int8_t tr_depth,
+  uint8_t parent_coeff_u,
+  uint8_t parent_coeff_v,
+  bool only_chroma,
+  lcu_coeff_t* coeff,
+  enum kvz_tree_type tree_type)
 {
   cabac_data_t * const cabac = &state->cabac;
   //const encoder_control_t *const ctrl = state->encoder_control;
   const videoframe_t * const frame = state->tile->frame;
+  const cu_array_t* used_array = tree_type != KVZ_CHROMA_T ? frame->cu_array : frame->chroma_cu_array;
 
-  const cu_info_t *cur_pu = uvg_cu_array_at_const(frame->cu_array, x, y);
+  const cu_info_t *cur_pu = uvg_cu_array_at_const(used_array, x, y);
   // Round coordinates down to a multiple of 8 to get the location of the
   // containing CU.
   const int x_cu = 8 * (x / 8);
   const int y_cu = 8 * (y / 8);
-  const cu_info_t *cur_cu = uvg_cu_array_at_const(frame->cu_array, x, y);
+  const cu_info_t *cur_cu = uvg_cu_array_at_const(used_array, x, y);
 
   // NxN signifies implicit transform split at the first transform level.
   // There is a similar implicit split for inter, but it is only used when
@@ -664,9 +667,9 @@ static void encode_transform_coeff(encoder_state_t * const state,
 
  
 
-  const int cb_flag_y = cbf_is_set(cur_pu->cbf, depth, COLOR_Y);
-  const int cb_flag_u = cur_pu->joint_cb_cr ? (cur_pu->joint_cb_cr >> 1) & 1 : cbf_is_set(cur_cu->cbf, depth, COLOR_U);
-  const int cb_flag_v = cur_pu->joint_cb_cr ? cur_pu->joint_cb_cr & 1 : cbf_is_set(cur_cu->cbf, depth, COLOR_V);
+  const int cb_flag_y = tree_type != KVZ_CHROMA_T ? cbf_is_set(cur_pu->cbf, depth, COLOR_Y) : 0;
+  const int cb_flag_u = tree_type != KVZ_LUMA_T ?( cur_pu->joint_cb_cr ? (cur_pu->joint_cb_cr >> 1) & 1 : cbf_is_set(cur_cu->cbf, depth, COLOR_U)) : 0;
+  const int cb_flag_v = tree_type != KVZ_LUMA_T ? (cur_pu->joint_cb_cr ? cur_pu->joint_cb_cr & 1 : cbf_is_set(cur_cu->cbf, depth, COLOR_V)) : 0;
 
   // The split_transform_flag is not signaled when:
   // - transform size is greater than 32 (depth == 0)
@@ -710,10 +713,10 @@ static void encode_transform_coeff(encoder_state_t * const state,
     uint8_t offset = LCU_WIDTH >> (depth + 1);
     int x2 = x + offset;
     int y2 = y + offset;
-    encode_transform_coeff(state, x,  y,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v, only_chroma, coeff);
-    encode_transform_coeff(state, x2, y,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v, only_chroma, coeff);
-    encode_transform_coeff(state, x,  y2, depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v, only_chroma, coeff);
-    encode_transform_coeff(state, x2, y2, depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v, only_chroma, coeff);
+    encode_transform_coeff(state, x,  y,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v, only_chroma, coeff, tree_type);
+    encode_transform_coeff(state, x2, y,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v, only_chroma, coeff, tree_type);
+    encode_transform_coeff(state, x,  y2, depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v, only_chroma, coeff, tree_type);
+    encode_transform_coeff(state, x2, y2, depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v, only_chroma, coeff, tree_type);
     return;
   }
 
@@ -722,7 +725,7 @@ static void encode_transform_coeff(encoder_state_t * const state,
   // - transform depth > 0
   // - we have chroma coefficients at this level
   // When it is not present, it is inferred to be 1.
-  if ((cur_cu->type == CU_INTRA || tr_depth > 0 || cb_flag_u || cb_flag_v) && !only_chroma) {
+  if ((cur_cu->type == CU_INTRA || tr_depth > 0 || cb_flag_u || cb_flag_v) && !only_chroma && tree_type != KVZ_CHROMA_T) {
       cabac->cur_ctx = &(cabac->ctx.qt_cbf_model_luma[0]);
       CABAC_BIN(cabac, cb_flag_y, "cbf_luma");
   }
@@ -755,7 +758,7 @@ static void encode_transform_coeff(encoder_state_t * const state,
         ((cb_flag_u || cb_flag_v ) 
           && cur_cu->type == CU_INTRA)
         || (cb_flag_u && cb_flag_v)) 
-      && (depth != 4 || only_chroma) 
+      && (depth != 4 || only_chroma || tree_type == KVZ_CHROMA_T) 
       && state->encoder_control->cfg.jccr
       ) {
       assert(cur_pu->joint_cb_cr < 4 && "JointCbCr is in search state.");
@@ -1438,16 +1441,19 @@ bool uvg_write_split_flag(const encoder_state_t * const state, cabac_data_t* cab
   return split_flag;
 }
 
-void uvg_encode_coding_tree(encoder_state_t * const state,
-                            uint16_t x,
-                            uint16_t y,
-                            uint8_t depth,
-                            lcu_coeff_t *coeff)
+void uvg_encode_coding_tree(
+  encoder_state_t * const state,
+  uint16_t x,
+  uint16_t y,
+  uint8_t depth,
+  lcu_coeff_t *coeff,
+  enum kvz_tree_type tree_type)
 {
   cabac_data_t * const cabac = &state->cabac;
   const encoder_control_t * const ctrl = state->encoder_control;
   const videoframe_t * const frame = state->tile->frame;
-  const cu_info_t *cur_cu   = uvg_cu_array_at_const((const cu_array_t * )frame->cu_array, x, y);
+  const cu_array_t* used_array = tree_type != KVZ_CHROMA_T ? frame->cu_array : frame->chroma_cu_array;
+  const cu_info_t *cur_cu   = uvg_cu_array_at_const(used_array, x, y);
 
   const int cu_width = LCU_WIDTH >> depth;
   const int cu_height = cu_width; // TODO: height for non-square blocks
@@ -1455,11 +1461,11 @@ void uvg_encode_coding_tree(encoder_state_t * const state,
 
   const cu_info_t *left_cu  = NULL;
   if (x > 0) {
-    left_cu = uvg_cu_array_at_const((const cu_array_t*)frame->cu_array, x - 1, y);
+    left_cu = uvg_cu_array_at_const(used_array, x - 1, y);
   }
   const cu_info_t *above_cu = NULL;
   if (y > 0) {
-    above_cu = uvg_cu_array_at_const((const cu_array_t*)frame->cu_array, x, y - 1);
+    above_cu = uvg_cu_array_at_const(used_array, x, y - 1);
   }
 
 
@@ -1485,16 +1491,16 @@ void uvg_encode_coding_tree(encoder_state_t * const state,
     
     if (split_flag || border) {
       // Split blocks and remember to change x and y block positions
-      uvg_encode_coding_tree(state, x, y, depth + 1, coeff);
+      uvg_encode_coding_tree(state, x, y, depth + 1, coeff, tree_type);
 
       if (!border_x || border_split_x) {
-        uvg_encode_coding_tree(state, x + half_cu, y, depth + 1, coeff);
+        uvg_encode_coding_tree(state, x + half_cu, y, depth + 1, coeff, tree_type);
       }
       if (!border_y || border_split_y) {
-        uvg_encode_coding_tree(state, x, y + half_cu, depth + 1, coeff);
+        uvg_encode_coding_tree(state, x, y + half_cu, depth + 1, coeff, tree_type);
       }
       if (!border || (border_split_x && border_split_y)) {
-        uvg_encode_coding_tree(state, x + half_cu, y + half_cu, depth + 1, coeff);
+        uvg_encode_coding_tree(state, x + half_cu, y + half_cu, depth + 1, coeff, tree_type);
       }
       return;
     }
@@ -1629,7 +1635,7 @@ void uvg_encode_coding_tree(encoder_state_t * const state,
       const int pu_y = PU_GET_Y(cur_cu->part_size, cu_width, y, i);
       const int pu_w = PU_GET_W(cur_cu->part_size, cu_width, i);
       const int pu_h = PU_GET_H(cur_cu->part_size, cu_width, i);
-      const cu_info_t *cur_pu = uvg_cu_array_at_const(frame->cu_array, pu_x, pu_y);
+      const cu_info_t *cur_pu = uvg_cu_array_at_const(used_array, pu_x, pu_y);
 
       non_zero_mvd |= uvg_encode_inter_prediction_unit(state, cabac, cur_pu, pu_x, pu_y, pu_w, pu_h, depth, NULL, NULL);
       DBG_PRINT_MV(state, pu_x, pu_y, pu_w, pu_h, cur_pu);
@@ -1662,21 +1668,25 @@ void uvg_encode_coding_tree(encoder_state_t * const state,
       // Code (possible) coeffs to bitstream
 
       if (cbf) {
-        encode_transform_coeff(state, x, y, depth, 0, 0, 0, 0, coeff);
+        encode_transform_coeff(state, x, y, depth, 0, 0, 0, 0, coeff, tree_type);
       }
 
       encode_mts_idx(state, cabac, cur_cu);
 
     }
   } else if (cur_cu->type == CU_INTRA) {
-    uvg_encode_intra_luma_coding_unit(state, cabac, cur_cu, x, y, depth, NULL, NULL);
+    if(tree_type != KVZ_CHROMA_T) {
+      uvg_encode_intra_luma_coding_unit(state, cabac, cur_cu, x, y, depth, NULL, NULL);
+    }
 
     // Code chroma prediction mode.
-    if (state->encoder_control->chroma_format != UVG_CSP_400 && depth != 4) {
+    if (state->encoder_control->chroma_format != UVG_CSP_400 && depth != 4 && tree_type != KVZ_LUMA_T) {
       encode_chroma_intra_cu(cabac, cur_cu, state->encoder_control->cfg.cclm, NULL);
     }
 
-    encode_transform_coeff(state, x, y, depth, 0, 0, 0, 0, coeff);
+    if (tree_type != KVZ_CHROMA_T) {
+      encode_transform_coeff(state, x, y, depth, 0, 0, 0, 0, coeff, tree_type);
+    }
 
     bool lfnst_written = encode_lfnst_idx(state, cabac, cur_cu, x, y, depth, COLOR_Y, cu_width, cu_height);
     bool is_separate_tree = depth == 4; // TODO: proper value for dual tree when dual tree structure is implemented
@@ -1684,14 +1694,15 @@ void uvg_encode_coding_tree(encoder_state_t * const state,
     encode_mts_idx(state, cabac, cur_cu);
 
     // For 4x4 the chroma PU/TU is coded after the last 
-    if (state->encoder_control->chroma_format != UVG_CSP_400 && depth == 4 && x % 8 && y % 8) {
+    if (state->encoder_control->chroma_format != UVG_CSP_400 && 
+      ((depth == 4 && x % 8 && y % 8) || tree_type == KVZ_CHROMA_T)) {
       encode_chroma_intra_cu(cabac, cur_cu, state->encoder_control->cfg.cclm, NULL);
       // LFNST constraints must be reset here. Otherwise the left over values will interfere when calculating new constraints
       cu_info_t* tmp = uvg_cu_array_at(frame->cu_array, x, y);
       tmp->violates_lfnst_constrained_luma = false;
       tmp->violates_lfnst_constrained_chroma = false;
       tmp->lfnst_last_scan_pos = false;
-      encode_transform_coeff(state, x, y, depth, 0, 0, 0, 1, coeff);
+      encode_transform_coeff(state, x, y, depth, 0, 0, 0, 1, coeff, tree_type);
       // Write LFNST only once for single tree structure
       if (!lfnst_written || is_separate_tree) {
         encode_lfnst_idx(state, cabac, tmp, x, y, depth, COLOR_UV, cu_width, cu_height);

@@ -539,6 +539,8 @@ typedef struct uvg_config
 
   uint8_t force_inter;
   char* cabac_debug_file_name;
+
+  uint8_t dual_tree;
 } uvg_config;
 
 /**
