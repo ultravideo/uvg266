@@ -41,6 +41,7 @@
 #include "strategies/strategies-picture.h"
 #include "tables.h"
 #include "reshape.h"
+#include "search.h"
 
 /**
  * \brief RDPCM direction.
@@ -231,6 +232,426 @@ void uvg_itransform2d(const encoder_control_t * const encoder,
     idct_func(encoder->bitdepth, coeff, block);
   }
 }
+
+static INLINE int64_t square(int x) {
+  return x * (int64_t)x;
+}
+
+static void generate_jccr_transforms(
+  encoder_state_t* const state,
+  const cu_info_t* const pred_cu,
+  int8_t width,
+  int8_t height,
+  int16_t u_resi[1024],
+  int16_t v_resi[1024],
+  coeff_t u_coeff[5120],
+  enum kvz_chroma_transforms transforms[5],
+  const int trans_offset,
+  int* num_transforms)
+{
+  ALIGNED(64) int16_t temp_resi[LCU_WIDTH_C * LCU_WIDTH_C * 3];
+  int64_t costs[4];
+  costs[0] = INT64_MAX;
+  for (int jccr = pred_cu->type == CU_INTRA ? 0 : 3; jccr < 4; jccr++) {
+    int64_t d1 = 0;
+    int64_t d2 = 0;
+    const int cbf_mask = jccr * (state->frame->jccr_sign ? -1 : 1);
+    int16_t* current_resi = &temp_resi[(jccr - 1) * trans_offset];
+    for (int y = 0; y < height; y++)
+    {
+      for (int x = 0; x < width; x++)
+      {
+        const int16_t cbx = u_resi[x + y * width], crx = v_resi[x + y * width];
+        if (cbf_mask == 2)
+        {
+          const int16_t resi = ((4 * cbx + 2 * crx) / 5);
+          current_resi[x + y * width] = resi;
+          d1 += square(cbx - resi) + square(crx - (resi >> 1));
+        }
+        else if (cbf_mask == -2)
+        {
+          const int16_t resi = ((4 * cbx - 2 * crx) / 5);
+          current_resi[x + y * width] = resi;
+          d1 += square(cbx - resi) + square(crx - (-resi >> 1));
+        }
+        else if (cbf_mask == 3)
+        {
+          const int16_t resi = ((cbx + crx) / 2);
+          current_resi[x + y * width] = resi;
+          d1 += square(cbx - resi) + square(crx - resi);
+        }
+        else if (cbf_mask == -3)
+        {
+          const int16_t resi = ((cbx - crx) / 2);
+          current_resi[x + y * width] = resi;
+          d1 += square(cbx - resi) + square(crx + resi);
+        }
+        else if (cbf_mask == 1)
+        {
+          const int16_t resi = ((4 * crx + 2 * cbx) / 5);
+          current_resi[x + y * width] = resi;
+          d1 += square(cbx - (resi >> 1)) + square(crx - resi);
+        }
+        else if (cbf_mask == -1)
+        {
+          const int16_t resi = ((4 * crx - 2 * cbx) / 5);
+          current_resi[x + y * width] = resi;
+          d1 += square(cbx - (-resi >> 1)) + square(crx - resi);
+        }
+        else
+        {
+          d1 += square(cbx);
+          d2 += square(crx);
+        }
+      }
+    }
+    costs[jccr] = d2 != 0 ? MIN(d1, d2) : d1;
+  }
+  int64_t min_dist1 = costs[0];
+  int64_t min_dist2 = INT64_MAX;
+  int     cbf_mask1 = 0;
+  int     cbf_mask2 = 0;
+  for (int cbfMask = 1; cbfMask < 4; cbfMask++)
+  {
+    if (costs[cbfMask] < min_dist1)
+    {
+      cbf_mask2 = cbf_mask1; min_dist2 = min_dist1;
+      cbf_mask1 = cbfMask;  min_dist1 = costs[cbf_mask1];
+    }
+    else if (costs[cbfMask] < min_dist2)
+    {
+      cbf_mask2 = cbfMask;  min_dist2 = costs[cbf_mask2];
+    }
+  }
+  if (cbf_mask1)
+  {
+    kvz_transform2d(
+      state->encoder_control,
+      &temp_resi[(cbf_mask1 - 1) * trans_offset],
+      &u_coeff[*num_transforms * trans_offset],
+      width,
+      COLOR_U,
+      pred_cu
+    );
+    transforms[(*num_transforms)] = cbf_mask1;
+    (*num_transforms)++;
+  }
+  if (cbf_mask2 && ((min_dist2 < (9 * min_dist1) / 8) || (!cbf_mask1 && min_dist2 < (3 * min_dist1) / 2)))
+  {
+    kvz_transform2d(
+      state->encoder_control,
+      &temp_resi[(cbf_mask2 - 1) * trans_offset],
+      &u_coeff[*num_transforms * trans_offset],
+      width,
+      COLOR_U,
+      pred_cu
+    );
+    transforms[(*num_transforms)] = cbf_mask2;
+    (*num_transforms)++;
+  }
+}
+
+
+
+#define IS_JCCR_MODE(t) ((t) != DCT7_CHROMA && (t) != CHROMA_TS)
+
+
+static void quantize_chroma(
+  encoder_state_t* const state,
+  int depth,
+  int8_t width,
+  int8_t height,
+  coeff_t u_coeff[5120],
+  coeff_t v_coeff[2048],
+  enum kvz_chroma_transforms transforms[5],
+  const int trans_offset,
+  int i,
+  coeff_t u_quant_coeff[1024],
+  coeff_t v_quant_coeff[1024],
+  const coeff_scan_order_t scan_order,
+  bool* u_has_coeffs,
+  bool* v_has_coeffs)
+{
+  if (state->encoder_control->cfg.rdoq_enable &&
+    (transforms[i] != CHROMA_TS || !state->encoder_control->cfg.rdoq_skip))
+  {
+    kvz_rdoq(state, &u_coeff[i * trans_offset], u_quant_coeff, width, height, transforms[i] != JCCR_1 ? COLOR_U : COLOR_V,
+      scan_order, CU_INTRA, depth, 0);
+
+    int j;
+    for (j = 0; j < width * height; ++j) {
+      if (u_quant_coeff[j]) {
+        *u_has_coeffs = 1;
+        break;
+      }
+    }
+
+    if (transforms[i] == DCT7_CHROMA) {
+      uint16_t temp_cbf = 0;
+      if (*u_has_coeffs)cbf_set(&temp_cbf, depth, COLOR_U);
+      kvz_rdoq(state, &v_coeff[i * trans_offset], v_quant_coeff, width, height, COLOR_V,
+        scan_order, CU_INTRA, depth, temp_cbf);
+
+    }
+  }
+  else if (state->encoder_control->cfg.rdoq_enable && transforms[i] == CHROMA_TS) {
+    kvz_ts_rdoq(state, &u_coeff[i * trans_offset], u_quant_coeff, width, height, COLOR_U, scan_order);
+    kvz_ts_rdoq(state, &v_coeff[i * trans_offset], v_quant_coeff, width, height, COLOR_V, scan_order);
+  }
+  else {
+    kvz_quant(state, &u_coeff[i * trans_offset], u_quant_coeff, width, height, transforms[i] != JCCR_1 ? COLOR_U : COLOR_V,
+      scan_order, CU_INTRA, transforms[i] == CHROMA_TS);
+
+    if (!IS_JCCR_MODE(transforms[i])) {
+      kvz_quant(state, &v_coeff[i * trans_offset], v_quant_coeff, width, height, COLOR_V,
+        scan_order, CU_INTRA, transforms[i] == CHROMA_TS);
+    }
+  }
+
+  for (int j = 0; j < width * height; ++j) {
+    if (u_quant_coeff[j]) {
+      *u_has_coeffs = 1;
+      break;
+    }
+  }
+  if (!IS_JCCR_MODE(transforms[i])) {
+    for (int j = 0; j < width * height; ++j) {
+      if (v_quant_coeff[j]) {
+        *v_has_coeffs = 1;
+        break;
+      }
+    }
+  }
+}
+
+void kvz_chroma_transform_search(
+  encoder_state_t* const state,
+  int depth,
+  lcu_t* const lcu,
+  cabac_data_t temp_cabac,
+  int8_t width,
+  int8_t height,
+  const int offset,
+  const uint8_t mode,
+  cu_info_t* pred_cu,
+  kvz_pixel u_pred[1024],
+  kvz_pixel v_pred[1024],
+  int16_t u_resi[1024],
+  int16_t v_resi[1024],
+  kvz_chorma_ts_out_t* chorma_ts_out)
+{
+  ALIGNED(64) coeff_t u_coeff[LCU_WIDTH_C * LCU_WIDTH_C * 5];
+  ALIGNED(64) uint8_t u_recon[LCU_WIDTH_C * LCU_WIDTH_C * 5];
+  ALIGNED(64) coeff_t v_coeff[LCU_WIDTH_C * LCU_WIDTH_C * 2];
+  ALIGNED(64) uint8_t v_recon[LCU_WIDTH_C * LCU_WIDTH_C * 5];
+  kvz_transform2d(
+    state->encoder_control, u_resi, u_coeff, width, COLOR_U, pred_cu
+  );
+  kvz_transform2d(
+    state->encoder_control, v_resi, v_coeff, width, COLOR_V, pred_cu
+  );
+  enum kvz_chroma_transforms transforms[5];
+  transforms[0] = DCT7_CHROMA;
+  const int trans_offset = width * height;
+  int num_transforms = 1;
+  const int can_use_tr_skip = state->encoder_control->cfg.trskip_enable &&
+    (1 << state->encoder_control->cfg.trskip_max_size) >= width &&
+    state->encoder_control->cfg.chroma_trskip_enable;
+  if (can_use_tr_skip) {
+    kvz_transformskip(state->encoder_control, u_resi, u_coeff + num_transforms * trans_offset, width);
+    kvz_transformskip(state->encoder_control, v_resi, v_coeff + num_transforms * trans_offset, width);
+    transforms[num_transforms] = CHROMA_TS;
+    num_transforms++;
+  }
+  if (state->encoder_control->cfg.jccr) {
+    generate_jccr_transforms(
+      state,
+      pred_cu,
+      width,
+      height,
+      u_resi,
+      v_resi,
+      u_coeff,
+      transforms,
+      trans_offset,
+      &num_transforms);
+  }
+  chorma_ts_out->best_u_cost = MAX_INT64;
+  chorma_ts_out->best_v_cost = MAX_INT64;
+  chorma_ts_out->best_combined_cost = MAX_INT64;
+  chorma_ts_out->best_u_index = -1;
+  chorma_ts_out->best_v_index = -1;
+  chorma_ts_out->best_combined_index = -1;
+  for (int i = 0; i < num_transforms; i++) {
+    coeff_t u_quant_coeff[LCU_WIDTH_C * LCU_WIDTH_C];
+    coeff_t v_quant_coeff[LCU_WIDTH_C * LCU_WIDTH_C];
+    int16_t u_recon_resi[LCU_WIDTH_C * LCU_WIDTH_C];
+    int16_t v_recon_resi[LCU_WIDTH_C * LCU_WIDTH_C];
+    const coeff_scan_order_t scan_order =
+      kvz_get_scan_order(pred_cu->type, mode, depth);
+    bool u_has_coeffs = false;
+    bool v_has_coeffs = false;
+    quantize_chroma(
+      state,
+      depth,
+      width,
+      height,
+      u_coeff,
+      v_coeff,
+      transforms,
+      trans_offset,
+      i,
+      u_quant_coeff,
+      v_quant_coeff,
+      scan_order,
+      &u_has_coeffs,
+      &v_has_coeffs);
+
+    if (IS_JCCR_MODE(transforms[i]) && !u_has_coeffs) continue;
+
+    if (u_has_coeffs) {
+      kvz_dequant(state, u_quant_coeff, &u_coeff[i * trans_offset], width, width, transforms[i] != JCCR_1 ? COLOR_U : COLOR_V,
+        pred_cu->type, transforms[i] == CHROMA_TS);
+      if (transforms[i] != CHROMA_TS) {
+        kvz_itransform2d(state->encoder_control, u_recon_resi, &u_coeff[i * trans_offset], width,
+          transforms[i] != JCCR_1 ? COLOR_U : COLOR_V, pred_cu);
+      }
+      else {
+        kvz_itransformskip(state->encoder_control, u_recon_resi, &u_coeff[i * trans_offset], width);
+      }
+      if (transforms[i] != JCCR_1) {
+        for (int j = 0; j < width * height; j++) {
+          u_recon[trans_offset * i + j] = CLIP_TO_PIXEL((kvz_pixel)(u_pred[j] + u_recon_resi[j]));
+        }
+      }
+      else {
+        for (int j = 0; j < width * height; j++) {
+          u_recon[trans_offset * i + j] = CLIP_TO_PIXEL(u_pred[j] + ((state->frame->jccr_sign ? -u_recon_resi[j] : u_recon_resi[j]) >> 1));
+        }
+      }
+    }
+    else {
+      kvz_pixels_blit(u_pred, &u_recon[trans_offset * i], width, height, width, width);
+    }
+    if (v_has_coeffs && !(IS_JCCR_MODE(transforms[i]))) {
+      kvz_dequant(state, v_quant_coeff, &v_coeff[i * trans_offset], width, width, COLOR_V,
+        pred_cu->type, transforms[i] == CHROMA_TS);
+      if (transforms[i] != CHROMA_TS) {
+        kvz_itransform2d(state->encoder_control, v_recon_resi, &v_coeff[i * trans_offset], width,
+          transforms[i] != JCCR_1 ? COLOR_U : COLOR_V, pred_cu);
+      }
+      else {
+        kvz_itransformskip(state->encoder_control, v_recon_resi, &v_coeff[i * trans_offset], width);
+      }
+      for (int j = 0; j < width * height; j++) {
+        v_recon[trans_offset * i + j] = CLIP_TO_PIXEL(v_pred[j] + v_recon_resi[j]);
+      }
+    }
+    else if (u_has_coeffs && IS_JCCR_MODE(transforms[i])) {
+      if (transforms[i] == JCCR_1) {
+        for (int j = 0; j < width * height; j++) {
+          v_recon[trans_offset * i + j] = CLIP_TO_PIXEL(v_pred[j] + u_recon_resi[j]);
+        }
+      }
+      else if (transforms[i] == JCCR_3) {
+        for (int j = 0; j < width * height; j++) {
+          v_recon[trans_offset * i + j] = CLIP_TO_PIXEL(v_pred[j] + (state->frame->jccr_sign ? -u_recon_resi[j] : u_recon_resi[j]));
+        }
+      }
+      else {
+        for (int j = 0; j < width * height; j++) {
+          v_recon[trans_offset * i + j] = CLIP_TO_PIXEL(v_pred[j] + ((state->frame->jccr_sign ? -u_recon_resi[j] : u_recon_resi[j]) >> 1));
+        }
+      }
+    }
+    else {
+      kvz_pixels_blit(v_pred, &v_recon[trans_offset * i], width, height, width, width);
+    }
+
+    unsigned ssd_u = 0;
+    unsigned ssd_v = 0;
+    if (!state->encoder_control->cfg.lossless) {
+      ssd_u = kvz_pixels_calc_ssd(&lcu->ref.u[offset], &u_recon[trans_offset * i],
+        LCU_WIDTH_C, width,
+        width);
+      ssd_v = kvz_pixels_calc_ssd(&lcu->ref.v[offset], &v_recon[trans_offset * i],
+        LCU_WIDTH_C, width,
+        width);
+    }
+
+    double u_bits = 0;
+    double v_bits = 0;
+    state->search_cabac.update = 1;
+
+    int cbf_u = transforms[i] & 2 || (u_has_coeffs && !(transforms[i] & 1));
+    CABAC_FBITS_UPDATE(&state->search_cabac, &state->search_cabac.ctx.qt_cbf_model_cb[0],
+      cbf_u, u_bits, "cbf_u"
+    );
+    int cbf_v = transforms[i] & 1 || (v_has_coeffs && !(transforms[i] & 2));
+    CABAC_FBITS_UPDATE(&state->search_cabac, &state->search_cabac.ctx.qt_cbf_model_cr[cbf_u],
+      cbf_v, v_bits, "cbf_v"
+    );
+
+    if (state->encoder_control->cfg.jccr && (cbf_u || cbf_v)) {
+      CABAC_FBITS_UPDATE(&state->search_cabac, &state->search_cabac.ctx.joint_cb_cr[cbf_u * 2 + cbf_v - 1],
+        transforms[i] != DCT7_CHROMA && transforms[i] != CHROMA_TS, v_bits, "jccr_flag"
+      );
+    }
+
+    if (cbf_u || (transforms[i] == JCCR_1 && u_has_coeffs)) {
+      if (can_use_tr_skip) {
+        CABAC_FBITS_UPDATE(&state->search_cabac, &state->search_cabac.ctx.transform_skip_model_chroma,
+          transforms[i] == CHROMA_TS, u_bits, "tr_skip_u"
+        );
+      }
+      double coeff_cost = kvz_get_coeff_cost(
+        state,
+        u_quant_coeff,
+        NULL,
+        width,
+        COLOR_U,
+        scan_order,
+        transforms[i] == CHROMA_TS);
+      u_bits += coeff_cost;
+    }
+    if (cbf_v && !IS_JCCR_MODE(transforms[i])) {
+      if (can_use_tr_skip) {
+        CABAC_FBITS_UPDATE(&state->search_cabac, &state->search_cabac.ctx.transform_skip_model_chroma,
+          transforms[i] == CHROMA_TS, v_bits, "tr_skip_v"
+        );
+      }
+      v_bits += kvz_get_coeff_cost(
+        state,
+        v_quant_coeff,
+        NULL,
+        width,
+        COLOR_V,
+        scan_order,
+        transforms[i] == CHROMA_TS);
+    }
+    if (!IS_JCCR_MODE(transforms[i])) {
+      double u_cost = KVZ_CHROMA_MULT * ssd_u + u_bits * state->frame->lambda;
+      double v_cost = KVZ_CHROMA_MULT * ssd_v + v_bits * state->frame->lambda;
+      if (u_cost < chorma_ts_out->best_u_cost) {
+        chorma_ts_out->best_u_cost = u_cost;
+        chorma_ts_out->best_u_index = transforms[i];
+      }
+      if (v_cost < chorma_ts_out->best_v_cost) {
+        chorma_ts_out->best_v_cost = v_cost;
+        chorma_ts_out->best_v_index = transforms[i];
+      }
+    }
+    else {
+      double cost = KVZ_CHROMA_MULT * (ssd_u + ssd_v) + (u_bits + v_bits) * state->frame->lambda;
+      if (cost < chorma_ts_out->best_combined_cost) {
+        chorma_ts_out->best_combined_cost = cost;
+        chorma_ts_out->best_combined_index = transforms[i];
+      }
+    }
+    memcpy(&state->search_cabac, &temp_cabac, sizeof(cabac_data_t));
+  }
+}
+
 
 void uvg_fwd_lfnst_NxN(coeff_t *src, coeff_t *dst, const int8_t mode, const int8_t index, const int8_t size, int zero_out_size)
 {
