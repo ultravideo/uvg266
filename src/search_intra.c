@@ -1488,7 +1488,7 @@ int8_t uvg_search_cu_intra_chroma(encoder_state_t * const state,
 {
   const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
 
-  cu_info_t *cur_pu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
+  const cu_info_t *cur_pu = &search_data->pred_cu;
   int8_t intra_mode = !cur_pu->intra.mip_flag ? cur_pu->intra.mode : 0;
   
   int8_t modes[8] = { 0, 50, 18, 1, intra_mode, 81, 82, 83 };

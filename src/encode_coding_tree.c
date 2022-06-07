@@ -747,6 +747,7 @@ static void encode_transform_coeff(encoder_state_t * const state,
       && (depth != 4 || only_chroma) 
       && state->encoder_control->cfg.jccr
       ) {
+      assert(cur_pu->joint_cb_cr < 4 && "JointCbCr is in search state.");
       cabac->cur_ctx = &cabac->ctx.joint_cb_cr[cb_flag_u * 2 + cb_flag_v - 1];
       CABAC_BIN(cabac, cur_pu->joint_cb_cr != 0, "tu_joint_cbcr_residual_flag");
     }

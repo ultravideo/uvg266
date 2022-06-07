@@ -854,7 +854,49 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         intra_cost += pred_mode_type_bits * state->lambda;
       }
 #endif
-      if (intra_search.cost < cost) {
+      double intra_cost = intra_search.cost;
+      if (intra_cost < cost) {
+        int8_t intra_mode = intra_search.pred_cu.intra.mode;
+        if(state->encoder_control->cfg.cclm) {
+          intra_search.pred_cu.intra.mode_chroma = -1;
+          uvg_intra_recon_cu(state,
+            x, y,
+            depth, &intra_search,
+            &intra_search.pred_cu,
+            lcu);
+
+          downsample_cclm_rec(
+            state, x, y, cu_width / 2, cu_width / 2, lcu->rec.y, lcu->left_ref.y[64]
+          );
+        }
+        intra_search.pred_cu.joint_cb_cr = 0;
+
+        // TODO: This heavily relies to square CUs
+        if ((depth != 4 || (x % 8 && y % 8)) && state->encoder_control->chroma_format != KVZ_CSP_400) {
+          // There is almost no benefit to doing the chroma mode search for
+          // rd2. Possibly because the luma mode search already takes chroma
+          // into account, so there is less of a chanse of luma mode being
+          // really bad for chroma.
+          intra_search.pred_cu.intra.mode_chroma = intra_search.pred_cu.intra.mode;
+          if (ctrl->cfg.rdo >= 3) {
+            uvg_search_cu_intra_chroma(state, x, y, depth, lcu, &intra_search);
+
+            if (intra_search.pred_cu.joint_cb_cr == 0) {
+              intra_search.pred_cu.joint_cb_cr = 4;
+            }
+
+          }
+          else if (!intra_search.pred_cu.intra.mip_flag) {
+            intra_search.pred_cu.intra.mode_chroma = intra_search.pred_cu.intra.mode;
+          }
+          else {
+            intra_search.pred_cu.intra.mode_chroma = 0;
+          }
+        }
+        intra_search.pred_cu.intra.mode = intra_mode;
+        intra_cost += intra_search.cost;
+      }
+      if (intra_cost < cost) {
         cost = intra_search.cost;
         *cur_cu = intra_search.pred_cu;
         cur_cu->type = CU_INTRA;
@@ -866,53 +908,19 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     if (cur_cu->type == CU_INTRA) {
       assert(cur_cu->part_size == SIZE_2Nx2N || cur_cu->part_size == SIZE_NxN);
 
-      intra_search.pred_cu.intra.mode_chroma = -1; // don't reconstruct chroma before search is performed for it
+      if ((depth == 4 && (x % 8 == 0 || y % 8 == 0)) || state->encoder_control->chroma_format == KVZ_CSP_400) {
+        intra_search.pred_cu.intra.mode_chroma = -1; 
+      }
       lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
       uvg_intra_recon_cu(state,
                          x, y,
                          depth, &intra_search,
                          NULL, 
                          lcu);
+      if (cur_cu->joint_cb_cr == 4) cur_cu->joint_cb_cr = 0;
+      lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
 
-      downsample_cclm_rec(
-        state, x, y, cu_width / 2, cu_width / 2, lcu->rec.y, lcu->left_ref.y[64]
-      );
-      cur_cu->joint_cb_cr = 0;
 
-      // TODO: This heavily relies to square CUs
-      if ((depth != 4 || (x % 8 && y % 8)) && state->encoder_control->chroma_format != UVG_CSP_400) {
-        // There is almost no benefit to doing the chroma mode search for
-        // rd2. Possibly because the luma mode search already takes chroma
-        // into account, so there is less of a chanse of luma mode being
-        // really bad for chroma.
-        intra_search.pred_cu.intra.mode_chroma = cur_cu->intra.mode; // skip luma
-        if (ctrl->cfg.rdo >= 3) {
-          cur_cu->intra.mode_chroma = uvg_search_cu_intra_chroma(state, x, y, depth, lcu, &intra_search);
-
-          if (intra_search.pred_cu.joint_cb_cr == 0) {
-            intra_search.pred_cu.joint_cb_cr = 4;
-            cur_cu->tr_skip |= intra_search.pred_cu.tr_skip;
-          }
-          else cur_cu->joint_cb_cr = intra_search.pred_cu.joint_cb_cr;
-
-          lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
-        }
-        else if(!cur_cu->intra.mip_flag) {
-          cur_cu->intra.mode_chroma = cur_cu->intra.mode;
-          intra_search.pred_cu.intra.mode_chroma = cur_cu->intra.mode;
-        }
-        else {
-          cur_cu->intra.mode_chroma = 0;
-          intra_search.pred_cu.intra.mode_chroma = 0;
-        }
-        intra_search.pred_cu.intra.mode = -1; // skip luma
-        uvg_intra_recon_cu(state,
-                           x, y, // TODO: as does this
-                           depth, &intra_search,
-                           NULL,
-                           lcu);
-
-      }
     } else if (cur_cu->type == CU_INTER) {
 
       if (!cur_cu->skipped) {

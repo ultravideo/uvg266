@@ -1576,7 +1576,7 @@ void uvg_intra_recon_cu(
     }
   } else {
     const bool has_luma = mode_luma != -1;
-    const bool has_chroma = mode_chroma != -1 &&  (x % 8 == 0 && y % 8 == 0);
+    const bool has_chroma = mode_chroma != -1 && (x % 8 == 0 && y % 8 == 0);
    
     // Process a leaf TU.
     if (has_luma) {
@@ -1588,7 +1588,7 @@ void uvg_intra_recon_cu(
     }
 
     uvg_quantize_lcu_residual(state, has_luma, has_chroma && !(search_data->pred_cu.joint_cb_cr & 3),
-      search_data->pred_cu.joint_cb_cr != 4 && state->encoder_control->cfg.jccr && (x % 8 == 0 && y % 8 == 0),
+      search_data->pred_cu.joint_cb_cr & 3 && state->encoder_control->cfg.jccr && has_chroma,
       x, y, depth, cur_cu, lcu, false);
   }
 }
