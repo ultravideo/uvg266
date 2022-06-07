@@ -265,6 +265,7 @@ cu_array_t * uvg_cu_array_copy_ref(cu_array_t* cua);
  * of the containing LCU.
  */
 #define SUB_SCU(xy) ((xy) & (LCU_WIDTH - 1))
+#define SUB_SCU_TREE(xy, t) ((xy) & (((t) != KVZ_CHROMA_T ? LCU_WIDTH : LCU_WIDTH_C) - 1))
 
 #define LCU_CU_WIDTH 16
 #define LCU_T_CU_WIDTH (LCU_CU_WIDTH + 1)

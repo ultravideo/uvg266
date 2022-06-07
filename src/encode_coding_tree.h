@@ -75,8 +75,12 @@ void uvg_encode_mvd(encoder_state_t * const state,
 double uvg_mock_encode_coding_unit(
   encoder_state_t* const state,
   cabac_data_t* cabac,
-  int x, int y, int depth,
-  lcu_t* lcu, cu_info_t* cur_cu);
+  int x,
+  int y,
+  int depth,
+  lcu_t* lcu,
+  cu_info_t* cur_cu,
+  enum kvz_tree_type tree_type);
 
 int uvg_encode_inter_prediction_unit(encoder_state_t* const state,
                                       cabac_data_t* const cabac,

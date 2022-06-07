@@ -188,6 +188,8 @@ static const struct option long_options[] = {
   { "no-combine-intra-cus",     no_argument, NULL, 0 },
   { "force-inter",              no_argument, NULL, 0 },
   { "no-force-inter",           no_argument, NULL, 0 },
+  { "dual-tree",                no_argument, NULL, 0 },
+  { "no-dual-tree",             no_argument, NULL, 0 },
   { "cabac-debug-file",   required_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
@@ -547,6 +549,8 @@ void print_help(void)
     "                               same length, start with same value, and can\n"
     "                               contain maximum 16 or 36 - starting value\n"
     "                               elements. [17,27,32,44]\n"
+    "      --(no-)dual-tree       : Use separate CTU structure for luma and\n"
+    "                               chroma in intra slices.\n"
     "\n"
     /* Word wrap to this width to stay under 80 characters (including ") *************/
     "Compression tools:\n"

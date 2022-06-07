@@ -534,7 +534,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
 
   if (encoder->chroma_format != UVG_CSP_400)
   {
-    WRITE_U(stream, 0, 1, "qtbtt_dual_tree_intra_flag");
+    WRITE_U(stream, encoder->cfg.dual_tree, 1, "qtbtt_dual_tree_intra_flag");
   }
   
   WRITE_UE(stream, 0, "sps_log2_diff_min_qt_min_cb_inter_slice");

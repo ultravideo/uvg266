@@ -219,6 +219,8 @@ int uvg_config_init(uvg_config *cfg)
   cfg->force_inter = 0;
 
   cfg->cabac_debug_file_name = NULL;
+
+  cfg->dual_tree = 0;
   return 1;
 }
 
@@ -1469,6 +1471,9 @@ int uvg_config_parse(uvg_config *cfg, const char *name, const char *value)
       fprintf(stderr, "Failed to allocate memory for cabac debug file name.\n");
       return 0;      
     }
+  }
+  else if OPT("dual-tree") {
+    cfg->dual_tree = atobool(value);
   }
   else {
     return 0;

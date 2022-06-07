@@ -1455,7 +1455,7 @@ void uvg_encode_coding_tree(
   const cu_array_t* used_array = tree_type != KVZ_CHROMA_T ? frame->cu_array : frame->chroma_cu_array;
   const cu_info_t *cur_cu   = uvg_cu_array_at_const(used_array, x, y);
 
-  const int cu_width = LCU_WIDTH >> depth;
+  const int cu_width = tree_type != KVZ_CHROMA_T ? LCU_WIDTH >> depth : LCU_WIDTH_C >> depth;
   const int cu_height = cu_width; // TODO: height for non-square blocks
   const int half_cu  = cu_width >> 1;
 
@@ -1731,8 +1731,12 @@ end:
 double uvg_mock_encode_coding_unit(
   encoder_state_t* const state,
   cabac_data_t* cabac,
-  int x, int y, int depth,
-  lcu_t* lcu, cu_info_t* cur_cu) {
+  int x,
+  int y,
+  int depth,
+  lcu_t* lcu,
+  cu_info_t* cur_cu,
+  enum kvz_tree_type tree_type) {
   double bits = 0;
   const encoder_control_t* const ctrl = state->encoder_control;
 
@@ -1754,7 +1758,7 @@ double uvg_mock_encode_coding_unit(
   }
 
   // When not in MAX_DEPTH, insert split flag and split the blocks if needed
-  if (depth != MAX_DEPTH) {
+  if (tree_type != KVZ_CHROMA_T ? depth != MAX_DEPTH : depth != MAX_DEPTH - 1) {
     uvg_write_split_flag(state, cabac, left_cu, above_cu, 0, depth, cu_width, x, y, &bits);
   }
 
@@ -1817,8 +1821,10 @@ double uvg_mock_encode_coding_unit(
     }
   }
   else if (cur_cu->type == CU_INTRA) {
-    uvg_encode_intra_luma_coding_unit(state, cabac, cur_cu, x, y, depth, lcu, &bits);
-    if((depth != 4 || (x % 8 != 0 && y % 8 != 0)) && state->encoder_control->chroma_format != UVG_CSP_400) {
+    if(tree_type != KVZ_CHROMA_T) {
+      uvg_encode_intra_luma_coding_unit(state, cabac, cur_cu, x, y, depth, lcu, &bits);
+    }
+    if((depth != 4 || (x % 8 != 0 && y % 8 != 0)) && state->encoder_control->chroma_format != UVG_CSP_400 && tree_type != KVZ_LUMA_T) {
       encode_chroma_intra_cu(cabac, cur_cu, state->encoder_control->cfg.cclm, &bits);
     }
   }

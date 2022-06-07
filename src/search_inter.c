@@ -2129,10 +2129,10 @@ void uvg_cu_cost_inter_rd2(encoder_state_t * const state,
   const int skip_context = uvg_get_skip_context(x, y, lcu, NULL, NULL);
   if (cur_cu->merged && cur_cu->part_size == SIZE_2Nx2N) {
     no_cbf_bits = CTX_ENTROPY_FBITS(&state->cabac.ctx.cu_skip_flag_model[skip_context], 1) + *inter_bitcost;
-    bits += uvg_mock_encode_coding_unit(state, cabac, x, y, depth, lcu, cur_cu);
+    bits += uvg_mock_encode_coding_unit(state, cabac, x, y, depth, lcu, cur_cu, KVZ_BOTH_T);
   }
   else {
-    no_cbf_bits = uvg_mock_encode_coding_unit(state, cabac, x, y, depth, lcu, cur_cu);
+    no_cbf_bits = uvg_mock_encode_coding_unit(state, cabac, x, y, depth, lcu, cur_cu, KVZ_BOTH_T);
     bits += no_cbf_bits - CTX_ENTROPY_FBITS(&cabac->ctx.cu_qt_root_cbf_model, 0) + CTX_ENTROPY_FBITS(&cabac->ctx.cu_qt_root_cbf_model, 1);
   }
   double no_cbf_cost = ssd + no_cbf_bits * state->lambda;

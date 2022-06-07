@@ -97,6 +97,7 @@ int uvg_videoframe_free(videoframe_t * const frame)
   frame->rec_lmcs = NULL;
 
   uvg_cu_array_free(&frame->cu_array);
+  kvz_cu_array_free(&frame->chroma_cu_array);
 
   FREE_POINTER(frame->sao_luma);
   FREE_POINTER(frame->sao_chroma);
