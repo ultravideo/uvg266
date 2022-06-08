@@ -74,7 +74,7 @@ static INLINE void copy_cu_pixels(int x_local, int y_local, int width, lcu_t *fr
                                   tree_type)
 {
   const int luma_index = x_local + y_local * LCU_WIDTH;
-  const int chroma_index = (x_local / 2) + (y_local / 2) * (LCU_WIDTH / 2);
+  const int chroma_index = tree_type == KVZ_CHROMA_T ? x_local + y_local * LCU_WIDTH_C : (x_local / 2) + (y_local / 2) * LCU_WIDTH_C;
 
   if(tree_type != KVZ_CHROMA_T) {
     uvg_pixels_blit(&from->rec.y[luma_index], &to->rec.y[luma_index],
@@ -97,7 +97,7 @@ static INLINE void copy_cu_coeffs(int x_local, int y_local, int width, lcu_t *fr
   }
 
   if (from->rec.chroma_format != UVG_CSP_400 && tree_type != KVZ_LUMA_T) {
-    const int chroma_z = xy_to_zorder(LCU_WIDTH_C, x_local >> 1, y_local >> 1);
+    const int chroma_z = xy_to_zorder(LCU_WIDTH_C, x_local >> (tree_type != KVZ_CHROMA_T), y_local >> (tree_type != KVZ_CHROMA_T));
     copy_coeffs(&from->coeff.u[chroma_z], &to->coeff.u[chroma_z], width >> 1);
     copy_coeffs(&from->coeff.v[chroma_z], &to->coeff.v[chroma_z], width >> 1);
     if (joint) {
@@ -783,7 +783,8 @@ static double search_cu(
 {
   const encoder_control_t* ctrl = state->encoder_control;
   const videoframe_t * const frame = state->tile->frame;
-  int cu_width = tree_type != KVZ_CHROMA_T ? LCU_WIDTH >> depth : LCU_WIDTH_C >> depth;
+  const int cu_width = tree_type != KVZ_CHROMA_T ? LCU_WIDTH >> depth : LCU_WIDTH_C >> depth;
+  const int luma_width = LCU_WIDTH >> depth;
   assert(cu_width >= 4);
   double cost = MAX_DOUBLE;
   double inter_zero_coeff_cost = MAX_DOUBLE;
@@ -811,8 +812,8 @@ static double search_cu(
   int x_local = SUB_SCU(x) >> (tree_type == KVZ_CHROMA_T);
   int y_local = SUB_SCU(y) >> (tree_type == KVZ_CHROMA_T);
 
-  int32_t frame_width = tree_type != KVZ_CHROMA_T ? frame->width : frame->width / 2;
-  int32_t frame_height = tree_type != KVZ_CHROMA_T ? frame->height: frame->height / 2;
+  int32_t frame_width = frame->width;
+  int32_t frame_height = frame->height;
   // Stop recursion if the CU is completely outside the frame.
   if (x >= frame_width || y >= frame_height) {
     // Return zero cost because this CU does not have to be coded.
@@ -853,7 +854,7 @@ static double search_cu(
 
   // If the CU is completely inside the frame at this depth, search for
   // prediction modes at this depth.
-  if ( x + cu_width <= frame_width && y + cu_width <= frame_height)
+  if ( x + luma_width <= frame_width && y + luma_width <= frame_height)
   {
     int cu_width_inter_min = LCU_WIDTH >> pu_depth_inter.max;
     bool can_use_inter =
@@ -891,7 +892,7 @@ static double search_cu(
                       && cost / (cu_width * cu_width) < INTRA_THRESHOLD)
                       || (ctrl->cfg.early_skip && cur_cu->skipped);
 
-    int32_t cu_width_intra_min = tree_type != KVZ_CHROMA_T ? LCU_WIDTH >> pu_depth_intra.max : LCU_WIDTH_C >> pu_depth_intra.max;
+    int32_t cu_width_intra_min = LCU_WIDTH >> pu_depth_intra.max;
     bool can_use_intra =
       (WITHIN(depth, pu_depth_intra.min, pu_depth_intra.max) ||
         // When the split was forced because the CTU is partially outside
