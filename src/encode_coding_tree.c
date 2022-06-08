@@ -965,6 +965,7 @@ static void encode_chroma_intra_cu(
         break;
       }
     }
+    assert(pred_mode != 5 && "Invalid chroma prediction mode");
     /*else if (intra_pred_mode_chroma == 66) {
         // Angular 66 mode is possible only if intra pred mode is one of the
         // possible chroma pred modes, in which case it is signaled with that

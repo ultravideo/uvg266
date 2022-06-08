@@ -922,7 +922,7 @@ static double search_cu(
       }
 #endif
       double intra_cost = intra_search.cost;
-      if (intra_cost < cost || tree_type == KVZ_CHROMA_T) {
+      if (intra_cost < cost && tree_type != KVZ_LUMA_T) {
         int8_t intra_mode = intra_search.pred_cu.intra.mode;
         if(state->encoder_control->cfg.cclm && tree_type == KVZ_BOTH_T) {
           intra_search.pred_cu.intra.mode_chroma = -1;
@@ -945,7 +945,8 @@ static double search_cu(
           // into account, so there is less of a chanse of luma mode being
           // really bad for chroma.
           if(tree_type == KVZ_CHROMA_T) {
-            intra_search.pred_cu.intra = kvz_get_co_located_luma_cu(x, y, luma_width, luma_width, lcu, NULL, KVZ_CHROMA_T)->intra;
+            intra_search.pred_cu.intra = kvz_get_co_located_luma_cu(x, y, luma_width, luma_width, NULL, state->tile->frame->cu_array, KVZ_CHROMA_T)->intra;
+            intra_mode = intra_search.pred_cu.intra.mode;
           }
           intra_search.pred_cu.intra.mode_chroma = intra_search.pred_cu.intra.mode;
           if (ctrl->cfg.rdo >= 3 || ctrl->cfg.jccr || ctrl->cfg.lfnst) {
@@ -973,9 +974,8 @@ static double search_cu(
           intra_search.pred_cu.violates_lfnst_constrained_chroma = false;
           intra_search.pred_cu.lfnst_last_scan_pos = false;
         }
-        if(tree_type != KVZ_CHROMA_T) {
-          intra_search.pred_cu.intra.mode = intra_mode;
-        }
+        intra_search.pred_cu.intra.mode = intra_mode;
+        
       }
       if (intra_cost < cost) {
         cost = intra_cost;
