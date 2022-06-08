@@ -549,8 +549,14 @@ static void encode_chroma_tu(encoder_state_t* const state, int x, int y, int dep
   }
 }
 
-static void encode_transform_unit(encoder_state_t * const state,
-                                  int x, int y, int depth, bool only_chroma, lcu_coeff_t* coeff)
+static void encode_transform_unit(
+  encoder_state_t * const state,
+  int x,
+  int y,
+  int depth,
+  bool only_chroma,
+  lcu_coeff_t* coeff,
+  enum kvz_tree_type tree_type)
 {
   assert(depth >= 1 && depth <= MAX_PU_DEPTH);
 
@@ -559,7 +565,8 @@ static void encode_transform_unit(encoder_state_t * const state,
   const uint8_t width = LCU_WIDTH >> depth;
   const uint8_t width_c = (depth == MAX_PU_DEPTH ? width : width / 2);
 
-  cu_info_t *cur_pu = uvg_cu_array_at(frame->cu_array, x, y);
+  cu_array_t* used_cu_array = tree_type != KVZ_CHROMA_T ? frame->cu_array : frame->chroma_cu_array;
+  const cu_info_t *cur_pu = uvg_cu_array_at_const(used_cu_array, x, y);
 
   int8_t scan_idx = uvg_get_scan_order(cur_pu->type, cur_pu->intra.mode, depth);
 
@@ -604,7 +611,7 @@ static void encode_transform_unit(encoder_state_t * const state,
     } else {
       // Time to to code the chroma transform blocks. Move to the top-left
       // corner of the block.
-      cur_pu = uvg_cu_array_at(frame->cu_array, x, y);
+      cur_pu = uvg_cu_array_at_const((const cu_array_t *)used_cu_array, x, y);
     }
   }
 
@@ -694,7 +701,7 @@ static void encode_transform_coeff(
   // - they have already been signaled to 0 previously
   // When they are not present they are inferred to be 0, except for size 4
   // when the flags from previous level are used.
-  if (state->encoder_control->chroma_format != UVG_CSP_400 && (depth != 4 || only_chroma)) {
+  if (state->encoder_control->chroma_format != UVG_CSP_400 && (depth != 4 || only_chroma) && tree_type != KVZ_LUMA_T) {
     
     if (!split) {
       if (true) {
@@ -765,7 +772,7 @@ static void encode_transform_coeff(
       cabac->cur_ctx = &cabac->ctx.joint_cb_cr[cb_flag_u * 2 + cb_flag_v - 1];
       CABAC_BIN(cabac, cur_pu->joint_cb_cr != 0, "tu_joint_cbcr_residual_flag");
     }
-    encode_transform_unit(state, x, y, depth, only_chroma, coeff);
+    encode_transform_unit(state, x, y, depth, only_chroma, coeff, tree_type);
   }
 }
 
@@ -1328,13 +1335,21 @@ static void encode_part_mode(encoder_state_t * const state,
 **/
 
 
-bool uvg_write_split_flag(const encoder_state_t * const state, cabac_data_t* cabac,
-  const cu_info_t * left_cu, const cu_info_t * above_cu,
+bool uvg_write_split_flag(
+  const encoder_state_t * const state,
+  cabac_data_t* cabac,
+  const cu_info_t * left_cu,
+  const cu_info_t * above_cu,
   uint8_t split_flag,
-  int depth, int cu_width, int x, int y, double* bits_out)
+  int depth,
+  int cu_width,
+  int x,
+  int y,
+  enum kvz_tree_type tree_type,
+  double* bits_out)
 {
-  uint16_t abs_x = x + state->tile->offset_x;
-  uint16_t abs_y = y + state->tile->offset_y;
+  uint16_t abs_x = x + (state->tile->offset_x >> (tree_type == KVZ_CHROMA_T));
+  uint16_t abs_y = y + (state->tile->offset_y >> (tree_type == KVZ_CHROMA_T));
   double bits = 0;
   const encoder_control_t* const ctrl = state->encoder_control;
   // Implisit split flag when on border
@@ -1350,8 +1365,8 @@ bool uvg_write_split_flag(const encoder_state_t * const state, cabac_data_t* cab
 
   uint8_t implicit_split_mode = UVG_NO_SPLIT;
   //bool implicit_split = border;
-  bool bottom_left_available = ((abs_y + cu_width - 1) < ctrl->in.height);
-  bool top_right_available = ((abs_x + cu_width - 1) < ctrl->in.width);
+  bool bottom_left_available = ((abs_y + cu_width - 1) < (ctrl->in.height >> (tree_type == KVZ_CHROMA_T)));
+  bool top_right_available = ((abs_x + cu_width - 1) < (ctrl->in.width >> (tree_type == KVZ_CHROMA_T)));
 
   if (!bottom_left_available && !top_right_available && allow_qt) {
     implicit_split_mode = UVG_QUAD_SPLIT;
@@ -1470,14 +1485,16 @@ void uvg_encode_coding_tree(
 
 
   // Absolute coordinates
-  uint16_t abs_x = x + state->tile->offset_x;
-  uint16_t abs_y = y + state->tile->offset_y;
+  uint16_t abs_x = x + (state->tile->offset_x >> (tree_type == KVZ_CHROMA_T));
+  uint16_t abs_y = y + (state->tile->offset_y >> (tree_type == KVZ_CHROMA_T));
 
+  int32_t used_width = tree_type !=  KVZ_CHROMA_T ? ctrl->in.width : ctrl->in.width / 2;
+  int32_t used_height = tree_type != KVZ_CHROMA_T ? ctrl->in.height : ctrl->in.height / 2;
   // Check for slice border
-  bool border_x = ctrl->in.width  < abs_x + cu_width;
-  bool border_y = ctrl->in.height < abs_y + cu_width;
-  bool border_split_x = ctrl->in.width  >= abs_x + (LCU_WIDTH >> MAX_DEPTH) + half_cu;
-  bool border_split_y = ctrl->in.height >= abs_y + (LCU_WIDTH >> MAX_DEPTH) + half_cu;
+  bool border_x = used_width  < abs_x + cu_width;
+  bool border_y = used_height < abs_y + cu_width;
+  bool border_split_x = used_width  >= abs_x + (LCU_WIDTH >> MAX_DEPTH) + half_cu;
+  bool border_split_y = used_height >= abs_y + (LCU_WIDTH >> MAX_DEPTH) + half_cu;
   bool border = border_x || border_y; /*!< are we in any border CU */
 
   if (depth <= state->frame->max_qp_delta_depth) {
@@ -1487,7 +1504,7 @@ void uvg_encode_coding_tree(
   // When not in MAX_DEPTH, insert split flag and split the blocks if needed
   if (depth != MAX_DEPTH) {
 
-    const int split_flag = uvg_write_split_flag(state, cabac, left_cu, above_cu, GET_SPLITDATA(cur_cu, depth), depth, cu_width, x, y, NULL);
+    const int split_flag = uvg_write_split_flag(state, cabac, left_cu, above_cu, GET_SPLITDATA(cur_cu, depth), depth, cu_width, x, y, tree_type,NULL);
     
     if (split_flag || border) {
       // Split blocks and remember to change x and y block positions
@@ -1680,7 +1697,7 @@ void uvg_encode_coding_tree(
     }
 
     // Code chroma prediction mode.
-    if (state->encoder_control->chroma_format != UVG_CSP_400 && depth != 4 && tree_type != KVZ_LUMA_T) {
+    if (state->encoder_control->chroma_format != UVG_CSP_400 && depth != 4 && tree_type == KVZ_BOTH_T) {
       encode_chroma_intra_cu(cabac, cur_cu, state->encoder_control->cfg.cclm, NULL);
     }
 
@@ -1759,7 +1776,7 @@ double uvg_mock_encode_coding_unit(
 
   // When not in MAX_DEPTH, insert split flag and split the blocks if needed
   if (tree_type != KVZ_CHROMA_T ? depth != MAX_DEPTH : depth != MAX_DEPTH - 1) {
-    uvg_write_split_flag(state, cabac, left_cu, above_cu, 0, depth, cu_width, x, y, &bits);
+    uvg_write_split_flag(state, cabac, left_cu, above_cu, 0, depth, cu_width, x, y, tree_type, &bits);
   }
 
   // Encode skip flag

@@ -96,10 +96,18 @@ void uvg_encode_intra_luma_coding_unit(const encoder_state_t* const state,
   int x, int y, int depth, const lcu_t* lcu, double* bits_out);
 
 
-bool uvg_write_split_flag(const encoder_state_t* const state, cabac_data_t* cabac,
-  const cu_info_t* left_cu, const cu_info_t* above_cu,
+bool uvg_write_split_flag(
+  const encoder_state_t* const state,
+  cabac_data_t* cabac,
+  const cu_info_t* left_cu,
+  const cu_info_t* above_cu,
   uint8_t split_flag,
-  int depth, int cu_width, int x, int y, double* bits_out);
+  int depth,
+  int cu_width,
+  int x,
+  int y,
+  enum kvz_tree_type tree_type,
+  double* bits_out);
 
 void uvg_encode_last_significant_xy(cabac_data_t * const cabac,
   uint8_t lastpos_x, uint8_t lastpos_y,

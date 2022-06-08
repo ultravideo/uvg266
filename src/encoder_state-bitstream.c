@@ -536,7 +536,14 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   {
     WRITE_U(stream, encoder->cfg.dual_tree, 1, "qtbtt_dual_tree_intra_flag");
   }
-  
+  if (encoder->cfg.dual_tree) {
+    WRITE_UE(stream, 0, "sps_log2_diff_min_qt_min_cb_intra_slice_chroma");
+    WRITE_UE(stream, 0, "sps_max_mtt_hierarchy_depth_intra_slice_chroma");
+    if (0 /*sps_max_mtt_hierarchy_depth_intra_slice_chroma != 0*/) {
+      WRITE_UE(stream, 0, "sps_log2_diff_max_bt_min_qt_intra_slice_chroma");
+      WRITE_UE(stream, 0, "sps_log2_diff_max_tt_min_qt_intra_slice_chroma");
+    }
+  }
   WRITE_UE(stream, 0, "sps_log2_diff_min_qt_min_cb_inter_slice");
   WRITE_UE(stream, 0, "sps_max_mtt_hierarchy_depth_inter_slice");  
 

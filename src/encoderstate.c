@@ -1171,7 +1171,7 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
             sub_state->tile->frame->height_in_lcu * LCU_WIDTH
         );
         if(main_state->encoder_control->cfg.dual_tree){
-          sub_state->tile->frame->chroma_cu_array = kvz_cu_subarray(
+          sub_state->tile->frame->chroma_cu_array = uvg_cu_subarray(
               main_state->tile->frame->chroma_cu_array,
               offset_x / 2,
               offset_y / 2,
@@ -1812,9 +1812,9 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, uvg_pict
     state->frame->irap_poc = state->frame->poc;
   }
 
-  if (cfg->dual_tree && state->encoder_control->chroma_format != KVZ_CSP_400 && state->frame->is_irap) {
+  if (cfg->dual_tree && state->encoder_control->chroma_format != UVG_CSP_400 && state->frame->is_irap) {
     assert(state->tile->frame->chroma_cu_array == NULL);
-    state->tile->frame->chroma_cu_array = kvz_cu_array_chroma_alloc(
+    state->tile->frame->chroma_cu_array = uvg_cu_array_chroma_alloc(
       state->tile->frame->width / 2,
       state->tile->frame->height / 2,
       state->encoder_control->chroma_format
