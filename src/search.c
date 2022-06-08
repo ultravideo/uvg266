@@ -944,6 +944,9 @@ static double search_cu(
           // rd2. Possibly because the luma mode search already takes chroma
           // into account, so there is less of a chanse of luma mode being
           // really bad for chroma.
+          if(tree_type == KVZ_CHROMA_T) {
+            intra_search.pred_cu.intra = kvz_get_co_located_luma_cu(x, y, luma_width, luma_width, lcu, NULL, KVZ_CHROMA_T)->intra;
+          }
           intra_search.pred_cu.intra.mode_chroma = intra_search.pred_cu.intra.mode;
           if (ctrl->cfg.rdo >= 3 || ctrl->cfg.jccr || ctrl->cfg.lfnst) {
             uvg_search_cu_intra_chroma(state, x, y, depth, lcu, &intra_search, tree_type);

@@ -146,4 +146,13 @@ void uvg_intra_recon_cu(
   lcu_t *lcu, 
   enum kvz_tree_type tree_type);
 
+const cu_info_t* kvz_get_co_located_luma_cu(
+  int x,
+  int y,
+  int width,
+  int height,
+  const lcu_t* const lcu,
+  const cu_array_t* const cu_array,
+  enum kvz_tree_type tree_type);
+
 int uvg_get_mip_flag_context(int x, int y, int width, int height, const lcu_t* lcu, cu_array_t* const cu_a);

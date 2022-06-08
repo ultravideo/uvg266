@@ -1417,6 +1417,30 @@ void uvg_intra_predict(
   }
 }
 
+// This function works on luma coordinates 
+const cu_info_t* kvz_get_co_located_luma_cu(
+  int x,
+  int y,
+  int width,
+  int height,
+  const lcu_t* const lcu,
+  const cu_array_t* const cu_array,
+  enum kvz_tree_type tree_type)
+{
+  assert((cu_array || lcu) && !(cu_array && lcu));
+  assert(tree_type != KVZ_LUMA_T && "Luma only CU shouldn't need colocated luma CU");
+  if(tree_type == KVZ_CHROMA_T) {
+    x += width >> 1;
+    y += height >> 1;
+  }
+  if(cu_array) {
+    return uvg_cu_array_at_const(cu_array, x, y);
+  }
+  else {
+    return LCU_GET_CU_AT_PX(lcu, SUB_SCU(x), SUB_SCU(y));
+  }
+}
+
 
 static void intra_recon_tb_leaf(
   encoder_state_t* const state,
