@@ -129,7 +129,7 @@ static void work_tree_copy_down(int x_local, int y_local, int depth, lcu_t *work
   const int width = tree_type != KVZ_CHROMA_T ? LCU_WIDTH >> depth : LCU_WIDTH_C >> 1;
   for (int i = depth + 1; i <= MAX_PU_DEPTH; i++) {
     copy_cu_info  (x_local, y_local, width, &work_tree[depth], &work_tree[i]);
-    copy_cu_pixels(x_local, y_local, width, &work_tree[depth], &work_tree[i], tree_type);
+    copy_cu_pixels(x_local, y_local, LCU_WIDTH >> depth, &work_tree[depth], &work_tree[i], tree_type);
   }
 }
 
