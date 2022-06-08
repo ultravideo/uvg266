@@ -143,6 +143,7 @@ void uvg_intra_recon_cu(
   int depth,
   intra_search_data_t* search_data,
   cu_info_t *cur_cu,
-  lcu_t *lcu);
+  lcu_t *lcu, 
+  enum kvz_tree_type tree_type);
 
 int uvg_get_mip_flag_context(int x, int y, int width, int height, const lcu_t* lcu, cu_array_t* const cu_a);

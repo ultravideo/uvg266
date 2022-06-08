@@ -375,15 +375,15 @@ static double search_intra_trdepth(
         if (pred_cu->lfnst_idx > 0 && pred_cu->tr_idx > 0) {
           continue;
         }
-        uvg_intra_recon_cu(
-          state,
-          x_px,
-          y_px,
-          depth,
-          search_data,
-          pred_cu,
-          lcu);
-        if (trafo != 0 && !cbf_is_set(pred_cu->cbf, depth, COLOR_Y)) continue;
+      
+     
+      uvg_intra_recon_cu(state,
+                         x_px, y_px,
+                         depth, search_data,
+                         pred_cu,
+                         lcu,
+                         KVZ_LUMA_T);
+      if (trafo != 0 && !cbf_is_set(pred_cu->cbf, depth, COLOR_Y)) continue;
 
         // TODO: Not sure if this should be 0 or 1 but at least seems to work with 1
         derive_mts_constraints(pred_cu, lcu, depth, lcu_px);
@@ -473,7 +473,8 @@ static double search_intra_trdepth(
           depth,
           search_data,
           pred_cu,
-          lcu);
+          lcu,
+          KVZ_BOTH_T);
         best_rd_cost += uvg_cu_rd_cost_chroma(
           state,
           lcu_px.x,
@@ -515,9 +516,21 @@ static double search_intra_trdepth(
         }
       }
       if (best_tr_idx == MTS_SKIP) break;
-      // Very unlikely that further search is necessary if skip seems best option
-    } // end lfnst_index loop
-
+    }
+    if(reconstruct_chroma) {
+      int8_t luma_mode = pred_cu->intra.mode;
+      pred_cu->intra.mode = -1;
+      pred_cu->intra.mode_chroma = chroma_mode;
+      pred_cu->joint_cb_cr= 4; // TODO: Maybe check the jccr mode here also but holy shit is the interface of search_intra_rdo bad currently
+      uvg_intra_recon_cu(state,
+                         x_px, y_px,
+                         depth, search_data,
+                         pred_cu, 
+                         lcu, 
+                         KVZ_BOTH_T);
+      best_rd_cost += uvg_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
+      pred_cu->intra.mode = luma_mode;
+    }
     pred_cu->tr_skip = best_tr_idx == MTS_SKIP;
     pred_cu->tr_idx = best_tr_idx;
     pred_cu->lfnst_idx = best_lfnst_idx;
@@ -1407,7 +1420,8 @@ int8_t uvg_search_intra_chroma_rdo(
   int8_t num_modes,
   lcu_t *const lcu,
   intra_search_data_t* chroma_data,
-  int8_t luma_mode)
+  int8_t luma_mode,
+  enum kvz_tree_type tree_type)
 {
   const bool reconstruct_chroma = (depth != 4) || (x_px & 4 && y_px & 4);
 
@@ -1552,11 +1566,13 @@ int8_t uvg_search_intra_chroma_rdo(
                              x_px, y_px,
                              depth, &chroma_data[mode_i],
                              pred_cu,
-                             lcu);
+                             lcu,
+                             tree_type);
           chroma_data[mode_i].cost += uvg_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
           memcpy(&state->search_cabac, &temp_cabac, sizeof(cabac_data_t));
-        }      
+        }
       }
+      
       pred_cu->cr_lfnst_idx = best_lfnst_index;
     }
     sort_modes(chroma_data, num_modes);
@@ -1569,9 +1585,14 @@ int8_t uvg_search_intra_chroma_rdo(
 
 #undef IS_JCCR_MODE
 
-int8_t uvg_search_cu_intra_chroma(encoder_state_t * const state,
-                              const int x_px, const int y_px,
-                              const int depth, lcu_t *lcu, intra_search_data_t *search_data)
+int8_t uvg_search_cu_intra_chroma(
+  encoder_state_t * const state,
+  const int x_px,
+  const int y_px,
+  const int depth,
+  lcu_t *lcu,
+  intra_search_data_t *search_data,
+  enum kvz_tree_type tree_type)
 {
   const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
 
@@ -1640,7 +1661,7 @@ int8_t uvg_search_cu_intra_chroma(encoder_state_t * const state,
   }
   
   if (num_modes > 1) {
-    uvg_search_intra_chroma_rdo(state, x_px, y_px, depth, num_modes, lcu, chroma_data, intra_mode);
+    uvg_search_intra_chroma_rdo(state, x_px, y_px, depth, num_modes, lcu, chroma_data, intra_mode, tree_type);
   }
   *search_data = chroma_data[0];
   return chroma_data[0].pred_cu.intra.mode_chroma;

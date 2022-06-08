@@ -112,7 +112,7 @@ static INLINE void copy_cu_coeffs(int x_local, int y_local, int width, lcu_t *fr
 static void work_tree_copy_up(int x_local, int y_local, int depth, lcu_t *work_tree, bool joint, enum
                               kvz_tree_type tree_type)
 {
-  const int width = tree_type != KVZ_CHROMA_T ? LCU_WIDTH >> depth : LCU_WIDTH_C >> depth;
+  const int width = LCU_WIDTH >> depth;
   copy_cu_info  (x_local, y_local, width, &work_tree[depth + 1], &work_tree[depth]);
   copy_cu_pixels(x_local, y_local, width, &work_tree[depth + 1], &work_tree[depth], tree_type);
   copy_cu_coeffs(x_local, y_local, width, &work_tree[depth + 1], &work_tree[depth], joint, tree_type);
@@ -808,8 +808,8 @@ static double search_cu(
 
   lcu_t *const lcu = &work_tree[depth];
 
-  int x_local = SUB_SCU_TREE(x, tree_type);
-  int y_local = SUB_SCU_TREE(y, tree_type);
+  int x_local = SUB_SCU(x) >> (tree_type == KVZ_CHROMA_T);
+  int y_local = SUB_SCU(y) >> (tree_type == KVZ_CHROMA_T);
 
   int32_t frame_width = tree_type != KVZ_CHROMA_T ? frame->width : frame->width / 2;
   int32_t frame_height = tree_type != KVZ_CHROMA_T ? frame->height: frame->height / 2;
@@ -923,13 +923,13 @@ static double search_cu(
       double intra_cost = intra_search.cost;
       if (intra_cost < cost || tree_type == KVZ_CHROMA_T) {
         int8_t intra_mode = intra_search.pred_cu.intra.mode;
-        if(state->encoder_control->cfg.cclm && tree_type != KVZ_CHROMA_T) {
+        if(state->encoder_control->cfg.cclm && tree_type == KVZ_BOTH_T) {
           intra_search.pred_cu.intra.mode_chroma = -1;
           uvg_intra_recon_cu(state,
             x, y,
             depth, &intra_search,
             &intra_search.pred_cu,
-            lcu);
+            lcu, tree_type);
 
           downsample_cclm_rec(
             state, x, y, cu_width / 2, cu_width / 2, lcu->rec.y, lcu->left_ref.y[64]
@@ -945,7 +945,7 @@ static double search_cu(
           // really bad for chroma.
           intra_search.pred_cu.intra.mode_chroma = intra_search.pred_cu.intra.mode;
           if (ctrl->cfg.rdo >= 3 || ctrl->cfg.jccr || ctrl->cfg.lfnst) {
-            uvg_search_cu_intra_chroma(state, x, y, depth, lcu, &intra_search);
+            uvg_search_cu_intra_chroma(state, x, y, depth, lcu, &intra_search, tree_type);
 
             if (intra_search.pred_cu.joint_cb_cr == 0) {
               intra_search.pred_cu.joint_cb_cr = 4;
@@ -962,7 +962,8 @@ static double search_cu(
             x, y,
             depth, &intra_search,
             &intra_search.pred_cu,
-            lcu);
+            lcu,
+            tree_type);
           intra_cost += uvg_cu_rd_cost_chroma(state, x_local, y_local, depth, &intra_search.pred_cu, lcu);
           intra_search.pred_cu.intra.mode = intra_mode;
           intra_search.pred_cu.violates_lfnst_constrained_chroma = false;
@@ -987,12 +988,15 @@ static double search_cu(
       if ((depth == 4 && (x % 8 == 0 || y % 8 == 0)) || state->encoder_control->chroma_format == UVG_CSP_400 || tree_type == KVZ_LUMA_T) {
         intra_search.pred_cu.intra.mode_chroma = -1; 
       }
+      if(tree_type == KVZ_CHROMA_T) {
+        intra_search.pred_cu.intra.mode = -1;
+      }
       lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
       uvg_intra_recon_cu(state,
                          x, y,
                          depth, &intra_search,
                          NULL, 
-                         lcu);
+                         lcu, tree_type);
       if(depth == 4 && x % 8 && y % 8) {
         intra_search.pred_cu.intra.mode_chroma = cur_cu->intra.mode_chroma;
         intra_search.pred_cu.intra.mode = -1;
@@ -1000,7 +1004,8 @@ static double search_cu(
           x, y,
           depth, &intra_search,
           NULL,
-          lcu);
+          lcu,
+          tree_type);
       }
       if (cur_cu->joint_cb_cr == 4) cur_cu->joint_cb_cr = 0;
       lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
@@ -1117,7 +1122,7 @@ static double search_cu(
 
   // Recursively split all the way to max search depth.
   if (can_split_cu) {
-    int half_cu = cu_width / 2;
+    int half_cu = cu_width >> (tree_type != KVZ_CHROMA_T);
     double split_cost = 0.0;
     int cbf = cbf_is_set_any(cur_cu->cbf, depth);
     cabac_data_t post_seach_cabac;
@@ -1132,8 +1137,8 @@ static double search_cu(
     if (depth < MAX_DEPTH) {
       // Add cost of cu_split_flag.
       uvg_write_split_flag(state, &state->search_cabac,
-                           x > 0 ? LCU_GET_CU_AT_PX(lcu, SUB_SCU(x) - 1, SUB_SCU(y)) : NULL,
-                           y > 0 ? LCU_GET_CU_AT_PX(lcu, SUB_SCU(x), SUB_SCU(y) - 1) : NULL,
+                           x > 0 ? LCU_GET_CU_AT_PX(lcu, (SUB_SCU(x) - 1) >> (tree_type == KVZ_CHROMA_T), SUB_SCU(y) >> (tree_type == KVZ_CHROMA_T)) : NULL,
+                           y > 0 ? LCU_GET_CU_AT_PX(lcu, SUB_SCU(x) >> (tree_type == KVZ_CHROMA_T), (SUB_SCU(y) - 1) >> (tree_type == KVZ_CHROMA_T)) : NULL,
                            1, depth, cu_width, x, y, tree_type,
                            &split_bits);
     }
@@ -1160,7 +1165,8 @@ static double search_cu(
     // of the top left CU from the next depth. This should ensure that 64x64
     // gets used, at least in the most obvious cases, while avoiding any
     // searching.
-    
+
+    // TODO: Dual tree
     if (cur_cu->type == CU_NOTSET && depth < MAX_PU_DEPTH
         && x + cu_width <= frame_width && y + cu_width <= frame_height 
         && state->encoder_control->cfg.combine_intra_cus)
@@ -1200,7 +1206,8 @@ static double search_cu(
                            depth,
                            &proxy,
                            NULL,
-                           lcu);
+                           lcu,
+                           tree_type);
 
         double mode_bits = calc_mode_bits(state, lcu, cur_cu, x, y, depth) + bits;
         cost += mode_bits * state->lambda;
@@ -1476,8 +1483,8 @@ void uvg_search_lcu(encoder_state_t * const state, const int x, const int y, con
   if(state->frame->slicetype == UVG_SLICE_I && state->encoder_control->cfg.dual_tree) {
     cost = search_cu(
       state,
-      x / 2,
-      y / 2,
+      x,
+      y,
       0,
       work_tree,
       KVZ_CHROMA_T);

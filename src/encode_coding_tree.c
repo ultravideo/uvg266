@@ -511,9 +511,21 @@ void uvg_encode_last_significant_xy(cabac_data_t * const cabac,
   if (cabac->only_count && bits_out) *bits_out += bits;
 }
 
-static void encode_chroma_tu(encoder_state_t* const state, int x, int y, int depth, const uint8_t width_c, cu_info_t* cur_pu, int8_t* scan_idx, lcu_coeff_t* coeff, uint8_t joint_chroma) {
-  int x_local = ((x & ~7) >> 1) % LCU_WIDTH_C;
-  int y_local = ((y & ~7) >> 1) % LCU_WIDTH_C;
+static void encode_chroma_tu(
+  encoder_state_t* const state,
+  int x,
+  int y,
+  int depth,
+  const uint8_t width_c,
+  const cu_info_t* cur_pu,
+  int8_t* scan_idx,
+  lcu_coeff_t* coeff,
+  uint8_t joint_chroma,
+  enum
+  kvz_tree_type tree_type)
+{
+  int x_local = ((x >> (tree_type != KVZ_CHROMA_T)) & ~3) % LCU_WIDTH_C;
+  int y_local = ((y >> (tree_type != KVZ_CHROMA_T)) & ~3) % LCU_WIDTH_C;
   cabac_data_t* const cabac = &state->cabac;
   *scan_idx = uvg_get_scan_order(cur_pu->type, cur_pu->intra.mode_chroma, depth);
   if(!joint_chroma){
@@ -618,7 +630,7 @@ static void encode_transform_unit(
   bool chroma_cbf_set = cbf_is_set(cur_pu->cbf, depth, COLOR_U) ||
                         cbf_is_set(cur_pu->cbf, depth, COLOR_V);
   if (chroma_cbf_set || joint_chroma) {
-    encode_chroma_tu(state, x, y, depth, width_c, cur_pu, &scan_idx, coeff, joint_chroma);
+    encode_chroma_tu(state, x, y, depth, width_c, cur_pu, &scan_idx, coeff, joint_chroma, tree_type);
   }
 }
 
@@ -1488,13 +1500,13 @@ void uvg_encode_coding_tree(
   uint16_t abs_x = x + (state->tile->offset_x >> (tree_type == KVZ_CHROMA_T));
   uint16_t abs_y = y + (state->tile->offset_y >> (tree_type == KVZ_CHROMA_T));
 
-  int32_t used_width = tree_type !=  KVZ_CHROMA_T ? ctrl->in.width : ctrl->in.width / 2;
-  int32_t used_height = tree_type != KVZ_CHROMA_T ? ctrl->in.height : ctrl->in.height / 2;
+  int32_t frame_width = tree_type !=  KVZ_CHROMA_T ? ctrl->in.width : ctrl->in.width / 2;
+  int32_t frame_height = tree_type != KVZ_CHROMA_T ? ctrl->in.height : ctrl->in.height / 2;
   // Check for slice border
-  bool border_x = used_width  < abs_x + cu_width;
-  bool border_y = used_height < abs_y + cu_width;
-  bool border_split_x = used_width  >= abs_x + (LCU_WIDTH >> MAX_DEPTH) + half_cu;
-  bool border_split_y = used_height >= abs_y + (LCU_WIDTH >> MAX_DEPTH) + half_cu;
+  bool border_x = frame_width  < abs_x + cu_width;
+  bool border_y = frame_height < abs_y + cu_width;
+  bool border_split_x = frame_width  >= abs_x + (LCU_WIDTH >> MAX_DEPTH) + half_cu;
+  bool border_split_y = frame_height >= abs_y + (LCU_WIDTH >> MAX_DEPTH) + half_cu;
   bool border = border_x || border_y; /*!< are we in any border CU */
 
   if (depth <= state->frame->max_qp_delta_depth) {

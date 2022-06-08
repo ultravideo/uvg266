@@ -520,6 +520,7 @@ static void predict_cclm(
   if (y0) {
     for (; available_above_right < width / 2; available_above_right++) {
       int x_extension = x_scu + width * 2 + 4 * available_above_right;
+      // TODO: Dual tree
       const cu_info_t* pu = LCU_GET_CU_AT_PX(lcu, x_extension, y_scu - 4);
       if (x_extension >= LCU_WIDTH || pu->type == CU_NOTSET) break;
     }
@@ -1524,9 +1525,10 @@ void uvg_intra_recon_cu(
   int depth,
   intra_search_data_t* search_data,
   cu_info_t *cur_cu,
-  lcu_t *lcu)
+  lcu_t *lcu,
+  enum kvz_tree_type tree_type)
 {
-  const vector2d_t lcu_px = { SUB_SCU(x), SUB_SCU(y) };
+  const vector2d_t lcu_px = { SUB_SCU(x) >> (tree_type == KVZ_CHROMA_T), SUB_SCU(y) >> (tree_type == KVZ_CHROMA_T) };
   const int8_t width = LCU_WIDTH >> depth;
   if (cur_cu == NULL) {
     cur_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
@@ -1555,16 +1557,16 @@ void uvg_intra_recon_cu(
     const int32_t x2 = x + offset;
     const int32_t y2 = y + offset;
 
-    uvg_intra_recon_cu(state, x,   y,   depth + 1, search_data, NULL, lcu);
-    uvg_intra_recon_cu(state, x2,  y,   depth + 1, search_data, NULL, lcu);
-    uvg_intra_recon_cu(state, x,   y2,  depth + 1, search_data, NULL, lcu);
-    uvg_intra_recon_cu(state, x2,  y2,  depth + 1, search_data, NULL, lcu);
+    uvg_intra_recon_cu(state, x,   y,   depth + 1, search_data, NULL, lcu, tree_type);
+    uvg_intra_recon_cu(state, x2,  y,   depth + 1, search_data, NULL, lcu, tree_type);
+    uvg_intra_recon_cu(state, x,   y2,  depth + 1, search_data, NULL, lcu, tree_type);
+    uvg_intra_recon_cu(state, x2,  y2,  depth + 1, search_data, NULL, lcu, tree_type);
 
     // Propagate coded block flags from child CUs to parent CU.
     uint16_t child_cbfs[3] = {
-      LCU_GET_CU_AT_PX(lcu, lcu_px.x + offset, lcu_px.y         )->cbf,
-      LCU_GET_CU_AT_PX(lcu, lcu_px.x,          lcu_px.y + offset)->cbf,
-      LCU_GET_CU_AT_PX(lcu, lcu_px.x + offset, lcu_px.y + offset)->cbf,
+      LCU_GET_CU_AT_PX(lcu, (lcu_px.x + offset) >> (tree_type == KVZ_CHROMA_T), lcu_px.y >> (tree_type == KVZ_CHROMA_T))->cbf,
+      LCU_GET_CU_AT_PX(lcu, lcu_px.x >> (tree_type == KVZ_CHROMA_T), (lcu_px.y + offset) >> (tree_type == KVZ_CHROMA_T))->cbf,
+      LCU_GET_CU_AT_PX(lcu, (lcu_px.x + offset) >> (tree_type == KVZ_CHROMA_T), (lcu_px.y + offset) >> (tree_type == KVZ_CHROMA_T))->cbf,
     };
 
     if (mode_luma != -1 && depth <= MAX_DEPTH) {
