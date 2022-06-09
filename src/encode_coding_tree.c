@@ -1515,7 +1515,7 @@ void uvg_encode_coding_tree(
   }
 
   // When not in MAX_DEPTH, insert split flag and split the blocks if needed
-  if (depth != MAX_DEPTH) {
+  if (depth != MAX_DEPTH && !(tree_type == KVZ_CHROMA_T && depth == MAX_DEPTH -1)) {
 
     const int split_flag = uvg_write_split_flag(state, cabac, left_cu, above_cu, GET_SPLITDATA(cur_cu, depth), depth, cu_width, x, y, tree_type,NULL);
     
@@ -1725,7 +1725,8 @@ void uvg_encode_coding_tree(
 
     // For 4x4 the chroma PU/TU is coded after the last 
     if (state->encoder_control->chroma_format != UVG_CSP_400 && 
-      ((depth == 4 && x % 8 && y % 8) || tree_type == KVZ_CHROMA_T)) {
+      ((depth == 4 && x % 8 && y % 8) || tree_type == KVZ_CHROMA_T) &&
+      tree_type != KVZ_LUMA_T)   {
       encode_chroma_intra_cu(cabac, cur_cu, state->encoder_control->cfg.cclm, NULL);
       // LFNST constraints must be reset here. Otherwise the left over values will interfere when calculating new constraints
       cu_info_t* tmp = uvg_cu_array_at(frame->cu_array, x, y);
