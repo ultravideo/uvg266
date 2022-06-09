@@ -668,7 +668,8 @@ static int search_intra_chroma_rough(
   uvg_intra_references *refs_v,
   intra_search_data_t* chroma_data,
   lcu_t* lcu,
-  int8_t luma_mode)
+  int8_t luma_mode,
+  enum kvz_tree_type tree_type)
 {
   assert(depth != 4 || (x_px & 4 && y_px & 4));
 
@@ -688,7 +689,7 @@ static int search_intra_chroma_rough(
   for (int i = 0; i < modes_count; ++i) {
     const int8_t mode_chroma = chroma_data[i].pred_cu.intra.mode_chroma;
     if (mode_chroma == luma_mode || mode_chroma == 0 || mode_chroma >= 81) continue;
-    uvg_intra_predict(state, refs_u, &loc, COLOR_U, pred, &chroma_data[i], lcu);
+    uvg_intra_predict(state, refs_u, &loc, COLOR_U, pred, &chroma_data[i], lcu, tree_type);
     //costs[i] += get_cost(encoder_state, pred, orig_block, satd_func, sad_func, width);
     switch (width) {
       case 4: chroma_data[i].cost += uvg_satd_4x4(pred, orig_block);
@@ -706,9 +707,8 @@ static int search_intra_chroma_rough(
   uvg_pixels_blit(orig_v, orig_block, width, width, origstride, width);
   for (int i = 0; i < modes_count; ++i) {
     const int8_t mode_chroma = chroma_data[i].pred_cu.intra.mode_chroma;
-    if (mode_chroma == luma_mode || mode_chroma == 0 || mode_chroma >= 81)
-      continue;
-    uvg_intra_predict(state, refs_v, &loc, COLOR_V, pred, &chroma_data[i], lcu);
+    if (mode_chroma == luma_mode || mode_chroma == 0 || mode_chroma >= 81) continue;
+    uvg_intra_predict(state, refs_v, &loc, COLOR_V, pred, &chroma_data[i], lcu, tree_type);
     //costs[i] += get_cost(encoder_state, pred, orig_block, satd_func, sad_func, width);
     switch (width) {
       case 4: chroma_data[i].cost += uvg_satd_4x4(pred, orig_block);
@@ -1056,9 +1056,9 @@ static int16_t search_intra_rough(
 
   int offset = 4;
   search_proxy.pred_cu.intra.mode = 0;
-  uvg_intra_predict(state, refs, &loc, COLOR_Y, preds[0], &search_proxy, NULL);
+  uvg_intra_predict(state, refs, &loc, COLOR_Y, preds[0], &search_proxy, NULL, KVZ_LUMA_T);
   search_proxy.pred_cu.intra.mode = 1;
-  uvg_intra_predict(state, refs, &loc, COLOR_Y, preds[1], &search_proxy, NULL);
+  uvg_intra_predict(state, refs, &loc, COLOR_Y, preds[1], &search_proxy, NULL, KVZ_LUMA_T);
   get_cost_dual(state, preds, orig_block, satd_dual_func, sad_dual_func, width, costs);
   mode_checked[0] = true;
   mode_checked[1] = true;
@@ -1108,7 +1108,7 @@ static int16_t search_intra_rough(
     for (int i = 0; i < PARALLEL_BLKS; ++i) {
       if (mode + i * offset <= 66) {
         search_proxy.pred_cu.intra.mode = mode + i*offset;
-        uvg_intra_predict(state, refs, &loc, COLOR_Y, preds[i], &search_proxy, NULL);
+        uvg_intra_predict(state, refs, &loc, COLOR_Y, preds[i], &search_proxy, NULL, KVZ_LUMA_T);
       }
     }
     
@@ -1180,7 +1180,7 @@ static int16_t search_intra_rough(
       
         for (int block = 0; block < PARALLEL_BLKS; ++block) {
           search_proxy.pred_cu.intra.mode = modes_to_check[block + i];
-          uvg_intra_predict(state, refs, &loc, COLOR_Y, preds[block], &search_proxy, NULL);
+          uvg_intra_predict(state, refs, &loc, COLOR_Y, preds[block], &search_proxy, NULL, KVZ_LUMA_T);
         
         }
 
@@ -1267,7 +1267,7 @@ static void get_rough_cost_for_2n_modes(
   double bits[PARALLEL_BLKS] = { 0 };
   for(int mode = 0; mode < num_modes; mode += PARALLEL_BLKS) {
     for (int i = 0; i < PARALLEL_BLKS; ++i) {
-      uvg_intra_predict(state, &refs[search_data[mode + i].pred_cu.intra.multi_ref_idx], cu_loc, COLOR_Y, preds[i], &search_data[mode + i], NULL);
+      uvg_intra_predict(state, &refs[search_data[mode + i].pred_cu.intra.multi_ref_idx], cu_loc, COLOR_Y, preds[i], &search_data[mode + i], NULL, KVZ_LUMA_T);
     }
     get_cost_dual(state, preds, orig_block, satd_dual_func, sad_dual_func, width, costs_out);
 
@@ -1490,7 +1490,8 @@ int8_t uvg_search_intra_chroma_rdo(
             COLOR_U,
             u_pred,
             &chroma_data[mode_i],
-            lcu);
+            lcu,
+            tree_type);
           uvg_intra_predict(
             state,
             &refs[COLOR_V - 1],
@@ -1498,7 +1499,8 @@ int8_t uvg_search_intra_chroma_rdo(
             COLOR_V,
             v_pred,
             &chroma_data[mode_i],
-            lcu);
+            lcu,
+            tree_type);
           uvg_generate_residual(
             &lcu->ref.u[offset],
             u_pred,
@@ -1657,7 +1659,8 @@ int8_t uvg_search_cu_intra_chroma(
                                           &refs_v,
                                           chroma_data,
                                           lcu,
-                                          intra_mode);
+                                          intra_mode,
+                                          tree_type);
   }
   
   if (num_modes > 1) {

@@ -133,8 +133,9 @@ void uvg_intra_predict(
   const color_t color,
   uvg_pixel* dst,
   const intra_search_data_t* data,
-  const lcu_t* lcu
-);
+  const lcu_t* lcu,
+  enum kvz_tree_type tree_type
+  );
 
 void uvg_intra_recon_cu(
   encoder_state_t* const state,
