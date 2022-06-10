@@ -1330,6 +1330,11 @@ static void get_mv_cand_from_candidates(const encoder_state_t * const state,
 
   candidates += b_candidates;
 
+  if (candidates > 0)
+    uvg_round_precision(INTERNAL_MV_PREC, 2, &mv_cand[0][0], &mv_cand[0][1]);
+  if (candidates > 1)
+    uvg_round_precision(INTERNAL_MV_PREC, 2, &mv_cand[1][0], &mv_cand[1][1]);
+
   // Remove identical candidate
   if (candidates == 2 && mv_cand[0][0] == mv_cand[1][0] && mv_cand[0][1] == mv_cand[1][1]) {
     candidates = 1;
