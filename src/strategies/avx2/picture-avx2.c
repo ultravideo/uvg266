@@ -1811,7 +1811,7 @@ int uvg_strategy_register_picture_avx2(void* opaque, uint8_t bitdepth)
 
     success &= uvg_strategyselector_register(opaque, "pixel_var", "avx2", 40, &pixel_var_avx2);
 
-    success &= kvz_strategyselector_register(opaque, "generate_residual", "avx2", 0, &generate_residual_avx2);
+    success &= uvg_strategyselector_register(opaque, "generate_residual", "avx2", 0, &generate_residual_avx2);
 
   }
 #endif // UVG_BIT_DEPTH == 8

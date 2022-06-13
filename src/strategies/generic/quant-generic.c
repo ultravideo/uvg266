@@ -219,8 +219,8 @@ int uvg_quant_cbcr_residual_generic(
       }
     }
   }
-  kvz_generate_residual(u_ref_in, u_pred_in, u_residual, width, in_stride, in_stride);
-  kvz_generate_residual(v_ref_in, v_pred_in, v_residual, width, in_stride, in_stride);
+  uvg_generate_residual(u_ref_in, u_pred_in, u_residual, width, in_stride, in_stride);
+  uvg_generate_residual(v_ref_in, v_pred_in, v_residual, width, in_stride, in_stride);
   
   
   const int cbf_mask = cur_cu->joint_cb_cr * (state->frame->jccr_sign ? -1 : 1);
@@ -409,7 +409,7 @@ int uvg_quantize_residual_generic(encoder_state_t *const state,
   const int height = width; // TODO: height for non-square blocks
 
   // Get residual. (ref_in - pred_in -> residual)
-  kvz_generate_residual(ref_in, pred_in, residual, width, in_stride, in_stride);
+  uvg_generate_residual(ref_in, pred_in, residual, width, in_stride, in_stride);
 
   if (state->tile->frame->lmcs_aps->m_sliceReshapeInfo.enableChromaAdj && color != COLOR_Y) {
     int y, x;

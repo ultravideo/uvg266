@@ -579,8 +579,8 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
       if(chroma_can_use_tr_skip && cb_flag_v) {
         CABAC_FBITS_UPDATE(cabac, &cabac->ctx.transform_skip_model_chroma, tr_cu->tr_skip & 4, tr_tree_bits, "transform_skip_flag");        
       }
-      coeff_bits += kvz_get_coeff_cost(state, &lcu->coeff.u[index], NULL, chroma_width, COLOR_U, scan_order, tr_cu->tr_skip & 2);
-      coeff_bits += kvz_get_coeff_cost(state, &lcu->coeff.v[index], NULL, chroma_width, COLOR_V, scan_order, tr_cu->tr_skip & 4);
+      coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.u[index], NULL, chroma_width, COLOR_U, scan_order, tr_cu->tr_skip & 2);
+      coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.v[index], NULL, chroma_width, COLOR_V, scan_order, tr_cu->tr_skip & 4);
       
     }
     else {
@@ -600,7 +600,7 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
       coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.joint_uv[index], NULL, chroma_width, COLOR_U, scan_order, 0);
     }
   }
-  if (kvz_is_mts_allowed(state, tr_cu)) {
+  if (uvg_is_mts_allowed(state, tr_cu)) {
 
     bool symbol = tr_cu->tr_idx != 0;
     int ctx_idx = 0;
@@ -872,7 +872,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         intra_search.pred_cu.joint_cb_cr = 0;
 
         // TODO: This heavily relies to square CUs
-        if ((depth != 4 || (x % 8 && y % 8)) && state->encoder_control->chroma_format != KVZ_CSP_400) {
+        if ((depth != 4 || (x % 8 && y % 8)) && state->encoder_control->chroma_format != UVG_CSP_400) {
           // There is almost no benefit to doing the chroma mode search for
           // rd2. Possibly because the luma mode search already takes chroma
           // into account, so there is less of a chanse of luma mode being
@@ -908,7 +908,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     if (cur_cu->type == CU_INTRA) {
       assert(cur_cu->part_size == SIZE_2Nx2N || cur_cu->part_size == SIZE_NxN);
 
-      if ((depth == 4 && (x % 8 == 0 || y % 8 == 0)) || state->encoder_control->chroma_format == KVZ_CSP_400) {
+      if ((depth == 4 && (x % 8 == 0 || y % 8 == 0)) || state->encoder_control->chroma_format == UVG_CSP_400) {
         intra_search.pred_cu.intra.mode_chroma = -1; 
       }
       lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
@@ -1045,7 +1045,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
 
     if (depth < MAX_DEPTH) {
       // Add cost of cu_split_flag.
-      kvz_write_split_flag(state, &state->search_cabac,
+      uvg_write_split_flag(state, &state->search_cabac,
         x > 0 ? LCU_GET_CU_AT_PX(lcu, SUB_SCU(x) - 1, SUB_SCU(y)) : NULL,
         y > 0 ? LCU_GET_CU_AT_PX(lcu, SUB_SCU(x), SUB_SCU(y) - 1) : NULL,
         1, depth, cu_width, x, y, &split_bits);

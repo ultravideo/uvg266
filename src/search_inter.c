@@ -2149,10 +2149,10 @@ void uvg_cu_cost_inter_rd2(encoder_state_t * const state,
       cur_cu,
       lcu,
       false);
-    ALIGNED(64) kvz_pixel u_pred[LCU_WIDTH_C * LCU_WIDTH_C];
-    ALIGNED(64) kvz_pixel v_pred[LCU_WIDTH_C * LCU_WIDTH_C];
-    kvz_pixels_blit(&lcu->ref.u[index], u_pred, width, width, LCU_WIDTH_C, width);
-    kvz_pixels_blit(&lcu->ref.v[index], v_pred, width, width, LCU_WIDTH_C, width);
+    ALIGNED(64) uvg_pixel u_pred[LCU_WIDTH_C * LCU_WIDTH_C];
+    ALIGNED(64) uvg_pixel v_pred[LCU_WIDTH_C * LCU_WIDTH_C];
+    uvg_pixels_blit(&lcu->ref.u[index], u_pred, width, width, LCU_WIDTH_C, width);
+    uvg_pixels_blit(&lcu->ref.v[index], v_pred, width, width, LCU_WIDTH_C, width);
     ALIGNED(64) int16_t u_resi[LCU_WIDTH_C * LCU_WIDTH_C];
     ALIGNED(64) int16_t v_resi[LCU_WIDTH_C * LCU_WIDTH_C];
 
@@ -2171,8 +2171,8 @@ void uvg_cu_cost_inter_rd2(encoder_state_t * const state,
       LCU_WIDTH_C,
       width);
 
-    kvz_chorma_ts_out_t chorma_ts_out;
-    kvz_chroma_transform_search(
+    uvg_chorma_ts_out_t chorma_ts_out;
+    uvg_chroma_transform_search(
       state,
       depth,
       lcu,

@@ -623,7 +623,7 @@ int uvg_quantize_residual_avx2(encoder_state_t *const state,
   assert(width >= TR_MIN_WIDTH);
 
   // Get residual. (ref_in - pred_in -> residual)
-  kvz_generate_residual(ref_in, pred_in, residual, width, in_stride, in_stride);
+  uvg_generate_residual(ref_in, pred_in, residual, width, in_stride, in_stride);
 
   if (state->tile->frame->lmcs_aps->m_sliceReshapeInfo.enableChromaAdj && color != COLOR_Y) {
     int y, x;
