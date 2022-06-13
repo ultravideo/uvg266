@@ -396,148 +396,216 @@ static double search_intra_trdepth(
       {
         pred_cu->mts_last_scan_pos = 0;
         pred_cu->violates_mts_coeff_constraint = 0;
+      }
 
-        const int max_tb_size = TR_MAX_WIDTH;
-        // LFNST search params
-        const int max_lfnst_idx = width > max_tb_size || height > max_tb_size ? 0 : 2;
+      const int max_tb_size = TR_MAX_WIDTH;
+      // LFNST search params
+      const int max_lfnst_idx = width > max_tb_size || height > max_tb_size ?
+                                  0 :
+                                  2;
 
-        int start_idx = 0;
-        int end_idx = state->encoder_control->cfg.lfnst && depth == pred_cu->tr_depth ? max_lfnst_idx : 0;
+      int start_idx = 0;
+      int end_idx = state->encoder_control->cfg.lfnst && depth == pred_cu->
+                    tr_depth ?
+                      max_lfnst_idx :
+                      0;
 
-        for (int lfnst_idx = start_idx; lfnst_idx <= end_idx; lfnst_idx++) {
-          // Initialize lfnst variables
-          pred_cu->lfnst_idx = lfnst_idx;
-          pred_cu->violates_lfnst_constrained[0] = false;
-          pred_cu->violates_lfnst_constrained[1] = false;
-          pred_cu->lfnst_last_scan_pos = false;
+      for (int lfnst_idx = start_idx; lfnst_idx <= end_idx; lfnst_idx++) {
+        // Initialize lfnst variables
+        pred_cu->lfnst_idx = lfnst_idx;
+        pred_cu->violates_lfnst_constrained[0] = false;
+        pred_cu->violates_lfnst_constrained[1] = false;
+        pred_cu->lfnst_last_scan_pos = false;
 
-          for (trafo = mts_start; trafo < num_transforms; trafo++) {
-            pred_cu->tr_idx = trafo;
-            if (mts_enabled) {
-              pred_cu->mts_last_scan_pos = 0;
-              pred_cu->violates_mts_coeff_constraint = 0;
+        for (trafo = mts_start; trafo < num_transforms; trafo++) {
+          pred_cu->tr_idx = trafo;
+          if (mts_enabled) {
+            pred_cu->mts_last_scan_pos = 0;
+            pred_cu->violates_mts_coeff_constraint = 0;
 
-              if (trafo == MTS_SKIP && width > (1 << state->encoder_control->cfg.trskip_max_size)) {
-                //TODO: parametrize that this is not hardcoded
-                // TODO: this probably should currently trip for chroma?
-                continue;
-              }
-            }
-            // MTS and LFNST cannot be on at the same time
-            if (pred_cu->lfnst_idx > 0 && pred_cu->tr_idx > 0) {
+            if (trafo == MTS_SKIP && width > (
+                  1 << state->encoder_control->cfg.trskip_max_size)) {
+              //TODO: parametrize that this is not hardcoded
+              // TODO: this probably should currently trip for chroma?
               continue;
             }
-            uvg_intra_recon_cu(state,
-              x_px, y_px,
-              depth, search_data,
-              pred_cu,
-              lcu);
-            if (trafo != 0 && !cbf_is_set(pred_cu->cbf, depth, COLOR_Y)) continue;
+          }
+          // MTS and LFNST cannot be on at the same time
+          if (pred_cu->lfnst_idx > 0 && pred_cu->tr_idx > 0) {
+            continue;
+          }
+          uvg_intra_recon_cu(
+            state,
+            x_px,
+            y_px,
+            depth,
+            search_data,
+            pred_cu,
+            lcu);
+          if (trafo != 0 && !cbf_is_set(pred_cu->cbf, depth, COLOR_Y)) continue;
 
-            // TODO: Not sure if this should be 0 or 1 but at least seems to work with 1
-            derive_mts_constraints(pred_cu, lcu, depth, lcu_px);
-            if (pred_cu->tr_idx > 1)
-            {
-              if (pred_cu->violates_mts_coeff_constraint || !pred_cu->mts_last_scan_pos)
-              {
-                continue;
-              }
-            }
-
-            if (pred_cu->lfnst_idx > 0) {
-              // Temp constraints. Updating the actual pred_cu constraints here will break things later
-              bool constraints[2] = { pred_cu->violates_lfnst_constrained[0],
-                                     pred_cu->lfnst_last_scan_pos };
-              derive_lfnst_constraints(pred_cu, lcu, depth, COLOR_Y, lcu_px, constraints);
-              if (constraints[0] || !constraints[1]) {
-                continue;
-              }
-            }
-            double rd_cost = uvg_cu_rd_cost_luma(state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
-            double mts_bits = 0;
-            if (num_transforms > 1 && trafo != MTS_SKIP && width <= 32 /*&& height <= 32*/
-              && !pred_cu->violates_mts_coeff_constraint && pred_cu->mts_last_scan_pos) {
-
-              bool symbol = trafo != 0;
-              int ctx_idx = 0;
-              mts_bits += CTX_ENTROPY_FBITS(&state->search_cabac.ctx.mts_idx_model[ctx_idx], symbol);
-
-              ctx_idx++;
-              for (int i = 0; i < 3 && symbol; i++, ctx_idx++)
-              {
-                symbol = trafo > i + MTS_DST7_DST7 ? 1 : 0;
-                mts_bits += CTX_ENTROPY_FBITS(&state->search_cabac.ctx.mts_idx_model[ctx_idx], symbol);
-              }
-
-            }
-            rd_cost += mts_bits * state->frame->lambda;
-
-            // TODO: there is an error in this cost calculation. This will be fixed when merged into current master
-            // This is compared to the previous best, which may have chroma cost included
-            if (rd_cost < best_rd_cost) {
-              best_rd_cost = rd_cost;
-              best_lfnst_idx = pred_cu->lfnst_idx;
-              best_tr_idx = pred_cu->tr_idx;
-              if (best_tr_idx == MTS_SKIP) break; // Very unlikely that further search is necessary if skip seems best option
-            }
-          } // end mts index loop (tr_idx)
-          if (reconstruct_chroma) {
-            int8_t luma_mode = pred_cu->intra.mode;
-            pred_cu->intra.mode = -1;
-            pred_cu->intra.mode_chroma = chroma_mode;
-            pred_cu->joint_cb_cr = 4; // TODO: Maybe check the jccr mode here also but holy shit is the interface of search_intra_rdo bad currently
-            uvg_intra_recon_cu(state,
-              x_px, y_px,
-              depth, search_data,
-              pred_cu,
-              lcu);
-            best_rd_cost += uvg_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
-            pred_cu->intra.mode = luma_mode;
-
-            // Check lfnst constraints for chroma
-            if (pred_cu->lfnst_idx > 0) {
-              // Temp constraints. Updating the actual pred_cu constraints here will break things later
-              bool constraints[2] = { pred_cu->violates_lfnst_constrained[1],
-                                     pred_cu->lfnst_last_scan_pos };
-              derive_lfnst_constraints(pred_cu, lcu, depth, COLOR_U, lcu_px, constraints);
-              if (constraints[0] || !constraints[1]) {
-                best_lfnst_idx = 0;
-                continue;
-              }
-              derive_lfnst_constraints(pred_cu, lcu, depth, COLOR_V, lcu_px, constraints);
-              if (constraints[0] || !constraints[1]) {
-                best_lfnst_idx = 0;
-                continue;
-              }
+          // TODO: Not sure if this should be 0 or 1 but at least seems to work with 1
+          derive_mts_constraints(pred_cu, lcu, depth, lcu_px);
+          if (pred_cu->tr_idx > 1) {
+            if (pred_cu->violates_mts_coeff_constraint || !pred_cu->
+                mts_last_scan_pos) {
+              continue;
             }
           }
-          if (best_tr_idx == MTS_SKIP) break; // Very unlikely that further search is necessary if skip seems best option
-        } // end lfnst_index loop
 
-        pred_cu->tr_skip = best_tr_idx == MTS_SKIP;
-        pred_cu->tr_idx = best_tr_idx;
-        pred_cu->lfnst_idx = best_lfnst_idx;
-        nosplit_cost += best_rd_cost;
+          if (pred_cu->lfnst_idx > 0) {
+            // Temp constraints. Updating the actual pred_cu constraints here will break things later
+            bool constraints[2] = {pred_cu->violates_lfnst_constrained[0],
+                                   pred_cu->lfnst_last_scan_pos};
+            derive_lfnst_constraints(
+              pred_cu,
+              lcu,
+              depth,
+              COLOR_Y,
+              lcu_px,
+              constraints);
+            if (constraints[0] || !constraints[1]) {
+              continue;
+            }
+          }
+          double rd_cost = uvg_cu_rd_cost_luma(
+            state,
+            lcu_px.x,
+            lcu_px.y,
+            depth,
+            pred_cu,
+            lcu);
+          double mts_bits = 0;
+          if (num_transforms > 1 && trafo != MTS_SKIP && width <= 32
+              /*&& height <= 32*/
+              && !pred_cu->violates_mts_coeff_constraint && pred_cu->
+              mts_last_scan_pos) {
 
-        // Early stop condition for the recursive search.
-        // If the cost of any 1/4th of the transform is already larger than the
-        // whole transform, assume that splitting further is a bad idea.
-        if (nosplit_cost >= cost_treshold) {
-          return nosplit_cost;
-          if (trafo == 0 && !cbf_is_set(pred_cu->cbf, depth, COLOR_Y)) {
-            break;
+            bool symbol = trafo != 0;
+            int ctx_idx = 0;
+            mts_bits += CTX_ENTROPY_FBITS(
+              &state->search_cabac.ctx.mts_idx_model[ctx_idx],
+              symbol);
+
+            ctx_idx++;
+            for (int i = 0; i < 3 && symbol; i++, ctx_idx++) {
+              symbol = trafo > i + MTS_DST7_DST7 ? 1 : 0;
+              mts_bits += CTX_ENTROPY_FBITS(
+                &state->search_cabac.ctx.mts_idx_model[ctx_idx],
+                symbol);
+            }
+
+          }
+          rd_cost += mts_bits * state->frame->lambda;
+
+          // TODO: there is an error in this cost calculation. This will be fixed when merged into current master
+          // This is compared to the previous best, which may have chroma cost included
+          if (rd_cost < best_rd_cost) {
+            best_rd_cost = rd_cost;
+            best_lfnst_idx = pred_cu->lfnst_idx;
+            best_tr_idx = pred_cu->tr_idx;
+            if (best_tr_idx == MTS_SKIP) break;
+            // Very unlikely that further search is necessary if skip seems best option
+          }
+        } // end mts index loop (tr_idx)
+        if (reconstruct_chroma) {
+          int8_t luma_mode = pred_cu->intra.mode;
+          pred_cu->intra.mode = -1;
+          pred_cu->intra.mode_chroma = chroma_mode;
+          pred_cu->joint_cb_cr = 4;
+          // TODO: Maybe check the jccr mode here also but holy shit is the interface of search_intra_rdo bad currently
+          uvg_intra_recon_cu(
+            state,
+            x_px,
+            y_px,
+            depth,
+            search_data,
+            pred_cu,
+            lcu);
+          best_rd_cost += uvg_cu_rd_cost_chroma(
+            state,
+            lcu_px.x,
+            lcu_px.y,
+            depth,
+            pred_cu,
+            lcu);
+          pred_cu->intra.mode = luma_mode;
+
+          // Check lfnst constraints for chroma
+          if (pred_cu->lfnst_idx > 0) {
+            // Temp constraints. Updating the actual pred_cu constraints here will break things later
+            bool constraints[2] = {pred_cu->violates_lfnst_constrained[1],
+                                   pred_cu->lfnst_last_scan_pos};
+            derive_lfnst_constraints(
+              pred_cu,
+              lcu,
+              depth,
+              COLOR_U,
+              lcu_px,
+              constraints);
+            if (constraints[0] || !constraints[1]) {
+              best_lfnst_idx = 0;
+              continue;
+            }
+            derive_lfnst_constraints(
+              pred_cu,
+              lcu,
+              depth,
+              COLOR_V,
+              lcu_px,
+              constraints);
+            if (constraints[0] || !constraints[1]) {
+              best_lfnst_idx = 0;
+              continue;
+            }
           }
         }
+        if (best_tr_idx == MTS_SKIP) break;
+        // Very unlikely that further search is necessary if skip seems best option
+      } // end lfnst_index loop
 
-        nosplit_cbf = pred_cu->cbf;
+      pred_cu->tr_skip = best_tr_idx == MTS_SKIP;
+      pred_cu->tr_idx = best_tr_idx;
+      pred_cu->lfnst_idx = best_lfnst_idx;
+      nosplit_cost += best_rd_cost;
 
-        uvg_pixels_blit(lcu->rec.y, nosplit_pixels.y, width, width, LCU_WIDTH, width);
-        if (reconstruct_chroma) {
-          uvg_pixels_blit(lcu->rec.u, nosplit_pixels.u, width_c, width_c, LCU_WIDTH_C, width_c);
-          uvg_pixels_blit(lcu->rec.v, nosplit_pixels.v, width_c, width_c, LCU_WIDTH_C, width_c);
+      // Early stop condition for the recursive search.
+      // If the cost of any 1/4th of the transform is already larger than the
+      // whole transform, assume that splitting further is a bad idea.
+      if (nosplit_cost >= cost_treshold) {
+        return nosplit_cost;
+        if (trafo == 0 && !cbf_is_set(pred_cu->cbf, depth, COLOR_Y)) {
+          break;
         }
       }
+
+      nosplit_cbf = pred_cu->cbf;
+
+      uvg_pixels_blit(
+        lcu->rec.y,
+        nosplit_pixels.y,
+        width,
+        width,
+        LCU_WIDTH,
+        width);
+      if (reconstruct_chroma) {
+        uvg_pixels_blit(
+          lcu->rec.u,
+          nosplit_pixels.u,
+          width_c,
+          width_c,
+          LCU_WIDTH_C,
+          width_c);
+        uvg_pixels_blit(
+          lcu->rec.v,
+          nosplit_pixels.v,
+          width_c,
+          width_c,
+          LCU_WIDTH_C,
+          width_c);
+      }
     }
+    
   }
   // Recurse further if all of the following:
   // - Current depth is less than maximum depth of the search (max_depth).

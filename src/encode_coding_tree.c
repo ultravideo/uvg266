@@ -516,7 +516,7 @@ static void encode_chroma_tu(encoder_state_t* const state, int x, int y, int dep
         // TODO: transform skip for chroma blocks
         CABAC_BIN(cabac, (cur_pu->tr_skip >> COLOR_U) & 1, "transform_skip_flag");
       }
-      uvg_encode_coeff_nxn(state, &state->cabac, coeff_u, width_c, COLOR_U, *scan_idx, NULL, cur_pu);
+      uvg_encode_coeff_nxn(state, &state->cabac, coeff_u, width_c, COLOR_U, *scan_idx, cur_pu, NULL);
     }
 
     if (cbf_is_set(cur_pu->cbf, depth, COLOR_V)) {
@@ -524,7 +524,7 @@ static void encode_chroma_tu(encoder_state_t* const state, int x, int y, int dep
         cabac->cur_ctx = &cabac->ctx.transform_skip_model_chroma;
         CABAC_BIN(cabac, (cur_pu->tr_skip >> COLOR_V) & 1, "transform_skip_flag");
       }
-      uvg_encode_coeff_nxn(state, &state->cabac, coeff_v, width_c, COLOR_V, *scan_idx, NULL, cur_pu);
+      uvg_encode_coeff_nxn(state, &state->cabac, coeff_v, width_c, COLOR_V, *scan_idx, cur_pu, NULL);
     }
   }
   else {
@@ -533,7 +533,7 @@ static void encode_chroma_tu(encoder_state_t* const state, int x, int y, int dep
       cabac->cur_ctx = &cabac->ctx.transform_skip_model_chroma;
       CABAC_BIN(cabac, 0, "transform_skip_flag");
     }
-    uvg_encode_coeff_nxn(state, &state->cabac, coeff_uv, width_c, COLOR_V, *scan_idx, NULL, cur_pu);
+    uvg_encode_coeff_nxn(state, &state->cabac, coeff_uv, width_c, COLOR_V, *scan_idx, cur_pu, NULL);
     
   }
 }
