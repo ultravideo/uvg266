@@ -259,11 +259,11 @@ static void derive_lfnst_constraints(cu_info_t* const pred_cu,
   const int lcu_x = (lcu_px.x >> shift) & ~3;
   const int lcu_y = (lcu_px.y >> shift) & ~3;
 
-  int8_t scan_idx = kvz_get_scan_order(pred_cu->type, pred_cu->intra.mode, depth);
+  int8_t scan_idx = uvg_get_scan_order(pred_cu->type, pred_cu->intra.mode, depth);
   // ToDo: large block support in VVC?
 
-  const uint32_t log2_block_size = kvz_g_convert_to_bit[width] + 2;
-  const uint32_t* scan = kvz_g_sig_last_scan[scan_idx][log2_block_size - 1];
+  const uint32_t log2_block_size = uvg_g_convert_to_bit[width] + 2;
+  const uint32_t* scan = uvg_g_sig_last_scan[scan_idx][log2_block_size - 1];
   const coeff_t* coeff;
   switch (color) {
     case COLOR_Y:
@@ -462,7 +462,7 @@ static double search_intra_trdepth(
           depth, search_data,
           pred_cu,
           lcu);
-        best_rd_cost += kvz_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
+        best_rd_cost += uvg_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
         pred_cu->intra.mode = luma_mode;
 
         // Check lfnst constraints for chroma

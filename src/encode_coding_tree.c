@@ -130,11 +130,11 @@ static int get_isp_split_dim(const int width, const int height, const int isp_sp
     non_split_dim_size = height;
   }
   
-  const int min_num_samples_cu = 1 << ((kvz_math_floor_log2(MIN_TB_SIZE_Y) << 1));
-  const int factor_to_min_samples = non_split_dim_size < min_num_samples_cu ? min_num_samples_cu >> kvz_math_floor_log2(non_split_dim_size) : 1;
+  const int min_num_samples_cu = 1 << ((uvg_math_floor_log2(MIN_TB_SIZE_Y) << 1));
+  const int factor_to_min_samples = non_split_dim_size < min_num_samples_cu ? min_num_samples_cu >> uvg_math_floor_log2(non_split_dim_size) : 1;
   partition_size = (split_dim_size >> div_shift) < factor_to_min_samples ? factor_to_min_samples : (split_dim_size >> div_shift);
 
-  assert(!(kvz_math_floor_log2(partition_size) + kvz_math_floor_log2(non_split_dim_size) < kvz_math_floor_log2(min_num_samples_cu)) && "Partition has less than minimum amount of samples.");
+  assert(!(uvg_math_floor_log2(partition_size) + uvg_math_floor_log2(non_split_dim_size) < uvg_math_floor_log2(min_num_samples_cu)) && "Partition has less than minimum amount of samples.");
   return partition_size;
 }
 
@@ -217,7 +217,7 @@ static bool encode_lfnst_idx(encoder_state_t * const state, cabac_data_t * const
         // TODO: this works only for square blocks
         const int pu_x = x + ((i % tu_row_length) * tu_width);
         const int pu_y = y + ((i / tu_row_length) * tu_height);
-        const cu_info_t* cur_tu = kvz_cu_array_at_const(frame->cu_array, pu_x, pu_y);
+        const cu_info_t* cur_tu = uvg_cu_array_at_const(frame->cu_array, pu_x, pu_y);
         assert(cur_tu != NULL && "NULL transform unit.");
         bool cbf_set = cbf_is_set(cur_tu->cbf, tr_depth, COLOR_Y);
 
@@ -1207,7 +1207,7 @@ void uvg_encode_intra_luma_coding_unit(const encoder_state_t * const state,
       }
     }
 
-    kvz_cabac_encode_trunc_bin(cabac, tmp_pred, 67 - INTRA_MPM_COUNT, bits_out);
+    uvg_cabac_encode_trunc_bin(cabac, tmp_pred, 67 - INTRA_MPM_COUNT, bits_out);
   }
   if (cabac->only_count && bits_out) *bits_out += bits;
 }
@@ -1658,7 +1658,7 @@ void uvg_encode_coding_tree(encoder_state_t * const state,
     if (state->encoder_control->chroma_format != UVG_CSP_400 && depth == 4 && x % 8 && y % 8) {
       encode_chroma_intra_cu(cabac, cur_cu, state->encoder_control->cfg.cclm);
       // LFNST constraints must be reset here. Otherwise the left over values will interfere when calculating new constraints
-      cu_info_t* tmp = kvz_cu_array_at(frame->cu_array, x, y);
+      cu_info_t* tmp = uvg_cu_array_at(frame->cu_array, x, y);
       tmp->violates_lfnst_constrained[0] = false;
       tmp->violates_lfnst_constrained[1] = false;
       tmp->lfnst_last_scan_pos = false;

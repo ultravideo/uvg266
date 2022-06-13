@@ -232,9 +232,9 @@ void uvg_itransform2d(const encoder_control_t * const encoder,
   }
 }
 
-void kvz_fwd_lfnst_NxN(coeff_t *src, coeff_t *dst, const int8_t mode, const int8_t index, const int8_t size, int zero_out_size)
+void uvg_fwd_lfnst_NxN(coeff_t *src, coeff_t *dst, const int8_t mode, const int8_t index, const int8_t size, int zero_out_size)
 {
-  const int8_t *tr_mat = (size > 4) ? kvz_lfnst_8x8[mode][index][0] : kvz_lfnst_4x4[mode][index][0];
+  const int8_t *tr_mat = (size > 4) ? uvg_lfnst_8x8[mode][index][0] : uvg_lfnst_4x4[mode][index][0];
   const int     tr_size = (size > 4) ? 48 : 16;
   int coef;
   coeff_t *out = dst;
@@ -277,7 +277,7 @@ static inline bool get_transpose_flag(const int8_t intra_mode)
          ((intra_mode < NUM_LUMA_MODE) && (intra_mode > DIA_IDX));
 }
 
-void kvz_fwd_lfnst(const cu_info_t* const cur_cu,
+void uvg_fwd_lfnst(const cu_info_t* const cur_cu,
   const int width, const int height,
   const uint8_t color,
   const uint16_t lfnst_idx,
@@ -295,14 +295,14 @@ void kvz_fwd_lfnst(const cu_info_t* const cur_cu,
 
   const int cu_type = cur_cu->type;
 
-  const int scan_order = kvz_get_scan_order(cu_type, intra_mode, depth);
+  const int scan_order = uvg_get_scan_order(cu_type, intra_mode, depth);
 
   if (lfnst_index && !mts_skip && (is_separate_tree || color == COLOR_Y))
   {
-    const uint32_t log2_block_size = kvz_g_convert_to_bit[width] + 2;
+    const uint32_t log2_block_size = uvg_g_convert_to_bit[width] + 2;
     assert(log2_block_size != -1 && "LFNST: invalid block width.");
     const bool whge3 = width >= 8 && height >= 8;
-    const uint32_t* scan = whge3 ? kvz_coef_top_left_diag_scan_8x8[log2_block_size] : kvz_g_sig_last_scan[scan_order][log2_block_size - 1];
+    const uint32_t* scan = whge3 ? uvg_coef_top_left_diag_scan_8x8[log2_block_size] : uvg_g_sig_last_scan[scan_order][log2_block_size - 1];
 
     if (is_cclm_mode) {
       intra_mode = cur_cu->intra.mode;
@@ -367,7 +367,7 @@ void kvz_fwd_lfnst(const cu_info_t* const cur_cu,
       }
     }
 
-    kvz_fwd_lfnst_NxN(tmp_in_matrix, tmp_out_matrix, kvz_lfnst_lut[intra_mode], lfnst_index - 1, sb_size,
+    uvg_fwd_lfnst_NxN(tmp_in_matrix, tmp_out_matrix, uvg_lfnst_lut[intra_mode], lfnst_index - 1, sb_size,
       (tu_4x4 || tu_8x8) ? 8 : 16);
 
     lfnst_tmp = tmp_out_matrix;   // forward spectral rearrangement
@@ -383,11 +383,11 @@ void kvz_fwd_lfnst(const cu_info_t* const cur_cu,
   }
 }
 
-void kvz_inv_lfnst_NxN(coeff_t *src, coeff_t *dst, const uint32_t mode, const uint32_t index, const uint32_t size, int zero_out_size, const int max_log2_tr_dyn_range)
+void uvg_inv_lfnst_NxN(coeff_t *src, coeff_t *dst, const uint32_t mode, const uint32_t index, const uint32_t size, int zero_out_size, const int max_log2_tr_dyn_range)
 {
   const coeff_t output_min = -(1 << max_log2_tr_dyn_range);
   const coeff_t output_max = (1 << max_log2_tr_dyn_range) - 1;
-  const int8_t *tr_mat = (size > 4) ? kvz_lfnst_8x8[mode][index][0] : kvz_lfnst_4x4[mode][index][0];
+  const int8_t *tr_mat = (size > 4) ? uvg_lfnst_8x8[mode][index][0] : uvg_lfnst_4x4[mode][index][0];
   const int tr_size = (size > 4) ? 48 : 16;
   int resi;
   coeff_t *out = dst;
@@ -408,7 +408,7 @@ void kvz_inv_lfnst_NxN(coeff_t *src, coeff_t *dst, const uint32_t mode, const ui
   }
 }
 
-void kvz_inv_lfnst(const cu_info_t *cur_cu, 
+void uvg_inv_lfnst(const cu_info_t *cur_cu, 
                    const int width, const int height,
                    const uint8_t color,
                    const uint16_t lfnst_idx,
@@ -429,12 +429,12 @@ void kvz_inv_lfnst(const cu_info_t *cur_cu,
 
   const int cu_type = cur_cu->type;
 
-  const int scan_order = kvz_get_scan_order(cu_type, intra_mode, depth);
+  const int scan_order = uvg_get_scan_order(cu_type, intra_mode, depth);
   
   if (lfnst_index && !mts_skip && (is_separate_tree || color == COLOR_Y)) {
-    const uint32_t log2_block_size = kvz_g_convert_to_bit[width] + 2;
+    const uint32_t log2_block_size = uvg_g_convert_to_bit[width] + 2;
     const bool whge3 = width >= 8 && height >= 8;
-    const uint32_t* scan = whge3 ? kvz_coef_top_left_diag_scan_8x8[log2_block_size] : kvz_g_sig_last_scan[scan_order][log2_block_size - 1];
+    const uint32_t* scan = whge3 ? uvg_coef_top_left_diag_scan_8x8[log2_block_size] : uvg_g_sig_last_scan[scan_order][log2_block_size - 1];
     
     if (is_cclm_mode) {
       intra_mode = cur_cu->intra.mode;
@@ -469,7 +469,7 @@ void kvz_inv_lfnst(const cu_info_t *cur_cu,
       scan_ptr++;
     }
 
-    kvz_inv_lfnst_NxN(tmp_in_matrix, tmp_out_matrix, kvz_lfnst_lut[intra_mode], lfnst_index - 1, sb_size,
+    uvg_inv_lfnst_NxN(tmp_in_matrix, tmp_out_matrix, uvg_lfnst_lut[intra_mode], lfnst_index - 1, sb_size,
       (tu_4x4_flag || tu_8x8_flag) ? 8 : 16, max_log2_dyn_range);
     lfnst_tmp = tmp_out_matrix;   // inverse low frequency non-separale transform
 
