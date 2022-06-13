@@ -600,6 +600,23 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
       coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.joint_uv[index], NULL, chroma_width, COLOR_U, scan_order, 0);
     }
   }
+  if (uvg_is_lfnst_allowed(state, tr_cu, COLOR_Y, width, width, x_px, y_px)) {
+    const int lfnst_idx = tr_cu->lfnst_idx;
+    CABAC_FBITS_UPDATE(
+      cabac,
+      &cabac->ctx.lfnst_idx_model[tr_cu->depth == 4],
+      lfnst_idx != 0,
+      tr_tree_bits,
+      "lfnst_idx");
+    if (lfnst_idx > 0) {
+      CABAC_FBITS_UPDATE(
+        cabac,
+        &cabac->ctx.lfnst_idx_model[2],
+        lfnst_idx == 2,
+        tr_tree_bits,
+        "lfnst_idx");
+    }
+  }
   if (uvg_is_mts_allowed(state, tr_cu)) {
 
     bool symbol = tr_cu->tr_idx != 0;

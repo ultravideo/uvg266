@@ -453,17 +453,18 @@ static double search_intra_trdepth(
             }
           }
 
+          bool constraints[2] = { pred_cu->violates_lfnst_constrained[0],
+                       pred_cu->lfnst_last_scan_pos };
+          derive_lfnst_constraints(
+            pred_cu,
+            lcu,
+            depth,
+            COLOR_Y,
+            lcu_px,
+            constraints);
           if (pred_cu->lfnst_idx > 0) {
             // Temp constraints. Updating the actual pred_cu constraints here will break things later
-            bool constraints[2] = {pred_cu->violates_lfnst_constrained[0],
-                                   pred_cu->lfnst_last_scan_pos};
-            derive_lfnst_constraints(
-              pred_cu,
-              lcu,
-              depth,
-              COLOR_Y,
-              lcu_px,
-              constraints);
+
             if (constraints[0] || !constraints[1]) {
               continue;
             }
@@ -475,28 +476,36 @@ static double search_intra_trdepth(
             depth,
             pred_cu,
             lcu);
-          double mts_bits = 0;
+          double transform_bits = 0;
+          if(state->encoder_control->cfg.lfnst && depth == pred_cu->tr_depth) {
+            if(!constraints[0] && constraints[1]) {
+              transform_bits += CTX_ENTROPY_FBITS(&state->search_cabac.ctx.lfnst_idx_model[tr_cu->depth == 4], lfnst_idx != 0);
+              if(lfnst_idx > 0) {
+                transform_bits += CTX_ENTROPY_FBITS(&state->search_cabac.ctx.lfnst_idx_model[2], lfnst_idx == 2);
+              }
+            }
+          }
           if (num_transforms > 1 && trafo != MTS_SKIP && width <= 32
               /*&& height <= 32*/
               && !pred_cu->violates_mts_coeff_constraint && pred_cu->
-              mts_last_scan_pos) {
+              mts_last_scan_pos && lfnst_idx == 0) {
 
             bool symbol = trafo != 0;
             int ctx_idx = 0;
-            mts_bits += CTX_ENTROPY_FBITS(
+            transform_bits += CTX_ENTROPY_FBITS(
               &state->search_cabac.ctx.mts_idx_model[ctx_idx],
               symbol);
 
             ctx_idx++;
             for (int i = 0; i < 3 && symbol; i++, ctx_idx++) {
               symbol = trafo > i + MTS_DST7_DST7 ? 1 : 0;
-              mts_bits += CTX_ENTROPY_FBITS(
+              transform_bits += CTX_ENTROPY_FBITS(
                 &state->search_cabac.ctx.mts_idx_model[ctx_idx],
                 symbol);
             }
 
           }
-          rd_cost += mts_bits * state->frame->lambda;
+          rd_cost += transform_bits * state->frame->lambda;
 
           // TODO: there is an error in this cost calculation. This will be fixed when merged into current master
           // This is compared to the previous best, which may have chroma cost included

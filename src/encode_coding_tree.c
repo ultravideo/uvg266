@@ -61,7 +61,8 @@ bool uvg_is_mts_allowed(const encoder_state_t * const state, cu_info_t *const pr
   //mts_allowed &= !cu.ispMode; // ISP_TODO: Uncomment this when ISP is implemented.
   //mts_allowed &= !cu.sbtInfo;
   mts_allowed &= !(pred_cu->bdpcmMode && cu_width <= ts_max_size && cu_height <= ts_max_size);
-  mts_allowed &= pred_cu->tr_idx != MTS_SKIP && !pred_cu->violates_mts_coeff_constraint && pred_cu->mts_last_scan_pos;
+  mts_allowed &= pred_cu->tr_idx != MTS_SKIP && !pred_cu->violates_mts_coeff_constraint && pred_cu->mts_last_scan_pos ;
+  mts_allowed &= pred_cu->lfnst_idx == 0;
   return mts_allowed;
 }
 
@@ -74,8 +75,7 @@ static void encode_mts_idx(encoder_state_t * const state,
 
   if (uvg_is_mts_allowed(state, (cu_info_t* const )pred_cu) && mts_idx != MTS_SKIP
        && !pred_cu->violates_mts_coeff_constraint
-       && pred_cu->mts_last_scan_pos
-       && pred_cu->lfnst_idx == 0
+       && pred_cu->mts_last_scan_pos       
     )
   {
     int symbol = mts_idx != MTS_DCT2_DCT2 ? 1 : 0;
@@ -158,8 +158,14 @@ static bool can_use_lfnst_with_isp(const int width, const int height, const int 
   return true;
 }
 
-static bool is_lfnst_allowed(encoder_state_t* const state, const cu_info_t* const pred_cu, const int color,
-                             const int width, const int height) 
+ bool uvg_is_lfnst_allowed(
+  encoder_state_t* const state,
+  const cu_info_t* const pred_cu,
+  const int color,
+  const int width,
+  const int height,
+  const int x,
+  const int y) 
 {
   if (state->encoder_control->cfg.lfnst && pred_cu->type == CU_INTRA) {
     const int isp_mode = 0; // ISP_TODO: assign proper ISP mode when ISP is implemented
@@ -179,38 +185,20 @@ static bool is_lfnst_allowed(encoder_state_t* const state, const cu_info_t* cons
       (cu_width > TR_MAX_WIDTH || cu_height > TR_MAX_WIDTH)) {
       return false;
     }
-
-    return true;
-  }
-  else {
-    return false;
-  }
-}
-
-static bool encode_lfnst_idx(encoder_state_t * const state, cabac_data_t * const cabac,
-                             const cu_info_t * const pred_cu, const int x, const int y,
-                             const int depth, const int color, const int width, const int height)
-{
-  
-  if (is_lfnst_allowed(state, pred_cu, color, width, height)) {
-    // Getting separate tree bool from block size is a temporary fix until a proper dual tree check is possible (there is no dual tree structure at time of writing this).
-    // VTM seems to force explicit dual tree structure for small 4x4 blocks
     bool is_separate_tree = depth == 4; // TODO: if/when separate/dual tree structure is implemented, get proper value for this
-    bool luma_flag = is_separate_tree ? (color == COLOR_Y ? true: false) : true;
+    bool luma_flag = is_separate_tree ? (color == COLOR_Y ? true : false) : true;
     bool chroma_flag = is_separate_tree ? (color != COLOR_Y ? true : false) : true;
     bool non_zero_coeff_non_ts_corner_8x8 = (luma_flag && pred_cu->violates_lfnst_constrained[0]) || (chroma_flag && pred_cu->violates_lfnst_constrained[1]);
     bool is_tr_skip = false;
 
     const videoframe_t* const frame = state->tile->frame;
     //const int num_pred_units = kvz_part_mode_num_parts[pred_cu->part_size];
-    const int cu_width = LCU_WIDTH >> depth;
     const int tr_depth = pred_cu->tr_depth;
     assert(depth <= tr_depth && "Depth greater than transform depth. This should never trigger.");
     const int num_transform_units = 1 << (2 * (tr_depth - depth));
     const int tu_row_length = 1 << (tr_depth - depth);
     const int tu_width = cu_width >> (tr_depth - depth);
     const int tu_height = tu_width; // TODO: height for non-square blocks
-    const int isp_mode = 0; // ISP_TODO:get isp_mode from cu when ISP is implemented
 
     // TODO: chroma transform skip
     if (color == COLOR_Y) {
@@ -227,10 +215,33 @@ static bool encode_lfnst_idx(encoder_state_t * const state, cabac_data_t * const
         }
       }
     }
-    
+
     if ((!pred_cu->lfnst_last_scan_pos && !isp_mode) || non_zero_coeff_non_ts_corner_8x8 || is_tr_skip) {
       return false;
     }
+    return true;
+  }
+  else {
+    return false;
+  }
+}
+
+static bool encode_lfnst_idx(
+  const encoder_state_t* const state,
+  cabac_data_t * const cabac,
+  const cu_info_t * const pred_cu,
+  const int x,
+  const int y,
+  const int depth,
+  const int color,
+  const int width,
+  const int height)
+{
+  
+  if (uvg_is_lfnst_allowed(state, pred_cu, color, width, height, x, y)) {
+    // Getting separate tree bool from block size is a temporary fix until a proper dual tree check is possible (there is no dual tree structure at time of writing this).
+    // VTM seems to force explicit dual tree structure for small 4x4 blocks
+    bool is_separate_tree = depth == 4; // TODO: if/when separate/dual tree structure is implemented, get proper value for this
 
     const int lfnst_index = pred_cu->lfnst_idx;
     assert((lfnst_index >= 0 && lfnst_index < 3) && "Invalid LFNST index.");
