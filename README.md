@@ -52,7 +52,6 @@ Speed and compression quality can be selected with ```--preset```, or by setting
 
 [comment]: # (BEGIN UVG266 HELP MESSAGE)
 ```
-Usage:
 uvg266 -i <input> --input-res <width>x<height> -o <output>
 
 Required:
@@ -277,9 +276,9 @@ Compression tools:
                                a zero coefficient CU is found. [disabled]
       --(no-)early-skip      : Try to find skip cu from merge candidates.
                                Perform no further search if skip is found.
-                               For rd=0..1: Try the first candidate.
-                               For rd=2.. : Try the best candidate based
-                                            on luma satd cost. [enabled]
+                               For rd = 0..1: Try the first candidate.
+                               For rd = 2.. : Try the best candidate based
+                                              on luma satd cost. [enabled]
       --max-merge <integer>  : Maximum number of merge candidates, 1..6 [6]
       --(no-)implicit-rdpcm  : Implicit residual DPCM. Currently only supported
                                with lossless coding. [disabled]
@@ -299,11 +298,11 @@ Compression tools:
                                                instead of DCT2 to certain intra
                                                blocks.
       --(no-)jccr            : Joint coding of chroma residual.
-                               Requires rdo> = 2. [disabled]
+                               Requires rdo >= 2. [disabled]
       --(no-)cclm            : Cross component linear model. 
                                Extra chroma prediction modes that are formed
                                via linear transformation from the luma
-                               prediction. Requires rdo >=3. [disabled
+                               prediction. Requires rdo >= 3. [disabled
       --(no-)amvr            : Adaptive Motion Vector Resolution.
                                Code some MVs with reduced resolution [disabled]
 

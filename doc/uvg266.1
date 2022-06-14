@@ -1,4 +1,29 @@
-.TH UVG266 "1" "April 2022" "uvg266 v0.2.3" "User Commands"
+.TH UVG266 "1" "June 2022" "uvg266 v3.12)
+0.2.3
+${PROJECT_VERSION}-${GIT_TAG_SHORT})
+"
+"${CMAKE_C_COMPILER_ID}
+LESS
+"VS")
+LESS
+"VS2013")
+LESS
+"VS2015")
+LESS
+"VS2017")
+LESS
+"VS2019")
+"VS2022")
+"${UVG_COMPILER_VERSION}")
+tar
+"Make
+${CMAKE_SOURCE_DIR}/${PROJECT_NAME}-${PROJECT_VERSION}.tar.gz
+tar
+cd
+echo
+echo
+${CMAKE_SOURCE_DIR}/${PROJECT_NAME}-${PROJECT_VERSION}.tar.gz
+"Checking" "User Commands"
 .SH NAME
 uvg266 \- open source VVC encoder
 .SH SYNOPSIS
@@ -234,7 +259,8 @@ Sample Adaptive Offset [full]
 \fB\-\-alf <string>        
 Adaptive Loop Filter [off]
     \- off: ALF disabled
-    \- no\-cc: ALF enabled without cross component refinement
+    \- no\-cc: ALF enabled without cross component
+             refinement
     \- full: Full ALF
 .TP
 \fB\-\-(no\-)rdoq           
@@ -245,12 +271,6 @@ Skip RDOQ for 4x4 blocks. [disabled]
 .TP
 \fB\-\-(no\-)signhide       
 Sign hiding [disabled]
-.TP
-\fB\-\-(no\-)smp            
-Symmetric motion partition [disabled]
-.TP
-\fB\-\-(no\-)amp            
-Asymmetric motion partition [disabled]
 .TP
 \fB\-\-rd <integer>        
 Intra mode search complexity [0]
@@ -319,6 +339,19 @@ Predict the pu\-depth\-intra using machine
  learning trees, overrides the
  \-\-pu\-depth\-intra parameter. [disabled]
 .TP
+\fB\-\-(no\-)combine\-intra\-cus: Whether the encoder tries to code a cu
+    on lower depth even when search is not
+    performed on said depth. Should only
+    be disabled if cus absolutely must not
+    be larger than limited by the search.
+    [enabled]
+.TP
+\fB\-\-force\-inter         
+Force the encoder to use inter always.
+This is mostly for debugging and is not
+guaranteed to produce sensible bitstream or
+work at all. [disabled]
+.TP
 \fB\-\-tr\-depth\-intra <int>
 Transform split depth for intra blocks [0]
 .TP
@@ -365,10 +398,10 @@ a zero coefficient CU is found. [disabled]
 \fB\-\-(no\-)early\-skip     
 Try to find skip cu from merge candidates.
 Perform no further search if skip is found.
-For rd=0..1: Try the first candidate.
-For rd=2..
+For rd = 0..1: Try the first candidate.
+For rd = 2..
 Try the best candidate based
-             on luma satd cost. [enabled]
+               on luma satd cost. [enabled]
 .TP
 \fB\-\-max\-merge <integer> 
 Maximum number of merge candidates, 1..6 [6]
@@ -386,6 +419,7 @@ predictions.
 .TP
 \fB\-\-(no\-)mip            
 Enable matrix weighted intra prediction.
+.TP
 \fB\-\-mts <string>        
 Multiple Transform Selection [off].
 (Currently only implemented for intra
@@ -393,23 +427,25 @@ and has effect only when rd >= 2)
     \- off: MTS disabled
     \- intra: MTS applied only for intra blocks.
     \- inter: MTS applied only for inter blocks.
-    \- both: MTS applied for both intra and inter blocks.
-    \- implicit: uses implicit MTS. Applies DST7 instead 
-                of DCT2 to certain intra blocks.
+    \- both: MTS applied for both intra and inter
+            blocks.
+    \- implicit: uses implicit MTS. Applies DST7
+                instead of DCT2 to certain intra
+                blocks.
 .TP
 \fB\-\-(no\-)jccr           
-Joint coding of chroma residual. 
-                               Requires rdo> = 2. [disabled]
+Joint coding of chroma residual.
+Requires rdo >= 2. [disabled]
 .TP
 \fB\-\-(no\-)cclm           
 Cross component linear model. 
 Extra chroma prediction modes that are formed
 via linear transformation from the luma
-prediction. Requires rdo >=3. [disabled
+prediction. Requires rdo >= 3. [disabled
 .TP
 \fB\-\-(no\-)amvr           
 Adaptive Motion Vector Resolution.
-Code some mv's with reduced resolution [disabled]
+Code some MVs with reduced resolution [disabled]
 
 .SS "Parallel processing:"
 .TP
@@ -442,8 +478,8 @@ Split picture into width x height uniform tiles.
               width.
 .TP
 \fB\-\-tiles\-height\-split <string>|u<int>
-    \- <string>: A comma\-separated list of tile row
-                column pixel coordinates.
+    \- <string>: A comma\-separated list of tile
+                row column pixel coordinates.
     \- u<int>: Number of tile rows of uniform
               height.
 .TP

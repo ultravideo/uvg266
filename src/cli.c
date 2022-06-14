@@ -656,7 +656,7 @@ void print_help(void)
     "                                   - both: MTS applied for both intra and inter\n"
     "                                           blocks.\n"
     "                                   - implicit: uses implicit MTS. Applies DST7\n"
-    "                                               instead of DCT2 to certain intra\n
+    "                                               instead of DCT2 to certain intra\n"
     "                                               blocks.\n"
     "      --(no-)jccr            : Joint coding of chroma residual.\n"
     "                               Requires rdo >= 2. [disabled]\n"
