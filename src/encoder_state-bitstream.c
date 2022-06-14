@@ -754,7 +754,7 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
   WRITE_UE(stream, encoder->in.width, "pic_width_in_luma_samples");
   WRITE_UE(stream, encoder->in.height, "pic_height_in_luma_samples");
 
-  bool use_conformance_window = encoder->in.width != encoder->in.real_width || encoder->in.height != encoder->in.real_height;
+  bool use_conformance_window = false; //Signalled only in SPS
 
   WRITE_U(stream, use_conformance_window, 1, "conformance_window_flag");
   if (use_conformance_window) {
