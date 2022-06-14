@@ -709,12 +709,13 @@ void uvg_encoder_control_input_init(encoder_control_t * const encoder,
   // pixels to the dimensions, so that they are. These extra pixels will be
   // compressed along with the real ones but they will be cropped out before
   // rendering.
-  if (encoder->in.width % CU_MIN_SIZE_PIXELS) {
-    encoder->in.width += CU_MIN_SIZE_PIXELS - (width % CU_MIN_SIZE_PIXELS);
+  // Changed to 8 pixel interval for VVC
+  if (encoder->in.width % CONF_WINDOW_PAD_IN_PIXELS) {
+    encoder->in.width += CONF_WINDOW_PAD_IN_PIXELS - (width % CONF_WINDOW_PAD_IN_PIXELS);
   }
 
-  if (encoder->in.height % CU_MIN_SIZE_PIXELS) {
-    encoder->in.height += CU_MIN_SIZE_PIXELS - (height % CU_MIN_SIZE_PIXELS);
+  if (encoder->in.height % CONF_WINDOW_PAD_IN_PIXELS) {
+    encoder->in.height += CONF_WINDOW_PAD_IN_PIXELS - (height % CONF_WINDOW_PAD_IN_PIXELS);
   }
 
   encoder->in.height_in_lcu = encoder->in.height / LCU_WIDTH;

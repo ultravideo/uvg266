@@ -91,8 +91,8 @@ static FILE* open_output_file(const char* filename)
 }
 
 static unsigned get_padding(unsigned width_or_height){
-  if (width_or_height % CU_MIN_SIZE_PIXELS){
-    return CU_MIN_SIZE_PIXELS - (width_or_height % CU_MIN_SIZE_PIXELS);
+  if (width_or_height % CONF_WINDOW_PAD_IN_PIXELS) {
+    return CONF_WINDOW_PAD_IN_PIXELS - (width_or_height % CONF_WINDOW_PAD_IN_PIXELS);
   }else{
     return 0;
   }

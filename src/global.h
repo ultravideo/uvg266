@@ -175,6 +175,10 @@ typedef int16_t mv_t;
 
 //! pow(2, MIN_SIZE)
 #define CU_MIN_SIZE_PIXELS (1 << MIN_SIZE)
+
+//! Round frame size up to this interval (8 pixels)
+#define CONF_WINDOW_PAD_IN_PIXELS ((1 << MIN_SIZE)<<1)
+
 //! spec: CtbSizeY
 #define LCU_WIDTH (1 << (MIN_SIZE + MAX_DEPTH))
 //! spec: CtbWidthC and CtbHeightC
