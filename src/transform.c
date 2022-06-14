@@ -158,6 +158,48 @@ int32_t uvg_get_scaled_qp(color_t color, int8_t qp, int8_t qp_offset, int8_t con
   return qp_scaled;
 }
 
+
+
+/**
+* \brief Derives lfnst constraints.
+*
+* \param pred_cu  Current prediction coding unit.
+* \param lcu      Current lcu.
+* \param depth    Current transform depth.
+* \param lcu_px   Position of the top left pixel of current CU within current LCU.
+*/
+void uvg_derive_lfnst_constraints(
+  cu_info_t* const pred_cu,
+  const int depth,
+  bool* constraints,
+  const coeff_t* coeff,
+  const int width,
+  const int height)
+{
+  coeff_scan_order_t scan_idx = uvg_get_scan_order(pred_cu->type, pred_cu->intra.mode, depth);
+  // ToDo: large block support in VVC?
+
+  const uint32_t log2_block_size = uvg_g_convert_to_bit[width] + 2;
+  const uint32_t* scan = uvg_g_sig_last_scan[scan_idx][log2_block_size - 1];
+
+  signed scan_pos_last = -1;
+
+  for (int i = 0; i < width * height; i++) {
+    if (coeff[scan[i]]) {
+      scan_pos_last = i;
+    }
+  }
+
+  if (scan_pos_last < 0) return;
+
+  if (pred_cu != NULL && pred_cu->tr_idx != MTS_SKIP && height >= 4 && width >= 4) {
+    const int max_lfnst_pos = ((height == 4 && width == 4) || (height == 8 && width == 8)) ? 7 : 15;
+    constraints[0] |= scan_pos_last > max_lfnst_pos;
+    constraints[1] |= scan_pos_last >= 1;
+  }
+}
+
+
 /**
  * \brief NxN inverse transform (2D)
  * \param coeff input data (transform coefficients)
@@ -454,9 +496,12 @@ void uvg_chroma_transform_search(
   transforms[0] = DCT7_CHROMA;
   const int trans_offset = width * height;
   int num_transforms = 1;
+
   const int can_use_tr_skip = state->encoder_control->cfg.trskip_enable &&
     (1 << state->encoder_control->cfg.trskip_max_size) >= width &&
-    state->encoder_control->cfg.chroma_trskip_enable;
+    state->encoder_control->cfg.chroma_trskip_enable && 
+    pred_cu->lfnst_idx == 0;
+
   if (can_use_tr_skip) {
     uvg_transformskip(state->encoder_control, u_resi, u_coeff + num_transforms * trans_offset, width);
     uvg_transformskip(state->encoder_control, v_resi, v_coeff + num_transforms * trans_offset, width);
@@ -506,8 +551,13 @@ void uvg_chroma_transform_search(
       scan_order,
       &u_has_coeffs,
       &v_has_coeffs);
-    if(pred_cu->type == CU_INTRA) {
-      
+    if(pred_cu->type == CU_INTRA && transforms[i] != CHROMA_TS) {
+      bool constraints[2] = { false, false };
+      uvg_derive_lfnst_constraints(pred_cu, depth, constraints, &u_coeff[i * trans_offset], width, height);
+      if(!IS_JCCR_MODE(transforms[i])) {
+        uvg_derive_lfnst_constraints(pred_cu, depth, constraints, &v_coeff[i * trans_offset], width, height);        
+      }
+      if (constraints[0] || !constraints[1] && pred_cu->lfnst_idx != 0) continue;
     }
 
     if (IS_JCCR_MODE(transforms[i]) && !u_has_coeffs) continue;

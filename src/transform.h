@@ -67,6 +67,14 @@ void uvg_itransform2d(const encoder_control_t * const encoder,
 
 int32_t uvg_get_scaled_qp(color_t color, int8_t qp, int8_t qp_offset, int8_t const* const chroma_scale);
 
+void uvg_derive_lfnst_constraints(
+  cu_info_t* const pred_cu,
+  const int depth,
+  bool* constraints,
+  const coeff_t* coeff,
+  const int width,
+  const int height);
+
 typedef struct {
   double best_u_cost;
   double best_v_cost;

@@ -246,45 +246,6 @@ static void derive_mts_constraints(cu_info_t *const pred_cu,
   }
 }
 
-/**
-* \brief Derives lfnst constraints.
-*
-* \param pred_cu  Current prediction coding unit.
-* \param lcu      Current lcu.
-* \param depth    Current transform depth.
-* \param lcu_px   Position of the top left pixel of current CU within current LCU.
-*/
-static void derive_lfnst_constraints(
-  cu_info_t* const pred_cu,
-  const int depth,
-  bool*constraints,
-  const coeff_t* coeff,
-  const int width,
-  const int height)
-{
-  coeff_scan_order_t scan_idx = uvg_get_scan_order(pred_cu->type, pred_cu->intra.mode, depth);
-  // ToDo: large block support in VVC?
-
-  const uint32_t log2_block_size = uvg_g_convert_to_bit[width] + 2;
-  const uint32_t* scan = uvg_g_sig_last_scan[scan_idx][log2_block_size - 1];
-
-  signed scan_pos_last = -1;
-  
-  for (int i = 0; i < width * height; i++) {
-    if (coeff[scan[i]]) {
-      scan_pos_last = i;
-    }
-  }
-  
-  if (scan_pos_last < 0) return;
-
-  if (pred_cu != NULL && pred_cu->tr_idx != MTS_SKIP && height >= 4 && width >= 4) {
-    const int max_lfnst_pos = ((height == 4 && width == 4) || (height == 8 && width == 8)) ? 7 : 15;
-    constraints[0] |= scan_pos_last > max_lfnst_pos;
-    constraints[1] |= scan_pos_last >= 1;
-  }
-}
-
 
 /**
 * \brief Perform search for best intra transform split configuration.
@@ -432,9 +393,9 @@ static double search_intra_trdepth(
           }
         }
 
-        const unsigned scan_offset = xy_to_zorder(width, lcu_px.x, lcu_px.y);
+        const unsigned scan_offset = xy_to_zorder(LCU_WIDTH, lcu_px.x, lcu_px.y);
 
-        derive_lfnst_constraints(
+        uvg_derive_lfnst_constraints(
           pred_cu,
           depth,
           constraints,
@@ -503,7 +464,7 @@ static double search_intra_trdepth(
         pred_cu->intra.mode_chroma = chroma_mode;
         pred_cu->joint_cb_cr = 4;
         // TODO: Maybe check the jccr mode here also but holy shit is the interface of search_intra_rdo bad currently
-        const unsigned scan_offset = xy_to_zorder(width_c, lcu_px.x, lcu_px.y);
+        const unsigned scan_offset = xy_to_zorder(LCU_WIDTH_C, lcu_px.x, lcu_px.y);
         uvg_intra_recon_cu(
           state,
           x_px,
@@ -526,7 +487,7 @@ static double search_intra_trdepth(
           // Temp constraints. Updating the actual pred_cu constraints here will break things later
           bool constraints[2] = {pred_cu->violates_lfnst_constrained_chroma,
                                  pred_cu->lfnst_last_scan_pos};
-          derive_lfnst_constraints(
+          uvg_derive_lfnst_constraints(
             pred_cu,
             depth,
             constraints,
@@ -538,7 +499,7 @@ static double search_intra_trdepth(
             best_lfnst_idx = 0;
             continue;
           }
-          derive_lfnst_constraints(
+          uvg_derive_lfnst_constraints(
             pred_cu,
             depth,
             constraints,
@@ -1487,16 +1448,19 @@ int8_t uvg_search_intra_chroma_rdo(
     ALIGNED(64) int16_t u_resi[LCU_WIDTH_C * LCU_WIDTH_C];
     ALIGNED(64) int16_t v_resi[LCU_WIDTH_C * LCU_WIDTH_C];
 
-    for(int lfnst_i = 0; lfnst_i < 3; ++lfnst_i) {
-      const int lfnst = lfnst_modes_to_check[lfnst_i];
-      if (lfnst == -1) {
-        continue;
-      }
-      for (int8_t mode_i = 0; mode_i < num_modes; ++mode_i) {
-        const uint8_t mode = chroma_data[mode_i].pred_cu.intra.mode_chroma;
-        double mode_bits = uvg_chroma_mode_bits(state, mode, luma_mode);
-        chroma_data[mode_i].cost = mode_bits * state->lambda;
-        cu_info_t* pred_cu = &chroma_data[mode_i].pred_cu;
+
+    for (int8_t mode_i = 0; mode_i < num_modes; ++mode_i) {
+      const uint8_t mode = chroma_data[mode_i].pred_cu.intra.mode_chroma;
+      double mode_bits = uvg_chroma_mode_bits(state, mode, luma_mode);
+      chroma_data[mode_i].cost = mode_bits * state->lambda;
+      cu_info_t* pred_cu = &chroma_data[mode_i].pred_cu;
+      uint8_t best_lfnst_index = 0;
+      for (int lfnst_i = 0; lfnst_i < 3; ++lfnst_i) {
+        const int lfnst = lfnst_modes_to_check[lfnst_i];
+        chroma_data[mode_i].lfnst_costs[lfnst] += mode_bits * state->lambda;
+        if (lfnst == -1) {
+          continue;
+        }
         if (pred_cu->tr_depth == pred_cu->depth) {
           uvg_intra_predict(
             state,
@@ -1544,15 +1508,38 @@ int8_t uvg_search_intra_chroma_rdo(
             u_resi,
             v_resi,
             &chorma_ts_out);
+
+          // LFNST constraint failed
+          if(chorma_ts_out.best_u_index == -1 && chorma_ts_out.best_combined_index == -1) {
+            chroma_data[mode_i].lfnst_costs[lfnst] = MAX_DOUBLE;
+            continue;
+          }
+
           if(chorma_ts_out.best_u_cost + chorma_ts_out.best_v_cost < chorma_ts_out.best_combined_cost) {
-            chroma_data[mode_i].pred_cu.joint_cb_cr = 0;
-            chroma_data[mode_i].pred_cu.tr_skip |= (chorma_ts_out.best_u_index == CHROMA_TS) << COLOR_U;
-            chroma_data[mode_i].pred_cu.tr_skip |= (chorma_ts_out.best_v_index == CHROMA_TS) << COLOR_V;
-            chroma_data[mode_i].cost += chorma_ts_out.best_u_cost + chorma_ts_out.best_v_cost;
+            chroma_data[mode_i].lfnst_costs[lfnst] += chorma_ts_out.best_u_cost + chorma_ts_out.best_v_cost;
+            if(lfnst == lfnst_modes_to_check[0] 
+              || (lfnst == 0 
+                && chroma_data[mode_i].lfnst_costs[lfnst] 
+                < chroma_data[mode_i].lfnst_costs[lfnst_modes_to_check[0]])) {
+              chroma_data[mode_i].pred_cu.joint_cb_cr = 0;
+              chroma_data[mode_i].pred_cu.tr_skip &= 1;
+              chroma_data[mode_i].pred_cu.tr_skip |= (chorma_ts_out.best_u_index == CHROMA_TS) << COLOR_U;
+              chroma_data[mode_i].pred_cu.tr_skip |= (chorma_ts_out.best_v_index == CHROMA_TS) << COLOR_V;
+              best_lfnst_index = lfnst;
+              chroma_data[mode_i].cost = chroma_data[mode_i].lfnst_costs[lfnst];
+            }
           }
           else {
-            chroma_data[mode_i].pred_cu.joint_cb_cr = chorma_ts_out.best_combined_index;
-            chroma_data[mode_i].cost += chorma_ts_out.best_combined_cost;
+            chroma_data[mode_i].lfnst_costs[lfnst] += chorma_ts_out.best_combined_cost;
+            if (lfnst == lfnst_modes_to_check[0]
+              || (lfnst == 0
+                && chroma_data[mode_i].lfnst_costs[lfnst]
+                < chroma_data[mode_i].lfnst_costs[lfnst_modes_to_check[0]])) {
+              chroma_data[mode_i].pred_cu.joint_cb_cr = chorma_ts_out.best_combined_index;
+              chroma_data[mode_i].pred_cu.tr_skip &= 1;
+              best_lfnst_index = lfnst;
+              chroma_data[mode_i].cost = chroma_data[mode_i].lfnst_costs[lfnst];
+            }
           }
         }
         else {
@@ -1567,6 +1554,7 @@ int8_t uvg_search_intra_chroma_rdo(
           memcpy(&state->search_cabac, &temp_cabac, sizeof(cabac_data_t));
         }      
       }
+      pred_cu->lfnst_idx = best_lfnst_index;
     }
     sort_modes(chroma_data, num_modes);
     
