@@ -934,7 +934,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     if (cur_cu->type == CU_INTRA) {
       assert(cur_cu->part_size == SIZE_2Nx2N || cur_cu->part_size == SIZE_NxN);
 
-      if ((depth == 4 && (x % 8 == 0 || y % 8 == 0)) || state->encoder_control->chroma_format == UVG_CSP_400) {
+      if ((depth == 4 ) || state->encoder_control->chroma_format == UVG_CSP_400) {
         intra_search.pred_cu.intra.mode_chroma = -1; 
       }
       lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
@@ -943,6 +943,15 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
                          depth, &intra_search,
                          NULL, 
                          lcu);
+      if(depth == 4 && x % 8 && y % 8) {
+        intra_search.pred_cu.intra.mode_chroma = cur_cu->intra.mode_chroma;
+        intra_search.pred_cu.intra.mode = -1;
+        uvg_intra_recon_cu(state,
+          x, y,
+          depth, &intra_search,
+          NULL,
+          lcu);
+      }
       if (cur_cu->joint_cb_cr == 4) cur_cu->joint_cb_cr = 0;
       lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
 
