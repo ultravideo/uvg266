@@ -105,8 +105,13 @@ void uvg_encode_coeff_nxn_generic(encoder_state_t * const state,
   bool is_chroma = color != COLOR_Y;
 
   if (cur_cu != NULL && /*cur_cu->tr_idx != MTS_SKIP &&*/ height >= 4 && width >= 4) {
-    const int max_lfnst_pos = ((height == 4 && width == 4) || (height == 8 && width == 8)) ? 7 : 15;
-    cur_cu->violates_lfnst_constrained[is_chroma] |= scan_pos_last > max_lfnst_pos;
+    const unsigned max_lfnst_pos = ((height == 4 && width == 4) || (height == 8 && width == 8)) ? 7 : 15;
+    if(!is_chroma) {
+      cur_cu->violates_lfnst_constrained_luma |= scan_pos_last > max_lfnst_pos;
+    }
+    else {
+      cur_cu->violates_lfnst_constrained_chroma |= scan_pos_last > max_lfnst_pos;
+    }
     cur_cu->lfnst_last_scan_pos |= scan_pos_last >= 1;
   }
 

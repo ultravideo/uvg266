@@ -151,8 +151,8 @@ static void lcu_fill_cu_info(lcu_t *lcu, int x_local, int y_local, int width, in
       //to->tr_idx    = cu->tr_idx;
       to->lfnst_idx = cu->lfnst_idx;
       to->lfnst_last_scan_pos = cu->lfnst_last_scan_pos;
-      to->violates_lfnst_constrained[0] = cu->violates_lfnst_constrained[0];
-      to->violates_lfnst_constrained[1] = cu->violates_lfnst_constrained[1];
+      to->violates_lfnst_constrained_luma = cu->violates_lfnst_constrained_luma;
+      to->violates_lfnst_constrained_chroma = cu->violates_lfnst_constrained_chroma;
 
       if (cu->type == CU_INTRA) {
         to->intra.mode        = cu->intra.mode;
@@ -617,6 +617,9 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
         "lfnst_idx");
     }
   }
+  tr_cu->lfnst_last_scan_pos = false;
+  tr_cu->violates_lfnst_constrained_luma = false;
+  tr_cu->violates_lfnst_constrained_chroma = false;
   if (uvg_is_mts_allowed(state, tr_cu)) {
 
     bool symbol = tr_cu->tr_idx != 0;
@@ -798,8 +801,8 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
   cur_cu->tr_idx = 0;
   cur_cu->violates_mts_coeff_constraint = 0;
   cur_cu->mts_last_scan_pos = 0;
-  cur_cu->violates_lfnst_constrained[0] = 0;
-  cur_cu->violates_lfnst_constrained[1] = 0;
+  cur_cu->violates_lfnst_constrained_luma = 0;
+  cur_cu->violates_lfnst_constrained_chroma = 0;
   cur_cu->lfnst_last_scan_pos = 0;
   cur_cu->lfnst_idx = 0;
   cur_cu->joint_cb_cr = 0;

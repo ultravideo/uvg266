@@ -188,7 +188,7 @@ static bool can_use_lfnst_with_isp(const int width, const int height, const int 
     bool is_separate_tree = depth == 4; // TODO: if/when separate/dual tree structure is implemented, get proper value for this
     bool luma_flag = is_separate_tree ? (color == COLOR_Y ? true : false) : true;
     bool chroma_flag = is_separate_tree ? (color != COLOR_Y ? true : false) : true;
-    bool non_zero_coeff_non_ts_corner_8x8 = (luma_flag && pred_cu->violates_lfnst_constrained[0]) || (chroma_flag && pred_cu->violates_lfnst_constrained[1]);
+    bool non_zero_coeff_non_ts_corner_8x8 = (luma_flag && pred_cu->violates_lfnst_constrained_luma) || (chroma_flag && pred_cu->violates_lfnst_constrained_chroma);
     bool is_tr_skip = false;
 
     const videoframe_t* const frame = state->tile->frame;
@@ -1688,8 +1688,8 @@ void uvg_encode_coding_tree(encoder_state_t * const state,
       encode_chroma_intra_cu(cabac, cur_cu, state->encoder_control->cfg.cclm, NULL);
       // LFNST constraints must be reset here. Otherwise the left over values will interfere when calculating new constraints
       cu_info_t* tmp = uvg_cu_array_at(frame->cu_array, x, y);
-      tmp->violates_lfnst_constrained[0] = false;
-      tmp->violates_lfnst_constrained[1] = false;
+      tmp->violates_lfnst_constrained_luma = false;
+      tmp->violates_lfnst_constrained_chroma = false;
       tmp->lfnst_last_scan_pos = false;
       encode_transform_coeff(state, x, y, depth, 0, 0, 0, 1, coeff);
       // Write LFNST only once for single tree structure

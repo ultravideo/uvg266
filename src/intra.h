@@ -70,6 +70,7 @@ typedef struct {
   double bits;
   double coeff_bits;
   double distortion;
+  double lfnst_costs[3];
 } intra_search_data_t ;
 
 

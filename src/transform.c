@@ -506,6 +506,9 @@ void uvg_chroma_transform_search(
       scan_order,
       &u_has_coeffs,
       &v_has_coeffs);
+    if(pred_cu->type == CU_INTRA) {
+      
+    }
 
     if (IS_JCCR_MODE(transforms[i]) && !u_has_coeffs) continue;
 

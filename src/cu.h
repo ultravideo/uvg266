@@ -159,14 +159,15 @@ typedef struct
    */
   uint8_t qp;
 
-  uint8_t bdpcmMode;
+  uint8_t bdpcmMode : 1;
 
-  bool violates_mts_coeff_constraint;
-  bool mts_last_scan_pos;
+  uint8_t violates_mts_coeff_constraint : 1;
+  uint8_t mts_last_scan_pos : 1;
 
-  bool violates_lfnst_constrained[2]; // Two types, luma and chroma. Luma index is 0.
-  bool lfnst_last_scan_pos;
-  uint8_t lfnst_idx;
+  uint8_t violates_lfnst_constrained_luma : 1; // Two types, luma and chroma. Luma index is 0.
+  uint8_t violates_lfnst_constrained_chroma : 1; // Two types, luma and chroma. Luma index is 0.
+  uint8_t lfnst_last_scan_pos : 1;
+  uint8_t lfnst_idx : 2;
 
   union {
     struct {
