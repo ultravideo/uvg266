@@ -572,6 +572,7 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
           "lfnst_idx");
       }
     }
+    tr_cu->lfnst_last_scan_pos = false;
   }
 
   unsigned chroma_ssd = 0;
@@ -599,8 +600,8 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
       if(chroma_can_use_tr_skip && cb_flag_v) {
         CABAC_FBITS_UPDATE(cabac, &cabac->ctx.transform_skip_model_chroma, tr_cu->tr_skip & 4, tr_tree_bits, "transform_skip_flag");        
       }
-      coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.u[index], NULL, chroma_width, COLOR_U, scan_order, tr_cu->tr_skip & 2);
-      coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.v[index], NULL, chroma_width, COLOR_V, scan_order, tr_cu->tr_skip & 4);
+      coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.u[index], tr_cu, chroma_width, COLOR_U, scan_order, tr_cu->tr_skip & 2);
+      coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.v[index], tr_cu, chroma_width, COLOR_V, scan_order, tr_cu->tr_skip & 4);
       
     }
     else {
