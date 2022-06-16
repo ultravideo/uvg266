@@ -508,7 +508,7 @@ static void predict_cclm(
   int available_left_below = 0;
 
 
-  uvg_pixel *y_rec = lcu->rec.y + x_scu + y_scu * LCU_WIDTH;
+  const uvg_pixel *y_rec = lcu->rec.y + x_scu + y_scu * LCU_WIDTH;
   const int stride2 = (((state->tile->frame->width + 7) & ~7) + FRAME_PADDING_LUMA);
 
   // Essentially what this does is that it uses 6-tap filtering to downsample
