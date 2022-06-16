@@ -47,8 +47,17 @@
 #define QUANT_SHIFT 14
 
 int uvg_strategy_register_quant_generic(void* opaque, uint8_t bitdepth);
-void uvg_quant_generic(const encoder_state_t * const state, coeff_t *coef, coeff_t *q_coef, int32_t width,
-  int32_t height, color_t color, int8_t scan_idx, int8_t block_type, int8_t transform_skip);
+void uvg_quant_generic(
+  const encoder_state_t * const state,
+  coeff_t *coef,
+  coeff_t *q_coef,
+  int32_t width,
+  int32_t height,
+  color_t color,
+  int8_t scan_idx,
+  int8_t block_type,
+  int8_t transform_skip,
+  uint8_t lfnst_idx);
 
 int uvg_quantize_residual_generic(encoder_state_t *const state,
   const cu_info_t *const cur_cu, const int width, const color_t color,

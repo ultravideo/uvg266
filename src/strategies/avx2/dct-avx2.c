@@ -1206,7 +1206,7 @@ const int16_t* uvg_g_mts_input[2][3][5] = {
   },
 };
 
-static void mts_dct_4x4_avx2(const int16_t* input, int16_t* output, tr_type_t type_hor, tr_type_t type_ver, uint8_t bitdepth)
+static void mts_dct_4x4_avx2(const int16_t* input, int16_t* output, tr_type_t type_hor, tr_type_t type_ver, uint8_t bitdepth, uint8_t lfnst_idx)
 {
   //const int height = 4;
   const int width = 4;
@@ -1229,7 +1229,7 @@ static void mts_dct_4x4_avx2(const int16_t* input, int16_t* output, tr_type_t ty
   _mm256_store_si256((__m256i*)output, result);
 }
 
-static void mts_idct_4x4_avx2(const int16_t* input, int16_t* output, tr_type_t type_hor, tr_type_t type_ver, uint8_t bitdepth)
+static void mts_idct_4x4_avx2(const int16_t* input, int16_t* output, tr_type_t type_hor, tr_type_t type_ver, uint8_t bitdepth, uint8_t lfnst_idx)
 {
   int32_t shift_1st = 7;
   int32_t shift_2nd = 12 - (bitdepth - 8);
@@ -1247,7 +1247,7 @@ static void mts_idct_4x4_avx2(const int16_t* input, int16_t* output, tr_type_t t
   _mm256_store_si256((__m256i*)output, result);
 }
 
-static void mts_dct_8x8_avx2(const int16_t* input, int16_t* output, tr_type_t type_hor, tr_type_t type_ver, uint8_t bitdepth)
+static void mts_dct_8x8_avx2(const int16_t* input, int16_t* output, tr_type_t type_hor, tr_type_t type_ver, uint8_t bitdepth, uint8_t lfnst_idx)
 {
   int32_t shift_1st = uvg_g_convert_to_bit[8] + 1 + (bitdepth - 8);
   int32_t shift_2nd = uvg_g_convert_to_bit[8] + 8;
@@ -1261,7 +1261,7 @@ static void mts_dct_8x8_avx2(const int16_t* input, int16_t* output, tr_type_t ty
   matmul_8x8_a_bt(dct2, tmpres, output, shift_2nd);
 }
 
-static void mts_idct_8x8_avx2(const int16_t* input, int16_t* output, tr_type_t type_hor, tr_type_t type_ver, uint8_t bitdepth)
+static void mts_idct_8x8_avx2(const int16_t* input, int16_t* output, tr_type_t type_hor, tr_type_t type_ver, uint8_t bitdepth, uint8_t lfnst_idx)
 {
   int32_t shift_1st = 7;
   int32_t shift_2nd = 12 - (bitdepth - 8);
@@ -1275,7 +1275,7 @@ static void mts_idct_8x8_avx2(const int16_t* input, int16_t* output, tr_type_t t
 }
 
 
-static void mts_dct_16x16_avx2(const int16_t* input, int16_t* output, tr_type_t type_hor, tr_type_t type_ver, uint8_t bitdepth)
+static void mts_dct_16x16_avx2(const int16_t* input, int16_t* output, tr_type_t type_hor, tr_type_t type_ver, uint8_t bitdepth, uint8_t lfnst_idx)
 {
   int32_t shift_1st = uvg_g_convert_to_bit[16] + 1 + (bitdepth - 8);
   int32_t shift_2nd = uvg_g_convert_to_bit[16] + 8;
@@ -1306,6 +1306,25 @@ static void mts_dct_16x16_avx2(const int16_t* input, int16_t* output, tr_type_t 
   // multiply completely
   matmul_16x16_a_bt(d_v, i_v, tmp, shift_1st);
   matmul_16x16_a_bt(d_v2, tmp, o_v, shift_2nd);
+
+  const int skip_line = lfnst_idx ? 8 : 0;
+  const int skip_line2 = lfnst_idx ? 8 : 0;
+  if (skip_line)
+  {
+    const int reduced_line = 8, cutoff = 8;
+    int16_t* dst2 = output + reduced_line;
+    for (int j = 0; j < cutoff; j++)
+    {
+      memset(dst2, 0, sizeof(int16_t) * skip_line);
+      dst2 += 16;
+    }
+  }
+
+  if (skip_line2)
+  {
+    int16_t* dst2 = output + 16 * 8;
+    memset(dst2, 0, sizeof(int16_t) * 16 * skip_line2);
+  }
 }
 
 /**********/
@@ -1395,7 +1414,7 @@ static void partial_butterfly_inverse_16_mts_avx2(const int16_t* src, int16_t* d
   }
 }
 
-static void mts_idct_16x16_avx2(const int16_t* input, int16_t* output, tr_type_t type_hor, tr_type_t type_ver, uint8_t bitdepth)
+static void mts_idct_16x16_avx2(const int16_t* input, int16_t* output, tr_type_t type_hor, tr_type_t type_ver, uint8_t bitdepth, uint8_t lfnst_idx)
 {
   int32_t shift_1st = 7;
   int32_t shift_2nd = 12 - (bitdepth - 8);
@@ -1510,7 +1529,7 @@ static void mul_clip_matrix_32x32_mts_avx2(const int16_t* left,
   }
 }
 
-static void mts_dct_32x32_avx2(const int16_t* input, int16_t* output, tr_type_t type_hor, tr_type_t type_ver, uint8_t bitdepth)
+static void mts_dct_32x32_avx2(const int16_t* input, int16_t* output, tr_type_t type_hor, tr_type_t type_ver, uint8_t bitdepth, uint8_t lfnst_idx)
 {
   int32_t shift_1st = uvg_g_convert_to_bit[32] + 1 + (bitdepth - 8); 
   int32_t shift_2nd = uvg_g_convert_to_bit[32] + 8; 
@@ -1519,15 +1538,19 @@ static void mts_dct_32x32_avx2(const int16_t* input, int16_t* output, tr_type_t 
   const int16_t* tdct = uvg_g_mts_input[1][type_hor][3];
   const int16_t* dct = uvg_g_mts_input[0][type_ver][3];
 
-  const int skip_width = (type_hor != DCT2) ? 16 : 0;
-  const int skip_height = (type_ver != DCT2) ? 16 : 0;
+  int skip_width = (type_hor != DCT2) ? 16 : 0;
+  int skip_height = (type_ver != DCT2) ? 16 : 0;
+  if(lfnst_idx) {
+    skip_width = 24;
+    skip_height = 24;
+  }
 
   mul_clip_matrix_32x32_mts_avx2(input, tdct, tmp, shift_1st, skip_width, 0 );
   mul_clip_matrix_32x32_mts_avx2(dct, tmp, output, shift_2nd, skip_width, skip_height);
 }
 
 
-static void mts_idct_32x32_avx2(const int16_t* input, int16_t* output, tr_type_t type_hor, tr_type_t type_ver, uint8_t bitdepth)
+static void mts_idct_32x32_avx2(const int16_t* input, int16_t* output, tr_type_t type_hor, tr_type_t type_ver, uint8_t bitdepth, uint8_t lfnst_idx)
 {
   int32_t shift_1st = 7; 
   int32_t shift_2nd = 12 - (bitdepth - 8); 
@@ -1542,7 +1565,7 @@ static void mts_idct_32x32_avx2(const int16_t* input, int16_t* output, tr_type_t
   mul_clip_matrix_32x32_mts_avx2(tmp, dct, output, shift_2nd, 0, 0);
 }
 
-typedef void tr_func(const int16_t*, int16_t*, tr_type_t , tr_type_t , uint8_t);
+typedef void tr_func(const int16_t*, int16_t*, tr_type_t , tr_type_t , uint8_t, uint8_t);
 
 // ToDo: Enable MTS 2x2 and 64x64 transforms
 static tr_func* dct_table[5] = {
@@ -1576,7 +1599,7 @@ static void mts_dct_avx2(
 
   uvg_get_tr_type(width, color, tu, &type_hor, &type_ver, mts_idx);
 
-  if (type_hor == DCT2 && type_ver == DCT2)
+  if (type_hor == DCT2 && type_ver == DCT2 && !tu->lfnst_idx)
   {
     dct_func* dct_func = uvg_get_dct_func(width, color, tu->type);
     dct_func(bitdepth, input, output);
@@ -1587,7 +1610,7 @@ static void mts_dct_avx2(
 
     tr_func* dct = dct_table[log2_width_minus2];
 
-    dct(input, output, type_hor, type_ver, bitdepth);
+    dct(input, output, type_hor, type_ver, bitdepth, tu->lfnst_idx);
   }
 }
 
@@ -1617,7 +1640,7 @@ static void mts_idct_avx2(
 
     tr_func* idct = idct_table[log2_width_minus2];
 
-    idct(input, output, type_hor, type_ver, bitdepth);
+    idct(input, output, type_hor, type_ver, bitdepth, tu->lfnst_idx);
   }
 }
 

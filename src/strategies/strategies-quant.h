@@ -46,7 +46,7 @@
 
 // Declare function pointers.
 typedef unsigned (quant_func)(const encoder_state_t * const state, coeff_t *coef, coeff_t *q_coef, int32_t width,
-  int32_t height, color_t color, int8_t scan_idx, int8_t block_type, int8_t transform_skip);
+  int32_t height, color_t color, int8_t scan_idx, int8_t block_type, int8_t transform_skip, uint8_t lfnst_idx);
 typedef unsigned (quant_cbcr_func)(
   encoder_state_t* const state,
   const cu_info_t* const cur_cu,

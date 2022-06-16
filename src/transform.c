@@ -246,7 +246,7 @@ void uvg_transform2d(const encoder_control_t * const encoder,
                      color_t color,
                      const cu_info_t *tu)
 {
-  if (encoder->cfg.mts)
+  if (encoder->cfg.mts || tu->lfnst_idx)
   {
     uvg_mts_dct(encoder->bitdepth, color, tu, block_size, block, coeff, encoder->cfg.mts);
   }
@@ -412,7 +412,8 @@ static void quantize_chroma(
   coeff_t v_quant_coeff[1024],
   const coeff_scan_order_t scan_order,
   bool* u_has_coeffs,
-  bool* v_has_coeffs)
+  bool* v_has_coeffs,
+  uint8_t lfnst_idx)
 {
   if (state->encoder_control->cfg.rdoq_enable &&
     (transforms[i] != CHROMA_TS || !state->encoder_control->cfg.rdoq_skip))
@@ -442,11 +443,11 @@ static void quantize_chroma(
   }
   else {
     uvg_quant(state, &u_coeff[i * trans_offset], u_quant_coeff, width, height, transforms[i] != JCCR_1 ? COLOR_U : COLOR_V,
-      scan_order, CU_INTRA, transforms[i] == CHROMA_TS);
+      scan_order, CU_INTRA, transforms[i] == CHROMA_TS, lfnst_idx);
 
     if (!IS_JCCR_MODE(transforms[i])) {
       uvg_quant(state, &v_coeff[i * trans_offset], v_quant_coeff, width, height, COLOR_V,
-        scan_order, CU_INTRA, transforms[i] == CHROMA_TS);
+        scan_order, CU_INTRA, transforms[i] == CHROMA_TS, lfnst_idx);
     }
   }
 
@@ -550,7 +551,9 @@ void uvg_chroma_transform_search(
       v_quant_coeff,
       scan_order,
       &u_has_coeffs,
-      &v_has_coeffs);
+      &v_has_coeffs,
+      pred_cu->lfnst_idx);
+    /*
     if(pred_cu->type == CU_INTRA && transforms[i] != CHROMA_TS) {
       bool constraints[2] = { false, false };
       uvg_derive_lfnst_constraints(pred_cu, depth, constraints, &u_coeff[i * trans_offset], width, height);
@@ -558,7 +561,7 @@ void uvg_chroma_transform_search(
         uvg_derive_lfnst_constraints(pred_cu, depth, constraints, &v_coeff[i * trans_offset], width, height);        
       }
       if ((constraints[0] || !constraints[1]) && pred_cu->lfnst_idx != 0) continue;
-    }
+    }*/
 
     if (IS_JCCR_MODE(transforms[i]) && !u_has_coeffs) continue;
 

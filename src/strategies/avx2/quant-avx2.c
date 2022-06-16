@@ -669,7 +669,7 @@ int uvg_quantize_residual_avx2(encoder_state_t *const state,
   }
   else {
     uvg_quant(state, coeff, coeff_out, width, width, color,
-      scan_order, cur_cu->type, cur_cu->tr_idx == MTS_SKIP && color == COLOR_Y);
+      scan_order, cur_cu->type, cur_cu->tr_idx == MTS_SKIP && color == COLOR_Y, cur_cu->lfnst_idx);
   }
 
   // Check if there are any non-zero coefficients.

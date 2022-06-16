@@ -347,8 +347,7 @@ static double search_intra_trdepth(
     for (int i = start_idx; i < end_idx + 1; ++i) {
       search_data->lfnst_costs[i] = MAX_DOUBLE;
     }
-    bool constraints[2] = { pred_cu->violates_lfnst_constrained_luma,
-                     pred_cu->lfnst_last_scan_pos };
+
 
     for (int lfnst_idx = start_idx; lfnst_idx <= end_idx; lfnst_idx++) {
       // Initialize lfnst variables
@@ -359,6 +358,8 @@ static double search_intra_trdepth(
 
       for (trafo = mts_start; trafo < num_transforms; trafo++) {
         pred_cu->tr_idx = trafo;
+        bool constraints[2] = { pred_cu->violates_lfnst_constrained_luma,
+                 pred_cu->lfnst_last_scan_pos };
         if (mts_enabled) {
           pred_cu->mts_last_scan_pos = 0;
           pred_cu->violates_mts_coeff_constraint = 0;
@@ -520,8 +521,8 @@ static double search_intra_trdepth(
     pred_cu->tr_skip = best_tr_idx == MTS_SKIP;
     pred_cu->tr_idx = best_tr_idx;
     pred_cu->lfnst_idx = best_lfnst_idx;
-    pred_cu->lfnst_last_scan_pos = constraints[1];
-    pred_cu->violates_lfnst_constrained_luma = constraints[0];
+    pred_cu->lfnst_last_scan_pos = false;
+    pred_cu->violates_lfnst_constrained_luma = false;
     nosplit_cost += best_rd_cost;
 
     // Early stop condition for the recursive search.
@@ -1435,7 +1436,7 @@ int8_t uvg_search_intra_chroma_rdo(
     int lfnst_modes_to_check[3];
     if(chroma_data->pred_cu.lfnst_idx) {
       lfnst_modes_to_check[0] = chroma_data->pred_cu.lfnst_idx;
-      lfnst_modes_to_check[1] = 0;
+      lfnst_modes_to_check[1] = -1;
       lfnst_modes_to_check[2] = -1;
     }
     else {
@@ -1457,10 +1458,10 @@ int8_t uvg_search_intra_chroma_rdo(
       uint8_t best_lfnst_index = 0;
       for (int lfnst_i = 0; lfnst_i < 3; ++lfnst_i) {
         const int lfnst = lfnst_modes_to_check[lfnst_i];
-        chroma_data[mode_i].lfnst_costs[lfnst] += mode_bits * state->lambda;
         if (lfnst == -1) {
           continue;
         }
+        chroma_data[mode_i].lfnst_costs[lfnst] += mode_bits * state->lambda;
         if (pred_cu->tr_depth == pred_cu->depth) {
           uvg_intra_predict(
             state,

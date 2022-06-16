@@ -157,6 +157,7 @@ TEST dct(void)
       cu_info_t tu;
       tu.type = CU_INTRA;
       tu.tr_idx = MTS_DST7_DST7 + trafo;
+      tu.lfnst_idx = 0;
 
       int16_t* buf = dct_bufs[trafo * NUM_SIZES + blocksize];
       ALIGNED(32) int16_t test_result[LCU_WIDTH * LCU_WIDTH] = { 0 };

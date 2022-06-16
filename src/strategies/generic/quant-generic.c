@@ -49,8 +49,17 @@
 * \brief quantize transformed coefficents
 *
 */
-void uvg_quant_generic(const encoder_state_t * const state, coeff_t *coef, coeff_t *q_coef, int32_t width,
-  int32_t height, color_t color, int8_t scan_idx, int8_t block_type, int8_t transform_skip)
+void uvg_quant_generic(
+  const encoder_state_t * const state,
+  coeff_t *coef,
+  coeff_t *q_coef,
+  int32_t width,
+  int32_t height,
+  color_t color,
+  int8_t scan_idx,
+  int8_t block_type,
+  int8_t transform_skip,
+  uint8_t lfnst_idx)
 {
   const encoder_control_t * const encoder = state->encoder_control;
   const uint32_t log2_block_size = uvg_g_convert_to_bit[width] + 2;
@@ -69,20 +78,41 @@ void uvg_quant_generic(const encoder_state_t * const state, coeff_t *coef, coeff
 
   uint32_t ac_sum = 0;
 
-  for (int32_t n = 0; n < width * height; n++) {
-    int32_t level = coef[n];
-    int64_t abs_level = (int64_t)abs(level);
-    int32_t  sign;
+  if(lfnst_idx == 0){
+    for (int32_t n = 0; n < width * height; n++) {
+      int32_t level = coef[n];
+      int64_t abs_level = (int64_t)abs(level);
+      int32_t sign;
 
-    sign = (level < 0 ? -1 : 1);
+      sign = (level < 0 ? -1 : 1);
 
-    int32_t curr_quant_coeff = quant_coeff[n];
-    level = (int32_t)((abs_level * curr_quant_coeff + add) >> q_bits);
-    ac_sum += level;
+      int32_t curr_quant_coeff = quant_coeff[n];
+      level = (int32_t)((abs_level * curr_quant_coeff + add) >> q_bits);
+      ac_sum += level;
 
-    level *= sign;
-    q_coef[n] = (coeff_t)(CLIP(-32768, 32767, level));
+      level *= sign;
+      q_coef[n] = (coeff_t)(CLIP(-32768, 32767, level));
 
+    }
+  }
+  else {
+    const int max_number_of_coeffs = ((width == 4 && height == 4) || (width == 8 && height == 8)) ? 8 : 16;
+    memset(q_coef, 0, width * height * sizeof(coeff_t));
+    for (int32_t n = 0; n < max_number_of_coeffs; n++) {
+      const uint32_t idx = scan[n];
+      int32_t level = coef[idx];
+      int64_t abs_level = (int64_t)abs(level);
+      int32_t sign;
+
+      sign = (level < 0 ? -1 : 1);
+
+      int32_t curr_quant_coeff = quant_coeff[n];
+      level = (abs_level * curr_quant_coeff + add) >> q_bits;
+      ac_sum += level;
+
+      level *= sign;
+      q_coef[idx] = (coeff_t)(CLIP(-32768, 32767, level));
+    }
   }
 
   // Signhiding
@@ -90,13 +120,27 @@ void uvg_quant_generic(const encoder_state_t * const state, coeff_t *coef, coeff
 
   int32_t delta_u[LCU_WIDTH*LCU_WIDTH >> 2];
 
-  for (int32_t n = 0; n < width * height; n++) {
-    int32_t level = coef[n];
-    int64_t abs_level = (int64_t)abs(level);
-    int32_t curr_quant_coeff = quant_coeff[n];
+  if(lfnst_idx == 0) {
+    for (int32_t n = 0; n < width * height; n++) {
+      int32_t level = coef[n];
+      int64_t abs_level = (int64_t)abs(level);
+      int32_t curr_quant_coeff = quant_coeff[n];
 
-    level = (int32_t)((abs_level * curr_quant_coeff + add) >> q_bits);
-    delta_u[n] = (int32_t)((abs_level * curr_quant_coeff - (level << q_bits)) >> q_bits8);
+      level = (int32_t)((abs_level * curr_quant_coeff + add) >> q_bits);
+      delta_u[n] = (int32_t)((abs_level * curr_quant_coeff - (level << q_bits)) >> q_bits8);
+    }
+  }
+  else {
+    const int max_number_of_coeffs = ((width == 4 && height == 4) || (width == 8 && height == 8)) ? 8 : 16;
+    for (int32_t n = 0; n < max_number_of_coeffs; n++) {
+      const uint32_t idx = scan[n];
+      int32_t level = coef[idx];
+      int64_t abs_level = (int64_t)abs(level);
+      int32_t curr_quant_coeff = quant_coeff[idx];
+
+      level = (abs_level * curr_quant_coeff + add) >> q_bits;
+      delta_u[idx] = (int32_t)((abs_level * curr_quant_coeff - (level << q_bits)) >> q_bits8);
+    }
   }
 
   if (ac_sum >= 2) {
@@ -277,7 +321,7 @@ int uvg_quant_cbcr_residual_generic(
   }
   else {
     uvg_quant(state, coeff, coeff_out, width, width, cur_cu->joint_cb_cr == 1 ? COLOR_V : COLOR_U,
-      scan_order, cur_cu->type, cur_cu->tr_idx == MTS_SKIP && false);
+      scan_order, cur_cu->type, cur_cu->tr_idx == MTS_SKIP && false, cur_cu->lfnst_idx);
   }
 
   int8_t has_coeffs = 0;
@@ -455,7 +499,7 @@ int uvg_quantize_residual_generic(encoder_state_t *const state,
   } else {
   
     uvg_quant(state, coeff, coeff_out, width, width, color,
-      scan_order, cur_cu->type, cur_cu->tr_idx == MTS_SKIP && color == COLOR_Y);
+      scan_order, cur_cu->type, cur_cu->tr_idx == MTS_SKIP && color == COLOR_Y, cur_cu->lfnst_idx);
   }
 
   // Check if there are any non-zero coefficients.
