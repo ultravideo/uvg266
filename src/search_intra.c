@@ -406,7 +406,7 @@ static double search_intra_trdepth(
           );
           // Temp constraints. Updating the actual pred_cu constraints here will break things later
 
-        if (constraints[0] || !constraints[1]) {
+        if (!constraints[1] && cbf_is_set(pred_cu->cbf, depth, COLOR_Y)) {
           //end_idx = 0;
           if (pred_cu->lfnst_idx > 0) {
             continue;
