@@ -6,7 +6,7 @@ set -e
 cd "$(dirname "$0")"
 
 date="$(date +"%B %Y")"
-version="$(awk '/VERSION/ {print $2}' ../CMakeLists.txt)"
+version="$(awk 'match($0,/VERSION [0-9]\.[0-9]\.[0-9]/) {print $2}' ../CMakeLists.txt)"
 manpage_file=../doc/uvg266.1
 
 cat <<EOF> $manpage_file
