@@ -1439,7 +1439,7 @@ int8_t uvg_search_intra_chroma_rdo(
         lfnst_modes_to_check[i] = i;
       }
     }
-    if(chroma_data->pred_cu.lfnst_idx) {
+    else if(chroma_data->pred_cu.lfnst_idx) {
       lfnst_modes_to_check[0] = chroma_data->pred_cu.lfnst_idx;
       lfnst_modes_to_check[1] = -1;
       lfnst_modes_to_check[2] = -1;
@@ -1524,10 +1524,8 @@ int8_t uvg_search_intra_chroma_rdo(
 
           if(chorma_ts_out.best_u_cost + chorma_ts_out.best_v_cost < chorma_ts_out.best_combined_cost) {
             chroma_data[mode_i].lfnst_costs[lfnst] += chorma_ts_out.best_u_cost + chorma_ts_out.best_v_cost;
-            if(lfnst == lfnst_modes_to_check[0] 
-              || (lfnst == 0 
-                && chroma_data[mode_i].lfnst_costs[lfnst] 
-                < chroma_data[mode_i].lfnst_costs[lfnst_modes_to_check[0]])) {
+            if( chroma_data[mode_i].lfnst_costs[lfnst] 
+                < chroma_data[mode_i].lfnst_costs[best_lfnst_index] || lfnst_i == 0) {
               chroma_data[mode_i].pred_cu.joint_cb_cr = 0;
               chroma_data[mode_i].pred_cu.tr_skip &= 1;
               chroma_data[mode_i].pred_cu.tr_skip |= (chorma_ts_out.best_u_index == CHROMA_TS) << COLOR_U;
@@ -1538,10 +1536,8 @@ int8_t uvg_search_intra_chroma_rdo(
           }
           else {
             chroma_data[mode_i].lfnst_costs[lfnst] += chorma_ts_out.best_combined_cost;
-            if (lfnst == lfnst_modes_to_check[0]
-              || (lfnst == 0
-                && chroma_data[mode_i].lfnst_costs[lfnst]
-                < chroma_data[mode_i].lfnst_costs[lfnst_modes_to_check[0]])) {
+            if (chroma_data[mode_i].lfnst_costs[lfnst]
+              < chroma_data[mode_i].lfnst_costs[best_lfnst_index] || lfnst_i == 0) {
               chroma_data[mode_i].pred_cu.joint_cb_cr = chorma_ts_out.best_combined_index;
               chroma_data[mode_i].pred_cu.tr_skip &= 1;
               best_lfnst_index = lfnst;

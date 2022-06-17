@@ -623,7 +623,7 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
   }
 
   if (uvg_is_lfnst_allowed(state, tr_cu, depth == 4 ? COLOR_UV : COLOR_Y, width, width, x_px, y_px)) {
-    const int lfnst_idx = tr_cu->lfnst_idx;
+    const int lfnst_idx = depth != 4 ? tr_cu->lfnst_idx : tr_cu->cr_lfnst_idx;
     CABAC_FBITS_UPDATE(
       cabac,
       &cabac->ctx.lfnst_idx_model[tr_cu->depth == 4],
@@ -941,6 +941,8 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
             lcu);
           intra_cost += uvg_cu_rd_cost_chroma(state, x_local, y_local, depth, &intra_search.pred_cu, lcu);
           intra_search.pred_cu.intra.mode = intra_mode;
+          intra_search.pred_cu.violates_lfnst_constrained_chroma = false;
+          intra_search.pred_cu.lfnst_last_scan_pos = false;
         }
 
       }

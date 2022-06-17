@@ -32,6 +32,7 @@
 
 #include "transform.h"
 
+#include "encode_coding_tree.h"
 #include "image.h"
 #include "uvg266.h"
 #include "lfnst_tables.h"
@@ -537,6 +538,12 @@ void uvg_chroma_transform_search(
       uvg_get_scan_order(pred_cu->type, mode, depth);
     bool u_has_coeffs = false;
     bool v_has_coeffs = false;
+    if(pred_cu->cr_lfnst_idx) {
+      uvg_fwd_lfnst(pred_cu, width, height, COLOR_U, pred_cu->cr_lfnst_idx, &u_coeff[i * trans_offset]);
+      if (!IS_JCCR_MODE(transforms[i])) {
+        uvg_fwd_lfnst(pred_cu, width, height, COLOR_V, pred_cu->cr_lfnst_idx, &v_coeff[i * trans_offset]);
+      }
+    }
     quantize_chroma(
       state,
       depth,
@@ -556,19 +563,23 @@ void uvg_chroma_transform_search(
     
     if(pred_cu->type == CU_INTRA && transforms[i] != CHROMA_TS && depth == 4) {
       bool constraints[2] = { false, false };
-      uvg_derive_lfnst_constraints(pred_cu, depth, constraints, &u_coeff[i * trans_offset], width, height);
+      uvg_derive_lfnst_constraints(pred_cu, depth, constraints, u_quant_coeff, width, height);
       if(!IS_JCCR_MODE(transforms[i])) {
-        uvg_derive_lfnst_constraints(pred_cu, depth, constraints, &v_coeff[i * trans_offset], width, height);        
+        uvg_derive_lfnst_constraints(pred_cu, depth, constraints, v_quant_coeff, width, height);
       }
-      if ((constraints[0] || !constraints[1]) && pred_cu->cr_lfnst_idx != 0) continue;
+      if (!constraints[1] && (u_has_coeffs || v_has_coeffs) && pred_cu->cr_lfnst_idx != 0) continue;
     }
 
     if (IS_JCCR_MODE(transforms[i]) && !u_has_coeffs) continue;
 
     if (u_has_coeffs) {
+
       uvg_dequant(state, u_quant_coeff, &u_coeff[i * trans_offset], width, width, transforms[i] != JCCR_1 ? COLOR_U : COLOR_V,
         pred_cu->type, transforms[i] == CHROMA_TS);
       if (transforms[i] != CHROMA_TS) {
+        if (pred_cu->cr_lfnst_idx) {
+          uvg_inv_lfnst(pred_cu, width, height, COLOR_U, pred_cu->cr_lfnst_idx, &u_coeff[i * trans_offset]);
+        }
         uvg_itransform2d(state->encoder_control, u_recon_resi, &u_coeff[i * trans_offset], width,
           transforms[i] != JCCR_1 ? COLOR_U : COLOR_V, pred_cu);
       }
@@ -593,6 +604,9 @@ void uvg_chroma_transform_search(
       uvg_dequant(state, v_quant_coeff, &v_coeff[i * trans_offset], width, width, COLOR_V,
         pred_cu->type, transforms[i] == CHROMA_TS);
       if (transforms[i] != CHROMA_TS) {
+        if (pred_cu->cr_lfnst_idx) {
+          uvg_inv_lfnst(pred_cu, width, height, COLOR_V, pred_cu->cr_lfnst_idx, &v_coeff[i * trans_offset]);
+        }
         uvg_itransform2d(state->encoder_control, v_recon_resi, &v_coeff[i * trans_offset], width,
           transforms[i] != JCCR_1 ? COLOR_U : COLOR_V, pred_cu);
       }
@@ -663,7 +677,7 @@ void uvg_chroma_transform_search(
       double coeff_cost = uvg_get_coeff_cost(
         state,
         u_quant_coeff,
-        NULL,
+        pred_cu,
         width,
         COLOR_U,
         scan_order,
@@ -679,11 +693,32 @@ void uvg_chroma_transform_search(
       v_bits += uvg_get_coeff_cost(
         state,
         v_quant_coeff,
-        NULL,
+        pred_cu,
         width,
         COLOR_V,
         scan_order,
         transforms[i] == CHROMA_TS);
+    }
+    if(depth == 4 && state->encoder_control->cfg.lfnst && 0) {
+      if(uvg_is_lfnst_allowed(state, pred_cu, COLOR_UV, width, height, 0 ,0)) {
+        const int lfnst_idx = pred_cu->cr_lfnst_idx;
+        CABAC_FBITS_UPDATE(
+          &state->search_cabac,
+          &state->search_cabac.ctx.lfnst_idx_model[1],
+          lfnst_idx != 0,
+          v_bits,
+          "lfnst_idx");
+        if (lfnst_idx > 0) {
+          CABAC_FBITS_UPDATE(
+            &state->search_cabac,
+            &state->search_cabac.ctx.lfnst_idx_model[2],
+            lfnst_idx == 2,
+            v_bits,
+            "lfnst_idx");
+        }
+      }
+      pred_cu->lfnst_last_scan_pos = false;
+      pred_cu->violates_lfnst_constrained_chroma = false;
     }
     if (!IS_JCCR_MODE(transforms[i])) {
       double u_cost = UVG_CHROMA_MULT * ssd_u + u_bits * state->frame->lambda;
