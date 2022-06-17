@@ -254,6 +254,12 @@ typedef int32_t mv_t;
 #define AMVP_MAX_NUM_CANDS 2
 #define AMVP_MAX_NUM_CANDS_MEM 3
 #define MRG_MAX_NUM_CANDS 6
+/**
+ * \brief Max number of merge candidates in Intra Block Copy
+ *
+ */
+#define IBC_MRG_MAX_NUM_CANDS 6
+
 
 #define MAX_NUM_HMVP_CANDS 5
 

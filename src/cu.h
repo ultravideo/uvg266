@@ -52,6 +52,7 @@ typedef enum {
   CU_INTRA  = 1,
   CU_INTER  = 2,
   CU_PCM    = 3,
+  CU_IBC    = 4,
 } cu_type_t;
 
 typedef enum {

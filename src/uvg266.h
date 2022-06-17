@@ -541,6 +541,9 @@ typedef struct uvg_config
   char* cabac_debug_file_name;
 
   uint8_t dual_tree;
+
+  uint8_t ibc; /* \brief Intra Block Copy parameter */
+
 } uvg_config;
 
 /**

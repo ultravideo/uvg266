@@ -694,7 +694,11 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
     WRITE_UE(stream, 0, "sps_internal_bit_depth_minus_input_bit_depth");
   }
 
-  WRITE_U(stream, 0, 1, "sps_ibc_enabled_flag");
+  WRITE_U(stream, encoder->cfg.ibc > 0 ? 1 : 0, 1, "sps_ibc_enabled_flag");
+  
+  if (encoder->cfg.ibc) {
+    WRITE_UE(stream,6 - IBC_MRG_MAX_NUM_CANDS, "sps_six_minus_max_num_ibc_merge_cand");
+  }
 
 #if LUMA_ADAPTIVE_DEBLOCKING_FILTER_QP_OFFSET
   // if(!no_ladf_constraint_flag)

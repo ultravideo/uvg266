@@ -221,6 +221,9 @@ int uvg_config_init(uvg_config *cfg)
   cfg->cabac_debug_file_name = NULL;
 
   cfg->dual_tree = 0;
+
+  cfg->ibc = 0;
+
   return 1;
 }
 
@@ -1474,6 +1477,14 @@ int uvg_config_parse(uvg_config *cfg, const char *name, const char *value)
   }
   else if OPT("dual-tree") {
     cfg->dual_tree = atobool(value);
+  }
+  else if OPT ("ibc") {
+    int ibc_value = atoi(value);
+    if (ibc_value < 0 || ibc_value > 2) {
+      fprintf(stderr, "ibc supports only range from 0 to 2\n");
+      return 0;
+    }
+    cfg->ibc = (uint8_t)ibc_value;
   }
   else {
     return 0;
