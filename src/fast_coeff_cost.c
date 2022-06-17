@@ -35,7 +35,7 @@
 #include "encoderstate.h"
 
 // Note: Assumes that costs are non-negative, for pretty obvious reasons
-static uint16_t to_q88(float f)
+static uint16_t to_q88(double f)
 {
   return (uint16_t)(f * 256.0f + 0.5f);
 }

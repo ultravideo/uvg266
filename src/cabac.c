@@ -204,7 +204,7 @@ void uvg_cabac_encode_trunc_bin(cabac_data_t * const data, const uint32_t bin_va
   int thresh;
   int symbol = bin_value;
   if (max_value > 256) {
-    int threshVal = 1 << 8;
+    uint32_t threshVal = 1 << 8;
     thresh = 8;
     while (threshVal <= max_value) {
       thresh++;
@@ -329,11 +329,11 @@ void uvg_cabac_write_coeff_remain(cabac_data_t * const cabac, const uint32_t rem
     unsigned prefix_length = 0;
     unsigned code_value = (bins >> rice_param) - cutoff;
     unsigned suffix_length;
-    if (code_value >= ((1 << max_prefix_length) - 1)) {
+    if ((int32_t)code_value >= ((1 << max_prefix_length) - 1)) {
       prefix_length = max_prefix_length;
       suffix_length = 15 /*max_log2_tr_dynamic_range*/;
     } else {
-      while (code_value > ((2 << prefix_length) - 2)) {
+      while ((int32_t)code_value > ((2 << prefix_length) - 2)) {
         prefix_length++;
       }
       suffix_length = prefix_length + rice_param + 1;

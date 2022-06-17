@@ -817,7 +817,7 @@ static void encoder_state_worker_encode_lcu_bitstream(void * opaque)
 
 
   pthread_mutex_lock(&state->frame->rc_lock);
-  const uint32_t bits = uvg_bitstream_tell(&state->stream) - existing_bits;
+  const uint32_t bits = (const uint32_t)(uvg_bitstream_tell(&state->stream) - existing_bits);
   state->frame->cur_frame_bits_coded += bits;
   // This variable is used differently by intra and inter frames and shouldn't
   // be touched in intra frames here
@@ -902,7 +902,7 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
     
     // Encode every LCU in order and perform SAO reconstruction after every
     // frame is encoded. Deblocking and SAO search is done during LCU encoding.
-    for (int i = 0; i < state->lcu_order_count; ++i) {
+    for (uint32_t i = 0; i < state->lcu_order_count; ++i) {
       encoder_state_worker_encode_lcu_search(&state->lcu_order[i]);
       // Without alf we can code the bitstream right after each LCU to update cabac contexts
       if (encoder->cfg.alf_type == 0) {
@@ -916,7 +916,7 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
       // If ALF was used the bitstream coding was simulated in search, reset the cabac/stream
       // And write the actual bitstream
       encoder_state_init_children_after_simulation(state);
-      for (int i = 0; i < state->lcu_order_count; ++i) {
+      for (uint32_t i = 0; i < state->lcu_order_count; ++i) {
         encoder_state_worker_encode_lcu_bitstream(&state->lcu_order[i]);
       }
     }
@@ -952,7 +952,7 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
       ref_state = state->previous_encoder_state;
     }
 
-    for (int i = 0; i < state->lcu_order_count; ++i) {
+    for (uint32_t i = 0; i < state->lcu_order_count; ++i) {
       const lcu_order_element_t * const lcu = &state->lcu_order[i];
 
       uvg_threadqueue_free_job(&state->tile->wf_jobs[lcu->id]);
@@ -1261,7 +1261,7 @@ void uvg_encoder_create_ref_lists(const encoder_state_t *const state)
   int num_positive = 0;
 
   // Add positive references to L1 list
-  for (int i = 0; i < state->frame->ref->used_size; i++) {
+  for (uint32_t i = 0; i < state->frame->ref->used_size; i++) {
     if (state->frame->ref->pocs[i] > state->frame->poc) {
       state->frame->ref_LX[1][state->frame->ref_LX_size[1]] = i;
       state->frame->ref_LX_size[1] += 1;
@@ -1275,7 +1275,7 @@ void uvg_encoder_create_ref_lists(const encoder_state_t *const state)
     (cfg->bipred && (cfg->gop_len == 0 || cfg->gop_lowdelay));
 
   // Add negative references to L0 and L1 lists.
-  for (int i = 0; i < state->frame->ref->used_size; i++) {
+  for (uint32_t i = 0; i < state->frame->ref->used_size; i++) {
     if (state->frame->ref->pocs[i] < state->frame->poc) {
       state->frame->ref_LX[0][state->frame->ref_LX_size[0]] = i;
       state->frame->ref_LX_size[0] += 1;
@@ -1517,7 +1517,7 @@ static void init_erp_aqp_roi(const encoder_control_t *encoder, uvg_picture *fram
     // Normalize.
     lcu_weight = (lcu_weight * frame_height) / (total_weight * lcu_height);
 
-    int8_t qp_delta = round(-ERP_AQP_STRENGTH * log2(lcu_weight));
+    int8_t qp_delta = (int8_t)(round(-ERP_AQP_STRENGTH * log2(lcu_weight)));
 
     if (orig_roi) {
       // If a ROI array already exists, we copy the existing values to the
@@ -1595,7 +1595,7 @@ static void next_roi_frame_from_file(uvg_picture *frame, FILE *file, enum uvg_ro
   frame->roi.roi_array = dqp_array;
 
   if (format == UVG_ROI_TXT) {
-    for (int i = 0; i < size; ++i) {
+    for (uint32_t i = 0; i < size; ++i) {
       int number; // Need a pointer to int for fscanf
       if (fscanf(file, "%d", &number) != 1) {
         fprintf(stderr, "Reading ROI file failed.\n");
@@ -1663,8 +1663,8 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, uvg_pict
     unsigned y_lim = state->tile->frame->height_in_lcu;
     
     unsigned id = 0;
-    for (int y = 0; y < y_lim; ++y) {
-      for (int x = 0; x < x_lim; ++x) {
+    for (uint32_t y = 0; y < y_lim; ++y) {
+      for (uint32_t x = 0; x < x_lim; ++x) {
         uvg_pixel tmp[LCU_LUMA_SIZE];
         int pxl_x = x * LCU_WIDTH;
         int pxl_y = y * LCU_WIDTH;

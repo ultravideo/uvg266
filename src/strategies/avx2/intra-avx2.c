@@ -144,7 +144,7 @@ static void uvg_angular_pred_avx2(
   uvg_pixel temp_side[2 * 128 + 3 + 33 * MAX_REF_LINE_IDX] = { 0 };
   const int_fast32_t width = 1 << log2_width;
 
-  uint32_t pred_mode = intra_mode; // ToDo: handle WAIP
+  int32_t pred_mode = intra_mode; // ToDo: handle WAIP
 
   // Whether to swap references to always project on the left reference row.
   const bool vertical_mode = intra_mode >= 34;

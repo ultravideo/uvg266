@@ -124,9 +124,9 @@ void uvg_calc_seq_stats(struct encoder_state_t* const state, const videoframe_t*
 
   int32_t m_binNum = PIC_CODE_CW_BINS;
   uvg_pixel* picY = &frame->source->y[0];
-  const int width = frame->source->width;
-  const int height = frame->source->height;
-  const int stride = frame->source->stride;
+  const uint32_t width = frame->source->width;
+  const uint32_t height = frame->source->height;
+  const uint32_t stride = frame->source->stride;
   uint32_t winLens = (aps->m_binNum == PIC_CODE_CW_BINS) ? (MIN(height, width) / 240) : 2;
   winLens = winLens > 0 ? winLens : 1;
 
@@ -336,9 +336,9 @@ void uvg_calc_seq_stats(struct encoder_state_t* const state, const videoframe_t*
   picY = &frame->source->y[CU_TO_PIXEL(0, 0, 0, frame->source->stride)];
   double avgY = 0.0;
   double varY = 0.0;
-  for (int y = 0; y < height; y++)
+  for (uint32_t y = 0; y < height; y++)
   {
-    for (int x = 0; x < width; x++)
+    for (uint32_t x = 0; x < width; x++)
     {
       avgY += picY[x];
       varY += (double)picY[x] * (double)picY[x];
@@ -1083,9 +1083,9 @@ void uvg_lmcs_preanalyzer(struct encoder_state_t* const state, const videoframe_
       {
         aps->m_binNum = PIC_CODE_CW_BINS;
         uvg_pixel* picY = &frame->source->y[0];
-        const int width = frame->source->width;
-        const int height = frame->source->height;
-        const int stride = frame->source->stride;
+        const uint32_t width = frame->source->width;
+        const uint32_t height = frame->source->height;
+        const uint32_t stride = frame->source->stride;
         uint32_t binCnt[PIC_CODE_CW_BINS] = { 0 };
         
         uvg_init_lmcs_seq_stats(&aps->m_srcSeqStats, aps->m_binNum);
@@ -1109,9 +1109,9 @@ void uvg_lmcs_preanalyzer(struct encoder_state_t* const state, const videoframe_
         double avgY = 0.0;
         double varY = 0.0;
         picY = &frame->source->y[0];
-        for (int y = 0; y < height; y++)
+        for (uint32_t y = 0; y < height; y++)
         {
-          for (int x = 0; x < width; x++)
+          for (uint32_t x = 0; x < width; x++)
           {
             avgY += picY[x];
             varY += (double)picY[x] * (double)picY[x];
@@ -1128,14 +1128,14 @@ void uvg_lmcs_preanalyzer(struct encoder_state_t* const state, const videoframe_
 
           uvg_pixel* picU = &frame->source->u[0];
           uvg_pixel* picV = &frame->source->v[0];
-          const int widthC = frame->source->width>>1;
-          const int heightC = frame->source->height>>1;
-          const int strideC = frame->source->stride>>1;
+          const uint32_t widthC = frame->source->width>>1;
+          const uint32_t heightC = frame->source->height>>1;
+          const uint32_t strideC = frame->source->stride>>1;
           double avgU = 0.0, avgV = 0.0;
           double varU = 0.0, varV = 0.0;
-          for (int y = 0; y < heightC; y++)
+          for (uint32_t y = 0; y < heightC; y++)
           {
-            for (int x = 0; x < widthC; x++)
+            for (uint32_t x = 0; x < widthC; x++)
             {
               avgU += picU[x];
               avgV += picV[x];
@@ -1188,7 +1188,7 @@ static void adjust_lmcs_pivot(lmcs_aps* aps)
     aps->m_reshapePivot[i + 1] = aps->m_reshapePivot[i] + aps->m_binCW[i];
   }
   int segIdxMax = (aps->m_reshapePivot[aps->m_sliceReshapeInfo.reshaperModelMaxBinIdx + 1] >> log2SegSize);
-  for (int i = aps->m_sliceReshapeInfo.reshaperModelMinBinIdx; i <= aps->m_sliceReshapeInfo.reshaperModelMaxBinIdx; i++)
+  for (uint32_t i = aps->m_sliceReshapeInfo.reshaperModelMinBinIdx; i <= aps->m_sliceReshapeInfo.reshaperModelMaxBinIdx; i++)
   {
     aps->m_reshapePivot[i + 1] = aps->m_reshapePivot[i] + aps->m_binCW[i];
     int segIdxCurr = (aps->m_reshapePivot[i] >> log2SegSize);
@@ -1199,7 +1199,7 @@ static void adjust_lmcs_pivot(lmcs_aps* aps)
       if (segIdxCurr == segIdxMax)
       {
         aps->m_reshapePivot[i] = aps->m_reshapePivot[aps->m_sliceReshapeInfo.reshaperModelMaxBinIdx + 1];
-        for (int j = i; j <= aps->m_sliceReshapeInfo.reshaperModelMaxBinIdx; j++)
+        for (uint32_t j = i; j <= aps->m_sliceReshapeInfo.reshaperModelMaxBinIdx; j++)
         {
           aps->m_reshapePivot[j + 1] = aps->m_reshapePivot[i];
           aps->m_binCW[j] = 0;
@@ -1213,7 +1213,7 @@ static void adjust_lmcs_pivot(lmcs_aps* aps)
         aps->m_reshapePivot[i + 1] += adjustVal;
         aps->m_binCW[i] += adjustVal;
 
-        for (int j = i + 1; j <= aps->m_sliceReshapeInfo.reshaperModelMaxBinIdx; j++)
+        for (uint32_t j = i + 1; j <= aps->m_sliceReshapeInfo.reshaperModelMaxBinIdx; j++)
         {
           if (aps->m_binCW[j] < (adjustVal + (orgCW >> 3)))
           {
@@ -1246,7 +1246,7 @@ static void adjust_lmcs_pivot(lmcs_aps* aps)
 
 static int get_pwl_idx_inv(lmcs_aps* aps,int lumaVal)
 {
-  int idxS = 0;
+  uint32_t idxS = 0;
   for (idxS = aps->m_sliceReshapeInfo.reshaperModelMinBinIdx; (idxS <= aps->m_sliceReshapeInfo.reshaperModelMaxBinIdx); idxS++)
   {
     if (lumaVal < aps->m_reshapePivot[idxS + 1])     break;
@@ -1304,7 +1304,7 @@ void uvg_construct_reshaper_lmcs(lmcs_aps* aps)
   adjust_lmcs_pivot(aps);
 
   int maxAbsDeltaCW = 0, absDeltaCW = 0, deltaCW = 0;
-  for (int i = aps->m_sliceReshapeInfo.reshaperModelMinBinIdx; i <= aps->m_sliceReshapeInfo.reshaperModelMaxBinIdx; i++)
+  for (uint32_t i = aps->m_sliceReshapeInfo.reshaperModelMinBinIdx; i <= aps->m_sliceReshapeInfo.reshaperModelMaxBinIdx; i++)
   {
     deltaCW = (int)aps->m_binCW[i] - (int)aps->m_initCW;
     aps->m_sliceReshapeInfo.reshaperModelBinCWDelta[i] = deltaCW;
@@ -1365,7 +1365,7 @@ static void code_lmcs_aps(encoder_state_t* const state, lmcs_aps* aps)
   assert(aps->m_sliceReshapeInfo.maxNbitsNeededDeltaCW > 0);
   WRITE_UE(stream, aps->m_sliceReshapeInfo.maxNbitsNeededDeltaCW - 1, "lmcs_delta_cw_prec_minus1");
 
-  for (int i = aps->m_sliceReshapeInfo.reshaperModelMinBinIdx; i <= aps->m_sliceReshapeInfo.reshaperModelMaxBinIdx; i++)
+  for (uint32_t i = aps->m_sliceReshapeInfo.reshaperModelMinBinIdx; i <= aps->m_sliceReshapeInfo.reshaperModelMaxBinIdx; i++)
   {
     int deltaCW = aps->m_sliceReshapeInfo.reshaperModelBinCWDelta[i];
     int signCW = (deltaCW < 0) ? 1 : 0;
@@ -1425,7 +1425,7 @@ void uvg_encode_lmcs_adaptive_parameter_set(encoder_state_t* const state)
 */
 static int getPWLIdxInv(lmcs_aps* aps, int lumaVal)
 {
-  int idxS = 0;
+  uint32_t idxS = 0;
   for (idxS = aps->m_sliceReshapeInfo.reshaperModelMinBinIdx; (idxS <= aps->m_sliceReshapeInfo.reshaperModelMaxBinIdx); idxS++)
   {
     if (lumaVal < aps->m_reshapePivot[idxS + 1])     break;
@@ -1491,7 +1491,7 @@ int uvg_calculate_lmcs_chroma_adj_vpdu_nei(encoder_state_t* const state, lmcs_ap
     {
       for (int i = 0; i < numNeighbor; i++)
       {
-        int k = (yPos + i) >= picH ? (picH - yPos - 1) : i;
+        int k = (yPos + i) >= (int32_t)picH ? (picH - yPos - 1) : i;
         recLuma += recSrc0[-1 + k * strideY];
         pelnum++;
       }
@@ -1500,7 +1500,7 @@ int uvg_calculate_lmcs_chroma_adj_vpdu_nei(encoder_state_t* const state, lmcs_ap
     {
       for (int i = 0; i < numNeighbor; i++)
       {
-        int k = (xPos + i) >= picW ? (picW - xPos - 1) : i;
+        int k = (xPos + i) >= (int32_t)picW ? (picW - xPos - 1) : i;
         recLuma += recSrc0[-strideY + k];
         pelnum++;
       }

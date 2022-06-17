@@ -823,7 +823,7 @@ static INLINE void bipred_average_px_px_template_avx2(uvg_pixel *dst,
   assert(!(pu_w == 2 && pu_h == 8) && "Branch for 2x8 not yet implemented.");
 
   if (has_pow2_width && area_mod_32 == 0) {
-    for (int i = 0; i < pu_w * pu_h; i += 32) {
+    for (uint32_t i = 0; i < pu_w * pu_h; i += 32) {
 
       int y = i / pu_w;
       int x = i % pu_w;
@@ -844,10 +844,10 @@ static INLINE void bipred_average_px_px_template_avx2(uvg_pixel *dst,
       }
     }
   } else if (area_mod_32 == 0) {
-    for (int i = 0; i < pu_w * pu_h; i += 24) {
+    for (uint32_t i = 0; i < pu_w * pu_h; i += 24) {
 
-      int y = i / pu_w;
-      int x = i % pu_w;
+      uint32_t y = i / pu_w;
+      uint32_t x = i % pu_w;
 
       // Last 64 bits of the 256 are not used to simplify the loop
       __m256i mask      = _mm256_setr_epi64x(-1, -1, -1, 0);
@@ -869,7 +869,7 @@ static INLINE void bipred_average_px_px_template_avx2(uvg_pixel *dst,
     switch (pu_w) {
       __m128i sample_L0, sample_L1, avg;
       case 8: // 8x2, 8x6
-        for (int i = 0; i < pu_w * pu_h; i += 16) {
+        for (uint32_t i = 0; i < pu_w * pu_h; i += 16) {
 
           int y = i / pu_w;
 
@@ -881,7 +881,7 @@ static INLINE void bipred_average_px_px_template_avx2(uvg_pixel *dst,
         }
         break;
       case 6: // 6x8
-        for (int i = 0; i < pu_w * pu_h; i += 12) {
+        for (uint32_t i = 0; i < pu_w * pu_h; i += 12) {
 
           int y = i / pu_w;
 
@@ -935,7 +935,7 @@ static INLINE void bipred_average_px_px_avx2(uvg_pixel *dst,
     int32_t shift = 15 - UVG_BIT_DEPTH; // TODO: defines
     int32_t offset = 1 << (shift - 1);
 
-    for (int i = 0; i < pu_w * pu_h; ++i)
+    for (uint32_t i = 0; i < pu_w * pu_h; ++i)
     {
       int y = i / pu_w;
       int x = i % pu_w;
@@ -964,7 +964,7 @@ static INLINE void bipred_average_im_im_template_avx2(uvg_pixel *dst,
   assert(!(pu_w == 2 && pu_h == 8) && "Branch for 2x8 not yet implemented.");
 
   if (has_pow2_width && area_mod_32 == 0) {
-    for (int i = 0; i < pu_w * pu_h; i += 32) {
+    for (uint32_t i = 0; i < pu_w * pu_h; i += 32) {
       int y = i / pu_w;
       int x = i % pu_w;
 
@@ -1011,7 +1011,7 @@ static INLINE void bipred_average_im_im_template_avx2(uvg_pixel *dst,
       }
     }
   } else if (area_mod_32 == 0) {
-    for (int i = 0; i < pu_w * pu_h; i += 24) {
+    for (uint32_t i = 0; i < pu_w * pu_h; i += 24) {
 
       int y = i / pu_w;
       int x = i % pu_w;
@@ -1062,7 +1062,7 @@ static INLINE void bipred_average_im_im_template_avx2(uvg_pixel *dst,
     // 8x2, 8x6, 6x8 blocks (and maybe 2x8 in the future)
     switch (pu_w) {
       case 8: // 8x2, 8x6
-        for (int i = 0; i < pu_w * pu_h; i += 16) {
+        for (uint32_t i = 0; i < pu_w * pu_h; i += 16) {
 
           int y = i / pu_w;
 
@@ -1092,7 +1092,7 @@ static INLINE void bipred_average_im_im_template_avx2(uvg_pixel *dst,
         }
         break;
       case 6: // 6x8
-        for (int i = 0; i < pu_w * pu_h; i += 12) {
+        for (uint32_t i = 0; i < pu_w * pu_h; i += 12) {
 
           int y = i / pu_w;
 
@@ -1163,7 +1163,7 @@ static void bipred_average_im_im_avx2(uvg_pixel *dst,
     int32_t shift = 15 - UVG_BIT_DEPTH; // TODO: defines
     int32_t offset = 1 << (shift - 1);
 
-    for (int i = 0; i < pu_w * pu_h; ++i)
+    for (uint32_t i = 0; i < pu_w * pu_h; ++i)
     {
       int y = i / pu_w;
       int x = i % pu_w;
@@ -1192,7 +1192,7 @@ static INLINE void bipred_average_px_im_template_avx2(uvg_pixel *dst,
   assert(!(pu_w == 2 && pu_h == 8) && "Branch for 2x8 not yet implemented.");
 
   if (has_pow2_width && area_mod_32 == 0) {
-    for (int i = 0; i < pu_w * pu_h; i += 32) {
+    for (uint32_t i = 0; i < pu_w * pu_h; i += 32) {
 
       int y = i / pu_w;
       int x = i % pu_w;
@@ -1242,7 +1242,7 @@ static INLINE void bipred_average_px_im_template_avx2(uvg_pixel *dst,
       }
     }
   } else if (area_mod_32 == 0) {
-    for (int i = 0; i < pu_w * pu_h; i += 24) {
+    for (uint32_t i = 0; i < pu_w * pu_h; i += 24) {
 
       int y = i / pu_w;
       int x = i % pu_w;
@@ -1297,7 +1297,7 @@ static INLINE void bipred_average_px_im_template_avx2(uvg_pixel *dst,
     // 8x2, 8x6, 6x8 blocks (and maybe 2x8 in the future)
     switch (pu_w) {
       case 8: // 8x2, 8x6
-        for (int i = 0; i < pu_w * pu_h; i += 16) {
+        for (uint32_t i = 0; i < pu_w * pu_h; i += 16) {
 
           int y = i / pu_w;
 
@@ -1329,7 +1329,7 @@ static INLINE void bipred_average_px_im_template_avx2(uvg_pixel *dst,
         }
         break;
       case 6: // 6x8
-        for (int i = 0; i < pu_w * pu_h; i += 12) {
+        for (uint32_t i = 0; i < pu_w * pu_h; i += 12) {
 
           int y = i / pu_w;
 
@@ -1404,7 +1404,7 @@ static void bipred_average_px_im_avx2(uvg_pixel *dst,
     int32_t shift = 15 - UVG_BIT_DEPTH; // TODO: defines
     int32_t offset = 1 << (shift - 1);
 
-    for (int i = 0; i < pu_w * pu_h; ++i)
+    for (uint32_t i = 0; i < pu_w * pu_h; ++i)
     {
       int y = i / pu_w;
       int x = i % pu_w;

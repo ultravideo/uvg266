@@ -52,7 +52,7 @@ static void array_md5_generic(const uvg_pixel* data,
   uint32_t width_modN = width % N;
   uint32_t width_less_modN = width - width_modN;
 
-  for (uint32_t y = 0; y < height; y++)
+  for (uint32_t y = 0; y < (uint32_t)height; y++)
   {
     for (uint32_t x = 0; x < width_less_modN; x += N)
     {      

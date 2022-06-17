@@ -48,7 +48,7 @@ static INLINE unsigned uvg_math_floor_log2(unsigned value)
 
   for (int i = 4; i >= 0; --i) {
     unsigned bits = 1ull << i;
-    unsigned shift = value >= (1 << bits) ? bits : 0;
+    unsigned shift = (int32_t)value >= (1 << bits) ? bits : 0;
     result += shift;
     value >>= shift;
   }

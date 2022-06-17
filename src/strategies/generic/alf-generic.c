@@ -945,11 +945,11 @@ static void alf_get_blk_stats_generic(encoder_state_t* const state,
             {
               if (0/*m_alfWSSD*/)
               {
-                alf_covariance[class_idx].ee[k][l][b0][b1] += weight * (e_local[k][b0] * (double)e_local[l][b1]);
+                alf_covariance[class_idx].ee[k][l][b0][b1] += (int64_t)(weight * (e_local[k][b0] * (double)e_local[l][b1]));
               }
               else
               {
-                alf_covariance[class_idx].ee[k][l][b0][b1] += e_local[k][b0] * (double)e_local[l][b1];
+                alf_covariance[class_idx].ee[k][l][b0][b1] += (int32_t)(e_local[k][b0] * (double)e_local[l][b1]);
               }
             }
           }
@@ -958,11 +958,11 @@ static void alf_get_blk_stats_generic(encoder_state_t* const state,
         {
           if (0/*m_alfWSSD*/)
           {
-            alf_covariance[class_idx].y[k][b] += weight * (e_local[k][b] * (double)y_local);
+            alf_covariance[class_idx].y[k][b] += (int32_t)(weight * (e_local[k][b] * (double)y_local));
           }
           else
           {
-            alf_covariance[class_idx].y[k][b] += e_local[k][b] * (double)y_local;
+            alf_covariance[class_idx].y[k][b] += (int32_t)(e_local[k][b] * (double)y_local);
           }
         }
       }

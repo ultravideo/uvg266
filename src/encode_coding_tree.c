@@ -50,9 +50,9 @@
 static bool is_mts_allowed(encoder_state_t * const state, cu_info_t *const pred_cu)
 {
   uint32_t ts_max_size = 1 << 2; //cu.cs->sps->getLog2MaxTransformSkipBlockSize();
-  const int max_size = 32; // CU::isIntra(cu) ? MTS_INTRA_MAX_CU_SIZE : MTS_INTER_MAX_CU_SIZE;
-  const int cu_width = LCU_WIDTH >> pred_cu->depth;
-  const int cu_height = LCU_WIDTH >> pred_cu->depth;
+  const uint32_t max_size = 32; // CU::isIntra(cu) ? MTS_INTRA_MAX_CU_SIZE : MTS_INTER_MAX_CU_SIZE;
+  const uint32_t cu_width    = LCU_WIDTH >> pred_cu->depth;
+  const uint32_t cu_height   = LCU_WIDTH >> pred_cu->depth;
   //bool mts_allowed = cu.chType == CHANNEL_TYPE_LUMA && compID == COMPONENT_Y;
 
   uint8_t mts_type = state->encoder_control->cfg.mts;
@@ -109,7 +109,7 @@ void uvg_encode_ts_residual(encoder_state_t* const state,
   int8_t scan_mode) {
   //const encoder_control_t * const encoder = state->encoder_control;
   //int c1 = 1;
-  int32_t i;
+  uint32_t i;
   int32_t blk_pos;
   // ToDo: large block support in VVC?
   uint32_t sig_coeffgroup_flag[32 * 32] = { 0 };
@@ -132,7 +132,7 @@ void uvg_encode_ts_residual(encoder_state_t* const state,
   unsigned scan_cg_last = (unsigned )-1;
   //unsigned scan_pos_last = (unsigned )-1;
 
-  for (int i = 0; i < width * width; i++) {
+  for (i = 0; i < width * width; i++) {
     if (coeff[scan[i]]) {
       //scan_pos_last = i;
       sig_coeffgroup_flag[scan_cg[i >> log2_cg_size]] = 1;
@@ -227,8 +227,8 @@ void uvg_encode_ts_residual(encoder_state_t* const state,
     }
 
 
-    int cutoffVal = 2;
-    int numGtBins = 4;
+    uint32_t cutoffVal = 2;
+    uint32_t numGtBins = 4;
     for (int scanPos = firstSigPos; scanPos <= min_sub_pos && maxCtxBins >= 4; scanPos++)
     {
       blk_pos = scan[scanPos];
@@ -239,7 +239,7 @@ void uvg_encode_ts_residual(encoder_state_t* const state,
       belowPixel = pos_y > 0 ? coeff[pos_x + (pos_y - 1) * width] : 0;
       absLevel = uvg_derive_mod_coeff(rightPixel, belowPixel, abs(coeff[blk_pos]), 0);
       cutoffVal = 2;
-      for (int i = 0; i < numGtBins; i++)
+      for (i = 0; i < numGtBins; i++)
       {
         if (absLevel >= cutoffVal)
         {

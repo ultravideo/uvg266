@@ -135,7 +135,7 @@ static uvg_encoder * uvg266_open(const uvg_config *cfg)
     encoder->states[i].frame->QP = (int8_t)cfg->qp;
   }
 
-  for (int i = 0; i < encoder->num_encoder_states; ++i) {
+  for (uint32_t i = 0; i < encoder->num_encoder_states; ++i) {
     if (i == 0) {
       encoder->states[i].previous_encoder_state = &encoder->states[encoder->num_encoder_states - 1];
     } else {
@@ -190,7 +190,7 @@ static int uvg266_headers(uvg_encoder *enc,
   uvg_encoder_state_write_parameter_sets(&stream, &enc->states[enc->cur_state_num]);
 
   // Get stream length before taking chunks since that clears the stream.
-  if (len_out) *len_out = uvg_bitstream_tell(&stream) / 8;
+  if (len_out) *len_out = (uint32_t)(uvg_bitstream_tell(&stream) / 8);
   if (data_out) *data_out = uvg_bitstream_take_chunks(&stream);
 
   uvg_bitstream_finalize(&stream);
@@ -213,25 +213,25 @@ static int yuv_io_extract_field(const uvg_picture *frame_in, unsigned source_sca
   if ((source_scan_type != 1) && (source_scan_type != 2)) return 0;
   if ((field_parity != 0)     && (field_parity != 1))     return 0;
 
-  unsigned offset = 0;
+  int32_t offset = 0;
   if (source_scan_type == 1) offset = field_parity ? 1 : 0;
   else if (source_scan_type == 2) offset = field_parity ? 0 : 1;  
 
   //Luma
-  for (int i = 0; i < field_out->height; ++i){
+  for (int32_t i = 0; i < field_out->height; ++i){
     uvg_pixel *row_in  = frame_in->y + MIN(frame_in->height - 1, 2 * i + offset) * frame_in->stride;
     uvg_pixel *row_out = field_out->y + i * field_out->stride;
     memcpy(row_out, row_in, sizeof(uvg_pixel) * frame_in->stride);
   }
 
   //Chroma
-  for (int i = 0; i < field_out->height / 2; ++i){
+  for (int32_t i = 0; i < field_out->height / 2; ++i) {
     uvg_pixel *row_in = frame_in->u + MIN(frame_in->height / 2 - 1, 2 * i + offset) * frame_in->stride / 2;
     uvg_pixel *row_out = field_out->u + i * field_out->stride / 2;
     memcpy(row_out, row_in, sizeof(uvg_pixel) * frame_in->stride / 2);
   }
 
-  for (int i = 0; i < field_out->height / 2; ++i){
+  for (int32_t i = 0; i < field_out->height / 2; ++i) {
     uvg_pixel *row_in = frame_in->v + MIN(frame_in->height / 2 - 1, 2 * i + offset) * frame_in->stride / 2;
     uvg_pixel *row_out = field_out->v + i * field_out->stride / 2;
     memcpy(row_out, row_in, sizeof(uvg_pixel) * frame_in->stride / 2);
@@ -297,7 +297,7 @@ static int uvg266_encode(uvg_encoder *enc,
     uvg_threadqueue_free_job(&output_state->tqj_bitstream_written);
 
     // Get stream length before taking chunks since that clears the stream.
-    if (len_out) *len_out = uvg_bitstream_tell(&output_state->stream) / 8;
+    if (len_out) *len_out = (uint32_t)(uvg_bitstream_tell(&output_state->stream) / 8);
     if (data_out) *data_out = uvg_bitstream_take_chunks(&output_state->stream);
     if (pic_out) *pic_out = uvg_image_copy_ref(output_state->tile->frame->rec);
     if (src_out) *src_out = uvg_image_copy_ref(output_state->tile->frame->source);

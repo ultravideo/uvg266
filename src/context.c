@@ -638,7 +638,7 @@ uint32_t uvg_context_get_sig_coeff_group_ts(uint32_t* sig_coeff_group_flag,
 * \param temp_sum  temporary output value used in the next steps
 * \returns context index for current scan position
 */
-uint32_t uvg_context_get_sig_ctx_idx_abs(const coeff_t* coeff, int32_t pos_x, int32_t pos_y,
+uint32_t uvg_context_get_sig_ctx_idx_abs(const coeff_t* coeff, uint32_t pos_x, uint32_t pos_y,
                                          uint32_t height, uint32_t width, int8_t type,
                                          int32_t* temp_diag, int32_t* temp_sum)
 {
@@ -796,7 +796,7 @@ unsigned uvg_lrg1_ctx_id_abs_ts(const coeff_t* coeff, int32_t pos_x, int32_t pos
 * \param height    height of the block
 * \returns context go rice parameter
 */
-uint32_t uvg_abs_sum(const coeff_t* coeff, int32_t pos_x, int32_t pos_y,
+uint32_t uvg_abs_sum(const coeff_t* coeff, uint32_t pos_x, uint32_t pos_y,
                              uint32_t height, uint32_t width, uint32_t baselevel)
 {
 #define UPDATE(x) sum+=abs(x)/*-(x?1:0)*/
@@ -838,35 +838,9 @@ uint32_t uvg_abs_sum(const coeff_t* coeff, int32_t pos_x, int32_t pos_y,
 * \param height    height of the block
 * \returns context go rice parameter
 */
-uint32_t uvg_go_rice_par_abs(const coeff_t* coeff, int32_t pos_x, int32_t pos_y,
+uint32_t uvg_go_rice_par_abs(const coeff_t* coeff, uint32_t pos_x, uint32_t pos_y,
   uint32_t height, uint32_t width, uint32_t baselevel)
 {
-//#define UPDATE(x) sum+=abs(x)/*-(x?1:0)*/
-//
-//  const coeff_t* data = coeff + pos_x + pos_y * width;
-//  int           sum = 0;
-//  if (pos_x < width - 1)
-//  {
-//    UPDATE(data[1]);
-//    if (pos_x < width - 2)
-//    {
-//      UPDATE(data[2]);
-//    }
-//    if (pos_y < height - 1)
-//    {
-//      UPDATE(data[width + 1]);
-//    }
-//  }
-//  if (pos_y < height - 1)
-//  {
-//    UPDATE(data[width]);
-//    if (pos_y < height - 2)
-//    {
-//      UPDATE(data[width << 1]);
-//    }
-//  }
-//#undef UPDATE
   uint32_t check = uvg_abs_sum(coeff, pos_x, pos_y, height, width, baselevel);
-  return  g_go_rice_pars[check];
-  /*return  g_go_rice_pars[uvg_abs_sum(coeff, pos_x, pos_y, height, width, baselevel)];*/
+  return  g_go_rice_pars[check];  
 }

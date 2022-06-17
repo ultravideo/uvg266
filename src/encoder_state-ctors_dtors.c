@@ -362,7 +362,7 @@ int uvg_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
   //Create sub-encoders
   {
     const encoder_control_t * const encoder = child_state->encoder_control;
-    int child_count = 0;
+    uint32_t child_count = 0;
     //We first check the type of this element.
     //If it's a MAIN, it can allow both slices or tiles as child
     //If it's a TILE, it can allow slices as child, if its parent is not a slice, or wavefront rows if there is no other children
@@ -493,7 +493,7 @@ int uvg_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
 
         //Fix children parent (since we changed the address), except for the last one which is not ready yet
         {
-          int i, j;
+          uint32_t i, j;
           for (i = 0; child_state->children[i].encoder_control && i < child_count; ++i) {
             for (j = 0; child_state->children[i].children[j].encoder_control; ++j) {
               child_state->children[i].children[j].parent = &child_state->children[i];
@@ -579,7 +579,6 @@ int uvg_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
       //Remark: this could be optimized, but since it's run only once, it's better to do it in a understandable way.
       
       //By default, the full tile
-      int i;
       int lcu_id;
       int lcu_start = 0;
       //End is the element AFTER the end (iterate < lcu_end)
@@ -599,7 +598,7 @@ int uvg_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
       child_state->lcu_order = MALLOC(lcu_order_element_t, child_state->lcu_order_count);
       assert(child_state->lcu_order);
       
-      for (i = 0; i < child_state->lcu_order_count; ++i) {
+      for (uint32_t i = 0; i < child_state->lcu_order_count; ++i) {
         lcu_id = lcu_start + i;
         child_state->lcu_order[i].encoder_state = child_state;
         child_state->lcu_order[i].id = lcu_id;
@@ -623,11 +622,11 @@ int uvg_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
         if (!child_state->lcu_order[i].first_row) {
           //Find LCU above
           if (child_state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW) {
-            int j;
+            uint32_t j;
             //For all previous wavefront rows
             for (j=0; &child_state->parent->children[j] != child_state && child_state->parent->children[j].encoder_control; ++j) {
               if (child_state->parent->children[j].wfrow->lcu_offset_y == child_state->wfrow->lcu_offset_y - 1) {
-                int k;
+                uint32_t k;
                 for (k=0; k < child_state->parent->children[j].lcu_order_count; ++k) {
                   if (child_state->parent->children[j].lcu_order[k].position.x == child_state->lcu_order[i].position.x) {
                     assert(child_state->parent->children[j].lcu_order[k].position.y == child_state->lcu_order[i].position.y - 1);

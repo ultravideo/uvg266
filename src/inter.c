@@ -890,8 +890,8 @@ static void get_temporal_merge_candidates(const encoder_state_t * const state,
     cu_array_t *ref_cu_array = state->frame->ref->cu_arrays[colocated_ref];
     int cu_per_width = ref_cu_array->width / SCU_WIDTH;
 
-    uint32_t xColBr = x + width;
-    uint32_t yColBr = y + height;
+    int32_t xColBr = x + width;
+    int32_t yColBr = y + height;
 
     // C0 must be available
     if (xColBr < state->encoder_control->in.width &&
@@ -911,8 +911,8 @@ static void get_temporal_merge_candidates(const encoder_state_t * const state,
         }
       }
     }
-    uint32_t xColCtr = x + (width / 2);
-    uint32_t yColCtr = y + (height / 2);
+    int32_t xColCtr = x + (width / 2);
+    int32_t yColCtr = y + (height / 2);
 
     // C1 must be inside the LCU, in the center position of current CU
     if (xColCtr < state->encoder_control->in.width && yColCtr < state->encoder_control->in.height) {
@@ -1222,7 +1222,7 @@ static bool add_temporal_candidate(const encoder_state_t *state,
   // uvg266 always sets collocated_from_l0_flag so the list is L1 when
   // there are future references.
   int col_list = reflist;
-  for (int i = 0; i < state->frame->ref->used_size; i++) {
+  for (uint32_t i = 0; i < state->frame->ref->used_size; i++) {
     if (state->frame->ref->pocs[i] > state->frame->poc) {
       col_list = 1;
       break;
@@ -1778,7 +1778,7 @@ uint8_t uvg_inter_get_merge_cand(const encoder_state_t * const state,
 
         mv_cand[candidates].mv[reflist][0] = avg_mv[0];
         mv_cand[candidates].mv[reflist][1] = avg_mv[1];
-        mv_cand[candidates].ref[reflist] = ref_i;
+        mv_cand[candidates].ref[reflist] = (uint8_t)ref_i;
       }
       // only one MV is valid, take the only one MV
       else if (ref_i != -1)
@@ -1787,7 +1787,7 @@ uint8_t uvg_inter_get_merge_cand(const encoder_state_t * const state,
 
         mv_cand[candidates].mv[reflist][0] = mv_i[0];
         mv_cand[candidates].mv[reflist][1] = mv_i[1];
-        mv_cand[candidates].ref[reflist] = ref_i;
+        mv_cand[candidates].ref[reflist] = (uint8_t)ref_i;
       }
       else if (ref_j != -1)
       {
@@ -1795,7 +1795,7 @@ uint8_t uvg_inter_get_merge_cand(const encoder_state_t * const state,
 
         mv_cand[candidates].mv[reflist][0] = mv_j[0];
         mv_cand[candidates].mv[reflist][1] = mv_j[1];
-        mv_cand[candidates].ref[reflist] = ref_j;
+        mv_cand[candidates].ref[reflist] = (uint8_t)ref_j;
       }
     }
 
@@ -1812,10 +1812,9 @@ uint8_t uvg_inter_get_merge_cand(const encoder_state_t * const state,
   int num_ref = state->frame->ref->used_size;
 
   if (candidates < max_num_cands && state->frame->slicetype == UVG_SLICE_B) {
-    int j;
     int ref_negative = 0;
     int ref_positive = 0;
-    for (j = 0; j < state->frame->ref->used_size; j++) {
+    for (uint32_t j = 0; j < state->frame->ref->used_size; j++) {
       if (state->frame->ref->pocs[j] < state->frame->poc) {
         ref_negative++;
       } else {

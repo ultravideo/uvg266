@@ -51,7 +51,7 @@ void uvg_context_copy(encoder_state_t * target_state, const encoder_state_t * so
 
 uint32_t uvg_context_get_sig_coeff_group( uint32_t *sig_coeff_group_flag,uint32_t pos_x, uint32_t pos_y,int32_t width);
 uint32_t uvg_context_get_sig_coeff_group_ts(uint32_t* sig_coeff_group_flag, uint32_t pos_x, uint32_t pos_y, int32_t width);
-uint32_t uvg_context_get_sig_ctx_idx_abs(const coeff_t* coeff, int32_t pos_x, int32_t pos_y,
+uint32_t uvg_context_get_sig_ctx_idx_abs(const coeff_t* coeff, uint32_t pos_x, uint32_t pos_y,
                                          uint32_t height, uint32_t width, int8_t type, 
                                          int32_t* temp_diag, int32_t* temp_sum);
 
@@ -62,10 +62,10 @@ int32_t uvg_derive_mod_coeff(int rightPixel, int belowPixel, coeff_t absCoeff, i
 unsigned uvg_lrg1_ctx_id_abs_ts(const coeff_t* coeff, int32_t pos_x, int32_t pos_y, int32_t width, int bdpcm);
 
 
-uint32_t uvg_abs_sum(const coeff_t* coeff, int32_t pos_x, int32_t pos_y,
+uint32_t uvg_abs_sum(const coeff_t* coeff, uint32_t pos_x, uint32_t pos_y,
                      uint32_t height, uint32_t width, uint32_t baselevel);
 
-uint32_t uvg_go_rice_par_abs(const coeff_t* coeff, int32_t pos_x, int32_t pos_y,
+uint32_t uvg_go_rice_par_abs(const coeff_t* coeff, uint32_t pos_x, uint32_t pos_y,
                              uint32_t height, uint32_t width, uint32_t baselevel);
 
 #define CNU 35

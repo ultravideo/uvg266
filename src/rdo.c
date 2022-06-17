@@ -453,7 +453,7 @@ INLINE int32_t uvg_get_ic_rate(encoder_state_t * const state,
   {
     uint32_t  symbol = (abs_level == 0 ? go_rice_zero : abs_level <= go_rice_zero ? abs_level - 1 : abs_level);
     uint32_t  length;
-    const int threshold = COEF_REMAIN_BIN_REDUCTION;
+    const uint32_t threshold = COEF_REMAIN_BIN_REDUCTION;
     if (symbol < (threshold << abs_go_rice))
     {
       length = symbol >> abs_go_rice;
@@ -464,7 +464,7 @@ INLINE int32_t uvg_get_ic_rate(encoder_state_t * const state,
       uint32_t prefixLength = 0;
       uint32_t suffix = (symbol >> abs_go_rice) - COEF_REMAIN_BIN_REDUCTION;
 
-      while ((prefixLength < maximumPrefixLength) && (suffix > ((2 << prefixLength) - 2)))
+      while ((prefixLength < maximumPrefixLength) && ((int32_t)suffix > ((2 << prefixLength) - 2)))
       {
         prefixLength++;
       }
@@ -476,7 +476,7 @@ INLINE int32_t uvg_get_ic_rate(encoder_state_t * const state,
     else {
       length = abs_go_rice;
       symbol = symbol - (threshold << abs_go_rice);
-      while (symbol >= (1 << length))
+      while ((int32_t)symbol >= (1 << length))
       {
         symbol -= (1 << (length++));
       }
@@ -498,7 +498,7 @@ INLINE int32_t uvg_get_ic_rate(encoder_state_t * const state,
       uint32_t prefixLength = 0;
       uint32_t suffix = (symbol >> abs_go_rice) - COEF_REMAIN_BIN_REDUCTION;
 
-      while ((prefixLength < maximumPrefixLength) && (suffix > ((2 << prefixLength) - 2)))
+      while ((prefixLength < maximumPrefixLength) && ((int32_t)suffix > ((2 << prefixLength) - 2)))
       {
         prefixLength++;
       }
@@ -689,7 +689,7 @@ void uvg_rdoq_sign_hiding(
   // This somehow scales quant_delta into fractional bits. Instead of the bits
   // being multiplied by lambda, the residual is divided by it, or something
   // like that.
-  const int64_t rd_factor = (inv_quant * inv_quant * (1 << (2 * (qp_scaled / 6)))
+  const int64_t rd_factor = (const int64_t)(inv_quant * inv_quant * (1 << (2 * (qp_scaled / 6)))
                       / lambda / 16 / (1 << (2 * (ctrl->bitdepth - 8))) + 0.5);
   const int last_cg = (last_pos - 1) >> LOG2_SCAN_SET_SIZE;
 
@@ -858,7 +858,7 @@ static INLINE int x_get_ic_rate_ts(const uint32_t            abs_level,
 
     uint32_t length;
     const int threshold = COEF_REMAIN_BIN_REDUCTION;
-    if (symbol < (threshold << rice_par))
+    if ((int32_t)symbol < (threshold << rice_par))
     {
       length = symbol >> rice_par;
       rate += (length + 1 + rice_par) << CTX_FRAC_BITS;
@@ -870,7 +870,7 @@ static INLINE int x_get_ic_rate_ts(const uint32_t            abs_level,
       uint32_t prefixLength = 0;
       uint32_t suffix = (symbol >> rice_par) - COEF_REMAIN_BIN_REDUCTION;
 
-      while ((prefixLength < maximumPrefixLength) && (suffix > ((2 << prefixLength) - 2)))
+      while ((prefixLength < maximumPrefixLength) && ((int32_t)suffix > ((2 << prefixLength) - 2)))
       {
         prefixLength++;
       }
@@ -883,7 +883,7 @@ static INLINE int x_get_ic_rate_ts(const uint32_t            abs_level,
     {
       length = rice_par;
       symbol = symbol - (threshold << rice_par);
-      while (symbol >= (1 << length))
+      while ((int32_t)symbol >= (1 << length))
       {
         symbol -= (1 << (length++));
       }
@@ -906,14 +906,14 @@ static INLINE int x_get_ic_rate_ts(const uint32_t            abs_level,
 
       (*num_ctx_bins) += 2;
 
-      int cutoffVal = 2;
+      uint32_t cutoffVal = 2;
 
       if (abs_level >= cutoffVal)
       {
         uint32_t symbol = (abs_level - cutoffVal) >> 1;
         uint32_t length;
         const int threshold = COEF_REMAIN_BIN_REDUCTION;
-        if (symbol < (threshold << rice_par))
+        if ((int32_t)symbol < (threshold << rice_par))
         {
           length = symbol >> rice_par;
           rate += (length + 1 + rice_par) << CTX_FRAC_BITS;
@@ -925,7 +925,7 @@ static INLINE int x_get_ic_rate_ts(const uint32_t            abs_level,
           uint32_t prefixLength = 0;
           uint32_t suffix = (symbol >> rice_par) - COEF_REMAIN_BIN_REDUCTION;
 
-          while ((prefixLength < maximumPrefixLength) && (suffix > ((2 << prefixLength) - 2)))
+          while ((prefixLength < maximumPrefixLength) && ((int32_t)suffix > ((2 << prefixLength) - 2)))
           {
             prefixLength++;
           }
@@ -938,7 +938,7 @@ static INLINE int x_get_ic_rate_ts(const uint32_t            abs_level,
         {
           length = rice_par;
           symbol = symbol - (threshold << rice_par);
-          while (symbol >= (1 << length))
+          while ((int32_t)symbol >= (1 << length))
           {
             symbol -= (1 << (length++));
           }
@@ -969,7 +969,7 @@ static INLINE int x_get_ic_rate_ts(const uint32_t            abs_level,
     rate += CTX_ENTROPY_BITS(frac_bits_sign, (abs_level - 2) & 1); // frac_bits_par.intBits[(abs_level - 2) & 1];
     num_ctx_bins += 2;
 
-    int cutoffVal = 2;
+    uint32_t cutoffVal = 2;
     const int numGtBins = 4;
     for (int i = 0; i < numGtBins; i++)
     {
@@ -977,7 +977,7 @@ static INLINE int x_get_ic_rate_ts(const uint32_t            abs_level,
       {
         const uint16_t ctxGtX = cutoffVal >> 1;
         // const BinFracBits* fracBitsGtX = fracBitsAccess.getFracBitsArray(ctxGtX);
-        unsigned gtX = (abs_level >= (cutoffVal + 2));
+        unsigned gtX = ((int32_t)abs_level >= (cutoffVal + 2));
         rate += CTX_ENTROPY_BITS(&frac_bits_gtx_ctx[ctxGtX], gtX);// fracBitsGtX.intBits[gtX];
         num_ctx_bins++;
       }
@@ -988,7 +988,7 @@ static INLINE int x_get_ic_rate_ts(const uint32_t            abs_level,
     {
       uint32_t symbol = (abs_level - cutoffVal) >> 1;
       uint32_t length;
-      const int threshold = COEF_REMAIN_BIN_REDUCTION;
+      const uint32_t threshold = COEF_REMAIN_BIN_REDUCTION;
       if (symbol < (threshold << rice_par))
       {
         length = symbol >> rice_par;
@@ -1001,7 +1001,7 @@ static INLINE int x_get_ic_rate_ts(const uint32_t            abs_level,
         uint32_t prefixLength = 0;
         uint32_t suffix = (symbol >> rice_par) - COEF_REMAIN_BIN_REDUCTION;
 
-        while ((prefixLength < maximumPrefixLength) && (suffix > ((2 << prefixLength) - 2)))
+        while ((prefixLength < maximumPrefixLength) && ((int32_t)suffix > ((2 << prefixLength) - 2)))
         {
           prefixLength++;
         }
@@ -1014,7 +1014,7 @@ static INLINE int x_get_ic_rate_ts(const uint32_t            abs_level,
       {
         length = rice_par;
         symbol = symbol - (threshold << rice_par);
-        while (symbol >= (1 << length))
+        while ((int32_t)symbol >= (1 << length))
         {
           symbol -= (1 << (length++));
         }
@@ -1202,7 +1202,7 @@ int uvg_ts_rdoq(encoder_state_t* const state, coeff_t* src_coeff, coeff_t* dest_
 
   int rem_reg_bins = (width * height * 7) >> 2;
 
-  for (int sbId = 0; sbId < cg_num; sbId++)
+  for (uint32_t sbId = 0; sbId < cg_num; sbId++)
   {
     uint32_t cg_blkpos = scan_cg[sbId];
 
@@ -1223,7 +1223,7 @@ int uvg_ts_rdoq(encoder_state_t* const state, coeff_t* src_coeff, coeff_t* dest_
 
       // set coeff
       const int64_t          tmp_level = (int64_t)(abs(src_coeff[blkpos])) * quant_coeff;
-      const int level_double = MIN(tmp_level, MAX_INT64 - (1ll << ((long long)q_bits - 1ll)));
+      const int level_double = (const int)MIN(tmp_level, MAX_INT64 - (1ll << ((long long)q_bits - 1ll)));
 
       uint32_t roundAbsLevel = MIN((uint32_t)(entropy_coding_maximum), (uint32_t)((level_double + ((1) << (q_bits - 1))) >> q_bits));
       uint32_t min_abs_level = (roundAbsLevel > 1 ? roundAbsLevel - 1 : 1);

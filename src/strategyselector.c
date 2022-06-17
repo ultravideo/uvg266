@@ -281,7 +281,7 @@ static void* strategyselector_choose_for(const strategy_list_t * const strategie
   int max_priority_i = -1;
   char buffer[256];
   char *override = NULL;
-  int i = 0;
+  uint32_t i = 0;
   
   // Because VS doesn't support snprintf, let's assert that there is
   // enough room in the buffer. Max length for strategy type is
@@ -369,7 +369,7 @@ static INLINE int get_cpuid(unsigned level, unsigned sublevel, cpuid_t *cpu_info
   __cpuidex(vendor_info, 0, 0);
 
   // Check highest supported function.
-  if (level > vendor_info[0]) return 0;
+  if ((int32_t)level > vendor_info[0]) return 0;
   
   int ms_cpu_info[4] = { cpu_info->eax, cpu_info->ebx, cpu_info->ecx, cpu_info->edx };
   __cpuidex(ms_cpu_info, level, sublevel);

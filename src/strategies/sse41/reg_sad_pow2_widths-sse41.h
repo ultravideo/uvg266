@@ -909,7 +909,7 @@ static INLINE uint32_t hor_sad_sse41_arbitrary(const uint8_t *pic_data, const ui
     __m128i borderpx_vec_f = _mm_set1_epi8(ref_data[(int32_t)((y + 2) * ref_stride + border_off)]);
     __m128i borderpx_vec_h = _mm_set1_epi8(ref_data[(int32_t)((y + 3) * ref_stride + border_off)]);
 
-    for (x = 0; x < outside_vecs; x++) {
+    for (x = 0; x < (int32_t)outside_vecs; x++) {
       __m128i a = _mm_loadu_si128((__m128i *)(pic_data + x * vec_width + (y + 0) * pic_stride + outvec_offset));
       __m128i c = _mm_loadu_si128((__m128i *)(pic_data + x * vec_width + (y + 1) * pic_stride + outvec_offset));
       __m128i e = _mm_loadu_si128((__m128i *)(pic_data + x * vec_width + (y + 2) * pic_stride + outvec_offset));
@@ -996,7 +996,7 @@ static INLINE uint32_t hor_sad_sse41_arbitrary(const uint8_t *pic_data, const ui
   if (height_residual_lines) {
     for (; y < height; y++) {
       __m128i borderpx_vec = _mm_set1_epi8(ref_data[(int32_t)((y + 0) * ref_stride + border_off)]);
-      for (x = 0; x < outside_vecs; x++) {
+      for (x = 0; x < (int32_t)outside_vecs; x++) {
         __m128i a = _mm_loadu_si128((__m128i *)(pic_data + x * vec_width + (y + 0) * pic_stride + outvec_offset));
 
         __m128i startoffs  = _mm_set1_epi8  ((x + inside_vecs) << vec_width_log2);

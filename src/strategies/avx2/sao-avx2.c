@@ -192,7 +192,7 @@ static INLINE void store_border_bytes(      uint8_t  *buf,
                                       const int32_t   width_rest,
                                             uint32_t  data)
 {
-  for (uint32_t i = 0; i < width_rest; i++) {
+  for (int32_t i = 0; i < width_rest; i++) {
     uint8_t currb = data & 0xff;
     buf[start_pos + i] = currb;
     data >>= 8;
@@ -291,11 +291,11 @@ static int32_t sao_edge_ddistortion_avx2(const uint8_t *orig_data,
                                                int32_t  eo_class,
                                          const int32_t  offsets[NUM_SAO_EDGE_CATEGORIES])
 {
-  int32_t y, x;
+  uint32_t y, x;
   vector2d_t a_ofs = g_sao_edge_offsets[eo_class][0];
   vector2d_t b_ofs = g_sao_edge_offsets[eo_class][1];
 
-   int32_t scan_width = block_width -   2;
+  uint32_t scan_width = block_width -   2;
   uint32_t width_db32 = scan_width  & ~31;
   uint32_t width_db4  = scan_width  &  ~3;
   uint32_t width_rest = scan_width  &   3;
@@ -330,7 +330,7 @@ static int32_t sao_edge_ddistortion_avx2(const uint8_t *orig_data,
   __m256i offsets_256  = broadcast_xmm2ymm  (offsets_8b);
 
   __m256i sum = _mm256_setzero_si256();
-  for (y = 1; y < block_height - 1; y++) {
+  for (y = 1; y < (uint32_t)block_height - 1; y++) {
     for (x = 1; x < width_db32 + 1; x += 32) {
       uint32_t c_pos =  y            * block_width + x;
       uint32_t a_pos = (y + a_ofs.y) * block_width + x + a_ofs.x;
@@ -630,7 +630,7 @@ static INLINE void reconstruct_color_band(const encoder_control_t *encoder,
                                                 int32_t            block_height,
                                                 color_t            color_i)
 {
-  const uint32_t width_db32 = block_width & ~31;
+  const int32_t width_db32 = block_width & ~31;
   const uint32_t width_db4  = block_width &  ~3;
   const uint32_t width_rest = block_width &   3;
 
@@ -644,8 +644,8 @@ static INLINE void reconstruct_color_band(const encoder_control_t *encoder,
   __m256i offsets[16];
   calc_sao_offset_array_avx2(encoder, sao, offsets, color_i);
 
-  for (uint32_t y = 0; y < block_height; y++) {
-    uint32_t x = 0;
+  for (int32_t y = 0; y < block_height; y++) {
+    int32_t x = 0;
     for (; x < width_db32; x += 32) {
       const uint32_t curr_srcpos = y *     stride + x;
       const uint32_t curr_dstpos = y * new_stride + x;
@@ -721,7 +721,7 @@ static INLINE void reconstruct_color_other(const encoder_control_t *encoder,
   const vector2d_t a_ofs       = g_sao_edge_offsets[sao->eo_class][0];
   const vector2d_t b_ofs       = g_sao_edge_offsets[sao->eo_class][1];
 
-  const uint32_t   width_db32  = block_width & ~31;
+  const  int32_t   width_db32  = block_width & ~31;
   const uint32_t   width_db4   = block_width &  ~3;
   const uint32_t   width_rest  = block_width &   3;
 
@@ -738,8 +738,8 @@ static INLINE void reconstruct_color_other(const encoder_control_t *encoder,
 
   const __m256i    sao_offs    = broadcast_xmm2ymm(sao_offs_16);
 
-  for (uint32_t y = 0; y < block_height; y++) {
-    uint32_t x;
+  for (int32_t y = 0; y < block_height; y++) {
+    int32_t x;
     for (x = 0; x < width_db32; x += 32) {
       const uint32_t  src_pos = y *     stride + x;
       const uint32_t  dst_pos = y * new_stride + x;
@@ -857,8 +857,8 @@ static int32_t sao_band_ddistortion_avx2(const encoder_state_t *state,
   const __m256i threes        = _mm256_set1_epi8 (3);
 
   __m256i sum = _mm256_setzero_si256();
-  for (uint32_t y = 0; y < block_height; y++) {
-    for (uint32_t x = 0; x < block_width; x += 32) {
+  for (int32_t y = 0; y < block_height; y++) {
+    for (int32_t x = 0; x < block_width; x += 32) {
       const int32_t curr_pos = y * block_width + x;
 
       __m256i   rd = _mm256_loadu_si256((const __m256i *)( rec_data + curr_pos));

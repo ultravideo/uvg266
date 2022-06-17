@@ -43,7 +43,7 @@ static int uvg_tree_predict_merge_depth_1(features_s* p_features, double* p_nb_i
       {
         *p_nb_iter = 19428.0;
         *p_nb_bad = 1740.0;
-        return -1.0000;
+        return -1;
       }
       else if (p_features->sub_variance_0 <= 9.1015)
       {
@@ -51,36 +51,36 @@ static int uvg_tree_predict_merge_depth_1(features_s* p_features, double* p_nb_i
         {
           *p_nb_iter = 1166.0;
           *p_nb_bad = 358.0;
-          return -1.0000;
+          return -1;
         }
         else {
           *p_nb_iter = 1049.0;
           *p_nb_bad = 392.0;
-          return 1.0000;
+          return 1;
         }
       }
       else {
         *p_nb_iter = 9371.0;
         *p_nb_bad = 1805.0;
-        return -1.0000;
+        return -1;
       }
     }
     else if (p_features->sub_variance_2 <= 23.3193)
     {
       *p_nb_iter = 1059.0;
       *p_nb_bad = 329.0;
-      return 1.0000;
+      return 1;
     }
     else if (p_features->sub_variance_1 <= 30.7348)
     {
       *p_nb_iter = 1042.0;
       *p_nb_bad = 395.0;
-      return 1.0000;
+      return 1;
     }
     else {
       *p_nb_iter = 1756.0;
       *p_nb_bad = 588.0;
-      return -1.0000;
+      return -1;
     }
   }
   else if (p_features->merge_variance <= 857.8047)
@@ -91,7 +91,7 @@ static int uvg_tree_predict_merge_depth_1(features_s* p_features, double* p_nb_i
       {
         *p_nb_iter = 2006.0;
         *p_nb_bad = 374.0;
-        return 1.0000;
+        return 1;
       }
       else if (p_features->neigh_variance_C <= 646.8204)
       {
@@ -103,60 +103,60 @@ static int uvg_tree_predict_merge_depth_1(features_s* p_features, double* p_nb_i
             {
               *p_nb_iter = 1208.0;
               *p_nb_bad = 399.0;
-              return 1.0000;
+              return 1;
             }
             else if (p_features->var_of_sub_var <= 11832.6635)
             {
               *p_nb_iter = 8701.0;
               *p_nb_bad = 3037.0;
-              return -1.0000;
+              return -1;
             }
             else if (p_features->neigh_variance_A <= 142.298)
             {
               *p_nb_iter = 1025.0;
               *p_nb_bad = 290.0;
-              return 1.0000;
+              return 1;
             }
             else if (p_features->variance <= 394.4839)
             {
               *p_nb_iter = 1156.0;
               *p_nb_bad = 489.0;
-              return 1.0000;
+              return 1;
             }
             else {
               *p_nb_iter = 1150.0;
               *p_nb_bad = 503.0;
-              return -1.0000;
+              return -1;
             }
           }
           else {
             *p_nb_iter = 1777.0;
             *p_nb_bad = 558.0;
-            return 1.0000;
+            return 1;
           }
         }
         else {
           *p_nb_iter = 1587.0;
           *p_nb_bad = 411.0;
-          return 1.0000;
+          return 1;
         }
       }
       else {
         *p_nb_iter = 1980.0;
         *p_nb_bad = 474.0;
-        return 1.0000;
+        return 1;
       }
     }
     else {
       *p_nb_iter = 3613.0;
       *p_nb_bad = 475.0;
-      return 1.0000;
+      return 1;
     }
   }
   else {
     *p_nb_iter = 20926.0;
     *p_nb_bad = 1873.0;
-    return 1.0000;
+    return 1;
   }
 }
 
@@ -171,30 +171,30 @@ static int uvg_tree_predict_merge_depth_2(features_s* p_features, double* p_nb_i
       {
         *p_nb_iter = 29253.0;
         *p_nb_bad = 3837.0;
-        return -1.0000;
+        return -1;
       }
       else if (p_features->variance <= 20.8711)
       {
         *p_nb_iter = 1292.0;
         *p_nb_bad = 458.0;
-        return 2.0000;
+        return 2;
       }
       else {
         *p_nb_iter = 1707.0;
         *p_nb_bad = 399.0;
-        return -1.0000;
+        return -1;
       }
     }
     else if (p_features->var_of_sub_var <= 3300.4034)
     {
       *p_nb_iter = 1554.0;
       *p_nb_bad = 675.0;
-      return -1.0000;
+      return -1;
     }
     else {
       *p_nb_iter = 1540.0;
       *p_nb_bad = 429.0;
-      return 2.0000;
+      return 2;
     }
   }
   else if (p_features->merge_variance <= 696.1989)
@@ -205,7 +205,7 @@ static int uvg_tree_predict_merge_depth_2(features_s* p_features, double* p_nb_i
       {
         *p_nb_iter = 3473.0;
         *p_nb_bad = 768.0;
-        return 2.0000;
+        return 2;
       }
       else if (p_features->neigh_variance_C <= 571.5329)
       {
@@ -215,7 +215,7 @@ static int uvg_tree_predict_merge_depth_2(features_s* p_features, double* p_nb_i
           {
             *p_nb_iter = 1887.0;
             *p_nb_bad = 588.0;
-            return 2.0000;
+            return 2;
           }
           else if (p_features->neigh_variance_A <= 380.5927)
           {
@@ -223,48 +223,48 @@ static int uvg_tree_predict_merge_depth_2(features_s* p_features, double* p_nb_i
             {
               *p_nb_iter = 1686.0;
               *p_nb_bad = 721.0;
-              return 2.0000;
+              return 2;
             }
             else if (p_features->neigh_variance_A <= 66.6749)
             {
               *p_nb_iter = 1440.0;
               *p_nb_bad = 631.0;
-              return 2.0000;
+              return 2;
             }
             else {
               *p_nb_iter = 5772.0;
               *p_nb_bad = 2031.0;
-              return -1.0000;
+              return -1;
             }
           }
           else {
             *p_nb_iter = 1791.0;
             *p_nb_bad = 619.0;
-            return 2.0000;
+            return 2;
           }
         }
         else {
           *p_nb_iter = 1624.0;
           *p_nb_bad = 494.0;
-          return 2.0000;
+          return 2;
         }
       }
       else {
         *p_nb_iter = 1298.0;
         *p_nb_bad = 312.0;
-        return 2.0000;
+        return 2;
       }
     }
     else {
       *p_nb_iter = 4577.0;
       *p_nb_bad = 892.0;
-      return 2.0000;
+      return 2;
     }
   }
   else {
     *p_nb_iter = 21106.0;
     *p_nb_bad = 2744.0;
-    return 2.0000;
+    return 2;
   }
 }
 
@@ -278,12 +278,12 @@ static int uvg_tree_predict_merge_depth_3(features_s* p_features, double* p_nb_i
     {
       *p_nb_iter = 29806.0;
       *p_nb_bad = 3603.0;
-      return -1.0000;
+      return -1;
     }
     else {
       *p_nb_iter = 1003.0;
       *p_nb_bad = 421.0;
-      return 3.0000;
+      return 3;
     }
   }
   else if (p_features->merge_variance <= 351.8138)
@@ -300,48 +300,48 @@ static int uvg_tree_predict_merge_depth_3(features_s* p_features, double* p_nb_i
             {
               *p_nb_iter = 1290.0;
               *p_nb_bad = 525.0;
-              return 3.0000;
+              return 3;
             }
             else if (p_features->neigh_variance_B <= 16.9287)
             {
               *p_nb_iter = 1045.0;
               *p_nb_bad = 499.0;
-              return 3.0000;
+              return 3;
             }
             else {
               *p_nb_iter = 6901.0;
               *p_nb_bad = 2494.0;
-              return -1.0000;
+              return -1;
             }
           }
           else {
             *p_nb_iter = 1332.0;
             *p_nb_bad = 408.0;
-            return 3.0000;
+            return 3;
           }
         }
         else {
           *p_nb_iter = 2929.0;
           *p_nb_bad = 842.0;
-          return 3.0000;
+          return 3;
         }
       }
       else {
         *p_nb_iter = 2239.0;
         *p_nb_bad = 572.0;
-        return 3.0000;
+        return 3;
       }
     }
     else {
       *p_nb_iter = 2777.0;
       *p_nb_bad = 714.0;
-      return 3.0000;
+      return 3;
     }
   }
   else {
     *p_nb_iter = 30678.0;
     *p_nb_bad = 5409.0;
-    return 3.0000;
+    return 3;
   }
 }
 
@@ -367,54 +367,54 @@ static int uvg_tree_predict_merge_depth_4(features_s* p_features, double* p_nb_i
                 {
                   *p_nb_iter = 27398.0;
                   *p_nb_bad = 4665.0;
-                  return -1.0000;
+                  return -1;
                 }
                 else {
                   *p_nb_iter = 1676.0;
                   *p_nb_bad = 795.0;
-                  return 4.0000;
+                  return 4;
                 }
               }
               else {
                 *p_nb_iter = 1405.0;
                 *p_nb_bad = 566.0;
-                return 4.0000;
+                return 4;
               }
             }
             else {
               *p_nb_iter = 2827.0;
               *p_nb_bad = 1173.0;
-              return 4.0000;
+              return 4;
             }
           }
           else {
             *p_nb_iter = 8871.0;
             *p_nb_bad = 822.0;
-            return -1.0000;
+            return -1;
           }
         }
         else {
           *p_nb_iter = 3162.0;
           *p_nb_bad = 718.0;
-          return 4.0000;
+          return 4;
         }
       }
       else {
         *p_nb_iter = 6154.0;
         *p_nb_bad = 1397.0;
-        return 4.0000;
+        return 4;
       }
     }
     else {
       *p_nb_iter = 9385.0;
       *p_nb_bad = 1609.0;
-      return 4.0000;
+      return 4;
     }
   }
   else {
     *p_nb_iter = 19122.0;
     *p_nb_bad = 2960.0;
-    return 4.0000;
+    return 4;
   }
 }
 
@@ -428,13 +428,13 @@ static int uvg_tree_predict_split_depth_0(features_s* p_features, double* p_nb_i
     {
       *p_nb_iter = 25155.0;
       *p_nb_bad = 2959.0;
-      return 0.0000;
+      return 0;
     }
     else if (p_features->sub_variance_2 <= 13.2892)
     {
       *p_nb_iter = 1080.0;
       *p_nb_bad = 383.0;
-      return -1.0000;
+      return -1;
     }
     else if (p_features->variance <= 564.1738)
     {
@@ -442,7 +442,7 @@ static int uvg_tree_predict_split_depth_0(features_s* p_features, double* p_nb_i
       {
         *p_nb_iter = 6067.0;
         *p_nb_bad = 1699.0;
-        return 0.0000;
+        return 0;
       }
       else if (p_features->var_of_sub_mean <= 46.2388)
       {
@@ -450,30 +450,30 @@ static int uvg_tree_predict_split_depth_0(features_s* p_features, double* p_nb_i
         {
           *p_nb_iter = 1088.0;
           *p_nb_bad = 377.0;
-          return -1.0000;
+          return -1;
         }
         else if (p_features->sub_variance_3 <= 61.4213)
         {
           *p_nb_iter = 1183.0;
           *p_nb_bad = 498.0;
-          return -1.0000;
+          return -1;
         }
         else {
           *p_nb_iter = 3416.0;
           *p_nb_bad = 1373.0;
-          return 0.0000;
+          return 0;
         }
       }
       else {
         *p_nb_iter = 3769.0;
         *p_nb_bad = 1093.0;
-        return 0.0000;
+        return 0;
       }
     }
     else {
       *p_nb_iter = 1036.0;
       *p_nb_bad = 434.0;
-      return -1.0000;
+      return -1;
     }
   }
   else if (p_features->var_of_sub_var <= 98333.8279)
@@ -486,42 +486,42 @@ static int uvg_tree_predict_split_depth_0(features_s* p_features, double* p_nb_i
         {
           *p_nb_iter = 1323.0;
           *p_nb_bad = 301.0;
-          return -1.0000;
+          return -1;
         }
         else if (p_features->var_of_sub_var <= 17347.3971)
         {
           *p_nb_iter = 1215.0;
           *p_nb_bad = 550.0;
-          return 0.0000;
+          return 0;
         }
         else if (p_features->qp <= 22)
         {
           *p_nb_iter = 1000.0;
           *p_nb_bad = 493.0;
-          return 0.0000;
+          return 0;
         }
         else {
           *p_nb_iter = 2640.0;
           *p_nb_bad = 1121.0;
-          return -1.0000;
+          return -1;
         }
       }
       else {
         *p_nb_iter = 5188.0;
         *p_nb_bad = 1248.0;
-        return -1.0000;
+        return -1;
       }
     }
     else {
       *p_nb_iter = 2323.0;
       *p_nb_bad = 274.0;
-      return -1.0000;
+      return -1;
     }
   }
   else {
     *p_nb_iter = 21357.0;
     *p_nb_bad = 1829.0;
-    return -1.0000;
+    return -1;
   }
 }
 
@@ -532,7 +532,7 @@ static int uvg_tree_predict_split_depth_1(features_s* p_features, double* p_nb_i
   {
     *p_nb_iter = 32445.0;
     *p_nb_bad = 4580.0;
-    return 1.0000;
+    return 1;
   }
   else if (p_features->var_of_sub_var <= 27289.2117)
   {
@@ -540,7 +540,7 @@ static int uvg_tree_predict_split_depth_1(features_s* p_features, double* p_nb_i
     {
       *p_nb_iter = 1900.0;
       *p_nb_bad = 401.0;
-      return -1.0000;
+      return -1;
     }
     else if (p_features->var_of_sub_var <= 5841.4773)
     {
@@ -548,25 +548,25 @@ static int uvg_tree_predict_split_depth_1(features_s* p_features, double* p_nb_i
       {
         *p_nb_iter = 1000.0;
         *p_nb_bad = 356.0;
-        return -1.0000;
+        return -1;
       }
       else if (p_features->neigh_variance_A <= 633.8163)
       {
         *p_nb_iter = 5279.0;
         *p_nb_bad = 1961.0;
-        return 1.0000;
+        return 1;
       }
       else {
         *p_nb_iter = 1176.0;
         *p_nb_bad = 527.0;
-        return -1.0000;
+        return -1;
       }
     }
     else if (p_features->sub_variance_0 <= 38.3035)
     {
       *p_nb_iter = 1251.0;
       *p_nb_bad = 293.0;
-      return -1.0000;
+      return -1;
     }
     else if (p_features->neigh_variance_B <= 664.9494)
     {
@@ -574,7 +574,7 @@ static int uvg_tree_predict_split_depth_1(features_s* p_features, double* p_nb_i
       {
         *p_nb_iter = 1276.0;
         *p_nb_bad = 471.0;
-        return -1.0000;
+        return -1;
       }
       else if (p_features->sub_variance_3 <= 404.3086)
       {
@@ -582,36 +582,36 @@ static int uvg_tree_predict_split_depth_1(features_s* p_features, double* p_nb_i
         {
           *p_nb_iter = 1005.0;
           *p_nb_bad = 435.0;
-          return -1.0000;
+          return -1;
         }
         else if (p_features->sub_variance_0 <= 282.3064)
         {
           *p_nb_iter = 1370.0;
           *p_nb_bad = 539.0;
-          return 1.0000;
+          return 1;
         }
         else {
           *p_nb_iter = 1013.0;
           *p_nb_bad = 495.0;
-          return -1.0000;
+          return -1;
         }
       }
       else {
         *p_nb_iter = 1000.0;
         *p_nb_bad = 379.0;
-        return -1.0000;
+        return -1;
       }
     }
     else {
       *p_nb_iter = 2270.0;
       *p_nb_bad = 679.0;
-      return -1.0000;
+      return -1;
     }
   }
   else {
     *p_nb_iter = 29015.0;
     *p_nb_bad = 3950.0;
-    return -1.0000;
+    return -1;
   }
 }
 
@@ -624,13 +624,13 @@ static int uvg_tree_predict_split_depth_2(features_s* p_features, double* p_nb_i
     {
       *p_nb_iter = 23216.0;
       *p_nb_bad = 1560.0;
-      return 2.0000;
+      return 2;
     }
     else if (p_features->merge_variance <= 259.6952)
     {
       *p_nb_iter = 7470.0;
       *p_nb_bad = 1902.0;
-      return 2.0000;
+      return 2;
     }
     else if (p_features->qp <= 27)
     {
@@ -638,18 +638,18 @@ static int uvg_tree_predict_split_depth_2(features_s* p_features, double* p_nb_i
       {
         *p_nb_iter = 1138.0;
         *p_nb_bad = 486.0;
-        return -1.0000;
+        return -1;
       }
       else {
         *p_nb_iter = 1619.0;
         *p_nb_bad = 716.0;
-        return 2.0000;
+        return 2;
       }
     }
     else {
       *p_nb_iter = 2425.0;
       *p_nb_bad = 861.0;
-      return 2.0000;
+      return 2;
     }
   }
   else if (p_features->var_of_sub_var <= 60850.5208)
@@ -662,7 +662,7 @@ static int uvg_tree_predict_split_depth_2(features_s* p_features, double* p_nb_i
         {
           *p_nb_iter = 1796.0;
           *p_nb_bad = 586.0;
-          return -1.0000;
+          return -1;
         }
         else if (p_features->neigh_variance_A <= 493.5849)
         {
@@ -670,42 +670,42 @@ static int uvg_tree_predict_split_depth_2(features_s* p_features, double* p_nb_i
           {
             *p_nb_iter = 1326.0;
             *p_nb_bad = 557.0;
-            return -1.0000;
+            return -1;
           }
           else if (p_features->variance <= 156.4014)
           {
             *p_nb_iter = 1210.0;
             *p_nb_bad = 563.0;
-            return -1.0000;
+            return -1;
           }
           else {
             *p_nb_iter = 1920.0;
             *p_nb_bad = 817.0;
-            return 2.0000;
+            return 2;
           }
         }
         else {
           *p_nb_iter = 1106.0;
           *p_nb_bad = 437.0;
-          return -1.0000;
+          return -1;
         }
       }
       else {
         *p_nb_iter = 1001.0;
         *p_nb_bad = 278.0;
-        return -1.0000;
+        return -1;
       }
     }
     else {
       *p_nb_iter = 13068.0;
       *p_nb_bad = 3612.0;
-      return -1.0000;
+      return -1;
     }
   }
   else {
     *p_nb_iter = 22705.0;
     *p_nb_bad = 2687.0;
-    return -1.0000;
+    return -1;
   }
 }
 
@@ -719,7 +719,7 @@ static int uvg_tree_predict_split_depth_3(features_s* p_features, double* p_nb_i
     {
       *p_nb_iter = 20568.0;
       *p_nb_bad = 767.0;
-      return 3.0000;
+      return 3;
     }
     else if (p_features->qp <= 27)
     {
@@ -727,24 +727,24 @@ static int uvg_tree_predict_split_depth_3(features_s* p_features, double* p_nb_i
       {
         *p_nb_iter = 1255.0;
         *p_nb_bad = 206.0;
-        return 3.0000;
+        return 3;
       }
       else if (p_features->merge_variance <= 375.2185)
       {
         *p_nb_iter = 3999.0;
         *p_nb_bad = 1321.0;
-        return 3.0000;
+        return 3;
       }
       else {
         *p_nb_iter = 1786.0;
         *p_nb_bad = 817.0;
-        return -1.0000;
+        return -1;
       }
     }
     else {
       *p_nb_iter = 5286.0;
       *p_nb_bad = 737.0;
-      return 3.0000;
+      return 3;
     }
   }
   else if (p_features->var_of_sub_var <= 37332.3018)
@@ -759,7 +759,7 @@ static int uvg_tree_predict_split_depth_3(features_s* p_features, double* p_nb_i
           {
             *p_nb_iter = 1114.0;
             *p_nb_bad = 346.0;
-            return -1.0000;
+            return -1;
           }
           else if (p_features->neigh_variance_B <= 221.5469)
           {
@@ -767,54 +767,54 @@ static int uvg_tree_predict_split_depth_3(features_s* p_features, double* p_nb_i
             {
               *p_nb_iter = 1539.0;
               *p_nb_bad = 606.0;
-              return 3.0000;
+              return 3;
             }
             else if (p_features->variance <= 155.5974)
             {
               *p_nb_iter = 1298.0;
               *p_nb_bad = 634.0;
-              return 3.0000;
+              return 3;
             }
             else {
               *p_nb_iter = 1076.0;
               *p_nb_bad = 456.0;
-              return -1.0000;
+              return -1;
             }
           }
           else {
             *p_nb_iter = 1644.0;
             *p_nb_bad = 639.0;
-            return -1.0000;
+            return -1;
           }
         }
         else {
           *p_nb_iter = 2401.0;
           *p_nb_bad = 713.0;
-          return -1.0000;
+          return -1;
         }
       }
       else if (p_features->merge_variance <= 281.9509)
       {
         *p_nb_iter = 1020.0;
         *p_nb_bad = 262.0;
-        return 3.0000;
+        return 3;
       }
       else {
         *p_nb_iter = 1278.0;
         *p_nb_bad = 594.0;
-        return -1.0000;
+        return -1;
       }
     }
     else {
       *p_nb_iter = 10507.0;
       *p_nb_bad = 2943.0;
-      return -1.0000;
+      return -1;
     }
   }
   else {
     *p_nb_iter = 25229.0;
     *p_nb_bad = 3060.0;
-    return -1.0000;
+    return -1;
   }
 }
 
@@ -965,7 +965,7 @@ static INLINE double vect_variance_blck_int8(const uvg_pixel* _mat_src, size_t _
 */
 static INLINE void features_var_avg_blck(uvg_pixel* arr_luma_px, uint32_t i_xLcu, uint32_t i_yLcu,
   uint32_t i_xBlck, uint32_t i_yBlck, uint8_t i_blockSize,
-  int32_t i_width, int32_t i_height,
+  uint32_t i_width, uint32_t i_height,
   double* p_average, double* p_variance)
 {
   uint32_t iXMax = CR_XMAX(i_xLcu, i_blockSize + i_xBlck, i_width);

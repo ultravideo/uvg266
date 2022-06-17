@@ -241,17 +241,17 @@ static INLINE void uvg_filter_deblock_chroma(const encoder_control_t * const enc
 
   if (part_P_nofilter) {
     if (large_boundary) {
-      src[-offset * 3] = m1;
-      src[-offset * 2] = m2;
+      src[-offset * 3] = (uvg_pixel)m1;
+      src[-offset * 2] = (uvg_pixel)m2;
     }
-    src[-offset * 1] = m3;
+    src[-offset * 1] = (uvg_pixel)m3;
   }
   if (part_Q_nofilter) {
     if (large_boundary) {
-      src[offset * 1] = m5;
-      src[offset * 2] = m6;
+      src[offset * 1] = (uvg_pixel)m5;
+      src[offset * 2] = (uvg_pixel)m6;
     }
-    src[0] = m4;
+    src[0] = (uvg_pixel)m4;
   }
 }
 

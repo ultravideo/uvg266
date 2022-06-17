@@ -61,7 +61,7 @@ static unsigned reg_sad_sse2(const uint8_t * const data1, const uint8_t * const 
     }
   }
   _mm_storeu_si128((__m128i*) sse_inc_array, sse_inc);
-  sad += sse_inc_array[0] + sse_inc_array[1];
+  sad += (uint32_t)(sse_inc_array[0] + sse_inc_array[1]);
 
   return sad;
 }

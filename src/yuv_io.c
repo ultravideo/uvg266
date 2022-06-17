@@ -148,7 +148,7 @@ static bool machine_is_big_endian()
 static void mask_to_bitdepth(uvg_pixel *buf, unsigned length, unsigned bitdepth)
 {
   uvg_pixel bitdepth_mask = (1 << bitdepth) - 1;
-  for (int i = 0; i < length; ++i) {
+  for (uint32_t i = 0; i < length; ++i) {
     buf[i] = buf[i] & bitdepth_mask;
   }
 }
@@ -340,16 +340,16 @@ int yuv_io_write(FILE* file,
                 unsigned output_width, unsigned output_height)
 {
   const int stride = img->stride;
-  for (int y = 0; y < output_height; ++y) {
+  for (uint32_t y = 0; y < output_height; ++y) {
     fwrite(&img->y[y * stride], sizeof(*img->y), output_width, file);
     // TODO: Check that fwrite succeeded.
   }
 
   if (img->chroma_format != UVG_CSP_400) {
-    for (int y = 0; y < output_height / 2; ++y) {
+    for (uint32_t y = 0; y < output_height / 2; ++y) {
       fwrite(&img->u[y * stride / 2], sizeof(*img->u), output_width / 2, file);
     }
-    for (int y = 0; y < output_height / 2; ++y) {
+    for (uint32_t y = 0; y < output_height / 2; ++y) {
       fwrite(&img->v[y * stride / 2], sizeof(*img->v), output_width / 2, file);
     }
   }

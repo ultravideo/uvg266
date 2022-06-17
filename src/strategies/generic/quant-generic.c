@@ -77,7 +77,7 @@ void uvg_quant_generic(const encoder_state_t * const state, coeff_t *coef, coeff
     sign = (level < 0 ? -1 : 1);
 
     int32_t curr_quant_coeff = quant_coeff[n];
-    level = (abs_level * curr_quant_coeff + add) >> q_bits;
+    level = (int32_t)((abs_level * curr_quant_coeff + add) >> q_bits);
     ac_sum += level;
 
     level *= sign;
@@ -95,7 +95,7 @@ void uvg_quant_generic(const encoder_state_t * const state, coeff_t *coef, coeff
     int64_t abs_level = (int64_t)abs(level);
     int32_t curr_quant_coeff = quant_coeff[n];
 
-    level = (abs_level * curr_quant_coeff + add) >> q_bits;
+    level = (int32_t)((abs_level * curr_quant_coeff + add) >> q_bits);
     delta_u[n] = (int32_t)((abs_level * curr_quant_coeff - (level << q_bits)) >> q_bits8);
   }
 

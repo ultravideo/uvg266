@@ -260,7 +260,7 @@ static double search_intra_trdepth(
   int y_px,
   int depth,
   int max_depth,
-  int cost_treshold,
+  double cost_treshold,
   intra_search_data_t *const search_data,
   lcu_t *const lcu)
 {
@@ -631,8 +631,8 @@ static int16_t search_intra_rough(
       if (mode + i * offset <= 66) {
         costs[modes_selected] = costs_out[i];
         modes[modes_selected] = mode + i * offset;
-        min_cost = MIN(min_cost, costs[modes_selected]);
-        max_cost = MAX(max_cost, costs[modes_selected]);
+        min_cost = (int32_t)MIN(min_cost, costs[modes_selected]);
+        max_cost = (int32_t)MAX(max_cost, costs[modes_selected]);
         ++modes_selected;
       }
     }
@@ -1219,7 +1219,7 @@ void uvg_search_cu_intra(
       number_of_modes_to_search = 0;
     }
     if(!skip_rough_search) {
-      sort_modes(search_data, number_of_modes);
+      sort_modes(search_data, (uint8_t)number_of_modes);
     }
 
     for(int pred_mode = 0; pred_mode < INTRA_MPM_COUNT; ++pred_mode) {

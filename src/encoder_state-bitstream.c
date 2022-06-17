@@ -981,7 +981,7 @@ static void encoder_state_entry_points_explore(const encoder_state_t * const sta
   int i;
   for (i = 0; state->children[i].encoder_control; ++i) {
     if (state->children[i].is_leaf) {
-      const int my_length = uvg_bitstream_tell(&state->children[i].stream)/8;
+      const int my_length = (const int)uvg_bitstream_tell(&state->children[i].stream)/8;
       ++(*r_count);
       if (my_length > *r_max_length) {
         *r_max_length = my_length;
@@ -996,7 +996,7 @@ static void encoder_state_write_bitstream_entry_points_write(bitstream_t * const
   int i;
   for (i = 0; state->children[i].encoder_control; ++i) {
     if (state->children[i].is_leaf) {
-      const int my_length = uvg_bitstream_tell(&state->children[i].stream)/8;
+      const int my_length = (const int)uvg_bitstream_tell(&state->children[i].stream)/8;
       ++(*r_count);
       //Don't write the last one
       if (*r_count < num_entry_points) {
@@ -1144,9 +1144,9 @@ static void uvg_encoder_state_write_bitstream_ref_pic_list(
   struct bitstream_t* const stream,
   struct encoder_state_t* const state)
 {
-  int j;
-  int ref_negative = 0;
-  int ref_positive = 0;
+  uint32_t j;
+  uint32_t ref_negative = 0;
+  uint32_t ref_positive = 0;
   const encoder_control_t* const encoder = state->encoder_control;
   if (encoder->cfg.gop_len) {
     for (j = 0; j < state->frame->ref->used_size; j++) {
@@ -1176,7 +1176,7 @@ static void uvg_encoder_state_write_bitstream_ref_pic_list(
         int8_t found = 0;
         do {
           delta_poc = encoder->cfg.gop[state->frame->gop_offset].ref_neg[j + poc_shift];
-          for (int i = 0; i < state->frame->ref->used_size; i++) {
+          for (uint32_t i = 0; i < state->frame->ref->used_size; i++) {
             if (state->frame->ref->pocs[i] == state->frame->poc - delta_poc) {
               found = 1;
               break;
@@ -1213,7 +1213,7 @@ static void uvg_encoder_state_write_bitstream_ref_pic_list(
         int8_t found = 0;
         do {
           delta_poc = encoder->cfg.gop[state->frame->gop_offset].ref_pos[j + poc_shift];
-          for (int i = 0; i < state->frame->ref->used_size; i++) {
+          for (uint32_t i = 0; i < state->frame->ref->used_size; i++) {
             if (state->frame->ref->pocs[i] == state->frame->poc + delta_poc) {
               found = 1;
               break;
@@ -1336,7 +1336,7 @@ void uvg_encoder_state_write_bitstream_slice_header(
     int ref_positive = 0;
     const encoder_control_t* const encoder = state->encoder_control;    
     if (encoder->cfg.gop_len) {
-      for (int j = 0; j < state->frame->ref->used_size; j++) {
+      for (uint32_t j = 0; j < state->frame->ref->used_size; j++) {
         if (state->frame->ref->pocs[j] < state->frame->poc) {
           ref_negative++;
         }
@@ -1573,7 +1573,7 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
 
   //Get bitstream length for stats
   uint64_t newpos = uvg_bitstream_tell(stream);
-  state->stats_bitstream_length = (newpos >> 3) - (curpos >> 3);
+  state->stats_bitstream_length = (uint32_t)((newpos >> 3) - (curpos >> 3));
 
   if (state->frame->num > 0) {
     state->frame->total_bits_coded = state->previous_encoder_state->frame->total_bits_coded;

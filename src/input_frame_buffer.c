@@ -162,12 +162,12 @@ uvg_picture* uvg_encoder_feed_frame(input_frame_buffer_t *buf,
     if (!cfg->open_gop && cfg->intra_period > 0) {
       // Offset the GOP position for each extra I-frame added to the structure
       // in closed gop case
-      int num_extra_frames = (buf->num_out - 1) / (cfg->intra_period + 1);
+      int32_t num_extra_frames = (int32_t)((buf->num_out - 1) / (cfg->intra_period + 1));
       gop_offset = (buf->num_out - 1 - num_extra_frames) % cfg->gop_len;
     }
 
     // Index of the first picture in the GOP that is being output.
-    int gop_start_idx = buf->num_out - 1 - gop_offset;
+    int32_t gop_start_idx = (int32_t)(buf->num_out - 1 - gop_offset);
 
     // Skip pictures until we find an available one.
     gop_offset += buf->gop_skipped;
@@ -179,7 +179,7 @@ uvg_picture* uvg_encoder_feed_frame(input_frame_buffer_t *buf,
       for (;;) {
         assert(gop_offset < cfg->gop_len + is_closed_gop ? 1 : 0);
         idx_out = gop_start_idx + cfg->gop[gop_offset].poc_offset - 1;
-        if (idx_out < buf->num_in - 1) {
+        if (idx_out < (int64_t)buf->num_in - 1) {
           // An available picture found.
           break;
         }
@@ -191,10 +191,10 @@ uvg_picture* uvg_encoder_feed_frame(input_frame_buffer_t *buf,
     if (buf->num_out < cfg->gop_len - 1) {
       // This picture needs a DTS that is less than the PTS of the first
       // frame so the delay must be applied.
-      int dts_idx = buf->num_out - 1;
+      int32_t dts_idx = (int32_t)(buf->num_out - 1);
       dts_out = buf->pts_buffer[dts_idx % gop_buf_size] + buf->delay;
     } else {
-      int dts_idx = buf->num_out - (cfg->gop_len - 1);
+      int32_t dts_idx = (int32_t)(buf->num_out - (cfg->gop_len - 1));
       dts_out = buf->pts_buffer[dts_idx % gop_buf_size] - 1;
     }
   }

@@ -129,7 +129,7 @@ void uvg_lcu_fill_trdepth(lcu_t *lcu, int x_px, int y_px, int depth, int tr_dept
 {
   const int x_local = SUB_SCU(x_px);
   const int y_local = SUB_SCU(y_px);
-  const int width = LCU_WIDTH >> depth;
+  const uint32_t width = LCU_WIDTH >> depth;
 
   for (unsigned y = 0; y < width; y += SCU_WIDTH) {
     for (unsigned x = 0; x < width; x += SCU_WIDTH) {
@@ -183,7 +183,7 @@ static void lcu_fill_inter(lcu_t *lcu, int x_local, int y_local, int cu_width)
   }
 }
 
-static void lcu_fill_cbf(lcu_t *lcu, int x_local, int y_local, int width, cu_info_t *cur_cu)
+static void lcu_fill_cbf(lcu_t *lcu, uint32_t x_local, uint32_t y_local, uint32_t width, cu_info_t *cur_cu)
 {
   const uint32_t tr_split = cur_cu->tr_depth - cur_cu->depth;
   const uint32_t mask = ~((width >> tr_split)-1);

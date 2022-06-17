@@ -148,7 +148,7 @@ void uvg_free_rc_data() {
  * \param[in,out] beta        beta parameter to update
  */
 static void update_parameters(uint32_t bits,
-                              uint32_t pixels,
+                              uint64_t pixels,
                               double lambda_real,
                               double *alpha,
                               double *beta)
@@ -392,7 +392,7 @@ static double pic_allocate_bits(encoder_state_t * const state)
 
 static int8_t lambda_to_qp(const double lambda)
 {
-  const int8_t qp = 4.2005 * log(lambda) + 13.7223 + 0.5;
+  const int8_t qp = (const int8_t)(4.2005 * log(lambda) + 13.7223 + 0.5);
   return CLIP_TO_QP(qp);
 }
 
@@ -613,21 +613,21 @@ static double get_ctu_bits(encoder_state_t * const state, vector2d_t pos) {
       pthread_mutex_lock(&state->frame->rc_lock);
       double bits_left = state->frame->cur_pic_target_bits - state->frame->cur_frame_bits_coded;
       double weighted_bits_left = (bits_left * window + (bits_left - state->frame->i_bits_left)*cus_left) / window;
-      avg_bits = mad * weighted_bits_left / state->frame->remaining_weight;
+      avg_bits = (int32_t)(mad * weighted_bits_left / state->frame->remaining_weight);
       state->frame->remaining_weight -= mad;
       state->frame->i_bits_left -= state->frame->cur_pic_target_bits * mad / state->frame->icost;
       pthread_mutex_unlock(&state->frame->rc_lock);
     }
     else {
-      avg_bits = state->frame->cur_pic_target_bits * ((double)state->frame->lcu_stats[index].pixels /
-        (state->encoder_control->in.height * state->encoder_control->in.width));
+      avg_bits = (int32_t)(state->frame->cur_pic_target_bits * ((double)state->frame->lcu_stats[index].pixels /
+        (state->encoder_control->in.height * state->encoder_control->in.width)));
     }
   }
   else {
     double total_weight = 0;
     // In case wpp is used only the ctus of the current frame are safe to use
     const int used_ctu_count = MIN(4, (encoder->cfg.wpp ? (pos.y + 1) * encoder->in.width_in_lcu : num_ctu) - index);
-    int target_bits = 0;
+    int32_t target_bits = 0;
     double best_lambda = 0.0;
     double temp_lambda = state->frame->lambda;
     double taylor_e3 = 0.0;
@@ -635,12 +635,12 @@ static double get_ctu_bits(encoder_state_t * const state, vector2d_t pos) {
 
     int last_ctu = index + used_ctu_count;
     for (int i = index; i < last_ctu; i++) {
-      target_bits += state->frame->lcu_stats[i].weight;
+      target_bits += (int32_t)state->frame->lcu_stats[i].weight;
     }
 
     pthread_mutex_lock(&state->frame->rc_lock);
     total_weight = state->frame->remaining_weight;
-    target_bits = MAX(target_bits + state->frame->cur_pic_target_bits - state->frame->cur_frame_bits_coded - (int)total_weight, 10);
+    target_bits = (int32_t)MAX(target_bits + state->frame->cur_pic_target_bits - state->frame->cur_frame_bits_coded - (int)total_weight, 10);
     pthread_mutex_unlock(&state->frame->rc_lock);
 
     //just similar with the process at frame level, details can refer to the function uvg_estimate_pic_lambda
@@ -812,8 +812,8 @@ static double qp_to_lambda(encoder_state_t* const state, int qp)
       pos.x + state->tile->lcu_offset_x,
       pos.y + state->tile->lcu_offset_y
     };
-    int id = lcu.x + lcu.y * state->tile->frame->width_in_lcu;
-    int aq_offset = round(state->frame->aq_offsets[id]);
+    int32_t id = lcu.x + lcu.y * state->tile->frame->width_in_lcu;
+    int32_t aq_offset = (int32_t)round(state->frame->aq_offsets[id]);
     state->qp += aq_offset;
     // Maximum delta QP is clipped according to ITU T-REC-H.265 specification chapter 7.4.9.10 Transform unit semantics
     // Clipping range is a function of bit depth
@@ -916,7 +916,7 @@ void uvg_update_after_picture(encoder_state_t * const state) {
   if (state->frame->is_irap && encoder->cfg.intra_bit_allocation) {
     double lnbpp = log(pow(state->frame->icost / pixels, BETA1));
     pthread_mutex_lock(&state->frame->new_ratecontrol->intra_lock);
-    double diff_lambda = state->frame->new_ratecontrol->intra_beta * log(state->frame->cur_frame_bits_coded) - log(state->frame->cur_pic_target_bits);
+    double diff_lambda = (double)(state->frame->new_ratecontrol->intra_beta * log((double)state->frame->cur_frame_bits_coded) - log((double)state->frame->cur_pic_target_bits));
 
     diff_lambda = CLIP(-0.125, 0.125, 0.25*diff_lambda);
 
@@ -1162,8 +1162,8 @@ void uvg_set_lcu_lambda_and_qp(encoder_state_t * const state,
       pos.x + state->tile->lcu_offset_x,
       pos.y + state->tile->lcu_offset_y
     };
-    int id = lcu_pos.x + lcu_pos.y * state->tile->frame->width_in_lcu;
-    int aq_offset = round(state->frame->aq_offsets[id]);
+    int32_t id = lcu_pos.x + lcu_pos.y * state->tile->frame->width_in_lcu;
+    int32_t aq_offset = (int32_t)round(state->frame->aq_offsets[id]);
     state->qp += aq_offset;    
     // Maximum delta QP is clipped according to ITU T-REC-H.265 specification chapter 7.4.9.10 Transform unit semantics
     // Clipping range is a function of bit depth

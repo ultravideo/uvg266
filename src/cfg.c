@@ -1477,18 +1477,18 @@ void uvg_config_process_lp_gop(uvg_config *cfg)
   // Initialize modulos for testing depth.
   // The picture belong to the lowest depth in which (poc % modulo) == 0.
   unsigned depth_modulos[8] = { 0 };
-  for (int d = 0; d < gop.d; ++d) {
+  for (uint32_t d = 0; d < gop.d; ++d) {
     depth_modulos[gop.d - 1 - d] = 1 << d;
   }
   depth_modulos[0] = gop.g;
 
   cfg->gop_lowdelay = 1;
   cfg->gop_len = gop.g;
-  for (int g = 1; g <= gop.g; ++g) {
+  for (uint32_t g = 1; g <= gop.g; ++g) {
     uvg_gop_config *gop_pic = &cfg->gop[g - 1];
 
     // Find gop depth for picture.
-    int gop_layer = 1;
+    uint32_t gop_layer = 1;
     while (gop_layer < gop.d && (g % depth_modulos[gop_layer - 1])) {
       ++gop_layer;
     }
@@ -1541,7 +1541,7 @@ void uvg_config_process_lp_gop(uvg_config *cfg)
     gop_pic->qp_factor = 0.4624;  // from HM
   }
 
-  for (int g = 0; g < gop.g; ++g) {
+  for (uint32_t g = 0; g < gop.g; ++g) {
     uvg_gop_config *gop_pic = &cfg->gop[g];
     if (!gop_pic->is_ref) {
       gop_pic->qp_factor = 0.68 * 1.31;  // derived from HM
@@ -1915,7 +1915,7 @@ static int validate_hevc_level(uvg_config *const cfg) {
     cfg->max_bitrate = LEVEL_CONSTRAINTS[lvl_idx].main_bitrate * 1000;
   }
 
-  if (cfg->target_bitrate > cfg->max_bitrate) {
+  if (cfg->target_bitrate > (int32_t)cfg->max_bitrate) {
     fprintf(stderr, "%s: target bitrate exceeds %i, which is the maximum %s tier level %g bitrate\n",
       level_err_prefix, cfg->max_bitrate, cfg->high_tier?"high":"main", lvl);
     level_error = 1;
@@ -1934,14 +1934,14 @@ static int validate_hevc_level(uvg_config *const cfg) {
   uint32_t max_dimension_squared = 8 * max_lps;
 
   // check maximum dimensions
-  if (cfg->width * cfg->width > max_dimension_squared) {
-    uint32_t max_dim = sqrtf(max_dimension_squared);
+  if (cfg->width * cfg->width > (int32_t)max_dimension_squared) {
+    uint32_t max_dim = (uint32_t)sqrtf((float)max_dimension_squared);
     fprintf(stderr, "%s: picture width of %i is too large for this level (%g), maximum dimension is %i\n",
       level_err_prefix, cfg->width, lvl, max_dim);
     level_error = 1;
   }
-  if (cfg->height * cfg->height > max_dimension_squared) {
-    uint32_t max_dim = sqrtf(max_dimension_squared);
+  if (cfg->height * cfg->height > (int32_t)max_dimension_squared) {
+    uint32_t max_dim = (uint32_t)sqrtf((float)max_dimension_squared);
     fprintf(stderr, "%s: picture height of %i is too large for this level (%g), maximum dimension is %i\n",
       level_err_prefix, cfg->height, lvl, max_dim);
     level_error = 1;

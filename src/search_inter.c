@@ -313,11 +313,11 @@ static void select_starting_point(inter_search_info_t *info,
   }
 
   // Go through candidates
-  for (unsigned i = 0; i < info->num_merge_cand; ++i) {
+  for (int32_t i = 0; i < info->num_merge_cand; ++i) {
     if (info->merge_cand[i].dir == 3) continue;
 
-    int x = (info->merge_cand[i].mv[info->merge_cand[i].dir - 1][0] + (1 << (INTERNAL_MV_PREC - 1)) ) >> INTERNAL_MV_PREC;
-    int y = (info->merge_cand[i].mv[info->merge_cand[i].dir - 1][1] + (1 << (INTERNAL_MV_PREC - 1)) ) >> INTERNAL_MV_PREC;
+    int32_t x = (info->merge_cand[i].mv[info->merge_cand[i].dir - 1][0] + (1 << (INTERNAL_MV_PREC - 1)) ) >> INTERNAL_MV_PREC;
+    int32_t y = (info->merge_cand[i].mv[info->merge_cand[i].dir - 1][1] + (1 << (INTERNAL_MV_PREC - 1)) ) >> INTERNAL_MV_PREC;
 
     if (x == 0 && y == 0) continue;
 
@@ -1063,7 +1063,7 @@ static void search_frac(inter_search_info_t *info,
     tmp_pic, tmp_stride,
     ext_origin + ext_s + 1, ext_s);
 
-  costs[0] += info->mvd_cost_func(state,
+  costs[0] += (uint32_t)info->mvd_cost_func(state,
                                   mv.x, mv.y, INTERNAL_MV_PREC,
                                   info->mv_cand,
                                   NULL,
@@ -1120,7 +1120,7 @@ static void search_frac(inter_search_info_t *info,
 
     for (int j = 0; j < 4; j++) {
       if (within_tile[j]) {
-        costs[j] += info->mvd_cost_func(
+        costs[j] += (uint32_t)info->mvd_cost_func(
             state,
             mv.x + pattern[j]->x,
             mv.y + pattern[j]->y,
@@ -1315,7 +1315,7 @@ static void search_pu_inter_ref(inter_search_info_t *info,
       // Kvazaar always sets collocated_from_l0_flag so the list is L1 when
       // there are future references.
       int col_list = ref_list;
-      for (int i = 0; i < info->state->frame->ref->used_size; i++) {
+      for (uint32_t i = 0; i < info->state->frame->ref->used_size; i++) {
         if (info->state->frame->ref->pocs[i] > info->state->frame->poc) {
           col_list = 1;
           break;
@@ -1469,7 +1469,7 @@ static void search_pu_inter_bipred(inter_search_info_t *info,
 
   inter_merge_cand_t *merge_cand = info->merge_cand;
 
-  for (int32_t idx = 0; idx < num_cand_pairs; idx++) {
+  for (uint32_t idx = 0; idx < num_cand_pairs; idx++) {
     uint8_t i = priorityList0[idx];
     uint8_t j = priorityList1[idx];
     if (i >= info->num_merge_cand || j >= info->num_merge_cand) break;
@@ -1810,12 +1810,12 @@ static void search_pu_inter(encoder_state_t * const state,
   amvp[2].size = 0;
 
   for (int mv_dir = 1; mv_dir < 4; ++mv_dir) {
-    for (int i = 0; i < state->frame->ref->used_size; ++i) {
+    for (uint32_t i = 0; i < state->frame->ref->used_size; ++i) {
       amvp[mv_dir - 1].cost[i] = MAX_DOUBLE;
     }
   }
 
-  for (int ref_idx = 0; ref_idx < state->frame->ref->used_size; ref_idx++) {
+  for (uint32_t ref_idx = 0; ref_idx < state->frame->ref->used_size; ref_idx++) {
     info->ref_idx = ref_idx;
     info->ref = state->frame->ref->images[ref_idx];
 

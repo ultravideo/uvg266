@@ -49,10 +49,10 @@ uvg_pixel uvg_fast_clip_16bit_to_pixel(int16_t value)
 #if UVG_BIT_DEPTH == 10
     temp &= PIXEL_MAX;
 #endif
-    return temp;
+    return (uvg_pixel)temp;
   }
   else {
-    return value;
+    return (uvg_pixel)value;
   }
 #else
   return CLIP(PIXEL_MIN, PIXEL_MAX, value);
@@ -557,7 +557,7 @@ static void bipred_average_px_px(uvg_pixel *dst,
   int32_t shift = 15 - UVG_BIT_DEPTH; // TODO: defines
   int32_t offset = 1 << (shift - 1);
 
-  for (int i = 0; i < pu_w * pu_h; ++i)
+  for (uint32_t i = 0; i < pu_w * pu_h; ++i)
   {
     int y = i / pu_w;
     int x = i % pu_w;
@@ -578,7 +578,7 @@ static void bipred_average_im_im(uvg_pixel *dst,
   int32_t shift = 15 - UVG_BIT_DEPTH; // TODO: defines
   int32_t offset = 1 << (shift - 1);
 
-  for (int i = 0; i < pu_w * pu_h; ++i)
+  for (uint32_t i = 0; i < pu_w * pu_h; ++i)
   {
     int y = i / pu_w;
     int x = i % pu_w;
@@ -599,7 +599,7 @@ static void bipred_average_px_im(uvg_pixel *dst,
   int32_t shift = 15 - UVG_BIT_DEPTH; // TODO: defines
   int32_t offset = 1 << (shift - 1);
 
-  for (int i = 0; i < pu_w * pu_h; ++i)
+  for (uint32_t i = 0; i < pu_w * pu_h; ++i)
   {
     int y = i / pu_w;
     int x = i % pu_w;
@@ -755,7 +755,7 @@ static double pixel_var_generic(const uvg_pixel *arr, const uint32_t len)
   double arr_mean = 0;
 
   // Calculate array mean
-  int i = 0;
+  uint32_t i        = 0;
   double sum = 0;
 
   for (; i < len; ++i) {

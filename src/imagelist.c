@@ -186,13 +186,13 @@ int uvg_image_list_rem(image_list_t * const list, const unsigned n)
     }
     list->used_size--;
   } else {
-    int i = n;
+    uint32_t i = n;
     // Shift all following pics one backward in the list
     for (i = n; i < list->used_size - 1; ++i) {
       list->images[i] = list->images[i + 1];
       list->cu_arrays[i] = list->cu_arrays[i + 1];
       list->pocs[i] = list->pocs[i + 1];
-      for (int j = 0; j < 16; j++) {
+      for (uint32_t j = 0; j < 16; j++) {
         list->ref_LXs[i][0][j] = list->ref_LXs[i + 1][0][j];
         list->ref_LXs[i][1][j] = list->ref_LXs[i + 1][1][j];
       }
