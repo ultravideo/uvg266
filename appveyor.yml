@@ -1,0 +1,59 @@
+# Email the author if their commit either failed to build or fixed a failed build
+# good -> bad, bad -> bad, bad -> good  but not  good -> good
+notifications:
+  - provider: Email
+    to:
+      - '{{commitAuthorEmail}}'
+    on_build_success: false
+    on_build_failure: true
+    on_build_status_changed: true
+
+
+# Downloading the whole history of the repository would be unnecessary
+clone_depth: 1
+
+image:
+- Visual Studio 2017
+- Visual Studio 2019
+- Visual Studio 2022
+
+# Don't bother with debug builds
+configuration: 
+  - Release  
+
+init:
+- echo %APPVEYOR_BUILD_WORKER_IMAGE%
+- if "%APPVEYOR_BUILD_WORKER_IMAGE%"=="Visual Studio 2017" ( set generator="Visual Studio 15 2017" )
+- if "%APPVEYOR_BUILD_WORKER_IMAGE%"=="Visual Studio 2019" ( set generator="Visual Studio 16 2019" )
+- if "%APPVEYOR_BUILD_WORKER_IMAGE%"=="Visual Studio 2022" ( set generator="Visual Studio 17 2022" )
+- echo %generator%
+
+# Try both shared and static builds
+environment:
+  matrix:
+  - BUILD_SHARED_LIBS: 0
+  - BUILD_SHARED_LIBS: 1
+  
+install:
+  #init and update submodules only in static build
+  - if "%BUILD_SHARED_LIBS%" == "0" git submodule update --recursive --init
+
+before_build:
+- cmd: |-
+    cd build
+    cmake --version
+    cmake .. -G %generator% -A x64 -DBUILD_SHARED_LIBS=%BUILD_SHARED_LIBS%
+
+build:
+  project: $(APPVEYOR_BUILD_FOLDER)\build\$(APPVEYOR_PROJECT_NAME).sln
+  verbosity: minimal
+  parallel: true
+only_commits:
+  files:
+    - CMakeLists.txt
+    - appveyor.yml
+    - src/
+
+test_script:
+  - if "%BUILD_SHARED_LIBS%" == "0" %APPVEYOR_BUILD_FOLDER%\build\tests\%CONFIGURATION%\uvg266_tests.exe
+  - '%APPVEYOR_BUILD_FOLDER%\build\%CONFIGURATION%\uvg266.exe --version'
