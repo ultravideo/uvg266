@@ -243,7 +243,7 @@ static bool encode_lfnst_idx(
     // VTM seems to force explicit dual tree structure for small 4x4 blocks
     bool is_separate_tree = depth == 4; // TODO: if/when separate/dual tree structure is implemented, get proper value for this
 
-    const int lfnst_index = pred_cu->lfnst_idx;
+    const int lfnst_index = color == COLOR_Y ? pred_cu->lfnst_idx : pred_cu->cr_lfnst_idx;
     assert((lfnst_index >= 0 && lfnst_index < 3) && "Invalid LFNST index.");
 
     uint16_t ctx_idx = 0;

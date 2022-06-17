@@ -1434,6 +1434,11 @@ int8_t uvg_search_intra_chroma_rdo(
     const int offset = ((lcu_px.x & ~7) >> 1) + ((lcu_px.y & ~7) >> 1)* LCU_WIDTH_C;
 
     int lfnst_modes_to_check[3];
+    if(depth == 4) {
+      for (int i = 0; i < 3; ++i) {
+        lfnst_modes_to_check[i] = i;
+      }
+    }
     if(chroma_data->pred_cu.lfnst_idx) {
       lfnst_modes_to_check[0] = chroma_data->pred_cu.lfnst_idx;
       lfnst_modes_to_check[1] = -1;
@@ -1461,6 +1466,7 @@ int8_t uvg_search_intra_chroma_rdo(
         if (lfnst == -1) {
           continue;
         }
+        pred_cu->cr_lfnst_idx = lfnst;
         chroma_data[mode_i].lfnst_costs[lfnst] += mode_bits * state->lambda;
         if (pred_cu->tr_depth == pred_cu->depth) {
           uvg_intra_predict(
@@ -1555,7 +1561,7 @@ int8_t uvg_search_intra_chroma_rdo(
           memcpy(&state->search_cabac, &temp_cabac, sizeof(cabac_data_t));
         }      
       }
-      pred_cu->lfnst_idx = best_lfnst_index;
+      pred_cu->cr_lfnst_idx = best_lfnst_index;
     }
     sort_modes(chroma_data, num_modes);
     
@@ -1603,7 +1609,9 @@ int8_t uvg_search_cu_intra_chroma(encoder_state_t * const state,
     chroma_data[i].pred_cu.intra.mode_chroma = num_modes == 1 ? intra_mode : modes[i];
     chroma_data[i].pred_cu.intra.mode = -1;
     chroma_data[i].cost = 0;
-    memcpy(chroma_data[i].lfnst_costs, search_data->lfnst_costs, sizeof(double) * 3);
+    if(depth != 4) {
+      memcpy(chroma_data[i].lfnst_costs, search_data->lfnst_costs, sizeof(double) * 3);
+    }
   }
   // Don't do rough mode search if all modes are selected.
   // FIXME: It might make more sense to only disable rough search if

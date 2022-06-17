@@ -501,7 +501,7 @@ void uvg_chroma_transform_search(
   const int can_use_tr_skip = state->encoder_control->cfg.trskip_enable &&
     (1 << state->encoder_control->cfg.trskip_max_size) >= width &&
     state->encoder_control->cfg.chroma_trskip_enable && 
-    pred_cu->lfnst_idx == 0;
+    pred_cu->cr_lfnst_idx == 0 ;
 
   if (can_use_tr_skip) {
     uvg_transformskip(state->encoder_control, u_resi, u_coeff + num_transforms * trans_offset, width);
@@ -552,16 +552,16 @@ void uvg_chroma_transform_search(
       scan_order,
       &u_has_coeffs,
       &v_has_coeffs,
-      pred_cu->lfnst_idx);
-    /*
-    if(pred_cu->type == CU_INTRA && transforms[i] != CHROMA_TS) {
+      pred_cu->cr_lfnst_idx);
+    
+    if(pred_cu->type == CU_INTRA && transforms[i] != CHROMA_TS && depth == 4) {
       bool constraints[2] = { false, false };
       uvg_derive_lfnst_constraints(pred_cu, depth, constraints, &u_coeff[i * trans_offset], width, height);
       if(!IS_JCCR_MODE(transforms[i])) {
         uvg_derive_lfnst_constraints(pred_cu, depth, constraints, &v_coeff[i * trans_offset], width, height);        
       }
-      if ((constraints[0] || !constraints[1]) && pred_cu->lfnst_idx != 0) continue;
-    }*/
+      if ((constraints[0] || !constraints[1]) && pred_cu->cr_lfnst_idx != 0) continue;
+    }
 
     if (IS_JCCR_MODE(transforms[i]) && !u_has_coeffs) continue;
 
