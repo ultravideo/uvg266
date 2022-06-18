@@ -1312,7 +1312,7 @@ static void search_pu_inter_ref(inter_search_info_t *info,
       // in L0 or L1, the primary list for the colocated PU is the inverse of
       // collocated_from_l0_flag. Otherwise it is equal to reflist.
       //
-      // Kvazaar always sets collocated_from_l0_flag so the list is L1 when
+      // uvg266 always sets collocated_from_l0_flag so the list is L1 when
       // there are future references.
       int col_list = ref_list;
       for (uint32_t i = 0; i < info->state->frame->ref->used_size; i++) {

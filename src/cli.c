@@ -343,7 +343,7 @@ cmdline_opts_t* cmdline_opts_parse(const uvg_api *const api, int argc, char *arg
   }
 
   if (opts->config->vps_period < 0) {
-    // Disabling parameter sets is only possible when using Kvazaar as
+    // Disabling parameter sets is only possible when using uvg266 as
     // a library.
     fprintf(stderr, "Input error: vps_period must be non-negative\n");
     ok = 0;

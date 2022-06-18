@@ -1266,7 +1266,7 @@ int uvg_config_parse(uvg_config *cfg, const char *name, const char *value)
       // Because the image is read straight into the reference buffers,
       // reading >8 bit samples doesn't work when sizeof(uvg_pixel)==1.
       fprintf(stderr, "input-bitdepth can't be set to larger than 8 because"
-                      " Kvazaar is compiled with UVG_BIT_DEPTH=8.\n");
+                      " uvg266 is compiled with UVG_BIT_DEPTH=8.\n");
       return 0;
     }
   }

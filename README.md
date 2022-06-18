@@ -9,7 +9,7 @@ uvg266 is still under development. Speed and RD-quality will continue to improve
 http://ultravideo.fi/#encoder for more information.
 
 - Linux [![uvg266_tests](https://github.com/ultravideo/uvg266/actions/workflows/uvg266.yml/badge.svg)](https://github.com/ultravideo/uvg266/actions/workflows/uvg266.yml)
-- Windows [![Build status](https://ci.appveyor.com/api/projects/status/88sg1h25lp0k71pu?svg=true)](https://ci.appveyor.com/project/Ultravideo/uvg266)
+- Windows [![Build status](https://ci.appveyor.com/api/projects/status/c1gwnnkyt5lycqka?svg=true)](https://ci.appveyor.com/project/Ultravideo/uvg266)
 
 ## Table of Contents
 

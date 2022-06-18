@@ -193,7 +193,7 @@ typedef int16_t mv_t;
 
 // ToDo: add VVC large block support
 #if LCU_WIDTH != 64
-  #error "Kvazaar only support LCU_WIDTH == 64"
+  #error "uvg266 only support LCU_WIDTH == 64"
 #endif
 
 #define LCU_LUMA_SIZE (LCU_WIDTH * LCU_WIDTH)

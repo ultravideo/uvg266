@@ -2,7 +2,7 @@
 image: ultravideo/kvazaar_ci_base:latest
 
 # Build and test kvazaar
-test-kvazaar: &test-template
+test-uvg266: &test-template
   stage: test
   script:
     - bash .travis-install.bash

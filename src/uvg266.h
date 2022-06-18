@@ -35,7 +35,7 @@
 /** 
  * \ingroup Control
  * \file
- * This file defines the public API of Kvazaar when used as a library.
+ * This file defines the public API of uvg266 when used as a library.
  */
 
 #include <stdint.h>
@@ -47,26 +47,26 @@ extern "C" {
 
 #if defined(UVG_DLL_EXPORTS)
   #if !defined(PIC)
-    // Building static kvazaar library.
+    // Building static uvg266 library.
     #define UVG_PUBLIC
   #elif defined(_WIN32) || defined(__CYGWIN__)
-    // Building kvazaar DLL on Windows.
+    // Building uvg266 DLL on Windows.
     #define UVG_PUBLIC __declspec(dllexport)
   #elif defined(__GNUC__)
-    // Building kvazaar shared library with GCC.
+    // Building uvg266 shared library with GCC.
     #define UVG_PUBLIC __attribute__ ((visibility ("default")))
   #else
     #define UVG_PUBLIC
   #endif
 #else
   #if defined(UVG_STATIC_LIB)
-    // Using static kvazaar library.
+    // Using static uvg266 library.
     #define UVG_PUBLIC
   #elif defined(_WIN32) || defined(__CYGWIN__)
-    // Using kvazaar DLL on Windows.
+    // Using uvg266 DLL on Windows.
     #define UVG_PUBLIC __declspec(dllimport)
   #else
-    // Using kvazaar shared library and not on Windows.
+    // Using uvg266 shared library and not on Windows.
     #define UVG_PUBLIC
   #endif
 #endif

@@ -1529,7 +1529,7 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
     uvg_encoder_state_write_parameter_sets(&state->stream, state);
   }
 
-  // Send Kvazaar version information only in the first frame.
+  // Send uvg266 version information only in the first frame.
   if (state->frame->num == 0 && encoder->cfg.add_encoder_info) {
     uvg_nal_write(stream, UVG_NAL_PREFIX_SEI_NUT, 0, state->frame->first_nal);
     state->frame->first_nal = false;

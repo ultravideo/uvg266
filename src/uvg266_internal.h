@@ -35,7 +35,7 @@
 /**
  * \ingroup Control
  * \file
- * \brief Definitions for opaque structs in kvazaar.h
+ * \brief Definitions for opaque structs in uvg266.h
  */
 
 #include "global.h" // IWYU pragma: keep
