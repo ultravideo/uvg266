@@ -382,7 +382,7 @@ static double search_intra_trdepth(
                          depth, search_data,
                          pred_cu,
                          lcu,
-                         KVZ_LUMA_T);
+                         UVG_LUMA_T);
       if (trafo != 0 && !cbf_is_set(pred_cu->cbf, depth, COLOR_Y)) continue;
 
         // TODO: Not sure if this should be 0 or 1 but at least seems to work with 1
@@ -474,7 +474,7 @@ static double search_intra_trdepth(
           search_data,
           pred_cu,
           lcu,
-          KVZ_BOTH_T);
+          UVG_BOTH_T);
         best_rd_cost += uvg_cu_rd_cost_chroma(
           state,
           lcu_px.x,
@@ -527,7 +527,7 @@ static double search_intra_trdepth(
                          depth, search_data,
                          pred_cu, 
                          lcu, 
-                         KVZ_BOTH_T);
+                         UVG_BOTH_T);
       best_rd_cost += uvg_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
       pred_cu->intra.mode = luma_mode;
     }
@@ -669,7 +669,7 @@ static int search_intra_chroma_rough(
   intra_search_data_t* chroma_data,
   lcu_t* lcu,
   int8_t luma_mode,
-  enum kvz_tree_type tree_type)
+  enum uvg_tree_type tree_type)
 {
   assert(depth != 4 || (x_px & 4 && y_px & 4));
 
@@ -1056,9 +1056,9 @@ static int16_t search_intra_rough(
 
   int offset = 4;
   search_proxy.pred_cu.intra.mode = 0;
-  uvg_intra_predict(state, refs, &loc, COLOR_Y, preds[0], &search_proxy, NULL, KVZ_LUMA_T);
+  uvg_intra_predict(state, refs, &loc, COLOR_Y, preds[0], &search_proxy, NULL, UVG_LUMA_T);
   search_proxy.pred_cu.intra.mode = 1;
-  uvg_intra_predict(state, refs, &loc, COLOR_Y, preds[1], &search_proxy, NULL, KVZ_LUMA_T);
+  uvg_intra_predict(state, refs, &loc, COLOR_Y, preds[1], &search_proxy, NULL, UVG_LUMA_T);
   get_cost_dual(state, preds, orig_block, satd_dual_func, sad_dual_func, width, costs);
   mode_checked[0] = true;
   mode_checked[1] = true;
@@ -1108,7 +1108,7 @@ static int16_t search_intra_rough(
     for (int i = 0; i < PARALLEL_BLKS; ++i) {
       if (mode + i * offset <= 66) {
         search_proxy.pred_cu.intra.mode = mode + i*offset;
-        uvg_intra_predict(state, refs, &loc, COLOR_Y, preds[i], &search_proxy, NULL, KVZ_LUMA_T);
+        uvg_intra_predict(state, refs, &loc, COLOR_Y, preds[i], &search_proxy, NULL, UVG_LUMA_T);
       }
     }
     
@@ -1180,7 +1180,7 @@ static int16_t search_intra_rough(
       
         for (int block = 0; block < PARALLEL_BLKS; ++block) {
           search_proxy.pred_cu.intra.mode = modes_to_check[block + i];
-          uvg_intra_predict(state, refs, &loc, COLOR_Y, preds[block], &search_proxy, NULL, KVZ_LUMA_T);
+          uvg_intra_predict(state, refs, &loc, COLOR_Y, preds[block], &search_proxy, NULL, UVG_LUMA_T);
         
         }
 
@@ -1267,7 +1267,7 @@ static void get_rough_cost_for_2n_modes(
   double bits[PARALLEL_BLKS] = { 0 };
   for(int mode = 0; mode < num_modes; mode += PARALLEL_BLKS) {
     for (int i = 0; i < PARALLEL_BLKS; ++i) {
-      uvg_intra_predict(state, &refs[search_data[mode + i].pred_cu.intra.multi_ref_idx], cu_loc, COLOR_Y, preds[i], &search_data[mode + i], NULL, KVZ_LUMA_T);
+      uvg_intra_predict(state, &refs[search_data[mode + i].pred_cu.intra.multi_ref_idx], cu_loc, COLOR_Y, preds[i], &search_data[mode + i], NULL, UVG_LUMA_T);
     }
     get_cost_dual(state, preds, orig_block, satd_dual_func, sad_dual_func, width, costs_out);
 
@@ -1421,7 +1421,7 @@ int8_t uvg_search_intra_chroma_rdo(
   lcu_t *const lcu,
   intra_search_data_t* chroma_data,
   int8_t luma_mode,
-  enum kvz_tree_type tree_type)
+  enum uvg_tree_type tree_type)
 {
   const bool reconstruct_chroma = (depth != 4) || (x_px & 4 && y_px & 4);
 
@@ -1594,7 +1594,7 @@ int8_t uvg_search_cu_intra_chroma(
   const int depth,
   lcu_t *lcu,
   intra_search_data_t *search_data,
-  enum kvz_tree_type tree_type)
+  enum uvg_tree_type tree_type)
 {
   const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
 

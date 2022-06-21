@@ -135,10 +135,10 @@ typedef struct {
 } vector2d_t;
 
 
-enum kvz_tree_type {
-  KVZ_BOTH_T = 0,
-  KVZ_LUMA_T = 1,
-  KVZ_CHROMA_T = 2
+enum uvg_tree_type {
+  UVG_BOTH_T = 0,
+  UVG_LUMA_T = 1,
+  UVG_CHROMA_T = 2
 };
 
 /**
@@ -248,7 +248,7 @@ cu_info_t* uvg_cu_array_at(cu_array_t *cua, unsigned x_px, unsigned y_px);
 const cu_info_t* uvg_cu_array_at_const(const cu_array_t *cua, unsigned x_px, unsigned y_px);
 
 cu_array_t * uvg_cu_array_alloc(const int width, const int height);
-cu_array_t* uvg_cu_array_chroma_alloc(const int width, const int height, enum kvz_chroma_format chroma);
+cu_array_t* uvg_cu_array_chroma_alloc(const int width, const int height, enum uvg_chroma_format chroma);
 cu_array_t * uvg_cu_subarray(cu_array_t *base,
                              const unsigned x_offset,
                              const unsigned y_offset,
@@ -381,7 +381,7 @@ typedef struct {
   cu_info_t cu[LCU_T_CU_WIDTH * LCU_T_CU_WIDTH + 1];
 } lcu_t;
 
-void uvg_cu_array_copy_from_lcu(cu_array_t* dst, int dst_x, int dst_y, const lcu_t *src, enum kvz_tree_type
+void uvg_cu_array_copy_from_lcu(cu_array_t* dst, int dst_x, int dst_y, const lcu_t *src, enum uvg_tree_type
                                 tree_type);
 
 /**

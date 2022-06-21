@@ -55,7 +55,7 @@ int8_t uvg_search_cu_intra_chroma(
   const int depth,
   lcu_t *lcu,
   intra_search_data_t* best_cclm,
-  enum kvz_tree_type tree_type);
+  enum uvg_tree_type tree_type);
 
 void uvg_search_cu_intra(
   encoder_state_t * const state,

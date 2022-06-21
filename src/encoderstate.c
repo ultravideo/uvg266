@@ -765,12 +765,12 @@ static void encoder_state_worker_encode_lcu_bitstream(void * opaque)
   //Encode ALF
   uvg_encode_alf_bits(state, lcu->position.y * frame->width_in_lcu + lcu->position.x);
 
-  enum kvz_tree_type tree_type = state->frame->slicetype == UVG_SLICE_I && state->encoder_control->cfg.dual_tree ? KVZ_LUMA_T : KVZ_BOTH_T;
+  enum uvg_tree_type tree_type = state->frame->slicetype == UVG_SLICE_I && state->encoder_control->cfg.dual_tree ? UVG_LUMA_T : UVG_BOTH_T;
   //Encode coding tree
   uvg_encode_coding_tree(state, lcu->position.x * LCU_WIDTH, lcu->position.y * LCU_WIDTH, 0, lcu->coeff, tree_type);
 
-  if(tree_type == KVZ_LUMA_T && state->encoder_control->chroma_format != UVG_CSP_400) {
-    uvg_encode_coding_tree(state, lcu->position.x * LCU_WIDTH_C, lcu->position.y * LCU_WIDTH_C, 0, lcu->coeff, KVZ_CHROMA_T);
+  if(tree_type == UVG_LUMA_T && state->encoder_control->chroma_format != UVG_CSP_400) {
+    uvg_encode_coding_tree(state, lcu->position.x * LCU_WIDTH_C, lcu->position.y * LCU_WIDTH_C, 0, lcu->coeff, UVG_CHROMA_T);
   }
 
   if (!state->cabac.only_count) {

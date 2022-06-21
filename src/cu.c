@@ -129,7 +129,7 @@ cu_array_t * uvg_cu_array_alloc(const int width, const int height)
 
   return cua;
 }
-cu_array_t * uvg_cu_array_chroma_alloc(const int width, const int height, enum kvz_chroma_format chroma)
+cu_array_t * uvg_cu_array_chroma_alloc(const int width, const int height, enum uvg_chroma_format chroma)
 {
   cu_array_t *cua = MALLOC(cu_array_t, 1);
 
@@ -234,10 +234,10 @@ cu_array_t * uvg_cu_array_copy_ref(cu_array_t* cua)
  * \param dst_y   y-coordinate of the top edge of the copied area in dst
  * \param src     source lcu
  */
-void uvg_cu_array_copy_from_lcu(cu_array_t* dst, int dst_x, int dst_y, const lcu_t *src, enum kvz_tree_type tree_type)
+void uvg_cu_array_copy_from_lcu(cu_array_t* dst, int dst_x, int dst_y, const lcu_t *src, enum uvg_tree_type tree_type)
 {
   const int dst_stride = dst->stride >> 2;
-  const int width = tree_type != KVZ_CHROMA_T ? LCU_WIDTH : LCU_WIDTH_C;
+  const int width = tree_type != UVG_CHROMA_T ? LCU_WIDTH : LCU_WIDTH_C;
   for (int y = 0; y < width; y += SCU_WIDTH) {
     for (int x = 0; x < width; x += SCU_WIDTH) {
       const cu_info_t *from_cu = LCU_GET_CU_AT_PX(src, x, y);

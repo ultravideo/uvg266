@@ -134,7 +134,7 @@ void uvg_intra_predict(
   uvg_pixel* dst,
   const intra_search_data_t* data,
   const lcu_t* lcu,
-  enum kvz_tree_type tree_type
+  enum uvg_tree_type tree_type
   );
 
 void uvg_intra_recon_cu(
@@ -145,15 +145,15 @@ void uvg_intra_recon_cu(
   intra_search_data_t* search_data,
   cu_info_t *cur_cu,
   lcu_t *lcu, 
-  enum kvz_tree_type tree_type);
+  enum uvg_tree_type tree_type);
 
-const cu_info_t* kvz_get_co_located_luma_cu(
+const cu_info_t* uvg_get_co_located_luma_cu(
   int x,
   int y,
   int width,
   int height,
   const lcu_t* const lcu,
   const cu_array_t* const cu_array,
-  enum kvz_tree_type tree_type);
+  enum uvg_tree_type tree_type);
 
 int uvg_get_mip_flag_context(int x, int y, int width, int height, const lcu_t* lcu, cu_array_t* const cu_a);

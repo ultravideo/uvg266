@@ -492,7 +492,7 @@ static void predict_cclm(
   uvg_intra_references* chroma_ref,
   uvg_pixel* dst,
   cclm_parameters_t* cclm_params,
-  enum kvz_tree_type tree_type
+  enum uvg_tree_type tree_type
   )
 {
   assert(mode == LM_CHROMA_IDX || mode == LM_CHROMA_L_IDX || mode == LM_CHROMA_T_IDX);
@@ -517,14 +517,14 @@ static void predict_cclm(
   // The luma reference is only needed when we are not on the edge of the picture.
   // Because the reference pixels that are needed on the edge of the ctu this code
   // is kinda messy but what can you do
-  const int ctu_size = tree_type == KVZ_CHROMA_T ? LCU_WIDTH_C : LCU_WIDTH;
+  const int ctu_size = tree_type == UVG_CHROMA_T ? LCU_WIDTH_C : LCU_WIDTH;
 
   if (y0) {
     if (y_scu == 0) available_above_right = MIN(width / 2, (64-x_scu - width * 2) / 2);
     for (; available_above_right < width / 2; available_above_right++) {
       int x_extension = x_scu + width * 2 + 4 * available_above_right;
-      x_extension >>= tree_type == KVZ_CHROMA_T;
-      const cu_info_t* pu = LCU_GET_CU_AT_PX(lcu, x_extension, (y_scu >> (tree_type==KVZ_CHROMA_T)) - 4);
+      x_extension >>= tree_type == UVG_CHROMA_T;
+      const cu_info_t* pu = LCU_GET_CU_AT_PX(lcu, x_extension, (y_scu >> (tree_type==UVG_CHROMA_T)) - 4);
       if (x_extension >= ctu_size || pu->type == CU_NOTSET || (pu->type == CU_INTRA && pu->intra.mode_chroma == -1)) break;
     }
     if(y_scu == 0) {
@@ -550,8 +550,8 @@ static void predict_cclm(
     if (x_scu == 0) available_left_below = MIN(width / 2, (64 - y_scu - height * 2) / 2);
     for (; available_left_below < height / 2; available_left_below++) {
       int y_extension = y_scu + height * 2 + 4 * available_left_below;
-      y_extension >>= tree_type == KVZ_CHROMA_T;
-      const cu_info_t* pu = LCU_GET_CU_AT_PX(lcu, (x_scu >> (tree_type == KVZ_CHROMA_T)) - 4, y_extension);
+      y_extension >>= tree_type == UVG_CHROMA_T;
+      const cu_info_t* pu = LCU_GET_CU_AT_PX(lcu, (x_scu >> (tree_type == UVG_CHROMA_T)) - 4, y_extension);
       if (y_extension >= ctu_size || pu->type == CU_NOTSET || (pu->type == CU_INTRA && pu->intra.mode_chroma == -1)) break;
       if(x_scu == 32 && y_scu == 0 && pu->depth == 0) break;
     }
@@ -1381,7 +1381,7 @@ void uvg_intra_predict(
   uvg_pixel* dst,
   const intra_search_data_t* data,
   const lcu_t* lcu,
-  enum kvz_tree_type tree_type
+  enum uvg_tree_type tree_type
   )
 {
   const int stride = (((state->tile->frame->width + 7) & ~7) + FRAME_PADDING_LUMA);
@@ -1425,18 +1425,18 @@ void uvg_intra_predict(
 }
 
 // This function works on luma coordinates 
-const cu_info_t* kvz_get_co_located_luma_cu(
+const cu_info_t* uvg_get_co_located_luma_cu(
   int x,
   int y,
   int width,
   int height,
   const lcu_t* const lcu,
   const cu_array_t* const cu_array,
-  enum kvz_tree_type tree_type)
+  enum uvg_tree_type tree_type)
 {
   assert((cu_array || lcu) && !(cu_array && lcu));
-  assert(tree_type != KVZ_LUMA_T && "Luma only CU shouldn't need colocated luma CU");
-  if(tree_type == KVZ_CHROMA_T) {
+  assert(tree_type != UVG_LUMA_T && "Luma only CU shouldn't need colocated luma CU");
+  if(tree_type == UVG_CHROMA_T) {
     x += width >> 1;
     y += height >> 1;
   }
@@ -1457,7 +1457,7 @@ static void intra_recon_tb_leaf(
   lcu_t *lcu,
   color_t color,
   const intra_search_data_t* search_data,
-  enum kvz_tree_type tree_type)
+  enum uvg_tree_type tree_type)
 {
   const uvg_config *cfg = &state->encoder_control->cfg;
   const int shift = color == COLOR_Y ? 0 : 1;
@@ -1558,9 +1558,9 @@ void uvg_intra_recon_cu(
   intra_search_data_t* search_data,
   cu_info_t *cur_cu,
   lcu_t *lcu,
-  enum kvz_tree_type tree_type)
+  enum uvg_tree_type tree_type)
 {
-  const vector2d_t lcu_px = { SUB_SCU(x) >> (tree_type == KVZ_CHROMA_T), SUB_SCU(y) >> (tree_type == KVZ_CHROMA_T) };
+  const vector2d_t lcu_px = { SUB_SCU(x) >> (tree_type == UVG_CHROMA_T), SUB_SCU(y) >> (tree_type == UVG_CHROMA_T) };
   const int8_t width = LCU_WIDTH >> depth;
   if (cur_cu == NULL) {
     cur_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
@@ -1596,9 +1596,9 @@ void uvg_intra_recon_cu(
 
     // Propagate coded block flags from child CUs to parent CU.
     uint16_t child_cbfs[3] = {
-      LCU_GET_CU_AT_PX(lcu, (lcu_px.x + offset) >> (tree_type == KVZ_CHROMA_T), lcu_px.y >> (tree_type == KVZ_CHROMA_T))->cbf,
-      LCU_GET_CU_AT_PX(lcu, lcu_px.x >> (tree_type == KVZ_CHROMA_T), (lcu_px.y + offset) >> (tree_type == KVZ_CHROMA_T))->cbf,
-      LCU_GET_CU_AT_PX(lcu, (lcu_px.x + offset) >> (tree_type == KVZ_CHROMA_T), (lcu_px.y + offset) >> (tree_type == KVZ_CHROMA_T))->cbf,
+      LCU_GET_CU_AT_PX(lcu, (lcu_px.x + offset) >> (tree_type == UVG_CHROMA_T), lcu_px.y >> (tree_type == UVG_CHROMA_T))->cbf,
+      LCU_GET_CU_AT_PX(lcu, lcu_px.x >> (tree_type == UVG_CHROMA_T), (lcu_px.y + offset) >> (tree_type == UVG_CHROMA_T))->cbf,
+      LCU_GET_CU_AT_PX(lcu, (lcu_px.x + offset) >> (tree_type == UVG_CHROMA_T), (lcu_px.y + offset) >> (tree_type == UVG_CHROMA_T))->cbf,
     };
 
     if (mode_luma != -1 && depth <= MAX_DEPTH) {
