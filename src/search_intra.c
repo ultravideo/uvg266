@@ -1628,7 +1628,7 @@ int8_t uvg_search_cu_intra_chroma(
     chroma_data[i].pred_cu.intra.mode_chroma = num_modes == 1 ? intra_mode : modes[i];
     chroma_data[i].pred_cu.intra.mode = -1;
     chroma_data[i].cost = 0;
-    if(depth != 4) {
+    if(depth != 4 && tree_type == UVG_BOTH_T) {
       memcpy(chroma_data[i].lfnst_costs, search_data->lfnst_costs, sizeof(double) * 3);
     }
   }

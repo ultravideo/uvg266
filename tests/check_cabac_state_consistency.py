@@ -30,9 +30,9 @@ def main(state_file: Path, ctx_names: list, ctx_count: int = 332, ctx_size: int 
     with open(state_file, "rb") as file:
         try:
             while True:
-                type_, x, y, depth = file.read(13).decode().split()
+                type_, x, y, depth, tree_type = file.read(15).decode().split()
                 # Reset stored data at the beginning of the frame
-                if x == '0' and y == '0' and type_ == "S":
+                if x == '0' and y == '0' and type_ == "S" and tree_type != "2":
                     if not was_zero_last:
                         frame_num += 1
                         ctx_store = dict()
@@ -44,14 +44,14 @@ def main(state_file: Path, ctx_names: list, ctx_count: int = 332, ctx_size: int 
                 ctx = file.read(ctx_count * ctx_size)
                 if type_ == "S":
                     # These shouldn't happen but just to make sure everything is working as intended
-                    if ctx_store.get((x, y, depth)):
+                    if ctx_store.get((x, y, depth, tree_type)):
                         raise RuntimeError
-                    ctx_store[(x, y, depth)] = ctx
+                    ctx_store[(x, y, depth, tree_type)] = ctx
                 else:
-                    if (x, y, depth) in e_store:
+                    if (x, y, depth, tree_type) in e_store:
                         raise RuntimeError
-                    e_store.add((x, y, depth))
-                    if (s_ctx := ctx_store[(x, y, depth)]) != ctx:
+                    e_store.add((x, y, depth, tree_type))
+                    if (s_ctx := ctx_store[(x, y, depth, tree_type)]) != ctx:
                         actual_problem = False
 
                         for i in range(ctx_count):
@@ -61,7 +61,7 @@ def main(state_file: Path, ctx_names: list, ctx_count: int = 332, ctx_size: int 
                                 if ctx_names[i] in ignore_list:
                                     continue
                                 actual_problem = True
-                                print(f"MISSMATCH in {ctx_names[i]} {frame_num=} {x=} {y=} {depth=}")
+                                print(f"MISSMATCH in {ctx_names[i]} {frame_num=} {x=} {y=} {depth=} {tree_type=}")
                                 print(
                                     f"GOT     : {int.from_bytes(temp_s[0:2], 'little')}:"
                                     f"{int.from_bytes(temp_s[2:4], 'little')} "

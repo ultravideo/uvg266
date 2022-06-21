@@ -589,7 +589,7 @@ static double cu_rd_cost_tr_split_accurate(
 
   unsigned chroma_ssd = 0;
   if(has_chroma) {
-    const vector2d_t lcu_px = { (x_px & ~7 ) / 2, (y_px & ~7) / 2 };
+    const vector2d_t lcu_px = { (x_px >> (tree_type != UVG_CHROMA_T)) & ~3, (y_px >> (tree_type != UVG_CHROMA_T)) &~3  };
     const int chroma_width = MAX(4, LCU_WIDTH >> (depth + 1));
     int8_t scan_order = uvg_get_scan_order(pred_cu->type, pred_cu->intra.mode_chroma, depth);
     const unsigned index = xy_to_zorder(LCU_WIDTH_C, lcu_px.x, lcu_px.y);
@@ -943,7 +943,7 @@ static double search_cu(
         intra_search.pred_cu.joint_cb_cr = 0;
 
         // TODO: This heavily relies to square CUs
-        if ((depth != 4 || (x % 8 && y % 8)) && state->encoder_control->chroma_format != UVG_CSP_400) {
+        if ((depth != 4 || (x % 8 && y % 8)) && state->encoder_control->chroma_format != UVG_CSP_400 && tree_type != UVG_LUMA_T) {
           // There is almost no benefit to doing the chroma mode search for
           // rd2. Possibly because the luma mode search already takes chroma
           // into account, so there is less of a chanse of luma mode being
@@ -973,7 +973,12 @@ static double search_cu(
             &intra_search.pred_cu,
             lcu,
             tree_type);
-          intra_cost += uvg_cu_rd_cost_chroma(state, x_local, y_local, depth, &intra_search.pred_cu, lcu);
+          if(tree_type != UVG_CHROMA_T) {
+            intra_cost += uvg_cu_rd_cost_chroma(state, x_local, y_local, depth, &intra_search.pred_cu, lcu);
+          }
+          else {
+            intra_cost = intra_search.cost;
+          }
           intra_search.pred_cu.intra.mode = intra_mode;
           intra_search.pred_cu.violates_lfnst_constrained_chroma = false;
           intra_search.pred_cu.lfnst_last_scan_pos = false;
@@ -1124,7 +1129,7 @@ static double search_cu(
       depth < pu_depth_inter.max);
 
   if(state->encoder_control->cabac_debug_file) {
-    fprintf(state->encoder_control->cabac_debug_file, "S %4d %4d %d", x, y, depth);
+    fprintf(state->encoder_control->cabac_debug_file, "S %4d %4d %d %d", x, y, depth, tree_type);
     fwrite(&state->search_cabac.ctx, 1,  sizeof(state->search_cabac.ctx), state->encoder_control->cabac_debug_file);
   }
 
