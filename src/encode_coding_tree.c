@@ -1771,17 +1771,27 @@ double uvg_mock_encode_coding_unit(
   double bits = 0;
   const encoder_control_t* const ctrl = state->encoder_control;
 
-  int x_local = SUB_SCU(x);
-  int y_local = SUB_SCU(y);
+  int x_local = SUB_SCU(x) >> (tree_type == UVG_CHROMA_T);
+  int y_local = SUB_SCU(y) >> (tree_type == UVG_CHROMA_T);
 
   const int cu_width = LCU_WIDTH >> depth;
   
   const cu_info_t* left_cu = NULL, *above_cu = NULL;
   if (x) {
-    left_cu = LCU_GET_CU_AT_PX(lcu, x_local - 1, y_local);
+    if(x_local || tree_type != UVG_CHROMA_T) {
+      left_cu = LCU_GET_CU_AT_PX(lcu, x_local - 1, y_local);
+    }
+    else {
+      left_cu = uvg_cu_array_at_const(state->tile->frame->chroma_cu_array, (x >> 1) - 1, y >> 1);
+    }
   }
   if (y) {
-    above_cu = LCU_GET_CU_AT_PX(lcu, x_local, y_local-1);
+    if(y_local || tree_type != UVG_CHROMA_T) {
+      above_cu = LCU_GET_CU_AT_PX(lcu, x_local, y_local-1);
+    }
+    else {
+      above_cu = uvg_cu_array_at_const(state->tile->frame->chroma_cu_array, x >> 1, (y >> 1) - 1);
+    }
   }
   
   if (depth <= state->frame->max_qp_delta_depth) {
@@ -1790,7 +1800,18 @@ double uvg_mock_encode_coding_unit(
 
   // When not in MAX_DEPTH, insert split flag and split the blocks if needed
   if (tree_type != UVG_CHROMA_T ? depth != MAX_DEPTH : depth != MAX_DEPTH - 1) {
-    uvg_write_split_flag(state, cabac, left_cu, above_cu, 0, depth, cu_width, x, y, tree_type, &bits);
+    uvg_write_split_flag(
+      state,
+      cabac,
+      left_cu,
+      above_cu,
+      0,
+      depth,
+      cu_width >> (tree_type == UVG_CHROMA_T),
+      x >> (tree_type == UVG_CHROMA_T),
+      y >> (tree_type == UVG_CHROMA_T),
+      tree_type,
+      &bits);
   }
 
   // Encode skip flag

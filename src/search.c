@@ -1149,11 +1149,35 @@ static double search_cu(
 
     if (depth < MAX_DEPTH) {
       // Add cost of cu_split_flag.
-      uvg_write_split_flag(state, &state->search_cabac,
-                           x > 0 ? LCU_GET_CU_AT_PX(lcu, (SUB_SCU(x) - 1) >> (tree_type == UVG_CHROMA_T), SUB_SCU(y) >> (tree_type == UVG_CHROMA_T)) : NULL,
-                           y > 0 ? LCU_GET_CU_AT_PX(lcu, SUB_SCU(x) >> (tree_type == UVG_CHROMA_T), (SUB_SCU(y) - 1) >> (tree_type == UVG_CHROMA_T)) : NULL,
-                           1, depth, cu_width, x, y, tree_type,
-                           &split_bits);
+      const cu_info_t* left_cu = NULL, * above_cu = NULL;
+      if (x) {
+        if (x_local || tree_type != UVG_CHROMA_T) {
+          left_cu = LCU_GET_CU_AT_PX(lcu, x_local - 1, y_local);
+        }
+        else {
+          left_cu = uvg_cu_array_at_const(state->tile->frame->chroma_cu_array, (x >> 1) - 1, y >> 1);
+        }
+      }
+      if (y) {
+        if (y_local || tree_type != UVG_CHROMA_T) {
+          above_cu = LCU_GET_CU_AT_PX(lcu, x_local, y_local - 1);
+        }
+        else {
+          above_cu = uvg_cu_array_at_const(state->tile->frame->chroma_cu_array, x >> 1, (y >> 1) - 1);
+        }
+      }
+      uvg_write_split_flag(
+        state,
+        &state->search_cabac,
+        left_cu,
+        above_cu,
+        1,
+        depth,
+        cu_width,
+        x >> (tree_type == UVG_CHROMA_T),
+        y >> (tree_type == UVG_CHROMA_T),
+        tree_type,
+        &split_bits);
     }
 
     state->search_cabac.update = 0;
