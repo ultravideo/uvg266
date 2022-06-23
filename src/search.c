@@ -566,12 +566,12 @@ static double cu_rd_cost_tr_split_accurate(
     coeff_bits += uvg_get_coeff_cost(state, coeffs, tr_cu, width, 0, luma_scan_mode, tr_cu->tr_skip & 1);
   }
 
-  if(depth == 4) {
-    if (uvg_is_lfnst_allowed(state, tr_cu, COLOR_Y, width, width, x_px, y_px)) {
+  if(depth == 4 || tree_type == UVG_LUMA_T) {
+    if (uvg_is_lfnst_allowed(state, tr_cu, width, width, x_px, y_px, tree_type)) {
       const int lfnst_idx = tr_cu->lfnst_idx;
       CABAC_FBITS_UPDATE(
         cabac,
-        &cabac->ctx.lfnst_idx_model[tr_cu->depth == 4],
+        &cabac->ctx.lfnst_idx_model[1],
         lfnst_idx != 0,
         tr_tree_bits,
         "lfnst_idx");
@@ -634,11 +634,11 @@ static double cu_rd_cost_tr_split_accurate(
     }
   }
 
-  if (uvg_is_lfnst_allowed(state, tr_cu, depth == 4 ? COLOR_UV : COLOR_Y, width, width, x_px, y_px)) {
-    const int lfnst_idx = depth != 4 ? tr_cu->lfnst_idx : tr_cu->cr_lfnst_idx;
+  if (uvg_is_lfnst_allowed(state, tr_cu, width, width, x_px, y_px, tree_type)) {
+    const int lfnst_idx = depth != 4 || tree_type != UVG_CHROMA_T ? tr_cu->lfnst_idx : tr_cu->cr_lfnst_idx;
     CABAC_FBITS_UPDATE(
       cabac,
-      &cabac->ctx.lfnst_idx_model[tr_cu->depth == 4],
+      &cabac->ctx.lfnst_idx_model[tr_cu->depth == 4 || tree_type != UVG_BOTH_T],
       lfnst_idx != 0,
       tr_tree_bits,
       "lfnst_idx");
@@ -913,7 +913,8 @@ static double search_cu(
       if(tree_type != UVG_CHROMA_T) {
         intra_search.pred_cu.joint_cb_cr = 4;
         uvg_search_cu_intra(state, x, y, depth, &intra_search,
-                            lcu);
+                            lcu,
+                            tree_type);
       }
 #ifdef COMPLETE_PRED_MODE_BITS
       // Technically counting these bits would be correct, however counting

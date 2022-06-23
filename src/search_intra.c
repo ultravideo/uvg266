@@ -268,7 +268,8 @@ static double search_intra_trdepth(
   int max_depth,
   double cost_treshold,
   intra_search_data_t *const search_data,
-  lcu_t *const lcu)
+  lcu_t *const lcu,
+  enum uvg_tree_type tree_type)
 {
   assert(depth >= 0 && depth <= MAX_PU_DEPTH);
 
@@ -422,7 +423,7 @@ static double search_intra_trdepth(
         double transform_bits = 0;
         if(state->encoder_control->cfg.lfnst && depth == pred_cu->tr_depth) {
           if(!constraints[0] && constraints[1]) {
-            transform_bits += CTX_ENTROPY_FBITS(&state->search_cabac.ctx.lfnst_idx_model[tr_cu->depth == 4], lfnst_idx != 0);
+            transform_bits += CTX_ENTROPY_FBITS(&state->search_cabac.ctx.lfnst_idx_model[tr_cu->depth == 4 || tree_type == UVG_LUMA_T], lfnst_idx != 0);
             if(lfnst_idx > 0) {
               transform_bits += CTX_ENTROPY_FBITS(&state->search_cabac.ctx.lfnst_idx_model[2], lfnst_idx == 2);
             }
@@ -581,15 +582,15 @@ static double search_intra_trdepth(
   if (depth < max_depth && depth < MAX_PU_DEPTH) {
     split_cost = 0;
 
-    split_cost += search_intra_trdepth(state, x_px, y_px, depth + 1, max_depth, nosplit_cost, search_data, lcu);
+    split_cost += search_intra_trdepth(state, x_px, y_px, depth + 1, max_depth, nosplit_cost, search_data, lcu, tree_type);
     if (split_cost < nosplit_cost) {
-      split_cost += search_intra_trdepth(state, x_px + offset, y_px, depth + 1, max_depth, nosplit_cost, search_data, lcu);
+      split_cost += search_intra_trdepth(state, x_px + offset, y_px, depth + 1, max_depth, nosplit_cost, search_data, lcu, tree_type);
     }
     if (split_cost < nosplit_cost) {
-      split_cost += search_intra_trdepth(state, x_px, y_px + offset, depth + 1, max_depth, nosplit_cost, search_data, lcu);
+      split_cost += search_intra_trdepth(state, x_px, y_px + offset, depth + 1, max_depth, nosplit_cost, search_data, lcu, tree_type);
     }
     if (split_cost < nosplit_cost) {
-      split_cost += search_intra_trdepth(state, x_px + offset, y_px + offset, depth + 1, max_depth, nosplit_cost, search_data, lcu);
+      split_cost += search_intra_trdepth(state, x_px + offset, y_px + offset, depth + 1, max_depth, nosplit_cost, search_data, lcu, tree_type);
     }
 
     double cbf_bits = 0.0;
@@ -1329,7 +1330,8 @@ static int8_t search_intra_rdo(
   int depth,
   int modes_to_check,
   intra_search_data_t *search_data,
-  lcu_t *lcu)
+  lcu_t *lcu,
+  enum uvg_tree_type tree_type)
 {
   const int tr_depth = CLIP(1, MAX_PU_DEPTH, depth + state->encoder_control->cfg.tr_depth_intra);
   
@@ -1339,7 +1341,7 @@ static int8_t search_intra_rdo(
     search_data[mode].bits = rdo_bitcost;
     search_data[mode].cost = rdo_bitcost * state->lambda;
 
-    double mode_cost = search_intra_trdepth(state, x_px, y_px, depth, tr_depth, MAX_INT, &search_data[mode], lcu);
+    double mode_cost = search_intra_trdepth(state, x_px, y_px, depth, tr_depth, MAX_INT, &search_data[mode], lcu, tree_type);
     search_data[mode].cost += mode_cost;
     if (state->encoder_control->cfg.intra_rdo_et && !cbf_is_set_any(search_data[mode].pred_cu.cbf, depth)) {
       modes_to_check = mode + 1;
@@ -1761,7 +1763,8 @@ void uvg_search_cu_intra(
   const int y_px,
   const int depth,
   intra_search_data_t* mode_out,
-  lcu_t *lcu)
+  lcu_t *lcu,
+  enum uvg_tree_type tree_type)
 {
   const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
   const int8_t cu_width = LCU_WIDTH >> depth;
@@ -1973,7 +1976,8 @@ void uvg_search_cu_intra(
       depth,
       number_of_modes_to_search,
       search_data,
-      lcu);
+      lcu,
+      tree_type);
     search_data[0].pred_cu.mts_last_scan_pos = false;
     search_data[0].pred_cu.violates_mts_coeff_constraint = false;
   }

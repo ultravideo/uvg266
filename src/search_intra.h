@@ -63,6 +63,7 @@ void uvg_search_cu_intra(
   const int y_px,
   const int depth,
   intra_search_data_t* search_data,
-  lcu_t *lcu);
+  lcu_t *lcu,
+  enum uvg_tree_type tree_type);
 
 #endif // SEARCH_INTRA_H_

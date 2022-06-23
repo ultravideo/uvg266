@@ -139,9 +139,9 @@ static int get_isp_split_dim(const int width, const int height, const int isp_sp
   return partition_size;
 }
 
-static bool can_use_lfnst_with_isp(const int width, const int height, const int isp_split_type, const int color)
+static bool can_use_lfnst_with_isp(const int width, const int height, const int isp_split_type, const enum uvg_tree_type tree_type)
 {
-  if (color != COLOR_Y) {
+  if (tree_type == UVG_CHROMA_T) {
     return false;
   }
   if (isp_split_type == NOT_INTRA_SUBPARTITIONS) {
@@ -161,11 +161,11 @@ static bool can_use_lfnst_with_isp(const int width, const int height, const int 
  bool uvg_is_lfnst_allowed(
   const encoder_state_t* const state,
   const cu_info_t* const pred_cu,
-  const int color,
   const int width,
   const int height,
   const int x,
-  const int y) 
+  const int y,
+  enum uvg_tree_type tree_type) 
 {
   if (state->encoder_control->cfg.lfnst && pred_cu->type == CU_INTRA) {
     const int isp_mode = 0; // ISP_TODO: assign proper ISP mode when ISP is implemented
@@ -173,21 +173,20 @@ static bool can_use_lfnst_with_isp(const int width, const int height, const int 
     const int depth = pred_cu->depth;
     const int chroma_width = width >> 1;
     const int chroma_height = height >> 1;
-    const int cu_width = color == COLOR_Y || depth == 4 ? width : chroma_width;
-    const int cu_height = color == COLOR_Y || depth == 4 ? height : chroma_height;
+    const int cu_width = tree_type != UVG_LUMA_T || depth == 4 ? width : chroma_width;
+    const int cu_height = tree_type != UVG_LUMA_T || depth == 4 ? height : chroma_height;
     bool can_use_lfnst_with_mip = (width >= 16 && height >= 16);
-    bool is_sep_tree = depth == 4; // TODO: if/when separate tree structure is implemented, add proper boolean here
+    bool is_sep_tree = depth == 4 || tree_type != UVG_BOTH_T;
     bool mip_flag = pred_cu->type == CU_INTRA ? pred_cu->intra.mip_flag : false;
 
-    if ((isp_mode && !can_use_lfnst_with_isp(width, height, isp_split_type, color)) ||
+    if ((isp_mode && !can_use_lfnst_with_isp(width, height, isp_split_type, tree_type)) ||
       (pred_cu->type == CU_INTRA && mip_flag && !can_use_lfnst_with_mip) || 
-      (is_sep_tree && color != COLOR_Y && MIN(cu_width, cu_height) < 4) || 
+      (is_sep_tree && MIN(cu_width, cu_height) < 4) || 
       (cu_width > TR_MAX_WIDTH || cu_height > TR_MAX_WIDTH)) {
       return false;
     }
-    bool is_separate_tree = depth == 4; // TODO: if/when separate/dual tree structure is implemented, get proper value for this
-    bool luma_flag = is_separate_tree ? (color == COLOR_Y ? true : false) : true;
-    bool chroma_flag = is_separate_tree ? (color != COLOR_Y ? true : false) : true;
+    bool luma_flag = (depth == 4 && tree_type == UVG_BOTH_T) || tree_type == UVG_LUMA_T;
+    bool chroma_flag = (depth == 4 && tree_type == UVG_BOTH_T) || tree_type == UVG_CHROMA_T;
     bool non_zero_coeff_non_ts_corner_8x8 = (luma_flag && pred_cu->violates_lfnst_constrained_luma) || (chroma_flag && pred_cu->violates_lfnst_constrained_chroma);
     bool is_tr_skip = false;
 
@@ -201,7 +200,7 @@ static bool can_use_lfnst_with_isp(const int width, const int height, const int 
     const int tu_height = tu_width; // TODO: height for non-square blocks
 
     // TODO: chroma transform skip
-    if (color == COLOR_Y) {
+    if (tree_type != UVG_BOTH_T) {
       for (int i = 0; i < num_transform_units; i++) {
         // TODO: this works only for square blocks
         const int pu_x = x + ((i % tu_row_length) * tu_width);
@@ -233,17 +232,17 @@ static bool encode_lfnst_idx(
   const int x,
   const int y,
   const int depth,
-  const int color,
   const int width,
-  const int height)
+  const int height,
+  enum uvg_tree_type tree_type)
 {
   
-  if (uvg_is_lfnst_allowed(state, pred_cu, color, width, height, x, y)) {
+  if (uvg_is_lfnst_allowed(state, pred_cu, width, height, x, y, tree_type)) {
     // Getting separate tree bool from block size is a temporary fix until a proper dual tree check is possible (there is no dual tree structure at time of writing this).
     // VTM seems to force explicit dual tree structure for small 4x4 blocks
-    bool is_separate_tree = depth == 4; // TODO: if/when separate/dual tree structure is implemented, get proper value for this
+    bool is_separate_tree = depth == 4 || tree_type != UVG_BOTH_T;
 
-    const int lfnst_index = color == COLOR_Y ? pred_cu->lfnst_idx : pred_cu->cr_lfnst_idx;
+    const int lfnst_index = tree_type != UVG_CHROMA_T ? pred_cu->lfnst_idx : pred_cu->cr_lfnst_idx;
     assert((lfnst_index >= 0 && lfnst_index < 3) && "Invalid LFNST index.");
 
     uint16_t ctx_idx = 0;
@@ -1718,8 +1717,7 @@ void uvg_encode_coding_tree(
       encode_transform_coeff(state, x, y, depth, 0, 0, 0, 0, coeff, tree_type);
     }
 
-    bool lfnst_written = encode_lfnst_idx(state, cabac, cur_cu, x, y, depth, COLOR_Y, cu_width, cu_height);
-    bool is_separate_tree = depth == 4; // TODO: proper value for dual tree when dual tree structure is implemented
+    bool lfnst_written = encode_lfnst_idx(state, cabac, cur_cu, x, y, depth, cu_width, cu_height, tree_type);
 
     encode_mts_idx(state, cabac, cur_cu);
 
@@ -1729,14 +1727,14 @@ void uvg_encode_coding_tree(
       tree_type != UVG_LUMA_T)   {
       encode_chroma_intra_cu(cabac, cur_cu, state->encoder_control->cfg.cclm, NULL);
       // LFNST constraints must be reset here. Otherwise the left over values will interfere when calculating new constraints
-      cu_info_t* tmp = uvg_cu_array_at(frame->cu_array, x, y);
+      cu_info_t* tmp = uvg_cu_array_at((cu_array_t*)used_array, x, y);
       tmp->violates_lfnst_constrained_luma = false;
       tmp->violates_lfnst_constrained_chroma = false;
       tmp->lfnst_last_scan_pos = false;
       encode_transform_coeff(state, x, y, depth, 0, 0, 0, 1, coeff, tree_type);
       // Write LFNST only once for single tree structure
-      if (!lfnst_written || is_separate_tree) {
-        encode_lfnst_idx(state, cabac, tmp, x, y, depth, COLOR_UV, cu_width, cu_height);
+      if (!lfnst_written || tree_type == UVG_CHROMA_T) {
+        encode_lfnst_idx(state, cabac, tmp, x, y, depth, cu_width, cu_height, tree_type);
       }
     }
   }
