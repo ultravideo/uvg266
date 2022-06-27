@@ -1555,7 +1555,7 @@ void uvg_encode_coding_tree(
   }
 
   // Encode skip flag
-  if (state->frame->slicetype != UVG_SLICE_I && cu_width != 4) {
+  if ((state->frame->slicetype != UVG_SLICE_I || state->encoder_control->cfg.ibc) && cu_width != 4) {
 
     int8_t ctx_skip = 0;
 
@@ -1570,6 +1570,15 @@ void uvg_encode_coding_tree(
     CABAC_BIN(cabac, cur_cu->skipped, "SkipFlag");
 
     if (cur_cu->skipped) {
+
+      if (state->encoder_control->cfg.ibc) { // ToDo: Only for luma channel
+        // ToDo: Disable for blocks over 64x64 pixels
+        int8_t ctx_ibc = 0;
+        if (left_cu && left_cu->type == CU_IBC) ctx_ibc++;
+        if (above_cu && above_cu->type == CU_IBC) ctx_ibc++;
+        cabac->cur_ctx = &(cabac->ctx.ibc_flag[ctx_ibc]);
+        CABAC_BIN(cabac, (cur_cu->type == CU_IBC), "IBCFlag");
+      }
       DBG_PRINT_MV(state, x, y, (uint32_t)cu_width, (uint32_t)cu_width, cur_cu);
       uvg_hmvp_add_mv(state, x, y, (uint32_t)cu_width, (uint32_t)cu_width, cur_cu);
       int16_t num_cand = state->encoder_control->cfg.max_merge;
@@ -1597,6 +1606,15 @@ void uvg_encode_coding_tree(
   }
 
   // Prediction mode
+  if (state->frame->slicetype == UVG_SLICE_I && state->encoder_control->cfg.ibc) { // ToDo: Only for luma channel
+    // ToDo: Disable for blocks over 64x64 pixels
+    int8_t ctx_ibc = 0;
+    if (left_cu && left_cu->type == CU_IBC) ctx_ibc++;
+    if (above_cu && above_cu->type == CU_IBC) ctx_ibc++;
+    cabac->cur_ctx = &(cabac->ctx.ibc_flag[ctx_ibc]);
+    CABAC_BIN(cabac, (cur_cu->type == CU_IBC), "IBCFlag");
+  }
+
   if (state->frame->slicetype != UVG_SLICE_I && cu_width != 4) {
 
     int8_t ctx_predmode = 0;
@@ -1607,6 +1625,15 @@ void uvg_encode_coding_tree(
 
     cabac->cur_ctx = &(cabac->ctx.cu_pred_mode_model[ctx_predmode]);
     CABAC_BIN(cabac, (cur_cu->type == CU_INTRA), "PredMode");
+
+    // We need IBC flag if the mode is signalled as Inter
+    if (state->encoder_control->cfg.ibc && cur_cu->type != CU_INTRA) {
+      int8_t ctx_ibc = 0;
+      if (left_cu && left_cu->type == CU_IBC) ctx_ibc++;
+      if (above_cu && above_cu->type == CU_IBC) ctx_ibc++;
+      cabac->cur_ctx = &(cabac->ctx.ibc_flag[ctx_ibc]);
+      CABAC_BIN(cabac, (cur_cu->type == CU_IBC), "IBCFlag");
+    }
   }
 
   // part_mode
