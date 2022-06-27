@@ -1450,7 +1450,7 @@ int8_t uvg_search_intra_chroma_rdo(
     const int offset = ((lcu_px.x & ~7) >> 1) + ((lcu_px.y & ~7) >> 1)* LCU_WIDTH_C;
 
     int lfnst_modes_to_check[3];
-    if(depth == 4) {
+    if((depth == 4 || tree_type == UVG_CHROMA_T) && state->encoder_control->cfg.lfnst) {
       for (int i = 0; i < 3; ++i) {
         lfnst_modes_to_check[i] = i;
       }
