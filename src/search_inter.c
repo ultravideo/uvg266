@@ -2186,7 +2186,8 @@ void uvg_cu_cost_inter_rd2(encoder_state_t * const state,
       v_pred,
       u_resi,
       v_resi,
-      &chorma_ts_out);
+      &chorma_ts_out,
+      UVG_BOTH_T);
     cbf_clear(&cur_cu->cbf, depth, COLOR_U);
     cbf_clear(&cur_cu->cbf, depth, COLOR_V);
     if (chorma_ts_out.best_u_cost + chorma_ts_out.best_v_cost < chorma_ts_out.best_combined_cost) {

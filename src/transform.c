@@ -482,7 +482,8 @@ void uvg_chroma_transform_search(
   uvg_pixel v_pred[1024],
   int16_t u_resi[1024],
   int16_t v_resi[1024],
-  uvg_chorma_ts_out_t* chorma_ts_out)
+  uvg_chorma_ts_out_t* chorma_ts_out,
+  enum uvg_tree_type tree_type)
 {
   ALIGNED(64) coeff_t u_coeff[LCU_WIDTH_C * LCU_WIDTH_C * 5];
   ALIGNED(64) uint8_t u_recon[LCU_WIDTH_C * LCU_WIDTH_C * 5];
@@ -699,7 +700,7 @@ void uvg_chroma_transform_search(
         scan_order,
         transforms[i] == CHROMA_TS);
     }
-    if(depth == 4 && state->encoder_control->cfg.lfnst && 0) {
+    if((depth == 4 || tree_type == UVG_CHROMA_T) && state->encoder_control->cfg.lfnst && 0) {
       if(uvg_is_lfnst_allowed(state, pred_cu, width, height, 0, 0 , UVG_CHROMA_T)) {
         const int lfnst_idx = pred_cu->cr_lfnst_idx;
         CABAC_FBITS_UPDATE(

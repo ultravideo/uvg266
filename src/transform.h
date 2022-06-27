@@ -110,7 +110,8 @@ void uvg_chroma_transform_search(
   uvg_pixel v_pred[1024],
   int16_t u_resi[1024],
   int16_t v_resi[1024],
-  uvg_chorma_ts_out_t* chorma_ts_out);
+  uvg_chorma_ts_out_t* chorma_ts_out,
+  enum uvg_tree_type tree_type);
 
 enum uvg_chroma_transforms {
   DCT7_CHROMA = 0,

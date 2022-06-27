@@ -1532,7 +1532,8 @@ int8_t uvg_search_intra_chroma_rdo(
             v_pred,
             u_resi,
             v_resi,
-            &chorma_ts_out);
+            &chorma_ts_out,
+            tree_type);
 
           // LFNST constraint failed
           if(chorma_ts_out.best_u_index == -1 && chorma_ts_out.best_combined_index == -1) {
