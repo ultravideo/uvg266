@@ -114,6 +114,7 @@ const cu_info_t* uvg_cu_array_at_const(const cu_array_t *cua, unsigned x_px, uns
 cu_array_t * uvg_cu_array_alloc(const int width, const int height)
 {
   cu_array_t *cua = MALLOC(cu_array_t, 1);
+  if (cua == NULL) return NULL;
 
   // Round up to a multiple of LCU width and divide by cell width.
   const int width_scu  = CEILDIV(width,  LCU_WIDTH) * LCU_WIDTH / SCU_WIDTH;
@@ -132,6 +133,7 @@ cu_array_t * uvg_cu_array_alloc(const int width, const int height)
 cu_array_t * uvg_cu_array_chroma_alloc(const int width, const int height, enum uvg_chroma_format chroma)
 {
   cu_array_t *cua = MALLOC(cu_array_t, 1);
+  if (cua == NULL) return NULL;
 
   // Round up to a multiple of LCU width and divide by cell width.
   const int chroma_height = chroma == UVG_CSP_444 ? LCU_WIDTH : LCU_WIDTH_C;
@@ -168,6 +170,7 @@ cu_array_t * uvg_cu_subarray(cu_array_t *base,
   }
 
   cu_array_t *cua = MALLOC(cu_array_t, 1);
+  if (cua == NULL) return NULL;
 
   // Find the real base array.
   cu_array_t *real_base = base;

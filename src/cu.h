@@ -238,10 +238,10 @@ typedef struct {
 typedef struct cu_array_t {
   struct cu_array_t *base; //!< \brief base cu array or NULL
   cu_info_t *data;  //!< \brief cu array
-  int32_t width;    //!< \brief width of the array in pixels
-  int32_t height;   //!< \brief height of the array in pixels
-  int32_t stride;   //!< \brief stride of the array in pixels
-  int32_t refcount; //!< \brief number of references to this cu_array
+  uint32_t width;    //!< \brief width of the array in pixels
+  uint32_t height;   //!< \brief height of the array in pixels
+  uint32_t stride;   //!< \brief stride of the array in pixels
+  uint32_t refcount; //!< \brief number of references to this cu_array
 } cu_array_t;
 
 cu_info_t* uvg_cu_array_at(cu_array_t *cua, unsigned x_px, unsigned y_px);

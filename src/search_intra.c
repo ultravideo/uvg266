@@ -1816,8 +1816,8 @@ void uvg_search_cu_intra(
   // Find modes with multiple reference lines if in use. Do not use if CU in first row.
   uint8_t lines = state->encoder_control->cfg.mrl && (y_px % LCU_WIDTH) != 0 ? MAX_REF_LINE_IDX : 1;
 
-  int16_t number_of_modes;
-  int16_t num_regular_modes;
+  uint8_t number_of_modes;
+  uint8_t num_regular_modes;
   bool skip_rough_search = (depth == 0 || state->encoder_control->cfg.rdo >= 4);
   if (!skip_rough_search) {
     num_regular_modes = number_of_modes = search_intra_rough(
@@ -1843,7 +1843,7 @@ void uvg_search_cu_intra(
     number_of_modes = UVG_NUM_INTRA_MODES;
   }
 
-  int16_t num_mrl_modes = 0;
+  uint8_t num_mrl_modes = 0;
   for(int line = 1; line < lines; ++line) {
     uvg_pixel extra_refs[128 * MAX_REF_LINE_IDX] = { 0 };
 

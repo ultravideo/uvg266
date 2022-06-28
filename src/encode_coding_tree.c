@@ -131,8 +131,8 @@ static int get_isp_split_dim(const int width, const int height, const int isp_sp
     non_split_dim_size = height;
   }
   
-  const int min_num_samples_cu = 1 << ((uvg_math_floor_log2(MIN_TB_SIZE_Y) << 1));
-  const int factor_to_min_samples = non_split_dim_size < min_num_samples_cu ? min_num_samples_cu >> uvg_math_floor_log2(non_split_dim_size) : 1;
+  const unsigned min_num_samples_cu = 1 << ((uvg_math_floor_log2(MIN_TB_SIZE_Y) << 1));
+  const unsigned factor_to_min_samples = non_split_dim_size < min_num_samples_cu ? min_num_samples_cu >> uvg_math_floor_log2(non_split_dim_size) : 1;
   partition_size = (split_dim_size >> div_shift) < factor_to_min_samples ? factor_to_min_samples : (split_dim_size >> div_shift);
 
   assert(!(uvg_math_floor_log2(partition_size) + uvg_math_floor_log2(non_split_dim_size) < uvg_math_floor_log2(min_num_samples_cu)) && "Partition has less than minimum amount of samples.");
@@ -518,7 +518,7 @@ static void encode_chroma_tu(
   int y,
   int depth,
   const uint8_t width_c,
-  const cu_info_t* cur_pu,
+  cu_info_t* cur_pu,
   int8_t* scan_idx,
   lcu_coeff_t* coeff,
   uint8_t joint_chroma,
@@ -631,7 +631,8 @@ static void encode_transform_unit(
   bool chroma_cbf_set = cbf_is_set(cur_pu->cbf, depth, COLOR_U) ||
                         cbf_is_set(cur_pu->cbf, depth, COLOR_V);
   if (chroma_cbf_set || joint_chroma) {
-    encode_chroma_tu(state, x, y, depth, width_c, cur_pu, &scan_idx, coeff, joint_chroma, tree_type);
+    //Need to drop const to get lfnst constraints
+    encode_chroma_tu(state, x, y, depth, width_c, (cu_info_t*)cur_pu, &scan_idx, coeff, joint_chroma, tree_type);
   }
 }
 

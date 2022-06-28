@@ -524,9 +524,9 @@ void uvg_chroma_transform_search(
       trans_offset,
       &num_transforms);
   }
-  chorma_ts_out->best_u_cost = MAX_INT64;
-  chorma_ts_out->best_v_cost = MAX_INT64;
-  chorma_ts_out->best_combined_cost = MAX_INT64;
+  chorma_ts_out->best_u_cost = MAX_DOUBLE;
+  chorma_ts_out->best_v_cost = MAX_DOUBLE;
+  chorma_ts_out->best_combined_cost = MAX_DOUBLE;
   chorma_ts_out->best_u_index = -1;
   chorma_ts_out->best_v_index = -1;
   chorma_ts_out->best_combined_index = -1;

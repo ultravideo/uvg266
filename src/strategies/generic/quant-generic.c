@@ -72,7 +72,7 @@ void uvg_quant_generic(
   const int32_t scalinglist_type = (block_type == CU_INTRA ? 0 : 3) + (int8_t)color;
   const int32_t *quant_coeff = encoder->scaling_list.quant_coeff[log2_tr_width][log2_tr_height][scalinglist_type][qp_scaled % 6];
   const int32_t transform_shift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - ((log2_tr_height + log2_tr_width) >> 1); //!< Represents scaling through forward transform
-  const int32_t q_bits = QUANT_SHIFT + qp_scaled / 6 + (transform_skip ? 0 : transform_shift);
+  const int64_t q_bits = QUANT_SHIFT + qp_scaled / 6 + (transform_skip ? 0 : transform_shift);
   const int32_t add = ((state->frame->slicetype == UVG_SLICE_I) ? 171 : 85) << (q_bits - 9);
   const int32_t q_bits8 = q_bits - 8;
 
@@ -482,7 +482,7 @@ int uvg_quantize_residual_generic(encoder_state_t *const state,
     uvg_transform2d(state->encoder_control, residual, coeff, width, color, cur_cu);
   }
 
-  const uint16_t lfnst_index = color == COLOR_Y ? cur_cu->lfnst_idx : cur_cu->cr_lfnst_idx;
+  const uint8_t lfnst_index = color == COLOR_Y ? cur_cu->lfnst_idx : cur_cu->cr_lfnst_idx;
 
   if (state->encoder_control->cfg.lfnst && cur_cu->type == CU_INTRA) {
     // Forward low frequency non-separable transform
