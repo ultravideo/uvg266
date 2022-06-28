@@ -520,7 +520,7 @@ static void predict_cclm(
   const int ctu_size = tree_type == UVG_CHROMA_T ? LCU_WIDTH_C : LCU_WIDTH;
 
   if (y0) {
-    if (y_scu == 0) available_above_right = MIN(width / 2, (64-x_scu - width * 2) / 2);
+    if (y_scu == 0) available_above_right = MIN(MIN(width / 2, (64-x_scu - width * 2) / 2), (state->tile->frame->width - x0 - width* 2) / 2);
     for (; available_above_right < width / 2; available_above_right++) {
       int x_extension = x_scu + width * 2 + 4 * available_above_right;
       x_extension >>= tree_type == UVG_CHROMA_T;
@@ -547,7 +547,7 @@ static void predict_cclm(
   }
 
   if(x0) {
-    if (x_scu == 0) available_left_below = MIN(width / 2, (64 - y_scu - height * 2) / 2);
+    if (x_scu == 0) available_left_below = MIN(MIN(width / 2, (64 - y_scu - height * 2) / 2), (state->tile->frame->height - y0 - height * 2) / 2);
     for (; available_left_below < height / 2; available_left_below++) {
       int y_extension = y_scu + height * 2 + 4 * available_left_below;
       y_extension >>= tree_type == UVG_CHROMA_T;
