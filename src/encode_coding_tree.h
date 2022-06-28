@@ -48,7 +48,8 @@ bool uvg_is_lfnst_allowed(
   const int height,
   const int x,
   const int y,
-  enum uvg_tree_type tree_type);
+  enum uvg_tree_type tree_type,
+  const color_t color);
 
 void uvg_encode_coding_tree(
   encoder_state_t * const state,

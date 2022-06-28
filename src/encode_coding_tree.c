@@ -165,7 +165,8 @@ static bool can_use_lfnst_with_isp(const int width, const int height, const int 
   const int height,
   const int x,
   const int y,
-  enum uvg_tree_type tree_type) 
+  enum uvg_tree_type tree_type,
+  const color_t color) 
 {
   if (state->encoder_control->cfg.lfnst && pred_cu->type == CU_INTRA) {
     const int isp_mode = 0; // ISP_TODO: assign proper ISP mode when ISP is implemented
@@ -185,8 +186,8 @@ static bool can_use_lfnst_with_isp(const int width, const int height, const int 
       (cu_width > TR_MAX_WIDTH || cu_height > TR_MAX_WIDTH)) {
       return false;
     }
-    bool luma_flag = (depth == 4 && tree_type == UVG_BOTH_T) || tree_type == UVG_LUMA_T;
-    bool chroma_flag = (depth == 4 && tree_type == UVG_BOTH_T) || tree_type == UVG_CHROMA_T;
+    bool luma_flag = (depth == 4 && color == COLOR_Y) || (tree_type != UVG_CHROMA_T && depth != 4);
+    bool chroma_flag = (depth == 4 && color != COLOR_Y) || tree_type != UVG_LUMA_T;
     bool non_zero_coeff_non_ts_corner_8x8 = (luma_flag && pred_cu->violates_lfnst_constrained_luma) || (chroma_flag && pred_cu->violates_lfnst_constrained_chroma);
     bool is_tr_skip = false;
 
@@ -234,10 +235,11 @@ static bool encode_lfnst_idx(
   const int depth,
   const int width,
   const int height,
-  enum uvg_tree_type tree_type)
+  enum uvg_tree_type tree_type,
+  const color_t color)
 {
   
-  if (uvg_is_lfnst_allowed(state, pred_cu, width, height, x, y, tree_type)) {
+  if (uvg_is_lfnst_allowed(state, pred_cu, width, height, x, y, tree_type, color)) {
     // Getting separate tree bool from block size is a temporary fix until a proper dual tree check is possible (there is no dual tree structure at time of writing this).
     // VTM seems to force explicit dual tree structure for small 4x4 blocks
     bool is_separate_tree = depth == 4 || tree_type != UVG_BOTH_T;
@@ -1717,7 +1719,7 @@ void uvg_encode_coding_tree(
       encode_transform_coeff(state, x, y, depth, 0, 0, 0, 0, coeff, tree_type);
     }
 
-    bool lfnst_written = encode_lfnst_idx(state, cabac, cur_cu, x, y, depth, cu_width, cu_height, tree_type);
+    bool lfnst_written = encode_lfnst_idx(state, cabac, cur_cu, x, y, depth, cu_width, cu_height, tree_type, COLOR_Y);
 
     encode_mts_idx(state, cabac, cur_cu);
 
@@ -1733,8 +1735,8 @@ void uvg_encode_coding_tree(
       tmp->lfnst_last_scan_pos = false;
       encode_transform_coeff(state, x, y, depth, 0, 0, 0, 1, coeff, tree_type);
       // Write LFNST only once for single tree structure
-      if (!lfnst_written || tree_type == UVG_CHROMA_T) {
-        encode_lfnst_idx(state, cabac, tmp, x, y, depth, cu_width, cu_height, tree_type);
+      if (!lfnst_written || tree_type == UVG_CHROMA_T || depth == 4) {
+        encode_lfnst_idx(state, cabac, tmp, x, y, depth, cu_width, cu_height, tree_type, COLOR_UV);
       }
     }
   }
