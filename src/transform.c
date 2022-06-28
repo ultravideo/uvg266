@@ -557,7 +557,7 @@ void uvg_chroma_transform_search(
       if(!IS_JCCR_MODE(transforms[i])) {
         uvg_derive_lfnst_constraints(pred_cu, depth, constraints, &v_coeff[i * trans_offset], width, height);        
       }
-      if (constraints[0] || !constraints[1] && pred_cu->lfnst_idx != 0) continue;
+      if ((constraints[0] || !constraints[1]) && pred_cu->lfnst_idx != 0) continue;
     }
 
     if (IS_JCCR_MODE(transforms[i]) && !u_has_coeffs) continue;

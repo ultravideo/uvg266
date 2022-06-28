@@ -159,7 +159,7 @@ static bool can_use_lfnst_with_isp(const int width, const int height, const int 
 }
 
  bool uvg_is_lfnst_allowed(
-  encoder_state_t* const state,
+  const encoder_state_t* const state,
   const cu_info_t* const pred_cu,
   const int color,
   const int width,

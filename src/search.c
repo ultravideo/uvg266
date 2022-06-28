@@ -898,7 +898,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
           // into account, so there is less of a chanse of luma mode being
           // really bad for chroma.
           intra_search.pred_cu.intra.mode_chroma = intra_search.pred_cu.intra.mode;
-          if (ctrl->cfg.rdo >= 3) {
+          if (ctrl->cfg.rdo >= 3 || ctrl->cfg.jccr || ctrl->cfg.lfnst) {
             uvg_search_cu_intra_chroma(state, x, y, depth, lcu, &intra_search);
 
             if (intra_search.pred_cu.joint_cb_cr == 0) {
@@ -912,12 +912,18 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
           else {
             intra_search.pred_cu.intra.mode_chroma = 0;
           }
+          uvg_intra_recon_cu(state,
+            x, y,
+            depth, &intra_search,
+            &intra_search.pred_cu,
+            lcu);
+          intra_cost += uvg_cu_rd_cost_chroma(state, x_local, y_local, depth, &intra_search.pred_cu, lcu);
+          intra_search.pred_cu.intra.mode = intra_mode;
         }
-        intra_search.pred_cu.intra.mode = intra_mode;
-        intra_cost += intra_search.cost;
+
       }
       if (intra_cost < cost) {
-        cost = intra_search.cost;
+        cost = intra_cost;
         *cur_cu = intra_search.pred_cu;
         cur_cu->type = CU_INTRA;
       }

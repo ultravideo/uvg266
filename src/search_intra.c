@@ -344,7 +344,7 @@ static double search_intra_trdepth(
                   tr_depth ?
                     max_lfnst_idx :
                     0;
-    for (int i = start_idx; i < end_idx; ++i) {
+    for (int i = start_idx; i < end_idx + 1; ++i) {
       search_data->lfnst_costs[i] = MAX_DOUBLE;
     }
     bool constraints[2] = { pred_cu->violates_lfnst_constrained_luma,
@@ -1588,8 +1588,8 @@ int8_t uvg_search_cu_intra_chroma(encoder_state_t * const state,
   // is always one of the modes, so 2 means the final decision is made
   // between luma mode and one other mode that looks the best
   // according to search_intra_chroma_rough.
-  const int8_t modes_in_depth[5] = { 1, 1, 1, 1, 2 };
-  int num_modes = modes_in_depth[depth];
+  // const int8_t modes_in_depth[5] = { 1, 1, 1, 1, 1 };
+  int num_modes = 5;
 
   if (state->encoder_control->cfg.rdo >= 3) {
     num_modes = total_modes;
@@ -1597,11 +1597,12 @@ int8_t uvg_search_cu_intra_chroma(encoder_state_t * const state,
 
   intra_search_data_t chroma_data[8];
   FILL(chroma_data, 0);
-  for (int i = 0; i < num_modes; i++) {
+  for (int i = state->encoder_control->cfg.rdo >= 3 ? 0 : 4; i < num_modes; i++) {
     chroma_data[i].pred_cu = *cur_pu;
     chroma_data[i].pred_cu.intra.mode_chroma = modes[i];
     chroma_data[i].pred_cu.intra.mode = -1;
     chroma_data[i].cost = 0;
+    memcpy(chroma_data[i].lfnst_costs, search_data->lfnst_costs, sizeof(double) * 3);
   }
   // Don't do rough mode search if all modes are selected.
   // FIXME: It might make more sense to only disable rough search if
