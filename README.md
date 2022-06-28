@@ -99,6 +99,8 @@ Options:
                                bits, lambda, distortion, and qp for each ctu.
                                These are meant for debugging and are not
                                written unless the prefix is defined.
+      --cabac-debug-file     : A debug file for cabac context.
+                               Ignore this, it is only for tests.
 
 Video structure:
   -q, --qp <integer>         : Quantization parameter [22]
@@ -180,6 +182,8 @@ Video structure:
                                same length, start with same value, and can
                                contain maximum 16 or 36 - starting value
                                elements. [17,27,32,44]
+      --(no-)dual-tree       : Use separate CTU structure for luma and
+                               chroma in intra slices.
 
 Compression tools:
       --(no-)deblock <beta:tc> : Deblocking filter. [0:0]
@@ -211,6 +215,8 @@ Compression tools:
       --(no-)full-intra-search : Try all intra modes during rough search.
                                [disabled]
       --(no-)transform-skip  : Try transform skip [disabled]
+      --(no-)chroma-transform-skip : Try transform skip for chroma 
+                                     blocks. [disabled]
       --tr-skip-max-size     : Max log2 size of transform skip 2..5 [2]
       --me <string>          : Integer motion estimation algorithm [hexbs]
                                    - hexbs: Hexagon Based Search
@@ -286,6 +292,8 @@ Compression tools:
       --(no-)mrl             : Enable use of multiple reference lines in intra
                                predictions.
       --(no-)mip             : Enable matrix weighted intra prediction.
+      --(no-)lfnst           : Enable low frequency non-separable transform.
+                                 [disabled]
       --mts <string>         : Multiple Transform Selection [off].
                                (Currently only implemented for intra
                                and has effect only when rd >= 2)
