@@ -929,7 +929,7 @@ static double search_cu(
       double intra_cost = intra_search.cost;
       if (intra_cost < cost && tree_type != UVG_LUMA_T) {
         int8_t intra_mode = intra_search.pred_cu.intra.mode;
-        if(state->encoder_control->cfg.cclm && tree_type == UVG_BOTH_T) {
+        if (state->encoder_control->cfg.cclm && tree_type == UVG_BOTH_T) {
           intra_search.pred_cu.intra.mode_chroma = -1;
           uvg_intra_recon_cu(state,
             x, y,
@@ -941,10 +941,10 @@ static double search_cu(
             state, x, y, cu_width / 2, cu_width / 2, lcu->rec.y, lcu->left_ref.y[64]
           );
         }
-        intra_search.pred_cu.joint_cb_cr = 0;
-
         // TODO: This heavily relies to square CUs
         if ((depth != 4 || (x % 8 && y % 8)) && state->encoder_control->chroma_format != UVG_CSP_400 && tree_type != UVG_LUMA_T) {
+
+          intra_search.pred_cu.joint_cb_cr = 0;
           // There is almost no benefit to doing the chroma mode search for
           // rd2. Possibly because the luma mode search already takes chroma
           // into account, so there is less of a chanse of luma mode being
@@ -984,6 +984,9 @@ static double search_cu(
           intra_search.pred_cu.intra.mode = intra_mode;
           intra_search.pred_cu.violates_lfnst_constrained_chroma = false;
           intra_search.pred_cu.lfnst_last_scan_pos = false;
+        }
+        else {
+          intra_search.pred_cu.intra.mode_chroma = intra_mode;
         }
         intra_search.pred_cu.intra.mode = intra_mode;
         
