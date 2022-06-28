@@ -2496,7 +2496,7 @@ static void mts_dct_generic(
 
   uvg_get_tr_type(width, color, tu, &type_hor, &type_ver, mts_idx);
 
-  if (type_hor == DCT2 && type_ver == DCT2 && !tu->lfnst_idx)
+  if (type_hor == DCT2 && type_ver == DCT2 && !tu->lfnst_idx && !tu->cr_lfnst_idx)
   {
     dct_func *dct_func = uvg_get_dct_func(width, color, tu->type);
     dct_func(bitdepth, input, output);
@@ -2507,7 +2507,7 @@ static void mts_dct_generic(
     int skip_width = (type_hor != DCT2 && width == 32) ? 16 : (width > 32 ? width - 32 : 0);
     int skip_height = (type_ver != DCT2 && height == 32) ? 16 : (height > 32 ? height - 32 : 0);
     const int log2_width_minus2 = uvg_g_convert_to_bit[width];
-    if(tu->lfnst_idx) {
+    if(tu->lfnst_idx || tu->cr_lfnst_idx) {
       if ((width == 4 && height > 4) || (width > 4 && height == 4))
       {
         skip_width = width - 4;

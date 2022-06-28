@@ -1777,16 +1777,19 @@ static void search_pu_inter(encoder_state_t * const state,
         cur_pu->inter.mv[1][1]  = info->merge_cand[merge_idx].mv[1][1];
         uvg_lcu_fill_trdepth(lcu, x, y, depth, MAX(1, depth));
         uvg_inter_recon_cu(state, lcu, x, y, width, true, false);
-        uvg_quantize_lcu_residual(state, true, false, false, x, y, depth, cur_pu, lcu, true);
+        uvg_quantize_lcu_residual(state, true, false, false, x, y, depth, cur_pu, lcu, true, UVG_BOTH_T);
 
         if (cbf_is_set(cur_pu->cbf, depth, COLOR_Y)) {
           continue;
         }
         else if (has_chroma) {
           uvg_inter_recon_cu(state, lcu, x, y, width, false, has_chroma);
-          uvg_quantize_lcu_residual(state, false, has_chroma, 
-            false, /*we are only checking for lack of coeffs so no need to check jccr*/
-            x, y, depth, cur_pu, lcu, true);
+          uvg_quantize_lcu_residual(state,
+                                    false, has_chroma,
+                                    false, /*we are only checking for lack of coeffs so no need to check jccr*/
+                                    x, y, depth, cur_pu, lcu,
+                                    true,
+            UVG_BOTH_T);
           if (!cbf_is_set_any(cur_pu->cbf, depth)) {
             cur_pu->type = CU_INTER;
             cur_pu->merge_idx = merge_idx;
@@ -2144,11 +2147,14 @@ void uvg_cu_cost_inter_rd2(encoder_state_t * const state,
   double chroma_cost = 0;
   if((state->encoder_control->cfg.jccr || can_use_chroma_tr_skip) && cur_cu->depth == cur_cu->tr_depth && reconstruct_chroma) {
     uvg_quantize_lcu_residual(state,
-      true, false,false, x, y,
-      depth,
-      cur_cu,
-      lcu,
-      false);
+                              true,
+                              false,
+                              false, x, y,
+                              depth,
+                              cur_cu,
+                              lcu,
+                              false, 
+      UVG_BOTH_T);
     ALIGNED(64) uvg_pixel u_pred[LCU_WIDTH_C * LCU_WIDTH_C];
     ALIGNED(64) uvg_pixel v_pred[LCU_WIDTH_C * LCU_WIDTH_C];
     uvg_pixels_blit(&lcu->ref.u[index], u_pred, width, width, LCU_WIDTH_C, width);
@@ -2207,12 +2213,13 @@ void uvg_cu_cost_inter_rd2(encoder_state_t * const state,
   }
   else {
     uvg_quantize_lcu_residual(state,
-      true, reconstruct_chroma,
-      reconstruct_chroma && state->encoder_control->cfg.jccr, x, y,
-      depth,
-      cur_cu,
-      lcu,
-      false);    
+                              true, reconstruct_chroma,
+                              reconstruct_chroma && state->encoder_control->cfg.jccr, x, y,
+                              depth,
+                              cur_cu,
+                              lcu,
+                              false, 
+      UVG_BOTH_T);    
   }
 
   int cbf = cbf_is_set_any(cur_cu->cbf, depth);

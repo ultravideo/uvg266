@@ -94,7 +94,8 @@ void uvg_quantize_lcu_residual(
   uint8_t depth,
   cu_info_t *cur_cu,
   lcu_t* lcu,
-  bool early_skip);
+  bool early_skip,
+  enum uvg_tree_type tree_type);
 
 void uvg_chroma_transform_search(
   encoder_state_t* const state,
@@ -122,16 +123,22 @@ enum uvg_chroma_transforms {
   JCCR_3 = 3,
 };
 
-void uvg_fwd_lfnst(const cu_info_t* const cur_cu,
-                   const int width, const int height,
-                   const uint8_t color,
-                   const uint16_t lfnst_idx,
-                   coeff_t *coeffs);
+void uvg_fwd_lfnst(
+  const cu_info_t* const cur_cu,
+  const int width,
+  const int height,
+  color_t color,
+  const uint16_t lfnst_idx,
+  coeff_t *coeffs,
+  enum uvg_tree_type tree_type);
 
-void uvg_inv_lfnst(const cu_info_t* cur_cu,
-                   const int width, const int height,
-                   const uint8_t color,
-                   const uint16_t lfnst_idx,
-                   coeff_t* coeffs);
+void uvg_inv_lfnst(
+  const cu_info_t* cur_cu,
+  const int width,
+  const int height,
+  const uint8_t color,
+  const uint16_t lfnst_idx,
+  coeff_t* coeffs,
+  enum uvg_tree_type tree_type);
 
 #endif

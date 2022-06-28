@@ -1622,7 +1622,9 @@ void uvg_intra_recon_cu(
     }
 
     uvg_quantize_lcu_residual(state, has_luma, has_chroma && !(search_data->pred_cu.joint_cb_cr & 3),
-      search_data->pred_cu.joint_cb_cr & 3 && state->encoder_control->cfg.jccr && has_chroma,
-      x, y, depth, cur_cu, lcu, false);
+                              search_data->pred_cu.joint_cb_cr & 3 && state->encoder_control->cfg.jccr && has_chroma,
+                              x, y, depth, cur_cu, lcu,
+                              false,
+      tree_type);
   }
 }

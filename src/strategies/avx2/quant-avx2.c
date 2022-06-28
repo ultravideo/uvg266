@@ -377,7 +377,7 @@ static INLINE unsigned uvg_math_floor_log2(unsigned value)
  *
  */
 void uvg_quant_avx2(const encoder_state_t * const state, const coeff_t * __restrict coef, coeff_t * __restrict q_coef, int32_t width,
-  int32_t height, color_t color, int8_t scan_idx, int8_t block_type, int8_t transform_skip)
+  int32_t height, color_t color, int8_t scan_idx, int8_t block_type, int8_t transform_skip, uint8_t lfnst_idx)
 {
   const encoder_control_t * const encoder = state->encoder_control;
   const uint32_t log2_block_size = uvg_g_convert_to_bit[width] + 2;
@@ -406,28 +406,29 @@ void uvg_quant_avx2(const encoder_state_t * const state, const coeff_t * __restr
     high_b = low_b;
   }
 
-  for (int32_t n = 0; n < width * height; n += VEC_WIDTH) {
+  if(lfnst_idx == 0) {
+    for (int32_t n = 0; n < width * height; n += VEC_WIDTH) {
 
-    __m256i v_level = _mm256_loadu_si256((__m256i *)(coef + n));
-    __m256i v_sign = _mm256_cmpgt_epi16(_mm256_setzero_si256(), v_level);
-    v_sign = _mm256_or_si256(v_sign, _mm256_set1_epi16(1));
+      __m256i v_level = _mm256_loadu_si256((__m256i *)(coef + n));
+      __m256i v_sign = _mm256_cmpgt_epi16(_mm256_setzero_si256(), v_level);
+      v_sign = _mm256_or_si256(v_sign, _mm256_set1_epi16(1));
 
-    if (state->encoder_control->scaling_list.enable) {
-      __m256i v_quant_coeff_lo = _mm256_loadu_si256(((__m256i *)(quant_coeff + n)) + 0);
-      __m256i v_quant_coeff_hi = _mm256_loadu_si256(((__m256i *)(quant_coeff + n)) + 1);
+      if (state->encoder_control->scaling_list.enable) {
+        __m256i v_quant_coeff_lo = _mm256_loadu_si256(((__m256i *)(quant_coeff + n)) + 0);
+        __m256i v_quant_coeff_hi = _mm256_loadu_si256(((__m256i *)(quant_coeff + n)) + 1);
 
-      low_b  = _mm256_permute2x128_si256(v_quant_coeff_lo,
-                                         v_quant_coeff_hi,
-                                         0x20);
+        low_b  = _mm256_permute2x128_si256(v_quant_coeff_lo,
+                                           v_quant_coeff_hi,
+                                           0x20);
 
-      high_b = _mm256_permute2x128_si256(v_quant_coeff_lo,
-                                         v_quant_coeff_hi,
-                                         0x31);
-    }
+        high_b = _mm256_permute2x128_si256(v_quant_coeff_lo,
+                                           v_quant_coeff_hi,
+                                           0x31);
+      }
 
-// TODO: do we need to have this?
-// #define CHECK_QUANT_COEFFS
-#ifdef CHECK_QUANT_COEFFS
+      // TODO: do we need to have this?
+      // #define CHECK_QUANT_COEFFS
+      #ifdef CHECK_QUANT_COEFFS
       __m256i abs_vq_lo = _mm256_abs_epi32(v_quant_coeff_lo);
       __m256i abs_vq_hi = _mm256_abs_epi32(v_quant_coeff_hi);
 
@@ -440,26 +441,46 @@ void uvg_quant_avx2(const encoder_state_t * const state, const coeff_t * __restr
       assert(!(over_16b_mask_lo || over_16b_mask_hi));
 #endif
 
-    v_level = _mm256_abs_epi16(v_level);
-    __m256i low_a  = _mm256_unpacklo_epi16(v_level, _mm256_setzero_si256());
-    __m256i high_a = _mm256_unpackhi_epi16(v_level, _mm256_setzero_si256());
+      v_level = _mm256_abs_epi16(v_level);
+      __m256i low_a  = _mm256_unpacklo_epi16(v_level, _mm256_setzero_si256());
+      __m256i high_a = _mm256_unpackhi_epi16(v_level, _mm256_setzero_si256());
 
-    __m256i v_level32_a = _mm256_mullo_epi32(low_a,  low_b);
-    __m256i v_level32_b = _mm256_mullo_epi32(high_a, high_b);
+      __m256i v_level32_a = _mm256_mullo_epi32(low_a,  low_b);
+      __m256i v_level32_b = _mm256_mullo_epi32(high_a, high_b);
 
-    v_level32_a = _mm256_add_epi32(v_level32_a, _mm256_set1_epi32(add));
-    v_level32_b = _mm256_add_epi32(v_level32_b, _mm256_set1_epi32(add));
+      v_level32_a = _mm256_add_epi32(v_level32_a, _mm256_set1_epi32(add));
+      v_level32_b = _mm256_add_epi32(v_level32_b, _mm256_set1_epi32(add));
 
-    v_level32_a = _mm256_srai_epi32(v_level32_a, q_bits);
-    v_level32_b = _mm256_srai_epi32(v_level32_b, q_bits);
+      v_level32_a = _mm256_srai_epi32(v_level32_a, q_bits);
+      v_level32_b = _mm256_srai_epi32(v_level32_b, q_bits);
 
-    v_level = _mm256_packs_epi32(v_level32_a, v_level32_b);
-    v_level = _mm256_sign_epi16(v_level, v_sign);
+      v_level = _mm256_packs_epi32(v_level32_a, v_level32_b);
+      v_level = _mm256_sign_epi16(v_level, v_sign);
 
-    _mm256_storeu_si256((__m256i *)(q_coef + n), v_level);
+      _mm256_storeu_si256((__m256i *)(q_coef + n), v_level);
 
-    v_ac_sum = _mm256_add_epi32(v_ac_sum, v_level32_a);
-    v_ac_sum = _mm256_add_epi32(v_ac_sum, v_level32_b);
+      v_ac_sum = _mm256_add_epi32(v_ac_sum, v_level32_a);
+      v_ac_sum = _mm256_add_epi32(v_ac_sum, v_level32_b);
+    }
+  }
+  else {
+    const int max_number_of_coeffs = ((width == 4 && height == 4) || (width == 8 && height == 8)) ? 8 : 16;
+    memset(q_coef, 0, width * height * sizeof(coeff_t));
+    for (int32_t n = 0; n < max_number_of_coeffs; n++) {
+      const uint32_t idx = scan[n];
+      int32_t level = coef[idx];
+      int64_t abs_level = (int64_t)abs(level);
+      int32_t sign;
+
+      sign = (level < 0 ? -1 : 1);
+
+      int32_t curr_quant_coeff = quant_coeff[n];
+      level = (abs_level * curr_quant_coeff + add) >> q_bits;
+      ac_sum += level;
+
+      level *= sign;
+      q_coef[idx] = (coeff_t)(CLIP(-32768, 32767, level));
+    }
   }
 
   __m128i temp = _mm_add_epi32(_mm256_castsi256_si128(v_ac_sum), _mm256_extracti128_si256(v_ac_sum, 1));
@@ -610,7 +631,8 @@ int uvg_quantize_residual_avx2(encoder_state_t *const state,
   const int in_stride, const int out_stride,
   const uint8_t *const ref_in, const uint8_t *const pred_in,
   uint8_t *rec_out, coeff_t *coeff_out,
-  bool early_skip, int lmcs_chroma_adj)
+  bool early_skip, int lmcs_chroma_adj,
+  enum uvg_tree_type tree_type)
 {
   // Temporary arrays to pass data to and from uvg_quant and transform functions.
   ALIGNED(64) int16_t residual[TR_MAX_WIDTH * TR_MAX_WIDTH];
@@ -646,11 +668,11 @@ int uvg_quantize_residual_avx2(encoder_state_t *const state,
     uvg_transform2d(state->encoder_control, residual, coeff, width, color, cur_cu);
   }
 
-  const uint16_t lfnst_index = cur_cu->lfnst_idx;
+  const uint16_t lfnst_index = color == COLOR_Y ? cur_cu->lfnst_idx : cur_cu->cr_lfnst_idx;
 
   if (state->encoder_control->cfg.lfnst && cur_cu->type == CU_INTRA) {
     // Forward low frequency non-separable transform
-    uvg_fwd_lfnst(cur_cu, width, height, color, lfnst_index, coeff);
+    uvg_fwd_lfnst(cur_cu, width, height, color, lfnst_index, coeff, tree_type);
   }
 
   // Quantize coeffs. (coeff -> coeff_out)
@@ -669,7 +691,7 @@ int uvg_quantize_residual_avx2(encoder_state_t *const state,
   }
   else {
     uvg_quant(state, coeff, coeff_out, width, width, color,
-      scan_order, cur_cu->type, cur_cu->tr_idx == MTS_SKIP && color == COLOR_Y, cur_cu->lfnst_idx);
+      scan_order, cur_cu->type, cur_cu->tr_idx == MTS_SKIP && color == COLOR_Y, lfnst_index);
   }
 
   // Check if there are any non-zero coefficients.
@@ -688,7 +710,7 @@ int uvg_quantize_residual_avx2(encoder_state_t *const state,
 
     if (state->encoder_control->cfg.lfnst && cur_cu->type == CU_INTRA) {
       // Inverse low frequency non-separable transform
-      uvg_inv_lfnst(cur_cu, width, height, color, lfnst_index, coeff);
+      uvg_inv_lfnst(cur_cu, width, height, color, lfnst_index, coeff, tree_type);
     }
     if (use_trskip) {
       uvg_itransformskip(state->encoder_control, residual, coeff, width);

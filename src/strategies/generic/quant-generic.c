@@ -247,7 +247,7 @@ int uvg_quant_cbcr_residual_generic(
   uvg_pixel* v_rec_out,
   coeff_t* coeff_out,
   bool early_skip, 
-  int lmcs_chroma_adj
+  int lmcs_chroma_adj, enum uvg_tree_type tree_type
   ) {
   ALIGNED(64) int16_t u_residual[TR_MAX_WIDTH * TR_MAX_WIDTH];
   ALIGNED(64) int16_t v_residual[TR_MAX_WIDTH * TR_MAX_WIDTH];
@@ -306,6 +306,9 @@ int uvg_quant_cbcr_residual_generic(
 
 
   uvg_transform2d(state->encoder_control, combined_residual, coeff, width, cur_cu->joint_cb_cr == 1 ? COLOR_V : COLOR_U, cur_cu);
+  if(cur_cu->cr_lfnst_idx) {
+    uvg_fwd_lfnst(cur_cu, width, width, COLOR_UV, cur_cu->lfnst_idx, coeff, tree_type);
+  }
 
   if (state->encoder_control->cfg.rdoq_enable &&
     (width > 4 || !state->encoder_control->cfg.rdoq_skip))
@@ -340,6 +343,9 @@ int uvg_quant_cbcr_residual_generic(
     // Get quantized residual. (coeff_out -> coeff -> residual)
     uvg_dequant(state, coeff_out, coeff, width, width, cur_cu->joint_cb_cr == 1 ? COLOR_V : COLOR_U,
       cur_cu->type, cur_cu->tr_idx == MTS_SKIP && false);
+    if (cur_cu->cr_lfnst_idx) {
+      uvg_inv_lfnst(cur_cu, width, width, COLOR_UV, cur_cu->lfnst_idx, coeff, tree_type);
+    }
     
     uvg_itransform2d(state->encoder_control, combined_residual, coeff, width, cur_cu->joint_cb_cr == 1 ? COLOR_V : COLOR_U, cur_cu);
     
@@ -439,7 +445,7 @@ int uvg_quantize_residual_generic(encoder_state_t *const state,
   const int in_stride, const int out_stride,
   const uvg_pixel *const ref_in, const uvg_pixel *const pred_in,
   uvg_pixel *rec_out, coeff_t *coeff_out,
-  bool early_skip, int lmcs_chroma_adj)
+  bool early_skip, int lmcs_chroma_adj, enum uvg_tree_type tree_type)
 {
   // Temporary arrays to pass data to and from uvg_quant and transform functions.
   ALIGNED(64) int16_t residual[TR_MAX_WIDTH * TR_MAX_WIDTH];
@@ -480,7 +486,7 @@ int uvg_quantize_residual_generic(encoder_state_t *const state,
 
   if (state->encoder_control->cfg.lfnst && cur_cu->type == CU_INTRA) {
     // Forward low frequency non-separable transform
-    uvg_fwd_lfnst(cur_cu, width, height, color, lfnst_index, coeff);
+    uvg_fwd_lfnst(cur_cu, width, height, color, lfnst_index, coeff, tree_type);
   }
   
 
@@ -524,7 +530,7 @@ int uvg_quantize_residual_generic(encoder_state_t *const state,
     
     if (state->encoder_control->cfg.lfnst && cur_cu->type == CU_INTRA) {
       // Inverse low frequency non-separable transform
-      uvg_inv_lfnst(cur_cu, width, height, color, lfnst_index, coeff);
+      uvg_inv_lfnst(cur_cu, width, height, color, lfnst_index, coeff, tree_type);
     }
     if (use_trskip) {
       uvg_itransformskip(state->encoder_control, residual, coeff, width);

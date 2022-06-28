@@ -247,7 +247,7 @@ void uvg_transform2d(const encoder_control_t * const encoder,
                      color_t color,
                      const cu_info_t *tu)
 {
-  if (encoder->cfg.mts || tu->lfnst_idx)
+  if (encoder->cfg.mts || tu->lfnst_idx || tu->cr_lfnst_idx)
   {
     uvg_mts_dct(encoder->bitdepth, color, tu, block_size, block, coeff, encoder->cfg.mts);
   }
@@ -540,9 +540,9 @@ void uvg_chroma_transform_search(
     bool u_has_coeffs = false;
     bool v_has_coeffs = false;
     if(pred_cu->cr_lfnst_idx) {
-      uvg_fwd_lfnst(pred_cu, width, height, COLOR_U, pred_cu->cr_lfnst_idx, &u_coeff[i * trans_offset]);
+      uvg_fwd_lfnst(pred_cu, width, height, COLOR_U, pred_cu->cr_lfnst_idx, &u_coeff[i * trans_offset], tree_type);
       if (!IS_JCCR_MODE(transforms[i])) {
-        uvg_fwd_lfnst(pred_cu, width, height, COLOR_V, pred_cu->cr_lfnst_idx, &v_coeff[i * trans_offset]);
+        uvg_fwd_lfnst(pred_cu, width, height, COLOR_V, pred_cu->cr_lfnst_idx, &v_coeff[i * trans_offset], tree_type);
       }
     }
     quantize_chroma(
@@ -562,7 +562,7 @@ void uvg_chroma_transform_search(
       &v_has_coeffs,
       pred_cu->cr_lfnst_idx);
     
-    if(pred_cu->type == CU_INTRA && transforms[i] != CHROMA_TS && depth == 4) {
+    if(pred_cu->type == CU_INTRA && transforms[i] != CHROMA_TS && (depth == 4 || tree_type == UVG_CHROMA_T)) {
       bool constraints[2] = { false, false };
       uvg_derive_lfnst_constraints(pred_cu, depth, constraints, u_quant_coeff, width, height);
       if(!IS_JCCR_MODE(transforms[i])) {
@@ -579,7 +579,7 @@ void uvg_chroma_transform_search(
         pred_cu->type, transforms[i] == CHROMA_TS);
       if (transforms[i] != CHROMA_TS) {
         if (pred_cu->cr_lfnst_idx) {
-          uvg_inv_lfnst(pred_cu, width, height, COLOR_U, pred_cu->cr_lfnst_idx, &u_coeff[i * trans_offset]);
+          uvg_inv_lfnst(pred_cu, width, height, COLOR_U, pred_cu->cr_lfnst_idx, &u_coeff[i * trans_offset], tree_type);
         }
         uvg_itransform2d(state->encoder_control, u_recon_resi, &u_coeff[i * trans_offset], width,
           transforms[i] != JCCR_1 ? COLOR_U : COLOR_V, pred_cu);
@@ -606,7 +606,7 @@ void uvg_chroma_transform_search(
         pred_cu->type, transforms[i] == CHROMA_TS);
       if (transforms[i] != CHROMA_TS) {
         if (pred_cu->cr_lfnst_idx) {
-          uvg_inv_lfnst(pred_cu, width, height, COLOR_V, pred_cu->cr_lfnst_idx, &v_coeff[i * trans_offset]);
+          uvg_inv_lfnst(pred_cu, width, height, COLOR_V, pred_cu->cr_lfnst_idx, &v_coeff[i * trans_offset], tree_type);
         }
         uvg_itransform2d(state->encoder_control, v_recon_resi, &v_coeff[i * trans_offset], width,
           transforms[i] != JCCR_1 ? COLOR_U : COLOR_V, pred_cu);
@@ -790,17 +790,20 @@ static inline bool get_transpose_flag(const int8_t intra_mode)
          ((intra_mode < NUM_LUMA_MODE) && (intra_mode > DIA_IDX));
 }
 
-void uvg_fwd_lfnst(const cu_info_t* const cur_cu,
-  const int width, const int height,
+void uvg_fwd_lfnst(
+  const cu_info_t* const cur_cu,
+  const int width,
+  const int height,
   const uint8_t color,
   const uint16_t lfnst_idx,
-  coeff_t *coeffs)
+  coeff_t *coeffs,
+  enum uvg_tree_type tree_type)
 {
   const uint16_t lfnst_index = lfnst_idx;
   int8_t intra_mode = (color == COLOR_Y) ? cur_cu->intra.mode : cur_cu->intra.mode_chroma;
   bool mts_skip = cur_cu->tr_idx == MTS_SKIP;
   const int depth = cur_cu->depth;
-  bool is_separate_tree = depth == 4; // TODO: proper dual tree check when that structure is implemented
+  bool is_separate_tree = depth == 4 || tree_type != UVG_BOTH_T; 
   bool is_cclm_mode = (intra_mode >= 81 && intra_mode <= 83); // CCLM modes are in [81, 83]
 
   bool is_mip = cur_cu->type == CU_INTRA ? cur_cu->intra.mip_flag : false;
@@ -921,11 +924,14 @@ void uvg_inv_lfnst_NxN(coeff_t *src, coeff_t *dst, const uint32_t mode, const ui
   }
 }
 
-void uvg_inv_lfnst(const cu_info_t *cur_cu, 
-                   const int width, const int height,
-                   const uint8_t color,
-                   const uint16_t lfnst_idx,
-                   coeff_t *coeffs)
+void uvg_inv_lfnst(
+  const cu_info_t *cur_cu,
+  const int width,
+  const int height,
+  const uint8_t color,
+  const uint16_t lfnst_idx,
+  coeff_t *coeffs,
+  enum uvg_tree_type tree_type)
 {
   // In VTM, max log2 dynamic range is something in range [15, 20] depending on whether extended precision processing is enabled
   // Such is not yet present in uvg266 so use 15 for now
@@ -934,7 +940,7 @@ void uvg_inv_lfnst(const cu_info_t *cur_cu,
   int8_t intra_mode = (color == COLOR_Y) ? cur_cu->intra.mode : cur_cu->intra.mode_chroma;
   bool mts_skip = cur_cu->tr_idx == MTS_SKIP;
   const int depth = cur_cu->depth;
-  bool is_separate_tree = depth == 4; // TODO: proper dual tree check when that structure is implemented
+  bool is_separate_tree = depth == 4 || tree_type != UVG_BOTH_T;
   bool is_cclm_mode = (intra_mode >= 81 && intra_mode <= 83); // CCLM modes are in [81, 83]
 
   bool is_mip = cur_cu->type == CU_INTRA ? cur_cu->intra.mip_flag : false;
@@ -1068,7 +1074,8 @@ int uvg_quantize_residual_trskip(
   skip.has_coeffs = uvg_quantize_residual(
     state, cur_cu, width, color, scan_order,
     1, in_stride, width,
-    ref_in, pred_in, skip.rec, skip.coeff, false, lmcs_chroma_adj);
+    ref_in, pred_in, skip.rec, skip.coeff, false, lmcs_chroma_adj, 
+    UVG_BOTH_T /* tree type doesn't matter for transformskip*/);
 
 /*  if (noskip.cost <= skip.cost) {
     *trskip_out = 0;
@@ -1093,14 +1100,16 @@ int uvg_quantize_residual_trskip(
  *
  * \param early_skip if this is used for early skip, bypass IT and IQ
  */
-static void quantize_tr_residual(encoder_state_t * const state,
-                                 const color_t color,
-                                 const int32_t x,
-                                 const int32_t y,
-                                 const uint8_t depth,
-                                 cu_info_t *cur_pu,
-                                 lcu_t* lcu,
-                                 bool early_skip)
+static void quantize_tr_residual(
+  encoder_state_t * const state,
+  const color_t color,
+  const int32_t x,
+  const int32_t y,
+  const uint8_t depth,
+  cu_info_t *cur_pu,
+  lcu_t* lcu,
+  bool early_skip,
+  enum uvg_tree_type tree_type)
 {
   const uvg_config *cfg    = &state->encoder_control->cfg;
   const int32_t shift      = color == COLOR_Y ? 0 : 1;
@@ -1222,7 +1231,8 @@ static void quantize_tr_residual(encoder_state_t * const state,
         &lcu->rec.u[offset], &lcu->rec.v[offset],
         &lcu->coeff.joint_uv[z_index],
         early_skip,
-        lmcs_chroma_adj
+        lmcs_chroma_adj,
+        tree_type
       );
       cur_pu->joint_cb_cr = has_coeffs;
       return;
@@ -1241,7 +1251,8 @@ static void quantize_tr_residual(encoder_state_t * const state,
                                        pred,
                                        coeff,
                                        early_skip,
-                                       lmcs_chroma_adj);
+                                       lmcs_chroma_adj,
+                                       tree_type);
     
   }
 
@@ -1279,7 +1290,8 @@ void uvg_quantize_lcu_residual(
   const uint8_t depth,
   cu_info_t *cur_pu,
   lcu_t* lcu,
-  bool early_skip)
+  bool early_skip,
+  enum uvg_tree_type tree_type)
 {
   const int32_t width = LCU_WIDTH >> depth;
   const vector2d_t lcu_px  = { SUB_SCU(x), SUB_SCU(y) };
@@ -1314,10 +1326,10 @@ void uvg_quantize_lcu_residual(
     const int32_t y2 = y + offset;
 
     // jccr is currently not supported if transform is split
-    uvg_quantize_lcu_residual(state, luma, chroma, 0,  x,  y, depth + 1, NULL, lcu, early_skip);
-    uvg_quantize_lcu_residual(state, luma, chroma, 0, x2,  y, depth + 1, NULL, lcu, early_skip);
-    uvg_quantize_lcu_residual(state, luma, chroma, 0,  x, y2, depth + 1, NULL, lcu, early_skip);
-    uvg_quantize_lcu_residual(state, luma, chroma, 0, x2, y2, depth + 1, NULL, lcu, early_skip);
+    uvg_quantize_lcu_residual(state, luma, chroma, 0,  x,  y, depth + 1, NULL, lcu, early_skip, tree_type);
+    uvg_quantize_lcu_residual(state, luma, chroma, 0, x2,  y, depth + 1, NULL, lcu, early_skip, tree_type);
+    uvg_quantize_lcu_residual(state, luma, chroma, 0,  x, y2, depth + 1, NULL, lcu, early_skip, tree_type);
+    uvg_quantize_lcu_residual(state, luma, chroma, 0, x2, y2, depth + 1, NULL, lcu, early_skip, tree_type);
 
     // Propagate coded block flags from child CUs to parent CU.
     uint16_t child_cbfs[3] = {
@@ -1335,14 +1347,14 @@ void uvg_quantize_lcu_residual(
   } else {
     // Process a leaf TU.
     if (luma) {
-      quantize_tr_residual(state, COLOR_Y, x, y, depth, cur_pu, lcu, early_skip);
+      quantize_tr_residual(state, COLOR_Y, x, y, depth, cur_pu, lcu, early_skip, tree_type);
     }
     if (chroma) {
-      quantize_tr_residual(state, COLOR_U, x, y, depth, cur_pu, lcu, early_skip);
-      quantize_tr_residual(state, COLOR_V, x, y, depth, cur_pu, lcu, early_skip);   
+      quantize_tr_residual(state, COLOR_U, x, y, depth, cur_pu, lcu, early_skip, tree_type);
+      quantize_tr_residual(state, COLOR_V, x, y, depth, cur_pu, lcu, early_skip, tree_type);   
     }
     if (jccr && cur_pu->tr_depth == cur_pu->depth) {
-      quantize_tr_residual(state, COLOR_UV, x, y, depth, cur_pu, lcu, early_skip);
+      quantize_tr_residual(state, COLOR_UV, x, y, depth, cur_pu, lcu, early_skip, tree_type);
     }
     if(chroma && jccr && cur_pu->tr_depth == cur_pu->depth) {
       assert( 0 && "Trying to quantize both jccr and regular at the same time.\n");

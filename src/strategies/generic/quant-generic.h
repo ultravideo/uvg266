@@ -65,7 +65,7 @@ int uvg_quantize_residual_generic(encoder_state_t *const state,
   const int in_stride, const int out_stride,
   const uvg_pixel *const ref_in, const uvg_pixel *const pred_in,
   uvg_pixel *rec_out, coeff_t *coeff_out,
-  bool early_skip, int lmcs_chroma_adj);
+  bool early_skip, int lmcs_chroma_adj, enum uvg_tree_type tree_type);
 
 int uvg_quant_cbcr_residual_generic(
   encoder_state_t* const state,
@@ -81,7 +81,8 @@ int uvg_quant_cbcr_residual_generic(
   uvg_pixel* v_rec_out,
   coeff_t* coeff_out,
   bool early_skip,
-  int lmcs_chroma_adj
+  int lmcs_chroma_adj, 
+  enum uvg_tree_type tree_type
 );
 
 #endif //STRATEGIES_QUANT_GENERIC_H_

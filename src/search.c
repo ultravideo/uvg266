@@ -635,7 +635,7 @@ static double cu_rd_cost_tr_split_accurate(
   }
 
   if (uvg_is_lfnst_allowed(state, tr_cu, width, width, x_px, y_px, tree_type)) {
-    const int lfnst_idx = depth != 4 || tree_type != UVG_CHROMA_T ? tr_cu->lfnst_idx : tr_cu->cr_lfnst_idx;
+    const int lfnst_idx = (depth != 4 && tree_type != UVG_CHROMA_T) ? tr_cu->lfnst_idx : tr_cu->cr_lfnst_idx;
     CABAC_FBITS_UPDATE(
       cabac,
       &cabac->ctx.lfnst_idx_model[tr_cu->depth == 4 || tree_type != UVG_BOTH_T],
@@ -952,6 +952,7 @@ static double search_cu(
           if(tree_type == UVG_CHROMA_T) {
             intra_search.pred_cu.intra = uvg_get_co_located_luma_cu(x, y, luma_width, luma_width, NULL, state->tile->frame->cu_array, UVG_CHROMA_T)->intra;
             intra_mode = intra_search.pred_cu.intra.mode;
+            intra_search.pred_cu.type = CU_INTRA;
           }
           intra_search.pred_cu.intra.mode_chroma = intra_search.pred_cu.intra.mode;
           if (ctrl->cfg.rdo >= 3 || ctrl->cfg.jccr || ctrl->cfg.lfnst) {
@@ -1056,7 +1057,8 @@ static double search_cu(
                                   depth,
                                   NULL,
                                   lcu,
-                                  false);
+                                  false,
+          tree_type);
 
         int cbf = cbf_is_set_any(cur_cu->cbf, depth);
 
