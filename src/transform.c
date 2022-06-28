@@ -794,7 +794,7 @@ void uvg_fwd_lfnst(
   const cu_info_t* const cur_cu,
   const int width,
   const int height,
-  const uint8_t color,
+  const color_t color,
   const uint16_t lfnst_idx,
   coeff_t *coeffs,
   enum uvg_tree_type tree_type)
@@ -928,7 +928,7 @@ void uvg_inv_lfnst(
   const cu_info_t *cur_cu,
   const int width,
   const int height,
-  const uint8_t color,
+  const color_t color,
   const uint16_t lfnst_idx,
   coeff_t *coeffs,
   enum uvg_tree_type tree_type)
