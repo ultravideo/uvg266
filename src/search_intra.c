@@ -383,7 +383,7 @@ static double search_intra_trdepth(
                          depth, search_data,
                          pred_cu,
                          lcu,
-                         UVG_LUMA_T);
+                         UVG_LUMA_T,true,false);
       if (trafo != 0 && !cbf_is_set(pred_cu->cbf, depth, COLOR_Y)) continue;
 
         // TODO: Not sure if this should be 0 or 1 but at least seems to work with 1
@@ -462,7 +462,6 @@ static double search_intra_trdepth(
       } // end mts index loop (tr_idx)
       if (reconstruct_chroma) {
         int8_t luma_mode = pred_cu->intra.mode;
-        pred_cu->intra.mode = -1;
         pred_cu->intra.mode_chroma = chroma_mode;
         pred_cu->joint_cb_cr = 4;
         // TODO: Maybe check the jccr mode here also but holy shit is the interface of search_intra_rdo bad currently
@@ -475,7 +474,7 @@ static double search_intra_trdepth(
           search_data,
           pred_cu,
           lcu,
-          UVG_BOTH_T);
+          UVG_BOTH_T,false,true);
         best_rd_cost += uvg_cu_rd_cost_chroma(
           state,
           lcu_px.x,
@@ -520,7 +519,6 @@ static double search_intra_trdepth(
     }
     if(reconstruct_chroma) {
       int8_t luma_mode = pred_cu->intra.mode;
-      pred_cu->intra.mode = -1;
       pred_cu->intra.mode_chroma = chroma_mode;
       pred_cu->joint_cb_cr= 4; // TODO: Maybe check the jccr mode here also but holy shit is the interface of search_intra_rdo bad currently
       uvg_intra_recon_cu(state,
@@ -528,7 +526,7 @@ static double search_intra_trdepth(
                          depth, search_data,
                          pred_cu, 
                          lcu, 
-                         UVG_BOTH_T);
+                         UVG_BOTH_T,false,true);
       best_rd_cost += uvg_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
       pred_cu->intra.mode = luma_mode;
     }
@@ -1572,7 +1570,7 @@ int8_t uvg_search_intra_chroma_rdo(
                              depth, &chroma_data[mode_i],
                              pred_cu,
                              lcu,
-                             tree_type);
+                             tree_type, false, true);
           chroma_data[mode_i].cost += uvg_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
           memcpy(&state->search_cabac, &temp_cabac, sizeof(cabac_data_t));
         }
@@ -1629,7 +1627,6 @@ int8_t uvg_search_cu_intra_chroma(
   for (int i = 0; i < num_modes; i++) {
     chroma_data[i].pred_cu = *cur_pu;
     chroma_data[i].pred_cu.intra.mode_chroma = num_modes == 1 ? intra_mode : modes[i];
-    chroma_data[i].pred_cu.intra.mode = -1;
     chroma_data[i].cost = 0;
     if(depth != 4 && tree_type == UVG_BOTH_T) {
       memcpy(chroma_data[i].lfnst_costs, search_data->lfnst_costs, sizeof(double) * 3);

@@ -144,8 +144,10 @@ void uvg_intra_recon_cu(
   int depth,
   intra_search_data_t* search_data,
   cu_info_t *cur_cu,
-  lcu_t *lcu, 
-  enum uvg_tree_type tree_type);
+  lcu_t *lcu,
+  enum uvg_tree_type tree_type,
+  bool recon_luma,
+  bool recon_chroma);
 
 const cu_info_t* uvg_get_co_located_luma_cu(
   int x,

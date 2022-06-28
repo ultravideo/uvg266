@@ -930,12 +930,11 @@ static double search_cu(
       if (intra_cost < cost && tree_type != UVG_LUMA_T) {
         int8_t intra_mode = intra_search.pred_cu.intra.mode;
         if (state->encoder_control->cfg.cclm && tree_type == UVG_BOTH_T) {
-          intra_search.pred_cu.intra.mode_chroma = -1;
           uvg_intra_recon_cu(state,
-            x, y,
-            depth, &intra_search,
-            &intra_search.pred_cu,
-            lcu, tree_type);
+                             x, y,
+                             depth, &intra_search,
+                             &intra_search.pred_cu,
+                             lcu, tree_type, true, false);
 
           downsample_cclm_rec(
             state, x, y, cu_width / 2, cu_width / 2, lcu->rec.y, lcu->left_ref.y[64]
@@ -970,11 +969,11 @@ static double search_cu(
             intra_search.pred_cu.intra.mode_chroma = 0;
           }
           uvg_intra_recon_cu(state,
-            x, y,
-            depth, &intra_search,
-            &intra_search.pred_cu,
-            lcu,
-            tree_type);
+                             x, y,
+                             depth, &intra_search,
+                             &intra_search.pred_cu,
+                             lcu,
+                             tree_type, false, true);
           if(tree_type != UVG_CHROMA_T) {
             intra_cost += uvg_cu_rd_cost_chroma(state, x_local, y_local, depth, &intra_search.pred_cu, lcu);
           }
@@ -1003,27 +1002,25 @@ static double search_cu(
     if (cur_cu->type == CU_INTRA) {
       assert(cur_cu->part_size == SIZE_2Nx2N || cur_cu->part_size == SIZE_NxN);
 
-      if ((depth == 4 && (x % 8 == 0 || y % 8 == 0)) || state->encoder_control->chroma_format == UVG_CSP_400 || tree_type == UVG_LUMA_T) {
-        intra_search.pred_cu.intra.mode_chroma = -1; 
-      }
-      if(tree_type == UVG_CHROMA_T) {
-        intra_search.pred_cu.intra.mode = -1;
+      bool recon_chroma = true;
+      bool recon_luma = tree_type != UVG_CHROMA_T;
+      if ((depth == 4) || state->encoder_control->chroma_format == UVG_CSP_400 || tree_type == UVG_LUMA_T) {
+        recon_chroma = false; 
       }
       lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
       uvg_intra_recon_cu(state,
                          x, y,
                          depth, &intra_search,
                          NULL, 
-                         lcu, tree_type);
-      if(depth == 4 && x % 8 && y % 8) {
+                         lcu, tree_type,recon_luma,recon_chroma);
+      if(depth == 4 && x % 8 && y % 8 && tree_type != UVG_LUMA_T && state->encoder_control->chroma_format != UVG_CSP_400) {
         intra_search.pred_cu.intra.mode_chroma = cur_cu->intra.mode_chroma;
-        intra_search.pred_cu.intra.mode = -1;
         uvg_intra_recon_cu(state,
-          x, y,
-          depth, &intra_search,
-          NULL,
-          lcu,
-          tree_type);
+                           x, y,
+                           depth, &intra_search,
+                           NULL,
+                           lcu,
+                           tree_type,false,true);
       }
       if (cur_cu->joint_cb_cr == 4) cur_cu->joint_cb_cr = 0;
       lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
@@ -1212,7 +1209,8 @@ static double search_cu(
     // TODO: Dual tree
     if (cur_cu->type == CU_NOTSET && depth < MAX_PU_DEPTH
         && x + cu_width <= frame_width && y + cu_width <= frame_height 
-        && state->encoder_control->cfg.combine_intra_cus)
+        && state->encoder_control->cfg.combine_intra_cus 
+      && tree_type == UVG_BOTH_T)
     {
 
       cu_info_t *cu_d1 = LCU_GET_CU_AT_PX(&work_tree[depth + 1], x_local, y_local);
@@ -1250,7 +1248,7 @@ static double search_cu(
                            &proxy,
                            NULL,
                            lcu,
-                           tree_type);
+                           tree_type, true, state->encoder_control->chroma_format == UVG_CSP_400);
 
         double mode_bits = calc_mode_bits(state, lcu, cur_cu, x, y, depth) + bits;
         cost += mode_bits * state->lambda;
