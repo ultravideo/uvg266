@@ -15,3 +15,4 @@ valgrind_test $common_args --transform-skip --tr-skip-max-size=5
 valgrind_test $common_args --vaq=8
 valgrind_test $common_args --vaq=8 --bitrate 350000
 valgrind_test $common_args --vaq=8 --rc-algorithm oba --bitrate 350000
+valgrind_test $common_args --ibc=1
