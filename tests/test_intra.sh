@@ -18,3 +18,4 @@ valgrind_test $common_args --alf=full --wpp --threads=1
 valgrind_test $common_args --jccr --rdoq --rd=2 --mts=intra
 valgrind_test $common_args --rd=3 --cclm --jccr
 valgrind_test $common_args --lfnst
+valgrind_test $common_args --lfnst --rd=3 --cclm --mip --dual-tree --fast-residual-cost 0
