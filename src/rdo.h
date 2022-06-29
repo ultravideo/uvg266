@@ -51,8 +51,18 @@ extern const uint32_t uvg_g_go_rice_prefix_len[5];
 int uvg_init_rdcost_outfiles(const char *fn_template);
 void uvg_close_rdcost_outfiles(void);
 
-void  uvg_rdoq(encoder_state_t *state, coeff_t *coef, coeff_t *dest_coeff, int32_t width,
-           int32_t height, int8_t type, int8_t scan_mode, int8_t block_type, int8_t tr_depth, uint16_t cbf);
+void  uvg_rdoq(
+  encoder_state_t *state,
+  coeff_t *coef,
+  coeff_t *dest_coeff,
+  int32_t width,
+  int32_t height,
+  int8_t type,
+  int8_t scan_mode,
+  int8_t block_type,
+  int8_t tr_depth,
+  uint16_t cbf,
+  uint8_t lfnst_idx);
 
 
 int uvg_ts_rdoq(encoder_state_t* const state, coeff_t* src_coeff, coeff_t* dest_coeff, int32_t width,

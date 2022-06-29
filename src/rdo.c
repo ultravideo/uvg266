@@ -1371,8 +1371,18 @@ int uvg_ts_rdoq(encoder_state_t* const state, coeff_t* src_coeff, coeff_t* dest_
  * coding engines using probability models like CABAC
  * From VTM 13.0
  */
-void uvg_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff, int32_t width,
-           int32_t height, int8_t type, int8_t scan_mode, int8_t block_type, int8_t tr_depth, uint16_t cbf)
+void uvg_rdoq(
+  encoder_state_t * const state,
+  coeff_t *coef,
+  coeff_t *dest_coeff,
+  int32_t width,
+  int32_t height,
+  int8_t type,
+  int8_t scan_mode,
+  int8_t block_type,
+  int8_t tr_depth,
+  uint16_t cbf,
+  uint8_t lfnst_idx)
 {
   const encoder_control_t * const encoder = state->encoder_control;
   cabac_data_t * const cabac = &state->cabac;
@@ -1451,12 +1461,14 @@ void uvg_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
   } rd_stats;
 
   //Find last cg and last scanpos
+  const int max_lfnst_pos = ((height == 4 && width == 4) || (height == 8 && width == 8)) ? 7 : 15;
   int32_t cg_scanpos;
   for (cg_scanpos = (cg_num - 1); cg_scanpos >= 0; cg_scanpos--)
   {
     for (int32_t scanpos_in_cg = (cg_size - 1); scanpos_in_cg >= 0; scanpos_in_cg--)
     {
       int32_t  scanpos        = cg_scanpos*cg_size + scanpos_in_cg;
+      if (lfnst_idx > 0 && scanpos > max_lfnst_pos) break;
       uint32_t blkpos         = scan[scanpos];
       int32_t q               = quant_coeff[blkpos];
       int32_t level_double    = coef[blkpos];

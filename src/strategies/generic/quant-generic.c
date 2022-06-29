@@ -307,7 +307,7 @@ int uvg_quant_cbcr_residual_generic(
 
   uvg_transform2d(state->encoder_control, combined_residual, coeff, width, cur_cu->joint_cb_cr == 1 ? COLOR_V : COLOR_U, cur_cu);
   if(cur_cu->cr_lfnst_idx) {
-    uvg_fwd_lfnst(cur_cu, width, width, COLOR_UV, cur_cu->lfnst_idx, coeff, tree_type);
+    uvg_fwd_lfnst(cur_cu, width, width, COLOR_UV, cur_cu->cr_lfnst_idx, coeff, tree_type);
   }
 
   if (state->encoder_control->cfg.rdoq_enable &&
@@ -316,7 +316,8 @@ int uvg_quant_cbcr_residual_generic(
     int8_t tr_depth = cur_cu->tr_depth - cur_cu->depth;
     tr_depth += (cur_cu->part_size == SIZE_NxN ? 1 : 0);
     uvg_rdoq(state, coeff, coeff_out, width, width, cur_cu->joint_cb_cr == 1 ? COLOR_V : COLOR_U,
-      scan_order, cur_cu->type, tr_depth, cur_cu->cbf);
+             scan_order, cur_cu->type, tr_depth, cur_cu->cbf,
+      cur_cu->cr_lfnst_idx);
   }
   else if (state->encoder_control->cfg.rdoq_enable && false) {
     uvg_ts_rdoq(state, coeff, coeff_out, width, width, cur_cu->joint_cb_cr == 2 ? COLOR_V : COLOR_U,
@@ -344,7 +345,7 @@ int uvg_quant_cbcr_residual_generic(
     uvg_dequant(state, coeff_out, coeff, width, width, cur_cu->joint_cb_cr == 1 ? COLOR_V : COLOR_U,
       cur_cu->type, cur_cu->tr_idx == MTS_SKIP && false);
     if (cur_cu->cr_lfnst_idx) {
-      uvg_inv_lfnst(cur_cu, width, width, COLOR_UV, cur_cu->lfnst_idx, coeff, tree_type);
+      uvg_inv_lfnst(cur_cu, width, width, COLOR_UV, cur_cu->cr_lfnst_idx, coeff, tree_type);
     }
     
     uvg_itransform2d(state->encoder_control, combined_residual, coeff, width, cur_cu->joint_cb_cr == 1 ? COLOR_V : COLOR_U, cur_cu);
@@ -498,7 +499,8 @@ int uvg_quantize_residual_generic(encoder_state_t *const state,
     int8_t tr_depth = cur_cu->tr_depth - cur_cu->depth;
     tr_depth += (cur_cu->part_size == SIZE_NxN ? 1 : 0);
     uvg_rdoq(state, coeff, coeff_out, width, width, color,
-      scan_order, cur_cu->type, tr_depth, cur_cu->cbf);
+             scan_order, cur_cu->type, tr_depth, cur_cu->cbf,
+      lfnst_index);
   } else if(state->encoder_control->cfg.rdoq_enable && use_trskip) {
     uvg_ts_rdoq(state, coeff, coeff_out, width, width, color,
       scan_order);
