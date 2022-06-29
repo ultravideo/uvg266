@@ -593,6 +593,39 @@ void uvg_inter_recon_cu(const encoder_state_t * const state,
   }
 }
 
+static void ibc_recon_cu(const encoder_state_t * const state,
+                         lcu_t *lcu,
+                         int32_t x,
+                         int32_t y,
+                         int32_t width,
+                         bool predict_luma,
+                         bool predict_chroma,
+                         int i_pu)
+{
+  const int x_scu    = SUB_SCU(x);
+  const int y_scu    = SUB_SCU(y);
+  const int offset = x_scu + y_scu * LCU_WIDTH;
+  const int offset_c = x_scu / 2 + y_scu / 2 * LCU_WIDTH_C;
+  cu_info_t *cu       = LCU_GET_CU_AT_PX(lcu, x_scu, y_scu);
+
+  int32_t    mv_x     = cu->inter.mv[0][0] >> UVG_IMV_4PEL;
+  int32_t    mv_y     = cu->inter.mv[0][1] >> UVG_IMV_4PEL;
+  uint32_t   ibc_row  = y / LCU_WIDTH;
+
+  int32_t    buffer_x = ((x - x_scu) + LCU_WIDTH < IBC_BUFFER_WIDTH ?
+                          x :
+                          x - (((x - x_scu) + LCU_WIDTH) - IBC_BUFFER_WIDTH)) + mv_x;
+  int32_t buffer_y = y_scu + mv_y;
+
+  // Predicted block completely outside of this LCU
+  if (mv_x + x_scu + width < 0) {  
+    uvg_pixels_blit(&state->tile->frame->ibc_buffer_y[ibc_row][buffer_y * IBC_BUFFER_WIDTH + buffer_x], lcu->rec.y + offset, width, width, IBC_BUFFER_WIDTH, LCU_WIDTH);
+    uvg_pixels_blit(&state->tile->frame->ibc_buffer_u[ibc_row][(buffer_y >> 1) * IBC_BUFFER_WIDTH_C + (buffer_x >> 1)], lcu->rec.u + offset_c, width / 2, width / 2, IBC_BUFFER_WIDTH_C, LCU_WIDTH_C);
+    uvg_pixels_blit(&state->tile->frame->ibc_buffer_v[ibc_row][(buffer_y >> 1) * IBC_BUFFER_WIDTH_C + (buffer_x >> 1)], lcu->rec.v + offset_c, width / 2, width / 2, IBC_BUFFER_WIDTH_C, LCU_WIDTH_C);
+  } else if (mv_x + x_scu + width >= width) { // Completely in current LCU
+  }
+}
+
 /**
  * Predict a single PU.
  *
@@ -627,11 +660,7 @@ void uvg_inter_pred_pu(const encoder_state_t * const state,
   cu_info_t *pu = LCU_GET_CU_AT_PX(lcu, SUB_SCU(pu_x), SUB_SCU(pu_y));
 
   if (pu->type == CU_IBC) {
-    const int offset = x_scu + y_scu * LCU_WIDTH;
-    const int offset_c = x_scu / 2 + y_scu / 2 * LCU_WIDTH_C;
-    uvg_pixels_blit(lcu->rec.y + offset, lcu->rec.y + offset, width, width, LCU_WIDTH, LCU_WIDTH);
-    uvg_pixels_blit(lcu->rec.u + offset_c, lcu->rec.joint_u + offset_c, width / 2, width / 2, LCU_WIDTH_C, LCU_WIDTH_C);
-    uvg_pixels_blit(lcu->rec.v + offset_c, lcu->rec.joint_v + offset_c, width / 2, width / 2, LCU_WIDTH_C, LCU_WIDTH_C);
+    ibc_recon_cu(state, lcu, x, y, width, predict_luma, predict_chroma, i_pu);
   } else {
 
     if (pu->inter.mv_dir == 3) {
