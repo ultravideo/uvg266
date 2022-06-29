@@ -250,6 +250,58 @@ static void encoder_state_recdata_to_bufs(encoder_state_t * const state,
                       frame->rec->stride / 2, 1);
     }
   }
+
+  // Fill IBC buffer
+  if (state->encoder_control->cfg.ibc) {
+
+    uint32_t ibc_buffer_pos_x = lcu->position_px.x + LCU_WIDTH > IBC_BUFFER_WIDTH ? IBC_BUFFER_WIDTH - LCU_WIDTH: lcu->position_px.x;
+    uint32_t ibc_buffer_pos_x_c = ibc_buffer_pos_x >> 1;
+    uint32_t ibc_buffer_row     = lcu->position_px.y / LCU_WIDTH;
+
+    // If the buffer is full shift all the lines LCU_WIDTH left
+    if (lcu->position_px.x + LCU_WIDTH > IBC_BUFFER_WIDTH) {
+      for (uint32_t i = 0; i < LCU_WIDTH; i++) {
+        memmove(
+          &frame->ibc_buffer_y[ibc_buffer_row][i * IBC_BUFFER_WIDTH],
+          &frame->ibc_buffer_y[ibc_buffer_row][i * IBC_BUFFER_WIDTH + LCU_WIDTH],
+          sizeof(uvg_pixel) * (IBC_BUFFER_WIDTH - LCU_WIDTH));
+      }
+      if (state->encoder_control->chroma_format != UVG_CSP_400) {
+        for (uint32_t i = 0; i < LCU_WIDTH_C; i++) {
+          memmove(
+            &frame->ibc_buffer_u[ibc_buffer_row][i * IBC_BUFFER_WIDTH_C],
+            &frame->ibc_buffer_u[ibc_buffer_row]
+                                [i * IBC_BUFFER_WIDTH_C + LCU_WIDTH_C],
+            sizeof(uvg_pixel) * (IBC_BUFFER_WIDTH_C - LCU_WIDTH_C));
+          memmove(
+            &frame->ibc_buffer_v[ibc_buffer_row][i * IBC_BUFFER_WIDTH_C],
+            &frame->ibc_buffer_v[ibc_buffer_row]
+                                [i * IBC_BUFFER_WIDTH_C + LCU_WIDTH_C],
+            sizeof(uvg_pixel) * (IBC_BUFFER_WIDTH_C - LCU_WIDTH_C));
+        }
+      }
+    }
+
+    const uint32_t ibc_block_width = MIN(LCU_WIDTH, (state->tile->frame->width-lcu->position_px.x));
+    const uint32_t ibc_block_height = MIN(LCU_WIDTH, (state->tile->frame->height-lcu->position_px.y));
+
+    uvg_pixels_blit(&frame->rec->y[lcu->position_px.y * frame->rec->stride + lcu->position_px.x],
+                    &frame->ibc_buffer_y[ibc_buffer_row][ibc_buffer_pos_x],
+                    ibc_block_width, ibc_block_height,
+                    frame->rec->stride, IBC_BUFFER_WIDTH);
+
+    if (state->encoder_control->chroma_format != UVG_CSP_400) {
+       uvg_pixels_blit(&frame->rec->u[(lcu->position_px.y >> 1) * (frame->rec->stride >> 1) + (lcu->position_px.x >> 1)],
+                       &frame->ibc_buffer_u[ibc_buffer_row][ibc_buffer_pos_x_c],
+                       ibc_block_width>>1, ibc_block_height>>1,
+                       frame->rec->stride >> 1, IBC_BUFFER_WIDTH_C);
+       uvg_pixels_blit(&frame->rec->v[(lcu->position_px.y >> 1) * (frame->rec->stride >> 1) + (lcu->position_px.x >> 1)],
+                       &frame->ibc_buffer_v[ibc_buffer_row][ibc_buffer_pos_x_c],
+                       ibc_block_width>>1, ibc_block_height>>1,
+                       frame->rec->stride >> 1, IBC_BUFFER_WIDTH_C);
+
+     }
+  }
   
 }
 

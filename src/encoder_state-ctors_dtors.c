@@ -122,6 +122,18 @@ static int encoder_state_config_tile_init(encoder_state_t * const state,
   state->tile->frame->hmvp_lut = malloc(sizeof(cu_info_t) * height_in_lcu * MAX_NUM_HMVP_CANDS);
   state->tile->frame->hmvp_size = calloc(1, sizeof(uint8_t) * height_in_lcu);
 
+  if (state->encoder_control->cfg.ibc) {
+    // Allocate pixel buffer for each LCU row
+    state->tile->frame->ibc_buffer_y = malloc(sizeof(uvg_pixel*) * state->tile->frame->height_in_lcu);
+    state->tile->frame->ibc_buffer_u = malloc(sizeof(uvg_pixel*) * state->tile->frame->height_in_lcu);
+    state->tile->frame->ibc_buffer_v = malloc(sizeof(uvg_pixel*) * state->tile->frame->height_in_lcu);
+    for (uint32_t i = 0; i < state->tile->frame->height_in_lcu; i++) {
+      state->tile->frame->ibc_buffer_y[i] = (uvg_pixel*)malloc(IBC_BUFFER_SIZE * 3); // ToDo: we don't need this much, but it would also support 4:4:4
+      state->tile->frame->ibc_buffer_u[i] = &state->tile->frame->ibc_buffer_y[i][IBC_BUFFER_SIZE];
+      state->tile->frame->ibc_buffer_v[i] = &state->tile->frame->ibc_buffer_y[i][IBC_BUFFER_SIZE * 2];
+    }
+  }
+
   state->tile->frame->rec = NULL;
   
   state->tile->frame->source = NULL;
@@ -196,6 +208,15 @@ static void encoder_state_config_tile_finalize(encoder_state_t * const state) {
 
   FREE_POINTER(state->tile->frame->hmvp_lut);
   FREE_POINTER(state->tile->frame->hmvp_size);
+
+  if (state->encoder_control->cfg.ibc) {
+    for (uint32_t i = 0; i < state->tile->frame->height_in_lcu; i++) {
+      FREE_POINTER(state->tile->frame->ibc_buffer_y[i]);
+    }
+    FREE_POINTER(state->tile->frame->ibc_buffer_y);
+    FREE_POINTER(state->tile->frame->ibc_buffer_u);
+    FREE_POINTER(state->tile->frame->ibc_buffer_v);
+  }
 
   uvg_videoframe_free(state->tile->frame);
   state->tile->frame = NULL;

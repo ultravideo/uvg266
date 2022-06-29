@@ -179,7 +179,7 @@ static void lcu_fill_cu_info(lcu_t *lcu, int x_local, int y_local, int width, in
   }
 }
 
-static void lcu_fill_inter(lcu_t *lcu, int x_local, int y_local, int cu_width)
+static void lcu_fill_inter(lcu_t *lcu, int x_local, int y_local, int cu_width, uint8_t type)
 {
   const part_mode_t part_mode = LCU_GET_CU_AT_PX(lcu, x_local, y_local)->part_size;
   const int num_pu = uvg_part_mode_num_parts[part_mode];
@@ -191,7 +191,7 @@ static void lcu_fill_inter(lcu_t *lcu, int x_local, int y_local, int cu_width)
     const int height_pu = PU_GET_H(part_mode, cu_width, i);
 
     cu_info_t *pu  = LCU_GET_CU_AT_PX(lcu, x_pu, y_pu);
-    pu->type = CU_INTER;
+    pu->type = type;
     lcu_fill_cu_info(lcu, x_pu, y_pu, width_pu, height_pu, pu);
   }
 }
@@ -1034,7 +1034,7 @@ static double search_cu(
       lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
 
 
-    } else if (cur_cu->type == CU_INTER) {
+    } else if (cur_cu->type == CU_INTER || cur_cu->type == CU_IBC) {
 
       if (!cur_cu->skipped) {
 
@@ -1080,7 +1080,7 @@ static double search_cu(
           inter_bitcost += cur_cu->merge_idx;        
         }
       }
-      lcu_fill_inter(lcu, x_local, y_local, cu_width);
+      lcu_fill_inter(lcu, x_local, y_local, cu_width, cur_cu->type);
       lcu_fill_cbf(lcu, x_local, y_local, cu_width, cur_cu);
     }
   }

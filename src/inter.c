@@ -626,49 +626,63 @@ void uvg_inter_pred_pu(const encoder_state_t * const state,
   const int pu_h = PU_GET_H(cu->part_size, width, i_pu);
   cu_info_t *pu = LCU_GET_CU_AT_PX(lcu, SUB_SCU(pu_x), SUB_SCU(pu_y));
 
-  if (pu->inter.mv_dir == 3) {
-    const uvg_picture *const refs[2] = {
-      state->frame->ref->images[
-        state->frame->ref_LX[0][
-          pu->inter.mv_ref[0]]],
-      state->frame->ref->images[
-        state->frame->ref_LX[1][
-          pu->inter.mv_ref[1]]],
-    };
-    uvg_inter_recon_bipred(state,
-      refs[0], refs[1],
-      pu_x, pu_y,
-      pu_w, pu_h,
-      pu->inter.mv,
-      lcu,
-      predict_luma, predict_chroma);
+  if (pu->type == CU_IBC) {
+    const int offset = x_scu + y_scu * LCU_WIDTH;
+    const int offset_c = x_scu / 2 + y_scu / 2 * LCU_WIDTH_C;
+    uvg_pixels_blit(lcu->rec.y + offset, lcu->rec.y + offset, width, width, LCU_WIDTH, LCU_WIDTH);
+    uvg_pixels_blit(lcu->rec.u + offset_c, lcu->rec.joint_u + offset_c, width / 2, width / 2, LCU_WIDTH_C, LCU_WIDTH_C);
+    uvg_pixels_blit(lcu->rec.v + offset_c, lcu->rec.joint_v + offset_c, width / 2, width / 2, LCU_WIDTH_C, LCU_WIDTH_C);
+  } else {
+
+    if (pu->inter.mv_dir == 3) {
+      const uvg_picture * const refs[2] = {
+        state->frame->ref->images[state->frame->ref_LX[0][pu->inter.mv_ref[0]]],
+        state->frame->ref->images[state->frame->ref_LX[1][pu->inter.mv_ref[1]]],
+      };
+      uvg_inter_recon_bipred(
+        state,
+        refs[0],
+        refs[1],
+        pu_x,
+        pu_y,
+        pu_w,
+        pu_h,
+        pu->inter.mv,
+        lcu,
+        predict_luma,
+        predict_chroma);
+    } else {
+      const int                 mv_idx = pu->inter.mv_dir - 1;
+      const uvg_picture * const ref =
+        (cu->type == CU_IBC) ?
+          state->tile->frame->rec :
+          (state->frame->ref
+             ->images[state->frame->ref_LX[mv_idx][pu->inter.mv_ref[mv_idx]]]);
+
+      const unsigned offset_luma = SUB_SCU(pu_y) * LCU_WIDTH + SUB_SCU(pu_x);
+      const unsigned offset_chroma =
+        SUB_SCU(pu_y) / 2 * LCU_WIDTH_C + SUB_SCU(pu_x) / 2;
+      yuv_t lcu_adapter;
+      lcu_adapter.size = pu_w * pu_h;
+      lcu_adapter.y    = lcu->rec.y + offset_luma,
+      lcu_adapter.u    = lcu->rec.u + offset_chroma,
+      lcu_adapter.v    = lcu->rec.v + offset_chroma,
+
+      inter_recon_unipred(
+        state,
+        ref,
+        pu_x,
+        pu_y,
+        pu_w,
+        pu_h,
+        LCU_WIDTH,
+        pu->inter.mv[mv_idx],
+        &lcu_adapter,
+        NULL,
+        predict_luma,
+        predict_chroma);
+    }
   }
-  else {
-    const int mv_idx = pu->inter.mv_dir - 1;
-    const uvg_picture *const ref =
-      state->frame->ref->images[
-        state->frame->ref_LX[mv_idx][
-          pu->inter.mv_ref[mv_idx]]];
-
-    const unsigned offset_luma = SUB_SCU(pu_y) * LCU_WIDTH + SUB_SCU(pu_x);
-    const unsigned offset_chroma = SUB_SCU(pu_y) / 2 * LCU_WIDTH_C + SUB_SCU(pu_x) / 2;
-    yuv_t lcu_adapter;
-    lcu_adapter.size = pu_w * pu_h;
-    lcu_adapter.y = lcu->rec.y + offset_luma,
-    lcu_adapter.u = lcu->rec.u + offset_chroma,
-    lcu_adapter.v = lcu->rec.v + offset_chroma,
-
-    inter_recon_unipred(state,
-      ref,
-      pu_x, pu_y,
-      pu_w, pu_h,
-      LCU_WIDTH,
-      pu->inter.mv[mv_idx],
-      &lcu_adapter,
-      NULL,
-      predict_luma, predict_chroma);
-  }
-
   if (predict_chroma && state->encoder_control->cfg.jccr) {
     const int offset = x_scu / 2 + y_scu / 2 * LCU_WIDTH_C;
     uvg_pixels_blit(lcu->rec.u + offset, lcu->rec.joint_u + offset, width / 2, width / 2, LCU_WIDTH_C, LCU_WIDTH_C);

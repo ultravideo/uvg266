@@ -176,7 +176,6 @@ typedef int32_t mv_t;
 //! pow(2, MIN_SIZE)
 #define CU_MIN_SIZE_PIXELS (1 << MIN_SIZE)
 
-//! Round frame size up to this interval (8 pixels)
 #define CONF_WINDOW_PAD_IN_PIXELS ((1 << MIN_SIZE)<<1)
 
 //! spec: CtbSizeY
@@ -259,6 +258,9 @@ typedef int32_t mv_t;
  *
  */
 #define IBC_MRG_MAX_NUM_CANDS 6
+#define IBC_BUFFER_SIZE       (256*128)
+#define IBC_BUFFER_WIDTH      (IBC_BUFFER_SIZE / LCU_WIDTH)
+#define IBC_BUFFER_WIDTH_C    ((IBC_BUFFER_SIZE / LCU_WIDTH) >> 1)
 
 
 #define MAX_NUM_HMVP_CANDS 5

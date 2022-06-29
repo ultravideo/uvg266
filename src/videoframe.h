@@ -78,6 +78,9 @@ typedef struct videoframe
 
   int32_t poc;           //!< \brief Picture order count
   cu_info_t* hmvp_lut; //!< \brief Look-up table for HMVP, one for each LCU row
+  uvg_pixel **ibc_buffer_y; //!< \brief Intra Block Copy buffer for each LCU row 
+  uvg_pixel **ibc_buffer_u; //!< \brief Intra Block Copy buffer for each LCU row 
+  uvg_pixel **ibc_buffer_v; //!< \brief Intra Block Copy buffer for each LCU row 
 
   uint8_t* hmvp_size; //!< \brief HMVP LUT size
   bool source_lmcs_mapped; //!< \brief Indicate if source_lmcs is available and mapped to LMCS

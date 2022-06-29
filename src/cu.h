@@ -147,7 +147,7 @@ enum uvg_tree_type {
  */
 typedef struct
 {
-  uint8_t type        : 2; //!< \brief block type, one of cu_type_t values
+  uint8_t type        : 3; //!< \brief block type, one of cu_type_t values
   uint8_t depth       : 3; //!< \brief depth / size of this block
   uint8_t part_size   : 3; //!< \brief partition mode, one of part_mode_t values
   uint8_t tr_depth    : 3; //!< \brief transform depth

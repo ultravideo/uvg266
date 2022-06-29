@@ -192,9 +192,6 @@ typedef struct encoder_state_config_frame_t {
   double *c_para;
   double *k_para;
 
-
-  cu_info_t* hmvp_lut; //!< \brief Look-up table for HMVP, one for each LCU row
-  uint8_t* hmvp_size; //!< \brief HMVP LUT size
   bool jccr_sign; 
 
 } encoder_state_config_frame_t;

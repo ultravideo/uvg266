@@ -1262,95 +1262,6 @@ void uvg_encode_intra_luma_coding_unit(const encoder_state_t * const state,
   if (cabac->only_count && bits_out) *bits_out += bits;
 }
 
-/**
-static void encode_part_mode(encoder_state_t * const state,
-                             cabac_data_t * const cabac,
-                             const cu_info_t * const cur_cu,
-                             int depth)
-{
-  // Binarization from Table 9-34 of the HEVC spec:
-  //
-  //                |   log2CbSize >     |    log2CbSize ==
-  //                |   MinCbLog2SizeY   |    MinCbLog2SizeY
-  // -------+-------+----------+---------+-----------+----------
-  //  pred  | part  | AMP      | AMP     |           |
-  //  mode  | mode  | disabled | enabled | size == 8 | size > 8
-  // -------+-------+----------+---------+-----------+----------
-  //  intra | 2Nx2N |        -         - |         1          1
-  //        |   NxN |        -         - |         0          0
-  // -------+-------+--------------------+----------------------
-  //  inter | 2Nx2N |        1         1 |         1          1
-  //        |  2NxN |       01       011 |        01         01
-  //        |  Nx2N |       00       001 |        00        001
-  //        |   NxN |        -         - |         -        000
-  //        | 2NxnU |        -      0100 |         -          -
-  //        | 2NxnD |        -      0101 |         -          -
-  //        | nLx2N |        -      0000 |         -          -
-  //        | nRx2N |        -      0001 |         -          -
-  // -------+-------+--------------------+----------------------
-  //
-  //
-  // Context indices from Table 9-37 of the HEVC spec:
-  //
-  //                                      binIdx
-  //                               |  0  1  2       3
-  // ------------------------------+------------------
-  //  log2CbSize == MinCbLog2SizeY |  0  1  2  bypass
-  //  log2CbSize >  MinCbLog2SizeY |  0  1  3  bypass
-  // ------------------------------+------------------
-  double bits = 0;
-  if (cur_cu->type == CU_INTRA) {
-    if (depth == MAX_DEPTH) {
-      cabac->cur_ctx = &(cabac->ctx.part_size_model[0]);
-      if (cur_cu->part_size == SIZE_2Nx2N) {
-        CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.part_size_model[0]), 1, bits, "part_mode 2Nx2N");
-      } else {
-        CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.part_size_model[0]), 0, bits, "part_mode NxN");
-      }
-    }
-  } else {
-
-    cabac->cur_ctx = &(cabac->ctx.part_size_model[0]);
-    if (cur_cu->part_size == SIZE_2Nx2N) {
-      CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.part_size_model[0]), 1, bits, "part_mode 2Nx2N");
-      return bits;
-    }
-    CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.part_size_model[0]), 0, bits, "part_mode split");
-
-    cabac->cur_ctx = &(cabac->ctx.part_size_model[1]);
-    if (cur_cu->part_size == SIZE_2NxN ||
-        cur_cu->part_size == SIZE_2NxnU ||
-        cur_cu->part_size == SIZE_2NxnD) {
-      CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.part_size_model[1]), 1, bits, "part_mode vertical");
-    } else {
-      CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.part_size_model[1]), 0, bits, "part_mode horizontal");
-    }
-
-    if (state->encoder_control->cfg.amp_enable && depth < MAX_DEPTH) {
-      cabac->cur_ctx = &(cabac->ctx.part_size_model[3]);
-
-      if (cur_cu->part_size == SIZE_2NxN ||
-          cur_cu->part_size == SIZE_Nx2N) {
-        CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.part_size_model[3]), 1, bits, "part_mode SMP");
-        return bits;
-      }
-      CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.part_size_model[3]), 0, bits, "part_mode AMP");
-
-      if (cur_cu->part_size == SIZE_2NxnU ||
-          cur_cu->part_size == SIZE_nLx2N) {
-        CABAC_BINS_EP(cabac, 0, 1, "part_mode AMP");
-        if(cabac->only_count) bits += 1;
-      } else {
-        CABAC_BINS_EP(cabac, 1, 1, "part_mode AMP");
-        if(cabac->only_count) bits += 1;
-      }
-    }
-  }
-  return bits;
-}
-**/
-
-
 bool uvg_write_split_flag(
   const encoder_state_t * const state,
   cabac_data_t* cabac,
@@ -1684,7 +1595,7 @@ void uvg_encode_coding_tree(
   } else 
 #endif
 
-  if (cur_cu->type == CU_INTER) {
+  if (cur_cu->type == CU_INTER || cur_cu->type == CU_IBC) {
     uint8_t imv_mode = UVG_IMV_OFF;
     
     const int num_pu = uvg_part_mode_num_parts[cur_cu->part_size];
@@ -1706,10 +1617,10 @@ void uvg_encode_coding_tree(
     // 0 = off, 1 = fullpel, 2 = 4-pel, 3 = half-pel
     if (ctrl->cfg.amvr && non_zero_mvd) {
       cabac->cur_ctx = &(cabac->ctx.imv_flag[0]);
-      CABAC_BIN(cabac, (imv_mode > UVG_IMV_OFF), "imv_flag");
+      if(cur_cu->type != CU_IBC) CABAC_BIN(cabac, (imv_mode > UVG_IMV_OFF), "imv_flag");
       if (imv_mode > UVG_IMV_OFF) {
         cabac->cur_ctx = &(cabac->ctx.imv_flag[4]);
-        CABAC_BIN(cabac, (imv_mode < UVG_IMV_HPEL), "imv_flag");
+        if(cur_cu->type != CU_IBC) CABAC_BIN(cabac, (imv_mode < UVG_IMV_HPEL), "imv_flag");
         if (imv_mode < UVG_IMV_HPEL) {
           cabac->cur_ctx = &(cabac->ctx.imv_flag[1]);
           CABAC_BIN(cabac, (imv_mode > UVG_IMV_FPEL), "imv_flag"); // 1 indicates 4PEL, 0 FPEL
