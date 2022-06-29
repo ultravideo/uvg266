@@ -178,7 +178,7 @@ static bool can_use_lfnst_with_isp(const int width, const int height, const int 
     const int cu_height = tree_type != UVG_LUMA_T || depth == 4 ? height : chroma_height;
     bool can_use_lfnst_with_mip = (width >= 16 && height >= 16);
     bool is_sep_tree = depth == 4 || tree_type != UVG_BOTH_T;
-    bool mip_flag = pred_cu->type == CU_INTRA ? pred_cu->intra.mip_flag : false;
+    bool mip_flag = pred_cu->type == CU_INTRA && color == COLOR_Y ? pred_cu->intra.mip_flag : false;
 
     if ((isp_mode && !can_use_lfnst_with_isp(width, height, isp_split_type, tree_type)) ||
       (pred_cu->type == CU_INTRA && mip_flag && !can_use_lfnst_with_mip) || 
@@ -1720,8 +1720,9 @@ void uvg_encode_coding_tree(
       encode_transform_coeff(state, x, y, depth, 0, 0, 0, 0, coeff, tree_type);
     }
 
-    bool lfnst_written = encode_lfnst_idx(state, cabac, cur_cu, x, y, depth, cu_width, cu_height, tree_type, COLOR_Y);
-
+    if (tree_type != UVG_CHROMA_T) {
+      bool lfnst_written = encode_lfnst_idx(state, cabac, cur_cu, x, y, depth, cu_width, cu_height, tree_type, COLOR_Y);
+    }
     encode_mts_idx(state, cabac, cur_cu);
 
     // For 4x4 the chroma PU/TU is coded after the last 
@@ -1736,9 +1737,8 @@ void uvg_encode_coding_tree(
       tmp->lfnst_last_scan_pos = false;
       encode_transform_coeff(state, x, y, depth, 0, 0, 0, 1, coeff, tree_type);
       // Write LFNST only once for single tree structure
-      if (!lfnst_written || tree_type == UVG_CHROMA_T || depth == 4) {
-        encode_lfnst_idx(state, cabac, tmp, x, y, depth, cu_width, cu_height, tree_type, COLOR_UV);
-      }
+      encode_lfnst_idx(state, cabac, tmp, x, y, depth, cu_width, cu_height, tree_type, COLOR_UV);
+      
     }
   }
 

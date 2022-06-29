@@ -336,9 +336,12 @@ static double search_intra_trdepth(
     
     const int max_tb_size = TR_MAX_WIDTH;
     // LFNST search params
-    const int max_lfnst_idx = width > max_tb_size || height > max_tb_size ?
+    int max_lfnst_idx = width > max_tb_size || height > max_tb_size ?
                                 0 :
                                 2;
+    if(pred_cu->intra.mip_flag && (width < 16 || height < 16)) {
+      max_lfnst_idx = 0;
+    }
 
     int start_idx = 0;
     int end_idx = state->encoder_control->cfg.lfnst && depth == pred_cu->
@@ -989,7 +992,7 @@ static double count_bits(
   return bits;
 }
 
-static int16_t search_intra_rough(
+static uint8_t search_intra_rough(
   encoder_state_t * const state,
   const cu_loc_t* const cu_loc,
   uvg_pixel *orig,
@@ -1041,7 +1044,7 @@ static int16_t search_intra_rough(
   const double planar_mode_flag = CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.luma_planar_model[1]), 0);
   const double not_planar_mode_flag = CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.luma_planar_model[1]), 1);
 
-  const int mode_list_size = state->encoder_control->cfg.mip ? 6 : 3;
+  const uint8_t mode_list_size = state->encoder_control->cfg.mip ? 6 : 3;
   struct mode_cost best_six_modes[6];
   // Initial offset decides how many modes are tried before moving on to the
   // recursive search.

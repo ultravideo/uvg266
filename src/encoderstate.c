@@ -1118,6 +1118,9 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
         sub_state->tile->frame->rec = NULL;
 
         uvg_cu_array_free(&sub_state->tile->frame->cu_array);
+        if(sub_state->tile->frame->chroma_cu_array) {
+          uvg_cu_array_free(&sub_state->tile->frame->chroma_cu_array);
+        }
 
         sub_state->tile->frame->source = uvg_image_make_subimage(
             main_state->tile->frame->source,
@@ -1989,6 +1992,9 @@ void uvg_encoder_prepare(encoder_state_t *state)
 
   if (state->previous_encoder_state != state) {
     uvg_cu_array_free(&state->tile->frame->cu_array);
+    if (state->tile->frame->chroma_cu_array) {
+      uvg_cu_array_free(&state->tile->frame->chroma_cu_array);
+    }
     unsigned width  = state->tile->frame->width_in_lcu  * LCU_WIDTH;
     unsigned height = state->tile->frame->height_in_lcu * LCU_WIDTH;
     state->tile->frame->cu_array = uvg_cu_array_alloc(width, height);
@@ -2011,6 +2017,9 @@ void uvg_encoder_prepare(encoder_state_t *state)
                    prev_state->frame->poc,
                    prev_state->frame->ref_LX);
     uvg_cu_array_free(&state->tile->frame->cu_array);
+    if (state->tile->frame->chroma_cu_array) {
+      uvg_cu_array_free(&state->tile->frame->chroma_cu_array);
+    }
     unsigned height = state->tile->frame->height_in_lcu * LCU_WIDTH;
     unsigned width  = state->tile->frame->width_in_lcu  * LCU_WIDTH;
     state->tile->frame->cu_array = uvg_cu_array_alloc(width, height);
@@ -2032,6 +2041,9 @@ void uvg_encoder_prepare(encoder_state_t *state)
   state->tile->frame->rec = NULL;
 
   uvg_cu_array_free(&state->tile->frame->cu_array);
+  if (state->tile->frame->chroma_cu_array) {
+    uvg_cu_array_free(&state->tile->frame->chroma_cu_array);
+  }
 
   // Update POC and frame count.
   state->frame->num = prev_state->frame->num + 1;

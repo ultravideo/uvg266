@@ -833,8 +833,8 @@ static double search_cu(
     pu_depth_intra.max = ctrl->cfg.pu_depth_intra.max[gop_layer] >= 0 ? ctrl->cfg.pu_depth_intra.max[gop_layer] : ctrl->cfg.pu_depth_intra.max[0];
   }
   if(tree_type == UVG_CHROMA_T) {
-    pu_depth_intra.max = MIN(3, pu_depth_intra.max);
-    pu_depth_intra.min = MIN(3, pu_depth_intra.min);
+    pu_depth_intra.max = CLIP(1, 3, pu_depth_intra.max);
+    pu_depth_intra.min = CLIP(1, 3, pu_depth_intra.min);
   }
   pu_depth_inter.min = ctrl->cfg.pu_depth_inter.min[gop_layer] >= 0 ? ctrl->cfg.pu_depth_inter.min[gop_layer] : ctrl->cfg.pu_depth_inter.min[0];
   pu_depth_inter.max = ctrl->cfg.pu_depth_inter.max[gop_layer] >= 0 ? ctrl->cfg.pu_depth_inter.max[gop_layer] : ctrl->cfg.pu_depth_inter.max[0];
@@ -926,20 +926,21 @@ static double search_cu(
         intra_cost += pred_mode_type_bits * state->lambda;
       }
 #endif
+      if (state->encoder_control->cfg.cclm && tree_type != UVG_CHROMA_T && state->encoder_control->chroma_format != UVG_CSP_400) {
+        uvg_intra_recon_cu(state,
+          x, y,
+          depth, &intra_search,
+          &intra_search.pred_cu,
+          lcu, tree_type, true, false);
+
+        downsample_cclm_rec(
+          state, x, y, cu_width / 2, cu_width / 2, lcu->rec.y, lcu->left_ref.y[64]
+        );
+      }
       double intra_cost = intra_search.cost;
       if (intra_cost < cost && tree_type != UVG_LUMA_T) {
         int8_t intra_mode = intra_search.pred_cu.intra.mode;
-        if (state->encoder_control->cfg.cclm && tree_type == UVG_BOTH_T) {
-          uvg_intra_recon_cu(state,
-                             x, y,
-                             depth, &intra_search,
-                             &intra_search.pred_cu,
-                             lcu, tree_type, true, false);
 
-          downsample_cclm_rec(
-            state, x, y, cu_width / 2, cu_width / 2, lcu->rec.y, lcu->left_ref.y[64]
-          );
-        }
         // TODO: This heavily relies to square CUs
         if ((depth != 4 || (x % 8 && y % 8)) && state->encoder_control->chroma_format != UVG_CSP_400 && tree_type != UVG_LUMA_T) {
 

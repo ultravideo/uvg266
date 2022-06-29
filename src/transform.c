@@ -943,7 +943,7 @@ void uvg_inv_lfnst(
   bool is_separate_tree = depth == 4 || tree_type != UVG_BOTH_T;
   bool is_cclm_mode = (intra_mode >= 81 && intra_mode <= 83); // CCLM modes are in [81, 83]
 
-  bool is_mip = cur_cu->type == CU_INTRA ? cur_cu->intra.mip_flag : false;
+  bool is_mip = cur_cu->type == CU_INTRA && tree_type != UVG_CHROMA_T ? cur_cu->intra.mip_flag : false;
   bool is_wide_angle = false; // TODO: get wide angle mode when implemented
 
   const int cu_type = cur_cu->type;
@@ -956,7 +956,7 @@ void uvg_inv_lfnst(
     const uint32_t* scan = whge3 ? uvg_coef_top_left_diag_scan_8x8[log2_block_size] : uvg_g_sig_last_scan[scan_order][log2_block_size - 1];
     
     if (is_cclm_mode) {
-      intra_mode = cur_cu->intra.mode;
+      intra_mode = cur_cu->intra.mip_flag ? 0 : cur_cu->intra.mode;
     }
     if (is_mip) {
       intra_mode = 0; // Set to planar mode
