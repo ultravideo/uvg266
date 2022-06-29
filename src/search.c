@@ -630,7 +630,7 @@ static double cu_rd_cost_tr_split_accurate(
       if (chroma_can_use_tr_skip) {
         CABAC_FBITS_UPDATE(cabac, &cabac->ctx.transform_skip_model_chroma, tr_cu->tr_skip & 2, tr_tree_bits, "transform_skip_flag");
       }
-      coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.joint_uv[index], NULL, chroma_width, COLOR_U, scan_order, 0);
+      coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.joint_uv[index], tr_cu, chroma_width, COLOR_U, scan_order, 0);
     }
   }
 
