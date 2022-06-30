@@ -50,10 +50,10 @@ typedef unsigned (encode_coeff_nxn_func)(encoder_state_t * const state,
                                          cabac_data_t * const cabac,
                                          const coeff_t *coeff,
                                          uint8_t width,
-                                         uint8_t type,
+                                         uint8_t color,
                                          int8_t scan_mode,
                                          cu_info_t* cur_cu,
-                                         bool is_luma);
+                                         double *bits_out);
 
 // Declare function pointers.
 extern encode_coeff_nxn_func *uvg_encode_coeff_nxn;

@@ -264,14 +264,19 @@ static INLINE void uvg_filter_deblock_chroma(const encoder_control_t * const enc
  * \param dir     direction of the edge to check
  * \return        true, if the edge is a TU boundary, otherwise false
  */
-static bool is_tu_boundary(const encoder_state_t *const state,
-                           int32_t x,
-                           int32_t y,
-                           edge_dir dir)
+static bool is_tu_boundary(
+  const encoder_state_t *const state,
+  int32_t x,
+  int32_t y,
+  edge_dir dir,
+  enum uvg_tree_type tree_type)
 {
+  x >>= tree_type == UVG_CHROMA_T;
+  y >>= tree_type == UVG_CHROMA_T;
+  // if (x & 3 || y & 3) return false;
   const cu_info_t *const scu =
-    uvg_cu_array_at_const(state->tile->frame->cu_array, x, y);
-  const int tu_width = LCU_WIDTH >> scu->tr_depth;
+    uvg_cu_array_at_const(tree_type != UVG_CHROMA_T ? state->tile->frame->cu_array : state->tile->frame->chroma_cu_array, x, y);
+  const int tu_width = LCU_WIDTH >> (scu->tr_depth + (tree_type == UVG_CHROMA_T));
 
   if (dir == EDGE_HOR) {
     return (y & (tu_width - 1)) == 0;
@@ -295,28 +300,38 @@ static bool is_pu_boundary(const encoder_state_t *const state,
                            int32_t y,
                            edge_dir dir)
 {
-  const cu_info_t *const scu =
-    uvg_cu_array_at_const(state->tile->frame->cu_array, x, y);
-  // Get the containing CU.
-  const int32_t cu_width = LCU_WIDTH >> scu->depth;
-  const int32_t x_cu = x & ~(cu_width - 1);
-  const int32_t y_cu = y & ~(cu_width - 1);
-  const cu_info_t *const cu =
-    uvg_cu_array_at_const(state->tile->frame->cu_array, x_cu, y_cu);
-
-  const int num_pu = uvg_part_mode_num_parts[cu->part_size];
-  for (int i = 0; i < num_pu; i++) {
-    if (dir == EDGE_HOR) {
-      int y_pu = PU_GET_Y(cu->part_size, cu_width, y_cu, i);
-      if (y_pu == y) return true;
-
-    } else {
-      int x_pu = PU_GET_X(cu->part_size, cu_width, x_cu, i);
-      if (x_pu == x) return true;
-    }
-  }
-
+  /*
+   TODO: it appears that this function can never be true when is_tu_boundary
+   is false. Therefore it should be safe to remove this function but let's keep
+   it for now, in case some other tool requires it.
+  */
   return false;
+  //const cu_info_t *const scu =
+  //  uvg_cu_array_at_const(state->tile->frame->cu_array, x, y);
+  //// Get the containing CU.
+  //const int32_t cu_width = LCU_WIDTH >> scu->depth;
+  //const int32_t x_cu = x & ~(cu_width - 1);
+  //const int32_t y_cu = y & ~(cu_width - 1);
+  //const cu_info_t *const cu =
+  //  uvg_cu_array_at_const(state->tile->frame->cu_array, x_cu, y_cu);
+
+  //const int num_pu = uvg_part_mode_num_parts[cu->part_size];
+  //for (int i = 0; i < num_pu; i++) {
+  //  if (dir == EDGE_HOR) {
+  //    int y_pu = PU_GET_Y(cu->part_size, cu_width, y_cu, i);
+  //    if (y_pu == y) {
+  //      return true;
+  //    }
+
+  //  } else {
+  //    int x_pu = PU_GET_X(cu->part_size, cu_width, x_cu, i);
+  //    if (x_pu == x) {
+  //      return true;
+  //    }
+  //  }
+  //}
+
+  //return false;
 }
 
 
@@ -599,7 +614,8 @@ static INLINE void get_max_filter_length(uint8_t *filt_len_P, uint8_t *filt_len_
                                          const edge_dir dir, const bool transform_edge,
                                          const int tu_size_P_side, const int tu_size_Q_side,
                                          const int pu_pos, const int pu_size, 
-                                         const bool merge_flag, const color_t comp)
+                                         const bool merge_flag, const color_t comp,
+                                         enum uvg_tree_type tree_type)
 {
   //const int tu_size_P_side = 0;
   //const int tu_size_Q_side = 0;
@@ -612,10 +628,10 @@ static INLINE void get_max_filter_length(uint8_t *filt_len_P, uint8_t *filt_len_
   bool transform_edge_4x4[2] = { false, false };
   bool transform_edge_8x8[2] = { false, false };
   
-  if (pos >= 4) transform_edge_4x4[0] = is_tu_boundary(state, x - x_mul * 4, y - y_mul * 4, dir);
-  if (pos >= 8) transform_edge_8x8[0] = is_tu_boundary(state, x - x_mul * 8, y - y_mul * 8, dir);
-  if (pos + 4 < len) transform_edge_4x4[1] = is_tu_boundary(state, x + x_mul * 4, y + y_mul * 4, dir);
-  if (pos + 8 < len) transform_edge_8x8[1] = is_tu_boundary(state, x + x_mul * 8, y + y_mul * 8, dir);
+  if (pos >= 4) transform_edge_4x4[0] = is_tu_boundary(state, x - x_mul * 4, y - y_mul * 4, dir, tree_type);
+  if (pos >= 8) transform_edge_8x8[0] = is_tu_boundary(state, x - x_mul * 8, y - y_mul * 8, dir, tree_type);
+  if (pos + 4 < len) transform_edge_4x4[1] = is_tu_boundary(state, x + x_mul * 4, y + y_mul * 4, dir, tree_type);
+  if (pos + 8 < len) transform_edge_8x8[1] = is_tu_boundary(state, x + x_mul * 8, y + y_mul * 8, dir, tree_type);
 
   if (comp == COLOR_Y) {
     if (tu_size_P_side <= 4 || tu_size_Q_side <= 4){
@@ -845,8 +861,11 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
       const int pu_pos = dir == EDGE_HOR ? y_coord - PU_GET_Y(cu_q->part_size, cu_size, 0, pu_part_idx) 
                                          : x_coord - PU_GET_X(cu_q->part_size, cu_size, 0, pu_part_idx);
       get_max_filter_length(&max_filter_length_P, &max_filter_length_Q, state, x_coord, y_coord,
-                            dir, tu_boundary, LCU_WIDTH >> cu_p->tr_depth, LCU_WIDTH >> cu_q->tr_depth,
-                            pu_pos, pu_size, cu_q->merged, COLOR_Y);
+                            dir, tu_boundary,
+                            LCU_WIDTH >> cu_p->tr_depth,
+                            LCU_WIDTH >> cu_q->tr_depth,
+                            pu_pos, pu_size, cu_q->merged, COLOR_Y,
+                            UVG_LUMA_T);
 
       if (max_filter_length_P > 3) {
         is_side_P_large = dir == EDGE_HOR && y % LCU_WIDTH == 0 ? false : true;
@@ -1011,7 +1030,8 @@ static void filter_deblock_edge_chroma(encoder_state_t * const state,
                                        int32_t y,
                                        int32_t length,
                                        edge_dir dir,
-                                       bool tu_boundary)
+                                       bool tu_boundary,
+                                       enum uvg_tree_type tree_type)
 {
   const encoder_control_t * const encoder = state->encoder_control;
   const videoframe_t * const frame = state->tile->frame;
@@ -1046,30 +1066,29 @@ static void filter_deblock_edge_chroma(encoder_state_t * const state,
     const int32_t offset = (dir == EDGE_HOR) ? stride :      1;
     const int32_t step   = (dir == EDGE_HOR) ?      1 : stride;
 
-    //printf("%d %d %d %d\n", x << 1, y << 1, num_parts, dir);
-
     for (uint32_t blk_idx = 0; blk_idx < num_parts; ++blk_idx)
     {
       // CUs on both sides of the edge
       cu_info_t *cu_p;
       cu_info_t *cu_q;
-      int32_t x_coord = x << 1;
-      int32_t y_coord = y << 1;
+      int32_t x_coord = x << (tree_type != UVG_CHROMA_T);
+      int32_t y_coord = y << (tree_type != UVG_CHROMA_T);
+      cu_array_t* cua = tree_type != UVG_CHROMA_T ? frame->cu_array : frame->chroma_cu_array;
       if (dir == EDGE_VER) {
-        y_coord = (y + min_chroma_length * blk_idx) << 1;
-        cu_p = uvg_cu_array_at(frame->cu_array, x_coord - 1, y_coord);
-        cu_q = uvg_cu_array_at(frame->cu_array, x_coord    , y_coord);
+        y_coord = (y + min_chroma_length * blk_idx) << (tree_type != UVG_CHROMA_T);
+        cu_p = uvg_cu_array_at(cua, x_coord - 1, y_coord);
+        cu_q = uvg_cu_array_at(cua, x_coord    , y_coord);
 
       } else {
-        x_coord = (x + min_chroma_length * blk_idx) << 1;
-        cu_p = uvg_cu_array_at(frame->cu_array, x_coord, y_coord - 1);
-        cu_q = uvg_cu_array_at(frame->cu_array, x_coord, y_coord    );
+        x_coord = (x + min_chroma_length * blk_idx) << (tree_type != UVG_CHROMA_T);
+        cu_p = uvg_cu_array_at(cua, x_coord, y_coord - 1);
+        cu_q = uvg_cu_array_at(cua, x_coord, y_coord    );
       }
 
-      const int cu_size = LCU_WIDTH >> cu_q->depth;
-      const int pu_part_idx = ((y << 1) + PU_GET_H(cu_q->part_size, cu_size, 0) <= y_coord ?
+      const int cu_size = LCU_WIDTH >> (cu_q->depth + (tree_type == UVG_CHROMA_T));
+      const int pu_part_idx = ((y << (tree_type != UVG_CHROMA_T)) + PU_GET_H(cu_q->part_size, cu_size, 0) <= y_coord ?
                                1 + (uvg_part_mode_num_parts[cu_q->part_size] >> 2) : 0)
-                              + ((x << 1) + PU_GET_W(cu_q->part_size, cu_size, 0) <= x_coord ? 1 : 0);
+                              + ((x << (tree_type != UVG_CHROMA_T)) + PU_GET_W(cu_q->part_size, cu_size, 0) <= x_coord ? 1 : 0);
       const int pu_size = dir == EDGE_HOR ? PU_GET_H(cu_q->part_size, cu_size, pu_part_idx)
                                           : PU_GET_W(cu_q->part_size, cu_size, pu_part_idx);
       const int pu_pos = dir == EDGE_HOR ? y_coord - PU_GET_Y(cu_q->part_size, cu_size, 0, pu_part_idx)
@@ -1081,11 +1100,12 @@ static void filter_deblock_edge_chroma(encoder_state_t * const state,
       const int tu_q_size = LCU_WIDTH >> (cu_q->tr_depth + (chroma_shift));
       get_max_filter_length(&max_filter_length_P, &max_filter_length_Q, state, x_coord, y_coord,
                             dir, tu_boundary, tu_p_size, tu_q_size,
-                            pu_pos, pu_size, cu_q->merged, COLOR_U);
+                            pu_pos, pu_size, cu_q->merged, COLOR_U,
+                            tree_type);
 
 
       const bool large_boundary = (max_filter_length_P >= 3 && max_filter_length_Q >= 3);
-      const bool is_chroma_hor_CTB_boundary = (dir == EDGE_HOR && y_coord % LCU_WIDTH == 0);
+      const bool is_chroma_hor_CTB_boundary = (dir == EDGE_HOR && y_coord % (LCU_WIDTH >> (tree_type == UVG_CHROMA_T)) == 0);
       uint8_t c_strength[2] = { 0, 0 };
       
 
@@ -1173,14 +1193,16 @@ static void filter_deblock_edge_chroma(encoder_state_t * const state,
  * \param dir       direction of the edges to filter
  * \param tu_boundary   whether the edge is a TU boundary
  */
-static void filter_deblock_unit(encoder_state_t * const state,
-                                int x,
-                                int y,
-                                int width,
-                                int height,
-                                edge_dir dir,
-                                bool tu_boundary, 
-                                bool previous_ctu)
+static void filter_deblock_unit(
+  encoder_state_t * const state,
+  int x,
+  int y,
+  int width,
+  int height,
+  edge_dir dir,
+  bool tu_boundary,
+  bool previous_ctu,
+  enum uvg_tree_type tree_type)
 {
   // no filtering on borders (where filter would use pixels outside the picture)
   if (x == 0 && dir == EDGE_VER) return;
@@ -1206,14 +1228,18 @@ static void filter_deblock_unit(encoder_state_t * const state,
     length   = height;
   }
 
-  filter_deblock_edge_luma(state, x, y, length, dir, tu_boundary);
+  if(tree_type != UVG_CHROMA_T) {
+    filter_deblock_edge_luma(state, x, y, length, dir, tu_boundary);
+  }
 
   // Chroma pixel coordinates.
   const int32_t x_c = x >> 1;
   const int32_t y_c = y >> 1;
-  if (state->encoder_control->chroma_format != UVG_CSP_400 && (is_on_8x8_grid(x_c, y_c, dir && (x_c + 4) % 32) 
-                                                               || (x == state->tile->frame->width - 8 && dir == 1 && y_c % 8 == 0))) {
-    filter_deblock_edge_chroma(state, x_c, y_c, length, dir, tu_boundary);
+  if (state->encoder_control->chroma_format != UVG_CSP_400 && 
+    (is_on_8x8_grid(x_c, y_c, dir && (x_c + 4) % 32)
+     || (x == state->tile->frame->width - 8 && dir == 1 && y_c % 8 == 0)) 
+    && tree_type != UVG_LUMA_T) {
+    filter_deblock_edge_chroma(state, x_c, y_c, length, dir, tu_boundary, tree_type);
   }
 }
 
@@ -1238,11 +1264,17 @@ static void filter_deblock_lcu_inside(encoder_state_t * const state,
   const int end_x = MIN(x + LCU_WIDTH, state->tile->frame->width);
   const int end_y = MIN(y + LCU_WIDTH, state->tile->frame->height);
 
+  const enum uvg_tree_type luma_tree = state->frame->is_irap && state->encoder_control->cfg.dual_tree ? UVG_LUMA_T : UVG_BOTH_T;
+  const enum uvg_tree_type chroma_tree = state->frame->is_irap && state->encoder_control->cfg.dual_tree ? UVG_CHROMA_T : UVG_BOTH_T;
+
   for (int edge_y = y; edge_y < end_y; edge_y += 4) {
     for (int edge_x = x; edge_x < end_x; edge_x += 4) {
-      bool tu_boundary = is_tu_boundary(state, edge_x, edge_y, dir);
+      bool tu_boundary = is_tu_boundary(state, edge_x, edge_y, dir, luma_tree);
       if (tu_boundary || is_pu_boundary(state, edge_x, edge_y, dir)) {
-        filter_deblock_unit(state, edge_x, edge_y, 4, 4, dir, tu_boundary, edge_x < x);
+        filter_deblock_unit(state, edge_x, edge_y, 4, 4, dir, tu_boundary, edge_x < x, luma_tree);
+      }
+      if(chroma_tree == UVG_CHROMA_T && is_tu_boundary(state, edge_x, edge_y, dir, chroma_tree)) {
+        filter_deblock_unit(state, edge_x, edge_y, 4, 4, dir, tu_boundary, edge_x < x, chroma_tree);        
       }
     }
   }
@@ -1261,13 +1293,15 @@ static void filter_deblock_lcu_rightmost(encoder_state_t * const state,
                                          int32_t y_px)
 {
   // Luma
+  const enum uvg_tree_type luma_tree = state->frame->is_irap && state->encoder_control->cfg.dual_tree ? UVG_LUMA_T : UVG_BOTH_T;
+  const enum uvg_tree_type chroma_tree = state->frame->is_irap && state->encoder_control->cfg.dual_tree ? UVG_CHROMA_T : UVG_BOTH_T;
+
   const int end = MIN(y_px + LCU_WIDTH, state->tile->frame->height);
   for (int x = x_px - 8; x < x_px; x += 4) {
     for (int y = y_px; y < end; y += 4) {
       // The top edge of the whole frame is not filtered.
-      bool tu_boundary = is_tu_boundary(state, x, y, EDGE_HOR);
-      bool pu_boundary = is_pu_boundary(state, x, y, EDGE_HOR);
-      if (y > 0 && (tu_boundary || pu_boundary)) {
+      bool tu_boundary = is_tu_boundary(state, x, y, EDGE_HOR, luma_tree);
+      if (y > 0 && (tu_boundary || is_pu_boundary(state, x, y, EDGE_HOR))) {
         filter_deblock_edge_luma(state, x, y, 4, EDGE_HOR, tu_boundary);
       }
     }
@@ -1281,10 +1315,9 @@ static void filter_deblock_lcu_rightmost(encoder_state_t * const state,
     const int end_c = MIN(y_px_c + LCU_WIDTH_C, state->tile->frame->height >> 1);
     for (int y_c = y_px_c; y_c < end_c; y_c += 8) {
       // The top edge of the whole frame is not filtered.
-      bool tu_boundary = is_tu_boundary(state, x_c << 1, y_c << 1, EDGE_HOR);
-      bool pu_boundary = is_pu_boundary(state, x_c << 1, y_c << 1, EDGE_HOR);
-      if (y_c > 0 && (tu_boundary || pu_boundary)) {
-        filter_deblock_edge_chroma(state, x_c , y_c, 4, EDGE_HOR, tu_boundary);
+      bool tu_boundary = is_tu_boundary(state, x_c << 1, y_c << 1, EDGE_HOR, chroma_tree);
+      if (y_c > 0 && (tu_boundary || is_pu_boundary(state, x_c << 1, y_c << 1, EDGE_HOR))) {
+        filter_deblock_edge_chroma(state, x_c , y_c, 4, EDGE_HOR, tu_boundary, chroma_tree);
       }
     }
   }
@@ -1325,7 +1358,6 @@ static void filter_deblock_lcu_rightmost(encoder_state_t * const state,
 void uvg_filter_deblock_lcu(encoder_state_t * const state, int x_px, int y_px)
 {
   assert(!state->encoder_control->cfg.lossless);
-
   filter_deblock_lcu_inside(state, x_px, y_px, EDGE_VER);
   if (x_px > 0) {
     filter_deblock_lcu_rightmost(state, x_px, y_px);

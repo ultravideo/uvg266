@@ -73,6 +73,7 @@ typedef struct
     cabac_ctx_t alf_cc_filter_control_flag[6];
     cabac_ctx_t sao_merge_flag_model;
     cabac_ctx_t sao_type_idx_model;
+    cabac_ctx_t lfnst_idx_model[3];
     cabac_ctx_t mts_idx_model[4];
     cabac_ctx_t split_flag_model[9]; //!< \brief split flag context models
     cabac_ctx_t qt_split_flag_model[6]; //!< \brief qt split flag context models
@@ -139,7 +140,7 @@ void uvg_cabac_encode_bins_ep(cabac_data_t *data, uint32_t bin_values, int num_b
 void uvg_cabac_encode_bin_trm(cabac_data_t *data, uint8_t bin_value);
 void uvg_cabac_write(cabac_data_t *data);
 void uvg_cabac_finish(cabac_data_t *data);
-void uvg_cabac_write_coeff_remain(cabac_data_t *cabac, uint32_t symbol,
+int uvg_cabac_write_coeff_remain(cabac_data_t *cabac, uint32_t symbol,
                               uint32_t r_param, const unsigned int cutoff);
 uint32_t uvg_cabac_write_ep_ex_golomb(struct encoder_state_t * const state, cabac_data_t *data,
                 uint32_t symbol, uint32_t count);

@@ -284,6 +284,13 @@ static const uint8_t INIT_SAO_MERGE_FLAG[4] = { 2, 60, 60, 0 };
 
 static const uint8_t INIT_SAO_TYPE_IDX[4] = { 2, 5, 13, 4 };
 
+static const uint8_t INIT_LFNST_IDX[4][3] = {
+  {  52,  37,  27, },
+  {  37,  45,  27, },
+  {  28,  52,  42, },
+  {   9,   9,  10, },
+};
+
 static const uint8_t INIT_MTS_IDX[4][4] = {
   {  45,  25,  27,   0, },
   {  45,  40,  27,   0, },
@@ -464,6 +471,7 @@ void uvg_ctx_init(cabac_ctx_t *ctx, int32_t qp, int32_t init_value, uint8_t rate
 void uvg_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
 {
   cabac_data_t * const cabac = &state->cabac;
+  memset(&state->cabac.ctx, 0, sizeof(state->cabac.ctx));
   uint16_t i, ii;
 
   // Initialize contexts
@@ -502,7 +510,8 @@ void uvg_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
 
   for (i = 0; i < 3; i++) {
     uvg_ctx_init(&cabac->ctx.cu_skip_flag_model[i], QP, INIT_SKIP_FLAG[slice][i], INIT_SKIP_FLAG[3][i]);
-    uvg_ctx_init(&cabac->ctx.joint_cb_cr[i], QP, INIT_JOINT_CB_CR_FLAG[slice][i], INIT_JOINT_CB_CR_FLAG[3][i]);   
+    uvg_ctx_init(&cabac->ctx.joint_cb_cr[i], QP, INIT_JOINT_CB_CR_FLAG[slice][i], INIT_JOINT_CB_CR_FLAG[3][i]);  
+    uvg_ctx_init(&cabac->ctx.lfnst_idx_model[i], QP, INIT_LFNST_IDX[slice][i], INIT_LFNST_IDX[3][i]);
     uvg_ctx_init(&cabac->ctx.transform_skip_sig_coeff_group[i], QP, INIT_TRANSFORM_SKIP_SIG_COEFF_GROUP[slice][i], INIT_TRANSFORM_SKIP_SIG_COEFF_GROUP[3][i]);
     uvg_ctx_init(&cabac->ctx.transform_skip_sig[i], QP, INIT_TRANSFORM_SKIP_SIG[slice][i], INIT_TRANSFORM_SKIP_SIG[3][i]);
   }

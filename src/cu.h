@@ -134,6 +134,13 @@ typedef struct {
   int y;
 } vector2d_t;
 
+
+enum uvg_tree_type {
+  UVG_BOTH_T = 0,
+  UVG_LUMA_T = 1,
+  UVG_CHROMA_T = 2
+};
+
 /**
  * \brief Struct for CU info
  */
@@ -146,7 +153,7 @@ typedef struct
   uint8_t skipped     : 1; //!< \brief flag to indicate this block is skipped
   uint8_t merged      : 1; //!< \brief flag to indicate this block is merged
   uint8_t merge_idx   : 3; //!< \brief merge index
-  uint8_t tr_skip     : 1; //!< \brief transform skip flag
+  uint8_t tr_skip     : 3; //!< \brief transform skip flag
   uint8_t tr_idx      : 3; //!< \brief transform index
   uint8_t joint_cb_cr : 3; //!< \brief joint chroma residual coding 
 
@@ -159,10 +166,16 @@ typedef struct
    */
   uint8_t qp;
 
-  uint8_t bdpcmMode;
+  uint8_t bdpcmMode : 1;
 
-  bool violates_mts_coeff_constraint;
-  bool mts_last_scan_pos;
+  uint8_t violates_mts_coeff_constraint : 1;
+  uint8_t mts_last_scan_pos : 1;
+
+  uint8_t violates_lfnst_constrained_luma : 1; // Two types, luma and chroma. Luma index is 0.
+  uint8_t violates_lfnst_constrained_chroma : 1; // Two types, luma and chroma. Luma index is 0.
+  uint8_t lfnst_last_scan_pos : 1;
+  uint8_t lfnst_idx : 2;
+  uint8_t cr_lfnst_idx : 2;
 
   union {
     struct {
@@ -225,16 +238,17 @@ typedef struct {
 typedef struct cu_array_t {
   struct cu_array_t *base; //!< \brief base cu array or NULL
   cu_info_t *data;  //!< \brief cu array
-  int32_t width;    //!< \brief width of the array in pixels
-  int32_t height;   //!< \brief height of the array in pixels
-  int32_t stride;   //!< \brief stride of the array in pixels
-  int32_t refcount; //!< \brief number of references to this cu_array
+  uint32_t width;    //!< \brief width of the array in pixels
+  uint32_t height;   //!< \brief height of the array in pixels
+  uint32_t stride;   //!< \brief stride of the array in pixels
+  uint32_t refcount; //!< \brief number of references to this cu_array
 } cu_array_t;
 
 cu_info_t* uvg_cu_array_at(cu_array_t *cua, unsigned x_px, unsigned y_px);
 const cu_info_t* uvg_cu_array_at_const(const cu_array_t *cua, unsigned x_px, unsigned y_px);
 
 cu_array_t * uvg_cu_array_alloc(const int width, const int height);
+cu_array_t* uvg_cu_array_chroma_alloc(const int width, const int height, enum uvg_chroma_format chroma);
 cu_array_t * uvg_cu_subarray(cu_array_t *base,
                              const unsigned x_offset,
                              const unsigned y_offset,
@@ -251,6 +265,7 @@ cu_array_t * uvg_cu_array_copy_ref(cu_array_t* cua);
  * of the containing LCU.
  */
 #define SUB_SCU(xy) ((xy) & (LCU_WIDTH - 1))
+#define SUB_SCU_TREE(xy, t) ((xy) & (((t) != KVZ_CHROMA_T ? LCU_WIDTH : LCU_WIDTH_C) - 1))
 
 #define LCU_CU_WIDTH 16
 #define LCU_T_CU_WIDTH (LCU_CU_WIDTH + 1)
@@ -366,7 +381,8 @@ typedef struct {
   cu_info_t cu[LCU_T_CU_WIDTH * LCU_T_CU_WIDTH + 1];
 } lcu_t;
 
-void uvg_cu_array_copy_from_lcu(cu_array_t* dst, int dst_x, int dst_y, const lcu_t *src);
+void uvg_cu_array_copy_from_lcu(cu_array_t* dst, int dst_x, int dst_y, const lcu_t *src, enum uvg_tree_type
+                                tree_type);
 
 /**
  * \brief Return pointer to the top right reference CU.

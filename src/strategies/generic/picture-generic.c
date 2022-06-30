@@ -190,6 +190,9 @@ static int32_t hadamard_4x4_generic(int32_t diff[4*4])
   for (int i = 0; i < 16; i++) {
     satd += abs(d[i]);
   }
+
+  satd -= abs(d[0]);
+  satd += abs(d[0]) >> 2;
   satd = ((satd + 1) >> 1);
 
   return satd;
@@ -334,7 +337,11 @@ static unsigned satd_8x8_subblock_generic(const uvg_pixel * piOrg, const int32_t
     sad += abs(((int*)m2)[i]);
   }
 
+
+  sad -= abs(m2[0][0]);
+  sad += abs(m2[0][0]) >> 2;
   sad = (sad + 2) >> 2;
+  
 
   return sad;
 }
@@ -375,7 +382,7 @@ static void satd_ ## n ## x ## n ## _dual_generic( \
   for (y = 0; y < (n); y += 8) { \
   unsigned row = y * (n); \
   for (x = 0; x < (n); x += 8) { \
-  sum += satd_8x8_subblock_generic(&preds[0][row + x], (n), &orig[row + x], (n)); \
+  sum += satd_8x8_subblock_generic(&orig[row + x], (n), &preds[0][row + x], (n)); \
   } \
   } \
   costs_out[0] = sum>>(UVG_BIT_DEPTH-8); \
@@ -384,7 +391,7 @@ static void satd_ ## n ## x ## n ## _dual_generic( \
   for (y = 0; y < (n); y += 8) { \
   unsigned row = y * (n); \
   for (x = 0; x < (n); x += 8) { \
-  sum += satd_8x8_subblock_generic(&preds[1][row + x], (n), &orig[row + x], (n)); \
+  sum += satd_8x8_subblock_generic(&orig[row + x], (n), &preds[1][row + x], (n)); \
   } \
   } \
   costs_out[1] = sum>>(UVG_BIT_DEPTH-8); \
@@ -774,6 +781,18 @@ static double pixel_var_generic(const uvg_pixel *arr, const uint32_t len)
   return var;
 }
 
+
+static void generate_residual_generic(const uvg_pixel* ref_in, const uvg_pixel* pred_in, int16_t* residual, 
+  int width, int ref_stride, int pred_stride)
+{
+  int y, x;
+  for (y = 0; y < width; ++y) {
+    for (x = 0; x < width; ++x) {
+      residual[x + y * width] = (int16_t)(ref_in[x + y * ref_stride] - pred_in[x + y * pred_stride]);
+    }
+  }
+}
+
 int uvg_strategy_register_picture_generic(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
@@ -814,6 +833,8 @@ int uvg_strategy_register_picture_generic(void* opaque, uint8_t bitdepth)
   success &= uvg_strategyselector_register(opaque, "hor_sad", "generic", 0, &hor_sad_generic);
 
   success &= uvg_strategyselector_register(opaque, "pixel_var", "generic", 0, &pixel_var_generic);
+
+  success &= uvg_strategyselector_register(opaque, "generate_residual", "generic", 0, &generate_residual_generic);
 
   return success;
 }

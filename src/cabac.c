@@ -315,15 +315,17 @@ void uvg_cabac_encode_bins_ep(cabac_data_t * const data, uint32_t bin_values, in
  * \param remainder Value of remaining abs coeff
  * \param rice_param Reference to Rice parameter.
  */
-void uvg_cabac_write_coeff_remain(cabac_data_t * const cabac, const uint32_t remainder, const uint32_t rice_param, const unsigned int cutoff)
+int uvg_cabac_write_coeff_remain(cabac_data_t * const cabac, const uint32_t remainder, const uint32_t rice_param, const unsigned int cutoff)
 {
   const unsigned threshold = cutoff << rice_param;
   uint32_t bins = remainder;
-
+  uint32_t bits = 0;
   if (bins < threshold) {
     uint32_t length = (bins >> rice_param) + 1;
     CABAC_BINS_EP(cabac, ((1 << (length)) - 2) , length, "coeff_abs_level_remaining");
     CABAC_BINS_EP(cabac, bins & ((1 << rice_param) - 1), rice_param, "coeff_abs_level_remaining");
+    bits += length;
+    bits += rice_param;
   } else {
     const unsigned max_prefix_length = 32 - cutoff - 15/*max_log2_tr_dynamic_range*/;
     unsigned prefix_length = 0;
@@ -344,8 +346,9 @@ void uvg_cabac_write_coeff_remain(cabac_data_t * const cabac, const uint32_t rem
     const unsigned suffix = ((code_value - ((1 << prefix_length) - 1)) << rice_param) | (bins & bit_mask);
     CABAC_BINS_EP(cabac, prefix, total_prefix_length, "coeff_abs_level_remaining");
     CABAC_BINS_EP(cabac, suffix, suffix_length, "coeff_abs_level_remaining");
+    bits += total_prefix_length + suffix_length;
   }
-
+  return bits;
 }
 
 

@@ -70,6 +70,7 @@ typedef struct {
   double bits;
   double coeff_bits;
   double distortion;
+  double lfnst_costs[3];
 } intra_search_data_t ;
 
 
@@ -132,8 +133,9 @@ void uvg_intra_predict(
   const color_t color,
   uvg_pixel* dst,
   const intra_search_data_t* data,
-  const lcu_t* lcu
-);
+  const lcu_t* lcu,
+  enum uvg_tree_type tree_type
+  );
 
 void uvg_intra_recon_cu(
   encoder_state_t* const state,
@@ -142,6 +144,18 @@ void uvg_intra_recon_cu(
   int depth,
   intra_search_data_t* search_data,
   cu_info_t *cur_cu,
-  lcu_t *lcu);
+  lcu_t *lcu,
+  enum uvg_tree_type tree_type,
+  bool recon_luma,
+  bool recon_chroma);
+
+const cu_info_t* uvg_get_co_located_luma_cu(
+  int x,
+  int y,
+  int width,
+  int height,
+  const lcu_t* const lcu,
+  const cu_array_t* const cu_array,
+  enum uvg_tree_type tree_type);
 
 int uvg_get_mip_flag_context(int x, int y, int width, int height, const lcu_t* lcu, cu_array_t* const cu_a);

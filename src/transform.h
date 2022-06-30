@@ -67,6 +67,23 @@ void uvg_itransform2d(const encoder_control_t * const encoder,
 
 int32_t uvg_get_scaled_qp(color_t color, int8_t qp, int8_t qp_offset, int8_t const* const chroma_scale);
 
+void uvg_derive_lfnst_constraints(
+  cu_info_t* const pred_cu,
+  const int depth,
+  bool* constraints,
+  const coeff_t* coeff,
+  const int width,
+  const int height);
+
+typedef struct {
+  double best_u_cost;
+  double best_v_cost;
+  double best_combined_cost;
+  int best_u_index;
+  int best_v_index;
+  int best_combined_index;
+} uvg_chorma_ts_out_t;
+
 void uvg_quantize_lcu_residual(
   encoder_state_t *state,
   bool luma,
@@ -77,6 +94,51 @@ void uvg_quantize_lcu_residual(
   uint8_t depth,
   cu_info_t *cur_cu,
   lcu_t* lcu,
-  bool early_skip);
+  bool early_skip,
+  enum uvg_tree_type tree_type);
+
+void uvg_chroma_transform_search(
+  encoder_state_t* const state,
+  int depth,
+  lcu_t* const lcu,
+  cabac_data_t* temp_cabac,
+  int8_t width,
+  int8_t height,
+  const int offset,
+  const uint8_t mode,
+  cu_info_t* pred_cu,
+  uvg_pixel u_pred[1024],
+  uvg_pixel v_pred[1024],
+  int16_t u_resi[1024],
+  int16_t v_resi[1024],
+  uvg_chorma_ts_out_t* chorma_ts_out,
+  enum uvg_tree_type tree_type);
+
+enum uvg_chroma_transforms {
+  DCT7_CHROMA = 0,
+  CHROMA_TS = 4,
+  NO_RESIDUAL = 8,
+  JCCR_1 = 1,
+  JCCR_2 = 2,
+  JCCR_3 = 3,
+};
+
+void uvg_fwd_lfnst(
+  const cu_info_t* const cur_cu,
+  const int width,
+  const int height,
+  const color_t color,
+  const uint16_t lfnst_idx,
+  coeff_t *coeffs,
+  enum uvg_tree_type tree_type);
+
+void uvg_inv_lfnst(
+  const cu_info_t* cur_cu,
+  const int width,
+  const int height,
+  const color_t color,
+  const uint16_t lfnst_idx,
+  coeff_t* coeffs,
+  enum uvg_tree_type tree_type);
 
 #endif

@@ -491,8 +491,9 @@ static void predict_cclm(
   const lcu_t* const lcu,
   uvg_intra_references* chroma_ref,
   uvg_pixel* dst,
-  cclm_parameters_t* cclm_params
-)
+  cclm_parameters_t* cclm_params,
+  enum uvg_tree_type tree_type
+  )
 {
   assert(mode == LM_CHROMA_IDX || mode == LM_CHROMA_L_IDX || mode == LM_CHROMA_T_IDX);
   assert(state->encoder_control->cfg.cclm);
@@ -516,12 +517,15 @@ static void predict_cclm(
   // The luma reference is only needed when we are not on the edge of the picture.
   // Because the reference pixels that are needed on the edge of the ctu this code
   // is kinda messy but what can you do
+  const int ctu_size = tree_type == UVG_CHROMA_T ? LCU_WIDTH_C : LCU_WIDTH;
 
   if (y0) {
+    if (y_scu == 0) available_above_right = MIN(MIN(width / 2, (64-x_scu - width * 2) / 2), (state->tile->frame->width - x0 - width* 2) / 2);
     for (; available_above_right < width / 2; available_above_right++) {
       int x_extension = x_scu + width * 2 + 4 * available_above_right;
-      const cu_info_t* pu = LCU_GET_CU_AT_PX(lcu, x_extension, y_scu - 4);
-      if (x_extension >= LCU_WIDTH || pu->type == CU_NOTSET) break;
+      x_extension >>= tree_type == UVG_CHROMA_T;
+      const cu_info_t* pu = LCU_GET_CU_AT_PX(lcu, x_extension, (y_scu >> (tree_type==UVG_CHROMA_T)) - 4);
+      if (x_extension >= ctu_size || pu->type == CU_NOTSET || (pu->type == CU_INTRA && pu->intra.mode_chroma == -1)) break;
     }
     if(y_scu == 0) {
       if(!state->encoder_control->cfg.wpp) available_above_right = MIN(width / 2, (state->tile->frame->width - x0 - width * 2) / 4);
@@ -543,10 +547,12 @@ static void predict_cclm(
   }
 
   if(x0) {
+    if (x_scu == 0) available_left_below = MIN(MIN(width / 2, (64 - y_scu - height * 2) / 2), (state->tile->frame->height - y0 - height * 2) / 2);
     for (; available_left_below < height / 2; available_left_below++) {
       int y_extension = y_scu + height * 2 + 4 * available_left_below;
-      const cu_info_t* pu = LCU_GET_CU_AT_PX(lcu, x_scu - 4, y_extension);
-      if (y_extension >= LCU_WIDTH || pu->type == CU_NOTSET) break;
+      y_extension >>= tree_type == UVG_CHROMA_T;
+      const cu_info_t* pu = LCU_GET_CU_AT_PX(lcu, (x_scu >> (tree_type == UVG_CHROMA_T)) - 4, y_extension);
+      if (y_extension >= ctu_size || pu->type == CU_NOTSET || (pu->type == CU_INTRA && pu->intra.mode_chroma == -1)) break;
       if(x_scu == 32 && y_scu == 0 && pu->depth == 0) break;
     }
     for(int i = 0; i < height + available_left_below * 2; i++) {
@@ -583,7 +589,7 @@ int uvg_get_mip_flag_context(int x, int y, int width, int height, const lcu_t* l
       left = LCU_GET_CU_AT_PX(lcu, x_local - 1, y_local); 
     }
     if (y) {
-      top = LCU_GET_CU_AT_PX(lcu, x_local - 1, y_local); 
+      top = LCU_GET_CU_AT_PX(lcu, x_local, y_local - 1); 
     }
   }
   else {
@@ -1374,7 +1380,8 @@ void uvg_intra_predict(
   const color_t color,
   uvg_pixel* dst,
   const intra_search_data_t* data,
-  const lcu_t* lcu
+  const lcu_t* lcu,
+  enum uvg_tree_type tree_type
   )
 {
   const int stride = (((state->tile->frame->width + 7) & ~7) + FRAME_PADDING_LUMA);
@@ -1392,7 +1399,6 @@ void uvg_intra_predict(
     }
     else {
       use_mip = state->encoder_control->chroma_format == UVG_CSP_444;
-      intra_mode = use_mip ? intra_mode : 0;
     }
   }
   if (intra_mode < 68) {
@@ -1409,11 +1415,36 @@ void uvg_intra_predict(
     if (data->pred_cu.depth != data->pred_cu.tr_depth || data->cclm_parameters[color == COLOR_U ? 0 : 1].b <= 0) {
       predict_cclm(
         state, color, width, width, x, y, stride, intra_mode, lcu, refs, dst, 
-        (cclm_parameters_t*)&data->cclm_parameters[color == COLOR_U ? 0 : 1]);
+        (cclm_parameters_t*)&data->cclm_parameters[color == COLOR_U ? 0 : 1],
+        tree_type);
     }
     else {
       linear_transform_cclm(&data->cclm_parameters[color == COLOR_U ? 0 : 1], dst, dst, width, width);
     }
+  }
+}
+
+// This function works on luma coordinates 
+const cu_info_t* uvg_get_co_located_luma_cu(
+  int x,
+  int y,
+  int width,
+  int height,
+  const lcu_t* const lcu,
+  const cu_array_t* const cu_array,
+  enum uvg_tree_type tree_type)
+{
+  assert((cu_array || lcu) && !(cu_array && lcu));
+  assert(tree_type != UVG_LUMA_T && "Luma only CU shouldn't need colocated luma CU");
+  if(tree_type == UVG_CHROMA_T) {
+    x += width >> 1;
+    y += height >> 1;
+  }
+  if(cu_array) {
+    return uvg_cu_array_at_const(cu_array, x, y);
+  }
+  else {
+    return LCU_GET_CU_AT_PX(lcu, SUB_SCU(x), SUB_SCU(y));
   }
 }
 
@@ -1425,7 +1456,8 @@ static void intra_recon_tb_leaf(
   int depth,
   lcu_t *lcu,
   color_t color,
-  const intra_search_data_t* search_data)
+  const intra_search_data_t* search_data,
+  enum uvg_tree_type tree_type)
 {
   const uvg_config *cfg = &state->encoder_control->cfg;
   const int shift = color == COLOR_Y ? 0 : 1;
@@ -1477,7 +1509,7 @@ static void intra_recon_tb_leaf(
     width, height,
   };
 
-  uvg_intra_predict(state, &refs, &loc, color, pred, search_data, lcu);
+  uvg_intra_predict(state, &refs, &loc, color, pred, search_data, lcu, tree_type);
 
   const int index = lcu_px.x + lcu_px.y * lcu_width;
   uvg_pixel *block = NULL;
@@ -1525,33 +1557,28 @@ void uvg_intra_recon_cu(
   int depth,
   intra_search_data_t* search_data,
   cu_info_t *cur_cu,
-  lcu_t *lcu)
+  lcu_t *lcu,
+  enum uvg_tree_type tree_type,
+  bool recon_luma,
+  bool recon_chroma)
 {
-  const vector2d_t lcu_px = { SUB_SCU(x), SUB_SCU(y) };
+  const vector2d_t lcu_px = { SUB_SCU(x) >> (tree_type == UVG_CHROMA_T), SUB_SCU(y) >> (tree_type == UVG_CHROMA_T) };
   const int8_t width = LCU_WIDTH >> depth;
   if (cur_cu == NULL) {
     cur_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
   }
-  const int8_t mode_luma = search_data->pred_cu.intra.mode;
-  const int8_t mode_chroma= search_data->pred_cu.intra.mode_chroma;
 
-  if(mode_chroma != -1 && mode_luma == -1) {
+  if(!recon_luma && recon_chroma) {
     x &= ~7;
     y &= ~7;
   }
   
-  if (mode_luma != -1 && mode_chroma != -1) {
-    if (search_data->pred_cu.intra.mip_flag) {
-      assert(mode_luma == mode_chroma && "Chroma mode must be derived from luma mode if block uses MIP.");
-    }
-  }
-
   // Reset CBFs because CBFs might have been set
   // for depth earlier
-  if (mode_luma >= 0) {
+  if (recon_luma) {
     cbf_clear(&cur_cu->cbf, depth, COLOR_Y);
   }
-  if (mode_chroma >= 0) {
+  if (recon_chroma) {
     cbf_clear(&cur_cu->cbf, depth, COLOR_U);
     cbf_clear(&cur_cu->cbf, depth, COLOR_V);
   }
@@ -1562,40 +1589,42 @@ void uvg_intra_recon_cu(
     const int32_t x2 = x + offset;
     const int32_t y2 = y + offset;
 
-    uvg_intra_recon_cu(state, x,   y,   depth + 1, search_data, NULL, lcu);
-    uvg_intra_recon_cu(state, x2,  y,   depth + 1, search_data, NULL, lcu);
-    uvg_intra_recon_cu(state, x,   y2,  depth + 1, search_data, NULL, lcu);
-    uvg_intra_recon_cu(state, x2,  y2,  depth + 1, search_data, NULL, lcu);
+    uvg_intra_recon_cu(state, x,   y,   depth + 1, search_data, NULL, lcu, tree_type, recon_luma, recon_chroma);
+    uvg_intra_recon_cu(state, x2,  y,   depth + 1, search_data, NULL, lcu, tree_type, recon_luma, recon_chroma);
+    uvg_intra_recon_cu(state, x,   y2,  depth + 1, search_data, NULL, lcu, tree_type, recon_luma, recon_chroma);
+    uvg_intra_recon_cu(state, x2,  y2,  depth + 1, search_data, NULL, lcu, tree_type, recon_luma, recon_chroma);
 
     // Propagate coded block flags from child CUs to parent CU.
     uint16_t child_cbfs[3] = {
-      LCU_GET_CU_AT_PX(lcu, lcu_px.x + offset, lcu_px.y         )->cbf,
-      LCU_GET_CU_AT_PX(lcu, lcu_px.x,          lcu_px.y + offset)->cbf,
-      LCU_GET_CU_AT_PX(lcu, lcu_px.x + offset, lcu_px.y + offset)->cbf,
+      LCU_GET_CU_AT_PX(lcu, (lcu_px.x + offset) >> (tree_type == UVG_CHROMA_T), lcu_px.y >> (tree_type == UVG_CHROMA_T))->cbf,
+      LCU_GET_CU_AT_PX(lcu, lcu_px.x >> (tree_type == UVG_CHROMA_T), (lcu_px.y + offset) >> (tree_type == UVG_CHROMA_T))->cbf,
+      LCU_GET_CU_AT_PX(lcu, (lcu_px.x + offset) >> (tree_type == UVG_CHROMA_T), (lcu_px.y + offset) >> (tree_type == UVG_CHROMA_T))->cbf,
     };
 
-    if (mode_luma != -1 && depth <= MAX_DEPTH) {
+    if (recon_luma && depth <= MAX_DEPTH) {
       cbf_set_conditionally(&cur_cu->cbf, child_cbfs, depth, COLOR_Y);
     }
-    if (mode_chroma != -1 && depth <= MAX_DEPTH) {
+    if (recon_chroma && depth <= MAX_DEPTH) {
       cbf_set_conditionally(&cur_cu->cbf, child_cbfs, depth, COLOR_U);
       cbf_set_conditionally(&cur_cu->cbf, child_cbfs, depth, COLOR_V);
     }
   } else {
-    const bool has_luma = mode_luma != -1;
-    const bool has_chroma = mode_chroma != -1 &&  (x % 8 == 0 && y % 8 == 0);
+    const bool has_luma = recon_luma;
+    const bool has_chroma = recon_chroma && (x % 8 == 0 && y % 8 == 0);
    
     // Process a leaf TU.
     if (has_luma) {
-      intra_recon_tb_leaf(state, x, y, depth, lcu, COLOR_Y, search_data);
+      intra_recon_tb_leaf(state, x, y, depth, lcu, COLOR_Y, search_data, tree_type);
     }
     if (has_chroma) {
-      intra_recon_tb_leaf(state, x, y, depth, lcu, COLOR_U, search_data);
-      intra_recon_tb_leaf(state, x, y, depth, lcu, COLOR_V, search_data);
+      intra_recon_tb_leaf(state, x, y, depth, lcu, COLOR_U, search_data, tree_type);
+      intra_recon_tb_leaf(state, x, y, depth, lcu, COLOR_V, search_data, tree_type);
     }
 
     uvg_quantize_lcu_residual(state, has_luma, has_chroma && !(search_data->pred_cu.joint_cb_cr & 3),
-      search_data->pred_cu.joint_cb_cr != 4 && state->encoder_control->cfg.jccr && (x % 8 == 0 && y % 8 == 0),
-      x, y, depth, cur_cu, lcu, false);
+                              search_data->pred_cu.joint_cb_cr & 3 && state->encoder_control->cfg.jccr && has_chroma,
+                              x, y, depth, cur_cu, lcu,
+                              false,
+      tree_type);
   }
 }

@@ -233,10 +233,10 @@ int uvg_init_rdcost_outfiles(const char *dir_path)
   // As long as QP is a two-digit number, template and produced string should
   // be equal in length ("%i" -> "22")
   assert(RD_SAMPLING_MAX_LAST_QP <= 99);
-  assert(strlen(fn_template) <= RD_SAMPLING_MAX_FN_LENGTH);
 
   strncpy(fn_template, dir_path, RD_SAMPLING_MAX_FN_LENGTH);
   strncat(fn_template, basename_tmpl, RD_SAMPLING_MAX_FN_LENGTH - strlen(dir_path));
+  assert(strlen(fn_template) <= RD_SAMPLING_MAX_FN_LENGTH);
 
   for (qp = 0; qp <= RD_SAMPLING_MAX_LAST_QP; qp++) {
     pthread_mutex_t *curr = outfile_mutex + qp;
@@ -290,17 +290,18 @@ out:
  *
  * \param coeff coefficient array
  * \param width coeff block width
- * \param type data type (0 == luma)
+ * \param color data type (0 == luma)
  *
  * \returns bits needed to code input coefficients
  */
-static INLINE uint32_t get_coeff_cabac_cost(
-    const encoder_state_t * const state,
-    const coeff_t *coeff,
-    int32_t width,
-    int32_t type,
-    int8_t scan_mode,
-    int8_t tr_skip)
+static INLINE double get_coeff_cabac_cost(
+  const encoder_state_t * const state,
+  const coeff_t *coeff,
+  int32_t width,
+  color_t color,
+  int8_t scan_mode,
+  int8_t tr_skip,
+  cu_info_t* cur_tu)
 {
   // Make sure there are coeffs present
   bool found = false;
@@ -319,8 +320,8 @@ static INLINE uint32_t get_coeff_cabac_cost(
 
   // Clear bytes and bits and set mode to "count"
   cabac_copy.only_count = 1;
-  int num_buffered_bytes = cabac_copy.num_buffered_bytes;
-  int bits_left = cabac_copy.bits_left;
+  cabac_copy.update = 1;
+  double bits = 0;
 
   // Execute the coding function.
   // It is safe to drop the const modifier since state won't be modified
@@ -330,26 +331,27 @@ static INLINE uint32_t get_coeff_cabac_cost(
                          &cabac_copy,
                          coeff,
                          width,
-                         type,
+                         color,
                          scan_mode,
-                         NULL,                   
-                         false);
+                         cur_tu,                   
+                         &bits);
   }
   else {
     uvg_encode_ts_residual((encoder_state_t* const)state,
       &cabac_copy,
       coeff,
       width,
-      type,
-      scan_mode);
+      color,
+      scan_mode,
+      &bits);
   }
-  if(cabac_copy.update) {
+  if(state->search_cabac.update) {
     memcpy((cabac_data_t *)&state->search_cabac, &cabac_copy, sizeof(cabac_copy));
   }
-  return (bits_left - cabac_copy.bits_left) + ((cabac_copy.num_buffered_bytes - num_buffered_bytes) << 3);
+  return bits;
 }
 
-static INLINE void save_ccc(int qp, const coeff_t *coeff, int32_t size, uint32_t ccc)
+static INLINE void save_ccc(int qp, const coeff_t *coeff, int32_t size, double ccc)
 {
   pthread_mutex_t *mtx = outfile_mutex + qp;
 
@@ -365,14 +367,14 @@ static INLINE void save_ccc(int qp, const coeff_t *coeff, int32_t size, uint32_t
   pthread_mutex_unlock(mtx);
 }
 
-static INLINE void save_accuracy(int qp, uint32_t ccc, uint32_t fast_cost)
+static INLINE void save_accuracy(int qp, double ccc, uint32_t fast_cost)
 {
   pthread_mutex_t *mtx = outfile_mutex + qp;
 
   assert(qp <= RD_SAMPLING_MAX_LAST_QP);
 
   pthread_mutex_lock(mtx);
-  fprintf(fastrd_learning_outfile[qp], "%u %u\n", fast_cost, ccc);
+  fprintf(fastrd_learning_outfile[qp], "%u %f\n", fast_cost, ccc);
   pthread_mutex_unlock(mtx);
 }
 
@@ -381,16 +383,18 @@ static INLINE void save_accuracy(int qp, uint32_t ccc, uint32_t fast_cost)
  *
  * \param coeff   coefficient array
  * \param width   coeff block width
- * \param type    data type (0 == luma)
+ * \param color    data type (0 == luma)
  *
  * \returns       number of bits needed to code coefficients
  */
-uint32_t uvg_get_coeff_cost(const encoder_state_t * const state,
-                            const coeff_t *coeff,
-                            int32_t width,
-                            int32_t type,
-                            int8_t scan_mode,
-                            int8_t tr_skip)
+double uvg_get_coeff_cost(
+  const encoder_state_t * const state,
+  const coeff_t *coeff,
+  cu_info_t* cur_tu,
+  int32_t width,
+  color_t color,
+  int8_t scan_mode,
+  int8_t tr_skip)
 {
   uint8_t save_cccs = state->encoder_control->cfg.fastrd_sampling_on;
   uint8_t check_accuracy = state->encoder_control->cfg.fastrd_accuracy_check_on;
@@ -407,13 +411,13 @@ uint32_t uvg_get_coeff_cost(const encoder_state_t * const state,
       uint64_t weights = uvg_fast_coeff_get_weights(state);
       uint32_t fast_cost = uvg_fast_coeff_cost(coeff, width, weights);
       if (check_accuracy) {
-        uint32_t ccc = get_coeff_cabac_cost(state, coeff, width, type, scan_mode, tr_skip);
+        double ccc = get_coeff_cabac_cost(state, coeff, width, color, scan_mode, tr_skip, cur_tu);
         save_accuracy(state->qp, ccc, fast_cost);
       }
       return fast_cost;
     }
   } else {
-    uint32_t ccc = get_coeff_cabac_cost(state, coeff, width, type, scan_mode, tr_skip);
+    double ccc = get_coeff_cabac_cost(state, coeff, width, color, scan_mode, tr_skip, cur_tu);
     if (save_cccs) {
       save_ccc(state->qp, coeff, width * width, ccc);
     }
@@ -1367,8 +1371,18 @@ int uvg_ts_rdoq(encoder_state_t* const state, coeff_t* src_coeff, coeff_t* dest_
  * coding engines using probability models like CABAC
  * From VTM 13.0
  */
-void uvg_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff, int32_t width,
-           int32_t height, int8_t type, int8_t scan_mode, int8_t block_type, int8_t tr_depth, uint16_t cbf)
+void uvg_rdoq(
+  encoder_state_t * const state,
+  coeff_t *coef,
+  coeff_t *dest_coeff,
+  int32_t width,
+  int32_t height,
+  int8_t type,
+  int8_t scan_mode,
+  int8_t block_type,
+  int8_t tr_depth,
+  uint16_t cbf,
+  uint8_t lfnst_idx)
 {
   const encoder_control_t * const encoder = state->encoder_control;
   cabac_data_t * const cabac = &state->cabac;
@@ -1447,12 +1461,14 @@ void uvg_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
   } rd_stats;
 
   //Find last cg and last scanpos
+  const int max_lfnst_pos = ((height == 4 && width == 4) || (height == 8 && width == 8)) ? 7 : 15;
   int32_t cg_scanpos;
   for (cg_scanpos = (cg_num - 1); cg_scanpos >= 0; cg_scanpos--)
   {
     for (int32_t scanpos_in_cg = (cg_size - 1); scanpos_in_cg >= 0; scanpos_in_cg--)
     {
       int32_t  scanpos        = cg_scanpos*cg_size + scanpos_in_cg;
+      if (lfnst_idx > 0 && scanpos > max_lfnst_pos) break;
       uint32_t blkpos         = scan[scanpos];
       int32_t q               = quant_coeff[blkpos];
       int32_t level_double    = coef[blkpos];

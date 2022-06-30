@@ -37,6 +37,7 @@
 #include "threads.h"
 
 
+
 /**
  * \brief Number of PUs in a CU.
  *
@@ -113,10 +114,31 @@ const cu_info_t* uvg_cu_array_at_const(const cu_array_t *cua, unsigned x_px, uns
 cu_array_t * uvg_cu_array_alloc(const int width, const int height)
 {
   cu_array_t *cua = MALLOC(cu_array_t, 1);
+  if (cua == NULL) return NULL;
 
   // Round up to a multiple of LCU width and divide by cell width.
   const int width_scu  = CEILDIV(width,  LCU_WIDTH) * LCU_WIDTH / SCU_WIDTH;
   const int height_scu = CEILDIV(height, LCU_WIDTH) * LCU_WIDTH / SCU_WIDTH;
+  const unsigned cu_array_size = width_scu * height_scu;
+
+  cua->base     = NULL;
+  cua->data     = calloc(cu_array_size, sizeof(cu_info_t));
+  cua->width    = width_scu  * SCU_WIDTH;
+  cua->height   = height_scu * SCU_WIDTH;
+  cua->stride   = cua->width;
+  cua->refcount = 1;
+
+  return cua;
+}
+cu_array_t * uvg_cu_array_chroma_alloc(const int width, const int height, enum uvg_chroma_format chroma)
+{
+  cu_array_t *cua = MALLOC(cu_array_t, 1);
+  if (cua == NULL) return NULL;
+
+  // Round up to a multiple of LCU width and divide by cell width.
+  const int chroma_height = chroma == UVG_CSP_444 ? LCU_WIDTH : LCU_WIDTH_C;
+  const int width_scu  = CEILDIV(width,  LCU_WIDTH_C) * LCU_WIDTH_C / SCU_WIDTH;
+  const int height_scu = CEILDIV(height, chroma_height) * chroma_height / SCU_WIDTH;
   const unsigned cu_array_size = width_scu * height_scu;
 
   cua->base     = NULL;
@@ -148,6 +170,7 @@ cu_array_t * uvg_cu_subarray(cu_array_t *base,
   }
 
   cu_array_t *cua = MALLOC(cu_array_t, 1);
+  if (cua == NULL) return NULL;
 
   // Find the real base array.
   cu_array_t *real_base = base;
@@ -214,11 +237,12 @@ cu_array_t * uvg_cu_array_copy_ref(cu_array_t* cua)
  * \param dst_y   y-coordinate of the top edge of the copied area in dst
  * \param src     source lcu
  */
-void uvg_cu_array_copy_from_lcu(cu_array_t* dst, int dst_x, int dst_y, const lcu_t *src)
+void uvg_cu_array_copy_from_lcu(cu_array_t* dst, int dst_x, int dst_y, const lcu_t *src, enum uvg_tree_type tree_type)
 {
   const int dst_stride = dst->stride >> 2;
-  for (int y = 0; y < LCU_WIDTH; y += SCU_WIDTH) {
-    for (int x = 0; x < LCU_WIDTH; x += SCU_WIDTH) {
+  const int width = tree_type != UVG_CHROMA_T ? LCU_WIDTH : LCU_WIDTH_C;
+  for (int y = 0; y < width; y += SCU_WIDTH) {
+    for (int x = 0; x < width; x += SCU_WIDTH) {
       const cu_info_t *from_cu = LCU_GET_CU_AT_PX(src, x, y);
       const int x_scu = (dst_x + x) >> 2;
       const int y_scu = (dst_y + y) >> 2;

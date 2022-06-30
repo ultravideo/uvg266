@@ -48,11 +48,11 @@
 
  // Modify weight of luma SSD.
 #ifndef UVG_LUMA_MULT
-#define UVG_LUMA_MULT 0.8
+#define UVG_LUMA_MULT 1.0
 #endif
 // Modify weight of chroma SSD.
 #ifndef UVG_CHROMA_MULT
-#define UVG_CHROMA_MULT 1.5
+#define UVG_CHROMA_MULT 1.0
 #endif
 
  /**
@@ -73,6 +73,7 @@ typedef struct unit_stats_map_t {
   int       size;                    //!< number of active elements in the lists
 } unit_stats_map_t;
 
+
 #define NUM_MIP_MODES_FULL(width, height) (((width) == 4 && (height) == 4) ? 32 : ((width) == 4 || (height) == 4 || ((width) == 8 && (height) == 8) ? 16 : 12))
 #define NUM_MIP_MODES_HALF(width, height) (NUM_MIP_MODES_FULL((width), (height)) >> 1)
 
@@ -91,16 +92,9 @@ double uvg_cu_rd_cost_chroma(const encoder_state_t *const state,
                              const int x_px, const int y_px, const int depth,
                              cu_info_t *const pred_cu,
                              lcu_t *const lcu);
-void uvg_select_jccr_mode(
-  const encoder_state_t* const state,
-  const int x_px,
-  const int y_px,
-  const int depth,
-  cu_info_t* const pred_cu,
-  lcu_t* const lcu,
-  double* cost_out);
 
-void uvg_lcu_fill_trdepth(lcu_t *lcu, int x_px, int y_px, int depth, int tr_depth);
+void uvg_lcu_fill_trdepth(lcu_t *lcu, int x_px, int y_px, int depth, uint8_t tr_depth, enum uvg_tree_type
+                          tree_type);
 
 void uvg_intra_recon_lcu_luma(encoder_state_t * const state, int x, int y, int depth, int8_t intra_mode, cu_info_t *cur_cu, lcu_t *lcu);
 void uvg_intra_recon_lcu_chroma(encoder_state_t * const state, int x, int y, int depth, int8_t intra_mode, cu_info_t *cur_cu, lcu_t *lcu);

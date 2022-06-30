@@ -51,20 +51,32 @@ extern const uint32_t uvg_g_go_rice_prefix_len[5];
 int uvg_init_rdcost_outfiles(const char *fn_template);
 void uvg_close_rdcost_outfiles(void);
 
-void  uvg_rdoq(encoder_state_t *state, coeff_t *coef, coeff_t *dest_coeff, int32_t width,
-           int32_t height, int8_t type, int8_t scan_mode, int8_t block_type, int8_t tr_depth, uint16_t cbf);
+void  uvg_rdoq(
+  encoder_state_t *state,
+  coeff_t *coef,
+  coeff_t *dest_coeff,
+  int32_t width,
+  int32_t height,
+  int8_t type,
+  int8_t scan_mode,
+  int8_t block_type,
+  int8_t tr_depth,
+  uint16_t cbf,
+  uint8_t lfnst_idx);
 
 
 int uvg_ts_rdoq(encoder_state_t* const state, coeff_t* src_coeff, coeff_t* dest_coeff, int32_t width,
                 int32_t height, int8_t type, int8_t scan_mode);
 
 
-uint32_t uvg_get_coeff_cost(const encoder_state_t * const state,
-                            const coeff_t *coeff,
-                            int32_t width,
-                            int32_t type,
-                            int8_t scan_mode,
-                            int8_t tr_skip);
+double uvg_get_coeff_cost(
+  const encoder_state_t * const state,
+  const coeff_t *coeff,
+  cu_info_t* cur_tu,
+  int32_t width,
+  color_t color,
+  int8_t scan_mode,
+  int8_t tr_skip);
 
 int32_t uvg_get_ic_rate(encoder_state_t *state, uint32_t abs_level, uint16_t ctx_num_gt1, uint16_t ctx_num_gt2, uint16_t ctx_num_par,
                     uint16_t abs_go_rice, uint32_t reg_bins, int8_t type, int use_limited_prefix_length);

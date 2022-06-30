@@ -90,6 +90,10 @@ A prefix used for stats files that include
 bits, lambda, distortion, and qp for each ctu.
 These are meant for debugging and are not
 written unless the prefix is defined.
+.TP
+\fB\-\-cabac\-debug\-file    
+A debug file for cabac context.
+Ignore this, it is only for tests.
 
 .SS "Video structure:"
 .TP
@@ -216,6 +220,10 @@ QP into chroma qp. These two lists have to be
 same length, start with same value, and can
 contain maximum 16 or 36 \- starting value
 elements. [17,27,32,44]
+.TP
+\fB\-\-(no\-)dual\-tree      
+Use separate CTU structure for luma and
+chroma in intra slices.
 
 .SS "Compression tools:"
 .TP
@@ -269,6 +277,10 @@ Try all intra modes during rough search.
 .TP
 \fB\-\-(no\-)transform\-skip 
 Try transform skip [disabled]
+.TP
+\fB\-\-(no\-)chroma\-transform\-skip
+Try transform skip for chroma 
+      blocks. [disabled]
 .TP
 \fB\-\-tr\-skip\-max\-size    
 Max log2 size of transform skip 2..5 [2]
@@ -394,6 +406,10 @@ predictions.
 .TP
 \fB\-\-(no\-)mip            
 Enable matrix weighted intra prediction.
+.TP
+\fB\-\-(no\-)lfnst          
+Enable low frequency non\-separable transform.
+  [disabled]
 .TP
 \fB\-\-mts <string>        
 Multiple Transform Selection [off].

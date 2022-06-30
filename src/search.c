@@ -70,14 +70,17 @@ static INLINE void copy_cu_info(int x_local, int y_local, int width, lcu_t *from
   }
 }
 
-static INLINE void copy_cu_pixels(int x_local, int y_local, int width, lcu_t *from, lcu_t *to)
+static INLINE void copy_cu_pixels(int x_local, int y_local, int width, lcu_t *from, lcu_t *to, enum uvg_tree_type
+                                  tree_type)
 {
   const int luma_index = x_local + y_local * LCU_WIDTH;
-  const int chroma_index = (x_local / 2) + (y_local / 2) * (LCU_WIDTH / 2);
+  const int chroma_index = tree_type == UVG_CHROMA_T ? x_local + y_local * LCU_WIDTH_C : (x_local / 2) + (y_local / 2) * LCU_WIDTH_C;
 
-  uvg_pixels_blit(&from->rec.y[luma_index], &to->rec.y[luma_index],
-                  width, width, LCU_WIDTH, LCU_WIDTH);
-  if (from->rec.chroma_format != UVG_CSP_400) {
+  if(tree_type != UVG_CHROMA_T) {
+    uvg_pixels_blit(&from->rec.y[luma_index], &to->rec.y[luma_index],
+                    width, width, LCU_WIDTH, LCU_WIDTH);
+  }
+  if (from->rec.chroma_format != UVG_CSP_400 && tree_type != UVG_LUMA_T) {
     uvg_pixels_blit(&from->rec.u[chroma_index], &to->rec.u[chroma_index],
                     width / 2, width / 2, LCU_WIDTH / 2, LCU_WIDTH / 2);
     uvg_pixels_blit(&from->rec.v[chroma_index], &to->rec.v[chroma_index],
@@ -85,13 +88,16 @@ static INLINE void copy_cu_pixels(int x_local, int y_local, int width, lcu_t *fr
   }
 }
 
-static INLINE void copy_cu_coeffs(int x_local, int y_local, int width, lcu_t *from, lcu_t *to, bool joint)
+static INLINE void copy_cu_coeffs(int x_local, int y_local, int width, lcu_t *from, lcu_t *to, bool joint, enum
+                                  uvg_tree_type tree_type)
 {
-  const int luma_z = xy_to_zorder(LCU_WIDTH, x_local, y_local);
-  copy_coeffs(&from->coeff.y[luma_z], &to->coeff.y[luma_z], width);
+  if (tree_type != UVG_CHROMA_T) {
+    const int luma_z = xy_to_zorder(LCU_WIDTH, x_local, y_local);
+    copy_coeffs(&from->coeff.y[luma_z], &to->coeff.y[luma_z], width);
+  }
 
-  if (from->rec.chroma_format != UVG_CSP_400) {
-    const int chroma_z = xy_to_zorder(LCU_WIDTH_C, x_local >> 1, y_local >> 1);
+  if (from->rec.chroma_format != UVG_CSP_400 && tree_type != UVG_LUMA_T) {
+    const int chroma_z = xy_to_zorder(LCU_WIDTH_C, x_local >> (tree_type != UVG_CHROMA_T), y_local >> (tree_type != UVG_CHROMA_T));
     copy_coeffs(&from->coeff.u[chroma_z], &to->coeff.u[chroma_z], width >> 1);
     copy_coeffs(&from->coeff.v[chroma_z], &to->coeff.v[chroma_z], width >> 1);
     if (joint) {
@@ -103,12 +109,13 @@ static INLINE void copy_cu_coeffs(int x_local, int y_local, int width, lcu_t *fr
 /**
  * Copy all non-reference CU data from next level to current level.
  */
-static void work_tree_copy_up(int x_local, int y_local, int depth, lcu_t *work_tree, bool joint)
+static void work_tree_copy_up(int x_local, int y_local, int depth, lcu_t *work_tree, bool joint, enum
+                              uvg_tree_type tree_type)
 {
   const int width = LCU_WIDTH >> depth;
   copy_cu_info  (x_local, y_local, width, &work_tree[depth + 1], &work_tree[depth]);
-  copy_cu_pixels(x_local, y_local, width, &work_tree[depth + 1], &work_tree[depth]);
-  copy_cu_coeffs(x_local, y_local, width, &work_tree[depth + 1], &work_tree[depth], joint);
+  copy_cu_pixels(x_local, y_local, width, &work_tree[depth + 1], &work_tree[depth], tree_type);
+  copy_cu_coeffs(x_local, y_local, width, &work_tree[depth + 1], &work_tree[depth], joint, tree_type);
   
 }
 
@@ -116,20 +123,22 @@ static void work_tree_copy_up(int x_local, int y_local, int depth, lcu_t *work_t
 /**
  * Copy all non-reference CU data from current level to all lower levels.
  */
-static void work_tree_copy_down(int x_local, int y_local, int depth, lcu_t *work_tree)
+static void work_tree_copy_down(int x_local, int y_local, int depth, lcu_t *work_tree, enum uvg_tree_type
+                                tree_type)
 {
-  const int width = LCU_WIDTH >> depth;
+  const int width = tree_type != UVG_CHROMA_T ? LCU_WIDTH >> depth : LCU_WIDTH_C >> 1;
   for (int i = depth + 1; i <= MAX_PU_DEPTH; i++) {
     copy_cu_info  (x_local, y_local, width, &work_tree[depth], &work_tree[i]);
-    copy_cu_pixels(x_local, y_local, width, &work_tree[depth], &work_tree[i]);
+    copy_cu_pixels(x_local, y_local, LCU_WIDTH >> depth, &work_tree[depth], &work_tree[i], tree_type);
   }
 }
 
-void uvg_lcu_fill_trdepth(lcu_t *lcu, int x_px, int y_px, int depth, int tr_depth)
+void uvg_lcu_fill_trdepth(lcu_t *lcu, int x_px, int y_px, int depth, uint8_t tr_depth, enum uvg_tree_type
+                          tree_type)
 {
   const int x_local = SUB_SCU(x_px);
   const int y_local = SUB_SCU(y_px);
-  const uint32_t width = LCU_WIDTH >> depth;
+  const unsigned width = (tree_type != UVG_CHROMA_T ? LCU_WIDTH  : LCU_WIDTH_C) >> depth;
 
   for (unsigned y = 0; y < width; y += SCU_WIDTH) {
     for (unsigned x = 0; x < width; x += SCU_WIDTH) {
@@ -138,7 +147,7 @@ void uvg_lcu_fill_trdepth(lcu_t *lcu, int x_px, int y_px, int depth, int tr_dept
   }
 }
 
-static void lcu_fill_cu_info(lcu_t *lcu, int x_local, int y_local, int width, int height, cu_info_t *cu)
+static void lcu_fill_cu_info(lcu_t *lcu, int x_local, int y_local, int width, int height, const cu_info_t *cu)
 {
   // Set mode in every CU covered by part_mode in this depth.
   for (int y = y_local; y < y_local + height; y += SCU_WIDTH) {
@@ -149,6 +158,10 @@ static void lcu_fill_cu_info(lcu_t *lcu, int x_local, int y_local, int width, in
       to->part_size = cu->part_size;
       to->qp        = cu->qp;
       //to->tr_idx    = cu->tr_idx;
+      to->lfnst_idx = cu->lfnst_idx;
+      to->lfnst_last_scan_pos = cu->lfnst_last_scan_pos;
+      to->violates_lfnst_constrained_luma = cu->violates_lfnst_constrained_luma;
+      to->violates_lfnst_constrained_chroma = cu->violates_lfnst_constrained_chroma;
 
       if (cu->type == CU_INTRA) {
         to->intra.mode        = cu->intra.mode;
@@ -183,7 +196,7 @@ static void lcu_fill_inter(lcu_t *lcu, int x_local, int y_local, int cu_width)
   }
 }
 
-static void lcu_fill_cbf(lcu_t *lcu, uint32_t x_local, uint32_t y_local, uint32_t width, cu_info_t *cur_cu)
+static void lcu_fill_cbf(lcu_t *lcu, int x_local, unsigned y_local, unsigned width, const cu_info_t *cur_cu)
 {
   const uint32_t tr_split = cur_cu->tr_depth - cur_cu->depth;
   const uint32_t mask = ~((width >> tr_split)-1);
@@ -233,7 +246,7 @@ static double cu_zero_coeff_cost(const encoder_state_t *state, lcu_t *work_tree,
       );
   }
   // Save the pixels at a lower level of the working tree.
-  copy_cu_pixels(x_local, y_local, cu_width, lcu, &work_tree[depth + 1]);
+  copy_cu_pixels(x_local, y_local, cu_width, lcu, &work_tree[depth + 1], UVG_BOTH_T);
 
   return ssd;
 }
@@ -320,36 +333,21 @@ double uvg_cu_rd_cost_luma(const encoder_state_t *const state,
     return sum + tr_tree_bits * state->lambda;
   }
 
-
-  if (cabac->update && tr_cu->tr_depth == tr_cu->depth && !skip_residual_coding) {
-    // Because these need to be coded before the luma cbf they also need to be counted
-    // before the cabac state changes. However, since this branch is only executed when
-    // calculating the last RD cost it is not problem to include the chroma cbf costs in
-    // luma, because the chroma cost is calculated right after the luma cost.
-    // However, if we have different tr_depth, the bits cannot be written in correct
-    // order anyways so do not touch the chroma cbf here.
-    if (state->encoder_control->chroma_format != UVG_CSP_400) {
-      cabac_ctx_t* cr_ctx = &(cabac->ctx.qt_cbf_model_cb[0]);
-      cabac->cur_ctx = cr_ctx;
-      int u_is_set = cbf_is_set(pred_cu->cbf, depth, COLOR_U);
-      int v_is_set = cbf_is_set(pred_cu->cbf, depth, COLOR_V);
-      CABAC_FBITS_UPDATE(cabac, cr_ctx, u_is_set, tr_tree_bits, "cbf_cb_search");
-      cr_ctx = &(cabac->ctx.qt_cbf_model_cr[u_is_set]);
-      CABAC_FBITS_UPDATE(cabac, cr_ctx, v_is_set, tr_tree_bits, "cbf_cb_search");
-    }
-  }
-
   // Add transform_tree cbf_luma bit cost.
   const int is_tr_split = tr_cu->tr_depth - tr_cu->depth;
+  int is_set = cbf_is_set(pred_cu->cbf, depth, COLOR_Y);
   if (pred_cu->type == CU_INTRA ||
       is_tr_split ||
       cbf_is_set(tr_cu->cbf, depth, COLOR_U) ||
       cbf_is_set(tr_cu->cbf, depth, COLOR_V))
   {
     cabac_ctx_t *ctx = &(cabac->ctx.qt_cbf_model_luma[0]);
-    int is_set = cbf_is_set(pred_cu->cbf, depth, COLOR_Y);
 
     CABAC_FBITS_UPDATE(cabac, ctx, is_set, tr_tree_bits, "cbf_y_search");
+  }
+
+  if (is_set && state->encoder_control->cfg.trskip_enable && width <= (1 << state->encoder_control->cfg.trskip_max_size)) {
+    CABAC_FBITS_UPDATE(cabac, &cabac->ctx.transform_skip_model_luma, pred_cu->tr_idx == MTS_SKIP, tr_tree_bits, "transform_skip_flag");
   }
 
   // SSD between reconstruction and original
@@ -366,7 +364,7 @@ double uvg_cu_rd_cost_luma(const encoder_state_t *const state,
     int8_t luma_scan_mode = uvg_get_scan_order(pred_cu->type, pred_cu->intra.mode, depth);
     const coeff_t *coeffs = &lcu->coeff.y[xy_to_zorder(LCU_WIDTH, x_px, y_px)];
 
-    coeff_bits += uvg_get_coeff_cost(state, coeffs, width, 0, luma_scan_mode, pred_cu->tr_idx == MTS_SKIP);
+    coeff_bits += uvg_get_coeff_cost(state, coeffs, NULL, width, 0, luma_scan_mode, pred_cu->tr_idx == MTS_SKIP);
   }
 
   double bits = tr_tree_bits + coeff_bits;
@@ -397,7 +395,7 @@ double uvg_cu_rd_cost_chroma(const encoder_state_t *const state,
   }
 
   // See luma for why the second condition
-  if (depth < MAX_PU_DEPTH && (!state->search_cabac.update || tr_cu->tr_depth != tr_cu->depth) && !skip_residual_coding) {
+  if (!skip_residual_coding) {
     const int tr_depth = depth - pred_cu->depth;
     cabac_data_t* cabac = (cabac_data_t*)&state->search_cabac;
     cabac_ctx_t *ctx = &(cabac->ctx.qt_cbf_model_cb[0]);
@@ -429,10 +427,11 @@ double uvg_cu_rd_cost_chroma(const encoder_state_t *const state,
 
   if (state->encoder_control->cfg.jccr) {
     int cbf_mask = cbf_is_set(pred_cu->cbf, depth, COLOR_U) * 2 + cbf_is_set(pred_cu->cbf, depth, COLOR_V) - 1;
-    const cabac_ctx_t* ctx = NULL;
+    cabac_ctx_t* ctx = NULL;
     if (cbf_mask != -1) {
-      ctx = &(state->cabac.ctx.joint_cb_cr[cbf_mask]);
-      tr_tree_bits += CTX_ENTROPY_FBITS(ctx, 0);      
+      cabac_data_t* cabac = (cabac_data_t*)&state->search_cabac;
+      ctx = &(cabac->ctx.joint_cb_cr[cbf_mask]);
+      CABAC_FBITS_UPDATE(cabac, ctx, 0, tr_tree_bits, "cbf_cb_search");
     }
   }
 
@@ -454,8 +453,8 @@ double uvg_cu_rd_cost_chroma(const encoder_state_t *const state,
     int8_t scan_order = uvg_get_scan_order(pred_cu->type, pred_cu->intra.mode_chroma, depth);
     const int index = xy_to_zorder(LCU_WIDTH_C, lcu_px.x, lcu_px.y);
 
-    coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.u[index], width, 2, scan_order, 0);
-    coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.v[index], width, 2, scan_order, 0);
+    coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.u[index], NULL, width, 2, scan_order, 0);
+    coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.v[index], NULL, width, 2, scan_order, 0);
   }
 
 
@@ -464,10 +463,14 @@ double uvg_cu_rd_cost_chroma(const encoder_state_t *const state,
   return (double)ssd * UVG_CHROMA_MULT + bits * state->c_lambda;
 }
 
-static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
-                                           const int x_px, const int y_px, const int depth,
-                                           const cu_info_t* const pred_cu,
-                                           lcu_t* const lcu) {
+static double cu_rd_cost_tr_split_accurate(
+  const encoder_state_t* const state,
+  const int x_px,
+  const int y_px,
+  const int depth,
+  const cu_info_t* const pred_cu,
+  lcu_t* const lcu,
+  enum uvg_tree_type tree_type) {
   const int width = LCU_WIDTH >> depth;
 
   const int skip_residual_coding = pred_cu->skipped || (pred_cu->type == CU_INTER && pred_cu->cbf == 0);
@@ -483,8 +486,8 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
 
   const uint8_t tr_depth = tr_cu->tr_depth - depth;
 
-  const int cb_flag_u = cbf_is_set(tr_cu->cbf, depth, COLOR_U);
-  const int cb_flag_v = cbf_is_set(tr_cu->cbf, depth, COLOR_V);
+  const int cb_flag_u = tr_cu->joint_cb_cr ? tr_cu->joint_cb_cr >> 1 : cbf_is_set(tr_cu->cbf, depth, COLOR_U);
+  const int cb_flag_v = tr_cu->joint_cb_cr ? tr_cu->joint_cb_cr & 1 : cbf_is_set(tr_cu->cbf, depth, COLOR_V);
 
   cabac_data_t* cabac = (cabac_data_t*)&state->search_cabac;
 
@@ -498,7 +501,8 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
 
   }
 
-  if(state->encoder_control->chroma_format != UVG_CSP_400 && !skip_residual_coding) {
+  bool has_chroma = state->encoder_control->chroma_format != UVG_CSP_400 && (depth != 4 || (x_px % 8 && y_px % 8)) && tree_type != UVG_LUMA_T;
+  if( !skip_residual_coding && has_chroma) {
     if(tr_cu->depth == depth || cbf_is_set(pred_cu->cbf, depth - 1, COLOR_U)) {
       CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.qt_cbf_model_cb[0]), cb_flag_u, tr_tree_bits, "cbf_cb");
     } 
@@ -511,13 +515,13 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
     int offset = LCU_WIDTH >> (depth + 1);
     double sum = 0;
 
-    sum += cu_rd_cost_tr_split_accurate(state, x_px, y_px, depth + 1, pred_cu, lcu);
-    sum += cu_rd_cost_tr_split_accurate(state, x_px + offset, y_px, depth + 1, pred_cu, lcu);
-    sum += cu_rd_cost_tr_split_accurate(state, x_px, y_px + offset, depth + 1, pred_cu, lcu);
-    sum += cu_rd_cost_tr_split_accurate(state, x_px + offset, y_px + offset, depth + 1, pred_cu, lcu);
+    sum += cu_rd_cost_tr_split_accurate(state, x_px, y_px, depth + 1, pred_cu, lcu, tree_type);
+    sum += cu_rd_cost_tr_split_accurate(state, x_px + offset, y_px, depth + 1, pred_cu, lcu, tree_type);
+    sum += cu_rd_cost_tr_split_accurate(state, x_px, y_px + offset, depth + 1, pred_cu, lcu, tree_type);
+    sum += cu_rd_cost_tr_split_accurate(state, x_px + offset, y_px + offset, depth + 1, pred_cu, lcu, tree_type);
     return sum + tr_tree_bits * state->lambda;
   }
-  const int cb_flag_y = cbf_is_set(tr_cu->cbf, depth, COLOR_Y) ;
+  const int cb_flag_y = cbf_is_set(tr_cu->cbf, depth, COLOR_Y) && tree_type != UVG_CHROMA_T;
 
   // Add transform_tree cbf_luma bit cost.
   const int is_tr_split = depth - tr_cu->depth;
@@ -525,17 +529,17 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
     is_tr_split ||
     cb_flag_u ||
     cb_flag_v) 
-      && !skip_residual_coding)
+      && !skip_residual_coding && tree_type != UVG_CHROMA_T)
   {
-    cabac_ctx_t* ctx = &(cabac->ctx.qt_cbf_model_luma[!is_tr_split]);
+    cabac_ctx_t* ctx = &(cabac->ctx.qt_cbf_model_luma[0]);
 
     CABAC_FBITS_UPDATE(cabac, ctx, cb_flag_y, tr_tree_bits, "cbf_y_search");
   }
 
-  if (cb_flag_y | cb_flag_u | cb_flag_v) {
+  if (cb_flag_y || cb_flag_u || cb_flag_v) {
     // TODO qp_delta_sign_flag
 
-    if ((cb_flag_u | cb_flag_v) && x_px % 8 == 0 && y_px % 8 == 0 && state->encoder_control->cfg.jccr) {
+    if ((cb_flag_u || cb_flag_v) && has_chroma && state->encoder_control->cfg.jccr) {
       CABAC_FBITS_UPDATE(cabac, &cabac->ctx.joint_cb_cr[cb_flag_u * 2 + cb_flag_v - 1], tr_cu->joint_cb_cr != 0, tr_tree_bits, "tu_joint_cbcr_residual_flag");
     }
   }
@@ -543,26 +547,55 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
 
   // SSD between reconstruction and original
   unsigned luma_ssd = 0;
-  if (!state->encoder_control->cfg.lossless) {
+  if (!state->encoder_control->cfg.lossless && tree_type != UVG_CHROMA_T) {
     int index = y_px * LCU_WIDTH + x_px;
     luma_ssd = uvg_pixels_calc_ssd(&lcu->ref.y[index], &lcu->rec.y[index],
       LCU_WIDTH, LCU_WIDTH,
       width);
   }
+  // Chroma transform skip enable/disable is non-normative, so we need to count the chroma
+  // tr-skip bits even when we are never using it.
+  const bool can_use_tr_skip = state->encoder_control->cfg.trskip_enable && width <= (1 << state->encoder_control->cfg.trskip_max_size);
 
-  {
+  if(cb_flag_y){
+    if (can_use_tr_skip) {
+      CABAC_FBITS_UPDATE(cabac, &cabac->ctx.transform_skip_model_luma, tr_cu->tr_idx == MTS_SKIP, tr_tree_bits, "transform_skip_flag");
+    }
     int8_t luma_scan_mode = uvg_get_scan_order(pred_cu->type, pred_cu->intra.mode, depth);
     const coeff_t* coeffs = &lcu->coeff.y[xy_to_zorder(LCU_WIDTH, x_px, y_px)];
 
-    coeff_bits += uvg_get_coeff_cost(state, coeffs, width, 0, luma_scan_mode, tr_cu->tr_skip);
+    coeff_bits += uvg_get_coeff_cost(state, coeffs, tr_cu, width, 0, luma_scan_mode, tr_cu->tr_skip & 1);
+  }
+
+  if(depth == 4 || tree_type == UVG_LUMA_T) {
+    if (uvg_is_lfnst_allowed(state, tr_cu, width, width, x_px, y_px, tree_type, COLOR_Y)) {
+      const int lfnst_idx = tr_cu->lfnst_idx;
+      CABAC_FBITS_UPDATE(
+        cabac,
+        &cabac->ctx.lfnst_idx_model[1],
+        lfnst_idx != 0,
+        tr_tree_bits,
+        "lfnst_idx");
+      if (lfnst_idx > 0) {
+        CABAC_FBITS_UPDATE(
+          cabac,
+          &cabac->ctx.lfnst_idx_model[2],
+          lfnst_idx == 2,
+          tr_tree_bits,
+          "lfnst_idx");
+      }
+    }
+    tr_cu->lfnst_last_scan_pos = false;
   }
 
   unsigned chroma_ssd = 0;
-  if(state->encoder_control->chroma_format != UVG_CSP_400 && (depth != 4 || (x_px % 8 != 0 && y_px % 8 != 0))) {
-    const vector2d_t lcu_px = { (x_px & ~7 ) / 2, (y_px & ~7) / 2 };
+  if(has_chroma) {
+    const vector2d_t lcu_px = { (x_px >> (tree_type != UVG_CHROMA_T)) & ~3, (y_px >> (tree_type != UVG_CHROMA_T)) &~3  };
     const int chroma_width = MAX(4, LCU_WIDTH >> (depth + 1));
     int8_t scan_order = uvg_get_scan_order(pred_cu->type, pred_cu->intra.mode_chroma, depth);
     const unsigned index = xy_to_zorder(LCU_WIDTH_C, lcu_px.x, lcu_px.y);
+
+    const bool chroma_can_use_tr_skip = state->encoder_control->cfg.trskip_enable && chroma_width <= (1 << state->encoder_control->cfg.trskip_max_size);
     if(pred_cu->joint_cb_cr == 0) {
       if (!state->encoder_control->cfg.lossless) {
         int index = lcu_px.y * LCU_WIDTH_C + lcu_px.x;
@@ -574,139 +607,72 @@ static double cu_rd_cost_tr_split_accurate(const encoder_state_t* const state,
           chroma_width);
         chroma_ssd = ssd_u + ssd_v;
       }
-
-      {
-
-        coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.u[index], chroma_width, 2, scan_order, 0);
-        coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.v[index], chroma_width, 2, scan_order, 0);
+      if(chroma_can_use_tr_skip && cb_flag_u) {
+        CABAC_FBITS_UPDATE(cabac, &cabac->ctx.transform_skip_model_chroma, tr_cu->tr_skip & 2, tr_tree_bits, "transform_skip_flag");        
       }
-    } else {
-      int ssd_u_joint = uvg_pixels_calc_ssd(&lcu->ref.u[index], &lcu->rec.joint_u[index],
-        LCU_WIDTH_C, LCU_WIDTH_C,
-        width);
-      int ssd_v_joint = uvg_pixels_calc_ssd(&lcu->ref.v[index], &lcu->rec.joint_v[index],
-        LCU_WIDTH_C, LCU_WIDTH_C,
-        chroma_width);
-      chroma_ssd = ssd_u_joint + ssd_v_joint;
-      coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.joint_uv[index], width, 2, scan_order, 0);
+      if(chroma_can_use_tr_skip && cb_flag_v) {
+        CABAC_FBITS_UPDATE(cabac, &cabac->ctx.transform_skip_model_chroma, tr_cu->tr_skip & 4, tr_tree_bits, "transform_skip_flag");        
+      }
+      coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.u[index], tr_cu, chroma_width, COLOR_U, scan_order, tr_cu->tr_skip & 2);
+      coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.v[index], tr_cu, chroma_width, COLOR_V, scan_order, tr_cu->tr_skip & 4);
+      
     }
+    else {
+      {
+        int index = lcu_px.y * LCU_WIDTH_C + lcu_px.x;
+        int ssd_u_joint = uvg_pixels_calc_ssd(&lcu->ref.u[index], &lcu->rec.joint_u[index],
+          LCU_WIDTH_C, LCU_WIDTH_C,
+          chroma_width);
+        int ssd_v_joint = uvg_pixels_calc_ssd(&lcu->ref.v[index], &lcu->rec.joint_v[index],
+          LCU_WIDTH_C, LCU_WIDTH_C,
+          chroma_width);
+        chroma_ssd = ssd_u_joint + ssd_v_joint;
+      }
+      if (chroma_can_use_tr_skip) {
+        CABAC_FBITS_UPDATE(cabac, &cabac->ctx.transform_skip_model_chroma, tr_cu->tr_skip & 2, tr_tree_bits, "transform_skip_flag");
+      }
+      coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.joint_uv[index], tr_cu, chroma_width, COLOR_U, scan_order, 0);
+    }
+  }
+
+  if (uvg_is_lfnst_allowed(state, tr_cu, width, width, x_px, y_px, tree_type, depth == 4 || tree_type == UVG_CHROMA_T ? COLOR_UV : COLOR_Y)) {
+    const int lfnst_idx = (depth != 4 && tree_type != UVG_CHROMA_T) ? tr_cu->lfnst_idx : tr_cu->cr_lfnst_idx;
+    CABAC_FBITS_UPDATE(
+      cabac,
+      &cabac->ctx.lfnst_idx_model[tr_cu->depth == 4 || tree_type != UVG_BOTH_T],
+      lfnst_idx != 0,
+      tr_tree_bits,
+      "lfnst_idx");
+    if (lfnst_idx > 0) {
+      CABAC_FBITS_UPDATE(
+        cabac,
+        &cabac->ctx.lfnst_idx_model[2],
+        lfnst_idx == 2,
+        tr_tree_bits,
+        "lfnst_idx");
+    }
+  }
+  tr_cu->lfnst_last_scan_pos = false;
+  tr_cu->violates_lfnst_constrained_luma = false;
+  tr_cu->violates_lfnst_constrained_chroma = false;
+  if (uvg_is_mts_allowed(state, tr_cu) && tree_type != UVG_CHROMA_T) {
+
+    bool symbol = tr_cu->tr_idx != 0;
+    int ctx_idx = 0;
+    CABAC_FBITS_UPDATE(cabac, &cabac->ctx.mts_idx_model[ctx_idx], symbol, tr_tree_bits, "mts_idx");
+
+    ctx_idx++;
+    for (int i = 0; i < 3 && symbol; i++, ctx_idx++)
+    {
+      symbol = tr_cu->tr_idx > i + MTS_DST7_DST7 ? 1 : 0;
+      CABAC_FBITS_UPDATE(cabac, &cabac->ctx.mts_idx_model[ctx_idx], symbol, tr_tree_bits, "mts_idx");
+    }
+    tr_cu->mts_last_scan_pos = false;
+    tr_cu->violates_mts_coeff_constraint = false;
   }
 
   double bits = tr_tree_bits + coeff_bits;
   return luma_ssd * UVG_LUMA_MULT + chroma_ssd * UVG_CHROMA_MULT + bits * state->lambda;
-}
-
-
-void uvg_select_jccr_mode(
-  const encoder_state_t* const state,
-  const int x_px,
-  const int y_px,
-  const int depth,
-  cu_info_t* pred_cu,
-  lcu_t* const lcu,
-  double* cost_out)
-{
-  const vector2d_t lcu_px = { (SUB_SCU(x_px) & ~7) / 2, (SUB_SCU(y_px) & ~7) / 2 };
-  const int width = (depth < MAX_DEPTH) ? LCU_WIDTH >> (depth + 1) : LCU_WIDTH >> depth;
-  if (pred_cu == NULL) pred_cu = LCU_GET_CU_AT_PX(lcu, SUB_SCU(x_px), SUB_SCU(y_px));
-  assert(pred_cu->depth == pred_cu->tr_depth && "jccr does not support transform splitting");
-  if (cost_out == NULL && pred_cu->joint_cb_cr == 0) {
-    return;
-  }
-
-  double tr_tree_bits = 0;
-  double joint_cbcr_tr_tree_bits = 0;
-  double coeff_bits = 0;
-  double joint_coeff_bits = 0;
-
-  assert(lcu_px.x >= 0 && lcu_px.x < LCU_WIDTH_C);
-  assert(lcu_px.y >= 0 && lcu_px.y < LCU_WIDTH_C);
-
-  if (depth == 4 && (x_px % 8 == 0 || y_px % 8 == 0)) {
-    // For MAX_PU_DEPTH calculate chroma for previous depth for the first
-    // block and return 0 cost for all others.
-    return;
-  }
-
-  cabac_data_t* cabac = (cabac_data_t*)&state->search_cabac;
-  cabac_ctx_t* ctx = &(cabac->ctx.qt_cbf_model_cb[0]);
-  cabac->cur_ctx = ctx;
-  int u_is_set = cbf_is_set(pred_cu->cbf, depth, COLOR_U);
-  CABAC_FBITS_UPDATE(cabac, ctx, u_is_set, tr_tree_bits, "cbf_cb_search");   
-  ctx = &(cabac->ctx.qt_cbf_model_cr[u_is_set]);
-  int v_is_set = cbf_is_set(pred_cu->cbf, depth, COLOR_V);
-  CABAC_FBITS_UPDATE(cabac, ctx, v_is_set, tr_tree_bits, "cbf_cr_search");
-
-  int cbf_mask = u_is_set * 2 + v_is_set - 1;
-  if((cbf_mask != -1 && pred_cu->type == CU_INTRA) || cbf_mask == 2)
-    CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.joint_cb_cr[cbf_mask]), 0, tr_tree_bits, "jccr_flag");
-
-  if(pred_cu->joint_cb_cr) {
-    const int u_jccr = (pred_cu->joint_cb_cr >> 1) & 1;
-    ctx = &(cabac->ctx.qt_cbf_model_cb[0]);
-    CABAC_FBITS_UPDATE(cabac, ctx, u_jccr, joint_cbcr_tr_tree_bits, "cbf_cb_search");
-    ctx = &(cabac->ctx.qt_cbf_model_cr[u_jccr]);
-    CABAC_FBITS_UPDATE(cabac, ctx, pred_cu->joint_cb_cr & 1, joint_cbcr_tr_tree_bits, "cbf_cr_search");
-    cbf_mask = pred_cu->joint_cb_cr - 1;
-    CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.joint_cb_cr[cbf_mask]), 1, joint_cbcr_tr_tree_bits, "jccr_flag");
-  }
-  unsigned ssd = 0;
-  unsigned joint_ssd = 0;
-  if (!state->encoder_control->cfg.lossless) {
-    const int index = lcu_px.y * LCU_WIDTH_C + lcu_px.x;
-    const unsigned ssd_u = uvg_pixels_calc_ssd(&lcu->ref.u[index], &lcu->rec.u[index],
-      LCU_WIDTH_C, LCU_WIDTH_C,
-      width);
-    const unsigned ssd_v = uvg_pixels_calc_ssd(&lcu->ref.v[index], &lcu->rec.v[index],
-      LCU_WIDTH_C, LCU_WIDTH_C,
-      width);
-    ssd = ssd_u + ssd_v;
-
-    if (pred_cu->joint_cb_cr) {
-      const unsigned ssd_u_joint = uvg_pixels_calc_ssd(&lcu->ref.u[index], &lcu->rec.joint_u[index],
-        LCU_WIDTH_C, LCU_WIDTH_C,
-        width);
-      const unsigned ssd_v_joint = uvg_pixels_calc_ssd(&lcu->ref.v[index], &lcu->rec.joint_v[index],
-        LCU_WIDTH_C, LCU_WIDTH_C,
-        width);
-      joint_ssd = ssd_u_joint + ssd_v_joint;      
-    }    
-  }
-
-  {
-    int8_t scan_order = uvg_get_scan_order(pred_cu->type, pred_cu->intra.mode_chroma, depth);
-    const int index = xy_to_zorder(LCU_WIDTH_C, lcu_px.x, lcu_px.y);
-
-    coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.u[index], width, 2, scan_order, 0);
-    coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.v[index], width, 2, scan_order, 0);
-    
-    joint_coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.joint_uv[index], width, 2, scan_order, 0);    
-  }
-
-
-  double bits = tr_tree_bits + coeff_bits;
-  double joint_bits = joint_cbcr_tr_tree_bits + joint_coeff_bits;
-
-  double cost = (double)ssd * UVG_CHROMA_MULT + bits * state->c_lambda;
-  double joint_cost = (double)joint_ssd * UVG_CHROMA_MULT + joint_bits * state->c_lambda;
-  if ((cost < joint_cost || !pred_cu->joint_cb_cr) || !state->encoder_control->cfg.jccr) {
-    pred_cu->joint_cb_cr = 0;
-    if (cost_out) *cost_out += cost;
-    return;
-  }
-  cbf_clear(&pred_cu->cbf, depth, COLOR_U);
-  cbf_clear(&pred_cu->cbf, depth, COLOR_V);
-  if (pred_cu->joint_cb_cr & 2) {
-    cbf_set(&pred_cu->cbf, depth, COLOR_U);
-  }
-  if (pred_cu->joint_cb_cr & 1) {
-    cbf_set(&pred_cu->cbf, depth, COLOR_V);
-  }
-  int lcu_width = LCU_WIDTH_C;
-  const int index = lcu_px.x + lcu_px.y * lcu_width;
-  uvg_pixels_blit(&lcu->rec.joint_u[index], &lcu->rec.u[index], width, width, lcu_width, lcu_width);
-  uvg_pixels_blit(&lcu->rec.joint_v[index], &lcu->rec.v[index], width, width, lcu_width, lcu_width);
-  if (cost_out) *cost_out += joint_cost;
 }
 
 
@@ -807,11 +773,20 @@ void uvg_sort_keys_by_cost(unit_stats_map_t *__restrict map)
  * - All the final data for the LCU gets eventually copied to depth 0, which
  *   will be the final output of the recursion.
  */
-static double search_cu(encoder_state_t * const state, int x, int y, int depth, lcu_t *work_tree)
+static double search_cu(
+  encoder_state_t* const state,
+  int x,
+  int y,
+  int depth,
+  lcu_t* work_tree,
+  enum uvg_tree_type
+  tree_type)
 {
   const encoder_control_t* ctrl = state->encoder_control;
   const videoframe_t * const frame = state->tile->frame;
-  int cu_width = LCU_WIDTH >> depth;
+  const int cu_width = tree_type != UVG_CHROMA_T ? LCU_WIDTH >> depth : LCU_WIDTH_C >> depth;
+  const int luma_width = LCU_WIDTH >> depth;
+  assert(cu_width >= 4);
   double cost = MAX_DOUBLE;
   double inter_zero_coeff_cost = MAX_DOUBLE;
   double inter_bitcost = MAX_INT;
@@ -835,11 +810,13 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
 
   lcu_t *const lcu = &work_tree[depth];
 
-  int x_local = SUB_SCU(x);
-  int y_local = SUB_SCU(y);
+  int x_local = SUB_SCU(x) >> (tree_type == UVG_CHROMA_T);
+  int y_local = SUB_SCU(y) >> (tree_type == UVG_CHROMA_T);
 
+  int32_t frame_width = frame->width;
+  int32_t frame_height = frame->height;
   // Stop recursion if the CU is completely outside the frame.
-  if (x >= frame->width || y >= frame->height) {
+  if (x >= frame_width || y >= frame_height) {
     // Return zero cost because this CU does not have to be coded.
     return 0;
   }
@@ -856,6 +833,10 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     pu_depth_intra.min = ctrl->cfg.pu_depth_intra.min[gop_layer] >= 0 ? ctrl->cfg.pu_depth_intra.min[gop_layer] : ctrl->cfg.pu_depth_intra.min[0];
     pu_depth_intra.max = ctrl->cfg.pu_depth_intra.max[gop_layer] >= 0 ? ctrl->cfg.pu_depth_intra.max[gop_layer] : ctrl->cfg.pu_depth_intra.max[0];
   }
+  if(tree_type == UVG_CHROMA_T) {
+    pu_depth_intra.max = CLIP(1, 3, pu_depth_intra.max);
+    pu_depth_intra.min = CLIP(1, 3, pu_depth_intra.min);
+  }
   pu_depth_inter.min = ctrl->cfg.pu_depth_inter.min[gop_layer] >= 0 ? ctrl->cfg.pu_depth_inter.min[gop_layer] : ctrl->cfg.pu_depth_inter.min[0];
   pu_depth_inter.max = ctrl->cfg.pu_depth_inter.max[gop_layer] >= 0 ? ctrl->cfg.pu_depth_inter.max[gop_layer] : ctrl->cfg.pu_depth_inter.max[0];
 
@@ -870,12 +851,15 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
   cur_cu->tr_idx = 0;
   cur_cu->violates_mts_coeff_constraint = 0;
   cur_cu->mts_last_scan_pos = 0;
+  cur_cu->violates_lfnst_constrained_luma = 0;
+  cur_cu->violates_lfnst_constrained_chroma = 0;
+  cur_cu->lfnst_last_scan_pos = 0;
+  cur_cu->lfnst_idx = 0;
   cur_cu->joint_cb_cr = 0;
 
   // If the CU is completely inside the frame at this depth, search for
   // prediction modes at this depth.
-  if (x + cu_width <= frame->width &&
-      y + cu_width <= frame->height)
+  if ( x + luma_width <= frame_width && y + luma_width <= frame_height)
   {
     int cu_width_inter_min = LCU_WIDTH >> pu_depth_inter.max;
     bool can_use_inter =
@@ -886,8 +870,8 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         // When the split was forced because the CTU is partially outside the
         // frame, we permit inter coding even if pu_depth_inter would
         // otherwise forbid it.
-        (x & ~(cu_width_inter_min - 1)) + cu_width_inter_min > frame->width ||
-        (y & ~(cu_width_inter_min - 1)) + cu_width_inter_min > frame->height
+        (x & ~(cu_width_inter_min - 1)) + cu_width_inter_min > frame_width ||
+        (y & ~(cu_width_inter_min - 1)) + cu_width_inter_min > frame_height
       );
 
     if (can_use_inter) {
@@ -919,16 +903,20 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         // When the split was forced because the CTU is partially outside
         // the frame, we permit intra coding even if pu_depth_intra would
         // otherwise forbid it.
-        (x & ~(cu_width_intra_min - 1)) + cu_width_intra_min > frame->width ||
-        (y & ~(cu_width_intra_min - 1)) + cu_width_intra_min > frame->height) &&
+        (x & ~(cu_width_intra_min - 1)) + cu_width_intra_min > frame_width ||
+        (y & ~(cu_width_intra_min - 1)) + cu_width_intra_min > frame_height) &&
       !(state->encoder_control->cfg.force_inter && state->frame->slicetype != UVG_SLICE_I);
 
     intra_search_data_t intra_search;
+    intra_search.cost = 0;
     if (can_use_intra && !skip_intra) {
       intra_search.pred_cu = *cur_cu;
-      intra_search.pred_cu.joint_cb_cr = 4;
-      uvg_search_cu_intra(state, x, y, depth, &intra_search,
-                          lcu);
+      if(tree_type != UVG_CHROMA_T) {
+        intra_search.pred_cu.joint_cb_cr = 4;
+        uvg_search_cu_intra(state, x, y, depth, &intra_search,
+                            lcu,
+                            tree_type);
+      }
 #ifdef COMPLETE_PRED_MODE_BITS
       // Technically counting these bits would be correct, however counting
       // them universally degrades quality so this block is disabled by default
@@ -939,8 +927,75 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         intra_cost += pred_mode_type_bits * state->lambda;
       }
 #endif
-      if (intra_search.cost < cost) {
-        cost = intra_search.cost;
+      if (state->encoder_control->cfg.cclm && tree_type != UVG_CHROMA_T && state->encoder_control->chroma_format != UVG_CSP_400) {
+        uvg_intra_recon_cu(state,
+          x, y,
+          depth, &intra_search,
+          &intra_search.pred_cu,
+          lcu, tree_type, true, false);
+
+        downsample_cclm_rec(
+          state, x, y, cu_width / 2, cu_width / 2, lcu->rec.y, lcu->left_ref.y[64]
+        );
+      }
+      double intra_cost = intra_search.cost;
+      if (intra_cost < cost && tree_type != UVG_LUMA_T) {
+        int8_t intra_mode = intra_search.pred_cu.intra.mode;
+
+        // TODO: This heavily relies to square CUs
+        if ((depth != 4 || (x % 8 && y % 8)) && state->encoder_control->chroma_format != UVG_CSP_400 && tree_type != UVG_LUMA_T) {
+
+          intra_search.pred_cu.joint_cb_cr = 0;
+          // There is almost no benefit to doing the chroma mode search for
+          // rd2. Possibly because the luma mode search already takes chroma
+          // into account, so there is less of a chanse of luma mode being
+          // really bad for chroma.
+          if(tree_type == UVG_CHROMA_T) {
+            intra_search.pred_cu.intra = uvg_get_co_located_luma_cu(x, y, luma_width, luma_width, NULL, state->tile->frame->cu_array, UVG_CHROMA_T)->intra;
+            intra_mode = intra_search.pred_cu.intra.mode;
+            intra_search.pred_cu.type = CU_INTRA;
+          }
+          intra_search.pred_cu.intra.mode_chroma = intra_search.pred_cu.intra.mode;
+          if (ctrl->cfg.rdo >= 3 || ctrl->cfg.jccr || ctrl->cfg.lfnst) {
+            uvg_search_cu_intra_chroma(state, x, y, depth, lcu, &intra_search, tree_type);
+
+            if (intra_search.pred_cu.joint_cb_cr == 0) {
+              intra_search.pred_cu.joint_cb_cr = 4;
+            }
+
+          }
+          else if (!intra_search.pred_cu.intra.mip_flag) {
+            intra_search.pred_cu.intra.mode_chroma = intra_search.pred_cu.intra.mode;
+          }
+          else {
+            intra_search.pred_cu.intra.mode_chroma = 0;
+          }
+          uvg_intra_recon_cu(state,
+                             x, y,
+                             depth, &intra_search,
+                             &intra_search.pred_cu,
+                             lcu,
+                             tree_type, false, true);
+          if(tree_type != UVG_CHROMA_T) {
+            intra_cost += uvg_cu_rd_cost_chroma(state, x_local, y_local, depth, &intra_search.pred_cu, lcu);
+          }
+          else {
+            intra_cost = intra_search.cost;
+          }
+          intra_search.pred_cu.intra.mode = intra_mode;
+          intra_search.pred_cu.violates_lfnst_constrained_chroma = false;
+          intra_search.pred_cu.lfnst_last_scan_pos = false;
+        }
+        else {
+          intra_search.pred_cu.intra.mode_chroma = intra_mode;
+        }
+        intra_search.pred_cu.intra.mode = intra_mode;
+        if(tree_type == UVG_CHROMA_T) {
+          uvg_lcu_fill_trdepth(lcu, x_local, y_local, depth, depth, tree_type);
+        }
+      }
+      if (intra_cost < cost) {
+        cost = intra_cost;
         *cur_cu = intra_search.pred_cu;
         cur_cu->type = CU_INTRA;
       }
@@ -951,67 +1006,30 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     if (cur_cu->type == CU_INTRA) {
       assert(cur_cu->part_size == SIZE_2Nx2N || cur_cu->part_size == SIZE_NxN);
 
-      intra_search.pred_cu.intra.mode_chroma = -1; // don't reconstruct chroma before search is performed for it
+      bool recon_chroma = true;
+      bool recon_luma = tree_type != UVG_CHROMA_T;
+      if ((depth == 4) || state->encoder_control->chroma_format == UVG_CSP_400 || tree_type == UVG_LUMA_T) {
+        recon_chroma = false; 
+      }
       lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
       uvg_intra_recon_cu(state,
                          x, y,
                          depth, &intra_search,
                          NULL, 
-                         lcu);
-
-      downsample_cclm_rec(
-        state, x, y, cu_width / 2, cu_width / 2, lcu->rec.y, lcu->left_ref.y[64]
-      );
-      cur_cu->joint_cb_cr = 0;
-
-      // TODO: This heavily relies to square CUs
-      if ((depth != 4 || (x % 8 && y % 8)) && state->encoder_control->chroma_format != UVG_CSP_400) {
-        // There is almost no benefit to doing the chroma mode search for
-        // rd2. Possibly because the luma mode search already takes chroma
-        // into account, so there is less of a chanse of luma mode being
-        // really bad for chroma.
-        intra_search.pred_cu.intra.mode_chroma = cur_cu->intra.mode_chroma; // skip luma
-        if (ctrl->cfg.rdo >= 3 && !cur_cu->intra.mip_flag) {
-          cur_cu->intra.mode_chroma = uvg_search_cu_intra_chroma(state, x, y, depth, lcu, &intra_search);
-
-          if (intra_search.pred_cu.joint_cb_cr == 0) intra_search.pred_cu.joint_cb_cr = 4;
-          else cur_cu->joint_cb_cr = intra_search.pred_cu.joint_cb_cr;
-
-          lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
-        }
-        intra_search.pred_cu.intra.mode = -1; // skip luma
+                         lcu, tree_type,recon_luma,recon_chroma);
+      if(depth == 4 && x % 8 && y % 8 && tree_type != UVG_LUMA_T && state->encoder_control->chroma_format != UVG_CSP_400) {
+        intra_search.pred_cu.intra.mode_chroma = cur_cu->intra.mode_chroma;
         uvg_intra_recon_cu(state,
-                           x, y, // TODO: as does this
+                           x, y,
                            depth, &intra_search,
                            NULL,
-                           lcu);
-        if(depth != 0 && state->encoder_control->cfg.jccr && ctrl->cfg.rdo < 3) {
-          uvg_select_jccr_mode(state,
-                               x, y,
-                               depth,
-                               NULL,
-                               lcu,
-                               NULL);
-        }
-        else if(depth != 0 && state->encoder_control->cfg.jccr && cur_cu->joint_cb_cr & 3) {
-          assert(cur_cu->joint_cb_cr < 4);
-          cbf_clear(&cur_cu->cbf, depth, COLOR_U);
-          cbf_clear(&cur_cu->cbf, depth, COLOR_V);
-          if (cur_cu->joint_cb_cr & 2) {
-            cbf_set(&cur_cu->cbf, depth, COLOR_U);
-          }
-          if (cur_cu->joint_cb_cr & 1) {
-            cbf_set(&cur_cu->cbf, depth, COLOR_V);
-          }
-          const vector2d_t lcu_px = { (x_local & ~7) / 2, (y_local & ~7) / 2 };
-          int lcu_width = LCU_WIDTH_C;
-          const int index = lcu_px.x + lcu_px.y * lcu_width;
-          const int width = (depth < MAX_DEPTH) ? LCU_WIDTH >> (depth + 1) : LCU_WIDTH >> depth;
-          uvg_pixels_blit(&lcu->rec.joint_u[index], &lcu->rec.u[index], width, width, lcu_width, lcu_width);
-          uvg_pixels_blit(&lcu->rec.joint_v[index], &lcu->rec.v[index], width, width, lcu_width, lcu_width);
-
-        }
+                           lcu,
+                           tree_type,false,true);
       }
+      if (cur_cu->joint_cb_cr == 4) cur_cu->joint_cb_cr = 0;
+      lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
+
+
     } else if (cur_cu->type == CU_INTER) {
 
       if (!cur_cu->skipped) {
@@ -1026,7 +1044,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         if (cur_cu->part_size != SIZE_2Nx2N) {
           tr_depth = depth + 1;
         }
-        uvg_lcu_fill_trdepth(lcu, x, y, depth, tr_depth);
+        uvg_lcu_fill_trdepth(lcu, x, y, depth, tr_depth, tree_type);
 
         const bool has_chroma = state->encoder_control->chroma_format != UVG_CSP_400;
         uvg_inter_recon_cu(state, lcu, x, y, cu_width, true, has_chroma);
@@ -1038,20 +1056,13 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         }
 
         uvg_quantize_lcu_residual(state,
-                                  true, has_chroma,
-                                  state->encoder_control->cfg.jccr, x, y,
+                                  true, has_chroma && !cur_cu->joint_cb_cr,
+                                  cur_cu->joint_cb_cr, x, y,
                                   depth,
                                   NULL,
                                   lcu,
-                                  false);
-        if (cur_cu->depth == cur_cu->tr_depth && state->encoder_control->cfg.jccr && cur_cu->joint_cb_cr) {
-          uvg_select_jccr_mode(state,
-            x, y,
-            depth,
-            NULL,
-            lcu,
-            NULL);
-        }
+                                  false,
+          tree_type);
 
         int cbf = cbf_is_set_any(cur_cu->cbf, depth);
 
@@ -1081,7 +1092,8 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         cabac,
         x, y, depth,
         lcu,
-        cur_cu);
+        cur_cu,
+        tree_type);
     }
     else {
       assert(0);
@@ -1089,13 +1101,13 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     
     cost = bits * state->lambda;
 
-    cost += cu_rd_cost_tr_split_accurate(state, x_local, y_local, depth, cur_cu, lcu);
+    cost += cu_rd_cost_tr_split_accurate(state, x_local, y_local, depth, cur_cu, lcu, tree_type);
     
     if (ctrl->cfg.zero_coeff_rdo && inter_zero_coeff_cost <= cost) {
       cost = inter_zero_coeff_cost;
 
       // Restore saved pixels from lower level of the working tree.
-      copy_cu_pixels(x_local, y_local, cu_width, &work_tree[depth + 1], lcu);
+      copy_cu_pixels(x_local, y_local, cu_width, &work_tree[depth + 1], lcu, tree_type);
 
       if (cur_cu->merged && cur_cu->part_size == SIZE_2Nx2N) {
         cur_cu->merged = 0;
@@ -1106,7 +1118,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       if (cur_cu->tr_depth != depth) {
         // Reset transform depth since there are no coefficients. This
         // ensures that CBF is cleared for the whole area of the CU.
-        uvg_lcu_fill_trdepth(lcu, x, y, depth, depth);
+        uvg_lcu_fill_trdepth(lcu, x, y, depth, depth, tree_type);
       }
 
       cur_cu->cbf = 0;
@@ -1123,24 +1135,56 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     (state->frame->slicetype != UVG_SLICE_I &&
       depth < pu_depth_inter.max);
 
+  if(state->encoder_control->cabac_debug_file) {
+    fprintf(state->encoder_control->cabac_debug_file, "S %4d %4d %d %d", x, y, depth, tree_type);
+    fwrite(&state->search_cabac.ctx, 1,  sizeof(state->search_cabac.ctx), state->encoder_control->cabac_debug_file);
+  }
+
   // Recursively split all the way to max search depth.
   if (can_split_cu) {
-    int half_cu = cu_width / 2;
+    int half_cu = cu_width >> (tree_type != UVG_CHROMA_T);
     double split_cost = 0.0;
     int cbf = cbf_is_set_any(cur_cu->cbf, depth);
     cabac_data_t post_seach_cabac;
     memcpy(&post_seach_cabac, &state->search_cabac, sizeof(post_seach_cabac));
     memcpy(&state->search_cabac, &pre_search_cabac, sizeof(post_seach_cabac));
+
+
     state->search_cabac.update = 1;
 
     double split_bits = 0;
 
     if (depth < MAX_DEPTH) {
       // Add cost of cu_split_flag.
-      uvg_write_split_flag(state, &state->search_cabac, 
-        x > 0 ? LCU_GET_CU_AT_PX(lcu,SUB_SCU(x) -1, SUB_SCU(y)): NULL,
-        y > 0 ? LCU_GET_CU_AT_PX(lcu, SUB_SCU(x), SUB_SCU(y) - 1) : NULL,
-        1, depth, cu_width, x, y, &split_bits);
+      const cu_info_t* left_cu = NULL, * above_cu = NULL;
+      if (x) {
+        if (x_local || tree_type != UVG_CHROMA_T) {
+          left_cu = LCU_GET_CU_AT_PX(lcu, x_local - 1, y_local);
+        }
+        else {
+          left_cu = uvg_cu_array_at_const(state->tile->frame->chroma_cu_array, (x >> 1) - 1, y >> 1);
+        }
+      }
+      if (y) {
+        if (y_local || tree_type != UVG_CHROMA_T) {
+          above_cu = LCU_GET_CU_AT_PX(lcu, x_local, y_local - 1);
+        }
+        else {
+          above_cu = uvg_cu_array_at_const(state->tile->frame->chroma_cu_array, x >> 1, (y >> 1) - 1);
+        }
+      }
+      uvg_write_split_flag(
+        state,
+        &state->search_cabac,
+        left_cu,
+        above_cu,
+        1,
+        depth,
+        cu_width,
+        x >> (tree_type == UVG_CHROMA_T),
+        y >> (tree_type == UVG_CHROMA_T),
+        tree_type,
+        &split_bits);
     }
 
     state->search_cabac.update = 0;
@@ -1152,22 +1196,25 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     // It is ok to interrupt the search as soon as it is known that
     // the split costs at least as much as not splitting.
     if (cur_cu->type == CU_NOTSET || cbf || state->encoder_control->cfg.cu_split_termination == UVG_CU_SPLIT_TERMINATION_OFF) {
-      if (split_cost < cost) split_cost += search_cu(state, x,           y,           depth + 1, work_tree);
-      if (split_cost < cost) split_cost += search_cu(state, x + half_cu, y,           depth + 1, work_tree);
-      if (split_cost < cost) split_cost += search_cu(state, x,           y + half_cu, depth + 1, work_tree);
-      if (split_cost < cost) split_cost += search_cu(state, x + half_cu, y + half_cu, depth + 1, work_tree);
+      if (split_cost < cost) split_cost += search_cu(state, x,           y,           depth + 1, work_tree, tree_type);
+      if (split_cost < cost) split_cost += search_cu(state, x + half_cu, y,           depth + 1, work_tree, tree_type);
+      if (split_cost < cost) split_cost += search_cu(state, x,           y + half_cu, depth + 1, work_tree, tree_type);
+      if (split_cost < cost) split_cost += search_cu(state, x + half_cu, y + half_cu, depth + 1, work_tree, tree_type);
     } else {
       split_cost = INT_MAX;
     }
+
 
     // If no search is not performed for this depth, try just the best mode
     // of the top left CU from the next depth. This should ensure that 64x64
     // gets used, at least in the most obvious cases, while avoiding any
     // searching.
-    
+
+    // TODO: Dual tree
     if (cur_cu->type == CU_NOTSET && depth < MAX_PU_DEPTH
-        && x + cu_width <= frame->width && y + cu_width <= frame->height 
-        && state->encoder_control->cfg.combine_intra_cus)
+        && x + cu_width <= frame_width && y + cu_width <= frame_height 
+        && state->encoder_control->cfg.combine_intra_cus 
+      && tree_type == UVG_BOTH_T)
     {
 
       cu_info_t *cu_d1 = LCU_GET_CU_AT_PX(&work_tree[depth + 1], x_local, y_local);
@@ -1180,9 +1227,10 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         cost = 0;
         double bits = 0;
         uvg_write_split_flag(state, &state->search_cabac,
-          x > 0 ? LCU_GET_CU_AT_PX(lcu, SUB_SCU(x) - 1, SUB_SCU(y)) : NULL,
-          y > 0 ? LCU_GET_CU_AT_PX(lcu, SUB_SCU(x), SUB_SCU(y) - 1) : NULL,
-          0, depth, cu_width, x, y, & split_bits);
+                             x > 0 ? LCU_GET_CU_AT_PX(lcu, SUB_SCU(x) - 1, SUB_SCU(y)) : NULL,
+                             y > 0 ? LCU_GET_CU_AT_PX(lcu, SUB_SCU(x), SUB_SCU(y) - 1) : NULL,
+                             0, depth, cu_width, x, y, tree_type,
+                             & split_bits);
 
         cur_cu->intra = cu_d1->intra;
         cur_cu->type = CU_INTRA;
@@ -1191,7 +1239,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         // Disable MRL in this case
         cur_cu->intra.multi_ref_idx = 0;
 
-        uvg_lcu_fill_trdepth(lcu, x, y, depth, cur_cu->tr_depth);
+        uvg_lcu_fill_trdepth(lcu, x, y, depth, cur_cu->tr_depth, tree_type);
         lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
         
         intra_search_data_t proxy;
@@ -1203,12 +1251,13 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
                            depth,
                            &proxy,
                            NULL,
-                           lcu);
+                           lcu,
+                           tree_type, true, state->encoder_control->chroma_format == UVG_CSP_400);
 
         double mode_bits = calc_mode_bits(state, lcu, cur_cu, x, y, depth) + bits;
         cost += mode_bits * state->lambda;
 
-        cost += cu_rd_cost_tr_split_accurate(state, x_local, y_local, depth, cur_cu, lcu);
+        cost += cu_rd_cost_tr_split_accurate(state, x_local, y_local, depth, cur_cu, lcu, tree_type);
 
         memcpy(&post_seach_cabac, &state->search_cabac, sizeof(post_seach_cabac));
         memcpy(&state->search_cabac, &temp_cabac, sizeof(temp_cabac));
@@ -1218,7 +1267,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     if (split_cost < cost) {
       // Copy split modes to this depth.
       cost = split_cost;
-      work_tree_copy_up(x_local, y_local, depth, work_tree, state->encoder_control->cfg.jccr);
+      work_tree_copy_up(x_local, y_local, depth, work_tree, state->encoder_control->cfg.jccr, tree_type);
 #if UVG_DEBUG
       //debug_split = 1;
 #endif
@@ -1226,7 +1275,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       // Copy this CU's mode all the way down for use in adjacent CUs mode
       // search.
       memcpy(&state->search_cabac, &post_seach_cabac, sizeof(post_seach_cabac));
-      work_tree_copy_down(x_local, y_local, depth, work_tree);
+      work_tree_copy_down(x_local, y_local, depth, work_tree, tree_type);
       downsample_cclm_rec(
         state, x, y, cu_width / 2, cu_width / 2, lcu->rec.y, lcu->left_ref.y[64]
       );
@@ -1246,10 +1295,12 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
   } else if (depth >= 0 && depth < MAX_PU_DEPTH) {
     // Need to copy modes down since the lower level of the work tree is used
     // when searching SMP and AMP blocks.
-    work_tree_copy_down(x_local, y_local, depth, work_tree);
-    downsample_cclm_rec(
-      state, x, y, cu_width / 2, cu_width / 2, lcu->rec.y, lcu->left_ref.y[64]
-    );
+    work_tree_copy_down(x_local, y_local, depth, work_tree, tree_type);
+    if(tree_type != UVG_CHROMA_T) {
+      downsample_cclm_rec(
+        state, x, y, cu_width / 2, cu_width / 2, lcu->rec.y, lcu->left_ref.y[64]
+      );
+    }
 
     if (state->frame->slicetype != UVG_SLICE_I) {
       // Reset HMVP to the beginning of this CU level search and add this CU as the mvp
@@ -1384,10 +1435,16 @@ static void init_lcu_t(const encoder_state_t * const state, const int x, const i
 /**
  * Copy CU and pixel data to it's place in picture datastructure.
  */
-static void copy_lcu_to_cu_data(const encoder_state_t * const state, int x_px, int y_px, const lcu_t *lcu)
+static void copy_lcu_to_cu_data(const encoder_state_t * const state, int x_px, int y_px, const lcu_t *lcu, enum
+                                uvg_tree_type tree_type)
 {
   // Copy non-reference CUs to picture.
-  uvg_cu_array_copy_from_lcu(state->tile->frame->cu_array, x_px, y_px, lcu);
+  uvg_cu_array_copy_from_lcu(
+    tree_type != UVG_CHROMA_T ? state->tile->frame->cu_array : state->tile->frame->chroma_cu_array, 
+    tree_type != UVG_CHROMA_T ? x_px : x_px / 2,
+    tree_type != UVG_CHROMA_T ? y_px : y_px / 2,
+    lcu, 
+    tree_type);
 
   // Copy pixels to picture.
   {
@@ -1396,15 +1453,17 @@ static void copy_lcu_to_cu_data(const encoder_state_t * const state, int x_px, i
     const int x_max = MIN(x_px + LCU_WIDTH, pic_width) - x_px;
     const int y_max = MIN(y_px + LCU_WIDTH, pic->height) - y_px;
 
-    uvg_pixels_blit(lcu->rec.y, &pic->rec->y[x_px + y_px * pic->rec->stride],
-                        x_max, y_max, LCU_WIDTH, pic->rec->stride);
+    if(tree_type != UVG_CHROMA_T) {
+      uvg_pixels_blit(lcu->rec.y, &pic->rec->y[x_px + y_px * pic->rec->stride],
+                          x_max, y_max, LCU_WIDTH, pic->rec->stride);
+    }
 
     if (state->tile->frame->lmcs_aps->m_sliceReshapeInfo.sliceReshaperEnableFlag) {
       uvg_pixels_blit(lcu->rec.y, &pic->rec_lmcs->y[x_px + y_px * pic->rec->stride],
         x_max, y_max, LCU_WIDTH, pic->rec->stride);
     }
 
-    if (state->encoder_control->chroma_format != UVG_CSP_400) {
+    if (state->encoder_control->chroma_format != UVG_CSP_400 && tree_type != UVG_LUMA_T) {
       uvg_pixels_blit(lcu->rec.u, &pic->rec->u[(x_px / 2) + (y_px / 2) * (pic->rec->stride / 2)],
                       x_max / 2, y_max / 2, LCU_WIDTH / 2, pic->rec->stride / 2);
       uvg_pixels_blit(lcu->rec.v, &pic->rec->v[(x_px / 2) + (y_px / 2) * (pic->rec->stride / 2)],
@@ -1443,8 +1502,16 @@ void uvg_search_lcu(encoder_state_t * const state, const int x, const int y, con
     uvg_lcu_luma_depth_pred(constr->ml_intra_depth_ctu, work_tree[0].ref.y, state->qp);
   }
 
+  int tree_type = state->frame->slicetype == UVG_SLICE_I
+  && state->encoder_control->cfg.dual_tree ? UVG_LUMA_T : UVG_BOTH_T;
   // Start search from depth 0.
-  double cost = search_cu(state, x, y, 0, work_tree);
+  double cost = search_cu(
+    state,
+    x,
+    y,
+    0,
+    work_tree,
+    tree_type);
 
   // Save squared cost for rate control.
   if(state->encoder_control->cfg.rc_algorithm == UVG_LAMBDA) {
@@ -1453,10 +1520,26 @@ void uvg_search_lcu(encoder_state_t * const state, const int x, const int y, con
 
   // The best decisions through out the LCU got propagated back to depth 0,
   // so copy those back to the frame.
-  copy_lcu_to_cu_data(state, x, y, &work_tree[0]);
+  copy_lcu_to_cu_data(state, x, y, &work_tree[0], tree_type);
 
   // Copy coeffs to encoder state.
   copy_coeffs(work_tree[0].coeff.y, coeff->y, LCU_WIDTH);
+
+  if(state->frame->slicetype == UVG_SLICE_I && state->encoder_control->cfg.dual_tree) {
+    cost = search_cu(
+      state,
+      x,
+      y,
+      0,
+      work_tree,
+      UVG_CHROMA_T);
+
+    if (state->encoder_control->cfg.rc_algorithm == UVG_LAMBDA) {
+      uvg_get_lcu_stats(state, x / LCU_WIDTH, y / LCU_WIDTH)->weight += cost * cost;
+    }
+    copy_lcu_to_cu_data(state, x, y, &work_tree[0], UVG_CHROMA_T);
+  }
+
   copy_coeffs(work_tree[0].coeff.u, coeff->u, LCU_WIDTH_C);
   copy_coeffs(work_tree[0].coeff.v, coeff->v, LCU_WIDTH_C);
   if (state->encoder_control->cfg.jccr) {

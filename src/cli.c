@@ -71,6 +71,8 @@ static const struct option long_options[] = {
   { "no-full-intra-search",     no_argument, NULL, 0 },
   { "transform-skip",           no_argument, NULL, 0 },
   { "no-transform-skip",        no_argument, NULL, 0 },
+  { "chroma-transform-skip",    no_argument, NULL, 0 },
+  { "no-chroma-transform-skip", no_argument, NULL, 0 },
   { "tr-skip-max-size",   required_argument, NULL, 0 },
   { "mts",                required_argument, NULL, 0 },
   { "no-mts",                   no_argument, NULL, 0 },
@@ -174,6 +176,8 @@ static const struct option long_options[] = {
   { "no-mrl",                   no_argument, NULL, 0 },
   { "mip",                      no_argument, NULL, 0 },
   { "no-mip",                   no_argument, NULL, 0 },
+  { "lfnst",                    no_argument, NULL, 0 },
+  { "no-lfnst",                 no_argument, NULL, 0 },
   { "jccr",                     no_argument, NULL, 0 },
   { "no-jccr",                  no_argument, NULL, 0 },
   { "amvr",                     no_argument, NULL, 0 },
@@ -184,6 +188,9 @@ static const struct option long_options[] = {
   { "no-combine-intra-cus",     no_argument, NULL, 0 },
   { "force-inter",              no_argument, NULL, 0 },
   { "no-force-inter",           no_argument, NULL, 0 },
+  { "dual-tree",                no_argument, NULL, 0 },
+  { "no-dual-tree",             no_argument, NULL, 0 },
+  { "cabac-debug-file",   required_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 
@@ -458,6 +465,8 @@ void print_help(void)
     "                               bits, lambda, distortion, and qp for each ctu.\n"
     "                               These are meant for debugging and are not\n"
     "                               written unless the prefix is defined.\n"
+    "      --cabac-debug-file     : A debug file for cabac context.\n"
+    "                               Ignore this, it is only for tests.\n"
     "\n"
     /* Word wrap to this width to stay under 80 characters (including ") *************/
     "Video structure:\n"
@@ -540,6 +549,8 @@ void print_help(void)
     "                               same length, start with same value, and can\n"
     "                               contain maximum 16 or 36 - starting value\n"
     "                               elements. [17,27,32,44]\n"
+    "      --(no-)dual-tree       : Use separate CTU structure for luma and\n"
+    "                               chroma in intra slices.\n"
     "\n"
     /* Word wrap to this width to stay under 80 characters (including ") *************/
     "Compression tools:\n"
@@ -572,6 +583,8 @@ void print_help(void)
     "      --(no-)full-intra-search : Try all intra modes during rough search.\n"
     "                               [disabled]\n"
     "      --(no-)transform-skip  : Try transform skip [disabled]\n"
+    "      --(no-)chroma-transform-skip : Try transform skip for chroma \n"
+    "                                     blocks. [disabled]\n"
     "      --tr-skip-max-size     : Max log2 size of transform skip 2..5 [2]\n"
     "      --me <string>          : Integer motion estimation algorithm [hexbs]\n"
     "                                   - hexbs: Hexagon Based Search\n"
@@ -647,6 +660,8 @@ void print_help(void)
     "      --(no-)mrl             : Enable use of multiple reference lines in intra\n"
     "                               predictions.\n"
     "      --(no-)mip             : Enable matrix weighted intra prediction.\n"
+    "      --(no-)lfnst           : Enable low frequency non-separable transform.\n"
+    "                                 [disabled]\n"
     "      --mts <string>         : Multiple Transform Selection [off].\n"
     "                               (Currently only implemented for intra\n"
     "                               and has effect only when rd >= 2)\n"

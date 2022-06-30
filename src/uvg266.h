@@ -334,6 +334,7 @@ typedef struct uvg_config
   int32_t rdo;            /*!< \brief RD-calculation level (0..2) */
   int32_t full_intra_search; /*!< \brief If true, don't skip modes in intra search. */
   int32_t trskip_enable;    /*!< \brief Flag to enable transform skip. */
+  int32_t chroma_trskip_enable; /*!< \brief Flag to enable transform skip for chroma blocks. */
   int32_t trskip_max_size;    /*!< \brief Transform skip max block size. */
   enum uvg_mts mts;        /*< \brief flag to enable multiple transform selection*/
   int32_t mts_implicit;        /*< \brief flag to enable implicit multiple transform selection*/
@@ -518,10 +519,12 @@ typedef struct uvg_config
   int8_t chroma_scale_out[3][17];
 
   /** \brief enable use of multiple reference lines in intra prediction */
-  int8_t mrl; 
+  int8_t mrl;
 
   /** \brief enable matrix weighted intra prediction */
   int8_t mip;
+  /** \brief enable low frequency non-separable transform */
+  int8_t lfnst;
 
 
   int8_t jccr;
@@ -535,6 +538,9 @@ typedef struct uvg_config
   uint8_t combine_intra_cus;
 
   uint8_t force_inter;
+  char* cabac_debug_file_name;
+
+  uint8_t dual_tree;
 } uvg_config;
 
 /**

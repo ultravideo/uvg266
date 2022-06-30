@@ -1775,18 +1775,21 @@ static void search_pu_inter(encoder_state_t * const state,
         cur_pu->inter.mv[0][1]  = info->merge_cand[merge_idx].mv[0][1];
         cur_pu->inter.mv[1][0]  = info->merge_cand[merge_idx].mv[1][0];
         cur_pu->inter.mv[1][1]  = info->merge_cand[merge_idx].mv[1][1];
-        uvg_lcu_fill_trdepth(lcu, x, y, depth, MAX(1, depth));
+        uvg_lcu_fill_trdepth(lcu, x, y, depth, MAX(1, depth), UVG_BOTH_T);
         uvg_inter_recon_cu(state, lcu, x, y, width, true, false);
-        uvg_quantize_lcu_residual(state, true, false, false, x, y, depth, cur_pu, lcu, true);
+        uvg_quantize_lcu_residual(state, true, false, false, x, y, depth, cur_pu, lcu, true, UVG_BOTH_T);
 
         if (cbf_is_set(cur_pu->cbf, depth, COLOR_Y)) {
           continue;
         }
         else if (has_chroma) {
           uvg_inter_recon_cu(state, lcu, x, y, width, false, has_chroma);
-          uvg_quantize_lcu_residual(state, false, has_chroma, 
-            false, /*we are only checking for lack of coeffs so no need to check jccr*/
-            x, y, depth, cur_pu, lcu, true);
+          uvg_quantize_lcu_residual(state,
+                                    false, has_chroma,
+                                    false, /*we are only checking for lack of coeffs so no need to check jccr*/
+                                    x, y, depth, cur_pu, lcu,
+                                    true,
+            UVG_BOTH_T);
           if (!cbf_is_set_any(cur_pu->cbf, depth)) {
             cur_pu->type = CU_INTER;
             cur_pu->merge_idx = merge_idx;
@@ -2094,14 +2097,15 @@ void uvg_cu_cost_inter_rd2(encoder_state_t * const state,
   if (cur_cu->part_size != SIZE_2Nx2N) {
     tr_depth = depth + 1;
   }
-  uvg_lcu_fill_trdepth(lcu, x, y, depth, tr_depth);
+  uvg_lcu_fill_trdepth(lcu, x, y, depth, tr_depth, UVG_BOTH_T);
 
   const int x_px = SUB_SCU(x);
   const int y_px = SUB_SCU(y);
   const int width = LCU_WIDTH >> depth;
   cabac_data_t cabac_copy;
   memcpy(&cabac_copy, &state->search_cabac, sizeof(cabac_copy));
-  cabac_copy.update = 1;
+  cabac_data_t* cabac = &state->search_cabac;
+  state->search_cabac.update = 1;
 
   cu_info_t* cur_pu = LCU_GET_CU_AT_PX(lcu, x_px, y_px);
   *cur_pu = *cur_cu;
@@ -2128,21 +2132,95 @@ void uvg_cu_cost_inter_rd2(encoder_state_t * const state,
   const int skip_context = uvg_get_skip_context(x, y, lcu, NULL, NULL);
   if (cur_cu->merged && cur_cu->part_size == SIZE_2Nx2N) {
     no_cbf_bits = CTX_ENTROPY_FBITS(&state->cabac.ctx.cu_skip_flag_model[skip_context], 1) + *inter_bitcost;
-    bits += uvg_mock_encode_coding_unit(state, &cabac_copy, x, y, depth, lcu, cur_cu);
+    bits += uvg_mock_encode_coding_unit(state, cabac, x, y, depth, lcu, cur_cu, UVG_BOTH_T);
   }
   else {
-    no_cbf_bits = uvg_mock_encode_coding_unit(state, &cabac_copy, x, y, depth, lcu, cur_cu);
-    bits += no_cbf_bits - CTX_ENTROPY_FBITS(&cabac_copy.ctx.cu_qt_root_cbf_model, 0) + CTX_ENTROPY_FBITS(&cabac_copy.ctx.cu_qt_root_cbf_model, 1);
+    no_cbf_bits = uvg_mock_encode_coding_unit(state, cabac, x, y, depth, lcu, cur_cu, UVG_BOTH_T);
+    bits += no_cbf_bits - CTX_ENTROPY_FBITS(&cabac->ctx.cu_qt_root_cbf_model, 0) + CTX_ENTROPY_FBITS(&cabac->ctx.cu_qt_root_cbf_model, 1);
   }
   double no_cbf_cost = ssd + no_cbf_bits * state->lambda;
 
-  uvg_quantize_lcu_residual(state,
-                            true, reconstruct_chroma,
-                            reconstruct_chroma && state->encoder_control->cfg.jccr, x, y,
-                            depth,
-                            cur_cu,
-                            lcu,
-                            false);
+  const int can_use_chroma_tr_skip = state->encoder_control->cfg.trskip_enable &&
+    (1 << state->encoder_control->cfg.trskip_max_size) >= width &&
+    state->encoder_control->cfg.chroma_trskip_enable;
+
+  double chroma_cost = 0;
+  if((state->encoder_control->cfg.jccr || can_use_chroma_tr_skip) && cur_cu->depth == cur_cu->tr_depth && reconstruct_chroma) {
+    uvg_quantize_lcu_residual(state,
+                              true,
+                              false,
+                              false, x, y,
+                              depth,
+                              cur_cu,
+                              lcu,
+                              false, 
+      UVG_BOTH_T);
+    ALIGNED(64) uvg_pixel u_pred[LCU_WIDTH_C * LCU_WIDTH_C];
+    ALIGNED(64) uvg_pixel v_pred[LCU_WIDTH_C * LCU_WIDTH_C];
+    uvg_pixels_blit(&lcu->ref.u[index], u_pred, width, width, LCU_WIDTH_C, width);
+    uvg_pixels_blit(&lcu->ref.v[index], v_pred, width, width, LCU_WIDTH_C, width);
+    ALIGNED(64) int16_t u_resi[LCU_WIDTH_C * LCU_WIDTH_C];
+    ALIGNED(64) int16_t v_resi[LCU_WIDTH_C * LCU_WIDTH_C];
+
+    uvg_generate_residual(
+      &lcu->ref.u[index],
+      u_pred,
+      u_resi,
+      width,
+      LCU_WIDTH_C,
+      width);
+    uvg_generate_residual(
+      &lcu->ref.v[index],
+      v_pred,
+      v_resi,
+      width,
+      LCU_WIDTH_C,
+      width);
+
+    uvg_chorma_ts_out_t chorma_ts_out;
+    uvg_chroma_transform_search(
+      state,
+      depth,
+      lcu,
+      &cabac_copy,
+      width,
+      width,
+      index,
+      0,
+      cur_cu,
+      u_pred,
+      v_pred,
+      u_resi,
+      v_resi,
+      &chorma_ts_out,
+      UVG_BOTH_T);
+    cbf_clear(&cur_cu->cbf, depth, COLOR_U);
+    cbf_clear(&cur_cu->cbf, depth, COLOR_V);
+    if (chorma_ts_out.best_u_cost + chorma_ts_out.best_v_cost < chorma_ts_out.best_combined_cost) {
+      cur_cu->joint_cb_cr = 0;
+      cur_cu->tr_skip |= (chorma_ts_out.best_u_index == CHROMA_TS) << COLOR_U;
+      cur_cu->tr_skip |= (chorma_ts_out.best_v_index == CHROMA_TS) << COLOR_V;
+      if(chorma_ts_out.best_u_index != NO_RESIDUAL) cbf_set(&cur_cu->cbf, depth, COLOR_U);
+      if(chorma_ts_out.best_v_index != NO_RESIDUAL) cbf_set(&cur_cu->cbf, depth, COLOR_V);
+      chroma_cost += chorma_ts_out.best_u_cost + chorma_ts_out.best_v_cost;
+    }
+    else {
+      cur_cu->joint_cb_cr = chorma_ts_out.best_combined_index;
+      if (chorma_ts_out.best_combined_index & 2) cbf_set(&cur_cu->cbf, depth, COLOR_U);
+      if (chorma_ts_out.best_combined_index & 1) cbf_set(&cur_cu->cbf, depth, COLOR_V);
+      chroma_cost += chorma_ts_out.best_combined_cost;
+    }
+  }
+  else {
+    uvg_quantize_lcu_residual(state,
+                              true, reconstruct_chroma,
+                              reconstruct_chroma && state->encoder_control->cfg.jccr, x, y,
+                              depth,
+                              cur_cu,
+                              lcu,
+                              false, 
+      UVG_BOTH_T);    
+  }
 
   int cbf = cbf_is_set_any(cur_cu->cbf, depth);
   
@@ -2153,7 +2231,7 @@ void uvg_cu_cost_inter_rd2(encoder_state_t * const state,
         *inter_cost += uvg_cu_rd_cost_chroma(state, x_px, y_px, depth, cur_cu, lcu);
       }
       else {
-        uvg_select_jccr_mode(state, x_px, y_px, depth, cur_cu, lcu, inter_cost);        
+        *inter_cost += chroma_cost;
       }
     }
   }

@@ -151,6 +151,13 @@ set(CLI_SOURCES "src/encmain.c" "src/cli.c" "src/cli.h" "src/yuv_io.c" "src/yuv_
 # Add the getopt and pthread for visual studio
 if(MSVC) 
   list(APPEND CLI_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/extras/getopt.c ${CMAKE_CURRENT_SOURCE_DIR}/src/threadwrapper/src/pthread.cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/threadwrapper/src/semaphore.cpp)
+  
+  string(REPLACE "/Zi" "/ZI" CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG}")
+  string(REPLACE "/Zi" "/ZI" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
+  string(REPLACE "/Zi" "/ZI" CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO}")
+  string(REPLACE "/Zi" "/ZI" CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
+
+  target_link_options(uvg266 PUBLIC "/INCREMENTAL")
 endif()
 
 add_executable(uvg266-bin ${CLI_SOURCES})
@@ -348,5 +355,8 @@ if(NOT DEFINED MSVC)
   endif()
   if(NOT "test_slices" IN_LIST XFAIL)
     add_test( NAME test_slices COMMAND ${PROJECT_SOURCE_DIR}/tests/test_slices.sh WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/tests)
+  endif()
+  if(NOT "test_cabac_state" IN_LIST XFAIL)
+    add_test( NAME test_cabac_state COMMAND ${PROJECT_SOURCE_DIR}/tests/test_cabac_state.sh WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/tests)
   endif()
 endif()

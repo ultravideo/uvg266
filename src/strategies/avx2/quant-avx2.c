@@ -49,6 +49,7 @@
 #include "scalinglist.h"
 #include "strategies/generic/quant-generic.h"
 #include "strategies/strategies-quant.h"
+#include "strategies/strategies-picture.h"
 #include "strategyselector.h"
 #include "tables.h"
 #include "transform.h"
@@ -376,7 +377,7 @@ static INLINE unsigned uvg_math_floor_log2(unsigned value)
  *
  */
 void uvg_quant_avx2(const encoder_state_t * const state, const coeff_t * __restrict coef, coeff_t * __restrict q_coef, int32_t width,
-  int32_t height, color_t color, int8_t scan_idx, int8_t block_type, int8_t transform_skip)
+  int32_t height, color_t color, int8_t scan_idx, int8_t block_type, int8_t transform_skip, uint8_t lfnst_idx)
 {
   const encoder_control_t * const encoder = state->encoder_control;
   const uint32_t log2_block_size = uvg_g_convert_to_bit[width] + 2;
@@ -389,7 +390,7 @@ void uvg_quant_avx2(const encoder_state_t * const state, const coeff_t * __restr
   const int32_t scalinglist_type = (block_type == CU_INTRA ? 0 : 3) + (int8_t)color;
   const int32_t *quant_coeff = encoder->scaling_list.quant_coeff[log2_tr_width][log2_tr_height][scalinglist_type][qp_scaled % 6];
   const int32_t transform_shift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - ((log2_tr_width + log2_tr_height) >> 1); //!< Represents scaling through forward transform
-  const int32_t q_bits = QUANT_SHIFT + qp_scaled / 6 + (transform_skip ? 0 : transform_shift);
+  const int64_t q_bits = QUANT_SHIFT + qp_scaled / 6 + (transform_skip ? 0 : transform_shift);
   const int32_t add = ((state->frame->slicetype == UVG_SLICE_I) ? 171 : 85) << (q_bits - 9);
   const int32_t q_bits8 = q_bits - 8;
 
@@ -405,28 +406,29 @@ void uvg_quant_avx2(const encoder_state_t * const state, const coeff_t * __restr
     high_b = low_b;
   }
 
-  for (int32_t n = 0; n < width * height; n += VEC_WIDTH) {
+  if(lfnst_idx == 0) {
+    for (int32_t n = 0; n < width * height; n += VEC_WIDTH) {
 
-    __m256i v_level = _mm256_loadu_si256((__m256i *)(coef + n));
-    __m256i v_sign = _mm256_cmpgt_epi16(_mm256_setzero_si256(), v_level);
-    v_sign = _mm256_or_si256(v_sign, _mm256_set1_epi16(1));
+      __m256i v_level = _mm256_loadu_si256((__m256i *)(coef + n));
+      __m256i v_sign = _mm256_cmpgt_epi16(_mm256_setzero_si256(), v_level);
+      v_sign = _mm256_or_si256(v_sign, _mm256_set1_epi16(1));
 
-    if (state->encoder_control->scaling_list.enable) {
-      __m256i v_quant_coeff_lo = _mm256_loadu_si256(((__m256i *)(quant_coeff + n)) + 0);
-      __m256i v_quant_coeff_hi = _mm256_loadu_si256(((__m256i *)(quant_coeff + n)) + 1);
+      if (state->encoder_control->scaling_list.enable) {
+        __m256i v_quant_coeff_lo = _mm256_loadu_si256(((__m256i *)(quant_coeff + n)) + 0);
+        __m256i v_quant_coeff_hi = _mm256_loadu_si256(((__m256i *)(quant_coeff + n)) + 1);
 
-      low_b  = _mm256_permute2x128_si256(v_quant_coeff_lo,
-                                         v_quant_coeff_hi,
-                                         0x20);
+        low_b  = _mm256_permute2x128_si256(v_quant_coeff_lo,
+                                           v_quant_coeff_hi,
+                                           0x20);
 
-      high_b = _mm256_permute2x128_si256(v_quant_coeff_lo,
-                                         v_quant_coeff_hi,
-                                         0x31);
-    }
+        high_b = _mm256_permute2x128_si256(v_quant_coeff_lo,
+                                           v_quant_coeff_hi,
+                                           0x31);
+      }
 
-// TODO: do we need to have this?
-// #define CHECK_QUANT_COEFFS
-#ifdef CHECK_QUANT_COEFFS
+      // TODO: do we need to have this?
+      // #define CHECK_QUANT_COEFFS
+      #ifdef CHECK_QUANT_COEFFS
       __m256i abs_vq_lo = _mm256_abs_epi32(v_quant_coeff_lo);
       __m256i abs_vq_hi = _mm256_abs_epi32(v_quant_coeff_hi);
 
@@ -439,26 +441,46 @@ void uvg_quant_avx2(const encoder_state_t * const state, const coeff_t * __restr
       assert(!(over_16b_mask_lo || over_16b_mask_hi));
 #endif
 
-    v_level = _mm256_abs_epi16(v_level);
-    __m256i low_a  = _mm256_unpacklo_epi16(v_level, _mm256_setzero_si256());
-    __m256i high_a = _mm256_unpackhi_epi16(v_level, _mm256_setzero_si256());
+      v_level = _mm256_abs_epi16(v_level);
+      __m256i low_a  = _mm256_unpacklo_epi16(v_level, _mm256_setzero_si256());
+      __m256i high_a = _mm256_unpackhi_epi16(v_level, _mm256_setzero_si256());
 
-    __m256i v_level32_a = _mm256_mullo_epi32(low_a,  low_b);
-    __m256i v_level32_b = _mm256_mullo_epi32(high_a, high_b);
+      __m256i v_level32_a = _mm256_mullo_epi32(low_a,  low_b);
+      __m256i v_level32_b = _mm256_mullo_epi32(high_a, high_b);
 
-    v_level32_a = _mm256_add_epi32(v_level32_a, _mm256_set1_epi32(add));
-    v_level32_b = _mm256_add_epi32(v_level32_b, _mm256_set1_epi32(add));
+      v_level32_a = _mm256_add_epi32(v_level32_a, _mm256_set1_epi32(add));
+      v_level32_b = _mm256_add_epi32(v_level32_b, _mm256_set1_epi32(add));
 
-    v_level32_a = _mm256_srai_epi32(v_level32_a, q_bits);
-    v_level32_b = _mm256_srai_epi32(v_level32_b, q_bits);
+      v_level32_a = _mm256_srai_epi32(v_level32_a, q_bits);
+      v_level32_b = _mm256_srai_epi32(v_level32_b, q_bits);
 
-    v_level = _mm256_packs_epi32(v_level32_a, v_level32_b);
-    v_level = _mm256_sign_epi16(v_level, v_sign);
+      v_level = _mm256_packs_epi32(v_level32_a, v_level32_b);
+      v_level = _mm256_sign_epi16(v_level, v_sign);
 
-    _mm256_storeu_si256((__m256i *)(q_coef + n), v_level);
+      _mm256_storeu_si256((__m256i *)(q_coef + n), v_level);
 
-    v_ac_sum = _mm256_add_epi32(v_ac_sum, v_level32_a);
-    v_ac_sum = _mm256_add_epi32(v_ac_sum, v_level32_b);
+      v_ac_sum = _mm256_add_epi32(v_ac_sum, v_level32_a);
+      v_ac_sum = _mm256_add_epi32(v_ac_sum, v_level32_b);
+    }
+  }
+  else {
+    const int max_number_of_coeffs = ((width == 4 && height == 4) || (width == 8 && height == 8)) ? 8 : 16;
+    memset(q_coef, 0, width * height * sizeof(coeff_t));
+    for (int32_t n = 0; n < max_number_of_coeffs; n++) {
+      const uint32_t idx = scan[n];
+      int32_t level = coef[idx];
+      int64_t abs_level = (int64_t)abs(level);
+      int32_t sign;
+
+      sign = (level < 0 ? -1 : 1);
+
+      int32_t curr_quant_coeff = quant_coeff[n];
+      level = (abs_level * curr_quant_coeff + add) >> q_bits;
+      ac_sum += level;
+
+      level *= sign;
+      q_coef[idx] = (coeff_t)(CLIP(-32768, 32767, level));
+    }
   }
 
   __m128i temp = _mm_add_epi32(_mm256_castsi256_si128(v_ac_sum), _mm256_extracti128_si256(v_ac_sum, 1));
@@ -542,19 +564,6 @@ void uvg_quant_avx2(const encoder_state_t * const state, const coeff_t * __restr
 
 #if UVG_BIT_DEPTH == 8
 
-static INLINE __m128i get_residual_4x1_avx2(const uint8_t *a_in, const uint8_t *b_in){
-  __m128i a = _mm_cvtsi32_si128(*(int32_t*)a_in);
-  __m128i b = _mm_cvtsi32_si128(*(int32_t*)b_in);
-  __m128i diff = _mm_sub_epi16(_mm_cvtepu8_epi16(a), _mm_cvtepu8_epi16(b) );
-  return diff;
-}
-
-static INLINE __m128i get_residual_8x1_avx2(const uint8_t *a_in, const uint8_t *b_in){
-  __m128i a = _mm_cvtsi64_si128(*(int64_t*)a_in);
-  __m128i b = _mm_cvtsi64_si128(*(int64_t*)b_in);
-  __m128i diff = _mm_sub_epi16(_mm_cvtepu8_epi16(a), _mm_cvtepu8_epi16(b) );
-  return diff;
-}
 
 static INLINE int32_t get_quantized_recon_4x1_avx2(int16_t *residual, const uint8_t *pred_in){
   __m128i res = _mm_loadl_epi64((__m128i*)residual);
@@ -568,51 +577,6 @@ static INLINE int64_t get_quantized_recon_8x1_avx2(int16_t *residual, const uint
   __m128i pred = _mm_cvtsi64_si128(*(int64_t*)pred_in);
   __m128i rec = _mm_add_epi16(res, _mm_cvtepu8_epi16(pred));
   return _mm_cvtsi128_si64(_mm_packus_epi16(rec, rec));
-}
-
-static void get_residual_avx2(const uint8_t *ref_in, const uint8_t *pred_in, int16_t *residual, int width, int in_stride){
-
-  __m128i diff = _mm_setzero_si128();
-  switch (width) {
-    case 4:
-      diff = get_residual_4x1_avx2(ref_in + 0 * in_stride, pred_in + 0 * in_stride);
-      _mm_storel_epi64((__m128i*)&(residual[0]), diff);
-      diff = get_residual_4x1_avx2(ref_in + 1 * in_stride, pred_in + 1 * in_stride);
-      _mm_storel_epi64((__m128i*)&(residual[4]), diff);
-      diff = get_residual_4x1_avx2(ref_in + 2 * in_stride, pred_in + 2 * in_stride);
-      _mm_storel_epi64((__m128i*)&(residual[8]), diff);
-      diff = get_residual_4x1_avx2(ref_in + 3 * in_stride, pred_in + 3 * in_stride);
-      _mm_storel_epi64((__m128i*)&(residual[12]), diff);
-    break;
-    case 8:
-      diff = get_residual_8x1_avx2(&ref_in[0 * in_stride], &pred_in[0 * in_stride]);
-      _mm_storeu_si128((__m128i*)&(residual[0]), diff);
-      diff = get_residual_8x1_avx2(&ref_in[1 * in_stride], &pred_in[1 * in_stride]);
-      _mm_storeu_si128((__m128i*)&(residual[8]), diff);
-      diff = get_residual_8x1_avx2(&ref_in[2 * in_stride], &pred_in[2 * in_stride]);
-      _mm_storeu_si128((__m128i*)&(residual[16]), diff);
-      diff = get_residual_8x1_avx2(&ref_in[3 * in_stride], &pred_in[3 * in_stride]);
-      _mm_storeu_si128((__m128i*)&(residual[24]), diff);
-      diff = get_residual_8x1_avx2(&ref_in[4 * in_stride], &pred_in[4 * in_stride]);
-      _mm_storeu_si128((__m128i*)&(residual[32]), diff);
-      diff = get_residual_8x1_avx2(&ref_in[5 * in_stride], &pred_in[5 * in_stride]);
-      _mm_storeu_si128((__m128i*)&(residual[40]), diff);
-      diff = get_residual_8x1_avx2(&ref_in[6 * in_stride], &pred_in[6 * in_stride]);
-      _mm_storeu_si128((__m128i*)&(residual[48]), diff);
-      diff = get_residual_8x1_avx2(&ref_in[7 * in_stride], &pred_in[7 * in_stride]);
-      _mm_storeu_si128((__m128i*)&(residual[56]), diff);
-    break;
-    default:
-      for (int y = 0; y < width; ++y) {
-        for (int x = 0; x < width; x+=16) {
-          diff = get_residual_8x1_avx2(&ref_in[x + y * in_stride], &pred_in[x + y * in_stride]);
-          _mm_storeu_si128((__m128i*)&residual[x + y * width], diff);
-          diff = get_residual_8x1_avx2(&ref_in[(x+8) + y * in_stride], &pred_in[(x+8) + y * in_stride]);
-          _mm_storeu_si128((__m128i*)&residual[(x+8) + y * width], diff);
-        }
-      }
-    break;
-  }
 }
 
 static void get_quantized_recon_avx2(int16_t *residual, const uint8_t *pred_in, int in_stride, uint8_t *rec_out, int out_stride, int width){
@@ -667,19 +631,21 @@ int uvg_quantize_residual_avx2(encoder_state_t *const state,
   const int in_stride, const int out_stride,
   const uint8_t *const ref_in, const uint8_t *const pred_in,
   uint8_t *rec_out, coeff_t *coeff_out,
-  bool early_skip, int lmcs_chroma_adj)
+  bool early_skip, int lmcs_chroma_adj,
+  enum uvg_tree_type tree_type)
 {
   // Temporary arrays to pass data to and from uvg_quant and transform functions.
   ALIGNED(64) int16_t residual[TR_MAX_WIDTH * TR_MAX_WIDTH];
   ALIGNED(64) coeff_t coeff[TR_MAX_WIDTH * TR_MAX_WIDTH];
 
+  const int height = width; // TODO: height for non-square blocks
   int has_coeffs = 0;
 
   assert(width <= TR_MAX_WIDTH);
   assert(width >= TR_MIN_WIDTH);
 
   // Get residual. (ref_in - pred_in -> residual)
-  get_residual_avx2(ref_in, pred_in, residual, width, in_stride);
+  uvg_generate_residual(ref_in, pred_in, residual, width, in_stride, in_stride);
 
   if (state->tile->frame->lmcs_aps->m_sliceReshapeInfo.enableChromaAdj && color != COLOR_Y) {
     int y, x;
@@ -702,6 +668,13 @@ int uvg_quantize_residual_avx2(encoder_state_t *const state,
     uvg_transform2d(state->encoder_control, residual, coeff, width, color, cur_cu);
   }
 
+  const uint16_t lfnst_index = color == COLOR_Y ? cur_cu->lfnst_idx : cur_cu->cr_lfnst_idx;
+
+  if (state->encoder_control->cfg.lfnst && cur_cu->type == CU_INTRA) {
+    // Forward low frequency non-separable transform
+    uvg_fwd_lfnst(cur_cu, width, height, color, lfnst_index, coeff, tree_type);
+  }
+
   // Quantize coeffs. (coeff -> coeff_out)
   
   if (state->encoder_control->cfg.rdoq_enable &&
@@ -710,7 +683,7 @@ int uvg_quantize_residual_avx2(encoder_state_t *const state,
     int8_t tr_depth = cur_cu->tr_depth - cur_cu->depth;
     tr_depth += (cur_cu->part_size == SIZE_NxN ? 1 : 0);
     uvg_rdoq(state, coeff, coeff_out, width, width, color,
-      scan_order, cur_cu->type, tr_depth, cur_cu->cbf);
+      scan_order, cur_cu->type, tr_depth, cur_cu->cbf, lfnst_index);
   }
   else if (state->encoder_control->cfg.rdoq_enable && use_trskip) {
     uvg_ts_rdoq(state, coeff, coeff_out, width, width, color,
@@ -718,7 +691,7 @@ int uvg_quantize_residual_avx2(encoder_state_t *const state,
   }
   else {
     uvg_quant(state, coeff, coeff_out, width, width, color,
-      scan_order, cur_cu->type, cur_cu->tr_idx == MTS_SKIP && color == COLOR_Y);
+      scan_order, cur_cu->type, cur_cu->tr_idx == MTS_SKIP && color == COLOR_Y, lfnst_index);
   }
 
   // Check if there are any non-zero coefficients.
@@ -731,10 +704,14 @@ int uvg_quantize_residual_avx2(encoder_state_t *const state,
   // Do the inverse quantization and transformation and the reconstruction to
   // rec_out.
   if (has_coeffs && !early_skip) {
-
     // Get quantized residual. (coeff_out -> coeff -> residual)
     uvg_dequant(state, coeff_out, coeff, width, width, color,
       cur_cu->type, cur_cu->tr_idx == MTS_SKIP && color == COLOR_Y);
+
+    if (state->encoder_control->cfg.lfnst && cur_cu->type == CU_INTRA) {
+      // Inverse low frequency non-separable transform
+      uvg_inv_lfnst(cur_cu, width, height, color, lfnst_index, coeff, tree_type);
+    }
     if (use_trskip) {
       uvg_itransformskip(state->encoder_control, residual, coeff, width);
     }

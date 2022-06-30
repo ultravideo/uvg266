@@ -76,6 +76,7 @@ int uvg_config_init(uvg_config *cfg)
   cfg->mv_rdo          = 0;
   cfg->full_intra_search = 0;
   cfg->trskip_enable   = 0;
+  cfg->chroma_trskip_enable = 0;
   cfg->trskip_max_size = 2; //Default to 4x4
   cfg->mts             = 0;
   cfg->mts_implicit    = 0;
@@ -204,6 +205,8 @@ int uvg_config_init(uvg_config *cfg)
   
   cfg->mip = false;
 
+  cfg->lfnst = false;
+
   parse_qp_map(cfg, 0);
 
   cfg->jccr = 0;
@@ -211,10 +214,13 @@ int uvg_config_init(uvg_config *cfg)
   cfg->amvr = 0;
 
   cfg->cclm = 0;
-
-
+  
   cfg->combine_intra_cus = 1;
   cfg->force_inter = 0;
+
+  cfg->cabac_debug_file_name = NULL;
+
+  cfg->dual_tree = 0;
   return 1;
 }
 
@@ -903,6 +909,8 @@ int uvg_config_parse(uvg_config *cfg, const char *name, const char *value)
     cfg->full_intra_search = atobool(value);
   else if OPT("transform-skip")
     cfg->trskip_enable = atobool(value);
+  else if OPT("chroma-transform-skip")
+    cfg->chroma_trskip_enable = atobool(value);
   else if OPT("tr-skip-max-size") {
     cfg->trskip_max_size = atoi(value);
     if (cfg->trskip_max_size < 2 || cfg->trskip_max_size > 5) {
@@ -1439,6 +1447,9 @@ int uvg_config_parse(uvg_config *cfg, const char *name, const char *value)
   else if OPT("mip") {
     cfg->mip = atobool(value);
   }
+  else if OPT("lfnst") {
+    cfg->lfnst = atobool(value);
+  }
   else if OPT("jccr") {
     cfg->jccr = (bool)atobool(value);
   }
@@ -1453,6 +1464,16 @@ int uvg_config_parse(uvg_config *cfg, const char *name, const char *value)
   }
   else if OPT("force-inter") {
     cfg->force_inter = atobool(value);
+  }
+  else if OPT("cabac-debug-file") {
+    cfg->cabac_debug_file_name = strdup(value);
+    if(cfg->cabac_debug_file_name == NULL) {
+      fprintf(stderr, "Failed to allocate memory for cabac debug file name.\n");
+      return 0;      
+    }
+  }
+  else if OPT("dual-tree") {
+    cfg->dual_tree = atobool(value);
   }
   else {
     return 0;
@@ -1805,6 +1826,16 @@ int uvg_config_validate(const uvg_config *const cfg)
       fprintf(stderr, "The chroma qp scaling lists of index %d are different lengths.\n", index);
       error = 1;
     }
+  }
+
+  if(cfg->owf != 0 && cfg->cabac_debug_file_name) {
+    fprintf(stderr, "OWF and cabac debugging are not supported at the same time.\n");
+    error = 1;
+  }
+
+  if(cfg->chroma_trskip_enable && !cfg->trskip_enable) {
+    fprintf(stderr, "Transform skip has to be enabled when chroma transform skip is enabled.\n");
+    error = 1;
   }
 
   return !error;

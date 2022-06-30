@@ -1366,6 +1366,11 @@ static void fastForwardDCT2_B32(const int16_t* src, int16_t* dst, int32_t shift,
       dst += line;
     }
   }
+  if (skip_line2) {
+    const int  reduced_line = line - skip_line2;
+    dst = p_coef + reduced_line * 32;
+    memset(dst, 0, skip_line2 * 32 * sizeof(coeff_t));
+  }
 }
 
 static void fastInverseDCT2_B32(const int16_t* src, int16_t* dst, int32_t shift, int line, int skip_line, int skip_line2)
@@ -2491,7 +2496,7 @@ static void mts_dct_generic(
 
   uvg_get_tr_type(width, color, tu, &type_hor, &type_ver, mts_idx);
 
-  if (type_hor == DCT2 && type_ver == DCT2)
+  if (type_hor == DCT2 && type_ver == DCT2 && !tu->lfnst_idx && !tu->cr_lfnst_idx)
   {
     dct_func *dct_func = uvg_get_dct_func(width, color, tu->type);
     dct_func(bitdepth, input, output);
@@ -2499,9 +2504,21 @@ static void mts_dct_generic(
   else
   {
     const int height = width;
-    const int skip_width = (type_hor != DCT2 && width == 32) ? 16 : (width > 32 ? width - 32 : 0);
-    const int skip_height = (type_ver != DCT2 && height == 32) ? 16 : (height > 32 ? height - 32 : 0);
+    int skip_width = (type_hor != DCT2 && width == 32) ? 16 : (width > 32 ? width - 32 : 0);
+    int skip_height = (type_ver != DCT2 && height == 32) ? 16 : (height > 32 ? height - 32 : 0);
     const int log2_width_minus2 = uvg_g_convert_to_bit[width];
+    if(tu->lfnst_idx || tu->cr_lfnst_idx) {
+      if ((width == 4 && height > 4) || (width > 4 && height == 4))
+      {
+        skip_width = width - 4;
+        skip_height = height - 4;
+      }
+      else if ((width >= 8 && height >= 8))
+      {
+        skip_width = width - 8;
+        skip_height = height - 8;
+      }
+    }
 
     partial_tr_func* dct_hor = dct_table[type_hor][log2_width_minus2];
     partial_tr_func* dct_ver = dct_table[type_ver][log2_width_minus2];

@@ -330,6 +330,14 @@ encoder_control_t* uvg_encoder_control_init(const uvg_config *const cfg)
     }
   }
 
+  if(cfg->cabac_debug_file_name) {
+    encoder->cabac_debug_file = fopen(cfg->cabac_debug_file_name, "wb");
+    if (!encoder->cabac_debug_file) {
+      fprintf(stderr, "Could not open cabac debug file.\n");
+      goto init_failed;
+    }
+  }
+
   if (cfg->fast_coeff_table_fn) {
     FILE *fast_coeff_table_f = fopen(cfg->fast_coeff_table_fn, "rb");
     if (fast_coeff_table_f == NULL) {
@@ -677,6 +685,8 @@ void uvg_encoder_control_free(encoder_control_t *const encoder)
 
   FREE_POINTER(encoder->cfg.roi.file_path);
 
+  FREE_POINTER(encoder->cfg.cabac_debug_file_name);
+
   uvg_scalinglist_destroy(&encoder->scaling_list);
 
   uvg_threadqueue_free(encoder->threadqueue);
@@ -689,6 +699,10 @@ void uvg_encoder_control_free(encoder_control_t *const encoder)
 
   if (encoder->roi_file) {
     fclose(encoder->roi_file);
+  }
+
+  if(encoder->cabac_debug_file) {
+    fclose(encoder->cabac_debug_file);
   }
 
   free(encoder);
