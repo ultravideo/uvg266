@@ -744,9 +744,12 @@ static void encoder_state_worker_encode_lcu_search(void * opaque)
 
   cu_info_t original_lut[MAX_NUM_HMVP_CANDS];
   uint8_t original_lut_size = state->tile->frame->hmvp_size[ctu_row];
+  cu_info_t original_lut_ibc[MAX_NUM_HMVP_CANDS];
+  uint8_t original_lut_size_ibc = state->tile->frame->hmvp_size_ibc[ctu_row];
 
   // Store original HMVP lut before search and restore after, since it's modified
   if(state->frame->slicetype != UVG_SLICE_I) memcpy(original_lut, &state->tile->frame->hmvp_lut[ctu_row_mul_five], sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
+  if(state->encoder_control->cfg.ibc) memcpy(original_lut_ibc, &state->tile->frame->hmvp_lut_ibc[ctu_row_mul_five], sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
 
   //This part doesn't write to bitstream, it's only search, deblock and sao
   uvg_search_lcu(state, lcu->position_px.x, lcu->position_px.y, state->tile->hor_buf_search, state->tile->ver_buf_search, lcu->coeff);
@@ -754,6 +757,10 @@ static void encoder_state_worker_encode_lcu_search(void * opaque)
   if(state->frame->slicetype != UVG_SLICE_I) {
     memcpy(&state->tile->frame->hmvp_lut[ctu_row_mul_five], original_lut, sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
     state->tile->frame->hmvp_size[ctu_row] = original_lut_size;
+  }
+  if (state->encoder_control->cfg.ibc) {
+    memcpy(&state->tile->frame->hmvp_lut_ibc[ctu_row_mul_five], original_lut_ibc, sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
+    state->tile->frame->hmvp_size_ibc[ctu_row] = original_lut_size_ibc;
   }
 
   encoder_state_recdata_to_bufs(state, lcu, state->tile->hor_buf_search, state->tile->ver_buf_search);

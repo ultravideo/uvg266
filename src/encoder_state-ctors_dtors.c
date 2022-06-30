@@ -122,6 +122,10 @@ static int encoder_state_config_tile_init(encoder_state_t * const state,
   state->tile->frame->hmvp_lut = malloc(sizeof(cu_info_t) * height_in_lcu * MAX_NUM_HMVP_CANDS);
   state->tile->frame->hmvp_size = calloc(1, sizeof(uint8_t) * height_in_lcu);
 
+  // Allocate the HMVP for IBC in any case
+  state->tile->frame->hmvp_lut_ibc = malloc(sizeof(cu_info_t) * height_in_lcu * MAX_NUM_HMVP_CANDS);
+  state->tile->frame->hmvp_size_ibc = calloc(1, sizeof(uint8_t) * height_in_lcu);
+
   if (state->encoder_control->cfg.ibc) {
     // Allocate pixel buffer for each LCU row
     state->tile->frame->ibc_buffer_y = malloc(sizeof(uvg_pixel*) * state->tile->frame->height_in_lcu);
@@ -208,6 +212,9 @@ static void encoder_state_config_tile_finalize(encoder_state_t * const state) {
 
   FREE_POINTER(state->tile->frame->hmvp_lut);
   FREE_POINTER(state->tile->frame->hmvp_size);
+
+  FREE_POINTER(state->tile->frame->hmvp_lut_ibc);
+  FREE_POINTER(state->tile->frame->hmvp_size_ibc);
 
   if (state->encoder_control->cfg.ibc) {
     for (uint32_t i = 0; i < state->tile->frame->height_in_lcu; i++) {

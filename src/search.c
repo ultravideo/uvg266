@@ -803,9 +803,12 @@ static double search_cu(
 
   cu_info_t hmvp_lut[MAX_NUM_HMVP_CANDS];
   uint8_t hmvp_lut_size = state->tile->frame->hmvp_size[ctu_row];
+  cu_info_t hmvp_lut_ibc[MAX_NUM_HMVP_CANDS];
+  uint8_t hmvp_lut_size_ibc = state->tile->frame->hmvp_size_ibc[ctu_row];
 
   // Store original HMVP lut before search and restore after, since it's modified
   if (state->frame->slicetype != UVG_SLICE_I) memcpy(hmvp_lut, &state->tile->frame->hmvp_lut[ctu_row_mul_five], sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
+  if(state->encoder_control->cfg.ibc) memcpy(hmvp_lut_ibc, &state->tile->frame->hmvp_lut_ibc[ctu_row_mul_five], sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
 
   struct {
     int32_t min;
@@ -1288,7 +1291,14 @@ static double search_cu(
       if (state->frame->slicetype != UVG_SLICE_I) {
         // Reset HMVP to the beginning of this CU level search and add this CU as the mvp
         memcpy(&state->tile->frame->hmvp_lut[ctu_row_mul_five], hmvp_lut, sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
-        state->tile->frame->hmvp_size[ctu_row] = hmvp_lut_size;
+        state->tile->frame->hmvp_size[ctu_row] = hmvp_lut_size;        
+      }
+      if (state->encoder_control->cfg.ibc) {        
+        memcpy(&state->tile->frame->hmvp_lut_ibc[ctu_row_mul_five], hmvp_lut_ibc, sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
+        state->tile->frame->hmvp_size_ibc[ctu_row] = hmvp_lut_size_ibc;        
+      }
+      // Add candidate when in inter slice or ibc is enabled
+      if(state->frame->slicetype != UVG_SLICE_I || state->encoder_control->cfg.ibc) {
         uvg_hmvp_add_mv(state, x, y, cu_width, cu_width, cur_cu);
       }
     }
@@ -1310,7 +1320,14 @@ static double search_cu(
     if (state->frame->slicetype != UVG_SLICE_I) {
       // Reset HMVP to the beginning of this CU level search and add this CU as the mvp
       memcpy(&state->tile->frame->hmvp_lut[ctu_row_mul_five], hmvp_lut, sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
-      state->tile->frame->hmvp_size[ctu_row] = hmvp_lut_size;
+      state->tile->frame->hmvp_size[ctu_row] = hmvp_lut_size;        
+    }
+    if (state->encoder_control->cfg.ibc) {        
+      memcpy(&state->tile->frame->hmvp_lut_ibc[ctu_row_mul_five], hmvp_lut_ibc, sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
+      state->tile->frame->hmvp_size_ibc[ctu_row] = hmvp_lut_size_ibc;        
+    }
+    // Add candidate when in inter slice or ibc is enabled
+    if(state->frame->slicetype != UVG_SLICE_I || state->encoder_control->cfg.ibc) {
       uvg_hmvp_add_mv(state, x, y, cu_width, cu_width, cur_cu);
     }
   }
