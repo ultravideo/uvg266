@@ -1775,7 +1775,7 @@ static void search_pu_inter(encoder_state_t * const state,
         cur_pu->inter.mv[0][1]  = info->merge_cand[merge_idx].mv[0][1];
         cur_pu->inter.mv[1][0]  = info->merge_cand[merge_idx].mv[1][0];
         cur_pu->inter.mv[1][1]  = info->merge_cand[merge_idx].mv[1][1];
-        uvg_lcu_fill_trdepth(lcu, x, y, depth, MAX(1, depth));
+        uvg_lcu_fill_trdepth(lcu, x, y, depth, MAX(1, depth), UVG_BOTH_T);
         uvg_inter_recon_cu(state, lcu, x, y, width, true, false);
         uvg_quantize_lcu_residual(state, true, false, false, x, y, depth, cur_pu, lcu, true, UVG_BOTH_T);
 
@@ -2097,7 +2097,7 @@ void uvg_cu_cost_inter_rd2(encoder_state_t * const state,
   if (cur_cu->part_size != SIZE_2Nx2N) {
     tr_depth = depth + 1;
   }
-  uvg_lcu_fill_trdepth(lcu, x, y, depth, tr_depth);
+  uvg_lcu_fill_trdepth(lcu, x, y, depth, tr_depth, UVG_BOTH_T);
 
   const int x_px = SUB_SCU(x);
   const int y_px = SUB_SCU(y);

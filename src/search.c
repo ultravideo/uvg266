@@ -133,11 +133,12 @@ static void work_tree_copy_down(int x_local, int y_local, int depth, lcu_t *work
   }
 }
 
-void uvg_lcu_fill_trdepth(lcu_t *lcu, int x_px, int y_px, int depth, uint8_t tr_depth)
+void uvg_lcu_fill_trdepth(lcu_t *lcu, int x_px, int y_px, int depth, uint8_t tr_depth, enum uvg_tree_type
+                          tree_type)
 {
   const int x_local = SUB_SCU(x_px);
   const int y_local = SUB_SCU(y_px);
-  const unsigned width = LCU_WIDTH >> depth;
+  const unsigned width = (tree_type != UVG_CHROMA_T ? LCU_WIDTH  : LCU_WIDTH_C) >> depth;
 
   for (unsigned y = 0; y < width; y += SCU_WIDTH) {
     for (unsigned x = 0; x < width; x += SCU_WIDTH) {
@@ -989,7 +990,9 @@ static double search_cu(
           intra_search.pred_cu.intra.mode_chroma = intra_mode;
         }
         intra_search.pred_cu.intra.mode = intra_mode;
-        
+        if(tree_type == UVG_CHROMA_T) {
+          uvg_lcu_fill_trdepth(lcu, x_local, y_local, depth, depth, tree_type);
+        }
       }
       if (intra_cost < cost) {
         cost = intra_cost;
@@ -1041,7 +1044,7 @@ static double search_cu(
         if (cur_cu->part_size != SIZE_2Nx2N) {
           tr_depth = depth + 1;
         }
-        uvg_lcu_fill_trdepth(lcu, x, y, depth, tr_depth);
+        uvg_lcu_fill_trdepth(lcu, x, y, depth, tr_depth, tree_type);
 
         const bool has_chroma = state->encoder_control->chroma_format != UVG_CSP_400;
         uvg_inter_recon_cu(state, lcu, x, y, cu_width, true, has_chroma);
@@ -1115,7 +1118,7 @@ static double search_cu(
       if (cur_cu->tr_depth != depth) {
         // Reset transform depth since there are no coefficients. This
         // ensures that CBF is cleared for the whole area of the CU.
-        uvg_lcu_fill_trdepth(lcu, x, y, depth, depth);
+        uvg_lcu_fill_trdepth(lcu, x, y, depth, depth, tree_type);
       }
 
       cur_cu->cbf = 0;
@@ -1236,7 +1239,7 @@ static double search_cu(
         // Disable MRL in this case
         cur_cu->intra.multi_ref_idx = 0;
 
-        uvg_lcu_fill_trdepth(lcu, x, y, depth, cur_cu->tr_depth);
+        uvg_lcu_fill_trdepth(lcu, x, y, depth, cur_cu->tr_depth, tree_type);
         lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
         
         intra_search_data_t proxy;

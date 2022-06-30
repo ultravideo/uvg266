@@ -625,7 +625,7 @@ static double search_intra_trdepth(
   if (depth == 0 || split_cost < nosplit_cost) {
     return split_cost;
   } else {
-    uvg_lcu_fill_trdepth(lcu, x_px, y_px, depth, depth);
+    uvg_lcu_fill_trdepth(lcu, x_px, y_px, depth, depth, tree_type);
 
     pred_cu->cbf = nosplit_cbf;
 
@@ -1916,7 +1916,7 @@ void uvg_search_cu_intra(
 
 
   // Set transform depth to current depth, meaning no transform splits.
-  uvg_lcu_fill_trdepth(lcu, x_px, y_px, depth, depth);
+  uvg_lcu_fill_trdepth(lcu, x_px, y_px, depth, depth, tree_type);
   // Refine results with slower search or get some results if rough search was skipped.
   const int32_t rdo_level = state->encoder_control->cfg.rdo;
   if (rdo_level >= 2 || skip_rough_search) {
