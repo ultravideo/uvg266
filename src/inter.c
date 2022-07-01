@@ -604,8 +604,8 @@ static void ibc_recon_cu(const encoder_state_t * const state,
 {
   const int x_scu    = SUB_SCU(x);
   const int y_scu    = SUB_SCU(y);
-  const int offset = x_scu + y_scu * LCU_WIDTH;
-  const int offset_c = x_scu / 2 + y_scu / 2 * LCU_WIDTH_C;
+  uint32_t offset = x_scu + y_scu * LCU_WIDTH;
+  uint32_t offset_c = x_scu / 2 + y_scu / 2 * LCU_WIDTH_C;
   cu_info_t *cu       = LCU_GET_CU_AT_PX(lcu, x_scu, y_scu);
 
   int32_t    mv_x     = cu->inter.mv[0][0] >> UVG_IMV_4PEL;
@@ -623,7 +623,7 @@ static void ibc_recon_cu(const encoder_state_t * const state,
   // Predicted block completely outside of this LCU
   if (mv_x + x_scu + width <= 0) {  
     if(predict_luma) uvg_pixels_blit(&state->tile->frame->ibc_buffer_y[ibc_row][buffer_y * IBC_BUFFER_WIDTH + buffer_x], lcu->rec.y + offset, width, width, IBC_BUFFER_WIDTH, LCU_WIDTH);
-    if (predict_chroma) {    
+    if (predict_chroma) {
       uvg_pixels_blit(&state->tile->frame->ibc_buffer_u[ibc_row][(buffer_y >> 1) * IBC_BUFFER_WIDTH_C + (buffer_x >> 1)], lcu->rec.u + offset_c, width / 2, width / 2, IBC_BUFFER_WIDTH_C, LCU_WIDTH_C);
       uvg_pixels_blit(&state->tile->frame->ibc_buffer_v[ibc_row][(buffer_y >> 1) * IBC_BUFFER_WIDTH_C + (buffer_x >> 1)], lcu->rec.v + offset_c, width / 2, width / 2, IBC_BUFFER_WIDTH_C, LCU_WIDTH_C);
     }
@@ -634,10 +634,22 @@ static void ibc_recon_cu(const encoder_state_t * const state,
       uvg_pixels_blit(&lcu->rec.v[((y_scu+mv_y) / 2) * LCU_WIDTH_C + (x_scu + mv_x) / 2], lcu->rec.v + offset_c, width / 2, width / 2, LCU_WIDTH_C, LCU_WIDTH_C);
     }
   } else { // Partly on the buffer and party on the current LCU rec
-    if(predict_luma) uvg_pixels_blit(&state->tile->frame->ibc_buffer_y[ibc_row][buffer_y * IBC_BUFFER_WIDTH + buffer_x], lcu->rec.y + offset, width, width, IBC_BUFFER_WIDTH, LCU_WIDTH);
+
+    uint32_t width_buffer = -(mv_x + x_scu);
+    uint32_t width_lcu    = width - width_buffer;
+    if(predict_luma) uvg_pixels_blit(&state->tile->frame->ibc_buffer_y[ibc_row][buffer_y * IBC_BUFFER_WIDTH + buffer_x], lcu->rec.y + offset, width_buffer, width, IBC_BUFFER_WIDTH, LCU_WIDTH);
     if (predict_chroma) {    
-      uvg_pixels_blit(&state->tile->frame->ibc_buffer_u[ibc_row][(buffer_y >> 1) * IBC_BUFFER_WIDTH_C + (buffer_x >> 1)], lcu->rec.u + offset_c, width / 2, width / 2, IBC_BUFFER_WIDTH_C, LCU_WIDTH_C);
-      uvg_pixels_blit(&state->tile->frame->ibc_buffer_v[ibc_row][(buffer_y >> 1) * IBC_BUFFER_WIDTH_C + (buffer_x >> 1)], lcu->rec.v + offset_c, width / 2, width / 2, IBC_BUFFER_WIDTH_C, LCU_WIDTH_C);
+      uvg_pixels_blit(&state->tile->frame->ibc_buffer_u[ibc_row][(buffer_y >> 1) * IBC_BUFFER_WIDTH_C + (buffer_x >> 1)], lcu->rec.u + offset_c, width_buffer / 2, width / 2, IBC_BUFFER_WIDTH_C, LCU_WIDTH_C);
+      uvg_pixels_blit(&state->tile->frame->ibc_buffer_v[ibc_row][(buffer_y >> 1) * IBC_BUFFER_WIDTH_C + (buffer_x >> 1)], lcu->rec.v + offset_c, width_buffer / 2, width / 2, IBC_BUFFER_WIDTH_C, LCU_WIDTH_C);
+    }
+
+    offset += width_buffer;
+    offset_c += width_buffer/2;
+
+    if(predict_luma) uvg_pixels_blit(&lcu->rec.y[(y_scu + mv_y) * LCU_WIDTH + x_scu + mv_x + width_buffer], lcu->rec.y + offset, width_lcu, width, LCU_WIDTH, LCU_WIDTH);
+    if (predict_chroma) {
+      uvg_pixels_blit(&lcu->rec.u[((y_scu+mv_y) / 2) * LCU_WIDTH_C + (x_scu + mv_x + width_buffer) / 2], lcu->rec.u + offset_c, width_lcu / 2, width / 2, LCU_WIDTH_C, LCU_WIDTH_C);
+      uvg_pixels_blit(&lcu->rec.v[((y_scu+mv_y) / 2) * LCU_WIDTH_C + (x_scu + mv_x + width_buffer) / 2], lcu->rec.v + offset_c, width_lcu / 2, width / 2, LCU_WIDTH_C, LCU_WIDTH_C);
     }
   }
 }
@@ -977,6 +989,128 @@ static void get_temporal_merge_candidates(const encoder_state_t * const state,
 }
 
 
+static INLINE int16_t get_scaled_mv(int16_t mv, int scale)
+{
+  int32_t scaled = scale * mv;
+  return CLIP(-32768, 32767, (scaled + 127 + (scaled < 0)) >> 8);
+}
+
+#define MV_EXPONENT_BITCOUNT 4
+#define MV_MANTISSA_BITCOUNT 6
+#define MV_MANTISSA_UPPER_LIMIT ((1 << (MV_MANTISSA_BITCOUNT - 1)) - 1)
+#define MV_MANTISSA_LIMIT (1 << (MV_MANTISSA_BITCOUNT - 1))
+#define MV_EXPONENT_MASK ((1 << MV_EXPONENT_BITCOUNT) - 1)
+
+static int convert_mv_fixed_to_float(int32_t val)
+{
+  uint32_t sign = val >> 31;
+  int scale = uvg_math_floor_log2((val ^ sign) | MV_MANTISSA_UPPER_LIMIT) - (MV_MANTISSA_BITCOUNT - 1);
+
+  int exponent;
+  uint32_t mantissa;
+  if (scale >= 0)
+  {
+    int round = (1 << scale) >> 1;
+    int n = (val + round) >> scale;
+    exponent = scale + ((n ^ sign) >> (MV_MANTISSA_BITCOUNT - 1));
+    mantissa = (n & MV_MANTISSA_UPPER_LIMIT) | (sign << (MV_MANTISSA_BITCOUNT - 1));
+  }
+  else
+  {
+    exponent = 0;
+    mantissa = val;
+  }
+
+  return exponent | (mantissa << MV_EXPONENT_BITCOUNT);
+}
+
+static int convert_mv_float_to_fixed(int val)
+{
+  int exponent = val & MV_EXPONENT_MASK;
+  uint32_t mantissa = val >> MV_EXPONENT_BITCOUNT;
+  return exponent == 0 ? mantissa : (mantissa ^ MV_MANTISSA_LIMIT) << (exponent - 1);
+}
+
+static int round_mv_comp(int x)
+{
+  return convert_mv_float_to_fixed(convert_mv_fixed_to_float(x));
+}
+
+static void apply_mv_scaling_pocs(int32_t current_poc,
+                                  int32_t current_ref_poc,
+                                  int32_t neighbor_poc,
+                                  int32_t neighbor_ref_poc,
+                                  mv_t mv_cand[2])
+{
+  int32_t diff_current  = current_poc  - current_ref_poc;
+  int32_t diff_neighbor = neighbor_poc - neighbor_ref_poc;
+
+  if (diff_current == diff_neighbor) return;
+
+  diff_current  = CLIP(-128, 127, diff_current);
+  diff_neighbor = CLIP(-128, 127, diff_neighbor);
+
+  int scale = CLIP(-4096, 4095,
+    (diff_current * ((0x4000 + (abs(diff_neighbor) >> 1)) / diff_neighbor) + 32) >> 6);
+
+  mv_cand[0] = get_scaled_mv(mv_cand[0], scale);
+  mv_cand[1] = get_scaled_mv(mv_cand[1], scale);
+}
+
+static INLINE void apply_mv_scaling(const encoder_state_t *state,
+                                    const cu_info_t *current_cu,
+                                    const cu_info_t *neighbor_cu,
+                                    int8_t current_reflist,
+                                    int8_t neighbor_reflist,
+                                    mv_t mv_cand[2])
+{
+  apply_mv_scaling_pocs(state->frame->poc,
+                        state->frame->ref->pocs[
+                          state->frame->ref_LX[current_reflist][
+                            current_cu->inter.mv_ref[current_reflist]]],
+                        state->frame->poc,
+                        state->frame->ref->pocs[
+                          state->frame->ref_LX[neighbor_reflist][
+                            neighbor_cu->inter.mv_ref[neighbor_reflist]]],
+                        mv_cand);
+}
+
+static INLINE bool add_mvp_candidate(const encoder_state_t *state,
+                                     const cu_info_t *cur_cu,
+                                     const cu_info_t *cand,
+                                     int8_t reflist,
+                                     bool scaling,
+                                     mv_t mv_cand_out[2])
+{
+  if (!cand) return false;
+
+  assert(cand->inter.mv_dir != 0);
+
+  for (int i = 0; i < 2; i++) {
+    const int cand_list = i == 0 ? reflist : !reflist;
+
+    if ((cand->inter.mv_dir & (1 << cand_list)) == 0) continue;
+
+    if (scaling) {
+      mv_cand_out[0] = cand->inter.mv[cand_list][0];
+      mv_cand_out[1] = cand->inter.mv[cand_list][1];
+      apply_mv_scaling(state, cur_cu, cand, reflist, cand_list, mv_cand_out);
+      return true;
+    }
+
+    if (state->frame->ref_LX[cand_list][cand->inter.mv_ref[cand_list]] ==
+        state->frame->ref_LX[reflist][cur_cu->inter.mv_ref[reflist]])
+    {
+      mv_cand_out[0] = cand->inter.mv[cand_list][0];
+      mv_cand_out[1] = cand->inter.mv[cand_list][1];
+      return true;
+    }
+  }
+
+  return false;
+}
+
+
 /**
  * \brief Get merge candidates for current block.
  *
@@ -993,16 +1127,15 @@ static void get_temporal_merge_candidates(const encoder_state_t * const state,
  * \param lcu             current LCU
  * \param cand_out        will be filled with A and B candidates
  */
-static void get_ibc_merge_candidates(int32_t x,
+static void get_ibc_merge_candidates(const encoder_state_t * const state,
+                                     const cu_info_t * const cur_cu,
+                                     lcu_t *lcu,
+                                     const cu_array_t *cua,
+                                     int32_t x,
                                      int32_t y,
                                      int32_t width,
                                      int32_t height,
-                                     int32_t picture_width,
-                                     int32_t picture_height,
-                                     lcu_t *lcu,
-                                     merge_candidates_t *cand_out,
-                                     uint8_t parallel_merge_level,
-                                     bool wpp
+                                     mv_t mv_cand[IBC_MRG_MAX_NUM_CANDS][2]
   )
 {
   /*
@@ -1017,29 +1150,72 @@ static void get_ibc_merge_candidates(int32_t x,
   */
   int32_t x_local = SUB_SCU(x); //!< coordinates from top-left of this LCU
   int32_t y_local = SUB_SCU(y);
-  // A0 and A1 availability testing
+
+  cu_info_t *a1      = NULL;
+  cu_info_t *b1      = NULL;
+
+  // A1 availability testing
   if (x != 0) {
-    cu_info_t *a1 = LCU_GET_CU_AT_PX(lcu, x_local - 1, y_local + height - 1);
+    a1 = lcu != NULL?LCU_GET_CU_AT_PX(lcu, x_local - 1, y_local + height - 1): uvg_cu_array_at_const(cua, x - 1, y + height - 1);
     // Do not check a1->coded because the block above is always coded before
     // the current one and the flag is not set when searching an SMP block.
     if (a1->type == CU_IBC) {
       inter_clear_cu_unused(a1);
-      cand_out->a[1] = a1;
-      cand_out->mer_a1[0] = parallel_merge_level;
+    } else {
+      a1 = NULL;
     }
   }
 
-  // B0, B1 and B2 availability testing
+  // B1 availability testing
   if (y != 0) {
-
-    cu_info_t *b1 = LCU_GET_CU_AT_PX(lcu, x_local + width - 1, y_local - 1);
+    b1 =  lcu != NULL?LCU_GET_CU_AT_PX(lcu, x_local + width - 1, y_local - 1): uvg_cu_array_at_const(cua, x + width - 1, y - 1);
     // Do not check b1->coded because the block to the left is always coded
     // before the current one and the flag is not set when searching an SMP
     // block.
     if (b1->type == CU_IBC) {
-      inter_clear_cu_unused(b1);
-      cand_out->b[1] = b1;
+      inter_clear_cu_unused(b1);      
+    } else {
+      b1 = NULL;
     }
+  }  
+  
+  uint8_t candidates = 0;
+
+  // Left predictors without scaling
+  if (add_mvp_candidate(state, cur_cu, a1, 0, false, mv_cand[candidates])) {
+    candidates++;
+  }
+
+  // Top predictors without scaling  
+  if (add_mvp_candidate(state, cur_cu, b1, 0, false, mv_cand[candidates])) {
+    candidates++;
+  }
+
+
+  if (candidates > 0)
+    uvg_round_precision(INTERNAL_MV_PREC, 2, &mv_cand[0][0], &mv_cand[0][1]);
+  if (candidates > 1)
+    uvg_round_precision(INTERNAL_MV_PREC, 2, &mv_cand[1][0], &mv_cand[1][1]);
+
+  if (candidates < IBC_MRG_MAX_NUM_CANDS)
+  {
+    const uint32_t ctu_row = (y >> LOG2_LCU_WIDTH);
+    const uint32_t ctu_row_mul_five = ctu_row * MAX_NUM_HMVP_CANDS;
+    int32_t num_cand = state->tile->frame->hmvp_size_ibc[ctu_row];
+    for (int i = 0; i < MIN(MAX_NUM_HMVP_CANDS,num_cand); i++) {
+      cu_info_t* cand = &state->tile->frame->hmvp_lut_ibc[ctu_row_mul_five + num_cand - 1 - i];
+      mv_cand[candidates][0] = cand->inter.mv[0][0];
+      mv_cand[candidates][1] = cand->inter.mv[0][1];
+      candidates++;
+      if (candidates == IBC_MRG_MAX_NUM_CANDS) return;
+    }
+  }
+
+  // Fill with (0,0)
+  while (candidates < IBC_MRG_MAX_NUM_CANDS) {
+    mv_cand[candidates][0] = 0;
+    mv_cand[candidates][1] = 0;
+    candidates++;
   }
 }
 
@@ -1140,65 +1316,6 @@ static void get_spatial_merge_candidates(int32_t x,
   }
 }
 
-
-/**
- * \brief Get merge candidates for current block.
- *
- * The output parameters b0, b1, b2, a0, a1 are pointed to the
- * corresponding cu_info_t struct in lcu->cu, or set to NULL, if the
- * candidate is not available.
- *
- * \param cua             cu information
- * \param x               block x position in pixels
- * \param y               block y position in pixels
- * \param width           block width in pixels
- * \param height          block height in pixels
- * \param picture_width   tile width in pixels
- * \param picture_height  tile height in pixels
- * \param cand_out        will be filled with A and B candidates
- */
-static void get_ibc_merge_candidates_cua(const cu_array_t *cua,
-                                             int32_t x,
-                                             int32_t y,
-                                             int32_t width,
-                                             int32_t height,
-                                             int32_t picture_width,
-                                             int32_t picture_height,
-                                             merge_candidates_t *cand_out,
-                                             bool wpp)
-{
-  /*
-  Predictor block locations
-  ____      _______
-  |B2|______|B1|B0|
-     |         |
-     |  Cur CU |
-   __|         |
-  |A1|_________|
-  |A0|
-  */
-  int32_t x_local = SUB_SCU(x); //!< coordinates from top-left of this LCU
-  int32_t y_local = SUB_SCU(y);
-  // A0 and A1 availability testing
-  if (x != 0) {
-    const cu_info_t *a1 = uvg_cu_array_at_const(cua, x - 1, y + height - 1);
-    // The block above is always coded before the current one.
-    if (a1->type == CU_IBC) {
-      cand_out->a[1] = a1;
-    }
-  }
-
-  // B1 availability testing
-  if (y != 0) {
-
-    const cu_info_t* b1 = uvg_cu_array_at_const(cua, x + width - 1, y - 1);
-    // The block to the left is always coded before the current one.
-    if (b1->type == CU_IBC) {
-      cand_out->b[1] = b1;
-    }
-  }
-}
-
 /**
  * \brief Get merge candidates for current block.
  *
@@ -1285,86 +1402,6 @@ static INLINE mv_t get_scaled_mv(mv_t mv, int scale)
   return CLIP(-131072, 131071, (scaled + 127 + (scaled < 0)) >> 8);
 }
 
-#define MV_EXPONENT_BITCOUNT 4
-#define MV_MANTISSA_BITCOUNT 6
-#define MV_MANTISSA_UPPER_LIMIT ((1 << (MV_MANTISSA_BITCOUNT - 1)) - 1)
-#define MV_MANTISSA_LIMIT (1 << (MV_MANTISSA_BITCOUNT - 1))
-#define MV_EXPONENT_MASK ((1 << MV_EXPONENT_BITCOUNT) - 1)
-
-static int convert_mv_fixed_to_float(int32_t val)
-{
-  uint32_t sign = val >> 31;
-  int scale = uvg_math_floor_log2((val ^ sign) | MV_MANTISSA_UPPER_LIMIT) - (MV_MANTISSA_BITCOUNT - 1);
-
-  int exponent;
-  uint32_t mantissa;
-  if (scale >= 0)
-  {
-    int round = (1 << scale) >> 1;
-    int n = (val + round) >> scale;
-    exponent = scale + ((n ^ sign) >> (MV_MANTISSA_BITCOUNT - 1));
-    mantissa = (n & MV_MANTISSA_UPPER_LIMIT) | (sign << (MV_MANTISSA_BITCOUNT - 1));
-  }
-  else
-  {
-    exponent = 0;
-    mantissa = val;
-  }
-
-  return exponent | (mantissa << MV_EXPONENT_BITCOUNT);
-}
-
-static int convert_mv_float_to_fixed(int val)
-{
-  int exponent = val & MV_EXPONENT_MASK;
-  uint32_t mantissa = val >> MV_EXPONENT_BITCOUNT;
-  return exponent == 0 ? mantissa : (mantissa ^ MV_MANTISSA_LIMIT) << (exponent - 1);
-}
-
-static int round_mv_comp(int x)
-{
-  return convert_mv_float_to_fixed(convert_mv_fixed_to_float(x));
-}
-
-static void apply_mv_scaling_pocs(int32_t current_poc,
-                                  int32_t current_ref_poc,
-                                  int32_t neighbor_poc,
-                                  int32_t neighbor_ref_poc,
-                                  mv_t mv_cand[2])
-{
-  int32_t diff_current  = current_poc  - current_ref_poc;
-  int32_t diff_neighbor = neighbor_poc - neighbor_ref_poc;
-
-  if (diff_current == diff_neighbor) return;
-
-  diff_current  = CLIP(-128, 127, diff_current);
-  diff_neighbor = CLIP(-128, 127, diff_neighbor);
-
-  int scale = CLIP(-4096, 4095,
-    (diff_current * ((0x4000 + (abs(diff_neighbor) >> 1)) / diff_neighbor) + 32) >> 6);
-
-  mv_cand[0] = get_scaled_mv(mv_cand[0], scale);
-  mv_cand[1] = get_scaled_mv(mv_cand[1], scale);
-}
-
-static INLINE void apply_mv_scaling(const encoder_state_t *state,
-                                    const cu_info_t *current_cu,
-                                    const cu_info_t *neighbor_cu,
-                                    int8_t current_reflist,
-                                    int8_t neighbor_reflist,
-                                    mv_t mv_cand[2])
-{
-  apply_mv_scaling_pocs(state->frame->poc,
-                        state->frame->ref->pocs[
-                          state->frame->ref_LX[current_reflist][
-                            current_cu->inter.mv_ref[current_reflist]]],
-                        state->frame->poc,
-                        state->frame->ref->pocs[
-                          state->frame->ref_LX[neighbor_reflist][
-                            neighbor_cu->inter.mv_ref[neighbor_reflist]]],
-                        mv_cand);
-}
-
 /**
  * \brief Try to add a temporal MVP or merge candidate.
  *
@@ -1430,41 +1467,6 @@ static bool add_temporal_candidate(const encoder_state_t *state,
   );
 
   return true;
-}
-
-static INLINE bool add_mvp_candidate(const encoder_state_t *state,
-                                     const cu_info_t *cur_cu,
-                                     const cu_info_t *cand,
-                                     int8_t reflist,
-                                     bool scaling,
-                                     mv_t mv_cand_out[2])
-{
-  if (!cand) return false;
-
-  assert(cand->inter.mv_dir != 0);
-
-  for (int i = 0; i < 2; i++) {
-    const int cand_list = i == 0 ? reflist : !reflist;
-
-    if ((cand->inter.mv_dir & (1 << cand_list)) == 0) continue;
-
-    if (scaling) {
-      mv_cand_out[0] = cand->inter.mv[cand_list][0];
-      mv_cand_out[1] = cand->inter.mv[cand_list][1];
-      apply_mv_scaling(state, cur_cu, cand, reflist, cand_list, mv_cand_out);
-      return true;
-    }
-
-    if (state->frame->ref_LX[cand_list][cand->inter.mv_ref[cand_list]] ==
-        state->frame->ref_LX[reflist][cur_cu->inter.mv_ref[reflist]])
-    {
-      mv_cand_out[0] = cand->inter.mv[cand_list][0];
-      mv_cand_out[1] = cand->inter.mv[cand_list][1];
-      return true;
-    }
-  }
-
-  return false;
 }
 
 /**
@@ -1568,71 +1570,6 @@ static void get_mv_cand_from_candidates(const encoder_state_t * const state,
   }
 }
 
-
-/**
- * \brief Pick two mv candidates from the spatial and temporal candidates.
- */
-static void get_ibc_mv_cand_from_candidates(const encoder_state_t * const state,
-                                        int32_t x,
-                                        int32_t y,
-                                        int32_t width,
-                                        int32_t height,
-                                        const merge_candidates_t *merge_cand,
-                                        const cu_info_t * const cur_cu,
-                                        int8_t reflist,
-                                        mv_t mv_cand[2][2])
-{
-  const cu_info_t *const *a = merge_cand->a;
-  const cu_info_t *const *b = merge_cand->b;
-
-  uint8_t candidates = 0;
-  uint8_t b_candidates = 0;
-
-  // Left predictors without scaling
-  if (add_mvp_candidate(state, cur_cu, a[1], reflist, false, mv_cand[candidates])) {
-    candidates++;
-  }
-
-
-  // Top predictors without scaling  
-  if (add_mvp_candidate(state, cur_cu, b[1], reflist, false, mv_cand[candidates])) {
-    b_candidates++;
-  }
-
-  candidates += b_candidates;
-
-  if (candidates > 0)
-    uvg_round_precision(INTERNAL_MV_PREC, 2, &mv_cand[0][0], &mv_cand[0][1]);
-  if (candidates > 1)
-    uvg_round_precision(INTERNAL_MV_PREC, 2, &mv_cand[1][0], &mv_cand[1][1]);
-
-  // Remove identical candidate
-  if (candidates == 2 && mv_cand[0][0] == mv_cand[1][0] && mv_cand[0][1] == mv_cand[1][1]) {
-    candidates = 1;
-  }
-
-  if (candidates < AMVP_MAX_NUM_CANDS)
-  {
-    const uint32_t ctu_row = (y >> LOG2_LCU_WIDTH);
-    const uint32_t ctu_row_mul_five = ctu_row * MAX_NUM_HMVP_CANDS;
-    int32_t num_cand = state->tile->frame->hmvp_size_ibc[ctu_row];
-    for (int i = 0; i < MIN(/*MAX_NUM_HMVP_AVMPCANDS*/4,num_cand); i++) {
-      cu_info_t* cand = &state->tile->frame->hmvp_lut_ibc[ctu_row_mul_five + num_cand - 1 - i];
-      mv_cand[candidates][0] = cand->inter.mv[0][0];
-      mv_cand[candidates][1] = cand->inter.mv[0][1];
-      candidates++;
-      if (candidates == AMVP_MAX_NUM_CANDS) return;
-    }
-  }
-
-  // Fill with (0,0)
-  while (candidates < AMVP_MAX_NUM_CANDS) {
-    mv_cand[candidates][0] = 0;
-    mv_cand[candidates][1] = 0;
-    candidates++;
-  }
-}
-
 /**
  * \brief Get MV prediction for current block.
  *
@@ -1659,12 +1596,10 @@ void uvg_inter_get_mv_cand(const encoder_state_t * const state,
   merge_candidates_t merge_cand = { 0 };
   const uint8_t parallel_merge_level = state->encoder_control->cfg.log2_parallel_merge_level;
   if (cur_cu->type == CU_IBC) {
-    get_ibc_merge_candidates(x, y, width, height,
-                                 state->tile->frame->width,
-                                 state->tile->frame->height,
-                                 lcu,
-                                 &merge_cand, parallel_merge_level,state->encoder_control->cfg.wpp);
-    get_ibc_mv_cand_from_candidates(state, x, y, width, height, &merge_cand, cur_cu, reflist, mv_cand);
+    mv_t ibc_mv_cand[IBC_MRG_MAX_NUM_CANDS][2];
+    get_ibc_merge_candidates(state, cur_cu,lcu,NULL, x, y, width, height,ibc_mv_cand);
+    memcpy(mv_cand[0], ibc_mv_cand[0], sizeof(mv_t) * 2);
+    memcpy(mv_cand[1], ibc_mv_cand[1], sizeof(mv_t) * 2);  
   } else {
     get_spatial_merge_candidates(x, y, width, height,
                                  state->tile->frame->width,
@@ -1703,11 +1638,10 @@ void uvg_inter_get_mv_cand_cua(const encoder_state_t * const state,
 
   const cu_array_t *cua = state->tile->frame->cu_array;
   if (cur_cu->type == CU_IBC) {
-    get_ibc_merge_candidates_cua(cua,x, y, width, height,
-                              state->tile->frame->width,
-                              state->tile->frame->height,                              
-                              &merge_cand, state->encoder_control->cfg.wpp);
-    get_ibc_mv_cand_from_candidates(state, x, y, width, height, &merge_cand, cur_cu, reflist, mv_cand);
+    mv_t ibc_mv_cand[IBC_MRG_MAX_NUM_CANDS][2];
+    get_ibc_merge_candidates(state, cur_cu, NULL,cua,x, y, width, height,ibc_mv_cand);
+    memcpy(mv_cand[0], ibc_mv_cand[0], sizeof(mv_t) * 2);
+    memcpy(mv_cand[1], ibc_mv_cand[1], sizeof(mv_t) * 2);    
   } else {
     get_spatial_merge_candidates_cua(cua,
                                      x, y, width, height,
