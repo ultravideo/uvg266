@@ -1008,6 +1008,91 @@ static double search_cu(
       }
     }
 
+    // Simple IBC search
+    if (can_use_intra && state->frame->slicetype == UVG_SLICE_I
+           && state->encoder_control->cfg.ibc) {
+      cu_info_t cu_backup  = *cur_cu;
+
+      uint32_t ibc_cost      = MAX_INT;
+      uint32_t ibc_cost_y    = MAX_INT;
+      uint32_t base_cost     = MAX_INT;
+      uint32_t base_cost_y   = MAX_INT;
+
+      
+      if(cur_cu->type == CU_INTRA) {
+         uvg_intra_recon_cu(state,x, y,depth, &intra_search,NULL,lcu);
+      } else {
+        uvg_inter_recon_cu(state, lcu, x, y, CU_WIDTH_FROM_DEPTH(depth), true, state->encoder_control->chroma_format != UVG_CSP_400);
+      }
+
+      bool ibc_better = false;
+      cur_cu->type    = CU_IBC;
+      cur_cu->inter.mv_dir   = 1;
+      cur_cu->skipped                         = false;
+      cur_cu->merged                          = false;
+      cur_cu->inter.mv_cand0                  = 0;
+      optimized_sad_func_ptr_t optimized_sad = uvg_get_optimized_sad(cu_width);
+      uint32_t  source_stride = state->tile->frame->width;
+      const int x_scu    = SUB_SCU(x);
+      const int y_scu    = SUB_SCU(y);
+      const uint32_t offset = x_scu + y_scu * LCU_WIDTH;
+      const uint32_t offset_c = x_scu / 2 + y_scu / 2 * LCU_WIDTH_C;
+
+      mv_t   best_vector[2] = {0, 0};
+
+
+      if (optimized_sad != NULL) {
+          base_cost_y = base_cost = optimized_sad(lcu->rec.y + offset, &state->tile->frame->source->y[y * source_stride + x], cu_width, LCU_WIDTH, source_stride);
+          if(state->encoder_control->chroma_format != UVG_CSP_400) {
+            base_cost += optimized_sad(lcu->rec.u + offset_c, &state->tile->frame->source->u[(y / 2) * source_stride / 2 + x / 2], cu_width / 2, LCU_WIDTH_C, source_stride / 2);
+            base_cost += optimized_sad(lcu->rec.v + offset_c, &state->tile->frame->source->v[(y / 2) * source_stride / 2 + x / 2], cu_width / 2, LCU_WIDTH_C, source_stride / 2);
+          }
+        } else {
+          base_cost_y = base_cost = uvg_reg_sad(lcu->rec.y + offset, &state->tile->frame->source->y[y * source_stride + x], cu_width,cu_width, LCU_WIDTH, source_stride);
+          if(state->encoder_control->chroma_format != UVG_CSP_400) {
+            base_cost += uvg_reg_sad(lcu->rec.u + offset_c, &state->tile->frame->source->u[(y / 2) * source_stride / 2 + x / 2], cu_width / 2, cu_width / 2, LCU_WIDTH_C, source_stride / 2);
+            base_cost += uvg_reg_sad(lcu->rec.v + offset_c, &state->tile->frame->source->v[(y / 2) * source_stride / 2 + x / 2], cu_width / 2, cu_width / 2, LCU_WIDTH_C, source_stride / 2);
+          }
+        }
+
+      for(int i = 0; i < 8; i++) {
+        cur_cu->inter.mv[0][0] = (-cu_width - i) << UVG_IMV_4PEL;
+        cur_cu->inter.mv[0][1] = 0;
+
+        if (x -cu_width - i < 0) break;
+
+        uvg_inter_recon_cu(state, lcu, x, y, CU_WIDTH_FROM_DEPTH(depth), true, state->encoder_control->chroma_format != UVG_CSP_400);
+        
+        if (optimized_sad != NULL) {
+          ibc_cost_y = ibc_cost = optimized_sad(lcu->rec.y + offset, &state->tile->frame->source->y[y * source_stride + x], cu_width, LCU_WIDTH, source_stride);
+          if(state->encoder_control->chroma_format != UVG_CSP_400) {
+            ibc_cost += optimized_sad(lcu->rec.u + offset_c, &state->tile->frame->source->u[(y / 2) * source_stride / 2 + x / 2], cu_width / 2, LCU_WIDTH_C, source_stride / 2);
+            ibc_cost += optimized_sad(lcu->rec.v + offset_c, &state->tile->frame->source->v[(y / 2) * source_stride / 2 + x / 2], cu_width / 2, LCU_WIDTH_C, source_stride / 2);
+          }
+        } else {
+          ibc_cost_y = ibc_cost = uvg_reg_sad(lcu->rec.y + offset, &state->tile->frame->source->y[y * source_stride + x], cu_width,cu_width, LCU_WIDTH, source_stride);
+          if(state->encoder_control->chroma_format != UVG_CSP_400) {
+            ibc_cost += uvg_reg_sad(lcu->rec.u + offset_c, &state->tile->frame->source->u[(y / 2) * source_stride / 2 + x / 2], cu_width / 2, cu_width / 2, LCU_WIDTH_C, source_stride / 2);
+            ibc_cost += uvg_reg_sad(lcu->rec.v + offset_c, &state->tile->frame->source->v[(y / 2) * source_stride / 2 + x / 2], cu_width / 2, cu_width / 2, LCU_WIDTH_C, source_stride / 2);
+          }
+        }
+        if (ibc_cost_y < base_cost_y) {
+          ibc_better     = true;
+          base_cost_y    = ibc_cost_y;
+          best_vector[0] = cur_cu->inter.mv[0][0];          
+          best_vector[1] = cur_cu->inter.mv[0][1];
+          //break;
+        }
+      }
+
+      if (!ibc_better) *cur_cu = cu_backup;
+      else {
+        cur_cu->inter.mv[0][0] = best_vector[0];
+        cur_cu->inter.mv[0][1] = best_vector[1];
+        //fprintf(stderr, "Coding IBC: %d, %d: %d, %d size: %d\r\n", x,y,cur_cu->inter.mv[0][0] / 4, cur_cu->inter.mv[0][1] / 4, cu_width);
+      }
+    }
+
     // Reconstruct best mode because we need the reconstructed pixels for
     // mode search of adjacent CUs.
     if (cur_cu->type == CU_INTRA) {

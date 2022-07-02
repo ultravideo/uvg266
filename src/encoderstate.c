@@ -254,7 +254,7 @@ static void encoder_state_recdata_to_bufs(encoder_state_t * const state,
   // Fill IBC buffer
   if (state->encoder_control->cfg.ibc) {
 
-    uint32_t ibc_buffer_pos_x = lcu->position_px.x + LCU_WIDTH > IBC_BUFFER_WIDTH ? IBC_BUFFER_WIDTH - LCU_WIDTH: lcu->position_px.x;
+    uint32_t ibc_buffer_pos_x = lcu->position_px.x + LCU_WIDTH >= IBC_BUFFER_WIDTH ? IBC_BUFFER_WIDTH - LCU_WIDTH: lcu->position_px.x;
     uint32_t ibc_buffer_pos_x_c = ibc_buffer_pos_x >> 1;
     uint32_t ibc_buffer_row     = lcu->position_px.y / LCU_WIDTH;
 

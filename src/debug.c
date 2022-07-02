@@ -131,7 +131,7 @@ void uvg_dbg_yuview_init(const encoder_control_t* const encoder, char* filename,
   fprintf(yuview_output, "%%;scaleFactor;16\r\n");
   fprintf(yuview_output, "%%;type;13;MVInterL0;vector\r\n");
   fprintf(yuview_output, "%%;vectorColor;0;0;0;255\r\n");
-  fprintf(yuview_output, "%%;scaleFactor;16\r\n");
+  fprintf(yuview_output, "%%;scaleFactor;4\r\n");
   fprintf(yuview_output, "%%;type;14;MVInterL1;vector\r\n");
   fprintf(yuview_output, "%%;vectorColor;255;255;255;255\r\n");
   fprintf(yuview_output, "%%;scaleFactor;16\r\n");

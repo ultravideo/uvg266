@@ -612,20 +612,20 @@ static void ibc_recon_cu(const encoder_state_t * const state,
   int32_t    mv_y     = cu->inter.mv[0][1] >> UVG_IMV_4PEL;
   uint32_t   ibc_row  = y / LCU_WIDTH;
 
-  int32_t    buffer_x = ((x - x_scu) + LCU_WIDTH < IBC_BUFFER_WIDTH ?
+  int32_t    buffer_x = ((x - x_scu) + LCU_WIDTH <= IBC_BUFFER_WIDTH ?
                           x :
-                          x - (((x - x_scu) + LCU_WIDTH) - IBC_BUFFER_WIDTH)) + mv_x;
+                          x - (((x - x_scu)) - IBC_BUFFER_WIDTH)) + mv_x;
   int32_t buffer_y = y_scu + mv_y;
 
-  // The whole block must fir to the left of the current position
+  // The whole block must be to the left of the current position
   assert(-mv_x >= width);
 
   // Predicted block completely outside of this LCU
   if (mv_x + x_scu + width <= 0) {  
     if(predict_luma) uvg_pixels_blit(&state->tile->frame->ibc_buffer_y[ibc_row][buffer_y * IBC_BUFFER_WIDTH + buffer_x], lcu->rec.y + offset, width, width, IBC_BUFFER_WIDTH, LCU_WIDTH);
     if (predict_chroma) {
-      uvg_pixels_blit(&state->tile->frame->ibc_buffer_u[ibc_row][(buffer_y >> 1) * IBC_BUFFER_WIDTH_C + (buffer_x >> 1)], lcu->rec.u + offset_c, width / 2, width / 2, IBC_BUFFER_WIDTH_C, LCU_WIDTH_C);
-      uvg_pixels_blit(&state->tile->frame->ibc_buffer_v[ibc_row][(buffer_y >> 1) * IBC_BUFFER_WIDTH_C + (buffer_x >> 1)], lcu->rec.v + offset_c, width / 2, width / 2, IBC_BUFFER_WIDTH_C, LCU_WIDTH_C);
+      uvg_pixels_blit(&state->tile->frame->ibc_buffer_u[ibc_row][(buffer_y / 2) * IBC_BUFFER_WIDTH_C + (buffer_x / 2)], lcu->rec.u + offset_c, width / 2, width / 2, IBC_BUFFER_WIDTH_C, LCU_WIDTH_C);
+      uvg_pixels_blit(&state->tile->frame->ibc_buffer_v[ibc_row][(buffer_y / 2) * IBC_BUFFER_WIDTH_C + (buffer_x / 2)], lcu->rec.v + offset_c, width / 2, width / 2, IBC_BUFFER_WIDTH_C, LCU_WIDTH_C);
     }
   } else if (mv_x + x_scu + width >= width) { // Completely in current LCU
     if(predict_luma) uvg_pixels_blit(&lcu->rec.y[(y_scu + mv_y) * LCU_WIDTH + x_scu + mv_x], lcu->rec.y + offset, width, width, LCU_WIDTH, LCU_WIDTH);
@@ -639,15 +639,15 @@ static void ibc_recon_cu(const encoder_state_t * const state,
     uint32_t width_lcu    = width - width_buffer;
     if(predict_luma) uvg_pixels_blit(&state->tile->frame->ibc_buffer_y[ibc_row][buffer_y * IBC_BUFFER_WIDTH + buffer_x], lcu->rec.y + offset, width_buffer, width, IBC_BUFFER_WIDTH, LCU_WIDTH);
     if (predict_chroma) {    
-      uvg_pixels_blit(&state->tile->frame->ibc_buffer_u[ibc_row][(buffer_y >> 1) * IBC_BUFFER_WIDTH_C + (buffer_x >> 1)], lcu->rec.u + offset_c, width_buffer / 2, width / 2, IBC_BUFFER_WIDTH_C, LCU_WIDTH_C);
-      uvg_pixels_blit(&state->tile->frame->ibc_buffer_v[ibc_row][(buffer_y >> 1) * IBC_BUFFER_WIDTH_C + (buffer_x >> 1)], lcu->rec.v + offset_c, width_buffer / 2, width / 2, IBC_BUFFER_WIDTH_C, LCU_WIDTH_C);
+      uvg_pixels_blit(&state->tile->frame->ibc_buffer_u[ibc_row][(buffer_y / 2) * IBC_BUFFER_WIDTH_C + (buffer_x / 2)], lcu->rec.u + offset_c, width_buffer / 2 + (width_buffer&1), width / 2, IBC_BUFFER_WIDTH_C, LCU_WIDTH_C);
+      uvg_pixels_blit(&state->tile->frame->ibc_buffer_v[ibc_row][(buffer_y / 2) * IBC_BUFFER_WIDTH_C + (buffer_x / 2)], lcu->rec.v + offset_c, width_buffer / 2 + (width_buffer&1), width / 2, IBC_BUFFER_WIDTH_C, LCU_WIDTH_C);
     }
 
     offset += width_buffer;
-    offset_c += width_buffer/2;
+    offset_c += width_buffer/2 + (width_buffer&1);
 
     if(predict_luma) uvg_pixels_blit(&lcu->rec.y[(y_scu + mv_y) * LCU_WIDTH + x_scu + mv_x + width_buffer], lcu->rec.y + offset, width_lcu, width, LCU_WIDTH, LCU_WIDTH);
-    if (predict_chroma) {
+    if (predict_chroma && (width_lcu / 2)) {
       uvg_pixels_blit(&lcu->rec.u[((y_scu+mv_y) / 2) * LCU_WIDTH_C + (x_scu + mv_x + width_buffer) / 2], lcu->rec.u + offset_c, width_lcu / 2, width / 2, LCU_WIDTH_C, LCU_WIDTH_C);
       uvg_pixels_blit(&lcu->rec.v[((y_scu+mv_y) / 2) * LCU_WIDTH_C + (x_scu + mv_x + width_buffer) / 2], lcu->rec.v + offset_c, width_lcu / 2, width / 2, LCU_WIDTH_C, LCU_WIDTH_C);
     }
@@ -1202,8 +1202,8 @@ static void get_ibc_merge_candidates(const encoder_state_t * const state,
     const uint32_t ctu_row = (y >> LOG2_LCU_WIDTH);
     const uint32_t ctu_row_mul_five = ctu_row * MAX_NUM_HMVP_CANDS;
     int32_t num_cand = state->tile->frame->hmvp_size_ibc[ctu_row];
-    for (int i = 0; i < MIN(MAX_NUM_HMVP_CANDS,num_cand); i++) {
-      cu_info_t* cand = &state->tile->frame->hmvp_lut_ibc[ctu_row_mul_five + num_cand - 1 - i];
+    for (int i = 0; i < MIN(4,num_cand); i++) {
+      cu_info_t* cand = &state->tile->frame->hmvp_lut_ibc[ctu_row_mul_five + i];
       mv_cand[candidates][0] = cand->inter.mv[0][0];
       mv_cand[candidates][1] = cand->inter.mv[0][1];
       candidates++;
