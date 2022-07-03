@@ -1056,7 +1056,7 @@ static double search_cu(
         }
 
       for(int i = 0; i < 8; i++) {
-        cur_cu->inter.mv[0][0] = (-cu_width - i) << UVG_IMV_4PEL;
+        cur_cu->inter.mv[0][0] = (-cu_width - i) * (1 << INTERNAL_MV_PREC);
         cur_cu->inter.mv[0][1] = 0;
 
         if (x -cu_width - i < 0) break;

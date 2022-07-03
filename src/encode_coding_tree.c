@@ -906,7 +906,7 @@ int uvg_encode_inter_prediction_unit(encoder_state_t * const state,
         mv_t mvd_hor = cur_cu->inter.mv[ref_list_idx][0] - mv_cand[cu_mv_cand][0];
         mv_t mvd_ver = cur_cu->inter.mv[ref_list_idx][1] - mv_cand[cu_mv_cand][1];
 
-        uvg_change_precision(INTERNAL_MV_PREC, uvg_g_imv_to_prec[UVG_IMV_OFF], &mvd_hor, &mvd_ver);
+        uvg_change_precision(INTERNAL_MV_PREC, uvg_g_imv_to_prec[(cur_cu->type == CU_IBC)?UVG_IMV_FPEL:UVG_IMV_OFF], &mvd_hor, &mvd_ver);
         uvg_encode_mvd(state, cabac, mvd_hor, mvd_ver, bits_out);
 
         non_zero_mvd |= (mvd_hor != 0) || (mvd_ver != 0);

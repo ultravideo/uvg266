@@ -608,8 +608,8 @@ static void ibc_recon_cu(const encoder_state_t * const state,
   uint32_t offset_c = x_scu / 2 + y_scu / 2 * LCU_WIDTH_C;
   cu_info_t *cu       = LCU_GET_CU_AT_PX(lcu, x_scu, y_scu);
 
-  int32_t    mv_x     = cu->inter.mv[0][0] >> UVG_IMV_4PEL;
-  int32_t    mv_y     = cu->inter.mv[0][1] >> UVG_IMV_4PEL;
+  int32_t    mv_x     = cu->inter.mv[0][0] >> INTERNAL_MV_PREC;
+  int32_t    mv_y     = cu->inter.mv[0][1] >> INTERNAL_MV_PREC;
   uint32_t   ibc_row  = y / LCU_WIDTH;
 
   int32_t    buffer_x = ((x - x_scu) + LCU_WIDTH <= IBC_BUFFER_WIDTH ?
@@ -1599,7 +1599,7 @@ void uvg_inter_get_mv_cand(const encoder_state_t * const state,
     mv_t ibc_mv_cand[IBC_MRG_MAX_NUM_CANDS][2];
     get_ibc_merge_candidates(state, cur_cu,lcu,NULL, x, y, width, height,ibc_mv_cand);
     memcpy(mv_cand[0], ibc_mv_cand[0], sizeof(mv_t) * 2);
-    memcpy(mv_cand[1], ibc_mv_cand[1], sizeof(mv_t) * 2);  
+    memcpy(mv_cand[1], ibc_mv_cand[1], sizeof(mv_t) * 2);
   } else {
     get_spatial_merge_candidates(x, y, width, height,
                                  state->tile->frame->width,
