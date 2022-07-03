@@ -1064,13 +1064,13 @@ static double search_cu(
         uvg_inter_recon_cu(state, lcu, x, y, CU_WIDTH_FROM_DEPTH(depth), true, state->encoder_control->chroma_format != UVG_CSP_400);
         
         if (optimized_sad != NULL) {
-          ibc_cost_y = ibc_cost = optimized_sad(lcu->rec.y + offset, &state->tile->frame->source->y[y * source_stride + x], cu_width, LCU_WIDTH, source_stride);
+          ibc_cost_y = ibc_cost = 3*optimized_sad(lcu->rec.y + offset, &state->tile->frame->source->y[y * source_stride + x], cu_width, LCU_WIDTH, source_stride);
           if(state->encoder_control->chroma_format != UVG_CSP_400) {
             ibc_cost += optimized_sad(lcu->rec.u + offset_c, &state->tile->frame->source->u[(y / 2) * source_stride / 2 + x / 2], cu_width / 2, LCU_WIDTH_C, source_stride / 2);
             ibc_cost += optimized_sad(lcu->rec.v + offset_c, &state->tile->frame->source->v[(y / 2) * source_stride / 2 + x / 2], cu_width / 2, LCU_WIDTH_C, source_stride / 2);
           }
         } else {
-          ibc_cost_y = ibc_cost = uvg_reg_sad(lcu->rec.y + offset, &state->tile->frame->source->y[y * source_stride + x], cu_width,cu_width, LCU_WIDTH, source_stride);
+          ibc_cost_y = ibc_cost = 3*uvg_reg_sad(lcu->rec.y + offset, &state->tile->frame->source->y[y * source_stride + x], cu_width,cu_width, LCU_WIDTH, source_stride);
           if(state->encoder_control->chroma_format != UVG_CSP_400) {
             ibc_cost += uvg_reg_sad(lcu->rec.u + offset_c, &state->tile->frame->source->u[(y / 2) * source_stride / 2 + x / 2], cu_width / 2, cu_width / 2, LCU_WIDTH_C, source_stride / 2);
             ibc_cost += uvg_reg_sad(lcu->rec.v + offset_c, &state->tile->frame->source->v[(y / 2) * source_stride / 2 + x / 2], cu_width / 2, cu_width / 2, LCU_WIDTH_C, source_stride / 2);
@@ -1081,7 +1081,7 @@ static double search_cu(
           base_cost_y    = ibc_cost_y;
           best_vector[0] = cur_cu->inter.mv[0][0];          
           best_vector[1] = cur_cu->inter.mv[0][1];
-          //break;
+          break;
         }
       }
 
