@@ -1844,6 +1844,7 @@ void uvg_search_cu_intra(
       search_data[i].cost = MAX_INT;
     }
     number_of_modes = UVG_NUM_INTRA_MODES;
+    num_regular_modes = UVG_NUM_INTRA_MODES;
   }
 
   uint8_t num_mrl_modes = 0;
