@@ -1158,6 +1158,41 @@ static double search_cu(
 
     if (depth < MAX_DEPTH) {
 
+      state->search_cabac.update = 1;
+      // Add cost of cu_split_flag.
+      const cu_info_t* left_cu = NULL, * above_cu = NULL;
+      if (x) {
+        if (x_local || tree_type != UVG_CHROMA_T) {
+          left_cu = LCU_GET_CU_AT_PX(lcu, x_local - 1, y_local);
+        }
+        else {
+          left_cu = uvg_cu_array_at_const(state->tile->frame->chroma_cu_array, (x >> 1) - 1, y >> 1);
+        }
+      }
+      if (y) {
+        if (y_local || tree_type != UVG_CHROMA_T) {
+          above_cu = LCU_GET_CU_AT_PX(lcu, x_local, y_local - 1);
+        }
+        else {
+          above_cu = uvg_cu_array_at_const(state->tile->frame->chroma_cu_array, x >> 1, (y >> 1) - 1);
+        }
+      }
+      uvg_write_split_flag(
+        state,
+        &state->search_cabac,
+        left_cu,
+        above_cu,
+        1,
+        depth,
+        cu_width,
+        x >> (tree_type == UVG_CHROMA_T),
+        y >> (tree_type == UVG_CHROMA_T),
+        tree_type,
+        &split_bits);
+    }
+
+    state->search_cabac.update = 0;
+    split_cost += split_bits * state->lambda;
 
     // If skip mode was selected for the block, skip further search.
     // Skip mode means there's no coefficients in the block, so splitting
@@ -1172,43 +1207,7 @@ static double search_cu(
     } else {
       split_cost = INT_MAX;
     }
-    state->search_cabac.update = 1;
 
-
-    // Add cost of cu_split_flag.
-    const cu_info_t* left_cu = NULL, * above_cu = NULL;
-    if (x) {
-      if (x_local || tree_type != UVG_CHROMA_T) {
-        left_cu = LCU_GET_CU_AT_PX(lcu, x_local - 1, y_local);
-      }
-      else {
-        left_cu = uvg_cu_array_at_const(state->tile->frame->chroma_cu_array, (x >> 1) - 1, y >> 1);
-      }
-    }
-    if (y) {
-      if (y_local || tree_type != UVG_CHROMA_T) {
-        above_cu = LCU_GET_CU_AT_PX(lcu, x_local, y_local - 1);
-      }
-      else {
-        above_cu = uvg_cu_array_at_const(state->tile->frame->chroma_cu_array, x >> 1, (y >> 1) - 1);
-      }
-    }
-    uvg_write_split_flag(
-      state,
-      &state->search_cabac,
-      left_cu,
-      above_cu,
-      1,
-      depth,
-      cu_width,
-      x >> (tree_type == UVG_CHROMA_T),
-      y >> (tree_type == UVG_CHROMA_T),
-      tree_type,
-      &split_bits);
-    }
-
-    state->search_cabac.update = 0;
-    split_cost += split_bits * state->lambda;
     // If no search is not performed for this depth, try just the best mode
     // of the top left CU from the next depth. This should ensure that 64x64
     // gets used, at least in the most obvious cases, while avoiding any
@@ -1234,7 +1233,7 @@ static double search_cu(
                              x > 0 ? LCU_GET_CU_AT_PX(lcu, SUB_SCU(x) - 1, SUB_SCU(y)) : NULL,
                              y > 0 ? LCU_GET_CU_AT_PX(lcu, SUB_SCU(x), SUB_SCU(y) - 1) : NULL,
                              0, depth, cu_width, x, y, tree_type,
-                             & split_bits);
+                             &bits);
 
         cur_cu->intra = cu_d1->intra;
         cur_cu->type = CU_INTRA;
@@ -1242,6 +1241,8 @@ static double search_cu(
 
         // Disable MRL in this case
         cur_cu->intra.multi_ref_idx = 0;
+        cur_cu->lfnst_idx = 0;
+        cur_cu->cr_lfnst_idx = 0;
 
         uvg_lcu_fill_trdepth(lcu, x, y, depth, cur_cu->tr_depth, tree_type);
         lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
