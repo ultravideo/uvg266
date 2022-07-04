@@ -233,7 +233,9 @@ static unsigned satd_4x4_8bit_avx2(const uint8_t *org, const uint8_t *cur)
   row3 = _mm_add_epi16(row3, _mm_shuffle_epi32(row3, _MM_SHUFFLE(0, 1, 0, 1) ));
   row3 = _mm_add_epi16(row3, _mm_shufflelo_epi16(row3, _MM_SHUFFLE(0, 1, 0, 1) ));
 
+  const int dc1 = abs(_mm_extract_epi16(row2, 0));
   unsigned sum = _mm_extract_epi16(row3, 0);
+  sum -= dc1 - (dc1 >> 2);
   unsigned satd = (sum + 1) >> 1;
 
   return satd;
@@ -280,10 +282,16 @@ static void satd_8bit_4x4_dual_avx2(
   row3 = _mm256_add_epi16(row3, _mm256_shuffle_epi32(row3, _MM_SHUFFLE(0, 1, 0, 1) ));
   row3 = _mm256_add_epi16(row3, _mm256_shufflelo_epi16(row3, _MM_SHUFFLE(0, 1, 0, 1) ));
 
+  const int16_t temp2 = _mm256_extract_epi16(row2, 0);
+  const int dc1 = abs(temp2);
   unsigned sum1 = _mm_extract_epi16(_mm256_castsi256_si128(row3), 0);
+  sum1 -= dc1 - (dc1 >> 2);
   sum1 = (sum1 + 1) >> 1;
 
+  const int16_t temp3 = _mm256_extract_epi16(row2, 8);
+  const int dc2 = abs(temp3);
   unsigned sum2 = _mm_extract_epi16(_mm256_extracti128_si256(row3, 1), 0);
+  sum2 -= dc2 - (dc2 >> 2);
   sum2 = (sum2 + 1) >> 1;
 
   satds_out[0] = sum1;
@@ -522,6 +530,13 @@ static void uvg_satd_8bit_8x8_general_dual_avx2(const uint8_t * buf1, unsigned s
   
   sum_block_dual_avx2(temp, sum0, sum1);
 
+  const int16_t temp2 = _mm256_extract_epi16(temp[0], 0);
+  const int dc1 = abs(temp2);
+  const int16_t temp3 = _mm256_extract_epi16(temp[0], 8);
+  const int dc2 = abs(temp3);
+  *sum0 -= dc1 - (dc1 >> 2);
+  *sum1 -= dc2 - (dc2 >> 2);
+
   *sum0 = (*sum0 + 2) >> 2;
   *sum1 = (*sum1 + 2) >> 2;
 }
@@ -557,6 +572,9 @@ static unsigned satd_8x8_subblock_8bit_avx2(const uint8_t * buf1, unsigned strid
   ver_transform_block_avx2(&temp);
   
   unsigned sad = sum_block_avx2(temp);
+
+  const int dc1 = abs(_mm_extract_epi16(temp[0], 0));
+  sad -= dc1 - (dc1 >> 2);
 
   unsigned result = (sad + 2) >> 2;
   return result;
