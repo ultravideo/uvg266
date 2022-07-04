@@ -1010,7 +1010,7 @@ static double search_cu(
 
     // Simple IBC search
     if (can_use_intra && state->frame->slicetype == UVG_SLICE_I
-           && state->encoder_control->cfg.ibc) {
+           && state->encoder_control->cfg.ibc && cu_width > 4) {
       cu_info_t cu_backup  = *cur_cu;
 
       uint32_t ibc_cost      = MAX_INT;
@@ -1031,6 +1031,7 @@ static double search_cu(
       cur_cu->skipped                         = false;
       cur_cu->merged                          = false;
       cur_cu->inter.mv_cand0                  = 0;
+      cur_cu->joint_cb_cr                     = 0;
       optimized_sad_func_ptr_t optimized_sad = uvg_get_optimized_sad(cu_width);
       uint32_t  source_stride = state->tile->frame->width;
       const int x_scu    = SUB_SCU(x);
