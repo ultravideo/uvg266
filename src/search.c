@@ -960,7 +960,7 @@ static double search_cu(
             intra_search.pred_cu.type = CU_INTRA;
           }
           intra_search.pred_cu.intra.mode_chroma = intra_search.pred_cu.intra.mode;
-          if (ctrl->cfg.rdo >= 3 || ctrl->cfg.jccr || ctrl->cfg.lfnst) {
+          if (ctrl->cfg.rdo >= 2 || ctrl->cfg.jccr || ctrl->cfg.lfnst) {
             uvg_search_cu_intra_chroma(state, x, y, depth, lcu, &intra_search, tree_type);
 
             if (intra_search.pred_cu.joint_cb_cr == 0) {

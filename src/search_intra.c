@@ -1621,7 +1621,7 @@ int8_t uvg_search_cu_intra_chroma(
   // const int8_t modes_in_depth[5] = { 1, 1, 1, 1, 2 };
   int num_modes = 1;
 
-  if (state->encoder_control->cfg.rdo >= 3 || tree_type == UVG_CHROMA_T) {
+  if (state->encoder_control->cfg.rdo >= 2 || tree_type == UVG_CHROMA_T) {
     num_modes = total_modes;
   }
 
