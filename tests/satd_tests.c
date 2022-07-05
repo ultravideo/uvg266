@@ -119,7 +119,7 @@ static void satd_tear_down_tests()
 
 TEST satd_test_black_and_white(void)
 {
-  const int satd_results[5] = {2040, 4080, 16320, 65280, 261120};
+  const int satd_results[5] = {510, 1020, 4080, 16320, 65280};
   
   const int test = 0;
 
@@ -137,7 +137,7 @@ TEST satd_test_black_and_white(void)
 
 TEST satd_test_checkers(void)
 {
-  const int satd_checkers_results[5] = { 2040, 4080, 16320, 65280, 261120 };
+  const int satd_checkers_results[5] = { 1278, 2556, 10224, 40896, 163584 };
 
   const int test = 1;
 
@@ -156,7 +156,7 @@ TEST satd_test_checkers(void)
 
 TEST satd_test_gradient(void)
 {
-  const int satd_gradient_results[5] = {3140,9004,20481,67262,258672};
+  const int satd_gradient_results[5] = {2728,7158,10775,23399,72780};
 
   const int test = 2;
 

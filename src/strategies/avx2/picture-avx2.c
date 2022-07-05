@@ -233,7 +233,8 @@ static unsigned satd_4x4_8bit_avx2(const uint8_t *org, const uint8_t *cur)
   row3 = _mm_add_epi16(row3, _mm_shuffle_epi32(row3, _MM_SHUFFLE(0, 1, 0, 1) ));
   row3 = _mm_add_epi16(row3, _mm_shufflelo_epi16(row3, _MM_SHUFFLE(0, 1, 0, 1) ));
 
-  const int dc1 = abs(_mm_extract_epi16(row2, 0));
+  const int16_t temp1 = _mm_extract_epi16(row2, 0);
+  const int dc1 = abs(temp1);
   unsigned sum = _mm_extract_epi16(row3, 0);
   sum -= dc1 - (dc1 >> 2);
   unsigned satd = (sum + 1) >> 1;
@@ -573,7 +574,8 @@ static unsigned satd_8x8_subblock_8bit_avx2(const uint8_t * buf1, unsigned strid
   
   unsigned sad = sum_block_avx2(temp);
 
-  const int dc1 = abs(_mm_extract_epi16(temp[0], 0));
+  const int16_t temp1 = _mm_extract_epi16(temp[0], 0);
+  const int dc1 = abs(temp1);
   sad -= dc1 - (dc1 >> 2);
 
   unsigned result = (sad + 2) >> 2;
