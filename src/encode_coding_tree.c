@@ -834,7 +834,7 @@ int uvg_encode_inter_prediction_unit(encoder_state_t * const state,
     if (cur_cu->inter.mv_dir & 2) DBG_YUVIEW_MV(state->frame->poc, DBG_YUVIEW_MVMERGE_L1, abs_x, abs_y, width, height, cur_cu->inter.mv[1][0], cur_cu->inter.mv[1][1]);
 #endif
   } else {
-    if (state->frame->slicetype == UVG_SLICE_B) {
+    if (state->frame->slicetype == UVG_SLICE_B && cur_cu->type != CU_IBC) {
       // Code Inter Dir
       uint8_t inter_dir = cur_cu->inter.mv_dir;
 
@@ -860,7 +860,7 @@ int uvg_encode_inter_prediction_unit(encoder_state_t * const state,
       // size of the current reference index list (L0/L1)
       uint8_t ref_LX_size = state->frame->ref_LX_size[ref_list_idx];
 
-      if (ref_LX_size > 1) {
+      if (ref_LX_size > 1 && cur_cu->type != CU_IBC) {
         // parseRefFrmIdx
         int32_t ref_frame = cur_cu->inter.mv_ref[ref_list_idx];
         
@@ -1798,7 +1798,7 @@ double uvg_mock_encode_coding_unit(
     CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.cu_pred_mode_model[ctx_predmode]), (cur_cu->type == CU_INTRA), bits, "PredMode");
   }
   
-  if (cur_cu->type == CU_INTER) {
+  if (cur_cu->type == CU_INTER || cur_cu->type == CU_IBC) {
     const uint8_t imv_mode = UVG_IMV_OFF;
     const int non_zero_mvd = uvg_encode_inter_prediction_unit(state, cabac, cur_cu, x, y, cu_width, cu_width, depth, lcu, &bits);
     if (ctrl->cfg.amvr && non_zero_mvd) {

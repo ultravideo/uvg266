@@ -1009,7 +1009,7 @@ static double search_cu(
     }
 
     // Simple IBC search
-    if (can_use_intra && state->frame->slicetype == UVG_SLICE_I
+    if (can_use_intra //&& state->frame->slicetype == UVG_SLICE_I
            && state->encoder_control->cfg.ibc && cu_width > 4) {
       cu_info_t cu_backup  = *cur_cu;
 
@@ -1174,7 +1174,7 @@ static double search_cu(
     }
   }
 
-  if (cur_cu->type == CU_INTRA || cur_cu->type == CU_INTER) {
+  if (cur_cu->type == CU_INTRA || cur_cu->type == CU_INTER || cur_cu->type == CU_IBC) {
     double bits = 0;
     cabac_data_t* cabac  = &state->search_cabac;
     cabac->update = 1;
