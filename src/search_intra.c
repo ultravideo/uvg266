@@ -1621,7 +1621,7 @@ int8_t uvg_search_cu_intra_chroma(
   // const int8_t modes_in_depth[5] = { 1, 1, 1, 1, 2 };
   int num_modes = 1;
 
-  if (state->encoder_control->cfg.rdo >= 3) {
+  if (state->encoder_control->cfg.rdo >= 3 || tree_type == UVG_CHROMA_T) {
     num_modes = total_modes;
   }
 
@@ -1666,8 +1666,11 @@ int8_t uvg_search_cu_intra_chroma(
                                           tree_type);
   }
   
-  if (num_modes > 1) {
+  if (num_modes > 1 || state->encoder_control->cfg.jccr) {
     uvg_search_intra_chroma_rdo(state, x_px, y_px, depth, num_modes, lcu, chroma_data, intra_mode, tree_type);
+  }
+  else if(cur_pu->lfnst_idx) {
+    chroma_data[0].pred_cu.cr_lfnst_idx = cur_pu->lfnst_idx;
   }
   *search_data = chroma_data[0];
   return chroma_data[0].pred_cu.intra.mode_chroma;
