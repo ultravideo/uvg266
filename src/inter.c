@@ -1153,6 +1153,8 @@ static void get_ibc_merge_candidates(const encoder_state_t * const state,
 
   cu_info_t *a1      = NULL;
   cu_info_t *b1      = NULL;
+    
+  uint8_t candidates = 0;
 
   // A1 availability testing
   if (x != 0) {
@@ -1161,6 +1163,9 @@ static void get_ibc_merge_candidates(const encoder_state_t * const state,
     // the current one and the flag is not set when searching an SMP block.
     if (a1->type == CU_IBC) {
       inter_clear_cu_unused(a1);
+      mv_cand[candidates][0] = a1->inter.mv[0][0];
+      mv_cand[candidates][1] = a1->inter.mv[0][1];
+      candidates++;
     } else {
       a1 = NULL;
     }
@@ -1173,24 +1178,14 @@ static void get_ibc_merge_candidates(const encoder_state_t * const state,
     // before the current one and the flag is not set when searching an SMP
     // block.
     if (b1->type == CU_IBC) {
-      inter_clear_cu_unused(b1);      
+      inter_clear_cu_unused(b1);
+      mv_cand[candidates][0] = b1->inter.mv[0][0];
+      mv_cand[candidates][1] = b1->inter.mv[0][1];
+      candidates++;
     } else {
       b1 = NULL;
     }
   }  
-  
-  uint8_t candidates = 0;
-
-  // Left predictors without scaling
-  if (add_mvp_candidate(state, cur_cu, a1, 0, false, mv_cand[candidates])) {
-    candidates++;
-  }
-
-  // Top predictors without scaling  
-  if (add_mvp_candidate(state, cur_cu, b1, 0, false, mv_cand[candidates])) {
-    candidates++;
-  }
-
 
   if (candidates > 0)
     uvg_round_precision(INTERNAL_MV_PREC, 2, &mv_cand[0][0], &mv_cand[0][1]);
@@ -1202,8 +1197,10 @@ static void get_ibc_merge_candidates(const encoder_state_t * const state,
     const uint32_t ctu_row = (y >> LOG2_LCU_WIDTH);
     const uint32_t ctu_row_mul_five = ctu_row * MAX_NUM_HMVP_CANDS;
     int32_t num_cand = state->tile->frame->hmvp_size_ibc[ctu_row];
-    for (int i = 0; i < MIN(4,num_cand); i++) {
+    for (int i = 0; i < MIN(MAX_NUM_HMVP_CANDS,num_cand); i++) {
       cu_info_t* cand = &state->tile->frame->hmvp_lut_ibc[ctu_row_mul_five + i];
+
+
       mv_cand[candidates][0] = cand->inter.mv[0][0];
       mv_cand[candidates][1] = cand->inter.mv[0][1];
       candidates++;
@@ -1928,7 +1925,6 @@ uint8_t uvg_inter_get_merge_cand(const encoder_state_t * const state,
 
     for (int i = 0; i < num_cand; i++) {
       const cu_info_t* hmvp_cand = &state->tile->frame->hmvp_lut[ctu_row_mul_five + i];
-      // ToDo: Add IBC condition
       if (i > 1 || ((!is_duplicate_candidate(hmvp_cand, a[1]))
                  && (!is_duplicate_candidate(hmvp_cand, b[1]))) ) {
         mv_cand[candidates].mv[0][0] = state->tile->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv[0][0];
