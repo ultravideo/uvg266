@@ -1020,7 +1020,8 @@ static double search_cu(
 
       
       if(cur_cu->type == CU_INTRA) {
-         uvg_intra_recon_cu(state,x, y,depth, &intra_search,NULL,lcu);
+        intra_search.pred_cu.intra.mode_chroma = -1; // don't reconstruct chroma before search is performed for it
+        uvg_intra_recon_cu(state,x, y,depth, &intra_search,NULL,lcu);
       } else {
         uvg_inter_recon_cu(state, lcu, x, y, CU_WIDTH_FROM_DEPTH(depth), true, state->encoder_control->chroma_format != UVG_CSP_400);
       }
@@ -1056,11 +1057,16 @@ static double search_cu(
           }
         }
 
-      for(int i = 0; i < 8; i++) {
-        cur_cu->inter.mv[0][0] = (-cu_width - i) * (1 << INTERNAL_MV_PREC);
-        cur_cu->inter.mv[0][1] = 0;
-
-        if (x -cu_width - i < 0) break;
+      for(int i = -1; i < 8; i++) {
+        if (i == -1) {
+          if (y_scu < cu_width) continue;
+          cur_cu->inter.mv[0][0] = 0;
+          cur_cu->inter.mv[0][1] = (-cu_width) * (1 << INTERNAL_MV_PREC);
+        } else {
+          cur_cu->inter.mv[0][0] = (-cu_width - i) * (1 << INTERNAL_MV_PREC);
+          cur_cu->inter.mv[0][1] = 0;
+          if (x - cu_width - i < 0) break;
+        }
 
         uvg_inter_recon_cu(state, lcu, x, y, CU_WIDTH_FROM_DEPTH(depth), true, state->encoder_control->chroma_format != UVG_CSP_400);
         
