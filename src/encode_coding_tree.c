@@ -1738,7 +1738,6 @@ void uvg_encode_coding_tree(
       encode_transform_coeff(state, x, y, depth, 0, 0, 0, 1, coeff, tree_type);
       // Write LFNST only once for single tree structure
       encode_lfnst_idx(state, cabac, tmp, x, y, depth, cu_width, cu_height, tree_type, COLOR_UV);
-      
     }
   }
 

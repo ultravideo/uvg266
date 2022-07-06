@@ -369,7 +369,7 @@ static double search_intra_trdepth(
           pred_cu->violates_mts_coeff_constraint = 0;
 
           if (trafo == MTS_SKIP && width > (
-                1 << state->encoder_control->cfg.trskip_max_size)) {
+                1 << state->encoder_control->cfg.trskip_max_size) || !state->encoder_control->cfg.trskip_enable) {
             //TODO: parametrize that this is not hardcoded
             // TODO: this probably should currently trip for chroma?
             continue;
