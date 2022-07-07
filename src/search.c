@@ -572,7 +572,7 @@ static double cu_rd_cost_tr_split_accurate(
   }
 
   if(depth == 4 || tree_type == UVG_LUMA_T) {
-    if (uvg_is_lfnst_allowed(state, tr_cu, width, width, x_px, y_px, tree_type, COLOR_Y)) {
+    if (uvg_is_lfnst_allowed(state, tr_cu, width, width, x_px, y_px, tree_type, COLOR_Y, lcu)) {
       const int lfnst_idx = tr_cu->lfnst_idx;
       CABAC_FBITS_UPDATE(
         cabac,
@@ -639,7 +639,7 @@ static double cu_rd_cost_tr_split_accurate(
     }
   }
 
-  if (uvg_is_lfnst_allowed(state, tr_cu, width, width, x_px, y_px, tree_type, depth == 4 || tree_type == UVG_CHROMA_T ? COLOR_UV : COLOR_Y)) {
+  if (uvg_is_lfnst_allowed(state, tr_cu, width, width, x_px, y_px, tree_type, depth == 4 || tree_type == UVG_CHROMA_T ? COLOR_UV : COLOR_Y, lcu)) {
     const int lfnst_idx = (depth != 4 && tree_type != UVG_CHROMA_T) ? tr_cu->lfnst_idx : tr_cu->cr_lfnst_idx;
     CABAC_FBITS_UPDATE(
       cabac,
