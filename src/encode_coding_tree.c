@@ -201,7 +201,7 @@ static bool can_use_lfnst_with_isp(const int width, const int height, const int 
     const int tu_height = tu_width; // TODO: height for non-square blocks
 
     // TODO: chroma transform skip
-    if (tree_type != UVG_BOTH_T) {
+    if (color == COLOR_Y) {
       for (int i = 0; i < num_transform_units; i++) {
         // TODO: this works only for square blocks
         const int pu_x = x + ((i % tu_row_length) * tu_width);
