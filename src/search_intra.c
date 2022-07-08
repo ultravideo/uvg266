@@ -314,7 +314,7 @@ static double search_intra_trdepth(
     int best_tr_idx = 0;
     int best_lfnst_idx = 0;
 
-    int trafo;
+    uint8_t trafo;
     int num_transforms = 1;
     if (pred_cu->tr_idx != MTS_TR_NUM)
     {
@@ -362,16 +362,14 @@ static double search_intra_trdepth(
 
       for (trafo = mts_start; trafo < num_transforms; trafo++) {
         pred_cu->tr_idx = trafo;
-        bool constraints[2] = { pred_cu->violates_lfnst_constrained_luma,
-                 pred_cu->lfnst_last_scan_pos };
+        pred_cu->tr_skip = trafo == MTS_SKIP;
+        bool constraints[2] = { false, false};
         if (mts_enabled) {
           pred_cu->mts_last_scan_pos = 0;
           pred_cu->violates_mts_coeff_constraint = 0;
 
-          if (trafo == MTS_SKIP && width > (
-                1 << state->encoder_control->cfg.trskip_max_size)) {
-            //TODO: parametrize that this is not hardcoded
-            // TODO: this probably should currently trip for chroma?
+          if ((trafo == MTS_SKIP && width > (1 << state->encoder_control->cfg.trskip_max_size))
+            || !state->encoder_control->cfg.trskip_enable) {
             continue;
           }
         }
@@ -379,17 +377,21 @@ static double search_intra_trdepth(
         if (pred_cu->lfnst_idx > 0 && pred_cu->tr_idx > 0) {
           continue;
         }
-      
-     
-      uvg_intra_recon_cu(state,
-                         x_px, y_px,
-                         depth, search_data,
-                         pred_cu,
-                         lcu,
-                         UVG_LUMA_T,true,false);
-      if (trafo != 0 && !cbf_is_set(pred_cu->cbf, depth, COLOR_Y)) continue;
+        
+        uvg_intra_recon_cu(
+          state,
+          x_px,
+          y_px,
+          depth,
+          search_data,
+          pred_cu,
+          lcu,
+          UVG_LUMA_T,
+          true,
+          false);
 
-        // TODO: Not sure if this should be 0 or 1 but at least seems to work with 1
+        if (trafo != 0 && !cbf_is_set(pred_cu->cbf, depth, COLOR_Y)) continue;
+        
         derive_mts_constraints(pred_cu, lcu, depth, lcu_px);
         if (pred_cu->tr_idx > 1) {
           if (pred_cu->violates_mts_coeff_constraint || !pred_cu->
@@ -398,17 +400,21 @@ static double search_intra_trdepth(
           }
         }
 
-        const unsigned scan_offset = xy_to_zorder(LCU_WIDTH, lcu_px.x, lcu_px.y);
+        const unsigned scan_offset = xy_to_zorder(
+          LCU_WIDTH,
+          lcu_px.x,
+          lcu_px.y);
 
-        uvg_derive_lfnst_constraints(
-          pred_cu,
-          depth,
-          constraints,
-          &lcu->coeff.y[scan_offset],
-          width,
-          height
-          );
-          // Temp constraints. Updating the actual pred_cu constraints here will break things later
+        if (trafo != MTS_SKIP && end_idx != 0) {
+          uvg_derive_lfnst_constraints(
+            pred_cu,
+            depth,
+            constraints,
+            &lcu->coeff.y[scan_offset],
+            width,
+            height
+            );
+        }
 
         if (!constraints[1] && cbf_is_set(pred_cu->cbf, depth, COLOR_Y)) {
           //end_idx = 0;
@@ -424,15 +430,21 @@ static double search_intra_trdepth(
           pred_cu,
           lcu);
         double transform_bits = 0;
-        if(state->encoder_control->cfg.lfnst && depth == pred_cu->tr_depth) {
-          if(!constraints[0] && constraints[1]) {
-            transform_bits += CTX_ENTROPY_FBITS(&state->search_cabac.ctx.lfnst_idx_model[tr_cu->depth == 4 || tree_type == UVG_LUMA_T], lfnst_idx != 0);
-            if(lfnst_idx > 0) {
-              transform_bits += CTX_ENTROPY_FBITS(&state->search_cabac.ctx.lfnst_idx_model[2], lfnst_idx == 2);
+        if (state->encoder_control->cfg.lfnst && depth == pred_cu->tr_depth &&
+            trafo != MTS_SKIP) {
+          if (!constraints[0] && constraints[1]) {
+            transform_bits += CTX_ENTROPY_FBITS(
+              &state->search_cabac.ctx.lfnst_idx_model[tr_cu->depth == 4 ||
+                tree_type == UVG_LUMA_T],
+              lfnst_idx != 0);
+            if (lfnst_idx > 0) {
+              transform_bits += CTX_ENTROPY_FBITS(
+                &state->search_cabac.ctx.lfnst_idx_model[2],
+                lfnst_idx == 2);
             }
           }
         }
-        if (num_transforms > 1 && trafo != MTS_SKIP && width <= 32
+        if (num_transforms > 2 && trafo != MTS_SKIP && width <= 32
             /*&& height <= 32*/
             && !pred_cu->violates_mts_coeff_constraint && pred_cu->
             mts_last_scan_pos && lfnst_idx == 0) {
@@ -454,7 +466,9 @@ static double search_intra_trdepth(
         }
         rd_cost += transform_bits * state->frame->lambda;
 
-        search_data->lfnst_costs[lfnst_idx] = MIN(search_data->lfnst_costs[lfnst_idx], rd_cost);
+        search_data->lfnst_costs[lfnst_idx] = MIN(
+          search_data->lfnst_costs[lfnst_idx],
+          rd_cost);
         if (rd_cost < best_rd_cost) {
           best_rd_cost = rd_cost;
           best_lfnst_idx = pred_cu->lfnst_idx;
@@ -468,7 +482,10 @@ static double search_intra_trdepth(
         pred_cu->intra.mode_chroma = chroma_mode;
         pred_cu->joint_cb_cr = 4;
         // TODO: Maybe check the jccr mode here also but holy shit is the interface of search_intra_rdo bad currently
-        const unsigned scan_offset = xy_to_zorder(LCU_WIDTH_C, lcu_px.x, lcu_px.y);
+        const unsigned scan_offset = xy_to_zorder(
+          LCU_WIDTH_C,
+          lcu_px.x,
+          lcu_px.y);
         uvg_intra_recon_cu(
           state,
           x_px,
@@ -477,7 +494,9 @@ static double search_intra_trdepth(
           search_data,
           pred_cu,
           lcu,
-          UVG_BOTH_T,false,true);
+          UVG_BOTH_T,
+          false,
+          true);
         best_rd_cost += uvg_cu_rd_cost_chroma(
           state,
           lcu_px.x,
@@ -497,8 +516,8 @@ static double search_intra_trdepth(
             depth,
             constraints,
             &lcu->coeff.u[scan_offset],
+            width_c,
             width_c
-            , width_c
             );
           if (constraints[0] || !constraints[1]) {
             best_lfnst_idx = 0;
@@ -509,8 +528,8 @@ static double search_intra_trdepth(
             depth,
             constraints,
             &lcu->coeff.u[scan_offset],
+            width_c,
             width_c
-            , width_c
             );
           if (constraints[0] || !constraints[1]) {
             best_lfnst_idx = 0;
@@ -1621,7 +1640,7 @@ int8_t uvg_search_cu_intra_chroma(
   // const int8_t modes_in_depth[5] = { 1, 1, 1, 1, 2 };
   int num_modes = 1;
 
-  if (state->encoder_control->cfg.rdo >= 3) {
+  if (state->encoder_control->cfg.rdo >= 2 || tree_type == UVG_CHROMA_T) {
     num_modes = total_modes;
   }
 
@@ -1666,8 +1685,11 @@ int8_t uvg_search_cu_intra_chroma(
                                           tree_type);
   }
   
-  if (num_modes > 1) {
+  if (num_modes > 1 || state->encoder_control->cfg.jccr) {
     uvg_search_intra_chroma_rdo(state, x_px, y_px, depth, num_modes, lcu, chroma_data, intra_mode, tree_type);
+  }
+  else if(cur_pu->lfnst_idx) {
+    chroma_data[0].pred_cu.cr_lfnst_idx = cur_pu->lfnst_idx;
   }
   *search_data = chroma_data[0];
   return chroma_data[0].pred_cu.intra.mode_chroma;
@@ -1844,6 +1866,7 @@ void uvg_search_cu_intra(
       search_data[i].cost = MAX_INT;
     }
     number_of_modes = UVG_NUM_INTRA_MODES;
+    num_regular_modes = UVG_NUM_INTRA_MODES;
   }
 
   uint8_t num_mrl_modes = 0;
@@ -1968,8 +1991,7 @@ void uvg_search_cu_intra(
         number_of_modes_to_search++;
       }
     }
-
-    // TODO: if rough search is implemented for MIP, sort mip_modes here.
+    
     search_intra_rdo(
       state,
       x_px,

@@ -166,7 +166,8 @@ static bool can_use_lfnst_with_isp(const int width, const int height, const int 
   const int x,
   const int y,
   enum uvg_tree_type tree_type,
-  const color_t color) 
+  const color_t color,
+  const lcu_t* lcu) 
 {
   if (state->encoder_control->cfg.lfnst && pred_cu->type == CU_INTRA) {
     const int isp_mode = 0; // ISP_TODO: assign proper ISP mode when ISP is implemented
@@ -201,12 +202,12 @@ static bool can_use_lfnst_with_isp(const int width, const int height, const int 
     const int tu_height = tu_width; // TODO: height for non-square blocks
 
     // TODO: chroma transform skip
-    if (tree_type != UVG_BOTH_T) {
+    if (color == COLOR_Y) {
       for (int i = 0; i < num_transform_units; i++) {
         // TODO: this works only for square blocks
-        const int pu_x = x + ((i % tu_row_length) * tu_width);
-        const int pu_y = y + ((i / tu_row_length) * tu_height);
-        const cu_info_t* cur_tu = uvg_cu_array_at_const(frame->cu_array, pu_x, pu_y);
+        const int tu_x = x + ((i % tu_row_length) * tu_width);
+        const int tu_y = y + ((i / tu_row_length) * tu_height);
+        const cu_info_t* cur_tu = lcu ? LCU_GET_CU_AT_PX(lcu, tu_x, tu_y) : uvg_cu_array_at_const(frame->cu_array, tu_x, tu_y);
         assert(cur_tu != NULL && "NULL transform unit.");
         bool cbf_set = cbf_is_set(cur_tu->cbf, tr_depth, COLOR_Y);
 
@@ -239,7 +240,7 @@ static bool encode_lfnst_idx(
   const color_t color)
 {
   
-  if (uvg_is_lfnst_allowed(state, pred_cu, width, height, x, y, tree_type, color)) {
+  if (uvg_is_lfnst_allowed(state, pred_cu, width, height, x, y, tree_type, color, NULL)) {
     // Getting separate tree bool from block size is a temporary fix until a proper dual tree check is possible (there is no dual tree structure at time of writing this).
     // VTM seems to force explicit dual tree structure for small 4x4 blocks
     bool is_separate_tree = depth == 4 || tree_type != UVG_BOTH_T;
@@ -399,7 +400,7 @@ void uvg_encode_ts_residual(encoder_state_t* const state,
       belowPixel = pos_y > 0 ? coeff[pos_x + (pos_y - 1) * width] : 0;
       absLevel = uvg_derive_mod_coeff(rightPixel, belowPixel, abs(coeff[blk_pos]), 0);
       cutoffVal = 2;
-      for (i = 0; i < numGtBins; i++)
+      for (int j = 0; j < numGtBins; j++)
       {
         if (absLevel >= cutoffVal)
         {
@@ -1738,7 +1739,6 @@ void uvg_encode_coding_tree(
       encode_transform_coeff(state, x, y, depth, 0, 0, 0, 1, coeff, tree_type);
       // Write LFNST only once for single tree structure
       encode_lfnst_idx(state, cabac, tmp, x, y, depth, cu_width, cu_height, tree_type, COLOR_UV);
-      
     }
   }
 
