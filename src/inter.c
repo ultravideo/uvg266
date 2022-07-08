@@ -618,7 +618,7 @@ static void ibc_recon_cu(const encoder_state_t * const state,
   int32_t buffer_y = y_scu + mv_y;
 
   // The whole block must be to the left of the current position
-  assert(-mv_x >= width);
+  assert((-mv_x >= width || -mv_y >= width) && x >= 0 && y >= 0);
 
   // Predicted block completely outside of this LCU
   if (mv_x + x_scu + width <= 0) {  
@@ -687,7 +687,7 @@ void uvg_inter_pred_pu(const encoder_state_t * const state,
   const int pu_h = PU_GET_H(cu->part_size, width, i_pu);
   cu_info_t *pu = LCU_GET_CU_AT_PX(lcu, SUB_SCU(pu_x), SUB_SCU(pu_y));
 
-  if (pu->type == CU_IBC) {
+  if (cu->type == CU_IBC) {
     ibc_recon_cu(state, lcu, x, y, width, predict_luma, predict_chroma, i_pu);
   } else {
 
@@ -710,11 +710,8 @@ void uvg_inter_pred_pu(const encoder_state_t * const state,
         predict_chroma);
     } else {
       const int                 mv_idx = pu->inter.mv_dir - 1;
-      const uvg_picture * const ref =
-        (cu->type == CU_IBC) ?
-          state->tile->frame->rec :
-          (state->frame->ref
-             ->images[state->frame->ref_LX[mv_idx][pu->inter.mv_ref[mv_idx]]]);
+      const uvg_picture * const ref = 
+        state->frame->ref->images[state->frame->ref_LX[mv_idx][pu->inter.mv_ref[mv_idx]]];
 
       const unsigned offset_luma = SUB_SCU(pu_y) * LCU_WIDTH + SUB_SCU(pu_x);
       const unsigned offset_chroma =
@@ -1856,6 +1853,19 @@ uint8_t uvg_inter_get_merge_cand(const encoder_state_t * const state,
   const uint8_t parallel_merge_level = state->encoder_control->cfg.log2_parallel_merge_level;
   merge_candidates_t merge_cand = { 0 };
   const uint8_t max_num_cands = state->encoder_control->cfg.max_merge;
+
+  cu_info_t         *cur_cu        = LCU_GET_CU_AT_PX(lcu, SUB_SCU(x), SUB_SCU(y));
+  if(cur_cu->type == CU_IBC) {
+    mv_t ibc_mv_cand[IBC_MRG_MAX_NUM_CANDS][2];
+    get_ibc_merge_candidates(state, cur_cu,lcu,NULL, x, y, width, height,ibc_mv_cand);
+    for (int i = 0; i < IBC_MRG_MAX_NUM_CANDS; i++) {
+      mv_cand[i].dir = 1;
+      mv_cand[i].mv[0][0] = ibc_mv_cand[i][0];
+      mv_cand[i].mv[0][1] = ibc_mv_cand[i][1];
+    }
+    return IBC_MRG_MAX_NUM_CANDS;
+  }
+
   get_spatial_merge_candidates(x, y, width, height,
                                state->tile->frame->width,
                                state->tile->frame->height,

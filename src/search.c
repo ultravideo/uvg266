@@ -45,6 +45,7 @@
 #include "rdo.h"
 #include "search_inter.h"
 #include "search_intra.h"
+#include "search_ibc.h"
 #include "threadqueue.h"
 #include "transform.h"
 #include "videoframe.h"
@@ -306,7 +307,7 @@ double uvg_cu_rd_cost_luma(const encoder_state_t *const state,
                            lcu_t *const lcu)
 {
   const int width = LCU_WIDTH >> depth;
-  const int skip_residual_coding = pred_cu->skipped || (pred_cu->type == CU_INTER && pred_cu->cbf == 0);
+  const int skip_residual_coding = pred_cu->skipped || (pred_cu->type != CU_INTRA && pred_cu->cbf == 0);
   cabac_data_t* cabac = (cabac_data_t *)&state->search_cabac;
 
   // cur_cu is used for TU parameters.
@@ -380,7 +381,7 @@ double uvg_cu_rd_cost_chroma(const encoder_state_t *const state,
   const vector2d_t lcu_px = { (x_px & ~7) / 2, (y_px & ~7) / 2 };
   const int width = (depth < MAX_DEPTH) ? LCU_WIDTH >> (depth + 1) : LCU_WIDTH >> depth;
   cu_info_t *const tr_cu = LCU_GET_CU_AT_PX(lcu, x_px, y_px);
-  const int skip_residual_coding = pred_cu->skipped || (pred_cu->type == CU_INTER && pred_cu->cbf == 0);
+  const int skip_residual_coding = pred_cu->skipped || (pred_cu->type != CU_INTRA && pred_cu->cbf == 0);
 
   double tr_tree_bits = 0;
   double coeff_bits = 0;
@@ -477,7 +478,7 @@ static double cu_rd_cost_tr_split_accurate(
   enum uvg_tree_type tree_type) {
   const int width = LCU_WIDTH >> depth;
 
-  const int skip_residual_coding = pred_cu->skipped || (pred_cu->type == CU_INTER && pred_cu->cbf == 0);
+  const int skip_residual_coding = pred_cu->skipped || (pred_cu->type != CU_INTRA && pred_cu->cbf == 0);
   // cur_cu is used for TU parameters.
   cu_info_t* const tr_cu = LCU_GET_CU_AT_PX(lcu, x_px, y_px);
 
@@ -499,7 +500,7 @@ static double cu_rd_cost_tr_split_accurate(
     int cbf = cbf_is_set_any(pred_cu->cbf, depth);
     // Only need to signal coded block flag if not skipped or merged
     // skip = no coded residual, merge = coded residual
-    if (pred_cu->type == CU_INTER && (pred_cu->part_size != SIZE_2Nx2N || !pred_cu->merged)) {
+    if (pred_cu->type != CU_INTRA && (pred_cu->part_size != SIZE_2Nx2N || !pred_cu->merged)) {
       CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.cu_qt_root_cbf_model), cbf, tr_tree_bits, "rqt_root_cbf");
     }
 
@@ -1010,93 +1011,26 @@ static double search_cu(
 
     // Simple IBC search
     if (can_use_intra //&& state->frame->slicetype == UVG_SLICE_I
-           && state->encoder_control->cfg.ibc && cu_width > 4) {
-      cu_info_t cu_backup  = *cur_cu;
+         && state->encoder_control->cfg.ibc 
+         && cu_width > 4
+         && (x >= cu_width || y >= cu_width)) {
 
-      uint32_t ibc_cost      = MAX_INT;
-      uint32_t ibc_cost_y    = MAX_INT;
-      uint32_t base_cost     = MAX_INT;
-      uint32_t base_cost_y   = MAX_INT;
+      cu_info_t backup_cu = *cur_cu;
 
-      
-      if(cur_cu->type == CU_INTRA) {
-        intra_search.pred_cu.intra.mode_chroma = -1; // don't reconstruct chroma before search is performed for it
-        uvg_intra_recon_cu(state,x, y,depth, &intra_search,NULL,lcu);
+      double mode_cost;
+      double mode_bitcost;
+      uvg_search_cu_ibc(state,
+                        x, y,
+                        depth,
+                        lcu,
+                        &mode_cost, &mode_bitcost);
+      if (mode_cost < cost) {
+        cost = mode_cost;
+        inter_bitcost = mode_bitcost;
+        cur_cu->type = CU_IBC;
+        cur_cu->joint_cb_cr = 0;
       } else {
-        uvg_inter_recon_cu(state, lcu, x, y, CU_WIDTH_FROM_DEPTH(depth), true, state->encoder_control->chroma_format != UVG_CSP_400);
-      }
-
-      bool ibc_better = false;
-      cur_cu->type    = CU_IBC;
-      cur_cu->inter.mv_dir   = 1;
-      cur_cu->skipped                         = false;
-      cur_cu->merged                          = false;
-      cur_cu->inter.mv_cand0                  = 0;
-      cur_cu->joint_cb_cr                     = 0;
-      optimized_sad_func_ptr_t optimized_sad = uvg_get_optimized_sad(cu_width);
-      uint32_t  source_stride = state->tile->frame->width;
-      const int x_scu    = SUB_SCU(x);
-      const int y_scu    = SUB_SCU(y);
-      const uint32_t offset = x_scu + y_scu * LCU_WIDTH;
-      const uint32_t offset_c = x_scu / 2 + y_scu / 2 * LCU_WIDTH_C;
-
-      mv_t   best_vector[2] = {0, 0};
-
-
-      if (optimized_sad != NULL) {
-          base_cost_y = base_cost = optimized_sad(lcu->rec.y + offset, &state->tile->frame->source->y[y * source_stride + x], cu_width, LCU_WIDTH, source_stride);
-          if(state->encoder_control->chroma_format != UVG_CSP_400) {
-            base_cost += optimized_sad(lcu->rec.u + offset_c, &state->tile->frame->source->u[(y / 2) * source_stride / 2 + x / 2], cu_width / 2, LCU_WIDTH_C, source_stride / 2);
-            base_cost += optimized_sad(lcu->rec.v + offset_c, &state->tile->frame->source->v[(y / 2) * source_stride / 2 + x / 2], cu_width / 2, LCU_WIDTH_C, source_stride / 2);
-          }
-        } else {
-          base_cost_y = base_cost = uvg_reg_sad(lcu->rec.y + offset, &state->tile->frame->source->y[y * source_stride + x], cu_width,cu_width, LCU_WIDTH, source_stride);
-          if(state->encoder_control->chroma_format != UVG_CSP_400) {
-            base_cost += uvg_reg_sad(lcu->rec.u + offset_c, &state->tile->frame->source->u[(y / 2) * source_stride / 2 + x / 2], cu_width / 2, cu_width / 2, LCU_WIDTH_C, source_stride / 2);
-            base_cost += uvg_reg_sad(lcu->rec.v + offset_c, &state->tile->frame->source->v[(y / 2) * source_stride / 2 + x / 2], cu_width / 2, cu_width / 2, LCU_WIDTH_C, source_stride / 2);
-          }
-        }
-
-      for(int i = -1; i < 8; i++) {
-        if (i == -1) {
-          if (y_scu < cu_width) continue;
-          cur_cu->inter.mv[0][0] = 0;
-          cur_cu->inter.mv[0][1] = (-cu_width) * (1 << INTERNAL_MV_PREC);
-        } else {
-          cur_cu->inter.mv[0][0] = (-cu_width - i) * (1 << INTERNAL_MV_PREC);
-          cur_cu->inter.mv[0][1] = 0;
-          if (x - cu_width - i < 0) break;
-        }
-
-        uvg_inter_recon_cu(state, lcu, x, y, CU_WIDTH_FROM_DEPTH(depth), true, state->encoder_control->chroma_format != UVG_CSP_400);
-        
-        if (optimized_sad != NULL) {
-          ibc_cost_y = ibc_cost = 3*optimized_sad(lcu->rec.y + offset, &state->tile->frame->source->y[y * source_stride + x], cu_width, LCU_WIDTH, source_stride);
-          if(state->encoder_control->chroma_format != UVG_CSP_400) {
-            ibc_cost += optimized_sad(lcu->rec.u + offset_c, &state->tile->frame->source->u[(y / 2) * source_stride / 2 + x / 2], cu_width / 2, LCU_WIDTH_C, source_stride / 2);
-            ibc_cost += optimized_sad(lcu->rec.v + offset_c, &state->tile->frame->source->v[(y / 2) * source_stride / 2 + x / 2], cu_width / 2, LCU_WIDTH_C, source_stride / 2);
-          }
-        } else {
-          ibc_cost_y = ibc_cost = 3*uvg_reg_sad(lcu->rec.y + offset, &state->tile->frame->source->y[y * source_stride + x], cu_width,cu_width, LCU_WIDTH, source_stride);
-          if(state->encoder_control->chroma_format != UVG_CSP_400) {
-            ibc_cost += uvg_reg_sad(lcu->rec.u + offset_c, &state->tile->frame->source->u[(y / 2) * source_stride / 2 + x / 2], cu_width / 2, cu_width / 2, LCU_WIDTH_C, source_stride / 2);
-            ibc_cost += uvg_reg_sad(lcu->rec.v + offset_c, &state->tile->frame->source->v[(y / 2) * source_stride / 2 + x / 2], cu_width / 2, cu_width / 2, LCU_WIDTH_C, source_stride / 2);
-          }
-        }
-        if (ibc_cost_y < base_cost_y) {
-          ibc_better     = true;
-          base_cost_y    = ibc_cost_y;
-          best_vector[0] = cur_cu->inter.mv[0][0];          
-          best_vector[1] = cur_cu->inter.mv[0][1];
-          break;
-        }
-      }
-
-      if (!ibc_better) *cur_cu = cu_backup;
-      else {
-        cur_cu->inter.mv[0][0] = best_vector[0];
-        cur_cu->inter.mv[0][1] = best_vector[1];
-        //fprintf(stderr, "Coding IBC: %d, %d: %d, %d size: %d\r\n", x,y,cur_cu->inter.mv[0][0] / 4, cur_cu->inter.mv[0][1] / 4, cu_width);
+        *cur_cu = backup_cu;
       }
     }
 
@@ -1180,7 +1114,7 @@ static double search_cu(
     }
   }
 
-  if (cur_cu->type == CU_INTRA || cur_cu->type == CU_INTER || cur_cu->type == CU_IBC) {
+  if (cur_cu->type == CU_INTRA || cur_cu->type == CU_INTER) {
     double bits = 0;
     cabac_data_t* cabac  = &state->search_cabac;
     cabac->update = 1;

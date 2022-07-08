@@ -1773,6 +1773,109 @@ double uvg_get_mvd_coding_cost_cabac(const encoder_state_t* state,
   return bits;
 }
 
+
+/** MVD cost calculation with CABAC
+* \returns int
+* Calculates Motion Vector cost and related costs using CABAC coding
+*/
+double uvg_calc_ibc_mvd_cost_cabac(const encoder_state_t * state,
+                               int x,
+                               int y,
+                               int mv_shift,
+                               mv_t mv_cand[2][2],
+                               inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
+                               int16_t num_cand,
+                               int32_t ref_idx,
+                               double* bitcost)
+{
+  cabac_data_t state_cabac_copy;
+  cabac_data_t* cabac;
+  uint32_t merge_idx;
+  vector2d_t mvd = { 0, 0 };
+  int8_t merged = 0;
+  int8_t cur_mv_cand = 0;
+
+  x *= 1 << mv_shift;
+  y *= 1 << mv_shift;
+
+  // Check every candidate to find a match
+  for (merge_idx = 0; merge_idx < (uint32_t)num_cand; merge_idx++) {
+    if (merge_cand[merge_idx].mv[merge_cand[merge_idx].dir - 1][0] == x &&
+      merge_cand[merge_idx].mv[merge_cand[merge_idx].dir - 1][1] == y)
+    {
+      merged = 1;
+      break;
+    }
+  }
+
+  // Store cabac state and contexts
+  memcpy(&state_cabac_copy, &state->search_cabac, sizeof(cabac_data_t));
+
+  // Clear bytes and bits and set mode to "count"
+  state_cabac_copy.only_count = 1;
+
+  cabac = &state_cabac_copy;
+  double bits = 0;
+
+  if (!merged) {
+    vector2d_t mvd1 = {
+      x - mv_cand[0][0],
+      y - mv_cand[0][1],
+    };
+    vector2d_t mvd2 = {
+      x - mv_cand[1][0],
+      y - mv_cand[1][1],
+    };
+
+    uvg_change_precision_vector2d(INTERNAL_MV_PREC, 2, &mvd1);
+    uvg_change_precision_vector2d(INTERNAL_MV_PREC, 2, &mvd2);
+
+    double cand1_cost = uvg_get_mvd_coding_cost_cabac(state, cabac, mvd1.x, mvd1.y);
+    double cand2_cost = uvg_get_mvd_coding_cost_cabac(state, cabac, mvd2.x, mvd2.y);
+
+    // Select candidate 1 if it has lower cost
+    if (cand2_cost < cand1_cost) {
+      cur_mv_cand = 1;
+      mvd = mvd2;
+    } else {
+      mvd = mvd1;
+    }
+  }
+
+  cabac->cur_ctx = &(cabac->ctx.cu_merge_flag_ext_model);
+
+  CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.cu_merge_flag_ext_model), merged, bits, "MergeFlag");
+  num_cand = state->encoder_control->cfg.max_merge;
+  if (merged) {
+    if (num_cand > 1) {
+      int32_t ui;
+      for (ui = 0; ui < num_cand - 1; ui++) {
+        int32_t symbol = (ui != merge_idx);
+        if (ui == 0) {
+          CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.cu_merge_idx_ext_model), symbol, bits, "MergeIndex");
+        } else {
+          CABAC_BIN_EP(cabac, symbol, "MergeIndex");
+          bits += 1;
+        }
+        if (symbol == 0) break;
+      }
+    }
+  } else {
+
+    // It is safe to drop const here because cabac->only_count is set.
+    uvg_encode_mvd((encoder_state_t*) state, cabac, mvd.x, mvd.y, &bits);
+
+    // Signal which candidate MV to use
+    cabac->cur_ctx = &(cabac->ctx.mvp_idx_model);
+    CABAC_BIN(cabac, cur_mv_cand, "mvp_flag");
+  }
+
+  *bitcost = bits;
+
+  // Store bitcost before restoring cabac
+  return *bitcost * state->lambda_sqrt;
+}
+
 /** MVD cost calculation with CABAC
 * \returns int
 * Calculates Motion Vector cost and related costs using CABAC coding
