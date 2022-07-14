@@ -178,6 +178,8 @@ static const struct option long_options[] = {
   { "no-mip",                   no_argument, NULL, 0 },
   { "lfnst",                    no_argument, NULL, 0 },
   { "no-lfnst",                 no_argument, NULL, 0 },
+  { "isp",                      no_argument, NULL, 0 },
+  { "no-isp",                   no_argument, NULL, 0 },
   { "jccr",                     no_argument, NULL, 0 },
   { "no-jccr",                  no_argument, NULL, 0 },
   { "amvr",                     no_argument, NULL, 0 },
@@ -671,6 +673,7 @@ void print_help(void)
     "      --(no-)mip             : Enable matrix weighted intra prediction.\n"
     "      --(no-)lfnst           : Enable low frequency non-separable transform.\n"
     "                                 [disabled]\n"
+    "      --(no-)isp             : Enable intra sub partitions. [disabled]\n"
     "      --mts <string>         : Multiple Transform Selection [off].\n"
     "                               (Currently only implemented for intra\n"
     "                               and has effect only when rd >= 2)\n"

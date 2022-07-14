@@ -207,6 +207,8 @@ int uvg_config_init(uvg_config *cfg)
 
   cfg->lfnst = false;
 
+  cfg->isp = false;
+
   parse_qp_map(cfg, 0);
 
   cfg->jccr = 0;
@@ -1453,6 +1455,9 @@ int uvg_config_parse(uvg_config *cfg, const char *name, const char *value)
   }
   else if OPT("lfnst") {
     cfg->lfnst = atobool(value);
+  }
+  else if OPT("isp") {
+    cfg->isp = atobool(value);
   }
   else if OPT("jccr") {
     cfg->jccr = (bool)atobool(value);
