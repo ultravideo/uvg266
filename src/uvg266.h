@@ -526,6 +526,8 @@ typedef struct uvg_config
   /** \brief enable low frequency non-separable transform */
   int8_t lfnst;
 
+  /** \brief enable intra sub partitions*/
+  int8_t isp;
 
   int8_t jccr;
 
