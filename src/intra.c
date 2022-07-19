@@ -197,6 +197,7 @@ int8_t uvg_intra_get_dir_luma_predictor(
 
 static void intra_filter_reference(
   int_fast8_t log2_width,
+  int_fast8_t log2_height,
   uvg_intra_references *refs)
 {
   if (refs->filtered_initialized) {
@@ -206,6 +207,7 @@ static void intra_filter_reference(
   }
 
   const int_fast8_t ref_width = 2 * (1 << log2_width) + 1;
+  const int_fast8_t ref_height = 2 * (1 << log2_height) + 1;
   uvg_intra_ref *ref = &refs->ref;
   uvg_intra_ref *filtered_ref = &refs->filtered_ref;
 
@@ -213,14 +215,13 @@ static void intra_filter_reference(
   filtered_ref->left[0] = (ref->left[1] + 2 * ref->left[0] + ref->top[1] + 2) >> 2;
   filtered_ref->top[0] = filtered_ref->left[0];
 
-  // TODO: use block height here instead of ref_width
   // Top to bottom
-  for (int_fast8_t y = 1; y < ref_width - 1; ++y) {
+  for (int_fast8_t y = 1; y < ref_height - 1; ++y) {
     uvg_pixel *p = &ref->left[y];
     filtered_ref->left[y] = (p[-1] + 2 * p[0] + p[1] + 2) >> 2;
   }
   // Bottom left (not filtered) 
-  filtered_ref->left[ref_width - 1] = ref->left[ref_width - 1];
+  filtered_ref->left[ref_height - 1] = ref->left[ref_height - 1];
 
   // Left to right
   for (int_fast8_t x = 1; x < ref_width - 1; ++x) {
@@ -234,36 +235,46 @@ static void intra_filter_reference(
 
 /**
 * \brief Generate dc prediction.
-* \param log2_width    Log2 of width, range 2..5.
+* \param cu_loc        CU location and size data.
+* \param color         Color channel.
 * \param ref_top       Pointer to -1 index of above reference, length=width*2+1.
 * \param ref_left      Pointer to -1 index of left reference, length=width*2+1.
 * \param dst           Buffer of size width*width.
 * \param multi_ref_idx Multi reference line index for use with MRL.
 */
 static void intra_pred_dc(
-  const int_fast8_t log2_width,
+  const cu_loc_t* const cu_loc,
+  const color_t color,
   const uvg_pixel *const ref_top,
   const uvg_pixel *const ref_left,
   uvg_pixel *const out_block,
   const uint8_t multi_ref_idx)
 {
-  int_fast8_t width = 1 << log2_width;
+  const int width = color == COLOR_Y ? cu_loc->width : cu_loc->chroma_width;
+  const int height = color == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
 
   int_fast16_t sum = 0;
-  for (int_fast8_t i = 0; i < width; ++i) {
-    sum += ref_top[i + 1 + multi_ref_idx];
-    sum += ref_left[i + 1 + multi_ref_idx];
+  // Only one loop is done for non-square blocks.
+  // In case of non-square blocks, only the longer reference is summed.
+  if (width >= height) {
+    for (int_fast8_t i = 0; i < width; ++i) {
+      sum += ref_top[i + 1 + multi_ref_idx];
+    }
+  }
+  if (width <= height) {
+    for (int_fast8_t j = 0; j < height; ++j) {
+      sum += ref_left[j + 1 + multi_ref_idx];
+    }
   }
   
   // JVET_K0122
-  // TODO: take non-square blocks into account
-  const int denom     = width << 1;
+  const int denom     = width == height ? width << 1 : MAX(width, height);
   const int divShift  = uvg_math_floor_log2(denom);
   const int divOffset = denom >> 1;
   
   const uvg_pixel dc_val = (sum + divOffset) >> divShift;
   //const uvg_pixel dc_val = (sum + width) >> (log2_width + 1);
-  const int_fast16_t block_size = 1 << (log2_width * 2);
+  const int_fast16_t block_size = width * height;
 
   for (int_fast16_t i = 0; i < block_size; ++i) {
     out_block[i] = dc_val;
@@ -901,31 +912,34 @@ static void mip_predict(
 static void intra_predict_regular(
   const encoder_state_t* const state,
   uvg_intra_references *refs,
-  int_fast8_t log2_width,
+  const cu_loc_t* const cu_loc,
   int_fast8_t mode,
   color_t color,
   uvg_pixel *dst,
   const uint8_t multi_ref_idx)
 {
-  const int_fast8_t width = 1 << log2_width;
+  const int width = color == COLOR_Y ? cu_loc->width : cu_loc->chroma_width;
+  const int height = color == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
+  const int log2_width = uvg_g_convert_to_bit[width] + 2;
+  const int log2_height = uvg_g_convert_to_bit[height] + 2;
   const uvg_config *cfg = &state->encoder_control->cfg;
 
   // MRL only for luma
   uint8_t multi_ref_index = color == COLOR_Y ? multi_ref_idx : 0;
 
   const uvg_intra_ref *used_ref = &refs->ref;
-  if (cfg->intra_smoothing_disabled || color != COLOR_Y || mode == 1 || width == 4 || multi_ref_index) {
+  if (cfg->intra_smoothing_disabled || color != COLOR_Y || mode == 1 || (width == 4 && height == 4) || multi_ref_index) {
     // For chroma, DC and 4x4 blocks, always use unfiltered reference.
   } else if (mode == 0) {
     // Otherwise, use filtered for planar.
-    if (width * width > 32) {
+    if (width * height > 32) {
       used_ref = &refs->filtered_ref;
     }
   } else {
     // Angular modes use smoothed reference pixels, unless the mode is close
     // to being either vertical or horizontal.
     static const int uvg_intra_hor_ver_dist_thres[8] = {24, 24, 24, 14, 2, 0, 0, 0 };
-    int filter_threshold = uvg_intra_hor_ver_dist_thres[(log2_width + log2_width) >> 1];
+    int filter_threshold = uvg_intra_hor_ver_dist_thres[(log2_width + log2_height) >> 1];
     int dist_from_vert_or_hor = MIN(abs(mode - 50), abs(mode - 18));
     if (dist_from_vert_or_hor > filter_threshold) {
 
@@ -939,15 +953,15 @@ static void intra_predict_regular(
   }
 
   if (used_ref == &refs->filtered_ref && !refs->filtered_initialized) {
-    intra_filter_reference(log2_width, refs);
+    intra_filter_reference(log2_width, log2_height, refs);
   }
 
   if (mode == 0) {
-    uvg_intra_pred_planar(log2_width, used_ref->top, used_ref->left, dst);
+    uvg_intra_pred_planar(cu_loc, color, used_ref->top, used_ref->left, dst);
   } else if (mode == 1) {
-    intra_pred_dc(log2_width, used_ref->top, used_ref->left, dst, multi_ref_index);
+    intra_pred_dc(cu_loc, color, used_ref->top, used_ref->left, dst, multi_ref_index);
   } else {
-    uvg_angular_pred(log2_width, mode, color, used_ref->top, used_ref->left, dst, multi_ref_index);
+    uvg_angular_pred(cu_loc, mode, color, used_ref->top, used_ref->left, dst, multi_ref_index);
   }
 
   // pdpc
@@ -1407,7 +1421,7 @@ void uvg_intra_predict(
       mip_predict(state, refs, width, height, dst, intra_mode, data->pred_cu.intra.mip_is_transposed);
     }
     else {
-      intra_predict_regular(state, refs, uvg_g_convert_to_bit[width] + 2, intra_mode, color, dst, data->pred_cu.intra.multi_ref_idx);
+      intra_predict_regular(state, refs, cu_loc, intra_mode, color, dst, data->pred_cu.intra.multi_ref_idx);
     }
   }
   else {

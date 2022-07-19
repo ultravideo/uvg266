@@ -34,6 +34,7 @@
 
 #include <stdlib.h>
 
+#include "cu.h"
 #include "intra.h"
 #include "uvg266.h"
 #include "strategyselector.h"
@@ -42,15 +43,16 @@
 
 /**
  * \brief Generate angular predictions.
- * \param log2_width    Log2 of width, range 2..5.
+ * \param cu_loc        CU location and size data.
  * \param intra_mode    Angular mode in range 2..34.
+ * \param channel_type  Color channel.
  * \param in_ref_above  Pointer to -1 index of above reference, length=width*2+1.
- * \param in_ref_left   Pointer to -1 index of left reference, length=width*2+1.
+ * \param in_ref_left   Pointer to -1 index of left reference, length=height*2+1.
  * \param dst           Buffer of size width*width.
  * \param multi_ref_idx Multi reference line index for use with MRL.
  */
 static void uvg_angular_pred_generic(
-  const int_fast8_t log2_width,
+  const cu_loc_t* const cu_loc,
   const int_fast8_t intra_mode,
   const int_fast8_t channel_type,
   const uvg_pixel *const in_ref_above,
@@ -58,8 +60,12 @@ static void uvg_angular_pred_generic(
   uvg_pixel *const dst,
   const uint8_t multi_ref_idx)
 {
+  const int width  = channel_type == COLOR_Y ? cu_loc->width : cu_loc->chroma_width;
+  const int height = channel_type == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
+  const int log2_width = uvg_g_convert_to_bit[width] + 2;
+  const int log2_height = uvg_g_convert_to_bit[height] + 2;
   
-  assert(log2_width >= 2 && log2_width <= 5);
+  assert((log2_width >= 2 && log2_width <= 5) && (log2_height >= 2 && log2_height <= 5));
   assert(intra_mode >= 2 && intra_mode <= 66);
 
   static const int16_t modedisp2sampledisp[32] = { 0,    1,    2,    3,    4,    6,     8,   10,   12,   14,   16,   18,   20,   23,   26,   29,   32,   35,   39,  45,  51,  57,  64,  73,  86, 102, 128, 171, 256, 341, 512, 1024 };
@@ -107,9 +113,8 @@ static void uvg_angular_pred_generic(
 
   // TODO: check the correct size for these arrays when MRL is used
   //uvg_pixel tmp_ref[2 * 128 + 3 + 33 * MAX_REF_LINE_IDX] = { 0 };
-  uvg_pixel temp_main[2 * 128 + 3 + 33 * MAX_REF_LINE_IDX] = { 0 };
-  uvg_pixel temp_side[2 * 128 + 3 + 33 * MAX_REF_LINE_IDX] = { 0 };
-  const int_fast32_t width = 1 << log2_width;
+  uvg_pixel temp_above[2 * 128 + 3 + 33 * MAX_REF_LINE_IDX] = { 0 };
+  uvg_pixel temp_left[2 * 128 + 3 + 33 * MAX_REF_LINE_IDX] = { 0 };
 
   uint32_t pred_mode = intra_mode; // ToDo: handle WAIP
 
@@ -124,7 +129,7 @@ static void uvg_angular_pred_generic(
   // Sample displacement per column in fractions of 32.
   const int_fast8_t sample_disp = (mode_disp < 0 ? -1 : 1) * modedisp2sampledisp[abs(mode_disp)];
   
-  // TODO: replace latter width with height
+  // ISP_TODO: replace latter width with height
   int scale = MIN(2, log2_width - pre_scale[abs(mode_disp)]);
 
   // Pointer for the reference we are interpolating from.
@@ -136,19 +141,32 @@ static void uvg_angular_pred_generic(
   // index 0 in block coordinates.
   if (sample_disp < 0) {
 
-    // TODO: for non-square blocks, separate loops for x and y is needed
-    for (int i = 0; i <= width + 1 + multi_ref_index; i++) {
-      temp_main[width + i] = (vertical_mode ? in_ref_above[i] : in_ref_left[i]);
-      temp_side[width + i] = (vertical_mode ? in_ref_left[i] : in_ref_above[i]);
-    }
+    // ISP_TODO: might be able to use memcpy instead of loops here, should be a bit faster.
+    /*if (vertical_mode) {
+      for (int i = 0; i <= width + 1 + multi_ref_index; i++) {
+        temp_main[width + i] = in_ref_above[i];
+      }
+      for (int j = 0; j <= height + 1 + multi_ref_index; j++) {
+        temp_side[height + j] = in_ref_left[j];
+      }
+    } else {
+      for (int i = 0; i <= width + 1 + multi_ref_index; i++) {
+        temp_side[width + i] = in_ref_above[i];
+      }
+      for (int j = 0; j <= height + 1 + multi_ref_index; j++) {
+        temp_main[height + j] = in_ref_left[j];
+      }
+    }*/
+    memcpy(&temp_above[height], &in_ref_above[0], (width + 2 + multi_ref_index) * sizeof(uvg_pixel));
+    memcpy(&temp_left[width], &in_ref_left[0], (height + 2 + multi_ref_index) * sizeof(uvg_pixel));
 
-    // TODO: take into account non-square blocks
-    ref_main = temp_main + width;
-    ref_side = temp_side + width;
+    ref_main = vertical_mode ? temp_above + height : temp_left + width;
+    ref_side = vertical_mode ? temp_left + width : temp_above + height;
 
     // TODO: for non square blocks, need to check if width or height is used for reference extension
-    for (int i = -width; i <= -1; i++) {
-      ref_main[i] = ref_side[MIN((-i * modedisp2invsampledisp[abs(mode_disp)] + 256) >> 9, width)];
+    int size_side = vertical_mode ? height : width;
+    for (int i = -size_side; i <= -1; i++) {
+      ref_main[i] = ref_side[MIN((-i * modedisp2invsampledisp[abs(mode_disp)] + 256) >> 9, size_side)];
     }
 
     //const uint32_t index_offset = width + 1;
@@ -186,23 +204,27 @@ static void uvg_angular_pred_generic(
   else {
     
     // TODO: again, separate loop needed for non-square blocks
-    for (int i = 0; i <= (width << 1) + multi_ref_index; i++) {
+    /*for (int i = 0; i <= (width << 1) + multi_ref_index; i++) {
       temp_main[i] = (vertical_mode ? in_ref_above[i] : in_ref_left[i]);
       temp_side[i] = (vertical_mode ? in_ref_left[i] : in_ref_above[i]);
-    }
+    }*/
+    memcpy(&temp_above[0], &in_ref_above[0], ((width << 1) + 1 + multi_ref_index) * sizeof(uvg_pixel));
+    memcpy(&temp_left[0], &in_ref_left[0], ((height << 1) + 1 + multi_ref_index) * sizeof(uvg_pixel));
+
+    ref_main = vertical_mode ? temp_above : temp_left;
+    ref_side = vertical_mode ? temp_left : temp_above;
 
     // TODO: this code block will need to change also when non-square blocks are used
-    // const int log2_ratio = 0;
-    const int s = 0;
+    const int log2_ratio = log2_width - log2_height;
+    const int s = MAX(0, vertical_mode ? log2_ratio : -log2_ratio);
     const int max_index = (multi_ref_index << s) + 2;
-    const int ref_length = width << 1;
-    const uvg_pixel val = temp_main[ref_length + multi_ref_index];
+    const int ref_length = vertical_mode ? width << 1 : height << 1;
+    const uvg_pixel val = ref_main[ref_length + multi_ref_index];
     for (int j = 1; j <= max_index; j++) {
-      temp_main[ref_length + multi_ref_index +  j] = val;
+      ref_main[ref_length + multi_ref_index +  j] = val;
     }
 
-    ref_main = temp_main;
-    ref_side = temp_side;
+    
     //// sample_disp >= 0 means we don't need to refer to negative indices,
     //// which means we can just use the references as is.
     //ref_main = (vertical_mode ? in_ref_above : in_ref_left) + 1;
@@ -222,7 +244,7 @@ static void uvg_angular_pred_generic(
   if (sample_disp != 0) {
     // The mode is not horizontal or vertical, we have to do interpolation.
 
-    for (int_fast32_t y = 0, delta_pos = sample_disp * (1 + multi_ref_index); y < width; ++y, delta_pos += sample_disp) {
+    for (int_fast32_t y = 0, delta_pos = sample_disp * (1 + multi_ref_index); y < height; ++y, delta_pos += sample_disp) {
       int_fast32_t delta_int = delta_pos >> 5;
       int_fast32_t delta_fract = delta_pos & (32 - 1);
 
@@ -237,6 +259,7 @@ static void uvg_angular_pred_generic(
           int filter_threshold = uvg_intra_hor_ver_dist_thres[log2_width];
           int dist_from_vert_or_hor = MIN(abs((int32_t)pred_mode - 50), abs((int32_t)pred_mode - 18));
           if (dist_from_vert_or_hor > filter_threshold) {
+            // ISP_TODO: these are introduced in the beginning of this function or am I missing something?
             static const int16_t modedisp2sampledisp[32] = { 0,    1,    2,    3,    4,    6,     8,   10,   12,   14,   16,   18,   20,   23,   26,   29,   32,   35,   39,  45,  51,  57,  64,  73,  86, 102, 128, 171, 256, 341, 512, 1024 };
             const int_fast8_t mode_disp = (pred_mode >= 34) ? pred_mode - 50 : 18 - pred_mode;
             const int_fast8_t sample_disp = (mode_disp < 0 ? -1 : 1) * modedisp2sampledisp[abs(mode_disp)];
@@ -291,7 +314,7 @@ static void uvg_angular_pred_generic(
         }
       }
       if(PDPC_filter) {
-        int       inv_angle_sum = 256;
+        int inv_angle_sum = 256;
         for (int x = 0; x < MIN(3 << scale, width); x++) {
           inv_angle_sum += modedisp2invsampledisp[abs(mode_disp)];
 
@@ -336,31 +359,54 @@ static void uvg_angular_pred_generic(
   }
   else {
     // Mode is horizontal or vertical, just copy the pixels.
+    
+    // Do not apply PDPC if multi ref line index is other than 0
+    // ISP_TODO: do not do PDPC if block is in BDPCM mode
+    bool do_pdpc = (((width >= 4 && height >= 4) || channel_type != 0) && sample_disp >= 0 && multi_ref_index == 0);
 
-    // TODO: update outer loop to use height instead of width
-    for (int_fast32_t y = 0; y < width; ++y) {
-      for (int_fast32_t x = 0; x < width; ++x) {
-        dst[y * width + x] = ref_main[x + 1];
-      }
-      // Do not apply PDPC if multi ref line index is other than 0
-      if ((width >= 4 || channel_type != 0) && sample_disp >= 0 && multi_ref_index == 0) {
-        int scale = (log2_width + log2_width - 2) >> 2;
-        const uvg_pixel top_left = ref_main[0];
+    if (do_pdpc) {
+      int scale = (log2_width + log2_height - 2) >> 2;
+      const uvg_pixel top_left = ref_main[0];
+      for (int_fast32_t y = 0; y < height; ++y) {
+        memcpy(&dst[y * width], &ref_main[1], width * sizeof(uvg_pixel));
         const uvg_pixel left = ref_side[1 + y];
-        for (int i = 0; i < MIN(3 << scale, width); i++) {
-          const int wL = 32 >> (2 * i >> scale);
-          const uvg_pixel val = dst[y * width + i];
-          dst[y * width + i] = CLIP_TO_PIXEL(val + ((wL * (left - top_left) + 32) >> 6));
+        for (int_fast32_t x = 0; x < MIN(3 << scale, width); ++x) {
+          const int wL = 32 >> (2 * x >> scale);
+          const uvg_pixel val = dst[y * width + x];
+          dst[y * width + x] = CLIP_TO_PIXEL(val + ((wL * (left - top_left) + 32) >> 6));
         }
       }
+    } else {
+      for (int_fast32_t y = 0; y < height; ++y) {
+        memcpy(&dst[y * width], &ref_main[1], width * sizeof(uvg_pixel));
+      }
     }
+    // ISP_TODO: there is no reason to run these loops AND then check if PDPC is applied. Do the check first and then run either the normal or PDPC loops
+
+    //for (int_fast32_t y = 0; y < height; ++y) {
+    //  for (int_fast32_t x = 0; x < width; ++x) {
+    //    dst[y * width + x] = ref_main[x + 1];
+    //  }
+    //  // Do not apply PDPC if multi ref line index is other than 0
+    //  // ISP_TODO: do not do PDPC if block is in BDPCM mode
+    //  if (((width >= 4 && height >= 4) || channel_type != 0) && sample_disp >= 0 && multi_ref_index == 0) {
+    //    int scale = (log2_width + log2_height - 2) >> 2;
+    //    const uvg_pixel top_left = ref_main[0];
+    //    const uvg_pixel left = ref_side[1 + y];
+    //    for (int i = 0; i < MIN(3 << scale, width); i++) { // ISP_TODO: is one loop enough for PDPC?
+    //      const int wL = 32 >> (2 * i >> scale);
+    //      const uvg_pixel val = dst[y * width + i];
+    //      dst[y * width + i] = CLIP_TO_PIXEL(val + ((wL * (left - top_left) + 32) >> 6));
+    //    }
+    //  }
+    //}
   }
 
   // Flip the block if this is was a horizontal mode.
   if (!vertical_mode) {
-    for (int_fast32_t y = 0; y < width - 1; ++y) {
+    for (int_fast32_t y = 0; y < height - 1; ++y) {
       for (int_fast32_t x = y + 1; x < width; ++x) {
-        SWAP(dst[y * width + x], dst[x * width + y], uvg_pixel);
+        SWAP(dst[y * width + x], dst[x * height + y], uvg_pixel);
       }
     }
   }
@@ -369,23 +415,31 @@ static void uvg_angular_pred_generic(
 
 /**
  * \brief Generate planar prediction.
- * \param log2_width    Log2 of width, range 2..5.
+ * \param cu_loc        CU location and size data.
+ * \param color         Color channel.
  * \param in_ref_above  Pointer to -1 index of above reference, length=width*2+1.
  * \param in_ref_left   Pointer to -1 index of left reference, length=width*2+1.
  * \param dst           Buffer of size width*width.
  */
 static void uvg_intra_pred_planar_generic(
-  const int_fast8_t log2_width,
+  const cu_loc_t* const cu_loc,
+  color_t color,
   const uvg_pixel *const ref_top,
   const uvg_pixel *const ref_left,
   uvg_pixel *const dst)
 {
-  // TODO: Add height
-  assert(log2_width >= 2 && log2_width <= 5);
+  const int width = color == COLOR_Y ? cu_loc->width : cu_loc->chroma_width;
+  const int height = color == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
+  const int log2_width = uvg_g_convert_to_bit[width] + 2;
+  const int log2_height = uvg_g_convert_to_bit[height] + 2;
 
-  const int_fast8_t width = 1 << log2_width;
+  const int offset = 1 << (log2_width + log2_height);
+  const int final_shift = 1 + log2_width + log2_height;
+  
+  assert((log2_width >= 2 && log2_width <= 5) && (log2_height >= 2 && log2_height <= 5));
+
   const uvg_pixel top_right = ref_top[width + 1];
-  const uvg_pixel bottom_left = ref_left[width + 1];
+  const uvg_pixel bottom_left = ref_left[height + 1];
 
 #if 0
   // Unoptimized version for reference.
@@ -397,18 +451,27 @@ static void uvg_intra_pred_planar_generic(
     }
   }
 #else
-  int_fast16_t top[32];
+  // TODO: get rid of magic numbers. Make a define for this
+  int_fast16_t top[64];
+  int_fast16_t bottom[64];
+  int_fast16_t left[64];
+  int_fast16_t right[64];
   for (int i = 0; i < width; ++i) {
-    top[i] = ref_top[i + 1] << log2_width;
+    bottom[i] = bottom_left - ref_top[i + 1];
+    top[i] = ref_top[i + 1] << log2_height;
   }
 
-  for (int y = 0; y < width; ++y) {
-    int_fast16_t hor = (ref_left[y + 1] << log2_width) + width;
+  for (int j = 0; j < height; ++j) {
+    right[j] = top_right - ref_left[j + 1];
+    left[j] = ref_left[j + 1] << log2_width;
+  }
+
+  for (int y = 0; y < height; ++y) {
+    int_fast16_t hor = left[y];
     for (int x = 0; x < width; ++x) {
-      hor += top_right - ref_left[y + 1];
-      top[x] += bottom_left - ref_top[x + 1];
-      dst[y * width + x] = (hor + top[x]) >> (log2_width + 1);
-      //
+      hor += right[y];
+      top[x] += bottom[x];
+      dst[y * width + x] = ((hor << log2_height) + (top[x] << log2_width) + offset) >> final_shift;
     }
   }
 #endif

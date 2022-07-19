@@ -42,10 +42,9 @@
 #include "strategyselector.h"
 #include "strategies/missing-intel-intrinsics.h"
 
-
  /**
  * \brief Generate angular predictions.
- * \param log2_width    Log2 of width, range 2..5.
+ * \param cu_loc        CU locationand size data.
  * \param intra_mode    Angular mode in range 2..34.
  * \param channel_type  Color channel.
  * \param in_ref_above  Pointer to -1 index of above reference, length=width*2+1.
@@ -54,7 +53,7 @@
  * \param multi_ref_idx Reference line index for use with MRL.
  */
 static void uvg_angular_pred_avx2(
-  const int_fast8_t log2_width,
+  const cu_loc_t* const cu_loc,
   const int_fast8_t intra_mode,
   const int_fast8_t channel_type,
   const uvg_pixel *const in_ref_above,
@@ -62,8 +61,12 @@ static void uvg_angular_pred_avx2(
   uvg_pixel *const dst,
   const uint8_t multi_ref_idx)
 {
-  
-  assert(log2_width >= 2 && log2_width <= 5);
+  const int width = channel_type == COLOR_Y ? cu_loc->width : cu_loc->chroma_width;
+  const int height = channel_type == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
+  const int log2_width = uvg_g_convert_to_bit[width] + 2;
+  const int log2_height = uvg_g_convert_to_bit[height] + 2;
+
+  assert((log2_width >= 2 && log2_width <= 5) && (log2_height >= 2 && log2_height <= 5));
   assert(intra_mode >= 2 && intra_mode <= 66);
 
   // TODO: implement handling of MRL
@@ -142,7 +145,6 @@ static void uvg_angular_pred_avx2(
   //uvg_pixel tmp_ref[2 * 128 + 3 + 33 * MAX_REF_LINE:IDX] = { 0 };
   uvg_pixel temp_main[2 * 128 + 3 + 33 * MAX_REF_LINE_IDX] = { 0 };
   uvg_pixel temp_side[2 * 128 + 3 + 33 * MAX_REF_LINE_IDX] = { 0 };
-  const int_fast32_t width = 1 << log2_width;
 
   int32_t pred_mode = intra_mode; // ToDo: handle WAIP
 
@@ -497,20 +499,26 @@ static void uvg_angular_pred_avx2(
 
 /**
  * \brief Generate planar prediction.
- * \param log2_width    Log2 of width, range 2..5.
+ * \param cu_loc        CU location and size data.
+ * \param color         Color channel.
  * \param in_ref_above  Pointer to -1 index of above reference, length=width*2+1.
  * \param in_ref_left   Pointer to -1 index of left reference, length=width*2+1.
  * \param dst           Buffer of size width*width.
  */
 static void uvg_intra_pred_planar_avx2(
-  const int_fast8_t log2_width,
+  const cu_loc_t* const cu_loc,
+  color_t color,
   const uint8_t *const ref_top,
   const uint8_t *const ref_left,
   uint8_t *const dst)
 {
-  assert(log2_width >= 2 && log2_width <= 5);
+  const int width = color == COLOR_Y ? cu_loc->width : cu_loc->chroma_width;
+  const int height = color == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
+  const int log2_width = uvg_g_convert_to_bit[width] + 2;
+  const int log2_height = uvg_g_convert_to_bit[height] + 2;
 
-  const int_fast8_t width = 1 << log2_width;
+  assert((log2_width >= 2 && log2_width <= 5) && (log2_height >= 2 && log2_height <= 5));
+
   const uint8_t top_right = ref_top[width + 1];
   const uint8_t bottom_left = ref_left[width + 1];
 
