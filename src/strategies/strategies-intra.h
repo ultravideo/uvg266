@@ -38,13 +38,14 @@
  * Interface for intra prediction functions.
  */
 
+#include "cu.h"
 #include "global.h" // IWYU pragma: keep
 #include "intra.h"
 #include "uvg266.h"
 
 
 typedef void (angular_pred_func)(
-  const int_fast8_t log2_width,
+  const cu_loc_t* const cu_loc,
   const int_fast8_t intra_mode,
   const int_fast8_t channel_type,
   const uvg_pixel *const in_ref_above,
@@ -53,7 +54,8 @@ typedef void (angular_pred_func)(
   const uint8_t multi_ref_idx);
 
 typedef void (intra_pred_planar_func)(
-  const int_fast8_t log2_width,
+  const cu_loc_t* const cu_loc,
+  color_t color,
   const uvg_pixel *const ref_top,
   const uvg_pixel *const ref_left,
   uvg_pixel *const dst);
