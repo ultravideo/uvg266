@@ -109,7 +109,7 @@ typedef void(uvg_sample_14bit_quarterpel_luma_func)(const encoder_control_t * co
   int16_t dst_stride,
   int8_t hor_flag,
   int8_t ver_flag,
-  const int16_t mv[2]);
+  const mv_t mv[2]);
 
 typedef void(uvg_sample_14bit_octpel_chroma_func)(const encoder_control_t *const encoder,
   uvg_pixel *src,
@@ -120,7 +120,7 @@ typedef void(uvg_sample_14bit_octpel_chroma_func)(const encoder_control_t *const
   int16_t dst_stride,
   int8_t hor_flag,
   int8_t ver_flag,
-  const int16_t mv[2]);
+  const mv_t mv[2]);
 
 // Declare function pointers.
 extern ipol_blocks_func * uvg_filter_hpel_blocks_hor_ver_luma;

@@ -1224,7 +1224,7 @@ static void uvg_sample_octpel_chroma_hi_avx2(const encoder_control_t *const enco
   int16_t dst_stride,
   int8_t hor_flag,
   int8_t ver_flag,
-  const int16_t mv[2])
+  const mv_t mv[2])
 {
   // TODO: Optimizations for rest of the blocks (for example 2x8).
   if (width % 4 != 0) {

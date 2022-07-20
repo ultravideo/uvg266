@@ -1492,7 +1492,7 @@ static void search_pu_inter_bipred(inter_search_info_t *info,
     bipred_pu->inter.mv_ref[0] = merge_cand[i].ref[0];
     bipred_pu->inter.mv_ref[1] = merge_cand[j].ref[1];
 
-    int16_t(*mv)[2] = bipred_pu->inter.mv;
+    mv_t(*mv)[2] = bipred_pu->inter.mv;
     mv[0][0] = merge_cand[i].mv[0][0];
     mv[0][1] = merge_cand[i].mv[0][1];
     mv[1][0] = merge_cand[j].mv[1][0];
@@ -1967,7 +1967,7 @@ static void search_pu_inter(encoder_state_t * const state,
       bipred_pu->inter.mv_ref[0] = best_unipred[0]->inter.mv_ref[0];
       bipred_pu->inter.mv_ref[1] = best_unipred[1]->inter.mv_ref[1];
 
-      int16_t (*mv)[2] = bipred_pu->inter.mv;
+      mv_t (*mv)[2] = bipred_pu->inter.mv;
       mv[0][0] = best_unipred[0]->inter.mv[0][0];
       mv[0][1] = best_unipred[0]->inter.mv[0][1];
       mv[1][0] = best_unipred[1]->inter.mv[1][0];

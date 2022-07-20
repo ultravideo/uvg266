@@ -140,7 +140,7 @@ void uvg_sample_quarterpel_luma_generic(const encoder_control_t * const encoder,
   int16_t dst_stride,
   int8_t hor_flag,
   int8_t ver_flag,
-  const int16_t mv[2])
+  const mv_t mv[2])
 {
   //TODO: horizontal and vertical only filtering
   int32_t x, y;
@@ -177,7 +177,7 @@ void uvg_sample_quarterpel_luma_generic(const encoder_control_t * const encoder,
   }
 }
 
-void uvg_sample_quarterpel_luma_hi_generic(const encoder_control_t * const encoder, uvg_pixel *src, int16_t src_stride, int width, int height, int16_t *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag, const int16_t mv[2])
+void uvg_sample_quarterpel_luma_hi_generic(const encoder_control_t * const encoder, uvg_pixel *src, int16_t src_stride, int width, int height, int16_t *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag, const mv_t mv[2])
 {
   //TODO: horizontal and vertical only filtering
   int32_t x, y;
@@ -687,7 +687,7 @@ void uvg_sample_octpel_chroma_generic(const encoder_control_t * const encoder,
   int16_t dst_stride,
   int8_t hor_flag,
   int8_t ver_flag,
-  const int16_t mv[2])
+  const mv_t mv[2])
 {
   //TODO: horizontal and vertical only filtering
   int32_t x, y;
@@ -724,7 +724,7 @@ void uvg_sample_octpel_chroma_generic(const encoder_control_t * const encoder,
   }
 }
 
-void uvg_sample_octpel_chroma_hi_generic(const encoder_control_t * const encoder, uvg_pixel *src, int16_t src_stride, int width, int height, int16_t *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag, const int16_t mv[2])
+void uvg_sample_octpel_chroma_hi_generic(const encoder_control_t * const encoder, uvg_pixel *src, int16_t src_stride, int width, int height, int16_t *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag, const mv_t mv[2])
 {
   //TODO: horizontal and vertical only filtering
   int32_t x, y;
