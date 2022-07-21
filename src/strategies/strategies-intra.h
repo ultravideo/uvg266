@@ -69,8 +69,8 @@ typedef void (intra_pred_filtered_dc_func)(
 
 typedef void (pdpc_planar_dc_func)(
   const int mode,
-  const int width,
-  const int log2_width,
+  const cu_loc_t* const cu_loc,
+  const color_t color,
   const uvg_intra_ref *const used_ref,
   uvg_pixel *const dst);
 

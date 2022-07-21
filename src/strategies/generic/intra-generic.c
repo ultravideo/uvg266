@@ -129,8 +129,8 @@ static void uvg_angular_pred_generic(
   // Sample displacement per column in fractions of 32.
   const int_fast8_t sample_disp = (mode_disp < 0 ? -1 : 1) * modedisp2sampledisp[abs(mode_disp)];
   
-  // ISP_TODO: replace latter width with height
-  int scale = MIN(2, log2_width - pre_scale[abs(mode_disp)]);
+  const int side_size = vertical_mode ? log2_height : log2_width;
+  int scale = MIN(2, side_size - pre_scale[abs(mode_disp)]);
 
   // Pointer for the reference we are interpolating from.
   uvg_pixel *ref_main;
@@ -524,25 +524,26 @@ static void uvg_intra_pred_filtered_dc_generic(
 
 /**
 * \brief Position Dependent Prediction Combination for Planar and DC modes.
-* \param log2_width    Log2 of width, range 2..5.
-* \param width         Block width matching log2_width.
+* \param cu_loc        CU location and size data.
 * \param used_ref      Pointer used reference pixel struct.
 * \param dst           Buffer of size width*width.
 */
 static void uvg_pdpc_planar_dc_generic(
   const int mode,
-  const int width,
-  const int log2_width,
+  const cu_loc_t* const cu_loc,
+  const color_t color,
   const uvg_intra_ref *const used_ref,
   uvg_pixel *const dst)
 {
   assert(mode == 0 || mode == 1);  // planar or DC
+  const int width =  color == COLOR_Y ? cu_loc->width : cu_loc->chroma_width;
+  const int height = color == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
+  const int log2_width = uvg_g_convert_to_bit[width] + 2;
+  const int log2_height = uvg_g_convert_to_bit[height] + 2;
 
-  // TODO: replace latter log2_width with log2_height
-  const int scale = ((log2_width - 2 + log2_width - 2 + 2) >> 2);
+  const int scale = (log2_width + log2_height - 2) >> 2;
 
-  // TODO: replace width with height
-  for (int y = 0; y < width; y++) {
+  for (int y = 0; y < height; y++) {
     int wT = 32 >> MIN(31, ((y << 1) >> scale));
     for (int x = 0; x < width; x++) {
       int wL = 32 >> MIN(31, ((x << 1) >> scale));

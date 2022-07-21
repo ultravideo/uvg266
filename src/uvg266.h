@@ -452,7 +452,7 @@ typedef struct uvg_config
   /** \brief Flag to enable/disable open GOP configuration */
   int8_t open_gop;
 
-	int32_t vaq; /** \brief Enable variance adaptive quantization*/
+  int32_t vaq; /** \brief Enable variance adaptive quantization*/
 
   /** \brief Type of scaling lists to use */
   int8_t scaling_list;
