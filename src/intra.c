@@ -969,13 +969,13 @@ static void intra_predict_regular(
   bool pdpcCondition = (mode == 0 || mode == 1); // Planar and DC
   if (pdpcCondition && multi_ref_index == 0) // Cannot be used with MRL.
   {
-    uvg_pdpc_planar_dc(mode, width, log2_width, used_ref, dst);
+    uvg_pdpc_planar_dc(mode, cu_loc, color, used_ref, dst);
   }
 }
 
 
 void uvg_intra_build_reference_any(
-  const int_fast8_t log2_width,
+  const cu_loc_t* const cu_loc,
   const color_t color,
   const vector2d_t *const luma_px,
   const vector2d_t *const pic_px,
@@ -984,7 +984,12 @@ void uvg_intra_build_reference_any(
   const uint8_t multi_ref_idx,
   uvg_pixel *extra_ref_lines)
 {
-  assert(log2_width >= 2 && log2_width <= 5);
+  const int width = color == COLOR_Y ? cu_loc->width : cu_loc->chroma_width;
+  const int height = color == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
+  const int log2_width = uvg_g_convert_to_bit[width] + 2;
+  const int log2_height = uvg_g_convert_to_bit[height] + 2;
+
+  assert((log2_width >= 2 && log2_width <= 5) && (log2_height >= 2 && log2_height <= 5));
 
   refs->filtered_initialized = false;
   uvg_pixel *out_left_ref = &refs->ref.left[0];
@@ -992,8 +997,6 @@ void uvg_intra_build_reference_any(
 
   const uvg_pixel dc_val = 1 << (UVG_BIT_DEPTH - 1); //TODO: add used bitdepth as a variable
   const int is_chroma = color != COLOR_Y ? 1 : 0;
-  // TODO: height for non-square blocks
-  const int_fast8_t width = 1 << log2_width;
 
   // Get multi ref index from CU under prediction or reconstrcution. Do not use MRL if not luma
   const uint8_t multi_ref_index = !is_chroma ? multi_ref_idx : 0;
@@ -1184,7 +1187,7 @@ void uvg_intra_build_reference_any(
 }
 
 void uvg_intra_build_reference_inner(
-  const int_fast8_t log2_width,
+  const cu_loc_t* const cu_loc,
   const color_t color,
   const vector2d_t *const luma_px,
   const vector2d_t *const pic_px,
@@ -1194,15 +1197,18 @@ void uvg_intra_build_reference_inner(
   const uint8_t multi_ref_idx,
   uvg_pixel* extra_ref_lines)
 {
-  assert(log2_width >= 2 && log2_width <= 5);
+  const int width = color == COLOR_Y ? cu_loc->width : cu_loc->chroma_width;
+  const int height = color == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
+  const int log2_width = uvg_g_convert_to_bit[width] + 2;
+  const int log2_height = uvg_g_convert_to_bit[height] + 2;
+
+  assert((log2_width >= 2 && log2_width <= 5) && (log2_height >= 2 && log2_height <= 5));
 
   refs->filtered_initialized = false;
   uvg_pixel * __restrict out_left_ref = &refs->ref.left[0];
   uvg_pixel * __restrict out_top_ref = &refs->ref.top[0];
 
   const int is_chroma = color != COLOR_Y ? 1 : 0;
-  // TODO: height for non-sqaure blocks
-  const int_fast8_t width = 1 << log2_width;
 
   // Get multiRefIdx from CU under prediction. Do not use MRL if not luma
   const uint8_t multi_ref_index = !is_chroma ? multi_ref_idx : 0;
@@ -1366,7 +1372,7 @@ void uvg_intra_build_reference_inner(
 }
 
 void uvg_intra_build_reference(
-  const int_fast8_t log2_width,
+  const cu_loc_t* const cu_loc,
   const color_t color,
   const vector2d_t *const luma_px,
   const vector2d_t *const pic_px,
@@ -1380,9 +1386,9 @@ void uvg_intra_build_reference(
 
   // Much logic can be discarded if not on the edge
   if (luma_px->x > 0 && luma_px->y > 0) {
-    uvg_intra_build_reference_inner(log2_width, color, luma_px, pic_px, lcu, refs, entropy_sync, multi_ref_idx, extra_ref_lines);
+    uvg_intra_build_reference_inner(cu_loc, color, luma_px, pic_px, lcu, refs, entropy_sync, multi_ref_idx, extra_ref_lines);
   } else {
-    uvg_intra_build_reference_any(log2_width, color, luma_px, pic_px, lcu, refs, multi_ref_idx, extra_ref_lines);
+    uvg_intra_build_reference_any(cu_loc, color, luma_px, pic_px, lcu, refs, multi_ref_idx, extra_ref_lines);
   }
 }
 
@@ -1513,16 +1519,15 @@ static void intra_recon_tb_leaf(
         frame->rec->stride, 1);
     }
   }
-  uvg_intra_build_reference(log2width, color, &luma_px, &pic_px, lcu, &refs, cfg->wpp, extra_refs, multi_ref_index);
-
-  uvg_pixel pred[32 * 32];
-
   cu_loc_t loc = {
     x, y,
     width, height,
     width, height,
   };
 
+  uvg_intra_build_reference(&loc, color, &luma_px, &pic_px, lcu, &refs, cfg->wpp, extra_refs, multi_ref_index);
+
+  uvg_pixel pred[32 * 32];
   uvg_intra_predict(state, &refs, &loc, color, pred, search_data, lcu, tree_type);
 
   const int index = lcu_px.x + lcu_px.y * lcu_width;

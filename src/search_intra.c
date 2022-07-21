@@ -682,22 +682,32 @@ static int search_intra_chroma_rough(
   int x_px,
   int y_px,
   int depth,
-  const uvg_pixel *orig_u,
-  const uvg_pixel *orig_v,
-  int16_t origstride,
-  uvg_intra_references *refs_u,
-  uvg_intra_references *refs_v,
+  const vector2d_t* const lcu_px,
   intra_search_data_t* chroma_data,
   lcu_t* lcu,
   int8_t luma_mode,
   enum uvg_tree_type tree_type)
 {
   assert(depth != 4 || (x_px & 4 && y_px & 4));
+  const int_fast8_t log2_width_c = MAX(LOG2_LCU_WIDTH - depth - 1, 2);
+  const vector2d_t pic_px = { state->tile->frame->width, state->tile->frame->height };
+  const vector2d_t luma_px = { x_px & ~7, y_px & ~7 };
+  const int width = 1 << log2_width_c;
+  const int height = width; // TODO: height for non-square blocks
 
-  const unsigned width = MAX(LCU_WIDTH_C >> depth, TR_MIN_WIDTH);
+  const cu_loc_t loc = { luma_px.x, luma_px.y, width, height, width, height };
+
+  uvg_intra_references refs_u;
+  uvg_intra_build_reference(&loc, COLOR_U, &luma_px, &pic_px, lcu, &refs_u, state->encoder_control->cfg.wpp, NULL, 0);
+
+  uvg_intra_references refs_v;
+  uvg_intra_build_reference(&loc, COLOR_V, &luma_px, &pic_px, lcu, &refs_v, state->encoder_control->cfg.wpp, NULL, 0);
+
+  vector2d_t lcu_cpx = { (lcu_px->x & ~7) / 2, (lcu_px->y & ~7) / 2 };
+  uvg_pixel* orig_u = &lcu->ref.u[lcu_cpx.x + lcu_cpx.y * LCU_WIDTH_C];
+  uvg_pixel* orig_v = &lcu->ref.v[lcu_cpx.x + lcu_cpx.y * LCU_WIDTH_C];
   
   //cost_pixel_nxn_func *const sad_func = uvg_pixels_get_sad_func(width);
-  cu_loc_t loc = { x_px & ~7, y_px & ~7, width, width, width, width };
     
   uvg_pixel _pred[32 * 32 + SIMD_ALIGNMENT];
   uvg_pixel *pred = ALIGNED_POINTER(_pred, SIMD_ALIGNMENT);
@@ -705,12 +715,12 @@ static int search_intra_chroma_rough(
   uvg_pixel _orig_block[32 * 32 + SIMD_ALIGNMENT];
   uvg_pixel *orig_block = ALIGNED_POINTER(_orig_block, SIMD_ALIGNMENT);
 
-  uvg_pixels_blit(orig_u, orig_block, width, width, origstride, width);
+  uvg_pixels_blit(orig_u, orig_block, width, width, LCU_WIDTH_C, width);
   int modes_count = (state->encoder_control->cfg.cclm ? 8 : 5);
   for (int i = 0; i < modes_count; ++i) {
     const int8_t mode_chroma = chroma_data[i].pred_cu.intra.mode_chroma;
     if (mode_chroma == luma_mode || mode_chroma == 0 || mode_chroma >= 81) continue;
-    uvg_intra_predict(state, refs_u, &loc, COLOR_U, pred, &chroma_data[i], lcu, tree_type);
+    uvg_intra_predict(state, &refs_u, &loc, COLOR_U, pred, &chroma_data[i], lcu, tree_type);
     //costs[i] += get_cost(encoder_state, pred, orig_block, satd_func, sad_func, width);
     switch (width) {
       case 4: chroma_data[i].cost += uvg_satd_4x4(pred, orig_block);
@@ -725,11 +735,11 @@ static int search_intra_chroma_rough(
     }
   }
 
-  uvg_pixels_blit(orig_v, orig_block, width, width, origstride, width);
+  uvg_pixels_blit(orig_v, orig_block, width, width, LCU_WIDTH_C, width);
   for (int i = 0; i < modes_count; ++i) {
     const int8_t mode_chroma = chroma_data[i].pred_cu.intra.mode_chroma;
     if (mode_chroma == luma_mode || mode_chroma == 0 || mode_chroma >= 81) continue;
-    uvg_intra_predict(state, refs_v, &loc, COLOR_V, pred, &chroma_data[i], lcu, tree_type);
+    uvg_intra_predict(state, &refs_v, &loc, COLOR_V, pred, &chroma_data[i], lcu, tree_type);
     //costs[i] += get_cost(encoder_state, pred, orig_block, satd_func, sad_func, width);
     switch (width) {
       case 4: chroma_data[i].cost += uvg_satd_4x4(pred, orig_block);
@@ -1270,8 +1280,15 @@ static void get_rough_cost_for_2n_modes(
 #define PARALLEL_BLKS 2
   assert(num_modes % 2 == 0 && "passing odd number of modes to get_rough_cost_for_2n_modes");
   const int width = cu_loc->width;
-  cost_pixel_nxn_multi_func* satd_dual_func = uvg_pixels_get_satd_dual_func(width);
-  cost_pixel_nxn_multi_func* sad_dual_func = uvg_pixels_get_sad_dual_func(width);
+  const int height = cu_loc->height;
+  cost_pixel_nxn_multi_func* satd_dual_func;
+  cost_pixel_nxn_multi_func* sad_dual_func;
+  if (width == height) {
+    satd_dual_func = uvg_pixels_get_satd_dual_func(width);
+    sad_dual_func = uvg_pixels_get_sad_dual_func(width);
+  } else {
+    assert(false && "Joose promised to fix this.");
+  }
 
   uvg_pixel _preds[PARALLEL_BLKS * MIN(LCU_WIDTH, 64)* MIN(LCU_WIDTH, 64)+ SIMD_ALIGNMENT];
   pred_buffer preds = ALIGNED_POINTER(_preds, SIMD_ALIGNMENT);
@@ -1447,6 +1464,10 @@ int8_t uvg_search_intra_chroma_rdo(
 {
   const bool reconstruct_chroma = (depth != 4) || (x_px & 4 && y_px & 4);
 
+  int log2_width = MAX(LOG2_LCU_WIDTH - depth - 1, 2);
+  int8_t width = 1 << log2_width;
+  int8_t height = 1 << log2_width;
+  const cu_loc_t loc = { x_px & ~7, y_px & ~7, width, height, width, height };
 
   uvg_intra_references refs[2];
   const vector2d_t luma_px = { x_px & ~7, y_px & ~7 };
@@ -1457,16 +1478,13 @@ int8_t uvg_search_intra_chroma_rdo(
 
 
   if (reconstruct_chroma) {
-    int log2_width = MAX(LOG2_LCU_WIDTH - depth - 1, 2);
-    uvg_intra_build_reference(log2_width, COLOR_U, &luma_px, &pic_px, lcu, &refs[0], state->encoder_control->cfg.wpp, NULL, 0);
-    uvg_intra_build_reference(log2_width, COLOR_V, &luma_px, &pic_px, lcu, &refs[1], state->encoder_control->cfg.wpp, NULL, 0);
+    uvg_intra_build_reference(&loc, COLOR_U, &luma_px, &pic_px, lcu, &refs[0], state->encoder_control->cfg.wpp, NULL, 0);
+    uvg_intra_build_reference(&loc, COLOR_V, &luma_px, &pic_px, lcu, &refs[1], state->encoder_control->cfg.wpp, NULL, 0);
     
     const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
     cabac_data_t temp_cabac;
     memcpy(&temp_cabac, &state->search_cabac, sizeof(cabac_data_t));
-    int8_t width = 1 << log2_width;
-    int8_t height = 1 << log2_width;
-    const cu_loc_t loc = { x_px &~7, y_px & ~7, width, height, width, height};
+    
     const int offset = ((lcu_px.x & ~7) >> 1) + ((lcu_px.y & ~7) >> 1)* LCU_WIDTH_C;
 
     int lfnst_modes_to_check[3];
@@ -1659,26 +1677,10 @@ int8_t uvg_search_cu_intra_chroma(
   // num_modes is 0.is 0.
 
   if(state->encoder_control->cfg.cclm && 0){
-    const int_fast8_t log2_width_c = MAX(LOG2_LCU_WIDTH - depth - 1, 2);
-    const vector2d_t pic_px = { state->tile->frame->width, state->tile->frame->height };
-    const vector2d_t luma_px = { x_px & ~7, y_px & ~7};
-
-    uvg_intra_references refs_u;
-    uvg_intra_build_reference(log2_width_c, COLOR_U, &luma_px, &pic_px, lcu, &refs_u, state->encoder_control->cfg.wpp, NULL, 0);
-
-    uvg_intra_references refs_v;
-    uvg_intra_build_reference(log2_width_c, COLOR_V, &luma_px, &pic_px, lcu, &refs_v, state->encoder_control->cfg.wpp, NULL, 0);
-
-    vector2d_t lcu_cpx = { (lcu_px.x & ~7) / 2, (lcu_px.y & ~7) / 2 };
-    uvg_pixel *ref_u = &lcu->ref.u[lcu_cpx.x + lcu_cpx.y * LCU_WIDTH_C];
-    uvg_pixel *ref_v = &lcu->ref.v[lcu_cpx.x + lcu_cpx.y * LCU_WIDTH_C];
+    
 
     num_modes = search_intra_chroma_rough(state, x_px, y_px, depth,
-                                          ref_u,
-                                          ref_v,
-                                          LCU_WIDTH_C,
-                                          &refs_u,
-                                          &refs_v,
+                                          &lcu_px,
                                           chroma_data,
                                           lcu,
                                           intra_mode,
@@ -1819,7 +1821,7 @@ void uvg_search_cu_intra(
   int8_t num_cand = uvg_intra_get_dir_luma_predictor(x_px, y_px, candidate_modes, cur_cu, left_cu, above_cu);
 
   if (depth > 0) {
-    uvg_intra_build_reference(log2_width, COLOR_Y, &luma_px, &pic_px, lcu, refs, state->encoder_control->cfg.wpp, NULL, 0);
+    uvg_intra_build_reference(&cu_loc, COLOR_Y, &luma_px, &pic_px, lcu, refs, state->encoder_control->cfg.wpp, NULL, 0);
   }
 
   // The maximum number of possible MIP modes depend on block size & shape
@@ -1887,7 +1889,7 @@ void uvg_search_cu_intra(
           frame->rec->stride, 1);
       }
     }
-    uvg_intra_build_reference(log2_width, COLOR_Y, &luma_px, &pic_px, lcu, &refs[line], state->encoder_control->cfg.wpp, extra_refs, line);
+    uvg_intra_build_reference(&cu_loc, COLOR_Y, &luma_px, &pic_px, lcu, &refs[line], state->encoder_control->cfg.wpp, extra_refs, line);
     for(int i = 1; i < INTRA_MPM_COUNT; i++) {
       num_mrl_modes++;
       const int index = (i - 1) + (INTRA_MPM_COUNT -1)*(line-1) + number_of_modes;

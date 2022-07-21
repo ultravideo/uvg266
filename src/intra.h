@@ -107,7 +107,7 @@ int8_t uvg_intra_get_dir_luma_predictor(
 * \param multi_ref_idx Multi reference line index for the prediction block.
 */
 void uvg_intra_build_reference(
-  const int_fast8_t log2_width,
+  const cu_loc_t* const cu_loc,
   const color_t color,
   const vector2d_t *const luma_px,
   const vector2d_t *const pic_px,
