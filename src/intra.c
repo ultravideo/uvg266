@@ -928,7 +928,7 @@ static void intra_predict_regular(
   uint8_t multi_ref_index = color == COLOR_Y ? multi_ref_idx : 0;
 
   const uvg_intra_ref *used_ref = &refs->ref;
-  if (cfg->intra_smoothing_disabled || color != COLOR_Y || mode == 1 || (width == 4 && height == 4) || multi_ref_index) {
+  if (cfg->intra_smoothing_disabled || color != COLOR_Y || mode == 1 || (width == 4 && height == 4) || multi_ref_index || width != height /*Fake ISP*/) {
     // For chroma, DC and 4x4 blocks, always use unfiltered reference.
   } else if (mode == 0) {
     // Otherwise, use filtered for planar.
