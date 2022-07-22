@@ -973,12 +973,16 @@ static void uvg_intra_pred_filtered_dc_avx2(
 */
 static void uvg_pdpc_planar_dc_avx2(
   const int mode,
-  const int width,
-  const int log2_width,
+  const cu_loc_t* const cu_loc,
+  const color_t color,
   const uvg_intra_ref *const used_ref,
   uvg_pixel *const dst)
 {
   assert(mode == 0 || mode == 1);  // planar or DC
+  const int width = color == COLOR_Y ? cu_loc->width : cu_loc->chroma_width;
+  const int height = color == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
+  const int log2_width = uvg_g_convert_to_bit[width] + 2;
+  const int log2_height = uvg_g_convert_to_bit[height] + 2;
 
   __m256i shuf_mask_byte = _mm256_setr_epi8(
     0, -1, 0, -1, 0, -1, 0, -1,
