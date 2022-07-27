@@ -349,12 +349,15 @@ void uvg_dbg_encoder_state_dump_graphviz(const encoder_state_t* const state) {
 
 
 #ifdef UVG_DEBUG_PRINT_MV_INFO
-static void lcu_from_cu_array(cu_array_t* src, int src_x, int src_y, lcu_t* dst)
+static void lcu_from_cu_array(const encoder_state_t* const state, cu_array_t* src, int src_x, int src_y, lcu_t* dst)
 {
   // ToDo: Fix invalid memory access outside of src->data
   const int dst_stride = src->stride >> 2;
-  for (int y = src_y ? -4 : 0; y < LCU_WIDTH; y += SCU_WIDTH) {
-    for (int x = src_x ? -4 : 0; x < LCU_WIDTH; x += SCU_WIDTH) {
+  const int max_width  = MIN(LCU_WIDTH, state->tile->frame->width - src_x);
+  const int max_height  = MIN(LCU_WIDTH, state->tile->frame->height - src_y);
+
+  for (int y = src_y ? -4 : 0; y < max_height; y += SCU_WIDTH) {
+    for (int x = src_x ? -4 : 0; x < max_width; x += SCU_WIDTH) {
       const cu_info_t* to_cu = LCU_GET_CU_AT_PX(dst, x, y);
       const int x_scu = (src_x + x) >> 2;
       const int y_scu = (src_y + y) >> 2;
@@ -362,14 +365,14 @@ static void lcu_from_cu_array(cu_array_t* src, int src_x, int src_y, lcu_t* dst)
       memcpy(to_cu, from_cu, sizeof(*to_cu));
     }
   }
-  if (src_x) {
+  if (src_x && src_y + 64 < state->tile->frame->height) {
     const cu_info_t* to_cu = LCU_GET_CU_AT_PX(dst, -1, 64);
     const int x_scu = (src_x + -1) >> 2;
     const int y_scu = (src_y + 64) >> 2;
     cu_info_t* from_cu = &src->data[x_scu + y_scu * dst_stride];
     memcpy(to_cu, from_cu, sizeof(*to_cu));
   }
-  if (src_y) {
+  if (src_y && src_x + 64 < state->tile->frame->width) {
     const cu_info_t* to_cu = LCU_GET_TOP_RIGHT_CU(dst);
     const int x_scu = (src_x + 64) >> 2;
     const int y_scu = (src_y + -1) >> 2;
@@ -383,7 +386,7 @@ static void lcu_from_cu_array(cu_array_t* src, int src_x, int src_y, lcu_t* dst)
 void uvg_print_merge_vectors(const encoder_state_t* const state, uint32_t pic_x, uint32_t pic_y, uint32_t block_width, uint32_t block_height, cu_info_t* cu) {
 
   lcu_t lcu;
-  lcu_from_cu_array(state->tile->frame->cu_array, pic_x - SUB_SCU(pic_x), pic_y - SUB_SCU(pic_y), &lcu);
+  lcu_from_cu_array(state, state->tile->frame->cu_array, pic_x - SUB_SCU(pic_x), pic_y - SUB_SCU(pic_y), &lcu);
   static int   val = 0;
   inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS] = { 0 };
   // Search for merge mode candidates

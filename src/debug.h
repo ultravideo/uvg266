@@ -31,7 +31,6 @@
  ****************************************************************************/
 #pragma once
 
-
 #ifdef UVG_DEBUG_PRINT_YUVIEW_CSV
 
 enum {
@@ -86,6 +85,11 @@ void uvg_dbg_encoder_state_dump_graphviz(const encoder_state_t* const state)
 #endif //UVG_DEBUG_PRINT_THREADING_INFO
 
 #ifdef UVG_DEBUG_PRINT_MV_INFO
+typedef struct encoder_state_t encoder_state_t;
+
+#include <stdint.h>
+#include "cu.h"
+
 void uvg_print_merge_vectors(const encoder_state_t* const state, uint32_t pic_x, uint32_t pic_y, uint32_t block_width, uint32_t block_height, cu_info_t* cu);
 #define DBG_PRINT_MV(_state, _pic_x, _pic_y, _block_width, _block_height, _cu) uvg_print_merge_vectors(_state, _pic_x, _pic_y, _block_width, _block_height, _cu);
 #else
