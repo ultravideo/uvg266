@@ -1101,7 +1101,7 @@ static void get_spatial_merge_candidates_cua(const cu_array_t *cua,
   }
 }
 
-static INLINE int16_t get_scaled_mv(int16_t mv, int scale)
+static INLINE mv_t get_scaled_mv(mv_t mv, int scale)
 {
   int32_t scaled = scale * mv;
   return CLIP(-32768, 32767, (scaled + 127 + (scaled < 0)) >> 8);
@@ -1586,8 +1586,8 @@ void uvg_change_precision(int src, int dst, mv_t* hor, mv_t* ver) {
   const int shift = (int)dst - (int)src;
   if (shift >= 0)
   {
-    uint16_t* hor_unsigned = (uint16_t *)hor;
-    uint16_t* ver_unsigned = (uint16_t *)ver;
+    uint32_t* hor_unsigned = (uint32_t *)hor;
+    uint32_t* ver_unsigned = (uint32_t *)ver;
 
     *hor_unsigned <<= shift;
     *ver_unsigned <<= shift;
@@ -1783,7 +1783,7 @@ uint8_t uvg_inter_get_merge_cand(const encoder_state_t * const state,
       // only one MV is valid, take the only one MV
       else if (ref_i != -1)
       {
-        int16_t mv_i[2] = { mv_cand[0].mv[reflist][0], mv_cand[0].mv[reflist][1] };
+        mv_t mv_i[2] = { mv_cand[0].mv[reflist][0], mv_cand[0].mv[reflist][1] };
 
         mv_cand[candidates].mv[reflist][0] = mv_i[0];
         mv_cand[candidates].mv[reflist][1] = mv_i[1];
@@ -1791,7 +1791,7 @@ uint8_t uvg_inter_get_merge_cand(const encoder_state_t * const state,
       }
       else if (ref_j != -1)
       {
-        int16_t mv_j[2] = { mv_cand[1].mv[reflist][0], mv_cand[1].mv[reflist][1] };
+        mv_t mv_j[2] = { mv_cand[1].mv[reflist][0], mv_cand[1].mv[reflist][1] };
 
         mv_cand[candidates].mv[reflist][0] = mv_j[0];
         mv_cand[candidates].mv[reflist][1] = mv_j[1];
