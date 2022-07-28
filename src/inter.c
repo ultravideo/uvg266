@@ -53,13 +53,6 @@ typedef struct {
   const cu_info_t *c0;
   const cu_info_t *c1;
 
-  uint16_t mer_a0[2];
-  uint16_t mer_a1[2];
-
-  uint16_t mer_b0[2];
-  uint16_t mer_b1[2];
-  uint16_t mer_b2[2];
-
 } merge_candidates_t;
 
 
@@ -972,7 +965,6 @@ static void get_spatial_merge_candidates(int32_t x,
     if (a1->type == CU_INTER) {
       inter_clear_cu_unused(a1);
       cand_out->a[1] = a1;
-      cand_out->mer_a1[0] = parallel_merge_level;
     }
 
     if (y_local + height < LCU_WIDTH && y + height < picture_height) {
@@ -1104,7 +1096,7 @@ static void get_spatial_merge_candidates_cua(const cu_array_t *cua,
 static INLINE mv_t get_scaled_mv(mv_t mv, int scale)
 {
   int32_t scaled = scale * mv;
-  return CLIP(-32768, 32767, (scaled + 127 + (scaled < 0)) >> 8);
+  return CLIP(-131072, 131071, (scaled + 127 + (scaled < 0)) >> 8);
 }
 
 #define MV_EXPONENT_BITCOUNT 4

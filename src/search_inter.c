@@ -1204,7 +1204,7 @@ int uvg_get_skip_context(int x, int y, lcu_t* const lcu, cu_array_t* const cu_a,
 /**
 * \brief Calculate the scaled MV
 */
-static INLINE int32_t get_scaled_mv(int16_t mv, int scale)
+static INLINE mv_t get_scaled_mv(mv_t mv, int scale)
 {
   int32_t scaled = scale * mv;
   return CLIP(-131072, 131071, (scaled + 127 + (scaled < 0)) >> 8);
