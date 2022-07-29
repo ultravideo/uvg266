@@ -66,4 +66,6 @@ void uvg_search_cu_intra(
   lcu_t *lcu,
   enum uvg_tree_type tree_type);
 
+int uvg_get_isp_split_dim(const int width, const int height, const int split_type);
+
 #endif // SEARCH_INTRA_H_

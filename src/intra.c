@@ -37,6 +37,8 @@
 #include "image.h"
 #include "uvg_math.h"
 #include "mip_data.h"
+#include "search.h"
+#include "search_intra.h"
 #include "strategies/strategies-intra.h"
 #include "tables.h"
 #include "transform.h"
@@ -1471,9 +1473,7 @@ const cu_info_t* uvg_get_co_located_luma_cu(
 
 static void intra_recon_tb_leaf(
   encoder_state_t* const state,
-  int x,
-  int y,
-  int depth,
+  const cu_loc_t* cu_loc,
   lcu_t *lcu,
   color_t color,
   const intra_search_data_t* search_data,
@@ -1482,13 +1482,14 @@ static void intra_recon_tb_leaf(
   const uvg_config *cfg = &state->encoder_control->cfg;
   const int shift = color == COLOR_Y ? 0 : 1;
 
-  int log2width = LOG2_LCU_WIDTH - depth;
-  if (color != COLOR_Y && depth < MAX_PU_DEPTH) {
-    // Chroma width is half of luma width, when not at maximum depth.
-    log2width -= 1;
-  }
-  const int width = 1 << log2width;
-  const int height = width; // TODO: proper height for non-square blocks
+  const int x = cu_loc->x;
+  const int y = cu_loc->y;
+  
+  const int width  = color == COLOR_Y ? cu_loc->width  : cu_loc->chroma_width;
+  const int height = color == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
+  int log2_width = uvg_g_convert_to_bit[width] + 2;
+  int log2_height = uvg_g_convert_to_bit[height] + 2;
+
   const int lcu_width = LCU_WIDTH >> shift;
 
   const vector2d_t luma_px = { x, y };
@@ -1510,25 +1511,20 @@ static void intra_recon_tb_leaf(
 
     // Copy extra ref lines, including ref line 1 and top left corner.
     for (int i = 0; i < MAX_REF_LINE_IDX; ++i) {
-      int height = (LCU_WIDTH >> depth) * 2 + MAX_REF_LINE_IDX;
-      height = MIN(height, (LCU_WIDTH - lcu_px.y + MAX_REF_LINE_IDX)); // Cut short if on bottom LCU edge. Cannot take references from below since they don't exist.
-      height = MIN(height, pic_px.y - luma_px.y + MAX_REF_LINE_IDX);
+      int ref_height = height * 2 + MAX_REF_LINE_IDX;
+      ref_height = MIN(ref_height, (LCU_WIDTH - lcu_px.y + MAX_REF_LINE_IDX)); // Cut short if on bottom LCU edge. Cannot take references from below since they don't exist.
+      ref_height = MIN(ref_height, pic_px.y - luma_px.y + MAX_REF_LINE_IDX);
       uvg_pixels_blit(&frame->rec->y[(luma_px.y - MAX_REF_LINE_IDX) * frame->rec->stride + luma_px.x - (1 + i)],
         &extra_refs[i * 128],
-        1, height,
+        1, ref_height,
         frame->rec->stride, 1);
     }
   }
-  cu_loc_t loc = {
-    x, y,
-    width, height,
-    width, height,
-  };
 
-  uvg_intra_build_reference(&loc, color, &luma_px, &pic_px, lcu, &refs, cfg->wpp, extra_refs, multi_ref_index);
+  uvg_intra_build_reference(cu_loc, color, &luma_px, &pic_px, lcu, &refs, cfg->wpp, extra_refs, multi_ref_index);
 
   uvg_pixel pred[32 * 32];
-  uvg_intra_predict(state, &refs, &loc, color, pred, search_data, lcu, tree_type);
+  uvg_intra_predict(state, &refs, cu_loc, color, pred, search_data, lcu, tree_type);
 
   const int index = lcu_px.x + lcu_px.y * lcu_width;
   uvg_pixel *block = NULL;
@@ -1548,9 +1544,9 @@ static void intra_recon_tb_leaf(
     default: break;
   }
 
-  uvg_pixels_blit(pred, block , width, width, width, lcu_width);
+  uvg_pixels_blit(pred, block , width, height, width, lcu_width);
   if(color != COLOR_Y && cfg->jccr) {
-    uvg_pixels_blit(pred, block2, width, width, width, lcu_width);
+    uvg_pixels_blit(pred, block2, width, height, width, lcu_width);
   }
 }
 
@@ -1583,6 +1579,7 @@ void uvg_intra_recon_cu(
 {
   const vector2d_t lcu_px = { SUB_SCU(x) >> (tree_type == UVG_CHROMA_T), SUB_SCU(y) >> (tree_type == UVG_CHROMA_T) };
   const int8_t width = LCU_WIDTH >> depth;
+  const int8_t height = width; // TODO: height for non-square blocks.
   if (cur_cu == NULL) {
     cur_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
   }
@@ -1620,6 +1617,7 @@ void uvg_intra_recon_cu(
       LCU_GET_CU_AT_PX(lcu, (lcu_px.x + offset) >> (tree_type == UVG_CHROMA_T), (lcu_px.y + offset) >> (tree_type == UVG_CHROMA_T))->cbf,
     };
 
+    // ISP_TODO: does not work with ISP yet, ask Joose when this is relevant.
     if (recon_luma && depth <= MAX_DEPTH) {
       cbf_set_conditionally(&cur_cu->cbf, child_cbfs, depth, COLOR_Y);
     }
@@ -1627,23 +1625,46 @@ void uvg_intra_recon_cu(
       cbf_set_conditionally(&cur_cu->cbf, child_cbfs, depth, COLOR_U);
       cbf_set_conditionally(&cur_cu->cbf, child_cbfs, depth, COLOR_V);
     }
-  } else {
-    const bool has_luma = recon_luma;
-    const bool has_chroma = recon_chroma && (x % 8 == 0 && y % 8 == 0);
-   
-    // Process a leaf TU.
-    if (has_luma) {
-      intra_recon_tb_leaf(state, x, y, depth, lcu, COLOR_Y, search_data, tree_type);
-    }
-    if (has_chroma) {
-      intra_recon_tb_leaf(state, x, y, depth, lcu, COLOR_U, search_data, tree_type);
-      intra_recon_tb_leaf(state, x, y, depth, lcu, COLOR_V, search_data, tree_type);
-    }
-
-    uvg_quantize_lcu_residual(state, has_luma, has_chroma && !(search_data->pred_cu.joint_cb_cr & 3),
-                              search_data->pred_cu.joint_cb_cr & 3 && state->encoder_control->cfg.jccr && has_chroma,
-                              x, y, depth, cur_cu, lcu,
-                              false,
-      tree_type);
+    return;
   }
+  if (search_data->pred_cu.intra.isp_mode != ISP_MODE_NO_ISP && recon_luma ) {
+    // ISP split is done horizontally or vertically depending on ISP mode, 2 or 4 times depending on block dimensions.
+    // Small blocks are split only twice.
+    int split_type = search_data->pred_cu.intra.isp_mode;
+    int part_dim = uvg_get_isp_split_dim(width, height, split_type);
+    int limit = split_type == ISP_MODE_HOR ? height : width;
+    for (int part = 0; part < limit; part + part_dim) {
+      const int part_x = split_type == ISP_MODE_HOR ? x : x + part;
+      const int part_y = split_type == ISP_MODE_HOR ? y + part: y;
+      const int part_w = split_type == ISP_MODE_HOR ? part_dim : width;
+      const int part_h = split_type == ISP_MODE_HOR ? height : part_dim;
+
+      cu_loc_t loc;
+      uvg_cu_loc_ctor(&loc, part_x, part_y, part_w, part_h);
+
+      intra_recon_tb_leaf(state, &loc, lcu, COLOR_Y, search_data, tree_type);
+      uvg_quantize_lcu_residual(state, true, false, false,
+                                &loc, depth, cur_cu, lcu,
+                                false, tree_type);
+    }
+  }
+  const bool has_luma = recon_luma && search_data->pred_cu.intra.isp_mode == ISP_MODE_NO_ISP;
+  const bool has_chroma = recon_chroma && (x % 8 == 0 && y % 8 == 0);
+
+  cu_loc_t loc;
+  uvg_cu_loc_ctor(&loc, x, y, width, height);
+   
+  // Process a leaf TU.
+  if (has_luma) {
+    intra_recon_tb_leaf(state, &loc, lcu, COLOR_Y, search_data, tree_type);
+  }
+  if (has_chroma) {
+    intra_recon_tb_leaf(state, &loc, lcu, COLOR_U, search_data, tree_type);
+    intra_recon_tb_leaf(state, &loc, lcu, COLOR_V, search_data, tree_type);
+  }
+
+  uvg_quantize_lcu_residual(state, has_luma, has_chroma && !(search_data->pred_cu.joint_cb_cr & 3),
+                            search_data->pred_cu.joint_cb_cr & 3 && state->encoder_control->cfg.jccr && has_chroma,
+                            &loc, depth, cur_cu, lcu,
+                            false, tree_type);
 }

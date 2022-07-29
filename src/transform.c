@@ -1105,14 +1105,15 @@ int uvg_quantize_residual_trskip(
 static void quantize_tr_residual(
   encoder_state_t * const state,
   const color_t color,
-  const int32_t x,
-  const int32_t y,
+  const cu_loc_t *cu_loc,
   const uint8_t depth,
   cu_info_t *cur_pu,
   lcu_t* lcu,
   bool early_skip,
   enum uvg_tree_type tree_type)
 {
+  const int x = cu_loc->x;
+  const int y = cu_loc->y;
   const uvg_config *cfg    = &state->encoder_control->cfg;
   const int32_t shift      = color == COLOR_Y ? 0 : 1;
   const vector2d_t lcu_px  = { SUB_SCU(x) >> shift, SUB_SCU(y) >> shift};
@@ -1130,13 +1131,9 @@ static void quantize_tr_residual(
   // This should ensure that the CBF data doesn't get corrupted if this function
   // is called more than once.
 
-  int32_t tr_width;
-  if (color == COLOR_Y) {
-    tr_width = LCU_WIDTH >> depth;
-  } else {
-    const int chroma_depth = (depth == MAX_PU_DEPTH ? depth - 1 : depth);
-    tr_width = LCU_WIDTH_C >> chroma_depth;
-  }
+  int32_t tr_width  = color == COLOR_Y ? cu_loc->width  : cu_loc->chroma_width;
+  int32_t tr_height = color == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
+  
   const int32_t lcu_width = LCU_WIDTH >> shift;
   const int8_t mode =
     (color == COLOR_Y) ? cur_pu->intra.mode : cur_pu->intra.mode_chroma;
@@ -1287,15 +1284,18 @@ void uvg_quantize_lcu_residual(
   const bool luma,
   const bool chroma,
   const bool jccr,
-  const int32_t x,
-  const int32_t y,
+  const cu_loc_t * cu_loc,
   const uint8_t depth,
   cu_info_t *cur_pu,
   lcu_t* lcu,
   bool early_skip,
   enum uvg_tree_type tree_type)
 {
-  const int32_t width = LCU_WIDTH >> depth;
+  const int x = cu_loc->x;
+  const int y = cu_loc->y;
+  const int width = cu_loc->width;
+  const int height = cu_loc->height;
+  
   const vector2d_t lcu_px  = { SUB_SCU(x), SUB_SCU(y) };
 
   if (cur_pu == NULL) {
@@ -1324,14 +1324,22 @@ void uvg_quantize_lcu_residual(
 
     // Split transform and increase depth
     const int offset = width / 2;
-    const int32_t x2 = x + offset;
-    const int32_t y2 = y + offset;
+    for (int j = 0; j < 2; ++j) {
+      for (int i = 0; i < 2; ++i) {
+        const cu_loc_t loc;
+        uvg_cu_loc_ctor(&loc, (x + i * offset), (y + j * offset), width, height);
+        // jccr is currently not supported if transform is split
+        uvg_quantize_lcu_residual(state, luma, chroma, 0, &loc, depth + 1, NULL, lcu, early_skip, tree_type);
+      }
+    }
 
-    // jccr is currently not supported if transform is split
-    uvg_quantize_lcu_residual(state, luma, chroma, 0,  x,  y, depth + 1, NULL, lcu, early_skip, tree_type);
-    uvg_quantize_lcu_residual(state, luma, chroma, 0, x2,  y, depth + 1, NULL, lcu, early_skip, tree_type);
-    uvg_quantize_lcu_residual(state, luma, chroma, 0,  x, y2, depth + 1, NULL, lcu, early_skip, tree_type);
-    uvg_quantize_lcu_residual(state, luma, chroma, 0, x2, y2, depth + 1, NULL, lcu, early_skip, tree_type);
+    //const int32_t x2 = x + offset;
+    //const int32_t y2 = y + offset;
+
+    //uvg_quantize_lcu_residual(state, luma, chroma, 0,  x,  y, depth + 1, NULL, lcu, early_skip, tree_type);
+    //uvg_quantize_lcu_residual(state, luma, chroma, 0, x2,  y, depth + 1, NULL, lcu, early_skip, tree_type);
+    //uvg_quantize_lcu_residual(state, luma, chroma, 0,  x, y2, depth + 1, NULL, lcu, early_skip, tree_type);
+    //uvg_quantize_lcu_residual(state, luma, chroma, 0, x2, y2, depth + 1, NULL, lcu, early_skip, tree_type);
 
     // Propagate coded block flags from child CUs to parent CU.
     uint16_t child_cbfs[3] = {
@@ -1348,15 +1356,18 @@ void uvg_quantize_lcu_residual(
 
   } else {
     // Process a leaf TU.
+    cu_loc_t loc;
+    uvg_cu_loc_ctor(&loc, x, y, width, height);
+
     if (luma) {
-      quantize_tr_residual(state, COLOR_Y, x, y, depth, cur_pu, lcu, early_skip, tree_type);
+      quantize_tr_residual(state, COLOR_Y, &loc, depth, cur_pu, lcu, early_skip, tree_type);
     }
     if (chroma) {
-      quantize_tr_residual(state, COLOR_U, x, y, depth, cur_pu, lcu, early_skip, tree_type);
-      quantize_tr_residual(state, COLOR_V, x, y, depth, cur_pu, lcu, early_skip, tree_type);   
+      quantize_tr_residual(state, COLOR_U, &loc, depth, cur_pu, lcu, early_skip, tree_type);
+      quantize_tr_residual(state, COLOR_V, &loc, depth, cur_pu, lcu, early_skip, tree_type);   
     }
     if (jccr && cur_pu->tr_depth == cur_pu->depth) {
-      quantize_tr_residual(state, COLOR_UV, x, y, depth, cur_pu, lcu, early_skip, tree_type);
+      quantize_tr_residual(state, COLOR_UV, &loc, depth, cur_pu, lcu, early_skip, tree_type);
     }
     if(chroma && jccr && cur_pu->tr_depth == cur_pu->depth) {
       assert( 0 && "Trying to quantize both jccr and regular at the same time.\n");

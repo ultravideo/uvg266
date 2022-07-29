@@ -251,3 +251,28 @@ void uvg_cu_array_copy_from_lcu(cu_array_t* dst, int dst_x, int dst_y, const lcu
     }
   }
 }
+
+/*
+ * \brief Constructs cu_loc_t based on given parameters. Calculates chroma dimensions automatically.
+ *
+ * \param loc     Destination cu_loc.
+ * \param x       Block top left x coordinate.
+ * \param y       Block top left y coordinate.
+ * \param width   Block width.
+ * \param height  Block height.
+*/
+void uvg_cu_loc_ctor(cu_loc_t* loc, int x, int y, int width, int height)
+{
+  assert(x >= 0 && y >= 0 && width >= 0 && height >= 0 && "Cannot give negative coordinates or block dimensions.");
+  assert(!(width > LCU_WIDTH || height > LCU_WIDTH) && "Luma CU dimension exceeds maximum (dim > LCU_WIDTH).");
+  assert(!(width < 4 || height < 4) && "Luma CU dimension smaller than 4."); // TODO: change if luma size 2 is allowed
+  
+  loc->x = x;
+  loc->y = y;
+  loc->width = width;
+  loc->height = height;
+  // TODO: when MTT is implemented, chroma dimensions can be minimum 2.
+  // Chroma width is half of luma width, when not at maximum depth.
+  loc->chroma_width = MAX(width >> 1, 4);
+  loc->chroma_height = MAX(height >> 1, 4);
+}

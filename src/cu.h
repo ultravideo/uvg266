@@ -184,6 +184,7 @@ typedef struct
       uint8_t multi_ref_idx;
       int8_t mip_flag;
       int8_t mip_is_transposed;
+      int8_t isp_mode;
     } intra;
     struct {
       mv_t    mv[2][2];  // \brief Motion vectors for L0 and L1
@@ -204,6 +205,8 @@ typedef struct {
   int8_t chroma_width;
   int8_t chroma_height;
 } cu_loc_t;
+
+void uvg_cu_loc_ctor(cu_loc_t *loc, int x, int y, int width, int height);
 
 
 #define CU_GET_MV_CAND(cu_info_ptr, reflist) \
