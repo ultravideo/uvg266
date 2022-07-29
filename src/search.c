@@ -170,6 +170,7 @@ static void lcu_fill_cu_info(lcu_t *lcu, int x_local, int y_local, int width, in
         to->intra.multi_ref_idx = cu->intra.multi_ref_idx;
         to->intra.mip_flag = cu->intra.mip_flag;
         to->intra.mip_is_transposed = cu->intra.mip_is_transposed;
+        to->intra.isp_mode = cu->intra.isp_mode;
       } else {
         to->skipped   = cu->skipped;
         to->merged    = cu->merged;
@@ -1091,10 +1092,13 @@ static double search_cu(
           inter_zero_coeff_cost = cu_zero_coeff_cost(state, work_tree, x, y, depth) + inter_bitcost * state->lambda;
 
         }
-
+        cu_loc_t loc;
+        const int width = LCU_WIDTH << depth;
+        const int height = width; // TODO: height for non-square blocks
+        uvg_cu_loc_ctor(&loc, x, y, width, height);
         uvg_quantize_lcu_residual(state,
                                   true, has_chroma && !cur_cu->joint_cb_cr,
-                                  cur_cu->joint_cb_cr, x, y,
+                                  cur_cu->joint_cb_cr, &loc,
                                   depth,
                                   NULL,
                                   lcu,

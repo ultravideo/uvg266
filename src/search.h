@@ -77,6 +77,14 @@ typedef struct unit_stats_map_t {
 #define NUM_MIP_MODES_FULL(width, height) (((width) == 4 && (height) == 4) ? 32 : ((width) == 4 || (height) == 4 || ((width) == 8 && (height) == 8) ? 16 : 12))
 #define NUM_MIP_MODES_HALF(width, height) (NUM_MIP_MODES_FULL((width), (height)) >> 1)
 
+// ISP related defines
+#define NUM_ISP_MODES 3
+#define ISP_MODE_NO_ISP 0
+#define ISP_MODE_HOR 1
+#define ISP_MODE_VER 2
+#define SPLIT_TYPE_HOR 1
+#define SPLIT_TYPE_VER 2
+
 void uvg_sort_modes(int8_t *__restrict modes, double *__restrict costs, uint8_t length);
 void uvg_sort_modes_intra_luma(int8_t *__restrict modes, int8_t *__restrict trafo, double *__restrict costs, uint8_t length);
 

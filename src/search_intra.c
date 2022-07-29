@@ -49,6 +49,7 @@
 #include "strategies/strategies-picture.h"
 #include "videoframe.h"
 #include "strategies/strategies-quant.h"
+#include "uvg_math.h"
 
 
 // Normalize SAD for comparison against SATD to estimate transform skip
@@ -247,6 +248,76 @@ static void derive_mts_constraints(cu_info_t *const pred_cu,
 }
 
 
+// ISP_TODO: move this function if it is used elsewhere
+bool can_use_isp(const int width, const int height, const int max_tr_size)
+{
+  const int log2_width = uvg_g_convert_to_bit[width] + 2;
+  const int log2_height = uvg_g_convert_to_bit[height] + 2;
+
+  // Each split block must have at least 16 samples.
+  bool not_enough_samples = (log2_width + log2_height <= 4);
+  bool cu_size_larger_than_max_tr_size = width > max_tr_size || height > max_tr_size;
+  if (not_enough_samples || cu_size_larger_than_max_tr_size) {
+    return false;
+  }
+  return true;
+}
+
+
+/**
+* \brief Returns ISP split partition size based on block dimensions and split type.
+*
+* Returns ISP split partition size based on block dimensions and split type.
+* Will fail if resulting partition size has less than 16 samples. 
+*
+* \param width        Block width.
+* \param height       Block height.
+* \param split_type   Horizontal or vertical split.
+*/
+int uvg_get_isp_split_dim(const int width, const int height, const int split_type)
+{
+  bool divide_in_rows = split_type == SPLIT_TYPE_HOR;
+  int split_dim_size, non_split_dim_size, partition_size, div_shift = 2;
+
+  if (divide_in_rows) {
+    split_dim_size = height;
+    non_split_dim_size = width;
+  }
+  else {
+    split_dim_size = width;
+    non_split_dim_size = height;
+  }
+
+  // ISP_TODO: make a define for this. Depends on minimum transform block log2 side length
+  const int min_num_samples = 16; // Minimum allowed number of samples for split block
+  const int factor_to_min_samples = non_split_dim_size < min_num_samples ? min_num_samples >> uvg_math_floor_log2(non_split_dim_size) : 1;
+  partition_size = (split_dim_size >> div_shift) < factor_to_min_samples ? factor_to_min_samples : (split_dim_size >> div_shift);
+
+  assert((uvg_math_floor_log2(partition_size) + uvg_math_floor_log2(non_split_dim_size) < uvg_math_floor_log2(min_num_samples)) &&
+    "Partition has less than allowed minimum number of samples.");
+  return partition_size;
+}
+
+
+// ISP_TODO: move this function if it is used elsewhere
+bool can_use_isp_with_lfnst(const int width, const int height, const int isp_mode)
+{
+  if (isp_mode == ISP_MODE_NO_ISP) {
+    return false;
+  }
+  const int tu_width = isp_mode == ISP_MODE_HOR ? width : uvg_get_isp_split_dim(width, height, SPLIT_TYPE_VER);
+  const int tu_height = isp_mode == ISP_MODE_HOR ? uvg_get_isp_split_dim(width, height, SPLIT_TYPE_HOR) : height;
+
+  // ISP_TODO: make a define for this or use existing
+  const int min_tb_size = 4;
+
+  if (!(tu_width >= min_tb_size && tu_height >= min_tb_size)) {
+    return false;
+  }
+  return true;
+}
+
+
 /**
 * \brief Perform search for best intra transform split configuration.
 *
@@ -325,6 +396,8 @@ static double search_intra_trdepth(
     {
       trafo = 0;
       num_transforms = (mts_enabled ? MTS_TR_NUM : 1);
+      // Do not do MTS search if ISP mode is used
+      num_transforms = pred_cu->intra.isp_mode == ISP_MODE_NO_ISP ? num_transforms : 1;
     }
     const int mts_start = trafo;
     //TODO: height
@@ -359,6 +432,11 @@ static double search_intra_trdepth(
       pred_cu->violates_lfnst_constrained_luma = false;
       pred_cu->violates_lfnst_constrained_chroma = false;
       pred_cu->lfnst_last_scan_pos = false;
+
+      if (pred_cu->lfnst_idx != 0) {
+        // Cannot use ISP with LFNST for small blocks
+        pred_cu->intra.isp_mode = can_use_isp_with_lfnst(width, height, pred_cu->intra.isp_mode) ? pred_cu->intra.isp_mode : ISP_MODE_NO_ISP;
+      }
 
       for (trafo = mts_start; trafo < num_transforms; trafo++) {
         pred_cu->tr_idx = trafo;
@@ -1371,18 +1449,27 @@ static int8_t search_intra_rdo(
   enum uvg_tree_type tree_type)
 {
   const int tr_depth = CLIP(1, MAX_PU_DEPTH, depth + state->encoder_control->cfg.tr_depth_intra);
+  const int width = LCU_WIDTH << depth;
+  const int height = width; // TODO: height for non-square blocks
   
   for (int mode = 0; mode < modes_to_check; mode++) {
-    double rdo_bitcost = uvg_luma_mode_bits(state, &search_data[mode].pred_cu, x_px, y_px, depth, lcu);
-    search_data[mode].pred_cu.tr_idx = MTS_TR_NUM;
-    search_data[mode].bits = rdo_bitcost;
-    search_data[mode].cost = rdo_bitcost * state->lambda;
+    bool can_do_isp_search = search_data[mode].pred_cu.intra.mip_flag ? false: true; // Cannot use ISP with MIP
+    can_do_isp_search = search_data[mode].pred_cu.intra.multi_ref_idx == 0 ? can_do_isp_search : false; // Cannot use ISP with MRL
+    int max_isp_modes = can_do_isp_search && can_use_isp(width, height, 64 /*MAX_TR_SIZE*/) && state->encoder_control->cfg.isp ? NUM_ISP_MODES : 1;
 
-    double mode_cost = search_intra_trdepth(state, x_px, y_px, depth, tr_depth, MAX_INT, &search_data[mode], lcu, tree_type);
-    search_data[mode].cost += mode_cost;
-    if (state->encoder_control->cfg.intra_rdo_et && !cbf_is_set_any(search_data[mode].pred_cu.cbf, depth)) {
-      modes_to_check = mode + 1;
-      break;
+    for (int isp_mode = 0; isp_mode < max_isp_modes; ++isp_mode) {
+      search_data[mode].pred_cu.intra.isp_mode = isp_mode;
+      double rdo_bitcost = uvg_luma_mode_bits(state, &search_data[mode].pred_cu, x_px, y_px, depth, lcu);
+      search_data[mode].pred_cu.tr_idx = MTS_TR_NUM;
+      search_data[mode].bits = rdo_bitcost;
+      search_data[mode].cost = rdo_bitcost * state->lambda;
+
+      double mode_cost = search_intra_trdepth(state, x_px, y_px, depth, tr_depth, MAX_INT, &search_data[mode], lcu, tree_type);
+      search_data[mode].cost += mode_cost;
+      if (state->encoder_control->cfg.intra_rdo_et && !cbf_is_set_any(search_data[mode].pred_cu.cbf, depth)) {
+        modes_to_check = mode + 1;
+        break;
+      }
     }
   }
 

@@ -1679,6 +1679,7 @@ static void search_pu_inter(encoder_state_t * const state,
   const uvg_config *cfg = &state->encoder_control->cfg;
   const videoframe_t * const frame = state->tile->frame;
   const int width_cu = LCU_WIDTH >> depth;
+  const int height_cu = width_cu; // TODO: non-square blocks
   const int x = PU_GET_X(part_mode, width_cu, x_cu, i_pu);
   const int y = PU_GET_Y(part_mode, width_cu, y_cu, i_pu);
   const int width = PU_GET_W(part_mode, width_cu, i_pu);
@@ -1826,7 +1827,11 @@ static void search_pu_inter(encoder_state_t * const state,
         cur_pu->inter.mv[1][1]  = info->merge_cand[merge_idx].mv[1][1];
         uvg_lcu_fill_trdepth(lcu, x, y, depth, MAX(1, depth), UVG_BOTH_T);
         uvg_inter_recon_cu(state, lcu, x, y, width, true, false);
-        uvg_quantize_lcu_residual(state, true, false, false, x, y, depth, cur_pu, lcu, true, UVG_BOTH_T);
+
+        cu_loc_t loc;
+        uvg_cu_loc_ctor(&loc, x, y, width_cu, height_cu);
+
+        uvg_quantize_lcu_residual(state, true, false, false, &loc, depth, cur_pu, lcu, true, UVG_BOTH_T);
 
         if (cbf_is_set(cur_pu->cbf, depth, COLOR_Y)) {
           continue;
@@ -1836,7 +1841,7 @@ static void search_pu_inter(encoder_state_t * const state,
           uvg_quantize_lcu_residual(state,
                                     false, has_chroma,
                                     false, /*we are only checking for lack of coeffs so no need to check jccr*/
-                                    x, y, depth, cur_pu, lcu,
+                                    &loc, depth, cur_pu, lcu,
                                     true,
             UVG_BOTH_T);
           if (!cbf_is_set_any(cur_pu->cbf, depth)) {
@@ -2151,6 +2156,10 @@ void uvg_cu_cost_inter_rd2(encoder_state_t * const state,
   const int x_px = SUB_SCU(x);
   const int y_px = SUB_SCU(y);
   const int width = LCU_WIDTH >> depth;
+  const int height = width; // TODO: non-square blocks
+  cu_loc_t loc;
+  uvg_cu_loc_ctor(&loc, x, y, width, height);
+
   cabac_data_t cabac_copy;
   memcpy(&cabac_copy, &state->search_cabac, sizeof(cabac_copy));
   cabac_data_t* cabac = &state->search_cabac;
@@ -2198,7 +2207,7 @@ void uvg_cu_cost_inter_rd2(encoder_state_t * const state,
     uvg_quantize_lcu_residual(state,
                               true,
                               false,
-                              false, x, y,
+                              false, &loc,
                               depth,
                               cur_cu,
                               lcu,
@@ -2263,7 +2272,8 @@ void uvg_cu_cost_inter_rd2(encoder_state_t * const state,
   else {
     uvg_quantize_lcu_residual(state,
                               true, reconstruct_chroma,
-                              reconstruct_chroma && state->encoder_control->cfg.jccr, x, y,
+                              reconstruct_chroma && state->encoder_control->cfg.jccr,
+                              &loc,
                               depth,
                               cur_cu,
                               lcu,
