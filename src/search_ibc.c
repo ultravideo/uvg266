@@ -93,7 +93,8 @@ static INLINE bool intmv_within_ibc_range(const ibc_search_info_t *info, int x, 
   bool negative_values = x <= 0 && y <= 0;
   bool mv_range_valid = ((-y >= info->height) || (-x >= info->width)) && // Must be block height/width away from the block
                         SUB_SCU(info->origin.y) >= -y && // Y vector must be inside the current CTU
-                        (-x <= IBC_BUFFER_WIDTH-LCU_WIDTH); // X must be inside the buffer
+                        (-x <= IBC_BUFFER_WIDTH-LCU_WIDTH) && // X must be inside the buffer
+                        info->origin.x + x >= 0; // Don't go outside of the frame
 
 
   return negative_values && mv_range_valid;
@@ -405,7 +406,6 @@ static int select_ibc_mv_cand(const encoder_state_t *state,
   // Pick the second candidate if it has lower cost.
   return cand2_cost < cand1_cost ? 1 : 0;
 }
-
 
 static double calc_ibc_mvd_cost(const encoder_state_t *state,
                             int x,
@@ -878,9 +878,9 @@ static void search_pu_ibc(encoder_state_t * const state,
         cur_pu->inter.mv_dir    = info->merge_cand[merge_idx].dir;
         cur_pu->inter.mv[0][0]  = info->merge_cand[merge_idx].mv[0][0];
         cur_pu->inter.mv[0][1]  = info->merge_cand[merge_idx].mv[0][1];
-        uvg_lcu_fill_trdepth(lcu, x, y, depth, MAX(1, depth));
+        uvg_lcu_fill_trdepth(lcu, x, y, depth, MAX(1, depth), UVG_BOTH_T);
         uvg_inter_recon_cu(state, lcu, x, y, width, true, false);
-        uvg_quantize_lcu_residual(state, true, false, false, x, y, depth, cur_pu, lcu, true);
+        uvg_quantize_lcu_residual(state, true, false, false, x, y, depth, cur_pu, lcu, true, UVG_BOTH_T);
 
         if (cbf_is_set(cur_pu->cbf, depth, COLOR_Y)) {
           continue;
@@ -889,7 +889,7 @@ static void search_pu_ibc(encoder_state_t * const state,
           uvg_inter_recon_cu(state, lcu, x, y, width, false, has_chroma);
           uvg_quantize_lcu_residual(state, false, has_chroma, 
             false, /*we are only checking for lack of coeffs so no need to check jccr*/
-            x, y, depth, cur_pu, lcu, true);
+            x, y, depth, cur_pu, lcu, true, UVG_BOTH_T);
           if (!cbf_is_set_any(cur_pu->cbf, depth)) {
             cur_pu->type = CU_IBC;
             cur_pu->merge_idx = merge_idx;

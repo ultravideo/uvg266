@@ -985,11 +985,10 @@ static void get_temporal_merge_candidates(const encoder_state_t * const state,
   }
 }
 
-
-static INLINE int16_t get_scaled_mv(int16_t mv, int scale)
+static INLINE mv_t get_scaled_mv(mv_t mv, int scale)
 {
   int32_t scaled = scale * mv;
-  return CLIP(-32768, 32767, (scaled + 127 + (scaled < 0)) >> 8);
+  return CLIP(-131072, 131071, (scaled + 127 + (scaled < 0)) >> 8);
 }
 
 #define MV_EXPONENT_BITCOUNT 4
@@ -1108,6 +1107,19 @@ static INLINE bool add_mvp_candidate(const encoder_state_t *state,
 }
 
 
+static bool is_duplicate_candidate_ibc(const cu_info_t* cu1, const cu_info_t* cu2)
+{
+  if (!cu2) return false;
+
+  if (cu1->inter.mv[0][0] != cu2->inter.mv[0][0]  ||
+      cu1->inter.mv[0][1] != cu2->inter.mv[0][1]) {
+    return false;
+  }
+
+
+  return true;
+}
+
 /**
  * \brief Get merge candidates for current block.
  *
@@ -1175,10 +1187,12 @@ static void get_ibc_merge_candidates(const encoder_state_t * const state,
     // before the current one and the flag is not set when searching an SMP
     // block.
     if (b1->type == CU_IBC) {
-      inter_clear_cu_unused(b1);
-      mv_cand[candidates][0] = b1->inter.mv[0][0];
-      mv_cand[candidates][1] = b1->inter.mv[0][1];
-      candidates++;
+      if(!is_duplicate_candidate_ibc(b1, a1)) {
+        inter_clear_cu_unused(b1);
+        mv_cand[candidates][0] = b1->inter.mv[0][0];
+        mv_cand[candidates][1] = b1->inter.mv[0][1];
+        candidates++;
+      }
     } else {
       b1 = NULL;
     }
@@ -1196,12 +1210,22 @@ static void get_ibc_merge_candidates(const encoder_state_t * const state,
     int32_t num_cand = state->tile->frame->hmvp_size_ibc[ctu_row];
     for (int i = 0; i < MIN(MAX_NUM_HMVP_CANDS,num_cand); i++) {
       cu_info_t* cand = &state->tile->frame->hmvp_lut_ibc[ctu_row_mul_five + i];
+      bool       duplicate = false;
 
+      // Check that the HMVP candidate is not duplicate
+      if (is_duplicate_candidate_ibc(cand, a1)) {
+        duplicate = true;
+      } else if(is_duplicate_candidate_ibc(cand, b1)) {
+        duplicate = true;
+      }
 
-      mv_cand[candidates][0] = cand->inter.mv[0][0];
-      mv_cand[candidates][1] = cand->inter.mv[0][1];
-      candidates++;
-      if (candidates == IBC_MRG_MAX_NUM_CANDS) return;
+      // allow duplicates after the first hmvp lut item
+      if (!duplicate || i > 0) {
+        mv_cand[candidates][0] = cand->inter.mv[0][0];
+        mv_cand[candidates][1] = cand->inter.mv[0][1];
+        candidates++;      
+        if (candidates == IBC_MRG_MAX_NUM_CANDS) return;
+      }
     }
   }
 
@@ -1388,12 +1412,6 @@ static void get_spatial_merge_candidates_cua(const cu_array_t *cua,
       }
     }
   }
-}
-
-static INLINE mv_t get_scaled_mv(mv_t mv, int scale)
-{
-  int32_t scaled = scale * mv;
-  return CLIP(-131072, 131071, (scaled + 127 + (scaled < 0)) >> 8);
 }
 
 /**
@@ -1697,14 +1715,23 @@ static void hmvp_shift_lut(cu_info_t* lut, int32_t size, int32_t start, int32_t 
   }
 }
 
-static bool hmvp_push_lut_item(cu_info_t* lut, int32_t size, const cu_info_t* cu) {
+static bool hmvp_push_lut_item(cu_info_t* lut, int32_t size, const cu_info_t* cu, bool ibc) {
 
   int8_t duplicate = -1;
 
-  for (int i = 0; i < size; i++) {
-    if (is_duplicate_candidate(cu, (const cu_info_t*)&lut[i])) {
-      duplicate = i;
-      break;
+  if (ibc) {
+    for (int i = 0; i < size; i++) {
+      if (is_duplicate_candidate_ibc(cu, (const cu_info_t *)&lut[i])) {
+        duplicate = i;
+        break;
+      }
+    }
+  } else {
+    for (int i = 0; i < size; i++) {
+      if (is_duplicate_candidate(cu, (const cu_info_t *)&lut[i])) {
+        duplicate = i;
+        break;
+      }
     }
   }
   // If duplicate found, shift the whole lut up to the duplicate, otherwise to the end
@@ -1741,12 +1768,12 @@ void uvg_hmvp_add_mv(const encoder_state_t* const state, uint32_t pic_x, uint32_
 
       
       if (cu->type == CU_IBC) {
-        bool add_row = hmvp_push_lut_item(&state->tile->frame->hmvp_lut_ibc[ctu_row_mul_five], state->tile->frame->hmvp_size_ibc[ctu_row], cu);
+        bool add_row = hmvp_push_lut_item(&state->tile->frame->hmvp_lut_ibc[ctu_row_mul_five], state->tile->frame->hmvp_size_ibc[ctu_row], cu, true);
         if(add_row && state->tile->frame->hmvp_size_ibc[ctu_row] < MAX_NUM_HMVP_CANDS) {
           state->tile->frame->hmvp_size_ibc[ctu_row]++;
         }
       } else {
-        bool add_row = hmvp_push_lut_item(&state->tile->frame->hmvp_lut[ctu_row_mul_five], state->tile->frame->hmvp_size[ctu_row], cu);
+        bool add_row = hmvp_push_lut_item(&state->tile->frame->hmvp_lut[ctu_row_mul_five], state->tile->frame->hmvp_size[ctu_row], cu, false);
         if(add_row && state->tile->frame->hmvp_size[ctu_row] < MAX_NUM_HMVP_CANDS) {
           state->tile->frame->hmvp_size[ctu_row]++;
         }
