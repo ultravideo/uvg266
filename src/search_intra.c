@@ -249,8 +249,11 @@ static void derive_mts_constraints(cu_info_t *const pred_cu,
 
 
 // ISP_TODO: move this function if it is used elsewhere
-bool can_use_isp(const int width, const int height, const int max_tr_size)
+static INLINE bool can_use_isp(const int width, const int height, const int max_tr_size)
 {
+  assert(!(width > LCU_WIDTH || height > LCU_WIDTH) && "Block size larger than max LCU size.");
+  assert(!(width < TR_MIN_WIDTH || height < TR_MIN_WIDTH) && "Block size smaller than min TR_WIDTH.");
+
   const int log2_width = uvg_g_convert_to_bit[width] + 2;
   const int log2_height = uvg_g_convert_to_bit[height] + 2;
 
@@ -300,16 +303,14 @@ int uvg_get_isp_split_dim(const int width, const int height, const int split_typ
 
 
 // ISP_TODO: move this function if it is used elsewhere
-bool can_use_isp_with_lfnst(const int width, const int height, const int isp_mode)
+static INLINE bool can_use_isp_with_lfnst(const int width, const int height, const int isp_mode)
 {
   if (isp_mode == ISP_MODE_NO_ISP) {
     return false;
   }
   const int tu_width = isp_mode == ISP_MODE_HOR ? width : uvg_get_isp_split_dim(width, height, SPLIT_TYPE_VER);
   const int tu_height = isp_mode == ISP_MODE_HOR ? uvg_get_isp_split_dim(width, height, SPLIT_TYPE_HOR) : height;
-
-  // ISP_TODO: make a define for this or use existing
-  const int min_tb_size = 4;
+  const int min_tb_size = TR_MIN_WIDTH; 
 
   if (!(tu_width >= min_tb_size && tu_height >= min_tb_size)) {
     return false;
@@ -1449,7 +1450,7 @@ static int8_t search_intra_rdo(
   enum uvg_tree_type tree_type)
 {
   const int tr_depth = CLIP(1, MAX_PU_DEPTH, depth + state->encoder_control->cfg.tr_depth_intra);
-  const int width = LCU_WIDTH << depth;
+  const int width = LCU_WIDTH >> depth;
   const int height = width; // TODO: height for non-square blocks
   
   for (int mode = 0; mode < modes_to_check; mode++) {
@@ -1633,6 +1634,7 @@ int8_t uvg_search_intra_chroma_rdo(
             u_pred,
             u_resi,
             width,
+            height,
             LCU_WIDTH_C,
             width);
           uvg_generate_residual(
@@ -1640,6 +1642,7 @@ int8_t uvg_search_intra_chroma_rdo(
             v_pred,
             v_resi,
             width,
+            height,
             LCU_WIDTH_C,
             width);
           uvg_chorma_ts_out_t chorma_ts_out;

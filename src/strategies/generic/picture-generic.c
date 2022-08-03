@@ -783,10 +783,10 @@ static double pixel_var_generic(const uvg_pixel *arr, const uint32_t len)
 
 
 static void generate_residual_generic(const uvg_pixel* ref_in, const uvg_pixel* pred_in, int16_t* residual, 
-  int width, int ref_stride, int pred_stride)
+  int width, int height, int ref_stride, int pred_stride)
 {
   int y, x;
-  for (y = 0; y < width; ++y) {
+  for (y = 0; y < height; ++y) {
     for (x = 0; x < width; ++x) {
       residual[x + y * width] = (int16_t)(ref_in[x + y * ref_stride] - pred_in[x + y * pred_stride]);
     }

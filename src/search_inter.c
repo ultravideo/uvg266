@@ -2225,6 +2225,7 @@ void uvg_cu_cost_inter_rd2(encoder_state_t * const state,
       u_pred,
       u_resi,
       width,
+      height,
       LCU_WIDTH_C,
       width);
     uvg_generate_residual(
@@ -2232,6 +2233,7 @@ void uvg_cu_cost_inter_rd2(encoder_state_t * const state,
       v_pred,
       v_resi,
       width,
+      height,
       LCU_WIDTH_C,
       width);
 

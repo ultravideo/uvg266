@@ -61,6 +61,7 @@ static void uvg_angular_pred_avx2(
   uvg_pixel *const dst,
   const uint8_t multi_ref_idx)
 {
+  // ISP_TODO: non-square block implementation, height is passed but not used
   const int width = channel_type == COLOR_Y ? cu_loc->width : cu_loc->chroma_width;
   const int height = channel_type == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
   const int log2_width = uvg_g_convert_to_bit[width] + 2;
@@ -512,6 +513,7 @@ static void uvg_intra_pred_planar_avx2(
   const uint8_t *const ref_left,
   uint8_t *const dst)
 {
+  // ISP_TODO: non-square block implementation, height is passed but not used
   const int width = color == COLOR_Y ? cu_loc->width : cu_loc->chroma_width;
   const int height = color == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
   const int log2_width = uvg_g_convert_to_bit[width] + 2;
@@ -977,6 +979,7 @@ static void uvg_pdpc_planar_dc_avx2(
   const uvg_intra_ref *const used_ref,
   uvg_pixel *const dst)
 {
+  // ISP_TODO: non-square block implementation, height is passed but not used
   assert(mode == 0 || mode == 1);  // planar or DC
   const int width = color == COLOR_Y ? cu_loc->width : cu_loc->chroma_width;
   const int height = color == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;

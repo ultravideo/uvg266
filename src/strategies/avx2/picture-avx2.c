@@ -1743,8 +1743,8 @@ static INLINE __m128i get_residual_8x1_avx2(const uint8_t* a_in, const uint8_t* 
   return diff;
 }
 
-static void generate_residual_avx2(const uint8_t* ref_in, const uint8_t* pred_in, int16_t* residual, int width, int ref_stride, int pred_stride) {
-
+static void generate_residual_avx2(const uint8_t* ref_in, const uint8_t* pred_in, int16_t* residual, int width, int height, int ref_stride, int pred_stride) {
+  // ISP_TODO: non-square block implementation, height is passed but not used
   __m128i diff = _mm_setzero_si128();
   switch (width) {
   case 4:

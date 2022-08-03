@@ -1590,18 +1590,20 @@ static void mts_dct_avx2(
   const color_t color,
   const cu_info_t* tu,
   const int8_t width,
+  const int8_t height,
   const int16_t* input,
   int16_t* output,
   const int8_t mts_idx)
 {
   tr_type_t type_hor;
   tr_type_t type_ver;
+  // ISP_TODO: height passed but not used
 
   uvg_get_tr_type(width, color, tu, &type_hor, &type_ver, mts_idx);
 
   if (type_hor == DCT2 && type_ver == DCT2 && !tu->lfnst_idx)
   {
-    dct_func* dct_func = uvg_get_dct_func(width, color, tu->type);
+    dct_func* dct_func = uvg_get_dct_func(width, height, color, tu->type);
     dct_func(bitdepth, input, output);
   }
   else

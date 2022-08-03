@@ -739,6 +739,11 @@ static void idct_ ## n ## x ## n ## _generic(int8_t bitdepth, const int16_t *inp
   partial_butterfly_inverse_ ## n ## _generic(tmp, output, shift_2nd); \
 }
 
+static void dct_non_square_generic(int8_t bitdepth, const int16_t* input, int16_t* output)
+{
+  // ISP_TODO: non-square transform here
+}
+
 DCT_NXN_GENERIC(4);
 DCT_NXN_GENERIC(8);
 DCT_NXN_GENERIC(16);
@@ -2487,26 +2492,28 @@ static void mts_dct_generic(
   const color_t color,
   const cu_info_t* tu,
   const int8_t width,
+  const int8_t height,
   const int16_t* input,
   int16_t* output,
   const int8_t mts_idx)
 {
   tr_type_t type_hor;
   tr_type_t type_ver;
+  // ISP_TODO: height passed but not used
 
   uvg_get_tr_type(width, color, tu, &type_hor, &type_ver, mts_idx);
 
-  if (type_hor == DCT2 && type_ver == DCT2 && !tu->lfnst_idx && !tu->cr_lfnst_idx)
+  if (type_hor == DCT2 && type_ver == DCT2 && !tu->lfnst_idx && !tu->cr_lfnst_idx || width != height)
   {
-    dct_func *dct_func = uvg_get_dct_func(width, color, tu->type);
+    dct_func *dct_func = uvg_get_dct_func(width, height, color, tu->type);
     dct_func(bitdepth, input, output);
   }
   else
   {
-    const int height = width;
     int skip_width = (type_hor != DCT2 && width == 32) ? 16 : (width > 32 ? width - 32 : 0);
     int skip_height = (type_ver != DCT2 && height == 32) ? 16 : (height > 32 ? height - 32 : 0);
     const int log2_width_minus2 = uvg_g_convert_to_bit[width];
+    const int log2_height_minus2 = uvg_g_convert_to_bit[height];
     if(tu->lfnst_idx || tu->cr_lfnst_idx) {
       if ((width == 4 && height > 4) || (width > 4 && height == 4))
       {
@@ -2521,11 +2528,11 @@ static void mts_dct_generic(
     }
 
     partial_tr_func* dct_hor = dct_table[type_hor][log2_width_minus2];
-    partial_tr_func* dct_ver = dct_table[type_ver][log2_width_minus2];
+    partial_tr_func* dct_ver = dct_table[type_ver][log2_height_minus2];
 
     int16_t tmp[32 * 32];
     const int32_t shift_1st = log2_width_minus2 + bitdepth - 7;
-    const int32_t shift_2nd = log2_width_minus2 + 8;
+    const int32_t shift_2nd = log2_height_minus2 + 8;
 
     dct_hor(input, tmp, shift_1st, height, 0, skip_width);
     dct_ver(tmp, output, shift_2nd, width, skip_width, skip_height);
@@ -2582,6 +2589,7 @@ int uvg_strategy_register_dct_generic(void* opaque, uint8_t bitdepth)
   success &= uvg_strategyselector_register(opaque, "dct_8x8", "generic", 0, &dct_8x8_generic);
   success &= uvg_strategyselector_register(opaque, "dct_16x16", "generic", 0, &dct_16x16_generic);
   success &= uvg_strategyselector_register(opaque, "dct_32x32", "generic", 0, &dct_32x32_generic);
+  success &= uvg_strategyselector_register(opaque, "dct_non_square", "generic", 0, &dct_non_square_generic);
 
   success &= uvg_strategyselector_register(opaque, "fast_inverse_dst_4x4", "generic", 0, &fast_inverse_dst_4x4_generic);
 
