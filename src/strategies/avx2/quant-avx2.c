@@ -626,7 +626,7 @@ static void get_quantized_recon_avx2(int16_t *residual, const uint8_t *pred_in, 
 * \returns  Whether coeff_out contains any non-zero coefficients.
 */
 int uvg_quantize_residual_avx2(encoder_state_t *const state,
-  const cu_info_t *const cur_cu, const int width, const color_t color,
+  const cu_info_t *const cur_cu, const int width, const int height, const color_t color,
   const coeff_scan_order_t scan_order, const int use_trskip,
   const int in_stride, const int out_stride,
   const uint8_t *const ref_in, const uint8_t *const pred_in,
@@ -637,15 +637,15 @@ int uvg_quantize_residual_avx2(encoder_state_t *const state,
   // Temporary arrays to pass data to and from uvg_quant and transform functions.
   ALIGNED(64) int16_t residual[TR_MAX_WIDTH * TR_MAX_WIDTH];
   ALIGNED(64) coeff_t coeff[TR_MAX_WIDTH * TR_MAX_WIDTH];
-
-  const int height = width; // TODO: height for non-square blocks
+  // ISP_TODO: non-square block implementation, height is passed but not used
+  
   int has_coeffs = 0;
 
   assert(width <= TR_MAX_WIDTH);
   assert(width >= TR_MIN_WIDTH);
 
   // Get residual. (ref_in - pred_in -> residual)
-  uvg_generate_residual(ref_in, pred_in, residual, width, in_stride, in_stride);
+  uvg_generate_residual(ref_in, pred_in, residual, width, height, in_stride, in_stride);
 
   if (state->tile->frame->lmcs_aps->m_sliceReshapeInfo.enableChromaAdj && color != COLOR_Y) {
     int y, x;
@@ -662,10 +662,10 @@ int uvg_quantize_residual_avx2(encoder_state_t *const state,
 
   // Transform residual. (residual -> coeff)
   if (use_trskip) {
-    uvg_transformskip(state->encoder_control, residual, coeff, width);
+    uvg_transformskip(state->encoder_control, residual, coeff, width, height);
   }
   else {
-    uvg_transform2d(state->encoder_control, residual, coeff, width, color, cur_cu);
+    uvg_transform2d(state->encoder_control, residual, coeff, width, height, color, cur_cu);
   }
 
   const uint16_t lfnst_index = color == COLOR_Y ? cur_cu->lfnst_idx : cur_cu->cr_lfnst_idx;

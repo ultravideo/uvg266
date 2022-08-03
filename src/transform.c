@@ -77,6 +77,7 @@ const uint8_t uvg_g_chroma_scale[58]=
  * Parameters pred_in and rec_out may be aliased.
  *
  * \param width       Transform width.
+ * \param height      Transform height.
  * \param in_stride   Stride for ref_in and pred_in
  * \param out_stride  Stride for rec_out.
  * \param ref_in      Reference pixels.
@@ -87,6 +88,7 @@ const uint8_t uvg_g_chroma_scale[58]=
  * \returns  Whether coeff_out contains any non-zero coefficients.
  */
 static bool bypass_transquant(const int width,
+                              const int height,
                               const int in_stride,
                               const int out_stride,
                               const uvg_pixel *const ref_in,
@@ -96,7 +98,7 @@ static bool bypass_transquant(const int width,
 {
   bool nonzero_coeffs = false;
 
-  for (int y = 0; y < width; ++y) {
+  for (int y = 0; y < height; ++y) {
     for (int x = 0; x < width; ++x) {
       int32_t in_idx    = x + y * in_stride;
       int32_t out_idx   = x + y * out_stride;
@@ -123,6 +125,7 @@ static bool bypass_transquant(const int width,
  * \param coeff   coefficients (residual) to filter
  */
 static void rdpcm(const int width,
+                  const int height,
                   const rdpcm_dir dir,
                   coeff_t *coeff)
 {
@@ -130,7 +133,7 @@ static void rdpcm(const int width,
   const int min_x  = (dir == RDPCM_HOR) ? 1 : 0;
   const int min_y  = (dir == RDPCM_HOR) ? 0 : 1;
 
-  for (int y = width - 1; y >= min_y; y--) {
+  for (int y = height - 1; y >= min_y; y--) {
     for (int x = width - 1; x >= min_x; x--) {
       const int index = x + y * width;
       coeff[index] -= coeff[index - offset];
@@ -203,17 +206,18 @@ void uvg_derive_lfnst_constraints(
 
 /**
  * \brief NxN inverse transform (2D)
- * \param coeff input data (transform coefficients)
- * \param block output data (residual)
- * \param block_size input data (width of transform)
+ * \param coeff   input data (transform coefficients)
+ * \param block   output data (residual)
+ * \param width   transform width
+ * \param height  transform height
  */
-void uvg_transformskip(const encoder_control_t * const encoder, int16_t *block,int16_t *coeff, int8_t block_size)
+void uvg_transformskip(const encoder_control_t * const encoder, int16_t *block,int16_t *coeff, int8_t width, int8_t height)
 {
-  int32_t  j,k;
-  for (j = 0; j < block_size; j++) {
-    for(k = 0; k < block_size; k ++) {
+  int32_t j, k;
+  for (j = 0; j < height; j++) {
+    for(k = 0; k < width; k ++) {
       // Casting back and forth to make UBSan not trigger due to left-shifting negatives
-      coeff[j * block_size + k] = (int16_t)((uint16_t)(block[j * block_size + k]));
+      coeff[j * width + k] = (int16_t)((uint16_t)(block[j * width + k]));
     }
   }
 }
@@ -243,17 +247,18 @@ void uvg_itransformskip(const encoder_control_t * const encoder, int16_t *block,
 void uvg_transform2d(const encoder_control_t * const encoder,
                      int16_t *block,
                      int16_t *coeff,
-                     int8_t block_size,
+                     int8_t block_width,
+                     int8_t block_height,
                      color_t color,
                      const cu_info_t *tu)
 {
-  if (encoder->cfg.mts || tu->lfnst_idx || tu->cr_lfnst_idx)
+  if (encoder->cfg.mts || tu->lfnst_idx || tu->cr_lfnst_idx || block_width != block_height)
   {
-    uvg_mts_dct(encoder->bitdepth, color, tu, block_size, block, coeff, encoder->cfg.mts);
+    uvg_mts_dct(encoder->bitdepth, color, tu, block_width, block_height, block, coeff, encoder->cfg.mts);
   }
   else
   {
-    dct_func *dct_func = uvg_get_dct_func(block_size, color, tu->type);
+    dct_func *dct_func = uvg_get_dct_func(block_width, block_height, color, tu->type);
     dct_func(encoder->bitdepth, block, coeff);
   }
 }
@@ -373,6 +378,7 @@ static void generate_jccr_transforms(
       &temp_resi[(cbf_mask1 - 1) * trans_offset],
       &u_coeff[*num_transforms * trans_offset],
       width,
+      height,
       COLOR_U,
       pred_cu
     );
@@ -386,6 +392,7 @@ static void generate_jccr_transforms(
       &temp_resi[(cbf_mask2 - 1) * trans_offset],
       &u_coeff[*num_transforms * trans_offset],
       width,
+      height,
       COLOR_U,
       pred_cu
     );
@@ -492,10 +499,10 @@ void uvg_chroma_transform_search(
   ALIGNED(64) coeff_t v_coeff[LCU_WIDTH_C * LCU_WIDTH_C * 2];
   ALIGNED(64) uint8_t v_recon[LCU_WIDTH_C * LCU_WIDTH_C * 5];
   uvg_transform2d(
-    state->encoder_control, u_resi, u_coeff, width, COLOR_U, pred_cu
+    state->encoder_control, u_resi, u_coeff, width, height, COLOR_U, pred_cu
   );
   uvg_transform2d(
-    state->encoder_control, v_resi, v_coeff, width, COLOR_V, pred_cu
+    state->encoder_control, v_resi, v_coeff, width, height, COLOR_V, pred_cu
   );
   enum uvg_chroma_transforms transforms[5];
   transforms[0] = DCT7_CHROMA;
@@ -508,8 +515,8 @@ void uvg_chroma_transform_search(
     pred_cu->cr_lfnst_idx == 0 ;
 
   if (can_use_tr_skip) {
-    uvg_transformskip(state->encoder_control, u_resi, u_coeff + num_transforms * trans_offset, width);
-    uvg_transformskip(state->encoder_control, v_resi, v_coeff + num_transforms * trans_offset, width);
+    uvg_transformskip(state->encoder_control, u_resi, u_coeff + num_transforms * trans_offset, width, height);
+    uvg_transformskip(state->encoder_control, v_resi, v_coeff + num_transforms * trans_offset, width, height);
     transforms[num_transforms] = CHROMA_TS;
     num_transforms++;
   }
@@ -1053,7 +1060,7 @@ void uvg_inv_lfnst(
  */
 int uvg_quantize_residual_trskip(
     encoder_state_t *const state,
-    const cu_info_t *const cur_cu, const int width, const color_t color,
+    const cu_info_t *const cur_cu, const int width, const int height, const color_t color,
     const coeff_scan_order_t scan_order, int8_t *trskip_out, 
     const int in_stride, const int out_stride,
     const uvg_pixel *const ref_in, const uvg_pixel *const pred_in, 
@@ -1074,7 +1081,7 @@ int uvg_quantize_residual_trskip(
   //noskip.cost += uvg_get_coeff_cost(state, noskip.coeff, 4, 0, scan_order) * bit_cost;
 
   skip.has_coeffs = uvg_quantize_residual(
-    state, cur_cu, width, color, scan_order,
+    state, cur_cu, width, height, color, scan_order,
     1, in_stride, width,
     ref_in, pred_in, skip.rec, skip.coeff, false, lmcs_chroma_adj, 
     UVG_BOTH_T /* tree type doesn't matter for transformskip*/);
@@ -1090,9 +1097,9 @@ int uvg_quantize_residual_trskip(
   if (best->has_coeffs || rec_out != pred_in) {
     // If there is no residual and reconstruction is already in rec_out, 
     // we can skip this.
-    uvg_pixels_blit(best->rec, rec_out, width, width, width, out_stride);
+    uvg_pixels_blit(best->rec, rec_out, width, height, width, out_stride);
   }
-  copy_coeffs(best->coeff, coeff_out, width);
+  copy_coeffs(best->coeff, coeff_out, width, height);
 
   return best->has_coeffs;
 }
@@ -1131,8 +1138,8 @@ static void quantize_tr_residual(
   // This should ensure that the CBF data doesn't get corrupted if this function
   // is called more than once.
 
-  int32_t tr_width  = color == COLOR_Y ? cu_loc->width  : cu_loc->chroma_width;
-  int32_t tr_height = color == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
+  const int32_t tr_width  = color == COLOR_Y ? cu_loc->width  : cu_loc->chroma_width;
+  const int32_t tr_height = color == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
   
   const int32_t lcu_width = LCU_WIDTH >> shift;
   const int8_t mode =
@@ -1183,7 +1190,9 @@ static void quantize_tr_residual(
   }
 
   if (cfg->lossless) {
+    // ISP_TODO: is there any sensible case where in and out strides would be different?
     has_coeffs = bypass_transquant(tr_width,
+                                   tr_height,
                                    lcu_width, // in stride
                                    lcu_width, // out stride
                                    ref,
@@ -1193,9 +1202,9 @@ static void quantize_tr_residual(
     if (cfg->implicit_rdpcm && cur_pu->type == CU_INTRA) {
       // implicit rdpcm for horizontal and vertical intra modes
       if (mode == 18) {
-        rdpcm(tr_width, RDPCM_HOR, coeff);
+        rdpcm(tr_width, tr_height, RDPCM_HOR, coeff);
       } else if (mode == 50) {
-        rdpcm(tr_width, RDPCM_VER, coeff);
+        rdpcm(tr_width, tr_height, RDPCM_VER, coeff);
       }
     }
 
@@ -1206,6 +1215,7 @@ static void quantize_tr_residual(
     has_coeffs = uvg_quantize_residual_trskip(state,
                                               cur_pu,
                                               tr_width,
+                                              tr_height,
                                               color,
                                               scan_idx,
                                               &tr_skip,
@@ -1222,6 +1232,7 @@ static void quantize_tr_residual(
         state,
         cur_pu,
         tr_width,
+        tr_height,
         scan_idx,
         lcu_width,
         lcu_width,
@@ -1240,6 +1251,7 @@ static void quantize_tr_residual(
     has_coeffs = uvg_quantize_residual(state,
                                        cur_pu,
                                        tr_width,
+                                       tr_height,
                                        color,
                                        scan_idx,
                                        false, // tr skip
@@ -1326,8 +1338,8 @@ void uvg_quantize_lcu_residual(
     const int offset = width / 2;
     for (int j = 0; j < 2; ++j) {
       for (int i = 0; i < 2; ++i) {
-        const cu_loc_t loc;
-        uvg_cu_loc_ctor(&loc, (x + i * offset), (y + j * offset), width, height);
+        cu_loc_t loc;
+        uvg_cu_loc_ctor(&loc, (x + i * offset), (y + j * offset), width >> 1, height >> 1);
         // jccr is currently not supported if transform is split
         uvg_quantize_lcu_residual(state, luma, chroma, 0, &loc, depth + 1, NULL, lcu, early_skip, tree_type);
       }

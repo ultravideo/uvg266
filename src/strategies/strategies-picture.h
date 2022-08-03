@@ -149,7 +149,7 @@ typedef void (inter_recon_bipred_func)(lcu_t * const lcu,
 
 typedef double (pixel_var_func)(const uvg_pixel *buf, const uint32_t len);
 
-typedef void (generate_residual_func)(const uvg_pixel* ref_in, const uvg_pixel* pred_in, int16_t* residual, int width, int ref_stride, int pred_stride);
+typedef void (generate_residual_func)(const uvg_pixel* ref_in, const uvg_pixel* pred_in, int16_t* residual, int width, int height, int ref_stride, int pred_stride);
 
 // Declare function pointers.
 extern reg_sad_func * uvg_reg_sad;

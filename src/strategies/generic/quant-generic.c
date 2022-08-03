@@ -237,6 +237,7 @@ int uvg_quant_cbcr_residual_generic(
   encoder_state_t* const state, 
   const cu_info_t* const cur_cu,
   const int width,
+  const int height,
   const coeff_scan_order_t scan_order,
   const int in_stride, const int out_stride,
   const uvg_pixel* const u_ref_in, 
@@ -247,28 +248,28 @@ int uvg_quant_cbcr_residual_generic(
   uvg_pixel* v_rec_out,
   coeff_t* coeff_out,
   bool early_skip, 
-  int lmcs_chroma_adj, enum uvg_tree_type tree_type
-  ) {
+  int lmcs_chroma_adj, enum uvg_tree_type tree_type) 
+{
   ALIGNED(64) int16_t u_residual[TR_MAX_WIDTH * TR_MAX_WIDTH];
   ALIGNED(64) int16_t v_residual[TR_MAX_WIDTH * TR_MAX_WIDTH];
   ALIGNED(64) int16_t combined_residual[TR_MAX_WIDTH * TR_MAX_WIDTH];
   ALIGNED(64) coeff_t coeff[TR_MAX_WIDTH * TR_MAX_WIDTH];
-
+  // ISP_TODO: this function is not fully converted to handle non-square blocks
   {
     int y, x;
-    for (y = 0; y < width; ++y) {
+    for (y = 0; y < height; ++y) {
       for (x = 0; x < width; ++x) {
         u_residual[x + y * width] = (int16_t)(u_ref_in[x + y * in_stride] - u_pred_in[x + y * in_stride]);
         v_residual[x + y * width] = (int16_t)(v_ref_in[x + y * in_stride] - v_pred_in[x + y * in_stride]);
       }
     }
   }
-  uvg_generate_residual(u_ref_in, u_pred_in, u_residual, width, in_stride, in_stride);
-  uvg_generate_residual(v_ref_in, v_pred_in, v_residual, width, in_stride, in_stride);
+  uvg_generate_residual(u_ref_in, u_pred_in, u_residual, width, height, in_stride, in_stride);
+  uvg_generate_residual(v_ref_in, v_pred_in, v_residual, width, height, in_stride, in_stride);
   
   
   const int cbf_mask = cur_cu->joint_cb_cr * (state->frame->jccr_sign ? -1 : 1);
-  for (int y = 0; y < width; y++)
+  for (int y = 0; y < height; y++)
   {
     for (int x = 0; x < width; x++)
     {
@@ -305,9 +306,9 @@ int uvg_quant_cbcr_residual_generic(
   }
 
 
-  uvg_transform2d(state->encoder_control, combined_residual, coeff, width, cur_cu->joint_cb_cr == 1 ? COLOR_V : COLOR_U, cur_cu);
+  uvg_transform2d(state->encoder_control, combined_residual, coeff, width, height, cur_cu->joint_cb_cr == 1 ? COLOR_V : COLOR_U, cur_cu);
   if(cur_cu->cr_lfnst_idx) {
-    uvg_fwd_lfnst(cur_cu, width, width, COLOR_UV, cur_cu->cr_lfnst_idx, coeff, tree_type);
+    uvg_fwd_lfnst(cur_cu, width, height, COLOR_UV, cur_cu->cr_lfnst_idx, coeff, tree_type);
   }
 
   if (state->encoder_control->cfg.rdoq_enable &&
@@ -441,7 +442,7 @@ int uvg_quant_cbcr_residual_generic(
 * \returns  Whether coeff_out contains any non-zero coefficients.
 */
 int uvg_quantize_residual_generic(encoder_state_t *const state,
-  const cu_info_t *const cur_cu, const int width, const color_t color,
+  const cu_info_t *const cur_cu, const int width, const int height, const color_t color,
   const coeff_scan_order_t scan_order, const int use_trskip,
   const int in_stride, const int out_stride,
   const uvg_pixel *const ref_in, const uvg_pixel *const pred_in,
@@ -454,19 +455,17 @@ int uvg_quantize_residual_generic(encoder_state_t *const state,
 
   int has_coeffs = 0;
 
-  assert(width <= TR_MAX_WIDTH);
-  assert(width >= TR_MIN_WIDTH);
-
-  const int height = width; // TODO: height for non-square blocks
+  assert(width <= TR_MAX_WIDTH && height <= TR_MAX_WIDTH);
+  assert(width >= TR_MIN_WIDTH && height >= TR_MIN_WIDTH);
 
   // Get residual. (ref_in - pred_in -> residual)
-  uvg_generate_residual(ref_in, pred_in, residual, width, in_stride, in_stride);
+  uvg_generate_residual(ref_in, pred_in, residual, width, height, in_stride, in_stride);
 
   if (state->tile->frame->lmcs_aps->m_sliceReshapeInfo.enableChromaAdj && color != COLOR_Y) {
     int y, x;
     int sign, absval;
     int maxAbsclipBD = (1 << UVG_BIT_DEPTH) - 1;
-    for (y = 0; y < width; ++y) {
+    for (y = 0; y < height; ++y) {
       for (x = 0; x < width; ++x) {
         sign = residual[x + y * width] >= 0 ? 1 : -1;
         absval = sign * residual[x + y * width];
@@ -477,10 +476,10 @@ int uvg_quantize_residual_generic(encoder_state_t *const state,
 
   // Transform residual. (residual -> coeff)
   if (use_trskip) {
-    uvg_transformskip(state->encoder_control, residual, coeff, width);
+    uvg_transformskip(state->encoder_control, residual, coeff, width, height);
   }
   else {
-    uvg_transform2d(state->encoder_control, residual, coeff, width, color, cur_cu);
+    uvg_transform2d(state->encoder_control, residual, coeff, width, height, color, cur_cu);
   }
 
   const uint8_t lfnst_index = color == COLOR_Y ? cur_cu->lfnst_idx : cur_cu->cr_lfnst_idx;

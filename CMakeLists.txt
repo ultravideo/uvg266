@@ -105,7 +105,7 @@ file(GLOB LIB_SOURCES RELATIVE ${PROJECT_SOURCE_DIR} "src/*.h" "src/*.c")
 list(REMOVE_ITEM LIB_SOURCES "src/encmain.c" "src/cli.c" "src/cli.h" "src/yuv_io.c" "src/yuv_io.h")
 
 # Add also all the strategies
-file(GLOB_RECURSE LIB_SOURCES_STRATEGIES RELATIVE ${PROJECT_SOURCE_DIR} "src/strategies/*.c")
+file(GLOB_RECURSE LIB_SOURCES_STRATEGIES RELATIVE ${PROJECT_SOURCE_DIR} "src/strategies/*.h" "src/strategies/*.c")
 
 # ToDo: do something with encode_coding_tree-avx2, currently not converted to VVC
 list(REMOVE_ITEM LIB_SOURCES_STRATEGIES "src/strategies/avx2/encode_coding_tree-avx2.c")
