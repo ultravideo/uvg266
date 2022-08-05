@@ -2584,8 +2584,11 @@ static void mts_idct_generic(
     partial_tr_func* idct_ver = idct_table[type_ver][log2_width_minus2];
 
     int16_t tmp[32 * 32];
-    const int32_t shift_1st = log2_width_minus2 - 7;
-    const int32_t shift_2nd = log2_height_minus2 + 8;
+    const int max_log2_tr_dynamic_range = 15;
+    const int transform_matrix_shift = 6;
+
+    const int32_t shift_1st = transform_matrix_shift + 1;
+    const int32_t shift_2nd = (transform_matrix_shift + max_log2_tr_dynamic_range - 1) - bitdepth;
 
     idct_ver(input, tmp, shift_1st, width, skip_width, skip_height);
     idct_hor(tmp, output, shift_2nd, height, 0, skip_width);
