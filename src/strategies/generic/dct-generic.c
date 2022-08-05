@@ -2499,8 +2499,8 @@ static void mts_dct_generic(
 {
   tr_type_t type_hor;
   tr_type_t type_ver;
-  // ISP_TODO: height passed but not used
 
+  // ISP_TODO: height
   uvg_get_tr_type(width, color, tu, &type_hor, &type_ver, mts_idx);
 
   if (type_hor == DCT2 && type_ver == DCT2 && !tu->lfnst_idx && !tu->cr_lfnst_idx || width != height)
@@ -2514,6 +2514,7 @@ static void mts_dct_generic(
     int skip_height = (type_ver != DCT2 && height == 32) ? 16 : (height > 32 ? height - 32 : 0);
     const int log2_width_minus2 = uvg_g_convert_to_bit[width];
     const int log2_height_minus2 = uvg_g_convert_to_bit[height];
+
     if(tu->lfnst_idx || tu->cr_lfnst_idx) {
       if ((width == 4 && height > 4) || (width > 4 && height == 4))
       {
@@ -2545,6 +2546,7 @@ static void mts_idct_generic(
   const color_t color,
   const cu_info_t* tu,
   const int8_t width,
+  const int8_t height,
   const int16_t* input,
   int16_t* output,
   const int8_t mts_idx)
@@ -2552,26 +2554,38 @@ static void mts_idct_generic(
   tr_type_t type_hor;
   tr_type_t type_ver;
 
+  // ISP_TODO: height
   uvg_get_tr_type(width, color, tu, &type_hor, &type_ver, mts_idx);
 
-  if (type_hor == DCT2 && type_ver == DCT2)
+  if (type_hor == DCT2 && type_ver == DCT2 && !tu->lfnst_idx && !tu->cr_lfnst_idx || width != height)
   {
     dct_func *idct_func = uvg_get_idct_func(width, color, tu->type);
     idct_func(bitdepth, input, output);
   }
   else
   {
-    const int height = width;
-    const int skip_width = (type_hor != DCT2 && width == 32) ? 16 : width > 32 ? width - 32 : 0;
-    const int skip_height = (type_ver != DCT2 && height == 32) ? 16 : height > 32 ? height - 32 : 0;
+    int skip_width = (type_hor != DCT2 && width == 32) ? 16 : width > 32 ? width - 32 : 0;
+    int skip_height = (type_ver != DCT2 && height == 32) ? 16 : height > 32 ? height - 32 : 0;
     const int log2_width_minus2 = uvg_g_convert_to_bit[width];
+    const int log2_height_minus2 = uvg_g_convert_to_bit[height];
+
+    if (tu->lfnst_idx || tu->cr_lfnst_idx) {
+      if ((width == 4 && height > 4) || (width > 4 && height == 4)) {
+        skip_width == width - 4;
+        skip_height == height - 4;
+      }
+      else if ((width >= 8 && height >= 8)) {
+        skip_width = width - 8;
+        skip_height = height - 8;
+      }
+    }
 
     partial_tr_func* idct_hor = idct_table[type_hor][log2_width_minus2];
     partial_tr_func* idct_ver = idct_table[type_ver][log2_width_minus2];
 
     int16_t tmp[32 * 32];
-    const int32_t shift_1st = 7;
-    const int32_t shift_2nd = 20 - bitdepth;
+    const int32_t shift_1st = log2_width_minus2 - 7;
+    const int32_t shift_2nd = log2_height_minus2 + 8;
 
     idct_ver(input, tmp, shift_1st, width, skip_width, skip_height);
     idct_hor(tmp, output, shift_2nd, height, 0, skip_width);

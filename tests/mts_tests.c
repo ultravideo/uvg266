@@ -134,7 +134,7 @@ static void setup_tests()
           tu.tr_idx = MTS_DST7_DST7 + trafo;
           tu.lfnst_idx = 0;
           tu.cr_lfnst_idx = 0;
-          idct_generic(UVG_BIT_DEPTH, COLOR_Y, &tu, 1 << (LCU_MIN_LOG_W + block), dct_bufs[trafo * NUM_SIZES + block], idct_result[trafo][block], UVG_MTS_BOTH);
+          idct_generic(UVG_BIT_DEPTH, COLOR_Y, &tu, 1 << (LCU_MIN_LOG_W + block), 1 << (LCU_MIN_LOG_W + block), dct_bufs[trafo * NUM_SIZES + block], idct_result[trafo][block], UVG_MTS_BOTH);
         }
       }
       

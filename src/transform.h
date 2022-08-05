@@ -61,7 +61,8 @@ void uvg_transform2d(const encoder_control_t * const encoder,
 void uvg_itransform2d(const encoder_control_t * const encoder,
                       int16_t *block,
                       int16_t *coeff,
-                      int8_t block_size,
+                      int8_t block_width,
+                      int8_t block_height,
                       color_t color,
                       const cu_info_t *tu);
 

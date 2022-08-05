@@ -349,7 +349,7 @@ int uvg_quant_cbcr_residual_generic(
       uvg_inv_lfnst(cur_cu, width, width, COLOR_UV, cur_cu->cr_lfnst_idx, coeff, tree_type);
     }
     
-    uvg_itransform2d(state->encoder_control, combined_residual, coeff, width, cur_cu->joint_cb_cr == 1 ? COLOR_V : COLOR_U, cur_cu);
+    uvg_itransform2d(state->encoder_control, combined_residual, coeff, width, height, cur_cu->joint_cb_cr == 1 ? COLOR_V : COLOR_U, cur_cu);
     
 
     //if (state->tile->frame->lmcs_aps->m_sliceReshapeInfo.enableChromaAdj && color != COLOR_Y) {
@@ -537,7 +537,7 @@ int uvg_quantize_residual_generic(encoder_state_t *const state,
       uvg_itransformskip(state->encoder_control, residual, coeff, width);
     }
     else {
-      uvg_itransform2d(state->encoder_control, residual, coeff, width, color, cur_cu);
+      uvg_itransform2d(state->encoder_control, residual, coeff, width, height, color, cur_cu);
     }
     
     if (state->tile->frame->lmcs_aps->m_sliceReshapeInfo.enableChromaAdj && color != COLOR_Y) {
