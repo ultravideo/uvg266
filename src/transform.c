@@ -266,17 +266,19 @@ void uvg_transform2d(const encoder_control_t * const encoder,
 void uvg_itransform2d(const encoder_control_t * const encoder,
                       int16_t *block,
                       int16_t *coeff,
-                      int8_t block_size,
+                      int8_t block_width,
+                      int8_t block_height,
                       color_t color,
                       const cu_info_t *tu)
 {
   if (encoder->cfg.mts)
   {
-    uvg_mts_idct(encoder->bitdepth, color, tu, block_size, coeff, block, encoder->cfg.mts);
+    uvg_mts_idct(encoder->bitdepth, color, tu, block_width, block_height, coeff, block, encoder->cfg.mts);
   }
   else
   {
-    dct_func *idct_func = uvg_get_idct_func(block_size, color, tu->type);
+    // ISP_TODO: block height
+    dct_func *idct_func = uvg_get_idct_func(block_width, color, tu->type);
     idct_func(encoder->bitdepth, coeff, block);
   }
 }
@@ -590,7 +592,7 @@ void uvg_chroma_transform_search(
         if (pred_cu->cr_lfnst_idx) {
           uvg_inv_lfnst(pred_cu, width, height, COLOR_U, pred_cu->cr_lfnst_idx, &u_coeff[i * trans_offset], tree_type);
         }
-        uvg_itransform2d(state->encoder_control, u_recon_resi, &u_coeff[i * trans_offset], width,
+        uvg_itransform2d(state->encoder_control, u_recon_resi, &u_coeff[i * trans_offset], width, height,
           transforms[i] != JCCR_1 ? COLOR_U : COLOR_V, pred_cu);
       }
       else {
@@ -617,7 +619,7 @@ void uvg_chroma_transform_search(
         if (pred_cu->cr_lfnst_idx) {
           uvg_inv_lfnst(pred_cu, width, height, COLOR_V, pred_cu->cr_lfnst_idx, &v_coeff[i * trans_offset], tree_type);
         }
-        uvg_itransform2d(state->encoder_control, v_recon_resi, &v_coeff[i * trans_offset], width,
+        uvg_itransform2d(state->encoder_control, v_recon_resi, &v_coeff[i * trans_offset], width, height,
           transforms[i] != JCCR_1 ? COLOR_U : COLOR_V, pred_cu);
       }
       else {

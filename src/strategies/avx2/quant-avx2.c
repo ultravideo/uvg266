@@ -716,7 +716,7 @@ int uvg_quantize_residual_avx2(encoder_state_t *const state,
       uvg_itransformskip(state->encoder_control, residual, coeff, width);
     }
     else {
-      uvg_itransform2d(state->encoder_control, residual, coeff, width, color, cur_cu);
+      uvg_itransform2d(state->encoder_control, residual, coeff, width, height, color, cur_cu);
     }
 
     if (state->tile->frame->lmcs_aps->m_sliceReshapeInfo.enableChromaAdj && color != COLOR_Y) {
