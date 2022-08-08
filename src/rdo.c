@@ -1386,8 +1386,8 @@ void uvg_rdoq(
 {
   const encoder_control_t * const encoder = state->encoder_control;
   cabac_data_t * const cabac = &state->cabac;
-  uint32_t log2_tr_width      = uvg_math_floor_log2( height );
-  uint32_t log2_tr_height      = uvg_math_floor_log2( width );
+  uint32_t log2_tr_width      = uvg_math_floor_log2(width);
+  uint32_t log2_tr_height      = uvg_math_floor_log2(height);
   int32_t  transform_shift   = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - ((log2_tr_height + log2_tr_width) >> 1);  // Represents scaling through forward transform
   uint16_t go_rice_param     = 0;
   uint32_t reg_bins = (width * height * 28) >> 4;
@@ -1697,6 +1697,7 @@ void uvg_rdoq(
       default:
         assert(0);
     }
+    // ISP_TODO: does height affect ctx_cbf? Do this when fixing other cbf stuff
     ctx_cbf    = ( type != COLOR_V ? 0 : cbf_is_set(cbf, 5 - uvg_math_floor_log2(width), COLOR_U));
     best_cost  = block_uncoded_cost +  lambda * CTX_ENTROPY_BITS(&base_cbf_model[ctx_cbf],0);
     base_cost +=   lambda * CTX_ENTROPY_BITS(&base_cbf_model[ctx_cbf],1);

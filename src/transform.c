@@ -1146,8 +1146,9 @@ static void quantize_tr_residual(
   const int32_t lcu_width = LCU_WIDTH >> shift;
   const int8_t mode =
     (color == COLOR_Y) ? cur_pu->intra.mode : cur_pu->intra.mode_chroma;
+  
   const coeff_scan_order_t scan_idx =
-    uvg_get_scan_order(cur_pu->type, mode, depth);
+    uvg_get_scan_order(cur_pu->type, mode, depth); // Height does not affect this
   const int offset = lcu_px.x + lcu_px.y * lcu_width;
   const int z_index = xy_to_zorder(lcu_width, lcu_px.x, lcu_px.y);
 
@@ -1269,6 +1270,7 @@ static void quantize_tr_residual(
     
   }
 
+  // ISP_TODO: when other ISP things work, ask Joose about this
   cbf_clear(&cur_pu->cbf, depth, color);
   if (has_coeffs) {
     cbf_set(&cur_pu->cbf, depth, color);
