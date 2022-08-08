@@ -63,6 +63,7 @@ void uvg_quant_generic(
 {
   const encoder_control_t * const encoder = state->encoder_control;
   const uint32_t log2_block_size = uvg_g_convert_to_bit[width] + 2;
+  // ISP_TODO: width & height affect scan order
   const uint32_t * const scan = uvg_g_sig_last_scan[scan_idx][log2_block_size - 1];
 
   int32_t qp_scaled = uvg_get_scaled_qp(color, state->qp, (encoder->bitdepth - 8) * 6, encoder->qp_map[0]);
@@ -493,15 +494,15 @@ int uvg_quantize_residual_generic(encoder_state_t *const state,
   // Quantize coeffs. (coeff -> coeff_out)
   
   if (state->encoder_control->cfg.rdoq_enable &&
-      (width > 4 || !state->encoder_control->cfg.rdoq_skip) && !use_trskip)
+      (width > 4 || !state->encoder_control->cfg.rdoq_skip) && !use_trskip) // ISP_TODO: width check here might not be necessary, therefore also height check unnecessary. Investigate.
   {
     int8_t tr_depth = cur_cu->tr_depth - cur_cu->depth;
     tr_depth += (cur_cu->part_size == SIZE_NxN ? 1 : 0);
-    uvg_rdoq(state, coeff, coeff_out, width, width, color,
+    uvg_rdoq(state, coeff, coeff_out, width, height, color,
              scan_order, cur_cu->type, tr_depth, cur_cu->cbf,
       lfnst_index);
   } else if(state->encoder_control->cfg.rdoq_enable && use_trskip) {
-    uvg_ts_rdoq(state, coeff, coeff_out, width, width, color,
+    uvg_ts_rdoq(state, coeff, coeff_out, width, height, color,
       scan_order);
   } else {
   
