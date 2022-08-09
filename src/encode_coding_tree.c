@@ -271,7 +271,8 @@ void uvg_encode_ts_residual(encoder_state_t* const state,
   uint32_t width,
   uint8_t type,
   int8_t scan_mode,
-  double* bits_out) {
+  double* bits_out) 
+{
   //const encoder_control_t * const encoder = state->encoder_control;
   //int c1 = 1;
   uint32_t i;
@@ -286,6 +287,7 @@ void uvg_encode_ts_residual(encoder_state_t* const state,
   const uint32_t log2_cg_size = uvg_g_log2_sbb_size[log2_block_size][log2_block_size][0] + uvg_g_log2_sbb_size[log2_block_size][log2_block_size][1];
   const uint32_t* scan =    uvg_g_sig_last_scan[scan_mode][log2_block_size - 1];
   const uint32_t* scan_cg = g_sig_last_scan_cg[log2_block_size - 1][scan_mode];
+
   double bits = 0;
 
   // Init base contexts according to block type
@@ -297,6 +299,7 @@ void uvg_encode_ts_residual(encoder_state_t* const state,
   unsigned scan_cg_last = (unsigned )-1;
   //unsigned scan_pos_last = (unsigned )-1;
 
+  // ISP_TODO: height
   for (i = 0; i < width * width; i++) {
     if (coeff[scan[i]]) {
       //scan_pos_last = i;
