@@ -194,21 +194,27 @@ static void derive_mts_constraints(cu_info_t *const pred_cu,
                                    const vector2d_t lcu_px)
 {
   const int width = LCU_WIDTH >> depth;
+  const int height = width; // ISP_TODO: height
   int8_t scan_idx = uvg_get_scan_order(pred_cu->type, pred_cu->intra.mode, depth);
   int32_t i;
   // ToDo: large block support in VVC?
   uint32_t sig_coeffgroup_flag[32 * 32] = { 0 };
 
-  const uint32_t log2_block_size = uvg_g_convert_to_bit[width] + 2;
-  const uint32_t log2_cg_size = uvg_g_log2_sbb_size[log2_block_size][log2_block_size][0]
-    + uvg_g_log2_sbb_size[log2_block_size][log2_block_size][1];
-  const uint32_t *scan = uvg_g_sig_last_scan[scan_idx][log2_block_size - 1];
-  const uint32_t *scan_cg = g_sig_last_scan_cg[log2_block_size - 1][scan_idx];
+  const uint32_t log2_block_width = uvg_g_convert_to_bit[width] + 2;
+  const uint32_t log2_block_height = uvg_g_convert_to_bit[height] + 2;
+  const uint32_t log2_cg_size = uvg_g_log2_sbb_size[log2_block_width][log2_block_width][0]
+    + uvg_g_log2_sbb_size[log2_block_width][log2_block_width][1]; // ISP_TODO: height
+  //const uint32_t *scan = uvg_g_sig_last_scan[scan_idx][log2_block_size - 1];
+  //const uint32_t *scan_cg = g_sig_last_scan_cg[log2_block_size - 1][scan_idx];
+  const uint32_t *scan = uvg_get_scan_order_table(SCAN_GROUP_NORM, scan_idx, log2_block_width, log2_block_height);
+  const uint32_t *scan_cg = uvg_get_scan_order_table(SCAN_GROUP_COEF, scan_idx, log2_block_width, log2_block_height);
+
   const coeff_t* coeff = &lcu->coeff.y[xy_to_zorder(LCU_WIDTH, lcu_px.x, lcu_px.y)];
 
   signed scan_cg_last = -1;
   signed scan_pos_last = -1;
 
+  // ISP_TODO: height
   for (int i = 0; i < width * width; i++) {
     if (coeff[scan[i]]) {
       scan_pos_last = i;

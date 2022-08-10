@@ -76,11 +76,13 @@ void uvg_encode_coeff_nxn_generic(encoder_state_t * const state,
   // CONSTANTS
 
   const int height = width; // TODO: height for non-square blocks.
-  const uint32_t log2_block_size = uvg_g_convert_to_bit[width]+2;
-  const uint32_t log2_cg_size = uvg_g_log2_sbb_size[log2_block_size][log2_block_size][0] + uvg_g_log2_sbb_size[log2_block_size][log2_block_size][1];
-  const uint32_t *scan =
-    uvg_g_sig_last_scan[scan_mode][log2_block_size - 1];
-  const uint32_t *scan_cg = g_sig_last_scan_cg[log2_block_size - 1][scan_mode];
+  const uint32_t log2_block_width = uvg_g_convert_to_bit[width]+2;
+  const uint32_t log2_block_height = uvg_g_convert_to_bit[width] + 2; // ISP_TODO: height
+  const uint32_t log2_cg_size = uvg_g_log2_sbb_size[log2_block_width][log2_block_width][0] + uvg_g_log2_sbb_size[log2_block_width][log2_block_width][1];
+  //const uint32_t *scan = uvg_g_sig_last_scan[scan_mode][log2_block_size - 1];
+  //const uint32_t *scan_cg = g_sig_last_scan_cg[log2_block_size - 1][scan_mode];
+  const uint32_t* scan = uvg_get_scan_order_table(SCAN_GROUP_NORM, scan_mode, log2_block_width, log2_block_height);
+  const uint32_t* scan_cg = uvg_get_scan_order_table(SCAN_GROUP_COEF, scan_mode, log2_block_width, log2_block_height);
 
 
   // Init base contexts according to block type

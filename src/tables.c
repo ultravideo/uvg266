@@ -2593,8 +2593,27 @@ static const uint32_t* g_scan_order[SCAN_GROUP_TYPES][MAX_LOG2_INDEX][MAX_LOG2_I
   }
 };
 
-uint32_t* uvg_get_scan_order(int scan_group, int log2_w, int log2_h)
+
+/**
+ * \brief Return array of scan order indices.
+ *
+ * \param scan_group  Scan group type, normal or coefficient.
+ * \param scan_type   Scan type, diagonal, horizontal or vertical
+ * \param log2_w      Log2 of block width.
+ * \param log2_h      Log2 of block height.
+ *
+ * \return  Returns pointer to scan order table based on given dimensions.
+ */
+uint32_t* uvg_get_scan_order_table(int scan_group, int scan_type, int log2_w, int log2_h)
 {
-  // ISP_TODO: returning coef group type does not work yet. It will break for non-square blocks
-  return g_scan_order[scan_group][log2_w][log2_h];
+  // ISP_TODO: horizontal and vertical scan types
+  assert(scan_type == SCAN_DIAG && "Horizontal and vertical scan not implemented.");
+
+  if (scan_group == SCAN_GROUP_NORM) {
+    return g_scan_order[scan_group][log2_w][log2_h];
+  }
+  else {
+    // ISP_TODO: returning coef group type does not work yet. It will break for non-square blocks
+    return g_scan_order[scan_group][log2_w >> 2][log2_h >> 2];
+  }
 }

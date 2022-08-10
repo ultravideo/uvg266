@@ -283,10 +283,14 @@ void uvg_encode_ts_residual(encoder_state_t* const state,
 
   // CONSTANTS
 
-  const uint32_t log2_block_size = uvg_g_convert_to_bit[width] + 2;
-  const uint32_t log2_cg_size = uvg_g_log2_sbb_size[log2_block_size][log2_block_size][0] + uvg_g_log2_sbb_size[log2_block_size][log2_block_size][1];
-  const uint32_t* scan =    uvg_g_sig_last_scan[scan_mode][log2_block_size - 1];
-  const uint32_t* scan_cg = g_sig_last_scan_cg[log2_block_size - 1][scan_mode];
+  const uint32_t log2_block_width = uvg_g_convert_to_bit[width] + 2;
+  const uint32_t log2_block_height = log2_block_width; // ISP_TODO: height
+  const uint32_t log2_cg_size = uvg_g_log2_sbb_size[log2_block_width][log2_block_width][0] + uvg_g_log2_sbb_size[log2_block_width][log2_block_width][1];
+  //const uint32_t* scan =    uvg_g_sig_last_scan[scan_mode][log2_block_size - 1];
+  //const uint32_t* scan_cg = g_sig_last_scan_cg[log2_block_size - 1][scan_mode];
+
+  const uint32_t* scan = uvg_get_scan_order_table(SCAN_GROUP_NORM, scan_mode, log2_block_width, log2_block_height);
+  const uint32_t* scan_cg = uvg_get_scan_order_table(SCAN_GROUP_COEF, scan_mode, log2_block_width, log2_block_height);
 
   double bits = 0;
 
@@ -295,6 +299,7 @@ void uvg_encode_ts_residual(encoder_state_t* const state,
 
   cabac->cur_ctx = base_coeff_group_ctx;
   
+  // ISP_TODO: height
   int maxCtxBins = (width * width * 7) >> 2;
   unsigned scan_cg_last = (unsigned )-1;
   //unsigned scan_pos_last = (unsigned )-1;
