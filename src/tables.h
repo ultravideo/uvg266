@@ -139,9 +139,9 @@ extern const uint32_t uvg_g_log2_sbb_size[7 + 1][7 + 1][2];
 #define SCAN_GROUP_TYPES 2
 #define MAX_LOG2_INDEX 7
 
-#define SCAN_GROUP_DIAG 0
+#define SCAN_GROUP_NORM 0
 #define SCAN_GROUP_COEF 1
 
-uint32_t* uvg_get_scan_order(int scan_group, int log2_w, int log2_h);
+uint32_t* uvg_get_scan_order_table(int scan_group, int scan_type, int log2_w, int log2_h);
 
 #endif //TABLES_H_

@@ -1141,7 +1141,8 @@ int uvg_ts_rdoq(encoder_state_t* const state, coeff_t* src_coeff, coeff_t* dest_
   const int  max_log2_tr_dynamic_range = 15;
   uint32_t log2_tr_width = uvg_math_floor_log2(width);
   uint32_t log2_tr_height = uvg_math_floor_log2(height);
-  const uint32_t log2_block_size = uvg_g_convert_to_bit[width] + 2;
+  const uint32_t log2_block_width = uvg_g_convert_to_bit[width] + 2;
+  const uint32_t log2_block_height = uvg_g_convert_to_bit[height] + 2;
   const uint32_t log2_cg_width = g_log2_sbb_size[log2_tr_width][log2_tr_height][0];
   const uint32_t log2_cg_height = g_log2_sbb_size[log2_tr_width][log2_tr_height][1];
 
@@ -1182,8 +1183,10 @@ int uvg_ts_rdoq(encoder_state_t* const state, coeff_t* src_coeff, coeff_t* dest_
 
   const coeff_t entropy_coding_maximum = (1 << max_log2_tr_dynamic_range) - 1;
 
-  const uint32_t* scan = uvg_g_sig_last_scan[scan_mode][log2_block_size - 1];
-  const uint32_t* scan_cg = g_sig_last_scan_cg[log2_block_size - 1][scan_mode];
+  //const uint32_t* scan = uvg_g_sig_last_scan[scan_mode][log2_block_size - 1];
+  //const uint32_t* scan_cg = g_sig_last_scan_cg[log2_block_size - 1][scan_mode];
+  const uint32_t* scan = uvg_get_scan_order_table(SCAN_GROUP_NORM, scan_mode, log2_block_width, log2_block_height);
+  const uint32_t* scan_cg = uvg_get_scan_order_table(SCAN_GROUP_COEF, scan_mode, log2_block_width, log2_block_height);
 
   uint32_t coeff_levels[3];
   double   coeff_level_error[4];
@@ -1221,8 +1224,8 @@ int uvg_ts_rdoq(encoder_state_t* const state, coeff_t* src_coeff, coeff_t* dest_
       scan_pos = (sbId << log2_cg_size) + scan_pos_in_sb;
       int last_pos_coded = sbSizeM1;
       uint32_t blkpos = scan[scan_pos];
-      uint32_t  pos_y = blkpos >> log2_block_size;
-      uint32_t  pos_x = blkpos - (pos_y << log2_block_size);
+      uint32_t  pos_y = blkpos >> log2_block_width;
+      uint32_t  pos_x = blkpos - (pos_y << log2_block_width); // TODO: height
       //===== quantization =====
 
       // set coeff
@@ -1391,7 +1394,8 @@ void uvg_rdoq(
   int32_t  transform_shift   = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - ((log2_tr_height + log2_tr_width) >> 1);  // Represents scaling through forward transform
   uint16_t go_rice_param     = 0;
   uint32_t reg_bins = (width * height * 28) >> 4;
-  const uint32_t log2_block_size   = uvg_g_convert_to_bit[ width ] + 2;
+  const uint32_t log2_block_width   = uvg_g_convert_to_bit[width] + 2;
+  const uint32_t log2_block_height = uvg_g_convert_to_bit[height] + 2;
   int32_t  scalinglist_type= (block_type == CU_INTRA ? 0 : 3) + type;
 
   int32_t qp_scaled = uvg_get_scaled_qp(type, state->qp, (encoder->bitdepth - 8) * 6, encoder->qp_map[0]);
@@ -1415,11 +1419,13 @@ void uvg_rdoq(
 
   memset(dest_coeff, 0, sizeof(coeff_t) * width * height);
 
-  const uint32_t log2_cg_size = uvg_g_log2_sbb_size[log2_block_size][log2_block_size][0] + uvg_g_log2_sbb_size[log2_block_size][log2_block_size][1];
+  // ISP_TODO: height
+  const uint32_t log2_cg_size = uvg_g_log2_sbb_size[log2_block_width][log2_block_width][0] + uvg_g_log2_sbb_size[log2_block_width][log2_block_width][1];
 
   const uint32_t cg_width = (MIN((uint8_t)32, width) >> (log2_cg_size / 2));
 
-  const uint32_t *scan_cg = g_sig_last_scan_cg[log2_block_size - 1][scan_mode];
+  //const uint32_t *scan_cg = g_sig_last_scan_cg[log2_block_size - 1][scan_mode];
+  const uint32_t *scan_cg = uvg_get_scan_order_table(SCAN_GROUP_COEF, scan_mode, log2_block_width, log2_block_height);
   const uint32_t cg_size = 16;
   const int32_t  shift = 4 >> 1;
   const uint32_t num_blk_side = width >> shift;
@@ -1431,8 +1437,9 @@ void uvg_rdoq(
   int32_t temp_diag = -1;
   int32_t temp_sum = -1;
 
-  const uint32_t *scan = uvg_g_sig_last_scan[ scan_mode ][ log2_block_size - 1 ];
-
+  //const uint32_t *scan = uvg_g_sig_last_scan[ scan_mode ][ log2_block_size - 1 ];
+  const uint32_t *scan = uvg_get_scan_order_table(SCAN_GROUP_NORM, scan_mode, log2_block_width, log2_block_height);
+  
   int32_t cg_last_scanpos = -1;
   int32_t last_scanpos = -1;
 
@@ -1527,8 +1534,8 @@ void uvg_rdoq(
 
       if (last_scanpos >= 0) {
 
-        uint32_t  pos_y = blkpos >> log2_block_size;
-        uint32_t  pos_x = blkpos - (pos_y << log2_block_size);
+        uint32_t  pos_y = blkpos >> log2_block_width;
+        uint32_t  pos_x = blkpos - (pos_y << log2_block_width); // ISP_TODO: height
         //===== coefficient level estimation =====
         int32_t  level;
         
@@ -1715,8 +1722,8 @@ void uvg_rdoq(
         uint32_t blkpos  = scan[scanpos];
 
         if( dest_coeff[ blkpos ] ) {
-          uint32_t   pos_y = blkpos >> log2_block_size;
-          uint32_t   pos_x = blkpos - ( pos_y << log2_block_size );
+          uint32_t   pos_y = blkpos >> log2_block_width;
+          uint32_t   pos_x = blkpos - ( pos_y << log2_block_width ); // ISP_TODO: height
 
           double cost_last = get_rate_last(lambda, pos_x, pos_y, last_x_bits,last_y_bits );
           double totalCost = base_cost + cost_last - cost_sig[ scanpos ];
