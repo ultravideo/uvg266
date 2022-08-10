@@ -286,11 +286,11 @@ void uvg_encode_ts_residual(encoder_state_t* const state,
   const uint32_t log2_block_width = uvg_g_convert_to_bit[width] + 2;
   const uint32_t log2_block_height = log2_block_width; // ISP_TODO: height
   const uint32_t log2_cg_size = uvg_g_log2_sbb_size[log2_block_width][log2_block_width][0] + uvg_g_log2_sbb_size[log2_block_width][log2_block_width][1];
-  //const uint32_t* scan =    uvg_g_sig_last_scan[scan_mode][log2_block_size - 1];
-  //const uint32_t* scan_cg = g_sig_last_scan_cg[log2_block_size - 1][scan_mode];
+  const uint32_t* old_scan =    uvg_g_sig_last_scan[scan_mode][log2_block_width - 1];
+  const uint32_t* old_scan_cg = g_sig_last_scan_cg[log2_block_width - 1][scan_mode];
 
-  const uint32_t* scan = uvg_get_scan_order_table(SCAN_GROUP_NORM, scan_mode, log2_block_width, log2_block_height);
-  const uint32_t* scan_cg = uvg_get_scan_order_table(SCAN_GROUP_COEF, scan_mode, log2_block_width, log2_block_height);
+  const uint32_t* scan = uvg_get_scan_order_table(SCAN_GROUP_4X4, scan_mode, log2_block_width, log2_block_height);
+  const uint32_t* scan_cg = uvg_get_scan_order_table(SCAN_GROUP_UNGROUPED, scan_mode, log2_block_width, log2_block_height);
 
   double bits = 0;
 
@@ -307,6 +307,9 @@ void uvg_encode_ts_residual(encoder_state_t* const state,
   // ISP_TODO: height
   for (i = 0; i < width * width; i++) {
     if (coeff[scan[i]]) {
+      // ISP_DEBUG
+      assert(old_scan[i] == scan[i] && "Old scan_cg differs from the new one.");
+      assert(old_scan_cg[i >> log2_cg_size] == scan_cg[i >> log2_cg_size] && "Old scan_cg differs from the new one.");
       //scan_pos_last = i;
       sig_coeffgroup_flag[scan_cg[i >> log2_cg_size]] = 1;
     }
