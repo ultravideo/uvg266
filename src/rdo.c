@@ -1183,10 +1183,10 @@ int uvg_ts_rdoq(encoder_state_t* const state, coeff_t* src_coeff, coeff_t* dest_
 
   const coeff_t entropy_coding_maximum = (1 << max_log2_tr_dynamic_range) - 1;
 
-  //const uint32_t* scan = uvg_g_sig_last_scan[scan_mode][log2_block_size - 1];
-  //const uint32_t* scan_cg = g_sig_last_scan_cg[log2_block_size - 1][scan_mode];
-  const uint32_t* scan = uvg_get_scan_order_table(SCAN_GROUP_NORM, scan_mode, log2_block_width, log2_block_height);
-  const uint32_t* scan_cg = uvg_get_scan_order_table(SCAN_GROUP_COEF, scan_mode, log2_block_width, log2_block_height);
+  const uint32_t* old_scan = uvg_g_sig_last_scan[scan_mode][log2_block_width - 1];
+  const uint32_t* old_scan_cg = g_sig_last_scan_cg[log2_block_width - 1][scan_mode];
+  const uint32_t* scan = uvg_get_scan_order_table(SCAN_GROUP_4X4, scan_mode, log2_block_width, log2_block_height);
+  const uint32_t* scan_cg = uvg_get_scan_order_table(SCAN_GROUP_UNGROUPED, scan_mode, log2_block_width, log2_block_height);
 
   uint32_t coeff_levels[3];
   double   coeff_level_error[4];
@@ -1212,6 +1212,9 @@ int uvg_ts_rdoq(encoder_state_t* const state, coeff_t* src_coeff, coeff_t* dest_
   for (uint32_t sbId = 0; sbId < cg_num; sbId++)
   {
     uint32_t cg_blkpos = scan_cg[sbId];
+    // ISP_DEBUG
+    assert(old_scan[sbId] == scan[sbId] && "Old scan_cg differs from the new one.");
+    assert(old_scan_cg[sbId] == scan_cg[sbId] && "Old scan_cg differs from the new one.");
 
     int no_coeff_coded = 0;
     base_cost = 0.0;
@@ -1424,8 +1427,12 @@ void uvg_rdoq(
 
   const uint32_t cg_width = (MIN((uint8_t)32, width) >> (log2_cg_size / 2));
 
-  //const uint32_t *scan_cg = g_sig_last_scan_cg[log2_block_size - 1][scan_mode];
-  const uint32_t *scan_cg = uvg_get_scan_order_table(SCAN_GROUP_COEF, scan_mode, log2_block_width, log2_block_height);
+  const uint32_t *old_scan = uvg_g_sig_last_scan[ scan_mode ][ log2_block_width - 1 ];
+  const uint32_t *old_scan_cg = g_sig_last_scan_cg[log2_block_width - 1][scan_mode];
+  
+  const uint32_t *scan = uvg_get_scan_order_table(SCAN_GROUP_4X4, scan_mode, log2_block_width, log2_block_height);
+  const uint32_t *scan_cg = uvg_get_scan_order_table(SCAN_GROUP_UNGROUPED, scan_mode, log2_block_width, log2_block_height);
+
   const uint32_t cg_size = 16;
   const int32_t  shift = 4 >> 1;
   const uint32_t num_blk_side = width >> shift;
@@ -1437,8 +1444,7 @@ void uvg_rdoq(
   int32_t temp_diag = -1;
   int32_t temp_sum = -1;
 
-  //const uint32_t *scan = uvg_g_sig_last_scan[ scan_mode ][ log2_block_size - 1 ];
-  const uint32_t *scan = uvg_get_scan_order_table(SCAN_GROUP_NORM, scan_mode, log2_block_width, log2_block_height);
+  
   
   int32_t cg_last_scanpos = -1;
   int32_t last_scanpos = -1;
@@ -1475,6 +1481,8 @@ void uvg_rdoq(
     for (int32_t scanpos_in_cg = (cg_size - 1); scanpos_in_cg >= 0; scanpos_in_cg--)
     {
       int32_t  scanpos        = cg_scanpos*cg_size + scanpos_in_cg;
+      assert(old_scan[scanpos] == scan[scanpos] && "Scan index differs from old system.");
+
       if (lfnst_idx > 0 && scanpos > max_lfnst_pos) break;
       uint32_t blkpos         = scan[scanpos];
       int32_t q               = quant_coeff[blkpos];
@@ -1509,6 +1517,7 @@ void uvg_rdoq(
   int32_t last_x_bits[32], last_y_bits[32];
 
   for (int32_t cg_scanpos = cg_last_scanpos; cg_scanpos >= 0; cg_scanpos--) {
+    assert(old_scan_cg[cg_scanpos] == scan_cg[cg_scanpos] && "Scan cg index differs from old system.");
     uint32_t cg_blkpos  = scan_cg[cg_scanpos];
     uint32_t cg_pos_y   = cg_blkpos / num_blk_side;
     uint32_t cg_pos_x   = cg_blkpos - (cg_pos_y * num_blk_side);
