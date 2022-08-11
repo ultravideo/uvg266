@@ -1601,7 +1601,7 @@ static void mts_dct_avx2(
 
   uvg_get_tr_type(width, color, tu, &type_hor, &type_ver, mts_idx);
 
-  if (type_hor == DCT2 && type_ver == DCT2 && !tu->lfnst_idx)
+  if (type_hor == DCT2 && type_ver == DCT2 && !tu->lfnst_idx && width == height)
   {
     dct_func* dct_func = uvg_get_dct_func(width, height, color, tu->type);
     dct_func(bitdepth, input, output);
@@ -1632,7 +1632,7 @@ static void mts_idct_avx2(
 
   uvg_get_tr_type(width, color, tu, &type_hor, &type_ver, mts_idx);
 
-  if (type_hor == DCT2 && type_ver == DCT2)
+  if (type_hor == DCT2 && type_ver == DCT2 && width == height)
   {
     dct_func* idct_func = uvg_get_idct_func(width, color, tu->type);
     idct_func(bitdepth, input, output);
