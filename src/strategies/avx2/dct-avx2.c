@@ -1622,6 +1622,7 @@ static void mts_idct_avx2(
   const color_t color,
   const cu_info_t* tu,
   const int8_t width,
+  const int8_t height,
   const int16_t* input,
   int16_t* output,
   const int8_t mts_idx)
