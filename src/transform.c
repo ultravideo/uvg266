@@ -271,14 +271,13 @@ void uvg_itransform2d(const encoder_control_t * const encoder,
                       color_t color,
                       const cu_info_t *tu)
 {
-  if (encoder->cfg.mts)
+  if (encoder->cfg.mts || block_width != block_height)
   {
     uvg_mts_idct(encoder->bitdepth, color, tu, block_width, block_height, coeff, block, encoder->cfg.mts);
   }
   else
   {
-    // ISP_TODO: block height
-    dct_func *idct_func = uvg_get_idct_func(block_width, color, tu->type);
+    dct_func *idct_func = uvg_get_idct_func(block_width, block_height, color, tu->type);
     idct_func(encoder->bitdepth, coeff, block);
   }
 }
