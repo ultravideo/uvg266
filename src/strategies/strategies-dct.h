@@ -86,7 +86,7 @@ extern mts_idct_func* uvg_mts_idct;
 
 int uvg_strategy_register_dct(void* opaque, uint8_t bitdepth);
 dct_func * uvg_get_dct_func(int8_t width, int8_t height, color_t color, cu_type_t type);
-dct_func * uvg_get_idct_func(int8_t width, color_t color, cu_type_t type);
+dct_func * uvg_get_idct_func(int8_t width, int8_t height, color_t color, cu_type_t type);
 
 
 

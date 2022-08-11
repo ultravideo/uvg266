@@ -99,7 +99,7 @@ dct_func * uvg_get_dct_func(int8_t width, int8_t height, color_t color, cu_type_
   if (width != height) {
     // Non-square block. Return generic dct for non-square blokcs.
     assert(false && "This should never be called at this point. Non-square stuff is done inside mts_dct function.");
-    return uvg_dct_non_square;
+    //return uvg_dct_non_square;
   }
   switch (width) {
   case 4:
@@ -128,8 +128,13 @@ dct_func * uvg_get_dct_func(int8_t width, int8_t height, color_t color, cu_type_
  *
  * \returns Pointer to the function.
  */
-dct_func * uvg_get_idct_func(int8_t width, color_t color, cu_type_t type)
+dct_func * uvg_get_idct_func(int8_t width, int8_t height, color_t color, cu_type_t type)
 {
+  if (width != height) {
+    // Non-square block. Return generic dct for non-square blokcs.
+    assert(false && "This should never be called at this point. Non-square stuff is done inside mts_idct function.");
+    //return uvg_idct_non_square;
+  }
   switch (width) {
   case 4:
     //if (color == COLOR_Y && type == CU_INTRA) {

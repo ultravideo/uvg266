@@ -2560,7 +2560,7 @@ static void mts_idct_generic(
 
   if (type_hor == DCT2 && type_ver == DCT2 && !tu->lfnst_idx && !tu->cr_lfnst_idx && width == height)
   {
-    dct_func *idct_func = uvg_get_idct_func(width, color, tu->type);
+    dct_func *idct_func = uvg_get_idct_func(width, height, color, tu->type);
     idct_func(bitdepth, input, output);
   }
   else

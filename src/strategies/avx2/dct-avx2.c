@@ -1634,7 +1634,7 @@ static void mts_idct_avx2(
 
   if (type_hor == DCT2 && type_ver == DCT2 && width == height)
   {
-    dct_func* idct_func = uvg_get_idct_func(width, color, tu->type);
+    dct_func* idct_func = uvg_get_idct_func(width, height, color, tu->type);
     idct_func(bitdepth, input, output);
   }
   else
