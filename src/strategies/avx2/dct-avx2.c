@@ -1579,6 +1579,7 @@ static tr_func* idct_table[5] = {
 
 extern void uvg_get_tr_type(
   int8_t width,
+  int8_t height,
   color_t color,
   const cu_info_t* tu,
   tr_type_t* hor_out,
@@ -1599,7 +1600,7 @@ static void mts_dct_avx2(
   tr_type_t type_ver;
   // ISP_TODO: height passed but not used
 
-  uvg_get_tr_type(width, color, tu, &type_hor, &type_ver, mts_idx);
+  uvg_get_tr_type(width, height, color, tu, &type_hor, &type_ver, mts_idx);
 
   if (type_hor == DCT2 && type_ver == DCT2 && !tu->lfnst_idx && width == height)
   {
@@ -1630,7 +1631,7 @@ static void mts_idct_avx2(
   tr_type_t type_hor;
   tr_type_t type_ver;
 
-  uvg_get_tr_type(width, color, tu, &type_hor, &type_ver, mts_idx);
+  uvg_get_tr_type(width, height, color, tu, &type_hor, &type_ver, mts_idx);
 
   if (type_hor == DCT2 && type_ver == DCT2 && width == height)
   {

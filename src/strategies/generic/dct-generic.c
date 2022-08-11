@@ -2442,6 +2442,7 @@ static const tr_type_t mts_subset_intra[4][2] = { { DST7, DST7 }, { DCT8, DST7 }
 
 void uvg_get_tr_type(
   int8_t width,
+  int8_t height,
   color_t color,
   const cu_info_t* tu,
   tr_type_t* hor_out,
@@ -2456,7 +2457,6 @@ void uvg_get_tr_type(
     return;
   }
 
-  const int height = width;
   const bool explicit_mts = mts_idx == UVG_MTS_BOTH || (tu->type == CU_INTRA ? mts_idx == UVG_MTS_INTRA : (mts_idx == UVG_MTS_INTER && tu->type == CU_INTER));
   const bool implicit_mts = tu->type == CU_INTRA && (mts_idx == UVG_MTS_IMPLICIT || mts_idx == UVG_MTS_INTER);
 
@@ -2501,8 +2501,7 @@ static void mts_dct_generic(
   tr_type_t type_hor;
   tr_type_t type_ver;
 
-  // ISP_TODO: height
-  uvg_get_tr_type(width, color, tu, &type_hor, &type_ver, mts_idx);
+  uvg_get_tr_type(width, height, color, tu, &type_hor, &type_ver, mts_idx);
 
   if (type_hor == DCT2 && type_ver == DCT2 && !tu->lfnst_idx && !tu->cr_lfnst_idx && width == height)
   {
@@ -2555,8 +2554,7 @@ static void mts_idct_generic(
   tr_type_t type_hor;
   tr_type_t type_ver;
 
-  // ISP_TODO: height
-  uvg_get_tr_type(width, color, tu, &type_hor, &type_ver, mts_idx);
+  uvg_get_tr_type(width, height, color, tu, &type_hor, &type_ver, mts_idx);
 
   if (type_hor == DCT2 && type_ver == DCT2 && !tu->lfnst_idx && !tu->cr_lfnst_idx && width == height)
   {
