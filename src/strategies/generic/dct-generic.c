@@ -739,10 +739,11 @@ static void idct_ ## n ## x ## n ## _generic(int8_t bitdepth, const int16_t *inp
   partial_butterfly_inverse_ ## n ## _generic(tmp, output, shift_2nd); \
 }
 
-static void dct_non_square_generic(int8_t bitdepth, const int16_t* input, int16_t* output)
-{
-  // ISP_TODO: non-square transform here
-}
+
+//static void dct_non_square_generic(int8_t bitdepth, const int16_t* input, int16_t* output)
+//{
+//  // ISP_TODO: non-square transform here
+//}
 
 DCT_NXN_GENERIC(4);
 DCT_NXN_GENERIC(8);
@@ -2606,7 +2607,7 @@ int uvg_strategy_register_dct_generic(void* opaque, uint8_t bitdepth)
   success &= uvg_strategyselector_register(opaque, "dct_8x8", "generic", 0, &dct_8x8_generic);
   success &= uvg_strategyselector_register(opaque, "dct_16x16", "generic", 0, &dct_16x16_generic);
   success &= uvg_strategyselector_register(opaque, "dct_32x32", "generic", 0, &dct_32x32_generic);
-  success &= uvg_strategyselector_register(opaque, "dct_non_square", "generic", 0, &dct_non_square_generic);
+  //success &= uvg_strategyselector_register(opaque, "dct_non_square", "generic", 0, &dct_non_square_generic);
 
   success &= uvg_strategyselector_register(opaque, "fast_inverse_dst_4x4", "generic", 0, &fast_inverse_dst_4x4_generic);
 
