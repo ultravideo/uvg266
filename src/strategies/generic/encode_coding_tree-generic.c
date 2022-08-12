@@ -148,6 +148,11 @@ void uvg_encode_coeff_nxn_generic(encoder_state_t * const state,
     int32_t cg_pos_y = cg_blk_pos / (MIN((uint8_t)32, width) >> (log2_cg_size / 2));
     int32_t cg_pos_x = cg_blk_pos - (cg_pos_y * (MIN((uint8_t)32, width) >> (log2_cg_size / 2)));
 
+    const uint32_t log2_cg_width = uvg_g_log2_sbb_size[log2_block_width][log2_block_height][0];
+    const uint32_t log2_cg_height = uvg_g_log2_sbb_size[log2_block_width][log2_block_height][1];
+    const uint32_t cg_width = (MIN((uint8_t)TR_MAX_WIDTH, width) >> log2_cg_width);
+    const uint32_t cg_height = (MIN((uint8_t)TR_MAX_WIDTH, height) >> log2_cg_height);
+
     // !!! residual_coding_subblock() !!!
 
     // Encode significant coeff group flag when not the last or the first
@@ -156,7 +161,7 @@ void uvg_encode_coeff_nxn_generic(encoder_state_t * const state,
     } else {
       uint32_t sig_coeff_group = (sig_coeffgroup_flag[cg_blk_pos] != 0);
       uint32_t ctx_sig = uvg_context_get_sig_coeff_group(sig_coeffgroup_flag, cg_pos_x,
-        cg_pos_y, (MIN((uint8_t)32, width) >> (log2_cg_size / 2)));
+        cg_pos_y, cg_width, cg_height);
       CABAC_FBITS_UPDATE(cabac, &base_coeff_group_ctx[ctx_sig], sig_coeff_group, bits, "significant_coeffgroup_flag");
     }
 
