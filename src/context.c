@@ -610,13 +610,14 @@ void uvg_context_copy(encoder_state_t * const target_state, const encoder_state_
 uint32_t uvg_context_get_sig_coeff_group( uint32_t *sig_coeff_group_flag,
                                       uint32_t pos_x,
                                       uint32_t pos_y,
-                                      int32_t width)
+                                      int32_t width,
+                                      int32_t height)
 {
   uint32_t uiRight = 0;
   uint32_t uiLower = 0;
   uint32_t position = pos_y * width + pos_x;
   if (pos_x + 1 < (uint32_t)width) uiRight = sig_coeff_group_flag[position + 1];
-  if (pos_y + 1 < (uint32_t)width) uiLower = sig_coeff_group_flag[position + width];
+  if (pos_y + 1 < (uint32_t)height) uiLower = sig_coeff_group_flag[position + width];
 
   return uiRight || uiLower;
 }

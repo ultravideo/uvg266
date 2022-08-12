@@ -1425,8 +1425,11 @@ void uvg_rdoq(
 
   // ISP_TODO: height
   const uint32_t log2_cg_size = uvg_g_log2_sbb_size[log2_block_width][log2_block_height][0] + uvg_g_log2_sbb_size[log2_block_width][log2_block_height][1];
+  const uint32_t log2_cg_width  = uvg_g_log2_sbb_size[log2_block_width][log2_block_height][0];
+  const uint32_t log2_cg_height = uvg_g_log2_sbb_size[log2_block_width][log2_block_height][1];
 
-  const uint32_t cg_width = (MIN((uint8_t)32, width) >> (log2_cg_size / 2));
+  const uint32_t cg_width  = (MIN((uint8_t)TR_MAX_WIDTH, width) >> log2_cg_width);
+  const uint32_t cg_height = (MIN((uint8_t)TR_MAX_WIDTH, height) >> log2_cg_height);
 
   const uint32_t *old_scan = uvg_g_sig_last_scan[ scan_mode ][ log2_block_width - 1 ];
   const uint32_t *old_scan_cg = g_sig_last_scan_cg[log2_block_width - 1][scan_mode];
@@ -1636,7 +1639,7 @@ void uvg_rdoq(
     if( cg_scanpos ) {
       if (sig_coeffgroup_flag[cg_blkpos] == 0) {
         uint32_t ctx_sig  = uvg_context_get_sig_coeff_group(sig_coeffgroup_flag, cg_pos_x,
-                                                        cg_pos_y, cg_width);
+                                                        cg_pos_y, cg_width, cg_height);
         cost_coeffgroup_sig[cg_scanpos] = lambda *CTX_ENTROPY_BITS(&base_coeff_group_ctx[ctx_sig],0);
         base_cost += cost_coeffgroup_sig[cg_scanpos]  - rd_stats.sig_cost;
       } else {
@@ -1652,7 +1655,7 @@ void uvg_rdoq(
 
           // add SigCoeffGroupFlag cost to total cost
           ctx_sig = uvg_context_get_sig_coeff_group(sig_coeffgroup_flag, cg_pos_x,
-            cg_pos_y, cg_width);
+            cg_pos_y, cg_width, cg_height);
 
           cost_coeffgroup_sig[cg_scanpos] = lambda * CTX_ENTROPY_BITS(&base_coeff_group_ctx[ctx_sig], 1);
           base_cost += cost_coeffgroup_sig[cg_scanpos];
@@ -1713,7 +1716,7 @@ void uvg_rdoq(
       default:
         assert(0);
     }
-    // ISP_TODO: does height affect ctx_cbf? Do this when fixing other cbf stuff
+    // This cbf should work even with non-square blocks
     ctx_cbf    = ( color != COLOR_V ? 0 : cbf_is_set(cbf, 5 - uvg_math_floor_log2(width), COLOR_U));
     best_cost  = block_uncoded_cost +  lambda * CTX_ENTROPY_BITS(&base_cbf_model[ctx_cbf],0);
     base_cost +=   lambda * CTX_ENTROPY_BITS(&base_cbf_model[ctx_cbf],1);
@@ -1732,7 +1735,7 @@ void uvg_rdoq(
 
         if( dest_coeff[ blkpos ] ) {
           uint32_t   pos_y = blkpos >> log2_block_width;
-          uint32_t   pos_x = blkpos - ( pos_y << log2_block_width ); // ISP_TODO: height
+          uint32_t   pos_x = blkpos - ( pos_y << log2_block_width );
 
           double cost_last = get_rate_last(lambda, pos_x, pos_y, last_x_bits,last_y_bits );
           double totalCost = base_cost + cost_last - cost_sig[ scanpos ];
