@@ -656,7 +656,7 @@ uint32_t uvg_context_get_sig_coeff_group_ts(uint32_t* sig_coeff_group_flag,
 * \returns context index for current scan position
 */
 uint32_t uvg_context_get_sig_ctx_idx_abs(const coeff_t* coeff, uint32_t pos_x, uint32_t pos_y,
-                                         uint32_t height, uint32_t width, int8_t type,
+                                         uint32_t width, uint32_t height, int8_t type,
                                          int32_t* temp_diag, int32_t* temp_sum)
 {
   const coeff_t* data = coeff + pos_x + pos_y * width;

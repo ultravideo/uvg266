@@ -1543,12 +1543,13 @@ void uvg_rdoq(
       if (last_scanpos >= 0) {
 
         uint32_t  pos_y = blkpos >> log2_block_width;
-        uint32_t  pos_x = blkpos - (pos_y << log2_block_width); // ISP_TODO: height
+        uint32_t  pos_x = blkpos - (pos_y << log2_block_width);
         //===== coefficient level estimation =====
         int32_t  level;
         
         uint16_t ctx_sig = 0;
         if (scanpos != last_scanpos) {
+          // VVC document 9.3.4.2.8, context for sig_coeff_flag calculated here
           ctx_sig = uvg_context_get_sig_ctx_idx_abs(dest_coeff, pos_x, pos_y, width, height, color, &temp_diag, &temp_sum);
         }
         
