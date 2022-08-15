@@ -62,14 +62,16 @@ void uvg_quant_generic(
   uint8_t lfnst_idx)
 {
   const encoder_control_t * const encoder = state->encoder_control;
-  const uint32_t log2_block_size = uvg_g_convert_to_bit[width] + 2;
-  // ISP_TODO: width & height affect scan order
-  const uint32_t * const scan = uvg_g_sig_last_scan[scan_idx][log2_block_size - 1];
+  const uint32_t log2_tr_width = uvg_g_convert_to_bit[width] + 2;
+  const uint32_t log2_tr_height = uvg_g_convert_to_bit[height] + 2;
+  //const uint32_t log2_block_size = uvg_g_convert_to_bit[width] + 2;
+  //const uint32_t * const old_scan = uvg_g_sig_last_scan[scan_idx][log2_block_size - 1];
+  const uint32_t * const scan = uvg_get_scan_order_table(SCAN_GROUP_4X4, scan_idx, log2_tr_width, log2_tr_height);
 
   int32_t qp_scaled = uvg_get_scaled_qp(color, state->qp, (encoder->bitdepth - 8) * 6, encoder->qp_map[0]);
   qp_scaled = transform_skip ? MAX(qp_scaled, 4 + 6 * MIN_QP_PRIME_TS) : qp_scaled;
-  uint32_t log2_tr_width = uvg_math_floor_log2(height);
-  uint32_t log2_tr_height = uvg_math_floor_log2(width);
+  
+  
   const int32_t scalinglist_type = (block_type == CU_INTRA ? 0 : 3) + (int8_t)color;
   const int32_t *quant_coeff = encoder->scaling_list.quant_coeff[log2_tr_width][log2_tr_height][scalinglist_type][qp_scaled % 6];
   const int32_t transform_shift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - ((log2_tr_height + log2_tr_width) >> 1); //!< Represents scaling through forward transform
