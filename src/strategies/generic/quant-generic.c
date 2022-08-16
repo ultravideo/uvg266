@@ -508,14 +508,14 @@ int uvg_quantize_residual_generic(encoder_state_t *const state,
       scan_order);
   } else {
   
-    uvg_quant(state, coeff, coeff_out, width, width, color,
+    uvg_quant(state, coeff, coeff_out, width, height, color,
       scan_order, cur_cu->type, cur_cu->tr_idx == MTS_SKIP && color == COLOR_Y, lfnst_index);
   }
 
   // Check if there are any non-zero coefficients.
   {
     int i;
-    for (i = 0; i < width * width; ++i) {
+    for (i = 0; i < width * height; ++i) {
       if (coeff_out[i] != 0) {
         has_coeffs = 1;
         break;
