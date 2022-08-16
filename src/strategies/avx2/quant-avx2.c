@@ -716,7 +716,7 @@ int uvg_quantize_residual_avx2(encoder_state_t *const state,
       uvg_inv_lfnst(cur_cu, width, height, color, lfnst_index, coeff, tree_type);
     }
     if (use_trskip) {
-      uvg_itransformskip(state->encoder_control, residual, coeff, width);
+      uvg_itransformskip(state->encoder_control, residual, coeff, width, height);
     }
     else {
       uvg_itransform2d(state->encoder_control, residual, coeff, width, height, color, cur_cu);
@@ -770,7 +770,7 @@ void uvg_dequant_avx2(const encoder_state_t * const state, coeff_t *q_coef, coef
   int32_t n;
   const uint32_t log2_tr_width =  uvg_g_convert_to_log2[width];
   const uint32_t log2_tr_height = uvg_g_convert_to_log2[height];
-  int32_t transform_shift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - ((uvg_math_floor_log2(width) + uvg_math_floor_log2(height)) >> 1); // Represents scaling through forward transform
+  int32_t transform_shift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - ((log2_tr_width + log2_tr_height) >> 1); // Represents scaling through forward transform
 
 
   int32_t qp_scaled = uvg_get_scaled_qp(color, state->qp, (encoder->bitdepth-8)*6, encoder->qp_map[0]);
@@ -780,8 +780,6 @@ void uvg_dequant_avx2(const encoder_state_t * const state, coeff_t *q_coef, coef
 
   if (encoder->scaling_list.enable)
   {
-    uint32_t log2_tr_width = uvg_math_floor_log2(height) + 2;
-    uint32_t log2_tr_height = uvg_math_floor_log2(width) + 2;
     int32_t scalinglist_type = (block_type == CU_INTRA ? 0 : 3) + (int8_t)(color);
 
     const int32_t* dequant_coef = encoder->scaling_list.de_quant_coeff[log2_tr_width - 2][log2_tr_height - 2][scalinglist_type][qp_scaled % 6];

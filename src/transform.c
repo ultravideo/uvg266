@@ -228,12 +228,12 @@ void uvg_transformskip(const encoder_control_t * const encoder, int16_t *block,i
  * \param block output data (residual)
  * \param block_size width of transform
  */
-void uvg_itransformskip(const encoder_control_t * const encoder, int16_t *block,int16_t *coeff, int8_t block_size)
+void uvg_itransformskip(const encoder_control_t * const encoder, int16_t *block,int16_t *coeff, int8_t block_width, int8_t block_height)
 {
   int32_t  j,k;
-  for ( j = 0; j < block_size; j++ ) {
-    for(k = 0; k < block_size; k ++) {
-      block[j * block_size + k] =  coeff[j * block_size + k];
+  for ( j = 0; j < block_height; j++ ) {
+    for(k = 0; k < block_width; k ++) {
+      block[j * block_width + k] =  coeff[j * block_width + k];
     }
   }
 }
@@ -595,7 +595,7 @@ void uvg_chroma_transform_search(
           transforms[i] != JCCR_1 ? COLOR_U : COLOR_V, pred_cu);
       }
       else {
-        uvg_itransformskip(state->encoder_control, u_recon_resi, &u_coeff[i * trans_offset], width);
+        uvg_itransformskip(state->encoder_control, u_recon_resi, &u_coeff[i * trans_offset], width, height);
       }
       if (transforms[i] != JCCR_1) {
         for (int j = 0; j < width * height; j++) {
@@ -622,7 +622,7 @@ void uvg_chroma_transform_search(
           transforms[i] != JCCR_1 ? COLOR_U : COLOR_V, pred_cu);
       }
       else {
-        uvg_itransformskip(state->encoder_control, v_recon_resi, &v_coeff[i * trans_offset], width);
+        uvg_itransformskip(state->encoder_control, v_recon_resi, &v_coeff[i * trans_offset], width, height);
       }
       for (int j = 0; j < width * height; j++) {
         v_recon[trans_offset * i + j] = CLIP_TO_PIXEL(v_pred[j] + v_recon_resi[j]);
