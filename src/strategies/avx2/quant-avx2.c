@@ -582,33 +582,60 @@ static INLINE int64_t get_quantized_recon_8x1_avx2(int16_t *residual, const uint
   return _mm_cvtsi128_si64(_mm_packus_epi16(rec, rec));
 }
 
-static void get_quantized_recon_avx2(int16_t *residual, const uint8_t *pred_in, int in_stride, uint8_t *rec_out, int out_stride, int width){
+static void get_quantized_recon_avx2(int16_t *residual, const uint8_t *pred_in, int in_stride, uint8_t *rec_out, int out_stride, int width, int height){
 
-  switch (width) {
+  if (height == width || width >= 16) {
+    switch (width) {
     case 4:
-      *(int32_t*)&(rec_out[0 * out_stride]) = get_quantized_recon_4x1_avx2(residual + 0 * width, pred_in + 0 * in_stride);
-      *(int32_t*)&(rec_out[1 * out_stride]) = get_quantized_recon_4x1_avx2(residual + 1 * width, pred_in + 1 * in_stride);
-      *(int32_t*)&(rec_out[2 * out_stride]) = get_quantized_recon_4x1_avx2(residual + 2 * width, pred_in + 2 * in_stride);
-      *(int32_t*)&(rec_out[3 * out_stride]) = get_quantized_recon_4x1_avx2(residual + 3 * width, pred_in + 3 * in_stride);
+      *(int32_t*) & (rec_out[0 * out_stride]) = get_quantized_recon_4x1_avx2(residual + 0 * width, pred_in + 0 * in_stride);
+      *(int32_t*)& (rec_out[1 * out_stride]) = get_quantized_recon_4x1_avx2(residual + 1 * width, pred_in + 1 * in_stride);
+      *(int32_t*)& (rec_out[2 * out_stride]) = get_quantized_recon_4x1_avx2(residual + 2 * width, pred_in + 2 * in_stride);
+      *(int32_t*)& (rec_out[3 * out_stride]) = get_quantized_recon_4x1_avx2(residual + 3 * width, pred_in + 3 * in_stride);
       break;
     case 8:
-      *(int64_t*)&(rec_out[0 * out_stride]) = get_quantized_recon_8x1_avx2(residual + 0 * width, pred_in + 0 * in_stride);
-      *(int64_t*)&(rec_out[1 * out_stride]) = get_quantized_recon_8x1_avx2(residual + 1 * width, pred_in + 1 * in_stride);
-      *(int64_t*)&(rec_out[2 * out_stride]) = get_quantized_recon_8x1_avx2(residual + 2 * width, pred_in + 2 * in_stride);
-      *(int64_t*)&(rec_out[3 * out_stride]) = get_quantized_recon_8x1_avx2(residual + 3 * width, pred_in + 3 * in_stride);
-      *(int64_t*)&(rec_out[4 * out_stride]) = get_quantized_recon_8x1_avx2(residual + 4 * width, pred_in + 4 * in_stride);
-      *(int64_t*)&(rec_out[5 * out_stride]) = get_quantized_recon_8x1_avx2(residual + 5 * width, pred_in + 5 * in_stride);
-      *(int64_t*)&(rec_out[6 * out_stride]) = get_quantized_recon_8x1_avx2(residual + 6 * width, pred_in + 6 * in_stride);
-      *(int64_t*)&(rec_out[7 * out_stride]) = get_quantized_recon_8x1_avx2(residual + 7 * width, pred_in + 7 * in_stride);
+      *(int64_t*) & (rec_out[0 * out_stride]) = get_quantized_recon_8x1_avx2(residual + 0 * width, pred_in + 0 * in_stride);
+      *(int64_t*)& (rec_out[1 * out_stride]) = get_quantized_recon_8x1_avx2(residual + 1 * width, pred_in + 1 * in_stride);
+      *(int64_t*)& (rec_out[2 * out_stride]) = get_quantized_recon_8x1_avx2(residual + 2 * width, pred_in + 2 * in_stride);
+      *(int64_t*)& (rec_out[3 * out_stride]) = get_quantized_recon_8x1_avx2(residual + 3 * width, pred_in + 3 * in_stride);
+      *(int64_t*)& (rec_out[4 * out_stride]) = get_quantized_recon_8x1_avx2(residual + 4 * width, pred_in + 4 * in_stride);
+      *(int64_t*)& (rec_out[5 * out_stride]) = get_quantized_recon_8x1_avx2(residual + 5 * width, pred_in + 5 * in_stride);
+      *(int64_t*)& (rec_out[6 * out_stride]) = get_quantized_recon_8x1_avx2(residual + 6 * width, pred_in + 6 * in_stride);
+      *(int64_t*)& (rec_out[7 * out_stride]) = get_quantized_recon_8x1_avx2(residual + 7 * width, pred_in + 7 * in_stride);
       break;
     default:
-      for (int y = 0; y < width; ++y) {
+      for (int y = 0; y < height; ++y) {
         for (int x = 0; x < width; x += 16) {
-          *(int64_t*)&(rec_out[x + y * out_stride]) = get_quantized_recon_8x1_avx2(residual + x + y * width, pred_in + x + y  * in_stride);
-          *(int64_t*)&(rec_out[(x + 8) + y * out_stride]) = get_quantized_recon_8x1_avx2(residual + (x + 8) + y * width, pred_in + (x + 8) + y  * in_stride);
+          *(int64_t*)& (rec_out[x + y * out_stride]) = get_quantized_recon_8x1_avx2(residual + x + y * width, pred_in + x + y * in_stride);
+          *(int64_t*)& (rec_out[(x + 8) + y * out_stride]) = get_quantized_recon_8x1_avx2(residual + (x + 8) + y * width, pred_in + (x + 8) + y * in_stride);
         }
       }
       break;
+    }
+  }
+  else {
+    switch (width) {
+    case 4:
+      for (int y = 0; y < height; y += 4) {
+        *(int32_t*)& (rec_out[(y + 0) * out_stride]) = get_quantized_recon_4x1_avx2(residual + (y + 0) * width, pred_in + (y + 0) * in_stride);
+        *(int32_t*)& (rec_out[(y + 1) * out_stride]) = get_quantized_recon_4x1_avx2(residual + (y + 1) * width, pred_in + (y + 1) * in_stride);
+        *(int32_t*)& (rec_out[(y + 2) * out_stride]) = get_quantized_recon_4x1_avx2(residual + (y + 2) * width, pred_in + (y + 2) * in_stride);
+        *(int32_t*)& (rec_out[(y + 3) * out_stride]) = get_quantized_recon_4x1_avx2(residual + (y + 3) * width, pred_in + (y + 3) * in_stride);
+      }
+      break;
+    case 8:
+      for (int y = 0; y < height; ++y) {
+        *(int32_t*)& (rec_out[y * out_stride]) = get_quantized_recon_8x1_avx2(residual + y * width, pred_in + y * in_stride);
+      }
+      break;
+    default:
+      for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+          int16_t val = residual[x + y * width] + pred_in[x + y * in_stride];
+          rec_out[x + y * out_stride] = (uvg_pixel)CLIP(0, PIXEL_MAX, val);
+        }
+      }
+      break;
+    }
   }
 }
 
@@ -726,7 +753,7 @@ int uvg_quantize_residual_avx2(encoder_state_t *const state,
       int y, x;
       int sign, absval;
       int maxAbsclipBD = (1 << UVG_BIT_DEPTH) - 1;
-      for (y = 0; y < width; ++y) {
+      for (y = 0; y < height; ++y) {
         for (x = 0; x < width; ++x) {
           residual[x + y * width] = (int16_t)CLIP((int16_t)(-maxAbsclipBD - 1), (int16_t)maxAbsclipBD, residual[x + y * width]);
           sign = residual[x + y * width] >= 0 ? 1 : -1;
@@ -742,14 +769,14 @@ int uvg_quantize_residual_avx2(encoder_state_t *const state,
     }
 
     // Get quantized reconstruction. (residual + pred_in -> rec_out)
-    get_quantized_recon_avx2(residual, pred_in, in_stride, rec_out, out_stride, width);
+    get_quantized_recon_avx2(residual, pred_in, in_stride, rec_out, out_stride, width, height);
   }
   else if (rec_out != pred_in) {
     // With no coeffs and rec_out == pred_int we skip copying the coefficients
     // because the reconstruction is just the prediction.
     int y, x;
 
-    for (y = 0; y < width; ++y) {
+    for (y = 0; y < height; ++y) {
       for (x = 0; x < width; ++x) {
         rec_out[x + y * out_stride] = pred_in[x + y * in_stride];
       }

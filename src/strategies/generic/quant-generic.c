@@ -547,7 +547,7 @@ int uvg_quantize_residual_generic(encoder_state_t *const state,
       int y, x;
       int sign, absval;
       int maxAbsclipBD = (1 << UVG_BIT_DEPTH) - 1;
-      for (y = 0; y < width; ++y) {
+      for (y = 0; y < height; ++y) {
         for (x = 0; x < width; ++x) {
           residual[x + y * width] = (int16_t)CLIP((int16_t)(-maxAbsclipBD - 1), (int16_t)maxAbsclipBD, residual[x + y * width]);
           sign = residual[x + y * width] >= 0 ? 1 : -1;
@@ -563,7 +563,7 @@ int uvg_quantize_residual_generic(encoder_state_t *const state,
     }
 
     // Get quantized reconstruction. (residual + pred_in -> rec_out)
-    for (y = 0; y < width; ++y) {
+    for (y = 0; y < height; ++y) {
       for (x = 0; x < width; ++x) {
         int16_t val = residual[x + y * width] + pred_in[x + y * in_stride];
         rec_out[x + y * out_stride] = (uvg_pixel)CLIP(0, PIXEL_MAX, val);
@@ -575,7 +575,7 @@ int uvg_quantize_residual_generic(encoder_state_t *const state,
     // because the reconstruction is just the prediction.
     int y, x;
 
-    for (y = 0; y < width; ++y) {
+    for (y = 0; y < height; ++y) {
       for (x = 0; x < width; ++x) {
         rec_out[x + y * out_stride] = pred_in[x + y * in_stride];
       }
