@@ -64,8 +64,8 @@ static void uvg_angular_pred_avx2(
   // ISP_TODO: non-square block implementation, height is passed but not used
   const int width = channel_type == COLOR_Y ? cu_loc->width : cu_loc->chroma_width;
   const int height = channel_type == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
-  const int log2_width = uvg_g_convert_to_bit[width] + 2;
-  const int log2_height = uvg_g_convert_to_bit[height] + 2;
+  const int log2_width =  uvg_g_convert_to_log2[width];
+  const int log2_height = uvg_g_convert_to_log2[height];
 
   assert((log2_width >= 2 && log2_width <= 5) && (log2_height >= 2 && log2_height <= 5));
   assert(intra_mode >= 2 && intra_mode <= 66);
@@ -516,8 +516,8 @@ static void uvg_intra_pred_planar_avx2(
   // ISP_TODO: non-square block implementation, height is passed but not used
   const int width = color == COLOR_Y ? cu_loc->width : cu_loc->chroma_width;
   const int height = color == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
-  const int log2_width = uvg_g_convert_to_bit[width] + 2;
-  const int log2_height = uvg_g_convert_to_bit[height] + 2;
+  const int log2_width =  uvg_g_convert_to_log2[width];
+  const int log2_height = uvg_g_convert_to_log2[height];
 
   assert((log2_width >= 2 && log2_width <= 5) && (log2_height >= 2 && log2_height <= 5));
 
@@ -983,8 +983,8 @@ static void uvg_pdpc_planar_dc_avx2(
   assert(mode == 0 || mode == 1);  // planar or DC
   const int width = color == COLOR_Y ? cu_loc->width : cu_loc->chroma_width;
   const int height = color == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
-  const int log2_width = uvg_g_convert_to_bit[width] + 2;
-  const int log2_height = uvg_g_convert_to_bit[height] + 2;
+  const int log2_width =  uvg_g_convert_to_log2[width];
+  const int log2_height = uvg_g_convert_to_log2[height];
 
   __m256i shuf_mask_byte = _mm256_setr_epi8(
     0, -1, 0, -1, 0, -1, 0, -1,

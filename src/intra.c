@@ -922,8 +922,8 @@ static void intra_predict_regular(
 {
   const int width = color == COLOR_Y ? cu_loc->width : cu_loc->chroma_width;
   const int height = color == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
-  const int log2_width = uvg_g_convert_to_bit[width] + 2;
-  const int log2_height = uvg_g_convert_to_bit[height] + 2;
+  const int log2_width = uvg_g_convert_to_log2[width];
+  const int log2_height = uvg_g_convert_to_log2[height];
   const uvg_config *cfg = &state->encoder_control->cfg;
 
   // MRL only for luma
@@ -988,8 +988,8 @@ void uvg_intra_build_reference_any(
 {
   const int width = color == COLOR_Y ? cu_loc->width : cu_loc->chroma_width;
   const int height = color == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
-  const int log2_width = uvg_g_convert_to_bit[width] + 2;
-  const int log2_height = uvg_g_convert_to_bit[height] + 2;
+  const int log2_width =  uvg_g_convert_to_log2[width];
+  const int log2_height = uvg_g_convert_to_log2[height];
 
   assert((log2_width >= 2 && log2_width <= 5) && (log2_height >= 2 && log2_height <= 5));
 
@@ -1201,8 +1201,8 @@ void uvg_intra_build_reference_inner(
 {
   const int width = color == COLOR_Y ? cu_loc->width : cu_loc->chroma_width;
   const int height = color == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
-  const int log2_width = uvg_g_convert_to_bit[width] + 2;
-  const int log2_height = uvg_g_convert_to_bit[height] + 2;
+  const int log2_width =  uvg_g_convert_to_log2[width];
+  const int log2_height = uvg_g_convert_to_log2[height];
 
   assert((log2_width >= 2 && log2_width <= 5) && (log2_height >= 2 && log2_height <= 5));
 
@@ -1487,8 +1487,8 @@ static void intra_recon_tb_leaf(
   
   const int width  = color == COLOR_Y ? cu_loc->width  : cu_loc->chroma_width;
   const int height = color == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
-  int log2_width = uvg_g_convert_to_bit[width] + 2;
-  int log2_height = uvg_g_convert_to_bit[height] + 2;
+  int log2_width =  uvg_g_convert_to_log2[width];
+  int log2_height = uvg_g_convert_to_log2[height];
 
   const int lcu_width = LCU_WIDTH >> shift;
 

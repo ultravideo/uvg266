@@ -1141,8 +1141,8 @@ int uvg_ts_rdoq(encoder_state_t* const state, coeff_t* src_coeff, coeff_t* dest_
   const int  max_log2_tr_dynamic_range = 15;
   uint32_t log2_tr_width = uvg_math_floor_log2(width);
   uint32_t log2_tr_height = uvg_math_floor_log2(height);
-  const uint32_t log2_block_width = uvg_g_convert_to_bit[width] + 2;
-  const uint32_t log2_block_height = uvg_g_convert_to_bit[height] + 2;
+  const uint32_t log2_block_width  = uvg_g_convert_to_log2[width];
+  const uint32_t log2_block_height = uvg_g_convert_to_log2[height];
   const uint32_t log2_cg_width = g_log2_sbb_size[log2_tr_width][log2_tr_height][0];
   const uint32_t log2_cg_height = g_log2_sbb_size[log2_tr_width][log2_tr_height][1];
 
@@ -1398,8 +1398,8 @@ void uvg_rdoq(
   int32_t  transform_shift   = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - ((log2_tr_height + log2_tr_width) >> 1);  // Represents scaling through forward transform
   uint16_t go_rice_param     = 0;
   uint32_t reg_bins = (width * height * 28) >> 4;
-  const uint32_t log2_block_width   = uvg_g_convert_to_bit[width] + 2;
-  const uint32_t log2_block_height = uvg_g_convert_to_bit[height] + 2;
+  const uint32_t log2_block_width  = uvg_g_convert_to_log2[width];
+  const uint32_t log2_block_height = uvg_g_convert_to_log2[height];
   int32_t  scalinglist_type= (block_type == CU_INTRA ? 0 : 3) + color;
 
   int32_t qp_scaled = uvg_get_scaled_qp(color, state->qp, (encoder->bitdepth - 8) * 6, encoder->qp_map[0]);
