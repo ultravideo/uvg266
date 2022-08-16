@@ -529,7 +529,7 @@ int uvg_quantize_residual_generic(encoder_state_t *const state,
     int y, x;
 
     // Get quantized residual. (coeff_out -> coeff -> residual)
-    uvg_dequant(state, coeff_out, coeff, width, width, color,
+    uvg_dequant(state, coeff_out, coeff, width, height, color,
       cur_cu->type, cur_cu->tr_idx == MTS_SKIP && color == COLOR_Y);
     
     if (state->encoder_control->cfg.lfnst && cur_cu->type == CU_INTRA) {
@@ -537,7 +537,7 @@ int uvg_quantize_residual_generic(encoder_state_t *const state,
       uvg_inv_lfnst(cur_cu, width, height, color, lfnst_index, coeff, tree_type);
     }
     if (use_trskip) {
-      uvg_itransformskip(state->encoder_control, residual, coeff, width);
+      uvg_itransformskip(state->encoder_control, residual, coeff, width, height);
     }
     else {
       uvg_itransform2d(state->encoder_control, residual, coeff, width, height, color, cur_cu);
