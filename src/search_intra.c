@@ -200,8 +200,8 @@ static void derive_mts_constraints(cu_info_t *const pred_cu,
   // ToDo: large block support in VVC?
   uint32_t sig_coeffgroup_flag[32 * 32] = { 0 };
 
-  const uint32_t log2_block_width = uvg_g_convert_to_bit[width] + 2;
-  const uint32_t log2_block_height = uvg_g_convert_to_bit[height] + 2;
+  const uint32_t log2_block_width =  uvg_g_convert_to_log2[width];
+  const uint32_t log2_block_height = uvg_g_convert_to_log2[height];
   const uint32_t log2_cg_size = uvg_g_log2_sbb_size[log2_block_width][log2_block_width][0]
     + uvg_g_log2_sbb_size[log2_block_width][log2_block_width][1]; // ISP_TODO: height
   const uint32_t *old_scan = uvg_g_sig_last_scan[scan_idx][log2_block_width - 1];
@@ -263,8 +263,8 @@ static INLINE bool can_use_isp(const int width, const int height, const int max_
   assert(!(width > LCU_WIDTH || height > LCU_WIDTH) && "Block size larger than max LCU size.");
   assert(!(width < TR_MIN_WIDTH || height < TR_MIN_WIDTH) && "Block size smaller than min TR_WIDTH.");
 
-  const int log2_width = uvg_g_convert_to_bit[width] + 2;
-  const int log2_height = uvg_g_convert_to_bit[height] + 2;
+  const int log2_width =  uvg_g_convert_to_log2[width];
+  const int log2_height = uvg_g_convert_to_log2[height];
 
   // Each split block must have at least 16 samples.
   bool not_enough_samples = (log2_width + log2_height <= 4);

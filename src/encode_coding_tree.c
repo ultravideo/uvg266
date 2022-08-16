@@ -283,8 +283,8 @@ void uvg_encode_ts_residual(encoder_state_t* const state,
 
   // CONSTANTS
 
-  const uint32_t log2_block_width = uvg_g_convert_to_bit[width] + 2;
-  const uint32_t log2_block_height = log2_block_width; // ISP_TODO: height
+  const uint32_t log2_block_width = uvg_g_convert_to_log2[width];
+  const uint32_t log2_block_height = log2_block_width; // TODO: height
   const uint32_t log2_cg_size = uvg_g_log2_sbb_size[log2_block_width][log2_block_width][0] + uvg_g_log2_sbb_size[log2_block_width][log2_block_width][1];
   const uint32_t* old_scan =    uvg_g_sig_last_scan[scan_mode][log2_block_width - 1];
   const uint32_t* old_scan_cg = g_sig_last_scan_cg[log2_block_width - 1][scan_mode];
@@ -1064,12 +1064,12 @@ void uvg_encode_intra_luma_coding_unit(const encoder_state_t * const state,
   uint32_t width = (LCU_WIDTH >> depth);
   uint32_t height = (LCU_WIDTH >> depth);
 
-  bool enough_samples = uvg_g_convert_to_bit[width] + uvg_g_convert_to_bit[height] > (uvg_g_convert_to_bit[4 /* MIN_TB_SIZEY*/] << 1);
+  // Need at least 16 samples in sub blocks to use isp. If both dimensions are 4, not enough samples. Size cannot be 2 at this point.
+  bool allow_isp = !(width == 4 && height == 4);
   uint8_t isp_mode = 0;
   // ToDo: add height comparison
   //isp_mode += ((width > TR_MAX_WIDTH) || !enough_samples) ? 1 : 0;
   //isp_mode += ((height > TR_MAX_WIDTH) || !enough_samples) ? 2 : 0;
-  bool allow_isp = enough_samples;
 
   // Code MIP related bits
   bool enable_mip = state->encoder_control->cfg.mip;

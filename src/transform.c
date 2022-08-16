@@ -183,7 +183,7 @@ void uvg_derive_lfnst_constraints(
   coeff_scan_order_t scan_idx = uvg_get_scan_order(pred_cu->type, pred_cu->intra.mode, depth);
   // ToDo: large block support in VVC?
 
-  const uint32_t log2_block_size = uvg_g_convert_to_bit[width] + 2;
+  const uint32_t log2_block_size = uvg_g_convert_to_log2[width];
   const uint32_t* scan = uvg_g_sig_last_scan[scan_idx][log2_block_size - 1];
 
   signed scan_pos_last = -1;
@@ -825,7 +825,7 @@ void uvg_fwd_lfnst(
 
   if (lfnst_index && !mts_skip && (is_separate_tree || color == COLOR_Y))
   {
-    const uint32_t log2_block_size = uvg_g_convert_to_bit[width] + 2;
+    const uint32_t log2_block_size = uvg_g_convert_to_log2[width];
     assert(log2_block_size != -1 && "LFNST: invalid block width.");
     const bool whge3 = width >= 8 && height >= 8;
     const uint32_t* scan = whge3 ? uvg_coef_top_left_diag_scan_8x8[log2_block_size] : uvg_g_sig_last_scan[scan_order][log2_block_size - 1];
@@ -961,7 +961,7 @@ void uvg_inv_lfnst(
   const int scan_order = uvg_get_scan_order(cu_type, intra_mode, depth);
   
   if (lfnst_index && !mts_skip && (is_separate_tree || color == COLOR_Y)) {
-    const uint32_t log2_block_size = uvg_g_convert_to_bit[width] + 2;
+    const uint32_t log2_block_size = uvg_g_convert_to_log2[width];
     const bool whge3 = width >= 8 && height >= 8;
     const uint32_t* scan = whge3 ? uvg_coef_top_left_diag_scan_8x8[log2_block_size] : uvg_g_sig_last_scan[scan_order][log2_block_size - 1];
     

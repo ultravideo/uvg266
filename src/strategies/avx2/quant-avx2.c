@@ -382,8 +382,8 @@ void uvg_quant_avx2(const encoder_state_t * const state, const coeff_t * __restr
   const encoder_control_t * const encoder = state->encoder_control;
   //const uint32_t log2_block_size = uvg_g_convert_to_bit[width] + 2;
   //const uint32_t * const old_scan = uvg_g_sig_last_scan[scan_idx][log2_block_size - 1];
-  const uint32_t log2_tr_width = uvg_g_convert_to_bit[width] + 2;
-  const uint32_t log2_tr_height = uvg_g_convert_to_bit[height] + 2;
+  const uint32_t log2_tr_width  = uvg_g_convert_to_log2[width];
+  const uint32_t log2_tr_height = uvg_g_convert_to_log2[height];
   const uint32_t* const scan = uvg_get_scan_order_table(SCAN_GROUP_4X4, scan_idx, log2_tr_width, log2_tr_height);
 
   int32_t qp_scaled = uvg_get_scaled_qp(color, state->qp, (encoder->bitdepth - 8) * 6, encoder->qp_map[0]);
@@ -768,6 +768,8 @@ void uvg_dequant_avx2(const encoder_state_t * const state, coeff_t *q_coef, coef
   const encoder_control_t * const encoder = state->encoder_control;
   int32_t shift,add,coeff_q;
   int32_t n;
+  const uint32_t log2_tr_width =  uvg_g_convert_to_log2[width];
+  const uint32_t log2_tr_height = uvg_g_convert_to_log2[height];
   int32_t transform_shift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - ((uvg_math_floor_log2(width) + uvg_math_floor_log2(height)) >> 1); // Represents scaling through forward transform
 
 

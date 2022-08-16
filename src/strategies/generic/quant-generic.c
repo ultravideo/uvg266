@@ -62,8 +62,8 @@ void uvg_quant_generic(
   uint8_t lfnst_idx)
 {
   const encoder_control_t * const encoder = state->encoder_control;
-  const uint32_t log2_tr_width = uvg_g_convert_to_bit[width] + 2;
-  const uint32_t log2_tr_height = uvg_g_convert_to_bit[height] + 2;
+  const uint32_t log2_tr_width  = uvg_g_convert_to_log2[width];
+  const uint32_t log2_tr_height = uvg_g_convert_to_log2[height];
   //const uint32_t log2_block_size = uvg_g_convert_to_bit[width] + 2;
   //const uint32_t * const old_scan = uvg_g_sig_last_scan[scan_idx][log2_block_size - 1];
   const uint32_t * const scan = uvg_get_scan_order_table(SCAN_GROUP_4X4, scan_idx, log2_tr_width, log2_tr_height);
@@ -594,7 +594,9 @@ void uvg_dequant_generic(const encoder_state_t * const state, coeff_t *q_coef, c
   const encoder_control_t * const encoder = state->encoder_control;
   int32_t shift,add,coeff_q;
   int32_t n;
-  int32_t transform_shift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - ((uvg_math_floor_log2(width) + uvg_math_floor_log2(height)) >> 1); // Represents scaling through forward transform
+  const uint32_t log2_tr_width  = uvg_g_convert_to_log2[width];
+  const uint32_t log2_tr_height = uvg_g_convert_to_log2[height];
+  int32_t transform_shift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - ((log2_tr_width + log2_tr_height) >> 1); // Represents scaling through forward transform
 
 
   int32_t qp_scaled = uvg_get_scaled_qp(color, state->qp, (encoder->bitdepth-8)*6, encoder->qp_map[0]);
@@ -604,11 +606,9 @@ void uvg_dequant_generic(const encoder_state_t * const state, coeff_t *q_coef, c
 
   if (encoder->scaling_list.enable)
   {
-    uint32_t log2_tr_width = uvg_math_floor_log2(height) + 2;
-    uint32_t log2_tr_height = uvg_math_floor_log2(width) + 2;
     int32_t scalinglist_type = (block_type == CU_INTRA ? 0 : 3) + (int8_t)(color);
 
-    const int32_t *dequant_coef = encoder->scaling_list.de_quant_coeff[log2_tr_width -2][log2_tr_height -2][scalinglist_type][qp_scaled%6];
+    const int32_t *dequant_coef = encoder->scaling_list.de_quant_coeff[log2_tr_width][log2_tr_height][scalinglist_type][qp_scaled%6];
     shift += 4;
 
     if (shift >qp_scaled / 6) {
@@ -629,7 +629,7 @@ void uvg_dequant_generic(const encoder_state_t * const state, coeff_t *q_coef, c
     int32_t scale = uvg_g_inv_quant_scales[qp_scaled%6] << (qp_scaled/6);
     add = 1 << (shift-1);
 
-    for (n = 0; n < width*height; n++) {
+    for (n = 0; n < width * height; n++) {
       coeff_q   = (q_coef[n] * scale + add) >> shift;
       coef[n] = (coeff_t)CLIP(-32768, 32767, coeff_q);
     }
