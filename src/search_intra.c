@@ -257,77 +257,6 @@ static void derive_mts_constraints(cu_info_t *const pred_cu,
 }
 
 
-// ISP_TODO: move this function if it is used elsewhere
-static INLINE bool can_use_isp(const int width, const int height, const int max_tr_size)
-{
-  assert(!(width > LCU_WIDTH || height > LCU_WIDTH) && "Block size larger than max LCU size.");
-  assert(!(width < TR_MIN_WIDTH || height < TR_MIN_WIDTH) && "Block size smaller than min TR_WIDTH.");
-
-  const int log2_width =  uvg_g_convert_to_log2[width];
-  const int log2_height = uvg_g_convert_to_log2[height];
-
-  // Each split block must have at least 16 samples.
-  bool not_enough_samples = (log2_width + log2_height <= 4);
-  bool cu_size_larger_than_max_tr_size = width > max_tr_size || height > max_tr_size;
-  if (not_enough_samples || cu_size_larger_than_max_tr_size) {
-    return false;
-  }
-  return true;
-}
-
-
-/**
-* \brief Returns ISP split partition size based on block dimensions and split type.
-*
-* Returns ISP split partition size based on block dimensions and split type.
-* Will fail if resulting partition size has less than 16 samples. 
-*
-* \param width        Block width.
-* \param height       Block height.
-* \param split_type   Horizontal or vertical split.
-*/
-int uvg_get_isp_split_dim(const int width, const int height, const int split_type)
-{
-  bool divide_in_rows = split_type == SPLIT_TYPE_HOR;
-  int split_dim_size, non_split_dim_size, partition_size, div_shift = 2;
-
-  if (divide_in_rows) {
-    split_dim_size = height;
-    non_split_dim_size = width;
-  }
-  else {
-    split_dim_size = width;
-    non_split_dim_size = height;
-  }
-
-  // ISP_TODO: make a define for this. Depends on minimum transform block log2 side length
-  const int min_num_samples = 16; // Minimum allowed number of samples for split block
-  const int factor_to_min_samples = non_split_dim_size < min_num_samples ? min_num_samples >> uvg_math_floor_log2(non_split_dim_size) : 1;
-  partition_size = (split_dim_size >> div_shift) < factor_to_min_samples ? factor_to_min_samples : (split_dim_size >> div_shift);
-
-  assert((uvg_math_floor_log2(partition_size) + uvg_math_floor_log2(non_split_dim_size) < uvg_math_floor_log2(min_num_samples)) &&
-    "Partition has less than allowed minimum number of samples.");
-  return partition_size;
-}
-
-
-// ISP_TODO: move this function if it is used elsewhere
-static INLINE bool can_use_isp_with_lfnst(const int width, const int height, const int isp_mode)
-{
-  if (isp_mode == ISP_MODE_NO_ISP) {
-    return false;
-  }
-  const int tu_width = isp_mode == ISP_MODE_HOR ? width : uvg_get_isp_split_dim(width, height, SPLIT_TYPE_VER);
-  const int tu_height = isp_mode == ISP_MODE_HOR ? uvg_get_isp_split_dim(width, height, SPLIT_TYPE_HOR) : height;
-  const int min_tb_size = TR_MIN_WIDTH; 
-
-  if (!(tu_width >= min_tb_size && tu_height >= min_tb_size)) {
-    return false;
-  }
-  return true;
-}
-
-
 /**
 * \brief Perform search for best intra transform split configuration.
 *
@@ -445,7 +374,7 @@ static double search_intra_trdepth(
 
       if (pred_cu->lfnst_idx != 0) {
         // Cannot use ISP with LFNST for small blocks
-        pred_cu->intra.isp_mode = can_use_isp_with_lfnst(width, height, pred_cu->intra.isp_mode) ? pred_cu->intra.isp_mode : ISP_MODE_NO_ISP;
+        pred_cu->intra.isp_mode = uvg_can_use_isp_with_lfnst(width, height, pred_cu->intra.isp_mode, tree_type) ? pred_cu->intra.isp_mode : ISP_MODE_NO_ISP;
       }
 
       for (trafo = mts_start; trafo < num_transforms; trafo++) {
@@ -1465,7 +1394,7 @@ static int8_t search_intra_rdo(
   for (int mode = 0; mode < modes_to_check; mode++) {
     bool can_do_isp_search = search_data[mode].pred_cu.intra.mip_flag ? false: true; // Cannot use ISP with MIP
     can_do_isp_search = search_data[mode].pred_cu.intra.multi_ref_idx == 0 ? can_do_isp_search : false; // Cannot use ISP with MRL
-    int max_isp_modes = can_do_isp_search && can_use_isp(width, height, 64 /*MAX_TR_SIZE*/) && state->encoder_control->cfg.isp ? NUM_ISP_MODES : 1;
+    int max_isp_modes = can_do_isp_search && uvg_can_use_isp(width, height, 64 /*MAX_TR_SIZE*/) && state->encoder_control->cfg.isp ? NUM_ISP_MODES : 1;
 
     for (int isp_mode = 0; isp_mode < max_isp_modes; ++isp_mode) {
       search_data[mode].pred_cu.intra.isp_mode = isp_mode;
