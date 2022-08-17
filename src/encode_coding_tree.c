@@ -102,63 +102,8 @@ static void encode_mts_idx(encoder_state_t * const state,
   }
 }
 
-// ISP_TODO: move these defines to a proper place when ISP is implemented
-// As of now, these are only needed in lfnst checks
-#define NOT_INTRA_SUBPARTITIONS 0
-#define HOR_INTRA_SUBPARTITIONS 1
-#define VER_INTRA_SUBPARTITIONS 2
-#define NUM_INTRA_SUBPARTITIONS_MODES 3
-#define INTRA_SUBPARTITIONS_RESERVED 4
-#define TU_1D_HOR_SPLIT 8
-#define TU_1D_VER_SPLIT 9
 
-#define MIN_TB_SIZE_X 4
-#define MIN_TB_SIZE_Y 4
-
-static int get_isp_split_dim(const int width, const int height, const int isp_split_type)
-{
-  bool divide_tu_in_rows = isp_split_type == TU_1D_HOR_SPLIT;
-  uint32_t split_dim_size, non_split_dim_size, partition_size, div_shift = 2;
-
-  if (divide_tu_in_rows)
-  {
-    split_dim_size = height;
-    non_split_dim_size = width;
-  }
-  else
-  {
-    split_dim_size = width;
-    non_split_dim_size = height;
-  }
-  
-  const unsigned min_num_samples_cu = 1 << ((uvg_math_floor_log2(MIN_TB_SIZE_Y) << 1));
-  const unsigned factor_to_min_samples = non_split_dim_size < min_num_samples_cu ? min_num_samples_cu >> uvg_math_floor_log2(non_split_dim_size) : 1;
-  partition_size = (split_dim_size >> div_shift) < factor_to_min_samples ? factor_to_min_samples : (split_dim_size >> div_shift);
-
-  assert(!(uvg_math_floor_log2(partition_size) + uvg_math_floor_log2(non_split_dim_size) < uvg_math_floor_log2(min_num_samples_cu)) && "Partition has less than minimum amount of samples.");
-  return partition_size;
-}
-
-static bool can_use_lfnst_with_isp(const int width, const int height, const int isp_split_type, const enum uvg_tree_type tree_type)
-{
-  if (tree_type == UVG_CHROMA_T) {
-    return false;
-  }
-  if (isp_split_type == NOT_INTRA_SUBPARTITIONS) {
-    return false;
-  }
-
-  const int tu_width = (isp_split_type == HOR_INTRA_SUBPARTITIONS) ? width : get_isp_split_dim(width, height, TU_1D_VER_SPLIT);
-  const int tu_height = (isp_split_type == HOR_INTRA_SUBPARTITIONS) ? get_isp_split_dim(width, height, TU_1D_HOR_SPLIT) : height;
-
-  if (!(tu_width >= MIN_TB_SIZE_Y && tu_height >= MIN_TB_SIZE_Y))
-  {
-    return false;
-  }
-  return true;
-}
-
- bool uvg_is_lfnst_allowed(
+bool uvg_is_lfnst_allowed(
   const encoder_state_t* const state,
   const cu_info_t* const pred_cu,
   const int width,
@@ -170,8 +115,7 @@ static bool can_use_lfnst_with_isp(const int width, const int height, const int 
   const lcu_t* lcu) 
 {
   if (state->encoder_control->cfg.lfnst && pred_cu->type == CU_INTRA) {
-    const int isp_mode = 0; // ISP_TODO: assign proper ISP mode when ISP is implemented
-    const int isp_split_type = 0;
+    const int isp_mode = pred_cu->intra.isp_mode;
     const int depth = pred_cu->depth;
     const int chroma_width = width >> 1;
     const int chroma_height = height >> 1;
@@ -181,7 +125,7 @@ static bool can_use_lfnst_with_isp(const int width, const int height, const int 
     bool is_sep_tree = depth == 4 || tree_type != UVG_BOTH_T;
     bool mip_flag = pred_cu->type == CU_INTRA && color == COLOR_Y ? pred_cu->intra.mip_flag : false;
 
-    if ((isp_mode && !can_use_lfnst_with_isp(width, height, isp_split_type, tree_type)) ||
+    if ((isp_mode && !uvg_can_use_isp_with_lfnst(width, height, isp_mode, tree_type)) ||
       (pred_cu->type == CU_INTRA && mip_flag && !can_use_lfnst_with_mip) || 
       (is_sep_tree && MIN(cu_width, cu_height) < 4) || 
       (cu_width > TR_MAX_WIDTH || cu_height > TR_MAX_WIDTH)) {
@@ -1064,13 +1008,6 @@ void uvg_encode_intra_luma_coding_unit(const encoder_state_t * const state,
   uint32_t width = (LCU_WIDTH >> depth);
   uint32_t height = (LCU_WIDTH >> depth);
 
-  // Need at least 16 samples in sub blocks to use isp. If both dimensions are 4, not enough samples. Size cannot be 2 at this point.
-  bool allow_isp = !(width == 4 && height == 4);
-  uint8_t isp_mode = 0;
-  // ToDo: add height comparison
-  //isp_mode += ((width > TR_MAX_WIDTH) || !enough_samples) ? 1 : 0;
-  //isp_mode += ((height > TR_MAX_WIDTH) || !enough_samples) ? 2 : 0;
-
   // Code MIP related bits
   bool enable_mip = state->encoder_control->cfg.mip;
   int8_t mip_flag = enable_mip ? cur_cu->intra.mip_flag : false;
@@ -1127,19 +1064,41 @@ void uvg_encode_intra_luma_coding_unit(const encoder_state_t * const state,
     }
   }
 
+  bool enable_isp = state->encoder_control->cfg.isp;
+  // Need at least 16 samples in sub blocks to use isp. If both dimensions are 4, not enough samples. Blocks of size 2 do not exist yet (not for luma at least)
+  bool allow_isp = enable_isp ? uvg_can_use_isp(width, height, 64 /*MAX_TR_SIZE*/) : false;
+  uint8_t isp_mode = allow_isp ? cur_cu->intra.isp_mode : 0;
 
-  // ToDo: update real usage, these if clauses as such don't make any sense
-  if (isp_mode != 0 && multi_ref_idx == 0) {
-    if (isp_mode) {
-      CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.intra_subpart_model[0]),  0, bits, "intra_subPartitions");
-    } else {
-      CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.intra_subpart_model[0]), 1, bits, "intra_subPartitions");
-      // ToDo: complete this if-clause
-      if (isp_mode == 3) {
-        CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.intra_subpart_model[0]), allow_isp - 1, bits, "intra_subPart_ver_hor");
-      }
+  // ToDo: add height comparison
+  //isp_mode += ((width > TR_MAX_WIDTH) || !enough_samples) ? 1 : 0;
+  //isp_mode += ((height > TR_MAX_WIDTH) || !enough_samples) ? 2 : 0;
+
+  if (allow_isp && !multi_ref_idx /*&& !bdpcm && !color_transform*/) {
+    if (isp_mode == ISP_MODE_NO_ISP) {
+      CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.intra_subpart_model[0]), 0, bits, "intra_subpartitions_mode");
+    }
+    else {
+      CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.intra_subpart_model[0]), 1, bits, "intra_subpartitions_mode");
+      CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.intra_subpart_model[1]), isp_mode - 1, bits, "intra_subpartitions_split_type"); // Vertical or horizontal split
     }
   }
+
+  
+  //if (allow_isp && !multi_ref_idx /*&& !bdpcm && !color_transform*/) {
+  //  if (isp_mode == ISP_MODE_NO_ISP) {
+  //    if (isp_mode) {
+  //      CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.intra_subpart_model[0]), 0, bits, "intra_subPartitions");
+  //    }
+  //    else {
+  //      CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.intra_subpart_model[0]), 1, bits, "intra_subPartitions");
+  //      // ToDo: complete this if-clause
+  //      if (isp_mode == 3) {
+  //        CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.intra_subpart_model[0]), allow_isp - 1, bits, "intra_subPart_ver_hor");
+  //      }
+  //    }
+  //  }
+  //}
+  
 
   const int cu_width = LCU_WIDTH >> depth;
     // PREDINFO CODING

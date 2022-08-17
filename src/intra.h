@@ -159,3 +159,14 @@ const cu_info_t* uvg_get_co_located_luma_cu(
   enum uvg_tree_type tree_type);
 
 int uvg_get_mip_flag_context(int x, int y, int width, int height, const lcu_t* lcu, cu_array_t* const cu_a);
+
+// ISP related defines
+#define NUM_ISP_MODES 3
+#define ISP_MODE_NO_ISP 0
+#define ISP_MODE_HOR 1
+#define ISP_MODE_VER 2
+#define SPLIT_TYPE_HOR 1
+#define SPLIT_TYPE_VER 2
+
+bool uvg_can_use_isp(const int width, const int height, const int max_tr_size);
+bool uvg_can_use_isp_with_lfnst(const int width, const int height, const int isp_mode, const enum uvg_tree_type tree_type);

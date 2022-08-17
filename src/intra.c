@@ -1471,6 +1471,41 @@ const cu_info_t* uvg_get_co_located_luma_cu(
 }
 
 
+/**
+* \brief Returns ISP split partition size based on block dimensions and split type.
+*
+* Returns ISP split partition size based on block dimensions and split type.
+* Will fail if resulting partition size has less than 16 samples.
+*
+* \param width        Block width.
+* \param height       Block height.
+* \param split_type   Horizontal or vertical split.
+*/
+static int get_isp_split_dim(const int width, const int height, const int split_type)
+{
+  bool divide_in_rows = split_type == SPLIT_TYPE_HOR;
+  int split_dim_size, non_split_dim_size, partition_size, div_shift = 2;
+
+  if (divide_in_rows) {
+    split_dim_size = height;
+    non_split_dim_size = width;
+  }
+  else {
+    split_dim_size = width;
+    non_split_dim_size = height;
+  }
+
+  // ISP_TODO: make a define for this. Depends on minimum transform block log2 side length
+  const int min_num_samples = 16; // Minimum allowed number of samples for split block
+  const int factor_to_min_samples = non_split_dim_size < min_num_samples ? min_num_samples >> uvg_math_floor_log2(non_split_dim_size) : 1;
+  partition_size = (split_dim_size >> div_shift) < factor_to_min_samples ? factor_to_min_samples : (split_dim_size >> div_shift);
+
+  assert((uvg_math_floor_log2(partition_size) + uvg_math_floor_log2(non_split_dim_size) < uvg_math_floor_log2(min_num_samples)) &&
+    "Partition has less than allowed minimum number of samples.");
+  return partition_size;
+}
+
+
 static void intra_recon_tb_leaf(
   encoder_state_t* const state,
   const cu_loc_t* cu_loc,
@@ -1631,7 +1666,7 @@ void uvg_intra_recon_cu(
     // ISP split is done horizontally or vertically depending on ISP mode, 2 or 4 times depending on block dimensions.
     // Small blocks are split only twice.
     int split_type = search_data->pred_cu.intra.isp_mode;
-    int part_dim = uvg_get_isp_split_dim(width, height, split_type);
+    int part_dim = get_isp_split_dim(width, height, split_type);
     int limit = split_type == ISP_MODE_HOR ? height : width;
     for (int part = 0; part < limit; part + part_dim) {
       const int part_x = split_type == ISP_MODE_HOR ? x : x + part;
@@ -1667,4 +1702,59 @@ void uvg_intra_recon_cu(
                             search_data->pred_cu.joint_cb_cr & 3 && state->encoder_control->cfg.jccr && has_chroma,
                             &loc, depth, cur_cu, lcu,
                             false, tree_type);
+}
+
+
+/**
+* \brief Check if ISP can be used for block size.
+*
+* \return True if isp can be used.
+* \param width        Block width.
+* \param height       Block height.
+* \param max_tr_size  Maximum supported transform block size (64).
+*/
+bool uvg_can_use_isp(const int width, const int height, const int max_tr_size)
+{
+  assert(!(width > LCU_WIDTH || height > LCU_WIDTH) && "Block size larger than max LCU size.");
+  assert(!(width < TR_MIN_WIDTH || height < TR_MIN_WIDTH) && "Block size smaller than min TR_WIDTH.");
+
+  const int log2_width = uvg_g_convert_to_log2[width];
+  const int log2_height = uvg_g_convert_to_log2[height];
+
+  // Each split block must have at least 16 samples.
+  bool not_enough_samples = (log2_width + log2_height <= 4);
+  bool cu_size_larger_than_max_tr_size = width > max_tr_size || height > max_tr_size;
+  if (not_enough_samples || cu_size_larger_than_max_tr_size) {
+    return false;
+  }
+  return true;
+}
+
+
+/**
+* \brief Check if given ISP mode can be used with LFNST.
+*
+* \return True if isp can be used.
+* \param width        Block width.
+* \param height       Block height.
+* \param isp_mode     ISP mode.
+* \param tree_type    Tree type. Dual, luma or chroma tree.
+*/
+bool uvg_can_use_isp_with_lfnst(const int width, const int height, const int isp_split_type, const enum uvg_tree_type tree_type)
+{
+  if (tree_type == UVG_CHROMA_T) {
+    return false;
+  }
+  if (isp_split_type == ISP_MODE_NO_ISP) {
+    return false;
+  }
+
+  const int tu_width = (isp_split_type == ISP_MODE_HOR) ? width : get_isp_split_dim(width, height, SPLIT_TYPE_VER);
+  const int tu_height = (isp_split_type == ISP_MODE_HOR) ? get_isp_split_dim(width, height, SPLIT_TYPE_HOR) : height;
+
+  if (!(tu_width >= TR_MIN_WIDTH && tu_height >= TR_MIN_WIDTH))
+  {
+    return false;
+  }
+  return true;
 }
