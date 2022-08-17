@@ -1481,8 +1481,10 @@ const cu_info_t* uvg_get_co_located_luma_cu(
 * \param height       Block height.
 * \param split_type   Horizontal or vertical split.
 */
-static int get_isp_split_dim(const int width, const int height, const int split_type)
+int uvg_get_isp_split_dim(const int width, const int height, const int split_type)
 {
+  assert(split_type != ISP_MODE_NO_ISP && "Cannot calculate split dimension if no split type is set. Make sure this function is not called in this case.");
+
   bool divide_in_rows = split_type == SPLIT_TYPE_HOR;
   int split_dim_size, non_split_dim_size, partition_size, div_shift = 2;
 
@@ -1666,9 +1668,9 @@ void uvg_intra_recon_cu(
     // ISP split is done horizontally or vertically depending on ISP mode, 2 or 4 times depending on block dimensions.
     // Small blocks are split only twice.
     int split_type = search_data->pred_cu.intra.isp_mode;
-    int part_dim = get_isp_split_dim(width, height, split_type);
+    int part_dim = uvg_get_isp_split_dim(width, height, split_type);
     int limit = split_type == ISP_MODE_HOR ? height : width;
-    for (int part = 0; part < limit; part + part_dim) {
+    for (int part = 0; part < limit; part += part_dim) {
       const int part_x = split_type == ISP_MODE_HOR ? x : x + part;
       const int part_y = split_type == ISP_MODE_HOR ? y + part: y;
       const int part_w = split_type == ISP_MODE_HOR ? part_dim : width;
@@ -1749,8 +1751,8 @@ bool uvg_can_use_isp_with_lfnst(const int width, const int height, const int isp
     return false;
   }
 
-  const int tu_width = (isp_split_type == ISP_MODE_HOR) ? width : get_isp_split_dim(width, height, SPLIT_TYPE_VER);
-  const int tu_height = (isp_split_type == ISP_MODE_HOR) ? get_isp_split_dim(width, height, SPLIT_TYPE_HOR) : height;
+  const int tu_width = (isp_split_type == ISP_MODE_HOR) ? width : uvg_get_isp_split_dim(width, height, SPLIT_TYPE_VER);
+  const int tu_height = (isp_split_type == ISP_MODE_HOR) ? uvg_get_isp_split_dim(width, height, SPLIT_TYPE_HOR) : height;
 
   if (!(tu_width >= TR_MIN_WIDTH && tu_height >= TR_MIN_WIDTH))
   {
