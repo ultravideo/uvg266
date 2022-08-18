@@ -1502,7 +1502,7 @@ int uvg_get_isp_split_dim(const int width, const int height, const int split_typ
   const int factor_to_min_samples = non_split_dim_size < min_num_samples ? min_num_samples >> uvg_math_floor_log2(non_split_dim_size) : 1;
   partition_size = (split_dim_size >> div_shift) < factor_to_min_samples ? factor_to_min_samples : (split_dim_size >> div_shift);
 
-  assert((uvg_math_floor_log2(partition_size) + uvg_math_floor_log2(non_split_dim_size) < uvg_math_floor_log2(min_num_samples)) &&
+  assert((uvg_math_floor_log2(partition_size) + uvg_math_floor_log2(non_split_dim_size) >= uvg_math_floor_log2(min_num_samples)) &&
     "Partition has less than allowed minimum number of samples.");
   return partition_size;
 }
