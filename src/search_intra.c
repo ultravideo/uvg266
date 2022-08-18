@@ -1392,8 +1392,11 @@ static int8_t search_intra_rdo(
   const int height = width; // TODO: height for non-square blocks
   
   for (int mode = 0; mode < modes_to_check; mode++) {
-    bool can_do_isp_search = search_data[mode].pred_cu.intra.mip_flag ? false: true; // Cannot use ISP with MIP
+    bool can_do_isp_search = search_data[mode].pred_cu.intra.mip_flag ? false : true; // Cannot use ISP with MIP
     can_do_isp_search = search_data[mode].pred_cu.intra.multi_ref_idx == 0 ? can_do_isp_search : false; // Cannot use ISP with MRL
+    double best_isp_cost = MAX_DOUBLE;
+    double best_bits = MAX_DOUBLE;
+    int8_t best_isp_mode = -1;
     int max_isp_modes = can_do_isp_search && uvg_can_use_isp(width, height, 64 /*MAX_TR_SIZE*/) && state->encoder_control->cfg.isp ? NUM_ISP_MODES : 1;
 
     for (int isp_mode = 0; isp_mode < max_isp_modes; ++isp_mode) {
@@ -1405,11 +1408,19 @@ static int8_t search_intra_rdo(
 
       double mode_cost = search_intra_trdepth(state, x_px, y_px, depth, tr_depth, MAX_INT, &search_data[mode], lcu, tree_type);
       search_data[mode].cost += mode_cost;
+      if (search_data[mode].cost < best_isp_cost) {
+        best_isp_cost = search_data[mode].cost;
+        best_isp_mode = isp_mode;
+        best_bits = search_data[mode].bits;
+      }
       if (state->encoder_control->cfg.intra_rdo_et && !cbf_is_set_any(search_data[mode].pred_cu.cbf, depth)) {
         modes_to_check = mode + 1;
         break;
       }
     }
+    search_data[mode].cost = best_isp_cost;
+    search_data[mode].bits = best_bits;
+    search_data[mode].pred_cu.intra.isp_mode = best_isp_mode;
   }
 
   // Update order according to new costs
