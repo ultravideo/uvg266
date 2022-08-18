@@ -340,7 +340,7 @@ double uvg_cu_rd_cost_luma(const encoder_state_t *const state,
   }
 
   // Add transform_tree cbf_luma bit cost.
-  if (pred_cu->intra.isp_mode == ISP_MODE_NO_ISP) {
+  if (pred_cu->type == CU_INTER || pred_cu->intra.isp_mode == ISP_MODE_NO_ISP) {
     const int is_tr_split = tr_cu->tr_depth - tr_cu->depth;
     int is_set = cbf_is_set(pred_cu->cbf, depth, COLOR_Y);
     if (pred_cu->type == CU_INTRA ||
@@ -379,9 +379,27 @@ double uvg_cu_rd_cost_luma(const encoder_state_t *const state,
 
   if (!skip_residual_coding) {
     int8_t luma_scan_mode = uvg_get_scan_order(pred_cu->type, pred_cu->intra.mode, depth);
-    const coeff_t *coeffs = &lcu->coeff.y[xy_to_zorder(LCU_WIDTH, x_px, y_px)];
+    if (pred_cu->type == CU_INTER || pred_cu->intra.isp_mode == ISP_MODE_NO_ISP) {
+      const coeff_t* coeffs = &lcu->coeff.y[xy_to_zorder(LCU_WIDTH, x_px, y_px)];
 
-    coeff_bits += uvg_get_coeff_cost(state, coeffs, NULL, width, height, 0, luma_scan_mode, pred_cu->tr_idx == MTS_SKIP);
+      coeff_bits += uvg_get_coeff_cost(state, coeffs, NULL, width, height, 0, luma_scan_mode, pred_cu->tr_idx == MTS_SKIP);
+    }
+    else {
+      int split_type = pred_cu->intra.isp_mode;
+      int part_dim = uvg_get_isp_split_dim(width, height, split_type);
+      int limit = split_type == ISP_MODE_HOR ? height : width;
+      int split_num = 0;
+      for (int part = 0; part < limit; part += part_dim) {
+        const int part_x = split_type == ISP_MODE_HOR ? x_px : x_px + part;
+        const int part_y = split_type == ISP_MODE_HOR ? y_px + part : y_px;
+        const int part_w = split_type == ISP_MODE_HOR ? part_dim : width;
+        const int part_h = split_type == ISP_MODE_HOR ? height : part_dim;
+
+        const coeff_t* coeffs = &lcu->coeff.y[xy_to_zorder(LCU_WIDTH, part_x, part_y)];
+
+        coeff_bits += uvg_get_coeff_cost(state, coeffs, NULL, part_w, part_h, 0, luma_scan_mode, pred_cu->tr_idx == MTS_SKIP);
+      }
+    }
   }
 
   double bits = tr_tree_bits + coeff_bits;
@@ -598,9 +616,27 @@ static double cu_rd_cost_tr_split_accurate(
       CABAC_FBITS_UPDATE(cabac, &cabac->ctx.transform_skip_model_luma, tr_cu->tr_idx == MTS_SKIP, tr_tree_bits, "transform_skip_flag");
     }
     int8_t luma_scan_mode = uvg_get_scan_order(pred_cu->type, pred_cu->intra.mode, depth);
-    const coeff_t* coeffs = &lcu->coeff.y[xy_to_zorder(LCU_WIDTH, x_px, y_px)];
+    if (pred_cu->type == CU_INTER || pred_cu->intra.isp_mode == ISP_MODE_NO_ISP) {
+      const coeff_t* coeffs = &lcu->coeff.y[xy_to_zorder(LCU_WIDTH, x_px, y_px)];
 
-    coeff_bits += uvg_get_coeff_cost(state, coeffs, tr_cu, width, height, 0, luma_scan_mode, tr_cu->tr_skip & 1);
+      coeff_bits += uvg_get_coeff_cost(state, coeffs, NULL, width, height, 0, luma_scan_mode, pred_cu->tr_idx == MTS_SKIP);
+    }
+    else {
+      int split_type = pred_cu->intra.isp_mode;
+      int part_dim = uvg_get_isp_split_dim(width, height, split_type);
+      int limit = split_type == ISP_MODE_HOR ? height : width;
+      int split_num = 0;
+      for (int part = 0; part < limit; part += part_dim) {
+        const int part_x = split_type == ISP_MODE_HOR ? x_px : x_px + part;
+        const int part_y = split_type == ISP_MODE_HOR ? y_px + part : y_px;
+        const int part_w = split_type == ISP_MODE_HOR ? part_dim : width;
+        const int part_h = split_type == ISP_MODE_HOR ? height : part_dim;
+
+        const coeff_t* coeffs = &lcu->coeff.y[xy_to_zorder(LCU_WIDTH, part_x, part_y)];
+
+        coeff_bits += uvg_get_coeff_cost(state, coeffs, NULL, part_w, part_h, 0, luma_scan_mode, pred_cu->tr_idx == MTS_SKIP);
+      }
+    }
   }
 
   if(depth == 4 || tree_type == UVG_LUMA_T) {
