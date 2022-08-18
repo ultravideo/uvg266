@@ -307,7 +307,8 @@ static void downsample_cclm_rec(encoder_state_t *state, int x, int y, int width,
 double uvg_cu_rd_cost_luma(const encoder_state_t *const state,
                            const int x_px, const int y_px, const int depth,
                            const cu_info_t *const pred_cu,
-                           lcu_t *const lcu)
+                           lcu_t *const lcu,
+                           uint8_t isp_cbf)
 {
   const int width = LCU_WIDTH >> depth;
   const int skip_residual_coding = pred_cu->skipped || (pred_cu->type != CU_INTRA && pred_cu->cbf == 0);
@@ -329,29 +330,40 @@ double uvg_cu_rd_cost_luma(const encoder_state_t *const state,
     int offset = width / 2;
     double sum = 0;
 
-    sum += uvg_cu_rd_cost_luma(state, x_px, y_px, depth + 1, pred_cu, lcu);
-    sum += uvg_cu_rd_cost_luma(state, x_px + offset, y_px, depth + 1, pred_cu, lcu);
-    sum += uvg_cu_rd_cost_luma(state, x_px, y_px + offset, depth + 1, pred_cu, lcu);
-    sum += uvg_cu_rd_cost_luma(state, x_px + offset, y_px + offset, depth + 1, pred_cu, lcu);
+    sum += uvg_cu_rd_cost_luma(state, x_px, y_px, depth + 1, pred_cu, lcu, isp_cbf);
+    sum += uvg_cu_rd_cost_luma(state, x_px + offset, y_px, depth + 1, pred_cu, lcu, isp_cbf);
+    sum += uvg_cu_rd_cost_luma(state, x_px, y_px + offset, depth + 1, pred_cu, lcu, isp_cbf);
+    sum += uvg_cu_rd_cost_luma(state, x_px + offset, y_px + offset, depth + 1, pred_cu, lcu, isp_cbf);
 
     return sum + tr_tree_bits * state->lambda;
   }
 
   // Add transform_tree cbf_luma bit cost.
-  const int is_tr_split = tr_cu->tr_depth - tr_cu->depth;
-  int is_set = cbf_is_set(pred_cu->cbf, depth, COLOR_Y);
-  if (pred_cu->type == CU_INTRA ||
+  if (pred_cu->intra.isp_mode == ISP_MODE_NO_ISP) {
+    const int is_tr_split = tr_cu->tr_depth - tr_cu->depth;
+    int is_set = cbf_is_set(pred_cu->cbf, depth, COLOR_Y);
+    if (pred_cu->type == CU_INTRA ||
       is_tr_split ||
       cbf_is_set(tr_cu->cbf, depth, COLOR_U) ||
       cbf_is_set(tr_cu->cbf, depth, COLOR_V))
-  {
-    cabac_ctx_t *ctx = &(cabac->ctx.qt_cbf_model_luma[0]);
+    {
+      cabac_ctx_t* ctx = &(cabac->ctx.qt_cbf_model_luma[0]);
 
-    CABAC_FBITS_UPDATE(cabac, ctx, is_set, tr_tree_bits, "cbf_y_search");
+      CABAC_FBITS_UPDATE(cabac, ctx, is_set, tr_tree_bits, "cbf_y_search");
+    }
+
+    if (is_set && state->encoder_control->cfg.trskip_enable && width <= (1 << state->encoder_control->cfg.trskip_max_size)) {
+      CABAC_FBITS_UPDATE(cabac, &cabac->ctx.transform_skip_model_luma, pred_cu->tr_idx == MTS_SKIP, tr_tree_bits, "transform_skip_flag");
+    }
   }
-
-  if (is_set && state->encoder_control->cfg.trskip_enable && width <= (1 << state->encoder_control->cfg.trskip_max_size)) {
-    CABAC_FBITS_UPDATE(cabac, &cabac->ctx.transform_skip_model_luma, pred_cu->tr_idx == MTS_SKIP, tr_tree_bits, "transform_skip_flag");
+  else {
+    cabac_ctx_t* ctx = &(cabac->ctx.qt_cbf_model_luma[0]);
+    // TODO: 8x4 CUs
+    for (int i = 0; i < 4; i++) {
+      if (i != 3 && isp_cbf != 0x8) {
+        CABAC_FBITS_UPDATE(cabac, ctx, (isp_cbf >> i) & 1, tr_tree_bits, "cbf_y_search");
+      }
+    }
   }
 
   // SSD between reconstruction and original
@@ -478,7 +490,8 @@ static double cu_rd_cost_tr_split_accurate(
   const int depth,
   const cu_info_t* const pred_cu,
   lcu_t* const lcu,
-  enum uvg_tree_type tree_type) {
+  enum uvg_tree_type tree_type,
+  uint8_t isp_cbf) {
   const int width = LCU_WIDTH >> depth;
 
   const int skip_residual_coding = pred_cu->skipped || (pred_cu->type != CU_INTRA && pred_cu->cbf == 0);
@@ -523,25 +536,37 @@ static double cu_rd_cost_tr_split_accurate(
     int offset = LCU_WIDTH >> (depth + 1);
     double sum = 0;
 
-    sum += cu_rd_cost_tr_split_accurate(state, x_px, y_px, depth + 1, pred_cu, lcu, tree_type);
-    sum += cu_rd_cost_tr_split_accurate(state, x_px + offset, y_px, depth + 1, pred_cu, lcu, tree_type);
-    sum += cu_rd_cost_tr_split_accurate(state, x_px, y_px + offset, depth + 1, pred_cu, lcu, tree_type);
-    sum += cu_rd_cost_tr_split_accurate(state, x_px + offset, y_px + offset, depth + 1, pred_cu, lcu, tree_type);
+    sum += cu_rd_cost_tr_split_accurate(state, x_px, y_px, depth + 1, pred_cu, lcu, tree_type, isp_cbf);
+    sum += cu_rd_cost_tr_split_accurate(state, x_px + offset, y_px, depth + 1, pred_cu, lcu, tree_type, isp_cbf);
+    sum += cu_rd_cost_tr_split_accurate(state, x_px, y_px + offset, depth + 1, pred_cu, lcu, tree_type, isp_cbf);
+    sum += cu_rd_cost_tr_split_accurate(state, x_px + offset, y_px + offset, depth + 1, pred_cu, lcu, tree_type, isp_cbf);
     return sum + tr_tree_bits * state->lambda;
   }
   const int cb_flag_y = cbf_is_set(tr_cu->cbf, depth, COLOR_Y) && tree_type != UVG_CHROMA_T;
 
+  const bool is_isp = !(pred_cu->type == CU_INTER || pred_cu->intra.isp_mode == ISP_MODE_NO_ISP);
   // Add transform_tree cbf_luma bit cost.
-  const int is_tr_split = depth - tr_cu->depth;
-  if ((pred_cu->type == CU_INTRA ||
-    is_tr_split ||
-    cb_flag_u ||
-    cb_flag_v) 
+  if (is_isp) {
+    const int is_tr_split = depth - tr_cu->depth;
+    if ((pred_cu->type == CU_INTRA ||
+      is_tr_split ||
+      cb_flag_u ||
+      cb_flag_v)
       && !skip_residual_coding && tree_type != UVG_CHROMA_T)
-  {
-    cabac_ctx_t* ctx = &(cabac->ctx.qt_cbf_model_luma[0]);
+    {
+      cabac_ctx_t* ctx = &(cabac->ctx.qt_cbf_model_luma[0]);
 
-    CABAC_FBITS_UPDATE(cabac, ctx, cb_flag_y, tr_tree_bits, "cbf_y_search");
+      CABAC_FBITS_UPDATE(cabac, ctx, cb_flag_y, tr_tree_bits, "cbf_y_search");
+    }
+  }
+  else {
+    cabac_ctx_t* ctx = &(cabac->ctx.qt_cbf_model_luma[0]);
+    // TODO: 8x4 CUs
+    for (int i = 0; i < 4; i++) {
+      if (i != 3 && isp_cbf != 0x8) {
+        CABAC_FBITS_UPDATE(cabac, ctx, (isp_cbf >> i) & 1, tr_tree_bits, "cbf_y_search");
+      }
+    }
   }
 
   if (cb_flag_y || cb_flag_u || cb_flag_v) {
@@ -563,7 +588,7 @@ static double cu_rd_cost_tr_split_accurate(
   }
   // Chroma transform skip enable/disable is non-normative, so we need to count the chroma
   // tr-skip bits even when we are never using it.
-  const bool can_use_tr_skip = state->encoder_control->cfg.trskip_enable && width <= (1 << state->encoder_control->cfg.trskip_max_size);
+  const bool can_use_tr_skip = state->encoder_control->cfg.trskip_enable && width <= (1 << state->encoder_control->cfg.trskip_max_size) && !is_isp;
 
   if(cb_flag_y){
     if (can_use_tr_skip) {
@@ -1144,7 +1169,7 @@ static double search_cu(
     
     cost = bits * state->lambda;
 
-    cost += cu_rd_cost_tr_split_accurate(state, x_local, y_local, depth, cur_cu, lcu, tree_type);
+    cost += cu_rd_cost_tr_split_accurate(state, x_local, y_local, depth, cur_cu, lcu, tree_type, 0);
     
     if (ctrl->cfg.zero_coeff_rdo && inter_zero_coeff_cost <= cost) {
       cost = inter_zero_coeff_cost;
@@ -1301,7 +1326,7 @@ static double search_cu(
         double mode_bits = calc_mode_bits(state, lcu, cur_cu, x, y, depth) + bits;
         cost += mode_bits * state->lambda;
 
-        cost += cu_rd_cost_tr_split_accurate(state, x_local, y_local, depth, cur_cu, lcu, tree_type);
+        cost += cu_rd_cost_tr_split_accurate(state, x_local, y_local, depth, cur_cu, lcu, tree_type, 0);
 
         memcpy(&post_seach_cabac, &state->search_cabac, sizeof(post_seach_cabac));
         memcpy(&state->search_cabac, &temp_cabac, sizeof(temp_cabac));

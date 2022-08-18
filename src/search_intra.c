@@ -406,6 +406,7 @@ static double search_intra_trdepth(
           UVG_LUMA_T,
           true,
           false);
+        if (pred_cu->intra.isp_mode != ISP_MODE_NO_ISP && search_data->best_isp_cbfs == 0) continue;
 
         if (trafo != 0 && !cbf_is_set(pred_cu->cbf, depth, COLOR_Y)) continue;
         
@@ -445,7 +446,8 @@ static double search_intra_trdepth(
           lcu_px.y,
           depth,
           pred_cu,
-          lcu);
+          lcu,
+          search_data->best_isp_cbfs);
         double transform_bits = 0;
         if (state->encoder_control->cfg.lfnst && depth == pred_cu->tr_depth &&
             trafo != MTS_SKIP) {

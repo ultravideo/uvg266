@@ -1665,12 +1665,15 @@ void uvg_intra_recon_cu(
     return;
   }
   if (search_data->pred_cu.intra.isp_mode != ISP_MODE_NO_ISP && recon_luma ) {
+    search_data->best_isp_cbfs = 0;
     // ISP split is done horizontally or vertically depending on ISP mode, 2 or 4 times depending on block dimensions.
     // Small blocks are split only twice.
     int split_type = search_data->pred_cu.intra.isp_mode;
     int part_dim = uvg_get_isp_split_dim(width, height, split_type);
     int limit = split_type == ISP_MODE_HOR ? height : width;
+    int split_num = 0;
     for (int part = 0; part < limit; part += part_dim) {
+      cbf_clear(&cur_cu->cbf, depth, COLOR_Y);
       const int part_x = split_type == ISP_MODE_HOR ? x : x + part;
       const int part_y = split_type == ISP_MODE_HOR ? y + part: y;
       const int part_w = split_type == ISP_MODE_HOR ? part_dim : width;
@@ -1683,6 +1686,8 @@ void uvg_intra_recon_cu(
       uvg_quantize_lcu_residual(state, true, false, false,
                                 &loc, depth, cur_cu, lcu,
                                 false, tree_type);
+      search_data->best_isp_cbfs |= cbf_is_set(cur_cu->cbf, depth, COLOR_Y) << (split_num++);
+   
     }
   }
   const bool has_luma = recon_luma && search_data->pred_cu.intra.isp_mode == ISP_MODE_NO_ISP;
@@ -1700,6 +1705,7 @@ void uvg_intra_recon_cu(
     intra_recon_tb_leaf(state, &loc, lcu, COLOR_V, search_data, tree_type);
   }
 
+  // TODO: not necessary to call if only luma and ISP is on
   uvg_quantize_lcu_residual(state, has_luma, has_chroma && !(search_data->pred_cu.joint_cb_cr & 3),
                             search_data->pred_cu.joint_cb_cr & 3 && state->encoder_control->cfg.jccr && has_chroma,
                             &loc, depth, cur_cu, lcu,

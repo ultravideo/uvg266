@@ -2286,7 +2286,7 @@ void uvg_cu_cost_inter_rd2(encoder_state_t * const state,
   int cbf = cbf_is_set_any(cur_cu->cbf, depth);
   
   if(cbf) {
-    *inter_cost = uvg_cu_rd_cost_luma(state, x_px, y_px, depth, cur_cu, lcu);
+    *inter_cost = uvg_cu_rd_cost_luma(state, x_px, y_px, depth, cur_cu, lcu, 0);
     if (reconstruct_chroma) {
       if (cur_cu->depth != cur_cu->tr_depth || !state->encoder_control->cfg.jccr) {
         *inter_cost += uvg_cu_rd_cost_chroma(state, x_px, y_px, depth, cur_cu, lcu);
