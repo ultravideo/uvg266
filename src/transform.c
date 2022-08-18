@@ -1269,7 +1269,6 @@ static void quantize_tr_residual(
     
   }
 
-  // ISP_TODO: when other ISP things work, ask Joose about this
   cbf_clear(&cur_pu->cbf, depth, color);
   if (has_coeffs) {
     cbf_set(&cur_pu->cbf, depth, color);

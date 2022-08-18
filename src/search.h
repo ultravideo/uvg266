@@ -87,7 +87,8 @@ void uvg_search_lcu(encoder_state_t *state, int x, int y, const yuv_t *hor_buf, 
 double uvg_cu_rd_cost_luma(const encoder_state_t *const state,
                            const int x_px, const int y_px, const int depth,
                            const cu_info_t *const pred_cu,
-                           lcu_t *const lcu);
+                           lcu_t *const lcu,
+                           uint8_t isp_cbf);
 double uvg_cu_rd_cost_chroma(const encoder_state_t *const state,
                              const int x_px, const int y_px, const int depth,
                              cu_info_t *const pred_cu,

@@ -71,6 +71,7 @@ typedef struct {
   double coeff_bits;
   double distortion;
   double lfnst_costs[3];
+  uint8_t best_isp_cbfs;
 } intra_search_data_t ;
 
 
@@ -168,5 +169,6 @@ int uvg_get_mip_flag_context(int x, int y, int width, int height, const lcu_t* l
 #define SPLIT_TYPE_HOR 1
 #define SPLIT_TYPE_VER 2
 
+int uvg_get_isp_split_dim(const int width, const int height, const int split_type);
 bool uvg_can_use_isp(const int width, const int height, const int max_tr_size);
 bool uvg_can_use_isp_with_lfnst(const int width, const int height, const int isp_mode, const enum uvg_tree_type tree_type);
