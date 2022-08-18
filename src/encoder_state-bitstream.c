@@ -666,7 +666,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
 
   WRITE_UE(stream, encoder->cfg.log2_parallel_merge_level-2, "log2_parallel_merge_level_minus2");
 
-  WRITE_U(stream, 0, 1, "sps_isp_enabled_flag");
+  WRITE_U(stream, encoder->cfg.isp, 1, "sps_isp_enabled_flag");
   
   if (state->encoder_control->cfg.mrl) {
     WRITE_U(stream, 1, 1, "sps_mrl_enabled_flag");
