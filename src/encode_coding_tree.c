@@ -213,6 +213,7 @@ void uvg_encode_ts_residual(encoder_state_t* const state,
   cabac_data_t* const cabac,
   const coeff_t* coeff,
   uint32_t width,
+  uint32_t height,
   uint8_t type,
   int8_t scan_mode,
   double* bits_out) 
@@ -227,8 +228,9 @@ void uvg_encode_ts_residual(encoder_state_t* const state,
 
   // CONSTANTS
 
-  const uint32_t log2_block_width = uvg_g_convert_to_log2[width];
-  const uint32_t log2_block_height = log2_block_width; // TODO: height
+  const uint32_t log2_block_width  = uvg_g_convert_to_log2[width];
+  const uint32_t log2_block_height = uvg_g_convert_to_log2[height];
+  // TODO: log2_cg_size is wrong if width != height
   const uint32_t log2_cg_size = uvg_g_log2_sbb_size[log2_block_width][log2_block_width][0] + uvg_g_log2_sbb_size[log2_block_width][log2_block_width][1];
   const uint32_t* old_scan =    uvg_g_sig_last_scan[scan_mode][log2_block_width - 1];
   const uint32_t* old_scan_cg = g_sig_last_scan_cg[log2_block_width - 1][scan_mode];
@@ -243,13 +245,11 @@ void uvg_encode_ts_residual(encoder_state_t* const state,
 
   cabac->cur_ctx = base_coeff_group_ctx;
   
-  // ISP_TODO: height
-  int maxCtxBins = (width * width * 7) >> 2;
+  int maxCtxBins = (width * height * 7) >> 2;
   unsigned scan_cg_last = (unsigned )-1;
   //unsigned scan_pos_last = (unsigned )-1;
 
-  // ISP_TODO: height
-  for (i = 0; i < width * width; i++) {
+  for (i = 0; i < width * height; i++) {
     if (coeff[scan[i]]) {
       // ISP_DEBUG
       assert(old_scan[i] == scan[i] && "Old scan_cg differs from the new one.");
@@ -258,7 +258,8 @@ void uvg_encode_ts_residual(encoder_state_t* const state,
       sig_coeffgroup_flag[scan_cg[i >> log2_cg_size]] = 1;
     }
   }
-  scan_cg_last = (width * width - 1) >> log2_cg_size;
+  // TODO: this won't work with non-square blocks
+  scan_cg_last = (width * height - 1) >> log2_cg_size;
   const uint32_t cg_width = (MIN((uint8_t)32, width) >> (log2_cg_size / 2));
 
   bool no_sig_group_before_last = true;
@@ -481,6 +482,7 @@ static void encode_chroma_tu(
   enum
   uvg_tree_type tree_type)
 {
+  int height_c = width_c; // TODO: height for non-square blocks
   int x_local = ((x >> (tree_type != UVG_CHROMA_T)) & ~3) % LCU_WIDTH_C;
   int y_local = ((y >> (tree_type != UVG_CHROMA_T)) & ~3) % LCU_WIDTH_C;
   cabac_data_t* const cabac = &state->cabac;
@@ -496,7 +498,7 @@ static void encode_chroma_tu(
         // TODO: transform skip for chroma blocks
         CABAC_BIN(cabac, (cur_pu->tr_skip >> COLOR_U) & 1, "transform_skip_flag");
       }
-      uvg_encode_coeff_nxn(state, &state->cabac, coeff_u, width_c, COLOR_U, *scan_idx, cur_pu, NULL);
+      uvg_encode_coeff_nxn(state, &state->cabac, coeff_u, width_c, height_c, COLOR_U, *scan_idx, cur_pu, NULL);
     }
 
     if (cbf_is_set(cur_pu->cbf, depth, COLOR_V)) {
@@ -504,7 +506,7 @@ static void encode_chroma_tu(
         cabac->cur_ctx = &cabac->ctx.transform_skip_model_chroma;
         CABAC_BIN(cabac, (cur_pu->tr_skip >> COLOR_V) & 1, "transform_skip_flag");
       }
-      uvg_encode_coeff_nxn(state, &state->cabac, coeff_v, width_c, COLOR_V, *scan_idx, cur_pu, NULL);
+      uvg_encode_coeff_nxn(state, &state->cabac, coeff_v, width_c, height_c, COLOR_V, *scan_idx, cur_pu, NULL);
     }
   }
   else {
@@ -513,7 +515,7 @@ static void encode_chroma_tu(
       cabac->cur_ctx = &cabac->ctx.transform_skip_model_chroma;
       CABAC_BIN(cabac, 0, "transform_skip_flag");
     }
-    uvg_encode_coeff_nxn(state, &state->cabac, coeff_uv, width_c, COLOR_V, *scan_idx, cur_pu, NULL);
+    uvg_encode_coeff_nxn(state, &state->cabac, coeff_uv, width_c, height_c, COLOR_V, *scan_idx, cur_pu, NULL);
     
   }
 }
@@ -534,6 +536,9 @@ static void encode_transform_unit(
   cabac_data_t* const cabac = &state->cabac;
   const uint8_t width = LCU_WIDTH >> depth;
   const uint8_t width_c = (depth == MAX_PU_DEPTH ? width : width / 2);
+  // TODO: height for non-square blocks
+  const uint8_t height = width;
+  const uint8_t height_c = width_c;
 
   cu_array_t* used_cu_array = tree_type != UVG_CHROMA_T ? frame->cu_array : frame->chroma_cu_array;
   const cu_info_t *cur_pu = uvg_cu_array_at_const(used_cu_array, x, y);
@@ -556,13 +561,14 @@ static void encode_transform_unit(
       DBG_YUVIEW_VALUE(state->frame->poc, DBG_YUVIEW_TR_SKIP, x, y, width, width, (cur_pu->tr_idx == MTS_SKIP) ? 1 : 0);
     }
     if(cur_pu->tr_idx == MTS_SKIP) {
-      uvg_encode_ts_residual(state, cabac, coeff_y, width, 0, scan_idx, NULL);      
+      uvg_encode_ts_residual(state, cabac, coeff_y, width, height, 0, scan_idx, NULL);      
     }
     else {
       uvg_encode_coeff_nxn(state,
                            cabac,
                            coeff_y,
                            width,
+                           height,
                            0,
                            scan_idx,
                            (cu_info_t * )cur_pu,

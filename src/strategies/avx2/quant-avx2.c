@@ -875,8 +875,9 @@ static uint32_t coeff_abs_sum_avx2(const coeff_t *coeffs, const size_t length)
   return parts[0] + parts[1] + parts[2] + parts[3];
 }
 
-static uint32_t fast_coeff_cost_avx2(const coeff_t *coeff, int32_t width, uint64_t weights)
+static uint32_t fast_coeff_cost_avx2(const coeff_t *coeff, int32_t width, int32_t height, uint64_t weights)
 {
+  assert((width == height) && "Non-square block handling not implemented for this function.");
   const __m256i zero           = _mm256_setzero_si256();
   const __m256i threes         = _mm256_set1_epi16(3);
   const __m256i negate_hibytes = _mm256_set1_epi16(0xff00);
@@ -893,7 +894,7 @@ static uint32_t fast_coeff_cost_avx2(const coeff_t *coeff, int32_t width, uint64
   __m256i wts_lo     = _mm256_broadcastsi128_si256(wts_lo_128);
   __m256i wts_hi     = _mm256_broadcastsi128_si256(wts_hi_128);
 
-  for (int i = 0; i < width * width; i += 32) {
+  for (int i = 0; i < width * height; i += 32) {
     __m256i curr_lo      = _mm256_loadu_si256 ((const __m256i *)(coeff + i));
     __m256i curr_abs_lo  = _mm256_abs_epi16   (curr_lo);
     __m256i curr_max3_lo = _mm256_min_epu16   (curr_abs_lo, threes);

@@ -55,6 +55,7 @@ void uvg_encode_coeff_nxn_generic(encoder_state_t * const state,
   cabac_data_t * const cabac,
   const coeff_t *coeff,
   uint8_t width,
+  uint8_t height,
   uint8_t color,
   int8_t scan_mode,
   cu_info_t* cur_cu,
@@ -75,7 +76,6 @@ void uvg_encode_coeff_nxn_generic(encoder_state_t * const state,
 
   // CONSTANTS
 
-  const int height = width; // TODO: height for non-square blocks.
   const uint32_t log2_block_width =  uvg_g_convert_to_log2[width];
   const uint32_t log2_block_height = uvg_g_convert_to_log2[height];
   const uint32_t log2_cg_size = uvg_g_log2_sbb_size[log2_block_width][log2_block_width][0] + uvg_g_log2_sbb_size[log2_block_width][log2_block_width][1];
@@ -192,7 +192,7 @@ void uvg_encode_coeff_nxn_generic(encoder_state_t * const state,
 
         sig = (coeff[blk_pos] != 0) ? 1 : 0;
         if (num_non_zero || next_sig_pos != infer_sig_pos) {
-          ctx_sig = uvg_context_get_sig_ctx_idx_abs(coeff, pos_x, pos_y, width, width, color, &temp_diag, &temp_sum);
+          ctx_sig = uvg_context_get_sig_ctx_idx_abs(coeff, pos_x, pos_y, width, height, color, &temp_diag, &temp_sum);
           cabac_ctx_t* sig_ctx_luma = &(cabac->ctx.cu_sig_model_luma[MAX(0, (quant_state - 1))][ctx_sig]);
           cabac_ctx_t* sig_ctx_chroma = &(cabac->ctx.cu_sig_model_chroma[MAX(0, (quant_state - 1))][MIN(ctx_sig,7)]);
 
@@ -200,7 +200,7 @@ void uvg_encode_coeff_nxn_generic(encoder_state_t * const state,
           reg_bins--;
 
         } else if (next_sig_pos != scan_pos_last) {
-          ctx_sig = uvg_context_get_sig_ctx_idx_abs(coeff, pos_x, pos_y, width, width, color, &temp_diag, &temp_sum);
+          ctx_sig = uvg_context_get_sig_ctx_idx_abs(coeff, pos_x, pos_y, width, height, color, &temp_diag, &temp_sum);
         }
 
 
@@ -266,7 +266,7 @@ void uvg_encode_coeff_nxn_generic(encoder_state_t * const state,
         blk_pos = scan[scan_pos];
         pos_y = blk_pos / width;
         pos_x = blk_pos - (pos_y * width);
-        int32_t abs_sum = uvg_abs_sum(coeff, pos_x, pos_y, width, width, 4);
+        int32_t abs_sum = uvg_abs_sum(coeff, pos_x, pos_y, width, height, 4);
 
         rice_param = g_go_rice_pars[abs_sum];
         uint32_t second_pass_abs_coeff = abs(coeff[blk_pos]);
@@ -284,7 +284,7 @@ void uvg_encode_coeff_nxn_generic(encoder_state_t * const state,
         pos_y = blk_pos / width;
         pos_x = blk_pos - (pos_y * width);
         uint32_t coeff_abs = abs(coeff[blk_pos]);
-        int32_t abs_sum = uvg_abs_sum(coeff, pos_x, pos_y, width, width, 0);
+        int32_t abs_sum = uvg_abs_sum(coeff, pos_x, pos_y, width, height, 0);
         rice_param = g_go_rice_pars[abs_sum];        
         pos0 = ((quant_state<2)?1:2) << rice_param;
         uint32_t remainder = (coeff_abs == 0 ? pos0 : coeff_abs <= pos0 ? coeff_abs - 1 : coeff_abs);
