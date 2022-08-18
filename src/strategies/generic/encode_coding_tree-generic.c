@@ -78,9 +78,8 @@ void uvg_encode_coeff_nxn_generic(encoder_state_t * const state,
 
   const uint32_t log2_block_width =  uvg_g_convert_to_log2[width];
   const uint32_t log2_block_height = uvg_g_convert_to_log2[height];
-  const uint32_t log2_cg_size = uvg_g_log2_sbb_size[log2_block_width][log2_block_width][0] + uvg_g_log2_sbb_size[log2_block_width][log2_block_width][1];
-  const uint32_t *old_scan = uvg_g_sig_last_scan[scan_mode][log2_block_width - 1];
-  const uint32_t *old_scan_cg = g_sig_last_scan_cg[log2_block_width - 1][scan_mode];
+  
+  const uint32_t log2_cg_size = uvg_g_log2_sbb_size[log2_block_width][log2_block_height][0] + uvg_g_log2_sbb_size[log2_block_width][log2_block_height][1];
   const uint32_t* scan = uvg_get_scan_order_table(SCAN_GROUP_4X4, scan_mode, log2_block_width, log2_block_height);
   const uint32_t* scan_cg = uvg_get_scan_order_table(SCAN_GROUP_UNGROUPED, scan_mode, log2_block_width, log2_block_height);
 
@@ -92,11 +91,8 @@ void uvg_encode_coeff_nxn_generic(encoder_state_t * const state,
   unsigned scan_cg_last = (unsigned)-1;
   unsigned scan_pos_last = (unsigned)-1;
 
-  for (int i = 0; i < width * width; i++) {
+  for (int i = 0; i < width * height; i++) {
     if (coeff[scan[i]]) {
-      // ISP_DEBUG
-      assert(old_scan[i] == scan[i] && "Old scan_cg differs from the new one.");
-      assert(old_scan_cg[i >> log2_cg_size] == scan_cg[i >> log2_cg_size] && "Old scan_cg differs from the new one.");
       scan_pos_last = i;
       sig_coeffgroup_flag[scan_cg[i >> log2_cg_size]] = 1;
     }
@@ -144,14 +140,14 @@ void uvg_encode_coeff_nxn_generic(encoder_state_t * const state,
   for (i = scan_cg_last; i >= 0; i--) {
 
     //int32_t abs_coeff[64*64];
-    int32_t cg_blk_pos = scan_cg[i];
-    int32_t cg_pos_y = cg_blk_pos / (MIN((uint8_t)32, width) >> (log2_cg_size / 2));
-    int32_t cg_pos_x = cg_blk_pos - (cg_pos_y * (MIN((uint8_t)32, width) >> (log2_cg_size / 2)));
-
     const uint32_t log2_cg_width = uvg_g_log2_sbb_size[log2_block_width][log2_block_height][0];
     const uint32_t log2_cg_height = uvg_g_log2_sbb_size[log2_block_width][log2_block_height][1];
     const uint32_t cg_width = (MIN((uint8_t)TR_MAX_WIDTH, width) >> log2_cg_width);
     const uint32_t cg_height = (MIN((uint8_t)TR_MAX_WIDTH, height) >> log2_cg_height);
+    int32_t cg_blk_pos = scan_cg[i];
+    int32_t cg_pos_y = cg_blk_pos / (MIN((uint8_t)32, width) >> log2_cg_width);
+    int32_t cg_pos_x = cg_blk_pos - (cg_pos_y * (MIN((uint8_t)32, width) >> log2_cg_width));
+
 
     // !!! residual_coding_subblock() !!!
 

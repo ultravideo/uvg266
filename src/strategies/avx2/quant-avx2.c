@@ -380,8 +380,6 @@ void uvg_quant_avx2(const encoder_state_t * const state, const coeff_t * __restr
   int32_t height, color_t color, int8_t scan_idx, int8_t block_type, int8_t transform_skip, uint8_t lfnst_idx)
 {
   const encoder_control_t * const encoder = state->encoder_control;
-  //const uint32_t log2_block_size = uvg_g_convert_to_bit[width] + 2;
-  //const uint32_t * const old_scan = uvg_g_sig_last_scan[scan_idx][log2_block_size - 1];
   const uint32_t log2_tr_width  = uvg_g_convert_to_log2[width];
   const uint32_t log2_tr_height = uvg_g_convert_to_log2[height];
   const uint32_t* const scan = uvg_get_scan_order_table(SCAN_GROUP_4X4, scan_idx, log2_tr_width, log2_tr_height);
