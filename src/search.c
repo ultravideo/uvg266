@@ -309,7 +309,8 @@ double uvg_cu_rd_cost_luma(const encoder_state_t *const state,
                            lcu_t *const lcu,
                            uint8_t isp_cbf)
 {
-  const int width = LCU_WIDTH >> depth;
+  const int width  = LCU_WIDTH >> depth;
+  const int height = width; // TODO: height for non-square blocks
   const int skip_residual_coding = pred_cu->skipped || (pred_cu->type == CU_INTER && pred_cu->cbf == 0);
   cabac_data_t* cabac = (cabac_data_t *)&state->search_cabac;
 
@@ -379,7 +380,7 @@ double uvg_cu_rd_cost_luma(const encoder_state_t *const state,
     int8_t luma_scan_mode = uvg_get_scan_order(pred_cu->type, pred_cu->intra.mode, depth);
     const coeff_t *coeffs = &lcu->coeff.y[xy_to_zorder(LCU_WIDTH, x_px, y_px)];
 
-    coeff_bits += uvg_get_coeff_cost(state, coeffs, NULL, width, 0, luma_scan_mode, pred_cu->tr_idx == MTS_SKIP);
+    coeff_bits += uvg_get_coeff_cost(state, coeffs, NULL, width, height, 0, luma_scan_mode, pred_cu->tr_idx == MTS_SKIP);
   }
 
   double bits = tr_tree_bits + coeff_bits;
@@ -393,7 +394,8 @@ double uvg_cu_rd_cost_chroma(const encoder_state_t *const state,
                              lcu_t *const lcu)
 {
   const vector2d_t lcu_px = { (x_px & ~7) / 2, (y_px & ~7) / 2 };
-  const int width = (depth < MAX_DEPTH) ? LCU_WIDTH >> (depth + 1) : LCU_WIDTH >> depth;
+  const int width  = (depth < MAX_DEPTH) ? LCU_WIDTH >> (depth + 1) : LCU_WIDTH >> depth;
+  const int height = width; // TODO: height for non-square blocks
   cu_info_t *const tr_cu = LCU_GET_CU_AT_PX(lcu, x_px, y_px);
   const int skip_residual_coding = pred_cu->skipped || (pred_cu->type == CU_INTER && pred_cu->cbf == 0);
 
@@ -467,11 +469,11 @@ double uvg_cu_rd_cost_chroma(const encoder_state_t *const state,
     const int index = xy_to_zorder(LCU_WIDTH_C, lcu_px.x, lcu_px.y);
 
     if((pred_cu->joint_cb_cr & 3) == 0){
-      coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.u[index], NULL, width, 2, scan_order, 0);
-      coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.v[index], NULL, width, 2, scan_order, 0);
+      coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.u[index], NULL, width, height, 2, scan_order, 0);
+      coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.v[index], NULL, width, height, 2, scan_order, 0);
     }
     else {
-      coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.joint_uv[index], NULL, width, 2, scan_order, 0);
+      coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.joint_uv[index], NULL, width, height, 2, scan_order, 0);
       
     }
   }
@@ -492,6 +494,7 @@ static double cu_rd_cost_tr_split_accurate(
   enum uvg_tree_type tree_type,
   uint8_t isp_cbf) {
   const int width = LCU_WIDTH >> depth;
+  const int height = width; // TODO: height for non-square blocks
 
   const int skip_residual_coding = pred_cu->skipped || (pred_cu->type == CU_INTER && pred_cu->cbf == 0);
   // cur_cu is used for TU parameters.
@@ -596,7 +599,7 @@ static double cu_rd_cost_tr_split_accurate(
     int8_t luma_scan_mode = uvg_get_scan_order(pred_cu->type, pred_cu->intra.mode, depth);
     const coeff_t* coeffs = &lcu->coeff.y[xy_to_zorder(LCU_WIDTH, x_px, y_px)];
 
-    coeff_bits += uvg_get_coeff_cost(state, coeffs, tr_cu, width, 0, luma_scan_mode, tr_cu->tr_skip & 1);
+    coeff_bits += uvg_get_coeff_cost(state, coeffs, tr_cu, width, height, 0, luma_scan_mode, tr_cu->tr_skip & 1);
   }
 
   if(depth == 4 || tree_type == UVG_LUMA_T) {
@@ -623,7 +626,8 @@ static double cu_rd_cost_tr_split_accurate(
   unsigned chroma_ssd = 0;
   if(has_chroma) {
     const vector2d_t lcu_px = { (x_px >> (tree_type != UVG_CHROMA_T)) & ~3, (y_px >> (tree_type != UVG_CHROMA_T)) &~3  };
-    const int chroma_width = MAX(4, LCU_WIDTH >> (depth + 1));
+    const int chroma_width  = MAX(4, LCU_WIDTH >> (depth + 1));
+    const int chroma_height = chroma_width; // TODO: height for non-square blocks
     int8_t scan_order = uvg_get_scan_order(pred_cu->type, pred_cu->intra.mode_chroma, depth);
     const unsigned index = xy_to_zorder(LCU_WIDTH_C, lcu_px.x, lcu_px.y);
 
@@ -645,8 +649,8 @@ static double cu_rd_cost_tr_split_accurate(
       if(chroma_can_use_tr_skip && cb_flag_v) {
         CABAC_FBITS_UPDATE(cabac, &cabac->ctx.transform_skip_model_chroma, tr_cu->tr_skip & 4, tr_tree_bits, "transform_skip_flag");        
       }
-      coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.u[index], tr_cu, chroma_width, COLOR_U, scan_order, tr_cu->tr_skip & 2);
-      coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.v[index], tr_cu, chroma_width, COLOR_V, scan_order, tr_cu->tr_skip & 4);
+      coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.u[index], tr_cu, chroma_width, chroma_height, COLOR_U, scan_order, tr_cu->tr_skip & 2);
+      coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.v[index], tr_cu, chroma_width, chroma_height, COLOR_V, scan_order, tr_cu->tr_skip & 4);
       
     }
     else {
@@ -663,7 +667,7 @@ static double cu_rd_cost_tr_split_accurate(
       if (chroma_can_use_tr_skip) {
         CABAC_FBITS_UPDATE(cabac, &cabac->ctx.transform_skip_model_chroma, tr_cu->tr_skip & 2, tr_tree_bits, "transform_skip_flag");
       }
-      coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.joint_uv[index], tr_cu, chroma_width, COLOR_U, scan_order, 0);
+      coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.joint_uv[index], tr_cu, chroma_width, chroma_height, COLOR_U, scan_order, 0);
     }
   }
 

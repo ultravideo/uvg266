@@ -690,6 +690,7 @@ void uvg_chroma_transform_search(
         u_quant_coeff,
         pred_cu,
         width,
+        height,
         COLOR_U,
         scan_order,
         transforms[i] == CHROMA_TS);
@@ -706,6 +707,7 @@ void uvg_chroma_transform_search(
         v_quant_coeff,
         pred_cu,
         width,
+        height,
         COLOR_V,
         scan_order,
         transforms[i] == CHROMA_TS);

@@ -649,7 +649,7 @@ uint32_t uvg_context_get_sig_coeff_group_ts(uint32_t* sig_coeff_group_flag,
 * \returns context index for current scan position
 */
 uint32_t uvg_context_get_sig_ctx_idx_abs(const coeff_t* coeff, uint32_t pos_x, uint32_t pos_y,
-                                         uint32_t width, uint32_t height, int8_t type,
+                                         uint32_t width, uint32_t height, int8_t color,
                                          int32_t* temp_diag, int32_t* temp_sum)
 {
   const coeff_t* data = coeff + pos_x + pos_y * width;
@@ -679,7 +679,7 @@ uint32_t uvg_context_get_sig_ctx_idx_abs(const coeff_t* coeff, uint32_t pos_x, u
   }
 #undef UPDATE
   int ctx_ofs = MIN((sum_abs+1)>>1, 3) + (diag < 2 ? 4 : 0);
-  if (type == 0 /* Luma */)
+  if (color == COLOR_Y)
   {
     ctx_ofs += diag < 5 ? 4 : 0;
   }
@@ -807,7 +807,7 @@ unsigned uvg_lrg1_ctx_id_abs_ts(const coeff_t* coeff, int32_t pos_x, int32_t pos
 * \returns context go rice parameter
 */
 uint32_t uvg_abs_sum(const coeff_t* coeff, uint32_t pos_x, uint32_t pos_y,
-                             uint32_t height, uint32_t width, uint32_t baselevel)
+                             uint32_t width, uint32_t height, uint32_t baselevel)
 {
 #define UPDATE(x) sum+=abs(x)/*-(x?1:0)*/
 
@@ -849,8 +849,8 @@ uint32_t uvg_abs_sum(const coeff_t* coeff, uint32_t pos_x, uint32_t pos_y,
 * \returns context go rice parameter
 */
 uint32_t uvg_go_rice_par_abs(const coeff_t* coeff, uint32_t pos_x, uint32_t pos_y,
-  uint32_t height, uint32_t width, uint32_t baselevel)
+  uint32_t width, uint32_t height, uint32_t baselevel)
 {
-  uint32_t check = uvg_abs_sum(coeff, pos_x, pos_y, height, width, baselevel);
+  uint32_t check = uvg_abs_sum(coeff, pos_x, pos_y, width, height, baselevel);
   return  g_go_rice_pars[check];  
 }

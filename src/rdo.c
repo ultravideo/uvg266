@@ -298,6 +298,7 @@ static INLINE double get_coeff_cabac_cost(
   const encoder_state_t * const state,
   const coeff_t *coeff,
   int32_t width,
+  int32_t height,
   color_t color,
   int8_t scan_mode,
   int8_t tr_skip,
@@ -305,7 +306,7 @@ static INLINE double get_coeff_cabac_cost(
 {
   // Make sure there are coeffs present
   bool found = false;
-  for (int i = 0; i < width*width; i++) {
+  for (int i = 0; i < width * height; i++) {
     if (coeff[i] != 0) {
       found = 1;
       break;
@@ -331,6 +332,7 @@ static INLINE double get_coeff_cabac_cost(
                          &cabac_copy,
                          coeff,
                          width,
+                         height,
                          color,
                          scan_mode,
                          cur_tu,                   
@@ -341,6 +343,7 @@ static INLINE double get_coeff_cabac_cost(
       &cabac_copy,
       coeff,
       width,
+      height,
       color,
       scan_mode,
       &bits);
@@ -392,6 +395,7 @@ double uvg_get_coeff_cost(
   const coeff_t *coeff,
   cu_info_t* cur_tu,
   int32_t width,
+  int32_t height,
   color_t color,
   int8_t scan_mode,
   int8_t tr_skip)
@@ -409,15 +413,15 @@ double uvg_get_coeff_cost(
       return UINT32_MAX; // Hush little compiler don't you cry, not really gonna return anything after assert(0)
     } else {
       uint64_t weights = uvg_fast_coeff_get_weights(state);
-      uint32_t fast_cost = uvg_fast_coeff_cost(coeff, width, weights);
+      uint32_t fast_cost = uvg_fast_coeff_cost(coeff, width, height, weights);
       if (check_accuracy) {
-        double ccc = get_coeff_cabac_cost(state, coeff, width, color, scan_mode, tr_skip, cur_tu);
+        double ccc = get_coeff_cabac_cost(state, coeff, width, height, color, scan_mode, tr_skip, cur_tu);
         save_accuracy(state->qp, ccc, fast_cost);
       }
       return fast_cost;
     }
   } else {
-    double ccc = get_coeff_cabac_cost(state, coeff, width, color, scan_mode, tr_skip, cur_tu);
+    double ccc = get_coeff_cabac_cost(state, coeff, width, height, color, scan_mode, tr_skip, cur_tu);
     if (save_cccs) {
       save_ccc(state->qp, coeff, width * width, ccc);
     }

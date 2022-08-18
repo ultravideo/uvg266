@@ -86,7 +86,7 @@ typedef unsigned (quant_residual_func)(encoder_state_t *const state,
 typedef unsigned (dequant_func)(const encoder_state_t * const state, coeff_t *q_coef, coeff_t *coef, int32_t width,
   int32_t height, color_t color, int8_t block_type, int8_t transform_skip);
 
-typedef uint32_t (fast_coeff_cost_func)(const coeff_t *coeff, int32_t width, uint64_t weights);
+typedef uint32_t (fast_coeff_cost_func)(const coeff_t *coeff, int32_t width, int32_t height, uint64_t weights);
 
 typedef uint32_t (coeff_abs_sum_func)(const coeff_t *coeffs, size_t length);
 

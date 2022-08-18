@@ -64,6 +64,7 @@ void uvg_encode_ts_residual(encoder_state_t* const state,
   cabac_data_t* const cabac,
   const coeff_t* coeff,
   uint32_t width,
+  uint32_t height,
   uint8_t type,
   int8_t scan_mode,
   double* bits);

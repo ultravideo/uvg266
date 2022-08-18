@@ -653,14 +653,15 @@ static INLINE void get_coeff_weights(uint64_t wts_packed, uint16_t *weights)
   weights[3] = (wts_packed >> 48) & 0xffff;
 }
 
-static uint32_t fast_coeff_cost_generic(const coeff_t *coeff, int32_t width, uint64_t weights)
+static uint32_t fast_coeff_cost_generic(const coeff_t *coeff, int32_t width, int32_t height, uint64_t weights)
 {
+  assert((width == height) && "Non-square block handling not implemented for this function.");
   uint32_t sum = 0;
   uint16_t weights_unpacked[4];
 
   get_coeff_weights(weights, weights_unpacked);
 
-  for (int32_t i = 0; i < width * width; i++) {
+  for (int32_t i = 0; i < width * height; i++) {
      int16_t curr = coeff[i];
     uint32_t curr_abs = abs(curr);
     if (curr_abs > 3) {

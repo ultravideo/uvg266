@@ -66,7 +66,7 @@ uint32_t uvg_abs_sum(const coeff_t* coeff, uint32_t pos_x, uint32_t pos_y,
                      uint32_t height, uint32_t width, uint32_t baselevel);
 
 uint32_t uvg_go_rice_par_abs(const coeff_t* coeff, uint32_t pos_x, uint32_t pos_y,
-                             uint32_t height, uint32_t width, uint32_t baselevel);
+                             uint32_t width, uint32_t height, uint32_t baselevel);
 
 #define CNU 35
 #define DWS 8
