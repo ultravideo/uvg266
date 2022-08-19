@@ -501,7 +501,6 @@ void uvg_quant_avx2(const encoder_state_t * const state, const coeff_t * __restr
     __m256i v_coef, q_coefs;
     __m256i v_quant_coeff_lo, v_quant_coeff_hi;
 
-    // ISP_TODO: do these avx common functions need height?
     scanord_read_vector(coeffs, scan, scan_idx, subpos, width, result_coeffs, 2);
 
     v_coef  = result_coeffs[0];

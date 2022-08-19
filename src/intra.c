@@ -1497,7 +1497,6 @@ int uvg_get_isp_split_dim(const int width, const int height, const int split_typ
     non_split_dim_size = height;
   }
 
-  // ISP_TODO: make a define for this. Depends on minimum transform block log2 side length
   const int min_num_samples = 16; // Minimum allowed number of samples for split block
   const int factor_to_min_samples = non_split_dim_size < min_num_samples ? min_num_samples >> uvg_math_floor_log2(non_split_dim_size) : 1;
   partition_size = (split_dim_size >> div_shift) < factor_to_min_samples ? factor_to_min_samples : (split_dim_size >> div_shift);
@@ -1654,7 +1653,6 @@ void uvg_intra_recon_cu(
       LCU_GET_CU_AT_PX(lcu, (lcu_px.x + offset) >> (tree_type == UVG_CHROMA_T), (lcu_px.y + offset) >> (tree_type == UVG_CHROMA_T))->cbf,
     };
 
-    // ISP_TODO: does not work with ISP yet, ask Joose when this is relevant.
     if (recon_luma && depth <= MAX_DEPTH) {
       cbf_set_conditionally(&cur_cu->cbf, child_cbfs, depth, COLOR_Y);
     }

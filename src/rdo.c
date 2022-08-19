@@ -1187,8 +1187,8 @@ int uvg_ts_rdoq(encoder_state_t* const state, coeff_t* src_coeff, coeff_t* dest_
 
   const coeff_t entropy_coding_maximum = (1 << max_log2_tr_dynamic_range) - 1;
 
-  const uint32_t* scan = uvg_get_scan_order_table(SCAN_GROUP_4X4, scan_mode, log2_block_width, log2_block_height);
-  const uint32_t* scan_cg = uvg_get_scan_order_table(SCAN_GROUP_UNGROUPED, scan_mode, log2_block_width, log2_block_height);
+  const uint32_t* const scan = uvg_get_scan_order_table(SCAN_GROUP_4X4, scan_mode, log2_block_width, log2_block_height);
+  const uint32_t* const scan_cg = uvg_get_scan_order_table(SCAN_GROUP_UNGROUPED, scan_mode, log2_block_width, log2_block_height);
 
   uint32_t coeff_levels[3];
   double   coeff_level_error[4];
@@ -1391,14 +1391,13 @@ void uvg_rdoq(
 {
   const encoder_control_t * const encoder = state->encoder_control;
   cabac_data_t * const cabac = &state->cabac;
-  // ISP_TODO: these dimensions can be removed, they are same as log2_block_dimensions
-  uint32_t log2_tr_width      = uvg_math_floor_log2(width);
-  uint32_t log2_tr_height      = uvg_math_floor_log2(height);
-  int32_t  transform_shift   = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - ((log2_tr_height + log2_tr_width) >> 1);  // Represents scaling through forward transform
+  const uint32_t log2_block_width = uvg_g_convert_to_log2[width];
+  const uint32_t log2_block_height = uvg_g_convert_to_log2[height];
+
+  int32_t  transform_shift   = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - ((log2_block_width + log2_block_height) >> 1);  // Represents scaling through forward transform
   uint16_t go_rice_param     = 0;
   uint32_t reg_bins = (width * height * 28) >> 4;
-  const uint32_t log2_block_width  = uvg_g_convert_to_log2[width];
-  const uint32_t log2_block_height = uvg_g_convert_to_log2[height];
+  
   int32_t  scalinglist_type= (block_type == CU_INTRA ? 0 : 3) + color;
 
   int32_t qp_scaled = uvg_get_scaled_qp(color, state->qp, (encoder->bitdepth - 8) * 6, encoder->qp_map[0]);
@@ -1407,8 +1406,8 @@ void uvg_rdoq(
 
   const double lambda = color ? state->c_lambda : state->lambda;
 
-  const int32_t *quant_coeff  = encoder->scaling_list.quant_coeff[log2_tr_width][log2_tr_height][scalinglist_type][qp_scaled%6];
-  const double *err_scale     = encoder->scaling_list.error_scale[log2_tr_width][log2_tr_height][scalinglist_type][qp_scaled%6];
+  const int32_t *quant_coeff  = encoder->scaling_list.quant_coeff[log2_block_width][log2_block_height][scalinglist_type][qp_scaled%6];
+  const double *err_scale     = encoder->scaling_list.error_scale[log2_block_width][log2_block_height][scalinglist_type][qp_scaled%6];
 
   double block_uncoded_cost = 0;
   
@@ -1422,7 +1421,6 @@ void uvg_rdoq(
 
   memset(dest_coeff, 0, sizeof(coeff_t) * width * height);
 
-  // ISP_TODO: height
   const uint32_t log2_cg_size = uvg_g_log2_sbb_size[log2_block_width][log2_block_height][0] + uvg_g_log2_sbb_size[log2_block_width][log2_block_height][1];
   const uint32_t log2_cg_width  = uvg_g_log2_sbb_size[log2_block_width][log2_block_height][0];
   const uint32_t log2_cg_height = uvg_g_log2_sbb_size[log2_block_width][log2_block_height][1];
@@ -1430,8 +1428,8 @@ void uvg_rdoq(
   const uint32_t cg_width  = (MIN((uint8_t)TR_MAX_WIDTH, width) >> log2_cg_width);
   const uint32_t cg_height = (MIN((uint8_t)TR_MAX_WIDTH, height) >> log2_cg_height);
 
-  const uint32_t *scan = uvg_get_scan_order_table(SCAN_GROUP_4X4, scan_mode, log2_block_width, log2_block_height);
-  const uint32_t *scan_cg = uvg_get_scan_order_table(SCAN_GROUP_UNGROUPED, scan_mode, log2_block_width, log2_block_height);
+  const uint32_t * const scan = uvg_get_scan_order_table(SCAN_GROUP_4X4, scan_mode, log2_block_width, log2_block_height);
+  const uint32_t * const scan_cg = uvg_get_scan_order_table(SCAN_GROUP_UNGROUPED, scan_mode, log2_block_width, log2_block_height);
 
   const uint32_t cg_size = 16;
   const int32_t  shift = 4 >> 1;
