@@ -255,7 +255,7 @@ int uvg_quant_cbcr_residual_generic(
   ALIGNED(64) int16_t v_residual[TR_MAX_WIDTH * TR_MAX_WIDTH];
   ALIGNED(64) int16_t combined_residual[TR_MAX_WIDTH * TR_MAX_WIDTH];
   ALIGNED(64) coeff_t coeff[TR_MAX_WIDTH * TR_MAX_WIDTH];
-  // ISP_TODO: this function is not fully converted to handle non-square blocks
+  // TODO: this function is not fully converted to handle non-square blocks
   {
     int y, x;
     for (y = 0; y < height; ++y) {
@@ -494,7 +494,7 @@ int uvg_quantize_residual_generic(encoder_state_t *const state,
   // Quantize coeffs. (coeff -> coeff_out)
   
   if (state->encoder_control->cfg.rdoq_enable &&
-      (width > 4 || !state->encoder_control->cfg.rdoq_skip) && !use_trskip) // ISP_TODO: width check here might not be necessary, therefore also height check unnecessary. Investigate.
+      (width > 4 || !state->encoder_control->cfg.rdoq_skip) && !use_trskip)
   {
     int8_t tr_depth = cur_cu->tr_depth - cur_cu->depth;
     tr_depth += (cur_cu->part_size == SIZE_NxN ? 1 : 0);

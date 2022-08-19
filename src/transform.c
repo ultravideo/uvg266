@@ -1194,7 +1194,6 @@ static void quantize_tr_residual(
   }
 
   if (cfg->lossless) {
-    // ISP_TODO: is there any sensible case where in and out strides would be different?
     has_coeffs = bypass_transquant(tr_width,
                                    tr_height,
                                    lcu_width, // in stride

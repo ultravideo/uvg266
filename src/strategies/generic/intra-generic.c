@@ -124,7 +124,6 @@ static void uvg_angular_pred_generic(
   const bool vertical_mode = intra_mode >= 34;
   // Modes distance to horizontal or vertical mode.
   const int_fast8_t mode_disp = vertical_mode ? pred_mode - 50 : -((int32_t)pred_mode - 18);
-  //const int_fast8_t mode_disp = vertical_mode ? intra_mode - 26 : 10 - intra_mode;
   
   // Sample displacement per column in fractions of 32.
   const int_fast8_t sample_disp = (mode_disp < 0 ? -1 : 1) * modedisp2sampledisp[abs(mode_disp)];
@@ -140,23 +139,6 @@ static void uvg_angular_pred_generic(
   // Set ref_main and ref_side such that, when indexed with 0, they point to
   // index 0 in block coordinates.
   if (sample_disp < 0) {
-
-    // ISP_TODO: might be able to use memcpy instead of loops here, should be a bit faster.
-    /*if (vertical_mode) {
-      for (int i = 0; i <= width + 1 + multi_ref_index; i++) {
-        temp_main[width + i] = in_ref_above[i];
-      }
-      for (int j = 0; j <= height + 1 + multi_ref_index; j++) {
-        temp_side[height + j] = in_ref_left[j];
-      }
-    } else {
-      for (int i = 0; i <= width + 1 + multi_ref_index; i++) {
-        temp_side[width + i] = in_ref_above[i];
-      }
-      for (int j = 0; j <= height + 1 + multi_ref_index; j++) {
-        temp_main[height + j] = in_ref_left[j];
-      }
-    }*/
     memcpy(&temp_above[height], &in_ref_above[0], (width + 2 + multi_ref_index) * sizeof(uvg_pixel));
     memcpy(&temp_left[width], &in_ref_left[0], (height + 2 + multi_ref_index) * sizeof(uvg_pixel));
 
@@ -259,10 +241,6 @@ static void uvg_angular_pred_generic(
           int filter_threshold = uvg_intra_hor_ver_dist_thres[log2_width];
           int dist_from_vert_or_hor = MIN(abs((int32_t)pred_mode - 50), abs((int32_t)pred_mode - 18));
           if (dist_from_vert_or_hor > filter_threshold) {
-            // ISP_TODO: these are introduced in the beginning of this function or am I missing something?
-            static const int16_t modedisp2sampledisp[32] = { 0,    1,    2,    3,    4,    6,     8,   10,   12,   14,   16,   18,   20,   23,   26,   29,   32,   35,   39,  45,  51,  57,  64,  73,  86, 102, 128, 171, 256, 341, 512, 1024 };
-            const int_fast8_t mode_disp = (pred_mode >= 34) ? pred_mode - 50 : 18 - pred_mode;
-            const int_fast8_t sample_disp = (mode_disp < 0 ? -1 : 1) * modedisp2sampledisp[abs(mode_disp)];
             if ((abs(sample_disp) & 0x1F) != 0)
             {
               use_cubic = false;
@@ -361,8 +339,8 @@ static void uvg_angular_pred_generic(
     // Mode is horizontal or vertical, just copy the pixels.
     
     // Do not apply PDPC if multi ref line index is other than 0
-    // ISP_TODO: do not do PDPC if block is in BDPCM mode
-    bool do_pdpc = (((width >= 4 && height >= 4) || channel_type != 0) && sample_disp >= 0 && multi_ref_index == 0);
+    // TODO: do not do PDPC if block is in BDPCM mode
+    bool do_pdpc = (((width >= 4 && height >= 4) || channel_type != 0) && sample_disp >= 0 && multi_ref_index == 0 /*&& !bdpcm*/);
 
     if (do_pdpc) {
       int scale = (log2_width + log2_height - 2) >> 2;
@@ -381,25 +359,6 @@ static void uvg_angular_pred_generic(
         memcpy(&dst[y * width], &ref_main[1], width * sizeof(uvg_pixel));
       }
     }
-    // ISP_TODO: there is no reason to run these loops AND then check if PDPC is applied. Do the check first and then run either the normal or PDPC loops
-
-    //for (int_fast32_t y = 0; y < height; ++y) {
-    //  for (int_fast32_t x = 0; x < width; ++x) {
-    //    dst[y * width + x] = ref_main[x + 1];
-    //  }
-    //  // Do not apply PDPC if multi ref line index is other than 0
-    //  // ISP_TODO: do not do PDPC if block is in BDPCM mode
-    //  if (((width >= 4 && height >= 4) || channel_type != 0) && sample_disp >= 0 && multi_ref_index == 0) {
-    //    int scale = (log2_width + log2_height - 2) >> 2;
-    //    const uvg_pixel top_left = ref_main[0];
-    //    const uvg_pixel left = ref_side[1 + y];
-    //    for (int i = 0; i < MIN(3 << scale, width); i++) { // ISP_TODO: is one loop enough for PDPC?
-    //      const int wL = 32 >> (2 * i >> scale);
-    //      const uvg_pixel val = dst[y * width + i];
-    //      dst[y * width + i] = CLIP_TO_PIXEL(val + ((wL * (left - top_left) + 32) >> 6));
-    //    }
-    //  }
-    //}
   }
 
   // Flip the block if this is was a horizontal mode.

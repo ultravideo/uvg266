@@ -739,12 +739,6 @@ static void idct_ ## n ## x ## n ## _generic(int8_t bitdepth, const int16_t *inp
   partial_butterfly_inverse_ ## n ## _generic(tmp, output, shift_2nd); \
 }
 
-
-//static void dct_non_square_generic(int8_t bitdepth, const int16_t* input, int16_t* output)
-//{
-//  // ISP_TODO: non-square transform here
-//}
-
 DCT_NXN_GENERIC(4);
 DCT_NXN_GENERIC(8);
 DCT_NXN_GENERIC(16);

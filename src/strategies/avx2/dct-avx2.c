@@ -1598,7 +1598,6 @@ static void mts_dct_avx2(
 {
   tr_type_t type_hor;
   tr_type_t type_ver;
-  // ISP_TODO: height passed but not used
 
   uvg_get_tr_type(width, height, color, tu, &type_hor, &type_ver, mts_idx);
 

@@ -2573,7 +2573,7 @@ static const uint32_t const g_scan_order_buffer[32258] = {
 
 // Get scan order table based on scan group type (grouped or ungrouped)
 // and log2 block width and height index
-static const uint32_t* g_scan_order[SCAN_GROUP_TYPES][MAX_LOG2_INDEX][MAX_LOG2_INDEX] =
+static const uint32_t* const g_scan_order[SCAN_GROUP_TYPES][MAX_LOG2_INDEX][MAX_LOG2_INDEX] =
 {
   {
     { g_scan_order_buffer + 0, g_scan_order_buffer + 1, g_scan_order_buffer + 3, g_scan_order_buffer + 7, g_scan_order_buffer + 15, g_scan_order_buffer + 31, g_scan_order_buffer + 63, },
@@ -2606,16 +2606,15 @@ static const uint32_t* g_scan_order[SCAN_GROUP_TYPES][MAX_LOG2_INDEX][MAX_LOG2_I
  *
  * \return  Returns pointer to scan order table based on given dimensions.
  */
-uint32_t* uvg_get_scan_order_table(int scan_group, int scan_type, int log2_w, int log2_h)
+const uint32_t* const uvg_get_scan_order_table(int scan_group, int scan_type, int log2_w, int log2_h)
 {
-  // ISP_TODO: horizontal and vertical scan types
+  // TODO: horizontal and vertical scan types
   assert(scan_type == SCAN_DIAG && "Horizontal and vertical scan not implemented.");
 
   if (scan_group == SCAN_GROUP_4X4) {
     return g_scan_order[scan_group][log2_w][log2_h];
   }
   else {
-    // ISP_TODO: returning coef group type does not work yet. It will break for non-square blocks
     return g_scan_order[scan_group][log2_w - 2][log2_h - 2];
   }
 }

@@ -58,7 +58,7 @@ bool uvg_is_mts_allowed(const encoder_state_t * const state, cu_info_t *const pr
   uint8_t mts_type = state->encoder_control->cfg.mts;
   bool mts_allowed = mts_type == UVG_MTS_BOTH || (pred_cu->type == CU_INTRA ? mts_type == UVG_MTS_INTRA : pred_cu->type == CU_INTER && mts_type == UVG_MTS_INTER);
   mts_allowed &= cu_width <= max_size && cu_height <= max_size;
-  //mts_allowed &= !cu.ispMode; // ISP_TODO: Uncomment this when ISP is implemented.
+  mts_allowed &= pred_cu->type == CU_INTRA ? !pred_cu->intra.isp_mode : true;
   //mts_allowed &= !cu.sbtInfo;
   mts_allowed &= !(pred_cu->bdpcmMode && cu_width <= ts_max_size && cu_height <= ts_max_size);
   mts_allowed &= pred_cu->tr_idx != MTS_SKIP && !pred_cu->violates_mts_coeff_constraint && pred_cu->mts_last_scan_pos ;
@@ -233,8 +233,8 @@ void uvg_encode_ts_residual(encoder_state_t* const state,
   // TODO: log2_cg_size is wrong if width != height
   const uint32_t log2_cg_size = uvg_g_log2_sbb_size[log2_block_width][log2_block_width][0] + uvg_g_log2_sbb_size[log2_block_width][log2_block_width][1];
   
-  const uint32_t* scan = uvg_get_scan_order_table(SCAN_GROUP_4X4, scan_mode, log2_block_width, log2_block_height);
-  const uint32_t* scan_cg = uvg_get_scan_order_table(SCAN_GROUP_UNGROUPED, scan_mode, log2_block_width, log2_block_height);
+  const uint32_t* const scan = uvg_get_scan_order_table(SCAN_GROUP_4X4, scan_mode, log2_block_width, log2_block_height);
+  const uint32_t* const scan_cg = uvg_get_scan_order_table(SCAN_GROUP_UNGROUPED, scan_mode, log2_block_width, log2_block_height);
 
   double bits = 0;
 
