@@ -2574,7 +2574,7 @@ static void mts_idct_generic(
     }
 
     partial_tr_func* idct_hor = idct_table[type_hor][log2_width_minus2];
-    partial_tr_func* idct_ver = idct_table[type_ver][log2_width_minus2];
+    partial_tr_func* idct_ver = idct_table[type_ver][log2_height_minus2];
 
     int16_t tmp[32 * 32];
     const int max_log2_tr_dynamic_range = 15;

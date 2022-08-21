@@ -1062,7 +1062,7 @@ void uvg_intra_build_reference_any(
     // Limit the number of available pixels based on block size and dimensions
     // of the picture.
     // TODO: height for non-square blocks
-    px_available_left = MIN(px_available_left, width * 2 + multi_ref_index);
+    px_available_left = MIN(px_available_left, height * 2 + multi_ref_index);
     px_available_left = MIN(px_available_left, (pic_px->y - luma_px->y) >> is_chroma);
 
     // Copy pixels from coded CUs.
@@ -1072,13 +1072,13 @@ void uvg_intra_build_reference_any(
     }
     // Extend the last pixel for the rest of the reference values.
     uvg_pixel nearest_pixel = left_border[(px_available_left - 1) * left_stride];
-    for (int i = px_available_left; i < width * 2 + multi_ref_index * 2; ++i) {
+    for (int i = px_available_left; i < height * 2 + multi_ref_index * 2; ++i) {
       out_left_ref[i + 1 + multi_ref_index] = nearest_pixel;
     }
   } else {
     // If we are on the left edge, extend the first pixel of the top row.
     uvg_pixel nearest_pixel = luma_px->y > 0 ? top_border[0] : dc_val;
-    for (int i = 0; i < width * 2 + multi_ref_index; i++) {
+    for (int i = 0; i < height * 2 + multi_ref_index; i++) {
       // Reserve space for top left reference
       out_left_ref[i + 1 + multi_ref_index] = nearest_pixel;
     }
@@ -1672,10 +1672,10 @@ void uvg_intra_recon_cu(
     int split_num = 0;
     for (int part = 0; part < limit; part += part_dim) {
       cbf_clear(&cur_cu->cbf, depth, COLOR_Y);
-      const int part_x = split_type == ISP_MODE_HOR ? x : x + part;
+      const int part_x = split_type == ISP_MODE_HOR ? x: x + part;
       const int part_y = split_type == ISP_MODE_HOR ? y + part: y;
-      const int part_w = split_type == ISP_MODE_HOR ? part_dim : width;
-      const int part_h = split_type == ISP_MODE_HOR ? height : part_dim;
+      const int part_w = split_type == ISP_MODE_HOR ? width : part_dim;
+      const int part_h = split_type == ISP_MODE_HOR ? part_dim : height;
 
       cu_loc_t loc;
       uvg_cu_loc_ctor(&loc, part_x, part_y, part_w, part_h);
