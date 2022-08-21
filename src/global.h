@@ -129,8 +129,8 @@ typedef int16_t coeff_t;
 typedef int16_t mv_t;
 
 //#define VERBOSE 1
-//#define UVG_DEBUG_PRINT_CABAC 1
-//#define UVG_DEBUG 1
+#define UVG_DEBUG_PRINT_CABAC 1
+#define UVG_DEBUG 1
 
 //#define UVG_DEBUG_PRINT_YUVIEW_CSV 1
 //#define UVG_DEBUG_PRINT_MV_INFO 1

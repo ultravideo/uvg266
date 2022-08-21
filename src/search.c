@@ -391,8 +391,8 @@ double uvg_cu_rd_cost_luma(const encoder_state_t *const state,
       for (int part = 0; part < limit; part += part_dim) {
         const int part_x = split_type == ISP_MODE_HOR ? x_px : x_px + part;
         const int part_y = split_type == ISP_MODE_HOR ? y_px + part : y_px;
-        const int part_w = split_type == ISP_MODE_HOR ? part_dim : width;
-        const int part_h = split_type == ISP_MODE_HOR ? height : part_dim;
+        const int part_w = split_type == ISP_MODE_HOR ? width : part_dim;
+        const int part_h = split_type == ISP_MODE_HOR ? part_dim : height;
 
         const coeff_t* coeffs = &lcu->coeff.y[xy_to_zorder(LCU_WIDTH, part_x, part_y)];
 
@@ -628,8 +628,8 @@ static double cu_rd_cost_tr_split_accurate(
       for (int part = 0; part < limit; part += part_dim) {
         const int part_x = split_type == ISP_MODE_HOR ? x_px : x_px + part;
         const int part_y = split_type == ISP_MODE_HOR ? y_px + part : y_px;
-        const int part_w = split_type == ISP_MODE_HOR ? part_dim : width;
-        const int part_h = split_type == ISP_MODE_HOR ? height : part_dim;
+        const int part_w = split_type == ISP_MODE_HOR ? width : part_dim;
+        const int part_h = split_type == ISP_MODE_HOR ? part_dim : height;
 
         const coeff_t* coeffs = &lcu->coeff.y[xy_to_zorder(LCU_WIDTH, part_x, part_y)];
 
