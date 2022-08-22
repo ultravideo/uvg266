@@ -567,7 +567,7 @@ static double cu_rd_cost_tr_split_accurate(
 
   const bool is_isp = !(pred_cu->type == CU_INTER || pred_cu->intra.isp_mode == ISP_MODE_NO_ISP);
   // Add transform_tree cbf_luma bit cost.
-  if (is_isp) {
+  if (!is_isp) {
     const int is_tr_split = depth - tr_cu->depth;
     if ((pred_cu->type == CU_INTRA ||
       is_tr_split ||
