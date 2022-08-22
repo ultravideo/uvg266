@@ -1014,9 +1014,8 @@ void uvg_encode_intra_luma_coding_unit(const encoder_state_t * const state,
   }
   */
   
-  // Intra Subpartition mode
   uint32_t width = (LCU_WIDTH >> depth);
-  uint32_t height = (LCU_WIDTH >> depth);
+  uint32_t height = (LCU_WIDTH >> depth); // TODO: height for non-square blocks
 
   // Code MIP related bits
   bool enable_mip = state->encoder_control->cfg.mip;
@@ -1079,10 +1078,6 @@ void uvg_encode_intra_luma_coding_unit(const encoder_state_t * const state,
   bool allow_isp = enable_isp ? uvg_can_use_isp(width, height, 64 /*MAX_TR_SIZE*/) : false;
   uint8_t isp_mode = allow_isp ? cur_cu->intra.isp_mode : 0;
 
-  // ToDo: add height comparison
-  //isp_mode += ((width > TR_MAX_WIDTH) || !enough_samples) ? 1 : 0;
-  //isp_mode += ((height > TR_MAX_WIDTH) || !enough_samples) ? 2 : 0;
-
   if (allow_isp && !multi_ref_idx /*&& !bdpcm && !color_transform*/) {
     if (isp_mode == ISP_MODE_NO_ISP) {
       CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.intra_subpart_model[0]), 0, bits, "intra_subpartitions_mode");
@@ -1092,23 +1087,6 @@ void uvg_encode_intra_luma_coding_unit(const encoder_state_t * const state,
       CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.intra_subpart_model[1]), isp_mode - 1, bits, "intra_subpartitions_split_type"); // Vertical or horizontal split
     }
   }
-
-  
-  //if (allow_isp && !multi_ref_idx /*&& !bdpcm && !color_transform*/) {
-  //  if (isp_mode == ISP_MODE_NO_ISP) {
-  //    if (isp_mode) {
-  //      CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.intra_subpart_model[0]), 0, bits, "intra_subPartitions");
-  //    }
-  //    else {
-  //      CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.intra_subpart_model[0]), 1, bits, "intra_subPartitions");
-  //      // ToDo: complete this if-clause
-  //      if (isp_mode == 3) {
-  //        CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.intra_subpart_model[0]), allow_isp - 1, bits, "intra_subPart_ver_hor");
-  //      }
-  //    }
-  //  }
-  //}
-  
 
   const int cu_width = LCU_WIDTH >> depth;
     // PREDINFO CODING
