@@ -36,6 +36,7 @@
 #include <string.h>
 
 #include "cabac.h"
+#include "cu.h"
 #include "encoder.h"
 #include "encode_coding_tree.h"
 #include "imagelist.h"
@@ -385,15 +386,17 @@ double uvg_cu_rd_cost_luma(const encoder_state_t *const state,
     }
     else {
       int split_type = pred_cu->intra.isp_mode;
-      int part_dim = uvg_get_isp_split_dim(width, height, split_type);
-      int limit = split_type == ISP_MODE_HOR ? height : width;
-      int split_num = 0;
-      for (int part = 0; part < limit; part += part_dim) {
-        const int part_x = split_type == ISP_MODE_HOR ? x_px : x_px + part;
-        const int part_y = split_type == ISP_MODE_HOR ? y_px + part : y_px;
-        const int part_w = split_type == ISP_MODE_HOR ? width : part_dim;
-        const int part_h = split_type == ISP_MODE_HOR ? part_dim : height;
+      int split_limit = split_type == ISP_MODE_NO_ISP ? 1 : uvg_get_isp_split_num(width, height, split_type);
 
+      for (int i = 0; i < split_limit; ++i) {
+        cu_loc_t loc;
+        uvg_get_isp_split_loc(&loc, x_px, y_px, width, height, i, split_type);
+        const int part_x = loc.x;
+        const int part_y = loc.y;
+        const int part_w = loc.width;
+        const int part_h = loc.height;
+
+        // TODO: maybe just pass the cu_loc_t to these functions
         const coeff_t* coeffs = &lcu->coeff.y[xy_to_zorder(LCU_WIDTH, part_x, part_y)];
 
         coeff_bits += uvg_get_coeff_cost(state, coeffs, NULL, part_w, part_h, 0, luma_scan_mode, pred_cu->tr_idx == MTS_SKIP);
@@ -622,15 +625,17 @@ static double cu_rd_cost_tr_split_accurate(
     }
     else {
       int split_type = pred_cu->intra.isp_mode;
-      int part_dim = uvg_get_isp_split_dim(width, height, split_type);
-      int limit = split_type == ISP_MODE_HOR ? height : width;
-      int split_num = 0;
-      for (int part = 0; part < limit; part += part_dim) {
-        const int part_x = split_type == ISP_MODE_HOR ? x_px : x_px + part;
-        const int part_y = split_type == ISP_MODE_HOR ? y_px + part : y_px;
-        const int part_w = split_type == ISP_MODE_HOR ? width : part_dim;
-        const int part_h = split_type == ISP_MODE_HOR ? part_dim : height;
+      int split_limit = split_type == ISP_MODE_NO_ISP ? 1 : uvg_get_isp_split_num(width, height, split_type);
 
+      for (int i = 0; i < split_limit; ++i) {
+        cu_loc_t loc;
+        uvg_get_isp_split_loc(&loc, x_px, y_px, width, height, i, split_type);
+        const int part_x = loc.x;
+        const int part_y = loc.y;
+        const int part_w = loc.width;
+        const int part_h = loc.height;
+
+        // TODO: maybe just pass the cu_loc_t to these functions
         const coeff_t* coeffs = &lcu->coeff.y[xy_to_zorder(LCU_WIDTH, part_x, part_y)];
 
         coeff_bits += uvg_get_coeff_cost(state, coeffs, NULL, part_w, part_h, 0, luma_scan_mode, pred_cu->tr_idx == MTS_SKIP);
@@ -857,6 +862,7 @@ static double search_cu(
   const encoder_control_t* ctrl = state->encoder_control;
   const videoframe_t * const frame = state->tile->frame;
   const int cu_width = tree_type != UVG_CHROMA_T ? LCU_WIDTH >> depth : LCU_WIDTH_C >> depth;
+  const int cu_height = cu_width; // TODO: height
   const int luma_width = LCU_WIDTH >> depth;
   assert(cu_width >= 4);
   double cost = MAX_DOUBLE;
@@ -1089,6 +1095,21 @@ static double search_cu(
                          depth, &intra_search,
                          NULL, 
                          lcu, tree_type,recon_luma,recon_chroma);
+      // Set isp split cbfs here
+      const int split_type = intra_search.pred_cu.intra.isp_mode;
+      const int split_num = split_type == ISP_MODE_NO_ISP ? 1 : uvg_get_isp_split_num(cu_width, cu_height, split_type);
+      for (int i = 0; i < split_num; ++i) {
+        cu_loc_t isp_loc;
+        uvg_get_isp_split_loc(&isp_loc, x, y, cu_width, cu_height, i, split_type);
+        //search_data->best_isp_cbfs |= cbf_is_set(cur_cu->cbf, depth, COLOR_Y) << (i++);
+        cu_info_t* split_cu = LCU_GET_CU_AT_PX(lcu, isp_loc.x, isp_loc.y);
+        bool cur_cbf = (intra_search.best_isp_cbfs >> i) & 1;
+        cbf_clear(&split_cu->cbf, depth, COLOR_Y);
+        if (cur_cbf) {
+          cbf_set(&split_cu->cbf, depth, COLOR_Y);
+        }
+      }
+
       if(depth == 4 && x % 8 && y % 8 && tree_type != UVG_LUMA_T && state->encoder_control->chroma_format != UVG_CSP_400) {
         intra_search.pred_cu.intra.mode_chroma = cur_cu->intra.mode_chroma;
         uvg_intra_recon_cu(state,
