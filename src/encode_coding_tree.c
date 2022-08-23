@@ -1143,8 +1143,8 @@ void uvg_encode_intra_luma_coding_unit(const encoder_state_t * const state,
   }
   // Is the mode in the MPM array or not
   flag = (mpm_preds == -1) ? 0 : 1;
-  if (!(cur_pu->intra.multi_ref_idx || (isp_mode))) {
-    CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.intra_luma_mpm_flag_model), flag, bits, "prev_intra_luma_pred_flag");
+  if (cur_pu->intra.multi_ref_idx == 0) {
+    CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.intra_luma_mpm_flag_model), flag, bits, "intra_luma_mpm_flag");
   }
     
   // Signal index of the prediction mode in the prediction list, if it is there
