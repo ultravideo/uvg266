@@ -1507,6 +1507,34 @@ int uvg_get_isp_split_dim(const int width, const int height, const int split_typ
 }
 
 
+int uvg_get_isp_split_num(const int width, const int height, const int split_type)
+{
+  assert((split_type != ISP_MODE_NO_ISP) && "This function cannot be called if ISP mode is 0.");
+  int split_dim = uvg_get_isp_split_dim(width, height, split_type);
+  int num = split_type == ISP_MODE_HOR ? height / split_dim : width / split_dim;
+
+  return num;
+}
+
+
+void uvg_get_isp_split_loc(cu_loc_t *loc, const int x, const int y, const int block_w, const int block_h, const int split_idx, const int split_type)
+{
+  assert((split_idx >= 0 && split_idx <= 3) && "ISP split index must be in [0, 3].");
+  int part_dim = block_w;
+  if (split_type != ISP_MODE_NO_ISP) {
+    part_dim = uvg_get_isp_split_dim(block_w, block_h, split_type);
+  }
+  const int offset = part_dim * split_idx;
+
+  const int part_x = split_type == ISP_MODE_HOR ? x : x + offset;
+  const int part_y = split_type == ISP_MODE_HOR ? y + offset : y;
+  const int part_w = split_type == ISP_MODE_HOR ? block_w : part_dim;
+  const int part_h = split_type == ISP_MODE_HOR ? part_dim : block_h;
+
+  uvg_cu_loc_ctor(loc, part_x, part_y, part_w, part_h);
+}
+
+
 static void intra_recon_tb_leaf(
   encoder_state_t* const state,
   const cu_loc_t* cu_loc,
@@ -1667,25 +1695,17 @@ void uvg_intra_recon_cu(
     // ISP split is done horizontally or vertically depending on ISP mode, 2 or 4 times depending on block dimensions.
     // Small blocks are split only twice.
     int split_type = search_data->pred_cu.intra.isp_mode;
-    int part_dim = uvg_get_isp_split_dim(width, height, split_type);
-    int limit = split_type == ISP_MODE_HOR ? height : width;
-    int split_num = 0;
-    for (int part = 0; part < limit; part += part_dim) {
-      cbf_clear(&cur_cu->cbf, depth, COLOR_Y);
-      const int part_x = split_type == ISP_MODE_HOR ? x: x + part;
-      const int part_y = split_type == ISP_MODE_HOR ? y + part: y;
-      const int part_w = split_type == ISP_MODE_HOR ? width : part_dim;
-      const int part_h = split_type == ISP_MODE_HOR ? part_dim : height;
+    int split_limit = split_type == ISP_MODE_NO_ISP ? 1 : uvg_get_isp_split_num(width, height, split_type);
 
+    for (int i = 0; i < split_limit; ++i) {
       cu_loc_t loc;
-      uvg_cu_loc_ctor(&loc, part_x, part_y, part_w, part_h);
+      uvg_get_isp_split_loc(&loc, x, y, width, height, i, split_type);
 
       intra_recon_tb_leaf(state, &loc, lcu, COLOR_Y, search_data, tree_type);
       uvg_quantize_lcu_residual(state, true, false, false,
-                                &loc, depth, cur_cu, lcu,
-                                false, tree_type);
-      search_data->best_isp_cbfs |= cbf_is_set(cur_cu->cbf, depth, COLOR_Y) << (split_num++);
-   
+        &loc, depth, cur_cu, lcu,
+        false, tree_type);
+      search_data->best_isp_cbfs |= cbf_is_set(cur_cu->cbf, depth, COLOR_Y) << (i++);
     }
   }
   const bool has_luma = recon_luma && search_data->pred_cu.intra.isp_mode == ISP_MODE_NO_ISP;

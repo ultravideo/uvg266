@@ -1623,24 +1623,14 @@ void uvg_encode_coding_tree(
       // ISP split is done horizontally or vertically depending on ISP mode, 2 or 4 times depending on block dimensions.
       // Small blocks are split only twice.
       int split_type = cur_cu->intra.isp_mode;
+      int split_limit = split_type == ISP_MODE_NO_ISP ? 1 : uvg_get_isp_split_num(cu_width, cu_height, split_type);
 
-      int part_dim = cu_width;
-      if (split_type != ISP_MODE_NO_ISP) {
-        part_dim = uvg_get_isp_split_dim(cu_width, cu_height, split_type);
-      }
-      int limit = split_type == ISP_MODE_HOR ? cu_height : cu_width;
-
-      for (int part = 0; part < limit; part += part_dim) {
-        const int part_x = split_type == ISP_MODE_HOR ? x : x + part;
-        const int part_y = split_type == ISP_MODE_HOR ? y + part : y;
-        const int part_w = split_type == ISP_MODE_HOR ? cu_width : part_dim;
-        const int part_h = split_type == ISP_MODE_HOR ? part_dim : cu_height;
-        
+      for (int i = 0; i < split_limit; ++i) {
         cu_loc_t loc;
-        uvg_cu_loc_ctor(&loc, part_x, part_y, part_w, part_h);
+        uvg_get_isp_split_loc(&loc, x, y, cu_width, cu_height, i, split_type);
 
         // Check if last split to write chroma
-        bool last_split = (part + part_dim) == limit;
+        bool last_split = (i + 1) == split_limit;
         encode_transform_coeff(state, &loc, depth, 0, 0, 0, 0, coeff, tree_type, last_split);
       }
     }

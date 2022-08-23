@@ -170,5 +170,7 @@ int uvg_get_mip_flag_context(int x, int y, int width, int height, const lcu_t* l
 #define SPLIT_TYPE_VER 2
 
 int uvg_get_isp_split_dim(const int width, const int height, const int split_type);
+int uvg_get_isp_split_num(const int width, const int height, const int split_type);
+void uvg_get_isp_split_loc(cu_loc_t *loc, const int x, const int y, const int block_w, const int block_h, const int split_idx, const int split_type);
 bool uvg_can_use_isp(const int width, const int height, const int max_tr_size);
 bool uvg_can_use_isp_with_lfnst(const int width, const int height, const int isp_mode, const enum uvg_tree_type tree_type);
