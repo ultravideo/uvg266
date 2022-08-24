@@ -622,7 +622,7 @@ static double cu_rd_cost_tr_split_accurate(
     if (pred_cu->type == CU_INTER || pred_cu->intra.isp_mode == ISP_MODE_NO_ISP) {
       const coeff_t* coeffs = &lcu->coeff.y[xy_to_zorder(LCU_WIDTH, x_px, y_px)];
 
-      coeff_bits += uvg_get_coeff_cost(state, coeffs, NULL, width, height, 0, luma_scan_mode, pred_cu->tr_idx == MTS_SKIP);
+      coeff_bits += uvg_get_coeff_cost(state, coeffs, tr_cu, width, height, 0, luma_scan_mode, pred_cu->tr_idx == MTS_SKIP);
     }
     else {
       int split_type = pred_cu->intra.isp_mode;
@@ -639,7 +639,7 @@ static double cu_rd_cost_tr_split_accurate(
         // TODO: maybe just pass the cu_loc_t to these functions
         const coeff_t* coeffs = &lcu->coeff.y[xy_to_zorder(LCU_WIDTH, part_x, part_y)];
 
-        coeff_bits += uvg_get_coeff_cost(state, coeffs, NULL, part_w, part_h, 0, luma_scan_mode, pred_cu->tr_idx == MTS_SKIP);
+        coeff_bits += uvg_get_coeff_cost(state, coeffs, tr_cu, part_w, part_h, 0, luma_scan_mode, pred_cu->tr_idx == MTS_SKIP);
       }
     }
   }
