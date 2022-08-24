@@ -54,13 +54,16 @@
 void uvg_encode_coeff_nxn_generic(encoder_state_t * const state,
   cabac_data_t * const cabac,
   const coeff_t *coeff,
-  uint8_t width,
-  uint8_t height,
+  cu_loc_t *cu_loc,
   uint8_t color,
   int8_t scan_mode,
   cu_info_t* cur_cu,
-  double* bits_out) {
-
+  double* bits_out) 
+{
+  const int x = cu_loc->x;
+  const int y = cu_loc->y;
+  const int width  = color == COLOR_Y ? cu_loc->width  : cu_loc->chroma_width;
+  const int height = color == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
   //const encoder_control_t * const encoder = state->encoder_control;
   //int c1 = 1;
   uint8_t last_coeff_x = 0;
@@ -91,10 +94,12 @@ void uvg_encode_coeff_nxn_generic(encoder_state_t * const state,
   unsigned scan_cg_last = (unsigned)-1;
   unsigned scan_pos_last = (unsigned)-1;
 
-  for (int i = 0; i < width * height; i++) {
-    if (coeff[scan[i]]) {
-      scan_pos_last = i;
-      sig_coeffgroup_flag[scan_cg[i >> log2_cg_size]] = 1;
+  for (int j = 0; j < height; j++) {
+    for (int i = 0; i < width; i++) {
+      if (coeff[scan[i + j * width]]) {
+        scan_pos_last = i + j * width;
+        sig_coeffgroup_flag[scan_cg[(i + j * width) >> log2_cg_size]] = 1;
+      }
     }
   }
   scan_cg_last = scan_pos_last >> log2_cg_size;

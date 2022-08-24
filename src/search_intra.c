@@ -1495,11 +1495,16 @@ int8_t uvg_search_intra_chroma_rdo(
 {
   const bool reconstruct_chroma = (depth != 4) || (x_px & 4 && y_px & 4);
 
-  int log2_width = MAX(LOG2_LCU_WIDTH - depth - 1, 2);
-  int8_t width = 1 << log2_width;
-  int8_t height = 1 << log2_width;
-  const cu_loc_t loc = { x_px & ~7, y_px & ~7, width, height, width, height };
+  const int luma_width  = LCU_WIDTH >> depth;
+  const int luma_height = LCU_WIDTH >> depth; // TODO: height
 
+  int log2_width = MAX(LOG2_LCU_WIDTH - depth - 1, 2);
+  
+  cu_loc_t loc;
+  uvg_cu_loc_ctor(&loc, x_px & ~7, y_px & ~7, luma_width, luma_height);
+
+  const int chroma_width  = loc.chroma_width;
+  const int chroma_height = loc.chroma_height;
   uvg_intra_references refs[2];
   const vector2d_t luma_px = { x_px & ~7, y_px & ~7 };
   const vector2d_t pic_px = {
@@ -1576,26 +1581,25 @@ int8_t uvg_search_intra_chroma_rdo(
             &lcu->ref.u[offset],
             u_pred,
             u_resi,
-            width,
-            height,
+            chroma_width,
+            chroma_height,
             LCU_WIDTH_C,
-            width);
+            chroma_width);
           uvg_generate_residual(
             &lcu->ref.v[offset],
             v_pred,
             v_resi,
-            width,
-            height,
+            chroma_width,
+            chroma_height,
             LCU_WIDTH_C,
-            width);
+            chroma_width);
           uvg_chorma_ts_out_t chorma_ts_out;
           uvg_chroma_transform_search(
             state,
             depth,
             lcu,
             &temp_cabac,
-            width,
-            height,
+            &loc,
             offset,
             mode,
             pred_cu,

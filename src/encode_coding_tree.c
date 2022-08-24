@@ -465,10 +465,8 @@ void uvg_encode_last_significant_xy(cabac_data_t * const cabac,
 
 static void encode_chroma_tu(
   encoder_state_t* const state,
-  int x,
-  int y,
+  cu_loc_t *cu_loc,
   int depth,
-  const uint8_t width_c,
   cu_info_t* cur_pu,
   int8_t* scan_idx,
   lcu_coeff_t* coeff,
@@ -476,9 +474,10 @@ static void encode_chroma_tu(
   enum
   uvg_tree_type tree_type)
 {
-  int height_c = width_c; // TODO: height for non-square blocks
-  int x_local = ((x >> (tree_type != UVG_CHROMA_T)) & ~3) % LCU_WIDTH_C;
-  int y_local = ((y >> (tree_type != UVG_CHROMA_T)) & ~3) % LCU_WIDTH_C;
+  int width_c = cu_loc->chroma_width;
+  //int height_c = cu_loc->chroma_height;
+  int x_local = ((cu_loc->x >> (tree_type != UVG_CHROMA_T)) & ~3) % LCU_WIDTH_C;
+  int y_local = ((cu_loc->y >> (tree_type != UVG_CHROMA_T)) & ~3) % LCU_WIDTH_C;
   cabac_data_t* const cabac = &state->cabac;
   *scan_idx = uvg_get_scan_order(cur_pu->type, cur_pu->intra.mode_chroma, depth);
   if(!joint_chroma){
@@ -486,13 +485,14 @@ static void encode_chroma_tu(
     const coeff_t *coeff_v = &coeff->v[xy_to_zorder(LCU_WIDTH_C, x_local, y_local)];
 
     if (cbf_is_set(cur_pu->cbf, depth, COLOR_U)) {
+      // ISP_TODO: do these checks need height?
       if(state->encoder_control->cfg.trskip_enable && width_c <= (1 << state->encoder_control->cfg.trskip_max_size)){
         cabac->cur_ctx = &cabac->ctx.transform_skip_model_chroma;
         // HEVC only supports transform_skip for Luma
         // TODO: transform skip for chroma blocks
         CABAC_BIN(cabac, (cur_pu->tr_skip >> COLOR_U) & 1, "transform_skip_flag");
       }
-      uvg_encode_coeff_nxn(state, &state->cabac, coeff_u, width_c, height_c, COLOR_U, *scan_idx, cur_pu, NULL);
+      uvg_encode_coeff_nxn(state, &state->cabac, coeff_u, cu_loc, COLOR_U, *scan_idx, cur_pu, NULL);
     }
 
     if (cbf_is_set(cur_pu->cbf, depth, COLOR_V)) {
@@ -500,7 +500,7 @@ static void encode_chroma_tu(
         cabac->cur_ctx = &cabac->ctx.transform_skip_model_chroma;
         CABAC_BIN(cabac, (cur_pu->tr_skip >> COLOR_V) & 1, "transform_skip_flag");
       }
-      uvg_encode_coeff_nxn(state, &state->cabac, coeff_v, width_c, height_c, COLOR_V, *scan_idx, cur_pu, NULL);
+      uvg_encode_coeff_nxn(state, &state->cabac, coeff_v, cu_loc, COLOR_V, *scan_idx, cur_pu, NULL);
     }
   }
   else {
@@ -509,7 +509,7 @@ static void encode_chroma_tu(
       cabac->cur_ctx = &cabac->ctx.transform_skip_model_chroma;
       CABAC_BIN(cabac, 0, "transform_skip_flag");
     }
-    uvg_encode_coeff_nxn(state, &state->cabac, coeff_uv, width_c, height_c, COLOR_V, *scan_idx, cur_pu, NULL);
+    uvg_encode_coeff_nxn(state, &state->cabac, coeff_uv, cu_loc, COLOR_V, *scan_idx, cur_pu, NULL);
     
   }
 }
@@ -561,8 +561,7 @@ static void encode_transform_unit(
       uvg_encode_coeff_nxn(state,
                            cabac,
                            coeff_y,
-                           width,
-                           height,
+                           cu_loc,
                            0,
                            scan_idx,
                            (cu_info_t * )cur_pu,
@@ -589,7 +588,7 @@ static void encode_transform_unit(
                         cbf_is_set(cur_pu->cbf, depth, COLOR_V);
   if ((chroma_cbf_set || joint_chroma) && last_split) {
     //Need to drop const to get lfnst constraints
-    encode_chroma_tu(state, x, y, depth, width_c, (cu_info_t*)cur_pu, &scan_idx, coeff, joint_chroma, tree_type);
+    encode_chroma_tu(state, cu_loc, depth, (cu_info_t*)cur_pu, &scan_idx, coeff, joint_chroma, tree_type);
   }
 }
 
@@ -1690,12 +1689,12 @@ void uvg_encode_coding_tree(
       int split_limit = split_type == ISP_MODE_NO_ISP ? 1 : uvg_get_isp_split_num(cu_width, cu_height, split_type);
 
       for (int i = 0; i < split_limit; ++i) {
-        cu_loc_t loc;
-        uvg_get_isp_split_loc(&loc, x, y, cu_width, cu_height, i, split_type);
+        cu_loc_t split_loc;
+        uvg_get_isp_split_loc(&split_loc, x, y, cu_width, cu_height, i, split_type);
 
         // Check if last split to write chroma
         bool last_split = (i + 1) == split_limit;
-        encode_transform_coeff(state, &loc, depth, 0, 0, 0, 0, coeff, tree_type, last_split);
+        encode_transform_coeff(state, &split_loc, depth, 0, 0, 0, 0, coeff, tree_type, last_split);
       }
     }
 
