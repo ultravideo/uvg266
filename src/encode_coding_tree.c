@@ -1444,12 +1444,16 @@ void uvg_encode_coding_tree(
   const cu_array_t* used_array = tree_type != UVG_CHROMA_T ? frame->cu_array : frame->chroma_cu_array;
   const cu_info_t *cur_cu   = uvg_cu_array_at_const(used_array, x, y);
 
-  const int cu_width = tree_type != UVG_CHROMA_T ? LCU_WIDTH >> depth : LCU_WIDTH_C >> depth;
-  const int cu_height = cu_width; // TODO: height for non-square blocks
+  const int width  = LCU_WIDTH >> depth;
+  const int height = width; // TODO: height for non-square blocks
+  cu_loc_t cu_loc;
+  uvg_cu_loc_ctor(&cu_loc, x, y, width, height);
+
+  const int cu_width  = tree_type != UVG_CHROMA_T ? cu_loc.width : cu_loc.chroma_width;
+  const int cu_height = tree_type != UVG_CHROMA_T ? cu_loc.height : cu_loc.chroma_height;
   const int half_cu  = cu_width >> 1;
 
-  cu_loc_t cu_loc;
-  uvg_cu_loc_ctor(&cu_loc, x, y, cu_width, cu_height);
+  
 
   const cu_info_t *left_cu  = NULL;
   if (x > 0) {
