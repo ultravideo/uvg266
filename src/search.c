@@ -387,7 +387,7 @@ double uvg_cu_rd_cost_luma(const encoder_state_t *const state,
     }
     else {
       int split_type = pred_cu->intra.isp_mode;
-      int split_limit = split_type == ISP_MODE_NO_ISP ? 1 : uvg_get_isp_split_num(width, height, split_type);
+      int split_limit = uvg_get_isp_split_num(width, height, split_type);
 
       for (int i = 0; i < split_limit; ++i) {
         cu_loc_t loc;
@@ -626,7 +626,7 @@ static double cu_rd_cost_tr_split_accurate(
     }
     else {
       int split_type = pred_cu->intra.isp_mode;
-      int split_limit = split_type == ISP_MODE_NO_ISP ? 1 : uvg_get_isp_split_num(width, height, split_type);
+      int split_limit = uvg_get_isp_split_num(width, height, split_type);
 
       for (int i = 0; i < split_limit; ++i) {
         cu_loc_t loc;

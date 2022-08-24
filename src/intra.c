@@ -1695,7 +1695,7 @@ void uvg_intra_recon_cu(
     // ISP split is done horizontally or vertically depending on ISP mode, 2 or 4 times depending on block dimensions.
     // Small blocks are split only twice.
     int split_type = search_data->pred_cu.intra.isp_mode;
-    int split_limit = split_type == ISP_MODE_NO_ISP ? 1 : uvg_get_isp_split_num(width, height, split_type);
+    int split_limit = uvg_get_isp_split_num(width, height, split_type);
 
     for (int i = 0; i < split_limit; ++i) {
       cu_loc_t loc;
