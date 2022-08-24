@@ -297,15 +297,17 @@ out:
 static INLINE double get_coeff_cabac_cost(
   const encoder_state_t * const state,
   const coeff_t *coeff,
-  int32_t width,
-  int32_t height,
+  cu_loc_t *cu_loc,
   color_t color,
   int8_t scan_mode,
   int8_t tr_skip,
   cu_info_t* cur_tu)
 {
+  const int width  = cu_loc->width;
+  const int height = cu_loc->height;
   // Make sure there are coeffs present
   bool found = false;
+  // ISP_TODO: this needs to be two separate x, y loops?
   for (int i = 0; i < width * height; i++) {
     if (coeff[i] != 0) {
       found = 1;
@@ -331,8 +333,7 @@ static INLINE double get_coeff_cabac_cost(
     uvg_encode_coeff_nxn((encoder_state_t*) state,
                          &cabac_copy,
                          coeff,
-                         width,
-                         height,
+                         cu_loc,
                          color,
                          scan_mode,
                          cur_tu,                   
@@ -394,14 +395,16 @@ double uvg_get_coeff_cost(
   const encoder_state_t * const state,
   const coeff_t *coeff,
   cu_info_t* cur_tu,
-  int32_t width,
-  int32_t height,
+  cu_loc_t *cu_loc,
   color_t color,
   int8_t scan_mode,
   int8_t tr_skip)
 {
   uint8_t save_cccs = state->encoder_control->cfg.fastrd_sampling_on;
   uint8_t check_accuracy = state->encoder_control->cfg.fastrd_accuracy_check_on;
+
+  const int width  = color == COLOR_Y ? cu_loc->width  : cu_loc->chroma_width;
+  const int height = color == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
 
   if (state->qp < state->encoder_control->cfg.fast_residual_cost_limit &&
       state->qp < MAX_FAST_COEFF_COST_QP && !tr_skip) {
@@ -415,13 +418,13 @@ double uvg_get_coeff_cost(
       uint64_t weights = uvg_fast_coeff_get_weights(state);
       uint32_t fast_cost = uvg_fast_coeff_cost(coeff, width, height, weights);
       if (check_accuracy) {
-        double ccc = get_coeff_cabac_cost(state, coeff, width, height, color, scan_mode, tr_skip, cur_tu);
+        double ccc = get_coeff_cabac_cost(state, coeff, cu_loc, color, scan_mode, tr_skip, cur_tu);
         save_accuracy(state->qp, ccc, fast_cost);
       }
       return fast_cost;
     }
   } else {
-    double ccc = get_coeff_cabac_cost(state, coeff, width, height, color, scan_mode, tr_skip, cur_tu);
+    double ccc = get_coeff_cabac_cost(state, coeff, cu_loc, color, scan_mode, tr_skip, cur_tu);
     if (save_cccs) {
       save_ccc(state->qp, coeff, width * width, ccc);
     }

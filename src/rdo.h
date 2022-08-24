@@ -73,8 +73,7 @@ double uvg_get_coeff_cost(
   const encoder_state_t * const state,
   const coeff_t *coeff,
   cu_info_t* cur_tu,
-  int32_t width,
-  int32_t height,
+  cu_loc_t *cu_loc,
   color_t color,
   int8_t scan_mode,
   int8_t tr_skip);

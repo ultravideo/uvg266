@@ -483,8 +483,7 @@ void uvg_chroma_transform_search(
   int depth,
   lcu_t* const lcu,
   cabac_data_t* temp_cabac,
-  int8_t width,
-  int8_t height,
+  cu_loc_t *cu_loc,
   const int offset,
   const uint8_t mode,
   cu_info_t* pred_cu,
@@ -499,6 +498,9 @@ void uvg_chroma_transform_search(
   ALIGNED(64) uint8_t u_recon[LCU_WIDTH_C * LCU_WIDTH_C * 5];
   ALIGNED(64) coeff_t v_coeff[LCU_WIDTH_C * LCU_WIDTH_C * 2];
   ALIGNED(64) uint8_t v_recon[LCU_WIDTH_C * LCU_WIDTH_C * 5];
+  const int width  = cu_loc->chroma_width;
+  const int height = cu_loc->chroma_height;
+
   uvg_transform2d(
     state->encoder_control, u_resi, u_coeff, width, height, COLOR_U, pred_cu
   );
@@ -689,8 +691,7 @@ void uvg_chroma_transform_search(
         state,
         u_quant_coeff,
         pred_cu,
-        width,
-        height,
+        cu_loc,
         COLOR_U,
         scan_order,
         transforms[i] == CHROMA_TS);
@@ -706,8 +707,7 @@ void uvg_chroma_transform_search(
         state,
         v_quant_coeff,
         pred_cu,
-        width,
-        height,
+        cu_loc,
         COLOR_V,
         scan_order,
         transforms[i] == CHROMA_TS);
@@ -1161,6 +1161,8 @@ static void quantize_tr_residual(
   // Pointers to current location in arrays with quantized coefficients.
   coeff_t *coeff = NULL;
 
+  // ISP_TODO: use temp coeff array size MAX_TR_WIDTH^2 instead of coeff pointers
+  // ISP_TODO: inside temp coeff array, entries are in the old order. PÖTKÖ
   switch (color) {
     case COLOR_Y:
       pred  = &lcu->rec.y[offset];
@@ -1272,9 +1274,9 @@ static void quantize_tr_residual(
 
   cbf_clear(&cur_pu->cbf, depth, color);
   if (has_coeffs) {
+    // ISP_TODO: copy coeffs into CU order instead of pötkö
     cbf_set(&cur_pu->cbf, depth, color);
-  }
-
+  } // ISP_TODO: if no coeffs, mem set width * height amount of coeffs to zero
 }
 
 /**

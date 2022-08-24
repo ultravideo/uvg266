@@ -1520,6 +1520,7 @@ int uvg_get_isp_split_num(const int width, const int height, const int split_typ
 void uvg_get_isp_split_loc(cu_loc_t *loc, const int x, const int y, const int block_w, const int block_h, const int split_idx, const int split_type)
 {
   assert((split_idx >= 0 && split_idx <= 3) && "ISP split index must be in [0, 3].");
+  assert((split_type == ISP_MODE_NO_ISP && split_idx > 0) && "Trying to ISP split when split type = NO_ISP.");
   int part_dim = block_w;
   if (split_type != ISP_MODE_NO_ISP) {
     part_dim = uvg_get_isp_split_dim(block_w, block_h, split_type);
@@ -1698,12 +1699,12 @@ void uvg_intra_recon_cu(
     int split_limit = uvg_get_isp_split_num(width, height, split_type);
 
     for (int i = 0; i < split_limit; ++i) {
-      cu_loc_t loc;
-      uvg_get_isp_split_loc(&loc, x, y, width, height, i, split_type);
+      cu_loc_t split_loc;
+      uvg_get_isp_split_loc(&split_loc, x, y, width, height, i, split_type);
 
-      intra_recon_tb_leaf(state, &loc, lcu, COLOR_Y, search_data, tree_type);
+      intra_recon_tb_leaf(state, &split_loc, lcu, COLOR_Y, search_data, tree_type);
       uvg_quantize_lcu_residual(state, true, false, false,
-        &loc, depth, cur_cu, lcu,
+        &split_loc, depth, cur_cu, lcu,
         false, tree_type);
       search_data->best_isp_cbfs |= cbf_is_set(cur_cu->cbf, depth, COLOR_Y) << (i++);
     }
