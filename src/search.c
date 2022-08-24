@@ -1130,7 +1130,7 @@ static double search_cu(
                          lcu, tree_type,recon_luma,recon_chroma);
       // Set isp split cbfs here
       const int split_type = intra_search.pred_cu.intra.isp_mode;
-      const int split_num = split_type == ISP_MODE_NO_ISP ? 1 : uvg_get_isp_split_num(cu_width, cu_height, split_type);
+      const int split_num = split_type == ISP_MODE_NO_ISP ? 0 : uvg_get_isp_split_num(cu_width, cu_height, split_type);
       for (int i = 0; i < split_num; ++i) {
         cu_loc_t isp_loc;
         uvg_get_isp_split_loc(&isp_loc, x, y, cu_width, cu_height, i, split_type);
