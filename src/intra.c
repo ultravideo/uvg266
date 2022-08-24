@@ -1520,7 +1520,7 @@ int uvg_get_isp_split_num(const int width, const int height, const int split_typ
 void uvg_get_isp_split_loc(cu_loc_t *loc, const int x, const int y, const int block_w, const int block_h, const int split_idx, const int split_type)
 {
   assert((split_idx >= 0 && split_idx <= 3) && "ISP split index must be in [0, 3].");
-  assert((split_type == ISP_MODE_NO_ISP && split_idx > 0) && "Trying to ISP split when split type = NO_ISP.");
+  assert((split_type == ISP_MODE_NO_ISP && split_idx == 0) && "Trying to ISP split when split type = NO_ISP.");
   int part_dim = block_w;
   if (split_type != ISP_MODE_NO_ISP) {
     part_dim = uvg_get_isp_split_dim(block_w, block_h, split_type);
