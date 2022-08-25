@@ -1102,21 +1102,10 @@ int uvg_quantize_residual_trskip(
     // we can skip this.
     uvg_pixels_blit(best->rec, rec_out, width, height, width, out_stride);
   }
-  copy_coeffs(best->coeff, coeff_out, width, height);
+  // TODO: copying coeffs here is very suspect
+  copy_coeffs(best->coeff, coeff_out, width, height, width);
 
   return best->has_coeffs;
-}
-
-
-static INLINE int translate_to_cu_order_idx(const int lcu_x, const int lcu_y, const int block_w, const int block_h, const int linear_idx)
-{
-  // ISP_TODO: get rid of all there temp variables after making sure this works
-  const int start_idx = lcu_x + lcu_y * LCU_WIDTH;
-  const int offset_x = linear_idx % block_w;
-  const int local_y = linear_idx / block_h;
-  const int offset_y = local_y * LCU_WIDTH;
-
-  return (start_idx + offset_x + offset_y);
 }
 
 
@@ -1176,23 +1165,21 @@ static void quantize_tr_residual(
   coeff_t coeff[TR_MAX_WIDTH * TR_MAX_WIDTH];
   coeff_t *dst_coeff = NULL;
 
-  // ISP_TODO: use temp coeff array size MAX_TR_WIDTH^2 instead of coeff pointers
-  // ISP_TODO: inside temp coeff array, entries are in the old linear order. PÖTKÖ
   switch (color) {
     case COLOR_Y:
       pred      = &lcu->rec.y[offset];
       ref       = &lcu->ref.y[offset];
-      dst_coeff = &lcu->coeff.y;
+      dst_coeff = &lcu->coeff.y[lcu_px.x + lcu_px.y * lcu_width];
       break;
     case COLOR_U:
       pred      = &lcu->rec.u[offset];
       ref       = &lcu->ref.u[offset];
-      dst_coeff = &lcu->coeff.u;
+      dst_coeff = &lcu->coeff.u[lcu_px.x + lcu_px.y * lcu_width];
       break;
     case COLOR_V:
       pred      = &lcu->rec.v[offset];
       ref       = &lcu->ref.v[offset];
-      dst_coeff = &lcu->coeff.v;
+      dst_coeff = &lcu->coeff.v[lcu_px.x + lcu_px.y * lcu_width];
       break;
     default:
       break;
@@ -1248,6 +1235,7 @@ static void quantize_tr_residual(
                                               lmcs_chroma_adj);
   } else {
     if(color == COLOR_UV) {
+      // ISP_TODO: fix this
       has_coeffs = uvg_quant_cbcr_residual(
         state,
         cur_pu,
@@ -1289,20 +1277,14 @@ static void quantize_tr_residual(
 
   cbf_clear(&cur_pu->cbf, depth, color);
   if (has_coeffs) {
-    const int coeffs_to_copy = tr_width * tr_height;
-    for (int i = 0; i < coeffs_to_copy; ++i) {
-      const coeff_t c = coeff[i];
-      const idx = translate_to_cu_order_idx(lcu_px.x, lcu_px.y, tr_width, tr_height, i);
-      dst_coeff[idx] = c;
+    for (int j = 0; j < tr_height; ++j) {
+      memcpy(&dst_coeff[j * lcu_width], &coeff[j * tr_width], tr_width * sizeof(coeff_t));
     }
     cbf_set(&cur_pu->cbf, depth, color);
   }
   else {
-    // ISP_TODO: if no coeffs, mem set width * height amount of coeffs to zero
-    int idx = lcu_px.x + lcu_px.y * LCU_WIDTH;
     for (int j = 0; j < tr_height; ++j) {
-      memset(dst_coeff[idx], 0, (sizeof(coeff_t) * tr_width));
-      idx += LCU_WIDTH;
+      memset(&dst_coeff[j * lcu_width], 0, (sizeof(coeff_t) * tr_width));
     }
   }
 }

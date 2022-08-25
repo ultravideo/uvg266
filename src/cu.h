@@ -415,9 +415,11 @@ void uvg_cu_array_copy_from_lcu(cu_array_t* dst, int dst_x, int dst_y, const lcu
  */
 static INLINE void copy_coeffs(const coeff_t *__restrict src,
                                coeff_t *__restrict dest,
-                               size_t width, size_t height)
+                               size_t width, size_t height, const int lcu_width)
 {
-  memcpy(dest, src, width * height * sizeof(coeff_t));
+  for (int j = 0; j < height; ++j) {
+    memcpy(dest + j * lcu_width, src + j * lcu_width, width * sizeof(coeff_t));
+  }
 }
 
 

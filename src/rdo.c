@@ -305,11 +305,21 @@ static INLINE double get_coeff_cabac_cost(
 {
   const int width  = cu_loc->width;
   const int height = cu_loc->height;
+  const int sub_coeff_w = color == COLOR_Y ? cu_loc->width  : cu_loc->chroma_width;
+  const int sub_coeff_h = color == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
+  const int lcu_width = color == COLOR_Y ? LCU_WIDTH : LCU_WIDTH_C;
+
+  int x_local = cu_loc->x % LCU_WIDTH;
+  int y_local = cu_loc->y % LCU_WIDTH;
+
   // Make sure there are coeffs present
   bool found = false;
-  // ISP_TODO: this needs to be two separate x, y loops?
-  for (int i = 0; i < width * height; i++) {
-    if (coeff[i] != 0) {
+
+  coeff_t sub_coeff[TR_MAX_WIDTH * TR_MAX_WIDTH];
+  uvg_get_sub_coeff(sub_coeff, coeff, x_local, y_local, sub_coeff_w, sub_coeff_h, lcu_width);
+
+  for (int i = 0; i < sub_coeff_w * sub_coeff_h; i++) {
+    if (sub_coeff[i] != 0) {
       found = 1;
       break;
     }
@@ -332,7 +342,7 @@ static INLINE double get_coeff_cabac_cost(
   if(!tr_skip) {
     uvg_encode_coeff_nxn((encoder_state_t*) state,
                          &cabac_copy,
-                         coeff,
+                         sub_coeff,
                          cu_loc,
                          color,
                          scan_mode,
@@ -342,7 +352,7 @@ static INLINE double get_coeff_cabac_cost(
   else {
     uvg_encode_ts_residual((encoder_state_t* const)state,
       &cabac_copy,
-      coeff,
+      sub_coeff,
       width,
       height,
       color,
