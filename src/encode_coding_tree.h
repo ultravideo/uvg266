@@ -116,3 +116,5 @@ void uvg_encode_last_significant_xy(cabac_data_t * const cabac,
   uint8_t lastpos_x, uint8_t lastpos_y,
   uint8_t width, uint8_t height,
   uint8_t type, uint8_t scan, double* bits_out);
+
+void uvg_get_sub_coeff(coeff_t* dst, const coeff_t* const src, const int lcu_x, const int lcu_y, const int block_w, const int block_h);

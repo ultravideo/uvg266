@@ -64,6 +64,7 @@ void uvg_encode_coeff_nxn_generic(encoder_state_t * const state,
   const int y = cu_loc->y;
   const int width  = color == COLOR_Y ? cu_loc->width  : cu_loc->chroma_width;
   const int height = color == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
+
   //const encoder_control_t * const encoder = state->encoder_control;
   //int c1 = 1;
   uint8_t last_coeff_x = 0;
@@ -94,14 +95,13 @@ void uvg_encode_coeff_nxn_generic(encoder_state_t * const state,
   unsigned scan_cg_last = (unsigned)-1;
   unsigned scan_pos_last = (unsigned)-1;
 
-  for (int j = 0; j < height; j++) {
-    for (int i = 0; i < width; i++) {
-      if (coeff[scan[i + j * width]]) {
-        scan_pos_last = i + j * width;
-        sig_coeffgroup_flag[scan_cg[(i + j * width) >> log2_cg_size]] = 1;
-      }
+  for (int i = 0; i < (width * height); ++i) {
+    if (coeff[scan[i]]) {
+      scan_pos_last = i;
+      sig_coeffgroup_flag[scan_cg[i >> log2_cg_size]] = 1;
     }
   }
+
   scan_cg_last = scan_pos_last >> log2_cg_size;
 
   int pos_last = scan[scan_pos_last];
@@ -139,7 +139,7 @@ void uvg_encode_coeff_nxn_generic(encoder_state_t * const state,
   int32_t temp_diag = -1;
   int32_t temp_sum = -1;
 
-  int32_t reg_bins = (width*width * 28) >> 4; //8 for 2x2
+  int32_t reg_bins = (width * height * 28) >> 4; //8 for 2x2
 
   // significant_coeff_flag
   for (i = scan_cg_last; i >= 0; i--) {

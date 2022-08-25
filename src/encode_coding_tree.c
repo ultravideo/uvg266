@@ -417,7 +417,7 @@ void uvg_encode_last_significant_xy(cabac_data_t * const cabac,
   //ToDo: own ctx_offset and shift for X and Y 
   uint8_t ctx_offset_x = type ? 0 : prefix_ctx[index_x];
   uint8_t ctx_offset_y = type ? 0 : prefix_ctx[index_y];
-  uint8_t shift_x = type ? CLIP(0, 2, width>>3) : (index_x+1)>>2;
+  uint8_t shift_x = type ? CLIP(0, 2, width >> 3) : (index_x + 1) >> 2;
   uint8_t shift_y = type ? CLIP(0, 2, width >> 3) : (index_y + 1) >> 2;
   double bits = 0;
 
@@ -481,11 +481,15 @@ static void encode_chroma_tu(
   cabac_data_t* const cabac = &state->cabac;
   *scan_idx = uvg_get_scan_order(cur_pu->type, cur_pu->intra.mode_chroma, depth);
   if(!joint_chroma){
-    const coeff_t *coeff_u = &coeff->u[xy_to_zorder(LCU_WIDTH_C, x_local, y_local)];
-    const coeff_t *coeff_v = &coeff->v[xy_to_zorder(LCU_WIDTH_C, x_local, y_local)];
+    // const coeff_t *coeff_u = &coeff->u[xy_to_zorder(LCU_WIDTH_C, x_local, y_local)];
+    // const coeff_t *coeff_v = &coeff->v[xy_to_zorder(LCU_WIDTH_C, x_local, y_local)];
+    coeff_t coeff_u[TR_MAX_WIDTH * TR_MAX_WIDTH];
+    coeff_t coeff_v[TR_MAX_WIDTH * TR_MAX_WIDTH];
+    uvg_get_sub_coeff(coeff_u, coeff->u, x_local, y_local, cu_loc->chroma_width, cu_loc->chroma_height, LCU_WIDTH_C);
+    uvg_get_sub_coeff(coeff_v, coeff->v, x_local, y_local, cu_loc->chroma_width, cu_loc->chroma_height, LCU_WIDTH_C);
 
     if (cbf_is_set(cur_pu->cbf, depth, COLOR_U)) {
-      // ISP_TODO: do these checks need height?
+      // TODO: height for this check and the others below
       if(state->encoder_control->cfg.trskip_enable && width_c <= (1 << state->encoder_control->cfg.trskip_max_size)){
         cabac->cur_ctx = &cabac->ctx.transform_skip_model_chroma;
         // HEVC only supports transform_skip for Luma
@@ -504,7 +508,9 @@ static void encode_chroma_tu(
     }
   }
   else {
-    const coeff_t *coeff_uv = &coeff->joint_uv[xy_to_zorder(LCU_WIDTH_C, x_local, y_local)];
+    // const coeff_t *coeff_uv = &coeff->joint_uv[xy_to_zorder(LCU_WIDTH_C, x_local, y_local)];
+    const coeff_t coeff_uv[TR_MAX_WIDTH * TR_MAX_WIDTH];
+    uvg_get_sub_coeff(coeff_uv, coeff->joint_uv, x_local, y_local, cu_loc->chroma_width, cu_loc->chroma_height, LCU_WIDTH_C);
     if (state->encoder_control->cfg.trskip_enable && width_c <= (1 << state->encoder_control->cfg.trskip_max_size)) {
       cabac->cur_ctx = &cabac->ctx.transform_skip_model_chroma;
       CABAC_BIN(cabac, 0, "transform_skip_flag");
@@ -544,7 +550,9 @@ static void encode_transform_unit(
   if (cbf_y && !only_chroma) {
     int x_local = x % LCU_WIDTH;
     int y_local = y % LCU_WIDTH;
-    const coeff_t *coeff_y = &coeff->y[xy_to_zorder(LCU_WIDTH, x_local, y_local)];
+    // const coeff_t *coeff_y = &coeff->y[xy_to_zorder(LCU_WIDTH, x_local, y_local)];
+    coeff_t coeff_y[TR_MAX_WIDTH * TR_MAX_WIDTH];
+    uvg_get_sub_coeff(coeff_y, coeff->y, x_local, y_local, width, height, LCU_WIDTH);
 
     // CoeffNxN
     // Residual Coding
@@ -1904,5 +1912,28 @@ void uvg_encode_mvd(encoder_state_t * const state,
     uint32_t mvd_ver_sign = mvd_ver > 0 ? 0 : 1;
     CABAC_BIN_EP(cabac, mvd_ver_sign, "mvd_sign_flag_ver");
     if (cabac->only_count) *bits_out += 1;
+  }
+}
+
+
+/**
+ * \brief Get a subset of LCU coeff array.
+ *
+ * \param dst         Destination array. Should be coeff_t [32*32].
+ * \param src         Coeff LCU array.
+ * \param lcu_x       Local LCU x coordinate.
+ * \param lcu_y       Local LCU y coordinate.
+ * \param width       Block width.
+ * \param height      Block height.
+ * \param lcu_width   LCU_WIDTH for luma, LCU_WIDTH_C for chroma.
+ *
+ */
+void uvg_get_sub_coeff(coeff_t *dst, const coeff_t * const src, const int lcu_x, const int lcu_y, const int block_w, const int block_h, const int lcu_width)
+{
+  // Take subset of coeff array
+  const coeff_t* coeff_ptr = &src[lcu_x + lcu_y * lcu_width];
+  for (int j = 0; j < block_h; ++j) {
+    //memcpy(dst_coeff + (j * lcu_width), &coeff[j * tr_width], tr_width * sizeof(coeff_t));
+    memcpy(&dst[j * block_w], &coeff_ptr[j * lcu_width], block_w * sizeof(coeff_t));
   }
 }

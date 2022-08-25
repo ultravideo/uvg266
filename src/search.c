@@ -89,20 +89,27 @@ static INLINE void copy_cu_pixels(int x_local, int y_local, int width, lcu_t *fr
   }
 }
 
+// ISP_TODO: this needs to work with the new coeff cu orderr
 static INLINE void copy_cu_coeffs(const cu_loc_t *cu_loc, lcu_t *from, lcu_t *to, bool joint, enum
                                   uvg_tree_type tree_type)
 {
   if (tree_type != UVG_CHROMA_T) {
-    const int luma_z = xy_to_zorder(LCU_WIDTH, cu_loc->x, cu_loc->y);
-    copy_coeffs(&from->coeff.y[luma_z], &to->coeff.y[luma_z], cu_loc->width, cu_loc->height);
+    //const int luma_z = xy_to_zorder(LCU_WIDTH, cu_loc->x, cu_loc->y);
+    const int idx = (cu_loc->x % LCU_WIDTH) + ((cu_loc->y % LCU_WIDTH) * LCU_WIDTH);
+    copy_coeffs(&from->coeff.y[idx], &to->coeff.y[idx], cu_loc->width, cu_loc->height, LCU_WIDTH);
+    
   }
 
   if (from->rec.chroma_format != UVG_CSP_400 && tree_type != UVG_LUMA_T) {
-    const int chroma_z = xy_to_zorder(LCU_WIDTH_C, cu_loc->x >> (tree_type != UVG_CHROMA_T), cu_loc->y >> (tree_type != UVG_CHROMA_T));
-    copy_coeffs(&from->coeff.u[chroma_z], &to->coeff.u[chroma_z], cu_loc->chroma_width, cu_loc->chroma_height);
-    copy_coeffs(&from->coeff.v[chroma_z], &to->coeff.v[chroma_z], cu_loc->chroma_width, cu_loc->chroma_height);
+    //const int chroma_z = xy_to_zorder(LCU_WIDTH_C, cu_loc->x >> (tree_type != UVG_CHROMA_T), cu_loc->y >> (tree_type != UVG_CHROMA_T));
+    const int chroma_x = cu_loc->x >> (tree_type != UVG_CHROMA_T);
+    const int chroma_y = cu_loc->y >> (tree_type != UVG_CHROMA_T);
+
+    const int idx = (chroma_x % LCU_WIDTH_C) + ((chroma_y % LCU_WIDTH_C) * LCU_WIDTH_C);
+    copy_coeffs(&from->coeff.u[idx], &to->coeff.u[idx], cu_loc->chroma_width, cu_loc->chroma_height, LCU_WIDTH_C);
+    copy_coeffs(&from->coeff.v[idx], &to->coeff.v[idx], cu_loc->chroma_width, cu_loc->chroma_height, LCU_WIDTH_C);
     if (joint) {
-      copy_coeffs(&from->coeff.joint_uv[chroma_z], &to->coeff.joint_uv[chroma_z], cu_loc->chroma_width, cu_loc->chroma_height);
+      copy_coeffs(&from->coeff.joint_uv[idx], &to->coeff.joint_uv[idx], cu_loc->chroma_width, cu_loc->chroma_height, LCU_WIDTH_C);
     }
   }
 }
@@ -1625,7 +1632,7 @@ void uvg_search_lcu(encoder_state_t * const state, const int x, const int y, con
   copy_lcu_to_cu_data(state, x, y, &work_tree[0], tree_type);
 
   // Copy coeffs to encoder state.
-  copy_coeffs(work_tree[0].coeff.y, coeff->y, LCU_WIDTH, LCU_WIDTH);
+  copy_coeffs(work_tree[0].coeff.y, coeff->y, LCU_WIDTH, LCU_WIDTH, LCU_WIDTH);
 
   if(state->frame->slicetype == UVG_SLICE_I && state->encoder_control->cfg.dual_tree) {
     cost = search_cu(
@@ -1642,9 +1649,9 @@ void uvg_search_lcu(encoder_state_t * const state, const int x, const int y, con
     copy_lcu_to_cu_data(state, x, y, &work_tree[0], UVG_CHROMA_T);
   }
 
-  copy_coeffs(work_tree[0].coeff.u, coeff->u, LCU_WIDTH_C, LCU_WIDTH_C);
-  copy_coeffs(work_tree[0].coeff.v, coeff->v, LCU_WIDTH_C, LCU_WIDTH_C);
+  copy_coeffs(work_tree[0].coeff.u, coeff->u, LCU_WIDTH_C, LCU_WIDTH_C, LCU_WIDTH_C);
+  copy_coeffs(work_tree[0].coeff.v, coeff->v, LCU_WIDTH_C, LCU_WIDTH_C, LCU_WIDTH_C);
   if (state->encoder_control->cfg.jccr) {
-    copy_coeffs(work_tree[0].coeff.joint_uv, coeff->joint_uv, LCU_WIDTH_C, LCU_WIDTH_C);
+    copy_coeffs(work_tree[0].coeff.joint_uv, coeff->joint_uv, LCU_WIDTH_C, LCU_WIDTH_C, LCU_WIDTH_C);
   }
 }
