@@ -1075,7 +1075,7 @@ static uint8_t search_intra_rough(
   FILL(search_proxy, 0);
   search_proxy.pred_cu = *pred_cu;
 
-  int offset = 4;
+  int offset = 8;
   search_proxy.pred_cu.intra.mode = 0;
   uvg_intra_predict(state, refs, &loc, COLOR_Y, preds[0], &search_proxy, NULL, UVG_LUMA_T);
   search_proxy.pred_cu.intra.mode = 1;
