@@ -1706,7 +1706,7 @@ void uvg_intra_recon_cu(
       uvg_quantize_lcu_residual(state, true, false, false,
         &split_loc, depth, cur_cu, lcu,
         false, tree_type);
-      search_data->best_isp_cbfs |= cbf_is_set(cur_cu->cbf, depth, COLOR_Y) << (i++);
+      search_data->best_isp_cbfs |= cbf_is_set(cur_cu->cbf, depth, COLOR_Y) << i;
     }
   }
   const bool has_luma = recon_luma && search_data->pred_cu.intra.isp_mode == ISP_MODE_NO_ISP;
