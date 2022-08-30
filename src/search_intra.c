@@ -975,7 +975,7 @@ static int16_t search_intra_rough(
 }*/
 
 
-static double count_bits(
+static INLINE double count_bits(
   encoder_state_t* const state,
   int8_t* intra_preds,
   const double not_mrl,
