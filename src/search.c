@@ -368,11 +368,13 @@ double uvg_cu_rd_cost_luma(const encoder_state_t *const state,
     }
   }
   else {
-    cabac_ctx_t* ctx = &(cabac->ctx.qt_cbf_model_luma[0]);
     // TODO: 8x4 CUs
     for (int i = 0; i < 4; i++) {
+      int luma_ctx = 2;
       if (i != 3 && isp_cbf != 0x8) {
-        CABAC_FBITS_UPDATE(cabac, ctx, (isp_cbf >> i) & 1, tr_tree_bits, "cbf_y_search");
+        const int flag = (isp_cbf >> i) & 1;
+        CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.qt_cbf_model_luma[luma_ctx]), flag, tr_tree_bits, "cbf_y_search");
+        luma_ctx = 2 + flag;
       }
     }
   }
@@ -597,11 +599,13 @@ static double cu_rd_cost_tr_split_accurate(
     }
   }
   else {
-    cabac_ctx_t* ctx = &(cabac->ctx.qt_cbf_model_luma[0]);
     // TODO: 8x4 CUs
     for (int i = 0; i < 4; i++) {
+      int luma_ctx = 2;
       if (i != 3 && isp_cbf != 0x8) {
-        CABAC_FBITS_UPDATE(cabac, ctx, (isp_cbf >> i) & 1, tr_tree_bits, "cbf_y_search");
+        const int flag = (isp_cbf >> i) & 1;
+        CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.qt_cbf_model_luma[luma_ctx]), flag, tr_tree_bits, "cbf_y_search");
+        luma_ctx = 2 + flag;
       }
     }
   }
@@ -1114,7 +1118,7 @@ static double search_cu(
         cu_loc_t isp_loc;
         uvg_get_isp_split_loc(&isp_loc, x, y, cu_width, cu_height, i, split_type);
         //search_data->best_isp_cbfs |= cbf_is_set(cur_cu->cbf, depth, COLOR_Y) << (i++);
-        cu_info_t* split_cu = LCU_GET_CU_AT_PX(lcu, isp_loc.x, isp_loc.y);
+        cu_info_t* split_cu = LCU_GET_CU_AT_PX(lcu, isp_loc.x % LCU_WIDTH, isp_loc.y % LCU_WIDTH);
         bool cur_cbf = (intra_search.best_isp_cbfs >> i) & 1;
         cbf_clear(&split_cu->cbf, depth, COLOR_Y);
         if (cur_cbf) {

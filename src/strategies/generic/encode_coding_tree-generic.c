@@ -126,7 +126,7 @@ void uvg_encode_coeff_nxn_generic(encoder_state_t * const state,
     last_coeff_x,
     last_coeff_y,
     width,
-    width,
+    height,
     color,
     scan_mode,
     bits_out);
