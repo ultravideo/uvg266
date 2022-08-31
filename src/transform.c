@@ -1156,7 +1156,7 @@ static void quantize_tr_residual(
   const coeff_scan_order_t scan_idx =
     uvg_get_scan_order(cur_pu->type, mode, depth); // Height does not affect this
   const int offset = lcu_px.x + lcu_px.y * lcu_width;
-  const int z_index = xy_to_zorder(lcu_width, lcu_px.x, lcu_px.y);
+  //const int z_index = xy_to_zorder(lcu_width, lcu_px.x, lcu_px.y);
 
   // Pointers to current location in arrays with prediction. The
   // reconstruction will be written to this array.
@@ -1182,6 +1182,9 @@ static void quantize_tr_residual(
       pred      = &lcu->rec.v[offset];
       ref       = &lcu->ref.v[offset];
       dst_coeff = &lcu->coeff.v[lcu_px.x + lcu_px.y * lcu_width];
+      break;
+    case COLOR_UV:
+      dst_coeff = &lcu->coeff.joint_uv[lcu_px.x + lcu_px.y * lcu_width];
       break;
     default:
       break;
@@ -1237,7 +1240,6 @@ static void quantize_tr_residual(
                                               lmcs_chroma_adj);
   } else {
     if(color == COLOR_UV) {
-      // ISP_TODO: fix this
       has_coeffs = uvg_quant_cbcr_residual(
         state,
         cur_pu,
@@ -1249,7 +1251,7 @@ static void quantize_tr_residual(
         &lcu->ref.u[offset], &lcu->ref.v[offset],
         &lcu->rec.u[offset], &lcu->rec.v[offset],
         &lcu->rec.u[offset], &lcu->rec.v[offset],
-        &lcu->coeff.joint_uv[z_index],
+        coeff,
         early_skip,
         lmcs_chroma_adj,
         tree_type
