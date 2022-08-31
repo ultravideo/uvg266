@@ -47,6 +47,9 @@ extern const uint8_t uvg_g_chroma_scale[58];
 extern const int16_t uvg_g_inv_quant_scales[6];
 extern const int16_t uvg_g_quant_scales[6];
 
+#define COEFF_ORDER_LINEAR 0
+#define COEFF_ORDER_CU 1
+
 void uvg_transformskip(const encoder_control_t *encoder, int16_t *block,int16_t *coeff, int8_t width, int8_t height);
 void uvg_itransformskip(const encoder_control_t *encoder, int16_t *block,int16_t *coeff, int8_t width, int8_t height);
 

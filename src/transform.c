@@ -694,7 +694,8 @@ void uvg_chroma_transform_search(
         cu_loc,
         COLOR_U,
         scan_order,
-        transforms[i] == CHROMA_TS);
+        transforms[i] == CHROMA_TS,
+        COEFF_ORDER_LINEAR);
       u_bits += coeff_cost;
     }
     if (cbf_v && !IS_JCCR_MODE(transforms[i])) {
@@ -710,7 +711,8 @@ void uvg_chroma_transform_search(
         cu_loc,
         COLOR_V,
         scan_order,
-        transforms[i] == CHROMA_TS);
+        transforms[i] == CHROMA_TS,
+        COEFF_ORDER_LINEAR);
     }
     if((depth == 4 || tree_type == UVG_CHROMA_T) && state->encoder_control->cfg.lfnst && 0) {
       if(uvg_is_lfnst_allowed(state, pred_cu, width, height, 0, 0 , UVG_CHROMA_T, COLOR_UV, lcu)) {
