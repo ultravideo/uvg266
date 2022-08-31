@@ -76,7 +76,8 @@ double uvg_get_coeff_cost(
   cu_loc_t *cu_loc,
   color_t color,
   int8_t scan_mode,
-  int8_t tr_skip);
+  int8_t tr_skip,
+  int coeff_order);
 
 int32_t uvg_get_ic_rate(encoder_state_t *state, uint32_t abs_level, uint16_t ctx_num_gt1, uint16_t ctx_num_gt2, uint16_t ctx_num_par,
                     uint16_t abs_go_rice, uint32_t reg_bins, int8_t type, int use_limited_prefix_length);

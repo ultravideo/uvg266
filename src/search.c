@@ -393,9 +393,10 @@ double uvg_cu_rd_cost_luma(const encoder_state_t *const state,
   if (!skip_residual_coding) {
     int8_t luma_scan_mode = uvg_get_scan_order(pred_cu->type, pred_cu->intra.mode, depth);
     if (pred_cu->type == CU_INTER || pred_cu->intra.isp_mode == ISP_MODE_NO_ISP) {
-      const coeff_t* coeffs = &lcu->coeff.y[xy_to_zorder(LCU_WIDTH, x_px, y_px)];
+      //const coeff_t* coeffs = &lcu->coeff.y[xy_to_zorder(LCU_WIDTH, x_px, y_px)];
+      const coeff_t* coeffs = lcu->coeff.y;
 
-      coeff_bits += uvg_get_coeff_cost(state, coeffs, NULL, &loc, 0, luma_scan_mode, pred_cu->tr_idx == MTS_SKIP);
+      coeff_bits += uvg_get_coeff_cost(state, coeffs, NULL, &loc, 0, luma_scan_mode, pred_cu->tr_idx == MTS_SKIP, COEFF_ORDER_CU);
     }
     else {
       int split_type = pred_cu->intra.isp_mode;
@@ -408,9 +409,10 @@ double uvg_cu_rd_cost_luma(const encoder_state_t *const state,
         const int part_y = split_loc.y;
 
         // TODO: maybe just pass the cu_loc_t to these functions
-        const coeff_t* coeffs = &lcu->coeff.y[xy_to_zorder(LCU_WIDTH, part_x, part_y)];
+        //const coeff_t* coeffs = &lcu->coeff.y[xy_to_zorder(LCU_WIDTH, part_x, part_y)];
+        const coeff_t* coeffs = lcu->coeff.y;
 
-        coeff_bits += uvg_get_coeff_cost(state, coeffs, NULL, &split_loc, 0, luma_scan_mode, pred_cu->tr_idx == MTS_SKIP);
+        coeff_bits += uvg_get_coeff_cost(state, coeffs, NULL, &split_loc, 0, luma_scan_mode, pred_cu->tr_idx == MTS_SKIP, COEFF_ORDER_CU);
       }
     }
   }
@@ -501,14 +503,14 @@ double uvg_cu_rd_cost_chroma(const encoder_state_t *const state,
 
   if (!skip_residual_coding) {
     int8_t scan_order = uvg_get_scan_order(pred_cu->type, pred_cu->intra.mode_chroma, depth);
-    const int index = xy_to_zorder(LCU_WIDTH_C, lcu_px.x, lcu_px.y);
+    //const int index = xy_to_zorder(LCU_WIDTH_C, lcu_px.x, lcu_px.y);
 
     if((pred_cu->joint_cb_cr & 3) == 0){
-      coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.u[index], NULL, &loc, 2, scan_order, 0);
-      coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.v[index], NULL, &loc, 2, scan_order, 0);
+      coeff_bits += uvg_get_coeff_cost(state, lcu->coeff.u, NULL, &loc, 2, scan_order, 0, COEFF_ORDER_CU);
+      coeff_bits += uvg_get_coeff_cost(state, lcu->coeff.v, NULL, &loc, 2, scan_order, 0, COEFF_ORDER_CU);
     }
     else {
-      coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.joint_uv[index], NULL, &loc, 2, scan_order, 0);
+      coeff_bits += uvg_get_coeff_cost(state, lcu->coeff.joint_uv, NULL, &loc, 2, scan_order, 0, COEFF_ORDER_CU);
       
     }
   }
@@ -638,9 +640,10 @@ static double cu_rd_cost_tr_split_accurate(
     }
     int8_t luma_scan_mode = uvg_get_scan_order(pred_cu->type, pred_cu->intra.mode, depth);
     if (pred_cu->type == CU_INTER || pred_cu->intra.isp_mode == ISP_MODE_NO_ISP) {
-      const coeff_t* coeffs = &lcu->coeff.y[xy_to_zorder(LCU_WIDTH, x_px, y_px)];
+      //const coeff_t* coeffs = &lcu->coeff.y[xy_to_zorder(LCU_WIDTH, x_px, y_px)];
+      const coeff_t* coeffs = lcu->coeff.y;
 
-      coeff_bits += uvg_get_coeff_cost(state, coeffs, tr_cu, &loc, 0, luma_scan_mode, pred_cu->tr_idx == MTS_SKIP);
+      coeff_bits += uvg_get_coeff_cost(state, coeffs, tr_cu, &loc, 0, luma_scan_mode, pred_cu->tr_idx == MTS_SKIP, COEFF_ORDER_CU);
     }
     else {
       int split_type = pred_cu->intra.isp_mode;
@@ -653,9 +656,10 @@ static double cu_rd_cost_tr_split_accurate(
         const int part_y = split_loc.y;
 
         // TODO: maybe just pass the cu_loc_t to these functions
-        const coeff_t* coeffs = &lcu->coeff.y[xy_to_zorder(LCU_WIDTH, part_x, part_y)];
+        //const coeff_t* coeffs = &lcu->coeff.y[xy_to_zorder(LCU_WIDTH, part_x, part_y)];
+        const coeff_t* coeffs = lcu->coeff.y;
 
-        coeff_bits += uvg_get_coeff_cost(state, coeffs, tr_cu, &split_loc, 0, luma_scan_mode, pred_cu->tr_idx == MTS_SKIP);
+        coeff_bits += uvg_get_coeff_cost(state, coeffs, tr_cu, &split_loc, 0, luma_scan_mode, pred_cu->tr_idx == MTS_SKIP, COEFF_ORDER_CU);
       }
     }
   }
@@ -687,7 +691,7 @@ static double cu_rd_cost_tr_split_accurate(
     const int chroma_width  = MAX(4, LCU_WIDTH >> (depth + 1));
     const int chroma_height = chroma_width; // TODO: height for non-square blocks
     int8_t scan_order = uvg_get_scan_order(pred_cu->type, pred_cu->intra.mode_chroma, depth);
-    const unsigned index = xy_to_zorder(LCU_WIDTH_C, lcu_px.x, lcu_px.y);
+    //const unsigned index = xy_to_zorder(LCU_WIDTH_C, lcu_px.x, lcu_px.y);
 
     const bool chroma_can_use_tr_skip = state->encoder_control->cfg.trskip_enable && chroma_width <= (1 << state->encoder_control->cfg.trskip_max_size);
     if(pred_cu->joint_cb_cr == 0) {
@@ -707,8 +711,8 @@ static double cu_rd_cost_tr_split_accurate(
       if(chroma_can_use_tr_skip && cb_flag_v) {
         CABAC_FBITS_UPDATE(cabac, &cabac->ctx.transform_skip_model_chroma, tr_cu->tr_skip & 4, tr_tree_bits, "transform_skip_flag");        
       }
-      coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.u[index], tr_cu, &loc, COLOR_U, scan_order, tr_cu->tr_skip & 2);
-      coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.v[index], tr_cu, &loc, COLOR_V, scan_order, tr_cu->tr_skip & 4);
+      coeff_bits += uvg_get_coeff_cost(state, lcu->coeff.u, tr_cu, &loc, COLOR_U, scan_order, tr_cu->tr_skip & 2, COEFF_ORDER_CU);
+      coeff_bits += uvg_get_coeff_cost(state, lcu->coeff.v, tr_cu, &loc, COLOR_V, scan_order, tr_cu->tr_skip & 4, COEFF_ORDER_CU);
       
     }
     else {
@@ -725,7 +729,7 @@ static double cu_rd_cost_tr_split_accurate(
       if (chroma_can_use_tr_skip) {
         CABAC_FBITS_UPDATE(cabac, &cabac->ctx.transform_skip_model_chroma, tr_cu->tr_skip & 2, tr_tree_bits, "transform_skip_flag");
       }
-      coeff_bits += uvg_get_coeff_cost(state, &lcu->coeff.joint_uv[index], tr_cu, &loc, COLOR_U, scan_order, 0);
+      coeff_bits += uvg_get_coeff_cost(state, lcu->coeff.joint_uv, tr_cu, &loc, COLOR_U, scan_order, 0, COEFF_ORDER_CU);
     }
   }
 

@@ -301,7 +301,8 @@ static INLINE double get_coeff_cabac_cost(
   color_t color,
   int8_t scan_mode,
   int8_t tr_skip,
-  cu_info_t* cur_tu)
+  cu_info_t* cur_tu,
+  int coeff_order)
 {
   const int width  = cu_loc->width;
   const int height = cu_loc->height;
@@ -315,11 +316,20 @@ static INLINE double get_coeff_cabac_cost(
   // Make sure there are coeffs present
   bool found = false;
 
+  coeff_t* coeff_ptr = NULL;
   coeff_t sub_coeff[TR_MAX_WIDTH * TR_MAX_WIDTH];
-  uvg_get_sub_coeff(sub_coeff, coeff, x_local, y_local, sub_coeff_w, sub_coeff_h, lcu_width);
+
+  if (coeff_order == COEFF_ORDER_LINEAR) {
+    coeff_ptr = coeff;
+  }
+  else {
+    // Coeff order CU
+    uvg_get_sub_coeff(sub_coeff, coeff, x_local, y_local, sub_coeff_w, sub_coeff_h, lcu_width);
+    coeff_ptr = sub_coeff;
+  }
 
   for (int i = 0; i < sub_coeff_w * sub_coeff_h; i++) {
-    if (sub_coeff[i] != 0) {
+    if (coeff_ptr[i] != 0) {
       found = 1;
       break;
     }
@@ -342,7 +352,7 @@ static INLINE double get_coeff_cabac_cost(
   if(!tr_skip) {
     uvg_encode_coeff_nxn((encoder_state_t*) state,
                          &cabac_copy,
-                         sub_coeff,
+                         coeff_ptr,
                          cu_loc,
                          color,
                          scan_mode,
@@ -352,7 +362,7 @@ static INLINE double get_coeff_cabac_cost(
   else {
     uvg_encode_ts_residual((encoder_state_t* const)state,
       &cabac_copy,
-      sub_coeff,
+      coeff_ptr,
       width,
       height,
       color,
@@ -408,7 +418,8 @@ double uvg_get_coeff_cost(
   cu_loc_t *cu_loc,
   color_t color,
   int8_t scan_mode,
-  int8_t tr_skip)
+  int8_t tr_skip,
+  int coeff_order)
 {
   uint8_t save_cccs = state->encoder_control->cfg.fastrd_sampling_on;
   uint8_t check_accuracy = state->encoder_control->cfg.fastrd_accuracy_check_on;
@@ -428,13 +439,13 @@ double uvg_get_coeff_cost(
       uint64_t weights = uvg_fast_coeff_get_weights(state);
       uint32_t fast_cost = uvg_fast_coeff_cost(coeff, width, height, weights);
       if (check_accuracy) {
-        double ccc = get_coeff_cabac_cost(state, coeff, cu_loc, color, scan_mode, tr_skip, cur_tu);
+        double ccc = get_coeff_cabac_cost(state, coeff, cu_loc, color, scan_mode, tr_skip, cur_tu, coeff_order);
         save_accuracy(state->qp, ccc, fast_cost);
       }
       return fast_cost;
     }
   } else {
-    double ccc = get_coeff_cabac_cost(state, coeff, cu_loc, color, scan_mode, tr_skip, cur_tu);
+    double ccc = get_coeff_cabac_cost(state, coeff, cu_loc, color, scan_mode, tr_skip, cur_tu, coeff_order);
     if (save_cccs) {
       save_ccc(state->qp, coeff, width * width, ccc);
     }
