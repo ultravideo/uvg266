@@ -1148,20 +1148,7 @@ static double search_cu(
                          depth, &intra_search,
                          NULL, 
                          lcu, tree_type,recon_luma,recon_chroma);
-      // Set isp split cbfs here
-      const int split_type = intra_search.pred_cu.intra.isp_mode;
-      const int split_num = split_type == ISP_MODE_NO_ISP ? 0 : uvg_get_isp_split_num(cu_width, cu_height, split_type);
-      for (int i = 0; i < split_num; ++i) {
-        cu_loc_t isp_loc;
-        uvg_get_isp_split_loc(&isp_loc, x, y, cu_width, cu_height, i, split_type);
-        //search_data->best_isp_cbfs |= cbf_is_set(cur_cu->cbf, depth, COLOR_Y) << (i++);
-        cu_info_t* split_cu = LCU_GET_CU_AT_PX(lcu, isp_loc.x % LCU_WIDTH, isp_loc.y % LCU_WIDTH);
-        bool cur_cbf = (intra_search.best_isp_cbfs >> i) & 1;
-        cbf_clear(&split_cu->cbf, depth, COLOR_Y);
-        if (cur_cbf) {
-          cbf_set(&split_cu->cbf, depth, COLOR_Y);
-        }
-      }
+
 
       if(depth == 4 && x % 8 && y % 8 && tree_type != UVG_LUMA_T && state->encoder_control->chroma_format != UVG_CSP_400) {
         intra_search.pred_cu.intra.mode_chroma = cur_cu->intra.mode_chroma;
@@ -1173,6 +1160,30 @@ static double search_cu(
                            tree_type,false,true);
       }
       if (cur_cu->joint_cb_cr == 4) cur_cu->joint_cb_cr = 0;
+
+      // Set isp split cbfs here
+      const int split_type = intra_search.pred_cu.intra.isp_mode;
+      const int split_num = split_type == ISP_MODE_NO_ISP ? 0 : uvg_get_isp_split_num(cu_width, cu_height, split_type);
+
+      const int cbf_cb = cbf_is_set(cur_cu->cbf, depth, COLOR_U);
+      const int cbf_cr = cbf_is_set(cur_cu->cbf, depth, COLOR_V);
+      const int jccr = cur_cu->joint_cb_cr;
+      for (int i = 0; i < split_num; ++i) {
+        cu_loc_t isp_loc;
+        uvg_get_isp_split_loc(&isp_loc, x, y, cu_width, cu_height, i, split_type);
+        //search_data->best_isp_cbfs |= cbf_is_set(cur_cu->cbf, depth, COLOR_Y) << (i++);
+        cu_info_t* split_cu = LCU_GET_CU_AT_PX(lcu, isp_loc.x % LCU_WIDTH, isp_loc.y % LCU_WIDTH);
+        bool cur_cbf = (intra_search.best_isp_cbfs >> i) & 1;
+        cbf_clear(&split_cu->cbf, depth, COLOR_Y);
+        cbf_clear(&split_cu->cbf, depth, COLOR_U);
+        cbf_clear(&split_cu->cbf, depth, COLOR_V);
+        if (cur_cbf) {
+          cbf_set(&split_cu->cbf, depth, COLOR_Y);
+        }
+        if(cbf_cb) cbf_set(&split_cu->cbf, depth, COLOR_U);
+        if(cbf_cr) cbf_set(&split_cu->cbf, depth, COLOR_V);
+        split_cu->joint_cb_cr = jccr;
+      }
       lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
 
 
