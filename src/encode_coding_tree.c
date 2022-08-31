@@ -527,7 +527,8 @@ static void encode_transform_unit(
   bool only_chroma,
   lcu_coeff_t* coeff,
   enum uvg_tree_type tree_type,
-  bool last_split)
+  bool last_split,
+  const cu_loc_t *original_loc)               // Original cu dimensions, before CU split
 {
   assert(depth >= 1 && depth <= MAX_PU_DEPTH);
 
@@ -596,7 +597,8 @@ static void encode_transform_unit(
                         cbf_is_set(cur_pu->cbf, depth, COLOR_V);
   if ((chroma_cbf_set || joint_chroma) && last_split) {
     //Need to drop const to get lfnst constraints
-    encode_chroma_tu(state, cu_loc, depth, (cu_info_t*)cur_pu, &scan_idx, coeff, joint_chroma, tree_type);
+    // Use original dimensions instead of ISP split dimensions
+    encode_chroma_tu(state, original_loc, depth, (cu_info_t*)cur_pu, &scan_idx, coeff, joint_chroma, tree_type);
   }
 }
 
@@ -620,7 +622,8 @@ static void encode_transform_coeff(
   lcu_coeff_t* coeff,
   enum uvg_tree_type tree_type,
   bool last_split,
-  int *luma_cbf_ctx)                // Always true except when writing sub partition coeffs (ISP)
+  int *luma_cbf_ctx,            // Always true except when writing sub partition coeffs (ISP)
+  cu_loc_t *original_loc)       // Original dimensions before ISP split
 {
   cabac_data_t * const cabac = &state->cabac;
   const int x = cu_loc->x;
@@ -707,7 +710,7 @@ static void encode_transform_coeff(
         cu_loc_t loc;
         uvg_cu_loc_ctor(&loc, (x + i * split_width), (y + j * split_height), width >> 1, height >> 1);
 
-        encode_transform_coeff(state, &loc, depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v, only_chroma, coeff, tree_type, true, luma_cbf_ctx);
+        encode_transform_coeff(state, &loc, depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v, only_chroma, coeff, tree_type, true, luma_cbf_ctx, &loc);
       }
     }
     return;
@@ -761,7 +764,7 @@ static void encode_transform_coeff(
       CABAC_BIN(cabac, cur_pu->joint_cb_cr != 0, "tu_joint_cbcr_residual_flag");
     }
 
-    encode_transform_unit(state, cu_loc, depth, only_chroma, coeff, tree_type, last_split);
+    encode_transform_unit(state, cu_loc, depth, only_chroma, coeff, tree_type, last_split, original_loc);
   }
 }
 
@@ -1676,7 +1679,7 @@ void uvg_encode_coding_tree(
       // Code (possible) coeffs to bitstream
       if (cbf) {
         int luma_cbf_ctx = 0;
-        encode_transform_coeff(state, &cu_loc, depth, 0, 0, 0, 0, coeff, tree_type, true, &luma_cbf_ctx);
+        encode_transform_coeff(state, &cu_loc, depth, 0, 0, 0, 0, coeff, tree_type, true, &luma_cbf_ctx, &cu_loc);
       }
 
       encode_mts_idx(state, cabac, cur_cu);
@@ -1706,7 +1709,7 @@ void uvg_encode_coding_tree(
 
         // Check if last split to write chroma
         bool last_split = (i + 1) == split_limit;
-        encode_transform_coeff(state, &split_loc, depth, 0, 0, 0, 0, coeff, tree_type, last_split, &luma_cbf_ctx);
+        encode_transform_coeff(state, &split_loc, depth, 0, 0, 0, 0, coeff, tree_type, last_split, &luma_cbf_ctx, &cu_loc);
       }
     }
 
@@ -1725,7 +1728,7 @@ void uvg_encode_coding_tree(
       tmp->violates_lfnst_constrained_luma = false;
       tmp->violates_lfnst_constrained_chroma = false;
       tmp->lfnst_last_scan_pos = false;
-      encode_transform_coeff(state, &cu_loc, depth, 0, 0, 0, 1, coeff, tree_type, true, &luma_cbf_ctx);
+      encode_transform_coeff(state, &cu_loc, depth, 0, 0, 0, 1, coeff, tree_type, true, &luma_cbf_ctx, &cu_loc);
       // Write LFNST only once for single tree structure
       encode_lfnst_idx(state, cabac, tmp, x, y, depth, cu_width, cu_height, tree_type, COLOR_UV);
     }
