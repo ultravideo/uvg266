@@ -930,7 +930,7 @@ static void intra_predict_regular(
   uint8_t multi_ref_index = color == COLOR_Y ? multi_ref_idx : 0;
 
   const uvg_intra_ref *used_ref = &refs->ref;
-  if (cfg->intra_smoothing_disabled || color != COLOR_Y || mode == 1 || (width == 4 && height == 4) || multi_ref_index || width != height /*Fake ISP*/) {
+  if (cfg->intra_smoothing_disabled || color != COLOR_Y || mode == 1 || (width == 4 && height == 4) || multi_ref_index || width != height /*ISP_TODO: replace this fake ISP check*/) {
     // For chroma, DC and 4x4 blocks, always use unfiltered reference.
   } else if (mode == 0) {
     // Otherwise, use filtered for planar.
@@ -984,14 +984,15 @@ void uvg_intra_build_reference_any(
   const lcu_t *const lcu,
   uvg_intra_references *const refs,
   const uint8_t multi_ref_idx,
-  uvg_pixel *extra_ref_lines)
+  uvg_pixel *extra_ref_lines,
+  bool is_isp)
 {
   const int width = color == COLOR_Y ? cu_loc->width : cu_loc->chroma_width;
   const int height = color == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
   const int log2_width =  uvg_g_convert_to_log2[width];
   const int log2_height = uvg_g_convert_to_log2[height];
 
-  assert((log2_width >= 2 && log2_width <= 5) && (log2_height >= 2 && log2_height <= 5));
+  assert((log2_width >= 1 && log2_width <= 5) && (log2_height >= 1 && log2_height <= 5));
 
   refs->filtered_initialized = false;
   uvg_pixel *out_left_ref = &refs->ref.left[0];
@@ -1057,7 +1058,13 @@ void uvg_intra_build_reference_any(
   // Generate left reference.
   if (luma_px->x > 0) {
     // Get the number of reference pixels based on the PU coordinate within the LCU.
-    int px_available_left = num_ref_pixels_left[lcu_px.y / 4][lcu_px.x / 4] >> is_chroma;
+    int px_available_left;
+    if (is_isp && !is_chroma) {
+      px_available_left = height;
+    }
+    else {
+      px_available_left = num_ref_pixels_left[lcu_px.y / 4][lcu_px.x / 4] >> is_chroma;
+    }
 
     // Limit the number of available pixels based on block size and dimensions
     // of the picture.
@@ -1161,10 +1168,16 @@ void uvg_intra_build_reference_any(
   }
 
   // Generate top reference.
+  int px_available_top;
   if (luma_px->y > 0) {
     // Get the number of reference pixels based on the PU coordinate within the LCU.
-    int px_available_top = num_ref_pixels_top[lcu_px.y / 4][lcu_px.x / 4] >> is_chroma;
-
+    if (is_isp && !is_chroma) {
+      px_available_top = width;
+    }
+    else {
+      px_available_top = num_ref_pixels_top[lcu_px.y / 4][lcu_px.x / 4] >> is_chroma;
+    }
+    
     // Limit the number of available pixels based on block size and dimensions
     // of the picture.
     px_available_top = MIN(px_available_top, width * 2 + multi_ref_index);
@@ -1197,7 +1210,8 @@ void uvg_intra_build_reference_inner(
   uvg_intra_references *const refs,
   bool entropy_sync,
   const uint8_t multi_ref_idx,
-  uvg_pixel* extra_ref_lines)
+  uvg_pixel* extra_ref_lines,
+  bool is_isp)
 {
   const int width = color == COLOR_Y ? cu_loc->width : cu_loc->chroma_width;
   const int height = color == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
@@ -1310,8 +1324,14 @@ void uvg_intra_build_reference_inner(
   }
   // Generate left reference.
 
-// Get the number of reference pixels based on the PU coordinate within the LCU.
-  int px_available_left = num_ref_pixels_left[lcu_px.y / 4][lcu_px.x / 4] >> is_chroma;
+  // Get the number of reference pixels based on the PU coordinate within the LCU.
+  int px_available_left;
+  if (is_isp && !is_chroma) {
+    px_available_left = height;
+  }
+  else {
+    px_available_left = num_ref_pixels_left[lcu_px.y / 4][lcu_px.x / 4] >> is_chroma;
+  }
 
   // Limit the number of available pixels based on block size and dimensions
   // of the picture.
@@ -1347,7 +1367,13 @@ void uvg_intra_build_reference_inner(
   // Generate top reference.
 
   // Get the number of reference pixels based on the PU coordinate within the LCU.
-  int px_available_top = num_ref_pixels_top[lcu_px.y / 4][lcu_px.x / 4] >> is_chroma;
+  int px_available_top;
+  if (is_isp && !is_chroma) {
+    px_available_top = width;
+  }
+  else {
+    px_available_top = num_ref_pixels_top[lcu_px.y / 4][lcu_px.x / 4] >> is_chroma;
+  }
 
   // Limit the number of available pixels based on block size and dimensions
   // of the picture.
@@ -1373,7 +1399,46 @@ void uvg_intra_build_reference_inner(
   }
 }
 
+void uvg_intra_build_reference_isp(
+  const cu_loc_t* const split_loc,
+  const cu_loc_t* const origin,
+  const color_t color,
+  const vector2d_t* const luma_px,
+  const vector2d_t* const pic_px,
+  const lcu_t* const lcu,
+  uvg_intra_references* const refs,
+  bool entropy_sync,
+  const int isp_mode)
+{
+  int ref_length_top = 0, ref_length_left = 0;
+
+  bool left_available  = split_loc->x > 0;
+  bool above_available = split_loc->y > 0;
+
+  if (split_loc->x == origin->x && split_loc->y == origin->y)
+  {
+    // First ISP split, call reference builders normally
+    if (luma_px->x > 0 && luma_px->y > 0) {
+      uvg_intra_build_reference_inner(split_loc, color, luma_px, pic_px, lcu, refs, entropy_sync, 0, NULL, false);
+    }
+    else {
+      uvg_intra_build_reference_any(split_loc, color, luma_px, pic_px, lcu, refs, 0, NULL, false);
+    }
+    
+  }
+  else
+  {
+    if (luma_px->x > 0 && luma_px->y > 0) {
+      uvg_intra_build_reference_inner(split_loc, color, luma_px, pic_px, lcu, refs, entropy_sync, 0, NULL, true);
+    }
+    else {
+      uvg_intra_build_reference_any(split_loc, color, luma_px, pic_px, lcu, refs, 0, NULL, true);
+    }
+  }
+}
+
 void uvg_intra_build_reference(
+  const cu_loc_t* const pu_loc,
   const cu_loc_t* const cu_loc,
   const color_t color,
   const vector2d_t *const luma_px,
@@ -1386,11 +1451,19 @@ void uvg_intra_build_reference(
 {
   assert(!(extra_ref_lines == NULL && multi_ref_idx != 0) && "Trying to use MRL with NULL extra references.");
 
+  bool is_isp = (pu_loc->x != cu_loc->x) || (pu_loc->y != cu_loc->y);
+
+  // If isp is in use, some extra logic is needed
+  if (is_isp) {
+    uvg_intra_build_reference_isp(pu_loc, cu_loc, color, luma_px, pic_px, lcu, refs, entropy_sync, is_isp);
+    return;
+  }
+
   // Much logic can be discarded if not on the edge
   if (luma_px->x > 0 && luma_px->y > 0) {
-    uvg_intra_build_reference_inner(cu_loc, color, luma_px, pic_px, lcu, refs, entropy_sync, multi_ref_idx, extra_ref_lines);
+    uvg_intra_build_reference_inner(pu_loc, color, luma_px, pic_px, lcu, refs, entropy_sync, multi_ref_idx, extra_ref_lines, is_isp);
   } else {
-    uvg_intra_build_reference_any(cu_loc, color, luma_px, pic_px, lcu, refs, multi_ref_idx, extra_ref_lines);
+    uvg_intra_build_reference_any(pu_loc, color, luma_px, pic_px, lcu, refs, multi_ref_idx, extra_ref_lines, is_isp);
   }
 }
 
@@ -1538,6 +1611,7 @@ void uvg_get_isp_split_loc(cu_loc_t *loc, const int x, const int y, const int bl
 
 static void intra_recon_tb_leaf(
   encoder_state_t* const state,
+  const cu_loc_t* pu_loc,
   const cu_loc_t* cu_loc,
   lcu_t *lcu,
   color_t color,
@@ -1586,7 +1660,7 @@ static void intra_recon_tb_leaf(
     }
   }
 
-  uvg_intra_build_reference(cu_loc, color, &luma_px, &pic_px, lcu, &refs, cfg->wpp, extra_refs, multi_ref_index);
+  uvg_intra_build_reference(pu_loc, cu_loc, color, &luma_px, &pic_px, lcu, &refs, cfg->wpp, extra_refs, multi_ref_index);
 
   uvg_pixel pred[32 * 32];
   uvg_intra_predict(state, &refs, cu_loc, color, pred, search_data, lcu, tree_type);
@@ -1697,12 +1771,14 @@ void uvg_intra_recon_cu(
     // Small blocks are split only twice.
     int split_type = search_data->pred_cu.intra.isp_mode;
     int split_limit = uvg_get_isp_split_num(width, height, split_type);
+    cu_loc_t origin_cu;
+    uvg_cu_loc_ctor(&origin_cu, x, y, width, height);
 
     for (int i = 0; i < split_limit; ++i) {
       cu_loc_t split_loc;
       uvg_get_isp_split_loc(&split_loc, x, y, width, height, i, split_type);
 
-      intra_recon_tb_leaf(state, &split_loc, lcu, COLOR_Y, search_data, tree_type);
+      intra_recon_tb_leaf(state, &split_loc, &origin_cu, lcu, COLOR_Y, search_data, tree_type);
       uvg_quantize_lcu_residual(state, true, false, false,
         &split_loc, depth, cur_cu, lcu,
         false, tree_type);
@@ -1717,11 +1793,11 @@ void uvg_intra_recon_cu(
    
   // Process a leaf TU.
   if (has_luma) {
-    intra_recon_tb_leaf(state, &loc, lcu, COLOR_Y, search_data, tree_type);
+    intra_recon_tb_leaf(state, &loc, &loc, lcu, COLOR_Y, search_data, tree_type);
   }
   if (has_chroma) {
-    intra_recon_tb_leaf(state, &loc, lcu, COLOR_U, search_data, tree_type);
-    intra_recon_tb_leaf(state, &loc, lcu, COLOR_V, search_data, tree_type);
+    intra_recon_tb_leaf(state, &loc, &loc, lcu, COLOR_U, search_data, tree_type);
+    intra_recon_tb_leaf(state, &loc, &loc, lcu, COLOR_V, search_data, tree_type);
   }
 
   // TODO: not necessary to call if only luma and ISP is on

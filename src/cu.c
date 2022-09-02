@@ -265,7 +265,8 @@ void uvg_cu_loc_ctor(cu_loc_t* loc, int x, int y, int width, int height)
 {
   assert(x >= 0 && y >= 0 && width >= 0 && height >= 0 && "Cannot give negative coordinates or block dimensions.");
   assert(!(width > LCU_WIDTH || height > LCU_WIDTH) && "Luma CU dimension exceeds maximum (dim > LCU_WIDTH).");
-  assert(!(width < 4 || height < 4) && "Luma CU dimension smaller than 4."); // TODO: change if luma size 2 is allowed
+  // This check is no longer valid. With non-square blocks and ISP enabled, even 1x16 and 16x1 (ISP needs at least 16 samples) blocks are valid
+  //assert(!(width < 4 || height < 4) && "Luma CU dimension smaller than 4.");
   
   loc->x = x;
   loc->y = y;

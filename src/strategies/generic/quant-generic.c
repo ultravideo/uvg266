@@ -456,8 +456,10 @@ int uvg_quantize_residual_generic(encoder_state_t *const state,
 
   int has_coeffs = 0;
 
-  assert(width <= TR_MAX_WIDTH && height <= TR_MAX_WIDTH);
-  assert(width >= TR_MIN_WIDTH && height >= TR_MIN_WIDTH);
+  // With ISP these checks no longer apply, since width and height 2 is now possible
+  // With MTT even 1x16 and 16x1 ISP splits are possible
+  //assert(width <= TR_MAX_WIDTH && height <= TR_MAX_WIDTH);
+  //assert(width >= TR_MIN_WIDTH && height >= TR_MIN_WIDTH);
 
   // Get residual. (ref_in - pred_in -> residual)
   uvg_generate_residual(ref_in, pred_in, residual, width, height, in_stride, in_stride);

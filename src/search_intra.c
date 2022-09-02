@@ -709,10 +709,10 @@ static int search_intra_chroma_rough(
   const cu_loc_t loc = { luma_px.x, luma_px.y, width, height, width, height };
 
   uvg_intra_references refs_u;
-  uvg_intra_build_reference(&loc, COLOR_U, &luma_px, &pic_px, lcu, &refs_u, state->encoder_control->cfg.wpp, NULL, 0);
+  uvg_intra_build_reference(&loc, &loc, COLOR_U, &luma_px, &pic_px, lcu, &refs_u, state->encoder_control->cfg.wpp, NULL, 0);
 
   uvg_intra_references refs_v;
-  uvg_intra_build_reference(&loc, COLOR_V, &luma_px, &pic_px, lcu, &refs_v, state->encoder_control->cfg.wpp, NULL, 0);
+  uvg_intra_build_reference(&loc, &loc, COLOR_V, &luma_px, &pic_px, lcu, &refs_v, state->encoder_control->cfg.wpp, NULL, 0);
 
   vector2d_t lcu_cpx = { (lcu_px->x & ~7) / 2, (lcu_px->y & ~7) / 2 };
   uvg_pixel* orig_u = &lcu->ref.u[lcu_cpx.x + lcu_cpx.y * LCU_WIDTH_C];
@@ -1514,8 +1514,8 @@ int8_t uvg_search_intra_chroma_rdo(
 
 
   if (reconstruct_chroma) {
-    uvg_intra_build_reference(&loc, COLOR_U, &luma_px, &pic_px, lcu, &refs[0], state->encoder_control->cfg.wpp, NULL, 0);
-    uvg_intra_build_reference(&loc, COLOR_V, &luma_px, &pic_px, lcu, &refs[1], state->encoder_control->cfg.wpp, NULL, 0);
+    uvg_intra_build_reference(&loc, &loc, COLOR_U, &luma_px, &pic_px, lcu, &refs[0], state->encoder_control->cfg.wpp, NULL, 0);
+    uvg_intra_build_reference(&loc, &loc, COLOR_V, &luma_px, &pic_px, lcu, &refs[1], state->encoder_control->cfg.wpp, NULL, 0);
     
     const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
     cabac_data_t temp_cabac;
@@ -1858,7 +1858,7 @@ void uvg_search_cu_intra(
   int8_t num_cand = uvg_intra_get_dir_luma_predictor(x_px, y_px, candidate_modes, cur_cu, left_cu, above_cu);
 
   if (depth > 0) {
-    uvg_intra_build_reference(&cu_loc, COLOR_Y, &luma_px, &pic_px, lcu, refs, state->encoder_control->cfg.wpp, NULL, 0);
+    uvg_intra_build_reference(&cu_loc, &cu_loc, COLOR_Y, &luma_px, &pic_px, lcu, refs, state->encoder_control->cfg.wpp, NULL, 0);
   }
 
   // The maximum number of possible MIP modes depend on block size & shape
@@ -1926,7 +1926,7 @@ void uvg_search_cu_intra(
           frame->rec->stride, 1);
       }
     }
-    uvg_intra_build_reference(&cu_loc, COLOR_Y, &luma_px, &pic_px, lcu, &refs[line], state->encoder_control->cfg.wpp, extra_refs, line);
+    uvg_intra_build_reference(&cu_loc, &cu_loc, COLOR_Y, &luma_px, &pic_px, lcu, &refs[line], state->encoder_control->cfg.wpp, extra_refs, line);
     for(int i = 1; i < INTRA_MPM_COUNT; i++) {
       num_mrl_modes++;
       const int index = (i - 1) + (INTRA_MPM_COUNT -1)*(line-1) + number_of_modes;
