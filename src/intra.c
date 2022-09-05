@@ -1446,9 +1446,10 @@ void uvg_intra_build_reference(
 {
   assert(!(extra_ref_lines == NULL && multi_ref_idx != 0) && "Trying to use MRL with NULL extra references.");
 
+  // This will be false for first ISP split
   bool is_isp = (pu_loc->x != cu_loc->x) || (pu_loc->y != cu_loc->y);
 
-  // If isp is in use, some extra logic is needed
+  // If isp is in use, some extra logic is needed. For first split, old reference builders can be used.
   if (is_isp) {
     uvg_intra_build_reference_isp(pu_loc, cu_loc, color, luma_px, pic_px, lcu, refs, entropy_sync, is_isp);
     return;
