@@ -205,13 +205,14 @@ static void derive_mts_constraints(cu_info_t *const pred_cu,
   const uint32_t * const scan = uvg_get_scan_order_table(SCAN_GROUP_4X4, scan_idx, log2_block_width, log2_block_height);
   const uint32_t * const scan_cg = uvg_get_scan_order_table(SCAN_GROUP_UNGROUPED, scan_idx, log2_block_width, log2_block_height);
 
-  const coeff_t* coeff = &lcu->coeff.y[xy_to_zorder(LCU_WIDTH, lcu_px.x, lcu_px.y)];
+  coeff_t coeff_y[TR_MAX_WIDTH * TR_MAX_WIDTH];
+  uvg_get_sub_coeff(coeff_y, lcu->coeff.y, lcu_px.x, lcu_px.y, width, height, LCU_WIDTH);
 
   signed scan_cg_last = -1;
   signed scan_pos_last = -1;
 
   for (int i = 0; i < width * height; i++) {
-    if (coeff[scan[i]]) {
+    if (coeff_y[scan[i]]) {
       scan_pos_last = i;
       sig_coeffgroup_flag[scan_cg[i >> log2_cg_size]] = 1;
     }
@@ -420,10 +421,11 @@ static double search_intra_trdepth(
             pred_cu,
             depth,
             constraints,
-            &lcu->coeff.y[scan_offset],
+            lcu->coeff.y,
             width,
-            height
-            );
+            height,
+            &lcu_px,
+            COLOR_Y);
         }
 
         if (!constraints[1] && cbf_is_set(pred_cu->cbf, depth, COLOR_Y)) {
@@ -493,10 +495,6 @@ static double search_intra_trdepth(
         pred_cu->intra.mode_chroma = chroma_mode;
         pred_cu->joint_cb_cr = 4;
         // TODO: Maybe check the jccr mode here also but holy shit is the interface of search_intra_rdo bad currently
-        const unsigned scan_offset = xy_to_zorder(
-          LCU_WIDTH_C,
-          lcu_px.x,
-          lcu_px.y);
         uvg_intra_recon_cu(
           state,
           x_px,
@@ -526,10 +524,11 @@ static double search_intra_trdepth(
             pred_cu,
             depth,
             constraints,
-            &lcu->coeff.u[scan_offset],
+            lcu->coeff.u,
             width_c,
-            width_c
-            );
+            width_c,
+            &lcu_px,
+            COLOR_U);
           if (constraints[0] || !constraints[1]) {
             best_lfnst_idx = 0;
             continue;
@@ -538,10 +537,11 @@ static double search_intra_trdepth(
             pred_cu,
             depth,
             constraints,
-            &lcu->coeff.u[scan_offset],
+            lcu->coeff.u,
             width_c,
-            width_c
-            );
+            width_c,
+            &lcu_px,
+            COLOR_U);
           if (constraints[0] || !constraints[1]) {
             best_lfnst_idx = 0;
             continue;

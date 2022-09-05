@@ -178,7 +178,9 @@ void uvg_derive_lfnst_constraints(
   bool* constraints,
   const coeff_t* coeff,
   const int width,
-  const int height)
+  const int height,
+  const vector2d_t * const lcu_px,
+  color_t color)
 {
   coeff_scan_order_t scan_idx = uvg_get_scan_order(pred_cu->type, pred_cu->intra.mode, depth);
   // ToDo: large block support in VVC?
@@ -187,6 +189,11 @@ void uvg_derive_lfnst_constraints(
   const uint32_t* scan = uvg_g_sig_last_scan[scan_idx][log2_block_size - 1];
 
   signed scan_pos_last = -1;
+  coeff_t temp[TR_MAX_WIDTH * TR_MAX_WIDTH];
+  if(lcu_px != NULL) {
+    uvg_get_sub_coeff(temp, coeff, lcu_px->x, lcu_px->y, width, height, color == COLOR_Y? LCU_WIDTH : LCU_WIDTH_C);
+    coeff = temp;
+  }
 
   for (int i = 0; i < width * height; i++) {
     if (coeff[scan[i]]) {
@@ -576,9 +583,9 @@ void uvg_chroma_transform_search(
     
     if(pred_cu->type == CU_INTRA && transforms[i] != CHROMA_TS && (depth == 4 || tree_type == UVG_CHROMA_T)) {
       bool constraints[2] = { false, false };
-      uvg_derive_lfnst_constraints(pred_cu, depth, constraints, u_quant_coeff, width, height);
+      uvg_derive_lfnst_constraints(pred_cu, depth, constraints, u_quant_coeff, width, height, NULL, COLOR_U);
       if(!IS_JCCR_MODE(transforms[i])) {
-        uvg_derive_lfnst_constraints(pred_cu, depth, constraints, v_quant_coeff, width, height);
+        uvg_derive_lfnst_constraints(pred_cu, depth, constraints, v_quant_coeff, width, height, NULL, COLOR_V);
       }
       if (!constraints[1] && (u_has_coeffs || v_has_coeffs) && pred_cu->cr_lfnst_idx != 0) continue;
     }
