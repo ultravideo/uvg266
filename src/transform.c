@@ -1257,6 +1257,17 @@ static void quantize_tr_residual(
         tree_type
       );
       cur_pu->joint_cb_cr = has_coeffs;
+      if (has_coeffs) {
+        for (int j = 0; j < tr_height; ++j) {
+          memcpy(&dst_coeff[j * lcu_width], &coeff[j * tr_width], tr_width * sizeof(coeff_t));
+        }
+        cbf_set(&cur_pu->cbf, depth, color);
+      }
+      else {
+        for (int j = 0; j < tr_height; ++j) {
+          memset(&dst_coeff[j * lcu_width], 0, (sizeof(coeff_t) * tr_width));
+        }
+      }
       return;
     }
 
