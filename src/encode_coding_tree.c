@@ -724,7 +724,9 @@ static void encode_transform_coeff(
   if ((cur_cu->type == CU_INTRA || tr_depth > 0 || cb_flag_u || cb_flag_v) && !only_chroma && tree_type != UVG_CHROMA_T) {
       cabac->cur_ctx = &(cabac->ctx.qt_cbf_model_luma[*luma_cbf_ctx]);
       CABAC_BIN(cabac, cb_flag_y, "cbf_luma");
-      *luma_cbf_ctx = 2 + cb_flag_y;
+      if (tr_depth == 0) {
+        *luma_cbf_ctx = 2 + cb_flag_y;
+      }
   }
 
   if (cb_flag_y | cb_flag_u | cb_flag_v) {
