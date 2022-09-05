@@ -114,7 +114,7 @@ bool uvg_is_lfnst_allowed(
   const color_t color,
   const lcu_t* lcu) 
 {
-  if (state->encoder_control->cfg.lfnst && pred_cu->type == CU_INTRA) {
+  if (state->encoder_control->cfg.lfnst && pred_cu->type == CU_INTRA && pred_cu->depth == pred_cu->tr_depth) {
     const int isp_mode = pred_cu->intra.isp_mode;
     const int depth = pred_cu->depth;
     const int chroma_width = width >> 1;
