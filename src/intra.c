@@ -1410,11 +1410,6 @@ void uvg_intra_build_reference_isp(
   bool entropy_sync,
   const int isp_mode)
 {
-  int ref_length_top = 0, ref_length_left = 0;
-
-  bool left_available  = split_loc->x > 0;
-  bool above_available = split_loc->y > 0;
-
   if (split_loc->x == origin->x && split_loc->y == origin->y)
   {
     // First ISP split, call reference builders normally
@@ -1621,11 +1616,11 @@ static void intra_recon_tb_leaf(
   const uvg_config *cfg = &state->encoder_control->cfg;
   const int shift = color == COLOR_Y ? 0 : 1;
 
-  const int x = cu_loc->x;
-  const int y = cu_loc->y;
+  const int x = pu_loc->x;
+  const int y = pu_loc->y;
   
-  const int width  = color == COLOR_Y ? cu_loc->width  : cu_loc->chroma_width;
-  const int height = color == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
+  const int width  = color == COLOR_Y ? pu_loc->width  : pu_loc->chroma_width;
+  const int height = color == COLOR_Y ? pu_loc->height : pu_loc->chroma_height;
   int log2_width =  uvg_g_convert_to_log2[width];
   int log2_height = uvg_g_convert_to_log2[height];
 
@@ -1663,7 +1658,7 @@ static void intra_recon_tb_leaf(
   uvg_intra_build_reference(pu_loc, cu_loc, color, &luma_px, &pic_px, lcu, &refs, cfg->wpp, extra_refs, multi_ref_index);
 
   uvg_pixel pred[32 * 32];
-  uvg_intra_predict(state, &refs, cu_loc, color, pred, search_data, lcu, tree_type);
+  uvg_intra_predict(state, &refs, pu_loc, color, pred, search_data, lcu, tree_type);
 
   const int index = lcu_px.x + lcu_px.y * lcu_width;
   uvg_pixel *block = NULL;
