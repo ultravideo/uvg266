@@ -78,7 +78,9 @@ void uvg_derive_lfnst_constraints(
   bool* constraints,
   const coeff_t* coeff,
   const int width,
-  const int height);
+  const int height,
+  const vector2d_t * const ,
+  color_t color);
 
 typedef struct {
   double best_u_cost;
