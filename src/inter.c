@@ -382,22 +382,25 @@ static void inter_cp_with_ext_border(const uvg_pixel *ref_buf, int ref_stride,
  * \param predict_luma   Enable or disable luma prediction for this call.
  * \param predict_chroma Enable or disable chroma prediction for this call.
 */
-static unsigned inter_recon_unipred(const encoder_state_t * const state,
-                                    const uvg_picture * const ref,
-                                    int32_t pu_x,
-                                    int32_t pu_y,
-                                    int32_t pu_w,
-                                    int32_t pu_h,
-                                    int32_t out_stride_luma,
-                                    const mv_t mv_param[2],
-                                    yuv_t *yuv_px,
-                                    yuv_im_t *yuv_im,
-                                    bool predict_luma,
-                                    bool predict_chroma)
+static unsigned inter_recon_unipred(
+  const encoder_state_t * const state,
+  const uvg_picture * const ref,
+  int32_t out_stride_luma,
+  const mv_t mv_param[2],
+  yuv_t *yuv_px,
+  yuv_im_t *yuv_im,
+  bool predict_luma,
+  bool predict_chroma,
+  const cu_loc_t* const cu_loc)
 {
   vector2d_t int_mv = { mv_param[0], mv_param[1] };
 
   uvg_change_precision_vector2d(INTERNAL_MV_PREC, 0, &int_mv);
+
+  const int pu_x = cu_loc->x;
+  const int pu_y = cu_loc->y;
+  const int pu_w = cu_loc->width;
+  const int pu_h = cu_loc->height;
 
   const vector2d_t int_mv_in_frame = {
     int_mv.x + pu_x + state->tile->offset_x,
@@ -514,23 +517,26 @@ static unsigned inter_recon_unipred(const encoder_state_t * const state,
  * \param predict_luma   Enable or disable luma prediction for this call.
  * \param predict_chroma Enable or disable chroma prediction for this call.
  */
-void uvg_inter_recon_bipred(const encoder_state_t *const state,
+void uvg_inter_recon_bipred(
+  const encoder_state_t *const state,
   const uvg_picture *ref1,
   const uvg_picture *ref2,
-  int32_t pu_x,
-  int32_t pu_y,
-  int32_t pu_w,
-  int32_t pu_h,
   mv_t mv_param[2][2],
   lcu_t *lcu,
   bool predict_luma,
-  bool predict_chroma)
+  bool predict_chroma,
+  const cu_loc_t* const cu_loc)
 {
   // Allocate maximum size arrays for interpolated and copied samples
   ALIGNED(64) uvg_pixel px_buf_L0[LCU_LUMA_SIZE + 2 * LCU_CHROMA_SIZE];
   ALIGNED(64) uvg_pixel px_buf_L1[LCU_LUMA_SIZE + 2 * LCU_CHROMA_SIZE];
   ALIGNED(64) uvg_pixel_im im_buf_L0[LCU_LUMA_SIZE + 2 * LCU_CHROMA_SIZE];
   ALIGNED(64) uvg_pixel_im im_buf_L1[LCU_LUMA_SIZE + 2 * LCU_CHROMA_SIZE];
+
+  const int pu_x = cu_loc->x;
+  const int pu_y = cu_loc->y;
+  const int pu_w = cu_loc->width;
+  const int pu_h = cu_loc->height;
 
   yuv_t px_L0;
   px_L0.size = pu_w * pu_h;
@@ -558,10 +564,10 @@ void uvg_inter_recon_bipred(const encoder_state_t *const state,
 
   // Sample blocks from both reference picture lists.
   // Flags state if the outputs were written to high-precision / interpolated sample buffers.
-  unsigned im_flags_L0 = inter_recon_unipred(state, ref1, pu_x, pu_y, pu_w, pu_h, pu_w, mv_param[0],
-                                             &px_L0, &im_L0, predict_luma, predict_chroma);
-  unsigned im_flags_L1 = inter_recon_unipred(state, ref2, pu_x, pu_y, pu_w, pu_h, pu_w, mv_param[1],
-                                             &px_L1, &im_L1, predict_luma, predict_chroma);
+  unsigned im_flags_L0 = inter_recon_unipred(state, ref1, pu_w, mv_param[0], &px_L0, &im_L0, predict_luma, predict_chroma,
+                                             cu_loc);
+  unsigned im_flags_L1 = inter_recon_unipred(state, ref2, pu_w, mv_param[1], &px_L1, &im_L1, predict_luma, predict_chroma,
+                                             cu_loc);
 
   // After reconstruction, merge the predictors by taking an average of each pixel
   uvg_bipred_average(lcu, &px_L0, &px_L1, &im_L0, &im_L1,
@@ -585,19 +591,14 @@ void uvg_inter_recon_bipred(const encoder_state_t *const state,
  * \param predict_luma   Enable or disable luma prediction for this call.
  * \param predict_chroma Enable or disable chroma prediction for this call.
  */
-void uvg_inter_recon_cu(const encoder_state_t * const state,
-                        lcu_t *lcu,
-                        int32_t x,
-                        int32_t y,
-                        int32_t width,
-                        bool predict_luma,
-                        bool predict_chroma)
+void uvg_inter_recon_cu(
+  const encoder_state_t * const state,
+  lcu_t *lcu,
+  bool predict_luma,
+  bool predict_chroma,
+  const cu_loc_t* const cu_loc)
 {
-  cu_info_t *cu = LCU_GET_CU_AT_PX(lcu, SUB_SCU(x), SUB_SCU(y));
-  const int num_pu = uvg_part_mode_num_parts[cu->part_size];
-  for (int i = 0; i < num_pu; ++i) {
-    uvg_inter_pred_pu(state, lcu, x, y, width, predict_luma, predict_chroma, i);
-  }
+  uvg_inter_pred_pu(state, lcu, predict_luma, predict_chroma, cu_loc);  
 }
 
 /**
@@ -614,24 +615,17 @@ void uvg_inter_recon_cu(const encoder_state_t * const state,
  * \param predict_chroma Enable or disable chroma prediction for this call.
  * \param i_pu           Index of the PU. Always zero for 2Nx2N. Used for SMP+AMP.
  */
-void uvg_inter_pred_pu(const encoder_state_t * const state,
-                       lcu_t *lcu,
-                       int32_t x,
-                       int32_t y,
-                       int32_t width,
-                       bool predict_luma,
-                       bool predict_chroma,
-                       int i_pu)
+void uvg_inter_pred_pu(
+  const encoder_state_t * const state,
+  lcu_t *lcu,
+  bool predict_luma,
+  bool predict_chroma,
+  const cu_loc_t* const cu_loc)
 
 {
-  const int x_scu = SUB_SCU(x);
-  const int y_scu = SUB_SCU(y);
-  cu_info_t *cu = LCU_GET_CU_AT_PX(lcu, x_scu, y_scu);
-  const int pu_x = PU_GET_X(cu->part_size, width, x, i_pu);
-  const int pu_y = PU_GET_Y(cu->part_size, width, y, i_pu);
-  const int pu_w = PU_GET_W(cu->part_size, width, i_pu);
-  const int pu_h = PU_GET_H(cu->part_size, width, i_pu);
-  cu_info_t *pu = LCU_GET_CU_AT_PX(lcu, SUB_SCU(pu_x), SUB_SCU(pu_y));
+  const int x_scu = SUB_SCU(cu_loc->x);
+  const int y_scu = SUB_SCU(cu_loc->y);
+  cu_info_t *pu = LCU_GET_CU_AT_PX(lcu, x_scu, y_scu);
 
   if (pu->inter.mv_dir == 3) {
     const uvg_picture *const refs[2] = {
@@ -643,12 +637,10 @@ void uvg_inter_pred_pu(const encoder_state_t * const state,
           pu->inter.mv_ref[1]]],
     };
     uvg_inter_recon_bipred(state,
-      refs[0], refs[1],
-      pu_x, pu_y,
-      pu_w, pu_h,
-      pu->inter.mv,
-      lcu,
-      predict_luma, predict_chroma);
+                           refs[0], refs[1],
+                           pu->inter.mv, lcu,
+                           predict_luma, predict_chroma,
+                           cu_loc);
   }
   else {
     const int mv_idx = pu->inter.mv_dir - 1;
@@ -657,29 +649,28 @@ void uvg_inter_pred_pu(const encoder_state_t * const state,
         state->frame->ref_LX[mv_idx][
           pu->inter.mv_ref[mv_idx]]];
 
-    const unsigned offset_luma = SUB_SCU(pu_y) * LCU_WIDTH + SUB_SCU(pu_x);
-    const unsigned offset_chroma = SUB_SCU(pu_y) / 2 * LCU_WIDTH_C + SUB_SCU(pu_x) / 2;
+    const unsigned offset_luma = SUB_SCU(cu_loc->y) * LCU_WIDTH + SUB_SCU(cu_loc->x);
+    const unsigned offset_chroma = SUB_SCU(cu_loc->y) / 2 * LCU_WIDTH_C + SUB_SCU(cu_loc->x) / 2;
     yuv_t lcu_adapter;
-    lcu_adapter.size = pu_w * pu_h;
+    lcu_adapter.size = cu_loc->width * cu_loc->height;
     lcu_adapter.y = lcu->rec.y + offset_luma,
     lcu_adapter.u = lcu->rec.u + offset_chroma,
     lcu_adapter.v = lcu->rec.v + offset_chroma,
 
     inter_recon_unipred(state,
-      ref,
-      pu_x, pu_y,
-      pu_w, pu_h,
-      LCU_WIDTH,
-      pu->inter.mv[mv_idx],
-      &lcu_adapter,
-      NULL,
-      predict_luma, predict_chroma);
+                        ref,
+                        LCU_WIDTH, pu->inter.mv[mv_idx],
+                        &lcu_adapter,
+                        NULL,
+                        predict_luma,
+                        predict_chroma,
+                        cu_loc);
   }
 
   if (predict_chroma && state->encoder_control->cfg.jccr) {
     const int offset = x_scu / 2 + y_scu / 2 * LCU_WIDTH_C;
-    uvg_pixels_blit(lcu->rec.u + offset, lcu->rec.joint_u + offset, width / 2, width / 2, LCU_WIDTH_C, LCU_WIDTH_C);
-    uvg_pixels_blit(lcu->rec.v + offset, lcu->rec.joint_v + offset, width / 2, width / 2, LCU_WIDTH_C, LCU_WIDTH_C);
+    uvg_pixels_blit(lcu->rec.u + offset, lcu->rec.joint_u + offset, cu_loc->chroma_width, cu_loc->chroma_height, LCU_WIDTH_C, LCU_WIDTH_C);
+    uvg_pixels_blit(lcu->rec.v + offset, lcu->rec.joint_v + offset, cu_loc->chroma_width, cu_loc->chroma_height, LCU_WIDTH_C, LCU_WIDTH_C);
   }
 }
 
@@ -854,14 +845,12 @@ static bool is_b0_cand_coded(int x, int y, int width, int height)
  * \param ref_idx   index in the reference list
  * \param cand_out  will be filled with C0 and C1 candidates
  */
-static void get_temporal_merge_candidates(const encoder_state_t * const state,
-                                          int32_t x,
-                                          int32_t y,
-                                          int32_t width,
-                                          int32_t height,
-                                          uint8_t ref_list,
-                                          uint8_t ref_idx,
-                                          merge_candidates_t *cand_out)
+static void get_temporal_merge_candidates(
+  const encoder_state_t * const state,
+  const cu_loc_t* const cu_loc,
+  uint8_t ref_list,
+  uint8_t ref_idx,
+  merge_candidates_t *cand_out)
 {
   /*
   Predictor block locations
@@ -890,8 +879,8 @@ static void get_temporal_merge_candidates(const encoder_state_t * const state,
     cu_array_t *ref_cu_array = state->frame->ref->cu_arrays[colocated_ref];
     int cu_per_width = ref_cu_array->width / SCU_WIDTH;
 
-    int32_t xColBr = x + width;
-    int32_t yColBr = y + height;
+    int32_t xColBr = cu_loc->x + cu_loc->width;
+    int32_t yColBr = cu_loc->y + cu_loc->height;
 
     // C0 must be available
     if (xColBr < state->encoder_control->in.width &&
@@ -911,8 +900,8 @@ static void get_temporal_merge_candidates(const encoder_state_t * const state,
         }
       }
     }
-    int32_t xColCtr = x + (width / 2);
-    int32_t yColCtr = y + (height / 2);
+    int32_t xColCtr = cu_loc->x + (cu_loc->width / 2);
+    int32_t yColCtr = cu_loc->y + (cu_loc->height / 2);
 
     // C1 must be inside the LCU, in the center position of current CU
     if (xColCtr < state->encoder_control->in.width && yColCtr < state->encoder_control->in.height) {
@@ -940,16 +929,14 @@ static void get_temporal_merge_candidates(const encoder_state_t * const state,
  * \param lcu             current LCU
  * \param cand_out        will be filled with A and B candidates
  */
-static void get_spatial_merge_candidates(int32_t x,
-                                         int32_t y,
-                                         int32_t width,
-                                         int32_t height,
-                                         int32_t picture_width,
-                                         int32_t picture_height,
-                                         lcu_t *lcu,
-                                         merge_candidates_t *cand_out,
-                                         uint8_t parallel_merge_level,
-                                         bool wpp
+static void get_spatial_merge_candidates(
+  const cu_loc_t* const cu_loc,
+  int32_t picture_width,
+  int32_t picture_height,
+  lcu_t *lcu,
+  merge_candidates_t *cand_out,
+  uint8_t parallel_merge_level,
+  bool wpp
   )
 {
   /*
@@ -962,8 +949,13 @@ static void get_spatial_merge_candidates(int32_t x,
   |A1|_________|
   |A0|
   */
-  int32_t x_local = SUB_SCU(x); //!< coordinates from top-left of this LCU
-  int32_t y_local = SUB_SCU(y);
+  const int32_t x_local = SUB_SCU(cu_loc->x); //!< coordinates from top-left of this LCU
+  const int32_t y_local = SUB_SCU(cu_loc->y);
+
+  const int x = cu_loc->x;
+  const int y = cu_loc->y;
+  const int width = cu_loc->width;
+  const int height = cu_loc->height;
   // A0 and A1 availability testing
   if (x != 0) {
     cu_info_t *a1 = LCU_GET_CU_AT_PX(lcu, x_local - 1, y_local + height - 1);
@@ -1037,15 +1029,13 @@ static void get_spatial_merge_candidates(int32_t x,
  * \param picture_height  tile height in pixels
  * \param cand_out        will be filled with A and B candidates
  */
-static void get_spatial_merge_candidates_cua(const cu_array_t *cua,
-                                             int32_t x,
-                                             int32_t y,
-                                             int32_t width,
-                                             int32_t height,
-                                             int32_t picture_width,
-                                             int32_t picture_height,
-                                             merge_candidates_t *cand_out,
-                                             bool wpp)
+static void get_spatial_merge_candidates_cua(
+  const cu_array_t *cua,
+  int32_t picture_width,
+  int32_t picture_height,
+  merge_candidates_t *cand_out,
+  bool wpp,
+  const cu_loc_t* const cu_loc)
 {
   /*
   Predictor block locations
@@ -1057,8 +1047,12 @@ static void get_spatial_merge_candidates_cua(const cu_array_t *cua,
   |A1|_________|
   |A0|
   */
-  int32_t x_local = SUB_SCU(x); //!< coordinates from top-left of this LCU
-  int32_t y_local = SUB_SCU(y);
+  const int x = cu_loc->x;
+  const int y = cu_loc->y;
+  const int width = cu_loc->width;
+  const int height = cu_loc->height;
+  const int32_t x_local = SUB_SCU(x); //!< coordinates from top-left of this LCU
+  const int32_t y_local = SUB_SCU(y);
   // A0 and A1 availability testing
   if (x != 0) {
     const cu_info_t *a1 = uvg_cu_array_at_const(cua, x - 1, y + height - 1);
@@ -1292,15 +1286,13 @@ static INLINE bool add_mvp_candidate(const encoder_state_t *state,
 /**
  * \brief Pick two mv candidates from the spatial and temporal candidates.
  */
-static void get_mv_cand_from_candidates(const encoder_state_t * const state,
-                                        int32_t x,
-                                        int32_t y,
-                                        int32_t width,
-                                        int32_t height,
-                                        const merge_candidates_t *merge_cand,
-                                        const cu_info_t * const cur_cu,
-                                        int8_t reflist,
-                                        mv_t mv_cand[2][2])
+static void get_mv_cand_from_candidates(
+  const encoder_state_t * const state,
+  const merge_candidates_t *merge_cand,
+  const cu_info_t * const cur_cu,
+  int8_t reflist,
+  mv_t mv_cand[2][2],
+  int ctu_row)
 {
   const cu_info_t *const *a = merge_cand->a;
   const cu_info_t *const *b = merge_cand->b;
@@ -1360,7 +1352,6 @@ static void get_mv_cand_from_candidates(const encoder_state_t * const state,
 
   if (candidates < AMVP_MAX_NUM_CANDS)
   {
-    const uint32_t ctu_row = (y >> LOG2_LCU_WIDTH);
     const uint32_t ctu_row_mul_five = ctu_row * MAX_NUM_HMVP_CANDS;
     int32_t num_cand = state->tile->frame->hmvp_size[ctu_row];
     for (int i = 0; i < MIN(/*MAX_NUM_HMVP_AVMPCANDS*/4,num_cand); i++) {
@@ -1403,25 +1394,22 @@ static void get_mv_cand_from_candidates(const encoder_state_t * const state,
  * \param lcu       current LCU
  * \param reflist   reflist index (either 0 or 1)
  */
-void uvg_inter_get_mv_cand(const encoder_state_t * const state,
-                           int32_t x,
-                           int32_t y,
-                           int32_t width,
-                           int32_t height,
-                           mv_t mv_cand[2][2],
-                           const cu_info_t  * const cur_cu,
-                           lcu_t *lcu,
-                           int8_t reflist)
+void uvg_inter_get_mv_cand(
+  const encoder_state_t * const state,
+  mv_t mv_cand[2][2],
+  const cu_info_t  * const cur_cu,
+  lcu_t *lcu,
+  int8_t reflist,
+  const cu_loc_t* const cu_loc)
 {
   merge_candidates_t merge_cand = { 0 };
   const uint8_t parallel_merge_level = state->encoder_control->cfg.log2_parallel_merge_level;
-  get_spatial_merge_candidates(x, y, width, height,
-                               state->tile->frame->width,
-                               state->tile->frame->height,
-                               lcu,
-                               &merge_cand, parallel_merge_level,state->encoder_control->cfg.wpp);
-  get_temporal_merge_candidates(state, x, y, width, height, 1, 0, &merge_cand);
-  get_mv_cand_from_candidates(state, x, y, width, height, &merge_cand, cur_cu, reflist, mv_cand);
+  get_spatial_merge_candidates(cu_loc, state->tile->frame->width, state->tile->frame->height, lcu,
+                               &merge_cand,
+                               parallel_merge_level,
+                               state->encoder_control->cfg.wpp);
+  get_temporal_merge_candidates(state, cu_loc, 1, 0, &merge_cand);
+  get_mv_cand_from_candidates(state, &merge_cand, cur_cu, reflist, mv_cand, cu_loc->y >> LOG2_LCU_WIDTH);
     
   uvg_round_precision(INTERNAL_MV_PREC, 2, &mv_cand[0][0], &mv_cand[0][1]);
   uvg_round_precision(INTERNAL_MV_PREC, 2, &mv_cand[1][0], &mv_cand[1][1]);
@@ -1439,24 +1427,21 @@ void uvg_inter_get_mv_cand(const encoder_state_t * const state,
  * \param cur_cu    current CU
  * \param reflist   reflist index (either 0 or 1)
  */
-void uvg_inter_get_mv_cand_cua(const encoder_state_t * const state,
-                               int32_t x,
-                               int32_t y,
-                               int32_t width,
-                               int32_t height,
-                               mv_t mv_cand[2][2],
-                               const cu_info_t* cur_cu,
-                               int8_t reflist)
+void uvg_inter_get_mv_cand_cua(
+  const encoder_state_t * const state,
+  mv_t mv_cand[2][2],
+  const cu_info_t* cur_cu,
+  int8_t reflist,
+  const cu_loc_t* const cu_loc)
 {
   merge_candidates_t merge_cand = { 0 };
 
   const cu_array_t *cua = state->tile->frame->cu_array;
   get_spatial_merge_candidates_cua(cua,
-                                   x, y, width, height,
-                                   state->tile->frame->width, state->tile->frame->height,
-                                   &merge_cand, state->encoder_control->cfg.wpp);
-  get_temporal_merge_candidates(state, x, y, width, height, 1, 0, &merge_cand);
-  get_mv_cand_from_candidates(state, x, y, width, height, &merge_cand, cur_cu, reflist, mv_cand);
+                                   state->tile->frame->width, state->tile->frame->height, &merge_cand, state->encoder_control->cfg.wpp,
+                                   cu_loc);
+  get_temporal_merge_candidates(state, cu_loc, 1, 0, &merge_cand);
+  get_mv_cand_from_candidates(state, &merge_cand, cur_cu, reflist, mv_cand, cu_loc->y >> LOG2_LCU_WIDTH);
 
   uvg_round_precision(INTERNAL_MV_PREC, 2, &mv_cand[0][0], &mv_cand[0][1]);
   uvg_round_precision(INTERNAL_MV_PREC, 2, &mv_cand[1][0], &mv_cand[1][1]);
@@ -1648,29 +1633,27 @@ void uvg_round_precision_vector2d(int src, int dst, vector2d_t* mv) {
  * \param lcu       lcu containing the block
  * \return          number of merge candidates
  */
-uint8_t uvg_inter_get_merge_cand(const encoder_state_t * const state,
-                                 int32_t x, int32_t y,
-                                 int32_t width, int32_t height,
-                                 bool use_a1, bool use_b1,
-                                 inter_merge_cand_t mv_cand[MRG_MAX_NUM_CANDS],
-                                 lcu_t *lcu)
+uint8_t uvg_inter_get_merge_cand(
+  const encoder_state_t * const state,
+  const cu_loc_t* const cu_loc,
+  inter_merge_cand_t mv_cand[MRG_MAX_NUM_CANDS],
+  lcu_t *lcu)
 {
   uint8_t candidates = 0;
   int8_t zero_idx = 0;
   const uint8_t parallel_merge_level = state->encoder_control->cfg.log2_parallel_merge_level;
   merge_candidates_t merge_cand = { 0 };
   const uint8_t max_num_cands = state->encoder_control->cfg.max_merge;
-  get_spatial_merge_candidates(x, y, width, height,
-                               state->tile->frame->width,
-                               state->tile->frame->height,
-                               lcu,
-                               &merge_cand, parallel_merge_level, state->encoder_control->cfg.wpp);
+  get_spatial_merge_candidates(cu_loc, state->tile->frame->width, state->tile->frame->height, lcu,
+                               &merge_cand,
+                               parallel_merge_level,
+                               state->encoder_control->cfg.wpp);
 
   const cu_info_t **a = merge_cand.a;
   const cu_info_t **b = merge_cand.b;
 
-  if (!use_a1) a[1] = NULL;
-  if (!use_b1) b[1] = NULL;
+  const int x = cu_loc->x;
+  const int y = cu_loc->y;
 
   if (different_mer(x, y, x, y - 1, parallel_merge_level) && add_merge_candidate(b[1], NULL, NULL, &mv_cand[candidates])) candidates++;
   if (different_mer(x, y, x - 1, y, parallel_merge_level) && add_merge_candidate(a[1], b[1], NULL, &mv_cand[candidates])) candidates++;
@@ -1691,7 +1674,7 @@ uint8_t uvg_inter_get_merge_cand(const encoder_state_t * const state,
     for (int reflist = 0; reflist <= max_reflist; reflist++) {
       // Fetch temporal candidates for the current CU
       // ToDo: change collocated_from_l0_flag to allow L1 ref
-      get_temporal_merge_candidates(state, x, y, width, height, 1, 0, &merge_cand);
+      get_temporal_merge_candidates(state, cu_loc, 1, 0, &merge_cand);
       // TODO: enable L1 TMVP candidate
       // get_temporal_merge_candidates(state, x, y, width, height, 2, 0, &merge_cand);
 
@@ -1723,7 +1706,7 @@ uint8_t uvg_inter_get_merge_cand(const encoder_state_t * const state,
   if (candidates == max_num_cands) return candidates;
 
   if (candidates != max_num_cands - 1) {
-    const uint32_t ctu_row = (y >> LOG2_LCU_WIDTH);
+    const uint32_t ctu_row = (cu_loc->y >> LOG2_LCU_WIDTH);
     const uint32_t ctu_row_mul_five = ctu_row * MAX_NUM_HMVP_CANDS;
     int32_t num_cand = state->tile->frame->hmvp_size[ctu_row];
 

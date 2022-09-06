@@ -825,11 +825,14 @@ static void encode_transform_coeff(
  * \param depth           Depth from LCU.
  * \return if non-zero mvd is coded
  */
-int uvg_encode_inter_prediction_unit(encoder_state_t * const state,
-                                      cabac_data_t * const cabac,
-                                      const cu_info_t * const cur_cu,
-                                      int x, int y, int width, int height,
-                                      int depth, lcu_t* lcu, double* bits_out)
+int uvg_encode_inter_prediction_unit(
+  encoder_state_t * const state,
+  cabac_data_t * const cabac,
+  const cu_info_t * const cur_cu,
+  int depth,
+  lcu_t* lcu,
+  double* bits_out,
+  const cu_loc_t* const cu_loc)
 {
   // Mergeflag
   int16_t num_cand = 0;
@@ -864,8 +867,8 @@ int uvg_encode_inter_prediction_unit(encoder_state_t * const state,
       // Code Inter Dir
       uint8_t inter_dir = cur_cu->inter.mv_dir;
 
-      if (cur_cu->part_size == SIZE_2Nx2N || (LCU_WIDTH >> depth) != 4) { // ToDo: limit on 4x8/8x4
-        uint32_t inter_dir_ctx = (7 - ((uvg_math_floor_log2(width) + uvg_math_floor_log2(height) + 1) >> 1));
+      if ((LCU_WIDTH >> depth) != 4) { // ToDo: limit on 4x8/8x4
+        uint32_t inter_dir_ctx = (7 - ((uvg_math_floor_log2(cu_loc->width) + uvg_math_floor_log2(cu_loc->height) + 1) >> 1));
 
         CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.inter_dir[inter_dir_ctx]), (inter_dir == 3), bits, "inter_pred_idc");
       }
@@ -916,16 +919,14 @@ int uvg_encode_inter_prediction_unit(encoder_state_t * const state,
         if (lcu) {
           uvg_inter_get_mv_cand(
             state, 
-            x, y, width, height,
-            mv_cand, cur_cu, 
-            lcu, ref_list_idx);
+            mv_cand, cur_cu, lcu, ref_list_idx,
+            cu_loc);
         }
         else {
           uvg_inter_get_mv_cand_cua(
             state,
-            x, y, width, height,
-            mv_cand, cur_cu, ref_list_idx
-          );
+            mv_cand, cur_cu, ref_list_idx, cu_loc
+            );
         }
 
         uint8_t cu_mv_cand = CU_GET_MV_CAND(cur_cu, ref_list_idx);
@@ -1435,11 +1436,11 @@ bool uvg_write_split_flag(
   if (no_split && allow_split) {
     // Get left and top block split_flags and if they are present and true, increase model number
     // ToDo: should use height and width to increase model, PU_GET_W() ?
-    if (left_cu && PU_GET_H(left_cu->part_size, LCU_WIDTH >> left_cu->depth, 0) < LCU_WIDTH >> depth) {
+    if (left_cu && LCU_WIDTH >> left_cu->depth < LCU_WIDTH >> depth) {
       split_model++;
     }
 
-    if (above_cu && PU_GET_W(above_cu->part_size, LCU_WIDTH >> above_cu->depth, 0) < LCU_WIDTH >> depth) {
+    if (above_cu && LCU_WIDTH >> above_cu->depth < LCU_WIDTH >> depth) {
       split_model++;
     }
 
@@ -1685,22 +1686,15 @@ void uvg_encode_coding_tree(
 
   if (cur_cu->type == CU_INTER) {
     uint8_t imv_mode = UVG_IMV_OFF;
-    
-    const int num_pu = uvg_part_mode_num_parts[cur_cu->part_size];
     bool non_zero_mvd = false;
+  
+    // TODO: height for non-square blocks
+    const cu_info_t *cur_pu = uvg_cu_array_at_const(used_array, cu_loc.x, cu_loc.y);
 
-    for (int i = 0; i < num_pu; ++i) {
-      // TODO: height for non-square blocks
-      const int pu_x = PU_GET_X(cur_cu->part_size, cu_width, x, i);
-      const int pu_y = PU_GET_Y(cur_cu->part_size, cu_width, y, i);
-      const int pu_w = PU_GET_W(cur_cu->part_size, cu_width, i);
-      const int pu_h = PU_GET_H(cur_cu->part_size, cu_width, i);
-      const cu_info_t *cur_pu = uvg_cu_array_at_const(used_array, pu_x, pu_y);
-
-      non_zero_mvd |= uvg_encode_inter_prediction_unit(state, cabac, cur_pu, pu_x, pu_y, pu_w, pu_h, depth, NULL, NULL);
-      DBG_PRINT_MV(state, pu_x, pu_y, pu_w, pu_h, cur_pu);
-      uvg_hmvp_add_mv(state, x, y, pu_w, pu_h, cur_pu);
-    }
+    non_zero_mvd |= uvg_encode_inter_prediction_unit(state, cabac, cur_pu, depth, NULL, NULL, &cu_loc);
+    DBG_PRINT_MV(state, pu_x, pu_y, pu_w, pu_h, cur_pu);
+    uvg_hmvp_add_mv(state, x, y, width, height, cur_pu);
+    
 
     // imv mode, select between fullpel, half-pel and quarter-pel resolutions
     // 0 = off, 1 = fullpel, 2 = 4-pel, 3 = half-pel
@@ -1721,7 +1715,7 @@ void uvg_encode_coding_tree(
       int cbf = cbf_is_set_any(cur_cu->cbf, depth);
       // Only need to signal coded block flag if not skipped or merged
       // skip = no coded residual, merge = coded residual
-      if (cur_cu->part_size != SIZE_2Nx2N || !cur_cu->merged) {
+      if (!cur_cu->merged) {
         cabac->cur_ctx = &(cabac->ctx.cu_qt_root_cbf_model);
         CABAC_BIN(cabac, cbf, "rqt_root_cbf");
       }
@@ -1807,14 +1801,17 @@ end:
 double uvg_mock_encode_coding_unit(
   encoder_state_t* const state,
   cabac_data_t* cabac,
-  int x,
-  int y,
-  int depth,
+  const cu_loc_t* const cu_loc,
   lcu_t* lcu,
   cu_info_t* cur_cu,
   enum uvg_tree_type tree_type) {
   double bits = 0;
   const encoder_control_t* const ctrl = state->encoder_control;
+
+  const int x = cu_loc->x;
+  const int y = cu_loc->y;
+
+  const uint8_t depth = 6 - uvg_g_convert_to_log2[cu_loc->width];
 
   int x_local = SUB_SCU(x) >> (tree_type == UVG_CHROMA_T);
   int y_local = SUB_SCU(y) >> (tree_type == UVG_CHROMA_T);
@@ -1906,7 +1903,7 @@ double uvg_mock_encode_coding_unit(
   
   if (cur_cu->type == CU_INTER) {
     const uint8_t imv_mode = UVG_IMV_OFF;
-    const int non_zero_mvd = uvg_encode_inter_prediction_unit(state, cabac, cur_cu, x, y, cu_width, cu_width, depth, lcu, &bits);
+    const int non_zero_mvd = uvg_encode_inter_prediction_unit(state, cabac, cur_cu, depth, lcu, &bits, cu_loc);
     if (ctrl->cfg.amvr && non_zero_mvd) {
       CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.imv_flag[0]), imv_mode, bits, "imv_flag");
       if (imv_mode > UVG_IMV_OFF) {

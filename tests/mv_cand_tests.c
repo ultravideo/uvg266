@@ -46,8 +46,11 @@ TEST test_get_spatial_merge_cand(void)
 
   merge_candidates_t cand = { 0 };
 
-  get_spatial_merge_candidates(64 + 32, 64, // x, y
-                               32, 24,      // width, height
+  cu_loc_t cu_loc;
+  uvg_cu_loc_ctor(&cu_loc, 64 + 32, 64, // x, y
+    32, 24); // width, height)
+
+  get_spatial_merge_candidates(&cu_loc,      
                                1920, 1080,  // picture size
                                &lcu,
                                &cand,
