@@ -558,7 +558,7 @@ static void encode_transform_unit(
     // CoeffNxN
     // Residual Coding
 
-    if(state->encoder_control->cfg.trskip_enable && width <= (1 << state->encoder_control->cfg.trskip_max_size && !(cur_pu->type == CU_INTRA && cur_pu->intra.isp_mode != ISP_MODE_NO_ISP))) {
+    if(state->encoder_control->cfg.trskip_enable && width <= (1 << state->encoder_control->cfg.trskip_max_size) && !(cur_pu->type == CU_INTRA && cur_pu->intra.isp_mode != ISP_MODE_NO_ISP)) {
       cabac->cur_ctx = &cabac->ctx.transform_skip_model_luma;
       CABAC_BIN(cabac, cur_pu->tr_idx == MTS_SKIP, "transform_skip_flag");
       DBG_YUVIEW_VALUE(state->frame->poc, DBG_YUVIEW_TR_SKIP, x, y, width, width, (cur_pu->tr_idx == MTS_SKIP) ? 1 : 0);
