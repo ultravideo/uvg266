@@ -855,13 +855,11 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
       uint8_t max_filter_length_P = 0;
       uint8_t max_filter_length_Q = 0;
       const int cu_size = LCU_WIDTH >> cu_q->depth;
-      const int pu_part_idx = (y + PU_GET_H(cu_q->part_size, cu_size, 0) <= y_coord ? 
-                               1 + (uvg_part_mode_num_parts[cu_q->part_size] >> 2) : 0)
-                            + (x + PU_GET_W(cu_q->part_size, cu_size, 0) <= x_coord ? 1 : 0);
-      const int pu_size = dir == EDGE_HOR ? PU_GET_H(cu_q->part_size, cu_size, pu_part_idx)
-                                          : PU_GET_W(cu_q->part_size, cu_size, pu_part_idx);
-      const int pu_pos = dir == EDGE_HOR ? y_coord - PU_GET_Y(cu_q->part_size, cu_size, 0, pu_part_idx) 
-                                         : x_coord - PU_GET_X(cu_q->part_size, cu_size, 0, pu_part_idx);
+      // TODO: NON square
+      const int pu_size = dir == EDGE_HOR ? cu_size
+                                          : cu_size;
+      const int pu_pos = dir == EDGE_HOR ? y_coord 
+                                         : x_coord;
       get_max_filter_length(&max_filter_length_P, &max_filter_length_Q, state, x_coord, y_coord,
                             dir, tu_boundary,
                             LCU_WIDTH >> cu_p->tr_depth,
@@ -1088,13 +1086,10 @@ static void filter_deblock_edge_chroma(encoder_state_t * const state,
       }
 
       const int cu_size = LCU_WIDTH >> (cu_q->depth + (tree_type == UVG_CHROMA_T));
-      const int pu_part_idx = ((y << (tree_type != UVG_CHROMA_T)) + PU_GET_H(cu_q->part_size, cu_size, 0) <= y_coord ?
-                               1 + (uvg_part_mode_num_parts[cu_q->part_size] >> 2) : 0)
-                              + ((x << (tree_type != UVG_CHROMA_T)) + PU_GET_W(cu_q->part_size, cu_size, 0) <= x_coord ? 1 : 0);
-      const int pu_size = dir == EDGE_HOR ? PU_GET_H(cu_q->part_size, cu_size, pu_part_idx)
-                                          : PU_GET_W(cu_q->part_size, cu_size, pu_part_idx);
-      const int pu_pos = dir == EDGE_HOR ? y_coord - PU_GET_Y(cu_q->part_size, cu_size, 0, pu_part_idx)
-                                         : x_coord - PU_GET_X(cu_q->part_size, cu_size, 0, pu_part_idx);
+      // TODO: non-square
+      const int pu_size = dir == EDGE_HOR ? cu_size : cu_size;
+      const int pu_pos = dir == EDGE_HOR ? y_coord
+                                         : x_coord;
       uint8_t max_filter_length_P = 0;
       uint8_t max_filter_length_Q = 0;
       

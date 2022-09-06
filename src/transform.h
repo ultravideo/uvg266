@@ -108,7 +108,7 @@ void uvg_chroma_transform_search(
   int depth,
   lcu_t* const lcu,
   cabac_data_t* temp_cabac,
-  cu_loc_t *cu_loc,
+  const cu_loc_t* const cu_loc,
   const int offset,
   const uint8_t mode,
   cu_info_t* pred_cu,

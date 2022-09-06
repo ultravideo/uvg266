@@ -294,13 +294,6 @@ static void uvg_angular_pred_avx2(
               f[yy][2] = 16 + offset;
               f[yy][3] = offset;
             }
-            // Cubic must be used if ref line != 0 or if isp mode != 0
-            if (multi_ref_index || isp) {
-              use_cubic = true;
-            }
-            const int16_t filter_coeff[4] = { 16 - (delta_fract[yy] >> 1), 32 - (delta_fract[yy] >> 1), 16 + (delta_fract[yy] >> 1), delta_fract[yy] >> 1 };
-            const int16_t *temp_f = use_cubic ? cubic_filter[delta_fract[yy]] : filter_coeff;
-            memcpy(f[yy], temp_f, 4 * sizeof(*temp_f));
           }
 
           // Do 4-tap intra interpolation filtering

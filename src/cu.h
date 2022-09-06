@@ -77,55 +77,6 @@ typedef enum {
   MTS_TR_NUM    = 6,
 } mts_idx;
 
-extern const uint8_t uvg_part_mode_num_parts[];
-extern const uint8_t uvg_part_mode_offsets[][4][2];
-extern const uint8_t uvg_part_mode_sizes[][4][2];
-
-/**
- * \brief Get the x coordinate of a PU.
- *
- * \param part_mode   partition mode of the containing CU
- * \param cu_width    width of the containing CU
- * \param cu_x        x coordinate of the containing CU
- * \param i           number of the PU
- * \return            location of the left edge of the PU
- */
-#define PU_GET_X(part_mode, cu_width, cu_x, i) \
-  ((cu_x) + uvg_part_mode_offsets[(part_mode)][(i)][0] * (cu_width) / 4)
-
-/**
- * \brief Get the y coordinate of a PU.
- *
- * \param part_mode   partition mode of the containing CU
- * \param cu_width    width of the containing CU
- * \param cu_y        y coordinate of the containing CU
- * \param i           number of the PU
- * \return            location of the top edge of the PU
- */
-#define PU_GET_Y(part_mode, cu_width, cu_y, i) \
-  ((cu_y) + uvg_part_mode_offsets[(part_mode)][(i)][1] * (cu_width) / 4)
-
-/**
- * \brief Get the width of a PU.
- *
- * \param part_mode   partition mode of the containing CU
- * \param cu_width    width of the containing CU
- * \param i           number of the PU
- * \return            width of the PU
- */
-#define PU_GET_W(part_mode, cu_width, i) \
-  (uvg_part_mode_sizes[(part_mode)][(i)][0] * (cu_width) / 4)
-
-/**
- * \brief Get the height of a PU.
- *
- * \param part_mode   partition mode of the containing CU
- * \param cu_width    width of the containing CU
- * \param i           number of the PU
- * \return            height of the PU
- */
-#define PU_GET_H(part_mode, cu_width, i) \
-  (uvg_part_mode_sizes[(part_mode)][(i)][1] * (cu_width) / 4)
 
 //////////////////////////////////////////////////////////////////////////
 // TYPES
@@ -142,6 +93,25 @@ enum uvg_tree_type {
   UVG_CHROMA_T = 2
 };
 
+enum split_type {
+  NO_SPLIT = 0,
+  QT_SPLIT = 1,
+  BT_HOR_SPLIT = 2,
+  BT_VER_SPLIT = 3,
+  TT_HOR_SPLIT = 4,
+  TT_VER_SPLIT = 5,
+};
+
+typedef struct  {
+  uint32_t split_tree;
+  uint8_t current_depth;
+} split_tree_t;
+
+
+// Split for each depth takes three bits like xxy where if either x bit is set
+// it is a MTT split, and if there are any MTT split QT split is not allowed
+#define CAN_QT_SPLIT(x) (((x) & 6DB6DB6) == 0)
+
 /**
  * \brief Struct for CU info
  */
@@ -149,7 +119,6 @@ typedef struct
 {
   uint8_t type        : 3; //!< \brief block type, one of cu_type_t values
   uint8_t depth       : 3; //!< \brief depth / size of this block
-  uint8_t part_size   : 3; //!< \brief partition mode, one of part_mode_t values
   uint8_t tr_depth    : 3; //!< \brief transform depth
   uint8_t skipped     : 1; //!< \brief flag to indicate this block is skipped
   uint8_t merged      : 1; //!< \brief flag to indicate this block is merged

@@ -708,7 +708,6 @@ int uvg_quantize_residual_avx2(encoder_state_t *const state,
       (width > 4 || !state->encoder_control->cfg.rdoq_skip) && !use_trskip)
   {
     int8_t tr_depth = cur_cu->tr_depth - cur_cu->depth;
-    tr_depth += (cur_cu->part_size == SIZE_NxN ? 1 : 0);
     uvg_rdoq(state, coeff, coeff_out, width, height, color,
       scan_order, cur_cu->type, tr_depth, cur_cu->cbf, lfnst_index);
   }

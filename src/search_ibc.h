@@ -46,7 +46,7 @@
 
 
 void uvg_search_cu_ibc(encoder_state_t * const state,
-                         int x, int y, int depth,
+                         const cu_loc_t * const  cu_loc,
                          lcu_t *lcu,
                          double *inter_cost,
                          double* inter_bitcost);

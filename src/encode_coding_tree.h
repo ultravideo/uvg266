@@ -78,20 +78,19 @@ void uvg_encode_mvd(encoder_state_t * const state,
 double uvg_mock_encode_coding_unit(
   encoder_state_t* const state,
   cabac_data_t* cabac,
-  int x,
-  int y,
-  int depth,
+  const cu_loc_t* const cu_loc,
   lcu_t* lcu,
   cu_info_t* cur_cu,
   enum uvg_tree_type tree_type);
 
-int uvg_encode_inter_prediction_unit(encoder_state_t* const state,
-                                      cabac_data_t* const cabac,
-                                      const cu_info_t* const cur_cu,
-                                      int x, int y, int width, int height,
-                                      int depth, 
-                                      lcu_t* lcu,
-                                      double* bits_out);
+int uvg_encode_inter_prediction_unit(
+  encoder_state_t* const state,
+  cabac_data_t* const cabac,
+  const cu_info_t* const cur_cu,
+  int depth,
+  lcu_t* lcu,
+  double* bits_out,
+  const cu_loc_t* const cu_loc);
 
 void uvg_encode_intra_luma_coding_unit(const encoder_state_t* const state,
   cabac_data_t* const cabac,
