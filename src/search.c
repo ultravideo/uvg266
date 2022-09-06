@@ -688,6 +688,7 @@ static double cu_rd_cost_tr_split_accurate(
   unsigned chroma_ssd = 0;
   if(has_chroma) {
     const vector2d_t lcu_px = { (x_px >> (tree_type != UVG_CHROMA_T)) & ~3, (y_px >> (tree_type != UVG_CHROMA_T)) &~3  };
+    uvg_cu_loc_ctor(&loc, lcu_px.x, lcu_px.y, width, height);
     const int chroma_width  = MAX(4, LCU_WIDTH >> (depth + 1));
     const int chroma_height = chroma_width; // TODO: height for non-square blocks
     int8_t scan_order = uvg_get_scan_order(pred_cu->type, pred_cu->intra.mode_chroma, depth);
