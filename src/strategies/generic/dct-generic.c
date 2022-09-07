@@ -2641,8 +2641,8 @@ static void mts_idct_generic(
 
     if (tu->lfnst_idx || tu->cr_lfnst_idx) {
       if ((width == 4 && height > 4) || (width > 4 && height == 4)) {
-        skip_width == width - 4;
-        skip_height == height - 4;
+        skip_width = width - 4;
+        skip_height = height - 4;
       }
       else if ((width >= 8 && height >= 8)) {
         skip_width = width - 8;

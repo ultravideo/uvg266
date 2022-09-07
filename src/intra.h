@@ -142,10 +142,8 @@ void uvg_intra_predict(
 
 void uvg_intra_recon_cu(
   encoder_state_t* const state,
-  int x,
-  int y,
-  int depth,
   intra_search_data_t* search_data,
+  const cu_loc_t* cu_loc,
   cu_info_t *cur_cu,
   lcu_t *lcu,
   enum uvg_tree_type tree_type,
@@ -161,7 +159,10 @@ const cu_info_t* uvg_get_co_located_luma_cu(
   const cu_array_t* const cu_array,
   enum uvg_tree_type tree_type);
 
-int uvg_get_mip_flag_context(int x, int y, int width, int height, const lcu_t* lcu, cu_array_t* const cu_a);
+uint8_t uvg_get_mip_flag_context(
+  const cu_loc_t* const cu_loc,
+  const lcu_t* lcu,
+  cu_array_t* const cu_a);
 
 // ISP related defines
 #define NUM_ISP_MODES 3

@@ -43,7 +43,9 @@
 #include "global.h" // IWYU pragma: keep
 #include "intra.h"
 
-double uvg_luma_mode_bits(const encoder_state_t *state, const cu_info_t* const cur_cu, int x, int y, int8_t depth, const lcu_t* lcu);
+double uvg_luma_mode_bits(const encoder_state_t *state, const cu_info_t* const cur_cu, const cu_loc_t*
+                          const cu_loc,
+                          const lcu_t* lcu);
                        
 double uvg_chroma_mode_bits(const encoder_state_t *state,
                         int8_t chroma_mode, int8_t luma_mode);
@@ -59,11 +61,9 @@ int8_t uvg_search_cu_intra_chroma(
 
 void uvg_search_cu_intra(
   encoder_state_t * const state,
-  const int x_px,
-  const int y_px,
-  const int depth,
   intra_search_data_t* search_data,
   lcu_t *lcu,
-  enum uvg_tree_type tree_type);
+  enum uvg_tree_type tree_type,
+  const cu_loc_t* const cu_loc);
 
 #endif // SEARCH_INTRA_H_
