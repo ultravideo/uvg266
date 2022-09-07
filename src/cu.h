@@ -118,7 +118,7 @@ typedef struct
 {
   uint8_t type        : 2; //!< \brief block type, one of cu_type_t values
   uint8_t depth       : 3; //!< \brief depth / size of this block
-  uint8_t tr_depth    : 3; //!< \brief transform depth
+  uint8_t tr_depth    ; //!< \brief transform depth
   uint8_t skipped     : 1; //!< \brief flag to indicate this block is skipped
   uint8_t merged      : 1; //!< \brief flag to indicate this block is merged
   uint8_t merge_idx   : 3; //!< \brief merge index
@@ -127,6 +127,8 @@ typedef struct
   uint8_t joint_cb_cr : 3; //!< \brief joint chroma residual coding 
 
   uint16_t cbf;
+
+  uint32_t split_tree : 3 * 9;
 
   /**
    * \brief QP used for the CU.
@@ -169,6 +171,8 @@ typedef struct
 typedef struct {
   int16_t x;
   int16_t y;
+  uint8_t local_x;
+  uint8_t local_y;
   int8_t width;
   int8_t height;
   int8_t chroma_width;

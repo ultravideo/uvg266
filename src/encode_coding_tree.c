@@ -660,7 +660,7 @@ static void encode_transform_coeff(
   bool last_split,
   bool can_skip_last_cbf,
   int *luma_cbf_ctx,            // Always true except when writing sub partition coeffs (ISP)
-  cu_loc_t *original_loc)       // Original dimensions before ISP split
+  const cu_loc_t * const original_loc)       // Original dimensions before ISP split
 {
   cabac_data_t * const cabac = &state->cabac;
   int x = cu_loc->x;
@@ -829,7 +829,6 @@ int uvg_encode_inter_prediction_unit(
   encoder_state_t * const state,
   cabac_data_t * const cabac,
   const cu_info_t * const cur_cu,
-  int depth,
   lcu_t* lcu,
   double* bits_out,
   const cu_loc_t* const cu_loc)
@@ -867,7 +866,7 @@ int uvg_encode_inter_prediction_unit(
       // Code Inter Dir
       uint8_t inter_dir = cur_cu->inter.mv_dir;
 
-      if ((LCU_WIDTH >> depth) != 4) { // ToDo: limit on 4x8/8x4
+      if (cu_loc->width + cu_loc->height > 12) { // ToDo: limit on 4x8/8x4
         uint32_t inter_dir_ctx = (7 - ((uvg_math_floor_log2(cu_loc->width) + uvg_math_floor_log2(cu_loc->height) + 1) >> 1));
 
         CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.inter_dir[inter_dir_ctx]), (inter_dir == 3), bits, "inter_pred_idc");
@@ -1038,10 +1037,13 @@ static void encode_chroma_intra_cu(
   else if (cabac->only_count && bits_out)*bits_out += bits;
 }
 
-void uvg_encode_intra_luma_coding_unit(const encoder_state_t * const state,
-                                     cabac_data_t * const cabac,
-                                     const cu_info_t * const cur_cu,
-                                     int x, int y, int depth, const lcu_t* lcu, double* bits_out)
+void uvg_encode_intra_luma_coding_unit(
+  const encoder_state_t * const state,
+  cabac_data_t * const cabac,
+  const cu_info_t * const cur_cu,
+  const cu_loc_t* const cu_loc,
+  const lcu_t* lcu,
+  double* bits_out)
 {
   const videoframe_t * const frame = state->tile->frame;
   uint8_t intra_pred_mode_actual;
@@ -1052,6 +1054,9 @@ void uvg_encode_intra_luma_coding_unit(const encoder_state_t * const state,
   int8_t mpm_preds = -1;
   uint32_t flag;
   double bits = 0;
+
+  const int x = cu_loc->x;
+  const int y = cu_loc->y;
 
   /*
   if ((cur_cu->type == CU_INTRA && (LCU_WIDTH >> cur_cu->depth <= 32))) {
@@ -1076,8 +1081,8 @@ void uvg_encode_intra_luma_coding_unit(const encoder_state_t * const state,
   }
   */
   
-  uint32_t width = (LCU_WIDTH >> depth);
-  uint32_t height = (LCU_WIDTH >> depth); // TODO: height for non-square blocks
+  uint32_t width = cu_loc->width;
+  uint32_t height = cu_loc->height; // TODO: height for non-square blocks
 
   // Code MIP related bits
   bool enable_mip = state->encoder_control->cfg.mip;
@@ -1102,9 +1107,7 @@ void uvg_encode_intra_luma_coding_unit(const encoder_state_t * const state,
   }
 
   if (cur_cu->type == CU_INTRA && !cur_cu->bdpcmMode && enable_mip) {
-    const int cu_width = LCU_WIDTH >> depth;
-    const int cu_height = cu_width; // TODO: height for non-square blocks
-    uint8_t ctx_id = uvg_get_mip_flag_context(x, y, cu_width, cu_height, lcu, lcu ? NULL : frame->cu_array);
+    uint8_t ctx_id = uvg_get_mip_flag_context(cu_loc, lcu, lcu ? NULL : frame->cu_array);
 
     // Write MIP flag
     CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.mip_flag[ctx_id]), mip_flag, bits, "mip_flag");
@@ -1149,8 +1152,7 @@ void uvg_encode_intra_luma_coding_unit(const encoder_state_t * const state,
       CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.intra_subpart_model[1]), isp_mode - 1, bits, "intra_subpartitions_split_type"); // Vertical or horizontal split
     }
   }
-
-  const int cu_width = LCU_WIDTH >> depth;
+  
     // PREDINFO CODING
     // If intra prediction mode is found from the predictors,
     // it can be signaled with two EP's. Otherwise we can send
@@ -1165,7 +1167,7 @@ void uvg_encode_intra_luma_coding_unit(const encoder_state_t * const state,
   if (x > 0) {
     assert(x >> 2 > 0);
     const int x_scu = SUB_SCU(x) - 1;
-    const int y_scu = SUB_SCU(y + cu_width - 1);
+    const int y_scu = SUB_SCU(y + height - 1);
     left_pu = lcu ?
                 LCU_GET_CU_AT_PX(
                   lcu,
@@ -1174,7 +1176,7 @@ void uvg_encode_intra_luma_coding_unit(const encoder_state_t * const state,
                 uvg_cu_array_at_const(
                   frame->cu_array,
                   x - 1,
-                  y + cu_width - 1);
+                  y + height - 1);
   }
   // Don't take the above PU across the LCU boundary.
   if (y % LCU_WIDTH > 0 && y > 0) {
@@ -1182,11 +1184,11 @@ void uvg_encode_intra_luma_coding_unit(const encoder_state_t * const state,
     above_pu = lcu ?
                  LCU_GET_CU_AT_PX(
                    lcu,
-                   SUB_SCU(x + cu_width - 1),
+                   SUB_SCU(x + width - 1),
                    SUB_SCU(y) - 1) :
                  uvg_cu_array_at_const(
                    frame->cu_array,
-                   x + cu_width - 1,
+                   x + width - 1,
                    y - 1);
   }
   
@@ -1494,28 +1496,25 @@ bool uvg_write_split_flag(
 
 void uvg_encode_coding_tree(
   encoder_state_t * const state,
-  uint16_t x,
-  uint16_t y,
-  uint8_t depth,
   lcu_coeff_t *coeff,
-  enum uvg_tree_type tree_type)
+  enum uvg_tree_type tree_type,
+  const cu_loc_t* const cu_loc,
+  const split_tree_t split_tree)
 {
   cabac_data_t * const cabac = &state->cabac;
   const encoder_control_t * const ctrl = state->encoder_control;
   const videoframe_t * const frame = state->tile->frame;
   const cu_array_t* used_array = tree_type != UVG_CHROMA_T ? frame->cu_array : frame->chroma_cu_array;
-  const cu_info_t *cur_cu   = uvg_cu_array_at_const(used_array, x, y);
-
-  const int width  = LCU_WIDTH >> depth;
-  const int height = width; // TODO: height for non-square blocks
-  cu_loc_t cu_loc;
-  uvg_cu_loc_ctor(&cu_loc, x, y, width, height);
-
-  const int cu_width  = tree_type != UVG_CHROMA_T ? cu_loc.width : cu_loc.chroma_width;
-  const int cu_height = tree_type != UVG_CHROMA_T ? cu_loc.height : cu_loc.chroma_height;
+  const cu_info_t *cur_cu   = uvg_cu_array_at_const(used_array, cu_loc->x, cu_loc->y);
+  
+  const int cu_width  = tree_type != UVG_CHROMA_T ? cu_loc->width : cu_loc->chroma_width;
+  const int cu_height = tree_type != UVG_CHROMA_T ? cu_loc->height : cu_loc->chroma_height;
   const int half_cu  = cu_width >> 1;
 
-  
+  const int x = cu_loc->x;
+  const int y = cu_loc->y;
+
+  const int depth = split_tree.current_depth;
 
   const cu_info_t *left_cu  = NULL;
   if (x > 0) {
@@ -1547,33 +1546,33 @@ void uvg_encode_coding_tree(
   // When not in MAX_DEPTH, insert split flag and split the blocks if needed
   if (depth != MAX_DEPTH && !(tree_type == UVG_CHROMA_T && depth == MAX_DEPTH -1)) {
 
-    const int split_flag = uvg_write_split_flag(state, cabac, left_cu, above_cu, GET_SPLITDATA(cur_cu, depth), depth, cu_width, x, y, tree_type,NULL);
+    const int split_flag = uvg_write_split_flag(state, cabac, left_cu, above_cu, (cur_cu->split_tree >> (split_tree.current_depth * 3)) & 7, depth, cu_width, x, y, tree_type,NULL);
     
     if (split_flag || border) {
+      const int half_luma = cu_loc->width / 2;
+      split_tree_t new_split_tree = { cur_cu->split_tree, split_tree.current_depth + 1 };
+
+      cu_loc_t new_cu_loc;
+      uvg_cu_loc_ctor(&new_cu_loc, x, y, half_luma, half_luma);
       // Split blocks and remember to change x and y block positions
-      uvg_encode_coding_tree(state, x, y, depth + 1, coeff, tree_type);
+      uvg_encode_coding_tree(state, coeff, tree_type, &new_cu_loc, new_split_tree);
 
       if (!border_x || border_split_x) {
-        uvg_encode_coding_tree(state, x + half_cu, y, depth + 1, coeff, tree_type);
+        uvg_cu_loc_ctor(&new_cu_loc, x + half_cu, y, half_luma, half_luma);
+        uvg_encode_coding_tree(state, coeff, tree_type, &new_cu_loc, new_split_tree);
       }
       if (!border_y || border_split_y) {
-        uvg_encode_coding_tree(state, x, y + half_cu, depth + 1, coeff, tree_type);
+        uvg_cu_loc_ctor(&new_cu_loc, x, y + half_cu, half_luma, half_luma);
+        uvg_encode_coding_tree(state, coeff, tree_type, &new_cu_loc, new_split_tree);
       }
       if (!border || (border_split_x && border_split_y)) {
-        uvg_encode_coding_tree(state, x + half_cu, y + half_cu, depth + 1, coeff, tree_type);
+        uvg_cu_loc_ctor(&new_cu_loc, x + half_cu, y + half_cu, half_luma, half_luma);
+        uvg_encode_coding_tree(state, coeff, tree_type, &new_cu_loc, new_split_tree);
       }
       return;
     }
   }
-
-  //ToDo: check if we can actually split
-  //ToDo: Implement MT split
-  if (depth < MAX_PU_DEPTH)
-  {
-   // cabac->cur_ctx = &(cabac->ctx.trans_subdiv_model[5 - ((uvg_g_convert_to_bit[LCU_WIDTH] + 2) - depth)]);
-   // CABAC_BIN(cabac, 0, "split_transform_flag");
-  }
-
+  
   DBG_YUVIEW_VALUE(state->frame->poc, DBG_YUVIEW_CU_TYPE, abs_x, abs_y, cu_width, cu_width, (cur_cu->type == CU_INTRA)?0:1);
 
   if (ctrl->cfg.lossless) {
@@ -1597,8 +1596,8 @@ void uvg_encode_coding_tree(
     CABAC_BIN(cabac, cur_cu->skipped, "SkipFlag");
 
     if (cur_cu->skipped) {
-      DBG_PRINT_MV(state, x, y, (uint32_t)cu_width, (uint32_t)cu_width, cur_cu);
-      uvg_hmvp_add_mv(state, x, y, (uint32_t)cu_width, (uint32_t)cu_width, cur_cu);
+      DBG_PRINT_MV(state, x, y, (uint32_t)cu_width, (uint32_t)cu_height, cur_cu);
+      uvg_hmvp_add_mv(state, x, y, cu_width, cu_height, cur_cu);
       int16_t num_cand = state->encoder_control->cfg.max_merge;
       if (num_cand > 1) {
         for (int ui = 0; ui < num_cand - 1; ui++) {
@@ -1624,7 +1623,7 @@ void uvg_encode_coding_tree(
   }
 
   // Prediction mode
-  if (state->frame->slicetype != UVG_SLICE_I && cu_width != 4) {
+  if (state->frame->slicetype != UVG_SLICE_I && cu_width != 4 && cu_height != 4) {
 
     int8_t ctx_predmode = 0;
 
@@ -1689,11 +1688,11 @@ void uvg_encode_coding_tree(
     bool non_zero_mvd = false;
   
     // TODO: height for non-square blocks
-    const cu_info_t *cur_pu = uvg_cu_array_at_const(used_array, cu_loc.x, cu_loc.y);
+    const cu_info_t *cur_pu = uvg_cu_array_at_const(used_array, cu_loc->x, cu_loc->y);
 
-    non_zero_mvd |= uvg_encode_inter_prediction_unit(state, cabac, cur_pu, depth, NULL, NULL, &cu_loc);
-    DBG_PRINT_MV(state, pu_x, pu_y, pu_w, pu_h, cur_pu);
-    uvg_hmvp_add_mv(state, x, y, width, height, cur_pu);
+    non_zero_mvd |= uvg_encode_inter_prediction_unit(state, cabac, cur_pu, NULL, NULL, cu_loc);
+    DBG_PRINT_MV(state, x, y, cu_width, cu_height, cur_pu);
+    uvg_hmvp_add_mv(state, x, y, cu_width, cu_height, cur_pu);
     
 
     // imv mode, select between fullpel, half-pel and quarter-pel resolutions
@@ -1722,7 +1721,7 @@ void uvg_encode_coding_tree(
       // Code (possible) coeffs to bitstream
       if (cbf) {
         int luma_cbf_ctx = 0;
-        encode_transform_coeff(state, &cu_loc, depth, 0, 0, 0, 0, coeff, tree_type, true, false, &luma_cbf_ctx, &cu_loc);
+        encode_transform_coeff(state, &cu_loc, depth, 0, 0, 0, 0, coeff, tree_type, true, false, &luma_cbf_ctx, cu_loc);
       }
 
       encode_mts_idx(state, cabac, cur_cu);
@@ -1730,7 +1729,7 @@ void uvg_encode_coding_tree(
     }
   } else if (cur_cu->type == CU_INTRA) {
     if(tree_type != UVG_CHROMA_T) {
-      uvg_encode_intra_luma_coding_unit(state, cabac, cur_cu, x, y, depth, NULL, NULL);
+      uvg_encode_intra_luma_coding_unit(state, cabac, cur_cu, cu_loc, NULL, NULL);
     }
 
     // Code chroma prediction mode.
@@ -1754,7 +1753,7 @@ void uvg_encode_coding_tree(
 
         // Check if last split to write chroma
         bool last_split = (i + 1) == split_limit;
-        encode_transform_coeff(state, &split_loc, depth, 0, 0, 0, 0, coeff, tree_type, last_split, can_skip_last_cbf, &luma_cbf_ctx, &cu_loc);
+        encode_transform_coeff(state, &split_loc, depth, 0, 0, 0, 0, coeff, tree_type, last_split, can_skip_last_cbf, &luma_cbf_ctx, cu_loc);
         can_skip_last_cbf &= luma_cbf_ctx == 2;
       }
     }
@@ -1774,7 +1773,7 @@ void uvg_encode_coding_tree(
       tmp->violates_lfnst_constrained_luma = false;
       tmp->violates_lfnst_constrained_chroma = false;
       tmp->lfnst_last_scan_pos = false;
-      encode_transform_coeff(state, &cu_loc, depth, 0, 0, 0, 1, coeff, tree_type, true, false, &luma_cbf_ctx, &cu_loc);
+      encode_transform_coeff(state, &cu_loc, depth, 0, 0, 0, 1, coeff, tree_type, true, false, &luma_cbf_ctx, cu_loc);
       // Write LFNST only once for single tree structure
       encode_lfnst_idx(state, cabac, tmp, x, y, depth, cu_width, cu_height, tree_type, COLOR_UV);
     }
@@ -1903,7 +1902,7 @@ double uvg_mock_encode_coding_unit(
   
   if (cur_cu->type == CU_INTER) {
     const uint8_t imv_mode = UVG_IMV_OFF;
-    const int non_zero_mvd = uvg_encode_inter_prediction_unit(state, cabac, cur_cu, depth, lcu, &bits, cu_loc);
+    const int non_zero_mvd = uvg_encode_inter_prediction_unit(state, cabac, cur_cu, lcu, &bits, cu_loc);
     if (ctrl->cfg.amvr && non_zero_mvd) {
       CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.imv_flag[0]), imv_mode, bits, "imv_flag");
       if (imv_mode > UVG_IMV_OFF) {
@@ -1916,7 +1915,7 @@ double uvg_mock_encode_coding_unit(
   }
   else if (cur_cu->type == CU_INTRA) {
     if(tree_type != UVG_CHROMA_T) {
-      uvg_encode_intra_luma_coding_unit(state, cabac, cur_cu, x, y, depth, lcu, &bits);
+      uvg_encode_intra_luma_coding_unit(state, cabac, cur_cu, cu_loc, lcu, &bits);
     }
     if((depth != 4 || (x % 8 != 0 && y % 8 != 0)) && state->encoder_control->chroma_format != UVG_CSP_400 && tree_type != UVG_LUMA_T) {
       encode_chroma_intra_cu(cabac, cur_cu, state->encoder_control->cfg.cclm, &bits);

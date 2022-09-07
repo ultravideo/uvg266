@@ -767,10 +767,15 @@ static void encoder_state_worker_encode_lcu_bitstream(void * opaque)
 
   enum uvg_tree_type tree_type = state->frame->slicetype == UVG_SLICE_I && state->encoder_control->cfg.dual_tree ? UVG_LUMA_T : UVG_BOTH_T;
   //Encode coding tree
-  uvg_encode_coding_tree(state, lcu->position.x * LCU_WIDTH, lcu->position.y * LCU_WIDTH, 0, lcu->coeff, tree_type);
+  cu_loc_t start;
+  uvg_cu_loc_ctor(&start, lcu->position.x * LCU_WIDTH, lcu->position.y * LCU_WIDTH, LCU_WIDTH, LCU_WIDTH);
+  split_tree_t split_tree = { 0, 0 };
+
+  uvg_encode_coding_tree(state, lcu->coeff, tree_type, &start, split_tree);
 
   if(tree_type == UVG_LUMA_T && state->encoder_control->chroma_format != UVG_CSP_400) {
-    uvg_encode_coding_tree(state, lcu->position.x * LCU_WIDTH_C, lcu->position.y * LCU_WIDTH_C, 0, lcu->coeff, UVG_CHROMA_T);
+    uvg_cu_loc_ctor(&start, lcu->position.x * LCU_WIDTH_C, lcu->position.y * LCU_WIDTH_C, LCU_WIDTH, LCU_WIDTH);
+    uvg_encode_coding_tree(state, lcu->coeff, UVG_CHROMA_T, &start, split_tree);
   }
 
   if (!state->cabac.only_count) {

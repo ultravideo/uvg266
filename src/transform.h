@@ -74,7 +74,6 @@ int32_t uvg_get_scaled_qp(color_t color, int8_t qp, int8_t qp_offset, int8_t con
 
 void uvg_derive_lfnst_constraints(
   cu_info_t* const pred_cu,
-  const int depth,
   bool* constraints,
   const coeff_t* coeff,
   const int width,

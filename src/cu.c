@@ -306,6 +306,8 @@ void uvg_cu_loc_ctor(cu_loc_t* loc, int x, int y, int width, int height)
   
   loc->x = x;
   loc->y = y;
+  loc->local_x = x % LCU_WIDTH;
+  loc->local_y = y % LCU_WIDTH;
   loc->width = width;
   loc->height = height;
   // TODO: when MTT is implemented, chroma dimensions can be minimum 2.

@@ -585,12 +585,18 @@ static void predict_cclm(
 }
 
 
-int uvg_get_mip_flag_context(int x, int y, int width, int height, const lcu_t* lcu, cu_array_t* const cu_a) {
+uint8_t uvg_get_mip_flag_context(
+  const cu_loc_t* const cu_loc,
+  const lcu_t* lcu,
+  cu_array_t* const cu_a) {
   assert(!(lcu && cu_a));
-  if (width > 2 * height || height > 2 * width) {
+  if (cu_loc->width > 2 * cu_loc->height || cu_loc->height > 2 * cu_loc->width) {
     return 3;
   }
-  
+
+  const int x = cu_loc->x;
+  const int y = cu_loc->y;
+
   int context = 0;
   const cu_info_t* left = NULL;
   const cu_info_t* top = NULL;
@@ -1761,26 +1767,26 @@ static void intra_recon_tb_leaf(
  */
 void uvg_intra_recon_cu(
   encoder_state_t* const state,
-  int x,
-  int y,
-  int depth,
   intra_search_data_t* search_data,
+  const cu_loc_t* cu_loc,
   cu_info_t *cur_cu,
   lcu_t *lcu,
   enum uvg_tree_type tree_type,
   bool recon_luma,
   bool recon_chroma)
 {
-  const vector2d_t lcu_px = { SUB_SCU(x) >> (tree_type == UVG_CHROMA_T), SUB_SCU(y) >> (tree_type == UVG_CHROMA_T) };
-  const int8_t width = LCU_WIDTH >> depth;
-  const int8_t height = width; // TODO: height for non-square blocks.
+  const uint8_t depth = 6 - uvg_g_convert_to_log2[cu_loc->width];
+  const vector2d_t lcu_px = { cu_loc->local_x >> (tree_type == UVG_CHROMA_T), cu_loc->local_y >> (tree_type == UVG_CHROMA_T) };
+  const int8_t width = cu_loc->width;
+  const int8_t height = cu_loc->height; // TODO: height for non-square blocks.
   if (cur_cu == NULL) {
     cur_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
   }
 
+  cu_loc_t chroma_cu_loc;
   if(!recon_luma && recon_chroma) {
-    x &= ~7;
-    y &= ~7;
+    uvg_cu_loc_ctor(&chroma_cu_loc, cu_loc->x & ~7, cu_loc->y & ~7, width, height);
+    cu_loc = &chroma_cu_loc;
   }
   
   // Reset CBFs because CBFs might have been set
@@ -1793,22 +1799,25 @@ void uvg_intra_recon_cu(
     cbf_clear(&cur_cu->cbf, depth, COLOR_V);
   }
 
-  if (depth == 0 || cur_cu->tr_depth > depth) {
+  if (width > TR_MAX_WIDTH || height > TR_MAX_WIDTH) {
+    cu_loc_t split_cu_loc;
 
-    const int offset = width / 2;
-    const int32_t x2 = x + offset;
-    const int32_t y2 = y + offset;
-
-    uvg_intra_recon_cu(state, x,   y,   depth + 1, search_data, NULL, lcu, tree_type, recon_luma, recon_chroma);
-    uvg_intra_recon_cu(state, x2,  y,   depth + 1, search_data, NULL, lcu, tree_type, recon_luma, recon_chroma);
-    uvg_intra_recon_cu(state, x,   y2,  depth + 1, search_data, NULL, lcu, tree_type, recon_luma, recon_chroma);
-    uvg_intra_recon_cu(state, x2,  y2,  depth + 1, search_data, NULL, lcu, tree_type, recon_luma, recon_chroma);
+    const int half_width = width / 2;
+    const int half_height = height / 2;
+    uvg_cu_loc_ctor(&split_cu_loc, cu_loc->x, cu_loc->y, half_width, half_height);
+    uvg_intra_recon_cu(state, search_data, &split_cu_loc, NULL, lcu, tree_type, recon_luma, recon_chroma);
+    uvg_cu_loc_ctor(&split_cu_loc, cu_loc->x + half_width, cu_loc->y, half_width, half_height);
+    uvg_intra_recon_cu(state, search_data, &split_cu_loc, NULL, lcu, tree_type, recon_luma, recon_chroma);
+    uvg_cu_loc_ctor(&split_cu_loc, cu_loc->x, cu_loc->y + half_height, half_width, half_height);
+    uvg_intra_recon_cu(state, search_data, &split_cu_loc, NULL, lcu, tree_type, recon_luma, recon_chroma);
+    uvg_cu_loc_ctor(&split_cu_loc, cu_loc->x + half_width, cu_loc->y + half_height, half_width, half_height);
+    uvg_intra_recon_cu(state, search_data, &split_cu_loc, NULL, lcu, tree_type, recon_luma, recon_chroma);
 
     // Propagate coded block flags from child CUs to parent CU.
     uint16_t child_cbfs[3] = {
-      LCU_GET_CU_AT_PX(lcu, (lcu_px.x + offset) >> (tree_type == UVG_CHROMA_T), lcu_px.y >> (tree_type == UVG_CHROMA_T))->cbf,
-      LCU_GET_CU_AT_PX(lcu, lcu_px.x >> (tree_type == UVG_CHROMA_T), (lcu_px.y + offset) >> (tree_type == UVG_CHROMA_T))->cbf,
-      LCU_GET_CU_AT_PX(lcu, (lcu_px.x + offset) >> (tree_type == UVG_CHROMA_T), (lcu_px.y + offset) >> (tree_type == UVG_CHROMA_T))->cbf,
+      LCU_GET_CU_AT_PX(lcu, (lcu_px.x + half_width) >> (tree_type == UVG_CHROMA_T), lcu_px.y >> (tree_type == UVG_CHROMA_T))->cbf,
+      LCU_GET_CU_AT_PX(lcu, lcu_px.x >> (tree_type == UVG_CHROMA_T), (lcu_px.y + half_height) >> (tree_type == UVG_CHROMA_T))->cbf,
+      LCU_GET_CU_AT_PX(lcu, (lcu_px.x + half_width) >> (tree_type == UVG_CHROMA_T), (lcu_px.y + half_height) >> (tree_type == UVG_CHROMA_T))->cbf,
     };
 
     if (recon_luma && depth <= MAX_DEPTH) {
@@ -1826,8 +1835,6 @@ void uvg_intra_recon_cu(
     // Small blocks are split only twice.
     int split_type = search_data->pred_cu.intra.isp_mode;
     int split_limit = uvg_get_isp_split_num(width, height, split_type, true);
-    cu_loc_t origin_cu;
-    uvg_cu_loc_ctor(&origin_cu, x, y, width, height);
 
     for (int i = 0; i < split_limit; ++i) {
       cu_loc_t tu_loc;
@@ -1845,24 +1852,21 @@ void uvg_intra_recon_cu(
     }
   }
   const bool has_luma = recon_luma && search_data->pred_cu.intra.isp_mode == ISP_MODE_NO_ISP;
-  const bool has_chroma = recon_chroma && (x % 8 == 0 && y % 8 == 0);
-
-  cu_loc_t loc;
-  uvg_cu_loc_ctor(&loc, x, y, width, height);
-   
+  const bool has_chroma = recon_chroma && (cu_loc->x % 8 == 0 && cu_loc->y % 8 == 0);
+     
   // Process a leaf TU.
   if (has_luma) {
-    intra_recon_tb_leaf(state, &loc, &loc, lcu, COLOR_Y, search_data, tree_type);
+    intra_recon_tb_leaf(state, cu_loc, cu_loc, lcu, COLOR_Y, search_data, tree_type);
   }
   if (has_chroma) {
-    intra_recon_tb_leaf(state, &loc, &loc, lcu, COLOR_U, search_data, tree_type);
-    intra_recon_tb_leaf(state, &loc, &loc, lcu, COLOR_V, search_data, tree_type);
+    intra_recon_tb_leaf(state, cu_loc, cu_loc, lcu, COLOR_U, search_data, tree_type);
+    intra_recon_tb_leaf(state, cu_loc, cu_loc, lcu, COLOR_V, search_data, tree_type);
   }
 
   // TODO: not necessary to call if only luma and ISP is on
   uvg_quantize_lcu_residual(state, has_luma, has_chroma && !(search_data->pred_cu.joint_cb_cr & 3),
                             search_data->pred_cu.joint_cb_cr & 3 && state->encoder_control->cfg.jccr && has_chroma,
-                            &loc, depth, cur_cu, lcu,
+                            cu_loc, depth, cur_cu, lcu,
                             false, tree_type);
 }
 

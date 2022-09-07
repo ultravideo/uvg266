@@ -760,16 +760,17 @@ static double cu_rd_cost_tr_split_accurate(
 
 
 // Return estimate of bits used to code prediction mode of cur_cu.
-static double calc_mode_bits(const encoder_state_t *state,
-                             const lcu_t *lcu,
-                             const cu_info_t * cur_cu,
-                             int x, int y, int depth)
+static double calc_mode_bits(
+  const encoder_state_t *state,
+  const lcu_t *lcu,
+  const cu_info_t * cur_cu,
+  const cu_loc_t* const cu_loc)
 {
   assert(cur_cu->type == CU_INTRA);
 
-  double mode_bits = uvg_luma_mode_bits(state, cur_cu, x, y, depth, lcu);
+  double mode_bits = uvg_luma_mode_bits(state, cur_cu, cu_loc, lcu);
 
-  if (((depth == 4 && x % 8 && y % 8) || (depth != 4)) && state->encoder_control->chroma_format != UVG_CSP_400) {
+  if (((cu_loc->width == 4 && cu_loc->x % 8 && cu_loc->y % 8) || (cu_loc->width != 4)) && state->encoder_control->chroma_format != UVG_CSP_400) {
     mode_bits += uvg_chroma_mode_bits(state, cur_cu->intra.mode_chroma, cur_cu->intra.mode);
   }
 
@@ -941,6 +942,7 @@ static double search_cu(
   cur_cu->lfnst_last_scan_pos = 0;
   cur_cu->lfnst_idx = 0;
   cur_cu->joint_cb_cr = 0;
+  cur_cu->split_tree = split_tree.split_tree;
 
   // If the CU is completely inside the frame at this depth, search for
   // prediction modes at this depth.
@@ -997,9 +999,7 @@ static double search_cu(
       intra_search.pred_cu = *cur_cu;
       if(tree_type != UVG_CHROMA_T) {
         intra_search.pred_cu.joint_cb_cr = 4;
-        uvg_search_cu_intra(state, x, y, depth, &intra_search,
-                            lcu,
-                            tree_type);
+        uvg_search_cu_intra(state, &intra_search, lcu, tree_type, cu_loc);
       }
 #ifdef COMPLETE_PRED_MODE_BITS
       // Technically counting these bits would be correct, however counting
@@ -1013,10 +1013,11 @@ static double search_cu(
 #endif
       if (state->encoder_control->cfg.cclm && tree_type != UVG_CHROMA_T && state->encoder_control->chroma_format != UVG_CSP_400) {
         uvg_intra_recon_cu(state,
-          x, y,
-          depth, &intra_search,
-          &intra_search.pred_cu,
-          lcu, tree_type, true, false);
+                           &intra_search, cu_loc,
+                           &intra_search.pred_cu, lcu,
+                           tree_type,
+                           true,
+                           false);
 
         downsample_cclm_rec(
           state, x, y, cu_width / 2, cu_width / 2, lcu->rec.y, lcu->left_ref.y[64]
@@ -1055,11 +1056,11 @@ static double search_cu(
             intra_search.pred_cu.intra.mode_chroma = 0;
           }
           uvg_intra_recon_cu(state,
-                             x, y,
-                             depth, &intra_search,
-                             &intra_search.pred_cu,
-                             lcu,
-                             tree_type, false, true);
+                             &intra_search, cu_loc,
+                             &intra_search.pred_cu, lcu,
+                             tree_type,
+                             false,
+                             true);
           if(tree_type != UVG_CHROMA_T) {
             intra_cost += uvg_cu_rd_cost_chroma(state, x_local, y_local, depth, &intra_search.pred_cu, lcu);
           }
@@ -1096,20 +1097,20 @@ static double search_cu(
       }
       lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
       uvg_intra_recon_cu(state,
-                         x, y,
-                         depth, &intra_search,
-                         NULL, 
-                         lcu, tree_type,recon_luma,recon_chroma);
+                         &intra_search, cu_loc,
+                         NULL, lcu,
+                         tree_type, 
+                         recon_luma, recon_chroma);
 
 
       if(split_tree.current_depth == 4 && x % 8 && y % 8 && tree_type != UVG_LUMA_T && state->encoder_control->chroma_format != UVG_CSP_400) {
         intra_search.pred_cu.intra.mode_chroma = cur_cu->intra.mode_chroma;
         uvg_intra_recon_cu(state,
-                           x, y,
-                           depth, &intra_search,
-                           NULL,
-                           lcu,
-                           tree_type,false,true);
+                           &intra_search, cu_loc,
+                           NULL, lcu,
+                           tree_type,
+                           false,
+                           true);
       }
       if (cur_cu->joint_cb_cr == 4) cur_cu->joint_cb_cr = 0;
 
@@ -1302,7 +1303,7 @@ static double search_cu(
     // It is ok to interrupt the search as soon as it is known that
     // the split costs at least as much as not splitting.
     if (cur_cu->type == CU_NOTSET || cbf || state->encoder_control->cfg.cu_split_termination == UVG_CU_SPLIT_TERMINATION_OFF) {
-      const split_tree_t new_split = { split_tree.split_tree | QT_SPLIT << split_tree.current_depth, split_tree.current_depth + 1};
+      const split_tree_t new_split = { split_tree.split_tree | QT_SPLIT << (split_tree.current_depth * 3), split_tree.current_depth + 1};
       cu_loc_t new_cu_loc;
       if (split_cost < cost) {
         uvg_cu_loc_ctor(&new_cu_loc, x, y, half_cu, half_cu);
@@ -1367,14 +1368,14 @@ static double search_cu(
         proxy.pred_cu = *cur_cu;
 
         uvg_intra_recon_cu(state,
-                           x, y,
-                           depth,
-                           &proxy,
+                           &proxy, cu_loc,
                            NULL,
                            lcu,
-                           tree_type, true, state->encoder_control->chroma_format == UVG_CSP_400);
+                           tree_type,
+                           true,
+                           state->encoder_control->chroma_format == UVG_CSP_400);
 
-        double mode_bits = calc_mode_bits(state, lcu, cur_cu, x, y, depth) + bits;
+        double mode_bits = calc_mode_bits(state, lcu, cur_cu, cu_loc) + bits;
         cost += mode_bits * state->lambda;
 
         cost += cu_rd_cost_tr_split_accurate(state, x_local, y_local, depth, cur_cu, lcu, tree_type, 0);
