@@ -273,7 +273,6 @@ typedef int32_t mv_t;
 #define CLIP_TO_PIXEL(value) CLIP(0, PIXEL_MAX, (value))
 #define CLIP_TO_QP(value) CLIP(0, 51, (value))
 #define SWAP(a,b,swaptype) { swaptype tempval; tempval = a; a = b; b = tempval; }
-#define CU_WIDTH_FROM_DEPTH(depth) (LCU_WIDTH >> depth)
 #define WITHIN(val, min_val, max_val) ((min_val) <= (val) && (val) <= (max_val))
 #define CEILDIV(x,y) (((x) + (y) - 1) / (y))
 

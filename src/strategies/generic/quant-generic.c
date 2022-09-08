@@ -317,8 +317,7 @@ int uvg_quant_cbcr_residual_generic(
   {
     int8_t tr_depth = cur_cu->tr_depth - cur_cu->depth;
     uvg_rdoq(state, coeff, coeff_out, width, width, cur_cu->joint_cb_cr == 1 ? COLOR_V : COLOR_U,
-             scan_order, cur_cu->type, tr_depth, cur_cu->cbf,
-      cur_cu->cr_lfnst_idx);
+             scan_order, cur_cu->type, cur_cu->cbf, cur_cu->cr_lfnst_idx);
   }
   else if (state->encoder_control->cfg.rdoq_enable && false) {
     uvg_ts_rdoq(state, coeff, coeff_out, width, width, cur_cu->joint_cb_cr == 2 ? COLOR_V : COLOR_U,
@@ -499,8 +498,7 @@ int uvg_quantize_residual_generic(encoder_state_t *const state,
   {
     int8_t tr_depth = cur_cu->tr_depth - cur_cu->depth;
     uvg_rdoq(state, coeff, coeff_out, width, height, color,
-             scan_order, cur_cu->type, tr_depth, cur_cu->cbf,
-      lfnst_index);
+             scan_order, cur_cu->type, cur_cu->cbf, lfnst_index);
   } else if(state->encoder_control->cfg.rdoq_enable && use_trskip) {
     uvg_ts_rdoq(state, coeff, coeff_out, width, height, color,
       scan_order);

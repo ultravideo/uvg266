@@ -431,9 +431,7 @@ static double search_intra_trdepth(
         }
         double rd_cost = uvg_cu_rd_cost_luma(
           state,
-          lcu_px.x,
-          lcu_px.y,
-          depth,
+          cu_loc,
           pred_cu,
           lcu,
           search_data->best_isp_cbfs);
@@ -502,11 +500,9 @@ static double search_intra_trdepth(
           );
         best_rd_cost += uvg_cu_rd_cost_chroma(
           state,
-          lcu_px.x,
-          lcu_px.y,
-          depth,
           pred_cu,
-          lcu);
+          lcu,
+          cu_loc);
         pred_cu->intra.mode = luma_mode;
 
         // Check lfnst constraints for chroma
@@ -552,7 +548,7 @@ static double search_intra_trdepth(
                          UVG_BOTH_T,
                          false,
                          true);
-      best_rd_cost += uvg_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
+      best_rd_cost += uvg_cu_rd_cost_chroma(state, pred_cu, lcu, cu_loc);
       pred_cu->intra.mode = luma_mode;
     }
     pred_cu->tr_skip = best_tr_idx == MTS_SKIP;
@@ -655,7 +651,7 @@ static double search_intra_trdepth(
   if (depth == 0 || split_cost < nosplit_cost) {
     return split_cost;
   } else {
-    uvg_lcu_fill_trdepth(lcu, cu_loc->x, cu_loc->y, depth, depth, tree_type);
+    uvg_lcu_fill_trdepth(lcu, cu_loc, depth, tree_type);
 
     pred_cu->cbf = nosplit_cbf;
 
@@ -690,19 +686,15 @@ static void sort_modes(intra_search_data_t* __restrict modes, uint8_t length)
 
 static int search_intra_chroma_rough(
   encoder_state_t * const state,
-  int x_px,
-  int y_px,
-  int depth,
-  const vector2d_t* const lcu_px,
   intra_search_data_t* chroma_data,
   lcu_t* lcu,
   int8_t luma_mode,
-  enum uvg_tree_type tree_type)
+  enum uvg_tree_type tree_type,
+  const cu_loc_t* const cu_loc)
 {
-  assert(depth != 4 || (x_px & 4 && y_px & 4));
-  const int_fast8_t log2_width_c = MAX(LOG2_LCU_WIDTH - depth - 1, 2);
+  const int_fast8_t log2_width_c = uvg_g_convert_to_log2[cu_loc->chroma_width];
   const vector2d_t pic_px = { state->tile->frame->width, state->tile->frame->height };
-  const vector2d_t luma_px = { x_px & ~7, y_px & ~7 };
+  const vector2d_t luma_px = { cu_loc->x & ~7, cu_loc->y & ~7 };
   const int width = 1 << log2_width_c;
   const int height = width; // TODO: height for non-square blocks
 
@@ -714,7 +706,7 @@ static int search_intra_chroma_rough(
   uvg_intra_references refs_v;
   uvg_intra_build_reference(&loc, &loc, COLOR_V, &luma_px, &pic_px, lcu, &refs_v, state->encoder_control->cfg.wpp, NULL, 0, 0);
 
-  vector2d_t lcu_cpx = { (lcu_px->x & ~7) / 2, (lcu_px->y & ~7) / 2 };
+  vector2d_t lcu_cpx = { (cu_loc->local_x & ~7) / 2, (cu_loc->local_y & ~7) / 2 };
   uvg_pixel* orig_u = &lcu->ref.u[lcu_cpx.x + lcu_cpx.y * LCU_WIDTH_C];
   uvg_pixel* orig_v = &lcu->ref.v[lcu_cpx.x + lcu_cpx.y * LCU_WIDTH_C];
   
@@ -1494,29 +1486,19 @@ double uvg_chroma_mode_bits(const encoder_state_t *state, int8_t chroma_mode, in
 
 int8_t uvg_search_intra_chroma_rdo(
   encoder_state_t * const state,
-  int x_px,
-  int y_px,
-  int depth,
   int8_t num_modes,
   lcu_t *const lcu,
   intra_search_data_t* chroma_data,
   int8_t luma_mode,
-  enum uvg_tree_type tree_type)
+  enum uvg_tree_type tree_type,
+  const cu_loc_t* const cu_loc)
 {
-  const bool reconstruct_chroma = (depth != 4) || (x_px & 4 && y_px & 4);
-
-  const int luma_width  = LCU_WIDTH >> depth;
-  const int luma_height = LCU_WIDTH >> depth; // TODO: height
-
-  int log2_width = MAX(LOG2_LCU_WIDTH - depth - 1, 2);
+  const bool reconstruct_chroma = true;
   
-  cu_loc_t loc;
-  uvg_cu_loc_ctor(&loc, x_px & ~7, y_px & ~7, luma_width, luma_height);
-
-  const int chroma_width  = loc.chroma_width;
-  const int chroma_height = loc.chroma_height;
+  const int chroma_width  = cu_loc->chroma_width;
+  const int chroma_height = cu_loc->chroma_height;
   uvg_intra_references refs[2];
-  const vector2d_t luma_px = { x_px & ~7, y_px & ~7 };
+  const vector2d_t luma_px = { cu_loc->x & ~7, cu_loc->y & ~7 };
   const vector2d_t pic_px = {
     state->tile->frame->width,
     state->tile->frame->height,
@@ -1524,17 +1506,17 @@ int8_t uvg_search_intra_chroma_rdo(
 
 
   if (reconstruct_chroma) {
-    uvg_intra_build_reference(&loc, &loc, COLOR_U, &luma_px, &pic_px, lcu, &refs[0], state->encoder_control->cfg.wpp, NULL, 0, 0);
-    uvg_intra_build_reference(&loc, &loc, COLOR_V, &luma_px, &pic_px, lcu, &refs[1], state->encoder_control->cfg.wpp, NULL, 0, 0);
+    uvg_intra_build_reference(cu_loc, cu_loc, COLOR_U, &luma_px, &pic_px, lcu, &refs[0], state->encoder_control->cfg.wpp, NULL, 0, 0);
+    uvg_intra_build_reference(cu_loc, cu_loc, COLOR_V, &luma_px, &pic_px, lcu, &refs[1], state->encoder_control->cfg.wpp, NULL, 0, 0);
     
-    const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
+    const vector2d_t lcu_px = { cu_loc->local_x, cu_loc->local_y };
     cabac_data_t temp_cabac;
     memcpy(&temp_cabac, &state->search_cabac, sizeof(cabac_data_t));
     
-    const int offset = ((lcu_px.x & ~7) >> 1) + ((lcu_px.y & ~7) >> 1)* LCU_WIDTH_C;
+    const int offset = ((cu_loc->local_x & ~7) >> 1) + ((cu_loc->local_y & ~7) >> 1)* LCU_WIDTH_C;
 
     int lfnst_modes_to_check[3];
-    if((depth == 4 || tree_type == UVG_CHROMA_T) && state->encoder_control->cfg.lfnst) {
+    if((cu_loc->width == 4 || tree_type == UVG_CHROMA_T) && state->encoder_control->cfg.lfnst) {
       for (int i = 0; i < 3; ++i) {
         lfnst_modes_to_check[i] = i;
       }
@@ -1572,7 +1554,7 @@ int8_t uvg_search_intra_chroma_rdo(
           uvg_intra_predict(
             state,
             &refs[COLOR_U - 1],
-            &loc,
+            cu_loc,
             COLOR_U,
             u_pred,
             &chroma_data[mode_i],
@@ -1581,7 +1563,7 @@ int8_t uvg_search_intra_chroma_rdo(
           uvg_intra_predict(
             state,
             &refs[COLOR_V - 1],
-            &loc,
+            cu_loc,
             COLOR_V,
             v_pred,
             &chroma_data[mode_i],
@@ -1606,12 +1588,10 @@ int8_t uvg_search_intra_chroma_rdo(
           uvg_chorma_ts_out_t chorma_ts_out;
           uvg_chroma_transform_search(
             state,
-            depth,
             lcu,
             &temp_cabac,
-            &loc,
+            cu_loc,
             offset,
-            mode,
             pred_cu,
             u_pred,
             v_pred,
@@ -1653,12 +1633,12 @@ int8_t uvg_search_intra_chroma_rdo(
           state->search_cabac.update = 1;
           chroma_data[mode_i].cost = mode_bits * state->lambda;
           uvg_intra_recon_cu(state,
-                             &chroma_data[mode_i], &loc,
+                             &chroma_data[mode_i], cu_loc,
                              pred_cu, lcu,
                              tree_type,
                              false,
                              true);
-          chroma_data[mode_i].cost += uvg_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
+          chroma_data[mode_i].cost += uvg_cu_rd_cost_chroma(state, pred_cu, lcu, cu_loc);
           memcpy(&state->search_cabac, &temp_cabac, sizeof(cabac_data_t));
         }
       }
@@ -1677,14 +1657,11 @@ int8_t uvg_search_intra_chroma_rdo(
 
 int8_t uvg_search_cu_intra_chroma(
   encoder_state_t * const state,
-  const int x_px,
-  const int y_px,
-  const int depth,
+  const cu_loc_t* const cu_loc,
   lcu_t *lcu,
   intra_search_data_t *search_data,
   enum uvg_tree_type tree_type)
 {
-  const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
 
   const cu_info_t *cur_pu = &search_data->pred_cu;
   int8_t intra_mode = !cur_pu->intra.mip_flag ? cur_pu->intra.mode : 0;
@@ -1697,6 +1674,9 @@ int8_t uvg_search_cu_intra_chroma(
       break;
     }
   }
+
+  cu_loc_t chroma_loc;
+  uvg_cu_loc_ctor(&chroma_loc, cu_loc->x & ~7, cu_loc->y & ~7, cu_loc->width, cu_loc->height);
 
   // The number of modes to select for slower chroma search. Luma mode
   // is always one of the modes, so 2 means the final decision is made
@@ -1715,7 +1695,7 @@ int8_t uvg_search_cu_intra_chroma(
     chroma_data[i].pred_cu = *cur_pu;
     chroma_data[i].pred_cu.intra.mode_chroma = num_modes == 1 ? intra_mode : modes[i];
     chroma_data[i].cost = 0;
-    if(depth != 4 && tree_type == UVG_BOTH_T) {
+    if(cu_loc->width != 4 && tree_type == UVG_BOTH_T) {
       memcpy(chroma_data[i].lfnst_costs, search_data->lfnst_costs, sizeof(double) * 3);
     }
   }
@@ -1726,16 +1706,13 @@ int8_t uvg_search_cu_intra_chroma(
   if(state->encoder_control->cfg.cclm && 0){
     
 
-    num_modes = search_intra_chroma_rough(state, x_px, y_px, depth,
-                                          &lcu_px,
-                                          chroma_data,
-                                          lcu,
-                                          intra_mode,
-                                          tree_type);
+    num_modes = search_intra_chroma_rough(state, chroma_data, lcu, intra_mode,
+                                          tree_type,
+                                          &chroma_loc);
   }
   
   if (num_modes > 1 || state->encoder_control->cfg.jccr) {
-    uvg_search_intra_chroma_rdo(state, x_px, y_px, depth, num_modes, lcu, chroma_data, intra_mode, tree_type);
+    uvg_search_intra_chroma_rdo(state, num_modes, lcu, chroma_data, intra_mode, tree_type, &chroma_loc);
   }
   else if(cur_pu->lfnst_idx) {
     chroma_data[0].pred_cu.cr_lfnst_idx = cur_pu->lfnst_idx;
@@ -1983,7 +1960,7 @@ void uvg_search_cu_intra(
   // Set transform depth to current depth, meaning no transform splits.
   {
     const int8_t depth = 6 - uvg_g_convert_to_log2[cu_loc->width];
-    uvg_lcu_fill_trdepth(lcu, cu_loc->x, cu_loc->y, depth, depth, tree_type);
+    uvg_lcu_fill_trdepth(lcu, cu_loc, depth, tree_type);
   }
   // Refine results with slower search or get some results if rough search was skipped.
   const int32_t rdo_level = state->encoder_control->cfg.rdo;

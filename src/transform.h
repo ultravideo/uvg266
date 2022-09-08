@@ -104,12 +104,10 @@ void uvg_quantize_lcu_residual(
 
 void uvg_chroma_transform_search(
   encoder_state_t* const state,
-  int depth,
   lcu_t* const lcu,
   cabac_data_t* temp_cabac,
   const cu_loc_t* const cu_loc,
   const int offset,
-  const uint8_t mode,
   cu_info_t* pred_cu,
   uvg_pixel u_pred[1024],
   uvg_pixel v_pred[1024],
