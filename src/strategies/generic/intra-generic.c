@@ -58,7 +58,8 @@ static void uvg_angular_pred_generic(
   const uvg_pixel *const in_ref_above,
   const uvg_pixel *const in_ref_left,
   uvg_pixel *const dst,
-  const uint8_t multi_ref_idx)
+  const uint8_t multi_ref_idx,
+  const uint8_t isp_mode)
 {
   const int width  = channel_type == COLOR_Y ? cu_loc->width : cu_loc->chroma_width;
   const int height = channel_type == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
@@ -119,6 +120,7 @@ static void uvg_angular_pred_generic(
   uint32_t pred_mode = intra_mode; // ToDo: handle WAIP
 
   uint8_t multi_ref_index = multi_ref_idx;
+  uint8_t isp = isp_mode;
 
   // Whether to swap references to always project on the left reference row.
   const bool vertical_mode = intra_mode >= 34;
@@ -246,8 +248,8 @@ static void uvg_angular_pred_generic(
               use_cubic = false;
             }
           }
-          // Cubic must be used if ref line != 0
-          if (multi_ref_index) {
+          // Cubic must be used if ref line != 0 or if isp mode is != 0
+          if (multi_ref_index || isp) {
             use_cubic = true;
           }
           const int16_t filter_coeff[4] = { 16 - (delta_fract >> 1), 32 - (delta_fract >> 1), 16 + (delta_fract >> 1), delta_fract >> 1 };

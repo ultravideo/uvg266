@@ -59,7 +59,8 @@ static void uvg_angular_pred_avx2(
   const uvg_pixel *const in_ref_above,
   const uvg_pixel *const in_ref_left,
   uvg_pixel *const dst,
-  const uint8_t multi_ref_idx)
+  const uint8_t multi_ref_idx,
+  const uint8_t isp_mode)
 {
   // ISP_TODO: non-square block implementation, height is passed but not used
   const int width = channel_type == COLOR_Y ? cu_loc->width : cu_loc->chroma_width;
@@ -72,6 +73,7 @@ static void uvg_angular_pred_avx2(
 
   // TODO: implement handling of MRL
   uint8_t multi_ref_index = channel_type == COLOR_Y ? multi_ref_idx : 0;
+  uint8_t isp = isp_mode;
 
   __m256i p_shuf_01 = _mm256_setr_epi8(
     0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
@@ -292,6 +294,13 @@ static void uvg_angular_pred_avx2(
               f[yy][2] = 16 + offset;
               f[yy][3] = offset;
             }
+            // Cubic must be used if ref line != 0 or if isp mode != 0
+            if (multi_ref_index || isp) {
+              use_cubic = true;
+            }
+            const int16_t filter_coeff[4] = { 16 - (delta_fract[yy] >> 1), 32 - (delta_fract[yy] >> 1), 16 + (delta_fract[yy] >> 1), delta_fract[yy] >> 1 };
+            const int16_t *temp_f = use_cubic ? cubic_filter[delta_fract[yy]] : filter_coeff;
+            memcpy(f[yy], temp_f, 4 * sizeof(*temp_f));
           }
 
           // Do 4-tap intra interpolation filtering
