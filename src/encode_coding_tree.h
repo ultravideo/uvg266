@@ -40,7 +40,8 @@
 #include "encoderstate.h"
 #include "global.h"
 
-bool uvg_is_mts_allowed(const encoder_state_t* const state, cu_info_t* const pred_cu);
+bool uvg_is_mts_allowed(const encoder_state_t* const state, cu_info_t* const pred_cu, const cu_loc_t*
+                        const cu_loc);
 bool uvg_is_lfnst_allowed(
   const encoder_state_t* const state,
   const cu_info_t* const pred_cu,
@@ -105,10 +106,8 @@ bool uvg_write_split_flag(
   const cu_info_t* left_cu,
   const cu_info_t* above_cu,
   uint8_t split_flag,
+  const cu_loc_t* const cu_loc,
   int depth,
-  int cu_width,
-  int x,
-  int y,
   enum uvg_tree_type tree_type,
   double* bits_out);
 

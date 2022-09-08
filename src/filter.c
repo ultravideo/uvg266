@@ -854,8 +854,7 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
       uint8_t max_filter_length_Q = 0;
       const int cu_size = LCU_WIDTH >> cu_q->depth;
       // TODO: NON square
-      const int pu_size = dir == EDGE_HOR ? cu_size
-                                          : cu_size;
+      const int pu_size = dir == EDGE_HOR ? cu_size : cu_size;
       const int pu_pos = dir == EDGE_HOR ? y_coord 
                                          : x_coord;
       get_max_filter_length(&max_filter_length_P, &max_filter_length_Q, state, x_coord, y_coord,

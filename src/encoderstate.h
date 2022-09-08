@@ -404,14 +404,13 @@ static INLINE bool encoder_state_must_write_vps(const encoder_state_t *state)
  * \param depth   depth in the CU tree
  * \return true, if it's the last CU in its QG, otherwise false
  */
-static INLINE bool is_last_cu_in_qg(const encoder_state_t *state, int x, int y, int depth)
+static INLINE bool is_last_cu_in_qg(const encoder_state_t *state, const cu_loc_t* const cu_loc)
 {
   if (state->frame->max_qp_delta_depth < 0) return false;
-
-  const int cu_width = LCU_WIDTH >> depth;
+  
   const int qg_width = LCU_WIDTH >> state->frame->max_qp_delta_depth;
-  const int right  = x + cu_width;
-  const int bottom = y + cu_width;
+  const int right  = cu_loc->x + cu_loc->width;
+  const int bottom = cu_loc->y + cu_loc->height;
   return (right % qg_width == 0 || right >= state->tile->frame->width) &&
          (bottom % qg_width == 0 || bottom >= state->tile->frame->height);
 }

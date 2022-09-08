@@ -1555,7 +1555,7 @@ void uvg_intra_predict(
     uvg_pixels_blit(&state->tile->frame->cclm_luma_rec[x / 2 + (y * stride) / 4], dst, width, width, stride / 2, width);
     if (data->pred_cu.depth != data->pred_cu.tr_depth || data->cclm_parameters[color == COLOR_U ? 0 : 1].b <= 0) {
       predict_cclm(
-        state, color, width, width, x, y, stride, intra_mode, lcu, refs, dst, 
+        state, color, width, height, x, y, stride, intra_mode, lcu, refs, dst, 
         (cclm_parameters_t*)&data->cclm_parameters[color == COLOR_U ? 0 : 1],
         tree_type);
     }

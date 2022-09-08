@@ -572,36 +572,45 @@ static void encode_sao(encoder_state_t * const state,
  * \param prev_qp         -1 if QP delta has not been coded in current QG,
  *                        otherwise the QP of the current QG
  */
-static void set_cu_qps(encoder_state_t *state, int x, int y, int depth, int *last_qp, int *prev_qp)
+static void set_cu_qps(encoder_state_t *state, const cu_loc_t* const cu_loc, int *last_qp, int *prev_qp, const
+                       int depth)
 {
 
   // Stop recursion if the CU is completely outside the frame.
-  if (x >= state->tile->frame->width || y >= state->tile->frame->height) return;
+  if (cu_loc->x >= state->tile->frame->width || cu_loc->y >= state->tile->frame->height) return;
 
-  cu_info_t *cu = uvg_cu_array_at(state->tile->frame->cu_array, x, y);
-  const int cu_width = LCU_WIDTH >> depth;
+  cu_info_t *cu = uvg_cu_array_at(state->tile->frame->cu_array, cu_loc->x, cu_loc->y);
+  const int width = LCU_WIDTH >> cu->depth;
 
   if (depth <= state->frame->max_qp_delta_depth) {
     *prev_qp = -1;
   }
 
-  if (cu->depth > depth) {
+  if (cu_loc->width > width) {
     // Recursively process sub-CUs.
-    const int d = cu_width >> 1;
-    set_cu_qps(state, x,     y,     depth + 1, last_qp, prev_qp);
-    set_cu_qps(state, x + d, y,     depth + 1, last_qp, prev_qp);
-    set_cu_qps(state, x,     y + d, depth + 1, last_qp, prev_qp);
-    set_cu_qps(state, x + d, y + d, depth + 1, last_qp, prev_qp);
+    const int half_width = cu_loc->width >> 1;
+    const int half_height = cu_loc->height >> 1;
+    cu_loc_t split_cu_loc;
+    uvg_cu_loc_ctor(&split_cu_loc, cu_loc->x, cu_loc->y, half_width, half_height);
+    set_cu_qps(state, &split_cu_loc,     last_qp,     prev_qp, depth + 1);
+    uvg_cu_loc_ctor(&split_cu_loc, cu_loc->x + half_width, cu_loc->y, half_width, half_height);
+    set_cu_qps(state, &split_cu_loc, last_qp,     prev_qp, depth + 1);
+    uvg_cu_loc_ctor(&split_cu_loc, cu_loc->x, cu_loc->y + half_height, half_width, half_height);
+    set_cu_qps(state, &split_cu_loc,     last_qp, prev_qp, depth + 1);
+    uvg_cu_loc_ctor(&split_cu_loc, cu_loc->x + half_width, cu_loc->y + half_height, half_width, half_height);
+    set_cu_qps(state, &split_cu_loc, last_qp, prev_qp, depth + 1);
 
   } else {
     bool cbf_found = *prev_qp >= 0;
 
+    int y_limit = cu_loc->y + cu_loc->height;
+    int x_limit = cu_loc->x + cu_loc->width;
     if (cu->tr_depth > depth) {
       // The CU is split into smaller transform units. Check whether coded
       // block flag is set for any of the TUs.
       const int tu_width = LCU_WIDTH >> cu->tr_depth;
-      for (int y_scu = y; !cbf_found && y_scu < y + cu_width; y_scu += tu_width) {
-        for (int x_scu = x; !cbf_found && x_scu < x + cu_width; x_scu += tu_width) {
+      for (int y_scu = cu_loc->y; !cbf_found && y_scu < y_limit; y_scu += tu_width) {
+        for (int x_scu = cu_loc->x; !cbf_found && x_scu < x_limit; x_scu += tu_width) {
           cu_info_t *tu = uvg_cu_array_at(state->tile->frame->cu_array, x_scu, y_scu);
           if (cbf_is_set_any(tu->cbf, cu->depth)) {
             cbf_found = true;
@@ -616,18 +625,18 @@ static void set_cu_qps(encoder_state_t *state, int x, int y, int depth, int *las
     if (cbf_found) {
       *prev_qp = qp = cu->qp;
     } else {
-      qp = uvg_get_cu_ref_qp(state, x, y, *last_qp);
+      qp = uvg_get_cu_ref_qp(state, cu_loc->x, cu_loc->y, *last_qp);
     }
 
     // Set the correct QP for all state->tile->frame->cu_array elements in
     // the area covered by the CU.
-    for (int y_scu = y; y_scu < y + cu_width; y_scu += SCU_WIDTH) {
-      for (int x_scu = x; x_scu < x + cu_width; x_scu += SCU_WIDTH) {
+    for (int y_scu = cu_loc->y; y_scu < y_limit; y_scu += SCU_WIDTH) {
+      for (int x_scu = cu_loc->x; x_scu < x_limit; x_scu += SCU_WIDTH) {
         uvg_cu_array_at(state->tile->frame->cu_array, x_scu, y_scu)->qp = qp;
       }
     }
 
-    if (is_last_cu_in_qg(state, x, y, depth)) {
+    if (is_last_cu_in_qg(state, cu_loc)) {
       *last_qp = cu->qp;
     }
   }
@@ -709,7 +718,9 @@ static void encoder_state_worker_encode_lcu_search(void * opaque)
   if (state->frame->max_qp_delta_depth >= 0) {
     int last_qp = state->last_qp;
     int prev_qp = -1;
-    set_cu_qps(state, lcu->position_px.x, lcu->position_px.y, 0, &last_qp, &prev_qp);
+    cu_loc_t cu_loc;
+    uvg_cu_loc_ctor(&cu_loc, lcu->position_px.x, lcu->position_px.y, LCU_WIDTH, LCU_WIDTH);
+    set_cu_qps(state, &cu_loc, &last_qp, &prev_qp, 0);
   }
 
   if (state->tile->frame->lmcs_aps->m_sliceReshapeInfo.sliceReshaperEnableFlag) {
