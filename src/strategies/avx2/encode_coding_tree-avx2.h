@@ -45,7 +45,7 @@
 void uvg_encode_coeff_nxn_avx2(encoder_state_t * const state,
                                cabac_data_t * const cabac,
                                const coeff_t *coeff,
-                               cu_loc_t *loc,
+                               const cu_loc_t *loc,
                                uint8_t type,
                                int8_t scan_mode,
                                int8_t tr_skip,

@@ -465,7 +465,7 @@ void uvg_encode_last_significant_xy(cabac_data_t * const cabac,
 
 static void encode_chroma_tu(
   encoder_state_t* const state,
-  cu_loc_t *cu_loc,
+  const cu_loc_t *cu_loc,
   int depth,
   cu_info_t* cur_pu,
   int8_t* scan_idx,
@@ -1937,12 +1937,13 @@ void uvg_encode_mvd(encoder_state_t * const state,
  * \param lcu_width   LCU_WIDTH for luma, LCU_WIDTH_C for chroma.
  *
  */
-void uvg_get_sub_coeff(coeff_t *dst, const coeff_t * const src, const int lcu_x, const int lcu_y, const int block_w, const int block_h, const int lcu_width)
+void uvg_get_sub_coeff(const coeff_t *dst, const coeff_t * const src, const int lcu_x, const int lcu_y, const int block_w, const int block_h, const int lcu_width)
 {
   // Take subset of coeff array
+  coeff_t* dst_ptr = dst;
   const coeff_t* coeff_ptr = &src[lcu_x + lcu_y * lcu_width];
   for (int j = 0; j < block_h; ++j) {
     //memcpy(dst_coeff + (j * lcu_width), &coeff[j * tr_width], tr_width * sizeof(coeff_t));
-    memcpy(&dst[j * block_w], &coeff_ptr[j * lcu_width], block_w * sizeof(coeff_t));
+    memcpy(&dst_ptr[j * block_w], &coeff_ptr[j * lcu_width], block_w * sizeof(coeff_t));
   }
 }
