@@ -54,7 +54,7 @@
 void uvg_encode_coeff_nxn_generic(encoder_state_t * const state,
   cabac_data_t * const cabac,
   const coeff_t *coeff,
-  cu_loc_t *cu_loc,
+  const cu_loc_t *cu_loc,
   uint8_t color,
   int8_t scan_mode,
   cu_info_t* cur_cu,

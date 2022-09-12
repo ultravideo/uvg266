@@ -117,7 +117,8 @@ void uvg_intra_build_reference(
   uvg_intra_references *const refs,
   bool entropy_sync,
   uvg_pixel *extra_refs,
-  uint8_t multi_ref_idx);
+  uint8_t multi_ref_idx,
+  const uint8_t isp_mode);
 
 /**
  * \brief Generate intra predictions.

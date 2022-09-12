@@ -978,23 +978,6 @@ static void intra_predict_regular(
 }
 
 
-int get_isp_ref_pixels_num(const int lcu_x, const int lcu_y, const int width, const int height, const int isp_mode)
-{
-  // TODO: this only works until non-square blocks are implemented
-  const int block_size = MAX(width, height);
-  const int split_size = MIN(width, height);
-  if (isp_mode == ISP_MODE_HOR) {
-    int ref_pix_left = LCU_WIDTH - lcu_y;
-  }
-  else if (isp_mode == ISP_MODE_VER) {
-
-  }
-  else {
-    assert(false && "This should never trigger.");
-  }
-}
-
-
 void uvg_intra_build_reference_any(
   const cu_loc_t* const pu_loc,
   const cu_loc_t* const cu_loc,
