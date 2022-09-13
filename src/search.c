@@ -455,23 +455,6 @@ double uvg_cu_rd_cost_chroma(
   int u_is_set = pred_cu->joint_cb_cr ? (pred_cu->joint_cb_cr & 2) >> 1 : cbf_is_set(pred_cu->cbf, depth, COLOR_U);
   int v_is_set = pred_cu->joint_cb_cr ? (pred_cu->joint_cb_cr & 1) : cbf_is_set(pred_cu->cbf, depth, COLOR_V);
 
-
-  // See luma for why the second condition
-  if (!skip_residual_coding) {
-    const int tr_depth = depth - pred_cu->depth;
-    cabac_data_t* cabac = (cabac_data_t*)&state->search_cabac;
-    cabac_ctx_t *ctx = &(cabac->ctx.qt_cbf_model_cb[0]);
-    cabac->cur_ctx = ctx;
-    if (tr_depth == 0 || cbf_is_set(pred_cu->cbf, depth - 1, COLOR_U)) {
-      CABAC_FBITS_UPDATE(cabac, ctx, u_is_set, tr_tree_bits, "cbf_cb_search");
-    }
-    ctx = &(cabac->ctx.qt_cbf_model_cr[u_is_set]);
-    if (tr_depth == 0 || cbf_is_set(pred_cu->cbf, depth - 1, COLOR_V)) {
-      CABAC_FBITS_UPDATE(cabac, ctx, v_is_set, tr_tree_bits, "cbf_cb_search");
-    }
-  }
-
-
   if (cu_loc->width > TR_MAX_WIDTH || cu_loc->height > TR_MAX_WIDTH) {
     double sum = 0;
     // Recursively process sub-CUs.
@@ -490,6 +473,22 @@ double uvg_cu_rd_cost_chroma(
 
     return sum + tr_tree_bits * state->lambda;
   }
+  
+  if (!skip_residual_coding) {
+    const int tr_depth = depth - pred_cu->depth;
+    cabac_data_t* cabac = (cabac_data_t*)&state->search_cabac;
+    cabac_ctx_t* ctx = &(cabac->ctx.qt_cbf_model_cb[0]);
+    cabac->cur_ctx = ctx;
+    if (tr_depth == 0 || cbf_is_set(pred_cu->cbf, depth - 1, COLOR_U)) {
+      CABAC_FBITS_UPDATE(cabac, ctx, u_is_set, tr_tree_bits, "cbf_cb_search");
+    }
+    ctx = &(cabac->ctx.qt_cbf_model_cr[u_is_set]);
+    if (tr_depth == 0 || cbf_is_set(pred_cu->cbf, depth - 1, COLOR_V)) {
+      CABAC_FBITS_UPDATE(cabac, ctx, v_is_set, tr_tree_bits, "cbf_cb_search");
+    }
+  }
+
+
 
   if (state->encoder_control->cfg.jccr) {
     int cbf_mask = u_is_set * 2 + v_is_set - 1;
@@ -570,17 +569,7 @@ static double cu_rd_cost_tr_split_accurate(
     }
 
   }
-
-  bool has_chroma = state->encoder_control->chroma_format != UVG_CSP_400 && (depth != 4 || (cu_loc->x % 8 && cu_loc->y % 8)) && tree_type != UVG_LUMA_T;
-  if( !skip_residual_coding && has_chroma) {
-    if(tr_cu->tr_depth == depth) {
-      CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.qt_cbf_model_cb[0]), cb_flag_u, tr_tree_bits, "cbf_cb");
-    } 
-    if(tr_cu->tr_depth == depth) {
-      CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.qt_cbf_model_cr[cb_flag_u]), cb_flag_v, tr_tree_bits, "cbf_cr");
-    } 
-  }
-
+  
   if (cu_loc->width > TR_MAX_WIDTH || cu_loc->height > TR_MAX_WIDTH) {
     double sum = 0;
 
@@ -597,6 +586,13 @@ static double cu_rd_cost_tr_split_accurate(
     sum += cu_rd_cost_tr_split_accurate(state, pred_cu, lcu, tree_type, isp_cbf, &split_cu_loc);
     return sum + tr_tree_bits * state->lambda;
   }
+
+  bool has_chroma = state->encoder_control->chroma_format != UVG_CSP_400 && (depth != 4 || (cu_loc->x % 8 && cu_loc->y % 8)) && tree_type != UVG_LUMA_T;
+  if (!skip_residual_coding && has_chroma) {
+    CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.qt_cbf_model_cb[0]), cb_flag_u, tr_tree_bits, "cbf_cb");  
+    CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.qt_cbf_model_cr[cb_flag_u]), cb_flag_v, tr_tree_bits, "cbf_cr");    
+  }
+
   const int cb_flag_y = cbf_is_set(tr_cu->cbf, depth, COLOR_Y) && tree_type != UVG_CHROMA_T;
 
   const bool is_isp = !(pred_cu->type == CU_INTER || pred_cu->intra.isp_mode == ISP_MODE_NO_ISP);

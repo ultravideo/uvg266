@@ -635,7 +635,7 @@ static void set_cu_qps(encoder_state_t *state, const cu_loc_t* const cu_loc, int
   if (cu_loc->x >= state->tile->frame->width || cu_loc->y >= state->tile->frame->height) return;
 
   cu_info_t *cu = uvg_cu_array_at(state->tile->frame->cu_array, cu_loc->x, cu_loc->y);
-  const int width = LCU_WIDTH >> cu->depth;
+  const int width = 1 << cu->log2_width;
 
   if (depth <= state->frame->max_qp_delta_depth) {
     *prev_qp = -1;
