@@ -654,8 +654,6 @@ static void encode_transform_coeff(
   const cu_loc_t * cu_loc,
   int8_t depth,
   int8_t tr_depth,
-  uint8_t parent_coeff_u,
-  uint8_t parent_coeff_v,
   bool only_chroma,
   lcu_coeff_t* coeff,
   enum uvg_tree_type tree_type,
@@ -726,13 +724,27 @@ static void encode_transform_coeff(
   }
   */
 
+  if (split) {
+    int split_width  = width >> 1;
+    int split_height = height >> 1;
+
+    for (int j = 0; j < 2; j++) {
+      for (int i = 0; i < 2; i++) {
+        cu_loc_t loc;
+        uvg_cu_loc_ctor(&loc, (x + i * split_width), (y + j * split_height), width >> 1, height >> 1);
+
+        encode_transform_coeff(state, &loc, depth + 1, tr_depth + 1, only_chroma, coeff, tree_type, true, luma_cbf_ctx, &loc);
+      }
+    }
+    return;
+  }
   // Chroma cb flags are not signaled when one of the following:
   // - transform size is 4 (2x2 chroma transform doesn't exist)
   // - they have already been signaled to 0 previously
   // When they are not present they are inferred to be 0, except for size 4
   // when the flags from previous level are used.
   if (state->encoder_control->chroma_format != UVG_CSP_400 && (depth != 4 || only_chroma) && tree_type != UVG_LUMA_T && last_split) {
-    
+
     if (!split) {
       if (true) {
         assert(tr_depth < 5);
@@ -741,14 +753,11 @@ static void encode_transform_coeff(
       }
       if (true) {
         cabac->cur_ctx = &(cabac->ctx.qt_cbf_model_cr[cb_flag_u ? 1 : 0]);
-        CABAC_BIN(cabac,  cb_flag_v, "cbf_cr");
+        CABAC_BIN(cabac, cb_flag_v, "cbf_cr");
       }
     }
   }
 
-  if (split) {
-    int split_width  = width >> 1;
-    int split_height = height >> 1;
 
     for (int j = 0; j < 2; j++) {
       for (int i = 0; i < 2; i++) {
@@ -1732,7 +1741,7 @@ void uvg_encode_coding_tree(
       // Code (possible) coeffs to bitstream
       if (cbf) {
         int luma_cbf_ctx = 0;
-        encode_transform_coeff(state, &cu_loc, depth, 0, 0, 0, 0, coeff, tree_type, true, false, &luma_cbf_ctx, cu_loc);
+        encode_transform_coeff(state, cu_loc, depth, 0, 0, 0, 0, coeff, tree_type, true, false, &luma_cbf_ctx, cu_loc);
       }
 
       encode_mts_idx(state, cabac, cur_cu, cu_loc);
@@ -1764,7 +1773,7 @@ void uvg_encode_coding_tree(
 
         // Check if last split to write chroma
         bool last_split = (i + 1) == split_limit;
-        encode_transform_coeff(state, &split_loc, depth, 0, 0, 0, 0, coeff, tree_type, last_split, can_skip_last_cbf, &luma_cbf_ctx, cu_loc);
+        encode_transform_coeff(state, &split_loc, depth, 0, 0, coeff, tree_type, last_split, can_skip_last_cbf, &luma_cbf_ctx, cu_loc);
         can_skip_last_cbf &= luma_cbf_ctx == 2;
       }
     }
@@ -1784,7 +1793,7 @@ void uvg_encode_coding_tree(
       tmp->violates_lfnst_constrained_luma = false;
       tmp->violates_lfnst_constrained_chroma = false;
       tmp->lfnst_last_scan_pos = false;
-      encode_transform_coeff(state, &cu_loc, depth, 0, 0, 0, 1, coeff, tree_type, true, false, &luma_cbf_ctx, cu_loc);
+      encode_transform_coeff(state, &cu_loc, depth, 0, 1, coeff, tree_type, true, false, &luma_cbf_ctx, cu_loc);
       // Write LFNST only once for single tree structure
       encode_lfnst_idx(state, cabac, tmp, x, y, depth, cu_width, cu_height, tree_type, COLOR_UV);
     }
