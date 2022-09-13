@@ -45,13 +45,9 @@ bool uvg_is_mts_allowed(const encoder_state_t* const state, cu_info_t* const pre
 bool uvg_is_lfnst_allowed(
   const encoder_state_t* const state,
   const cu_info_t* const pred_cu,
-  const int width,
-  const int height,
-  const int x,
-  const int y,
   enum uvg_tree_type tree_type,
   const color_t color,
-  const lcu_t* lcu);
+  const cu_loc_t* const cu_loc);
 
 void uvg_encode_coding_tree(
   encoder_state_t * const state,
