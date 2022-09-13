@@ -673,8 +673,11 @@ static double cu_rd_cost_tr_split_accurate(
     }
   }
 
-  if(cu_loc->width == 4 || tree_type == UVG_LUMA_T) {
-    if (uvg_is_lfnst_allowed(state, tr_cu, width, height, cu_loc->local_x, cu_loc->local_y, tree_type, COLOR_Y, lcu)) {
+  const bool is_local_sep_tree = pred_cu->log2_width + pred_cu->log2_height < 6 && tree_type == UVG_BOTH_T;
+
+  if(is_local_sep_tree || tree_type == UVG_LUMA_T) {
+
+    if (uvg_is_lfnst_allowed(state, tr_cu, is_local_sep_tree ? UVG_LUMA_T : tree_type, COLOR_Y, cu_loc)) {
       const int lfnst_idx = tr_cu->lfnst_idx;
       CABAC_FBITS_UPDATE(
         cabac,
@@ -746,11 +749,12 @@ static double cu_rd_cost_tr_split_accurate(
     }
   }
 
-  if (uvg_is_lfnst_allowed(state, tr_cu, width, height, cu_loc->local_x, cu_loc->local_y, tree_type, cu_loc->width == 4 || tree_type == UVG_CHROMA_T ? COLOR_UV : COLOR_Y, lcu)) {
-    const int lfnst_idx = (cu_loc->width != 4 && tree_type != UVG_CHROMA_T) ? tr_cu->lfnst_idx : tr_cu->cr_lfnst_idx;
+  const bool is_chroma_tree = is_local_sep_tree || tree_type == UVG_CHROMA_T;
+  if (uvg_is_lfnst_allowed(state, tr_cu, is_local_sep_tree ? UVG_CHROMA_T : tree_type, is_chroma_tree ? COLOR_UV : COLOR_Y, cu_loc)) {
+    const int lfnst_idx = is_chroma_tree ? tr_cu->cr_lfnst_idx : tr_cu->lfnst_idx;
     CABAC_FBITS_UPDATE(
       cabac,
-      &cabac->ctx.lfnst_idx_model[tr_cu->depth == 4 || tree_type != UVG_BOTH_T],
+      &cabac->ctx.lfnst_idx_model[is_chroma_tree],
       lfnst_idx != 0,
       tr_tree_bits,
       "lfnst_idx");
@@ -971,6 +975,8 @@ static double search_cu(
   cur_cu->lfnst_idx = 0;
   cur_cu->joint_cb_cr = 0;
   cur_cu->split_tree = split_tree.split_tree;
+  cur_cu->log2_width = uvg_g_convert_to_log2[cu_width];
+  cur_cu->log2_height = uvg_g_convert_to_log2[cu_height];
 
   // If the CU is completely inside the frame at this depth, search for
   // prediction modes at this depth.

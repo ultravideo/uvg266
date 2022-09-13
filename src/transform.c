@@ -723,7 +723,7 @@ void uvg_chroma_transform_search(
         COEFF_ORDER_LINEAR);
     }
     if((depth == 4 || tree_type == UVG_CHROMA_T) && state->encoder_control->cfg.lfnst && 0) {
-      if(uvg_is_lfnst_allowed(state, pred_cu, width, height, 0, 0 , UVG_CHROMA_T, COLOR_UV, lcu)) {
+      if(uvg_is_lfnst_allowed(state, pred_cu, UVG_CHROMA_T, COLOR_UV, cu_loc)) {
         const int lfnst_idx = pred_cu->cr_lfnst_idx;
         CABAC_FBITS_UPDATE(
           &state->search_cabac,

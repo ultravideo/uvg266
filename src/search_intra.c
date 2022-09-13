@@ -300,7 +300,7 @@ static double search_intra_trdepth(
     pred_cu->tr_depth = depth;
 
     const bool mts_enabled = (state->encoder_control->cfg.mts == UVG_MTS_INTRA || state->encoder_control->cfg.mts == UVG_MTS_BOTH)
-      && tr_cu->depth == tr_cu->tr_depth;
+      && PU_IS_TU(pred_cu);
 
     nosplit_cost = 0.0;
 
@@ -330,10 +330,10 @@ static double search_intra_trdepth(
       num_transforms = pred_cu->intra.isp_mode == ISP_MODE_NO_ISP ? num_transforms : 1;
     }
     const int mts_start = trafo;
-    //TODO: height
-    if (state->encoder_control->cfg.trskip_enable && 
-        width <= (1 << state->encoder_control->cfg.trskip_max_size) /*&& height == 4*/ && 
-        pred_cu->intra.isp_mode == ISP_MODE_NO_ISP) { // tr_skip cannot be used wit ISP
+    if (state->encoder_control->cfg.trskip_enable 
+      && width <= (1 << state->encoder_control->cfg.trskip_max_size)
+      && height <= (1 << state->encoder_control->cfg.trskip_max_size)
+      && pred_cu->intra.isp_mode == ISP_MODE_NO_ISP) {
       num_transforms = MAX(num_transforms, 2);
     }
     pred_cu->intra.mode_chroma = -1;
@@ -346,9 +346,10 @@ static double search_intra_trdepth(
       max_lfnst_idx = 0;
     }
 
+    const bool is_local_dual_tree = pred_cu->log2_width + pred_cu->log2_height < 6 && tree_type == UVG_BOTH_T;
+
     int start_idx = 0;
-    int end_idx = state->encoder_control->cfg.lfnst && 
-                  depth == pred_cu->tr_depth &&
+    int end_idx = state->encoder_control->cfg.lfnst && PU_IS_TU(pred_cu) &&
                   uvg_can_use_isp_with_lfnst(width, height, pred_cu->intra.isp_mode, tree_type) ? max_lfnst_idx : 0;
     for (int i = start_idx; i < end_idx + 1; ++i) {
       search_data->lfnst_costs[i] = MAX_DOUBLE;
@@ -436,11 +437,11 @@ static double search_intra_trdepth(
           lcu,
           search_data->best_isp_cbfs);
         double transform_bits = 0;
-        if (state->encoder_control->cfg.lfnst && depth == pred_cu->tr_depth &&
+        if (state->encoder_control->cfg.lfnst && PU_IS_TU(pred_cu) &&
             trafo != MTS_SKIP) {
           if (!constraints[0] && constraints[1]) {
             transform_bits += CTX_ENTROPY_FBITS(
-              &state->search_cabac.ctx.lfnst_idx_model[tr_cu->depth == 4 ||
+              &state->search_cabac.ctx.lfnst_idx_model[is_local_dual_tree ||
                 tree_type == UVG_LUMA_T],
               lfnst_idx != 0);
             if (lfnst_idx > 0) {
@@ -566,30 +567,6 @@ static double search_intra_trdepth(
     }
 
     nosplit_cbf = pred_cu->cbf;
-
-    uvg_pixels_blit(
-      lcu->rec.y,
-      nosplit_pixels.y,
-      width,
-      width,
-      LCU_WIDTH,
-      width);
-    if (reconstruct_chroma) {
-      uvg_pixels_blit(
-        lcu->rec.u,
-        nosplit_pixels.u,
-        width_c,
-        width_c,
-        LCU_WIDTH_C,
-        width_c);
-      uvg_pixels_blit(
-        lcu->rec.v,
-        nosplit_pixels.v,
-        width_c,
-        width_c,
-        LCU_WIDTH_C,
-        width_c);
-    }
   }
     
   
@@ -619,31 +596,7 @@ static double search_intra_trdepth(
       uvg_cu_loc_ctor(&split_cu_loc, cu_loc->x + half_width, cu_loc->y + half_height, half_width, half_height);
       split_cost += search_intra_trdepth(state, &split_cu_loc, max_depth, nosplit_cost, search_data, lcu, tree_type);
     }
-
-    double cbf_bits = 0.0;
-
-    // Add cost of cbf chroma bits on transform tree.
-    // All cbf bits are accumulated to pred_cu.cbf and cbf_is_set returns true
-    // if cbf is set at any level >= depth, so cbf chroma is assumed to be 0
-    // if this and any previous transform block has no chroma coefficients.
-    // When searching the first block we don't actually know the real values,
-    // so this will code cbf as 0 and not code the cbf at all for descendants.
-    if (state->encoder_control->chroma_format != UVG_CSP_400) {
-      const uint8_t tr_depth = depth - pred_cu->depth;
-      cabac_data_t* cabac = (cabac_data_t *)&state->search_cabac;
-
-      cabac_ctx_t* ctx = &(cabac->ctx.qt_cbf_model_cb[0]);
-      if (tr_depth == 0 || cbf_is_set(pred_cu->cbf, depth - 1, COLOR_U)) {
-        CABAC_FBITS_UPDATE(cabac, ctx, cbf_is_set(pred_cu->cbf, depth, COLOR_U), cbf_bits, "cbf_cb");
-      }
-      ctx = &(state->cabac.ctx.qt_cbf_model_cr[cbf_is_set(pred_cu->cbf, depth, COLOR_U)]);
-      if (tr_depth == 0 || cbf_is_set(pred_cu->cbf, depth - 1, COLOR_V)) {
-        CABAC_FBITS_UPDATE(cabac, ctx, cbf_is_set(pred_cu->cbf, depth, COLOR_V), cbf_bits, "cbf_cr");
-      }
-    }
-
-    double bits = cbf_bits;
-    split_cost += bits * state->lambda;
+    
   } else {
     assert(width <= TR_MAX_WIDTH);
   }
@@ -652,17 +605,6 @@ static double search_intra_trdepth(
     return split_cost;
   } else {
     uvg_lcu_fill_trdepth(lcu, cu_loc, depth, tree_type);
-
-    pred_cu->cbf = nosplit_cbf;
-
-    // We only restore the pixel data and not coefficients or cbf data.
-    // The only thing we really need are the border pixels.uvg_intra_get_dir_luma_predictor
-    uvg_pixels_blit(nosplit_pixels.y, lcu->rec.y, width, width, width, LCU_WIDTH);
-    if (reconstruct_chroma) {
-      uvg_pixels_blit(nosplit_pixels.u, lcu->rec.u, width_c, width_c, width_c, LCU_WIDTH_C);
-      uvg_pixels_blit(nosplit_pixels.v, lcu->rec.v, width_c, width_c, width_c, LCU_WIDTH_C);
-    }
-
     return nosplit_cost;
   }
 }
