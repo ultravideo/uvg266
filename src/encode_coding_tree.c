@@ -622,6 +622,7 @@ static void encode_transform_coeff(
   lcu_coeff_t* coeff,
   enum uvg_tree_type tree_type,
   bool last_split,
+  bool can_skip_last_cbf,
   int *luma_cbf_ctx,            // Always true except when writing sub partition coeffs (ISP)
   cu_loc_t *original_loc)       // Original dimensions before ISP split
 {
@@ -630,6 +631,8 @@ static void encode_transform_coeff(
   const int y = cu_loc->y;
   const int width = cu_loc->width;
   const int height = cu_loc->height;
+
+  bool isp_split = cu_loc->x != original_loc->x || cu_loc->y != original_loc->y;
 
   //const encoder_control_t *const ctrl = state->encoder_control;
   const videoframe_t * const frame = state->tile->frame;
@@ -710,7 +713,7 @@ static void encode_transform_coeff(
         cu_loc_t loc;
         uvg_cu_loc_ctor(&loc, (x + i * split_width), (y + j * split_height), width >> 1, height >> 1);
 
-        encode_transform_coeff(state, &loc, depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v, only_chroma, coeff, tree_type, true, luma_cbf_ctx, &loc);
+        encode_transform_coeff(state, &loc, depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v, only_chroma, coeff, tree_type, true, false, luma_cbf_ctx, &loc);
       }
     }
     return;
@@ -722,11 +725,15 @@ static void encode_transform_coeff(
   // - we have chroma coefficients at this level
   // When it is not present, it is inferred to be 1.
   if ((cur_cu->type == CU_INTRA || tr_depth > 0 || cb_flag_u || cb_flag_v) && !only_chroma && tree_type != UVG_CHROMA_T) {
+    if (can_skip_last_cbf && isp_split && last_split) {
+      // Do not write luma cbf if first three isp splits have luma cbf 0
+    } else {
       cabac->cur_ctx = &(cabac->ctx.qt_cbf_model_luma[*luma_cbf_ctx]);
       CABAC_BIN(cabac, cb_flag_y, "cbf_luma");
       if (tr_depth == 0) {
         *luma_cbf_ctx = 2 + cb_flag_y;
       }
+    }
   }
 
   if (cb_flag_y | cb_flag_u | cb_flag_v) {
@@ -1681,7 +1688,7 @@ void uvg_encode_coding_tree(
       // Code (possible) coeffs to bitstream
       if (cbf) {
         int luma_cbf_ctx = 0;
-        encode_transform_coeff(state, &cu_loc, depth, 0, 0, 0, 0, coeff, tree_type, true, &luma_cbf_ctx, &cu_loc);
+        encode_transform_coeff(state, &cu_loc, depth, 0, 0, 0, 0, coeff, tree_type, true, false, &luma_cbf_ctx, &cu_loc);
       }
 
       encode_mts_idx(state, cabac, cur_cu);
@@ -1705,13 +1712,16 @@ void uvg_encode_coding_tree(
       int split_type = cur_cu->intra.isp_mode;
       int split_limit = split_type == ISP_MODE_NO_ISP ? 1 : uvg_get_isp_split_num(cu_width, cu_height, split_type);
       luma_cbf_ctx = split_limit != 1 ? 2 : 0;
+      // If all first three splits have luma cbf 0, the last one must be one. Since the value ca be derived, no need to write it
+      bool can_skip_last_cbf = true;
       for (int i = 0; i < split_limit; ++i) {
         cu_loc_t split_loc;
         uvg_get_isp_split_loc(&split_loc, x, y, cu_width, cu_height, i, split_type);
 
         // Check if last split to write chroma
         bool last_split = (i + 1) == split_limit;
-        encode_transform_coeff(state, &split_loc, depth, 0, 0, 0, 0, coeff, tree_type, last_split, &luma_cbf_ctx, &cu_loc);
+        encode_transform_coeff(state, &split_loc, depth, 0, 0, 0, 0, coeff, tree_type, last_split, can_skip_last_cbf, &luma_cbf_ctx, &cu_loc);
+        can_skip_last_cbf &= luma_cbf_ctx == 2;
       }
     }
 
@@ -1730,7 +1740,7 @@ void uvg_encode_coding_tree(
       tmp->violates_lfnst_constrained_luma = false;
       tmp->violates_lfnst_constrained_chroma = false;
       tmp->lfnst_last_scan_pos = false;
-      encode_transform_coeff(state, &cu_loc, depth, 0, 0, 0, 1, coeff, tree_type, true, &luma_cbf_ctx, &cu_loc);
+      encode_transform_coeff(state, &cu_loc, depth, 0, 0, 0, 1, coeff, tree_type, true, false, &luma_cbf_ctx, &cu_loc);
       // Write LFNST only once for single tree structure
       encode_lfnst_idx(state, cabac, tmp, x, y, depth, cu_width, cu_height, tree_type, COLOR_UV);
     }
