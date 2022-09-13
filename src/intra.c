@@ -1075,13 +1075,7 @@ void uvg_intra_build_reference_any(
         px_available_left = height;
       }
       else {
-        // Left LCU edge has more pixels available
-        if (lcu_px.x > 0) {
-          px_available_left = cu_height - (pu_y - cu_y);
-        }
-        else {
-          px_available_left = LCU_WIDTH - lcu_px.y;
-        }
+        px_available_left = num_ref_pixels_left[lcu_px.y / 4][lcu_px.x / 4];
       }
     }
     else {
@@ -1198,12 +1192,7 @@ void uvg_intra_build_reference_any(
         px_available_top = width;
       }
       else {
-        if (lcu_px.y > 0) {
-          px_available_top = LCU_WIDTH - lcu_px.x;
-        }
-        else {
-          px_available_top = LCU_WIDTH;
-        }
+        px_available_top = num_ref_pixels_top[lcu_px.y / 4][lcu_px.x / 4];
       }
     }
     else {
@@ -1372,13 +1361,7 @@ void uvg_intra_build_reference_inner(
       px_available_left = height;
     }
     else {
-      // Left LCU edge has more pixels available
-      if (lcu_px.x > 0) {
-        px_available_left = cu_height - (pu_y - cu_y);
-      }
-      else {
-        px_available_left = LCU_WIDTH - lcu_px.y;
-      }
+      px_available_left = num_ref_pixels_left[lcu_px.y / 4][lcu_px.x / 4];
     }
 
   }
@@ -1426,12 +1409,7 @@ void uvg_intra_build_reference_inner(
       px_available_top = width;
     }
     else {
-      if (lcu_px.y > 0) {
-        px_available_top = LCU_WIDTH - lcu_px.x;
-      }
-      else {
-        px_available_top = LCU_WIDTH;
-      }
+      px_available_top = num_ref_pixels_top[lcu_px.y / 4][lcu_px.x / 4];
     }
   }
   else {
