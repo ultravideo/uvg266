@@ -304,10 +304,10 @@ static double search_intra_trdepth(
 
     nosplit_cost = 0.0;
 
-    cbf_clear(&pred_cu->cbf, depth, COLOR_Y);
+    cbf_clear(&pred_cu->cbf, COLOR_Y);
     if (reconstruct_chroma) {
-      cbf_clear(&pred_cu->cbf, depth, COLOR_U);
-      cbf_clear(&pred_cu->cbf, depth, COLOR_V);
+      cbf_clear(&pred_cu->cbf, COLOR_U);
+      cbf_clear(&pred_cu->cbf, COLOR_V);
     }
 
     const int8_t chroma_mode = reconstruct_chroma ? (!pred_cu->intra.mip_flag ? pred_cu->intra.mode : 0) : -1;
@@ -398,7 +398,7 @@ static double search_intra_trdepth(
           );
         if (pred_cu->intra.isp_mode != ISP_MODE_NO_ISP && search_data->best_isp_cbfs == 0) continue;
 
-        if (trafo != 0 && !cbf_is_set(pred_cu->cbf, depth, COLOR_Y)) continue;
+        if (trafo != 0 && !cbf_is_set(pred_cu->cbf, COLOR_Y)) continue;
         
         derive_mts_constraints(pred_cu, lcu, width, height, lcu_px);
         if (pred_cu->tr_idx > 1) {
@@ -424,7 +424,7 @@ static double search_intra_trdepth(
             COLOR_Y);
         }
 
-        if (!constraints[1] && cbf_is_set(pred_cu->cbf, depth, COLOR_Y)) {
+        if (!constraints[1] && cbf_is_set(pred_cu->cbf, COLOR_Y)) {
           //end_idx = 0;
           if (pred_cu->lfnst_idx > 0) {
             continue;
@@ -1347,7 +1347,7 @@ static int8_t search_intra_rdo(
         best_isp_mode = isp_mode;
         best_bits = search_data[mode].bits;
       }
-      if (state->encoder_control->cfg.intra_rdo_et && !cbf_is_set_any(search_data[mode].pred_cu.cbf, depth)) {
+      if (state->encoder_control->cfg.intra_rdo_et && !cbf_is_set_any(search_data[mode].pred_cu.cbf)) {
         modes_to_check = mode + 1;
         break;
       }

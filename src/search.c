@@ -361,11 +361,11 @@ double uvg_cu_rd_cost_luma(
   if (pred_cu->type == CU_INTER || pred_cu->intra.isp_mode == ISP_MODE_NO_ISP) {
     const int depth = 6 - uvg_g_convert_to_log2[cu_loc->width];
     const int is_tr_split = tr_cu->tr_depth - tr_cu->depth;
-    int is_set = cbf_is_set(pred_cu->cbf, depth, COLOR_Y);
+    int is_set = cbf_is_set(pred_cu->cbf, COLOR_Y);
     if (pred_cu->type == CU_INTRA ||
       is_tr_split ||
-      cbf_is_set(tr_cu->cbf, depth, COLOR_U) ||
-      cbf_is_set(tr_cu->cbf, depth, COLOR_V))
+      cbf_is_set(tr_cu->cbf, COLOR_U) ||
+      cbf_is_set(tr_cu->cbf, COLOR_V))
     {
       cabac_ctx_t* ctx = &(cabac->ctx.qt_cbf_model_luma[0]);
 
@@ -455,8 +455,8 @@ double uvg_cu_rd_cost_chroma(
   }
 
   const int depth = 6 - uvg_g_convert_to_log2[cu_loc->width];
-  int u_is_set = pred_cu->joint_cb_cr ? (pred_cu->joint_cb_cr & 2) >> 1 : cbf_is_set(pred_cu->cbf, depth, COLOR_U);
-  int v_is_set = pred_cu->joint_cb_cr ? (pred_cu->joint_cb_cr & 1) : cbf_is_set(pred_cu->cbf, depth, COLOR_V);
+  int u_is_set = pred_cu->joint_cb_cr ? (pred_cu->joint_cb_cr & 2) >> 1 : cbf_is_set(pred_cu->cbf, COLOR_U);
+  int v_is_set = pred_cu->joint_cb_cr ? (pred_cu->joint_cb_cr & 1) : cbf_is_set(pred_cu->cbf, COLOR_V);
 
   if (cu_loc->width > TR_MAX_WIDTH || cu_loc->height > TR_MAX_WIDTH) {
     double sum = 0;
@@ -482,11 +482,11 @@ double uvg_cu_rd_cost_chroma(
     cabac_data_t* cabac = (cabac_data_t*)&state->search_cabac;
     cabac_ctx_t* ctx = &(cabac->ctx.qt_cbf_model_cb[0]);
     cabac->cur_ctx = ctx;
-    if (tr_depth == 0 || cbf_is_set(pred_cu->cbf, depth - 1, COLOR_U)) {
+    if (tr_depth == 0 || cbf_is_set(pred_cu->cbf, COLOR_U)) {
       CABAC_FBITS_UPDATE(cabac, ctx, u_is_set, tr_tree_bits, "cbf_cb_search");
     }
     ctx = &(cabac->ctx.qt_cbf_model_cr[u_is_set]);
-    if (tr_depth == 0 || cbf_is_set(pred_cu->cbf, depth - 1, COLOR_V)) {
+    if (tr_depth == 0 || cbf_is_set(pred_cu->cbf, COLOR_V)) {
       CABAC_FBITS_UPDATE(cabac, ctx, v_is_set, tr_tree_bits, "cbf_cb_search");
     }
   }
@@ -558,13 +558,13 @@ static double cu_rd_cost_tr_split_accurate(
 
   const int depth = 6 - uvg_g_convert_to_log2[cu_loc->width];
   
-  const int cb_flag_u = tr_cu->joint_cb_cr ? tr_cu->joint_cb_cr >> 1 : cbf_is_set(tr_cu->cbf, depth, COLOR_U);
-  const int cb_flag_v = tr_cu->joint_cb_cr ? tr_cu->joint_cb_cr & 1 : cbf_is_set(tr_cu->cbf, depth, COLOR_V);
+  const int cb_flag_u = tr_cu->joint_cb_cr ? tr_cu->joint_cb_cr >> 1 : cbf_is_set(tr_cu->cbf, COLOR_U);
+  const int cb_flag_v = tr_cu->joint_cb_cr ? tr_cu->joint_cb_cr & 1 : cbf_is_set(tr_cu->cbf, COLOR_V);
 
   cabac_data_t* cabac = (cabac_data_t*)&state->search_cabac;
 
   {
-    int cbf = cbf_is_set_any(tr_cu->cbf, depth);
+    int cbf = cbf_is_set_any(tr_cu->cbf);
     // Only need to signal coded block flag if not skipped or merged
     // skip = no coded residual, merge = coded residual
     if (pred_cu->type != CU_INTRA && (!pred_cu->merged)) {
@@ -596,7 +596,7 @@ static double cu_rd_cost_tr_split_accurate(
     CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.qt_cbf_model_cr[cb_flag_u]), cb_flag_v, tr_tree_bits, "cbf_cr");    
   }
 
-  const int cb_flag_y = cbf_is_set(tr_cu->cbf, depth, COLOR_Y) && tree_type != UVG_CHROMA_T;
+  const int cb_flag_y = cbf_is_set(tr_cu->cbf, COLOR_Y) && tree_type != UVG_CHROMA_T;
 
   const bool is_isp = !(pred_cu->type == CU_INTER || pred_cu->intra.isp_mode == ISP_MODE_NO_ISP);
   // Add transform_tree cbf_luma bit cost.
@@ -1182,8 +1182,8 @@ static double search_cu(
       const int split_type = intra_search.pred_cu.intra.isp_mode;
       const int split_num = split_type == ISP_MODE_NO_ISP ? 0 : uvg_get_isp_split_num(cu_width, cu_height, split_type, true);
 
-      const int cbf_cb = cbf_is_set(cur_cu->cbf, split_tree.current_depth, COLOR_U);
-      const int cbf_cr = cbf_is_set(cur_cu->cbf, split_tree.current_depth, COLOR_V);
+      const int cbf_cb = cbf_is_set(cur_cu->cbf, COLOR_U);
+      const int cbf_cr = cbf_is_set(cur_cu->cbf, COLOR_V);
       const int jccr = cur_cu->joint_cb_cr;
       for (int i = 0; i < split_num; ++i) {
         cu_loc_t isp_loc;
@@ -1195,14 +1195,14 @@ static double search_cu(
         uvg_get_isp_cu_arr_coords(&tmp_x, &tmp_y);
         cu_info_t* split_cu = LCU_GET_CU_AT_PX(lcu, tmp_x % LCU_WIDTH, tmp_y % LCU_WIDTH);
         bool cur_cbf = (intra_search.best_isp_cbfs >> i) & 1;
-        cbf_clear(&split_cu->cbf, split_tree.current_depth, COLOR_Y);
-        cbf_clear(&split_cu->cbf, split_tree.current_depth, COLOR_U);
-        cbf_clear(&split_cu->cbf, split_tree.current_depth, COLOR_V);
+        cbf_clear(&split_cu->cbf, COLOR_Y);
+        cbf_clear(&split_cu->cbf, COLOR_U);
+        cbf_clear(&split_cu->cbf, COLOR_V);
         if (cur_cbf) {
-          cbf_set(&split_cu->cbf, split_tree.current_depth, COLOR_Y);
+          cbf_set(&split_cu->cbf, COLOR_Y);
         }
-        if(cbf_cb) cbf_set(&split_cu->cbf, split_tree.current_depth, COLOR_U);
-        if(cbf_cr) cbf_set(&split_cu->cbf, split_tree.current_depth, COLOR_V);
+        if(cbf_cb) cbf_set(&split_cu->cbf, COLOR_U);
+        if(cbf_cr) cbf_set(&split_cu->cbf, COLOR_V);
         split_cu->joint_cb_cr = jccr;
       }
       lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
@@ -1241,7 +1241,7 @@ static double search_cu(
                                   false,
           tree_type);
 
-        int cbf = cbf_is_set_any(cur_cu->cbf, split_tree.current_depth);
+        int cbf = cbf_is_set_any(cur_cu->cbf);
 
         if (cur_cu->merged && !cbf) {
           cur_cu->merged = 0;
@@ -1327,7 +1327,7 @@ static double search_cu(
 
     int half_cu = cu_width >> (tree_type != UVG_CHROMA_T);
     double split_cost = 0.0;
-    int cbf = cbf_is_set_any(cur_cu->cbf, split_tree.current_depth);
+    int cbf = cbf_is_set_any(cur_cu->cbf);
     cabac_data_t post_seach_cabac;
     memcpy(&post_seach_cabac, &state->search_cabac, sizeof(post_seach_cabac));
     memcpy(&state->search_cabac, &pre_search_cabac, sizeof(post_seach_cabac));
