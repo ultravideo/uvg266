@@ -612,12 +612,12 @@ static void set_cu_qps(encoder_state_t *state, const cu_loc_t* const cu_loc, int
       for (int y_scu = cu_loc->y; !cbf_found && y_scu < y_limit; y_scu += tu_width) {
         for (int x_scu = cu_loc->x; !cbf_found && x_scu < x_limit; x_scu += tu_width) {
           cu_info_t *tu = uvg_cu_array_at(state->tile->frame->cu_array, x_scu, y_scu);
-          if (cbf_is_set_any(tu->cbf, cu->depth)) {
+          if (cbf_is_set_any(tu->cbf)) {
             cbf_found = true;
           }
         }
       }
-    } else if (cbf_is_set_any(cu->cbf, cu->depth)) {
+    } else if (cbf_is_set_any(cu->cbf)) {
       cbf_found = true;
     }
 
@@ -1936,9 +1936,9 @@ static void _encode_one_frame_add_bitstream_deps(const encoder_state_t * const s
 void uvg_encode_one_frame(encoder_state_t * const state, uvg_picture* frame)
 {
 #if UVG_DEBUG_PRINT_CABAC == 1
-  uvg_cabac_bins_count = 0;
+  // uvg_cabac_bins_count = 0;
   if (state->frame->num == 0) uvg_cabac_bins_verbose = true;
-  else uvg_cabac_bins_verbose = false;
+  // else uvg_cabac_bins_verbose = false;
 #endif
 
 

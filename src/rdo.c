@@ -1732,7 +1732,7 @@ void uvg_rdoq(
         assert(0);
     }
     // This cbf should work even with non-square blocks
-    ctx_cbf    = ( color != COLOR_V ? 0 : cbf_is_set(cbf, 5 - uvg_math_floor_log2(width), COLOR_U));
+    ctx_cbf    = ( color != COLOR_V ? 0 : cbf_is_set(cbf, COLOR_U));
     best_cost  = block_uncoded_cost +  lambda * CTX_ENTROPY_BITS(&base_cbf_model[ctx_cbf],0);
     base_cost +=   lambda * CTX_ENTROPY_BITS(&base_cbf_model[ctx_cbf],1);
   }

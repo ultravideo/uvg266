@@ -446,7 +446,7 @@ static void quantize_chroma(
 
     if (transforms[i] == DCT7_CHROMA) {
       uint16_t temp_cbf = 0;
-      if (*u_has_coeffs)cbf_set(&temp_cbf, depth, COLOR_U);
+      if (*u_has_coeffs)cbf_set(&temp_cbf, COLOR_U);
       uvg_rdoq(state, &v_coeff[i * trans_offset], v_quant_coeff, width, height, COLOR_V,
                scan_order, CU_INTRA, temp_cbf, lfnst_idx);
 
@@ -1289,7 +1289,7 @@ static void quantize_tr_residual(
         for (int j = 0; j < tr_height; ++j) {
           memcpy(&dst_coeff[j * lcu_width], &coeff[j * tr_width], tr_width * sizeof(coeff_t));
         }
-        cbf_set(&cur_pu->cbf, depth, color);
+        cbf_set(&cur_pu->cbf, color);
       }
       else {
         for (int j = 0; j < tr_height; ++j) {
@@ -1318,13 +1318,12 @@ static void quantize_tr_residual(
     
   }
 
-  // ISP_TODO: does this cu point to correct cbf when ISP is used for small blocks?
-  cbf_clear(&cur_pu->cbf, depth, color);
+  cbf_clear(&cur_pu->cbf, color);
   if (has_coeffs) {
     for (int j = 0; j < tr_height; ++j) {
       memcpy(&dst_coeff[j * lcu_width], &coeff[j * tr_width], tr_width * sizeof(coeff_t));
     }
-    cbf_set(&cur_pu->cbf, depth, color);
+    cbf_set(&cur_pu->cbf, color);
   }
   else {
     for (int j = 0; j < tr_height; ++j) {
@@ -1387,11 +1386,11 @@ void uvg_quantize_lcu_residual(
   // for depth earlier
   // ISP_TODO: does this cur_cu point to the correct place when ISP is used for small blocks?
   if (luma) {
-    cbf_clear(&cur_pu->cbf, depth, COLOR_Y);
+    cbf_clear(&cur_pu->cbf, COLOR_Y);
   }
   if (chroma || jccr) {
-    cbf_clear(&cur_pu->cbf, depth, COLOR_U);
-    cbf_clear(&cur_pu->cbf, depth, COLOR_V);
+    cbf_clear(&cur_pu->cbf, COLOR_U);
+    cbf_clear(&cur_pu->cbf, COLOR_V);
   }
 
   if (depth == 0 || cur_pu->tr_depth > depth) {
@@ -1423,9 +1422,10 @@ void uvg_quantize_lcu_residual(
     };
 
     if (depth <= MAX_DEPTH) {
-      cbf_set_conditionally(&cur_pu->cbf, child_cbfs, depth, COLOR_Y);
-      cbf_set_conditionally(&cur_pu->cbf, child_cbfs, depth, COLOR_U);
-      cbf_set_conditionally(&cur_pu->cbf, child_cbfs, depth, COLOR_V);
+      cur_pu->root_cbf = cbf_is_set_any(cur_pu->cbf)
+      || cbf_is_set_any(child_cbfs[0])
+      || cbf_is_set_any(child_cbfs[1])
+      || cbf_is_set_any(child_cbfs[2]);
     }
 
   } else {

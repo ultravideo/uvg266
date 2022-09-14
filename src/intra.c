@@ -1792,11 +1792,11 @@ void uvg_intra_recon_cu(
   // Reset CBFs because CBFs might have been set
   // for depth earlier
   if (recon_luma) {
-    cbf_clear(&cur_cu->cbf, depth, COLOR_Y);
+    cbf_clear(&cur_cu->cbf, COLOR_Y);
   }
   if (recon_chroma) {
-    cbf_clear(&cur_cu->cbf, depth, COLOR_U);
-    cbf_clear(&cur_cu->cbf, depth, COLOR_V);
+    cbf_clear(&cur_cu->cbf, COLOR_U);
+    cbf_clear(&cur_cu->cbf, COLOR_V);
   }
 
   if (width > TR_MAX_WIDTH || height > TR_MAX_WIDTH) {
@@ -1820,13 +1820,13 @@ void uvg_intra_recon_cu(
       LCU_GET_CU_AT_PX(lcu, (lcu_px.x + half_width) >> (tree_type == UVG_CHROMA_T), (lcu_px.y + half_height) >> (tree_type == UVG_CHROMA_T))->cbf,
     };
 
-    if (recon_luma && depth <= MAX_DEPTH) {
-      cbf_set_conditionally(&cur_cu->cbf, child_cbfs, depth, COLOR_Y);
-    }
-    if (recon_chroma && depth <= MAX_DEPTH) {
-      cbf_set_conditionally(&cur_cu->cbf, child_cbfs, depth, COLOR_U);
-      cbf_set_conditionally(&cur_cu->cbf, child_cbfs, depth, COLOR_V);
-    }
+    //if (recon_luma && depth <= MAX_DEPTH) {
+    //  cbf_set_conditionally(&cur_cu->cbf, child_cbfs, depth, COLOR_Y);
+    //}
+    //if (recon_chroma && depth <= MAX_DEPTH) {
+    //  cbf_set_conditionally(&cur_cu->cbf, child_cbfs, depth, COLOR_U);
+    //  cbf_set_conditionally(&cur_cu->cbf, child_cbfs, depth, COLOR_V);
+    //}
     return;
   }
   if (search_data->pred_cu.intra.isp_mode != ISP_MODE_NO_ISP && recon_luma ) {
@@ -1848,7 +1848,7 @@ void uvg_intra_recon_cu(
       uvg_quantize_lcu_residual(state, true, false, false,
         &tu_loc, depth, cur_cu, lcu,
         false, tree_type);
-      search_data->best_isp_cbfs |= cbf_is_set(cur_cu->cbf, depth, COLOR_Y) << i;
+      search_data->best_isp_cbfs |= cbf_is_set(cur_cu->cbf, COLOR_Y) << i;
     }
   }
   const bool has_luma = recon_luma && search_data->pred_cu.intra.isp_mode == ISP_MODE_NO_ISP;

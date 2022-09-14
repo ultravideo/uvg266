@@ -1767,7 +1767,7 @@ static void search_pu_inter(
 
         uvg_quantize_lcu_residual(state, true, false, false, cu_loc, depth, cur_pu, lcu, true, UVG_BOTH_T);
 
-        if (cbf_is_set(cur_pu->cbf, depth, COLOR_Y)) {
+        if (cbf_is_set(cur_pu->cbf, COLOR_Y)) {
           continue;
         }
         else if (has_chroma) {
@@ -1778,7 +1778,7 @@ static void search_pu_inter(
                                     cu_loc, depth, cur_pu, lcu,
                                     true,
             UVG_BOTH_T);
-          if (!cbf_is_set_any(cur_pu->cbf, depth)) {
+          if (!cbf_is_set_any(cur_pu->cbf)) {
             cur_pu->type = CU_INTER;
             cur_pu->merge_idx = merge_idx;
             cur_pu->skipped = true;
@@ -2179,20 +2179,20 @@ void uvg_cu_cost_inter_rd2(
       v_resi,
       &chorma_ts_out,
       UVG_BOTH_T);
-    cbf_clear(&cur_cu->cbf, depth, COLOR_U);
-    cbf_clear(&cur_cu->cbf, depth, COLOR_V);
+    cbf_clear(&cur_cu->cbf, COLOR_U);
+    cbf_clear(&cur_cu->cbf, COLOR_V);
     if (chorma_ts_out.best_u_cost + chorma_ts_out.best_v_cost < chorma_ts_out.best_combined_cost) {
       cur_cu->joint_cb_cr = 0;
       cur_cu->tr_skip |= (chorma_ts_out.best_u_index == CHROMA_TS) << COLOR_U;
       cur_cu->tr_skip |= (chorma_ts_out.best_v_index == CHROMA_TS) << COLOR_V;
-      if(chorma_ts_out.best_u_index != NO_RESIDUAL) cbf_set(&cur_cu->cbf, depth, COLOR_U);
-      if(chorma_ts_out.best_v_index != NO_RESIDUAL) cbf_set(&cur_cu->cbf, depth, COLOR_V);
+      if(chorma_ts_out.best_u_index != NO_RESIDUAL) cbf_set(&cur_cu->cbf, COLOR_U);
+      if(chorma_ts_out.best_v_index != NO_RESIDUAL) cbf_set(&cur_cu->cbf, COLOR_V);
       chroma_cost += chorma_ts_out.best_u_cost + chorma_ts_out.best_v_cost;
     }
     else {
       cur_cu->joint_cb_cr = chorma_ts_out.best_combined_index;
-      if (chorma_ts_out.best_combined_index & 2) cbf_set(&cur_cu->cbf, depth, COLOR_U);
-      if (chorma_ts_out.best_combined_index & 1) cbf_set(&cur_cu->cbf, depth, COLOR_V);
+      if (chorma_ts_out.best_combined_index & 2) cbf_set(&cur_cu->cbf, COLOR_U);
+      if (chorma_ts_out.best_combined_index & 1) cbf_set(&cur_cu->cbf, COLOR_V);
       chroma_cost += chorma_ts_out.best_combined_cost;
     }
   }
@@ -2208,7 +2208,7 @@ void uvg_cu_cost_inter_rd2(
       UVG_BOTH_T);    
   }
 
-  int cbf = cbf_is_set_any(cur_cu->cbf, depth);
+  int cbf = cbf_is_set_any(cur_cu->cbf);
   
   if(cbf) {
     *inter_cost = uvg_cu_rd_cost_luma(state, cu_loc, cur_cu, lcu, 0);

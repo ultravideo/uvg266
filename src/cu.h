@@ -131,6 +131,8 @@ typedef struct
 
   uint16_t cbf;
 
+  uint8_t root_cbf;
+
   uint32_t split_tree : 3 * 9;
 
   /**
@@ -535,34 +537,31 @@ static INLINE unsigned xy_to_zorder(unsigned width, unsigned x, unsigned y)
 } while(0)
 
 
-#define NUM_CBF_DEPTHS 5
-static const uint16_t cbf_masks[NUM_CBF_DEPTHS] = { 0x1f, 0x0f, 0x07, 0x03, 0x1 };
-
 /**
  * Check if CBF in a given level >= depth is true.
  */
-static INLINE int cbf_is_set(uint16_t cbf, int depth, color_t plane)
+static INLINE int cbf_is_set(uint16_t cbf, color_t plane)
 {
-  return (cbf & (cbf_masks[depth] << (NUM_CBF_DEPTHS * plane))) != 0;
+  return (cbf & (1 << (plane))) != 0;
 }
 
 /**
  * Check if CBF in a given level >= depth is true.
  */
-static INLINE int cbf_is_set_any(uint16_t cbf, int depth)
+static INLINE int cbf_is_set_any(uint16_t cbf)
 {
-  return cbf_is_set(cbf, depth, COLOR_Y) ||
-         cbf_is_set(cbf, depth, COLOR_U) ||
-         cbf_is_set(cbf, depth, COLOR_V);
+  return cbf_is_set(cbf, COLOR_Y) ||
+         cbf_is_set(cbf, COLOR_U) ||
+         cbf_is_set(cbf, COLOR_V);
 }
 
 /**
  * Set CBF in a level to true.
  */
-static INLINE void cbf_set(uint16_t *cbf, int depth, color_t plane)
+static INLINE void cbf_set(uint16_t *cbf, color_t plane)
 {
   // Return value of the bit corresponding to the level.
-  *cbf |= (0x10 >> depth) << (NUM_CBF_DEPTHS * plane);
+  *cbf |= (1) << (plane);
 }
 
 /**
@@ -571,20 +570,20 @@ static INLINE void cbf_set(uint16_t *cbf, int depth, color_t plane)
  */
 static INLINE void cbf_set_conditionally(uint16_t *cbf, uint16_t child_cbfs[3], int depth, color_t plane)
 {
-  bool child_cbf_set = cbf_is_set(child_cbfs[0], depth + 1, plane) ||
-                       cbf_is_set(child_cbfs[1], depth + 1, plane) ||
-                       cbf_is_set(child_cbfs[2], depth + 1, plane);
+  bool child_cbf_set = cbf_is_set(child_cbfs[0], plane) ||
+                       cbf_is_set(child_cbfs[1], plane) ||
+                       cbf_is_set(child_cbfs[2], plane);
   if (child_cbf_set) {
-    cbf_set(cbf, depth, plane);
+    cbf_set(cbf, plane);
   }
 }
 
 /**
  * Set CBF in a levels <= depth to false.
  */
-static INLINE void cbf_clear(uint16_t *cbf, int depth, color_t plane)
+static INLINE void cbf_clear(uint16_t *cbf, color_t plane)
 {
-  *cbf &= ~(cbf_masks[depth] << (NUM_CBF_DEPTHS * plane));
+  *cbf &= ~(1 << (plane));
 }
 
 /**
@@ -592,8 +591,8 @@ static INLINE void cbf_clear(uint16_t *cbf, int depth, color_t plane)
  */
 static INLINE void cbf_copy(uint16_t *cbf, uint16_t src, color_t plane)
 {
-  cbf_clear(cbf, 0, plane);
-  *cbf |= src & (cbf_masks[0] << (NUM_CBF_DEPTHS * plane));
+  cbf_clear(cbf, plane);
+  *cbf |= src & (1 <<  plane);
 }
 
 #define GET_SPLITDATA(CU,curDepth) (((CU)->split_tree >> (curDepth)) & 7)

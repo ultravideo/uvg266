@@ -757,8 +757,8 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
           cu_q = uvg_cu_array_at(frame->cu_array, x_coord, y);
         }
 
-        bool nonzero_coeffs = cbf_is_set(cu_q->cbf, cu_q->tr_depth, COLOR_Y)
-          || cbf_is_set(cu_p->cbf, cu_p->tr_depth, COLOR_Y);
+        bool nonzero_coeffs = cbf_is_set(cu_q->cbf, COLOR_Y)
+          || cbf_is_set(cu_p->cbf, COLOR_Y);
 
         // Filter strength
         strength = 0;
@@ -1120,10 +1120,10 @@ static void filter_deblock_edge_chroma(encoder_state_t * const state,
         c_strength[1] = 2;
       }
       else if (tu_boundary){ //TODO: Add ciip/IBC related stuff
-        bool nonzero_coeffs_U = cbf_is_set(cu_q->cbf, cu_q->tr_depth, COLOR_U)
-                                || cbf_is_set(cu_p->cbf, cu_p->tr_depth, COLOR_U);
-        bool nonzero_coeffs_V = cbf_is_set(cu_q->cbf, cu_q->tr_depth, COLOR_V)
-                                || cbf_is_set(cu_p->cbf, cu_p->tr_depth, COLOR_V);
+        bool nonzero_coeffs_U = cbf_is_set(cu_q->cbf, COLOR_U)
+                                || cbf_is_set(cu_p->cbf, COLOR_U);
+        bool nonzero_coeffs_V = cbf_is_set(cu_q->cbf, COLOR_V)
+                                || cbf_is_set(cu_p->cbf, COLOR_V);
         c_strength[0] = nonzero_coeffs_U ? 1 : 0;
         c_strength[1] = nonzero_coeffs_V ? 1 : 0;
       }

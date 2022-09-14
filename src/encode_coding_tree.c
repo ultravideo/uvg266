@@ -466,7 +466,7 @@ static void encode_chroma_tu(
     uvg_get_sub_coeff(coeff_u, coeff->u, x_local, y_local, cu_loc->chroma_width, cu_loc->chroma_height, LCU_WIDTH_C);
     uvg_get_sub_coeff(coeff_v, coeff->v, x_local, y_local, cu_loc->chroma_width, cu_loc->chroma_height, LCU_WIDTH_C);
 
-    if (cbf_is_set(cur_pu->cbf, depth, COLOR_U)) {
+    if (cbf_is_set(cur_pu->cbf, COLOR_U)) {
       // TODO: height for this check and the others below
       if(state->encoder_control->cfg.trskip_enable && width_c <= (1 << state->encoder_control->cfg.trskip_max_size)){
         cabac->cur_ctx = &cabac->ctx.transform_skip_model_chroma;
@@ -477,7 +477,7 @@ static void encode_chroma_tu(
       uvg_encode_coeff_nxn(state, &state->cabac, coeff_u, cu_loc, COLOR_U, *scan_idx, cur_pu, NULL);
     }
 
-    if (cbf_is_set(cur_pu->cbf, depth, COLOR_V)) {
+    if (cbf_is_set(cur_pu->cbf, COLOR_V)) {
       if (state->encoder_control->cfg.trskip_enable && width_c <= (1 << state->encoder_control->cfg.trskip_max_size)) {
         cabac->cur_ctx = &cabac->ctx.transform_skip_model_chroma;
         CABAC_BIN(cabac, (cur_pu->tr_skip >> COLOR_V) & 1, "transform_skip_flag");
@@ -526,7 +526,7 @@ static void encode_transform_unit(
 
   int8_t scan_idx = uvg_get_scan_order(cur_pu->type, cur_pu->intra.mode, depth);
 
-  int cbf_y = cbf_is_set(cur_pu->cbf, depth, COLOR_Y);
+  int cbf_y = cbf_is_set(cur_pu->cbf, COLOR_Y);
 
   if (cbf_y && !only_chroma) {
     int x_local = x % LCU_WIDTH;
@@ -573,8 +573,8 @@ static void encode_transform_unit(
     }
   }
 
-  bool chroma_cbf_set = cbf_is_set(cur_pu->cbf, depth, COLOR_U) ||
-                        cbf_is_set(cur_pu->cbf, depth, COLOR_V);
+  bool chroma_cbf_set = cbf_is_set(cur_pu->cbf, COLOR_U) ||
+                        cbf_is_set(cur_pu->cbf, COLOR_V);
   if ((chroma_cbf_set || joint_chroma) && last_split) {
     //Need to drop const to get lfnst constraints
     // Use original dimensions instead of ISP split dimensions
@@ -644,9 +644,9 @@ static void encode_transform_coeff(
 
   int8_t split = (cu_loc->width > TR_MAX_WIDTH || cu_loc->height > TR_MAX_WIDTH);
 
-  const int cb_flag_y = tree_type != UVG_CHROMA_T ? cbf_is_set(cur_pu->cbf, depth, COLOR_Y) : 0;
-  const int cb_flag_u = tree_type != UVG_LUMA_T ?( cur_pu->joint_cb_cr ? (cur_pu->joint_cb_cr >> 1) & 1 : cbf_is_set(cur_cu->cbf, depth, COLOR_U)) : 0;
-  const int cb_flag_v = tree_type != UVG_LUMA_T ? (cur_pu->joint_cb_cr ? cur_pu->joint_cb_cr & 1 : cbf_is_set(cur_cu->cbf, depth, COLOR_V)) : 0;
+  const int cb_flag_y = tree_type != UVG_CHROMA_T ? cbf_is_set(cur_pu->cbf, COLOR_Y) : 0;
+  const int cb_flag_u = tree_type != UVG_LUMA_T ?( cur_pu->joint_cb_cr ? (cur_pu->joint_cb_cr >> 1) & 1 : cbf_is_set(cur_cu->cbf, COLOR_U)) : 0;
+  const int cb_flag_v = tree_type != UVG_LUMA_T ? (cur_pu->joint_cb_cr ? cur_pu->joint_cb_cr & 1 : cbf_is_set(cur_cu->cbf, COLOR_V)) : 0;
 
   // The split_transform_flag is not signaled when:
   // - transform size is greater than 32 (depth == 0)
@@ -1670,15 +1670,15 @@ void uvg_encode_coding_tree(
     }
 
     {
-      int cbf = cbf_is_set_any(cur_cu->cbf, depth);
       // Only need to signal coded block flag if not skipped or merged
       // skip = no coded residual, merge = coded residual
+      const bool has_coeffs = cur_pu->root_cbf || cur_pu->cbf;
       if (!cur_cu->merged) {
         cabac->cur_ctx = &(cabac->ctx.cu_qt_root_cbf_model);
-        CABAC_BIN(cabac, cbf, "rqt_root_cbf");
+        CABAC_BIN(cabac, has_coeffs, "rqt_root_cbf");
       }
       // Code (possible) coeffs to bitstream
-      if (cbf) {
+      if (has_coeffs) {
         int luma_cbf_ctx = 0;
         encode_transform_coeff(state, cu_loc, depth, 0, 0, 0, 0, coeff, tree_type, true, false, &luma_cbf_ctx, cu_loc);
       }
