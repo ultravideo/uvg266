@@ -1331,14 +1331,14 @@ bool uvg_write_split_flag(
   cabac_data_t* cabac,
   const cu_info_t * left_cu,
   const cu_info_t * above_cu,
-  uint8_t split_flag,
   const cu_loc_t* const cu_loc,
+  const uint32_t split_tree,
   int depth,
   enum uvg_tree_type tree_type,
   double* bits_out)
 {
-  uint16_t abs_x = (cu_loc->x + state->tile->offset_x) >> (tree_type == UVG_CHROMA_T);
-  uint16_t abs_y = (cu_loc->y + state->tile->offset_y) >> (tree_type == UVG_CHROMA_T);
+  uint16_t abs_x = cu_loc->x + (state->tile->offset_x >> (tree_type == UVG_CHROMA_T));
+  uint16_t abs_y = cu_loc->y + (state->tile->offset_y >> (tree_type == UVG_CHROMA_T));
   double bits = 0;
   const encoder_control_t* const ctrl = state->encoder_control;
   // Implisit split flag when on border
@@ -1360,23 +1360,23 @@ bool uvg_write_split_flag(
   bool top_right_available = ((abs_x + cu_width - 1) < (ctrl->in.width >> (tree_type == UVG_CHROMA_T)));
 
   if (!bottom_left_available && !top_right_available && allow_qt) {
-    implicit_split_mode = UVG_QUAD_SPLIT;
+    implicit_split_mode = QT_SPLIT;
   }
   else if (!bottom_left_available && allow_btt) {
-    implicit_split_mode = UVG_HORZ_SPLIT;
+    implicit_split_mode = BT_HOR_SPLIT;
   }
   else if (!top_right_available && allow_btt) {
-    implicit_split_mode = UVG_VERT_SPLIT;
+    implicit_split_mode = BT_VER_SPLIT;
   }
   else if (!bottom_left_available || !top_right_available) {
-    implicit_split_mode = UVG_QUAD_SPLIT;
+    implicit_split_mode = QT_SPLIT;
   }
   
   // Check split conditions
   if (implicit_split_mode != UVG_NO_SPLIT) {
     no_split = th_split = tv_split = false;
-    bh_split = (implicit_split_mode == UVG_HORZ_SPLIT);
-    bv_split = (implicit_split_mode == UVG_VERT_SPLIT);
+    bh_split = (implicit_split_mode == BT_HOR_SPLIT);
+    bv_split = (implicit_split_mode == BT_VER_SPLIT);
   }
 
   if (!allow_btt) {
@@ -1385,17 +1385,18 @@ bool uvg_write_split_flag(
 
   bool allow_split = allow_qt | bh_split | bv_split | th_split | tv_split;
 
-  split_flag |= implicit_split_mode != UVG_NO_SPLIT;
+  int split_flag = (split_tree >> (depth * 3)) & 7;
+
+  split_flag = implicit_split_mode != UVG_NO_SPLIT ? implicit_split_mode : split_flag;
 
   int split_model = 0;
   if (no_split && allow_split) {
     // Get left and top block split_flags and if they are present and true, increase model number
-    // ToDo: should use height and width to increase model, PU_GET_W() ?
-    if (left_cu && left_cu->depth > depth) {
+    if (left_cu && (1 << left_cu->log2_height) < cu_height) {
       split_model++;
     }
 
-    if (above_cu && above_cu->depth > depth) {
+    if (above_cu && (1 << above_cu->log2_width) < cu_width) {
       split_model++;
     }
 
@@ -1411,15 +1412,11 @@ bool uvg_write_split_flag(
     split_model += 3 * (split_num >> 1);
 
     cabac->cur_ctx = &(cabac->ctx.split_flag_model[split_model]);
-    if(cabac->only_count && !split_flag) {
 
-      //printf("%hu %hu %d %d %d\n", state->search_cabac.ctx.split_flag_model[split_model].state[0], state->search_cabac.ctx.split_flag_model[split_model].state[1],
-      //  split_model, x, y);
-    }
-    CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.split_flag_model[split_model]), split_flag, bits, "split_flag");
+    CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.split_flag_model[split_model]), split_flag != 0, bits, "split_flag");
   }
 
-  bool qt_split = split_flag || implicit_split_mode == UVG_QUAD_SPLIT;
+  bool qt_split = split_flag == UVG_QUAD_SPLIT;
 
   if (!(implicit_split_mode == UVG_NO_SPLIT) && (allow_qt && allow_btt)) {
     split_model = (left_cu && GET_SPLITDATA(left_cu, depth)) + (above_cu && GET_SPLITDATA(above_cu, depth)) + (depth < 2 ? 0 : 3);
@@ -1431,17 +1428,17 @@ bool uvg_write_split_flag(
 
     split_model = 0;
 
-    // Get left and top block split_flags and if they are present and true, increase model number
-    if (left_cu && GET_SPLITDATA(left_cu, depth) == 1) {
+    // TODO: These are incorrect
+    if (left_cu && (1 << left_cu->log2_height) > cu_height) {
       split_model++;
     }
 
-    if (above_cu && GET_SPLITDATA(above_cu, depth) == 1) {
+    if (above_cu && (1 << above_cu->log2_width) > cu_width) {
       split_model++;
     }
 
     split_model += (depth > 2 ? 0 : 3);
-    CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.qt_split_flag_model[split_model]), split_flag, bits, "split_cu_mode");
+    CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.qt_split_flag_model[split_model]), qt_split, bits, "split_cu_mode");
   }
   if (bits_out) *bits_out += bits;
   return split_flag;
@@ -1503,9 +1500,9 @@ void uvg_encode_coding_tree(
       state,
       cabac,
       left_cu,
-      above_cu,
-      (cur_cu->split_tree >> (split_tree.current_depth * 3)) & 7,
+      above_cu, 
       cu_loc,
+      cur_cu->split_tree,
       depth,
       tree_type,
       NULL);
@@ -1785,7 +1782,7 @@ double uvg_mock_encode_coding_unit(
       left_cu = LCU_GET_CU_AT_PX(lcu, x_local - 1, y_local);
     }
     else {
-      left_cu = uvg_cu_array_at_const(state->tile->frame->chroma_cu_array, (x >> 1) - 1, y >> 1);
+      left_cu = uvg_cu_array_at_const(state->tile->frame->chroma_cu_array, x  - 1, y);
     }
   }
   if (y) {
@@ -1793,7 +1790,7 @@ double uvg_mock_encode_coding_unit(
       above_cu = LCU_GET_CU_AT_PX(lcu, x_local, y_local-1);
     }
     else {
-      above_cu = uvg_cu_array_at_const(state->tile->frame->chroma_cu_array, x >> 1, (y >> 1) - 1);
+      above_cu = uvg_cu_array_at_const(state->tile->frame->chroma_cu_array, x, y - 1);
     }
   }
   
@@ -1808,8 +1805,8 @@ double uvg_mock_encode_coding_unit(
       cabac,
       left_cu,
       above_cu,
-      0,
       cu_loc,
+      cur_cu->split_tree,
       depth,
       tree_type,
       &bits);
