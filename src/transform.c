@@ -1353,7 +1353,9 @@ void uvg_quantize_lcu_residual(
 
   // Tell clang-analyzer what is up. For some reason it can't figure out from
   // asserting just depth.
-  assert(width ==  4 ||
+  // Width 2 is possible with ISP blocks
+  assert(width ==  2 ||
+         width ==  4 ||
          width ==  8 ||
          width == 16 ||
          width == 32 ||
