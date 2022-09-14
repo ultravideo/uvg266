@@ -101,8 +101,8 @@ bool uvg_write_split_flag(
   cabac_data_t* cabac,
   const cu_info_t* left_cu,
   const cu_info_t* above_cu,
-  uint8_t split_flag,
   const cu_loc_t* const cu_loc,
+  const uint32_t split_tree,
   int depth,
   enum uvg_tree_type tree_type,
   double* bits_out);

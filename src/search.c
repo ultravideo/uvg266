@@ -193,6 +193,9 @@ static void lcu_fill_cu_info(lcu_t *lcu, int x_local, int y_local, int width, in
       to->violates_lfnst_constrained_luma = cu->violates_lfnst_constrained_luma;
       to->violates_lfnst_constrained_chroma = cu->violates_lfnst_constrained_chroma;
 
+      to->log2_height = cu->log2_height;
+      to->log2_width = cu->log2_width;
+
       if (cu->type == CU_INTRA) {
         to->intra.mode        = cu->intra.mode;
         to->intra.mode_chroma = cu->intra.mode_chroma;
@@ -1256,6 +1259,14 @@ static double search_cu(
   }
 
   if (cur_cu->type == CU_INTRA || cur_cu->type == CU_INTER || cur_cu->type == CU_IBC) {
+  // The cabac functions assume chroma locations whereas the search uses luma locations
+  // for the chroma tree, therefore we need to shift the chroma coordinates here for
+  // passing to the bit cost calculating functions.
+  cu_loc_t chroma_loc = *cu_loc;
+  chroma_loc.y >>= 1;
+  chroma_loc.x >>= 1;
+
+  if (cur_cu->type == CU_INTRA || cur_cu->type == CU_INTER) {
     double bits = 0;
     cabac_data_t* cabac  = &state->search_cabac;
     cabac->update = 1;
@@ -1263,7 +1274,9 @@ static double search_cu(
     bits += uvg_mock_encode_coding_unit(
       state,
       cabac,
-      cu_loc, lcu, cur_cu,
+      tree_type != UVG_CHROMA_T ? cu_loc : &chroma_loc, 
+      lcu,
+      cur_cu,
       tree_type);
 
     
@@ -1310,6 +1323,8 @@ static double search_cu(
 
   // Recursively split all the way to max search depth.
   if (can_split_cu) {
+    const split_tree_t new_split = { split_tree.split_tree | QT_SPLIT << (split_tree.current_depth * 3), split_tree.current_depth + 1 };
+
     int half_cu = cu_width >> (tree_type != UVG_CHROMA_T);
     double split_cost = 0.0;
     int cbf = cbf_is_set_any(cur_cu->cbf, split_tree.current_depth);
@@ -1345,9 +1360,9 @@ static double search_cu(
         state,
         &state->search_cabac,
         left_cu,
-        above_cu,
-        1,
-        cu_loc,
+        above_cu, 
+        tree_type != UVG_CHROMA_T ? cu_loc : &chroma_loc,
+        new_split.split_tree,
         depth,
         tree_type,
         &split_bits);
@@ -1362,7 +1377,6 @@ static double search_cu(
     // It is ok to interrupt the search as soon as it is known that
     // the split costs at least as much as not splitting.
     if (cur_cu->type == CU_NOTSET || cbf || state->encoder_control->cfg.cu_split_termination == UVG_CU_SPLIT_TERMINATION_OFF) {
-      const split_tree_t new_split = { split_tree.split_tree | QT_SPLIT << (split_tree.current_depth * 3), split_tree.current_depth + 1};
       cu_loc_t new_cu_loc;
       if (split_cost < cost) {
         uvg_cu_loc_ctor(&new_cu_loc, x, y, half_cu, half_cu);
@@ -1407,8 +1421,7 @@ static double search_cu(
         double bits = 0;
         uvg_write_split_flag(state, &state->search_cabac,
                              x > 0 ? LCU_GET_CU_AT_PX(lcu, SUB_SCU(x) - 1, SUB_SCU(y)) : NULL,
-                             y > 0 ? LCU_GET_CU_AT_PX(lcu, SUB_SCU(x), SUB_SCU(y) - 1) : NULL,
-                             0, cu_loc, depth, tree_type, &bits);
+                             y > 0 ? LCU_GET_CU_AT_PX(lcu, SUB_SCU(x), SUB_SCU(y) - 1) : NULL, cu_loc, cur_cu->split_tree, depth, tree_type, &bits);
 
         cur_cu->intra = cu_d1->intra;
         cur_cu->type = CU_INTRA;
