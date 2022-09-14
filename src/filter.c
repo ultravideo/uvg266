@@ -276,10 +276,11 @@ static bool is_tu_boundary(
   // if (x & 3 || y & 3) return false;
   const cu_info_t *const scu =
     uvg_cu_array_at_const(tree_type != UVG_CHROMA_T ? state->tile->frame->cu_array : state->tile->frame->chroma_cu_array, x, y);
-  const int tu_width = LCU_WIDTH >> (scu->tr_depth + (tree_type == UVG_CHROMA_T));
+  const int tu_width = MIN(TR_MAX_WIDTH, 1 << scu->log2_width);
+  const int tu_height = MIN(TR_MAX_WIDTH, 1 << scu->log2_height);
 
   if (dir == EDGE_HOR) {
-    return (y & (tu_width - 1)) == 0;
+    return (y & (tu_height - 1)) == 0;
   } else {
     return (x & (tu_width - 1)) == 0;
   }
@@ -854,15 +855,20 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
       bool is_side_Q_large = false;
       uint8_t max_filter_length_P = 0;
       uint8_t max_filter_length_Q = 0;
-      const int cu_size = LCU_WIDTH >> cu_q->depth;
-      // TODO: NON square
-      const int pu_size = dir == EDGE_HOR ? cu_size : cu_size;
-      const int pu_pos = dir == EDGE_HOR ? y_coord 
-                                         : x_coord;
+
+      const int cu_width = 1 << cu_q->log2_width;
+      const int cu_height = 1 << cu_q->log2_height;
+      const int pu_size = dir == EDGE_HOR ? cu_height : cu_width;
+      const int pu_pos = dir == EDGE_HOR ? y_coord : x_coord;
+
+
+      const int tu_size_p_side = dir == EDGE_HOR ? MIN(1 << cu_p->log2_height, TR_MAX_WIDTH) : MIN(1 << cu_p->log2_width, TR_MAX_WIDTH);
+      const int tu_size_q_side = dir == EDGE_HOR ? MIN(1 << cu_q->log2_height, TR_MAX_WIDTH) : MIN(1 << cu_q->log2_width, TR_MAX_WIDTH);
+
       get_max_filter_length(&max_filter_length_P, &max_filter_length_Q, state, x_coord, y_coord,
                             dir, tu_boundary,
-                            LCU_WIDTH >> cu_p->tr_depth,
-                            LCU_WIDTH >> cu_q->tr_depth,
+                            tu_size_p_side,
+                            tu_size_q_side,
                             pu_pos, pu_size, cu_q->merged, COLOR_Y,
                             UVG_LUMA_T);
 
@@ -1083,19 +1089,25 @@ static void filter_deblock_edge_chroma(encoder_state_t * const state,
         cu_p = uvg_cu_array_at(cua, x_coord, y_coord - 1);
         cu_q = uvg_cu_array_at(cua, x_coord, y_coord    );
       }
-
-      const int cu_size = LCU_WIDTH >> (cu_q->depth + (tree_type == UVG_CHROMA_T));
-      // TODO: non-square
-      const int pu_size = dir == EDGE_HOR ? cu_size : cu_size;
-      const int pu_pos = dir == EDGE_HOR ? y_coord
-                                         : x_coord;
+      
       uint8_t max_filter_length_P = 0;
       uint8_t max_filter_length_Q = 0;
       
-      const int tu_p_size = LCU_WIDTH >> (cu_p->tr_depth + (chroma_shift));
-      const int tu_q_size = LCU_WIDTH >> (cu_q->tr_depth + (chroma_shift));
+      const int cu_width = 1 << (cu_q->log2_width - (tree_type != UVG_CHROMA_T));
+      const int cu_height = 1 << (cu_q->log2_height - (tree_type != UVG_CHROMA_T));
+      const int pu_size = dir == EDGE_HOR ? cu_height : cu_width;
+      const int pu_pos = dir == EDGE_HOR ? y_coord : x_coord;
+
+
+      const int tu_size_p_side = dir == EDGE_HOR ? 
+        MIN(1 << (cu_p->log2_height - (tree_type != UVG_CHROMA_T)), TR_MAX_WIDTH) :
+        MIN(1 << (cu_p->log2_width - (tree_type != UVG_CHROMA_T)), TR_MAX_WIDTH);
+      const int tu_size_q_side = dir == EDGE_HOR ?
+        MIN(1 << (cu_q->log2_height - (tree_type != UVG_CHROMA_T)), TR_MAX_WIDTH) :
+        MIN(1 << (cu_q->log2_width - (tree_type != UVG_CHROMA_T)), TR_MAX_WIDTH);
+
       get_max_filter_length(&max_filter_length_P, &max_filter_length_Q, state, x_coord, y_coord,
-                            dir, tu_boundary, tu_p_size, tu_q_size,
+                            dir, tu_boundary, tu_size_p_side, tu_size_q_side,
                             pu_pos, pu_size, cu_q->merged, COLOR_U,
                             tree_type);
 
