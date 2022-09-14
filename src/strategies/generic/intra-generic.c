@@ -414,7 +414,8 @@ static void uvg_intra_pred_planar_generic(
   const int offset = 1 << (log2_width + log2_height);
   const int final_shift = 1 + log2_width + log2_height;
   
-  assert((log2_width >= 2 && log2_width <= 5) && (log2_height >= 2 && log2_height <= 5));
+  // If ISP is enabled log_dim 1 is possible (limit was previously 2)
+  assert((log2_width >= 1 && log2_width <= 5) && (log2_height >= 1 && log2_height <= 5));
 
   const uvg_pixel top_right = ref_top[width + 1];
   const uvg_pixel bottom_left = ref_left[height + 1];

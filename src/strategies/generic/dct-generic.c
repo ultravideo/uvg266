@@ -771,6 +771,12 @@ static void fast_inverse_dst_4x4_generic(int8_t bitdepth, const int16_t* input, 
 
 
 // DCT-2
+#define DEFINE_DCT2_P2_MATRIX(a) \
+{ \
+   a,  a, \
+   a, -a  \
+}
+
 #define DEFINE_DCT2_P4_MATRIX(a,b,c) \
 { \
    a,  a,  a,  a, \
@@ -1002,6 +1008,7 @@ static void fast_inverse_dst_4x4_generic(int8_t bitdepth, const int16_t* input, 
 }
 
 // DCT-2
+const int16_t uvg_g_DCT2P2[4] = DEFINE_DCT2_P2_MATRIX(64);
 const int16_t uvg_g_DCT2P4[16] = DEFINE_DCT2_P4_MATRIX(64, 83, 36);
 const int16_t uvg_g_DCT2P8[64] = DEFINE_DCT2_P8_MATRIX(64, 83, 36, 89, 75, 50, 18);
 const int16_t uvg_g_DCT2P16[256] = DEFINE_DCT2_P16_MATRIX(64, 83, 36, 89, 75, 50, 18, 90, 87, 80, 70, 57, 43, 25, 9);
@@ -1020,6 +1027,68 @@ const int16_t uvg_g_DCT8P16[256] = DEFINE_DCT8_P16_MATRIX(88, 88, 87, 85, 81, 77
 const int16_t uvg_g_DCT8P32[1024] = DEFINE_DCT8_P32_MATRIX(90, 90, 89, 88, 87, 86, 85, 84, 82, 80, 78, 77, 74, 72, 68, 66, 63, 60, 56, 53, 50, 46, 42, 38, 34, 30, 26, 21, 17, 13, 9, 4);
 
 // ********************************** DCT-2 **********************************
+void fastForwardDCT2_B2(const int16_t* src, int16_t* dst, int32_t shift, int line, int skip_line, int skip_line2)
+{
+  int32_t j;
+  int32_t E, O;
+  int32_t add = (shift > 0) ? (1 << (shift - 1)) : 0;
+
+  const int16_t* iT = uvg_g_DCT2P2;
+
+  int16_t *p_coef = dst;
+  const int  reduced_line = line - skip_line;
+  for (j = 0; j < reduced_line; j++)
+  {
+    /* E and O */
+    E = src[0] + src[1];
+    O = src[0] - src[1];
+
+    dst[0] = (iT[0] * E + add) >> shift;
+    dst[line] = (iT[2] * O + add) >> shift;
+
+
+    src += 2;
+    dst++;
+  }
+  if (skip_line)
+  {
+    dst = p_coef + reduced_line;
+    for (j = 0; j < 2; j++)
+    {
+      memset(dst, 0, sizeof(int16_t) * skip_line);
+      dst += line;
+    }
+  }
+}
+
+void fastInverseDCT2_B2(const int16_t* src, int16_t* dst, int shift, int line, int skip_line, int skip_line2)
+{
+  int32_t j;
+  int32_t E, O;
+  int32_t add = 1 << (shift - 1);
+
+  const int16_t* iT = uvg_g_DCT2P2;
+
+  const int  reduced_line = line - skip_line;
+  for (j = 0; j < reduced_line; j++)
+  {
+    /* Utilizing symmetry properties to the maximum to minimize the number of multiplications */
+    E = iT[0] * (src[0] + src[line]);
+    O = iT[2] * (src[0] - src[line]);
+
+    /* Combining even and odd terms at each hierarchy levels to calculate the final spatial domain vector */
+    dst[0] = (short)CLIP(-32768, 32767, (E + add) >> shift);
+    dst[1] = (short)CLIP(-32768, 32767, (O + add) >> shift);
+
+    src++;
+    dst += 2;
+  }
+  if (skip_line)
+  {
+    memset(dst, 0, (skip_line << 1) * sizeof(int16_t));
+  }
+}
+
 static void fastForwardDCT2_B4(const int16_t* src, int16_t* dst, int32_t shift, int line, int skip_line, int skip_line2)
 {
   int32_t j;
@@ -2417,16 +2486,16 @@ DCT_MTS_NXN_GENERIC(DST1, 32);
 typedef void partial_tr_func(const int16_t*, int16_t*, int32_t, int, int, int);
 
 // ToDo: Enable MTS 2x2 and 64x64 transforms
-static partial_tr_func* dct_table[3][5] = {
-  { fastForwardDCT2_B4, fastForwardDCT2_B8, fastForwardDCT2_B16, fastForwardDCT2_B32, NULL },
-  { fastForwardDCT8_B4, fastForwardDCT8_B8, fastForwardDCT8_B16, fastForwardDCT8_B32, NULL },
-  { fastForwardDST7_B4, fastForwardDST7_B8, fastForwardDST7_B16, fastForwardDST7_B32, NULL },
+static partial_tr_func* dct_table[3][6] = {
+  { fastForwardDCT2_B2, fastForwardDCT2_B4, fastForwardDCT2_B8, fastForwardDCT2_B16, fastForwardDCT2_B32, NULL },
+  { NULL,               fastForwardDCT8_B4, fastForwardDCT8_B8, fastForwardDCT8_B16, fastForwardDCT8_B32, NULL },
+  { NULL,               fastForwardDST7_B4, fastForwardDST7_B8, fastForwardDST7_B16, fastForwardDST7_B32, NULL },
 };
 
-static partial_tr_func* idct_table[3][5] = {
-  { fastInverseDCT2_B4, fastInverseDCT2_B8, fastInverseDCT2_B16, fastInverseDCT2_B32, NULL/*fastInverseDCT2_B64*/ },
-  { fastInverseDCT8_B4, fastInverseDCT8_B8, fastInverseDCT8_B16, fastInverseDCT8_B32, NULL },
-  { fastInverseDST7_B4, fastInverseDST7_B8, fastInverseDST7_B16, fastInverseDST7_B32, NULL },
+static partial_tr_func* idct_table[3][6] = {
+  { fastInverseDCT2_B2, fastInverseDCT2_B4, fastInverseDCT2_B8, fastInverseDCT2_B16, fastInverseDCT2_B32, NULL/*fastInverseDCT2_B64*/ },
+  { NULL,               fastInverseDCT8_B4, fastInverseDCT8_B8, fastInverseDCT8_B16, fastInverseDCT8_B32, NULL },
+  { NULL,               fastInverseDST7_B4, fastInverseDST7_B8, fastInverseDST7_B16, fastInverseDST7_B32, NULL },
 };
 
 
@@ -2458,6 +2527,7 @@ void uvg_get_tr_type(
 
   if (implicit_mts)
   {
+    // ISP_TODO: do these apply for ISP blocks?
     bool width_ok = width >= 4 && width <= 16;
     bool height_ok = height >= 4 && height <= 16;
 
@@ -2506,8 +2576,10 @@ static void mts_dct_generic(
   {
     int skip_width = (type_hor != DCT2 && width == 32) ? 16 : (width > 32 ? width - 32 : 0);
     int skip_height = (type_ver != DCT2 && height == 32) ? 16 : (height > 32 ? height - 32 : 0);
-    const int log2_width_minus2 = uvg_g_convert_to_bit[width];
-    const int log2_height_minus2 = uvg_g_convert_to_bit[height];
+    const int log2_width_minus1  = uvg_g_convert_to_log2[width] - 1;
+    const int log2_height_minus1 = uvg_g_convert_to_log2[height] - 1;
+    //const int log2_width_minus2 = uvg_g_convert_to_bit[width];
+    //const int log2_height_minus2 = uvg_g_convert_to_bit[height];
 
     if(tu->lfnst_idx || tu->cr_lfnst_idx) {
       if ((width == 4 && height > 4) || (width > 4 && height == 4))
@@ -2522,12 +2594,12 @@ static void mts_dct_generic(
       }
     }
 
-    partial_tr_func* dct_hor = dct_table[type_hor][log2_width_minus2];
-    partial_tr_func* dct_ver = dct_table[type_ver][log2_height_minus2];
+    partial_tr_func* dct_hor = dct_table[type_hor][log2_width_minus1];
+    partial_tr_func* dct_ver = dct_table[type_ver][log2_height_minus1];
 
     int16_t tmp[32 * 32];
-    const int32_t shift_1st = log2_width_minus2 + bitdepth - 7;
-    const int32_t shift_2nd = log2_height_minus2 + 8;
+    const int32_t shift_1st = log2_width_minus1 + bitdepth - 8;
+    const int32_t shift_2nd = log2_height_minus1 + 7;
 
     dct_hor(input, tmp, shift_1st, height, 0, skip_width);
     dct_ver(tmp, output, shift_2nd, width, skip_width, skip_height);
@@ -2559,8 +2631,8 @@ static void mts_idct_generic(
   {
     int skip_width = (type_hor != DCT2 && width == 32) ? 16 : width > 32 ? width - 32 : 0;
     int skip_height = (type_ver != DCT2 && height == 32) ? 16 : height > 32 ? height - 32 : 0;
-    const int log2_width_minus2 = uvg_g_convert_to_bit[width];
-    const int log2_height_minus2 = uvg_g_convert_to_bit[height];
+    const int log2_width_minus1  = uvg_g_convert_to_log2[width] - 1;
+    const int log2_height_minus1 = uvg_g_convert_to_log2[height] - 1;
 
     if (tu->lfnst_idx || tu->cr_lfnst_idx) {
       if ((width == 4 && height > 4) || (width > 4 && height == 4)) {
@@ -2573,8 +2645,8 @@ static void mts_idct_generic(
       }
     }
 
-    partial_tr_func* idct_hor = idct_table[type_hor][log2_width_minus2];
-    partial_tr_func* idct_ver = idct_table[type_ver][log2_height_minus2];
+    partial_tr_func* idct_hor = idct_table[type_hor][log2_width_minus1];
+    partial_tr_func* idct_ver = idct_table[type_ver][log2_height_minus1];
 
     int16_t tmp[32 * 32];
     const int max_log2_tr_dynamic_range = 15;
