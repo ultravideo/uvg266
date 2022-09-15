@@ -271,8 +271,6 @@ static double search_intra_trdepth(
   lcu_t *const lcu,
   enum uvg_tree_type tree_type)
 {
-
-  const uint8_t depth = 6 - uvg_g_convert_to_log2[cu_loc->width];
   const uint8_t width = cu_loc->width;
   const uint8_t height = cu_loc->height; // TODO: height for non-square blocks
   const uint8_t width_c = cu_loc->chroma_width;
@@ -595,7 +593,7 @@ static double search_intra_trdepth(
     }
   }
 
-  if (depth == 0 || split_cost < nosplit_cost) {
+  if (!PU_IS_TU(pred_cu) || split_cost < nosplit_cost) {
     return split_cost;
   } else {
     return nosplit_cost;
@@ -1306,7 +1304,6 @@ static int8_t search_intra_rdo(
   enum uvg_tree_type tree_type,
   const cu_loc_t* const cu_loc)
 {
-  const int8_t depth = 6 - uvg_g_convert_to_log2[cu_loc->width];
   const int width = cu_loc->width;
   const int height = cu_loc->height; // TODO: height for non-square blocks
   

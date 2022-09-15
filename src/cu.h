@@ -117,7 +117,6 @@ typedef struct  {
 typedef struct
 {
   uint8_t type        : 2; //!< \brief block type, one of cu_type_t values
-  uint8_t depth       : 3; //!< \brief depth / size of this block
   uint8_t skipped     : 1; //!< \brief flag to indicate this block is skipped
   uint8_t merged      : 1; //!< \brief flag to indicate this block is merged
   uint8_t merge_idx   : 3; //!< \brief merge index
@@ -198,7 +197,7 @@ void uvg_cu_loc_ctor(cu_loc_t *loc, int x, int y, int width, int height);
     } \
   } while (0)
 
-#define CHECKPOINT_CU(prefix_str, cu) CHECKPOINT(prefix_str " type=%d depth=%d part_size=%d coded=%d " \
+#define CHECKPOINT_CU(prefix_str, cu) CHECKPOINT(prefix_str " type=%d part_size=%d coded=%d " \
   "skipped=%d merged=%d merge_idx=%d cbf.y=%d cbf.u=%d cbf.v=%d " \
   "intra[0].cost=%u intra[0].bitcost=%u intra[0].mode=%d intra[0].mode_chroma=%d intra[0].tr_skip=%d " \
   "intra[1].cost=%u intra[1].bitcost=%u intra[1].mode=%d intra[1].mode_chroma=%d intra[1].tr_skip=%d " \
@@ -206,7 +205,7 @@ void uvg_cu_loc_ctor(cu_loc_t *loc, int x, int y, int width, int height);
   "intra[3].cost=%u intra[3].bitcost=%u intra[3].mode=%d intra[3].mode_chroma=%d intra[3].tr_skip=%d " \
   "inter.cost=%u inter.bitcost=%u inter.mv[0]=%d inter.mv[1]=%d inter.mvd[0]=%d inter.mvd[1]=%d " \
   "inter.mv_cand=%d inter.mv_ref=%d inter.mv_dir=%d inter.mode=%d" \
-  , (cu).type, (cu).depth, (cu).part_size, (cu).coded, \
+  , (cu).type, (cu).part_size, (cu).coded, \
   (cu).skipped, (cu).merged, (cu).merge_idx, (cu).cbf.y, (cu).cbf.u, (cu).cbf.v, \
   (cu).intra[0].cost, (cu).intra[0].bitcost, (cu).intra[0].mode, (cu).intra[0].mode_chroma, (cu).intra[0].tr_skip, \
   (cu).intra[1].cost, (cu).intra[1].bitcost, (cu).intra[1].mode, (cu).intra[1].mode_chroma, (cu).intra[1].tr_skip, \
@@ -567,7 +566,7 @@ static INLINE void cbf_set(uint16_t *cbf, color_t plane)
  * Set CBF in a level to true if it is set at a lower level in any of
  * the child_cbfs.
  */
-static INLINE void cbf_set_conditionally(uint16_t *cbf, uint16_t child_cbfs[3], int depth, color_t plane)
+static INLINE void cbf_set_conditionally(uint16_t *cbf, uint16_t child_cbfs[3], color_t plane)
 {
   bool child_cbf_set = cbf_is_set(child_cbfs[0], plane) ||
                        cbf_is_set(child_cbfs[1], plane) ||
@@ -578,7 +577,6 @@ static INLINE void cbf_set_conditionally(uint16_t *cbf, uint16_t child_cbfs[3], 
 }
 
 /**
- * Set CBF in a levels <= depth to false.
  */
 static INLINE void cbf_clear(uint16_t *cbf, color_t plane)
 {

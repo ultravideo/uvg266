@@ -96,7 +96,6 @@ void uvg_quantize_lcu_residual(
   bool chroma,
   const bool jccr,
   const cu_loc_t* cu_loc,
-  uint8_t depth,
   cu_info_t *cur_cu,
   lcu_t* lcu,
   bool early_skip,
