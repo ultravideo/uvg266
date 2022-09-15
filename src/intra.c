@@ -565,7 +565,7 @@ static void predict_cclm(
       y_extension >>= tree_type == UVG_CHROMA_T;
       const cu_info_t* pu = LCU_GET_CU_AT_PX(lcu, (x_scu >> (tree_type == UVG_CHROMA_T)) - 4, y_extension);
       if (y_extension >= ctu_size || pu->type == CU_NOTSET || (pu->type == CU_INTRA && pu->intra.mode_chroma == -1)) break;
-      if(x_scu == 32 && y_scu == 0 && pu->depth == 0) break;
+      if(x_scu == 32 && y_scu == 0 && pu->log2_width == 6) break;
     }
     for(int i = 0; i < height + available_left_below * 2; i++) {
       sampled_luma_ref.left[i] = state->tile->frame->cclm_luma_rec[(y0/2 + i) * (stride2/2) + x0 / 2 - 1];
@@ -1866,8 +1866,9 @@ void uvg_intra_recon_cu(
   // TODO: not necessary to call if only luma and ISP is on
   uvg_quantize_lcu_residual(state, has_luma, has_chroma && !(search_data->pred_cu.joint_cb_cr & 3),
                             search_data->pred_cu.joint_cb_cr & 3 && state->encoder_control->cfg.jccr && has_chroma,
-                            cu_loc, depth, cur_cu, lcu,
-                            false, tree_type);
+                            cu_loc, cur_cu, lcu,
+                            false,
+                            tree_type);
 }
 
 

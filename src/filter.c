@@ -307,32 +307,6 @@ static bool is_pu_boundary(const encoder_state_t *const state,
    it for now, in case some other tool requires it.
   */
   return false;
-  //const cu_info_t *const scu =
-  //  uvg_cu_array_at_const(state->tile->frame->cu_array, x, y);
-  //// Get the containing CU.
-  //const int32_t cu_width = LCU_WIDTH >> scu->depth;
-  //const int32_t x_cu = x & ~(cu_width - 1);
-  //const int32_t y_cu = y & ~(cu_width - 1);
-  //const cu_info_t *const cu =
-  //  uvg_cu_array_at_const(state->tile->frame->cu_array, x_cu, y_cu);
-
-  //const int num_pu = uvg_part_mode_num_parts[cu->part_size];
-  //for (int i = 0; i < num_pu; i++) {
-  //  if (dir == EDGE_HOR) {
-  //    int y_pu = PU_GET_Y(cu->part_size, cu_width, y_cu, i);
-  //    if (y_pu == y) {
-  //      return true;
-  //    }
-
-  //  } else {
-  //    int x_pu = PU_GET_X(cu->part_size, cu_width, x_cu, i);
-  //    if (x_pu == x) {
-  //      return true;
-  //    }
-  //  }
-  //}
-
-  //return false;
 }
 
 

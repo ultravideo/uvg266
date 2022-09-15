@@ -76,7 +76,6 @@ static const struct option long_options[] = {
   { "tr-skip-max-size",   required_argument, NULL, 0 },
   { "mts",                required_argument, NULL, 0 },
   { "no-mts",                   no_argument, NULL, 0 },
-  { "tr-depth-intra",     required_argument, NULL, 0 },
   { "me",                 required_argument, NULL, 0 },
   { "subme",              required_argument, NULL, 0 },
   { "source-scan-type",   required_argument, NULL, 0 },
@@ -636,7 +635,6 @@ void print_help(void)
     "                               This is mostly for debugging and is not\n"
     "                               guaranteed to produce sensible bitstream or\n"
     "                               work at all. [disabled]\n"
-    "      --tr-depth-intra <int> : Transform split depth for intra blocks [0]\n"
     "      --(no-)bipred          : Bi-prediction [disabled]\n"
     "      --cu-split-termination <string> : CU split search termination [zero]\n"
     "                                   - off: Don't terminate early.\n"

@@ -1813,7 +1813,7 @@ static void search_pu_inter(
         cur_pu->inter.mv[1][1]  = info->merge_cand[merge_idx].mv[1][1];
         uvg_inter_recon_cu(state, lcu, true, false, cu_loc);
 
-        uvg_quantize_lcu_residual(state, true, false, false, cu_loc, depth, cur_pu, lcu, true, UVG_BOTH_T);
+        uvg_quantize_lcu_residual(state, true, false, false, cu_loc, cur_pu, lcu, true, UVG_BOTH_T);
 
         if (cbf_is_set(cur_pu->cbf, COLOR_Y)) {
           continue;
@@ -1823,9 +1823,9 @@ static void search_pu_inter(
           uvg_quantize_lcu_residual(state,
                                     false, has_chroma,
                                     false, /*we are only checking for lack of coeffs so no need to check jccr*/
-                                    cu_loc, depth, cur_pu, lcu,
+                                    cu_loc, cur_pu, lcu,
                                     true,
-            UVG_BOTH_T);
+                                    UVG_BOTH_T);
           if (!cbf_is_set_any(cur_pu->cbf)) {
             cur_pu->type = CU_INTER;
             cur_pu->merge_idx = merge_idx;
@@ -2181,11 +2181,10 @@ void uvg_cu_cost_inter_rd2(
                               false,
                               false,
                               cu_loc,
-                              depth,
                               cur_cu,
                               lcu,
-                              false, 
-      UVG_BOTH_T);
+                              false,
+                              UVG_BOTH_T);
     ALIGNED(64) uvg_pixel u_pred[LCU_WIDTH_C * LCU_WIDTH_C];
     ALIGNED(64) uvg_pixel v_pred[LCU_WIDTH_C * LCU_WIDTH_C];
     uvg_pixels_blit(&lcu->ref.u[index], u_pred, width, width, LCU_WIDTH_C, width);
@@ -2246,11 +2245,10 @@ void uvg_cu_cost_inter_rd2(
                               true, reconstruct_chroma,
                               reconstruct_chroma && state->encoder_control->cfg.jccr,
                               cu_loc,
-                              depth,
                               cur_cu,
                               lcu,
-                              false, 
-      UVG_BOTH_T);    
+                              false,
+                              UVG_BOTH_T);    
   }
 
   int cbf = cbf_is_set_any(cur_cu->cbf);

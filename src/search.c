@@ -165,7 +165,6 @@ static void lcu_fill_cu_info(lcu_t *lcu, int x_local, int y_local, int width, in
     for (int x = x_local; x < x_local + width; x += SCU_WIDTH) {
       cu_info_t *to = LCU_GET_CU_AT_PX(lcu, x, y);
       to->type      = cu->type;
-      to->depth     = cu->depth;
       to->qp        = cu->qp;
       to->split_tree = cu->split_tree;
       //to->tr_idx    = cu->tr_idx;
@@ -457,7 +456,6 @@ double uvg_cu_rd_cost_chroma(
   }
   
   if (!skip_residual_coding) {
-    const int tr_depth = depth - pred_cu->depth;
     cabac_data_t* cabac = (cabac_data_t*)&state->search_cabac;
     cabac_ctx_t* ctx = &(cabac->ctx.qt_cbf_model_cb[0]);
     cabac->cur_ctx = ctx;
@@ -945,7 +943,6 @@ static double search_cu(
 
   cur_cu = LCU_GET_CU_AT_PX(lcu, x_local, y_local);
   // Assign correct depth
-  cur_cu->depth = (split_tree.current_depth > MAX_DEPTH) ? MAX_DEPTH : split_tree.current_depth;
   cur_cu->type = CU_NOTSET;
   cur_cu->qp = state->qp;
   cur_cu->bdpcmMode = 0;
@@ -1045,7 +1042,8 @@ static double search_cu(
         int8_t intra_mode = intra_search.pred_cu.intra.mode;
 
         // TODO: This heavily relies to square CUs
-        if ((split_tree.current_depth != 4 || (x % 8 && y % 8)) && state->encoder_control->chroma_format != UVG_CSP_400 && tree_type != UVG_LUMA_T) {
+        if ((cur_cu->log2_height + cur_cu->log2_width >= 6 || (x % 8 && y % 8))
+          && state->encoder_control->chroma_format != UVG_CSP_400 && tree_type != UVG_LUMA_T) {
 
           intra_search.pred_cu.joint_cb_cr = 0;
           if(tree_type == UVG_CHROMA_T) {
@@ -1129,7 +1127,7 @@ static double search_cu(
 
       bool recon_chroma = true;
       bool recon_luma = tree_type != UVG_CHROMA_T;
-      if ((split_tree.current_depth == 4) || state->encoder_control->chroma_format == UVG_CSP_400 || tree_type == UVG_LUMA_T) {
+      if ((cur_cu->log2_height + cur_cu->log2_width < 6) || state->encoder_control->chroma_format == UVG_CSP_400 || tree_type == UVG_LUMA_T) {
         recon_chroma = false; 
       }
       lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
@@ -1140,7 +1138,7 @@ static double search_cu(
                          recon_luma, recon_chroma);
 
 
-      if(split_tree.current_depth == 4 && x % 8 && y % 8 && tree_type != UVG_LUMA_T && state->encoder_control->chroma_format != UVG_CSP_400) {
+      if(cur_cu->log2_height + cur_cu->log2_width < 6 && x % 8 && y % 8 && tree_type != UVG_LUMA_T && state->encoder_control->chroma_format != UVG_CSP_400) {
         intra_search.pred_cu.intra.mode_chroma = cur_cu->intra.mode_chroma;
         uvg_intra_recon_cu(state,
                            &intra_search, cu_loc,
@@ -1203,11 +1201,10 @@ static double search_cu(
         uvg_quantize_lcu_residual(state,
                                   true, has_chroma && !cur_cu->joint_cb_cr,
                                   cur_cu->joint_cb_cr, &loc,
-                                  depth,
                                   NULL,
                                   lcu,
                                   false,
-          tree_type);
+                                  tree_type);
 
         int cbf = cbf_is_set_any(cur_cu->cbf);
 
@@ -1297,7 +1294,7 @@ static double search_cu(
 
     double split_bits = 0;
 
-    if (split_tree.current_depth < MAX_DEPTH) {
+    if (cur_cu->log2_height + cur_cu->log2_width > 4) {
 
       state->search_cabac.update = 1;
       // Add cost of cu_split_flag.
@@ -1375,7 +1372,7 @@ static double search_cu(
       cu_info_t *cu_d1 = LCU_GET_CU_AT_PX(&work_tree[depth + 1], x_local, y_local);
 
       // If the best CU in depth+1 is intra and the biggest it can be, try it.
-      if (cu_d1->type == CU_INTRA && cu_d1->depth == depth + 1) {
+      if (cu_d1->type == CU_INTRA && (cu_d1->log2_height + 1 == cur_cu->log2_height || cu_d1->log2_width + 1 == cur_cu->log2_width)) {
         cabac_data_t temp_cabac;
         memcpy(&temp_cabac, &state->search_cabac, sizeof(temp_cabac));
         memcpy(&state->search_cabac, &pre_search_cabac, sizeof(pre_search_cabac));
@@ -1452,7 +1449,7 @@ static double search_cu(
         state, x, y, cu_width / 2, cu_width / 2, lcu->rec.y, lcu->left_ref.y[64]
       );      
     }
-  } else if (depth >= 0 && depth < MAX_PU_DEPTH) {
+  } else if (cur_cu->log2_height + cur_cu->log2_width > 4) {
     // Need to copy modes down since the lower level of the work tree is used
     // when searching SMP and AMP blocks.
     work_tree_copy_down(depth, work_tree, tree_type, cu_loc);
