@@ -660,10 +660,10 @@ static void set_cu_qps(encoder_state_t *state, const cu_loc_t* const cu_loc, int
 
     int y_limit = cu_loc->y + cu_loc->height;
     int x_limit = cu_loc->x + cu_loc->width;
-    if (cu->tr_depth > depth) {
+    if (cu_loc->width > TR_MAX_WIDTH || cu_loc->height > TR_MAX_WIDTH) {
       // The CU is split into smaller transform units. Check whether coded
       // block flag is set for any of the TUs.
-      const int tu_width = LCU_WIDTH >> cu->tr_depth;
+      const int tu_width = MIN(TR_MAX_WIDTH, 1 << cu->log2_width);
       for (int y_scu = cu_loc->y; !cbf_found && y_scu < y_limit; y_scu += tu_width) {
         for (int x_scu = cu_loc->x; !cbf_found && x_scu < x_limit; x_scu += tu_width) {
           cu_info_t *tu = uvg_cu_array_at(state->tile->frame->cu_array, x_scu, y_scu);

@@ -767,7 +767,6 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
         }
         else if (tu_boundary && nonzero_coeffs) {
           // Non-zero residual/coeffs and transform boundary
-          // Neither CU is intra so tr_depth <= MAX_DEPTH.
           strength = 1;
         }
         else if(cu_p->inter.mv_dir == 3 || cu_q->inter.mv_dir == 3 || state->frame->slicetype == UVG_SLICE_B) { // B-slice related checks. TODO: Need to account for cu_p being in another slice?

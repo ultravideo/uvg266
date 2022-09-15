@@ -132,8 +132,6 @@ typedef struct encoder_control_t
 
   FILE *roi_file;
 
-  int tr_depth_inter;
-
   //! pic_parameter_set
   struct {
     uint8_t dependent_slice_segments_enabled_flag;

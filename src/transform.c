@@ -1393,7 +1393,7 @@ void uvg_quantize_lcu_residual(
     cbf_clear(&cur_pu->cbf, COLOR_V);
   }
 
-  if (depth == 0 || cur_pu->tr_depth > depth) {
+  if (cu_loc->width > TR_MAX_WIDTH || cu_loc->height > TR_MAX_WIDTH) {
 
     // Split transform and increase depth
     const int offset = width / 2;
@@ -1420,13 +1420,12 @@ void uvg_quantize_lcu_residual(
       LCU_GET_CU_AT_PX(lcu, lcu_px.x,          lcu_px.y + offset)->cbf,
       LCU_GET_CU_AT_PX(lcu, lcu_px.x + offset, lcu_px.y + offset)->cbf,
     };
-
-    if (depth <= MAX_DEPTH) {
-      cur_pu->root_cbf = cbf_is_set_any(cur_pu->cbf)
+    
+    cur_pu->root_cbf = cbf_is_set_any(cur_pu->cbf)
       || cbf_is_set_any(child_cbfs[0])
       || cbf_is_set_any(child_cbfs[1])
       || cbf_is_set_any(child_cbfs[2]);
-    }
+    
 
   } else {
     // Process a leaf TU.
@@ -1440,10 +1439,10 @@ void uvg_quantize_lcu_residual(
       quantize_tr_residual(state, COLOR_U, &loc, depth, cur_pu, lcu, early_skip, tree_type);
       quantize_tr_residual(state, COLOR_V, &loc, depth, cur_pu, lcu, early_skip, tree_type);   
     }
-    if (jccr && cur_pu->tr_depth == cur_pu->depth) {
+    if (jccr && PU_IS_TU(cur_pu)) {
       quantize_tr_residual(state, COLOR_UV, &loc, depth, cur_pu, lcu, early_skip, tree_type);
     }
-    if(chroma && jccr && cur_pu->tr_depth == cur_pu->depth) {
+    if(chroma && jccr && PU_IS_TU(cur_pu)) {
       assert( 0 && "Trying to quantize both jccr and regular at the same time.\n");
     }
   }

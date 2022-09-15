@@ -158,25 +158,6 @@ static void work_tree_copy_down(
   }
 }
 
-void uvg_lcu_fill_trdepth(
-  lcu_t *lcu,
-  const cu_loc_t* const cu_loc,
-  uint8_t tr_depth,
-  enum uvg_tree_type
-  tree_type)
-{
-  const int x_local = cu_loc->local_x >> (tree_type == UVG_CHROMA_T);
-  const int y_local = cu_loc->local_y >> (tree_type == UVG_CHROMA_T);
-  const unsigned width = tree_type != UVG_CHROMA_T ? cu_loc->width  : cu_loc->chroma_width;
-  const unsigned height = tree_type != UVG_CHROMA_T ? cu_loc->height : cu_loc->chroma_height;
-
-  for (unsigned y = 0; y < height; y += SCU_WIDTH) {
-    for (unsigned x = 0; x < width; x += SCU_WIDTH) {
-      LCU_GET_CU_AT_PX(lcu, x_local + x, y_local + y)->tr_depth = tr_depth;
-    }
-  }
-}
-
 static void lcu_fill_cu_info(lcu_t *lcu, int x_local, int y_local, int width, int height, const cu_info_t *cu)
 {
   // Set mode in every CU covered by part_mode in this depth.
@@ -216,8 +197,7 @@ static void lcu_fill_cu_info(lcu_t *lcu, int x_local, int y_local, int width, in
 
 static void lcu_fill_cbf(lcu_t *lcu, int x_local, unsigned y_local, unsigned width, const cu_info_t *cur_cu)
 {
-  const uint32_t tr_split = cur_cu->tr_depth - cur_cu->depth;
-  const uint32_t mask = ~((width >> tr_split)-1);
+  const uint32_t mask = ~((MIN(width, TR_MAX_WIDTH))-1);
 
   // Set coeff flags in every CU covered by part_mode in this depth.
   for (uint32_t y = y_local; y < y_local + width; y += SCU_WIDTH) {
@@ -360,10 +340,9 @@ double uvg_cu_rd_cost_luma(
   // Add transform_tree cbf_luma bit cost.
   if (pred_cu->type == CU_INTER || pred_cu->intra.isp_mode == ISP_MODE_NO_ISP) {
     const int depth = 6 - uvg_g_convert_to_log2[cu_loc->width];
-    const int is_tr_split = tr_cu->tr_depth - tr_cu->depth;
     int is_set = cbf_is_set(pred_cu->cbf, COLOR_Y);
     if (pred_cu->type == CU_INTRA ||
-      is_tr_split ||
+      !PU_IS_TU(pred_cu) ||
       cbf_is_set(tr_cu->cbf, COLOR_U) ||
       cbf_is_set(tr_cu->cbf, COLOR_V))
     {
@@ -482,13 +461,11 @@ double uvg_cu_rd_cost_chroma(
     cabac_data_t* cabac = (cabac_data_t*)&state->search_cabac;
     cabac_ctx_t* ctx = &(cabac->ctx.qt_cbf_model_cb[0]);
     cabac->cur_ctx = ctx;
-    if (tr_depth == 0 || cbf_is_set(pred_cu->cbf, COLOR_U)) {
-      CABAC_FBITS_UPDATE(cabac, ctx, u_is_set, tr_tree_bits, "cbf_cb_search");
-    }
+    CABAC_FBITS_UPDATE(cabac, ctx, u_is_set, tr_tree_bits, "cbf_cb_search");
+    
     ctx = &(cabac->ctx.qt_cbf_model_cr[u_is_set]);
-    if (tr_depth == 0 || cbf_is_set(pred_cu->cbf, COLOR_V)) {
-      CABAC_FBITS_UPDATE(cabac, ctx, v_is_set, tr_tree_bits, "cbf_cb_search");
-    }
+    CABAC_FBITS_UPDATE(cabac, ctx, v_is_set, tr_tree_bits, "cbf_cb_search");
+    
   }
 
 
@@ -969,7 +946,6 @@ static double search_cu(
   cur_cu = LCU_GET_CU_AT_PX(lcu, x_local, y_local);
   // Assign correct depth
   cur_cu->depth = (split_tree.current_depth > MAX_DEPTH) ? MAX_DEPTH : split_tree.current_depth;
-  cur_cu->tr_depth = cu_width > TR_MAX_WIDTH || cu_height > TR_MAX_WIDTH ? 1 : split_tree.current_depth;
   cur_cu->type = CU_NOTSET;
   cur_cu->qp = state->qp;
   cur_cu->bdpcmMode = 0;
@@ -1112,9 +1088,6 @@ static double search_cu(
           intra_search.pred_cu.intra.mode_chroma = intra_mode;
         }
         intra_search.pred_cu.intra.mode = intra_mode;
-        if(tree_type == UVG_CHROMA_T) {
-          uvg_lcu_fill_trdepth(lcu, cu_loc, split_tree.current_depth, tree_type);
-        }
       }
       if (intra_cost < cost) {
         cost = intra_cost;
@@ -1216,11 +1189,6 @@ static double search_cu(
             if (cur_cu->inter.mv_dir & 1) uvg_round_precision(INTERNAL_MV_PREC, 2, &cur_cu->inter.mv[0][0], &cur_cu->inter.mv[0][1]);
             if (cur_cu->inter.mv_dir & 2) uvg_round_precision(INTERNAL_MV_PREC, 2, &cur_cu->inter.mv[1][0], &cur_cu->inter.mv[1][1]);
         }
-        // Reset transform depth because intra messes with them.
-        // This will no longer be necessary if the transform depths are not shared.
-        int tr_depth = MAX(1, split_tree.current_depth);
-
-        uvg_lcu_fill_trdepth(lcu, cu_loc, tr_depth, tree_type);
 
         const bool has_chroma = state->encoder_control->chroma_format != UVG_CSP_400;
         uvg_inter_recon_cu(state, lcu, true, has_chroma, cu_loc);
@@ -1294,12 +1262,6 @@ static double search_cu(
         cur_cu->merged = 0;
         cur_cu->skipped = 1;
         lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
-      }
-
-      if (cur_cu->tr_depth != 0) {
-        // Reset transform depth since there are no coefficients. This
-        // ensures that CBF is cleared for the whole area of the CU.
-        uvg_lcu_fill_trdepth(lcu, cu_loc, depth, tree_type);
       }
 
       cur_cu->cbf = 0;
@@ -1430,8 +1392,7 @@ static double search_cu(
         cur_cu->intra.multi_ref_idx = 0;
         cur_cu->lfnst_idx = 0;
         cur_cu->cr_lfnst_idx = 0;
-
-        uvg_lcu_fill_trdepth(lcu, cu_loc, cur_cu->tr_depth, tree_type);
+        
         lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
         
         intra_search_data_t proxy;

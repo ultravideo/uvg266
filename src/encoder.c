@@ -378,11 +378,7 @@ encoder_control_t* uvg_encoder_control_init(const uvg_config *const cfg)
   {
     goto init_failed;
   }
-
-  // NOTE: When tr_depth_inter is equal to 0, the transform is still split
-  // for SMP and AMP partition units.
-  encoder->tr_depth_inter = 0;
-
+  
   //Tiles
   encoder->tiles_enable = encoder->cfg.tiles_width_count > 1 ||
                           encoder->cfg.tiles_height_count > 1;
