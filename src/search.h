@@ -96,13 +96,6 @@ double uvg_cu_rd_cost_chroma(
   lcu_t *const lcu,
   const cu_loc_t * const);
 
-void uvg_lcu_fill_trdepth(
-  lcu_t *lcu,
-  const cu_loc_t* const cu_loc,
-  uint8_t tr_depth,
-  enum uvg_tree_type
-  tree_type);
-
 void uvg_intra_recon_lcu_luma(encoder_state_t * const state, int x, int y, int depth, int8_t intra_mode, cu_info_t *cur_cu, lcu_t *lcu);
 void uvg_intra_recon_lcu_chroma(encoder_state_t * const state, int x, int y, int depth, int8_t intra_mode, cu_info_t *cur_cu, lcu_t *lcu);
 

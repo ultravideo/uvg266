@@ -1762,7 +1762,6 @@ static void search_pu_inter(
         cur_pu->inter.mv[0][1]  = info->merge_cand[merge_idx].mv[0][1];
         cur_pu->inter.mv[1][0]  = info->merge_cand[merge_idx].mv[1][0];
         cur_pu->inter.mv[1][1]  = info->merge_cand[merge_idx].mv[1][1];
-        uvg_lcu_fill_trdepth(lcu, cu_loc, MAX(1, depth), UVG_BOTH_T);
         uvg_inter_recon_cu(state, lcu, true, false, cu_loc);
 
         uvg_quantize_lcu_residual(state, true, false, false, cu_loc, depth, cur_pu, lcu, true, UVG_BOTH_T);
@@ -2078,9 +2077,6 @@ void uvg_cu_cost_inter_rd2(
   const cu_loc_t* const cu_loc){
 
   const uint8_t depth = 6 - uvg_g_convert_to_log2[cu_loc->width];
-  int tr_depth = MAX(1, depth);
-
-  uvg_lcu_fill_trdepth(lcu, cu_loc, tr_depth, UVG_BOTH_T);
 
   const int x_px = SUB_SCU(cu_loc->x);
   const int y_px = SUB_SCU(cu_loc->y);
@@ -2130,7 +2126,7 @@ void uvg_cu_cost_inter_rd2(
     state->encoder_control->cfg.chroma_trskip_enable;
 
   double chroma_cost = 0;
-  if((state->encoder_control->cfg.jccr || can_use_chroma_tr_skip) && cur_cu->depth == cur_cu->tr_depth && reconstruct_chroma) {
+  if((state->encoder_control->cfg.jccr || can_use_chroma_tr_skip) && PU_IS_TU(cur_cu) && reconstruct_chroma) {
     uvg_quantize_lcu_residual(state,
                               true,
                               false,
@@ -2213,7 +2209,7 @@ void uvg_cu_cost_inter_rd2(
   if(cbf) {
     *inter_cost = uvg_cu_rd_cost_luma(state, cu_loc, cur_cu, lcu, 0);
     if (reconstruct_chroma) {
-      if (cur_cu->depth != cur_cu->tr_depth || !state->encoder_control->cfg.jccr) {
+      if (!PU_IS_TU(cur_cu) || !state->encoder_control->cfg.jccr) {
         *inter_cost += uvg_cu_rd_cost_chroma(state, cur_cu, lcu, cu_loc);
       }
       else {

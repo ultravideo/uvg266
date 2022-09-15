@@ -266,7 +266,6 @@ static void derive_mts_constraints(cu_info_t *const pred_cu,
 static double search_intra_trdepth(
   encoder_state_t * const state,
   const cu_loc_t* const cu_loc,
-  int max_depth,
   double cost_treshold,
   intra_search_data_t *const search_data,
   lcu_t *const lcu,
@@ -296,8 +295,6 @@ static double search_intra_trdepth(
   double nosplit_cost = INT32_MAX;
 
   if (width <= TR_MAX_WIDTH && height <= TR_MAX_WIDTH) {
-    tr_cu->tr_depth = depth;
-    pred_cu->tr_depth = depth;
 
     const bool mts_enabled = (state->encoder_control->cfg.mts == UVG_MTS_INTRA || state->encoder_control->cfg.mts == UVG_MTS_BOTH)
       && PU_IS_TU(pred_cu);
@@ -575,7 +572,7 @@ static double search_intra_trdepth(
   //   - Maximum transform hierarchy depth is constrained by clipping
   //     max_depth.
   // - Min transform size hasn't been reached (MAX_PU_DEPTH).
-  if (depth < max_depth && depth < MAX_PU_DEPTH) {
+  else {
     cu_loc_t split_cu_loc;
 
     const int half_width = width / 2;
@@ -583,28 +580,24 @@ static double search_intra_trdepth(
     split_cost = 0;
 
     uvg_cu_loc_ctor(&split_cu_loc, cu_loc->x, cu_loc->y, half_width, half_height);
-    split_cost += search_intra_trdepth(state, &split_cu_loc, max_depth, nosplit_cost, search_data, lcu, tree_type);
+    split_cost += search_intra_trdepth(state, &split_cu_loc, nosplit_cost, search_data, lcu, tree_type);
     if (split_cost < nosplit_cost) {
       uvg_cu_loc_ctor(&split_cu_loc, cu_loc->x + half_width, cu_loc->y, half_width, half_height);
-      split_cost += search_intra_trdepth(state, &split_cu_loc, max_depth, nosplit_cost, search_data, lcu, tree_type);
+      split_cost += search_intra_trdepth(state, &split_cu_loc, nosplit_cost, search_data, lcu, tree_type);
     }
     if (split_cost < nosplit_cost) {
       uvg_cu_loc_ctor(&split_cu_loc, cu_loc->x, cu_loc->y + half_height, half_width, half_height);
-      split_cost += search_intra_trdepth(state, &split_cu_loc, max_depth, nosplit_cost, search_data, lcu, tree_type);
+      split_cost += search_intra_trdepth(state, &split_cu_loc, nosplit_cost, search_data, lcu, tree_type);
     }
     if (split_cost < nosplit_cost) {
       uvg_cu_loc_ctor(&split_cu_loc, cu_loc->x + half_width, cu_loc->y + half_height, half_width, half_height);
-      split_cost += search_intra_trdepth(state, &split_cu_loc, max_depth, nosplit_cost, search_data, lcu, tree_type);
+      split_cost += search_intra_trdepth(state, &split_cu_loc, nosplit_cost, search_data, lcu, tree_type);
     }
-    
-  } else {
-    assert(width <= TR_MAX_WIDTH);
   }
 
   if (depth == 0 || split_cost < nosplit_cost) {
     return split_cost;
   } else {
-    uvg_lcu_fill_trdepth(lcu, cu_loc, depth, tree_type);
     return nosplit_cost;
   }
 }
@@ -1314,7 +1307,6 @@ static int8_t search_intra_rdo(
   const cu_loc_t* const cu_loc)
 {
   const int8_t depth = 6 - uvg_g_convert_to_log2[cu_loc->width];
-  const int tr_depth = CLIP(1, MAX_PU_DEPTH, depth + state->encoder_control->cfg.tr_depth_intra);
   const int width = cu_loc->width;
   const int height = cu_loc->height; // TODO: height for non-square blocks
   
@@ -1338,7 +1330,7 @@ static int8_t search_intra_rdo(
       search_data[mode].bits = rdo_bitcost;
       search_data[mode].cost = rdo_bitcost * state->lambda;
 
-      double mode_cost = search_intra_trdepth(state, cu_loc, tr_depth, MAX_INT, &search_data[mode], lcu, tree_type);
+      double mode_cost = search_intra_trdepth(state, cu_loc, MAX_INT, &search_data[mode], lcu, tree_type);
       best_mts_mode_for_isp[isp_mode] = search_data[mode].pred_cu.tr_idx;
       best_lfnst_mode_for_isp[isp_mode] = search_data[mode].pred_cu.lfnst_idx;
       search_data[mode].cost += mode_cost;
@@ -1492,7 +1484,7 @@ int8_t uvg_search_intra_chroma_rdo(
         }
         pred_cu->cr_lfnst_idx = lfnst;
         chroma_data[mode_i].lfnst_costs[lfnst] += mode_bits * state->lambda;
-        if (pred_cu->tr_depth == pred_cu->depth) {
+        if (PU_IS_TU(pred_cu)) {
           uvg_intra_predict(
             state,
             &refs[COLOR_U - 1],
@@ -1898,12 +1890,6 @@ void uvg_search_cu_intra(
     number_of_modes += num_mip_modes;
   }
 
-
-  // Set transform depth to current depth, meaning no transform splits.
-  {
-    const int8_t depth = 6 - uvg_g_convert_to_log2[cu_loc->width];
-    uvg_lcu_fill_trdepth(lcu, cu_loc, depth, tree_type);
-  }
   // Refine results with slower search or get some results if rough search was skipped.
   const int32_t rdo_level = state->encoder_control->cfg.rdo;
   if (rdo_level >= 2 || skip_rough_search) {

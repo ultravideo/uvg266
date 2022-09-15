@@ -80,7 +80,6 @@ int uvg_config_init(uvg_config *cfg)
   cfg->trskip_max_size = 2; //Default to 4x4
   cfg->mts             = 0;
   cfg->mts_implicit    = 0;
-  cfg->tr_depth_intra  = 0;
   cfg->ime_algorithm   = 0; /* hexbs */
   cfg->fme_level       = 4;
   cfg->source_scan_type = 0; /* progressive */
@@ -926,8 +925,6 @@ int uvg_config_parse(uvg_config *cfg, const char *name, const char *value)
     cfg->mts = mts_type;
     cfg->mts_implicit = (mts_type == UVG_MTS_IMPLICIT);
   }
-  else if OPT("tr-depth-intra")
-    cfg->tr_depth_intra = atoi(value);
   else if OPT("me") {
     int8_t ime_algorithm = 0;
     if (!parse_enum(value, me_names, &ime_algorithm)) return 0;
@@ -1669,12 +1666,6 @@ int uvg_config_validate(const uvg_config *const cfg)
 
   if (cfg->rdo < 0 || cfg->rdo > 3) {
     fprintf(stderr, "Input error: --rd parameter out of range [0..3]\n");
-    error = 1;
-  }
-
-  if (cfg->tr_depth_intra < 0 || cfg->tr_depth_intra > 4) {
-    // range is 0 .. CtbLog2SizeY - Log2MinTrafoSize
-    fprintf(stderr, "Input error: --tr-depth-intra is out of range [0..4]\n");
     error = 1;
   }
 

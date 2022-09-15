@@ -338,7 +338,6 @@ typedef struct uvg_config
   int32_t trskip_max_size;    /*!< \brief Transform skip max block size. */
   enum uvg_mts mts;        /*< \brief flag to enable multiple transform selection*/
   int32_t mts_implicit;        /*< \brief flag to enable implicit multiple transform selection*/
-  int32_t tr_depth_intra; /*!< \brief Maximum transform depth for intra. */
   enum uvg_ime_algorithm ime_algorithm;  /*!< \brief Integer motion estimation algorithm. */
   int32_t fme_level;      /*!< \brief Fractional pixel motion estimation level (0: disabled, 1: enabled). */
   int8_t source_scan_type; /*!< \brief Source scan type (0: progressive, 1: top field first, 2: bottom field first).*/
