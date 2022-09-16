@@ -971,6 +971,7 @@ static void intra_predict_regular(
   // pdpc
   // bool pdpcCondition = (mode == 0 || mode == 1 || mode == 18 || mode == 50);
   bool pdpcCondition = (mode == 0 || mode == 1); // Planar and DC
+  pdpcCondition &= width >= TR_MIN_WIDTH && height >= TR_MIN_WIDTH;
   if (pdpcCondition && multi_ref_index == 0) // Cannot be used with MRL.
   {
     uvg_pdpc_planar_dc(mode, cu_loc, color, used_ref, dst);

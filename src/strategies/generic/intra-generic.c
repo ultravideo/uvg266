@@ -302,7 +302,7 @@ static void uvg_angular_pred_generic(
 
      
       // PDPC
-      bool PDPC_filter = (tmp_width >= 4 || channel_type != 0);
+      bool PDPC_filter = ((tmp_width >= TR_MIN_WIDTH && tmp_height >= TR_MIN_WIDTH)  || channel_type != 0);
       if (pred_mode > 1 && pred_mode < 67) {
         if (mode_disp < 0 || multi_ref_index) { // Cannot be used with MRL.
           PDPC_filter = false;

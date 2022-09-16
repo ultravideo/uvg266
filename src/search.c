@@ -1139,8 +1139,12 @@ static double search_cu(
       for (int i = 0; i < split_num; ++i) {
         cu_loc_t isp_loc;
         uvg_get_isp_split_loc(&isp_loc, x, y, cu_width, cu_height, i, split_type);
-        //search_data->best_isp_cbfs |= cbf_is_set(cur_cu->cbf, depth, COLOR_Y) << (i++);
-        cu_info_t* split_cu = LCU_GET_CU_AT_PX(lcu, isp_loc.x % LCU_WIDTH, isp_loc.y % LCU_WIDTH);
+        // Fetching from CU array does not work for dimensions less than 4
+        // Fetch proper x, y coords for isp blocks
+        int tmp_x = isp_loc.x;
+        int tmp_y = isp_loc.y;
+        uvg_get_isp_cu_arr_coords(&tmp_x, &tmp_y);
+        cu_info_t* split_cu = LCU_GET_CU_AT_PX(lcu, tmp_x % LCU_WIDTH, tmp_y % LCU_WIDTH);
         bool cur_cbf = (intra_search.best_isp_cbfs >> i) & 1;
         cbf_clear(&split_cu->cbf, depth, COLOR_Y);
         cbf_clear(&split_cu->cbf, depth, COLOR_U);

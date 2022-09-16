@@ -542,7 +542,10 @@ static void encode_transform_unit(
   const uint8_t height_c = cu_loc->chroma_height;
 
   cu_array_t* used_cu_array = tree_type != UVG_CHROMA_T ? frame->cu_array : frame->chroma_cu_array;
-  const cu_info_t *cur_pu = uvg_cu_array_at_const(used_cu_array, x, y);
+  int isp_x = x;
+  int isp_y = y;
+  uvg_get_isp_cu_arr_coords(&isp_x, &isp_y);
+  const cu_info_t *cur_pu = uvg_cu_array_at_const(used_cu_array, isp_x, isp_y);
 
   int8_t scan_idx = uvg_get_scan_order(cur_pu->type, cur_pu->intra.mode, depth);
 
@@ -627,12 +630,16 @@ static void encode_transform_coeff(
   cu_loc_t *original_loc)       // Original dimensions before ISP split
 {
   cabac_data_t * const cabac = &state->cabac;
-  const int x = cu_loc->x;
-  const int y = cu_loc->y;
+  int x = cu_loc->x;
+  int y = cu_loc->y;
   const int width = cu_loc->width;
   const int height = cu_loc->height;
 
   bool isp_split = cu_loc->x != original_loc->x || cu_loc->y != original_loc->y;
+
+  if (isp_split) {
+    uvg_get_isp_cu_arr_coords(&x, &y);
+  }
 
   //const encoder_control_t *const ctrl = state->encoder_control;
   const videoframe_t * const frame = state->tile->frame;
@@ -643,7 +650,7 @@ static void encode_transform_coeff(
   // containing CU.
   const int x_cu = 8 * (x / 8);
   const int y_cu = 8 * (y / 8);
-  const cu_info_t *cur_cu = uvg_cu_array_at_const(used_array, x, y);
+  const cu_info_t *cur_cu = uvg_cu_array_at_const(used_array, x, y); // TODO: very suspect, chroma cbfs stored in upper left corner, everything else in bottom right for depth 4
 
   // NxN signifies implicit transform split at the first transform level.
   // There is a similar implicit split for inter, but it is only used when

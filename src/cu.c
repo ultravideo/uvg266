@@ -97,6 +97,42 @@ cu_info_t* uvg_cu_array_at(cu_array_t *cua, unsigned x_px, unsigned y_px)
 }
 
 
+void uvg_get_isp_cu_arr_coords(int *x, int *y)
+{
+  // Do nothing if dimensions are divisible by 4
+  if (*y % 4 == 0 && *x % 4 == 0) return;
+  const int remainder_y = *y % 4;
+  const int remainder_x = *x % 4;
+
+  if (remainder_y != 0) {
+    // Horizontal ISP split
+    if (remainder_y % 2 == 0) {
+      // 8x2 block
+      *y -= 2;
+      *x += 4;
+    }
+    else {
+      // 16x1 block
+      *y -= remainder_y;
+      *x += remainder_y * 4;
+    }
+  }
+  else {
+    // Vertical ISP split
+    if (*x % 2 == 0) {
+      // 2x8 block
+      *y += 4;
+      *x -= 2;
+    }
+    else {
+      // 1x16 block
+      *y += remainder_x * 4;
+      *x -= remainder_x;
+    }
+  }
+}
+
+
 const cu_info_t* uvg_cu_array_at_const(const cu_array_t *cua, unsigned x_px, unsigned y_px)
 {
   assert(x_px < cua->width);
