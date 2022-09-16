@@ -1248,7 +1248,8 @@ void uvg_intra_build_reference_inner(
   const int cu_x = cu_loc->x;
   const int cu_y = cu_loc->y;
 
-  assert((log2_width >= 2 && log2_width <= 5) && (log2_height >= 2 && log2_height <= 5));
+  // Log2_dim 1 is possible with ISP blocks
+  assert((log2_width >= 1 && log2_width <= 5) && (log2_height >= 1 && log2_height <= 5));
 
   refs->filtered_initialized = false;
   uvg_pixel * __restrict out_left_ref = &refs->ref.left[0];
