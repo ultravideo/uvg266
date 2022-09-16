@@ -1027,7 +1027,7 @@ const int16_t uvg_g_DCT8P16[256] = DEFINE_DCT8_P16_MATRIX(88, 88, 87, 85, 81, 77
 const int16_t uvg_g_DCT8P32[1024] = DEFINE_DCT8_P32_MATRIX(90, 90, 89, 88, 87, 86, 85, 84, 82, 80, 78, 77, 74, 72, 68, 66, 63, 60, 56, 53, 50, 46, 42, 38, 34, 30, 26, 21, 17, 13, 9, 4);
 
 // ********************************** DCT-2 **********************************
-void fastForwardDCT2_B2(const int16_t* src, int16_t* dst, int32_t shift, int line, int skip_line, int skip_line2)
+static void fastForwardDCT2_B2(const int16_t* src, int16_t* dst, int32_t shift, int line, int skip_line, int skip_line2)
 {
   int32_t j;
   int32_t E, O;
@@ -1061,7 +1061,7 @@ void fastForwardDCT2_B2(const int16_t* src, int16_t* dst, int32_t shift, int lin
   }
 }
 
-void fastInverseDCT2_B2(const int16_t* src, int16_t* dst, int shift, int line, int skip_line, int skip_line2)
+static void fastInverseDCT2_B2(const int16_t* src, int16_t* dst, int shift, int line, int skip_line, int skip_line2)
 {
   int32_t j;
   int32_t E, O;
