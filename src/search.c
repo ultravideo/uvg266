@@ -1336,22 +1336,19 @@ static double search_cu(
     // It is ok to interrupt the search as soon as it is known that
     // the split costs at least as much as not splitting.
     if (cur_cu->type == CU_NOTSET || cbf || state->encoder_control->cfg.cu_split_termination == UVG_CU_SPLIT_TERMINATION_OFF) {
-      cu_loc_t new_cu_loc;
+      cu_loc_t new_cu_loc[4];
+      uvg_get_split_locs(cu_loc, QT_SPLIT, new_cu_loc);
       if (split_cost < cost) {
-        uvg_cu_loc_ctor(&new_cu_loc, x, y, half_cu, half_cu);
-        split_cost += search_cu(state, &new_cu_loc, work_tree, tree_type, new_split);
+        split_cost += search_cu(state, &new_cu_loc[0], work_tree, tree_type, new_split);
       }
       if (split_cost < cost) {
-        uvg_cu_loc_ctor(&new_cu_loc, x + half_cu, y, half_cu, half_cu);
-        split_cost += search_cu(state, &new_cu_loc, work_tree, tree_type, new_split);
+        split_cost += search_cu(state, &new_cu_loc[1], work_tree, tree_type, new_split);
       }
       if (split_cost < cost) {
-        uvg_cu_loc_ctor(&new_cu_loc, x, y + half_cu, half_cu, half_cu);
-        split_cost += search_cu(state, &new_cu_loc, work_tree, tree_type, new_split);
+        split_cost += search_cu(state, &new_cu_loc[2], work_tree, tree_type, new_split);
       }
       if (split_cost < cost) {
-        uvg_cu_loc_ctor(&new_cu_loc, x + half_cu, y + half_cu, half_cu, half_cu);
-        split_cost += search_cu(state, &new_cu_loc, work_tree, tree_type, new_split);
+        split_cost += search_cu(state, &new_cu_loc[3], work_tree, tree_type, new_split);
       }
     } else {
       split_cost = INT_MAX;
