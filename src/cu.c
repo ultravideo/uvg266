@@ -315,3 +315,42 @@ void uvg_cu_loc_ctor(cu_loc_t* loc, int x, int y, int width, int height)
   loc->chroma_width = MAX(width >> 1, 4);
   loc->chroma_height = MAX(height >> 1, 4);
 }
+
+
+void uvg_get_split_locs(const cu_loc_t* const origin, enum split_type split, cu_loc_t out[4])
+{
+  const int half_width = origin->width >> 1;
+  const int half_height = origin->height >> 1;
+  const int quarter_width = origin->width >> 2;
+  const int quarter_height = origin->height >> 2;
+
+  switch (split) {
+    case NO_SPLIT:
+      assert(0 && "trying to get split from no split");
+    break;
+    case QT_SPLIT:
+      uvg_cu_loc_ctor(&out[0], origin->x, origin->y, half_width, half_height);
+      uvg_cu_loc_ctor(&out[1], origin->x + half_width, origin->y, half_width, half_height);
+      uvg_cu_loc_ctor(&out[2], origin->x, origin->y + half_height, half_width, half_height);
+      uvg_cu_loc_ctor(&out[3], origin->x + half_width, origin->y + half_height, half_width, half_height);
+    break;
+    case BT_HOR_SPLIT:
+      uvg_cu_loc_ctor(&out[0], origin->x, origin->y, origin->width, half_height);
+      uvg_cu_loc_ctor(&out[1], origin->x, origin->y + half_height, origin->width, half_height);
+    break;
+    case BT_VER_SPLIT:
+      uvg_cu_loc_ctor(&out[0], origin->x, origin->y, half_width, origin->height);
+      uvg_cu_loc_ctor(&out[1], origin->x + half_width, origin->y, half_width, origin->height);
+    break;
+    case TT_HOR_SPLIT:
+      uvg_cu_loc_ctor(&out[0], origin->x, origin->y, origin->width, quarter_height);
+      uvg_cu_loc_ctor(&out[1], origin->x, origin->y + quarter_height, origin->width, half_height);
+      uvg_cu_loc_ctor(&out[2], origin->x, origin->y + quarter_height + half_height, origin->width, quarter_height);
+    break;
+    case TT_VER_SPLIT:
+      uvg_cu_loc_ctor(&out[0], origin->x, origin->y, quarter_width, origin->height);
+      uvg_cu_loc_ctor(&out[1], origin->x + quarter_width, origin->y, half_width, origin->height);
+      uvg_cu_loc_ctor(&out[2], origin->x + quarter_width + half_width, origin->y, quarter_width, origin->height);
+    break;
+  }
+}
