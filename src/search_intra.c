@@ -373,7 +373,7 @@ static double search_intra_trdepth(
       for (trafo = mts_start; trafo < num_transforms; trafo++) {
         pred_cu->tr_idx = trafo;
         pred_cu->tr_skip = trafo == MTS_SKIP;
-        bool constraints[2] = { false, false};
+        bool constraints[2] = {false, false};
         if (mts_enabled) {
           pred_cu->mts_last_scan_pos = 0;
           pred_cu->violates_mts_coeff_constraint = 0;
