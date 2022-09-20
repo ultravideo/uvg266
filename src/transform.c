@@ -1297,6 +1297,7 @@ static void quantize_tr_residual(
     
   }
 
+  // ISP_TODO: does this cu point to correct cbf when ISP is used for small blocks?
   cbf_clear(&cur_pu->cbf, depth, color);
   if (has_coeffs) {
     for (int j = 0; j < tr_height; ++j) {
@@ -1353,7 +1354,7 @@ void uvg_quantize_lcu_residual(
 
   // Tell clang-analyzer what is up. For some reason it can't figure out from
   // asserting just depth.
-  // Width 2 is possible with ISP blocks
+  // Width 2 is possible with ISP blocks // ISP_TODO: no, they actually are not
   assert(width ==  2 ||
          width ==  4 ||
          width ==  8 ||
@@ -1363,6 +1364,7 @@ void uvg_quantize_lcu_residual(
 
   // Reset CBFs because CBFs might have been set
   // for depth earlier
+  // ISP_TODO: does this cur_cu point to the correct place when ISP is used for small blocks?
   if (luma) {
     cbf_clear(&cur_pu->cbf, depth, COLOR_Y);
   }

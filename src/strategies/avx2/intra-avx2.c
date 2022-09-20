@@ -357,7 +357,7 @@ static void uvg_angular_pred_avx2(
           PDPC_filter = false;
         }
         else if (mode_disp > 0) {
-          PDPC_filter = (scale >= 0);
+          PDPC_filter &= (scale >= 0);
         }
       }
       if(PDPC_filter) {
