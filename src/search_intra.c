@@ -333,7 +333,9 @@ static double search_intra_trdepth(
     }
     const int mts_start = trafo;
     //TODO: height
-    if (state->encoder_control->cfg.trskip_enable && width <= (1 << state->encoder_control->cfg.trskip_max_size) /*&& height == 4*/) {
+    if (state->encoder_control->cfg.trskip_enable && 
+        width <= (1 << state->encoder_control->cfg.trskip_max_size) /*&& height == 4*/ && 
+        pred_cu->intra.isp_mode == ISP_MODE_NO_ISP) { // tr_skip cannot be used wit ISP
       num_transforms = MAX(num_transforms, 2);
     }
     pred_cu->intra.mode_chroma = -1;
@@ -349,10 +351,9 @@ static double search_intra_trdepth(
     }
 
     int start_idx = 0;
-    int end_idx = state->encoder_control->cfg.lfnst && depth == pred_cu->
-                  tr_depth ?
-                    max_lfnst_idx :
-                    0;
+    int end_idx = state->encoder_control->cfg.lfnst && 
+                  depth == pred_cu->tr_depth &&
+                  uvg_can_use_isp_with_lfnst(width, height, pred_cu->intra.isp_mode, tree_type) ? max_lfnst_idx : 0;
     for (int i = start_idx; i < end_idx + 1; ++i) {
       search_data->lfnst_costs[i] = MAX_DOUBLE;
     }
@@ -365,10 +366,10 @@ static double search_intra_trdepth(
       pred_cu->violates_lfnst_constrained_chroma = false;
       pred_cu->lfnst_last_scan_pos = false;
 
-      if (pred_cu->lfnst_idx != 0) {
-        // Cannot use ISP with LFNST for small blocks
-        pred_cu->intra.isp_mode = uvg_can_use_isp_with_lfnst(width, height, pred_cu->intra.isp_mode, tree_type) ? pred_cu->intra.isp_mode : ISP_MODE_NO_ISP;
-      }
+      //if (pred_cu->lfnst_idx != 0) {
+      //  // Cannot use ISP with LFNST for small blocks
+      //  pred_cu->intra.isp_mode = uvg_can_use_isp_with_lfnst(width, height, pred_cu->intra.isp_mode, tree_type) ? pred_cu->intra.isp_mode : ISP_MODE_NO_ISP;
+      //}
 
       for (trafo = mts_start; trafo < num_transforms; trafo++) {
         pred_cu->tr_idx = trafo;
