@@ -1657,13 +1657,13 @@ void uvg_encode_coding_tree(
       // ISP split is done horizontally or vertically depending on ISP mode, 2 or 4 times depending on block dimensions.
       // Small blocks are split only twice.
       int split_type = cur_cu->intra.isp_mode;
-      int split_limit = split_type == ISP_MODE_NO_ISP ? 1 : uvg_get_isp_split_num(cu_width, cu_height, split_type);
+      int split_limit = split_type == ISP_MODE_NO_ISP ? 1 : uvg_get_isp_split_num(cu_width, cu_height, split_type, true);
       luma_cbf_ctx = split_limit != 1 ? 2 : 0;
       // If all first three splits have luma cbf 0, the last one must be one. Since the value ca be derived, no need to write it
       bool can_skip_last_cbf = true;
       for (int i = 0; i < split_limit; ++i) {
         cu_loc_t split_loc;
-        uvg_get_isp_split_loc(&split_loc, x, y, cu_width, cu_height, i, split_type);
+        uvg_get_isp_split_loc(&split_loc, x, y, cu_width, cu_height, i, split_type, true);
 
         // Check if last split to write chroma
         bool last_split = (i + 1) == split_limit;

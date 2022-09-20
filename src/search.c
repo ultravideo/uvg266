@@ -370,7 +370,8 @@ double uvg_cu_rd_cost_luma(const encoder_state_t *const state,
   }
   else {
     // TODO: 8x4 CUs
-    for (int i = 0; i < 4; i++) {
+    const int split_limit = uvg_get_isp_split_num(width, height, pred_cu->intra.isp_mode, true);
+    for (int i = 0; i < split_limit; i++) {
       int luma_ctx = 2;
       if (i != 3 && isp_cbf != 0x8) {
         const int flag = (isp_cbf >> i) & 1;
@@ -400,11 +401,11 @@ double uvg_cu_rd_cost_luma(const encoder_state_t *const state,
     }
     else {
       int split_type = pred_cu->intra.isp_mode;
-      int split_limit = uvg_get_isp_split_num(width, height, split_type);
+      int split_limit = uvg_get_isp_split_num(width, height, split_type, true);
 
       for (int i = 0; i < split_limit; ++i) {
         cu_loc_t split_loc;
-        uvg_get_isp_split_loc(&split_loc, x_px, y_px, width, height, i, split_type);
+        uvg_get_isp_split_loc(&split_loc, x_px, y_px, width, height, i, split_type, true);
         const int part_x = split_loc.x;
         const int part_y = split_loc.y;
 
@@ -603,7 +604,8 @@ static double cu_rd_cost_tr_split_accurate(
   }
   else {
     // TODO: 8x4 CUs
-    for (int i = 0; i < 4; i++) {
+    const int split_limit = uvg_get_isp_split_num(width, height, pred_cu->intra.isp_mode, true);
+    for (int i = 0; i < split_limit; i++) {
       int luma_ctx = 2;
       if (i != 3 && isp_cbf != 0x8) {
         const int flag = (isp_cbf >> i) & 1;
@@ -647,11 +649,11 @@ static double cu_rd_cost_tr_split_accurate(
     }
     else {
       int split_type = pred_cu->intra.isp_mode;
-      int split_limit = uvg_get_isp_split_num(width, height, split_type);
+      int split_limit = uvg_get_isp_split_num(width, height, split_type, true);
 
       for (int i = 0; i < split_limit; ++i) {
         cu_loc_t split_loc;
-        uvg_get_isp_split_loc(&split_loc, x_px, y_px, width, height, i, split_type);
+        uvg_get_isp_split_loc(&split_loc, x_px, y_px, width, height, i, split_type, true);
         const int part_x = split_loc.x;
         const int part_y = split_loc.y;
 
@@ -1164,14 +1166,14 @@ static double search_cu(
 
       // Set isp split cbfs here
       const int split_type = intra_search.pred_cu.intra.isp_mode;
-      const int split_num = split_type == ISP_MODE_NO_ISP ? 0 : uvg_get_isp_split_num(cu_width, cu_height, split_type);
+      const int split_num = split_type == ISP_MODE_NO_ISP ? 0 : uvg_get_isp_split_num(cu_width, cu_height, split_type, true);
 
       const int cbf_cb = cbf_is_set(cur_cu->cbf, depth, COLOR_U);
       const int cbf_cr = cbf_is_set(cur_cu->cbf, depth, COLOR_V);
       const int jccr = cur_cu->joint_cb_cr;
       for (int i = 0; i < split_num; ++i) {
         cu_loc_t isp_loc;
-        uvg_get_isp_split_loc(&isp_loc, x, y, cu_width, cu_height, i, split_type);
+        uvg_get_isp_split_loc(&isp_loc, x, y, cu_width, cu_height, i, split_type, true);
         // Fetching from CU array does not work for dimensions less than 4
         // Fetch proper x, y coords for isp blocks
         int tmp_x = isp_loc.x;
@@ -1179,6 +1181,7 @@ static double search_cu(
         uvg_get_isp_cu_arr_coords(&tmp_x, &tmp_y);
         cu_info_t* split_cu = LCU_GET_CU_AT_PX(lcu, tmp_x % LCU_WIDTH, tmp_y % LCU_WIDTH);
         bool cur_cbf = (intra_search.best_isp_cbfs >> i) & 1;
+        // ISP_TODO: here, cbfs are also set for chroma for all ISP splits, is this behavior wanted?
         cbf_clear(&split_cu->cbf, depth, COLOR_Y);
         cbf_clear(&split_cu->cbf, depth, COLOR_U);
         cbf_clear(&split_cu->cbf, depth, COLOR_V);

@@ -1077,6 +1077,10 @@ void uvg_intra_build_reference_any(
       }
       else {
         px_available_left = num_ref_pixels_left[lcu_px.y / 4][lcu_px.x / 4];
+        // This table does not have values for dimensions less than 4
+        if (lcu_px.y % 4 != 0) {
+          px_available_left -= 2;
+        }
       }
     }
     else {
@@ -1085,7 +1089,6 @@ void uvg_intra_build_reference_any(
 
     // Limit the number of available pixels based on block size and dimensions
     // of the picture.
-    // TODO: height for non-square blocks
     px_available_left = MIN(px_available_left, cu_height * 2 + multi_ref_index);
     px_available_left = MIN(px_available_left, (pic_px->y - luma_px->y) >> is_chroma);
 
@@ -1364,6 +1367,10 @@ void uvg_intra_build_reference_inner(
     }
     else {
       px_available_left = num_ref_pixels_left[lcu_px.y / 4][lcu_px.x / 4];
+      // This table does not have values for dimensions less than 4
+      if (lcu_px.y % 4 != 0) {
+        px_available_left -= 2;
+      }
     }
 
   }
@@ -1378,13 +1385,24 @@ void uvg_intra_build_reference_inner(
 
   // Copy pixels from coded CUs.
   int i = multi_ref_index;  // Offset by multi_ref_index
-  do {
-    out_left_ref[i + 1] = left_border[(i + 0 - multi_ref_index) * left_stride];
-    out_left_ref[i + 2] = left_border[(i + 1 - multi_ref_index) * left_stride];
-    out_left_ref[i + 3] = left_border[(i + 2 - multi_ref_index) * left_stride];
-    out_left_ref[i + 4] = left_border[(i + 3 - multi_ref_index) * left_stride];
-    i += 4;
-  } while (i < px_available_left);
+  
+  // Do different loop for heights smaller than 4 (possible for some ISP splits)
+  if (lcu_px.y % 4 != 0) {
+    do {
+      out_left_ref[i + 1] = left_border[(i + 0 - multi_ref_index) * left_stride];
+      out_left_ref[i + 2] = left_border[(i + 1 - multi_ref_index) * left_stride];
+      i += 2;
+    } while (i < px_available_left);
+  }
+  else {
+    do {
+      out_left_ref[i + 1] = left_border[(i + 0 - multi_ref_index) * left_stride];
+      out_left_ref[i + 2] = left_border[(i + 1 - multi_ref_index) * left_stride];
+      out_left_ref[i + 3] = left_border[(i + 2 - multi_ref_index) * left_stride];
+      out_left_ref[i + 4] = left_border[(i + 3 - multi_ref_index) * left_stride];
+      i += 4;
+    } while (i < px_available_left);
+  }
 
   // Extend the last pixel for the rest of the reference values.
   uvg_pixel nearest_pixel = out_left_ref[i];
@@ -1556,7 +1574,7 @@ const cu_info_t* uvg_get_co_located_luma_cu(
 * \param height       Block height.
 * \param split_type   Horizontal or vertical split.
 */
-int uvg_get_isp_split_dim(const int width, const int height, const int split_type)
+int uvg_get_isp_split_dim(const int width, const int height, const int split_type, const bool is_transform_split)
 {
   assert(split_type != ISP_MODE_NO_ISP && "Cannot calculate split dimension if no split type is set. Make sure this function is not called in this case.");
 
@@ -1576,35 +1594,45 @@ int uvg_get_isp_split_dim(const int width, const int height, const int split_typ
   const int factor_to_min_samples = non_split_dim_size < min_num_samples ? min_num_samples >> uvg_math_floor_log2(non_split_dim_size) : 1;
   partition_size = (split_dim_size >> div_shift) < factor_to_min_samples ? factor_to_min_samples : (split_dim_size >> div_shift);
 
+  // Minimum width for ISP splits are 4. (JVET-T2001 chapter 8.4.5.1 equation 246: nPbW = Max(4, nW)) 
+  // Except this does not apply for transform blocks for some reason. VTM does seem to expect 4 transform blocks even if only two pred blocks were used
+  // Height can be 2.
+  if (!divide_in_rows && !is_transform_split) {
+    partition_size = MAX(4, partition_size);
+  }
+
   assert((uvg_math_floor_log2(partition_size) + uvg_math_floor_log2(non_split_dim_size) >= uvg_math_floor_log2(min_num_samples)) &&
     "Partition has less than allowed minimum number of samples.");
   return partition_size;
 }
 
 
-int uvg_get_isp_split_num(const int width, const int height, const int split_type)
+int uvg_get_isp_split_num(const int width, const int height, const int split_type, const bool is_transform_split)
 {
   assert((split_type != ISP_MODE_NO_ISP) && "This function cannot be called if ISP mode is 0.");
-  int split_dim = uvg_get_isp_split_dim(width, height, split_type);
+  int split_dim = uvg_get_isp_split_dim(width, height, split_type, is_transform_split);
   int num = split_type == ISP_MODE_HOR ? height / split_dim : width / split_dim;
 
   return num;
 }
 
 
-void uvg_get_isp_split_loc(cu_loc_t *loc, const int x, const int y, const int block_w, const int block_h, const int split_idx, const int split_type)
+void uvg_get_isp_split_loc(cu_loc_t *loc, const int x, const int y, const int block_w, const int block_h, int split_idx, const int split_type, const bool is_transform_split)
 {
   assert((split_idx >= 0 && split_idx <= 3) && "ISP split index must be in [0, 3].");
   assert((split_type != ISP_MODE_NO_ISP || split_idx == 0) && "Trying to ISP split when split type = NO_ISP.");
   int part_dim = block_w;
   if (split_type != ISP_MODE_NO_ISP) {
-    part_dim = uvg_get_isp_split_dim(block_w, block_h, split_type);
+    part_dim = uvg_get_isp_split_dim(block_w, block_h, split_type, is_transform_split);
+  }
+  if(split_type == ISP_MODE_VER && block_w < 16 && !is_transform_split) {
+    split_idx /= 2;
   }
   const int offset = part_dim * split_idx;
 
   const int part_x = split_type == ISP_MODE_HOR ? x : x + offset;
   const int part_y = split_type == ISP_MODE_HOR ? y + offset : y;
-  const int part_w = split_type == ISP_MODE_HOR ? block_w : part_dim;
+  const int part_w = split_type == ISP_MODE_HOR ? block_w  : part_dim;
   const int part_h = split_type == ISP_MODE_HOR ? part_dim : block_h;
 
   uvg_cu_loc_ctor(loc, part_x, part_y, part_w, part_h);
@@ -1773,17 +1801,21 @@ void uvg_intra_recon_cu(
     // ISP split is done horizontally or vertically depending on ISP mode, 2 or 4 times depending on block dimensions.
     // Small blocks are split only twice.
     int split_type = search_data->pred_cu.intra.isp_mode;
-    int split_limit = uvg_get_isp_split_num(width, height, split_type);
+    int split_limit = uvg_get_isp_split_num(width, height, split_type, true);
     cu_loc_t origin_cu;
     uvg_cu_loc_ctor(&origin_cu, x, y, width, height);
 
     for (int i = 0; i < split_limit; ++i) {
-      cu_loc_t split_loc;
-      uvg_get_isp_split_loc(&split_loc, x, y, width, height, i, split_type);
+      cu_loc_t tu_loc;
+      uvg_get_isp_split_loc(&tu_loc, x, y, width, height, i, split_type, true);
+      cu_loc_t pu_loc;
+      uvg_get_isp_split_loc(&pu_loc, x, y, width, height, i, split_type, false);
 
-      intra_recon_tb_leaf(state, &split_loc, &origin_cu, lcu, COLOR_Y, search_data, tree_type);
+      if(tu_loc.x % 4 == 0) {
+        intra_recon_tb_leaf(state, &pu_loc, &origin_cu, lcu, COLOR_Y, search_data, tree_type);
+      }
       uvg_quantize_lcu_residual(state, true, false, false,
-        &split_loc, depth, cur_cu, lcu,
+        &tu_loc, depth, cur_cu, lcu,
         false, tree_type);
       search_data->best_isp_cbfs |= cbf_is_set(cur_cu->cbf, depth, COLOR_Y) << i;
     }
@@ -1855,8 +1887,8 @@ bool uvg_can_use_isp_with_lfnst(const int width, const int height, const int isp
     return false;
   }
 
-  const int tu_width = (isp_split_type == ISP_MODE_HOR) ? width : uvg_get_isp_split_dim(width, height, SPLIT_TYPE_VER);
-  const int tu_height = (isp_split_type == ISP_MODE_HOR) ? uvg_get_isp_split_dim(width, height, SPLIT_TYPE_HOR) : height;
+  const int tu_width = (isp_split_type == ISP_MODE_HOR) ? width : uvg_get_isp_split_dim(width, height, SPLIT_TYPE_VER, true);
+  const int tu_height = (isp_split_type == ISP_MODE_HOR) ? uvg_get_isp_split_dim(width, height, SPLIT_TYPE_HOR, true) : height;
 
   if (!(tu_width >= TR_MIN_WIDTH && tu_height >= TR_MIN_WIDTH))
   {
