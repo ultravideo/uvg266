@@ -1103,7 +1103,7 @@ void uvg_encode_intra_luma_coding_unit(const encoder_state_t * const state,
 
   bool enable_isp = state->encoder_control->cfg.isp;
   // Need at least 16 samples in sub blocks to use isp. If both dimensions are 4, not enough samples. Blocks of size 2 do not exist yet (not for luma at least)
-  bool allow_isp = enable_isp ? uvg_can_use_isp(width, height, 64 /*MAX_TR_SIZE*/) : false;
+  bool allow_isp = enable_isp ? uvg_can_use_isp(width, height) : false;
   uint8_t isp_mode = allow_isp ? cur_cu->intra.isp_mode : 0;
 
   if (allow_isp && !multi_ref_idx /*&& !bdpcm && !color_transform*/) {
