@@ -1851,7 +1851,7 @@ void uvg_intra_recon_cu(
 * \param height       Block height.
 * \param max_tr_size  Maximum supported transform block size (64).
 */
-bool uvg_can_use_isp(const int width, const int height, const int max_tr_size)
+bool uvg_can_use_isp(const int width, const int height)
 {
   assert(!(width > LCU_WIDTH || height > LCU_WIDTH) && "Block size larger than max LCU size.");
   assert(!(width < TR_MIN_WIDTH || height < TR_MIN_WIDTH) && "Block size smaller than min TR_WIDTH.");
@@ -1861,7 +1861,7 @@ bool uvg_can_use_isp(const int width, const int height, const int max_tr_size)
 
   // Each split block must have at least 16 samples.
   bool not_enough_samples = (log2_width + log2_height <= 4);
-  bool cu_size_larger_than_max_tr_size = width > max_tr_size || height > max_tr_size;
+  bool cu_size_larger_than_max_tr_size = width > TR_MAX_WIDTH || height > TR_MAX_WIDTH;
   if (not_enough_samples || cu_size_larger_than_max_tr_size) {
     return false;
   }

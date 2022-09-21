@@ -1392,7 +1392,7 @@ static int8_t search_intra_rdo(
     double best_isp_cost = MAX_DOUBLE;
     double best_bits = MAX_DOUBLE;
     int8_t best_isp_mode = -1;
-    int max_isp_modes = can_do_isp_search && uvg_can_use_isp(width, height, TR_MAX_WIDTH) && state->encoder_control->cfg.isp ? NUM_ISP_MODES : 1;
+    int max_isp_modes = can_do_isp_search && uvg_can_use_isp(width, height) && state->encoder_control->cfg.isp ? NUM_ISP_MODES : 1;
 
     for (int isp_mode = 0; isp_mode < max_isp_modes; ++isp_mode) {
       search_data[mode].pred_cu.intra.isp_mode = isp_mode;
