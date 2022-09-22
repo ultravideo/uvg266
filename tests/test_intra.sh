@@ -19,5 +19,5 @@ valgrind_test $common_args --jccr --rdoq --rd=2 --mts=intra
 valgrind_test $common_args --rd=3 --cclm --jccr
 valgrind_test $common_args --lfnst
 valgrind_test $common_args --lfnst --rd=3 --cclm --mip --dual-tree --fast-residual-cost 0
-valgrind_test $common_args --rd=2 --isp --cpuid=0
-valgrind_test $common_args --rd=2 --isp --cpuid=0 --lfnst --mts=intra
+valgrind_test $common_args --rd=2 --isp --cpuid=0 --fast-residual-cost 0
+valgrind_test $common_args --rd=2 --isp --cpuid=0 --lfnst --mts=intra --fast-residual-cost 0
