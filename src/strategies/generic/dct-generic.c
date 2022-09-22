@@ -1435,11 +1435,6 @@ static void fastForwardDCT2_B32(const int16_t* src, int16_t* dst, int32_t shift,
       dst += line;
     }
   }
-  if (skip_line2) {
-    const int  reduced_line = line - skip_line2;
-    dst = p_coef + reduced_line * 32;
-    memset(dst, 0, skip_line2 * 32 * sizeof(coeff_t));
-  }
 }
 
 static void fastInverseDCT2_B32(const int16_t* src, int16_t* dst, int32_t shift, int line, int skip_line, int skip_line2)
