@@ -133,10 +133,35 @@ bool uvg_is_lfnst_allowed(
     }
     bool luma_flag = (depth == 4 && color == COLOR_Y) || (tree_type != UVG_CHROMA_T && depth != 4);
     bool chroma_flag = (depth == 4 && color != COLOR_Y) || tree_type != UVG_LUMA_T;
-    bool non_zero_coeff_non_ts_corner_8x8 = (luma_flag && pred_cu->violates_lfnst_constrained_luma) || (chroma_flag && pred_cu->violates_lfnst_constrained_chroma);
+    bool non_zero_coeff_non_ts_corner_8x8 = false;
+    bool last_scan_pos = false;
     bool is_tr_skip = false;
 
+    int split_num = color == COLOR_Y && isp_mode ? uvg_get_isp_split_num(width, height, isp_mode, false) : 0;
     const videoframe_t* const frame = state->tile->frame;
+    
+    if (split_num) {
+      // Constraints for ISP split blocks
+      for (int i = 0; i < split_num; ++i) {
+        cu_loc_t split_loc;
+        uvg_get_isp_split_loc(&split_loc, x, y, width, height, i, isp_mode, false);
+        int local_split_x = split_loc.x;
+        int local_split_y = split_loc.y;
+        uvg_get_isp_cu_arr_coords(&local_split_x, &local_split_y);
+        cu_info_t* split_cu = lcu ? LCU_GET_CU_AT_PX(lcu, local_split_x, local_split_y) : 
+                                    uvg_cu_array_at_const(frame->cu_array, local_split_x, local_split_y);
+
+        if (cbf_is_set(split_cu->cbf, depth, COLOR_Y)) {
+          non_zero_coeff_non_ts_corner_8x8 |= (luma_flag && split_cu->violates_lfnst_constrained_luma) || (chroma_flag && split_cu->violates_lfnst_constrained_chroma);
+          //last_scan_pos |= split_cu->lfnst_last_scan_pos;
+          last_scan_pos |= true;
+        }
+      }
+    } else {
+      non_zero_coeff_non_ts_corner_8x8 |= (luma_flag && pred_cu->violates_lfnst_constrained_luma) || (chroma_flag && pred_cu->violates_lfnst_constrained_chroma);
+      last_scan_pos |= pred_cu->lfnst_last_scan_pos;
+    }
+
     //const int num_pred_units = kvz_part_mode_num_parts[pred_cu->part_size];
     const int tr_depth = pred_cu->tr_depth;
     assert(depth <= tr_depth && "Depth greater than transform depth. This should never trigger.");
