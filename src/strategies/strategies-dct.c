@@ -60,7 +60,7 @@ void(*uvg_mts_dct)(int8_t bitdepth,
   int8_t height,
   const int16_t *input,
   int16_t *output,
-  const int8_t mts_idx);
+  const int8_t mts_type);
 
 void(*uvg_mts_idct)(int8_t bitdepth,
   color_t color,
@@ -69,7 +69,7 @@ void(*uvg_mts_idct)(int8_t bitdepth,
   int8_t height,
   const int16_t *input,
   int16_t *output,
-  const int8_t mts_idx);
+  const int8_t mts_type);
 
 
 int uvg_strategy_register_dct(void* opaque, uint8_t bitdepth) {

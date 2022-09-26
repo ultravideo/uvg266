@@ -2505,7 +2505,7 @@ void uvg_get_tr_type(
   const cu_info_t* tu,
   tr_type_t* hor_out,
   tr_type_t* ver_out,
-  const int8_t mts_idx)
+  const int8_t mts_type)
 {
   *hor_out = DCT2;
   *ver_out = DCT2;
@@ -2515,14 +2515,20 @@ void uvg_get_tr_type(
     return;
   }
 
-  const bool explicit_mts = mts_idx == UVG_MTS_BOTH || (tu->type == CU_INTRA ? mts_idx == UVG_MTS_INTRA : (mts_idx == UVG_MTS_INTER && tu->type == CU_INTER));
-  const bool implicit_mts = tu->type == CU_INTRA && (mts_idx == UVG_MTS_IMPLICIT || mts_idx == UVG_MTS_INTER);
+  const bool explicit_mts = mts_type == UVG_MTS_BOTH || (tu->type == CU_INTRA ? mts_type == UVG_MTS_INTRA : (mts_type == UVG_MTS_INTER && tu->type == CU_INTER));
+  const bool implicit_mts = tu->type == CU_INTRA && (mts_type == UVG_MTS_IMPLICIT || mts_type == UVG_MTS_INTER);
 
   assert(!(explicit_mts && implicit_mts));
+  const bool is_isp = tu->type == CU_INTRA && tu->intra.isp_mode && color == COLOR_Y ? tu->intra.isp_mode : 0;
+  const int8_t lfnst_idx = color == COLOR_Y ? tu->lfnst_idx : tu->cr_lfnst_idx;
+  // const bool is_sbt = cu->type == CU_INTER && tu->sbt && color == COLOR_Y; // TODO: check SBT here when implemented
 
-  if (implicit_mts)
+  if (is_isp && lfnst_idx) {
+    return;
+  }
+
+  if (implicit_mts || (is_isp && explicit_mts))
   {
-    // ISP_TODO: do these apply for ISP blocks?
     bool width_ok = width >= 4 && width <= 16;
     bool height_ok = height >= 4 && height <= 16;
 
@@ -2536,6 +2542,10 @@ void uvg_get_tr_type(
     }
     return;
   }
+
+  /*
+  TODO: SBT HANDLING
+  */
 
   if (explicit_mts)
   {
@@ -2555,12 +2565,12 @@ static void mts_dct_generic(
   const int8_t height,
   const int16_t* input,
   int16_t* output,
-  const int8_t mts_idx)
+  const int8_t mts_type)
 {
   tr_type_t type_hor;
   tr_type_t type_ver;
 
-  uvg_get_tr_type(width, height, color, tu, &type_hor, &type_ver, mts_idx);
+  uvg_get_tr_type(width, height, color, tu, &type_hor, &type_ver, mts_type);
 
   if (type_hor == DCT2 && type_ver == DCT2 && !tu->lfnst_idx && !tu->cr_lfnst_idx && width == height)
   {
@@ -2610,12 +2620,12 @@ static void mts_idct_generic(
   const int8_t height,
   const int16_t* input,
   int16_t* output,
-  const int8_t mts_idx)
+  const int8_t mts_type)
 {
   tr_type_t type_hor;
   tr_type_t type_ver;
 
-  uvg_get_tr_type(width, height, color, tu, &type_hor, &type_ver, mts_idx);
+  uvg_get_tr_type(width, height, color, tu, &type_hor, &type_ver, mts_type);
 
   if (type_hor == DCT2 && type_ver == DCT2 && !tu->lfnst_idx && !tu->cr_lfnst_idx && width == height)
   {
