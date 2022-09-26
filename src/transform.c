@@ -580,6 +580,7 @@ void uvg_chroma_transform_search(
       &u_has_coeffs,
       &v_has_coeffs,
       pred_cu->cr_lfnst_idx);
+      if(pred_cu->cr_lfnst_idx !=0 && !u_has_coeffs && !v_has_coeffs) continue;
     
     if(pred_cu->type == CU_INTRA && transforms[i] != CHROMA_TS && (depth == 4 || tree_type == UVG_CHROMA_T)) {
       bool constraints[2] = { false, false };

@@ -343,9 +343,7 @@ static double search_intra_trdepth(
     
     const int max_tb_size = TR_MAX_WIDTH;
     // LFNST search params
-    int max_lfnst_idx = width > max_tb_size || height > max_tb_size ?
-                                0 :
-                                2;
+    int max_lfnst_idx = width > max_tb_size || height > max_tb_size ? 0 : 2;
     if(pred_cu->intra.mip_flag && (width < 16 || height < 16)) {
       max_lfnst_idx = 0;
     }
@@ -379,8 +377,8 @@ static double search_intra_trdepth(
           pred_cu->mts_last_scan_pos = 0;
           pred_cu->violates_mts_coeff_constraint = 0;
 
-          if ((trafo == MTS_SKIP && width > (1 << state->encoder_control->cfg.trskip_max_size))
-            || !state->encoder_control->cfg.trskip_enable) {
+          if (trafo == MTS_SKIP && (width > (1 << state->encoder_control->cfg.trskip_max_size)
+            || !state->encoder_control->cfg.trskip_enable)) {
             continue;
           }
         }

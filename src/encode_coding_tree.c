@@ -230,6 +230,12 @@ static bool encode_lfnst_idx(
     return true;
   }
   else {
+    if(depth != 4 || color == COLOR_Y) {
+      assert(pred_cu->lfnst_idx == 0);
+    }
+    if(depth == 4 && color != COLOR_Y) {
+      assert(pred_cu->cr_lfnst_idx == 0);
+    }
     return false;
   }
 }
