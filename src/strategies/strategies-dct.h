@@ -68,7 +68,7 @@ typedef void (mts_dct_func)(
   int8_t height,
   const int16_t* input,
   int16_t* output,
-  const int8_t mts_idx);
+  const int8_t mts_type);
 
 extern mts_dct_func* uvg_mts_dct;
 
@@ -80,7 +80,7 @@ typedef void (mts_idct_func)(
   int8_t height,
   const int16_t* input,
   int16_t* output,
-  const int8_t mts_idx);
+  const int8_t mts_type);
 
 extern mts_idct_func* uvg_mts_idct;
 

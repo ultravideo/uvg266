@@ -1584,7 +1584,7 @@ extern void uvg_get_tr_type(
   const cu_info_t* tu,
   tr_type_t* hor_out,
   tr_type_t* ver_out,
-  const int8_t mts_idx);
+  const int8_t mts_type);
 
 static void mts_dct_avx2(
   const int8_t bitdepth,
@@ -1594,12 +1594,12 @@ static void mts_dct_avx2(
   const int8_t height,
   const int16_t* input,
   int16_t* output,
-  const int8_t mts_idx)
+  const int8_t mts_type)
 {
   tr_type_t type_hor;
   tr_type_t type_ver;
 
-  uvg_get_tr_type(width, height, color, tu, &type_hor, &type_ver, mts_idx);
+  uvg_get_tr_type(width, height, color, tu, &type_hor, &type_ver, mts_type);
 
   if (type_hor == DCT2 && type_ver == DCT2 && !tu->lfnst_idx && width == height)
   {
@@ -1625,12 +1625,12 @@ static void mts_idct_avx2(
   const int8_t height,
   const int16_t* input,
   int16_t* output,
-  const int8_t mts_idx)
+  const int8_t mts_type)
 {
   tr_type_t type_hor;
   tr_type_t type_ver;
 
-  uvg_get_tr_type(width, height, color, tu, &type_hor, &type_ver, mts_idx);
+  uvg_get_tr_type(width, height, color, tu, &type_hor, &type_ver, mts_type);
 
   if (type_hor == DCT2 && type_ver == DCT2 && width == height)
   {
