@@ -1392,7 +1392,12 @@ static int8_t search_intra_rdo(
     int8_t best_isp_mode = -1;
     int max_isp_modes = can_do_isp_search && uvg_can_use_isp(width, height) && state->encoder_control->cfg.isp ? NUM_ISP_MODES : 1;
 
+    //
+    int best_mts_mode_for_isp[NUM_ISP_MODES] = {0};
+    int best_lfnst_mode_for_isp[NUM_ISP_MODES] = {0};
     for (int isp_mode = 0; isp_mode < max_isp_modes; ++isp_mode) {
+      
+
       search_data[mode].pred_cu.intra.isp_mode = isp_mode;
       double rdo_bitcost = uvg_luma_mode_bits(state, &search_data[mode].pred_cu, x_px, y_px, depth, lcu);
       search_data[mode].pred_cu.tr_idx = MTS_TR_NUM;
@@ -1400,6 +1405,8 @@ static int8_t search_intra_rdo(
       search_data[mode].cost = rdo_bitcost * state->lambda;
 
       double mode_cost = search_intra_trdepth(state, x_px, y_px, depth, tr_depth, MAX_INT, &search_data[mode], lcu, tree_type);
+      best_mts_mode_for_isp[isp_mode] = search_data[mode].pred_cu.tr_idx;
+      best_lfnst_mode_for_isp[isp_mode] = search_data[mode].pred_cu.lfnst_idx;
       search_data[mode].cost += mode_cost;
       if (search_data[mode].cost < best_isp_cost) {
         best_isp_cost = search_data[mode].cost;
@@ -1414,6 +1421,8 @@ static int8_t search_intra_rdo(
     search_data[mode].cost = best_isp_cost;
     search_data[mode].bits = best_bits;
     search_data[mode].pred_cu.intra.isp_mode = best_isp_mode;
+    search_data[mode].pred_cu.tr_idx = best_mts_mode_for_isp[best_isp_mode];
+    search_data[mode].pred_cu.lfnst_idx = best_lfnst_mode_for_isp[best_isp_mode];
   }
 
   // Update order according to new costs
