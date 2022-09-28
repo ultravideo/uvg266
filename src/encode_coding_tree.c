@@ -151,7 +151,9 @@ bool uvg_is_lfnst_allowed(
         cu_info_t* split_cu = lcu ? LCU_GET_CU_AT_PX(lcu, local_split_x, local_split_y) : 
                                     uvg_cu_array_at_const(frame->cu_array, local_split_x, local_split_y);
 
-        if (cbf_is_set(split_cu->cbf, depth, COLOR_Y)) {
+        //if (cbf_is_set(split_cu->cbf, depth, COLOR_Y)) {
+        // ISP_TODO: remove this if clause altogether if it seems it is not needed
+        if (true) {
           non_zero_coeff_non_ts_corner_8x8 |= (luma_flag && split_cu->violates_lfnst_constrained_luma) || (chroma_flag && split_cu->violates_lfnst_constrained_chroma);
           //last_scan_pos |= split_cu->lfnst_last_scan_pos;
           last_scan_pos |= true;
