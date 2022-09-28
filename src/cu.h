@@ -172,8 +172,8 @@ typedef struct
   uint8_t violates_mts_coeff_constraint : 1;
   uint8_t mts_last_scan_pos : 1;
 
-  uint8_t violates_lfnst_constrained_luma : 1; // Two types, luma and chroma. Luma index is 0.
-  uint8_t violates_lfnst_constrained_chroma : 1; // Two types, luma and chroma. Luma index is 0.
+  uint8_t violates_lfnst_constrained_luma : 1;
+  uint8_t violates_lfnst_constrained_chroma : 1;
   uint8_t lfnst_last_scan_pos : 1;
   uint8_t lfnst_idx : 2;
   uint8_t cr_lfnst_idx : 2;
