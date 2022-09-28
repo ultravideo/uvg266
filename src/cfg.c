@@ -221,6 +221,7 @@ int uvg_config_init(uvg_config *cfg)
   cfg->cabac_debug_file_name = NULL;
 
   cfg->dual_tree = 0;
+  cfg->intra_rough_search_levels = 2;
   return 1;
 }
 
@@ -1475,6 +1476,9 @@ int uvg_config_parse(uvg_config *cfg, const char *name, const char *value)
   else if OPT("dual-tree") {
     cfg->dual_tree = atobool(value);
   }
+  else if OPT("intra-rough-granularity") {
+    cfg->intra_rough_search_levels = atoi(value);
+  }
   else {
     return 0;
   }
@@ -1835,6 +1839,11 @@ int uvg_config_validate(const uvg_config *const cfg)
 
   if(cfg->chroma_trskip_enable && !cfg->trskip_enable) {
     fprintf(stderr, "Transform skip has to be enabled when chroma transform skip is enabled.\n");
+    error = 1;
+  }
+
+  if(cfg->intra_rough_search_levels > 4) {
+    fprintf(stderr, "intra-rough-granularity must be between [0..4].\n");
     error = 1;
   }
 
