@@ -166,10 +166,8 @@ static void uvg_angular_pred_avx2(
   // Set ref_main and ref_side such that, when indexed with 0, they point to
   // index 0 in block coordinates.
   if (sample_disp < 0) {
-    for (int i = 0; i <= width + 1 + multi_ref_index; i++) {
-      temp_main[width + i] = (vertical_mode ? in_ref_above[i] : in_ref_left[i]);
-      temp_side[width + i] = (vertical_mode ? in_ref_left[i] : in_ref_above[i]);
-    }
+    memcpy(&temp_main[width], vertical_mode ? in_ref_above : in_ref_left, sizeof(uvg_pixel) * (width + 1 + multi_ref_index + 1));
+    memcpy(&temp_side[width], vertical_mode ? in_ref_left : in_ref_above, sizeof(uvg_pixel) * (width + 1 + multi_ref_index + 1));
 
     ref_main = temp_main + width;
     ref_side = temp_side + width;
@@ -213,19 +211,15 @@ static void uvg_angular_pred_avx2(
     //tmp_ref[most_negative_index + index_offset - 1] = tmp_ref[most_negative_index + index_offset];
   }
   else {
-    
-    for (int i = 0; i <= (width << 1) + multi_ref_index; i++) {
-      temp_main[i] = (vertical_mode ? in_ref_above[i] : in_ref_left[i]);
-      temp_side[i] = (vertical_mode ? in_ref_left[i] : in_ref_above[i]);
-    }
+
+    memcpy(temp_main, vertical_mode ? in_ref_above : in_ref_left, sizeof(uvg_pixel)* (width * 2 + multi_ref_index + 1));
+    memcpy(temp_side, vertical_mode ? in_ref_left : in_ref_above, sizeof(uvg_pixel)* (width * 2 + multi_ref_index + 1));
 
     const int s = 0;
     const int max_index = (multi_ref_index << s) + 2;
     const int ref_length = width << 1;
     const uvg_pixel val = temp_main[ref_length + multi_ref_index];
-    for (int j = 0; j <= max_index; j++) {
-      temp_main[ref_length + multi_ref_index + j] = val;
-    }
+    memset(temp_main + ref_length + multi_ref_index, val, max_index + 1);
 
     ref_main = temp_main;
     ref_side = temp_side;
@@ -245,12 +239,28 @@ static void uvg_angular_pred_avx2(
   ref_main += multi_ref_index;
   ref_side += multi_ref_index;
 
+  static const int uvg_intra_hor_ver_dist_thres[8] = { 24, 24, 24, 14, 2, 0, 0, 0 };
+  int filter_threshold = uvg_intra_hor_ver_dist_thres[log2_width];
+  int dist_from_vert_or_hor = MIN(abs((int32_t)pred_mode - 50), abs((int32_t)pred_mode - 18));
+
+  bool use_cubic = true; // Default to cubic filter
+  if (dist_from_vert_or_hor > filter_threshold) {
+    if ((abs(sample_disp) & 0x1F) != 0)
+    {
+      use_cubic = false;
+    }
+  }
+  // Cubic must be used if ref line != 0
+  if (multi_ref_index) {
+    use_cubic = true;
+  }
+
   if (sample_disp != 0) {
     // The mode is not horizontal or vertical, we have to do interpolation.
 
     int_fast32_t delta_pos = sample_disp * multi_ref_index;
-    int_fast32_t delta_int[4] = { 0 };
-    int_fast32_t delta_fract[4] = { 0 };
+    int64_t delta_int[4] = { 0 };
+    int16_t delta_fract[4] = { 0 };
     for (int_fast32_t y = 0; y + 3 < width; y += 4) {
 
       for (int yy = 0; yy < 4; ++yy) {
@@ -263,38 +273,27 @@ static void uvg_angular_pred_avx2(
         
         // Luma Channel
         if (channel_type == 0) {
-
-          int64_t ref_main_index[4] = { 0 };
+          
           int16_t f[4][4] = { { 0 } };
-
-          for (int yy = 0; yy < 4; ++yy) {
-
-            ref_main_index[yy] = delta_int[yy];
-            bool use_cubic = true; // Default to cubic filter
-            static const int uvg_intra_hor_ver_dist_thres[8] = { 24, 24, 24, 14, 2, 0, 0, 0 };
-            int filter_threshold = uvg_intra_hor_ver_dist_thres[log2_width];
-            int dist_from_vert_or_hor = MIN(abs((int32_t)pred_mode - 50), abs((int32_t)pred_mode - 18));
-            if (dist_from_vert_or_hor > filter_threshold) {
-              static const int16_t modedisp2sampledisp[32] = { 0,    1,    2,    3,    4,    6,     8,   10,   12,   14,   16,   18,   20,   23,   26,   29,   32,   35,   39,  45,  51,  57,  64,  73,  86, 102, 128, 171, 256, 341, 512, 1024 };
-              const int_fast8_t mode_disp = (pred_mode >= 34) ? pred_mode - 50 : 18 - pred_mode;
-              const int_fast8_t sample_disp = (mode_disp < 0 ? -1 : 1) * modedisp2sampledisp[abs(mode_disp)];
-              if ((abs(sample_disp) & 0x1F) != 0)
-              {
-                use_cubic = false;
-              }
+          if (use_cubic) {
+            memcpy(f[0], cubic_filter[delta_fract[0]], 8);
+            memcpy(f[1], cubic_filter[delta_fract[1]], 8);
+            memcpy(f[2], cubic_filter[delta_fract[2]], 8);
+            memcpy(f[3], cubic_filter[delta_fract[3]], 8);
+          }
+          else {
+            for(int yy = 0; yy < 4; ++yy) {
+              const int16_t offset = (delta_fract[yy] >> 1);
+              f[yy][0] = 16 - offset;
+              f[yy][1] = 32 - offset;
+              f[yy][2] = 16 + offset;
+              f[yy][3] = offset;
             }
-            // Cubic must be used if ref line != 0
-            if (multi_ref_index) {
-              use_cubic = true;
-            }
-            const int16_t filter_coeff[4] = { 16 - (delta_fract[yy] >> 1), 32 - (delta_fract[yy] >> 1), 16 + (delta_fract[yy] >> 1), delta_fract[yy] >> 1 };
-            const int16_t *temp_f = use_cubic ? cubic_filter[delta_fract[yy]] : filter_coeff;
-            memcpy(f[yy], temp_f, 4 * sizeof(*temp_f));
           }
 
           // Do 4-tap intra interpolation filtering
           uvg_pixel *p = (uvg_pixel*)ref_main;
-          __m256i vidx = _mm256_loadu_si256((__m256i *)ref_main_index);
+          __m256i vidx = _mm256_loadu_si256((__m256i *)delta_int);
           __m256i all_weights = _mm256_loadu_si256((__m256i *)f);
           __m256i w01 = _mm256_shuffle_epi8(all_weights, w_shuf_01);
           __m256i w23 = _mm256_shuffle_epi8(all_weights, w_shuf_23);

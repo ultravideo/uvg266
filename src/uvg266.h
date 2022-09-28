@@ -541,6 +541,8 @@ typedef struct uvg_config
   char* cabac_debug_file_name;
 
   uint8_t dual_tree;
+
+  uint8_t intra_rough_search_levels;
 } uvg_config;
 
 /**

@@ -191,6 +191,7 @@ static const struct option long_options[] = {
   { "dual-tree",                no_argument, NULL, 0 },
   { "no-dual-tree",             no_argument, NULL, 0 },
   { "cabac-debug-file",   required_argument, NULL, 0 },
+  { "intra-rough-granularity",required_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 
@@ -615,6 +616,13 @@ void print_help(void)
     "      --ml-pu-depth-intra    : Predict the pu-depth-intra using machine\n"
     "                                learning trees, overrides the\n"
     "                                --pu-depth-intra parameter. [disabled]\n"
+    "      --intra-rough-granularity : How many levels are used for the\n"
+    "                                   logarithmic intra rough search. 0..4\n"
+    "                                   With 0 all of the modes are checked \n"
+    "                                   in a single level, 1 checks every second\n"
+    "                                   mode is checked on first level and then\n"
+    "                                   second level checks the modes surrounding\n"
+    "                                   the three best modes. [2]\n"
     "      --(no-)combine-intra-cus: Whether the encoder tries to code a cu\n"
     "                                   on lower depth even when search is not\n"
     "                                   performed on said depth. Should only\n"

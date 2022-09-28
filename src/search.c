@@ -974,13 +974,14 @@ static double search_cu(
           else {
             intra_search.pred_cu.intra.mode_chroma = 0;
           }
-          uvg_intra_recon_cu(state,
-                             x, y,
-                             depth, &intra_search,
-                             &intra_search.pred_cu,
-                             lcu,
-                             tree_type, false, true);
-          if(tree_type != UVG_CHROMA_T) {
+
+          if(tree_type != UVG_CHROMA_T && ctrl->cfg.rdo >= 2) {
+            uvg_intra_recon_cu(state,
+              x, y,
+              depth, &intra_search,
+              &intra_search.pred_cu,
+              lcu,
+              tree_type, false, true);
             intra_cost += uvg_cu_rd_cost_chroma(state, x_local, y_local, depth, &intra_search.pred_cu, lcu);
           }
           else {
@@ -1201,9 +1202,9 @@ static double search_cu(
     // the split costs at least as much as not splitting.
     if (cur_cu->type == CU_NOTSET || cbf || state->encoder_control->cfg.cu_split_termination == UVG_CU_SPLIT_TERMINATION_OFF) {
       if (split_cost < cost) split_cost += search_cu(state, x,           y,           depth + 1, work_tree, tree_type);
-      if (split_cost < cost || 1) split_cost += search_cu(state, x + half_cu, y,           depth + 1, work_tree, tree_type);
-      if (split_cost < cost || 1) split_cost += search_cu(state, x,           y + half_cu, depth + 1, work_tree, tree_type);
-      if (split_cost < cost || 1) split_cost += search_cu(state, x + half_cu, y + half_cu, depth + 1, work_tree, tree_type);
+      if (split_cost < cost) split_cost += search_cu(state, x + half_cu, y,           depth + 1, work_tree, tree_type);
+      if (split_cost < cost) split_cost += search_cu(state, x,           y + half_cu, depth + 1, work_tree, tree_type);
+      if (split_cost < cost) split_cost += search_cu(state, x + half_cu, y + half_cu, depth + 1, work_tree, tree_type);
     } else {
       split_cost = INT_MAX;
     }

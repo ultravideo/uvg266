@@ -975,7 +975,7 @@ static int16_t search_intra_rough(
 }*/
 
 
-static double count_bits(
+static INLINE double count_bits(
   encoder_state_t* const state,
   int8_t* intra_preds,
   const double not_mrl,
@@ -1075,7 +1075,7 @@ static uint8_t search_intra_rough(
   FILL(search_proxy, 0);
   search_proxy.pred_cu = *pred_cu;
 
-  int offset = 4;
+  int offset = 1 << state->encoder_control->cfg.intra_rough_search_levels;
   search_proxy.pred_cu.intra.mode = 0;
   uvg_intra_predict(state, refs, &loc, COLOR_Y, preds[0], &search_proxy, NULL, UVG_LUMA_T);
   search_proxy.pred_cu.intra.mode = 1;
@@ -1123,7 +1123,7 @@ static uint8_t search_intra_rough(
   best_six_modes[3].cost = MAX_DOUBLE;
   best_six_modes[4].cost = MAX_DOUBLE;
   best_six_modes[5].cost = MAX_DOUBLE;
-  for (int mode = 4; mode <= 66; mode += PARALLEL_BLKS * offset) {
+  for (int mode = 2 + offset / 2; mode <= 66; mode += PARALLEL_BLKS * offset) {
     
     double costs_out[PARALLEL_BLKS] = { 0 };
     for (int i = 0; i < PARALLEL_BLKS; ++i) {
