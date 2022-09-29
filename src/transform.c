@@ -812,6 +812,26 @@ static inline bool get_transpose_flag(const int8_t intra_mode)
          ((intra_mode < NUM_LUMA_MODE) && (intra_mode > DIA_IDX));
 }
 
+
+static inline bool block_is_mip(const cu_info_t * const cur_cu, const color_t color, const bool is_sep_tree)
+{
+  if (cur_cu->type == CU_INTRA) {
+    if (color == COLOR_Y) {
+      return cur_cu->intra.mip_flag;
+    }
+    else {
+      // MIP_TODO: currently, only chroma 420 is supported. Therefore this will always return false
+
+      //bool derived_mode = cur_cu->intra.mode_chroma == (!cur_cu->intra.mip_flag ? cur_cu->intra.mode : 0);
+      //bool is_chroma_mip = !is_sep_tree /*&& chroma_format == CHROMA_444*/ && cur_cu->intra.mip_flag;
+      //return is_chroma_mip && derived_mode;
+
+      return false;
+    }
+  }
+  return false;
+}
+
 void uvg_fwd_lfnst(
   const cu_info_t* const cur_cu,
   const int width,
@@ -828,7 +848,7 @@ void uvg_fwd_lfnst(
   bool is_separate_tree = depth == 4 || tree_type != UVG_BOTH_T; 
   bool is_cclm_mode = (intra_mode >= 81 && intra_mode <= 83); // CCLM modes are in [81, 83]
 
-  bool is_mip = cur_cu->type == CU_INTRA ? cur_cu->intra.mip_flag : false;
+  bool is_mip = block_is_mip(cur_cu, color, is_separate_tree);
   bool is_wide_angle = false; // TODO: get wide angle mode when implemented
 
   const int cu_type = cur_cu->type;
@@ -965,7 +985,7 @@ void uvg_inv_lfnst(
   bool is_separate_tree = depth == 4 || tree_type != UVG_BOTH_T;
   bool is_cclm_mode = (intra_mode >= 81 && intra_mode <= 83); // CCLM modes are in [81, 83]
 
-  bool is_mip = cur_cu->type == CU_INTRA && tree_type != UVG_CHROMA_T ? cur_cu->intra.mip_flag : false;
+  bool is_mip = block_is_mip(cur_cu, color, is_separate_tree);
   bool is_wide_angle = false; // TODO: get wide angle mode when implemented
 
   const int cu_type = cur_cu->type;
