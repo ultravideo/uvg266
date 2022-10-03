@@ -148,7 +148,7 @@ bool uvg_is_lfnst_allowed(
         int local_split_x = split_loc.x;
         int local_split_y = split_loc.y;
         uvg_get_isp_cu_arr_coords(&local_split_x, &local_split_y);
-        cu_info_t* split_cu = lcu ? LCU_GET_CU_AT_PX(lcu, local_split_x, local_split_y) : 
+        const cu_info_t* split_cu = lcu ? LCU_GET_CU_AT_PX(lcu, local_split_x, local_split_y) : 
                                     uvg_cu_array_at_const(frame->cu_array, local_split_x, local_split_y);
 
         //if (cbf_is_set(split_cu->cbf, depth, COLOR_Y)) {
@@ -1990,7 +1990,7 @@ void uvg_encode_mvd(encoder_state_t * const state,
 void uvg_get_sub_coeff(const coeff_t *dst, const coeff_t * const src, const int lcu_x, const int lcu_y, const int block_w, const int block_h, const int lcu_width)
 {
   // Take subset of coeff array
-  coeff_t* dst_ptr = dst;
+  coeff_t* dst_ptr = (coeff_t*)dst;
   const coeff_t* coeff_ptr = &src[lcu_x + lcu_y * lcu_width];
   for (int j = 0; j < block_h; ++j) {
     //memcpy(dst_coeff + (j * lcu_width), &coeff[j * tr_width], tr_width * sizeof(coeff_t));

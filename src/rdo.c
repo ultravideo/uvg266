@@ -320,7 +320,7 @@ static INLINE double get_coeff_cabac_cost(
   coeff_t sub_coeff[TR_MAX_WIDTH * TR_MAX_WIDTH];
 
   if (coeff_order == COEFF_ORDER_LINEAR) {
-    coeff_ptr = coeff;
+    coeff_ptr = (coeff_t*)coeff;
   }
   else {
     // Coeff order CU
