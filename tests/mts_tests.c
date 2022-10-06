@@ -111,6 +111,7 @@ static void setup_tests()
           tu.tr_idx = MTS_DST7_DST7 + trafo;
           tu.lfnst_idx = 0;
           tu.cr_lfnst_idx = 0;
+          tu.intra.isp_mode = 0;
           mts_generic(UVG_BIT_DEPTH, COLOR_Y, &tu, 1 << (LCU_MIN_LOG_W + block), 1 << (LCU_MIN_LOG_W + block), dct_bufs[trafo*NUM_SIZES+block], dct_result[trafo][block], UVG_MTS_BOTH);
         }
       }      
@@ -134,6 +135,7 @@ static void setup_tests()
           tu.tr_idx = MTS_DST7_DST7 + trafo;
           tu.lfnst_idx = 0;
           tu.cr_lfnst_idx = 0;
+          tu.intra.isp_mode = 0;
           idct_generic(UVG_BIT_DEPTH, COLOR_Y, &tu, 1 << (LCU_MIN_LOG_W + block), 1 << (LCU_MIN_LOG_W + block), dct_bufs[trafo * NUM_SIZES + block], idct_result[trafo][block], UVG_MTS_BOTH);
         }
       }
@@ -163,6 +165,7 @@ TEST dct(void)
       tu.tr_idx = MTS_DST7_DST7 + trafo;
       tu.lfnst_idx = 0;
       tu.cr_lfnst_idx = 0;
+      tu.intra.isp_mode = 0;
 
       int16_t* buf = dct_bufs[trafo * NUM_SIZES + blocksize];
       ALIGNED(32) int16_t test_result[LCU_WIDTH * LCU_WIDTH] = { 0 };
@@ -188,6 +191,9 @@ TEST idct(void)
       cu_info_t tu;
       tu.type = CU_INTRA;
       tu.tr_idx = MTS_DST7_DST7 + trafo;
+      tu.lfnst_idx = 0;
+      tu.cr_lfnst_idx = 0;
+      tu.intra.isp_mode = 0;
 
       int16_t* buf = dct_bufs[trafo * NUM_SIZES + blocksize];
       ALIGNED(32) int16_t test_result[LCU_WIDTH * LCU_WIDTH] = { 0 };
