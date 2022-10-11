@@ -152,58 +152,18 @@ static void uvg_angular_pred_generic(
     ref_main = vertical_mode ? temp_above + height : temp_left + width;
     ref_side = vertical_mode ? temp_left + width : temp_above + height;
 
-    // TODO: for non square blocks, need to check if width or height is used for reference extension
     int size_side = vertical_mode ? height : width;
     for (int i = -size_side; i <= -1; i++) {
       ref_main[i] = ref_side[MIN((-i * modedisp2invsampledisp[abs(mode_disp)] + 256) >> 9, size_side)];
     }
-
-    //const uint32_t index_offset = width + 1;
-    //const int32_t last_index = width;
-    //const int_fast32_t most_negative_index = (width * sample_disp) >> 5;
-    //// Negative sample_disp means, we need to use both references.
-
-    //// TODO: update refs to take into account variating block size and shapes
-    ////       (height is not always equal to width)
-    //ref_side = (vertical_mode ? in_ref_left : in_ref_above) + 1;
-    //ref_main = (vertical_mode ? in_ref_above : in_ref_left) + 1;
-
-    //// Move the reference pixels to start from the middle to the later half of
-    //// the tmp_ref, so there is room for negative indices.
-    //for (int_fast32_t x = -1; x < width; ++x) {
-    //  tmp_ref[x + index_offset] = ref_main[x];
-    //}
-    //// Get a pointer to block index 0 in tmp_ref.
-    //ref_main = &tmp_ref[index_offset];
-    //tmp_ref[index_offset -1] = tmp_ref[index_offset];
-
-    //// Extend the side reference to the negative indices of main reference.
-    //int_fast32_t col_sample_disp = 128; // rounding for the ">> 8"
-    //int_fast16_t inv_abs_sample_disp = modedisp2invsampledisp[abs(mode_disp)];
-    //// TODO: add 'vertical_mode ? height : width' instead of 'width'
-    //
-    //for (int_fast32_t x = -1; x > most_negative_index; x--) {
-    //  col_sample_disp += inv_abs_sample_disp;
-    //  int_fast32_t side_index = col_sample_disp >> 8;
-    //  tmp_ref[x + index_offset - 1] = ref_side[side_index - 1];
-    //}
-    //tmp_ref[last_index + index_offset] = tmp_ref[last_index + index_offset - 1];
-    //tmp_ref[most_negative_index + index_offset - 1] = tmp_ref[most_negative_index + index_offset];
   }
   else {
-    
-    // TODO: again, separate loop needed for non-square blocks
-    /*for (int i = 0; i <= (width << 1) + multi_ref_index; i++) {
-      temp_main[i] = (vertical_mode ? in_ref_above[i] : in_ref_left[i]);
-      temp_side[i] = (vertical_mode ? in_ref_left[i] : in_ref_above[i]);
-    }*/
     memcpy(&temp_above[0], &in_ref_above[0], (top_ref_length + 1 + multi_ref_index) * sizeof(uvg_pixel));
     memcpy(&temp_left[0], &in_ref_left[0], (left_ref_lenght + 1 + multi_ref_index) * sizeof(uvg_pixel));
 
     ref_main = vertical_mode ? temp_above : temp_left;
     ref_side = vertical_mode ? temp_left : temp_above;
 
-    // TODO: this code block will need to change also when non-square blocks are used
     const int log2_ratio = log2_width - log2_height;
     const int s = MAX(0, vertical_mode ? log2_ratio : -log2_ratio);
     const int max_index = (multi_ref_index << s) + 2;
@@ -218,17 +178,6 @@ static void uvg_angular_pred_generic(
     for (int j = 1; j <= max_index; j++) {
       ref_main[ref_length + multi_ref_index +  j] = val;
     }
-    
-    //// sample_disp >= 0 means we don't need to refer to negative indices,
-    //// which means we can just use the references as is.
-    //ref_main = (vertical_mode ? in_ref_above : in_ref_left) + 1;
-    //ref_side = (vertical_mode ? in_ref_left : in_ref_above) + 1;
-
-    //memcpy(tmp_ref + width, ref_main, (width*2) * sizeof(uvg_pixel));
-    //ref_main = &tmp_ref[width];
-    //tmp_ref[width-1] = tmp_ref[width];
-    //int8_t last_index = 1 + width*2;
-    //tmp_ref[width + last_index] = tmp_ref[width + last_index - 1];
   }
 
   // Flip dimensions for horizontal modes
