@@ -141,7 +141,7 @@ static void uvg_angular_pred_generic(
 
   const int cu_dim = MAX(width, height);
   const int top_ref_length  = isp_mode ? width + cu_dim  : width << 1;
-  const int left_ref_lenght = isp_mode ? height + cu_dim : height << 1;
+  const int left_ref_length = isp_mode ? height + cu_dim : height << 1;
 
   // Set ref_main and ref_side such that, when indexed with 0, they point to
   // index 0 in block coordinates.
@@ -159,7 +159,7 @@ static void uvg_angular_pred_generic(
   }
   else {
     memcpy(&temp_above[0], &in_ref_above[0], (top_ref_length + 1 + multi_ref_index) * sizeof(uvg_pixel));
-    memcpy(&temp_left[0], &in_ref_left[0], (left_ref_lenght + 1 + multi_ref_index) * sizeof(uvg_pixel));
+    memcpy(&temp_left[0], &in_ref_left[0], (left_ref_length + 1 + multi_ref_index) * sizeof(uvg_pixel));
 
     ref_main = vertical_mode ? temp_above : temp_left;
     ref_side = vertical_mode ? temp_left : temp_above;
@@ -169,7 +169,7 @@ static void uvg_angular_pred_generic(
     const int max_index = (multi_ref_index << s) + 2;
     int ref_length;
     if (isp_mode) {
-      ref_length = vertical_mode ? top_ref_length : left_ref_lenght;
+      ref_length = vertical_mode ? top_ref_length : left_ref_length;
     }
     else {
       ref_length = vertical_mode ? width << 1 : height << 1;

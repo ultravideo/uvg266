@@ -234,7 +234,6 @@ static void intra_filter_reference(
   filtered_ref->top[ref_width - 1] = ref->top[ref_width - 1];
 }
 
-
 /**
 * \brief Generate dc prediction.
 * \param cu_loc        CU location and size data.
@@ -254,7 +253,7 @@ static void intra_pred_dc(
 {
   const int width = color == COLOR_Y ? cu_loc->width : cu_loc->chroma_width;
   const int height = color == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
-
+  
   int_fast16_t sum = 0;
   // Only one loop is done for non-square blocks.
   // In case of non-square blocks, only the longer reference is summed.
@@ -1004,6 +1003,8 @@ void uvg_intra_build_reference_any(
   const int cu_x = cu_loc->x;
   const int cu_y = cu_loc->y;
 
+  bool is_first_isp_block = isp_mode ? pu_x == cu_x && pu_y == cu_y : false;
+
   assert((log2_width >= 1 && log2_width <= 5) && (log2_height >= 1 && log2_height <= 5));
 
   refs->filtered_initialized = false;
@@ -1071,7 +1072,7 @@ void uvg_intra_build_reference_any(
   if (luma_px->x > 0) {
     // Get the number of reference pixels based on the PU coordinate within the LCU.
     int px_available_left;
-    if (isp_mode && !is_chroma) {
+    if (isp_mode && !is_first_isp_block && !is_chroma) {
       if (isp_mode == ISP_MODE_VER) {
         px_available_left = height;
       }
@@ -1099,13 +1100,18 @@ void uvg_intra_build_reference_any(
     }
     // Extend the last pixel for the rest of the reference values.
     uvg_pixel nearest_pixel = left_border[(px_available_left - 1) * left_stride];
-    for (int i = px_available_left; i < cu_height * 2 + multi_ref_index * 2; ++i) {
+
+    // If first isp split, take samples as if it were normal square block
+    int tmp_h = is_first_isp_block ? cu_height * 2 : (isp_mode ? cu_height + height : height * 2);
+    for (int i = px_available_left; i < tmp_h + multi_ref_index * 2; ++i) {
       out_left_ref[i + 1 + multi_ref_index] = nearest_pixel;
     }
   } else {
     // If we are on the left edge, extend the first pixel of the top row.
     uvg_pixel nearest_pixel = luma_px->y > 0 ? top_border[0] : dc_val;
-    for (int i = 0; i < height * 2 + multi_ref_index; i++) {
+    // If first isp split, take samples as if it were normal square block
+    int tmp_h = is_first_isp_block ? cu_height * 2 : (isp_mode ? cu_height + height : height * 2);
+    for (int i = 0; i < tmp_h + multi_ref_index; i++) {
       // Reserve space for top left reference
       out_left_ref[i + 1 + multi_ref_index] = nearest_pixel;
     }
@@ -1191,7 +1197,7 @@ void uvg_intra_build_reference_any(
   int px_available_top;
   if (luma_px->y > 0) {
     // Get the number of reference pixels based on the PU coordinate within the LCU.
-    if (isp_mode && !is_chroma) {
+    if (isp_mode && !is_first_isp_block && !is_chroma) {
       if (isp_mode == ISP_MODE_HOR) {
         px_available_top = width;
       }
@@ -1214,13 +1220,19 @@ void uvg_intra_build_reference_any(
     }
     // Extend the last pixel for the rest of the reference values.
     uvg_pixel nearest_pixel = top_border[px_available_top - 1];
-    for (int i = px_available_top; i < width * 2 + multi_ref_index * 2; ++i) {
+
+    // If first isp split, take samples as if it were normal square block
+    int tmp_w = is_first_isp_block ? cu_width * 2 : (isp_mode ? cu_width + width : width * 2);
+    for (int i = px_available_top; i < tmp_w + multi_ref_index * 2; ++i) {
       out_top_ref[i + 1 + multi_ref_index] = nearest_pixel;
     }
   } else {
     // Extend nearest pixel.
     uvg_pixel nearest_pixel = luma_px->x > 0 ? left_border[0] : dc_val;
-    for (int i = 0; i < cu_width * 2 + multi_ref_index; i++) {
+
+    // If first isp split, take samples as if it were normal square block
+    int tmp_w = is_first_isp_block ? cu_width * 2 : (isp_mode ? cu_width + width : width * 2);
+    for (int i = 0; i < tmp_w + multi_ref_index * 2; i++) {
       out_top_ref[i + 1] = nearest_pixel;
     }
   }
@@ -1251,6 +1263,8 @@ void uvg_intra_build_reference_inner(
   const int pu_y = pu_loc->y;
   const int cu_x = cu_loc->x;
   const int cu_y = cu_loc->y;
+
+  bool is_first_isp_block = isp_mode ? pu_x == cu_x && pu_y == cu_y : false;
 
   // Log2_dim 1 is possible with ISP blocks
   assert((log2_width >= 1 && log2_width <= 5) && (log2_height >= 1 && log2_height <= 5));
@@ -1361,7 +1375,7 @@ void uvg_intra_build_reference_inner(
 
   // Get the number of reference pixels based on the PU coordinate within the LCU.
   int px_available_left;
-  if (isp_mode && !is_chroma) {
+  if (isp_mode && !is_first_isp_block && !is_chroma) {
     if (isp_mode == ISP_MODE_VER) {
       px_available_left = height;
     }
@@ -1406,7 +1420,10 @@ void uvg_intra_build_reference_inner(
 
   // Extend the last pixel for the rest of the reference values.
   uvg_pixel nearest_pixel = out_left_ref[i];
-  for (; i < cu_height * 2; i += 4) {
+
+  // If first isp split, take samples as if it were normal square block
+  int tmp_h = is_first_isp_block ? cu_height * 2 : (isp_mode ? cu_height + height : height * 2);
+  for (; i < tmp_h; i += 4) {
     out_left_ref[i + 1] = nearest_pixel;
     out_left_ref[i + 2] = nearest_pixel;
     out_left_ref[i + 3] = nearest_pixel;
@@ -1424,7 +1441,7 @@ void uvg_intra_build_reference_inner(
 
   // Get the number of reference pixels based on the PU coordinate within the LCU.
   int px_available_top;
-  if (isp_mode && !is_chroma) {
+  if (isp_mode && !is_first_isp_block && !is_chroma) {
     if (isp_mode == ISP_MODE_HOR) {
       px_available_top = width;
     }
@@ -1452,7 +1469,10 @@ void uvg_intra_build_reference_inner(
 
   // Extend the last pixel for the rest of the reference values.
   nearest_pixel = out_top_ref[i + multi_ref_index];
-  for (; i < (cu_width + multi_ref_index) * 2; i += 4) {
+
+  // If first isp split, take samples as if it were normal square block
+  int tmp_w = is_first_isp_block ? cu_width * 2 : (isp_mode ? cu_width + width : width * 2);
+  for (; i < tmp_w + (multi_ref_index * 2); i += 4) {
     out_top_ref[i + 1 + multi_ref_index] = nearest_pixel;
     out_top_ref[i + 2 + multi_ref_index] = nearest_pixel;
     out_top_ref[i + 3 + multi_ref_index] = nearest_pixel;
@@ -1476,14 +1496,14 @@ void uvg_intra_build_reference(
 {
   assert(!(extra_ref_lines == NULL && multi_ref_idx != 0) && "Trying to use MRL with NULL extra references.");
 
-  bool first_split = color == COLOR_Y && isp_mode && pu_loc->x == cu_loc->x && pu_loc->y == cu_loc->y;
-  uint8_t isp = first_split ? 0 : isp_mode;
+  //bool first_split = color == COLOR_Y && isp_mode && pu_loc->x == cu_loc->x && pu_loc->y == cu_loc->y;
+  //uint8_t isp = first_split ? 0 : isp_mode;
 
   // Much logic can be discarded if not on the edge
   if (luma_px->x > 0 && luma_px->y > 0) {
-    uvg_intra_build_reference_inner(pu_loc, cu_loc, color, luma_px, pic_px, lcu, refs, entropy_sync, multi_ref_idx, extra_ref_lines, isp);
+    uvg_intra_build_reference_inner(pu_loc, cu_loc, color, luma_px, pic_px, lcu, refs, entropy_sync, multi_ref_idx, extra_ref_lines, isp_mode);
   } else {
-    uvg_intra_build_reference_any(pu_loc, cu_loc, color, luma_px, pic_px, lcu, refs, multi_ref_idx, extra_ref_lines, isp);
+    uvg_intra_build_reference_any(pu_loc, cu_loc, color, luma_px, pic_px, lcu, refs, multi_ref_idx, extra_ref_lines, isp_mode);
   }
 }
 
@@ -1676,6 +1696,7 @@ static void intra_recon_tb_leaf(
   uint8_t isp_mode = color == COLOR_Y ? search_data->pred_cu.intra.isp_mode : 0;
 
   uvg_intra_references refs;
+
   // Extra reference lines for use with MRL. Extra lines needed only for left edge.
   uvg_pixel extra_refs[128 * MAX_REF_LINE_IDX] = { 0 };
 
