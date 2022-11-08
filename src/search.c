@@ -75,6 +75,44 @@ static INLINE void copy_cu_info(lcu_t *from, lcu_t *to, const cu_loc_t* const cu
   }
 }
 
+
+static INLINE void initialize_partial_work_tree(lcu_t* from, lcu_t *to, const cu_loc_t * const cu_loc, enum uvg_tree_type tree_type) {
+
+  const int y_limit = MAX((cu_loc->local_y + cu_loc->height), LCU_WIDTH) >> (tree_type == UVG_CHROMA_T);
+  const int x_limit = MAX(cu_loc->local_x + cu_loc->width, LCU_WIDTH) >> (tree_type == UVG_CHROMA_T);
+
+  if (cu_loc->local_x == 0) {
+    to->left_ref = from->left_ref;
+  }
+  if (cu_loc->local_y == 0) {
+    to->top_ref = from->top_ref;
+  }
+
+  to->ref.chroma_format = from->ref.chroma_format;
+
+  if (tree_type != UVG_CHROMA_T) {
+    const int offset = cu_loc->local_x + cu_loc->local_y * LCU_WIDTH;
+    uvg_pixels_blit(&from->ref.y[offset], &to->ref.y[offset], cu_loc->width, cu_loc->height, LCU_WIDTH, LCU_WIDTH);
+  }
+
+  if(tree_type != UVG_LUMA_T && from->ref.chroma_format != UVG_CSP_400) {
+    const int offset = cu_loc->local_x / 2 + cu_loc->local_y / 2 * LCU_WIDTH_C;
+    uvg_pixels_blit(&from->ref.u[offset], &to->ref.u[offset], cu_loc->chroma_width, cu_loc->chroma_height, LCU_WIDTH_C, LCU_WIDTH_C);
+    uvg_pixels_blit(&from->ref.v[offset], &to->ref.v[offset], cu_loc->chroma_width, cu_loc->chroma_height, LCU_WIDTH_C, LCU_WIDTH_C);
+  } 
+
+  const int y_start = (cu_loc->local_y >> (tree_type == UVG_CHROMA_T)) - 4;
+  const int x_start = (cu_loc->local_x >> (tree_type == UVG_CHROMA_T)) - 4;
+  for (int y = y_start; y < y_limit; y += SCU_WIDTH) {
+    const int temp = LCU_CU_OFFSET + ((x_start) >> 2) + ((y) >> 2) * LCU_T_CU_WIDTH;
+    *LCU_GET_CU_AT_PX(to, x_start, y) = *LCU_GET_CU_AT_PX(from, x_start, y);
+
+  }
+  for (int x = x_start; x < x_limit; x += SCU_WIDTH) {
+    *LCU_GET_CU_AT_PX(to, x, y_start) = *LCU_GET_CU_AT_PX(from, x, y_start);
+  }
+}
+
 static INLINE void copy_cu_pixels(
   lcu_t *from,
   lcu_t *to,
@@ -942,18 +980,10 @@ static double search_cu(
   pu_depth_inter.max = ctrl->cfg.pu_depth_inter.max[gop_layer] >= 0 ? ctrl->cfg.pu_depth_inter.max[gop_layer] : ctrl->cfg.pu_depth_inter.max[0];
 
   cur_cu = LCU_GET_CU_AT_PX(lcu, x_local, y_local);
+  memset(cur_cu, 0, sizeof(cu_info_t));
   // Assign correct depth
   cur_cu->type = CU_NOTSET;
   cur_cu->qp = state->qp;
-  cur_cu->bdpcmMode = 0;
-  cur_cu->tr_idx = 0;
-  cur_cu->violates_mts_coeff_constraint = 0;
-  cur_cu->mts_last_scan_pos = 0;
-  cur_cu->violates_lfnst_constrained_luma = 0;
-  cur_cu->violates_lfnst_constrained_chroma = 0;
-  cur_cu->lfnst_last_scan_pos = 0;
-  cur_cu->lfnst_idx = 0;
-  cur_cu->joint_cb_cr = 0;
   cur_cu->split_tree = split_tree.split_tree;
   cur_cu->log2_width = uvg_g_convert_to_log2[cu_width];
   cur_cu->log2_height = uvg_g_convert_to_log2[cu_height];
@@ -1336,6 +1366,7 @@ static double search_cu(
     // It is ok to interrupt the search as soon as it is known that
     // the split costs at least as much as not splitting.
     if (cur_cu->type == CU_NOTSET || cbf || state->encoder_control->cfg.cu_split_termination == UVG_CU_SPLIT_TERMINATION_OFF) {
+      initialize_partial_work_tree(&work_tree[depth], &work_tree[depth + 1], cu_loc, tree_type);
       cu_loc_t new_cu_loc[4];
       uvg_get_split_locs(cu_loc, QT_SPLIT, new_cu_loc);
       if (split_cost < cost) {
@@ -1651,9 +1682,6 @@ void uvg_search_lcu(encoder_state_t * const state, const int x, const int y, con
   // process.
   lcu_t work_tree[MAX_PU_DEPTH + 1];
   init_lcu_t(state, x, y, &work_tree[0], hor_buf, ver_buf);
-  for (int depth = 1; depth <= MAX_PU_DEPTH; ++depth) {
-    work_tree[depth] = work_tree[0];
-  }
 
   // If the ML depth prediction is enabled, 
   // generate the depth prediction interval 
