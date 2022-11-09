@@ -89,6 +89,7 @@ static INLINE void initialize_partial_work_tree(lcu_t* from, lcu_t *to, const cu
   }
 
   to->ref.chroma_format = from->ref.chroma_format;
+  to->rec.chroma_format = from->rec.chroma_format;
 
   if (tree_type != UVG_CHROMA_T) {
     const int offset = cu_loc->local_x + cu_loc->local_y * LCU_WIDTH;
