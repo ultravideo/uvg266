@@ -77,8 +77,8 @@ static INLINE void copy_cu_info(lcu_t *from, lcu_t *to, const cu_loc_t* const cu
 
 static INLINE void initialize_partial_work_tree(lcu_t* from, lcu_t *to, const cu_loc_t * const cu_loc, enum uvg_tree_type tree_type) {
 
-  const int y_limit = MAX((cu_loc->local_y + cu_loc->height), LCU_WIDTH) >> (tree_type == UVG_CHROMA_T);
-  const int x_limit = MAX(cu_loc->local_x + cu_loc->width, LCU_WIDTH) >> (tree_type == UVG_CHROMA_T);
+  const int y_limit = (LCU_WIDTH - cu_loc->local_y) >> (tree_type == UVG_CHROMA_T);
+  const int x_limit = (LCU_WIDTH - cu_loc->local_x) >> (tree_type == UVG_CHROMA_T);
 
   if (cu_loc->local_x == 0) {
     to->left_ref = from->left_ref;
@@ -110,6 +110,12 @@ static INLINE void initialize_partial_work_tree(lcu_t* from, lcu_t *to, const cu
   }
   for (int x = x_start; x < x_limit; x += SCU_WIDTH) {
     *LCU_GET_CU_AT_PX(to, x, y_start) = *LCU_GET_CU_AT_PX(from, x, y_start);
+  }
+
+  for (int y = cu_loc->local_y >> (tree_type == UVG_CHROMA_T); y < y_limit; y += SCU_WIDTH) {
+    for (int x = cu_loc->local_x >> (tree_type == UVG_CHROMA_T); x < x_limit; x += SCU_WIDTH) {
+      memset(LCU_GET_CU_AT_PX(to, x, y), 0, sizeof(cu_info_t));
+    }
   }
 }
 
@@ -1381,6 +1387,9 @@ static double search_cu(
 
         cur_cu->intra = cu_d1->intra;
         cur_cu->type = CU_INTRA;
+        if (cur_cu->intra.mode_chroma > 79) {
+          cur_cu->intra.mode_chroma = cur_cu->intra.mode;
+        }
 
         // Disable MRL in this case
         cur_cu->intra.multi_ref_idx = 0;
