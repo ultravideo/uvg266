@@ -1228,7 +1228,7 @@ static double search_cu(
         const bool has_chroma = state->encoder_control->chroma_format != UVG_CSP_400;
         uvg_inter_recon_cu(state, lcu, true, has_chroma, cu_loc);
 
-        if (ctrl->cfg.zero_coeff_rdo && !ctrl->cfg.lossless && !ctrl->cfg.rdoq_enable) {
+        if (ctrl->cfg.zero_coeff_rdo && !ctrl->cfg.lossless && !ctrl->cfg.rdoq_enable && false) {
           //Calculate cost for zero coeffs
           inter_zero_coeff_cost = cu_zero_coeff_cost(state, work_tree, cu_loc, split_tree.current_depth) + inter_bitcost * state->lambda;
 
