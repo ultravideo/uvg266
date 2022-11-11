@@ -82,6 +82,7 @@ static INLINE void initialize_partial_work_tree(lcu_t* from, lcu_t *to, const cu
 
   if (cu_loc->local_x == 0) {
     to->left_ref = from->left_ref;
+    *LCU_GET_TOP_RIGHT_CU(to) = *LCU_GET_TOP_RIGHT_CU(from);
   }
   if (cu_loc->local_y == 0) {
     to->top_ref = from->top_ref;
