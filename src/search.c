@@ -544,11 +544,11 @@ double uvg_cu_rd_cost_chroma(
     uvg_cu_loc_ctor(&chroma_loc, lcu_px.x, lcu_px.y, cu_loc->width, cu_loc->height);
 
     if((pred_cu->joint_cb_cr & 3) == 0){
-      coeff_bits += uvg_get_coeff_cost(state, lcu->coeff.u, NULL, cu_loc, 2, scan_order, 0, COEFF_ORDER_CU);
-      coeff_bits += uvg_get_coeff_cost(state, lcu->coeff.v, NULL, cu_loc, 2, scan_order, 0, COEFF_ORDER_CU);
+      coeff_bits += uvg_get_coeff_cost(state, lcu->coeff.u, NULL, &chroma_loc, 2, scan_order, 0, COEFF_ORDER_CU);
+      coeff_bits += uvg_get_coeff_cost(state, lcu->coeff.v, NULL, &chroma_loc, 2, scan_order, 0, COEFF_ORDER_CU);
     }
     else {
-      coeff_bits += uvg_get_coeff_cost(state, lcu->coeff.joint_uv, NULL, cu_loc, 2, scan_order, 0, COEFF_ORDER_CU);
+      coeff_bits += uvg_get_coeff_cost(state, lcu->coeff.joint_uv, NULL, &chroma_loc, 2, scan_order, 0, COEFF_ORDER_CU);
       
     }
   }
