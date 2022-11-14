@@ -78,8 +78,8 @@ static INLINE void copy_cu_info(lcu_t *from, lcu_t *to, const cu_loc_t* const cu
 
 static INLINE void initialize_partial_work_tree(lcu_t* from, lcu_t *to, const cu_loc_t * const cu_loc, const enum uvg_tree_type tree_type) {
 
-  const int y_limit = (LCU_WIDTH - cu_loc->local_y) >> (tree_type == UVG_CHROMA_T);
-  const int x_limit = (LCU_WIDTH - cu_loc->local_x) >> (tree_type == UVG_CHROMA_T);
+  const int y_limit = LCU_WIDTH >> (tree_type == UVG_CHROMA_T);
+  const int x_limit = LCU_WIDTH >> (tree_type == UVG_CHROMA_T);
 
   if (cu_loc->local_x == 0) {
     to->left_ref = from->left_ref;
@@ -106,11 +106,11 @@ static INLINE void initialize_partial_work_tree(lcu_t* from, lcu_t *to, const cu
 
   const int y_start = (cu_loc->local_y >> (tree_type == UVG_CHROMA_T)) - 4;
   const int x_start = (cu_loc->local_x >> (tree_type == UVG_CHROMA_T)) - 4;
-  for (int y = y_start; y < (tree_type != UVG_CHROMA_T ? LCU_WIDTH : LCU_WIDTH_C); y += SCU_WIDTH) {
+  for (int y = y_start; y < y_limit; y += SCU_WIDTH) {
     *LCU_GET_CU_AT_PX(to, x_start, y) = *LCU_GET_CU_AT_PX(from, x_start, y);
 
   }
-  for (int x = x_start; x < (tree_type != UVG_CHROMA_T ? LCU_WIDTH : LCU_WIDTH_C); x += SCU_WIDTH) {
+  for (int x = x_start; x < x_limit; x += SCU_WIDTH) {
     *LCU_GET_CU_AT_PX(to, x, y_start) = *LCU_GET_CU_AT_PX(from, x, y_start);
   }
 
