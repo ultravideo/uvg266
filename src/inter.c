@@ -708,9 +708,9 @@ void uvg_inter_pred_pu(
     const unsigned offset_chroma = SUB_SCU(cu_loc->y) / 2 * LCU_WIDTH_C + SUB_SCU(cu_loc->x) / 2;
     yuv_t lcu_adapter;
     lcu_adapter.size = cu_loc->width * cu_loc->height;
-    lcu_adapter.y = lcu->rec.y + offset_luma,
-    lcu_adapter.u = lcu->rec.u + offset_chroma,
-    lcu_adapter.v = lcu->rec.v + offset_chroma,
+    lcu_adapter.y = lcu->rec.y + offset_luma;
+    lcu_adapter.u = lcu->rec.u + offset_chroma;
+    lcu_adapter.v = lcu->rec.v + offset_chroma;
 
     inter_recon_unipred(state,
                         ref,
