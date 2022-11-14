@@ -561,7 +561,7 @@ static void encode_transform_unit(
   }
 
   bool joint_chroma = cur_pu->joint_cb_cr != 0;
-  if (cur_pu->log2_height + cur_pu->log2_width < 6) {
+  if (cur_pu->log2_height + cur_pu->log2_width < 6 && tree_type != UVG_CHROMA_T) {
     // For size 4x4 luma transform the corresponding chroma transforms are
     // also of size 4x4 covering 8x8 luma pixels. The residual is coded in
     // the last transform unit.
@@ -1743,7 +1743,7 @@ double uvg_mock_encode_coding_unit(
     if(tree_type != UVG_CHROMA_T) {
       uvg_encode_intra_luma_coding_unit(state, cabac, cur_cu, cu_loc, lcu, &bits);
     }
-    if((cur_cu->log2_height + cur_cu->log2_width >= 6 || (x % 8 != 0 && y % 8 != 0)) && state->encoder_control->chroma_format != UVG_CSP_400 && tree_type != UVG_LUMA_T) {
+    if((cur_cu->log2_height + cur_cu->log2_width >= 6 || (x % 8 != 0 && y % 8 != 0) || tree_type == UVG_CHROMA_T) && state->encoder_control->chroma_format != UVG_CSP_400 && tree_type != UVG_LUMA_T) {
       encode_chroma_intra_cu(cabac, cur_cu, state->encoder_control->cfg.cclm, &bits);
     }
   }

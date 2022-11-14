@@ -1076,7 +1076,7 @@ static double search_cu(
         int8_t intra_mode = intra_search.pred_cu.intra.mode;
 
         // TODO: This heavily relies to square CUs
-        if ((cur_cu->log2_height + cur_cu->log2_width >= 6 || (x % 8 && y % 8))
+        if ((cur_cu->log2_height + cur_cu->log2_width >= 6 || (x % 8 && y % 8) || tree_type == UVG_CHROMA_T)
           && state->encoder_control->chroma_format != UVG_CSP_400 && tree_type != UVG_LUMA_T) {
 
           intra_search.pred_cu.joint_cb_cr = 0;
@@ -1145,7 +1145,8 @@ static double search_cu(
                          recon_luma, recon_chroma);
 
 
-      if(cur_cu->log2_height + cur_cu->log2_width < 6 && x % 8 && y % 8 && tree_type != UVG_LUMA_T && state->encoder_control->chroma_format != UVG_CSP_400) {
+      if((cur_cu->log2_height + cur_cu->log2_width < 6 && x % 8 && y % 8 && tree_type != UVG_LUMA_T && state->encoder_control->chroma_format != UVG_CSP_400 ) 
+        || tree_type == UVG_CHROMA_T) {
         intra_search.pred_cu.intra.mode_chroma = cur_cu->intra.mode_chroma;
         uvg_intra_recon_cu(state,
                            &intra_search, cu_loc,
