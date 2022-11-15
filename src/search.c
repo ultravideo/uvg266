@@ -114,6 +114,11 @@ static INLINE void initialize_partial_work_tree(lcu_t* from, lcu_t *to, const cu
     }
   }
 
+  if (tree_type == UVG_CHROMA_T) {
+    // These are needed for CCLM
+    uvg_pixels_blit(from->rec.y, to->rec.y, MIN(cu_loc->local_x + cu_loc->width * 2, LCU_WIDTH), MIN(cu_loc->local_y + cu_loc->height * 2, LCU_WIDTH), LCU_WIDTH, LCU_WIDTH);
+  }
+
   to->ref.chroma_format = from->ref.chroma_format;
   to->rec.chroma_format = from->rec.chroma_format;
 
@@ -924,7 +929,7 @@ void uvg_sort_keys_by_cost(unit_stats_map_t *__restrict map)
 static double search_cu(
   encoder_state_t* const state,
   const cu_loc_t* const cu_loc,
-  lcu_t* work_tree,
+  lcu_t* lcu,
   enum uvg_tree_type
   tree_type,
   const split_tree_t split_tree)
@@ -958,9 +963,7 @@ static double search_cu(
     int32_t min;
     int32_t max;
   } pu_depth_inter, pu_depth_intra;
-
-  lcu_t *const lcu = &work_tree[split_tree.current_depth];
-
+  
   int x_local = SUB_SCU(x) >> (tree_type == UVG_CHROMA_T);
   int y_local = SUB_SCU(y) >> (tree_type == UVG_CHROMA_T);
 
@@ -1209,7 +1212,7 @@ static double search_cu(
 
         if (ctrl->cfg.zero_coeff_rdo && !ctrl->cfg.lossless && !ctrl->cfg.rdoq_enable && false) {
           //Calculate cost for zero coeffs
-          inter_zero_coeff_cost = cu_zero_coeff_cost(state, work_tree, cu_loc, split_tree.current_depth) + inter_bitcost * state->lambda;
+          // inter_zero_coeff_cost = cu_zero_coeff_cost(state, work_tree, cu_loc, split_tree.current_depth) + inter_bitcost * state->lambda;
 
         }
         cu_loc_t loc;
@@ -1264,21 +1267,21 @@ static double search_cu(
 
     cost += cu_rd_cost_tr_split_accurate(state, cur_cu, lcu, tree_type, 0, cu_loc);
     
-    if (ctrl->cfg.zero_coeff_rdo && inter_zero_coeff_cost <= cost) {
-      cost = inter_zero_coeff_cost;
+    //if (ctrl->cfg.zero_coeff_rdo && inter_zero_coeff_cost <= cost) {
+    //  cost = inter_zero_coeff_cost;
 
-      // Restore saved pixels from lower level of the working tree.
-      copy_cu_pixels(&work_tree[split_tree.current_depth + 1], lcu, cu_loc, tree_type);
+    //  // Restore saved pixels from lower level of the working tree.
+    //  copy_cu_pixels(&work_tree[split_tree.current_depth + 1], lcu, cu_loc, tree_type);
 
-      if (cur_cu->merged) {
-        cur_cu->merged = 0;
-        cur_cu->skipped = 1;
-        lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
-      }
+    //  if (cur_cu->merged) {
+    //    cur_cu->merged = 0;
+    //    cur_cu->skipped = 1;
+    //    lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
+    //  }
 
-      cur_cu->cbf = 0;
-      lcu_fill_cbf(lcu, x_local, y_local, cu_width, cur_cu);
-    }
+    //  cur_cu->cbf = 0;
+    //  lcu_fill_cbf(lcu, x_local, y_local, cu_width, cur_cu);
+    //}
     cabac->update = 0;
   } 
 
@@ -1308,6 +1311,7 @@ static double search_cu(
 
 
     double split_bits = 0;
+    lcu_t split_lcu;
 
     if (cur_cu->log2_height + cur_cu->log2_width > 4) {
 
@@ -1351,20 +1355,20 @@ static double search_cu(
     // It is ok to interrupt the search as soon as it is known that
     // the split costs at least as much as not splitting.
     if (cur_cu->type == CU_NOTSET || cbf || state->encoder_control->cfg.cu_split_termination == UVG_CU_SPLIT_TERMINATION_OFF) {
-      initialize_partial_work_tree(&work_tree[depth], &work_tree[depth + 1], cu_loc, tree_type);
+      initialize_partial_work_tree(lcu, &split_lcu, cu_loc, tree_type);
       cu_loc_t new_cu_loc[4];
       uvg_get_split_locs(cu_loc, QT_SPLIT, new_cu_loc);
       if (split_cost < cost) {
-        split_cost += search_cu(state, &new_cu_loc[0], work_tree, tree_type, new_split);
+        split_cost += search_cu(state, &new_cu_loc[0], &split_lcu, tree_type, new_split);
       }
       if (split_cost < cost) {
-        split_cost += search_cu(state, &new_cu_loc[1], work_tree, tree_type, new_split);
+        split_cost += search_cu(state, &new_cu_loc[1], &split_lcu, tree_type, new_split);
       }
       if (split_cost < cost) {
-        split_cost += search_cu(state, &new_cu_loc[2], work_tree, tree_type, new_split);
+        split_cost += search_cu(state, &new_cu_loc[2], &split_lcu, tree_type, new_split);
       }
       if (split_cost < cost) {
-        split_cost += search_cu(state, &new_cu_loc[3], work_tree, tree_type, new_split);
+        split_cost += search_cu(state, &new_cu_loc[3], &split_lcu, tree_type, new_split);
       }
     } else {
       split_cost = INT_MAX;
@@ -1382,7 +1386,7 @@ static double search_cu(
       && tree_type == UVG_BOTH_T)
     {
 
-      cu_info_t *cu_d1 = LCU_GET_CU_AT_PX(&work_tree[depth + 1], x_local, y_local);
+      cu_info_t *cu_d1 = LCU_GET_CU_AT_PX(&split_lcu, x_local, y_local);
 
       // If the best CU in depth+1 is intra and the biggest it can be, try it.
       if (cu_d1->type == CU_INTRA && (cu_d1->log2_height + 1 == cur_cu->log2_height || cu_d1->log2_width + 1 == cur_cu->log2_width)) {
@@ -1433,7 +1437,7 @@ static double search_cu(
     if (split_cost < cost) {
       // Copy split modes to this depth.
       cost = split_cost;
-      work_tree_copy_up(&work_tree[depth + 1], &work_tree[depth], state->encoder_control->cfg.jccr, tree_type, cu_loc);
+      work_tree_copy_up(&split_lcu, lcu, state->encoder_control->cfg.jccr, tree_type, cu_loc);
 #if UVG_DEBUG
       //debug_split = 1;
 #endif
@@ -1652,15 +1656,15 @@ void uvg_search_lcu(encoder_state_t * const state, const int x, const int y, con
   // will use these as temporary storage for predictions before making
   // a decision on which to use, and they get updated during the search
   // process.
-  lcu_t work_tree[MAX_PU_DEPTH + 1];
-  init_lcu_t(state, x, y, &work_tree[0], hor_buf, ver_buf);
+  lcu_t work_tree;
+  init_lcu_t(state, x, y, &work_tree, hor_buf, ver_buf);
 
   // If the ML depth prediction is enabled, 
   // generate the depth prediction interval 
   // for the current lcu
   constraint_t* constr = state->constraint;
   if (constr->ml_intra_depth_ctu) {
-    uvg_lcu_luma_depth_pred(constr->ml_intra_depth_ctu, work_tree[0].ref.y, state->qp);
+    uvg_lcu_luma_depth_pred(constr->ml_intra_depth_ctu, work_tree.ref.y, state->qp);
   }
 
   int tree_type = state->frame->slicetype == UVG_SLICE_I
@@ -1673,7 +1677,7 @@ void uvg_search_lcu(encoder_state_t * const state, const int x, const int y, con
   double cost = search_cu(
     state, 
     &start,
-    work_tree,
+    &work_tree,
     tree_type,
     split_tree);
 
@@ -1684,26 +1688,26 @@ void uvg_search_lcu(encoder_state_t * const state, const int x, const int y, con
 
   // The best decisions through out the LCU got propagated back to depth 0,
   // so copy those back to the frame.
-  copy_lcu_to_cu_data(state, x, y, &work_tree[0], tree_type);
+  copy_lcu_to_cu_data(state, x, y, &work_tree, tree_type);
 
   // Copy coeffs to encoder state.
-  copy_coeffs(work_tree[0].coeff.y, coeff->y, LCU_WIDTH, LCU_WIDTH, LCU_WIDTH);
+  copy_coeffs(work_tree.coeff.y, coeff->y, LCU_WIDTH, LCU_WIDTH, LCU_WIDTH);
 
   if(state->frame->slicetype == UVG_SLICE_I && state->encoder_control->cfg.dual_tree) {
     cost = search_cu(
       state, &start,
-      work_tree,
+      &work_tree,
       UVG_CHROMA_T, split_tree);
 
     if (state->encoder_control->cfg.rc_algorithm == UVG_LAMBDA) {
       uvg_get_lcu_stats(state, x / LCU_WIDTH, y / LCU_WIDTH)->weight += cost * cost;
     }
-    copy_lcu_to_cu_data(state, x, y, &work_tree[0], UVG_CHROMA_T);
+    copy_lcu_to_cu_data(state, x, y, &work_tree, UVG_CHROMA_T);
   }
 
-  copy_coeffs(work_tree[0].coeff.u, coeff->u, LCU_WIDTH_C, LCU_WIDTH_C, LCU_WIDTH_C);
-  copy_coeffs(work_tree[0].coeff.v, coeff->v, LCU_WIDTH_C, LCU_WIDTH_C, LCU_WIDTH_C);
+  copy_coeffs(work_tree.coeff.u, coeff->u, LCU_WIDTH_C, LCU_WIDTH_C, LCU_WIDTH_C);
+  copy_coeffs(work_tree.coeff.v, coeff->v, LCU_WIDTH_C, LCU_WIDTH_C, LCU_WIDTH_C);
   if (state->encoder_control->cfg.jccr) {
-    copy_coeffs(work_tree[0].coeff.joint_uv, coeff->joint_uv, LCU_WIDTH_C, LCU_WIDTH_C, LCU_WIDTH_C);
+    copy_coeffs(work_tree.coeff.joint_uv, coeff->joint_uv, LCU_WIDTH_C, LCU_WIDTH_C, LCU_WIDTH_C);
   }
 }
