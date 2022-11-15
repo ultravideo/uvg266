@@ -203,8 +203,8 @@ extern pixel_var_func *uvg_pixel_var;
 extern generate_residual_func* uvg_generate_residual;
 
 int uvg_strategy_register_picture(void* opaque, uint8_t bitdepth);
-cost_pixel_nxn_multi_func * uvg_pixels_get_satd_dual_func(unsigned n);
-cost_pixel_nxn_multi_func * uvg_pixels_get_sad_dual_func(unsigned n);
+cost_pixel_nxn_multi_func * uvg_pixels_get_satd_dual_func(unsigned width, unsigned height);
+cost_pixel_nxn_multi_func * uvg_pixels_get_sad_dual_func(unsigned width, unsigned height);
 
 #define STRATEGIES_PICTURE_EXPORTS \
   {"crc32c_4x4", (void**) &uvg_crc32c_4x4}, \

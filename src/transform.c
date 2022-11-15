@@ -584,7 +584,7 @@ void uvg_chroma_transform_search(
     if (is_jccr && !u_has_coeffs) continue;
 
     if (u_has_coeffs) {
-      uvg_dequant(state, u_quant_coeff, &u_coeff[i * trans_offset], width, width, transforms[i] != JCCR_1 ? COLOR_U : COLOR_V,
+      uvg_dequant(state, u_quant_coeff, &u_coeff[i * trans_offset], width, height, transforms[i] != JCCR_1 ? COLOR_U : COLOR_V,
         pred_cu->type, transforms[i] == CHROMA_TS);
 
       if (transforms[i] != CHROMA_TS) {

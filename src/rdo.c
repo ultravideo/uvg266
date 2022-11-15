@@ -447,7 +447,7 @@ double uvg_get_coeff_cost(
   } else {
     double ccc = get_coeff_cabac_cost(state, coeff_ptr, cu_loc, color, scan_mode, tr_skip, cur_tu);
     if (save_cccs) {
-      save_ccc(state->qp, coeff, width * width, ccc);
+      save_ccc(state->qp, coeff, width * height, ccc);
     }
     return ccc;
   }
@@ -1474,10 +1474,13 @@ void uvg_rdoq(
   // Hope the compiler is able to utilize this information.
   switch (cg_num) {
     case  1: FILL_ARRAY(sig_coeffgroup_flag, 0,  1); break;
+    case  2: FILL_ARRAY(sig_coeffgroup_flag, 0,  2); break;
     case  4: FILL_ARRAY(sig_coeffgroup_flag, 0,  4); break;
+    case  8: FILL_ARRAY(sig_coeffgroup_flag, 0,  8); break;
     case 16: FILL_ARRAY(sig_coeffgroup_flag, 0, 16); break;
+    case 32: FILL_ARRAY(sig_coeffgroup_flag, 0, 32); break;
     case 64: FILL_ARRAY(sig_coeffgroup_flag, 0, 64); break;
-    default: assert(0 && "There should be 1, 4, 16 or 64 coefficient groups");
+    default: assert(0 && "There should be 1, 2, 4, 8, 16, 32 or 64 coefficient groups");
   }
 
   cabac_ctx_t *base_coeff_group_ctx = &(cabac->ctx.sig_coeff_group_model[color ? 2 : 0]);

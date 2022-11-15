@@ -185,7 +185,10 @@ typedef struct {
 
 void uvg_cu_loc_ctor(cu_loc_t *loc, int x, int y, int width, int height);
 
-void uvg_get_split_locs(const cu_loc_t* const origin, enum split_type split, cu_loc_t out[4]);
+int uvg_get_split_locs(
+  const cu_loc_t* const origin,
+  enum split_type split,
+  cu_loc_t out[4]);
 
 #define CU_GET_MV_CAND(cu_info_ptr, reflist) \
   (((reflist) == 0) ? (cu_info_ptr)->inter.mv_cand0 : (cu_info_ptr)->inter.mv_cand1)

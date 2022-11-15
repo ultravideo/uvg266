@@ -51,7 +51,7 @@ static void init_sig_last_scan(uint32_t *buff_d, uint32_t *buff_h,
                                uint32_t *buff_v,
                                int32_t width, int32_t height)
 {
-  uint32_t num_scan_pos  = width * width;
+  uint32_t num_scan_pos  = width * height;
   uint32_t next_scan_pos = 0;
   int32_t  xx, yy, x, y;
   uint32_t scan_line;

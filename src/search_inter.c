@@ -2187,8 +2187,8 @@ void uvg_cu_cost_inter_rd2(
                               UVG_BOTH_T);
     ALIGNED(64) uvg_pixel u_pred[LCU_WIDTH_C * LCU_WIDTH_C];
     ALIGNED(64) uvg_pixel v_pred[LCU_WIDTH_C * LCU_WIDTH_C];
-    uvg_pixels_blit(&lcu->ref.u[index], u_pred, width, width, LCU_WIDTH_C, width);
-    uvg_pixels_blit(&lcu->ref.v[index], v_pred, width, width, LCU_WIDTH_C, width);
+    uvg_pixels_blit(&lcu->ref.u[index], u_pred, width, height, LCU_WIDTH_C, width);
+    uvg_pixels_blit(&lcu->ref.v[index], v_pred, width, height, LCU_WIDTH_C, width);
     ALIGNED(64) int16_t u_resi[LCU_WIDTH_C * LCU_WIDTH_C];
     ALIGNED(64) int16_t v_resi[LCU_WIDTH_C * LCU_WIDTH_C];
 
