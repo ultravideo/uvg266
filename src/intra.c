@@ -1552,7 +1552,7 @@ void uvg_intra_predict(
     }
   }
   else {
-    uvg_pixels_blit(&state->tile->frame->cclm_luma_rec[x / 2 + (y * stride) / 4], dst, width, width, stride / 2, width);
+    uvg_pixels_blit(&state->tile->frame->cclm_luma_rec[x / 2 + (y * stride) / 4], dst, width, height, stride / 2, width);
     if (!PU_IS_TU(&data->pred_cu) || data->cclm_parameters[color == COLOR_U ? 0 : 1].b <= 0) {
       predict_cclm(
         state, color, width, height, x, y, stride, intra_mode, lcu, refs, dst, 
@@ -1560,7 +1560,7 @@ void uvg_intra_predict(
         tree_type);
     }
     else {
-      linear_transform_cclm(&data->cclm_parameters[color == COLOR_U ? 0 : 1], dst, dst, width, width);
+      linear_transform_cclm(&data->cclm_parameters[color == COLOR_U ? 0 : 1], dst, dst, width, height);
     }
   }
 }

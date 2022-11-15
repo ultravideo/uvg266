@@ -130,17 +130,31 @@ static INLINE uint8_t select_best_mode_index(const int8_t *modes, const double *
  *
  * \return  
  */
-static void get_cost_dual(encoder_state_t * const state, 
-                       const pred_buffer preds, const uvg_pixel *orig_block,
-                       cost_pixel_nxn_multi_func *satd_twin_func,
-                       cost_pixel_nxn_multi_func *sad_twin_func,
-                       int width, double *costs_out)
+static void get_cost_dual(
+  encoder_state_t * const state,
+  const pred_buffer preds,
+  const uvg_pixel *orig_block,
+  cost_pixel_nxn_multi_func *satd_twin_func,
+  cost_pixel_nxn_multi_func *sad_twin_func,
+  int width,
+  int height,
+  double *costs_out)
 {
   #define PARALLEL_BLKS 2
   unsigned satd_costs[PARALLEL_BLKS] = { 0 };
-  satd_twin_func(preds, orig_block, PARALLEL_BLKS, satd_costs);
+  if (satd_twin_func != NULL) {
+    satd_twin_func(preds, orig_block, PARALLEL_BLKS, satd_costs);
+  } else {
+    satd_costs[0] = uvg_satd_any_size(width, height, preds[0], width, orig_block, LCU_WIDTH);
+    satd_costs[1] = uvg_satd_any_size(width, height, preds[1], width, orig_block, LCU_WIDTH);
+  }
   unsigned unsigned_sad_costs[PARALLEL_BLKS] = { 0 };
-  sad_twin_func(preds, orig_block, PARALLEL_BLKS, unsigned_sad_costs);
+  if (sad_twin_func != NULL) {
+    sad_twin_func(preds, orig_block, PARALLEL_BLKS, unsigned_sad_costs);
+  } else {
+    unsigned_sad_costs[0] = uvg_reg_sad(preds[0], orig_block, width, height, width, LCU_WIDTH);
+    unsigned_sad_costs[1] = uvg_reg_sad(preds[1], orig_block, width, height, width, LCU_WIDTH);
+  }
   costs_out[0] = (double)MIN(satd_costs[0], unsigned_sad_costs[0] * 2);
   costs_out[1] = (double)MIN(satd_costs[1], unsigned_sad_costs[1] * 2);
 
@@ -651,7 +665,7 @@ static int search_intra_chroma_rough(
   uvg_pixel _orig_block[32 * 32 + SIMD_ALIGNMENT];
   uvg_pixel *orig_block = ALIGNED_POINTER(_orig_block, SIMD_ALIGNMENT);
 
-  uvg_pixels_blit(orig_u, orig_block, width, width, LCU_WIDTH_C, width);
+  uvg_pixels_blit(orig_u, orig_block, width, height, LCU_WIDTH_C, width);
   int modes_count = (state->encoder_control->cfg.cclm ? 8 : 5);
   for (int i = 0; i < modes_count; ++i) {
     const int8_t mode_chroma = chroma_data[i].pred_cu.intra.mode_chroma;
@@ -671,7 +685,7 @@ static int search_intra_chroma_rough(
     }
   }
 
-  uvg_pixels_blit(orig_v, orig_block, width, width, LCU_WIDTH_C, width);
+  uvg_pixels_blit(orig_v, orig_block, width, height, LCU_WIDTH_C, width);
   for (int i = 0; i < modes_count; ++i) {
     const int8_t mode_chroma = chroma_data[i].pred_cu.intra.mode_chroma;
     if (mode_chroma == luma_mode || mode_chroma == 0 || mode_chroma >= 81) continue;
@@ -764,7 +778,7 @@ static int16_t search_intra_rough(
   uvg_pixel *orig_block = ALIGNED_POINTER(_orig_block, SIMD_ALIGNMENT);
 
   // Store original block for SAD computation
-  uvg_pixels_blit(orig, orig_block, width, width, origstride, width);
+  uvg_pixels_blit(orig, orig_block, width, height, origstride, width);
 
   int8_t modes_selected = 0;
   // Note: get_cost and get_cost_dual may return negative costs.
@@ -783,7 +797,7 @@ static int16_t search_intra_rough(
 
   // Calculate SAD for evenly spaced modes to select the starting point for 
   // the recursive search.
-  cu_loc_t loc = { 0, 0, width, width, width, width };
+  cu_loc_t loc = { 0, 0, width, height, width, height };
   intra_search_data_t search_proxy;
   FILL(search_proxy, 0);
   search_proxy.pred_cu = *pred_cu;
@@ -963,19 +977,19 @@ static uint8_t search_intra_rough(
   uvg_pixel *orig,
   int32_t origstride,
   uvg_intra_references *refs,
-  int log2_width,
+  int width,
+  int height,
   int8_t *intra_preds,
   intra_search_data_t* modes_out,
   cu_info_t* const pred_cu,
   uint8_t mip_ctx)
 {
   #define PARALLEL_BLKS 2 // TODO: use 4 for AVX-512 in the future?
-  assert(log2_width >= 2 && log2_width <= 5);
-  int_fast8_t width = 1 << log2_width;
+  assert(width >= 4 && width <= 32);
   // cost_pixel_nxn_func *satd_func = kvz_pixels_get_satd_func(width);
   // cost_pixel_nxn_func *sad_func = kvz_pixels_get_sad_func(width);
-  cost_pixel_nxn_multi_func *satd_dual_func = uvg_pixels_get_satd_dual_func(width);
-  cost_pixel_nxn_multi_func *sad_dual_func = uvg_pixels_get_sad_dual_func(width);
+  cost_pixel_nxn_multi_func *satd_dual_func = uvg_pixels_get_satd_dual_func(width, height);
+  cost_pixel_nxn_multi_func *sad_dual_func = uvg_pixels_get_sad_dual_func(width, height);
   bool mode_checked[UVG_NUM_INTRA_MODES] = {0};
   double costs[UVG_NUM_INTRA_MODES];
 
@@ -990,7 +1004,7 @@ static uint8_t search_intra_rough(
   uvg_pixel *orig_block = ALIGNED_POINTER(_orig_block, SIMD_ALIGNMENT);
 
   // Store original block for SAD computation
-  uvg_pixels_blit(orig, orig_block, width, width, origstride, width);
+  uvg_pixels_blit(orig, orig_block, width, height, origstride, width);
 
   int8_t modes_selected = 0;
   // Note: get_cost and get_cost_dual may return negative costs.
@@ -1016,17 +1030,16 @@ static uint8_t search_intra_rough(
 
   // Calculate SAD for evenly spaced modes to select the starting point for 
   // the recursive search.
-  cu_loc_t loc = { 0, 0, width, width, width, width };
   intra_search_data_t search_proxy;
   FILL(search_proxy, 0);
   search_proxy.pred_cu = *pred_cu;
 
   int offset = 4;
   search_proxy.pred_cu.intra.mode = 0;
-  uvg_intra_predict(state, refs, &loc, COLOR_Y, preds[0], &search_proxy, NULL, UVG_LUMA_T);
+  uvg_intra_predict(state, refs, cu_loc, COLOR_Y, preds[0], &search_proxy, NULL, UVG_LUMA_T);
   search_proxy.pred_cu.intra.mode = 1;
-  uvg_intra_predict(state, refs, &loc, COLOR_Y, preds[1], &search_proxy, NULL, UVG_LUMA_T);
-  get_cost_dual(state, preds, orig_block, satd_dual_func, sad_dual_func, width, costs);
+  uvg_intra_predict(state, refs, cu_loc, COLOR_Y, preds[1], &search_proxy, NULL, UVG_LUMA_T);
+  get_cost_dual(state, preds, orig_block, satd_dual_func, sad_dual_func, width, height, costs);
   mode_checked[0] = true;
   mode_checked[1] = true;
   costs[0] += count_bits(
@@ -1075,12 +1088,12 @@ static uint8_t search_intra_rough(
     for (int i = 0; i < PARALLEL_BLKS; ++i) {
       if (mode + i * offset <= 66) {
         search_proxy.pred_cu.intra.mode = mode + i*offset;
-        uvg_intra_predict(state, refs, &loc, COLOR_Y, preds[i], &search_proxy, NULL, UVG_LUMA_T);
+        uvg_intra_predict(state, refs, cu_loc, COLOR_Y, preds[i], &search_proxy, NULL, UVG_LUMA_T);
       }
     }
     
     //TODO: add generic version of get cost  multi
-    get_cost_dual(state, preds, orig_block, satd_dual_func, sad_dual_func, width, costs_out);
+    get_cost_dual(state, preds, orig_block, satd_dual_func, sad_dual_func, width, height, costs_out);
     for (int i = 0; i < PARALLEL_BLKS; ++i) {
       if (mode + i * offset <= 66) {
         costs_out[i] += count_bits(
@@ -1147,12 +1160,12 @@ static uint8_t search_intra_rough(
       
         for (int block = 0; block < PARALLEL_BLKS; ++block) {
           search_proxy.pred_cu.intra.mode = modes_to_check[block + i];
-          uvg_intra_predict(state, refs, &loc, COLOR_Y, preds[block], &search_proxy, NULL, UVG_LUMA_T);
+          uvg_intra_predict(state, refs, cu_loc, COLOR_Y, preds[block], &search_proxy, NULL, UVG_LUMA_T);
         
         }
 
         //TODO: add generic version of get cost multi
-        get_cost_dual(state, preds, orig_block, satd_dual_func, sad_dual_func, width, costs_out);
+        get_cost_dual(state, preds, orig_block, satd_dual_func, sad_dual_func, width, height, costs_out);
         for (int block = 0; block < PARALLEL_BLKS; ++block) {
             costs_out[block] += count_bits(
               state,
@@ -1219,12 +1232,9 @@ static void get_rough_cost_for_2n_modes(
   const int height = cu_loc->height;
   cost_pixel_nxn_multi_func* satd_dual_func;
   cost_pixel_nxn_multi_func* sad_dual_func;
-  if (width == height) {
-    satd_dual_func = uvg_pixels_get_satd_dual_func(width);
-    sad_dual_func = uvg_pixels_get_sad_dual_func(width);
-  } else {
-    assert(false && "Joose promised to fix this.");
-  }
+  satd_dual_func = uvg_pixels_get_satd_dual_func(width, height);
+  sad_dual_func = uvg_pixels_get_sad_dual_func(width, height);
+
 
   uvg_pixel _preds[PARALLEL_BLKS * MIN(LCU_WIDTH, 64)* MIN(LCU_WIDTH, 64)+ SIMD_ALIGNMENT];
   pred_buffer preds = ALIGNED_POINTER(_preds, SIMD_ALIGNMENT);
@@ -1232,7 +1242,7 @@ static void get_rough_cost_for_2n_modes(
   uvg_pixel _orig_block[MIN(LCU_WIDTH, 64) * MIN(LCU_WIDTH, 64) + SIMD_ALIGNMENT];
   uvg_pixel* orig_block = ALIGNED_POINTER(_orig_block, SIMD_ALIGNMENT);
 
-  uvg_pixels_blit(orig, orig_block, width, width, orig_stride, width);
+  uvg_pixels_blit(orig, orig_block, width, height, orig_stride, width);
   
   const double mrl = state->encoder_control->cfg.mrl && (cu_loc->y % LCU_WIDTH) ? CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.multi_ref_line[0]), 1) : 0;
   const double not_mip = state->encoder_control->cfg.mip ? CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.mip_flag[mip_ctx]), 0) : 0;
@@ -1243,7 +1253,7 @@ static void get_rough_cost_for_2n_modes(
     for (int i = 0; i < PARALLEL_BLKS; ++i) {
       uvg_intra_predict(state, &refs[search_data[mode + i].pred_cu.intra.multi_ref_idx], cu_loc, COLOR_Y, preds[i], &search_data[mode + i], NULL, UVG_LUMA_T);
     }
-    get_cost_dual(state, preds, orig_block, satd_dual_func, sad_dual_func, width, costs_out);
+    get_cost_dual(state, preds, orig_block, satd_dual_func, sad_dual_func, width, height, costs_out);
 
     for(int i = 0; i < PARALLEL_BLKS; ++i) {
       uint8_t multi_ref_idx = search_data[mode + i].pred_cu.intra.multi_ref_idx;
@@ -1796,16 +1806,17 @@ void uvg_search_cu_intra(
   bool skip_rough_search = (is_large || state->encoder_control->cfg.rdo >= 4);
   if (!skip_rough_search) {
     num_regular_modes = number_of_modes = search_intra_rough(
-      state,
-      cu_loc,
-      ref_pixels,
-      LCU_WIDTH,
-      refs,
-      log2_width,
-      candidate_modes,
-      search_data,
-      &temp_pred_cu,
-      mip_ctx);
+                          state,
+                          cu_loc,
+                          ref_pixels,
+                          LCU_WIDTH,
+                          refs,
+                          cu_loc->width,
+                          cu_loc->height,
+                          candidate_modes,
+                          search_data,
+                          &temp_pred_cu,
+                          mip_ctx);
     // if(lines == 1) sort_modes(search_data, number_of_modes);
 
   } else {

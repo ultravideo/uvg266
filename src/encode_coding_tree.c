@@ -543,7 +543,7 @@ static void encode_transform_unit(
     if(state->encoder_control->cfg.trskip_enable && width <= (1 << state->encoder_control->cfg.trskip_max_size) && !(cur_pu->type == CU_INTRA && cur_pu->intra.isp_mode != ISP_MODE_NO_ISP)) {
       cabac->cur_ctx = &cabac->ctx.transform_skip_model_luma;
       CABAC_BIN(cabac, cur_pu->tr_idx == MTS_SKIP, "transform_skip_flag");
-      DBG_YUVIEW_VALUE(state->frame->poc, DBG_YUVIEW_TR_SKIP, x, y, width, width, (cur_pu->tr_idx == MTS_SKIP) ? 1 : 0);
+      DBG_YUVIEW_VALUE(state->frame->poc, DBG_YUVIEW_TR_SKIP, x, y, width, height, (cur_pu->tr_idx == MTS_SKIP) ? 1 : 0);
     }
     if(cur_pu->tr_idx == MTS_SKIP) {
       uvg_encode_ts_residual(state, cabac, coeff_y, width, height, 0, scan_idx, NULL);      
@@ -1040,7 +1040,7 @@ void uvg_encode_intra_luma_coding_unit(
   int multi_ref_idx = enable_mrl ? cur_cu->intra.multi_ref_idx : 0;
   
 #ifdef UVG_DEBUG_PRINT_YUVIEW_CSV
-  if(multi_ref_idx) DBG_YUVIEW_VALUE(state->frame->poc, DBG_YUVIEW_MRL, x, y, width, width, multi_ref_idx);
+  if(multi_ref_idx) DBG_YUVIEW_VALUE(state->frame->poc, DBG_YUVIEW_MRL, x, y, width, height, multi_ref_idx);
 #endif
 
   if (cur_cu->type == CU_INTRA && (y % LCU_WIDTH) != 0 && !cur_cu->bdpcmMode && enable_mrl && !mip_flag) {
@@ -1222,7 +1222,7 @@ bool uvg_write_split_flag(
   no_split = allow_qt = bh_split = bv_split = th_split = tv_split = true;
   if (depth > MAX_DEPTH) allow_qt = false;
   // ToDo: update this when btt is actually used
-  bool allow_btt = false;// when mt_depth < MAX_BT_DEPTH
+  bool allow_btt = true;// when mt_depth < MAX_BT_DEPTH
   
   const int cu_width = tree_type != UVG_CHROMA_T ? cu_loc->width : cu_loc->chroma_width;
   const int cu_height = tree_type != UVG_CHROMA_T ? cu_loc->height : cu_loc->chroma_height;
@@ -1289,7 +1289,7 @@ bool uvg_write_split_flag(
     CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.split_flag_model[split_model]), split_flag != 0, bits, "split_flag");
   }
 
-  bool qt_split = split_flag == UVG_QUAD_SPLIT;
+  bool qt_split = split_flag == QT_SPLIT;
 
   if (!(implicit_split_mode == UVG_NO_SPLIT) && (allow_qt && allow_btt)) {
     split_model = (left_cu && GET_SPLITDATA(left_cu, depth)) + (above_cu && GET_SPLITDATA(above_cu, depth)) + (depth < 2 ? 0 : 3);
@@ -1384,28 +1384,16 @@ void uvg_encode_coding_tree(
       const int half_luma = cu_loc->width / 2;
       split_tree_t new_split_tree = { cur_cu->split_tree, split_tree.current_depth + 1 };
 
-      cu_loc_t new_cu_loc;
-      uvg_cu_loc_ctor(&new_cu_loc, x, y, half_luma, half_luma);
-      // Split blocks and remember to change x and y block positions
-      uvg_encode_coding_tree(state, coeff, tree_type, &new_cu_loc, new_split_tree);
-
-      if (!border_x || border_split_x) {
-        uvg_cu_loc_ctor(&new_cu_loc, x + half_cu, y, half_luma, half_luma);
-        uvg_encode_coding_tree(state, coeff, tree_type, &new_cu_loc, new_split_tree);
-      }
-      if (!border_y || border_split_y) {
-        uvg_cu_loc_ctor(&new_cu_loc, x, y + half_cu, half_luma, half_luma);
-        uvg_encode_coding_tree(state, coeff, tree_type, &new_cu_loc, new_split_tree);
-      }
-      if (!border || (border_split_x && border_split_y)) {
-        uvg_cu_loc_ctor(&new_cu_loc, x + half_cu, y + half_cu, half_luma, half_luma);
-        uvg_encode_coding_tree(state, coeff, tree_type, &new_cu_loc, new_split_tree);
+      cu_loc_t new_cu_loc[4];
+      const int splits = uvg_get_split_locs(cu_loc, split_flag, new_cu_loc);
+      for (int split = 0; split <splits; ++split) {
+        uvg_encode_coding_tree(state, coeff, tree_type, &new_cu_loc[split], new_split_tree);
       }
       return;
     }
   }
   
-  DBG_YUVIEW_VALUE(state->frame->poc, DBG_YUVIEW_CU_TYPE, abs_x, abs_y, cu_width, cu_width, (cur_cu->type == CU_INTRA)?0:1);
+  DBG_YUVIEW_VALUE(state->frame->poc, DBG_YUVIEW_CU_TYPE, abs_x, abs_y, cu_width, cu_height, (cur_cu->type == CU_INTRA)?0:1);
 
   if (ctrl->cfg.lossless) {
     cabac->cur_ctx = &cabac->ctx.cu_transquant_bypass;
@@ -1446,8 +1434,8 @@ void uvg_encode_coding_tree(
         }
       }
 #ifdef UVG_DEBUG_PRINT_YUVIEW_CSV
-      if (cur_cu->inter.mv_dir & 1) DBG_YUVIEW_MV(state->frame->poc, DBG_YUVIEW_MVSKIP_L0, abs_x, abs_y, cu_width, cu_width, cur_cu->inter.mv[0][0], cur_cu->inter.mv[0][1]);
-      if (cur_cu->inter.mv_dir & 2) DBG_YUVIEW_MV(state->frame->poc, DBG_YUVIEW_MVSKIP_L1, abs_x, abs_y, cu_width, cu_width, cur_cu->inter.mv[1][0], cur_cu->inter.mv[1][1]);
+      if (cur_cu->inter.mv_dir & 1) DBG_YUVIEW_MV(state->frame->poc, DBG_YUVIEW_MVSKIP_L0, abs_x, abs_y, cu_width, cu_height, cur_cu->inter.mv[0][0], cur_cu->inter.mv[0][1]);
+      if (cur_cu->inter.mv_dir & 2) DBG_YUVIEW_MV(state->frame->poc, DBG_YUVIEW_MVSKIP_L1, abs_x, abs_y, cu_width, cu_height, cur_cu->inter.mv[1][0], cur_cu->inter.mv[1][1]);
 #endif
 
       goto end;

@@ -252,15 +252,16 @@ static void lcu_fill_cu_info(lcu_t *lcu, int x_local, int y_local, int width, in
 }
 
 
-static void lcu_fill_cbf(lcu_t *lcu, int x_local, unsigned y_local, unsigned width, const cu_info_t *cur_cu)
+static void lcu_fill_cbf(lcu_t *lcu, int x_local, unsigned y_local, unsigned width, unsigned height, const cu_info_t *cur_cu)
 {
-  const uint32_t mask = ~((MIN(width, TR_MAX_WIDTH))-1);
+  const uint32_t x_mask = ~((MIN(width, TR_MAX_WIDTH))-1);
+  const uint32_t y_mask = ~((MIN(height, TR_MAX_WIDTH))-1);
 
   // Set coeff flags in every CU covered by part_mode in this depth.
-  for (uint32_t y = y_local; y < y_local + width; y += SCU_WIDTH) {
+  for (uint32_t y = y_local; y < y_local + height; y += SCU_WIDTH) {
     for (uint32_t x = x_local; x < x_local + width; x += SCU_WIDTH) {
       // Use TU top-left CU to propagate coeff flags
-      cu_info_t *cu_from = LCU_GET_CU_AT_PX(lcu, x & mask, y & mask);
+      cu_info_t *cu_from = LCU_GET_CU_AT_PX(lcu, x & x_mask, y & y_mask);
       cu_info_t *cu_to   = LCU_GET_CU_AT_PX(lcu, x, y);
       if (cu_from != cu_to) {
         // Chroma and luma coeff data is needed for deblocking
@@ -942,6 +943,7 @@ static double search_cu(
   const int x = cu_loc->x;
   const int y = cu_loc->y;
   const int luma_width = cu_loc->width;
+  const int luma_height = cu_loc->height;
   assert(cu_width >= 4);
   double cost = MAX_DOUBLE;
   double inter_zero_coeff_cost = MAX_DOUBLE;
@@ -1005,7 +1007,7 @@ static double search_cu(
 
   // If the CU is completely inside the frame at this depth, search for
   // prediction modes at this depth.
-  if ( x + luma_width <= frame_width && y + luma_width <= frame_height)
+  if ( x + luma_width <= frame_width && y + luma_height <= frame_height)
   {
     int cu_width_inter_min = LCU_WIDTH >> pu_depth_inter.max;
     bool can_use_inter =
@@ -1018,7 +1020,7 @@ static double search_cu(
         // otherwise forbid it.
         (x & ~(cu_width_inter_min - 1)) + cu_width_inter_min > frame_width ||
         (y & ~(cu_width_inter_min - 1)) + cu_width_inter_min > frame_height
-      );
+      ) && cu_loc->width == cu_loc->height; // Don't allow non square inter CUs for now
 
     if (can_use_inter) {
       double mode_cost;
@@ -1148,7 +1150,7 @@ static double search_cu(
       if ((cur_cu->log2_height + cur_cu->log2_width < 6) || state->encoder_control->chroma_format == UVG_CSP_400 || tree_type == UVG_LUMA_T) {
         recon_chroma = false; 
       }
-      lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
+      lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_height, cur_cu);
       uvg_intra_recon_cu(state,
                          &intra_search, cu_loc,
                          NULL, lcu,
@@ -1195,7 +1197,7 @@ static double search_cu(
         if(cbf_cr) cbf_set(&split_cu->cbf, COLOR_V);
         split_cu->joint_cb_cr = jccr;
       }
-      lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
+      lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_height, cur_cu);
 
 
     } else if (cur_cu->type == CU_INTER) {
@@ -1238,7 +1240,7 @@ static double search_cu(
         }
       }
       lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_height, cur_cu);
-      lcu_fill_cbf(lcu, x_local, y_local, cu_width, cur_cu);
+      lcu_fill_cbf(lcu, x_local, y_local, cu_width, cu_height, cur_cu);
     }
   }
 
@@ -1276,7 +1278,7 @@ static double search_cu(
     //  if (cur_cu->merged) {
     //    cur_cu->merged = 0;
     //    cur_cu->skipped = 1;
-    //    lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
+    //    lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_height, cur_cu);
     //  }
 
     //  cur_cu->cbf = 0;
@@ -1300,9 +1302,9 @@ static double search_cu(
 
   // Recursively split all the way to max search depth.
   if (can_split_cu) {
-    const split_tree_t new_split = { split_tree.split_tree | QT_SPLIT << (split_tree.current_depth * 3), split_tree.current_depth + 1 };
-
-    int half_cu = cu_width >> (tree_type != UVG_CHROMA_T);
+    const int split_type = depth == 0 ? QT_SPLIT : BT_HOR_SPLIT;
+    const split_tree_t new_split = { split_tree.split_tree | split_type << (split_tree.current_depth * 3), split_tree.current_depth + 1 };
+    
     double split_cost = 0.0;
     int cbf = cbf_is_set_any(cur_cu->cbf);
     cabac_data_t post_seach_cabac;
@@ -1357,19 +1359,14 @@ static double search_cu(
     if (cur_cu->type == CU_NOTSET || cbf || state->encoder_control->cfg.cu_split_termination == UVG_CU_SPLIT_TERMINATION_OFF) {
       initialize_partial_work_tree(lcu, &split_lcu, cu_loc, tree_type);
       cu_loc_t new_cu_loc[4];
-      uvg_get_split_locs(cu_loc, QT_SPLIT, new_cu_loc);
-      if (split_cost < cost) {
-        split_cost += search_cu(state, &new_cu_loc[0], &split_lcu, tree_type, new_split);
+      const int splits = uvg_get_split_locs(cu_loc, split_type, new_cu_loc);
+      for (int split = 0; split < splits; ++split) {
+        split_cost += search_cu(state, &new_cu_loc[split], &split_lcu, tree_type, new_split);
+        if (split_cost < cost) {
+          break;
+        }
       }
-      if (split_cost < cost) {
-        split_cost += search_cu(state, &new_cu_loc[1], &split_lcu, tree_type, new_split);
-      }
-      if (split_cost < cost) {
-        split_cost += search_cu(state, &new_cu_loc[2], &split_lcu, tree_type, new_split);
-      }
-      if (split_cost < cost) {
-        split_cost += search_cu(state, &new_cu_loc[3], &split_lcu, tree_type, new_split);
-      }
+
     } else {
       split_cost = INT_MAX;
     }
@@ -1410,7 +1407,7 @@ static double search_cu(
         cur_cu->lfnst_idx = 0;
         cur_cu->cr_lfnst_idx = 0;
         
-        lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
+        lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_height, cur_cu);
         
         intra_search_data_t proxy;
         FILL(proxy, 0);
@@ -1453,7 +1450,7 @@ static double search_cu(
         // Reset HMVP to the beginning of this CU level search and add this CU as the mvp
         memcpy(&state->tile->frame->hmvp_lut[ctu_row_mul_five], hmvp_lut, sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
         state->tile->frame->hmvp_size[ctu_row] = hmvp_lut_size;
-        uvg_hmvp_add_mv(state, x, y, cu_width, cu_width, cur_cu);
+        uvg_hmvp_add_mv(state, x, y, cu_width, cu_height, cur_cu);
       }
     }
     else {
@@ -1474,7 +1471,7 @@ static double search_cu(
       // Reset HMVP to the beginning of this CU level search and add this CU as the mvp
       memcpy(&state->tile->frame->hmvp_lut[ctu_row_mul_five], hmvp_lut, sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
       state->tile->frame->hmvp_size[ctu_row] = hmvp_lut_size;
-      uvg_hmvp_add_mv(state, x, y, cu_width, cu_width, cur_cu);
+      uvg_hmvp_add_mv(state, x, y, cu_width, cu_height, cur_cu);
     }
   }
 

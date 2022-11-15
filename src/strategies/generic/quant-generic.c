@@ -315,22 +315,22 @@ int uvg_quant_cbcr_residual_generic(
   if (state->encoder_control->cfg.rdoq_enable &&
     (width > 4 || !state->encoder_control->cfg.rdoq_skip))
   {
-    uvg_rdoq(state, coeff, coeff_out, width, width, cur_cu->joint_cb_cr == 1 ? COLOR_V : COLOR_U,
+    uvg_rdoq(state, coeff, coeff_out, width, height, cur_cu->joint_cb_cr == 1 ? COLOR_V : COLOR_U,
              scan_order, cur_cu->type, cur_cu->cbf, cur_cu->cr_lfnst_idx);
   }
   else if (state->encoder_control->cfg.rdoq_enable && false) {
-    uvg_ts_rdoq(state, coeff, coeff_out, width, width, cur_cu->joint_cb_cr == 2 ? COLOR_V : COLOR_U,
+    uvg_ts_rdoq(state, coeff, coeff_out, width, height, cur_cu->joint_cb_cr == 2 ? COLOR_V : COLOR_U,
       scan_order);
   }
   else {
-    uvg_quant(state, coeff, coeff_out, width, width, cur_cu->joint_cb_cr == 1 ? COLOR_V : COLOR_U,
+    uvg_quant(state, coeff, coeff_out, width, height, cur_cu->joint_cb_cr == 1 ? COLOR_V : COLOR_U,
       scan_order, cur_cu->type, cur_cu->tr_idx == MTS_SKIP && false, cur_cu->lfnst_idx);
   }
 
   int8_t has_coeffs = 0;
   {
     int i;
-    for (i = 0; i < width * width; ++i) {
+    for (i = 0; i < width * height; ++i) {
       if (coeff_out[i] != 0) {
         has_coeffs = 1;
         break;
@@ -341,10 +341,10 @@ int uvg_quant_cbcr_residual_generic(
   if (has_coeffs && !early_skip) {
 
     // Get quantized residual. (coeff_out -> coeff -> residual)
-    uvg_dequant(state, coeff_out, coeff, width, width, cur_cu->joint_cb_cr == 1 ? COLOR_V : COLOR_U,
+    uvg_dequant(state, coeff_out, coeff, width, height, cur_cu->joint_cb_cr == 1 ? COLOR_V : COLOR_U,
       cur_cu->type, cur_cu->tr_idx == MTS_SKIP && false);
     if (cur_cu->cr_lfnst_idx) {
-      uvg_inv_lfnst(cur_cu, width, width, COLOR_UV, cur_cu->cr_lfnst_idx, coeff, tree_type);
+      uvg_inv_lfnst(cur_cu, width, height, COLOR_UV, cur_cu->cr_lfnst_idx, coeff, tree_type);
     }
     
     uvg_itransform2d(state->encoder_control, combined_residual, coeff, width, height, cur_cu->joint_cb_cr == 1 ? COLOR_V : COLOR_U, cur_cu);

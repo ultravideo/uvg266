@@ -720,7 +720,7 @@ int uvg_quantize_residual_avx2(encoder_state_t *const state,
   }
 
   // Check if there are any non-zero coefficients.
-  for (int i = 0; i < width * width; i += 8) {
+  for (int i = 0; i < width * height; i += 8) {
     __m128i v_quant_coeff = _mm_loadu_si128((__m128i*)&(coeff_out[i]));
     has_coeffs = !_mm_testz_si128(_mm_set1_epi8(0xFF), v_quant_coeff);
     if(has_coeffs) break;
@@ -730,7 +730,7 @@ int uvg_quantize_residual_avx2(encoder_state_t *const state,
   // rec_out.
   if (has_coeffs && !early_skip) {
     // Get quantized residual. (coeff_out -> coeff -> residual)
-    uvg_dequant(state, coeff_out, coeff, width, width, color,
+    uvg_dequant(state, coeff_out, coeff, width, height, color,
       cur_cu->type, cur_cu->tr_idx == MTS_SKIP && color == COLOR_Y);
 
     if (state->encoder_control->cfg.lfnst && cur_cu->type == CU_INTRA) {
