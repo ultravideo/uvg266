@@ -84,9 +84,34 @@ static INLINE void initialize_partial_work_tree(lcu_t* from, lcu_t *to, const cu
     to->left_ref = from->left_ref;
     *LCU_GET_TOP_RIGHT_CU(to) = *LCU_GET_TOP_RIGHT_CU(from);
   }
+  else {
+    if(tree_type != UVG_CHROMA_T) {
+      uvg_pixels_blit(from->rec.y, to->rec.y, cu_loc->local_x, LCU_WIDTH, LCU_WIDTH, LCU_WIDTH);
+    }
+    if(tree_type != UVG_LUMA_T && from->ref.chroma_format != UVG_CSP_400) {
+      uvg_pixels_blit(from->rec.u, to->rec.u, cu_loc->local_x / 2, LCU_WIDTH_C, LCU_WIDTH_C, LCU_WIDTH_C);
+      uvg_pixels_blit(from->rec.v, to->rec.v, cu_loc->local_x / 2, LCU_WIDTH_C, LCU_WIDTH_C, LCU_WIDTH_C);
+    }
+  }
+
   if (cu_loc->local_y == 0) {
     to->top_ref = from->top_ref;
     *LCU_GET_TOP_RIGHT_CU(to) = *LCU_GET_TOP_RIGHT_CU(from);
+  }
+  else {
+    if (tree_type != UVG_CHROMA_T) {
+      uvg_pixels_blit(&from->rec.y[cu_loc->local_x], &to->rec.y[cu_loc->local_x], 
+        LCU_WIDTH - cu_loc->local_x, cu_loc->local_y,
+        LCU_WIDTH, LCU_WIDTH);
+    }
+    if (tree_type != UVG_LUMA_T && from->ref.chroma_format != UVG_CSP_400) {
+      uvg_pixels_blit(&from->rec.u[cu_loc->local_x / 2], &to->rec.u[cu_loc->local_x / 2],
+        LCU_WIDTH_C - cu_loc->local_x / 2, cu_loc->local_y / 2,
+        LCU_WIDTH_C, LCU_WIDTH_C);
+      uvg_pixels_blit(&from->rec.v[cu_loc->local_x / 2], &to->rec.v[cu_loc->local_x / 2],
+        LCU_WIDTH_C - cu_loc->local_x / 2, cu_loc->local_y / 2,
+        LCU_WIDTH_C, LCU_WIDTH_C);
+    }
   }
 
   to->ref.chroma_format = from->ref.chroma_format;
@@ -173,35 +198,18 @@ static INLINE void copy_cu_coeffs(const cu_loc_t *cu_loc, lcu_t *from, lcu_t *to
  * Copy all non-reference CU data from next level to current level.
  */
 static void work_tree_copy_up(
-  lcu_t *work_tree,
+  lcu_t *from,
+  lcu_t* to,
   bool joint,
   enum
   uvg_tree_type tree_type,
-  const cu_loc_t* const cu_loc,
-  const int depth)
-{
-  copy_cu_info  (&work_tree[depth + 1], &work_tree[depth], cu_loc, tree_type);
-  copy_cu_pixels(&work_tree[depth + 1], &work_tree[depth], cu_loc, tree_type);
-  copy_cu_coeffs(cu_loc, &work_tree[depth + 1], &work_tree[depth], joint, tree_type);
-  
-}
-
-
-/**
- * Copy all non-reference CU data from current level to all lower levels.
- */
-static void work_tree_copy_down(
-  int depth,
-  lcu_t *work_tree,
-  enum uvg_tree_type
-  tree_type,
   const cu_loc_t* const cu_loc)
 {
-  for (int i = depth + 1; i <= MAX_PU_DEPTH; i++) {
-    copy_cu_info  (&work_tree[depth], &work_tree[i], cu_loc, tree_type);
-    copy_cu_pixels(&work_tree[depth], &work_tree[i], cu_loc, tree_type);
-  }
+  copy_cu_info  (from, to, cu_loc, tree_type);
+  copy_cu_pixels(from, to, cu_loc, tree_type);
+  copy_cu_coeffs(cu_loc, from, to, joint, tree_type);  
 }
+
 
 static void lcu_fill_cu_info(lcu_t *lcu, int x_local, int y_local, int width, int height, const cu_info_t *cu)
 {
@@ -1425,7 +1433,7 @@ static double search_cu(
     if (split_cost < cost) {
       // Copy split modes to this depth.
       cost = split_cost;
-      work_tree_copy_up(work_tree, state->encoder_control->cfg.jccr, tree_type, cu_loc, depth);
+      work_tree_copy_up(&work_tree[depth + 1], &work_tree[depth], state->encoder_control->cfg.jccr, tree_type, cu_loc);
 #if UVG_DEBUG
       //debug_split = 1;
 #endif
@@ -1433,7 +1441,6 @@ static double search_cu(
       // Copy this CU's mode all the way down for use in adjacent CUs mode
       // search.
       memcpy(&state->search_cabac, &post_seach_cabac, sizeof(post_seach_cabac));
-      work_tree_copy_down(depth, work_tree, tree_type, cu_loc);
       downsample_cclm_rec(
         state, x, y, cu_width / 2, cu_width / 2, lcu->rec.y, lcu->left_ref.y[64]
       );
@@ -1453,7 +1460,6 @@ static double search_cu(
   } else if (cur_cu->log2_height + cur_cu->log2_width > 4) {
     // Need to copy modes down since the lower level of the work tree is used
     // when searching SMP and AMP blocks.
-    work_tree_copy_down(depth, work_tree, tree_type, cu_loc);
     if(tree_type != UVG_CHROMA_T) {
       downsample_cclm_rec(
         state, x, y, cu_width / 2, cu_width / 2, lcu->rec.y, lcu->left_ref.y[64]
