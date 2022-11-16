@@ -2124,9 +2124,7 @@ void uvg_cu_cost_inter_rd2(
   double   *inter_cost,
   double* inter_bitcost,
   const cu_loc_t* const cu_loc){
-
-  const uint8_t depth = 6 - uvg_g_convert_to_log2[cu_loc->width];
-
+  
   const int x_px = SUB_SCU(cu_loc->x);
   const int y_px = SUB_SCU(cu_loc->y);
   const int width = cu_loc->width;
@@ -2160,12 +2158,24 @@ void uvg_cu_cost_inter_rd2(
   double no_cbf_bits;
   double bits = 0;
   const int skip_context = uvg_get_skip_context(cu_loc->x, cu_loc->y, lcu, NULL, NULL);
+
+  int8_t depth = 0;
+  int8_t mtt_depth = 0;
+  uint32_t splits = cur_cu->split_tree;
+  while (splits & 7) {
+    if ((splits & 7) != QT_SPLIT) {
+      mtt_depth++;
+    }
+    depth++;
+    splits >>= 3;
+  }
+  const split_tree_t splitt_tree = { cur_cu->split_tree, depth, mtt_depth };
   if (cur_cu->merged) {
     no_cbf_bits = CTX_ENTROPY_FBITS(&state->cabac.ctx.cu_skip_flag_model[skip_context], 1) + *inter_bitcost;
-    bits += uvg_mock_encode_coding_unit(state, cabac, cu_loc, lcu, cur_cu, UVG_BOTH_T);
+    bits += uvg_mock_encode_coding_unit(state, cabac, cu_loc, lcu, cur_cu, UVG_BOTH_T, splitt_tree);
   }
   else {
-    no_cbf_bits = uvg_mock_encode_coding_unit(state, cabac, cu_loc, lcu, cur_cu, UVG_BOTH_T);
+    no_cbf_bits = uvg_mock_encode_coding_unit(state, cabac, cu_loc, lcu, cur_cu, UVG_BOTH_T, splitt_tree);
     bits += no_cbf_bits - CTX_ENTROPY_FBITS(&cabac->ctx.cu_qt_root_cbf_model, 0) + CTX_ENTROPY_FBITS(&cabac->ctx.cu_qt_root_cbf_model, 1);
   }
   double no_cbf_cost = ssd + no_cbf_bits * state->lambda;

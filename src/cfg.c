@@ -222,6 +222,22 @@ int uvg_config_init(uvg_config *cfg)
   cfg->cabac_debug_file_name = NULL;
 
   cfg->dual_tree = 0;
+
+  cfg->min_qt_size[0] = 4;
+  cfg->min_qt_size[1] = 4;
+  cfg->min_qt_size[2] = 4;
+
+  cfg->max_btt_depth[0] = 1;
+  cfg->max_btt_depth[1] = 0;
+  cfg->max_btt_depth[2] = 0;
+
+  cfg->max_tt_size[0] = 64;
+  cfg->max_bt_size[0] = 64;
+  cfg->max_tt_size[1] = 64;
+  cfg->max_bt_size[1] = 64;
+  cfg->max_tt_size[2] = 64;
+  cfg->max_bt_size[2] = 64;
+
   cfg->intra_rough_search_levels = 2;
 
   cfg->ibc = 0;

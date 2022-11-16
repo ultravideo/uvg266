@@ -44,8 +44,8 @@
 #include "global.h" // IWYU pragma: keep
 
 extern const uint8_t uvg_g_chroma_scale[58];
-extern const int16_t uvg_g_inv_quant_scales[6];
-extern const int16_t uvg_g_quant_scales[6];
+extern const int16_t uvg_g_inv_quant_scales[2][6];
+extern const int16_t uvg_g_quant_scales[2][6];
 
 #define COEFF_ORDER_LINEAR 0
 #define COEFF_ORDER_CU 1

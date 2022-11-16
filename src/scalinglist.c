@@ -88,8 +88,14 @@ static const int32_t g_quant_inter_default_8x8[64] =
   24, 25, 28, 33, 41, 54, 71, 91
 };
 
-const int16_t uvg_g_quant_scales[6] = {26214, 23302, 20560, 18396, 16384, 14564};
-const int16_t uvg_g_inv_quant_scales[6] = {40, 45, 51, 57, 64, 72};
+const int16_t uvg_g_quant_scales[2][6] = {
+  {26214, 23302, 20560, 18396, 16384, 14564},
+    { 18396,16384,14564,13107,11651,10280 }
+};
+const int16_t uvg_g_inv_quant_scales[2][6] = {
+  {40, 45, 51, 57, 64, 72},
+  { 57,64,72,80,90,102 }
+};
 
 
 /**
@@ -406,11 +412,11 @@ void uvg_scalinglist_set(scaling_list_t* const scaling_list, const int32_t* cons
   int32_t* quantcoeff = (int32_t*)scaling_list->quant_coeff[size_id_x][size_id_y][listId][qp];
   int32_t* dequantcoeff = (int32_t*)scaling_list->de_quant_coeff[size_id_x][size_id_y][listId][qp];
 
-  // Encoder list
-  uvg_scalinglist_process_enc(coeff, quantcoeff, uvg_g_quant_scales[qp] << 4, height, width, ratio,
+  // Encoder list TODO: the sqrt adjusted lists
+  uvg_scalinglist_process_enc(coeff, quantcoeff, uvg_g_quant_scales[0][qp] << 4, height, width, ratio,
                               MIN(8, g_scaling_list_size_x[size_id_x]), dc, !scaling_list->enable);
   // Decoder list
-  scalinglist_process_dec(coeff, dequantcoeff, uvg_g_inv_quant_scales[qp], height, width, ratio,
+  scalinglist_process_dec(coeff, dequantcoeff, uvg_g_inv_quant_scales[0][qp], height, width, ratio,
                           MIN(8, g_scaling_list_size_x[size_id_x]), dc, !scaling_list->enable);
 
 

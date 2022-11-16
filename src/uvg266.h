@@ -543,13 +543,11 @@ typedef struct uvg_config
 
   uint8_t dual_tree;
 
-  uint8_t min_qt_size[3];
+  uint8_t min_qt_size[3];  /* intra, inter, dual tree chroma*/
   uint8_t max_bt_size[3];
   uint8_t max_tt_size[3];
 
-  uint8_t max_intra_slice_btt_depth;
-  uint8_t max_intra_slice_btt_depth_chroma;
-  uint8_t max_inter_slice_btt_depth;
+  uint8_t max_btt_depth[3];
 
   uint8_t intra_rough_search_levels;
 
