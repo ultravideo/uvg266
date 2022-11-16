@@ -530,10 +530,10 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   // if(!no_partition_constraints_override_constraint_flag)
     WRITE_U(stream, 0, 1, "partition_constraints_override_enabled_flag");
   WRITE_UE(stream, uvg_g_convert_to_log2[encoder->cfg.min_qt_size[0]] - MIN_SIZE, "sps_log2_diff_min_qt_min_cb_intra_slice_luma");
-  WRITE_UE(stream, encoder->cfg.max_intra_slice_btt_depth, "sps_max_mtt_hierarchy_depth_intra_slice_luma");
-  if (encoder->cfg.max_intra_slice_btt_depth) {
-    WRITE_UE(stream, uvg_g_convert_to_log2[encoder->cfg.min_qt_size[0]] - uvg_g_convert_to_log2[encoder->cfg.max_bt_size[0]], "sps_log2_diff_max_bt_min_qt_intra_slice_luma");
-    WRITE_UE(stream, uvg_g_convert_to_log2[encoder->cfg.min_qt_size[0]] - uvg_g_convert_to_log2[encoder->cfg.max_tt_size[0]], "sps_log2_diff_max_tt_min_qt_intra_slice_luma");
+  WRITE_UE(stream, encoder->cfg.max_btt_depth[0], "sps_max_mtt_hierarchy_depth_intra_slice_luma");
+  if (encoder->cfg.max_btt_depth[0]) {
+    WRITE_UE(stream, uvg_g_convert_to_log2[encoder->cfg.max_bt_size[0]] - uvg_g_convert_to_log2[encoder->cfg.min_qt_size[0]], "sps_log2_diff_max_bt_min_qt_intra_slice_luma");
+    WRITE_UE(stream, uvg_g_convert_to_log2[encoder->cfg.max_tt_size[0]] - uvg_g_convert_to_log2[encoder->cfg.min_qt_size[0]], "sps_log2_diff_max_tt_min_qt_intra_slice_luma");
   }
   
   if (encoder->chroma_format != UVG_CSP_400)
@@ -542,17 +542,17 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   }
   if (encoder->cfg.dual_tree) {
     WRITE_UE(stream, uvg_g_convert_to_log2[encoder->cfg.min_qt_size[2]] - MIN_SIZE, "sps_log2_diff_min_qt_min_cb_intra_slice_chroma");
-    WRITE_UE(stream, encoder->cfg.max_intra_slice_btt_depth_chroma, "sps_max_mtt_hierarchy_depth_intra_slice_chroma");
-    if (encoder->cfg.max_intra_slice_btt_depth_chroma) {
-      WRITE_UE(stream, uvg_g_convert_to_log2[encoder->cfg.min_qt_size[2]] - uvg_g_convert_to_log2[encoder->cfg.max_bt_size[2]], "sps_log2_diff_max_bt_min_qt_intra_slice_chroma");
-      WRITE_UE(stream, uvg_g_convert_to_log2[encoder->cfg.min_qt_size[2]] - uvg_g_convert_to_log2[encoder->cfg.max_tt_size[2]], "sps_log2_diff_max_tt_min_qt_intra_slice_chroma");
+    WRITE_UE(stream, encoder->cfg.max_btt_depth[2], "sps_max_mtt_hierarchy_depth_intra_slice_chroma");
+    if (encoder->cfg.max_btt_depth[2]) {
+      WRITE_UE(stream, uvg_g_convert_to_log2[encoder->cfg.max_bt_size[2]] - uvg_g_convert_to_log2[encoder->cfg.min_qt_size[2]], "sps_log2_diff_max_bt_min_qt_intra_slice_chroma");
+      WRITE_UE(stream, uvg_g_convert_to_log2[encoder->cfg.max_tt_size[2]] - uvg_g_convert_to_log2[encoder->cfg.min_qt_size[2]], "sps_log2_diff_max_tt_min_qt_intra_slice_chroma");
     }
   }
   WRITE_UE(stream, uvg_g_convert_to_log2[encoder->cfg.min_qt_size[1]] - MIN_SIZE, "sps_log2_diff_min_qt_min_cb_inter_slice");
-  WRITE_UE(stream, encoder->cfg.max_inter_slice_btt_depth, "sps_max_mtt_hierarchy_depth_inter_slice");
-  if (encoder->cfg.max_inter_slice_btt_depth != 0) {
-    WRITE_UE(stream, uvg_g_convert_to_log2[encoder->cfg.min_qt_size[1]] - uvg_g_convert_to_log2[encoder->cfg.max_bt_size[1]], "sps_log2_diff_max_bt_min_qt_inter_tile_group");
-    WRITE_UE(stream, uvg_g_convert_to_log2[encoder->cfg.min_qt_size[1]] - uvg_g_convert_to_log2[encoder->cfg.max_tt_size[1]], "sps_log2_diff_max_tt_min_qt_inter_tile_group");
+  WRITE_UE(stream, encoder->cfg.max_btt_depth[1], "sps_max_mtt_hierarchy_depth_inter_slice");
+  if (encoder->cfg.max_btt_depth[1] != 0) {
+    WRITE_UE(stream, uvg_g_convert_to_log2[encoder->cfg.max_bt_size[1]] - uvg_g_convert_to_log2[encoder->cfg.min_qt_size[1]], "sps_log2_diff_max_bt_min_qt_inter_tile_group");
+    WRITE_UE(stream, uvg_g_convert_to_log2[encoder->cfg.max_tt_size[1]] - uvg_g_convert_to_log2[encoder->cfg.min_qt_size[1]], "sps_log2_diff_max_tt_min_qt_inter_tile_group");
   }
 
   if (LCU_WIDTH > 32)

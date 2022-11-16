@@ -1199,14 +1199,13 @@ void uvg_encode_intra_luma_coding_unit(
 }
 
 
-bool uvg_write_split_flag(
-  const encoder_state_t * const state,
+uint8_t uvg_write_split_flag(
+  const encoder_state_t* const state,
   cabac_data_t* cabac,
-  const cu_info_t * left_cu,
-  const cu_info_t * above_cu,
+  const cu_info_t* left_cu,
+  const cu_info_t* above_cu,
   const cu_loc_t* const cu_loc,
-  const uint32_t split_tree,
-  int depth,
+  split_tree_t split_tree,
   enum uvg_tree_type tree_type,
   double* bits_out)
 {
@@ -1217,15 +1216,15 @@ bool uvg_write_split_flag(
   // Implisit split flag when on border
   // Exception made in VVC with flag not being implicit if the BT can be used for
   // horizontal or vertical split, then this flag tells if QT or BT is used
+  const int slice_type = state->frame->is_irap ? (tree_type == UVG_CHROMA_T ? 2 : 0) : 1;
 
   bool no_split, allow_qt, bh_split, bv_split, th_split, tv_split;
   no_split = allow_qt = bh_split = bv_split = th_split = tv_split = true;
-  if (depth > MAX_DEPTH) allow_qt = false;
-  // ToDo: update this when btt is actually used
-  bool allow_btt = true;// when mt_depth < MAX_BT_DEPTH
   
   const int cu_width = tree_type != UVG_CHROMA_T ? cu_loc->width : cu_loc->chroma_width;
   const int cu_height = tree_type != UVG_CHROMA_T ? cu_loc->height : cu_loc->chroma_height;
+  if (cu_width == state->encoder_control->cfg.min_qt_size[slice_type] || split_tree.mtt_depth > 0) allow_qt = false;
+  bool allow_btt = state->encoder_control->cfg.max_btt_depth[slice_type] > split_tree.mtt_depth && cu_width <= 64;
 
   uint8_t implicit_split_mode = UVG_NO_SPLIT;
   //bool implicit_split = border;
@@ -1255,10 +1254,16 @@ bool uvg_write_split_flag(
   if (!allow_btt) {
     bh_split = bv_split = th_split = tv_split = false;
   }
+  else {
+    bv_split &= cu_width <= state->encoder_control->cfg.max_bt_size[slice_type];
+    tv_split &= cu_width <= state->encoder_control->cfg.max_tt_size[slice_type];
+    bh_split &= cu_height <= state->encoder_control->cfg.max_bt_size[slice_type];
+    th_split &= cu_height <= state->encoder_control->cfg.max_tt_size[slice_type];
+  }
 
   bool allow_split = allow_qt | bh_split | bv_split | th_split | tv_split;
 
-  int split_flag = (split_tree >> (depth * 3)) & 7;
+  int split_flag = (split_tree.split_tree >> (split_tree.current_depth * 3)) & 7;
 
   split_flag = implicit_split_mode != UVG_NO_SPLIT ? implicit_split_mode : split_flag;
 
@@ -1286,33 +1291,41 @@ bool uvg_write_split_flag(
 
     cabac->cur_ctx = &(cabac->ctx.split_flag_model[split_model]);
 
-    CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.split_flag_model[split_model]), split_flag != 0, bits, "split_flag");
+    CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.split_flag_model[split_model]), split_flag != NO_SPLIT, bits, "split_cu_flag");
   }
 
-  bool qt_split = split_flag == QT_SPLIT;
 
-  if (!(implicit_split_mode == UVG_NO_SPLIT) && (allow_qt && allow_btt)) {
-    split_model = (left_cu && GET_SPLITDATA(left_cu, depth)) + (above_cu && GET_SPLITDATA(above_cu, depth)) + (depth < 2 ? 0 : 3);
-    CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.qt_split_flag_model[split_model]), qt_split, bits, "QT_split_flag");
-  }
-
-  // Only signal split when it is not implicit, currently only Qt split supported
-  if (!(implicit_split_mode == UVG_NO_SPLIT) && !qt_split && (bh_split | bv_split | th_split | tv_split)) {
-
-    split_model = 0;
-
-    // TODO: These are incorrect
-    if (left_cu && (1 << left_cu->log2_height) > cu_height) {
-      split_model++;
+  if (implicit_split_mode == UVG_NO_SPLIT && allow_qt && (bh_split || bv_split || th_split || tv_split) && split_flag != NO_SPLIT) {
+    bool qt_split = split_flag == QT_SPLIT;
+    if((bv_split || bh_split || tv_split || th_split) && allow_qt) {
+      split_model = (left_cu && GET_SPLITDATA(left_cu, split_tree.current_depth)) + (above_cu && GET_SPLITDATA(above_cu, split_tree.current_depth)) + (split_tree.current_depth < 2 ? 0 : 3);
+      CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.qt_split_flag_model[split_model]), qt_split, bits, "qt_split_flag");
     }
-
-    if (above_cu && (1 << above_cu->log2_width) > cu_width) {
-      split_model++;
+    if (!qt_split) {
+      const bool is_vertical = split_flag == BT_VER_SPLIT || split_flag == TT_VER_SPLIT;
+      if((bh_split || th_split) && (bv_split || tv_split)) {
+        split_model = 0;
+        if(bv_split + tv_split > bh_split + th_split) {
+          split_model = 4;
+        } else if(bv_split + tv_split < bh_split + th_split) {
+          split_model = 3;
+        } else {
+          const int d_a = cu_width / (above_cu ? (1 << above_cu->log2_width) : 1);
+          const int d_l = cu_height / (left_cu ? (1 << left_cu->log2_height) : 1);
+          if(d_a != d_l && above_cu && left_cu) {
+            split_model = d_a < d_l ? 1 : 2;
+          }
+        }
+        CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.mtt_vertical_model[split_model]), is_vertical, bits, "mtt_vertical_flag");
+      }
+      if ((bv_split && tv_split && is_vertical) || (bh_split && th_split && !is_vertical)) {
+        split_model = 2 * is_vertical + split_tree.mtt_depth <= 1;
+        CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.mtt_binary_model[split_model]), 
+          split_flag == BT_VER_SPLIT || split_flag == BT_HOR_SPLIT, bits, "mtt_binary_flag");
+      }
     }
-
-    split_model += (depth > 2 ? 0 : 3);
-    CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.qt_split_flag_model[split_model]), qt_split, bits, "split_cu_mode");
   }
+
   if (bits_out) *bits_out += bits;
   return split_flag;
 }
@@ -1322,7 +1335,7 @@ void uvg_encode_coding_tree(
   lcu_coeff_t *coeff,
   enum uvg_tree_type tree_type,
   const cu_loc_t* const cu_loc,
-  const split_tree_t split_tree)
+  split_tree_t split_tree)
 {
   cabac_data_t * const cabac = &state->cabac;
   const encoder_control_t * const ctrl = state->encoder_control;
@@ -1332,8 +1345,7 @@ void uvg_encode_coding_tree(
   
   const int cu_width  = tree_type != UVG_CHROMA_T ? cu_loc->width : cu_loc->chroma_width;
   const int cu_height = tree_type != UVG_CHROMA_T ? cu_loc->height : cu_loc->chroma_height;
-  const int half_cu  = cu_width >> 1;
-
+ 
   const int x = cu_loc->x;
   const int y = cu_loc->y;
 
@@ -1357,9 +1369,9 @@ void uvg_encode_coding_tree(
   int32_t frame_height = tree_type != UVG_CHROMA_T ? ctrl->in.height : ctrl->in.height / 2;
   // Check for slice border
   bool border_x = frame_width  < abs_x + cu_width;
-  bool border_y = frame_height < abs_y + cu_width;
-  bool border_split_x = frame_width  >= abs_x + (LCU_WIDTH >> MAX_DEPTH) + half_cu;
-  bool border_split_y = frame_height >= abs_y + (LCU_WIDTH >> MAX_DEPTH) + half_cu;
+  bool border_y = frame_height < abs_y + cu_height;
+  bool border_split_x = frame_width  >= abs_x + (LCU_WIDTH >> MAX_DEPTH) + cu_width / 2;
+  bool border_split_y = frame_height >= abs_y + (LCU_WIDTH >> MAX_DEPTH) + cu_height / 2;
   bool border = border_x || border_y; /*!< are we in any border CU */
 
   if (depth <= state->frame->max_qp_delta_depth) {
@@ -1368,21 +1380,20 @@ void uvg_encode_coding_tree(
 
   // When not in MAX_DEPTH, insert split flag and split the blocks if needed
   if (cu_width + cu_height > 8) {
-
+    split_tree.split_tree = cur_cu->split_tree;
     const int split_flag = uvg_write_split_flag(
       state,
       cabac,
       left_cu,
       above_cu, 
       cu_loc,
-      cur_cu->split_tree,
-      depth,
+      split_tree,
       tree_type,
       NULL);
     
     if (split_flag || border) {
       const int half_luma = cu_loc->width / 2;
-      split_tree_t new_split_tree = { cur_cu->split_tree, split_tree.current_depth + 1 };
+      const split_tree_t new_split_tree = { cur_cu->split_tree, split_tree.current_depth + 1, split_tree.mtt_depth + (split_flag != QT_SPLIT)};
 
       cu_loc_t new_cu_loc[4];
       const int splits = uvg_get_split_locs(cu_loc, split_flag, new_cu_loc);
@@ -1621,7 +1632,8 @@ double uvg_mock_encode_coding_unit(
   const cu_loc_t* const cu_loc,
   lcu_t* lcu,
   cu_info_t* cur_cu,
-  enum uvg_tree_type tree_type) {
+  enum uvg_tree_type tree_type,
+  const split_tree_t split_tree) {
   double bits = 0;
   const encoder_control_t* const ctrl = state->encoder_control;
 
@@ -1663,8 +1675,7 @@ double uvg_mock_encode_coding_unit(
       left_cu,
       above_cu,
       cu_loc,
-      cur_cu->split_tree,
-      depth,
+      split_tree,
       tree_type,
       &bits);
   }

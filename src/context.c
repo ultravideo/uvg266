@@ -50,6 +50,21 @@ static const uint8_t  INIT_QT_SPLIT_FLAG[4][6] = {
   {   0,   8,   8,  12,  12,   8, },
 };
 
+
+static const uint8_t INIT_VERTICAL_SPLIT_FLAG[4][5] = {
+  {  43,  42,  37,  42,  44, },
+  {  43,  35,  37,  34,  52, },
+  {  43,  42,  29,  27,  44, },
+  {   9,   8,   9,   8,   5, },
+};
+
+static const uint8_t INIT_BINARY_SPLIT_FLAG[4][4] = {
+  {  28,  29,  28,  29, },
+  {  43,  37,  21,  22, },
+  {  36,  45,  36,  45, },
+  {  12,  13,  12,  13, },
+  };
+
 static const uint8_t INIT_SKIP_FLAG[4][3] = {
   {  57,  60,  46, },
   {  57,  59,  45, },
@@ -566,6 +581,11 @@ void uvg_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
     uvg_ctx_init(&cabac->ctx.part_size_model[i], QP, INIT_PART_SIZE[slice][i], INIT_PART_SIZE[3][i]);
     uvg_ctx_init(&cabac->ctx.bdpcm_mode[i], QP, BDPCM_MODE_INIT[slice][i], BDPCM_MODE_INIT[3][i]);
     uvg_ctx_init(&cabac->ctx.qt_cbf_model_luma[i], QP, INIT_QT_CBF[slice][i], INIT_QT_CBF[3][i]);
+    uvg_ctx_init(&cabac->ctx.mtt_binary_model[i], QP, INIT_BINARY_SPLIT_FLAG[slice][i], INIT_BINARY_SPLIT_FLAG[3][i]);
+  }
+
+  for (i = 0; i < 5; i++) {
+    uvg_ctx_init(&cabac->ctx.mtt_vertical_model[i], QP, INIT_VERTICAL_SPLIT_FLAG[slice][i], INIT_VERTICAL_SPLIT_FLAG[3][i]);
   }
 
   for (i = 0; i < 6; i++) {  

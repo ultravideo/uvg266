@@ -705,19 +705,20 @@ static void calc_last_bits(encoder_state_t * const state, int32_t width, int32_t
  * tables generated during RDOQ to select the best coefficient to change.
  */
 void uvg_rdoq_sign_hiding(
-    const encoder_state_t *const state,
-    const int32_t qp_scaled,
-    const uint32_t *const scan2raster,
-    const struct sh_rates_t *const sh_rates,
-    const int32_t last_pos,
-    const coeff_t *const coeffs,
-    coeff_t *const quant_coeffs, 
-    const int8_t color)
+  const encoder_state_t *const state,
+  const int32_t qp_scaled,
+  const uint32_t *const scan2raster,
+  const struct sh_rates_t *const sh_rates,
+  const int32_t last_pos,
+  const coeff_t *const coeffs,
+  coeff_t *const quant_coeffs,
+  const int8_t color,
+  const bool need_sqrt_adjust)
 {
   const encoder_control_t * const ctrl = state->encoder_control;
   const double lambda = color ? state->c_lambda : state->lambda;
 
-  int inv_quant = uvg_g_inv_quant_scales[qp_scaled % 6];
+  int inv_quant = uvg_g_inv_quant_scales[need_sqrt_adjust][qp_scaled % 6];
   // This somehow scales quant_delta into fractional bits. Instead of the bits
   // being multiplied by lambda, the residual is divided by it, or something
   // like that.
@@ -1203,7 +1204,7 @@ int uvg_ts_rdoq(encoder_state_t* const state, coeff_t* src_coeff, coeff_t* dest_
 
   const bool   needs_sqrt2_scale = false; // from VTM: should always be false - transform-skipped blocks don't require sqrt(2) compensation.
   const int    q_bits = QUANT_SHIFT + qp_scaled / 6  + (needs_sqrt2_scale ? -1 : 0);  // Right shift of non-RDOQ quantizer;  level = (coeff*uiQ + offset)>>q_bits
-  const int32_t quant_coeff = uvg_g_quant_scales[qp_scaled % 6];
+  const int32_t quant_coeff = uvg_g_quant_scales[needs_sqrt2_scale][qp_scaled % 6];
  
   const double error_scale = (double)(1 << CTX_FRAC_BITS) / quant_coeff / quant_coeff;
 
@@ -1416,8 +1417,10 @@ void uvg_rdoq(
   cabac_data_t * const cabac = &state->cabac;
   const uint32_t log2_block_width = uvg_g_convert_to_log2[width];
   const uint32_t log2_block_height = uvg_g_convert_to_log2[height];
+  bool needs_block_size_trafo_scale = !false && ((log2_block_width + log2_block_height) % 2 == 1);
+  needs_block_size_trafo_scale |= 1; // Non log2 block size
 
-  int32_t  transform_shift   = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - ((log2_block_width + log2_block_height) >> 1);  // Represents scaling through forward transform
+  int32_t  transform_shift   = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - ((log2_block_width + log2_block_height) >> 1) + needs_block_size_trafo_scale;  // Represents scaling through forward transform
   uint16_t go_rice_param     = 0;
   uint32_t reg_bins = (width * height * 28) >> 4;
   
@@ -1789,7 +1792,7 @@ void uvg_rdoq(
   }
 
   if (encoder->cfg.signhide_enable && abs_sum >= 2) {
-    uvg_rdoq_sign_hiding(state, qp_scaled, scan, &sh_rates, best_last_idx_p1, coef, dest_coeff, color);
+    uvg_rdoq_sign_hiding(state, qp_scaled, scan, &sh_rates, best_last_idx_p1, coef, dest_coeff, color, needs_block_size_trafo_scale);
   }
 }
 

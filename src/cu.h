@@ -104,6 +104,7 @@ enum split_type {
 typedef struct  {
   uint32_t split_tree;
   uint8_t current_depth;
+  uint8_t mtt_depth;
 } split_tree_t;
 
 
