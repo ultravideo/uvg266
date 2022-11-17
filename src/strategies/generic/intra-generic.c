@@ -61,8 +61,8 @@ static void uvg_angular_pred_generic(
   const uint8_t multi_ref_idx,
   const uint8_t isp_mode)
 {
-  const int width  = channel_type == COLOR_Y ? cu_loc->width : cu_loc->chroma_width;
-  const int height = channel_type == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
+  int width  = channel_type == COLOR_Y ? cu_loc->width : cu_loc->chroma_width;
+  int height = channel_type == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
   const int log2_width  = uvg_g_convert_to_log2[width];
   const int log2_height = uvg_g_convert_to_log2[height];
   
@@ -180,13 +180,6 @@ static void uvg_angular_pred_generic(
     }
   }
 
-  // Flip dimensions for horizontal modes
-  int tmp_width = vertical_mode ? width : height;
-  int tmp_height = vertical_mode ? height : width;
-
-  uvg_pixel tmp_dst[LCU_WIDTH * LCU_WIDTH];
-  uvg_pixel* dst_buf = vertical_mode ? dst : tmp_dst;
-
 
   // compensate for line offset in reference line buffers
   ref_main += multi_ref_index;
@@ -207,7 +200,7 @@ static void uvg_angular_pred_generic(
           uvg_pixel p[4];
           bool use_cubic = true; // Default to cubic filter
           static const int uvg_intra_hor_ver_dist_thres[8] = { 24, 24, 24, 14, 2, 0, 0, 0 };
-          int filter_threshold = uvg_intra_hor_ver_dist_thres[log2_width];
+          int filter_threshold = uvg_intra_hor_ver_dist_thres[(log2_width + log2_height) >> 1];
           int dist_from_vert_or_hor = MIN(abs((int32_t)pred_mode - 50), abs((int32_t)pred_mode - 18));
           if (dist_from_vert_or_hor > filter_threshold) {
             if ((abs(sample_disp) & 0x1F) != 0)
@@ -270,38 +263,6 @@ static void uvg_angular_pred_generic(
           dst_buf[y * tmp_width + x] = dst_buf[y * tmp_width + x] + ((wL * (left - dst_buf[y * tmp_width + x]) + 32) >> 6);
         }
       }
-
-        /*
-      if (pred_mode == 2 || pred_mode == 66) {
-        int wT = 16 >> MIN(31, ((y << 1) >> scale));
-        for (int x = 0; x < width; x++) {
-          int wL = 16 >> MIN(31, ((x << 1) >> scale));
-          if (wT + wL == 0) break;
-          int c = x + y + 1;
-          if (c >= 2 * width) { wL = 0; }
-          if (c >= 2 * width) { wT = 0; }
-          const uvg_pixel left = (wL != 0) ? ref_side[c] : 0;
-          const uvg_pixel top  = (wT != 0) ? ref_main[c] : 0;
-          dst[y * width + x] = CLIP_TO_PIXEL((wL * left + wT * top + (64 - wL - wT) * dst[y * width + x] + 32) >> 6);
-        }
-      } else if (sample_disp == 0 || sample_disp >= 12) {
-        int inv_angle_sum_0 = 2;
-        for (int x = 0; x < width; x++) {
-          inv_angle_sum_0 += modedisp2invsampledisp[abs(mode_disp)];
-          int delta_pos_0 = inv_angle_sum_0 >> 2;
-          int delta_frac_0 = delta_pos_0 & 63;
-          int delta_int_0 = delta_pos_0 >> 6;
-          int delta_y = y + delta_int_0 + 1;
-          // TODO: convert to JVET_K0500_WAIP
-          if (delta_y > width + width - 1) break;
-
-          int wL = 32 >> MIN(31, ((x << 1) >> scale));
-          if (wL == 0) break;
-          const uvg_pixel *p = ref_side + delta_y - 1;
-          uvg_pixel left = p[delta_frac_0 >> 5];
-          dst[y * width + x] = CLIP_TO_PIXEL((wL * left + (64 - wL) * dst[y * width + x] + 32) >> 6);
-        }
-      }*/
     }
   }
   else {
@@ -312,6 +273,7 @@ static void uvg_angular_pred_generic(
     bool do_pdpc = (((tmp_width >= 4 && tmp_height >= 4) || channel_type != 0) && sample_disp >= 0 && multi_ref_index == 0 /*&& !bdpcm*/);
 
     if (do_pdpc) {
+      if (!vertical_mode) {SWAP(width, height, int)}
       int scale = (log2_width + log2_height - 2) >> 2;
       const uvg_pixel top_left = ref_main[0];
       for (int_fast32_t y = 0; y < tmp_height; ++y) {
@@ -332,9 +294,9 @@ static void uvg_angular_pred_generic(
 
   // Flip the block if this is was a horizontal mode.
   if (!vertical_mode) {
-    for (int_fast32_t y = 0; y < tmp_height; ++y) {
-      for (int_fast32_t x = 0; x < tmp_width; ++x) {
-        dst[x * width + y] = tmp_dst[y * tmp_width + x];
+    for (int_fast32_t y = 0; y < height - 1; ++y) {
+      for (int_fast32_t x = y + 1; x < width; ++x) {
+        SWAP(dst[y * height + x], dst[x * width + y], uvg_pixel);
       }
     }
   }
