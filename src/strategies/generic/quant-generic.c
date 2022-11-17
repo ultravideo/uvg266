@@ -78,7 +78,11 @@ void uvg_quant_generic(
   const int32_t add = ((state->frame->slicetype == UVG_SLICE_I) ? 171 : 85) << (q_bits - 9);
   const int32_t q_bits8 = q_bits - 8;
 
+  const int32_t default_quant_coeff = uvg_g_quant_scales[needs_block_size_trafo_scale][qp_scaled % 6];
+
   uint32_t ac_sum = 0;
+
+  const bool use_scaling_list = state->encoder_control->cfg.scaling_list != UVG_SCALING_LIST_OFF;
 
   if(lfnst_idx == 0){
     for (int32_t n = 0; n < width * height; n++) {
@@ -88,7 +92,7 @@ void uvg_quant_generic(
 
       sign = (level < 0 ? -1 : 1);
 
-      int32_t curr_quant_coeff = quant_coeff[n];
+      int32_t curr_quant_coeff = use_scaling_list ? quant_coeff[n] : default_quant_coeff;
       level = (int32_t)((abs_level * curr_quant_coeff + add) >> q_bits);
       ac_sum += level;
 
