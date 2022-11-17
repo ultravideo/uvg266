@@ -1431,6 +1431,8 @@ void uvg_rdoq(
   int32_t q_bits = QUANT_SHIFT + qp_scaled/6 + transform_shift;
 
   const double lambda = color ? state->c_lambda : state->lambda;
+  const int32_t default_quant_coeff = uvg_g_quant_scales[needs_block_size_trafo_scale][qp_scaled % 6];
+  const bool use_scaling_list = state->encoder_control->cfg.scaling_list != UVG_SCALING_LIST_OFF;
 
   const int32_t *quant_coeff  = encoder->scaling_list.quant_coeff[log2_block_width][log2_block_height][scalinglist_type][qp_scaled%6];
   const double *err_scale     = encoder->scaling_list.error_scale[log2_block_width][log2_block_height][scalinglist_type][qp_scaled%6];
@@ -1509,7 +1511,7 @@ void uvg_rdoq(
 
       if (lfnst_idx > 0 && scanpos > max_lfnst_pos) break;
       uint32_t blkpos         = scan[scanpos];
-      int32_t q               = quant_coeff[blkpos];
+      int32_t q               = use_scaling_list ? quant_coeff[blkpos] : default_quant_coeff;
       int32_t level_double    = coef[blkpos];
       level_double            = MIN(abs(level_double) * q, MAX_INT - (1 << (q_bits - 1)));
       uint32_t max_abs_level  = (level_double + (1 << (q_bits - 1))) >> q_bits;

@@ -396,6 +396,8 @@ void uvg_quant_avx2(const encoder_state_t * const state, const coeff_t * __restr
   const int32_t add = ((state->frame->slicetype == UVG_SLICE_I) ? 171 : 85) << (q_bits - 9);
   const int32_t q_bits8 = q_bits - 8;
 
+  const int32_t default_quant_coeff = uvg_g_quant_scales[needs_block_size_trafo_scale][qp_scaled % 6];
+
   uint32_t ac_sum = 0;
   int32_t last_cg = -1;
 
@@ -404,7 +406,7 @@ void uvg_quant_avx2(const encoder_state_t * const state, const coeff_t * __restr
   // Loading once is enough if scaling lists are not off
   __m256i low_b = _mm256_setzero_si256(), high_b = _mm256_setzero_si256();
   if (!(state->encoder_control->scaling_list.enable)) {
-    low_b  = _mm256_set1_epi32(quant_coeff[0]);
+    low_b  = _mm256_set1_epi32(default_quant_coeff);
     high_b = low_b;
   }
 
