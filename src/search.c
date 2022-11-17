@@ -1085,7 +1085,7 @@ static double search_cu(
                            false);
 
         downsample_cclm_rec(
-          state, x, y, cu_width / 2, cu_width / 2, lcu->rec.y, lcu->left_ref.y[64]
+          state, x, y, cu_width / 2, cu_height / 2, lcu->rec.y, lcu->left_ref.y[64]
         );
       }
       double intra_cost = intra_search.cost;
@@ -1479,7 +1479,7 @@ static double search_cu(
       // search.
       memcpy(&state->search_cabac, &post_seach_cabac, sizeof(post_seach_cabac));
       downsample_cclm_rec(
-        state, x, y, cu_width / 2, cu_width / 2, lcu->rec.y, lcu->left_ref.y[64]
+        state, x, y, cu_width / 2, cu_height / 2, lcu->rec.y, lcu->left_ref.y[64]
       );
 
       if (state->frame->slicetype != UVG_SLICE_I) {
@@ -1498,7 +1498,7 @@ static double search_cu(
     }
     else {
       downsample_cclm_rec(
-        state, x, y, cu_width / 2, cu_width / 2, lcu->rec.y, lcu->left_ref.y[64]
+        state, x, y, cu_width / 2, cu_height / 2, lcu->rec.y, lcu->left_ref.y[64]
       );      
     }
   } else if (cur_cu->log2_height + cur_cu->log2_width > 4) {
@@ -1506,7 +1506,7 @@ static double search_cu(
     // when searching SMP and AMP blocks.
     if(tree_type != UVG_CHROMA_T) {
       downsample_cclm_rec(
-        state, x, y, cu_width / 2, cu_width / 2, lcu->rec.y, lcu->left_ref.y[64]
+        state, x, y, cu_width / 2, cu_height / 2, lcu->rec.y, lcu->left_ref.y[64]
       );
     }
 

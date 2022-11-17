@@ -324,8 +324,8 @@ static void get_cclm_parameters(
   //int left_below_units = total_left_units - tu_height_in_units;
   //int avai_above_right_units = 0;  // TODO these are non zero only with non-square CUs
   //int avai_left_below_units = 0;
-  int avai_above_units = CLIP(0, tu_height_in_units, y0/base_unit_size);
-  int avai_left_units = CLIP(0, tu_width_in_units, x0 / base_unit_size);
+  int avai_above_units = y0 ? tu_width_in_units : 0;
+  int avai_left_units = x0 ? tu_height_in_units : 0;
 
   bool above_available = avai_above_units != 0;
   bool left_available = avai_left_units != 0;
@@ -559,7 +559,7 @@ static void predict_cclm(
   }
 
   if(x0) {
-    if (x_scu == 0) available_left_below = MIN(MIN(width / 2, (64 - y_scu - height * 2) / 2), (state->tile->frame->height - y0 - height * 2) / 2);
+    if (x_scu == 0) available_left_below = MIN(MIN(height / 2, (64 - y_scu - height * 2) / 2), (state->tile->frame->height - y0 - height * 2) / 2);
     for (; available_left_below < height / 2; available_left_below++) {
       int y_extension = y_scu + height * 2 + 4 * available_left_below;
       y_extension >>= tree_type == UVG_CHROMA_T;
@@ -937,7 +937,7 @@ static void intra_predict_regular(
   uint8_t isp = color == COLOR_Y ? isp_mode : 0;
 
   const uvg_intra_ref *used_ref = &refs->ref;
-  if (cfg->intra_smoothing_disabled || color != COLOR_Y || mode == 1 || (width == 4 && height == 4) || multi_ref_index || width != height /*ISP_TODO: replace this fake ISP check*/) {
+  if (cfg->intra_smoothing_disabled || color != COLOR_Y || mode == 1 || (width == 4 && height == 4) || multi_ref_index || isp_mode /*ISP_TODO: replace this fake ISP check*/) {
     // For chroma, DC and 4x4 blocks, always use unfiltered reference.
   } else if (mode == 0) {
     // Otherwise, use filtered for planar.
@@ -1400,7 +1400,7 @@ void uvg_intra_build_reference_inner(
 
   // Limit the number of available pixels based on block size and dimensions
   // of the picture.
-  px_available_left = MIN(px_available_left, cu_height * 2);
+  px_available_left = MIN(px_available_left, height * 2);
   px_available_left = MIN(px_available_left, (pic_px->y - luma_px->y) >> is_chroma);
 
   // Copy pixels from coded CUs.
@@ -1438,7 +1438,7 @@ void uvg_intra_build_reference_inner(
 
   // Extend for MRL
   if (multi_ref_index) {
-    for (; i < width * 2 + multi_ref_index; ++i) {
+    for (; i < height * 2 + multi_ref_index; ++i) {
       out_left_ref[i + 1] = nearest_pixel;
     }
   }
