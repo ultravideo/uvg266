@@ -985,6 +985,7 @@ static void intra_predict_regular(
 
 
 void uvg_intra_build_reference_any(
+  const encoder_state_t* const state,
   const cu_loc_t* const pu_loc,
   const cu_loc_t* const cu_loc,
   const color_t color,
@@ -1019,6 +1020,7 @@ void uvg_intra_build_reference_any(
 
   const uvg_pixel dc_val = 1 << (UVG_BIT_DEPTH - 1); //TODO: add used bitdepth as a variable
   const int is_chroma = color != COLOR_Y ? 1 : 0;
+  const int is_dual_tree = is_chroma && state->encoder_control->cfg.dual_tree && state->frame->is_irap;
 
   // Get multi ref index from CU under prediction or reconstrcution. Do not use MRL if not luma
   const uint8_t multi_ref_index = !is_chroma ? multi_ref_idx : 0;
@@ -1091,7 +1093,8 @@ void uvg_intra_build_reference_any(
       }
     }
     else {
-      px_available_left = num_ref_pixels_left[lcu_px.y / 4][lcu_px.x / 4] >> is_chroma;
+      const int num_cus = uvg_count_available_edge_cus(cu_loc, lcu, true);      
+      px_available_left = is_dual_tree || !is_chroma ? num_cus * 4 : num_cus *2;
     }
 
     // Limit the number of available pixels based on block size and dimensions
@@ -1212,7 +1215,8 @@ void uvg_intra_build_reference_any(
       }
     }
     else {
-      px_available_top = num_ref_pixels_top[lcu_px.y / 4][lcu_px.x / 4] >> is_chroma;
+      const int num_cus = uvg_count_available_edge_cus(cu_loc, lcu, false);
+      px_available_top = is_dual_tree || !is_chroma ? num_cus * 4 : num_cus * 2;
     }
     
     // Limit the number of available pixels based on block size and dimensions
@@ -1245,6 +1249,7 @@ void uvg_intra_build_reference_any(
 }
 
 void uvg_intra_build_reference_inner(
+  const encoder_state_t* const state,
   const cu_loc_t* const pu_loc,
   const cu_loc_t* const cu_loc,
   const color_t color,
@@ -1280,6 +1285,7 @@ void uvg_intra_build_reference_inner(
   uvg_pixel * __restrict out_top_ref = &refs->ref.top[0];
 
   const int is_chroma = color != COLOR_Y ? 1 : 0;
+  const int is_dual_tree = is_chroma && state->encoder_control->cfg.dual_tree && state->frame->is_irap;
 
   // Get multiRefIdx from CU under prediction. Do not use MRL if not luma
   const uint8_t multi_ref_index = !is_chroma ? multi_ref_idx : 0;
@@ -1395,7 +1401,8 @@ void uvg_intra_build_reference_inner(
 
   }
   else {
-    px_available_left = num_ref_pixels_left[lcu_px.y / 4][lcu_px.x / 4] >> is_chroma;
+    const int num_cus = uvg_count_available_edge_cus(cu_loc, lcu, true);
+    px_available_left = is_dual_tree || !is_chroma ? num_cus * 4 : num_cus * 2;
   }
 
   // Limit the number of available pixels based on block size and dimensions
@@ -1456,7 +1463,8 @@ void uvg_intra_build_reference_inner(
     }
   }
   else {
-    px_available_top = num_ref_pixels_top[lcu_px.y / 4][lcu_px.x / 4] >> is_chroma;
+    const int num_cus = uvg_count_available_edge_cus(cu_loc, lcu, true);
+    px_available_top = is_dual_tree || !is_chroma ? num_cus * 4 : num_cus * 2;
   }
 
   // Limit the number of available pixels based on block size and dimensions
@@ -1488,6 +1496,7 @@ void uvg_intra_build_reference_inner(
 
 
 void uvg_intra_build_reference(
+  const encoder_state_t* const state,
   const cu_loc_t* const pu_loc,
   const cu_loc_t* const cu_loc,
   const color_t color,
@@ -1507,9 +1516,9 @@ void uvg_intra_build_reference(
 
   // Much logic can be discarded if not on the edge
   if (luma_px->x > 0 && luma_px->y > 0) {
-    uvg_intra_build_reference_inner(pu_loc, cu_loc, color, luma_px, pic_px, lcu, refs, entropy_sync, multi_ref_idx, extra_ref_lines, isp_mode);
+    uvg_intra_build_reference_inner(state, pu_loc, cu_loc, color, luma_px, pic_px, lcu, refs, entropy_sync, multi_ref_idx, extra_ref_lines, isp_mode);
   } else {
-    uvg_intra_build_reference_any(pu_loc, cu_loc, color, luma_px, pic_px, lcu, refs, multi_ref_idx, extra_ref_lines, isp_mode);
+    uvg_intra_build_reference_any(state, pu_loc, cu_loc, color, luma_px, pic_px, lcu, refs, multi_ref_idx, extra_ref_lines, isp_mode);
   }
 }
 
@@ -1721,7 +1730,7 @@ static void intra_recon_tb_leaf(
     }
   }
 
-  uvg_intra_build_reference(pu_loc, cu_loc, color, &luma_px, &pic_px, lcu, &refs, cfg->wpp, extra_refs, multi_ref_index, isp_mode);
+  uvg_intra_build_reference(state, pu_loc, cu_loc, color, &luma_px, &pic_px, lcu, &refs, cfg->wpp, extra_refs, multi_ref_index, isp_mode);
 
   uvg_pixel pred[32 * 32];
   uvg_intra_predict(state, &refs, pu_loc, color, pred, search_data, lcu, tree_type);

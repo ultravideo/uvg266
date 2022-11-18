@@ -1263,7 +1263,7 @@ uint8_t uvg_write_split_flag(
 
   bool allow_split = allow_qt | bh_split | bv_split | th_split | tv_split;
 
-  int split_flag = (split_tree.split_tree >> (split_tree.current_depth * 3)) & 7;
+  enum split_type split_flag = (split_tree.split_tree >> (split_tree.current_depth * 3)) & 7;
 
   split_flag = implicit_split_mode != UVG_NO_SPLIT ? implicit_split_mode : split_flag;
 
@@ -1298,7 +1298,19 @@ uint8_t uvg_write_split_flag(
   if (implicit_split_mode == UVG_NO_SPLIT && allow_qt && (bh_split || bv_split || th_split || tv_split) && split_flag != NO_SPLIT) {
     bool qt_split = split_flag == QT_SPLIT;
     if((bv_split || bh_split || tv_split || th_split) && allow_qt) {
-      split_model = (left_cu && GET_SPLITDATA(left_cu, split_tree.current_depth)) + (above_cu && GET_SPLITDATA(above_cu, split_tree.current_depth)) + (split_tree.current_depth < 2 ? 0 : 3);
+      unsigned left_qt_depth = 0;
+      unsigned top_qt_depth = 0;
+      if(left_cu) {
+        while (((left_cu->split_tree >> left_qt_depth) & 7u) == QT_SPLIT) {
+          left_qt_depth++;
+        }
+      }
+      if(above_cu) {
+        while (((above_cu->split_tree >> top_qt_depth) & 7u) == QT_SPLIT) {
+          top_qt_depth++;
+        }
+      }
+      split_model = (left_cu && (left_qt_depth > split_tree.current_depth)) + (above_cu && (top_qt_depth > split_tree.current_depth)) + (split_tree.current_depth < 2 ? 0 : 3);
       CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.qt_split_flag_model[split_model]), qt_split, bits, "qt_split_flag");
     }
     if (!qt_split) {
@@ -1319,7 +1331,7 @@ uint8_t uvg_write_split_flag(
         CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.mtt_vertical_model[split_model]), is_vertical, bits, "mtt_vertical_flag");
       }
       if ((bv_split && tv_split && is_vertical) || (bh_split && th_split && !is_vertical)) {
-        split_model = 2 * is_vertical + split_tree.mtt_depth <= 1;
+        split_model = (2 * is_vertical) + (split_tree.mtt_depth <= 1);
         CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.mtt_binary_model[split_model]), 
           split_flag == BT_VER_SPLIT || split_flag == BT_HOR_SPLIT, bits, "mtt_binary_flag");
       }

@@ -190,6 +190,7 @@ int uvg_get_split_locs(
   enum split_type split,
   cu_loc_t out[4]);
 
+
 #define CU_GET_MV_CAND(cu_info_ptr, reflist) \
   (((reflist) == 0) ? (cu_info_ptr)->inter.mv_cand0 : (cu_info_ptr)->inter.mv_cand1)
 
@@ -368,6 +369,8 @@ typedef struct {
 
 void uvg_cu_array_copy_from_lcu(cu_array_t* dst, int dst_x, int dst_y, const lcu_t *src, enum uvg_tree_type
                                 tree_type);
+
+int uvg_count_available_edge_cus(const cu_loc_t* const cu_loc, const lcu_t* const lcu, bool left);
 
 /**
  * \brief Return pointer to the top right reference CU.

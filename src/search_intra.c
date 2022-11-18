@@ -294,14 +294,6 @@ static double search_intra_trdepth(
 
   const bool reconstruct_chroma = false;// (depth != 4 || (depth == 4 && (x_px & 4 && y_px & 4))) && state->encoder_control->chroma_format != UVG_CSP_400;
   cu_info_t* pred_cu = &search_data->pred_cu;
-  cu_info_t* const tr_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
-
-  struct {
-    uvg_pixel y[TR_MAX_WIDTH*TR_MAX_WIDTH];
-    uvg_pixel u[TR_MAX_WIDTH*TR_MAX_WIDTH];
-    uvg_pixel v[TR_MAX_WIDTH*TR_MAX_WIDTH];
-  } nosplit_pixels;
-  uint16_t nosplit_cbf = 0;
 
   double split_cost = INT32_MAX;
   double nosplit_cost = INT32_MAX;
@@ -574,8 +566,6 @@ static double search_intra_trdepth(
     if (nosplit_cost >= cost_treshold) {
       return nosplit_cost;
     }
-
-    nosplit_cbf = pred_cu->cbf;
   }
     
   
@@ -648,10 +638,10 @@ static int search_intra_chroma_rough(
   const cu_loc_t loc = { luma_px.x, luma_px.y, width, height, width, height };
 
   uvg_intra_references refs_u;
-  uvg_intra_build_reference(&loc, &loc, COLOR_U, &luma_px, &pic_px, lcu, &refs_u, state->encoder_control->cfg.wpp, NULL, 0, 0);
+  uvg_intra_build_reference(state, &loc, &loc, COLOR_U, &luma_px, &pic_px, lcu, &refs_u, state->encoder_control->cfg.wpp, NULL, 0, 0);
 
   uvg_intra_references refs_v;
-  uvg_intra_build_reference(&loc, &loc, COLOR_V, &luma_px, &pic_px, lcu, &refs_v, state->encoder_control->cfg.wpp, NULL, 0, 0);
+  uvg_intra_build_reference(state, &loc, &loc, COLOR_V, &luma_px, &pic_px, lcu, &refs_v, state->encoder_control->cfg.wpp, NULL, 0, 0);
 
   vector2d_t lcu_cpx = { (cu_loc->local_x & ~7) / 2, (cu_loc->local_y & ~7) / 2 };
   uvg_pixel* orig_u = &lcu->ref.u[lcu_cpx.x + lcu_cpx.y * LCU_WIDTH_C];
@@ -1447,8 +1437,8 @@ int8_t uvg_search_intra_chroma_rdo(
 
 
   if (reconstruct_chroma) {
-    uvg_intra_build_reference(cu_loc, cu_loc, COLOR_U, &luma_px, &pic_px, lcu, &refs[0], state->encoder_control->cfg.wpp, NULL, 0, 0);
-    uvg_intra_build_reference(cu_loc, cu_loc, COLOR_V, &luma_px, &pic_px, lcu, &refs[1], state->encoder_control->cfg.wpp, NULL, 0, 0);
+    uvg_intra_build_reference(state, cu_loc, cu_loc, COLOR_U, &luma_px, &pic_px, lcu, &refs[0], state->encoder_control->cfg.wpp, NULL, 0, 0);
+    uvg_intra_build_reference(state, cu_loc, cu_loc, COLOR_V, &luma_px, &pic_px, lcu, &refs[1], state->encoder_control->cfg.wpp, NULL, 0, 0);
     
     const vector2d_t lcu_px = { cu_loc->local_x, cu_loc->local_y };
     cabac_data_t temp_cabac;
@@ -1783,7 +1773,7 @@ void uvg_search_cu_intra(
 
   bool is_large = cu_loc->width > TR_MAX_WIDTH || cu_loc->height > TR_MAX_WIDTH;
   if (!is_large) {
-    uvg_intra_build_reference(cu_loc, cu_loc, COLOR_Y, &luma_px, &pic_px, lcu, refs, state->encoder_control->cfg.wpp, NULL, 0, 0);
+    uvg_intra_build_reference(state, cu_loc, cu_loc, COLOR_Y, &luma_px, &pic_px, lcu, refs, state->encoder_control->cfg.wpp, NULL, 0, 0);
   }
   
   // This is needed for bit cost calculation and requires too many parameters to be
@@ -1848,7 +1838,7 @@ void uvg_search_cu_intra(
           frame->rec->stride, 1);
       }
     }
-    uvg_intra_build_reference(cu_loc, cu_loc, COLOR_Y, &luma_px, &pic_px, lcu, &refs[line], state->encoder_control->cfg.wpp, extra_refs, line, 0);
+    uvg_intra_build_reference(state, cu_loc, cu_loc, COLOR_Y, &luma_px, &pic_px, lcu, &refs[line], state->encoder_control->cfg.wpp, extra_refs, line, 0);
     for(int i = 1; i < INTRA_MPM_COUNT; i++) {
       num_mrl_modes++;
       const int index = (i - 1) + (INTRA_MPM_COUNT -1)*(line-1) + number_of_modes;
