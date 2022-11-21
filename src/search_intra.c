@@ -575,25 +575,24 @@ static double search_intra_trdepth(
   //     max_depth.
   // - Min transform size hasn't been reached (MAX_PU_DEPTH).
   else {
-    cu_loc_t split_cu_loc;
-
-    const int half_width = width / 2;
-    const int half_height = height / 2;
     split_cost = 0;
 
-    uvg_cu_loc_ctor(&split_cu_loc, cu_loc->x, cu_loc->y, half_width, half_height);
-    split_cost += search_intra_trdepth(state, &split_cu_loc, nosplit_cost, search_data, lcu, tree_type);
-    if (split_cost < nosplit_cost) {
-      uvg_cu_loc_ctor(&split_cu_loc, cu_loc->x + half_width, cu_loc->y, half_width, half_height);
-      split_cost += search_intra_trdepth(state, &split_cu_loc, nosplit_cost, search_data, lcu, tree_type);
+
+    enum split_type split;
+    if (cu_loc->width > TR_MAX_WIDTH && cu_loc->height > TR_MAX_WIDTH) {
+      split = QT_SPLIT;
     }
-    if (split_cost < nosplit_cost) {
-      uvg_cu_loc_ctor(&split_cu_loc, cu_loc->x, cu_loc->y + half_height, half_width, half_height);
-      split_cost += search_intra_trdepth(state, &split_cu_loc, nosplit_cost, search_data, lcu, tree_type);
+    else if (cu_loc->width > TR_MAX_WIDTH) {
+      split = BT_VER_SPLIT;
     }
-    if (split_cost < nosplit_cost) {
-      uvg_cu_loc_ctor(&split_cu_loc, cu_loc->x + half_width, cu_loc->y + half_height, half_width, half_height);
-      split_cost += search_intra_trdepth(state, &split_cu_loc, nosplit_cost, search_data, lcu, tree_type);
+    else {
+      split = BT_HOR_SPLIT;
+    }
+
+    cu_loc_t split_cu_loc[4];
+    const int split_count = uvg_get_split_locs(cu_loc, split, split_cu_loc);
+    for (int i = 0; i < split_count; ++i) {
+      split_cost += search_intra_trdepth(state, &split_cu_loc[i], nosplit_cost, search_data, lcu, tree_type);
     }
   }
 
@@ -1821,7 +1820,7 @@ void uvg_search_cu_intra(
   }
 
   uint8_t num_mrl_modes = 0;
-  for(int line = 1; line < lines; ++line) {
+  for(int line = 1; line < lines && !is_large; ++line) {
     uvg_pixel extra_refs[128 * MAX_REF_LINE_IDX] = { 0 };
 
     if (luma_px.x > 0 && lcu_px.x == 0 && lcu_px.y > 0) {

@@ -565,7 +565,7 @@ static void predict_cclm(
       y_extension >>= tree_type == UVG_CHROMA_T;
       const cu_info_t* pu = LCU_GET_CU_AT_PX(lcu, (x_scu >> (tree_type == UVG_CHROMA_T)) - 4, y_extension);
       if (y_extension >= ctu_size || pu->type == CU_NOTSET || (pu->type == CU_INTRA && pu->intra.mode_chroma == -1)) break;
-      if(x_scu == 32 && y_scu == 0 && pu->log2_width == 6) break;
+      if(x_scu == 32 && y_scu == 0 && pu->log2_height == 6 && pu->log2_width == 6 ) break;
     }
     for(int i = 0; i < height + available_left_below * 2; i++) {
       sampled_luma_ref.left[i] = state->tile->frame->cclm_luma_rec[(y0/2 + i) * (stride2/2) + x0 / 2 - 1];
@@ -1783,6 +1783,7 @@ static void intra_recon_tb_leaf(
   }
 }
 
+
 /**
  * \brief Reconstruct an intra CU
  *
@@ -1833,33 +1834,23 @@ void uvg_intra_recon_cu(
   }
 
   if (width > TR_MAX_WIDTH || height > TR_MAX_WIDTH) {
-    cu_loc_t split_cu_loc;
+    enum split_type split;
+    if (cu_loc->width > TR_MAX_WIDTH && cu_loc->height > TR_MAX_WIDTH) {
+      split = QT_SPLIT;
+    }
+    else if (cu_loc->width > TR_MAX_WIDTH) {
+      split = BT_VER_SPLIT;
+    }
+    else {
+      split = BT_HOR_SPLIT;
+    }
 
-    const int half_width = width / 2;
-    const int half_height = height / 2;
-    uvg_cu_loc_ctor(&split_cu_loc, cu_loc->x, cu_loc->y, half_width, half_height);
-    uvg_intra_recon_cu(state, search_data, &split_cu_loc, NULL, lcu, tree_type, recon_luma, recon_chroma);
-    uvg_cu_loc_ctor(&split_cu_loc, cu_loc->x + half_width, cu_loc->y, half_width, half_height);
-    uvg_intra_recon_cu(state, search_data, &split_cu_loc, NULL, lcu, tree_type, recon_luma, recon_chroma);
-    uvg_cu_loc_ctor(&split_cu_loc, cu_loc->x, cu_loc->y + half_height, half_width, half_height);
-    uvg_intra_recon_cu(state, search_data, &split_cu_loc, NULL, lcu, tree_type, recon_luma, recon_chroma);
-    uvg_cu_loc_ctor(&split_cu_loc, cu_loc->x + half_width, cu_loc->y + half_height, half_width, half_height);
-    uvg_intra_recon_cu(state, search_data, &split_cu_loc, NULL, lcu, tree_type, recon_luma, recon_chroma);
+    cu_loc_t split_cu_loc[4];
+    const int split_count = uvg_get_split_locs(cu_loc, split, split_cu_loc);
+    for (int i = 0; i < split_count; ++i) {
+      uvg_intra_recon_cu(state, search_data, &split_cu_loc[i], NULL, lcu, tree_type, recon_luma, recon_chroma);
+    }
 
-    // Propagate coded block flags from child CUs to parent CU.
-    uint16_t child_cbfs[3] = {
-      LCU_GET_CU_AT_PX(lcu, (lcu_px.x + half_width) >> (tree_type == UVG_CHROMA_T), lcu_px.y >> (tree_type == UVG_CHROMA_T))->cbf,
-      LCU_GET_CU_AT_PX(lcu, lcu_px.x >> (tree_type == UVG_CHROMA_T), (lcu_px.y + half_height) >> (tree_type == UVG_CHROMA_T))->cbf,
-      LCU_GET_CU_AT_PX(lcu, (lcu_px.x + half_width) >> (tree_type == UVG_CHROMA_T), (lcu_px.y + half_height) >> (tree_type == UVG_CHROMA_T))->cbf,
-    };
-
-    //if (recon_luma && depth <= MAX_DEPTH) {
-    //  cbf_set_conditionally(&cur_cu->cbf, child_cbfs, depth, COLOR_Y);
-    //}
-    //if (recon_chroma && depth <= MAX_DEPTH) {
-    //  cbf_set_conditionally(&cur_cu->cbf, child_cbfs, depth, COLOR_U);
-    //  cbf_set_conditionally(&cur_cu->cbf, child_cbfs, depth, COLOR_V);
-    //}
     return;
   }
   if (search_data->pred_cu.intra.isp_mode != ISP_MODE_NO_ISP && recon_luma ) {
