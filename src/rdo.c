@@ -1418,7 +1418,7 @@ void uvg_rdoq(
   const uint32_t log2_block_width = uvg_g_convert_to_log2[width];
   const uint32_t log2_block_height = uvg_g_convert_to_log2[height];
   bool needs_block_size_trafo_scale = !false && ((log2_block_width + log2_block_height) % 2 == 1);
-  needs_block_size_trafo_scale |= 1; // Non log2 block size
+  needs_block_size_trafo_scale |= 0; // Non log2 block size
 
   int32_t  transform_shift   = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - ((log2_block_width + log2_block_height) >> 1) + needs_block_size_trafo_scale;  // Represents scaling through forward transform
   uint16_t go_rice_param     = 0;

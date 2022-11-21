@@ -165,6 +165,12 @@ uint8_t uvg_get_mip_flag_context(
   const lcu_t* lcu,
   cu_array_t* const cu_a);
 
+int8_t uvg_wide_angle_correction(
+  int_fast8_t mode,
+  const bool is_isp,
+  const int log2_width,
+  const int log2_height);
+
 // ISP related defines
 #define NUM_ISP_MODES 3
 #define ISP_MODE_NO_ISP 0

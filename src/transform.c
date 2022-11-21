@@ -34,6 +34,7 @@
 
 #include "encode_coding_tree.h"
 #include "image.h"
+#include "intra.h"
 #include "uvg266.h"
 #include "lfnst_tables.h"
 #include "rdo.h"
@@ -184,8 +185,9 @@ void uvg_derive_lfnst_constraints(
   coeff_scan_order_t scan_idx = SCAN_DIAG;
   // ToDo: large block support in VVC?
 
-  const uint32_t log2_block_size = uvg_g_convert_to_log2[width];
-  const uint32_t* scan = uvg_g_sig_last_scan[scan_idx][log2_block_size - 1];
+  const uint32_t log2_tr_width = uvg_g_convert_to_log2[width];
+  const uint32_t log2_tr_height = uvg_g_convert_to_log2[height];
+  const uint32_t* scan = uvg_get_scan_order_table(SCAN_GROUP_4X4, scan_idx, log2_tr_width, log2_tr_height);
 
   signed scan_pos_last = -1;
   coeff_t temp[TR_MAX_WIDTH * TR_MAX_WIDTH];
@@ -801,7 +803,27 @@ void uvg_fwd_lfnst_NxN(coeff_t *src, coeff_t *dst, const int8_t mode, const int8
   }
 }
 
-static inline bool get_transpose_flag(const int8_t intra_mode)
+static uint32_t get_lfnst_intra_mode(int mode)
+{
+  uint32_t intraMode;
+
+  if (mode < 0)
+  {
+    intraMode = (uint32_t)(mode + (NUM_EXT_LUMA_MODE >> 1) + NUM_LUMA_MODE);
+  }
+  else if (mode >= NUM_LUMA_MODE)
+  {
+    intraMode = (uint32_t)(mode + (NUM_EXT_LUMA_MODE >> 1));
+  }
+  else
+  {
+    intraMode = (uint32_t)mode;
+  }
+
+  return intraMode;
+}
+
+static bool get_transpose_flag(const int8_t intra_mode)
 {
   return ((intra_mode >= NUM_LUMA_MODE) && (intra_mode >= (NUM_LUMA_MODE + (NUM_EXT_LUMA_MODE >> 1)))) ||
          ((intra_mode < NUM_LUMA_MODE) && (intra_mode > DIA_IDX));
@@ -837,22 +859,22 @@ void uvg_fwd_lfnst(
   enum uvg_tree_type tree_type)
 {
   const uint16_t lfnst_index = lfnst_idx;
+  const uint32_t log2_width = uvg_g_convert_to_log2[width];
+  const uint32_t log2_height = uvg_g_convert_to_log2[height];
   int8_t intra_mode = (color == COLOR_Y) ? cur_cu->intra.mode : cur_cu->intra.mode_chroma;
   bool mts_skip = cur_cu->tr_idx == MTS_SKIP;
   bool is_separate_tree = cur_cu->log2_height + cur_cu->log2_width < 6 || tree_type != UVG_BOTH_T;
   bool is_cclm_mode = (intra_mode >= 81 && intra_mode <= 83); // CCLM modes are in [81, 83]
 
   bool is_mip = block_is_mip(cur_cu, color, is_separate_tree);
-  bool is_wide_angle = false; // TODO: get wide angle mode when implemented
   
   const int scan_order = SCAN_DIAG;
 
   if (lfnst_index && !mts_skip && (is_separate_tree || color == COLOR_Y))
   {
-    const uint32_t log2_block_size = uvg_g_convert_to_log2[width];
-    assert(log2_block_size != -1 && "LFNST: invalid block width.");
+    assert(log2_width != -1 && "LFNST: invalid block width.");
     const bool whge3 = width >= 8 && height >= 8;
-    const uint32_t* scan = whge3 ? uvg_coef_top_left_diag_scan_8x8[log2_block_size] : uvg_g_sig_last_scan[scan_order][log2_block_size - 1];
+    const uint32_t* scan = whge3 ? uvg_coef_top_left_diag_scan_8x8[log2_width] : uvg_g_sig_last_scan[scan_order][log2_width - 1];
 
     if (is_cclm_mode) {
       intra_mode = cur_cu->intra.mode;
@@ -862,11 +884,11 @@ void uvg_fwd_lfnst(
     }
     assert(intra_mode < NUM_INTRA_MODE && "LFNST: Invalid intra mode.");
     assert(lfnst_index < 3 && "LFNST: Invalid LFNST index. Must be in [0, 2]");
-
-    if (is_wide_angle) {
-      // Transform wide angle mode to intra mode
-      intra_mode = intra_mode; // TODO: wide angle modes not implemented yet. Do nothing.
-    }
+    int32_t wide_adjusted_mode = uvg_wide_angle_correction(intra_mode, cur_cu->intra.isp_mode != 0, log2_width, log2_height);
+    
+    // Transform wide angle mode to intra mode
+    intra_mode = get_lfnst_intra_mode(wide_adjusted_mode);
+  
 
     bool transpose = get_transpose_flag(intra_mode);
     const int sb_size = whge3 ? 8 : 4;
@@ -971,20 +993,19 @@ void uvg_inv_lfnst(
   // Such is not yet present in uvg266 so use 15 for now
   const int max_log2_dyn_range = 15;
   const uint32_t  lfnst_index = lfnst_idx;
+  const uint32_t log2_width = uvg_g_convert_to_log2[width];
+  const uint32_t log2_height = uvg_g_convert_to_log2[height];
   int8_t intra_mode = (color == COLOR_Y) ? cur_cu->intra.mode : cur_cu->intra.mode_chroma;
   bool mts_skip = cur_cu->tr_idx == MTS_SKIP;
   bool is_separate_tree = cur_cu->log2_height + cur_cu->log2_width < 6 || tree_type != UVG_BOTH_T;
   bool is_cclm_mode = (intra_mode >= 81 && intra_mode <= 83); // CCLM modes are in [81, 83]
 
   bool is_mip = block_is_mip(cur_cu, color, is_separate_tree);
-  bool is_wide_angle = false; // TODO: get wide angle mode when implemented
-  
   const int scan_order = SCAN_DIAG;
   
   if (lfnst_index && !mts_skip && (is_separate_tree || color == COLOR_Y)) {
-    const uint32_t log2_block_size = uvg_g_convert_to_log2[width];
     const bool whge3 = width >= 8 && height >= 8;
-    const uint32_t* scan = whge3 ? uvg_coef_top_left_diag_scan_8x8[log2_block_size] : uvg_g_sig_last_scan[scan_order][log2_block_size - 1];
+    const uint32_t* scan = whge3 ? uvg_coef_top_left_diag_scan_8x8[log2_width] : uvg_g_sig_last_scan[scan_order][log2_width - 1];
     
     if (is_cclm_mode) {
       intra_mode = cur_cu->intra.mip_flag ? 0 : cur_cu->intra.mode;
@@ -994,12 +1015,11 @@ void uvg_inv_lfnst(
     }
     assert(intra_mode < NUM_INTRA_MODE && "LFNST: Invalid intra mode.");
     assert(lfnst_index < 3 && "LFNST: Invalid LFNST index. Must be in [0, 2]");
+    int32_t wide_adjusted_mode = uvg_wide_angle_correction(intra_mode, cur_cu->intra.isp_mode != 0, log2_width, log2_height);
 
-    if (is_wide_angle) {
-      // Transform wide angle mode to intra mode
-      intra_mode = intra_mode; // TODO: wide angle modes not implemented yet. Do nothing.
-    }
-
+    
+    intra_mode = get_lfnst_intra_mode(wide_adjusted_mode); 
+    
     bool          transpose_flag = get_transpose_flag(intra_mode);
     const int     sb_size = whge3 ? 8 : 4;
     bool          tu_4x4_flag = (width == 4 && height == 4);

@@ -1303,7 +1303,7 @@ static double search_cu(
 
   // Recursively split all the way to max search depth.
   if (can_split_cu) {
-    const int split_type = depth == 0 ? QT_SPLIT : BT_VER_SPLIT;
+    const int split_type = depth == 0 ? QT_SPLIT : TT_HOR_SPLIT;
     const split_tree_t new_split = {
       split_tree.split_tree | split_type << (split_tree.current_depth * 3),
       split_tree.current_depth + 1,

@@ -532,7 +532,7 @@ static void predict_cclm(
   const int ctu_size = tree_type == UVG_CHROMA_T ? LCU_WIDTH_C : LCU_WIDTH;
 
   if (y0) {
-    if (y_scu == 0) available_above_right = MIN(MIN(width / 2, (64-x_scu - width * 2) / 2), (state->tile->frame->width - x0 - width* 2) / 2);
+    if (y_scu == 0) available_above_right = MIN(MIN(width / 2, (64-x_scu - width * 2) / 4), (state->tile->frame->width - x0 - width* 2) / 4);
     for (; available_above_right < width / 2; available_above_right++) {
       int x_extension = x_scu + width * 2 + 4 * available_above_right;
       x_extension >>= tree_type == UVG_CHROMA_T;
@@ -559,7 +559,7 @@ static void predict_cclm(
   }
 
   if(x0) {
-    if (x_scu == 0) available_left_below = MIN(MIN(height / 2, (64 - y_scu - height * 2) / 2), (state->tile->frame->height - y0 - height * 2) / 2);
+    if (x_scu == 0) available_left_below = MIN(MIN(height / 2, (64 - y_scu - height * 2) / 4), (state->tile->frame->height - y0 - height * 2) / 4);
     for (; available_left_below < height / 2; available_left_below++) {
       int y_extension = y_scu + height * 2 + 4 * available_left_below;
       y_extension >>= tree_type == UVG_CHROMA_T;
@@ -916,6 +916,24 @@ static void mip_predict(
 }
 
 
+int8_t uvg_wide_angle_correction(int_fast8_t mode, const bool is_isp, const int log2_width, const int log2_height)
+{
+  int8_t pred_mode = mode;
+  if (!is_isp && log2_width != log2_height) {
+    if (mode > 1 && mode <= 66) {
+      const int modeShift[] = { 0, 6, 10, 12, 14, 15 };
+      const int deltaSize = abs(log2_width - log2_height);
+      if (log2_width > log2_height && mode < 2 + modeShift[deltaSize]) {
+        pred_mode += (66 - 1);
+      }
+      else if (log2_height > log2_width && mode > 66 - modeShift[deltaSize]) {
+        pred_mode -= (66 - 1);
+      }
+    }
+  }
+  return pred_mode;
+}
+
 static void intra_predict_regular(
   const encoder_state_t* const state,
   uvg_intra_references *refs,
@@ -937,19 +955,10 @@ static void intra_predict_regular(
   uint8_t isp = color == COLOR_Y ? isp_mode : 0;
 
   // Wide angle correction
-  int8_t pred_mode = mode;
-  if (!is_isp && width != height) {
-    if (mode > 1 && mode <= 66) {
-      const int modeShift[] = { 0, 6, 10, 12, 14, 15 };
-      const int deltaSize = abs(log2_width - log2_height);
-      if (width > height && mode < 2 + modeShift[deltaSize]) {
-        pred_mode += (66 - 1);
-      }
-      else if (height > width && mode > 66 - modeShift[deltaSize]) {
-        pred_mode -= (66 - 1);
-      }
-    }
-  }
+  int8_t pred_mode = uvg_wide_angle_correction(mode,
+                                               is_isp,
+                                               log2_width,
+                                               log2_height);
 
   const uvg_intra_ref *used_ref = &refs->ref;
   if (cfg->intra_smoothing_disabled || color != COLOR_Y || mode == 1 || (width == 4 && height == 4) || multi_ref_index || isp_mode /*ISP_TODO: replace this fake ISP check*/) {
