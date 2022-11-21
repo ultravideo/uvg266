@@ -625,25 +625,31 @@ static void encode_transform_coeff(
   const int x_cu = 8 * (x / 8);
   const int y_cu = 8 * (y / 8);
   const cu_info_t *cur_cu = uvg_cu_array_at_const(used_array, x, y); // TODO: very suspect, chroma cbfs stored in upper left corner, everything else in bottom right for depth 4
-  
-  int8_t split = (cu_loc->width > TR_MAX_WIDTH || cu_loc->height > TR_MAX_WIDTH);
+
+  const bool ver_split = cu_loc->height > TR_MAX_WIDTH;
+  const bool hor_split = cu_loc->width > TR_MAX_WIDTH;
 
   const int cb_flag_y = tree_type != UVG_CHROMA_T ? cbf_is_set(cur_pu->cbf, COLOR_Y) : 0;
   const int cb_flag_u = tree_type != UVG_LUMA_T ?( cur_pu->joint_cb_cr ? (cur_pu->joint_cb_cr >> 1) & 1 : cbf_is_set(cur_cu->cbf, COLOR_U)) : 0;
   const int cb_flag_v = tree_type != UVG_LUMA_T ? (cur_pu->joint_cb_cr ? cur_pu->joint_cb_cr & 1 : cbf_is_set(cur_cu->cbf, COLOR_V)) : 0;
 
 
-  if (split) {
-    int split_width  = width >> 1;
-    int split_height = height >> 1;
+  if (hor_split || ver_split) {
+    enum split_type split;
+    if (cu_loc->width > TR_MAX_WIDTH && cu_loc->height > TR_MAX_WIDTH) {
+      split = QT_SPLIT;
+    }
+    else if (cu_loc->width > TR_MAX_WIDTH) {
+      split = BT_VER_SPLIT;
+    }
+    else {
+      split = BT_HOR_SPLIT;
+    }
 
-    for (int j = 0; j < 2; j++) {
-      for (int i = 0; i < 2; i++) {
-        cu_loc_t loc;
-        uvg_cu_loc_ctor(&loc, (x + i * split_width), (y + j * split_height), width >> 1, height >> 1);
-
-        encode_transform_coeff(state, &loc, only_chroma, coeff, tree_type, true, luma_cbf_ctx, &loc);
-      }
+    cu_loc_t split_cu_loc[4];
+    const int split_count = uvg_get_split_locs(cu_loc, split, split_cu_loc);
+    for (int i = 0; i < split_count; ++i) {
+      encode_transform_coeff(state, &split_cu_loc[i], only_chroma, coeff, tree_type, true, luma_cbf_ctx, &split_cu_loc[i]);
     }
     return;
   }

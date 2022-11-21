@@ -1400,25 +1400,27 @@ void uvg_quantize_lcu_residual(
   }
 
   if (cu_loc->width > TR_MAX_WIDTH || cu_loc->height > TR_MAX_WIDTH) {
+    enum split_type split;
+    if (cu_loc->width > TR_MAX_WIDTH && cu_loc->height > TR_MAX_WIDTH) {
+      split = QT_SPLIT;
+    }
+    else if (cu_loc->width > TR_MAX_WIDTH) {
+      split = BT_VER_SPLIT;
+    }
+    else {
+      split = BT_HOR_SPLIT;
+    }
 
-    // Split transform and increase depth
-    const int offset = width / 2;
-    for (int j = 0; j < 2; ++j) {
-      for (int i = 0; i < 2; ++i) {
-        cu_loc_t loc;
-        uvg_cu_loc_ctor(&loc, (x + i * offset), (y + j * offset), width >> 1, height >> 1);
-        // jccr is currently not supported if transform is split
-        uvg_quantize_lcu_residual(state, luma, chroma, 0, &loc, NULL, lcu, early_skip, tree_type);
+    cu_loc_t split_cu_loc[4];
+    uint16_t child_cbfs[3];
+    const int split_count = uvg_get_split_locs(cu_loc, split, split_cu_loc);
+    for (int i = 0; i < split_count; ++i) {
+      uvg_quantize_lcu_residual(state, luma, chroma, 0, &split_cu_loc[i], NULL, lcu, early_skip, tree_type);
+      if(i != 0) {
+        child_cbfs[i - 1] = LCU_GET_CU_AT_PX(lcu, split_cu_loc[i].local_x, split_cu_loc[i].local_y)->cbf;
       }
     }
-    
 
-    // Propagate coded block flags from child CUs to parent CU.
-    uint16_t child_cbfs[3] = {
-      LCU_GET_CU_AT_PX(lcu, lcu_px.x + offset, lcu_px.y         )->cbf,
-      LCU_GET_CU_AT_PX(lcu, lcu_px.x,          lcu_px.y + offset)->cbf,
-      LCU_GET_CU_AT_PX(lcu, lcu_px.x + offset, lcu_px.y + offset)->cbf,
-    };
     
     cur_pu->root_cbf = cbf_is_set_any(cur_pu->cbf)
       || cbf_is_set_any(child_cbfs[0])

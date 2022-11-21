@@ -372,10 +372,10 @@ int uvg_count_available_edge_cus(const cu_loc_t* const cu_loc, const lcu_t* cons
     while (LCU_GET_CU_AT_PX(lcu, cu_loc->local_x - TR_MIN_WIDTH, cu_loc->local_y + amount)->type != CU_NOTSET && (cu_loc->local_y + amount) < LCU_WIDTH) {
       amount += TR_MIN_WIDTH;
     }
-    return amount / TR_MIN_WIDTH;
+    return MAX(amount / TR_MIN_WIDTH, cu_loc->height / TR_MIN_WIDTH);
   }
   while (LCU_GET_CU_AT_PX(lcu, cu_loc->local_x + amount, cu_loc->local_y - TR_MIN_WIDTH)->type != CU_NOTSET && cu_loc->local_x + amount < LCU_WIDTH) {
     amount += TR_MIN_WIDTH;
   }
-  return amount / TR_MIN_WIDTH;
+  return MAX(amount / TR_MIN_WIDTH, cu_loc->width / TR_MIN_WIDTH);
 }
