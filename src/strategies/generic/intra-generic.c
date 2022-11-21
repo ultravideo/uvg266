@@ -68,7 +68,7 @@ static void uvg_angular_pred_generic(
   
   // Log2_dim 1 is possible with ISP blocks
   assert((log2_width >= 1 && log2_width <= 5) && (log2_height >= 1 && log2_height <= 5));
-  assert(intra_mode >= 2 && intra_mode <= 66);
+  // assert(intra_mode >= 2 && intra_mode <= 66);
 
   static const int16_t modedisp2sampledisp[32] = { 0,    1,    2,    3,    4,    6,     8,   10,   12,   14,   16,   18,   20,   23,   26,   29,   32,   35,   39,  45,  51,  57,  64,  73,  86, 102, 128, 171, 256, 341, 512, 1024 };
   static const int16_t modedisp2invsampledisp[32] = { 0, 16384, 8192, 5461, 4096, 2731, 2048, 1638, 1365, 1170, 1024, 910, 819, 712, 630, 565, 512, 468, 420, 364, 321, 287, 256, 224, 191, 161, 128, 96, 64, 48, 32, 16 }; // (512 * 32) / sampledisp

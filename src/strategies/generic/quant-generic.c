@@ -375,7 +375,7 @@ int uvg_quant_cbcr_residual_generic(
     //}
     const int temp = cur_cu->joint_cb_cr * (state->frame->jccr_sign ? -1 : 1);
     // Get quantized reconstruction. (residual + pred_in -> rec_out)
-    for (int y = 0; y < width; y++) {
+    for (int y = 0; y < height; y++) {
       for (int x = 0; x < width; x++) {
         if (temp == 2) {
           u_residual[x + y * width] = combined_residual[x + y * width];
@@ -404,7 +404,7 @@ int uvg_quant_cbcr_residual_generic(
         }
       }
     }
-    for (int y = 0; y < width; ++y) {
+    for (int y = 0; y < height; ++y) {
       for (int x = 0; x < width; ++x) {
         int16_t u_val = u_residual[x + y * width] + u_pred_in[x + y * in_stride];
         u_rec_out[x + y * out_stride] = (uvg_pixel)CLIP(0, PIXEL_MAX, u_val);
@@ -417,7 +417,7 @@ int uvg_quant_cbcr_residual_generic(
     // With no coeffs and rec_out == pred_int we skip copying the coefficients
     // because the reconstruction is just the prediction.
 
-    for (int y = 0; y < width; ++y) {
+    for (int y = 0; y < height; ++y) {
       for (int x = 0; x < width; ++x) {
         u_rec_out[x + y * out_stride] = u_pred_in[x + y * in_stride];
         v_rec_out[x + y * out_stride] = v_pred_in[x + y * in_stride];

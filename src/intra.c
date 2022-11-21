@@ -936,6 +936,21 @@ static void intra_predict_regular(
   uint8_t multi_ref_index = color == COLOR_Y ? multi_ref_idx : 0;
   uint8_t isp = color == COLOR_Y ? isp_mode : 0;
 
+  // Wide angle correction
+  int8_t pred_mode = mode;
+  if (!is_isp && width != height) {
+    if (mode > 1 && mode <= 66) {
+      const int modeShift[] = { 0, 6, 10, 12, 14, 15 };
+      const int deltaSize = abs(log2_width - log2_height);
+      if (width > height && mode < 2 + modeShift[deltaSize]) {
+        pred_mode += (66 - 1);
+      }
+      else if (height > width && mode > 66 - modeShift[deltaSize]) {
+        pred_mode -= (66 - 1);
+      }
+    }
+  }
+
   const uvg_intra_ref *used_ref = &refs->ref;
   if (cfg->intra_smoothing_disabled || color != COLOR_Y || mode == 1 || (width == 4 && height == 4) || multi_ref_index || isp_mode /*ISP_TODO: replace this fake ISP check*/) {
     // For chroma, DC and 4x4 blocks, always use unfiltered reference.
@@ -949,11 +964,11 @@ static void intra_predict_regular(
     // to being either vertical or horizontal.
     static const int uvg_intra_hor_ver_dist_thres[8] = {24, 24, 24, 14, 2, 0, 0, 0 };
     int filter_threshold = uvg_intra_hor_ver_dist_thres[(log2_width + log2_height) >> 1];
-    int dist_from_vert_or_hor = MIN(abs(mode - 50), abs(mode - 18));
+    int dist_from_vert_or_hor = MIN(abs(pred_mode - 50), abs(pred_mode - 18));
     if (dist_from_vert_or_hor > filter_threshold) {
 
       static const int16_t modedisp2sampledisp[32] = { 0,    1,    2,    3,    4,    6,     8,   10,   12,   14,   16,   18,   20,   23,   26,   29,   32,   35,   39,  45,  51,  57,  64,  73,  86, 102, 128, 171, 256, 341, 512, 1024 };
-      const int_fast8_t mode_disp = (mode >= 34) ? mode - 50 : 18 - mode;
+      const int_fast8_t mode_disp = (pred_mode >= 34) ? pred_mode - 50 : 18 - pred_mode;
       const int_fast8_t sample_disp = (mode_disp < 0 ? -1 : 1) * modedisp2sampledisp[abs(mode_disp)];
       if ((abs(sample_disp) & 0x1F) == 0) {
         used_ref = &refs->filtered_ref;
@@ -970,7 +985,7 @@ static void intra_predict_regular(
   } else if (mode == 1) {
     intra_pred_dc(cu_loc, color, used_ref->top, used_ref->left, dst, multi_ref_index);
   } else {
-    uvg_angular_pred(cu_loc, mode, color, used_ref->top, used_ref->left, dst, multi_ref_index, isp);
+    uvg_angular_pred(cu_loc, pred_mode, color, used_ref->top, used_ref->left, dst, multi_ref_index, isp);
   }
 
   // pdpc
@@ -1463,7 +1478,7 @@ void uvg_intra_build_reference_inner(
     }
   }
   else {
-    const int num_cus = uvg_count_available_edge_cus(cu_loc, lcu, true);
+    const int num_cus = uvg_count_available_edge_cus(cu_loc, lcu, false);
     px_available_top = is_dual_tree || !is_chroma ? num_cus * 4 : num_cus * 2;
   }
 
