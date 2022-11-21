@@ -69,7 +69,7 @@ void uvg_quant_generic(
   int32_t qp_scaled = uvg_get_scaled_qp(color, state->qp, (encoder->bitdepth - 8) * 6, encoder->qp_map[0]);
   qp_scaled = transform_skip ? MAX(qp_scaled, 4 + 6 * MIN_QP_PRIME_TS) : qp_scaled;
   bool needs_block_size_trafo_scale = !transform_skip && ((log2_tr_height + log2_tr_width) % 2 == 1);
-  needs_block_size_trafo_scale |= 1; // Non log2 block size
+  needs_block_size_trafo_scale |= 0; // Non log2 block size
     
   const int32_t scalinglist_type = (block_type == CU_INTRA ? 0 : 3) + (int8_t)color;
   const int32_t *quant_coeff = encoder->scaling_list.quant_coeff[log2_tr_width][log2_tr_height][scalinglist_type][qp_scaled % 6];
@@ -598,7 +598,7 @@ void uvg_dequant_generic(const encoder_state_t * const state, coeff_t *q_coef, c
   int32_t transform_shift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - ((log2_tr_width + log2_tr_height) >> 1); // Represents scaling through forward transform
 
   bool needs_block_size_trafo_scale = !transform_skip && ((log2_tr_height + log2_tr_width) % 2 == 1);
-  needs_block_size_trafo_scale |= 1; // Non log2 block size
+  needs_block_size_trafo_scale |= 0; // Non log2 block size
 
   int32_t qp_scaled = uvg_get_scaled_qp(color, state->qp, (encoder->bitdepth-8)*6, encoder->qp_map[0]);
   qp_scaled = transform_skip ? MAX(qp_scaled, 4 + 6 * MIN_QP_PRIME_TS) : qp_scaled;
