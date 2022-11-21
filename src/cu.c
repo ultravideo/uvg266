@@ -364,18 +364,18 @@ int uvg_count_available_edge_cus(const cu_loc_t* const cu_loc, const lcu_t* cons
   if ((left && cu_loc->x == 0) || (!left && cu_loc->y == 0)) {
     return 0;
   }
-  if (left && cu_loc->local_x == 0) return (LCU_CU_WIDTH - cu_loc->local_y) / 4;
-  if (!left && cu_loc->local_y == 0) return (LCU_CU_WIDTH - cu_loc->local_x) / 4;
+  if (left && cu_loc->local_x == 0) return (LCU_WIDTH - cu_loc->local_y) / 4;
+  if (!left && cu_loc->local_y == 0) return (cu_loc->width) / 2;
 
   int amount = 0;
   if(left) {
-    while (LCU_GET_CU_AT_PX(lcu, cu_loc->local_x - TR_MIN_WIDTH, cu_loc->local_y + amount * TR_MIN_WIDTH)->type != CU_NOTSET) {
-      amount++;
+    while (LCU_GET_CU_AT_PX(lcu, cu_loc->local_x - TR_MIN_WIDTH, cu_loc->local_y + amount)->type != CU_NOTSET && (cu_loc->local_y + amount) < LCU_WIDTH) {
+      amount += TR_MIN_WIDTH;
     }
-    return amount;
+    return amount / TR_MIN_WIDTH;
   }
-  while (LCU_GET_CU_AT_PX(lcu, cu_loc->local_x + amount * TR_MIN_WIDTH, cu_loc->local_y - TR_MIN_WIDTH)->type != CU_NOTSET) {
-    amount++;
+  while (LCU_GET_CU_AT_PX(lcu, cu_loc->local_x + amount, cu_loc->local_y - TR_MIN_WIDTH)->type != CU_NOTSET && cu_loc->local_x + amount < LCU_WIDTH) {
+    amount += TR_MIN_WIDTH;
   }
-  return amount;
+  return amount / TR_MIN_WIDTH;
 }
