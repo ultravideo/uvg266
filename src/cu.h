@@ -189,7 +189,8 @@ void uvg_cu_loc_ctor(cu_loc_t *loc, int x, int y, int width, int height);
 int uvg_get_split_locs(
   const cu_loc_t* const origin,
   enum split_type split,
-  cu_loc_t out[4]);
+  cu_loc_t out[4],
+  uint8_t* separate_chroma);
 
 
 #define CU_GET_MV_CAND(cu_info_ptr, reflist) \

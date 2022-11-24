@@ -916,7 +916,8 @@ static void mip_predict(
 }
 
 
-int8_t uvg_wide_angle_correction(int_fast8_t mode, const bool is_isp, const int log2_width, const int log2_height)
+int8_t uvg_wide_angle_correction(int_fast8_t mode, const bool is_isp, const int log2_width, const int log2_height, const
+                                 bool account_for_dc_planar)
 {
   int8_t pred_mode = mode;
   if (!is_isp && log2_width != log2_height) {
@@ -927,7 +928,7 @@ int8_t uvg_wide_angle_correction(int_fast8_t mode, const bool is_isp, const int 
         pred_mode += (66 - 1);
       }
       else if (log2_height > log2_width && mode > 66 - modeShift[deltaSize]) {
-        pred_mode -= (66 - 1);
+        pred_mode -= (66 - 1) + (account_for_dc_planar ? 2 : 0);
       }
     }
   }
@@ -958,7 +959,8 @@ static void intra_predict_regular(
   int8_t pred_mode = uvg_wide_angle_correction(mode,
                                                is_isp,
                                                log2_width,
-                                               log2_height);
+                                               log2_height,
+                                               false);
 
   const uvg_intra_ref *used_ref = &refs->ref;
   if (cfg->intra_smoothing_disabled || color != COLOR_Y || mode == 1 || (width == 4 && height == 4) || multi_ref_index || isp_mode /*ISP_TODO: replace this fake ISP check*/) {
@@ -1817,12 +1819,7 @@ void uvg_intra_recon_cu(
     cur_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
   }
 
-  cu_loc_t chroma_cu_loc;
-  if(!recon_luma && recon_chroma) {
-    uvg_cu_loc_ctor(&chroma_cu_loc, cu_loc->x & ~7, cu_loc->y & ~7, width, height);
-    cu_loc = &chroma_cu_loc;
-  }
-  
+   
   // Reset CBFs because CBFs might have been set
   // for depth earlier
   if (recon_luma) {
@@ -1846,7 +1843,7 @@ void uvg_intra_recon_cu(
     }
 
     cu_loc_t split_cu_loc[4];
-    const int split_count = uvg_get_split_locs(cu_loc, split, split_cu_loc);
+    const int split_count = uvg_get_split_locs(cu_loc, split, split_cu_loc,NULL);
     for (int i = 0; i < split_count; ++i) {
       uvg_intra_recon_cu(state, search_data, &split_cu_loc[i], NULL, lcu, tree_type, recon_luma, recon_chroma);
     }
@@ -1876,7 +1873,7 @@ void uvg_intra_recon_cu(
     }
   }
   const bool has_luma = recon_luma && search_data->pred_cu.intra.isp_mode == ISP_MODE_NO_ISP;
-  const bool has_chroma = recon_chroma && (cu_loc->x % 8 == 0 && cu_loc->y % 8 == 0);
+  const bool has_chroma = recon_chroma;
      
   // Process a leaf TU.
   if (has_luma) {

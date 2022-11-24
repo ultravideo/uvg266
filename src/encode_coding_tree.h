@@ -54,7 +54,9 @@ void uvg_encode_coding_tree(
   lcu_coeff_t *coeff,
   enum uvg_tree_type tree_type,
   const cu_loc_t* const cu_loc,
-  split_tree_t split_tree);
+  const cu_loc_t* const chroma_loc,
+  split_tree_t split_tree,
+  bool has_chroma);
 
 void uvg_encode_ts_residual(encoder_state_t* const state,
   cabac_data_t* const cabac,
