@@ -957,7 +957,7 @@ static void intra_predict_regular(
 
   // Wide angle correction
   int8_t pred_mode = uvg_wide_angle_correction(mode,
-                                               is_isp,
+                                               isp_mode,
                                                log2_width,
                                                log2_height,
                                                false);
@@ -1859,15 +1859,15 @@ void uvg_intra_recon_cu(
 
     for (int i = 0; i < split_limit; ++i) {
       cu_loc_t tu_loc;
-      uvg_get_isp_split_loc(&tu_loc, x, y, width, height, i, split_type, true);
+      uvg_get_isp_split_loc(&tu_loc,  cu_loc->x, cu_loc->y, width, height, i, split_type, true);
       cu_loc_t pu_loc;
-      uvg_get_isp_split_loc(&pu_loc, x, y, width, height, i, split_type, false);
+      uvg_get_isp_split_loc(&pu_loc, cu_loc->x, cu_loc->y, width, height, i, split_type, false);
 
       if(tu_loc.x % 4 == 0) {
-        intra_recon_tb_leaf(state, &pu_loc, &origin_cu, lcu, COLOR_Y, search_data, tree_type);
+        intra_recon_tb_leaf(state, &pu_loc, cu_loc, lcu, COLOR_Y, search_data, tree_type);
       }
       uvg_quantize_lcu_residual(state, true, false, false,
-        &tu_loc, depth, cur_cu, lcu,
+        &tu_loc, cur_cu, lcu,
         false, tree_type);
       search_data->best_isp_cbfs |= cbf_is_set(cur_cu->cbf, COLOR_Y) << i;
     }
