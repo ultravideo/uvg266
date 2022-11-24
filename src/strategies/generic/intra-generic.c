@@ -192,7 +192,7 @@ static void uvg_angular_pred_generic(
   if (sample_disp != 0) {
     // The mode is not horizontal or vertical, we have to do interpolation.
 
-    for (int_fast32_t y = 0, delta_pos = sample_disp * (1 + multi_ref_index); y < tmp_height; ++y, delta_pos += sample_disp) {
+    for (int_fast32_t y = 0, delta_pos = sample_disp * (1 + multi_ref_index); y < height; ++y, delta_pos += sample_disp) {
       int_fast32_t delta_int = delta_pos >> 5;
       int_fast32_t delta_fract = delta_pos & (32 - 1);
 
@@ -219,7 +219,7 @@ static void uvg_angular_pred_generic(
           const int16_t filter_coeff[4] = { 16 - (delta_fract >> 1), 32 - (delta_fract >> 1), 16 + (delta_fract >> 1), delta_fract >> 1 };
           int16_t const * const f = use_cubic ? cubic_filter[delta_fract] : filter_coeff;
           // Do 4-tap intra interpolation filtering
-          for (int_fast32_t x = 0; x < tmp_width; x++, ref_main_index++) {
+          for (int_fast32_t x = 0; x < width; x++, ref_main_index++) {
             p[0] = ref_main[ref_main_index];
             p[1] = ref_main[ref_main_index + 1];
             p[2] = ref_main[ref_main_index + 2];
@@ -232,7 +232,7 @@ static void uvg_angular_pred_generic(
         else {
         
           // Do linear filtering
-          for (int_fast32_t x = 0; x < tmp_width; ++x) {
+          for (int_fast32_t x = 0; x < width; ++x) {
             uvg_pixel ref1 = ref_main[x + delta_int + 1];
             uvg_pixel ref2 = ref_main[x + delta_int + 2];
             work[y * width + x] = ref1 + ((delta_fract * (ref2-ref1) + 16) >> 5);
@@ -248,7 +248,7 @@ static void uvg_angular_pred_generic(
 
      
       // PDPC
-      bool PDPC_filter = ((tmp_width >= TR_MIN_WIDTH && tmp_height >= TR_MIN_WIDTH)  || channel_type != 0) && multi_ref_index == 0;
+      bool PDPC_filter = ((width >= TR_MIN_WIDTH && height >= TR_MIN_WIDTH)  || channel_type != 0) && multi_ref_index == 0;
       if (pred_mode > 1 && pred_mode < 67) {
         if (mode_disp < 0 || multi_ref_index) { // Cannot be used with MRL.
           PDPC_filter = false;
@@ -259,7 +259,7 @@ static void uvg_angular_pred_generic(
       }
       if(PDPC_filter) {
         int inv_angle_sum = 256;
-        for (int x = 0; x < MIN(3 << scale, tmp_width); x++) {
+        for (int x = 0; x < MIN(3 << scale, width); x++) {
           inv_angle_sum += modedisp2invsampledisp[abs(mode_disp)];
 
           int wL = 32 >> (2 * x >> scale);
@@ -274,7 +274,7 @@ static void uvg_angular_pred_generic(
     
     // Do not apply PDPC if multi ref line index is other than 0
     // TODO: do not do PDPC if block is in BDPCM mode
-    bool do_pdpc = (((tmp_width >= 4 && tmp_height >= 4) || channel_type != 0) && sample_disp >= 0 && multi_ref_index == 0 /*&& !bdpcm*/);
+    bool do_pdpc = (((width >= 4 && height >= 4) || channel_type != 0) && sample_disp >= 0 && multi_ref_index == 0 /*&& !bdpcm*/);
 
     if (do_pdpc) {
       int scale = (log2_width + log2_height - 2) >> 2;
@@ -282,7 +282,7 @@ static void uvg_angular_pred_generic(
       for (int_fast32_t y = 0; y < height; ++y) {
         memcpy(&work[y * width], &ref_main[1], width * sizeof(uvg_pixel));
         const uvg_pixel left = ref_side[1 + y];
-        for (int_fast32_t x = 0; x < MIN(3 << scale, tmp_width); ++x) {
+        for (int_fast32_t x = 0; x < MIN(3 << scale, width); ++x) {
           const int wL = 32 >> (2 * x >> scale);
           const uvg_pixel val = work[y * width + x];
           work[y * width + x] = CLIP_TO_PIXEL(val + ((wL * (left - top_left) + 32) >> 6));

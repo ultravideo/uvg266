@@ -422,9 +422,9 @@ double uvg_cu_rd_cost_luma(
   }
   else {
     // TODO: 8x4 CUs
-    const int split_limit = uvg_get_isp_split_num(width, height, pred_cu->intra.isp_mode, true);
+    const int split_limit = uvg_get_isp_split_num(cu_loc->width, cu_loc->height, pred_cu->intra.isp_mode, true);
+    int luma_ctx = 2;
     for (int i = 0; i < split_limit; i++) {
-      int luma_ctx = 2;
       if (i != 3 && isp_cbf != 0x8) {
         const int flag = (isp_cbf >> i) & 1;
         CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.qt_cbf_model_luma[luma_ctx]), flag, tr_tree_bits, "cbf_y_search");
@@ -1306,7 +1306,7 @@ static double search_cu(
 
   // Recursively split all the way to max search depth.
   if (can_split_cu) {
-    const int split_type = depth == 2 ? TT_HOR_SPLIT : QT_SPLIT;
+    const int split_type = depth == 2 ? BT_HOR_SPLIT : QT_SPLIT;
     const split_tree_t new_split = {
       split_tree.split_tree | split_type << (split_tree.current_depth * 3),
       split_tree.current_depth + 1,
@@ -1370,7 +1370,7 @@ static double search_cu(
       initialize_partial_work_tree(lcu, &split_lcu, cu_loc, tree_type);
       for (int split = 0; split < splits; ++split) {
         split_cost += search_cu(state, 
-          &new_cu_loc[split], separate_chroma ? cu_loc : &new_cu_loc[split],
+          &new_cu_loc[split], separate_chroma ? chroma_loc : &new_cu_loc[split],
           &split_lcu, 
           tree_type, new_split,
           !separate_chroma || split == splits - 1);

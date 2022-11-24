@@ -129,8 +129,7 @@ bool uvg_is_lfnst_allowed(
     }
     bool luma_flag = tree_type != UVG_CHROMA_T;
     bool chroma_flag = tree_type != UVG_LUMA_T;
-    bool non_zero_coeff_non_ts_corner_8x8 = false;
-    bool last_scan_pos = false;
+    bool non_zero_coeff_non_ts_corner_8x8 = (luma_flag && pred_cu->violates_lfnst_constrained_luma) || (chroma_flag && pred_cu->violates_lfnst_constrained_chroma);
     bool is_tr_skip = false;
     
     if (color == COLOR_Y && pred_cu->tr_idx == MTS_SKIP) {
@@ -177,10 +176,10 @@ static bool encode_lfnst_idx(
     return true;
   }
   else {
-    if(depth != 4 || color == COLOR_Y) {
+    if(color == COLOR_Y) {
       assert(pred_cu->lfnst_idx == 0);
     }
-    if(depth == 4 && color != COLOR_Y) {
+    if(tree_type == UVG_CHROMA_T && color != COLOR_Y) {
       assert(pred_cu->cr_lfnst_idx == 0);
     }
     return false;
@@ -612,7 +611,8 @@ static void encode_transform_coeff(
   cabac_data_t * const cabac = &state->cabac;
 
   bool isp_split = cu_loc->x != original_loc->x || cu_loc->y != original_loc->y;
-
+  int x = cu_loc->x;
+  int y = cu_loc->y;
   if (isp_split) {
     uvg_get_isp_cu_arr_coords(&x, &y);
   }
@@ -621,7 +621,7 @@ static void encode_transform_coeff(
   const videoframe_t * const frame = state->tile->frame;
   const cu_array_t* used_array = tree_type != UVG_CHROMA_T ? frame->cu_array : frame->chroma_cu_array;
   if(cur_tu == NULL) {
-    cur_tu = uvg_cu_array_at_const(used_array, cu_loc->x, cu_loc->y);
+    cur_tu = uvg_cu_array_at_const(used_array, x, y);
   }
 
   const bool ver_split = cu_loc->height > TR_MAX_WIDTH;
@@ -647,36 +647,25 @@ static void encode_transform_coeff(
     cu_loc_t split_cu_loc[4];
     const int split_count = uvg_get_split_locs(cu_loc, split, split_cu_loc,NULL);
     for (int i = 0; i < split_count; ++i) {
-      encode_transform_coeff(state, &split_cu_loc[i], only_chroma, coeff, NULL, tree_type, true, luma_cbf_ctx, &split_cu_loc[i]);
+      encode_transform_coeff(state, &split_cu_loc[i], only_chroma, coeff, NULL, tree_type, true, false, luma_cbf_ctx, &split_cu_loc[i]);
     }
     return;
   }
+
+
   // Chroma cb flags are not signaled when one of the following:
   // No chroma.
   // Not the last CU for area of 64 pixels cowered by more than one luma CU.
   // Not the last ISP Split
-  if (state->encoder_control->chroma_format != UVG_CSP_400 
+  if (state->encoder_control->chroma_format != UVG_CSP_400
     && (cur_tu->log2_height + cur_tu->log2_width >= 6 || only_chroma)
-    && tree_type != UVG_LUMA_T 
+    && tree_type != UVG_LUMA_T
     && last_split) {
     cabac->cur_ctx = &(cabac->ctx.qt_cbf_model_cb[0]);
     CABAC_BIN(cabac, cb_flag_u, "cbf_cb");
     cabac->cur_ctx = &(cabac->ctx.qt_cbf_model_cr[cb_flag_u ? 1 : 0]);
-    CABAC_BIN(cabac, cb_flag_v, "cbf_cr");    
+    CABAC_BIN(cabac, cb_flag_v, "cbf_cr");
   }
-
-
-    for (int j = 0; j < 2; j++) {
-      for (int i = 0; i < 2; i++) {
-        cu_loc_t loc;
-        uvg_cu_loc_ctor(&loc, (x + i * split_width), (y + j * split_height), width >> 1, height >> 1);
-
-        encode_transform_coeff(state, &loc, depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v, only_chroma, coeff, tree_type, true, false, luma_cbf_ctx, &loc);
-      }
-    }
-    return;
-  }
-
   // Luma coded block flag is signaled when one of the following:
   // - prediction mode is intra
   // - transform depth > 0
@@ -1417,7 +1406,7 @@ void uvg_encode_coding_tree(
       const int splits = uvg_get_split_locs(cu_loc, split_flag, new_cu_loc, &separate_chroma);
       for (int split = 0; split <splits; ++split) {
         uvg_encode_coding_tree(state, coeff, tree_type,
-          &new_cu_loc[split], separate_chroma ? cu_loc : &new_cu_loc[split],
+          &new_cu_loc[split], separate_chroma ? chroma_loc : &new_cu_loc[split],
           new_split_tree, !separate_chroma || split == splits - 1);
       }
       return;
@@ -1612,8 +1601,9 @@ void uvg_encode_coding_tree(
     encode_mts_idx(state, cabac, cur_cu, cu_loc);
 
     // For 4x4 the chroma PU/TU is coded after the last 
-    if (state->encoder_control->chroma_format != UVG_CSP_400 && 
-      (has_chroma || tree_type == UVG_CHROMA_T) &&
+    if (state->encoder_control->chroma_format != UVG_CSP_400 &&
+      (((chroma_loc->width != cu_loc->width || chroma_loc->height != cu_loc->height)&&
+      has_chroma) || tree_type == UVG_CHROMA_T) &&
       tree_type != UVG_LUMA_T)   {
       encode_chroma_intra_cu(cabac, cur_cu, state->encoder_control->cfg.cclm, NULL);
       // LFNST constraints must be reset here. Otherwise the left over values will interfere when calculating new constraints
