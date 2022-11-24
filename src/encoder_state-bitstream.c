@@ -1122,7 +1122,7 @@ static void uvg_encoder_state_write_bitstream_picture_header(
     WRITE_U(stream, 0, 1, "ph_mvd_l1_zero_flag");
   }
 
-  if (encoder->cfg.jccr) {
+  if (encoder->cfg.jccr && encoder->chroma_format != UVG_CSP_400) {
     WRITE_U(stream, state->frame->jccr_sign, 1, "ph_joint_cbcr_sign_flag");
   }
   // END PICTURE HEADER

@@ -590,7 +590,7 @@ static double search_intra_trdepth(
     }
 
     cu_loc_t split_cu_loc[4];
-    const int split_count = uvg_get_split_locs(cu_loc, split, split_cu_loc);
+    const int split_count = uvg_get_split_locs(cu_loc, split, split_cu_loc,NULL);
     for (int i = 0; i < split_count; ++i) {
       split_cost += search_intra_trdepth(state, &split_cu_loc[i], nosplit_cost, search_data, lcu, tree_type);
     }
@@ -1418,10 +1418,11 @@ int8_t uvg_search_intra_chroma_rdo(
   encoder_state_t * const state,
   int8_t num_modes,
   lcu_t *const lcu,
+  const cu_loc_t* const cu_loc,
   intra_search_data_t* chroma_data,
   int8_t luma_mode,
   enum uvg_tree_type tree_type,
-  const cu_loc_t* const cu_loc)
+  bool is_separate)
 {
   const bool reconstruct_chroma = true;
   
@@ -1446,7 +1447,7 @@ int8_t uvg_search_intra_chroma_rdo(
     const int offset = ((cu_loc->local_x & ~7) >> 1) + ((cu_loc->local_y & ~7) >> 1)* LCU_WIDTH_C;
 
     int lfnst_modes_to_check[3];
-    if((cu_loc->width == 4 || tree_type == UVG_CHROMA_T) && state->encoder_control->cfg.lfnst) {
+    if((is_separate || tree_type == UVG_CHROMA_T) && state->encoder_control->cfg.lfnst) {
       for (int i = 0; i < 3; ++i) {
         lfnst_modes_to_check[i] = i;
       }
@@ -1528,7 +1529,7 @@ int8_t uvg_search_intra_chroma_rdo(
             u_resi,
             v_resi,
             &chorma_ts_out,
-            tree_type);
+            is_separate ? UVG_CHROMA_T : tree_type);
 
           // LFNST constraint failed
           if(chorma_ts_out.best_u_index == -1 && chorma_ts_out.best_combined_index == -1) {
@@ -1590,7 +1591,8 @@ int8_t uvg_search_cu_intra_chroma(
   const cu_loc_t* const cu_loc,
   lcu_t *lcu,
   intra_search_data_t *search_data,
-  enum uvg_tree_type tree_type)
+  enum uvg_tree_type tree_type,
+  bool is_separate)
 {
 
   const cu_info_t *cur_pu = &search_data->pred_cu;
@@ -1604,9 +1606,7 @@ int8_t uvg_search_cu_intra_chroma(
       break;
     }
   }
-
-  cu_loc_t chroma_loc;
-  uvg_cu_loc_ctor(&chroma_loc, cu_loc->x & ~7, cu_loc->y & ~7, cu_loc->width, cu_loc->height);
+  
 
   // The number of modes to select for slower chroma search. Luma mode
   // is always one of the modes, so 2 means the final decision is made
@@ -1638,11 +1638,11 @@ int8_t uvg_search_cu_intra_chroma(
 
     num_modes = search_intra_chroma_rough(state, chroma_data, lcu, intra_mode,
                                           tree_type,
-                                          &chroma_loc);
+                                          cu_loc);
   }
   
   if (num_modes > 1 || state->encoder_control->cfg.jccr) {
-    uvg_search_intra_chroma_rdo(state, num_modes, lcu, chroma_data, intra_mode, tree_type, &chroma_loc);
+    uvg_search_intra_chroma_rdo(state, num_modes, lcu, cu_loc, chroma_data, intra_mode, tree_type, is_separate);
   }
   else if(cur_pu->lfnst_idx) {
     chroma_data[0].pred_cu.cr_lfnst_idx = cur_pu->lfnst_idx;

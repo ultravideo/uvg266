@@ -2586,7 +2586,7 @@ static void mts_dct_generic(
     //const int log2_width_minus2 = uvg_g_convert_to_bit[width];
     //const int log2_height_minus2 = uvg_g_convert_to_bit[height];
 
-    if(tu->lfnst_idx || tu->cr_lfnst_idx) {
+    if((tu->lfnst_idx && color == COLOR_Y) || (tu->cr_lfnst_idx && color != COLOR_Y)) {
       if ((width == 4 && height > 4) || (width > 4 && height == 4))
       {
         skip_width = width - 4;
@@ -2639,7 +2639,7 @@ static void mts_idct_generic(
     const int log2_width_minus1  = uvg_g_convert_to_log2[width] - 1;
     const int log2_height_minus1 = uvg_g_convert_to_log2[height] - 1;
 
-    if (tu->lfnst_idx || tu->cr_lfnst_idx) {
+    if ((tu->lfnst_idx && color == COLOR_Y) || (tu->cr_lfnst_idx && color != COLOR_Y)) {
       if ((width == 4 && height > 4) || (width > 4 && height == 4)) {
         skip_width = width - 4;
         skip_height = height - 4;

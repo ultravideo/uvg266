@@ -169,7 +169,8 @@ int8_t uvg_wide_angle_correction(
   int_fast8_t mode,
   const bool is_isp,
   const int log2_width,
-  const int log2_height);
+  const int log2_height,
+  const bool account_for_dc_planar);
 
 // ISP related defines
 #define NUM_ISP_MODES 3

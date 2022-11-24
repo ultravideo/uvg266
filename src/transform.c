@@ -574,7 +574,7 @@ void uvg_chroma_transform_search(
       pred_cu->cr_lfnst_idx);
       if(pred_cu->cr_lfnst_idx !=0 && !u_has_coeffs && !v_has_coeffs) continue;
     
-    if(pred_cu->type == CU_INTRA && transforms[i] != CHROMA_TS && (cu_loc->width == 4 || tree_type == UVG_CHROMA_T)) {
+    if(pred_cu->type == CU_INTRA && transforms[i] != CHROMA_TS && tree_type == UVG_CHROMA_T) {
       bool constraints[2] = { false, false };
       uvg_derive_lfnst_constraints(pred_cu, constraints, u_quant_coeff, width, height, NULL, COLOR_U);
       if(!is_jccr) {
@@ -863,6 +863,8 @@ void uvg_fwd_lfnst(
   const uint32_t log2_height = uvg_g_convert_to_log2[height];
   int8_t intra_mode = (color == COLOR_Y) ? cur_cu->intra.mode : cur_cu->intra.mode_chroma;
   bool mts_skip = cur_cu->tr_idx == MTS_SKIP;
+  // This check is safe for 8x16 cus split with TT, since it is checking the dimensions of the
+  // last luma CU which will be 8x4, i.e., 3 + 2 < 6
   bool is_separate_tree = cur_cu->log2_height + cur_cu->log2_width < 6 || tree_type != UVG_BOTH_T;
   bool is_cclm_mode = (intra_mode >= 81 && intra_mode <= 83); // CCLM modes are in [81, 83]
 
@@ -879,12 +881,12 @@ void uvg_fwd_lfnst(
     if (is_cclm_mode) {
       intra_mode = cur_cu->intra.mode;
     }
-    if (is_mip) {
+    if (is_mip && color == COLOR_Y) {
       intra_mode = 0; // Set to planar mode
     }
     assert(intra_mode < NUM_INTRA_MODE && "LFNST: Invalid intra mode.");
     assert(lfnst_index < 3 && "LFNST: Invalid LFNST index. Must be in [0, 2]");
-    int32_t wide_adjusted_mode = uvg_wide_angle_correction(intra_mode, cur_cu->intra.isp_mode != 0, log2_width, log2_height);
+    int32_t wide_adjusted_mode = uvg_wide_angle_correction(intra_mode, cur_cu->intra.isp_mode != 0, log2_width, log2_height, true);
     
     // Transform wide angle mode to intra mode
     intra_mode = get_lfnst_intra_mode(wide_adjusted_mode);
@@ -1010,12 +1012,12 @@ void uvg_inv_lfnst(
     if (is_cclm_mode) {
       intra_mode = cur_cu->intra.mip_flag ? 0 : cur_cu->intra.mode;
     }
-    if (is_mip) {
+    if (is_mip && color == COLOR_Y) {
       intra_mode = 0; // Set to planar mode
     }
     assert(intra_mode < NUM_INTRA_MODE && "LFNST: Invalid intra mode.");
     assert(lfnst_index < 3 && "LFNST: Invalid LFNST index. Must be in [0, 2]");
-    int32_t wide_adjusted_mode = uvg_wide_angle_correction(intra_mode, cur_cu->intra.isp_mode != 0, log2_width, log2_height);
+    int32_t wide_adjusted_mode = uvg_wide_angle_correction(intra_mode, cur_cu->intra.isp_mode != 0, log2_width, log2_height, true);
 
     
     intra_mode = get_lfnst_intra_mode(wide_adjusted_mode); 
@@ -1175,6 +1177,7 @@ static void quantize_tr_residual(
                            cur_pu->log2_width + cur_pu-> log2_height < 6&&
                            (x % 4 != 0 || y % 4 != 0);
   if (handled_elsewhere) {
+    assert(0);
     return;
   }
 
@@ -1413,7 +1416,7 @@ void uvg_quantize_lcu_residual(
 
     cu_loc_t split_cu_loc[4];
     uint16_t child_cbfs[3];
-    const int split_count = uvg_get_split_locs(cu_loc, split, split_cu_loc);
+    const int split_count = uvg_get_split_locs(cu_loc, split, split_cu_loc,NULL);
     for (int i = 0; i < split_count; ++i) {
       uvg_quantize_lcu_residual(state, luma, chroma, 0, &split_cu_loc[i], NULL, lcu, early_skip, tree_type);
       if(i != 0) {
