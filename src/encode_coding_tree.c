@@ -452,8 +452,8 @@ static void encode_chroma_tu(
 {
   int width_c = cu_loc->chroma_width;
   int height_c = cu_loc->chroma_height;
-  int x_local = ((cu_loc->x >> (tree_type != UVG_CHROMA_T)) & ~3) % LCU_WIDTH_C;
-  int y_local = ((cu_loc->y >> (tree_type != UVG_CHROMA_T)) & ~3) % LCU_WIDTH_C;
+  int x_local = (cu_loc->x >> (tree_type != UVG_CHROMA_T)) % LCU_WIDTH_C;
+  int y_local = (cu_loc->y >> (tree_type != UVG_CHROMA_T)) % LCU_WIDTH_C;
   cabac_data_t* const cabac = &state->cabac;
   *scan_idx = SCAN_DIAG;
   if(!joint_chroma){
@@ -1668,6 +1668,7 @@ double uvg_mock_encode_coding_unit(
   encoder_state_t* const state,
   cabac_data_t* cabac,
   const cu_loc_t* const cu_loc,
+  const cu_loc_t* const chroma_loc,
   lcu_t* lcu,
   cu_info_t* cur_cu,
   enum uvg_tree_type tree_type,
@@ -1780,7 +1781,7 @@ double uvg_mock_encode_coding_unit(
     if(tree_type != UVG_CHROMA_T) {
       uvg_encode_intra_luma_coding_unit(state, cabac, cur_cu, cu_loc, lcu, &bits);
     }
-    if((cur_cu->log2_height + cur_cu->log2_width >= 6 || (x % 8 != 0 && y % 8 != 0) || tree_type == UVG_CHROMA_T) && state->encoder_control->chroma_format != UVG_CSP_400 && tree_type != UVG_LUMA_T) {
+    if((chroma_loc || tree_type == UVG_CHROMA_T) && state->encoder_control->chroma_format != UVG_CSP_400 && tree_type != UVG_LUMA_T) {
       encode_chroma_intra_cu(cabac, cur_cu, state->encoder_control->cfg.cclm, &bits);
     }
   }

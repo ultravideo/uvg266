@@ -77,6 +77,7 @@ double uvg_mock_encode_coding_unit(
   encoder_state_t* const state,
   cabac_data_t* cabac,
   const cu_loc_t* const cu_loc,
+  const cu_loc_t* const chroma_loc,
   lcu_t* lcu,
   cu_info_t* cur_cu,
   enum uvg_tree_type tree_type,
