@@ -131,7 +131,7 @@ static void uvg_angular_pred_generic(
   const int_fast8_t mode_disp = vertical_mode ? pred_mode - 50 : -((int32_t)pred_mode - 18);
   
   // Sample displacement per column in fractions of 32.
-  const int_fast8_t sample_disp = (mode_disp < 0 ? -1 : 1) * modedisp2sampledisp[abs(mode_disp)];
+  const int16_t sample_disp = (mode_disp < 0 ? -1 : 1) * modedisp2sampledisp[abs(mode_disp)];
   
   const int side_size = vertical_mode ? log2_height : log2_width;
   int scale = MIN(2, side_size - pre_scale[abs(mode_disp)]);
@@ -248,7 +248,7 @@ static void uvg_angular_pred_generic(
 
      
       // PDPC
-      bool PDPC_filter = ((width >= TR_MIN_WIDTH && height >= TR_MIN_WIDTH)  || channel_type != 0) && multi_ref_index == 0;
+      bool PDPC_filter = (width >= TR_MIN_WIDTH && height >= TR_MIN_WIDTH) && multi_ref_index == 0;
       if (pred_mode > 1 && pred_mode < 67) {
         if (mode_disp < 0 || multi_ref_index) { // Cannot be used with MRL.
           PDPC_filter = false;
@@ -274,7 +274,7 @@ static void uvg_angular_pred_generic(
     
     // Do not apply PDPC if multi ref line index is other than 0
     // TODO: do not do PDPC if block is in BDPCM mode
-    bool do_pdpc = (((width >= 4 && height >= 4) || channel_type != 0) && sample_disp >= 0 && multi_ref_index == 0 /*&& !bdpcm*/);
+    bool do_pdpc = ((width >= 4 && height >= 4) && sample_disp >= 0 && multi_ref_index == 0 /*&& !bdpcm*/);
 
     if (do_pdpc) {
       int scale = (log2_width + log2_height - 2) >> 2;

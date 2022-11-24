@@ -187,8 +187,8 @@ static INLINE void copy_cu_coeffs(const cu_loc_t *cu_loc, lcu_t *from, lcu_t *to
 
   if (from->rec.chroma_format != UVG_CSP_400 && tree_type != UVG_LUMA_T) {
     //const int chroma_z = xy_to_zorder(LCU_WIDTH_C, cu_loc->x >> (tree_type != UVG_CHROMA_T), cu_loc->y >> (tree_type != UVG_CHROMA_T));
-    const int chroma_x = (cu_loc->x >> 1) & ~3;
-    const int chroma_y = (cu_loc->y >> 1) & ~3;
+    const int chroma_x = (cu_loc->x >> 1);
+    const int chroma_y = (cu_loc->y >> 1);
 
     const int idx = (chroma_x % LCU_WIDTH_C) + ((chroma_y % LCU_WIDTH_C) * LCU_WIDTH_C);
     copy_coeffs(&from->coeff.u[idx], &to->coeff.u[idx], cu_loc->chroma_width, cu_loc->chroma_height, LCU_WIDTH_C);
@@ -208,11 +208,16 @@ static void work_tree_copy_up(
   bool joint,
   enum
   uvg_tree_type tree_type,
-  const cu_loc_t* const cu_loc)
+  const cu_loc_t* const cu_loc,
+  const cu_loc_t* const chroma_loc)
 {
   copy_cu_info  (from, to, cu_loc, tree_type);
-  copy_cu_pixels(from, to, cu_loc, tree_type);
-  copy_cu_coeffs(cu_loc, from, to, joint, tree_type);  
+  copy_cu_pixels(from, to, cu_loc, cu_loc != chroma_loc && tree_type == UVG_LUMA_T ? UVG_LUMA_T : tree_type);
+  copy_cu_coeffs(cu_loc, from, to, joint, cu_loc != chroma_loc && tree_type == UVG_LUMA_T ? UVG_LUMA_T : tree_type);
+  if (cu_loc != chroma_loc && tree_type == UVG_LUMA_T) {
+    copy_cu_pixels(from, to, chroma_loc, UVG_CHROMA_T);
+    copy_cu_coeffs(chroma_loc, from, to, joint, UVG_CHROMA_T);
+  }
 }
 
 
@@ -481,7 +486,7 @@ double uvg_cu_rd_cost_chroma(
   lcu_t *const lcu,
   const cu_loc_t * const cu_loc)
 {
-  const vector2d_t lcu_px = { (cu_loc->local_x & ~7) / 2, (cu_loc->local_y & ~7) / 2 };
+  const vector2d_t lcu_px = { (cu_loc->local_x) / 2, (cu_loc->local_y) / 2 };
   cu_info_t *const tr_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
   const int skip_residual_coding = pred_cu->skipped || (pred_cu->type == CU_INTER && pred_cu->cbf == 0);
   
@@ -786,7 +791,7 @@ static double cu_rd_cost_tr_split_accurate(
       if (chroma_can_use_tr_skip) {
         CABAC_FBITS_UPDATE(cabac, &cabac->ctx.transform_skip_model_chroma, tr_cu->tr_skip & 2, tr_tree_bits, "transform_skip_flag");
       }
-      coeff_bits += uvg_get_coeff_cost(state, lcu->coeff.joint_uv, tr_cu, &chroma_loc, COLOR_U, scan_order, 0, COEFF_ORDER_CU);
+      coeff_bits += uvg_get_coeff_cost(state, lcu->coeff.joint_uv, tr_cu, &temp_chroma_loc, COLOR_U, scan_order, 0, COEFF_ORDER_CU);
     }
   }
 
@@ -948,6 +953,7 @@ static double search_cu(
   const int y = cu_loc->y;
   const int luma_width = cu_loc->width;
   const int luma_height = cu_loc->height;
+  const bool is_separate_tree = chroma_loc == NULL || cu_loc->height != chroma_loc->height || cu_loc->width != chroma_loc->width;
   assert(cu_width >= 4);
   double cost = MAX_DOUBLE;
   double inter_zero_coeff_cost = MAX_DOUBLE;
@@ -1150,7 +1156,7 @@ static double search_cu(
 
       bool recon_chroma = true;
       bool recon_luma = tree_type != UVG_CHROMA_T;
-      if ((cur_cu->log2_height + cur_cu->log2_width < 6) || !has_chroma || state->encoder_control->chroma_format == UVG_CSP_400 || tree_type == UVG_LUMA_T) {
+      if (is_separate_tree || !has_chroma || state->encoder_control->chroma_format == UVG_CSP_400 || tree_type == UVG_LUMA_T) {
         recon_chroma = false; 
       }
       lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_height, cur_cu);
@@ -1161,7 +1167,7 @@ static double search_cu(
                          recon_luma, recon_chroma);
 
 
-      if((cur_cu->log2_height + cur_cu->log2_width < 6 && has_chroma && tree_type != UVG_LUMA_T && state->encoder_control->chroma_format != UVG_CSP_400 ) 
+      if((is_separate_tree && has_chroma && tree_type != UVG_LUMA_T && state->encoder_control->chroma_format != UVG_CSP_400 ) 
         || tree_type == UVG_CHROMA_T) {
         intra_search.pred_cu.intra.mode_chroma = cur_cu->intra.mode_chroma;
         uvg_intra_recon_cu(state,
@@ -1263,6 +1269,7 @@ static double search_cu(
       state,
       cabac,
       tree_type != UVG_CHROMA_T ? cu_loc : &separate_tree_chroma_loc,
+      is_separate_tree && !has_chroma ? NULL : chroma_loc,
       lcu,
       cur_cu,
       tree_type,
@@ -1306,7 +1313,7 @@ static double search_cu(
 
   // Recursively split all the way to max search depth.
   if (can_split_cu) {
-    const int split_type = depth == 2 ? BT_HOR_SPLIT : QT_SPLIT;
+    const int split_type = depth == 2 ? TT_VER_SPLIT : QT_SPLIT;
     const split_tree_t new_split = {
       split_tree.split_tree | split_type << (split_tree.current_depth * 3),
       split_tree.current_depth + 1,
@@ -1447,7 +1454,7 @@ static double search_cu(
     if (split_cost < cost) {
       // Copy split modes to this depth.
       cost = split_cost;
-      work_tree_copy_up(&split_lcu, lcu, state->encoder_control->cfg.jccr, tree_type, cu_loc);
+      work_tree_copy_up(&split_lcu, lcu, state->encoder_control->cfg.jccr, tree_type, cu_loc, is_separate_tree && !has_chroma ? NULL : chroma_loc);
 #if UVG_DEBUG
       //debug_split = 1;
 #endif

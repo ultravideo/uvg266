@@ -630,7 +630,7 @@ static int search_intra_chroma_rough(
 {
   const int_fast8_t log2_width_c = uvg_g_convert_to_log2[cu_loc->chroma_width];
   const vector2d_t pic_px = { state->tile->frame->width, state->tile->frame->height };
-  const vector2d_t luma_px = { cu_loc->x & ~7, cu_loc->y & ~7 };
+  const vector2d_t luma_px = { cu_loc->x, cu_loc->y};
   const int width = 1 << log2_width_c;
   const int height = width; // TODO: height for non-square blocks
 
@@ -642,7 +642,7 @@ static int search_intra_chroma_rough(
   uvg_intra_references refs_v;
   uvg_intra_build_reference(state, &loc, &loc, COLOR_V, &luma_px, &pic_px, lcu, &refs_v, state->encoder_control->cfg.wpp, NULL, 0, 0);
 
-  vector2d_t lcu_cpx = { (cu_loc->local_x & ~7) / 2, (cu_loc->local_y & ~7) / 2 };
+  vector2d_t lcu_cpx = { (cu_loc->local_x) / 2, (cu_loc->local_y) / 2 };
   uvg_pixel* orig_u = &lcu->ref.u[lcu_cpx.x + lcu_cpx.y * LCU_WIDTH_C];
   uvg_pixel* orig_v = &lcu->ref.v[lcu_cpx.x + lcu_cpx.y * LCU_WIDTH_C];
   
@@ -1429,7 +1429,7 @@ int8_t uvg_search_intra_chroma_rdo(
   const int chroma_width  = cu_loc->chroma_width;
   const int chroma_height = cu_loc->chroma_height;
   uvg_intra_references refs[2];
-  const vector2d_t luma_px = { cu_loc->x & ~7, cu_loc->y & ~7 };
+  const vector2d_t luma_px = { cu_loc->x, cu_loc->y };
   const vector2d_t pic_px = {
     state->tile->frame->width,
     state->tile->frame->height,
@@ -1444,7 +1444,7 @@ int8_t uvg_search_intra_chroma_rdo(
     cabac_data_t temp_cabac;
     memcpy(&temp_cabac, &state->search_cabac, sizeof(cabac_data_t));
     
-    const int offset = ((cu_loc->local_x & ~7) >> 1) + ((cu_loc->local_y & ~7) >> 1)* LCU_WIDTH_C;
+    const int offset = ((cu_loc->local_x) >> 1) + ((cu_loc->local_y) >> 1)* LCU_WIDTH_C;
 
     int lfnst_modes_to_check[3];
     if((is_separate || tree_type == UVG_CHROMA_T) && state->encoder_control->cfg.lfnst) {
