@@ -872,7 +872,7 @@ void uvg_fwd_lfnst(
   
   const int scan_order = SCAN_DIAG;
 
-  if (lfnst_index && !mts_skip && (is_separate_tree || color == COLOR_Y))
+  if (lfnst_index && !mts_skip)
   {
     assert(log2_width != -1 && "LFNST: invalid block width.");
     const bool whge3 = width >= 8 && height >= 8;
@@ -1005,7 +1005,7 @@ void uvg_inv_lfnst(
   bool is_mip = block_is_mip(cur_cu, color, is_separate_tree);
   const int scan_order = SCAN_DIAG;
   
-  if (lfnst_index && !mts_skip && (is_separate_tree || color == COLOR_Y)) {
+  if (lfnst_index && !mts_skip) {
     const bool whge3 = width >= 8 && height >= 8;
     const uint32_t* scan = whge3 ? uvg_coef_top_left_diag_scan_8x8[log2_width] : uvg_g_sig_last_scan[scan_order][log2_width - 1];
     

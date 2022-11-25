@@ -1099,17 +1099,20 @@ static double search_cu(
         int8_t intra_mode = intra_search.pred_cu.intra.mode;
         
         if ((has_chroma || tree_type == UVG_CHROMA_T)
-          && state->encoder_control->chroma_format != UVG_CSP_400 && tree_type != UVG_LUMA_T) {
+          && state->encoder_control->chroma_format != UVG_CSP_400) {
 
           intra_search.pred_cu.joint_cb_cr = 0;
-          if(tree_type == UVG_CHROMA_T) {
-            intra_search.pred_cu.intra = uvg_get_co_located_luma_cu(x, y, luma_width, luma_width, NULL, state->tile->frame->cu_array, UVG_CHROMA_T)->intra;
-            intra_mode = intra_search.pred_cu.intra.mode;
+          if(tree_type == UVG_CHROMA_T || is_separate_tree) {
+            intra_mode = uvg_get_co_located_luma_mode(chroma_loc->x, chroma_loc->y, chroma_loc->width, chroma_loc->height,
+                                                    is_separate_tree ? lcu : NULL,
+                                                    tree_type == UVG_CHROMA_T ? state->tile->frame->cu_array : NULL, UVG_CHROMA_T);
             intra_search.pred_cu.type = CU_INTRA;
+          } else  if (intra_search.pred_cu.intra.mip_flag) {
+            intra_mode = 0;
           }
-          intra_search.pred_cu.intra.mode_chroma = intra_search.pred_cu.intra.mode;
+          intra_search.pred_cu.intra.mode_chroma = intra_mode;
           if (ctrl->cfg.rdo >= 2 || ctrl->cfg.jccr || ctrl->cfg.lfnst) {
-            uvg_search_cu_intra_chroma(state, chroma_loc, lcu, &intra_search, tree_type, cu_loc->x != chroma_loc->x || cu_loc->y != chroma_loc->y);
+            uvg_search_cu_intra_chroma(state, chroma_loc, lcu, &intra_search, intra_mode, tree_type, is_separate_tree);
 
             if (intra_search.pred_cu.joint_cb_cr == 0) {
               intra_search.pred_cu.joint_cb_cr = 4;
@@ -1117,7 +1120,7 @@ static double search_cu(
 
           }
           else if (!intra_search.pred_cu.intra.mip_flag) {
-            intra_search.pred_cu.intra.mode_chroma = intra_search.pred_cu.intra.mode;
+            intra_search.pred_cu.intra.mode_chroma = intra_mode;
           }
           else {
             intra_search.pred_cu.intra.mode_chroma = 0;
@@ -1134,14 +1137,12 @@ static double search_cu(
           else {
             intra_cost = intra_search.cost;
           }
-          intra_search.pred_cu.intra.mode = intra_mode;
           intra_search.pred_cu.violates_lfnst_constrained_chroma = false;
           intra_search.pred_cu.lfnst_last_scan_pos = false;
         }
         else {
           intra_search.pred_cu.intra.mode_chroma = intra_mode;
         }
-        intra_search.pred_cu.intra.mode = intra_mode;
       }
       if (intra_cost < cost) {
         cost = intra_cost;
@@ -1176,6 +1177,8 @@ static double search_cu(
                            tree_type,
                            false,
                            true);
+      } else {
+        assert(cur_cu->cr_lfnst_idx == 0 && "If we don't have separate tree chroma lfnst index must be 0");
       }
       if (cur_cu->joint_cb_cr == 4) cur_cu->joint_cb_cr = 0;
 
@@ -1314,10 +1317,11 @@ static double search_cu(
   // Recursively split all the way to max search depth.
   if (can_split_cu) {
     const int split_type = depth == 2 ? TT_VER_SPLIT : QT_SPLIT;
-    const split_tree_t new_split = {
+    split_tree_t new_split = {
       split_tree.split_tree | split_type << (split_tree.current_depth * 3),
       split_tree.current_depth + 1,
       split_tree.mtt_depth + (split_type != QT_SPLIT),
+      0
     };
     
     double split_cost = 0.0;
@@ -1376,6 +1380,7 @@ static double search_cu(
       const int splits = uvg_get_split_locs(cu_loc, split_type, new_cu_loc, &separate_chroma);
       initialize_partial_work_tree(lcu, &split_lcu, cu_loc, tree_type);
       for (int split = 0; split < splits; ++split) {
+        new_split.part_index = split;
         split_cost += search_cu(state, 
           &new_cu_loc[split], separate_chroma ? chroma_loc : &new_cu_loc[split],
           &split_lcu, 

@@ -1602,7 +1602,7 @@ void uvg_intra_predict(
 }
 
 // This function works on luma coordinates 
-const cu_info_t* uvg_get_co_located_luma_cu(
+int8_t uvg_get_co_located_luma_mode(
   int x,
   int y,
   int width,
@@ -1617,12 +1617,17 @@ const cu_info_t* uvg_get_co_located_luma_cu(
     x += width >> 1;
     y += height >> 1;
   }
+  const cu_info_t* cu;
   if(cu_array) {
-    return uvg_cu_array_at_const(cu_array, x, y);
+    cu = uvg_cu_array_at_const(cu_array, x, y);
   }
   else {
-    return LCU_GET_CU_AT_PX(lcu, SUB_SCU(x), SUB_SCU(y));
+    cu = LCU_GET_CU_AT_PX(lcu, SUB_SCU(x), SUB_SCU(y));
   }
+  if (cu->intra.mip_flag) {
+    return 0;
+  }
+  return cu->intra.mode;
 }
 
 

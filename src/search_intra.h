@@ -55,6 +55,7 @@ int8_t uvg_search_cu_intra_chroma(
   const cu_loc_t* const cu_loc,
   lcu_t *lcu,
   intra_search_data_t* best_cclm,
+  int8_t luma_mode,
   enum uvg_tree_type tree_type,
   bool is_separate);
 

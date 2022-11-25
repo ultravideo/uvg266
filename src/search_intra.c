@@ -1452,11 +1452,6 @@ int8_t uvg_search_intra_chroma_rdo(
         lfnst_modes_to_check[i] = i;
       }
     }
-    else if(chroma_data->pred_cu.lfnst_idx) {
-      lfnst_modes_to_check[0] = chroma_data->pred_cu.lfnst_idx;
-      lfnst_modes_to_check[1] = -1;
-      lfnst_modes_to_check[2] = -1;
-    }
     else {
       lfnst_modes_to_check[0] = 0;
       lfnst_modes_to_check[1] = -1;
@@ -1591,17 +1586,17 @@ int8_t uvg_search_cu_intra_chroma(
   const cu_loc_t* const cu_loc,
   lcu_t *lcu,
   intra_search_data_t *search_data,
+  int8_t luma_mode,
   enum uvg_tree_type tree_type,
   bool is_separate)
 {
 
   const cu_info_t *cur_pu = &search_data->pred_cu;
-  int8_t intra_mode = !cur_pu->intra.mip_flag ? cur_pu->intra.mode : 0;
   
-  int8_t modes[8] = { 0, 50, 18, 1, intra_mode, 81, 82, 83 };
+  int8_t modes[8] = { 0, 50, 18, 1, luma_mode, 81, 82, 83 };
   uint8_t total_modes = (state->encoder_control->cfg.cclm ? 8 : 5);
   for(int i = 0; i < 4; i++) {
-    if (modes[i] == intra_mode) {
+    if (modes[i] == luma_mode) {
       modes[i] = 66;
       break;
     }
@@ -1623,7 +1618,7 @@ int8_t uvg_search_cu_intra_chroma(
   FILL(chroma_data, 0);
   for (int i = 0; i < num_modes; i++) {
     chroma_data[i].pred_cu = *cur_pu;
-    chroma_data[i].pred_cu.intra.mode_chroma = num_modes == 1 ? intra_mode : modes[i];
+    chroma_data[i].pred_cu.intra.mode_chroma = num_modes == 1 ? luma_mode : modes[i];
     chroma_data[i].cost = 0;
     if(cu_loc->width != 4 && tree_type == UVG_BOTH_T) {
       memcpy(chroma_data[i].lfnst_costs, search_data->lfnst_costs, sizeof(double) * 3);
@@ -1636,13 +1631,13 @@ int8_t uvg_search_cu_intra_chroma(
   if(state->encoder_control->cfg.cclm && 0){
     
 
-    num_modes = search_intra_chroma_rough(state, chroma_data, lcu, intra_mode,
+    num_modes = search_intra_chroma_rough(state, chroma_data, lcu, luma_mode,
                                           tree_type,
                                           cu_loc);
   }
   
   if (num_modes > 1 || state->encoder_control->cfg.jccr) {
-    uvg_search_intra_chroma_rdo(state, num_modes, lcu, cu_loc, chroma_data, intra_mode, tree_type, is_separate);
+    uvg_search_intra_chroma_rdo(state, num_modes, lcu, cu_loc, chroma_data, luma_mode, tree_type, is_separate);
   }
   else if(cur_pu->lfnst_idx) {
     chroma_data[0].pred_cu.cr_lfnst_idx = cur_pu->lfnst_idx;

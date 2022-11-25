@@ -151,7 +151,7 @@ void uvg_intra_recon_cu(
   bool recon_luma,
   bool recon_chroma);
 
-const cu_info_t* uvg_get_co_located_luma_cu(
+int8_t uvg_get_co_located_luma_mode(
   int x,
   int y,
   int width,
