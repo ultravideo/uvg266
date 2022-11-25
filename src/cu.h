@@ -106,6 +106,7 @@ typedef struct  {
   uint32_t split_tree;
   uint8_t current_depth;
   uint8_t mtt_depth;
+  uint8_t part_index;
 } split_tree_t;
 
 
@@ -185,12 +186,15 @@ typedef struct {
 } cu_loc_t;
 
 void uvg_cu_loc_ctor(cu_loc_t *loc, int x, int y, int width, int height);
+typedef struct encoder_state_t encoder_state_t;
 
 int uvg_get_split_locs(
   const cu_loc_t* const origin,
   enum split_type split,
   cu_loc_t out[4],
   uint8_t* separate_chroma);
+int uvg_get_possible_splits(const encoder_state_t* const state,
+  const cu_loc_t* const cu_loc, split_tree_t split_tree, enum uvg_tree_type tree_type, bool splits[6]);
 
 
 #define CU_GET_MV_CAND(cu_info_ptr, reflist) \
