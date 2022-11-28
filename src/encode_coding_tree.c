@@ -1643,7 +1643,7 @@ void uvg_encode_coding_tree(
       ((is_local_dual_tree &&
       has_chroma) || tree_type == UVG_CHROMA_T) &&
       tree_type != UVG_LUMA_T)   {
-      int8_t luma_dir = uvg_get_co_located_luma_mode(chroma_loc->x, chroma_loc->y, chroma_loc->width, chroma_loc->height, NULL, frame->cu_array, UVG_CHROMA_T);
+      int8_t luma_dir = uvg_get_co_located_luma_mode(chroma_loc, cu_loc, cur_cu, NULL, frame->cu_array, UVG_CHROMA_T);
       encode_chroma_intra_cu(cabac, cur_cu, state->encoder_control->cfg.cclm, luma_dir,NULL);
       // LFNST constraints must be reset here. Otherwise the left over values will interfere when calculating new constraints
       cu_info_t* tmp = (cu_info_t*)cur_cu;
@@ -1793,9 +1793,9 @@ double uvg_mock_encode_coding_unit(
       uvg_encode_intra_luma_coding_unit(state, cabac, cur_cu, cu_loc, lcu, &bits);
     }
     if((chroma_loc || tree_type == UVG_CHROMA_T) && state->encoder_control->chroma_format != UVG_CSP_400 && tree_type != UVG_LUMA_T) {
-      int8_t luma_dir = uvg_get_co_located_luma_mode(chroma_loc->x, chroma_loc->y, chroma_loc->width, chroma_loc->height,
-        tree_type != UVG_CHROMA_T ? lcu : NULL,
-        tree_type == UVG_CHROMA_T ? state->tile->frame->cu_array : NULL,   is_separate_tree ? UVG_CHROMA_T : tree_type);
+      int8_t luma_dir = uvg_get_co_located_luma_mode(chroma_loc,cu_loc , cur_cu, tree_type != UVG_CHROMA_T ? lcu : NULL,
+              tree_type == UVG_CHROMA_T ? state->tile->frame->cu_array : NULL,
+              is_separate_tree ? UVG_CHROMA_T : tree_type);
       encode_chroma_intra_cu(cabac, cur_cu, state->encoder_control->cfg.cclm, luma_dir, &bits);
     }
   }

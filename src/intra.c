@@ -1603,22 +1603,26 @@ void uvg_intra_predict(
 
 // This function works on luma coordinates 
 int8_t uvg_get_co_located_luma_mode(
-  int x,
-  int y,
-  int width,
-  int height,
+  const cu_loc_t* const chroma_loc,
+  const cu_loc_t* const cu_loc,
+  const cu_info_t* luma_cu,
   const lcu_t* const lcu,
   const cu_array_t* const cu_array,
   enum uvg_tree_type tree_type)
 {
+  int x = chroma_loc->x;
+  int y = chroma_loc->y;
   assert((cu_array || lcu) && !(cu_array && lcu));
   assert(tree_type != UVG_LUMA_T && "Luma only CU shouldn't need colocated luma CU");
   if(tree_type == UVG_CHROMA_T) {
-    x += width >> 1;
-    y += height >> 1;
+    x += chroma_loc->width >> 1;
+    y += chroma_loc->height >> 1;
   }
   const cu_info_t* cu;
-  if(cu_array) {
+  if (lcu && cu_loc->x <= x && x < cu_loc->x + cu_loc->width && cu_loc->y <= y && y < cu_loc->y + cu_loc->height) {
+    cu = luma_cu;
+  }
+  else if(cu_array) {
     cu = uvg_cu_array_at_const(cu_array, x, y);
   }
   else {

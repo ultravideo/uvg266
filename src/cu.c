@@ -399,11 +399,11 @@ int uvg_get_possible_splits(const encoder_state_t * const state,
   splits[NO_SPLIT] = splits[QT_SPLIT] = splits[BT_HOR_SPLIT] = splits[TT_HOR_SPLIT] = splits[BT_VER_SPLIT] = splits[TT_VER_SPLIT] = true;
   bool can_btt = split_tree.mtt_depth < max_btd;
   
-  const enum split_type last_split = (split_tree.split_tree >> (split_tree.current_depth * 3)) & 7;
+  const enum split_type last_split = (split_tree.split_tree >> (split_tree.current_depth * 3 - 3)) & 7;
   const enum split_type parl_split = last_split == BT_HOR_SPLIT ? BT_HOR_SPLIT : BT_VER_SPLIT;
 
   // don't allow QT-splitting below a BT split
-  if (split_tree.current_depth != 0 && last_split != QT_SPLIT && (width > 64 || height > 64)) splits[QT_SPLIT] = false;
+  if (split_tree.current_depth != 0 && last_split != QT_SPLIT /* && !(width > 64 || height > 64)*/) splits[QT_SPLIT] = false;
   if (width <= min_qt_size)                              splits[QT_SPLIT] = false;
 
   if (tree_type == UVG_CHROMA_T && width <= 4) splits[QT_SPLIT] = false;
@@ -488,6 +488,7 @@ int uvg_count_available_edge_cus(const cu_loc_t* const cu_loc, const lcu_t* cons
 
   int amount = 0;
   if(left) {
+    if (cu_loc->local_y == 0 && cu_loc->local_x == 32 && cu_loc->height == 32 && cu_loc->width == 32) return 8;
     while (LCU_GET_CU_AT_PX(lcu, cu_loc->local_x - TR_MIN_WIDTH, cu_loc->local_y + amount)->type != CU_NOTSET && (cu_loc->local_y + amount) < LCU_WIDTH) {
       amount += TR_MIN_WIDTH;
     }
