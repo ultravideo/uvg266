@@ -152,10 +152,9 @@ void uvg_intra_recon_cu(
   bool recon_chroma);
 
 int8_t uvg_get_co_located_luma_mode(
-  int x,
-  int y,
-  int width,
-  int height,
+  const cu_loc_t* const chroma_loc,
+  const cu_loc_t* const cu_loc,
+  const cu_info_t* luma_cu,
   const lcu_t* const lcu,
   const cu_array_t* const cu_array,
   enum uvg_tree_type tree_type);

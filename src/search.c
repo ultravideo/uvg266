@@ -1103,9 +1103,10 @@ static double search_cu(
 
           intra_search.pred_cu.joint_cb_cr = 0;
           if(tree_type == UVG_CHROMA_T || is_separate_tree) {
-            intra_mode = uvg_get_co_located_luma_mode(chroma_loc->x, chroma_loc->y, chroma_loc->width, chroma_loc->height,
-                                                    is_separate_tree ? lcu : NULL,
-                                                    tree_type == UVG_CHROMA_T ? state->tile->frame->cu_array : NULL, UVG_CHROMA_T);
+            intra_mode = uvg_get_co_located_luma_mode(
+                    chroma_loc, cu_loc, &intra_search.pred_cu, is_separate_tree ? lcu : NULL,
+                    tree_type == UVG_CHROMA_T ? state->tile->frame->cu_array : NULL,
+                    UVG_CHROMA_T);
             intra_search.pred_cu.type = CU_INTRA;
           } else  if (intra_search.pred_cu.intra.mip_flag) {
             intra_mode = 0;
@@ -1314,86 +1315,102 @@ static double search_cu(
     fwrite(&state->search_cabac.ctx, 1,  sizeof(state->search_cabac.ctx), state->encoder_control->cabac_debug_file);
   }
 
+  bool can_split[6];
+  uvg_get_possible_splits(state, cu_loc, split_tree, tree_type, can_split);
+  can_split_cu &= can_split[1] || can_split[2] || can_split[3] || can_split[4] || can_split[5];
+
   // Recursively split all the way to max search depth.
   if (can_split_cu) {
-    const int split_type = depth == 2 ? TT_VER_SPLIT : QT_SPLIT;
-    split_tree_t new_split = {
-      split_tree.split_tree | split_type << (split_tree.current_depth * 3),
-      split_tree.current_depth + 1,
-      split_tree.mtt_depth + (split_type != QT_SPLIT),
-      0
-    };
-    
-    double split_cost = 0.0;
-    int cbf = cbf_is_set_any(cur_cu->cbf);
+    lcu_t * split_lcu = MALLOC(lcu_t, 5);
+    enum split_type best_split = 0;
+    double best_split_cost = MAX_DOUBLE;
     cabac_data_t post_seach_cabac;
+    cabac_data_t best_split_cabac;
     memcpy(&post_seach_cabac, &state->search_cabac, sizeof(post_seach_cabac));
-    memcpy(&state->search_cabac, &pre_search_cabac, sizeof(post_seach_cabac));
+    for (int split_type = QT_SPLIT; split_type <= TT_VER_SPLIT; ++split_type) {
+      if (!can_split[split_type] || split_type != QT_SPLIT) continue;
+      split_tree_t new_split = {
+        split_tree.split_tree | split_type << (split_tree.current_depth * 3),
+        split_tree.current_depth + 1,
+        split_tree.mtt_depth + (split_type != QT_SPLIT),
+        0
+      };
+    
+      double split_cost = 0.0;
+      int cbf = cbf_is_set_any(cur_cu->cbf);
+      memcpy(&state->search_cabac, &pre_search_cabac, sizeof(post_seach_cabac));
 
 
-    double split_bits = 0;
-    lcu_t split_lcu;
+      double split_bits = 0;
 
-    if (cur_cu->log2_height + cur_cu->log2_width > 4) {
+      if (cur_cu->log2_height + cur_cu->log2_width > 4) {
 
-      state->search_cabac.update = 1;
-      // Add cost of cu_split_flag.
-      const cu_info_t* left_cu = NULL, * above_cu = NULL;
-      if (x) {
-        if (x_local || tree_type != UVG_CHROMA_T) {
-          left_cu = LCU_GET_CU_AT_PX(lcu, x_local - 1, y_local);
+        state->search_cabac.update = 1;
+        // Add cost of cu_split_flag.
+        const cu_info_t* left_cu = NULL, * above_cu = NULL;
+        if (x) {
+          if (x_local || tree_type != UVG_CHROMA_T) {
+            left_cu = LCU_GET_CU_AT_PX(lcu, x_local - 1, y_local);
+          }
+          else {
+            left_cu = uvg_cu_array_at_const(state->tile->frame->chroma_cu_array, (x >> 1) - 1, y >> 1);
+          }
         }
-        else {
-          left_cu = uvg_cu_array_at_const(state->tile->frame->chroma_cu_array, (x >> 1) - 1, y >> 1);
+        if (y) {
+          if (y_local || tree_type != UVG_CHROMA_T) {
+            above_cu = LCU_GET_CU_AT_PX(lcu, x_local, y_local - 1);
+          }
+          else {
+            above_cu = uvg_cu_array_at_const(state->tile->frame->chroma_cu_array, x >> 1, (y >> 1) - 1);
+          }
         }
-      }
-      if (y) {
-        if (y_local || tree_type != UVG_CHROMA_T) {
-          above_cu = LCU_GET_CU_AT_PX(lcu, x_local, y_local - 1);
-        }
-        else {
-          above_cu = uvg_cu_array_at_const(state->tile->frame->chroma_cu_array, x >> 1, (y >> 1) - 1);
-        }
-      }
-      uvg_write_split_flag(
-        state,
-        &state->search_cabac,
-        left_cu,
-        above_cu, 
-        tree_type != UVG_CHROMA_T ? cu_loc : &separate_tree_chroma_loc,
-        split_tree,
-        tree_type,
-        &split_bits);
-    }
-
-    state->search_cabac.update = 0;
-    split_cost += split_bits * state->lambda;
-
-    // If skip mode was selected for the block, skip further search.
-    // Skip mode means there's no coefficients in the block, so splitting
-    // might not give any better results but takes more time to do.
-    // It is ok to interrupt the search as soon as it is known that
-    // the split costs at least as much as not splitting.
-    if (cur_cu->type == CU_NOTSET || cbf || state->encoder_control->cfg.cu_split_termination == UVG_CU_SPLIT_TERMINATION_OFF) {
-      cu_loc_t new_cu_loc[4];
-      uint8_t separate_chroma = 0;
-      const int splits = uvg_get_split_locs(cu_loc, split_type, new_cu_loc, &separate_chroma);
-      initialize_partial_work_tree(lcu, &split_lcu, cu_loc, tree_type);
-      for (int split = 0; split < splits; ++split) {
-        new_split.part_index = split;
-        split_cost += search_cu(state, 
-          &new_cu_loc[split], separate_chroma ? chroma_loc : &new_cu_loc[split],
-          &split_lcu, 
-          tree_type, new_split,
-          !separate_chroma || split == splits - 1);
-        // If there is no separate chroma the block will always have chroma, otherwise it is the last block of the split that has the chroma
-        if (split_cost > cost) {
-          break;
-        }
+        split_tree_t count_tree = split_tree;
+        count_tree.split_tree = split_tree.split_tree | split_type << (split_tree.current_depth * 3);
+        uvg_write_split_flag(
+          state,
+          &state->search_cabac,
+          left_cu,
+          above_cu, 
+          tree_type != UVG_CHROMA_T ? cu_loc : &separate_tree_chroma_loc,
+          count_tree,
+          tree_type,
+          &split_bits);
       }
 
-    } else {
-      split_cost = INT_MAX;
+      state->search_cabac.update = 0;
+      split_cost += split_bits * state->lambda;
+
+      // If skip mode was selected for the block, skip further search.
+      // Skip mode means there's no coefficients in the block, so splitting
+      // might not give any better results but takes more time to do.
+      // It is ok to interrupt the search as soon as it is known that
+      // the split costs at least as much as not splitting.
+      if (cur_cu->type == CU_NOTSET || cbf || state->encoder_control->cfg.cu_split_termination == UVG_CU_SPLIT_TERMINATION_OFF) {
+        cu_loc_t new_cu_loc[4];
+        uint8_t separate_chroma = 0;
+        const int splits = uvg_get_split_locs(cu_loc, split_type, new_cu_loc, &separate_chroma);
+        initialize_partial_work_tree(lcu, &split_lcu[split_type - 1], cu_loc, tree_type);
+        for (int split = 0; split < splits; ++split) {
+          new_split.part_index = split;
+          split_cost += search_cu(state, 
+            &new_cu_loc[split], separate_chroma ? chroma_loc : &new_cu_loc[split],
+            &split_lcu[split_type -1], 
+            tree_type, new_split,
+            !separate_chroma || split == splits - 1);
+          // If there is no separate chroma the block will always have chroma, otherwise it is the last block of the split that has the chroma
+          if (split_cost > cost || split_cost > best_split_cost) {
+            break;
+          }
+        }
+
+      } else {
+        split_cost = INT_MAX;
+      }
+      if (split_cost < best_split_cost) {
+        best_split_cost = split_cost;
+        best_split = split_type;
+        memcpy(&best_split_cabac, &state->search_cabac, sizeof(cabac_data_t));
+      }
     }
 
     // If no search is not performed for this depth, try just the best mode
@@ -1408,7 +1425,7 @@ static double search_cu(
       && tree_type == UVG_BOTH_T)
     {
 
-      cu_info_t *cu_d1 = LCU_GET_CU_AT_PX(&split_lcu, x_local, y_local);
+      cu_info_t *cu_d1 = LCU_GET_CU_AT_PX(&split_lcu[best_split - 1], x_local, y_local);
 
       // If the best CU in depth+1 is intra and the biggest it can be, try it.
       if (cu_d1->type == CU_INTRA && (cu_d1->log2_height + 1 == cur_cu->log2_height || cu_d1->log2_width + 1 == cur_cu->log2_width)) {
@@ -1456,10 +1473,14 @@ static double search_cu(
       }
     }
 
-    if (split_cost < cost) {
+    if (best_split_cost < cost) {
       // Copy split modes to this depth.
-      cost = split_cost;
-      work_tree_copy_up(&split_lcu, lcu, state->encoder_control->cfg.jccr, tree_type, cu_loc, is_separate_tree && !has_chroma ? NULL : chroma_loc);
+      cost = best_split_cost;
+      memcpy(&state->search_cabac, &best_split_cabac, sizeof(best_split_cabac));
+      work_tree_copy_up(&split_lcu[best_split -1], lcu, state->encoder_control->cfg.jccr, tree_type, cu_loc, is_separate_tree && !has_chroma ? NULL : chroma_loc);
+      downsample_cclm_rec(
+        state, x, y, cu_width / 2, cu_height / 2, lcu->rec.y, lcu->left_ref.y[64]
+      );
 #if UVG_DEBUG
       //debug_split = 1;
 #endif
@@ -1483,6 +1504,7 @@ static double search_cu(
         state, x, y, cu_width / 2, cu_height / 2, lcu->rec.y, lcu->left_ref.y[64]
       );      
     }
+    FREE_POINTER(split_lcu);
   } else if (cur_cu->log2_height + cur_cu->log2_width > 4) {
     // Need to copy modes down since the lower level of the work tree is used
     // when searching SMP and AMP blocks.
@@ -1699,11 +1721,11 @@ void uvg_search_lcu(encoder_state_t * const state, const int x, const int y, con
   double cost = search_cu(
     state, 
     &start,
-    NULL,
+    &start,
     &work_tree,
     tree_type,
     split_tree,
-    false);
+    true);
 
   // Save squared cost for rate control.
   if(state->encoder_control->cfg.rc_algorithm == UVG_LAMBDA) {
@@ -1720,10 +1742,10 @@ void uvg_search_lcu(encoder_state_t * const state, const int x, const int y, con
   if(state->frame->slicetype == UVG_SLICE_I && state->encoder_control->cfg.dual_tree) {
     cost = search_cu(
       state, &start,
-      NULL,
+      &start,
       &work_tree, UVG_CHROMA_T,
       split_tree,
-      false);
+      true);
 
     if (state->encoder_control->cfg.rc_algorithm == UVG_LAMBDA) {
       uvg_get_lcu_stats(state, x / LCU_WIDTH, y / LCU_WIDTH)->weight += cost * cost;
