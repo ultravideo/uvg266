@@ -617,7 +617,7 @@ void uvg_chroma_transform_search(
 
 
     if (v_has_coeffs && !is_jccr) {
-      uvg_dequant(state, v_quant_coeff, &v_coeff[i * trans_offset], width, width, COLOR_V,
+      uvg_dequant(state, v_quant_coeff, &v_coeff[i * trans_offset], width, height, COLOR_V,
         pred_cu->type, transforms[i] == CHROMA_TS);
 
       if (transforms[i] != CHROMA_TS) {
@@ -661,10 +661,10 @@ void uvg_chroma_transform_search(
     if (!state->encoder_control->cfg.lossless) {
       ssd_u = uvg_pixels_calc_ssd(&lcu->ref.u[offset], &u_recon[trans_offset * i],
         LCU_WIDTH_C, width,
-        width);
+        width, height);
       ssd_v = uvg_pixels_calc_ssd(&lcu->ref.v[offset], &v_recon[trans_offset * i],
         LCU_WIDTH_C, width,
-        width);
+        width, height);
     }
 
     double u_bits = 0;

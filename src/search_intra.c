@@ -145,15 +145,15 @@ static void get_cost_dual(
   if (satd_twin_func != NULL) {
     satd_twin_func(preds, orig_block, PARALLEL_BLKS, satd_costs);
   } else {
-    satd_costs[0] = uvg_satd_any_size(width, height, preds[0], width, orig_block, LCU_WIDTH);
-    satd_costs[1] = uvg_satd_any_size(width, height, preds[1], width, orig_block, LCU_WIDTH);
+    satd_costs[0] = uvg_satd_any_size_vtm(width, height, orig_block, width, preds[0], width);
+    satd_costs[1] = uvg_satd_any_size_vtm(width, height, orig_block, width, preds[1], width);
   }
   unsigned unsigned_sad_costs[PARALLEL_BLKS] = { 0 };
   if (sad_twin_func != NULL) {
     sad_twin_func(preds, orig_block, PARALLEL_BLKS, unsigned_sad_costs);
   } else {
-    unsigned_sad_costs[0] = uvg_reg_sad(preds[0], orig_block, width, height, width, LCU_WIDTH);
-    unsigned_sad_costs[1] = uvg_reg_sad(preds[1], orig_block, width, height, width, LCU_WIDTH);
+    unsigned_sad_costs[0] = uvg_reg_sad(preds[0], orig_block, width, height, width, width);
+    unsigned_sad_costs[1] = uvg_reg_sad(preds[1], orig_block, width, height, width, width);
   }
   costs_out[0] = (double)MIN(satd_costs[0], unsigned_sad_costs[0] * 2);
   costs_out[1] = (double)MIN(satd_costs[1], unsigned_sad_costs[1] * 2);
