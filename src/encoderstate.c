@@ -883,13 +883,20 @@ static void encoder_state_worker_encode_lcu_bitstream(void * opaque)
   //Encode coding tree
   cu_loc_t start;
   uvg_cu_loc_ctor(&start, lcu->position.x * LCU_WIDTH, lcu->position.y * LCU_WIDTH, LCU_WIDTH, LCU_WIDTH);
-  split_tree_t split_tree = { 0, 0, 0, 0 };
+  split_tree_t split_tree = { 0, 0, 0 };
 
   uvg_encode_coding_tree(state, lcu->coeff, tree_type, &start, &start, split_tree, true);
 
   if(tree_type == UVG_LUMA_T && state->encoder_control->chroma_format != UVG_CSP_400) {
-    uvg_cu_loc_ctor(&start, lcu->position.x * LCU_WIDTH_C, lcu->position.y * LCU_WIDTH_C, LCU_WIDTH, LCU_WIDTH);
-    uvg_encode_coding_tree(state, lcu->coeff, UVG_CHROMA_T, &start, &start, split_tree, true);
+    uvg_cu_loc_ctor(&start, lcu->position.x * LCU_WIDTH, lcu->position.y * LCU_WIDTH, LCU_WIDTH, LCU_WIDTH);
+    cu_loc_t chroma_tree_loc = start;
+    chroma_tree_loc.x >>= 1;
+    chroma_tree_loc.y >>= 1;
+    chroma_tree_loc.local_x = chroma_tree_loc.x & LCU_WIDTH_C;
+    chroma_tree_loc.local_y = chroma_tree_loc.y & LCU_WIDTH_C;
+    chroma_tree_loc.width >>= 1;
+    chroma_tree_loc.height >>= 1;
+    uvg_encode_coding_tree(state, lcu->coeff, UVG_CHROMA_T, &start, &chroma_tree_loc, split_tree, true);
   }
 
   if (!state->cabac.only_count) {

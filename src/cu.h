@@ -377,6 +377,7 @@ void uvg_cu_array_copy_from_lcu(cu_array_t* dst, int dst_x, int dst_y, const lcu
                                 tree_type);
 
 int uvg_count_available_edge_cus(const cu_loc_t* const cu_loc, const lcu_t* const lcu, bool left);
+int uvg_count_chroma_tree_available_edge_cus(int x, int y, int width, int height, const lcu_t* const lcu, bool left);
 
 /**
  * \brief Return pointer to the top right reference CU.
