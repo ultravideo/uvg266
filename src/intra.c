@@ -1119,9 +1119,14 @@ void uvg_intra_build_reference_any(
       }
     }
     else {
-      const int num_cus = uvg_count_available_edge_cus(cu_loc, lcu, true);      
-      px_available_left = is_dual_tree || !is_chroma ? num_cus * 4 : num_cus *2;
-      px_available_left -= px.x % 4;
+      if (!is_dual_tree) {
+        const int num_cus = uvg_count_available_edge_cus(cu_loc, lcu, true);
+        px_available_left = is_dual_tree || !is_chroma ? num_cus * 4 : num_cus * 2;
+      }
+      else {
+        const int num_cus = uvg_count_chroma_tree_available_edge_cus(cu_loc->x >> 1, cu_loc->y >> 1, width, height, lcu, true);
+        px_available_left = num_cus * 4;
+      }
     }
 
     // Limit the number of available pixels based on block size and dimensions
@@ -1242,8 +1247,14 @@ void uvg_intra_build_reference_any(
       }
     }
     else {
-      const int num_cus = uvg_count_available_edge_cus(cu_loc, lcu, false);
-      px_available_top = is_dual_tree || !is_chroma ? num_cus * 4 : num_cus * 2;
+      if (!is_dual_tree) {
+        const int num_cus = uvg_count_available_edge_cus(cu_loc, lcu, false);
+        px_available_top = is_dual_tree || !is_chroma ? num_cus * 4 : num_cus * 2;
+      }
+      else {
+        const int num_cus = uvg_count_chroma_tree_available_edge_cus(cu_loc->x >> 1, cu_loc->y >> 1, width, height, lcu, false);
+        px_available_top = num_cus * 4;
+      }
     }
     
     // Limit the number of available pixels based on block size and dimensions
@@ -1428,8 +1439,13 @@ void uvg_intra_build_reference_inner(
 
   }
   else {
-    const int num_cus = uvg_count_available_edge_cus(cu_loc, lcu, true);
-    px_available_left = is_dual_tree || !is_chroma ? num_cus * 4 : num_cus * 2;
+    if(!is_dual_tree) {
+      const int num_cus = uvg_count_available_edge_cus(cu_loc, lcu, true);
+      px_available_left = is_dual_tree || !is_chroma ? num_cus * 4 : num_cus * 2;
+    } else {
+      const int num_cus = uvg_count_chroma_tree_available_edge_cus(cu_loc->x >> 1, cu_loc->y >> 1, width, height, lcu, true);
+      px_available_left = num_cus * 4;
+    }
   }
 
   // Limit the number of available pixels based on block size and dimensions
@@ -1490,8 +1506,14 @@ void uvg_intra_build_reference_inner(
     }
   }
   else {
-    const int num_cus = uvg_count_available_edge_cus(cu_loc, lcu, false);
-    px_available_top = is_dual_tree || !is_chroma ? num_cus * 4 : num_cus * 2;
+    if (!is_dual_tree) {
+      const int num_cus = uvg_count_available_edge_cus(cu_loc, lcu, false);
+      px_available_top = is_dual_tree || !is_chroma ? num_cus * 4 : num_cus * 2;
+    }
+    else {
+      const int num_cus = uvg_count_chroma_tree_available_edge_cus(cu_loc->x >> 1, cu_loc->y >> 1, width, height, lcu, false);
+      px_available_top = num_cus * 4;
+    }
   }
 
   // Limit the number of available pixels based on block size and dimensions

@@ -229,7 +229,7 @@ int uvg_config_init(uvg_config *cfg)
 
   cfg->max_btt_depth[0] = 1;
   cfg->max_btt_depth[1] = 0;
-  cfg->max_btt_depth[2] = 0;
+  cfg->max_btt_depth[2] = 1;
 
   cfg->max_tt_size[0] = 64;
   cfg->max_bt_size[0] = 64;

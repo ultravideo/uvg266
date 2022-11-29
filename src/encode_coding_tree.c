@@ -1352,13 +1352,14 @@ void uvg_encode_coding_tree(
   const encoder_control_t * const ctrl = state->encoder_control;
   const videoframe_t * const frame = state->tile->frame;
   const cu_array_t* used_array = tree_type != UVG_CHROMA_T ? frame->cu_array : frame->chroma_cu_array;
-  const cu_info_t *cur_cu   = uvg_cu_array_at_const(used_array, cu_loc->x, cu_loc->y);
   
   const int cu_width  = tree_type != UVG_CHROMA_T ? cu_loc->width : cu_loc->chroma_width;
   const int cu_height = tree_type != UVG_CHROMA_T ? cu_loc->height : cu_loc->chroma_height;
  
-  const int x = cu_loc->x;
-  const int y = cu_loc->y;
+  const int x = tree_type != UVG_CHROMA_T ? cu_loc->x : chroma_loc->x;
+  const int y = tree_type != UVG_CHROMA_T ? cu_loc->y : chroma_loc->y;
+
+  const cu_info_t* cur_cu = uvg_cu_array_at_const(used_array, x, y);
 
   const int depth = split_tree.current_depth;
 
@@ -1397,7 +1398,7 @@ void uvg_encode_coding_tree(
       cabac,
       left_cu,
       above_cu, 
-      cu_loc,
+      tree_type != UVG_CHROMA_T ? cu_loc : chroma_loc,
       split_tree,
       tree_type,
       NULL);
@@ -1406,19 +1407,34 @@ void uvg_encode_coding_tree(
       split_tree_t new_split_tree = { cur_cu->split_tree, split_tree.current_depth + 1, split_tree.mtt_depth + (split_flag != QT_SPLIT), 0};
 
       cu_loc_t new_cu_loc[4];
+      cu_loc_t chroma_tree_loc;
       uint8_t separate_chroma = 0;
       const int splits = uvg_get_split_locs(cu_loc, split_flag, new_cu_loc, &separate_chroma);
       for (int split = 0; split <splits; ++split) {
         new_split_tree.part_index = split;
+        if (tree_type == UVG_CHROMA_T) {
+          chroma_tree_loc = new_cu_loc[split];
+          chroma_tree_loc.x >>= 1;
+          chroma_tree_loc.y >>= 1;
+          chroma_tree_loc.local_x = chroma_tree_loc.x & LCU_WIDTH_C;
+          chroma_tree_loc.local_y = chroma_tree_loc.y & LCU_WIDTH_C;
+          chroma_tree_loc.width >>= 1;
+          chroma_tree_loc.height >>= 1;
+          assert(!separate_chroma);
+        }
         uvg_encode_coding_tree(state, coeff, tree_type,
-          &new_cu_loc[split], separate_chroma ? chroma_loc : &new_cu_loc[split],
+          &new_cu_loc[split], 
+          separate_chroma ? chroma_loc :(tree_type == UVG_CHROMA_T ? &chroma_tree_loc :  &new_cu_loc[split]),
           new_split_tree, !separate_chroma || split == splits - 1);
       }
       return;
     }
   }
   
-  DBG_YUVIEW_VALUE(state->frame->poc, DBG_YUVIEW_CU_TYPE, abs_x, abs_y, cu_width, cu_height, (cur_cu->type == CU_INTRA)?0:1);
+  DBG_YUVIEW_VALUE(state->frame->poc, DBG_YUVIEW_CU_TYPE, abs_x, abs_y, cu_width, cu_height, (cur_cu->type == CU_INTRA) ? 0 : 1);
+
+  if(tree_type==UVG_CHROMA_T)
+    fprintf(stderr, "%d %d %d %d\n", x * 2, y * 2, cu_width * 2, cu_height*2);
 
   if (ctrl->cfg.lossless) {
     cabac->cur_ctx = &cabac->ctx.cu_transquant_bypass;
@@ -1614,7 +1630,7 @@ void uvg_encode_coding_tree(
       ((is_local_dual_tree &&
       has_chroma) || tree_type == UVG_CHROMA_T) &&
       tree_type != UVG_LUMA_T)   {
-      int8_t luma_dir = uvg_get_co_located_luma_mode(chroma_loc, cu_loc, cur_cu, NULL, frame->cu_array, UVG_CHROMA_T);
+      int8_t luma_dir = uvg_get_co_located_luma_mode(tree_type != UVG_CHROMA_T ? chroma_loc : cu_loc, cu_loc, cur_cu, NULL, frame->cu_array, UVG_CHROMA_T);
       encode_chroma_intra_cu(cabac, cur_cu, state->encoder_control->cfg.cclm, luma_dir,NULL);
       // LFNST constraints must be reset here. Otherwise the left over values will interfere when calculating new constraints
       cu_info_t* tmp = (cu_info_t*)cur_cu;

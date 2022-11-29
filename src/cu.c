@@ -407,11 +407,7 @@ int uvg_get_possible_splits(const encoder_state_t * const state,
   if (width <= min_qt_size)                              splits[QT_SPLIT] = false;
 
   if (tree_type == UVG_CHROMA_T && width <= 4) splits[QT_SPLIT] = false;
-  if (tree_type == UVG_CHROMA_T)
-  {
-    splits[QT_SPLIT] = splits[BT_VER_SPLIT] = splits[TT_HOR_SPLIT] = splits[BT_VER_SPLIT] = splits[TT_VER_SPLIT] = false;
-    return;
-  }
+
   if (implicitSplit != NO_SPLIT)
   {
     splits[NO_SPLIT] = splits[TT_HOR_SPLIT] = splits[TT_VER_SPLIT] = false;
@@ -498,4 +494,26 @@ int uvg_count_available_edge_cus(const cu_loc_t* const cu_loc, const lcu_t* cons
     amount += TR_MIN_WIDTH;
   }
   return MAX(amount / TR_MIN_WIDTH, cu_loc->width / TR_MIN_WIDTH);
+}
+
+int uvg_count_chroma_tree_available_edge_cus(int x, int y, int width, int height, const lcu_t* const lcu, bool left)
+{
+  if (left && x == 0 || !left && y == 0) return 0;
+  const int local_x = x % LCU_WIDTH_C;
+  const int local_y = y % LCU_WIDTH_C;
+  if (left && local_x == 0) return (LCU_WIDTH_C - local_y) / 4;
+  if (!left && local_y == 0) return width / 2;
+
+  int amount = 0;
+  if(left) {
+    while (LCU_GET_CU_AT_PX(lcu, local_x - TR_MIN_WIDTH, local_y + amount)->type != CU_NOTSET && (local_y + amount) < LCU_WIDTH_C) {
+      amount += TR_MIN_WIDTH;
+    }
+    return MAX(amount / TR_MIN_WIDTH, height / TR_MIN_WIDTH);
+  }
+  while (LCU_GET_CU_AT_PX(lcu, local_x + amount, local_y - TR_MIN_WIDTH)->type != CU_NOTSET && local_x + amount < LCU_WIDTH_C) {
+    amount += TR_MIN_WIDTH;
+  }
+  return MAX(amount / TR_MIN_WIDTH, width / TR_MIN_WIDTH);
+
 }
