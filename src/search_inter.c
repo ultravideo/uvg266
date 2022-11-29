@@ -2095,15 +2095,15 @@ void uvg_cu_cost_inter_rd2(
   int index = y_px * LCU_WIDTH + x_px;
   double ssd = uvg_pixels_calc_ssd(&lcu->ref.y[index], &lcu->rec.y[index],
                                    LCU_WIDTH, LCU_WIDTH,
-                                   width) * UVG_LUMA_MULT;
+                                   width, height) * UVG_LUMA_MULT;
   if (reconstruct_chroma) {
     int index = y_px / 2 * LCU_WIDTH_C + x_px / 2;
     double ssd_u = uvg_pixels_calc_ssd(&lcu->ref.u[index], &lcu->rec.u[index],
                                        LCU_WIDTH_C, LCU_WIDTH_C,
-                                       cu_loc->chroma_width);
+                                       cu_loc->chroma_width, cu_loc->chroma_height);
     double ssd_v = uvg_pixels_calc_ssd(&lcu->ref.v[index], &lcu->rec.v[index],
                                        LCU_WIDTH_C, LCU_WIDTH_C,
-                                       cu_loc->chroma_width);
+                                       cu_loc->chroma_width, cu_loc->chroma_height);
     ssd += (ssd_u + ssd_v) * UVG_CHROMA_MULT;
   }
   double no_cbf_bits;

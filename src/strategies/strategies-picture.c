@@ -68,6 +68,7 @@ cost_pixel_nxn_multi_func * uvg_satd_32x32_dual = 0;
 cost_pixel_nxn_multi_func * uvg_satd_64x64_dual = 0;
 
 cost_pixel_any_size_func * uvg_satd_any_size = 0;
+cost_pixel_any_size_func * uvg_satd_any_size_vtm = 0;
 cost_pixel_any_size_multi_func * uvg_satd_any_size_quad = 0;
 
 pixels_calc_ssd_func * uvg_pixels_calc_ssd = 0;

@@ -716,8 +716,9 @@ SATD_ANY_SIZE_MULTI_AVX2(quad_avx2, 4)
 
 static unsigned pixels_calc_ssd_avx2(const uint8_t *const ref, const uint8_t *const rec,
                  const int ref_stride, const int rec_stride,
-                 const int width)
+                 const int width, const int height)
 {
+  assert(width == height && "Non square not yet implemented");
   __m256i ssd_part;
   __m256i diff = _mm256_setzero_si256();
   __m128i sum;

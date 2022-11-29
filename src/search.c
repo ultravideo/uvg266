@@ -297,16 +297,16 @@ static double cu_zero_coeff_cost(
   double ssd = 0.0;
   ssd += UVG_LUMA_MULT * uvg_pixels_calc_ssd(
     &lcu->ref.y[luma_index], &lcu->rec.y[luma_index],
-    LCU_WIDTH, LCU_WIDTH, cu_loc->width
+    LCU_WIDTH, LCU_WIDTH, cu_loc->width, cu_loc->height
     );
   if (y_local % 8 == 0 && x_local % 8 == 0 && state->encoder_control->chroma_format != UVG_CSP_400) {
     ssd += UVG_CHROMA_MULT * uvg_pixels_calc_ssd(
       &lcu->ref.u[chroma_index], &lcu->rec.u[chroma_index],
-      LCU_WIDTH_C, LCU_WIDTH_C, cu_loc->chroma_width
+      LCU_WIDTH_C, LCU_WIDTH_C, cu_loc->chroma_width, cu_loc->chroma_height
       );
     ssd += UVG_CHROMA_MULT * uvg_pixels_calc_ssd(
       &lcu->ref.v[chroma_index], &lcu->rec.v[chroma_index],
-      LCU_WIDTH_C, LCU_WIDTH_C, cu_loc->chroma_width
+      LCU_WIDTH_C, LCU_WIDTH_C, cu_loc->chroma_width, cu_loc->chroma_height
       );
   }
   // Save the pixels at a lower level of the working tree.
@@ -444,7 +444,7 @@ double uvg_cu_rd_cost_luma(
     int index = cu_loc->local_y * LCU_WIDTH + cu_loc->local_x;
     ssd = uvg_pixels_calc_ssd(&lcu->ref.y[index], &lcu->rec.y[index],
                                         LCU_WIDTH,          LCU_WIDTH,
-                                        cu_loc->width);
+                                        cu_loc->width, cu_loc->height);
   }
 
 
@@ -549,10 +549,10 @@ double uvg_cu_rd_cost_chroma(
     int index = lcu_px.y * LCU_WIDTH_C + lcu_px.x;
     int ssd_u = uvg_pixels_calc_ssd(&lcu->ref.u[index], &lcu->rec.u[index],
                                     LCU_WIDTH_C,         LCU_WIDTH_C,
-                                    cu_loc->chroma_width);
+                                    cu_loc->chroma_width, cu_loc->chroma_height);
     int ssd_v = uvg_pixels_calc_ssd(&lcu->ref.v[index], &lcu->rec.v[index],
                                     LCU_WIDTH_C,        LCU_WIDTH_C,
-                                    cu_loc->chroma_width);
+                                    cu_loc->chroma_width, cu_loc->chroma_height);
     ssd = ssd_u + ssd_v;
   }
 
@@ -683,7 +683,7 @@ static double cu_rd_cost_tr_split_accurate(
     int index = cu_loc->local_x + LCU_WIDTH * cu_loc->local_y;
     luma_ssd = uvg_pixels_calc_ssd(&lcu->ref.y[index], &lcu->rec.y[index],
       LCU_WIDTH, LCU_WIDTH,
-      width);
+      width, height);
   }
   // Chroma transform skip enable/disable is non-normative, so we need to count the chroma
   // tr-skip bits even when we are never using it.
@@ -761,10 +761,10 @@ static double cu_rd_cost_tr_split_accurate(
         int index = lcu_px.y * LCU_WIDTH_C + lcu_px.x;
         unsigned ssd_u = uvg_pixels_calc_ssd(&lcu->ref.u[index], &lcu->rec.u[index],
           LCU_WIDTH_C, LCU_WIDTH_C,
-          chroma_width);
+          chroma_width, chroma_height);
         unsigned ssd_v = uvg_pixels_calc_ssd(&lcu->ref.v[index], &lcu->rec.v[index],
           LCU_WIDTH_C, LCU_WIDTH_C,
-          chroma_width);
+          chroma_width, chroma_height);
         chroma_ssd = ssd_u + ssd_v;
       }
       if(chroma_can_use_tr_skip && cb_flag_u) {
@@ -782,10 +782,10 @@ static double cu_rd_cost_tr_split_accurate(
         int index = lcu_px.y * LCU_WIDTH_C + lcu_px.x;
         int ssd_u_joint = uvg_pixels_calc_ssd(&lcu->ref.u[index], &lcu->rec.u[index],
           LCU_WIDTH_C, LCU_WIDTH_C,
-          chroma_width);
+          chroma_width, chroma_height);
         int ssd_v_joint = uvg_pixels_calc_ssd(&lcu->ref.v[index], &lcu->rec.v[index],
           LCU_WIDTH_C, LCU_WIDTH_C,
-          chroma_width);
+          chroma_width, chroma_height);
         chroma_ssd = ssd_u_joint + ssd_v_joint;
       }
       if (chroma_can_use_tr_skip) {
@@ -1328,7 +1328,7 @@ static double search_cu(
     cabac_data_t best_split_cabac;
     memcpy(&post_seach_cabac, &state->search_cabac, sizeof(post_seach_cabac));
     for (int split_type = QT_SPLIT; split_type <= TT_VER_SPLIT; ++split_type) {
-      if (!can_split[split_type] || split_type != QT_SPLIT) continue;
+      if (!can_split[split_type] || (split_type != QT_SPLIT && depth == 0) || (split_type == QT_SPLIT && depth == 1)) continue;
       split_tree_t new_split = {
         split_tree.split_tree | split_type << (split_tree.current_depth * 3),
         split_tree.current_depth + 1,

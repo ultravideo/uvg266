@@ -124,7 +124,7 @@ typedef unsigned (cost_pixel_any_size_func)(
 typedef void (cost_pixel_nxn_multi_func)(const pred_buffer preds, const uvg_pixel *orig, unsigned num_modes, unsigned *costs_out);
 typedef void (cost_pixel_any_size_multi_func)(int width, int height, const uvg_pixel **preds, const int stride, const uvg_pixel *orig, const int orig_stride, unsigned num_modes, unsigned *costs_out, int8_t *valid);
 
-typedef unsigned (pixels_calc_ssd_func)(const uvg_pixel *const ref, const uvg_pixel *const rec, const int ref_stride, const int rec_stride, const int width);
+typedef unsigned (pixels_calc_ssd_func)(const uvg_pixel *const ref, const uvg_pixel *const rec, const int ref_stride, const int rec_stride, const int width, const int height);
 typedef optimized_sad_func_ptr_t (get_optimized_sad_func)(int32_t);
 typedef uint32_t (ver_sad_func)(const uvg_pixel *pic_data, const uvg_pixel *ref_data,
                                 int32_t block_width, int32_t block_height,
@@ -166,6 +166,7 @@ extern cost_pixel_nxn_func * uvg_satd_16x16;
 extern cost_pixel_nxn_func * uvg_satd_32x32;
 extern cost_pixel_nxn_func * uvg_satd_64x64;
 extern cost_pixel_any_size_func *uvg_satd_any_size;
+extern cost_pixel_any_size_func *uvg_satd_any_size_vtm;
 
 extern cost_pixel_nxn_multi_func * uvg_sad_4x4_dual;
 extern cost_pixel_nxn_multi_func * uvg_sad_8x8_dual;
@@ -210,6 +211,7 @@ cost_pixel_nxn_multi_func * uvg_pixels_get_sad_dual_func(unsigned width, unsigne
   {"satd_32x32", (void**) &uvg_satd_32x32}, \
   {"satd_64x64", (void**) &uvg_satd_64x64}, \
   {"satd_any_size", (void**) &uvg_satd_any_size}, \
+  {"satd_any_size_vtm", (void**) &uvg_satd_any_size_vtm}, \
   {"sad_4x4_dual", (void**) &uvg_sad_4x4_dual}, \
   {"sad_8x8_dual", (void**) &uvg_sad_8x8_dual}, \
   {"sad_16x16_dual", (void**) &uvg_sad_16x16_dual}, \
