@@ -440,7 +440,7 @@ int uvg_get_possible_splits(const encoder_state_t * const state,
   {
     splits[BT_HOR_SPLIT] = splits[TT_HOR_SPLIT] = splits[BT_VER_SPLIT] = splits[TT_VER_SPLIT] = false;
 
-    return;
+    return 0;
   }
 
   if (width > max_bt_size || height > max_bt_size)

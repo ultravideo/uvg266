@@ -1206,66 +1206,26 @@ uint8_t uvg_write_split_flag(
   enum uvg_tree_type tree_type,
   double* bits_out)
 {
-  uint16_t abs_x = cu_loc->x + (state->tile->offset_x >> (tree_type == UVG_CHROMA_T));
-  uint16_t abs_y = cu_loc->y + (state->tile->offset_y >> (tree_type == UVG_CHROMA_T));
   double bits = 0;
-  const encoder_control_t* const ctrl = state->encoder_control;
   // Implisit split flag when on border
   // Exception made in VVC with flag not being implicit if the BT can be used for
   // horizontal or vertical split, then this flag tells if QT or BT is used
-  const int slice_type = state->frame->is_irap ? (tree_type == UVG_CHROMA_T ? 2 : 0) : 1;
-
-  bool no_split, allow_qt, bh_split, bv_split, th_split, tv_split;
-  no_split = allow_qt = bh_split = bv_split = th_split = tv_split = true;
-  
   const int cu_width = tree_type != UVG_CHROMA_T ? cu_loc->width : cu_loc->chroma_width;
   const int cu_height = tree_type != UVG_CHROMA_T ? cu_loc->height : cu_loc->chroma_height;
-  if (cu_width == state->encoder_control->cfg.min_qt_size[slice_type] || split_tree.mtt_depth > 0) allow_qt = false;
-  bool allow_btt = state->encoder_control->cfg.max_btt_depth[slice_type] > split_tree.mtt_depth && cu_width <= 64;
 
-  uint8_t implicit_split_mode = UVG_NO_SPLIT;
-  //bool implicit_split = border;
-  bool bottom_left_available = ((abs_y + cu_height - 1) < (ctrl->in.height >> (tree_type == UVG_CHROMA_T)));
-  bool top_right_available = ((abs_x + cu_width - 1) < (ctrl->in.width >> (tree_type == UVG_CHROMA_T)));
 
-  if (!bottom_left_available && !top_right_available && allow_qt) {
-    implicit_split_mode = QT_SPLIT;
-  }
-  else if (!bottom_left_available && allow_btt) {
-    implicit_split_mode = BT_HOR_SPLIT;
-  }
-  else if (!top_right_available && allow_btt) {
-    implicit_split_mode = BT_VER_SPLIT;
-  }
-  else if (!bottom_left_available || !top_right_available) {
-    implicit_split_mode = QT_SPLIT;
-  }
-  
-  // Check split conditions
-  if (implicit_split_mode != UVG_NO_SPLIT) {
-    no_split = th_split = tv_split = false;
-    bh_split = (implicit_split_mode == BT_HOR_SPLIT);
-    bv_split = (implicit_split_mode == BT_VER_SPLIT);
-  }
+  bool can_split[6];
+  const bool is_implicit = uvg_get_possible_splits(state, cu_loc, split_tree, tree_type, can_split);
 
-  if (!allow_btt) {
-    bh_split = bv_split = th_split = tv_split = false;
-  }
-  else {
-    bv_split &= cu_width <= state->encoder_control->cfg.max_bt_size[slice_type] && cu_width > state->encoder_control->cfg.min_qt_size[slice_type];
-    tv_split &= cu_width <= state->encoder_control->cfg.max_tt_size[slice_type] && cu_width > 2 * state->encoder_control->cfg.min_qt_size[slice_type];
-    bh_split &= cu_height <= state->encoder_control->cfg.max_bt_size[slice_type] && cu_height > state->encoder_control->cfg.min_qt_size[slice_type];
-    th_split &= cu_height <= state->encoder_control->cfg.max_tt_size[slice_type] && cu_height > 2 * state->encoder_control->cfg.min_qt_size[slice_type];
-  }
 
-  bool allow_split = allow_qt | bh_split | bv_split | th_split | tv_split;
+  bool allow_split = can_split[1] || can_split[2] || can_split[3] || can_split[4] || can_split[5];
 
   enum split_type split_flag = (split_tree.split_tree >> (split_tree.current_depth * 3)) & 7;
 
-  split_flag = implicit_split_mode != UVG_NO_SPLIT ? implicit_split_mode : split_flag;
+  split_flag = is_implicit ? (can_split[QT_SPLIT] ? QT_SPLIT : (can_split[BT_HOR_SPLIT] ? BT_HOR_SPLIT : BT_VER_SPLIT)) : split_flag;
 
   int split_model = 0;
-  if (no_split && allow_split) {
+  if (can_split[NO_SPLIT] && allow_split) {
     // Get left and top block split_flags and if they are present and true, increase model number
     if (left_cu && (1 << left_cu->log2_height) < cu_height) {
       split_model++;
@@ -1276,11 +1236,11 @@ uint8_t uvg_write_split_flag(
     }
 
     uint32_t split_num = 0;
-    if (allow_qt) split_num += 2;
-    if (bh_split) split_num++;
-    if (bv_split) split_num++;
-    if (th_split) split_num++;
-    if (tv_split) split_num++;
+    if (can_split[QT_SPLIT]) split_num += 2;
+    if (can_split[BT_HOR_SPLIT]) split_num++;
+    if (can_split[BT_VER_SPLIT]) split_num++;
+    if (can_split[TT_HOR_SPLIT]) split_num++;
+    if (can_split[TT_VER_SPLIT]) split_num++;
 
     if (split_num > 0) split_num--;
 
@@ -1292,9 +1252,9 @@ uint8_t uvg_write_split_flag(
   }
 
 
-  if (implicit_split_mode == UVG_NO_SPLIT && allow_qt && (bh_split || bv_split || th_split || tv_split) && split_flag != NO_SPLIT) {
+  if (!is_implicit && can_split[QT_SPLIT] && (can_split[BT_HOR_SPLIT] || can_split[BT_VER_SPLIT] || can_split[TT_HOR_SPLIT] || can_split[TT_VER_SPLIT]) && split_flag != NO_SPLIT) {
     bool qt_split = split_flag == QT_SPLIT;
-    if((bv_split || bh_split || tv_split || th_split) && allow_qt) {
+    if((can_split[BT_VER_SPLIT] || can_split[BT_HOR_SPLIT] || can_split[TT_VER_SPLIT] || can_split[TT_HOR_SPLIT]) && can_split[QT_SPLIT]) {
       unsigned left_qt_depth = 0;
       unsigned top_qt_depth = 0;
       if(left_cu) {
@@ -1312,11 +1272,11 @@ uint8_t uvg_write_split_flag(
     }
     if (!qt_split) {
       const bool is_vertical = split_flag == BT_VER_SPLIT || split_flag == TT_VER_SPLIT;
-      if((bh_split || th_split) && (bv_split || tv_split)) {
+      if((can_split[BT_HOR_SPLIT] || can_split[TT_HOR_SPLIT]) && (can_split[BT_VER_SPLIT] || can_split[TT_VER_SPLIT])) {
         split_model = 0;
-        if(bv_split + tv_split > bh_split + th_split) {
+        if(can_split[BT_VER_SPLIT] + can_split[TT_VER_SPLIT] > can_split[BT_HOR_SPLIT] + can_split[TT_HOR_SPLIT]) {
           split_model = 4;
-        } else if(bv_split + tv_split < bh_split + th_split) {
+        } else if(can_split[BT_VER_SPLIT] + can_split[TT_VER_SPLIT] < can_split[BT_HOR_SPLIT] + can_split[TT_HOR_SPLIT]) {
           split_model = 3;
         } else {
           const int d_a = cu_width / (above_cu ? (1 << above_cu->log2_width) : 1);
@@ -1327,7 +1287,7 @@ uint8_t uvg_write_split_flag(
         }
         CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.mtt_vertical_model[split_model]), is_vertical, bits, "mtt_vertical_flag");
       }
-      if ((bv_split && tv_split && is_vertical) || (bh_split && th_split && !is_vertical)) {
+      if ((can_split[BT_VER_SPLIT] && can_split[TT_VER_SPLIT] && is_vertical) || (can_split[BT_HOR_SPLIT] && can_split[TT_HOR_SPLIT] && !is_vertical)) {
         split_model = (2 * is_vertical) + (split_tree.mtt_depth <= 1);
         CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.mtt_binary_model[split_model]), 
           split_flag == BT_VER_SPLIT || split_flag == BT_HOR_SPLIT, bits, "mtt_binary_flag");
@@ -1432,10 +1392,7 @@ void uvg_encode_coding_tree(
   }
   
   DBG_YUVIEW_VALUE(state->frame->poc, DBG_YUVIEW_CU_TYPE, abs_x, abs_y, cu_width, cu_height, (cur_cu->type == CU_INTRA) ? 0 : 1);
-
-  if(tree_type==UVG_CHROMA_T)
-    fprintf(stderr, "%d %d %d %d\n", x * 2, y * 2, cu_width * 2, cu_height*2);
-
+  
   if (ctrl->cfg.lossless) {
     cabac->cur_ctx = &cabac->ctx.cu_transquant_bypass;
     CABAC_BIN(cabac, 1, "cu_transquant_bypass_flag");
