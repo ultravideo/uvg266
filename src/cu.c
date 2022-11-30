@@ -400,7 +400,7 @@ int uvg_get_possible_splits(const encoder_state_t * const state,
   bool can_btt = split_tree.mtt_depth < max_btd;
   
   const enum split_type last_split = (split_tree.split_tree >> (split_tree.current_depth * 3 - 3)) & 7;
-  const enum split_type parl_split = last_split == BT_HOR_SPLIT ? BT_HOR_SPLIT : BT_VER_SPLIT;
+  const enum split_type parl_split = last_split == TT_HOR_SPLIT ? BT_HOR_SPLIT : BT_VER_SPLIT;
 
   // don't allow QT-splitting below a BT split
   if (split_tree.current_depth != 0 && last_split != QT_SPLIT /* && !(width > 64 || height > 64)*/) splits[QT_SPLIT] = false;
@@ -459,12 +459,12 @@ int uvg_get_possible_splits(const encoder_state_t * const state,
 
   //if (modeType == MODE_TYPE_INTER && width * height == 32)  splits[BT_VER_SPLIT] = splits[BT_HOR_SPLIT] = false;
 
-  if (height <= 2 * min_tt_size || height > max_tt_size || width > max_tt_size)
+  if (cu_loc->chroma_height <= min_tt_size || height > max_tt_size || width > max_tt_size)
     splits[TT_HOR_SPLIT] = false;
   if (width > 64 || height > 64)  splits[TT_HOR_SPLIT] = false;
   if (tree_type == UVG_CHROMA_T && width * height <= 16 * 2)     splits[TT_HOR_SPLIT] = false;
 
-  if (width <= 2 * min_tt_size || width > max_tt_size || height > max_tt_size)
+  if (cu_loc->chroma_width <= min_tt_size || width > max_tt_size || height > max_tt_size)
     splits[TT_VER_SPLIT] = false;
   if (width > 64 || height > 64)  splits[TT_VER_SPLIT] = false;
   if (tree_type == UVG_CHROMA_T && (width * height <= 16 * 2 || width == 8))     splits[TT_VER_SPLIT] = false;

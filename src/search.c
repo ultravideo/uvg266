@@ -215,7 +215,7 @@ static void work_tree_copy_up(
   copy_cu_info  (from, to, cu_loc, tree_type);
   copy_cu_pixels(from, to, cu_loc, cu_loc != chroma_loc && tree_type == UVG_LUMA_T ? UVG_LUMA_T : tree_type);
   copy_cu_coeffs(cu_loc, from, to, joint, cu_loc != chroma_loc && tree_type == UVG_LUMA_T ? UVG_LUMA_T : tree_type);
-  if (cu_loc != chroma_loc && tree_type == UVG_LUMA_T) {
+  if (cu_loc != chroma_loc && tree_type != UVG_LUMA_T) {
     copy_cu_pixels(from, to, chroma_loc, UVG_CHROMA_T);
     copy_cu_coeffs(chroma_loc, from, to, joint, UVG_CHROMA_T);
   }
@@ -1189,7 +1189,7 @@ static double search_cu(
 
       bool recon_chroma = true;
       bool recon_luma = tree_type != UVG_CHROMA_T;
-      if (is_separate_tree || !has_chroma || state->encoder_control->chroma_format == UVG_CSP_400 || tree_type == UVG_LUMA_T) {
+      if (is_separate_tree || !has_chroma || state->encoder_control->chroma_format == UVG_CSP_400 || tree_type == UVG_LUMA_T || cu_loc->chroma_height % 4 == 2) {
         recon_chroma = false; 
       }
       lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_height, cur_cu);
@@ -1200,7 +1200,7 @@ static double search_cu(
                          recon_luma, recon_chroma);
 
 
-      if((is_separate_tree && has_chroma && tree_type != UVG_LUMA_T && state->encoder_control->chroma_format != UVG_CSP_400 ) 
+      if((!recon_chroma && state->encoder_control->chroma_format != UVG_CSP_400 ) 
         || tree_type == UVG_CHROMA_T) {
         intra_search.pred_cu.intra.mode_chroma = cur_cu->intra.mode_chroma;
         uvg_intra_recon_cu(state,
@@ -1360,7 +1360,7 @@ static double search_cu(
     cabac_data_t best_split_cabac;
     memcpy(&post_seach_cabac, &state->search_cabac, sizeof(post_seach_cabac));
     for (int split_type = QT_SPLIT; split_type <= TT_VER_SPLIT; ++split_type) {
-      if (!can_split[split_type] || (split_type != QT_SPLIT && depth == 0) || (split_type == QT_SPLIT && depth == 1)) continue;
+      if (!can_split[split_type] || (tree_type == UVG_CHROMA_T && split_type == TT_HOR_SPLIT && cu_loc->chroma_height == 8)) continue;
       split_tree_t new_split = {
         split_tree.split_tree | split_type << (split_tree.current_depth * 3),
         split_tree.current_depth + 1,

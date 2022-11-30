@@ -1476,7 +1476,7 @@ int8_t uvg_search_intra_chroma_rdo(
         }
         pred_cu->cr_lfnst_idx = lfnst;
         chroma_data[mode_i].lfnst_costs[lfnst] += mode_bits * state->lambda;
-        if (PU_IS_TU(pred_cu)) {
+        if (PU_IS_TU(pred_cu) && (tree_type != UVG_CHROMA_T || (pred_cu->log2_width < 5 && pred_cu->log2_height < 5))) {
           uvg_intra_predict(
             state,
             &refs[COLOR_U - 1],
@@ -1594,7 +1594,7 @@ int8_t uvg_search_cu_intra_chroma(
   const cu_info_t *cur_pu = &search_data->pred_cu;
   
   int8_t modes[8] = { 0, 50, 18, 1, luma_mode, 81, 82, 83 };
-  uint8_t total_modes = (state->encoder_control->cfg.cclm ? 8 : 5);
+  uint8_t total_modes = (state->encoder_control->cfg.cclm && uvg_cclm_is_allowed(state, cu_loc, cur_pu, tree_type) ? 8 : 5);
   for(int i = 0; i < 4; i++) {
     if (modes[i] == luma_mode) {
       modes[i] = 66;

@@ -563,6 +563,7 @@ static void encode_transform_unit(
                            (cu_info_t * )cur_pu,
                            NULL);
     }
+    if (tree_type == UVG_LUMA_T) return;
   }
 
   bool joint_chroma = cur_pu->joint_cb_cr != 0;
@@ -627,8 +628,9 @@ static void encode_transform_coeff(
     cur_tu = uvg_cu_array_at_const(used_array, x, y);
   }
 
-  const bool ver_split = cu_loc->height > TR_MAX_WIDTH;
-  const bool hor_split = cu_loc->width > TR_MAX_WIDTH;
+  const int tr_limit = (TR_MAX_WIDTH >> (tree_type == UVG_CHROMA_T));
+  const bool ver_split = cu_loc->height > tr_limit;
+  const bool hor_split = cu_loc->width > tr_limit;
 
   const int cb_flag_y = tree_type != UVG_CHROMA_T ? cbf_is_set(cur_tu->cbf, COLOR_Y) : 0;
   const int cb_flag_u = tree_type != UVG_LUMA_T ?(cur_tu->joint_cb_cr ? (cur_tu->joint_cb_cr >> 1) & 1 : cbf_is_set(cur_tu->cbf, COLOR_U)) : 0;
@@ -637,10 +639,10 @@ static void encode_transform_coeff(
 
   if (hor_split || ver_split) {
     enum split_type split;
-    if (cu_loc->width > TR_MAX_WIDTH && cu_loc->height > TR_MAX_WIDTH) {
+    if (cu_loc->width > tr_limit && cu_loc->height > tr_limit) {
       split = QT_SPLIT;
     }
-    else if (cu_loc->width > TR_MAX_WIDTH) {
+    else if (cu_loc->width > tr_limit) {
       split = BT_VER_SPLIT;
     }
     else {
@@ -650,6 +652,10 @@ static void encode_transform_coeff(
     cu_loc_t split_cu_loc[4];
     const int split_count = uvg_get_split_locs(cu_loc, split, split_cu_loc,NULL);
     for (int i = 0; i < split_count; ++i) {
+      if(tree_type == UVG_CHROMA_T) {
+        split_cu_loc[i].chroma_width = split_cu_loc[i].width;
+        split_cu_loc[i].chroma_height = split_cu_loc[i].height;
+      }
       encode_transform_coeff(state, &split_cu_loc[i], only_chroma,
         coeff, NULL, tree_type, true, false, luma_cbf_ctx, &split_cu_loc[i], &split_cu_loc[i]);
     }
@@ -1252,7 +1258,7 @@ uint8_t uvg_write_split_flag(
   }
 
 
-  if (!is_implicit && can_split[QT_SPLIT] && (can_split[BT_HOR_SPLIT] || can_split[BT_VER_SPLIT] || can_split[TT_HOR_SPLIT] || can_split[TT_VER_SPLIT]) && split_flag != NO_SPLIT) {
+  if (!is_implicit && (can_split[BT_HOR_SPLIT] || can_split[BT_VER_SPLIT] || can_split[TT_HOR_SPLIT] || can_split[TT_VER_SPLIT]) && split_flag != NO_SPLIT) {
     bool qt_split = split_flag == QT_SPLIT;
     if((can_split[BT_VER_SPLIT] || can_split[BT_HOR_SPLIT] || can_split[TT_VER_SPLIT] || can_split[TT_HOR_SPLIT]) && can_split[QT_SPLIT]) {
       unsigned left_qt_depth = 0;
@@ -1617,7 +1623,7 @@ void uvg_encode_coding_tree(
       has_chroma) || tree_type == UVG_CHROMA_T) &&
       tree_type != UVG_LUMA_T)   {
       int8_t luma_dir = uvg_get_co_located_luma_mode(tree_type != UVG_CHROMA_T ? chroma_loc : cu_loc, cu_loc, cur_cu, NULL, frame->cu_array, UVG_CHROMA_T);
-      encode_chroma_intra_cu(cabac, cur_cu, state->encoder_control->cfg.cclm, luma_dir,NULL);
+      encode_chroma_intra_cu(cabac, cur_cu, state->encoder_control->cfg.cclm && uvg_cclm_is_allowed(state, cu_loc, cur_cu, tree_type), luma_dir,NULL);
       // LFNST constraints must be reset here. Otherwise the left over values will interfere when calculating new constraints
       cu_info_t* tmp = (cu_info_t*)cur_cu;
       tmp->violates_lfnst_constrained_luma = false;
@@ -1769,7 +1775,7 @@ double uvg_mock_encode_coding_unit(
       int8_t luma_dir = uvg_get_co_located_luma_mode(chroma_loc,cu_loc , cur_cu, tree_type != UVG_CHROMA_T ? lcu : NULL,
               tree_type == UVG_CHROMA_T ? state->tile->frame->cu_array : NULL,
               is_separate_tree ? UVG_CHROMA_T : tree_type);
-      encode_chroma_intra_cu(cabac, cur_cu, state->encoder_control->cfg.cclm, luma_dir, &bits);
+      encode_chroma_intra_cu(cabac, cur_cu, state->encoder_control->cfg.cclm && uvg_cclm_is_allowed(state, cu_loc, cur_cu, tree_type), luma_dir, &bits);
     }
   }
   else {
