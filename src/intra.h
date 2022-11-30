@@ -158,6 +158,8 @@ int8_t uvg_get_co_located_luma_mode(
   const lcu_t* const lcu,
   const cu_array_t* const cu_array,
   enum uvg_tree_type tree_type);
+bool uvg_cclm_is_allowed(const encoder_state_t* const state, const cu_loc_t* const luma_loc, cu_info_t const* const cur_cu, enum
+                         uvg_tree_type tree_type);
 
 uint8_t uvg_get_mip_flag_context(
   const cu_loc_t* const cu_loc,

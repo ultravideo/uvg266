@@ -283,6 +283,26 @@ static void intra_pred_dc(
 }
 
 
+bool uvg_cclm_is_allowed(const encoder_state_t* const state, const cu_loc_t * const luma_loc, cu_info_t const * const cur_cu, enum
+                         uvg_tree_type tree_type)
+{
+  if (tree_type != UVG_CHROMA_T) {
+    return true;
+  }
+  uint32_t chroma_split = GET_SPLITDATA(cur_cu, 0);
+  if((chroma_split == BT_VER_SPLIT || chroma_split == TT_VER_SPLIT || chroma_split == TT_HOR_SPLIT) && GET_SPLITDATA(cur_cu, 1) == NO_SPLIT) return false;
+  const cu_info_t* const luma_cu = uvg_cu_array_at_const(state->tile->frame->cu_array, luma_loc->x, luma_loc->y);
+  uint32_t split = GET_SPLITDATA(luma_cu, 0);
+  if (split != QT_SPLIT && split != NO_SPLIT) {
+    return false;
+  }
+  if (split != NO_SPLIT && luma_cu->intra.isp_mode != ISP_MODE_NO_ISP) {
+    return false;
+  }
+  return true;
+}
+
+
 enum lm_mode
 {
   LM_CHROMA_IDX = 81,
@@ -1846,7 +1866,7 @@ void uvg_intra_recon_cu(
   const uint8_t depth = 6 - uvg_g_convert_to_log2[cu_loc->width];
   const vector2d_t lcu_px = { cu_loc->local_x >> (tree_type == UVG_CHROMA_T), cu_loc->local_y >> (tree_type == UVG_CHROMA_T) };
   const int8_t width = cu_loc->width;
-  const int8_t height = cu_loc->height; // TODO: height for non-square blocks.
+  const int8_t height = cu_loc->height;
   if (cur_cu == NULL) {
     cur_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
   }
