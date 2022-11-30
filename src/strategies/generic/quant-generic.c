@@ -314,7 +314,7 @@ int uvg_quant_cbcr_residual_generic(
 
   uvg_transform2d(state->encoder_control, combined_residual, coeff, width, height, cur_cu->joint_cb_cr == 1 ? COLOR_V : COLOR_U, cur_cu);
   if(cur_cu->cr_lfnst_idx) {
-    uvg_fwd_lfnst(cur_cu, width, height, COLOR_UV, cur_cu->cr_lfnst_idx, coeff, tree_type);
+    uvg_fwd_lfnst(cur_cu, width, height, COLOR_UV, cur_cu->cr_lfnst_idx, coeff, tree_type, state->collocated_luma_mode);
   }
 
   if (state->encoder_control->cfg.rdoq_enable &&
@@ -329,7 +329,7 @@ int uvg_quant_cbcr_residual_generic(
   }
   else {
     uvg_quant(state, coeff, coeff_out, width, height, cur_cu->joint_cb_cr == 1 ? COLOR_V : COLOR_U,
-      scan_order, cur_cu->type, cur_cu->tr_idx == MTS_SKIP && false, cur_cu->lfnst_idx);
+      scan_order, cur_cu->type, cur_cu->tr_idx == MTS_SKIP && false, cur_cu->cr_lfnst_idx);
   }
 
   int8_t has_coeffs = 0;
@@ -349,7 +349,7 @@ int uvg_quant_cbcr_residual_generic(
     uvg_dequant(state, coeff_out, coeff, width, height, cur_cu->joint_cb_cr == 1 ? COLOR_V : COLOR_U,
       cur_cu->type, cur_cu->tr_idx == MTS_SKIP && false);
     if (cur_cu->cr_lfnst_idx) {
-      uvg_inv_lfnst(cur_cu, width, height, COLOR_UV, cur_cu->cr_lfnst_idx, coeff, tree_type);
+      uvg_inv_lfnst(cur_cu, width, height, COLOR_UV, cur_cu->cr_lfnst_idx, coeff, tree_type, state->collocated_luma_mode);
     }
     
     uvg_itransform2d(state->encoder_control, combined_residual, coeff, width, height, cur_cu->joint_cb_cr == 1 ? COLOR_V : COLOR_U, cur_cu);
@@ -491,7 +491,7 @@ int uvg_quantize_residual_generic(encoder_state_t *const state,
 
   if (state->encoder_control->cfg.lfnst && cur_cu->type == CU_INTRA) {
     // Forward low frequency non-separable transform
-    uvg_fwd_lfnst(cur_cu, width, height, color, lfnst_index, coeff, tree_type);
+    uvg_fwd_lfnst(cur_cu, width, height, color, lfnst_index, coeff, tree_type, state->collocated_luma_mode);
   }
   
 
@@ -533,7 +533,7 @@ int uvg_quantize_residual_generic(encoder_state_t *const state,
     
     if (state->encoder_control->cfg.lfnst && cur_cu->type == CU_INTRA) {
       // Inverse low frequency non-separable transform
-      uvg_inv_lfnst(cur_cu, width, height, color, lfnst_index, coeff, tree_type);
+      uvg_inv_lfnst(cur_cu, width, height, color, lfnst_index, coeff, tree_type, state->collocated_luma_mode);
     }
     if (use_trskip) {
       uvg_itransformskip(state->encoder_control, residual, coeff, width, height);

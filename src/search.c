@@ -1111,6 +1111,7 @@ static double search_cu(
                     chroma_loc, cu_loc, &intra_search.pred_cu, is_separate_tree ? lcu : NULL,
                     tree_type == UVG_CHROMA_T ? state->tile->frame->cu_array : NULL,
                     UVG_CHROMA_T);
+            state->collocated_luma_mode = intra_mode;
             intra_search.pred_cu.type = CU_INTRA;
           } else  if (intra_search.pred_cu.intra.mip_flag) {
             intra_mode = 0;

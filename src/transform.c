@@ -554,9 +554,9 @@ void uvg_chroma_transform_search(
     bool v_has_coeffs = false;
     bool is_jccr = IS_JCCR_MODE(transforms[i]);
     if(pred_cu->cr_lfnst_idx) {
-      uvg_fwd_lfnst(pred_cu, width, height, COLOR_U, pred_cu->cr_lfnst_idx, &u_coeff[i * trans_offset], tree_type);
+      uvg_fwd_lfnst(pred_cu, width, height, COLOR_U, pred_cu->cr_lfnst_idx, &u_coeff[i * trans_offset], tree_type, state->collocated_luma_mode);
       if (!is_jccr) {
-        uvg_fwd_lfnst(pred_cu, width, height, COLOR_V, pred_cu->cr_lfnst_idx, &v_coeff[i * trans_offset], tree_type);
+        uvg_fwd_lfnst(pred_cu, width, height, COLOR_V, pred_cu->cr_lfnst_idx, &v_coeff[i * trans_offset], tree_type, state->collocated_luma_mode);
       }
     }
     quantize_chroma(
@@ -572,7 +572,7 @@ void uvg_chroma_transform_search(
       &u_has_coeffs,
       &v_has_coeffs,
       pred_cu->cr_lfnst_idx);
-      if(pred_cu->cr_lfnst_idx !=0 && !u_has_coeffs && !v_has_coeffs) continue;
+    if(pred_cu->cr_lfnst_idx !=0 && !u_has_coeffs && !v_has_coeffs) continue;
     
     if(pred_cu->type == CU_INTRA && transforms[i] != CHROMA_TS && tree_type == UVG_CHROMA_T) {
       bool constraints[2] = { false, false };
@@ -591,7 +591,7 @@ void uvg_chroma_transform_search(
 
       if (transforms[i] != CHROMA_TS) {
         if (pred_cu->cr_lfnst_idx) {
-          uvg_inv_lfnst(pred_cu, width, height, COLOR_U, pred_cu->cr_lfnst_idx, &u_coeff[i * trans_offset], tree_type);
+          uvg_inv_lfnst(pred_cu, width, height, COLOR_U, pred_cu->cr_lfnst_idx, &u_coeff[i * trans_offset], tree_type, state->collocated_luma_mode);
         }
         uvg_itransform2d(state->encoder_control, u_recon_resi, &u_coeff[i * trans_offset], width, height,
           transforms[i] != JCCR_1 ? COLOR_U : COLOR_V, pred_cu);
@@ -622,7 +622,7 @@ void uvg_chroma_transform_search(
 
       if (transforms[i] != CHROMA_TS) {
         if (pred_cu->cr_lfnst_idx) {
-          uvg_inv_lfnst(pred_cu, width, height, COLOR_V, pred_cu->cr_lfnst_idx, &v_coeff[i * trans_offset], tree_type);
+          uvg_inv_lfnst(pred_cu, width, height, COLOR_V, pred_cu->cr_lfnst_idx, &v_coeff[i * trans_offset], tree_type, state->collocated_luma_mode);
         }
         uvg_itransform2d(state->encoder_control, v_recon_resi, &v_coeff[i * trans_offset], width, height,
           transforms[i] != JCCR_1 ? COLOR_U : COLOR_V, pred_cu);
@@ -856,7 +856,8 @@ void uvg_fwd_lfnst(
   const color_t color,
   const uint16_t lfnst_idx,
   coeff_t *coeffs,
-  enum uvg_tree_type tree_type)
+  enum uvg_tree_type tree_type,
+  int8_t luma_mode)
 {
   const uint16_t lfnst_index = lfnst_idx;
   const uint32_t log2_width = uvg_g_convert_to_log2[width];
@@ -879,7 +880,7 @@ void uvg_fwd_lfnst(
     const uint32_t* scan = whge3 ? uvg_coef_top_left_diag_scan_8x8[log2_width] : uvg_g_sig_last_scan[scan_order][log2_width - 1];
 
     if (is_cclm_mode) {
-      intra_mode = cur_cu->intra.mode;
+      intra_mode = luma_mode;
     }
     if (is_mip && color == COLOR_Y) {
       intra_mode = 0; // Set to planar mode
@@ -989,7 +990,8 @@ void uvg_inv_lfnst(
   const color_t color,
   const uint16_t lfnst_idx,
   coeff_t *coeffs,
-  enum uvg_tree_type tree_type)
+  enum uvg_tree_type tree_type,
+  int8_t luma_mode)
 {
   // In VTM, max log2 dynamic range is something in range [15, 20] depending on whether extended precision processing is enabled
   // Such is not yet present in uvg266 so use 15 for now
@@ -1010,7 +1012,7 @@ void uvg_inv_lfnst(
     const uint32_t* scan = whge3 ? uvg_coef_top_left_diag_scan_8x8[log2_width] : uvg_g_sig_last_scan[scan_order][log2_width - 1];
     
     if (is_cclm_mode) {
-      intra_mode = cur_cu->intra.mip_flag ? 0 : cur_cu->intra.mode;
+      intra_mode = luma_mode;
     }
     if (is_mip && color == COLOR_Y) {
       intra_mode = 0; // Set to planar mode
@@ -1299,7 +1301,7 @@ static void quantize_tr_residual(
         for (int j = 0; j < tr_height; ++j) {
           memcpy(&dst_coeff[j * lcu_width], &coeff[j * tr_width], tr_width * sizeof(coeff_t));
         }
-        cbf_set(&cur_pu->cbf, color);
+        cbf_set(&cur_pu->cbf, COLOR_U);
       }
       else {
         for (int j = 0; j < tr_height; ++j) {

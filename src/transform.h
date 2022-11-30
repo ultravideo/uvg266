@@ -131,7 +131,8 @@ void uvg_fwd_lfnst(
   const color_t color,
   const uint16_t lfnst_idx,
   coeff_t *coeffs,
-  enum uvg_tree_type tree_type);
+  enum uvg_tree_type tree_type,
+  int8_t luma_mode);
 
 void uvg_inv_lfnst(
   const cu_info_t* cur_cu,
@@ -140,6 +141,7 @@ void uvg_inv_lfnst(
   const color_t color,
   const uint16_t lfnst_idx,
   coeff_t* coeffs,
-  enum uvg_tree_type tree_type);
+  enum uvg_tree_type tree_type,
+  int8_t luma_mode);
 
 #endif
