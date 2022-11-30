@@ -124,7 +124,7 @@ bool uvg_is_lfnst_allowed(
     if ((isp_mode && !uvg_can_use_isp_with_lfnst(cu_width, cu_height, isp_mode, tree_type)) ||
       (pred_cu->type == CU_INTRA && mip_flag && !can_use_lfnst_with_mip) || 
       (is_sep_tree && MIN(cu_width, cu_height) < 4) || 
-      (cu_width > TR_MAX_WIDTH || cu_height > TR_MAX_WIDTH)) {
+      (cu_width > (TR_MAX_WIDTH >> (tree_type == UVG_CHROMA_T)) || cu_height > (TR_MAX_WIDTH >> (tree_type == UVG_CHROMA_T)))) {
       return false;
     }
     bool luma_flag = tree_type != UVG_CHROMA_T;

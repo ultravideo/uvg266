@@ -362,7 +362,12 @@ typedef struct encoder_state_t {
   //Constraint structure  
   void * constraint;
 
-
+  // Since lfnst needs the collocated luma intra mode for
+  // dual tree if the chroma mode is cclm mode and getting all of
+  // the information that would be necessary to get the collocated
+  // luma mode in the lfnst functions, instead store the current
+  // collocated luma mode in the state.
+  int8_t collocated_luma_mode;
 } encoder_state_t;
 
 void uvg_encode_one_frame(encoder_state_t * const state, uvg_picture* frame);
