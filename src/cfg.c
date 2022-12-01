@@ -227,9 +227,9 @@ int uvg_config_init(uvg_config *cfg)
   cfg->min_qt_size[1] = 4;
   cfg->min_qt_size[2] = 4;
 
-  cfg->max_btt_depth[0] = 2;
+  cfg->max_btt_depth[0] = 0;
   cfg->max_btt_depth[1] = 0;
-  cfg->max_btt_depth[2] = 1;
+  cfg->max_btt_depth[2] = 0;
 
   cfg->max_tt_size[0] = 64;
   cfg->max_bt_size[0] = 64;
@@ -345,7 +345,7 @@ static int parse_tiles_specification(const char* const arg, int32_t * const ntil
 
   return 1;
 }
-/*
+
 static int parse_uint8(const char *numstr,uint8_t* number,int min, int max)
 {
   char *tail;
@@ -361,7 +361,7 @@ static int parse_uint8(const char *numstr,uint8_t* number,int min, int max)
     return 1;
   }
 }
-*/
+
 static int parse_int8(const char *numstr,int8_t* number,int min, int max)
 {
   char *tail;
@@ -377,7 +377,7 @@ static int parse_int8(const char *numstr,int8_t* number,int min, int max)
     return 1;
   }
 }
-/*
+
 static int parse_array(const char *array, uint8_t *coeff_key, int size,
                             int min, int max)
 {
@@ -401,15 +401,15 @@ static int parse_array(const char *array, uint8_t *coeff_key, int size,
     free(key);
     return 0;
   }
-  else if (i<size){
-    fprintf(stderr, "parsing failed : too few members.\n");
-    free(key);
-    return 0;
-  }
+  //else if (i<size){
+  //  fprintf(stderr, "parsing failed : too few members.\n");
+  //  free(key);
+  //  return 0;
+  //}
   free(key);
-  return 1;
+  return i;
 }
-*/
+
 
 static int parse_qp_scale_array(const char *array, int8_t *out)
 {
@@ -1491,6 +1491,49 @@ int uvg_config_parse(uvg_config *cfg, const char *name, const char *value)
   }
   else if OPT("dual-tree") {
     cfg->dual_tree = atobool(value);
+  }
+  else if OPT("mtt-depth-intra") {
+    cfg->max_btt_depth[0]  = atoi(value);
+  }
+  else if OPT("mtt-depth-intra-chroma") {
+    cfg->max_btt_depth[2]  = atoi(value);
+  }
+  else if OPT("mtt-depth-inter") {
+    cfg->max_btt_depth[1]  = atoi(value);
+  }
+  else if OPT("max-bt-size") {
+  uint8_t sizes[3];
+  const int got = parse_array(value, sizes, 3, 0, 128);
+    if (got == 1) {
+      cfg->max_bt_size[0] = sizes[0];
+      cfg->max_bt_size[1] = sizes[0];
+      cfg->max_bt_size[2] = sizes[0];
+    }
+    else if (got == 3) {
+      cfg->max_bt_size[0] = sizes[0];
+      cfg->max_bt_size[1] = sizes[1];
+      cfg->max_bt_size[2] = sizes[2];      
+    } else {
+      fprintf(stderr, "Incorrect amount of values provided for max-bt-size\n");
+      return 0;
+    }
+  }
+  else if OPT("max-tt-size") {
+  uint8_t sizes[3];
+  const int got = parse_array(value, sizes, 3, 0, 128);
+    if (got == 1) {
+      cfg->max_tt_size[0] = sizes[0];
+      cfg->max_tt_size[1] = sizes[0];
+      cfg->max_tt_size[2] = sizes[0];
+    }
+    else if (got == 3) {
+      cfg->max_tt_size[0] = sizes[0];
+      cfg->max_tt_size[1] = sizes[1];
+      cfg->max_tt_size[2] = sizes[2];      
+    } else {
+      fprintf(stderr, "Incorrect amount of values provided for max-tt-size\n");
+      return 0;
+    }
   }
   else {
     return 0;

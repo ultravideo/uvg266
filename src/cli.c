@@ -192,6 +192,11 @@ static const struct option long_options[] = {
   { "dual-tree",                no_argument, NULL, 0 },
   { "no-dual-tree",             no_argument, NULL, 0 },
   { "cabac-debug-file",   required_argument, NULL, 0 },
+  {"mtt-depth-intra",     required_argument, NULL, 0 },
+  {"mtt-depth-inter",     required_argument, NULL, 0 },
+  {"mtt-depth-intra-chroma", required_argument, NULL, 0 },
+  {"max_bt_size",         required_argument, NULL, 0 },
+  {"max_tt_size",         required_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 
@@ -601,14 +606,14 @@ void print_help(void)
     "                                   - 2: + 1/2-pixel diagonal\n"
     "                                   - 3: + 1/4-pixel horizontal and vertical\n"
     "                                   - 4: + 1/4-pixel diagonal\n"
-    "      --pu-depth-inter <int>-<int> : Inter prediction units sizes [0-3]\n"
-    "                                   - 0, 1, 2, 3: from 64x64 to 8x8\n"
+    "      --pu-depth-inter <int>-<int> : Maximum and minimum split depths where\n"
+    "                                     inter search is performed 0..8. [0-3]\n"
     "                                   - Accepts a list of values separated by ','\n"
     "                                     for setting separate depths per GOP layer\n"
     "                                     (values can be omitted to use the first\n"
     "                                     value for the respective layer).\n"
-    "      --pu-depth-intra <int>-<int> : Intra prediction units sizes [1-4]\n"
-    "                                   - 0, 1, 2, 3, 4: from 64x64 to 4x4\n"
+    "      --pu-depth-intra <int>-<int> : Maximum and minimum split depths where\n"
+    "                                     intra search is performed 0..8. [1-4]\n"
     "                                   - Accepts a list of values separated by ','\n"
     "                                     for setting separate depths per GOP layer\n"
     "                                     (values can be omitted to use the first\n"
@@ -616,6 +621,20 @@ void print_help(void)
     "      --ml-pu-depth-intra    : Predict the pu-depth-intra using machine\n"
     "                                learning trees, overrides the\n"
     "                                --pu-depth-intra parameter. [disabled]\n"
+    "      --mtt-depth-intra      : Depth of mtt for intra slices 0..3.[0]\n"
+    "      --mtt-depth-intra-chroma : Depth of mtt for chroma dual tree in\n"
+    "                                      intra slices 0..3.[0]\n"
+    "      --mtt-depth-inter      : Depth of mtt for inter slices 0..3.[0]\n"
+    "      --max-bt-size          : maximum size for a CU resulting from\n"
+    "                                   a bt split. A singular value shared for all\n"
+    "                                   or a list of three values for the different\n"
+    "                                   slices types (intra, inter, intra-chroma)\n"
+    "                                   can be provided. [64, 64, 32]\n"
+    "      --max-tt-size          : maximum size for a CU resulting from\n"
+    "                                   a tt split. A singular value shared for all\n"
+    "                                   or a list of three values for the different\n"
+    "                                   slices types (intra, inter, intra-chroma)\n"
+    "                                   can be provided. [64, 64, 32]\n"
     "      --(no-)combine-intra-cus: Whether the encoder tries to code a cu\n"
     "                                   on lower depth even when search is not\n"
     "                                   performed on said depth. Should only\n"
