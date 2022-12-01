@@ -330,6 +330,7 @@ int uvg_get_split_locs(
   const int half_height = origin->height >> 1;
   const int quarter_width = origin->width >> 2;
   const int quarter_height = origin->height >> 2;
+  if (origin->width == 4 && separate_chroma) *separate_chroma = 1;
 
   switch (split) {
     case NO_SPLIT:
@@ -350,7 +351,7 @@ int uvg_get_split_locs(
     case BT_VER_SPLIT:
       uvg_cu_loc_ctor(&out[0], origin->x, origin->y, half_width, origin->height);
       uvg_cu_loc_ctor(&out[1], origin->x + half_width, origin->y, half_width, origin->height);
-      if (half_width == 4 && separate_chroma) *separate_chroma = 1;
+      if ((half_width == 4 || half_width * origin->height < 64) && separate_chroma) *separate_chroma = 1;
       return 2;
     case TT_HOR_SPLIT:
       uvg_cu_loc_ctor(&out[0], origin->x, origin->y, origin->width, quarter_height);
@@ -362,7 +363,7 @@ int uvg_get_split_locs(
       uvg_cu_loc_ctor(&out[0], origin->x, origin->y, quarter_width, origin->height);
       uvg_cu_loc_ctor(&out[1], origin->x + quarter_width, origin->y, half_width, origin->height);
       uvg_cu_loc_ctor(&out[2], origin->x + quarter_width + half_width, origin->y, quarter_width, origin->height);
-      if (quarter_width == 4 && separate_chroma) *separate_chroma = 1;
+      if ((quarter_width == 4 || quarter_width * origin->height < 64) && separate_chroma) *separate_chroma = 1;
       return 3;
   }
   return 0;
@@ -390,10 +391,10 @@ int uvg_get_possible_splits(const encoder_state_t * const state,
   const int slice_type = state->frame->is_irap ? (tree_type == UVG_CHROMA_T ? 2 : 0) : 1;
 
   const unsigned max_btd = state->encoder_control->cfg.max_btt_depth[slice_type]; // +currImplicitBtDepth;
-  const unsigned max_bt_size = state->encoder_control->cfg.max_bt_size[slice_type];
-  const unsigned min_bt_size = 1 << MIN_SIZE;
-  const unsigned max_tt_size = state->encoder_control->cfg.max_tt_size[slice_type];
-  const unsigned min_tt_size = 1 << MIN_SIZE;
+  const unsigned max_bt_size = state->encoder_control->cfg.max_bt_size[slice_type] >> (tree_type == UVG_CHROMA_T);
+  const unsigned min_bt_size = 1 << MIN_SIZE >> (tree_type == UVG_CHROMA_T);
+  const unsigned max_tt_size = state->encoder_control->cfg.max_tt_size[slice_type] >> (tree_type == UVG_CHROMA_T);
+  const unsigned min_tt_size = 1 << MIN_SIZE >> (tree_type == UVG_CHROMA_T);
   const unsigned min_qt_size = state->encoder_control->cfg.min_qt_size[slice_type];
   
   splits[NO_SPLIT] = splits[QT_SPLIT] = splits[BT_HOR_SPLIT] = splits[TT_HOR_SPLIT] = splits[BT_VER_SPLIT] = splits[TT_VER_SPLIT] = true;
@@ -459,12 +460,12 @@ int uvg_get_possible_splits(const encoder_state_t * const state,
 
   //if (modeType == MODE_TYPE_INTER && width * height == 32)  splits[BT_VER_SPLIT] = splits[BT_HOR_SPLIT] = false;
 
-  if (cu_loc->chroma_height <= min_tt_size || height > max_tt_size || width > max_tt_size)
+  if (height <= 2 * min_tt_size || height > max_tt_size || width > max_tt_size)
     splits[TT_HOR_SPLIT] = false;
   if (width > 64 || height > 64)  splits[TT_HOR_SPLIT] = false;
   if (tree_type == UVG_CHROMA_T && width * height <= 16 * 2)     splits[TT_HOR_SPLIT] = false;
 
-  if (cu_loc->chroma_width <= min_tt_size || width > max_tt_size || height > max_tt_size)
+  if (width <= 2 * min_tt_size || width > max_tt_size || height > max_tt_size)
     splits[TT_VER_SPLIT] = false;
   if (width > 64 || height > 64)  splits[TT_VER_SPLIT] = false;
   if (tree_type == UVG_CHROMA_T && (width * height <= 16 * 2 || width == 8))     splits[TT_VER_SPLIT] = false;

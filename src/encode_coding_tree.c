@@ -657,7 +657,7 @@ static void encode_transform_coeff(
         split_cu_loc[i].chroma_height = split_cu_loc[i].height;
       }
       encode_transform_coeff(state, &split_cu_loc[i], only_chroma,
-        coeff, NULL, tree_type, true, false, luma_cbf_ctx, &split_cu_loc[i], &split_cu_loc[i]);
+        coeff, NULL, tree_type, true, false, luma_cbf_ctx, &split_cu_loc[i], chroma_loc);
     }
     return;
   }
@@ -1391,14 +1391,16 @@ void uvg_encode_coding_tree(
         uvg_encode_coding_tree(state, coeff, tree_type,
           &new_cu_loc[split], 
           separate_chroma ? chroma_loc :(tree_type == UVG_CHROMA_T ? &chroma_tree_loc :  &new_cu_loc[split]),
-          new_split_tree, !separate_chroma || split == splits - 1);
+          new_split_tree, !separate_chroma || (split == splits - 1 && has_chroma));
       }
       return;
     }
   }
   
   DBG_YUVIEW_VALUE(state->frame->poc, DBG_YUVIEW_CU_TYPE, abs_x, abs_y, cu_width, cu_height, cur_cu->type-1);
-  
+
+  fprintf(stderr, "%4d %4d %2d %2d %d\n", x, y, cu_width, cu_height, has_chroma);
+
   if (ctrl->cfg.lossless) {
     cabac->cur_ctx = &cabac->ctx.cu_transquant_bypass;
     CABAC_BIN(cabac, 1, "cu_transquant_bypass_flag");

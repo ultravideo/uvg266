@@ -289,8 +289,15 @@ bool uvg_cclm_is_allowed(const encoder_state_t* const state, const cu_loc_t * co
   if (tree_type != UVG_CHROMA_T) {
     return true;
   }
-  uint32_t chroma_split = GET_SPLITDATA(cur_cu, 0);
-  if((chroma_split == BT_VER_SPLIT || chroma_split == TT_VER_SPLIT || chroma_split == TT_HOR_SPLIT) && GET_SPLITDATA(cur_cu, 1) == NO_SPLIT) return false;
+  uint32_t chroma_split_depth0 = GET_SPLITDATA(cur_cu, 0);
+  uint32_t chroma_split_depth1 = GET_SPLITDATA(cur_cu, 1);
+  bool allow = false;
+  if (chroma_split_depth0 == QT_SPLIT || (chroma_split_depth0 == BT_HOR_SPLIT && chroma_split_depth1 == BT_VER_SPLIT)) allow = true;
+  else if (chroma_split_depth0 == NO_SPLIT) allow = true;
+  else if (chroma_split_depth0 == BT_HOR_SPLIT && chroma_split_depth1 == NO_SPLIT) allow = true;
+  if (!allow) {
+    return false;
+  }
   const cu_info_t* const luma_cu = uvg_cu_array_at_const(state->tile->frame->cu_array, luma_loc->x, luma_loc->y);
   uint32_t split = GET_SPLITDATA(luma_cu, 0);
   if (split != QT_SPLIT && split != NO_SPLIT) {
@@ -318,7 +325,7 @@ static void get_cclm_parameters(
   uvg_intra_ref* luma_src, uvg_intra_references*chroma_ref,
   int16_t *a, int16_t*b, int16_t*shift) {
 
-  const int base_unit_size = 1 << (6 - PU_DEPTH_INTRA_MAX);
+  const int base_unit_size = 4;
 
   // TODO: take into account YUV422
   const int unit_w = base_unit_size >> 1;

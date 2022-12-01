@@ -145,11 +145,11 @@ typedef int32_t mv_t;
 
 #define INTERNAL_MV_PREC 4 // Internal motion vector precision, 4 = 1/16 pel
 
-//! Limits for prediction block sizes. 0 = 64x64, 4 = 4x4.
+//! Limits for prediction block sizes. 
 #define PU_DEPTH_INTER_MIN 0
-#define PU_DEPTH_INTER_MAX 3
+#define PU_DEPTH_INTER_MAX 8
 #define PU_DEPTH_INTRA_MIN 0
-#define PU_DEPTH_INTRA_MAX 4
+#define PU_DEPTH_INTRA_MAX 8
 
 //! Maximum number of layers in GOP structure (for allocating structures)
 #define MAX_GOP_LAYERS 6

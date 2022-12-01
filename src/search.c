@@ -215,7 +215,7 @@ static void work_tree_copy_up(
   copy_cu_info  (from, to, cu_loc, tree_type);
   copy_cu_pixels(from, to, cu_loc, cu_loc != chroma_loc && tree_type == UVG_LUMA_T ? UVG_LUMA_T : tree_type);
   copy_cu_coeffs(cu_loc, from, to, joint, cu_loc != chroma_loc && tree_type == UVG_LUMA_T ? UVG_LUMA_T : tree_type);
-  if (cu_loc != chroma_loc && tree_type != UVG_LUMA_T) {
+  if (chroma_loc && tree_type != UVG_LUMA_T) {
     copy_cu_pixels(from, to, chroma_loc, UVG_CHROMA_T);
     copy_cu_coeffs(chroma_loc, from, to, joint, UVG_CHROMA_T);
   }
@@ -1201,7 +1201,7 @@ static double search_cu(
                          recon_luma, recon_chroma);
 
 
-      if((!recon_chroma && state->encoder_control->chroma_format != UVG_CSP_400 ) 
+      if((!recon_chroma && state->encoder_control->chroma_format != UVG_CSP_400 && tree_type != UVG_LUMA_T) 
         || tree_type == UVG_CHROMA_T) {
         intra_search.pred_cu.intra.mode_chroma = cur_cu->intra.mode_chroma;
         uvg_intra_recon_cu(state,
@@ -1361,7 +1361,10 @@ static double search_cu(
     cabac_data_t best_split_cabac;
     memcpy(&post_seach_cabac, &state->search_cabac, sizeof(post_seach_cabac));
     for (int split_type = QT_SPLIT; split_type <= TT_VER_SPLIT; ++split_type) {
-      if (!can_split[split_type] || (tree_type == UVG_CHROMA_T && split_type == TT_HOR_SPLIT && cu_loc->chroma_height == 8)) continue;
+      if (!can_split[split_type] 
+        || (tree_type == UVG_CHROMA_T && split_type == TT_HOR_SPLIT && cu_loc->chroma_height == 8)
+        || (tree_type == UVG_CHROMA_T && split_type == BT_HOR_SPLIT && cu_loc->chroma_height == 4))
+        continue;
       split_tree_t new_split = {
         split_tree.split_tree | split_type << (split_tree.current_depth * 3),
         split_tree.current_depth + 1,
@@ -1429,7 +1432,7 @@ static double search_cu(
             &new_cu_loc[split], separate_chroma ? chroma_loc : &new_cu_loc[split],
             &split_lcu[split_type -1], 
             tree_type, new_split,
-            !separate_chroma || split == splits - 1);
+            !separate_chroma || (split == splits - 1 && has_chroma));
           // If there is no separate chroma the block will always have chroma, otherwise it is the last block of the split that has the chroma
           if (split_cost > cost || split_cost > best_split_cost) {
             break;
