@@ -657,7 +657,7 @@ static void encode_transform_coeff(
         split_cu_loc[i].chroma_height = split_cu_loc[i].height;
       }
       encode_transform_coeff(state, &split_cu_loc[i], only_chroma,
-        coeff, NULL, tree_type, true, false, luma_cbf_ctx, &split_cu_loc[i], chroma_loc);
+        coeff, NULL, tree_type, true, false, luma_cbf_ctx, &split_cu_loc[i], chroma_loc ? &split_cu_loc[i] : NULL);
     }
     return;
   }
@@ -1399,7 +1399,7 @@ void uvg_encode_coding_tree(
   
   DBG_YUVIEW_VALUE(state->frame->poc, DBG_YUVIEW_CU_TYPE, abs_x, abs_y, cu_width, cu_height, (cur_cu->type == CU_INTRA) ? 0 : 1);
 
-  fprintf(stderr, "%4d %4d %2d %2d %d\n", x, y, cu_width, cu_height, has_chroma);
+  // fprintf(stderr, "%4d %4d %2d %2d %d\n", x, y, cu_width, cu_height, has_chroma);
 
   if (ctrl->cfg.lossless) {
     cabac->cur_ctx = &cabac->ctx.cu_transquant_bypass;
@@ -1587,8 +1587,9 @@ void uvg_encode_coding_tree(
 
     if (tree_type != UVG_CHROMA_T) {
       encode_lfnst_idx(state, cabac, cur_cu, is_local_dual_tree && state->encoder_control->chroma_format != UVG_CSP_400 ? UVG_LUMA_T : tree_type, COLOR_Y, cu_loc);
+
+      encode_mts_idx(state, cabac, cur_cu, cu_loc);
     }
-    encode_mts_idx(state, cabac, cur_cu, cu_loc);
 
     // For 4x4 the chroma PU/TU is coded after the last 
     if (state->encoder_control->chroma_format != UVG_CSP_400 &&
@@ -1748,7 +1749,7 @@ double uvg_mock_encode_coding_unit(
       int8_t luma_dir = uvg_get_co_located_luma_mode(chroma_loc,cu_loc , cur_cu, tree_type != UVG_CHROMA_T ? lcu : NULL,
               tree_type == UVG_CHROMA_T ? state->tile->frame->cu_array : NULL,
               is_separate_tree ? UVG_CHROMA_T : tree_type);
-      encode_chroma_intra_cu(cabac, cur_cu, state->encoder_control->cfg.cclm && uvg_cclm_is_allowed(state, cu_loc, cur_cu, tree_type), luma_dir, &bits);
+      encode_chroma_intra_cu(cabac, cur_cu, state->encoder_control->cfg.cclm && uvg_cclm_is_allowed(state, chroma_loc, cur_cu, tree_type), luma_dir, &bits);
     }
   }
   else {

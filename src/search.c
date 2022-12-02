@@ -75,7 +75,9 @@ static INLINE void copy_cu_info(lcu_t *from, lcu_t *to, const cu_loc_t* const cu
 }
 
 
-static INLINE void initialize_partial_work_tree(lcu_t* from, lcu_t *to, const cu_loc_t * const cu_loc, const enum uvg_tree_type tree_type) {
+static INLINE void initialize_partial_work_tree(lcu_t* from, lcu_t *to, const cu_loc_t * const cu_loc, const cu_loc_t* const
+                                                chroma_loc,
+                                                const enum uvg_tree_type tree_type) {
 
   const int y_limit = LCU_WIDTH >> (tree_type == UVG_CHROMA_T);
   const int x_limit = LCU_WIDTH >> (tree_type == UVG_CHROMA_T);
@@ -89,8 +91,8 @@ static INLINE void initialize_partial_work_tree(lcu_t* from, lcu_t *to, const cu
       uvg_pixels_blit(from->rec.y, to->rec.y, cu_loc->local_x, LCU_WIDTH, LCU_WIDTH, LCU_WIDTH);
     }
     if(tree_type != UVG_LUMA_T && from->ref.chroma_format != UVG_CSP_400) {
-      uvg_pixels_blit(from->rec.u, to->rec.u, cu_loc->local_x / 2, LCU_WIDTH_C, LCU_WIDTH_C, LCU_WIDTH_C);
-      uvg_pixels_blit(from->rec.v, to->rec.v, cu_loc->local_x / 2, LCU_WIDTH_C, LCU_WIDTH_C, LCU_WIDTH_C);
+      uvg_pixels_blit(from->rec.u, to->rec.u, chroma_loc->local_x / 2, LCU_WIDTH_C, LCU_WIDTH_C, LCU_WIDTH_C);
+      uvg_pixels_blit(from->rec.v, to->rec.v, chroma_loc->local_x / 2, LCU_WIDTH_C, LCU_WIDTH_C, LCU_WIDTH_C);
     }
   }
 
@@ -105,11 +107,11 @@ static INLINE void initialize_partial_work_tree(lcu_t* from, lcu_t *to, const cu
         LCU_WIDTH, LCU_WIDTH);
     }
     if (tree_type != UVG_LUMA_T && from->ref.chroma_format != UVG_CSP_400) {
-      uvg_pixels_blit(&from->rec.u[cu_loc->local_x / 2], &to->rec.u[cu_loc->local_x / 2],
-        LCU_WIDTH_C - cu_loc->local_x / 2, cu_loc->local_y / 2,
+      uvg_pixels_blit(&from->rec.u[chroma_loc->local_x / 2], &to->rec.u[chroma_loc->local_x / 2],
+        LCU_WIDTH_C - chroma_loc->local_x / 2, chroma_loc->local_y / 2,
         LCU_WIDTH_C, LCU_WIDTH_C);
-      uvg_pixels_blit(&from->rec.v[cu_loc->local_x / 2], &to->rec.v[cu_loc->local_x / 2],
-        LCU_WIDTH_C - cu_loc->local_x / 2, cu_loc->local_y / 2,
+      uvg_pixels_blit(&from->rec.v[chroma_loc->local_x / 2], &to->rec.v[chroma_loc->local_x / 2],
+        LCU_WIDTH_C - chroma_loc->local_x / 2, chroma_loc->local_y / 2,
         LCU_WIDTH_C, LCU_WIDTH_C);
     }
   }
@@ -128,16 +130,15 @@ static INLINE void initialize_partial_work_tree(lcu_t* from, lcu_t *to, const cu
   }
 
   if(tree_type != UVG_LUMA_T && from->ref.chroma_format != UVG_CSP_400) {
-    const int offset = cu_loc->local_x / 2 + cu_loc->local_y / 2 * LCU_WIDTH_C;
-    uvg_pixels_blit(&from->ref.u[offset], &to->ref.u[offset], cu_loc->chroma_width, cu_loc->chroma_height, LCU_WIDTH_C, LCU_WIDTH_C);
-    uvg_pixels_blit(&from->ref.v[offset], &to->ref.v[offset], cu_loc->chroma_width, cu_loc->chroma_height, LCU_WIDTH_C, LCU_WIDTH_C);
+    const int offset = chroma_loc->local_x / 2 + chroma_loc->local_y / 2 * LCU_WIDTH_C;
+    uvg_pixels_blit(&from->ref.u[offset], &to->ref.u[offset], chroma_loc->chroma_width, chroma_loc->chroma_height, LCU_WIDTH_C, LCU_WIDTH_C);
+    uvg_pixels_blit(&from->ref.v[offset], &to->ref.v[offset], chroma_loc->chroma_width, chroma_loc->chroma_height, LCU_WIDTH_C, LCU_WIDTH_C);
   } 
 
   const int y_start = (cu_loc->local_y >> (tree_type == UVG_CHROMA_T)) - 4;
   const int x_start = (cu_loc->local_x >> (tree_type == UVG_CHROMA_T)) - 4;
   for (int y = y_start; y < y_limit; y += SCU_WIDTH) {
     *LCU_GET_CU_AT_PX(to, x_start, y) = *LCU_GET_CU_AT_PX(from, x_start, y);
-
   }
   for (int x = x_start; x < x_limit; x += SCU_WIDTH) {
     *LCU_GET_CU_AT_PX(to, x, y_start) = *LCU_GET_CU_AT_PX(from, x, y_start);
@@ -146,6 +147,22 @@ static INLINE void initialize_partial_work_tree(lcu_t* from, lcu_t *to, const cu
   for (int y = cu_loc->local_y >> (tree_type == UVG_CHROMA_T); y < y_limit; y += SCU_WIDTH) {
     for (int x = cu_loc->local_x >> (tree_type == UVG_CHROMA_T); x < x_limit; x += SCU_WIDTH) {
       memset(LCU_GET_CU_AT_PX(to, x, y), 0, sizeof(cu_info_t));
+    }
+  }
+
+  if(chroma_loc->local_y != cu_loc->local_y || chroma_loc->local_x != cu_loc->local_x && tree_type == UVG_BOTH_T) {
+    const int y_start = (chroma_loc->local_y >> (tree_type == UVG_CHROMA_T)) - 4;
+    const int x_start = (chroma_loc->local_x >> (tree_type == UVG_CHROMA_T)) - 4;
+    for (int y = y_start; y < y_limit; y += SCU_WIDTH) {
+      *LCU_GET_CU_AT_PX(to, x_start, y) = *LCU_GET_CU_AT_PX(from, x_start, y);
+    }
+    if (chroma_loc->local_x == 0) {
+      to->left_ref = from->left_ref;
+      *LCU_GET_TOP_RIGHT_CU(to) = *LCU_GET_TOP_RIGHT_CU(from);      
+    }
+    if (chroma_loc->local_y == 0) {
+      to->top_ref = from->top_ref;
+      *LCU_GET_TOP_RIGHT_CU(to) = *LCU_GET_TOP_RIGHT_CU(from);      
     }
   }
 }
@@ -1393,7 +1410,7 @@ static double search_cu(
         cu_loc_t new_cu_loc[4];
         uint8_t separate_chroma = 0;
         const int splits = uvg_get_split_locs(cu_loc, split_type, new_cu_loc, &separate_chroma);
-        initialize_partial_work_tree(lcu, &split_lcu[split_type - 1], cu_loc, tree_type);
+        initialize_partial_work_tree(lcu, &split_lcu[split_type - 1], cu_loc, separate_chroma ? chroma_loc : cu_loc , tree_type);
         for (int split = 0; split < splits; ++split) {
           new_split.part_index = split;
           split_cost += search_cu(state, 

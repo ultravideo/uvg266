@@ -377,7 +377,8 @@ static double search_intra_trdepth(
           pred_cu->mts_last_scan_pos = 0;
           pred_cu->violates_mts_coeff_constraint = 0;
 
-          if (trafo == MTS_SKIP && (width > (1 << state->encoder_control->cfg.trskip_max_size)
+          if (trafo == MTS_SKIP && ((width > (1 << state->encoder_control->cfg.trskip_max_size)
+            || (height > (1 << state->encoder_control->cfg.trskip_max_size)))
             || !state->encoder_control->cfg.trskip_enable)) {
             continue;
           }
