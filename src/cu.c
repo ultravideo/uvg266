@@ -370,10 +370,17 @@ int uvg_get_split_locs(
 }
 
 
-int uvg_get_implicit_split(const encoder_state_t* const state, const cu_loc_t* const cu_loc)
+int uvg_get_implicit_split(const encoder_state_t* const state, const cu_loc_t* const cu_loc, enum
+                           uvg_tree_type tree_type)
 {
-  bool right_ok = state->tile->frame->width >= cu_loc->x + cu_loc->width;
-  bool bottom_ok = state->tile->frame->height >= cu_loc->y + cu_loc->height;
+  // This checking if cabac is in update state is a very dirty way of checking
+  // whether we are in the search or writing the bitstream, and unfortunately the
+  // coordinates are different for chroma tree in those two conditions. It might be
+  // possible to pass the chroma loc for uvg_get_possible_splits in the search but
+  // then all of the conditions need to be checked in that function.
+  // This current solutions *might* not work with alf enabled but I think it should work
+  bool right_ok = (state->tile->frame->width >> (tree_type == UVG_CHROMA_T && state->cabac.update)) >= cu_loc->x + cu_loc->width;
+  bool bottom_ok = (state->tile->frame->height >> (tree_type == UVG_CHROMA_T && state->cabac.update)) >= cu_loc->y + cu_loc->height;
 
   if (right_ok && bottom_ok) return NO_SPLIT;
   if (right_ok) return BT_HOR_SPLIT;
@@ -387,10 +394,11 @@ int uvg_get_possible_splits(const encoder_state_t * const state,
 {
   const int width = tree_type != UVG_CHROMA_T ? cu_loc->width : cu_loc->chroma_width;
   const int height = tree_type != UVG_CHROMA_T ? cu_loc->height : cu_loc->chroma_height;
-  const enum split_type implicitSplit = uvg_get_implicit_split(state, cu_loc);
+  const enum split_type implicitSplit = uvg_get_implicit_split(state, cu_loc, tree_type);
   const int slice_type = state->frame->is_irap ? (tree_type == UVG_CHROMA_T ? 2 : 0) : 1;
 
-  const unsigned max_btd = state->encoder_control->cfg.max_btt_depth[slice_type]; // +currImplicitBtDepth;
+  const unsigned max_btd =
+    state->encoder_control->cfg.max_btt_depth[slice_type] + split_tree.implicit_mtt_depth;
   const unsigned max_bt_size = state->encoder_control->cfg.max_bt_size[slice_type] >> (tree_type == UVG_CHROMA_T);
   const unsigned min_bt_size = 1 << MIN_SIZE >> (tree_type == UVG_CHROMA_T);
   const unsigned max_tt_size = state->encoder_control->cfg.max_tt_size[slice_type] >> (tree_type == UVG_CHROMA_T);

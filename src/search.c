@@ -1382,19 +1382,13 @@ static double search_cu(
         || (tree_type == UVG_CHROMA_T && split_type == TT_HOR_SPLIT && cu_loc->chroma_height == 8)
         || (tree_type == UVG_CHROMA_T && split_type == BT_HOR_SPLIT && cu_loc->chroma_height == 4))
         continue;
-      split_tree_t new_split = {
-        split_tree.split_tree | split_type << (split_tree.current_depth * 3),
-        split_tree.current_depth + 1,
-        split_tree.mtt_depth + (split_type != QT_SPLIT),
-        0
-      };
-    
       double split_cost = 0.0;
       int cbf = cbf_is_set_any(cur_cu->cbf);
       memcpy(&state->search_cabac, &pre_search_cabac, sizeof(post_seach_cabac));
 
 
       double split_bits = 0;
+      bool is_implicit = false;
 
       if (cur_cu->log2_height + cur_cu->log2_width > 4) {
 
@@ -1427,8 +1421,19 @@ static double search_cu(
           tree_type != UVG_CHROMA_T ? cu_loc : &separate_tree_chroma_loc,
           count_tree,
           tree_type,
-          &split_bits);
+          &is_implicit,
+          &split_bits
+          );
       }
+
+
+      split_tree_t new_split = {
+        split_tree.split_tree | split_type << (split_tree.current_depth * 3),
+        split_tree.current_depth + 1,
+        split_tree.mtt_depth + (split_type != QT_SPLIT),
+        split_tree.implicit_mtt_depth + (split_type != QT_SPLIT && is_implicit),
+        0
+      };
 
       state->search_cabac.update = 0;
       split_cost += split_bits * state->lambda;
@@ -1489,7 +1494,8 @@ static double search_cu(
         double bits = 0;
         uvg_write_split_flag(state, &state->search_cabac,
                              x > 0 ? LCU_GET_CU_AT_PX(lcu, SUB_SCU(x) - 1, SUB_SCU(y)) : NULL,
-                             y > 0 ? LCU_GET_CU_AT_PX(lcu, SUB_SCU(x), SUB_SCU(y) - 1) : NULL, cu_loc, split_tree, tree_type, &bits);
+                             y > 0 ? LCU_GET_CU_AT_PX(lcu, SUB_SCU(x), SUB_SCU(y) - 1) : NULL, cu_loc, split_tree, tree_type, NULL,
+                             &bits);
 
         cur_cu->intra = cu_d1->intra;
         cur_cu->type = CU_INTRA;
@@ -1783,7 +1789,7 @@ void uvg_search_lcu(encoder_state_t * const state, const int x, const int y, con
 
   cu_loc_t start;
   uvg_cu_loc_ctor(&start, x, y, LCU_WIDTH, LCU_WIDTH);
-  split_tree_t split_tree = { 0, 0, 0 };
+  split_tree_t split_tree = { 0, 0, 0, 0, 0 };
   // Start search from depth 0.
   double cost = search_cu(
     state, 
