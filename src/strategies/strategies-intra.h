@@ -52,7 +52,8 @@ typedef void (angular_pred_func)(
   const uvg_pixel *const in_ref_left,
   uvg_pixel *const dst,
   const uint8_t multi_ref_idx,
-  const uint8_t isp_mode);
+  const uint8_t isp_mode,
+  const int cu_dim);
 
 typedef void (intra_pred_planar_func)(
   const cu_loc_t* const cu_loc,

@@ -47,7 +47,7 @@ bool uvg_is_lfnst_allowed(
   const cu_info_t* const pred_cu,
   enum uvg_tree_type tree_type,
   const color_t color,
-  const cu_loc_t* const cu_loc);
+  const cu_loc_t* const cu_loc, const lcu_t* const lcu);
 
 void uvg_encode_coding_tree(
   encoder_state_t * const state,

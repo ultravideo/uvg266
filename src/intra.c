@@ -300,13 +300,13 @@ bool uvg_cclm_is_allowed(const encoder_state_t* const state, const cu_loc_t * co
   }
   const cu_info_t* const luma_cu = uvg_cu_array_at_const(state->tile->frame->cu_array, luma_loc->x, luma_loc->y);
   uint32_t split = GET_SPLITDATA(luma_cu, 0);
-  if (split != QT_SPLIT && split != NO_SPLIT) {
-    return false;
+  if (split != NO_SPLIT) {
+    allow = split == QT_SPLIT;
   }
-  if (split != NO_SPLIT && luma_cu->intra.isp_mode != ISP_MODE_NO_ISP) {
-    return false;
+  else if (split != NO_SPLIT && luma_cu->intra.isp_mode != ISP_MODE_NO_ISP) {
+    allow = false;
   }
-  return true;
+  return allow;
 }
 
 
@@ -943,11 +943,15 @@ static void mip_predict(
 }
 
 
-int8_t uvg_wide_angle_correction(int_fast8_t mode, const bool is_isp, const int log2_width, const int log2_height, const
-                                 bool account_for_dc_planar)
+int8_t uvg_wide_angle_correction(
+  int_fast8_t mode,
+  const int log2_width,
+  const int log2_height,
+  const
+  bool account_for_dc_planar)
 {
   int8_t pred_mode = mode;
-  if (!is_isp && log2_width != log2_height) {
+  if (log2_width != log2_height) {
     if (mode > 1 && mode <= 66) {
       const int modeShift[] = { 0, 6, 10, 12, 14, 15 };
       const int deltaSize = abs(log2_width - log2_height);
@@ -965,15 +969,17 @@ int8_t uvg_wide_angle_correction(int_fast8_t mode, const bool is_isp, const int 
 static void intra_predict_regular(
   const encoder_state_t* const state,
   uvg_intra_references *refs,
+  const cu_info_t* const       cur_cu,
   const cu_loc_t* const cu_loc,
+  const cu_loc_t* const pu_loc,
   int_fast8_t mode,
   color_t color,
   uvg_pixel *dst,
   const uint8_t multi_ref_idx,
   const uint8_t isp_mode)
 {
-  const int width = color == COLOR_Y ? cu_loc->width : cu_loc->chroma_width;
-  const int height = color == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
+  const int width = color == COLOR_Y ? pu_loc->width : pu_loc->chroma_width;
+  const int height = color == COLOR_Y ? pu_loc->height : pu_loc->chroma_height;
   const int log2_width = uvg_g_convert_to_log2[width];
   const int log2_height = uvg_g_convert_to_log2[height];
   const uvg_config *cfg = &state->encoder_control->cfg;
@@ -983,11 +989,12 @@ static void intra_predict_regular(
   uint8_t isp = color == COLOR_Y ? isp_mode : 0;
 
   // Wide angle correction
-  int8_t pred_mode = uvg_wide_angle_correction(mode,
-                                               isp_mode,
-                                               log2_width,
-                                               log2_height,
-                                               false);
+  int8_t pred_mode = uvg_wide_angle_correction(
+    mode,
+    color == COLOR_Y ? cur_cu->log2_width : log2_width,
+    color == COLOR_Y ? cur_cu->log2_height : log2_height,
+    false
+    );
 
   const uvg_intra_ref *used_ref = &refs->ref;
   if (cfg->intra_smoothing_disabled || color != COLOR_Y || mode == 1 || (width == 4 && height == 4) || multi_ref_index || isp_mode /*ISP_TODO: replace this fake ISP check*/) {
@@ -1019,11 +1026,20 @@ static void intra_predict_regular(
   }
 
   if (mode == 0) {
-    uvg_intra_pred_planar(cu_loc, color, used_ref->top, used_ref->left, dst);
+    uvg_intra_pred_planar(pu_loc, color, used_ref->top, used_ref->left, dst);
   } else if (mode == 1) {
-    intra_pred_dc(cu_loc, color, used_ref->top, used_ref->left, dst, multi_ref_index);
+    intra_pred_dc(pu_loc, color, used_ref->top, used_ref->left, dst, multi_ref_index);
   } else {
-    uvg_angular_pred(cu_loc, pred_mode, color, used_ref->top, used_ref->left, dst, multi_ref_index, isp);
+    uvg_angular_pred(
+      pu_loc,
+      pred_mode,
+      color,
+      used_ref->top,
+      used_ref->left,
+      dst,
+      multi_ref_index,
+      isp,
+      isp_mode == ISP_MODE_HOR ? cu_loc->height : cu_loc->width);
   }
 
   // pdpc
@@ -1032,7 +1048,7 @@ static void intra_predict_regular(
   pdpcCondition &= width >= TR_MIN_WIDTH && height >= TR_MIN_WIDTH;
   if (pdpcCondition && multi_ref_index == 0) // Cannot be used with MRL.
   {
-    uvg_pdpc_planar_dc(mode, cu_loc, color, used_ref, dst);
+    uvg_pdpc_planar_dc(mode, pu_loc, color, used_ref, dst);
   }
 }
 
@@ -1065,7 +1081,7 @@ void uvg_intra_build_reference_any(
 
   bool is_first_isp_block = isp_mode ? pu_x == cu_x && pu_y == cu_y : false;
 
-  assert((log2_width >= 1 && log2_width <= 5) && (log2_height >= 1 && log2_height <= 5));
+  assert((log2_width >= 2 && log2_width <= 5) &&  log2_height <= 5);
 
   refs->filtered_initialized = false;
   uvg_pixel *out_left_ref = &refs->ref.left[0];
@@ -1138,11 +1154,8 @@ void uvg_intra_build_reference_any(
         px_available_left = height;
       }
       else {
-        px_available_left = num_ref_pixels_left[lcu_px.y / 4][lcu_px.x / 4];
-        // This table does not have values for dimensions less than 4
-        if (lcu_px.y % 4 != 0) {
-          px_available_left -= 2;
-        }
+        px_available_left = uvg_count_available_edge_cus(cu_loc, lcu, true) * 4;
+        px_available_left -= pu_loc->y - cu_loc->y;
       }
     }
     else {
@@ -1270,7 +1283,8 @@ void uvg_intra_build_reference_any(
         px_available_top = width;
       }
       else {
-        px_available_top = num_ref_pixels_top[lcu_px.y / 4][lcu_px.x / 4];
+      px_available_top = uvg_count_available_edge_cus(cu_loc, lcu, false) * 4;
+      px_available_top -= pu_loc->x - cu_loc->x;
       }
     }
     else {
@@ -1343,7 +1357,7 @@ void uvg_intra_build_reference_inner(
   bool is_first_isp_block = isp_mode ? pu_x == cu_x && pu_y == cu_y : false;
 
   // Log2_dim 1 is possible with ISP blocks
-  assert((log2_width >= 1 && log2_width <= 5) && (log2_height >= 1 && log2_height <= 5));
+  assert((log2_width >= 2 && log2_width <= 5) &&  log2_height <= 5);
 
   refs->filtered_initialized = false;
   uvg_pixel * __restrict out_left_ref = &refs->ref.left[0];
@@ -1457,11 +1471,8 @@ void uvg_intra_build_reference_inner(
       px_available_left = height;
     }
     else {
-      px_available_left = num_ref_pixels_left[lcu_px.y / 4][lcu_px.x / 4];
-      // This table does not have values for dimensions less than 4
-      if (lcu_px.y % 4 != 0) {
-        px_available_left -= 2;
-      }
+      px_available_left = uvg_count_available_edge_cus(cu_loc, lcu, true) * 4;
+      px_available_left -= pu_loc->y - cu_loc->y;
     }
 
   }
@@ -1477,7 +1488,7 @@ void uvg_intra_build_reference_inner(
 
   // Limit the number of available pixels based on block size and dimensions
   // of the picture.
-  px_available_left = MIN(px_available_left, height * 2);
+  px_available_left = MIN(px_available_left, cu_height * 2);
   px_available_left = MIN(px_available_left, (pic_px->y - luma_px->y) >> is_chroma);
 
   // Copy pixels from coded CUs.
@@ -1529,7 +1540,8 @@ void uvg_intra_build_reference_inner(
       px_available_top = width;
     }
     else {
-      px_available_top = num_ref_pixels_top[lcu_px.y / 4][lcu_px.x / 4];
+      px_available_top = uvg_count_available_edge_cus(cu_loc, lcu, false) * 4;
+      px_available_top -= pu_loc->x - cu_loc->x;
     }
   }
   else {
@@ -1603,6 +1615,7 @@ void uvg_intra_predict(
   const encoder_state_t* const state,
   uvg_intra_references* const refs,
   const cu_loc_t* const cu_loc,
+  const cu_loc_t* const pu_loc,
   const color_t color,
   uvg_pixel* dst,
   const intra_search_data_t* data,
@@ -1614,10 +1627,10 @@ void uvg_intra_predict(
   // TODO: what is this used for?
   // const bool filter_boundary = color == COLOR_Y && !(cfg->lossless && cfg->implicit_rdpcm);
   bool use_mip = false;
-  const int width = color == COLOR_Y ? cu_loc->width : cu_loc->chroma_width;
-  const int height = color == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
-  const int x = cu_loc->x;
-  const int y = cu_loc->y;
+  const int width = color == COLOR_Y ? pu_loc->width : pu_loc->chroma_width;
+  const int height = color == COLOR_Y ? pu_loc->height : pu_loc->chroma_height;
+  const int x = pu_loc->x;
+  const int y = pu_loc->y;
   int8_t intra_mode = color == COLOR_Y ? data->pred_cu.intra.mode : data->pred_cu.intra.mode_chroma;
   if (data->pred_cu.intra.mip_flag) {
     if (color == COLOR_Y) {
@@ -1633,7 +1646,7 @@ void uvg_intra_predict(
       mip_predict(state, refs, width, height, dst, intra_mode, data->pred_cu.intra.mip_is_transposed);
     }
     else {
-      intra_predict_regular(state, refs, cu_loc, intra_mode, color, dst, data->pred_cu.intra.multi_ref_idx, data->pred_cu.intra.isp_mode);
+      intra_predict_regular(state, refs, &data->pred_cu, cu_loc, pu_loc, intra_mode, color, dst, data->pred_cu.intra.multi_ref_idx, data->pred_cu.intra.isp_mode);
     }
   }
   else {
@@ -1748,7 +1761,7 @@ void uvg_get_isp_split_loc(cu_loc_t *loc, const int x, const int y, const int bl
   if (split_type != ISP_MODE_NO_ISP) {
     part_dim = uvg_get_isp_split_dim(block_w, block_h, split_type, is_transform_split);
   }
-  if(split_type == ISP_MODE_VER && block_w < 16 && !is_transform_split) {
+  if(split_type == ISP_MODE_VER && block_w < 16 && block_h != 4 && !is_transform_split) {
     split_idx /= 2;
   }
   const int offset = part_dim * split_idx;
@@ -1818,7 +1831,7 @@ static void intra_recon_tb_leaf(
   uvg_intra_build_reference(state, pu_loc, cu_loc, color, &luma_px, &pic_px, lcu, &refs, cfg->wpp, extra_refs, multi_ref_index, isp_mode);
 
   uvg_pixel pred[32 * 32];
-  uvg_intra_predict(state, &refs, pu_loc, color, pred, search_data, lcu, tree_type);
+  uvg_intra_predict(state, &refs, cu_loc, pu_loc, color, pred, search_data, lcu, tree_type);
 
   const int index = lcu_px.x + lcu_px.y * lcu_width;
   uvg_pixel *block = NULL;

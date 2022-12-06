@@ -2605,9 +2605,14 @@ static void mts_dct_generic(
     int16_t tmp[32 * 32];
     const int32_t shift_1st = log2_width_minus1 + bitdepth - 8;
     const int32_t shift_2nd = log2_height_minus1 + 7;
-
-    dct_hor(input, tmp, shift_1st, height, 0, skip_width);
-    dct_ver(tmp, output, shift_2nd, width, skip_width, skip_height);
+    if (height == 1) {
+      dct_hor(input, output, shift_1st, height, 0, skip_width);
+    } else if (width == 1) {
+      dct_ver(input, output, shift_2nd, width, 0, skip_height);
+    } else {
+      dct_hor(input, tmp, shift_1st, height, 0, skip_width);
+      dct_ver(tmp, output, shift_2nd, width, skip_width, skip_height);
+    }    
   }
 }
 
@@ -2660,8 +2665,14 @@ static void mts_idct_generic(
     const int32_t shift_1st = transform_matrix_shift + 1;
     const int32_t shift_2nd = (transform_matrix_shift + max_log2_tr_dynamic_range - 1) - bitdepth;
 
-    idct_ver(input, tmp, shift_1st, width, skip_width, skip_height);
-    idct_hor(tmp, output, shift_2nd, height, 0, skip_width);
+    if (height == 1) {
+      idct_hor(input, output, shift_1st, height, 0, skip_width);
+    } else if (width == 1) {
+      idct_ver(input, output, shift_2nd, width, 0, skip_height);
+    } else {
+      idct_ver(input, tmp, shift_1st, width, skip_width, skip_height);
+      idct_hor(tmp, output, shift_2nd, height, 0, skip_width);
+    }
   }
 }
 

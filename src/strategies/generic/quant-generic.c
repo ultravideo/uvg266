@@ -313,15 +313,16 @@ int uvg_quant_cbcr_residual_generic(
 
 
   uvg_transform2d(state->encoder_control, combined_residual, coeff, width, height, cur_cu->joint_cb_cr == 1 ? COLOR_V : COLOR_U, cur_cu);
-  if(cur_cu->cr_lfnst_idx) {
-    uvg_fwd_lfnst(cur_cu, width, height, COLOR_UV, cur_cu->cr_lfnst_idx, coeff, tree_type, state->collocated_luma_mode);
+  uint8_t lfnst_idx = tree_type == UVG_CHROMA_T ? cur_cu->cr_lfnst_idx : cur_cu->lfnst_idx;
+  if(lfnst_idx) {
+    uvg_fwd_lfnst(cur_cu, width, height, COLOR_UV, lfnst_idx, coeff, tree_type, state->collocated_luma_mode);
   }
 
   if (state->encoder_control->cfg.rdoq_enable &&
     (width > 4 || !state->encoder_control->cfg.rdoq_skip))
   {
     uvg_rdoq(state, coeff, coeff_out, width, height, cur_cu->joint_cb_cr == 1 ? COLOR_V : COLOR_U,
-             scan_order, cur_cu->type, cur_cu->cbf, cur_cu->cr_lfnst_idx);
+             scan_order, cur_cu->type, cur_cu->cbf, lfnst_idx);
   }
   else if (state->encoder_control->cfg.rdoq_enable && false) {
     uvg_ts_rdoq(state, coeff, coeff_out, width, height, cur_cu->joint_cb_cr == 2 ? COLOR_V : COLOR_U,
@@ -329,7 +330,7 @@ int uvg_quant_cbcr_residual_generic(
   }
   else {
     uvg_quant(state, coeff, coeff_out, width, height, cur_cu->joint_cb_cr == 1 ? COLOR_V : COLOR_U,
-      scan_order, cur_cu->type, cur_cu->tr_idx == MTS_SKIP && false, cur_cu->cr_lfnst_idx);
+      scan_order, cur_cu->type, cur_cu->tr_idx == MTS_SKIP && false, lfnst_idx);
   }
 
   int8_t has_coeffs = 0;
@@ -348,8 +349,8 @@ int uvg_quant_cbcr_residual_generic(
     // Get quantized residual. (coeff_out -> coeff -> residual)
     uvg_dequant(state, coeff_out, coeff, width, height, cur_cu->joint_cb_cr == 1 ? COLOR_V : COLOR_U,
       cur_cu->type, cur_cu->tr_idx == MTS_SKIP && false);
-    if (cur_cu->cr_lfnst_idx) {
-      uvg_inv_lfnst(cur_cu, width, height, COLOR_UV, cur_cu->cr_lfnst_idx, coeff, tree_type, state->collocated_luma_mode);
+    if (lfnst_idx) {
+      uvg_inv_lfnst(cur_cu, width, height, COLOR_UV, lfnst_idx, coeff, tree_type, state->collocated_luma_mode);
     }
     
     uvg_itransform2d(state->encoder_control, combined_residual, coeff, width, height, cur_cu->joint_cb_cr == 1 ? COLOR_V : COLOR_U, cur_cu);
@@ -487,7 +488,7 @@ int uvg_quantize_residual_generic(encoder_state_t *const state,
     uvg_transform2d(state->encoder_control, residual, coeff, width, height, color, cur_cu);
   }
 
-  const uint8_t lfnst_index = color == COLOR_Y ? cur_cu->lfnst_idx : cur_cu->cr_lfnst_idx;
+  const uint8_t lfnst_index = tree_type != UVG_CHROMA_T || color == COLOR_Y ? cur_cu->lfnst_idx : cur_cu->cr_lfnst_idx;
 
   if (state->encoder_control->cfg.lfnst && cur_cu->type == CU_INTRA) {
     // Forward low frequency non-separable transform

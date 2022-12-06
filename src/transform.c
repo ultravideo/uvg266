@@ -571,7 +571,7 @@ void uvg_chroma_transform_search(
       SCAN_DIAG,
       &u_has_coeffs,
       &v_has_coeffs,
-      pred_cu->cr_lfnst_idx);
+      tree_type == UVG_CHROMA_T ?  pred_cu->cr_lfnst_idx : pred_cu->lfnst_idx);
     if(pred_cu->cr_lfnst_idx !=0 && !u_has_coeffs && !v_has_coeffs) continue;
     
     if(pred_cu->type == CU_INTRA && transforms[i] != CHROMA_TS && tree_type == UVG_CHROMA_T) {
@@ -720,7 +720,7 @@ void uvg_chroma_transform_search(
         COEFF_ORDER_LINEAR);
     }
     if((depth == 4 || tree_type == UVG_CHROMA_T) && state->encoder_control->cfg.lfnst && 0) {
-      if(uvg_is_lfnst_allowed(state, pred_cu, UVG_CHROMA_T, COLOR_UV, cu_loc)) {
+      if(uvg_is_lfnst_allowed(state, pred_cu, UVG_CHROMA_T, COLOR_UV, cu_loc, lcu)) {
         const int lfnst_idx = pred_cu->cr_lfnst_idx;
         CABAC_FBITS_UPDATE(
           &state->search_cabac,
@@ -873,7 +873,7 @@ void uvg_fwd_lfnst(
   
   const int scan_order = SCAN_DIAG;
 
-  if (lfnst_index && !mts_skip)
+  if (lfnst_index && !mts_skip && (color == COLOR_Y || is_separate_tree))
   {
     assert(log2_width != -1 && "LFNST: invalid block width.");
     const bool whge3 = width >= 8 && height >= 8;
@@ -887,7 +887,12 @@ void uvg_fwd_lfnst(
     }
     assert(intra_mode < NUM_INTRA_MODE && "LFNST: Invalid intra mode.");
     assert(lfnst_index < 3 && "LFNST: Invalid LFNST index. Must be in [0, 2]");
-    int32_t wide_adjusted_mode = uvg_wide_angle_correction(intra_mode, cur_cu->intra.isp_mode != 0, log2_width, log2_height, true);
+    int32_t wide_adjusted_mode = uvg_wide_angle_correction(
+      intra_mode, 
+      color == COLOR_Y ? cur_cu->log2_width : log2_width,
+      color == COLOR_Y ? cur_cu->log2_height : log2_height,
+      true
+      );
     
     // Transform wide angle mode to intra mode
     intra_mode = get_lfnst_intra_mode(wide_adjusted_mode);
@@ -1007,7 +1012,7 @@ void uvg_inv_lfnst(
   bool is_mip = block_is_mip(cur_cu, color, is_separate_tree);
   const int scan_order = SCAN_DIAG;
   
-  if (lfnst_index && !mts_skip) {
+  if (lfnst_index && !mts_skip && (color == COLOR_Y || is_separate_tree)) {
     const bool whge3 = width >= 8 && height >= 8;
     const uint32_t* scan = whge3 ? uvg_coef_top_left_diag_scan_8x8[log2_width] : uvg_g_sig_last_scan[scan_order][log2_width - 1];
     
@@ -1019,7 +1024,12 @@ void uvg_inv_lfnst(
     }
     assert(intra_mode < NUM_INTRA_MODE && "LFNST: Invalid intra mode.");
     assert(lfnst_index < 3 && "LFNST: Invalid LFNST index. Must be in [0, 2]");
-    int32_t wide_adjusted_mode = uvg_wide_angle_correction(intra_mode, cur_cu->intra.isp_mode != 0, log2_width, log2_height, true);
+    int32_t wide_adjusted_mode = uvg_wide_angle_correction(
+      intra_mode, 
+      color == COLOR_Y ? cur_cu->log2_width : log2_width,
+      color == COLOR_Y ? cur_cu->log2_height : log2_height,
+      true
+      );
 
     
     intra_mode = get_lfnst_intra_mode(wide_adjusted_mode); 
@@ -1386,7 +1396,8 @@ void uvg_quantize_lcu_residual(
   // Tell clang-analyzer what is up. For some reason it can't figure out from
   // asserting just depth.
   // Width 2 is possible with ISP blocks // ISP_TODO: no, they actually are not
-  assert(width ==  2 ||
+  assert(width ==  1 ||
+         width ==  2 ||
          width ==  4 ||
          width ==  8 ||
          width == 16 ||

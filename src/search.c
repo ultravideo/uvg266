@@ -741,7 +741,7 @@ static double cu_rd_cost_tr_split_accurate(
 
   if(is_local_sep_tree || tree_type == UVG_LUMA_T) {
 
-    if (uvg_is_lfnst_allowed(state, tr_cu, is_local_sep_tree ? UVG_LUMA_T : tree_type, COLOR_Y, cu_loc)) {
+    if (uvg_is_lfnst_allowed(state, tr_cu, is_local_sep_tree ? UVG_LUMA_T : tree_type, COLOR_Y, cu_loc, lcu)) {
       const int lfnst_idx = tr_cu->lfnst_idx;
       CABAC_FBITS_UPDATE(
         cabac,
@@ -814,7 +814,7 @@ static double cu_rd_cost_tr_split_accurate(
   }
 
   const bool is_chroma_tree = is_local_sep_tree || tree_type == UVG_CHROMA_T;
-  if (uvg_is_lfnst_allowed(state, tr_cu, is_local_sep_tree ? UVG_CHROMA_T : tree_type, is_chroma_tree ? COLOR_UV : COLOR_Y, is_chroma_tree ? cu_loc : chroma_loc)) {
+  if (uvg_is_lfnst_allowed(state, tr_cu, is_local_sep_tree ? UVG_CHROMA_T : tree_type, is_chroma_tree ? COLOR_UV : COLOR_Y, is_chroma_tree ? cu_loc : chroma_loc, lcu)) {
     const int lfnst_idx = is_chroma_tree ? tr_cu->cr_lfnst_idx : tr_cu->lfnst_idx;
     CABAC_FBITS_UPDATE(
       cabac,
@@ -1151,7 +1151,7 @@ static double search_cu(
           uvg_intra_recon_cu(state,
                              &intra_search, chroma_loc,
                              &intra_search.pred_cu, lcu,
-                             tree_type,
+                             is_separate_tree ? UVG_CHROMA_T : tree_type,
                              false,
                              true);
           if(tree_type != UVG_CHROMA_T) {
@@ -1224,7 +1224,7 @@ static double search_cu(
         uvg_intra_recon_cu(state,
                            &intra_search, chroma_loc,
                            cur_cu, lcu,
-                           tree_type,
+                           UVG_CHROMA_T,
                            false,
                            true);
       } else {

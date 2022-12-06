@@ -60,7 +60,8 @@ static void uvg_angular_pred_avx2(
   const uvg_pixel *const in_ref_left,
   uvg_pixel *const dst,
   const uint8_t multi_ref_idx,
-  const uint8_t isp_mode)
+  const uint8_t isp_mode,
+  const int cu_dim)
 {
   // ISP_TODO: non-square block implementation, height is passed but not used
   const int width = channel_type == COLOR_Y ? cu_loc->width : cu_loc->chroma_width;

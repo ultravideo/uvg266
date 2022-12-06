@@ -59,7 +59,8 @@ static void uvg_angular_pred_generic(
   const uvg_pixel *const in_ref_left,
   uvg_pixel *const dst,
   const uint8_t multi_ref_idx,
-  const uint8_t isp_mode)
+  const uint8_t isp_mode,
+  const int cu_dim)
 {
   int width  = channel_type == COLOR_Y ? cu_loc->width : cu_loc->chroma_width;
   int height = channel_type == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
@@ -141,10 +142,9 @@ static void uvg_angular_pred_generic(
   // Pointer for the other reference.
   const uvg_pixel *ref_side;
   uvg_pixel* work = width == height || vertical_mode ? dst : temp_dst;
-
-  const int cu_dim = MAX(width, height);
-  const int top_ref_length  = isp_mode ? width + cu_dim  : width << 1;
-  const int left_ref_length = isp_mode ? height + cu_dim : height << 1;
+  
+  const int top_ref_length  = isp_mode == ISP_MODE_VER ? width + cu_dim  : width << 1;
+  const int left_ref_length = isp_mode == ISP_MODE_HOR ? height + cu_dim : height << 1;
 
   // Set ref_main and ref_side such that, when indexed with 0, they point to
   // index 0 in block coordinates.
@@ -338,7 +338,7 @@ static void uvg_intra_pred_planar_generic(
   const int final_shift = 1 + log2_width + log2_height;
   
   // If ISP is enabled log_dim 1 is possible (limit was previously 2)
-  assert((log2_width >= 1 && log2_width <= 5) && (log2_height >= 1 && log2_height <= 5));
+  assert((log2_width >= 2 && log2_width <= 5) &&  log2_height <= 5);
 
   const uvg_pixel top_right = ref_top[width + 1];
   const uvg_pixel bottom_left = ref_left[height + 1];
