@@ -134,6 +134,7 @@ void uvg_intra_predict(
   const encoder_state_t* const state,
   uvg_intra_references* const refs,
   const cu_loc_t* const cu_loc,
+  const cu_loc_t* const pu_loc,
   const color_t color,
   uvg_pixel* dst,
   const intra_search_data_t* data,
@@ -168,7 +169,6 @@ uint8_t uvg_get_mip_flag_context(
 
 int8_t uvg_wide_angle_correction(
   int_fast8_t mode,
-  const bool is_isp,
   const int log2_width,
   const int log2_height,
   const bool account_for_dc_planar);
