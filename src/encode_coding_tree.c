@@ -1239,6 +1239,7 @@ uint8_t uvg_write_split_flag(
   const cu_loc_t* const cu_loc,
   split_tree_t split_tree,
   enum uvg_tree_type tree_type,
+  bool* is_implicit_out,
   double* bits_out)
 {
   double bits = 0;
@@ -1257,7 +1258,10 @@ uint8_t uvg_write_split_flag(
 
   enum split_type split_flag = (split_tree.split_tree >> (split_tree.current_depth * 3)) & 7;
 
-  split_flag = is_implicit ? (can_split[QT_SPLIT] ? QT_SPLIT : (can_split[BT_HOR_SPLIT] ? BT_HOR_SPLIT : BT_VER_SPLIT)) : split_flag;
+  assert(can_split[split_flag] && "Trying to write an illegal split");
+
+  // split_flag = is_implicit ? (can_split[QT_SPLIT] ? QT_SPLIT : (can_split[BT_HOR_SPLIT] ? BT_HOR_SPLIT : BT_VER_SPLIT)) : split_flag;
+  *is_implicit_out = is_implicit;
 
   int split_model = 0;
   if (can_split[NO_SPLIT] && allow_split) {
@@ -1287,7 +1291,9 @@ uint8_t uvg_write_split_flag(
   }
 
 
-  if (!is_implicit && (can_split[BT_HOR_SPLIT] || can_split[BT_VER_SPLIT] || can_split[TT_HOR_SPLIT] || can_split[TT_VER_SPLIT]) && split_flag != NO_SPLIT) {
+  if ((!is_implicit || (can_split[QT_SPLIT] && (can_split[BT_HOR_SPLIT] || can_split[BT_VER_SPLIT]))) 
+    && (can_split[BT_HOR_SPLIT] || can_split[BT_VER_SPLIT] || can_split[TT_HOR_SPLIT] || can_split[TT_VER_SPLIT]) 
+    && split_flag != NO_SPLIT) {
     bool qt_split = split_flag == QT_SPLIT;
     if((can_split[BT_VER_SPLIT] || can_split[BT_HOR_SPLIT] || can_split[TT_VER_SPLIT] || can_split[TT_HOR_SPLIT]) && can_split[QT_SPLIT]) {
       unsigned left_qt_depth = 0;
@@ -1374,12 +1380,9 @@ void uvg_encode_coding_tree(
 
   int32_t frame_width = tree_type !=  UVG_CHROMA_T ? ctrl->in.width : ctrl->in.width / 2;
   int32_t frame_height = tree_type != UVG_CHROMA_T ? ctrl->in.height : ctrl->in.height / 2;
-  // Check for slice border
-  bool border_x = frame_width  < abs_x + cu_width;
-  bool border_y = frame_height < abs_y + cu_height;
-  bool border_split_x = frame_width  >= abs_x + (LCU_WIDTH >> MAX_DEPTH) + cu_width / 2;
-  bool border_split_y = frame_height >= abs_y + (LCU_WIDTH >> MAX_DEPTH) + cu_height / 2;
-  bool border = border_x || border_y; /*!< are we in any border CU */
+
+  // Stop if we are outside of the frame
+  if (abs_x >= frame_width || abs_y >= frame_height) return;
 
   if (depth <= state->frame->max_qp_delta_depth) {
     state->must_code_qp_delta = true;
@@ -1388,6 +1391,7 @@ void uvg_encode_coding_tree(
   // When not in MAX_DEPTH, insert split flag and split the blocks if needed
   if (cu_width + cu_height > 8) {
     split_tree.split_tree = cur_cu->split_tree;
+    bool is_implicit;
     const int split_flag = uvg_write_split_flag(
       state,
       cabac,
@@ -1396,10 +1400,16 @@ void uvg_encode_coding_tree(
       tree_type != UVG_CHROMA_T ? cu_loc : chroma_loc,
       split_tree,
       tree_type,
-      NULL);
+      &is_implicit,
+      NULL
+      );
     
-    if (split_flag || border) {
-      split_tree_t new_split_tree = { cur_cu->split_tree, split_tree.current_depth + 1, split_tree.mtt_depth + (split_flag != QT_SPLIT), 0};
+    if (split_flag != NO_SPLIT) {
+      split_tree_t new_split_tree = { cur_cu->split_tree,
+        split_tree.current_depth + 1,
+        split_tree.mtt_depth + (split_flag != QT_SPLIT),
+        split_tree.implicit_mtt_depth + (split_flag != QT_SPLIT && is_implicit),
+      0};
 
       cu_loc_t new_cu_loc[4];
       cu_loc_t chroma_tree_loc;
@@ -1702,6 +1712,8 @@ double uvg_mock_encode_coding_unit(
 
   // When not in MAX_DEPTH, insert split flag and split the blocks if needed
   if (cur_cu->log2_height + cur_cu->log2_width > 4) {
+    // We do not care about whether the split is implicit or not since there is never split here
+    bool is_implicit;
     uvg_write_split_flag(
       state,
       cabac,
@@ -1709,8 +1721,9 @@ double uvg_mock_encode_coding_unit(
       above_cu,
       cu_loc,
       split_tree,
-      tree_type,
-      &bits);
+      tree_type, &is_implicit,
+      &bits
+      );
   }
 
   // Encode skip flag

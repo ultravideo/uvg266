@@ -105,6 +105,7 @@ typedef struct  {
   uint32_t split_tree;
   uint8_t current_depth;
   uint8_t mtt_depth;
+  uint8_t implicit_mtt_depth;
   uint8_t part_index;
 } split_tree_t;
 
