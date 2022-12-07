@@ -1438,7 +1438,7 @@ void uvg_encode_coding_tree(
   
   DBG_YUVIEW_VALUE(state->frame->poc, DBG_YUVIEW_CU_TYPE, abs_x, abs_y, cu_width, cu_height, (cur_cu->type == CU_INTRA) ? 0 : 1);
 
-  //fprintf(stderr, "%4d %4d %2d %2d %d\n", x, y, cu_width, cu_height, has_chroma);
+  //fprintf(stderr, "%4d %4d %2d %2d %d %d\n", x, y, cu_width, cu_height, has_chroma, cur_cu->split_tree);
 
   if (ctrl->cfg.lossless) {
     cabac->cur_ctx = &cabac->ctx.cu_transquant_bypass;
@@ -1639,11 +1639,11 @@ void uvg_encode_coding_tree(
       int8_t luma_dir = uvg_get_co_located_luma_mode(tree_type != UVG_CHROMA_T ? chroma_loc : cu_loc, cu_loc, cur_cu, NULL, frame->cu_array, UVG_CHROMA_T);
       encode_chroma_intra_cu(cabac, cur_cu, state->encoder_control->cfg.cclm && uvg_cclm_is_allowed(state, cu_loc, cur_cu, tree_type), luma_dir,NULL);
       // LFNST constraints must be reset here. Otherwise the left over values will interfere when calculating new constraints
-      cu_info_t* tmp = (cu_info_t*)cur_cu;
+      cu_info_t* tmp = uvg_cu_array_at((cu_array_t *)used_array, chroma_loc->x, chroma_loc->y);
       tmp->violates_lfnst_constrained_luma = false;
       tmp->violates_lfnst_constrained_chroma = false;
       tmp->lfnst_last_scan_pos = false;
-      encode_transform_coeff(state, chroma_loc, 1, coeff, cur_cu, tree_type, true, false, &luma_cbf_ctx, chroma_loc, chroma_loc);
+      encode_transform_coeff(state, chroma_loc, 1, coeff, NULL, tree_type, true, false, &luma_cbf_ctx, chroma_loc, chroma_loc);
       // Write LFNST only once for single tree structure
       encode_lfnst_idx(state, cabac, tmp, is_local_dual_tree ? UVG_CHROMA_T : tree_type, COLOR_UV, chroma_loc);
     }

@@ -1884,7 +1884,14 @@ void uvg_intra_recon_cu(
   bool recon_chroma)
 {
   const uint8_t depth = 6 - uvg_g_convert_to_log2[cu_loc->width];
-  const vector2d_t lcu_px = { cu_loc->local_x >> (tree_type == UVG_CHROMA_T), cu_loc->local_y >> (tree_type == UVG_CHROMA_T) };
+  const vector2d_t lcu_px = {
+    cu_loc->local_x >>
+      (tree_type == UVG_CHROMA_T && state->encoder_control->cfg.dual_tree &&
+       state->frame->slicetype == UVG_SLICE_I),
+    cu_loc->local_y >>
+      (tree_type == UVG_CHROMA_T && state->encoder_control->cfg.dual_tree &&
+       state->frame->slicetype == UVG_SLICE_I),
+  };
   const int8_t width = cu_loc->width;
   const int8_t height = cu_loc->height;
   if (cur_cu == NULL) {
@@ -1917,7 +1924,11 @@ void uvg_intra_recon_cu(
     cu_loc_t split_cu_loc[4];
     const int split_count = uvg_get_split_locs(cu_loc, split, split_cu_loc,NULL);
     for (int i = 0; i < split_count; ++i) {
-      uvg_intra_recon_cu(state, search_data, &split_cu_loc[i], NULL, lcu, tree_type, recon_luma, recon_chroma);
+      uvg_intra_recon_cu(
+        state, search_data, &split_cu_loc[i],
+        NULL, lcu,
+        state->encoder_control->cfg.dual_tree && state->frame->slicetype == UVG_SLICE_I ? tree_type : UVG_BOTH_T, 
+        recon_luma, recon_chroma);
     }
 
     return;

@@ -863,7 +863,7 @@ void uvg_fwd_lfnst(
   const uint32_t log2_width = uvg_g_convert_to_log2[width];
   const uint32_t log2_height = uvg_g_convert_to_log2[height];
   int8_t intra_mode = (color == COLOR_Y) ? cur_cu->intra.mode : cur_cu->intra.mode_chroma;
-  bool mts_skip = cur_cu->tr_idx == MTS_SKIP;
+  bool mts_skip = cur_cu->tr_idx == MTS_SKIP && color == COLOR_Y;
   // This check is safe for 8x16 cus split with TT, since it is checking the dimensions of the
   // last luma CU which will be 8x4, i.e., 3 + 2 < 6
   bool is_separate_tree = cur_cu->log2_height + cur_cu->log2_width < 6 || tree_type != UVG_BOTH_T;
@@ -1005,7 +1005,7 @@ void uvg_inv_lfnst(
   const uint32_t log2_width = uvg_g_convert_to_log2[width];
   const uint32_t log2_height = uvg_g_convert_to_log2[height];
   int8_t intra_mode = (color == COLOR_Y) ? cur_cu->intra.mode : cur_cu->intra.mode_chroma;
-  bool mts_skip = cur_cu->tr_idx == MTS_SKIP;
+  bool mts_skip = cur_cu->tr_idx == MTS_SKIP && color == COLOR_Y;
   bool is_separate_tree = cur_cu->log2_height + cur_cu->log2_width < 6 || tree_type != UVG_BOTH_T;
   bool is_cclm_mode = (intra_mode >= 81 && intra_mode <= 83); // CCLM modes are in [81, 83]
 
