@@ -1415,6 +1415,7 @@ void uvg_encode_coding_tree(
       cu_loc_t chroma_tree_loc;
       uint8_t separate_chroma = 0;
       const int splits = uvg_get_split_locs(cu_loc, split_flag, new_cu_loc, &separate_chroma);
+      separate_chroma |= !has_chroma;
       for (int split = 0; split <splits; ++split) {
         new_split_tree.part_index = split;
         if (tree_type == UVG_CHROMA_T) {
@@ -1438,7 +1439,7 @@ void uvg_encode_coding_tree(
   
   DBG_YUVIEW_VALUE(state->frame->poc, DBG_YUVIEW_CU_TYPE, abs_x, abs_y, cu_width, cu_height, (cur_cu->type == CU_INTRA) ? 0 : 1);
 
-  //fprintf(stderr, "%4d %4d %2d %2d %d %d\n", x, y, cu_width, cu_height, has_chroma, cur_cu->split_tree);
+  fprintf(stderr, "%4d %4d %2d %2d %d %d\n", x, y, cu_width, cu_height, has_chroma, cur_cu->split_tree);
 
   if (ctrl->cfg.lossless) {
     cabac->cur_ctx = &cabac->ctx.cu_transquant_bypass;
