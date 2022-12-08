@@ -338,6 +338,7 @@ static double search_intra_trdepth(
       num_transforms = MAX(num_transforms, 2);
     }
     pred_cu->intra.mode_chroma = -1;
+    pred_cu->joint_cb_cr = 4;
     
     const int max_tb_size = TR_MAX_WIDTH;
     // LFNST search params
@@ -488,6 +489,7 @@ static double search_intra_trdepth(
       if (reconstruct_chroma) {
         int8_t luma_mode = pred_cu->intra.mode;
         pred_cu->intra.mode_chroma = chroma_mode;
+        pred_cu->joint_cb_cr = 4;
         // TODO: Maybe check the jccr mode here also but holy shit is the interface of search_intra_rdo bad currently
         uvg_intra_recon_cu(
           state,
@@ -542,6 +544,7 @@ static double search_intra_trdepth(
     if(reconstruct_chroma) {
       int8_t luma_mode = pred_cu->intra.mode;
       pred_cu->intra.mode_chroma = chroma_mode;
+      pred_cu->joint_cb_cr= 4; // TODO: Maybe check the jccr mode here also but holy shit is the interface of search_intra_rdo bad currently
       uvg_intra_recon_cu(state,
                          search_data, cu_loc,
                          pred_cu, lcu,
@@ -561,7 +564,7 @@ static double search_intra_trdepth(
     // Early stop condition for the recursive search.
     // If the cost of any 1/4th of the transform is already larger than the
     // whole transform, assume that splitting further is a bad idea.
-    if (nosplit_cost >= cost_treshold) {
+    if (nosplit_cost <= cost_treshold) {
       return nosplit_cost;
     }
   }
@@ -1445,7 +1448,7 @@ int8_t uvg_search_intra_chroma_rdo(
     const int offset = ((cu_loc->local_x) >> 1) + ((cu_loc->local_y) >> 1)* LCU_WIDTH_C;
 
     int lfnst_modes_to_check[3];
-    if((is_separate || tree_type == UVG_CHROMA_T) && state->encoder_control->cfg.lfnst) {
+    if((is_separate || tree_type == UVG_CHROMA_T) && state->encoder_control->cfg.lfnst && PU_IS_TU(&chroma_data->pred_cu) ) {
       for (int i = 0; i < 3; ++i) {
         lfnst_modes_to_check[i] = i;
       }

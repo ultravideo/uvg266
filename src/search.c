@@ -315,6 +315,8 @@ static void lcu_fill_chroma_cu_info(lcu_t *lcu, const cu_loc_t * const cu_loc)
       cu->intra.mode_chroma = bottom_right->intra.mode_chroma;
       cu->joint_cb_cr       = bottom_right->joint_cb_cr;
       cu->cr_lfnst_idx      = bottom_right->cr_lfnst_idx;
+      cu->type = bottom_right->type;
+      cu->tr_skip |= bottom_right->tr_skip & 6;
     }
   }
 }
@@ -1015,6 +1017,7 @@ static double search_cu(
   const int y = cu_loc->y;
   const int luma_width = cu_loc->width;
   const int luma_height = cu_loc->height;
+  
   const bool is_separate_tree = chroma_loc == NULL || cu_loc->height != chroma_loc->height || cu_loc->width != chroma_loc->width;
   assert(cu_width >= 4);
   double cost = MAX_DOUBLE;
@@ -1381,6 +1384,7 @@ static double search_cu(
     cost = bits * state->lambda;
 
     cost += cu_rd_cost_tr_split_accurate(state, cur_cu, lcu, tree_type, 0, cu_loc, chroma_loc, has_chroma);
+    //fprintf(stderr, "%4d %4d %2d %2d %d %d %f\n", x, y, cu_width, cu_height, has_chroma, cur_cu->split_tree, cost);
     
     //if (ctrl->cfg.zero_coeff_rdo && inter_zero_coeff_cost <= cost) {
     //  cost = inter_zero_coeff_cost;
@@ -1495,6 +1499,7 @@ static double search_cu(
       cu_loc_t new_cu_loc[4];
       uint8_t separate_chroma = 0;
       const int splits = uvg_get_split_locs(cu_loc, split_type, new_cu_loc, &separate_chroma);
+      separate_chroma |= !has_chroma;
       initialize_partial_work_tree(lcu, &split_lcu[split_type - 1], cu_loc, separate_chroma ? chroma_loc : cu_loc , tree_type);
       for (int split = 0; split < splits; ++split) {
         new_split.part_index = split;
