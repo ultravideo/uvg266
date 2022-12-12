@@ -30,7 +30,7 @@ def main(state_file: Path, ctx_names: list, ctx_count: int = 332, ctx_size: int 
     with open(state_file, "rb") as file:
         try:
             while True:
-                type_, x, y, depth, tree_type = file.read(15).decode().split()
+                type_, x, y, depth, tree_type = file.read(23).decode().split()
                 # Reset stored data at the beginning of the frame
                 if x == '0' and y == '0' and type_ == "S" and tree_type != "2":
                     if not was_zero_last:
@@ -38,7 +38,7 @@ def main(state_file: Path, ctx_names: list, ctx_count: int = 332, ctx_size: int 
                         ctx_store = dict()
                         e_store = set()
                     was_zero_last = True
-                else:
+                elif int(x) >= 64 and int(y) >= 64:
                     was_zero_last = False
 
                 ctx = file.read(ctx_count * ctx_size)
