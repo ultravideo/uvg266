@@ -689,8 +689,12 @@ static double cu_rd_cost_tr_split_accurate(
     
     cu_loc_t split_cu_loc[4];
     const int split_count= uvg_get_split_locs(cu_loc, split, split_cu_loc,NULL);
+    cu_loc_t split_chroma_cu_loc[4];
+    if (chroma_loc) {
+      uvg_get_split_locs(chroma_loc, split, split_chroma_cu_loc, NULL);
+    }
     for (int i = 0; i < split_count; ++i) {
-      sum += cu_rd_cost_tr_split_accurate(state, pred_cu, lcu, tree_type, isp_cbf, &split_cu_loc[i], &split_cu_loc[i], has_chroma);
+      sum += cu_rd_cost_tr_split_accurate(state, pred_cu, lcu, tree_type, isp_cbf, &split_cu_loc[i], chroma_loc ? &split_chroma_cu_loc[i] : NULL, has_chroma);
     }
     return sum + tr_tree_bits * state->lambda;
   }
@@ -750,7 +754,10 @@ static double cu_rd_cost_tr_split_accurate(
   }
   // Chroma transform skip enable/disable is non-normative, so we need to count the chroma
   // tr-skip bits even when we are never using it.
-  const bool can_use_tr_skip = state->encoder_control->cfg.trskip_enable && width <= (1 << state->encoder_control->cfg.trskip_max_size) && !is_isp;
+  const bool can_use_tr_skip = state->encoder_control->cfg.trskip_enable
+                               && width <= (1 << state->encoder_control->cfg.trskip_max_size)
+                               && height <= (1 << state->encoder_control->cfg.trskip_max_size)
+                               && !is_isp;
 
   if(cb_flag_y){
     if (can_use_tr_skip) {
@@ -859,7 +866,7 @@ static double cu_rd_cost_tr_split_accurate(
   }
 
   const bool is_chroma_tree = is_local_sep_tree || tree_type == UVG_CHROMA_T;
-  if (uvg_is_lfnst_allowed(state, tr_cu, is_local_sep_tree ? UVG_CHROMA_T : tree_type, is_chroma_tree ? COLOR_UV : COLOR_Y, is_chroma_tree ? cu_loc : chroma_loc, lcu)) {
+  if (uvg_is_lfnst_allowed(state, tr_cu, is_local_sep_tree ? UVG_CHROMA_T : tree_type, is_chroma_tree ? COLOR_UV : COLOR_Y, is_chroma_tree ? chroma_loc : cu_loc, lcu)) {
     const int lfnst_idx = is_chroma_tree ? tr_cu->cr_lfnst_idx : tr_cu->lfnst_idx;
     CABAC_FBITS_UPDATE(
       cabac,
@@ -1381,7 +1388,7 @@ static double search_cu(
       split_tree.current_depth < pu_depth_inter.max);
 
   if(state->encoder_control->cabac_debug_file) {
-    fprintf(state->encoder_control->cabac_debug_file, "S %4d %4d %d %d", x, y, split_tree.current_depth, tree_type);
+    fprintf(state->encoder_control->cabac_debug_file, "S %4d %4d %9d %d", x, y, split_tree.split_tree, tree_type);
     fwrite(&state->search_cabac.ctx, 1,  sizeof(state->search_cabac.ctx), state->encoder_control->cabac_debug_file);
   }
 

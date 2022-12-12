@@ -1656,7 +1656,7 @@ void uvg_encode_coding_tree(
     exit(1);
   }
   if (state->encoder_control->cabac_debug_file) {
-    fprintf(state->encoder_control->cabac_debug_file, "E %4d %4d %d %d", x << (tree_type == UVG_CHROMA_T), y << (tree_type == UVG_CHROMA_T), depth, tree_type);
+    fprintf(state->encoder_control->cabac_debug_file, "E %4d %4d %9d %d", x << (tree_type == UVG_CHROMA_T), y << (tree_type == UVG_CHROMA_T), split_tree.split_tree, tree_type);
     fwrite(&cabac->ctx, 1, sizeof(cabac->ctx), state->encoder_control->cabac_debug_file);
   }
 
