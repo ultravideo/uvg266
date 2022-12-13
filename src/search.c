@@ -39,6 +39,7 @@
 #include "cu.h"
 #include "encoder.h"
 #include "encode_coding_tree.h"
+#include "filter.h"
 #include "imagelist.h"
 #include "inter.h"
 #include "intra.h"
@@ -253,6 +254,10 @@ static void work_tree_copy_up(
         to_cu->intra.mode_chroma = from_cu->intra.mode_chroma;
         to_cu->joint_cb_cr = from_cu->joint_cb_cr;
         to_cu->cr_lfnst_idx = from_cu->cr_lfnst_idx;
+        to_cu->chroma_deblocking = from_cu->chroma_deblocking;
+        to_cu->log2_chroma_width = from_cu->log2_chroma_width;
+        to_cu->log2_chroma_height = from_cu->log2_chroma_height;
+
         cbf_copy(&to_cu->cbf, from_cu->cbf, COLOR_U);
         cbf_copy(&to_cu->cbf, from_cu->cbf, COLOR_V);
       }
@@ -281,6 +286,9 @@ static void lcu_fill_cu_info(lcu_t *lcu, int x_local, int y_local, int width, in
 
       to->log2_height = cu->log2_height;
       to->log2_width = cu->log2_width;
+
+      to->log2_chroma_height = cu->log2_chroma_height;
+      to->log2_chroma_width = cu->log2_chroma_width;
 
       if (cu->type == CU_INTRA) {
         to->intra.mode        = cu->intra.mode;
@@ -315,13 +323,36 @@ static void lcu_fill_chroma_cu_info(lcu_t *lcu, const cu_loc_t * const cu_loc)
       cu->intra.mode_chroma = bottom_right->intra.mode_chroma;
       cu->joint_cb_cr       = bottom_right->joint_cb_cr;
       cu->cr_lfnst_idx      = bottom_right->cr_lfnst_idx;
+      cu->log2_chroma_height = bottom_right->log2_chroma_height;
+      cu->log2_chroma_width = bottom_right->log2_chroma_width;
       cu->type = bottom_right->type;
       cu->tr_skip |= bottom_right->tr_skip & 6;
     }
   }
 }
-  
 
+
+static void lcu_fill_chroma_cbfs(lcu_t *lcu, const cu_loc_t * const chroma_loc, enum uvg_tree_type tree_type)
+{
+  int8_t height = tree_type == UVG_CHROMA_T ? chroma_loc->chroma_height : chroma_loc->height;
+  int8_t width = tree_type == UVG_CHROMA_T ? chroma_loc->chroma_width : chroma_loc->width;
+  uint32_t x_local = chroma_loc->local_x;
+  uint32_t y_local = chroma_loc->local_y;
+  const int offset = ~((TR_MAX_WIDTH >> (tree_type == UVG_CHROMA_T)) - 1);
+  // Set coeff flags in every CU covered by part_mode in this depth.
+  for (uint32_t y = 0; y < height; y += SCU_WIDTH) {
+    for (uint32_t x = 0; x < width; x += SCU_WIDTH) {
+      // Use TU top-left CU to propagate coeff flags
+      cu_info_t* cu_from = LCU_GET_CU_AT_PX(lcu, x_local + (x & offset), y_local + (y & offset));
+      cu_info_t* cu_to = LCU_GET_CU_AT_PX(lcu, x_local + x, y_local + y);
+      if (cu_from != cu_to) {
+        cbf_copy(&cu_to->cbf, cu_from->cbf, COLOR_U);
+        cbf_copy(&cu_to->cbf, cu_from->cbf, COLOR_V);
+      }
+    }
+  }
+  
+}
 
 static void lcu_fill_cbf(lcu_t *lcu, int x_local, unsigned y_local, unsigned width, unsigned height, const cu_info_t *cur_cu, enum
                          uvg_tree_type tree_type)
@@ -996,6 +1027,97 @@ void uvg_sort_keys_by_cost(unit_stats_map_t *__restrict map)
 }
 
 
+static void mark_deblocking(const cu_loc_t* const cu_loc, const cu_loc_t* const chroma_loc, lcu_t* lcu, enum uvg_tree_type tree_type, bool has_chroma, const bool is_separate_tree, int x_local, int y_local)
+{
+  if(tree_type != UVG_CHROMA_T) {
+    if(cu_loc->x) {
+      for (int x = cu_loc->local_x; x < cu_loc->local_x + cu_loc->width; x += TR_MAX_WIDTH) {
+        for (int y = cu_loc->local_y; y < cu_loc->local_y + cu_loc->height; y += SCU_WIDTH) {
+          LCU_GET_CU_AT_PX(lcu, x, y)->luma_deblocking |= EDGE_VER;
+          if(!is_separate_tree && tree_type == UVG_BOTH_T) LCU_GET_CU_AT_PX(lcu, x, y)->chroma_deblocking |= EDGE_VER;
+        }
+      }
+    }
+    else if(cu_loc->width == 64) {
+      for (int y = cu_loc->local_y; y < cu_loc->local_y + cu_loc->height; y += SCU_WIDTH) {
+        LCU_GET_CU_AT_PX(lcu, TR_MAX_WIDTH, y)->luma_deblocking |= EDGE_VER;
+        if (!is_separate_tree && tree_type == UVG_BOTH_T) LCU_GET_CU_AT_PX(lcu, TR_MAX_WIDTH, y)->chroma_deblocking |= EDGE_VER;
+      }        
+    }
+
+    if(cu_loc->y) {
+      for (int y = cu_loc->local_y; y < cu_loc->local_y + cu_loc->height; y += TR_MAX_WIDTH) {
+        for (int x = cu_loc->local_x; x < cu_loc->local_x + cu_loc->width; x += SCU_WIDTH) {
+          LCU_GET_CU_AT_PX(lcu, x, y)->luma_deblocking |= EDGE_HOR;
+          if (!is_separate_tree && tree_type == UVG_BOTH_T) LCU_GET_CU_AT_PX(lcu, x, y)->chroma_deblocking |= EDGE_HOR;
+        }
+      }
+    }
+    else if (cu_loc->height == 64) {
+      for (int x = cu_loc->local_x; x < cu_loc->local_x + cu_loc->width; x += SCU_WIDTH) {
+        LCU_GET_CU_AT_PX(lcu, x, TR_MAX_WIDTH)->luma_deblocking |= EDGE_VER;
+        if (!is_separate_tree && tree_type == UVG_BOTH_T) LCU_GET_CU_AT_PX(lcu, x, TR_MAX_WIDTH)->chroma_deblocking |= EDGE_VER;
+      }
+    }
+
+    if(is_separate_tree && has_chroma) {
+      if (chroma_loc->x) {
+        for (int x = chroma_loc->local_x; x < chroma_loc->local_x + chroma_loc->width; x += TR_MAX_WIDTH) {
+          for (int y = chroma_loc->local_y; y < chroma_loc->local_y + chroma_loc->height; y += SCU_WIDTH) {
+            LCU_GET_CU_AT_PX(lcu, x, y)->chroma_deblocking |= EDGE_VER;
+          }
+        }
+      }
+      else if(cu_loc->width == 64) {
+        for (int y = chroma_loc->local_y; y < chroma_loc->local_y + chroma_loc->height; y += SCU_WIDTH) {
+          LCU_GET_CU_AT_PX(lcu, TR_MAX_WIDTH, y)->chroma_deblocking |= EDGE_VER;
+        }          
+      }
+
+      if (chroma_loc->y) {
+        for (int y = chroma_loc->local_y; y < chroma_loc->local_y + chroma_loc->height; y += TR_MAX_WIDTH) {
+          for (int x = chroma_loc->local_x; x < chroma_loc->local_x + chroma_loc->width; x += SCU_WIDTH) {
+            LCU_GET_CU_AT_PX(lcu, x, y)->chroma_deblocking |= EDGE_HOR;
+          }
+        }
+      }
+      else if (cu_loc->height == 64) {
+        for (int x = chroma_loc->local_x; x < chroma_loc->local_x + chroma_loc->width; x += SCU_WIDTH) {
+          LCU_GET_CU_AT_PX(lcu, x, TR_MAX_WIDTH)->chroma_deblocking |= EDGE_VER;
+        }
+      }
+    }
+  }
+  else {
+
+    if (chroma_loc->x) {
+      for (int x = x_local; x < x_local + chroma_loc->chroma_width; x += TR_MAX_WIDTH / 2) {
+        for (int y = y_local; y < y_local + chroma_loc->chroma_height; y += SCU_WIDTH) {
+          LCU_GET_CU_AT_PX(lcu, x, y)->chroma_deblocking |= EDGE_VER;
+        }
+      }
+    }
+    else if(chroma_loc->width == 64) {
+      for (int y = y_local; y < y_local + chroma_loc->chroma_height; y += SCU_WIDTH) {
+        LCU_GET_CU_AT_PX(lcu, TR_MAX_WIDTH / 2, y)->chroma_deblocking |= EDGE_VER;
+      }        
+    }
+
+    if(chroma_loc->y) {
+      for (int y = y_local; y < y_local + chroma_loc->chroma_height; y += TR_MAX_WIDTH / 2) {
+        for (int x = x_local; x < x_local + chroma_loc->chroma_width; x += SCU_WIDTH) {
+          LCU_GET_CU_AT_PX(lcu, x, y)->chroma_deblocking |= EDGE_HOR;
+        }
+      }        
+    }
+    else if (chroma_loc->height == 64) {
+      for (int x = x_local; x < x_local + chroma_loc->chroma_width; x += SCU_WIDTH) {
+        LCU_GET_CU_AT_PX(lcu, x, TR_MAX_WIDTH / 2)->chroma_deblocking |= EDGE_VER;
+      }
+    }
+  }
+}
+
 /**
  * Search every mode from 0 to MAX_PU_DEPTH and return cost of best mode.
  * - The recursion is started at depth 0 and goes in Z-order to MAX_PU_DEPTH.
@@ -1089,6 +1211,11 @@ static double search_cu(
   cur_cu->split_tree = split_tree.split_tree;
   cur_cu->log2_width = uvg_g_convert_to_log2[cu_width];
   cur_cu->log2_height = uvg_g_convert_to_log2[cu_height];
+
+  if(chroma_loc) {
+    cur_cu->log2_chroma_height = uvg_g_convert_to_log2[chroma_loc->chroma_height];
+    cur_cu->log2_chroma_width = uvg_g_convert_to_log2[chroma_loc->chroma_width];
+  }
 
   // If the CU is completely inside the frame at this depth, search for
   // prediction modes at this depth.
@@ -1269,23 +1396,21 @@ static double search_cu(
       if((!recon_chroma && state->encoder_control->chroma_format != UVG_CSP_400 && tree_type != UVG_LUMA_T) 
         || tree_type == UVG_CHROMA_T) {
         intra_search.pred_cu.intra.mode_chroma = cur_cu->intra.mode_chroma;
-        lcu_fill_chroma_cu_info(
-          lcu,
-          chroma_loc);
+        if(tree_type != UVG_CHROMA_T) {
+          lcu_fill_chroma_cu_info(
+            lcu,
+            chroma_loc);
+        }
         uvg_intra_recon_cu(state,
                            &intra_search, chroma_loc,
                            NULL, lcu,
                            UVG_CHROMA_T,
                            false,
                            true);
-        lcu_fill_cbf(
+        lcu_fill_chroma_cbfs(
           lcu,
-          chroma_loc->local_x,
-          chroma_loc->local_y,
-          chroma_loc->width,
-          chroma_loc->height,
-          cur_cu,
-          UVG_CHROMA_T);
+          chroma_loc,
+          tree_type);
       } else {
         assert(cur_cu->cr_lfnst_idx == 0 && "If we don't have separate tree chroma lfnst index must be 0");
       }
@@ -1409,6 +1534,16 @@ static double search_cu(
     //  lcu_fill_cbf(lcu, x_local, y_local, cu_width, cur_cu);
     //}
     cabac->update = 0;
+
+    mark_deblocking(
+      cu_loc,
+      chroma_loc,
+      lcu,
+      tree_type,
+      has_chroma,
+      is_separate_tree,
+      x_local,
+      y_local);
   } 
 
   bool can_split_cu =
