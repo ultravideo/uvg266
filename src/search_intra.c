@@ -338,7 +338,6 @@ static double search_intra_trdepth(
       num_transforms = MAX(num_transforms, 2);
     }
     pred_cu->intra.mode_chroma = -1;
-    pred_cu->joint_cb_cr = 4;
     
     const int max_tb_size = TR_MAX_WIDTH;
     // LFNST search params
@@ -489,7 +488,6 @@ static double search_intra_trdepth(
       if (reconstruct_chroma) {
         int8_t luma_mode = pred_cu->intra.mode;
         pred_cu->intra.mode_chroma = chroma_mode;
-        pred_cu->joint_cb_cr = 4;
         // TODO: Maybe check the jccr mode here also but holy shit is the interface of search_intra_rdo bad currently
         uvg_intra_recon_cu(
           state,
@@ -544,7 +542,6 @@ static double search_intra_trdepth(
     if(reconstruct_chroma) {
       int8_t luma_mode = pred_cu->intra.mode;
       pred_cu->intra.mode_chroma = chroma_mode;
-      pred_cu->joint_cb_cr= 4; // TODO: Maybe check the jccr mode here also but holy shit is the interface of search_intra_rdo bad currently
       uvg_intra_recon_cu(state,
                          search_data, cu_loc,
                          pred_cu, lcu,
