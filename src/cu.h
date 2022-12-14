@@ -126,7 +126,7 @@ typedef struct
   uint8_t merge_idx   : 3; //!< \brief merge index
   uint8_t tr_skip     : 3; //!< \brief transform skip flag
   uint8_t tr_idx      : 3; //!< \brief transform index
-  uint8_t joint_cb_cr : 3; //!< \brief joint chroma residual coding 
+  uint8_t joint_cb_cr : 2; //!< \brief joint chroma residual coding 
 
   uint8_t log2_width : 3;
   uint8_t log2_height : 3;
