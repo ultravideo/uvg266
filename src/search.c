@@ -1721,6 +1721,8 @@ static double search_cu(
 
         cost += cu_rd_cost_tr_split_accurate(state, cur_cu, lcu, tree_type, 0, cu_loc, chroma_loc, has_chroma);
 
+        mark_deblocking(cu_loc, chroma_loc, lcu, tree_type, has_chroma, is_separate_tree, x_local, y_local);
+
         memcpy(&post_seach_cabac, &state->search_cabac, sizeof(post_seach_cabac));
         memcpy(&state->search_cabac, &temp_cabac, sizeof(temp_cabac));
       }
