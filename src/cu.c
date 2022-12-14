@@ -413,7 +413,7 @@ int uvg_get_possible_splits(const encoder_state_t * const state,
   splits[NO_SPLIT] = splits[QT_SPLIT] = splits[BT_HOR_SPLIT] = splits[TT_HOR_SPLIT] = splits[BT_VER_SPLIT] = splits[TT_VER_SPLIT] = true;
   bool can_btt = split_tree.mtt_depth < max_btd;
   
-  const enum split_type last_split = (split_tree.split_tree >> (split_tree.current_depth * 3 - 3)) & 7;
+  const enum split_type last_split = GET_SPLITDATA(&split_tree, 0);
   const enum split_type parl_split = last_split == TT_HOR_SPLIT ? BT_HOR_SPLIT : BT_VER_SPLIT;
 
   // don't allow QT-splitting below a BT split
