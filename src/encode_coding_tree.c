@@ -141,8 +141,8 @@ bool uvg_is_lfnst_allowed(
       for (int i = 0; i < split_num; ++i) {
         cu_loc_t split_loc;
         uvg_get_isp_split_loc(&split_loc, cu_loc->x, cu_loc->y, cu_width, cu_height, i, isp_mode, false);
-        int local_split_x = split_loc.x;
-        int local_split_y = split_loc.y;
+        int local_split_x = lcu ? split_loc.local_x : split_loc.x;
+        int local_split_y = lcu ? split_loc.local_y : split_loc.y;
         uvg_get_isp_cu_arr_coords(&local_split_x, &local_split_y);
         const cu_info_t* split_cu = lcu ? LCU_GET_CU_AT_PX(lcu, local_split_x, local_split_y) :
           uvg_cu_array_at_const(frame->cu_array, local_split_x, local_split_y);
