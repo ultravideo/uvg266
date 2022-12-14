@@ -1054,8 +1054,8 @@ static void mark_deblocking(const cu_loc_t* const cu_loc, const cu_loc_t* const 
     }
     else if (cu_loc->height == 64) {
       for (int x = cu_loc->local_x; x < cu_loc->local_x + cu_loc->width; x += SCU_WIDTH) {
-        LCU_GET_CU_AT_PX(lcu, x, TR_MAX_WIDTH)->luma_deblocking |= EDGE_VER;
-        if (!is_separate_tree && tree_type == UVG_BOTH_T) LCU_GET_CU_AT_PX(lcu, x, TR_MAX_WIDTH)->chroma_deblocking |= EDGE_VER;
+        LCU_GET_CU_AT_PX(lcu, x, TR_MAX_WIDTH)->luma_deblocking |= EDGE_HOR;
+        if (!is_separate_tree && tree_type == UVG_BOTH_T) LCU_GET_CU_AT_PX(lcu, x, TR_MAX_WIDTH)->chroma_deblocking |= EDGE_HOR;
       }
     }
 
