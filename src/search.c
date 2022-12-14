@@ -1560,7 +1560,24 @@ static double search_cu(
   }
 
   bool can_split[6];
-  uvg_get_possible_splits(state, cu_loc, split_tree, tree_type, can_split);
+  bool is_implicit = uvg_get_possible_splits(state, cu_loc, split_tree, tree_type, can_split);
+
+  const int slice_type = state->frame->is_irap ? (tree_type == UVG_CHROMA_T ? 2 : 0) : 1;
+  const int max_btd = state->encoder_control->cfg.max_btt_depth[slice_type];
+  int minimum_split_amount;
+  switch (slice_type) {
+  case 0: minimum_split_amount = pu_depth_intra.min - split_tree.current_depth; break;
+  case 1: minimum_split_amount = MIN(pu_depth_intra.min, pu_depth_inter.min) - split_tree.current_depth; break;
+  case 2: minimum_split_amount = pu_depth_intra.min - split_tree.current_depth; break;
+    default:
+      assert(0 && "Incorrect_slice_type");
+  }
+  if(minimum_split_amount > max_btd && !is_implicit) {
+    // If search should not be performed at depths that cannot be reached after a maximum mtt split amount
+    // we are in trouble, therefore prevent mtt splits in such situation
+    can_split[2] = can_split[3] = can_split[4] = can_split[5] = false;
+  }
+
   can_split_cu &= can_split[1] || can_split[2] || can_split[3] || can_split[4] || can_split[5];
 
 
@@ -1588,7 +1605,6 @@ static double search_cu(
 
 
       double split_bits = 0;
-      bool is_implicit = false;
 
       if (cur_cu->log2_height + cur_cu->log2_width > 4) {
 
