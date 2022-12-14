@@ -475,7 +475,7 @@ SATD_DUAL_NXN(64, uvg_pixel)
 
 SATD_ANY_SIZE_MULTI_GENERIC(quad_generic, 4)
 
-uint64_t xCalcHADs2x2(const uvg_pixel* piOrg, const uvg_pixel* piCur, int iStrideOrg, int iStrideCur)
+static uint64_t xCalcHADs2x2(const uvg_pixel* piOrg, const uvg_pixel* piCur, int iStrideOrg, int iStrideCur)
 {
   uint64_t satd = 0;
   coeff_t diff[4], m[4];
@@ -943,7 +943,7 @@ static uint64_t xCalcHADs8x4(const uvg_pixel* piOrg, const uvg_pixel* piCur, int
 }
 
 
-uint64_t xGetHADs(int width, int height, const uvg_pixel* ref_in, int ref_stride, const uvg_pixel* pred_in, int pred_stride)
+static uint64_t xGetHADs(int width, int height, const uvg_pixel* ref_in, int ref_stride, const uvg_pixel* pred_in, int pred_stride)
 {
   const uvg_pixel* piOrg = ref_in;
   const uvg_pixel* piCur = pred_in;
