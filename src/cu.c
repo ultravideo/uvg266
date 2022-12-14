@@ -370,8 +370,12 @@ int uvg_get_split_locs(
 }
 
 
-int uvg_get_implicit_split(const encoder_state_t* const state, const cu_loc_t* const cu_loc, enum
-                           uvg_tree_type tree_type)
+int uvg_get_implicit_split(
+  const encoder_state_t* const state,
+  const cu_loc_t* const cu_loc,
+  enum
+  uvg_tree_type tree_type,
+  uint8_t max_mtt_depth)
 {
   // This checking if cabac is in update state is a very dirty way of checking
   // whether we are in the search or writing the bitstream, and unfortunately the
@@ -383,8 +387,8 @@ int uvg_get_implicit_split(const encoder_state_t* const state, const cu_loc_t* c
   bool bottom_ok = (state->tile->frame->height >> (tree_type == UVG_CHROMA_T && state->cabac.update)) >= cu_loc->y + cu_loc->height;
 
   if (right_ok && bottom_ok) return NO_SPLIT;
-  if (right_ok) return BT_HOR_SPLIT;
-  if (bottom_ok) return BT_VER_SPLIT;
+  if (right_ok && max_mtt_depth != 0) return BT_HOR_SPLIT;
+  if (bottom_ok && max_mtt_depth != 0) return BT_VER_SPLIT;
   return QT_SPLIT;
 }
 
@@ -394,7 +398,6 @@ int uvg_get_possible_splits(const encoder_state_t * const state,
 {
   const int width = tree_type != UVG_CHROMA_T ? cu_loc->width : cu_loc->chroma_width;
   const int height = tree_type != UVG_CHROMA_T ? cu_loc->height : cu_loc->chroma_height;
-  const enum split_type implicitSplit = uvg_get_implicit_split(state, cu_loc, tree_type);
   const int slice_type = state->frame->is_irap ? (tree_type == UVG_CHROMA_T ? 2 : 0) : 1;
 
   const unsigned max_btd =
@@ -404,6 +407,8 @@ int uvg_get_possible_splits(const encoder_state_t * const state,
   const unsigned max_tt_size = state->encoder_control->cfg.max_tt_size[slice_type] >> (tree_type == UVG_CHROMA_T);
   const unsigned min_tt_size = 1 << MIN_SIZE >> (tree_type == UVG_CHROMA_T);
   const unsigned min_qt_size = state->encoder_control->cfg.min_qt_size[slice_type];
+
+  const enum split_type implicitSplit = uvg_get_implicit_split(state, cu_loc, tree_type, max_btd);
   
   splits[NO_SPLIT] = splits[QT_SPLIT] = splits[BT_HOR_SPLIT] = splits[TT_HOR_SPLIT] = splits[BT_VER_SPLIT] = splits[TT_VER_SPLIT] = true;
   bool can_btt = split_tree.mtt_depth < max_btd;
