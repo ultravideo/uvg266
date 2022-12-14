@@ -1540,7 +1540,7 @@ static double search_cu(
     default:
       assert(0 && "Incorrect_slice_type");
   }
-  if(minimum_split_amount > max_btd && !is_implicit) {
+  if(minimum_split_amount > max_btd && !is_implicit && can_split[1]) {
     // If search should not be performed at depths that cannot be reached after a maximum mtt split amount
     // we are in trouble, therefore prevent mtt splits in such situation
     can_split[2] = can_split[3] = can_split[4] = can_split[5] = false;
