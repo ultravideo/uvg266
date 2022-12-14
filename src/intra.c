@@ -551,11 +551,8 @@ static void predict_cclm(
   const uvg_pixel *y_rec = lcu->rec.y + x_scu + y_scu * LCU_WIDTH;
   const int stride2 = (((state->tile->frame->width + 7) & ~7) + FRAME_PADDING_LUMA);
 
-  // Essentially what this does is that it uses 6-tap filtering to downsample
-  // the luma intra references down to match the resolution of the chroma channel.
-  // The luma reference is only needed when we are not on the edge of the picture.
-  // Because the reference pixels that are needed on the edge of the ctu this code
-  // is kinda messy but what can you do
+  tree_type = state->encoder_control->cfg.dual_tree && state->frame->slicetype == UVG_SLICE_I ? tree_type : UVG_BOTH_T;
+
   const int ctu_size = tree_type == UVG_CHROMA_T ? LCU_WIDTH_C : LCU_WIDTH;
 
   if (y0) {
