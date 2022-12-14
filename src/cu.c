@@ -499,12 +499,12 @@ int uvg_count_available_edge_cus(const cu_loc_t* const cu_loc, const lcu_t* cons
   int amount = 0;
   if(left) {
     if (cu_loc->local_y == 0 && cu_loc->local_x == 32 && cu_loc->height == 32 && cu_loc->width == 32) return 8;
-    while (LCU_GET_CU_AT_PX(lcu, cu_loc->local_x - TR_MIN_WIDTH, cu_loc->local_y + amount)->type != CU_NOTSET && (cu_loc->local_y + amount) < LCU_WIDTH) {
+    while (cu_loc->local_y + amount < LCU_WIDTH && LCU_GET_CU_AT_PX(lcu, cu_loc->local_x - TR_MIN_WIDTH, cu_loc->local_y + amount)->type != CU_NOTSET) {
       amount += TR_MIN_WIDTH;
     }
     return MAX(amount / TR_MIN_WIDTH, cu_loc->height / TR_MIN_WIDTH);
   }
-  while (LCU_GET_CU_AT_PX(lcu, cu_loc->local_x + amount, cu_loc->local_y - TR_MIN_WIDTH)->type != CU_NOTSET && cu_loc->local_x + amount < LCU_WIDTH) {
+  while (cu_loc->local_x + amount < LCU_WIDTH && LCU_GET_CU_AT_PX(lcu, cu_loc->local_x + amount, cu_loc->local_y - TR_MIN_WIDTH)->type != CU_NOTSET) {
     amount += TR_MIN_WIDTH;
   }
   return MAX(amount / TR_MIN_WIDTH, cu_loc->width / TR_MIN_WIDTH);
@@ -520,12 +520,12 @@ int uvg_count_chroma_tree_available_edge_cus(int x, int y, int width, int height
 
   int amount = 0;
   if(left) {
-    while (LCU_GET_CU_AT_PX(lcu, local_x - TR_MIN_WIDTH, local_y + amount)->type != CU_NOTSET && (local_y + amount) < LCU_WIDTH_C) {
+    while (local_y + amount < LCU_WIDTH_C && LCU_GET_CU_AT_PX(lcu, local_x - TR_MIN_WIDTH, local_y + amount)->type != CU_NOTSET) {
       amount += TR_MIN_WIDTH;
     }
     return MAX(amount / TR_MIN_WIDTH, height / TR_MIN_WIDTH);
   }
-  while (LCU_GET_CU_AT_PX(lcu, local_x + amount, local_y - TR_MIN_WIDTH)->type != CU_NOTSET && local_x + amount < LCU_WIDTH_C) {
+  while (local_x + amount < LCU_WIDTH_C && LCU_GET_CU_AT_PX(lcu, local_x + amount, local_y - TR_MIN_WIDTH)->type != CU_NOTSET) {
     amount += TR_MIN_WIDTH;
   }
   return MAX(amount / TR_MIN_WIDTH, width / TR_MIN_WIDTH);
