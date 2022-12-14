@@ -165,6 +165,14 @@ static INLINE void initialize_partial_work_tree(lcu_t* from, lcu_t *to, const cu
     for (int y = y_start; y < y_limit; y += SCU_WIDTH) {
       *LCU_GET_CU_AT_PX(to, x_start, y) = *LCU_GET_CU_AT_PX(from, x_start, y);
     }
+
+    for(int y = chroma_loc->local_y; y < chroma_loc->local_y + chroma_loc->height; y += SCU_WIDTH) {
+      for (int x = chroma_loc->local_x; x < chroma_loc->local_x + chroma_loc->width; x += SCU_WIDTH) {
+        if(x >= cu_loc->local_x && y>= cu_loc->local_y) continue;
+        *LCU_GET_CU_AT_PX(to, x, y) = *LCU_GET_CU_AT_PX(from, x, y);
+      }      
+    }
+
     if (chroma_loc->local_x == 0) {
       to->left_ref = from->left_ref;
       *LCU_GET_TOP_RIGHT_CU(to) = *LCU_GET_TOP_RIGHT_CU(from);      
