@@ -450,7 +450,7 @@ static void downsample_cclm_rec(encoder_state_t *state, int x, int y, int width,
   if((y + height * 2) % 64 == 0) {
     int line = y / 64 * stride2 / 2;
     y_rec -= LCU_WIDTH;
-    for (int i = 0; i < width; ++i) {
+    for (int i = 0; i < width && i + x < stride2 / 2; ++i) {
       int s = 2;
       s += y_rec[i * 2] * 2;
       s += y_rec[i * 2 + 1];
