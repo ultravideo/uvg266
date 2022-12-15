@@ -165,6 +165,9 @@ static INLINE void initialize_partial_work_tree(lcu_t* from, lcu_t *to, const cu
     for (int y = y_start; y < y_limit; y += SCU_WIDTH) {
       *LCU_GET_CU_AT_PX(to, x_start, y) = *LCU_GET_CU_AT_PX(from, x_start, y);
     }
+    for (int x = x_start; x < y_limit; x += SCU_WIDTH) {
+      *LCU_GET_CU_AT_PX(to, x, y_start) = *LCU_GET_CU_AT_PX(from, x, y_start);
+    }
 
     for(int y = chroma_loc->local_y; y < chroma_loc->local_y + chroma_loc->height; y += SCU_WIDTH) {
       for (int x = chroma_loc->local_x; x < chroma_loc->local_x + chroma_loc->width; x += SCU_WIDTH) {
