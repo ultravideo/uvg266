@@ -2615,7 +2615,7 @@ const uint32_t* const uvg_get_scan_order_table(int scan_group, int scan_type, in
     return g_scan_order[scan_group][log2_w][log2_h];
   }
   else {
-    if (log2_w == 1 || log2_h == 1) {
+    if (log2_w <= 1 || log2_h <= 1) {
       // Just return array containing [0, 15] in order
       return g_scan_order[scan_group][0][4];
     }

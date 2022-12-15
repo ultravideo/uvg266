@@ -1461,7 +1461,7 @@ void uvg_rdoq(
 
   const uint32_t cg_size = 16;
   const int32_t  shift = 4 >> 1;
-  const uint32_t num_blk_side = width >> shift;
+  const uint32_t num_blk_side = MAX(width >> shift, 1);
   double   cost_coeffgroup_sig[ 64 ];
   uint32_t sig_coeffgroup_flag[ 64 ];
 
