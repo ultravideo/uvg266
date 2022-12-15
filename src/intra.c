@@ -1495,8 +1495,7 @@ void uvg_intra_build_reference_inner(
   if (px.y % 4 != 0) {
     do {
       out_left_ref[i + 1] = left_border[(i + 0 - multi_ref_index) * left_stride];
-      out_left_ref[i + 2] = left_border[(i + 1 - multi_ref_index) * left_stride];
-      i += 2;
+      i += 1;
     } while (i < px_available_left);
   }
   else {
