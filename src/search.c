@@ -1093,7 +1093,7 @@ static void mark_deblocking(const cu_loc_t* const cu_loc, const cu_loc_t* const 
       }
       else if (cu_loc->height == 64) {
         for (int x = chroma_loc->local_x; x < chroma_loc->local_x + chroma_loc->width; x += SCU_WIDTH) {
-          LCU_GET_CU_AT_PX(lcu, x, TR_MAX_WIDTH)->chroma_deblocking |= EDGE_VER;
+          LCU_GET_CU_AT_PX(lcu, x, TR_MAX_WIDTH)->chroma_deblocking |= EDGE_HOR;
         }
       }
     }
@@ -1122,7 +1122,7 @@ static void mark_deblocking(const cu_loc_t* const cu_loc, const cu_loc_t* const 
     }
     else if (chroma_loc->height == 64) {
       for (int x = x_local; x < x_local + chroma_loc->chroma_width; x += SCU_WIDTH) {
-        LCU_GET_CU_AT_PX(lcu, x, TR_MAX_WIDTH / 2)->chroma_deblocking |= EDGE_VER;
+        LCU_GET_CU_AT_PX(lcu, x, TR_MAX_WIDTH / 2)->chroma_deblocking |= EDGE_HOR;
       }
     }
   }
