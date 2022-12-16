@@ -429,7 +429,7 @@ static void downsample_cclm_rec(encoder_state_t *state, int x, int y, int width,
   const int stride = state->tile->frame->rec->stride;
   const int stride2 = (((state->tile->frame->width + 7) & ~7) + FRAME_PADDING_LUMA);
 
-  for (int y_ = 0; y_ < height && y_ * 2 + y < state->encoder_control->cfg.height; y_++) {
+  for (int y_ = 0; y_ < height && y_ * 2 + y < state->tile->frame->height; y_++) {
     for (int x_ = 0; x_ < width; x_++) {
       int s = 4;
       s += y_rec[2 * x_] * 2;
