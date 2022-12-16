@@ -1439,7 +1439,7 @@ void uvg_encode_coding_tree(
   
   DBG_YUVIEW_VALUE(state->frame->poc, DBG_YUVIEW_CU_TYPE, abs_x, abs_y, cu_width, cu_height, cur_cu->type-1);
 
-  // fprintf(stderr, "%4d %4d %2d %2d %d %d\n", x, y, cu_width, cu_height, has_chroma, cur_cu->split_tree);
+  // fprintf(stderr, "%4d %4d %2d %2d %d %d %d\n", x, y, cu_width, cu_height, has_chroma, tree_type, cur_cu->split_tree);
 
   if (ctrl->cfg.lossless) {
     cabac->cur_ctx = &cabac->ctx.cu_transquant_bypass;
