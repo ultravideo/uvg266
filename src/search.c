@@ -449,7 +449,7 @@ static void downsample_cclm_rec(encoder_state_t *state, int x, int y, int width,
   if((y + height * 2) % 64 == 0) {
     int line = y / 64 * stride2 / 2;
     y_rec -= LCU_WIDTH;
-    for (int i = 0; i < width && i + x < stride2 / 2; ++i) {
+    for (int i = 0; i < width && i + x / 2 < stride2 / 2; ++i) {
       int s = 2;
       s += y_rec[i * 2] * 2;
       s += y_rec[i * 2 + 1];
@@ -1523,6 +1523,31 @@ static double search_cu(
       is_separate_tree,
       x_local,
       y_local);
+    if (cur_cu->type == CU_INTRA && cur_cu->intra.isp_mode != ISP_MODE_NO_ISP && tree_type != UVG_CHROMA_T) {
+      const int split_num = uvg_get_isp_split_num( cu_width, cu_height, cur_cu->intra.isp_mode,true);
+      for (int i = 1; i < split_num; i++) {
+        cu_loc_t isp_loc;
+        uvg_get_isp_split_loc(
+          &isp_loc,
+          x,
+          y,
+          cu_width,
+          cu_height,
+          i,
+          cur_cu->intra.isp_mode,
+          true);
+        if (x % 4 || y % 4) continue;
+        mark_deblocking(
+          &isp_loc,
+          chroma_loc,
+          lcu,
+          UVG_LUMA_T,
+          false,
+          false,
+          isp_loc.local_x,
+          isp_loc.local_y);
+      }
+    }
   } 
 
   bool can_split_cu =
