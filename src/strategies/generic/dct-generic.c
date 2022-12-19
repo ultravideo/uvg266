@@ -2599,8 +2599,8 @@ static void mts_dct_generic(
       }
     }
 
-    partial_tr_func* dct_hor = dct_table[type_hor][log2_width_minus1];
-    partial_tr_func* dct_ver = dct_table[type_ver][log2_height_minus1];
+    partial_tr_func* dct_hor = width != 1 ? dct_table[type_hor][log2_width_minus1] : NULL;
+    partial_tr_func* dct_ver = height != 1 ? dct_table[type_ver][log2_height_minus1] : NULL;
 
     int16_t tmp[32 * 32];
     const int32_t shift_1st = log2_width_minus1 + bitdepth - 8;
@@ -2655,8 +2655,8 @@ static void mts_idct_generic(
       }
     }
 
-    partial_tr_func* idct_hor = idct_table[type_hor][log2_width_minus1];
-    partial_tr_func* idct_ver = idct_table[type_ver][log2_height_minus1];
+    partial_tr_func* idct_hor = width != 1 ? idct_table[type_hor][log2_width_minus1] : NULL;
+    partial_tr_func* idct_ver = height != 1 ? idct_table[type_ver][log2_height_minus1] : NULL;
 
     int16_t tmp[32 * 32];
     const int max_log2_tr_dynamic_range = 15;
