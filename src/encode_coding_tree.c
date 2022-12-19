@@ -115,8 +115,8 @@ bool uvg_is_lfnst_allowed(
 {
   if (state->encoder_control->cfg.lfnst && pred_cu->type == CU_INTRA && PU_IS_TU(pred_cu)) {
     const int isp_mode = pred_cu->intra.isp_mode;
-    const int cu_width = tree_type != UVG_CHROMA_T ? cu_loc->width : cu_loc->chroma_width;
-    const int cu_height = tree_type != UVG_CHROMA_T ? cu_loc->height : cu_loc->chroma_height;
+    const int cu_width  = tree_type != UVG_CHROMA_T ? 1 << pred_cu->log2_width : 1 << pred_cu->log2_chroma_width;
+    const int cu_height = tree_type != UVG_CHROMA_T ? 1 << pred_cu->log2_height : 1 << pred_cu->log2_chroma_height;
     bool can_use_lfnst_with_mip = (cu_width >= 16 && cu_height >= 16);
     bool is_sep_tree = tree_type != UVG_BOTH_T;
     bool mip_flag = pred_cu->type == CU_INTRA && color == COLOR_Y ? pred_cu->intra.mip_flag : false;
