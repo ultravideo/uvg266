@@ -1492,7 +1492,7 @@ void uvg_intra_build_reference_inner(
   int i = multi_ref_index;  // Offset by multi_ref_index
   
   // Do different loop for heights smaller than 4 (possible for some ISP splits)
-  if (px.y % 4 != 0) {
+  if (px.y % 4 != 0 || px_available_left < 4) {
     do {
       out_left_ref[i + 1] = left_border[(i + 0 - multi_ref_index) * left_stride];
       i += 1;
