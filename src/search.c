@@ -190,15 +190,27 @@ static INLINE void initialize_partial_work_tree(
       to->top_ref = from->top_ref;
       *LCU_GET_TOP_RIGHT_CU(to) = *LCU_GET_TOP_RIGHT_CU(from);      
     }
-  }
-  if (x_limit != LCU_WIDTH >> (tree_type == UVG_CHROMA_T)) {
-    for (int y = y_start; y < y_limit; y += SCU_WIDTH) {
-      memset(LCU_GET_CU_AT_PX(to, x_limit, y), 0, sizeof(cu_info_t));
+    if (x_limit != LCU_WIDTH >> (tree_type == UVG_CHROMA_T)) {
+      for (int y = y_start; y < y_limit; y += SCU_WIDTH) {
+        memset(LCU_GET_CU_AT_PX(to, x_limit, y), 0, sizeof(cu_info_t));
+      }
+    }
+    if (y_limit != LCU_WIDTH >> (tree_type == UVG_CHROMA_T)) {
+      for (int x = x_start; x < x_limit; x += SCU_WIDTH) {
+        memset(LCU_GET_CU_AT_PX(to, x, y_limit), 0, sizeof(cu_info_t));
+      }
     }
   }
-  if (y_limit != LCU_WIDTH >> (tree_type == UVG_CHROMA_T)) {
-    for (int x = x_start; x < x_limit; x += SCU_WIDTH) {
-      memset(LCU_GET_CU_AT_PX(to, x, y_limit), 0, sizeof(cu_info_t));
+  else {
+    if (x_limit != LCU_WIDTH >> (tree_type == UVG_CHROMA_T)) {
+      for (int y = y_start; y < y_limit; y += SCU_WIDTH) {
+        memset(LCU_GET_CU_AT_PX(to, x_limit, y), 0, sizeof(cu_info_t));
+      }
+    }
+    if (y_limit != LCU_WIDTH >> (tree_type == UVG_CHROMA_T)) {
+      for (int x = x_start; x < x_limit; x += SCU_WIDTH) {
+        memset(LCU_GET_CU_AT_PX(to, x, y_limit), 0, sizeof(cu_info_t));
+      }
     }
   }
 }
