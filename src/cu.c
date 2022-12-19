@@ -496,7 +496,7 @@ int uvg_count_available_edge_cus(const cu_loc_t* const cu_loc, const lcu_t* cons
   if (left && cu_loc->local_x == 0) return (LCU_WIDTH - cu_loc->local_y) / 4;
   if (!left && cu_loc->local_y == 0) return (cu_loc->width) / 2;
 
-  int amount = 0;
+  int amount = left ? cu_loc->height & ~3 : cu_loc->width & ~3;
   if(left) {
     const cu_info_t* cu = LCU_GET_CU_AT_PX(lcu, cu_loc->local_x, cu_loc->local_y);
     if (cu_loc->local_y == 0 && cu_loc->local_x == 32 && cu->log2_height == 6 && cu->log2_width == 6) return 8;
