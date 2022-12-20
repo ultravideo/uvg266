@@ -36,6 +36,7 @@
 
 #include "cu.h"
 #include "encoder.h"
+#include "intra.h"
 #include "uvg266.h"
 #include "transform.h"
 #include "videoframe.h"
@@ -834,10 +835,40 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
       const int cu_height = 1 << cu_q->log2_height;
       const int pu_size = dir == EDGE_HOR ? cu_height : cu_width;
       const int pu_pos = dir == EDGE_HOR ? y_coord : x_coord;
+      int tu_size_q_side = 0;
+      if (cu_q->type == CU_INTRA && cu_q->intra.isp_mode != ISP_MODE_NO_ISP) {
+        if (cu_q->intra.isp_mode == ISP_MODE_VER && dir == EDGE_VER) {
+          tu_size_q_side = MAX(4, cu_height >> 2);
+        } else if (cu_q->intra.isp_mode == ISP_MODE_HOR && dir == EDGE_HOR) {
+          tu_size_q_side = MAX(4, cu_width >> 2);
+        } else {
+          tu_size_q_side = dir == EDGE_HOR ?
+                             MIN(1 << cu_q->log2_height, TR_MAX_WIDTH) :
+                             MIN(1 << cu_q->log2_width, TR_MAX_WIDTH);
+        }
+      } else {
+        tu_size_q_side = dir == EDGE_HOR ?
+                           MIN(1 << cu_q->log2_height, TR_MAX_WIDTH) :
+                           MIN(1 << cu_q->log2_width, TR_MAX_WIDTH);
+      }
 
-
-      const int tu_size_p_side = dir == EDGE_HOR ? MIN(1 << cu_p->log2_height, TR_MAX_WIDTH) : MIN(1 << cu_p->log2_width, TR_MAX_WIDTH);
-      const int tu_size_q_side = dir == EDGE_HOR ? MIN(1 << cu_q->log2_height, TR_MAX_WIDTH) : MIN(1 << cu_q->log2_width, TR_MAX_WIDTH);
+      int tu_size_p_side = 0;
+      if (cu_p->type == CU_INTRA && cu_p->intra.isp_mode != ISP_MODE_NO_ISP) {
+        if (cu_p->intra.isp_mode == ISP_MODE_VER && dir == EDGE_VER) {
+          tu_size_p_side = MAX(4, (1 << cu_p->log2_height) >> 2);
+        } else if (cu_p->intra.isp_mode == ISP_MODE_HOR && dir == EDGE_HOR) {
+          tu_size_p_side = MAX(4, (1 << cu_p->log2_width) >> 2);
+        } else {
+          tu_size_p_side = dir == EDGE_HOR ?
+                             MIN(1 << cu_p->log2_height, TR_MAX_WIDTH) :
+                             MIN(1 << cu_p->log2_width, TR_MAX_WIDTH);
+        }
+      } else {
+        tu_size_p_side = dir == EDGE_HOR ?
+                           MIN(1 << cu_p->log2_height, TR_MAX_WIDTH) :
+                           MIN(1 << cu_p->log2_width, TR_MAX_WIDTH);
+        
+      }
 
       get_max_filter_length(&max_filter_length_P, &max_filter_length_Q, state, x_coord, y_coord,
                             dir, tu_boundary,
