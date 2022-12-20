@@ -1445,7 +1445,7 @@ int8_t uvg_search_intra_chroma_rdo(
     const int offset = ((cu_loc->local_x) >> 1) + ((cu_loc->local_y) >> 1)* LCU_WIDTH_C;
 
     int lfnst_modes_to_check[3];
-    if((is_separate || tree_type == UVG_CHROMA_T) && state->encoder_control->cfg.lfnst && PU_IS_TU(&chroma_data->pred_cu) ) {
+    if((is_separate || tree_type == UVG_CHROMA_T) && state->encoder_control->cfg.lfnst && PU_IS_TU(&chroma_data->pred_cu) && chroma_height >= 4 && chroma_width >= 4) {
       for (int i = 0; i < 3; ++i) {
         lfnst_modes_to_check[i] = i;
       }
