@@ -1567,7 +1567,7 @@ static double search_cu(
           i,
           cur_cu->intra.isp_mode,
           true);
-        if (x % 4 || y % 4) continue;
+        if (isp_loc.x % 4 || isp_loc.y % 4) continue;
         mark_deblocking(
           &isp_loc,
           chroma_loc,
