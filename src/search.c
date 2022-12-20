@@ -537,8 +537,9 @@ double uvg_cu_rd_cost_luma(
     return sum + tr_tree_bits * state->lambda;
   }
 
+  const bool is_not_isp = pred_cu->type == CU_INTER || pred_cu->intra.isp_mode == ISP_MODE_NO_ISP;
   // Add transform_tree cbf_luma bit cost.
-  if (pred_cu->type == CU_INTER || pred_cu->intra.isp_mode == ISP_MODE_NO_ISP) {
+  if (is_not_isp) {
     const int depth = 6 - uvg_g_convert_to_log2[cu_loc->width];
     int is_set = cbf_is_set(pred_cu->cbf, COLOR_Y);
     if (pred_cu->type == CU_INTRA ||
@@ -561,8 +562,9 @@ double uvg_cu_rd_cost_luma(
     // TODO: 8x4 CUs
     const int split_limit = uvg_get_isp_split_num(cu_loc->width, cu_loc->height, pred_cu->intra.isp_mode, true);
     int luma_ctx = 2;
+    const int split_limit_minus_one = split_limit - 1;
     for (int i = 0; i < split_limit; i++) {
-      if (i != 3 && isp_cbf != 0x8) {
+      if (i != split_limit_minus_one || isp_cbf != 1 << split_limit_minus_one) {
         const int flag = (isp_cbf >> i) & 1;
         CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.qt_cbf_model_luma[luma_ctx]), flag, tr_tree_bits, "cbf_y_search");
         luma_ctx = 2 + flag;
@@ -582,7 +584,7 @@ double uvg_cu_rd_cost_luma(
 
   if (!skip_residual_coding) {
     int8_t luma_scan_mode = SCAN_DIAG;
-    if (pred_cu->type == CU_INTER || pred_cu->intra.isp_mode == ISP_MODE_NO_ISP) {
+    if (is_not_isp) {
       //const coeff_t* coeffs = &lcu->coeff.y[xy_to_zorder(LCU_WIDTH, x_px, y_px)];
       const coeff_t* coeffs = lcu->coeff.y;
 
@@ -794,9 +796,10 @@ static double cu_rd_cost_tr_split_accurate(
   else {
     // TODO: 8x4 CUs
     const int split_limit = uvg_get_isp_split_num(width, height, pred_cu->intra.isp_mode, true);
+    int luma_ctx = 2;
+    const int split_limit_minus_one = split_limit - 1;
     for (int i = 0; i < split_limit; i++) {
-      int luma_ctx = 2;
-      if (i != 3 && isp_cbf != 0x8) {
+      if (i != split_limit_minus_one || isp_cbf != 1 << split_limit_minus_one) {
         const int flag = (isp_cbf >> i) & 1;
         CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.qt_cbf_model_luma[luma_ctx]), flag, tr_tree_bits, "cbf_y_search");
         luma_ctx = 2 + flag;
@@ -828,7 +831,7 @@ static double cu_rd_cost_tr_split_accurate(
                                && height <= (1 << state->encoder_control->cfg.trskip_max_size)
                                && !is_isp;
 
-  if(cb_flag_y){
+  if(cb_flag_y || is_isp){
     if (can_use_tr_skip) {
       CABAC_FBITS_UPDATE(cabac, &cabac->ctx.transform_skip_model_luma, tr_cu->tr_idx == MTS_SKIP, tr_tree_bits, "transform_skip_flag");
     }
@@ -935,7 +938,7 @@ static double cu_rd_cost_tr_split_accurate(
   }
 
   const bool is_chroma_tree = is_local_sep_tree || tree_type == UVG_CHROMA_T;
-  if (uvg_is_lfnst_allowed(state, tr_cu, is_local_sep_tree ? UVG_CHROMA_T : tree_type, is_chroma_tree ? COLOR_UV : COLOR_Y, is_chroma_tree ? chroma_loc : cu_loc, lcu)) {
+  if (uvg_is_lfnst_allowed(state, tr_cu, is_local_sep_tree ? UVG_CHROMA_T : tree_type, is_chroma_tree ? COLOR_UV : COLOR_Y, is_chroma_tree ? chroma_loc : cu_loc, lcu) && tree_type != UVG_LUMA_T) {
     const int lfnst_idx = is_chroma_tree ? tr_cu->cr_lfnst_idx : tr_cu->lfnst_idx;
     CABAC_FBITS_UPDATE(
       cabac,
@@ -1251,6 +1254,8 @@ static double search_cu(
     cur_cu->log2_chroma_width = uvg_g_convert_to_log2[chroma_loc->chroma_width];
   }
 
+  intra_search_data_t intra_search;
+
   // If the CU is completely inside the frame at this depth, search for
   // prediction modes at this depth.
   if ( x + luma_width <= frame_width && y + luma_height <= frame_height)
@@ -1300,7 +1305,6 @@ static double search_cu(
         (y & ~(cu_width_intra_min - 1)) + cu_width_intra_min > frame_height) &&
       !(state->encoder_control->cfg.force_inter && state->frame->slicetype != UVG_SLICE_I);
 
-    intra_search_data_t intra_search;
     intra_search.cost = 0;
     if (can_use_intra && !skip_intra) {
       intra_search.pred_cu = *cur_cu;
@@ -1521,7 +1525,7 @@ static double search_cu(
     
     cost = bits * state->lambda;
 
-    cost += cu_rd_cost_tr_split_accurate(state, cur_cu, lcu, tree_type, 0, cu_loc, chroma_loc, has_chroma);
+    cost += cu_rd_cost_tr_split_accurate(state, cur_cu, lcu, tree_type, intra_search.best_isp_cbfs, cu_loc, chroma_loc, has_chroma);
     //fprintf(stderr, "%4d %4d %2d %2d %d %d %f\n", x, y, cu_width, cu_height, has_chroma, cur_cu->split_tree, cost);
     
     //if (ctrl->cfg.zero_coeff_rdo && inter_zero_coeff_cost <= cost) {
