@@ -33,6 +33,7 @@
 #include "rdo.h"
 
 #include <errno.h>
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
@@ -1420,7 +1421,7 @@ void uvg_rdoq(
   bool needs_block_size_trafo_scale = !false && ((log2_block_width + log2_block_height) % 2 == 1);
   needs_block_size_trafo_scale |= 0; // Non log2 block size
 
-  int32_t  transform_shift   = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - ((log2_block_width + log2_block_height) >> 1) + needs_block_size_trafo_scale;  // Represents scaling through forward transform
+  int32_t  transform_shift   = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - ((log2_block_width + log2_block_height) >> 1);  // Represents scaling through forward transform
   uint16_t go_rice_param     = 0;
   uint32_t reg_bins = (width * height * 28) >> 4;
   
@@ -1428,7 +1429,7 @@ void uvg_rdoq(
 
   int32_t qp_scaled = uvg_get_scaled_qp(color, state->qp, (encoder->bitdepth - 8) * 6, encoder->qp_map[0]);
   
-  int32_t q_bits = QUANT_SHIFT + qp_scaled/6 + transform_shift;
+  int32_t q_bits = QUANT_SHIFT + qp_scaled/6 + transform_shift - needs_block_size_trafo_scale;
 
   const double lambda = color ? state->c_lambda : state->lambda;
   const int32_t default_quant_coeff = uvg_g_quant_scales[needs_block_size_trafo_scale][qp_scaled % 6];
@@ -1473,7 +1474,14 @@ void uvg_rdoq(
   int32_t cg_last_scanpos = -1;
   int32_t last_scanpos = -1;
 
-  uint32_t cg_num = width * height >> 4;
+  uint32_t       cg_num          = lfnst_idx > 0 ? 1 : width * height >> 4;
+
+  double         dTransShift = (double)transform_shift + (needs_block_size_trafo_scale ? -0.5 : 0.0);
+  // Compensate for scaling of bitcount in Lagrange cost function
+  double scale       = CTX_FRAC_ONE_BIT;
+  // Compensate for scaling through forward transform
+  scale              = scale * pow(2.0, -2.0 * dTransShift);
+  const double  default_error_scale = scale / default_quant_coeff / default_quant_coeff;
 
   // Explicitly tell the only possible numbers of elements to be zeroed.
   // Hope the compiler is able to utilize this information.
@@ -1502,14 +1510,14 @@ void uvg_rdoq(
 
   //Find last cg and last scanpos
   const int max_lfnst_pos = ((height == 4 && width == 4) || (height == 8 && width == 8)) ? 7 : 15;
-  int32_t cg_scanpos;
+  int32_t   cg_scanpos;
+  uint32_t  max_scan_group_size = lfnst_idx > 0 ? max_lfnst_pos : cg_size - 1;
   for (cg_scanpos = (cg_num - 1); cg_scanpos >= 0; cg_scanpos--)
   {
-    for (int32_t scanpos_in_cg = (cg_size - 1); scanpos_in_cg >= 0; scanpos_in_cg--)
+    for (int32_t scanpos_in_cg = max_scan_group_size; scanpos_in_cg >= 0; scanpos_in_cg--)
     {
       int32_t  scanpos        = cg_scanpos*cg_size + scanpos_in_cg;
-
-      if (lfnst_idx > 0 && scanpos > max_lfnst_pos) break;
+      
       uint32_t blkpos         = scan[scanpos];
       int32_t q               = use_scaling_list ? quant_coeff[blkpos] : default_quant_coeff;
       int32_t level_double    = coef[blkpos];
@@ -1518,7 +1526,7 @@ void uvg_rdoq(
 
       double err = (double)level_double;
 
-      cost_coeff0[scanpos] = err * err * err_scale[blkpos];      
+      cost_coeff0[scanpos] = err * err * (use_scaling_list ? err_scale[blkpos] : default_error_scale);      
       
       dest_coeff[blkpos] = max_abs_level;
       if (max_abs_level > 0) {
@@ -1548,21 +1556,21 @@ void uvg_rdoq(
     uint32_t cg_pos_x   = cg_blkpos - (cg_pos_y * num_blk_side);
 
     FILL(rd_stats, 0);
-    for (int32_t scanpos_in_cg = cg_size - 1; scanpos_in_cg >= 0; scanpos_in_cg--)  {
+    for (int32_t scanpos_in_cg = max_scan_group_size; scanpos_in_cg >= 0; scanpos_in_cg--)  {
       int32_t  scanpos = cg_scanpos*cg_size + scanpos_in_cg;
       if (scanpos > last_scanpos) {
         continue;
       }
       uint32_t blkpos         = scan[scanpos];
-      int32_t q               = quant_coeff[blkpos];
-      double temp             = err_scale[blkpos];
+      int32_t q               = use_scaling_list ? quant_coeff[blkpos] : default_quant_coeff;
+      double temp             = (use_scaling_list ? err_scale[blkpos] : default_error_scale);
       int32_t level_double    = coef[blkpos];
       level_double            = MIN(abs(level_double) * q , MAX_INT - (1 << (q_bits - 1)));
       uint32_t max_abs_level  = (level_double + (1 << (q_bits - 1))) >> q_bits;
       dest_coeff[blkpos] = max_abs_level;
       double err = (double)level_double;
 
-      cost_coeff0[scanpos] = err * err * err_scale[blkpos];
+      cost_coeff0[scanpos] = err * err * (use_scaling_list ? err_scale[blkpos] : default_error_scale);
 
       block_uncoded_cost      += cost_coeff0[ scanpos ];
 
@@ -1698,7 +1706,7 @@ void uvg_rdoq(
             cost_coeffgroup_sig[cg_scanpos] = lambda * CTX_ENTROPY_BITS(&base_coeff_group_ctx[ctx_sig], 0);
 
             // reset coeffs to 0 in this block
-            for (int32_t scanpos_in_cg = cg_size - 1; scanpos_in_cg >= 0; scanpos_in_cg--) {
+            for (int32_t scanpos_in_cg = max_scan_group_size; scanpos_in_cg >= 0; scanpos_in_cg--) {
               int32_t  scanpos = cg_scanpos*cg_size + scanpos_in_cg;
               uint32_t blkpos = scan[scanpos];
               if (dest_coeff[blkpos]){
@@ -1751,7 +1759,7 @@ void uvg_rdoq(
     base_cost -= cost_coeffgroup_sig[cg_scanpos];
 
     if (sig_coeffgroup_flag[ cg_blkpos ]) {
-      for ( int32_t scanpos_in_cg = cg_size - 1; scanpos_in_cg >= 0; scanpos_in_cg--) {
+      for ( int32_t scanpos_in_cg = max_scan_group_size; scanpos_in_cg >= 0; scanpos_in_cg--) {
         int32_t  scanpos = cg_scanpos*cg_size + scanpos_in_cg;
         if (scanpos > last_scanpos) continue;
         uint32_t blkpos  = scan[scanpos];
