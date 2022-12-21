@@ -298,12 +298,18 @@ static double search_intra_trdepth(
   double split_cost = INT32_MAX;
   double nosplit_cost = INT32_MAX;
 
+  cabac_data_t cabac_data;
+  memcpy(&cabac_data, &state->search_cabac, sizeof(cabac_data_t));
+  state->search_cabac.update = 1;
+
   if (width <= TR_MAX_WIDTH && height <= TR_MAX_WIDTH) {
 
     const bool mts_enabled = (state->encoder_control->cfg.mts == UVG_MTS_INTRA || state->encoder_control->cfg.mts == UVG_MTS_BOTH)
       && PU_IS_TU(pred_cu);
 
     nosplit_cost = 0.0;
+    const bool has_been_split = 1 << pred_cu->log2_width != cu_loc->width ||
+                                1 << pred_cu->log2_height != cu_loc->height;
 
     cbf_clear(&pred_cu->cbf, COLOR_Y);
     if (reconstruct_chroma) {
@@ -345,9 +351,7 @@ static double search_intra_trdepth(
     if(pred_cu->intra.mip_flag && (width < 16 || height < 16)) {
       max_lfnst_idx = 0;
     }
-
-    const bool is_local_dual_tree = pred_cu->log2_width + pred_cu->log2_height < 6 && tree_type == UVG_BOTH_T;
-
+    
     int start_idx = 0;
     int end_idx = state->encoder_control->cfg.lfnst && PU_IS_TU(pred_cu) &&
                   uvg_can_use_isp_with_lfnst(width, height, pred_cu->intra.isp_mode, tree_type) ? max_lfnst_idx : 0;
@@ -431,6 +435,12 @@ static double search_intra_trdepth(
             continue;
           }
         }
+
+        if (!has_been_split) {
+          memcpy(&state->search_cabac, &cabac_data, sizeof(cabac_data));
+          state->search_cabac.update = 1;
+        }
+
         double rd_cost = uvg_cu_rd_cost_luma(
           state,
           cu_loc,
@@ -442,8 +452,7 @@ static double search_intra_trdepth(
             trafo != MTS_SKIP) {
           if (!constraints[0] && constraints[1]) {
             transform_bits += CTX_ENTROPY_FBITS(
-              &state->search_cabac.ctx.lfnst_idx_model[is_local_dual_tree ||
-                tree_type == UVG_LUMA_T],
+              &state->search_cabac.ctx.lfnst_idx_model[tree_type == UVG_LUMA_T],
               lfnst_idx != 0);
             if (lfnst_idx > 0) {
               transform_bits += CTX_ENTROPY_FBITS(
@@ -593,6 +602,7 @@ static double search_intra_trdepth(
       split_cost += search_intra_trdepth(state, &split_cu_loc[i], nosplit_cost, search_data, lcu, tree_type);
     }
   }
+  memcpy(&state->search_cabac, &cabac_data, sizeof(cabac_data));
 
   if (!PU_IS_TU(pred_cu) || split_cost < nosplit_cost) {
     return split_cost;
