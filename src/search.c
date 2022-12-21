@@ -1309,7 +1309,7 @@ static double search_cu(
     if (can_use_intra && !skip_intra) {
       intra_search.pred_cu = *cur_cu;
       if(tree_type != UVG_CHROMA_T) {
-        uvg_search_cu_intra(state, &intra_search, lcu, tree_type, cu_loc);
+        uvg_search_cu_intra(state, &intra_search, lcu, is_separate_tree ? UVG_LUMA_T : tree_type, cu_loc);
       }
 #ifdef COMPLETE_PRED_MODE_BITS
       // Technically counting these bits would be correct, however counting
