@@ -571,6 +571,7 @@ static double search_intra_trdepth(
     // If the cost of any 1/4th of the transform is already larger than the
     // whole transform, assume that splitting further is a bad idea.
     if (nosplit_cost <= cost_treshold) {
+      memcpy(&state->search_cabac, &cabac_data, sizeof(cabac_data));
       return nosplit_cost;
     }
   }
