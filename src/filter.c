@@ -838,9 +838,9 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
       int tu_size_q_side = 0;
       if (cu_q->type == CU_INTRA && cu_q->intra.isp_mode != ISP_MODE_NO_ISP) {
         if (cu_q->intra.isp_mode == ISP_MODE_VER && dir == EDGE_VER) {
-          tu_size_q_side = MAX(4, cu_height >> 2);
-        } else if (cu_q->intra.isp_mode == ISP_MODE_HOR && dir == EDGE_HOR) {
           tu_size_q_side = MAX(4, cu_width >> 2);
+        } else if (cu_q->intra.isp_mode == ISP_MODE_HOR && dir == EDGE_HOR) {
+          tu_size_q_side = MAX(4,  cu_height >> 2);
         } else {
           tu_size_q_side = dir == EDGE_HOR ?
                              MIN(1 << cu_q->log2_height, TR_MAX_WIDTH) :
@@ -855,9 +855,9 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
       int tu_size_p_side = 0;
       if (cu_p->type == CU_INTRA && cu_p->intra.isp_mode != ISP_MODE_NO_ISP) {
         if (cu_p->intra.isp_mode == ISP_MODE_VER && dir == EDGE_VER) {
-          tu_size_p_side = MAX(4, (1 << cu_p->log2_height) >> 2);
-        } else if (cu_p->intra.isp_mode == ISP_MODE_HOR && dir == EDGE_HOR) {
           tu_size_p_side = MAX(4, (1 << cu_p->log2_width) >> 2);
+        } else if (cu_p->intra.isp_mode == ISP_MODE_HOR && dir == EDGE_HOR) {
+          tu_size_p_side = MAX(4, (1 << cu_p->log2_height) >> 2);
         } else {
           tu_size_p_side = dir == EDGE_HOR ?
                              MIN(1 << cu_p->log2_height, TR_MAX_WIDTH) :
