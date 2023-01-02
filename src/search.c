@@ -1647,6 +1647,7 @@ static double search_cu(
 
   can_split_cu &= can_split[1] || can_split[2] || can_split[3] || can_split[4] || can_split[5];
 
+  bool improved[6] = {false};
 
   // If skip mode was selected for the block, skip further search.
   // Skip mode means there's no coefficients in the block, so splitting
@@ -1654,7 +1655,7 @@ static double search_cu(
   // It is ok to interrupt the search as soon as it is known that
   // the split costs at least as much as not splitting.
   int cbf = cbf_is_set_any(cur_cu->cbf);
-  if (can_split_cu && (cur_cu->type == CU_NOTSET || cbf || state->encoder_control->cfg.cu_split_termination == UVG_CU_SPLIT_TERMINATION_OFF)) {
+  if (can_split_cu && (cur_cu->type == CU_NOTSET || cbf || state->encoder_control->cfg.cu_split_termination == UVG_CU_SPLIT_TERMINATION_OFF || true)) {
     lcu_t * split_lcu = MALLOC(lcu_t, 5);
     enum split_type best_split = 0;
     double best_split_cost = MAX_DOUBLE;
@@ -1667,6 +1668,26 @@ static double search_cu(
         || (tree_type == UVG_CHROMA_T && split_type == TT_HOR_SPLIT && cu_loc->chroma_height == 8)
         || (tree_type == UVG_CHROMA_T && split_type == BT_HOR_SPLIT && cu_loc->chroma_height == 4))
         continue;
+
+      // Best no split has no residual and same direction bt didn't improve so don't try tt
+      if (
+        !cbf && ((!improved[BT_VER_SPLIT] && split_type == TT_VER_SPLIT) ||
+        (!improved[BT_HOR_SPLIT] && split_type == TT_HOR_SPLIT)))
+          continue;
+
+      if (split_type == TT_HOR_SPLIT) {
+        if (LCU_GET_CU_AT_PX(&split_lcu[BT_HOR_SPLIT - 1], x_local, y_local)->log2_height == cur_cu->log2_height - 1 &&
+            LCU_GET_CU_AT_PX(&split_lcu[BT_HOR_SPLIT - 1], x_local, y_local + luma_height / 2)->log2_height == cur_cu->log2_height - 1) {
+          continue;
+        }
+      }
+      if (split_type == TT_VER_SPLIT) {
+        if (LCU_GET_CU_AT_PX(&split_lcu[BT_VER_SPLIT - 1], x_local, y_local)->log2_width == cur_cu->log2_width - 1 &&
+            LCU_GET_CU_AT_PX(&split_lcu[BT_VER_SPLIT - 1], x_local + luma_width / 2, y_local)->log2_width == cur_cu->log2_width - 1) {
+          continue;
+        }
+      }
+
       double split_cost = 0.0;
       memcpy(&state->search_cabac, &pre_search_cabac, sizeof(post_seach_cabac));
 
@@ -1709,6 +1730,8 @@ static double search_cu(
           );
       }
 
+      const double factor    = state->qp > 30 ? 1.1 : 1.075;
+      if (split_bits * state->frame->lambda + cost / factor > cost) continue;
 
       split_tree_t new_split = {
         split_tree.split_tree | split_type << (split_tree.current_depth * 3),
@@ -1720,6 +1743,8 @@ static double search_cu(
 
       state->search_cabac.update = 0;
       split_cost += split_bits * state->lambda;
+
+      bool stop_to_qt = split_type == QT_SPLIT;
 
       cu_loc_t new_cu_loc[4];
       uint8_t separate_chroma = 0;
@@ -1734,17 +1759,26 @@ static double search_cu(
           tree_type, new_split,
           !separate_chroma || (split == splits - 1 && has_chroma));
         // If there is no separate chroma the block will always have chroma, otherwise it is the last block of the split that has the chroma
+
+        if (split_type == QT_SPLIT) {
+          const cu_info_t * const t = LCU_GET_CU_AT_PX(&split_lcu[0], new_cu_loc[split].local_x, new_cu_loc[split].local_y);
+          stop_to_qt &= t->log2_height == cur_cu->log2_height - 1 && t->log2_width == cur_cu->log2_width;
+        }
+
         if (split_cost > cost || split_cost > best_split_cost) {
+          stop_to_qt = false;
           break;
         }
       }
 
+      improved[split_type] = cost > split_cost;
       
       if (split_cost < best_split_cost) {
         best_split_cost = split_cost;
         best_split = split_type;
         memcpy(&best_split_cabac, &state->search_cabac, sizeof(cabac_data_t));
       }
+      if (stop_to_qt) break;
     }
 
     // If no search is not performed for this depth, try just the best mode
