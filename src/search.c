@@ -1806,7 +1806,10 @@ static double search_cu(
         // If there is no separate chroma the block will always have chroma, otherwise it is the last block of the split that has the chroma
 
         if (split_type == QT_SPLIT && completely_inside) {
-          const cu_info_t * const t = LCU_GET_CU_AT_PX(&split_lcu[0], new_cu_loc[split].local_x, new_cu_loc[split].local_y);
+          const cu_info_t * const t = LCU_GET_CU_AT_PX(
+            &split_lcu[0],
+            new_cu_loc[split].local_x >> (tree_type == UVG_CHROMA_T),
+            new_cu_loc[split].local_y >> (tree_type == UVG_CHROMA_T));
           stop_to_qt |= GET_SPLITDATA(t, depth + 1) == QT_SPLIT;
         }
 
