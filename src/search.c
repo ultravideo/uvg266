@@ -1159,7 +1159,12 @@ static void mark_deblocking(const cu_loc_t* const cu_loc, const cu_loc_t* const 
   }
 }
 
-static bool check_for_early_termission(const int cu_width, const int cu_height, cu_info_t* cur_cu, int x_local, int y_local, bool improved[6], int cbf, lcu_t* split_lcu, int split_type)
+static bool check_for_early_termission(const int cu_width, const int cu_height, const cu_info_t* const cur_cu, int x_local, int y_local, const
+                                       bool* improved,
+                                       int cbf,
+                                       lcu_t* split_lcu,
+                                       int split_type,
+                                       const bool* can_split)
 {
   // Best no split has no residual and same direction bt didn't improve so don't try tt
   // 3.11
@@ -1170,7 +1175,7 @@ static bool check_for_early_termission(const int cu_width, const int cu_height, 
 
 
   // 3.8
-  if (split_type == TT_HOR_SPLIT) {
+  if (split_type == TT_HOR_SPLIT && can_split[BT_HOR_SPLIT]) {
     bool can_skip = true;
     for (int x_scu = x_local; x_scu < x_local + cu_width; x_scu += 4) {
       can_skip &=
@@ -1179,7 +1184,7 @@ static bool check_for_early_termission(const int cu_width, const int cu_height, 
     }
     if (can_skip) return true;
   }
-  if (split_type == TT_VER_SPLIT) {
+  if (split_type == TT_VER_SPLIT && can_split[BT_VER_SPLIT]) {
     bool can_skip = true;
     for (int y_scu = y_local; y_scu < y_local + cu_height; y_scu += 4) {
       can_skip &=
@@ -1292,9 +1297,10 @@ static double search_cu(
 
   intra_search_data_t intra_search;
 
+  const bool completely_inside = x + luma_width <= frame_width && y + luma_height <= frame_height;
   // If the CU is completely inside the frame at this depth, search for
   // prediction modes at this depth.
-  if ( x + luma_width <= frame_width && y + luma_height <= frame_height)
+  if ( completely_inside)
   {
     int cu_width_inter_min = LCU_WIDTH >> pu_depth_inter.max;
     bool can_use_inter =
@@ -1707,16 +1713,20 @@ static double search_cu(
         || (tree_type == UVG_CHROMA_T && split_type == BT_HOR_SPLIT && cu_loc->chroma_height == 4))
         continue;
 
-      if (check_for_early_termission(
-        cu_width,
-        cu_height,
-        cur_cu,
-        x_local,
-        y_local,
-        improved,
-        cbf,
-        split_lcu,
-        split_type)) continue;
+      if (completely_inside && check_for_early_termission(
+            cu_width,
+            cu_height,
+            cur_cu,
+            x_local,
+            y_local,
+            improved,
+            cbf,
+            split_lcu,
+            split_type,
+            can_split)) {
+        can_split[split_type] = false;
+        continue;
+      }
 
       double split_cost = 0.0;
       memcpy(&state->search_cabac, &pre_search_cabac, sizeof(post_seach_cabac));
@@ -1762,7 +1772,10 @@ static double search_cu(
 
       // 3.9
       const double factor    = state->qp > 30 ? 1.1 : 1.075;
-      if (split_bits * state->frame->lambda + cost / factor > cost) continue;
+      if (split_bits * state->frame->lambda + cost / factor > cost) {
+        can_split[split_type] = false;
+        continue;
+      }
 
       split_tree_t new_split = {
         split_tree.split_tree | split_type << (split_tree.current_depth * 3),
@@ -1792,12 +1805,13 @@ static double search_cu(
           !separate_chroma || (split == splits - 1 && has_chroma));
         // If there is no separate chroma the block will always have chroma, otherwise it is the last block of the split that has the chroma
 
-        if (split_type == QT_SPLIT) {
+        if (split_type == QT_SPLIT && completely_inside) {
           const cu_info_t * const t = LCU_GET_CU_AT_PX(&split_lcu[0], new_cu_loc[split].local_x, new_cu_loc[split].local_y);
           stop_to_qt |= GET_SPLITDATA(t, depth + 1) == QT_SPLIT;
         }
 
         if (split_cost > cost || split_cost > best_split_cost) {
+          can_split[split_type] = false;
           break;
         }
       }
