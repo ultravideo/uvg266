@@ -1158,6 +1158,38 @@ static void mark_deblocking(const cu_loc_t* const cu_loc, const cu_loc_t* const 
   }
 }
 
+static bool check_for_early_termission(const int cu_width, const int cu_height, cu_info_t* cur_cu, int x_local, int y_local, bool improved[6], int cbf, lcu_t* split_lcu, int split_type)
+{
+  // Best no split has no residual and same direction bt didn't improve so don't try tt
+  // 3.11
+  if (
+    !cbf && ((!improved[BT_VER_SPLIT] && split_type == TT_VER_SPLIT) ||
+             (!improved[BT_HOR_SPLIT] && split_type == TT_HOR_SPLIT)))
+    return true;
+
+
+  // 3.8
+  if (split_type == TT_HOR_SPLIT) {
+    bool can_skip = true;
+    for (int x_scu = x_local; x_scu < x_local + cu_width; x_scu += 4) {
+      can_skip &=
+        LCU_GET_CU_AT_PX(&split_lcu[BT_HOR_SPLIT - 1], x_scu, y_local)->log2_height == cur_cu->log2_height - 1 &&
+        LCU_GET_CU_AT_PX(&split_lcu[BT_HOR_SPLIT - 1], x_scu, y_local + cu_height / 2)->log2_height == cur_cu->log2_height - 1;
+    }
+    if (can_skip) return true;
+  }
+  if (split_type == TT_VER_SPLIT) {
+    bool can_skip = true;
+    for (int y_scu = y_local; y_scu < y_local + cu_height; y_scu += 4) {
+      can_skip &=
+        LCU_GET_CU_AT_PX(&split_lcu[BT_VER_SPLIT - 1], x_local, y_scu)->log2_width == cur_cu->log2_width - 1 &&
+        LCU_GET_CU_AT_PX(&split_lcu[BT_VER_SPLIT - 1], x_local + cu_width / 2, y_scu)->log2_width == cur_cu->log2_width - 1;
+    }
+    if (can_skip) return true;
+  }
+  return false;
+}
+
 /**
  * Search every mode from 0 to MAX_PU_DEPTH and return cost of best mode.
  * - The recursion is started at depth 0 and goes in Z-order to MAX_PU_DEPTH.
@@ -1623,6 +1655,12 @@ static double search_cu(
   // It is ok to interrupt the search as soon as it is known that
   // the split costs at least as much as not splitting.
   int cbf = cbf_is_set_any(cur_cu->cbf);
+
+  // 3.13
+  if ((cu_height < 32 || cu_width < 32) && cur_cu->type != CU_NOTSET  && !cbf && split_tree.mtt_depth > 1 && tree_type != UVG_CHROMA_T) {
+    can_split_cu = false;
+  }
+
   if (can_split_cu && (cur_cu->type == CU_NOTSET || cbf || state->encoder_control->cfg.cu_split_termination == UVG_CU_SPLIT_TERMINATION_OFF || true)) {
     lcu_t * split_lcu = MALLOC(lcu_t, 5);
     enum split_type best_split = 0;
@@ -1637,24 +1675,16 @@ static double search_cu(
         || (tree_type == UVG_CHROMA_T && split_type == BT_HOR_SPLIT && cu_loc->chroma_height == 4))
         continue;
 
-      // Best no split has no residual and same direction bt didn't improve so don't try tt
-      if (
-        !cbf && ((!improved[BT_VER_SPLIT] && split_type == TT_VER_SPLIT) ||
-        (!improved[BT_HOR_SPLIT] && split_type == TT_HOR_SPLIT)))
-          continue;
-
-      if (split_type == TT_HOR_SPLIT) {
-        if (LCU_GET_CU_AT_PX(&split_lcu[BT_HOR_SPLIT - 1], x_local, y_local)->log2_height == cur_cu->log2_height - 1 &&
-            LCU_GET_CU_AT_PX(&split_lcu[BT_HOR_SPLIT - 1], x_local, y_local + luma_height / 2)->log2_height == cur_cu->log2_height - 1) {
-          continue;
-        }
-      }
-      if (split_type == TT_VER_SPLIT) {
-        if (LCU_GET_CU_AT_PX(&split_lcu[BT_VER_SPLIT - 1], x_local, y_local)->log2_width == cur_cu->log2_width - 1 &&
-            LCU_GET_CU_AT_PX(&split_lcu[BT_VER_SPLIT - 1], x_local + luma_width / 2, y_local)->log2_width == cur_cu->log2_width - 1) {
-          continue;
-        }
-      }
+      if (check_for_early_termission(
+        cu_width,
+        cu_height,
+        cur_cu,
+        x_local,
+        y_local,
+        improved,
+        cbf,
+        split_lcu,
+        split_type)) continue;
 
       double split_cost = 0.0;
       memcpy(&state->search_cabac, &pre_search_cabac, sizeof(post_seach_cabac));
@@ -1698,6 +1728,7 @@ static double search_cu(
           );
       }
 
+      // 3.9
       const double factor    = state->qp > 30 ? 1.1 : 1.075;
       if (split_bits * state->frame->lambda + cost / factor > cost) continue;
 
@@ -1712,7 +1743,8 @@ static double search_cu(
       state->search_cabac.update = 0;
       split_cost += split_bits * state->lambda;
 
-      bool stop_to_qt = split_type == QT_SPLIT;
+      // 3.7
+      bool stop_to_qt = false;
 
       cu_loc_t new_cu_loc[4];
       uint8_t separate_chroma = 0;
@@ -1730,11 +1762,10 @@ static double search_cu(
 
         if (split_type == QT_SPLIT) {
           const cu_info_t * const t = LCU_GET_CU_AT_PX(&split_lcu[0], new_cu_loc[split].local_x, new_cu_loc[split].local_y);
-          stop_to_qt &= t->log2_height == cur_cu->log2_height - 1 && t->log2_width == cur_cu->log2_width;
+          stop_to_qt |= GET_SPLITDATA(t, depth + 1) == QT_SPLIT;
         }
 
         if (split_cost > cost || split_cost > best_split_cost) {
-          stop_to_qt = false;
           break;
         }
       }
