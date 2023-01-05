@@ -44,7 +44,6 @@
 #include "fast_coeff_cost.h"
 #include "reshape.h"
 
-#define QUANT_SHIFT 14
 /**
 * \brief quantize transformed coefficents
 *
