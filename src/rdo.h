@@ -44,6 +44,8 @@
 #include "global.h" // IWYU pragma: keep
 #include "search_inter.h"
 
+#define QUANT_SHIFT 14
+#define IQUANT_SHIFT 6
 
 extern const uint32_t uvg_g_go_rice_range[5];
 extern const uint32_t uvg_g_go_rice_prefix_len[5];

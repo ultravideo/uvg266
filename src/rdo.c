@@ -53,7 +53,6 @@
 #include "strategies/strategies-quant.h"
 
 
-#define QUANT_SHIFT          14
 #define SCAN_SET_SIZE        16
 #define LOG2_SCAN_SET_SIZE    4
 #define SBH_THRESHOLD         4

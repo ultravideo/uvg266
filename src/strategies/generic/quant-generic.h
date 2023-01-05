@@ -44,8 +44,6 @@
 #include "uvg266.h"
 #include "tables.h"
 
-#define QUANT_SHIFT 14
-
 int uvg_strategy_register_quant_generic(void* opaque, uint8_t bitdepth);
 void uvg_quant_generic(
   const encoder_state_t * const state,
