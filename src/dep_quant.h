@@ -35,6 +35,22 @@
 
 #include "global.h"
 
+typedef struct encoder_control_t encoder_control_t;
 
+typedef struct
+{
+  uint8_t num;
+  uint8_t inPos[5];
+} NbInfoSbb;
+
+typedef struct
+{
+  uint16_t maxDist;
+  uint16_t num;
+  uint16_t outPos[5];
+} NbInfoOut;
+
+int uvg_init_nb_info(encoder_control_t* encoder);
+void uvg_dealloc_nb_info(encoder_control_t* encoder);
 
 #endif

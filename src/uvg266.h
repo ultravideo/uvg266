@@ -552,7 +552,7 @@ typedef struct uvg_config
   uint8_t intra_rough_search_levels;
 
   uint8_t ibc; /* \brief Intra Block Copy parameter */
-
+  uint8_t dep_quant;
 } uvg_config;
 
 /**
