@@ -548,6 +548,8 @@ typedef struct uvg_config
   uint8_t max_tt_size[3]; /* intra, inter, dual tree chroma*/
 
   uint8_t max_btt_depth[3]; /* intra, inter, dual tree chroma*/
+
+  uint8_t dep_quant;
 } uvg_config;
 
 /**

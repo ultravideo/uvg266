@@ -1252,7 +1252,7 @@ int uvg_ts_rdoq(encoder_state_t* const state, coeff_t* src_coeff, coeff_t* dest_
       int last_pos_coded = sbSizeM1;
       uint32_t blkpos = scan[scan_pos];
       uint32_t  pos_y = blkpos >> log2_block_width;
-      uint32_t  pos_x = blkpos - (pos_y << log2_block_width); // TODO: height
+      uint32_t  pos_x = blkpos - (pos_y << log2_block_width); 
       //===== quantization =====
 
       // set coeff

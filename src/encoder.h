@@ -38,6 +38,7 @@
  * Initialization of encoder_control_t.
  */
 
+#include "dep_quant.h"
 #include "global.h" // IWYU pragma: keep
 #include "uvg266.h"
 #include "scalinglist.h"
@@ -97,6 +98,9 @@ typedef struct encoder_control_t
 
   //scaling list
   scaling_list_t scaling_list;
+
+  NbInfoSbb* m_scanId2NbInfoSbbArray[7 + 1][7 + 1];
+  NbInfoOut* m_scanId2NbInfoOutArray[7 + 1][7 + 1];
 
   //spec: references to variables defined in Rec. ITU-T H.265 (04/2013)
   int8_t tiles_enable; /*!<spec: tiles_enabled */

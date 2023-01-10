@@ -320,6 +320,13 @@ encoder_control_t* uvg_encoder_control_init(const uvg_config *const cfg)
     encoder->scaling_list.use_default_list = 1;
   }
 
+  if(cfg->dep_quant) {
+    if(!uvg_init_nb_info(encoder)) {
+      fprintf(stderr, "Could not initialize nb info.\n");
+      goto init_failed;      
+    }
+  }
+
   // ROI / delta QP
   if (cfg->roi.file_path) {
     const char *mode[2] = { "r", "rb" };
