@@ -707,8 +707,21 @@ int uvg_quantize_residual_avx2(encoder_state_t *const state,
   }
 
   // Quantize coeffs. (coeff -> coeff_out)
-  
-  if (state->encoder_control->cfg.rdoq_enable &&
+  int abs_sum = 0;
+  if(!use_trskip && state->encoder_control->cfg.dep_quant) {
+    uvg_dep_quant(
+      state,
+      cur_cu,
+      width,
+      height,
+      coeff,
+      coeff_out,
+      color,
+      tree_type,
+      &abs_sum,
+      state->encoder_control->cfg.scaling_list);
+  }
+  else if (state->encoder_control->cfg.rdoq_enable &&
       (width > 4 || !state->encoder_control->cfg.rdoq_skip) && !use_trskip)
   {
     uvg_rdoq(state, coeff, coeff_out, width, height, color,
@@ -792,6 +805,10 @@ int uvg_quantize_residual_avx2(encoder_state_t *const state,
 void uvg_dequant_avx2(const encoder_state_t * const state, coeff_t *q_coef, coeff_t *coef, int32_t width, int32_t height,color_t color, int8_t block_type, int8_t transform_skip)
 {
   const encoder_control_t * const encoder = state->encoder_control;
+  if (encoder->cfg.dep_quant) {
+    uvg_dep_quant_dequant(state, block_type, width, height, color, q_coef, coef, encoder->cfg.scaling_list);
+    return;
+  }
   int32_t shift,add,coeff_q;
   int32_t n;
   const uint32_t log2_tr_width =  uvg_g_convert_to_log2[width];
