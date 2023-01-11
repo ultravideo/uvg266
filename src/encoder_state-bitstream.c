@@ -686,7 +686,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
 
   WRITE_U(stream, 0, 1, "scaling_list_enabled_flag");
 
-  WRITE_U(stream, 0, 1, "pic_dep_quant_enabled_flag");
+  WRITE_U(stream, encoder->cfg.dep_quant, 1, "pic_dep_quant_enabled_flag");
 
   WRITE_U(stream, encoder->cfg.signhide_enable, 1, "pic_sign_data_hiding_enabled_flag");
 
@@ -1355,11 +1355,14 @@ void uvg_encoder_state_write_bitstream_slice_header(
   }
 
   // ToDo: depquant
+  if (encoder->cfg.dep_quant) {
+    WRITE_U(stream, 1, 1, "sh_dep_quant_used_flag");
+  }
 
-  if (state->encoder_control->cfg.signhide_enable) {
+  if (state->encoder_control->cfg.signhide_enable && !encoder->cfg.dep_quant) {
     WRITE_U(stream, 1, 1, "sh_sign_data_hiding_used_flag");
   }
-  if (state->encoder_control->cfg.trskip_enable && !state->encoder_control->cfg.signhide_enable /* && !cfg.dep_quant*/)
+  if (state->encoder_control->cfg.trskip_enable && !state->encoder_control->cfg.signhide_enable  && !encoder->cfg.dep_quant)
   {
     // TODO: find out what this is actually about and parametrize it
     WRITE_U(stream, 0, 1, "sh_ts_residual_coding_disabled_flag"); 

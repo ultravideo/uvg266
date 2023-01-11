@@ -197,6 +197,8 @@ static const struct option long_options[] = {
   {"mtt-depth-intra-chroma", required_argument, NULL, 0 },
   {"max_bt_size",         required_argument, NULL, 0 },
   {"max_tt_size",         required_argument, NULL, 0 },
+  { "dep-quant",                no_argument, NULL, 0 },
+  { "no-dep-quant",             no_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 
@@ -575,6 +577,7 @@ void print_help(void)
     "                                   - full: Full ALF\n"
     "      --(no-)rdoq            : Rate-distortion optimized quantization [enabled]\n"
     "      --(no-)rdoq-skip       : Skip RDOQ for 4x4 blocks. [disabled]\n"
+    "      --(no-)dep-quant       : Use dependent quantization. [disabled]\n"
     "      --(no-)signhide        : Sign hiding [disabled]\n"
     "      --rd <integer>         : Intra mode search complexity [0]\n"
     "                                   - 0: Skip intra if inter is good enough.\n"

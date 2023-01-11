@@ -237,6 +237,8 @@ int uvg_config_init(uvg_config *cfg)
   cfg->max_bt_size[1] = 64;
   cfg->max_tt_size[2] = 64;
   cfg->max_bt_size[2] = 64;
+
+  cfg->dep_quant = 0;
   return 1;
 }
 
@@ -1534,6 +1536,9 @@ int uvg_config_parse(uvg_config *cfg, const char *name, const char *value)
       fprintf(stderr, "Incorrect amount of values provided for max-tt-size\n");
       return 0;
     }
+  }
+  else if OPT("dep-quant") {
+    cfg->dep_quant = (bool)atobool(value);
   }
   else {
     return 0;

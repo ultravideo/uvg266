@@ -302,7 +302,7 @@ void uvg_encode_coeff_nxn_generic(encoder_state_t * const state,
 
       uint32_t num_signs = num_non_zero;
 
-      if (state->encoder_control->cfg.signhide_enable && (last_nz_pos_in_cg - first_nz_pos_in_cg >= 4)) {
+      if (state->encoder_control->cfg.signhide_enable && !state->encoder_control->cfg.dep_quant && (last_nz_pos_in_cg - first_nz_pos_in_cg >= 4)) {
         num_signs--;
         coeff_signs >>= 1;
       }
