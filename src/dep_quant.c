@@ -1096,7 +1096,7 @@ static void xDecideAndUpdate(
 }
 
 
-uint8_t uvg_dep_quant(
+int uvg_dep_quant(
   const encoder_state_t* const state,
   const cu_info_t* const cur_tu,
   const cu_loc_t* const cu_loc,
@@ -1104,8 +1104,7 @@ uint8_t uvg_dep_quant(
   coeff_t* coeff_out,
   const color_t compID,
   enum uvg_tree_type tree_type,
-  const double lambda,
-  coeff_t* absSum,
+  int* absSum,
   const bool enableScalingLists)
 {
   const encoder_control_t* const encoder = state->encoder_control;
@@ -1285,6 +1284,83 @@ uint8_t uvg_dep_quant(
     decision       = dep_quant_context.m_trellis[scanIdx][decision.prevId];
     int32_t blkpos = scan[scanIdx];
     coeff_out[blkpos] = (srcCoeff[blkpos] < 0 ? -decision.absLevel : decision.absLevel);
-    absSum += decision.absLevel;
+    *absSum += decision.absLevel;
+  }
+  return *absSum;
+}
+
+
+void uvg_dep_quant_dequant(
+  const encoder_state_t* const state,
+  const cu_info_t* const cur_tu,
+  const cu_loc_t* const cu_loc,
+  const color_t compID,
+  coeff_t* quant_coeff,
+  coeff_t * coeff, 
+  bool enableScalingLists)
+{
+  const encoder_control_t* const encoder = state->encoder_control;
+  const uint32_t  width = compID == COLOR_Y ? cu_loc->width : cu_loc->chroma_width;
+  const uint32_t  height = compID == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
+
+  const int       numCoeff = width * height;
+  
+  const uint32_t  log2_tr_width = uvg_g_convert_to_log2[width];
+  const uint32_t  log2_tr_height = uvg_g_convert_to_log2[height];
+  const uint32_t* const scan = uvg_get_scan_order_table(SCAN_GROUP_4X4, 0, log2_tr_width, log2_tr_height);
+  bool needs_block_size_trafo_scale =((log2_tr_height + log2_tr_width) % 2 == 1);
+  needs_block_size_trafo_scale |= 0; // Non log2 block size
+
+  //----- reset coefficients and get last scan index -----
+  memset(coeff, 0, numCoeff * sizeof(coeff_t));
+  int lastScanIdx = -1;
+  for (int scanIdx = numCoeff - 1; scanIdx >= 0; scanIdx--)
+  {
+    if (quant_coeff[scan[scanIdx]])
+    {
+      lastScanIdx = scanIdx;
+      break;
+    }
+  }
+  if (lastScanIdx < 0)
+  {
+    return;
+  }
+
+  //----- set dequant parameters -----
+  const int         qpDQ = uvg_get_scaled_qp(compID, state->qp, (encoder->bitdepth - 8) * 6, encoder->qp_map[0]); + 1;
+  const int         qpPer = qpDQ / 6;
+  const int         qpRem = qpDQ - 6 * qpPer;
+  const int         channelBitDepth = encoder->bitdepth;
+  const int         maxLog2TrDynamicRange = MAX_TR_DYNAMIC_RANGE;
+  const coeff_t      minTCoeff = -(1 << maxLog2TrDynamicRange);
+  const coeff_t      maxTCoeff = (1 << maxLog2TrDynamicRange) - 1;
+  const int         transformShift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - ((log2_tr_height + log2_tr_width) >> 1) - needs_block_size_trafo_scale;
+  int  shift = IQUANT_SHIFT + 1 - qpPer - transformShift + (enableScalingLists ? 4 : 0);
+  int  invQScale = uvg_g_inv_quant_scales[needs_block_size_trafo_scale ? 1 : 0][qpRem];
+  int  add = (shift < 0) ? 0 : ((1 << shift) >> 1);
+  int32_t scalinglist_type = (cur_tu->type == CU_INTRA ? 0 : 3) + (int8_t)(compID);
+
+  const int32_t* dequant_coef = encoder->scaling_list.de_quant_coeff[log2_tr_width][log2_tr_height][scalinglist_type][qpDQ % 6];
+  //----- dequant coefficients -----
+  for (int state = 0, scanIdx = lastScanIdx; scanIdx >= 0; scanIdx--)
+  {
+    const unsigned  rasterPos = scan[scanIdx];
+    const coeff_t level = quant_coeff[rasterPos];
+    if (level)
+    {
+      if (enableScalingLists)
+      {
+        invQScale = dequant_coef[rasterPos];//scalingfactor*levelScale
+      }
+      if (shift < 0 && (enableScalingLists || scanIdx == lastScanIdx))
+      {
+        invQScale <<= -shift;
+      }
+      int  qIdx = (level << 1) + (level > 0 ? -(state >> 1) : (state >> 1));
+      int64_t  nomTCoeff = ((int64_t)qIdx * (int64_t)invQScale + add) >> ((shift < 0) ? 0 : shift);
+      coeff[rasterPos] = (coeff_t)CLIP(minTCoeff, maxTCoeff, nomTCoeff);
+    }
+    state = (32040 >> ((state << 2) + ((level & 1) << 1))) & 3;   // the 16-bit value "32040" represent the state transition table
   }
 }

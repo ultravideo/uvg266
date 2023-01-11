@@ -33,6 +33,7 @@
 #ifndef DEP_QUANT_H_
 #define DEP_QUANT_H_
 
+#include "cu.h"
 #include "global.h"
 
 typedef struct encoder_control_t encoder_control_t;
@@ -53,4 +54,24 @@ typedef struct
 int uvg_init_nb_info(encoder_control_t* encoder);
 void uvg_dealloc_nb_info(encoder_control_t* encoder);
 
+
+void uvg_dep_quant_dequant(
+  const encoder_state_t* const state,
+  const cu_info_t* const cur_tu,
+  const cu_loc_t* const cu_loc,
+  const color_t compID,
+  coeff_t* quant_coeff,
+  coeff_t* coeff,
+  bool enableScalingLists);
+
+int uvg_dep_quant(
+  const encoder_state_t* const state,
+  const cu_info_t* const cur_tu,
+  const cu_loc_t* const cu_loc,
+  const coeff_t* srcCoeff,
+  coeff_t* coeff_out,
+  const color_t compID,
+  enum uvg_tree_type tree_type,
+  int* absSum,
+  const bool enableScalingLists);
 #endif
