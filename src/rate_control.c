@@ -795,6 +795,9 @@ static double qp_to_lambda(encoder_state_t* const state, int qp)
       state->frame->QP + 2 + frame_allocation,
       est_qp);
   }
+  if(state->encoder_control->cfg.dep_quant) {
+    est_lambda *= pow(2, 0.25 / 3.0);
+  }
 
   state->lambda = est_lambda;
   state->lambda_sqrt = sqrt(est_lambda);
@@ -820,7 +823,11 @@ static double qp_to_lambda(encoder_state_t* const state, int qp)
     // Since this value will be later combined with qp_pred, clip to half of that instead to be safe
     state->qp = CLIP(state->frame->QP + UVG_QP_DELTA_MIN / 2, state->frame->QP + UVG_QP_DELTA_MAX / 2, state->qp);
     state->qp = CLIP_TO_QP(state->qp);
-    state->lambda = qp_to_lambda(state, state->qp);
+    double to_lambda = qp_to_lambda(state, state->qp);
+    if (state->encoder_control->cfg.dep_quant) {
+      to_lambda *= pow(2, 0.25 / 3.0);
+    }
+    state->lambda = to_lambda;
     state->lambda_sqrt = sqrt(state->lambda);
     
     ctu->adjust_lambda = state->lambda;
@@ -1103,7 +1110,12 @@ void uvg_set_lcu_lambda_and_qp(encoder_state_t * const state,
       pos.x = 0;
     }
     state->qp = CLIP_TO_QP(state->frame->QP + dqp);
-    state->lambda = qp_to_lambda(state, state->qp);
+    double to_lambda = qp_to_lambda(state, state->qp);
+
+    if (state->encoder_control->cfg.dep_quant) {
+      to_lambda *= pow(2, 0.25 / 3.0);
+    }
+    state->lambda = to_lambda;
     state->lambda_sqrt = sqrt(state->lambda);
   }
   else if (ctrl->cfg.target_bitrate > 0) {
@@ -1138,6 +1150,9 @@ void uvg_set_lcu_lambda_and_qp(encoder_state_t * const state,
                   state->frame->lambda * 1.5874010519681994,
                   lambda);
     lambda = clip_lambda(lambda);
+    if (state->encoder_control->cfg.dep_quant) {
+      lambda *= pow(2, 0.25 / 3.0);
+    }
 
     state->lambda      = lambda;
     state->lambda_sqrt = sqrt(lambda);
@@ -1145,8 +1160,13 @@ void uvg_set_lcu_lambda_and_qp(encoder_state_t * const state,
 
   } else {
     state->qp          = state->frame->QP;
-    state->lambda      = state->frame->lambda;
-    state->lambda_sqrt = sqrt(state->frame->lambda);
+    double lambda = state->frame->lambda;
+
+    if (state->encoder_control->cfg.dep_quant) {
+      lambda *= pow(2, 0.25 / 3.0);
+    }
+    state->lambda      = lambda;
+    state->lambda_sqrt = sqrt(lambda);
   }
 
   lcu->lambda = state->lambda;
@@ -1170,7 +1190,11 @@ void uvg_set_lcu_lambda_and_qp(encoder_state_t * const state,
     // Since this value will be later combined with qp_pred, clip to half of that instead to be safe
     state->qp = CLIP(state->frame->QP + UVG_QP_DELTA_MIN / 2, state->frame->QP + UVG_QP_DELTA_MAX / 2, state->qp);
     state->qp = CLIP_TO_QP(state->qp);
-    state->lambda = qp_to_lambda(state, state->qp);
+    double to_lambda = qp_to_lambda(state, state->qp);
+    if (state->encoder_control->cfg.dep_quant) {
+      to_lambda *= pow(2, 0.25 / 3.0);
+    }
+    state->lambda = to_lambda;
     state->lambda_sqrt = sqrt(state->lambda);
 
     lcu->adjust_lambda = state->lambda;

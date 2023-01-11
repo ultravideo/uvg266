@@ -57,8 +57,9 @@ void uvg_dealloc_nb_info(encoder_control_t* encoder);
 
 void uvg_dep_quant_dequant(
   const encoder_state_t* const state,
-  const cu_info_t* const cur_tu,
-  const cu_loc_t* const cu_loc,
+  const int block_type,
+  const int width,
+  const int height,
   const color_t compID,
   coeff_t* quant_coeff,
   coeff_t* coeff,
@@ -67,7 +68,8 @@ void uvg_dep_quant_dequant(
 int uvg_dep_quant(
   const encoder_state_t* const state,
   const cu_info_t* const cur_tu,
-  const cu_loc_t* const cu_loc,
+  const int width,
+  const int height,
   const coeff_t* srcCoeff,
   coeff_t* coeff_out,
   const color_t compID,

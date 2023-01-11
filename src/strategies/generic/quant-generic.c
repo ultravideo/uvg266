@@ -316,8 +316,21 @@ int uvg_quant_cbcr_residual_generic(
   if(lfnst_idx) {
     uvg_fwd_lfnst(cur_cu, width, height, COLOR_UV, lfnst_idx, coeff, tree_type, state->collocated_luma_mode);
   }
-
-  if (state->encoder_control->cfg.rdoq_enable &&
+  int abs_sum = 0;
+  if (!false && state->encoder_control->cfg.dep_quant) {
+    uvg_dep_quant(
+      state,
+      cur_cu,
+      width,
+      height,
+      coeff,
+      coeff_out,
+      COLOR_U,
+      tree_type,
+      &abs_sum,
+      state->encoder_control->cfg.scaling_list);
+  }
+  else if (state->encoder_control->cfg.rdoq_enable &&
     (width > 4 || !state->encoder_control->cfg.rdoq_skip))
   {
     uvg_rdoq(state, coeff, coeff_out, width, height, cur_cu->joint_cb_cr == 1 ? COLOR_V : COLOR_U,
@@ -497,7 +510,21 @@ int uvg_quantize_residual_generic(encoder_state_t *const state,
 
   // Quantize coeffs. (coeff -> coeff_out)
   
-  if (state->encoder_control->cfg.rdoq_enable &&
+  int abs_sum = 0;
+  if (!false && state->encoder_control->cfg.dep_quant) {
+    uvg_dep_quant(
+      state,
+      cur_cu,
+      width,
+      height,
+      coeff,
+      coeff_out,
+      COLOR_U,
+      tree_type,
+      &abs_sum,
+      state->encoder_control->cfg.scaling_list);
+  }
+  else if (state->encoder_control->cfg.rdoq_enable &&
       (width > 4 || !state->encoder_control->cfg.rdoq_skip) && !use_trskip)
   {
     uvg_rdoq(state, coeff, coeff_out, width, height, color,
@@ -591,6 +618,10 @@ int uvg_quantize_residual_generic(encoder_state_t *const state,
 void uvg_dequant_generic(const encoder_state_t * const state, coeff_t *q_coef, coeff_t *coef, int32_t width, int32_t height,color_t color, int8_t block_type, int8_t transform_skip)
 {
   const encoder_control_t * const encoder = state->encoder_control;
+  if(encoder->cfg.dep_quant) {
+    uvg_dep_quant_dequant(state, block_type, width, height, color, q_coef, coef, encoder->cfg.scaling_list);
+    return;
+  }
   int32_t shift,add,coeff_q;
   int32_t n;
   const uint32_t log2_tr_width  = uvg_g_convert_to_log2[width];
