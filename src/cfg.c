@@ -242,6 +242,7 @@ int uvg_config_init(uvg_config *cfg)
 
   cfg->ibc = 0;
 
+  cfg->dep_quant = 0;
   return 1;
 }
 
@@ -1550,6 +1551,9 @@ int uvg_config_parse(uvg_config *cfg, const char *name, const char *value)
       return 0;
     }
     cfg->ibc = (uint8_t)ibc_value;
+  }
+  else if OPT("dep-quant") {
+    cfg->dep_quant = (bool)atobool(value);
   }
   else {
     return 0;
