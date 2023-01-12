@@ -133,7 +133,7 @@ void uvg_encode_coeff_nxn_generic(encoder_state_t * const state,
 
 
 
-  uint32_t quant_state_transition_table = 0; //ToDo: dep quant enable changes this
+  uint32_t quant_state_transition_table = state->encoder_control->cfg.dep_quant ? 32040 : 0; 
   int32_t quant_state = 0;
   uint8_t  ctx_offset[16];
   int32_t temp_diag = -1;
