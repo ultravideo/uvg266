@@ -511,7 +511,7 @@ int uvg_quantize_residual_generic(encoder_state_t *const state,
   // Quantize coeffs. (coeff -> coeff_out)
   
   int abs_sum = 0;
-  if (!false && state->encoder_control->cfg.dep_quant) {
+  if (!use_trskip && state->encoder_control->cfg.dep_quant) {
     uvg_dep_quant(
       state,
       cur_cu,
@@ -519,7 +519,7 @@ int uvg_quantize_residual_generic(encoder_state_t *const state,
       height,
       coeff,
       coeff_out,
-      COLOR_U,
+      color,
       tree_type,
       &abs_sum,
       state->encoder_control->cfg.scaling_list);
@@ -618,7 +618,7 @@ int uvg_quantize_residual_generic(encoder_state_t *const state,
 void uvg_dequant_generic(const encoder_state_t * const state, coeff_t *q_coef, coeff_t *coef, int32_t width, int32_t height,color_t color, int8_t block_type, int8_t transform_skip)
 {
   const encoder_control_t * const encoder = state->encoder_control;
-  if(encoder->cfg.dep_quant) {
+  if(encoder->cfg.dep_quant && !transform_skip) {
     uvg_dep_quant_dequant(state, block_type, width, height, color, q_coef, coef, encoder->cfg.scaling_list);
     return;
   }
