@@ -519,7 +519,7 @@ int uvg_quantize_residual_generic(encoder_state_t *const state,
       height,
       coeff,
       coeff_out,
-      COLOR_U,
+      color,
       tree_type,
       &abs_sum,
       state->encoder_control->cfg.scaling_list);
