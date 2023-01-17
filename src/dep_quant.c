@@ -1257,7 +1257,7 @@ int uvg_dep_quant(
 
     uint32_t blkpos_next = scan[scanIdx ? scanIdx - 1 : 0];
     uint32_t  pos_y_next = blkpos_next >> log2_tr_width;
-    uint32_t  pos_x_next = blkpos_next - (pos_y << log2_tr_width);
+    uint32_t  pos_x_next = blkpos_next - (pos_y_next << log2_tr_width);
     uint32_t cg_blockpos_next = scanIdx ? cg_scan[(scanIdx -1) >> 4] : 0;
     uint32_t cg_pos_y_next = cg_blockpos_next / height_in_sbb;
     uint32_t cg_pos_x_next = cg_blockpos_next - (cg_pos_y_next * height_in_sbb);
@@ -1269,12 +1269,13 @@ int uvg_dep_quant(
     uint32_t nextSbbRight = (cg_pos_x_next < width_in_sbb - 1 ? cg_blockpos_next + 1 : 0);
     uint32_t nextSbbBelow = (cg_pos_y_next < height_in_sbb - 1 ? cg_blockpos_next + width_in_sbb : 0);
 
+    context_store* ctxs = &dep_quant_context;
     if (enableScalingLists) {
       init_quant_block(state, &dep_quant_context.m_quant, cur_tu, log2_tr_width, log2_tr_height, compID, needs_block_size_trafo_scale, q_coeff[blkpos]);
 
       xDecideAndUpdate(
         &rate_estimator,
-        &dep_quant_context,
+        ctxs,
         abs(srcCoeff[blkpos]),
         scanIdx,
         cg_pos,
@@ -1296,7 +1297,7 @@ int uvg_dep_quant(
     else {
       xDecideAndUpdate(
         &rate_estimator,
-        &dep_quant_context,
+        ctxs,
         abs(srcCoeff[blkpos]),
         scanIdx,
         cg_pos,
@@ -1314,10 +1315,6 @@ int uvg_dep_quant(
         effectWidth,
         effectHeight); //tu.cu->slice->getReverseLastSigCoeffFlag());
     }
-    Decision* d = dep_quant_context.m_trellis[scanIdx];
-    Decision temp[8];
-    memcpy(temp, d, sizeof(Decision) * 8);
-    d++;
   }
 
   //===== find best path =====
