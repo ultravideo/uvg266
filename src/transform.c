@@ -417,6 +417,7 @@ static void generate_jccr_transforms(
 
 static void quantize_chroma(
   encoder_state_t* const state,
+  cu_info_t * const cur_tu,
   int8_t width,
   int8_t height,
   coeff_t u_coeff[5120],
@@ -427,8 +428,48 @@ static void quantize_chroma(
   const coeff_scan_order_t scan_order,
   bool* u_has_coeffs,
   bool* v_has_coeffs,
-  uint8_t lfnst_idx)
+  uint8_t lfnst_idx, 
+  enum uvg_tree_type tree_type)
 {
+  if(state->encoder_control->cfg.dep_quant && transform != CHROMA_TS) {
+    int abs_sum = 0;
+    uvg_dep_quant(
+      state,
+      cur_tu,
+      width,
+      height,
+      u_coeff,
+      u_quant_coeff,
+      COLOR_U,
+      tree_type,
+      &abs_sum,
+      state->encoder_control->cfg.scaling_list
+    );
+    if (abs_sum > 0) {
+      *u_has_coeffs = 1;
+      cbf_set(&cur_tu->cbf, COLOR_U);
+    }
+    if (transform == DCT7_CHROMA) {
+      abs_sum = 0;
+      uvg_dep_quant(
+        state,
+        cur_tu,
+        width,
+        height,
+        v_coeff,
+        v_quant_coeff,
+        COLOR_V,
+        tree_type,
+        &abs_sum,
+        state->encoder_control->cfg.scaling_list
+      );
+      if (abs_sum > 0) {
+        *v_has_coeffs = 1;
+      }
+      cbf_clear(&cur_tu->cbf, COLOR_U);
+    }
+    return;
+  }
   if (state->encoder_control->cfg.rdoq_enable &&
     (transform != CHROMA_TS || !state->encoder_control->cfg.rdoq_skip))
   {
@@ -561,6 +602,7 @@ void uvg_chroma_transform_search(
     }
     quantize_chroma(
       state,
+      pred_cu,
       width,
       height,
       &u_coeff[i * trans_offset],
@@ -570,8 +612,7 @@ void uvg_chroma_transform_search(
       v_quant_coeff,
       SCAN_DIAG,
       &u_has_coeffs,
-      &v_has_coeffs,
-      tree_type == UVG_CHROMA_T ?  pred_cu->cr_lfnst_idx : pred_cu->lfnst_idx);
+      &v_has_coeffs, tree_type == UVG_CHROMA_T ?  pred_cu->cr_lfnst_idx : pred_cu->lfnst_idx, tree_type);
     if(pred_cu->cr_lfnst_idx !=0 && !u_has_coeffs && !v_has_coeffs) continue;
     
     if(pred_cu->type == CU_INTRA && transforms[i] != CHROMA_TS && tree_type == UVG_CHROMA_T) {

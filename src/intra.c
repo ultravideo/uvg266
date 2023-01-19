@@ -1941,7 +1941,7 @@ void uvg_intra_recon_cu(
       uvg_get_isp_split_loc(&tu_loc,  cu_loc->x, cu_loc->y, width, height, i, split_type, true);
       cu_loc_t pu_loc;
       uvg_get_isp_split_loc(&pu_loc, cu_loc->x, cu_loc->y, width, height, i, split_type, false);
-
+      cur_cu->intra.isp_index = 0;
       if(tu_loc.x % 4 == 0) {
         intra_recon_tb_leaf(state, &pu_loc, cu_loc, lcu, COLOR_Y, search_data, tree_type);
       }
@@ -1949,6 +1949,7 @@ void uvg_intra_recon_cu(
         &tu_loc, cur_cu, lcu,
         false, tree_type);
       search_data->best_isp_cbfs |= cbf_is_set(cur_cu->cbf, COLOR_Y) << i;
+      cur_cu->intra.isp_cbfs = search_data->best_isp_cbfs;
     }
   }
   const bool has_luma = recon_luma && search_data->pred_cu.intra.isp_mode == ISP_MODE_NO_ISP;
