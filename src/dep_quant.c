@@ -440,7 +440,6 @@ static void xSetLastCoeffOffset(
   const int width,
   const int height,
   rate_estimator* rate_estimator,
-  const bool cb_cbf,
   const color_t compID)
 {
   int32_t cbfDeltaBits = 0;
@@ -451,25 +450,18 @@ static void xSetLastCoeffOffset(
     bool        lastCbfIsInferred     = false;
     bool        useIntraSubPartitions = cur_tu->type == CU_INTRA && cur_tu->intra.isp_mode && compID == COLOR_Y;
     if (useIntraSubPartitions) {
-      bool     rootCbfSoFar       = false;
-      bool     isLastSubPartition = false; //TODO: isp check
       uint32_t nTus = uvg_get_isp_split_num(width, height, cur_tu->intra.isp_mode, true);
+      bool     isLastSubPartition = cur_tu->intra.isp_index +1 == nTus; //TODO: isp check
       if (isLastSubPartition) {
-        //TransformUnit* tuPointer = tu.cu->firstTU;
-        //for (int tuIdx = 0; tuIdx < nTus - 1; tuIdx++) {
-        //  rootCbfSoFar |= TU::getCbfAtDepth(*tuPointer, COMPONENT_Y, tu.depth);
-        //  tuPointer = tuPointer->next;
-        //}
-        if (!rootCbfSoFar) {
-          lastCbfIsInferred = true;
-        }
+        lastCbfIsInferred = cur_tu->intra.isp_cbfs == 0;
       }
       if (!lastCbfIsInferred) {
-        prevLumaCbf = false;
+        prevLumaCbf = cur_tu->intra.isp_index != 0 && (cur_tu->intra.isp_cbfs & (1 << (cur_tu->intra.isp_index - 1)));
       }
       const cabac_ctx_t * const cbf_ctx = &state->search_cabac.ctx.qt_cbf_model_luma[2 + prevLumaCbf];
       cbfDeltaBits = lastCbfIsInferred ? 0 : (int32_t)CTX_ENTROPY_BITS(cbf_ctx, 1) - (int32_t)CTX_ENTROPY_BITS(cbf_ctx, 0);
-    } else {
+    }
+    else {
       const cabac_ctx_t* cbf_ctx;
       switch (compID) {
         case COLOR_Y:
@@ -479,7 +471,7 @@ static void xSetLastCoeffOffset(
           cbf_ctx = &state->search_cabac.ctx.qt_cbf_model_cb[0];
           break;
         case COLOR_V:
-          cbf_ctx = &state->search_cabac.ctx.qt_cbf_model_cr[cb_cbf];
+          cbf_ctx = &state->search_cabac.ctx.qt_cbf_model_cr[cbf_is_set(cur_tu->cbf, COLOR_U)];
           break;
       }
       cbfDeltaBits = (int32_t)CTX_ENTROPY_BITS(cbf_ctx, 1) - (int32_t)CTX_ENTROPY_BITS(cbf_ctx, 0);
@@ -1182,7 +1174,7 @@ int uvg_dep_quant(
   int             effWidth = width, effHeight = height;
   if (
     (is_mts ||
-     (state->encoder_control->cfg.mts && 1 /*sbt not used by block*/ &&
+     (state->encoder_control->cfg.mts && 0 /*sbt used by block*/ &&
       height <= 32 && width <= 32)) &&
     compID == COLOR_Y) {
     effHeight = (height == 32) ? 16 : height;
@@ -1212,7 +1204,7 @@ int uvg_dep_quant(
   //===== real init =====
   rate_estimator rate_estimator;
   init_rate_esimator(&rate_estimator, &state->search_cabac, compID);
-  xSetLastCoeffOffset(state, cur_tu, width, height, &rate_estimator, cbf_is_set(cur_tu->cbf, COLOR_U), compID);
+  xSetLastCoeffOffset(state, cur_tu, width, height, &rate_estimator, compID);
 
   reset_common_context(&dep_quant_context.m_common_context, &rate_estimator, (width * height) >> 4, numCoeff);
   dep_quant_context.m_common_context.m_nbInfo = encoder->m_scanId2NbInfoOutArray[log2_tr_width][log2_tr_height];
