@@ -168,6 +168,8 @@ typedef struct
       int8_t mip_flag;
       int8_t mip_is_transposed;
       int8_t isp_mode;
+      uint8_t isp_cbfs : 4;
+      uint8_t isp_index : 2;
     } intra;
     struct {
       mv_t    mv[2][2];  // \brief Motion vectors for L0 and L1
