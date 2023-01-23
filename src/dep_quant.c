@@ -1145,7 +1145,7 @@ int uvg_dep_quant(
   const bool      is_mts   = compID == COLOR_Y && cur_tu->tr_idx > MTS_SKIP;
   const bool      is_ts    = cur_tu->tr_skip >> compID & 1;
 
-    const uint32_t  log2_tr_width  = uvg_g_convert_to_log2[width];
+  const uint32_t  log2_tr_width  = uvg_g_convert_to_log2[width];
   const uint32_t  log2_tr_height = uvg_g_convert_to_log2[height];
   const uint32_t* const scan     = uvg_get_scan_order_table(SCAN_GROUP_4X4,0,log2_tr_width,log2_tr_height);
   const uint32_t* const cg_scan     = uvg_get_scan_order_table(SCAN_GROUP_UNGROUPED,0,log2_tr_width,log2_tr_height);
@@ -1155,7 +1155,7 @@ int uvg_dep_quant(
   bool needs_block_size_trafo_scale = is_ts && ((log2_tr_height + log2_tr_width) % 2 == 1);
   needs_block_size_trafo_scale |= 0; // Non log2 block size
 
-    const int32_t scalinglist_type = (cur_tu->type == CU_INTRA ? 0 : 3) + (int8_t)compID;
+  const int32_t scalinglist_type = (cur_tu->type == CU_INTRA ? 0 : 3) + (int8_t)compID;
   const int32_t *q_coeff = encoder->scaling_list.quant_coeff[log2_tr_width][log2_tr_height][scalinglist_type][qp_scaled % 6];
   const int32_t transform_shift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - ((log2_tr_height + log2_tr_width) >> 1) - needs_block_size_trafo_scale; //!< Represents scaling through forward transform
   const int64_t q_bits = QUANT_SHIFT + qp_scaled / 6 + (is_ts ? 0 : transform_shift );

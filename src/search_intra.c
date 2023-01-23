@@ -390,7 +390,12 @@ static double search_intra_trdepth(
         if (pred_cu->lfnst_idx > 0 && pred_cu->tr_idx > 0) {
           continue;
         }
-        
+
+        if (!has_been_split) {
+          memcpy(&state->search_cabac, &cabac_data, sizeof(cabac_data));
+          state->search_cabac.update = 1;
+        }
+
         uvg_intra_recon_cu(
           state,
           search_data,
@@ -435,12 +440,7 @@ static double search_intra_trdepth(
             continue;
           }
         }
-
-        if (!has_been_split) {
-          memcpy(&state->search_cabac, &cabac_data, sizeof(cabac_data));
-          state->search_cabac.update = 1;
-        }
-
+        
         double rd_cost = uvg_cu_rd_cost_luma(
           state,
           cu_loc,
