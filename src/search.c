@@ -1360,12 +1360,27 @@ static double search_cu(
       }
 #endif
       if (state->encoder_control->cfg.cclm && tree_type != UVG_CHROMA_T && state->encoder_control->chroma_format != UVG_CSP_400) {
-        uvg_intra_recon_cu(state,
-                           &intra_search, cu_loc,
-                           &intra_search.pred_cu, lcu,
-                           tree_type,
-                           true,
-                           false);
+        if(intra_search.pred_cu.intra.isp_mode == ISP_MODE_NO_ISP) {
+          uvg_intra_recon_cu(state,
+                             &intra_search, cu_loc,
+                             &intra_search.pred_cu, lcu,
+                             tree_type,
+                             true,
+                             false);
+        }
+        else {
+          cabac_data_t temp_cabac;
+          memcpy(&temp_cabac, &state->search_cabac, sizeof(cabac_data_t));
+          state->search_cabac.update = 1;
+          uvg_recon_and_estimate_cost_isp(
+            state,
+            cu_loc,
+            0,
+            &intra_search,
+            lcu
+          );
+          memcpy(&state->search_cabac, &temp_cabac, sizeof(cabac_data_t));
+        }
 
         downsample_cclm_rec(
           state, x, y, cu_width / 2, cu_height / 2, lcu->rec.y, lcu->left_ref.y[64]
@@ -1430,7 +1445,7 @@ static double search_cu(
     if (cur_cu->type == CU_INTRA) {
 
       bool recon_chroma = true;
-      bool recon_luma = tree_type != UVG_CHROMA_T;
+      bool recon_luma = tree_type != UVG_CHROMA_T && cur_cu->intra.isp_mode == ISP_MODE_NO_ISP;
       if (is_separate_tree || !has_chroma || state->encoder_control->chroma_format == UVG_CSP_400 || tree_type == UVG_LUMA_T || cu_loc->chroma_height % 4 == 2) {
         recon_chroma = false; 
       }
@@ -1440,6 +1455,15 @@ static double search_cu(
                          NULL, lcu,
                          tree_type, 
                          recon_luma, recon_chroma);
+      if (!state->encoder_control->cfg.cclm && cur_cu->intra.isp_mode != ISP_MODE_NO_ISP) {
+        uvg_recon_and_estimate_cost_isp(
+          state,
+          cu_loc,
+          0,
+          &intra_search,
+          lcu
+        );
+      }
 
 
       if((!recon_chroma && state->encoder_control->chroma_format != UVG_CSP_400 && tree_type != UVG_LUMA_T) 

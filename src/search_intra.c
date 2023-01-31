@@ -264,6 +264,7 @@ static void derive_mts_constraints(cu_info_t *const pred_cu,
 }
 
 
+
 /**
 * \brief Perform search for best intra transform split configuration.
 *
@@ -353,14 +354,14 @@ static double search_intra_trdepth(
     }
     
     int start_idx = 0;
-    int end_idx = state->encoder_control->cfg.lfnst && PU_IS_TU(pred_cu) &&
+    int end_lfnst_idx = state->encoder_control->cfg.lfnst && PU_IS_TU(pred_cu) &&
                   uvg_can_use_isp_with_lfnst(width, height, pred_cu->intra.isp_mode, tree_type) ? max_lfnst_idx : 0;
-    for (int i = start_idx; i < end_idx + 1; ++i) {
+    for (int i = start_idx; i < end_lfnst_idx + 1; ++i) {
       search_data->lfnst_costs[i] = MAX_DOUBLE;
     }
 
 
-    for (int lfnst_idx = start_idx; lfnst_idx <= end_idx; lfnst_idx++) {
+    for (int lfnst_idx = start_idx; lfnst_idx <= end_lfnst_idx; lfnst_idx++) {
       // Initialize lfnst variables
       pred_cu->lfnst_idx = lfnst_idx;
       pred_cu->violates_lfnst_constrained_luma = false;
@@ -391,21 +392,32 @@ static double search_intra_trdepth(
           continue;
         }
 
-        if (!has_been_split) {
+        if (!has_been_split && (lfnst_idx != 0 || trafo != 0)) {
           memcpy(&state->search_cabac, &cabac_data, sizeof(cabac_data));
           state->search_cabac.update = 1;
         }
-
-        uvg_intra_recon_cu(
-          state,
-          search_data,
-          cu_loc,
-          pred_cu,
-          lcu,
-          UVG_LUMA_T,
-          true,
-          false
+        double rd_cost;
+        if (pred_cu->intra.isp_mode != ISP_MODE_NO_ISP) {
+          rd_cost = uvg_recon_and_estimate_cost_isp(
+            state,
+            cu_loc,
+            cost_treshold,
+            search_data,
+            lcu
           );
+        }
+        else {
+          uvg_intra_recon_cu(
+            state,
+            search_data,
+            cu_loc,
+            pred_cu,
+            lcu,
+            UVG_LUMA_T,
+            true,
+            false
+          );
+        }
         if (pred_cu->intra.isp_mode != ISP_MODE_NO_ISP && search_data->best_isp_cbfs == 0) continue;
 
         if (trafo != 0 && !cbf_is_set(pred_cu->cbf, COLOR_Y)) continue;
@@ -417,13 +429,8 @@ static double search_intra_trdepth(
             continue;
           }
         }
-
-        const unsigned scan_offset = xy_to_zorder(
-          LCU_WIDTH,
-          lcu_px.x,
-          lcu_px.y);
-
-        if (trafo != MTS_SKIP && end_idx != 0) {
+        
+        if (trafo != MTS_SKIP && end_lfnst_idx != 0) {
           uvg_derive_lfnst_constraints(
             pred_cu,
             constraints,
@@ -434,22 +441,25 @@ static double search_intra_trdepth(
             COLOR_Y);
         }
 
-        if (!constraints[1] && cbf_is_set(pred_cu->cbf, COLOR_Y)) {
+        if (!constraints[1] && (cbf_is_set(pred_cu->cbf, COLOR_Y) || pred_cu->intra.isp_mode != ISP_MODE_NO_ISP)) {
           //end_idx = 0;
           if (pred_cu->lfnst_idx > 0) {
             continue;
           }
         }
-        
-        double rd_cost = uvg_cu_rd_cost_luma(
-          state,
-          cu_loc,
-          pred_cu,
-          lcu,
-          search_data->best_isp_cbfs);
+
+
+        if (pred_cu->intra.isp_mode == ISP_MODE_NO_ISP) {
+          rd_cost = uvg_cu_rd_cost_luma(
+            state,
+            cu_loc,
+            pred_cu,
+            lcu,
+            search_data->best_isp_cbfs);
+        }
         double transform_bits = 0;
         if (state->encoder_control->cfg.lfnst && PU_IS_TU(pred_cu) &&
-            trafo != MTS_SKIP) {
+          trafo != MTS_SKIP && end_lfnst_idx != 0) {
           if (!constraints[0] && constraints[1]) {
             transform_bits += CTX_ENTROPY_FBITS(
               &state->search_cabac.ctx.lfnst_idx_model[tree_type == UVG_LUMA_T],
@@ -462,9 +472,9 @@ static double search_intra_trdepth(
           }
         }
         if (num_transforms > 2 && trafo != MTS_SKIP && width <= 32
-            /*&& height <= 32*/
+            && height <= 32
             && !pred_cu->violates_mts_coeff_constraint && pred_cu->
-            mts_last_scan_pos && lfnst_idx == 0) {
+            mts_last_scan_pos) {
 
           bool symbol = trafo != 0;
           int ctx_idx = 0;
@@ -1320,12 +1330,12 @@ static int8_t search_intra_rdo(
     can_do_isp_search = search_data[mode].pred_cu.intra.multi_ref_idx == 0 ? can_do_isp_search : false; // Cannot use ISP with MRL
     double best_isp_cost = MAX_DOUBLE;
     double best_bits = MAX_DOUBLE;
-    int8_t best_isp_mode = -1;
+    int8_t best_isp_mode = 0;
     int max_isp_modes = can_do_isp_search && uvg_can_use_isp(width, height) && state->encoder_control->cfg.isp ? NUM_ISP_MODES : 1;
 
     //
-    int best_mts_mode_for_isp[NUM_ISP_MODES] = {0};
-    int best_lfnst_mode_for_isp[NUM_ISP_MODES] = {0};
+    uint8_t best_mts_mode_for_isp[NUM_ISP_MODES] = {0};
+    uint8_t best_lfnst_mode_for_isp[NUM_ISP_MODES] = {0};
     for (int isp_mode = 0; isp_mode < max_isp_modes; ++isp_mode) {
       
 
@@ -1353,6 +1363,7 @@ static int8_t search_intra_rdo(
     search_data[mode].bits = best_bits;
     search_data[mode].pred_cu.intra.isp_mode = best_isp_mode;
     search_data[mode].pred_cu.tr_idx = best_mts_mode_for_isp[best_isp_mode];
+    search_data[mode].pred_cu.tr_skip = best_mts_mode_for_isp[best_isp_mode] == MTS_SKIP;
     search_data[mode].pred_cu.lfnst_idx = best_lfnst_mode_for_isp[best_isp_mode];
   }
 
