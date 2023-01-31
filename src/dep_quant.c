@@ -450,7 +450,7 @@ static void xSetLastCoeffOffset(
     bool        lastCbfIsInferred     = false;
     bool        useIntraSubPartitions = cur_tu->type == CU_INTRA && cur_tu->intra.isp_mode && compID == COLOR_Y;
     if (useIntraSubPartitions) {
-      uint32_t nTus = uvg_get_isp_split_num(width, height, cur_tu->intra.isp_mode, true);
+      uint32_t nTus = uvg_get_isp_split_num(1 << cur_tu->log2_width, 1 << cur_tu->log2_height, cur_tu->intra.isp_mode, true);
       bool     isLastSubPartition = cur_tu->intra.isp_index +1 == nTus; //TODO: isp check
       if (isLastSubPartition) {
         lastCbfIsInferred = cur_tu->intra.isp_cbfs == 0;
@@ -479,7 +479,7 @@ static void xSetLastCoeffOffset(
      
   }
 
-static const unsigned prefixCtx[] = {0, 0, 0, 3, 6, 10, 15, 21};
+  static const unsigned prefixCtx[] = {0, 0, 0, 3, 6, 10, 15, 21};
   uint32_t              ctxBits[14];
   for (unsigned xy = 0; xy < 2; xy++) {
     int32_t        bitOffset  = (xy ? cbfDeltaBits : 0);
@@ -1143,7 +1143,7 @@ int uvg_dep_quant(
   *absSum                    = 0;
 
   const bool      is_mts   = compID == COLOR_Y && cur_tu->tr_idx > MTS_SKIP;
-  const bool      is_ts    = cur_tu->tr_skip >> compID & 1;
+  const bool      is_ts    = (cur_tu->tr_skip >> compID) & 1;
 
   const uint32_t  log2_tr_width  = uvg_g_convert_to_log2[width];
   const uint32_t  log2_tr_height = uvg_g_convert_to_log2[height];

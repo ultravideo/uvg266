@@ -37,8 +37,10 @@
 #include "image.h"
 #include "uvg_math.h"
 #include "mip_data.h"
+#include "rdo.h"
 #include "search.h"
 #include "search_intra.h"
+#include "strategies-picture.h"
 #include "strategies/strategies-intra.h"
 #include "tables.h"
 #include "transform.h"
@@ -1693,6 +1695,8 @@ int8_t uvg_get_co_located_luma_mode(
 }
 
 
+
+
 /**
 * \brief Returns ISP split partition size based on block dimensions and split type.
 *
@@ -1788,8 +1792,6 @@ static void intra_recon_tb_leaf(
   
   const int width  = color == COLOR_Y ? pu_loc->width  : pu_loc->chroma_width;
   const int height = color == COLOR_Y ? pu_loc->height : pu_loc->chroma_height;
-  int log2_width =  uvg_g_convert_to_log2[width];
-  int log2_height = uvg_g_convert_to_log2[height];
 
   const int lcu_width = LCU_WIDTH >> shift;
 
@@ -2025,4 +2027,59 @@ bool uvg_can_use_isp_with_lfnst(const int width, const int height, const int isp
     return false;
   }
   return true;
+}
+
+
+double uvg_recon_and_estimate_cost_isp(encoder_state_t* const state,
+  const cu_loc_t* const cu_loc,
+  double cost_treshold,
+  intra_search_data_t* const search_data,
+  lcu_t* const lcu) {
+  assert(state->search_cabac.update && "ISP reconstruction must be done with CABAC update");
+  double cost = 0;
+
+  const int width = cu_loc->width;
+  const int height = cu_loc->height;
+
+  search_data->best_isp_cbfs = 0;
+  // ISP split is done horizontally or vertically depending on ISP mode, 2 or 4 times depending on block dimensions.
+  // Small blocks are split only twice.
+  int split_type = search_data->pred_cu.intra.isp_mode;
+  int split_limit = uvg_get_isp_split_num(width, height, split_type, true);
+
+  int cbf_context = 2;
+
+  for (int i = 0; i < split_limit; ++i) {
+    cu_loc_t tu_loc;
+    uvg_get_isp_split_loc(&tu_loc, cu_loc->x, cu_loc->y, width, height, i, split_type, true);
+    cu_loc_t pu_loc;
+    uvg_get_isp_split_loc(&pu_loc, cu_loc->x, cu_loc->y, width, height, i, split_type, false);
+    search_data->pred_cu.intra.isp_index = 0;
+    if (tu_loc.x % 4 == 0) {
+      intra_recon_tb_leaf(state, &pu_loc, cu_loc, lcu, COLOR_Y, search_data, UVG_LUMA_T);
+    }
+    uvg_quantize_lcu_residual(state, true, false, false,
+      &tu_loc, &search_data->pred_cu, lcu,
+      false, UVG_LUMA_T);
+
+    int index = cu_loc->local_y * LCU_WIDTH + cu_loc->local_x;
+    int ssd = uvg_pixels_calc_ssd(&lcu->ref.y[index], &lcu->rec.y[index],
+      LCU_WIDTH, LCU_WIDTH,
+      tu_loc.width, tu_loc.height);
+    double coeff_bits = uvg_get_coeff_cost(state, lcu->coeff.y, NULL, &tu_loc, 0, SCAN_DIAG, false, COEFF_ORDER_CU);
+
+
+    int cbf = cbf_is_set(search_data->pred_cu.cbf, COLOR_Y);
+    if (i + 1 != split_limit && search_data->best_isp_cbfs != 0) {
+      CABAC_FBITS_UPDATE(&state->search_cabac, &state->search_cabac.ctx.qt_cbf_model_luma[cbf_context], cbf, coeff_bits, "cbf_luma_isp_recon");
+    }
+    cost += ssd + coeff_bits * state->lambda;
+
+    cbf_context = 2 + cbf;
+
+    search_data->best_isp_cbfs |= cbf << i;
+    search_data->pred_cu.intra.isp_cbfs = search_data->best_isp_cbfs;
+
+  }
+  return cost;
 }

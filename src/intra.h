@@ -152,6 +152,12 @@ void uvg_intra_recon_cu(
   bool recon_luma,
   bool recon_chroma);
 
+double uvg_recon_and_estimate_cost_isp(encoder_state_t* const state,
+  const cu_loc_t* const cu_loc,
+  double cost_treshold,
+  intra_search_data_t* const search_data,
+  lcu_t* const lcu);
+
 int8_t uvg_get_co_located_luma_mode(
   const cu_loc_t* const chroma_loc,
   const cu_loc_t* const cu_loc,
