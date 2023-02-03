@@ -2016,7 +2016,7 @@ bool uvg_can_use_isp_with_lfnst(const int width, const int height, const int isp
     return false;
   }
   if (isp_split_type == ISP_MODE_NO_ISP) {
-    return false;
+    return true;
   }
 
   const int tu_width = (isp_split_type == ISP_MODE_HOR) ? width : uvg_get_isp_split_dim(width, height, SPLIT_TYPE_VER, true);
@@ -2062,7 +2062,7 @@ double uvg_recon_and_estimate_cost_isp(encoder_state_t* const state,
       &tu_loc, &search_data->pred_cu, lcu,
       false, UVG_LUMA_T);
 
-    int index = cu_loc->local_y * LCU_WIDTH + cu_loc->local_x;
+    int index = tu_loc.local_y * LCU_WIDTH + tu_loc.local_x;
     int ssd = uvg_pixels_calc_ssd(&lcu->ref.y[index], &lcu->rec.y[index],
       LCU_WIDTH, LCU_WIDTH,
       tu_loc.width, tu_loc.height);

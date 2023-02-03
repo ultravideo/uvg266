@@ -240,6 +240,7 @@ int uvg_init_nb_info(encoder_control_t * encoder) {
           {
             nbSbb->inPos[k] = 0;
           }
+          printf("");
         }
         {
           //===== outside subband neighbours =====
@@ -1282,8 +1283,8 @@ int uvg_dep_quant(
         encoder->m_scanId2NbInfoSbbArray[log2_tr_width][log2_tr_height][scanIdx ? scanIdx - 1 : 0],
         (zeroOut && (pos_x >= effWidth || pos_y >= effHeight)),
         q_coeff[blkpos],
-        effectWidth,
-        effectHeight
+        width,
+        height
       ); //tu.cu->slice->getReverseLastSigCoeffFlag());
     }
     else {
@@ -1304,9 +1305,13 @@ int uvg_dep_quant(
         encoder->m_scanId2NbInfoSbbArray[log2_tr_width][log2_tr_height][scanIdx ? scanIdx - 1 : 0],
         (zeroOut && (pos_x >= effWidth || pos_y >= effHeight)),
         default_quant_coeff,
-        effectWidth,
-        effectHeight); //tu.cu->slice->getReverseLastSigCoeffFlag());
+        width,
+        height); //tu.cu->slice->getReverseLastSigCoeffFlag());
     }
+    Decision temp[8];
+    Decision* decisions = ctxs->m_trellis[scanIdx];
+    memcpy(temp, decisions, sizeof(Decision) * 8);
+    decisions++;
   }
 
   //===== find best path =====

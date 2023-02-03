@@ -361,21 +361,16 @@ static double search_intra_trdepth(
     }
 
 
-    for (int lfnst_idx = start_idx; lfnst_idx <= end_lfnst_idx; lfnst_idx++) {
-      // Initialize lfnst variables
-      pred_cu->lfnst_idx = lfnst_idx;
-      pred_cu->violates_lfnst_constrained_luma = false;
-      pred_cu->violates_lfnst_constrained_chroma = false;
-      pred_cu->lfnst_last_scan_pos = false;
-
-      //if (pred_cu->lfnst_idx != 0) {
-      //  // Cannot use ISP with LFNST for small blocks
-      //  pred_cu->intra.isp_mode = uvg_can_use_isp_with_lfnst(width, height, pred_cu->intra.isp_mode, tree_type) ? pred_cu->intra.isp_mode : ISP_MODE_NO_ISP;
-      //}
-
-      for (trafo = mts_start; trafo < num_transforms; trafo++) {
+    for (trafo = mts_start; trafo < num_transforms; trafo++) {
+      for (int lfnst_idx = start_idx; lfnst_idx <= end_lfnst_idx; lfnst_idx++) {
+        // Initialize lfnst variables
         pred_cu->tr_idx = trafo;
         pred_cu->tr_skip = trafo == MTS_SKIP;
+        pred_cu->lfnst_idx = lfnst_idx;
+        pred_cu->violates_lfnst_constrained_luma = false;
+        pred_cu->violates_lfnst_constrained_chroma = false;
+        pred_cu->lfnst_last_scan_pos = false;
+
         bool constraints[2] = {false, false};
         if (mts_enabled) {
           pred_cu->mts_last_scan_pos = 0;
@@ -1337,7 +1332,7 @@ static int8_t search_intra_rdo(
     uint8_t best_mts_mode_for_isp[NUM_ISP_MODES] = {0};
     uint8_t best_lfnst_mode_for_isp[NUM_ISP_MODES] = {0};
     for (int isp_mode = 0; isp_mode < max_isp_modes; ++isp_mode) {
-      
+       
 
       search_data[mode].pred_cu.intra.isp_mode = isp_mode;
       double rdo_bitcost = uvg_luma_mode_bits(state, &search_data[mode].pred_cu, cu_loc, lcu);
