@@ -237,7 +237,7 @@ void uvg_encode_ts_residual(encoder_state_t* const state,
   const uint32_t log2_block_width  = uvg_g_convert_to_log2[width];
   const uint32_t log2_block_height = uvg_g_convert_to_log2[height];
   // TODO: log2_cg_size is wrong if width != height
-  const uint32_t log2_cg_size = uvg_g_log2_sbb_size[log2_block_width][log2_block_width][0] + uvg_g_log2_sbb_size[log2_block_width][log2_block_width][1];
+  const uint32_t log2_cg_size = uvg_g_log2_sbb_size[log2_block_width][log2_block_width][0] + uvg_g_log2_sbb_size[log2_block_width][log2_block_height][1];
   
   const uint32_t* const scan = uvg_get_scan_order_table(SCAN_GROUP_4X4, scan_mode, log2_block_width, log2_block_height);
   const uint32_t* const scan_cg = uvg_get_scan_order_table(SCAN_GROUP_UNGROUPED, scan_mode, log2_block_width, log2_block_height);
@@ -265,7 +265,7 @@ void uvg_encode_ts_residual(encoder_state_t* const state,
   bool no_sig_group_before_last = true;
 
   for (i = 0; i <= scan_cg_last; i++) {
-    if (!(width == 4 || (i ==scan_cg_last && no_sig_group_before_last))) {
+    if (!((width == 4 && height == 4) || (i ==scan_cg_last && no_sig_group_before_last))) {
       uint32_t cg_blkpos = scan_cg[i];
       uint32_t cg_pos_y = cg_blkpos / cg_width;
       uint32_t cg_pos_x = cg_blkpos - (cg_pos_y * cg_width);

@@ -1196,8 +1196,11 @@ int uvg_ts_rdoq(encoder_state_t* const state, coeff_t* src_coeff, coeff_t* dest_
 
   switch (cg_num) {
   case  1: FILL_ARRAY(sig_coeffgroup_flag, 0, 1); FILL_ARRAY(cost_coeffgroup_sig, 0, 1); break;
+  case  2: FILL_ARRAY(sig_coeffgroup_flag, 0, 2); FILL_ARRAY(cost_coeffgroup_sig, 0, 2); break;
   case  4: FILL_ARRAY(sig_coeffgroup_flag, 0, 4); FILL_ARRAY(cost_coeffgroup_sig, 0, 4);  break;
+  case  8: FILL_ARRAY(sig_coeffgroup_flag, 0, 8); FILL_ARRAY(cost_coeffgroup_sig, 0, 8);  break;
   case 16: FILL_ARRAY(sig_coeffgroup_flag, 0, 16); FILL_ARRAY(cost_coeffgroup_sig, 0, 16);  break;
+  case 32: FILL_ARRAY(sig_coeffgroup_flag, 0, 32); FILL_ARRAY(cost_coeffgroup_sig, 0, 32);  break;
   case 64: FILL_ARRAY(sig_coeffgroup_flag, 0, 64); FILL_ARRAY(cost_coeffgroup_sig, 0, 64); break;
   default: assert(0 && "There should be 1, 4, 16 or 64 coefficient groups");
   }

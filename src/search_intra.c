@@ -341,6 +341,7 @@ static double search_intra_trdepth(
     if (state->encoder_control->cfg.trskip_enable 
       && width <= (1 << state->encoder_control->cfg.trskip_max_size)
       && height <= (1 << state->encoder_control->cfg.trskip_max_size)
+      && PU_IS_TU(pred_cu)
       && pred_cu->intra.isp_mode == ISP_MODE_NO_ISP) {
       num_transforms = MAX(num_transforms, 2);
     }
@@ -378,6 +379,7 @@ static double search_intra_trdepth(
 
           if (trafo == MTS_SKIP && ((width > (1 << state->encoder_control->cfg.trskip_max_size)
             || (height > (1 << state->encoder_control->cfg.trskip_max_size)))
+            || !PU_IS_TU(pred_cu)
             || !state->encoder_control->cfg.trskip_enable)) {
             continue;
           }
