@@ -195,8 +195,8 @@ static const struct option long_options[] = {
   {"mtt-depth-intra",     required_argument, NULL, 0 },
   {"mtt-depth-inter",     required_argument, NULL, 0 },
   {"mtt-depth-intra-chroma", required_argument, NULL, 0 },
-  {"max_bt_size",         required_argument, NULL, 0 },
-  {"max_tt_size",         required_argument, NULL, 0 },
+  {"max-bt-size",         required_argument, NULL, 0 },
+  {"max-tt-size",         required_argument, NULL, 0 },
   { "dep-quant",                no_argument, NULL, 0 },
   { "no-dep-quant",             no_argument, NULL, 0 },
   {0, 0, 0, 0}

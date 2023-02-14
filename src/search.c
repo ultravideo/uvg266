@@ -1568,6 +1568,8 @@ static double search_cu(
   cu_loc_t separate_tree_chroma_loc = *cu_loc;
   separate_tree_chroma_loc.y >>= 1;
   separate_tree_chroma_loc.x >>= 1;
+  separate_tree_chroma_loc.width >>= 1;
+  separate_tree_chroma_loc.height >>= 1;
 
   if (cur_cu->type == CU_INTRA || cur_cu->type == CU_INTER) {
     double bits = 0;
@@ -1657,7 +1659,7 @@ static double search_cu(
   }
 
   bool can_split[6];
-  bool is_implicit = uvg_get_possible_splits(state, cu_loc, split_tree, tree_type, can_split);
+  bool is_implicit = uvg_get_possible_splits(state, cu_loc, split_tree, tree_type, can_split, false);
 
   const int slice_type = state->frame->is_irap ? (tree_type == UVG_CHROMA_T ? 2 : 0) : 1;
   const int max_btd = state->encoder_control->cfg.max_btt_depth[slice_type];
