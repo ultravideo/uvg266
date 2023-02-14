@@ -203,7 +203,8 @@ int uvg_get_split_locs(
   cu_loc_t out[4],
   uint8_t* separate_chroma);
 int uvg_get_possible_splits(const encoder_state_t* const state,
-  const cu_loc_t* const cu_loc, split_tree_t split_tree, enum uvg_tree_type tree_type, bool splits[6]);
+                            const cu_loc_t* const cu_loc, split_tree_t split_tree, enum uvg_tree_type tree_type, bool splits[6], bool
+                            use_chroma_coordinates);
 
 
 #define CU_GET_MV_CAND(cu_info_ptr, reflist) \

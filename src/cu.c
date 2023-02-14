@@ -373,18 +373,11 @@ int uvg_get_split_locs(
 int uvg_get_implicit_split(
   const encoder_state_t* const state,
   const cu_loc_t* const cu_loc,
-  enum
-  uvg_tree_type tree_type,
-  uint8_t max_mtt_depth)
+  uint8_t max_mtt_depth,
+  bool uses_chroma_coordinates)
 {
-  // This checking if cabac is in update state is a very dirty way of checking
-  // whether we are in the search or writing the bitstream, and unfortunately the
-  // coordinates are different for chroma tree in those two conditions. It might be
-  // possible to pass the chroma loc for uvg_get_possible_splits in the search but
-  // then all of the conditions need to be checked in that function.
-  // This current solutions *might* not work with alf enabled but I think it should work
-  bool right_ok = (state->tile->frame->width >> (tree_type == UVG_CHROMA_T && state->cabac.update)) >= cu_loc->x + cu_loc->width;
-  bool bottom_ok = (state->tile->frame->height >> (tree_type == UVG_CHROMA_T && state->cabac.update)) >= cu_loc->y + cu_loc->height;
+  bool right_ok = (state->tile->frame->width >> uses_chroma_coordinates) >= cu_loc->x + cu_loc->width;
+  bool bottom_ok = (state->tile->frame->height >> uses_chroma_coordinates) >= cu_loc->y + cu_loc->height;
 
   if (right_ok && bottom_ok) return NO_SPLIT;
   if (right_ok && max_mtt_depth != 0) return BT_HOR_SPLIT;
@@ -394,10 +387,11 @@ int uvg_get_implicit_split(
 
 
 int uvg_get_possible_splits(const encoder_state_t * const state,
-  const cu_loc_t * const cu_loc, split_tree_t split_tree, enum uvg_tree_type tree_type, bool splits[6])
+                            const cu_loc_t * const cu_loc, split_tree_t split_tree, enum uvg_tree_type tree_type, bool splits[6], bool
+                            use_chroma_coordinates)
 {
-  const int width = tree_type != UVG_CHROMA_T ? cu_loc->width : cu_loc->chroma_width;
-  const int height = tree_type != UVG_CHROMA_T ? cu_loc->height : cu_loc->chroma_height;
+  const unsigned width = tree_type != UVG_CHROMA_T ? cu_loc->width : cu_loc->chroma_width;
+  const unsigned height = tree_type != UVG_CHROMA_T ? cu_loc->height : cu_loc->chroma_height;
   const int slice_type = state->frame->is_irap ? (tree_type == UVG_CHROMA_T ? 2 : 0) : 1;
 
   const unsigned max_btd =
@@ -408,7 +402,7 @@ int uvg_get_possible_splits(const encoder_state_t * const state,
   const unsigned min_tt_size = 1 << MIN_SIZE >> (tree_type == UVG_CHROMA_T);
   const unsigned min_qt_size = state->encoder_control->cfg.min_qt_size[slice_type];
 
-  const enum split_type implicitSplit = uvg_get_implicit_split(state, cu_loc, tree_type, max_btd);
+  const enum split_type implicitSplit = uvg_get_implicit_split(state, cu_loc, max_btd, use_chroma_coordinates);
   
   splits[NO_SPLIT] = splits[QT_SPLIT] = splits[BT_HOR_SPLIT] = splits[TT_HOR_SPLIT] = splits[BT_VER_SPLIT] = splits[TT_VER_SPLIT] = true;
   bool can_btt = split_tree.mtt_depth < max_btd;
@@ -426,8 +420,8 @@ int uvg_get_possible_splits(const encoder_state_t * const state,
   {
     splits[NO_SPLIT] = splits[TT_HOR_SPLIT] = splits[TT_VER_SPLIT] = false;
 
-    splits[BT_HOR_SPLIT] = implicitSplit == BT_HOR_SPLIT;
-    splits[BT_VER_SPLIT] = implicitSplit == BT_VER_SPLIT;
+    splits[BT_HOR_SPLIT] = implicitSplit == BT_HOR_SPLIT && height <= max_bt_size;
+    splits[BT_VER_SPLIT] = implicitSplit == BT_VER_SPLIT && width <= max_bt_size;
     if (tree_type == UVG_CHROMA_T && width == 4) splits[BT_VER_SPLIT] = false;
     if (!splits[BT_HOR_SPLIT] && !splits[BT_VER_SPLIT] && !splits[QT_SPLIT]) splits[QT_SPLIT] = true;
     return 1;

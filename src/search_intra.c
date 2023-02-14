@@ -417,7 +417,7 @@ static double search_intra_trdepth(
         }
         if (pred_cu->intra.isp_mode != ISP_MODE_NO_ISP && search_data->best_isp_cbfs == 0) continue;
 
-        if (trafo != 0 && !cbf_is_set(pred_cu->cbf, COLOR_Y)) continue;
+        if ((trafo != 0 || lfnst_idx != 0) && !cbf_is_set(pred_cu->cbf, COLOR_Y)) continue;
         
         derive_mts_constraints(pred_cu, lcu, width, height, lcu_px);
         if (pred_cu->tr_idx > 1) {

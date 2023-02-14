@@ -1251,7 +1251,7 @@ uint8_t uvg_write_split_flag(
 
 
   bool can_split[6];
-  const bool is_implicit = uvg_get_possible_splits(state, cu_loc, split_tree, tree_type, can_split);
+  const bool is_implicit = uvg_get_possible_splits(state, cu_loc, split_tree, tree_type, can_split, tree_type == UVG_CHROMA_T);
 
 
   bool allow_split = can_split[1] || can_split[2] || can_split[3] || can_split[4] || can_split[5];
