@@ -1153,7 +1153,7 @@ int uvg_dep_quant(
 
   int32_t qp_scaled = uvg_get_scaled_qp(compID, state->qp, (encoder->bitdepth - 8) * 6, encoder->qp_map[0]);
   qp_scaled = is_ts ? MAX(qp_scaled, 4 + 6 * MIN_QP_PRIME_TS) : qp_scaled;
-  bool needs_block_size_trafo_scale = is_ts && ((log2_tr_height + log2_tr_width) % 2 == 1);
+  bool needs_block_size_trafo_scale = !is_ts && ((log2_tr_height + log2_tr_width) % 2 == 1);
   needs_block_size_trafo_scale |= 0; // Non log2 block size
 
   const int32_t scalinglist_type = (cur_tu->type == CU_INTRA ? 0 : 3) + (int8_t)compID;
@@ -1252,8 +1252,8 @@ int uvg_dep_quant(
     uint32_t  pos_y_next = blkpos_next >> log2_tr_width;
     uint32_t  pos_x_next = blkpos_next - (pos_y_next << log2_tr_width);
     uint32_t cg_blockpos_next = scanIdx ? cg_scan[(scanIdx -1) >> 4] : 0;
-    uint32_t cg_pos_y_next = cg_blockpos_next / height_in_sbb;
-    uint32_t cg_pos_x_next = cg_blockpos_next - (cg_pos_y_next * height_in_sbb);
+    uint32_t cg_pos_y_next = cg_blockpos_next / width_in_sbb;
+    uint32_t cg_pos_x_next = cg_blockpos_next - (cg_pos_y_next * width_in_sbb);
     uint32_t diag = pos_y_next + pos_x_next;
 
     uint32_t sig_ctx_offset = compID == COLOR_Y ? (diag < 2 ? 8 : diag < 5 ? 4 : 0) : (diag < 2 ? 4 : 0);
@@ -1308,10 +1308,7 @@ int uvg_dep_quant(
         width,
         height); //tu.cu->slice->getReverseLastSigCoeffFlag());
     }
-    Decision temp[8];
-    Decision* decisions = ctxs->m_trellis[scanIdx];
-    memcpy(temp, decisions, sizeof(Decision) * 8);
-    decisions++;
+
   }
 
   //===== find best path =====

@@ -457,7 +457,7 @@ static double search_intra_trdepth(
         double transform_bits = 0;
         if (state->encoder_control->cfg.lfnst && PU_IS_TU(pred_cu) &&
           trafo != MTS_SKIP && end_lfnst_idx != 0) {
-          if (!constraints[0] && constraints[1]) {
+          if ((!constraints[0] && constraints[1]) || lfnst_idx != 0) {
             transform_bits += CTX_ENTROPY_FBITS(
               &state->search_cabac.ctx.lfnst_idx_model[tree_type == UVG_LUMA_T],
               lfnst_idx != 0);
@@ -468,7 +468,10 @@ static double search_intra_trdepth(
             }
           }
         }
-        if (num_transforms > 2 && trafo != MTS_SKIP && width <= 32
+        if (num_transforms > 2 && trafo != MTS_SKIP
+            && pred_cu->intra.isp_mode == ISP_MODE_NO_ISP
+            && lfnst_idx == 0
+            && width <= 32
             && height <= 32
             && !pred_cu->violates_mts_coeff_constraint && pred_cu->
             mts_last_scan_pos) {
@@ -488,7 +491,7 @@ static double search_intra_trdepth(
           }
 
         }
-        rd_cost += transform_bits * state->frame->lambda;
+        rd_cost += transform_bits * state->lambda;
 
         search_data->lfnst_costs[lfnst_idx] = MIN(
           search_data->lfnst_costs[lfnst_idx],
