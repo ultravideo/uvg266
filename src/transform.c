@@ -782,8 +782,8 @@ void uvg_chroma_transform_search(
       pred_cu->violates_lfnst_constrained_chroma = false;
     }
     if (!is_jccr) {
-      double u_cost = UVG_CHROMA_MULT * ssd_u + u_bits * state->frame->lambda;
-      double v_cost = UVG_CHROMA_MULT * ssd_v + v_bits * state->frame->lambda;
+      double u_cost = UVG_CHROMA_MULT * ssd_u + u_bits * state->c_lambda;
+      double v_cost = UVG_CHROMA_MULT * ssd_v + v_bits * state->c_lambda;
       if (u_cost < chorma_ts_out->best_u_cost) {
         chorma_ts_out->best_u_cost = u_cost;
         chorma_ts_out->best_u_index = u_has_coeffs ? transforms[i] : NO_RESIDUAL;
@@ -794,7 +794,7 @@ void uvg_chroma_transform_search(
       }
     }
     else {
-      double cost = UVG_CHROMA_MULT * (ssd_u + ssd_v) + (u_bits + v_bits) * state->frame->lambda;
+      double cost = UVG_CHROMA_MULT * (ssd_u + ssd_v) + (u_bits + v_bits) * state->c_lambda;
       if (cost < chorma_ts_out->best_combined_cost) {
         chorma_ts_out->best_combined_cost = cost;
         chorma_ts_out->best_combined_index = transforms[i];

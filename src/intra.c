@@ -2070,7 +2070,7 @@ double uvg_recon_and_estimate_cost_isp(encoder_state_t* const state,
 
 
     int cbf = cbf_is_set(search_data->pred_cu.cbf, COLOR_Y);
-    if (i + 1 != split_limit && search_data->best_isp_cbfs != 0) {
+    if (i + 1 != split_limit || search_data->best_isp_cbfs != 1 << (split_limit - 1)) {
       CABAC_FBITS_UPDATE(&state->search_cabac, &state->search_cabac.ctx.qt_cbf_model_luma[cbf_context], cbf, coeff_bits, "cbf_luma_isp_recon");
     }
     cost += ssd + coeff_bits * state->lambda;

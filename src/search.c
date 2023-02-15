@@ -1798,7 +1798,7 @@ static double search_cu(
 
       // 3.9
       const double factor    = state->qp > 30 ? 1.1 : 1.075;
-      if (split_bits * state->frame->lambda + cost / factor > cost) {
+      if (split_bits * state->lambda + cost / factor > cost) {
         can_split[split_type] = false;
         continue;
       }
