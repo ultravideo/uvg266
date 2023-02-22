@@ -138,9 +138,8 @@ void uvg_intra_predict(
   const color_t color,
   uvg_pixel* dst,
   const intra_search_data_t* data,
-  const lcu_t* lcu,
-  enum uvg_tree_type tree_type
-  );
+  const lcu_t* lcu
+);
 
 void uvg_intra_recon_cu(
   encoder_state_t* const state,

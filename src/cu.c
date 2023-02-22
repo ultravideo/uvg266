@@ -276,10 +276,10 @@ cu_array_t * uvg_cu_array_copy_ref(cu_array_t* cua)
  * \param dst_y   y-coordinate of the top edge of the copied area in dst
  * \param src     source lcu
  */
-void uvg_cu_array_copy_from_lcu(cu_array_t* dst, int dst_x, int dst_y, const lcu_t *src, enum uvg_tree_type tree_type)
+void uvg_cu_array_copy_from_lcu(cu_array_t* dst, int dst_x, int dst_y, const lcu_t *src)
 {
   const int dst_stride = dst->stride >> 2;
-  const int width = tree_type != UVG_CHROMA_T ? LCU_WIDTH : LCU_WIDTH_C;
+  const int width = LCU_WIDTH;
   for (int y = 0; y < width; y += SCU_WIDTH) {
     for (int x = 0; x < width; x += SCU_WIDTH) {
       const cu_info_t *from_cu = LCU_GET_CU_AT_PX(src, x, y);
@@ -373,11 +373,10 @@ int uvg_get_split_locs(
 int uvg_get_implicit_split(
   const encoder_state_t* const state,
   const cu_loc_t* const cu_loc,
-  uint8_t max_mtt_depth,
-  bool uses_chroma_coordinates)
+  uint8_t max_mtt_depth)
 {
-  bool right_ok = (state->tile->frame->width >> uses_chroma_coordinates) >= cu_loc->x + cu_loc->width;
-  bool bottom_ok = (state->tile->frame->height >> uses_chroma_coordinates) >= cu_loc->y + cu_loc->height;
+  bool right_ok = (state->tile->frame->width) >= cu_loc->x + cu_loc->width;
+  bool bottom_ok = (state->tile->frame->height) >= cu_loc->y + cu_loc->height;
 
   if (right_ok && bottom_ok) return NO_SPLIT;
   if (right_ok && max_mtt_depth != 0) return BT_HOR_SPLIT;
@@ -387,22 +386,21 @@ int uvg_get_implicit_split(
 
 
 int uvg_get_possible_splits(const encoder_state_t * const state,
-                            const cu_loc_t * const cu_loc, split_tree_t split_tree, enum uvg_tree_type tree_type, bool splits[6], bool
-                            use_chroma_coordinates)
+                            const cu_loc_t * const cu_loc, split_tree_t split_tree, enum uvg_tree_type tree_type, bool splits[6])
 {
-  const unsigned width = tree_type != UVG_CHROMA_T ? cu_loc->width : cu_loc->chroma_width;
-  const unsigned height = tree_type != UVG_CHROMA_T ? cu_loc->height : cu_loc->chroma_height;
+  const unsigned width = cu_loc->width;
+  const unsigned height = cu_loc->height;
   const int slice_type = state->frame->is_irap ? (tree_type == UVG_CHROMA_T ? 2 : 0) : 1;
 
   const unsigned max_btd =
     state->encoder_control->cfg.max_btt_depth[slice_type] + split_tree.implicit_mtt_depth;
-  const unsigned max_bt_size = state->encoder_control->cfg.max_bt_size[slice_type] >> (tree_type == UVG_CHROMA_T);
-  const unsigned min_bt_size = 1 << MIN_SIZE >> (tree_type == UVG_CHROMA_T);
-  const unsigned max_tt_size = state->encoder_control->cfg.max_tt_size[slice_type] >> (tree_type == UVG_CHROMA_T);
-  const unsigned min_tt_size = 1 << MIN_SIZE >> (tree_type == UVG_CHROMA_T);
+  const unsigned max_bt_size = state->encoder_control->cfg.max_bt_size[slice_type];
+  const unsigned min_bt_size = 1 << MIN_SIZE;
+  const unsigned max_tt_size = state->encoder_control->cfg.max_tt_size[slice_type];
+  const unsigned min_tt_size = 1 << MIN_SIZE;
   const unsigned min_qt_size = state->encoder_control->cfg.min_qt_size[slice_type];
 
-  const enum split_type implicitSplit = uvg_get_implicit_split(state, cu_loc, max_btd, use_chroma_coordinates);
+  const enum split_type implicitSplit = uvg_get_implicit_split(state, cu_loc, max_btd);
   
   splits[NO_SPLIT] = splits[QT_SPLIT] = splits[BT_HOR_SPLIT] = splits[TT_HOR_SPLIT] = splits[BT_VER_SPLIT] = splits[TT_VER_SPLIT] = true;
   bool can_btt = split_tree.mtt_depth < max_btd;
@@ -414,7 +412,7 @@ int uvg_get_possible_splits(const encoder_state_t * const state,
   if (split_tree.current_depth != 0 && last_split != QT_SPLIT /* && !(width > 64 || height > 64)*/) splits[QT_SPLIT] = false;
   if (width <= min_qt_size)                              splits[QT_SPLIT] = false;
 
-  if (tree_type == UVG_CHROMA_T && width <= 4) splits[QT_SPLIT] = false;
+  if (tree_type == UVG_CHROMA_T && width <= 8) splits[QT_SPLIT] = false;
 
   if (implicitSplit != NO_SPLIT)
   {
@@ -422,7 +420,7 @@ int uvg_get_possible_splits(const encoder_state_t * const state,
 
     splits[BT_HOR_SPLIT] = implicitSplit == BT_HOR_SPLIT && height <= max_bt_size;
     splits[BT_VER_SPLIT] = implicitSplit == BT_VER_SPLIT && width <= max_bt_size;
-    if (tree_type == UVG_CHROMA_T && width == 4) splits[BT_VER_SPLIT] = false;
+    if (tree_type == UVG_CHROMA_T && width <= 8) splits[BT_VER_SPLIT] = false;
     if (!splits[BT_HOR_SPLIT] && !splits[BT_VER_SPLIT] && !splits[QT_SPLIT]) splits[QT_SPLIT] = true;
     return 1;
   }
@@ -459,23 +457,23 @@ int uvg_get_possible_splits(const encoder_state_t * const state,
   // specific check for BT splits
   if (height <= min_bt_size)                            splits[BT_HOR_SPLIT] = false;
   if (width > 64 && height <= 64) splits[BT_HOR_SPLIT] = false;
-  if (tree_type == UVG_CHROMA_T && width * height <= 16)     splits[BT_HOR_SPLIT] = false;
+  if (tree_type == UVG_CHROMA_T && width * height <= 64)     splits[BT_HOR_SPLIT] = false;
 
   if (width <= min_bt_size)                              splits[BT_VER_SPLIT] = false;
   if (width <= 64 && height > 64) splits[BT_VER_SPLIT] = false;
-  if (tree_type == UVG_CHROMA_T && (width * height <= 16 || width == 4))     splits[BT_VER_SPLIT] = false;
+  if (tree_type == UVG_CHROMA_T && (width * height <= 64 || width <= 8))     splits[BT_VER_SPLIT] = false;
 
   //if (modeType == MODE_TYPE_INTER && width * height == 32)  splits[BT_VER_SPLIT] = splits[BT_HOR_SPLIT] = false;
 
   if (height <= 2 * min_tt_size || height > max_tt_size || width > max_tt_size)
     splits[TT_HOR_SPLIT] = false;
   if (width > 64 || height > 64)  splits[TT_HOR_SPLIT] = false;
-  if (tree_type == UVG_CHROMA_T && width * height <= 16 * 2)     splits[TT_HOR_SPLIT] = false;
+  if (tree_type == UVG_CHROMA_T && width * height <= 64 * 2)     splits[TT_HOR_SPLIT] = false;
 
   if (width <= 2 * min_tt_size || width > max_tt_size || height > max_tt_size)
     splits[TT_VER_SPLIT] = false;
   if (width > 64 || height > 64)  splits[TT_VER_SPLIT] = false;
-  if (tree_type == UVG_CHROMA_T && (width * height <= 16 * 2 || width == 8))     splits[TT_VER_SPLIT] = false;
+  if (tree_type == UVG_CHROMA_T && (width * height <= 64 * 2 || width <= 16))     splits[TT_VER_SPLIT] = false;
 
   //if (modeType == MODE_TYPE_INTER && width * height == 64)  splits[TT_VER_SPLIT] = splits[TT_HOR_SPLIT] = false;
   return 0;
