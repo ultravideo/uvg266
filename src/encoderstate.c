@@ -890,12 +890,6 @@ static void encoder_state_worker_encode_lcu_bitstream(void * opaque)
   if(tree_type == UVG_LUMA_T && state->encoder_control->chroma_format != UVG_CSP_400) {
     uvg_cu_loc_ctor(&start, lcu->position.x * LCU_WIDTH, lcu->position.y * LCU_WIDTH, LCU_WIDTH, LCU_WIDTH);
     cu_loc_t chroma_tree_loc = start;
-    chroma_tree_loc.x >>= 1;
-    chroma_tree_loc.y >>= 1;
-    chroma_tree_loc.local_x = chroma_tree_loc.x & LCU_WIDTH_C;
-    chroma_tree_loc.local_y = chroma_tree_loc.y & LCU_WIDTH_C;
-    chroma_tree_loc.width >>= 1;
-    chroma_tree_loc.height >>= 1;
     uvg_encode_coding_tree(state, lcu->coeff, UVG_CHROMA_T, &start, &chroma_tree_loc, split_tree, true);
   }
 
@@ -1175,6 +1169,12 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
           uvg_threadqueue_submit(state->encoder_control->threadqueue, job[0]);
 
           uvg_threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], state->tile->wf_recon_jobs[lcu->id]);
+#ifdef UVG_DEBUG_PRINT_CABAC
+          // Ensures that the ctus are encoded in raster scan order
+          if(i >= state->tile->frame->width_in_lcu) {
+            uvg_threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], state->tile->wf_recon_jobs[(lcu->id / state->tile->frame->width_in_lcu - 1) * state->tile->frame->width_in_lcu]);
+          }
+#endif
         }
 
         uvg_threadqueue_submit(state->encoder_control->threadqueue, state->tile->wf_jobs[lcu->id]);
@@ -1307,10 +1307,10 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
         if(main_state->encoder_control->cfg.dual_tree){
           sub_state->tile->frame->chroma_cu_array = uvg_cu_subarray(
               main_state->tile->frame->chroma_cu_array,
-              offset_x / 2,
-              offset_y / 2,
-              sub_state->tile->frame->width_in_lcu * LCU_WIDTH_C,
-              sub_state->tile->frame->height_in_lcu * LCU_WIDTH_C
+              offset_x,
+              offset_y,
+              sub_state->tile->frame->width_in_lcu * LCU_WIDTH,
+              sub_state->tile->frame->height_in_lcu * LCU_WIDTH
           );
         }
       }
@@ -1949,10 +1949,9 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, uvg_pict
 
   if (cfg->dual_tree && state->encoder_control->chroma_format != UVG_CSP_400 && state->frame->is_irap) {
     assert(state->tile->frame->chroma_cu_array == NULL);
-    state->tile->frame->chroma_cu_array = uvg_cu_array_chroma_alloc(
-      state->tile->frame->width / 2,
-      state->tile->frame->height / 2,
-      state->encoder_control->chroma_format
+    state->tile->frame->chroma_cu_array = uvg_cu_array_alloc(
+      state->tile->frame->width,
+      state->tile->frame->height
     );
   }
   // Set pictype.

@@ -203,8 +203,7 @@ int uvg_get_split_locs(
   cu_loc_t out[4],
   uint8_t* separate_chroma);
 int uvg_get_possible_splits(const encoder_state_t* const state,
-                            const cu_loc_t* const cu_loc, split_tree_t split_tree, enum uvg_tree_type tree_type, bool splits[6], bool
-                            use_chroma_coordinates);
+                            const cu_loc_t* const cu_loc, split_tree_t split_tree, enum uvg_tree_type tree_type, bool splits[6]);
 
 
 #define CU_GET_MV_CAND(cu_info_ptr, reflist) \
@@ -383,8 +382,7 @@ typedef struct {
   cu_info_t cu[LCU_T_CU_WIDTH * LCU_T_CU_WIDTH + 1];
 } lcu_t;
 
-void uvg_cu_array_copy_from_lcu(cu_array_t* dst, int dst_x, int dst_y, const lcu_t *src, enum uvg_tree_type
-                                tree_type);
+void uvg_cu_array_copy_from_lcu(cu_array_t* dst, int dst_x, int dst_y, const lcu_t *src);
 
 int uvg_count_available_edge_cus(const cu_loc_t* const cu_loc, const lcu_t* const lcu, bool left);
 int uvg_count_chroma_tree_available_edge_cus(int x, int y, int width, int height, const lcu_t* const lcu, bool left);

@@ -67,10 +67,10 @@ static const int INTRA_THRESHOLD = 8;
 static INLINE void copy_cu_info(lcu_t *from, lcu_t *to, const cu_loc_t* const cu_loc, enum uvg_tree_type
                                 tree_type)
 {
-  const int y_limit = (cu_loc->local_y + cu_loc->height) >> (tree_type == UVG_CHROMA_T);
-  const int x_limit = (cu_loc->local_x + cu_loc->width) >> (tree_type == UVG_CHROMA_T);
-  for   (int y = cu_loc->local_y >> (tree_type == UVG_CHROMA_T); y < y_limit; y += SCU_WIDTH) {
-    for (int x = cu_loc->local_x >> (tree_type == UVG_CHROMA_T); x < x_limit; x += SCU_WIDTH) {
+  const int y_limit = (cu_loc->local_y + cu_loc->height);
+  const int x_limit = (cu_loc->local_x + cu_loc->width);
+  for   (int y = cu_loc->local_y ; y < y_limit; y += SCU_WIDTH) {
+    for (int x = cu_loc->local_x ; x < x_limit; x += SCU_WIDTH) {
       *LCU_GET_CU_AT_PX(to, x, y) = *LCU_GET_CU_AT_PX(from, x, y);
     }
   }
@@ -86,8 +86,8 @@ static INLINE void initialize_partial_work_tree(
   chroma_loc,
   const enum uvg_tree_type tree_type) {
 
-  const int y_limit = MIN(LCU_WIDTH,  state->tile->frame->height - cu_loc->y / 64 * 64) >> (tree_type == UVG_CHROMA_T);
-  const int x_limit = MIN(LCU_WIDTH, state->tile->frame->width - cu_loc->x / 64 * 64) >> (tree_type == UVG_CHROMA_T);
+  const int y_limit = MIN(LCU_WIDTH,  state->tile->frame->height - cu_loc->y / 64 * 64);
+  const int x_limit = MIN(LCU_WIDTH, state->tile->frame->width - cu_loc->x / 64 * 64);
 
   if (cu_loc->local_x == 0) {
     to->left_ref = from->left_ref;
@@ -150,8 +150,8 @@ static INLINE void initialize_partial_work_tree(
     
   }
 
-  const int y_start = (cu_loc->local_y >> (tree_type == UVG_CHROMA_T)) - 4;
-  const int x_start = (cu_loc->local_x >> (tree_type == UVG_CHROMA_T)) - 4;
+  const int y_start = (cu_loc->local_y) - 4;
+  const int x_start = (cu_loc->local_x) - 4;
   for (int y = y_start; y < y_limit; y += SCU_WIDTH) {
     *LCU_GET_CU_AT_PX(to, x_start, y) = *LCU_GET_CU_AT_PX(from, x_start, y);
   }
@@ -159,15 +159,15 @@ static INLINE void initialize_partial_work_tree(
     *LCU_GET_CU_AT_PX(to, x, y_start) = *LCU_GET_CU_AT_PX(from, x, y_start);
   }
 
-  for (int y = cu_loc->local_y >> (tree_type == UVG_CHROMA_T); y < y_limit; y += SCU_WIDTH) {
-    for (int x = cu_loc->local_x >> (tree_type == UVG_CHROMA_T); x < x_limit; x += SCU_WIDTH) {
+  for (int y = cu_loc->local_y; y < y_limit; y += SCU_WIDTH) {
+    for (int x = cu_loc->local_x ; x < x_limit; x += SCU_WIDTH) {
       memset(LCU_GET_CU_AT_PX(to, x, y), 0, sizeof(cu_info_t));
     }
   }
 
   if(chroma_loc->local_y != cu_loc->local_y || chroma_loc->local_x != cu_loc->local_x && tree_type == UVG_BOTH_T) {
-    const int y_start = (chroma_loc->local_y >> (tree_type == UVG_CHROMA_T)) - 4;
-    const int x_start = (chroma_loc->local_x >> (tree_type == UVG_CHROMA_T)) - 4;
+    const int y_start = (chroma_loc->local_y) - 4;
+    const int x_start = (chroma_loc->local_x) - 4;
     for (int y = y_start; y < y_limit; y += SCU_WIDTH) {
       *LCU_GET_CU_AT_PX(to, x_start, y) = *LCU_GET_CU_AT_PX(from, x_start, y);
     }
@@ -190,24 +190,24 @@ static INLINE void initialize_partial_work_tree(
       to->top_ref = from->top_ref;
       *LCU_GET_TOP_RIGHT_CU(to) = *LCU_GET_TOP_RIGHT_CU(from);      
     }
-    if (x_limit != LCU_WIDTH >> (tree_type == UVG_CHROMA_T)) {
+    if (x_limit != LCU_WIDTH) {
       for (int y = y_start; y < y_limit; y += SCU_WIDTH) {
         memset(LCU_GET_CU_AT_PX(to, x_limit, y), 0, sizeof(cu_info_t));
       }
     }
-    if (y_limit != LCU_WIDTH >> (tree_type == UVG_CHROMA_T)) {
+    if (y_limit != LCU_WIDTH) {
       for (int x = x_start; x < x_limit; x += SCU_WIDTH) {
         memset(LCU_GET_CU_AT_PX(to, x, y_limit), 0, sizeof(cu_info_t));
       }
     }
   }
   else {
-    if (x_limit != LCU_WIDTH >> (tree_type == UVG_CHROMA_T)) {
+    if (x_limit != LCU_WIDTH) {
       for (int y = y_start; y < y_limit; y += SCU_WIDTH) {
         memset(LCU_GET_CU_AT_PX(to, x_limit, y), 0, sizeof(cu_info_t));
       }
     }
-    if (y_limit != LCU_WIDTH >> (tree_type == UVG_CHROMA_T)) {
+    if (y_limit != LCU_WIDTH) {
       for (int x = x_start; x < x_limit; x += SCU_WIDTH) {
         memset(LCU_GET_CU_AT_PX(to, x, y_limit), 0, sizeof(cu_info_t));
       }
@@ -222,10 +222,10 @@ static INLINE void copy_cu_pixels(
   enum uvg_tree_type
   tree_type)
 {
-  const int x_local = cu_loc->local_x >> (tree_type == UVG_CHROMA_T);
-  const int y_local = cu_loc->local_y >> (tree_type == UVG_CHROMA_T);
+  const int x_local = cu_loc->local_x;
+  const int y_local = cu_loc->local_y;
   const int luma_index = x_local + y_local * LCU_WIDTH;
-  const int chroma_index = tree_type == UVG_CHROMA_T ? x_local + y_local * LCU_WIDTH_C : (x_local / 2) + (y_local / 2) * LCU_WIDTH_C;
+  const int chroma_index =  (x_local / 2) + (y_local / 2) * LCU_WIDTH_C;
 
   if(tree_type != UVG_CHROMA_T) {
     uvg_pixels_blit(&from->rec.y[luma_index], &to->rec.y[luma_index],
@@ -372,11 +372,11 @@ static void lcu_fill_chroma_cu_info(lcu_t *lcu, const cu_loc_t * const cu_loc)
 
 static void lcu_fill_chroma_cbfs(lcu_t *lcu, const cu_loc_t * const chroma_loc, enum uvg_tree_type tree_type)
 {
-  int8_t height = tree_type == UVG_CHROMA_T ? chroma_loc->chroma_height : chroma_loc->height;
-  int8_t width = tree_type == UVG_CHROMA_T ? chroma_loc->chroma_width : chroma_loc->width;
+  int8_t height = chroma_loc->height;
+  int8_t width =  chroma_loc->width;
   uint32_t x_local = chroma_loc->local_x;
   uint32_t y_local = chroma_loc->local_y;
-  const int offset = ~((TR_MAX_WIDTH >> (tree_type == UVG_CHROMA_T)) - 1);
+  const int offset = ~((TR_MAX_WIDTH) - 1);
   // Set coeff flags in every CU covered by part_mode in this depth.
   for (uint32_t y = 0; y < height; y += SCU_WIDTH) {
     for (uint32_t x = 0; x < width; x += SCU_WIDTH) {
@@ -728,7 +728,7 @@ static double cu_rd_cost_tr_split_accurate(
   
   const int skip_residual_coding = pred_cu->skipped || (pred_cu->type != CU_INTRA && pred_cu->cbf == 0);
   // cur_cu is used for TU parameters.
-  cu_info_t* const tr_cu = LCU_GET_CU_AT_PX(lcu, cu_loc->local_x >> (tree_type == UVG_CHROMA_T), cu_loc->local_y >> (tree_type == UVG_CHROMA_T));
+  cu_info_t* const tr_cu = LCU_GET_CU_AT_PX(lcu, cu_loc->local_x, cu_loc->local_y);
 
   double coeff_bits = 0;
   double tr_tree_bits = 0;
@@ -1132,28 +1132,28 @@ static void mark_deblocking(const cu_loc_t* const cu_loc, const cu_loc_t* const 
   else {
 
     if (chroma_loc->x) {
-      for (int x = x_local; x < x_local + chroma_loc->chroma_width; x += TR_MAX_WIDTH / 2) {
-        for (int y = y_local; y < y_local + chroma_loc->chroma_height; y += SCU_WIDTH) {
+      for (int x = x_local; x < x_local + chroma_loc->width; x += TR_MAX_WIDTH) {
+        for (int y = y_local; y < y_local + chroma_loc->height; y += SCU_WIDTH) {
           LCU_GET_CU_AT_PX(lcu, x, y)->chroma_deblocking |= EDGE_VER;
         }
       }
     }
     else if(chroma_loc->width == 64) {
-      for (int y = y_local; y < y_local + chroma_loc->chroma_height; y += SCU_WIDTH) {
-        LCU_GET_CU_AT_PX(lcu, TR_MAX_WIDTH / 2, y)->chroma_deblocking |= EDGE_VER;
+      for (int y = y_local; y < y_local + chroma_loc->height; y += SCU_WIDTH) {
+        LCU_GET_CU_AT_PX(lcu, TR_MAX_WIDTH, y)->chroma_deblocking |= EDGE_VER;
       }        
     }
 
     if(chroma_loc->y) {
-      for (int y = y_local; y < y_local + chroma_loc->chroma_height; y += TR_MAX_WIDTH / 2) {
-        for (int x = x_local; x < x_local + chroma_loc->chroma_width; x += SCU_WIDTH) {
+      for (int y = y_local; y < y_local + chroma_loc->height; y += TR_MAX_WIDTH) {
+        for (int x = x_local; x < x_local + chroma_loc->width; x += SCU_WIDTH) {
           LCU_GET_CU_AT_PX(lcu, x, y)->chroma_deblocking |= EDGE_HOR;
         }
       }        
     }
     else if (chroma_loc->height == 64) {
-      for (int x = x_local; x < x_local + chroma_loc->chroma_width; x += SCU_WIDTH) {
-        LCU_GET_CU_AT_PX(lcu, x, TR_MAX_WIDTH / 2)->chroma_deblocking |= EDGE_HOR;
+      for (int x = x_local; x < x_local + chroma_loc->width; x += SCU_WIDTH) {
+        LCU_GET_CU_AT_PX(lcu, x, TR_MAX_WIDTH)->chroma_deblocking |= EDGE_HOR;
       }
     }
   }
@@ -1218,8 +1218,8 @@ static double search_cu(
   const int depth = split_tree.current_depth;
   const encoder_control_t* ctrl = state->encoder_control;
   const videoframe_t * const frame = state->tile->frame;
-  const int cu_width = tree_type != UVG_CHROMA_T ? cu_loc->width : cu_loc->chroma_width;
-  const int cu_height = tree_type != UVG_CHROMA_T ? cu_loc->height : cu_loc->chroma_height;
+  const int cu_width = cu_loc->width;
+  const int cu_height =  cu_loc->height;
   const int x = cu_loc->x;
   const int y = cu_loc->y;
   const int luma_width = cu_loc->width;
@@ -1251,8 +1251,8 @@ static double search_cu(
     int32_t max;
   } pu_depth_inter, pu_depth_intra;
   
-  int x_local = SUB_SCU(x) >> (tree_type == UVG_CHROMA_T);
-  int y_local = SUB_SCU(y) >> (tree_type == UVG_CHROMA_T);
+  int x_local = SUB_SCU(x);
+  int y_local = SUB_SCU(y);
 
   int32_t frame_width = frame->width;
   int32_t frame_height = frame->height;
@@ -1611,7 +1611,7 @@ static double search_cu(
     bits += uvg_mock_encode_coding_unit(
       state,
       cabac,
-      tree_type != UVG_CHROMA_T ? cu_loc : &separate_tree_chroma_loc,
+      cu_loc,
       is_separate_tree && !has_chroma ? NULL : chroma_loc,
       lcu,
       cur_cu,
@@ -1691,7 +1691,7 @@ static double search_cu(
   }
 
   bool can_split[6];
-  bool is_implicit = uvg_get_possible_splits(state, cu_loc, split_tree, tree_type, can_split, false);
+  bool is_implicit = uvg_get_possible_splits(state, cu_loc, split_tree, tree_type, can_split);
 
   const int slice_type = state->frame->is_irap ? (tree_type == UVG_CHROMA_T ? 2 : 0) : 1;
   const int max_btd = state->encoder_control->cfg.max_btt_depth[slice_type];
@@ -1736,7 +1736,8 @@ static double search_cu(
     for (int split_type = QT_SPLIT; split_type <= TT_VER_SPLIT; ++split_type) {
       if (!can_split[split_type] 
         || (tree_type == UVG_CHROMA_T && split_type == TT_HOR_SPLIT && cu_loc->chroma_height == 8)
-        || (tree_type == UVG_CHROMA_T && split_type == BT_HOR_SPLIT && cu_loc->chroma_height == 4))
+        || (tree_type == UVG_CHROMA_T && split_type == BT_HOR_SPLIT && cu_loc->chroma_height == 4)
+        )
         continue;
 
       if (completely_inside && check_for_early_termission(
@@ -1788,7 +1789,7 @@ static double search_cu(
           &state->search_cabac,
           left_cu,
           above_cu, 
-          tree_type != UVG_CHROMA_T ? cu_loc : &separate_tree_chroma_loc,
+          cu_loc,
           count_tree,
           tree_type,
           &is_implicit,
@@ -1834,8 +1835,8 @@ static double search_cu(
         if (split_type == QT_SPLIT && completely_inside) {
           const cu_info_t * const t = LCU_GET_CU_AT_PX(
             &split_lcu[0],
-            new_cu_loc[split].local_x >> (tree_type == UVG_CHROMA_T),
-            new_cu_loc[split].local_y >> (tree_type == UVG_CHROMA_T));
+            new_cu_loc[split].local_x,
+            new_cu_loc[split].local_y);
           stop_to_qt |= GET_SPLITDATA(t, depth + 1) == QT_SPLIT;
         }
 
@@ -2113,10 +2114,9 @@ static void copy_lcu_to_cu_data(const encoder_state_t * const state, int x_px, i
   // Copy non-reference CUs to picture.
   uvg_cu_array_copy_from_lcu(
     tree_type != UVG_CHROMA_T ? state->tile->frame->cu_array : state->tile->frame->chroma_cu_array, 
-    tree_type != UVG_CHROMA_T ? x_px : x_px / 2,
-    tree_type != UVG_CHROMA_T ? y_px : y_px / 2,
-    lcu, 
-    tree_type);
+    x_px,
+    y_px,
+    lcu);
 
   // Copy pixels to picture.
   {

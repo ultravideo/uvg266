@@ -475,14 +475,12 @@ static void encode_chroma_tu(
   cu_info_t* cur_pu,
   int8_t* scan_idx,
   lcu_coeff_t* coeff,
-  uint8_t joint_chroma,
-  enum
-  uvg_tree_type tree_type)
+  uint8_t joint_chroma)
 {
   int width_c = cu_loc->chroma_width;
   int height_c = cu_loc->chroma_height;
-  int x_local = (cu_loc->x >> (tree_type != UVG_CHROMA_T)) % LCU_WIDTH_C;
-  int y_local = (cu_loc->y >> (tree_type != UVG_CHROMA_T)) % LCU_WIDTH_C;
+  int x_local = (cu_loc->x >> 1) % LCU_WIDTH_C;
+  int y_local = (cu_loc->y >> 1) % LCU_WIDTH_C;
   cabac_data_t* const cabac = &state->cabac;
   *scan_idx = SCAN_DIAG;
   if(!joint_chroma){
@@ -615,7 +613,7 @@ static void encode_transform_unit(
   if ((chroma_cbf_set || joint_chroma) && last_split && chroma_loc) {
     //Need to drop const to get lfnst constraints
     // Use original dimensions instead of ISP split dimensions
-    encode_chroma_tu(state, chroma_loc, (cu_info_t*)cur_pu, &scan_idx, coeff, joint_chroma, tree_type);
+    encode_chroma_tu(state, chroma_loc, (cu_info_t*)cur_pu, &scan_idx, coeff, joint_chroma);
   }
 }
 
@@ -657,7 +655,7 @@ static void encode_transform_coeff(
     cur_tu = uvg_cu_array_at_const(used_array, x, y);
   }
 
-  const int tr_limit = (TR_MAX_WIDTH >> (tree_type == UVG_CHROMA_T));
+  const int tr_limit = TR_MAX_WIDTH;
   const bool ver_split = cu_loc->height > tr_limit;
   const bool hor_split = cu_loc->width > tr_limit;
 
@@ -681,10 +679,6 @@ static void encode_transform_coeff(
     cu_loc_t split_cu_loc[4];
     const int split_count = uvg_get_split_locs(cu_loc, split, split_cu_loc,NULL);
     for (int i = 0; i < split_count; ++i) {
-      if(tree_type == UVG_CHROMA_T) {
-        split_cu_loc[i].chroma_width = split_cu_loc[i].width;
-        split_cu_loc[i].chroma_height = split_cu_loc[i].height;
-      }
       encode_transform_coeff(state, &split_cu_loc[i], only_chroma,
         coeff, NULL, tree_type, true, false, luma_cbf_ctx, &split_cu_loc[i], chroma_loc ? &split_cu_loc[i] : NULL);
     }
@@ -1246,12 +1240,12 @@ uint8_t uvg_write_split_flag(
   // Implisit split flag when on border
   // Exception made in VVC with flag not being implicit if the BT can be used for
   // horizontal or vertical split, then this flag tells if QT or BT is used
-  const int cu_width = tree_type != UVG_CHROMA_T ? cu_loc->width : cu_loc->chroma_width;
-  const int cu_height = tree_type != UVG_CHROMA_T ? cu_loc->height : cu_loc->chroma_height;
+  const int cu_width =  cu_loc->width;
+  const int cu_height =  cu_loc->height;
 
 
   bool can_split[6];
-  const bool is_implicit = uvg_get_possible_splits(state, cu_loc, split_tree, tree_type, can_split, tree_type == UVG_CHROMA_T);
+  const bool is_implicit = uvg_get_possible_splits(state, cu_loc, split_tree, tree_type, can_split);
 
 
   bool allow_split = can_split[1] || can_split[2] || can_split[3] || can_split[4] || can_split[5];
@@ -1354,11 +1348,11 @@ void uvg_encode_coding_tree(
   const videoframe_t * const frame = state->tile->frame;
   const cu_array_t* used_array = tree_type != UVG_CHROMA_T ? frame->cu_array : frame->chroma_cu_array;
   
-  const int cu_width  = tree_type != UVG_CHROMA_T ? cu_loc->width : cu_loc->chroma_width;
-  const int cu_height = tree_type != UVG_CHROMA_T ? cu_loc->height : cu_loc->chroma_height;
+  const int cu_width  = cu_loc->width;
+  const int cu_height = cu_loc->height;
  
-  const int x = tree_type != UVG_CHROMA_T ? cu_loc->x : chroma_loc->x;
-  const int y = tree_type != UVG_CHROMA_T ? cu_loc->y : chroma_loc->y;
+  const int x = cu_loc->x;
+  const int y = cu_loc->y;
 
   const cu_info_t* cur_cu = uvg_cu_array_at_const(used_array, x, y);
 
@@ -1375,11 +1369,11 @@ void uvg_encode_coding_tree(
 
 
   // Absolute coordinates
-  uint16_t abs_x = x + (state->tile->offset_x >> (tree_type == UVG_CHROMA_T));
-  uint16_t abs_y = y + (state->tile->offset_y >> (tree_type == UVG_CHROMA_T));
+  uint16_t abs_x = x + state->tile->offset_x;
+  uint16_t abs_y = y + state->tile->offset_y ;
 
-  int32_t frame_width = tree_type !=  UVG_CHROMA_T ? ctrl->in.width : ctrl->in.width / 2;
-  int32_t frame_height = tree_type != UVG_CHROMA_T ? ctrl->in.height : ctrl->in.height / 2;
+  int32_t frame_width =  ctrl->in.width;
+  int32_t frame_height =  ctrl->in.height;
 
   // Stop if we are outside of the frame
   if (abs_x >= frame_width || abs_y >= frame_height) return;
@@ -1412,25 +1406,14 @@ void uvg_encode_coding_tree(
       0};
 
       cu_loc_t new_cu_loc[4];
-      cu_loc_t chroma_tree_loc;
       uint8_t separate_chroma = 0;
       const int splits = uvg_get_split_locs(cu_loc, split_flag, new_cu_loc, &separate_chroma);
       separate_chroma |= !has_chroma;
       for (int split = 0; split <splits; ++split) {
         new_split_tree.part_index = split;
-        if (tree_type == UVG_CHROMA_T) {
-          chroma_tree_loc = new_cu_loc[split];
-          chroma_tree_loc.x >>= 1;
-          chroma_tree_loc.y >>= 1;
-          chroma_tree_loc.local_x = chroma_tree_loc.x & LCU_WIDTH_C;
-          chroma_tree_loc.local_y = chroma_tree_loc.y & LCU_WIDTH_C;
-          chroma_tree_loc.width >>= 1;
-          chroma_tree_loc.height >>= 1;
-          assert(!separate_chroma);
-        }
         uvg_encode_coding_tree(state, coeff, tree_type,
           &new_cu_loc[split], 
-          separate_chroma ? chroma_loc :(tree_type == UVG_CHROMA_T ? &chroma_tree_loc :  &new_cu_loc[split]),
+          separate_chroma ? chroma_loc : &new_cu_loc[split],
           new_split_tree, !separate_chroma || (split == splits - 1 && has_chroma));
       }
       return;
@@ -1714,8 +1697,8 @@ double uvg_mock_encode_coding_unit(
 
   const uint8_t depth = 6 - uvg_g_convert_to_log2[cu_loc->width];
 
-  int x_local = cu_loc->local_x >> (tree_type == UVG_CHROMA_T);
-  int y_local = cu_loc->local_y >> (tree_type == UVG_CHROMA_T);
+  int x_local = cu_loc->local_x;
+  int y_local = cu_loc->local_y;
   const bool is_separate_tree = chroma_loc == NULL || cu_loc->height != chroma_loc->height || cu_loc->width != chroma_loc->width;
     
   const cu_info_t* left_cu = NULL, *above_cu = NULL;

@@ -273,8 +273,6 @@ static bool is_tu_boundary(
   color_t color,
   enum uvg_tree_type tree_type)
 {
-  x >>= tree_type == UVG_CHROMA_T;
-  y >>= tree_type == UVG_CHROMA_T;
   // if (x & 3 || y & 3) return false;
   const cu_info_t *const scu =
     uvg_cu_array_at_const(tree_type != UVG_CHROMA_T ? state->tile->frame->cu_array : state->tile->frame->chroma_cu_array, x, y);
@@ -1081,8 +1079,8 @@ static void filter_deblock_edge_chroma(encoder_state_t * const state,
       // CUs on both sides of the edge
       cu_info_t *cu_p;
       cu_info_t *cu_q;
-      int32_t x_coord = x << (tree_type != UVG_CHROMA_T);
-      int32_t y_coord = y << (tree_type != UVG_CHROMA_T);
+      int32_t x_coord = x << 1;
+      int32_t y_coord = y << 1;
       cu_array_t* cua = tree_type != UVG_CHROMA_T ? frame->cu_array : frame->chroma_cu_array;
       if (dir == EDGE_VER) {
         y_coord = (y + min_chroma_length * blk_idx) << (tree_type != UVG_CHROMA_T);
