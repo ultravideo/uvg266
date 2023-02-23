@@ -2133,7 +2133,7 @@ void uvg_search_lcu(encoder_state_t * const state, const int x, const int y, con
     &work_tree,
     tree_type,
     split_tree,
-    true);
+    tree_type == UVG_BOTH_T);
 
   // Save squared cost for rate control.
   if(state->encoder_control->cfg.rc_algorithm == UVG_LAMBDA) {
