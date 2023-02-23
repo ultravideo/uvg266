@@ -502,25 +502,3 @@ int uvg_count_available_edge_cus(const cu_loc_t* const cu_loc, const lcu_t* cons
   }
   return MAX(amount / TR_MIN_WIDTH, cu_loc->width / TR_MIN_WIDTH);
 }
-
-int uvg_count_chroma_tree_available_edge_cus(int x, int y, int width, int height, const lcu_t* const lcu, bool left)
-{
-  if (left && x == 0 || !left && y == 0) return 0;
-  const int local_x = x % LCU_WIDTH_C;
-  const int local_y = y % LCU_WIDTH_C;
-  if (left && local_x == 0) return (LCU_WIDTH_C - local_y) / 4;
-  if (!left && local_y == 0) return width / 2;
-
-  int amount = 0;
-  if(left) {
-    while (local_y + amount < LCU_WIDTH_C && LCU_GET_CU_AT_PX(lcu, local_x - TR_MIN_WIDTH, local_y + amount)->type != CU_NOTSET) {
-      amount += TR_MIN_WIDTH;
-    }
-    return MAX(amount / TR_MIN_WIDTH, height / TR_MIN_WIDTH);
-  }
-  while (local_x + amount < LCU_WIDTH_C && LCU_GET_CU_AT_PX(lcu, local_x + amount, local_y - TR_MIN_WIDTH)->type != CU_NOTSET) {
-    amount += TR_MIN_WIDTH;
-  }
-  return MAX(amount / TR_MIN_WIDTH, width / TR_MIN_WIDTH);
-
-}
