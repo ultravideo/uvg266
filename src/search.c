@@ -1274,10 +1274,7 @@ static double search_cu(
     pu_depth_intra.min = ctrl->cfg.pu_depth_intra.min[gop_layer] >= 0 ? ctrl->cfg.pu_depth_intra.min[gop_layer] : ctrl->cfg.pu_depth_intra.min[0];
     pu_depth_intra.max = ctrl->cfg.pu_depth_intra.max[gop_layer] >= 0 ? ctrl->cfg.pu_depth_intra.max[gop_layer] : ctrl->cfg.pu_depth_intra.max[0];
   }
-  if(tree_type == UVG_CHROMA_T) {
-    pu_depth_intra.max = CLIP(1, 3, pu_depth_intra.max);
-    pu_depth_intra.min = CLIP(1, 3, pu_depth_intra.min);
-  }
+
   pu_depth_inter.min = ctrl->cfg.pu_depth_inter.min[gop_layer] >= 0 ? ctrl->cfg.pu_depth_inter.min[gop_layer] : ctrl->cfg.pu_depth_inter.min[0];
   pu_depth_inter.max = ctrl->cfg.pu_depth_inter.max[gop_layer] >= 0 ? ctrl->cfg.pu_depth_inter.max[gop_layer] : ctrl->cfg.pu_depth_inter.max[0];
 
@@ -1734,10 +1731,7 @@ static double search_cu(
     memcpy(&post_seach_cabac, &state->search_cabac, sizeof(post_seach_cabac));
     // Recursively split all the way to max search depth.
     for (int split_type = QT_SPLIT; split_type <= TT_VER_SPLIT; ++split_type) {
-      if (!can_split[split_type] 
-        || (tree_type == UVG_CHROMA_T && split_type == TT_HOR_SPLIT && cu_loc->chroma_height == 8)
-        || (tree_type == UVG_CHROMA_T && split_type == BT_HOR_SPLIT && cu_loc->chroma_height == 4)
-        )
+      if (!can_split[split_type])
         continue;
 
       if (completely_inside && check_for_early_termission(

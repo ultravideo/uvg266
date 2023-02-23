@@ -1083,12 +1083,12 @@ static void filter_deblock_edge_chroma(encoder_state_t * const state,
       int32_t y_coord = y << 1;
       cu_array_t* cua = tree_type != UVG_CHROMA_T ? frame->cu_array : frame->chroma_cu_array;
       if (dir == EDGE_VER) {
-        y_coord = (y + min_chroma_length * blk_idx) << (tree_type != UVG_CHROMA_T);
+        y_coord = (y + min_chroma_length * blk_idx) << (1);
         cu_p = uvg_cu_array_at(cua, x_coord - 1, y_coord);
         cu_q = uvg_cu_array_at(cua, x_coord    , y_coord);
 
       } else {
-        x_coord = (x + min_chroma_length * blk_idx) << (tree_type != UVG_CHROMA_T);
+        x_coord = (x + min_chroma_length * blk_idx) << (1);
         cu_p = uvg_cu_array_at(cua, x_coord, y_coord - 1);
         cu_q = uvg_cu_array_at(cua, x_coord, y_coord    );
       }
@@ -1116,7 +1116,7 @@ static void filter_deblock_edge_chroma(encoder_state_t * const state,
 
 
       const bool large_boundary = (max_filter_length_P >= 3 && max_filter_length_Q >= 3);
-      const bool is_chroma_hor_CTB_boundary = (dir == EDGE_HOR && y_coord % (LCU_WIDTH >> (tree_type == UVG_CHROMA_T)) == 0);
+      const bool is_chroma_hor_CTB_boundary = (dir == EDGE_HOR && y_coord % LCU_WIDTH == 0);
       uint8_t c_strength[2] = { 0, 0 };
       
 
