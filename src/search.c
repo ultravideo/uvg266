@@ -1733,7 +1733,7 @@ static double search_cu(
             left_cu = LCU_GET_CU_AT_PX(lcu, x_local - 1, y_local);
           }
           else {
-            left_cu = uvg_cu_array_at_const(state->tile->frame->chroma_cu_array, (x >> 1) - 1, y >> 1);
+            left_cu = uvg_cu_array_at_const(state->tile->frame->chroma_cu_array, x - 1, y);
           }
         }
         if (y) {
@@ -1741,7 +1741,7 @@ static double search_cu(
             above_cu = LCU_GET_CU_AT_PX(lcu, x_local, y_local - 1);
           }
           else {
-            above_cu = uvg_cu_array_at_const(state->tile->frame->chroma_cu_array, x >> 1, (y >> 1) - 1);
+            above_cu = uvg_cu_array_at_const(state->tile->frame->chroma_cu_array, x, y - 1);
           }
         }
         split_tree_t count_tree = split_tree;
