@@ -2608,7 +2608,7 @@ static void mts_dct_generic(
     if (height == 1) {
       dct_hor(input, output, shift_1st, height, 0, skip_width);
     } else if (width == 1) {
-      dct_ver(input, output, shift_2nd, width, 0, skip_height);
+      dct_ver(input, output, log2_height_minus1 + 1 + bitdepth + 6 - 15, width, 0, skip_height);
     } else {
       dct_hor(input, tmp, shift_1st, height, 0, skip_width);
       dct_ver(tmp, output, shift_2nd, width, skip_width, skip_height);
@@ -2666,9 +2666,9 @@ static void mts_idct_generic(
     const int32_t shift_2nd = (transform_matrix_shift + max_log2_tr_dynamic_range - 1) - bitdepth;
 
     if (height == 1) {
-      idct_hor(input, output, shift_1st, height, 0, skip_width);
+      idct_hor(input, output, shift_2nd + 1, height, 0, skip_width);
     } else if (width == 1) {
-      idct_ver(input, output, shift_2nd, width, 0, skip_height);
+      idct_ver(input, output, shift_2nd + 1, width, 0, skip_height);
     } else {
       idct_ver(input, tmp, shift_1st, width, skip_width, skip_height);
       idct_hor(tmp, output, shift_2nd, height, 0, skip_width);

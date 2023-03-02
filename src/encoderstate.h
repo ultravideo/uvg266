@@ -332,6 +332,7 @@ typedef struct encoder_state_t {
   int8_t qp;
 
   double c_lambda;
+  double chroma_weights[4];
 
   /**
    * \brief Whether a QP delta value must be coded for the current LCU.

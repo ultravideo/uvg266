@@ -43,6 +43,7 @@
 #include "imagelist.h"
 #include "inter.h"
 #include "intra.h"
+#include "rate_control.h"
 #include "uvg266.h"
 #include "rdo.h"
 #include "search_inter.h"
@@ -731,7 +732,8 @@ static double cu_rd_cost_tr_split_accurate(
   cu_info_t* const tr_cu = LCU_GET_CU_AT_PX(lcu, cu_loc->local_x, cu_loc->local_y);
 
   double coeff_bits = 0;
-  double tr_tree_bits = 0;
+  double luma_bits = 0;
+  double chroma_bits = 0;
   
   const int cb_flag_u = tr_cu->joint_cb_cr ? tr_cu->joint_cb_cr >> 1 : cbf_is_set(tr_cu->cbf, COLOR_U);
   const int cb_flag_v = tr_cu->joint_cb_cr ? tr_cu->joint_cb_cr & 1 : cbf_is_set(tr_cu->cbf, COLOR_V);
@@ -743,7 +745,7 @@ static double cu_rd_cost_tr_split_accurate(
     // Only need to signal coded block flag if not skipped or merged
     // skip = no coded residual, merge = coded residual
     if (pred_cu->type != CU_INTRA && (!pred_cu->merged)) {
-      CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.cu_qt_root_cbf_model), cbf, tr_tree_bits, "rqt_root_cbf");
+      CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.cu_qt_root_cbf_model), cbf, luma_bits, "rqt_root_cbf");
     }
 
   }
@@ -768,13 +770,13 @@ static double cu_rd_cost_tr_split_accurate(
     for (int i = 0; i < split_count; ++i) {
       sum += cu_rd_cost_tr_split_accurate(state, pred_cu, lcu, tree_type, isp_cbf, &split_cu_loc[i], chroma_loc ? &split_chroma_cu_loc[i] : NULL, has_chroma);
     }
-    return sum + tr_tree_bits * state->lambda;
+    return sum + luma_bits * state->lambda;
   }
 
   has_chroma = state->encoder_control->chroma_format != UVG_CSP_400 && has_chroma && tree_type != UVG_LUMA_T;
   if (!skip_residual_coding && has_chroma) {
-    CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.qt_cbf_model_cb[0]), cb_flag_u, tr_tree_bits, "cbf_cb");  
-    CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.qt_cbf_model_cr[cb_flag_u]), cb_flag_v, tr_tree_bits, "cbf_cr");    
+    CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.qt_cbf_model_cb[0]), cb_flag_u, chroma_bits, "cbf_cb");  
+    CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.qt_cbf_model_cr[cb_flag_u]), cb_flag_v, chroma_bits, "cbf_cr");    
   }
 
   const int cb_flag_y = cbf_is_set(tr_cu->cbf, COLOR_Y) && tree_type != UVG_CHROMA_T;
@@ -791,7 +793,7 @@ static double cu_rd_cost_tr_split_accurate(
     {
       cabac_ctx_t* ctx = &(cabac->ctx.qt_cbf_model_luma[0]);
 
-      CABAC_FBITS_UPDATE(cabac, ctx, cb_flag_y, tr_tree_bits, "cbf_y_search");
+      CABAC_FBITS_UPDATE(cabac, ctx, cb_flag_y, luma_bits, "cbf_y_search");
     }
   }
   else {
@@ -802,7 +804,7 @@ static double cu_rd_cost_tr_split_accurate(
     for (int i = 0; i < split_limit; i++) {
       if (i != split_limit_minus_one || isp_cbf != 1 << split_limit_minus_one) {
         const int flag = (isp_cbf >> i) & 1;
-        CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.qt_cbf_model_luma[luma_ctx]), flag, tr_tree_bits, "cbf_y_search");
+        CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.qt_cbf_model_luma[luma_ctx]), flag, luma_bits, "cbf_y_search");
         luma_ctx = 2 + flag;
       }
     }
@@ -812,7 +814,7 @@ static double cu_rd_cost_tr_split_accurate(
     // TODO qp_delta_sign_flag
 
     if ((cb_flag_u || cb_flag_v) && has_chroma && state->encoder_control->cfg.jccr) {
-      CABAC_FBITS_UPDATE(cabac, &cabac->ctx.joint_cb_cr[cb_flag_u * 2 + cb_flag_v - 1], tr_cu->joint_cb_cr != 0, tr_tree_bits, "tu_joint_cbcr_residual_flag");
+      CABAC_FBITS_UPDATE(cabac, &cabac->ctx.joint_cb_cr[cb_flag_u * 2 + cb_flag_v - 1], tr_cu->joint_cb_cr != 0, chroma_bits, "tu_joint_cbcr_residual_flag");
     }
   }
 
@@ -834,7 +836,7 @@ static double cu_rd_cost_tr_split_accurate(
 
   if(cb_flag_y || is_isp){
     if (can_use_tr_skip) {
-      CABAC_FBITS_UPDATE(cabac, &cabac->ctx.transform_skip_model_luma, tr_cu->tr_idx == MTS_SKIP, tr_tree_bits, "transform_skip_flag");
+      CABAC_FBITS_UPDATE(cabac, &cabac->ctx.transform_skip_model_luma, tr_cu->tr_idx == MTS_SKIP, luma_bits, "transform_skip_flag");
     }
     int8_t luma_scan_mode = SCAN_DIAG;
     if (pred_cu->type == CU_INTER || pred_cu->intra.isp_mode == ISP_MODE_NO_ISP) {
@@ -872,14 +874,14 @@ static double cu_rd_cost_tr_split_accurate(
         cabac,
         &cabac->ctx.lfnst_idx_model[1],
         lfnst_idx != 0,
-        tr_tree_bits,
+        luma_bits,
         "lfnst_idx");
       if (lfnst_idx > 0) {
         CABAC_FBITS_UPDATE(
           cabac,
           &cabac->ctx.lfnst_idx_model[2],
           lfnst_idx == 2,
-          tr_tree_bits,
+          luma_bits,
           "lfnst_idx");
       }
     }
@@ -903,38 +905,34 @@ static double cu_rd_cost_tr_split_accurate(
       if (!state->encoder_control->cfg.lossless) {
         int index = lcu_px.y * LCU_WIDTH_C + lcu_px.x;
         unsigned ssd_u = uvg_pixels_calc_ssd(&lcu->ref.u[index], &lcu->rec.u[index],
-          LCU_WIDTH_C, LCU_WIDTH_C,
-          chroma_width, chroma_height);
+          LCU_WIDTH_C, LCU_WIDTH_C, chroma_width, chroma_height) * state->chroma_weights[1];
         unsigned ssd_v = uvg_pixels_calc_ssd(&lcu->ref.v[index], &lcu->rec.v[index],
-          LCU_WIDTH_C, LCU_WIDTH_C,
-          chroma_width, chroma_height);
+          LCU_WIDTH_C, LCU_WIDTH_C, chroma_width, chroma_height) * state->chroma_weights[2];
         chroma_ssd = ssd_u + ssd_v;
       }
       if(chroma_can_use_tr_skip && cb_flag_u) {
-        CABAC_FBITS_UPDATE(cabac, &cabac->ctx.transform_skip_model_chroma, tr_cu->tr_skip & 2, tr_tree_bits, "transform_skip_flag");        
+        CABAC_FBITS_UPDATE(cabac, &cabac->ctx.transform_skip_model_chroma, tr_cu->tr_skip & 2, chroma_bits, "transform_skip_flag");        
       }
       if(chroma_can_use_tr_skip && cb_flag_v) {
-        CABAC_FBITS_UPDATE(cabac, &cabac->ctx.transform_skip_model_chroma, tr_cu->tr_skip & 4, tr_tree_bits, "transform_skip_flag");        
+        CABAC_FBITS_UPDATE(cabac, &cabac->ctx.transform_skip_model_chroma, tr_cu->tr_skip & 4, chroma_bits, "transform_skip_flag");        
       }
-      coeff_bits += uvg_get_coeff_cost(state, lcu->coeff.u, tr_cu, &temp_chroma_loc, COLOR_U, scan_order, tr_cu->tr_skip & 2, COEFF_ORDER_CU);
-      coeff_bits += uvg_get_coeff_cost(state, lcu->coeff.v, tr_cu, &temp_chroma_loc, COLOR_V, scan_order, tr_cu->tr_skip & 4, COEFF_ORDER_CU);
+      chroma_bits += uvg_get_coeff_cost(state, lcu->coeff.u, tr_cu, &temp_chroma_loc, COLOR_U, scan_order, tr_cu->tr_skip & 2, COEFF_ORDER_CU);
+      chroma_bits += uvg_get_coeff_cost(state, lcu->coeff.v, tr_cu, &temp_chroma_loc, COLOR_V, scan_order, tr_cu->tr_skip & 4, COEFF_ORDER_CU);
       
     }
     else {
       {
         int index = lcu_px.y * LCU_WIDTH_C + lcu_px.x;
         int ssd_u_joint = uvg_pixels_calc_ssd(&lcu->ref.u[index], &lcu->rec.u[index],
-          LCU_WIDTH_C, LCU_WIDTH_C,
-          chroma_width, chroma_height);
+          LCU_WIDTH_C, LCU_WIDTH_C, chroma_width, chroma_height) * state->chroma_weights[3];
         int ssd_v_joint = uvg_pixels_calc_ssd(&lcu->ref.v[index], &lcu->rec.v[index],
-          LCU_WIDTH_C, LCU_WIDTH_C,
-          chroma_width, chroma_height);
+          LCU_WIDTH_C, LCU_WIDTH_C, chroma_width, chroma_height) * state->chroma_weights[3];
         chroma_ssd = ssd_u_joint + ssd_v_joint;
       }
       if (chroma_can_use_tr_skip) {
-        CABAC_FBITS_UPDATE(cabac, &cabac->ctx.transform_skip_model_chroma, tr_cu->tr_skip & 2, tr_tree_bits, "transform_skip_flag");
+        CABAC_FBITS_UPDATE(cabac, &cabac->ctx.transform_skip_model_chroma, tr_cu->tr_skip & 2, chroma_bits, "transform_skip_flag");
       }
-      coeff_bits += uvg_get_coeff_cost(state, lcu->coeff.joint_uv, tr_cu, &temp_chroma_loc, COLOR_U, scan_order, 0, COEFF_ORDER_CU);
+      chroma_bits += uvg_get_coeff_cost(state, lcu->coeff.joint_uv, tr_cu, &temp_chroma_loc, COLOR_U, scan_order, 0, COEFF_ORDER_CU);
     }
   }
 
@@ -945,14 +943,14 @@ static double cu_rd_cost_tr_split_accurate(
       cabac,
       &cabac->ctx.lfnst_idx_model[is_chroma_tree],
       lfnst_idx != 0,
-      tr_tree_bits,
+      luma_bits,
       "lfnst_idx");
     if (lfnst_idx > 0) {
       CABAC_FBITS_UPDATE(
         cabac,
         &cabac->ctx.lfnst_idx_model[2],
         lfnst_idx == 2,
-        tr_tree_bits,
+        luma_bits,
         "lfnst_idx");
     }
   }
@@ -963,20 +961,20 @@ static double cu_rd_cost_tr_split_accurate(
 
     bool symbol = tr_cu->tr_idx != 0;
     int ctx_idx = 0;
-    CABAC_FBITS_UPDATE(cabac, &cabac->ctx.mts_idx_model[ctx_idx], symbol, tr_tree_bits, "mts_idx");
+    CABAC_FBITS_UPDATE(cabac, &cabac->ctx.mts_idx_model[ctx_idx], symbol, luma_bits, "mts_idx");
 
     ctx_idx++;
     for (int i = 0; i < 3 && symbol; i++, ctx_idx++)
     {
       symbol = tr_cu->tr_idx > i + MTS_DST7_DST7 ? 1 : 0;
-      CABAC_FBITS_UPDATE(cabac, &cabac->ctx.mts_idx_model[ctx_idx], symbol, tr_tree_bits, "mts_idx");
+      CABAC_FBITS_UPDATE(cabac, &cabac->ctx.mts_idx_model[ctx_idx], symbol, luma_bits, "mts_idx");
     }
     tr_cu->mts_last_scan_pos = false;
     tr_cu->violates_mts_coeff_constraint = false;
   }
 
-  double bits = tr_tree_bits + coeff_bits;
-  return luma_ssd * UVG_LUMA_MULT + chroma_ssd * UVG_CHROMA_MULT + bits * state->lambda;
+  double bits = luma_bits + coeff_bits;
+  return luma_ssd * UVG_LUMA_MULT + chroma_ssd * UVG_CHROMA_MULT  + (bits + chroma_bits) * state->lambda;
 }
 
 
@@ -1378,7 +1376,8 @@ static double search_cu(
             cu_loc,
             0,
             &intra_search,
-            lcu
+            lcu,
+            NULL
           );
           memcpy(&state->search_cabac, &temp_cabac, sizeof(cabac_data_t));
         }
@@ -1478,19 +1477,22 @@ static double search_cu(
         recon_chroma = false; 
       }
       lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_height, cur_cu);
-      uvg_intra_recon_cu(state,
-                         &intra_search, cu_loc,
-                         NULL, lcu,
-                         tree_type, 
-                         recon_luma, recon_chroma);
       if (!state->encoder_control->cfg.cclm && cur_cu->intra.isp_mode != ISP_MODE_NO_ISP) {
         uvg_recon_and_estimate_cost_isp(
           state,
           cu_loc,
           0,
           &intra_search,
-          lcu
+          lcu,
+          NULL
         );
+      }
+      else {
+        uvg_intra_recon_cu(state,
+          &intra_search, cu_loc,
+          NULL, lcu,
+          tree_type,
+          recon_luma, recon_chroma);        
       }
 
 
@@ -1518,7 +1520,7 @@ static double search_cu(
 
       // Set isp split cbfs here
       const int split_type = intra_search.pred_cu.intra.isp_mode;
-      const int split_num = split_type == ISP_MODE_NO_ISP ? 0 : uvg_get_isp_split_num(cu_width, cu_height, split_type, true);
+      const int split_num = split_type == ISP_MODE_NO_ISP || tree_type == UVG_CHROMA_T ? 0 : uvg_get_isp_split_num(cu_width, cu_height, split_type, true);
 
       const int cbf_cb = cbf_is_set(cur_cu->cbf, COLOR_U);
       const int cbf_cr = cbf_is_set(cur_cu->cbf, COLOR_V);
@@ -1530,7 +1532,7 @@ static double search_cu(
         // Fetch proper x, y coords for isp blocks
         int tmp_x = isp_loc.x;
         int tmp_y = isp_loc.y;
-        uvg_get_isp_cu_arr_coords(&tmp_x, &tmp_y);
+        uvg_get_isp_cu_arr_coords(&tmp_x, &tmp_y, MAX(cu_width, cu_height));
         cu_info_t* split_cu = LCU_GET_CU_AT_PX(lcu, tmp_x % LCU_WIDTH, tmp_y % LCU_WIDTH);
         bool cur_cbf = (intra_search.best_isp_cbfs >> i) & 1;
         cbf_clear(&split_cu->cbf, COLOR_Y);
@@ -1733,6 +1735,13 @@ static double search_cu(
     for (int split_type = QT_SPLIT; split_type <= TT_VER_SPLIT; ++split_type) {
       if (!can_split[split_type])
         continue;
+      split_tree_t new_split = {
+        split_tree.split_tree | split_type << (split_tree.current_depth * 3),
+        split_tree.current_depth + 1,
+        split_tree.mtt_depth + (split_type != QT_SPLIT),
+        split_tree.implicit_mtt_depth + (split_type != QT_SPLIT && is_implicit),
+        0
+      };
 
       if (completely_inside && check_for_early_termission(
             cu_width,
@@ -1798,13 +1807,6 @@ static double search_cu(
         continue;
       }
 
-      split_tree_t new_split = {
-        split_tree.split_tree | split_type << (split_tree.current_depth * 3),
-        split_tree.current_depth + 1,
-        split_tree.mtt_depth + (split_type != QT_SPLIT),
-        split_tree.implicit_mtt_depth + (split_type != QT_SPLIT && is_implicit),
-        0
-      };
 
       state->search_cabac.update = 0;
       split_cost += split_bits * state->lambda;
@@ -2166,7 +2168,9 @@ void uvg_search_lcu(encoder_state_t * const state, const int x, const int y, con
   }
 
   int tree_type = state->frame->slicetype == UVG_SLICE_I
-  && state->encoder_control->cfg.dual_tree ? UVG_LUMA_T : UVG_BOTH_T;
+                  && state->encoder_control->cfg.dual_tree
+                    ? UVG_LUMA_T
+                    : UVG_BOTH_T;
 
   cu_loc_t start;
   uvg_cu_loc_ctor(&start, x, y, LCU_WIDTH, LCU_WIDTH);

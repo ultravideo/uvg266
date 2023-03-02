@@ -88,6 +88,10 @@ typedef struct {
   int best_u_index;
   int best_v_index;
   int best_combined_index;
+  uint64_t u_distortion;
+  uint64_t v_distortion;
+  double   u_bits;
+  double   v_bits;
 } uvg_chorma_ts_out_t;
 
 void uvg_quantize_lcu_residual(
