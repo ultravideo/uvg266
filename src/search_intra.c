@@ -365,6 +365,7 @@ static double search_intra_trdepth(
     for (trafo = mts_start; trafo < num_transforms; trafo++) {
       for (int lfnst_idx = start_idx; lfnst_idx <= end_lfnst_idx; lfnst_idx++) {
         // Initialize lfnst variables
+        search_data->best_isp_cbfs = 0;
         pred_cu->tr_idx = trafo;
         pred_cu->tr_skip = trafo == MTS_SKIP;
         pred_cu->lfnst_idx = lfnst_idx;
@@ -400,8 +401,10 @@ static double search_intra_trdepth(
             cu_loc,
             cost_treshold,
             search_data,
-            lcu
+            lcu,
+            &constraints[0]
           );
+          constraints[1] = search_data->best_isp_cbfs != 0;
         }
         else {
           uvg_intra_recon_cu(
@@ -427,7 +430,7 @@ static double search_intra_trdepth(
           }
         }
         
-        if (trafo != MTS_SKIP && end_lfnst_idx != 0) {
+        if (trafo != MTS_SKIP && end_lfnst_idx != 0 && pred_cu->intra.isp_mode == ISP_MODE_NO_ISP) {
           uvg_derive_lfnst_constraints(
             pred_cu,
             constraints,
@@ -438,7 +441,7 @@ static double search_intra_trdepth(
             COLOR_Y);
         }
 
-        if (!constraints[1] && (cbf_is_set(pred_cu->cbf, COLOR_Y) || pred_cu->intra.isp_mode != ISP_MODE_NO_ISP)) {
+        if (!constraints[1] && cbf_is_set(pred_cu->cbf, COLOR_Y)) {
           //end_idx = 0;
           if (pred_cu->lfnst_idx > 0) {
             continue;
@@ -456,8 +459,8 @@ static double search_intra_trdepth(
         }
         double transform_bits = 0;
         if (state->encoder_control->cfg.lfnst && PU_IS_TU(pred_cu) &&
-          trafo != MTS_SKIP && end_lfnst_idx != 0) {
-          if ((!constraints[0] && constraints[1]) || lfnst_idx != 0) {
+          trafo != MTS_SKIP && end_lfnst_idx != 0 && (cbf_is_set(pred_cu->cbf, COLOR_Y) || search_data->best_isp_cbfs != 0)) {
+          if ((!constraints[0] && (constraints[1] || pred_cu->intra.isp_mode != ISP_MODE_NO_ISP))) {
             transform_bits += CTX_ENTROPY_FBITS(
               &state->search_cabac.ctx.lfnst_idx_model[tree_type == UVG_LUMA_T],
               lfnst_idx != 0);
@@ -469,6 +472,7 @@ static double search_intra_trdepth(
           }
         }
         if (num_transforms > 2 && trafo != MTS_SKIP
+            && (cbf_is_set(pred_cu->cbf, COLOR_Y) || search_data->best_isp_cbfs != 0)
             && pred_cu->intra.isp_mode == ISP_MODE_NO_ISP
             && lfnst_idx == 0
             && width <= 32
@@ -952,8 +956,9 @@ static double count_bits(
   const double not_mpm_mode_bit,
   const double planar_mode_flag,
   const double not_planar_mode_flag,
+  const double not_isp_flag,
   int8_t mode
-  )
+)
 {
   int i = 0;
   int smaller_than_pred = 0;
@@ -975,7 +980,7 @@ static double count_bits(
   else {
     bits = not_mpm_mode_bit + 5 + (mode - smaller_than_pred > 2);
   }
-  bits += not_mrl + not_mip;
+  bits += not_mrl + not_mip + not_isp_flag;
   return bits;
 }
 
@@ -1023,13 +1028,14 @@ static uint8_t search_intra_rough(
     int8_t mode;
     double cost;
   };
-
+  
   const double not_mrl = state->encoder_control->cfg.mrl && (cu_loc->y % LCU_WIDTH) ? CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.multi_ref_line[0]), 0) : 0;
   const double not_mip = state->encoder_control->cfg.mip ? CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.mip_flag[mip_ctx]), 0) : 0;
   const double mpm_mode_bit = CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.intra_luma_mpm_flag_model), 1);
   const double not_mpm_mode_bit = CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.intra_luma_mpm_flag_model), 0);
   const double planar_mode_flag = CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.luma_planar_model[1]), 0);
   const double not_planar_mode_flag = CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.luma_planar_model[1]), 1);
+  const double not_isp_flag = state->encoder_control->cfg.isp && uvg_can_use_isp(width, height) ? CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.intra_subpart_model[0]), 0) : 0;
 
   const uint8_t mode_list_size = state->encoder_control->cfg.mip ? 6 : 3;
   struct mode_cost best_six_modes[6];
@@ -1059,7 +1065,7 @@ static uint8_t search_intra_rough(
     not_mpm_mode_bit,
     planar_mode_flag,
     not_planar_mode_flag,
-    0) * state->lambda_sqrt;
+    not_isp_flag, 0) * state->lambda_sqrt;
   costs[1] += count_bits(
     state,
     intra_preds,
@@ -1069,7 +1075,7 @@ static uint8_t search_intra_rough(
     not_mpm_mode_bit,
     planar_mode_flag,
     not_planar_mode_flag,
-    1) * state->lambda_sqrt;
+    not_isp_flag, 1) * state->lambda_sqrt;
   if(costs[0] < costs[1]) {
     min_cost = costs[0];
     max_cost = costs[1];
@@ -1113,7 +1119,7 @@ static uint8_t search_intra_rough(
           not_mpm_mode_bit,
           planar_mode_flag,
           not_planar_mode_flag,
-          mode + i * offset) * state->lambda_sqrt;
+          not_isp_flag, mode + i * offset) * state->lambda_sqrt;
       }
     }
 
@@ -1184,7 +1190,7 @@ static uint8_t search_intra_rough(
               not_mpm_mode_bit,
               planar_mode_flag,
               not_planar_mode_flag,
-              modes_to_check[block + i]) * state->lambda_sqrt;
+              not_isp_flag, modes_to_check[block + i]) * state->lambda_sqrt;
           
         }
 
@@ -1327,7 +1333,8 @@ static int8_t search_intra_rdo(
   
   for (int mode = 0; mode < modes_to_check; mode++) {
     bool can_do_isp_search = search_data[mode].pred_cu.intra.mip_flag ? false : true; // Cannot use ISP with MIP
-    can_do_isp_search = search_data[mode].pred_cu.intra.multi_ref_idx == 0 ? can_do_isp_search : false; // Cannot use ISP with MRL
+    // can_do_isp_search = search_data[mode].pred_cu.intra.multi_ref_idx == 0 ? can_do_isp_search : false; // Cannot use ISP with MRL
+    const uint8_t mrl_idx = search_data[mode].pred_cu.intra.multi_ref_idx;
     double best_isp_cost = MAX_DOUBLE;
     double best_bits = MAX_DOUBLE;
     int8_t best_isp_mode = 0;
@@ -1340,6 +1347,7 @@ static int8_t search_intra_rdo(
        
 
       search_data[mode].pred_cu.intra.isp_mode = isp_mode;
+      search_data[mode].pred_cu.intra.multi_ref_idx = isp_mode == ISP_MODE_NO_ISP ? mrl_idx : 0;
       double rdo_bitcost = uvg_luma_mode_bits(state, &search_data[mode].pred_cu, cu_loc, lcu);
       search_data[mode].pred_cu.tr_idx = MTS_TR_NUM;
       search_data[mode].bits = rdo_bitcost;
@@ -1362,6 +1370,7 @@ static int8_t search_intra_rdo(
     search_data[mode].cost = best_isp_cost;
     search_data[mode].bits = best_bits;
     search_data[mode].pred_cu.intra.isp_mode = best_isp_mode;
+    search_data[mode].pred_cu.intra.multi_ref_idx = best_isp_mode == ISP_MODE_NO_ISP ? mrl_idx : 0;
     search_data[mode].pred_cu.tr_idx = best_mts_mode_for_isp[best_isp_mode];
     search_data[mode].pred_cu.tr_skip = best_mts_mode_for_isp[best_isp_mode] == MTS_SKIP;
     search_data[mode].pred_cu.lfnst_idx = best_lfnst_mode_for_isp[best_isp_mode];
@@ -1482,11 +1491,13 @@ int8_t uvg_search_intra_chroma_rdo(
     ALIGNED(64) int16_t u_resi[LCU_WIDTH_C * LCU_WIDTH_C];
     ALIGNED(64) int16_t v_resi[LCU_WIDTH_C * LCU_WIDTH_C];
 
+    double original_c_lambda = state->c_lambda;
 
     for (int8_t mode_i = 0; mode_i < num_modes; ++mode_i) {
       const uint8_t mode = chroma_data[mode_i].pred_cu.intra.mode_chroma;
       double mode_bits = uvg_chroma_mode_bits(state, mode, luma_mode);
-      chroma_data[mode_i].cost = mode_bits * state->lambda;
+      chroma_data[mode_i].cost = mode_bits * state->c_lambda;
+      chroma_data[mode_i].bits = mode_bits;
       cu_info_t* pred_cu = &chroma_data[mode_i].pred_cu;
       uint8_t best_lfnst_index = 0;
       for (int lfnst_i = 0; lfnst_i < 3; ++lfnst_i) {
@@ -1494,9 +1505,10 @@ int8_t uvg_search_intra_chroma_rdo(
         if (lfnst == -1) {
           continue;
         }
+        state->c_lambda = original_c_lambda * (state->encoder_control->cfg.jccr && state->qp > 18 ? 1.3 : 1.0);
         pred_cu->cr_lfnst_idx = lfnst;
-        chroma_data[mode_i].lfnst_costs[lfnst] += mode_bits * state->lambda;
-        if (PU_IS_TU(pred_cu) && (tree_type != UVG_CHROMA_T || (pred_cu->log2_width < 5 && pred_cu->log2_height < 5))) {
+        chroma_data[mode_i].lfnst_costs[lfnst] += mode_bits * state->c_lambda;
+        if (PU_IS_TU(pred_cu) && (tree_type != UVG_CHROMA_T || (pred_cu->log2_chroma_width < 5 && pred_cu->log2_chroma_height < 5))) {
           uvg_intra_predict(
             state,
             &refs[COLOR_U - 1],
@@ -1552,8 +1564,9 @@ int8_t uvg_search_intra_chroma_rdo(
             continue;
           }
 
+          double actual_cost = state->lambda * (chorma_ts_out.u_bits + chorma_ts_out.v_bits + mode_bits) + (chorma_ts_out.u_distortion + chorma_ts_out.v_distortion);
           if(chorma_ts_out.best_u_cost + chorma_ts_out.best_v_cost < chorma_ts_out.best_combined_cost) {
-            chroma_data[mode_i].lfnst_costs[lfnst] += chorma_ts_out.best_u_cost + chorma_ts_out.best_v_cost;
+            chroma_data[mode_i].lfnst_costs[lfnst] = actual_cost;
             if( chroma_data[mode_i].lfnst_costs[lfnst] 
                 < chroma_data[mode_i].lfnst_costs[best_lfnst_index] || lfnst_i == 0) {
               chroma_data[mode_i].pred_cu.joint_cb_cr = 0;
@@ -1565,7 +1578,7 @@ int8_t uvg_search_intra_chroma_rdo(
             }
           }
           else {
-            chroma_data[mode_i].lfnst_costs[lfnst] += chorma_ts_out.best_combined_cost;
+            chroma_data[mode_i].lfnst_costs[lfnst] = actual_cost;
             if (chroma_data[mode_i].lfnst_costs[lfnst]
               < chroma_data[mode_i].lfnst_costs[best_lfnst_index] || lfnst_i == 0) {
               chroma_data[mode_i].pred_cu.joint_cb_cr = chorma_ts_out.best_combined_index;
@@ -1574,10 +1587,11 @@ int8_t uvg_search_intra_chroma_rdo(
               chroma_data[mode_i].cost = chroma_data[mode_i].lfnst_costs[lfnst];
             }
           }
+
         }
         else {
           state->search_cabac.update = 1;
-          chroma_data[mode_i].cost = mode_bits * state->lambda;
+          chroma_data[mode_i].cost = mode_bits * state->c_lambda;
           uvg_intra_recon_cu(state,
                              &chroma_data[mode_i], cu_loc,
                              pred_cu, lcu,
@@ -1593,6 +1607,7 @@ int8_t uvg_search_intra_chroma_rdo(
     }
     sort_modes(chroma_data, num_modes);
     
+    state->c_lambda = original_c_lambda;
     return chroma_data[0].pred_cu.intra.mode_chroma;
   }
 

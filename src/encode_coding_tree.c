@@ -143,7 +143,7 @@ bool uvg_is_lfnst_allowed(
         uvg_get_isp_split_loc(&split_loc, cu_loc->x, cu_loc->y, cu_width, cu_height, i, isp_mode, false);
         int local_split_x = lcu ? split_loc.local_x : split_loc.x;
         int local_split_y = lcu ? split_loc.local_y : split_loc.y;
-        uvg_get_isp_cu_arr_coords(&local_split_x, &local_split_y);
+        uvg_get_isp_cu_arr_coords(&local_split_x, &local_split_y, MAX(cu_width, cu_height));
         const cu_info_t* split_cu = lcu ? LCU_GET_CU_AT_PX(lcu, local_split_x, local_split_y) :
           uvg_cu_array_at_const(frame->cu_array, local_split_x, local_split_y);
 
@@ -550,7 +550,7 @@ static void encode_transform_unit(
   cu_array_t* used_cu_array = tree_type != UVG_CHROMA_T ? frame->cu_array : frame->chroma_cu_array;
   int isp_x = x;
   int isp_y = y;
-  uvg_get_isp_cu_arr_coords(&isp_x, &isp_y);
+  uvg_get_isp_cu_arr_coords(&isp_x, &isp_y, MAX(width, height));
   if(cur_pu == NULL) {
     cur_pu = uvg_cu_array_at_const(used_cu_array, isp_x, isp_y);
   }
@@ -645,7 +645,7 @@ static void encode_transform_coeff(
   int x = cu_loc->x;
   int y = cu_loc->y;
   if (isp_split) {
-    uvg_get_isp_cu_arr_coords(&x, &y);
+    uvg_get_isp_cu_arr_coords(&x, &y, MAX(cu_loc->width, cu_loc->height));
   }
 
   //const encoder_control_t *const ctrl = state->encoder_control;

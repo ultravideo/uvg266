@@ -37,6 +37,7 @@
 #include "intra.h"
 #include "uvg266.h"
 #include "lfnst_tables.h"
+#include "rate_control.h"
 #include "rdo.h"
 #include "strategies/strategies-dct.h"
 #include "strategies/strategies-quant.h"
@@ -362,7 +363,7 @@ static void generate_jccr_transforms(
         }
       }
     }
-    costs[jccr] = d2 != 0 ? MIN(d1, d2) : d1;
+    costs[jccr] = jccr == 0 ? MIN(d1, d2) : d1;
   }
   int64_t min_dist1 = costs[0];
   int64_t min_dist2 = INT64_MAX;
@@ -418,8 +419,7 @@ static void generate_jccr_transforms(
 static void quantize_chroma(
   encoder_state_t* const state,
   cu_info_t * const cur_tu,
-  int8_t width,
-  int8_t height,
+  const cu_loc_t* const cu_loc,
   coeff_t u_coeff[5120],
   coeff_t v_coeff[2048],
   enum uvg_chroma_transforms transform,
@@ -428,9 +428,13 @@ static void quantize_chroma(
   const coeff_scan_order_t scan_order,
   bool* u_has_coeffs,
   bool* v_has_coeffs,
-  uint8_t lfnst_idx, 
-  enum uvg_tree_type tree_type)
+  uint8_t lfnst_idx,
+  enum uvg_tree_type tree_type,
+  double* u_coeff_cost,
+  double* v_coeff_cost)
 {
+  int8_t width = cu_loc->chroma_width;
+  int8_t height = cu_loc->chroma_height;
   if(state->encoder_control->cfg.dep_quant && transform != CHROMA_TS) {
     int abs_sum = 0;
     uvg_dep_quant(
@@ -445,10 +449,23 @@ static void quantize_chroma(
       &abs_sum,
       state->encoder_control->cfg.scaling_list
     );
+
+    cbf_clear(&cur_tu->cbf, COLOR_U);
     if (abs_sum > 0) {
       *u_has_coeffs = 1;
       cbf_set(&cur_tu->cbf, COLOR_U);
     }
+
+    *u_coeff_cost = uvg_get_coeff_cost(
+      state,
+      u_quant_coeff,
+      cur_tu,
+      cu_loc,
+      COLOR_U,
+      SCAN_DIAG,
+      false,
+      COEFF_ORDER_LINEAR);
+
     if (transform == DCT7_CHROMA) {
       abs_sum = 0;
       uvg_dep_quant(
@@ -463,10 +480,24 @@ static void quantize_chroma(
         &abs_sum,
         state->encoder_control->cfg.scaling_list
       );
+
+      cbf_clear(&cur_tu->cbf, COLOR_V);
       if (abs_sum > 0) {
         *v_has_coeffs = 1;
+        cbf_set(&cur_tu->cbf, COLOR_V);
       }
+
+      *v_coeff_cost = uvg_get_coeff_cost(
+        state,
+        v_quant_coeff,
+        cur_tu,
+        cu_loc,
+        COLOR_V,
+        SCAN_DIAG,
+        false,
+        COEFF_ORDER_LINEAR);
       cbf_clear(&cur_tu->cbf, COLOR_U);
+      cbf_clear(&cur_tu->cbf, COLOR_V);
     }
     return;
   }
@@ -580,6 +611,9 @@ void uvg_chroma_transform_search(
       trans_offset,
       &num_transforms);
   }
+
+  double lambda = state->c_lambda;
+
   chorma_ts_out->best_u_cost = MAX_DOUBLE;
   chorma_ts_out->best_v_cost = MAX_DOUBLE;
   chorma_ts_out->best_combined_cost = MAX_DOUBLE;
@@ -600,11 +634,27 @@ void uvg_chroma_transform_search(
         uvg_fwd_lfnst(pred_cu, width, height, COLOR_V, pred_cu->cr_lfnst_idx, &v_coeff[i * trans_offset], tree_type, state->collocated_luma_mode);
       }
     }
+    uint8_t old_jccr = pred_cu->joint_cb_cr;
+    pred_cu->joint_cb_cr = 0;
+    if(is_jccr) {
+      state->c_lambda = lambda *  (transforms[i] == JCCR_3 ? 0.5 : 0.8);
+      pred_cu->joint_cb_cr = transforms[i];
+    }
+    else if(state->encoder_control->cfg.dep_quant) {
+      state->search_cabac.update = 1;
+    }
+
+    double u_coeff_cost = 0;
+    double v_coeff_cost = 0;
+    unsigned ssd_u = 0;
+    unsigned ssd_v = 0;
+    double   u_bits = 0;
+    double   v_bits = 0;
+
     quantize_chroma(
       state,
       pred_cu,
-      width,
-      height,
+      cu_loc,
       &u_coeff[i * trans_offset],
       &v_coeff[i * trans_offset],
       transforms[i],
@@ -612,8 +662,12 @@ void uvg_chroma_transform_search(
       v_quant_coeff,
       SCAN_DIAG,
       &u_has_coeffs,
-      &v_has_coeffs, tree_type == UVG_CHROMA_T ?  pred_cu->cr_lfnst_idx : pred_cu->lfnst_idx, tree_type);
-    if(pred_cu->cr_lfnst_idx !=0 && !u_has_coeffs && !v_has_coeffs) continue;
+      &v_has_coeffs, tree_type == UVG_CHROMA_T ?  pred_cu->cr_lfnst_idx : pred_cu->lfnst_idx, 
+      tree_type,
+      &u_coeff_cost,
+      &v_coeff_cost);
+    pred_cu->joint_cb_cr = old_jccr;
+    if (pred_cu->cr_lfnst_idx != 0 && !u_has_coeffs && !v_has_coeffs) goto reset_cabac;
     
     if(pred_cu->type == CU_INTRA && transforms[i] != CHROMA_TS && tree_type == UVG_CHROMA_T) {
       bool constraints[2] = { false, false };
@@ -621,10 +675,10 @@ void uvg_chroma_transform_search(
       if(!is_jccr) {
         uvg_derive_lfnst_constraints(pred_cu, constraints, v_quant_coeff, width, height, NULL, COLOR_V);
       }
-      if (!constraints[1] && (u_has_coeffs || v_has_coeffs) && pred_cu->cr_lfnst_idx != 0) continue;
+      if (!constraints[1] && (u_has_coeffs || v_has_coeffs) && pred_cu->cr_lfnst_idx != 0) goto reset_cabac;
     }
 
-    if (is_jccr && !u_has_coeffs) continue;
+    if (is_jccr && !u_has_coeffs) goto reset_cabac;
 
     if (u_has_coeffs) {
       uvg_dequant(state, u_quant_coeff, &u_coeff[i * trans_offset], width, height, transforms[i] != JCCR_1 ? COLOR_U : COLOR_V,
@@ -697,8 +751,6 @@ void uvg_chroma_transform_search(
       uvg_pixels_blit(v_pred, &v_recon[trans_offset * i], width, height, width, width);
     }
 
-    unsigned ssd_u = 0;
-    unsigned ssd_v = 0;
     if (!state->encoder_control->cfg.lossless) {
       ssd_u = uvg_pixels_calc_ssd(&lcu->ref.u[offset], &u_recon[trans_offset * i],
         LCU_WIDTH_C, width,
@@ -706,10 +758,10 @@ void uvg_chroma_transform_search(
       ssd_v = uvg_pixels_calc_ssd(&lcu->ref.v[offset], &v_recon[trans_offset * i],
         LCU_WIDTH_C, width,
         width, height);
+      ssd_u = (double)ssd_u * state->chroma_weights[1];
+      ssd_v = (double)ssd_v * state->chroma_weights[2];
     }
 
-    double u_bits = 0;
-    double v_bits = 0;
     state->search_cabac.update = 1;
 
     int cbf_u = transforms[i] & 2 || (u_has_coeffs && !(transforms[i] & 1));
@@ -733,16 +785,17 @@ void uvg_chroma_transform_search(
           transforms[i] == CHROMA_TS, u_bits, "tr_skip_u"
         );
       }
-      double coeff_cost = uvg_get_coeff_cost(
-        state,
-        u_quant_coeff,
-        pred_cu,
-        cu_loc,
-        COLOR_U,
-        SCAN_DIAG,
-        transforms[i] == CHROMA_TS,
-        COEFF_ORDER_LINEAR);
-      u_bits += coeff_cost;
+      if(u_coeff_cost == 0) {
+        u_coeff_cost = uvg_get_coeff_cost(
+          state,
+          u_quant_coeff,
+          pred_cu,
+          cu_loc,
+          COLOR_U,
+          SCAN_DIAG,
+          transforms[i] == CHROMA_TS,
+          COEFF_ORDER_LINEAR);
+      }
     }
     if (cbf_v && !is_jccr) {
       if (can_use_tr_skip) {
@@ -750,16 +803,20 @@ void uvg_chroma_transform_search(
           transforms[i] == CHROMA_TS, v_bits, "tr_skip_v"
         );
       }
-      v_bits += uvg_get_coeff_cost(
-        state,
-        v_quant_coeff,
-        pred_cu,
-        cu_loc,
-        COLOR_V,
-        SCAN_DIAG,
-        transforms[i] == CHROMA_TS,
-        COEFF_ORDER_LINEAR);
+      if (v_coeff_cost == 0) {
+        v_coeff_cost = uvg_get_coeff_cost(
+          state,
+          v_quant_coeff,
+          pred_cu,
+          cu_loc,
+          COLOR_V,
+          SCAN_DIAG,
+          transforms[i] == CHROMA_TS,
+          COEFF_ORDER_LINEAR);
+      }
     }
+    u_bits += u_coeff_cost;
+    v_bits += v_coeff_cost;
     if((depth == 4 || tree_type == UVG_CHROMA_T) && state->encoder_control->cfg.lfnst && 0) {
       if(uvg_is_lfnst_allowed(state, pred_cu, UVG_CHROMA_T, COLOR_UV, cu_loc, lcu)) {
         const int lfnst_idx = pred_cu->cr_lfnst_idx;
@@ -781,25 +838,35 @@ void uvg_chroma_transform_search(
       pred_cu->lfnst_last_scan_pos = false;
       pred_cu->violates_lfnst_constrained_chroma = false;
     }
+
     if (!is_jccr) {
-      double u_cost = UVG_CHROMA_MULT * ssd_u + u_bits * state->c_lambda;
-      double v_cost = UVG_CHROMA_MULT * ssd_v + v_bits * state->c_lambda;
+      double u_cost = UVG_CHROMA_MULT * ssd_u + u_bits * state->lambda;
+      double v_cost = UVG_CHROMA_MULT * ssd_v + v_bits * state->lambda;
       if (u_cost < chorma_ts_out->best_u_cost) {
         chorma_ts_out->best_u_cost = u_cost;
         chorma_ts_out->best_u_index = u_has_coeffs ? transforms[i] : NO_RESIDUAL;
+        chorma_ts_out->u_bits = u_bits;
+        chorma_ts_out->u_distortion = ssd_u;
       }
       if (v_cost < chorma_ts_out->best_v_cost) {
         chorma_ts_out->best_v_cost = v_cost;
         chorma_ts_out->best_v_index = v_has_coeffs ? transforms[i] : NO_RESIDUAL;
+        chorma_ts_out->v_bits = v_bits;
+        chorma_ts_out->v_distortion = ssd_v;
       }
     }
     else {
-      double cost = UVG_CHROMA_MULT * (ssd_u + ssd_v) + (u_bits + v_bits) * state->c_lambda;
-      if (cost < chorma_ts_out->best_combined_cost) {
+      double cost = UVG_CHROMA_MULT * (ssd_u + ssd_v) + (u_bits + v_bits) * state->lambda;
+      if (cost < chorma_ts_out->best_combined_cost && cost < chorma_ts_out->best_u_cost + chorma_ts_out->best_v_cost) {
         chorma_ts_out->best_combined_cost = cost;
         chorma_ts_out->best_combined_index = transforms[i];
+        chorma_ts_out->u_bits              = u_bits;
+        chorma_ts_out->u_distortion        = ssd_u;
+        chorma_ts_out->v_bits              = v_bits;
+        chorma_ts_out->v_distortion        = ssd_v;
       }
     }
+reset_cabac:
     memcpy(&state->search_cabac, temp_cabac, sizeof(cabac_data_t));
   }
 }
@@ -1493,9 +1560,24 @@ void uvg_quantize_lcu_residual(
     if (luma) {
       quantize_tr_residual(state, COLOR_Y, &loc, cur_pu, lcu, early_skip, tree_type);
     }
+    double c_lambda = state->c_lambda;
+    state->c_lambda = uvg_calculate_chroma_lambda(state, state->encoder_control->cfg.jccr, cur_pu->joint_cb_cr);
     if (chroma) {
-      quantize_tr_residual(state, COLOR_U, &loc, cur_pu, lcu, early_skip, tree_type);
-      quantize_tr_residual(state, COLOR_V, &loc, cur_pu, lcu, early_skip, tree_type);   
+      if(state->encoder_control->cfg.dep_quant) {
+        cabac_data_t temp_cabac;
+        memcpy(&temp_cabac, &state->search_cabac, sizeof(cabac_data_t));
+        state->search_cabac.update = 1;
+        quantize_tr_residual(state, COLOR_U, &loc, cur_pu, lcu, early_skip, tree_type);
+        cu_loc_t temp_chroma_loc;
+        uvg_cu_loc_ctor(&temp_chroma_loc, (cu_loc->x >> 1) % LCU_WIDTH_C, (cu_loc->y >> 1) % LCU_WIDTH_C, cu_loc->width, cu_loc->height);
+        uvg_get_coeff_cost(state, lcu->coeff.u, NULL, &temp_chroma_loc, COLOR_U, 0, (cur_pu->tr_skip & 2) >> 1, COEFF_ORDER_CU);
+        quantize_tr_residual(state, COLOR_V, &loc, cur_pu, lcu, early_skip, tree_type);
+        memcpy(&state->search_cabac, &temp_cabac, sizeof(cabac_data_t));
+      }
+      else {
+        quantize_tr_residual(state, COLOR_U, &loc, cur_pu, lcu, early_skip, tree_type);
+        quantize_tr_residual(state, COLOR_V, &loc, cur_pu, lcu, early_skip, tree_type);
+      }
     }
     if (jccr && PU_IS_TU(cur_pu)) {
       quantize_tr_residual(state, COLOR_UV, &loc, cur_pu, lcu, early_skip, tree_type);
@@ -1503,5 +1585,6 @@ void uvg_quantize_lcu_residual(
     if(chroma && jccr && PU_IS_TU(cur_pu)) {
       assert( 0 && "Trying to quantize both jccr and regular at the same time.\n");
     }
+    state->c_lambda = c_lambda;
   }
 }

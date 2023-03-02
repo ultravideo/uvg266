@@ -804,6 +804,11 @@ static double qp_to_lambda(encoder_state_t* const state, int qp)
   state->qp = est_qp;
   int8_t chroma_qp = encoder->qp_map[0][est_qp];
   double tmpWeight = pow(2.0, (est_qp - chroma_qp) / 3.0);
+  if (state->encoder_control->cfg.dep_quant)
+  {
+    tmpWeight *= (state->encoder_control->cfg.gop_len >= 8 ? pow(2.0, 0.1 / 3.0) : pow(2.0, 0.2 / 3.0));  // increase chroma weight for dependent quantization (in order to reduce bit rate shift from chroma to luma)
+  }
+  state->chroma_weights[1] = state->chroma_weights[2] = state->chroma_weights[3] = tmpWeight;
   state->c_lambda = est_lambda / tmpWeight;
   ctu->qp = est_qp;
   ctu->lambda = est_lambda;
@@ -1174,6 +1179,11 @@ void uvg_set_lcu_lambda_and_qp(encoder_state_t * const state,
 
   int8_t chroma_qp = ctrl->qp_map[0][state->qp];
   double tmpWeight = pow(2.0, (state->qp - chroma_qp) / 3.0);
+  if (state->encoder_control->cfg.dep_quant)
+  {
+    tmpWeight *= (state->encoder_control->cfg.gop_len >= 8 ? pow(2.0, 0.1 / 3.0) : pow(2.0, 0.2 / 3.0));  // increase chroma weight for dependent quantization (in order to reduce bit rate shift from chroma to luma)
+  }
+  state->chroma_weights[1] = state->chroma_weights[2] = state->chroma_weights[3] = tmpWeight;
   state->c_lambda = state->lambda / tmpWeight;
 
   // Apply variance adaptive quantization
@@ -1200,4 +1210,24 @@ void uvg_set_lcu_lambda_and_qp(encoder_state_t * const state,
     lcu->adjust_lambda = state->lambda;
     lcu->adjust_qp = state->qp;
   }
+}
+
+
+double uvg_calculate_chroma_lambda(encoder_state_t *state, bool use_jccr, int jccr_mode)
+{
+  const encoder_control_t * const ctrl = state->encoder_control;
+  double lambda = state->lambda;
+  int8_t chroma_qp = ctrl->qp_map[0][state->qp];
+  double tmpWeight = pow(2.0, (state->qp - chroma_qp) / 3.0);
+  if (state->encoder_control->cfg.dep_quant) {
+    tmpWeight *= (state->encoder_control->cfg.gop_len >= 8 ? pow(2.0, 0.1 / 3.0) : pow(2.0, 0.2 / 3.0)); // increase chroma weight for dependent quantization (in order to reduce bit rate shift from chroma to luma)
+  }
+  lambda /= tmpWeight;
+  lambda *= use_jccr && state->qp > 18 ? 1.3 : 1.0;
+  if (jccr_mode == 1 || jccr_mode == 2) {
+    lambda *= 0.8;
+  } else if (jccr_mode == 3) {
+    lambda *= 0.5;
+  }
+  return lambda;
 }

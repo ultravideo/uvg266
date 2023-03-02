@@ -244,7 +244,7 @@ typedef struct cu_array_t {
 } cu_array_t;
 
 cu_info_t* uvg_cu_array_at(cu_array_t *cua, unsigned x_px, unsigned y_px);
-void uvg_get_isp_cu_arr_coords(int* x, int* y);
+void uvg_get_isp_cu_arr_coords(int* x, int* y, int dim);
 const cu_info_t* uvg_cu_array_at_const(const cu_array_t *cua, unsigned x_px, unsigned y_px);
 
 cu_array_t * uvg_cu_array_alloc(const int width, const int height);

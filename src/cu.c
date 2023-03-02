@@ -100,7 +100,7 @@ cu_info_t* uvg_cu_array_at(cu_array_t *cua, unsigned x_px, unsigned y_px)
 }
 
 
-void uvg_get_isp_cu_arr_coords(int *x, int *y)
+void uvg_get_isp_cu_arr_coords(int *x, int *y, int dim)
 {
   // Do nothing if dimensions are divisible by 4
   if (*y % 4 == 0 && *x % 4 == 0) return;
@@ -109,7 +109,7 @@ void uvg_get_isp_cu_arr_coords(int *x, int *y)
 
   if (remainder_y != 0) {
     // Horizontal ISP split
-    if (remainder_y % 2 == 0) {
+    if (remainder_y % 2 == 0 && dim == 8) {
       // 8x2 block
       *y -= 2;
       *x += 4;
@@ -122,7 +122,7 @@ void uvg_get_isp_cu_arr_coords(int *x, int *y)
   }
   else {
     // Vertical ISP split
-    if (*x % 2 == 0) {
+    if (*x % 2 == 0 && dim == 8) {
       // 2x8 block
       *y += 4;
       *x -= 2;

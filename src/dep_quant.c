@@ -343,7 +343,7 @@ static void init_quant_block(
   const bool             needsSqrt2ScaleAdjustment,
   const int              gValue)
 {
-  double     lambda = state->lambda;
+  double     lambda = color == COLOR_Y ? state->lambda : state->c_lambda;
 
   const int  qpDQ = state->qp + 1;
   const int  qpPer = qpDQ / 6;
@@ -475,7 +475,7 @@ static void xSetLastCoeffOffset(
           cbf_ctx = &state->search_cabac.ctx.qt_cbf_model_cr[cbf_is_set(cur_tu->cbf, COLOR_U)];
           break;
       }
-      cbfDeltaBits = (int32_t)CTX_ENTROPY_BITS(cbf_ctx, 1) - (int32_t)CTX_ENTROPY_BITS(cbf_ctx, 0);
+      cbfDeltaBits = compID != COLOR_Y && cur_tu->joint_cb_cr ? 0 : (int32_t)CTX_ENTROPY_BITS(cbf_ctx, 1) - (int32_t)CTX_ENTROPY_BITS(cbf_ctx, 0);
     }
      
   }

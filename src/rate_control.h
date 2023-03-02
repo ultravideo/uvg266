@@ -76,4 +76,6 @@ void uvg_set_ctu_qp_lambda(encoder_state_t * const state, vector2d_t pos);
 void uvg_update_after_picture(encoder_state_t * const state);
 void uvg_estimate_pic_lambda(encoder_state_t * const state);
 
+double uvg_calculate_chroma_lambda(encoder_state_t *state, bool use_jccr, int jccr_mode);
+
 #endif // RATE_CONTROL_H_
