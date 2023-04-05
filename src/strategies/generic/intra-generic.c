@@ -190,11 +190,28 @@ static void uvg_angular_pred_generic(
   if (!vertical_mode) { SWAP(width, height, int) }
 
   if (sample_disp != 0) {
+    bool use_cubic = true; // Default to cubic filter
+    static const int uvg_intra_hor_ver_dist_thres[8] = { 24, 24, 24, 14, 2, 0, 0, 0 };
+    int filter_threshold = uvg_intra_hor_ver_dist_thres[(log2_width + log2_height) >> 1];
+    int dist_from_vert_or_hor = MIN(abs((int32_t)pred_mode - 50), abs((int32_t)pred_mode - 18));
+    if (dist_from_vert_or_hor > filter_threshold) {
+      if ((abs(sample_disp) & 0x1F) != 0)
+      {
+        use_cubic = false;
+      }
+    }
+    // Cubic must be used if ref line != 0 or if isp mode is != 0
+    if (multi_ref_index || isp) {
+      use_cubic = true;
+    }
     // The mode is not horizontal or vertical, we have to do interpolation.
 
     for (int_fast32_t y = 0, delta_pos = sample_disp * (1 + multi_ref_index); y < height; ++y, delta_pos += sample_disp) {
+
       int_fast32_t delta_int = delta_pos >> 5;
       int_fast32_t delta_fract = delta_pos & (32 - 1);
+      const int16_t filter_coeff[4] = { 16 - (delta_fract >> 1), 32 - (delta_fract >> 1), 16 + (delta_fract >> 1), delta_fract >> 1 };
+      int16_t const* const f = use_cubic ? cubic_filter[delta_fract] : filter_coeff;
 
       if ((abs(sample_disp) & 0x1F) != 0) {
         
@@ -202,22 +219,7 @@ static void uvg_angular_pred_generic(
         if (channel_type == 0) {
           int32_t ref_main_index = delta_int;
           uvg_pixel p[4];
-          bool use_cubic = true; // Default to cubic filter
-          static const int uvg_intra_hor_ver_dist_thres[8] = { 24, 24, 24, 14, 2, 0, 0, 0 };
-          int filter_threshold = uvg_intra_hor_ver_dist_thres[(log2_width + log2_height) >> 1];
-          int dist_from_vert_or_hor = MIN(abs((int32_t)pred_mode - 50), abs((int32_t)pred_mode - 18));
-          if (dist_from_vert_or_hor > filter_threshold) {
-            if ((abs(sample_disp) & 0x1F) != 0)
-            {
-              use_cubic = false;
-            }
-          }
-          // Cubic must be used if ref line != 0 or if isp mode is != 0
-          if (multi_ref_index || isp) {
-            use_cubic = true;
-          }
-          const int16_t filter_coeff[4] = { 16 - (delta_fract >> 1), 32 - (delta_fract >> 1), 16 + (delta_fract >> 1), delta_fract >> 1 };
-          int16_t const * const f = use_cubic ? cubic_filter[delta_fract] : filter_coeff;
+
           // Do 4-tap intra interpolation filtering
           for (int_fast32_t x = 0; x < width; x++, ref_main_index++) {
             p[0] = ref_main[ref_main_index];

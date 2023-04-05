@@ -1304,7 +1304,7 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
             sub_state->tile->frame->width_in_lcu * LCU_WIDTH,
             sub_state->tile->frame->height_in_lcu * LCU_WIDTH
         );
-        if(main_state->encoder_control->cfg.dual_tree){
+        if(main_state->encoder_control->cfg.dual_tree && main_state->frame->is_irap){
           sub_state->tile->frame->chroma_cu_array = uvg_cu_subarray(
               main_state->tile->frame->chroma_cu_array,
               offset_x,
