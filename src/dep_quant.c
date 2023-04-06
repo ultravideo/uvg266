@@ -89,8 +89,8 @@ typedef struct
 
 typedef struct
 {
-  coeff_t absLevel;
-  int64_t deltaDist;
+  coeff_t absLevel[4];
+  int64_t deltaDist[4];
 } PQData;
 
 typedef struct
@@ -558,37 +558,38 @@ static void checkRdCosts(
   const all_depquant_states * const state,
   const enum ScanPosType            spt,
   const PQData *                    pqDataA,
-  const PQData *                    pqDataB,
   Decision *                        decisions,
   const int                         decisionA,
   const int                         decisionB,
   const int                         state_offset)
 {
+  const int pqA = decisionA && decisionB ? 3 : 0;
+    const int pqB = decisionA && decisionB ? 1 : 2;
     const int32_t* goRiceTab = g_goRiceBits[state->m_goRicePar[state_offset]];
-    int64_t         rdCostA = state->m_rdCost[state_offset] + pqDataA->deltaDist;
-    int64_t         rdCostB = state->m_rdCost[state_offset] + pqDataB->deltaDist;
+    int64_t         rdCostA = state->m_rdCost[state_offset] + pqDataA->deltaDist[pqA];
+    int64_t         rdCostB = state->m_rdCost[state_offset] + pqDataA->deltaDist[pqB];
     int64_t         rdCostZ = state->m_rdCost[state_offset];
     if (state->m_remRegBins[state_offset] >= 4)
     {
-        if (pqDataA->absLevel < 4)
+        if (pqDataA->absLevel[pqA] < 4)
         {
-            rdCostA += state->m_coeffFracBits[state_offset][pqDataA->absLevel];
+            rdCostA += state->m_coeffFracBits[state_offset][pqDataA->absLevel[pqA]];
         }
         else
         {
-            const coeff_t value = (pqDataA->absLevel - 4) >> 1;
+            const coeff_t value = (pqDataA->absLevel[pqA] - 4) >> 1;
             rdCostA +=
-                state->m_coeffFracBits[state_offset][pqDataA->absLevel - (value << 1)] + goRiceTab[value < RICEMAX ? value : RICEMAX - 1];
+                state->m_coeffFracBits[state_offset][pqDataA->absLevel[pqA] - (value << 1)] + goRiceTab[value < RICEMAX ? value : RICEMAX - 1];
         }
-        if (pqDataB->absLevel < 4)
+        if (pqDataA->absLevel[pqB] < 4)
         {
-            rdCostB += state->m_coeffFracBits[state_offset][pqDataB->absLevel];
+            rdCostB += state->m_coeffFracBits[state_offset][pqDataA->absLevel[pqB]];
         }
         else
         {
-            const coeff_t value = (pqDataB->absLevel - 4) >> 1;
+            const coeff_t value = (pqDataA->absLevel[pqB] - 4) >> 1;
             rdCostB +=
-                state->m_coeffFracBits[state_offset][pqDataB->absLevel - (value << 1)] + goRiceTab[value < RICEMAX ? value : RICEMAX - 1];
+                state->m_coeffFracBits[state_offset][pqDataA->absLevel[pqB] - (value << 1)] + goRiceTab[value < RICEMAX ? value : RICEMAX - 1];
         }
         if (spt == SCAN_ISCSBB)
         {
@@ -616,19 +617,19 @@ static void checkRdCosts(
     else
     {
         rdCostA +=
-            (1 << SCALE_BITS) + goRiceTab[pqDataA->absLevel <= state->m_goRiceZero[state_offset] 
-            ? pqDataA->absLevel - 1
-            : (pqDataA->absLevel < RICEMAX ? pqDataA->absLevel : RICEMAX - 1)];
+            (1 << SCALE_BITS) + goRiceTab[pqDataA->absLevel[pqA] <= state->m_goRiceZero[state_offset]
+            ? pqDataA->absLevel[pqA] - 1
+            : (pqDataA->absLevel[pqA] < RICEMAX ? pqDataA->absLevel[pqA] : RICEMAX - 1)];
         rdCostB +=
-            (1 << SCALE_BITS) + goRiceTab[pqDataB->absLevel <= state->m_goRiceZero[state_offset]
-            ? pqDataB->absLevel - 1
-            : (pqDataB->absLevel < RICEMAX ? pqDataB->absLevel : RICEMAX - 1)];
+            (1 << SCALE_BITS) + goRiceTab[pqDataA->absLevel[pqB] <= state->m_goRiceZero[state_offset]
+            ? pqDataA->absLevel[pqB] - 1
+            : (pqDataA->absLevel[pqB] < RICEMAX ? pqDataA->absLevel[pqB] : RICEMAX - 1)];
         rdCostZ += goRiceTab[state->m_goRiceZero[state_offset]];
     }
     if (rdCostA < decisions->rdCost[decisionA])
     {
         decisions->rdCost[decisionA] = rdCostA;
-        decisions->absLevel[decisionA] = pqDataA->absLevel;
+        decisions->absLevel[decisionA] = pqDataA->absLevel[pqA];
         decisions->prevId[decisionA] = state->m_stateId[state_offset];
     }
     if (rdCostZ < decisions->rdCost[decisionA])
@@ -640,7 +641,7 @@ static void checkRdCosts(
     if (rdCostB < decisions->rdCost[decisionB])
     {
         decisions->rdCost[decisionB] = rdCostB;
-        decisions->absLevel[decisionB] = pqDataB->absLevel;
+        decisions->absLevel[decisionB] = pqDataA->absLevel[pqB];
         decisions->prevId[decisionB] = state->m_stateId[state_offset];
     }
 }
@@ -659,20 +660,20 @@ static INLINE void checkRdCostSkipSbb(const all_depquant_states* const state, De
 static INLINE void checkRdCostStart(const depquant_state* const state, int32_t lastOffset, const PQData *pqData, Decision *decisions, int
                                     decision_id)
 {
-    int64_t rdCost = pqData->deltaDist + lastOffset;
-    if (pqData->absLevel < 4)
+    int64_t rdCost = pqData->deltaDist[decision_id] + lastOffset;
+    if (pqData->absLevel[decision_id] < 4)
     {
-        rdCost += state->m_coeffFracBits[pqData->absLevel];
+        rdCost += state->m_coeffFracBits[pqData->absLevel[decision_id]];
     }
     else
     {
-        const coeff_t value = (pqData->absLevel - 4) >> 1;
-        rdCost += state->m_coeffFracBits[pqData->absLevel - (value << 1)] + g_goRiceBits[state->m_goRicePar][value < RICEMAX ? value : RICEMAX - 1];
+        const coeff_t value = (pqData->absLevel[decision_id] - 4) >> 1;
+        rdCost += state->m_coeffFracBits[pqData->absLevel[decision_id] - (value << 1)] + g_goRiceBits[state->m_goRicePar][value < RICEMAX ? value : RICEMAX - 1];
     }
     if (rdCost < decisions->rdCost[decision_id])
     {
         decisions->rdCost[decision_id] = rdCost;
-        decisions->absLevel[decision_id] = pqData->absLevel;
+        decisions->absLevel[decision_id] = pqData->absLevel[decision_id];
         decisions->prevId[decision_id] = -1;
     }
 }
@@ -683,21 +684,21 @@ static INLINE void preQuantCoeff(const quant_block * const qp, const coeff_t abs
     int64_t scaledOrg = (int64_t)(absCoeff) * quanCoeff;
     coeff_t  qIdx = MAX(1, MIN(qp->m_maxQIdx, (coeff_t)((scaledOrg + qp->m_QAdd) >> qp->m_QShift)));
     int64_t scaledAdd = qIdx * qp->m_DistStepAdd - scaledOrg * qp->m_DistOrgFact;
-    PQData *pq_a = &pqData[qIdx & 3];
-    pq_a->deltaDist = (scaledAdd * qIdx + qp->m_DistAdd) >> qp->m_DistShift;
-    pq_a->absLevel = (++qIdx) >> 1;
+    int index = qIdx & 3;
+    pqData->deltaDist[index] = (scaledAdd * qIdx + qp->m_DistAdd) >> qp->m_DistShift;
+    pqData->absLevel[index] = (++qIdx) >> 1;
     scaledAdd += qp->m_DistStepAdd;
-    PQData *pq_b = &pqData[qIdx & 3];
-    pq_b->deltaDist = (scaledAdd * qIdx + qp->m_DistAdd) >> qp->m_DistShift;
-    pq_b->absLevel = (++qIdx) >> 1;
+    index = qIdx & 3;
+    pqData->deltaDist[index] = (scaledAdd * qIdx + qp->m_DistAdd) >> qp->m_DistShift;
+    pqData->absLevel[index] = (++qIdx) >> 1;
     scaledAdd += qp->m_DistStepAdd;
-    PQData *pq_c = &pqData[qIdx & 3];
-    pq_c->deltaDist = (scaledAdd * qIdx + qp->m_DistAdd) >> qp->m_DistShift;
-    pq_c->absLevel = (++qIdx) >> 1;
+    index = qIdx & 3;
+    pqData->deltaDist[index] = (scaledAdd * qIdx + qp->m_DistAdd) >> qp->m_DistShift;
+    pqData->absLevel[index] = (++qIdx) >> 1;
     scaledAdd += qp->m_DistStepAdd;
-    PQData *pq_d = &pqData[qIdx & 3];
-    pq_d->deltaDist = (scaledAdd * qIdx + qp->m_DistAdd) >> qp->m_DistShift;
-    pq_d->absLevel = (++qIdx) >> 1;
+    index = qIdx & 3;
+    pqData->deltaDist[index] = (scaledAdd * qIdx + qp->m_DistAdd) >> qp->m_DistShift;
+    pqData->absLevel[index] = (++qIdx) >> 1;
 }
 
 
@@ -732,12 +733,12 @@ static void xDecide(
         return;
     }
 
-    PQData  pqData[4];
-    preQuantCoeff(qp, absCoeff, pqData, quanCoeff);
-    checkRdCosts(all_states, spt, &pqData[0], &pqData[2], decisions, 0, 2, prev_offset + 0);
-    checkRdCosts(all_states, spt, &pqData[0], &pqData[2], decisions, 2, 0, prev_offset + 1);
-    checkRdCosts(all_states, spt, &pqData[3], &pqData[1], decisions, 1, 3, prev_offset + 2);
-    checkRdCosts(all_states, spt, &pqData[3], &pqData[1], decisions, 3, 1, prev_offset + 3);
+    PQData  pqData;
+    preQuantCoeff(qp, absCoeff, &pqData, quanCoeff);
+    checkRdCosts(all_states, spt, &pqData, decisions, 0, 2, prev_offset + 0);
+    checkRdCosts(all_states, spt, &pqData, decisions, 2, 0, prev_offset + 1);
+    checkRdCosts(all_states, spt, &pqData, decisions, 1, 3, prev_offset + 2);
+    checkRdCosts(all_states, spt, &pqData, decisions, 3, 1, prev_offset + 3);
     if (spt == SCAN_EOCSBB)
     {
         checkRdCostSkipSbb(all_states, decisions, 0, skip_offset);
@@ -746,8 +747,8 @@ static void xDecide(
         checkRdCostSkipSbb(all_states, decisions,3, skip_offset);
     }
 
-    checkRdCostStart(m_startState, lastOffset, &pqData[0], decisions, 0);
-    checkRdCostStart(m_startState, lastOffset, &pqData[2], decisions, 2);
+    checkRdCostStart(m_startState, lastOffset, &pqData, decisions, 0);
+    checkRdCostStart(m_startState, lastOffset, &pqData, decisions, 2);
 }
 
 
