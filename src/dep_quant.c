@@ -547,11 +547,15 @@ static void depquant_state_init(depquant_state* state, uint32_t sig_frac_bits[2]
   state->m_sbbFracBits[1] = 0;
 }
 
-static INLINE void checkRdCostSkipSbbZeroOut(Decision * decision, const all_depquant_states * const state, int decision_id, int skip_offset) {  
-    int64_t rdCost                    = state->m_rdCost[decision_id + skip_offset] + state->m_sbbFracBits[decision_id + skip_offset][0];
-    decision->rdCost[decision_id]   = rdCost;
-    decision->absLevel[decision_id] = 0;
-    decision->prevId[decision_id]   = 4 + state->m_stateId[decision_id + skip_offset];
+static INLINE void checkRdCostSkipSbbZeroOut(
+  Decision* decision, 
+  const all_depquant_states* const state,
+  int decision_id, 
+  int skip_offset) {
+  int64_t rdCost = state->m_rdCost[decision_id + skip_offset] + state->m_sbbFracBits[decision_id + skip_offset][0];
+  decision->rdCost[decision_id] = rdCost;
+  decision->absLevel[decision_id] = 0;
+  decision->prevId[decision_id] = 4 + state->m_stateId[decision_id + skip_offset];
 }
 
 static void checkRdCosts(
@@ -564,141 +568,126 @@ static void checkRdCosts(
   const int                         state_offset)
 {
   const int pqA = decisionA && decisionB ? 3 : 0;
-    const int pqB = decisionA && decisionB ? 1 : 2;
-    const int32_t* goRiceTab = g_goRiceBits[state->m_goRicePar[state_offset]];
-    int64_t         rdCostA = state->m_rdCost[state_offset] + pqDataA->deltaDist[pqA];
-    int64_t         rdCostB = state->m_rdCost[state_offset] + pqDataA->deltaDist[pqB];
-    int64_t         rdCostZ = state->m_rdCost[state_offset];
-    if (state->m_remRegBins[state_offset] >= 4)
-    {
-        if (pqDataA->absLevel[pqA] < 4)
-        {
-            rdCostA += state->m_coeffFracBits[state_offset][pqDataA->absLevel[pqA]];
-        }
-        else
-        {
-            const coeff_t value = (pqDataA->absLevel[pqA] - 4) >> 1;
-            rdCostA +=
-                state->m_coeffFracBits[state_offset][pqDataA->absLevel[pqA] - (value << 1)] + goRiceTab[value < RICEMAX ? value : RICEMAX - 1];
-        }
-        if (pqDataA->absLevel[pqB] < 4)
-        {
-            rdCostB += state->m_coeffFracBits[state_offset][pqDataA->absLevel[pqB]];
-        }
-        else
-        {
-            const coeff_t value = (pqDataA->absLevel[pqB] - 4) >> 1;
-            rdCostB +=
-                state->m_coeffFracBits[state_offset][pqDataA->absLevel[pqB] - (value << 1)] + goRiceTab[value < RICEMAX ? value : RICEMAX - 1];
-        }
-        if (spt == SCAN_ISCSBB)
-        {
-            rdCostA += state->m_sigFracBits[state_offset][1];
-            rdCostB += state->m_sigFracBits[state_offset][1];
-            rdCostZ += state->m_sigFracBits[state_offset][0];
-        }
-        else if (spt == SCAN_SOCSBB)
-        {
-            rdCostA += state->m_sbbFracBits[state_offset][1] + state->m_sigFracBits[state_offset][1];
-            rdCostB += state->m_sbbFracBits[state_offset][1] + state->m_sigFracBits[state_offset][1];
-            rdCostZ += state->m_sbbFracBits[state_offset][1] + state->m_sigFracBits[state_offset][0];
-        }
-        else if (state->m_numSigSbb[state_offset])
-        {
-            rdCostA += state->m_sigFracBits[state_offset][1];
-            rdCostB += state->m_sigFracBits[state_offset][1];
-            rdCostZ += state->m_sigFracBits[state_offset][0];
-        }
-        else
-        {
-            rdCostZ = decisions->rdCost[decisionA];
-        }
+  const int pqB = decisionA && decisionB ? 1 : 2;
+  const int32_t* goRiceTab = g_goRiceBits[state->m_goRicePar[state_offset]];
+  int64_t rdCostA = state->m_rdCost[state_offset] + pqDataA->deltaDist[pqA];
+  int64_t rdCostB = state->m_rdCost[state_offset] + pqDataA->deltaDist[pqB];
+  int64_t rdCostZ = state->m_rdCost[state_offset];
+  if (state->m_remRegBins[state_offset] >= 4) {
+    if (pqDataA->absLevel[pqA] < 4) {
+      rdCostA += state->m_coeffFracBits[state_offset][pqDataA->absLevel[pqA]];
     }
-    else
-    {
-        rdCostA +=
-            (1 << SCALE_BITS) + goRiceTab[pqDataA->absLevel[pqA] <= state->m_goRiceZero[state_offset]
-            ? pqDataA->absLevel[pqA] - 1
-            : (pqDataA->absLevel[pqA] < RICEMAX ? pqDataA->absLevel[pqA] : RICEMAX - 1)];
-        rdCostB +=
-            (1 << SCALE_BITS) + goRiceTab[pqDataA->absLevel[pqB] <= state->m_goRiceZero[state_offset]
-            ? pqDataA->absLevel[pqB] - 1
-            : (pqDataA->absLevel[pqB] < RICEMAX ? pqDataA->absLevel[pqB] : RICEMAX - 1)];
-        rdCostZ += goRiceTab[state->m_goRiceZero[state_offset]];
+    else {
+      const coeff_t value = (pqDataA->absLevel[pqA] - 4) >> 1;
+      rdCostA +=
+        state->m_coeffFracBits[state_offset][pqDataA->absLevel[pqA] - (value << 1)] + goRiceTab[
+          value < RICEMAX ? value : RICEMAX - 1];
     }
-    if (rdCostA < decisions->rdCost[decisionA])
-    {
-        decisions->rdCost[decisionA] = rdCostA;
-        decisions->absLevel[decisionA] = pqDataA->absLevel[pqA];
-        decisions->prevId[decisionA] = state->m_stateId[state_offset];
+    if (pqDataA->absLevel[pqB] < 4) {
+      rdCostB += state->m_coeffFracBits[state_offset][pqDataA->absLevel[pqB]];
     }
-    if (rdCostZ < decisions->rdCost[decisionA])
-    {
-        decisions->rdCost[decisionA] = rdCostZ;
-        decisions->absLevel[decisionA] = 0;
-        decisions->prevId[decisionA] = state->m_stateId[state_offset];
+    else {
+      const coeff_t value = (pqDataA->absLevel[pqB] - 4) >> 1;
+      rdCostB +=
+        state->m_coeffFracBits[state_offset][pqDataA->absLevel[pqB] - (value << 1)] + goRiceTab[
+          value < RICEMAX ? value : RICEMAX - 1];
     }
-    if (rdCostB < decisions->rdCost[decisionB])
-    {
-        decisions->rdCost[decisionB] = rdCostB;
-        decisions->absLevel[decisionB] = pqDataA->absLevel[pqB];
-        decisions->prevId[decisionB] = state->m_stateId[state_offset];
+    if (spt == SCAN_ISCSBB) {
+      rdCostA += state->m_sigFracBits[state_offset][1];
+      rdCostB += state->m_sigFracBits[state_offset][1];
+      rdCostZ += state->m_sigFracBits[state_offset][0];
     }
+    else if (spt == SCAN_SOCSBB) {
+      rdCostA += state->m_sbbFracBits[state_offset][1] + state->m_sigFracBits[state_offset][1];
+      rdCostB += state->m_sbbFracBits[state_offset][1] + state->m_sigFracBits[state_offset][1];
+      rdCostZ += state->m_sbbFracBits[state_offset][1] + state->m_sigFracBits[state_offset][0];
+    }
+    else if (state->m_numSigSbb[state_offset]) {
+      rdCostA += state->m_sigFracBits[state_offset][1];
+      rdCostB += state->m_sigFracBits[state_offset][1];
+      rdCostZ += state->m_sigFracBits[state_offset][0];
+    }
+    else {
+      rdCostZ = decisions->rdCost[decisionA];
+    }
+  }
+  else {
+    rdCostA += (1 << SCALE_BITS) + goRiceTab[pqDataA->absLevel[pqA] <= state->m_goRiceZero[state_offset]
+                                      ? pqDataA->absLevel[pqA] - 1
+                                      : (pqDataA->absLevel[pqA] < RICEMAX ? pqDataA->absLevel[pqA] : RICEMAX - 1)];
+    rdCostB += (1 << SCALE_BITS) + goRiceTab[pqDataA->absLevel[pqB] <= state->m_goRiceZero[state_offset]
+                                      ? pqDataA->absLevel[pqB] - 1
+                                      : (pqDataA->absLevel[pqB] < RICEMAX ? pqDataA->absLevel[pqB] : RICEMAX - 1)];
+    rdCostZ += goRiceTab[state->m_goRiceZero[state_offset]];
+  }
+  if (rdCostA < decisions->rdCost[decisionA]) {
+    decisions->rdCost[decisionA] = rdCostA;
+    decisions->absLevel[decisionA] = pqDataA->absLevel[pqA];
+    decisions->prevId[decisionA] = state->m_stateId[state_offset];
+  }
+  if (rdCostZ < decisions->rdCost[decisionA]) {
+    decisions->rdCost[decisionA] = rdCostZ;
+    decisions->absLevel[decisionA] = 0;
+    decisions->prevId[decisionA] = state->m_stateId[state_offset];
+  }
+  if (rdCostB < decisions->rdCost[decisionB]) {
+    decisions->rdCost[decisionB] = rdCostB;
+    decisions->absLevel[decisionB] = pqDataA->absLevel[pqB];
+    decisions->prevId[decisionB] = state->m_stateId[state_offset];
+  }
 }
 
 static INLINE void checkRdCostSkipSbb(const all_depquant_states* const state, Decision * decisions, int decision_id, int skip_offset)
 {
-    int64_t rdCost = state->m_rdCost[skip_offset + decision_id] + state->m_sbbFracBits[skip_offset + decision_id][0];
-    if (rdCost < decisions->rdCost[decision_id])
-    {
-        decisions->rdCost[decision_id] = rdCost;
-        decisions->absLevel[decision_id] = 0;
-        decisions->prevId[decision_id] = 4 + state->m_stateId[skip_offset + decision_id];
-    }
+  int64_t rdCost = state->m_rdCost[skip_offset + decision_id] + state->m_sbbFracBits[skip_offset + decision_id][0];
+  if (rdCost < decisions->rdCost[decision_id])
+  {
+    decisions->rdCost[decision_id] = rdCost;
+    decisions->absLevel[decision_id] = 0;
+    decisions->prevId[decision_id] = 4 + state->m_stateId[skip_offset + decision_id];
+  }
 }
 
 static INLINE void checkRdCostStart(const depquant_state* const state, int32_t lastOffset, const PQData *pqData, Decision *decisions, int
                                     decision_id)
 {
-    int64_t rdCost = pqData->deltaDist[decision_id] + lastOffset;
-    if (pqData->absLevel[decision_id] < 4)
-    {
-        rdCost += state->m_coeffFracBits[pqData->absLevel[decision_id]];
-    }
-    else
-    {
-        const coeff_t value = (pqData->absLevel[decision_id] - 4) >> 1;
-        rdCost += state->m_coeffFracBits[pqData->absLevel[decision_id] - (value << 1)] + g_goRiceBits[state->m_goRicePar][value < RICEMAX ? value : RICEMAX - 1];
-    }
-    if (rdCost < decisions->rdCost[decision_id])
-    {
-        decisions->rdCost[decision_id] = rdCost;
-        decisions->absLevel[decision_id] = pqData->absLevel[decision_id];
-        decisions->prevId[decision_id] = -1;
-    }
+  int64_t rdCost = pqData->deltaDist[decision_id] + lastOffset;
+  if (pqData->absLevel[decision_id] < 4) {
+    rdCost += state->m_coeffFracBits[pqData->absLevel[decision_id]];
+  }
+  else {
+    const coeff_t value = (pqData->absLevel[decision_id] - 4) >> 1;
+    rdCost += state->m_coeffFracBits[pqData->absLevel[decision_id] - (value << 1)]
+              + g_goRiceBits[state->m_goRicePar][value < RICEMAX ? value : RICEMAX - 1];
+  }
+  if (rdCost < decisions->rdCost[decision_id]) {
+    decisions->rdCost[decision_id] = rdCost;
+    decisions->absLevel[decision_id] = pqData->absLevel[decision_id];
+    decisions->prevId[decision_id] = -1;
+  }
 }
 
 
 static INLINE void preQuantCoeff(const quant_block * const qp, const coeff_t absCoeff, PQData* pqData, coeff_t quanCoeff)
 {
-    int64_t scaledOrg = (int64_t)(absCoeff) * quanCoeff;
-    coeff_t  qIdx = MAX(1, MIN(qp->m_maxQIdx, (coeff_t)((scaledOrg + qp->m_QAdd) >> qp->m_QShift)));
-    int64_t scaledAdd = qIdx * qp->m_DistStepAdd - scaledOrg * qp->m_DistOrgFact;
-    int index = qIdx & 3;
-    pqData->deltaDist[index] = (scaledAdd * qIdx + qp->m_DistAdd) >> qp->m_DistShift;
-    pqData->absLevel[index] = (++qIdx) >> 1;
-    scaledAdd += qp->m_DistStepAdd;
-    index = qIdx & 3;
-    pqData->deltaDist[index] = (scaledAdd * qIdx + qp->m_DistAdd) >> qp->m_DistShift;
-    pqData->absLevel[index] = (++qIdx) >> 1;
-    scaledAdd += qp->m_DistStepAdd;
-    index = qIdx & 3;
-    pqData->deltaDist[index] = (scaledAdd * qIdx + qp->m_DistAdd) >> qp->m_DistShift;
-    pqData->absLevel[index] = (++qIdx) >> 1;
-    scaledAdd += qp->m_DistStepAdd;
-    index = qIdx & 3;
-    pqData->deltaDist[index] = (scaledAdd * qIdx + qp->m_DistAdd) >> qp->m_DistShift;
-    pqData->absLevel[index] = (++qIdx) >> 1;
+  int64_t scaledOrg = (int64_t)(absCoeff) * quanCoeff;
+  coeff_t  qIdx = MAX(1, MIN(qp->m_maxQIdx, (coeff_t)((scaledOrg + qp->m_QAdd) >> qp->m_QShift)));
+  int64_t scaledAdd = qIdx * qp->m_DistStepAdd - scaledOrg * qp->m_DistOrgFact;
+  int index = qIdx & 3;
+  pqData->deltaDist[index] = (scaledAdd * qIdx + qp->m_DistAdd) >> qp->m_DistShift;
+  pqData->absLevel[index] = (++qIdx) >> 1;
+  scaledAdd += qp->m_DistStepAdd;
+  index = qIdx & 3;
+  pqData->deltaDist[index] = (scaledAdd * qIdx + qp->m_DistAdd) >> qp->m_DistShift;
+  pqData->absLevel[index] = (++qIdx) >> 1;
+  scaledAdd += qp->m_DistStepAdd;
+  index = qIdx & 3;
+  pqData->deltaDist[index] = (scaledAdd * qIdx + qp->m_DistAdd) >> qp->m_DistShift;
+  pqData->absLevel[index] = (++qIdx) >> 1;
+  scaledAdd += qp->m_DistStepAdd;
+  index = qIdx & 3;
+  pqData->deltaDist[index] = (scaledAdd * qIdx + qp->m_DistAdd) >> qp->m_DistShift;
+  pqData->absLevel[index] = (++qIdx) >> 1;
 }
 
 
@@ -719,63 +708,55 @@ static void xDecide(
   const int                  skip_offset,
   const int                  prev_offset)
 {
-    memcpy(decisions, &startDec, sizeof(Decision));
+  memcpy(decisions, &startDec, sizeof(Decision));
 
-    if (zeroOut)
-    {
-        if (spt == SCAN_EOCSBB)
-        {
-            checkRdCostSkipSbbZeroOut(decisions, all_states, 0, skip_offset);
-            checkRdCostSkipSbbZeroOut(decisions, all_states, 1, skip_offset);
-            checkRdCostSkipSbbZeroOut(decisions, all_states,2, skip_offset);
-            checkRdCostSkipSbbZeroOut(decisions, all_states,3, skip_offset);
-        }
-        return;
+  if (zeroOut) {
+    if (spt == SCAN_EOCSBB) {
+      checkRdCostSkipSbbZeroOut(decisions, all_states, 0, skip_offset);
+      checkRdCostSkipSbbZeroOut(decisions, all_states, 1, skip_offset);
+      checkRdCostSkipSbbZeroOut(decisions, all_states, 2, skip_offset);
+      checkRdCostSkipSbbZeroOut(decisions, all_states, 3, skip_offset);
     }
+    return;
+  }
 
-    PQData  pqData;
-    preQuantCoeff(qp, absCoeff, &pqData, quanCoeff);
-    checkRdCosts(all_states, spt, &pqData, decisions, 0, 2, prev_offset + 0);
-    checkRdCosts(all_states, spt, &pqData, decisions, 2, 0, prev_offset + 1);
-    checkRdCosts(all_states, spt, &pqData, decisions, 1, 3, prev_offset + 2);
-    checkRdCosts(all_states, spt, &pqData, decisions, 3, 1, prev_offset + 3);
-    if (spt == SCAN_EOCSBB)
-    {
-        checkRdCostSkipSbb(all_states, decisions, 0, skip_offset);
-        checkRdCostSkipSbb(all_states, decisions, 1, skip_offset);
-        checkRdCostSkipSbb(all_states, decisions,2, skip_offset);
-        checkRdCostSkipSbb(all_states, decisions,3, skip_offset);
-    }
+  PQData pqData;
+  preQuantCoeff(qp, absCoeff, &pqData, quanCoeff);
+  checkRdCosts(all_states, spt, &pqData, decisions, 0, 2, prev_offset + 0);
+  checkRdCosts(all_states, spt, &pqData, decisions, 2, 0, prev_offset + 1);
+  checkRdCosts(all_states, spt, &pqData, decisions, 1, 3, prev_offset + 2);
+  checkRdCosts(all_states, spt, &pqData, decisions, 3, 1, prev_offset + 3);
+  if (spt == SCAN_EOCSBB) {
+    checkRdCostSkipSbb(all_states, decisions, 0, skip_offset);
+    checkRdCostSkipSbb(all_states, decisions, 1, skip_offset);
+    checkRdCostSkipSbb(all_states, decisions, 2, skip_offset);
+    checkRdCostSkipSbb(all_states, decisions, 3, skip_offset);
+  }
 
-    checkRdCostStart(m_startState, lastOffset, &pqData, decisions, 0);
-    checkRdCostStart(m_startState, lastOffset, &pqData, decisions, 2);
+  checkRdCostStart(m_startState, lastOffset, &pqData, decisions, 0);
+  checkRdCostStart(m_startState, lastOffset, &pqData, decisions, 2);
 }
 
 
 static INLINE unsigned templateAbsCompare(coeff_t sum)
 {
-    int rangeIdx = 0;
-    if (sum < g_riceT[0])
-    {
-        rangeIdx = 0;
-    }
-    else if (sum < g_riceT[1])
-    {
-        rangeIdx = 1;
-    }
-    else if (sum < g_riceT[2])
-    {
-        rangeIdx = 2;
-    }
-    else if (sum < g_riceT[3])
-    {
-        rangeIdx = 3;
-    }
-    else
-    {
-        rangeIdx = 4;
-    }
-    return g_riceShift[rangeIdx];
+  int rangeIdx = 0;
+  if (sum < g_riceT[0]) {
+    rangeIdx = 0;
+  }
+  else if (sum < g_riceT[1]) {
+    rangeIdx = 1;
+  }
+  else if (sum < g_riceT[2]) {
+    rangeIdx = 2;
+  }
+  else if (sum < g_riceT[3]) {
+    rangeIdx = 3;
+  }
+  else {
+    rangeIdx = 4;
+  }
+  return g_riceShift[rangeIdx];
 }
 
 static INLINE void update_common_context(
@@ -866,43 +847,41 @@ static INLINE void updateStateEOS(
   const Decision * decisions,
   int              decision_id)
 {
-    all_depquant_states* state = &ctxs->m_allStates;
-    int curr_state_offset = ctxs->m_curr_state_offset + decision_id;
-    state->m_rdCost[curr_state_offset] = decisions->rdCost[decision_id];
-    if (decisions->prevId[decision_id] > -2)
-    {
-      int prvState = -1;
-      if (decisions->prevId[decision_id] >= 4)
-      {
-          prvState = ctxs->m_skip_state_offset + (decisions->prevId[decision_id] - 4);
-          state->m_numSigSbb[curr_state_offset] = 0;
-          memset(state->m_absLevelsAndCtxInit[curr_state_offset], 0, 16 * sizeof(uint8_t));
-      }
-      else if (decisions->prevId[decision_id] >= 0)
-      {
-          prvState = ctxs->m_prev_state_offset + decisions->prevId[decision_id];
-          state->m_numSigSbb[curr_state_offset] = state->m_numSigSbb[prvState] + !!decisions->absLevel[decision_id];
-          memcpy(state->m_absLevelsAndCtxInit[curr_state_offset], state->m_absLevelsAndCtxInit[prvState], 16 * sizeof(uint8_t));
-      }
-      else
-      {
-          state->m_numSigSbb[curr_state_offset] = 1;
-          memset(state->m_absLevelsAndCtxInit[curr_state_offset], 0, 16 * sizeof(uint8_t));
-      }
-      uint8_t* temp = (uint8_t*)(&state->m_absLevelsAndCtxInit[curr_state_offset][scan_pos & 15]);
-      *temp = (uint8_t)MIN(255, decisions->absLevel[decision_id]);
-
-      update_common_context(ctxs, state->m_commonCtx, scan_pos, cg_pos, width_in_sbb, height_in_sbb, next_sbb_right,next_sbb_below, prvState, ctxs->m_curr_state_offset + decision_id);
-      
-      coeff_t  tinit = state->m_absLevelsAndCtxInit[curr_state_offset][8 + ((scan_pos - 1) & 15)];
-      coeff_t  sumNum = tinit & 7;
-      coeff_t  sumAbs1 = (tinit >> 3) & 31;
-      coeff_t  sumGt1 = sumAbs1 - sumNum;
-      state->m_sigFracBits[curr_state_offset][0] = state->m_sigFracBitsArray[curr_state_offset][sigCtxOffsetNext + MIN((sumAbs1 + 1) >> 1, 3)][0];
-      state->m_sigFracBits[curr_state_offset][1] = state->m_sigFracBitsArray[curr_state_offset][sigCtxOffsetNext + MIN((sumAbs1 + 1) >> 1, 3)][1];
-      
-      memcpy(state->m_coeffFracBits[curr_state_offset], state->m_gtxFracBitsArray[gtxCtxOffsetNext + (sumGt1 < 4 ? sumGt1 : 4)], sizeof(state->m_coeffFracBits[0]));
+  all_depquant_states* state = &ctxs->m_allStates;
+  int curr_state_offset = ctxs->m_curr_state_offset + decision_id;
+  state->m_rdCost[curr_state_offset] = decisions->rdCost[decision_id];
+  if (decisions->prevId[decision_id] > -2) {
+    int prvState = -1;
+    if (decisions->prevId[decision_id] >= 4) {
+      prvState = ctxs->m_skip_state_offset + (decisions->prevId[decision_id] - 4);
+      state->m_numSigSbb[curr_state_offset] = 0;
+      memset(state->m_absLevelsAndCtxInit[curr_state_offset], 0, 16 * sizeof(uint8_t));
     }
+    else if (decisions->prevId[decision_id] >= 0) {
+      prvState = ctxs->m_prev_state_offset + decisions->prevId[decision_id];
+      state->m_numSigSbb[curr_state_offset] = state->m_numSigSbb[prvState] + !!decisions->absLevel[decision_id];
+      memcpy(state->m_absLevelsAndCtxInit[curr_state_offset], state->m_absLevelsAndCtxInit[prvState], 16 * sizeof(uint8_t));
+    }
+    else {
+      state->m_numSigSbb[curr_state_offset] = 1;
+      memset(state->m_absLevelsAndCtxInit[curr_state_offset], 0, 16 * sizeof(uint8_t));
+    }
+    uint8_t* temp = (uint8_t*)(&state->m_absLevelsAndCtxInit[curr_state_offset][scan_pos & 15]);
+    *temp = (uint8_t)MIN(255, decisions->absLevel[decision_id]);
+
+    update_common_context(ctxs, state->m_commonCtx, scan_pos, cg_pos, width_in_sbb, height_in_sbb, next_sbb_right,
+                          next_sbb_below, prvState, ctxs->m_curr_state_offset + decision_id);
+
+    coeff_t tinit = state->m_absLevelsAndCtxInit[curr_state_offset][8 + ((scan_pos - 1) & 15)];
+    coeff_t sumNum = tinit & 7;
+    coeff_t sumAbs1 = (tinit >> 3) & 31;
+    coeff_t sumGt1 = sumAbs1 - sumNum;
+    state->m_sigFracBits[curr_state_offset][0] = state->m_sigFracBitsArray[curr_state_offset][sigCtxOffsetNext + MIN((sumAbs1 + 1) >> 1, 3)][0];
+    state->m_sigFracBits[curr_state_offset][1] = state->m_sigFracBitsArray[curr_state_offset][sigCtxOffsetNext + MIN((sumAbs1 + 1) >> 1, 3)][1];
+
+    memcpy(state->m_coeffFracBits[curr_state_offset],
+           state->m_gtxFracBitsArray[gtxCtxOffsetNext + (sumGt1 < 4 ? sumGt1 : 4)], sizeof(state->m_coeffFracBits[0]));
+  }
 }
 
 static INLINE void updateState(
@@ -916,179 +895,161 @@ static INLINE void updateState(
   const int       baseLevel,
   const bool      extRiceFlag,
   int             decision_id) {
-    all_depquant_states* state = &ctxs->m_allStates;
-    int state_id = ctxs->m_curr_state_offset + decision_id;
-    state->m_rdCost[state_id] = decisions->rdCost[decision_id];
-    if (decisions->prevId[decision_id] > -2)
-    {
-        if (decisions->prevId[decision_id] >= 0)
-        {
-            const int prvState = ctxs->m_prev_state_offset + decisions->prevId[decision_id];
-            state->m_numSigSbb[state_id] = (state->m_numSigSbb[prvState]) + !!decisions->absLevel[decision_id];
-            state->m_refSbbCtxId[state_id] = state->m_refSbbCtxId[prvState];
-            state->m_sbbFracBits[state_id][0] = state->m_sbbFracBits[prvState][0];
-            state->m_sbbFracBits[state_id][1] = state->m_sbbFracBits[prvState][1];
-            state->m_remRegBins[state_id] = state->m_remRegBins[prvState] - 1;
-            state->m_goRicePar[state_id] = state->m_goRicePar[prvState];
-            if (state->m_remRegBins[state_id] >= 4)
-            {
-                state->m_remRegBins[state_id] -= (decisions->absLevel[decision_id] < 2 ? (unsigned)decisions->absLevel[decision_id] : 3);
-            }
-            memcpy(state->m_absLevelsAndCtxInit[state_id], state->m_absLevelsAndCtxInit[prvState], 48 * sizeof(uint8_t));
-        }
-        else
-        {
-            state->m_numSigSbb[state_id] = 1;
-            state->m_refSbbCtxId[state_id] = -1;
-            int ctxBinSampleRatio = 28; //(scanInfo.chType == CHANNEL_TYPE_LUMA) ? MAX_TU_LEVEL_CTX_CODED_BIN_CONSTRAINT_LUMA : MAX_TU_LEVEL_CTX_CODED_BIN_CONSTRAINT_CHROMA;
-            state->m_remRegBins[state_id] = (state->effWidth * state->effHeight * ctxBinSampleRatio) / 16 - (decisions->absLevel[decision_id] < 2 ? (unsigned)decisions->absLevel[decision_id] : 3);
-            memset(state->m_absLevelsAndCtxInit[state_id], 0, 48 * sizeof(uint8_t));
-        }
-
-        uint8_t* levels = (uint8_t*)(state->m_absLevelsAndCtxInit[state_id]);
-        levels[scan_pos & 15] = (uint8_t)MIN(255, decisions->absLevel[decision_id]);
-
-        if (state->m_remRegBins[state_id] >= 4)
-        {
-            coeff_t  tinit = state->m_absLevelsAndCtxInit[state_id][8 + ((scan_pos - 1) & 15)];
-            coeff_t  sumAbs1 = (tinit >> 3) & 31;
-            coeff_t sumNum = tinit & 7;
-#define UPDATE(k) {coeff_t t=levels[next_nb_info_ssb.inPos[k]]; sumAbs1+=MIN(4+(t&1),t); sumNum+=!!t; }
-            if (numIPos == 1)
-            {
-                UPDATE(0);
-            }
-            else if (numIPos == 2)
-            {
-                UPDATE(0);
-                UPDATE(1);
-            }
-            else if (numIPos == 3)
-            {
-                UPDATE(0);
-                UPDATE(1);
-                UPDATE(2);
-            }
-            else if (numIPos == 4)
-            {
-                UPDATE(0);
-                UPDATE(1);
-                UPDATE(2);
-                UPDATE(3);
-            }
-            else if (numIPos == 5)
-            {
-                UPDATE(0);
-                UPDATE(1);
-                UPDATE(2);
-                UPDATE(3);
-                UPDATE(4);
-            }
-#undef UPDATE
-            coeff_t sumGt1 = sumAbs1 - sumNum;
-            state->m_sigFracBits[state_id][0] = state->m_sigFracBitsArray[state_id][sigCtxOffsetNext + MIN((sumAbs1 + 1) >> 1, 3)][0];
-            state->m_sigFracBits[state_id][1] = state->m_sigFracBitsArray[state_id][sigCtxOffsetNext + MIN((sumAbs1 + 1) >> 1, 3)][1];
-            memcpy(state->m_coeffFracBits[state_id], state->m_gtxFracBitsArray[gtxCtxOffsetNext + (sumGt1 < 4 ? sumGt1 : 4)], sizeof(state->m_coeffFracBits[0]));
-            
-
-            coeff_t  sumAbs = state->m_absLevelsAndCtxInit[state_id][8 + ((scan_pos - 1) & 15)] >> 8;
-#define UPDATE(k) {coeff_t t=levels[next_nb_info_ssb.inPos[k]]; sumAbs+=t; }
-            if (numIPos == 1)
-            {
-                UPDATE(0);
-            }
-            else if (numIPos == 2)
-            {
-                UPDATE(0);
-                UPDATE(1);
-            }
-            else if (numIPos == 3)
-            {
-                UPDATE(0);
-                UPDATE(1);
-                UPDATE(2);
-            }
-            else if (numIPos == 4)
-            {
-                UPDATE(0);
-                UPDATE(1);
-                UPDATE(2);
-                UPDATE(3);
-            }
-            else if (numIPos == 5)
-            {
-                UPDATE(0);
-                UPDATE(1);
-                UPDATE(2);
-                UPDATE(3);
-                UPDATE(4);
-            }
-#undef UPDATE
-            if (extRiceFlag)
-            {
-                unsigned currentShift = templateAbsCompare(sumAbs);
-                sumAbs = sumAbs >> currentShift;
-                int sumAll = MAX(MIN(31, (int)sumAbs - (int)baseLevel), 0);
-                state->m_goRicePar[state_id] = g_goRiceParsCoeff[sumAll];
-                state->m_goRicePar[state_id] += currentShift;
-            }
-            else
-            {
-                int sumAll = MAX(MIN(31, (int)sumAbs - 4 * 5), 0);
-                state->m_goRicePar[state_id] = g_goRiceParsCoeff[sumAll];
-            }
-        }
-        else
-        {
-            coeff_t  sumAbs = (state->m_absLevelsAndCtxInit[state_id][8 + ((scan_pos - 1) & 15)]) >> 8;
-#define UPDATE(k) {coeff_t t=levels[next_nb_info_ssb.inPos[k]]; sumAbs+=t; }
-            if (numIPos == 1)
-            {
-                UPDATE(0);
-            }
-            else if (numIPos == 2)
-            {
-                UPDATE(0);
-                UPDATE(1);
-            }
-            else if (numIPos == 3)
-            {
-                UPDATE(0);
-                UPDATE(1);
-                UPDATE(2);
-            }
-            else if (numIPos == 4)
-            {
-                UPDATE(0);
-                UPDATE(1);
-                UPDATE(2);
-                UPDATE(3);
-            }
-            else if (numIPos == 5)
-            {
-                UPDATE(0);
-                UPDATE(1);
-                UPDATE(2);
-                UPDATE(3);
-                UPDATE(4);
-            }
-#undef UPDATE
-            if (extRiceFlag)
-            {
-                unsigned currentShift = templateAbsCompare(sumAbs);
-                sumAbs = sumAbs >> currentShift;
-                sumAbs = MIN(31, sumAbs);
-                state->m_goRicePar[state_id] = g_goRiceParsCoeff[sumAbs];
-                state->m_goRicePar[state_id] += currentShift;
-            }
-            else
-            {
-                sumAbs = MIN(31, sumAbs);
-                state->m_goRicePar[state_id] = g_goRiceParsCoeff[sumAbs];
-            }
-            state->m_goRiceZero[state_id] = ((state_id & 3) < 2 ? 1 : 2) << state->m_goRicePar[state_id];
-        }
+  all_depquant_states* state = &ctxs->m_allStates;
+  int state_id = ctxs->m_curr_state_offset + decision_id;
+  state->m_rdCost[state_id] = decisions->rdCost[decision_id];
+  if (decisions->prevId[decision_id] > -2) {
+    if (decisions->prevId[decision_id] >= 0) {
+      const int prvState = ctxs->m_prev_state_offset + decisions->prevId[decision_id];
+      state->m_numSigSbb[state_id] = (state->m_numSigSbb[prvState]) + !!decisions->absLevel[decision_id];
+      state->m_refSbbCtxId[state_id] = state->m_refSbbCtxId[prvState];
+      state->m_sbbFracBits[state_id][0] = state->m_sbbFracBits[prvState][0];
+      state->m_sbbFracBits[state_id][1] = state->m_sbbFracBits[prvState][1];
+      state->m_remRegBins[state_id] = state->m_remRegBins[prvState] - 1;
+      state->m_goRicePar[state_id] = state->m_goRicePar[prvState];
+      if (state->m_remRegBins[state_id] >= 4) {
+        state->m_remRegBins[state_id] -= (decisions->absLevel[decision_id] < 2
+                                            ? (unsigned)decisions->absLevel[decision_id]
+                                            : 3);
+      }
+      memcpy(state->m_absLevelsAndCtxInit[state_id], state->m_absLevelsAndCtxInit[prvState], 48 * sizeof(uint8_t));
     }
+    else {
+      state->m_numSigSbb[state_id] = 1;
+      state->m_refSbbCtxId[state_id] = -1;
+      int ctxBinSampleRatio = 28;
+      //(scanInfo.chType == CHANNEL_TYPE_LUMA) ? MAX_TU_LEVEL_CTX_CODED_BIN_CONSTRAINT_LUMA : MAX_TU_LEVEL_CTX_CODED_BIN_CONSTRAINT_CHROMA;
+      state->m_remRegBins[state_id] = (state->effWidth * state->effHeight * ctxBinSampleRatio) / 16 - (
+        decisions->absLevel[decision_id] < 2 ? (unsigned)decisions->absLevel[decision_id] : 3);
+      memset(state->m_absLevelsAndCtxInit[state_id], 0, 48 * sizeof(uint8_t));
+    }
+
+    uint8_t* levels = (uint8_t*)(state->m_absLevelsAndCtxInit[state_id]);
+    levels[scan_pos & 15] = (uint8_t)MIN(255, decisions->absLevel[decision_id]);
+
+    if (state->m_remRegBins[state_id] >= 4) {
+      coeff_t tinit = state->m_absLevelsAndCtxInit[state_id][8 + ((scan_pos - 1) & 15)];
+      coeff_t sumAbs1 = (tinit >> 3) & 31;
+      coeff_t sumNum = tinit & 7;
+#define UPDATE(k) {coeff_t t=levels[next_nb_info_ssb.inPos[k]]; sumAbs1+=MIN(4+(t&1),t); sumNum+=!!t; }
+      if (numIPos == 1) {
+        UPDATE(0);
+      }
+      else if (numIPos == 2) {
+        UPDATE(0);
+        UPDATE(1);
+      }
+      else if (numIPos == 3) {
+        UPDATE(0);
+        UPDATE(1);
+        UPDATE(2);
+      }
+      else if (numIPos == 4) {
+        UPDATE(0);
+        UPDATE(1);
+        UPDATE(2);
+        UPDATE(3);
+      }
+      else if (numIPos == 5) {
+        UPDATE(0);
+        UPDATE(1);
+        UPDATE(2);
+        UPDATE(3);
+        UPDATE(4);
+      }
+#undef UPDATE
+      coeff_t sumGt1 = sumAbs1 - sumNum;
+      state->m_sigFracBits[state_id][0] = state->m_sigFracBitsArray[state_id][sigCtxOffsetNext + MIN(
+        (sumAbs1 + 1) >> 1, 3)][0];
+      state->m_sigFracBits[state_id][1] = state->m_sigFracBitsArray[state_id][sigCtxOffsetNext + MIN(
+        (sumAbs1 + 1) >> 1, 3)][1];
+      memcpy(state->m_coeffFracBits[state_id], state->m_gtxFracBitsArray[gtxCtxOffsetNext + (sumGt1 < 4 ? sumGt1 : 4)],
+             sizeof(state->m_coeffFracBits[0]));
+
+
+      coeff_t sumAbs = state->m_absLevelsAndCtxInit[state_id][8 + ((scan_pos - 1) & 15)] >> 8;
+#define UPDATE(k) {coeff_t t=levels[next_nb_info_ssb.inPos[k]]; sumAbs+=t; }
+      if (numIPos == 1) {
+        UPDATE(0);
+      }
+      else if (numIPos == 2) {
+        UPDATE(0);
+        UPDATE(1);
+      }
+      else if (numIPos == 3) {
+        UPDATE(0);
+        UPDATE(1);
+        UPDATE(2);
+      }
+      else if (numIPos == 4) {
+        UPDATE(0);
+        UPDATE(1);
+        UPDATE(2);
+        UPDATE(3);
+      }
+      else if (numIPos == 5) {
+        UPDATE(0);
+        UPDATE(1);
+        UPDATE(2);
+        UPDATE(3);
+        UPDATE(4);
+      }
+#undef UPDATE
+      if (extRiceFlag) {
+        unsigned currentShift = templateAbsCompare(sumAbs);
+        sumAbs = sumAbs >> currentShift;
+        int sumAll = MAX(MIN(31, (int)sumAbs - (int)baseLevel), 0);
+        state->m_goRicePar[state_id] = g_goRiceParsCoeff[sumAll];
+        state->m_goRicePar[state_id] += currentShift;
+      }
+      else {
+        int sumAll = MAX(MIN(31, (int)sumAbs - 4 * 5), 0);
+        state->m_goRicePar[state_id] = g_goRiceParsCoeff[sumAll];
+      }
+    }
+    else {
+      coeff_t sumAbs = (state->m_absLevelsAndCtxInit[state_id][8 + ((scan_pos - 1) & 15)]) >> 8;
+#define UPDATE(k) {coeff_t t=levels[next_nb_info_ssb.inPos[k]]; sumAbs+=t; }
+      if (numIPos == 1) {
+        UPDATE(0);
+      }
+      else if (numIPos == 2) {
+        UPDATE(0);
+        UPDATE(1);
+      }
+      else if (numIPos == 3) {
+        UPDATE(0);
+        UPDATE(1);
+        UPDATE(2);
+      }
+      else if (numIPos == 4) {
+        UPDATE(0);
+        UPDATE(1);
+        UPDATE(2);
+        UPDATE(3);
+      }
+      else if (numIPos == 5) {
+        UPDATE(0);
+        UPDATE(1);
+        UPDATE(2);
+        UPDATE(3);
+        UPDATE(4);
+      }
+#undef UPDATE
+      if (extRiceFlag) {
+        unsigned currentShift = templateAbsCompare(sumAbs);
+        sumAbs = sumAbs >> currentShift;
+        sumAbs = MIN(31, sumAbs);
+        state->m_goRicePar[state_id] = g_goRiceParsCoeff[sumAbs];
+        state->m_goRicePar[state_id] += currentShift;
+      }
+      else {
+        sumAbs = MIN(31, sumAbs);
+        state->m_goRicePar[state_id] = g_goRiceParsCoeff[sumAbs];
+      }
+      state->m_goRiceZero[state_id] = ((state_id & 3) < 2 ? 1 : 2) << state->m_goRicePar[state_id];
+    }
+  }
 }
 
 static bool same[13];
