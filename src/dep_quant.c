@@ -852,68 +852,68 @@ static void check_rd_costs_avx2(const all_depquant_states* const state, const en
   if (temp_rd_cost_a[0] < decisions->rdCost[0]) {
     decisions->rdCost[0] = temp_rd_cost_a[0];
     decisions->absLevel[0] = pqDataA->absLevel[0];
-    decisions->prevId[0] = state->m_stateId[start];    
+    decisions->prevId[0] = 0;    
   }
   if (temp_rd_cost_z[0] < decisions->rdCost[0]) {
     decisions->rdCost[0] = temp_rd_cost_z[0];
     decisions->absLevel[0] = 0;
-    decisions->prevId[0] = state->m_stateId[start];    
+    decisions->prevId[0] = 0;    
   }
   if (temp_rd_cost_b[1] < decisions->rdCost[0]) {
     decisions->rdCost[0] = temp_rd_cost_b[1];
     decisions->absLevel[0] = pqDataA->absLevel[2];
-    decisions->prevId[0] = state->m_stateId[start + 1];    
+    decisions->prevId[0] = 1;    
   }
 
   // Decision 2
   if (temp_rd_cost_a[1] < decisions->rdCost[2]) {
     decisions->rdCost[2] = temp_rd_cost_a[1];
     decisions->absLevel[2] = pqDataA->absLevel[0];
-    decisions->prevId[2] = state->m_stateId[start + 1];    
+    decisions->prevId[2] =1;    
   }
   if (temp_rd_cost_z[1] < decisions->rdCost[2]) {
     decisions->rdCost[2] = temp_rd_cost_z[1];
     decisions->absLevel[2] = 0;
-    decisions->prevId[2] = state->m_stateId[start + 1];    
+    decisions->prevId[2] = 1;    
   }
   if (temp_rd_cost_b[0] < decisions->rdCost[2]) {
     decisions->rdCost[2] = temp_rd_cost_b[0];
     decisions->absLevel[2] = pqDataA->absLevel[2];
-    decisions->prevId[2] = state->m_stateId[start];    
+    decisions->prevId[2] = 0;    
   }
 
   // Decision 1
   if (temp_rd_cost_a[2] < decisions->rdCost[1]) {
     decisions->rdCost[1] = temp_rd_cost_a[2];
     decisions->absLevel[1] = pqDataA->absLevel[3];
-    decisions->prevId[1] = state->m_stateId[start + 2];    
+    decisions->prevId[1] = 2;    
   }
   if (temp_rd_cost_z[2] < decisions->rdCost[1]) {
     decisions->rdCost[1] = temp_rd_cost_z[2];
     decisions->absLevel[1] = 0;
-    decisions->prevId[1] = state->m_stateId[start + 2];    
+    decisions->prevId[1] = 2;    
   }
   if (temp_rd_cost_b[3] < decisions->rdCost[1]) {
     decisions->rdCost[1] = temp_rd_cost_b[3];
     decisions->absLevel[1] = pqDataA->absLevel[1];
-    decisions->prevId[1] = state->m_stateId[start + 3];    
+    decisions->prevId[1] = 3;    
   }
 
   // Decision 3
   if (temp_rd_cost_a[3] < decisions->rdCost[3]) {
     decisions->rdCost[3] = temp_rd_cost_a[3];
     decisions->absLevel[3] = pqDataA->absLevel[3];
-    decisions->prevId[3] = state->m_stateId[start + 3];    
+    decisions->prevId[3] = 3;    
   }
   if (temp_rd_cost_z[3] < decisions->rdCost[3]) {
     decisions->rdCost[3] = temp_rd_cost_z[3];
     decisions->absLevel[3] = 0;
-    decisions->prevId[3] = state->m_stateId[start + 3];    
+    decisions->prevId[3] = 3;    
   }
   if (temp_rd_cost_b[2] < decisions->rdCost[3]) {
     decisions->rdCost[3] = temp_rd_cost_b[2];
     decisions->absLevel[3] = pqDataA->absLevel[1];
-    decisions->prevId[3] = state->m_stateId[start + 2];    
+    decisions->prevId[3] = 2;    
   }
 }
 
