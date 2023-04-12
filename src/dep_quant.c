@@ -877,6 +877,12 @@ static void check_rd_costs_avx2(const all_depquant_states* const state, const en
     rd_cost_b = _mm256_loadu_epi64(temp_rd_cost_b);
     rd_cost_z = _mm256_loadu_epi64(temp_rd_cost_z);
   }
+  rd_cost_a = _mm256_permute4x64_epi64(rd_cost_a, 216);
+  rd_cost_b = _mm256_permute4x64_epi64(rd_cost_b, 141);
+  rd_cost_z = _mm256_permute4x64_epi64(rd_cost_z, 216);
+
+  __m256i decision_data;
+
   // Decision 0
   if (temp_rd_cost_a[0] < decisions->rdCost[0]) {
     decisions->rdCost[0] = temp_rd_cost_a[0];
