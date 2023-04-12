@@ -38,6 +38,17 @@
 
 typedef struct encoder_control_t encoder_control_t;
 
+struct dep_quant_scan_info
+{
+  uint8_t sig_ctx_offset[2];
+  uint8_t gtx_ctx_offset[2];
+  uint16_t cg_pos;
+  uint16_t  pos_y;
+  uint16_t  pos_x;
+  uint8_t next_sbb_right;
+  uint8_t next_sbb_below;
+};
+
 typedef struct
 {
   uint8_t num;

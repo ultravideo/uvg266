@@ -101,6 +101,7 @@ typedef struct encoder_control_t
 
   NbInfoSbb* m_scanId2NbInfoSbbArray[7 + 1][7 + 1];
   NbInfoOut* m_scanId2NbInfoOutArray[7 + 1][7 + 1];
+  struct dep_quant_scan_info* scan_info[7 + 1][7 + 1];
 
   //spec: references to variables defined in Rec. ITU-T H.265 (04/2013)
   int8_t tiles_enable; /*!<spec: tiles_enabled */
