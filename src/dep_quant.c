@@ -184,6 +184,7 @@ typedef struct
 int uvg_init_nb_info(encoder_control_t * encoder) {
   memset(encoder->m_scanId2NbInfoSbbArray, 0, sizeof(encoder->m_scanId2NbInfoSbbArray));
   memset(encoder->m_scanId2NbInfoOutArray, 0, sizeof(encoder->m_scanId2NbInfoOutArray));
+  memset(encoder->scan_info, 0, sizeof(encoder->scan_info));
   for (int hd = 0; hd <= 6; hd++)
   {
 
@@ -206,6 +207,7 @@ int uvg_init_nb_info(encoder_control_t * encoder) {
       const uint32_t      blkWidthIdx = hd;
       const uint32_t      blkHeightIdx = vd;
       const uint32_t* scanId2RP = uvg_get_scan_order_table(SCAN_GROUP_4X4, scanType, blkWidthIdx, blkHeightIdx);
+      const uint32_t* const cg_scan = uvg_get_scan_order_table(SCAN_GROUP_UNGROUPED, 0, hd, vd);
       NbInfoSbb** sId2NbSbb = &encoder->m_scanId2NbInfoSbbArray[hd][vd];
       NbInfoOut** sId2NbOut = &encoder->m_scanId2NbInfoOutArray[hd][vd];
       // consider only non-zero-out region
@@ -221,11 +223,18 @@ int uvg_init_nb_info(encoder_control_t * encoder) {
       if (*sId2NbOut == NULL) {
         return 0;
       }
+      encoder->scan_info[hd][vd] = MALLOC(struct dep_quant_scan_info, totalValues);
+      if (encoder->scan_info[hd][vd] == NULL) {
+        return 0;
+      }
+
 
       for (uint32_t scanId = 0; scanId < totalValues; scanId++)
       {
         raster2id[scanId2RP[scanId]] = scanId;
       }
+      const uint32_t height_in_sbb = MAX(blockHeight >> 2, 1);
+      const uint32_t width_in_sbb = MAX(blockWidth >> 2, 1);
 
       for (unsigned scanId = 0; scanId < totalValues; scanId++)
       {
@@ -309,6 +318,28 @@ int uvg_init_nb_info(encoder_control_t * encoder) {
             }
           }
         }
+        uint32_t cg_pos = cg_scan[scanId >> 4];
+
+        uint32_t blkpos_next = scanId2RP[scanId ? scanId - 1 : 0];
+        uint32_t  pos_y_next = blkpos_next >> hd;
+        uint32_t  pos_x_next = blkpos_next - (pos_y_next << hd);
+        uint32_t cg_blockpos_next = scanId ? cg_scan[(scanId - 1) >> 4] : 0;
+        uint32_t cg_pos_y_next = cg_blockpos_next / width_in_sbb;
+        uint32_t cg_pos_x_next = cg_blockpos_next - (cg_pos_y_next * width_in_sbb);
+        uint32_t diag = pos_y_next + pos_x_next;
+        
+
+        uint32_t nextSbbRight = (cg_pos_x_next < width_in_sbb - 1 ? cg_blockpos_next + 1 : 0);
+        uint32_t nextSbbBelow = (cg_pos_y_next < height_in_sbb - 1 ? cg_blockpos_next + width_in_sbb : 0);
+        encoder->scan_info[hd][vd][scanId].pos_x = pos_x;
+        encoder->scan_info[hd][vd][scanId].pos_y = pos_y;
+        encoder->scan_info[hd][vd][scanId].sig_ctx_offset[0] = (diag < 2 ? 8 : diag < 5 ? 4 : 0);
+        encoder->scan_info[hd][vd][scanId].sig_ctx_offset[1] = (diag < 2 ? 4 : 0);
+        encoder->scan_info[hd][vd][scanId].gtx_ctx_offset[0] = (diag < 1 ? 16 : diag < 3 ? 11 : diag < 10 ? 6 : 1);
+        encoder->scan_info[hd][vd][scanId].gtx_ctx_offset[1] = (diag < 1 ? 6 : 1);
+        encoder->scan_info[hd][vd][scanId].cg_pos = cg_pos;
+        encoder->scan_info[hd][vd][scanId].next_sbb_right = nextSbbRight;
+        encoder->scan_info[hd][vd][scanId].next_sbb_below = nextSbbBelow;
       }
 
       // make it relative
@@ -338,6 +369,7 @@ void uvg_dealloc_nb_info(encoder_control_t* encoder) {
       }
       if(encoder->m_scanId2NbInfoOutArray[hd][vd]) FREE_POINTER(encoder->m_scanId2NbInfoOutArray[hd][vd]);
       if(encoder->m_scanId2NbInfoOutArray[hd][vd]) FREE_POINTER(encoder->m_scanId2NbInfoSbbArray[hd][vd]);
+      if(encoder->scan_info[hd][vd]) FREE_POINTER(encoder->scan_info[hd][vd]);
     }
   }
 }
@@ -1904,24 +1936,19 @@ static INLINE void updateState(
 
 static bool same[13];
 static void xDecideAndUpdate(
-  rate_estimator* re,
-  context_store* ctxs,
-  const coeff_t absCoeff,
-  const uint32_t scan_pos,
-  const uint32_t cg_pos,
-  const uint32_t pos_x,
-  const uint32_t pos_y,
-  const uint32_t sigCtxOffsetNext,
-  const uint32_t gtxCtxOffsetNext,
-  const uint32_t width_in_sbb,
-  const uint32_t height_in_sbb,
-  const uint32_t next_sbb_right,
-  const uint32_t next_sbb_below,
-  const NbInfoSbb next_nb_info_ssb,
-  bool zeroOut,
-  coeff_t quantCoeff,
-  int effWidth,
-  int effHeight)
+  rate_estimator*                         re,
+  context_store*                          ctxs,
+  struct dep_quant_scan_info const* const scan_info,
+  const coeff_t                           absCoeff,
+  const uint32_t                          scan_pos,
+  const uint32_t                          width_in_sbb,
+  const uint32_t                          height_in_sbb,
+  const NbInfoSbb                         next_nb_info_ssb,
+  bool                                    zeroOut,
+  coeff_t                                 quantCoeff,
+  int                                     effWidth,
+  int                                     effHeight,
+  bool                                    is_chroma)
 {
   Decision* decisions = &ctxs->m_trellis[scan_pos];
   SWAP(ctxs->m_curr_state_offset, ctxs->m_prev_state_offset, int);
@@ -1936,20 +1963,20 @@ static void xDecideAndUpdate(
     spt = SCAN_EOCSBB;
   }
 
-  xDecide(&ctxs->m_allStates, &ctxs->m_startState, &ctxs->m_quant, spt, absCoeff, re->m_lastBitsX[pos_x] + re->m_lastBitsY[pos_y], decisions, zeroOut, quantCoeff,ctxs->m_skip_state_offset, ctxs->m_prev_state_offset);
+  xDecide(&ctxs->m_allStates, &ctxs->m_startState, &ctxs->m_quant, spt, absCoeff, re->m_lastBitsX[scan_info->pos_x] + re->m_lastBitsY[scan_info->pos_y], decisions, zeroOut, quantCoeff,ctxs->m_skip_state_offset, ctxs->m_prev_state_offset);
 
   if (scan_pos) {
     if (!(scan_pos & 15)) {
       SWAP(ctxs->m_common_context.m_currSbbCtx, ctxs->m_common_context.m_prevSbbCtx, SbbCtx*);
-      updateStateEOS(ctxs, scan_pos, cg_pos, sigCtxOffsetNext, gtxCtxOffsetNext, width_in_sbb, height_in_sbb, next_sbb_right, next_sbb_below, decisions, 0);
-      updateStateEOS(ctxs, scan_pos, cg_pos, sigCtxOffsetNext, gtxCtxOffsetNext, width_in_sbb, height_in_sbb, next_sbb_right, next_sbb_below, decisions, 1);
-      updateStateEOS(ctxs, scan_pos, cg_pos, sigCtxOffsetNext, gtxCtxOffsetNext, width_in_sbb, height_in_sbb, next_sbb_right, next_sbb_below, decisions, 2);
-      updateStateEOS(ctxs, scan_pos, cg_pos, sigCtxOffsetNext, gtxCtxOffsetNext, width_in_sbb, height_in_sbb, next_sbb_right, next_sbb_below, decisions, 3);
+      updateStateEOS(ctxs, scan_pos, scan_info->cg_pos, scan_info->sig_ctx_offset[is_chroma], scan_info->gtx_ctx_offset[is_chroma], width_in_sbb, height_in_sbb, scan_info->next_sbb_right, scan_info->next_sbb_below, decisions, 0);
+      updateStateEOS(ctxs, scan_pos, scan_info->cg_pos, scan_info->sig_ctx_offset[is_chroma], scan_info->gtx_ctx_offset[is_chroma], width_in_sbb, height_in_sbb, scan_info->next_sbb_right, scan_info->next_sbb_below, decisions, 1);
+      updateStateEOS(ctxs, scan_pos, scan_info->cg_pos, scan_info->sig_ctx_offset[is_chroma], scan_info->gtx_ctx_offset[is_chroma], width_in_sbb, height_in_sbb, scan_info->next_sbb_right, scan_info->next_sbb_below, decisions, 2);
+      updateStateEOS(ctxs, scan_pos, scan_info->cg_pos, scan_info->sig_ctx_offset[is_chroma], scan_info->gtx_ctx_offset[is_chroma], width_in_sbb, height_in_sbb, scan_info->next_sbb_right, scan_info->next_sbb_below, decisions, 3);
       memcpy(decisions->prevId + 4, decisions->prevId, 4 * sizeof(int));
       memcpy(decisions->absLevel + 4, decisions->absLevel, 4 * sizeof(coeff_t));
       memcpy(decisions->rdCost + 4, decisions->rdCost, 4 * sizeof(int64_t));
     } else if (!zeroOut) {
-      update_states_avx2(ctxs, next_nb_info_ssb.num, scan_pos, decisions, sigCtxOffsetNext, gtxCtxOffsetNext, next_nb_info_ssb, 4, false);
+      update_states_avx2(ctxs, next_nb_info_ssb.num, scan_pos, decisions, scan_info->sig_ctx_offset[is_chroma], scan_info->gtx_ctx_offset[is_chroma], next_nb_info_ssb, 4, false);
     /*  updateState(ctxs, next_nb_info_ssb.num, scan_pos, decisions, sigCtxOffsetNext, gtxCtxOffsetNext, next_nb_info_ssb, 4, false, 0);
       updateState(ctxs, next_nb_info_ssb.num, scan_pos, decisions, sigCtxOffsetNext, gtxCtxOffsetNext, next_nb_info_ssb, 4, false, 1);
       updateState(ctxs, next_nb_info_ssb.num, scan_pos, decisions, sigCtxOffsetNext, gtxCtxOffsetNext, next_nb_info_ssb, 4, false, 2);
@@ -2105,26 +2132,11 @@ int uvg_dep_quant(
 
   const uint32_t height_in_sbb = MAX(height >> 2, 1);
   const uint32_t width_in_sbb = MAX(width >> 2, 1);
+
   //===== populate trellis =====
   for (int scanIdx = firstTestPos; scanIdx >= 0; scanIdx--) {
     uint32_t blkpos = scan[scanIdx];
-    uint32_t  pos_y = blkpos >> log2_tr_width;
-    uint32_t  pos_x = blkpos - (pos_y << log2_tr_width);
-    uint32_t cg_pos = cg_scan[scanIdx >> 4];
-
-    uint32_t blkpos_next = scan[scanIdx ? scanIdx - 1 : 0];
-    uint32_t  pos_y_next = blkpos_next >> log2_tr_width;
-    uint32_t  pos_x_next = blkpos_next - (pos_y_next << log2_tr_width);
-    uint32_t cg_blockpos_next = scanIdx ? cg_scan[(scanIdx -1) >> 4] : 0;
-    uint32_t cg_pos_y_next = cg_blockpos_next / width_in_sbb;
-    uint32_t cg_pos_x_next = cg_blockpos_next - (cg_pos_y_next * width_in_sbb);
-    uint32_t diag = pos_y_next + pos_x_next;
-
-    uint32_t sig_ctx_offset = compID == COLOR_Y ? (diag < 2 ? 8 : diag < 5 ? 4 : 0) : (diag < 2 ? 4 : 0);
-    uint32_t gtx_ctx_offset = compID == COLOR_Y ? (diag < 1 ? 16 : diag < 3 ? 11 : diag < 10 ? 6 : 1) : (diag < 1 ? 6 : 1);
-
-    uint32_t nextSbbRight = (cg_pos_x_next < width_in_sbb - 1 ? cg_blockpos_next + 1 : 0);
-    uint32_t nextSbbBelow = (cg_pos_y_next < height_in_sbb - 1 ? cg_blockpos_next + width_in_sbb : 0);
+    struct dep_quant_scan_info* scan_info = &encoder->scan_info[log2_tr_width][log2_tr_height][scanIdx];
 
     context_store* ctxs = &dep_quant_context;
     if (enableScalingLists) {
@@ -2133,44 +2145,34 @@ int uvg_dep_quant(
       xDecideAndUpdate(
         &rate_estimator,
         ctxs,
+        scan_info,
         abs(srcCoeff[blkpos]),
         scanIdx,
-        cg_pos,
-        pos_x,
-        pos_y,
-        sig_ctx_offset,
-        gtx_ctx_offset,
         width_in_sbb,
         height_in_sbb,
-        nextSbbRight,
-        nextSbbBelow,
         encoder->m_scanId2NbInfoSbbArray[log2_tr_width][log2_tr_height][scanIdx ? scanIdx - 1 : 0],
-        (zeroOut && (pos_x >= effWidth || pos_y >= effHeight)),
+        (zeroOut && (scan_info->pos_x >= effWidth || scan_info->pos_y >= effHeight)),
         q_coeff[blkpos],
         width,
-        height
-      ); //tu.cu->slice->getReverseLastSigCoeffFlag());
+        height,
+        compID != 0
+        ); //tu.cu->slice->getReverseLastSigCoeffFlag());
     }
     else {
       xDecideAndUpdate(
         &rate_estimator,
         ctxs,
+        scan_info,
         abs(srcCoeff[blkpos]),
         scanIdx,
-        cg_pos,
-        pos_x,
-        pos_y,
-        sig_ctx_offset,
-        gtx_ctx_offset,
         width_in_sbb,
         height_in_sbb,
-        nextSbbRight,
-        nextSbbBelow,
         encoder->m_scanId2NbInfoSbbArray[log2_tr_width][log2_tr_height][scanIdx ? scanIdx - 1 : 0],
-        (zeroOut && (pos_x >= effWidth || pos_y >= effHeight)),
+        (zeroOut && (scan_info->pos_x >= effWidth || scan_info->pos_y >= effHeight)),
         default_quant_coeff,
         width,
-        height); //tu.cu->slice->getReverseLastSigCoeffFlag());
+        height,
+        compID != 0); //tu.cu->slice->getReverseLastSigCoeffFlag());
     }
     if(0){
       printf("%d\n", scanIdx);
