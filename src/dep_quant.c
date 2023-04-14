@@ -1385,7 +1385,7 @@ static INLINE void update_states_avx2(
       }
     }
     uint32_t level_offset = scan_pos & 15;
-    __m128i   max_abs = _mm_min_epi32(abs_level, _mm_set1_epi32(255));
+    __m128i   max_abs = _mm_min_epi32(abs_level, _mm_set1_epi32(32));
     uint32_t max_abs_s[4];
     _mm_storeu_epi32(max_abs_s, max_abs);
     for (int i = 0; i < 4; ++i) {
@@ -1527,6 +1527,7 @@ static INLINE void update_states_avx2(
       }
 
       __m128i sum_abs = _mm_srli_epi32(tinit, 8);
+      sum_abs = _mm_min_epi32(sum_abs, _mm_set1_epi32(32));
       switch (numIPos) {
         case 5:
           {
@@ -1534,8 +1535,7 @@ static INLINE void update_states_avx2(
             levels,
             _mm_add_epi32(levels_start_offsets, _mm_set1_epi32(next_nb_info_ssb.inPos[4])),
             1);
-            t = _mm_and_epi32(t, first_byte);
-          sum_abs = _mm_add_epi32(sum_abs, t);
+          sum_abs = _mm_add_epi32(t, sum_abs);
           }
         case 4:
           {
@@ -1543,8 +1543,7 @@ static INLINE void update_states_avx2(
             levels,
             _mm_add_epi32(levels_start_offsets, _mm_set1_epi32(next_nb_info_ssb.inPos[3])),
             1);
-            t = _mm_and_epi32(t, first_byte);
-          sum_abs = _mm_add_epi32(sum_abs, t);
+          sum_abs = _mm_add_epi32(t, sum_abs);
           }
         case 3:
           {
@@ -1552,8 +1551,7 @@ static INLINE void update_states_avx2(
             levels,
             _mm_add_epi32(levels_start_offsets, _mm_set1_epi32(next_nb_info_ssb.inPos[2])),
             1);
-            t = _mm_and_epi32(t, first_byte);
-          sum_abs = _mm_add_epi32(sum_abs, t);
+          sum_abs = _mm_add_epi32(t, sum_abs);
           }
         case 2:
           {
@@ -1561,8 +1559,7 @@ static INLINE void update_states_avx2(
             levels,
             _mm_add_epi32(levels_start_offsets, _mm_set1_epi32(next_nb_info_ssb.inPos[1])),
             1);
-            t = _mm_and_epi32(t, first_byte);
-          sum_abs = _mm_add_epi32(sum_abs, t);
+          sum_abs = _mm_add_epi32(t, sum_abs);
           }
         case 1:
           {
@@ -1570,12 +1567,12 @@ static INLINE void update_states_avx2(
             levels,
             _mm_add_epi32(levels_start_offsets, _mm_set1_epi32(next_nb_info_ssb.inPos[0])),
             1);
-            t = _mm_and_epi32(t, first_byte);
-          sum_abs = _mm_add_epi32(sum_abs, t);
+          sum_abs = _mm_add_epi32(t, sum_abs);
           } break;
         default:
           assert(0);
       }
+      sum_abs = _mm_and_epi32(sum_abs, first_byte);
       if (extRiceFlag) {
         assert(0 && "Not implemented for avx2");
       } else {
@@ -1815,7 +1812,7 @@ static INLINE void updateState(
     state->all_gte_four &= state->m_remRegBins[state_id] >= 4;
     state->all_lt_four &= state->m_remRegBins[state_id] < 4;
     uint8_t* levels = (uint8_t*)(state->m_absLevelsAndCtxInit[state_id]);
-    levels[scan_pos & 15] = (uint8_t)MIN(255, decisions->absLevel[decision_id]);
+    levels[scan_pos & 15] = (uint8_t)MIN(32, decisions->absLevel[decision_id]);
 
     if (state->m_remRegBins[state_id] >= 4) {
       coeff_t tinit = state->m_absLevelsAndCtxInit[state_id][8 + ((scan_pos - 1) & 15)];
