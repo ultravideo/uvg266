@@ -1150,7 +1150,7 @@ static INLINE void update_common_context(
   ctxs->m_allStates.m_sbbFracBits[curr_state][0] = cc->m_sbbFlagBits[sigNSbb][0];
   ctxs->m_allStates.m_sbbFracBits[curr_state][1] = cc->m_sbbFlagBits[sigNSbb][1];
 
-  uint16_t templateCtxInit[16];
+  uint16_t *templateCtxInit = ctxs->m_allStates.m_absLevelsAndCtxInit[curr_state] + 8;
   const int scanBeg = scan_pos - 16;
   const NbInfoOut* nbOut = cc->m_nbInfo + scanBeg;
   const uint8_t* absLevels = levels + scanBeg;
@@ -1179,7 +1179,6 @@ static INLINE void update_common_context(
     }
   }
   memset(ctxs->m_allStates.m_absLevelsAndCtxInit[curr_state], 0, 16 * sizeof(uint8_t));
-  memcpy(ctxs->m_allStates.m_absLevelsAndCtxInit[curr_state] + 8, templateCtxInit, 16 * sizeof(uint16_t));
 }
 
 
