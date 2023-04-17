@@ -51,6 +51,22 @@ struct dep_quant_scan_info
 
 typedef struct
 {
+  int     m_QShift;
+  int64_t m_QAdd;
+  int64_t m_QScale;
+  int64_t m_maxQIdx;
+  int64_t m_thresLast;
+  int64_t m_thresSSbb;
+  // distortion normalization
+  int     m_DistShift;
+  int64_t m_DistAdd;
+  int64_t m_DistStepAdd;
+  int64_t m_DistOrgFact;
+  bool    needs_init;
+} quant_block;
+
+typedef struct
+{
   uint8_t num;
   uint8_t inPos[5];
 } NbInfoSbb;

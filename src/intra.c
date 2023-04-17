@@ -2019,6 +2019,7 @@ double uvg_recon_and_estimate_cost_isp(encoder_state_t* const state,
   int split_limit = uvg_get_isp_split_num(width, height, split_type, true);
 
   int cbf_context = 2;
+  state->quant_blocks[1].needs_init = true;
 
   for (int i = 0; i < split_limit; ++i) {
     search_data->pred_cu.intra.isp_index = i;

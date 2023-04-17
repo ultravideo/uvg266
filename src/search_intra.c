@@ -361,7 +361,6 @@ static double search_intra_trdepth(
       search_data->lfnst_costs[i] = MAX_DOUBLE;
     }
 
-
     for (trafo = mts_start; trafo < num_transforms; trafo++) {
       for (int lfnst_idx = start_idx; lfnst_idx <= end_lfnst_idx; lfnst_idx++) {
         // Initialize lfnst variables
@@ -1492,6 +1491,7 @@ int8_t uvg_search_intra_chroma_rdo(
     ALIGNED(64) int16_t v_resi[LCU_WIDTH_C * LCU_WIDTH_C];
 
     double original_c_lambda = state->c_lambda;
+    state->quant_blocks[2].needs_init = true;
 
     for (int8_t mode_i = 0; mode_i < num_modes; ++mode_i) {
       const uint8_t mode = chroma_data[mode_i].pred_cu.intra.mode_chroma;
@@ -1968,7 +1968,8 @@ void uvg_search_cu_intra(
         number_of_modes_to_search++;
       }
     }
-    
+
+    state->quant_blocks[0].needs_init = 1;
     search_intra_rdo(
       state,
       number_of_modes_to_search,
