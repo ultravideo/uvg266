@@ -371,6 +371,7 @@ typedef struct encoder_state_t {
   int8_t collocated_luma_mode;
 
   quant_block quant_blocks[3]; // luma, ISP, chroma
+  rate_estimator rate_estimator[4]; // luma, cb, cr, isp
 } encoder_state_t;
 
 void uvg_encode_one_frame(encoder_state_t * const state, uvg_picture* frame);
