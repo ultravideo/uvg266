@@ -369,6 +369,8 @@ typedef struct encoder_state_t {
   // luma mode in the lfnst functions, instead store the current
   // collocated luma mode in the state.
   int8_t collocated_luma_mode;
+
+  quant_block quant_blocks[3]; // luma, ISP, chroma
 } encoder_state_t;
 
 void uvg_encode_one_frame(encoder_state_t * const state, uvg_picture* frame);

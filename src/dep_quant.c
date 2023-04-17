@@ -65,20 +65,7 @@ static const uint32_t g_goRiceParsCoeff[32] = { 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1,
 
 enum ScanPosType { SCAN_ISCSBB = 0, SCAN_SOCSBB = 1, SCAN_EOCSBB = 2 };
 
-typedef struct
-{
-  int m_QShift;
-  int64_t m_QAdd;
-  int64_t m_QScale;
-  int64_t m_maxQIdx;
-  int64_t m_thresLast;
-  int64_t m_thresSSbb;
-  // distortion normalization
-  int m_DistShift;
-  int64_t m_DistAdd;
-  int64_t m_DistStepAdd;
-  int64_t m_DistOrgFact;
-} quant_block;
+
 
 
 typedef struct
@@ -172,13 +159,13 @@ typedef struct
 
 typedef struct
 {
-    common_context   m_common_context;
+    common_context  m_common_context;
     all_depquant_states m_allStates;
     int m_curr_state_offset;
     int m_prev_state_offset;
     int m_skip_state_offset;
     depquant_state       m_startState;
-    quant_block   m_quant;
+    quant_block*   m_quant;
     Decision    m_trellis[TR_MAX_WIDTH * TR_MAX_WIDTH];
 } context_store;
 
@@ -443,6 +430,7 @@ static void init_quant_block(
   qp->m_DistAdd = ((int64_t)(1) << qp->m_DistShift) >> 1;
   qp->m_DistStepAdd = (int64_t)(nomDistFactor * (double)((int64_t)(1) << (qp->m_DistShift + qp->m_QShift)) + .5);
   qp->m_DistOrgFact = (int64_t)(nomDistFactor * (double)((int64_t)(1) << (qp->m_DistShift + 1)) + .5);
+  qp->needs_init = false;
 }
 
 static void reset_common_context(common_context* ctx, const rate_estimator * rate_estimator, int numSbb, int num_coeff)
@@ -2241,7 +2229,7 @@ static void xDecideAndUpdate(
     spt = SCAN_EOCSBB;
   }
 
-  xDecide(&ctxs->m_allStates, &ctxs->m_startState, &ctxs->m_quant, spt, absCoeff, re->m_lastBitsX[scan_info->pos_x] + re->m_lastBitsY[scan_info->pos_y], decisions, zeroOut, quantCoeff,ctxs->m_skip_state_offset, ctxs->m_prev_state_offset);
+  xDecide(&ctxs->m_allStates, &ctxs->m_startState, ctxs->m_quant, spt, absCoeff, re->m_lastBitsX[scan_info->pos_x] + re->m_lastBitsY[scan_info->pos_y], decisions, zeroOut, quantCoeff,ctxs->m_skip_state_offset, ctxs->m_prev_state_offset);
 
   if (scan_pos) {
     if (!(scan_pos & 15)) {
@@ -2313,11 +2301,17 @@ int uvg_dep_quant(
 
   const int32_t scalinglist_type = (cur_tu->type == CU_INTRA ? 0 : 3) + (int8_t)compID;
   const int32_t *q_coeff = encoder->scaling_list.quant_coeff[log2_tr_width][log2_tr_height][scalinglist_type][qp_scaled % 6];
-  const int32_t transform_shift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - ((log2_tr_height + log2_tr_width) >> 1) - needs_block_size_trafo_scale; //!< Represents scaling through forward transform
-  const int64_t q_bits = QUANT_SHIFT + qp_scaled / 6 + (is_ts ? 0 : transform_shift );
-  const int32_t add = ((state->frame->slicetype == UVG_SLICE_I) ? 171 : 85) << (q_bits - 9);
-  
-  init_quant_block(state, &dep_quant_context.m_quant, cur_tu, log2_tr_width, log2_tr_height, compID, needs_block_size_trafo_scale, -1);
+
+  if (compID != COLOR_Y) {
+    dep_quant_context.m_quant = (quant_block*)& state->quant_blocks[2];
+  } else if (cur_tu->type == CU_INTRA && cur_tu->intra.isp_mode != ISP_MODE_NO_ISP) {
+    dep_quant_context.m_quant = (quant_block*)&state->quant_blocks[1];    
+  } else {
+    dep_quant_context.m_quant = (quant_block*)&state->quant_blocks[0];   
+  }
+  if (dep_quant_context.m_quant->needs_init) {
+    init_quant_block(state, dep_quant_context.m_quant, cur_tu, log2_tr_width, log2_tr_height, compID, needs_block_size_trafo_scale, -1);
+  }
   
   //===== scaling matrix ====
   //const int         qpDQ = cQP.Qp + 1;
@@ -2345,8 +2339,8 @@ int uvg_dep_quant(
     height >= 4) {
     firstTestPos =((width == 4 && height == 4) || (width == 8 && height == 8)) ? 7 : 15;
   }
-  const int32_t default_quant_coeff = dep_quant_context.m_quant.m_QScale;
-  const int32_t thres               = dep_quant_context.m_quant.m_thresLast;
+  const int32_t default_quant_coeff = dep_quant_context.m_quant->m_QScale;
+  const int32_t thres               = dep_quant_context.m_quant->m_thresLast;
   for (; firstTestPos >= 0; firstTestPos--) {
     coeff_t thresTmp = (enableScalingLists) ? (thres / (4 * q_coeff[scan[firstTestPos]])) : (thres / (4 * default_quant_coeff));
     if (abs(srcCoeff[scan[firstTestPos]]) > thresTmp) {
@@ -2419,7 +2413,7 @@ int uvg_dep_quant(
 
     context_store* ctxs = &dep_quant_context;
     if (enableScalingLists) {
-      init_quant_block(state, &dep_quant_context.m_quant, cur_tu, log2_tr_width, log2_tr_height, compID, needs_block_size_trafo_scale, q_coeff[blkpos]);
+      init_quant_block(state, dep_quant_context.m_quant, cur_tu, log2_tr_width, log2_tr_height, compID, needs_block_size_trafo_scale, q_coeff[blkpos]);
 
       xDecideAndUpdate(
         &rate_estimator,
