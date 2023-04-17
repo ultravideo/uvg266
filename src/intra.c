@@ -1908,6 +1908,8 @@ void uvg_intra_recon_cu(
     int split_type = search_data->pred_cu.intra.isp_mode;
     int split_limit = uvg_get_isp_split_num(width, height, split_type, true);
 
+    state->quant_blocks[1].needs_init = true;
+
     for (int i = 0; i < split_limit; ++i) {
       cu_loc_t tu_loc;
       uvg_get_isp_split_loc(&tu_loc,  cu_loc->x, cu_loc->y, width, height, i, split_type, true);
@@ -1917,6 +1919,7 @@ void uvg_intra_recon_cu(
       if(tu_loc.x % 4 == 0) {
         intra_recon_tb_leaf(state, &pu_loc, cu_loc, lcu, COLOR_Y, search_data);
       }
+      state->rate_estimator[3].needs_init = true;
       uvg_quantize_lcu_residual(state, true, false, false,
         &tu_loc, cur_cu, lcu,
         false, tree_type);
@@ -2030,6 +2033,8 @@ double uvg_recon_and_estimate_cost_isp(encoder_state_t* const state,
     if (tu_loc.x % 4 == 0) {
       intra_recon_tb_leaf(state, &pu_loc, cu_loc, lcu, COLOR_Y, search_data);
     }
+
+    state->rate_estimator[3].needs_init = true;
     uvg_quantize_lcu_residual(state, true, false, false,
       &tu_loc, &search_data->pred_cu, lcu,
       false, UVG_LUMA_T);

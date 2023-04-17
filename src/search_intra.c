@@ -1492,6 +1492,7 @@ int8_t uvg_search_intra_chroma_rdo(
 
     double original_c_lambda = state->c_lambda;
     state->quant_blocks[2].needs_init = true;
+    state->rate_estimator[1].needs_init = true;
 
     for (int8_t mode_i = 0; mode_i < num_modes; ++mode_i) {
       const uint8_t mode = chroma_data[mode_i].pred_cu.intra.mode_chroma;

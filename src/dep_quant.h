@@ -36,6 +36,14 @@
 #include "cu.h"
 #include "global.h"
 
+#define SM_NUM_CTX_SETS_SIG   3
+#define SM_NUM_CTX_SETS_GTX   2
+#define SM_MAX_NUM_SIG_SBB_CTX 2
+#define SM_MAX_NUM_SIG_CTX    12
+#define SM_MAX_NUM_GTX_CTX    21
+#define SCALE_BITS         15
+#define RICEMAX            32
+
 typedef struct encoder_control_t encoder_control_t;
 
 struct dep_quant_scan_info
@@ -64,6 +72,17 @@ typedef struct
   int64_t m_DistOrgFact;
   bool    needs_init;
 } quant_block;
+
+typedef struct
+{
+  int32_t  m_lastBitsX[TR_MAX_WIDTH];
+  int32_t  m_lastBitsY[TR_MAX_WIDTH];
+  uint32_t m_sigSbbFracBits[SM_MAX_NUM_SIG_SBB_CTX][2];
+  uint32_t m_sigFracBits[SM_NUM_CTX_SETS_SIG][SM_MAX_NUM_SIG_CTX][2];
+  int32_t  m_gtxFracBits[SM_MAX_NUM_GTX_CTX][6];
+  bool     needs_init;
+} rate_estimator;
+
 
 typedef struct
 {

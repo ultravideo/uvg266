@@ -468,6 +468,7 @@ static void quantize_chroma(
 
     if (transform == DCT7_CHROMA) {
       abs_sum = 0;
+      state->rate_estimator[2].needs_init = true;
       uvg_dep_quant(
         state,
         cur_tu,
@@ -1538,6 +1539,7 @@ void uvg_quantize_lcu_residual(
     cu_loc_t split_cu_loc[4];
     uint16_t child_cbfs[3];
     const int split_count = uvg_get_split_locs(cu_loc, split, split_cu_loc,NULL);
+    
     for (int i = 0; i < split_count; ++i) {
       uvg_quantize_lcu_residual(state, luma, chroma, 0, &split_cu_loc[i], NULL, lcu, early_skip, tree_type);
       if(i != 0) {
@@ -1558,11 +1560,14 @@ void uvg_quantize_lcu_residual(
     uvg_cu_loc_ctor(&loc, x, y, width, height);
 
     if (luma) {
+      state->quant_blocks[0].needs_init = true;
+      state->rate_estimator[0].needs_init = true;
       quantize_tr_residual(state, COLOR_Y, &loc, cur_pu, lcu, early_skip, tree_type);
     }
     double c_lambda = state->c_lambda;
     state->c_lambda = uvg_calculate_chroma_lambda(state, state->encoder_control->cfg.jccr, cur_pu->joint_cb_cr);
     if (chroma) {
+      state->rate_estimator[2].needs_init = true;
       if(state->encoder_control->cfg.dep_quant) {
         cabac_data_t temp_cabac;
         memcpy(&temp_cabac, &state->search_cabac, sizeof(cabac_data_t));

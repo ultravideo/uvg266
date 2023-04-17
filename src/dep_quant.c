@@ -42,13 +42,6 @@
 #include <immintrin.h>
 
 
-#define sm_numCtxSetsSig 3
-#define sm_numCtxSetsGtx 2
-#define sm_maxNumSigSbbCtx 2
-#define sm_maxNumSigCtx    12
-#define sm_maxNumGtxCtx    21
-#define SCALE_BITS 15
-#define RICEMAX 32
 
 static const int32_t g_goRiceBits[4][RICEMAX] = {
     { 32768,  65536,  98304, 131072, 163840, 196608, 262144, 262144, 327680, 327680, 327680, 327680, 393216, 393216, 393216, 393216, 393216, 393216, 393216, 393216, 458752, 458752, 458752, 458752, 458752, 458752, 458752, 458752, 458752, 458752, 458752, 458752},
@@ -100,16 +93,6 @@ typedef struct
   uint8_t level_memory[8* TR_MAX_WIDTH * TR_MAX_WIDTH];
   int num_coeff;
 } common_context;
-
-
-typedef struct
-{
-  int32_t m_lastBitsX[TR_MAX_WIDTH];
-  int32_t m_lastBitsY[TR_MAX_WIDTH];
-  uint32_t m_sigSbbFracBits[sm_maxNumSigSbbCtx][2];
-  uint32_t m_sigFracBits[sm_numCtxSetsSig][sm_maxNumSigCtx][2];
-  int32_t m_gtxFracBits[sm_maxNumGtxCtx][6];
-} rate_estimator;
 
 
 typedef struct
@@ -451,12 +434,12 @@ static void reset_common_context(common_context* ctx, const rate_estimator * rat
 static void init_rate_esimator(rate_estimator * rate_estimator, const cabac_data_t * const ctx, color_t color)
 {
   const cabac_ctx_t * base_ctx = color == COLOR_Y ? ctx->ctx.sig_coeff_group_model : (ctx->ctx.sig_coeff_group_model + 2);
-  for (unsigned ctxId = 0; ctxId < sm_maxNumSigSbbCtx; ctxId++) {
+  for (unsigned ctxId = 0; ctxId < SM_MAX_NUM_SIG_SBB_CTX; ctxId++) {
     rate_estimator->m_sigSbbFracBits[ctxId][0] = CTX_ENTROPY_BITS(&base_ctx[ctxId], 0);
     rate_estimator->m_sigSbbFracBits[ctxId][1] = CTX_ENTROPY_BITS(&base_ctx[ctxId], 1);
   }
   unsigned numCtx = (color == COLOR_Y ? 12 : 8);
-  for (unsigned ctxSetId = 0; ctxSetId < sm_numCtxSetsSig; ctxSetId++) {
+  for (unsigned ctxSetId = 0; ctxSetId < SM_NUM_CTX_SETS_SIG; ctxSetId++) {
     base_ctx = color == COLOR_Y ? ctx->ctx.cu_sig_model_luma[ctxSetId] : ctx->ctx.cu_sig_model_chroma[ctxSetId];
     for (unsigned ctxId = 0; ctxId < numCtx; ctxId++) {
       rate_estimator->m_sigFracBits[ctxSetId][ctxId][0] = CTX_ENTROPY_BITS(&base_ctx[ctxId], 0);
@@ -2309,7 +2292,8 @@ int uvg_dep_quant(
   } else {
     dep_quant_context.m_quant = (quant_block*)&state->quant_blocks[0];   
   }
-  if (dep_quant_context.m_quant->needs_init) {
+  //TODO: no idea when it is safe not to reinit for inter
+  if (dep_quant_context.m_quant->needs_init || cur_tu->type == CU_INTER) {
     init_quant_block(state, dep_quant_context.m_quant, cur_tu, log2_tr_width, log2_tr_height, compID, needs_block_size_trafo_scale, -1);
   }
   
@@ -2352,11 +2336,15 @@ int uvg_dep_quant(
   }
 
   //===== real init =====
-  rate_estimator rate_estimator;
-  init_rate_esimator(&rate_estimator, &state->search_cabac, compID);
-  xSetLastCoeffOffset(state, cur_tu, width, height, &rate_estimator, compID);
+  rate_estimator* rate_estimator = compID == COLOR_Y && cur_tu->type == CU_INTRA && cur_tu->intra.isp_mode != ISP_MODE_NO_ISP ?
+    &state->rate_estimator[3] : &state->rate_estimator[compID];
+  if(rate_estimator->needs_init || cur_tu->type == CU_INTER) {
+    init_rate_esimator(rate_estimator, &state->search_cabac, compID);
+    xSetLastCoeffOffset(state, cur_tu, width, height, rate_estimator, compID);
+    rate_estimator->needs_init = false;
+  }
 
-  reset_common_context(&dep_quant_context.m_common_context, &rate_estimator, (width * height) >> 4, numCoeff);
+  reset_common_context(&dep_quant_context.m_common_context, rate_estimator, (width * height) >> 4, numCoeff);
   dep_quant_context.m_common_context.m_nbInfo = encoder->m_scanId2NbInfoOutArray[log2_tr_width][log2_tr_height];
   
 
@@ -2367,9 +2355,9 @@ int uvg_dep_quant(
     dep_quant_context.m_allStates.m_numSigSbb[k] = 0;
     dep_quant_context.m_allStates.m_remRegBins[k] = 4; // just large enough for last scan pos
     dep_quant_context.m_allStates.m_refSbbCtxId[k] = -1;
-    dep_quant_context.m_allStates.m_sigFracBits[k][0] = rate_estimator.m_sigFracBits[0][0][0];
-    dep_quant_context.m_allStates.m_sigFracBits[k][1] = rate_estimator.m_sigFracBits[0][0][1];
-    memcpy(dep_quant_context.m_allStates.m_coeffFracBits[k], rate_estimator.m_gtxFracBits[0], sizeof(dep_quant_context.m_allStates.m_coeffFracBits[k]));
+    dep_quant_context.m_allStates.m_sigFracBits[k][0] = rate_estimator->m_sigFracBits[0][0][0];
+    dep_quant_context.m_allStates.m_sigFracBits[k][1] = rate_estimator->m_sigFracBits[0][0][1];
+    memcpy(dep_quant_context.m_allStates.m_coeffFracBits[k], rate_estimator->m_gtxFracBits[0], sizeof(dep_quant_context.m_allStates.m_coeffFracBits[k]));
     dep_quant_context.m_allStates.m_goRicePar[k] = 0;
     dep_quant_context.m_allStates.m_goRiceZero[k] = 0;
 
@@ -2378,7 +2366,7 @@ int uvg_dep_quant(
 
     dep_quant_context.m_allStates.m_stateId[k] = k & 3;
     for (int i = 0; i < (compID == COLOR_Y ? 12 : 8); ++i) {
-      memcpy(dep_quant_context.m_allStates.m_sigFracBitsArray[k][i], rate_estimator.m_sigFracBits[(k & 3 ? (k & 3) - 1 : 0)][i], sizeof(uint32_t) * 2);
+      memcpy(dep_quant_context.m_allStates.m_sigFracBitsArray[k][i], rate_estimator->m_sigFracBits[(k & 3 ? (k & 3) - 1 : 0)][i], sizeof(uint32_t) * 2);
     }
   }
 
@@ -2388,19 +2376,19 @@ int uvg_dep_quant(
   dep_quant_context.m_allStates.all_lt_four = false;
   dep_quant_context.m_allStates.m_commonCtx = &dep_quant_context.m_common_context;
   for (int i = 0; i < (compID == COLOR_Y ? 21 : 11); ++i) {
-    memcpy(dep_quant_context.m_allStates.m_gtxFracBitsArray[i], rate_estimator.m_gtxFracBits[i], sizeof(int32_t) * 6);
+    memcpy(dep_quant_context.m_allStates.m_gtxFracBitsArray[i], rate_estimator->m_gtxFracBits[i], sizeof(int32_t) * 6);
   }
 
-  depquant_state_init(&dep_quant_context.m_startState, rate_estimator.m_sigFracBits[0][0], rate_estimator.m_gtxFracBits[0]);
+  depquant_state_init(&dep_quant_context.m_startState, rate_estimator->m_sigFracBits[0][0], rate_estimator->m_gtxFracBits[0]);
   dep_quant_context.m_startState.effHeight = effectHeight;
   dep_quant_context.m_startState.effWidth = effectWidth;
   dep_quant_context.m_startState.m_stateId = 0;
   dep_quant_context.m_startState.m_commonCtx = &dep_quant_context.m_common_context;
   for (int i = 0; i < (compID == COLOR_Y ? 12 : 8); ++i) {
-    dep_quant_context.m_startState.m_sigFracBitsArray[i] = rate_estimator.m_sigFracBits[0][i];
+    dep_quant_context.m_startState.m_sigFracBitsArray[i] = rate_estimator->m_sigFracBits[0][i];
   }
   for (int i = 0; i < (compID == COLOR_Y ? 21 : 11); ++i) {
-    dep_quant_context.m_startState.m_gtxFracBitsArray[i] = rate_estimator.m_gtxFracBits[i];
+    dep_quant_context.m_startState.m_gtxFracBitsArray[i] = rate_estimator->m_gtxFracBits[i];
   }
 
   const uint32_t height_in_sbb = MAX(height >> 2, 1);
@@ -2416,7 +2404,7 @@ int uvg_dep_quant(
       init_quant_block(state, dep_quant_context.m_quant, cur_tu, log2_tr_width, log2_tr_height, compID, needs_block_size_trafo_scale, q_coeff[blkpos]);
 
       xDecideAndUpdate(
-        &rate_estimator,
+        rate_estimator,
         ctxs,
         scan_info,
         abs(srcCoeff[blkpos]),
@@ -2433,7 +2421,7 @@ int uvg_dep_quant(
     }
     else {
       xDecideAndUpdate(
-        &rate_estimator,
+        rate_estimator,
         ctxs,
         scan_info,
         abs(srcCoeff[blkpos]),
