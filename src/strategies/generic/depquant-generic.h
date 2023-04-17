@@ -1,3 +1,5 @@
+#ifndef STRATEGIES_DEPQUANT_GENERIC_H_
+#define STRATEGIES_DEPQUANT_GENERIC_H_
 /*****************************************************************************
  * This file is part of uvg266 VVC encoder.
  *
@@ -30,30 +32,19 @@
  * INCLUDING NEGLIGENCE OR OTHERWISE ARISING IN ANY WAY OUT OF THE USE OF THIS
  ****************************************************************************/
 
-#include "strategies/strategies-quant.h"
+/**
+ * \ingroup Optimization
+ * \file
+ * Generic C implementations of optimized functions.
+ */
 
-#include "strategies/avx2/quant-avx2.h"
-#include "strategies/generic/quant-generic.h"
-#include "strategyselector.h"
-
-
-// Define function pointers.
-quant_func           *uvg_quant;
-quant_cbcr_func      *uvg_quant_cbcr_residual;
-quant_residual_func  *uvg_quantize_residual;
-dequant_func         *uvg_dequant;
-coeff_abs_sum_func   *uvg_coeff_abs_sum;
-fast_coeff_cost_func *uvg_fast_coeff_cost;
+#include "cu.h"
+#include "encoderstate.h"
+#include "global.h" // IWYU pragma: keep
+#include "uvg266.h"
+#include "tables.h"
 
 
-int uvg_strategy_register_quant(void *opaque, uint8_t bitdepth)
-{
-  bool success = true;
+int uvg_strategy_register_depquant_generic(void* opaque, uint8_t bitdepth);
 
-  success &= uvg_strategy_register_quant_generic(opaque, bitdepth);
-
-  if (uvg_g_hardware_flags.intel_flags.avx2) {
-    success &= uvg_strategy_register_quant_avx2(opaque, bitdepth);
-  }
-  return success;
-}
+#endif //STRATEGIES_DEPQUANT_GENERIC_H_
