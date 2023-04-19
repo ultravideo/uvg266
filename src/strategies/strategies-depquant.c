@@ -1,5 +1,3 @@
-#ifndef STRATEGIES_DEPQUANT_H_
-#define STRATEGIES_DEPQUANT_H_
 /*****************************************************************************
  * This file is part of uvg266 VVC encoder.
  *
@@ -32,46 +30,25 @@
  * INCLUDING NEGLIGENCE OR OTHERWISE ARISING IN ANY WAY OUT OF THE USE OF THIS
  ****************************************************************************/
 
-/**
- * \ingroup Optimization
- * \file
- * Interface for sao functions.
- */
+#include "strategies/strategies-depquant.h"
 
-#include "encoder.h"
-#include "encoderstate.h"
-#include "global.h" // IWYU pragma: keep
-#include "uvg266.h"
-#include "dep_quant.h"
+#include "strategies/avx2/depquant-avx2.h"
+#include "strategies/generic/depquant-generic.h"
+#include "strategyselector.h"
 
 
-// Declare function pointers.
-typedef int(dep_quant_decide_and_update_func)(
-  rate_estimator_t*                       re,
-  context_store*                          ctxs,
-  struct dep_quant_scan_info const* const scan_info,
-  const coeff_t                           absCoeff,
-  const uint32_t                          scan_pos,
-  const uint32_t                          width_in_sbb,
-  const uint32_t                          height_in_sbb,
-  const NbInfoSbb                         next_nb_info_ssb,
-  bool                                    zeroOut,
-  coeff_t                                 quantCoeff,
-  const uint32_t                          effWidth,
-  const uint32_t                          effHeight,
-  bool                                    is_chroma);
+// Define function pointers.
+dep_quant_decide_and_update_func* uvg_dep_quant_decide_and_update;
 
 
+int uvg_strategy_register_depquant(void *opaque, uint8_t bitdepth)
+{
+  bool success = true;
 
-// Declare function pointers.
-extern dep_quant_decide_and_update_func* uvg_dep_quant_decide_and_update;
+  success &= uvg_strategy_register_depquant_generic(opaque, bitdepth);
 
-int uvg_strategy_register_depquant(void* opaque, uint8_t bitdepth);
-
-
-#define STRATEGIES_DEPQUANT_EXPORTS \
-  {"dep_quant_decide_and_update", (void**)&uvg_dep_quant_decide_and_update}, \
-
-
-
-#endif //STRATEGIES_DEPQUANT_H_
+  if (uvg_g_hardware_flags.intel_flags.avx2) {
+    success &= uvg_strategy_register_depquant_avx2(opaque, bitdepth);
+  }
+  return success;
+}

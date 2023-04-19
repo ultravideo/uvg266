@@ -97,6 +97,91 @@ typedef struct
   uint16_t outPos[5];
 } NbInfoOut;
 
+typedef struct {
+  int32_t absLevel[4];
+  int64_t deltaDist[4];
+} PQData;
+
+typedef struct {
+  int64_t ALIGNED(32) rdCost[8];
+  int32_t ALIGNED(32) absLevel[8];
+  int32_t ALIGNED(32) prevId[8];
+} Decision;
+
+
+typedef struct {
+  uint8_t* sbbFlags;
+  uint8_t* levels;
+} SbbCtx;
+
+typedef struct {
+  const NbInfoOut* m_nbInfo;
+  uint32_t         m_sbbFlagBits[2][2];
+  SbbCtx           m_allSbbCtx[8];
+  int              m_curr_sbb_ctx_offset;
+  int              m_prev_sbb_ctx_offset;
+  uint8_t          sbb_memory[8 * 1024];
+  uint8_t          level_memory[8 * TR_MAX_WIDTH * TR_MAX_WIDTH];
+  int              num_coeff;
+} common_context;
+
+
+typedef struct {
+  int64_t  m_rdCost;
+  uint16_t m_absLevelsAndCtxInit
+    [24]; // 16x8bit for abs levels + 16x16bit for ctx init id
+  int8_t          m_numSigSbb;
+  int             m_remRegBins;
+  int8_t          m_refSbbCtxId;
+  uint32_t        m_sbbFracBits[2];
+  uint32_t        m_sigFracBits[2];
+  int32_t         m_coeffFracBits[6];
+  int8_t          m_goRicePar;
+  int8_t          m_goRiceZero;
+  int8_t          m_stateId;
+  uint32_t*       m_sigFracBitsArray[12];
+  int32_t*        m_gtxFracBitsArray[21];
+  common_context* m_commonCtx;
+
+  unsigned        effWidth;
+  unsigned        effHeight;
+} depquant_state;
+typedef struct {
+  int64_t  ALIGNED(32) m_rdCost[12];
+  uint16_t ALIGNED(32) m_absLevelsAndCtxInit
+    [12][24]; // 16x8bit for abs levels + 16x16bit for ctx init id
+  int8_t          ALIGNED(16) m_numSigSbb[12];
+  int             ALIGNED(32) m_remRegBins[12];
+  int8_t          ALIGNED(16) m_refSbbCtxId[12];
+  uint32_t        ALIGNED(32) m_sbbFracBits[12][2];
+  uint32_t        ALIGNED(32) m_sigFracBits[12][2];
+  int32_t         ALIGNED(32) m_coeffFracBits[12][6];
+  int8_t          ALIGNED(16) m_goRicePar[12];
+  int8_t          ALIGNED(16) m_goRiceZero[12];
+  int8_t          ALIGNED(16) m_stateId[12];
+  uint32_t        ALIGNED(32) m_sigFracBitsArray[12][12][2];
+  int32_t         ALIGNED(32) m_gtxFracBitsArray[21][6];
+  common_context* m_commonCtx;
+
+  unsigned        effWidth;
+  unsigned        effHeight;
+
+  bool            all_gte_four;
+  bool            all_lt_four;
+} all_depquant_states;
+
+typedef struct {
+  common_context      m_common_context;
+  all_depquant_states m_allStates;
+  int                 m_curr_state_offset;
+  int                 m_prev_state_offset;
+  int                 m_skip_state_offset;
+  depquant_state      m_startState;
+  quant_block*        m_quant;
+  Decision            m_trellis[TR_MAX_WIDTH * TR_MAX_WIDTH];
+} context_store;
+
+
 int uvg_init_nb_info(encoder_control_t* encoder);
 void uvg_dealloc_nb_info(encoder_control_t* encoder);
 
@@ -122,4 +207,40 @@ int uvg_dep_quant(
   enum uvg_tree_type tree_type,
   int* absSum,
   const bool enableScalingLists);
+
+
+void uvg_dep_quant_update_state(
+  context_store*  ctxs,
+  int             numIPos,
+  const uint32_t  scan_pos,
+  const Decision* decisions,
+  const uint32_t  sigCtxOffsetNext,
+  const uint32_t  gtxCtxOffsetNext,
+  const NbInfoSbb next_nb_info_ssb,
+  const int       baseLevel,
+  const bool      extRiceFlag,
+  int             decision_id);
+
+
+void uvg_dep_quant_update_state_eos(
+  context_store*  ctxs,
+  const uint32_t  scan_pos,
+  const uint32_t  cg_pos,
+  const uint32_t  sigCtxOffsetNext,
+  const uint32_t  gtxCtxOffsetNext,
+  const uint32_t  width_in_sbb,
+  const uint32_t  height_in_sbb,
+  const uint32_t  next_sbb_right,
+  const uint32_t  next_sbb_below,
+  const Decision* decisions,
+  int             decision_id);
+
+void uvg_dep_quant_check_rd_costs(
+  const all_depquant_states* const state,
+  const enum ScanPosType           spt,
+  const PQData*                    pqDataA,
+  Decision*                        decisions,
+  const int                        decisionA,
+  const int                        decisionB,
+  const int                        state_offset);
 #endif

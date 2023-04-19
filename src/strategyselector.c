@@ -107,6 +107,10 @@ int uvg_strategyselector_init(int32_t cpuid, uint8_t bitdepth) {
     fprintf(stderr, "uvg_strategy_register_encode failed!\n");
     return 0;
   }
+  if (!uvg_strategy_register_depquant(&strategies, bitdepth)) {
+    fprintf(stderr, "uvg_strategy_register_depquant failed!\n");
+    return 0;
+  }
   
   while(cur_strategy_to_select->fptr) {
     *(cur_strategy_to_select->fptr) = strategyselector_choose_for(&strategies, cur_strategy_to_select->strategy_type);
