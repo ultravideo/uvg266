@@ -40,7 +40,6 @@
 #include "uvg_math.h"
 #include "generic/quant-generic.h"
 #include <immintrin.h>
-#include <zmmintrin.h>
 
 
 
@@ -1287,7 +1286,7 @@ static void update_state_eos_avx2(context_store* ctxs, const uint32_t scan_pos, 
       __m128i sbb_below = next_sbb_below ? _mm_i32gather_epi32((const int *)cc->m_allSbbCtx[cc->m_curr_sbb_ctx_offset].sbbFlags, sbb_offsets_below, 1) : _mm_set1_epi32(0);
 
       __m128i sig_sbb = _mm_or_epi32(sbb_right, sbb_below);
-      sig_sbb         = _mm_and_epi32(sig_sbb, _mm_set1_epi32(0xff));
+      sig_sbb         = _mm_and_si128(sig_sbb, _mm_set1_epi32(0xff));
       sig_sbb = _mm_min_epi32(sig_sbb, _mm_set1_epi32(1));
       //__m256i sig_sbb_mask = _mm256_cvtepi32_epi64(sig_sbb);
       //const __m256i duplication_mask = _mm256_setr_epi8(
@@ -1353,14 +1352,14 @@ static void update_state_eos_avx2(context_store* ctxs, const uint32_t scan_pos, 
           {
             __m128i offset = _mm_add_epi32(levels_offsets, _mm_set1_epi32(nbOut->outPos[4]));
             __m128i t = _mm_i32gather_epi32((const int *)absLevels, offset, 1);
-            t = _mm_and_epi32(t, first_byte);
+            t = _mm_and_si128(t, first_byte);
             sum_abs = _mm_add_epi32(sum_abs, t);
             sum_num   = _mm_add_epi32(sum_num, _mm_min_epi32(t, ones));
             __m128i min_t = _mm_min_epi32(
               t,
               _mm_add_epi32(
                 fours,
-                _mm_and_epi32(t, ones)
+                _mm_and_si128(t, ones)
               )
             );
             sum_abs_1 = _mm_add_epi32(sum_abs_1, min_t);
@@ -1368,53 +1367,53 @@ static void update_state_eos_avx2(context_store* ctxs, const uint32_t scan_pos, 
         case 4: {
             __m128i offset = _mm_add_epi32(levels_offsets, _mm_set1_epi32(nbOut->outPos[3]));
             __m128i t     = _mm_i32gather_epi32((const int*)absLevels, offset, 1);
-            t = _mm_and_epi32(t, first_byte);
+            t = _mm_and_si128(t, first_byte);
             sum_abs = _mm_add_epi32(sum_abs, t);
             sum_num   = _mm_add_epi32(sum_num, _mm_min_epi32(t, ones));
             __m128i min_t = _mm_min_epi32(
               t,
               _mm_add_epi32(
                 fours,
-                _mm_and_epi32(t, ones)));
+                _mm_and_si128(t, ones)));
             sum_abs_1 = _mm_add_epi32(sum_abs_1, min_t);
         }
         case 3: {
             __m128i offset = _mm_add_epi32(levels_offsets, _mm_set1_epi32(nbOut->outPos[2]));
             __m128i t     = _mm_i32gather_epi32((const int*)absLevels, offset, 1);
-            t = _mm_and_epi32(t, first_byte);
+            t = _mm_and_si128(t, first_byte);
             sum_abs = _mm_add_epi32(sum_abs, t);
             sum_num   = _mm_add_epi32(sum_num, _mm_min_epi32(t, ones));
             __m128i min_t = _mm_min_epi32(
               t,
               _mm_add_epi32(
                 fours,
-                _mm_and_epi32(t, ones)));
+                _mm_and_si128(t, ones)));
             sum_abs_1 = _mm_add_epi32(sum_abs_1, min_t);
         }
         case 2: {
             __m128i offset = _mm_add_epi32(levels_offsets, _mm_set1_epi32(nbOut->outPos[1]));
             __m128i t     = _mm_i32gather_epi32((const int*)absLevels, offset, 1);
-            t = _mm_and_epi32(t, first_byte);
+            t = _mm_and_si128(t, first_byte);
             sum_abs = _mm_add_epi32(sum_abs, t);
             sum_num   = _mm_add_epi32(sum_num, _mm_min_epi32(t, ones));
             __m128i min_t = _mm_min_epi32(
               t,
               _mm_add_epi32(
                 fours,
-                _mm_and_epi32(t, ones)));
+                _mm_and_si128(t, ones)));
             sum_abs_1 = _mm_add_epi32(sum_abs_1, min_t);
         }
         case 1: {
             __m128i offset = _mm_add_epi32(levels_offsets, _mm_set1_epi32(nbOut->outPos[0]));
             __m128i t = _mm_i32gather_epi32((const int*)absLevels, offset, 1);
-            t = _mm_and_epi32(t, first_byte);
+            t = _mm_and_si128(t, first_byte);
             sum_abs = _mm_add_epi32(sum_abs, t);
             sum_num = _mm_add_epi32(sum_num, _mm_min_epi32(t, ones));
             __m128i min_t = _mm_min_epi32(
               t,
               _mm_add_epi32(
                 fours,
-                _mm_and_epi32(t, ones)));
+                _mm_and_si128(t, ones)));
             sum_abs_1 = _mm_add_epi32(sum_abs_1, min_t);
         }
             break;
@@ -1465,8 +1464,8 @@ static void update_state_eos_avx2(context_store* ctxs, const uint32_t scan_pos, 
       }
     }
 
-    __m128i sum_num = _mm_and_epi32(last, _mm_set1_epi32(7));
-    __m128i sum_abs1 = _mm_and_epi32(
+    __m128i sum_num = _mm_and_si128(last, _mm_set1_epi32(7));
+    __m128i sum_abs1 = _mm_and_si128(
       _mm_srli_epi32(last, 3),
       _mm_set1_epi32(31));
 
@@ -1730,9 +1729,9 @@ static INLINE void update_states_avx2(
         (int *)state->m_absLevelsAndCtxInit[state_offset],
         _mm_add_epi32(ctx_start_offsets, _mm_set1_epi32(tinit_offset)),
         2);
-      tinit = _mm_and_epi32(tinit, first_two_bytes);
-      __m128i sum_abs1 = _mm_and_epi32(_mm_srli_epi32(tinit, 3), _mm_set1_epi32(31));
-      __m128i sum_num = _mm_and_epi32(tinit, _mm_set1_epi32(7));
+      tinit = _mm_and_si128(tinit, first_two_bytes);
+      __m128i sum_abs1 = _mm_and_si128(_mm_srli_epi32(tinit, 3), _mm_set1_epi32(31));
+      __m128i sum_num = _mm_and_si128(tinit, _mm_set1_epi32(7));
 
       uint8_t* levels = (uint8_t*)state->m_absLevelsAndCtxInit[state_offset];
       switch (numIPos) {
@@ -1742,9 +1741,9 @@ static INLINE void update_states_avx2(
             (int *)levels,
             _mm_add_epi32(levels_start_offsets, _mm_set1_epi32(next_nb_info_ssb.inPos[4])),
             1);
-          t = _mm_and_epi32(t, first_byte);
+          t = _mm_and_si128(t, first_byte);
           __m128i min_arg = _mm_min_epi32(
-            _mm_add_epi32(_mm_set1_epi32(4), _mm_and_epi32(t, ones)),
+            _mm_add_epi32(_mm_set1_epi32(4), _mm_and_si128(t, ones)),
             t
           );
           sum_abs1 = _mm_add_epi32(
@@ -1753,7 +1752,7 @@ static INLINE void update_states_avx2(
           );
           sum_num = _mm_add_epi32(
             sum_num,
-            _mm_min_epi32(_mm_and_epi32(t, first_byte), ones));
+            _mm_min_epi32(_mm_and_si128(t, first_byte), ones));
         }
       case 4:
         {
@@ -1761,9 +1760,9 @@ static INLINE void update_states_avx2(
             (int*)levels,
             _mm_add_epi32(levels_start_offsets, _mm_set1_epi32(next_nb_info_ssb.inPos[3])),
             1);
-          t = _mm_and_epi32(t, first_byte);
+          t = _mm_and_si128(t, first_byte);
           __m128i min_arg = _mm_min_epi32(
-            _mm_add_epi32(_mm_set1_epi32(4), _mm_and_epi32(t, ones)),
+            _mm_add_epi32(_mm_set1_epi32(4), _mm_and_si128(t, ones)),
             t
           );
           sum_abs1 = _mm_add_epi32(
@@ -1772,7 +1771,7 @@ static INLINE void update_states_avx2(
           );
           sum_num = _mm_add_epi32(
             sum_num,
-            _mm_min_epi32(_mm_and_epi32(t, first_byte), ones));
+            _mm_min_epi32(_mm_and_si128(t, first_byte), ones));
         }
       case 3:
         {
@@ -1780,9 +1779,9 @@ static INLINE void update_states_avx2(
             (int*)levels,
             _mm_add_epi32(levels_start_offsets, _mm_set1_epi32(next_nb_info_ssb.inPos[2])),
             1);
-          t = _mm_and_epi32(t, first_byte);
+          t = _mm_and_si128(t, first_byte);
           __m128i min_arg = _mm_min_epi32(
-            _mm_add_epi32(_mm_set1_epi32(4), _mm_and_epi32(t, ones)),
+            _mm_add_epi32(_mm_set1_epi32(4), _mm_and_si128(t, ones)),
             t
           );
           sum_abs1 = _mm_add_epi32(
@@ -1791,7 +1790,7 @@ static INLINE void update_states_avx2(
           );
           sum_num = _mm_add_epi32(
             sum_num,
-            _mm_min_epi32(_mm_and_epi32(t, first_byte), ones));
+            _mm_min_epi32(_mm_and_si128(t, first_byte), ones));
         }
       case 2:
         {
@@ -1799,9 +1798,9 @@ static INLINE void update_states_avx2(
             (int*)levels,
             _mm_add_epi32(levels_start_offsets, _mm_set1_epi32(next_nb_info_ssb.inPos[1])),
             1);
-          t = _mm_and_epi32(t, first_byte);
+          t = _mm_and_si128(t, first_byte);
         __m128i min_arg = _mm_min_epi32(
-              _mm_add_epi32(_mm_set1_epi32(4), _mm_and_epi32(t, ones)),
+              _mm_add_epi32(_mm_set1_epi32(4), _mm_and_si128(t, ones)),
               t
             );
           sum_abs1 = _mm_add_epi32(
@@ -1810,16 +1809,16 @@ static INLINE void update_states_avx2(
           );
           sum_num = _mm_add_epi32(
             sum_num,
-            _mm_min_epi32(_mm_and_epi32(t, first_byte), ones));
+            _mm_min_epi32(_mm_and_si128(t, first_byte), ones));
         }
       case 1: {
           __m128i t = _mm_i32gather_epi32(
             (int*)levels,
             _mm_add_epi32(levels_start_offsets, _mm_set1_epi32(next_nb_info_ssb.inPos[0])),
             1);
-          t = _mm_and_epi32(t, first_byte);
+          t = _mm_and_si128(t, first_byte);
           __m128i min_arg = _mm_min_epi32(
-            _mm_add_epi32(_mm_set1_epi32(4), _mm_and_epi32(t, ones)),
+            _mm_add_epi32(_mm_set1_epi32(4), _mm_and_si128(t, ones)),
             t
           );
           sum_abs1 = _mm_add_epi32(
@@ -1828,7 +1827,7 @@ static INLINE void update_states_avx2(
             );
           sum_num = _mm_add_epi32(
             sum_num,
-            _mm_min_epi32(_mm_and_epi32(t, first_byte), ones));
+            _mm_min_epi32(_mm_and_si128(t, first_byte), ones));
         } break;
       default:
           assert(0);
@@ -1897,7 +1896,7 @@ static INLINE void update_states_avx2(
         default:
           assert(0);
       }
-      sum_abs = _mm_and_epi32(sum_abs, first_byte);
+      sum_abs = _mm_and_si128(sum_abs, first_byte);
       if (extRiceFlag) {
         assert(0 && "Not implemented for avx2");
       } else {
@@ -1925,7 +1924,7 @@ static INLINE void update_states_avx2(
         (int*)state->m_absLevelsAndCtxInit[state_offset],
         _mm_add_epi32(ctx_start_offsets, _mm_set1_epi32(tinit_offset)),
         2);
-      tinit = _mm_and_epi32(tinit, last_two_bytes);
+      tinit = _mm_and_si128(tinit, last_two_bytes);
       __m128i sum_abs = _mm_srli_epi32(tinit, 8);
       switch (numIPos) {
         case 5: {
@@ -1933,7 +1932,7 @@ static INLINE void update_states_avx2(
             (int*)levels,
             _mm_add_epi32(levels_start_offsets, _mm_set1_epi32(next_nb_info_ssb.inPos[4])),
             1);
-          t = _mm_and_epi32(t, last_byte);
+          t = _mm_and_si128(t, last_byte);
           sum_abs = _mm_add_epi32(sum_abs, t);
         }
         case 4: {
@@ -1941,7 +1940,7 @@ static INLINE void update_states_avx2(
             (int*)levels,
             _mm_add_epi32(levels_start_offsets, _mm_set1_epi32(next_nb_info_ssb.inPos[3])),
             1);
-          t = _mm_and_epi32(t, last_byte);
+          t = _mm_and_si128(t, last_byte);
           sum_abs = _mm_add_epi32(sum_abs, t);
         }
         case 3: {
@@ -1949,7 +1948,7 @@ static INLINE void update_states_avx2(
             (int*)levels,
             _mm_add_epi32(levels_start_offsets, _mm_set1_epi32(next_nb_info_ssb.inPos[2])),
             1);
-          t = _mm_and_epi32(t, last_byte);
+          t = _mm_and_si128(t, last_byte);
           sum_abs = _mm_add_epi32(sum_abs, t);
         }
         case 2: {
@@ -1957,7 +1956,7 @@ static INLINE void update_states_avx2(
             (int*)levels,
             _mm_add_epi32(levels_start_offsets, _mm_set1_epi32(next_nb_info_ssb.inPos[1])),
             1);
-          t = _mm_and_epi32(t, last_byte);
+          t = _mm_and_si128(t, last_byte);
           sum_abs = _mm_add_epi32(sum_abs, t);
         }
         case 1: {
@@ -1965,7 +1964,7 @@ static INLINE void update_states_avx2(
             (int*)levels,
             _mm_add_epi32(levels_start_offsets, _mm_set1_epi32(next_nb_info_ssb.inPos[0])),
             1);
-          t = _mm_and_epi32(t, last_byte);
+          t = _mm_and_si128(t, last_byte);
           sum_abs = _mm_add_epi32(sum_abs, t);
         } break;
         default:
