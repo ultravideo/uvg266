@@ -40,6 +40,7 @@
 #include "uvg_math.h"
 #include "generic/quant-generic.h"
 #include <immintrin.h>
+#include <zmmintrin.h>
 
 
 
@@ -246,7 +247,6 @@ int uvg_init_nb_info(encoder_control_t * encoder) {
           {
             nbSbb->inPos[k] = 0;
           }
-          printf("");
         }
         {
           //===== outside subband neighbours =====
@@ -416,7 +416,7 @@ static void init_quant_block(
   qp->needs_init = false;
 }
 
-static void reset_common_context(common_context* ctx, const rate_estimator * rate_estimator, int numSbb, int num_coeff)
+static void reset_common_context(common_context* ctx, const rate_estimator_t * rate_estimator, int numSbb, int num_coeff)
 {
   //memset(&ctx->m_nbInfo, 0, sizeof(ctx->m_nbInfo));
   memcpy(&ctx->m_sbbFlagBits, &rate_estimator->m_sigSbbFracBits, sizeof(rate_estimator->m_sigSbbFracBits));
@@ -431,7 +431,7 @@ static void reset_common_context(common_context* ctx, const rate_estimator * rat
   ctx->num_coeff = num_coeff;
 }
 
-static void init_rate_esimator(rate_estimator * rate_estimator, const cabac_data_t * const ctx, color_t color)
+static void init_rate_esimator(rate_estimator_t * rate_estimator, const cabac_data_t * const ctx, color_t color)
 {
   const cabac_ctx_t * base_ctx = color == COLOR_Y ? ctx->ctx.sig_coeff_group_model : (ctx->ctx.sig_coeff_group_model + 2);
   for (unsigned ctxId = 0; ctxId < SM_MAX_NUM_SIG_SBB_CTX; ctxId++) {
@@ -453,7 +453,7 @@ static void init_rate_esimator(rate_estimator * rate_estimator, const cabac_data
     const cabac_ctx_t * gt2_ctx = color == COLOR_Y ? &ctx->ctx.cu_gtx_flag_model_luma[0][ctxId] : &ctx->ctx.cu_gtx_flag_model_chroma[0][ctxId];
     const cabac_ctx_t * gt1_ctx = color == COLOR_Y ? &ctx->ctx.cu_gtx_flag_model_luma[1][ctxId] : &ctx->ctx.cu_gtx_flag_model_chroma[1][ctxId];
 
-    int32_t* cb = &rate_estimator->m_gtxFracBits[ctxId];
+    int32_t* cb = rate_estimator->m_gtxFracBits[ctxId];
     int32_t par0    = (1 << SCALE_BITS) + (int32_t)CTX_ENTROPY_BITS(par_ctx, 0);
     int32_t par1 = (1 << SCALE_BITS) + (int32_t)CTX_ENTROPY_BITS(par_ctx, 1);
     cb[0] = 0;
@@ -471,7 +471,7 @@ static void xSetLastCoeffOffset(
   const cu_info_t* const cur_tu,
   const int width,
   const int height,
-  rate_estimator* rate_estimator,
+  rate_estimator_t* rate_estimator,
   const color_t compID)
 {
   int32_t cbfDeltaBits = 0;
@@ -579,7 +579,7 @@ static void check_rd_costs_avx2(const all_depquant_states* const state, const en
   __m256i pq_a_delta_dist = _mm256_setr_epi64x(pqDataA->deltaDist[0], pqDataA->deltaDist[0], pqDataA->deltaDist[3], pqDataA->deltaDist[3]);
   __m256i pq_b_delta_dist = _mm256_setr_epi64x(pqDataA->deltaDist[2], pqDataA->deltaDist[2], pqDataA->deltaDist[1], pqDataA->deltaDist[1]);
 
-  __m256i rd_cost_a = _mm256_loadu_si256(&state->m_rdCost[start]);
+  __m256i rd_cost_a = _mm256_load_si256((__m256i const*)&state->m_rdCost[start]);
   __m256i rd_cost_b = rd_cost_a;
   __m256i rd_cost_z = rd_cost_a;
 
@@ -611,7 +611,7 @@ static void check_rd_costs_avx2(const all_depquant_states* const state, const en
       rd_cost_a = _mm256_add_epi64(rd_cost_a, _mm256_cvtepi32_epi64(temp));
     } else {
       const int pqAs[4] = {0, 0, 3, 3};
-      int64_t rd_costs[4] = {0, 0, 0, 0}; 
+      ALIGNED(32) int64_t rd_costs[4] = {0, 0, 0, 0}; 
       for (int i = 0; i < 4; i++) {
         const int      state_offset = start + i;
         const int      pqA = pqAs[i];
@@ -623,7 +623,7 @@ static void check_rd_costs_avx2(const all_depquant_states* const state, const en
           rd_costs[i] += state->m_coeffFracBits[state_offset][pqDataA->absLevel[pqA] - (value << 1)] + goRiceTab[value < RICEMAX ? value : RICEMAX - 1];
         }
       }
-      rd_cost_a = _mm256_add_epi64(rd_cost_a, _mm256_loadu_si256(&rd_costs[0]));
+      rd_cost_a = _mm256_add_epi64(rd_cost_a, _mm256_loadu_si256((__m256i const *)&rd_costs[0]));
     }
 
     if (pqDataA->absLevel[1] < 4 && pqDataA->absLevel[2] < 4) {
@@ -661,7 +661,8 @@ static void check_rd_costs_avx2(const all_depquant_states* const state, const en
           rd_costs[i] += state->m_coeffFracBits[state_offset][pqDataA->absLevel[pqB] - (value << 1)] + goRiceTab[value < RICEMAX ? value : RICEMAX - 1];
         }
       }
-      rd_cost_b = _mm256_add_epi64(rd_cost_b, _mm256_loadu_si256(&rd_costs[0]));
+      rd_cost_b =
+        _mm256_add_epi64(rd_cost_b, _mm256_loadu_si256((__m256i const *) & rd_costs[0]));
     }
 
     if (spt == SCAN_ISCSBB) {
@@ -871,7 +872,7 @@ static void check_rd_costs_avx2(const all_depquant_states* const state, const en
 
   _mm256_storeu_epi64(decisions->rdCost, final_rd_cost);
   final_data = _mm256_permutevar8x32_epi32(final_data, _mm256_set_epi32(7, 5, 3, 1, 6, 4, 2, 0));
-  _mm256_storeu2_m128i(decisions->prevId, decisions->absLevel, final_data);
+  _mm256_storeu2_m128i((__m128i *)decisions->prevId, (__m128i *)decisions->absLevel, final_data);
 }
 
 
@@ -984,7 +985,7 @@ static INLINE void checkRdCostStart(const depquant_state* const state, int32_t l
 static INLINE void preQuantCoeff(const quant_block * const qp, const coeff_t absCoeff, PQData* pqData, coeff_t quanCoeff)
 {
   int64_t scaledOrg = (int64_t)(absCoeff) * quanCoeff;
-  coeff_t  qIdx = MAX(1, MIN(qp->m_maxQIdx, (coeff_t)((scaledOrg + qp->m_QAdd) >> qp->m_QShift)));
+  coeff_t  qIdx = MAX(1, (coeff_t)MIN(qp->m_maxQIdx, ((scaledOrg + qp->m_QAdd) >> qp->m_QShift)));
   int64_t scaledAdd = qIdx * qp->m_DistStepAdd - scaledOrg * qp->m_DistOrgFact;
   int index = qIdx & 3;
   pqData->deltaDist[index] = (scaledAdd * qIdx + qp->m_DistAdd) >> qp->m_DistShift;
@@ -1182,34 +1183,34 @@ static void update_state_eos_avx2(context_store* ctxs, const uint32_t scan_pos, 
   if (all_above_minus_two) {
     bool all_have_previous_state = true;
     __m128i prev_state;
+    __m128i prev_state_no_offset;
     __m128i abs_level = _mm_loadu_epi32(decisions->absLevel);
     if (all_above_four) {
       prev_state = _mm_set1_epi32(ctxs->m_skip_state_offset);
+      prev_state_no_offset = _mm_sub_epi32(_mm_loadu_epi32(decisions->prevId), _mm_set1_epi32(4));
       prev_state = _mm_add_epi32(
         prev_state,
-        _mm_sub_epi32(
-          _mm_loadu_epi32(decisions->prevId),
-          _mm_set1_epi32(4)
-        )
+            prev_state_no_offset
       );
       memset(&state->m_numSigSbb[state_offset], 0, 4);
       for (int i = 0; i < 4; ++i) {
         memset(state->m_absLevelsAndCtxInit[state_offset + i], 0, 16 * sizeof(uint8_t));    
       }
     } else if (all_between_zero_and_three) {
-      prev_state = _mm_set1_epi32(ctxs->m_prev_state_offset);
+      prev_state_no_offset = _mm_set1_epi32(ctxs->m_prev_state_offset);
       prev_state = _mm_add_epi32(
-        prev_state,
+        prev_state_no_offset,
         _mm_loadu_epi32(decisions->prevId)
       );
-      __m128i num_sig_sbb = _mm_i32gather_epi32(&state->m_numSigSbb[state_offset], prev_state, 1);
-      num_sig_sbb = _mm_and_epi32(num_sig_sbb, _mm_set1_epi32(0xff));
+      __m128i control = _mm_setr_epi8(0, 4, 8, 12, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1);
+      __m128i prev_state_with_ff_high_bytes = _mm_or_epi32(prev_state, _mm_set1_epi32(0xffffff00));
+      __m128i num_sig_sbb = _mm_loadu_epi32(state->m_numSigSbb);
+      num_sig_sbb = _mm_shuffle_epi8(num_sig_sbb, prev_state_with_ff_high_bytes);
       num_sig_sbb = _mm_add_epi32(
         num_sig_sbb,
         _mm_min_epi32(abs_level, _mm_set1_epi32(1))
       );
 
-            __m128i control = _mm_setr_epi8(0, 4, 8, 12, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1);
       num_sig_sbb = _mm_shuffle_epi8(num_sig_sbb, control);
       int num_sig_sbb_s = _mm_extract_epi32(num_sig_sbb, 0);
       memcpy(&state->m_numSigSbb[state_offset], &num_sig_sbb_s, 4);
@@ -1221,15 +1222,18 @@ static void update_state_eos_avx2(context_store* ctxs, const uint32_t scan_pos, 
       }
     } else {
       int prev_state_s[4] = {-1, -1, -1, -1};
+      int prev_state_no_offset_s[4] = {-1, -1, -1, -1};
       for (int i = 0; i < 4; ++i) {
         const int decision_id = i;
         const int curr_state_offset = state_offset + i;
         if (decisions->prevId[decision_id] >= 4) {
           prev_state_s[i] = ctxs->m_skip_state_offset + (decisions->prevId[decision_id] - 4);
+          prev_state_no_offset_s[i] = decisions->prevId[decision_id] - 4;
           state->m_numSigSbb[curr_state_offset] = 0;
           memset(state->m_absLevelsAndCtxInit[curr_state_offset], 0, 16 * sizeof(uint8_t));
         } else if (decisions->prevId[decision_id] >= 0) {
           prev_state_s[i] = ctxs->m_prev_state_offset + decisions->prevId[decision_id];
+          prev_state_no_offset_s[i] = decisions->prevId[decision_id];
           state->m_numSigSbb[curr_state_offset] = state->m_numSigSbb[prev_state_s[i]] + !!decisions->absLevel[decision_id];
           memcpy(state->m_absLevelsAndCtxInit[curr_state_offset], state->m_absLevelsAndCtxInit[prev_state_s[i]], 16 * sizeof(uint8_t));
         } else {
@@ -1239,6 +1243,7 @@ static void update_state_eos_avx2(context_store* ctxs, const uint32_t scan_pos, 
         }
       }
       prev_state = _mm_loadu_epi32(prev_state_s);
+      prev_state_no_offset = _mm_loadu_epi32(prev_state_no_offset_s);
     }
     uint32_t level_offset = scan_pos & 15;
     __m128i  max_abs = _mm_min_epi32(abs_level, _mm_set1_epi32(32));
@@ -1276,15 +1281,24 @@ static void update_state_eos_avx2(context_store* ctxs, const uint32_t scan_pos, 
       __m128i sbb_offsets = _mm_set_epi32(3 * numSbb, 2 * numSbb, 1 * numSbb, 0);
       __m128i next_sbb_right_m = _mm_set1_epi32(next_sbb_right);
       __m128i sbb_offsets_right = _mm_add_epi32(sbb_offsets, next_sbb_right_m);
-      __m128i sbb_right = next_sbb_right ? _mm_i32gather_epi32(cc->m_allSbbCtx[cc->m_curr_sbb_ctx_offset].sbbFlags, sbb_offsets_right, 1) : _mm_set1_epi32(0);
+      __m128i sbb_right = next_sbb_right ? _mm_i32gather_epi32((const int *)cc->m_allSbbCtx[cc->m_curr_sbb_ctx_offset].sbbFlags, sbb_offsets_right, 1) : _mm_set1_epi32(0);
 
       __m128i sbb_offsets_below = _mm_add_epi32(sbb_offsets, _mm_set1_epi32(next_sbb_below));
-      __m128i sbb_below = next_sbb_below ? _mm_i32gather_epi32(cc->m_allSbbCtx[cc->m_curr_sbb_ctx_offset].sbbFlags, sbb_offsets_below, 1) : _mm_set1_epi32(0);
+      __m128i sbb_below = next_sbb_below ? _mm_i32gather_epi32((const int *)cc->m_allSbbCtx[cc->m_curr_sbb_ctx_offset].sbbFlags, sbb_offsets_below, 1) : _mm_set1_epi32(0);
 
       __m128i sig_sbb = _mm_or_epi32(sbb_right, sbb_below);
       sig_sbb         = _mm_and_epi32(sig_sbb, _mm_set1_epi32(0xff));
       sig_sbb = _mm_min_epi32(sig_sbb, _mm_set1_epi32(1));
-      __m256i sbb_frac_bits = _mm256_i32gather_epi64(cc->m_sbbFlagBits, sig_sbb, 8);
+      //__m256i sig_sbb_mask = _mm256_cvtepi32_epi64(sig_sbb);
+      //const __m256i duplication_mask = _mm256_setr_epi8(
+      //  0, 0, 0, 0, 0, 0, 0, 0,
+      //  1, 1, 1, 1, 1, 1, 1, 1, 
+      //  2, 2, 2, 2, 2, 2, 2, 2, 
+      //  3, 3, 3, 3, 3, 3, 3, 3);
+      //sig_sbb_mask = _mm256_shuffle_epi8(sig_sbb_mask, duplication_mask);
+      __m256i sbb_frac_bits = _mm256_i32gather_epi64((int64_t *)cc->m_sbbFlagBits[0], sig_sbb, 8);
+      //__m256i sbb_frac_bits = _mm256_loadu_epi64(cc->m_sbbFlagBits);
+      //sbb_frac_bits = _mm256_shu
       _mm256_storeu_epi64(state->m_sbbFracBits[state_offset], sbb_frac_bits);
 
       memset(&state->m_numSigSbb[state_offset], 0, 4);
@@ -1294,6 +1308,9 @@ static void update_state_eos_avx2(context_store* ctxs, const uint32_t scan_pos, 
       memcpy(&state->m_refSbbCtxId[state_offset], states, 4);
       if (all_have_previous_state) {
         __m128i rem_reg_bins = _mm_i32gather_epi32(state->m_remRegBins, prev_state, 4);
+        //prev_state_no_offset = _mm_shuffle_epi8(prev_state_no_offset, _mm_setr_epi8(0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3));
+        //__m128i rem_reg_bins = _mm_loadu_epi32(&state->m_remRegBins[previous_state_array[0] & 0xfc]);
+        //rem_reg_bins = _mm_shuffle_epi8(rem_reg_bins, mask);
         _mm_storeu_epi32(&state->m_remRegBins[state_offset], rem_reg_bins);
       } else {
         const int temp = (state->effWidth * state->effHeight * 28) / 16;
@@ -1335,7 +1352,7 @@ static void update_state_eos_avx2(context_store* ctxs, const uint32_t scan_pos, 
         case 5:
           {
             __m128i offset = _mm_add_epi32(levels_offsets, _mm_set1_epi32(nbOut->outPos[4]));
-            __m128i t = _mm_i32gather_epi32(absLevels, offset, 1);
+            __m128i t = _mm_i32gather_epi32((const int *)absLevels, offset, 1);
             t = _mm_and_epi32(t, first_byte);
             sum_abs = _mm_add_epi32(sum_abs, t);
             sum_num   = _mm_add_epi32(sum_num, _mm_min_epi32(t, ones));
@@ -1350,7 +1367,7 @@ static void update_state_eos_avx2(context_store* ctxs, const uint32_t scan_pos, 
           }
         case 4: {
             __m128i offset = _mm_add_epi32(levels_offsets, _mm_set1_epi32(nbOut->outPos[3]));
-            __m128i t = _mm_i32gather_epi32(absLevels, offset, 1);
+            __m128i t     = _mm_i32gather_epi32((const int*)absLevels, offset, 1);
             t = _mm_and_epi32(t, first_byte);
             sum_abs = _mm_add_epi32(sum_abs, t);
             sum_num   = _mm_add_epi32(sum_num, _mm_min_epi32(t, ones));
@@ -1363,7 +1380,7 @@ static void update_state_eos_avx2(context_store* ctxs, const uint32_t scan_pos, 
         }
         case 3: {
             __m128i offset = _mm_add_epi32(levels_offsets, _mm_set1_epi32(nbOut->outPos[2]));
-            __m128i t = _mm_i32gather_epi32(absLevels, offset, 1);
+            __m128i t     = _mm_i32gather_epi32((const int*)absLevels, offset, 1);
             t = _mm_and_epi32(t, first_byte);
             sum_abs = _mm_add_epi32(sum_abs, t);
             sum_num   = _mm_add_epi32(sum_num, _mm_min_epi32(t, ones));
@@ -1376,7 +1393,7 @@ static void update_state_eos_avx2(context_store* ctxs, const uint32_t scan_pos, 
         }
         case 2: {
             __m128i offset = _mm_add_epi32(levels_offsets, _mm_set1_epi32(nbOut->outPos[1]));
-            __m128i t = _mm_i32gather_epi32(absLevels, offset, 1);
+            __m128i t     = _mm_i32gather_epi32((const int*)absLevels, offset, 1);
             t = _mm_and_epi32(t, first_byte);
             sum_abs = _mm_add_epi32(sum_abs, t);
             sum_num   = _mm_add_epi32(sum_num, _mm_min_epi32(t, ones));
@@ -1389,7 +1406,7 @@ static void update_state_eos_avx2(context_store* ctxs, const uint32_t scan_pos, 
         }
         case 1: {
             __m128i offset = _mm_add_epi32(levels_offsets, _mm_set1_epi32(nbOut->outPos[0]));
-            __m128i t = _mm_i32gather_epi32(absLevels, offset, 1);
+            __m128i t = _mm_i32gather_epi32((const int*)absLevels, offset, 1);
             t = _mm_and_epi32(t, first_byte);
             sum_abs = _mm_add_epi32(sum_abs, t);
             sum_num = _mm_add_epi32(sum_num, _mm_min_epi32(t, ones));
@@ -1462,7 +1479,7 @@ static void update_state_eos_avx2(context_store* ctxs, const uint32_t scan_pos, 
     __m128i offsets = _mm_set_epi32(12 * 3, 12 * 2, 12 * 1, 12 * 0);
     offsets = _mm_add_epi32(offsets, _mm_set1_epi32(sigCtxOffsetNext));
     offsets         = _mm_add_epi32(offsets, sum_abs_min);
-    __m256i sig_frac_bits = _mm256_i32gather_epi64(state->m_sigFracBitsArray[state_offset][0], offsets, 8);
+    __m256i sig_frac_bits = _mm256_i32gather_epi64((const int64_t *)&state->m_sigFracBitsArray[state_offset][0][0], offsets, 8);
     _mm256_storeu_epi64(&state->m_sigFracBits[state_offset][0], sig_frac_bits);
 
 
@@ -1588,34 +1605,29 @@ static INLINE void update_states_avx2(
       __m128i prv_states = _mm_loadu_epi32(decisions->prevId);
       __m128i prev_offset = _mm_set1_epi32(ctxs->m_prev_state_offset);
       prv_states = _mm_add_epi32(prv_states, prev_offset);
-
-
-      //__m128i num_sig_sbb = _mm_i32gather_epi32(state->m_numSigSbb, prv_states, 1);
-      //__m128 mask = _mm_set_epi32(0xff, 0xff, 0xff, 0xff);
-      //num_sig_sbb 
-
-
-      int32_t prv_states_scalar[4];
-      _mm_storeu_epi32(prv_states_scalar, prv_states);
-      int8_t sig_sbb[4] = {state->m_numSigSbb[prv_states_scalar[0]], state->m_numSigSbb[prv_states_scalar[1]], state->m_numSigSbb[prv_states_scalar[2]], state->m_numSigSbb[prv_states_scalar[3]]};
-      for (int i = 0; i < 4; ++i) {
-        sig_sbb[i] = sig_sbb[i] || decisions->absLevel[i];
-      }
-      memcpy(&state->m_numSigSbb[state_offset], sig_sbb, 4);
-
-      __m128i ref_sbb_ctx_idx = _mm_i32gather_epi32(state->m_refSbbCtxId, prv_states, 1);
       __m128i control = _mm_setr_epi8(0, 4, 8, 12, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1);
-      ref_sbb_ctx_idx = _mm_shuffle_epi8(ref_sbb_ctx_idx, control);
+      __m128i shuffled_prev_states = _mm_shuffle_epi8(prv_states, control);
+      
+      __m128i sig_sbb = _mm_loadu_epi32(state->m_numSigSbb);
+      sig_sbb = _mm_shuffle_epi8(sig_sbb, shuffled_prev_states);
+      __m128i has_coeff = _mm_min_epi32(abs_level, _mm_set1_epi32(1));
+      has_coeff         = _mm_shuffle_epi8(has_coeff, control);
+      sig_sbb           = _mm_or_epi32(sig_sbb, has_coeff);
+      int sig_sbb_i = _mm_extract_epi32(sig_sbb, 0);
+      memcpy(&state->m_numSigSbb[state_offset], &sig_sbb_i, 4);
+      
+      __m128i ref_sbb_ctx_idx = _mm_loadu_epi32(state->m_refSbbCtxId);
+      ref_sbb_ctx_idx = _mm_shuffle_epi8(ref_sbb_ctx_idx, shuffled_prev_states);
       int ref_sbb_ctx = _mm_extract_epi32(ref_sbb_ctx_idx, 0);
       memcpy(&state->m_refSbbCtxId[state_offset], &ref_sbb_ctx, 4);
-
-      __m128i go_rice_par = _mm_i32gather_epi32(state->m_goRicePar, prv_states, 1);
-      go_rice_par = _mm_shuffle_epi8(go_rice_par, control);
+      
+      __m128i go_rice_par = _mm_loadu_epi32(state->m_goRicePar);
+      go_rice_par = _mm_shuffle_epi8(go_rice_par, shuffled_prev_states);
       int go_rice_par_i = _mm_extract_epi32(go_rice_par, 0);
       memcpy(&state->m_goRicePar[state_offset], &go_rice_par_i, 4);
 
       
-      __m256i sbb_frac_bits = _mm256_i32gather_epi64(state->m_sbbFracBits, prv_states, 8);
+      __m256i sbb_frac_bits = _mm256_i32gather_epi64((const int64_t *)state->m_sbbFracBits[0], prv_states, 8);
       _mm256_storeu_epi64(&state->m_sbbFracBits[state_offset][0], sbb_frac_bits);
 
       __m128i rem_reg_bins = _mm_i32gather_epi32(state->m_remRegBins, prv_states, 4);
@@ -1638,6 +1650,8 @@ static INLINE void update_states_avx2(
       bit_mask = _mm_movemask_epi8(mask); 
       rem_reg_all_lt4 = (bit_mask == 0xFFFF);
 
+      int32_t prv_states_scalar[4];
+      _mm_storeu_epi32(prv_states_scalar, prv_states);
       for (int i = 0; i < 4; ++i) {
         memcpy(state->m_absLevelsAndCtxInit[state_offset + i], state->m_absLevelsAndCtxInit[prv_states_scalar[i]], 48 * sizeof(uint8_t));        
       }
@@ -1713,19 +1727,19 @@ static INLINE void update_states_avx2(
       const __m128i levels_start_offsets = _mm_set_epi32(48 * 3, 48 * 2, 48 * 1, 48 * 0);
       const __m128i ctx_start_offsets = _mm_srli_epi32(levels_start_offsets, 1);
       __m128i        tinit = _mm_i32gather_epi32(
-        state->m_absLevelsAndCtxInit[state_offset],
+        (int *)state->m_absLevelsAndCtxInit[state_offset],
         _mm_add_epi32(ctx_start_offsets, _mm_set1_epi32(tinit_offset)),
         2);
       tinit = _mm_and_epi32(tinit, first_two_bytes);
       __m128i sum_abs1 = _mm_and_epi32(_mm_srli_epi32(tinit, 3), _mm_set1_epi32(31));
       __m128i sum_num = _mm_and_epi32(tinit, _mm_set1_epi32(7));
 
-      uint8_t* levels = state->m_absLevelsAndCtxInit[state_offset];
+      uint8_t* levels = (uint8_t*)state->m_absLevelsAndCtxInit[state_offset];
       switch (numIPos) {
       case 5:
         {
           __m128i t = _mm_i32gather_epi32(
-            levels,
+            (int *)levels,
             _mm_add_epi32(levels_start_offsets, _mm_set1_epi32(next_nb_info_ssb.inPos[4])),
             1);
           t = _mm_and_epi32(t, first_byte);
@@ -1744,7 +1758,7 @@ static INLINE void update_states_avx2(
       case 4:
         {
           __m128i t = _mm_i32gather_epi32(
-            levels,
+            (int*)levels,
             _mm_add_epi32(levels_start_offsets, _mm_set1_epi32(next_nb_info_ssb.inPos[3])),
             1);
           t = _mm_and_epi32(t, first_byte);
@@ -1763,7 +1777,7 @@ static INLINE void update_states_avx2(
       case 3:
         {
           __m128i t = _mm_i32gather_epi32(
-            levels,
+            (int*)levels,
             _mm_add_epi32(levels_start_offsets, _mm_set1_epi32(next_nb_info_ssb.inPos[2])),
             1);
           t = _mm_and_epi32(t, first_byte);
@@ -1782,7 +1796,7 @@ static INLINE void update_states_avx2(
       case 2:
         {
           __m128i t = _mm_i32gather_epi32(
-            levels,
+            (int*)levels,
             _mm_add_epi32(levels_start_offsets, _mm_set1_epi32(next_nb_info_ssb.inPos[1])),
             1);
           t = _mm_and_epi32(t, first_byte);
@@ -1800,7 +1814,7 @@ static INLINE void update_states_avx2(
         }
       case 1: {
           __m128i t = _mm_i32gather_epi32(
-            levels,
+            (int*)levels,
             _mm_add_epi32(levels_start_offsets, _mm_set1_epi32(next_nb_info_ssb.inPos[0])),
             1);
           t = _mm_and_epi32(t, first_byte);
@@ -1826,7 +1840,7 @@ static INLINE void update_states_avx2(
         _mm_srli_epi32(_mm_add_epi32(sum_abs1, ones), 1),
         _mm_set1_epi32(3));
       offsets = _mm_add_epi32(offsets, temp);
-      __m256i sig_frac_bits = _mm256_i32gather_epi64(state->m_sigFracBitsArray[state_offset][0], offsets, 8);
+      __m256i sig_frac_bits = _mm256_i32gather_epi64((const int64_t *)state->m_sigFracBitsArray[state_offset][0], offsets, 8);
       _mm256_storeu_epi64(&state->m_sigFracBits[state_offset][0], sig_frac_bits);
 
       sum_gt1 = _mm_min_epi32(sum_gt1, _mm_set1_epi32(4));
@@ -1843,7 +1857,7 @@ static INLINE void update_states_avx2(
         case 5:
           {
           __m128i t = _mm_i32gather_epi32(
-            levels,
+            (int*)levels,
             _mm_add_epi32(levels_start_offsets, _mm_set1_epi32(next_nb_info_ssb.inPos[4])),
             1);
           sum_abs = _mm_add_epi32(t, sum_abs);
@@ -1851,7 +1865,7 @@ static INLINE void update_states_avx2(
         case 4:
           {
           __m128i t = _mm_i32gather_epi32(
-            levels,
+            (int*)levels,
             _mm_add_epi32(levels_start_offsets, _mm_set1_epi32(next_nb_info_ssb.inPos[3])),
             1);
           sum_abs = _mm_add_epi32(t, sum_abs);
@@ -1859,7 +1873,7 @@ static INLINE void update_states_avx2(
         case 3:
           {
           __m128i t = _mm_i32gather_epi32(
-            levels,
+            (int*)levels,
             _mm_add_epi32(levels_start_offsets, _mm_set1_epi32(next_nb_info_ssb.inPos[2])),
             1);
           sum_abs = _mm_add_epi32(t, sum_abs);
@@ -1867,7 +1881,7 @@ static INLINE void update_states_avx2(
         case 2:
           {
           __m128i t = _mm_i32gather_epi32(
-            levels,
+            (int*)levels,
             _mm_add_epi32(levels_start_offsets, _mm_set1_epi32(next_nb_info_ssb.inPos[1])),
             1);
           sum_abs = _mm_add_epi32(t, sum_abs);
@@ -1875,7 +1889,7 @@ static INLINE void update_states_avx2(
         case 1:
           {
           __m128i t = _mm_i32gather_epi32(
-            levels,
+            (int*)levels,
             _mm_add_epi32(levels_start_offsets, _mm_set1_epi32(next_nb_info_ssb.inPos[0])),
             1);
           sum_abs = _mm_add_epi32(t, sum_abs);
@@ -1901,15 +1915,14 @@ static INLINE void update_states_avx2(
     }
 
     else if (rem_reg_all_lt4) {
-      uint8_t*       levels = state->m_absLevelsAndCtxInit[state_offset];
+      uint8_t*       levels = (uint8_t*)state->m_absLevelsAndCtxInit[state_offset];
       const __m128i  last_two_bytes = _mm_set1_epi32(0xffff);
       const __m128i  last_byte = _mm_set1_epi32(0xff);
-      const __m128i  ones = _mm_set1_epi32(1);
       const uint32_t tinit_offset = MIN(level_offset - 1u, 15u) + 8;
       const __m128i levels_start_offsets = _mm_set_epi32(48 * 3, 48 * 2, 48 * 1, 48 * 0);
       const __m128i ctx_start_offsets = _mm_srli_epi32(levels_start_offsets, 1);
       __m128i       tinit = _mm_i32gather_epi32(
-        state->m_absLevelsAndCtxInit[state_offset],
+        (int*)state->m_absLevelsAndCtxInit[state_offset],
         _mm_add_epi32(ctx_start_offsets, _mm_set1_epi32(tinit_offset)),
         2);
       tinit = _mm_and_epi32(tinit, last_two_bytes);
@@ -1917,7 +1930,7 @@ static INLINE void update_states_avx2(
       switch (numIPos) {
         case 5: {
           __m128i t = _mm_i32gather_epi32(
-            levels,
+            (int*)levels,
             _mm_add_epi32(levels_start_offsets, _mm_set1_epi32(next_nb_info_ssb.inPos[4])),
             1);
           t = _mm_and_epi32(t, last_byte);
@@ -1925,7 +1938,7 @@ static INLINE void update_states_avx2(
         }
         case 4: {
           __m128i t = _mm_i32gather_epi32(
-            levels,
+            (int*)levels,
             _mm_add_epi32(levels_start_offsets, _mm_set1_epi32(next_nb_info_ssb.inPos[3])),
             1);
           t = _mm_and_epi32(t, last_byte);
@@ -1933,7 +1946,7 @@ static INLINE void update_states_avx2(
         }
         case 3: {
           __m128i t = _mm_i32gather_epi32(
-            levels,
+            (int*)levels,
             _mm_add_epi32(levels_start_offsets, _mm_set1_epi32(next_nb_info_ssb.inPos[2])),
             1);
           t = _mm_and_epi32(t, last_byte);
@@ -1941,7 +1954,7 @@ static INLINE void update_states_avx2(
         }
         case 2: {
           __m128i t = _mm_i32gather_epi32(
-            levels,
+            (int*)levels,
             _mm_add_epi32(levels_start_offsets, _mm_set1_epi32(next_nb_info_ssb.inPos[1])),
             1);
           t = _mm_and_epi32(t, last_byte);
@@ -1949,7 +1962,7 @@ static INLINE void update_states_avx2(
         }
         case 1: {
           __m128i t = _mm_i32gather_epi32(
-            levels,
+            (int*)levels,
             _mm_add_epi32(levels_start_offsets, _mm_set1_epi32(next_nb_info_ssb.inPos[0])),
             1);
           t = _mm_and_epi32(t, last_byte);
@@ -2205,7 +2218,7 @@ static INLINE void updateState(
 
 static bool same[13];
 static void xDecideAndUpdate(
-  rate_estimator*                         re,
+  rate_estimator_t*                         re,
   context_store*                          ctxs,
   struct dep_quant_scan_info const* const scan_info,
   const coeff_t                           absCoeff,
@@ -2215,8 +2228,8 @@ static void xDecideAndUpdate(
   const NbInfoSbb                         next_nb_info_ssb,
   bool                                    zeroOut,
   coeff_t                                 quantCoeff,
-  int                                     effWidth,
-  int                                     effHeight,
+  const uint32_t                          effWidth,
+  const uint32_t                          effHeight,
   bool                                    is_chroma)
 {
   Decision* decisions = &ctxs->m_trellis[scan_pos];
@@ -2356,8 +2369,8 @@ int uvg_dep_quant(
   }
 
   //===== real init =====
-  rate_estimator* rate_estimator = compID == COLOR_Y && cur_tu->type == CU_INTRA && cur_tu->intra.isp_mode != ISP_MODE_NO_ISP ?
-    &state->rate_estimator[3] : &state->rate_estimator[compID];
+  rate_estimator_t* rate_estimator = (rate_estimator_t *)(compID == COLOR_Y && cur_tu->type == CU_INTRA && cur_tu->intra.isp_mode != ISP_MODE_NO_ISP ?
+    &state->rate_estimator[3] : &state->rate_estimator[compID]);
   if(rate_estimator->needs_init || cur_tu->type == CU_INTER) {
     init_rate_esimator(rate_estimator, &state->search_cabac, compID);
     xSetLastCoeffOffset(state, cur_tu, width, height, rate_estimator, compID);

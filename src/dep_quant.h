@@ -81,7 +81,7 @@ typedef struct
   uint32_t m_sigFracBits[SM_NUM_CTX_SETS_SIG][SM_MAX_NUM_SIG_CTX][2];
   int32_t  m_gtxFracBits[SM_MAX_NUM_GTX_CTX][6];
   bool     needs_init;
-} rate_estimator;
+} rate_estimator_t;
 
 
 typedef struct

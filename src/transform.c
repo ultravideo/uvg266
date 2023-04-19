@@ -437,6 +437,7 @@ static void quantize_chroma(
   int8_t height = cu_loc->chroma_height;
   if(state->encoder_control->cfg.dep_quant && transform != CHROMA_TS) {
     int abs_sum = 0;
+    state->quant_blocks[1].needs_init = state->encoder_control->cfg.jccr;
     uvg_dep_quant(
       state,
       cur_tu,
