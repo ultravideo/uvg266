@@ -1202,7 +1202,7 @@ static void update_state_eos_avx2(context_store* ctxs, const uint32_t scan_pos, 
         _mm_load_si128((const __m128i*)decisions->prevId)
       );
       __m128i control = _mm_setr_epi8(0, 4, 8, 12, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1);
-      __m128i prev_state_with_ff_high_bytes = _mm_or_epi32(prev_state, _mm_set1_epi32(0xffffff00));
+      __m128i prev_state_with_ff_high_bytes = _mm_or_si128(prev_state, _mm_set1_epi32(0xffffff00));
       __m128i num_sig_sbb = _mm_load_si128((const __m128i*)state->m_numSigSbb);
       num_sig_sbb = _mm_shuffle_epi8(num_sig_sbb, prev_state_with_ff_high_bytes);
       num_sig_sbb = _mm_add_epi32(
@@ -1281,7 +1281,7 @@ static void update_state_eos_avx2(context_store* ctxs, const uint32_t scan_pos, 
       __m128i sbb_offsets_below = _mm_add_epi32(sbb_offsets, _mm_set1_epi32(next_sbb_below));
       __m128i sbb_below = next_sbb_below ? _mm_i32gather_epi32((const int *)cc->m_allSbbCtx[cc->m_curr_sbb_ctx_offset].sbbFlags, sbb_offsets_below, 1) : _mm_set1_epi32(0);
 
-      __m128i sig_sbb = _mm_or_epi32(sbb_right, sbb_below);
+      __m128i sig_sbb = _mm_or_si128(sbb_right, sbb_below);
       sig_sbb         = _mm_and_si128(sig_sbb, _mm_set1_epi32(0xff));
       sig_sbb = _mm_min_epi32(sig_sbb, _mm_set1_epi32(1));
       __m256i sbb_frac_bits = _mm256_i32gather_epi64((int64_t *)cc->m_sbbFlagBits[0], sig_sbb, 8);
@@ -1595,7 +1595,7 @@ static INLINE void update_states_avx2(
       sig_sbb = _mm_shuffle_epi8(sig_sbb, shuffled_prev_states);
       __m128i has_coeff = _mm_min_epi32(abs_level, _mm_set1_epi32(1));
       has_coeff         = _mm_shuffle_epi8(has_coeff, control);
-      sig_sbb           = _mm_or_epi32(sig_sbb, has_coeff);
+      sig_sbb           = _mm_or_si128(sig_sbb, has_coeff);
       int sig_sbb_i = _mm_extract_epi32(sig_sbb, 0);
       memcpy(&state->m_numSigSbb[state_offset], &sig_sbb_i, 4);
       
