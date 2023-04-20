@@ -366,6 +366,18 @@ static void check_rd_costs_avx2(const all_depquant_states* const state, const en
 }
 
 
+static INLINE void checkRdCostSkipSbbZeroOut(
+  Decision*                        decision,
+  const all_depquant_states* const state,
+  int                              decision_id,
+  int                              skip_offset)
+{
+  int64_t rdCost = state->m_rdCost[decision_id + skip_offset] + state->m_sbbFracBits[decision_id + skip_offset][0];
+  decision->rdCost[decision_id] = rdCost;
+  decision->absLevel[decision_id] = 0;
+  decision->prevId[decision_id] = 4 + state->m_stateId[decision_id + skip_offset];
+}
+
 
 static INLINE void checkRdCostSkipSbb(const all_depquant_states* const state, Decision * decisions, int decision_id, int skip_offset)
 {
@@ -1265,11 +1277,7 @@ static INLINE void update_states_avx2(
           }
 #undef UPDATE
           if (extRiceFlag) {
-            unsigned currentShift = templateAbsCompare(sumAbs);
-            sumAbs = sumAbs >> currentShift;
-            int sumAll = MAX(MIN(31, (int)sumAbs - (int)baseLevel), 0);
-            state->m_goRicePar[state_id] = g_goRiceParsCoeff[sumAll];
-            state->m_goRicePar[state_id] += currentShift;
+            assert(0 && "Not implemented for avx2");
           } else {
             int sumAll = MAX(MIN(31, (int)sumAbs - 4 * 5), 0);
             state->m_goRicePar[state_id] = g_goRiceParsCoeff[sumAll];
@@ -1291,11 +1299,7 @@ static INLINE void update_states_avx2(
           }
 #undef UPDATE
           if (extRiceFlag) {
-            unsigned currentShift = templateAbsCompare(sumAbs);
-            sumAbs = sumAbs >> currentShift;
-            sumAbs = MIN(31, sumAbs);
-            state->m_goRicePar[state_id] = g_goRiceParsCoeff[sumAbs];
-            state->m_goRicePar[state_id] += currentShift;
+            assert(0 && "Not implemented for avx2");
           } else {
             sumAbs = MIN(31, sumAbs);
             state->m_goRicePar[state_id] = g_goRiceParsCoeff[sumAbs];
