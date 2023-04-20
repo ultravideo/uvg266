@@ -60,9 +60,6 @@ static const int g_riceShift[5] = { 0, 2, 4, 6, 8 };
 static const uint32_t g_goRiceParsCoeff[32] = { 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 2, 2,
                                          2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3 };
 
-enum ScanPosType { SCAN_ISCSBB = 0, SCAN_SOCSBB = 1, SCAN_EOCSBB = 2 };
-
-
 static void check_rd_costs_avx2(const all_depquant_states* const state, const enum ScanPosType spt, const PQData* pqDataA, Decision* decisions, int start)
 {
   int64_t temp_rd_cost_a[4] = {0, 0, 0, 0};

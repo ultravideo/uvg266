@@ -46,6 +46,8 @@
 
 typedef struct encoder_control_t encoder_control_t;
 
+enum ScanPosType { SCAN_ISCSBB = 0, SCAN_SOCSBB = 1, SCAN_EOCSBB = 2 };
+
 struct dep_quant_scan_info
 {
   uint8_t sig_ctx_offset[2];

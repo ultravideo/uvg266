@@ -54,8 +54,6 @@ static const int g_riceShift[5] = { 0, 2, 4, 6, 8 };
 static const uint32_t g_goRiceParsCoeff[32] = { 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 2, 2,
                                          2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3 };
 
-enum ScanPosType { SCAN_ISCSBB = 0, SCAN_SOCSBB = 1, SCAN_EOCSBB = 2 };
-
 
 int uvg_init_nb_info(encoder_control_t * encoder) {
   memset(encoder->m_scanId2NbInfoSbbArray, 0, sizeof(encoder->m_scanId2NbInfoSbbArray));
@@ -697,7 +695,7 @@ void uvg_dep_quant_update_state(
   int             decision_id) {
   all_depquant_states* state = &ctxs->m_allStates;
   int state_id = ctxs->m_curr_state_offset + decision_id;
-  // state->m_rdCost[state_id] = decisions->rdCost[decision_id];
+  state->m_rdCost[state_id] = decisions->rdCost[decision_id];
   if (decisions->prevId[decision_id] > -2) {
     if (decisions->prevId[decision_id] >= 0) {
       const int prvState = ctxs->m_prev_state_offset + decisions->prevId[decision_id];

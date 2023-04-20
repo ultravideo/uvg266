@@ -61,15 +61,6 @@ static const int32_t g_goRiceBits[4][RICEMAX] = {
    229376, 229376, 229376, 229376, 229376, 229376, 229376, 229376},
 };
 
-static const int      g_riceT[4]            = {32, 128, 512, 2048};
-static const int      g_riceShift[5]        = {0, 2, 4, 6, 8};
-
-static const uint32_t g_goRiceParsCoeff[32] = {0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1,
-                                               1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2,
-                                               2, 2, 2, 2, 2, 2, 3, 3, 3, 3};
-
-enum ScanPosType { SCAN_ISCSBB = 0, SCAN_SOCSBB = 1, SCAN_EOCSBB = 2 };
-
 
 static INLINE void checkRdCostSkipSbbZeroOut(
   Decision* decision, 
