@@ -437,7 +437,7 @@ static void quantize_chroma(
   int8_t height = cu_loc->chroma_height;
   if(state->encoder_control->cfg.dep_quant && transform != CHROMA_TS) {
     int abs_sum = 0;
-    state->quant_blocks[1].needs_init = state->encoder_control->cfg.jccr;
+    state->quant_blocks[2].needs_init = state->encoder_control->cfg.jccr;
     uvg_dep_quant(
       state,
       cur_tu,
@@ -1561,8 +1561,6 @@ void uvg_quantize_lcu_residual(
     uvg_cu_loc_ctor(&loc, x, y, width, height);
 
     if (luma) {
-      state->quant_blocks[0].needs_init = true;
-      state->rate_estimator[0].needs_init = true;
       quantize_tr_residual(state, COLOR_Y, &loc, cur_pu, lcu, early_skip, tree_type);
     }
     double c_lambda = state->c_lambda;
