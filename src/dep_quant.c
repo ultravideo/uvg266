@@ -908,6 +908,8 @@ int uvg_dep_quant(
     init_rate_esimator(rate_estimator, &state->search_cabac, compID);
     xSetLastCoeffOffset(state, cur_tu, width, height, rate_estimator, compID);
     rate_estimator->needs_init = false;
+  } else if (compID == COLOR_U && state->encoder_control->cfg.jccr) {
+    xSetLastCoeffOffset(state, cur_tu, width, height, rate_estimator, compID);    
   }
 
   reset_common_context(&dep_quant_context.m_common_context, rate_estimator, (width * height) >> 4, numCoeff);

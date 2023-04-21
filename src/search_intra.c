@@ -1971,6 +1971,7 @@ void uvg_search_cu_intra(
     }
 
     state->quant_blocks[0].needs_init = 1;
+    state->rate_estimator[0].needs_init = 1;
     search_intra_rdo(
       state,
       number_of_modes_to_search,

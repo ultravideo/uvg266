@@ -1414,6 +1414,7 @@ static double search_cu(
           else {
             intra_search.pred_cu.intra.mode_chroma = 0;
           }
+          state->quant_blocks[2].needs_init = true;
           uvg_intra_recon_cu(state,
                              &intra_search, chroma_loc,
                              &intra_search.pred_cu, lcu,
