@@ -35,6 +35,7 @@
 */
 
 #include "strategies/avx2/depquant-avx2.h"
+#include "strategyselector.h"
 
 #if COMPILE_INTEL_AVX2 && defined X86_64
 #include "dep_quant.h"
@@ -352,13 +353,13 @@ static void check_rd_costs_avx2(const all_depquant_states* const state, const en
   __m256i cheaper_first = _mm256_blendv_epi8(rd_cost_a, rd_cost_b, a_vs_b);
   __m256i cheaper_first_data = _mm256_blendv_epi8(a_data, b_data, a_vs_b);
 
-  __m256i z_vs_decision = _mm256_cmpgt_epi64(rd_cost_z, rd_cost_decision);
-  __m256i cheaper_second = _mm256_blendv_epi8(rd_cost_z, rd_cost_decision, z_vs_decision);
-  __m256i cheaper_second_data = _mm256_blendv_epi8(z_data, decision_data, z_vs_decision);
+  __m256i z_vs_decision = _mm256_cmpgt_epi64(rd_cost_decision, rd_cost_z);
+  __m256i cheaper_second = _mm256_blendv_epi8(rd_cost_decision, rd_cost_z, z_vs_decision);
+  __m256i cheaper_second_data = _mm256_blendv_epi8(decision_data, z_data, z_vs_decision);
 
-  __m256i final_decision = _mm256_cmpgt_epi64(cheaper_first, cheaper_second);
-  __m256i final_rd_cost = _mm256_blendv_epi8(cheaper_first, cheaper_second, final_decision);
-  __m256i final_data = _mm256_blendv_epi8(cheaper_first_data, cheaper_second_data, final_decision);
+  __m256i final_decision = _mm256_cmpgt_epi64(cheaper_second, cheaper_first);
+  __m256i final_rd_cost = _mm256_blendv_epi8(cheaper_second, cheaper_first, final_decision);
+  __m256i final_data = _mm256_blendv_epi8(cheaper_second_data, cheaper_first_data, final_decision);
 
   _mm256_store_si256((__m256i*)decisions->rdCost, final_rd_cost);
   final_data = _mm256_permutevar8x32_epi32(final_data, _mm256_set_epi32(7, 5, 3, 1, 6, 4, 2, 0));
@@ -952,7 +953,7 @@ static INLINE void update_states_avx2(
       }
     }
     uint32_t level_offset = scan_pos & 15;
-    __m128i   max_abs = _mm_min_epi32(abs_level, _mm_set1_epi32(32));
+    __m128i   max_abs = _mm_min_epi32(abs_level, _mm_set1_epi32(51));
     uint32_t max_abs_s[4];
     _mm_storeu_si128((__m128i*)max_abs_s, max_abs);
     for (int i = 0; i < 4; ++i) {
@@ -1094,7 +1095,7 @@ static INLINE void update_states_avx2(
       }
 
       __m128i sum_abs = _mm_srli_epi32(tinit, 8);
-      sum_abs = _mm_min_epi32(sum_abs, _mm_set1_epi32(32));
+      sum_abs = _mm_min_epi32(sum_abs, _mm_set1_epi32(51));
       switch (numIPos) {
         case 5:
           {
@@ -1103,6 +1104,9 @@ static INLINE void update_states_avx2(
             _mm_add_epi32(levels_start_offsets, _mm_set1_epi32(next_nb_info_ssb.inPos[4])),
             1);
           sum_abs = _mm_add_epi32(t, sum_abs);
+          // Need this to make sure we don't go beyond 255
+          sum_abs = _mm_and_si128(sum_abs, first_byte);
+          sum_abs = _mm_min_epi32(sum_abs, _mm_set1_epi32(51));
           }
         case 4:
           {

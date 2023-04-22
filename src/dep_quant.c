@@ -664,7 +664,7 @@ void uvg_dep_quant_update_state_eos(
       memset(state->m_absLevelsAndCtxInit[curr_state_offset], 0, 16 * sizeof(uint8_t));
     }
     uint8_t* temp = (uint8_t*)(&state->m_absLevelsAndCtxInit[curr_state_offset][scan_pos & 15]);
-    *temp = (uint8_t)MIN(32, decisions->absLevel[decision_id]);
+    *temp = (uint8_t)MIN(51, decisions->absLevel[decision_id]);
 
     update_common_context(ctxs, state->m_commonCtx, scan_pos, cg_pos, width_in_sbb, height_in_sbb, next_sbb_right,
                           next_sbb_below, prvState, ctxs->m_curr_state_offset + decision_id);
