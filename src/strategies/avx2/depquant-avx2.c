@@ -749,10 +749,10 @@ static void update_state_eos_avx2(context_store* ctxs, const uint32_t scan_pos, 
       v_tmp[2] = _mm256_permute4x64_epi64(v_tmp16_hi[0], _MM_SHUFFLE(3, 1, 2, 0));
       v_tmp[3] = _mm256_permute4x64_epi64(v_tmp16_hi[1], _MM_SHUFFLE(3, 1, 2, 0));
 
-      _mm256_store_si256((__m256i*)(state->m_absLevelsAndCtxInit[state_offset] + 8),  _mm256_permute2x128_si256(v_tmp[0], v_tmp[1], 0x20));
-      _mm256_store_si256((__m256i*)(state->m_absLevelsAndCtxInit[state_offset + 1] + 8),  _mm256_permute2x128_si256(v_tmp[0], v_tmp[1], 0x31));
-      _mm256_store_si256((__m256i*)(state->m_absLevelsAndCtxInit[state_offset + 2] + 8),  _mm256_permute2x128_si256(v_tmp[2], v_tmp[3], 0x20));
-      _mm256_store_si256((__m256i*)(state->m_absLevelsAndCtxInit[state_offset + 3] + 8),  _mm256_permute2x128_si256(v_tmp[2], v_tmp[3], 0x31));
+      _mm256_storeu_si256((__m256i*)(state->m_absLevelsAndCtxInit[state_offset] + 8),  _mm256_permute2x128_si256(v_tmp[0], v_tmp[1], 0x20));
+      _mm256_storeu_si256((__m256i*)(state->m_absLevelsAndCtxInit[state_offset + 1] + 8),  _mm256_permute2x128_si256(v_tmp[0], v_tmp[1], 0x31));
+      _mm256_storeu_si256((__m256i*)(state->m_absLevelsAndCtxInit[state_offset + 2] + 8),  _mm256_permute2x128_si256(v_tmp[2], v_tmp[3], 0x20));
+      _mm256_storeu_si256((__m256i*)(state->m_absLevelsAndCtxInit[state_offset + 3] + 8),  _mm256_permute2x128_si256(v_tmp[2], v_tmp[3], 0x31));
 
       for (int i = 0; i < 4; ++i) {
         memset(state->m_absLevelsAndCtxInit[state_offset + i], 0, 16);
