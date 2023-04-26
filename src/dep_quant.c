@@ -656,7 +656,7 @@ void uvg_dep_quant_update_state_eos(
     }
     else if (decisions->prevId[decision_id] >= 0) {
       prvState = ctxs->m_prev_state_offset + decisions->prevId[decision_id];
-      state->m_numSigSbb[curr_state_offset] = state->m_numSigSbb[prvState] + !!decisions->absLevel[decision_id];
+      state->m_numSigSbb[curr_state_offset] = state->m_numSigSbb[prvState] || !!decisions->absLevel[decision_id];
       memcpy(state->m_absLevelsAndCtxInit[curr_state_offset], state->m_absLevelsAndCtxInit[prvState], 16 * sizeof(uint8_t));
     }
     else {
