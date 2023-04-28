@@ -804,7 +804,6 @@ void uvg_dep_quant_update_state(
   }
 }
 
-static bool same[13];
 
 int uvg_dep_quant(
   const encoder_state_t* const state,
@@ -889,14 +888,15 @@ int uvg_dep_quant(
     height >= 4) {
     firstTestPos =((width == 4 && height == 4) || (width == 8 && height == 8)) ? 7 : 15;
   }
-  const int32_t default_quant_coeff = dep_quant_context.m_quant->m_QScale;
-  const int32_t thres               = dep_quant_context.m_quant->m_thresLast;
-  for (; firstTestPos >= 0; firstTestPos--) {
-    coeff_t thresTmp = (enableScalingLists) ? (thres / (4 * q_coeff[scan[firstTestPos]])) : (thres / (4 * default_quant_coeff));
-    if (abs(srcCoeff[scan[firstTestPos]]) > thresTmp) {
-      break;
-    }
-  }
+  uvg_find_first_non_zero_coeff(
+    srcCoeff,
+    enableScalingLists,
+    dep_quant_context,
+    scan,
+    q_coeff,
+    &firstTestPos,
+    width, 
+    height);
   if (firstTestPos < 0) {
     return 0;
   }
@@ -962,6 +962,7 @@ int uvg_dep_quant(
   const uint32_t height_in_sbb = MAX(height >> 2, 1);
   const uint32_t width_in_sbb = MAX(width >> 2, 1);
 
+  const int      default_quant_coeff = dep_quant_context.m_quant->m_QScale;
   //===== populate trellis =====
   for (int scanIdx = firstTestPos; scanIdx >= 0; scanIdx--) {
     uint32_t blkpos = scan[scanIdx];

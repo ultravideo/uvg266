@@ -227,12 +227,26 @@ static void uvg_dep_quant_decide_and_update_generic(
 }
 
 
+void uvg_find_first_non_zero_generic(const coeff_t* srcCoeff, const bool enableScalingLists, context_store dep_quant_context, const uint32_t* const scan, const int32_t* q_coeff, int* firstTestPos, int width, int height)
+{
+  const int default_quant_coeff = dep_quant_context.m_quant->m_QScale;
+  const int32_t thres  = dep_quant_context.m_quant->m_thresLast;
+  int temp = *firstTestPos;
+  for (; temp >= 0; (temp)--) {
+    coeff_t thresTmp = (enableScalingLists) ? (thres / (4 * q_coeff[scan[(temp)]])) : (thres / (4 * default_quant_coeff));
+    if (abs(srcCoeff[scan[(temp)]]) > thresTmp) {
+      break;
+    }
+  }
+  *firstTestPos = temp;
+}
+
 int uvg_strategy_register_depquant_generic(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
   
-  success &= uvg_strategyselector_register(opaque, "dep_quant_decide_and_update", "generic", 40, &uvg_dep_quant_decide_and_update_generic);
-
+  success &= uvg_strategyselector_register(opaque, "dep_quant_decide_and_update", "generic", 0, &uvg_dep_quant_decide_and_update_generic);
+  success &= uvg_strategyselector_register(opaque, "find_first_non_zero_coeff", "generic", 0, &uvg_find_first_non_zero_generic);
 
   return success;
 }

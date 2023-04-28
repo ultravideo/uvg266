@@ -61,16 +61,27 @@ typedef int(dep_quant_decide_and_update_func)(
   const uint32_t                          effHeight,
   bool                                    is_chroma);
 
+typedef void(find_first_non_zero_coeff_func)(
+  const coeff_t*        srcCoeff,
+  const bool            enableScalingLists,
+  context_store         dep_quant_context,
+  const uint32_t* const scan,
+  const int32_t*        q_coeff,
+  int*                  firstTestPos,
+  int                   width,
+  int                   height);
 
 
 // Declare function pointers.
 extern dep_quant_decide_and_update_func* uvg_dep_quant_decide_and_update;
+extern find_first_non_zero_coeff_func* uvg_find_first_non_zero_coeff;
 
 int uvg_strategy_register_depquant(void* opaque, uint8_t bitdepth);
 
 
 #define STRATEGIES_DEPQUANT_EXPORTS \
   {"dep_quant_decide_and_update", (void**)&uvg_dep_quant_decide_and_update}, \
+  {"find_first_non_zero_coeff", (void**)&uvg_find_first_non_zero_coeff}, \
 
 
 

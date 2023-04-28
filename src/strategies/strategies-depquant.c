@@ -39,6 +39,7 @@
 
 // Define function pointers.
 dep_quant_decide_and_update_func* uvg_dep_quant_decide_and_update;
+find_first_non_zero_coeff_func* uvg_find_first_non_zero_coeff;
 
 
 int uvg_strategy_register_depquant(void *opaque, uint8_t bitdepth)
