@@ -570,10 +570,11 @@ static INLINE void update_common_context(
   const int        prev_state,
   const int        curr_state)
 {
-  const uint32_t numSbb = width_in_sbb * height_in_sbb;
-  uint8_t* sbbFlags = cc->m_allSbbCtx[cc->m_curr_sbb_ctx_offset + (curr_state & 3)].sbbFlags;
-  uint8_t* levels = cc->m_allSbbCtx[cc->m_curr_sbb_ctx_offset + (curr_state & 3)].levels;
-  size_t setCpSize = cc->m_nbInfo[scan_pos - 1].maxDist * sizeof(uint8_t);
+  const uint32_t numSbb    = width_in_sbb * height_in_sbb;
+  const int     curr_state_without_offset         = curr_state & 3;
+  uint8_t*       sbbFlags  = cc->m_allSbbCtx[cc->m_curr_sbb_ctx_offset + curr_state_without_offset].sbbFlags;
+  uint8_t*       levels    = cc->m_allSbbCtx[cc->m_curr_sbb_ctx_offset + curr_state_without_offset].levels;
+  size_t         setCpSize = cc->m_nbInfo[scan_pos - 1].maxDist * sizeof(uint8_t);
   if (prev_state != -1 && ctxs->m_allStates.m_refSbbCtxId[prev_state] >= 0) {
     memcpy(sbbFlags, cc->m_allSbbCtx[cc->m_prev_sbb_ctx_offset + ctxs->m_allStates.m_refSbbCtxId[prev_state]].sbbFlags, numSbb * sizeof(uint8_t));
     memcpy(levels + scan_pos, cc->m_allSbbCtx[cc->m_prev_sbb_ctx_offset + ctxs->m_allStates.m_refSbbCtxId[prev_state]].levels + scan_pos, setCpSize);
@@ -596,11 +597,11 @@ static INLINE void update_common_context(
     ctxs->m_allStates.m_remRegBins[curr_state] = (ctxs->m_allStates.effWidth * ctxs->m_allStates.effHeight * ctxBinSampleRatio) / 16;
   }
   ctxs->m_allStates.m_goRicePar[curr_state] = 0;
-  ctxs->m_allStates.m_refSbbCtxId[curr_state] = curr_state & 3;
+  ctxs->m_allStates.m_refSbbCtxId[curr_state] = curr_state_without_offset;
   ctxs->m_allStates.m_sbbFracBits[curr_state][0] = cc->m_sbbFlagBits[sigNSbb][0];
   ctxs->m_allStates.m_sbbFracBits[curr_state][1] = cc->m_sbbFlagBits[sigNSbb][1];
 
-  uint16_t *templateCtxInit = ctxs->m_allStates.m_ctxInit[curr_state];
+  uint16_t *templateCtxInit = ctxs->m_allStates.m_ctxInit[ctxs->m_curr_state_offset >> 2];
   const int scanBeg = scan_pos - 16;
   const NbInfoOut* nbOut = cc->m_nbInfo + scanBeg;
   const uint8_t* absLevels = levels + scanBeg;
@@ -622,10 +623,10 @@ static INLINE void update_common_context(
         }
       }
 #undef UPDATE
-      templateCtxInit[id] = (uint16_t)(sumNum) + ((uint16_t)(sumAbs1) << 3) + ((uint16_t)MIN(127, sumAbs) << 8);
+      templateCtxInit[curr_state_without_offset + id * 4] = (uint16_t)(sumNum) + ((uint16_t)(sumAbs1) << 3) + ((uint16_t)MIN(127, sumAbs) << 8);
     }
     else {
-      templateCtxInit[id] = 0;
+      templateCtxInit[curr_state_without_offset + id * 4] = 0;
     }
   }
   memset(ctxs->m_allStates.m_absLevels[curr_state], 0, 16 * sizeof(uint8_t));
@@ -671,7 +672,7 @@ void uvg_dep_quant_update_state_eos(
     update_common_context(ctxs, state->m_commonCtx, scan_pos, cg_pos, width_in_sbb, height_in_sbb, next_sbb_right,
                           next_sbb_below, prvState, ctxs->m_curr_state_offset + decision_id);
 
-    coeff_t tinit = state->m_ctxInit[curr_state_offset][((scan_pos - 1) & 15)];
+    coeff_t tinit = state->m_ctxInit[ctxs->m_curr_state_offset  >> 2][((scan_pos - 1) & 15) * 4 + decision_id];
     coeff_t sumNum = tinit & 7;
     coeff_t sumAbs1 = (tinit >> 3) & 31;
     coeff_t sumGt1 = sumAbs1 - sumNum;
@@ -695,12 +696,13 @@ void uvg_dep_quant_update_state(
   const int       baseLevel,
   const bool      extRiceFlag,
   int             decision_id) {
-  all_depquant_states* state = &ctxs->m_allStates;
-  int state_id = ctxs->m_curr_state_offset + decision_id;
-  state->m_rdCost[state_id] = decisions->rdCost[decision_id];
-  if (decisions->prevId[decision_id] > -2) {
-    if (decisions->prevId[decision_id] >= 0) {
-      const int prvState = ctxs->m_prev_state_offset + decisions->prevId[decision_id];
+  all_depquant_states* state    = &ctxs->m_allStates;
+  int                  state_id = ctxs->m_curr_state_offset + decision_id;
+  state->m_rdCost[state_id]     = decisions->rdCost[decision_id];
+  int32_t prev_id_no_offset     = decisions->prevId[decision_id];
+  if (prev_id_no_offset > -2) {
+    if (prev_id_no_offset >= 0) {
+      const int prvState = ctxs->m_prev_state_offset + prev_id_no_offset;
       state->m_numSigSbb[state_id] = (state->m_numSigSbb[prvState]) || !!decisions->absLevel[decision_id];
       state->m_refSbbCtxId[state_id] = state->m_refSbbCtxId[prvState];
       state->m_sbbFracBits[state_id][0] = state->m_sbbFracBits[prvState][0];
@@ -713,7 +715,9 @@ void uvg_dep_quant_update_state(
                                             : 3);
       }
       memcpy(state->m_absLevels[state_id], state->m_absLevels[prvState], 16 * sizeof(uint8_t));
-      memcpy(state->m_ctxInit[state_id], state->m_ctxInit[prvState], 16 * sizeof(uint16_t));
+      for (int i = 0; i < 64; i += 4) {
+        state->m_ctxInit[ctxs->m_curr_state_offset  >> 2][decision_id + i] = state->m_ctxInit[ctxs->m_prev_state_offset  >> 2][prev_id_no_offset + i];
+      }
     }
     else {
       state->m_numSigSbb[state_id] = 1;
@@ -723,7 +727,9 @@ void uvg_dep_quant_update_state(
       state->m_remRegBins[state_id] = (state->effWidth * state->effHeight * ctxBinSampleRatio) / 16 - (
         decisions->absLevel[decision_id] < 2 ? (unsigned)decisions->absLevel[decision_id] : 3);
       memset(state->m_absLevels[state_id], 0, 16 * sizeof(uint8_t));
-      memset(state->m_ctxInit[state_id], 0, 16 * sizeof(uint16_t));
+      for (int i = 0; i < 64; i += 4) {
+        state->m_ctxInit[ctxs->m_curr_state_offset >> 2][decision_id + i] = 0;
+      }
     }
     state->all_gte_four &= state->m_remRegBins[state_id] >= 4;
     state->all_lt_four &= state->m_remRegBins[state_id] < 4;
@@ -731,7 +737,7 @@ void uvg_dep_quant_update_state(
     levels[scan_pos & 15] = (uint8_t)MIN(32, decisions->absLevel[decision_id]);
 
     if (state->m_remRegBins[state_id] >= 4) {
-      coeff_t tinit = state->m_ctxInit[state_id][((scan_pos - 1) & 15)];
+      coeff_t tinit = state->m_ctxInit[ctxs->m_curr_state_offset  >> 2][((scan_pos - 1) & 15) * 4 + decision_id];
       coeff_t sumAbs1 = (tinit >> 3) & 31;
       coeff_t sumNum = tinit & 7;
 #define UPDATE(k) {coeff_t t=levels[next_nb_info_ssb.inPos[k]]; sumAbs1+=MIN(4+(t&1),t); sumNum+=!!t; }
@@ -753,7 +759,7 @@ void uvg_dep_quant_update_state(
              sizeof(state->m_coeffFracBits[0]));
 
 
-      coeff_t sumAbs = state->m_ctxInit[state_id][(scan_pos - 1) & 15] >> 8;
+      coeff_t sumAbs = state->m_ctxInit[ctxs->m_curr_state_offset  >> 2][((scan_pos - 1) & 15) * 4 + decision_id] >> 8;
 #define UPDATE(k) {coeff_t t=levels[next_nb_info_ssb.inPos[k]]; sumAbs+=t; }
       switch (numIPos) {
         case 5: UPDATE(4);
@@ -777,7 +783,7 @@ void uvg_dep_quant_update_state(
       }
     }
     else {
-      coeff_t sumAbs = (state->m_ctxInit[state_id][(scan_pos - 1) & 15]) >> 8;
+      coeff_t sumAbs = state->m_ctxInit[ctxs->m_curr_state_offset  >> 2][((scan_pos - 1) & 15) * 4 + decision_id] >> 8;
 #define UPDATE(k) {coeff_t t=levels[next_nb_info_ssb.inPos[k]]; sumAbs+=t; }
       switch (numIPos) {
         case 5: UPDATE(4);
@@ -1055,7 +1061,10 @@ int uvg_dep_quant(
         height,
         compID != 0); //tu.cu->slice->getReverseLastSigCoeffFlag());
     }
-    if(0){
+    for (int i = 0; i < 8; ++i) {
+      assert(ctxs->m_allStates.m_refSbbCtxId[i] < 5);
+    }
+    if(1){
       printf("%d\n", scanIdx);
       for (int i = 0; i < 4; i++) {
         printf("%lld %hu %d\n", ctxs->m_trellis[scanIdx].rdCost[i], ctxs->m_trellis[scanIdx].absLevel[i], ctxs->m_trellis[scanIdx].prevId[i]);
