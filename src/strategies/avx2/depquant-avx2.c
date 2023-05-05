@@ -506,7 +506,7 @@ static void update_state_eos_avx2(context_store* ctxs, const uint32_t scan_pos, 
       );
       memset(&state->m_numSigSbb[state_offset], 0, 4);
       for (int i = 0; i < 4; ++i) {
-        memset(state->m_absLevelsAndCtxInit[state_offset + i], 0, 16 * sizeof(uint8_t));    
+        memset(state->m_absLevels[state_offset + i], 0, 16 * sizeof(uint8_t));    
       }
     } else if (all_between_zero_and_three) {
       prev_state_no_offset = _mm_set1_epi32(ctxs->m_prev_state_offset);
@@ -530,7 +530,7 @@ static void update_state_eos_avx2(context_store* ctxs, const uint32_t scan_pos, 
       int32_t prev_state_scalar[4];
       _mm_storeu_si128((__m128i*)prev_state_scalar, prev_state);
       for (int i = 0; i < 4; ++i) {
-        memcpy(state->m_absLevelsAndCtxInit[state_offset + i], state->m_absLevelsAndCtxInit[prev_state_scalar[i]], 16 * sizeof(uint8_t));
+        memcpy(state->m_absLevels[state_offset + i], state->m_absLevels[prev_state_scalar[i]], 16 * sizeof(uint8_t));
       }
     } else {
       int prev_state_s[4] = {-1, -1, -1, -1};
@@ -540,14 +540,14 @@ static void update_state_eos_avx2(context_store* ctxs, const uint32_t scan_pos, 
         if (decisions->prevId[decision_id] >= 4) {
           prev_state_s[i] = ctxs->m_skip_state_offset + (decisions->prevId[decision_id] - 4);
           state->m_numSigSbb[curr_state_offset] = 0;
-          memset(state->m_absLevelsAndCtxInit[curr_state_offset], 0, 16 * sizeof(uint8_t));
+          memset(state->m_absLevels[curr_state_offset], 0, 16 * sizeof(uint8_t));
         } else if (decisions->prevId[decision_id] >= 0) {
           prev_state_s[i] = ctxs->m_prev_state_offset + decisions->prevId[decision_id];
           state->m_numSigSbb[curr_state_offset] = state->m_numSigSbb[prev_state_s[i]] || !!decisions->absLevel[decision_id];
-          memcpy(state->m_absLevelsAndCtxInit[curr_state_offset], state->m_absLevelsAndCtxInit[prev_state_s[i]], 16 * sizeof(uint8_t));
+          memcpy(state->m_absLevels[curr_state_offset], state->m_absLevels[prev_state_s[i]], 16 * sizeof(uint8_t));
         } else {
           state->m_numSigSbb[curr_state_offset] = 1;
-          memset(state->m_absLevelsAndCtxInit[curr_state_offset], 0, 16 * sizeof(uint8_t));
+          memset(state->m_absLevels[curr_state_offset], 0, 16 * sizeof(uint8_t));
           all_have_previous_state = false;
         }
       }
@@ -558,7 +558,7 @@ static void update_state_eos_avx2(context_store* ctxs, const uint32_t scan_pos, 
     uint32_t max_abs_s[4];
     _mm_storeu_si128((__m128i*)max_abs_s, max_abs);
     for (int i = 0; i < 4; ++i) {
-      uint8_t* levels = (uint8_t*)state->m_absLevelsAndCtxInit[state_offset + i];
+      uint8_t* levels      = (uint8_t*)state->m_absLevels[state_offset + i];
       levels[level_offset] = max_abs_s[i];
     }
 
@@ -583,7 +583,7 @@ static void update_state_eos_avx2(context_store* ctxs, const uint32_t scan_pos, 
           memset(levels + scan_pos, 0, setCpSize);
         }
         sbbFlags[cg_pos] = ctxs->m_allStates.m_numSigSbb[curr_state + state_offset];
-        memcpy(levels + scan_pos, ctxs->m_allStates.m_absLevelsAndCtxInit[curr_state + state_offset], 16 * sizeof(uint8_t));
+        memcpy(levels + scan_pos, ctxs->m_allStates.m_absLevels[curr_state + state_offset], 16 * sizeof(uint8_t));
       }
 
       __m128i sbb_offsets = _mm_set_epi32(3 * numSbb, 2 * numSbb, 1 * numSbb, 0);
@@ -751,13 +751,13 @@ static void update_state_eos_avx2(context_store* ctxs, const uint32_t scan_pos, 
       v_tmp[2] = _mm256_permute4x64_epi64(v_tmp16_hi[0], _MM_SHUFFLE(3, 1, 2, 0));
       v_tmp[3] = _mm256_permute4x64_epi64(v_tmp16_hi[1], _MM_SHUFFLE(3, 1, 2, 0));
 
-      _mm256_storeu_si256((__m256i*)(state->m_absLevelsAndCtxInit[state_offset] + 8),  _mm256_permute2x128_si256(v_tmp[0], v_tmp[1], 0x20));
-      _mm256_storeu_si256((__m256i*)(state->m_absLevelsAndCtxInit[state_offset + 1] + 8),  _mm256_permute2x128_si256(v_tmp[0], v_tmp[1], 0x31));
-      _mm256_storeu_si256((__m256i*)(state->m_absLevelsAndCtxInit[state_offset + 2] + 8),  _mm256_permute2x128_si256(v_tmp[2], v_tmp[3], 0x20));
-      _mm256_storeu_si256((__m256i*)(state->m_absLevelsAndCtxInit[state_offset + 3] + 8),  _mm256_permute2x128_si256(v_tmp[2], v_tmp[3], 0x31));
+      _mm256_storeu_si256((__m256i*)(state->m_ctxInit[state_offset]),  _mm256_permute2x128_si256(v_tmp[0], v_tmp[1], 0x20));
+      _mm256_storeu_si256((__m256i*)(state->m_ctxInit[state_offset + 1]),  _mm256_permute2x128_si256(v_tmp[0], v_tmp[1], 0x31));
+      _mm256_storeu_si256((__m256i*)(state->m_ctxInit[state_offset + 2]),  _mm256_permute2x128_si256(v_tmp[2], v_tmp[3], 0x20));
+      _mm256_storeu_si256((__m256i*)(state->m_ctxInit[state_offset + 3]),  _mm256_permute2x128_si256(v_tmp[2], v_tmp[3], 0x31));
 
       for (int i = 0; i < 4; ++i) {
-        memset(state->m_absLevelsAndCtxInit[state_offset + i], 0, 16);
+        memset(state->m_absLevels[state_offset + i], 0, 16);
       }
     }
 
@@ -887,7 +887,8 @@ static INLINE void update_states_avx2(
       int32_t prv_states_scalar[4];
       _mm_storeu_si128((__m128i*)prv_states_scalar, prv_states);
       for (int i = 0; i < 4; ++i) {
-        memcpy(state->m_absLevelsAndCtxInit[state_offset + i], state->m_absLevelsAndCtxInit[prv_states_scalar[i]], 48 * sizeof(uint8_t));        
+        memcpy(state->m_absLevels[state_offset + i], state->m_absLevels[prv_states_scalar[i]], 16 * sizeof(uint8_t));        
+        memcpy(state->m_ctxInit[state_offset + i], state->m_ctxInit[prv_states_scalar[i]], 16 * sizeof(uint16_t));        
       }
     }
     else if (all_minus_one) {
@@ -912,7 +913,8 @@ static INLINE void update_states_avx2(
       bit_mask = _mm_movemask_epi8(mask);
       rem_reg_all_lt4 = (bit_mask == 0xFFFF);
       
-      memset(state->m_absLevelsAndCtxInit[state_offset], 0, 48 * sizeof(uint8_t) * 4);
+      memset(state->m_absLevels[state_offset], 0, 16 * sizeof(uint8_t) * 4);
+      memset(state->m_ctxInit[state_offset], 0, 16 * sizeof(uint16_t) * 4);
       
     }
     else {
@@ -930,14 +932,16 @@ static INLINE void update_states_avx2(
           if (state->m_remRegBins[state_id] >= 4) {
             state->m_remRegBins[state_id] -= (decisions->absLevel[decision_id] < 2 ? (unsigned)decisions->absLevel[decision_id] : 3);
           }
-          memcpy(state->m_absLevelsAndCtxInit[state_id], state->m_absLevelsAndCtxInit[prvState], 48 * sizeof(uint8_t));
+          memcpy(state->m_absLevels[state_id], state->m_absLevels[prvState], 16 * sizeof(uint8_t));
+          memcpy(state->m_ctxInit[state_id], state->m_ctxInit[prvState], 16 * sizeof(uint16_t));
         } else {
           state->m_numSigSbb[state_id] = 1;
           state->m_refSbbCtxId[state_id] = -1;
           int ctxBinSampleRatio = 28;
           //(scanInfo.chType == CHANNEL_TYPE_LUMA) ? MAX_TU_LEVEL_CTX_CODED_BIN_CONSTRAINT_LUMA : MAX_TU_LEVEL_CTX_CODED_BIN_CONSTRAINT_CHROMA;
           state->m_remRegBins[state_id] = (state->effWidth * state->effHeight * ctxBinSampleRatio) / 16 - (decisions->absLevel[decision_id] < 2 ? (unsigned)decisions->absLevel[decision_id] : 3);
-          memset(state->m_absLevelsAndCtxInit[state_id], 0, 48 * sizeof(uint8_t));
+          memset(state->m_absLevels[state_id], 0, 16 * sizeof(uint8_t));
+          memset(state->m_ctxInit[state_id], 0, 16 * sizeof(uint16_t));
         }
         rem_reg_all_gte_4 &= state->m_remRegBins[state_id] >= 4;
         rem_reg_all_lt4 &= state->m_remRegBins[state_id] < 4;
@@ -948,7 +952,7 @@ static INLINE void update_states_avx2(
     uint32_t max_abs_s[4];
     _mm_storeu_si128((__m128i*)max_abs_s, max_abs);
     for (int i = 0; i < 4; ++i) {
-      uint8_t* levels = (uint8_t*)state->m_absLevelsAndCtxInit[state_offset + i];
+      uint8_t* levels = (uint8_t*)state->m_absLevels[state_offset + i];
       levels[level_offset] = max_abs_s[i];
     }
     state->all_gte_four = rem_reg_all_gte_4;
@@ -957,18 +961,17 @@ static INLINE void update_states_avx2(
       const __m128i  first_two_bytes = _mm_set1_epi32(0xffff);
       const __m128i  first_byte = _mm_set1_epi32(0xff);
       const __m128i  ones = _mm_set1_epi32(1);
-      const uint32_t tinit_offset = MIN(level_offset - 1u, 15u) + 8;
-      const __m128i levels_start_offsets = _mm_set_epi32(48 * 3, 48 * 2, 48 * 1, 48 * 0);
-      const __m128i ctx_start_offsets = _mm_srli_epi32(levels_start_offsets, 1);
+      const uint32_t tinit_offset = MIN(level_offset - 1u, 15u);
+      const __m128i levels_start_offsets = _mm_set_epi32(16 * 3, 16 * 2, 16 * 1, 16 * 0);
       __m128i        tinit = _mm_i32gather_epi32(
-        (int *)state->m_absLevelsAndCtxInit[state_offset],
-        _mm_add_epi32(ctx_start_offsets, _mm_set1_epi32(tinit_offset)),
+        (int *)state->m_ctxInit[state_offset],
+        _mm_add_epi32(levels_start_offsets, _mm_set1_epi32(tinit_offset)),
         2);
       tinit = _mm_and_si128(tinit, first_two_bytes);
       __m128i sum_abs1 = _mm_and_si128(_mm_srli_epi32(tinit, 3), _mm_set1_epi32(31));
       __m128i sum_num = _mm_and_si128(tinit, _mm_set1_epi32(7));
 
-      uint8_t* levels = (uint8_t*)state->m_absLevelsAndCtxInit[state_offset];
+      uint8_t* levels = (uint8_t*)state->m_absLevels[state_offset];
       switch (numIPos) {
       case 5:
         {
@@ -1145,15 +1148,14 @@ static INLINE void update_states_avx2(
 
     else if (rem_reg_all_lt4) {
       const __m128i first_byte = _mm_set1_epi32(0xff);
-      uint8_t*       levels = (uint8_t*)state->m_absLevelsAndCtxInit[state_offset];
+      uint8_t*       levels = (uint8_t*)state->m_absLevels[state_offset];
       const __m128i  last_two_bytes = _mm_set1_epi32(0xffff);
       const __m128i  last_byte = _mm_set1_epi32(0xff);
-      const uint32_t tinit_offset = MIN(level_offset - 1u, 15u) + 8;
-      const __m128i levels_start_offsets = _mm_set_epi32(48 * 3, 48 * 2, 48 * 1, 48 * 0);
-      const __m128i ctx_start_offsets = _mm_srli_epi32(levels_start_offsets, 1);
+      const uint32_t tinit_offset = MIN(level_offset - 1u, 15u);
+      const __m128i levels_start_offsets = _mm_set_epi32(16 * 3, 16 * 2, 16 * 1, 16 * 0);
       __m128i       tinit = _mm_i32gather_epi32(
-        (int*)state->m_absLevelsAndCtxInit[state_offset],
-        _mm_add_epi32(ctx_start_offsets, _mm_set1_epi32(tinit_offset)),
+        (int*)state->m_ctxInit[state_offset],
+        _mm_add_epi32(levels_start_offsets, _mm_set1_epi32(tinit_offset)),
         2);
       tinit = _mm_and_si128(tinit, last_two_bytes);
       __m128i sum_abs = _mm_srli_epi32(tinit, 8);
@@ -1221,9 +1223,9 @@ static INLINE void update_states_avx2(
     else {
       for (int i = 0; i < 4; ++i) {
         const int state_id = state_offset + i;
-        uint8_t*  levels = (uint8_t*)(state->m_absLevelsAndCtxInit[state_id]);
+        uint8_t*  levels = (uint8_t*)(state->m_absLevels[state_id]);
         if (state->m_remRegBins[state_id] >= 4) {
-          coeff_t tinit = state->m_absLevelsAndCtxInit[state_id][8 + ((scan_pos - 1) & 15)];
+          coeff_t tinit = state->m_ctxInit[state_id][((scan_pos - 1) & 15)];
           coeff_t sumAbs1 = (tinit >> 3) & 31;
           coeff_t sumNum = tinit & 7;
 #define UPDATE(k)                                  \
@@ -1247,7 +1249,7 @@ static INLINE void update_states_avx2(
           memcpy(state->m_coeffFracBits[state_id], state->m_gtxFracBitsArray[gtxCtxOffsetNext + (sumGt1 < 4 ? sumGt1 : 4)], sizeof(state->m_coeffFracBits[0]));
 
 
-          coeff_t sumAbs = state->m_absLevelsAndCtxInit[state_id][8 + ((scan_pos - 1) & 15)] >> 8;
+          coeff_t sumAbs = state->m_ctxInit[state_id][((scan_pos - 1) & 15)] >> 8;
 #define UPDATE(k)                                  \
   {                                                \
     coeff_t t = levels[next_nb_info_ssb.inPos[k]]; \
@@ -1269,7 +1271,7 @@ static INLINE void update_states_avx2(
             state->m_goRicePar[state_id] = g_goRiceParsCoeff[sumAll];
           }
         } else {
-          coeff_t sumAbs = (state->m_absLevelsAndCtxInit[state_id][8 + ((scan_pos - 1) & 15)]) >> 8;
+          coeff_t sumAbs = (state->m_ctxInit[state_id][((scan_pos - 1) & 15)]) >> 8;
 #define UPDATE(k)                                  \
   {                                                \
     coeff_t t = levels[next_nb_info_ssb.inPos[k]]; \

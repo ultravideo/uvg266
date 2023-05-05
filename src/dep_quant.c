@@ -583,7 +583,7 @@ static INLINE void update_common_context(
     memset(levels + scan_pos, 0, setCpSize);
   }
   sbbFlags[cg_pos] = !!ctxs->m_allStates.m_numSigSbb[curr_state];
-  memcpy(levels + scan_pos, ctxs->m_allStates.m_absLevelsAndCtxInit[curr_state], 16 * sizeof(uint8_t));
+  memcpy(levels + scan_pos, ctxs->m_allStates.m_absLevels[curr_state], 16 * sizeof(uint8_t));
 
   const int       sigNSbb = ((next_sbb_right ? sbbFlags[next_sbb_right] : false) || (next_sbb_below ? sbbFlags[next_sbb_below] : false) ? 1 : 0);
   ctxs->m_allStates.m_numSigSbb[curr_state] = 0;
@@ -600,7 +600,7 @@ static INLINE void update_common_context(
   ctxs->m_allStates.m_sbbFracBits[curr_state][0] = cc->m_sbbFlagBits[sigNSbb][0];
   ctxs->m_allStates.m_sbbFracBits[curr_state][1] = cc->m_sbbFlagBits[sigNSbb][1];
 
-  uint16_t *templateCtxInit = ctxs->m_allStates.m_absLevelsAndCtxInit[curr_state] + 8;
+  uint16_t *templateCtxInit = ctxs->m_allStates.m_ctxInit[curr_state];
   const int scanBeg = scan_pos - 16;
   const NbInfoOut* nbOut = cc->m_nbInfo + scanBeg;
   const uint8_t* absLevels = levels + scanBeg;
@@ -628,7 +628,7 @@ static INLINE void update_common_context(
       templateCtxInit[id] = 0;
     }
   }
-  memset(ctxs->m_allStates.m_absLevelsAndCtxInit[curr_state], 0, 16 * sizeof(uint8_t));
+  memset(ctxs->m_allStates.m_absLevels[curr_state], 0, 16 * sizeof(uint8_t));
 }
 
 
@@ -654,24 +654,24 @@ void uvg_dep_quant_update_state_eos(
     if (decisions->prevId[decision_id] >= 4) {
       prvState = ctxs->m_skip_state_offset + (decisions->prevId[decision_id] - 4);
       state->m_numSigSbb[curr_state_offset] = 0;
-      memset(state->m_absLevelsAndCtxInit[curr_state_offset], 0, 16 * sizeof(uint8_t));
+      memset(state->m_absLevels[curr_state_offset], 0, 16 * sizeof(uint8_t));
     }
     else if (decisions->prevId[decision_id] >= 0) {
       prvState = ctxs->m_prev_state_offset + decisions->prevId[decision_id];
       state->m_numSigSbb[curr_state_offset] = state->m_numSigSbb[prvState] || !!decisions->absLevel[decision_id];
-      memcpy(state->m_absLevelsAndCtxInit[curr_state_offset], state->m_absLevelsAndCtxInit[prvState], 16 * sizeof(uint8_t));
+      memcpy(state->m_absLevels[curr_state_offset], state->m_absLevels[prvState], 16 * sizeof(uint8_t));
     }
     else {
       state->m_numSigSbb[curr_state_offset] = 1;
-      memset(state->m_absLevelsAndCtxInit[curr_state_offset], 0, 16 * sizeof(uint8_t));
+      memset(state->m_absLevels[curr_state_offset], 0, 16 * sizeof(uint8_t));
     }
-    uint8_t* temp = (uint8_t*)(&state->m_absLevelsAndCtxInit[curr_state_offset][scan_pos & 15]);
+    uint8_t* temp = &state->m_absLevels[curr_state_offset][scan_pos & 15];
     *temp = (uint8_t)MIN(51, decisions->absLevel[decision_id]);
 
     update_common_context(ctxs, state->m_commonCtx, scan_pos, cg_pos, width_in_sbb, height_in_sbb, next_sbb_right,
                           next_sbb_below, prvState, ctxs->m_curr_state_offset + decision_id);
 
-    coeff_t tinit = state->m_absLevelsAndCtxInit[curr_state_offset][8 + ((scan_pos - 1) & 15)];
+    coeff_t tinit = state->m_ctxInit[curr_state_offset][((scan_pos - 1) & 15)];
     coeff_t sumNum = tinit & 7;
     coeff_t sumAbs1 = (tinit >> 3) & 31;
     coeff_t sumGt1 = sumAbs1 - sumNum;
@@ -712,7 +712,8 @@ void uvg_dep_quant_update_state(
                                             ? (unsigned)decisions->absLevel[decision_id]
                                             : 3);
       }
-      memcpy(state->m_absLevelsAndCtxInit[state_id], state->m_absLevelsAndCtxInit[prvState], 48 * sizeof(uint8_t));
+      memcpy(state->m_absLevels[state_id], state->m_absLevels[prvState], 16 * sizeof(uint8_t));
+      memcpy(state->m_ctxInit[state_id], state->m_ctxInit[prvState], 16 * sizeof(uint16_t));
     }
     else {
       state->m_numSigSbb[state_id] = 1;
@@ -721,15 +722,16 @@ void uvg_dep_quant_update_state(
       //(scanInfo.chType == CHANNEL_TYPE_LUMA) ? MAX_TU_LEVEL_CTX_CODED_BIN_CONSTRAINT_LUMA : MAX_TU_LEVEL_CTX_CODED_BIN_CONSTRAINT_CHROMA;
       state->m_remRegBins[state_id] = (state->effWidth * state->effHeight * ctxBinSampleRatio) / 16 - (
         decisions->absLevel[decision_id] < 2 ? (unsigned)decisions->absLevel[decision_id] : 3);
-      memset(state->m_absLevelsAndCtxInit[state_id], 0, 48 * sizeof(uint8_t));
+      memset(state->m_absLevels[state_id], 0, 16 * sizeof(uint8_t));
+      memset(state->m_ctxInit[state_id], 0, 16 * sizeof(uint16_t));
     }
     state->all_gte_four &= state->m_remRegBins[state_id] >= 4;
     state->all_lt_four &= state->m_remRegBins[state_id] < 4;
-    uint8_t* levels = (uint8_t*)(state->m_absLevelsAndCtxInit[state_id]);
+    uint8_t* levels = state->m_absLevels[state_id];
     levels[scan_pos & 15] = (uint8_t)MIN(32, decisions->absLevel[decision_id]);
 
     if (state->m_remRegBins[state_id] >= 4) {
-      coeff_t tinit = state->m_absLevelsAndCtxInit[state_id][8 + ((scan_pos - 1) & 15)];
+      coeff_t tinit = state->m_ctxInit[state_id][((scan_pos - 1) & 15)];
       coeff_t sumAbs1 = (tinit >> 3) & 31;
       coeff_t sumNum = tinit & 7;
 #define UPDATE(k) {coeff_t t=levels[next_nb_info_ssb.inPos[k]]; sumAbs1+=MIN(4+(t&1),t); sumNum+=!!t; }
@@ -751,7 +753,7 @@ void uvg_dep_quant_update_state(
              sizeof(state->m_coeffFracBits[0]));
 
 
-      coeff_t sumAbs = state->m_absLevelsAndCtxInit[state_id][8 + ((scan_pos - 1) & 15)] >> 8;
+      coeff_t sumAbs = state->m_ctxInit[state_id][(scan_pos - 1) & 15] >> 8;
 #define UPDATE(k) {coeff_t t=levels[next_nb_info_ssb.inPos[k]]; sumAbs+=t; }
       switch (numIPos) {
         case 5: UPDATE(4);
@@ -775,7 +777,7 @@ void uvg_dep_quant_update_state(
       }
     }
     else {
-      coeff_t sumAbs = (state->m_absLevelsAndCtxInit[state_id][8 + ((scan_pos - 1) & 15)]) >> 8;
+      coeff_t sumAbs = (state->m_ctxInit[state_id][(scan_pos - 1) & 15]) >> 8;
 #define UPDATE(k) {coeff_t t=levels[next_nb_info_ssb.inPos[k]]; sumAbs+=t; }
       switch (numIPos) {
         case 5: UPDATE(4);

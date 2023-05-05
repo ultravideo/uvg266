@@ -130,8 +130,7 @@ typedef struct {
 
 typedef struct {
   int64_t  m_rdCost;
-  uint16_t m_absLevelsAndCtxInit
-    [24]; // 16x8bit for abs levels + 16x16bit for ctx init id
+  uint16_t m_absLevelsAndCtxInit[24]; // 16x8bit for abs levels + 16x16bit for ctx init id
   int8_t          m_numSigSbb;
   int             m_remRegBins;
   int8_t          m_refSbbCtxId;
@@ -150,8 +149,8 @@ typedef struct {
 } depquant_state;
 typedef struct {
   int64_t  ALIGNED(32) m_rdCost[12];
-  uint16_t ALIGNED(32) m_absLevelsAndCtxInit
-    [12][24]; // 16x8bit for abs levels + 16x16bit for ctx init id
+  uint8_t  ALIGNED(32) m_absLevels[12][16]; 
+  uint16_t ALIGNED(32) m_ctxInit[12][16]; 
   int8_t          ALIGNED(16) m_numSigSbb[12];
   int             ALIGNED(32) m_remRegBins[12];
   int8_t          ALIGNED(16) m_refSbbCtxId[12];
