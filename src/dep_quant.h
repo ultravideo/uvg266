@@ -150,7 +150,7 @@ typedef struct {
 typedef struct {
   int64_t  ALIGNED(32) m_rdCost[12];
   uint8_t  ALIGNED(32) m_absLevels[12][16]; 
-  uint16_t ALIGNED(32) m_ctxInit[12][16]; 
+  uint16_t ALIGNED(32) m_ctxInit[3][16 * 4]; 
   int8_t          ALIGNED(16) m_numSigSbb[12];
   int             ALIGNED(32) m_remRegBins[12];
   int8_t          ALIGNED(16) m_refSbbCtxId[12];
