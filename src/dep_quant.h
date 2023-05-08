@@ -119,7 +119,7 @@ typedef struct {
 typedef struct {
   const NbInfoOut* m_nbInfo;
   uint32_t         m_sbbFlagBits[2][2];
-  SbbCtx           m_allSbbCtx[8];
+  SbbCtx           m_allSbbCtx[2];
   int              m_curr_sbb_ctx_offset;
   int              m_prev_sbb_ctx_offset;
   uint8_t          sbb_memory[8 * 1024];
@@ -149,7 +149,7 @@ typedef struct {
 } depquant_state;
 typedef struct {
   int64_t  ALIGNED(32) m_rdCost[12];
-  uint8_t  ALIGNED(32) m_absLevels[12][16]; 
+  uint8_t  ALIGNED(32) m_absLevels[3][16 * 4]; 
   uint16_t ALIGNED(32) m_ctxInit[3][16 * 4]; 
   int8_t          ALIGNED(16) m_numSigSbb[12];
   int             ALIGNED(32) m_remRegBins[12];
