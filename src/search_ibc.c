@@ -336,7 +336,6 @@ static void select_starting_point(ibc_search_info_t *info,
   }
 }
 
-
 static double get_ibc_mvd_coding_cost(const encoder_state_t* state,
   const cabac_data_t* cabac,
   const int32_t mvd_hor,
