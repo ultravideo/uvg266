@@ -497,6 +497,7 @@ static void update_state_eos_avx2(context_store* ctxs, const uint32_t scan_pos, 
     __m128i prev_state;
     __m128i prev_state_no_offset;
     __m128i abs_level = _mm_load_si128((const __m128i*)decisions->absLevel);
+    __m128i control = _mm_setr_epi8(0, 4, 8, 12, 0, 4, 8, 12, -1, -1, -1, -1, -1, -1, -1, -1);
     if (all_above_four) {
       prev_state = _mm_set1_epi32(ctxs->m_skip_state_offset);
       prev_state_no_offset = _mm_sub_epi32(_mm_load_si128((const __m128i*)decisions->prevId), _mm_set1_epi32(4));
@@ -505,16 +506,14 @@ static void update_state_eos_avx2(context_store* ctxs, const uint32_t scan_pos, 
             prev_state_no_offset
       );
       memset(&state->m_numSigSbb[state_offset], 0, 4);
-      for (int i = 0; i < 4; ++i) {
-        memset(state->m_absLevels[state_offset + i], 0, 16 * sizeof(uint8_t));    
-      }
+      memset(state->m_absLevels[state_offset >> 2], 0, 64 * sizeof(uint8_t));    
+      
     } else if (all_between_zero_and_three) {
-      prev_state_no_offset = _mm_set1_epi32(ctxs->m_prev_state_offset);
+      prev_state_no_offset = _mm_load_si128((const __m128i*)decisions->prevId);
       prev_state = _mm_add_epi32(
         prev_state_no_offset,
-        _mm_load_si128((const __m128i*)decisions->prevId)
+        _mm_set1_epi32(ctxs->m_prev_state_offset)
       );
-      __m128i control = _mm_setr_epi8(0, 4, 8, 12, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1);
       __m128i prev_state_with_ff_high_bytes = _mm_or_si128(prev_state, _mm_set1_epi32(0xffffff00));
       __m128i num_sig_sbb = _mm_load_si128((const __m128i*)state->m_numSigSbb);
       num_sig_sbb = _mm_shuffle_epi8(num_sig_sbb, prev_state_with_ff_high_bytes);
@@ -527,10 +526,15 @@ static void update_state_eos_avx2(context_store* ctxs, const uint32_t scan_pos, 
       int num_sig_sbb_s = _mm_extract_epi32(num_sig_sbb, 0);
       memcpy(&state->m_numSigSbb[state_offset], &num_sig_sbb_s, 4);
 
-      int32_t prev_state_scalar[4];
-      _mm_storeu_si128((__m128i*)prev_state_scalar, prev_state);
-      for (int i = 0; i < 4; ++i) {
-        memcpy(state->m_absLevels[state_offset + i], state->m_absLevels[prev_state_scalar[i]], 16 * sizeof(uint8_t));
+      __m128i temp_prev_state = _mm_shuffle_epi8(prev_state_no_offset, control);
+      __m256i prev_state_256 = _mm256_castsi128_si256(temp_prev_state);
+      prev_state_256 = _mm256_permute4x64_epi64(prev_state_256, 0);
+      __m256i temp_add = _mm256_setr_epi32(0, 0x04040404, 0x08080808, 0x0c0c0c0c, 0, 0x04040404, 0x08080808, 0x0c0c0c0c);
+      prev_state_256 = _mm256_add_epi8(prev_state_256, temp_add);
+      for (int i = 0; i < 64; i += (256 / (8 * sizeof(uint8_t)))) {
+        __m256i data = _mm256_load_si256((__m256i*)&state->m_absLevels[ctxs->m_prev_state_offset >> 2][i]);
+        data = _mm256_shuffle_epi8(data, prev_state_256);
+        _mm256_store_si256((__m256i*)&state->m_absLevels[ctxs->m_curr_state_offset >> 2][i], data);
       }
     } else {
       int prev_state_s[4] = {-1, -1, -1, -1};
@@ -540,27 +544,31 @@ static void update_state_eos_avx2(context_store* ctxs, const uint32_t scan_pos, 
         if (decisions->prevId[decision_id] >= 4) {
           prev_state_s[i] = ctxs->m_skip_state_offset + (decisions->prevId[decision_id] - 4);
           state->m_numSigSbb[curr_state_offset] = 0;
-          memset(state->m_absLevels[curr_state_offset], 0, 16 * sizeof(uint8_t));
+          for (int j = i; j < 64; j += 4) {
+            state->m_absLevels[curr_state_offset >> 2][j] = 0;
+          }
         } else if (decisions->prevId[decision_id] >= 0) {
           prev_state_s[i] = ctxs->m_prev_state_offset + decisions->prevId[decision_id];
           state->m_numSigSbb[curr_state_offset] = state->m_numSigSbb[prev_state_s[i]] || !!decisions->absLevel[decision_id];
-          memcpy(state->m_absLevels[curr_state_offset], state->m_absLevels[prev_state_s[i]], 16 * sizeof(uint8_t));
+          for (int j = 0; j < 64; j += 4) {
+            state->m_absLevels[curr_state_offset >> 2][j + i] = state->m_absLevels[ctxs->m_prev_state_offset >> 2][j + decisions->prevId[decision_id]];
+          }
         } else {
           state->m_numSigSbb[curr_state_offset] = 1;
-          memset(state->m_absLevels[curr_state_offset], 0, 16 * sizeof(uint8_t));
+          for (int j = i; j < 64; j += 4) {
+            state->m_absLevels[curr_state_offset >> 2][j] = 0;
+          }
           all_have_previous_state = false;
         }
       }
       prev_state = _mm_loadu_si128((__m128i const*)prev_state_s);
     }
     uint32_t level_offset = scan_pos & 15;
-    __m128i  max_abs = _mm_min_epi32(abs_level, _mm_set1_epi32(32));
-    uint32_t max_abs_s[4];
-    _mm_storeu_si128((__m128i*)max_abs_s, max_abs);
-    for (int i = 0; i < 4; ++i) {
-      uint8_t* levels      = (uint8_t*)state->m_absLevels[state_offset + i];
-      levels[level_offset] = max_abs_s[i];
-    }
+    __m128i  max_abs = _mm_min_epi32(abs_level, _mm_set1_epi32(51));
+    max_abs = _mm_shuffle_epi8(max_abs, control);
+    uint32_t packed_max_abs = _mm_extract_epi32(max_abs, 0);
+    memcpy(&state->m_absLevels[state_offset >> 2][level_offset * 4], &packed_max_abs, 4);
+
 
     // Update common context
     __m128i last;
@@ -571,31 +579,40 @@ static void update_state_eos_avx2(context_store* ctxs, const uint32_t scan_pos, 
       int previous_state_array[4];
       _mm_storeu_si128((__m128i*)previous_state_array, prev_state);
       for (int curr_state = 0; curr_state < 4; ++curr_state) {
-        uint8_t* sbbFlags = cc->m_allSbbCtx[cc->m_curr_sbb_ctx_offset + (curr_state)].sbbFlags;
-        uint8_t* levels = cc->m_allSbbCtx[cc->m_curr_sbb_ctx_offset + (curr_state)].levels;
+        uint8_t* sbbFlags = cc->m_allSbbCtx[cc->m_curr_sbb_ctx_offset ].sbbFlags;
+        uint8_t* levels = cc->m_allSbbCtx[cc->m_curr_sbb_ctx_offset].levels;
         const int p_state = previous_state_array[curr_state];
         if (p_state != -1 && ctxs->m_allStates.m_refSbbCtxId[p_state] >= 0) {
-          const int prev_sbb = cc->m_prev_sbb_ctx_offset + ctxs->m_allStates.m_refSbbCtxId[p_state];
-          memcpy(sbbFlags, cc->m_allSbbCtx[prev_sbb].sbbFlags, numSbb * sizeof(uint8_t));
-          memcpy(levels + scan_pos, cc->m_allSbbCtx[prev_sbb].levels + scan_pos, setCpSize);
+          const int prev_sbb = ctxs->m_allStates.m_refSbbCtxId[p_state];
+          for (int i = 0; i < numSbb; ++i) {
+            sbbFlags[i * 4 + curr_state] = cc->m_allSbbCtx[cc->m_prev_sbb_ctx_offset].sbbFlags[i * 4 + prev_sbb];
+          }
+          for (int i = 16; i < setCpSize; ++i) {
+            levels[scan_pos * 4 + i * 4 + curr_state] = cc->m_allSbbCtx[cc->m_prev_sbb_ctx_offset].levels[scan_pos * 4 + i * 4 + prev_sbb];
+          }
         } else {
-          memset(sbbFlags, 0, numSbb * sizeof(uint8_t));
-          memset(levels + scan_pos, 0, setCpSize);
+          for (int i = 0; i < numSbb; ++i) {
+            sbbFlags[i * 4 + curr_state] = 0;
+          }
+          for (int i = 16; i < setCpSize; ++i) {
+            levels[scan_pos * 4 + i * 4 + curr_state] = 0;
+          }
         }
-        sbbFlags[cg_pos] = ctxs->m_allStates.m_numSigSbb[curr_state + state_offset];
-        memcpy(levels + scan_pos, ctxs->m_allStates.m_absLevels[curr_state + state_offset], 16 * sizeof(uint8_t));
+        sbbFlags[cg_pos * 4 + curr_state] = ctxs->m_allStates.m_numSigSbb[curr_state + state_offset];
+        for (int i = 0; i < 16; ++i) {
+          levels[scan_pos * 4 + i * 4 + curr_state] = ctxs->m_allStates.m_absLevels[state_offset / 4][i * 4 + curr_state];
+        }
       }
-
-      __m128i sbb_offsets = _mm_set_epi32(3 * numSbb, 2 * numSbb, 1 * numSbb, 0);
-      __m128i next_sbb_right_m = _mm_set1_epi32(next_sbb_right);
-      __m128i sbb_offsets_right = _mm_add_epi32(sbb_offsets, next_sbb_right_m);
-      __m128i sbb_right = next_sbb_right ? _mm_i32gather_epi32((const int *)cc->m_allSbbCtx[cc->m_curr_sbb_ctx_offset].sbbFlags, sbb_offsets_right, 1) : _mm_set1_epi32(0);
-
-      __m128i sbb_offsets_below = _mm_add_epi32(sbb_offsets, _mm_set1_epi32(next_sbb_below));
-      __m128i sbb_below = next_sbb_below ? _mm_i32gather_epi32((const int *)cc->m_allSbbCtx[cc->m_curr_sbb_ctx_offset].sbbFlags, sbb_offsets_below, 1) : _mm_set1_epi32(0);
+      
+      __m128i sbb_right = next_sbb_right ?
+          _mm_cvtepi8_epi32(_mm_loadu_si128((__m128i*)&cc->m_allSbbCtx[cc->m_curr_sbb_ctx_offset].sbbFlags[next_sbb_right * 4])) :
+          _mm_set1_epi32(0);
+      
+      __m128i sbb_below = next_sbb_below ?
+        _mm_cvtepi8_epi32(_mm_loadu_si128((__m128i*)&cc->m_allSbbCtx[cc->m_curr_sbb_ctx_offset].sbbFlags[next_sbb_below * 4])) :
+        _mm_set1_epi32(0);
 
       __m128i sig_sbb = _mm_or_si128(sbb_right, sbb_below);
-      sig_sbb         = _mm_and_si128(sig_sbb, _mm_set1_epi32(0xff));
       sig_sbb = _mm_min_epi32(sig_sbb, _mm_set1_epi32(1));
       __m256i sbb_frac_bits = _mm256_i32gather_epi64((int64_t *)cc->m_sbbFlagBits[0], sig_sbb, 8);
       _mm256_store_si256((__m256i*)state->m_sbbFracBits[state_offset], sbb_frac_bits);
@@ -621,7 +638,7 @@ static void update_state_eos_avx2(context_store* ctxs, const uint32_t scan_pos, 
       
       const int        scanBeg = scan_pos - 16;
       const NbInfoOut* nbOut = cc->m_nbInfo + scanBeg;
-      const uint8_t*   absLevels = cc->m_allSbbCtx[cc->m_curr_sbb_ctx_offset].levels + scanBeg;
+      const uint8_t*   absLevels = cc->m_allSbbCtx[cc->m_curr_sbb_ctx_offset].levels + scanBeg * 4;
 
       __m128i          levels_offsets = _mm_set_epi32(cc->num_coeff * 3, cc->num_coeff * 2, cc->num_coeff * 1, 0);
       __m128i          first_byte = _mm_set1_epi32(0xff);
@@ -629,8 +646,6 @@ static void update_state_eos_avx2(context_store* ctxs, const uint32_t scan_pos, 
       __m128i         fours = _mm_set1_epi32(4);
       __m256i          all[4];
       uint64_t         temp[4];
-      const __m256i v_shuffle = _mm256_set_epi8(15, 14,  7,  6, 13, 12,  5,  4, 11, 10,  3,  2,  9,  8,  1,  0,
-                                                31, 30, 23, 22, 29, 28, 21, 20, 27, 26, 19, 18, 25, 24, 17, 16);
 
       for (int id = 0; id < 16; id++, nbOut++) {
         if (nbOut->num == 0) {
@@ -646,9 +661,7 @@ static void update_state_eos_avx2(context_store* ctxs, const uint32_t scan_pos, 
         switch (nbOut->num) {
         case 5:
           {
-            __m128i offset = _mm_add_epi32(levels_offsets, _mm_set1_epi32(nbOut->outPos[4]));
-            __m128i t = _mm_i32gather_epi32((const int *)absLevels, offset, 1);
-            t = _mm_and_si128(t, first_byte);
+            __m128i t = _mm_cvtepi8_epi32(_mm_loadu_si128((__m128i*)(&absLevels[nbOut->outPos[4] * 4])));
             sum_abs = _mm_add_epi32(sum_abs, t);
             sum_num   = _mm_add_epi32(sum_num, _mm_min_epi32(t, ones));
             __m128i min_t = _mm_min_epi32(
@@ -661,9 +674,7 @@ static void update_state_eos_avx2(context_store* ctxs, const uint32_t scan_pos, 
             sum_abs_1 = _mm_add_epi32(sum_abs_1, min_t);
           }
         case 4: {
-            __m128i offset = _mm_add_epi32(levels_offsets, _mm_set1_epi32(nbOut->outPos[3]));
-            __m128i t     = _mm_i32gather_epi32((const int*)absLevels, offset, 1);
-            t = _mm_and_si128(t, first_byte);
+            __m128i t = _mm_cvtepi8_epi32(_mm_loadu_si128((__m128i*)(&absLevels[nbOut->outPos[3] * 4])));
             sum_abs = _mm_add_epi32(sum_abs, t);
             sum_num   = _mm_add_epi32(sum_num, _mm_min_epi32(t, ones));
             __m128i min_t = _mm_min_epi32(
@@ -674,9 +685,7 @@ static void update_state_eos_avx2(context_store* ctxs, const uint32_t scan_pos, 
             sum_abs_1 = _mm_add_epi32(sum_abs_1, min_t);
         }
         case 3: {
-            __m128i offset = _mm_add_epi32(levels_offsets, _mm_set1_epi32(nbOut->outPos[2]));
-            __m128i t     = _mm_i32gather_epi32((const int*)absLevels, offset, 1);
-            t = _mm_and_si128(t, first_byte);
+            __m128i t = _mm_cvtepi8_epi32(_mm_loadu_si128((__m128i*)(&absLevels[nbOut->outPos[2] * 4])));
             sum_abs = _mm_add_epi32(sum_abs, t);
             sum_num   = _mm_add_epi32(sum_num, _mm_min_epi32(t, ones));
             __m128i min_t = _mm_min_epi32(
@@ -687,9 +696,7 @@ static void update_state_eos_avx2(context_store* ctxs, const uint32_t scan_pos, 
             sum_abs_1 = _mm_add_epi32(sum_abs_1, min_t);
         }
         case 2: {
-            __m128i offset = _mm_add_epi32(levels_offsets, _mm_set1_epi32(nbOut->outPos[1]));
-            __m128i t     = _mm_i32gather_epi32((const int*)absLevels, offset, 1);
-            t = _mm_and_si128(t, first_byte);
+            __m128i t = _mm_cvtepi8_epi32(_mm_loadu_si128((__m128i*)(&absLevels[nbOut->outPos[1] * 4])));
             sum_abs = _mm_add_epi32(sum_abs, t);
             sum_num   = _mm_add_epi32(sum_num, _mm_min_epi32(t, ones));
             __m128i min_t = _mm_min_epi32(
@@ -700,9 +707,7 @@ static void update_state_eos_avx2(context_store* ctxs, const uint32_t scan_pos, 
             sum_abs_1 = _mm_add_epi32(sum_abs_1, min_t);
         }
         case 1: {
-            __m128i offset = _mm_add_epi32(levels_offsets, _mm_set1_epi32(nbOut->outPos[0]));
-            __m128i t = _mm_i32gather_epi32((const int*)absLevels, offset, 1);
-            t = _mm_and_si128(t, first_byte);
+            __m128i t = _mm_cvtepi8_epi32(_mm_loadu_si128((__m128i*)(&absLevels[nbOut->outPos[0] * 4])));
             sum_abs = _mm_add_epi32(sum_abs, t);
             sum_num = _mm_add_epi32(sum_num, _mm_min_epi32(t, ones));
             __m128i min_t = _mm_min_epi32(
@@ -735,7 +740,7 @@ static void update_state_eos_avx2(context_store* ctxs, const uint32_t scan_pos, 
       _mm256_storeu_si256((__m256i*)(&state->m_ctxInit[state_offset >> 2][48]), all[3]);
 
       for (int i = 0; i < 4; ++i) {
-        memset(state->m_absLevels[state_offset + i], 0, 16);
+        memset(state->m_absLevels[state_offset >> 2], 0, 16 * 4);
       }
     }
 
@@ -811,13 +816,13 @@ static INLINE void update_states_avx2(
 
     bool    rem_reg_all_gte_4 = true;
     bool    rem_reg_all_lt4 = true;
+    __m128i control = _mm_setr_epi8(0, 4, 8, 12, 0, 4, 8, 12, -1, -1, -1, -1, -1, -1, -1, -1);
 
     __m128i abs_level = _mm_load_si128((__m128i const*)decisions->absLevel);
     if (all_non_negative) {
       __m128i prv_states_o  = _mm_load_si128((__m128i const*)decisions->prevId);
       __m128i prev_offset = _mm_set1_epi32(ctxs->m_prev_state_offset);
       __m128i prv_states     = _mm_add_epi32(prv_states_o, prev_offset);
-      __m128i control = _mm_setr_epi8(0, 4, 8, 12, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1);
       __m128i shuffled_prev_states = _mm_shuffle_epi8(prv_states, control);
       
       __m128i sig_sbb   = _mm_load_si128((__m128i const*)state->m_numSigSbb);
@@ -862,17 +867,32 @@ static INLINE void update_states_avx2(
       bit_mask = _mm_movemask_epi8(mask); 
       rem_reg_all_lt4 = (bit_mask == 0xFFFF);
 
-      int32_t prv_states_scalar[4];
-      _mm_storeu_si128((__m128i*)prv_states_scalar, prv_states);
-      for (int i = 0; i < 4; ++i) {
-        memcpy(state->m_absLevels[state_offset + i], state->m_absLevels[prv_states_scalar[i]], 16 * sizeof(uint8_t));       
+
+      __m128i temp_prev_state = _mm_shuffle_epi8(prv_states_o, control);
+      __m256i prev_state_256  = _mm256_castsi128_si256(temp_prev_state);
+      prev_state_256          = _mm256_permute4x64_epi64(prev_state_256, 0);
+      __m256i temp_add        = _mm256_setr_epi32(
+        0,
+        0x04040404,
+        0x08080808,
+        0x0c0c0c0c,
+        0,
+        0x04040404,
+        0x08080808,
+        0x0c0c0c0c);
+      prev_state_256 = _mm256_add_epi8(prev_state_256, temp_add);
+      for (int i = 0; i < 64; i += (256 / (8 * sizeof(uint8_t)))) {
+        __m256i data = _mm256_load_si256((__m256i*)&state->m_absLevels[ctxs->m_prev_state_offset >> 2][i]);
+        data = _mm256_shuffle_epi8(data, prev_state_256);
+        _mm256_store_si256((__m256i*)&state->m_absLevels[ctxs->m_curr_state_offset >> 2][i], data);
       }
+
       __m256i prev_state_full = _mm256_load_si256((__m256i const*)decisions->prevId);
       __m256i shuffle_mask = _mm256_setr_epi8(0, 0, 4, 4,8, 8, 12, 12, 0, 0, 4, 4, 8, 8, 12, 12,0, 0, 0, 0,0, 0, 0, 0,16, 16, 16, 16, 16, 16, 16, 16);
       prev_state_full = _mm256_shuffle_epi8(prev_state_full, shuffle_mask);
       prev_state_full  = _mm256_permute4x64_epi64(prev_state_full, 0);
       prev_state_full  = _mm256_slli_epi16(prev_state_full, 1);
-      __m256i temp_add = _mm256_setr_epi8(0, 1, 0, 1, 0, 1, 0, 1, 8, 9, 8, 9, 8, 9, 8, 9, 16, 17, 16, 17,16, 17,16, 17, 24, 25,24,25,24,25,24,25);
+      temp_add = _mm256_setr_epi8(0, 1, 0, 1, 0, 1, 0, 1, 8, 9, 8, 9, 8, 9, 8, 9, 16, 17, 16, 17,16, 17,16, 17, 24, 25,24,25,24,25,24,25);
       prev_state_full = _mm256_add_epi8(prev_state_full, temp_add);
 
       for (int i = 0; i < 64; i += (256 / 8 / sizeof(uint16_t))) {
@@ -903,7 +923,7 @@ static INLINE void update_states_avx2(
       bit_mask = _mm_movemask_epi8(mask);
       rem_reg_all_lt4 = (bit_mask == 0xFFFF);
       
-      memset(state->m_absLevels[state_offset], 0, 16 * sizeof(uint8_t) * 4);
+      memset(state->m_absLevels[state_offset >> 2], 0, 16 * sizeof(uint8_t) * 4);
       memset(state->m_ctxInit[state_offset >> 2], 0, 16 * sizeof(uint16_t) * 4);
       
     }
@@ -922,9 +942,11 @@ static INLINE void update_states_avx2(
           if (state->m_remRegBins[state_id] >= 4) {
             state->m_remRegBins[state_id] -= (decisions->absLevel[decision_id] < 2 ? (unsigned)decisions->absLevel[decision_id] : 3);
           }
-          memcpy(state->m_absLevels[state_id], state->m_absLevels[prvState], 16 * sizeof(uint8_t));
           for (int k = 0; k < 16; ++k) {
             state->m_ctxInit[state_offset >> 2][k * 4 + i] = state->m_ctxInit[ctxs->m_prev_state_offset >> 2][k * 4 + decisions->prevId[decision_id]];
+          }
+          for (int k = 0; k < 16; ++k) {
+            state->m_absLevels[state_offset >> 2][k * 4 + i] = state->m_absLevels[ctxs->m_prev_state_offset >> 2][k * 4 + decisions->prevId[decision_id]];
           }
         } else {
           state->m_numSigSbb[state_id] = 1;
@@ -932,25 +954,24 @@ static INLINE void update_states_avx2(
           int ctxBinSampleRatio = 28;
           //(scanInfo.chType == CHANNEL_TYPE_LUMA) ? MAX_TU_LEVEL_CTX_CODED_BIN_CONSTRAINT_LUMA : MAX_TU_LEVEL_CTX_CODED_BIN_CONSTRAINT_CHROMA;
           state->m_remRegBins[state_id] = (state->effWidth * state->effHeight * ctxBinSampleRatio) / 16 - (decisions->absLevel[decision_id] < 2 ? (unsigned)decisions->absLevel[decision_id] : 3);
-          memset(state->m_absLevels[state_id], 0, 16 * sizeof(uint8_t));
-          for (int k = 0; k < 16; ++k) {
-            state->m_ctxInit[state_offset >> 2][k * 4 + i] = 0;
+          for (int k = i; k < 64; k += 4) {
+            state->m_ctxInit[state_offset >> 2][k] = 0;
+            state->m_absLevels[state_offset >> 2][k] = 0;
           }
         }
         rem_reg_all_gte_4 &= state->m_remRegBins[state_id] >= 4;
         rem_reg_all_lt4 &= state->m_remRegBins[state_id] < 4;
       }
     }
-    uint32_t level_offset = scan_pos & 15;
-    __m128i   max_abs = _mm_min_epi32(abs_level, _mm_set1_epi32(51));
-    uint32_t max_abs_s[4];
-    _mm_storeu_si128((__m128i*)max_abs_s, max_abs);
-    for (int i = 0; i < 4; ++i) {
-      uint8_t* levels = (uint8_t*)state->m_absLevels[state_offset + i];
-      levels[level_offset] = max_abs_s[i];
-    }
+    uint32_t level_offset   = scan_pos & 15;
+    __m128i  max_abs        = _mm_min_epi32(abs_level, _mm_set1_epi32(51));
+    max_abs                 = _mm_shuffle_epi8(max_abs, control);
+    uint32_t packed_max_abs = _mm_extract_epi32(max_abs, 0);
+    memcpy(&state->m_absLevels[state_offset >> 2][level_offset * 4], &packed_max_abs,4);
+
     state->all_gte_four = rem_reg_all_gte_4;
     state->all_lt_four = rem_reg_all_lt4;
+
     if (rem_reg_all_gte_4) {
       const __m128i  first_byte = _mm_set1_epi32(0xff);
       const __m128i  ones = _mm_set1_epi32(1);
@@ -961,15 +982,11 @@ static INLINE void update_states_avx2(
       __m128i sum_abs1 = _mm_and_si128(_mm_srli_epi32(tinit, 3), _mm_set1_epi32(31));
       __m128i sum_num = _mm_and_si128(tinit, _mm_set1_epi32(7));
 
-      uint8_t* levels = (uint8_t*)state->m_absLevels[state_offset];
+      uint8_t* levels = (uint8_t*)state->m_absLevels[state_offset >> 2];
       switch (numIPos) {
       case 5:
         {
-          __m128i t = _mm_i32gather_epi32(
-            (int *)levels,
-            _mm_add_epi32(levels_start_offsets, _mm_set1_epi32(next_nb_info_ssb.inPos[4])),
-            1);
-          t = _mm_and_si128(t, first_byte);
+          __m128i t = _mm_cvtepi8_epi32(_mm_loadu_si128((__m128i*)(&levels[next_nb_info_ssb.inPos[4] * 4])));
           __m128i min_arg = _mm_min_epi32(
             _mm_add_epi32(_mm_set1_epi32(4), _mm_and_si128(t, ones)),
             t
@@ -984,11 +1001,7 @@ static INLINE void update_states_avx2(
         }
       case 4:
         {
-          __m128i t = _mm_i32gather_epi32(
-            (int*)levels,
-            _mm_add_epi32(levels_start_offsets, _mm_set1_epi32(next_nb_info_ssb.inPos[3])),
-            1);
-          t = _mm_and_si128(t, first_byte);
+          __m128i t = _mm_cvtepi8_epi32(_mm_loadu_si128((__m128i*)(&levels[next_nb_info_ssb.inPos[3] * 4])));
           __m128i min_arg = _mm_min_epi32(
             _mm_add_epi32(_mm_set1_epi32(4), _mm_and_si128(t, ones)),
             t
@@ -1001,11 +1014,7 @@ static INLINE void update_states_avx2(
         }
       case 3:
         {
-          __m128i t = _mm_i32gather_epi32(
-            (int*)levels,
-            _mm_add_epi32(levels_start_offsets, _mm_set1_epi32(next_nb_info_ssb.inPos[2])),
-            1);
-          t = _mm_and_si128(t, first_byte);
+          __m128i t = _mm_cvtepi8_epi32(_mm_loadu_si128((__m128i*)(&levels[next_nb_info_ssb.inPos[2] * 4])));
           __m128i min_arg = _mm_min_epi32(
             _mm_add_epi32(_mm_set1_epi32(4), _mm_and_si128(t, ones)),
             t
@@ -1018,11 +1027,7 @@ static INLINE void update_states_avx2(
         }
       case 2:
         {
-          __m128i t = _mm_i32gather_epi32(
-            (int*)levels,
-            _mm_add_epi32(levels_start_offsets, _mm_set1_epi32(next_nb_info_ssb.inPos[1])),
-            1);
-          t = _mm_and_si128(t, first_byte);
+          __m128i t = _mm_cvtepi8_epi32(_mm_loadu_si128((__m128i*)(&levels[next_nb_info_ssb.inPos[1] * 4])));
         __m128i min_arg = _mm_min_epi32(
               _mm_add_epi32(_mm_set1_epi32(4), _mm_and_si128(t, ones)),
               t
@@ -1034,11 +1039,7 @@ static INLINE void update_states_avx2(
           sum_num = _mm_add_epi32(sum_num, _mm_min_epi32(t, ones));
         }
       case 1: {
-          __m128i t = _mm_i32gather_epi32(
-            (int*)levels,
-            _mm_add_epi32(levels_start_offsets, _mm_set1_epi32(next_nb_info_ssb.inPos[0])),
-            1);
-          t = _mm_and_si128(t, first_byte);
+          __m128i t = _mm_cvtepi8_epi32(_mm_loadu_si128((__m128i*)(&levels[next_nb_info_ssb.inPos[0] * 4])));
           __m128i min_arg = _mm_min_epi32(
             _mm_add_epi32(_mm_set1_epi32(4), _mm_and_si128(t, ones)),
             t
@@ -1075,51 +1076,32 @@ static INLINE void update_states_avx2(
       switch (numIPos) {
         case 5:
           {
-          __m128i t = _mm_i32gather_epi32(
-            (int*)levels,
-            _mm_add_epi32(levels_start_offsets, _mm_set1_epi32(next_nb_info_ssb.inPos[4])),
-            1);
+          __m128i t = _mm_cvtepi8_epi32(_mm_loadu_si128((__m128i*)(&levels[next_nb_info_ssb.inPos[4] * 4])));
           sum_abs = _mm_add_epi32(t, sum_abs);
-          // Need this to make sure we don't go beyond 255
-          sum_abs = _mm_and_si128(sum_abs, first_byte);
-          sum_abs = _mm_min_epi32(sum_abs, _mm_set1_epi32(51));
           }
         case 4:
           {
-          __m128i t = _mm_i32gather_epi32(
-            (int*)levels,
-            _mm_add_epi32(levels_start_offsets, _mm_set1_epi32(next_nb_info_ssb.inPos[3])),
-            1);
+          __m128i t = _mm_cvtepi8_epi32(_mm_loadu_si128((__m128i*)(&levels[next_nb_info_ssb.inPos[3] * 4])));
           sum_abs = _mm_add_epi32(t, sum_abs);
           }
         case 3:
           {
-          __m128i t = _mm_i32gather_epi32(
-            (int*)levels,
-            _mm_add_epi32(levels_start_offsets, _mm_set1_epi32(next_nb_info_ssb.inPos[2])),
-            1);
+          __m128i t = _mm_cvtepi8_epi32(_mm_loadu_si128((__m128i*)(&levels[next_nb_info_ssb.inPos[2] * 4])));
           sum_abs = _mm_add_epi32(t, sum_abs);
           }
         case 2:
           {
-          __m128i t = _mm_i32gather_epi32(
-            (int*)levels,
-            _mm_add_epi32(levels_start_offsets, _mm_set1_epi32(next_nb_info_ssb.inPos[1])),
-            1);
+          __m128i t = _mm_cvtepi8_epi32(_mm_loadu_si128((__m128i*)(&levels[next_nb_info_ssb.inPos[1] * 4])));
           sum_abs = _mm_add_epi32(t, sum_abs);
           }
         case 1:
           {
-          __m128i t = _mm_i32gather_epi32(
-            (int*)levels,
-            _mm_add_epi32(levels_start_offsets, _mm_set1_epi32(next_nb_info_ssb.inPos[0])),
-            1);
+          __m128i t = _mm_cvtepi8_epi32(_mm_loadu_si128((__m128i*)(&levels[next_nb_info_ssb.inPos[0] * 4])));
           sum_abs = _mm_add_epi32(t, sum_abs);
           } break;
         default:
           assert(0);
       }
-      sum_abs = _mm_and_si128(sum_abs, first_byte);
       if (extRiceFlag) {
         assert(0 && "Not implemented for avx2");
       } else {
@@ -1138,7 +1120,7 @@ static INLINE void update_states_avx2(
 
     else if (rem_reg_all_lt4) {
       const __m128i first_byte = _mm_set1_epi32(0xff);
-      uint8_t*       levels = (uint8_t*)state->m_absLevels[state_offset];
+      uint8_t*       levels = (uint8_t*)state->m_absLevels[state_offset >> 2];
       const __m128i  last_byte = _mm_set1_epi32(0xff);
       const uint32_t tinit_offset = MIN(level_offset - 1u, 15u);
       const __m128i levels_start_offsets = _mm_set_epi32(16 * 3, 16 * 2, 16 * 1, 16 * 0);
@@ -1147,48 +1129,34 @@ static INLINE void update_states_avx2(
       __m128i sum_abs = _mm_srli_epi32(tinit, 8);
       sum_abs         = _mm_min_epi32(sum_abs, _mm_set1_epi32(51));
       switch (numIPos) {
-        case 5: {
-          __m128i t = _mm_i32gather_epi32(
-            (int*)levels,
-            _mm_add_epi32(levels_start_offsets, _mm_set1_epi32(next_nb_info_ssb.inPos[4])),
-            1);
-          sum_abs = _mm_add_epi32(sum_abs, t);
-          // Need this to make sure we don't go beyond 255
-          sum_abs = _mm_and_si128(sum_abs, first_byte);
-          sum_abs = _mm_min_epi32(sum_abs, _mm_set1_epi32(51));
-        }
-        case 4: {
-          __m128i t = _mm_i32gather_epi32(
-            (int*)levels,
-            _mm_add_epi32(levels_start_offsets, _mm_set1_epi32(next_nb_info_ssb.inPos[3])),
-            1);
-          sum_abs = _mm_add_epi32(sum_abs, t);
-        }
-        case 3: {
-          __m128i t = _mm_i32gather_epi32(
-            (int*)levels,
-            _mm_add_epi32(levels_start_offsets, _mm_set1_epi32(next_nb_info_ssb.inPos[2])),
-            1);
-          sum_abs = _mm_add_epi32(sum_abs, t);
-        }
-        case 2: {
-          __m128i t = _mm_i32gather_epi32(
-            (int*)levels,
-            _mm_add_epi32(levels_start_offsets, _mm_set1_epi32(next_nb_info_ssb.inPos[1])),
-            1);
-          sum_abs = _mm_add_epi32(sum_abs, t);
-        }
-        case 1: {
-          __m128i t = _mm_i32gather_epi32(
-            (int*)levels,
-            _mm_add_epi32(levels_start_offsets, _mm_set1_epi32(next_nb_info_ssb.inPos[0])),
-            1);
-          sum_abs = _mm_add_epi32(sum_abs, t);
-        } break;
+        case 5:
+          {
+          __m128i t = _mm_cvtepi8_epi32(_mm_loadu_si128((__m128i*)(&levels[next_nb_info_ssb.inPos[4] * 4])));
+          sum_abs = _mm_add_epi32(t, sum_abs);
+          }
+        case 4:
+          {
+          __m128i t = _mm_cvtepi8_epi32(_mm_loadu_si128((__m128i*)(&levels[next_nb_info_ssb.inPos[3] * 4])));
+          sum_abs = _mm_add_epi32(t, sum_abs);
+          }
+        case 3:
+          {
+          __m128i t = _mm_cvtepi8_epi32(_mm_loadu_si128((__m128i*)(&levels[next_nb_info_ssb.inPos[2] * 4])));
+          sum_abs = _mm_add_epi32(t, sum_abs);
+          }
+        case 2:
+          {
+          __m128i t = _mm_cvtepi8_epi32(_mm_loadu_si128((__m128i*)(&levels[next_nb_info_ssb.inPos[1] * 4])));
+          sum_abs = _mm_add_epi32(t, sum_abs);
+          }
+        case 1:
+          {
+          __m128i t = _mm_cvtepi8_epi32(_mm_loadu_si128((__m128i*)(&levels[next_nb_info_ssb.inPos[0] * 4])));
+          sum_abs = _mm_add_epi32(t, sum_abs);
+          } break;
         default:
           assert(0);
       }
-      sum_abs = _mm_and_si128(sum_abs, last_byte);
       if (extRiceFlag) {
         assert(0 && "Not implemented for avx2");
       } else {
@@ -1209,14 +1177,14 @@ static INLINE void update_states_avx2(
     else {
       for (int i = 0; i < 4; ++i) {
         const int state_id = state_offset + i;
-        uint8_t*  levels = (uint8_t*)(state->m_absLevels[state_id]);
+        uint8_t*  levels = (uint8_t*)(state->m_absLevels[state_offset >> 2]);
         if (state->m_remRegBins[state_id] >= 4) {
           coeff_t tinit = state->m_ctxInit[state_offset >> 2][((scan_pos - 1) & 15) * 4 + i];
           coeff_t sumAbs1 = (tinit >> 3) & 31;
           coeff_t sumNum = tinit & 7;
 #define UPDATE(k)                                  \
   {                                                \
-    coeff_t t = levels[next_nb_info_ssb.inPos[k]]; \
+    coeff_t t = levels[next_nb_info_ssb.inPos[k] * 4 + i]; \
     sumAbs1 += MIN(4 + (t & 1), t);                \
     sumNum += !!t;                                 \
   }
@@ -1238,7 +1206,7 @@ static INLINE void update_states_avx2(
           coeff_t sumAbs = state->m_ctxInit[state_offset >> 2][((scan_pos - 1) & 15) * 4 + i] >> 8;
 #define UPDATE(k)                                  \
   {                                                \
-    coeff_t t = levels[next_nb_info_ssb.inPos[k]]; \
+    coeff_t t = levels[next_nb_info_ssb.inPos[k] * 4 + i]; \
     sumAbs += t;                                   \
   }
           switch (numIPos) {
@@ -1260,7 +1228,7 @@ static INLINE void update_states_avx2(
           coeff_t sumAbs = (state->m_ctxInit[state_offset >> 2][((scan_pos - 1) & 15) * 4 + i]) >> 8;
 #define UPDATE(k)                                  \
   {                                                \
-    coeff_t t = levels[next_nb_info_ssb.inPos[k]]; \
+    coeff_t t = levels[next_nb_info_ssb.inPos[k] * 4 + i]; \
     sumAbs += t;                                   \
   }
           switch (numIPos) {
@@ -1345,7 +1313,7 @@ void uvg_dep_quant_decide_and_update_avx2(
     //  for (int k = 0; k < 16; ++k) {
     //    printf(
     //      "%3d ",
-    //      ctxs->m_allStates.m_ctxInit[ctxs->m_curr_state_offset / 4][k * 4 + i]);
+    //      ctxs->m_allStates.m_absLevels[ctxs->m_curr_state_offset / 4][k * 4 + i]);
     //  }
     //  printf("\n");
     //}
