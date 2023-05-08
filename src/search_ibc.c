@@ -906,7 +906,9 @@ static void search_pu_ibc(encoder_state_t * const state,
   }
 
   // AMVP search starts here
-  amvp[0].size = 0;
+  amvp[0].size    = 0;
+  amvp[1].size    = 0;
+  amvp[2].size    = 0;
   amvp[0].cost[0] = MAX_DOUBLE;
 
 
