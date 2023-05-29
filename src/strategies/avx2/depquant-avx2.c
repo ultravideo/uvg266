@@ -104,7 +104,7 @@ static void check_rd_costs_avx2(const all_depquant_states* const state, const en
       value = _mm_min_epi32(value, max_rice);
       // In the original implementation the goRiceTab is selected beforehand, but since we need to load from
       // potentially four different locations, we need to calculate the offsets and use gather
-      __m128i go_rice_tab = _mm_cvtepi8_epi32(_mm_loadu_si32(&state->m_goRicePar[start]));
+      __m128i go_rice_tab = _mm_cvtepi8_epi32(_mm_loadu_si128((__m128i *)&state->m_goRicePar[start]));
       go_rice_tab = _mm_slli_epi32(go_rice_tab, 5);
       value = _mm_add_epi32(value, go_rice_tab);
 
@@ -727,7 +727,7 @@ static void update_state_eos_avx2(context_store* ctxs, const uint32_t scan_pos, 
       sig_sbb = _mm_min_epi32(sig_sbb, _mm_set1_epi32(1));
       // Gather is not necessary here put it would require at least five operation to do the same thing
       // so the performance gain in my opinion is not worth the readability loss
-      __m256i sbb_frac_bits = _mm256_i32gather_epi64((int64_t *)cc->m_sbbFlagBits[0], sig_sbb, 8);
+      __m256i sbb_frac_bits = _mm256_i32gather_epi64((const long long int *)cc->m_sbbFlagBits[0], sig_sbb, 8);
       _mm256_store_si256((__m256i*)state->m_sbbFracBits[state_offset], sbb_frac_bits);
 
       memset(&state->m_numSigSbb[state_offset], 0, 4);
@@ -868,7 +868,7 @@ static void update_state_eos_avx2(context_store* ctxs, const uint32_t scan_pos, 
     __m128i offsets = _mm_set_epi32(12 * 3, 12 * 2, 12 * 1, 12 * 0);
     offsets = _mm_add_epi32(offsets, _mm_set1_epi32(sigCtxOffsetNext));
     offsets         = _mm_add_epi32(offsets, sum_abs_min);
-    __m256i sig_frac_bits = _mm256_i32gather_epi64((const int64_t *)&state->m_sigFracBitsArray[state_offset][0][0], offsets, 8);
+    __m256i sig_frac_bits = _mm256_i32gather_epi64((long long const*)&state->m_sigFracBitsArray[state_offset][0][0], offsets, 8);
     _mm256_store_si256((__m256i*)&state->m_sigFracBits[state_offset][0], sig_frac_bits);
 
 
@@ -959,7 +959,7 @@ static INLINE void update_states_avx2(
 
       // Again gather is not necessary but it is easier to read and shouldn't have too large of a performance hit
       // Should be true for all gathers here
-      __m256i sbb_frac_bits = _mm256_i32gather_epi64((const int64_t *)state->m_sbbFracBits[0], prv_states, 8);
+      __m256i sbb_frac_bits = _mm256_i32gather_epi64((const long long *)state->m_sbbFracBits[0], prv_states, 8);
       _mm256_store_si256((__m256i*)&state->m_sbbFracBits[state_offset][0], sbb_frac_bits);
 
       // Next three lines: state->m_remRegBins = prvState->m_remRegBins - 1;
@@ -1218,7 +1218,7 @@ static INLINE void update_states_avx2(
         _mm_srli_epi32(_mm_add_epi32(sum_abs1, ones), 1),
         _mm_set1_epi32(3));
       offsets = _mm_add_epi32(offsets, temp);
-      __m256i sig_frac_bits = _mm256_i32gather_epi64((const int64_t *)state->m_sigFracBitsArray[state_offset][0], offsets, 8);
+      __m256i sig_frac_bits = _mm256_i32gather_epi64((const long long *)state->m_sigFracBitsArray[state_offset][0], offsets, 8);
       _mm256_store_si256((__m256i*)&state->m_sigFracBits[state_offset][0], sig_frac_bits);
 
       sum_gt1 = _mm_min_epi32(sum_gt1, _mm_set1_epi32(4));
