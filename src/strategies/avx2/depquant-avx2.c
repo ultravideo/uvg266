@@ -144,7 +144,7 @@ static void check_rd_costs_avx2(const all_depquant_states* const state, const en
 
       __m128i max_rice = _mm_set1_epi32(31);
       value = _mm_min_epi32(value, max_rice);
-      __m128i go_rice_tab = _mm_cvtepi8_epi32(_mm_loadu_si32(&state->m_goRicePar[start]));
+      __m128i go_rice_tab = _mm_cvtepi8_epi32(_mm_loadu_si128((__m128i*)&state->m_goRicePar[start]));
       go_rice_tab = _mm_slli_epi32(go_rice_tab, 5);
       value = _mm_add_epi32(value, go_rice_tab);
 
