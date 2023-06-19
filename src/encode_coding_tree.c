@@ -1466,7 +1466,7 @@ void uvg_encode_coding_tree(
   }
 
   // Encode skip flag
-  if ((state->frame->slicetype != UVG_SLICE_I || state->encoder_control->cfg.ibc) && cu_width != 4) {
+  if ((state->frame->slicetype != UVG_SLICE_I || state->encoder_control->cfg.ibc)) {
 
     int8_t ctx_skip = 0;
 
@@ -1476,9 +1476,10 @@ void uvg_encode_coding_tree(
     if (above_cu && above_cu->skipped) {
       ctx_skip++;
     }
-
-    cabac->cur_ctx = &(cabac->ctx.cu_skip_flag_model[ctx_skip]);
-    CABAC_BIN(cabac, cur_cu->skipped, "SkipFlag");
+    if (cu_width > 4 || state->encoder_control->cfg.ibc) {
+      cabac->cur_ctx = &(cabac->ctx.cu_skip_flag_model[ctx_skip]);
+      CABAC_BIN(cabac, cur_cu->skipped, "SkipFlag");
+    }
 
     if (cur_cu->skipped) {
 
@@ -1518,7 +1519,7 @@ void uvg_encode_coding_tree(
   }
 
   // Prediction mode
-  if (state->frame->slicetype == UVG_SLICE_I && state->encoder_control->cfg.ibc) { // ToDo: Only for luma channel
+  if ((state->frame->slicetype == UVG_SLICE_I || cu_width == 4) && state->encoder_control->cfg.ibc) { // ToDo: Only for luma channel
     // ToDo: Disable for blocks over 64x64 pixels
     int8_t ctx_ibc = 0;
     if (left_cu && left_cu->type == CU_IBC) ctx_ibc++;
