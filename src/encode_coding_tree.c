@@ -1482,7 +1482,8 @@ void uvg_encode_coding_tree(
 
     if (cur_cu->skipped) {
 
-      if (state->encoder_control->cfg.ibc) { // ToDo: Only for luma channel
+      if (state->encoder_control->cfg.ibc && state->frame->slicetype != UVG_SLICE_I)
+      { // ToDo: Only for luma channel
         // ToDo: Disable for blocks over 64x64 pixels
         int8_t ctx_ibc = 0;
         if (left_cu && left_cu->type == CU_IBC) ctx_ibc++;
@@ -1835,35 +1836,38 @@ void uvg_encode_mvd(encoder_state_t * const state,
   const int8_t ver_abs_gr0 = mvd_ver != 0;
   const uint32_t mvd_hor_abs = abs(mvd_hor);
   const uint32_t mvd_ver_abs = abs(mvd_ver);
+  double         temp_bits_out = 0.0;
 
   cabac->cur_ctx = &cabac->ctx.cu_mvd_model[0];
-  CABAC_FBITS_UPDATE(cabac, &cabac->ctx.cu_mvd_model[0], (mvd_hor != 0), *bits_out, "abs_mvd_greater0_flag_hor");
-  CABAC_FBITS_UPDATE(cabac, &cabac->ctx.cu_mvd_model[0], (mvd_ver != 0), *bits_out, "abs_mvd_greater0_flag_ver");
+  CABAC_FBITS_UPDATE(cabac, &cabac->ctx.cu_mvd_model[0], (mvd_hor != 0), temp_bits_out, "abs_mvd_greater0_flag_hor");
+  CABAC_FBITS_UPDATE(cabac, &cabac->ctx.cu_mvd_model[0], (mvd_ver != 0), temp_bits_out, "abs_mvd_greater0_flag_ver");
 
   cabac->cur_ctx = &cabac->ctx.cu_mvd_model[1];
   if (hor_abs_gr0) {
-    CABAC_FBITS_UPDATE(cabac, &cabac->ctx.cu_mvd_model[1], (mvd_hor_abs>1), *bits_out,"abs_mvd_greater1_flag_hor");
+    CABAC_FBITS_UPDATE(cabac, &cabac->ctx.cu_mvd_model[1], (mvd_hor_abs>1), temp_bits_out,"abs_mvd_greater1_flag_hor");
   }
   if (ver_abs_gr0) {
-    CABAC_FBITS_UPDATE(cabac, &cabac->ctx.cu_mvd_model[1], (mvd_ver_abs>1), *bits_out, "abs_mvd_greater1_flag_ver");
+    CABAC_FBITS_UPDATE(cabac, &cabac->ctx.cu_mvd_model[1], (mvd_ver_abs>1), temp_bits_out, "abs_mvd_greater1_flag_ver");
   }
 
   if (hor_abs_gr0) {
     if (mvd_hor_abs > 1) {
       uint32_t bits = uvg_cabac_write_ep_ex_golomb(state, cabac, mvd_hor_abs - 2, 1);
-      if(cabac->only_count) *bits_out += bits;
+      if(cabac->only_count) temp_bits_out += bits;
     }
     uint32_t mvd_hor_sign = (mvd_hor > 0) ? 0 : 1;
     CABAC_BIN_EP(cabac, mvd_hor_sign, "mvd_sign_flag_hor");
-    if (cabac->only_count) *bits_out += 1;
+    if (cabac->only_count) temp_bits_out += 1;
   }
   if (ver_abs_gr0) {
     if (mvd_ver_abs > 1) {
       uint32_t bits = uvg_cabac_write_ep_ex_golomb(state, cabac, mvd_ver_abs - 2, 1);
-      if (cabac->only_count) *bits_out += bits;
+      if (cabac->only_count) temp_bits_out += bits;
     }
     uint32_t mvd_ver_sign = mvd_ver > 0 ? 0 : 1;
     CABAC_BIN_EP(cabac, mvd_ver_sign, "mvd_sign_flag_ver");
-    if (cabac->only_count) *bits_out += 1;
+    if (cabac->only_count) temp_bits_out += 1;
   }
+
+  if(bits_out) *bits_out = temp_bits_out;
 }
