@@ -39,8 +39,8 @@
  * \param value the value of the node to be created
  * \return uvg_hashmap_node a node with the given key and value
  */
-uvg_hashmap_node* uvg_hashmap_create_node(uint32_t key, uint32_t value) {
-  uvg_hashmap_node* new_node = (uvg_hashmap_node*)malloc(sizeof(uvg_hashmap_node));
+uvg_hashmap_node_t* uvg_hashmap_create_node(uint32_t key, uint32_t value) {
+  uvg_hashmap_node_t* new_node = (uvg_hashmap_node_t*)malloc(sizeof(uvg_hashmap_node_t));
   new_node->key = key;
   new_node->value = value;
   new_node->next = NULL;
@@ -53,11 +53,11 @@ uvg_hashmap_node* uvg_hashmap_create_node(uint32_t key, uint32_t value) {
  * \param bucket_size the size of the hashmap bucket
  * \return uvg_hashmap a new uvg_hashmap with the given bucket size
  */
-uvg_hashmap* uvg_hashmap_create(uint32_t bucket_size)
+uvg_hashmap_t* uvg_hashmap_create(uint32_t bucket_size)
 {
-  uvg_hashmap* new_hashmap = (uvg_hashmap*)malloc(sizeof(uvg_hashmap));
+  uvg_hashmap_t* new_hashmap = (uvg_hashmap_t*)malloc(sizeof(uvg_hashmap_t));
   new_hashmap->bucket_size = bucket_size;
-  new_hashmap->table = (uvg_hashmap_node**)malloc(sizeof(uvg_hashmap_node*) * bucket_size);
+  new_hashmap->table = (uvg_hashmap_node_t**)malloc(sizeof(uvg_hashmap_node_t*) * bucket_size);
   for (int i = 0; i < bucket_size; i++) {
     new_hashmap->table[i] = NULL;
   }
@@ -84,10 +84,10 @@ uint32_t uvg_hashmap_hash(uint32_t key, uint32_t bucket_size) {
  * \param key   the key of the new node
  * \param value the value of the new node
  */
-void uvg_hashmap_insert(uvg_hashmap* map, uint32_t key, uint32_t value) {
+void uvg_hashmap_insert(uvg_hashmap_t* map, uint32_t key, uint32_t value) {
     uint32_t hash_index = uvg_hashmap_hash(key, map->bucket_size);
-    uvg_hashmap_node* new_node = uvg_hashmap_create_node(key, value);
-    new_node->next = map->table[hash_index];
+    uvg_hashmap_node_t* new_node = uvg_hashmap_create_node(key, value);
+    new_node->next = (void*)map->table[hash_index];
     map->table[hash_index] = new_node;
 }
 
@@ -98,20 +98,20 @@ void uvg_hashmap_insert(uvg_hashmap* map, uint32_t key, uint32_t value) {
  * \param key the key to search for
  * \return uvg_hashmap_node the node with the given key, NULL if not found.
  */
-uvg_hashmap_node* uvg_hashmap_search(uvg_hashmap* map, uint32_t key) {
+uvg_hashmap_node_t* uvg_hashmap_search(uvg_hashmap_t* map, uint32_t key) {
   uint32_t hashIndex = uvg_hashmap_hash(key, map->bucket_size);
-  uvg_hashmap_node* temp = map->table[hashIndex];
-  uvg_hashmap_node* return_node    = NULL;
+  uvg_hashmap_node_t* temp = map->table[hashIndex];
+  uvg_hashmap_node_t* return_node    = NULL;
   // Search key in chain and return all of them
   while (temp) {
     if (temp->key == key) {
-      uvg_hashmap_node* new_node = uvg_hashmap_create_node(key, temp->value);
+      uvg_hashmap_node_t* new_node = uvg_hashmap_create_node(key, temp->value);
       if (return_node != NULL) {
-        new_node->next = return_node;
+        new_node->next = (void*)return_node;
       }
       return_node = new_node;
     }
-    temp = temp->next;
+    temp = (uvg_hashmap_node_t*)temp->next;
   }
   return return_node;
 }
@@ -121,11 +121,11 @@ uvg_hashmap_node* uvg_hashmap_search(uvg_hashmap* map, uint32_t key) {
  * 
  * \param node the node to free the memory of.
  */
-void uvg_hashmap_node_free(uvg_hashmap_node* node)
+void uvg_hashmap_node_free(uvg_hashmap_node_t* node)
 {
   while (node) {
-    uvg_hashmap_node* to_delete = node;
-    node                        = node->next;
+    uvg_hashmap_node_t* to_delete = node;
+    node                        = (uvg_hashmap_node_t*)node->next;
     free(to_delete);
   }
 }
@@ -135,9 +135,9 @@ void uvg_hashmap_node_free(uvg_hashmap_node* node)
  * 
  * \param map the hashmap to free the memory of.
  */
-void uvg_hashmap_free(uvg_hashmap* map) {
+void uvg_hashmap_free(uvg_hashmap_t* map) {
   for (int i = 0; i < map->bucket_size; i++) {
-    uvg_hashmap_node* temp = map->table[i];
+    uvg_hashmap_node_t* temp = map->table[i];
     uvg_hashmap_node_free(temp);
   }
   free(map->table);

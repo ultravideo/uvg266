@@ -1,3 +1,5 @@
+#pragma once
+
 /*****************************************************************************
  * This file is part of uvg266 VVC encoder.
  *
@@ -42,24 +44,24 @@
 typedef struct uvg_hashmap_node {
     uint32_t key;
     uint32_t value;
-    struct uvg_hashmap_node* next;
-} uvg_hashmap_node;
+    void* next;
+} uvg_hashmap_node_t;
 
 typedef struct uvg_hashmap {
   uint32_t bucket_size;
-  uvg_hashmap_node** table;
-} uvg_hashmap;
+  uvg_hashmap_node_t** table;
+} uvg_hashmap_t;
 
-uvg_hashmap_node* uvg_hashmap_create_node(uint32_t key, uint32_t value);
+uvg_hashmap_node_t* uvg_hashmap_create_node(uint32_t key, uint32_t value);
 
-uvg_hashmap* uvg_hashmap_create(uint32_t bucket_size);
+uvg_hashmap_t* uvg_hashmap_create(uint32_t bucket_size);
 
 uint32_t uvg_hashmap_hash(uint32_t key, uint32_t bucket_size);
 
-void uvg_hashmap_insert(uvg_hashmap* map, uint32_t key, uint32_t value);
+void uvg_hashmap_insert(uvg_hashmap_t* map, uint32_t key, uint32_t value);
 
-uvg_hashmap_node* uvg_hashmap_search(uvg_hashmap* map, uint32_t key);
+uvg_hashmap_node_t* uvg_hashmap_search(uvg_hashmap_t* map, uint32_t key);
 
-void uvg_hashmap_node_free(uvg_hashmap_node* node);
+void uvg_hashmap_node_free(uvg_hashmap_node_t* node);
 
-void uvg_hashmap_free(uvg_hashmap* map);
+void uvg_hashmap_free(uvg_hashmap_t* map);

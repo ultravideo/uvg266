@@ -833,9 +833,9 @@ int uvg_strategy_register_picture_generic(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
   if (bitdepth == 8) {
-    success &= uvg_strategyselector_register(opaque, "uvg_crc32c_4x4", "generic", 0, &uvg_crc32c_4x4_8bit_generic);
+    success &= uvg_strategyselector_register(opaque, "crc32c_4x4", "generic", 0, &uvg_crc32c_4x4_8bit_generic);
   } else {
-    success &= uvg_strategyselector_register(opaque, "uvg_crc32c_4x4", "generic", 0, &uvg_crc32c_4x4_16bit_generic);
+    success &= uvg_strategyselector_register(opaque, "crc32c_4x4", "generic", 0, &uvg_crc32c_4x4_16bit_generic);
   }
   
 

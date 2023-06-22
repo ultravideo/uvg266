@@ -41,7 +41,7 @@
 
 
 // Define function pointers.
-crc32c_4x4_func * uvg_crc32c_4x4;
+crc32c_4x4_func * uvg_crc32c_4x4 = 0;
 reg_sad_func * uvg_reg_sad = 0;
 
 cost_pixel_nxn_func * uvg_sad_4x4 = 0;
@@ -96,6 +96,9 @@ int uvg_strategy_register_picture(void* opaque, uint8_t bitdepth) {
   }
   if (uvg_g_hardware_flags.intel_flags.sse41) {
     success &= uvg_strategy_register_picture_sse41(opaque, bitdepth);
+  }
+  if (uvg_g_hardware_flags.intel_flags.sse42) {
+    success &= uvg_strategy_register_picture_sse42(opaque, bitdepth);
   }
   if (uvg_g_hardware_flags.intel_flags.avx2) {
     success &= uvg_strategy_register_picture_avx2(opaque, bitdepth);

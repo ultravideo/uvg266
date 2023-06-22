@@ -41,6 +41,7 @@
 #include "cu.h"
 #include "global.h" // IWYU pragma: keep
 #include "uvg266.h"
+#include "hashmap.h"
 
 
 /**
@@ -89,6 +90,9 @@ typedef struct videoframe
   bool source_lmcs_mapped; //!< \brief Indicate if source_lmcs is available and mapped to LMCS
   bool lmcs_top_level; //!< \brief Indicate that in this level the LMCS images are allocated
   bool rec_lmcs_mapped; //!< \brief Indicate if rec_lmcs is available and mapped to LMCS
+
+  uvg_hashmap_t *ibc_hashmap; //!< \brief Hashmap for IBC hash search
+
 } videoframe_t;
 
 

@@ -67,13 +67,13 @@ static uint32_t uvg_crc32c_4x4_16bit_sse42(const uvg_pixel *buf, uint32_t pic_st
 
 #endif //COMPILE_INTEL_SSE42
 
-int uvg_strategy_register_picture_sse41(void* opaque, uint8_t bitdepth) {
+int uvg_strategy_register_picture_sse42(void* opaque, uint8_t bitdepth) {
   bool success = true;
 #if COMPILE_INTEL_SSE42
   if (bitdepth == 8){
-    success &= uvg_strategyselector_register(opaque, "uvg_crc32c_4x4", "sse42", 0, &uvg_crc32c_4x4_8bit_sse42); 
+    success &= uvg_strategyselector_register(opaque, "crc32c_4x4", "sse42", 0, &uvg_crc32c_4x4_8bit_sse42); 
   } else {
-    success &= uvg_strategyselector_register(opaque, "uvg_crc32c_4x4", "sse42", 0, &uvg_crc32c_4x4_16bit_sse42); 
+    success &= uvg_strategyselector_register(opaque, "crc32c_4x4", "sse42", 0, &uvg_crc32c_4x4_16bit_sse42); 
   }
 #endif
   return success;

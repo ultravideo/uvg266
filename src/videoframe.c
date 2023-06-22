@@ -102,7 +102,14 @@ int uvg_videoframe_free(videoframe_t * const frame)
   FREE_POINTER(frame->sao_luma);
   FREE_POINTER(frame->sao_chroma);
 
+  if (frame->ibc_hashmap != NULL) {
+    uvg_hashmap_free(frame->ibc_hashmap);
+    frame->ibc_hashmap = NULL;
+  }
+
   free(frame);
+
+  
 
   return 1;
 }
