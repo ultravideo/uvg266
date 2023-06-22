@@ -1,7 +1,9 @@
+#pragma once
+
 /*****************************************************************************
  * This file is part of uvg266 VVC encoder.
  *
- * Copyright (c) 2023, Tampere University, ITU/ISO/IEC, project contributors
+ * Copyright (c) 2022, Tampere University, ITU/ISO/IEC, project contributors
  * All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without modification,
@@ -30,36 +32,14 @@
  * INCLUDING NEGLIGENCE OR OTHERWISE ARISING IN ANY WAY OUT OF THE USE OF THIS
  ****************************************************************************/
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdint.h>
+/**
+ * \ingroup Optimization
+ * \file
+ * Optimizations for SSE4.2.
+ */
 
-// The ratio of the hashmap bucket size to the maximum number of elements
-#define UVG_HASHMAP_RATIO 0.35
-// Use Hashmap for 4x4 blocks
-#define UVG_HASHMAP_BLOCKSIZE 4
+#include "global.h" // IWYU pragma: keep
+#include "uvg266.h"
 
-typedef struct uvg_hashmap_node {
-    uint32_t key;
-    uint32_t value;
-    struct uvg_hashmap_node* next;
-} uvg_hashmap_node;
 
-typedef struct uvg_hashmap {
-  uint32_t bucket_size;
-  uvg_hashmap_node** table;
-} uvg_hashmap;
-
-uvg_hashmap_node* uvg_hashmap_create_node(uint32_t key, uint32_t value);
-
-uvg_hashmap* uvg_hashmap_create(uint32_t bucket_size);
-
-uint32_t uvg_hashmap_hash(uint32_t key);
-
-void uvg_hashmap_insert(uvg_hashmap* map, uint32_t key, uint32_t value);
-
-uvg_hashmap_node* uvg_hashmap_search(uvg_hashmap* map, uint32_t key);
-
-void uvg_hashmap_node_free(uvg_hashmap_node* node);
-
-void uvg_hashmap_free(uvg_hashmap* map);
+int uvg_strategy_register_picture_sse42(void* opaque, uint8_t bitdepth);

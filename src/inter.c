@@ -1666,6 +1666,13 @@ void uvg_inter_get_mv_cand_cua(const encoder_state_t * const state,
   uvg_round_precision(INTERNAL_MV_PREC, 2, &mv_cand[1][0], &mv_cand[1][1]);
 }
 
+/**
+•	\brief Checks if two CUs have similar motion vectors. The function takes two CUs and compares their motion vectors.
+•	\param cu1   first CU
+•	\param cu2   second CU
+•	\return returns 0 if the two CUs have dissimilar motion vectors, and 1 if the motions are similar. 
+*/
+
 static bool is_duplicate_candidate(const cu_info_t* cu1, const cu_info_t* cu2)
 {
   if (!cu2) return false;
@@ -1684,6 +1691,16 @@ static bool is_duplicate_candidate(const cu_info_t* cu1, const cu_info_t* cu2)
   return true;
 }
 
+/**
+* Adds a merge candidate to the list of possible candidates, if it is not a duplicate.
+*
+* \param cand The candidate to be added.
+* \param possible_duplicate1 The first possible duplicate candidate to check for duplication.
+* \param possible_duplicate2 The second possible duplicate candidate to check for duplication.
+* \param merge_cand_out The output parameter to store the merge candidate information.
+*
+* @return Returns true if the merge candidate was added successfully, false otherwise.
+*/
 static bool add_merge_candidate(const cu_info_t *cand,
                                 const cu_info_t *possible_duplicate1,
                                 const cu_info_t *possible_duplicate2,

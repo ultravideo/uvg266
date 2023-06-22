@@ -30,36 +30,51 @@
  * INCLUDING NEGLIGENCE OR OTHERWISE ARISING IN ANY WAY OUT OF THE USE OF THIS
  ****************************************************************************/
 
-#include <stdio.h>
+#include "global.h"
+
+#if COMPILE_INTEL_SSE42
+#include "uvg266.h"
+
+#include "strategies/sse42/picture-sse42.h"
+
+#include <immintrin.h>
 #include <stdlib.h>
-#include <stdint.h>
 
-// The ratio of the hashmap bucket size to the maximum number of elements
-#define UVG_HASHMAP_RATIO 0.35
-// Use Hashmap for 4x4 blocks
-#define UVG_HASHMAP_BLOCKSIZE 4
+#include "strategyselector.h"
 
-typedef struct uvg_hashmap_node {
-    uint32_t key;
-    uint32_t value;
-    struct uvg_hashmap_node* next;
-} uvg_hashmap_node;
 
-typedef struct uvg_hashmap {
-  uint32_t bucket_size;
-  uvg_hashmap_node** table;
-} uvg_hashmap;
 
-uvg_hashmap_node* uvg_hashmap_create_node(uint32_t key, uint32_t value);
+static uint32_t uvg_crc32c_4x4_8bit_sse42(const uvg_pixel *buf, uint32_t pic_stride)
+{
+  uint32_t crc = 0xFFFFFFFF;
+  crc = _mm_crc32_u32(crc, *((uint32_t *)&buf[0 * pic_stride]));
+  crc = _mm_crc32_u32(crc, *((uint32_t *)&buf[1 * pic_stride]));
+  crc = _mm_crc32_u32(crc, *((uint32_t *)&buf[2 * pic_stride]));
+  crc = _mm_crc32_u32(crc, *((uint32_t *)&buf[3 * pic_stride]));
+  return crc ^ 0xFFFFFFFF;
+}
 
-uvg_hashmap* uvg_hashmap_create(uint32_t bucket_size);
+static uint32_t uvg_crc32c_4x4_16bit_sse42(const uvg_pixel *buf, uint32_t pic_stride)
+{
+  uint32_t crc = 0xFFFFFFFF;
+  crc = _mm_crc32_u64(crc, *((uint32_t *)&buf[0 * pic_stride]));
+  crc = _mm_crc32_u64(crc, *((uint32_t *)&buf[1 * pic_stride]));
+  crc = _mm_crc32_u64(crc, *((uint32_t *)&buf[2 * pic_stride]));
+  crc = _mm_crc32_u64(crc, *((uint32_t *)&buf[3 * pic_stride]));
+  return crc ^ 0xFFFFFFFF;
+}
 
-uint32_t uvg_hashmap_hash(uint32_t key);
 
-void uvg_hashmap_insert(uvg_hashmap* map, uint32_t key, uint32_t value);
+#endif //COMPILE_INTEL_SSE42
 
-uvg_hashmap_node* uvg_hashmap_search(uvg_hashmap* map, uint32_t key);
-
-void uvg_hashmap_node_free(uvg_hashmap_node* node);
-
-void uvg_hashmap_free(uvg_hashmap* map);
+int uvg_strategy_register_picture_sse41(void* opaque, uint8_t bitdepth) {
+  bool success = true;
+#if COMPILE_INTEL_SSE42
+  if (bitdepth == 8){
+    success &= uvg_strategyselector_register(opaque, "uvg_crc32c_4x4", "sse42", 0, &uvg_crc32c_4x4_8bit_sse42); 
+  } else {
+    success &= uvg_strategyselector_register(opaque, "uvg_crc32c_4x4", "sse42", 0, &uvg_crc32c_4x4_16bit_sse42); 
+  }
+#endif
+  return success;
+}

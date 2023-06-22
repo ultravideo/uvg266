@@ -151,7 +151,14 @@ typedef double (pixel_var_func)(const uvg_pixel *buf, const uint32_t len);
 
 typedef void (generate_residual_func)(const uvg_pixel* ref_in, const uvg_pixel* pred_in, int16_t* residual, int width, int ref_stride, int pred_stride);
 
+
+extern const uint32_t uvg_crc_table[256];
+
+typedef uint32_t(crc32c_4x4_func)(const uvg_pixel *buf, uint32_t pic_stride);
+
 // Declare function pointers.
+extern crc32c_4x4_func * uvg_crc32c_4x4;
+
 extern reg_sad_func * uvg_reg_sad;
 
 extern cost_pixel_nxn_func * uvg_sad_4x4;
