@@ -54,7 +54,7 @@ uvg_hashmap_node* uvg_hashmap_create_node(uint32_t key, uint32_t value);
 
 uvg_hashmap* uvg_hashmap_create(uint32_t bucket_size);
 
-uint32_t uvg_hashmap_hash(uint32_t key);
+uint32_t uvg_hashmap_hash(uint32_t key, uint32_t bucket_size);
 
 void uvg_hashmap_insert(uvg_hashmap* map, uint32_t key, uint32_t value);
 
