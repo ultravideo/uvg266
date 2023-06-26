@@ -37,9 +37,9 @@
 #include <stdint.h>
 
 // The ratio of the hashmap bucket size to the maximum number of elements
-#define UVG_HASHMAP_RATIO 0.35
+#define UVG_HASHMAP_RATIO 6.0
 // Use Hashmap for 4x4 blocks
-#define UVG_HASHMAP_BLOCKSIZE 4
+#define UVG_HASHMAP_BLOCKSIZE 8
 
 typedef struct uvg_hashmap_node {
     uint32_t key;
@@ -56,11 +56,13 @@ uvg_hashmap_node_t* uvg_hashmap_create_node(uint32_t key, uint32_t value);
 
 uvg_hashmap_t* uvg_hashmap_create(uint32_t bucket_size);
 
-uint32_t uvg_hashmap_hash(uint32_t key, uint32_t bucket_size);
+//uint32_t uvg_hashmap_hash(uint32_t key, uint32_t bucket_size);
 
 void uvg_hashmap_insert(uvg_hashmap_t* map, uint32_t key, uint32_t value);
 
 uvg_hashmap_node_t* uvg_hashmap_search(uvg_hashmap_t* map, uint32_t key);
+
+uint32_t uvg_hashmap_search_return_first(uvg_hashmap_t* map, uint32_t key);
 
 void uvg_hashmap_node_free(uvg_hashmap_node_t* node);
 

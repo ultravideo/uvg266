@@ -155,9 +155,11 @@ typedef void (generate_residual_func)(const uvg_pixel* ref_in, const uvg_pixel* 
 extern const uint32_t uvg_crc_table[256];
 
 typedef uint32_t(crc32c_4x4_func)(const uvg_pixel *buf, uint32_t pic_stride);
+typedef uint32_t(crc32c_8x8_func)(const uvg_pixel *buf, uint32_t pic_stride);
 
 // Declare function pointers.
 extern crc32c_4x4_func * uvg_crc32c_4x4;
+extern crc32c_8x8_func * uvg_crc32c_8x8;
 
 extern reg_sad_func * uvg_reg_sad;
 
@@ -206,6 +208,7 @@ cost_pixel_nxn_multi_func * uvg_pixels_get_sad_dual_func(unsigned n);
 
 #define STRATEGIES_PICTURE_EXPORTS \
   {"crc32c_4x4", (void**) &uvg_crc32c_4x4}, \
+  {"crc32c_8x8", (void **)&uvg_crc32c_8x8}, \
   {"reg_sad", (void**) &uvg_reg_sad}, \
   {"sad_4x4", (void**) &uvg_sad_4x4}, \
   {"sad_8x8", (void**) &uvg_sad_8x8}, \

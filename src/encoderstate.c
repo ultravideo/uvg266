@@ -45,16 +45,19 @@
 #include "encode_coding_tree.h"
 #include "encoder_state-bitstream.h"
 #include "filter.h"
+#include "hashmap.h"
 #include "image.h"
 #include "rate_control.h"
 #include "sao.h"
 #include "search.h"
 #include "tables.h"
+#include "threads.h"
 #include "threadqueue.h"
 #include "alf.h"
 #include "reshape.h"
 
 #include "strategies/strategies-picture.h"
+
 
 /**
  * \brief Strength of QP adjustments when using adaptive QP for 360 video.
@@ -1934,6 +1937,36 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, uvg_pict
       break;
     default:
       assert(0);
+  }
+
+  if (state->encoder_control->cfg.ibc != 0) {
+    int         items = 0;
+    UVG_CLOCK_T hashmap_start_real_time;
+    UVG_CLOCK_T hashmap_end_real_time;
+    UVG_GET_TIME(&hashmap_start_real_time);
+    // Create a new hashmap with UVG_HASHMAP_RATIO buckets per 4x4 block
+    state->tile->frame->ibc_hashmap = uvg_hashmap_create(
+        (int)(((float)(state->tile->frame->width * state->tile->frame->height) / 
+          (float)(UVG_HASHMAP_BLOCKSIZE * UVG_HASHMAP_BLOCKSIZE)) * UVG_HASHMAP_RATIO));
+        
+    // Fill the hashmap with the current frame's block information
+    for (int y = 0; y < state->tile->frame->height; y += 1) {
+      for (int x = 0; x < state->tile->frame->width; x += 1) {
+        uint32_t crc = uvg_crc32c_8x8(state->tile->frame->source->y + y * state->tile->frame->width + x, state->tile->frame->width);
+
+        //uint32_t found = uvg_hashmap_search_return_first(state->tile->frame->ibc_hashmap, crc);
+        //uvg_hashmap_node_t* found = uvg_hashmap_search(state->tile->frame->ibc_hashmap, crc);
+
+        //if (found != NULL) uvg_hashmap_node_free(found);
+
+        uvg_hashmap_insert(state->tile->frame->ibc_hashmap, crc, ((x&0xffff)<<16) | (y&0xffff));
+        items++;
+      }
+    }
+    UVG_GET_TIME(&hashmap_end_real_time);
+    double wall_time = UVG_CLOCK_T_AS_DOUBLE(hashmap_end_real_time) -
+                       UVG_CLOCK_T_AS_DOUBLE(hashmap_start_real_time);
+    fprintf(stderr, "Hashmap creation time: %f, items: %d, size %d\n", wall_time, items, state->tile->frame->ibc_hashmap->bucket_size);
   }
 
   if (state->encoder_control->cfg.lmcs_enable) {

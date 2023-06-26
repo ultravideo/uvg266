@@ -72,9 +72,11 @@ uvg_hashmap_t* uvg_hashmap_create(uint32_t bucket_size)
  * \param bucket_size the size of the hashmap bucket
  * \return the hashed index for the given key and bucket size. 
  */
-uint32_t uvg_hashmap_hash(uint32_t key, uint32_t bucket_size) {
+static uint32_t uvg_hashmap_hash(uint32_t key, uint32_t bucket_size)
+{
   key ^= (key >> 20) ^ (key >> 12);
   return (key ^ (key >> 7) ^ (key >> 4) ^ 2654435769U) % bucket_size;
+  //return key % bucket_size;
 }
 
 /**
@@ -100,20 +102,21 @@ void uvg_hashmap_insert(uvg_hashmap_t* map, uint32_t key, uint32_t value) {
  */
 uvg_hashmap_node_t* uvg_hashmap_search(uvg_hashmap_t* map, uint32_t key) {
   uint32_t hashIndex = uvg_hashmap_hash(key, map->bucket_size);
-  uvg_hashmap_node_t* temp = map->table[hashIndex];
-  uvg_hashmap_node_t* return_node    = NULL;
-  // Search key in chain and return all of them
+  return map->table[hashIndex];
+}
+
+uint32_t uvg_hashmap_search_return_first(uvg_hashmap_t* map, uint32_t key)
+{
+  uint32_t            hashIndex   = uvg_hashmap_hash(key, map->bucket_size);
+  uvg_hashmap_node_t* temp        = map->table[hashIndex];  
+  // Search key in chain and return the first match
   while (temp) {
     if (temp->key == key) {
-      uvg_hashmap_node_t* new_node = uvg_hashmap_create_node(key, temp->value);
-      if (return_node != NULL) {
-        new_node->next = (void*)return_node;
-      }
-      return_node = new_node;
+      return temp->value;
     }
     temp = (uvg_hashmap_node_t*)temp->next;
   }
-  return return_node;
+  return -1;
 }
 
 /**

@@ -42,6 +42,7 @@
 
 // Define function pointers.
 crc32c_4x4_func * uvg_crc32c_4x4 = 0;
+crc32c_8x8_func * uvg_crc32c_8x8 = 0;
 reg_sad_func * uvg_reg_sad = 0;
 
 cost_pixel_nxn_func * uvg_sad_4x4 = 0;
