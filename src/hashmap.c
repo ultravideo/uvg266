@@ -44,6 +44,7 @@ uvg_hashmap_node_t* uvg_hashmap_create_node(uint32_t key, uint32_t value) {
   new_node->key = key;
   new_node->value = value;
   new_node->next = NULL;
+  new_node->size  = 1;
   return new_node;
 }
 
@@ -90,6 +91,7 @@ void uvg_hashmap_insert(uvg_hashmap_t* map, uint32_t key, uint32_t value) {
     uint32_t hash_index = uvg_hashmap_hash(key, map->bucket_size);
     uvg_hashmap_node_t* new_node = uvg_hashmap_create_node(key, value);
     new_node->next = (void*)map->table[hash_index];
+    if (new_node->next != NULL) new_node->size = ((uvg_hashmap_node_t*)new_node->next)->size + 1;
     map->table[hash_index] = new_node;
 }
 

@@ -288,6 +288,23 @@ static void encoder_state_recdata_to_bufs(encoder_state_t * const state,
     const uint32_t ibc_block_width = MIN(LCU_WIDTH, (state->tile->frame->width-lcu->position_px.x));
     const uint32_t ibc_block_height = MIN(LCU_WIDTH, (state->tile->frame->height-lcu->position_px.y));
 
+    int items = 0;
+    // Hash the current LCU to the IBC hashmap
+    for (int32_t xx = (lcu->position_px.x>8)?-6:0; xx < (int32_t)(ibc_block_width)-7; xx+=2) {
+      for (int32_t yy = 0; yy < (int32_t)(ibc_block_height)-7; yy++) {
+        int cur_x = lcu->position_px.x + xx;
+        int cur_y = lcu->position_px.y + yy;
+        uint32_t crc = uvg_crc32c_8x8(&frame->rec->y[cur_y * frame->rec->stride + cur_x],frame->rec->stride);
+        if (state->encoder_control->chroma_format != UVG_CSP_400) {
+          crc ^= uvg_crc32c_4x4(&frame->rec->u[(cur_y>>1) * (frame->rec->stride>>1) + (cur_x>>1)],frame->rec->stride>>1);
+          crc ^= uvg_crc32c_4x4(&frame->rec->v[(cur_y>>1) * (frame->rec->stride>>1) + (cur_x>>1)],frame->rec->stride>>1);
+        }
+        uvg_hashmap_insert(frame->ibc_hashmap_row[ibc_buffer_row], crc, ((cur_x&0xffff)<<16) | (cur_y&0xffff));
+        items++;
+      }
+    }
+    //fprintf(stderr, "Inserted %d items to %dx%d at %dx%d\r\n", items, ibc_block_width, ibc_block_height, lcu->position_px.x, lcu->position_px.y);
+
     uvg_pixels_blit(&frame->rec->y[lcu->position_px.y * frame->rec->stride + lcu->position_px.x],
                     &frame->ibc_buffer_y[ibc_buffer_row][ibc_buffer_pos_x],
                     ibc_block_width, ibc_block_height,
@@ -1937,36 +1954,6 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, uvg_pict
       break;
     default:
       assert(0);
-  }
-
-  if (state->encoder_control->cfg.ibc != 0) {
-    int         items = 0;
-    UVG_CLOCK_T hashmap_start_real_time;
-    UVG_CLOCK_T hashmap_end_real_time;
-    UVG_GET_TIME(&hashmap_start_real_time);
-    // Create a new hashmap with UVG_HASHMAP_RATIO buckets per 4x4 block
-    state->tile->frame->ibc_hashmap = uvg_hashmap_create(
-        (int)(((float)(state->tile->frame->width * state->tile->frame->height) / 
-          (float)(UVG_HASHMAP_BLOCKSIZE * UVG_HASHMAP_BLOCKSIZE)) * UVG_HASHMAP_RATIO));
-        
-    // Fill the hashmap with the current frame's block information
-    for (int y = 0; y < state->tile->frame->height; y += 1) {
-      for (int x = 0; x < state->tile->frame->width; x += 1) {
-        uint32_t crc = uvg_crc32c_8x8(state->tile->frame->source->y + y * state->tile->frame->width + x, state->tile->frame->width);
-
-        //uint32_t found = uvg_hashmap_search_return_first(state->tile->frame->ibc_hashmap, crc);
-        //uvg_hashmap_node_t* found = uvg_hashmap_search(state->tile->frame->ibc_hashmap, crc);
-
-        //if (found != NULL) uvg_hashmap_node_free(found);
-
-        uvg_hashmap_insert(state->tile->frame->ibc_hashmap, crc, ((x&0xffff)<<16) | (y&0xffff));
-        items++;
-      }
-    }
-    UVG_GET_TIME(&hashmap_end_real_time);
-    double wall_time = UVG_CLOCK_T_AS_DOUBLE(hashmap_end_real_time) -
-                       UVG_CLOCK_T_AS_DOUBLE(hashmap_start_real_time);
-    fprintf(stderr, "Hashmap creation time: %f, items: %d, size %d\n", wall_time, items, state->tile->frame->ibc_hashmap->bucket_size);
   }
 
   if (state->encoder_control->cfg.lmcs_enable) {

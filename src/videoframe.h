@@ -81,7 +81,8 @@ typedef struct videoframe
     
   uvg_pixel **ibc_buffer_y; //!< \brief Intra Block Copy buffer for each LCU row 
   uvg_pixel **ibc_buffer_u; //!< \brief Intra Block Copy buffer for each LCU row 
-  uvg_pixel **ibc_buffer_v; //!< \brief Intra Block Copy buffer for each LCU row 
+  uvg_pixel **ibc_buffer_v; //!< \brief Intra Block Copy buffer for each LCU row
+  uvg_hashmap_t **ibc_hashmap_row; //!< \brief Hashmap for IBC hash search for each LCU row
   cu_info_t* hmvp_lut_ibc; //!< \brief Look-up table for HMVP in IBC, one for each LCU row
   uint8_t* hmvp_size_ibc; //!< \brief HMVP IBC LUT size
 
@@ -90,8 +91,6 @@ typedef struct videoframe
   bool source_lmcs_mapped; //!< \brief Indicate if source_lmcs is available and mapped to LMCS
   bool lmcs_top_level; //!< \brief Indicate that in this level the LMCS images are allocated
   bool rec_lmcs_mapped; //!< \brief Indicate if rec_lmcs is available and mapped to LMCS
-
-  uvg_hashmap_t *ibc_hashmap; //!< \brief Hashmap for IBC hash search
 
 } videoframe_t;
 
