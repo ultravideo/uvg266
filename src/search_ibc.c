@@ -1022,6 +1022,215 @@ static void search_pu_ibc(encoder_state_t * const state,
   }
 }
 
+#include "threads.h"
+
+static int uvg_search_hash_cu_ibc(encoder_state_t* const state,
+  int x, int y, int depth,
+  lcu_t* lcu,
+  double* inter_cost,
+  double* inter_bitcost)
+{
+  const int x_cu = x;
+  const int y_cu = y;
+  const int part_mode = SIZE_2Nx2N;
+  const uvg_config          *cfg      = &state->encoder_control->cfg;
+  const videoframe_t * const frame    = state->tile->frame;
+  const int                  width_cu = LCU_WIDTH >> depth;
+  const int                  width    = PU_GET_W(part_mode, width_cu, 0);
+  const int                  height   = PU_GET_H(part_mode, width_cu, 0);
+
+  const bool                 merge_a1  = true;
+  const bool                 merge_b1  = true;
+
+  ibc_search_info_t info;
+
+  const int  x_local = SUB_SCU(x);
+  const int  y_local = SUB_SCU(y);
+  cu_info_t *cur_pu  = LCU_GET_CU_AT_PX(lcu, x_local, y_local);
+
+  cur_pu->type       = CU_IBC;
+  cur_pu->part_size  = part_mode;
+  cur_pu->depth      = depth;
+  cur_pu->tr_depth   = depth;
+  cur_pu->qp         = state->qp;
+
+  // Default to candidate 0
+  CU_SET_MV_CAND(cur_pu, 0, 0);
+
+  FILL(info, 0);
+
+  info.state    = state;
+  info.pic      = frame->source;
+  info.origin.x = x;
+  info.origin.y = y;
+  info.width    = width;
+  info.height   = height;
+  info.mvd_cost_func =
+    cfg->mv_rdo ? uvg_calc_ibc_mvd_cost_cabac : calc_ibc_mvd_cost;
+  info.optimized_sad  = uvg_get_optimized_sad(width);
+  info.lcu            = lcu;
+
+  // Search for merge mode candidates
+  info.num_merge_cand = uvg_inter_get_merge_cand(
+    state,
+    x,
+    y,
+    width,
+    height,
+    merge_a1,
+    merge_b1,
+    info.merge_cand,
+    lcu);
+
+  *inter_cost                = MAX_DOUBLE;
+
+  bool valid_mv = false;
+  
+  static double time_spent = 0.0;
+  static double search_time = 0.0;
+  static double crc_time    = 0.0;
+  static int    evaluations = 0;
+  static int hits = 0;
+
+
+  UVG_CLOCK_T   hashmap_start_temp;
+  UVG_CLOCK_T   hashmap_end_temp;
+
+
+  UVG_CLOCK_T   hashmap_start_real_time;
+  UVG_CLOCK_T   hashmap_end_real_time;
+  UVG_GET_TIME(&hashmap_start_real_time);
+
+  int           xx  = x;
+  int           yy  = y;
+
+  int           best_mv_x    = INT_MAX>>2;
+  int           best_mv_y    = INT_MAX>>2;
+
+  int           own_location = ((xx & 0xffff) << 16) | (yy & 0xffff);
+
+  uint32_t      ibc_buffer_row = yy / LCU_WIDTH;
+
+  //UVG_GET_TIME(&hashmap_start_temp);
+  uint32_t crc = uvg_crc32c_8x8(&state->tile->frame->source->y[yy * state->tile->frame->source->stride + xx],state->tile->frame->source->stride);
+  if (state->encoder_control->chroma_format != UVG_CSP_400) {
+    crc ^= uvg_crc32c_4x4(&state->tile->frame->source->u[(yy >> 1) * (state->tile->frame->source->stride>>1) + (xx >> 1)],state->tile->frame->source->stride>>1);
+    crc ^= uvg_crc32c_4x4(&state->tile->frame->source->v[(yy >> 1) * (state->tile->frame->source->stride>>1) + (xx >> 1)],state->tile->frame->source->stride>>1);
+  }
+  /* UVG_GET_TIME(&hashmap_end_temp);
+  crc_time += UVG_CLOCK_T_AS_DOUBLE(hashmap_end_temp) -
+                UVG_CLOCK_T_AS_DOUBLE(hashmap_start_temp);*/
+
+  uvg_hashmap_node_t *result = uvg_hashmap_search(state->tile->frame->ibc_hashmap_row[ibc_buffer_row],crc);
+  
+  /* UVG_GET_TIME(&hashmap_start_temp);
+  search_time += UVG_CLOCK_T_AS_DOUBLE(hashmap_start_temp) -
+              UVG_CLOCK_T_AS_DOUBLE(hashmap_end_temp);*/
+
+  bool found_block = false;
+
+  int  hashes_found = 0;
+
+  while (result != NULL) {
+    if (hashes_found == 0 && result->size > 1000) {
+      fprintf(stderr, "Found a block with %d elements\n", result->size);
+      //break;      
+    }
+    if (result->key == crc && result->value != own_location) {
+      hashes_found++;      
+      hits++;
+      int pos_x = result->value >> 16;
+      int pos_y = result->value & 0xffff;
+      int mv_x = pos_x - xx;
+      int mv_y = pos_y - yy;
+      if (pos_x <= xx - width && pos_y <= yy - height) {
+        valid_mv = intmv_within_ibc_range(&info, mv_x, mv_y);
+        if (valid_mv) {
+          bool full_block = true; // Is the full block covered by the IBC?
+          for (int xxx = xx+UVG_HASHMAP_BLOCKSIZE; xxx < xx + width; xxx+=UVG_HASHMAP_BLOCKSIZE) {
+            for (int yyy = yy; yyy < yy + height; yyy += UVG_HASHMAP_BLOCKSIZE) {
+              uint32_t crc_other_blocks = uvg_crc32c_8x8(&state->tile->frame->source->y[yyy * state->tile->frame->source->stride + xxx],state->tile->frame->source->stride);
+              if (state->encoder_control->chroma_format != UVG_CSP_400) {
+                crc_other_blocks ^= uvg_crc32c_4x4(&state->tile->frame->source->u[(yyy >> 1) * (state->tile->frame->source->stride>>1) + (xxx >> 1)],state->tile->frame->source->stride>>1);
+                crc_other_blocks ^= uvg_crc32c_4x4(&state->tile->frame->source->v[(yyy >> 1) * (state->tile->frame->source->stride>>1) + (xxx >> 1)],state->tile->frame->source->stride>>1);
+              }
+              uvg_hashmap_node_t *result2 = uvg_hashmap_search(state->tile->frame->ibc_hashmap_row[ibc_buffer_row],crc_other_blocks);
+              evaluations++;
+              bool found_match = false;
+              while (result2) {
+                if (result2->key == crc_other_blocks) {
+                  int pos_x_temp   = (uint16_t)(result2->value >> 16);
+                  int pos_y_temp   = (uint16_t)(result2->value & 0xffff);
+                  int mv_x_temp    = pos_x_temp - xxx;
+                  int mv_y_temp    = pos_y_temp - yyy;
+
+                  if (mv_x_temp == mv_x && mv_y_temp == mv_y) {
+                    found_match = true;
+                    break;
+                  }
+                }
+                result2 = result2->next;
+              }
+              if (!found_match) {
+                full_block = false;
+                break;
+              }
+            }
+            if (!full_block) {
+              break;
+            } 
+          }
+
+          if (full_block) {
+
+            double cost    = get_ibc_mvd_coding_cost(state, &state->cabac, mv_x,mv_y) * state->lambda_sqrt;
+            bool better_mv = cost < *inter_cost;
+            if (better_mv) {
+              best_mv_x              = mv_x;
+              best_mv_y              = mv_y;
+              *inter_cost            = cost;
+              *inter_bitcost         = 0.0;
+              fprintf(stderr, "Found best IBC!! %dx%d %dx%d: %d,%d\r\n", x,y, width,width, mv_x, mv_y);
+              found_block = true;
+              break;
+            }
+          }
+        }
+      }
+    }
+    result = result->next;
+  }
+
+  
+  UVG_GET_TIME(&hashmap_end_real_time);
+  time_spent += UVG_CLOCK_T_AS_DOUBLE(hashmap_end_real_time) -
+                     UVG_CLOCK_T_AS_DOUBLE(hashmap_start_real_time);
+  //if (x > state->tile->frame->width-64 && y > state->tile->frame->height-64)
+    //fprintf(stderr, "Hashmap time: %f (crc: %f, search: %f) Evaluations: %d Hits: %d, hashed in this block: %d\n", time_spent,crc_time, search_time, evaluations, hits,hashes_found);
+   
+  if (!found_block) return;
+
+  cur_pu->inter.mv[0][0] = best_mv_x << INTERNAL_MV_PREC;
+  cur_pu->inter.mv[0][1] = best_mv_y << INTERNAL_MV_PREC;
+  
+
+  uvg_inter_recon_cu(
+    state,
+    lcu,
+    x,
+    y,
+    CU_WIDTH_FROM_DEPTH(depth),
+    true,
+    state->encoder_control->chroma_format != UVG_CSP_400);
+
+  if (*inter_cost < MAX_DOUBLE) {
+    assert(fracmv_within_ibc_range(
+      &info,
+      cur_pu->inter.mv[0][0],
+      cur_pu->inter.mv[0][1]));
+  }
+
+}
 
 
 /**
@@ -1046,7 +1255,13 @@ void uvg_search_cu_ibc(encoder_state_t * const state,
 {
   *inter_cost = MAX_DOUBLE;
   *inter_bitcost = MAX_INT;
-
+   // Quick hashmap search
+  uvg_search_hash_cu_ibc(state,
+                              x, y, depth,
+                              lcu,
+                              inter_cost,
+                              inter_bitcost);
+  return;
   // Store information of L0, L1, and bipredictions.
   // Best cost will be left at MAX_DOUBLE if no valid CU is found.
   // These will be initialized by the following function.
