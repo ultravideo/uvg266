@@ -56,26 +56,26 @@ static uint32_t uvg_crc32c_4x4_8bit_sse42(const uvg_pixel *buf, uint32_t pic_str
 
 static uint32_t uvg_crc32c_4x4_16bit_sse42(const uvg_pixel *buf, uint32_t pic_stride)
 {
-  uint32_t crc = 0xFFFFFFFF;
-  crc = _mm_crc32_u64(crc, *((uint32_t *)&buf[0 * pic_stride]));
-  crc = _mm_crc32_u64(crc, *((uint32_t *)&buf[1 * pic_stride]));
-  crc = _mm_crc32_u64(crc, *((uint32_t *)&buf[2 * pic_stride]));
-  crc = _mm_crc32_u64(crc, *((uint32_t *)&buf[3 * pic_stride]));
-  return crc ^ 0xFFFFFFFF;
+  uint64_t crc = 0xFFFFFFFF;
+  crc = _mm_crc32_u64(crc, *((uint64_t *)&buf[0 * pic_stride]));
+  crc = _mm_crc32_u64(crc, *((uint64_t *)&buf[1 * pic_stride]));
+  crc = _mm_crc32_u64(crc, *((uint64_t *)&buf[2 * pic_stride]));
+  crc = _mm_crc32_u64(crc, *((uint64_t *)&buf[3 * pic_stride]));
+  return (uint32_t)(crc ^ 0xFFFFFFFF);
 }
 
 static uint32_t uvg_crc32c_8x8_8bit_sse42(const uvg_pixel *buf, uint32_t pic_stride)
 {
-  uint32_t crc = 0xFFFFFFFF;
-  crc = _mm_crc32_u64(crc, *((uint32_t *)&buf[0 * pic_stride]));
-  crc = _mm_crc32_u64(crc, *((uint32_t *)&buf[1 * pic_stride]));
-  crc = _mm_crc32_u64(crc, *((uint32_t *)&buf[2 * pic_stride]));
-  crc = _mm_crc32_u64(crc, *((uint32_t *)&buf[3 * pic_stride]));
-  crc = _mm_crc32_u64(crc, *((uint32_t *)&buf[4 * pic_stride]));
-  crc = _mm_crc32_u64(crc, *((uint32_t *)&buf[5 * pic_stride]));
-  crc = _mm_crc32_u64(crc, *((uint32_t *)&buf[6 * pic_stride]));
-  crc = _mm_crc32_u64(crc, *((uint32_t *)&buf[7 * pic_stride]));
-  return crc ^ 0xFFFFFFFF;
+  uint64_t crc = 0xFFFFFFFF;
+  crc = _mm_crc32_u64(crc, *((uint64_t *)&buf[0 * pic_stride]));
+  crc = _mm_crc32_u64(crc, *((uint64_t *)&buf[1 * pic_stride]));
+  crc = _mm_crc32_u64(crc, *((uint64_t *)&buf[2 * pic_stride]));
+  crc = _mm_crc32_u64(crc, *((uint64_t *)&buf[3 * pic_stride]));
+  crc = _mm_crc32_u64(crc, *((uint64_t *)&buf[4 * pic_stride]));
+  crc = _mm_crc32_u64(crc, *((uint64_t *)&buf[5 * pic_stride]));
+  crc = _mm_crc32_u64(crc, *((uint64_t *)&buf[6 * pic_stride]));
+  crc = _mm_crc32_u64(crc, *((uint64_t *)&buf[7 * pic_stride]));
+  return (uint32_t)(crc ^ 0xFFFFFFFF);
 }
 
 
