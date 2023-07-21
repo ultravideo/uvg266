@@ -767,6 +767,7 @@ static void search_pu_ibc(encoder_state_t * const state,
   cur_pu->depth = depth;
   cur_pu->tr_depth = depth;
   cur_pu->qp = state->qp;
+  cur_pu->inter.mv_dir = 1;
 
   // Default to candidate 0
   CU_SET_MV_CAND(cur_pu, 0, 0);
@@ -1295,19 +1296,17 @@ void uvg_search_cu_ibc(encoder_state_t * const state,
 
   cu_info_t *best_inter_pu = NULL;
 
-  // Find best AMVP PU
-  for (int mv_dir = 1; mv_dir < 4; ++mv_dir) {
 
-    int best_key = amvp[mv_dir - 1].keys[0];
+  int best_key = amvp[0].keys[0];
 
-    if (amvp[mv_dir - 1].size > 0 &&
-        amvp[mv_dir - 1].cost[best_key] < *inter_cost) {
+  if (amvp[0].size > 0 &&
+      amvp[0].cost[best_key] < *inter_cost) {
 
-      best_inter_pu  = &amvp[mv_dir - 1].unit[best_key];
-      *inter_cost    =  amvp[mv_dir - 1].cost[best_key];
-      *inter_bitcost =  amvp[mv_dir - 1].bits[best_key];
-    }
+    best_inter_pu  = &amvp[0].unit[best_key];
+    *inter_cost    =  amvp[0].cost[best_key];
+    *inter_bitcost =  amvp[0].bits[best_key];
   }
+
 
   // Compare best AMVP against best Merge mode
   int best_merge_key = merge.keys[0];
