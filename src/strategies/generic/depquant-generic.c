@@ -227,10 +227,10 @@ static void uvg_dep_quant_decide_and_update_generic(
 }
 
 
-void uvg_find_first_non_zero_generic(const coeff_t* srcCoeff, const bool enableScalingLists, context_store dep_quant_context, const uint32_t* const scan, const int32_t* q_coeff, int* firstTestPos, int width, int height)
+void uvg_find_first_non_zero_generic(const coeff_t* srcCoeff, const bool enableScalingLists, const context_store * const dep_quant_context, const uint32_t* const scan, const int32_t* q_coeff, int* firstTestPos, int width, int height)
 {
-  const int default_quant_coeff = dep_quant_context.m_quant->m_QScale;
-  const int32_t thres  = dep_quant_context.m_quant->m_thresLast;
+  const int default_quant_coeff = dep_quant_context->m_quant->m_QScale;
+  const int32_t thres  = dep_quant_context->m_quant->m_thresLast;
   int temp = *firstTestPos;
   for (; temp >= 0; (temp)--) {
     coeff_t thresTmp = (enableScalingLists) ? (thres / (4 * q_coeff[scan[(temp)]])) : (thres / (4 * default_quant_coeff));

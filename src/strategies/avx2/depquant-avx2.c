@@ -1482,18 +1482,10 @@ void uvg_dep_quant_decide_and_update_avx2(
 }
 
 
-void uvg_find_first_non_zero_avx2(
-  const coeff_t* srcCoeff,
-  const bool enableScalingLists,
-  context_store dep_quant_context, 
-  const uint32_t* const scan,
-  const int32_t* q_coeff,
-  int* firstTestPos, 
-  const int width,
-  const int height)
+void uvg_find_first_non_zero_avx2(const coeff_t* srcCoeff, const bool enableScalingLists, const context_store * const dep_quant_context, const uint32_t* const scan, const int32_t* q_coeff, int* firstTestPos, const int width, const int height)
 {
-  const int default_quant_coeff = dep_quant_context.m_quant->m_QScale;
-  const int32_t thres  = dep_quant_context.m_quant->m_thresLast;
+  const int default_quant_coeff = dep_quant_context->m_quant->m_QScale;
+  const int32_t thres  = dep_quant_context->m_quant->m_thresLast;
   int temp = *firstTestPos;
   if (enableScalingLists) {
     for (; temp >= 0; (temp)--) {
