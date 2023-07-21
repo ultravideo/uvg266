@@ -1749,35 +1749,27 @@ static void generate_residual_avx2(const uint8_t* ref_in, const uint8_t* pred_in
   __m128i diff = _mm_setzero_si128();
   switch (width) {
   case 4:
-    diff = get_residual_4x1_avx2(ref_in + 0 * ref_stride, pred_in + 0 * pred_stride);
-    _mm_storel_epi64((__m128i*) & (residual[0]), diff);
-    diff = get_residual_4x1_avx2(ref_in + 1 * ref_stride, pred_in + 1 * pred_stride);
-    _mm_storel_epi64((__m128i*) & (residual[4]), diff);
-    diff = get_residual_4x1_avx2(ref_in + 2 * ref_stride, pred_in + 2 * pred_stride);
-    _mm_storel_epi64((__m128i*) & (residual[8]), diff);
-    diff = get_residual_4x1_avx2(ref_in + 3 * ref_stride, pred_in + 3 * pred_stride);
-    _mm_storel_epi64((__m128i*) & (residual[12]), diff);
+    for (int y = 0; y < height; y+=4) {
+      diff = get_residual_4x1_avx2(ref_in + y * ref_stride, pred_in + y * pred_stride);
+      _mm_storel_epi64((__m128i*) & (residual[y * 4]), diff);
+      diff = get_residual_4x1_avx2(ref_in + (y + 1) * ref_stride, pred_in + (y + 1) * pred_stride);
+      _mm_storel_epi64((__m128i*) & (residual[y * 4 + 4]), diff);
+      diff = get_residual_4x1_avx2(ref_in + (y + 2) * ref_stride, pred_in + (y + 2) * pred_stride);
+      _mm_storel_epi64((__m128i*) & (residual[y * 4 + 8]), diff);
+      diff = get_residual_4x1_avx2(ref_in + (y + 3) * ref_stride, pred_in + (y + 3) * pred_stride);
+      _mm_storel_epi64((__m128i*) & (residual[y * 4 + 12]), diff);
+    }
     break;
   case 8:
-    diff = get_residual_8x1_avx2(&ref_in[0 * ref_stride], &pred_in[0 * pred_stride]);
-    _mm_storeu_si128((__m128i*) & (residual[0]), diff);
-    diff = get_residual_8x1_avx2(&ref_in[1 * ref_stride], &pred_in[1 * pred_stride]);
-    _mm_storeu_si128((__m128i*) & (residual[8]), diff);
-    diff = get_residual_8x1_avx2(&ref_in[2 * ref_stride], &pred_in[2 * pred_stride]);
-    _mm_storeu_si128((__m128i*) & (residual[16]), diff);
-    diff = get_residual_8x1_avx2(&ref_in[3 * ref_stride], &pred_in[3 * pred_stride]);
-    _mm_storeu_si128((__m128i*) & (residual[24]), diff);
-    diff = get_residual_8x1_avx2(&ref_in[4 * ref_stride], &pred_in[4 * pred_stride]);
-    _mm_storeu_si128((__m128i*) & (residual[32]), diff);
-    diff = get_residual_8x1_avx2(&ref_in[5 * ref_stride], &pred_in[5 * pred_stride]);
-    _mm_storeu_si128((__m128i*) & (residual[40]), diff);
-    diff = get_residual_8x1_avx2(&ref_in[6 * ref_stride], &pred_in[6 * pred_stride]);
-    _mm_storeu_si128((__m128i*) & (residual[48]), diff);
-    diff = get_residual_8x1_avx2(&ref_in[7 * ref_stride], &pred_in[7 * pred_stride]);
-    _mm_storeu_si128((__m128i*) & (residual[56]), diff);
+    for (int y = 0; y < height; y += 2) {
+      diff = get_residual_8x1_avx2(&ref_in[y * ref_stride], &pred_in[y * pred_stride]);
+      _mm_storeu_si128((__m128i*) & (residual[y * 8]), diff);
+      diff = get_residual_8x1_avx2(&ref_in[(y + 1) * ref_stride], &pred_in[(y + 1) * pred_stride]);
+      _mm_storeu_si128((__m128i*) & (residual[y*8 + 8]), diff);
+    }
     break;
   default:
-    for (int y = 0; y < width; ++y) {
+    for (int y = 0; y < height; ++y) {
       for (int x = 0; x < width; x += 16) {
         diff = get_residual_8x1_avx2(&ref_in[x + y * ref_stride], &pred_in[x + y * pred_stride]);
         _mm_storeu_si128((__m128i*) & residual[x + y * width], diff);
@@ -1816,15 +1808,15 @@ int uvg_strategy_register_picture_avx2(void* opaque, uint8_t bitdepth)
     success &= uvg_strategyselector_register(opaque, "satd_32x32", "avx2", 40, &satd_32x32_8bit_avx2);
     success &= uvg_strategyselector_register(opaque, "satd_64x64", "avx2", 40, &satd_64x64_8bit_avx2);
 
-    success &= uvg_strategyselector_register(opaque, "satd_4x4_dual", "avx2", 40, &satd_8bit_4x4_dual_avx2);
-    success &= uvg_strategyselector_register(opaque, "satd_8x8_dual", "avx2", 40, &satd_8bit_8x8_dual_avx2);
-    success &= uvg_strategyselector_register(opaque, "satd_16x16_dual", "avx2", 40, &satd_8bit_16x16_dual_avx2);
-    success &= uvg_strategyselector_register(opaque, "satd_32x32_dual", "avx2", 40, &satd_8bit_32x32_dual_avx2);
-    success &= uvg_strategyselector_register(opaque, "satd_64x64_dual", "avx2", 40, &satd_8bit_64x64_dual_avx2);
-    success &= uvg_strategyselector_register(opaque, "satd_any_size", "avx2", 40, &satd_any_size_8bit_avx2);
-    success &= uvg_strategyselector_register(opaque, "satd_any_size_quad", "avx2", 40, &satd_any_size_quad_avx2);
+    //success &= uvg_strategyselector_register(opaque, "satd_4x4_dual", "avx2", 40, &satd_8bit_4x4_dual_avx2);
+    //success &= uvg_strategyselector_register(opaque, "satd_8x8_dual", "avx2", 40, &satd_8bit_8x8_dual_avx2);
+    //success &= uvg_strategyselector_register(opaque, "satd_16x16_dual", "avx2", 40, &satd_8bit_16x16_dual_avx2);
+    //success &= uvg_strategyselector_register(opaque, "satd_32x32_dual", "avx2", 40, &satd_8bit_32x32_dual_avx2);
+    //success &= uvg_strategyselector_register(opaque, "satd_64x64_dual", "avx2", 40, &satd_8bit_64x64_dual_avx2);
+    //success &= uvg_strategyselector_register(opaque, "satd_any_size", "avx2", 40, &satd_any_size_8bit_avx2);
+    //success &= uvg_strategyselector_register(opaque, "satd_any_size_quad", "avx2", 40, &satd_any_size_quad_avx2);
 
-    success &= uvg_strategyselector_register(opaque, "pixels_calc_ssd", "avx2", 40, &pixels_calc_ssd_avx2);
+    //success &= uvg_strategyselector_register(opaque, "pixels_calc_ssd", "avx2", 40, &pixels_calc_ssd_avx2);
     success &= uvg_strategyselector_register(opaque, "bipred_average", "avx2", 40, &bipred_average_avx2);
     success &= uvg_strategyselector_register(opaque, "get_optimized_sad", "avx2", 40, &get_optimized_sad_avx2);
     success &= uvg_strategyselector_register(opaque, "ver_sad", "avx2", 40, &ver_sad_avx2);

@@ -960,7 +960,7 @@ int uvg_strategy_register_quant_avx2(void* opaque, uint8_t bitdepth)
 #if COMPILE_INTEL_AVX2 && defined X86_64
 #if UVG_BIT_DEPTH == 8
   if (bitdepth == 8) {
-    success &= uvg_strategyselector_register(opaque, "quantize_residual", "avx2", 40, &uvg_quantize_residual_avx2);
+    //success &= uvg_strategyselector_register(opaque, "quantize_residual", "avx2", 40, &uvg_quantize_residual_avx2);
     success &= uvg_strategyselector_register(opaque, "dequant", "avx2", 40, &uvg_dequant_avx2);
   }
 #endif // UVG_BIT_DEPTH == 8
