@@ -61,15 +61,15 @@ typedef int(dep_quant_decide_and_update_func)(
   const uint32_t                          effHeight,
   bool                                    is_chroma);
 
-typedef void(find_first_non_zero_coeff_func)(
-  const coeff_t*        srcCoeff,
-  const bool            enableScalingLists,
-  context_store         dep_quant_context,
-  const uint32_t* const scan,
-  const int32_t*        q_coeff,
-  int*                  firstTestPos,
-  int                   width,
-  int                   height);
+typedef void (find_first_non_zero_coeff_func)(
+  const coeff_t*             srcCoeff,
+  const bool                 enableScalingLists,
+  const context_store* const dep_quant_context,
+  const uint32_t* const      scan,
+  const int32_t*             q_coeff,
+  int*                       firstTestPos,
+  int                        width,
+  int                        height);
 
 
 // Declare function pointers.

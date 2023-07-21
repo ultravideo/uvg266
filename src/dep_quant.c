@@ -32,8 +32,6 @@
 
 #include "dep_quant.h"
 
-#include <immintrin.h>
-
 #include "cu.h"
 #include "encoderstate.h"
 #include "intra.h"
@@ -923,63 +921,15 @@ int uvg_dep_quant(
     height >= 4) {
     firstTestPos =((width == 4 && height == 4) || (width == 8 && height == 8)) ? 7 : 15;
   }
-  //uvg_find_first_non_zero_coeff(srcCoeff, enableScalingLists, dep_quant_context, scan, q_coeff, &firstTestPos, width, height);
-  const int     default_quant_coeff = dep_quant_context.m_quant->m_QScale;
-  const int32_t thres = dep_quant_context.m_quant->m_thresLast;
-  int           temp = firstTestPos;
-  if (enableScalingLists) {
-    for (; temp >= 0; (temp)--) {
-      coeff_t thresTmp = thres / (4 * q_coeff[scan[(temp)]]);
-      if (abs(srcCoeff[scan[(temp)]]) > thresTmp) {
-        break;
-      }
-    }
-  } else {
-    coeff_t thresTmp = thres / (4 * default_quant_coeff);
-    if (temp >= 16 && height >= 4) {
-      __m256i th = _mm256_set1_epi16(thresTmp);
-      temp -= 15;
-      for (; temp >= 0; temp -= 16) {
-        __m256i sbb_data;
-        if (width <= 4) {
-          sbb_data = _mm256_loadu_si256((__m256i const*)&srcCoeff[scan[temp]]);
-        } else if (width == 8) {
-          uint32_t i = scan[temp];
-          __m256i  first = _mm256_loadu_si256((__m256i const*)&srcCoeff[i]);
-          __m256i  second = _mm256_loadu_si256((__m256i const*)&srcCoeff[i + 12]);
-          sbb_data = _mm256_blend_epi32(first, second, 204);
-        } else {
-          int16_t  temp_d[16];
-          uint32_t i = scan[temp];
-          memcpy(temp_d, &srcCoeff[i], 8);
-          i += width;
-          memcpy(temp_d + 4, &srcCoeff[i], 8);
-          i += width;
-          memcpy(temp_d + 8, &srcCoeff[i], 8);
-          i += width;
-          memcpy(temp_d + 12, &srcCoeff[i], 8);
-
-          sbb_data = _mm256_loadu_si256((__m256i const*)temp_d);
-        }
-        sbb_data = _mm256_abs_epi16(sbb_data);
-
-        __m256i a = _mm256_cmpgt_epi16(sbb_data, th);
-        if (!_mm256_testz_si256(a, a)) {
-          if (temp >= 0) {
-            temp += 15;
-          }
-          break;
-        }
-      }
-    }
-    for (; temp >= 0; temp--) {
-      if (abs(srcCoeff[scan[(temp)]]) > thresTmp) {
-        break;
-      }
-    }
-  }
-
-  firstTestPos = temp;
+  uvg_find_first_non_zero_coeff(
+    srcCoeff,
+    enableScalingLists,
+    &dep_quant_context,
+    scan,
+    q_coeff,
+    &firstTestPos,
+    width, 
+    height);
   if (firstTestPos < 0) {
     return 0;
   }
@@ -1044,7 +994,8 @@ int uvg_dep_quant(
 
   const uint32_t height_in_sbb = MAX(height >> 2, 1);
   const uint32_t width_in_sbb = MAX(width >> 2, 1);
-  
+
+  const int      default_quant_coeff = dep_quant_context.m_quant->m_QScale;
   //===== populate trellis =====
   for (int scanIdx = firstTestPos; scanIdx >= 0; scanIdx--) {
     uint32_t blkpos = scan[scanIdx];
