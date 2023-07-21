@@ -154,9 +154,8 @@ static void encoder_state_write_bitstream_PTL(bitstream_t *stream,
   // end Profile Tier
 
   //uint8_t level = state->encoder_control->cfg.level;
-  // ToDo: level hardcoded to 5.2
-  WRITE_U(stream, 86, 8, "general_level_idc");
-
+  // ToDo: level hardcoded to 6.3
+  WRITE_U(stream, 105, 8, "general_level_idc");
 
   WRITE_U(stream, 0, 1, "ptl_frame_only_constraint_flag");
   WRITE_U(stream, 0, 1, "ptl_multilayer_enabled_flag");
