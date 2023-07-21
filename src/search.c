@@ -1012,6 +1012,7 @@ static double search_cu(
     // Simple IBC search
     if (can_use_intra //&& state->frame->slicetype == UVG_SLICE_I
          && state->encoder_control->cfg.ibc 
+         && cost > 1000
          && cu_width > 4
          && (x >= cu_width || y >= cu_width)
          && !cur_cu->skipped) {
@@ -1029,6 +1030,7 @@ static double search_cu(
         cost = mode_cost;
         inter_bitcost = mode_bitcost;
         cur_cu->type = CU_IBC;
+        cur_cu->inter.mv_dir = 1;
         cur_cu->joint_cb_cr = 0;
       } else {
         *cur_cu = backup_cu;

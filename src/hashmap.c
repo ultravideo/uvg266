@@ -75,9 +75,9 @@ uvg_hashmap_t* uvg_hashmap_create(uint32_t bucket_size)
  */
 static uint32_t uvg_hashmap_hash(uint32_t key, uint32_t bucket_size)
 {
-  key ^= (key >> 20) ^ (key >> 12);
-  return (key ^ (key >> 7) ^ (key >> 4) ^ 2654435769U) % bucket_size;
-  //return key % bucket_size;
+  //key ^= (key >> 20) ^ (key >> 12);
+  //return (key ^ (key >> 7) ^ (key >> 4) ^ 2654435769U) % bucket_size;
+  return key % bucket_size;
 }
 
 /**

@@ -1082,7 +1082,8 @@ static int uvg_search_hash_cu_ibc(encoder_state_t* const state,
     info.merge_cand,
     lcu);
 
-  *inter_cost                = MAX_DOUBLE;
+  *inter_cost               = MAX_DOUBLE;
+  *inter_bitcost            = MAX_DOUBLE;
 
   bool valid_mv = false;
   
@@ -1112,11 +1113,12 @@ static int uvg_search_hash_cu_ibc(encoder_state_t* const state,
   uint32_t      ibc_buffer_row = yy / LCU_WIDTH;
 
   //UVG_GET_TIME(&hashmap_start_temp);
-  uint32_t crc = uvg_crc32c_8x8(&state->tile->frame->source->y[yy * state->tile->frame->source->stride + xx],state->tile->frame->source->stride);
-  if (state->encoder_control->chroma_format != UVG_CSP_400) {
+  uint32_t crc = state->tile->frame->ibc_hashmap_pos_to_hash[(yy / UVG_HASHMAP_BLOCKSIZE)*state->tile->frame->ibc_hashmap_pos_to_hash_stride + xx / UVG_HASHMAP_BLOCKSIZE];
+  //uvg_crc32c_8x8(&state->tile->frame->source->y[yy * state->tile->frame->source->stride + xx],state->tile->frame->source->stride);
+  /* if (state->encoder_control->chroma_format != UVG_CSP_400) {
     crc ^= uvg_crc32c_4x4(&state->tile->frame->source->u[(yy >> 1) * (state->tile->frame->source->stride>>1) + (xx >> 1)],state->tile->frame->source->stride>>1);
     crc ^= uvg_crc32c_4x4(&state->tile->frame->source->v[(yy >> 1) * (state->tile->frame->source->stride>>1) + (xx >> 1)],state->tile->frame->source->stride>>1);
-  }
+  }*/
   /* UVG_GET_TIME(&hashmap_end_temp);
   crc_time += UVG_CLOCK_T_AS_DOUBLE(hashmap_end_temp) -
                 UVG_CLOCK_T_AS_DOUBLE(hashmap_start_temp);*/
@@ -1133,11 +1135,11 @@ static int uvg_search_hash_cu_ibc(encoder_state_t* const state,
 
   while (result != NULL) {
     if (hashes_found == 0 && result->size > 1000) {
-      fprintf(stderr, "Found a block with %d elements\n", result->size);
+      //fprintf(stderr, "Found a block with %d elements\n", result->size);
       //break;      
     }
     if (result->key == crc && result->value != own_location) {
-      hashes_found++;      
+      hashes_found++;
       hits++;
       int pos_x = result->value >> 16;
       int pos_y = result->value & 0xffff;
@@ -1149,11 +1151,13 @@ static int uvg_search_hash_cu_ibc(encoder_state_t* const state,
           bool full_block = true; // Is the full block covered by the IBC?
           for (int xxx = xx+UVG_HASHMAP_BLOCKSIZE; xxx < xx + width; xxx+=UVG_HASHMAP_BLOCKSIZE) {
             for (int yyy = yy; yyy < yy + height; yyy += UVG_HASHMAP_BLOCKSIZE) {
-              uint32_t crc_other_blocks = uvg_crc32c_8x8(&state->tile->frame->source->y[yyy * state->tile->frame->source->stride + xxx],state->tile->frame->source->stride);
+              uint32_t crc_other_blocks = state->tile->frame->ibc_hashmap_pos_to_hash[(yyy / UVG_HASHMAP_BLOCKSIZE)*state->tile->frame->ibc_hashmap_pos_to_hash_stride + xxx / UVG_HASHMAP_BLOCKSIZE];
+              //uvg_crc32c_8x8(&state->tile->frame->source->y[yyy * state->tile->frame->source->stride + xxx],state->tile->frame->source->stride);
+              /*
               if (state->encoder_control->chroma_format != UVG_CSP_400) {
                 crc_other_blocks ^= uvg_crc32c_4x4(&state->tile->frame->source->u[(yyy >> 1) * (state->tile->frame->source->stride>>1) + (xxx >> 1)],state->tile->frame->source->stride>>1);
                 crc_other_blocks ^= uvg_crc32c_4x4(&state->tile->frame->source->v[(yyy >> 1) * (state->tile->frame->source->stride>>1) + (xxx >> 1)],state->tile->frame->source->stride>>1);
-              }
+              }*/
               uvg_hashmap_node_t *result2 = uvg_hashmap_search(state->tile->frame->ibc_hashmap_row[ibc_buffer_row],crc_other_blocks);
               evaluations++;
               bool found_match = false;
@@ -1180,19 +1184,22 @@ static int uvg_search_hash_cu_ibc(encoder_state_t* const state,
               break;
             } 
           }
+          double     cost = *inter_cost, bits = *inter_bitcost;
+          vector2d_t mv = { best_mv_x, best_mv_y};
+          
+          if (full_block && check_mv_cost(&info, mv_x, mv_y, &cost, &bits, &mv)) {
 
-          if (full_block) {
-
-            double cost    = get_ibc_mvd_coding_cost(state, &state->cabac, mv_x,mv_y) * state->lambda_sqrt;
+            //double cost    = get_ibc_mvd_coding_cost(state, &state->cabac, mv_x,mv_y) * state->lambda_sqrt;
+            //cost += 
             bool better_mv = cost < *inter_cost;
             if (better_mv) {
               best_mv_x              = mv_x;
               best_mv_y              = mv_y;
               *inter_cost            = cost;
-              *inter_bitcost         = 0.0;
+              *inter_bitcost         = bits;
               fprintf(stderr, "Found best IBC!! %dx%d %dx%d: %d,%d\r\n", x,y, width,width, mv_x, mv_y);
               found_block = true;
-              break;
+              //break;
             }
           }
         }
@@ -1256,12 +1263,13 @@ void uvg_search_cu_ibc(encoder_state_t * const state,
   *inter_cost = MAX_DOUBLE;
   *inter_bitcost = MAX_INT;
    // Quick hashmap search
-  uvg_search_hash_cu_ibc(state,
-                              x, y, depth,
-                              lcu,
-                              inter_cost,
-                              inter_bitcost);
-  return;
+  /* uvg_search_hash_cu_ibc(
+    state,
+                          x, y, depth,
+                          lcu,
+                          inter_cost,
+                          inter_bitcost);
+  return;*/
   // Store information of L0, L1, and bipredictions.
   // Best cost will be left at MAX_DOUBLE if no valid CU is found.
   // These will be initialized by the following function.
@@ -1327,7 +1335,7 @@ void uvg_search_cu_ibc(encoder_state_t * const state,
   uvg_inter_recon_cu(state, lcu, x, y, CU_WIDTH_FROM_DEPTH(depth),
     true, state->encoder_control->chroma_format != UVG_CSP_400);   
 
-  if (*inter_cost < MAX_DOUBLE) {
+  if (*inter_cost < MAX_DOUBLE) {    
     assert(fracmv_within_ibc_range(&info, cur_pu->inter.mv[0][0], cur_pu->inter.mv[0][1]));
   }
 }

@@ -83,6 +83,8 @@ typedef struct videoframe
   uvg_pixel **ibc_buffer_u; //!< \brief Intra Block Copy buffer for each LCU row 
   uvg_pixel **ibc_buffer_v; //!< \brief Intra Block Copy buffer for each LCU row
   uvg_hashmap_t **ibc_hashmap_row; //!< \brief Hashmap for IBC hash search for each LCU row
+  uint32_t *ibc_hashmap_pos_to_hash; //!< \brief Hashmap reverse search for position to hash
+  uint32_t ibc_hashmap_pos_to_hash_stride; //!< \brief Hashmap position to hash stride
   cu_info_t* hmvp_lut_ibc; //!< \brief Look-up table for HMVP in IBC, one for each LCU row
   uint8_t* hmvp_size_ibc; //!< \brief HMVP IBC LUT size
 
