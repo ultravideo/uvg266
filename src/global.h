@@ -258,7 +258,7 @@ typedef int32_t mv_t;
  *
  */
 #define IBC_MRG_MAX_NUM_CANDS 6
-#define IBC_BUFFER_SIZE       (256*128)
+#define IBC_BUFFER_SIZE       (128*128)
 #define IBC_BUFFER_WIDTH      (IBC_BUFFER_SIZE / LCU_WIDTH)
 #define IBC_BUFFER_WIDTH_C    ((IBC_BUFFER_SIZE / LCU_WIDTH) >> 1)
 
