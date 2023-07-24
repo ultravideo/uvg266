@@ -312,6 +312,55 @@ static void select_starting_point(inter_search_info_t *info,
     check_mv_cost(info, extra_mv.x, extra_mv.y, best_cost, best_bits, best_mv);
   }
 
+  if (info->state->encoder_control->cfg.ibc & 2) {
+    int      origin_x       = info->origin.x;
+    int      origin_y       = info->origin.y;
+
+    int      ibc_origin_x   = origin_x / UVG_HASHMAP_BLOCKSIZE;
+    int      ibc_origin_y   = origin_y / UVG_HASHMAP_BLOCKSIZE;
+
+    int      own_location   = ((origin_x & 0xffff) << 16) | (origin_y & 0xffff);
+
+    uint32_t ibc_buffer_row = origin_y / LCU_WIDTH;
+
+    uint32_t crc = info->state->tile->frame->ibc_hashmap_pos_to_hash
+                      [(origin_y / UVG_HASHMAP_BLOCKSIZE) *
+                        info->state->tile->frame->ibc_hashmap_pos_to_hash_stride +
+                      origin_x / UVG_HASHMAP_BLOCKSIZE];
+
+    uvg_hashmap_node_t *result = uvg_hashmap_search(
+      info->state->tile->frame->ibc_hashmap_row[ibc_buffer_row], crc);
+
+    while (result != NULL) {
+      if (result->key == crc && result->value != own_location) {
+        int pos_x = result->value >> 16;
+        int pos_y = result->value & 0xffff;
+        int mv_x  = pos_x - origin_x;
+        int mv_y  = pos_y - origin_y;
+
+        int ibc_pos_x = pos_x / UVG_HASHMAP_BLOCKSIZE;
+        int ibc_pos_y = pos_y / UVG_HASHMAP_BLOCKSIZE;
+
+        bool full_block = true;
+        for (int ibc_x = 0; ibc_x < info->width / UVG_HASHMAP_BLOCKSIZE; ibc_x++) {
+          for (int ibc_y = 0; ibc_y < info->height / UVG_HASHMAP_BLOCKSIZE; ibc_y++) {
+            uint32_t neighbor_crc = info->state->tile->frame->ibc_hashmap_pos_to_hash
+                      [(ibc_pos_y+ibc_y) * info->state->tile->frame->ibc_hashmap_pos_to_hash_stride + ibc_pos_x + ibc_x];
+            uint32_t other_crc = info->state->tile->frame->ibc_hashmap_pos_to_hash
+                      [(ibc_origin_y+ibc_y) * info->state->tile->frame->ibc_hashmap_pos_to_hash_stride + ibc_origin_x + ibc_x];
+            if (other_crc != neighbor_crc) {
+              full_block = false;
+              break;
+            }
+          }
+          if (!full_block) break;
+        }
+        if (full_block) check_mv_cost(info, mv_x, mv_y, best_cost, best_bits, best_mv);
+      }
+      result = result->next;
+    }
+  }
+
   // Go through candidates
   for (int32_t i = 0; i < info->num_merge_cand; ++i) {
     if (info->merge_cand[i].dir == 3) continue;
