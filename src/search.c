@@ -1010,7 +1010,7 @@ static double search_cu(
     }
 
     // Simple IBC search
-    if (cost > 500 && can_use_intra //&& state->frame->slicetype == UVG_SLICE_I
+    if (can_use_intra //&& state->frame->slicetype == UVG_SLICE_I
          && state->encoder_control->cfg.ibc 
          && cost > 1000
          && cu_width > 4

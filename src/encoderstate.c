@@ -755,14 +755,14 @@ static void encoder_state_worker_encode_lcu_search(void * opaque)
   if(state->encoder_control->cfg.ibc) memcpy(original_lut_ibc, &state->tile->frame->hmvp_lut_ibc[ctu_row_mul_five], sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
 
 
-  if (state->encoder_control->cfg.ibc) {
+  if (state->encoder_control->cfg.ibc & 2) {
     videoframe_t * const frame      = state->tile->frame;
     const uint32_t ibc_block_width  = MIN(LCU_WIDTH, (state->tile->frame->width-lcu->position_px.x));
     const uint32_t ibc_block_height = MIN(LCU_WIDTH, (state->tile->frame->height-lcu->position_px.y));
     int items = 0;
     // Hash the current LCU to the IBC hashmap
-    for (int32_t xx = (lcu->position_px.x>8)?-7:0; xx < (int32_t)(ibc_block_width)-7; xx++) {
-      for (int32_t yy = 0; yy < (int32_t)(ibc_block_height)-7; yy++) {
+    for (int32_t xx = 0; xx < (int32_t)(ibc_block_width)-7; xx+=UVG_HASHMAP_BLOCKSIZE) {
+      for (int32_t yy = 0; yy < (int32_t)(ibc_block_height)-7; yy+=UVG_HASHMAP_BLOCKSIZE) {
         int cur_x = lcu->position_px.x + xx;
         int cur_y = lcu->position_px.y + yy;
         

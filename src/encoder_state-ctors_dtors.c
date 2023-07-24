@@ -133,9 +133,11 @@ static int encoder_state_config_tile_init(encoder_state_t * const state,
     state->tile->frame->ibc_buffer_v = malloc(sizeof(uvg_pixel*) * state->tile->frame->height_in_lcu);
     state->tile->frame->ibc_hashmap_row = malloc(sizeof(uvg_hashmap_t) * state->tile->frame->height_in_lcu);
 
-    state->tile->frame->ibc_hashmap_pos_to_hash_stride = ((state->tile->frame->width+UVG_HASHMAP_BLOCKSIZE-1)/ UVG_HASHMAP_BLOCKSIZE);
-    state->tile->frame->ibc_hashmap_pos_to_hash = malloc(sizeof(uint32_t) *
-      ((state->tile->frame->height+UVG_HASHMAP_BLOCKSIZE-1)/ UVG_HASHMAP_BLOCKSIZE) * state->tile->frame->ibc_hashmap_pos_to_hash_stride);
+    if (state->encoder_control->cfg.ibc & 2) {
+      state->tile->frame->ibc_hashmap_pos_to_hash_stride = ((state->tile->frame->width+UVG_HASHMAP_BLOCKSIZE-1)/ UVG_HASHMAP_BLOCKSIZE);
+      state->tile->frame->ibc_hashmap_pos_to_hash = malloc(sizeof(uint32_t) *
+        ((state->tile->frame->height+UVG_HASHMAP_BLOCKSIZE-1)/ UVG_HASHMAP_BLOCKSIZE) * state->tile->frame->ibc_hashmap_pos_to_hash_stride);
+    }
 
     for (uint32_t i = 0; i < state->tile->frame->height_in_lcu; i++) {
       state->tile->frame->ibc_hashmap_row[i] = uvg_hashmap_create((LCU_WIDTH * IBC_BUFFER_WIDTH)>>2);
@@ -224,7 +226,9 @@ static void encoder_state_config_tile_finalize(encoder_state_t * const state) {
   FREE_POINTER(state->tile->frame->hmvp_size_ibc);
 
   if (state->encoder_control->cfg.ibc) {
-    FREE_POINTER(state->tile->frame->ibc_hashmap_pos_to_hash);
+    if (state->encoder_control->cfg.ibc & 2) {
+      FREE_POINTER(state->tile->frame->ibc_hashmap_pos_to_hash);
+    }
 
     for (uint32_t i = 0; i < state->tile->frame->height_in_lcu; i++) {
       FREE_POINTER(state->tile->frame->ibc_buffer_y[i]);
