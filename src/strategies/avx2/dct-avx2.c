@@ -2174,6 +2174,9 @@ void fast_inverse_tr_2x8_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, t
   const int32_t shift_2nd = INVERSE_SHIFT_2ND;
 
   const int16_t* ver_coeff = fi_dct2_8x2_coeff_hor; // TODO: rename
+  if (ver == DST7) {
+    ver_coeff = fi_dst7_8x2_coeff_hor;
+  }
   const int16_t* hor_coeff = fi_dct2_8x2_coeff_ver; // rename
   // No coeffs for DCT8 and DST7 transforms since they do not exist for this block size
 
@@ -2359,6 +2362,9 @@ void fast_inverse_tr_2x16_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, 
   const int32_t shift_2nd = INVERSE_SHIFT_2ND;
 
   const int16_t* ver_coeff = fi_dct2_16x2_coeff_hor; // TODO: rename
+  if (ver == DST7) {
+    ver_coeff = fi_dst7_16x2_coeff_hor;
+  }
   const int16_t* hor_coeff = fi_dct2_16x2_coeff_ver; // rename
   // No coeffs for DCT8 and DST7 transforms since they do not exist for this block size
 
@@ -3607,7 +3613,7 @@ static void fast_inverse_tr_8x2_avx2_hor(const __m256i* src, int16_t* dst, const
   _mm256_store_si256((__m256i*)dst, v_result);
 }
 
-void fast_inverse_tr_8x2_avx2(const int16_t* src, int16_t* dst, const int mts_type)
+void fast_inverse_tr_8x2_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
 {
   const int width = 8;
   const int height = 2;
@@ -3620,6 +3626,9 @@ void fast_inverse_tr_8x2_avx2(const int16_t* src, int16_t* dst, const int mts_ty
 
   const int16_t* ver_coeff = ff_dct2_2xN_coeff_hor; // TODO: rename
   const int16_t* hor_coeff = fi_dct2_2x8_coeff_ver; // rename
+  if (hor == DST7) {
+    hor_coeff = fi_dst7_2x8_coeff_ver;
+  }
   // Only dct2 transform is defined for this block size
 
   __m256i v_ver_pass_out;
@@ -4810,6 +4819,9 @@ void fast_inverse_tr_16x2_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, 
 
   const int16_t* ver_coeff = ff_dct2_2xN_coeff_hor; // TODO: rename
   const int16_t* hor_coeff = fi_dct2_2x16_coeff_ver; // rename
+  if (hor == DST7) {
+    hor_coeff = fi_dst7_2x16_coeff_ver;
+  }
   // DST7 and DCT8 are not defined for this block size
 
   __m256i v_ver_pass_out[2];
@@ -5455,7 +5467,7 @@ static void fast_inverse_tr_16x16_avx2_hor(const int16_t* src, __m256i* dst, con
   //  dst[i] = _mm256_packs_epi32(v_trunc_lo[i], v_trunc_hi[i]);
   //}
 
-  for (int j = 0; j < 16; ++j) {
+  for (int j = 0; j < line; ++j) {
     __m256i res_0 = _mm256_setzero_si256();
     __m256i res_1 = _mm256_setzero_si256();
 
@@ -7219,7 +7231,7 @@ void fast_inverse_tr_32x8_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, 
   }
 
   __m256i v_ver_pass_out[16];
-  if(ver == DCT2) {
+  if(ver == DCT2 || hor == DCT2) {
     fast_inverse_tr_32x8_avx2_ver(src, v_ver_pass_out, ver_coeff, shift_1st, height, 0, skip_width);
   }
   else {
@@ -8128,9 +8140,26 @@ static void mts_idct_avx2(
   else {
     const int log2_width_minus1  = uvg_g_convert_to_log2[width] - 1;
     const int log2_height_minus1 = uvg_g_convert_to_log2[height] - 1;
-
-    dct_full_pass* idct_func = idct_function_table[log2_width_minus1][log2_height_minus1];
-    idct_func(input, output, type_hor, type_ver);
+        if (height == 1) {
+      if (width == 16) {
+        fast_forward_DCT2_B16_avx2_hor(input, (__m256i*)output, type_hor == DCT2 ? fi_dct2_16x1_coeff_hor : fi_dst7_16x1_coeff_hor, 13, 1, 0, 0);
+        _mm256_store_si256((__m256i*)output, _mm256_permute4x64_epi64(_mm256_load_si256((__m256i*)output), _MM_SHUFFLE(3, 1, 2, 0)));
+      } else if (width == 32) {
+        fast_forward_DCT2_B32_avx2_hor(input, (__m256i*)output, fi_dct2_32xN_coeff_hor, 13, 1, 0, 0);        
+      }
+    }
+    else if (width == 1){
+      if (height == 16) {
+        fast_forward_DCT2_B16_avx2_hor(input, (__m256i*)output, type_ver == DCT2 ? fi_dct2_16x1_coeff_hor : fi_dst7_16x1_coeff_hor, 13, 1, 0, 0);
+        _mm256_store_si256((__m256i*)output, _mm256_permute4x64_epi64(_mm256_load_si256((__m256i*)output), _MM_SHUFFLE(3, 1, 2, 0)));
+      } else if (height == 32) {
+        fast_forward_DCT2_B32_avx2_hor(input, (__m256i*)output, fi_dct2_32xN_coeff_hor, 13, 1, 0, 0);        
+      }
+    }
+    else {
+      dct_full_pass* idct_func = idct_function_table[log2_width_minus1][log2_height_minus1];
+      idct_func(input, output, type_hor, type_ver);
+    }
   }
 }
 
