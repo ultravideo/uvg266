@@ -2198,9 +2198,9 @@ void fast_forward_tr_2x16_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, 
   const int32_t shift_2nd = log2_height_minus1 + 7;
 
   const int16_t* hor_coeff = ff_dct2_2xN_coeff_hor;
-  const int16_t* ver_coeff = uvg_g_dct_16;
+  const int16_t* ver_coeff = &uvg_g_dct_16[0][0];
   if (ver == DST7) {
-    ver_coeff = uvg_g_dst7_16;
+    ver_coeff = &uvg_g_dst7_16[0][0];
   }
   const __m256i v_res_shuffle = _mm256_load_si256((const __m256i*)ff_dct2_2x16_ver_result_shuffle);
   // No coeffs for DCT8 and DST7 transforms since they do not exist for this block size
@@ -2389,7 +2389,7 @@ void fast_forward_tr_2x32_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, 
   const int32_t shift_2nd = log2_height_minus1 + 7;
 
   const int16_t* hor_coeff = ff_dct2_2xN_coeff_hor;
-  const int16_t* ver_coeff = uvg_g_dct_32;
+  const int16_t* ver_coeff = &uvg_g_dct_32[0][0];
   // For result shuffling, can use existing shuffle vector
   const __m256i v_res_shuffle = _mm256_load_si256((const __m256i*)ff_dct2_2x16_ver_result_shuffle);
   // No coeffs for DCT8 and DST7 transforms since they do not exist for this block size
@@ -2562,7 +2562,7 @@ void fast_inverse_tr_2x32_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, 
   const int32_t shift_1st = INVERSE_SHIFT_1ST;
   const int32_t shift_2nd = INVERSE_SHIFT_2ND;
 
-  const int16_t* ver_coeff = uvg_g_dct_32_t; // rename
+  const int16_t* ver_coeff = &uvg_g_dct_32_t[0][0]; // rename
   const int16_t* hor_coeff = fi_dct2_32x2_coeff_ver; // TODO: rename
   // No coeffs for DCT8 and DST7 transforms since they do not exist for this block size
 
@@ -2986,16 +2986,16 @@ void fast_forward_tr_4x16_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, 
   const int32_t shift_2nd = log2_height_minus1 + 7;
 
   const int16_t* hor_coeff = fast_forward_dct2_b4_coeff;
-  const int16_t* ver_coeff = uvg_g_dct_16;
+  const int16_t* ver_coeff = &uvg_g_dct_16[0][0];
   if (hor == DST7) {
     hor_coeff = fast_forward_dst7_b4_coeff;
   } else if (hor == DCT8) {
     hor_coeff = fast_forward_dct8_b4_coeff;
   }
   if (ver == DST7) {
-    ver_coeff = uvg_g_dst7_16;
+    ver_coeff = &uvg_g_dst7_16[0][0];
   } else if (ver == DCT8) {
-    ver_coeff = uvg_g_dct8_16;
+    ver_coeff = &uvg_g_dct8_16[0][0];
   }
 
   __m256i v_hor_pass_out[4];
@@ -3415,7 +3415,7 @@ void fast_inverse_tr_4x32_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, 
   const int32_t shift_1st = INVERSE_SHIFT_1ST;
   const int32_t shift_2nd = INVERSE_SHIFT_2ND;
 
-  const int16_t* ver_coeff = uvg_g_dct_32_t;
+  const int16_t* ver_coeff = &uvg_g_dct_32_t[0][0];
   const int16_t* hor_coeff = fi_dct2_32x4_coeff_ver; // TODO: rename
   if (hor == DST7) {
     hor_coeff = fi_dst7_32x4_coeff_ver; // TODO: rename
@@ -3423,9 +3423,9 @@ void fast_inverse_tr_4x32_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, 
     hor_coeff = fi_dct8_32x4_coeff_ver; // TODO: rename
   }
   if (ver == DST7) {
-    ver_coeff = uvg_g_dst7_32_t;
+    ver_coeff = &uvg_g_dst7_32_t[0][0];
   } else if (ver == DCT8) {
-    ver_coeff = uvg_g_dct8_32;
+    ver_coeff = &uvg_g_dct8_32[0][0];
   }
 
   __m256i v_ver_pass_out[8];
@@ -4587,7 +4587,7 @@ void fast_inverse_tr_8x32_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, 
   const int32_t shift_1st = INVERSE_SHIFT_1ST;
   const int32_t shift_2nd = INVERSE_SHIFT_2ND;
 
-  const int16_t* ver_coeff = uvg_g_dct_32_t;
+  const int16_t* ver_coeff = &uvg_g_dct_32_t[0][0];
   const int16_t* hor_coeff = fi_dct2_32x8_coeff_ver; // TODO: rename table
   if (hor == DST7) {
     hor_coeff = fi_dst7_32x8_coeff_ver; // TODO: rename
@@ -4595,9 +4595,9 @@ void fast_inverse_tr_8x32_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, 
     hor_coeff = fi_dct8_32x8_coeff_ver; // TODO: rename
   }
   if (ver == DST7) {
-    ver_coeff = uvg_g_dst7_32_t;
+    ver_coeff = &uvg_g_dst7_32_t[0][0];
   } else if (ver == DCT8) {
-    ver_coeff = uvg_g_dct8_32;
+    ver_coeff = &uvg_g_dct8_32[0][0];
   }
 
   __m256i v_ver_pass_out[16];
@@ -5949,7 +5949,7 @@ void fast_inverse_tr_16x32_avx2(const int16_t* src, int16_t* dst, tr_type_t hor,
   const int32_t shift_1st = INVERSE_SHIFT_1ST;
   const int32_t shift_2nd = INVERSE_SHIFT_2ND;
 
-  const int16_t* ver_coeff = uvg_g_dct_32_t;
+  const int16_t* ver_coeff = &uvg_g_dct_32_t[0][0];
   const int16_t* hor_coeff = fi_dct2_16x16_coeff_hor;
   if (hor == DST7) {
     hor_coeff = fi_dst7_16x32_coeff_hor; // TODO: coeffs
@@ -5957,9 +5957,9 @@ void fast_inverse_tr_16x32_avx2(const int16_t* src, int16_t* dst, tr_type_t hor,
     hor_coeff = fi_dct8_16x32_coeff_hor;
   }
   if (ver == DST7) {
-    ver_coeff = uvg_g_dst7_32_t;
+    ver_coeff = &uvg_g_dst7_32_t[0][0];
   } else if (ver == DCT8) {
-    ver_coeff = uvg_g_dct8_32;
+    ver_coeff = &uvg_g_dct8_32[0][0];
   }
 
   __m256i v_ver_pass_out[32];
@@ -6108,8 +6108,8 @@ static void fast_forward_DCT2_32x2_avx2_ver(const __m256i* src, int16_t* dst, in
   // Prepare coeffs
   // TODO: either rename these old coeff tables to be consistent with other new avx2 functions
   // or construct them here in place. Should be ease to accomplish with set1_epi32, just use a int32_t combined from two int16_t
-  const __m256i v_coeff_0 = _mm256_load_si256((const __m256i*)fast_forward_dct2_b2_coeff[0]);
-  const __m256i v_coeff_1 = _mm256_load_si256((const __m256i*)fast_forward_dct2_b2_coeff[16]);
+  const __m256i v_coeff_0 = _mm256_load_si256((const __m256i*)&fast_forward_dct2_b2_coeff[0]);
+  const __m256i v_coeff_1 = _mm256_load_si256((const __m256i*)&fast_forward_dct2_b2_coeff[16]);
   
   // Got data for 4 vectors, 32 lines with 2 samples each
   __m256i v_result_e[4];
@@ -6147,7 +6147,7 @@ static void fast_forward_DCT2_32x4_avx2_ver(const __m256i* src, int16_t* dst, in
   // Got data for 8 vectors, 32 lines with 4 samples each
 
   // Prepare coeffs
-  const int16_t* coeff = uvg_g_dct_4;
+  const int16_t* coeff = &uvg_g_dct_4[0][0];
   const int a = coeff[0];
   const int b = coeff[1 * 4 + 0];
   const int c = coeff[1 * 4 + 1];
@@ -6891,11 +6891,11 @@ void fast_inverse_tr_32x4_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, 
   const int32_t shift_2nd = INVERSE_SHIFT_2ND;
 
   const int16_t* ver_coeff = fi_dct2_4x32_coeff_hor; // TODO: rename
-  const int16_t* hor_coeff = uvg_g_dct_32_t;
+  const int16_t* hor_coeff = &uvg_g_dct_32_t[0][0];
   if (hor == DST7) {
-    hor_coeff = uvg_g_dst7_32_t;
+    hor_coeff = &uvg_g_dst7_32_t[0][0];
   } else if (hor == DCT8) {
-    hor_coeff = uvg_g_dct8_32;
+    hor_coeff = &uvg_g_dct8_32[0][0];
   }
   if (ver == DST7) {
     ver_coeff = fi_dst7_4x32_coeff_hor; // TODO: rename
@@ -8023,7 +8023,7 @@ void fast_inverse_tr_32x32_avx2(const int16_t* src, int16_t* dst, tr_type_t hor,
   const int32_t shift_1st = INVERSE_SHIFT_1ST;
   const int32_t shift_2nd = INVERSE_SHIFT_2ND;
 
-  const int16_t* ver_coeff = uvg_g_dct_32_t;
+  const int16_t* ver_coeff = &uvg_g_dct_32_t[0][0];
   const int16_t* hor_coeff = fi_dct2_32xN_coeff_hor;
   if (hor == DST7) {
     hor_coeff = fi_dst7_32xN_coeff_hor;
@@ -8031,9 +8031,9 @@ void fast_inverse_tr_32x32_avx2(const int16_t* src, int16_t* dst, tr_type_t hor,
     hor_coeff = fi_dct8_32xN_coeff_hor;
   }
   if (ver == DST7) {
-    ver_coeff = uvg_g_dst7_32_t;
+    ver_coeff = &uvg_g_dst7_32_t[0][0];
   } else if (ver == DCT8) {
-    ver_coeff = uvg_g_dct8_32;
+    ver_coeff = &uvg_g_dct8_32[0][0];
   }
 
   __m256i v_ver_pass_out[64];
