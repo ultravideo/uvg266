@@ -5,15 +5,15 @@
 
 // Shuffle tables for simple avx2 functions
 
-ALIGNED(32) const int32_t  ff_dct2_b4_permute_0[8] = { 0, 2, 4, 6, 0, 2, 4, 6 };
-ALIGNED(32) const int32_t  ff_dct2_b4_permute_1[8] = { 1, 3, 5, 7, 1, 3, 5, 7 };
+ALIGNED(32) static const int32_t  ff_dct2_b4_permute_0[8] = { 0, 2, 4, 6, 0, 2, 4, 6 };
+ALIGNED(32) static const int32_t  ff_dct2_b4_permute_1[8] = { 1, 3, 5, 7, 1, 3, 5, 7 };
 
-ALIGNED(32) const int32_t  fi_dct2_b4_permute_0[8] = { 0, 0, 0, 0, 2, 2, 2, 2 };
-ALIGNED(32) const int32_t  fi_dct2_b4_permute_1[8] = { 4, 4, 4, 4, 6, 6, 6, 6 };
-ALIGNED(32) const int32_t  fi_dct2_b4_permute_2[8] = { 1, 1, 1, 1, 3, 3, 3, 3 };
-ALIGNED(32) const int32_t  fi_dct2_b4_permute_3[8] = { 5, 5, 5, 5, 7, 7, 7, 7 };
+ALIGNED(32) static const int32_t  fi_dct2_b4_permute_0[8] = { 0, 0, 0, 0, 2, 2, 2, 2 };
+ALIGNED(32) static const int32_t  fi_dct2_b4_permute_1[8] = { 4, 4, 4, 4, 6, 6, 6, 6 };
+ALIGNED(32) static const int32_t  fi_dct2_b4_permute_2[8] = { 1, 1, 1, 1, 3, 3, 3, 3 };
+ALIGNED(32) static const int32_t  fi_dct2_b4_permute_3[8] = { 5, 5, 5, 5, 7, 7, 7, 7 };
 
-ALIGNED(32) const int32_t  ff_dct2_b32_permute[8][8] = {
+ALIGNED(32) static const int32_t  ff_dct2_b32_permute[8][8] = {
   {0, 0, 0, 0, 0, 0, 0, 0},
   {1, 1, 1, 1, 1, 1, 1, 1},
   {2, 2, 2, 2, 2, 2, 2, 2},
@@ -27,29 +27,29 @@ ALIGNED(32) const int32_t  ff_dct2_b32_permute[8][8] = {
 
 // Coeff tables for simple avx2 functions
 
-ALIGNED(32) const int16_t  fast_forward_dct2_b2_coeff[32] = {
+ALIGNED(32) static const int16_t  fast_forward_dct2_b2_coeff[32] = {
   64,  64, 64,  64, 64,  64, 64,  64, 64,  64, 64,  64, 64,  64, 64,  64,
   64, -64, 64, -64, 64, -64, 64, -64, 64, -64, 64, -64, 64, -64, 64, -64,
 };
 
-            const int16_t* fast_inverse_dct2_b2_coeff = fast_forward_dct2_b2_coeff; // Inverse coeffs for this transform are same as forward
+static const int16_t* fast_inverse_dct2_b2_coeff = fast_forward_dct2_b2_coeff; // Inverse coeffs for this transform are same as forward
 
 // Coeff arrays for B4
-ALIGNED(32) const int16_t  fast_forward_dct2_b4_coeff[64] = {
+ALIGNED(32) static const int16_t  fast_forward_dct2_b4_coeff[64] = {
  64,  64,  64,  64,  64,  64,  64,  64,  64, -64,  64, -64,  64, -64,  64, -64,
  64,  64,  64,  64,  64,  64,  64,  64, -64,  64, -64,  64, -64,  64, -64,  64,
  83,  36,  83,  36,  83,  36,  83,  36,  36, -83,  36, -83,  36, -83,  36, -83,
 -36, -83, -36, -83, -36, -83, -36, -83,  83, -36,  83, -36,  83, -36,  83, -36,
 };
 
-ALIGNED(32) const int16_t  fast_forward_dst7_b4_coeff[64] = {
+ALIGNED(32) static const int16_t  fast_forward_dst7_b4_coeff[64] = {
  29,  55,  29,  55,  29,  55,  29,  55,  84, -29,  84, -29,  84, -29,  84, -29,
  74,  84,  74,  84,  74,  84,  74,  84, -74,  55, -74,  55, -74,  55, -74,  55,
  74,  74,  74,  74,  74,  74,  74,  74,  55, -84,  55, -84,  55, -84,  55, -84,
   0, -74,   0, -74,   0, -74,   0, -74,  74, -29,  74, -29,  74, -29,  74, -29,
 };
 
-ALIGNED(32) const int16_t  fast_forward_dct8_b4_coeff[64] = {
+ALIGNED(32) static const int16_t  fast_forward_dct8_b4_coeff[64] = {
  84,  74,  84,  74,  84,  74,  84,  74,  55, -74,  55, -74,  55, -74,  55, -74,
  55,  29,  55,  29,  55,  29,  55,  29, -29,  84, -29,  84, -29,  84, -29,  84,
  74,   0,  74,   0,  74,   0,  74,   0,  29, -74,  29, -74,  29, -74,  29, -74,
@@ -57,21 +57,21 @@ ALIGNED(32) const int16_t  fast_forward_dct8_b4_coeff[64] = {
 };
 
 // Coeff arrays for inverse B4
-ALIGNED(32) const int16_t  fast_inverse_dct2_b4_coeff[64] = {
+ALIGNED(32) static const int16_t  fast_inverse_dct2_b4_coeff[64] = {
  64,  83,  64,  36,  64, -36,  64, -83,  64,  83,  64,  36,  64, -36,  64, -83,
  64,  36, -64, -83, -64,  83,  64, -36,  64,  36, -64, -83, -64,  83,  64, -36,
  64,  83,  64,  36,  64, -36,  64, -83,  64,  83,  64,  36,  64, -36,  64, -83,
  64,  36, -64, -83, -64,  83,  64, -36,  64,  36, -64, -83, -64,  83,  64, -36,
 };
 
-ALIGNED(32) const int16_t  fast_inverse_dst7_b4_coeff[64] = {
+ALIGNED(32) static const int16_t  fast_inverse_dst7_b4_coeff[64] = {
  29,  74,  55,  74,  74,   0,  84, -74,  29,  74,  55,  74,  74,   0,  84, -74,
  84,  55, -29, -84, -74,  74,  55, -29,  84,  55, -29, -84, -74,  74,  55, -29,
  29,  74,  55,  74,  74,   0,  84, -74,  29,  74,  55,  74,  74,   0,  84, -74,
  84,  55, -29, -84, -74,  74,  55, -29,  84,  55, -29, -84, -74,  74,  55, -29,
 };
 
-ALIGNED(32) const int16_t  fast_inverse_dct8_b4_coeff[64] = {
+ALIGNED(32) static const int16_t  fast_inverse_dct8_b4_coeff[64] = {
  84,  74,  74,   0,  55, -74,  29, -74,  84,  74,  74,   0,  55, -74,  29, -74,
  55,  29, -74, -74, -29,  84,  84, -55,  55,  29, -74, -74, -29,  84,  84, -55,
  84,  74,  74,   0,  55, -74,  29, -74,  84,  74,  74,   0,  55, -74,  29, -74,
@@ -79,7 +79,7 @@ ALIGNED(32) const int16_t  fast_inverse_dct8_b4_coeff[64] = {
 };
 
 // Coeff arrays for forward B8
-ALIGNED(32) const int16_t  fast_forward_dct2_b8_coeff[128] = {
+ALIGNED(32) static const int16_t  fast_forward_dct2_b8_coeff[128] = {
  64,  64,  89,  75,  83,  36,  75, -18,  64,  64,  89,  75,  83,  36,  75, -18,
  64,  64,  50,  18, -36, -83, -89, -50,  64,  64,  50,  18, -36, -83, -89, -50,
  64,  64, -18, -50, -83, -36,  50,  89,  64,  64, -18, -50, -83, -36,  50,  89,
@@ -90,7 +90,7 @@ ALIGNED(32) const int16_t  fast_forward_dct2_b8_coeff[128] = {
 -64,  64,  89, -50, -83,  36,  50, -18, -64,  64,  89, -50, -83,  36,  50, -18,
 };
 
-ALIGNED(32) const int16_t  fast_forward_dst7_b8_coeff[128] = {
+ALIGNED(32) static const int16_t  fast_forward_dst7_b8_coeff[128] = {
  17,  32,  46,  78,  71,  85,  85,  46,  17,  32,  46,  78,  71,  85,  85,  46,
  46,  60,  86,  71,  32, -46, -60, -78,  46,  60,  86,  71,  32, -46, -60, -78,
  71,  78,  32, -17, -86, -60,  17,  86,  71,  78,  32, -17, -86, -60,  17,  86,
@@ -101,7 +101,7 @@ ALIGNED(32) const int16_t  fast_forward_dst7_b8_coeff[128] = {
 -71,  60,  86, -46, -78,  32,  46, -17, -71,  60,  86, -46, -78,  32,  46, -17,
 };
 
-ALIGNED(32) const int16_t  fast_forward_dct8_b8_coeff[128] = {
+ALIGNED(32) static const int16_t  fast_forward_dct8_b8_coeff[128] = {
  86,  85,  85,  60,  78,  17,  71, -32,  86,  85,  85,  60,  78,  17,  71, -32,
  78,  71,  17, -32, -60, -86, -86, -17,  78,  71,  17, -32, -60, -86, -86, -17,
  60,  46, -71, -86, -46,  32,  78,  60,  60,  46, -71, -86, -46,  32,  78,  60,
@@ -113,7 +113,7 @@ ALIGNED(32) const int16_t  fast_forward_dct8_b8_coeff[128] = {
 };
 
 // Coeff arrays for inverse B8
-ALIGNED(32) const int16_t  fast_inverse_dct2_b8_coeff[128] = {
+ALIGNED(32) static const int16_t  fast_inverse_dct2_b8_coeff[128] = {
  64,  89,  64,  75,  64,  50,  64,  18,  64,  89,  64,  75,  64,  50,  64,  18,
  83,  75,  36, -18, -36, -89, -83, -50,  83,  75,  36, -18, -36, -89, -83, -50,
  64,  50, -64, -89, -64,  18,  64,  75,  64,  50, -64, -89, -64,  18,  64,  75,
@@ -124,7 +124,7 @@ ALIGNED(32) const int16_t  fast_inverse_dct2_b8_coeff[128] = {
 -36,  89,  83, -75, -83,  50,  36, -18, -36,  89,  83, -75, -83,  50,  36, -18,
 };
 
-ALIGNED(32) const int16_t  fast_inverse_dst7_b8_coeff[128] = {
+ALIGNED(32) static const int16_t  fast_inverse_dst7_b8_coeff[128] = {
  17,  46,  32,  78,  46,  86,  60,  71,  17,  46,  32,  78,  46,  86,  60,  71,
  71,  85,  85,  46,  32, -60, -46, -78,  71,  85,  85,  46,  32, -60, -46, -78,
  86,  78, -17, -71, -85, -17,  32,  85,  86,  78, -17, -71, -85, -17,  32,  85,
@@ -135,10 +135,10 @@ ALIGNED(32) const int16_t  fast_inverse_dst7_b8_coeff[128] = {
 -46,  85,  85, -71, -78,  46,  32, -17, -46,  85,  85, -71, -78,  46,  32, -17,
 };
 
-            const int16_t* fast_inverse_dct8_b8_coeff = fast_forward_dct8_b8_coeff; // The table used in forward transform works with inverse also.
+static const int16_t* fast_inverse_dct8_b8_coeff = fast_forward_dct8_b8_coeff; // The table used in forward transform works with inverse also.
 
 // Coeff arrays for forward B16
-ALIGNED(32) const int16_t  fast_forward_dct2_b16_coeff[256] = {
+ALIGNED(32) static const int16_t  fast_forward_dct2_b16_coeff[256] = {
  64,  64,  90,  87,  89,  75,  87,  57,  64, -64,  57, -80,  50, -89,  43, -90,
  64,  64,  80,  70,  50,  18,   9, -43, -64,  64, -25,  90,  18,  75,  57,  25,
  64,  64,  57,  43, -18, -50, -80, -90,  64, -64,  -9, -87, -75, -18, -87,  70,
@@ -157,7 +157,7 @@ ALIGNED(32) const int16_t  fast_forward_dct2_b16_coeff[256] = {
  36,  83,  -9, -80, -18,  75,  43, -70, -83,  36,  70, -25, -50,  18,  25,  -9,
 };
 
-ALIGNED(32) const int16_t  fast_forward_dst7_b16_coeff[256] = {
+ALIGNED(32) static const int16_t  fast_forward_dst7_b16_coeff[256] = {
   8,  17,  25,  48,  40,  73,  55,  87,  88,  -8,  87, -40,  81, -68,  73, -85,  // 0
  25,  33,  68,  81,  88,  85,  81,  40, -88,  17, -68,  73, -25,  88,  25,  55,
  40,  48,  88,  88,  62,  25, -17, -68,  87, -25,  33, -88, -48, -48, -88,  48,
@@ -176,7 +176,7 @@ ALIGNED(32) const int16_t  fast_forward_dst7_b16_coeff[256] = {
  25,  81,   0, -77, -25,  73,  48, -68, -81,  33,  68, -25, -48,  17,  25,  -8,
 };
 
-ALIGNED(32) const int16_t  fast_forward_dct8_b16_coeff[256] = {
+ALIGNED(32) static const int16_t  fast_forward_dct8_b16_coeff[256] = {
  88,  88,  88,  81,  87,  68,  85,  48,  62, -68,  55, -81,  48, -88,  40, -88,  // 0
  87,  85,  68,  48,  33,  -8,  -8, -62, -55,  73, -17,  88,  25,  68,  62,  17,
  81,  77,  25,   0, -48, -77, -88, -77,  48, -77, -25, -77, -81,   0, -81,  77,
@@ -196,7 +196,7 @@ ALIGNED(32) const int16_t  fast_forward_dct8_b16_coeff[256] = {
 };
 
 // Coeff arrays for inverse B16
-ALIGNED(32) const int16_t  fast_inverse_dct2_b16_coeff[256] = {
+ALIGNED(32) static const int16_t  fast_inverse_dct2_b16_coeff[256] = {
    64,  90,  64,  87,  64,  80,  64,  70,  64,  -9,  64, -25,  64, -43,  64, -57,
    89,  87,  75,  57,  50,   9,  18, -43, -89,  25, -75,  70, -50,  90, -18,  80,
    83,  80,  36,   9, -36, -70, -83, -87,  83, -43,  36, -90, -36, -57, -83,  25,
@@ -215,7 +215,7 @@ ALIGNED(32) const int16_t  fast_inverse_dct2_b16_coeff[256] = {
    89,  70, -75, -80,  50,  87, -18, -90, -89,  57,  75, -43, -50,  25,  18,  -9,
 };
 
-ALIGNED(32) const int16_t  fast_inverse_dst7_b16_coeff[256] = {
+ALIGNED(32) static const int16_t  fast_inverse_dst7_b16_coeff[256] = {
   8,  25,  17,  48,  25,  68,  33,  81,  68,  48,  73,  25,  77,   0,  81, -25,  // 0
  40,  55,  73,  87,  88,  81,  85,  40, -81, -25, -88,  33, -77,  77, -48,  88,
  68,  77,  88,  77,  48,   0, -25, -77,  88,   0,  68, -77,   0, -77, -68,   0,
@@ -234,10 +234,10 @@ ALIGNED(32) const int16_t  fast_inverse_dst7_b16_coeff[256] = {
  85,  73, -68, -81,  40,  87,  -8, -88, -87,  55,  73, -40, -48,  25,  17,  -8,
 };
 
-            const int16_t* fast_inverse_dct8_b16_coeff = fast_forward_dct8_b16_coeff;
+static const int16_t* fast_inverse_dct8_b16_coeff = fast_forward_dct8_b16_coeff;
 
 // Coeff arrays for forward B32
-ALIGNED(32) const int16_t  fast_forward_dct2_b32_coeff[1024] = {
+ALIGNED(32) static const int16_t  fast_forward_dct2_b32_coeff[1024] = {
  64,  64,  90,  90,  90,  87,  90,  82,  89,  75,  88,  67,  87,  57,  85,  46,  // 0
  83,  36,  82,  22,  80,   9,  78,  -4,  75, -18,  73, -31,  70, -43,  67, -54,
  64, -64,  61, -73,  57, -80,  54, -85,  50, -89,  46, -90,  43, -90,  38, -88,
@@ -304,7 +304,7 @@ ALIGNED(32) const int16_t  fast_forward_dct2_b32_coeff[1024] = {
 -83,  36,  78, -31, -70,  25,  61, -22, -50,  18,  38, -13, -25,   9,  13,  -4,
 };
 
-ALIGNED(32) const int16_t  fast_forward_dst7_b32_coeff[1024] = {
+ALIGNED(32) static const int16_t  fast_forward_dst7_b32_coeff[1024] = {
   4,   9,  13,  26,  21,  42,  30,  56,  38,  68,  46,  78,  53,  85,  60,  89,  // 0
  66,  90,  72,  86,  77,  80,  80,  72,  84,  60,  86,  46,  88,  30,  90,  13,
  90,  -4,  89, -21,  87, -38,  85, -53,  82, -66,  78, -77,  74, -84,  68, -88,
@@ -371,7 +371,7 @@ ALIGNED(32) const int16_t  fast_forward_dst7_b32_coeff[1024] = {
 -82,  34,  77, -30, -68,  26,  60, -21, -50,  17,  38, -13, -26,   9,  13,  -4,
 };
 
-ALIGNED(32) const int16_t  fast_forward_dct8_b32_coeff[1024] = {
+ALIGNED(32) static const int16_t  fast_forward_dct8_b32_coeff[1024] = {
  90,  90,  90,  87,  89,  84,  88,  78,  87,  72,  86,  63,  85,  53,  84,  42,  // 0
  82,  30,  80,  17,  78,   4,  77,  -9,  74, -21,  72, -34,  68, -46,  66, -56,
  63, -66,  60, -74,  56, -80,  53, -85,  50, -88,  46, -90,  42, -89,  38, -86,
@@ -439,7 +439,7 @@ ALIGNED(32) const int16_t  fast_forward_dct8_b32_coeff[1024] = {
 };
 
 // Coeff arrays for inverse B32
-ALIGNED(32) const int16_t  fast_inverse_dct2_b32_coeff[1024] = {
+ALIGNED(32) static const int16_t  fast_inverse_dct2_b32_coeff[1024] = {
    64,  90,  64,  90,  64,  88,  64,  85,  64,  82,  64,  78,  64,  73,  64,  67,  // 0
  64,  61,  64,  54,  64,  46,  64,  38,  64,  31,  64,  22,  64,  13,  64,   4,
  64,  -4,  64, -13,  64, -22,  64, -31,  64, -38,  64, -46,  64, -54,  64, -61,
@@ -506,7 +506,7 @@ ALIGNED(32) const int16_t  fast_inverse_dct2_b32_coeff[1024] = {
 -90,  61,  87, -54, -80,  46,  70, -38, -57,  31,  43, -22, -25,  13,   9,  -4,
 };
 
-ALIGNED(32) const int16_t  fast_inverse_dst7_b32_coeff[1024] = {
+ALIGNED(32) static const int16_t  fast_inverse_dst7_b32_coeff[1024] = {
   4,  13,   9,  26,  13,  38,  17,  50,  21,  60,  26,  68,  30,  77,  34,  82,  // 0
  38,  86,  42,  89,  46,  90,  50,  88,  53,  85,  56,  80,  60,  74,  63,  66,
  66,  56,  68,  46,  72,  34,  74,  21,  77,   9,  78,  -4,  80, -17,  82, -30,
@@ -573,7 +573,7 @@ ALIGNED(32) const int16_t  fast_inverse_dst7_b32_coeff[1024] = {
 -89,  60,  85, -53, -78,  46,  68, -38, -56,  30,  42, -21, -26,  13,   9,  -4,
 };
 
-            const int16_t* fast_inverse_dct8_b32_coeff = fast_forward_dct8_b32_coeff;
+static const int16_t* fast_inverse_dct8_b32_coeff = fast_forward_dct8_b32_coeff;
 
 
 // Shuffle tables for advanced and optimized avx2 functions
@@ -582,7 +582,7 @@ ALIGNED(32) const int16_t  fast_inverse_dst7_b32_coeff[1024] = {
 // _mm256_shuffle_epi8
 // Input  [0 1 2 3 4 5 6 7 | XX
 // Output [0 4 1 5 2 6 3 7 | XX
-ALIGNED(32) const int8_t shuffle_16b_0415[32] = {
+ALIGNED(32) static const int8_t shuffle_16b_0415[32] = {
   0, 1, 8, 9, 2, 3, 10, 11, 4, 5, 12, 13, 6, 7, 14, 15,
   0, 1, 8, 9, 2, 3, 10, 11, 4, 5, 12, 13, 6, 7, 14, 15,
 };
@@ -591,7 +591,7 @@ ALIGNED(32) const int8_t shuffle_16b_0415[32] = {
 // _mm256_shuffle_epi8
 // Input  [0 1 2 3 4 5 6 7 |
 // Output [0 2 4 6 1 3 5 7 |
-ALIGNED(32) const int8_t shuffle_16b_0246[32] = {
+ALIGNED(32) static const int8_t shuffle_16b_0246[32] = {
   0, 1, 4, 5, 8, 9, 12, 13, 2, 3, 6, 7, 10, 11, 14, 15,
   0, 1, 4, 5, 8, 9, 12, 13, 2, 3, 6, 7, 10, 11, 14, 15,
 };
@@ -600,117 +600,117 @@ ALIGNED(32) const int8_t shuffle_16b_0246[32] = {
 // _mm256_permutevar8x32_epi32
 // Input  [0 1 2 3 | 4 5 6 7]
 // Output [0 1 4 5 | 2 6 3 7]
-ALIGNED(32) const int32_t permute_32b_0415[8] = { 0, 4, 1, 5, 2, 6, 3, 7 };
+ALIGNED(32) static const int32_t permute_32b_0415[8] = { 0, 4, 1, 5, 2, 6, 3, 7 };
 
 
-            const int8_t* fi_tr_2x8_shuffle_hor = shuffle_16b_0415;
+          static const int8_t* fi_tr_2x8_shuffle_hor = shuffle_16b_0415;
 
-ALIGNED(32) const int8_t  fi_tr_2x8_result_shuffle1_ver[32] = {
+ALIGNED(32) static const int8_t  fi_tr_2x8_result_shuffle1_ver[32] = {
  0, 1, 4, 5, 8, 9, 12, 13, 2, 3, 6, 7, 10, 11, 14, 15,
  0, 1, 4, 5, 8, 9, 12, 13, 2, 3, 6, 7, 10, 11, 14, 15,
 };
 
-ALIGNED(32) const int8_t  ff_dct2_2x8_shuffle_ver[32] = {
+ALIGNED(32) static const int8_t  ff_dct2_2x8_shuffle_ver[32] = {
    0,  1,  4,  5,  2,  3,  6,  7,  8,  9, 12, 13, 10, 11, 14, 15,
   16, 17, 20, 21, 18, 19, 22, 23, 24, 25, 28, 29, 26, 27, 30, 31
 };
 
-ALIGNED(32) const int8_t  ff_dct2_2x8_result_shuffle_ver[32] = {
+ALIGNED(32) static const int8_t  ff_dct2_2x8_result_shuffle_ver[32] = {
    0,  1,  4,  5,  2,  3,  6,  7,  8,  9, 12, 13, 10, 11, 14, 15,
   16, 17, 20, 21, 18, 19, 22, 23, 24, 25, 28, 29, 26, 27, 30, 31
 };
 
-ALIGNED(32) const int8_t  fi_tr_2x8_result_shuffle2_ver[32] = {
+ALIGNED(32) static const int8_t  fi_tr_2x8_result_shuffle2_ver[32] = {
  0, 1, 8, 9, 2, 3, 10, 11, 4, 5, 12, 13, 6, 7, 14, 15,
  0, 1, 8, 9, 2, 3, 10, 11, 4, 5, 12, 13, 6, 7, 14, 15,
 };
 
-ALIGNED(32) const int8_t  ff_dct2_2x16_ver_result_shuffle[32] = {
+ALIGNED(32) static const int8_t  ff_dct2_2x16_ver_result_shuffle[32] = {
    0,  1,  8,  9,  2,  3, 10, 11,  4,  5, 12, 13,  6,  7, 14, 15,
    0,  1,  8,  9,  2,  3, 10, 11,  4,  5, 12, 13,  6,  7, 14, 15,
 };
 
-ALIGNED(32) const int8_t  fi_tr_4x4_shuffle_hor[32] = {
+ALIGNED(32) static const int8_t  fi_tr_4x4_shuffle_hor[32] = {
   0, 1, 8, 9, 2, 3, 10, 11, 4, 5, 12, 13, 6, 7, 14, 15,
   0, 1, 8, 9, 2, 3, 10, 11, 4, 5, 12, 13, 6, 7, 14, 15,
 };
 
-ALIGNED(32) const int8_t  fi_tr_4x4_result_shuffle_ver[32] = {
+ALIGNED(32) static const int8_t  fi_tr_4x4_result_shuffle_ver[32] = {
   0, 1, 4, 5, 8, 9, 12, 13, 2, 3, 6, 7, 10, 11, 14, 15,
   0, 1, 4, 5, 8, 9, 12, 13, 2, 3, 6, 7, 10, 11, 14, 15,
 };
 
-ALIGNED(32) const int8_t  fi_tr_4x8_result_shuffle_ver[32] = {
+ALIGNED(32) static const int8_t  fi_tr_4x8_result_shuffle_ver[32] = {
   0, 1, 4, 5, 8, 9, 12, 13, 2, 3, 6, 7, 10, 11, 14, 15,
   0, 1, 4, 5, 8, 9, 12, 13, 2, 3, 6, 7, 10, 11, 14, 15,
 };
 
-ALIGNED(32) const int8_t  ff_dct2_8x2_ver_pass_shuffle[32] = {
+ALIGNED(32) static const int8_t  ff_dct2_8x2_ver_pass_shuffle[32] = {
    0,  1,  8,  9,  2,  3, 10, 11, 4,  5, 12, 13,  6,  7, 14, 15,
    0,  1,  8,  9,  2,  3, 10, 11, 4,  5, 12, 13,  6,  7, 14, 15
 };
 
-ALIGNED(32) const int8_t  fi_tr_8x2_shuffle_hor[32] = {
+ALIGNED(32) static const int8_t  fi_tr_8x2_shuffle_hor[32] = {
   0, 1, 4, 5, 8, 9, 12, 13, 2, 3, 6, 7, 10, 11, 14, 15,
   0, 1, 4, 5, 8, 9, 12, 13, 2, 3, 6, 7, 10, 11, 14, 15,
 };
 
-ALIGNED(32) const int8_t  fi_tr_8x2_shuffle_ver[32] = {
+ALIGNED(32) static const int8_t  fi_tr_8x2_shuffle_ver[32] = {
   0, 1, 8, 9, 2, 3, 10, 11, 4, 5, 12, 13, 6, 7, 14, 15,
   0, 1, 8, 9, 2, 3, 10, 11, 4, 5, 12, 13, 6, 7, 14, 15,
 };
 
-            const int8_t* fi_tr_8x2_res_shuffle_ver = shuffle_16b_0415;
+          static const int8_t* fi_tr_8x2_res_shuffle_ver = shuffle_16b_0415;
 
-ALIGNED(32) const int8_t  ff_dct2_8x4_ver_pass_shuffle[32] = {
+ALIGNED(32) static const int8_t  ff_dct2_8x4_ver_pass_shuffle[32] = {
    0,  1,  8,  9,  4,  5, 12, 13, 2,  3, 10, 11,  6,  7, 14, 15,
    0,  1,  8,  9,  4,  5, 12, 13, 2,  3, 10, 11,  6,  7, 14, 15,
 };
 
 // TODO: remove duplicate tables. Rename with a more descriptive name.
-ALIGNED(32) const int8_t  ff_dct2_8x4_ver_pass_result_shuffle[32] = {
+ALIGNED(32) static const int8_t  ff_dct2_8x4_ver_pass_result_shuffle[32] = {
    0,  1,  4,  5,  2,  3,  6,  7, 8,  9, 12, 13, 10, 11, 14, 15,
    0,  1,  4,  5,  2,  3,  6,  7, 8,  9, 12, 13, 10, 11, 14, 15,
 };
 
-ALIGNED(32) const int8_t  ff_dct2_8x16_butterfly_shuffle[32] = {
+ALIGNED(32) static const int8_t  ff_dct2_8x16_butterfly_shuffle[32] = {
    0,  1, 14, 15,  2,  3, 12, 13,  4,  5, 10, 11,  6,  7,  8,  9,
   16, 17, 30, 31, 18, 19, 28, 29, 20, 21, 26, 27, 22, 23, 24, 25
 };
 
-ALIGNED(32) const int8_t  ff_dct2_8x16_butterfly_shuffle_order[32] = {
+ALIGNED(32) static const int8_t  ff_dct2_8x16_butterfly_shuffle_order[32] = {
    0,  1,  4,  5,  2,  3,  6,  7,  8,  9, 12, 13, 10, 11, 14, 15,
   16, 17, 20, 21, 18, 19, 22, 23, 24, 25, 28, 29, 26, 27, 30, 31
 };
 
 // Arrange samples into butterfly formation
-ALIGNED(32) const int8_t  ff_dct2_16x8_butterfly_shuffle[32] = {
+ALIGNED(32) static const int8_t  ff_dct2_16x8_butterfly_shuffle[32] = {
    0,  1, 14, 15,  2,  3, 12, 13,  4,  5, 10, 11,  6,  7,  8,  9,
   16, 17, 30, 31, 18, 19, 28, 29, 20, 21, 26, 27, 22, 23, 24, 25
 };
 
 // Swap two middle 16-bit values in each 64-bit chunk
-ALIGNED(32) const int8_t  ff_dct2_16x8_butterfly_res_shuffle_ver[32] = {
+ALIGNED(32) static const int8_t  ff_dct2_16x8_butterfly_res_shuffle_ver[32] = {
    0,  1,  4,  5,  2,  3,  6,  7,  8,  9, 12, 13, 10, 11, 14, 15,
   16, 17, 20, 21, 18, 19, 22, 23, 24, 25, 28, 29, 26, 27, 30, 31
 };
 
-ALIGNED(32) const int8_t  ff_dct2_16x32_reverse_64b_order[32] = {
+ALIGNED(32) static const int8_t  ff_dct2_16x32_reverse_64b_order[32] = {
   6,  7,  4,  5,  2,  3,  0,  1,  14, 15, 12, 13, 10, 11,  8,  9,
   22, 23, 20, 21, 18, 19, 16, 17, 30, 31, 28, 29, 26, 27, 24, 25,
 };
 
-ALIGNED(32) const int8_t  ff_dct2_32x2_butterfly_order_shuffle[32] = {
+ALIGNED(32) static const int8_t  ff_dct2_32x2_butterfly_order_shuffle[32] = {
   14, 15, 12, 13, 10, 11,  8,  9,  6,  7,  4,  5,  2,  3,  0,  1,
   30, 31, 28, 29, 26, 27, 24, 25, 22, 23, 20, 21, 18, 19, 16, 17
 };
 
-ALIGNED(32) const int8_t  ff_dct2_32x8_shuffle_order[32] = {
+ALIGNED(32) static const int8_t  ff_dct2_32x8_shuffle_order[32] = {
    0,  1, 14, 15,  2,  3, 12, 13,  4,  5, 10, 11,  6,  7,  8,  9,
   16, 17, 30, 31, 18, 19, 28, 29, 20, 21, 26, 27, 22, 23, 24, 25
 };
 
-ALIGNED(32) const int8_t  ff_dct2_32x8_shuffle_result[32] = {
+ALIGNED(32) static const int8_t  ff_dct2_32x8_shuffle_result[32] = {
    0,  1,  8,  9,  2,  3, 10, 11,  4,  5, 12, 13,  6,  7, 14, 15,
   16, 17, 24, 25, 18, 19, 26, 27, 20, 21, 28, 29, 22, 23, 30, 31
 };
@@ -719,12 +719,12 @@ ALIGNED(32) const int8_t  ff_dct2_32x8_shuffle_result[32] = {
 // Coeff tables for advanced and optimized avx2 functions
 
 // 2xN
-ALIGNED(32) const int16_t  ff_dct2_2xN_coeff_hor[32] = {
+ALIGNED(32) static const int16_t  ff_dct2_2xN_coeff_hor[32] = {
  64,  64, 64,  64, 64,  64, 64,  64, 64,  64, 64,  64, 64,  64, 64,  64,
  64, -64, 64, -64, 64, -64, 64, -64, 64, -64, 64, -64, 64, -64, 64, -64
 };
 
-ALIGNED(32) const int16_t  ff_dct2_2x8_coeff_ver[128] = {
+ALIGNED(32) static const int16_t  ff_dct2_2x8_coeff_ver[128] = {
  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,
  89,  75,  50,  18, -18, -50, -75, -89,  89,  75,  50,  18, -18, -50, -75, -89,
  83,  36, -36, -83, -83, -36,  36,  83,  83,  36, -36, -83, -83, -36,  36,  83,
@@ -735,7 +735,7 @@ ALIGNED(32) const int16_t  ff_dct2_2x8_coeff_ver[128] = {
  18, -50,  75, -89,  89, -75,  50, -18,  18, -50,  75, -89,  89, -75,  50, -18
 };
 
-ALIGNED(32)
+ALIGNED(32) static
 const int16_t ff_dst7_2x8_coeff_ver[128] = {
   17, 32,  46,  60,  71,  78,  85,  86,  17, 32,  46,  60,  71,  78,  85,  86,
   46, 78,  86,  71,  32,  -17, -60, -85, 46, 78,  86,  71,  32,  -17, -60, -85,
@@ -748,7 +748,7 @@ const int16_t ff_dst7_2x8_coeff_ver[128] = {
 };
 
 
-ALIGNED(32) const int16_t  fi_dct2_2x8_coeff_ver[128] = {
+ALIGNED(32) static const int16_t  fi_dct2_2x8_coeff_ver[128] = {
  64,  89,  83,  75,  64,  75,  36, -18,  64,  89,  83,  75,  64,  75,  36, -18,
  64,  50,  36,  18, -64, -89, -83, -50,  64,  50,  36,  18, -64, -89, -83, -50,
  64,  50, -36, -89,  64,  18, -83, -50,  64,  50, -36, -89,  64,  18, -83, -50,
@@ -759,7 +759,7 @@ ALIGNED(32) const int16_t  fi_dct2_2x8_coeff_ver[128] = {
 -64,  89, -83,  50,  64, -50,  36, -18, -64,  89, -83,  50,  64, -50,  36, -18,
 };
 
-ALIGNED(32) const int16_t  fi_dst7_2x8_coeff_ver[128] = {
+ALIGNED(32) static const int16_t  fi_dst7_2x8_coeff_ver[128] = {
  17,  46,  71,  85,  32,  78,  85,  46,  17,  46,  71,  85,  32,  78,  85,  46,
  86,  78,  60,  32, -17, -71, -86, -60,  86,  78,  60,  32, -17, -71, -86, -60,
  46,  86,  32, -60,  60,  71, -46, -78,  46,  86,  32, -60,  60,  71, -46, -78,
@@ -770,7 +770,7 @@ ALIGNED(32) const int16_t  fi_dst7_2x8_coeff_ver[128] = {
 -71,  86, -78,  46,  60, -46,  32, -17, -71,  86, -78,  46,  60, -46,  32, -17,
 };
 
-ALIGNED(32) const int16_t  fi_dct8_2x8_coeff_ver[128] = {
+ALIGNED(32) static const int16_t  fi_dct8_2x8_coeff_ver[128] = {
  86,  85,  78,  71,  85,  60,  17, -32,  86,  85,  78,  71,  85,  60,  17, -32,
  60,  46,  32,  17, -71, -86, -78, -46,  60,  46,  32,  17, -71, -86, -78, -46,
  78,  17, -60, -86,  71, -32, -86, -17,  78,  17, -60, -86,  71, -32, -86, -17,
@@ -783,7 +783,7 @@ ALIGNED(32) const int16_t  fi_dct8_2x8_coeff_ver[128] = {
 
 
 
-ALIGNED(32) const int16_t  fi_dct2_2x16_coeff_ver[512] = {
+ALIGNED(32) static const int16_t  fi_dct2_2x16_coeff_ver[512] = {
  64,  90,  89,  87,  64,  90,  89,  87,  64,  57,  50,  43,  64,  57,  50,  43,  // 0
  83,  80,  75,  70,  83,  80,  75,  70,  36,  25,  18,   9,  36,  25,  18,   9,
  64,  87,  75,  57,  64,  87,  75,  57, -64, -80, -89, -90, -64, -80, -89, -90,
@@ -818,7 +818,7 @@ ALIGNED(32) const int16_t  fi_dct2_2x16_coeff_ver[512] = {
  83, -80,  75, -70,  83, -80,  75, -70,  36, -25,  18,  -9,  36, -25,  18,  -9,
 };
 
-ALIGNED(32) const int16_t fi_dst7_2x16_coeff_ver[512] = {
+ALIGNED(32) static const int16_t fi_dst7_2x16_coeff_ver[512] = {
   8,  25,  40,  55,   8,  25,  40,  55,  88,  87,  81,  73,  88,  87,  81,  73,  // 0
  68,  77,  85,  88,  68,  77,  85,  88,  62,  48,  33,  17,  62,  48,  33,  17, 
  17,  48,  73,  87,  17,  48,  73,  87,  -8, -40, -68, -85,  -8, -40, -68, -85, 
@@ -853,7 +853,7 @@ ALIGNED(32) const int16_t fi_dst7_2x16_coeff_ver[512] = {
  81, -77,  73, -68,  81, -77,  73, -68,  33, -25,  17,  -8,  33, -25,  17,  -8, 
 };
 
-ALIGNED(32) const int16_t  fi_dct2_2x32_coeff_ver[2048] = {
+ALIGNED(32) static const int16_t  fi_dct2_2x32_coeff_ver[2048] = {
  64,  90,  90,  90,  89,  88,  87,  85,  64,  90,  90,  90,  89,  88,  87,  85,  // 0
  83,  82,  80,  78,  75,  73,  70,  67,  83,  82,  80,  78,  75,  73,  70,  67,
  64,  61,  57,  54,  50,  46,  43,  38,  64,  61,  57,  54,  50,  46,  43,  38,
@@ -986,7 +986,7 @@ ALIGNED(32) const int16_t  fi_dct2_2x32_coeff_ver[2048] = {
 
 
 // 4xN
-ALIGNED(32) const int16_t  ff_dct2_4x8_coeff_ver[256] = {
+ALIGNED(32) static const int16_t  ff_dct2_4x8_coeff_ver[256] = {
  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  // 0
  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,
  89,  75,  50,  18,  89,  75,  50,  18,  89,  75,  50,  18,  89,  75,  50,  18,
@@ -1005,7 +1005,7 @@ ALIGNED(32) const int16_t  ff_dct2_4x8_coeff_ver[256] = {
  89, -75,  50, -18,  89, -75,  50, -18,  89, -75,  50, -18,  89, -75,  50, -18,
 };
 
-ALIGNED(32) const int16_t  ff_dst7_4x8_coeff_ver[256] = {
+ALIGNED(32) static const int16_t  ff_dst7_4x8_coeff_ver[256] = {
  17,  32,  46,  60,  17,  32,  46,  60,  17,  32,  46,  60,  17,  32,  46,  60,  // 0
  71,  78,  85,  86,  71,  78,  85,  86,  71,  78,  85,  86,  71,  78,  85,  86,
  46,  78,  86,  71,  46,  78,  86,  71,  46,  78,  86,  71,  46,  78,  86,  71,
@@ -1024,7 +1024,7 @@ ALIGNED(32) const int16_t  ff_dst7_4x8_coeff_ver[256] = {
  85, -71,  46, -17,  85, -71,  46, -17,  85, -71,  46, -17,  85, -71,  46, -17,
 };
 
-ALIGNED(32) const int16_t  ff_dct8_4x8_coeff_ver[256] = {
+ALIGNED(32) static const int16_t  ff_dct8_4x8_coeff_ver[256] = {
  86,  85,  78,  71,  86,  85,  78,  71,  86,  85,  78,  71,  86,  85,  78,  71,  // 0
  60,  46,  32,  17,  60,  46,  32,  17,  60,  46,  32,  17,  60,  46,  32,  17,
  85,  60,  17, -32,  85,  60,  17, -32,  85,  60,  17, -32,  85,  60,  17, -32,
@@ -1044,21 +1044,21 @@ ALIGNED(32) const int16_t  ff_dct8_4x8_coeff_ver[256] = {
 };
 
 
-ALIGNED(32) const int16_t  fi_dct2_4xN_coeff_hor[64] = {
+ALIGNED(32) static const int16_t  fi_dct2_4xN_coeff_hor[64] = {
  64,  83,  64,  36,  64,  83,  64,  36,  64,  83,  64,  36,  64,  83,  64,  36,
  64,  36, -64, -83,  64,  36, -64, -83,  64,  36, -64, -83,  64,  36, -64, -83,
  64, -36, -64,  83,  64, -36, -64,  83,  64, -36, -64,  83,  64, -36, -64,  83,
  64, -83,  64, -36,  64, -83,  64, -36,  64, -83,  64, -36,  64, -83,  64, -36,
 };
 
-ALIGNED(32) const int16_t  fi_dst7_4xN_coeff_hor[64] = {
+ALIGNED(32) static const int16_t  fi_dst7_4xN_coeff_hor[64] = {
  29,  74,  84,  55,  29,  74,  84,  55,  29,  74,  84,  55,  29,  74,  84,  55,
  55,  74, -29, -84,  55,  74, -29, -84,  55,  74, -29, -84,  55,  74, -29, -84,
  74,   0, -74,  74,  74,   0, -74,  74,  74,   0, -74,  74,  74,   0, -74,  74,
  84, -74,  55, -29,  84, -74,  55, -29,  84, -74,  55, -29,  84, -74,  55, -29,
 };
 
-ALIGNED(32) const int16_t  fi_dct8_4xN_coeff_hor[64] = { // TODO: this is probably identical to forward table, remove this if unnecessary
+ALIGNED(32) static const int16_t  fi_dct8_4xN_coeff_hor[64] = { // TODO: this is probably identical to forward table, remove this if unnecessary
  84,  74,  55,  29,  84,  74,  55,  29,  84,  74,  55,  29,  84,  74,  55,  29,
  74,   0, -74, -74,  74,   0, -74, -74,  74,   0, -74, -74,  74,   0, -74, -74,
  55, -74, -29,  84,  55, -74, -29,  84,  55, -74, -29,  84,  55, -74, -29,  84,
@@ -1066,7 +1066,7 @@ ALIGNED(32) const int16_t  fi_dct8_4xN_coeff_hor[64] = { // TODO: this is probab
 };
 
 
-ALIGNED(32) const int16_t  fi_dct2_4x8_coeff_hor[128] = {
+ALIGNED(32) static const int16_t  fi_dct2_4x8_coeff_hor[128] = {
  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,
  64, -64,  64, -64,  64, -64,  64, -64,  64, -64,  64, -64,  64, -64,  64, -64,
  64, -64,  64, -64,  64, -64,  64, -64,  64, -64,  64, -64,  64, -64,  64, -64,
@@ -1077,7 +1077,7 @@ ALIGNED(32) const int16_t  fi_dct2_4x8_coeff_hor[128] = {
 -83, -36, -83, -36, -83, -36, -83, -36, -83, -36, -83, -36, -83, -36, -83, -36,
 };
 
-ALIGNED(32) const int16_t  fi_dst7_4x8_coeff_hor[128] = {
+ALIGNED(32) static const int16_t  fi_dst7_4x8_coeff_hor[128] = {
  29,  84,  29,  84,  29,  84,  29,  84,  29,  84,  29,  84,  29,  84,  29,  84,
  55, -29,  55, -29,  55, -29,  55, -29,  55, -29,  55, -29,  55, -29,  55, -29,
  74, -74,  74, -74,  74, -74,  74, -74,  74, -74,  74, -74,  74, -74,  74, -74,
@@ -1088,7 +1088,7 @@ ALIGNED(32) const int16_t  fi_dst7_4x8_coeff_hor[128] = {
 -74, -29, -74, -29, -74, -29, -74, -29, -74, -29, -74, -29, -74, -29, -74, -29,
 };
 
-ALIGNED(32) const int16_t  fi_dct8_4x8_coeff_hor[128] = { // TODO: this is probably identical to forward table, remove this if unnecessary
+ALIGNED(32) static const int16_t  fi_dct8_4x8_coeff_hor[128] = { // TODO: this is probably identical to forward table, remove this if unnecessary
  84,  55,  84,  55,  84,  55,  84,  55,  84,  55,  84,  55,  84,  55,  84,  55,
  74, -74,  74, -74,  74, -74,  74, -74,  74, -74,  74, -74,  74, -74,  74, -74,
  55, -29,  55, -29,  55, -29,  55, -29,  55, -29,  55, -29,  55, -29,  55, -29,
@@ -1100,7 +1100,7 @@ ALIGNED(32) const int16_t  fi_dct8_4x8_coeff_hor[128] = { // TODO: this is proba
 };
 
 
-ALIGNED(32) const int16_t  fi_dct2_4x8_coeff_ver[256] = {
+ALIGNED(32) static const int16_t  fi_dct2_4x8_coeff_ver[256] = {
  64,  89,  83,  75,  64,  89,  83,  75,  64,  89,  83,  75,  64,  89,  83,  75,  // 0
  64,  50,  36,  18,  64,  50,  36,  18,  64,  50,  36,  18,  64,  50,  36,  18,
  64,  75,  36, -18,  64,  75,  36, -18,  64,  75,  36, -18,  64,  75,  36, -18,
@@ -1119,7 +1119,7 @@ ALIGNED(32) const int16_t  fi_dct2_4x8_coeff_ver[256] = {
  64, -50,  36, -18,  64, -50,  36, -18,  64, -50,  36, -18,  64, -50,  36, -18,
 };
 
-ALIGNED(32) const int16_t  fi_dst7_4x8_coeff_ver[256] = {
+ALIGNED(32) static const int16_t  fi_dst7_4x8_coeff_ver[256] = {
  17,  46,  71,  85,  17,  46,  71,  85,  17,  46,  71,  85,  17,  46,  71,  85,  // 0
  86,  78,  60,  32,  86,  78,  60,  32,  86,  78,  60,  32,  86,  78,  60,  32,
  32,  78,  85,  46,  32,  78,  85,  46,  32,  78,  85,  46,  32,  78,  85,  46,
@@ -1138,7 +1138,7 @@ ALIGNED(32) const int16_t  fi_dst7_4x8_coeff_ver[256] = {
  60, -46,  32, -17,  60, -46,  32, -17,  60, -46,  32, -17,  60, -46,  32, -17,
 };
 
-ALIGNED(32) const int16_t  fi_dct8_4x8_coeff_ver[256] = { // TODO: this is probably identical to forward table, remove this if unnecessary
+ALIGNED(32) static const int16_t  fi_dct8_4x8_coeff_ver[256] = { // TODO: this is probably identical to forward table, remove this if unnecessary
  86,  85,  78,  71,  86,  85,  78,  71,  86,  85,  78,  71,  86,  85,  78,  71,  // 0
  60,  46,  32,  17,  60,  46,  32,  17,  60,  46,  32,  17,  60,  46,  32,  17,
  85,  60,  17, -32,  85,  60,  17, -32,  85,  60,  17, -32,  85,  60,  17, -32,
@@ -1158,7 +1158,7 @@ ALIGNED(32) const int16_t  fi_dct8_4x8_coeff_ver[256] = { // TODO: this is proba
 };
 
 
-ALIGNED(32) const int16_t  fi_dct2_4x16_coeff_hor[128] = {
+ALIGNED(32) static const int16_t  fi_dct2_4x16_coeff_hor[128] = {
  64,  83,  64,  83,  64,  83,  64,  83,  64,  83,  64,  83,  64,  83,  64,  83,
  64,  36,  64,  36,  64,  36,  64,  36,  64,  36,  64,  36,  64,  36,  64,  36,
  64,  36,  64,  36,  64,  36,  64,  36,  64,  36,  64,  36,  64,  36,  64,  36,
@@ -1169,7 +1169,7 @@ ALIGNED(32) const int16_t  fi_dct2_4x16_coeff_hor[128] = {
  64, -36,  64, -36,  64, -36,  64, -36,  64, -36,  64, -36,  64, -36,  64, -36,
 };
 
-ALIGNED(32) const int16_t  fi_dst7_4x16_coeff_hor[128] = {
+ALIGNED(32) static const int16_t  fi_dst7_4x16_coeff_hor[128] = {
  29,  74,  29,  74,  29,  74,  29,  74,  29,  74,  29,  74,  29,  74,  29,  74,
  84,  55,  84,  55,  84,  55,  84,  55,  84,  55,  84,  55,  84,  55,  84,  55,
  55,  74,  55,  74,  55,  74,  55,  74,  55,  74,  55,  74,  55,  74,  55,  74,
@@ -1180,7 +1180,7 @@ ALIGNED(32) const int16_t  fi_dst7_4x16_coeff_hor[128] = {
  55, -29,  55, -29,  55, -29,  55, -29,  55, -29,  55, -29,  55, -29,  55, -29,
 };
 
-ALIGNED(32) const int16_t  fi_dct8_4x16_coeff_hor[128] = { // TODO: this is probably identical to forward table, remove this if unnecessary
+ALIGNED(32) static const int16_t  fi_dct8_4x16_coeff_hor[128] = { // TODO: this is probably identical to forward table, remove this if unnecessary
  84,  74,  84,  74,  84,  74,  84,  74,  84,  74,  84,  74,  84,  74,  84,  74,
  55,  29,  55,  29,  55,  29,  55,  29,  55,  29,  55,  29,  55,  29,  55,  29,
  74,   0,  74,   0,  74,   0,  74,   0,  74,   0,  74,   0,  74,   0,  74,   0,
@@ -1192,7 +1192,7 @@ ALIGNED(32) const int16_t  fi_dct8_4x16_coeff_hor[128] = { // TODO: this is prob
 };
 
 
-ALIGNED(32) const int16_t  fi_dct2_4x16_coeff_ver[512] = {
+ALIGNED(32) static const int16_t  fi_dct2_4x16_coeff_ver[512] = {
  64,  90,  89,  87,  83,  80,  75,  70,  64,  90,  89,  87,  83,  80,  75,  70,  // 0
  64,  57,  50,  43,  36,  25,  18,   9,  64,  57,  50,  43,  36,  25,  18,   9,
  64,  87,  75,  57,  36,   9, -18, -43,  64,  87,  75,  57,  36,   9, -18, -43,
@@ -1227,7 +1227,7 @@ ALIGNED(32) const int16_t  fi_dct2_4x16_coeff_ver[512] = {
  64, -57,  50, -43,  36, -25,  18,  -9,  64, -57,  50, -43,  36, -25,  18,  -9,
 };
 
-ALIGNED(32) const int16_t  fi_dst7_4x16_coeff_ver[512] = {
+ALIGNED(32) static const int16_t  fi_dst7_4x16_coeff_ver[512] = {
   8,  25,  40,  55,  68,  77,  85,  88,   8,  25,  40,  55,  68,  77,  85,  88,  // 0
  88,  87,  81,  73,  62,  48,  33,  17,  88,  87,  81,  73,  62,  48,  33,  17,
  17,  48,  73,  87,  88,  77,  55,  25,  17,  48,  73,  87,  88,  77,  55,  25,
@@ -1262,7 +1262,7 @@ ALIGNED(32) const int16_t  fi_dst7_4x16_coeff_ver[512] = {
  62, -55,  48, -40,  33, -25,  17,  -8,  62, -55,  48, -40,  33, -25,  17,  -8,
 };
 
-ALIGNED(32) const int16_t  fi_dct8_4x16_coeff_ver[512] = {
+ALIGNED(32) static const int16_t  fi_dct8_4x16_coeff_ver[512] = {
  88,  88,  87,  85,  81,  77,  73,  68,  88,  88,  87,  85,  81,  77,  73,  68,  // 0
  62,  55,  48,  40,  33,  25,  17,   8,  62,  55,  48,  40,  33,  25,  17,   8,
  88,  81,  68,  48,  25,   0, -25, -48,  88,  81,  68,  48,  25,   0, -25, -48,
@@ -1298,7 +1298,7 @@ ALIGNED(32) const int16_t  fi_dct8_4x16_coeff_ver[512] = {
 };
 
 
-ALIGNED(32) const int16_t  fi_dct2_4x32_coeff_hor[128] = {
+ALIGNED(32) static const int16_t  fi_dct2_4x32_coeff_hor[128] = {
  64,  83,  64,  83,  64,  83,  64,  83,  64,  83,  64,  83,  64,  83,  64,  83,
  64,  36,  64,  36,  64,  36,  64,  36,  64,  36,  64,  36,  64,  36,  64,  36,
  64, -36,  64, -36,  64, -36,  64, -36,  64, -36,  64, -36,  64, -36,  64, -36,
@@ -1309,7 +1309,7 @@ ALIGNED(32) const int16_t  fi_dct2_4x32_coeff_hor[128] = {
  64, -36,  64, -36,  64, -36,  64, -36,  64, -36,  64, -36,  64, -36,  64, -36,
 };
 
-ALIGNED(32) const int16_t  fi_dst7_4x32_coeff_hor[128] = {
+ALIGNED(32) static const int16_t  fi_dst7_4x32_coeff_hor[128] = {
  29,  74,  29,  74,  29,  74,  29,  74,  29,  74,  29,  74,  29,  74,  29,  74,
  55,  74,  55,  74,  55,  74,  55,  74,  55,  74,  55,  74,  55,  74,  55,  74,
  74,   0,  74,   0,  74,   0,  74,   0,  74,   0,  74,   0,  74,   0,  74,   0,
@@ -1320,7 +1320,7 @@ ALIGNED(32) const int16_t  fi_dst7_4x32_coeff_hor[128] = {
  55, -29,  55, -29,  55, -29,  55, -29,  55, -29,  55, -29,  55, -29,  55, -29,
 };
 
-ALIGNED(32) const int16_t  fi_dct8_4x32_coeff_hor[128] = { 
+ALIGNED(32) static const int16_t  fi_dct8_4x32_coeff_hor[128] = { 
  84,  74,  84,  74,  84,  74,  84,  74,  84,  74,  84,  74,  84,  74,  84,  74,
  74,   0,  74,   0,  74,   0,  74,   0,  74,   0,  74,   0,  74,   0,  74,   0,
  55, -74,  55, -74,  55, -74,  55, -74,  55, -74,  55, -74,  55, -74,  55, -74,
@@ -1333,7 +1333,7 @@ ALIGNED(32) const int16_t  fi_dct8_4x32_coeff_hor[128] = {
 
 
 // 8xN
-ALIGNED(32) const int16_t  ff_dct2_8xN_coeff_hor[128] = {
+ALIGNED(32) static const int16_t  ff_dct2_8xN_coeff_hor[128] = {
  64,  64,  89,  75,  83,  36,  75, -18,  64,  64,  89,  75,  83,  36,  75, -18,
  64,  64,  50,  18, -36, -83, -89, -50,  64,  64,  50,  18, -36, -83, -89, -50,
  64,  64, -18, -50, -83, -36,  50,  89,  64,  64, -18, -50, -83, -36,  50,  89,
@@ -1344,7 +1344,7 @@ ALIGNED(32) const int16_t  ff_dct2_8xN_coeff_hor[128] = {
 -64,  64,  89, -50, -83,  36,  50, -18, -64,  64,  89, -50, -83,  36,  50, -18
 };
 
-ALIGNED(32) const int16_t  ff_dst7_8xN_coeff_hor[128] = {
+ALIGNED(32) static const int16_t  ff_dst7_8xN_coeff_hor[128] = {
  17,  32,  46,  78,  71,  85,  85,  46,  17,  32,  46,  78,  71,  85,  85,  46,
  46,  60,  86,  71,  32, -46, -60, -78,  46,  60,  86,  71,  32, -46, -60, -78,
  71,  78,  32, -17, -86, -60,  17,  86,  71,  78,  32, -17, -86, -60,  17,  86,
@@ -1355,7 +1355,7 @@ ALIGNED(32) const int16_t  ff_dst7_8xN_coeff_hor[128] = {
 -71,  60,  86, -46, -78,  32,  46, -17, -71,  60,  86, -46, -78,  32,  46, -17,
 };
 
-ALIGNED(32) const int16_t  ff_dct8_8xN_coeff_hor[128] = {
+ALIGNED(32) static const int16_t  ff_dct8_8xN_coeff_hor[128] = {
  86,  85,  85,  60,  78,  17,  71, -32,  86,  85,  85,  60,  78,  17,  71, -32,
  78,  71,  17, -32, -60, -86, -86, -17,  78,  71,  17, -32, -60, -86, -86, -17,
  60,  46, -71, -86, -46,  32,  78,  60,  60,  46, -71, -86, -46,  32,  78,  60,
@@ -1367,10 +1367,10 @@ ALIGNED(32) const int16_t  ff_dct8_8xN_coeff_hor[128] = {
 };
 
 
-            const int16_t* ff_dct2_8x2_coeff_ver = ff_dct2_2xN_coeff_hor; // This is identical to existing table
+          static const int16_t* ff_dct2_8x2_coeff_ver = ff_dct2_2xN_coeff_hor; // This is identical to existing table
 
 
-ALIGNED(32) const int16_t  fi_dct2_8x2_coeff_hor[128] = {
+ALIGNED(32) static const int16_t  fi_dct2_8x2_coeff_hor[128] = {
  64,  89,  83,  75,  64,  50,  36,  18,  64,  89,  83,  75,  64,  50,  36,  18,
  64,  75,  36, -18, -64, -89, -83, -50,  64,  75,  36, -18, -64, -89, -83, -50,
  64,  50, -36, -89, -64,  18,  83,  75,  64,  50, -36, -89, -64,  18,  83,  75,
@@ -1381,7 +1381,7 @@ ALIGNED(32) const int16_t  fi_dct2_8x2_coeff_hor[128] = {
  64, -89,  83, -75,  64, -50,  36, -18,  64, -89,  83, -75,  64, -50,  36, -18,
 };
 
-ALIGNED(32) const int16_t  fi_dst7_8x2_coeff_hor[128] = {
+ALIGNED(32) static const int16_t  fi_dst7_8x2_coeff_hor[128] = {
   17,  46,  71,  85,  86,  78,  60,  32, 17,  46,  71,  85,  86,  78,  60,  32,
   32,  78,  85,  46, -17, -71, -86, -60, 32,  78,  85,  46, -17, -71, -86, -60,
   46,  86,  32, -60, -85, -17,  71,  78, 46,  86,  32, -60, -85, -17,  71,  78,
@@ -1392,10 +1392,10 @@ ALIGNED(32) const int16_t  fi_dst7_8x2_coeff_hor[128] = {
   86, -85,  78, -71,  60, -46,  32, -17, 86, -85,  78, -71,  60, -46,  32, -17,
 };
 
-            const int16_t* fi_dct2_8x2_coeff_ver = ff_dct2_2xN_coeff_hor; // This is identical to existing table
+          static const int16_t* fi_dct2_8x2_coeff_ver = ff_dct2_2xN_coeff_hor; // This is identical to existing table
 
 
-ALIGNED(32) const int16_t  ff_dct2_8x4_coeff_ver[128] = {
+ALIGNED(32) static const int16_t  ff_dct2_8x4_coeff_ver[128] = {
  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,
  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,
  83,  36,  83,  36,  83,  36,  83,  36,  83,  36,  83,  36,  83,  36,  83,  36,
@@ -1406,7 +1406,7 @@ ALIGNED(32) const int16_t  ff_dct2_8x4_coeff_ver[128] = {
  83, -36,  83, -36,  83, -36,  83, -36,  83, -36,  83, -36,  83, -36,  83, -36,
 };
 
-ALIGNED(32) const int16_t  ff_dst7_8x4_coeff_ver[128] = {
+ALIGNED(32) static const int16_t  ff_dst7_8x4_coeff_ver[128] = {
  29,  55,  29,  55,  29,  55,  29,  55,  29,  55,  29,  55,  29,  55,  29,  55,
  74,  84,  74,  84,  74,  84,  74,  84,  74,  84,  74,  84,  74,  84,  74,  84,
  74,  74,  74,  74,  74,  74,  74,  74,  74,  74,  74,  74,  74,  74,  74,  74,
@@ -1417,7 +1417,7 @@ ALIGNED(32) const int16_t  ff_dst7_8x4_coeff_ver[128] = {
  74, -29,  74, -29,  74, -29,  74, -29,  74, -29,  74, -29,  74, -29,  74, -29,
 };
 
-ALIGNED(32) const int16_t  ff_dct8_8x4_coeff_ver[128] = {
+ALIGNED(32) static const int16_t  ff_dct8_8x4_coeff_ver[128] = {
  84,  74,  84,  74,  84,  74,  84,  74,  84,  74,  84,  74,  84,  74,  84,  74,
  55,  29,  55,  29,  55,  29,  55,  29,  55,  29,  55,  29,  55,  29,  55,  29,
  74,   0,  74,   0,  74,   0,  74,   0,  74,   0,  74,   0,  74,   0,  74,   0,
@@ -1429,7 +1429,7 @@ ALIGNED(32) const int16_t  ff_dct8_8x4_coeff_ver[128] = {
 };
 
 
-ALIGNED(32) const int16_t  fi_dct2_8x4_coeff_hor[256] = {
+ALIGNED(32) static const int16_t  fi_dct2_8x4_coeff_hor[256] = {
  64,  89,  83,  75,  64,  89,  83,  75,  64,  89,  83,  75,  64,  89,  83,  75,  // 0
  64,  50,  36,  18,  64,  50,  36,  18,  64,  50,  36,  18,  64,  50,  36,  18,
  64,  75,  36, -18,  64,  75,  36, -18,  64,  75,  36, -18,  64,  75,  36, -18,
@@ -1448,7 +1448,7 @@ ALIGNED(32) const int16_t  fi_dct2_8x4_coeff_hor[256] = {
  64, -50,  36, -18,  64, -50,  36, -18,  64, -50,  36, -18,  64, -50,  36, -18,
 };
 
-ALIGNED(32) const int16_t  fi_dst7_8x4_coeff_hor[256] = {
+ALIGNED(32) static const int16_t  fi_dst7_8x4_coeff_hor[256] = {
  17,  46,  71,  85,  17,  46,  71,  85,  17,  46,  71,  85,  17,  46,  71,  85,  // 0
  86,  78,  60,  32,  86,  78,  60,  32,  86,  78,  60,  32,  86,  78,  60,  32,
  32,  78,  85,  46,  32,  78,  85,  46,  32,  78,  85,  46,  32,  78,  85,  46,
@@ -1467,7 +1467,7 @@ ALIGNED(32) const int16_t  fi_dst7_8x4_coeff_hor[256] = {
  60, -46,  32, -17,  60, -46,  32, -17,  60, -46,  32, -17,  60, -46,  32, -17,
 };
 
-ALIGNED(32) const int16_t  fi_dct8_8x4_coeff_hor[256] = {
+ALIGNED(32) static const int16_t  fi_dct8_8x4_coeff_hor[256] = {
  86,  85,  78,  71,  86,  85,  78,  71,  86,  85,  78,  71,  86,  85,  78,  71,  // 0
  60,  46,  32,  17,  60,  46,  32,  17,  60,  46,  32,  17,  60,  46,  32,  17,
  85,  60,  17, -32,  85,  60,  17, -32,  85,  60,  17, -32,  85,  60,  17, -32,
@@ -1487,7 +1487,7 @@ ALIGNED(32) const int16_t  fi_dct8_8x4_coeff_hor[256] = {
 };
 
 
-ALIGNED(32) const int16_t  fi_dct2_8x4_coeff_ver[128] = {
+ALIGNED(32) static const int16_t  fi_dct2_8x4_coeff_ver[128] = {
  64,  83,  64,  83,  64,  83,  64,  83,  64,  83,  64,  83,  64,  83,  64,  83,
  64,  36,  64,  36,  64,  36,  64,  36,  64,  36,  64,  36,  64,  36,  64,  36,
  64,  36,  64,  36,  64,  36,  64,  36,  64,  36,  64,  36,  64,  36,  64,  36,
@@ -1498,7 +1498,7 @@ ALIGNED(32) const int16_t  fi_dct2_8x4_coeff_ver[128] = {
  64, -36,  64, -36,  64, -36,  64, -36,  64, -36,  64, -36,  64, -36,  64, -36,
 };
 
-ALIGNED(32) const int16_t  fi_dst7_8x4_coeff_ver[128] = {
+ALIGNED(32) static const int16_t  fi_dst7_8x4_coeff_ver[128] = {
  29,  74,  29,  74,  29,  74,  29,  74,  29,  74,  29,  74,  29,  74,  29,  74,
  84,  55,  84,  55,  84,  55,  84,  55,  84,  55,  84,  55,  84,  55,  84,  55,
  55,  74,  55,  74,  55,  74,  55,  74,  55,  74,  55,  74,  55,  74,  55,  74,
@@ -1509,24 +1509,24 @@ ALIGNED(32) const int16_t  fi_dst7_8x4_coeff_ver[128] = {
  55, -29,  55, -29,  55, -29,  55, -29,  55, -29,  55, -29,  55, -29,  55, -29,
 };
 
-            const int16_t* fi_dct8_8x4_coeff_ver      = ff_dct8_8x4_coeff_ver; // Duplicate table
+          static const int16_t* fi_dct8_8x4_coeff_ver      = ff_dct8_8x4_coeff_ver; // Duplicate table
 
 
-ALIGNED(32) const int16_t  ff_dct2_8x8_coeff_ver[64] = {
+ALIGNED(32) static const int16_t  ff_dct2_8x8_coeff_ver[64] = {
  64,  64,  64,  64,  64,  64,  64,  64,  89,  50,  75,  18, -18, -75, -50, -89,
  83, -36,  36, -83, -83,  36, -36,  83,  75, -89, -18, -50,  50,  18,  89, -75,
  64, -64, -64,  64,  64, -64, -64,  64,  50,  18, -89,  75, -75,  89, -18, -50,
  36,  83, -83, -36, -36, -83,  83,  36,  18,  75, -50, -89,  89,  50, -75, -18,
 };
 
-ALIGNED(32) const int16_t  ff_dst7_8x8_coeff_ver[64] = {
+ALIGNED(32) static const int16_t  ff_dst7_8x8_coeff_ver[64] = {
  17,  46,  32,  60,  71,  85,  78,  86,  46,  86,  78,  71,  32, -60, -17, -85,
  71,  32,  85, -46, -86,  17, -60,  78,  85, -60,  46, -78,  17,  32,  86, -71,
  86, -85, -17,  32,  78, -71, -46,  60,  78, -17, -71,  85, -60,  86, -32, -46,
  60,  71, -86, -17, -46, -78,  85,  32,  32,  78, -60, -86,  85,  46, -71, -17,
 };
 
-ALIGNED(32) const int16_t  ff_dct8_8x8_coeff_ver[64] = {
+ALIGNED(32) static const int16_t  ff_dct8_8x8_coeff_ver[64] = {
  86,  78,  85,  71,  60,  32,  46,  17,  85,  17,  60, -32, -71, -78, -86, -46,
  78, -60,  17, -86, -46,  85,  32,  71,  71, -86, -32, -17,  78, -46,  60, -85,
  60, -46, -71,  78,  32, -17, -85,  86,  46,  32, -86,  60, -85,  71,  17, -78,
@@ -1534,7 +1534,7 @@ ALIGNED(32) const int16_t  ff_dct8_8x8_coeff_ver[64] = {
 };
 
 
-ALIGNED(32) const int16_t  fi_dct2_8x8_coeff_hor[512] = {
+ALIGNED(32) static const int16_t  fi_dct2_8x8_coeff_hor[512] = {
  64,  89,  64,  89,  64,  89,  64,  89,  64,  89,  64,  89,  64,  89,  64,  89,  // 0
  83,  75,  83,  75,  83,  75,  83,  75,  83,  75,  83,  75,  83,  75,  83,  75,
  64,  50,  64,  50,  64,  50,  64,  50,  64,  50,  64,  50,  64,  50,  64,  50,
@@ -1569,7 +1569,7 @@ ALIGNED(32) const int16_t  fi_dct2_8x8_coeff_hor[512] = {
  36, -18,  36, -18,  36, -18,  36, -18,  36, -18,  36, -18,  36, -18,  36, -18,
 };
 
-ALIGNED(32) const int16_t  fi_dst7_8x8_coeff_hor[512] = {
+ALIGNED(32) static const int16_t  fi_dst7_8x8_coeff_hor[512] = {
  17,  46,  17,  46,  17,  46,  17,  46,  17,  46,  17,  46,  17,  46,  17,  46,  // 0
  71,  85,  71,  85,  71,  85,  71,  85,  71,  85,  71,  85,  71,  85,  71,  85,
  86,  78,  86,  78,  86,  78,  86,  78,  86,  78,  86,  78,  86,  78,  86,  78,
@@ -1604,7 +1604,7 @@ ALIGNED(32) const int16_t  fi_dst7_8x8_coeff_hor[512] = {
  32, -17,  32, -17,  32, -17,  32, -17,  32, -17,  32, -17,  32, -17,  32, -17,
 };
 
-ALIGNED(32) const int16_t  fi_dct8_8x8_coeff_hor[512] = {
+ALIGNED(32) static const int16_t  fi_dct8_8x8_coeff_hor[512] = {
  86,  85,  86,  85,  86,  85,  86,  85,  86,  85,  86,  85,  86,  85,  86,  85,  // 0
  78,  71,  78,  71,  78,  71,  78,  71,  78,  71,  78,  71,  78,  71,  78,  71,
  60,  46,  60,  46,  60,  46,  60,  46,  60,  46,  60,  46,  60,  46,  60,  46,
@@ -1640,7 +1640,7 @@ ALIGNED(32) const int16_t  fi_dct8_8x8_coeff_hor[512] = {
 };
 
 
-ALIGNED(32) const int16_t  ff_dct2_8x16_coeff_ver[256] = {
+ALIGNED(32) static const int16_t  ff_dct2_8x16_coeff_ver[256] = {
  64,  64,  90,  87,  89,  75,  87,  57,  83,  36,  80,   9,  75, -18,  70, -43,  // 0
  64, -64,  57, -80,  50, -89,  43, -90,  36, -83,  25, -70,  18, -50,   9, -25,
  64,  64,  80,  70,  50,  18,   9, -43, -36, -83, -70, -87, -89, -50, -87,   9,
@@ -1659,7 +1659,7 @@ ALIGNED(32) const int16_t  ff_dct2_8x16_coeff_ver[256] = {
 -64,  64,  80, -57, -89,  50,  90, -43, -83,  36,  70, -25, -50,  18,  25,  -9,
 };
 
-ALIGNED(32) const int16_t  ff_dst7_8x16_coeff_ver[256] = {
+ALIGNED(32) static const int16_t  ff_dst7_8x16_coeff_ver[256] = {
   8,  17,  25,  48,  40,  73,  55,  87,  68,  88,  77,  77,  85,  55,  88,  25,  // 0
  88,  -8,  87, -40,  81, -68,  73, -85,  62, -88,  48, -81,  33, -62,  17, -33,
  25,  33,  68,  81,  88,  85,  81,  40,  48, -25,   0, -77, -48, -87, -81, -48,
@@ -1678,7 +1678,7 @@ ALIGNED(32) const int16_t  ff_dst7_8x16_coeff_ver[256] = {
 -68,  62,  81, -55, -88,  48,  88, -40, -81,  33,  68, -25, -48,  17,  25,  -8,
 };
 
-ALIGNED(32) const int16_t  ff_dct8_8x16_coeff_ver[256] = {
+ALIGNED(32) static const int16_t  ff_dct8_8x16_coeff_ver[256] = {
  88,  88,  88,  81,  87,  68,  85,  48,  81,  25,  77,   0,  73, -25,  68, -48,  // 0
  62, -68,  55, -81,  48, -88,  40, -88,  33, -81,  25, -68,  17, -48,   8, -25,
  87,  85,  68,  48,  33,  -8,  -8, -62, -48, -88, -77, -77, -88, -33, -81,  25,
@@ -1697,7 +1697,7 @@ ALIGNED(32) const int16_t  ff_dct8_8x16_coeff_ver[256] = {
  -8,  88,  40, -87, -68,  81,  85, -73, -88,  62,  81, -48, -62,  33,  33, -17,
 };
 
-ALIGNED(32) const int16_t  ff_dct2_8x16_butterfly_o_row_coeff_hor[256] = {
+ALIGNED(32) static const int16_t  ff_dct2_8x16_butterfly_o_row_coeff_hor[256] = {
  89, -89,  89, -89,  89, -89,  89, -89,  89, -89,  89, -89,  89, -89,  89, -89,  // 0
  75, -75,  75, -75,  75, -75,  75, -75,  75, -75,  75, -75,  75, -75,  75, -75,
  50, -50,  50, -50,  50, -50,  50, -50,  50, -50,  50, -50,  50, -50,  50, -50,
@@ -1717,14 +1717,14 @@ ALIGNED(32) const int16_t  ff_dct2_8x16_butterfly_o_row_coeff_hor[256] = {
 };
 
 
-            const int16_t* fi_dct2_8x16_coeff_hor = fi_dct2_8x8_coeff_hor;
+          static const int16_t* fi_dct2_8x16_coeff_hor = fi_dct2_8x8_coeff_hor;
             
-            const int16_t* fi_dst7_8x16_coeff_hor = fi_dst7_8x8_coeff_hor;
+          static const int16_t* fi_dst7_8x16_coeff_hor = fi_dst7_8x8_coeff_hor;
             
-            const int16_t* fi_dct8_8x16_coeff_hor = fi_dct8_8x8_coeff_hor;
+          static const int16_t* fi_dct8_8x16_coeff_hor = fi_dct8_8x8_coeff_hor;
 
 
-ALIGNED(32) const int16_t  fi_dct2_8x16_coeff_ver[2048] = {
+ALIGNED(32) static const int16_t  fi_dct2_8x16_coeff_ver[2048] = {
  64,  90,  64,  90,  64,  90,  64,  90,  64,  90,  64,  90,  64,  90,  64,  90,  // 0
  89,  87,  89,  87,  89,  87,  89,  87,  89,  87,  89,  87,  89,  87,  89,  87,
  83,  80,  83,  80,  83,  80,  83,  80,  83,  80,  83,  80,  83,  80,  83,  80,
@@ -1855,7 +1855,7 @@ ALIGNED(32) const int16_t  fi_dct2_8x16_coeff_ver[2048] = {
  18,  -9,  18,  -9,  18,  -9,  18,  -9,  18,  -9,  18,  -9,  18,  -9,  18,  -9,
 };
 
-ALIGNED(32) const int16_t  fi_dst7_8x16_coeff_ver[2048] = {
+ALIGNED(32) static const int16_t  fi_dst7_8x16_coeff_ver[2048] = {
   8,  25,   8,  25,   8,  25,   8,  25,   8,  25,   8,  25,   8,  25,   8,  25,  // 0
  40,  55,  40,  55,  40,  55,  40,  55,  40,  55,  40,  55,  40,  55,  40,  55,
  68,  77,  68,  77,  68,  77,  68,  77,  68,  77,  68,  77,  68,  77,  68,  77,
@@ -1986,7 +1986,7 @@ ALIGNED(32) const int16_t  fi_dst7_8x16_coeff_ver[2048] = {
  17,  -8,  17,  -8,  17,  -8,  17,  -8,  17,  -8,  17,  -8,  17,  -8,  17,  -8,
 };
 
-ALIGNED(32) const int16_t  fi_dct8_8x16_coeff_ver[2048] = {
+ALIGNED(32) static const int16_t  fi_dct8_8x16_coeff_ver[2048] = {
  88,  88,  88,  88,  88,  88,  88,  88,  88,  88,  88,  88,  88,  88,  88,  88,  // 0
  87,  85,  87,  85,  87,  85,  87,  85,  87,  85,  87,  85,  87,  85,  87,  85,
  81,  77,  81,  77,  81,  77,  81,  77,  81,  77,  81,  77,  81,  77,  81,  77,
@@ -2118,7 +2118,7 @@ ALIGNED(32) const int16_t  fi_dct8_8x16_coeff_ver[2048] = {
 };
 
 
-ALIGNED(32) const int16_t  ff_dct2_8x32_coeff_ver[1024] = {
+ALIGNED(32) static const int16_t  ff_dct2_8x32_coeff_ver[1024] = {
  64,  64,  90,  90,  90,  87,  90,  82,  89,  75,  88,  67,  87,  57,  85,  46,  // 0
  83,  36,  82,  22,  80,   9,  78,  -4,  75, -18,  73, -31,  70, -43,  67, -54,
  64, -64,  61, -73,  57, -80,  54, -85,  50, -89,  46, -90,  43, -90,  38, -88,
@@ -2185,7 +2185,7 @@ ALIGNED(32) const int16_t  ff_dct2_8x32_coeff_ver[1024] = {
 -83,  36,  78, -31, -70,  25,  61, -22, -50,  18,  38, -13, -25,   9,  13,  -4,
 };
 
-ALIGNED(32) const int16_t  ff_dst7_8x32_coeff_ver[1024] = {
+ALIGNED(32) static const int16_t  ff_dst7_8x32_coeff_ver[1024] = {
   4,   9,  13,  26,  21,  42,  30,  56,  38,  68,  46,  78,  53,  85,  60,  89,  // 0
  66,  90,  72,  86,  77,  80,  80,  72,  84,  60,  86,  46,  88,  30,  90,  13,
  90,  -4,  89, -21,  87, -38,  85, -53,  82, -66,  78, -77,  74, -84,  68, -88,
@@ -2252,7 +2252,7 @@ ALIGNED(32) const int16_t  ff_dst7_8x32_coeff_ver[1024] = {
 -82,  34,  77, -30, -68,  26,  60, -21, -50,  17,  38, -13, -26,   9,  13,  -4,
 };
 
-ALIGNED(32) const int16_t  ff_dct8_8x32_coeff_ver[1024] = {
+ALIGNED(32) static const int16_t  ff_dct8_8x32_coeff_ver[1024] = {
  90,  90,  90,  87,  89,  84,  88,  78,  87,  72,  86,  63,  85,  53,  84,  42,  // 0
  82,  30,  80,  17,  78,   4,  77,  -9,  74, -21,  72, -34,  68, -46,  66, -56,
  63, -66,  60, -74,  56, -80,  53, -85,  50, -88,  46, -90,  42, -89,  38, -86,
@@ -2320,15 +2320,15 @@ ALIGNED(32) const int16_t  ff_dct8_8x32_coeff_ver[1024] = {
 };
 
 
-            const int16_t* fi_dct2_8x32_coeff_hor = fi_dct2_8x8_coeff_hor;
+          static const int16_t* fi_dct2_8x32_coeff_hor = fi_dct2_8x8_coeff_hor;
 
-            const int16_t* fi_dst7_8x32_coeff_hor = fi_dst7_8x8_coeff_hor;
+          static const int16_t* fi_dst7_8x32_coeff_hor = fi_dst7_8x8_coeff_hor;
 
-            const int16_t* fi_dct8_8x32_coeff_hor = fi_dct8_8x8_coeff_hor;
+          static const int16_t* fi_dct8_8x32_coeff_hor = fi_dct8_8x8_coeff_hor;
 
 
 // 16xN
-ALIGNED(32) const int16_t  ff_dct2_16xN_coeff_hor[256] = {
+ALIGNED(32) static const int16_t  ff_dct2_16xN_coeff_hor[256] = {
  64,  64,  90,  87,  89,  75,  87,  57,  64, -64,  57, -80,  50, -89,  43, -90,
  64,  64,  80,  70,  50,  18,   9, -43, -64,  64, -25,  90,  18,  75,  57,  25,
  64,  64,  57,  43, -18, -50, -80, -90,  64, -64,  -9, -87, -75, -18, -87,  70,
@@ -2347,7 +2347,7 @@ ALIGNED(32) const int16_t  ff_dct2_16xN_coeff_hor[256] = {
  36,  83,  -9, -80, -18,  75,  43, -70, -83,  36,  70, -25, -50,  18,  25,  -9,
 };
 
-ALIGNED(32) const int16_t  ff_dst7_16xN_coeff_hor[256] = {
+ALIGNED(32) static const int16_t  ff_dst7_16xN_coeff_hor[256] = {
   8,  17,  25,  48,  40,  73,  55,  87,  88,  -8,  87, -40,  81, -68,  73, -85,  // 0
  25,  33,  68,  81,  88,  85,  81,  40, -88,  17, -68,  73, -25,  88,  25,  55,
  40,  48,  88,  88,  62,  25, -17, -68,  87, -25,  33, -88, -48, -48, -88,  48,
@@ -2366,7 +2366,7 @@ ALIGNED(32) const int16_t  ff_dst7_16xN_coeff_hor[256] = {
  25,  81,   0, -77, -25,  73,  48, -68, -81,  33,  68, -25, -48,  17,  25,  -8,
 };
 
-ALIGNED(32) const int16_t  ff_dct8_16xN_coeff_hor[256] = {
+ALIGNED(32) static const int16_t  ff_dct8_16xN_coeff_hor[256] = {
  88,  88,  88,  81,  87,  68,  85,  48,  62, -68,  55, -81,  48, -88,  40, -88,  // 0
  87,  85,  68,  48,  33,  -8,  -8, -62, -55,  73, -17,  88,  25,  68,  62,  17,
  81,  77,  25,   0, -48, -77, -88, -77,  48, -77, -25, -77, -81,   0, -81,  77,
@@ -2386,10 +2386,10 @@ ALIGNED(32) const int16_t  ff_dct8_16xN_coeff_hor[256] = {
 };
 
 
-            const int16_t* ff_dct2_16x2_coeff_ver = ff_dct2_2xN_coeff_hor; // This is identical to existing table
+static const int16_t* ff_dct2_16x2_coeff_ver = ff_dct2_2xN_coeff_hor; // This is identical to existing table
 
 
-ALIGNED(32) const int16_t  fi_dct2_16x2_coeff_hor[512] = {
+ALIGNED(32) static const int16_t  fi_dct2_16x2_coeff_hor[512] = {
  64,  90,  89,  87,  83,  80,  75,  70,  64,  90,  89,  87,  83,  80,  75,  70,  // 0
  64,  57,  50,  43,  36,  25,  18,   9,  64,  57,  50,  43,  36,  25,  18,   9,
  64,  87,  75,  57,  36,   9, -18, -43,  64,  87,  75,  57,  36,   9, -18, -43,
@@ -2424,11 +2424,11 @@ ALIGNED(32) const int16_t  fi_dct2_16x2_coeff_hor[512] = {
  64, -57,  50, -43,  36, -25,  18,  -9,  64, -57,  50, -43,  36, -25,  18,  -9,
 };
 
-            const int16_t* fi_dct2_16x2_coeff_ver = ff_dct2_2xN_coeff_hor; // This is identical to existing table
+          static const int16_t* fi_dct2_16x2_coeff_ver = ff_dct2_2xN_coeff_hor; // This is identical to existing table
 
 
 
-ALIGNED(32) const int16_t  fi_dst7_16x2_coeff_hor[512] = {
+ALIGNED(32) static const int16_t  fi_dst7_16x2_coeff_hor[512] = {
   8,  25,  40,  55,  68,  77,  85,  88,   8,  25,  40,  55,  68,  77,  85,  88,  // 0
  88,  87,  81,  73,  62,  48,  33,  17,  88,  87,  81,  73,  62,  48,  33,  17, 
  17,  48,  73,  87,  88,  77,  55,  25,  17,  48,  73,  87,  88,  77,  55,  25, 
@@ -2464,7 +2464,7 @@ ALIGNED(32) const int16_t  fi_dst7_16x2_coeff_hor[512] = {
 };
 
 
-ALIGNED(32) const int16_t  ff_dct2_16x8_butterfly_o_row_coeff_hor[1024] = {
+ALIGNED(32) static const int16_t  ff_dct2_16x8_butterfly_o_row_coeff_hor[1024] = {
  90, -90,  90, -90,  90, -90,  90, -90,  90, -90,  90, -90,  90, -90,  90, -90,  // 0
  87, -87,  87, -87,  87, -87,  87, -87,  87, -87,  87, -87,  87, -87,  87, -87,
  80, -80,  80, -80,  80, -80,  80, -80,  80, -80,  80, -80,  80, -80,  80, -80,
@@ -2532,7 +2532,7 @@ ALIGNED(32) const int16_t  ff_dct2_16x8_butterfly_o_row_coeff_hor[1024] = {
 };
 
 
-ALIGNED(32) const int16_t  ff_dct2_16x4_coeff_ver[128] = {
+ALIGNED(32) static const int16_t  ff_dct2_16x4_coeff_ver[128] = {
  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,
  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,
  83,  36,  83,  36,  83,  36,  83,  36,  83,  36,  83,  36,  83,  36,  83,  36,
@@ -2543,7 +2543,7 @@ ALIGNED(32) const int16_t  ff_dct2_16x4_coeff_ver[128] = {
  83, -36,  83, -36,  83, -36,  83, -36,  83, -36,  83, -36,  83, -36,  83, -36,
 };
 
-ALIGNED(32) const int16_t  ff_dst7_16x4_coeff_ver[128] = {
+ALIGNED(32) static const int16_t  ff_dst7_16x4_coeff_ver[128] = {
  29,  55,  29,  55,  29,  55,  29,  55,  29,  55,  29,  55,  29,  55,  29,  55,
  74,  84,  74,  84,  74,  84,  74,  84,  74,  84,  74,  84,  74,  84,  74,  84,
  74,  74,  74,  74,  74,  74,  74,  74,  74,  74,  74,  74,  74,  74,  74,  74,
@@ -2554,7 +2554,7 @@ ALIGNED(32) const int16_t  ff_dst7_16x4_coeff_ver[128] = {
  74, -29,  74, -29,  74, -29,  74, -29,  74, -29,  74, -29,  74, -29,  74, -29,
 };
 
-ALIGNED(32) const int16_t  ff_dct8_16x4_coeff_ver[128] = {
+ALIGNED(32) static const int16_t  ff_dct8_16x4_coeff_ver[128] = {
  84,  74,  84,  74,  84,  74,  84,  74,  84,  74,  84,  74,  84,  74,  84,  74,
  55,  29,  55,  29,  55,  29,  55,  29,  55,  29,  55,  29,  55,  29,  55,  29,
  74,   0,  74,   0,  74,   0,  74,   0,  74,   0,  74,   0,  74,   0,  74,   0,
@@ -2566,7 +2566,7 @@ ALIGNED(32) const int16_t  ff_dct8_16x4_coeff_ver[128] = {
 };
 
 
-ALIGNED(32) const int16_t  fi_dct2_16x4_coeff_hor[1024] = {
+ALIGNED(32) static const int16_t  fi_dct2_16x4_coeff_hor[1024] = {
  64,  90,  89,  87,  64,  90,  89,  87,  64,  90,  89,  87,  64,  90,  89,  87,  // 0
  83,  80,  75,  70,  83,  80,  75,  70,  83,  80,  75,  70,  83,  80,  75,  70,
  64,  57,  50,  43,  64,  57,  50,  43,  64,  57,  50,  43,  64,  57,  50,  43,
@@ -2633,7 +2633,7 @@ ALIGNED(32) const int16_t  fi_dct2_16x4_coeff_hor[1024] = {
  36, -25,  18,  -9,  36, -25,  18,  -9,  36, -25,  18,  -9,  36, -25,  18,  -9,
 };
 
-ALIGNED(32) const int16_t  fi_dst7_16x4_coeff_hor[1024] = {
+ALIGNED(32) static const int16_t  fi_dst7_16x4_coeff_hor[1024] = {
   8,  25,  40,  55,   8,  25,  40,  55,   8,  25,  40,  55,   8,  25,  40,  55,  // 0
  68,  77,  85,  88,  68,  77,  85,  88,  68,  77,  85,  88,  68,  77,  85,  88,
  88,  87,  81,  73,  88,  87,  81,  73,  88,  87,  81,  73,  88,  87,  81,  73,
@@ -2700,7 +2700,7 @@ ALIGNED(32) const int16_t  fi_dst7_16x4_coeff_hor[1024] = {
  33, -25,  17,  -8,  33, -25,  17,  -8,  33, -25,  17,  -8,  33, -25,  17,  -8,
 };
 
-ALIGNED(32) const int16_t  fi_dct8_16x4_coeff_hor[1024] = {
+ALIGNED(32) static const int16_t  fi_dct8_16x4_coeff_hor[1024] = {
  88,  88,  87,  85,  88,  88,  87,  85,  88,  88,  87,  85,  88,  88,  87,  85,  // 0
  81,  77,  73,  68,  81,  77,  73,  68,  81,  77,  73,  68,  81,  77,  73,  68,
  62,  55,  48,  40,  62,  55,  48,  40,  62,  55,  48,  40,  62,  55,  48,  40,
@@ -2768,7 +2768,7 @@ ALIGNED(32) const int16_t  fi_dct8_16x4_coeff_hor[1024] = {
 };
 
 
-ALIGNED(32) const int16_t  fi_dct2_16x4_coeff_ver[128] = {
+ALIGNED(32) static const int16_t  fi_dct2_16x4_coeff_ver[128] = {
  64,  83,  64,  83,  64,  83,  64,  83,  64,  83,  64,  83,  64,  83,  64,  83,
  64,  36,  64,  36,  64,  36,  64,  36,  64,  36,  64,  36,  64,  36,  64,  36,
  64,  36,  64,  36,  64,  36,  64,  36,  64,  36,  64,  36,  64,  36,  64,  36,
@@ -2779,7 +2779,7 @@ ALIGNED(32) const int16_t  fi_dct2_16x4_coeff_ver[128] = {
  64, -36,  64, -36,  64, -36,  64, -36,  64, -36,  64, -36,  64, -36,  64, -36,
 };
 
-ALIGNED(32) const int16_t  fi_dst7_16x4_coeff_ver[128] = {
+ALIGNED(32) static const int16_t  fi_dst7_16x4_coeff_ver[128] = {
  29,  74,  29,  74,  29,  74,  29,  74,  29,  74,  29,  74,  29,  74,  29,  74,
  84,  55,  84,  55,  84,  55,  84,  55,  84,  55,  84,  55,  84,  55,  84,  55,
  55,  74,  55,  74,  55,  74,  55,  74,  55,  74,  55,  74,  55,  74,  55,  74,
@@ -2790,7 +2790,7 @@ ALIGNED(32) const int16_t  fi_dst7_16x4_coeff_ver[128] = {
  55, -29,  55, -29,  55, -29,  55, -29,  55, -29,  55, -29,  55, -29,  55, -29,
 };
 
-ALIGNED(32) const int16_t  fi_dct8_16x4_coeff_ver[128] = {
+ALIGNED(32) static const int16_t  fi_dct8_16x4_coeff_ver[128] = {
  84,  74,  84,  74,  84,  74,  84,  74,  84,  74,  84,  74,  84,  74,  84,  74,
  55,  29,  55,  29,  55,  29,  55,  29,  55,  29,  55,  29,  55,  29,  55,  29,
  74,   0,  74,   0,  74,   0,  74,   0,  74,   0,  74,   0,  74,   0,  74,   0,
@@ -2802,28 +2802,28 @@ ALIGNED(32) const int16_t  fi_dct8_16x4_coeff_ver[128] = {
 };
 
 
-ALIGNED(32) const int16_t  ff_dct2_16x8_coeff_ver[64] = {
+ALIGNED(32) static const int16_t  ff_dct2_16x8_coeff_ver[64] = {
  64,  64,  89,  75,  83,  36,  75, -18,  64, -64,  50, -89,  36, -83,  18, -50,
  64,  64,  50,  18, -36, -83, -89, -50, -64,  64,  18,  75,  83, -36,  75, -89,
  64,  64, -18, -50, -83, -36,  50,  89,  64, -64, -75, -18, -36,  83,  89, -75,
  64,  64, -75, -89,  36,  83,  18, -75, -64,  64,  89, -50, -83,  36,  50, -18,
 };
 
-ALIGNED(32) const int16_t  ff_dst7_16x8_coeff_ver[64] = {
+ALIGNED(32) static const int16_t  ff_dst7_16x8_coeff_ver[64] = {
  17,  32,  46,  78,  71,  85,  85,  46,  86, -17,  78, -71,  60, -86,  32, -60,
  46,  60,  86,  71,  32, -46, -60, -78, -85,  32, -17,  85,  71, -17,  78, -86,
  71,  78,  32, -17, -86, -60,  17,  86,  78, -46, -60, -32, -46,  85,  85, -71,
  85,  86, -60, -85,  17,  78,  32, -71, -71,  60,  86, -46, -78,  32,  46, -17,
 };
 
-ALIGNED(32) const int16_t  ff_dct8_16x8_coeff_ver[64] = {
+ALIGNED(32) static const int16_t  ff_dct8_16x8_coeff_ver[64] = {
  86,  85,  85,  60,  78,  17,  71, -32,  60, -71,  46, -86,  32, -78,  17, -46,
  78,  71,  17, -32, -60, -86, -86, -17, -46,  78,  32,  60,  85, -46,  71, -85,
  60,  46, -71, -86, -46,  32,  78,  60,  32, -85, -85,  17, -17,  71,  86, -78,
  32,  17, -78, -46,  85,  71, -46, -85, -17,  86,  71, -78, -86,  60,  60, -32,
 };
 
-ALIGNED(32) const int16_t  ff_dct2_16x8_butterfly_coeff_ver[128] = {
+ALIGNED(32) static const int16_t  ff_dct2_16x8_butterfly_coeff_ver[128] = {
    64,  64,  89,  75,  83,  36,  75, -18,  64,  64,  89,  75,  83,  36,  75, -18,
    64,  64,  50,  18, -36, -83, -89, -50,  64,  64,  50,  18, -36, -83, -89, -50,
    64,  64, -18, -50, -83, -36,  50,  89,  64,  64, -18, -50, -83, -36,  50,  89,
@@ -2834,7 +2834,7 @@ ALIGNED(32) const int16_t  ff_dct2_16x8_butterfly_coeff_ver[128] = {
   -64,  64,  89, -50, -83,  36,  50, -18, -64,  64,  89, -50, -83,  36,  50, -18
 };
 
-ALIGNED(32) const int16_t  ff_dct2_16x8_butterfly_o_row_coeff_ver[256] = {
+ALIGNED(32) static const int16_t  ff_dct2_16x8_butterfly_o_row_coeff_ver[256] = {
  89, -89,  89, -89,  89, -89,  89, -89,  89, -89,  89, -89,  89, -89,  89, -89,  // 0
  75, -75,  75, -75,  75, -75,  75, -75,  75, -75,  75, -75,  75, -75,  75, -75,
  50, -50,  50, -50,  50, -50,  50, -50,  50, -50,  50, -50,  50, -50,  50, -50,
@@ -2854,21 +2854,21 @@ ALIGNED(32) const int16_t  ff_dct2_16x8_butterfly_o_row_coeff_ver[256] = {
 };
 
 
-            const int16_t* fi_dct2_16x8_coeff_hor = fi_dct2_8x16_coeff_ver; // Duplicate table.
+          static const int16_t* fi_dct2_16x8_coeff_hor = fi_dct2_8x16_coeff_ver; // Duplicate table.
            
-            const int16_t* fi_dst7_16x8_coeff_hor = fi_dst7_8x16_coeff_ver; // Duplicate table.
+          static const int16_t* fi_dst7_16x8_coeff_hor = fi_dst7_8x16_coeff_ver; // Duplicate table.
            
-            const int16_t* fi_dct8_16x8_coeff_hor = fi_dct8_8x16_coeff_ver; // Duplicate table.
+          static const int16_t* fi_dct8_16x8_coeff_hor = fi_dct8_8x16_coeff_ver; // Duplicate table.
 
 
-            const int16_t* fi_dct2_16x8_coeff_ver = fi_dct2_8x8_coeff_hor;  // Duplicate table
+          static const int16_t* fi_dct2_16x8_coeff_ver = fi_dct2_8x8_coeff_hor;  // Duplicate table
            
-            const int16_t* fi_dst7_16x8_coeff_ver = fi_dst7_8x8_coeff_hor;  // Duplicate table
+          static const int16_t* fi_dst7_16x8_coeff_ver = fi_dst7_8x8_coeff_hor;  // Duplicate table
            
-            const int16_t* fi_dct8_16x8_coeff_ver = fi_dct8_8x8_coeff_hor;  // Duplicate table
+          static const int16_t* fi_dct8_16x8_coeff_ver = fi_dct8_8x8_coeff_hor;  // Duplicate table
 
 
-ALIGNED(32) const int16_t  ff_dct2_16x16_coeff_ver[256] = {
+ALIGNED(32) static const int16_t  ff_dct2_16x16_coeff_ver[256] = {
  64,  64,  90,  87,  89,  75,  87,  57,  83,  36,  80,   9,  75, -18,  70, -43,  // 0
  64, -64,  57, -80,  50, -89,  43, -90,  36, -83,  25, -70,  18, -50,   9, -25,
  64,  64,  80,  70,  50,  18,   9, -43, -36, -83, -70, -87, -89, -50, -87,   9,
@@ -2887,7 +2887,7 @@ ALIGNED(32) const int16_t  ff_dct2_16x16_coeff_ver[256] = {
 -64,  64,  80, -57, -89,  50,  90, -43, -83,  36,  70, -25, -50,  18,  25,  -9,
 };
 
-ALIGNED(32) const int16_t  ff_dst7_16x16_coeff_ver[256] = {
+ALIGNED(32) static const int16_t  ff_dst7_16x16_coeff_ver[256] = {
   8,  17,  25,  48,  40,  73,  55,  87,  68,  88,  77,  77,  85,  55,  88,  25,  // 0
  88,  -8,  87, -40,  81, -68,  73, -85,  62, -88,  48, -81,  33, -62,  17, -33,
  25,  33,  68,  81,  88,  85,  81,  40,  48, -25,   0, -77, -48, -87, -81, -48,
@@ -2906,7 +2906,7 @@ ALIGNED(32) const int16_t  ff_dst7_16x16_coeff_ver[256] = {
 -68,  62,  81, -55, -88,  48,  88, -40, -81,  33,  68, -25, -48,  17,  25,  -8,
 };
 
-ALIGNED(32) const int16_t  ff_dct8_16x16_coeff_ver[256] = {
+ALIGNED(32) static const int16_t  ff_dct8_16x16_coeff_ver[256] = {
  88,  88,  88,  81,  87,  68,  85,  48,  81,  25,  77,   0,  73, -25,  68, -48,  // 0
  62, -68,  55, -81,  48, -88,  40, -88,  33, -81,  25, -68,  17, -48,   8, -25,
  87,  85,  68,  48,  33,  -8,  -8, -62, -48, -88, -77, -77, -88, -33, -81,  25,
@@ -2926,7 +2926,7 @@ ALIGNED(32) const int16_t  ff_dct8_16x16_coeff_ver[256] = {
 };
 
 
-ALIGNED(32) const int16_t  fi_dct2_16x16_coeff_hor[256] = {
+ALIGNED(32) static const int16_t  fi_dct2_16x16_coeff_hor[256] = {
  64,  90,  64,  87,  64,  80,  64,  70,  64,  57,  64,  43,  64,  25,  64,   9,  // 0
  64,  -9,  64, -25,  64, -43,  64, -57,  64, -70,  64, -80,  64, -87,  64, -90,
  89,  87,  75,  57,  50,   9,  18, -43, -18, -80, -50, -90, -75, -70, -89, -25,
@@ -2945,7 +2945,7 @@ ALIGNED(32) const int16_t  fi_dct2_16x16_coeff_hor[256] = {
 -18,  90,  50, -87, -75,  80,  89, -70, -89,  57,  75, -43, -50,  25,  18,  -9,
 };
 
-ALIGNED(32) const int16_t  fi_dst7_16x16_coeff_hor[256] = {
+ALIGNED(32) static const int16_t  fi_dst7_16x16_coeff_hor[256] = {
   8,  25,  17,  48,  25,  68,  33,  81,  40,  88,  48,  88,  55,  81,  62,  68,  // 0
  68,  48,  73,  25,  77,   0,  81, -25,  85, -48,  87, -68,  88, -81,  88, -88,
  40,  55,  73,  87,  88,  81,  85,  40,  62, -17,  25, -68, -17, -88, -55, -73,
@@ -2964,7 +2964,7 @@ ALIGNED(32) const int16_t  fi_dst7_16x16_coeff_hor[256] = {
 -25,  88,  55, -85, -77,  77,  88, -68, -87,  55,  73, -40, -48,  25,  17,  -8,
 };
 
-ALIGNED(32) const int16_t  fi_dct2_16x1_coeff_hor[256] = {
+ALIGNED(32) static const int16_t  fi_dct2_16x1_coeff_hor[256] = {
  64,  90,  64,  87,  64,  80,  64,  70,  64,  57,  64,  43,  64,  25,  64,   9,  // 0
  89,  87,  75,  57,  50,   9,  18, -43, -18, -80, -50, -90, -75, -70, -89, -25,
  83,  80,  36,   9, -36, -70, -83, -87, -83, -25, -36,  57,  36,  90,  83,  43,
@@ -2983,7 +2983,7 @@ ALIGNED(32) const int16_t  fi_dct2_16x1_coeff_hor[256] = {
 -18,  90,  50, -87, -75,  80,  89, -70, -89,  57,  75, -43, -50,  25,  18,  -9,
 };
 
-ALIGNED(32) const int16_t  fi_dst7_16x1_coeff_hor[256] = {
+ALIGNED(32) static const int16_t  fi_dst7_16x1_coeff_hor[256] = {
   8,  25,  17,  48,  25,  68,  33,  81,  40,  88,  48,  88,  55,  81,  62,  68,  // 0
  40,  55,  73,  87,  88,  81,  85,  40,  62, -17,  25, -68, -17, -88, -55, -73,
  68,  77,  88,  77,  48,   0, -25, -77, -81, -77, -81,   0, -25,  77,  48,  77,
@@ -3002,17 +3002,17 @@ ALIGNED(32) const int16_t  fi_dst7_16x1_coeff_hor[256] = {
 -25,  88,  55, -85, -77,  77,  88, -68, -87,  55,  73, -40, -48,  25,  17,  -8,
 };
 
-ALIGNED(32) const int16_t* fi_dct8_16x16_coeff_hor = ff_dct8_16x16_coeff_ver;
+ALIGNED(32) static const int16_t* fi_dct8_16x16_coeff_hor = ff_dct8_16x16_coeff_ver;
 
 
-            const int16_t* fi_dct2_16x16_coeff_ver = fi_dct2_16x16_coeff_hor;
+          static const int16_t* fi_dct2_16x16_coeff_ver = fi_dct2_16x16_coeff_hor;
 
-            const int16_t* fi_dst7_16x16_coeff_ver = fi_dst7_16x16_coeff_hor;
+          static const int16_t* fi_dst7_16x16_coeff_ver = fi_dst7_16x16_coeff_hor;
 
-            const int16_t* fi_dct8_16x16_coeff_ver = ff_dct8_16x16_coeff_ver;
+          static const int16_t* fi_dct8_16x16_coeff_ver = ff_dct8_16x16_coeff_ver;
 
 
-ALIGNED(32) const int16_t  ff_dct2_16x32_butterfly_o_row_coeff_ver[4096] = { // TODO: change this to 32-bit combined coeff table at some point, these huge tables are getting out of hand
+ALIGNED(32) static const int16_t  ff_dct2_16x32_butterfly_o_row_coeff_ver[4096] = { // TODO: change this to 32-bit combined coeff table at some point, these huge tables are getting out of hand
  90, -90,  90, -90,  90, -90,  90, -90,  90, -90,  90, -90,  90, -90,  90, -90,  // 0
  90, -90,  90, -90,  90, -90,  90, -90,  90, -90,  90, -90,  90, -90,  90, -90,
  88, -88,  88, -88,  88, -88,  88, -88,  88, -88,  88, -88,  88, -88,  88, -88,
@@ -3271,7 +3271,7 @@ ALIGNED(32) const int16_t  ff_dct2_16x32_butterfly_o_row_coeff_ver[4096] = { // 
 -90,  90, -90,  90, -90,  90, -90,  90, -90,  90, -90,  90, -90,  90, -90,  90,
 };
 
-ALIGNED(32) const int16_t  ff_dct2_16x32_coeff_ver[1024] = {
+ALIGNED(32) static const int16_t  ff_dct2_16x32_coeff_ver[1024] = {
  64,  64,  90,  90,  90,  87,  90,  82,  89,  75,  88,  67,  87,  57,  85,  46,  // 0
  83,  36,  82,  22,  80,   9,  78,  -4,  75, -18,  73, -31,  70, -43,  67, -54,
  64, -64,  61, -73,  57, -80,  54, -85,  50, -89,  46, -90,  43, -90,  38, -88,
@@ -3338,7 +3338,7 @@ ALIGNED(32) const int16_t  ff_dct2_16x32_coeff_ver[1024] = {
 -83,  36,  78, -31, -70,  25,  61, -22, -50,  18,  38, -13, -25,   9,  13,  -4,
 };
 
-ALIGNED(32) const int16_t  ff_dst7_16x32_coeff_ver[1024] = {
+ALIGNED(32) static const int16_t  ff_dst7_16x32_coeff_ver[1024] = {
   4,   9,  13,  26,  21,  42,  30,  56,  38,  68,  46,  78,  53,  85,  60,  89,  // 0
  66,  90,  72,  86,  77,  80,  80,  72,  84,  60,  86,  46,  88,  30,  90,  13,
  90,  -4,  89, -21,  87, -38,  85, -53,  82, -66,  78, -77,  74, -84,  68, -88,
@@ -3405,7 +3405,7 @@ ALIGNED(32) const int16_t  ff_dst7_16x32_coeff_ver[1024] = {
 -82,  34,  77, -30, -68,  26,  60, -21, -50,  17,  38, -13, -26,   9,  13,  -4,
 };
 
-ALIGNED(32) const int16_t  ff_dct8_16x32_coeff_ver[1024] = {
+ALIGNED(32) static const int16_t  ff_dct8_16x32_coeff_ver[1024] = {
  90,  90,  90,  87,  89,  84,  88,  78,  87,  72,  86,  63,  85,  53,  84,  42,  // 0
  82,  30,  80,  17,  78,   4,  77,  -9,  74, -21,  72, -34,  68, -46,  66, -56,
  63, -66,  60, -74,  56, -80,  53, -85,  50, -88,  46, -90,  42, -89,  38, -86,
@@ -3473,14 +3473,14 @@ ALIGNED(32) const int16_t  ff_dct8_16x32_coeff_ver[1024] = {
 };
 
 
-            const int16_t* fi_dct2_16x32_coeff_hor = fi_dct2_16x16_coeff_hor;
+          static const int16_t* fi_dct2_16x32_coeff_hor = fi_dct2_16x16_coeff_hor;
 
-            const int16_t* fi_dst7_16x32_coeff_hor = fi_dst7_16x16_coeff_hor;
+          static const int16_t* fi_dst7_16x32_coeff_hor = fi_dst7_16x16_coeff_hor;
 
-            const int16_t* fi_dct8_16x32_coeff_hor = ff_dct8_16x16_coeff_ver;
+          static const int16_t* fi_dct8_16x32_coeff_hor = ff_dct8_16x16_coeff_ver;
 
 // 32xN
-ALIGNED(32) const int16_t  ff_dct2_32xN_coeff_hor[1024] = {
+ALIGNED(32) static const int16_t  ff_dct2_32xN_coeff_hor[1024] = {
  64,  64,  90,  90,  90,  87,  90,  82,  89,  75,  88,  67,  87,  57,  85,  46,  // 0
  83,  36,  82,  22,  80,   9,  78,  -4,  75, -18,  73, -31,  70, -43,  67, -54,
  64, -64,  61, -73,  57, -80,  54, -85,  50, -89,  46, -90,  43, -90,  38, -88,
@@ -3547,7 +3547,7 @@ ALIGNED(32) const int16_t  ff_dct2_32xN_coeff_hor[1024] = {
 -83,  36,  78, -31, -70,  25,  61, -22, -50,  18,  38, -13, -25,   9,  13,  -4,
 };
 
-ALIGNED(32) const int16_t  ff_dst7_32xN_coeff_hor[1024] = {
+ALIGNED(32) static const int16_t  ff_dst7_32xN_coeff_hor[1024] = {
  4,   9,  13,  26,  21,  42,  30,  56,  38,  68,  46,  78,  53,  85,  60,  89,  66,  90,  72,  86,  77,  80,  80,  72,  84,  60,  86,  46,  88,  30,  90,  13,  // 0
  90,  -4,  89, -21,  87, -38,  85, -53,  82, -66,  78, -77,  74, -84,  68, -88,  63, -90,  56, -87,  50, -82,  42, -74,  34, -63,  26, -50,  17, -34,   9, -17,
  13,  17,  38,  50,  60,  74,  77,  87,  86,  88,  90,  77,  85,  53,  74,  21,  56, -13,  34, -46,   9, -72, -17, -86, -42, -89, -63, -78, -78, -56, -87, -26,  // 2
@@ -3582,7 +3582,7 @@ ALIGNED(32) const int16_t  ff_dst7_32xN_coeff_hor[1024] = {
 -66,  63,  74, -60, -80,  56,  85, -53, -88,  50,  90, -46, -89,  42,  86, -38, -82,  34,  77, -30, -68,  26,  60, -21, -50,  17,  38, -13, -26,   9,  13,  -4,
 };
 
-ALIGNED(32) const int16_t  ff_dct8_32xN_coeff_hor[1024] = {
+ALIGNED(32) static const int16_t  ff_dct8_32xN_coeff_hor[1024] = {
  90,  90,  90,  87,  89,  84,  88,  78,  87,  72,  86,  63,  85,  53,  84,  42,  82,  30,  80,  17,  78,   4,  77,  -9,  74, -21,  72, -34,  68, -46,  66, -56,  // 0
  63, -66,  60, -74,  56, -80,  53, -85,  50, -88,  46, -90,  42, -89,  38, -86,  34, -82,  30, -77,  26, -68,  21, -60,  17, -50,  13, -38,   9, -26,   4, -13,
  89,  88,  84,  78,  74,  60,  60,  34,  42,   4,  21, -26,   0, -53, -21, -74, -42, -86, -60, -90, -74, -82, -84, -66, -89, -42, -89, -13, -84,  17, -74,  46,  // 2
@@ -3617,7 +3617,7 @@ ALIGNED(32) const int16_t  ff_dct8_32xN_coeff_hor[1024] = {
  -4,  90,  21, -89, -38,  87,  53, -85, -66,  82,  77, -78, -84,  74,  88, -68, -90,  63,  87, -56, -82,  50,  74, -42, -63,  34,  50, -26, -34,  17,  17,  -9,
 };
 
-ALIGNED(32) const int16_t  fi_dct2_32xN_coeff_hor[1024] = {
+ALIGNED(32) static const int16_t  fi_dct2_32xN_coeff_hor[1024] = {
 64,  90,  64,  90,  64,  88,  64,  85,  64,  82,  64,  78,  64,  73,  64,  67,  64,  61,  64,  54,  64,  46,  64,  38,  64,  31,  64,  22,  64,  13,  64,   4,  // 0
  64,  -4,  64, -13,  64, -22,  64, -31,  64, -38,  64, -46,  64, -54,  64, -61,  64, -67,  64, -73,  64, -78,  64, -82,  64, -85,  64, -88,  64, -90,  64, -90,
  90,  90,  87,  82,  80,  67,  70,  46,  57,  22,  43,  -4,  25, -31,   9, -54,  -9, -73, -25, -85, -43, -90, -57, -88, -70, -78, -80, -61, -87, -38, -90, -13,  // 2
@@ -3653,7 +3653,7 @@ ALIGNED(32) const int16_t  fi_dct2_32xN_coeff_hor[1024] = {
 };
 
 
-ALIGNED(32) const int16_t  fi_dst7_32xN_coeff_hor[1024] = {
+ALIGNED(32) static const int16_t  fi_dst7_32xN_coeff_hor[1024] = {
  4,  13,   9,  26,  13,  38,  17,  50,  21,  60,  26,  68,  30,  77,  34,  82,  38,  86,  42,  89,  46,  90,  50,  88,  53,  85,  56,  80,  60,  74,  63,  66,  // 0
  66,  56,  68,  46,  72,  34,  74,  21,  77,   9,  78,  -4,  80, -17,  82, -30,  84, -42,  85, -53,  86, -63,  87, -72,  88, -78,  89, -84,  90, -87,  90, -90,
  21,  30,  42,  56,  60,  77,  74,  87,  84,  89,  89,  80,  89,  63,  84,  38,  74,   9,  60, -21,  42, -50,  21, -72,   0, -85, -21, -90, -42, -84, -60, -68,  // 2
@@ -3689,7 +3689,7 @@ ALIGNED(32) const int16_t  fi_dst7_32xN_coeff_hor[1024] = {
 };
 
 
-ALIGNED(32) const int16_t  fi_dct8_32xN_coeff_hor[1024] = {
+ALIGNED(32) static const int16_t  fi_dct8_32xN_coeff_hor[1024] = {
 90,  90,  90,  87,  89,  84,  88,  78,  87,  72,  86,  63,  85,  53,  84,  42,  82,  30,  80,  17,  78,   4,  77,  -9,  74, -21,  72, -34,  68, -46,  66, -56,  // 0
  63, -66,  60, -74,  56, -80,  53, -85,  50, -88,  46, -90,  42, -89,  38, -86,  34, -82,  30, -77,  26, -68,  21, -60,  17, -50,  13, -38,   9, -26,   4, -13,
  89,  88,  84,  78,  74,  60,  60,  34,  42,   4,  21, -26,   0, -53, -21, -74, -42, -86, -60, -90, -74, -82, -84, -66, -89, -42, -89, -13, -84,  17, -74,  46,  // 2
@@ -3724,7 +3724,7 @@ ALIGNED(32) const int16_t  fi_dct8_32xN_coeff_hor[1024] = {
  -4,  90,  21, -89, -38,  87,  53, -85, -66,  82,  77, -78, -84,  74,  88, -68, -90,  63,  87, -56, -82,  50,  74, -42, -63,  34,  50, -26, -34,  17,  17,  -9,
 };
 
-const int16_t ff_dct8_4x32_coeff_ver[1024] = {
+static const int16_t ff_dct8_4x32_coeff_ver[1024] = {
 90,  90,  90,  87,  89,  84,  88,  78,  87,  72,  86,  63,  85,  53,  84,  42,  82,  30,  80,  17,  78,   4,  77,  -9,  74, -21,  72, -34,  68, -46,  66, -56,  // 0
  63, -66,  60, -74,  56, -80,  53, -85,  50, -88,  46, -90,  42, -89,  38, -86,  34, -82,  30, -77,  26, -68,  21, -60,  17, -50,  13, -38,   9, -26,   4, -13,
  89,  88,  84,  78,  74,  60,  60,  34,  42,   4,  21, -26,   0, -53, -21, -74, -42, -86, -60, -90, -74, -82, -84, -66, -89, -42, -89, -13, -84,  17, -74,  46,  // 2
@@ -3758,7 +3758,7 @@ const int16_t ff_dct8_4x32_coeff_ver[1024] = {
   9,   4, -26, -13,  42,  21, -56, -30,  68,  38, -78, -46,  85,  53, -89, -60,  90,  66, -86, -72,  80,  77, -72, -80,  60,  84, -46, -86,  30,  88, -13, -90,  // 30
  -4,  90,  21, -89, -38,  87,  53, -85, -66,  82,  77, -78, -84,  74,  88, -68, -90,  63,  87, -56, -82,  50,  74, -42, -63,  34,  50, -26, -34,  17,  17,  -9,
 };
-const int16_t ff_dst7_4x32_coeff_ver[1024] = {
+static const int16_t ff_dst7_4x32_coeff_ver[1024] = {
   4,   9,  13,  26,  21,  42,  30,  56,  38,  68,  46,  78,  53,  85,  60,  89,  66,  90,  72,  86,  77,  80,  80,  72,  84,  60,  86,  46,  88,  30,  90,  13,  // 0
  90,  -4,  89, -21,  87, -38,  85, -53,  82, -66,  78, -77,  74, -84,  68, -88,  63, -90,  56, -87,  50, -82,  42, -74,  34, -63,  26, -50,  17, -34,   9, -17,
  13,  17,  38,  50,  60,  74,  77,  87,  86,  88,  90,  77,  85,  53,  74,  21,  56, -13,  34, -46,   9, -72, -17, -86, -42, -89, -63, -78, -78, -56, -87, -26,  // 2
@@ -3793,13 +3793,13 @@ const int16_t ff_dst7_4x32_coeff_ver[1024] = {
 -66,  63,  74, -60, -80,  56,  85, -53, -88,  50,  90, -46, -89,  42,  86, -38, -82,  34,  77, -30, -68,  26,  60, -21, -50,  17,  38, -13, -26,   9,  13,  -4,
 };
 
-            const int16_t* ff_dct2_32x2_coeff_ver = ff_dct2_2xN_coeff_hor; // This is identical to existing table
+          static const int16_t* ff_dct2_32x2_coeff_ver = ff_dct2_2xN_coeff_hor; // This is identical to existing table
 
 
-            const int16_t* fi_dct2_32x2_coeff_ver = ff_dct2_2xN_coeff_hor;
+          static const int16_t* fi_dct2_32x2_coeff_ver = ff_dct2_2xN_coeff_hor;
 
 
-ALIGNED(32) const int16_t  ff_dct2_32x4_butterfly_eo_row_coeff_hor[512] = {
+ALIGNED(32) static const int16_t  ff_dct2_32x4_butterfly_eo_row_coeff_hor[512] = {
  90,  90,  87,  87,  90,  90,  87,  87,  90,  90,  87,  87,  90,  90,  87,  87,  // 0
  80,  80,  70,  70,  80,  80,  70,  70,  80,  80,  70,  70,  80,  80,  70,  70,
  57,  57,  43,  43,  57,  57,  43,  43,  57,  57,  43,  43,  57,  57,  43,  43,
@@ -3834,7 +3834,7 @@ ALIGNED(32) const int16_t  ff_dct2_32x4_butterfly_eo_row_coeff_hor[512] = {
  87,  87, -90, -90,  87,  87, -90, -90,  87,  87, -90, -90,  87,  87, -90, -90,
 };
 
-ALIGNED(32) const int16_t  ff_dct2_32x4_butterfly_o_row_coeff_hor[2048] = { // TODO: change this to 32-bit combined coeff table at some point, these huge tables are getting out of hand
+ALIGNED(32) static const int16_t  ff_dct2_32x4_butterfly_o_row_coeff_hor[2048] = { // TODO: change this to 32-bit combined coeff table at some point, these huge tables are getting out of hand
  90, -90,  90, -90,  90, -90,  90, -90,  90, -90,  90, -90,  90, -90,  90, -90,  // 0
  88, -88,  85, -85,  88, -88,  85, -85,  88, -88,  85, -85,  88, -88,  85, -85,
  82, -82,  78, -78,  82, -82,  78, -78,  82, -82,  78, -78,  82, -82,  78, -78,
@@ -3966,7 +3966,7 @@ ALIGNED(32) const int16_t  ff_dct2_32x4_butterfly_o_row_coeff_hor[2048] = { // T
 };
 
 
-ALIGNED(32) const int16_t  ff_dct2_32x4_coeff_ver[128] = {
+ALIGNED(32) static const int16_t  ff_dct2_32x4_coeff_ver[128] = {
  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,
  83,  36,  83,  36,  83,  36,  83,  36,  83,  36,  83,  36,  83,  36,  83,  36,
  64, -64,  64, -64,  64, -64,  64, -64,  64, -64,  64, -64,  64, -64,  64, -64,
@@ -3977,7 +3977,7 @@ ALIGNED(32) const int16_t  ff_dct2_32x4_coeff_ver[128] = {
  83, -36,  83, -36,  83, -36,  83, -36,  83, -36,  83, -36,  83, -36,  83, -36,
 };
 
-ALIGNED(32) const int16_t  ff_dst7_32x4_coeff_ver[128] = {
+ALIGNED(32) static const int16_t  ff_dst7_32x4_coeff_ver[128] = {
  29,  55,  29,  55,  29,  55,  29,  55,  29,  55,  29,  55,  29,  55,  29,  55,
  74,  74,  74,  74,  74,  74,  74,  74,  74,  74,  74,  74,  74,  74,  74,  74,
  84, -29,  84, -29,  84, -29,  84, -29,  84, -29,  84, -29,  84, -29,  84, -29,
@@ -3988,7 +3988,7 @@ ALIGNED(32) const int16_t  ff_dst7_32x4_coeff_ver[128] = {
  74, -29,  74, -29,  74, -29,  74, -29,  74, -29,  74, -29,  74, -29,  74, -29,
 };
 
-ALIGNED(32) const int16_t  ff_dct8_32x4_coeff_ver[128] = {
+ALIGNED(32) static const int16_t  ff_dct8_32x4_coeff_ver[128] = {
  84,  74,  84,  74,  84,  74,  84,  74,  84,  74,  84,  74,  84,  74,  84,  74,
  74,   0,  74,   0,  74,   0,  74,   0,  74,   0,  74,   0,  74,   0,  74,   0,
  55, -74,  55, -74,  55, -74,  55, -74,  55, -74,  55, -74,  55, -74,  55, -74,
@@ -4000,7 +4000,7 @@ ALIGNED(32) const int16_t  ff_dct8_32x4_coeff_ver[128] = {
 };
 
 
-ALIGNED(32) const int16_t  fi_dct2_32x4_coeff_ver[128] = {
+ALIGNED(32) static const int16_t  fi_dct2_32x4_coeff_ver[128] = {
  64,  83,  64,  83,  64,  83,  64,  83,  64,  83,  64,  83,  64,  83,  64,  83,
  64,  36,  64,  36,  64,  36,  64,  36,  64,  36,  64,  36,  64,  36,  64,  36,
  64,  36,  64,  36,  64,  36,  64,  36,  64,  36,  64,  36,  64,  36,  64,  36,
@@ -4011,7 +4011,7 @@ ALIGNED(32) const int16_t  fi_dct2_32x4_coeff_ver[128] = {
  64, -36,  64, -36,  64, -36,  64, -36,  64, -36,  64, -36,  64, -36,  64, -36,
 };
 
-ALIGNED(32) const int16_t  fi_dst7_32x4_coeff_ver[128] = {
+ALIGNED(32) static const int16_t  fi_dst7_32x4_coeff_ver[128] = {
  29,  74,  29,  74,  29,  74,  29,  74,  29,  74,  29,  74,  29,  74,  29,  74,
  84,  55,  84,  55,  84,  55,  84,  55,  84,  55,  84,  55,  84,  55,  84,  55,
  55,  74,  55,  74,  55,  74,  55,  74,  55,  74,  55,  74,  55,  74,  55,  74,
@@ -4022,7 +4022,7 @@ ALIGNED(32) const int16_t  fi_dst7_32x4_coeff_ver[128] = {
  55, -29,  55, -29,  55, -29,  55, -29,  55, -29,  55, -29,  55, -29,  55, -29,
 };
 
-ALIGNED(32) const int16_t  fi_dct8_32x4_coeff_ver[128] = {
+ALIGNED(32) static const int16_t  fi_dct8_32x4_coeff_ver[128] = {
  84,  74,  84,  74,  84,  74,  84,  74,  84,  74,  84,  74,  84,  74,  84,  74,
  55,  29,  55,  29,  55,  29,  55,  29,  55,  29,  55,  29,  55,  29,  55,  29,
  74,   0,  74,   0,  74,   0,  74,   0,  74,   0,  74,   0,  74,   0,  74,   0,
@@ -4034,7 +4034,7 @@ ALIGNED(32) const int16_t  fi_dct8_32x4_coeff_ver[128] = {
 };
 
 
-ALIGNED(32) const int16_t  ff_dct2_32x8_coeff_ver[512] = {
+ALIGNED(32) static const int16_t  ff_dct2_32x8_coeff_ver[512] = {
  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  64,  // 0
  89,  75,  89,  75,  89,  75,  89,  75,  89,  75,  89,  75,  89,  75,  89,  75,
  83,  36,  83,  36,  83,  36,  83,  36,  83,  36,  83,  36,  83,  36,  83,  36,
@@ -4069,7 +4069,7 @@ ALIGNED(32) const int16_t  ff_dct2_32x8_coeff_ver[512] = {
  50, -18,  50, -18,  50, -18,  50, -18,  50, -18,  50, -18,  50, -18,  50, -18,
 };
 
-ALIGNED(32) const int16_t  ff_dst7_32x8_coeff_ver[512] = {
+ALIGNED(32) static const int16_t  ff_dst7_32x8_coeff_ver[512] = {
  17,  32,  17,  32,  17,  32,  17,  32,  17,  32,  17,  32,  17,  32,  17,  32,  // 0
  46,  78,  46,  78,  46,  78,  46,  78,  46,  78,  46,  78,  46,  78,  46,  78,
  71,  85,  71,  85,  71,  85,  71,  85,  71,  85,  71,  85,  71,  85,  71,  85,
@@ -4104,7 +4104,7 @@ ALIGNED(32) const int16_t  ff_dst7_32x8_coeff_ver[512] = {
  46, -17,  46, -17,  46, -17,  46, -17,  46, -17,  46, -17,  46, -17,  46, -17,
 };
 
-ALIGNED(32) const int16_t  ff_dct8_32x8_coeff_ver[512] = {
+ALIGNED(32) static const int16_t  ff_dct8_32x8_coeff_ver[512] = {
  86,  85,  86,  85,  86,  85,  86,  85,  86,  85,  86,  85,  86,  85,  86,  85,  // 0
  85,  60,  85,  60,  85,  60,  85,  60,  85,  60,  85,  60,  85,  60,  85,  60,
  78,  17,  78,  17,  78,  17,  78,  17,  78,  17,  78,  17,  78,  17,  78,  17,
@@ -4140,7 +4140,7 @@ ALIGNED(32) const int16_t  ff_dct8_32x8_coeff_ver[512] = {
 };
 
 
-ALIGNED(32) const int16_t  fi_dct2_32x8_coeff_ver[256] = {
+ALIGNED(32) static const int16_t  fi_dct2_32x8_coeff_ver[256] = {
  64,  89,  83,  75,  64,  89,  83,  75,  64,  89,  83,  75,  64,  89,  83,  75,  // 0
  64,  50,  36,  18,  64,  50,  36,  18,  64,  50,  36,  18,  64,  50,  36,  18,
  64,  75,  36, -18,  64,  75,  36, -18,  64,  75,  36, -18,  64,  75,  36, -18,
@@ -4159,7 +4159,7 @@ ALIGNED(32) const int16_t  fi_dct2_32x8_coeff_ver[256] = {
  64, -50,  36, -18,  64, -50,  36, -18,  64, -50,  36, -18,  64, -50,  36, -18,
 };
 
-ALIGNED(32) const int16_t  fi_dst7_32x8_coeff_ver[256] = {
+ALIGNED(32) static const int16_t  fi_dst7_32x8_coeff_ver[256] = {
  17,  46,  71,  85,  17,  46,  71,  85,  17,  46,  71,  85,  17,  46,  71,  85,  // 0
  86,  78,  60,  32,  86,  78,  60,  32,  86,  78,  60,  32,  86,  78,  60,  32,
  32,  78,  85,  46,  32,  78,  85,  46,  32,  78,  85,  46,  32,  78,  85,  46,
@@ -4178,7 +4178,7 @@ ALIGNED(32) const int16_t  fi_dst7_32x8_coeff_ver[256] = {
  60, -46,  32, -17,  60, -46,  32, -17,  60, -46,  32, -17,  60, -46,  32, -17,
 };
 
-ALIGNED(32) const int16_t  fi_dct8_32x8_coeff_ver[256] = {
+ALIGNED(32) static const int16_t  fi_dct8_32x8_coeff_ver[256] = {
  86,  85,  78,  71,  86,  85,  78,  71,  86,  85,  78,  71,  86,  85,  78,  71,  // 0
  60,  46,  32,  17,  60,  46,  32,  17,  60,  46,  32,  17,  60,  46,  32,  17,
  85,  60,  17, -32,  85,  60,  17, -32,  85,  60,  17, -32,  85,  60,  17, -32,
@@ -4198,7 +4198,7 @@ ALIGNED(32) const int16_t  fi_dct8_32x8_coeff_ver[256] = {
 };
 
 
-ALIGNED(32) const int16_t  ff_dct2_32x16_coeff_ver[256] = {
+ALIGNED(32) static const int16_t  ff_dct2_32x16_coeff_ver[256] = {
  64,  64,  90,  87,  89,  75,  87,  57,  83,  36,  80,   9,  75, -18,  70, -43,  // 0
  64, -64,  57, -80,  50, -89,  43, -90,  36, -83,  25, -70,  18, -50,   9, -25,
  64,  64,  80,  70,  50,  18,   9, -43, -36, -83, -70, -87, -89, -50, -87,   9,
@@ -4217,7 +4217,7 @@ ALIGNED(32) const int16_t  ff_dct2_32x16_coeff_ver[256] = {
 -64,  64,  80, -57, -89,  50,  90, -43, -83,  36,  70, -25, -50,  18,  25,  -9,
 };
 
-ALIGNED(32) const int16_t  ff_dst7_32x16_coeff_ver[256] = {
+ALIGNED(32) static const int16_t  ff_dst7_32x16_coeff_ver[256] = {
   8,  17,  25,  48,  40,  73,  55,  87,  68,  88,  77,  77,  85,  55,  88,  25,  // 0
  88,  -8,  87, -40,  81, -68,  73, -85,  62, -88,  48, -81,  33, -62,  17, -33,
  25,  33,  68,  81,  88,  85,  81,  40,  48, -25,   0, -77, -48, -87, -81, -48,
@@ -4236,7 +4236,7 @@ ALIGNED(32) const int16_t  ff_dst7_32x16_coeff_ver[256] = {
 -68,  62,  81, -55, -88,  48,  88, -40, -81,  33,  68, -25, -48,  17,  25,  -8,
 };
 
-ALIGNED(32) const int16_t  ff_dct8_32x16_coeff_ver[256] = {
+ALIGNED(32) static const int16_t  ff_dct8_32x16_coeff_ver[256] = {
  88,  88,  88,  81,  87,  68,  85,  48,  81,  25,  77,   0,  73, -25,  68, -48,  // 0
  62, -68,  55, -81,  48, -88,  40, -88,  33, -81,  25, -68,  17, -48,   8, -25,
  87,  85,  68,  48,  33,  -8,  -8, -62, -48, -88, -77, -77, -88, -33, -81,  25,
@@ -4256,7 +4256,7 @@ ALIGNED(32) const int16_t  ff_dct8_32x16_coeff_ver[256] = {
 };
 
 
-ALIGNED(32) const int16_t  fi_dct2_32x16_coeff_ver[256] = {
+ALIGNED(32) static const int16_t  fi_dct2_32x16_coeff_ver[256] = {
  64,  90,  64,  87,  64,  80,  64,  70,  64,  57,  64,  43,  64,  25,  64,   9,  // 0
  64,  -9,  64, -25,  64, -43,  64, -57,  64, -70,  64, -80,  64, -87,  64, -90,
  89,  87,  75,  57,  50,   9,  18, -43, -18, -80, -50, -90, -75, -70, -89, -25,
@@ -4275,7 +4275,7 @@ ALIGNED(32) const int16_t  fi_dct2_32x16_coeff_ver[256] = {
 -18,  90,  50, -87, -75,  80,  89, -70, -89,  57,  75, -43, -50,  25,  18,  -9,
 };
 
-ALIGNED(32) const int16_t  fi_dst7_32x16_coeff_ver[256] = {
+ALIGNED(32) static const int16_t  fi_dst7_32x16_coeff_ver[256] = {
   8,  25,  17,  48,  25,  68,  33,  81,  40,  88,  48,  88,  55,  81,  62,  68,  // 0
  68,  48,  73,  25,  77,   0,  81, -25,  85, -48,  87, -68,  88, -81,  88, -88,
  40,  55,  73,  87,  88,  81,  85,  40,  62, -17,  25, -68, -17, -88, -55, -73,
@@ -4294,7 +4294,7 @@ ALIGNED(32) const int16_t  fi_dst7_32x16_coeff_ver[256] = {
 -25,  88,  55, -85, -77,  77,  88, -68, -87,  55,  73, -40, -48,  25,  17,  -8,
 };
 
-ALIGNED(32) const int16_t  fi_dct8_32x16_coeff_ver[256] = {
+ALIGNED(32) static const int16_t  fi_dct8_32x16_coeff_ver[256] = {
  88,  88,  88,  81,  87,  68,  85,  48,  81,  25,  77,   0,  73, -25,  68, -48,  // 0
  62, -68,  55, -81,  48, -88,  40, -88,  33, -81,  25, -68,  17, -48,   8, -25,
  87,  85,  68,  48,  33,  -8,  -8, -62, -48, -88, -77, -77, -88, -33, -81,  25,
@@ -4314,7 +4314,7 @@ ALIGNED(32) const int16_t  fi_dct8_32x16_coeff_ver[256] = {
 };
 
 
-ALIGNED(32) const int16_t  ff_dct2_32x32_coeff_ver[1024] = {
+ALIGNED(32) static const int16_t  ff_dct2_32x32_coeff_ver[1024] = {
  64,  64,  90,  90,  90,  87,  90,  82,  89,  75,  88,  67,  87,  57,  85,  46,  // 0
  83,  36,  82,  22,  80,   9,  78,  -4,  75, -18,  73, -31,  70, -43,  67, -54,
  64, -64,  61, -73,  57, -80,  54, -85,  50, -89,  46, -90,  43, -90,  38, -88,
@@ -4381,7 +4381,7 @@ ALIGNED(32) const int16_t  ff_dct2_32x32_coeff_ver[1024] = {
 -83,  36,  78, -31, -70,  25,  61, -22, -50,  18,  38, -13, -25,   9,  13,  -4,
 };
 
-ALIGNED(32) const int16_t  ff_dst7_32x32_coeff_ver[1024] = {
+ALIGNED(32) static const int16_t  ff_dst7_32x32_coeff_ver[1024] = {
   4,   9,  13,  26,  21,  42,  30,  56,  38,  68,  46,  78,  53,  85,  60,  89,  // 0
  66,  90,  72,  86,  77,  80,  80,  72,  84,  60,  86,  46,  88,  30,  90,  13,
  90,  -4,  89, -21,  87, -38,  85, -53,  82, -66,  78, -77,  74, -84,  68, -88,
@@ -4448,7 +4448,7 @@ ALIGNED(32) const int16_t  ff_dst7_32x32_coeff_ver[1024] = {
 -82,  34,  77, -30, -68,  26,  60, -21, -50,  17,  38, -13, -26,   9,  13,  -4,
 };
 
-ALIGNED(32) const int16_t  ff_dct8_32x32_coeff_ver[1024] = {
+ALIGNED(32) static const int16_t  ff_dct8_32x32_coeff_ver[1024] = {
  90,  90,  90,  87,  89,  84,  88,  78,  87,  72,  86,  63,  85,  53,  84,  42,  // 0
  82,  30,  80,  17,  78,   4,  77,  -9,  74, -21,  72, -34,  68, -46,  66, -56,
  63, -66,  60, -74,  56, -80,  53, -85,  50, -88,  46, -90,  42, -89,  38, -86,
@@ -4514,13 +4514,6 @@ ALIGNED(32) const int16_t  ff_dct8_32x32_coeff_ver[1024] = {
  -4,  90,  21, -89, -38,  87,  53, -85, -66,  82,  77, -78, -84,  74,  88, -68,
 -90,  63,  87, -56, -82,  50,  74, -42, -63,  34,  50, -26, -34,  17,  17,  -9,
 };
-
-
-typedef int32_t TCoeff;
-typedef int16_t TMatrixCoeff;
-
-//! \ingroup CommonLib
-//! \{
 
 
   // DCT-2

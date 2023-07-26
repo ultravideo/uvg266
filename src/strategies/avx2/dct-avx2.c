@@ -82,7 +82,7 @@ static INLINE __m256i truncate_avx2(__m256i v, __m256i debias, int32_t shift)
 // TODO: find avx2 solution for transpose
 // TODO: attempt to make a generic transpose for avx2. Needs some extra logic for different widths and heights.
 // TODO: make a few solutions for exact sizes and see if some pattern emerges...
-void transpose_matrix(const int16_t* src, int16_t* dst, const int width, const int height) {
+static void transpose_matrix(const int16_t* src, int16_t* dst, const int width, const int height) {
   const int sample_num = width * height;
   const int vectors = sample_num / 16;
 
@@ -150,7 +150,7 @@ void transpose_matrix(const int16_t* src, int16_t* dst, const int width, const i
   }
 }
 
-void transpose_generic(const int16_t* src, int16_t* dst, const int width, const int height)
+static void transpose_generic(const int16_t* src, int16_t* dst, const int width, const int height)
 {
   for (int y = 0; y < height; ++y) {
     for (int x = 0; x < width; ++x) {
@@ -644,7 +644,7 @@ static transpose_func* transpose_func_table[6][6] = {
 
 
 // Dispatcher function for avx2 transposes. This calls the proper subfunction
-void transpose_avx2(const __m256i* src, __m256i* dst, const int width, const int height)
+static void transpose_avx2(const __m256i* src, __m256i* dst, const int width, const int height)
 {
   // No need to transpose something of width or height 1
   const int w_log2_minus1 = uvg_g_convert_to_log2[width] - 1;
@@ -2043,7 +2043,7 @@ static void fast_forward_tr_2xN_avx2_hor(const int16_t* src, __m256i* dst, const
   }
 }
 
-void fast_forward_tr_2x8_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
+static void fast_forward_tr_2x8_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
 {
   const int width = 2;
   const int height = 8;
@@ -2162,7 +2162,7 @@ static void fast_inverse_tr_2x8_avx2_hor(const __m256i* src, int16_t* dst, const
   _mm256_store_si256((__m256i*)dst, v_result);
 }
 
-void fast_inverse_tr_2x8_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
+static void fast_inverse_tr_2x8_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
 {
   const int width = 2;
   const int height = 8;
@@ -2187,7 +2187,7 @@ void fast_inverse_tr_2x8_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, t
 }
 
 
-void fast_forward_tr_2x16_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
+static void fast_forward_tr_2x16_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
 {
   const int width = 2;
   const int height = 16;
@@ -2350,7 +2350,7 @@ static void fast_inverse_tr_2x16_avx2_hor(const __m256i* src, int16_t* dst, cons
   _mm256_store_si256((__m256i*) & dst[16], v_result_1);
 }
 
-void fast_inverse_tr_2x16_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
+static void fast_inverse_tr_2x16_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
 {
   const int width = 2;
   const int height = 16;
@@ -2375,7 +2375,7 @@ void fast_inverse_tr_2x16_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, 
 }
 
 
-void fast_forward_tr_2x32_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
+static void fast_forward_tr_2x32_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
 {
   const int width = 2;
   const int height = 32;
@@ -2551,7 +2551,7 @@ static void fast_inverse_tr_2x32_avx2_hor(const __m256i* src, int16_t* dst, cons
   }
 }
 
-void fast_inverse_tr_2x32_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
+static void fast_inverse_tr_2x32_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
 {
   const int width = 2;
   const int height = 32;
@@ -2574,7 +2574,7 @@ void fast_inverse_tr_2x32_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, 
 }
 
 
-void fast_forward_tr_4xN_avx2_hor(const int16_t* src, __m256i* dst, const int16_t* coeff, int32_t shift, int line, int skip_line, int skip_line2)
+static void fast_forward_tr_4xN_avx2_hor(const int16_t* src, __m256i* dst, const int16_t* coeff, int32_t shift, int line, int skip_line, int skip_line2)
 {
   const int32_t    add = (shift > 0) ? (1 << (shift - 1)) : 0; // ISP_TODO: optimize (shift > 0) check out if shift is always gt 0
   const __m256i debias = _mm256_set1_epi32(add);
@@ -2620,7 +2620,7 @@ void fast_forward_tr_4xN_avx2_hor(const int16_t* src, __m256i* dst, const int16_
   }
 }
 
-void fast_forward_tr_4x4_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
+static void fast_forward_tr_4x4_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
 {
   const int width = 4;
   const int height = 4;
@@ -2733,7 +2733,7 @@ static void fast_inverse_tr_4x4_avx2_ver(const __m256i* src, int16_t* dst, const
   _mm256_store_si256((__m256i*)dst, v_result);
 }
 
-void fast_inverse_tr_4x4_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
+static void fast_inverse_tr_4x4_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
 {
   const int width = 4;
   const int height = 4;
@@ -2764,7 +2764,7 @@ void fast_inverse_tr_4x4_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, t
 }
 
 
-void fast_forward_tr_4x8_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
+static void fast_forward_tr_4x8_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
 {
   const int width = 4;
   const int height = 8;
@@ -2941,7 +2941,7 @@ static void fast_inverse_tr_4x8_avx2_hor(const __m256i* src, int16_t* dst, const
   _mm256_store_si256((__m256i*) & dst[16], v_result_1);
 }
 
-void fast_inverse_tr_4x8_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
+static void fast_inverse_tr_4x8_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
 {
   const int width = 4;
   const int height = 8;
@@ -2972,7 +2972,7 @@ void fast_inverse_tr_4x8_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, t
 }
 
 
-void fast_forward_tr_4x16_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
+static void fast_forward_tr_4x16_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
 {
   const int width = 4;
   const int height = 16;
@@ -3169,7 +3169,7 @@ static void fast_inverse_tr_4x16_avx2_hor(const __m256i* src, int16_t* dst, cons
   }
 }
 
-void fast_inverse_tr_4x16_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
+static void fast_inverse_tr_4x16_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
 {
   const int width = 4;
   const int height = 16;
@@ -3200,7 +3200,7 @@ void fast_inverse_tr_4x16_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, 
 }
 
 
-void fast_forward_tr_4x32_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
+static void fast_forward_tr_4x32_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
 {
   const int width = 4;
   const int height = 32;
@@ -3404,7 +3404,7 @@ static void fast_inverse_tr_4x32_avx2_hor(const __m256i* src, int16_t* dst, cons
   }
 }
 
-void fast_inverse_tr_4x32_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
+static void fast_inverse_tr_4x32_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
 {
   const int width = 4;
   const int height = 32;
@@ -3495,7 +3495,7 @@ static void fast_forward_tr_8xN_avx2_hor(const int16_t* src, __m256i* dst, const
   }
 }
 
-void fast_forward_tr_8x2_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
+static void fast_forward_tr_8x2_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
 {
   const int width = 8;
   const int height = 2;
@@ -3613,7 +3613,7 @@ static void fast_inverse_tr_8x2_avx2_hor(const __m256i* src, int16_t* dst, const
   _mm256_store_si256((__m256i*)dst, v_result);
 }
 
-void fast_inverse_tr_8x2_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
+static void fast_inverse_tr_8x2_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
 {
   const int width = 8;
   const int height = 2;
@@ -3637,7 +3637,7 @@ void fast_inverse_tr_8x2_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, t
   fast_inverse_tr_8x2_avx2_hor(&v_ver_pass_out, dst, hor_coeff, shift_2nd, height, 0, skip_width);
 }
 
-void fast_forward_tr_8x4_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
+static void fast_forward_tr_8x4_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
 {
   const int width = 8;
   const int height = 4;
@@ -3804,7 +3804,7 @@ static void fast_inverse_tr_8x4_avx2_hor(const __m256i* src, int16_t* dst, const
   _mm256_store_si256((__m256i*) & dst[16], v_result[1]);
 }
 
-void fast_inverse_tr_8x4_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
+static void fast_inverse_tr_8x4_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
 {
   const int width = 8;
   const int height = 4;
@@ -3835,7 +3835,7 @@ void fast_inverse_tr_8x4_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, t
 }
 
 
-void fast_forward_tr_8x8_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
+static void fast_forward_tr_8x8_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
 {
   const int width = 8;
   const int height = 8;
@@ -4052,7 +4052,7 @@ static void fast_inverse_tr_8x8_avx2_ver(const __m256i* src, int16_t* dst, const
   }
 }
 
-void fast_inverse_tr_8x8_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
+static void fast_inverse_tr_8x8_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
 {
   const int width = 8;
   const int height = 8;
@@ -4083,7 +4083,7 @@ void fast_inverse_tr_8x8_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, t
 }
 
 
-void fast_forward_tr_8x16_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
+static void fast_forward_tr_8x16_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
 {
   const int width = 8;
   const int height = 16;
@@ -4331,7 +4331,7 @@ static void fast_inverse_tr_8x16_avx2_hor(const __m256i* src, int16_t* dst, cons
   }
 }
 
-void fast_inverse_tr_8x16_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
+static void fast_inverse_tr_8x16_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
 {
   const int width = 8;
   const int height = 16;
@@ -4362,7 +4362,7 @@ void fast_inverse_tr_8x16_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, 
 }
 
 
-void fast_forward_tr_8x32_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
+static void fast_forward_tr_8x32_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
 {
   const int width = 8;
   const int height = 32;
@@ -4576,7 +4576,7 @@ static void fast_inverse_tr_8x32_avx2_hor(const __m256i* src, int16_t* dst, cons
   // TODO: mts cutoff
 }
 
-void fast_inverse_tr_8x32_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
+static void fast_inverse_tr_8x32_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
 {
   const int width = 8;
   const int height = 32;
@@ -4689,7 +4689,7 @@ static void fast_forward_DCT2_B16_avx2_hor(const int16_t* src, __m256i* dst, con
   }
 }
 
-void fast_forward_tr_16x2_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
+static void fast_forward_tr_16x2_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
 {
   const int width = 16;
   const int height = 2;
@@ -4806,7 +4806,7 @@ static void fast_inverse_tr_16x2_avx2_hor(const __m256i* src, int16_t* dst, cons
   _mm256_store_si256((__m256i*) & dst[16], v_result_1);
 }
 
-void fast_inverse_tr_16x2_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
+static void fast_inverse_tr_16x2_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
 {
   const int width = 16;
   const int height = 2;
@@ -4831,7 +4831,7 @@ void fast_inverse_tr_16x2_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, 
 }
 
 
-void fast_forward_tr_16x4_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
+static void fast_forward_tr_16x4_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
 {
   const int width = 16;
   const int height = 4;
@@ -5039,7 +5039,7 @@ static void fast_inverse_tr_16x4_avx2_hor(const __m256i* src, int16_t* dst, cons
   }
 }
 
-void fast_inverse_tr_16x4_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
+static void fast_inverse_tr_16x4_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
 {
   const int width = 16;
   const int height = 4;
@@ -5070,7 +5070,7 @@ void fast_inverse_tr_16x4_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, 
 }
 
 
-void fast_forward_tr_16x8_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
+static void fast_forward_tr_16x8_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
 {
   const int width = 16;
   const int height = 8;
@@ -5293,7 +5293,7 @@ static void fast_inverse_tr_16x8_avx2_hor(const __m256i* src, int16_t* dst, cons
   }
 }
 
-void fast_inverse_tr_16x8_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
+static void fast_inverse_tr_16x8_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
 {
   const int width = 16;
   const int height = 8;
@@ -5324,7 +5324,7 @@ void fast_inverse_tr_16x8_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, 
 }
 
 
-void fast_forward_tr_16x16_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
+static void fast_forward_tr_16x16_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
 {
   const int width = 16;
   const int height = 16;
@@ -5629,7 +5629,7 @@ static void fast_inverse_tr_16x16_avx2_ver(const __m256i* src, int16_t* dst, con
   //transpose_avx2(v_result, (__m256i*)dst, 16, 16);
 }
 
-void fast_inverse_tr_16x16_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
+static void fast_inverse_tr_16x16_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
 {
   const int width = 16;
   const int height = 16;
@@ -5660,7 +5660,7 @@ void fast_inverse_tr_16x16_avx2(const int16_t* src, int16_t* dst, tr_type_t hor,
 }
 
 
-void fast_forward_tr_16x32_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
+static void fast_forward_tr_16x32_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
 {
   const int width = 16;
   const int height = 32;
@@ -5938,7 +5938,7 @@ static void fast_inverse_tr_16x32_avx2_hor(const __m256i* src, int16_t* dst, con
   }
 }
 
-void fast_inverse_tr_16x32_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
+static void fast_inverse_tr_16x32_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
 {
   const int width = 16;
   const int height = 32;
@@ -6285,7 +6285,7 @@ static void fast_forward_DCT2_32x8_avx2_ver(const __m256i* src, int16_t* dst, in
 }
 
 
-void fast_forward_tr_32x2_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
+static void fast_forward_tr_32x2_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
 {
   const int width = 32;
   const int height = 2;
@@ -6450,7 +6450,7 @@ static void fast_inverse_tr_32x2_avx2_hor(const __m256i* src, int16_t* dst, cons
   // TODO: cutoff for DCT8 and DST7
 }
 
-void fast_inverse_tr_32x2_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
+static void fast_inverse_tr_32x2_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
 {
   const int width = 32;
   const int height = 2;
@@ -6472,7 +6472,7 @@ void fast_inverse_tr_32x2_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, 
 }
 
 
-void fast_forward_tr_32x4_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
+static void fast_forward_tr_32x4_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
 {
   const int width = 32;
   const int height = 4;
@@ -6879,7 +6879,7 @@ static void fast_inverse_tr_32x4_avx2_mts_hor(const __m256i* src, int16_t* dst, 
   // TODO: cutoff for dct8 and dst7
 }
 
-void fast_inverse_tr_32x4_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
+static void fast_inverse_tr_32x4_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
 {
   const int width = 32;
   const int height = 4;
@@ -6920,7 +6920,7 @@ void fast_inverse_tr_32x4_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, 
 }
 
 
-void fast_forward_tr_32x8_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
+static void fast_forward_tr_32x8_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
 {
   const int width = 32;
   const int height = 8;
@@ -7206,7 +7206,7 @@ static void fast_inverse_tr_32x8_avx2_hor(const __m256i* src, int16_t* dst, cons
   // TODO: cutoff for dct8 and dst7
 }
 
-void fast_inverse_tr_32x8_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
+static void fast_inverse_tr_32x8_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
 {
   const int width = 32;
   const int height = 8;
@@ -7242,7 +7242,7 @@ void fast_inverse_tr_32x8_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, 
 }
 
 
-void fast_forward_tr_32x16_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
+static void fast_forward_tr_32x16_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
 {
   const int width = 32;
   const int height = 16;
@@ -7615,7 +7615,7 @@ static void fast_inverse_tr_32x16_avx2_hor(const __m256i* src, int16_t* dst, con
   // TODO: MTS cutoff
 }
 
-void fast_inverse_tr_32x16_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
+static void fast_inverse_tr_32x16_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
 {
   const int width = 32;
   const int height = 16;
@@ -7646,7 +7646,7 @@ void fast_inverse_tr_32x16_avx2(const int16_t* src, int16_t* dst, tr_type_t hor,
 }
 
 
-void fast_forward_tr_32x32_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
+static void fast_forward_tr_32x32_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
 {
   const int width = 32;
   const int height = 32;
@@ -8012,7 +8012,7 @@ static void fast_inverse_tr_32x32_avx2_hor(const __m256i* src, int16_t* dst, con
   }
 }
 
-void fast_inverse_tr_32x32_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
+static void fast_inverse_tr_32x32_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
 {
   const int width = 32;
   const int height = 32;
