@@ -2752,9 +2752,9 @@ void fast_inverse_tr_4x4_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, t
   }
 
   __m256i v_hor_pass_out;
-  fast_inverse_tr_4x4_avx2_hor(src, &v_hor_pass_out, hor_coeff, shift_1st, height, 0, skip_width);
+  fast_inverse_tr_4x4_avx2_hor(src, &v_hor_pass_out, ver_coeff, shift_1st, height, 0, skip_width);
 
-  fast_inverse_tr_4x4_avx2_ver(&v_hor_pass_out, dst, ver_coeff, shift_2nd, width, skip_width, skip_height);
+  fast_inverse_tr_4x4_avx2_ver(&v_hor_pass_out, dst, hor_coeff, shift_2nd, width, skip_width, skip_height);
 }
 
 
@@ -3568,39 +3568,46 @@ static void fast_inverse_tr_8x2_avx2_ver(const int16_t* src, __m256i* dst, const
 
 static void fast_inverse_tr_8x2_avx2_hor(const __m256i* src, int16_t* dst, const int16_t* coeff, int32_t shift, int line, int skip_line, int skip_line2)
 {
-  const int32_t    add = (shift > 0) ? (1 << (shift - 1)) : 0; // ISP_TODO: optimize (shift > 0) check out if shift is always gt 0
+  const int32_t    add = (shift > 0) ? (1 << (shift - 1)) : 0;
   const __m256i debias = _mm256_set1_epi32(add);
 
   const __m256i* v_coeff = (const __m256i*)coeff;
   const __m256i v_shuffle1 = _mm256_load_si256((const __m256i*)fi_tr_2x8_result_shuffle1_ver);
   const __m256i v_shuffle2 = _mm256_load_si256((const __m256i*)fi_tr_2x8_result_shuffle2_ver);
 
-  __m256i v_madd_0 = _mm256_madd_epi16(src[0], v_coeff[0]);
-  __m256i v_madd_1 = _mm256_madd_epi16(src[0], v_coeff[1]);
-  __m256i v_madd_2 = _mm256_madd_epi16(src[0], v_coeff[2]);
-  __m256i v_madd_3 = _mm256_madd_epi16(src[0], v_coeff[3]);
-  __m256i v_madd_4 = _mm256_madd_epi16(src[0], v_coeff[4]);
-  __m256i v_madd_5 = _mm256_madd_epi16(src[0], v_coeff[5]);
-  __m256i v_madd_6 = _mm256_madd_epi16(src[0], v_coeff[6]);
-  __m256i v_madd_7 = _mm256_madd_epi16(src[0], v_coeff[7]);
+  // Duplicate sources to enable vertical addition
+  __m256i v_src_0 = _mm256_permute4x64_epi64(*src, _MM_SHUFFLE(1, 1, 0, 0));
+  __m256i v_src_1 = _mm256_permute4x64_epi64(*src, _MM_SHUFFLE(3, 3, 2, 2));
 
-  __m256i v_add_0 = _mm256_add_epi32(v_madd_0, v_madd_1);
-  __m256i v_add_1 = _mm256_add_epi32(v_madd_2, v_madd_3);
-  __m256i v_add_2 = _mm256_add_epi32(v_madd_4, v_madd_5);
-  __m256i v_add_3 = _mm256_add_epi32(v_madd_6, v_madd_7);
+  __m256i v_madd_00 = _mm256_madd_epi16(v_src_0, v_coeff[0]);
+  __m256i v_madd_01 = _mm256_madd_epi16(v_src_1, v_coeff[1]);
+  
+  __m256i v_madd_10 = _mm256_madd_epi16(v_src_0, v_coeff[2]);
+  __m256i v_madd_11 = _mm256_madd_epi16(v_src_1, v_coeff[3]);
+
+  __m256i v_madd_20 = _mm256_madd_epi16(v_src_0, v_coeff[4]);
+  __m256i v_madd_21 = _mm256_madd_epi16(v_src_1, v_coeff[5]);
+  
+  __m256i v_madd_30 = _mm256_madd_epi16(v_src_0, v_coeff[6]);
+  __m256i v_madd_31 = _mm256_madd_epi16(v_src_1, v_coeff[7]);
+
+  __m256i v_add_0 = _mm256_add_epi32(v_madd_00, v_madd_01);
+  __m256i v_add_1 = _mm256_add_epi32(v_madd_10, v_madd_11);
+  __m256i v_add_2 = _mm256_add_epi32(v_madd_20, v_madd_21);
+  __m256i v_add_3 = _mm256_add_epi32(v_madd_30, v_madd_31);
 
   __m256i v_trunc_0 = truncate_avx2(_mm256_hadd_epi32(v_add_0, v_add_1), debias, shift);
   __m256i v_trunc_1 = truncate_avx2(_mm256_hadd_epi32(v_add_2, v_add_3), debias, shift);
 
   __m256i v_result = _mm256_packs_epi32(v_trunc_0, v_trunc_1);
-  v_result = _mm256_shuffle_epi8(v_result, v_shuffle1);
-  v_result = _mm256_permute4x64_epi64(v_result, _MM_SHUFFLE(3, 1, 2, 0));
-  v_result = _mm256_shuffle_epi8(v_result, v_shuffle2);
+  //v_result = _mm256_shuffle_epi8(v_result, v_shuffle1);
+  //v_result = _mm256_permute4x64_epi64(v_result, _MM_SHUFFLE(3, 1, 2, 0));
+  //v_result = _mm256_shuffle_epi8(v_result, v_shuffle2);
 
   _mm256_store_si256((__m256i*)dst, v_result);
 }
 
-void fast_inverse_tr_8x2_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
+void fast_inverse_tr_8x2_avx2(const int16_t* src, int16_t* dst, const int mts_type)
 {
   const int width = 8;
   const int height = 2;
@@ -3617,10 +3624,9 @@ void fast_inverse_tr_8x2_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, t
 
   __m256i v_ver_pass_out;
   fast_inverse_tr_8x2_avx2_ver(src, &v_ver_pass_out, ver_coeff, shift_1st, width, skip_width, skip_height);
-  
+
   fast_inverse_tr_8x2_avx2_hor(&v_ver_pass_out, dst, hor_coeff, shift_2nd, height, 0, skip_width);
 }
-
 
 void fast_forward_tr_8x4_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, tr_type_t ver)
 {
@@ -4062,9 +4068,9 @@ void fast_inverse_tr_8x8_avx2(const int16_t* src, int16_t* dst, tr_type_t hor, t
   }
 
   __m256i v_hor_pass_out[4];
-  fast_inverse_tr_8x8_avx2_hor(src, v_hor_pass_out, hor_coeff, shift_1st, height, 0, skip_width);
+  fast_inverse_tr_8x8_avx2_hor(src, v_hor_pass_out, ver_coeff, shift_1st, height, 0, skip_width);
 
-  fast_inverse_tr_8x8_avx2_ver(v_hor_pass_out, dst, ver_coeff, shift_2nd, width, skip_width, skip_height);
+  fast_inverse_tr_8x8_avx2_ver(v_hor_pass_out, dst, hor_coeff, shift_2nd, width, skip_width, skip_height);
 }
 
 
@@ -5636,9 +5642,9 @@ void fast_inverse_tr_16x16_avx2(const int16_t* src, int16_t* dst, tr_type_t hor,
   }
 
   __m256i v_hor_pass_out[16];
-  fast_inverse_tr_16x16_avx2_hor(src, v_hor_pass_out, hor_coeff, shift_1st, height, 0, skip_width);
+  fast_inverse_tr_16x16_avx2_hor(src, v_hor_pass_out, ver_coeff, shift_1st, height, 0, skip_width);
 
-  fast_inverse_tr_16x16_avx2_ver(v_hor_pass_out, dst, ver_coeff, shift_2nd, width, skip_width, skip_height);
+  fast_inverse_tr_16x16_avx2_ver(v_hor_pass_out, dst, hor_coeff, shift_2nd, width, skip_width, skip_height);
 }
 
 
@@ -8152,7 +8158,7 @@ int uvg_strategy_register_dct_avx2(void* opaque, uint8_t bitdepth)
     success &= uvg_strategyselector_register(opaque, "idct_32x32", "avx2", 40, &matrix_idct_32x32_avx2);
 
     success &= uvg_strategyselector_register(opaque, "mts_dct", "avx2", 40, &mts_dct_avx2);
-    //success &= uvg_strategyselector_register(opaque, "mts_idct", "avx2", 40, &mts_idct_avx2);
+    success &= uvg_strategyselector_register(opaque, "mts_idct", "avx2", 40, &mts_idct_avx2);
 
   }
 #endif // UVG_BIT_DEPTH == 8
