@@ -5963,7 +5963,7 @@ static void fast_inverse_tr_16x32_avx2(const int16_t* src, int16_t* dst, tr_type
   }
 
   __m256i v_ver_pass_out[32];
-  fast_inverse_tr_16x32_avx2_ver(src, v_ver_pass_out, ver_coeff, shift_1st, width, skip_width, skip_height);
+  fast_inverse_tr_16x32_avx2_ver(src, v_ver_pass_out, ver_coeff, shift_1st, width, skip_width, 0);
   int16_t* ver_pass_out = (int16_t*)v_ver_pass_out;
   fast_inverse_tr_16x32_avx2_hor(v_ver_pass_out, dst, hor_coeff, shift_2nd, height, 0, skip_width);
 }
