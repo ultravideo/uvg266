@@ -778,7 +778,11 @@ static void encoder_state_worker_encode_lcu_search(void * opaque)
         }
         
         if (!same_data || (xx % UVG_HASHMAP_BLOCKSIZE == 0 && yy % UVG_HASHMAP_BLOCKSIZE == 0)) {
-          uint32_t crc = uvg_crc32c_8x8(&frame->source->y[cur_y * frame->source->stride + cur_x],frame->source->stride);       
+          uint32_t crc = uvg_crc32c_8x8(&frame->source->y[cur_y * frame->source->stride + cur_x],frame->source->stride);
+          if (state->encoder_control->chroma_format != UVG_CSP_400) {
+            crc += uvg_crc32c_4x4(&frame->source->u[(cur_y>>1) * (frame->source->stride>>1) + (cur_x>>1)],frame->source->stride>>1);
+            crc += uvg_crc32c_4x4(&frame->source->v[(cur_y>>1) * (frame->source->stride>>1) + (cur_x>>1)],frame->source->stride>>1);
+          }
           if (xx % UVG_HASHMAP_BLOCKSIZE == 0 && yy % UVG_HASHMAP_BLOCKSIZE == 0) {
             state->tile->frame->ibc_hashmap_pos_to_hash[(cur_y / UVG_HASHMAP_BLOCKSIZE)*state->tile->frame->ibc_hashmap_pos_to_hash_stride + cur_x / UVG_HASHMAP_BLOCKSIZE] = crc;
           }
