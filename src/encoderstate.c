@@ -761,8 +761,8 @@ static void encoder_state_worker_encode_lcu_search(void * opaque)
     const uint32_t ibc_block_height = MIN(LCU_WIDTH, (state->tile->frame->height-lcu->position_px.y));
     int items = 0;
     // Hash the current LCU to the IBC hashmap
-    for (int32_t xx = 0; xx < (int32_t)(ibc_block_width)-7; xx+=UVG_HASHMAP_BLOCKSIZE) {
-      for (int32_t yy = 0; yy < (int32_t)(ibc_block_height)-7; yy+=UVG_HASHMAP_BLOCKSIZE) {
+    for (int32_t xx = 0; xx < (int32_t)(ibc_block_width)-7; xx+=UVG_HASHMAP_BLOCKSIZE>>1) {
+      for (int32_t yy = 0; yy < (int32_t)(ibc_block_height)-7; yy+=UVG_HASHMAP_BLOCKSIZE>>1) {
         int cur_x = lcu->position_px.x + xx;
         int cur_y = lcu->position_px.y + yy;
         
@@ -782,12 +782,6 @@ static void encoder_state_worker_encode_lcu_search(void * opaque)
           if (xx % UVG_HASHMAP_BLOCKSIZE == 0 && yy % UVG_HASHMAP_BLOCKSIZE == 0) {
             state->tile->frame->ibc_hashmap_pos_to_hash[(cur_y / UVG_HASHMAP_BLOCKSIZE)*state->tile->frame->ibc_hashmap_pos_to_hash_stride + cur_x / UVG_HASHMAP_BLOCKSIZE] = crc;
           }
-          /*
-          if (state->encoder_control->chroma_format != UVG_CSP_400) {
-            crc ^= uvg_crc32c_4x4(&frame->rec->u[(cur_y>>1) * (frame->rec->stride>>1) + (cur_x>>1)],frame->rec->stride>>1);
-            crc ^= uvg_crc32c_4x4(&frame->rec->v[(cur_y>>1) * (frame->rec->stride>>1) + (cur_x>>1)],frame->rec->stride>>1);
-          }
-          */
           uvg_hashmap_insert(frame->ibc_hashmap_row[ctu_row], crc, ((cur_x&0xffff)<<16) | (cur_y&0xffff));
           items++;
         }

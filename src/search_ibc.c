@@ -489,7 +489,7 @@ static double calc_ibc_mvd_cost(const encoder_state_t *state,
     temp_bitcost += mvd_cost;
   }
   *bitcost = temp_bitcost;
-  return temp_bitcost * state->lambda_sqrt;
+  return temp_bitcost * state->lambda;
 }
 
 
@@ -1008,7 +1008,7 @@ static void search_pu_ibc(encoder_state_t * const state,
       info->width,
       (best_mv.x >> INTERNAL_MV_PREC),
       (best_mv.y >> INTERNAL_MV_PREC));
-    best_cost += best_bits * info->state->lambda_sqrt;
+    best_cost += best_bits * info->state->lambda;
   }
 
 
@@ -1069,7 +1069,7 @@ static void search_pu_ibc(encoder_state_t * const state,
     if(amvp[0].size > 0) {
       const uint8_t best_key = amvp[0].keys[0];
       amvp[0].bits[best_key] += total_bits;
-      amvp[0].cost[best_key] += (total_bits)* state->lambda_sqrt;
+      amvp[0].cost[best_key] += (total_bits)* state->lambda;
     }
   }
 }
@@ -1240,7 +1240,7 @@ static int uvg_search_hash_cu_ibc(encoder_state_t* const state,
    
   if (!found_block) return;
 
-  *inter_cost = 2;
+  *inter_cost    = ibc_cost;
   *inter_bitcost = ibc_bitcost;
 
   uint32_t merge_idx;
@@ -1268,7 +1268,7 @@ static int uvg_search_hash_cu_ibc(encoder_state_t* const state,
   
 
   const int ibc_flag = CTX_ENTROPY_FBITS(&state->search_cabac.ctx.ibc_flag[0], 1);
-  ibc_cost += ibc_flag * state->lambda_sqrt;
+  ibc_cost += ibc_flag * state->lambda;
   ibc_bitcost += ibc_flag;
 
   uvg_inter_recon_cu(
