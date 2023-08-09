@@ -45,16 +45,19 @@
 #include "encode_coding_tree.h"
 #include "encoder_state-bitstream.h"
 #include "filter.h"
+#include "hashmap.h"
 #include "image.h"
 #include "rate_control.h"
 #include "sao.h"
 #include "search.h"
 #include "tables.h"
+#include "threads.h"
 #include "threadqueue.h"
 #include "alf.h"
 #include "reshape.h"
 
 #include "strategies/strategies-picture.h"
+
 
 /**
  * \brief Strength of QP adjustments when using adaptive QP for 360 video.
@@ -249,6 +252,58 @@ static void encoder_state_recdata_to_bufs(encoder_state_t * const state,
                       1, lcu->size.y / 2,
                       frame->rec->stride / 2, 1);
     }
+  }
+
+  // Fill IBC buffer
+  if (state->encoder_control->cfg.ibc) {
+
+    uint32_t ibc_buffer_pos_x = lcu->position_px.x + LCU_WIDTH >= IBC_BUFFER_WIDTH ? IBC_BUFFER_WIDTH - LCU_WIDTH: lcu->position_px.x;
+    uint32_t ibc_buffer_pos_x_c = ibc_buffer_pos_x >> 1;
+    uint32_t ibc_buffer_row     = lcu->position_px.y / LCU_WIDTH;
+
+    // If the buffer is full shift all the lines LCU_WIDTH left
+    if (lcu->position_px.x + LCU_WIDTH > IBC_BUFFER_WIDTH) {
+      for (uint32_t i = 0; i < LCU_WIDTH; i++) {
+        memmove(
+          &frame->ibc_buffer_y[ibc_buffer_row][i * IBC_BUFFER_WIDTH],
+          &frame->ibc_buffer_y[ibc_buffer_row][i * IBC_BUFFER_WIDTH + LCU_WIDTH],
+          sizeof(uvg_pixel) * (IBC_BUFFER_WIDTH - LCU_WIDTH));
+      }
+      if (state->encoder_control->chroma_format != UVG_CSP_400) {
+        for (uint32_t i = 0; i < LCU_WIDTH_C; i++) {
+          memmove(
+            &frame->ibc_buffer_u[ibc_buffer_row][i * IBC_BUFFER_WIDTH_C],
+            &frame->ibc_buffer_u[ibc_buffer_row]
+                                [i * IBC_BUFFER_WIDTH_C + LCU_WIDTH_C],
+            sizeof(uvg_pixel) * (IBC_BUFFER_WIDTH_C - LCU_WIDTH_C));
+          memmove(
+            &frame->ibc_buffer_v[ibc_buffer_row][i * IBC_BUFFER_WIDTH_C],
+            &frame->ibc_buffer_v[ibc_buffer_row]
+                                [i * IBC_BUFFER_WIDTH_C + LCU_WIDTH_C],
+            sizeof(uvg_pixel) * (IBC_BUFFER_WIDTH_C - LCU_WIDTH_C));
+        }
+      }
+    }
+
+    const uint32_t ibc_block_width = MIN(LCU_WIDTH, (state->tile->frame->width-lcu->position_px.x));
+    const uint32_t ibc_block_height = MIN(LCU_WIDTH, (state->tile->frame->height-lcu->position_px.y));
+
+    uvg_pixels_blit(&frame->rec->y[lcu->position_px.y * frame->rec->stride + lcu->position_px.x],
+                    &frame->ibc_buffer_y[ibc_buffer_row][ibc_buffer_pos_x],
+                    ibc_block_width, ibc_block_height,
+                    frame->rec->stride, IBC_BUFFER_WIDTH);
+
+    if (state->encoder_control->chroma_format != UVG_CSP_400) {
+       uvg_pixels_blit(&frame->rec->u[(lcu->position_px.y >> 1) * (frame->rec->stride >> 1) + (lcu->position_px.x >> 1)],
+                       &frame->ibc_buffer_u[ibc_buffer_row][ibc_buffer_pos_x_c],
+                       ibc_block_width>>1, ibc_block_height>>1,
+                       frame->rec->stride >> 1, IBC_BUFFER_WIDTH_C);
+       uvg_pixels_blit(&frame->rec->v[(lcu->position_px.y >> 1) * (frame->rec->stride >> 1) + (lcu->position_px.x >> 1)],
+                       &frame->ibc_buffer_v[ibc_buffer_row][ibc_buffer_pos_x_c],
+                       ibc_block_width>>1, ibc_block_height>>1,
+                       frame->rec->stride >> 1, IBC_BUFFER_WIDTH_C);
+
+     }
   }
   
 }
@@ -692,9 +747,53 @@ static void encoder_state_worker_encode_lcu_search(void * opaque)
 
   cu_info_t original_lut[MAX_NUM_HMVP_CANDS];
   uint8_t original_lut_size = state->tile->frame->hmvp_size[ctu_row];
+  cu_info_t original_lut_ibc[MAX_NUM_HMVP_CANDS];
+  uint8_t original_lut_size_ibc = state->tile->frame->hmvp_size_ibc[ctu_row];
 
   // Store original HMVP lut before search and restore after, since it's modified
   if(state->frame->slicetype != UVG_SLICE_I) memcpy(original_lut, &state->tile->frame->hmvp_lut[ctu_row_mul_five], sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
+  if(state->encoder_control->cfg.ibc) memcpy(original_lut_ibc, &state->tile->frame->hmvp_lut_ibc[ctu_row_mul_five], sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
+
+
+  if (state->encoder_control->cfg.ibc & 2) {
+    videoframe_t * const frame      = state->tile->frame;
+    const uint32_t ibc_block_width  = MIN(LCU_WIDTH, (state->tile->frame->width-lcu->position_px.x));
+    const uint32_t ibc_block_height = MIN(LCU_WIDTH, (state->tile->frame->height-lcu->position_px.y));
+    int items = 0;
+    // Hash the current LCU to the IBC hashmap
+    for (int32_t xx = 0; xx < (int32_t)(ibc_block_width)-7; xx+=UVG_HASHMAP_BLOCKSIZE>>1) {
+      for (int32_t yy = 0; yy < (int32_t)(ibc_block_height)-7; yy+=UVG_HASHMAP_BLOCKSIZE>>1) {
+        int cur_x = lcu->position_px.x + xx;
+        int cur_y = lcu->position_px.y + yy;
+        
+        // Skip blocks that seem to be the same value for the whole block
+        uint64_t first_line =
+          *(uint64_t *)&frame->source->y[cur_y * frame->source->stride + cur_x];
+        bool same_data = true;
+        for (int y_temp = 1; y_temp < 8; y_temp++) {
+          if (*(uint64_t *)&frame->source->y[(cur_y+y_temp) * frame->source->stride + cur_x] != first_line) {
+            same_data = false;
+            break;
+          }
+        }
+        
+        if (!same_data || (xx % UVG_HASHMAP_BLOCKSIZE == 0 && yy % UVG_HASHMAP_BLOCKSIZE == 0)) {
+          uint32_t crc = uvg_crc32c_8x8(&frame->source->y[cur_y * frame->source->stride + cur_x],frame->source->stride);
+          if (state->encoder_control->chroma_format != UVG_CSP_400) {
+            crc += uvg_crc32c_4x4(&frame->source->u[(cur_y>>1) * (frame->source->stride>>1) + (cur_x>>1)],frame->source->stride>>1);
+            crc += uvg_crc32c_4x4(&frame->source->v[(cur_y>>1) * (frame->source->stride>>1) + (cur_x>>1)],frame->source->stride>>1);
+          }
+          if (xx % UVG_HASHMAP_BLOCKSIZE == 0 && yy % UVG_HASHMAP_BLOCKSIZE == 0) {
+            state->tile->frame->ibc_hashmap_pos_to_hash[(cur_y / UVG_HASHMAP_BLOCKSIZE)*state->tile->frame->ibc_hashmap_pos_to_hash_stride + cur_x / UVG_HASHMAP_BLOCKSIZE] = crc;
+          }
+          uvg_hashmap_insert(frame->ibc_hashmap_row[ctu_row], crc, ((cur_x&0xffff)<<16) | (cur_y&0xffff));
+          items++;
+        }
+      }
+    }
+  }
+  //fprintf(stderr, "Inserted %d items to %dx%d at %dx%d\r\n", items, ibc_block_width, ibc_block_height, lcu->position_px.x, lcu->position_px.y);
+
 
   //This part doesn't write to bitstream, it's only search, deblock and sao
   uvg_search_lcu(state, lcu->position_px.x, lcu->position_px.y, state->tile->hor_buf_search, state->tile->ver_buf_search, lcu->coeff);
@@ -702,6 +801,10 @@ static void encoder_state_worker_encode_lcu_search(void * opaque)
   if(state->frame->slicetype != UVG_SLICE_I) {
     memcpy(&state->tile->frame->hmvp_lut[ctu_row_mul_five], original_lut, sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
     state->tile->frame->hmvp_size[ctu_row] = original_lut_size;
+  }
+  if (state->encoder_control->cfg.ibc) {
+    memcpy(&state->tile->frame->hmvp_lut_ibc[ctu_row_mul_five], original_lut_ibc, sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
+    state->tile->frame->hmvp_size_ibc[ctu_row] = original_lut_size_ibc;
   }
 
   encoder_state_recdata_to_bufs(state, lcu, state->tile->hor_buf_search, state->tile->ver_buf_search);
@@ -899,8 +1002,13 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
   bool wavefront = state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW;
 
   // Clear hmvp lut size before each leaf
-  if (!wavefront) memset(state->tile->frame->hmvp_size, 0, sizeof(uint8_t) * state->tile->frame->height_in_lcu);
-  else state->tile->frame->hmvp_size[state->wfrow->lcu_offset_y] = 0;
+  if (!wavefront) {
+    memset(state->tile->frame->hmvp_size, 0, sizeof(uint8_t) * state->tile->frame->height_in_lcu);
+    if(cfg->ibc) memset(state->tile->frame->hmvp_size_ibc, 0, sizeof(uint8_t) * state->tile->frame->height_in_lcu);
+  } else {
+    state->tile->frame->hmvp_size[state->wfrow->lcu_offset_y] = 0;
+    state->tile->frame->hmvp_size_ibc[state->wfrow->lcu_offset_y] = 0;
+  }
 
   bool use_parallel_encoding = (wavefront && state->parent->children[1].encoder_control);
   if (!use_parallel_encoding) {
@@ -1644,6 +1752,7 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, uvg_pict
 
   if (!state->encoder_control->tiles_enable) {
     memset(state->tile->frame->hmvp_size, 0, sizeof(uint8_t) * state->tile->frame->height_in_lcu);
+    memset(state->tile->frame->hmvp_size_ibc, 0, sizeof(uint8_t) * state->tile->frame->height_in_lcu);
   }
 
   // ROI / delta QP maps

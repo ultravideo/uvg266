@@ -423,6 +423,13 @@ static const uint8_t INIT_CCLM_MODEL[4] = {
      9, 
 };
 
+static const uint8_t INIT_IBC_FLAG[4][3] = {
+  {   0,  43,  45, },
+  {   0,  57,  44, },
+  {  17,  42,  36, },
+  {   1,   5,   8, },
+};
+
 /*
 static const uint16_t g_inistateToCount[128] = {
   614,   647,   681,   718,   756,   797,   839,   884,   932,   982,   1034,  1089,  1148,  1209,  1274,  1342,
@@ -514,6 +521,7 @@ void uvg_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
     uvg_ctx_init(&cabac->ctx.lfnst_idx_model[i], QP, INIT_LFNST_IDX[slice][i], INIT_LFNST_IDX[3][i]);
     uvg_ctx_init(&cabac->ctx.transform_skip_sig_coeff_group[i], QP, INIT_TRANSFORM_SKIP_SIG_COEFF_GROUP[slice][i], INIT_TRANSFORM_SKIP_SIG_COEFF_GROUP[3][i]);
     uvg_ctx_init(&cabac->ctx.transform_skip_sig[i], QP, INIT_TRANSFORM_SKIP_SIG[slice][i], INIT_TRANSFORM_SKIP_SIG[3][i]);
+    uvg_ctx_init(&cabac->ctx.ibc_flag[i], QP, INIT_IBC_FLAG[slice][i], INIT_IBC_FLAG[3][i]);
   }
 
   for (i = 0; i < 4; i++) {

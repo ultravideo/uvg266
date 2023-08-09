@@ -88,6 +88,7 @@ uint32_t uvg_get_coded_level(encoder_state_t * state, double* coded_cost, double
                          int32_t q_bits,double temp, int8_t last, int8_t type);
 
 uvg_mvd_cost_func uvg_calc_mvd_cost_cabac;
+uvg_mvd_cost_func uvg_calc_ibc_mvd_cost_cabac;
 
 double uvg_get_mvd_coding_cost_cabac(const encoder_state_t* state,
                                      const cabac_data_t* cabac,

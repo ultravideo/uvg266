@@ -45,6 +45,7 @@
 #include "rdo.h"
 #include "search_inter.h"
 #include "search_intra.h"
+#include "search_ibc.h"
 #include "threadqueue.h"
 #include "transform.h"
 #include "videoframe.h"
@@ -179,7 +180,7 @@ static void lcu_fill_cu_info(lcu_t *lcu, int x_local, int y_local, int width, in
   }
 }
 
-static void lcu_fill_inter(lcu_t *lcu, int x_local, int y_local, int cu_width)
+static void lcu_fill_inter(lcu_t *lcu, int x_local, int y_local, int cu_width, uint8_t type)
 {
   const part_mode_t part_mode = LCU_GET_CU_AT_PX(lcu, x_local, y_local)->part_size;
   const int num_pu = uvg_part_mode_num_parts[part_mode];
@@ -191,7 +192,7 @@ static void lcu_fill_inter(lcu_t *lcu, int x_local, int y_local, int cu_width)
     const int height_pu = PU_GET_H(part_mode, cu_width, i);
 
     cu_info_t *pu  = LCU_GET_CU_AT_PX(lcu, x_pu, y_pu);
-    pu->type = CU_INTER;
+    pu->type = type;
     lcu_fill_cu_info(lcu, x_pu, y_pu, width_pu, height_pu, pu);
   }
 }
@@ -306,7 +307,7 @@ double uvg_cu_rd_cost_luma(const encoder_state_t *const state,
                            lcu_t *const lcu)
 {
   const int width = LCU_WIDTH >> depth;
-  const int skip_residual_coding = pred_cu->skipped || (pred_cu->type == CU_INTER && pred_cu->cbf == 0);
+  const int skip_residual_coding = pred_cu->skipped || (pred_cu->type != CU_INTRA && pred_cu->cbf == 0);
   cabac_data_t* cabac = (cabac_data_t *)&state->search_cabac;
 
   // cur_cu is used for TU parameters.
@@ -380,7 +381,7 @@ double uvg_cu_rd_cost_chroma(const encoder_state_t *const state,
   const vector2d_t lcu_px = { (x_px & ~7) / 2, (y_px & ~7) / 2 };
   const int width = (depth < MAX_DEPTH) ? LCU_WIDTH >> (depth + 1) : LCU_WIDTH >> depth;
   cu_info_t *const tr_cu = LCU_GET_CU_AT_PX(lcu, x_px, y_px);
-  const int skip_residual_coding = pred_cu->skipped || (pred_cu->type == CU_INTER && pred_cu->cbf == 0);
+  const int skip_residual_coding = pred_cu->skipped || (pred_cu->type != CU_INTRA && pred_cu->cbf == 0);
 
   double tr_tree_bits = 0;
   double coeff_bits = 0;
@@ -477,7 +478,7 @@ static double cu_rd_cost_tr_split_accurate(
   enum uvg_tree_type tree_type) {
   const int width = LCU_WIDTH >> depth;
 
-  const int skip_residual_coding = pred_cu->skipped || (pred_cu->type == CU_INTER && pred_cu->cbf == 0);
+  const int skip_residual_coding = pred_cu->skipped || (pred_cu->type != CU_INTRA && pred_cu->cbf == 0);
   // cur_cu is used for TU parameters.
   cu_info_t* const tr_cu = LCU_GET_CU_AT_PX(lcu, x_px, y_px);
 
@@ -499,7 +500,7 @@ static double cu_rd_cost_tr_split_accurate(
     int cbf = cbf_is_set_any(pred_cu->cbf, depth);
     // Only need to signal coded block flag if not skipped or merged
     // skip = no coded residual, merge = coded residual
-    if (pred_cu->type == CU_INTER && (pred_cu->part_size != SIZE_2Nx2N || !pred_cu->merged)) {
+    if (pred_cu->type != CU_INTRA && (pred_cu->part_size != SIZE_2Nx2N || !pred_cu->merged)) {
       CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.cu_qt_root_cbf_model), cbf, tr_tree_bits, "rqt_root_cbf");
     }
 
@@ -803,9 +804,12 @@ static double search_cu(
 
   cu_info_t hmvp_lut[MAX_NUM_HMVP_CANDS];
   uint8_t hmvp_lut_size = state->tile->frame->hmvp_size[ctu_row];
+  cu_info_t hmvp_lut_ibc[MAX_NUM_HMVP_CANDS];
+  uint8_t hmvp_lut_size_ibc = state->tile->frame->hmvp_size_ibc[ctu_row];
 
   // Store original HMVP lut before search and restore after, since it's modified
   if (state->frame->slicetype != UVG_SLICE_I) memcpy(hmvp_lut, &state->tile->frame->hmvp_lut[ctu_row_mul_five], sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
+  if(state->encoder_control->cfg.ibc) memcpy(hmvp_lut_ibc, &state->tile->frame->hmvp_lut_ibc[ctu_row_mul_five], sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
 
   struct {
     int32_t min;
@@ -1006,6 +1010,34 @@ static double search_cu(
       }
     }
 
+    // Simple IBC search
+    if (can_use_intra //&& state->frame->slicetype == UVG_SLICE_I
+         && state->encoder_control->cfg.ibc 
+         && cost > 1000
+         && cu_width > 4
+         && (x >= cu_width || y >= cu_width)
+         && !cur_cu->skipped) {
+
+      cu_info_t backup_cu = *cur_cu;
+
+      double mode_cost;
+      double mode_bitcost;
+      uvg_search_cu_ibc(state,
+                        x, y,
+                        depth,
+                        lcu,
+                        &mode_cost, &mode_bitcost);
+      if (mode_cost < cost) {
+        cost = mode_cost;
+        inter_bitcost = mode_bitcost;
+        cur_cu->type = CU_IBC;
+        cur_cu->inter.mv_dir = 1;
+        cur_cu->joint_cb_cr = 0;
+      } else {
+        *cur_cu = backup_cu;
+      }
+    }
+
     // Reconstruct best mode because we need the reconstructed pixels for
     // mode search of adjacent CUs.
     if (cur_cu->type == CU_INTRA) {
@@ -1035,7 +1067,7 @@ static double search_cu(
       lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
 
 
-    } else if (cur_cu->type == CU_INTER) {
+    } else if (cur_cu->type == CU_INTER || cur_cu->type == CU_IBC) {
 
       if (!cur_cu->skipped) {
 
@@ -1081,12 +1113,12 @@ static double search_cu(
           inter_bitcost += cur_cu->merge_idx;        
         }
       }
-      lcu_fill_inter(lcu, x_local, y_local, cu_width);
+      lcu_fill_inter(lcu, x_local, y_local, cu_width, cur_cu->type);
       lcu_fill_cbf(lcu, x_local, y_local, cu_width, cur_cu);
     }
   }
 
-  if (cur_cu->type == CU_INTRA || cur_cu->type == CU_INTER) {
+  if (cur_cu->type == CU_INTRA || cur_cu->type == CU_INTER || cur_cu->type == CU_IBC) {
     double bits = 0;
     cabac_data_t* cabac  = &state->search_cabac;
     cabac->update = 1;
@@ -1289,7 +1321,14 @@ static double search_cu(
       if (state->frame->slicetype != UVG_SLICE_I) {
         // Reset HMVP to the beginning of this CU level search and add this CU as the mvp
         memcpy(&state->tile->frame->hmvp_lut[ctu_row_mul_five], hmvp_lut, sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
-        state->tile->frame->hmvp_size[ctu_row] = hmvp_lut_size;
+        state->tile->frame->hmvp_size[ctu_row] = hmvp_lut_size;        
+      }
+      if (state->encoder_control->cfg.ibc) {        
+        memcpy(&state->tile->frame->hmvp_lut_ibc[ctu_row_mul_five], hmvp_lut_ibc, sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
+        state->tile->frame->hmvp_size_ibc[ctu_row] = hmvp_lut_size_ibc;        
+      }
+      // Add candidate when in inter slice or ibc is enabled
+      if(state->frame->slicetype != UVG_SLICE_I || state->encoder_control->cfg.ibc) {
         uvg_hmvp_add_mv(state, x, y, cu_width, cu_width, cur_cu);
       }
     }
@@ -1311,7 +1350,14 @@ static double search_cu(
     if (state->frame->slicetype != UVG_SLICE_I) {
       // Reset HMVP to the beginning of this CU level search and add this CU as the mvp
       memcpy(&state->tile->frame->hmvp_lut[ctu_row_mul_five], hmvp_lut, sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
-      state->tile->frame->hmvp_size[ctu_row] = hmvp_lut_size;
+      state->tile->frame->hmvp_size[ctu_row] = hmvp_lut_size;        
+    }
+    if (state->encoder_control->cfg.ibc) {        
+      memcpy(&state->tile->frame->hmvp_lut_ibc[ctu_row_mul_five], hmvp_lut_ibc, sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
+      state->tile->frame->hmvp_size_ibc[ctu_row] = hmvp_lut_size_ibc;        
+    }
+    // Add candidate when in inter slice or ibc is enabled
+    if(state->frame->slicetype != UVG_SLICE_I || state->encoder_control->cfg.ibc) {
       uvg_hmvp_add_mv(state, x, y, cu_width, cu_width, cur_cu);
     }
   }

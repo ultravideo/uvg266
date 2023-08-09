@@ -593,6 +593,67 @@ void uvg_inter_recon_cu(const encoder_state_t * const state,
   }
 }
 
+static void ibc_recon_cu(const encoder_state_t * const state,
+                         lcu_t *lcu,
+                         int32_t x,
+                         int32_t y,
+                         int32_t width,
+                         bool predict_luma,
+                         bool predict_chroma,
+                         int i_pu)
+{
+  const int x_scu    = SUB_SCU(x);
+  const int y_scu    = SUB_SCU(y);
+  uint32_t offset = x_scu + y_scu * LCU_WIDTH;
+  uint32_t offset_c = x_scu / 2 + y_scu / 2 * LCU_WIDTH_C;
+  cu_info_t *cu       = LCU_GET_CU_AT_PX(lcu, x_scu, y_scu);
+
+  int32_t    mv_x     = cu->inter.mv[0][0] >> INTERNAL_MV_PREC;
+  int32_t    mv_y     = cu->inter.mv[0][1] >> INTERNAL_MV_PREC;
+  uint32_t   ibc_row  = y / LCU_WIDTH;
+
+  int32_t    buffer_x = ((x - x_scu) + LCU_WIDTH <= IBC_BUFFER_WIDTH ?
+                          x :
+                          x - (((x - x_scu)) - IBC_BUFFER_WIDTH)) + mv_x;
+  int32_t buffer_y = y_scu + mv_y;
+
+  // The whole block must be to the left of the current position
+  assert((-mv_x >= width || -mv_y >= width) && x >= 0 && y >= 0);
+
+  // Predicted block completely outside of this LCU
+  if (mv_x + x_scu + width <= 0) {  
+    if(predict_luma) uvg_pixels_blit(&state->tile->frame->ibc_buffer_y[ibc_row][buffer_y * IBC_BUFFER_WIDTH + buffer_x], lcu->rec.y + offset, width, width, IBC_BUFFER_WIDTH, LCU_WIDTH);
+    if (predict_chroma) {
+      uvg_pixels_blit(&state->tile->frame->ibc_buffer_u[ibc_row][(buffer_y / 2) * IBC_BUFFER_WIDTH_C + (buffer_x / 2)], lcu->rec.u + offset_c, width / 2, width / 2, IBC_BUFFER_WIDTH_C, LCU_WIDTH_C);
+      uvg_pixels_blit(&state->tile->frame->ibc_buffer_v[ibc_row][(buffer_y / 2) * IBC_BUFFER_WIDTH_C + (buffer_x / 2)], lcu->rec.v + offset_c, width / 2, width / 2, IBC_BUFFER_WIDTH_C, LCU_WIDTH_C);
+    }
+  } else if (mv_x + x_scu + width >= width) { // Completely in current LCU
+    if(predict_luma) uvg_pixels_blit(&lcu->rec.y[(y_scu + mv_y) * LCU_WIDTH + x_scu + mv_x], lcu->rec.y + offset, width, width, LCU_WIDTH, LCU_WIDTH);
+    if (predict_chroma) {
+      uvg_pixels_blit(&lcu->rec.u[((y_scu+mv_y) / 2) * LCU_WIDTH_C + (x_scu + mv_x) / 2], lcu->rec.u + offset_c, width / 2, width / 2, LCU_WIDTH_C, LCU_WIDTH_C);
+      uvg_pixels_blit(&lcu->rec.v[((y_scu+mv_y) / 2) * LCU_WIDTH_C + (x_scu + mv_x) / 2], lcu->rec.v + offset_c, width / 2, width / 2, LCU_WIDTH_C, LCU_WIDTH_C);
+    }
+  } else { // Partly on the buffer and party on the current LCU rec
+
+    uint32_t width_buffer = -(mv_x + x_scu);
+    uint32_t width_lcu    = width - width_buffer;
+    if(predict_luma) uvg_pixels_blit(&state->tile->frame->ibc_buffer_y[ibc_row][buffer_y * IBC_BUFFER_WIDTH + buffer_x], lcu->rec.y + offset, width_buffer, width, IBC_BUFFER_WIDTH, LCU_WIDTH);
+    if (predict_chroma) {    
+      uvg_pixels_blit(&state->tile->frame->ibc_buffer_u[ibc_row][(buffer_y / 2) * IBC_BUFFER_WIDTH_C + (buffer_x / 2)], lcu->rec.u + offset_c, width_buffer / 2 + (width_buffer&1), width / 2, IBC_BUFFER_WIDTH_C, LCU_WIDTH_C);
+      uvg_pixels_blit(&state->tile->frame->ibc_buffer_v[ibc_row][(buffer_y / 2) * IBC_BUFFER_WIDTH_C + (buffer_x / 2)], lcu->rec.v + offset_c, width_buffer / 2 + (width_buffer&1), width / 2, IBC_BUFFER_WIDTH_C, LCU_WIDTH_C);
+    }
+
+    offset += width_buffer;
+    offset_c += width_buffer/2 + (width_buffer&1);
+
+    if(predict_luma) uvg_pixels_blit(&lcu->rec.y[(y_scu + mv_y) * LCU_WIDTH + x_scu + mv_x + width_buffer], lcu->rec.y + offset, width_lcu, width, LCU_WIDTH, LCU_WIDTH);
+    if (predict_chroma && (width_lcu / 2)) {
+      uvg_pixels_blit(&lcu->rec.u[((y_scu+mv_y) / 2) * LCU_WIDTH_C + (x_scu + mv_x + width_buffer) / 2], lcu->rec.u + offset_c, width_lcu / 2, width / 2, LCU_WIDTH_C, LCU_WIDTH_C);
+      uvg_pixels_blit(&lcu->rec.v[((y_scu+mv_y) / 2) * LCU_WIDTH_C + (x_scu + mv_x + width_buffer) / 2], lcu->rec.v + offset_c, width_lcu / 2, width / 2, LCU_WIDTH_C, LCU_WIDTH_C);
+    }
+  }
+}
+
 /**
  * Predict a single PU.
  *
@@ -626,49 +687,56 @@ void uvg_inter_pred_pu(const encoder_state_t * const state,
   const int pu_h = PU_GET_H(cu->part_size, width, i_pu);
   cu_info_t *pu = LCU_GET_CU_AT_PX(lcu, SUB_SCU(pu_x), SUB_SCU(pu_y));
 
-  if (pu->inter.mv_dir == 3) {
-    const uvg_picture *const refs[2] = {
-      state->frame->ref->images[
-        state->frame->ref_LX[0][
-          pu->inter.mv_ref[0]]],
-      state->frame->ref->images[
-        state->frame->ref_LX[1][
-          pu->inter.mv_ref[1]]],
-    };
-    uvg_inter_recon_bipred(state,
-      refs[0], refs[1],
-      pu_x, pu_y,
-      pu_w, pu_h,
-      pu->inter.mv,
-      lcu,
-      predict_luma, predict_chroma);
+  if (cu->type == CU_IBC) {
+    ibc_recon_cu(state, lcu, x, y, width, predict_luma, predict_chroma, i_pu);
+  } else {
+
+    if (pu->inter.mv_dir == 3) {
+      const uvg_picture * const refs[2] = {
+        state->frame->ref->images[state->frame->ref_LX[0][pu->inter.mv_ref[0]]],
+        state->frame->ref->images[state->frame->ref_LX[1][pu->inter.mv_ref[1]]],
+      };
+      uvg_inter_recon_bipred(
+        state,
+        refs[0],
+        refs[1],
+        pu_x,
+        pu_y,
+        pu_w,
+        pu_h,
+        pu->inter.mv,
+        lcu,
+        predict_luma,
+        predict_chroma);
+    } else {
+      const int                 mv_idx = pu->inter.mv_dir - 1;
+      const uvg_picture * const ref = 
+        state->frame->ref->images[state->frame->ref_LX[mv_idx][pu->inter.mv_ref[mv_idx]]];
+
+      const unsigned offset_luma = SUB_SCU(pu_y) * LCU_WIDTH + SUB_SCU(pu_x);
+      const unsigned offset_chroma =
+        SUB_SCU(pu_y) / 2 * LCU_WIDTH_C + SUB_SCU(pu_x) / 2;
+      yuv_t lcu_adapter;
+      lcu_adapter.size = pu_w * pu_h;
+      lcu_adapter.y    = lcu->rec.y + offset_luma,
+      lcu_adapter.u    = lcu->rec.u + offset_chroma,
+      lcu_adapter.v    = lcu->rec.v + offset_chroma,
+
+      inter_recon_unipred(
+        state,
+        ref,
+        pu_x,
+        pu_y,
+        pu_w,
+        pu_h,
+        LCU_WIDTH,
+        pu->inter.mv[mv_idx],
+        &lcu_adapter,
+        NULL,
+        predict_luma,
+        predict_chroma);
+    }
   }
-  else {
-    const int mv_idx = pu->inter.mv_dir - 1;
-    const uvg_picture *const ref =
-      state->frame->ref->images[
-        state->frame->ref_LX[mv_idx][
-          pu->inter.mv_ref[mv_idx]]];
-
-    const unsigned offset_luma = SUB_SCU(pu_y) * LCU_WIDTH + SUB_SCU(pu_x);
-    const unsigned offset_chroma = SUB_SCU(pu_y) / 2 * LCU_WIDTH_C + SUB_SCU(pu_x) / 2;
-    yuv_t lcu_adapter;
-    lcu_adapter.size = pu_w * pu_h;
-    lcu_adapter.y = lcu->rec.y + offset_luma,
-    lcu_adapter.u = lcu->rec.u + offset_chroma,
-    lcu_adapter.v = lcu->rec.v + offset_chroma,
-
-    inter_recon_unipred(state,
-      ref,
-      pu_x, pu_y,
-      pu_w, pu_h,
-      LCU_WIDTH,
-      pu->inter.mv[mv_idx],
-      &lcu_adapter,
-      NULL,
-      predict_luma, predict_chroma);
-  }
-
   if (predict_chroma && state->encoder_control->cfg.jccr) {
     const int offset = x_scu / 2 + y_scu / 2 * LCU_WIDTH_C;
     uvg_pixels_blit(lcu->rec.u + offset, lcu->rec.joint_u + offset, width / 2, width / 2, LCU_WIDTH_C, LCU_WIDTH_C);
@@ -917,6 +985,259 @@ static void get_temporal_merge_candidates(const encoder_state_t * const state,
   }
 }
 
+static INLINE mv_t get_scaled_mv(mv_t mv, int scale)
+{
+  int32_t scaled = scale * mv;
+  return CLIP(-131072, 131071, (scaled + 127 + (scaled < 0)) >> 8);
+}
+
+#define MV_EXPONENT_BITCOUNT 4
+#define MV_MANTISSA_BITCOUNT 6
+#define MV_MANTISSA_UPPER_LIMIT ((1 << (MV_MANTISSA_BITCOUNT - 1)) - 1)
+#define MV_MANTISSA_LIMIT (1 << (MV_MANTISSA_BITCOUNT - 1))
+#define MV_EXPONENT_MASK ((1 << MV_EXPONENT_BITCOUNT) - 1)
+
+static int convert_mv_fixed_to_float(int32_t val)
+{
+  uint32_t sign = val >> 31;
+  int scale = uvg_math_floor_log2((val ^ sign) | MV_MANTISSA_UPPER_LIMIT) - (MV_MANTISSA_BITCOUNT - 1);
+
+  int exponent;
+  uint32_t mantissa;
+  if (scale >= 0)
+  {
+    int round = (1 << scale) >> 1;
+    int n = (val + round) >> scale;
+    exponent = scale + ((n ^ sign) >> (MV_MANTISSA_BITCOUNT - 1));
+    mantissa = (n & MV_MANTISSA_UPPER_LIMIT) | (sign << (MV_MANTISSA_BITCOUNT - 1));
+  }
+  else
+  {
+    exponent = 0;
+    mantissa = val;
+  }
+
+  return exponent | (mantissa << MV_EXPONENT_BITCOUNT);
+}
+
+static int convert_mv_float_to_fixed(int val)
+{
+  int exponent = val & MV_EXPONENT_MASK;
+  uint32_t mantissa = val >> MV_EXPONENT_BITCOUNT;
+  return exponent == 0 ? mantissa : (mantissa ^ MV_MANTISSA_LIMIT) << (exponent - 1);
+}
+
+static int round_mv_comp(int x)
+{
+  return convert_mv_float_to_fixed(convert_mv_fixed_to_float(x));
+}
+
+static void apply_mv_scaling_pocs(int32_t current_poc,
+                                  int32_t current_ref_poc,
+                                  int32_t neighbor_poc,
+                                  int32_t neighbor_ref_poc,
+                                  mv_t mv_cand[2])
+{
+  int32_t diff_current  = current_poc  - current_ref_poc;
+  int32_t diff_neighbor = neighbor_poc - neighbor_ref_poc;
+
+  if (diff_current == diff_neighbor) return;
+
+  diff_current  = CLIP(-128, 127, diff_current);
+  diff_neighbor = CLIP(-128, 127, diff_neighbor);
+
+  int scale = CLIP(-4096, 4095,
+    (diff_current * ((0x4000 + (abs(diff_neighbor) >> 1)) / diff_neighbor) + 32) >> 6);
+
+  mv_cand[0] = get_scaled_mv(mv_cand[0], scale);
+  mv_cand[1] = get_scaled_mv(mv_cand[1], scale);
+}
+
+static INLINE void apply_mv_scaling(const encoder_state_t *state,
+                                    const cu_info_t *current_cu,
+                                    const cu_info_t *neighbor_cu,
+                                    int8_t current_reflist,
+                                    int8_t neighbor_reflist,
+                                    mv_t mv_cand[2])
+{
+  apply_mv_scaling_pocs(state->frame->poc,
+                        state->frame->ref->pocs[
+                          state->frame->ref_LX[current_reflist][
+                            current_cu->inter.mv_ref[current_reflist]]],
+                        state->frame->poc,
+                        state->frame->ref->pocs[
+                          state->frame->ref_LX[neighbor_reflist][
+                            neighbor_cu->inter.mv_ref[neighbor_reflist]]],
+                        mv_cand);
+}
+
+static INLINE bool add_mvp_candidate(const encoder_state_t *state,
+                                     const cu_info_t *cur_cu,
+                                     const cu_info_t *cand,
+                                     int8_t reflist,
+                                     bool scaling,
+                                     mv_t mv_cand_out[2])
+{
+  if (!cand) return false;
+
+  assert(cand->inter.mv_dir != 0);
+
+  for (int i = 0; i < 2; i++) {
+    const int cand_list = i == 0 ? reflist : !reflist;
+
+    if ((cand->inter.mv_dir & (1 << cand_list)) == 0) continue;
+
+    if (scaling) {
+      mv_cand_out[0] = cand->inter.mv[cand_list][0];
+      mv_cand_out[1] = cand->inter.mv[cand_list][1];
+      apply_mv_scaling(state, cur_cu, cand, reflist, cand_list, mv_cand_out);
+      return true;
+    }
+
+    if (state->frame->ref_LX[cand_list][cand->inter.mv_ref[cand_list]] ==
+        state->frame->ref_LX[reflist][cur_cu->inter.mv_ref[reflist]])
+    {
+      mv_cand_out[0] = cand->inter.mv[cand_list][0];
+      mv_cand_out[1] = cand->inter.mv[cand_list][1];
+      return true;
+    }
+  }
+
+  return false;
+}
+
+
+static bool is_duplicate_candidate_ibc(const cu_info_t* cu1, const cu_info_t* cu2)
+{
+  if (!cu2) return false;
+
+  if (cu1->inter.mv[0][0] != cu2->inter.mv[0][0]  ||
+      cu1->inter.mv[0][1] != cu2->inter.mv[0][1]) {
+    return false;
+  }
+
+
+  return true;
+}
+
+/**
+ * \brief Get merge candidates for current block.
+ *
+ * The output parameters b0, b1, b2, a0, a1 are pointed to the
+ * corresponding cu_info_t struct in lcu->cu, or set to NULL, if the
+ * candidate is not available.
+ *
+ * \param x               block x position in pixels
+ * \param y               block y position in pixels
+ * \param width           block width in pixels
+ * \param height          block height in pixels
+ * \param picture_width   tile width in pixels
+ * \param picture_height  tile height in pixels
+ * \param lcu             current LCU
+ * \param cand_out        will be filled with A and B candidates
+ */
+static void get_ibc_merge_candidates(const encoder_state_t * const state,
+                                     const cu_info_t * const cur_cu,
+                                     lcu_t *lcu,
+                                     const cu_array_t *cua,
+                                     int32_t x,
+                                     int32_t y,
+                                     int32_t width,
+                                     int32_t height,
+                                     mv_t mv_cand[IBC_MRG_MAX_NUM_CANDS][2]
+  )
+{
+  /*
+  Predictor block locations
+  ____      _______
+  |B2|______|B1|B0|
+     |         |
+     |  Cur CU |
+   __|         |
+  |A1|_________|
+  |A0|
+  */
+  int32_t x_local = SUB_SCU(x); //!< coordinates from top-left of this LCU
+  int32_t y_local = SUB_SCU(y);
+
+  cu_info_t *a1      = NULL;
+  cu_info_t *b1      = NULL;
+    
+  uint8_t candidates = 0;
+
+  // A1 availability testing
+  if (x != 0) {
+    a1 = lcu != NULL?LCU_GET_CU_AT_PX(lcu, x_local - 1, y_local + height - 1): uvg_cu_array_at_const(cua, x - 1, y + height - 1);
+    // Do not check a1->coded because the block above is always coded before
+    // the current one and the flag is not set when searching an SMP block.
+    if (a1->type == CU_IBC) {
+      inter_clear_cu_unused(a1);
+      mv_cand[candidates][0] = a1->inter.mv[0][0];
+      mv_cand[candidates][1] = a1->inter.mv[0][1];
+      candidates++;
+    } else {
+      a1 = NULL;
+    }
+  }
+
+  // B1 availability testing
+  if (y != 0) {
+    b1 =  lcu != NULL?LCU_GET_CU_AT_PX(lcu, x_local + width - 1, y_local - 1): uvg_cu_array_at_const(cua, x + width - 1, y - 1);
+    // Do not check b1->coded because the block to the left is always coded
+    // before the current one and the flag is not set when searching an SMP
+    // block.
+    if (b1->type == CU_IBC) {
+      if(!is_duplicate_candidate_ibc(b1, a1)) {
+        inter_clear_cu_unused(b1);
+        mv_cand[candidates][0] = b1->inter.mv[0][0];
+        mv_cand[candidates][1] = b1->inter.mv[0][1];
+        candidates++;
+      }
+    } else {
+      b1 = NULL;
+    }
+  }  
+
+  if (candidates > 0)
+    uvg_round_precision(INTERNAL_MV_PREC, 2, &mv_cand[0][0], &mv_cand[0][1]);
+  if (candidates > 1)
+    uvg_round_precision(INTERNAL_MV_PREC, 2, &mv_cand[1][0], &mv_cand[1][1]);
+
+  if (candidates < IBC_MRG_MAX_NUM_CANDS)
+  {
+    const uint32_t ctu_row = (y >> LOG2_LCU_WIDTH);
+    const uint32_t ctu_row_mul_five = ctu_row * MAX_NUM_HMVP_CANDS;
+    int32_t num_cand = state->tile->frame->hmvp_size_ibc[ctu_row];
+    for (int i = 0; i < MIN(MAX_NUM_HMVP_CANDS,num_cand); i++) {
+      cu_info_t* cand = &state->tile->frame->hmvp_lut_ibc[ctu_row_mul_five + i];
+      bool       duplicate = false;
+
+      // Check that the HMVP candidate is not duplicate
+      if (is_duplicate_candidate_ibc(cand, a1)) {
+        duplicate = true;
+      } else if(is_duplicate_candidate_ibc(cand, b1)) {
+        duplicate = true;
+      }
+
+      // allow duplicates after the first hmvp lut item
+      if (!duplicate || i > 0) {
+        mv_cand[candidates][0] = cand->inter.mv[0][0];
+        mv_cand[candidates][1] = cand->inter.mv[0][1];
+        candidates++;      
+        if (candidates == IBC_MRG_MAX_NUM_CANDS) return;
+      }
+    }
+  }
+
+  // Fill with (0,0)
+  while (candidates < IBC_MRG_MAX_NUM_CANDS) {
+    mv_cand[candidates][0] = 0;
+    mv_cand[candidates][1] = 0;
+    candidates++;
+  }
+}
+
+
 /**
  * \brief Get merge candidates for current block.
  *
@@ -1093,92 +1414,6 @@ static void get_spatial_merge_candidates_cua(const cu_array_t *cua,
   }
 }
 
-static INLINE mv_t get_scaled_mv(mv_t mv, int scale)
-{
-  int32_t scaled = scale * mv;
-  return CLIP(-131072, 131071, (scaled + 127 + (scaled < 0)) >> 8);
-}
-
-#define MV_EXPONENT_BITCOUNT 4
-#define MV_MANTISSA_BITCOUNT 6
-#define MV_MANTISSA_UPPER_LIMIT ((1 << (MV_MANTISSA_BITCOUNT - 1)) - 1)
-#define MV_MANTISSA_LIMIT (1 << (MV_MANTISSA_BITCOUNT - 1))
-#define MV_EXPONENT_MASK ((1 << MV_EXPONENT_BITCOUNT) - 1)
-
-static int convert_mv_fixed_to_float(int32_t val)
-{
-  uint32_t sign = val >> 31;
-  int scale = uvg_math_floor_log2((val ^ sign) | MV_MANTISSA_UPPER_LIMIT) - (MV_MANTISSA_BITCOUNT - 1);
-
-  int exponent;
-  uint32_t mantissa;
-  if (scale >= 0)
-  {
-    int round = (1 << scale) >> 1;
-    int n = (val + round) >> scale;
-    exponent = scale + ((n ^ sign) >> (MV_MANTISSA_BITCOUNT - 1));
-    mantissa = (n & MV_MANTISSA_UPPER_LIMIT) | (sign << (MV_MANTISSA_BITCOUNT - 1));
-  }
-  else
-  {
-    exponent = 0;
-    mantissa = val;
-  }
-
-  return exponent | (mantissa << MV_EXPONENT_BITCOUNT);
-}
-
-static int convert_mv_float_to_fixed(int val)
-{
-  int exponent = val & MV_EXPONENT_MASK;
-  uint32_t mantissa = val >> MV_EXPONENT_BITCOUNT;
-  return exponent == 0 ? mantissa : (mantissa ^ MV_MANTISSA_LIMIT) << (exponent - 1);
-}
-
-static int round_mv_comp(int x)
-{
-  return convert_mv_float_to_fixed(convert_mv_fixed_to_float(x));
-}
-
-static void apply_mv_scaling_pocs(int32_t current_poc,
-                                  int32_t current_ref_poc,
-                                  int32_t neighbor_poc,
-                                  int32_t neighbor_ref_poc,
-                                  mv_t mv_cand[2])
-{
-  int32_t diff_current  = current_poc  - current_ref_poc;
-  int32_t diff_neighbor = neighbor_poc - neighbor_ref_poc;
-
-  if (diff_current == diff_neighbor) return;
-
-  diff_current  = CLIP(-128, 127, diff_current);
-  diff_neighbor = CLIP(-128, 127, diff_neighbor);
-
-  int scale = CLIP(-4096, 4095,
-    (diff_current * ((0x4000 + (abs(diff_neighbor) >> 1)) / diff_neighbor) + 32) >> 6);
-
-  mv_cand[0] = get_scaled_mv(mv_cand[0], scale);
-  mv_cand[1] = get_scaled_mv(mv_cand[1], scale);
-}
-
-static INLINE void apply_mv_scaling(const encoder_state_t *state,
-                                    const cu_info_t *current_cu,
-                                    const cu_info_t *neighbor_cu,
-                                    int8_t current_reflist,
-                                    int8_t neighbor_reflist,
-                                    mv_t mv_cand[2])
-{
-  apply_mv_scaling_pocs(state->frame->poc,
-                        state->frame->ref->pocs[
-                          state->frame->ref_LX[current_reflist][
-                            current_cu->inter.mv_ref[current_reflist]]],
-                        state->frame->poc,
-                        state->frame->ref->pocs[
-                          state->frame->ref_LX[neighbor_reflist][
-                            neighbor_cu->inter.mv_ref[neighbor_reflist]]],
-                        mv_cand);
-}
-
 /**
  * \brief Try to add a temporal MVP or merge candidate.
  *
@@ -1244,41 +1479,6 @@ static bool add_temporal_candidate(const encoder_state_t *state,
   );
 
   return true;
-}
-
-static INLINE bool add_mvp_candidate(const encoder_state_t *state,
-                                     const cu_info_t *cur_cu,
-                                     const cu_info_t *cand,
-                                     int8_t reflist,
-                                     bool scaling,
-                                     mv_t mv_cand_out[2])
-{
-  if (!cand) return false;
-
-  assert(cand->inter.mv_dir != 0);
-
-  for (int i = 0; i < 2; i++) {
-    const int cand_list = i == 0 ? reflist : !reflist;
-
-    if ((cand->inter.mv_dir & (1 << cand_list)) == 0) continue;
-
-    if (scaling) {
-      mv_cand_out[0] = cand->inter.mv[cand_list][0];
-      mv_cand_out[1] = cand->inter.mv[cand_list][1];
-      apply_mv_scaling(state, cur_cu, cand, reflist, cand_list, mv_cand_out);
-      return true;
-    }
-
-    if (state->frame->ref_LX[cand_list][cand->inter.mv_ref[cand_list]] ==
-        state->frame->ref_LX[reflist][cur_cu->inter.mv_ref[reflist]])
-    {
-      mv_cand_out[0] = cand->inter.mv[cand_list][0];
-      mv_cand_out[1] = cand->inter.mv[cand_list][1];
-      return true;
-    }
-  }
-
-  return false;
 }
 
 /**
@@ -1407,14 +1607,20 @@ void uvg_inter_get_mv_cand(const encoder_state_t * const state,
 {
   merge_candidates_t merge_cand = { 0 };
   const uint8_t parallel_merge_level = state->encoder_control->cfg.log2_parallel_merge_level;
-  get_spatial_merge_candidates(x, y, width, height,
-                               state->tile->frame->width,
-                               state->tile->frame->height,
-                               lcu,
-                               &merge_cand, parallel_merge_level,state->encoder_control->cfg.wpp);
-  get_temporal_merge_candidates(state, x, y, width, height, 1, 0, &merge_cand);
-  get_mv_cand_from_candidates(state, x, y, width, height, &merge_cand, cur_cu, reflist, mv_cand);
-    
+  if (cur_cu->type == CU_IBC) {
+    mv_t ibc_mv_cand[IBC_MRG_MAX_NUM_CANDS][2];
+    get_ibc_merge_candidates(state, cur_cu,lcu,NULL, x, y, width, height,ibc_mv_cand);
+    memcpy(mv_cand[0], ibc_mv_cand[0], sizeof(mv_t) * 2);
+    memcpy(mv_cand[1], ibc_mv_cand[1], sizeof(mv_t) * 2);
+  } else {
+    get_spatial_merge_candidates(x, y, width, height,
+                                 state->tile->frame->width,
+                                 state->tile->frame->height,
+                                 lcu,
+                                 &merge_cand, parallel_merge_level,state->encoder_control->cfg.wpp);
+    get_temporal_merge_candidates(state, x, y, width, height, 1, 0, &merge_cand);
+    get_mv_cand_from_candidates(state, x, y, width, height, &merge_cand, cur_cu, reflist, mv_cand);
+  }
   uvg_round_precision(INTERNAL_MV_PREC, 2, &mv_cand[0][0], &mv_cand[0][1]);
   uvg_round_precision(INTERNAL_MV_PREC, 2, &mv_cand[1][0], &mv_cand[1][1]);
 }
@@ -1443,16 +1649,29 @@ void uvg_inter_get_mv_cand_cua(const encoder_state_t * const state,
   merge_candidates_t merge_cand = { 0 };
 
   const cu_array_t *cua = state->tile->frame->cu_array;
-  get_spatial_merge_candidates_cua(cua,
-                                   x, y, width, height,
-                                   state->tile->frame->width, state->tile->frame->height,
-                                   &merge_cand, state->encoder_control->cfg.wpp);
-  get_temporal_merge_candidates(state, x, y, width, height, 1, 0, &merge_cand);
-  get_mv_cand_from_candidates(state, x, y, width, height, &merge_cand, cur_cu, reflist, mv_cand);
-
+  if (cur_cu->type == CU_IBC) {
+    mv_t ibc_mv_cand[IBC_MRG_MAX_NUM_CANDS][2];
+    get_ibc_merge_candidates(state, cur_cu, NULL,cua,x, y, width, height,ibc_mv_cand);
+    memcpy(mv_cand[0], ibc_mv_cand[0], sizeof(mv_t) * 2);
+    memcpy(mv_cand[1], ibc_mv_cand[1], sizeof(mv_t) * 2);    
+  } else {
+    get_spatial_merge_candidates_cua(cua,
+                                     x, y, width, height,
+                                     state->tile->frame->width, state->tile->frame->height,
+                                     &merge_cand, state->encoder_control->cfg.wpp);
+    get_temporal_merge_candidates(state, x, y, width, height, 1, 0, &merge_cand);
+    get_mv_cand_from_candidates(state, x, y, width, height, &merge_cand, cur_cu, reflist, mv_cand);
+  }
   uvg_round_precision(INTERNAL_MV_PREC, 2, &mv_cand[0][0], &mv_cand[0][1]);
   uvg_round_precision(INTERNAL_MV_PREC, 2, &mv_cand[1][0], &mv_cand[1][1]);
 }
+
+/**
+•	\brief Checks if two CUs have similar motion vectors. The function takes two CUs and compares their motion vectors.
+•	\param cu1   first CU
+•	\param cu2   second CU
+•	\return returns 0 if the two CUs have dissimilar motion vectors, and 1 if the motions are similar. 
+*/
 
 static bool is_duplicate_candidate(const cu_info_t* cu1, const cu_info_t* cu2)
 {
@@ -1472,6 +1691,16 @@ static bool is_duplicate_candidate(const cu_info_t* cu1, const cu_info_t* cu2)
   return true;
 }
 
+/**
+* Adds a merge candidate to the list of possible candidates, if it is not a duplicate.
+*
+* \param cand The candidate to be added.
+* \param possible_duplicate1 The first possible duplicate candidate to check for duplication.
+* \param possible_duplicate2 The second possible duplicate candidate to check for duplication.
+* \param merge_cand_out The output parameter to store the merge candidate information.
+*
+* @return Returns true if the merge candidate was added successfully, false otherwise.
+*/
 static bool add_merge_candidate(const cu_info_t *cand,
                                 const cu_info_t *possible_duplicate1,
                                 const cu_info_t *possible_duplicate2,
@@ -1503,14 +1732,23 @@ static void hmvp_shift_lut(cu_info_t* lut, int32_t size, int32_t start, int32_t 
   }
 }
 
-static bool hmvp_push_lut_item(cu_info_t* lut, int32_t size, const cu_info_t* cu) {
+static bool hmvp_push_lut_item(cu_info_t* lut, int32_t size, const cu_info_t* cu, bool ibc) {
 
   int8_t duplicate = -1;
 
-  for (int i = 0; i < size; i++) {
-    if (is_duplicate_candidate(cu, (const cu_info_t*)&lut[i])) {
-      duplicate = i;
-      break;
+  if (ibc) {
+    for (int i = 0; i < size; i++) {
+      if (is_duplicate_candidate_ibc(cu, (const cu_info_t *)&lut[i])) {
+        duplicate = i;
+        break;
+      }
+    }
+  } else {
+    for (int i = 0; i < size; i++) {
+      if (is_duplicate_candidate(cu, (const cu_info_t *)&lut[i])) {
+        duplicate = i;
+        break;
+      }
     }
   }
   // If duplicate found, shift the whole lut up to the duplicate, otherwise to the end
@@ -1534,21 +1772,28 @@ static bool hmvp_push_lut_item(cu_info_t* lut, int32_t size, const cu_info_t* cu
 void uvg_hmvp_add_mv(const encoder_state_t* const state, uint32_t pic_x, uint32_t pic_y, uint32_t block_width, uint32_t block_height, const cu_info_t* cu)
 {
   //if (!cu.geoFlag && !cu.affine)
-  if(cu->type == CU_INTER)
+  if(cu->type != CU_INTRA)
   {    
 
     const uint8_t parallel_merge_level = state->encoder_control->cfg.log2_parallel_merge_level;
     const uint32_t xBr = block_width + pic_x;
     const uint32_t yBr = block_height + pic_y;
     bool hmvp_possible = ((xBr >> parallel_merge_level) > (pic_x >> parallel_merge_level)) && ((yBr >> parallel_merge_level) > (pic_y >> parallel_merge_level));
-    if (hmvp_possible) { // ToDo: check for IBC
+    if (hmvp_possible || cu->type == CU_IBC) {
       const uint32_t ctu_row = (pic_y >> LOG2_LCU_WIDTH);
       const uint32_t ctu_row_mul_five = ctu_row * MAX_NUM_HMVP_CANDS;
 
       
-      bool add_row = hmvp_push_lut_item(&state->tile->frame->hmvp_lut[ctu_row_mul_five], state->tile->frame->hmvp_size[ctu_row], cu);
-      if(add_row && state->tile->frame->hmvp_size[ctu_row] < MAX_NUM_HMVP_CANDS) {
-        state->tile->frame->hmvp_size[ctu_row]++;
+      if (cu->type == CU_IBC) {
+        bool add_row = hmvp_push_lut_item(&state->tile->frame->hmvp_lut_ibc[ctu_row_mul_five], state->tile->frame->hmvp_size_ibc[ctu_row], cu, true);
+        if(add_row && state->tile->frame->hmvp_size_ibc[ctu_row] < MAX_NUM_HMVP_CANDS) {
+          state->tile->frame->hmvp_size_ibc[ctu_row]++;
+        }
+      } else {
+        bool add_row = hmvp_push_lut_item(&state->tile->frame->hmvp_lut[ctu_row_mul_five], state->tile->frame->hmvp_size[ctu_row], cu, false);
+        if(add_row && state->tile->frame->hmvp_size[ctu_row] < MAX_NUM_HMVP_CANDS) {
+          state->tile->frame->hmvp_size[ctu_row]++;
+        }
       }
     }
   }
@@ -1652,6 +1897,19 @@ uint8_t uvg_inter_get_merge_cand(const encoder_state_t * const state,
   const uint8_t parallel_merge_level = state->encoder_control->cfg.log2_parallel_merge_level;
   merge_candidates_t merge_cand = { 0 };
   const uint8_t max_num_cands = state->encoder_control->cfg.max_merge;
+
+  cu_info_t         *cur_cu        = LCU_GET_CU_AT_PX(lcu, SUB_SCU(x), SUB_SCU(y));
+  if(cur_cu->type == CU_IBC) {
+    mv_t ibc_mv_cand[IBC_MRG_MAX_NUM_CANDS][2];
+    get_ibc_merge_candidates(state, cur_cu,lcu,NULL, x, y, width, height,ibc_mv_cand);
+    for (int i = 0; i < IBC_MRG_MAX_NUM_CANDS; i++) {
+      mv_cand[i].dir = 1;
+      mv_cand[i].mv[0][0] = ibc_mv_cand[i][0];
+      mv_cand[i].mv[0][1] = ibc_mv_cand[i][1];
+    }
+    return IBC_MRG_MAX_NUM_CANDS;
+  }
+
   get_spatial_merge_candidates(x, y, width, height,
                                state->tile->frame->width,
                                state->tile->frame->height,
@@ -1721,7 +1979,6 @@ uint8_t uvg_inter_get_merge_cand(const encoder_state_t * const state,
 
     for (int i = 0; i < num_cand; i++) {
       const cu_info_t* hmvp_cand = &state->tile->frame->hmvp_lut[ctu_row_mul_five + i];
-      // ToDo: Add IBC condition
       if (i > 1 || ((!is_duplicate_candidate(hmvp_cand, a[1]))
                  && (!is_duplicate_candidate(hmvp_cand, b[1]))) ) {
         mv_cand[candidates].mv[0][0] = state->tile->frame->hmvp_lut[ctu_row_mul_five + i].inter.mv[0][0];

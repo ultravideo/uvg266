@@ -192,6 +192,7 @@ static const struct option long_options[] = {
   { "no-dual-tree",             no_argument, NULL, 0 },
   { "cabac-debug-file",   required_argument, NULL, 0 },
   { "intra-rough-granularity",required_argument, NULL, 0 },
+  { "ibc",                required_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 

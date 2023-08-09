@@ -834,7 +834,7 @@ int uvg_encode_inter_prediction_unit(encoder_state_t * const state,
     if (cur_cu->inter.mv_dir & 2) DBG_YUVIEW_MV(state->frame->poc, DBG_YUVIEW_MVMERGE_L1, abs_x, abs_y, width, height, cur_cu->inter.mv[1][0], cur_cu->inter.mv[1][1]);
 #endif
   } else {
-    if (state->frame->slicetype == UVG_SLICE_B) {
+    if (state->frame->slicetype == UVG_SLICE_B && cur_cu->type != CU_IBC) {
       // Code Inter Dir
       uint8_t inter_dir = cur_cu->inter.mv_dir;
 
@@ -860,7 +860,7 @@ int uvg_encode_inter_prediction_unit(encoder_state_t * const state,
       // size of the current reference index list (L0/L1)
       uint8_t ref_LX_size = state->frame->ref_LX_size[ref_list_idx];
 
-      if (ref_LX_size > 1) {
+      if (ref_LX_size > 1 && cur_cu->type != CU_IBC) {
         // parseRefFrmIdx
         int32_t ref_frame = cur_cu->inter.mv_ref[ref_list_idx];
         
@@ -906,7 +906,7 @@ int uvg_encode_inter_prediction_unit(encoder_state_t * const state,
         mv_t mvd_hor = cur_cu->inter.mv[ref_list_idx][0] - mv_cand[cu_mv_cand][0];
         mv_t mvd_ver = cur_cu->inter.mv[ref_list_idx][1] - mv_cand[cu_mv_cand][1];
 
-        uvg_change_precision(INTERNAL_MV_PREC, uvg_g_imv_to_prec[UVG_IMV_OFF], &mvd_hor, &mvd_ver);
+        uvg_change_precision(INTERNAL_MV_PREC, uvg_g_imv_to_prec[(cur_cu->type == CU_IBC)?UVG_IMV_FPEL:UVG_IMV_OFF], &mvd_hor, &mvd_ver);
         uvg_encode_mvd(state, cabac, mvd_hor, mvd_ver, bits_out);
 
         non_zero_mvd |= (mvd_hor != 0) || (mvd_ver != 0);
@@ -1262,95 +1262,6 @@ void uvg_encode_intra_luma_coding_unit(const encoder_state_t * const state,
   if (cabac->only_count && bits_out) *bits_out += bits;
 }
 
-/**
-static void encode_part_mode(encoder_state_t * const state,
-                             cabac_data_t * const cabac,
-                             const cu_info_t * const cur_cu,
-                             int depth)
-{
-  // Binarization from Table 9-34 of the HEVC spec:
-  //
-  //                |   log2CbSize >     |    log2CbSize ==
-  //                |   MinCbLog2SizeY   |    MinCbLog2SizeY
-  // -------+-------+----------+---------+-----------+----------
-  //  pred  | part  | AMP      | AMP     |           |
-  //  mode  | mode  | disabled | enabled | size == 8 | size > 8
-  // -------+-------+----------+---------+-----------+----------
-  //  intra | 2Nx2N |        -         - |         1          1
-  //        |   NxN |        -         - |         0          0
-  // -------+-------+--------------------+----------------------
-  //  inter | 2Nx2N |        1         1 |         1          1
-  //        |  2NxN |       01       011 |        01         01
-  //        |  Nx2N |       00       001 |        00        001
-  //        |   NxN |        -         - |         -        000
-  //        | 2NxnU |        -      0100 |         -          -
-  //        | 2NxnD |        -      0101 |         -          -
-  //        | nLx2N |        -      0000 |         -          -
-  //        | nRx2N |        -      0001 |         -          -
-  // -------+-------+--------------------+----------------------
-  //
-  //
-  // Context indices from Table 9-37 of the HEVC spec:
-  //
-  //                                      binIdx
-  //                               |  0  1  2       3
-  // ------------------------------+------------------
-  //  log2CbSize == MinCbLog2SizeY |  0  1  2  bypass
-  //  log2CbSize >  MinCbLog2SizeY |  0  1  3  bypass
-  // ------------------------------+------------------
-  double bits = 0;
-  if (cur_cu->type == CU_INTRA) {
-    if (depth == MAX_DEPTH) {
-      cabac->cur_ctx = &(cabac->ctx.part_size_model[0]);
-      if (cur_cu->part_size == SIZE_2Nx2N) {
-        CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.part_size_model[0]), 1, bits, "part_mode 2Nx2N");
-      } else {
-        CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.part_size_model[0]), 0, bits, "part_mode NxN");
-      }
-    }
-  } else {
-
-    cabac->cur_ctx = &(cabac->ctx.part_size_model[0]);
-    if (cur_cu->part_size == SIZE_2Nx2N) {
-      CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.part_size_model[0]), 1, bits, "part_mode 2Nx2N");
-      return bits;
-    }
-    CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.part_size_model[0]), 0, bits, "part_mode split");
-
-    cabac->cur_ctx = &(cabac->ctx.part_size_model[1]);
-    if (cur_cu->part_size == SIZE_2NxN ||
-        cur_cu->part_size == SIZE_2NxnU ||
-        cur_cu->part_size == SIZE_2NxnD) {
-      CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.part_size_model[1]), 1, bits, "part_mode vertical");
-    } else {
-      CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.part_size_model[1]), 0, bits, "part_mode horizontal");
-    }
-
-    if (state->encoder_control->cfg.amp_enable && depth < MAX_DEPTH) {
-      cabac->cur_ctx = &(cabac->ctx.part_size_model[3]);
-
-      if (cur_cu->part_size == SIZE_2NxN ||
-          cur_cu->part_size == SIZE_Nx2N) {
-        CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.part_size_model[3]), 1, bits, "part_mode SMP");
-        return bits;
-      }
-      CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.part_size_model[3]), 0, bits, "part_mode AMP");
-
-      if (cur_cu->part_size == SIZE_2NxnU ||
-          cur_cu->part_size == SIZE_nLx2N) {
-        CABAC_BINS_EP(cabac, 0, 1, "part_mode AMP");
-        if(cabac->only_count) bits += 1;
-      } else {
-        CABAC_BINS_EP(cabac, 1, 1, "part_mode AMP");
-        if(cabac->only_count) bits += 1;
-      }
-    }
-  }
-  return bits;
-}
-**/
-
-
 bool uvg_write_split_flag(
   const encoder_state_t * const state,
   cabac_data_t* cabac,
@@ -1547,7 +1458,7 @@ void uvg_encode_coding_tree(
    // CABAC_BIN(cabac, 0, "split_transform_flag");
   }
 
-  DBG_YUVIEW_VALUE(state->frame->poc, DBG_YUVIEW_CU_TYPE, abs_x, abs_y, cu_width, cu_width, (cur_cu->type == CU_INTRA)?0:1);
+  DBG_YUVIEW_VALUE(state->frame->poc, DBG_YUVIEW_CU_TYPE, abs_x, abs_y, cu_width, cu_width, cur_cu->type-1);
 
   if (ctrl->cfg.lossless) {
     cabac->cur_ctx = &cabac->ctx.cu_transquant_bypass;
@@ -1555,7 +1466,7 @@ void uvg_encode_coding_tree(
   }
 
   // Encode skip flag
-  if (state->frame->slicetype != UVG_SLICE_I && cu_width != 4) {
+  if ((state->frame->slicetype != UVG_SLICE_I || state->encoder_control->cfg.ibc)) {
 
     int8_t ctx_skip = 0;
 
@@ -1565,11 +1476,22 @@ void uvg_encode_coding_tree(
     if (above_cu && above_cu->skipped) {
       ctx_skip++;
     }
-
-    cabac->cur_ctx = &(cabac->ctx.cu_skip_flag_model[ctx_skip]);
-    CABAC_BIN(cabac, cur_cu->skipped, "SkipFlag");
+    if (cu_width > 4 || state->encoder_control->cfg.ibc) {
+      cabac->cur_ctx = &(cabac->ctx.cu_skip_flag_model[ctx_skip]);
+      CABAC_BIN(cabac, cur_cu->skipped, "SkipFlag");
+    }
 
     if (cur_cu->skipped) {
+
+      if (state->encoder_control->cfg.ibc && state->frame->slicetype != UVG_SLICE_I)
+      { // ToDo: Only for luma channel
+        // ToDo: Disable for blocks over 64x64 pixels
+        int8_t ctx_ibc = 0;
+        if (left_cu && left_cu->type == CU_IBC) ctx_ibc++;
+        if (above_cu && above_cu->type == CU_IBC) ctx_ibc++;
+        cabac->cur_ctx = &(cabac->ctx.ibc_flag[ctx_ibc]);
+        CABAC_BIN(cabac, (cur_cu->type == CU_IBC), "IBCFlag");
+      }
       DBG_PRINT_MV(state, x, y, (uint32_t)cu_width, (uint32_t)cu_width, cur_cu);
       uvg_hmvp_add_mv(state, x, y, (uint32_t)cu_width, (uint32_t)cu_width, cur_cu);
       int16_t num_cand = state->encoder_control->cfg.max_merge;
@@ -1597,6 +1519,15 @@ void uvg_encode_coding_tree(
   }
 
   // Prediction mode
+  if ((state->frame->slicetype == UVG_SLICE_I || cu_width == 4) && state->encoder_control->cfg.ibc) { // ToDo: Only for luma channel
+    // ToDo: Disable for blocks over 64x64 pixels
+    int8_t ctx_ibc = 0;
+    if (left_cu && left_cu->type == CU_IBC) ctx_ibc++;
+    if (above_cu && above_cu->type == CU_IBC) ctx_ibc++;
+    cabac->cur_ctx = &(cabac->ctx.ibc_flag[ctx_ibc]);
+    CABAC_BIN(cabac, (cur_cu->type == CU_IBC), "IBCFlag");
+  }
+
   if (state->frame->slicetype != UVG_SLICE_I && cu_width != 4) {
 
     int8_t ctx_predmode = 0;
@@ -1607,6 +1538,15 @@ void uvg_encode_coding_tree(
 
     cabac->cur_ctx = &(cabac->ctx.cu_pred_mode_model[ctx_predmode]);
     CABAC_BIN(cabac, (cur_cu->type == CU_INTRA), "PredMode");
+
+    // We need IBC flag if the mode is signalled as Inter
+    if (state->encoder_control->cfg.ibc && cur_cu->type != CU_INTRA) {
+      int8_t ctx_ibc = 0;
+      if (left_cu && left_cu->type == CU_IBC) ctx_ibc++;
+      if (above_cu && above_cu->type == CU_IBC) ctx_ibc++;
+      cabac->cur_ctx = &(cabac->ctx.ibc_flag[ctx_ibc]);
+      CABAC_BIN(cabac, (cur_cu->type == CU_IBC), "IBCFlag");
+    }
   }
 
   // part_mode
@@ -1657,7 +1597,7 @@ void uvg_encode_coding_tree(
   } else 
 #endif
 
-  if (cur_cu->type == CU_INTER) {
+  if (cur_cu->type == CU_INTER || cur_cu->type == CU_IBC) {
     uint8_t imv_mode = UVG_IMV_OFF;
     
     const int num_pu = uvg_part_mode_num_parts[cur_cu->part_size];
@@ -1679,10 +1619,10 @@ void uvg_encode_coding_tree(
     // 0 = off, 1 = fullpel, 2 = 4-pel, 3 = half-pel
     if (ctrl->cfg.amvr && non_zero_mvd) {
       cabac->cur_ctx = &(cabac->ctx.imv_flag[0]);
-      CABAC_BIN(cabac, (imv_mode > UVG_IMV_OFF), "imv_flag");
+      if(cur_cu->type != CU_IBC) CABAC_BIN(cabac, (imv_mode > UVG_IMV_OFF), "imv_flag");
       if (imv_mode > UVG_IMV_OFF) {
         cabac->cur_ctx = &(cabac->ctx.imv_flag[4]);
-        CABAC_BIN(cabac, (imv_mode < UVG_IMV_HPEL), "imv_flag");
+        if(cur_cu->type != CU_IBC) CABAC_BIN(cabac, (imv_mode < UVG_IMV_HPEL), "imv_flag");
         if (imv_mode < UVG_IMV_HPEL) {
           cabac->cur_ctx = &(cabac->ctx.imv_flag[1]);
           CABAC_BIN(cabac, (imv_mode > UVG_IMV_FPEL), "imv_flag"); // 1 indicates 4PEL, 0 FPEL
@@ -1860,7 +1800,7 @@ double uvg_mock_encode_coding_unit(
     CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.cu_pred_mode_model[ctx_predmode]), (cur_cu->type == CU_INTRA), bits, "PredMode");
   }
   
-  if (cur_cu->type == CU_INTER) {
+  if (cur_cu->type == CU_INTER || cur_cu->type == CU_IBC) {
     const uint8_t imv_mode = UVG_IMV_OFF;
     const int non_zero_mvd = uvg_encode_inter_prediction_unit(state, cabac, cur_cu, x, y, cu_width, cu_width, depth, lcu, &bits);
     if (ctrl->cfg.amvr && non_zero_mvd) {
@@ -1897,35 +1837,38 @@ void uvg_encode_mvd(encoder_state_t * const state,
   const int8_t ver_abs_gr0 = mvd_ver != 0;
   const uint32_t mvd_hor_abs = abs(mvd_hor);
   const uint32_t mvd_ver_abs = abs(mvd_ver);
+  double         temp_bits_out = 0.0;
 
   cabac->cur_ctx = &cabac->ctx.cu_mvd_model[0];
-  CABAC_FBITS_UPDATE(cabac, &cabac->ctx.cu_mvd_model[0], (mvd_hor != 0), *bits_out, "abs_mvd_greater0_flag_hor");
-  CABAC_FBITS_UPDATE(cabac, &cabac->ctx.cu_mvd_model[0], (mvd_ver != 0), *bits_out, "abs_mvd_greater0_flag_ver");
+  CABAC_FBITS_UPDATE(cabac, &cabac->ctx.cu_mvd_model[0], (mvd_hor != 0), temp_bits_out, "abs_mvd_greater0_flag_hor");
+  CABAC_FBITS_UPDATE(cabac, &cabac->ctx.cu_mvd_model[0], (mvd_ver != 0), temp_bits_out, "abs_mvd_greater0_flag_ver");
 
   cabac->cur_ctx = &cabac->ctx.cu_mvd_model[1];
   if (hor_abs_gr0) {
-    CABAC_FBITS_UPDATE(cabac, &cabac->ctx.cu_mvd_model[1], (mvd_hor_abs>1), *bits_out,"abs_mvd_greater1_flag_hor");
+    CABAC_FBITS_UPDATE(cabac, &cabac->ctx.cu_mvd_model[1], (mvd_hor_abs>1), temp_bits_out,"abs_mvd_greater1_flag_hor");
   }
   if (ver_abs_gr0) {
-    CABAC_FBITS_UPDATE(cabac, &cabac->ctx.cu_mvd_model[1], (mvd_ver_abs>1), *bits_out, "abs_mvd_greater1_flag_ver");
+    CABAC_FBITS_UPDATE(cabac, &cabac->ctx.cu_mvd_model[1], (mvd_ver_abs>1), temp_bits_out, "abs_mvd_greater1_flag_ver");
   }
 
   if (hor_abs_gr0) {
     if (mvd_hor_abs > 1) {
       uint32_t bits = uvg_cabac_write_ep_ex_golomb(state, cabac, mvd_hor_abs - 2, 1);
-      if(cabac->only_count) *bits_out += bits;
+      if(cabac->only_count) temp_bits_out += bits;
     }
     uint32_t mvd_hor_sign = (mvd_hor > 0) ? 0 : 1;
     CABAC_BIN_EP(cabac, mvd_hor_sign, "mvd_sign_flag_hor");
-    if (cabac->only_count) *bits_out += 1;
+    if (cabac->only_count) temp_bits_out += 1;
   }
   if (ver_abs_gr0) {
     if (mvd_ver_abs > 1) {
       uint32_t bits = uvg_cabac_write_ep_ex_golomb(state, cabac, mvd_ver_abs - 2, 1);
-      if (cabac->only_count) *bits_out += bits;
+      if (cabac->only_count) temp_bits_out += bits;
     }
     uint32_t mvd_ver_sign = mvd_ver > 0 ? 0 : 1;
     CABAC_BIN_EP(cabac, mvd_ver_sign, "mvd_sign_flag_ver");
-    if (cabac->only_count) *bits_out += 1;
+    if (cabac->only_count) temp_bits_out += 1;
   }
+
+  if(bits_out) *bits_out = temp_bits_out;
 }
