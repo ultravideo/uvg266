@@ -922,19 +922,18 @@ static void search_pu_ibc(
         cur_pu->inter.mv_dir    = info->merge_cand[merge_idx].dir;
         cur_pu->inter.mv[0][0]  = info->merge_cand[merge_idx].mv[0][0];
         cur_pu->inter.mv[0][1]  = info->merge_cand[merge_idx].mv[0][1];
-        uvg_lcu_fill_trdepth(lcu, cu_loc->x, cu_loc->y, depth, MAX(1, depth), UVG_BOTH_T);
         uvg_inter_recon_cu(state, lcu, true, false, cu_loc);
-        uvg_quantize_lcu_residual(state, true, false, false, cu_loc, depth, cur_pu, lcu, true, UVG_BOTH_T);
+        uvg_quantize_lcu_residual(state, true, false, false, cu_loc, cur_pu, lcu, true, UVG_BOTH_T);
 
-        if (cbf_is_set(cur_pu->cbf, depth, COLOR_Y)) {
+        if (cbf_is_set(cur_pu->cbf, COLOR_Y)) {
           continue;
         }
         else if (has_chroma) {
           uvg_inter_recon_cu(state, lcu, false, has_chroma, cu_loc);
           uvg_quantize_lcu_residual(state, false, has_chroma, 
             false, /*we are only checking for lack of coeffs so no need to check jccr*/
-            cu_loc, depth, cur_pu, lcu, true, UVG_BOTH_T);
-          if (!cbf_is_set_any(cur_pu->cbf, depth)) {
+            cu_loc, cur_pu, lcu, true, UVG_BOTH_T);
+          if (!cbf_is_set_any(cur_pu->cbf)) {
             cur_pu->type = CU_IBC;
             cur_pu->merge_idx = merge_idx;
             cur_pu->skipped = true;
@@ -1112,8 +1111,6 @@ static int uvg_search_hash_cu_ibc(encoder_state_t* const state,
   info.num_merge_cand = uvg_inter_get_merge_cand(
     state,
     cu_loc,
-    merge_a1,
-    merge_b1,
     info.merge_cand,
     lcu);
 
@@ -1127,11 +1124,6 @@ static int uvg_search_hash_cu_ibc(encoder_state_t* const state,
   static double crc_time    = 0.0;
   static int    evaluations = 0;
   static int hits = 0;
-
-
-  UVG_CLOCK_T   hashmap_start_temp;
-  UVG_CLOCK_T   hashmap_end_temp;
-
 
   UVG_CLOCK_T   hashmap_start_real_time;
   UVG_CLOCK_T   hashmap_end_real_time;
@@ -1194,7 +1186,7 @@ static int uvg_search_hash_cu_ibc(encoder_state_t* const state,
           if (full_block) {
             double     cost = ibc_cost, bits = ibc_bitcost;
             vector2d_t mv = { best_mv_x, best_mv_y};
-            cost = calc_ibc_mvd_cost(state, mv_x, mv_y,INTERNAL_MV_PREC,info.mv_cand, info.merge_cand, info.num_merge_cand, NULL, &bits);
+            cost = calc_ibc_mvd_cost(state, mv_x, mv_y,INTERNAL_MV_PREC,info.mv_cand, info.merge_cand, info.num_merge_cand, 0, &bits);
             //double cost    = get_ibc_mvd_coding_cost(state, &state->cabac, mv_x,mv_y) * state->lambda_sqrt;
             //cost += 
             bool better_mv = cost < ibc_cost;
@@ -1221,7 +1213,7 @@ static int uvg_search_hash_cu_ibc(encoder_state_t* const state,
   //if (x > state->tile->frame->width-64 && y > state->tile->frame->height-64)
     //fprintf(stderr, "Hashmap time: %f (crc: %f, search: %f) Evaluations: %d Hits: %d, hashed in this block: %d\n", time_spent,crc_time, search_time, evaluations, hits,hashes_found);
    
-  if (!found_block) return;
+  if (!found_block) return 0;
 
   *inter_cost    = ibc_cost;
   *inter_bitcost = ibc_bitcost;
@@ -1250,7 +1242,7 @@ static int uvg_search_hash_cu_ibc(encoder_state_t* const state,
   cur_pu->skipped = merged;
   
 
-  const int ibc_flag = CTX_ENTROPY_FBITS(&state->search_cabac.ctx.ibc_flag[0], 1);
+  const float ibc_flag = CTX_ENTROPY_FBITS(&state->search_cabac.ctx.ibc_flag[0], 1);
   ibc_cost += ibc_flag * state->lambda;
   ibc_bitcost += ibc_flag;
 
@@ -1267,7 +1259,7 @@ static int uvg_search_hash_cu_ibc(encoder_state_t* const state,
       cur_pu->inter.mv[0][0],
       cur_pu->inter.mv[0][1]));
   }
-
+  return 1;
 }
 
 
@@ -1313,7 +1305,6 @@ void uvg_search_cu_ibc(encoder_state_t * const state,
 
   search_pu_ibc(state,
                   cu_loc,
-                  SIZE_2Nx2N, 0,
                   amvp,
                   &merge,
                   &info);

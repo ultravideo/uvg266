@@ -1591,8 +1591,7 @@ static double search_cu(
       lcu_fill_cbf(lcu, x_local, y_local, cu_width, cu_height, cur_cu, UVG_BOTH_T);
     }
   }
-
-  if (cur_cu->type == CU_INTRA || cur_cu->type == CU_INTER || cur_cu->type == CU_IBC) {
+  
   // The cabac functions assume chroma locations whereas the search uses luma locations
   // for the chroma tree, therefore we need to shift the chroma coordinates here for
   // passing to the bit cost calculating functions.
@@ -1602,7 +1601,7 @@ static double search_cu(
   separate_tree_chroma_loc.width >>= 1;
   separate_tree_chroma_loc.height >>= 1;
 
-  if (cur_cu->type == CU_INTRA || cur_cu->type == CU_INTER) {
+  if (cur_cu->type == CU_INTRA || cur_cu->type == CU_INTER || cur_cu->type == CU_IBC) {
     double bits = 0;
     cabac_data_t* cabac  = &state->search_cabac;
     cabac->update = 1;
