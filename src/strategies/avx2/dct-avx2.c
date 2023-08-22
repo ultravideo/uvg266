@@ -8095,6 +8095,7 @@ static void mts_dct_avx2(
   else{
     const int log2_width_minus1  = uvg_g_convert_to_log2[width] - 1;
     const int log2_height_minus1 = uvg_g_convert_to_log2[height] - 1;
+    // Transforms with 1 lenght dimensions are handled separately since their interface differ from other full pass functions
     if (height == 1) {
       if (width == 16) {
         fast_forward_DCT2_B16_avx2_hor(input, (__m256i*)output, type_hor == DCT2 ? ff_dct2_16xN_coeff_hor : ff_dst7_16xN_coeff_hor, 3, 1, 0, 0);
@@ -8140,7 +8141,8 @@ static void mts_idct_avx2(
   else {
     const int log2_width_minus1  = uvg_g_convert_to_log2[width] - 1;
     const int log2_height_minus1 = uvg_g_convert_to_log2[height] - 1;
-        if (height == 1) {
+    // Transforms with 1 lenght dimensions can be transformed with existing forward functions
+    if (height == 1) {
       if (width == 16) {
         fast_forward_DCT2_B16_avx2_hor(input, (__m256i*)output, type_hor == DCT2 ? fi_dct2_16x1_coeff_hor : fi_dst7_16x1_coeff_hor, 13, 1, 0, 0);
         _mm256_store_si256((__m256i*)output, _mm256_permute4x64_epi64(_mm256_load_si256((__m256i*)output), _MM_SHUFFLE(3, 1, 2, 0)));
