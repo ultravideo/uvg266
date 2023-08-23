@@ -781,7 +781,7 @@ static double cu_rd_cost_tr_split_accurate(
 
   const int cb_flag_y = cbf_is_set(tr_cu->cbf, COLOR_Y) && tree_type != UVG_CHROMA_T;
 
-  const bool is_isp = !(pred_cu->type == CU_INTER || pred_cu->intra.isp_mode == ISP_MODE_NO_ISP);
+  const bool is_isp = !(pred_cu->type != CU_INTRA || pred_cu->intra.isp_mode == ISP_MODE_NO_ISP);
   // Add transform_tree cbf_luma bit cost.
   if (!is_isp) {
     const int is_tr_split = cu_loc->width > TR_MAX_WIDTH || cu_loc->height > TR_MAX_WIDTH;
@@ -839,7 +839,7 @@ static double cu_rd_cost_tr_split_accurate(
       CABAC_FBITS_UPDATE(cabac, &cabac->ctx.transform_skip_model_luma, tr_cu->tr_idx == MTS_SKIP, luma_bits, "transform_skip_flag");
     }
     int8_t luma_scan_mode = SCAN_DIAG;
-    if (pred_cu->type == CU_INTER || pred_cu->intra.isp_mode == ISP_MODE_NO_ISP) {
+    if (pred_cu->type != CU_INTRA || pred_cu->intra.isp_mode == ISP_MODE_NO_ISP) {
       //const coeff_t* coeffs = &lcu->coeff.y[xy_to_zorder(LCU_WIDTH, x_px, y_px)];
       const coeff_t* coeffs = lcu->coeff.y;
 
@@ -1290,7 +1290,7 @@ static double search_cu(
     cur_cu->log2_chroma_width = uvg_g_convert_to_log2[chroma_loc->chroma_width];
   }
 
-  intra_search_data_t intra_search;
+  intra_search_data_t intra_search = {0};
 
   const bool completely_inside = x + luma_width <= frame_width && y + luma_height <= frame_height;
   // If the CU is completely inside the frame at this depth, search for
