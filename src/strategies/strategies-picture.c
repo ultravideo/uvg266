@@ -37,6 +37,7 @@
 #include "strategies/generic/picture-generic.h"
 #include "strategies/sse2/picture-sse2.h"
 #include "strategies/sse41/picture-sse41.h"
+#include "strategies/sse42/picture-sse42.h"
 #include "strategyselector.h"
 
 

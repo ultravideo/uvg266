@@ -75,7 +75,8 @@ typedef struct {
    * \brief Possible optimized SAD implementation for the width, leave as
    *        NULL for arbitrary-width blocks
    */
-  optimized_sad_func_ptr_t optimized_sad;
+  optimized_sad_func_ptr_t optimized_sad_y;
+  optimized_sad_func_ptr_t optimized_sad_uv;
 
   lcu_t                   *lcu;
 
@@ -166,12 +167,15 @@ static uint32_t calculate_ibc_cost_satd(const encoder_state_t *state, lcu_t* lcu
 }
 
 
-static uint32_t calculate_ibc_cost_sad(const encoder_state_t *state, optimized_sad_func_ptr_t optimized_sad, lcu_t* lcu, const cu_loc_t* loc, int32_t mv_x, int32_t mv_y)
+static uint32_t calculate_ibc_cost_sad(ibc_search_info_t *info, const cu_loc_t* loc, int32_t mv_x, int32_t mv_y)
 {  
   const uint32_t x = loc->x;
   const uint32_t y = loc->y;
-  cu_info_t *cur_cu    = LCU_GET_CU_AT_PX(lcu, SUB_SCU(x), SUB_SCU(y));
-
+  lcu_t         *lcu    = info->lcu;
+  cu_info_t     *cur_cu     = LCU_GET_CU_AT_PX(lcu, SUB_SCU(x), SUB_SCU(y));
+  
+  const encoder_state_t* state = info->state;
+  
   cu_info_t cu_backup  = *cur_cu;
   uint32_t       cost  = MAX_INT;
 
@@ -195,19 +199,22 @@ static uint32_t calculate_ibc_cost_sad(const encoder_state_t *state, optimized_s
   
   *cur_cu = cu_backup;
 
-  if (optimized_sad != NULL) {
-    cost = optimized_sad(lcu->rec.y + offset, &state->tile->frame->source->y[y * state->tile->frame->source->stride + x], width, LCU_WIDTH, state->tile->frame->source->stride);
-    if(state->encoder_control->chroma_format != UVG_CSP_400) {
-      cost += optimized_sad(lcu->rec.u + offset_c, &state->tile->frame->source->u[(y / 2) * state->tile->frame->source->stride / 2 + x / 2], width / 2, LCU_WIDTH_C, state->tile->frame->source->stride / 2);
-      cost += optimized_sad(lcu->rec.v + offset_c, &state->tile->frame->source->v[(y / 2) * state->tile->frame->source->stride / 2 + x / 2], width / 2, LCU_WIDTH_C, state->tile->frame->source->stride / 2);
-    }
+  if (info->optimized_sad_y != NULL) {
+    cost = info->optimized_sad_y(lcu->rec.y + offset, &state->tile->frame->source->y[y * state->tile->frame->source->stride + x], width, LCU_WIDTH, state->tile->frame->source->stride);
   } else {
     cost = uvg_reg_sad(lcu->rec.y + offset, &state->tile->frame->source->y[y * state->tile->frame->source->stride + x], width,width, LCU_WIDTH, state->tile->frame->source->stride);
-    if(state->encoder_control->chroma_format != UVG_CSP_400) {
+  }
+
+  // ToDo: Enable chroma cost calculation
+  /* if (state->encoder_control->chroma_format != UVG_CSP_400) {
+    if (info->optimized_sad_uv != NULL) {    
+      cost += info->optimized_sad_uv(lcu->rec.u + offset_c, &state->tile->frame->source->u[(y / 2) * state->tile->frame->source->stride / 2 + x / 2], width / 2, LCU_WIDTH_C, state->tile->frame->source->stride / 2);
+      cost += info->optimized_sad_uv(lcu->rec.v + offset_c, &state->tile->frame->source->v[(y / 2) * state->tile->frame->source->stride / 2 + x / 2], width / 2, LCU_WIDTH_C, state->tile->frame->source->stride / 2);
+    } else {
       cost += uvg_reg_sad(lcu->rec.u + offset_c, &state->tile->frame->source->u[(y / 2) * state->tile->frame->source->stride / 2 + x / 2], width / 2, width / 2, LCU_WIDTH_C, state->tile->frame->source->stride / 2);
       cost += uvg_reg_sad(lcu->rec.v + offset_c, &state->tile->frame->source->v[(y / 2) * state->tile->frame->source->stride / 2 + x / 2], width / 2, width / 2, LCU_WIDTH_C, state->tile->frame->source->stride / 2);
     }
-  }
+  }*/
 
   return cost;
 }
@@ -247,7 +254,7 @@ static bool check_mv_cost(ibc_search_info_t *info,
   uvg_cu_loc_ctor(&loc, info->origin.x, info->origin.y, info->width, info->height);
 
 
-  cost = calculate_ibc_cost_sad(info->state, info->optimized_sad, info->lcu, &loc, x, y);
+  cost = calculate_ibc_cost_sad(info, &loc, x, y);
 
   if (cost >= *best_cost) return false;
 
@@ -826,7 +833,8 @@ static void search_pu_ibc(
   info->height   = height_cu;
   info->mvd_cost_func =
     cfg->mv_rdo ? uvg_calc_ibc_mvd_cost_cabac : calc_ibc_mvd_cost;
-  info->optimized_sad = uvg_get_optimized_sad(width_cu);
+  info->optimized_sad_y  = uvg_get_optimized_sad(width_cu);
+  info->optimized_sad_uv = uvg_get_optimized_sad(cu_loc->chroma_width);
   info->lcu           = lcu;
 
   // Search for merge mode candidates
@@ -1104,7 +1112,8 @@ static int uvg_search_hash_cu_ibc(encoder_state_t* const state,
   info.height   = height_cu;
   info.mvd_cost_func =
     cfg->mv_rdo ? uvg_calc_ibc_mvd_cost_cabac : calc_ibc_mvd_cost;
-  info.optimized_sad  = uvg_get_optimized_sad(width_cu);
+  info.optimized_sad_y  = uvg_get_optimized_sad(width_cu);
+  info.optimized_sad_uv = uvg_get_optimized_sad(cu_loc->chroma_width);
   info.lcu            = lcu;
 
   // Search for merge mode candidates
