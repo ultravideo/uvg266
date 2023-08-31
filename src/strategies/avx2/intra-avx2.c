@@ -34,13 +34,19 @@
 
 #if COMPILE_INTEL_AVX2 && defined X86_64
 #include "uvg266.h"
+#include "cu.h"
+#include "tables.h"
 #if UVG_BIT_DEPTH == 8
 
 #include <immintrin.h>
 #include <stdlib.h>
+#include <assert.h>
+#include <string.h>
 
-#include "strategyselector.h"
-#include "strategies/missing-intel-intrinsics.h"
+#include "intra-avx2.h"
+
+ #include "strategyselector.h"
+ #include "strategies/missing-intel-intrinsics.h"
 
  /**
  * \brief Generate angular predictions.
@@ -1066,8 +1072,10 @@ static void uvg_pdpc_planar_dc_avx2(
   }
 }
 
-#endif //UVG_BIT_DEPTH == 8
-#endif //COMPILE_INTEL_AVX2 && defined X86_64
+#endif // UVG_BIT_DEPTH == 8
+
+#endif // COMPILE_INTEL_AVX2 && defined X86_64
+
 
 int uvg_strategy_register_intra_avx2(void* opaque, uint8_t bitdepth)
 {
