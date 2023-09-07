@@ -515,7 +515,7 @@ static void uvg_angular_pred_avx2(
  * \param in_ref_left   Pointer to -1 index of left reference, length=width*2+1.
  * \param dst           Buffer of size width*width.
  */
-static void uvg_intra_pred_planar_avx2(
+static void uvg_intra_pred_planar_avx2_old(
   const cu_loc_t* const cu_loc,
   color_t color,
   const uint8_t *const ref_top,
@@ -615,6 +615,142 @@ static void uvg_intra_pred_planar_avx2(
     _mm_storeu_si128((__m128i *)dst, result);
   }
 }
+
+
+typedef void (intra_planar_half_func)(const uvg_pixel* ref, const int line, const int shift, __m256i* dst);
+
+// w1 and w2 for planar horizontal do not exist, since intra prediction must be at least of width 4
+// Also worth noting is that minimum amount of samples must be 16, 
+// therefore the smallest possible predictions are 4x4, 8x2 and 16x1
+static void intra_pred_planar_hor_w4(const uvg_pixel* ref, const int line, const int shift, __m256i* dst) {}
+static void intra_pred_planar_hor_w8(const uvg_pixel* ref, const int line, const int shift, __m256i* dst)
+{
+  const __m256i v_last_ref = _mm256_set1_epi16(ref[8 + 1]);
+
+  __m256i v_ref_coeff = _mm256_setr_epi16(7, 6, 5, 4, 3, 2, 1, 0, 7, 6, 5, 4, 3, 2, 1, 0);
+  __m256i v_last_ref_coeff = _mm256_setr_epi16(1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
+
+  __m256i v_last_ref_mul = _mm256_mullo_epi16(v_last_ref, v_last_ref_coeff);
+
+  for (int i = 0, d = 0; i < line; i += 2, ++d) {
+    // Handle 2 lines at a time
+    __m128i v_ref0 = _mm_set1_epi16(ref[i + 1]);
+    __m128i v_ref1 = _mm_set1_epi16(ref[i + 2]);
+
+    __m256i v_ref = _mm256_castsi128_si256(v_ref0);
+    v_ref = _mm256_inserti128_si256(v_ref, v_ref1, 1);
+
+    __m256i v_tmp = _mm256_mullo_epi16(v_ref, v_ref_coeff);
+
+    v_tmp = _mm256_add_epi16(v_last_ref_mul, v_tmp);
+    dst[d] = _mm256_slli_epi16(v_tmp, shift);
+  }
+}
+static void intra_pred_planar_hor_w16(const uvg_pixel* ref, const int line, const int shift, __m256i* dst) {}
+static void intra_pred_planar_hor_w32(const uvg_pixel* ref, const int line, const int shift, __m256i* dst) {}
+
+static void intra_pred_planar_ver_w1(const uvg_pixel* ref, const int line, const int shift, __m256i* dst) {}
+static void intra_pred_planar_ver_w2(const uvg_pixel* ref, const int line, const int shift, __m256i* dst) {}
+static void intra_pred_planar_ver_w4(const uvg_pixel* ref, const int line, const int shift, __m256i* dst) {}
+static void intra_pred_planar_ver_w8(const uvg_pixel* ref, const int line, const int shift, __m256i* dst) 
+{
+  const __m256i v_last_ref = _mm256_set1_epi8(ref[line + 1]);
+  
+  // Got eight 8-bit samples, or 64 bits of data. Duplicate to fill a whole 256-bit vector.
+  const __m128i v_ref_raw = _mm_load_si128((const __m128i*)&ref[1]);
+  __m256i v_ref = _mm256_castsi128_si256(v_ref_raw);
+  v_ref = _mm256_inserti128_si256(v_ref, v_ref_raw, 1);
+  v_ref = _mm256_shuffle_epi32(v_ref, _MM_SHUFFLE(1, 1, 0, 0));
+
+  // Handle 4 lines at a time, unless line == 2
+  for (int y = 0, d = 0; y < line; y += 4, d += 2) {
+    const int a1 = line - 1 - (y + 0);
+    const int b1 = (y + 0) + 1;
+    const int a2 = line - 1 - (y + 1);
+    const int b2 = (y + 1) + 1;
+    const int a3 = line - 1 - (y + 2);
+    const int b3 = (y + 2) + 1;
+    const int a4 = line - 1 - (y + 3);
+    const int b4 = (y + 3) + 1;
+    __m256i v_ys = _mm256_setr_epi8(a1, b1, a1, b1, a1, b1, a1, b1, 
+                                    a2, b2, a2, b2, a2, b2, a2, b2, 
+                                    a3, b3, a3, b3, a3, b3, a3, b3, 
+                                    a4, b4, a4, b4, a4, b4, a4, b4); // TODO: these could be loaded from a table
+    __m256i v_lo = _mm256_unpacklo_epi8(v_ref, v_last_ref);
+    __m256i v_hi = _mm256_unpackhi_epi8(v_ref, v_last_ref);
+
+    __m256i v_madd_lo = _mm256_maddubs_epi16(v_lo, v_ys);
+    __m256i v_madd_hi = _mm256_maddubs_epi16(v_hi, v_ys);
+    v_madd_lo = _mm256_slli_epi16(v_madd_lo, shift);
+    v_madd_hi = _mm256_slli_epi16(v_madd_hi, shift);
+    __m256i v_tmp0 = _mm256_permute2x128_si256(v_madd_lo, v_madd_hi, 0x20);
+    __m256i v_tmp1 = _mm256_permute2x128_si256(v_madd_lo, v_madd_hi, 0x31);
+
+    dst[d + 0] = _mm256_permute4x64_epi64(v_tmp0, _MM_SHUFFLE(3, 1, 2, 0));
+    dst[d + 1] = _mm256_permute4x64_epi64(v_tmp1, _MM_SHUFFLE(3, 1, 2, 0));
+  }
+
+  //__m256i v_tmp = _mm256_maddubs_epi16
+  
+}
+static void intra_pred_planar_ver_w16(const uvg_pixel* ref, const int line, const int shift, __m256i* dst) {}
+static void intra_pred_planar_ver_w32(const uvg_pixel* ref, const int line, const int shift, __m256i* dst) {}
+
+
+static intra_planar_half_func* planar_func_table[2][6] = {
+  {                    NULL,                      NULL,  intra_pred_planar_hor_w4,  intra_pred_planar_hor_w8, intra_pred_planar_hor_w16, intra_pred_planar_hor_w32,},
+  {intra_pred_planar_ver_w1,  intra_pred_planar_ver_w2,  intra_pred_planar_ver_w4,  intra_pred_planar_ver_w8, intra_pred_planar_ver_w16, intra_pred_planar_ver_w32,}
+};
+
+
+void uvg_intra_pred_planar_avx2(const cu_loc_t* const cu_loc,
+  color_t color,
+  const uint8_t* const ref_top,
+  const uint8_t* const ref_left,
+  uint8_t* const dst)
+{
+  const int width = color == COLOR_Y ? cu_loc->width : cu_loc->chroma_width;
+  const int height = color == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
+  const int samples = width * height;
+  const __m256i v_samples = _mm256_set1_epi16(samples);
+
+  const int log2_width = uvg_g_convert_to_log2[width];
+  const int log2_height = uvg_g_convert_to_log2[height];
+  const int shift_r = log2_width + log2_height + 1;
+  
+  __m256i v_pred_hor[64];
+  __m256i v_pred_ver[64];
+
+  intra_planar_half_func* planar_hor = planar_func_table[0][log2_width];
+  intra_planar_half_func* planar_ver = planar_func_table[1][log2_width];
+
+  planar_hor(ref_left, height, log2_height, v_pred_hor);
+  planar_ver(ref_top, height, log2_width, v_pred_ver);
+
+  // debug
+  int16_t* hor_res = (int16_t*)v_pred_hor;
+  int16_t* ver_res = (int16_t*)v_pred_ver;
+
+  __m256i v_res[64];
+  for (int i = 0, d = 0; i < samples; i += 16, ++d) {
+    v_res[d] = _mm256_add_epi16(v_pred_ver[d], v_pred_hor[d]);
+    v_res[d] = _mm256_add_epi16(v_res[d], v_samples);
+    v_res[d] = _mm256_srli_epi16(v_res[d], shift_r);
+  }
+
+  // debug
+  int16_t* res = (int16_t*)v_res;
+
+  /*if (samples == 16) {
+
+  }
+  else {
+    for (int i = 0, s = 0; i < samples; i += 16, s += 2) {
+      _mm256_store_si256((__m256i*)dst[i], _mm256_packus_epi16(v_res[s + 0], v_res[s + 1]));
+    }
+  }*/
+}
+
 
 // Calculate the DC value for a 4x4 block. The algorithm uses slightly
 // different addends, multipliers etc for different pixels in the block,
