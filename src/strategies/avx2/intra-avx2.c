@@ -622,7 +622,26 @@ typedef void (intra_planar_half_func)(const uvg_pixel* ref, const int line, cons
 // w1 and w2 for planar horizontal do not exist, since intra prediction must be at least of width 4
 // Also worth noting is that minimum amount of samples must be 16, 
 // therefore the smallest possible predictions are 4x4, 8x2 and 16x1
-static void intra_pred_planar_hor_w4(const uvg_pixel* ref, const int line, const int shift, __m256i* dst) {}
+static void intra_pred_planar_hor_w4(const uvg_pixel* ref, const int line, const int shift, __m256i* dst)
+{
+  const __m256i v_last_ref = _mm256_set1_epi16(ref[4 + 1]);
+
+  __m256i v_ref_coeff = _mm256_setr_epi16(3, 2, 1, 0, 3, 2, 1, 0, 3, 2, 1, 0, 3, 2, 1, 0);
+  __m256i v_last_ref_coeff = _mm256_setr_epi16(1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4);
+
+  __m256i v_last_ref_mul = _mm256_mullo_epi16(v_last_ref, v_last_ref_coeff);
+
+  for (int i = 0, d = 0; i < line; i += 4, ++d) {
+    // Handle 4 lines at a time
+    __m256i v_ref = _mm256_setr_epi16(ref[i + 1], ref[i + 1], ref[i + 1], ref[i + 1], ref[i + 2], ref[i + 2], ref[i + 2], ref[i + 2], 
+                                      ref[i + 3], ref[i + 3], ref[i + 3], ref[i + 3], ref[i + 4], ref[i + 4], ref[i + 4], ref[i + 4]);
+
+    __m256i v_tmp = _mm256_mullo_epi16(v_ref, v_ref_coeff);
+
+    v_tmp = _mm256_add_epi16(v_last_ref_mul, v_tmp);
+    dst[d] = _mm256_slli_epi16(v_tmp, shift);
+  }
+}
 static void intra_pred_planar_hor_w8(const uvg_pixel* ref, const int line, const int shift, __m256i* dst)
 {
   const __m256i v_last_ref = _mm256_set1_epi16(ref[8 + 1]);
@@ -651,7 +670,35 @@ static void intra_pred_planar_hor_w32(const uvg_pixel* ref, const int line, cons
 
 static void intra_pred_planar_ver_w1(const uvg_pixel* ref, const int line, const int shift, __m256i* dst) {}
 static void intra_pred_planar_ver_w2(const uvg_pixel* ref, const int line, const int shift, __m256i* dst) {}
-static void intra_pred_planar_ver_w4(const uvg_pixel* ref, const int line, const int shift, __m256i* dst) {}
+static void intra_pred_planar_ver_w4(const uvg_pixel* ref, const int line, const int shift, __m256i* dst)
+{
+  const __m256i v_last_ref = _mm256_set1_epi8(ref[line + 1]);
+
+  // Got four 8-bit references, or 32 bits of data. Duplicate to fill a whole 256-bit vector.
+  const uint32_t* tmp = (const uint32_t*)&ref[1]; // Cast to 32 bit int to load 4 refs at the same time
+  const __m256i v_ref = _mm256_set1_epi32(*tmp);
+
+  // Handle 4 lines at a time
+  for (int y = 0, d = 0; y < line; y += 4, ++d) {
+    const int a1 = line - 1 - (y + 0);
+    const int a2 = line - 1 - (y + 1);
+    const int a3 = line - 1 - (y + 2);
+    const int a4 = line - 1 - (y + 3);
+    const int b1 = (y + 0) + 1;
+    const int b2 = (y + 1) + 1;
+    const int b3 = (y + 2) + 1;
+    const int b4 = (y + 3) + 1;
+
+    __m256i v_ys = _mm256_setr_epi8(a1, b1, a1, b1, a1, b1, a1, b1,
+                                    a2, b2, a2, b2, a2, b2, a2, b2,
+                                    a3, b3, a3, b3, a3, b3, a3, b3,
+                                    a4, b4, a4, b4, a4, b4, a4, b4); // TODO: these could be loaded from a table
+    __m256i v_lo = _mm256_unpacklo_epi8(v_ref, v_last_ref);
+
+    __m256i v_madd_lo = _mm256_maddubs_epi16(v_lo, v_ys);
+    dst[d] = _mm256_slli_epi16(v_madd_lo, shift);
+  }
+}
 static void intra_pred_planar_ver_w8(const uvg_pixel* ref, const int line, const int shift, __m256i* dst) 
 {
   const __m256i v_last_ref = _mm256_set1_epi8(ref[line + 1]);
@@ -689,9 +736,6 @@ static void intra_pred_planar_ver_w8(const uvg_pixel* ref, const int line, const
     dst[d + 0] = _mm256_permute4x64_epi64(v_tmp0, _MM_SHUFFLE(3, 1, 2, 0));
     dst[d + 1] = _mm256_permute4x64_epi64(v_tmp1, _MM_SHUFFLE(3, 1, 2, 0));
   }
-
-  //__m256i v_tmp = _mm256_maddubs_epi16
-  
 }
 static void intra_pred_planar_ver_w16(const uvg_pixel* ref, const int line, const int shift, __m256i* dst) {}
 static void intra_pred_planar_ver_w32(const uvg_pixel* ref, const int line, const int shift, __m256i* dst) {}
