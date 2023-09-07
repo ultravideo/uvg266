@@ -665,7 +665,24 @@ static void intra_pred_planar_hor_w8(const uvg_pixel* ref, const int line, const
     dst[d] = _mm256_slli_epi16(v_tmp, shift);
   }
 }
-static void intra_pred_planar_hor_w16(const uvg_pixel* ref, const int line, const int shift, __m256i* dst) {}
+static void intra_pred_planar_hor_w16(const uvg_pixel* ref, const int line, const int shift, __m256i* dst)
+{
+  const __m256i v_last_ref = _mm256_set1_epi16(ref[16 + 1]);
+
+  __m256i v_ref_coeff = _mm256_setr_epi16(15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0);
+  __m256i v_last_ref_coeff = _mm256_setr_epi16(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16);
+
+  __m256i v_last_ref_mul = _mm256_mullo_epi16(v_last_ref, v_last_ref_coeff);
+
+  for (int i = 0, d = 0; i < line; ++i, ++d) {
+    __m256i v_ref = _mm256_set1_epi16(ref[i + 1]);
+
+    __m256i v_tmp = _mm256_mullo_epi16(v_ref, v_ref_coeff); // TODO: the result is needed immediately after this. This leads to NOPs, consider doing multiple lines at a time
+
+    v_tmp = _mm256_add_epi16(v_last_ref_mul, v_tmp);
+    dst[d] = _mm256_slli_epi16(v_tmp, shift);
+  }
+}
 static void intra_pred_planar_hor_w32(const uvg_pixel* ref, const int line, const int shift, __m256i* dst) {}
 
 static void intra_pred_planar_ver_w1(const uvg_pixel* ref, const int line, const int shift, __m256i* dst) {}
@@ -737,7 +754,36 @@ static void intra_pred_planar_ver_w8(const uvg_pixel* ref, const int line, const
     dst[d + 1] = _mm256_permute4x64_epi64(v_tmp1, _MM_SHUFFLE(3, 1, 2, 0));
   }
 }
-static void intra_pred_planar_ver_w16(const uvg_pixel* ref, const int line, const int shift, __m256i* dst) {}
+static void intra_pred_planar_ver_w16(const uvg_pixel* ref, const int line, const int shift, __m256i* dst)
+{
+  const __m256i v_last_ref = _mm256_set1_epi8(ref[line + 1]);
+
+  // Got 16 8-bit samples, or 128 bits of data. Duplicate to fill a whole 256-bit vector.
+  const __m128i v_ref_raw = _mm_load_si128((const __m128i*) &ref[1]);
+  __m256i v_ref = _mm256_castsi128_si256(v_ref_raw);
+  v_ref = _mm256_inserti128_si256(v_ref, v_ref_raw, 1);
+
+  // Handle 2 lines at a time
+  for (int y = 0; y < line; y += 2) {
+    const int a1 = line - 1 - (y + 0);
+    const int b1 = (y + 0) + 1;
+    const int a2 = line - 1 - (y + 1);
+    const int b2 = (y + 1) + 1;
+    __m256i v_ys = _mm256_setr_epi8(a1, b1, a1, b1, a1, b1, a1, b1,
+                                    a1, b1, a1, b1, a1, b1, a1, b1,
+                                    a2, b2, a2, b2, a2, b2, a2, b2,
+                                    a2, b2, a2, b2, a2, b2, a2, b2); // TODO: these could be loaded from a table
+    __m256i v_lo = _mm256_unpacklo_epi8(v_ref, v_last_ref);
+    __m256i v_hi = _mm256_unpackhi_epi8(v_ref, v_last_ref);
+
+    __m256i v_madd_lo = _mm256_maddubs_epi16(v_lo, v_ys);
+    __m256i v_madd_hi = _mm256_maddubs_epi16(v_hi, v_ys);
+    v_madd_lo = _mm256_slli_epi16(v_madd_lo, shift);
+    v_madd_hi = _mm256_slli_epi16(v_madd_hi, shift);
+    dst[y + 0] = _mm256_permute2x128_si256(v_madd_lo, v_madd_hi, 0x20);
+    dst[y + 1] = _mm256_permute2x128_si256(v_madd_lo, v_madd_hi, 0x31);
+  }
+}
 static void intra_pred_planar_ver_w32(const uvg_pixel* ref, const int line, const int shift, __m256i* dst) {}
 
 
