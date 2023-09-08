@@ -797,7 +797,7 @@ void uvg_intra_pred_planar_avx2(const cu_loc_t* const cu_loc,
   color_t color,
   const uint8_t* const ref_top,
   const uint8_t* const ref_left,
-  uint8_t* const dst)
+  uint8_t* dst)
 {
   const int width = color == COLOR_Y ? cu_loc->width : cu_loc->chroma_width;
   const int height = color == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
@@ -831,14 +831,20 @@ void uvg_intra_pred_planar_avx2(const cu_loc_t* const cu_loc,
   // debug
   int16_t* res = (int16_t*)v_res;
 
-  /*if (samples == 16) {
-
+  if (samples == 16) {
+    __m256i v_tmp = _mm256_packus_epi16(v_res[0], v_res[0]);
+    v_tmp = _mm256_permute4x64_epi64(v_tmp, _MM_SHUFFLE(3, 1, 2, 0));
+    __m128i v_tmp2 = _mm256_castsi256_si128(v_tmp);
+    _mm_store_si128((__m128i*)dst, v_tmp2);
   }
   else {
-    for (int i = 0, s = 0; i < samples; i += 16, s += 2) {
-      _mm256_store_si256((__m256i*)dst[i], _mm256_packus_epi16(v_res[s + 0], v_res[s + 1]));
+    for (int i = 0, s = 0; i < samples; i += 32, s += 2) {
+      __m256i v_tmp = _mm256_packus_epi16(v_res[s + 0], v_res[s + 1]);
+      v_tmp = _mm256_permute4x64_epi64(v_tmp, _MM_SHUFFLE(3, 1, 2, 0));
+
+      _mm256_store_si256((__m256i*)&dst[i], v_tmp);
     }
-  }*/
+  }
 }
 
 
