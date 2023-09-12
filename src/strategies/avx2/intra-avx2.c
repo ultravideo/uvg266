@@ -831,7 +831,27 @@ static void intra_pred_planar_hor_w16(const uvg_pixel* ref, const int line, cons
   }
   #undef UNROLL_LOOP
 }
-static void intra_pred_planar_hor_w32(const uvg_pixel* ref, const int line, const int shift, __m256i* dst) {}
+static void intra_pred_planar_hor_w32(const uvg_pixel* ref, const int line, const int shift, __m256i* dst)
+{
+  const __m256i v_last_ref = _mm256_set1_epi16(ref[32 + 1]);
+
+  __m256i v_ref_coeff0 = _mm256_setr_epi16(31, 30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 17, 16);
+  __m256i v_ref_coeff1 = _mm256_setr_epi16(15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0);
+
+  __m256i v_last_ref_coeff0 = _mm256_setr_epi16(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16);
+  __m256i v_last_ref_coeff1 = _mm256_setr_epi16(17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32);
+
+  __m256i v_last_ref_mul0 = _mm256_mullo_epi16(v_last_ref, v_last_ref_coeff0);
+  __m256i v_last_ref_mul1 = _mm256_mullo_epi16(v_last_ref, v_last_ref_coeff1);
+
+  for (int i = 0, d = 0; i < line; ++i, d += 2) {
+    __m256i v_ref = _mm256_set1_epi16(ref[i + 1]);
+    __m256i v_tmp0 = _mm256_mullo_epi16(v_ref, v_ref_coeff0);
+    __m256i v_tmp1 = _mm256_mullo_epi16(v_ref, v_ref_coeff1);
+    dst[d + 0] = _mm256_add_epi16(v_last_ref_mul0, v_tmp0);
+    dst[d + 1] = _mm256_add_epi16(v_last_ref_mul1, v_tmp1);
+  }
+}
 
 static void intra_pred_planar_ver_w1(const uvg_pixel* ref, const int line, const int shift, __m256i* dst) {}
 static void intra_pred_planar_ver_w2(const uvg_pixel* ref, const int line, const int shift, __m256i* dst) {}
@@ -1008,7 +1028,28 @@ static void intra_pred_planar_ver_w16(const uvg_pixel* ref, const int line, cons
   }
   #undef UNROLL_LOOP
 }
-static void intra_pred_planar_ver_w32(const uvg_pixel* ref, const int line, const int shift, __m256i* dst) {}
+static void intra_pred_planar_ver_w32(const uvg_pixel* ref, const int line, const int shift, __m256i* dst)
+{
+  const __m256i v_last_ref = _mm256_set1_epi8(ref[line + 1]);
+
+  // Got 32 8-bit samples, or 256 bits of data. Load into a single vector
+  const __m256i v_ref = _mm256_load_si256((const __m256i*) &ref[1]);
+
+  // These stay constant through the loop
+  const __m256i v_lo = _mm256_unpacklo_epi8(v_ref, v_last_ref);
+  const __m256i v_hi = _mm256_unpackhi_epi8(v_ref, v_last_ref);
+
+  for (int y = 0, a = line - 1, b = 1, d = 0; y < line; ++y, --a, ++b, d += 2) {
+    int8_t tmp[2] = {a, b};
+    int16_t* tmp2 = (int16_t*)tmp;
+    const __m256i v_ys = _mm256_set1_epi16(*tmp2);
+
+    __m256i v_madd_lo = _mm256_maddubs_epi16(v_lo, v_ys);
+    __m256i v_madd_hi = _mm256_maddubs_epi16(v_hi, v_ys);
+    dst[d + 0] = _mm256_permute2x128_si256(v_madd_lo, v_madd_hi, 0x20);
+    dst[d + 1] = _mm256_permute2x128_si256(v_madd_lo, v_madd_hi, 0x31);
+  }
+}
 
 
 static intra_planar_half_func* planar_func_table[2][6] = {
