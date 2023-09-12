@@ -701,12 +701,16 @@ static void intra_pred_planar_hor_w4(const uvg_pixel* ref, const int line, const
   __m256i v_last_ref_coeff = _mm256_setr_epi16(1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4);
 
   __m256i v_last_ref_mul = _mm256_mullo_epi16(v_last_ref, v_last_ref_coeff);
+  __m256i shuffle_mask = _mm256_setr_epi8(0, -1, 0, -1, 0, -1, 0, -1, 8, -1, 8, -1, 8, -1, 8, -1, 0, -1, 0, -1, 0, -1, 0, -1, 8, -1, 8, -1, 8, -1, 8, -1);
 
   for (int i = 0, d = 0; i < line; i += 4, ++d) {
     // Handle 4 lines at a time
-    // TODO: setr is VERY SLOW, replace this
-    __m256i v_ref = _mm256_setr_epi16(ref[i + 1], ref[i + 1], ref[i + 1], ref[i + 1], ref[i + 2], ref[i + 2], ref[i + 2], ref[i + 2], 
-                                      ref[i + 3], ref[i + 3], ref[i + 3], ref[i + 3], ref[i + 4], ref[i + 4], ref[i + 4], ref[i + 4]);
+    // | ref1 | ref2 | ref3 | ref4 | Don't care
+    __m128i v_ref_0 = _mm_loadu_si128((__m128i const*)& ref[i + 1]);
+    // | ref1 | 0 * 7 | ref2 | 0 * 7 | ref3 | 0 * 7 | ref4 | 0* 7 |
+    __m256i v_ref = _mm256_cvtepu8_epi64(v_ref_0);
+    // | ref1_l | ref1_h | ref1_l | ref1_h | ... 
+    v_ref = _mm256_shuffle_epi8(v_ref, shuffle_mask);
 
     __m256i v_tmp = _mm256_mullo_epi16(v_ref, v_ref_coeff);
 
