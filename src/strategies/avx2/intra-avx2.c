@@ -980,6 +980,8 @@ void uvg_intra_pred_planar_avx2(const cu_loc_t* const cu_loc,
   }*/
 
   // New loop
+  __m128i shift_r_v = _mm_setzero_si128();
+  shift_r_v = _mm_insert_epi32(shift_r_v, shift_r, 0);
   for (int i = 0, d = 0; i < samples; i += 16, ++d) {
     __m256i v_lo = _mm256_unpacklo_epi16(v_pred_hor[d], v_pred_ver[d]);
     __m256i v_hi = _mm256_unpackhi_epi16(v_pred_hor[d], v_pred_ver[d]);
@@ -991,8 +993,8 @@ void uvg_intra_pred_planar_avx2(const cu_loc_t* const cu_loc,
     v_madd_lo = _mm256_add_epi32(v_madd_lo, v_samples);
     v_madd_hi = _mm256_add_epi32(v_madd_hi, v_samples);
 
-    v_madd_lo = _mm256_srli_epi32(v_madd_lo, shift_r);
-    v_madd_hi = _mm256_srli_epi32(v_madd_hi, shift_r);
+    v_madd_lo = _mm256_srl_epi32(v_madd_lo, shift_r_v);
+    v_madd_hi = _mm256_srl_epi32(v_madd_hi, shift_r_v);
 
     v_res[d] = _mm256_packs_epi32(v_madd_lo, v_madd_hi);
   }
