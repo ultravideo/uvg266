@@ -1062,7 +1062,7 @@ void uvg_intra_pred_planar_avx2(const cu_loc_t* const cu_loc,
   color_t color,
   const uint8_t* const ref_top,
   const uint8_t* const ref_left,
-  uint8_t* dst)
+  uvg_pixel* dst)
 {
   const int width = color == COLOR_Y ? cu_loc->width : cu_loc->chroma_width;
   const int height = color == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
@@ -1073,8 +1073,8 @@ void uvg_intra_pred_planar_avx2(const cu_loc_t* const cu_loc,
   const int log2_height = uvg_g_convert_to_log2[height];
   const int shift_r = log2_width + log2_height + 1;
   
-  __m256i v_pred_hor[64];
-  __m256i v_pred_ver[64];
+  __m256i v_pred_hor[256];
+  __m256i v_pred_ver[256];
 
   intra_planar_half_func* planar_hor = planar_func_table[0][log2_width];
   intra_planar_half_func* planar_ver = planar_func_table[1][log2_width];
@@ -1091,7 +1091,7 @@ void uvg_intra_pred_planar_avx2(const cu_loc_t* const cu_loc,
   int32_t* tmp2 = (int32_t*)tmp;
   const __m256i v_madd_shift = _mm256_set1_epi32(*tmp2);
 
-  __m256i v_res[64];
+  __m256i v_res[256];
   // Old loop
   /*for (int i = 0, d = 0; i < samples; i += 16, ++d) {
     v_res[d] = _mm256_add_epi16(v_pred_ver[d], v_pred_hor[d]);
