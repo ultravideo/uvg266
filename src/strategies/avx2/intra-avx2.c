@@ -735,19 +735,34 @@ static void intra_pred_planar_hor_w4(const uvg_pixel* ref, const int line, const
   __m256i v_last_ref_mul = _mm256_mullo_epi16(v_last_ref, v_last_ref_coeff);
   __m256i shuffle_mask = _mm256_setr_epi8(0, -1, 0, -1, 0, -1, 0, -1, 8, -1, 8, -1, 8, -1, 8, -1, 0, -1, 0, -1, 0, -1, 0, -1, 8, -1, 8, -1, 8, -1, 8, -1);
 
-  for (int i = 0, d = 0; i < line; i += 4, ++d) {
-    // Handle 4 lines at a time
-    // | ref1 | ref2 | ref3 | ref4 | Don't care
-    __m128i v_ref_0 = _mm_loadu_si128((__m128i const*)& ref[i + 1]);
-    // | ref1 | 0 * 7 | ref2 | 0 * 7 | ref3 | 0 * 7 | ref4 | 0* 7 |
-    __m256i v_ref = _mm256_cvtepu8_epi64(v_ref_0);
-    // | ref1_l | ref1_h | ref1_l | ref1_h | ... 
-    v_ref = _mm256_shuffle_epi8(v_ref, shuffle_mask);
-
-    __m256i v_tmp = _mm256_mullo_epi16(v_ref, v_ref_coeff);
-
-    dst[d] = _mm256_add_epi16(v_last_ref_mul, v_tmp);
+  // Handle 4 lines at a time
+  #define UNROLL_LOOP(num) \
+  for (int i = 0, d = 0; i < (num); i += 4, ++d) { \
+    /* | ref1 | ref2 | ref3 | ref4 | Don't care*/ \
+    __m128i v_ref_0 = _mm_loadu_si128((__m128i const*)& ref[i + 1]); \
+    /* | ref1 | 0 * 7 | ref2 | 0 * 7 | ref3 | 0 * 7 | ref4 | 0* 7 | */ \
+    __m256i v_ref = _mm256_cvtepu8_epi64(v_ref_0); \
+    /* | ref1_l | ref1_h | ref1_l | ref1_h | ... */ \
+    v_ref = _mm256_shuffle_epi8(v_ref, shuffle_mask); \
+    \
+    __m256i v_tmp = _mm256_mullo_epi16(v_ref, v_ref_coeff); \
+    \
+    dst[d] = _mm256_add_epi16(v_last_ref_mul, v_tmp); \
   }
+
+  switch (line) {
+  case 1: UNROLL_LOOP(1); break;
+  case 2: UNROLL_LOOP(2); break;
+  case 4: UNROLL_LOOP(4); break;
+  case 8: UNROLL_LOOP(8); break;
+  case 16: UNROLL_LOOP(16); break;
+  case 32: UNROLL_LOOP(32); break;
+  case 64: UNROLL_LOOP(64); break;
+  default:
+    assert(false && "Invalid dimension.");
+    break;
+  }
+  #undef UNROLL_LOOP
 }
 static void intra_pred_planar_hor_w8(const uvg_pixel* ref, const int line, const int shift, __m256i* dst)
 {
@@ -758,18 +773,33 @@ static void intra_pred_planar_hor_w8(const uvg_pixel* ref, const int line, const
 
   __m256i v_last_ref_mul = _mm256_mullo_epi16(v_last_ref, v_last_ref_coeff);
 
-  for (int i = 0, d = 0; i < line; i += 2, ++d) {
-    // Handle 2 lines at a time
-    __m128i v_ref0 = _mm_set1_epi16(ref[i + 1]);
-    __m128i v_ref1 = _mm_set1_epi16(ref[i + 2]);
-
-    __m256i v_ref = _mm256_castsi128_si256(v_ref0);
-    v_ref = _mm256_inserti128_si256(v_ref, v_ref1, 1);
-
-    __m256i v_tmp = _mm256_mullo_epi16(v_ref, v_ref_coeff);
-
-    dst[d] = _mm256_add_epi16(v_last_ref_mul, v_tmp);
+  // Handle 2 lines at a time
+  #define UNROLL_LOOP(num) \
+  for (int i = 0, d = 0; i < (num); i += 2, ++d) { \
+    __m128i v_ref0 = _mm_set1_epi16(ref[i + 1]); \
+    __m128i v_ref1 = _mm_set1_epi16(ref[i + 2]); \
+    \
+    __m256i v_ref = _mm256_castsi128_si256(v_ref0); \
+    v_ref = _mm256_inserti128_si256(v_ref, v_ref1, 1); \
+    \
+    __m256i v_tmp = _mm256_mullo_epi16(v_ref, v_ref_coeff); \
+    \
+    dst[d] = _mm256_add_epi16(v_last_ref_mul, v_tmp); \
   }
+
+  switch (line) {
+  case 1: UNROLL_LOOP(1); break;
+  case 2: UNROLL_LOOP(2); break;
+  case 4: UNROLL_LOOP(4); break;
+  case 8: UNROLL_LOOP(8); break;
+  case 16: UNROLL_LOOP(16); break;
+  case 32: UNROLL_LOOP(32); break;
+  case 64: UNROLL_LOOP(64); break;
+  default:
+    assert(false && "Invalid dimension.");
+    break;
+  }
+  #undef UNROLL_LOOP
 }
 static void intra_pred_planar_hor_w16(const uvg_pixel* ref, const int line, const int shift, __m256i* dst)
 {
@@ -780,13 +810,26 @@ static void intra_pred_planar_hor_w16(const uvg_pixel* ref, const int line, cons
 
   __m256i v_last_ref_mul = _mm256_mullo_epi16(v_last_ref, v_last_ref_coeff);
 
-  for (int i = 0, d = 0; i < line; ++i, ++d) {
-    __m256i v_ref = _mm256_set1_epi16(ref[i + 1]);
-
-    __m256i v_tmp = _mm256_mullo_epi16(v_ref, v_ref_coeff); // TODO: the result is needed immediately after this. This leads to NOPs, consider doing multiple lines at a time
-
-    dst[d] = _mm256_add_epi16(v_last_ref_mul, v_tmp);
+  #define UNROLL_LOOP(num) \
+  for (int i = 0, d = 0; i < (num); ++i, ++d) { \
+    __m256i v_ref = _mm256_set1_epi16(ref[i + 1]); \
+    __m256i v_tmp = _mm256_mullo_epi16(v_ref, v_ref_coeff); \
+    dst[d] = _mm256_add_epi16(v_last_ref_mul, v_tmp); \
   }
+
+  switch (line) {
+  case 1: UNROLL_LOOP(1); break;
+  case 2: UNROLL_LOOP(2); break;
+  case 4: UNROLL_LOOP(4); break;
+  case 8: UNROLL_LOOP(8); break;
+  case 16: UNROLL_LOOP(16); break;
+  case 32: UNROLL_LOOP(32); break;
+  case 64: UNROLL_LOOP(64); break;
+  default:
+    assert(false && "Invalid dimension.");
+    break;
+  }
+  #undef UNROLL_LOOP
 }
 static void intra_pred_planar_hor_w32(const uvg_pixel* ref, const int line, const int shift, __m256i* dst) {}
 
