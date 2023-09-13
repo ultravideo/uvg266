@@ -84,7 +84,8 @@ ALIGNED(32) static const int8_t planar_avx2_ver_w4ys[1024] = {
   1,   1,   1,   1,   1,   1,   1,   1,   0,   2,   0,   2,   0,   2,   0,   2,   1,   1,   1,   1,   1,   1,   1,   1,   0,   2,   0,   2,   0,   2,   0,   2,  // offset 31. line == 2
 };
 
-ALIGNED(32) static const int8_t planar_avx2_ver_w8ys[4096] = {
+// TODO: Reduce size back to 2048 if last line is not needed
+ALIGNED(32) static const int8_t planar_avx2_ver_w8ys[2080] = { 
  63,   1,  63,   1,  63,   1,  63,   1,  63,   1,  63,   1,  63,   1,  63,   1,  62,   2,  62,   2,  62,   2,  62,   2,  62,   2,  62,   2,  62,   2,  62,   2,  // offset 0, line == 64
  61,   3,  61,   3,  61,   3,  61,   3,  61,   3,  61,   3,  61,   3,  61,   3,  60,   4,  60,   4,  60,   4,  60,   4,  60,   4,  60,   4,  60,   4,  60,   4,
  59,   5,  59,   5,  59,   5,  59,   5,  59,   5,  59,   5,  59,   5,  59,   5,  58,   6,  58,   6,  58,   6,  58,   6,  58,   6,  58,   6,  58,   6,  58,   6,
@@ -147,8 +148,9 @@ ALIGNED(32) static const int8_t planar_avx2_ver_w8ys[4096] = {
   1,   7,   1,   7,   1,   7,   1,   7,   1,   7,   1,   7,   1,   7,   1,   7,   0,   8,   0,   8,   0,   8,   0,   8,   0,   8,   0,   8,   0,   8,   0,   8,
   3,   1,   3,   1,   3,   1,   3,   1,   3,   1,   3,   1,   3,   1,   3,   1,   2,   2,   2,   2,   2,   2,   2,   2,   2,   2,   2,   2,   2,   2,   2,   2,  // offset 60, line == 4
   1,   3,   1,   3,   1,   3,   1,   3,   1,   3,   1,   3,   1,   3,   1,   3,   0,   4,   0,   4,   0,   4,   0,   4,   0,   4,   0,   4,   0,   4,   0,   4,
-  1,   1,   1,   1,   1,   1,   1,   1,   0,   2,   0,   2,   0,   2,   0,   2,   1,   1,   1,   1,   1,   1,   1,   1,   0,   2,   0,   2,   0,   2,   0,   2,  // offset 62, line == 2
-  1,   1,   1,   1,   1,   1,   1,   1,   0,   2,   0,   2,   0,   2,   0,   2,   1,   1,   1,   1,   1,   1,   1,   1,   0,   2,   0,   2,   0,   2,   0,   2,  // offset 63, line == 1, this might not be needed, ever
+  1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,  // offset 62, line == 2
+  0,   2,   0,   2,   0,   2,   0,   2,   0,   2,   0,   2,   0,   2,   0,   2,   0,   2,   0,   2,   0,   2,   0,   2,   0,   2,   0,   2,   0,   2,   0,   2,
+  0,   1,   0,   1,   0,   1,   0,   1,   0,   1,   0,   1,   0,   1,   0,   1,   0,   1,   0,   1,   0,   1,   0,   1,   0,   1,   0,   1,   0,   1,   0,   1,  // offset 64, line == 1, this might not be needed, ever
 };
 
  /**
@@ -729,11 +731,11 @@ static void intra_pred_planar_hor_w4(const uvg_pixel* ref, const int line, const
 {
   const __m256i v_last_ref = _mm256_set1_epi16(ref[4 + 1]);
 
-  __m256i v_ref_coeff = _mm256_setr_epi16(3, 2, 1, 0, 3, 2, 1, 0, 3, 2, 1, 0, 3, 2, 1, 0);
-  __m256i v_last_ref_coeff = _mm256_setr_epi16(1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4);
+  const __m256i v_ref_coeff = _mm256_setr_epi16(3, 2, 1, 0, 3, 2, 1, 0, 3, 2, 1, 0, 3, 2, 1, 0);
+  const __m256i v_last_ref_coeff = _mm256_setr_epi16(1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4);
 
-  __m256i v_last_ref_mul = _mm256_mullo_epi16(v_last_ref, v_last_ref_coeff);
-  __m256i shuffle_mask = _mm256_setr_epi8(0, -1, 0, -1, 0, -1, 0, -1, 8, -1, 8, -1, 8, -1, 8, -1, 0, -1, 0, -1, 0, -1, 0, -1, 8, -1, 8, -1, 8, -1, 8, -1);
+  const __m256i v_last_ref_mul = _mm256_mullo_epi16(v_last_ref, v_last_ref_coeff);
+  const __m256i shuffle_mask = _mm256_setr_epi8(0, -1, 0, -1, 0, -1, 0, -1, 8, -1, 8, -1, 8, -1, 8, -1, 0, -1, 0, -1, 0, -1, 0, -1, 8, -1, 8, -1, 8, -1, 8, -1);
 
   // Handle 4 lines at a time
   #define UNROLL_LOOP(num) \
@@ -768,10 +770,10 @@ static void intra_pred_planar_hor_w8(const uvg_pixel* ref, const int line, const
 {
   const __m256i v_last_ref = _mm256_set1_epi16(ref[8 + 1]);
 
-  __m256i v_ref_coeff = _mm256_setr_epi16(7, 6, 5, 4, 3, 2, 1, 0, 7, 6, 5, 4, 3, 2, 1, 0);
-  __m256i v_last_ref_coeff = _mm256_setr_epi16(1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
+  const __m256i v_ref_coeff = _mm256_setr_epi16(7, 6, 5, 4, 3, 2, 1, 0, 7, 6, 5, 4, 3, 2, 1, 0);
+  const __m256i v_last_ref_coeff = _mm256_setr_epi16(1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
 
-  __m256i v_last_ref_mul = _mm256_mullo_epi16(v_last_ref, v_last_ref_coeff);
+  const __m256i v_last_ref_mul = _mm256_mullo_epi16(v_last_ref, v_last_ref_coeff);
 
   // Handle 2 lines at a time
   #define UNROLL_LOOP(num) \
@@ -805,10 +807,10 @@ static void intra_pred_planar_hor_w16(const uvg_pixel* ref, const int line, cons
 {
   const __m256i v_last_ref = _mm256_set1_epi16(ref[16 + 1]);
 
-  __m256i v_ref_coeff = _mm256_setr_epi16(15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0);
-  __m256i v_last_ref_coeff = _mm256_setr_epi16(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16);
+  const __m256i v_ref_coeff = _mm256_setr_epi16(15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0);
+  const __m256i v_last_ref_coeff = _mm256_setr_epi16(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16);
 
-  __m256i v_last_ref_mul = _mm256_mullo_epi16(v_last_ref, v_last_ref_coeff);
+  const __m256i v_last_ref_mul = _mm256_mullo_epi16(v_last_ref, v_last_ref_coeff);
 
   #define UNROLL_LOOP(num) \
   for (int i = 0, d = 0; i < (num); ++i, ++d) { \
@@ -835,14 +837,14 @@ static void intra_pred_planar_hor_w32(const uvg_pixel* ref, const int line, cons
 {
   const __m256i v_last_ref = _mm256_set1_epi16(ref[32 + 1]);
 
-  __m256i v_ref_coeff0 = _mm256_setr_epi16(31, 30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 17, 16);
-  __m256i v_ref_coeff1 = _mm256_setr_epi16(15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0);
+  const __m256i v_ref_coeff0 = _mm256_setr_epi16(31, 30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 17, 16);
+  const __m256i v_ref_coeff1 = _mm256_setr_epi16(15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0);
 
-  __m256i v_last_ref_coeff0 = _mm256_setr_epi16(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16);
-  __m256i v_last_ref_coeff1 = _mm256_setr_epi16(17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32);
+  const __m256i v_last_ref_coeff0 = _mm256_setr_epi16(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16);
+  const __m256i v_last_ref_coeff1 = _mm256_setr_epi16(17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32);
 
-  __m256i v_last_ref_mul0 = _mm256_mullo_epi16(v_last_ref, v_last_ref_coeff0);
-  __m256i v_last_ref_mul1 = _mm256_mullo_epi16(v_last_ref, v_last_ref_coeff1);
+  const __m256i v_last_ref_mul0 = _mm256_mullo_epi16(v_last_ref, v_last_ref_coeff0);
+  const __m256i v_last_ref_mul1 = _mm256_mullo_epi16(v_last_ref, v_last_ref_coeff1);
 
   #define UNROLL_LOOP(num) \
   for (int i = 0, d = 0; i < (num); ++i, d += 2) { \
@@ -867,9 +869,38 @@ static void intra_pred_planar_hor_w32(const uvg_pixel* ref, const int line, cons
   }
   #undef UNROLL_LOOP
 }
+static void intra_pred_planar_hor_w64(const uvg_pixel* ref, const int line, const int shift, __m256i* dst)
+{
+  const __m256i v_last_ref = _mm256_set1_epi16(ref[64 + 1]);
 
-static void intra_pred_planar_ver_w1(const uvg_pixel* ref, const int line, const int shift, __m256i* dst) {}
-static void intra_pred_planar_ver_w2(const uvg_pixel* ref, const int line, const int shift, __m256i* dst) {}
+  const __m256i v_ref_coeff0 = _mm256_setr_epi16(63, 62, 61, 60, 59, 58, 57, 56, 55, 54, 53, 52, 51, 50, 49, 48);
+  const __m256i v_ref_coeff1 = _mm256_setr_epi16(47, 46, 45, 44, 43, 42, 41, 40, 39, 38, 37, 36, 35, 34, 33, 32);
+  const __m256i v_ref_coeff2 = _mm256_setr_epi16(31, 30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 17, 16);
+  const __m256i v_ref_coeff3 = _mm256_setr_epi16(15, 14, 13, 12, 11, 10,  9,  8,  7,  6,  5,  4,  3,  2,  1,  0);
+
+  const __m256i v_last_ref_coeff0 = _mm256_setr_epi16( 1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 16);
+  const __m256i v_last_ref_coeff1 = _mm256_setr_epi16(17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32);
+  const __m256i v_last_ref_coeff2 = _mm256_setr_epi16(33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48);
+  const __m256i v_last_ref_coeff3 = _mm256_setr_epi16(49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64);
+
+  const __m256i v_last_ref_mul0 = _mm256_mullo_epi16(v_last_ref, v_last_ref_coeff0);
+  const __m256i v_last_ref_mul1 = _mm256_mullo_epi16(v_last_ref, v_last_ref_coeff1);
+  const __m256i v_last_ref_mul2 = _mm256_mullo_epi16(v_last_ref, v_last_ref_coeff2);
+  const __m256i v_last_ref_mul3 = _mm256_mullo_epi16(v_last_ref, v_last_ref_coeff3);
+
+  for (int i = 0, d = 0; i < line; ++i, d += 4) {
+    __m256i v_ref = _mm256_set1_epi16(ref[i + 1]);
+    __m256i v_tmp0 = _mm256_mullo_epi16(v_ref, v_ref_coeff0);
+    __m256i v_tmp1 = _mm256_mullo_epi16(v_ref, v_ref_coeff1);
+    __m256i v_tmp2 = _mm256_mullo_epi16(v_ref, v_ref_coeff2);
+    __m256i v_tmp3 = _mm256_mullo_epi16(v_ref, v_ref_coeff3);
+    dst[d + 0] = _mm256_add_epi16(v_last_ref_mul0, v_tmp0);
+    dst[d + 1] = _mm256_add_epi16(v_last_ref_mul1, v_tmp1);
+    dst[d + 2] = _mm256_add_epi16(v_last_ref_mul2, v_tmp2);
+    dst[d + 3] = _mm256_add_epi16(v_last_ref_mul3, v_tmp3);
+  }
+}
+
 static void intra_pred_planar_ver_w4(const uvg_pixel* ref, const int line, const int shift, __m256i* dst)
 {
   const __m256i v_last_ref = _mm256_set1_epi8(ref[line + 1]);
@@ -885,20 +916,15 @@ static void intra_pred_planar_ver_w4(const uvg_pixel* ref, const int line, const
 
   // Table offset
   int offset;
-  if (line == 64) {
-    offset = 0;
-  }
-  else if (line == 32) {
-    offset = 16;
-  }
-  else if (line == 16) {
-    offset = 24;
-  }
-  else if (line == 8) {
-    offset = 28;
-  }
-  else { // Do not care about lines < 4 since they are illegal
-    offset = 30;
+  switch (line) {
+    case 64: offset = 0;  break;
+    case 32: offset = 16; break;
+    case 16: offset = 24; break;
+    case  8: offset = 28; break;
+    case  4: offset = 30; break;
+    default:
+      assert(false && "Invalid height for width 4.");
+      break;
   }
 
   // Handle 4 lines at a time
@@ -927,7 +953,7 @@ static void intra_pred_planar_ver_w8(const uvg_pixel* ref, const int line, const
   const __m256i v_last_ref = _mm256_set1_epi8(ref[line + 1]);
   
   // Got eight 8-bit samples, or 64 bits of data. Duplicate to fill a whole 256-bit vector.
-  const __m128i v_ref_raw = _mm_load_si128((const __m128i*)&ref[1]);
+  const __m128i v_ref_raw = _mm_loadu_si128((const __m128i*)&ref[1]);
   __m256i v_ref = _mm256_castsi128_si256(v_ref_raw);
   v_ref = _mm256_inserti128_si256(v_ref, v_ref_raw, 1);
   v_ref = _mm256_shuffle_epi32(v_ref, _MM_SHUFFLE(1, 1, 0, 0));
@@ -936,23 +962,16 @@ static void intra_pred_planar_ver_w8(const uvg_pixel* ref, const int line, const
 
   // Table offset
   int offset;
-  if (line == 64) {
-    offset = 0;
-  }
-  else if (line == 32) {
-    offset = 16;
-  }
-  else if (line == 16) {
-    offset = 24;
-  }
-  else if (line == 8) {
-    offset = 28;
-  }
-  else if (line == 4) {
-    offset = 30;
-  }
-  else { // Do not care about line == 1 since it is illegal for this width
-    offset = 31;
+  switch (line) {
+  case 64: offset = 0;  break;
+  case 32: offset = 16; break;
+  case 16: offset = 24; break;
+  case  8: offset = 28; break;
+  case  4: offset = 30; break;
+  case  2: offset = 31; break;
+  default:
+    assert(false && "Invalid height for width 8.");
+    break;
   }
 
   // Handle 4 lines at a time
@@ -989,7 +1008,7 @@ static void intra_pred_planar_ver_w16(const uvg_pixel* ref, const int line, cons
   const __m256i v_last_ref = _mm256_set1_epi8(ref[line + 1]);
 
   // Got 16 8-bit samples, or 128 bits of data. Duplicate to fill a whole 256-bit vector.
-  const __m128i v_ref_raw = _mm_load_si128((const __m128i*) &ref[1]);
+  const __m128i v_ref_raw = _mm_loadu_si128((const __m128i*) &ref[1]);
   __m256i v_ref = _mm256_castsi128_si256(v_ref_raw);
   v_ref = _mm256_inserti128_si256(v_ref, v_ref_raw, 1);
 
@@ -997,41 +1016,46 @@ static void intra_pred_planar_ver_w16(const uvg_pixel* ref, const int line, cons
 
   // Table offset
   int offset;
-  if (line == 64) {
-    offset = 0;
-  }
-  else if (line == 32) {
-    offset = 16;
-  }
-  else if (line == 16) {
-    offset = 24;
-  }
-  else if (line == 8) {
-    offset = 28;
-  }
-  else if (line == 4) {
-    offset = 30;
-  }
-  else { // Do not care about line == 1 since it is illegal for this width
-    offset = 31;
+  switch (line) {
+  case 64: offset = 0;  break;
+  case 32: offset = 32; break;
+  case 16: offset = 48; break;
+  case  8: offset = 56; break;
+  case  4: offset = 60; break;
+  case  2: offset = 62; break;
+  case  1: offset = 64; break;
+  default:
+    assert(false && "Invalid height for width 16.");
+    break;
   }
 
+  // Calculations for cases where line > 2
   // These stay constant through the loop
   const __m256i v_lo = _mm256_unpacklo_epi8(v_ref, v_last_ref);
   const __m256i v_hi = _mm256_unpackhi_epi8(v_ref, v_last_ref);
 
   // Handle 2 lines at a time
   #define UNROLL_LOOP(num) \
-  for (int y = 0, s = offset; y < (num); y += 2, ++s) { \
+  for (int y = 0, s = offset; y < line; y += 2, ++s) { \
     __m256i v_madd_lo = _mm256_maddubs_epi16(v_lo, v_ys[s]); \
     __m256i v_madd_hi = _mm256_maddubs_epi16(v_hi, v_ys[s]); \
     dst[y + 0] = _mm256_permute2x128_si256(v_madd_lo, v_madd_hi, 0x20); \
     dst[y + 1] = _mm256_permute2x128_si256(v_madd_lo, v_madd_hi, 0x31); \
   }
 
+  __m256i v_tmp;
   switch (line) {
-  case 1: UNROLL_LOOP(1); break;
-  case 2: UNROLL_LOOP(2); break;
+  case 1:
+    // Specialized calculation for line == 1
+    v_tmp = _mm256_permute2x128_si256(v_lo, v_hi, 0x20);
+    dst[0] = _mm256_maddubs_epi16(v_tmp, v_ys[offset + 0]);
+    break;
+  case 2: 
+    // Specialized calculation for line == 2
+    v_tmp = _mm256_permute2x128_si256(v_lo, v_hi, 0x20);
+    dst[0] = _mm256_maddubs_epi16(v_tmp, v_ys[offset + 0]);
+    dst[1] = _mm256_maddubs_epi16(v_tmp, v_ys[offset + 1]);
+    break;
   case 4: UNROLL_LOOP(4); break;
   case 8: UNROLL_LOOP(8); break;
   case 16: UNROLL_LOOP(16); break;
@@ -1041,23 +1065,23 @@ static void intra_pred_planar_ver_w16(const uvg_pixel* ref, const int line, cons
     assert(false && "Invalid dimension.");
     break;
   }
-  #undef UNROLL_LOOP
+#undef UNROLL_LOOP
 }
 static void intra_pred_planar_ver_w32(const uvg_pixel* ref, const int line, const int shift, __m256i* dst)
 {
   const __m256i v_last_ref = _mm256_set1_epi8(ref[line + 1]);
 
   // Got 32 8-bit samples, or 256 bits of data. Load into a single vector
-  const __m256i v_ref = _mm256_load_si256((const __m256i*) &ref[1]);
+  const __m256i v_ref = _mm256_loadu_si256((const __m256i*) &ref[1]);
 
   // These stay constant through the loop
   const __m256i v_lo = _mm256_unpacklo_epi8(v_ref, v_last_ref);
   const __m256i v_hi = _mm256_unpackhi_epi8(v_ref, v_last_ref);
 
   #define UNROLL_LOOP(num) \
-  for (int y = 0, a = (num) - 1, b = 1, d = 0; y < (num); ++y, --a, ++b, d += 2) { \
-    int8_t tmp[2] = {a, b}; \
-    int16_t* tmp2 = (int16_t*)tmp; \
+  for (uint8_t y = 0, a = (num) - 1, b = 1, d = 0; y < (num); ++y, --a, ++b, d += 2) { \
+    uint8_t tmp[2] = {a, b}; \
+    uint16_t* tmp2 = (uint16_t*)tmp; \
     const __m256i v_ys = _mm256_set1_epi16(*tmp2); \
     \
     __m256i v_madd_lo = _mm256_maddubs_epi16(v_lo, v_ys); \
@@ -1080,11 +1104,41 @@ static void intra_pred_planar_ver_w32(const uvg_pixel* ref, const int line, cons
   }
   #undef UNROLL_LOOP
 }
+static void intra_pred_planar_ver_w64(const uvg_pixel* ref, const int line, const int shift, __m256i* dst)
+{
+  const __m256i v_last_ref = _mm256_set1_epi8(ref[line + 1]);
+
+  // Got 64 8-bit samples, or 512 bits of data. Load into two vectors
+  const __m256i v_ref0 = _mm256_loadu_si256((const __m256i*) &ref[1]);
+  const __m256i v_ref1 = _mm256_loadu_si256((const __m256i*) &ref[33]);
+
+  // These stay constant through the loop
+  const __m256i v_lo0 = _mm256_unpacklo_epi8(v_ref0, v_last_ref);
+  const __m256i v_lo1 = _mm256_unpacklo_epi8(v_ref1, v_last_ref);
+  const __m256i v_hi0 = _mm256_unpackhi_epi8(v_ref0, v_last_ref);
+  const __m256i v_hi1 = _mm256_unpackhi_epi8(v_ref1, v_last_ref);
+
+  for (uint8_t y = 0, a = line - 1, b = 1, d = 0; y < line; ++y, --a, ++b, d += 4) {
+    uint8_t tmp[2] = {a, b};
+    uint16_t* tmp2 = (uint16_t*)tmp;
+    const __m256i v_ys = _mm256_set1_epi16(*tmp2);
+    
+    __m256i v_madd_lo0 = _mm256_maddubs_epi16(v_lo0, v_ys);
+    __m256i v_madd_lo1 = _mm256_maddubs_epi16(v_lo1, v_ys);
+    __m256i v_madd_hi0 = _mm256_maddubs_epi16(v_hi0, v_ys);
+    __m256i v_madd_hi1 = _mm256_maddubs_epi16(v_hi1, v_ys);
+
+    dst[d + 0] = _mm256_permute2x128_si256(v_madd_lo0, v_madd_hi0, 0x20);
+    dst[d + 1] = _mm256_permute2x128_si256(v_madd_lo0, v_madd_hi0, 0x31);
+    dst[d + 2] = _mm256_permute2x128_si256(v_madd_lo1, v_madd_hi1, 0x20);
+    dst[d + 3] = _mm256_permute2x128_si256(v_madd_lo1, v_madd_hi1, 0x31);
+  }
+}
 
 
-static intra_planar_half_func* planar_func_table[2][6] = {
-  {                    NULL,                      NULL,  intra_pred_planar_hor_w4,  intra_pred_planar_hor_w8, intra_pred_planar_hor_w16, intra_pred_planar_hor_w32,},
-  {intra_pred_planar_ver_w1,  intra_pred_planar_ver_w2,  intra_pred_planar_ver_w4,  intra_pred_planar_ver_w8, intra_pred_planar_ver_w16, intra_pred_planar_ver_w32,}
+static intra_planar_half_func* planar_func_table[2][7] = {
+  {                    NULL,                      NULL,  intra_pred_planar_hor_w4,  intra_pred_planar_hor_w8, intra_pred_planar_hor_w16, intra_pred_planar_hor_w32, intra_pred_planar_hor_w64},
+  {                    NULL,                      NULL,  intra_pred_planar_ver_w4,  intra_pred_planar_ver_w8, intra_pred_planar_ver_w16, intra_pred_planar_ver_w32, intra_pred_planar_ver_w64}
 };
 
 
@@ -1094,8 +1148,8 @@ void uvg_intra_pred_planar_avx2(const cu_loc_t* const cu_loc,
   const uint8_t* const ref_left,
   uvg_pixel* dst)
 {
-  const int width = color == COLOR_Y ? cu_loc->width : cu_loc->chroma_width;
-  const int height = color == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
+  const int16_t width = color == COLOR_Y ? cu_loc->width : cu_loc->chroma_width;
+  const int16_t height = color == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
   const int samples = width * height;
   const __m256i v_samples = _mm256_set1_epi32(samples);
 
