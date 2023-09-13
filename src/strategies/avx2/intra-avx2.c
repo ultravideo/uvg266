@@ -844,13 +844,28 @@ static void intra_pred_planar_hor_w32(const uvg_pixel* ref, const int line, cons
   __m256i v_last_ref_mul0 = _mm256_mullo_epi16(v_last_ref, v_last_ref_coeff0);
   __m256i v_last_ref_mul1 = _mm256_mullo_epi16(v_last_ref, v_last_ref_coeff1);
 
-  for (int i = 0, d = 0; i < line; ++i, d += 2) {
-    __m256i v_ref = _mm256_set1_epi16(ref[i + 1]);
-    __m256i v_tmp0 = _mm256_mullo_epi16(v_ref, v_ref_coeff0);
-    __m256i v_tmp1 = _mm256_mullo_epi16(v_ref, v_ref_coeff1);
-    dst[d + 0] = _mm256_add_epi16(v_last_ref_mul0, v_tmp0);
-    dst[d + 1] = _mm256_add_epi16(v_last_ref_mul1, v_tmp1);
+  #define UNROLL_LOOP(num) \
+  for (int i = 0, d = 0; i < (num); ++i, d += 2) { \
+    __m256i v_ref = _mm256_set1_epi16(ref[i + 1]); \
+    __m256i v_tmp0 = _mm256_mullo_epi16(v_ref, v_ref_coeff0); \
+    __m256i v_tmp1 = _mm256_mullo_epi16(v_ref, v_ref_coeff1); \
+    dst[d + 0] = _mm256_add_epi16(v_last_ref_mul0, v_tmp0); \
+    dst[d + 1] = _mm256_add_epi16(v_last_ref_mul1, v_tmp1); \
   }
+
+  switch (line) {
+  case 1: UNROLL_LOOP(1); break;
+  case 2: UNROLL_LOOP(2); break;
+  case 4: UNROLL_LOOP(4); break;
+  case 8: UNROLL_LOOP(8); break;
+  case 16: UNROLL_LOOP(16); break;
+  case 32: UNROLL_LOOP(32); break;
+  case 64: UNROLL_LOOP(64); break;
+  default:
+    assert(false && "Invalid dimension.");
+    break;
+  }
+  #undef UNROLL_LOOP
 }
 
 static void intra_pred_planar_ver_w1(const uvg_pixel* ref, const int line, const int shift, __m256i* dst) {}
@@ -1039,16 +1054,31 @@ static void intra_pred_planar_ver_w32(const uvg_pixel* ref, const int line, cons
   const __m256i v_lo = _mm256_unpacklo_epi8(v_ref, v_last_ref);
   const __m256i v_hi = _mm256_unpackhi_epi8(v_ref, v_last_ref);
 
-  for (int y = 0, a = line - 1, b = 1, d = 0; y < line; ++y, --a, ++b, d += 2) {
-    int8_t tmp[2] = {a, b};
-    int16_t* tmp2 = (int16_t*)tmp;
-    const __m256i v_ys = _mm256_set1_epi16(*tmp2);
-
-    __m256i v_madd_lo = _mm256_maddubs_epi16(v_lo, v_ys);
-    __m256i v_madd_hi = _mm256_maddubs_epi16(v_hi, v_ys);
-    dst[d + 0] = _mm256_permute2x128_si256(v_madd_lo, v_madd_hi, 0x20);
-    dst[d + 1] = _mm256_permute2x128_si256(v_madd_lo, v_madd_hi, 0x31);
+  #define UNROLL_LOOP(num) \
+  for (int y = 0, a = (num) - 1, b = 1, d = 0; y < (num); ++y, --a, ++b, d += 2) { \
+    int8_t tmp[2] = {a, b}; \
+    int16_t* tmp2 = (int16_t*)tmp; \
+    const __m256i v_ys = _mm256_set1_epi16(*tmp2); \
+    \
+    __m256i v_madd_lo = _mm256_maddubs_epi16(v_lo, v_ys); \
+    __m256i v_madd_hi = _mm256_maddubs_epi16(v_hi, v_ys); \
+    dst[d + 0] = _mm256_permute2x128_si256(v_madd_lo, v_madd_hi, 0x20); \
+    dst[d + 1] = _mm256_permute2x128_si256(v_madd_lo, v_madd_hi, 0x31); \
   }
+
+  switch (line) {
+  case 1: UNROLL_LOOP(1); break;
+  case 2: UNROLL_LOOP(2); break;
+  case 4: UNROLL_LOOP(4); break;
+  case 8: UNROLL_LOOP(8); break;
+  case 16: UNROLL_LOOP(16); break;
+  case 32: UNROLL_LOOP(32); break;
+  case 64: UNROLL_LOOP(64); break;
+  default:
+    assert(false && "Invalid dimension.");
+    break;
+  }
+  #undef UNROLL_LOOP
 }
 
 
