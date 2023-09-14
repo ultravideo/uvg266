@@ -163,7 +163,7 @@ ALIGNED(32) static const int8_t planar_avx2_ver_w8ys[2080] = {
  * \param dst           Buffer of size width*width.
  * \param multi_ref_idx Reference line index for use with MRL.
  */
-static void uvg_angular_pred_avx2(
+static void uvg_angular_pred_avx2_old(
   const cu_loc_t* const cu_loc,
   const int_fast8_t intra_mode,
   const int_fast8_t channel_type,
@@ -255,9 +255,8 @@ static void uvg_angular_pred_avx2(
     { 0,  2, 63, -1 },
   };
 
-                                                    // Temporary buffer for modes 11-25.
-                                                    // It only needs to be big enough to hold indices from -width to width-1.
-  //uvg_pixel tmp_ref[2 * 128 + 3 + 33 * MAX_REF_LINE:IDX] = { 0 };
+  // Temporary buffer for modes 11-25.
+  // It only needs to be big enough to hold indices from -width to width-1.
   uvg_pixel temp_main[2 * 128 + 3 + 33 * MAX_REF_LINE_IDX] = { 0 };
   uvg_pixel temp_side[2 * 128 + 3 + 33 * MAX_REF_LINE_IDX] = { 0 };
 
@@ -521,38 +520,6 @@ static void uvg_angular_pred_avx2(
           *(uint32_t*)(dst + (y + 3) * width + x) = _mm_extract_epi32(vdst, 3);
         }
       }
-
-        /*
-      if (pred_mode == 2 || pred_mode == 66) {
-        int wT = 16 >> MIN(31, ((y << 1) >> scale));
-        for (int x = 0; x < width; x++) {
-          int wL = 16 >> MIN(31, ((x << 1) >> scale));
-          if (wT + wL == 0) break;
-          int c = x + y + 1;
-          if (c >= 2 * width) { wL = 0; }
-          if (c >= 2 * width) { wT = 0; }
-          const uvg_pixel left = (wL != 0) ? ref_side[c] : 0;
-          const uvg_pixel top  = (wT != 0) ? ref_main[c] : 0;
-          dst[y * width + x] = CLIP_TO_PIXEL((wL * left + wT * top + (64 - wL - wT) * dst[y * width + x] + 32) >> 6);
-        }
-      } else if (sample_disp == 0 || sample_disp >= 12) {
-        int inv_angle_sum_0 = 2;
-        for (int x = 0; x < width; x++) {
-          inv_angle_sum_0 += modedisp2invsampledisp[abs(mode_disp)];
-          int delta_pos_0 = inv_angle_sum_0 >> 2;
-          int delta_frac_0 = delta_pos_0 & 63;
-          int delta_int_0 = delta_pos_0 >> 6;
-          int delta_y = y + delta_int_0 + 1;
-          // TODO: convert to JVET_K0500_WAIP
-          if (delta_y > width + width - 1) break;
-
-          int wL = 32 >> MIN(31, ((x << 1) >> scale));
-          if (wL == 0) break;
-          const uvg_pixel *p = ref_side + delta_y - 1;
-          uvg_pixel left = p[delta_frac_0 >> 5];
-          dst[y * width + x] = CLIP_TO_PIXEL((wL * left + (64 - wL) * dst[y * width + x] + 32) >> 6);
-        }
-      }*/
     }
   }
   else {
@@ -611,6 +578,22 @@ static void uvg_angular_pred_avx2(
     }
   }
 }
+
+
+static void uvg_angular_pred_avx2(
+  const cu_loc_t* const cu_loc,
+  const int_fast8_t intra_mode,
+  const int_fast8_t channel_type,
+  const uvg_pixel* const in_ref_above,
+  const uvg_pixel* const in_ref_left,
+  uvg_pixel* const dst,
+  const uint8_t multi_ref_idx,
+  const uint8_t isp_mode,
+  const int cu_dim)
+{
+
+}
+
 
 /**
  * \brief Generate planar prediction.
@@ -1588,6 +1571,8 @@ static void uvg_intra_pred_filtered_dc_avx2(
 * \param used_ref      Pointer used reference pixel struct.
 * \param dst           Buffer of size width*width.
 */
+// TODO: does not work with blocks with height 1 and 2
+// TODO: also has width someplaces where height should be
 static void uvg_pdpc_planar_dc_avx2(
   const int mode,
   const cu_loc_t* const cu_loc,
