@@ -703,14 +703,15 @@ static void uvg_angular_pred_avx2(
   // Set ref_main and ref_side such that, when indexed with 0, they point to
   // index 0 in block coordinates.
   if (sample_disp < 0) {
-    memcpy(&temp_main[width], vertical_mode ? in_ref_above : in_ref_left, sizeof(uvg_pixel) * (width + 1 + multi_ref_index + 1));
-    memcpy(&temp_side[width], vertical_mode ? in_ref_left : in_ref_above, sizeof(uvg_pixel) * (width + 1 + multi_ref_index + 1));
+    memcpy(&temp_main[height], &in_ref_above[0], (width + 2 + multi_ref_index) * sizeof(uvg_pixel));
+    memcpy(&temp_side[width], &in_ref_left[0], (height + 2 + multi_ref_index) * sizeof(uvg_pixel));
 
-    ref_main = temp_main + width;
-    ref_side = temp_side + width;
+    ref_main = vertical_mode ? temp_main + height : temp_side + width;
+    ref_side = vertical_mode ? temp_side + width  : temp_main + height;
 
-    for (int i = -width; i <= -1; i++) {
-      ref_main[i] = ref_side[MIN((-i * modedisp2invsampledisp[abs(mode_disp)] + 256) >> 9, width)];
+    int size_side = vertical_mode ? height : width;
+    for (int i = -size_side; i <= -1; i++) {
+      ref_main[i] = ref_side[MIN((-i * modedisp2invsampledisp[abs(mode_disp)] + 256) >> 9, size_side)];
     }
   }
   else {
