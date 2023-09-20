@@ -743,7 +743,7 @@ static void uvg_angular_pred_avx2(
   if (!vertical_mode) { SWAP(width, height, int) }
 
   static const int uvg_intra_hor_ver_dist_thres[8] = { 24, 24, 24, 14, 2, 0, 0, 0 };
-  int filter_threshold = uvg_intra_hor_ver_dist_thres[log2_width];
+  int filter_threshold = uvg_intra_hor_ver_dist_thres[(log2_width + log2_height) >> 1];
   int dist_from_vert_or_hor = MIN(abs((int32_t)pred_mode - 50), abs((int32_t)pred_mode - 18));
 
   bool use_cubic = true; // Default to cubic filter
