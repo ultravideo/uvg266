@@ -744,8 +744,8 @@ static void uvg_angular_pred_avx2(
   // Sample displacement per column in fractions of 32.
   const int_fast8_t sample_disp = (mode_disp < 0 ? -1 : 1) * modedisp2sampledisp[abs(mode_disp)];
 
-  // TODO: replace latter width with height
-  int scale = MIN(2, log2_width - pre_scale[abs(mode_disp)]);
+  const int side_size = vertical_mode ? log2_height : log2_width;
+  int scale = MIN(2, side_size - pre_scale[abs(mode_disp)]);
 
   // Pointer for the reference we are interpolating from.
   uvg_pixel* ref_main;
