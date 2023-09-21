@@ -926,26 +926,45 @@ static void uvg_angular_pred_avx2(
             __m256i w01 = _mm256_shuffle_epi8(all_weights, w_shuf_01);
             __m256i w23 = _mm256_shuffle_epi8(all_weights, w_shuf_23);
 
-            for (int_fast32_t x = 0; x + 3 < width; x += 4, p += 4) {
+            // Special case. Original height was < 4 and dimensions have been swapped -> current width < 4 (horizontal mode).
+            if (width < 4) {
+              for (int_fast32_t x = 0; x < width; ++x) {
+                uvg_pixel ref[4][4];
+                for (int r = 0; r < 4; ++r) {
+                  ref[0][r] = ref_main[(delta_int[0] + x) + r];
+                  ref[1][r] = ref_main[(delta_int[1] + x) + r];
+                  ref[2][r] = ref_main[(delta_int[2] + x) + r];
+                  ref[3][r] = ref_main[(delta_int[3] + x) + r];
+                }
 
-              __m256i vp = _mm256_i64gather_epi64((const long long int*)p, vidx, 1);
-              __m256i vp_01 = _mm256_shuffle_epi8(vp, p_shuf_01);
-              __m256i vp_23 = _mm256_shuffle_epi8(vp, p_shuf_23);
+                dst[(y + 0) * width + x] = CLIP_TO_PIXEL(((int32_t)(f[0][0] * ref[0][0]) + (int32_t)(f[0][1] * ref[0][1]) + (int32_t)(f[0][2] * ref[0][2]) + (int32_t)(f[0][3] * ref[0][3]) + 32) >> 6);;
+                dst[(y + 1) * width + x] = CLIP_TO_PIXEL(((int32_t)(f[1][0] * ref[1][0]) + (int32_t)(f[1][1] * ref[1][1]) + (int32_t)(f[1][2] * ref[1][2]) + (int32_t)(f[1][3] * ref[1][3]) + 32) >> 6);;
+                dst[(y + 2) * width + x] = CLIP_TO_PIXEL(((int32_t)(f[2][0] * ref[2][0]) + (int32_t)(f[2][1] * ref[2][1]) + (int32_t)(f[2][2] * ref[2][2]) + (int32_t)(f[2][3] * ref[2][3]) + 32) >> 6);;
+                dst[(y + 3) * width + x] = CLIP_TO_PIXEL(((int32_t)(f[3][0] * ref[3][0]) + (int32_t)(f[3][1] * ref[3][1]) + (int32_t)(f[3][2] * ref[3][2]) + (int32_t)(f[3][3] * ref[3][3]) + 32) >> 6);;
+              }
+            }
+            else {
+              for (int_fast32_t x = 0; x + 3 < width; x += 4, p += 4) {
 
-              __m256i dot_01 = _mm256_maddubs_epi16(vp_01, w01);
-              __m256i dot_23 = _mm256_maddubs_epi16(vp_23, w23);
-              __m256i sum = _mm256_add_epi16(dot_01, dot_23);
-              sum = _mm256_add_epi16(sum, _mm256_set1_epi16(32));
-              sum = _mm256_srai_epi16(sum, 6);
+                __m256i vp = _mm256_i64gather_epi64((const long long int*)p, vidx, 1);
+                __m256i vp_01 = _mm256_shuffle_epi8(vp, p_shuf_01);
+                __m256i vp_23 = _mm256_shuffle_epi8(vp, p_shuf_23);
 
-              __m128i lo = _mm256_castsi256_si128(sum);
-              __m128i hi = _mm256_extracti128_si256(sum, 1);
-              __m128i filtered = _mm_packus_epi16(lo, hi);
+                __m256i dot_01 = _mm256_maddubs_epi16(vp_01, w01);
+                __m256i dot_23 = _mm256_maddubs_epi16(vp_23, w23);
+                __m256i sum = _mm256_add_epi16(dot_01, dot_23);
+                sum = _mm256_add_epi16(sum, _mm256_set1_epi16(32));
+                sum = _mm256_srai_epi16(sum, 6);
 
-              *(uint32_t*)(dst + (y + 0) * width + x) = _mm_extract_epi32(filtered, 0);
-              *(uint32_t*)(dst + (y + 1) * width + x) = _mm_extract_epi32(filtered, 1);
-              *(uint32_t*)(dst + (y + 2) * width + x) = _mm_extract_epi32(filtered, 2);
-              *(uint32_t*)(dst + (y + 3) * width + x) = _mm_extract_epi32(filtered, 3);
+                __m128i lo = _mm256_castsi256_si128(sum);
+                __m128i hi = _mm256_extracti128_si256(sum, 1);
+                __m128i filtered = _mm_packus_epi16(lo, hi);
+
+                *(uint32_t*)(dst + (y + 0) * width + x) = _mm_extract_epi32(filtered, 0);
+                *(uint32_t*)(dst + (y + 1) * width + x) = _mm_extract_epi32(filtered, 1);
+                *(uint32_t*)(dst + (y + 2) * width + x) = _mm_extract_epi32(filtered, 2);
+                *(uint32_t*)(dst + (y + 3) * width + x) = _mm_extract_epi32(filtered, 3);
+              }
             }
           }
           else {
