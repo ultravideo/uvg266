@@ -686,7 +686,7 @@ void uvg_dep_quant_update_state_eos(
       }
     }
     uint8_t* temp = &state->m_absLevels[ctxs->m_curr_state_offset / 4][(scan_pos & 15) * 4 + decision_id];
-    *temp = (uint8_t)MIN(51, decisions->absLevel[decision_id]);
+    *temp = (uint8_t)MIN(255, decisions->absLevel[decision_id]);
 
     update_common_context(ctxs, state->m_commonCtx, scan_pos, cg_pos, width_in_sbb, height_in_sbb, next_sbb_right,
                           next_sbb_below, prvState, ctxs->m_curr_state_offset + decision_id);
@@ -1037,14 +1037,6 @@ int uvg_dep_quant(
         height,
         compID != 0); //tu.cu->slice->getReverseLastSigCoeffFlag());
     }
-
-    if(0){
-      printf("%d\n", scanIdx);
-      for (int i = 0; i < 4; i++) {
-        printf("%lld %hu %d\n", ctxs->m_trellis[scanIdx].rdCost[i], ctxs->m_trellis[scanIdx].absLevel[i], ctxs->m_trellis[scanIdx].prevId[i]);
-      }
-      printf("\n");
-    }
   }
 
   //===== find best path =====
@@ -1061,11 +1053,6 @@ int uvg_dep_quant(
   //===== backward scanning =====
   int scanIdx = 0;
   context_store* ctxs = &dep_quant_context;
-  //  printf("%d\n", scanIdx);
-  //for (int i = 0; i < 4; i++) {
-  //  printf("%lld %hu %d\n", ctxs->m_trellis[scanIdx].rdCost[i], ctxs->m_trellis[scanIdx].absLevel[i], ctxs->m_trellis[scanIdx].prevId[i]);
-  //}
-  //printf("\n");
   for (; prev_id >= 0; scanIdx++) {
     Decision temp       = dep_quant_context.m_trellis[scanIdx];
     int32_t blkpos = scan[scanIdx];

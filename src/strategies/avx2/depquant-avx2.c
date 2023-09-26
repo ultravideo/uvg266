@@ -480,10 +480,6 @@ static void xDecide(
   PQData pqData;
   preQuantCoeff(qp, absCoeff, &pqData, quanCoeff);
   check_rd_costs_avx2(all_states, spt, &pqData, decisions, prev_offset);
-  //uvg_dep_quant_check_rd_costs(all_states, spt, &pqData, decisions, 0, 2, prev_offset + 0);
-  //uvg_dep_quant_check_rd_costs(all_states, spt, &pqData, decisions, 2, 0, prev_offset + 1);
-  //uvg_dep_quant_check_rd_costs(all_states, spt, &pqData, decisions, 1, 3, prev_offset + 2);
-  //uvg_dep_quant_check_rd_costs(all_states, spt, &pqData, decisions, 3, 1, prev_offset + 3);
   if (spt == SCAN_EOCSBB) {
     checkRdCostSkipSbb(all_states, decisions, 0, skip_offset);
     checkRdCostSkipSbb(all_states, decisions, 1, skip_offset);
@@ -594,7 +590,7 @@ static void update_state_eos_avx2(context_store* ctxs, const uint32_t scan_pos, 
       prev_state = _mm_loadu_si128((__m128i const*)prev_state_s);
     }
     uint32_t level_offset = scan_pos & 15;
-    __m128i  max_abs = _mm_min_epi32(abs_level, _mm_set1_epi32(51));
+    __m128i  max_abs = _mm_min_epi32(abs_level, _mm_set1_epi32(255));
     max_abs = _mm_shuffle_epi8(max_abs, control);
     uint32_t packed_max_abs = _mm_extract_epi32(max_abs, 0);
     memcpy(&state->m_absLevels[state_offset >> 2][level_offset * 4], &packed_max_abs, 4);
@@ -1073,7 +1069,6 @@ static INLINE void update_states_avx2(
           state->m_numSigSbb[state_id] = 1;
           state->m_refSbbCtxId[state_id] = -1;
           int ctxBinSampleRatio = 28;
-          //(scanInfo.chType == CHANNEL_TYPE_LUMA) ? MAX_TU_LEVEL_CTX_CODED_BIN_CONSTRAINT_LUMA : MAX_TU_LEVEL_CTX_CODED_BIN_CONSTRAINT_CHROMA;
           state->m_remRegBins[state_id] = (state->effWidth * state->effHeight * ctxBinSampleRatio) / 16 - (decisions->absLevel[decision_id] < 2 ? (unsigned)decisions->absLevel[decision_id] : 3);
         }
         rem_reg_all_gte_4 &= state->m_remRegBins[state_id] >= 4;
@@ -1124,7 +1119,7 @@ static INLINE void update_states_avx2(
       }
     }
     uint32_t level_offset   = scan_pos & 15;
-    __m128i  max_abs        = _mm_min_epi32(abs_level, _mm_set1_epi32(51));
+    __m128i  max_abs        = _mm_min_epi32(abs_level, _mm_set1_epi32(255));
     max_abs                 = _mm_shuffle_epi8(max_abs, control);
     uint32_t packed_max_abs = _mm_extract_epi32(max_abs, 0);
     memcpy(&state->m_absLevels[state_offset >> 2][level_offset * 4], &packed_max_abs,4);
@@ -1230,7 +1225,7 @@ static INLINE void update_states_avx2(
       }
 
       __m128i sum_abs = _mm_srli_epi32(tinit, 8);
-      sum_abs = _mm_min_epi32(sum_abs, _mm_set1_epi32(51));
+      sum_abs = _mm_min_epi32(sum_abs, _mm_set1_epi32(255));
       switch (numIPos) {
         case 5:
           {
@@ -1283,7 +1278,7 @@ static INLINE void update_states_avx2(
       __m128i   tinit = _mm_loadu_si128((__m128i*)(&state->m_ctxInit[state_offset >> 2][tinit_offset * 4]));
       tinit = _mm_cvtepi16_epi32(tinit); 
       __m128i sum_abs = _mm_srli_epi32(tinit, 8);
-      sum_abs         = _mm_min_epi32(sum_abs, _mm_set1_epi32(51));
+      sum_abs         = _mm_min_epi32(sum_abs, _mm_set1_epi32(255));
       switch (numIPos) {
         case 5:
           {
@@ -1465,15 +1460,6 @@ void uvg_dep_quant_decide_and_update_avx2(
     } else if (!zeroOut) {
       update_states_avx2(ctxs, next_nb_info_ssb.num, scan_pos, decisions, scan_info->sig_ctx_offset[is_chroma], scan_info->gtx_ctx_offset[is_chroma], next_nb_info_ssb, 4, false);
     }
-    //for (int i = 0; i<4; i++) {
-    //  for (int k = 0; k < 16; ++k) {
-    //    printf(
-    //      "%3d ",
-    //      ctxs->m_allStates.m_absLevels[ctxs->m_curr_state_offset / 4][k * 4 + i]);
-    //  }
-    //  printf("\n");
-    //}
-    //printf("\n");
 
     if (spt == SCAN_SOCSBB) {
       SWAP(ctxs->m_skip_state_offset, ctxs->m_prev_state_offset, int);
