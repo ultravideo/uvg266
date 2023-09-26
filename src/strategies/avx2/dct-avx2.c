@@ -52,7 +52,9 @@ extern const int16_t uvg_g_dct_8_t[8][8];
 extern const int16_t uvg_g_dct_16_t[16][16];
 extern const int16_t uvg_g_dct_32_t[32][32];
 
-#if COMPILE_INTEL_AVX2
+#define COMPILE_INTEL_AVX2 1
+
+#if COMPILE_INTEL_AVX2 
 #include "uvg266.h"
 #if UVG_BIT_DEPTH == 8
 #include <immintrin.h>
@@ -1739,22 +1741,7 @@ static void mts_dct_16x16_avx2(const int16_t* input, int16_t* output, tr_type_t 
 
   const int skip_line = lfnst_idx ? 8 : 0;
   const int skip_line2 = lfnst_idx ? 8 : 0;
-  if (skip_line)
-  {
-    const int reduced_line = 8, cutoff = 8;
-    int16_t* dst2 = output + reduced_line;
-    for (int j = 0; j < cutoff; j++)
-    {
-      memset(dst2, 0, sizeof(int16_t) * skip_line);
-      dst2 += 16;
-    }
-  }
 
-  if (skip_line2)
-  {
-    int16_t* dst2 = output + 16 * 8;
-    memset(dst2, 0, sizeof(int16_t) * 16 * skip_line2);
-  }
 }
 
 /**********/
@@ -1942,21 +1929,7 @@ static void mul_clip_matrix_32x32_mts_avx2(const int16_t* left,
     _mm256_store_si256(dst_v + dst_base + 1, h23);
   }
   
-  if (skip_line)
-  {
-    int16_t* dst2 = dst + reduced_line;
-    for (j = 0; j < cutoff; j++)
-    {
-      memset(dst2, 0, sizeof(int16_t) * skip_line);
-      dst2 += 32;
-    }
-  }
 
-  if (skip_line2)
-  {
-    int16_t* dst2 = dst + 32 * cutoff;
-    memset(dst2, 0, sizeof(int16_t) * 32 * skip_line2);
-  }
 }
 
 static void mts_dct_32x32_avx2(const int16_t* input, int16_t* output, tr_type_t type_hor, tr_type_t type_ver, uint8_t bitdepth, uint8_t lfnst_idx)
@@ -3283,19 +3256,7 @@ static void fast_forward_tr_4x32_avx2(const int16_t* src, int16_t* dst, tr_type_
   }
   transpose_avx2(temp_out, (__m256i*) dst, 32, 4);
 
-  if (skip_width) {
-    dst = p_dst + reduced_line;
-    for (int j = 0; j < cutoff; j++)
-    {
-      memset(dst, 0, sizeof(int16_t) * skip_width);
-      dst += width;
-    }
-  }
 
-  if (skip_height) {
-    dst = p_dst + width * cutoff;
-    memset(dst, 0, sizeof(int16_t) * width * skip_height);
-  }
 }
 
 
@@ -4448,19 +4409,7 @@ static void fast_forward_tr_8x32_avx2(const int16_t* src, int16_t* dst, tr_type_
   transpose_avx2(temp_out, (__m256i*) dst, 32, 8);
 #undef NUM_PARTS
 #undef PART_DIMENSION
-  if (skip_width) {
-    dst = p_dst + reduced_line;
-    for (int j = 0; j < cutoff; j++)
-    {
-      memset(dst, 0, sizeof(int16_t) * skip_width);
-      dst += width;
-    }
-  }
 
-  if (skip_height) {
-    dst = p_dst + width * cutoff;
-    memset(dst, 0, sizeof(int16_t) * width * skip_height);
-  }
 }
 
 
@@ -5850,19 +5799,6 @@ static void fast_forward_tr_16x32_avx2(const int16_t* src, int16_t* dst, tr_type
 #undef PART_DIMENSION
 #endif
 
-  if (skip_width) {
-    dst = p_dst + reduced_line;
-    for (int j = 0; j < cutoff; j++)
-    {
-      memset(dst, 0, sizeof(int16_t) * skip_width);
-      dst += width;
-    }
-  }
-
-  if (skip_height) {
-    dst = p_dst + width * cutoff;
-    memset(dst, 0, sizeof(int16_t) * width * skip_height);
-  }
 }
 
 
@@ -6273,15 +6209,6 @@ static void fast_forward_DCT2_32x8_avx2_ver(const __m256i* src, int16_t* dst, in
     dst += 16;
   }
 
-  if (skip_line)
-  {
-    dst = p_dst + reduced_line;
-    for (int j = 0; j < 8; j++)
-    {
-      memset(dst, 0, sizeof(int16_t) * skip_line);
-      dst += line;
-    }
-  }
 }
 
 
@@ -6565,19 +6492,6 @@ static void fast_forward_tr_32x4_avx2(const int16_t* src, int16_t* dst, tr_type_
     dst += 32;
   }
 
-  if (skip_width) {
-    dst = p_dst + reduced_line;
-    for (int j = 0; j < cutoff; j++)
-    {
-      memset(dst, 0, sizeof(int16_t) * skip_width);
-      dst += width;
-    }
-  }
-
-  if (skip_height) {
-    dst = p_dst + width * cutoff;
-    memset(dst, 0, sizeof(int16_t) * width * skip_height);
-  }
 }
 
 
@@ -7034,19 +6948,7 @@ static void fast_forward_tr_32x8_avx2(const int16_t* src, int16_t* dst, tr_type_
   }
 #undef NUM_PARTS
 #undef PART_DIMENSION
-  if (skip_width) {
-    dst = p_dst + reduced_line;
-    for (int j = 0; j < cutoff; j++)
-    {
-      memset(dst, 0, sizeof(int16_t) * skip_width);
-      dst += width;
-    }
-  }
 
-  if (skip_height) {
-    dst = p_dst + width * cutoff;
-    memset(dst, 0, sizeof(int16_t) * width * skip_height);
-  }
 }
 
 
@@ -7366,19 +7268,6 @@ static void fast_forward_tr_32x16_avx2(const int16_t* src, int16_t* dst, tr_type
   }
 #undef NUM_PARTS
 #undef PART_DIMENSION
-  if (skip_width) {
-    dst = p_dst + reduced_line;
-    for (int j = 0; j < cutoff; j++)
-    {
-      memset(dst, 0, sizeof(int16_t) * skip_width);
-      dst += width;
-    }
-  }
-
-  if (skip_height) {
-    dst = p_dst + width * cutoff;
-    memset(dst, 0, sizeof(int16_t) * width * skip_height);
-  }
 }
 
 
@@ -7838,19 +7727,6 @@ static void fast_forward_tr_32x32_avx2(const int16_t* src, int16_t* dst, tr_type
 #undef PART_DIMENSION
 #endif
 
-  if (skip_width) {
-    dst = p_dst + reduced_line;
-    for (int j = 0; j < cutoff; j++)
-    {
-      memset(dst, 0, sizeof(int16_t) * skip_width);
-      dst += width;
-    }
-  }
-
-  if (skip_height) {
-    dst = p_dst + width * cutoff;
-    memset(dst, 0, sizeof(int16_t) * width * skip_height);
-  }
 }
 
 

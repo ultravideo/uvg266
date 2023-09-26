@@ -37,7 +37,6 @@
 #include "strategies/avx2/depquant-avx2.h"
 #include "strategyselector.h"
 
-#define COMPILE_INTEL_AVX2 1
 
 #if COMPILE_INTEL_AVX2 && defined X86_64
 #include "dep_quant.h"
