@@ -507,7 +507,7 @@ static void quantize_chroma(
     (transform != CHROMA_TS || !state->encoder_control->cfg.rdoq_skip))
   {
     uvg_rdoq(state, u_coeff, u_quant_coeff, width, height, transform != JCCR_1 ? COLOR_U : COLOR_V,
-             scan_order, CU_INTRA, 0, lfnst_idx);
+             scan_order, CU_INTRA, 0, lfnst_idx, 0);
 
     int j;
     for (j = 0; j < width * height; ++j) {
@@ -521,7 +521,7 @@ static void quantize_chroma(
       uint16_t temp_cbf = 0;
       if (*u_has_coeffs)cbf_set(&temp_cbf, COLOR_U);
       uvg_rdoq(state, v_coeff, v_quant_coeff, width, height, COLOR_V,
-               scan_order, CU_INTRA, temp_cbf, lfnst_idx);
+               scan_order, CU_INTRA, temp_cbf, lfnst_idx, 0);
 
     }
   }

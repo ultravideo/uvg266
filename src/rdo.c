@@ -843,28 +843,28 @@ void uvg_rdoq_sign_hiding(
   }
 }
 
-static unsigned templateAbsSum(const coeff_t* coeff, int baseLevel, uint32_t  posX, uint32_t  posY, uint32_t width, uint32_t height)
+static unsigned templateAbsSum(const coeff_t* coeff, int baseLevel, uint32_t  posX, uint32_t  posY, uint32_t width, uint32_t height, uint8_t mts_index)
 {
   const coeff_t* pData = coeff + posX + posY * width;
   coeff_t          sum = 0;
   if (posX < width - 1)
   {
-    sum += abs(pData[1]);
+    sum += mts_index && posX + 1 >= 16 ? 0 : abs(pData[1]);
     if (posX < width - 2)
     {
-      sum += abs(pData[2]);
+      sum += mts_index && posX + 2 >= 16 ? 0 : abs(pData[2]);
     }
     if (posY < height - 1)
     {
-      sum += abs(pData[width + 1]);
+      sum += mts_index && (posY + 1 >= 16 || posX + 1 >= 16) ? 0 : abs(pData[width + 1]);
     }
   }
   if (posY < height - 1)
   {
-    sum += abs(pData[width]);
+    sum += mts_index && posY + 1 >= 16 ? 0 : abs(pData[width]);
     if (posY < height - 2)
     {
-      sum += abs(pData[width << 1]);
+      sum += mts_index && posY + 2 >= 16 ? 0 : abs(pData[width << 1]);
     }
   }
   return MAX(MIN(sum - 5 * baseLevel, 31), 0);
@@ -1398,6 +1398,48 @@ int uvg_ts_rdoq(encoder_state_t* const state, coeff_t* src_coeff, coeff_t* dest_
   return abs_sum;
 }
 
+
+static uint32_t context_get_sig_ctx_idx_abs(const coeff_t* coeff, uint32_t pos_x, uint32_t pos_y,
+                                            uint32_t width, uint32_t height, int8_t color,
+                                            int32_t* temp_diag, int32_t* temp_sum, int8_t mts)
+{
+  const coeff_t* data = coeff + pos_x + pos_y * width;
+  const int     diag = pos_x + pos_y;
+  int           num_pos = 0;
+  int           sum_abs = 0;
+#define UPDATE(x) {int a=abs(x);sum_abs+=MIN(4+(a&1),a);num_pos+=(a?1:0);}
+  if (pos_x < width - 1)
+  {
+    UPDATE(mts && pos_x + 1 >= 16 ? 0 : data[1]);
+    if (pos_x < width - 2)
+    {
+      UPDATE(mts && pos_x + 2 >= 16 ? 0 : data[2]);
+    }
+    if (pos_y < height - 1)
+    {
+      UPDATE(mts && (pos_y + 1 >= 16 || pos_x + 1 >= 16) ? 0 : data[width + 1]);
+    }
+  }
+  if (pos_y < height - 1)
+  {
+    UPDATE(mts && pos_x + 1 >= 16 ? 0 : data[width]);
+    if (pos_y < height - 2)
+    {
+      UPDATE(mts && pos_x + 2 >= 16 ? 0 : data[width << 1]);
+    }
+  }
+#undef UPDATE
+  int ctx_ofs = MIN((sum_abs + 1) >> 1, 3) + (diag < 2 ? 4 : 0);
+  if (color == COLOR_Y)
+  {
+    ctx_ofs += diag < 5 ? 4 : 0;
+  }
+
+  *temp_diag = diag;
+  *temp_sum = sum_abs - num_pos;
+  return ctx_ofs;
+}
+
 /** RDOQ with CABAC
  * \returns void
  * Rate distortion optimized quantization for entropy
@@ -1414,7 +1456,7 @@ void uvg_rdoq(
   int8_t scan_mode,
   int8_t block_type,
   uint16_t cbf,
-  uint8_t lfnst_idx)
+  uint8_t lfnst_idx, uint8_t mts_idx)
 {
   const encoder_control_t * const encoder = state->encoder_control;
   cabac_data_t * const cabac = &state->cabac;
@@ -1516,6 +1558,10 @@ void uvg_rdoq(
   uint32_t  max_scan_group_size = lfnst_idx > 0 ? max_lfnst_pos : cg_size - 1;
   for (cg_scanpos = (cg_num - 1); cg_scanpos >= 0; cg_scanpos--)
   {
+    uint32_t cg_blkpos = scan_cg[cg_scanpos];
+    uint32_t cg_pos_y = cg_blkpos / num_blk_side;
+    uint32_t cg_pos_x = cg_blkpos - (cg_pos_y * num_blk_side);
+    if (mts_idx != 0 && (cg_pos_y >= 4 || cg_pos_x >= 4)) continue;
     for (int32_t scanpos_in_cg = max_scan_group_size; scanpos_in_cg >= 0; scanpos_in_cg--)
     {
       int32_t  scanpos        = cg_scanpos*cg_size + scanpos_in_cg;
@@ -1558,6 +1604,7 @@ void uvg_rdoq(
     uint32_t cg_pos_x   = cg_blkpos - (cg_pos_y * num_blk_side);
 
     FILL(rd_stats, 0);
+    if (mts_idx != 0 && (cg_pos_y >= 4 || cg_pos_x >= 4)) continue;
     for (int32_t scanpos_in_cg = max_scan_group_size; scanpos_in_cg >= 0; scanpos_in_cg--)  {
       int32_t  scanpos = cg_scanpos*cg_size + scanpos_in_cg;
       if (scanpos > last_scanpos) {
@@ -1586,7 +1633,7 @@ void uvg_rdoq(
         uint16_t ctx_sig = 0;
         if (scanpos != last_scanpos) {
           // VVC document 9.3.4.2.8, context for sig_coeff_flag calculated here
-          ctx_sig = uvg_context_get_sig_ctx_idx_abs(dest_coeff, pos_x, pos_y, width, height, color, &temp_diag, &temp_sum);
+          ctx_sig = context_get_sig_ctx_idx_abs(dest_coeff, pos_x, pos_y, width, height, color, &temp_diag, &temp_sum, mts_idx);
         }
         
         if (temp_diag != -1) {
@@ -1595,7 +1642,7 @@ void uvg_rdoq(
         else ctx_set = 0;
 
         if (reg_bins < 4) {
-          int  sumAll = templateAbsSum(dest_coeff, 0, pos_x, pos_y, width, height);
+          int  sumAll = templateAbsSum(dest_coeff, 0, pos_x, pos_y, width, height,mts_idx);
           go_rice_param = g_auiGoRiceParsCoeff[sumAll];
         }
 
@@ -1647,7 +1694,7 @@ void uvg_rdoq(
         }
         else if (reg_bins >= 4) {
           reg_bins -= (level < 2 ? level : 3) + (scanpos != last_scanpos);
-          int  sumAll = templateAbsSum(coef, 4, pos_x, pos_y, width, height);
+          int  sumAll = templateAbsSum(coef, 4, pos_x, pos_y, width, height, mts_idx);
           go_rice_param = g_auiGoRiceParsCoeff[sumAll];
         }
       }
@@ -1792,11 +1839,23 @@ void uvg_rdoq(
   } // end for
 
   uint32_t abs_sum = 0;
-  for ( int32_t scanpos = 0; scanpos < best_last_idx_p1; scanpos++) {
-    int32_t blkPos     = scan[scanpos];
-    int32_t level      = dest_coeff[blkPos];
-    abs_sum            += level;
-    dest_coeff[blkPos] = (coeff_t)(( coef[blkPos] < 0 ) ? -level : level);
+  if(!mts_idx || (width < 32 && height < 32)) {
+    for ( int32_t scanpos = 0; scanpos < best_last_idx_p1; scanpos++) {
+      int32_t blkPos     = scan[scanpos];
+      int32_t level      = dest_coeff[blkPos];
+      abs_sum            += level;
+      dest_coeff[blkPos] = (coeff_t)(( coef[blkPos] < 0 ) ? -level : level);
+    }
+  }
+  else {
+    for ( int32_t scanpos = 0; scanpos < best_last_idx_p1; scanpos++) {
+      int32_t blkPos     = scan[scanpos];
+      int32_t blk_x = blkPos & (width - 1);
+      int32_t blk_y = blkPos >> log2_block_width;
+      int32_t level      = blk_x >= 16 || blk_y >= 16 ? 0 : dest_coeff[blkPos];
+      abs_sum            += level;
+      dest_coeff[blkPos] = (coeff_t)(( level < 0 ) ? -level : level);
+    }
   }
   //===== clean uncoded coefficients =====
   for ( int32_t scanpos = best_last_idx_p1; scanpos <= last_scanpos; scanpos++) {

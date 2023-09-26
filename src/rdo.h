@@ -63,7 +63,7 @@ void  uvg_rdoq(
   int8_t scan_mode,
   int8_t block_type,
   uint16_t cbf,
-  uint8_t lfnst_idx);
+  uint8_t lfnst_idx, uint8_t mts_idx);
 
 
 int uvg_ts_rdoq(encoder_state_t* const state, coeff_t* src_coeff, coeff_t* dest_coeff, int32_t width,
