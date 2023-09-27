@@ -1,4 +1,4 @@
-.TH UVG266 "8" "July 2022" "uvg266 v0.4.1" "User Commands"
+.TH UVG266 "1" "September 2023" "uvg266 v0.8.0" "User Commands"
 .SH NAME
 uvg266 \- open source VVC encoder
 .SH SYNOPSIS
@@ -252,6 +252,9 @@ Rate\-distortion optimized quantization [enabled]
 \fB\-\-(no\-)rdoq\-skip      
 Skip RDOQ for 4x4 blocks. [disabled]
 .TP
+\fB\-\-(no\-)dep\-quant      
+Use dependent quantization. [disabled]
+.TP
 \fB\-\-(no\-)signhide       
 Sign hiding [disabled]
 .TP
@@ -306,16 +309,16 @@ Fractional pixel motion estimation level [4]
     \- 4: + 1/4\-pixel diagonal
 .TP
 \fB\-\-pu\-depth\-inter <int>\-<int>
-Inter prediction units sizes [0\-3]
-    \- 0, 1, 2, 3: from 64x64 to 8x8
+Maximum and minimum split depths where
+      inter search is performed 0..8. [0\-3]
     \- Accepts a list of values separated by ','
       for setting separate depths per GOP layer
       (values can be omitted to use the first
       value for the respective layer).
 .TP
 \fB\-\-pu\-depth\-intra <int>\-<int>
-Intra prediction units sizes [1\-4]
-    \- 0, 1, 2, 3, 4: from 64x64 to 4x4
+Maximum and minimum split depths where
+      intra search is performed 0..8. [1\-4]
     \- Accepts a list of values separated by ','
       for setting separate depths per GOP layer
       (values can be omitted to use the first
@@ -325,6 +328,41 @@ Intra prediction units sizes [1\-4]
 Predict the pu\-depth\-intra using machine
  learning trees, overrides the
  \-\-pu\-depth\-intra parameter. [disabled]
+.TP
+\fB\-\-mtt\-depth\-intra     
+Depth of mtt for intra slices 0..3.[0]
+.TP
+\fB\-\-mtt\-depth\-intra\-chroma
+Depth of mtt for chroma dual tree in
+       intra slices 0..3.[0]
+.TP
+\fB\-\-mtt\-depth\-inter     
+Depth of mtt for inter slices 0..3.[0]
+                              All MTTs are currently experimental and
+                              require disabling some avx2 optimizations.
+.TP
+\fB\-\-max\-bt\-size         
+maximum size for a CU resulting from
+    a bt split. A singular value shared for all
+    or a list of three values for the different
+    slices types (intra, inter, intra\-chroma)
+    can be provided. [64, 64, 32]
+.TP
+\fB\-\-max\-tt\-size         
+maximum size for a CU resulting from
+    a tt split. A singular value shared for all
+    or a list of three values for the different
+    slices types (intra, inter, intra\-chroma)
+    can be provided. [64, 64, 32]
+.TP
+\fB\-\-intra\-rough\-granularity
+How many levels are used for the
+    logarithmic intra rough search. 0..4
+    With 0 all of the modes are checked 
+    in a single level, 1 checks every second
+    mode is checked on first level and then
+    second level checks the modes surrounding
+    the three best modes. [2]
 .TP
 \fB\-\-(no\-)combine\-intra\-cus: Whether the encoder tries to code a cu
     on lower depth even when search is not
@@ -338,9 +376,6 @@ Force the encoder to use inter always.
 This is mostly for debugging and is not
 guaranteed to produce sensible bitstream or
 work at all. [disabled]
-.TP
-\fB\-\-tr\-depth\-intra <int>
-Transform split depth for intra blocks [0]
 .TP
 \fB\-\-(no\-)bipred         
 Bi\-prediction [disabled]
@@ -410,6 +445,11 @@ Enable matrix weighted intra prediction.
 \fB\-\-(no\-)lfnst          
 Enable low frequency non\-separable transform.
   [disabled]
+.TP
+\fB\-\-(no\-)isp            
+Enable intra sub partitions. [disabled]
+Experimental, requires disabling some avx2
+optimizations.
 .TP
 \fB\-\-mts <string>        
 Multiple Transform Selection [off].

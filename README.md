@@ -201,6 +201,7 @@ Compression tools:
                                    - full: Full ALF
       --(no-)rdoq            : Rate-distortion optimized quantization [enabled]
       --(no-)rdoq-skip       : Skip RDOQ for 4x4 blocks. [disabled]
+      --(no-)dep-quant       : Use dependent quantization. [disabled]
       --(no-)signhide        : Sign hiding [disabled]
       --rd <integer>         : Intra mode search complexity [0]
                                    - 0: Skip intra if inter is good enough.
@@ -232,14 +233,14 @@ Compression tools:
                                    - 2: + 1/2-pixel diagonal
                                    - 3: + 1/4-pixel horizontal and vertical
                                    - 4: + 1/4-pixel diagonal
-      --pu-depth-inter <int>-<int> : Inter prediction units sizes [0-3]
-                                   - 0, 1, 2, 3: from 64x64 to 8x8
+      --pu-depth-inter <int>-<int> : Maximum and minimum split depths where
+                                     inter search is performed 0..8. [0-3]
                                    - Accepts a list of values separated by ','
                                      for setting separate depths per GOP layer
                                      (values can be omitted to use the first
                                      value for the respective layer).
-      --pu-depth-intra <int>-<int> : Intra prediction units sizes [1-4]
-                                   - 0, 1, 2, 3, 4: from 64x64 to 4x4
+      --pu-depth-intra <int>-<int> : Maximum and minimum split depths where
+                                     intra search is performed 0..8. [1-4]
                                    - Accepts a list of values separated by ','
                                      for setting separate depths per GOP layer
                                      (values can be omitted to use the first
@@ -247,6 +248,29 @@ Compression tools:
       --ml-pu-depth-intra    : Predict the pu-depth-intra using machine
                                 learning trees, overrides the
                                 --pu-depth-intra parameter. [disabled]
+      --mtt-depth-intra      : Depth of mtt for intra slices 0..3.[0]
+      --mtt-depth-intra-chroma : Depth of mtt for chroma dual tree in
+                                      intra slices 0..3.[0]
+      --mtt-depth-inter      : Depth of mtt for inter slices 0..3.[0]
+                              All MTTs are currently experimental and
+                              require disabling some avx2 optimizations.
+      --max-bt-size          : maximum size for a CU resulting from
+                                   a bt split. A singular value shared for all
+                                   or a list of three values for the different
+                                   slices types (intra, inter, intra-chroma)
+                                   can be provided. [64, 64, 32]
+      --max-tt-size          : maximum size for a CU resulting from
+                                   a tt split. A singular value shared for all
+                                   or a list of three values for the different
+                                   slices types (intra, inter, intra-chroma)
+                                   can be provided. [64, 64, 32]
+      --intra-rough-granularity : How many levels are used for the
+                                   logarithmic intra rough search. 0..4
+                                   With 0 all of the modes are checked 
+                                   in a single level, 1 checks every second
+                                   mode is checked on first level and then
+                                   second level checks the modes surrounding
+                                   the three best modes. [2]
       --(no-)combine-intra-cus: Whether the encoder tries to code a cu
                                    on lower depth even when search is not
                                    performed on said depth. Should only
@@ -257,7 +281,6 @@ Compression tools:
                                This is mostly for debugging and is not
                                guaranteed to produce sensible bitstream or
                                work at all. [disabled]
-      --tr-depth-intra <int> : Transform split depth for intra blocks [0]
       --(no-)bipred          : Bi-prediction [disabled]
       --cu-split-termination <string> : CU split search termination [zero]
                                    - off: Don't terminate early.
@@ -294,6 +317,9 @@ Compression tools:
       --(no-)mip             : Enable matrix weighted intra prediction.
       --(no-)lfnst           : Enable low frequency non-separable transform.
                                  [disabled]
+      --(no-)isp             : Enable intra sub partitions. [disabled]
+                               Experimental, requires disabling some avx2
+                               optimizations.
       --mts <string>         : Multiple Transform Selection [off].
                                (Currently only implemented for intra
                                and has effect only when rd >= 2)
