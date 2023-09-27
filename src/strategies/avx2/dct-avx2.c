@@ -52,8 +52,6 @@ extern const int16_t uvg_g_dct_8_t[8][8];
 extern const int16_t uvg_g_dct_16_t[16][16];
 extern const int16_t uvg_g_dct_32_t[32][32];
 
-#define COMPILE_INTEL_AVX2 1
-
 #if COMPILE_INTEL_AVX2 
 #include "uvg266.h"
 #if UVG_BIT_DEPTH == 8
