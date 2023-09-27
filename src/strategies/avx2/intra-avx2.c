@@ -42,10 +42,9 @@
 #include "strategyselector.h"
 #include "strategies/missing-intel-intrinsics.h"
 
-
  /**
  * \brief Generate angular predictions.
- * \param log2_width    Log2 of width, range 2..5.
+ * \param cu_loc        CU locationand size data.
  * \param intra_mode    Angular mode in range 2..34.
  * \param channel_type  Color channel.
  * \param in_ref_above  Pointer to -1 index of above reference, length=width*2+1.
@@ -54,20 +53,28 @@
  * \param multi_ref_idx Reference line index for use with MRL.
  */
 static void uvg_angular_pred_avx2(
-  const int_fast8_t log2_width,
+  const cu_loc_t* const cu_loc,
   const int_fast8_t intra_mode,
   const int_fast8_t channel_type,
   const uvg_pixel *const in_ref_above,
   const uvg_pixel *const in_ref_left,
   uvg_pixel *const dst,
-  const uint8_t multi_ref_idx)
+  const uint8_t multi_ref_idx,
+  const uint8_t isp_mode,
+  const int cu_dim)
 {
-  
-  assert(log2_width >= 2 && log2_width <= 5);
+  // ISP_TODO: non-square block implementation, height is passed but not used
+  const int width = channel_type == COLOR_Y ? cu_loc->width : cu_loc->chroma_width;
+  const int height = channel_type == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
+  const int log2_width =  uvg_g_convert_to_log2[width];
+  const int log2_height = uvg_g_convert_to_log2[height];
+
+  assert((log2_width >= 2 && log2_width <= 5) && (log2_height >= 2 && log2_height <= 5));
   assert(intra_mode >= 2 && intra_mode <= 66);
 
   // TODO: implement handling of MRL
   uint8_t multi_ref_index = channel_type == COLOR_Y ? multi_ref_idx : 0;
+  uint8_t isp = isp_mode;
 
   __m256i p_shuf_01 = _mm256_setr_epi8(
     0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
@@ -142,7 +149,6 @@ static void uvg_angular_pred_avx2(
   //uvg_pixel tmp_ref[2 * 128 + 3 + 33 * MAX_REF_LINE:IDX] = { 0 };
   uvg_pixel temp_main[2 * 128 + 3 + 33 * MAX_REF_LINE_IDX] = { 0 };
   uvg_pixel temp_side[2 * 128 + 3 + 33 * MAX_REF_LINE_IDX] = { 0 };
-  const int_fast32_t width = 1 << log2_width;
 
   int32_t pred_mode = intra_mode; // ToDo: handle WAIP
 
@@ -345,13 +351,13 @@ static void uvg_angular_pred_avx2(
 
      
       // PDPC
-      bool PDPC_filter = (width >= 4 || channel_type != 0);
+      bool PDPC_filter = ((width >= TR_MIN_WIDTH && height >= TR_MIN_WIDTH) || channel_type != 0);
       if (pred_mode > 1 && pred_mode < 67) {
         if (mode_disp < 0 || multi_ref_index) { // Cannot be used with MRL.
           PDPC_filter = false;
         }
         else if (mode_disp > 0) {
-          PDPC_filter = (scale >= 0);
+          PDPC_filter &= (scale >= 0);
         }
       }
       if(PDPC_filter) {
@@ -497,20 +503,27 @@ static void uvg_angular_pred_avx2(
 
 /**
  * \brief Generate planar prediction.
- * \param log2_width    Log2 of width, range 2..5.
+ * \param cu_loc        CU location and size data.
+ * \param color         Color channel.
  * \param in_ref_above  Pointer to -1 index of above reference, length=width*2+1.
  * \param in_ref_left   Pointer to -1 index of left reference, length=width*2+1.
  * \param dst           Buffer of size width*width.
  */
 static void uvg_intra_pred_planar_avx2(
-  const int_fast8_t log2_width,
+  const cu_loc_t* const cu_loc,
+  color_t color,
   const uint8_t *const ref_top,
   const uint8_t *const ref_left,
   uint8_t *const dst)
 {
-  assert(log2_width >= 2 && log2_width <= 5);
+  // ISP_TODO: non-square block implementation, height is passed but not used
+  const int width = color == COLOR_Y ? cu_loc->width : cu_loc->chroma_width;
+  const int height = color == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
+  const int log2_width =  uvg_g_convert_to_log2[width];
+  const int log2_height = uvg_g_convert_to_log2[height];
 
-  const int_fast8_t width = 1 << log2_width;
+  assert((log2_width >= 2 && log2_width <= 5) && (log2_height >= 2 && log2_height <= 5));
+
   const uint8_t top_right = ref_top[width + 1];
   const uint8_t bottom_left = ref_left[width + 1];
 
@@ -964,12 +977,17 @@ static void uvg_intra_pred_filtered_dc_avx2(
 */
 static void uvg_pdpc_planar_dc_avx2(
   const int mode,
-  const int width,
-  const int log2_width,
+  const cu_loc_t* const cu_loc,
+  const color_t color,
   const uvg_intra_ref *const used_ref,
   uvg_pixel *const dst)
 {
+  // ISP_TODO: non-square block implementation, height is passed but not used
   assert(mode == 0 || mode == 1);  // planar or DC
+  const int width = color == COLOR_Y ? cu_loc->width : cu_loc->chroma_width;
+  const int height = color == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
+  const int log2_width =  uvg_g_convert_to_log2[width];
+  const int log2_height = uvg_g_convert_to_log2[height];
 
   __m256i shuf_mask_byte = _mm256_setr_epi8(
     0, -1, 0, -1, 0, -1, 0, -1,

@@ -332,6 +332,7 @@ typedef struct encoder_state_t {
   int8_t qp;
 
   double c_lambda;
+  double chroma_weights[4];
 
   /**
    * \brief Whether a QP delta value must be coded for the current LCU.
@@ -359,7 +360,15 @@ typedef struct encoder_state_t {
   //Constraint structure  
   void * constraint;
 
+  // Since lfnst needs the collocated luma intra mode for
+  // dual tree if the chroma mode is cclm mode and getting all of
+  // the information that would be necessary to get the collocated
+  // luma mode in the lfnst functions, instead store the current
+  // collocated luma mode in the state.
+  int8_t collocated_luma_mode;
 
+  quant_block quant_blocks[3]; // luma, ISP, chroma
+  rate_estimator_t rate_estimator[4]; // luma, cb, cr, isp
 } encoder_state_t;
 
 void uvg_encode_one_frame(encoder_state_t * const state, uvg_picture* frame);
@@ -401,14 +410,13 @@ static INLINE bool encoder_state_must_write_vps(const encoder_state_t *state)
  * \param depth   depth in the CU tree
  * \return true, if it's the last CU in its QG, otherwise false
  */
-static INLINE bool is_last_cu_in_qg(const encoder_state_t *state, int x, int y, int depth)
+static INLINE bool is_last_cu_in_qg(const encoder_state_t *state, const cu_loc_t* const cu_loc)
 {
   if (state->frame->max_qp_delta_depth < 0) return false;
-
-  const int cu_width = LCU_WIDTH >> depth;
+  
   const int qg_width = LCU_WIDTH >> state->frame->max_qp_delta_depth;
-  const int right  = x + cu_width;
-  const int bottom = y + cu_width;
+  const int right  = cu_loc->x + cu_loc->width;
+  const int bottom = cu_loc->y + cu_loc->height;
   return (right % qg_width == 0 || right >= state->tile->frame->width) &&
          (bottom % qg_width == 0 || bottom >= state->tile->frame->height);
 }

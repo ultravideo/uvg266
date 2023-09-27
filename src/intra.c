@@ -37,6 +37,10 @@
 #include "image.h"
 #include "uvg_math.h"
 #include "mip_data.h"
+#include "rdo.h"
+#include "search.h"
+#include "search_intra.h"
+#include "strategies-picture.h"
 #include "strategies/strategies-intra.h"
 #include "tables.h"
 #include "transform.h"
@@ -197,6 +201,7 @@ int8_t uvg_intra_get_dir_luma_predictor(
 
 static void intra_filter_reference(
   int_fast8_t log2_width,
+  int_fast8_t log2_height,
   uvg_intra_references *refs)
 {
   if (refs->filtered_initialized) {
@@ -206,6 +211,7 @@ static void intra_filter_reference(
   }
 
   const int_fast8_t ref_width = 2 * (1 << log2_width) + 1;
+  const int_fast8_t ref_height = 2 * (1 << log2_height) + 1;
   uvg_intra_ref *ref = &refs->ref;
   uvg_intra_ref *filtered_ref = &refs->filtered_ref;
 
@@ -213,14 +219,13 @@ static void intra_filter_reference(
   filtered_ref->left[0] = (ref->left[1] + 2 * ref->left[0] + ref->top[1] + 2) >> 2;
   filtered_ref->top[0] = filtered_ref->left[0];
 
-  // TODO: use block height here instead of ref_width
   // Top to bottom
-  for (int_fast8_t y = 1; y < ref_width - 1; ++y) {
+  for (int_fast8_t y = 1; y < ref_height - 1; ++y) {
     uvg_pixel *p = &ref->left[y];
     filtered_ref->left[y] = (p[-1] + 2 * p[0] + p[1] + 2) >> 2;
   }
   // Bottom left (not filtered) 
-  filtered_ref->left[ref_width - 1] = ref->left[ref_width - 1];
+  filtered_ref->left[ref_height - 1] = ref->left[ref_height - 1];
 
   // Left to right
   for (int_fast8_t x = 1; x < ref_width - 1; ++x) {
@@ -231,43 +236,79 @@ static void intra_filter_reference(
   filtered_ref->top[ref_width - 1] = ref->top[ref_width - 1];
 }
 
-
 /**
 * \brief Generate dc prediction.
-* \param log2_width    Log2 of width, range 2..5.
+* \param cu_loc        CU location and size data.
+* \param color         Color channel.
 * \param ref_top       Pointer to -1 index of above reference, length=width*2+1.
 * \param ref_left      Pointer to -1 index of left reference, length=width*2+1.
 * \param dst           Buffer of size width*width.
 * \param multi_ref_idx Multi reference line index for use with MRL.
 */
 static void intra_pred_dc(
-  const int_fast8_t log2_width,
+  const cu_loc_t* const cu_loc,
+  const color_t color,
   const uvg_pixel *const ref_top,
   const uvg_pixel *const ref_left,
   uvg_pixel *const out_block,
   const uint8_t multi_ref_idx)
 {
-  int_fast8_t width = 1 << log2_width;
-
+  const int width = color == COLOR_Y ? cu_loc->width : cu_loc->chroma_width;
+  const int height = color == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
+  
   int_fast16_t sum = 0;
-  for (int_fast8_t i = 0; i < width; ++i) {
-    sum += ref_top[i + 1 + multi_ref_idx];
-    sum += ref_left[i + 1 + multi_ref_idx];
+  // Only one loop is done for non-square blocks.
+  // In case of non-square blocks, only the longer reference is summed.
+  if (width >= height) {
+    for (int_fast8_t i = 0; i < width; ++i) {
+      sum += ref_top[i + 1 + multi_ref_idx];
+    }
+  }
+  if (width <= height) {
+    for (int_fast8_t j = 0; j < height; ++j) {
+      sum += ref_left[j + 1 + multi_ref_idx];
+    }
   }
   
   // JVET_K0122
-  // TODO: take non-square blocks into account
-  const int denom     = width << 1;
+  const int denom     = width == height ? width << 1 : MAX(width, height);
   const int divShift  = uvg_math_floor_log2(denom);
   const int divOffset = denom >> 1;
   
   const uvg_pixel dc_val = (sum + divOffset) >> divShift;
   //const uvg_pixel dc_val = (sum + width) >> (log2_width + 1);
-  const int_fast16_t block_size = 1 << (log2_width * 2);
+  const int_fast16_t block_size = width * height;
 
   for (int_fast16_t i = 0; i < block_size; ++i) {
     out_block[i] = dc_val;
   }
+}
+
+
+bool uvg_cclm_is_allowed(const encoder_state_t* const state, const cu_loc_t * const luma_loc, cu_info_t const * const cur_cu, enum
+                         uvg_tree_type tree_type)
+{
+  if (tree_type != UVG_CHROMA_T) {
+    return true;
+  }
+  uint32_t chroma_split_depth0 = GET_SPLITDATA(cur_cu, 0);
+  uint32_t chroma_split_depth1 = GET_SPLITDATA(cur_cu, 1);
+  bool allow = false;
+  if (chroma_split_depth0 == QT_SPLIT || (chroma_split_depth0 == BT_HOR_SPLIT && chroma_split_depth1 == BT_VER_SPLIT)) allow = true;
+  else if (chroma_split_depth0 == NO_SPLIT) allow = true;
+  else if (chroma_split_depth0 == BT_HOR_SPLIT && chroma_split_depth1 == NO_SPLIT) allow = true;
+  if (!allow) {
+    return false;
+  }
+  const cu_info_t* const luma_cu = uvg_cu_array_at_const(state->tile->frame->cu_array, luma_loc->x, luma_loc->y);
+  uint32_t split = GET_SPLITDATA(luma_cu, 0);
+  if (split != NO_SPLIT) {
+    allow = split == QT_SPLIT;
+  }
+  else if (split != NO_SPLIT && luma_cu->intra.isp_mode != ISP_MODE_NO_ISP) {
+    allow = false;
+  }
+  return allow;
 }
 
 
@@ -286,7 +327,7 @@ static void get_cclm_parameters(
   uvg_intra_ref* luma_src, uvg_intra_references*chroma_ref,
   int16_t *a, int16_t*b, int16_t*shift) {
 
-  const int base_unit_size = 1 << (6 - PU_DEPTH_INTRA_MAX);
+  const int base_unit_size = 4;
 
   // TODO: take into account YUV422
   const int unit_w = base_unit_size >> 1;
@@ -312,8 +353,8 @@ static void get_cclm_parameters(
   //int left_below_units = total_left_units - tu_height_in_units;
   //int avai_above_right_units = 0;  // TODO these are non zero only with non-square CUs
   //int avai_left_below_units = 0;
-  int avai_above_units = CLIP(0, tu_height_in_units, y0/base_unit_size);
-  int avai_left_units = CLIP(0, tu_width_in_units, x0 / base_unit_size);
+  int avai_above_units = y0 ? tu_width_in_units : 0;
+  int avai_left_units = x0 ? tu_height_in_units : 0;
 
   bool above_available = avai_above_units != 0;
   bool left_available = avai_left_units != 0;
@@ -491,9 +532,8 @@ static void predict_cclm(
   const lcu_t* const lcu,
   uvg_intra_references* chroma_ref,
   uvg_pixel* dst,
-  cclm_parameters_t* cclm_params,
-  enum uvg_tree_type tree_type
-  )
+  cclm_parameters_t* cclm_params
+)
 {
   assert(mode == LM_CHROMA_IDX || mode == LM_CHROMA_L_IDX || mode == LM_CHROMA_T_IDX);
   assert(state->encoder_control->cfg.cclm);
@@ -511,20 +551,14 @@ static void predict_cclm(
 
   const uvg_pixel *y_rec = lcu->rec.y + x_scu + y_scu * LCU_WIDTH;
   const int stride2 = (((state->tile->frame->width + 7) & ~7) + FRAME_PADDING_LUMA);
-
-  // Essentially what this does is that it uses 6-tap filtering to downsample
-  // the luma intra references down to match the resolution of the chroma channel.
-  // The luma reference is only needed when we are not on the edge of the picture.
-  // Because the reference pixels that are needed on the edge of the ctu this code
-  // is kinda messy but what can you do
-  const int ctu_size = tree_type == UVG_CHROMA_T ? LCU_WIDTH_C : LCU_WIDTH;
+  
+  const int ctu_size = LCU_WIDTH;
 
   if (y0) {
-    if (y_scu == 0) available_above_right = MIN(MIN(width / 2, (64-x_scu - width * 2) / 2), (state->tile->frame->width - x0 - width* 2) / 2);
+    if (y_scu == 0) available_above_right = MIN(MIN(width / 2, (64-x_scu - width * 2) / 4), (state->tile->frame->width - x0 - width* 2) / 4);
     for (; available_above_right < width / 2; available_above_right++) {
       int x_extension = x_scu + width * 2 + 4 * available_above_right;
-      x_extension >>= tree_type == UVG_CHROMA_T;
-      const cu_info_t* pu = LCU_GET_CU_AT_PX(lcu, x_extension, (y_scu >> (tree_type==UVG_CHROMA_T)) - 4);
+      const cu_info_t* pu = LCU_GET_CU_AT_PX(lcu, x_extension, (y_scu) - 4);
       if (x_extension >= ctu_size || pu->type == CU_NOTSET || (pu->type == CU_INTRA && pu->intra.mode_chroma == -1)) break;
     }
     if(y_scu == 0) {
@@ -547,13 +581,12 @@ static void predict_cclm(
   }
 
   if(x0) {
-    if (x_scu == 0) available_left_below = MIN(MIN(width / 2, (64 - y_scu - height * 2) / 2), (state->tile->frame->height - y0 - height * 2) / 2);
+    if (x_scu == 0) available_left_below = MIN(MIN(height / 2, (64 - y_scu - height * 2) / 4), (state->tile->frame->height - y0 - height * 2) / 4);
     for (; available_left_below < height / 2; available_left_below++) {
       int y_extension = y_scu + height * 2 + 4 * available_left_below;
-      y_extension >>= tree_type == UVG_CHROMA_T;
-      const cu_info_t* pu = LCU_GET_CU_AT_PX(lcu, (x_scu >> (tree_type == UVG_CHROMA_T)) - 4, y_extension);
+      const cu_info_t* pu = LCU_GET_CU_AT_PX(lcu, (x_scu) - 4, y_extension);
       if (y_extension >= ctu_size || pu->type == CU_NOTSET || (pu->type == CU_INTRA && pu->intra.mode_chroma == -1)) break;
-      if(x_scu == 32 && y_scu == 0 && pu->depth == 0) break;
+      if(x_scu == 32 && y_scu == 0 && pu->log2_height == 6 && pu->log2_width == 6 ) break;
     }
     for(int i = 0; i < height + available_left_below * 2; i++) {
       sampled_luma_ref.left[i] = state->tile->frame->cclm_luma_rec[(y0/2 + i) * (stride2/2) + x0 / 2 - 1];
@@ -573,12 +606,18 @@ static void predict_cclm(
 }
 
 
-int uvg_get_mip_flag_context(int x, int y, int width, int height, const lcu_t* lcu, cu_array_t* const cu_a) {
+uint8_t uvg_get_mip_flag_context(
+  const cu_loc_t* const cu_loc,
+  const lcu_t* lcu,
+  cu_array_t* const cu_a) {
   assert(!(lcu && cu_a));
-  if (width > 2 * height || height > 2 * width) {
+  if (cu_loc->width > 2 * cu_loc->height || cu_loc->height > 2 * cu_loc->width) {
     return 3;
   }
-  
+
+  const int x = cu_loc->x;
+  const int y = cu_loc->y;
+
   int context = 0;
   const cu_info_t* left = NULL;
   const cu_info_t* top = NULL;
@@ -898,39 +937,77 @@ static void mip_predict(
 }
 
 
+int8_t uvg_wide_angle_correction(
+  int_fast8_t mode,
+  const int log2_width,
+  const int log2_height,
+  const
+  bool account_for_dc_planar)
+{
+  int8_t pred_mode = mode;
+  if (log2_width != log2_height) {
+    if (mode > 1 && mode <= 66) {
+      const int modeShift[] = { 0, 6, 10, 12, 14, 15 };
+      const int deltaSize = abs(log2_width - log2_height);
+      if (log2_width > log2_height && mode < 2 + modeShift[deltaSize]) {
+        pred_mode += (66 - 1);
+      }
+      else if (log2_height > log2_width && mode > 66 - modeShift[deltaSize]) {
+        pred_mode -= (66 - 1) + (account_for_dc_planar ? 2 : 0);
+      }
+    }
+  }
+  return pred_mode;
+}
+
 static void intra_predict_regular(
   const encoder_state_t* const state,
   uvg_intra_references *refs,
-  int_fast8_t log2_width,
+  const cu_info_t* const       cur_cu,
+  const cu_loc_t* const cu_loc,
+  const cu_loc_t* const pu_loc,
   int_fast8_t mode,
   color_t color,
   uvg_pixel *dst,
-  const uint8_t multi_ref_idx)
+  const uint8_t multi_ref_idx,
+  const uint8_t isp_mode)
 {
-  const int_fast8_t width = 1 << log2_width;
+  const int width = color == COLOR_Y ? pu_loc->width : pu_loc->chroma_width;
+  const int height = color == COLOR_Y ? pu_loc->height : pu_loc->chroma_height;
+  const int log2_width = uvg_g_convert_to_log2[width];
+  const int log2_height = uvg_g_convert_to_log2[height];
   const uvg_config *cfg = &state->encoder_control->cfg;
 
   // MRL only for luma
   uint8_t multi_ref_index = color == COLOR_Y ? multi_ref_idx : 0;
+  uint8_t isp = color == COLOR_Y ? isp_mode : 0;
+
+  // Wide angle correction
+  int8_t pred_mode = uvg_wide_angle_correction(
+    mode,
+    color == COLOR_Y ? cur_cu->log2_width : log2_width,
+    color == COLOR_Y ? cur_cu->log2_height : log2_height,
+    false
+    );
 
   const uvg_intra_ref *used_ref = &refs->ref;
-  if (cfg->intra_smoothing_disabled || color != COLOR_Y || mode == 1 || width == 4 || multi_ref_index) {
+  if (cfg->intra_smoothing_disabled || color != COLOR_Y || mode == 1 || (width == 4 && height == 4) || multi_ref_index || isp_mode /*ISP_TODO: replace this fake ISP check*/) {
     // For chroma, DC and 4x4 blocks, always use unfiltered reference.
   } else if (mode == 0) {
     // Otherwise, use filtered for planar.
-    if (width * width > 32) {
+    if (width * height > 32) {
       used_ref = &refs->filtered_ref;
     }
   } else {
     // Angular modes use smoothed reference pixels, unless the mode is close
     // to being either vertical or horizontal.
     static const int uvg_intra_hor_ver_dist_thres[8] = {24, 24, 24, 14, 2, 0, 0, 0 };
-    int filter_threshold = uvg_intra_hor_ver_dist_thres[(log2_width + log2_width) >> 1];
-    int dist_from_vert_or_hor = MIN(abs(mode - 50), abs(mode - 18));
+    int filter_threshold = uvg_intra_hor_ver_dist_thres[(log2_width + log2_height) >> 1];
+    int dist_from_vert_or_hor = MIN(abs(pred_mode - 50), abs(pred_mode - 18));
     if (dist_from_vert_or_hor > filter_threshold) {
 
       static const int16_t modedisp2sampledisp[32] = { 0,    1,    2,    3,    4,    6,     8,   10,   12,   14,   16,   18,   20,   23,   26,   29,   32,   35,   39,  45,  51,  57,  64,  73,  86, 102, 128, 171, 256, 341, 512, 1024 };
-      const int_fast8_t mode_disp = (mode >= 34) ? mode - 50 : 18 - mode;
+      const int_fast8_t mode_disp = (pred_mode >= 34) ? pred_mode - 50 : 18 - pred_mode;
       const int_fast8_t sample_disp = (mode_disp < 0 ? -1 : 1) * modedisp2sampledisp[abs(mode_disp)];
       if ((abs(sample_disp) & 0x1F) == 0) {
         used_ref = &refs->filtered_ref;
@@ -939,38 +1016,66 @@ static void intra_predict_regular(
   }
 
   if (used_ref == &refs->filtered_ref && !refs->filtered_initialized) {
-    intra_filter_reference(log2_width, refs);
+    intra_filter_reference(log2_width, log2_height, refs);
   }
 
   if (mode == 0) {
-    uvg_intra_pred_planar(log2_width, used_ref->top, used_ref->left, dst);
+    uvg_intra_pred_planar(pu_loc, color, used_ref->top, used_ref->left, dst);
   } else if (mode == 1) {
-    intra_pred_dc(log2_width, used_ref->top, used_ref->left, dst, multi_ref_index);
+    intra_pred_dc(pu_loc, color, used_ref->top, used_ref->left, dst, multi_ref_index);
   } else {
-    uvg_angular_pred(log2_width, mode, color, used_ref->top, used_ref->left, dst, multi_ref_index);
+    uvg_angular_pred(
+      pu_loc,
+      pred_mode,
+      color,
+      used_ref->top,
+      used_ref->left,
+      dst,
+      multi_ref_index,
+      isp,
+      isp_mode == ISP_MODE_HOR ? cu_loc->height : cu_loc->width);
   }
 
   // pdpc
   // bool pdpcCondition = (mode == 0 || mode == 1 || mode == 18 || mode == 50);
   bool pdpcCondition = (mode == 0 || mode == 1); // Planar and DC
+  pdpcCondition &= width >= TR_MIN_WIDTH && height >= TR_MIN_WIDTH;
   if (pdpcCondition && multi_ref_index == 0) // Cannot be used with MRL.
   {
-    uvg_pdpc_planar_dc(mode, width, log2_width, used_ref, dst);
+    uvg_pdpc_planar_dc(mode, pu_loc, color, used_ref, dst);
   }
 }
 
 
 void uvg_intra_build_reference_any(
-  const int_fast8_t log2_width,
+  const encoder_state_t* const state,
+  const cu_loc_t* const pu_loc,
+  const cu_loc_t* const cu_loc,
   const color_t color,
   const vector2d_t *const luma_px,
   const vector2d_t *const pic_px,
   const lcu_t *const lcu,
   uvg_intra_references *const refs,
   const uint8_t multi_ref_idx,
-  uvg_pixel *extra_ref_lines)
+  uvg_pixel *extra_ref_lines,
+  const uint8_t isp_mode)
 {
-  assert(log2_width >= 2 && log2_width <= 5);
+  const int width  = color == COLOR_Y ? pu_loc->width  : pu_loc->chroma_width;
+  const int height = color == COLOR_Y ? pu_loc->height : pu_loc->chroma_height;
+  const int log2_width =  uvg_g_convert_to_log2[width];
+  const int log2_height = uvg_g_convert_to_log2[height];
+
+  // These are only used with ISP, so no need to check chroma
+  const int cu_width  = cu_loc->width;
+  const int cu_height = cu_loc->height;
+  const int pu_x = pu_loc->x;
+  const int pu_y = pu_loc->y;
+  const int cu_x = cu_loc->x;
+  const int cu_y = cu_loc->y;
+
+  bool is_first_isp_block = isp_mode ? pu_x == cu_x && pu_y == cu_y : false;
+
+  assert((log2_width >= 2 && log2_width <= 5) &&  log2_height <= 5);
 
   refs->filtered_initialized = false;
   uvg_pixel *out_left_ref = &refs->ref.left[0];
@@ -978,8 +1083,7 @@ void uvg_intra_build_reference_any(
 
   const uvg_pixel dc_val = 1 << (UVG_BIT_DEPTH - 1); //TODO: add used bitdepth as a variable
   const int is_chroma = color != COLOR_Y ? 1 : 0;
-  // TODO: height for non-square blocks
-  const int_fast8_t width = 1 << log2_width;
+  const int is_dual_tree = is_chroma && state->encoder_control->cfg.dual_tree && state->frame->is_irap;
 
   // Get multi ref index from CU under prediction or reconstrcution. Do not use MRL if not luma
   const uint8_t multi_ref_index = !is_chroma ? multi_ref_idx : 0;
@@ -1038,12 +1142,24 @@ void uvg_intra_build_reference_any(
   // Generate left reference.
   if (luma_px->x > 0) {
     // Get the number of reference pixels based on the PU coordinate within the LCU.
-    int px_available_left = num_ref_pixels_left[lcu_px.y / 4][lcu_px.x / 4] >> is_chroma;
+    int px_available_left;
+    if (isp_mode && !is_first_isp_block && !is_chroma) {
+      if (isp_mode == ISP_MODE_VER) {
+        px_available_left = height;
+      }
+      else {
+        px_available_left = uvg_count_available_edge_cus(cu_loc, lcu, true) * 4;
+        px_available_left -= pu_loc->y - cu_loc->y;
+      }
+    }
+    else {
+      const int num_cus = uvg_count_available_edge_cus(cu_loc, lcu, true);
+      px_available_left = !is_chroma ? num_cus * 4 : num_cus * 2;
+    }
 
     // Limit the number of available pixels based on block size and dimensions
     // of the picture.
-    // TODO: height for non-square blocks
-    px_available_left = MIN(px_available_left, width * 2 + multi_ref_index);
+    px_available_left = MIN(px_available_left, cu_height * 2 + multi_ref_index);
     px_available_left = MIN(px_available_left, (pic_px->y - luma_px->y) >> is_chroma);
 
     // Copy pixels from coded CUs.
@@ -1053,13 +1169,18 @@ void uvg_intra_build_reference_any(
     }
     // Extend the last pixel for the rest of the reference values.
     uvg_pixel nearest_pixel = left_border[(px_available_left - 1) * left_stride];
-    for (int i = px_available_left; i < width * 2 + multi_ref_index * 2; ++i) {
+
+    // If first isp split, take samples as if it were normal square block
+    int tmp_h = is_first_isp_block ? cu_height * 2 : (isp_mode ? cu_height + height : height * 2);
+    for (int i = px_available_left; i < tmp_h + multi_ref_index * 2; ++i) {
       out_left_ref[i + 1 + multi_ref_index] = nearest_pixel;
     }
   } else {
     // If we are on the left edge, extend the first pixel of the top row.
     uvg_pixel nearest_pixel = luma_px->y > 0 ? top_border[0] : dc_val;
-    for (int i = 0; i < width * 2 + multi_ref_index; i++) {
+    // If first isp split, take samples as if it were normal square block
+    int tmp_h = is_first_isp_block ? cu_height * 2 : (isp_mode ? cu_height + height : height * 2);
+    for (int i = 0; i < tmp_h + multi_ref_index; i++) {
       // Reserve space for top left reference
       out_left_ref[i + 1 + multi_ref_index] = nearest_pixel;
     }
@@ -1142,13 +1263,26 @@ void uvg_intra_build_reference_any(
   }
 
   // Generate top reference.
+  int px_available_top;
   if (luma_px->y > 0) {
     // Get the number of reference pixels based on the PU coordinate within the LCU.
-    int px_available_top = num_ref_pixels_top[lcu_px.y / 4][lcu_px.x / 4] >> is_chroma;
-
+    if (isp_mode && !is_first_isp_block && !is_chroma) {
+      if (isp_mode == ISP_MODE_HOR) {
+        px_available_top = width;
+      }
+      else {
+      px_available_top = uvg_count_available_edge_cus(cu_loc, lcu, false) * 4;
+      px_available_top -= pu_loc->x - cu_loc->x;
+      }
+    }
+    else {
+      const int num_cus = uvg_count_available_edge_cus(cu_loc, lcu, false);
+      px_available_top = !is_chroma ? num_cus * 4 : num_cus * 2;
+    }
+    
     // Limit the number of available pixels based on block size and dimensions
     // of the picture.
-    px_available_top = MIN(px_available_top, width * 2 + multi_ref_index);
+    px_available_top = MIN(px_available_top, cu_width * 2 + multi_ref_index);
     px_available_top = MIN(px_available_top, (pic_px->x - luma_px->x) >> is_chroma);
 
     // Copy all the pixels we can.
@@ -1157,20 +1291,28 @@ void uvg_intra_build_reference_any(
     }
     // Extend the last pixel for the rest of the reference values.
     uvg_pixel nearest_pixel = top_border[px_available_top - 1];
-    for (int i = px_available_top; i < width * 2 + multi_ref_index * 2; ++i) {
+
+    // If first isp split, take samples as if it were normal square block
+    int tmp_w = is_first_isp_block ? cu_width * 2 : (isp_mode ? cu_width + width : width * 2);
+    for (int i = px_available_top; i < tmp_w + multi_ref_index * 2; ++i) {
       out_top_ref[i + 1 + multi_ref_index] = nearest_pixel;
     }
   } else {
     // Extend nearest pixel.
     uvg_pixel nearest_pixel = luma_px->x > 0 ? left_border[0] : dc_val;
-    for (int i = 0; i < width * 2 + multi_ref_index; i++) {
+
+    // If first isp split, take samples as if it were normal square block
+    int tmp_w = is_first_isp_block ? cu_width * 2 : (isp_mode ? cu_width + width : width * 2);
+    for (int i = 0; i < tmp_w + multi_ref_index * 2; i++) {
       out_top_ref[i + 1] = nearest_pixel;
     }
   }
 }
 
 void uvg_intra_build_reference_inner(
-  const int_fast8_t log2_width,
+  const encoder_state_t* const state,
+  const cu_loc_t* const pu_loc,
+  const cu_loc_t* const cu_loc,
   const color_t color,
   const vector2d_t *const luma_px,
   const vector2d_t *const pic_px,
@@ -1178,17 +1320,33 @@ void uvg_intra_build_reference_inner(
   uvg_intra_references *const refs,
   bool entropy_sync,
   const uint8_t multi_ref_idx,
-  uvg_pixel* extra_ref_lines)
+  uvg_pixel* extra_ref_lines,
+  uint8_t isp_mode)
 {
-  assert(log2_width >= 2 && log2_width <= 5);
+  const int width  = color == COLOR_Y ? pu_loc->width  : pu_loc->chroma_width;
+  const int height = color == COLOR_Y ? pu_loc->height : pu_loc->chroma_height;
+  const int cu_width  = color == COLOR_Y ? cu_loc->width  : cu_loc->chroma_width;
+  const int cu_height = color == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
+  const int log2_width =  uvg_g_convert_to_log2[width];
+  const int log2_height = uvg_g_convert_to_log2[height];
+
+  // These are only used with ISP, so no need to check chroma
+  const int pu_x = pu_loc->x;
+  const int pu_y = pu_loc->y;
+  const int cu_x = cu_loc->x;
+  const int cu_y = cu_loc->y;
+
+  bool is_first_isp_block = isp_mode ? pu_x == cu_x && pu_y == cu_y : false;
+
+  // Log2_dim 1 is possible with ISP blocks
+  assert((log2_width >= 2 && log2_width <= 5) &&  log2_height <= 5);
 
   refs->filtered_initialized = false;
   uvg_pixel * __restrict out_left_ref = &refs->ref.left[0];
   uvg_pixel * __restrict out_top_ref = &refs->ref.top[0];
 
   const int is_chroma = color != COLOR_Y ? 1 : 0;
-  // TODO: height for non-sqaure blocks
-  const int_fast8_t width = 1 << log2_width;
+  const int is_dual_tree = is_chroma && state->encoder_control->cfg.dual_tree && state->frame->is_irap;
 
   // Get multiRefIdx from CU under prediction. Do not use MRL if not luma
   const uint8_t multi_ref_index = !is_chroma ? multi_ref_idx : 0;
@@ -1288,27 +1446,59 @@ void uvg_intra_build_reference_inner(
   }
   // Generate left reference.
 
-// Get the number of reference pixels based on the PU coordinate within the LCU.
-  int px_available_left = num_ref_pixels_left[lcu_px.y / 4][lcu_px.x / 4] >> is_chroma;
+  // Get the number of reference pixels based on the PU coordinate within the LCU.
+  int px_available_left;
+  if (isp_mode && !is_first_isp_block && !is_chroma) {
+    if (isp_mode == ISP_MODE_VER) {
+      px_available_left = height;
+    }
+    else {
+      px_available_left = uvg_count_available_edge_cus(cu_loc, lcu, true) * 4;
+      px_available_left -= pu_loc->y - cu_loc->y;
+    }
+
+  }
+  else {
+    if(!is_dual_tree) {
+      const int num_cus = uvg_count_available_edge_cus(cu_loc, lcu, true);
+      px_available_left = is_dual_tree || !is_chroma ? num_cus * 4 : num_cus * 2;
+    } else {
+      const int num_cus = uvg_count_available_edge_cus(cu_loc, lcu, true);
+      px_available_left = !is_chroma ? num_cus * 4 : num_cus * 2;
+    }
+  }
 
   // Limit the number of available pixels based on block size and dimensions
   // of the picture.
-  px_available_left = MIN(px_available_left, width * 2);
+  px_available_left = MIN(px_available_left, cu_height * 2);
   px_available_left = MIN(px_available_left, (pic_px->y - luma_px->y) >> is_chroma);
 
   // Copy pixels from coded CUs.
   int i = multi_ref_index;  // Offset by multi_ref_index
-  do {
-    out_left_ref[i + 1] = left_border[(i + 0 - multi_ref_index) * left_stride];
-    out_left_ref[i + 2] = left_border[(i + 1 - multi_ref_index) * left_stride];
-    out_left_ref[i + 3] = left_border[(i + 2 - multi_ref_index) * left_stride];
-    out_left_ref[i + 4] = left_border[(i + 3 - multi_ref_index) * left_stride];
-    i += 4;
-  } while (i < px_available_left);
+  
+  // Do different loop for heights smaller than 4 (possible for some ISP splits)
+  if (px.y % 4 != 0 || px_available_left < 4) {
+    do {
+      out_left_ref[i + 1] = left_border[(i + 0 - multi_ref_index) * left_stride];
+      i += 1;
+    } while (i < px_available_left);
+  }
+  else {
+    do {
+      out_left_ref[i + 1] = left_border[(i + 0 - multi_ref_index) * left_stride];
+      out_left_ref[i + 2] = left_border[(i + 1 - multi_ref_index) * left_stride];
+      out_left_ref[i + 3] = left_border[(i + 2 - multi_ref_index) * left_stride];
+      out_left_ref[i + 4] = left_border[(i + 3 - multi_ref_index) * left_stride];
+      i += 4;
+    } while (i < px_available_left);
+  }
 
   // Extend the last pixel for the rest of the reference values.
   uvg_pixel nearest_pixel = out_left_ref[i];
-  for (; i < width * 2; i += 4) {
+
+  // If first isp split, take samples as if it were normal square block
+  int tmp_h = is_first_isp_block ? cu_height * 2 : (isp_mode ? cu_height + height : height * 2);
+  for (; i < tmp_h; i += 4) {
     out_left_ref[i + 1] = nearest_pixel;
     out_left_ref[i + 2] = nearest_pixel;
     out_left_ref[i + 3] = nearest_pixel;
@@ -1317,7 +1507,7 @@ void uvg_intra_build_reference_inner(
 
   // Extend for MRL
   if (multi_ref_index) {
-    for (; i < width * 2 + multi_ref_index; ++i) {
+    for (; i < height * 2 + multi_ref_index; ++i) {
       out_left_ref[i + 1] = nearest_pixel;
     }
   }
@@ -1325,11 +1515,24 @@ void uvg_intra_build_reference_inner(
   // Generate top reference.
 
   // Get the number of reference pixels based on the PU coordinate within the LCU.
-  int px_available_top = num_ref_pixels_top[lcu_px.y / 4][lcu_px.x / 4] >> is_chroma;
+  int px_available_top;
+  if (isp_mode && !is_first_isp_block && !is_chroma) {
+    if (isp_mode == ISP_MODE_HOR) {
+      px_available_top = width;
+    }
+    else {
+      px_available_top = uvg_count_available_edge_cus(cu_loc, lcu, false) * 4;
+      px_available_top -= pu_loc->x - cu_loc->x;
+    }
+  }
+  else {
+      const int num_cus = uvg_count_available_edge_cus(cu_loc, lcu, false);
+      px_available_top = !is_chroma ? num_cus * 4 : num_cus * 2;
+  }
 
   // Limit the number of available pixels based on block size and dimensions
   // of the picture.
-  px_available_top = MIN(px_available_top, width * 2 + multi_ref_index);
+  px_available_top = MIN(px_available_top, cu_width * 2 + multi_ref_index);
   px_available_top = MIN(px_available_top, (pic_px->x - luma_px->x) >> is_chroma);
 
   if (entropy_sync && px.y == 0) px_available_top = MIN(px_available_top, ((LCU_WIDTH >> is_chroma) - px.x) -1);
@@ -1343,7 +1546,10 @@ void uvg_intra_build_reference_inner(
 
   // Extend the last pixel for the rest of the reference values.
   nearest_pixel = out_top_ref[i + multi_ref_index];
-  for (; i < (width + multi_ref_index) * 2; i += 4) {
+
+  // If first isp split, take samples as if it were normal square block
+  int tmp_w = is_first_isp_block ? cu_width * 2 : (isp_mode ? cu_width + width : width * 2);
+  for (; i < tmp_w + (multi_ref_index * 2); i += 4) {
     out_top_ref[i + 1 + multi_ref_index] = nearest_pixel;
     out_top_ref[i + 2 + multi_ref_index] = nearest_pixel;
     out_top_ref[i + 3 + multi_ref_index] = nearest_pixel;
@@ -1351,8 +1557,11 @@ void uvg_intra_build_reference_inner(
   }
 }
 
+
 void uvg_intra_build_reference(
-  const int_fast8_t log2_width,
+  const encoder_state_t* const state,
+  const cu_loc_t* const pu_loc,
+  const cu_loc_t* const cu_loc,
   const color_t color,
   const vector2d_t *const luma_px,
   const vector2d_t *const pic_px,
@@ -1360,15 +1569,19 @@ void uvg_intra_build_reference(
   uvg_intra_references *const refs,
   bool entropy_sync,
   uvg_pixel *extra_ref_lines,
-  uint8_t multi_ref_idx)
+  uint8_t multi_ref_idx,
+  const uint8_t isp_mode)
 {
   assert(!(extra_ref_lines == NULL && multi_ref_idx != 0) && "Trying to use MRL with NULL extra references.");
 
+  //bool first_split = color == COLOR_Y && isp_mode && pu_loc->x == cu_loc->x && pu_loc->y == cu_loc->y;
+  //uint8_t isp = first_split ? 0 : isp_mode;
+
   // Much logic can be discarded if not on the edge
   if (luma_px->x > 0 && luma_px->y > 0) {
-    uvg_intra_build_reference_inner(log2_width, color, luma_px, pic_px, lcu, refs, entropy_sync, multi_ref_idx, extra_ref_lines);
+    uvg_intra_build_reference_inner(state, pu_loc, cu_loc, color, luma_px, pic_px, lcu, refs, entropy_sync, multi_ref_idx, extra_ref_lines, isp_mode);
   } else {
-    uvg_intra_build_reference_any(log2_width, color, luma_px, pic_px, lcu, refs, multi_ref_idx, extra_ref_lines);
+    uvg_intra_build_reference_any(state, pu_loc, cu_loc, color, luma_px, pic_px, lcu, refs, multi_ref_idx, extra_ref_lines, isp_mode);
   }
 }
 
@@ -1377,21 +1590,21 @@ void uvg_intra_predict(
   const encoder_state_t* const state,
   uvg_intra_references* const refs,
   const cu_loc_t* const cu_loc,
+  const cu_loc_t* const pu_loc,
   const color_t color,
   uvg_pixel* dst,
   const intra_search_data_t* data,
-  const lcu_t* lcu,
-  enum uvg_tree_type tree_type
-  )
+  const lcu_t* lcu
+)
 {
   const int stride = (((state->tile->frame->width + 7) & ~7) + FRAME_PADDING_LUMA);
   // TODO: what is this used for?
   // const bool filter_boundary = color == COLOR_Y && !(cfg->lossless && cfg->implicit_rdpcm);
   bool use_mip = false;
-  const int width = color == COLOR_Y ? cu_loc->width : cu_loc->chroma_width;
-  const int height = color == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
-  const int x = cu_loc->x;
-  const int y = cu_loc->y;
+  const int width = color == COLOR_Y ? pu_loc->width : pu_loc->chroma_width;
+  const int height = color == COLOR_Y ? pu_loc->height : pu_loc->chroma_height;
+  const int x = pu_loc->x;
+  const int y = pu_loc->y;
   int8_t intra_mode = color == COLOR_Y ? data->pred_cu.intra.mode : data->pred_cu.intra.mode_chroma;
   if (data->pred_cu.intra.mip_flag) {
     if (color == COLOR_Y) {
@@ -1407,68 +1620,153 @@ void uvg_intra_predict(
       mip_predict(state, refs, width, height, dst, intra_mode, data->pred_cu.intra.mip_is_transposed);
     }
     else {
-      intra_predict_regular(state, refs, uvg_g_convert_to_bit[width] + 2, intra_mode, color, dst, data->pred_cu.intra.multi_ref_idx);
+      intra_predict_regular(state, refs, &data->pred_cu, cu_loc, pu_loc, intra_mode, color, dst, data->pred_cu.intra.multi_ref_idx, data->pred_cu.intra.isp_mode);
     }
   }
   else {
-    uvg_pixels_blit(&state->tile->frame->cclm_luma_rec[x / 2 + (y * stride) / 4], dst, width, width, stride / 2, width);
-    if (data->pred_cu.depth != data->pred_cu.tr_depth || data->cclm_parameters[color == COLOR_U ? 0 : 1].b <= 0) {
+    uvg_pixels_blit(&state->tile->frame->cclm_luma_rec[x / 2 + (y * stride) / 4], dst, width, height, stride / 2, width);
+    if (width != 1 << data->pred_cu.log2_chroma_width || height != 1 << data->pred_cu.log2_chroma_height || data->cclm_parameters[color == COLOR_U ? 0 : 1].b <= 0) {
       predict_cclm(
-        state, color, width, width, x, y, stride, intra_mode, lcu, refs, dst, 
-        (cclm_parameters_t*)&data->cclm_parameters[color == COLOR_U ? 0 : 1],
-        tree_type);
+        state, color, width, height, x, y, stride, intra_mode, lcu, refs, dst, 
+        (cclm_parameters_t*)&data->cclm_parameters[color == COLOR_U ? 0 : 1]);
     }
     else {
-      linear_transform_cclm(&data->cclm_parameters[color == COLOR_U ? 0 : 1], dst, dst, width, width);
+      linear_transform_cclm(&data->cclm_parameters[color == COLOR_U ? 0 : 1], dst, dst, width, height);
     }
   }
 }
 
 // This function works on luma coordinates 
-const cu_info_t* uvg_get_co_located_luma_cu(
-  int x,
-  int y,
-  int width,
-  int height,
+int8_t uvg_get_co_located_luma_mode(
+  const cu_loc_t* const chroma_loc,
+  const cu_loc_t* const cu_loc,
+  const cu_info_t* luma_cu,
   const lcu_t* const lcu,
   const cu_array_t* const cu_array,
   enum uvg_tree_type tree_type)
 {
+  int x = chroma_loc->x;
+  int y = chroma_loc->y;
   assert((cu_array || lcu) && !(cu_array && lcu));
   assert(tree_type != UVG_LUMA_T && "Luma only CU shouldn't need colocated luma CU");
   if(tree_type == UVG_CHROMA_T) {
-    x += width >> 1;
-    y += height >> 1;
+    x += chroma_loc->width >> 1;
+    y += chroma_loc->height >> 1;
   }
-  if(cu_array) {
-    return uvg_cu_array_at_const(cu_array, x, y);
+  const cu_info_t* cu;
+  if (lcu && cu_loc->x <= x && x < cu_loc->x + cu_loc->width && cu_loc->y <= y && y < cu_loc->y + cu_loc->height) {
+    cu = luma_cu;
+  }
+  else if(cu_array) {
+    cu = uvg_cu_array_at_const(cu_array, x, y);
   }
   else {
-    return LCU_GET_CU_AT_PX(lcu, SUB_SCU(x), SUB_SCU(y));
+    cu = LCU_GET_CU_AT_PX(lcu, SUB_SCU(x), SUB_SCU(y));
   }
+  if (cu->intra.mip_flag) {
+    return 0;
+  }
+  return cu->intra.mode;
+}
+
+
+
+
+/**
+* \brief Returns ISP split partition size based on block dimensions and split type.
+*
+* Returns ISP split partition size based on block dimensions and split type.
+* Will fail if resulting partition size has less than 16 samples.
+*
+* \param width        Block width.
+* \param height       Block height.
+* \param split_type   Horizontal or vertical split.
+*/
+int uvg_get_isp_split_dim(const int width, const int height, const int split_type, const bool is_transform_split)
+{
+  assert(split_type != ISP_MODE_NO_ISP && "Cannot calculate split dimension if no split type is set. Make sure this function is not called in this case.");
+
+  bool divide_in_rows = split_type == SPLIT_TYPE_HOR;
+  int split_dim_size, non_split_dim_size, partition_size, div_shift = 2;
+
+  if (divide_in_rows) {
+    split_dim_size = height;
+    non_split_dim_size = width;
+  }
+  else {
+    split_dim_size = width;
+    non_split_dim_size = height;
+  }
+
+  const int min_num_samples = 16; // Minimum allowed number of samples for split block
+  const int factor_to_min_samples = non_split_dim_size < min_num_samples ? min_num_samples >> uvg_math_floor_log2(non_split_dim_size) : 1;
+  partition_size = (split_dim_size >> div_shift) < factor_to_min_samples ? factor_to_min_samples : (split_dim_size >> div_shift);
+
+  // Minimum width for ISP splits are 4. (JVET-T2001 chapter 8.4.5.1 equation 246: nPbW = Max(4, nW)) 
+  // Except this does not apply for transform blocks for some reason. VTM does seem to expect 4 transform blocks even if only two pred blocks were used
+  // Height can be 2.
+  if (!divide_in_rows && !is_transform_split) {
+    partition_size = MAX(4, partition_size);
+  }
+
+  assert((uvg_math_floor_log2(partition_size) + uvg_math_floor_log2(non_split_dim_size) >= uvg_math_floor_log2(min_num_samples)) &&
+    "Partition has less than allowed minimum number of samples.");
+  return partition_size;
+}
+
+
+int uvg_get_isp_split_num(const int width, const int height, const int split_type, const bool is_transform_split)
+{
+  assert((split_type != ISP_MODE_NO_ISP) && "This function cannot be called if ISP mode is 0.");
+  int split_dim = uvg_get_isp_split_dim(width, height, split_type, is_transform_split);
+  int num = split_type == ISP_MODE_HOR ? height / split_dim : width / split_dim;
+
+  return num;
+}
+
+
+void uvg_get_isp_split_loc(cu_loc_t *loc, const int x, const int y, const int block_w, const int block_h, int split_idx, const int split_type, const bool is_transform_split)
+{
+  // Check for illegal splits
+  assert(!(block_w == 4 && block_h == 4) || split_idx == 0 && "Trying to get ISP split CU when split is not allowed.");
+  assert(!((block_w * block_h) <= 16) || split_idx < 2 && "Split index for small blocks must be in [0, 1]");
+  assert((split_idx >= 0 && split_idx <= 3) && "ISP split index must be in [0, 3].");
+  assert((split_type != ISP_MODE_NO_ISP || split_idx == 0) && "Trying to ISP split when split type = NO_ISP.");
+  int part_dim = block_w;
+  if (split_type != ISP_MODE_NO_ISP) {
+    part_dim = uvg_get_isp_split_dim(block_w, block_h, split_type, is_transform_split);
+  }
+  if(split_type == ISP_MODE_VER && block_w < 16 && block_h != 4 && !is_transform_split) {
+    split_idx /= 2;
+  }
+  const int offset = part_dim * split_idx;
+
+  const int part_x = split_type == ISP_MODE_HOR ? x : x + offset;
+  const int part_y = split_type == ISP_MODE_HOR ? y + offset : y;
+  const int part_w = split_type == ISP_MODE_HOR ? block_w  : part_dim;
+  const int part_h = split_type == ISP_MODE_HOR ? part_dim : block_h;
+
+  uvg_cu_loc_ctor(loc, part_x, part_y, part_w, part_h);
 }
 
 
 static void intra_recon_tb_leaf(
   encoder_state_t* const state,
-  int x,
-  int y,
-  int depth,
+  const cu_loc_t* pu_loc,
+  const cu_loc_t* cu_loc,
   lcu_t *lcu,
   color_t color,
-  const intra_search_data_t* search_data,
-  enum uvg_tree_type tree_type)
+  const intra_search_data_t* search_data)
 {
   const uvg_config *cfg = &state->encoder_control->cfg;
   const int shift = color == COLOR_Y ? 0 : 1;
 
-  int log2width = LOG2_LCU_WIDTH - depth;
-  if (color != COLOR_Y && depth < MAX_PU_DEPTH) {
-    // Chroma width is half of luma width, when not at maximum depth.
-    log2width -= 1;
-  }
-  const int width = 1 << log2width;
-  const int height = width; // TODO: proper height for non-square blocks
+  const int x = pu_loc->x;
+  const int y = pu_loc->y;
+  
+  const int width  = color == COLOR_Y ? pu_loc->width  : pu_loc->chroma_width;
+  const int height = color == COLOR_Y ? pu_loc->height : pu_loc->chroma_height;
+
   const int lcu_width = LCU_WIDTH >> shift;
 
   const vector2d_t luma_px = { x, y };
@@ -1480,8 +1778,10 @@ static void intra_recon_tb_leaf(
   int y_scu = SUB_SCU(y);
   const vector2d_t lcu_px = {x_scu >> shift, y_scu >> shift };
   uint8_t multi_ref_index = color == COLOR_Y ? search_data->pred_cu.intra.multi_ref_idx: 0;
+  uint8_t isp_mode = color == COLOR_Y ? search_data->pred_cu.intra.isp_mode : 0;
 
   uvg_intra_references refs;
+
   // Extra reference lines for use with MRL. Extra lines needed only for left edge.
   uvg_pixel extra_refs[128 * MAX_REF_LINE_IDX] = { 0 };
 
@@ -1490,26 +1790,20 @@ static void intra_recon_tb_leaf(
 
     // Copy extra ref lines, including ref line 1 and top left corner.
     for (int i = 0; i < MAX_REF_LINE_IDX; ++i) {
-      int height = (LCU_WIDTH >> depth) * 2 + MAX_REF_LINE_IDX;
-      height = MIN(height, (LCU_WIDTH - lcu_px.y + MAX_REF_LINE_IDX)); // Cut short if on bottom LCU edge. Cannot take references from below since they don't exist.
-      height = MIN(height, pic_px.y - luma_px.y + MAX_REF_LINE_IDX);
+      int ref_height = height * 2 + MAX_REF_LINE_IDX;
+      ref_height = MIN(ref_height, (LCU_WIDTH - lcu_px.y + MAX_REF_LINE_IDX)); // Cut short if on bottom LCU edge. Cannot take references from below since they don't exist.
+      ref_height = MIN(ref_height, pic_px.y - luma_px.y + MAX_REF_LINE_IDX);
       uvg_pixels_blit(&frame->rec->y[(luma_px.y - MAX_REF_LINE_IDX) * frame->rec->stride + luma_px.x - (1 + i)],
         &extra_refs[i * 128],
-        1, height,
+        1, ref_height,
         frame->rec->stride, 1);
     }
   }
-  uvg_intra_build_reference(log2width, color, &luma_px, &pic_px, lcu, &refs, cfg->wpp, extra_refs, multi_ref_index);
+
+  uvg_intra_build_reference(state, pu_loc, cu_loc, color, &luma_px, &pic_px, lcu, &refs, cfg->wpp, extra_refs, multi_ref_index, isp_mode);
 
   uvg_pixel pred[32 * 32];
-
-  cu_loc_t loc = {
-    x, y,
-    width, height,
-    width, height,
-  };
-
-  uvg_intra_predict(state, &refs, &loc, color, pred, search_data, lcu, tree_type);
+  uvg_intra_predict(state, &refs, cu_loc, pu_loc, color, pred, search_data, lcu);
 
   const int index = lcu_px.x + lcu_px.y * lcu_width;
   uvg_pixel *block = NULL;
@@ -1529,11 +1823,12 @@ static void intra_recon_tb_leaf(
     default: break;
   }
 
-  uvg_pixels_blit(pred, block , width, width, width, lcu_width);
+  uvg_pixels_blit(pred, block , width, height, width, lcu_width);
   if(color != COLOR_Y && cfg->jccr) {
-    uvg_pixels_blit(pred, block2, width, width, width, lcu_width);
+    uvg_pixels_blit(pred, block2, width, height, width, lcu_width);
   }
 }
+
 
 /**
  * \brief Reconstruct an intra CU
@@ -1552,79 +1847,219 @@ static void intra_recon_tb_leaf(
  */
 void uvg_intra_recon_cu(
   encoder_state_t* const state,
-  int x,
-  int y,
-  int depth,
   intra_search_data_t* search_data,
+  const cu_loc_t* cu_loc,
   cu_info_t *cur_cu,
   lcu_t *lcu,
   enum uvg_tree_type tree_type,
   bool recon_luma,
   bool recon_chroma)
 {
-  const vector2d_t lcu_px = { SUB_SCU(x) >> (tree_type == UVG_CHROMA_T), SUB_SCU(y) >> (tree_type == UVG_CHROMA_T) };
-  const int8_t width = LCU_WIDTH >> depth;
+  const uint8_t depth = 6 - uvg_g_convert_to_log2[cu_loc->width];
+  const vector2d_t lcu_px = {
+    cu_loc->local_x,
+    cu_loc->local_y,
+  };
+  const int8_t width = cu_loc->width;
+  const int8_t height = cu_loc->height;
   if (cur_cu == NULL) {
     cur_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
   }
 
-  if(!recon_luma && recon_chroma) {
-    x &= ~7;
-    y &= ~7;
-  }
-  
+   
   // Reset CBFs because CBFs might have been set
   // for depth earlier
   if (recon_luma) {
-    cbf_clear(&cur_cu->cbf, depth, COLOR_Y);
+    cbf_clear(&cur_cu->cbf, COLOR_Y);
   }
   if (recon_chroma) {
-    cbf_clear(&cur_cu->cbf, depth, COLOR_U);
-    cbf_clear(&cur_cu->cbf, depth, COLOR_V);
+    cbf_clear(&cur_cu->cbf, COLOR_U);
+    cbf_clear(&cur_cu->cbf, COLOR_V);
   }
 
-  if (depth == 0 || cur_cu->tr_depth > depth) {
-
-    const int offset = width / 2;
-    const int32_t x2 = x + offset;
-    const int32_t y2 = y + offset;
-
-    uvg_intra_recon_cu(state, x,   y,   depth + 1, search_data, NULL, lcu, tree_type, recon_luma, recon_chroma);
-    uvg_intra_recon_cu(state, x2,  y,   depth + 1, search_data, NULL, lcu, tree_type, recon_luma, recon_chroma);
-    uvg_intra_recon_cu(state, x,   y2,  depth + 1, search_data, NULL, lcu, tree_type, recon_luma, recon_chroma);
-    uvg_intra_recon_cu(state, x2,  y2,  depth + 1, search_data, NULL, lcu, tree_type, recon_luma, recon_chroma);
-
-    // Propagate coded block flags from child CUs to parent CU.
-    uint16_t child_cbfs[3] = {
-      LCU_GET_CU_AT_PX(lcu, (lcu_px.x + offset) >> (tree_type == UVG_CHROMA_T), lcu_px.y >> (tree_type == UVG_CHROMA_T))->cbf,
-      LCU_GET_CU_AT_PX(lcu, lcu_px.x >> (tree_type == UVG_CHROMA_T), (lcu_px.y + offset) >> (tree_type == UVG_CHROMA_T))->cbf,
-      LCU_GET_CU_AT_PX(lcu, (lcu_px.x + offset) >> (tree_type == UVG_CHROMA_T), (lcu_px.y + offset) >> (tree_type == UVG_CHROMA_T))->cbf,
-    };
-
-    if (recon_luma && depth <= MAX_DEPTH) {
-      cbf_set_conditionally(&cur_cu->cbf, child_cbfs, depth, COLOR_Y);
+  if (width > TR_MAX_WIDTH || height > TR_MAX_WIDTH) {
+    enum split_type split;
+    if (cu_loc->width > TR_MAX_WIDTH && cu_loc->height > TR_MAX_WIDTH) {
+      split = QT_SPLIT;
     }
-    if (recon_chroma && depth <= MAX_DEPTH) {
-      cbf_set_conditionally(&cur_cu->cbf, child_cbfs, depth, COLOR_U);
-      cbf_set_conditionally(&cur_cu->cbf, child_cbfs, depth, COLOR_V);
+    else if (cu_loc->width > TR_MAX_WIDTH) {
+      split = BT_VER_SPLIT;
     }
-  } else {
-    const bool has_luma = recon_luma;
-    const bool has_chroma = recon_chroma && (x % 8 == 0 && y % 8 == 0);
-   
-    // Process a leaf TU.
-    if (has_luma) {
-      intra_recon_tb_leaf(state, x, y, depth, lcu, COLOR_Y, search_data, tree_type);
-    }
-    if (has_chroma) {
-      intra_recon_tb_leaf(state, x, y, depth, lcu, COLOR_U, search_data, tree_type);
-      intra_recon_tb_leaf(state, x, y, depth, lcu, COLOR_V, search_data, tree_type);
+    else {
+      split = BT_HOR_SPLIT;
     }
 
-    uvg_quantize_lcu_residual(state, has_luma, has_chroma && !(search_data->pred_cu.joint_cb_cr & 3),
-                              search_data->pred_cu.joint_cb_cr & 3 && state->encoder_control->cfg.jccr && has_chroma,
-                              x, y, depth, cur_cu, lcu,
-                              false,
-      tree_type);
+    cu_loc_t split_cu_loc[4];
+    const int split_count = uvg_get_split_locs(cu_loc, split, split_cu_loc,NULL);
+    for (int i = 0; i < split_count; ++i) {
+      uvg_intra_recon_cu(
+        state, search_data, &split_cu_loc[i],
+        NULL, lcu,
+        state->encoder_control->cfg.dual_tree && state->frame->slicetype == UVG_SLICE_I ? tree_type : UVG_BOTH_T, 
+        recon_luma, recon_chroma);
+    }
+
+    return;
   }
+  if (search_data->pred_cu.intra.isp_mode != ISP_MODE_NO_ISP && recon_luma ) {
+    search_data->best_isp_cbfs = 0;
+    // ISP split is done horizontally or vertically depending on ISP mode, 2 or 4 times depending on block dimensions.
+    // Small blocks are split only twice.
+    int split_type = search_data->pred_cu.intra.isp_mode;
+    int split_limit = uvg_get_isp_split_num(width, height, split_type, true);
+
+    state->quant_blocks[1].needs_init = true;
+
+    for (int i = 0; i < split_limit; ++i) {
+      cu_loc_t tu_loc;
+      uvg_get_isp_split_loc(&tu_loc,  cu_loc->x, cu_loc->y, width, height, i, split_type, true);
+      cu_loc_t pu_loc;
+      uvg_get_isp_split_loc(&pu_loc, cu_loc->x, cu_loc->y, width, height, i, split_type, false);
+      cur_cu->intra.isp_index = 0;
+      if(tu_loc.x % 4 == 0) {
+        intra_recon_tb_leaf(state, &pu_loc, cu_loc, lcu, COLOR_Y, search_data);
+      }
+      state->rate_estimator[3].needs_init = true;
+      uvg_quantize_lcu_residual(state, true, false, false,
+        &tu_loc, cur_cu, lcu,
+        false, tree_type);
+      search_data->best_isp_cbfs |= cbf_is_set(cur_cu->cbf, COLOR_Y) << i;
+      cur_cu->intra.isp_cbfs = search_data->best_isp_cbfs;
+    }
+  }
+  const bool has_luma = recon_luma && search_data->pred_cu.intra.isp_mode == ISP_MODE_NO_ISP;
+  const bool has_chroma = recon_chroma;
+     
+  // Process a leaf TU.
+  if (has_luma) {
+    intra_recon_tb_leaf(state, cu_loc, cu_loc, lcu, COLOR_Y, search_data);
+  }
+  if (has_chroma) {
+    intra_recon_tb_leaf(state, cu_loc, cu_loc, lcu, COLOR_U, search_data);
+    intra_recon_tb_leaf(state, cu_loc, cu_loc, lcu, COLOR_V, search_data);
+  }
+
+  // TODO: not necessary to call if only luma and ISP is on
+  uvg_quantize_lcu_residual(state, has_luma, has_chroma && !(search_data->pred_cu.joint_cb_cr & 3),
+                            search_data->pred_cu.joint_cb_cr & 3 && state->encoder_control->cfg.jccr && has_chroma,
+                            cu_loc, cur_cu, lcu,
+                            false,
+                            tree_type);
+}
+
+
+/**
+* \brief Check if ISP can be used for block size.
+*
+* \return True if isp can be used.
+* \param width        Block width.
+* \param height       Block height.
+* \param max_tr_size  Maximum supported transform block size (64).
+*/
+bool uvg_can_use_isp(const int width, const int height)
+{
+  assert(!(width > LCU_WIDTH || height > LCU_WIDTH) && "Block size larger than max LCU size.");
+  assert(!(width < TR_MIN_WIDTH || height < TR_MIN_WIDTH) && "Block size smaller than min TR_WIDTH.");
+
+  const int log2_width = uvg_g_convert_to_log2[width];
+  const int log2_height = uvg_g_convert_to_log2[height];
+
+  // Each split block must have at least 16 samples.
+  bool not_enough_samples = (log2_width + log2_height <= 4);
+  bool cu_size_larger_than_max_tr_size = width > TR_MAX_WIDTH || height > TR_MAX_WIDTH;
+  if (not_enough_samples || cu_size_larger_than_max_tr_size) {
+    return false;
+  }
+  return true;
+}
+
+
+/**
+* \brief Check if given ISP mode can be used with LFNST.
+*
+* \return True if isp can be used.
+* \param width        Block width.
+* \param height       Block height.
+* \param isp_mode     ISP mode.
+* \param tree_type    Tree type. Dual, luma or chroma tree.
+*/
+bool uvg_can_use_isp_with_lfnst(const int width, const int height, const int isp_split_type, const enum uvg_tree_type tree_type)
+{
+  if (tree_type == UVG_CHROMA_T) {
+    return false;
+  }
+  if (isp_split_type == ISP_MODE_NO_ISP) {
+    return true;
+  }
+
+  const int tu_width = (isp_split_type == ISP_MODE_HOR) ? width : uvg_get_isp_split_dim(width, height, SPLIT_TYPE_VER, true);
+  const int tu_height = (isp_split_type == ISP_MODE_HOR) ? uvg_get_isp_split_dim(width, height, SPLIT_TYPE_HOR, true) : height;
+
+  if (!(tu_width >= TR_MIN_WIDTH && tu_height >= TR_MIN_WIDTH))
+  {
+    return false;
+  }
+  return true;
+}
+
+
+double uvg_recon_and_estimate_cost_isp(encoder_state_t* const state,
+                                       const cu_loc_t* const cu_loc,
+                                       double cost_treshold,
+                                       intra_search_data_t* const search_data,
+                                       lcu_t* const lcu, bool* violates_lfnst) {
+  assert(state->search_cabac.update && "ISP reconstruction must be done with CABAC update");
+  double cost = 0;
+
+  const int width = cu_loc->width;
+  const int height = cu_loc->height;
+
+  search_data->best_isp_cbfs = 0;
+  search_data->pred_cu.intra.isp_cbfs = 0;
+  // ISP split is done horizontally or vertically depending on ISP mode, 2 or 4 times depending on block dimensions.
+  // Small blocks are split only twice.
+  int split_type = search_data->pred_cu.intra.isp_mode;
+  int split_limit = uvg_get_isp_split_num(width, height, split_type, true);
+
+  int cbf_context = 2;
+  state->quant_blocks[1].needs_init = true;
+
+  for (int i = 0; i < split_limit; ++i) {
+    search_data->pred_cu.intra.isp_index = i;
+    cu_loc_t tu_loc;
+    uvg_get_isp_split_loc(&tu_loc, cu_loc->x, cu_loc->y, width, height, i, split_type, true);
+    cu_loc_t pu_loc;
+    uvg_get_isp_split_loc(&pu_loc, cu_loc->x, cu_loc->y, width, height, i, split_type, false);
+    if (tu_loc.x % 4 == 0) {
+      intra_recon_tb_leaf(state, &pu_loc, cu_loc, lcu, COLOR_Y, search_data);
+    }
+
+    state->rate_estimator[3].needs_init = true;
+    uvg_quantize_lcu_residual(state, true, false, false,
+      &tu_loc, &search_data->pred_cu, lcu,
+      false, UVG_LUMA_T);
+
+    int index = tu_loc.local_y * LCU_WIDTH + tu_loc.local_x;
+    int ssd = uvg_pixels_calc_ssd(&lcu->ref.y[index], &lcu->rec.y[index],
+      LCU_WIDTH, LCU_WIDTH,
+      tu_loc.width, tu_loc.height);
+    double coeff_bits = uvg_get_coeff_cost(state, lcu->coeff.y, &search_data->pred_cu, &tu_loc, 0, SCAN_DIAG, false, COEFF_ORDER_CU);
+
+
+    int cbf = cbf_is_set(search_data->pred_cu.cbf, COLOR_Y);
+    if (i + 1 != split_limit || search_data->best_isp_cbfs != 0) {
+      CABAC_FBITS_UPDATE(&state->search_cabac, &state->search_cabac.ctx.qt_cbf_model_luma[cbf_context], cbf, coeff_bits, "cbf_luma_isp_recon");
+    }
+    cost += ssd + coeff_bits * state->lambda;
+
+    cbf_context = 2 + cbf;
+    if(violates_lfnst) *violates_lfnst |= search_data->pred_cu.violates_lfnst_constrained_luma;
+    search_data->pred_cu.violates_lfnst_constrained_luma = false;
+
+    search_data->best_isp_cbfs |= cbf << i;
+    search_data->pred_cu.intra.isp_cbfs = search_data->best_isp_cbfs;
+
+  }
+  search_data->pred_cu.intra.isp_index = 0;
+  return cost;
 }

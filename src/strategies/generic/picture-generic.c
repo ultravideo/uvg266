@@ -32,6 +32,7 @@
 
 #include "strategies/generic/picture-generic.h"
 
+#include <math.h>
 #include <stdlib.h>
 
 #include "strategies/strategies-picture.h"
@@ -474,6 +475,577 @@ SATD_DUAL_NXN(64, uvg_pixel)
 
 SATD_ANY_SIZE_MULTI_GENERIC(quad_generic, 4)
 
+static uint64_t xCalcHADs2x2(const uvg_pixel* piOrg, const uvg_pixel* piCur, int iStrideOrg, int iStrideCur)
+{
+  uint64_t satd = 0;
+  coeff_t diff[4], m[4];
+
+  diff[0] = piOrg[0] - piCur[0];
+  diff[1] = piOrg[1] - piCur[1];
+  diff[2] = piOrg[iStrideOrg] - piCur[0 + iStrideCur];
+  diff[3] = piOrg[iStrideOrg + 1] - piCur[1 + iStrideCur];
+  m[0] = diff[0] + diff[2];
+  m[1] = diff[1] + diff[3];
+  m[2] = diff[0] - diff[2];
+  m[3] = diff[1] - diff[3];
+
+  satd += abs(m[0] + m[1]) >> 2;
+  satd += abs(m[0] - m[1]);
+  satd += abs(m[2] + m[3]);
+  satd += abs(m[2] - m[3]);
+
+  return satd;
+}
+
+
+static uint64_t xCalcHADs16x8(const uvg_pixel* piOrg, const uvg_pixel* piCur, int iStrideOrg, int iStrideCur)
+{   //need to add SIMD implementation ,JCA
+  int k, i, j, jj, sad = 0;
+  int diff[128], m1[8][16], m2[8][16];
+  for (k = 0; k < 128; k += 16)
+  {
+    diff[k + 0] = piOrg[0] - piCur[0];
+    diff[k + 1] = piOrg[1] - piCur[1];
+    diff[k + 2] = piOrg[2] - piCur[2];
+    diff[k + 3] = piOrg[3] - piCur[3];
+    diff[k + 4] = piOrg[4] - piCur[4];
+    diff[k + 5] = piOrg[5] - piCur[5];
+    diff[k + 6] = piOrg[6] - piCur[6];
+    diff[k + 7] = piOrg[7] - piCur[7];
+
+    diff[k + 8] = piOrg[8] - piCur[8];
+    diff[k + 9] = piOrg[9] - piCur[9];
+    diff[k + 10] = piOrg[10] - piCur[10];
+    diff[k + 11] = piOrg[11] - piCur[11];
+    diff[k + 12] = piOrg[12] - piCur[12];
+    diff[k + 13] = piOrg[13] - piCur[13];
+    diff[k + 14] = piOrg[14] - piCur[14];
+    diff[k + 15] = piOrg[15] - piCur[15];
+
+    piCur += iStrideCur;
+    piOrg += iStrideOrg;
+  }
+
+  //horizontal
+  for (j = 0; j < 8; j++)
+  {
+    jj = j << 4;
+
+    m2[j][0] = diff[jj] + diff[jj + 8];
+    m2[j][1] = diff[jj + 1] + diff[jj + 9];
+    m2[j][2] = diff[jj + 2] + diff[jj + 10];
+    m2[j][3] = diff[jj + 3] + diff[jj + 11];
+    m2[j][4] = diff[jj + 4] + diff[jj + 12];
+    m2[j][5] = diff[jj + 5] + diff[jj + 13];
+    m2[j][6] = diff[jj + 6] + diff[jj + 14];
+    m2[j][7] = diff[jj + 7] + diff[jj + 15];
+    m2[j][8] = diff[jj] - diff[jj + 8];
+    m2[j][9] = diff[jj + 1] - diff[jj + 9];
+    m2[j][10] = diff[jj + 2] - diff[jj + 10];
+    m2[j][11] = diff[jj + 3] - diff[jj + 11];
+    m2[j][12] = diff[jj + 4] - diff[jj + 12];
+    m2[j][13] = diff[jj + 5] - diff[jj + 13];
+    m2[j][14] = diff[jj + 6] - diff[jj + 14];
+    m2[j][15] = diff[jj + 7] - diff[jj + 15];
+
+    m1[j][0] = m2[j][0] + m2[j][4];
+    m1[j][1] = m2[j][1] + m2[j][5];
+    m1[j][2] = m2[j][2] + m2[j][6];
+    m1[j][3] = m2[j][3] + m2[j][7];
+    m1[j][4] = m2[j][0] - m2[j][4];
+    m1[j][5] = m2[j][1] - m2[j][5];
+    m1[j][6] = m2[j][2] - m2[j][6];
+    m1[j][7] = m2[j][3] - m2[j][7];
+    m1[j][8] = m2[j][8] + m2[j][12];
+    m1[j][9] = m2[j][9] + m2[j][13];
+    m1[j][10] = m2[j][10] + m2[j][14];
+    m1[j][11] = m2[j][11] + m2[j][15];
+    m1[j][12] = m2[j][8] - m2[j][12];
+    m1[j][13] = m2[j][9] - m2[j][13];
+    m1[j][14] = m2[j][10] - m2[j][14];
+    m1[j][15] = m2[j][11] - m2[j][15];
+
+    m2[j][0] = m1[j][0] + m1[j][2];
+    m2[j][1] = m1[j][1] + m1[j][3];
+    m2[j][2] = m1[j][0] - m1[j][2];
+    m2[j][3] = m1[j][1] - m1[j][3];
+    m2[j][4] = m1[j][4] + m1[j][6];
+    m2[j][5] = m1[j][5] + m1[j][7];
+    m2[j][6] = m1[j][4] - m1[j][6];
+    m2[j][7] = m1[j][5] - m1[j][7];
+    m2[j][8] = m1[j][8] + m1[j][10];
+    m2[j][9] = m1[j][9] + m1[j][11];
+    m2[j][10] = m1[j][8] - m1[j][10];
+    m2[j][11] = m1[j][9] - m1[j][11];
+    m2[j][12] = m1[j][12] + m1[j][14];
+    m2[j][13] = m1[j][13] + m1[j][15];
+    m2[j][14] = m1[j][12] - m1[j][14];
+    m2[j][15] = m1[j][13] - m1[j][15];
+
+    m1[j][0] = m2[j][0] + m2[j][1];
+    m1[j][1] = m2[j][0] - m2[j][1];
+    m1[j][2] = m2[j][2] + m2[j][3];
+    m1[j][3] = m2[j][2] - m2[j][3];
+    m1[j][4] = m2[j][4] + m2[j][5];
+    m1[j][5] = m2[j][4] - m2[j][5];
+    m1[j][6] = m2[j][6] + m2[j][7];
+    m1[j][7] = m2[j][6] - m2[j][7];
+    m1[j][8] = m2[j][8] + m2[j][9];
+    m1[j][9] = m2[j][8] - m2[j][9];
+    m1[j][10] = m2[j][10] + m2[j][11];
+    m1[j][11] = m2[j][10] - m2[j][11];
+    m1[j][12] = m2[j][12] + m2[j][13];
+    m1[j][13] = m2[j][12] - m2[j][13];
+    m1[j][14] = m2[j][14] + m2[j][15];
+    m1[j][15] = m2[j][14] - m2[j][15];
+  }
+
+  //vertical
+  for (i = 0; i < 16; i++)
+  {
+    m2[0][i] = m1[0][i] + m1[4][i];
+    m2[1][i] = m1[1][i] + m1[5][i];
+    m2[2][i] = m1[2][i] + m1[6][i];
+    m2[3][i] = m1[3][i] + m1[7][i];
+    m2[4][i] = m1[0][i] - m1[4][i];
+    m2[5][i] = m1[1][i] - m1[5][i];
+    m2[6][i] = m1[2][i] - m1[6][i];
+    m2[7][i] = m1[3][i] - m1[7][i];
+
+    m1[0][i] = m2[0][i] + m2[2][i];
+    m1[1][i] = m2[1][i] + m2[3][i];
+    m1[2][i] = m2[0][i] - m2[2][i];
+    m1[3][i] = m2[1][i] - m2[3][i];
+    m1[4][i] = m2[4][i] + m2[6][i];
+    m1[5][i] = m2[5][i] + m2[7][i];
+    m1[6][i] = m2[4][i] - m2[6][i];
+    m1[7][i] = m2[5][i] - m2[7][i];
+
+    m2[0][i] = m1[0][i] + m1[1][i];
+    m2[1][i] = m1[0][i] - m1[1][i];
+    m2[2][i] = m1[2][i] + m1[3][i];
+    m2[3][i] = m1[2][i] - m1[3][i];
+    m2[4][i] = m1[4][i] + m1[5][i];
+    m2[5][i] = m1[4][i] - m1[5][i];
+    m2[6][i] = m1[6][i] + m1[7][i];
+    m2[7][i] = m1[6][i] - m1[7][i];
+  }
+
+  for (i = 0; i < 8; i++)
+  {
+    for (j = 0; j < 16; j++)
+    {
+      sad += abs(m2[i][j]);
+    }
+  }
+
+  sad -= abs(m2[0][0]);
+  sad += abs(m2[0][0]) >> 2;
+  sad = (int)(sad / sqrt(16.0 * 8) * 2);
+
+  return sad;
+}
+
+static uint64_t xCalcHADs8x16(const uvg_pixel* piOrg, const uvg_pixel* piCur, int iStrideOrg, int iStrideCur)
+{
+  int k, i, j, jj, sad = 0;
+  int diff[128], m1[16][8], m2[16][8];
+  for (k = 0; k < 128; k += 8)
+  {
+    diff[k + 0] = piOrg[0] - piCur[0];
+    diff[k + 1] = piOrg[1] - piCur[1];
+    diff[k + 2] = piOrg[2] - piCur[2];
+    diff[k + 3] = piOrg[3] - piCur[3];
+    diff[k + 4] = piOrg[4] - piCur[4];
+    diff[k + 5] = piOrg[5] - piCur[5];
+    diff[k + 6] = piOrg[6] - piCur[6];
+    diff[k + 7] = piOrg[7] - piCur[7];
+
+    piCur += iStrideCur;
+    piOrg += iStrideOrg;
+  }
+
+  //horizontal
+  for (j = 0; j < 16; j++)
+  {
+    jj = j << 3;
+
+    m2[j][0] = diff[jj] + diff[jj + 4];
+    m2[j][1] = diff[jj + 1] + diff[jj + 5];
+    m2[j][2] = diff[jj + 2] + diff[jj + 6];
+    m2[j][3] = diff[jj + 3] + diff[jj + 7];
+    m2[j][4] = diff[jj] - diff[jj + 4];
+    m2[j][5] = diff[jj + 1] - diff[jj + 5];
+    m2[j][6] = diff[jj + 2] - diff[jj + 6];
+    m2[j][7] = diff[jj + 3] - diff[jj + 7];
+
+    m1[j][0] = m2[j][0] + m2[j][2];
+    m1[j][1] = m2[j][1] + m2[j][3];
+    m1[j][2] = m2[j][0] - m2[j][2];
+    m1[j][3] = m2[j][1] - m2[j][3];
+    m1[j][4] = m2[j][4] + m2[j][6];
+    m1[j][5] = m2[j][5] + m2[j][7];
+    m1[j][6] = m2[j][4] - m2[j][6];
+    m1[j][7] = m2[j][5] - m2[j][7];
+
+    m2[j][0] = m1[j][0] + m1[j][1];
+    m2[j][1] = m1[j][0] - m1[j][1];
+    m2[j][2] = m1[j][2] + m1[j][3];
+    m2[j][3] = m1[j][2] - m1[j][3];
+    m2[j][4] = m1[j][4] + m1[j][5];
+    m2[j][5] = m1[j][4] - m1[j][5];
+    m2[j][6] = m1[j][6] + m1[j][7];
+    m2[j][7] = m1[j][6] - m1[j][7];
+  }
+
+  //vertical
+  for (i = 0; i < 8; i++)
+  {
+    m1[0][i] = m2[0][i] + m2[8][i];
+    m1[1][i] = m2[1][i] + m2[9][i];
+    m1[2][i] = m2[2][i] + m2[10][i];
+    m1[3][i] = m2[3][i] + m2[11][i];
+    m1[4][i] = m2[4][i] + m2[12][i];
+    m1[5][i] = m2[5][i] + m2[13][i];
+    m1[6][i] = m2[6][i] + m2[14][i];
+    m1[7][i] = m2[7][i] + m2[15][i];
+    m1[8][i] = m2[0][i] - m2[8][i];
+    m1[9][i] = m2[1][i] - m2[9][i];
+    m1[10][i] = m2[2][i] - m2[10][i];
+    m1[11][i] = m2[3][i] - m2[11][i];
+    m1[12][i] = m2[4][i] - m2[12][i];
+    m1[13][i] = m2[5][i] - m2[13][i];
+    m1[14][i] = m2[6][i] - m2[14][i];
+    m1[15][i] = m2[7][i] - m2[15][i];
+
+    m2[0][i] = m1[0][i] + m1[4][i];
+    m2[1][i] = m1[1][i] + m1[5][i];
+    m2[2][i] = m1[2][i] + m1[6][i];
+    m2[3][i] = m1[3][i] + m1[7][i];
+    m2[4][i] = m1[0][i] - m1[4][i];
+    m2[5][i] = m1[1][i] - m1[5][i];
+    m2[6][i] = m1[2][i] - m1[6][i];
+    m2[7][i] = m1[3][i] - m1[7][i];
+    m2[8][i] = m1[8][i] + m1[12][i];
+    m2[9][i] = m1[9][i] + m1[13][i];
+    m2[10][i] = m1[10][i] + m1[14][i];
+    m2[11][i] = m1[11][i] + m1[15][i];
+    m2[12][i] = m1[8][i] - m1[12][i];
+    m2[13][i] = m1[9][i] - m1[13][i];
+    m2[14][i] = m1[10][i] - m1[14][i];
+    m2[15][i] = m1[11][i] - m1[15][i];
+
+    m1[0][i] = m2[0][i] + m2[2][i];
+    m1[1][i] = m2[1][i] + m2[3][i];
+    m1[2][i] = m2[0][i] - m2[2][i];
+    m1[3][i] = m2[1][i] - m2[3][i];
+    m1[4][i] = m2[4][i] + m2[6][i];
+    m1[5][i] = m2[5][i] + m2[7][i];
+    m1[6][i] = m2[4][i] - m2[6][i];
+    m1[7][i] = m2[5][i] - m2[7][i];
+    m1[8][i] = m2[8][i] + m2[10][i];
+    m1[9][i] = m2[9][i] + m2[11][i];
+    m1[10][i] = m2[8][i] - m2[10][i];
+    m1[11][i] = m2[9][i] - m2[11][i];
+    m1[12][i] = m2[12][i] + m2[14][i];
+    m1[13][i] = m2[13][i] + m2[15][i];
+    m1[14][i] = m2[12][i] - m2[14][i];
+    m1[15][i] = m2[13][i] - m2[15][i];
+
+    m2[0][i] = m1[0][i] + m1[1][i];
+    m2[1][i] = m1[0][i] - m1[1][i];
+    m2[2][i] = m1[2][i] + m1[3][i];
+    m2[3][i] = m1[2][i] - m1[3][i];
+    m2[4][i] = m1[4][i] + m1[5][i];
+    m2[5][i] = m1[4][i] - m1[5][i];
+    m2[6][i] = m1[6][i] + m1[7][i];
+    m2[7][i] = m1[6][i] - m1[7][i];
+    m2[8][i] = m1[8][i] + m1[9][i];
+    m2[9][i] = m1[8][i] - m1[9][i];
+    m2[10][i] = m1[10][i] + m1[11][i];
+    m2[11][i] = m1[10][i] - m1[11][i];
+    m2[12][i] = m1[12][i] + m1[13][i];
+    m2[13][i] = m1[12][i] - m1[13][i];
+    m2[14][i] = m1[14][i] + m1[15][i];
+    m2[15][i] = m1[14][i] - m1[15][i];
+  }
+
+  for (i = 0; i < 16; i++)
+  {
+    for (j = 0; j < 8; j++)
+    {
+      sad += abs(m2[i][j]);
+    }
+  }
+
+  sad -= abs(m2[0][0]);
+  sad += abs(m2[0][0]) >> 2;
+  sad = (int)(sad / sqrt(16.0 * 8) * 2);
+
+  return sad;
+}
+
+static uint64_t xCalcHADs4x8(const uvg_pixel* piOrg, const uvg_pixel* piCur, int iStrideOrg, int iStrideCur)
+{
+  int k, i, j, jj, sad = 0;
+  int diff[32], m1[8][4], m2[8][4];
+  for (k = 0; k < 32; k += 4)
+  {
+    diff[k + 0] = piOrg[0] - piCur[0];
+    diff[k + 1] = piOrg[1] - piCur[1];
+    diff[k + 2] = piOrg[2] - piCur[2];
+    diff[k + 3] = piOrg[3] - piCur[3];
+
+    piCur += iStrideCur;
+    piOrg += iStrideOrg;
+  }
+
+  //horizontal
+  for (j = 0; j < 8; j++)
+  {
+    jj = j << 2;
+    m2[j][0] = diff[jj] + diff[jj + 2];
+    m2[j][1] = diff[jj + 1] + diff[jj + 3];
+    m2[j][2] = diff[jj] - diff[jj + 2];
+    m2[j][3] = diff[jj + 1] - diff[jj + 3];
+
+    m1[j][0] = m2[j][0] + m2[j][1];
+    m1[j][1] = m2[j][0] - m2[j][1];
+    m1[j][2] = m2[j][2] + m2[j][3];
+    m1[j][3] = m2[j][2] - m2[j][3];
+  }
+
+  //vertical
+  for (i = 0; i < 4; i++)
+  {
+    m2[0][i] = m1[0][i] + m1[4][i];
+    m2[1][i] = m1[1][i] + m1[5][i];
+    m2[2][i] = m1[2][i] + m1[6][i];
+    m2[3][i] = m1[3][i] + m1[7][i];
+    m2[4][i] = m1[0][i] - m1[4][i];
+    m2[5][i] = m1[1][i] - m1[5][i];
+    m2[6][i] = m1[2][i] - m1[6][i];
+    m2[7][i] = m1[3][i] - m1[7][i];
+
+    m1[0][i] = m2[0][i] + m2[2][i];
+    m1[1][i] = m2[1][i] + m2[3][i];
+    m1[2][i] = m2[0][i] - m2[2][i];
+    m1[3][i] = m2[1][i] - m2[3][i];
+    m1[4][i] = m2[4][i] + m2[6][i];
+    m1[5][i] = m2[5][i] + m2[7][i];
+    m1[6][i] = m2[4][i] - m2[6][i];
+    m1[7][i] = m2[5][i] - m2[7][i];
+
+    m2[0][i] = m1[0][i] + m1[1][i];
+    m2[1][i] = m1[0][i] - m1[1][i];
+    m2[2][i] = m1[2][i] + m1[3][i];
+    m2[3][i] = m1[2][i] - m1[3][i];
+    m2[4][i] = m1[4][i] + m1[5][i];
+    m2[5][i] = m1[4][i] - m1[5][i];
+    m2[6][i] = m1[6][i] + m1[7][i];
+    m2[7][i] = m1[6][i] - m1[7][i];
+  }
+
+  for (i = 0; i < 8; i++)
+  {
+    for (j = 0; j < 4; j++)
+    {
+      sad += abs(m2[i][j]);
+    }
+  }
+
+  sad -= abs(m2[0][0]);
+  sad += abs(m2[0][0]) >> 2;
+  sad = (int)(sad / sqrt(4.0 * 8) * 2);
+
+  return sad;
+}
+
+static uint64_t xCalcHADs8x4(const uvg_pixel* piOrg, const uvg_pixel* piCur, int iStrideOrg, int iStrideCur)
+{
+  int k, i, j, jj, sad = 0;
+  int diff[32], m1[4][8], m2[4][8];
+  for (k = 0; k < 32; k += 8)
+  {
+    diff[k + 0] = piOrg[0] - piCur[0];
+    diff[k + 1] = piOrg[1] - piCur[1];
+    diff[k + 2] = piOrg[2] - piCur[2];
+    diff[k + 3] = piOrg[3] - piCur[3];
+    diff[k + 4] = piOrg[4] - piCur[4];
+    diff[k + 5] = piOrg[5] - piCur[5];
+    diff[k + 6] = piOrg[6] - piCur[6];
+    diff[k + 7] = piOrg[7] - piCur[7];
+
+    piCur += iStrideCur;
+    piOrg += iStrideOrg;
+  }
+
+  //horizontal
+  for (j = 0; j < 4; j++)
+  {
+    jj = j << 3;
+
+    m2[j][0] = diff[jj] + diff[jj + 4];
+    m2[j][1] = diff[jj + 1] + diff[jj + 5];
+    m2[j][2] = diff[jj + 2] + diff[jj + 6];
+    m2[j][3] = diff[jj + 3] + diff[jj + 7];
+    m2[j][4] = diff[jj] - diff[jj + 4];
+    m2[j][5] = diff[jj + 1] - diff[jj + 5];
+    m2[j][6] = diff[jj + 2] - diff[jj + 6];
+    m2[j][7] = diff[jj + 3] - diff[jj + 7];
+
+    m1[j][0] = m2[j][0] + m2[j][2];
+    m1[j][1] = m2[j][1] + m2[j][3];
+    m1[j][2] = m2[j][0] - m2[j][2];
+    m1[j][3] = m2[j][1] - m2[j][3];
+    m1[j][4] = m2[j][4] + m2[j][6];
+    m1[j][5] = m2[j][5] + m2[j][7];
+    m1[j][6] = m2[j][4] - m2[j][6];
+    m1[j][7] = m2[j][5] - m2[j][7];
+
+    m2[j][0] = m1[j][0] + m1[j][1];
+    m2[j][1] = m1[j][0] - m1[j][1];
+    m2[j][2] = m1[j][2] + m1[j][3];
+    m2[j][3] = m1[j][2] - m1[j][3];
+    m2[j][4] = m1[j][4] + m1[j][5];
+    m2[j][5] = m1[j][4] - m1[j][5];
+    m2[j][6] = m1[j][6] + m1[j][7];
+    m2[j][7] = m1[j][6] - m1[j][7];
+  }
+
+  //vertical
+  for (i = 0; i < 8; i++)
+  {
+    m1[0][i] = m2[0][i] + m2[2][i];
+    m1[1][i] = m2[1][i] + m2[3][i];
+    m1[2][i] = m2[0][i] - m2[2][i];
+    m1[3][i] = m2[1][i] - m2[3][i];
+
+    m2[0][i] = m1[0][i] + m1[1][i];
+    m2[1][i] = m1[0][i] - m1[1][i];
+    m2[2][i] = m1[2][i] + m1[3][i];
+    m2[3][i] = m1[2][i] - m1[3][i];
+  }
+
+  for (i = 0; i < 4; i++)
+  {
+    for (j = 0; j < 8; j++)
+    {
+      sad += abs(m2[i][j]);
+    }
+  }
+
+  sad -= abs(m2[0][0]);
+  sad += abs(m2[0][0]) >> 2;
+  sad = (int)(sad / sqrt(4.0 * 8) * 2);
+
+  return sad;
+}
+
+
+static uint64_t xGetHADs(int width, int height, const uvg_pixel* ref_in, int ref_stride, const uvg_pixel* pred_in, int pred_stride)
+{
+  const uvg_pixel* piOrg = ref_in;
+  const uvg_pixel* piCur = pred_in;
+  const int  iRows = height;
+  const int  iCols = width;
+  const int  iStrideOrg = ref_stride;
+  const int  iStrideCur = pred_stride;
+
+  int  x = 0, y = 0;
+
+  uint64_t uiSum = 0;
+
+  if (iCols > iRows && (iRows & 7) == 0 && (iCols & 15) == 0)
+  {
+    for (y = 0; y < iRows; y += 8)
+    {
+      for (x = 0; x < iCols; x += 16)
+      {
+        uiSum += xCalcHADs16x8(&piOrg[x], &piCur[x], iStrideOrg, iStrideCur);
+      }
+      piOrg += iStrideOrg * 8;
+      piCur += iStrideCur * 8;
+    }
+  }
+  else if (iCols < iRows && (iCols & 7) == 0 && (iRows & 15) == 0)
+  {
+    for (y = 0; y < iRows; y += 16)
+    {
+      for (x = 0; x < iCols; x += 8)
+      {
+        uiSum += xCalcHADs8x16(&piOrg[x], &piCur[x], iStrideOrg, iStrideCur);
+      }
+      piOrg += iStrideOrg * 16;
+      piCur += iStrideCur * 16;
+    }
+  }
+  else if (iCols > iRows && (iRows & 3) == 0 && (iCols & 7) == 0)
+  {
+    for (y = 0; y < iRows; y += 4)
+    {
+      for (x = 0; x < iCols; x += 8)
+      {
+        uiSum += xCalcHADs8x4(&piOrg[x], &piCur[x], iStrideOrg, iStrideCur);
+      }
+      piOrg += iStrideOrg * 4;
+      piCur += iStrideCur * 4;
+    }
+  }
+  else if (iCols < iRows && (iCols & 3) == 0 && (iRows & 7) == 0)
+  {
+    for (y = 0; y < iRows; y += 8)
+    {
+      for (x = 0; x < iCols; x += 4)
+      {
+        uiSum += xCalcHADs4x8(&piOrg[x], &piCur[x], iStrideOrg, iStrideCur);
+      }
+      piOrg += iStrideOrg * 8;
+      piCur += iStrideCur * 8;
+    }
+  }
+  else if ((iRows % 8 == 0) && (iCols % 8 == 0))
+  {
+    for (y = 0; y < iRows; y += 8)
+    {
+      for (x = 0; x < iCols; x += 8)
+      {
+        uiSum += satd_8x8_subblock_generic(&piOrg[x], iStrideOrg, &piCur[x], iStrideCur);
+      }
+      piOrg += 8 * iStrideOrg;
+      piCur += 8 * iStrideCur;
+    }
+  }
+  else if ((iRows % 4 == 0) && (iCols % 4 == 0))
+  {
+    for (y = 0; y < iRows; y += 4)
+    {
+      for (x = 0; x < iCols; x += 4)
+      {
+        uiSum += uvg_satd_4x4_subblock_generic(&piOrg[x], iStrideOrg, &piCur[x], iStrideCur);
+      }
+      piOrg += 4 * iStrideOrg;
+      piCur += 4 * iStrideCur;
+    }
+  }
+  else if ((iRows % 2 == 0) && (iCols % 2 == 0))
+  {
+    for (y = 0; y < iRows; y += 2)
+    {
+      for (x = 0; x < iCols; x += 2)
+      {
+        uiSum += xCalcHADs2x2(&piOrg[x], &piCur[x], iStrideOrg, iStrideCur);
+      }
+      piOrg += 2 * iStrideOrg;
+      piCur += 2 * iStrideCur;
+    }
+  }
+
+  // TODO: 10 bit
+  return (uiSum >> 0);
+}
+
+
 // Function macro for defining SAD calculating functions
 // for fixed size blocks.
 #define SAD_NXN(n, pixel_type) \
@@ -539,12 +1111,12 @@ SAD_DUAL_NXN(64, uvg_pixel)
 
 static unsigned pixels_calc_ssd_generic(const uvg_pixel *const ref, const uvg_pixel *const rec,
                  const int ref_stride, const int rec_stride,
-                 const int width)
+                 const int width, const int height)
 {
   int ssd = 0;
   int y, x;
 
-  for (y = 0; y < width; ++y) {
+  for (y = 0; y < height; ++y) {
     for (x = 0; x < width; ++x) {
       int diff = ref[x + y * ref_stride] - rec[x + y * rec_stride];
       ssd += diff * diff;
@@ -783,10 +1355,10 @@ static double pixel_var_generic(const uvg_pixel *arr, const uint32_t len)
 
 
 static void generate_residual_generic(const uvg_pixel* ref_in, const uvg_pixel* pred_in, int16_t* residual, 
-  int width, int ref_stride, int pred_stride)
+  int width, int height, int ref_stride, int pred_stride)
 {
   int y, x;
-  for (y = 0; y < width; ++y) {
+  for (y = 0; y < height; ++y) {
     for (x = 0; x < width; ++x) {
       residual[x + y * width] = (int16_t)(ref_in[x + y * ref_stride] - pred_in[x + y * pred_stride]);
     }
@@ -897,6 +1469,7 @@ int uvg_strategy_register_picture_generic(void* opaque, uint8_t bitdepth)
   success &= uvg_strategyselector_register(opaque, "satd_32x32_dual", "generic", 0, &satd_32x32_dual_generic);
   success &= uvg_strategyselector_register(opaque, "satd_64x64_dual", "generic", 0, &satd_64x64_dual_generic);
   success &= uvg_strategyselector_register(opaque, "satd_any_size", "generic", 0, &satd_any_size_generic);
+  success &= uvg_strategyselector_register(opaque, "satd_any_size_vtm", "generic", 0, &xGetHADs);
   success &= uvg_strategyselector_register(opaque, "satd_any_size_quad", "generic", 0, &satd_any_size_quad_generic);
 
   success &= uvg_strategyselector_register(opaque, "pixels_calc_ssd", "generic", 0, &pixels_calc_ssd_generic);

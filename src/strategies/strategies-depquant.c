@@ -1,6 +1,3 @@
-#ifndef ENCODE_CODING_TREE_GENERIC_H_
-#define ENCODE_CODING_TREE_GENERIC_H_
-
 /*****************************************************************************
  * This file is part of uvg266 VVC encoder.
  *
@@ -33,23 +30,26 @@
  * INCLUDING NEGLIGENCE OR OTHERWISE ARISING IN ANY WAY OUT OF THE USE OF THIS
  ****************************************************************************/
 
-/**
- * \file
- * Functions for writing the coding quadtree and related syntax.
- */
+#include "strategies/strategies-depquant.h"
 
-#include "encoderstate.h"
-#include "global.h"
+#include "strategies/avx2/depquant-avx2.h"
+#include "strategies/generic/depquant-generic.h"
+#include "strategyselector.h"
 
-void uvg_encode_coeff_nxn_generic(encoder_state_t * const state,
-                                  cabac_data_t * const cabac,
-                                  const coeff_t *coeff,
-                                  const cu_loc_t * const loc,
-                                  uint8_t color,
-                                  int8_t scan_mode,
-                                  cu_info_t* cur_cu,
-                                  double* bits_out);
 
-int uvg_strategy_register_encode_generic(void* opaque, uint8_t bitdepth);
+// Define function pointers.
+dep_quant_decide_and_update_func* uvg_dep_quant_decide_and_update;
+find_first_non_zero_coeff_func* uvg_find_first_non_zero_coeff;
 
-#endif // ENCODE_CODING_TREE_GENERIC_H_
+
+int uvg_strategy_register_depquant(void *opaque, uint8_t bitdepth)
+{
+  bool success = true;
+
+  success &= uvg_strategy_register_depquant_generic(opaque, bitdepth);
+
+  if (uvg_g_hardware_flags.intel_flags.avx2) {
+    success &= uvg_strategy_register_depquant_avx2(opaque, bitdepth);
+  }
+  return success;
+}

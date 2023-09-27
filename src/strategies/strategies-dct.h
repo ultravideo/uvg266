@@ -51,6 +51,7 @@ extern dct_func * uvg_dct_4x4;
 extern dct_func * uvg_dct_8x8;
 extern dct_func * uvg_dct_16x16;
 extern dct_func * uvg_dct_32x32;
+extern dct_func * uvg_dct_non_square;
 
 extern dct_func * uvg_fast_inverse_dst_4x4;
 
@@ -64,9 +65,10 @@ typedef void (mts_dct_func)(
   color_t color,
   const cu_info_t* tu,
   int8_t width,
+  int8_t height,
   const int16_t* input,
   int16_t* output,
-  const int8_t mts_idx);
+  const int8_t mts_type);
 
 extern mts_dct_func* uvg_mts_dct;
 
@@ -75,15 +77,16 @@ typedef void (mts_idct_func)(
   color_t color,
   const cu_info_t* tu,
   int8_t width,
+  int8_t height,
   const int16_t* input,
   int16_t* output,
-  const int8_t mts_idx);
+  const int8_t mts_type);
 
 extern mts_idct_func* uvg_mts_idct;
 
 int uvg_strategy_register_dct(void* opaque, uint8_t bitdepth);
-dct_func * uvg_get_dct_func(int8_t width, color_t color, cu_type_t type);
-dct_func * uvg_get_idct_func(int8_t width, color_t color, cu_type_t type);
+dct_func * uvg_get_dct_func(int8_t width, int8_t height, color_t color, cu_type_t type);
+dct_func * uvg_get_idct_func(int8_t width, int8_t height, color_t color, cu_type_t type);
 
 
 

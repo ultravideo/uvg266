@@ -44,23 +44,28 @@
 #include "global.h" // IWYU pragma: keep
 
 extern const uint8_t uvg_g_chroma_scale[58];
-extern const int16_t uvg_g_inv_quant_scales[6];
-extern const int16_t uvg_g_quant_scales[6];
+extern const int16_t uvg_g_inv_quant_scales[2][6];
+extern const int16_t uvg_g_quant_scales[2][6];
 
-void uvg_transformskip(const encoder_control_t *encoder, int16_t *block,int16_t *coeff, int8_t block_size);
-void uvg_itransformskip(const encoder_control_t *encoder, int16_t *block,int16_t *coeff, int8_t block_size);
+#define COEFF_ORDER_LINEAR 0
+#define COEFF_ORDER_CU 1
+
+void uvg_transformskip(const encoder_control_t *encoder, int16_t *block,int16_t *coeff, int8_t width, int8_t height);
+void uvg_itransformskip(const encoder_control_t *encoder, int16_t *block,int16_t *coeff, int8_t width, int8_t height);
 
 void uvg_transform2d(const encoder_control_t * const encoder,
                      int16_t *block,
                      int16_t *coeff,
-                     int8_t block_size,
+                     int8_t block_width,
+                     int8_t block_height,
                      color_t color,
                      const cu_info_t *tu);
 
 void uvg_itransform2d(const encoder_control_t * const encoder,
                       int16_t *block,
                       int16_t *coeff,
-                      int8_t block_size,
+                      int8_t block_width,
+                      int8_t block_height,
                       color_t color,
                       const cu_info_t *tu);
 
@@ -69,11 +74,12 @@ int32_t uvg_get_scaled_qp(color_t color, int8_t qp, int8_t qp_offset, int8_t con
 
 void uvg_derive_lfnst_constraints(
   cu_info_t* const pred_cu,
-  const int depth,
   bool* constraints,
   const coeff_t* coeff,
   const int width,
-  const int height);
+  const int height,
+  const vector2d_t * const ,
+  color_t color);
 
 typedef struct {
   double best_u_cost;
@@ -82,6 +88,10 @@ typedef struct {
   int best_u_index;
   int best_v_index;
   int best_combined_index;
+  uint64_t u_distortion;
+  uint64_t v_distortion;
+  double   u_bits;
+  double   v_bits;
 } uvg_chorma_ts_out_t;
 
 void uvg_quantize_lcu_residual(
@@ -89,9 +99,7 @@ void uvg_quantize_lcu_residual(
   bool luma,
   bool chroma,
   const bool jccr,
-  int32_t x,
-  int32_t y,
-  uint8_t depth,
+  const cu_loc_t* cu_loc,
   cu_info_t *cur_cu,
   lcu_t* lcu,
   bool early_skip,
@@ -99,13 +107,10 @@ void uvg_quantize_lcu_residual(
 
 void uvg_chroma_transform_search(
   encoder_state_t* const state,
-  int depth,
   lcu_t* const lcu,
   cabac_data_t* temp_cabac,
-  int8_t width,
-  int8_t height,
+  const cu_loc_t* const cu_loc,
   const int offset,
-  const uint8_t mode,
   cu_info_t* pred_cu,
   uvg_pixel u_pred[1024],
   uvg_pixel v_pred[1024],
@@ -130,7 +135,8 @@ void uvg_fwd_lfnst(
   const color_t color,
   const uint16_t lfnst_idx,
   coeff_t *coeffs,
-  enum uvg_tree_type tree_type);
+  enum uvg_tree_type tree_type,
+  int8_t luma_mode);
 
 void uvg_inv_lfnst(
   const cu_info_t* cur_cu,
@@ -139,6 +145,7 @@ void uvg_inv_lfnst(
   const color_t color,
   const uint16_t lfnst_idx,
   coeff_t* coeffs,
-  enum uvg_tree_type tree_type);
+  enum uvg_tree_type tree_type,
+  int8_t luma_mode);
 
 #endif

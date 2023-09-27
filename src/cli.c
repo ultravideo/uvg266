@@ -76,7 +76,6 @@ static const struct option long_options[] = {
   { "tr-skip-max-size",   required_argument, NULL, 0 },
   { "mts",                required_argument, NULL, 0 },
   { "no-mts",                   no_argument, NULL, 0 },
-  { "tr-depth-intra",     required_argument, NULL, 0 },
   { "me",                 required_argument, NULL, 0 },
   { "subme",              required_argument, NULL, 0 },
   { "source-scan-type",   required_argument, NULL, 0 },
@@ -178,6 +177,8 @@ static const struct option long_options[] = {
   { "no-mip",                   no_argument, NULL, 0 },
   { "lfnst",                    no_argument, NULL, 0 },
   { "no-lfnst",                 no_argument, NULL, 0 },
+  { "isp",                      no_argument, NULL, 0 },
+  { "no-isp",                   no_argument, NULL, 0 },
   { "jccr",                     no_argument, NULL, 0 },
   { "no-jccr",                  no_argument, NULL, 0 },
   { "amvr",                     no_argument, NULL, 0 },
@@ -191,8 +192,15 @@ static const struct option long_options[] = {
   { "dual-tree",                no_argument, NULL, 0 },
   { "no-dual-tree",             no_argument, NULL, 0 },
   { "cabac-debug-file",   required_argument, NULL, 0 },
+  { "mtt-depth-intra",    required_argument, NULL, 0 },
+  { "mtt-depth-inter",    required_argument, NULL, 0 },
+  { "mtt-depth-intra-chroma", required_argument, NULL, 0 },
+  { "max-bt-size",        required_argument, NULL, 0 },
+  { "max-tt-size",        required_argument, NULL, 0 },
   { "intra-rough-granularity",required_argument, NULL, 0 },
   { "ibc",                required_argument, NULL, 0 },
+  { "dep-quant",                no_argument, NULL, 0 },
+  { "no-dep-quant",             no_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 
@@ -571,6 +579,7 @@ void print_help(void)
     "                                   - full: Full ALF\n"
     "      --(no-)rdoq            : Rate-distortion optimized quantization [enabled]\n"
     "      --(no-)rdoq-skip       : Skip RDOQ for 4x4 blocks. [disabled]\n"
+    "      --(no-)dep-quant       : Use dependent quantization. [disabled]\n"
     "      --(no-)signhide        : Sign hiding [disabled]\n"
     "      --rd <integer>         : Intra mode search complexity [0]\n"
     "                                   - 0: Skip intra if inter is good enough.\n"
@@ -602,14 +611,14 @@ void print_help(void)
     "                                   - 2: + 1/2-pixel diagonal\n"
     "                                   - 3: + 1/4-pixel horizontal and vertical\n"
     "                                   - 4: + 1/4-pixel diagonal\n"
-    "      --pu-depth-inter <int>-<int> : Inter prediction units sizes [0-3]\n"
-    "                                   - 0, 1, 2, 3: from 64x64 to 8x8\n"
+    "      --pu-depth-inter <int>-<int> : Maximum and minimum split depths where\n"
+    "                                     inter search is performed 0..8. [0-3]\n"
     "                                   - Accepts a list of values separated by ','\n"
     "                                     for setting separate depths per GOP layer\n"
     "                                     (values can be omitted to use the first\n"
     "                                     value for the respective layer).\n"
-    "      --pu-depth-intra <int>-<int> : Intra prediction units sizes [1-4]\n"
-    "                                   - 0, 1, 2, 3, 4: from 64x64 to 4x4\n"
+    "      --pu-depth-intra <int>-<int> : Maximum and minimum split depths where\n"
+    "                                     intra search is performed 0..8. [1-4]\n"
     "                                   - Accepts a list of values separated by ','\n"
     "                                     for setting separate depths per GOP layer\n"
     "                                     (values can be omitted to use the first\n"
@@ -617,6 +626,22 @@ void print_help(void)
     "      --ml-pu-depth-intra    : Predict the pu-depth-intra using machine\n"
     "                                learning trees, overrides the\n"
     "                                --pu-depth-intra parameter. [disabled]\n"
+    "      --mtt-depth-intra      : Depth of mtt for intra slices 0..3.[0]\n"
+    "      --mtt-depth-intra-chroma : Depth of mtt for chroma dual tree in\n"
+    "                                      intra slices 0..3.[0]\n"
+    "      --mtt-depth-inter      : Depth of mtt for inter slices 0..3.[0]\n"
+    "                              All MTTs are currently experimental and\n"
+    "                              require disabling some avx2 optimizations.\n"
+    "      --max-bt-size          : maximum size for a CU resulting from\n"
+    "                                   a bt split. A singular value shared for all\n"
+    "                                   or a list of three values for the different\n"
+    "                                   slices types (intra, inter, intra-chroma)\n"
+    "                                   can be provided. [64, 64, 32]\n"
+    "      --max-tt-size          : maximum size for a CU resulting from\n"
+    "                                   a tt split. A singular value shared for all\n"
+    "                                   or a list of three values for the different\n"
+    "                                   slices types (intra, inter, intra-chroma)\n"
+    "                                   can be provided. [64, 64, 32]\n"
     "      --intra-rough-granularity : How many levels are used for the\n"
     "                                   logarithmic intra rough search. 0..4\n"
     "                                   With 0 all of the modes are checked \n"
@@ -634,7 +659,6 @@ void print_help(void)
     "                               This is mostly for debugging and is not\n"
     "                               guaranteed to produce sensible bitstream or\n"
     "                               work at all. [disabled]\n"
-    "      --tr-depth-intra <int> : Transform split depth for intra blocks [0]\n"
     "      --(no-)bipred          : Bi-prediction [disabled]\n"
     "      --cu-split-termination <string> : CU split search termination [zero]\n"
     "                                   - off: Don't terminate early.\n"
@@ -671,6 +695,9 @@ void print_help(void)
     "      --(no-)mip             : Enable matrix weighted intra prediction.\n"
     "      --(no-)lfnst           : Enable low frequency non-separable transform.\n"
     "                                 [disabled]\n"
+    "      --(no-)isp             : Enable intra sub partitions. [disabled]\n"
+    "                               Experimental, requires disabling some avx2\n"
+    "                               optimizations.\n"
     "      --mts <string>         : Multiple Transform Selection [off].\n"
     "                               (Currently only implemented for intra\n"
     "                               and has effect only when rd >= 2)\n"

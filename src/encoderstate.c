@@ -627,43 +627,52 @@ static void encode_sao(encoder_state_t * const state,
  * \param prev_qp         -1 if QP delta has not been coded in current QG,
  *                        otherwise the QP of the current QG
  */
-static void set_cu_qps(encoder_state_t *state, int x, int y, int depth, int *last_qp, int *prev_qp)
+static void set_cu_qps(encoder_state_t *state, const cu_loc_t* const cu_loc, int *last_qp, int *prev_qp, const
+                       int depth)
 {
 
   // Stop recursion if the CU is completely outside the frame.
-  if (x >= state->tile->frame->width || y >= state->tile->frame->height) return;
+  if (cu_loc->x >= state->tile->frame->width || cu_loc->y >= state->tile->frame->height) return;
 
-  cu_info_t *cu = uvg_cu_array_at(state->tile->frame->cu_array, x, y);
-  const int cu_width = LCU_WIDTH >> depth;
+  cu_info_t *cu = uvg_cu_array_at(state->tile->frame->cu_array, cu_loc->x, cu_loc->y);
+  const int width = 1 << cu->log2_width;
 
   if (depth <= state->frame->max_qp_delta_depth) {
     *prev_qp = -1;
   }
 
-  if (cu->depth > depth) {
+  if (cu_loc->width > width) {
     // Recursively process sub-CUs.
-    const int d = cu_width >> 1;
-    set_cu_qps(state, x,     y,     depth + 1, last_qp, prev_qp);
-    set_cu_qps(state, x + d, y,     depth + 1, last_qp, prev_qp);
-    set_cu_qps(state, x,     y + d, depth + 1, last_qp, prev_qp);
-    set_cu_qps(state, x + d, y + d, depth + 1, last_qp, prev_qp);
+    const int half_width = cu_loc->width >> 1;
+    const int half_height = cu_loc->height >> 1;
+    cu_loc_t split_cu_loc;
+    uvg_cu_loc_ctor(&split_cu_loc, cu_loc->x, cu_loc->y, half_width, half_height);
+    set_cu_qps(state, &split_cu_loc,     last_qp,     prev_qp, depth + 1);
+    uvg_cu_loc_ctor(&split_cu_loc, cu_loc->x + half_width, cu_loc->y, half_width, half_height);
+    set_cu_qps(state, &split_cu_loc, last_qp,     prev_qp, depth + 1);
+    uvg_cu_loc_ctor(&split_cu_loc, cu_loc->x, cu_loc->y + half_height, half_width, half_height);
+    set_cu_qps(state, &split_cu_loc,     last_qp, prev_qp, depth + 1);
+    uvg_cu_loc_ctor(&split_cu_loc, cu_loc->x + half_width, cu_loc->y + half_height, half_width, half_height);
+    set_cu_qps(state, &split_cu_loc, last_qp, prev_qp, depth + 1);
 
   } else {
     bool cbf_found = *prev_qp >= 0;
 
-    if (cu->tr_depth > depth) {
+    int y_limit = cu_loc->y + cu_loc->height;
+    int x_limit = cu_loc->x + cu_loc->width;
+    if (cu_loc->width > TR_MAX_WIDTH || cu_loc->height > TR_MAX_WIDTH) {
       // The CU is split into smaller transform units. Check whether coded
       // block flag is set for any of the TUs.
-      const int tu_width = LCU_WIDTH >> cu->tr_depth;
-      for (int y_scu = y; !cbf_found && y_scu < y + cu_width; y_scu += tu_width) {
-        for (int x_scu = x; !cbf_found && x_scu < x + cu_width; x_scu += tu_width) {
+      const int tu_width = MIN(TR_MAX_WIDTH, 1 << cu->log2_width);
+      for (int y_scu = cu_loc->y; !cbf_found && y_scu < y_limit; y_scu += tu_width) {
+        for (int x_scu = cu_loc->x; !cbf_found && x_scu < x_limit; x_scu += tu_width) {
           cu_info_t *tu = uvg_cu_array_at(state->tile->frame->cu_array, x_scu, y_scu);
-          if (cbf_is_set_any(tu->cbf, cu->depth)) {
+          if (cbf_is_set_any(tu->cbf)) {
             cbf_found = true;
           }
         }
       }
-    } else if (cbf_is_set_any(cu->cbf, cu->depth)) {
+    } else if (cbf_is_set_any(cu->cbf)) {
       cbf_found = true;
     }
 
@@ -671,18 +680,18 @@ static void set_cu_qps(encoder_state_t *state, int x, int y, int depth, int *las
     if (cbf_found) {
       *prev_qp = qp = cu->qp;
     } else {
-      qp = uvg_get_cu_ref_qp(state, x, y, *last_qp);
+      qp = uvg_get_cu_ref_qp(state, cu_loc->x, cu_loc->y, *last_qp);
     }
 
     // Set the correct QP for all state->tile->frame->cu_array elements in
     // the area covered by the CU.
-    for (int y_scu = y; y_scu < y + cu_width; y_scu += SCU_WIDTH) {
-      for (int x_scu = x; x_scu < x + cu_width; x_scu += SCU_WIDTH) {
+    for (int y_scu = cu_loc->y; y_scu < y_limit; y_scu += SCU_WIDTH) {
+      for (int x_scu = cu_loc->x; x_scu < x_limit; x_scu += SCU_WIDTH) {
         uvg_cu_array_at(state->tile->frame->cu_array, x_scu, y_scu)->qp = qp;
       }
     }
 
-    if (is_last_cu_in_qg(state, x, y, depth)) {
+    if (is_last_cu_in_qg(state, cu_loc)) {
       *last_qp = cu->qp;
     }
   }
@@ -812,7 +821,9 @@ static void encoder_state_worker_encode_lcu_search(void * opaque)
   if (state->frame->max_qp_delta_depth >= 0) {
     int last_qp = state->last_qp;
     int prev_qp = -1;
-    set_cu_qps(state, lcu->position_px.x, lcu->position_px.y, 0, &last_qp, &prev_qp);
+    cu_loc_t cu_loc;
+    uvg_cu_loc_ctor(&cu_loc, lcu->position_px.x, lcu->position_px.y, LCU_WIDTH, LCU_WIDTH);
+    set_cu_qps(state, &cu_loc, &last_qp, &prev_qp, 0);
   }
 
   if (state->tile->frame->lmcs_aps->m_sliceReshapeInfo.sliceReshaperEnableFlag) {
@@ -870,10 +881,16 @@ static void encoder_state_worker_encode_lcu_bitstream(void * opaque)
 
   enum uvg_tree_type tree_type = state->frame->slicetype == UVG_SLICE_I && state->encoder_control->cfg.dual_tree ? UVG_LUMA_T : UVG_BOTH_T;
   //Encode coding tree
-  uvg_encode_coding_tree(state, lcu->position.x * LCU_WIDTH, lcu->position.y * LCU_WIDTH, 0, lcu->coeff, tree_type);
+  cu_loc_t start;
+  uvg_cu_loc_ctor(&start, lcu->position.x * LCU_WIDTH, lcu->position.y * LCU_WIDTH, LCU_WIDTH, LCU_WIDTH);
+  split_tree_t split_tree = { 0, 0, 0, 0, 0 };
+
+  uvg_encode_coding_tree(state, lcu->coeff, tree_type, &start, &start, split_tree, true);
 
   if(tree_type == UVG_LUMA_T && state->encoder_control->chroma_format != UVG_CSP_400) {
-    uvg_encode_coding_tree(state, lcu->position.x * LCU_WIDTH_C, lcu->position.y * LCU_WIDTH_C, 0, lcu->coeff, UVG_CHROMA_T);
+    uvg_cu_loc_ctor(&start, lcu->position.x * LCU_WIDTH, lcu->position.y * LCU_WIDTH, LCU_WIDTH, LCU_WIDTH);
+    cu_loc_t chroma_tree_loc = start;
+    uvg_encode_coding_tree(state, lcu->coeff, UVG_CHROMA_T, &start, &chroma_tree_loc, split_tree, true);
   }
 
   if (!state->cabac.only_count) {
@@ -1152,6 +1169,12 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
           uvg_threadqueue_submit(state->encoder_control->threadqueue, job[0]);
 
           uvg_threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], state->tile->wf_recon_jobs[lcu->id]);
+#ifdef UVG_DEBUG_PRINT_CABAC
+          // Ensures that the ctus are encoded in raster scan order
+          if(i >= state->tile->frame->width_in_lcu) {
+            uvg_threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], state->tile->wf_recon_jobs[(lcu->id / state->tile->frame->width_in_lcu - 1) * state->tile->frame->width_in_lcu]);
+          }
+#endif
         }
 
         uvg_threadqueue_submit(state->encoder_control->threadqueue, state->tile->wf_jobs[lcu->id]);
@@ -1281,13 +1304,13 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
             sub_state->tile->frame->width_in_lcu * LCU_WIDTH,
             sub_state->tile->frame->height_in_lcu * LCU_WIDTH
         );
-        if(main_state->encoder_control->cfg.dual_tree){
+        if(main_state->encoder_control->cfg.dual_tree && main_state->frame->is_irap){
           sub_state->tile->frame->chroma_cu_array = uvg_cu_subarray(
               main_state->tile->frame->chroma_cu_array,
-              offset_x / 2,
-              offset_y / 2,
-              sub_state->tile->frame->width_in_lcu * LCU_WIDTH_C,
-              sub_state->tile->frame->height_in_lcu * LCU_WIDTH_C
+              offset_x,
+              offset_y,
+              sub_state->tile->frame->width_in_lcu * LCU_WIDTH,
+              sub_state->tile->frame->height_in_lcu * LCU_WIDTH
           );
         }
       }
@@ -1926,10 +1949,9 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, uvg_pict
 
   if (cfg->dual_tree && state->encoder_control->chroma_format != UVG_CSP_400 && state->frame->is_irap) {
     assert(state->tile->frame->chroma_cu_array == NULL);
-    state->tile->frame->chroma_cu_array = uvg_cu_array_chroma_alloc(
-      state->tile->frame->width / 2,
-      state->tile->frame->height / 2,
-      state->encoder_control->chroma_format
+    state->tile->frame->chroma_cu_array = uvg_cu_array_alloc(
+      state->tile->frame->width,
+      state->tile->frame->height
     );
   }
   // Set pictype.
@@ -2029,9 +2051,9 @@ static void _encode_one_frame_add_bitstream_deps(const encoder_state_t * const s
 void uvg_encode_one_frame(encoder_state_t * const state, uvg_picture* frame)
 {
 #if UVG_DEBUG_PRINT_CABAC == 1
-  uvg_cabac_bins_count = 0;
+  // uvg_cabac_bins_count = 0;
   if (state->frame->num == 0) uvg_cabac_bins_verbose = true;
-  else uvg_cabac_bins_verbose = false;
+  // else uvg_cabac_bins_verbose = false;
 #endif
 
 
@@ -2193,11 +2215,12 @@ int uvg_get_cu_ref_qp(const encoder_state_t *state, int x, int y, int last_qp)
 {
   const cu_array_t *cua = state->tile->frame->cu_array;
   // Quantization group width
-  const int qg_width = LCU_WIDTH >> MIN(state->frame->max_qp_delta_depth, uvg_cu_array_at_const(cua, x, y)->depth);
+  const int qg_width = 1 << MAX(6 - state->frame->max_qp_delta_depth, uvg_cu_array_at_const(cua, x, y)->log2_width);
+  const int qg_height = 1 << MAX(6 - state->frame->max_qp_delta_depth, uvg_cu_array_at_const(cua, x, y)->log2_height);
 
   // Coordinates of the top-left corner of the quantization group
   const int x_qg = x & ~(qg_width - 1);
-  const int y_qg = y & ~(qg_width - 1);
+  const int y_qg = y & ~(qg_height - 1);
   if(x_qg == 0 && y_qg > 0 && y_qg % LCU_WIDTH == 0) {
     return uvg_cu_array_at_const(cua, x_qg, y_qg - 1)->qp;
   }

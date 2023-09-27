@@ -61,7 +61,7 @@ videoframe_t * uvg_videoframe_alloc(int32_t width,
     frame->sao_chroma = MALLOC(sao_info_t, frame->width_in_lcu * frame->height_in_lcu);
     if (cclm) {
       assert(chroma_format == UVG_CSP_420);
-      frame->cclm_luma_rec = MALLOC(uvg_pixel, (((width + 7) & ~7) + FRAME_PADDING_LUMA) * (((height + 7) & ~7) + FRAME_PADDING_LUMA) / 4);
+      frame->cclm_luma_rec = MALLOC(uvg_pixel, (((width + 7) & ~7) + FRAME_PADDING_LUMA) * (((height + 15) & ~7) + FRAME_PADDING_LUMA) / 4);
       frame->cclm_luma_rec_top_line = MALLOC(uvg_pixel, (((width + 7) & ~7) + FRAME_PADDING_LUMA) / 2 * CEILDIV(height, 64));
     }
   }

@@ -37,6 +37,7 @@
 #include "strategies/generic/picture-generic.h"
 #include "strategies/sse2/picture-sse2.h"
 #include "strategies/sse41/picture-sse41.h"
+#include "strategies/sse42/picture-sse42.h"
 #include "strategyselector.h"
 
 
@@ -70,6 +71,7 @@ cost_pixel_nxn_multi_func * uvg_satd_32x32_dual = 0;
 cost_pixel_nxn_multi_func * uvg_satd_64x64_dual = 0;
 
 cost_pixel_any_size_func * uvg_satd_any_size = 0;
+cost_pixel_any_size_func * uvg_satd_any_size_vtm = 0;
 cost_pixel_any_size_multi_func * uvg_satd_any_size_quad = 0;
 
 pixels_calc_ssd_func * uvg_pixels_calc_ssd = 0;
@@ -115,103 +117,116 @@ int uvg_strategy_register_picture(void* opaque, uint8_t bitdepth) {
 /**
 * \brief  Get a function that calculates SATD for NxN block.
 *
-* \param n  Width of the region for which SATD is calculated.
+* \param width  Width of the region for which SATD is calculated.
 *
 * \returns  Pointer to cost_16bit_nxn_func.
 */
-cost_pixel_nxn_func * uvg_pixels_get_satd_func(unsigned n)
+cost_pixel_nxn_func * uvg_pixels_get_satd_func(unsigned width, unsigned height)
 {
-  switch (n) {
-  case 4:
-    return uvg_satd_4x4;
-  case 8:
-    return uvg_satd_8x8;
-  case 16:
-    return uvg_satd_16x16;
-  case 32:
-    return uvg_satd_32x32;
-  case 64:
-    return uvg_satd_64x64;
-  default:
-    return NULL;
+  if(width == height) {
+    switch (width) {
+      case 4:
+        return uvg_satd_4x4;
+      case 8:
+        return uvg_satd_8x8;
+      case 16:
+        return uvg_satd_16x16;
+      case 32:
+        return uvg_satd_32x32;
+      case 64:
+        return uvg_satd_64x64;
+      default:
+        return NULL;
+    }
   }
+  return NULL;
 }
 
 
 /**
 * \brief  Get a function that calculates SAD for NxN block.
 *
-* \param n  Width of the region for which SAD is calculated.
+* \param width  Width of the region for which SAD is calculated.
 *
 * \returns  Pointer to cost_16bit_nxn_func.
 */
-cost_pixel_nxn_func * uvg_pixels_get_sad_func(unsigned n)
+cost_pixel_nxn_func * uvg_pixels_get_sad_func(unsigned width, unsigned height)
 {
-  switch (n) {
-  case 4:
-    return uvg_sad_4x4;
-  case 8:
-    return uvg_sad_8x8;
-  case 16:
-    return uvg_sad_16x16;
-  case 32:
-    return uvg_sad_32x32;
-  case 64:
-    return uvg_sad_64x64;
-  default:
-    return NULL;
+  if(width == height) {
+    switch (width) {
+      case 4:
+        return uvg_sad_4x4;
+      case 8:
+        return uvg_sad_8x8;
+      case 16:
+        return uvg_sad_16x16;
+      case 32:
+        return uvg_sad_32x32;
+      case 64:
+        return uvg_sad_64x64;
+      default:
+        return NULL;
+    }
   }
+  return NULL;
 }
 
 /**
 * \brief  Get a function that calculates SATDs for 2 NxN blocks.
 *
-* \param n  Width of the region for which SATD is calculated.
+* \param width  Width of the region for which SATD is calculated.
+* \param height  Height of the region for which SATD is calculated.
 *
 * \returns  Pointer to cost_pixel_nxn_multi_func.
 */
-cost_pixel_nxn_multi_func * uvg_pixels_get_satd_dual_func(unsigned n)
+cost_pixel_nxn_multi_func * uvg_pixels_get_satd_dual_func(unsigned width, unsigned height)
 {
-  switch (n) {
-  case 4:
-    return uvg_satd_4x4_dual;
-  case 8:
-    return uvg_satd_8x8_dual;
-  case 16:
-    return uvg_satd_16x16_dual;
-  case 32:
-    return uvg_satd_32x32_dual;
-  case 64:
-    return uvg_satd_64x64_dual;
-  default:
-    return NULL;
+  if(width == height) {
+    switch (width) {
+      case 4:
+        return uvg_satd_4x4_dual;
+      case 8:
+        return uvg_satd_8x8_dual;
+      case 16:
+        return uvg_satd_16x16_dual;
+      case 32:
+        return uvg_satd_32x32_dual;
+      case 64:
+        return uvg_satd_64x64_dual;
+      default:
+        return NULL;
+    }
   }
+  return NULL;
 }
 
 
 /**
 * \brief  Get a function that calculates SADs for 2 NxN blocks.
 *
-* \param n  Width of the region for which SAD is calculated.
+* \param width  Width of the region for which SAD is calculated.
 *
 * \returns  Pointer to cost_pixel_nxn_multi_func.
 */
-cost_pixel_nxn_multi_func * uvg_pixels_get_sad_dual_func(unsigned n)
+cost_pixel_nxn_multi_func * uvg_pixels_get_sad_dual_func(unsigned width, unsigned height)
 {
-  switch (n) {
-  case 4:
-    return uvg_sad_4x4_dual;
-  case 8:
-    return uvg_sad_8x8_dual;
-  case 16:
-    return uvg_sad_16x16_dual;
-  case 32:
-    return uvg_sad_32x32_dual;
-  case 64:
-    return uvg_sad_64x64_dual;
-  default:
-    return NULL;
+  if(width == height) {
+    switch (width) {
+      case 4:
+        return uvg_sad_4x4_dual;
+      case 8:
+        return uvg_sad_8x8_dual;
+      case 16:
+        return uvg_sad_16x16_dual;
+      case 32:
+        return uvg_sad_32x32_dual;
+      case 64:
+        return uvg_sad_64x64_dual;
+      default:
+        return NULL;
+    }
   }
+  return NULL;
 }
 
 // Precomputed CRC32C lookup table for polynomial 0x04C11DB7

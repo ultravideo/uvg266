@@ -338,7 +338,6 @@ typedef struct uvg_config
   int32_t trskip_max_size;    /*!< \brief Transform skip max block size. */
   enum uvg_mts mts;        /*< \brief flag to enable multiple transform selection*/
   int32_t mts_implicit;        /*< \brief flag to enable implicit multiple transform selection*/
-  int32_t tr_depth_intra; /*!< \brief Maximum transform depth for intra. */
   enum uvg_ime_algorithm ime_algorithm;  /*!< \brief Integer motion estimation algorithm. */
   int32_t fme_level;      /*!< \brief Fractional pixel motion estimation level (0: disabled, 1: enabled). */
   int8_t source_scan_type; /*!< \brief Source scan type (0: progressive, 1: top field first, 2: bottom field first).*/
@@ -452,7 +451,7 @@ typedef struct uvg_config
   /** \brief Flag to enable/disable open GOP configuration */
   int8_t open_gop;
 
-	int32_t vaq; /** \brief Enable variance adaptive quantization*/
+  int32_t vaq; /** \brief Enable variance adaptive quantization*/
 
   /** \brief Type of scaling lists to use */
   int8_t scaling_list;
@@ -526,6 +525,8 @@ typedef struct uvg_config
   /** \brief enable low frequency non-separable transform */
   int8_t lfnst;
 
+  /** \brief enable intra sub partitions*/
+  int8_t isp;
 
   int8_t jccr;
 
@@ -542,9 +543,16 @@ typedef struct uvg_config
 
   uint8_t dual_tree;
 
+  uint8_t min_qt_size[3]; /* intra, inter, dual tree chroma*/
+  uint8_t max_bt_size[3]; /* intra, inter, dual tree chroma*/
+  uint8_t max_tt_size[3]; /* intra, inter, dual tree chroma*/
+
+  uint8_t max_btt_depth[3]; /* intra, inter, dual tree chroma*/
+
   uint8_t intra_rough_search_levels;
 
   uint8_t ibc; /* \brief Intra Block Copy parameter */
+  uint8_t dep_quant;
 } uvg_config;
 
 /**

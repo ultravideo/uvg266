@@ -80,7 +80,6 @@ int uvg_config_init(uvg_config *cfg)
   cfg->trskip_max_size = 2; //Default to 4x4
   cfg->mts             = 0;
   cfg->mts_implicit    = 0;
-  cfg->tr_depth_intra  = 0;
   cfg->ime_algorithm   = 0; /* hexbs */
   cfg->fme_level       = 4;
   cfg->source_scan_type = 0; /* progressive */
@@ -207,6 +206,8 @@ int uvg_config_init(uvg_config *cfg)
 
   cfg->lfnst = false;
 
+  cfg->isp = false;
+
   parse_qp_map(cfg, 0);
 
   cfg->jccr = 0;
@@ -221,10 +222,27 @@ int uvg_config_init(uvg_config *cfg)
   cfg->cabac_debug_file_name = NULL;
 
   cfg->dual_tree = 0;
+
+  cfg->min_qt_size[0] = 4;
+  cfg->min_qt_size[1] = 4;
+  cfg->min_qt_size[2] = 4;
+
+  cfg->max_btt_depth[0] = 0;
+  cfg->max_btt_depth[1] = 0;
+  cfg->max_btt_depth[2] = 0;
+
+  cfg->max_tt_size[0] = 64;
+  cfg->max_bt_size[0] = 64;
+  cfg->max_tt_size[1] = 64;
+  cfg->max_bt_size[1] = 64;
+  cfg->max_tt_size[2] = 64;
+  cfg->max_bt_size[2] = 64;
+
   cfg->intra_rough_search_levels = 2;
 
   cfg->ibc = 0;
 
+  cfg->dep_quant = 0;
   return 1;
 }
 
@@ -333,7 +351,7 @@ static int parse_tiles_specification(const char* const arg, int32_t * const ntil
 
   return 1;
 }
-/*
+
 static int parse_uint8(const char *numstr,uint8_t* number,int min, int max)
 {
   char *tail;
@@ -349,7 +367,7 @@ static int parse_uint8(const char *numstr,uint8_t* number,int min, int max)
     return 1;
   }
 }
-*/
+
 static int parse_int8(const char *numstr,int8_t* number,int min, int max)
 {
   char *tail;
@@ -365,7 +383,7 @@ static int parse_int8(const char *numstr,int8_t* number,int min, int max)
     return 1;
   }
 }
-/*
+
 static int parse_array(const char *array, uint8_t *coeff_key, int size,
                             int min, int max)
 {
@@ -389,15 +407,15 @@ static int parse_array(const char *array, uint8_t *coeff_key, int size,
     free(key);
     return 0;
   }
-  else if (i<size){
-    fprintf(stderr, "parsing failed : too few members.\n");
-    free(key);
-    return 0;
-  }
+  //else if (i<size){
+  //  fprintf(stderr, "parsing failed : too few members.\n");
+  //  free(key);
+  //  return 0;
+  //}
   free(key);
-  return 1;
+  return i;
 }
-*/
+
 
 static int parse_qp_scale_array(const char *array, int8_t *out)
 {
@@ -928,8 +946,6 @@ int uvg_config_parse(uvg_config *cfg, const char *name, const char *value)
     cfg->mts = mts_type;
     cfg->mts_implicit = (mts_type == UVG_MTS_IMPLICIT);
   }
-  else if OPT("tr-depth-intra")
-    cfg->tr_depth_intra = atoi(value);
   else if OPT("me") {
     int8_t ime_algorithm = 0;
     if (!parse_enum(value, me_names, &ime_algorithm)) return 0;
@@ -1454,6 +1470,9 @@ int uvg_config_parse(uvg_config *cfg, const char *name, const char *value)
   else if OPT("lfnst") {
     cfg->lfnst = atobool(value);
   }
+  else if OPT("isp") {
+    cfg->isp = atobool(value);
+  }
   else if OPT("jccr") {
     cfg->jccr = (bool)atobool(value);
   }
@@ -1479,6 +1498,49 @@ int uvg_config_parse(uvg_config *cfg, const char *name, const char *value)
   else if OPT("dual-tree") {
     cfg->dual_tree = atobool(value);
   }
+  else if OPT("mtt-depth-intra") {
+    cfg->max_btt_depth[0]  = atoi(value);
+  }
+  else if OPT("mtt-depth-intra-chroma") {
+    cfg->max_btt_depth[2]  = atoi(value);
+  }
+  else if OPT("mtt-depth-inter") {
+    cfg->max_btt_depth[1]  = atoi(value);
+  }
+  else if OPT("max-bt-size") {
+  uint8_t sizes[3];
+  const int got = parse_array(value, sizes, 3, 0, 128);
+    if (got == 1) {
+      cfg->max_bt_size[0] = sizes[0];
+      cfg->max_bt_size[1] = sizes[0];
+      cfg->max_bt_size[2] = sizes[0];
+    }
+    else if (got == 3) {
+      cfg->max_bt_size[0] = sizes[0];
+      cfg->max_bt_size[1] = sizes[1];
+      cfg->max_bt_size[2] = sizes[2];      
+    } else {
+      fprintf(stderr, "Incorrect amount of values provided for max-bt-size\n");
+      return 0;
+    }
+  }
+  else if OPT("max-tt-size") {
+  uint8_t sizes[3];
+  const int got = parse_array(value, sizes, 3, 0, 128);
+    if (got == 1) {
+      cfg->max_tt_size[0] = sizes[0];
+      cfg->max_tt_size[1] = sizes[0];
+      cfg->max_tt_size[2] = sizes[0];
+    }
+    else if (got == 3) {
+      cfg->max_tt_size[0] = sizes[0];
+      cfg->max_tt_size[1] = sizes[1];
+      cfg->max_tt_size[2] = sizes[2];      
+    } else {
+      fprintf(stderr, "Incorrect amount of values provided for max-tt-size\n");
+      return 0;
+    }
+  }
   else if OPT("intra-rough-granularity") {
     cfg->intra_rough_search_levels = atoi(value);
   }
@@ -1489,7 +1551,11 @@ int uvg_config_parse(uvg_config *cfg, const char *name, const char *value)
       return 0;
     }
     cfg->ibc = (uint8_t)ibc_value;
-  }  else {
+  }
+  else if OPT("dep-quant") {
+    cfg->dep_quant = (bool)atobool(value);
+  }
+  else {
     return 0;
   }
 #undef OPT
@@ -1678,12 +1744,6 @@ int uvg_config_validate(const uvg_config *const cfg)
 
   if (cfg->rdo < 0 || cfg->rdo > 3) {
     fprintf(stderr, "Input error: --rd parameter out of range [0..3]\n");
-    error = 1;
-  }
-
-  if (cfg->tr_depth_intra < 0 || cfg->tr_depth_intra > 4) {
-    // range is 0 .. CtbLog2SizeY - Log2MinTrafoSize
-    fprintf(stderr, "Input error: --tr-depth-intra is out of range [0..4]\n");
     error = 1;
   }
 

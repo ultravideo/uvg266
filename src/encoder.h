@@ -38,6 +38,7 @@
  * Initialization of encoder_control_t.
  */
 
+#include "dep_quant.h"
 #include "global.h" // IWYU pragma: keep
 #include "uvg266.h"
 #include "scalinglist.h"
@@ -98,6 +99,10 @@ typedef struct encoder_control_t
   //scaling list
   scaling_list_t scaling_list;
 
+  NbInfoSbb* m_scanId2NbInfoSbbArray[7 + 1][7 + 1];
+  NbInfoOut* m_scanId2NbInfoOutArray[7 + 1][7 + 1];
+  struct dep_quant_scan_info* scan_info[7 + 1][7 + 1];
+
   //spec: references to variables defined in Rec. ITU-T H.265 (04/2013)
   int8_t tiles_enable; /*!<spec: tiles_enabled */
 
@@ -131,8 +136,6 @@ typedef struct encoder_control_t
   double gop_layer_weights[MAX_GOP_LAYERS];
 
   FILE *roi_file;
-
-  int tr_depth_inter;
 
   //! pic_parameter_set
   struct {

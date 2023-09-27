@@ -771,6 +771,12 @@ static void fast_inverse_dst_4x4_generic(int8_t bitdepth, const int16_t* input, 
 
 
 // DCT-2
+#define DEFINE_DCT2_P2_MATRIX(a) \
+{ \
+   a,  a, \
+   a, -a  \
+}
+
 #define DEFINE_DCT2_P4_MATRIX(a,b,c) \
 { \
    a,  a,  a,  a, \
@@ -1002,6 +1008,7 @@ static void fast_inverse_dst_4x4_generic(int8_t bitdepth, const int16_t* input, 
 }
 
 // DCT-2
+const int16_t uvg_g_DCT2P2[4] = DEFINE_DCT2_P2_MATRIX(64);
 const int16_t uvg_g_DCT2P4[16] = DEFINE_DCT2_P4_MATRIX(64, 83, 36);
 const int16_t uvg_g_DCT2P8[64] = DEFINE_DCT2_P8_MATRIX(64, 83, 36, 89, 75, 50, 18);
 const int16_t uvg_g_DCT2P16[256] = DEFINE_DCT2_P16_MATRIX(64, 83, 36, 89, 75, 50, 18, 90, 87, 80, 70, 57, 43, 25, 9);
@@ -1020,6 +1027,68 @@ const int16_t uvg_g_DCT8P16[256] = DEFINE_DCT8_P16_MATRIX(88, 88, 87, 85, 81, 77
 const int16_t uvg_g_DCT8P32[1024] = DEFINE_DCT8_P32_MATRIX(90, 90, 89, 88, 87, 86, 85, 84, 82, 80, 78, 77, 74, 72, 68, 66, 63, 60, 56, 53, 50, 46, 42, 38, 34, 30, 26, 21, 17, 13, 9, 4);
 
 // ********************************** DCT-2 **********************************
+static void fastForwardDCT2_B2(const int16_t* src, int16_t* dst, int32_t shift, int line, int skip_line, int skip_line2)
+{
+  int32_t j;
+  int32_t E, O;
+  int32_t add = (shift > 0) ? (1 << (shift - 1)) : 0;
+
+  const int16_t* iT = uvg_g_DCT2P2;
+
+  int16_t *p_coef = dst;
+  const int  reduced_line = line - skip_line;
+  for (j = 0; j < reduced_line; j++)
+  {
+    /* E and O */
+    E = src[0] + src[1];
+    O = src[0] - src[1];
+
+    dst[0] = (iT[0] * E + add) >> shift;
+    dst[line] = (iT[2] * O + add) >> shift;
+
+
+    src += 2;
+    dst++;
+  }
+  if (skip_line)
+  {
+    dst = p_coef + reduced_line;
+    for (j = 0; j < 2; j++)
+    {
+      memset(dst, 0, sizeof(int16_t) * skip_line);
+      dst += line;
+    }
+  }
+}
+
+static void fastInverseDCT2_B2(const int16_t* src, int16_t* dst, int shift, int line, int skip_line, int skip_line2)
+{
+  int32_t j;
+  int32_t E, O;
+  int32_t add = 1 << (shift - 1);
+
+  const int16_t* iT = uvg_g_DCT2P2;
+
+  const int  reduced_line = line - skip_line;
+  for (j = 0; j < reduced_line; j++)
+  {
+    /* Utilizing symmetry properties to the maximum to minimize the number of multiplications */
+    E = iT[0] * (src[0] + src[line]);
+    O = iT[2] * (src[0] - src[line]);
+
+    /* Combining even and odd terms at each hierarchy levels to calculate the final spatial domain vector */
+    dst[0] = (short)CLIP(-32768, 32767, (E + add) >> shift);
+    dst[1] = (short)CLIP(-32768, 32767, (O + add) >> shift);
+
+    src++;
+    dst += 2;
+  }
+  if (skip_line)
+  {
+    memset(dst, 0, (skip_line << 1) * sizeof(int16_t));
+  }
+}
+
 static void fastForwardDCT2_B4(const int16_t* src, int16_t* dst, int32_t shift, int line, int skip_line, int skip_line2)
 {
   int32_t j;
@@ -1365,11 +1434,6 @@ static void fastForwardDCT2_B32(const int16_t* src, int16_t* dst, int32_t shift,
       memset(dst, 0, sizeof(int16_t)*skip_line);
       dst += line;
     }
-  }
-  if (skip_line2) {
-    const int  reduced_line = line - skip_line2;
-    dst = p_coef + reduced_line * 32;
-    memset(dst, 0, skip_line2 * 32 * sizeof(coeff_t));
   }
 }
 
@@ -2417,16 +2481,16 @@ DCT_MTS_NXN_GENERIC(DST1, 32);
 typedef void partial_tr_func(const int16_t*, int16_t*, int32_t, int, int, int);
 
 // ToDo: Enable MTS 2x2 and 64x64 transforms
-static partial_tr_func* dct_table[3][5] = {
-  { fastForwardDCT2_B4, fastForwardDCT2_B8, fastForwardDCT2_B16, fastForwardDCT2_B32, NULL },
-  { fastForwardDCT8_B4, fastForwardDCT8_B8, fastForwardDCT8_B16, fastForwardDCT8_B32, NULL },
-  { fastForwardDST7_B4, fastForwardDST7_B8, fastForwardDST7_B16, fastForwardDST7_B32, NULL },
+static partial_tr_func* dct_table[3][6] = {
+  { fastForwardDCT2_B2, fastForwardDCT2_B4, fastForwardDCT2_B8, fastForwardDCT2_B16, fastForwardDCT2_B32, NULL },
+  { NULL,               fastForwardDCT8_B4, fastForwardDCT8_B8, fastForwardDCT8_B16, fastForwardDCT8_B32, NULL },
+  { NULL,               fastForwardDST7_B4, fastForwardDST7_B8, fastForwardDST7_B16, fastForwardDST7_B32, NULL },
 };
 
-static partial_tr_func* idct_table[3][5] = {
-  { fastInverseDCT2_B4, fastInverseDCT2_B8, fastInverseDCT2_B16, fastInverseDCT2_B32, NULL/*fastInverseDCT2_B64*/ },
-  { fastInverseDCT8_B4, fastInverseDCT8_B8, fastInverseDCT8_B16, fastInverseDCT8_B32, NULL },
-  { fastInverseDST7_B4, fastInverseDST7_B8, fastInverseDST7_B16, fastInverseDST7_B32, NULL },
+static partial_tr_func* idct_table[3][6] = {
+  { fastInverseDCT2_B2, fastInverseDCT2_B4, fastInverseDCT2_B8, fastInverseDCT2_B16, fastInverseDCT2_B32, NULL/*fastInverseDCT2_B64*/ },
+  { NULL,               fastInverseDCT8_B4, fastInverseDCT8_B8, fastInverseDCT8_B16, fastInverseDCT8_B32, NULL },
+  { NULL,               fastInverseDST7_B4, fastInverseDST7_B8, fastInverseDST7_B16, fastInverseDST7_B32, NULL },
 };
 
 
@@ -2436,11 +2500,12 @@ static const tr_type_t mts_subset_intra[4][2] = { { DST7, DST7 }, { DCT8, DST7 }
 
 void uvg_get_tr_type(
   int8_t width,
+  int8_t height,
   color_t color,
   const cu_info_t* tu,
   tr_type_t* hor_out,
   tr_type_t* ver_out,
-  const int8_t mts_idx)
+  const int8_t mts_type)
 {
   *hor_out = DCT2;
   *ver_out = DCT2;
@@ -2450,13 +2515,19 @@ void uvg_get_tr_type(
     return;
   }
 
-  const int height = width;
-  const bool explicit_mts = mts_idx == UVG_MTS_BOTH || (tu->type == CU_INTRA ? mts_idx == UVG_MTS_INTRA : (mts_idx == UVG_MTS_INTER && tu->type == CU_INTER));
-  const bool implicit_mts = tu->type == CU_INTRA && (mts_idx == UVG_MTS_IMPLICIT || mts_idx == UVG_MTS_INTER);
+  const bool explicit_mts = mts_type == UVG_MTS_BOTH || (tu->type == CU_INTRA ? mts_type == UVG_MTS_INTRA : (mts_type == UVG_MTS_INTER && tu->type == CU_INTER));
+  const bool implicit_mts = tu->type == CU_INTRA && (mts_type == UVG_MTS_IMPLICIT || mts_type == UVG_MTS_INTER);
 
   assert(!(explicit_mts && implicit_mts));
+  const bool is_isp = tu->type == CU_INTRA && tu->intra.isp_mode && color == COLOR_Y ? tu->intra.isp_mode : 0;
+  const int8_t lfnst_idx = color == COLOR_Y ? tu->lfnst_idx : tu->cr_lfnst_idx;
+  // const bool is_sbt = cu->type == CU_INTER && tu->sbt && color == COLOR_Y; // TODO: check SBT here when implemented
 
-  if (implicit_mts)
+  if (is_isp && lfnst_idx) {
+    return;
+  }
+
+  if (implicit_mts || (is_isp && explicit_mts))
   {
     bool width_ok = width >= 4 && width <= 16;
     bool height_ok = height >= 4 && height <= 16;
@@ -2471,6 +2542,10 @@ void uvg_get_tr_type(
     }
     return;
   }
+
+  /*
+  TODO: SBT HANDLING
+  */
 
   if (explicit_mts)
   {
@@ -2487,27 +2562,31 @@ static void mts_dct_generic(
   const color_t color,
   const cu_info_t* tu,
   const int8_t width,
+  const int8_t height,
   const int16_t* input,
   int16_t* output,
-  const int8_t mts_idx)
+  const int8_t mts_type)
 {
   tr_type_t type_hor;
   tr_type_t type_ver;
 
-  uvg_get_tr_type(width, color, tu, &type_hor, &type_ver, mts_idx);
+  uvg_get_tr_type(width, height, color, tu, &type_hor, &type_ver, mts_type);
 
-  if (type_hor == DCT2 && type_ver == DCT2 && !tu->lfnst_idx && !tu->cr_lfnst_idx)
+  if (type_hor == DCT2 && type_ver == DCT2 && !tu->lfnst_idx && !tu->cr_lfnst_idx && width == height)
   {
-    dct_func *dct_func = uvg_get_dct_func(width, color, tu->type);
+    dct_func *dct_func = uvg_get_dct_func(width, height, color, tu->type);
     dct_func(bitdepth, input, output);
   }
   else
   {
-    const int height = width;
     int skip_width = (type_hor != DCT2 && width == 32) ? 16 : (width > 32 ? width - 32 : 0);
     int skip_height = (type_ver != DCT2 && height == 32) ? 16 : (height > 32 ? height - 32 : 0);
-    const int log2_width_minus2 = uvg_g_convert_to_bit[width];
-    if(tu->lfnst_idx || tu->cr_lfnst_idx) {
+    const int log2_width_minus1  = uvg_g_convert_to_log2[width] - 1;
+    const int log2_height_minus1 = uvg_g_convert_to_log2[height] - 1;
+    //const int log2_width_minus2 = uvg_g_convert_to_bit[width];
+    //const int log2_height_minus2 = uvg_g_convert_to_bit[height];
+
+    if((tu->lfnst_idx && color == COLOR_Y) || (tu->cr_lfnst_idx && color != COLOR_Y)) {
       if ((width == 4 && height > 4) || (width > 4 && height == 4))
       {
         skip_width = width - 4;
@@ -2520,15 +2599,20 @@ static void mts_dct_generic(
       }
     }
 
-    partial_tr_func* dct_hor = dct_table[type_hor][log2_width_minus2];
-    partial_tr_func* dct_ver = dct_table[type_ver][log2_width_minus2];
+    partial_tr_func* dct_hor = width != 1 ? dct_table[type_hor][log2_width_minus1] : NULL;
+    partial_tr_func* dct_ver = height != 1 ? dct_table[type_ver][log2_height_minus1] : NULL;
 
     int16_t tmp[32 * 32];
-    const int32_t shift_1st = log2_width_minus2 + bitdepth - 7;
-    const int32_t shift_2nd = log2_width_minus2 + 8;
-
-    dct_hor(input, tmp, shift_1st, height, 0, skip_width);
-    dct_ver(tmp, output, shift_2nd, width, skip_width, skip_height);
+    const int32_t shift_1st = log2_width_minus1 + bitdepth - 8;
+    const int32_t shift_2nd = log2_height_minus1 + 7;
+    if (height == 1) {
+      dct_hor(input, output, shift_1st, height, 0, skip_width);
+    } else if (width == 1) {
+      dct_ver(input, output, log2_height_minus1 + 1 + bitdepth + 6 - 15, width, 0, skip_height);
+    } else {
+      dct_hor(input, tmp, shift_1st, height, 0, skip_width);
+      dct_ver(tmp, output, shift_2nd, width, skip_width, skip_height);
+    }    
   }
 }
 
@@ -2538,36 +2622,57 @@ static void mts_idct_generic(
   const color_t color,
   const cu_info_t* tu,
   const int8_t width,
+  const int8_t height,
   const int16_t* input,
   int16_t* output,
-  const int8_t mts_idx)
+  const int8_t mts_type)
 {
   tr_type_t type_hor;
   tr_type_t type_ver;
 
-  uvg_get_tr_type(width, color, tu, &type_hor, &type_ver, mts_idx);
+  uvg_get_tr_type(width, height, color, tu, &type_hor, &type_ver, mts_type);
 
-  if (type_hor == DCT2 && type_ver == DCT2)
+  if (type_hor == DCT2 && type_ver == DCT2 && !tu->lfnst_idx && !tu->cr_lfnst_idx && width == height)
   {
-    dct_func *idct_func = uvg_get_idct_func(width, color, tu->type);
+    dct_func *idct_func = uvg_get_idct_func(width, height, color, tu->type);
     idct_func(bitdepth, input, output);
   }
   else
   {
-    const int height = width;
-    const int skip_width = (type_hor != DCT2 && width == 32) ? 16 : width > 32 ? width - 32 : 0;
-    const int skip_height = (type_ver != DCT2 && height == 32) ? 16 : height > 32 ? height - 32 : 0;
-    const int log2_width_minus2 = uvg_g_convert_to_bit[width];
+    int skip_width = (type_hor != DCT2 && width == 32) ? 16 : width > 32 ? width - 32 : 0;
+    int skip_height = (type_ver != DCT2 && height == 32) ? 16 : height > 32 ? height - 32 : 0;
+    const int log2_width_minus1  = uvg_g_convert_to_log2[width] - 1;
+    const int log2_height_minus1 = uvg_g_convert_to_log2[height] - 1;
 
-    partial_tr_func* idct_hor = idct_table[type_hor][log2_width_minus2];
-    partial_tr_func* idct_ver = idct_table[type_ver][log2_width_minus2];
+    if ((tu->lfnst_idx && color == COLOR_Y) || (tu->cr_lfnst_idx && color != COLOR_Y)) {
+      if ((width == 4 && height > 4) || (width > 4 && height == 4)) {
+        skip_width = width - 4;
+        skip_height = height - 4;
+      }
+      else if ((width >= 8 && height >= 8)) {
+        skip_width = width - 8;
+        skip_height = height - 8;
+      }
+    }
+
+    partial_tr_func* idct_hor = width != 1 ? idct_table[type_hor][log2_width_minus1] : NULL;
+    partial_tr_func* idct_ver = height != 1 ? idct_table[type_ver][log2_height_minus1] : NULL;
 
     int16_t tmp[32 * 32];
-    const int32_t shift_1st = 7;
-    const int32_t shift_2nd = 20 - bitdepth;
+    const int max_log2_tr_dynamic_range = 15;
+    const int transform_matrix_shift = 6;
 
-    idct_ver(input, tmp, shift_1st, width, skip_width, skip_height);
-    idct_hor(tmp, output, shift_2nd, height, 0, skip_width);
+    const int32_t shift_1st = transform_matrix_shift + 1;
+    const int32_t shift_2nd = (transform_matrix_shift + max_log2_tr_dynamic_range - 1) - bitdepth;
+
+    if (height == 1) {
+      idct_hor(input, output, shift_2nd + 1, height, 0, skip_width);
+    } else if (width == 1) {
+      idct_ver(input, output, shift_2nd + 1, width, 0, skip_height);
+    } else {
+      idct_ver(input, tmp, shift_1st, width, skip_width, skip_height);
+      idct_hor(tmp, output, shift_2nd, height, 0, skip_width);
+    }
   }
 }
 
@@ -2582,6 +2687,7 @@ int uvg_strategy_register_dct_generic(void* opaque, uint8_t bitdepth)
   success &= uvg_strategyselector_register(opaque, "dct_8x8", "generic", 0, &dct_8x8_generic);
   success &= uvg_strategyselector_register(opaque, "dct_16x16", "generic", 0, &dct_16x16_generic);
   success &= uvg_strategyselector_register(opaque, "dct_32x32", "generic", 0, &dct_32x32_generic);
+  //success &= uvg_strategyselector_register(opaque, "dct_non_square", "generic", 0, &dct_non_square_generic);
 
   success &= uvg_strategyselector_register(opaque, "fast_inverse_dst_4x4", "generic", 0, &fast_inverse_dst_4x4_generic);
 

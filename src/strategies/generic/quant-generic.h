@@ -44,8 +44,6 @@
 #include "uvg266.h"
 #include "tables.h"
 
-#define QUANT_SHIFT 14
-
 int uvg_strategy_register_quant_generic(void* opaque, uint8_t bitdepth);
 void uvg_quant_generic(
   const encoder_state_t * const state,
@@ -60,7 +58,7 @@ void uvg_quant_generic(
   uint8_t lfnst_idx);
 
 int uvg_quantize_residual_generic(encoder_state_t *const state,
-  const cu_info_t *const cur_cu, const int width, const color_t color,
+  const cu_info_t *const cur_cu, const int width, const int height, const color_t color,
   const coeff_scan_order_t scan_order, const int use_trskip,
   const int in_stride, const int out_stride,
   const uvg_pixel *const ref_in, const uvg_pixel *const pred_in,
@@ -71,6 +69,7 @@ int uvg_quant_cbcr_residual_generic(
   encoder_state_t* const state,
   const cu_info_t* const cur_cu,
   const int width,
+  const int height,
   const coeff_scan_order_t scan_order,
   const int in_stride, const int out_stride,
   const uvg_pixel* const u_ref_in,

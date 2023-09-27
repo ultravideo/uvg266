@@ -1,6 +1,5 @@
-#ifndef ENCODE_CODING_TREE_GENERIC_H_
-#define ENCODE_CODING_TREE_GENERIC_H_
-
+#ifndef STRATEGIES_DEPQUANT_GENERIC_H_
+#define STRATEGIES_DEPQUANT_GENERIC_H_
 /*****************************************************************************
  * This file is part of uvg266 VVC encoder.
  *
@@ -34,22 +33,18 @@
  ****************************************************************************/
 
 /**
+ * \ingroup Optimization
  * \file
- * Functions for writing the coding quadtree and related syntax.
+ * Generic C implementations of optimized functions.
  */
 
+#include "cu.h"
 #include "encoderstate.h"
-#include "global.h"
+#include "global.h" // IWYU pragma: keep
+#include "uvg266.h"
+#include "tables.h"
 
-void uvg_encode_coeff_nxn_generic(encoder_state_t * const state,
-                                  cabac_data_t * const cabac,
-                                  const coeff_t *coeff,
-                                  const cu_loc_t * const loc,
-                                  uint8_t color,
-                                  int8_t scan_mode,
-                                  cu_info_t* cur_cu,
-                                  double* bits_out);
 
-int uvg_strategy_register_encode_generic(void* opaque, uint8_t bitdepth);
+int uvg_strategy_register_depquant_generic(void* opaque, uint8_t bitdepth);
 
-#endif // ENCODE_CODING_TREE_GENERIC_H_
+#endif //STRATEGIES_DEPQUANT_GENERIC_H_

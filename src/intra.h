@@ -71,6 +71,7 @@ typedef struct {
   double coeff_bits;
   double distortion;
   double lfnst_costs[3];
+  uint8_t best_isp_cbfs;
 } intra_search_data_t ;
 
 
@@ -107,7 +108,9 @@ int8_t uvg_intra_get_dir_luma_predictor(
 * \param multi_ref_idx Multi reference line index for the prediction block.
 */
 void uvg_intra_build_reference(
-  const int_fast8_t log2_width,
+  const encoder_state_t* const state,
+  const cu_loc_t* const pu_loc,
+  const cu_loc_t* const cu_loc,
   const color_t color,
   const vector2d_t *const luma_px,
   const vector2d_t *const pic_px,
@@ -115,7 +118,8 @@ void uvg_intra_build_reference(
   uvg_intra_references *const refs,
   bool entropy_sync,
   uvg_pixel *extra_refs,
-  uint8_t multi_ref_idx);
+  uint8_t multi_ref_idx,
+  const uint8_t isp_mode);
 
 /**
  * \brief Generate intra predictions.
@@ -130,32 +134,60 @@ void uvg_intra_predict(
   const encoder_state_t* const state,
   uvg_intra_references* const refs,
   const cu_loc_t* const cu_loc,
+  const cu_loc_t* const pu_loc,
   const color_t color,
   uvg_pixel* dst,
   const intra_search_data_t* data,
-  const lcu_t* lcu,
-  enum uvg_tree_type tree_type
-  );
+  const lcu_t* lcu
+);
 
 void uvg_intra_recon_cu(
   encoder_state_t* const state,
-  int x,
-  int y,
-  int depth,
   intra_search_data_t* search_data,
+  const cu_loc_t* cu_loc,
   cu_info_t *cur_cu,
   lcu_t *lcu,
   enum uvg_tree_type tree_type,
   bool recon_luma,
   bool recon_chroma);
 
-const cu_info_t* uvg_get_co_located_luma_cu(
-  int x,
-  int y,
-  int width,
-  int height,
+double uvg_recon_and_estimate_cost_isp(encoder_state_t* const state,
+                                       const cu_loc_t* const cu_loc,
+                                       double cost_treshold,
+                                       intra_search_data_t* const search_data,
+                                       lcu_t* const lcu, bool* violates_lfnst);
+
+int8_t uvg_get_co_located_luma_mode(
+  const cu_loc_t* const chroma_loc,
+  const cu_loc_t* const cu_loc,
+  const cu_info_t* luma_cu,
   const lcu_t* const lcu,
   const cu_array_t* const cu_array,
   enum uvg_tree_type tree_type);
+bool uvg_cclm_is_allowed(const encoder_state_t* const state, const cu_loc_t* const luma_loc, cu_info_t const* const cur_cu, enum
+                         uvg_tree_type tree_type);
 
-int uvg_get_mip_flag_context(int x, int y, int width, int height, const lcu_t* lcu, cu_array_t* const cu_a);
+uint8_t uvg_get_mip_flag_context(
+  const cu_loc_t* const cu_loc,
+  const lcu_t* lcu,
+  cu_array_t* const cu_a);
+
+int8_t uvg_wide_angle_correction(
+  int_fast8_t mode,
+  const int log2_width,
+  const int log2_height,
+  const bool account_for_dc_planar);
+
+// ISP related defines
+#define NUM_ISP_MODES 3
+#define ISP_MODE_NO_ISP 0
+#define ISP_MODE_HOR 1
+#define ISP_MODE_VER 2
+#define SPLIT_TYPE_HOR 1
+#define SPLIT_TYPE_VER 2
+
+int uvg_get_isp_split_dim(const int width, const int height, const int split_type, const bool is_transform_block);
+int uvg_get_isp_split_num(const int width, const int height, const int split_type, const bool is_transform_block);
+void uvg_get_isp_split_loc(cu_loc_t *loc, const int x, const int y, const int block_w, const int block_h, int split_idx, const int split_type, const bool is_transform_block);
+bool uvg_can_use_isp(const int width, const int height);
+bool uvg_can_use_isp_with_lfnst(const int width, const int height, const int isp_mode, const enum uvg_tree_type tree_type);

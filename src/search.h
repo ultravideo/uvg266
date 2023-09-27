@@ -84,19 +84,17 @@ void uvg_sort_keys_by_cost(unit_stats_map_t *__restrict map);
 
 void uvg_search_lcu(encoder_state_t *state, int x, int y, const yuv_t *hor_buf, const yuv_t *ver_buf, lcu_coeff_t *coeff);
 
-double uvg_cu_rd_cost_luma(const encoder_state_t *const state,
-                           const int x_px, const int y_px, const int depth,
-                           const cu_info_t *const pred_cu,
-                           lcu_t *const lcu);
-double uvg_cu_rd_cost_chroma(const encoder_state_t *const state,
-                             const int x_px, const int y_px, const int depth,
-                             cu_info_t *const pred_cu,
-                             lcu_t *const lcu);
+double uvg_cu_rd_cost_luma(
+  const encoder_state_t *const state,
+  const cu_loc_t* const cu_loc,
+  const cu_info_t *const pred_cu,
+  lcu_t *const lcu,
+  uint8_t isp_cbf);
+double uvg_cu_rd_cost_chroma(
+  const encoder_state_t *const state,
+  cu_info_t *const pred_cu,
+  lcu_t *const lcu,
+  const cu_loc_t * const);
 
-void uvg_lcu_fill_trdepth(lcu_t *lcu, int x_px, int y_px, int depth, uint8_t tr_depth, enum uvg_tree_type
-                          tree_type);
-
-void uvg_intra_recon_lcu_luma(encoder_state_t * const state, int x, int y, int depth, int8_t intra_mode, cu_info_t *cur_cu, lcu_t *lcu);
-void uvg_intra_recon_lcu_chroma(encoder_state_t * const state, int x, int y, int depth, int8_t intra_mode, cu_info_t *cur_cu, lcu_t *lcu);
 
 #endif

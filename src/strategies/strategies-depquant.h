@@ -1,6 +1,5 @@
-#ifndef ENCODE_CODING_TREE_GENERIC_H_
-#define ENCODE_CODING_TREE_GENERIC_H_
-
+#ifndef STRATEGIES_DEPQUANT_H_
+#define STRATEGIES_DEPQUANT_H_
 /*****************************************************************************
  * This file is part of uvg266 VVC encoder.
  *
@@ -34,22 +33,56 @@
  ****************************************************************************/
 
 /**
+ * \ingroup Optimization
  * \file
- * Functions for writing the coding quadtree and related syntax.
+ * Interface for sao functions.
  */
 
+#include "encoder.h"
 #include "encoderstate.h"
-#include "global.h"
+#include "global.h" // IWYU pragma: keep
+#include "uvg266.h"
+#include "dep_quant.h"
 
-void uvg_encode_coeff_nxn_generic(encoder_state_t * const state,
-                                  cabac_data_t * const cabac,
-                                  const coeff_t *coeff,
-                                  const cu_loc_t * const loc,
-                                  uint8_t color,
-                                  int8_t scan_mode,
-                                  cu_info_t* cur_cu,
-                                  double* bits_out);
 
-int uvg_strategy_register_encode_generic(void* opaque, uint8_t bitdepth);
+// Declare function pointers.
+typedef int(dep_quant_decide_and_update_func)(
+  rate_estimator_t*                       re,
+  context_store*                          ctxs,
+  struct dep_quant_scan_info const* const scan_info,
+  const coeff_t                           absCoeff,
+  const uint32_t                          scan_pos,
+  const uint32_t                          width_in_sbb,
+  const uint32_t                          height_in_sbb,
+  const NbInfoSbb                         next_nb_info_ssb,
+  bool                                    zeroOut,
+  coeff_t                                 quantCoeff,
+  const uint32_t                          effWidth,
+  const uint32_t                          effHeight,
+  bool                                    is_chroma);
 
-#endif // ENCODE_CODING_TREE_GENERIC_H_
+typedef void (find_first_non_zero_coeff_func)(
+  const coeff_t*             srcCoeff,
+  const bool                 enableScalingLists,
+  const context_store* const dep_quant_context,
+  const uint32_t* const      scan,
+  const int32_t*             q_coeff,
+  int*                       firstTestPos,
+  int                        width,
+  int                        height);
+
+
+// Declare function pointers.
+extern dep_quant_decide_and_update_func* uvg_dep_quant_decide_and_update;
+extern find_first_non_zero_coeff_func* uvg_find_first_non_zero_coeff;
+
+int uvg_strategy_register_depquant(void* opaque, uint8_t bitdepth);
+
+
+#define STRATEGIES_DEPQUANT_EXPORTS \
+  {"dep_quant_decide_and_update", (void**)&uvg_dep_quant_decide_and_update}, \
+  {"find_first_non_zero_coeff", (void**)&uvg_find_first_non_zero_coeff}, \
+
+
+
+#endif //STRATEGIES_DEPQUANT_H_

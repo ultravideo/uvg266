@@ -40,30 +40,29 @@
 #include "encoderstate.h"
 #include "global.h"
 
-bool uvg_is_mts_allowed(const encoder_state_t* const state, cu_info_t* const pred_cu);
+bool uvg_is_mts_allowed(const encoder_state_t* const state, cu_info_t* const pred_cu, const cu_loc_t*
+                        const cu_loc);
 bool uvg_is_lfnst_allowed(
   const encoder_state_t* const state,
   const cu_info_t* const pred_cu,
-  const int width,
-  const int height,
-  const int x,
-  const int y,
   enum uvg_tree_type tree_type,
   const color_t color,
-  const lcu_t* lcu);
+  const cu_loc_t* const cu_loc, const lcu_t* const lcu);
 
 void uvg_encode_coding_tree(
   encoder_state_t * const state,
-  uint16_t x_ctb,
-  uint16_t y_ctb,
-  uint8_t depth,
   lcu_coeff_t *coeff,
-  enum uvg_tree_type tree_type);
+  enum uvg_tree_type tree_type,
+  const cu_loc_t* const cu_loc,
+  const cu_loc_t* const chroma_loc,
+  split_tree_t split_tree,
+  bool has_chroma);
 
 void uvg_encode_ts_residual(encoder_state_t* const state,
   cabac_data_t* const cabac,
   const coeff_t* coeff,
   uint32_t width,
+  uint32_t height,
   uint8_t type,
   int8_t scan_mode,
   double* bits);
@@ -77,41 +76,47 @@ void uvg_encode_mvd(encoder_state_t * const state,
 double uvg_mock_encode_coding_unit(
   encoder_state_t* const state,
   cabac_data_t* cabac,
-  int x,
-  int y,
-  int depth,
+  const cu_loc_t* const cu_loc,
+  const cu_loc_t* const chroma_loc,
   lcu_t* lcu,
   cu_info_t* cur_cu,
-  enum uvg_tree_type tree_type);
+  enum uvg_tree_type tree_type,
+  const split_tree_t split_tree);
 
-int uvg_encode_inter_prediction_unit(encoder_state_t* const state,
-                                      cabac_data_t* const cabac,
-                                      const cu_info_t* const cur_cu,
-                                      int x, int y, int width, int height,
-                                      int depth, 
-                                      lcu_t* lcu,
-                                      double* bits_out);
-
-void uvg_encode_intra_luma_coding_unit(const encoder_state_t* const state,
+int uvg_encode_inter_prediction_unit(
+  encoder_state_t* const state,
   cabac_data_t* const cabac,
   const cu_info_t* const cur_cu,
-  int x, int y, int depth, const lcu_t* lcu, double* bits_out);
+  lcu_t* lcu,
+  double* bits_out,
+  const cu_loc_t* const cu_loc);
+
+void uvg_encode_intra_luma_coding_unit(
+  const encoder_state_t* const state,
+  cabac_data_t* const cabac,
+  const cu_info_t* const cur_cu,
+  const cu_loc_t* const cu_loc,
+  const lcu_t* lcu,
+  double* bits_out);
 
 
-bool uvg_write_split_flag(
+uint8_t uvg_write_split_flag(
   const encoder_state_t* const state,
   cabac_data_t* cabac,
   const cu_info_t* left_cu,
   const cu_info_t* above_cu,
-  uint8_t split_flag,
-  int depth,
-  int cu_width,
-  int x,
-  int y,
+  const cu_loc_t* const cu_loc,
+  split_tree_t,
   enum uvg_tree_type tree_type,
+  bool* is_implicit_out,
   double* bits_out);
 
 void uvg_encode_last_significant_xy(cabac_data_t * const cabac,
   uint8_t lastpos_x, uint8_t lastpos_y,
   uint8_t width, uint8_t height,
   uint8_t type, uint8_t scan, double* bits_out);
+
+void uvg_get_sub_coeff(const coeff_t* dst, const coeff_t* const src, 
+                       const int lcu_x, const int lcu_y, 
+                       const int block_w, const int block_h, 
+                       const int lcu_width);

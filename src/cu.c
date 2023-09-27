@@ -34,6 +34,9 @@
 #include <stdlib.h>
 
 #include "cu.h"
+
+#include "alf.h"
+#include "encoderstate.h"
 #include "threads.h"
 
 
@@ -94,6 +97,42 @@ const uint8_t uvg_part_mode_sizes[][4][2] = {
 cu_info_t* uvg_cu_array_at(cu_array_t *cua, unsigned x_px, unsigned y_px)
 {
   return (cu_info_t*) uvg_cu_array_at_const(cua, x_px, y_px);
+}
+
+
+void uvg_get_isp_cu_arr_coords(int *x, int *y, int dim)
+{
+  // Do nothing if dimensions are divisible by 4
+  if (*y % 4 == 0 && *x % 4 == 0) return;
+  const int remainder_y = *y % 4;
+  const int remainder_x = *x % 4;
+
+  if (remainder_y != 0) {
+    // Horizontal ISP split
+    if (remainder_y % 2 == 0 && dim == 8) {
+      // 8x2 block
+      *y -= 2;
+      *x += 4;
+    }
+    else {
+      // 16x1 block
+      *y -= remainder_y;
+      *x += remainder_y * 4;
+    }
+  }
+  else {
+    // Vertical ISP split
+    if (*x % 2 == 0 && dim == 8) {
+      // 2x8 block
+      *y += 4;
+      *x -= 2;
+    }
+    else {
+      // 1x16 block
+      *y += remainder_x * 4;
+      *x -= remainder_x;
+    }
+  }
 }
 
 
@@ -237,10 +276,10 @@ cu_array_t * uvg_cu_array_copy_ref(cu_array_t* cua)
  * \param dst_y   y-coordinate of the top edge of the copied area in dst
  * \param src     source lcu
  */
-void uvg_cu_array_copy_from_lcu(cu_array_t* dst, int dst_x, int dst_y, const lcu_t *src, enum uvg_tree_type tree_type)
+void uvg_cu_array_copy_from_lcu(cu_array_t* dst, int dst_x, int dst_y, const lcu_t *src)
 {
   const int dst_stride = dst->stride >> 2;
-  const int width = tree_type != UVG_CHROMA_T ? LCU_WIDTH : LCU_WIDTH_C;
+  const int width = LCU_WIDTH;
   for (int y = 0; y < width; y += SCU_WIDTH) {
     for (int x = 0; x < width; x += SCU_WIDTH) {
       const cu_info_t *from_cu = LCU_GET_CU_AT_PX(src, x, y);
@@ -250,4 +289,216 @@ void uvg_cu_array_copy_from_lcu(cu_array_t* dst, int dst_x, int dst_y, const lcu
       memcpy(to_cu,                  from_cu, sizeof(*to_cu));
     }
   }
+}
+
+/*
+ * \brief Constructs cu_loc_t based on given parameters. Calculates chroma dimensions automatically.
+ *
+ * \param loc     Destination cu_loc.
+ * \param x       Block top left x coordinate.
+ * \param y       Block top left y coordinate.
+ * \param width   Block width.
+ * \param height  Block height.
+*/
+void uvg_cu_loc_ctor(cu_loc_t* loc, int x, int y, int width, int height)
+{
+  assert(x >= 0 && y >= 0 && width >= 0 && height >= 0 && "Cannot give negative coordinates or block dimensions.");
+  assert(!(width > LCU_WIDTH || height > LCU_WIDTH) && "Luma CU dimension exceeds maximum (dim > LCU_WIDTH).");
+  // This check is no longer valid. With non-square blocks and ISP enabled, even 1x16 and 16x1 (ISP needs at least 16 samples) blocks are valid
+  //assert(!(width < 4 || height < 4) && "Luma CU dimension smaller than 4.");
+  
+  loc->x = x;
+  loc->y = y;
+  loc->local_x = x % LCU_WIDTH;
+  loc->local_y = y % LCU_WIDTH;
+  loc->width = width;
+  loc->height = height;
+  // TODO: when MTT is implemented, chroma dimensions can be minimum 2.
+  // Chroma width is half of luma width, when not at maximum depth.
+  loc->chroma_width = width >> 1;
+  loc->chroma_height = height >> 1;
+}
+
+
+int uvg_get_split_locs(
+  const cu_loc_t* const origin,
+  enum split_type split,
+  cu_loc_t out[4],
+  uint8_t* separate_chroma)
+{
+  const int half_width = origin->width >> 1;
+  const int half_height = origin->height >> 1;
+  const int quarter_width = origin->width >> 2;
+  const int quarter_height = origin->height >> 2;
+  if (origin->width == 4 && separate_chroma) *separate_chroma = 1;
+
+  switch (split) {
+    case NO_SPLIT:
+      assert(0 && "trying to get split from no split");
+    break;
+    case QT_SPLIT:
+      uvg_cu_loc_ctor(&out[0], origin->x, origin->y, half_width, half_height);
+      uvg_cu_loc_ctor(&out[1], origin->x + half_width, origin->y, half_width, half_height);
+      uvg_cu_loc_ctor(&out[2], origin->x, origin->y + half_height, half_width, half_height);
+      uvg_cu_loc_ctor(&out[3], origin->x + half_width, origin->y + half_height, half_width, half_height);
+      if (half_height == 4 && separate_chroma) *separate_chroma = 1;
+      return 4;
+    case BT_HOR_SPLIT:
+      uvg_cu_loc_ctor(&out[0], origin->x, origin->y, origin->width, half_height);
+      uvg_cu_loc_ctor(&out[1], origin->x, origin->y + half_height, origin->width, half_height);
+      if (half_height * origin->width < 64 && separate_chroma) *separate_chroma = 1;
+      return 2;
+    case BT_VER_SPLIT:
+      uvg_cu_loc_ctor(&out[0], origin->x, origin->y, half_width, origin->height);
+      uvg_cu_loc_ctor(&out[1], origin->x + half_width, origin->y, half_width, origin->height);
+      if ((half_width == 4 || half_width * origin->height < 64) && separate_chroma) *separate_chroma = 1;
+      return 2;
+    case TT_HOR_SPLIT:
+      uvg_cu_loc_ctor(&out[0], origin->x, origin->y, origin->width, quarter_height);
+      uvg_cu_loc_ctor(&out[1], origin->x, origin->y + quarter_height, origin->width, half_height);
+      uvg_cu_loc_ctor(&out[2], origin->x, origin->y + quarter_height + half_height, origin->width, quarter_height);
+      if (quarter_height * origin->width < 64 && separate_chroma) *separate_chroma = 1;
+      return 3;
+    case TT_VER_SPLIT:
+      uvg_cu_loc_ctor(&out[0], origin->x, origin->y, quarter_width, origin->height);
+      uvg_cu_loc_ctor(&out[1], origin->x + quarter_width, origin->y, half_width, origin->height);
+      uvg_cu_loc_ctor(&out[2], origin->x + quarter_width + half_width, origin->y, quarter_width, origin->height);
+      if ((quarter_width == 4 || quarter_width * origin->height < 64) && separate_chroma) *separate_chroma = 1;
+      return 3;
+  }
+  return 0;
+}
+
+
+int uvg_get_implicit_split(
+  const encoder_state_t* const state,
+  const cu_loc_t* const cu_loc,
+  uint8_t max_mtt_depth)
+{
+  bool right_ok = (state->tile->frame->width) >= cu_loc->x + cu_loc->width;
+  bool bottom_ok = (state->tile->frame->height) >= cu_loc->y + cu_loc->height;
+
+  if (right_ok && bottom_ok) return NO_SPLIT;
+  if (right_ok && max_mtt_depth != 0) return BT_HOR_SPLIT;
+  if (bottom_ok && max_mtt_depth != 0) return BT_VER_SPLIT;
+  return QT_SPLIT;
+}
+
+
+int uvg_get_possible_splits(const encoder_state_t * const state,
+                            const cu_loc_t * const cu_loc, split_tree_t split_tree, enum uvg_tree_type tree_type, bool splits[6])
+{
+  const unsigned width = cu_loc->width;
+  const unsigned height = cu_loc->height;
+  const int slice_type = state->frame->is_irap ? (tree_type == UVG_CHROMA_T ? 2 : 0) : 1;
+
+  const unsigned max_btd =
+    state->encoder_control->cfg.max_btt_depth[slice_type] + split_tree.implicit_mtt_depth;
+  const unsigned max_bt_size = state->encoder_control->cfg.max_bt_size[slice_type];
+  const unsigned min_bt_size = 1 << MIN_SIZE;
+  const unsigned max_tt_size = state->encoder_control->cfg.max_tt_size[slice_type];
+  const unsigned min_tt_size = 1 << MIN_SIZE;
+  const unsigned min_qt_size = state->encoder_control->cfg.min_qt_size[slice_type];
+
+  const enum split_type implicitSplit = uvg_get_implicit_split(state, cu_loc, max_btd);
+  
+  splits[NO_SPLIT] = splits[QT_SPLIT] = splits[BT_HOR_SPLIT] = splits[TT_HOR_SPLIT] = splits[BT_VER_SPLIT] = splits[TT_VER_SPLIT] = true;
+  bool can_btt = split_tree.mtt_depth < max_btd;
+  
+  const enum split_type last_split = GET_SPLITDATA(&split_tree, split_tree.current_depth - 1);
+  const enum split_type parl_split = last_split == TT_HOR_SPLIT ? BT_HOR_SPLIT : BT_VER_SPLIT;
+
+  // don't allow QT-splitting below a BT split
+  if (split_tree.current_depth != 0 && last_split != QT_SPLIT /* && !(width > 64 || height > 64)*/) splits[QT_SPLIT] = false;
+  if (width <= min_qt_size)                              splits[QT_SPLIT] = false;
+
+  if (tree_type == UVG_CHROMA_T && width <= 8) splits[QT_SPLIT] = false;
+
+  if (implicitSplit != NO_SPLIT)
+  {
+    splits[NO_SPLIT] = splits[TT_HOR_SPLIT] = splits[TT_VER_SPLIT] = false;
+
+    splits[BT_HOR_SPLIT] = implicitSplit == BT_HOR_SPLIT && height <= max_bt_size;
+    splits[BT_VER_SPLIT] = implicitSplit == BT_VER_SPLIT && width <= max_bt_size;
+    if (tree_type == UVG_CHROMA_T && width <= 8) splits[BT_VER_SPLIT] = false;
+    if (!splits[BT_HOR_SPLIT] && !splits[BT_VER_SPLIT] && !splits[QT_SPLIT]) splits[QT_SPLIT] = true;
+    return 1;
+  }
+
+  if ((last_split == TT_HOR_SPLIT || last_split == TT_VER_SPLIT) && split_tree.part_index == 1)
+  {
+    splits[BT_HOR_SPLIT] = parl_split != BT_HOR_SPLIT;
+    splits[BT_VER_SPLIT] = parl_split != BT_VER_SPLIT;
+  }
+
+  if (can_btt && (width <= min_bt_size && height <= min_bt_size)
+    && ((width <= min_tt_size && height <= min_tt_size)))
+  {
+    can_btt = false;
+  }
+  if (can_btt && (width > max_bt_size || height > max_bt_size)
+    && ((width > max_tt_size || height > max_tt_size)))
+  {
+    can_btt = false;
+  }
+
+  if (!can_btt)
+  {
+    splits[BT_HOR_SPLIT] = splits[TT_HOR_SPLIT] = splits[BT_VER_SPLIT] = splits[TT_VER_SPLIT] = false;
+
+    return 0;
+  }
+
+  if (width > max_bt_size || height > max_bt_size)
+  {
+    splits[BT_HOR_SPLIT] = splits[BT_VER_SPLIT] = false;
+  }
+
+  // specific check for BT splits
+  if (height <= min_bt_size)                            splits[BT_HOR_SPLIT] = false;
+  if (width > 64 && height <= 64) splits[BT_HOR_SPLIT] = false;
+  if (tree_type == UVG_CHROMA_T && width * height <= 64)     splits[BT_HOR_SPLIT] = false;
+
+  if (width <= min_bt_size)                              splits[BT_VER_SPLIT] = false;
+  if (width <= 64 && height > 64) splits[BT_VER_SPLIT] = false;
+  if (tree_type == UVG_CHROMA_T && (width * height <= 64 || width <= 8))     splits[BT_VER_SPLIT] = false;
+
+  //if (modeType == MODE_TYPE_INTER && width * height == 32)  splits[BT_VER_SPLIT] = splits[BT_HOR_SPLIT] = false;
+
+  if (height <= 2 * min_tt_size || height > max_tt_size || width > max_tt_size)
+    splits[TT_HOR_SPLIT] = false;
+  if (width > 64 || height > 64)  splits[TT_HOR_SPLIT] = false;
+  if (tree_type == UVG_CHROMA_T && width * height <= 64 * 2)     splits[TT_HOR_SPLIT] = false;
+
+  if (width <= 2 * min_tt_size || width > max_tt_size || height > max_tt_size)
+    splits[TT_VER_SPLIT] = false;
+  if (width > 64 || height > 64)  splits[TT_VER_SPLIT] = false;
+  if (tree_type == UVG_CHROMA_T && (width * height <= 64 * 2 || width <= 16))     splits[TT_VER_SPLIT] = false;
+
+  //if (modeType == MODE_TYPE_INTER && width * height == 64)  splits[TT_VER_SPLIT] = splits[TT_HOR_SPLIT] = false;
+  return 0;
+}
+
+
+int uvg_count_available_edge_cus(const cu_loc_t* const cu_loc, const lcu_t* const lcu, bool left)
+{
+  if ((left && cu_loc->x == 0) || (!left && cu_loc->y == 0)) {
+    return 0;
+  }
+  if (left && cu_loc->local_x == 0) return (LCU_WIDTH - cu_loc->local_y) / 4;
+  if (!left && cu_loc->local_y == 0) return (cu_loc->width) / 2;
+
+  int amount = left ? cu_loc->height & ~3 : cu_loc->width & ~3;
+  if(left) {
+    const cu_info_t* cu = LCU_GET_CU_AT_PX(lcu, cu_loc->local_x, cu_loc->local_y);
+    if (cu_loc->local_y == 0 && cu_loc->local_x == 32 && cu->log2_height == 6 && cu->log2_width == 6) return 8;
+    while (cu_loc->local_y + amount < LCU_WIDTH && LCU_GET_CU_AT_PX(lcu, cu_loc->local_x - TR_MIN_WIDTH, cu_loc->local_y + amount)->type != CU_NOTSET) {
+      amount += TR_MIN_WIDTH;
+    }
+    return MAX(amount / TR_MIN_WIDTH, cu_loc->height / TR_MIN_WIDTH);
+  }
+  while (cu_loc->local_x + amount < LCU_WIDTH && LCU_GET_CU_AT_PX(lcu, cu_loc->local_x + amount, cu_loc->local_y - TR_MIN_WIDTH)->type != CU_NOTSET) {
+    amount += TR_MIN_WIDTH;
+  }
+  return MAX(amount / TR_MIN_WIDTH, cu_loc->width / TR_MIN_WIDTH);
 }

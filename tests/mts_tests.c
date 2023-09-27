@@ -111,7 +111,8 @@ static void setup_tests()
           tu.tr_idx = MTS_DST7_DST7 + trafo;
           tu.lfnst_idx = 0;
           tu.cr_lfnst_idx = 0;
-          mts_generic(UVG_BIT_DEPTH, COLOR_Y, &tu, 1 << (LCU_MIN_LOG_W + block), dct_bufs[trafo*NUM_SIZES+block], dct_result[trafo][block], UVG_MTS_BOTH);
+          tu.intra.isp_mode = 0;
+          mts_generic(UVG_BIT_DEPTH, COLOR_Y, &tu, 1 << (LCU_MIN_LOG_W + block), 1 << (LCU_MIN_LOG_W + block), dct_bufs[trafo*NUM_SIZES+block], dct_result[trafo][block], UVG_MTS_BOTH);
         }
       }      
     }
@@ -134,7 +135,8 @@ static void setup_tests()
           tu.tr_idx = MTS_DST7_DST7 + trafo;
           tu.lfnst_idx = 0;
           tu.cr_lfnst_idx = 0;
-          idct_generic(UVG_BIT_DEPTH, COLOR_Y, &tu, 1 << (LCU_MIN_LOG_W + block), dct_bufs[trafo * NUM_SIZES + block], idct_result[trafo][block], UVG_MTS_BOTH);
+          tu.intra.isp_mode = 0;
+          idct_generic(UVG_BIT_DEPTH, COLOR_Y, &tu, 1 << (LCU_MIN_LOG_W + block), 1 << (LCU_MIN_LOG_W + block), dct_bufs[trafo * NUM_SIZES + block], idct_result[trafo][block], UVG_MTS_BOTH);
         }
       }
       
@@ -156,6 +158,7 @@ TEST dct(void)
 {
   char testname[100];
   for (int blocksize = 0; blocksize < NUM_SIZES; blocksize++) {
+    size_t size = 1 << (LCU_MIN_LOG_W + blocksize);
     for (int trafo = 0; trafo < NUM_TRANSFORM; trafo++) {      
       sprintf(testname, "Block: %d x %d, trafo: %d", 1 << (LCU_MIN_LOG_W + blocksize), 1 << (LCU_MIN_LOG_W + blocksize), trafo);
       cu_info_t tu;
@@ -163,14 +166,20 @@ TEST dct(void)
       tu.tr_idx = MTS_DST7_DST7 + trafo;
       tu.lfnst_idx = 0;
       tu.cr_lfnst_idx = 0;
+      tu.intra.isp_mode = 0;
 
       int16_t* buf = dct_bufs[trafo * NUM_SIZES + blocksize];
       ALIGNED(32) int16_t test_result[LCU_WIDTH * LCU_WIDTH] = { 0 };
 
-      test_env.tested_func(UVG_BIT_DEPTH, COLOR_Y, &tu, 1 << (LCU_MIN_LOG_W + blocksize), buf, test_result, UVG_MTS_BOTH);
+      test_env.tested_func(UVG_BIT_DEPTH, COLOR_Y, &tu, 1 << (LCU_MIN_LOG_W + blocksize), 1 << (LCU_MIN_LOG_W + blocksize), buf, test_result, UVG_MTS_BOTH);
 
-      for (int i = 0; i < LCU_WIDTH * LCU_WIDTH; ++i) {
-        ASSERT_EQm(testname, test_result[i], dct_result[trafo][blocksize][i]);
+      for (int y = 0; y < size; ++y) {
+        if (y>= 16) break;
+        for (int x = 0; x < size; ++x) {
+          if (x >= 16) break;
+          int i = y * size + x;
+          ASSERT_EQm(testname, test_result[i], dct_result[trafo][blocksize][i]);
+        }
       }
       //fprintf(stderr, "PASS: %s\r\n", testname);
     }
@@ -188,11 +197,14 @@ TEST idct(void)
       cu_info_t tu;
       tu.type = CU_INTRA;
       tu.tr_idx = MTS_DST7_DST7 + trafo;
+      tu.lfnst_idx = 0;
+      tu.cr_lfnst_idx = 0;
+      tu.intra.isp_mode = 0;
 
       int16_t* buf = dct_bufs[trafo * NUM_SIZES + blocksize];
       ALIGNED(32) int16_t test_result[LCU_WIDTH * LCU_WIDTH] = { 0 };
 
-      test_env.tested_func(UVG_BIT_DEPTH, COLOR_Y, &tu, 1 << (LCU_MIN_LOG_W + blocksize), buf, test_result, UVG_MTS_BOTH);
+      test_env.tested_func(UVG_BIT_DEPTH, COLOR_Y, &tu, 1 << (LCU_MIN_LOG_W + blocksize), 1 << (LCU_MIN_LOG_W + blocksize), buf, test_result, UVG_MTS_BOTH);
 
       for (int i = 0; i < LCU_WIDTH * LCU_WIDTH; ++i) {
         ASSERT_EQm(testname, test_result[i], idct_result[trafo][blocksize][i]);

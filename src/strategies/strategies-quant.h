@@ -45,12 +45,23 @@
 #include "tables.h"
 
 // Declare function pointers.
-typedef unsigned (quant_func)(const encoder_state_t * const state, coeff_t *coef, coeff_t *q_coef, int32_t width,
-  int32_t height, color_t color, int8_t scan_idx, int8_t block_type, int8_t transform_skip, uint8_t lfnst_idx);
+typedef unsigned (quant_func)(
+  const encoder_state_t * const state, 
+  coeff_t *coef, 
+  coeff_t *q_coef, 
+  int32_t width,
+  int32_t height, 
+  color_t color, 
+  int8_t scan_idx, 
+  int8_t block_type, 
+  int8_t transform_skip, 
+  uint8_t lfnst_idx);
+
 typedef unsigned (quant_cbcr_func)(
   encoder_state_t* const state,
   const cu_info_t* const cur_cu,
   const int width,
+  const int height,
   const coeff_scan_order_t scan_order,
   const int in_stride, const int out_stride,
   const uvg_pixel* const u_ref_in,
@@ -63,16 +74,19 @@ typedef unsigned (quant_cbcr_func)(
   bool early_skip,
   int lmcs_chroma_adj, 
   enum uvg_tree_type tree_type);
+
 typedef unsigned (quant_residual_func)(encoder_state_t *const state,
-  const cu_info_t *const cur_cu, const int width, const color_t color,
+  const cu_info_t *const cur_cu, const int width, const int height, const color_t color,
   const coeff_scan_order_t scan_order, const int use_trskip,
   const int in_stride, const int out_stride,
   const uvg_pixel *const ref_in, const uvg_pixel *const pred_in,
   uvg_pixel *rec_out, coeff_t *coeff_out,
   bool early_skip, int lmcs_chroma_adj, enum uvg_tree_type tree_type);
+
 typedef unsigned (dequant_func)(const encoder_state_t * const state, coeff_t *q_coef, coeff_t *coef, int32_t width,
   int32_t height, color_t color, int8_t block_type, int8_t transform_skip);
-typedef uint32_t (fast_coeff_cost_func)(const coeff_t *coeff, int32_t width, uint64_t weights);
+
+typedef uint32_t (fast_coeff_cost_func)(const coeff_t *coeff, int32_t width, int32_t height, uint64_t weights);
 
 typedef uint32_t (coeff_abs_sum_func)(const coeff_t *coeffs, size_t length);
 

@@ -34,8 +34,10 @@
 
 #include "encode_coding_tree.h"
 #include "image.h"
+#include "intra.h"
 #include "uvg266.h"
 #include "lfnst_tables.h"
+#include "rate_control.h"
 #include "rdo.h"
 #include "strategies/strategies-dct.h"
 #include "strategies/strategies-quant.h"
@@ -77,6 +79,7 @@ const uint8_t uvg_g_chroma_scale[58]=
  * Parameters pred_in and rec_out may be aliased.
  *
  * \param width       Transform width.
+ * \param height      Transform height.
  * \param in_stride   Stride for ref_in and pred_in
  * \param out_stride  Stride for rec_out.
  * \param ref_in      Reference pixels.
@@ -87,6 +90,7 @@ const uint8_t uvg_g_chroma_scale[58]=
  * \returns  Whether coeff_out contains any non-zero coefficients.
  */
 static bool bypass_transquant(const int width,
+                              const int height,
                               const int in_stride,
                               const int out_stride,
                               const uvg_pixel *const ref_in,
@@ -96,7 +100,7 @@ static bool bypass_transquant(const int width,
 {
   bool nonzero_coeffs = false;
 
-  for (int y = 0; y < width; ++y) {
+  for (int y = 0; y < height; ++y) {
     for (int x = 0; x < width; ++x) {
       int32_t in_idx    = x + y * in_stride;
       int32_t out_idx   = x + y * out_stride;
@@ -123,6 +127,7 @@ static bool bypass_transquant(const int width,
  * \param coeff   coefficients (residual) to filter
  */
 static void rdpcm(const int width,
+                  const int height,
                   const rdpcm_dir dir,
                   coeff_t *coeff)
 {
@@ -130,7 +135,7 @@ static void rdpcm(const int width,
   const int min_x  = (dir == RDPCM_HOR) ? 1 : 0;
   const int min_y  = (dir == RDPCM_HOR) ? 0 : 1;
 
-  for (int y = width - 1; y >= min_y; y--) {
+  for (int y = height - 1; y >= min_y; y--) {
     for (int x = width - 1; x >= min_x; x--) {
       const int index = x + y * width;
       coeff[index] -= coeff[index - offset];
@@ -171,19 +176,26 @@ int32_t uvg_get_scaled_qp(color_t color, int8_t qp, int8_t qp_offset, int8_t con
 */
 void uvg_derive_lfnst_constraints(
   cu_info_t* const pred_cu,
-  const int depth,
   bool* constraints,
   const coeff_t* coeff,
   const int width,
-  const int height)
+  const int height,
+  const vector2d_t * const lcu_px,
+  color_t color)
 {
-  coeff_scan_order_t scan_idx = uvg_get_scan_order(pred_cu->type, pred_cu->intra.mode, depth);
+  coeff_scan_order_t scan_idx = SCAN_DIAG;
   // ToDo: large block support in VVC?
 
-  const uint32_t log2_block_size = uvg_g_convert_to_bit[width] + 2;
-  const uint32_t* scan = uvg_g_sig_last_scan[scan_idx][log2_block_size - 1];
+  const uint32_t log2_tr_width = uvg_g_convert_to_log2[width];
+  const uint32_t log2_tr_height = uvg_g_convert_to_log2[height];
+  const uint32_t* scan = uvg_get_scan_order_table(SCAN_GROUP_4X4, scan_idx, log2_tr_width, log2_tr_height);
 
   signed scan_pos_last = -1;
+  coeff_t temp[TR_MAX_WIDTH * TR_MAX_WIDTH];
+  if(lcu_px != NULL) {
+    uvg_get_sub_coeff(temp, coeff, lcu_px->x, lcu_px->y, width, height, color == COLOR_Y? LCU_WIDTH : LCU_WIDTH_C);
+    coeff = temp;
+  }
 
   for (int i = 0; i < width * height; i++) {
     if (coeff[scan[i]]) {
@@ -203,17 +215,18 @@ void uvg_derive_lfnst_constraints(
 
 /**
  * \brief NxN inverse transform (2D)
- * \param coeff input data (transform coefficients)
- * \param block output data (residual)
- * \param block_size input data (width of transform)
+ * \param coeff   input data (transform coefficients)
+ * \param block   output data (residual)
+ * \param width   transform width
+ * \param height  transform height
  */
-void uvg_transformskip(const encoder_control_t * const encoder, int16_t *block,int16_t *coeff, int8_t block_size)
+void uvg_transformskip(const encoder_control_t * const encoder, int16_t *block,int16_t *coeff, int8_t width, int8_t height)
 {
-  int32_t  j,k;
-  for (j = 0; j < block_size; j++) {
-    for(k = 0; k < block_size; k ++) {
+  int32_t j, k;
+  for (j = 0; j < height; j++) {
+    for(k = 0; k < width; k ++) {
       // Casting back and forth to make UBSan not trigger due to left-shifting negatives
-      coeff[j * block_size + k] = (int16_t)((uint16_t)(block[j * block_size + k]));
+      coeff[j * width + k] = (int16_t)((uint16_t)(block[j * width + k]));
     }
   }
 }
@@ -224,12 +237,12 @@ void uvg_transformskip(const encoder_control_t * const encoder, int16_t *block,i
  * \param block output data (residual)
  * \param block_size width of transform
  */
-void uvg_itransformskip(const encoder_control_t * const encoder, int16_t *block,int16_t *coeff, int8_t block_size)
+void uvg_itransformskip(const encoder_control_t * const encoder, int16_t *block,int16_t *coeff, int8_t block_width, int8_t block_height)
 {
   int32_t  j,k;
-  for ( j = 0; j < block_size; j++ ) {
-    for(k = 0; k < block_size; k ++) {
-      block[j * block_size + k] =  coeff[j * block_size + k];
+  for ( j = 0; j < block_height; j++ ) {
+    for(k = 0; k < block_width; k ++) {
+      block[j * block_width + k] =  coeff[j * block_width + k];
     }
   }
 }
@@ -243,17 +256,18 @@ void uvg_itransformskip(const encoder_control_t * const encoder, int16_t *block,
 void uvg_transform2d(const encoder_control_t * const encoder,
                      int16_t *block,
                      int16_t *coeff,
-                     int8_t block_size,
+                     int8_t block_width,
+                     int8_t block_height,
                      color_t color,
                      const cu_info_t *tu)
 {
-  if (encoder->cfg.mts || tu->lfnst_idx || tu->cr_lfnst_idx)
+  if (encoder->cfg.mts || tu->lfnst_idx || tu->cr_lfnst_idx || block_width != block_height)
   {
-    uvg_mts_dct(encoder->bitdepth, color, tu, block_size, block, coeff, encoder->cfg.mts);
+    uvg_mts_dct(encoder->bitdepth, color, tu, block_width, block_height, block, coeff, encoder->cfg.mts);
   }
   else
   {
-    dct_func *dct_func = uvg_get_dct_func(block_size, color, tu->type);
+    dct_func *dct_func = uvg_get_dct_func(block_width, block_height, color, tu->type);
     dct_func(encoder->bitdepth, block, coeff);
   }
 }
@@ -261,17 +275,18 @@ void uvg_transform2d(const encoder_control_t * const encoder,
 void uvg_itransform2d(const encoder_control_t * const encoder,
                       int16_t *block,
                       int16_t *coeff,
-                      int8_t block_size,
+                      int8_t block_width,
+                      int8_t block_height,
                       color_t color,
                       const cu_info_t *tu)
 {
-  if (encoder->cfg.mts)
+  if (encoder->cfg.mts || block_width != block_height)
   {
-    uvg_mts_idct(encoder->bitdepth, color, tu, block_size, coeff, block, encoder->cfg.mts);
+    uvg_mts_idct(encoder->bitdepth, color, tu, block_width, block_height, coeff, block, encoder->cfg.mts);
   }
   else
   {
-    dct_func *idct_func = uvg_get_idct_func(block_size, color, tu->type);
+    dct_func *idct_func = uvg_get_idct_func(block_width, block_height, color, tu->type);
     idct_func(encoder->bitdepth, coeff, block);
   }
 }
@@ -348,7 +363,7 @@ static void generate_jccr_transforms(
         }
       }
     }
-    costs[jccr] = d2 != 0 ? MIN(d1, d2) : d1;
+    costs[jccr] = jccr == 0 ? MIN(d1, d2) : d1;
   }
   int64_t min_dist1 = costs[0];
   int64_t min_dist2 = INT64_MAX;
@@ -373,6 +388,7 @@ static void generate_jccr_transforms(
       &temp_resi[(cbf_mask1 - 1) * trans_offset],
       &u_coeff[*num_transforms * trans_offset],
       width,
+      height,
       COLOR_U,
       pred_cu
     );
@@ -386,6 +402,7 @@ static void generate_jccr_transforms(
       &temp_resi[(cbf_mask2 - 1) * trans_offset],
       &u_coeff[*num_transforms * trans_offset],
       width,
+      height,
       COLOR_U,
       pred_cu
     );
@@ -401,27 +418,96 @@ static void generate_jccr_transforms(
 
 static void quantize_chroma(
   encoder_state_t* const state,
-  int depth,
-  int8_t width,
-  int8_t height,
+  cu_info_t * const cur_tu,
+  const cu_loc_t* const cu_loc,
   coeff_t u_coeff[5120],
   coeff_t v_coeff[2048],
-  enum uvg_chroma_transforms transforms[5],
-  const int trans_offset,
-  int i,
+  enum uvg_chroma_transforms transform,
   coeff_t u_quant_coeff[1024],
   coeff_t v_quant_coeff[1024],
   const coeff_scan_order_t scan_order,
   bool* u_has_coeffs,
   bool* v_has_coeffs,
-  uint8_t lfnst_idx)
+  uint8_t lfnst_idx,
+  enum uvg_tree_type tree_type,
+  double* u_coeff_cost,
+  double* v_coeff_cost)
 {
+  int8_t width = cu_loc->chroma_width;
+  int8_t height = cu_loc->chroma_height;
+  if(state->encoder_control->cfg.dep_quant && transform != CHROMA_TS) {
+    int abs_sum = 0;
+    state->quant_blocks[2].needs_init |= state->encoder_control->cfg.jccr;
+    uvg_dep_quant(
+      state,
+      cur_tu,
+      width,
+      height,
+      u_coeff,
+      u_quant_coeff,
+      COLOR_U,
+      tree_type,
+      &abs_sum,
+      state->encoder_control->cfg.scaling_list
+    );
+
+    cbf_clear(&cur_tu->cbf, COLOR_U);
+    if (abs_sum > 0) {
+      *u_has_coeffs = 1;
+      cbf_set(&cur_tu->cbf, COLOR_U);
+    }
+
+    *u_coeff_cost = uvg_get_coeff_cost(
+      state,
+      u_quant_coeff,
+      cur_tu,
+      cu_loc,
+      COLOR_U,
+      SCAN_DIAG,
+      false,
+      COEFF_ORDER_LINEAR);
+
+    if (transform == DCT7_CHROMA) {
+      abs_sum = 0;
+      state->rate_estimator[2].needs_init = true;
+      uvg_dep_quant(
+        state,
+        cur_tu,
+        width,
+        height,
+        v_coeff,
+        v_quant_coeff,
+        COLOR_V,
+        tree_type,
+        &abs_sum,
+        state->encoder_control->cfg.scaling_list
+      );
+
+      cbf_clear(&cur_tu->cbf, COLOR_V);
+      if (abs_sum > 0) {
+        *v_has_coeffs = 1;
+        cbf_set(&cur_tu->cbf, COLOR_V);
+      }
+
+      *v_coeff_cost = uvg_get_coeff_cost(
+        state,
+        v_quant_coeff,
+        cur_tu,
+        cu_loc,
+        COLOR_V,
+        SCAN_DIAG,
+        false,
+        COEFF_ORDER_LINEAR);
+      cbf_clear(&cur_tu->cbf, COLOR_U);
+      cbf_clear(&cur_tu->cbf, COLOR_V);
+    }
+    return;
+  }
   if (state->encoder_control->cfg.rdoq_enable &&
-    (transforms[i] != CHROMA_TS || !state->encoder_control->cfg.rdoq_skip))
+    (transform != CHROMA_TS || !state->encoder_control->cfg.rdoq_skip))
   {
-    uvg_rdoq(state, &u_coeff[i * trans_offset], u_quant_coeff, width, height, transforms[i] != JCCR_1 ? COLOR_U : COLOR_V,
-             scan_order, CU_INTRA, depth, 0,
-             lfnst_idx);
+    uvg_rdoq(state, u_coeff, u_quant_coeff, width, height, transform != JCCR_1 ? COLOR_U : COLOR_V,
+             scan_order, CU_INTRA, 0, lfnst_idx, 0);
 
     int j;
     for (j = 0; j < width * height; ++j) {
@@ -431,26 +517,25 @@ static void quantize_chroma(
       }
     }
 
-    if (transforms[i] == DCT7_CHROMA) {
+    if (transform == DCT7_CHROMA) {
       uint16_t temp_cbf = 0;
-      if (*u_has_coeffs)cbf_set(&temp_cbf, depth, COLOR_U);
-      uvg_rdoq(state, &v_coeff[i * trans_offset], v_quant_coeff, width, height, COLOR_V,
-               scan_order, CU_INTRA, depth, temp_cbf,
-               lfnst_idx);
+      if (*u_has_coeffs)cbf_set(&temp_cbf, COLOR_U);
+      uvg_rdoq(state, v_coeff, v_quant_coeff, width, height, COLOR_V,
+               scan_order, CU_INTRA, temp_cbf, lfnst_idx, 0);
 
     }
   }
-  else if (state->encoder_control->cfg.rdoq_enable && transforms[i] == CHROMA_TS) {
-    uvg_ts_rdoq(state, &u_coeff[i * trans_offset], u_quant_coeff, width, height, COLOR_U, scan_order);
-    uvg_ts_rdoq(state, &v_coeff[i * trans_offset], v_quant_coeff, width, height, COLOR_V, scan_order);
+  else if (state->encoder_control->cfg.rdoq_enable && transform == CHROMA_TS) {
+    uvg_ts_rdoq(state, u_coeff, u_quant_coeff, width, height, COLOR_U, scan_order);
+    uvg_ts_rdoq(state, v_coeff, v_quant_coeff, width, height, COLOR_V, scan_order);
   }
   else {
-    uvg_quant(state, &u_coeff[i * trans_offset], u_quant_coeff, width, height, transforms[i] != JCCR_1 ? COLOR_U : COLOR_V,
-      scan_order, CU_INTRA, transforms[i] == CHROMA_TS, lfnst_idx);
+    uvg_quant(state, u_coeff, u_quant_coeff, width, height, transform != JCCR_1 ? COLOR_U : COLOR_V,
+      scan_order, CU_INTRA, transform == CHROMA_TS, lfnst_idx);
 
-    if (!IS_JCCR_MODE(transforms[i])) {
-      uvg_quant(state, &v_coeff[i * trans_offset], v_quant_coeff, width, height, COLOR_V,
-        scan_order, CU_INTRA, transforms[i] == CHROMA_TS, lfnst_idx);
+    if (!IS_JCCR_MODE(transform)) {
+      uvg_quant(state, v_coeff, v_quant_coeff, width, height, COLOR_V,
+        scan_order, CU_INTRA, transform == CHROMA_TS, lfnst_idx);
     }
   }
 
@@ -460,7 +545,7 @@ static void quantize_chroma(
       break;
     }
   }
-  if (!IS_JCCR_MODE(transforms[i])) {
+  if (!IS_JCCR_MODE(transform)) {
     for (int j = 0; j < width * height; ++j) {
       if (v_quant_coeff[j]) {
         *v_has_coeffs = 1;
@@ -472,13 +557,10 @@ static void quantize_chroma(
 
 void uvg_chroma_transform_search(
   encoder_state_t* const state,
-  int depth,
   lcu_t* const lcu,
   cabac_data_t* temp_cabac,
-  int8_t width,
-  int8_t height,
+  const cu_loc_t* const cu_loc,
   const int offset,
-  const uint8_t mode,
   cu_info_t* pred_cu,
   uvg_pixel u_pred[1024],
   uvg_pixel v_pred[1024],
@@ -489,13 +571,18 @@ void uvg_chroma_transform_search(
 {
   ALIGNED(64) coeff_t u_coeff[LCU_WIDTH_C * LCU_WIDTH_C * 5];
   ALIGNED(64) uint8_t u_recon[LCU_WIDTH_C * LCU_WIDTH_C * 5];
-  ALIGNED(64) coeff_t v_coeff[LCU_WIDTH_C * LCU_WIDTH_C * 2];
+  ALIGNED(64) coeff_t v_coeff[LCU_WIDTH_C * LCU_WIDTH_C * 2]; // In case of JCCR the v channel does not have coefficients
   ALIGNED(64) uint8_t v_recon[LCU_WIDTH_C * LCU_WIDTH_C * 5];
+  const int width  = cu_loc->chroma_width;
+  const int height = cu_loc->chroma_height;
+
+  const int depth = 6 - uvg_g_convert_to_log2[cu_loc->width];
+
   uvg_transform2d(
-    state->encoder_control, u_resi, u_coeff, width, COLOR_U, pred_cu
+    state->encoder_control, u_resi, u_coeff, width, height, COLOR_U, pred_cu
   );
   uvg_transform2d(
-    state->encoder_control, v_resi, v_coeff, width, COLOR_V, pred_cu
+    state->encoder_control, v_resi, v_coeff, width, height, COLOR_V, pred_cu
   );
   enum uvg_chroma_transforms transforms[5];
   transforms[0] = DCT7_CHROMA;
@@ -508,8 +595,8 @@ void uvg_chroma_transform_search(
     pred_cu->cr_lfnst_idx == 0 ;
 
   if (can_use_tr_skip) {
-    uvg_transformskip(state->encoder_control, u_resi, u_coeff + num_transforms * trans_offset, width);
-    uvg_transformskip(state->encoder_control, v_resi, v_coeff + num_transforms * trans_offset, width);
+    uvg_transformskip(state->encoder_control, u_resi, u_coeff + num_transforms * trans_offset, width, height);
+    uvg_transformskip(state->encoder_control, v_resi, v_coeff + num_transforms * trans_offset, width, height);
     transforms[num_transforms] = CHROMA_TS;
     num_transforms++;
   }
@@ -526,6 +613,9 @@ void uvg_chroma_transform_search(
       trans_offset,
       &num_transforms);
   }
+
+  double lambda = state->c_lambda;
+
   chorma_ts_out->best_u_cost = MAX_DOUBLE;
   chorma_ts_out->best_v_cost = MAX_DOUBLE;
   chorma_ts_out->best_combined_cost = MAX_DOUBLE;
@@ -537,58 +627,76 @@ void uvg_chroma_transform_search(
     coeff_t v_quant_coeff[LCU_WIDTH_C * LCU_WIDTH_C];
     int16_t u_recon_resi[LCU_WIDTH_C * LCU_WIDTH_C];
     int16_t v_recon_resi[LCU_WIDTH_C * LCU_WIDTH_C];
-    const coeff_scan_order_t scan_order =
-      uvg_get_scan_order(pred_cu->type, mode, depth);
     bool u_has_coeffs = false;
     bool v_has_coeffs = false;
+    bool is_jccr = IS_JCCR_MODE(transforms[i]);
     if(pred_cu->cr_lfnst_idx) {
-      uvg_fwd_lfnst(pred_cu, width, height, COLOR_U, pred_cu->cr_lfnst_idx, &u_coeff[i * trans_offset], tree_type);
-      if (!IS_JCCR_MODE(transforms[i])) {
-        uvg_fwd_lfnst(pred_cu, width, height, COLOR_V, pred_cu->cr_lfnst_idx, &v_coeff[i * trans_offset], tree_type);
+      uvg_fwd_lfnst(pred_cu, width, height, COLOR_U, pred_cu->cr_lfnst_idx, &u_coeff[i * trans_offset], tree_type, state->collocated_luma_mode);
+      if (!is_jccr) {
+        uvg_fwd_lfnst(pred_cu, width, height, COLOR_V, pred_cu->cr_lfnst_idx, &v_coeff[i * trans_offset], tree_type, state->collocated_luma_mode);
       }
     }
+    uint8_t old_jccr = pred_cu->joint_cb_cr;
+    pred_cu->joint_cb_cr = 0;
+    if(is_jccr) {
+      state->c_lambda = lambda *  (transforms[i] == JCCR_3 ? 0.5 : 0.8);
+      pred_cu->joint_cb_cr = transforms[i];
+    }
+    else if(state->encoder_control->cfg.dep_quant) {
+      state->search_cabac.update = 1;
+    }
+
+    double u_coeff_cost = 0;
+    double v_coeff_cost = 0;
+    unsigned ssd_u = 0;
+    unsigned ssd_v = 0;
+    double   u_bits = 0;
+    double   v_bits = 0;
+
     quantize_chroma(
       state,
-      depth,
-      width,
-      height,
-      u_coeff,
-      v_coeff,
-      transforms,
-      trans_offset,
-      i,
+      pred_cu,
+      cu_loc,
+      &u_coeff[i * trans_offset],
+      &v_coeff[i * trans_offset],
+      transforms[i],
       u_quant_coeff,
       v_quant_coeff,
-      scan_order,
+      SCAN_DIAG,
       &u_has_coeffs,
-      &v_has_coeffs,
-      pred_cu->cr_lfnst_idx);
+      &v_has_coeffs, tree_type == UVG_CHROMA_T ?  pred_cu->cr_lfnst_idx : pred_cu->lfnst_idx, 
+      tree_type,
+      &u_coeff_cost,
+      &v_coeff_cost);
+    pred_cu->joint_cb_cr = old_jccr;
+    if (pred_cu->cr_lfnst_idx != 0 && !u_has_coeffs && !v_has_coeffs) goto reset_cabac;
     
-    if(pred_cu->type == CU_INTRA && transforms[i] != CHROMA_TS && (depth == 4 || tree_type == UVG_CHROMA_T)) {
+    if(pred_cu->type == CU_INTRA && transforms[i] != CHROMA_TS && tree_type == UVG_CHROMA_T) {
       bool constraints[2] = { false, false };
-      uvg_derive_lfnst_constraints(pred_cu, depth, constraints, u_quant_coeff, width, height);
-      if(!IS_JCCR_MODE(transforms[i])) {
-        uvg_derive_lfnst_constraints(pred_cu, depth, constraints, v_quant_coeff, width, height);
+      uvg_derive_lfnst_constraints(pred_cu, constraints, u_quant_coeff, width, height, NULL, COLOR_U);
+      if(!is_jccr) {
+        uvg_derive_lfnst_constraints(pred_cu, constraints, v_quant_coeff, width, height, NULL, COLOR_V);
       }
-      if (!constraints[1] && (u_has_coeffs || v_has_coeffs) && pred_cu->cr_lfnst_idx != 0) continue;
+      if (!constraints[1] && (u_has_coeffs || v_has_coeffs) && pred_cu->cr_lfnst_idx != 0) goto reset_cabac;
     }
 
-    if (IS_JCCR_MODE(transforms[i]) && !u_has_coeffs) continue;
+    if (is_jccr && !u_has_coeffs) goto reset_cabac;
 
     if (u_has_coeffs) {
-
-      uvg_dequant(state, u_quant_coeff, &u_coeff[i * trans_offset], width, width, transforms[i] != JCCR_1 ? COLOR_U : COLOR_V,
+      uvg_dequant(state, u_quant_coeff, &u_coeff[i * trans_offset], width, height, transforms[i] != JCCR_1 ? COLOR_U : COLOR_V,
         pred_cu->type, transforms[i] == CHROMA_TS);
+
       if (transforms[i] != CHROMA_TS) {
         if (pred_cu->cr_lfnst_idx) {
-          uvg_inv_lfnst(pred_cu, width, height, COLOR_U, pred_cu->cr_lfnst_idx, &u_coeff[i * trans_offset], tree_type);
+          uvg_inv_lfnst(pred_cu, width, height, COLOR_U, pred_cu->cr_lfnst_idx, &u_coeff[i * trans_offset], tree_type, state->collocated_luma_mode);
         }
-        uvg_itransform2d(state->encoder_control, u_recon_resi, &u_coeff[i * trans_offset], width,
+        uvg_itransform2d(state->encoder_control, u_recon_resi, &u_coeff[i * trans_offset], width, height,
           transforms[i] != JCCR_1 ? COLOR_U : COLOR_V, pred_cu);
       }
       else {
-        uvg_itransformskip(state->encoder_control, u_recon_resi, &u_coeff[i * trans_offset], width);
+        uvg_itransformskip(state->encoder_control, u_recon_resi, &u_coeff[i * trans_offset], width, height);
       }
+
       if (transforms[i] != JCCR_1) {
         for (int j = 0; j < width * height; j++) {
           u_recon[trans_offset * i + j] = CLIP_TO_PIXEL((uvg_pixel)(u_pred[j] + u_recon_resi[j]));
@@ -603,24 +711,28 @@ void uvg_chroma_transform_search(
     else {
       uvg_pixels_blit(u_pred, &u_recon[trans_offset * i], width, height, width, width);
     }
-    if (v_has_coeffs && !(IS_JCCR_MODE(transforms[i]))) {
-      uvg_dequant(state, v_quant_coeff, &v_coeff[i * trans_offset], width, width, COLOR_V,
+
+
+    if (v_has_coeffs && !is_jccr) {
+      uvg_dequant(state, v_quant_coeff, &v_coeff[i * trans_offset], width, height, COLOR_V,
         pred_cu->type, transforms[i] == CHROMA_TS);
+
       if (transforms[i] != CHROMA_TS) {
         if (pred_cu->cr_lfnst_idx) {
-          uvg_inv_lfnst(pred_cu, width, height, COLOR_V, pred_cu->cr_lfnst_idx, &v_coeff[i * trans_offset], tree_type);
+          uvg_inv_lfnst(pred_cu, width, height, COLOR_V, pred_cu->cr_lfnst_idx, &v_coeff[i * trans_offset], tree_type, state->collocated_luma_mode);
         }
-        uvg_itransform2d(state->encoder_control, v_recon_resi, &v_coeff[i * trans_offset], width,
+        uvg_itransform2d(state->encoder_control, v_recon_resi, &v_coeff[i * trans_offset], width, height,
           transforms[i] != JCCR_1 ? COLOR_U : COLOR_V, pred_cu);
       }
       else {
-        uvg_itransformskip(state->encoder_control, v_recon_resi, &v_coeff[i * trans_offset], width);
+        uvg_itransformskip(state->encoder_control, v_recon_resi, &v_coeff[i * trans_offset], width, height);
       }
+
       for (int j = 0; j < width * height; j++) {
         v_recon[trans_offset * i + j] = CLIP_TO_PIXEL(v_pred[j] + v_recon_resi[j]);
       }
     }
-    else if (u_has_coeffs && IS_JCCR_MODE(transforms[i])) {
+    else if (u_has_coeffs && is_jccr) {
       if (transforms[i] == JCCR_1) {
         for (int j = 0; j < width * height; j++) {
           v_recon[trans_offset * i + j] = CLIP_TO_PIXEL(v_pred[j] + u_recon_resi[j]);
@@ -641,19 +753,17 @@ void uvg_chroma_transform_search(
       uvg_pixels_blit(v_pred, &v_recon[trans_offset * i], width, height, width, width);
     }
 
-    unsigned ssd_u = 0;
-    unsigned ssd_v = 0;
     if (!state->encoder_control->cfg.lossless) {
       ssd_u = uvg_pixels_calc_ssd(&lcu->ref.u[offset], &u_recon[trans_offset * i],
         LCU_WIDTH_C, width,
-        width);
+        width, height);
       ssd_v = uvg_pixels_calc_ssd(&lcu->ref.v[offset], &v_recon[trans_offset * i],
         LCU_WIDTH_C, width,
-        width);
+        width, height);
+      ssd_u = (double)ssd_u * state->chroma_weights[1];
+      ssd_v = (double)ssd_v * state->chroma_weights[2];
     }
 
-    double u_bits = 0;
-    double v_bits = 0;
     state->search_cabac.update = 1;
 
     int cbf_u = transforms[i] & 2 || (u_has_coeffs && !(transforms[i] & 1));
@@ -677,33 +787,40 @@ void uvg_chroma_transform_search(
           transforms[i] == CHROMA_TS, u_bits, "tr_skip_u"
         );
       }
-      double coeff_cost = uvg_get_coeff_cost(
-        state,
-        u_quant_coeff,
-        pred_cu,
-        width,
-        COLOR_U,
-        scan_order,
-        transforms[i] == CHROMA_TS);
-      u_bits += coeff_cost;
+      if(u_coeff_cost == 0) {
+        u_coeff_cost = uvg_get_coeff_cost(
+          state,
+          u_quant_coeff,
+          pred_cu,
+          cu_loc,
+          COLOR_U,
+          SCAN_DIAG,
+          transforms[i] == CHROMA_TS,
+          COEFF_ORDER_LINEAR);
+      }
     }
-    if (cbf_v && !IS_JCCR_MODE(transforms[i])) {
+    if (cbf_v && !is_jccr) {
       if (can_use_tr_skip) {
         CABAC_FBITS_UPDATE(&state->search_cabac, &state->search_cabac.ctx.transform_skip_model_chroma,
           transforms[i] == CHROMA_TS, v_bits, "tr_skip_v"
         );
       }
-      v_bits += uvg_get_coeff_cost(
-        state,
-        v_quant_coeff,
-        pred_cu,
-        width,
-        COLOR_V,
-        scan_order,
-        transforms[i] == CHROMA_TS);
+      if (v_coeff_cost == 0) {
+        v_coeff_cost = uvg_get_coeff_cost(
+          state,
+          v_quant_coeff,
+          pred_cu,
+          cu_loc,
+          COLOR_V,
+          SCAN_DIAG,
+          transforms[i] == CHROMA_TS,
+          COEFF_ORDER_LINEAR);
+      }
     }
+    u_bits += u_coeff_cost;
+    v_bits += v_coeff_cost;
     if((depth == 4 || tree_type == UVG_CHROMA_T) && state->encoder_control->cfg.lfnst && 0) {
-      if(uvg_is_lfnst_allowed(state, pred_cu, width, height, 0, 0 , UVG_CHROMA_T, COLOR_UV, lcu)) {
+      if(uvg_is_lfnst_allowed(state, pred_cu, UVG_CHROMA_T, COLOR_UV, cu_loc, lcu)) {
         const int lfnst_idx = pred_cu->cr_lfnst_idx;
         CABAC_FBITS_UPDATE(
           &state->search_cabac,
@@ -723,25 +840,35 @@ void uvg_chroma_transform_search(
       pred_cu->lfnst_last_scan_pos = false;
       pred_cu->violates_lfnst_constrained_chroma = false;
     }
-    if (!IS_JCCR_MODE(transforms[i])) {
-      double u_cost = UVG_CHROMA_MULT * ssd_u + u_bits * state->frame->lambda;
-      double v_cost = UVG_CHROMA_MULT * ssd_v + v_bits * state->frame->lambda;
+
+    if (!is_jccr) {
+      double u_cost = UVG_CHROMA_MULT * ssd_u + u_bits * state->lambda;
+      double v_cost = UVG_CHROMA_MULT * ssd_v + v_bits * state->lambda;
       if (u_cost < chorma_ts_out->best_u_cost) {
         chorma_ts_out->best_u_cost = u_cost;
         chorma_ts_out->best_u_index = u_has_coeffs ? transforms[i] : NO_RESIDUAL;
+        chorma_ts_out->u_bits = u_bits;
+        chorma_ts_out->u_distortion = ssd_u;
       }
       if (v_cost < chorma_ts_out->best_v_cost) {
         chorma_ts_out->best_v_cost = v_cost;
         chorma_ts_out->best_v_index = v_has_coeffs ? transforms[i] : NO_RESIDUAL;
+        chorma_ts_out->v_bits = v_bits;
+        chorma_ts_out->v_distortion = ssd_v;
       }
     }
     else {
-      double cost = UVG_CHROMA_MULT * (ssd_u + ssd_v) + (u_bits + v_bits) * state->frame->lambda;
-      if (cost < chorma_ts_out->best_combined_cost) {
+      double cost = UVG_CHROMA_MULT * (ssd_u + ssd_v) + (u_bits + v_bits) * state->lambda;
+      if (cost < chorma_ts_out->best_combined_cost && cost < chorma_ts_out->best_u_cost + chorma_ts_out->best_v_cost) {
         chorma_ts_out->best_combined_cost = cost;
         chorma_ts_out->best_combined_index = transforms[i];
+        chorma_ts_out->u_bits              = u_bits;
+        chorma_ts_out->u_distortion        = ssd_u;
+        chorma_ts_out->v_bits              = v_bits;
+        chorma_ts_out->v_distortion        = ssd_v;
       }
     }
+reset_cabac:
     memcpy(&state->search_cabac, temp_cabac, sizeof(cabac_data_t));
   }
 }
@@ -786,10 +913,50 @@ void uvg_fwd_lfnst_NxN(coeff_t *src, coeff_t *dst, const int8_t mode, const int8
   }
 }
 
-static inline bool get_transpose_flag(const int8_t intra_mode)
+static uint32_t get_lfnst_intra_mode(int mode)
+{
+  uint32_t intraMode;
+
+  if (mode < 0)
+  {
+    intraMode = (uint32_t)(mode + (NUM_EXT_LUMA_MODE >> 1) + NUM_LUMA_MODE);
+  }
+  else if (mode >= NUM_LUMA_MODE)
+  {
+    intraMode = (uint32_t)(mode + (NUM_EXT_LUMA_MODE >> 1));
+  }
+  else
+  {
+    intraMode = (uint32_t)mode;
+  }
+
+  return intraMode;
+}
+
+static bool get_transpose_flag(const int8_t intra_mode)
 {
   return ((intra_mode >= NUM_LUMA_MODE) && (intra_mode >= (NUM_LUMA_MODE + (NUM_EXT_LUMA_MODE >> 1)))) ||
          ((intra_mode < NUM_LUMA_MODE) && (intra_mode > DIA_IDX));
+}
+
+
+static inline bool block_is_mip(const cu_info_t * const cur_cu, const color_t color, const bool is_sep_tree)
+{
+  if (cur_cu->type == CU_INTRA) {
+    if (color == COLOR_Y) {
+      return cur_cu->intra.mip_flag;
+    }
+    else {
+      // MIP_TODO: currently, only chroma 420 is supported. Therefore this will always return false
+
+      //bool derived_mode = cur_cu->intra.mode_chroma == (!cur_cu->intra.mip_flag ? cur_cu->intra.mode : 0);
+      //bool is_chroma_mip = !is_sep_tree /*&& chroma_format == CHROMA_444*/ && cur_cu->intra.mip_flag;
+      //return is_chroma_mip && derived_mode;
+
+      return false;
+    }
+  }
+  return false;
 }
 
 void uvg_fwd_lfnst(
@@ -799,42 +966,47 @@ void uvg_fwd_lfnst(
   const color_t color,
   const uint16_t lfnst_idx,
   coeff_t *coeffs,
-  enum uvg_tree_type tree_type)
+  enum uvg_tree_type tree_type,
+  int8_t luma_mode)
 {
   const uint16_t lfnst_index = lfnst_idx;
+  const uint32_t log2_width = uvg_g_convert_to_log2[width];
+  const uint32_t log2_height = uvg_g_convert_to_log2[height];
   int8_t intra_mode = (color == COLOR_Y) ? cur_cu->intra.mode : cur_cu->intra.mode_chroma;
-  bool mts_skip = cur_cu->tr_idx == MTS_SKIP;
-  const int depth = cur_cu->depth;
-  bool is_separate_tree = depth == 4 || tree_type != UVG_BOTH_T; 
+  bool mts_skip = cur_cu->tr_idx == MTS_SKIP && color == COLOR_Y;
+  // This check is safe for 8x16 cus split with TT, since it is checking the dimensions of the
+  // last luma CU which will be 8x4, i.e., 3 + 2 < 6
+  bool is_separate_tree = cur_cu->log2_height + cur_cu->log2_width < 6 || tree_type != UVG_BOTH_T;
   bool is_cclm_mode = (intra_mode >= 81 && intra_mode <= 83); // CCLM modes are in [81, 83]
 
-  bool is_mip = cur_cu->type == CU_INTRA ? cur_cu->intra.mip_flag : false;
-  bool is_wide_angle = false; // TODO: get wide angle mode when implemented
+  bool is_mip = block_is_mip(cur_cu, color, is_separate_tree);
+  
+  const int scan_order = SCAN_DIAG;
 
-  const int cu_type = cur_cu->type;
-
-  const int scan_order = uvg_get_scan_order(cu_type, intra_mode, depth);
-
-  if (lfnst_index && !mts_skip && (is_separate_tree || color == COLOR_Y))
+  if (lfnst_index && !mts_skip && (color == COLOR_Y || is_separate_tree))
   {
-    const uint32_t log2_block_size = uvg_g_convert_to_bit[width] + 2;
-    assert(log2_block_size != -1 && "LFNST: invalid block width.");
+    assert(log2_width != -1 && "LFNST: invalid block width.");
     const bool whge3 = width >= 8 && height >= 8;
-    const uint32_t* scan = whge3 ? uvg_coef_top_left_diag_scan_8x8[log2_block_size] : uvg_g_sig_last_scan[scan_order][log2_block_size - 1];
+    const uint32_t* scan = whge3 ? uvg_coef_top_left_diag_scan_8x8[log2_width] : uvg_g_sig_last_scan[scan_order][log2_width - 1];
 
     if (is_cclm_mode) {
-      intra_mode = cur_cu->intra.mode;
+      intra_mode = luma_mode;
     }
-    if (is_mip) {
+    if (is_mip && color == COLOR_Y) {
       intra_mode = 0; // Set to planar mode
     }
     assert(intra_mode < NUM_INTRA_MODE && "LFNST: Invalid intra mode.");
     assert(lfnst_index < 3 && "LFNST: Invalid LFNST index. Must be in [0, 2]");
-
-    if (is_wide_angle) {
-      // Transform wide angle mode to intra mode
-      intra_mode = intra_mode; // TODO: wide angle modes not implemented yet. Do nothing.
-    }
+    int32_t wide_adjusted_mode = uvg_wide_angle_correction(
+      intra_mode, 
+      color == COLOR_Y ? cur_cu->log2_width : log2_width,
+      color == COLOR_Y ? cur_cu->log2_height : log2_height,
+      true
+      );
+    
+    // Transform wide angle mode to intra mode
+    intra_mode = get_lfnst_intra_mode(wide_adjusted_mode);
+  
 
     bool transpose = get_transpose_flag(intra_mode);
     const int sb_size = whge3 ? 8 : 4;
@@ -933,44 +1105,45 @@ void uvg_inv_lfnst(
   const color_t color,
   const uint16_t lfnst_idx,
   coeff_t *coeffs,
-  enum uvg_tree_type tree_type)
+  enum uvg_tree_type tree_type,
+  int8_t luma_mode)
 {
   // In VTM, max log2 dynamic range is something in range [15, 20] depending on whether extended precision processing is enabled
   // Such is not yet present in uvg266 so use 15 for now
   const int max_log2_dyn_range = 15;
   const uint32_t  lfnst_index = lfnst_idx;
+  const uint32_t log2_width = uvg_g_convert_to_log2[width];
+  const uint32_t log2_height = uvg_g_convert_to_log2[height];
   int8_t intra_mode = (color == COLOR_Y) ? cur_cu->intra.mode : cur_cu->intra.mode_chroma;
-  bool mts_skip = cur_cu->tr_idx == MTS_SKIP;
-  const int depth = cur_cu->depth;
-  bool is_separate_tree = depth == 4 || tree_type != UVG_BOTH_T;
+  bool mts_skip = cur_cu->tr_idx == MTS_SKIP && color == COLOR_Y;
+  bool is_separate_tree = cur_cu->log2_height + cur_cu->log2_width < 6 || tree_type != UVG_BOTH_T;
   bool is_cclm_mode = (intra_mode >= 81 && intra_mode <= 83); // CCLM modes are in [81, 83]
 
-  bool is_mip = cur_cu->type == CU_INTRA && tree_type != UVG_CHROMA_T ? cur_cu->intra.mip_flag : false;
-  bool is_wide_angle = false; // TODO: get wide angle mode when implemented
-
-  const int cu_type = cur_cu->type;
-
-  const int scan_order = uvg_get_scan_order(cu_type, intra_mode, depth);
+  bool is_mip = block_is_mip(cur_cu, color, is_separate_tree);
+  const int scan_order = SCAN_DIAG;
   
-  if (lfnst_index && !mts_skip && (is_separate_tree || color == COLOR_Y)) {
-    const uint32_t log2_block_size = uvg_g_convert_to_bit[width] + 2;
+  if (lfnst_index && !mts_skip && (color == COLOR_Y || is_separate_tree)) {
     const bool whge3 = width >= 8 && height >= 8;
-    const uint32_t* scan = whge3 ? uvg_coef_top_left_diag_scan_8x8[log2_block_size] : uvg_g_sig_last_scan[scan_order][log2_block_size - 1];
+    const uint32_t* scan = whge3 ? uvg_coef_top_left_diag_scan_8x8[log2_width] : uvg_g_sig_last_scan[scan_order][log2_width - 1];
     
     if (is_cclm_mode) {
-      intra_mode = cur_cu->intra.mip_flag ? 0 : cur_cu->intra.mode;
+      intra_mode = luma_mode;
     }
-    if (is_mip) {
+    if (is_mip && color == COLOR_Y) {
       intra_mode = 0; // Set to planar mode
     }
     assert(intra_mode < NUM_INTRA_MODE && "LFNST: Invalid intra mode.");
     assert(lfnst_index < 3 && "LFNST: Invalid LFNST index. Must be in [0, 2]");
+    int32_t wide_adjusted_mode = uvg_wide_angle_correction(
+      intra_mode, 
+      color == COLOR_Y ? cur_cu->log2_width : log2_width,
+      color == COLOR_Y ? cur_cu->log2_height : log2_height,
+      true
+      );
 
-    if (is_wide_angle) {
-      // Transform wide angle mode to intra mode
-      intra_mode = intra_mode; // TODO: wide angle modes not implemented yet. Do nothing.
-    }
-
+    
+    intra_mode = get_lfnst_intra_mode(wide_adjusted_mode); 
+    
     bool          transpose_flag = get_transpose_flag(intra_mode);
     const int     sb_size = whge3 ? 8 : 4;
     bool          tu_4x4_flag = (width == 4 && height == 4);
@@ -1053,7 +1226,7 @@ void uvg_inv_lfnst(
  */
 int uvg_quantize_residual_trskip(
     encoder_state_t *const state,
-    const cu_info_t *const cur_cu, const int width, const color_t color,
+    const cu_info_t *const cur_cu, const int width, const int height, const color_t color,
     const coeff_scan_order_t scan_order, int8_t *trskip_out, 
     const int in_stride, const int out_stride,
     const uvg_pixel *const ref_in, const uvg_pixel *const pred_in, 
@@ -1074,7 +1247,7 @@ int uvg_quantize_residual_trskip(
   //noskip.cost += uvg_get_coeff_cost(state, noskip.coeff, 4, 0, scan_order) * bit_cost;
 
   skip.has_coeffs = uvg_quantize_residual(
-    state, cur_cu, width, color, scan_order,
+    state, cur_cu, width, height, color, scan_order,
     1, in_stride, width,
     ref_in, pred_in, skip.rec, skip.coeff, false, lmcs_chroma_adj, 
     UVG_BOTH_T /* tree type doesn't matter for transformskip*/);
@@ -1090,12 +1263,14 @@ int uvg_quantize_residual_trskip(
   if (best->has_coeffs || rec_out != pred_in) {
     // If there is no residual and reconstruction is already in rec_out, 
     // we can skip this.
-    uvg_pixels_blit(best->rec, rec_out, width, width, width, out_stride);
+    uvg_pixels_blit(best->rec, rec_out, width, height, width, out_stride);
   }
-  copy_coeffs(best->coeff, coeff_out, width);
+  // TODO: copying coeffs here is very suspect
+  copy_coeffs(best->coeff, coeff_out, width, height, width);
 
   return best->has_coeffs;
 }
+
 
 /**
  * Calculate the residual coefficients for a single TU.
@@ -1105,14 +1280,15 @@ int uvg_quantize_residual_trskip(
 static void quantize_tr_residual(
   encoder_state_t * const state,
   const color_t color,
-  const int32_t x,
-  const int32_t y,
-  const uint8_t depth,
+  const cu_loc_t *cu_loc,
   cu_info_t *cur_pu,
   lcu_t* lcu,
   bool early_skip,
   enum uvg_tree_type tree_type)
 {
+  const int x = cu_loc->x;
+  const int y = cu_loc->y;
+
   const uvg_config *cfg    = &state->encoder_control->cfg;
   const int32_t shift      = color == COLOR_Y ? 0 : 1;
   const vector2d_t lcu_px  = { SUB_SCU(x) >> shift, SUB_SCU(y) >> shift};
@@ -1120,9 +1296,10 @@ static void quantize_tr_residual(
   // If luma is 4x4, do chroma for the 8x8 luma area when handling the top
   // left PU because the coordinates are correct.
   bool handled_elsewhere = color != COLOR_Y &&
-                           depth == MAX_DEPTH &&
+                           cur_pu->log2_width + cur_pu-> log2_height < 6&&
                            (x % 4 != 0 || y % 4 != 0);
   if (handled_elsewhere) {
+    assert(0);
     return;
   }
 
@@ -1130,44 +1307,44 @@ static void quantize_tr_residual(
   // This should ensure that the CBF data doesn't get corrupted if this function
   // is called more than once.
 
-  int32_t tr_width;
-  if (color == COLOR_Y) {
-    tr_width = LCU_WIDTH >> depth;
-  } else {
-    const int chroma_depth = (depth == MAX_PU_DEPTH ? depth - 1 : depth);
-    tr_width = LCU_WIDTH_C >> chroma_depth;
-  }
+  const int32_t tr_width  = color == COLOR_Y ? cu_loc->width  : cu_loc->chroma_width;
+  const int32_t tr_height = color == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
+  
   const int32_t lcu_width = LCU_WIDTH >> shift;
   const int8_t mode =
     (color == COLOR_Y) ? cur_pu->intra.mode : cur_pu->intra.mode_chroma;
-  const coeff_scan_order_t scan_idx =
-    uvg_get_scan_order(cur_pu->type, mode, depth);
+  
+  const coeff_scan_order_t scan_idx = SCAN_DIAG; 
   const int offset = lcu_px.x + lcu_px.y * lcu_width;
-  const int z_index = xy_to_zorder(lcu_width, lcu_px.x, lcu_px.y);
+  //const int z_index = xy_to_zorder(lcu_width, lcu_px.x, lcu_px.y);
 
   // Pointers to current location in arrays with prediction. The
   // reconstruction will be written to this array.
   uvg_pixel *pred = NULL;
   // Pointers to current location in arrays with reference.
   const uvg_pixel *ref = NULL;
-  // Pointers to current location in arrays with quantized coefficients.
-  coeff_t *coeff = NULL;
+  // Temp coeff array
+  coeff_t coeff[TR_MAX_WIDTH * TR_MAX_WIDTH];
+  coeff_t *dst_coeff = NULL;
 
   switch (color) {
     case COLOR_Y:
-      pred  = &lcu->rec.y[offset];
-      ref   = &lcu->ref.y[offset];
-      coeff = &lcu->coeff.y[z_index];
+      pred      = &lcu->rec.y[offset];
+      ref       = &lcu->ref.y[offset];
+      dst_coeff = &lcu->coeff.y[lcu_px.x + lcu_px.y * lcu_width];
       break;
     case COLOR_U:
-      pred = &lcu->rec.u[offset];
-      ref  = &lcu->ref.u[offset];
-      coeff = &lcu->coeff.u[z_index];
+      pred      = &lcu->rec.u[offset];
+      ref       = &lcu->ref.u[offset];
+      dst_coeff = &lcu->coeff.u[lcu_px.x + lcu_px.y * lcu_width];
       break;
     case COLOR_V:
-      pred = &lcu->rec.v[offset];
-      ref  = &lcu->ref.v[offset];
-      coeff = &lcu->coeff.v[z_index];
+      pred      = &lcu->rec.v[offset];
+      ref       = &lcu->ref.v[offset];
+      dst_coeff = &lcu->coeff.v[lcu_px.x + lcu_px.y * lcu_width];
+      break;
+    case COLOR_UV:
+      dst_coeff = &lcu->coeff.joint_uv[lcu_px.x + lcu_px.y * lcu_width];
       break;
     default:
       break;
@@ -1187,6 +1364,7 @@ static void quantize_tr_residual(
 
   if (cfg->lossless) {
     has_coeffs = bypass_transquant(tr_width,
+                                   tr_height,
                                    lcu_width, // in stride
                                    lcu_width, // out stride
                                    ref,
@@ -1196,9 +1374,9 @@ static void quantize_tr_residual(
     if (cfg->implicit_rdpcm && cur_pu->type == CU_INTRA) {
       // implicit rdpcm for horizontal and vertical intra modes
       if (mode == 18) {
-        rdpcm(tr_width, RDPCM_HOR, coeff);
+        rdpcm(tr_width, tr_height, RDPCM_HOR, coeff);
       } else if (mode == 50) {
-        rdpcm(tr_width, RDPCM_VER, coeff);
+        rdpcm(tr_width, tr_height, RDPCM_VER, coeff);
       }
     }
 
@@ -1209,6 +1387,7 @@ static void quantize_tr_residual(
     has_coeffs = uvg_quantize_residual_trskip(state,
                                               cur_pu,
                                               tr_width,
+                                              tr_height,
                                               color,
                                               scan_idx,
                                               &tr_skip,
@@ -1225,24 +1404,37 @@ static void quantize_tr_residual(
         state,
         cur_pu,
         tr_width,
+        tr_height,
         scan_idx,
         lcu_width,
         lcu_width,
         &lcu->ref.u[offset], &lcu->ref.v[offset],
         &lcu->rec.u[offset], &lcu->rec.v[offset],
         &lcu->rec.u[offset], &lcu->rec.v[offset],
-        &lcu->coeff.joint_uv[z_index],
+        coeff,
         early_skip,
         lmcs_chroma_adj,
         tree_type
       );
       cur_pu->joint_cb_cr = has_coeffs;
+      if (has_coeffs) {
+        for (int j = 0; j < tr_height; ++j) {
+          memcpy(&dst_coeff[j * lcu_width], &coeff[j * tr_width], tr_width * sizeof(coeff_t));
+        }
+        cbf_set(&cur_pu->cbf, COLOR_U);
+      }
+      else {
+        for (int j = 0; j < tr_height; ++j) {
+          memset(&dst_coeff[j * lcu_width], 0, (sizeof(coeff_t) * tr_width));
+        }
+      }
       return;
     }
 
     has_coeffs = uvg_quantize_residual(state,
                                        cur_pu,
                                        tr_width,
+                                       tr_height,
                                        color,
                                        scan_idx,
                                        false, // tr skip
@@ -1258,11 +1450,18 @@ static void quantize_tr_residual(
     
   }
 
-  cbf_clear(&cur_pu->cbf, depth, color);
+  cbf_clear(&cur_pu->cbf, color);
   if (has_coeffs) {
-    cbf_set(&cur_pu->cbf, depth, color);
+    for (int j = 0; j < tr_height; ++j) {
+      memcpy(&dst_coeff[j * lcu_width], &coeff[j * tr_width], tr_width * sizeof(coeff_t));
+    }
+    cbf_set(&cur_pu->cbf, color);
   }
-
+  else {
+    for (int j = 0; j < tr_height; ++j) {
+      memset(&dst_coeff[j * lcu_width], 0, (sizeof(coeff_t) * tr_width));
+    }
+  }
 }
 
 /**
@@ -1287,15 +1486,17 @@ void uvg_quantize_lcu_residual(
   const bool luma,
   const bool chroma,
   const bool jccr,
-  const int32_t x,
-  const int32_t y,
-  const uint8_t depth,
+  const cu_loc_t * cu_loc,
   cu_info_t *cur_pu,
   lcu_t* lcu,
   bool early_skip,
   enum uvg_tree_type tree_type)
 {
-  const int32_t width = LCU_WIDTH >> depth;
+  const int x = cu_loc->x;
+  const int y = cu_loc->y;
+  const int width = cu_loc->width;
+  const int height = cu_loc->height;
+  
   const vector2d_t lcu_px  = { SUB_SCU(x), SUB_SCU(y) };
 
   if (cur_pu == NULL) {
@@ -1304,7 +1505,10 @@ void uvg_quantize_lcu_residual(
 
   // Tell clang-analyzer what is up. For some reason it can't figure out from
   // asserting just depth.
-  assert(width ==  4 ||
+  // Width 2 is possible with ISP blocks // ISP_TODO: no, they actually are not
+  assert(width ==  1 ||
+         width ==  2 ||
+         width ==  4 ||
          width ==  8 ||
          width == 16 ||
          width == 32 ||
@@ -1312,54 +1516,79 @@ void uvg_quantize_lcu_residual(
 
   // Reset CBFs because CBFs might have been set
   // for depth earlier
+  // ISP_TODO: does this cur_cu point to the correct place when ISP is used for small blocks?
   if (luma) {
-    cbf_clear(&cur_pu->cbf, depth, COLOR_Y);
+    cbf_clear(&cur_pu->cbf, COLOR_Y);
   }
   if (chroma || jccr) {
-    cbf_clear(&cur_pu->cbf, depth, COLOR_U);
-    cbf_clear(&cur_pu->cbf, depth, COLOR_V);
+    cbf_clear(&cur_pu->cbf, COLOR_U);
+    cbf_clear(&cur_pu->cbf, COLOR_V);
   }
 
-  if (depth == 0 || cur_pu->tr_depth > depth) {
-
-    // Split transform and increase depth
-    const int offset = width / 2;
-    const int32_t x2 = x + offset;
-    const int32_t y2 = y + offset;
-
-    // jccr is currently not supported if transform is split
-    uvg_quantize_lcu_residual(state, luma, chroma, 0,  x,  y, depth + 1, NULL, lcu, early_skip, tree_type);
-    uvg_quantize_lcu_residual(state, luma, chroma, 0, x2,  y, depth + 1, NULL, lcu, early_skip, tree_type);
-    uvg_quantize_lcu_residual(state, luma, chroma, 0,  x, y2, depth + 1, NULL, lcu, early_skip, tree_type);
-    uvg_quantize_lcu_residual(state, luma, chroma, 0, x2, y2, depth + 1, NULL, lcu, early_skip, tree_type);
-
-    // Propagate coded block flags from child CUs to parent CU.
-    uint16_t child_cbfs[3] = {
-      LCU_GET_CU_AT_PX(lcu, lcu_px.x + offset, lcu_px.y         )->cbf,
-      LCU_GET_CU_AT_PX(lcu, lcu_px.x,          lcu_px.y + offset)->cbf,
-      LCU_GET_CU_AT_PX(lcu, lcu_px.x + offset, lcu_px.y + offset)->cbf,
-    };
-
-    if (depth <= MAX_DEPTH) {
-      cbf_set_conditionally(&cur_pu->cbf, child_cbfs, depth, COLOR_Y);
-      cbf_set_conditionally(&cur_pu->cbf, child_cbfs, depth, COLOR_U);
-      cbf_set_conditionally(&cur_pu->cbf, child_cbfs, depth, COLOR_V);
+  if (cu_loc->width > TR_MAX_WIDTH || cu_loc->height > TR_MAX_WIDTH) {
+    enum split_type split;
+    if (cu_loc->width > TR_MAX_WIDTH && cu_loc->height > TR_MAX_WIDTH) {
+      split = QT_SPLIT;
     }
+    else if (cu_loc->width > TR_MAX_WIDTH) {
+      split = BT_VER_SPLIT;
+    }
+    else {
+      split = BT_HOR_SPLIT;
+    }
+
+    cu_loc_t split_cu_loc[4];
+    uint16_t child_cbfs[3];
+    const int split_count = uvg_get_split_locs(cu_loc, split, split_cu_loc,NULL);
+    
+    for (int i = 0; i < split_count; ++i) {
+      uvg_quantize_lcu_residual(state, luma, chroma, 0, &split_cu_loc[i], NULL, lcu, early_skip, tree_type);
+      if(i != 0) {
+        child_cbfs[i - 1] = LCU_GET_CU_AT_PX(lcu, split_cu_loc[i].local_x, split_cu_loc[i].local_y)->cbf;
+      }
+    }
+
+    
+    cur_pu->root_cbf = cbf_is_set_any(cur_pu->cbf)
+      || cbf_is_set_any(child_cbfs[0])
+      || cbf_is_set_any(child_cbfs[1])
+      || cbf_is_set_any(child_cbfs[2]);
+    
 
   } else {
     // Process a leaf TU.
+    cu_loc_t loc;
+    uvg_cu_loc_ctor(&loc, x, y, width, height);
+
     if (luma) {
-      quantize_tr_residual(state, COLOR_Y, x, y, depth, cur_pu, lcu, early_skip, tree_type);
+      quantize_tr_residual(state, COLOR_Y, &loc, cur_pu, lcu, early_skip, tree_type);
     }
+    double c_lambda = state->c_lambda;
+    state->c_lambda = uvg_calculate_chroma_lambda(state, state->encoder_control->cfg.jccr, cur_pu->joint_cb_cr);
     if (chroma) {
-      quantize_tr_residual(state, COLOR_U, x, y, depth, cur_pu, lcu, early_skip, tree_type);
-      quantize_tr_residual(state, COLOR_V, x, y, depth, cur_pu, lcu, early_skip, tree_type);   
+      state->rate_estimator[2].needs_init = true;
+      if(state->encoder_control->cfg.dep_quant) {
+        cabac_data_t temp_cabac;
+        memcpy(&temp_cabac, &state->search_cabac, sizeof(cabac_data_t));
+        state->search_cabac.update = 1;
+        quantize_tr_residual(state, COLOR_U, &loc, cur_pu, lcu, early_skip, tree_type);
+        cu_loc_t temp_chroma_loc;
+        uvg_cu_loc_ctor(&temp_chroma_loc, (cu_loc->x >> 1) % LCU_WIDTH_C, (cu_loc->y >> 1) % LCU_WIDTH_C, cu_loc->width, cu_loc->height);
+        uvg_get_coeff_cost(state, lcu->coeff.u, NULL, &temp_chroma_loc, COLOR_U, 0, (cur_pu->tr_skip & 2) >> 1, COEFF_ORDER_CU);
+        quantize_tr_residual(state, COLOR_V, &loc, cur_pu, lcu, early_skip, tree_type);
+        memcpy(&state->search_cabac, &temp_cabac, sizeof(cabac_data_t));
+      }
+      else {
+        quantize_tr_residual(state, COLOR_U, &loc, cur_pu, lcu, early_skip, tree_type);
+        quantize_tr_residual(state, COLOR_V, &loc, cur_pu, lcu, early_skip, tree_type);
+      }
     }
-    if (jccr && cur_pu->tr_depth == cur_pu->depth) {
-      quantize_tr_residual(state, COLOR_UV, x, y, depth, cur_pu, lcu, early_skip, tree_type);
+    if (jccr && PU_IS_TU(cur_pu)) {
+      quantize_tr_residual(state, COLOR_UV, &loc, cur_pu, lcu, early_skip, tree_type);
     }
-    if(chroma && jccr && cur_pu->tr_depth == cur_pu->depth) {
+    if(chroma && jccr && PU_IS_TU(cur_pu)) {
       assert( 0 && "Trying to quantize both jccr and regular at the same time.\n");
     }
+    state->c_lambda = c_lambda;
   }
 }

@@ -75,7 +75,8 @@ typedef struct {
    * \brief Possible optimized SAD implementation for the width, leave as
    *        NULL for arbitrary-width blocks
    */
-  optimized_sad_func_ptr_t optimized_sad;
+  optimized_sad_func_ptr_t optimized_sad_y;
+  optimized_sad_func_ptr_t optimized_sad_uv;
 
   lcu_t                   *lcu;
 
@@ -109,8 +110,10 @@ static INLINE bool fracmv_within_ibc_range(const ibc_search_info_t *info, int x,
 }
 
 
-static uint32_t calculate_ibc_cost_satd(const encoder_state_t *state, lcu_t* lcu, int32_t x, int32_t y, int32_t width, int32_t mv_x, int32_t mv_y)
+static uint32_t calculate_ibc_cost_satd(const encoder_state_t *state, lcu_t* lcu, const cu_loc_t* loc, int32_t mv_x, int32_t mv_y)
 {  
+  const uint32_t x = loc->x;
+  const uint32_t y = loc->y;
   const int x_scu    = SUB_SCU(x);
   const int y_scu    = SUB_SCU(y);
 
@@ -132,9 +135,11 @@ static uint32_t calculate_ibc_cost_satd(const encoder_state_t *state, lcu_t* lcu
   cur_cu->inter.mv[0][0]                  = mv_x * (1 << INTERNAL_MV_PREC);;
   cur_cu->inter.mv[0][1]                  = mv_y * (1 << INTERNAL_MV_PREC);;
 
-  uvg_inter_recon_cu(state, lcu, x, y, width, true, state->encoder_control->chroma_format != UVG_CSP_400);
+  uvg_inter_recon_cu(state, lcu, true, state->encoder_control->chroma_format != UVG_CSP_400, loc);
   
   *cur_cu = cu_backup;
+  uint32_t width = loc->width;
+  uint32_t height = loc->height;
 
   cost = uvg_satd_any_size(width,
                            width,
@@ -162,10 +167,15 @@ static uint32_t calculate_ibc_cost_satd(const encoder_state_t *state, lcu_t* lcu
 }
 
 
-static uint32_t calculate_ibc_cost_sad(const encoder_state_t *state, optimized_sad_func_ptr_t optimized_sad, lcu_t* lcu, int32_t x, int32_t y, int32_t width, int32_t mv_x, int32_t mv_y)
+static uint32_t calculate_ibc_cost_sad(ibc_search_info_t *info, const cu_loc_t* loc, int32_t mv_x, int32_t mv_y)
 {  
-  cu_info_t *cur_cu    = LCU_GET_CU_AT_PX(lcu, SUB_SCU(x), SUB_SCU(y));
-
+  const uint32_t x = loc->x;
+  const uint32_t y = loc->y;
+  lcu_t         *lcu    = info->lcu;
+  cu_info_t     *cur_cu     = LCU_GET_CU_AT_PX(lcu, SUB_SCU(x), SUB_SCU(y));
+  
+  const encoder_state_t* state = info->state;
+  
   cu_info_t cu_backup  = *cur_cu;
   uint32_t       cost  = MAX_INT;
 
@@ -173,6 +183,8 @@ static uint32_t calculate_ibc_cost_sad(const encoder_state_t *state, optimized_s
   const int y_scu    = SUB_SCU(y);
   const uint32_t offset = x_scu + y_scu * LCU_WIDTH;
   const uint32_t offset_c = x_scu / 2 + y_scu / 2 * LCU_WIDTH_C;
+  const uint32_t width = loc->width;
+  const uint32_t height = loc->height;
 
   cur_cu->type    = CU_IBC;
   cur_cu->inter.mv_dir   = 1;
@@ -183,23 +195,26 @@ static uint32_t calculate_ibc_cost_sad(const encoder_state_t *state, optimized_s
   cur_cu->inter.mv[0][0]                  = mv_x * (1 << INTERNAL_MV_PREC);;
   cur_cu->inter.mv[0][1]                  = mv_y * (1 << INTERNAL_MV_PREC);;
 
-  uvg_inter_recon_cu(state, lcu, x, y, width, true, state->encoder_control->chroma_format != UVG_CSP_400);
+  uvg_inter_recon_cu(state, lcu, true, state->encoder_control->chroma_format != UVG_CSP_400, loc);
   
   *cur_cu = cu_backup;
 
-  if (optimized_sad != NULL) {
-    cost = optimized_sad(lcu->rec.y + offset, &state->tile->frame->source->y[y * state->tile->frame->source->stride + x], width, LCU_WIDTH, state->tile->frame->source->stride);
-    if(state->encoder_control->chroma_format != UVG_CSP_400) {
-      cost += optimized_sad(lcu->rec.u + offset_c, &state->tile->frame->source->u[(y / 2) * state->tile->frame->source->stride / 2 + x / 2], width / 2, LCU_WIDTH_C, state->tile->frame->source->stride / 2);
-      cost += optimized_sad(lcu->rec.v + offset_c, &state->tile->frame->source->v[(y / 2) * state->tile->frame->source->stride / 2 + x / 2], width / 2, LCU_WIDTH_C, state->tile->frame->source->stride / 2);
-    }
+  if (info->optimized_sad_y != NULL) {
+    cost = info->optimized_sad_y(lcu->rec.y + offset, &state->tile->frame->source->y[y * state->tile->frame->source->stride + x], width, LCU_WIDTH, state->tile->frame->source->stride);
   } else {
     cost = uvg_reg_sad(lcu->rec.y + offset, &state->tile->frame->source->y[y * state->tile->frame->source->stride + x], width,width, LCU_WIDTH, state->tile->frame->source->stride);
-    if(state->encoder_control->chroma_format != UVG_CSP_400) {
+  }
+
+  // ToDo: Enable chroma cost calculation
+  /* if (state->encoder_control->chroma_format != UVG_CSP_400) {
+    if (info->optimized_sad_uv != NULL) {    
+      cost += info->optimized_sad_uv(lcu->rec.u + offset_c, &state->tile->frame->source->u[(y / 2) * state->tile->frame->source->stride / 2 + x / 2], width / 2, LCU_WIDTH_C, state->tile->frame->source->stride / 2);
+      cost += info->optimized_sad_uv(lcu->rec.v + offset_c, &state->tile->frame->source->v[(y / 2) * state->tile->frame->source->stride / 2 + x / 2], width / 2, LCU_WIDTH_C, state->tile->frame->source->stride / 2);
+    } else {
       cost += uvg_reg_sad(lcu->rec.u + offset_c, &state->tile->frame->source->u[(y / 2) * state->tile->frame->source->stride / 2 + x / 2], width / 2, width / 2, LCU_WIDTH_C, state->tile->frame->source->stride / 2);
       cost += uvg_reg_sad(lcu->rec.v + offset_c, &state->tile->frame->source->v[(y / 2) * state->tile->frame->source->stride / 2 + x / 2], width / 2, width / 2, LCU_WIDTH_C, state->tile->frame->source->stride / 2);
     }
-  }
+  }*/
 
   return cost;
 }
@@ -235,8 +250,11 @@ static bool check_mv_cost(ibc_search_info_t *info,
 
   double bitcost = 0;
   double cost    = MAX_DOUBLE;
+  cu_loc_t loc;
+  uvg_cu_loc_ctor(&loc, info->origin.x, info->origin.y, info->width, info->height);
 
-  cost = calculate_ibc_cost_sad(info->state, info->optimized_sad, info->lcu, info->origin.x, info->origin.y, info->width, x, y);
+
+  cost = calculate_ibc_cost_sad(info, &loc, x, y);
 
   if (cost >= *best_cost) return false;
 
@@ -246,7 +264,7 @@ static bool check_mv_cost(ibc_search_info_t *info,
       info->mv_cand,
       NULL,
       0,
-      NULL,
+      0,
       &bitcost
   );
 
@@ -782,63 +800,47 @@ static bool merge_candidate_in_list(inter_merge_cand_t *all_cands,
  * \param amvp        Return searched AMVP PUs sorted by costs
  * \param merge       Return searched Merge PUs sorted by costs
  */
-static void search_pu_ibc(encoder_state_t * const state,
-  int x_cu, int y_cu,
-  int depth,
-  part_mode_t part_mode,
-  int i_pu,
-  unit_stats_map_t *amvp,
-  unit_stats_map_t *merge,
-  ibc_search_info_t *info)
+static void search_pu_ibc(
+  encoder_state_t * const state,
+  const cu_loc_t * const  cu_loc,
+  unit_stats_map_t       *amvp,
+  unit_stats_map_t       *merge,
+  ibc_search_info_t      *info)
 {
-  const uvg_config *cfg = &state->encoder_control->cfg;
-  const videoframe_t * const frame = state->tile->frame;
-  const int width_cu = LCU_WIDTH >> depth;
-  const int x = PU_GET_X(part_mode, width_cu, x_cu, i_pu);
-  const int y = PU_GET_Y(part_mode, width_cu, y_cu, i_pu);
-  const int width = PU_GET_W(part_mode, width_cu, i_pu);
-  const int height = PU_GET_H(part_mode, width_cu, i_pu);
-
-  // Merge candidate A1 may not be used for the second PU of Nx2N, nLx2N and
-  // nRx2N partitions.
-  const bool merge_a1 = i_pu == 0 || width >= height;
-  // Merge candidate B1 may not be used for the second PU of 2NxN, 2NxnU and
-  // 2NxnD partitions.
-  const bool merge_b1 = i_pu == 0 || width <= height;
-
+  const uvg_config          *cfg      = &state->encoder_control->cfg;
+  const videoframe_t * const frame    = state->tile->frame;
+  const int                  width_cu = cu_loc->width;
+  const int                  height_cu= cu_loc->height;
 
   lcu_t                     *lcu      = info->lcu;
-  const int x_local = SUB_SCU(x);
-  const int y_local = SUB_SCU(y);
-  cu_info_t *cur_pu = LCU_GET_CU_AT_PX(lcu, x_local, y_local);
-  cur_pu->type = CU_IBC;
-  cur_pu->part_size = part_mode;
-  cur_pu->depth = depth;
-  cur_pu->tr_depth = depth;
-  cur_pu->qp = state->qp;
-  cur_pu->inter.mv_dir = 1;
+  const int                  x_local  = SUB_SCU(cu_loc->x);
+  const int                  y_local  = SUB_SCU(cu_loc->y);
+  cu_info_t                 *cur_pu   = LCU_GET_CU_AT_PX(lcu, x_local, y_local);
+  cur_pu->type                        = CU_IBC;
+  cur_pu->qp                          = state->qp;
+  cur_pu->inter.mv_dir                = 1;
 
   // Default to candidate 0
   CU_SET_MV_CAND(cur_pu, 0, 0);
-  
+
   FILL(*info, 0);
 
-  info->state          = state;
-  info->pic            = frame->source;
-  info->origin.x       = x;
-  info->origin.y       = y;
-  info->width          = width;
-  info->height         = height;
-  info->mvd_cost_func  = cfg->mv_rdo ? uvg_calc_ibc_mvd_cost_cabac : calc_ibc_mvd_cost;
-  info->optimized_sad  = uvg_get_optimized_sad(width);
-  info->lcu            = lcu;
+  info->state    = state;
+  info->pic      = frame->source;
+  info->origin.x = cu_loc->x;
+  info->origin.y = cu_loc->y;
+  info->width    = width_cu;
+  info->height   = height_cu;
+  info->mvd_cost_func =
+    cfg->mv_rdo ? uvg_calc_ibc_mvd_cost_cabac : calc_ibc_mvd_cost;
+  info->optimized_sad_y  = uvg_get_optimized_sad(width_cu);
+  info->optimized_sad_uv = uvg_get_optimized_sad(cu_loc->chroma_width);
+  info->lcu           = lcu;
 
   // Search for merge mode candidates
   info->num_merge_cand = uvg_inter_get_merge_cand(
                           state,
-                          x, y,
-                          width, height,
-                          merge_a1, merge_b1,
+                          cu_loc,
                           info->merge_cand,
                           lcu);
 
@@ -853,7 +855,7 @@ static void search_pu_ibc(encoder_state_t * const state,
 #ifdef COMPLETE_PRED_MODE_BITS
   // Technically counting these bits would be correct, however counting
   // them universally degrades quality so this block is disabled by default
-  const double no_skip_flag = CTX_ENTROPY_FBITS(&state->search_cabac.ctx.cu_skip_flag_model[uvg_get_skip_context(x, y, lcu, NULL)], 0);
+  const double no_skip_flag = CTX_ENTROPY_FBITS(&state->search_cabac.ctx.cu_skip_flag_model[uvg_get_skip_context(cu_loc->x, cu_loc->y, lcu, NULL)], 0);
 #else
   const double no_skip_flag = 0;
 #endif
@@ -875,7 +877,7 @@ static void search_pu_ibc(encoder_state_t * const state,
     {
       continue;
     }
-    uvg_inter_pred_pu(state, info->lcu, x_cu, y_cu, width_cu, true, false, i_pu);
+    uvg_inter_pred_pu(state, info->lcu, true, false, cu_loc);
     merge->unit[merge->size] = *cur_pu;
     merge->unit[merge->size].type = CU_IBC;
     merge->unit[merge->size].merge_idx = merge_idx;
@@ -883,11 +885,11 @@ static void search_pu_ibc(encoder_state_t * const state,
     merge->unit[merge->size].skipped = false;
 
     double bits = merge_flag_cost + merge_idx + CTX_ENTROPY_FBITS(&(state->search_cabac.ctx.cu_merge_idx_ext_model), merge_idx != 0);
-    if(state->encoder_control->cfg.rdo >= 2 && cur_pu->part_size == SIZE_2Nx2N) {
-      uvg_cu_cost_inter_rd2(state, x, y, depth, &merge->unit[merge->size], lcu, &merge->cost[merge->size], &bits);
+    if(state->encoder_control->cfg.rdo >= 2) {
+      uvg_cu_cost_inter_rd2(state, &merge->unit[merge->size], lcu, &merge->cost[merge->size], &bits, cu_loc);
     }
     else {
-      merge->cost[merge->size] = uvg_satd_any_size(width, height,
+      merge->cost[merge->size] = uvg_satd_any_size(width_cu, height_cu,
         lcu->rec.y + y_local * LCU_WIDTH + x_local, LCU_WIDTH,
         lcu->ref.y + y_local * LCU_WIDTH + x_local, LCU_WIDTH);
       bits += no_skip_flag;
@@ -909,7 +911,7 @@ static void search_pu_ibc(encoder_state_t * const state,
     
   // Early Skip Mode Decision
   bool has_chroma = state->encoder_control->chroma_format != UVG_CSP_400;
-  if (cfg->early_skip && cur_pu->part_size == SIZE_2Nx2N) {
+  if (cfg->early_skip) {
     for (int merge_key = 0; merge_key < num_rdo_cands; ++merge_key) {
       if(cfg->rdo >= 2 && merge->unit[merge->keys[merge_key]].skipped) {
         merge->size = 1;
@@ -919,6 +921,7 @@ static void search_pu_ibc(encoder_state_t * const state,
         merge->keys[0] = 0;
       }
       else if(cfg->rdo < 2) {
+        const uint8_t depth = 6 - uvg_g_convert_to_log2[cu_loc->width];
         // Reconstruct blocks with merge candidate.
         // Check luma CBF. Then, check chroma CBFs if luma CBF is not set
         // and chroma exists.
@@ -927,19 +930,18 @@ static void search_pu_ibc(encoder_state_t * const state,
         cur_pu->inter.mv_dir    = info->merge_cand[merge_idx].dir;
         cur_pu->inter.mv[0][0]  = info->merge_cand[merge_idx].mv[0][0];
         cur_pu->inter.mv[0][1]  = info->merge_cand[merge_idx].mv[0][1];
-        uvg_lcu_fill_trdepth(lcu, x, y, depth, MAX(1, depth), UVG_BOTH_T);
-        uvg_inter_recon_cu(state, lcu, x, y, width, true, false);
-        uvg_quantize_lcu_residual(state, true, false, false, x, y, depth, cur_pu, lcu, true, UVG_BOTH_T);
+        uvg_inter_recon_cu(state, lcu, true, false, cu_loc);
+        uvg_quantize_lcu_residual(state, true, false, false, cu_loc, cur_pu, lcu, true, UVG_BOTH_T);
 
-        if (cbf_is_set(cur_pu->cbf, depth, COLOR_Y)) {
+        if (cbf_is_set(cur_pu->cbf, COLOR_Y)) {
           continue;
         }
         else if (has_chroma) {
-          uvg_inter_recon_cu(state, lcu, x, y, width, false, has_chroma);
+          uvg_inter_recon_cu(state, lcu, false, has_chroma, cu_loc);
           uvg_quantize_lcu_residual(state, false, has_chroma, 
             false, /*we are only checking for lack of coeffs so no need to check jccr*/
-            x, y, depth, cur_pu, lcu, true, UVG_BOTH_T);
-          if (!cbf_is_set_any(cur_pu->cbf, depth)) {
+            cu_loc, cur_pu, lcu, true, UVG_BOTH_T);
+          if (!cbf_is_set_any(cur_pu->cbf)) {
             cur_pu->type = CU_IBC;
             cur_pu->merge_idx = merge_idx;
             cur_pu->skipped = true;
@@ -964,15 +966,12 @@ static void search_pu_ibc(encoder_state_t * const state,
 
   // Do the motion search
 
-  uvg_inter_get_mv_cand(info->state,
-    info->origin.x,
-    info->origin.y,
-    info->width,
-    info->height,
+  uvg_inter_get_mv_cand(info->state,    
     info->mv_cand,
     cur_pu,
     lcu,
-    NULL);
+    0,
+    cu_loc);
 
   vector2d_t best_mv = { 0, 0 };
 
@@ -1003,9 +1002,7 @@ static void search_pu_ibc(encoder_state_t * const state,
     best_cost = calculate_ibc_cost_satd(
       info->state,
       lcu,
-      info->origin.x,
-      info->origin.y,
-      info->width,
+      cu_loc,
       (best_mv.x >> INTERNAL_MV_PREC),
       (best_mv.y >> INTERNAL_MV_PREC));
     best_cost += best_bits * info->state->lambda;
@@ -1052,16 +1049,16 @@ static void search_pu_ibc(encoder_state_t * const state,
   };
 
 
-  if (state->encoder_control->cfg.rdo >= 2 && cur_pu->part_size == SIZE_2Nx2N) {
-    if (amvp[0].size) uvg_cu_cost_inter_rd2(state, x, y, depth, &amvp[0].unit[best_keys[0]], lcu, &amvp[0].cost[best_keys[0]], &amvp[0].bits[best_keys[0]]);    
+  if (state->encoder_control->cfg.rdo >= 2) {
+    if (amvp[0].size) uvg_cu_cost_inter_rd2(state, &amvp[0].unit[best_keys[0]], lcu, &amvp[0].cost[best_keys[0]], &amvp[0].bits[best_keys[0]], cu_loc);    
   }
 
 
   if(cfg->rdo < 2) {
     int predmode_ctx;
 
-    const int ibc_flag = CTX_ENTROPY_FBITS(&state->search_cabac.ctx.ibc_flag[0], 1) * 3;
-    const int skip_contest = uvg_get_skip_context(x, y, lcu, NULL, &predmode_ctx);
+    const float ibc_flag = CTX_ENTROPY_FBITS(&state->search_cabac.ctx.ibc_flag[0], 1);
+    const int skip_contest = uvg_get_skip_context(cu_loc->x, cu_loc->y, lcu, NULL, &predmode_ctx);
     const double no_skip_flag = CTX_ENTROPY_FBITS(&state->search_cabac.ctx.cu_skip_flag_model[skip_contest], 0);
 
     const double pred_mode_bits = CTX_ENTROPY_FBITS(&state->search_cabac.ctx.cu_pred_mode_model[predmode_ctx], 0);
@@ -1077,33 +1074,29 @@ static void search_pu_ibc(encoder_state_t * const state,
 #include "threads.h"
 
 static int uvg_search_hash_cu_ibc(encoder_state_t* const state,
-  int x, int y, int depth,
+  const cu_loc_t* cu_loc,
   lcu_t* lcu,
   double* inter_cost,
   double* inter_bitcost)
 {
-  const int x_cu = x;
-  const int y_cu = y;
+  const int x_cu = cu_loc->x;
+  const int y_cu = cu_loc->y;
   const int part_mode = SIZE_2Nx2N;
   const uvg_config          *cfg      = &state->encoder_control->cfg;
   const videoframe_t * const frame    = state->tile->frame;
-  const int                  width_cu = LCU_WIDTH >> depth;
-  const int                  width    = PU_GET_W(part_mode, width_cu, 0);
-  const int                  height   = PU_GET_H(part_mode, width_cu, 0);
+  const int                  width_cu = cu_loc->width;
+  const int                  height_cu = cu_loc->height;
 
   const bool                 merge_a1  = true;
   const bool                 merge_b1  = true;
 
   ibc_search_info_t info;
 
-  const int  x_local = SUB_SCU(x);
-  const int  y_local = SUB_SCU(y);
+  const int  x_local = SUB_SCU(x_cu);
+  const int  y_local = SUB_SCU(y_cu);
   cu_info_t *cur_pu  = LCU_GET_CU_AT_PX(lcu, x_local, y_local);
 
   cur_pu->type       = CU_IBC;
-  cur_pu->part_size  = part_mode;
-  cur_pu->depth      = depth;
-  cur_pu->tr_depth   = depth;
   cur_pu->qp         = state->qp;
 
   // Default to candidate 0
@@ -1113,24 +1106,20 @@ static int uvg_search_hash_cu_ibc(encoder_state_t* const state,
 
   info.state    = state;
   info.pic      = frame->source;
-  info.origin.x = x;
-  info.origin.y = y;
-  info.width    = width;
-  info.height   = height;
+  info.origin.x = cu_loc->x;
+  info.origin.y = cu_loc->y;
+  info.width    = width_cu;
+  info.height   = height_cu;
   info.mvd_cost_func =
     cfg->mv_rdo ? uvg_calc_ibc_mvd_cost_cabac : calc_ibc_mvd_cost;
-  info.optimized_sad  = uvg_get_optimized_sad(width);
+  info.optimized_sad_y  = uvg_get_optimized_sad(width_cu);
+  info.optimized_sad_uv = uvg_get_optimized_sad(cu_loc->chroma_width);
   info.lcu            = lcu;
 
   // Search for merge mode candidates
   info.num_merge_cand = uvg_inter_get_merge_cand(
     state,
-    x,
-    y,
-    width,
-    height,
-    merge_a1,
-    merge_b1,
+    cu_loc,
     info.merge_cand,
     lcu);
 
@@ -1145,17 +1134,12 @@ static int uvg_search_hash_cu_ibc(encoder_state_t* const state,
   static int    evaluations = 0;
   static int hits = 0;
 
-
-  UVG_CLOCK_T   hashmap_start_temp;
-  UVG_CLOCK_T   hashmap_end_temp;
-
-
   UVG_CLOCK_T   hashmap_start_real_time;
   UVG_CLOCK_T   hashmap_end_real_time;
   UVG_GET_TIME(&hashmap_start_real_time);
 
-  int           xx  = x;
-  int           yy  = y;
+  int           xx  = x_cu;
+  int           yy  = y_cu;
 
   int           best_mv_x    = INT_MAX>>2;
   int           best_mv_y    = INT_MAX>>2;
@@ -1185,12 +1169,12 @@ static int uvg_search_hash_cu_ibc(encoder_state_t* const state,
       int pos_y = result->value & 0xffff;
       int mv_x = pos_x - xx;
       int mv_y = pos_y - yy;
-      if (pos_x <= xx - width && pos_y <= yy - height) {
+      if (pos_x <= xx - width_cu && pos_y <= yy - height_cu) {
         valid_mv = intmv_within_ibc_range(&info, mv_x, mv_y);
         if (valid_mv) {
           bool full_block = true; // Is the full block covered by the IBC?
-          for (int offset_x = UVG_HASHMAP_BLOCKSIZE; offset_x < width; offset_x+=UVG_HASHMAP_BLOCKSIZE) {
-            for (int offset_y = 0; offset_y < height; offset_y += UVG_HASHMAP_BLOCKSIZE) {
+          for (int offset_x = UVG_HASHMAP_BLOCKSIZE; offset_x < width_cu; offset_x+=UVG_HASHMAP_BLOCKSIZE) {
+            for (int offset_y = 0; offset_y < height_cu; offset_y += UVG_HASHMAP_BLOCKSIZE) {
               uint32_t crc_other_blocks = state->tile->frame->ibc_hashmap_pos_to_hash[
                 ((yy+offset_y) / UVG_HASHMAP_BLOCKSIZE)*state->tile->frame->ibc_hashmap_pos_to_hash_stride + (xx+offset_x) / UVG_HASHMAP_BLOCKSIZE];
 
@@ -1211,7 +1195,7 @@ static int uvg_search_hash_cu_ibc(encoder_state_t* const state,
           if (full_block) {
             double     cost = ibc_cost, bits = ibc_bitcost;
             vector2d_t mv = { best_mv_x, best_mv_y};
-            cost = calc_ibc_mvd_cost(state, mv_x, mv_y,INTERNAL_MV_PREC,info.mv_cand, info.merge_cand, info.num_merge_cand, NULL, &bits);
+            cost = calc_ibc_mvd_cost(state, mv_x, mv_y,INTERNAL_MV_PREC,info.mv_cand, info.merge_cand, info.num_merge_cand, 0, &bits);
             //double cost    = get_ibc_mvd_coding_cost(state, &state->cabac, mv_x,mv_y) * state->lambda_sqrt;
             //cost += 
             bool better_mv = cost < ibc_cost;
@@ -1220,7 +1204,7 @@ static int uvg_search_hash_cu_ibc(encoder_state_t* const state,
               best_mv_y              = mv_y;
               ibc_cost               = cost;
               ibc_bitcost            = bits;
-              fprintf(stderr, "Found best IBC!! %dx%d %dx%d: %d,%d\r\n", x,y, width,width, mv_x, mv_y);
+              fprintf(stderr, "Found best IBC!! %dx%d %dx%d: %d,%d\r\n", x_cu,y_cu, width_cu,height_cu, mv_x, mv_y);
               found_block = true;
               //break;
             }
@@ -1238,7 +1222,7 @@ static int uvg_search_hash_cu_ibc(encoder_state_t* const state,
   //if (x > state->tile->frame->width-64 && y > state->tile->frame->height-64)
     //fprintf(stderr, "Hashmap time: %f (crc: %f, search: %f) Evaluations: %d Hits: %d, hashed in this block: %d\n", time_spent,crc_time, search_time, evaluations, hits,hashes_found);
    
-  if (!found_block) return;
+  if (!found_block) return 0;
 
   *inter_cost    = ibc_cost;
   *inter_bitcost = ibc_bitcost;
@@ -1267,18 +1251,16 @@ static int uvg_search_hash_cu_ibc(encoder_state_t* const state,
   cur_pu->skipped = merged;
   
 
-  const int ibc_flag = CTX_ENTROPY_FBITS(&state->search_cabac.ctx.ibc_flag[0], 1);
+  const float ibc_flag = CTX_ENTROPY_FBITS(&state->search_cabac.ctx.ibc_flag[0], 1);
   ibc_cost += ibc_flag * state->lambda;
   ibc_bitcost += ibc_flag;
 
   uvg_inter_recon_cu(
     state,
     lcu,
-    x,
-    y,
-    CU_WIDTH_FROM_DEPTH(depth),
     true,
-    state->encoder_control->chroma_format != UVG_CSP_400);
+    state->encoder_control->chroma_format != UVG_CSP_400,
+    cu_loc);
 
   if (*inter_cost < MAX_DOUBLE) {
     assert(fracmv_within_ibc_range(
@@ -1286,7 +1268,7 @@ static int uvg_search_hash_cu_ibc(encoder_state_t* const state,
       cur_pu->inter.mv[0][0],
       cur_pu->inter.mv[0][1]));
   }
-
+  return 1;
 }
 
 
@@ -1305,17 +1287,18 @@ static int uvg_search_hash_cu_ibc(encoder_state_t* const state,
  * \param inter_bitcost Return inter bitcost
  */
 void uvg_search_cu_ibc(encoder_state_t * const state,
-                         int x, int y, int depth,
-                         lcu_t *lcu,
-                         double   *inter_cost,
-                         double* inter_bitcost)
+                       const cu_loc_t * const  cu_loc,
+                       lcu_t *lcu,
+                       double   *inter_cost,
+                       double* inter_bitcost)
 {
   *inter_cost = MAX_DOUBLE;
   *inter_bitcost = MAX_INT;
+
    // Quick hashmap search
   /* uvg_search_hash_cu_ibc(
     state,
-                          x, y, depth,
+                          cu_loc,
                           lcu,
                           inter_cost,
                           inter_bitcost);
@@ -1330,8 +1313,7 @@ void uvg_search_cu_ibc(encoder_state_t * const state,
   info.lcu = lcu;
 
   search_pu_ibc(state,
-                  x, y, depth,
-                  SIZE_2Nx2N, 0,
+                  cu_loc,
                   amvp,
                   &merge,
                   &info);
@@ -1374,14 +1356,14 @@ void uvg_search_cu_ibc(encoder_state_t * const state,
     return;
   }
 
-  const int x_local = SUB_SCU(x);
-  const int y_local = SUB_SCU(y);
+  const int  x_local = SUB_SCU(cu_loc->x);
+  const int  y_local = SUB_SCU(cu_loc->y);
   cu_info_t *cur_pu = LCU_GET_CU_AT_PX(lcu, x_local, y_local);
   *cur_pu = *best_inter_pu;
   cur_pu->type       = CU_IBC;
 
-  uvg_inter_recon_cu(state, lcu, x, y, CU_WIDTH_FROM_DEPTH(depth),
-    true, state->encoder_control->chroma_format != UVG_CSP_400);   
+  uvg_inter_recon_cu(state, lcu, 
+    true, state->encoder_control->chroma_format != UVG_CSP_400, cu_loc);   
 
   if (*inter_cost < MAX_DOUBLE) {    
     assert(fracmv_within_ibc_range(&info, cur_pu->inter.mv[0][0], cur_pu->inter.mv[0][1]));

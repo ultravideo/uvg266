@@ -134,6 +134,15 @@ typedef enum
  */
 extern const uint32_t* const uvg_g_sig_last_scan[3][5];
 extern const int8_t uvg_g_convert_to_bit[LCU_WIDTH + 1];
+extern const int8_t uvg_g_convert_to_log2[LCU_WIDTH + 1];
 extern const uint32_t uvg_g_log2_sbb_size[7 + 1][7 + 1][2];
+
+#define SCAN_GROUP_TYPES 2
+#define MAX_LOG2_INDEX 7
+
+#define SCAN_GROUP_UNGROUPED 0
+#define SCAN_GROUP_4X4 1
+
+const uint32_t* const uvg_get_scan_order_table(int scan_group, int scan_type, int log2_w, int log2_h);
 
 #endif //TABLES_H_

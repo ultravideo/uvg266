@@ -77,55 +77,6 @@ typedef enum {
   MTS_TR_NUM    = 6,
 } mts_idx;
 
-extern const uint8_t uvg_part_mode_num_parts[];
-extern const uint8_t uvg_part_mode_offsets[][4][2];
-extern const uint8_t uvg_part_mode_sizes[][4][2];
-
-/**
- * \brief Get the x coordinate of a PU.
- *
- * \param part_mode   partition mode of the containing CU
- * \param cu_width    width of the containing CU
- * \param cu_x        x coordinate of the containing CU
- * \param i           number of the PU
- * \return            location of the left edge of the PU
- */
-#define PU_GET_X(part_mode, cu_width, cu_x, i) \
-  ((cu_x) + uvg_part_mode_offsets[(part_mode)][(i)][0] * (cu_width) / 4)
-
-/**
- * \brief Get the y coordinate of a PU.
- *
- * \param part_mode   partition mode of the containing CU
- * \param cu_width    width of the containing CU
- * \param cu_y        y coordinate of the containing CU
- * \param i           number of the PU
- * \return            location of the top edge of the PU
- */
-#define PU_GET_Y(part_mode, cu_width, cu_y, i) \
-  ((cu_y) + uvg_part_mode_offsets[(part_mode)][(i)][1] * (cu_width) / 4)
-
-/**
- * \brief Get the width of a PU.
- *
- * \param part_mode   partition mode of the containing CU
- * \param cu_width    width of the containing CU
- * \param i           number of the PU
- * \return            width of the PU
- */
-#define PU_GET_W(part_mode, cu_width, i) \
-  (uvg_part_mode_sizes[(part_mode)][(i)][0] * (cu_width) / 4)
-
-/**
- * \brief Get the height of a PU.
- *
- * \param part_mode   partition mode of the containing CU
- * \param cu_width    width of the containing CU
- * \param i           number of the PU
- * \return            height of the PU
- */
-#define PU_GET_H(part_mode, cu_width, i) \
-  (uvg_part_mode_sizes[(part_mode)][(i)][1] * (cu_width) / 4)
 
 //////////////////////////////////////////////////////////////////////////
 // TYPES
@@ -142,23 +93,52 @@ enum uvg_tree_type {
   UVG_CHROMA_T = 2
 };
 
+enum split_type {
+  NO_SPLIT = 0,
+  QT_SPLIT = 1,
+  BT_HOR_SPLIT = 2,
+  BT_VER_SPLIT = 3,
+  TT_HOR_SPLIT = 4,
+  TT_VER_SPLIT = 5,
+};
+
+typedef struct  {
+  uint32_t split_tree;
+  uint8_t current_depth;
+  uint8_t mtt_depth;
+  uint8_t implicit_mtt_depth;
+  uint8_t part_index;
+} split_tree_t;
+
+
+// Split for each depth takes three bits like xxy where if either x bit is set
+// it is a MTT split, and if there are any MTT split QT split is not allowed
+#define CAN_QT_SPLIT(x) (((x) & 6DB6DB6) == 0)
+
 /**
  * \brief Struct for CU info
  */
 typedef struct
 {
   uint8_t type        : 3; //!< \brief block type, one of cu_type_t values
-  uint8_t depth       : 3; //!< \brief depth / size of this block
-  uint8_t part_size   : 3; //!< \brief partition mode, one of part_mode_t values
-  uint8_t tr_depth    : 3; //!< \brief transform depth
   uint8_t skipped     : 1; //!< \brief flag to indicate this block is skipped
   uint8_t merged      : 1; //!< \brief flag to indicate this block is merged
   uint8_t merge_idx   : 3; //!< \brief merge index
   uint8_t tr_skip     : 3; //!< \brief transform skip flag
   uint8_t tr_idx      : 3; //!< \brief transform index
-  uint8_t joint_cb_cr : 3; //!< \brief joint chroma residual coding 
+  uint8_t joint_cb_cr : 2; //!< \brief joint chroma residual coding 
+
+  uint8_t log2_width : 3;
+  uint8_t log2_height : 3;
+
+  uint8_t log2_chroma_width : 3;
+  uint8_t log2_chroma_height : 3;
 
   uint16_t cbf;
+
+  uint8_t root_cbf;
+
+  uint32_t split_tree : 3 * 9;
 
   /**
    * \brief QP used for the CU.
@@ -172,11 +152,14 @@ typedef struct
   uint8_t violates_mts_coeff_constraint : 1;
   uint8_t mts_last_scan_pos : 1;
 
-  uint8_t violates_lfnst_constrained_luma : 1; // Two types, luma and chroma. Luma index is 0.
-  uint8_t violates_lfnst_constrained_chroma : 1; // Two types, luma and chroma. Luma index is 0.
+  uint8_t violates_lfnst_constrained_luma : 1;
+  uint8_t violates_lfnst_constrained_chroma : 1;
   uint8_t lfnst_last_scan_pos : 1;
   uint8_t lfnst_idx : 2;
   uint8_t cr_lfnst_idx : 2;
+
+  uint8_t luma_deblocking : 2;
+  uint8_t chroma_deblocking : 2;
 
   union {
     struct {
@@ -185,6 +168,9 @@ typedef struct
       uint8_t multi_ref_idx;
       int8_t mip_flag;
       int8_t mip_is_transposed;
+      int8_t isp_mode;
+      uint8_t isp_cbfs : 4;
+      uint8_t isp_index : 2;
     } intra;
     struct {
       mv_t    mv[2][2];  // \brief Motion vectors for L0 and L1
@@ -200,11 +186,24 @@ typedef struct
 typedef struct {
   int16_t x;
   int16_t y;
+  uint8_t local_x;
+  uint8_t local_y;
   int8_t width;
   int8_t height;
   int8_t chroma_width;
   int8_t chroma_height;
 } cu_loc_t;
+
+void uvg_cu_loc_ctor(cu_loc_t *loc, int x, int y, int width, int height);
+typedef struct encoder_state_t encoder_state_t;
+
+int uvg_get_split_locs(
+  const cu_loc_t* const origin,
+  enum split_type split,
+  cu_loc_t out[4],
+  uint8_t* separate_chroma);
+int uvg_get_possible_splits(const encoder_state_t* const state,
+                            const cu_loc_t* const cu_loc, split_tree_t split_tree, enum uvg_tree_type tree_type, bool splits[6]);
 
 
 #define CU_GET_MV_CAND(cu_info_ptr, reflist) \
@@ -219,7 +218,7 @@ typedef struct {
     } \
   } while (0)
 
-#define CHECKPOINT_CU(prefix_str, cu) CHECKPOINT(prefix_str " type=%d depth=%d part_size=%d tr_depth=%d coded=%d " \
+#define CHECKPOINT_CU(prefix_str, cu) CHECKPOINT(prefix_str " type=%d part_size=%d coded=%d " \
   "skipped=%d merged=%d merge_idx=%d cbf.y=%d cbf.u=%d cbf.v=%d " \
   "intra[0].cost=%u intra[0].bitcost=%u intra[0].mode=%d intra[0].mode_chroma=%d intra[0].tr_skip=%d " \
   "intra[1].cost=%u intra[1].bitcost=%u intra[1].mode=%d intra[1].mode_chroma=%d intra[1].tr_skip=%d " \
@@ -227,7 +226,7 @@ typedef struct {
   "intra[3].cost=%u intra[3].bitcost=%u intra[3].mode=%d intra[3].mode_chroma=%d intra[3].tr_skip=%d " \
   "inter.cost=%u inter.bitcost=%u inter.mv[0]=%d inter.mv[1]=%d inter.mvd[0]=%d inter.mvd[1]=%d " \
   "inter.mv_cand=%d inter.mv_ref=%d inter.mv_dir=%d inter.mode=%d" \
-  , (cu).type, (cu).depth, (cu).part_size, (cu).tr_depth, (cu).coded, \
+  , (cu).type, (cu).part_size, (cu).coded, \
   (cu).skipped, (cu).merged, (cu).merge_idx, (cu).cbf.y, (cu).cbf.u, (cu).cbf.v, \
   (cu).intra[0].cost, (cu).intra[0].bitcost, (cu).intra[0].mode, (cu).intra[0].mode_chroma, (cu).intra[0].tr_skip, \
   (cu).intra[1].cost, (cu).intra[1].bitcost, (cu).intra[1].mode, (cu).intra[1].mode_chroma, (cu).intra[1].tr_skip, \
@@ -246,6 +245,7 @@ typedef struct cu_array_t {
 } cu_array_t;
 
 cu_info_t* uvg_cu_array_at(cu_array_t *cua, unsigned x_px, unsigned y_px);
+void uvg_get_isp_cu_arr_coords(int* x, int* y, int dim);
 const cu_info_t* uvg_cu_array_at_const(const cu_array_t *cua, unsigned x_px, unsigned y_px);
 
 cu_array_t * uvg_cu_array_alloc(const int width, const int height);
@@ -382,8 +382,9 @@ typedef struct {
   cu_info_t cu[LCU_T_CU_WIDTH * LCU_T_CU_WIDTH + 1];
 } lcu_t;
 
-void uvg_cu_array_copy_from_lcu(cu_array_t* dst, int dst_x, int dst_y, const lcu_t *src, enum uvg_tree_type
-                                tree_type);
+void uvg_cu_array_copy_from_lcu(cu_array_t* dst, int dst_x, int dst_y, const lcu_t *src);
+
+int uvg_count_available_edge_cus(const cu_loc_t* const cu_loc, const lcu_t* const lcu, bool left);
 
 /**
  * \brief Return pointer to the top right reference CU.
@@ -412,9 +413,11 @@ void uvg_cu_array_copy_from_lcu(cu_array_t* dst, int dst_x, int dst_y, const lcu
  */
 static INLINE void copy_coeffs(const coeff_t *__restrict src,
                                coeff_t *__restrict dest,
-                               size_t width)
+                               size_t width, size_t height, const int lcu_width)
 {
-  memcpy(dest, src, width * width * sizeof(coeff_t));
+  for (int j = 0; j < height; ++j) {
+    memcpy(dest + j * lcu_width, src + j * lcu_width, width * sizeof(coeff_t));
+  }
 }
 
 
@@ -554,56 +557,52 @@ static INLINE unsigned xy_to_zorder(unsigned width, unsigned x, unsigned y)
 } while(0)
 
 
-#define NUM_CBF_DEPTHS 5
-static const uint16_t cbf_masks[NUM_CBF_DEPTHS] = { 0x1f, 0x0f, 0x07, 0x03, 0x1 };
-
 /**
  * Check if CBF in a given level >= depth is true.
  */
-static INLINE int cbf_is_set(uint16_t cbf, int depth, color_t plane)
+static INLINE int cbf_is_set(uint16_t cbf, color_t plane)
 {
-  return (cbf & (cbf_masks[depth] << (NUM_CBF_DEPTHS * plane))) != 0;
+  return (cbf & (1 << (plane))) != 0;
 }
 
 /**
  * Check if CBF in a given level >= depth is true.
  */
-static INLINE int cbf_is_set_any(uint16_t cbf, int depth)
+static INLINE int cbf_is_set_any(uint16_t cbf)
 {
-  return cbf_is_set(cbf, depth, COLOR_Y) ||
-         cbf_is_set(cbf, depth, COLOR_U) ||
-         cbf_is_set(cbf, depth, COLOR_V);
+  return cbf_is_set(cbf, COLOR_Y) ||
+         cbf_is_set(cbf, COLOR_U) ||
+         cbf_is_set(cbf, COLOR_V);
 }
 
 /**
  * Set CBF in a level to true.
  */
-static INLINE void cbf_set(uint16_t *cbf, int depth, color_t plane)
+static INLINE void cbf_set(uint16_t *cbf, color_t plane)
 {
   // Return value of the bit corresponding to the level.
-  *cbf |= (0x10 >> depth) << (NUM_CBF_DEPTHS * plane);
+  *cbf |= (1) << (plane);
 }
 
 /**
  * Set CBF in a level to true if it is set at a lower level in any of
  * the child_cbfs.
  */
-static INLINE void cbf_set_conditionally(uint16_t *cbf, uint16_t child_cbfs[3], int depth, color_t plane)
+static INLINE void cbf_set_conditionally(uint16_t *cbf, uint16_t child_cbfs[3], color_t plane)
 {
-  bool child_cbf_set = cbf_is_set(child_cbfs[0], depth + 1, plane) ||
-                       cbf_is_set(child_cbfs[1], depth + 1, plane) ||
-                       cbf_is_set(child_cbfs[2], depth + 1, plane);
+  bool child_cbf_set = cbf_is_set(child_cbfs[0], plane) ||
+                       cbf_is_set(child_cbfs[1], plane) ||
+                       cbf_is_set(child_cbfs[2], plane);
   if (child_cbf_set) {
-    cbf_set(cbf, depth, plane);
+    cbf_set(cbf, plane);
   }
 }
 
 /**
- * Set CBF in a levels <= depth to false.
  */
-static INLINE void cbf_clear(uint16_t *cbf, int depth, color_t plane)
+static INLINE void cbf_clear(uint16_t *cbf, color_t plane)
 {
-  *cbf &= ~(cbf_masks[depth] << (NUM_CBF_DEPTHS * plane));
+  *cbf &= ~(1 << (plane));
 }
 
 /**
@@ -611,11 +610,11 @@ static INLINE void cbf_clear(uint16_t *cbf, int depth, color_t plane)
  */
 static INLINE void cbf_copy(uint16_t *cbf, uint16_t src, color_t plane)
 {
-  cbf_clear(cbf, 0, plane);
-  *cbf |= src & (cbf_masks[0] << (NUM_CBF_DEPTHS * plane));
+  cbf_clear(cbf, plane);
+  *cbf |= src & (1 <<  plane);
 }
 
-#define GET_SPLITDATA(CU,curDepth) ((CU)->depth > curDepth)
-#define SET_SPLITDATA(CU,flag) { (CU)->split=(flag); }
+#define GET_SPLITDATA(CU,curDepth) ((CU)->split_tree >> ((MAX((curDepth), 0) * 3)) & 7)
+#define PU_IS_TU(cu) ((cu)->log2_width <= TR_MAX_LOG2_SIZE && (cu)->log2_height <= TR_MAX_LOG2_SIZE)
 
 #endif

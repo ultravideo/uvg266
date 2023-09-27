@@ -73,11 +73,12 @@ typedef double uvg_mvd_cost_func(const encoder_state_t *state,
                                   int32_t ref_idx,
                                   double *bitcost);
 
-void uvg_search_cu_inter(encoder_state_t * const state,
-                         int x, int y, int depth,
-                         lcu_t *lcu,
-                         double *inter_cost,
-                         double* inter_bitcost);
+void uvg_search_cu_inter(
+  encoder_state_t * const state,
+  const cu_loc_t* const cu_loc,
+  lcu_t *lcu,
+  double *inter_cost,
+  double* inter_bitcost);
 
 
 
@@ -85,12 +86,13 @@ unsigned uvg_inter_satd_cost(const encoder_state_t* state,
                              const lcu_t *lcu,
                              int x,
                              int y);
-void uvg_cu_cost_inter_rd2(encoder_state_t* const state,
-  int x, int y, int depth,
+void uvg_cu_cost_inter_rd2(
+  encoder_state_t* const state,
   cu_info_t* cur_cu,
   lcu_t* lcu,
   double* inter_cost,
-  double* inter_bitcost);
+  double* inter_bitcost,
+  const cu_loc_t* const cu_loc);
 
 int uvg_get_skip_context(int x, int y, lcu_t* const lcu, cu_array_t* const cu_a, int* predmode_ctx);
 

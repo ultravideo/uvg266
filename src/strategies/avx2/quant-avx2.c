@@ -380,19 +380,23 @@ void uvg_quant_avx2(const encoder_state_t * const state, const coeff_t * __restr
   int32_t height, color_t color, int8_t scan_idx, int8_t block_type, int8_t transform_skip, uint8_t lfnst_idx)
 {
   const encoder_control_t * const encoder = state->encoder_control;
-  const uint32_t log2_block_size = uvg_g_convert_to_bit[width] + 2;
-  const uint32_t * const scan = uvg_g_sig_last_scan[scan_idx][log2_block_size - 1];
+  const uint32_t log2_tr_width  = uvg_g_convert_to_log2[width];
+  const uint32_t log2_tr_height = uvg_g_convert_to_log2[height];
+  const uint32_t* const scan = uvg_get_scan_order_table(SCAN_GROUP_4X4, scan_idx, log2_tr_width, log2_tr_height);
 
   int32_t qp_scaled = uvg_get_scaled_qp(color, state->qp, (encoder->bitdepth - 8) * 6, encoder->qp_map[0]);
   qp_scaled = transform_skip ? MAX(qp_scaled, 4 + 6 * MIN_QP_PRIME_TS) : qp_scaled;
-  uint32_t log2_tr_width = uvg_math_floor_log2(height);
-  uint32_t log2_tr_height = uvg_math_floor_log2(width);
+  bool needs_block_size_trafo_scale = !transform_skip && ((log2_tr_height + log2_tr_width) % 2 == 1);
+  needs_block_size_trafo_scale |= 0; // Non log2 block size
+  
   const int32_t scalinglist_type = (block_type == CU_INTRA ? 0 : 3) + (int8_t)color;
   const int32_t *quant_coeff = encoder->scaling_list.quant_coeff[log2_tr_width][log2_tr_height][scalinglist_type][qp_scaled % 6];
   const int32_t transform_shift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - ((log2_tr_width + log2_tr_height) >> 1); //!< Represents scaling through forward transform
-  const int64_t q_bits = QUANT_SHIFT + qp_scaled / 6 + (transform_skip ? 0 : transform_shift);
+  const int64_t q_bits = QUANT_SHIFT + qp_scaled / 6 + (transform_skip ? 0 : transform_shift - needs_block_size_trafo_scale);
   const int32_t add = ((state->frame->slicetype == UVG_SLICE_I) ? 171 : 85) << (q_bits - 9);
   const int32_t q_bits8 = q_bits - 8;
+
+  const int32_t default_quant_coeff = uvg_g_quant_scales[needs_block_size_trafo_scale][qp_scaled % 6];
 
   uint32_t ac_sum = 0;
   int32_t last_cg = -1;
@@ -402,7 +406,7 @@ void uvg_quant_avx2(const encoder_state_t * const state, const coeff_t * __restr
   // Loading once is enough if scaling lists are not off
   __m256i low_b = _mm256_setzero_si256(), high_b = _mm256_setzero_si256();
   if (!(state->encoder_control->scaling_list.enable)) {
-    low_b  = _mm256_set1_epi32(quant_coeff[0]);
+    low_b  = _mm256_set1_epi32(default_quant_coeff);
     high_b = low_b;
   }
 
@@ -579,33 +583,60 @@ static INLINE int64_t get_quantized_recon_8x1_avx2(int16_t *residual, const uint
   return _mm_cvtsi128_si64(_mm_packus_epi16(rec, rec));
 }
 
-static void get_quantized_recon_avx2(int16_t *residual, const uint8_t *pred_in, int in_stride, uint8_t *rec_out, int out_stride, int width){
+static void get_quantized_recon_avx2(int16_t *residual, const uint8_t *pred_in, int in_stride, uint8_t *rec_out, int out_stride, int width, int height){
 
-  switch (width) {
+  if (height == width || width >= 16) {
+    switch (width) {
     case 4:
-      *(int32_t*)&(rec_out[0 * out_stride]) = get_quantized_recon_4x1_avx2(residual + 0 * width, pred_in + 0 * in_stride);
-      *(int32_t*)&(rec_out[1 * out_stride]) = get_quantized_recon_4x1_avx2(residual + 1 * width, pred_in + 1 * in_stride);
-      *(int32_t*)&(rec_out[2 * out_stride]) = get_quantized_recon_4x1_avx2(residual + 2 * width, pred_in + 2 * in_stride);
-      *(int32_t*)&(rec_out[3 * out_stride]) = get_quantized_recon_4x1_avx2(residual + 3 * width, pred_in + 3 * in_stride);
+      *(int32_t*) & (rec_out[0 * out_stride]) = get_quantized_recon_4x1_avx2(residual + 0 * width, pred_in + 0 * in_stride);
+      *(int32_t*)& (rec_out[1 * out_stride]) = get_quantized_recon_4x1_avx2(residual + 1 * width, pred_in + 1 * in_stride);
+      *(int32_t*)& (rec_out[2 * out_stride]) = get_quantized_recon_4x1_avx2(residual + 2 * width, pred_in + 2 * in_stride);
+      *(int32_t*)& (rec_out[3 * out_stride]) = get_quantized_recon_4x1_avx2(residual + 3 * width, pred_in + 3 * in_stride);
       break;
     case 8:
-      *(int64_t*)&(rec_out[0 * out_stride]) = get_quantized_recon_8x1_avx2(residual + 0 * width, pred_in + 0 * in_stride);
-      *(int64_t*)&(rec_out[1 * out_stride]) = get_quantized_recon_8x1_avx2(residual + 1 * width, pred_in + 1 * in_stride);
-      *(int64_t*)&(rec_out[2 * out_stride]) = get_quantized_recon_8x1_avx2(residual + 2 * width, pred_in + 2 * in_stride);
-      *(int64_t*)&(rec_out[3 * out_stride]) = get_quantized_recon_8x1_avx2(residual + 3 * width, pred_in + 3 * in_stride);
-      *(int64_t*)&(rec_out[4 * out_stride]) = get_quantized_recon_8x1_avx2(residual + 4 * width, pred_in + 4 * in_stride);
-      *(int64_t*)&(rec_out[5 * out_stride]) = get_quantized_recon_8x1_avx2(residual + 5 * width, pred_in + 5 * in_stride);
-      *(int64_t*)&(rec_out[6 * out_stride]) = get_quantized_recon_8x1_avx2(residual + 6 * width, pred_in + 6 * in_stride);
-      *(int64_t*)&(rec_out[7 * out_stride]) = get_quantized_recon_8x1_avx2(residual + 7 * width, pred_in + 7 * in_stride);
+      *(int64_t*) & (rec_out[0 * out_stride]) = get_quantized_recon_8x1_avx2(residual + 0 * width, pred_in + 0 * in_stride);
+      *(int64_t*)& (rec_out[1 * out_stride]) = get_quantized_recon_8x1_avx2(residual + 1 * width, pred_in + 1 * in_stride);
+      *(int64_t*)& (rec_out[2 * out_stride]) = get_quantized_recon_8x1_avx2(residual + 2 * width, pred_in + 2 * in_stride);
+      *(int64_t*)& (rec_out[3 * out_stride]) = get_quantized_recon_8x1_avx2(residual + 3 * width, pred_in + 3 * in_stride);
+      *(int64_t*)& (rec_out[4 * out_stride]) = get_quantized_recon_8x1_avx2(residual + 4 * width, pred_in + 4 * in_stride);
+      *(int64_t*)& (rec_out[5 * out_stride]) = get_quantized_recon_8x1_avx2(residual + 5 * width, pred_in + 5 * in_stride);
+      *(int64_t*)& (rec_out[6 * out_stride]) = get_quantized_recon_8x1_avx2(residual + 6 * width, pred_in + 6 * in_stride);
+      *(int64_t*)& (rec_out[7 * out_stride]) = get_quantized_recon_8x1_avx2(residual + 7 * width, pred_in + 7 * in_stride);
       break;
     default:
-      for (int y = 0; y < width; ++y) {
+      for (int y = 0; y < height; ++y) {
         for (int x = 0; x < width; x += 16) {
-          *(int64_t*)&(rec_out[x + y * out_stride]) = get_quantized_recon_8x1_avx2(residual + x + y * width, pred_in + x + y  * in_stride);
-          *(int64_t*)&(rec_out[(x + 8) + y * out_stride]) = get_quantized_recon_8x1_avx2(residual + (x + 8) + y * width, pred_in + (x + 8) + y  * in_stride);
+          *(int64_t*)& (rec_out[x + y * out_stride]) = get_quantized_recon_8x1_avx2(residual + x + y * width, pred_in + x + y * in_stride);
+          *(int64_t*)& (rec_out[(x + 8) + y * out_stride]) = get_quantized_recon_8x1_avx2(residual + (x + 8) + y * width, pred_in + (x + 8) + y * in_stride);
         }
       }
       break;
+    }
+  }
+  else {
+    switch (width) {
+    case 4:
+      for (int y = 0; y < height; y += 4) {
+        *(int32_t*)& (rec_out[(y + 0) * out_stride]) = get_quantized_recon_4x1_avx2(residual + (y + 0) * width, pred_in + (y + 0) * in_stride);
+        *(int32_t*)& (rec_out[(y + 1) * out_stride]) = get_quantized_recon_4x1_avx2(residual + (y + 1) * width, pred_in + (y + 1) * in_stride);
+        *(int32_t*)& (rec_out[(y + 2) * out_stride]) = get_quantized_recon_4x1_avx2(residual + (y + 2) * width, pred_in + (y + 2) * in_stride);
+        *(int32_t*)& (rec_out[(y + 3) * out_stride]) = get_quantized_recon_4x1_avx2(residual + (y + 3) * width, pred_in + (y + 3) * in_stride);
+      }
+      break;
+    case 8:
+      for (int y = 0; y < height; ++y) {
+        *(int32_t*)& (rec_out[y * out_stride]) = get_quantized_recon_8x1_avx2(residual + y * width, pred_in + y * in_stride);
+      }
+      break;
+    default:
+      for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+          int16_t val = residual[x + y * width] + pred_in[x + y * in_stride];
+          rec_out[x + y * out_stride] = (uvg_pixel)CLIP(0, PIXEL_MAX, val);
+        }
+      }
+      break;
+    }
   }
 }
 
@@ -626,7 +657,7 @@ static void get_quantized_recon_avx2(int16_t *residual, const uint8_t *pred_in, 
 * \returns  Whether coeff_out contains any non-zero coefficients.
 */
 int uvg_quantize_residual_avx2(encoder_state_t *const state,
-  const cu_info_t *const cur_cu, const int width, const color_t color,
+  const cu_info_t *const cur_cu, const int width, const int height, const color_t color,
   const coeff_scan_order_t scan_order, const int use_trskip,
   const int in_stride, const int out_stride,
   const uint8_t *const ref_in, const uint8_t *const pred_in,
@@ -637,15 +668,15 @@ int uvg_quantize_residual_avx2(encoder_state_t *const state,
   // Temporary arrays to pass data to and from uvg_quant and transform functions.
   ALIGNED(64) int16_t residual[TR_MAX_WIDTH * TR_MAX_WIDTH];
   ALIGNED(64) coeff_t coeff[TR_MAX_WIDTH * TR_MAX_WIDTH];
-
-  const int height = width; // TODO: height for non-square blocks
+  // ISP_TODO: non-square block implementation, height is passed but not used
+  
   int has_coeffs = 0;
 
   assert(width <= TR_MAX_WIDTH);
   assert(width >= TR_MIN_WIDTH);
 
   // Get residual. (ref_in - pred_in -> residual)
-  uvg_generate_residual(ref_in, pred_in, residual, width, in_stride, in_stride);
+  uvg_generate_residual(ref_in, pred_in, residual, width, height, in_stride, in_stride);
 
   if (state->tile->frame->lmcs_aps->m_sliceReshapeInfo.enableChromaAdj && color != COLOR_Y) {
     int y, x;
@@ -662,40 +693,51 @@ int uvg_quantize_residual_avx2(encoder_state_t *const state,
 
   // Transform residual. (residual -> coeff)
   if (use_trskip) {
-    uvg_transformskip(state->encoder_control, residual, coeff, width);
+    uvg_transformskip(state->encoder_control, residual, coeff, width, height);
   }
   else {
-    uvg_transform2d(state->encoder_control, residual, coeff, width, color, cur_cu);
+    uvg_transform2d(state->encoder_control, residual, coeff, width, height, color, cur_cu);
   }
 
   const uint16_t lfnst_index = color == COLOR_Y ? cur_cu->lfnst_idx : cur_cu->cr_lfnst_idx;
 
   if (state->encoder_control->cfg.lfnst && cur_cu->type == CU_INTRA) {
     // Forward low frequency non-separable transform
-    uvg_fwd_lfnst(cur_cu, width, height, color, lfnst_index, coeff, tree_type);
+    uvg_fwd_lfnst(cur_cu, width, height, color, lfnst_index, coeff, tree_type, state->collocated_luma_mode);
   }
 
   // Quantize coeffs. (coeff -> coeff_out)
-  
-  if (state->encoder_control->cfg.rdoq_enable &&
+  int abs_sum = 0;
+  if(!use_trskip && state->encoder_control->cfg.dep_quant) {
+    uvg_dep_quant(
+      state,
+      cur_cu,
+      width,
+      height,
+      coeff,
+      coeff_out,
+      color,
+      tree_type,
+      &abs_sum,
+      state->encoder_control->cfg.scaling_list);
+  }
+  else if (state->encoder_control->cfg.rdoq_enable &&
       (width > 4 || !state->encoder_control->cfg.rdoq_skip) && !use_trskip)
   {
-    int8_t tr_depth = cur_cu->tr_depth - cur_cu->depth;
-    tr_depth += (cur_cu->part_size == SIZE_NxN ? 1 : 0);
-    uvg_rdoq(state, coeff, coeff_out, width, width, color,
-      scan_order, cur_cu->type, tr_depth, cur_cu->cbf, lfnst_index);
+    uvg_rdoq(state, coeff, coeff_out, width, height, color,
+      scan_order, cur_cu->type, cur_cu->cbf, lfnst_index, color == 0 ? cur_cu->tr_idx : 0);
   }
   else if (state->encoder_control->cfg.rdoq_enable && use_trskip) {
-    uvg_ts_rdoq(state, coeff, coeff_out, width, width, color,
+    uvg_ts_rdoq(state, coeff, coeff_out, width, height, color,
       scan_order);
   }
   else {
-    uvg_quant(state, coeff, coeff_out, width, width, color,
+    uvg_quant(state, coeff, coeff_out, width, height, color,
       scan_order, cur_cu->type, cur_cu->tr_idx == MTS_SKIP && color == COLOR_Y, lfnst_index);
   }
 
   // Check if there are any non-zero coefficients.
-  for (int i = 0; i < width * width; i += 8) {
+  for (int i = 0; i < width * height; i += 8) {
     __m128i v_quant_coeff = _mm_loadu_si128((__m128i*)&(coeff_out[i]));
     has_coeffs = !_mm_testz_si128(_mm_set1_epi8(0xFF), v_quant_coeff);
     if(has_coeffs) break;
@@ -705,25 +747,25 @@ int uvg_quantize_residual_avx2(encoder_state_t *const state,
   // rec_out.
   if (has_coeffs && !early_skip) {
     // Get quantized residual. (coeff_out -> coeff -> residual)
-    uvg_dequant(state, coeff_out, coeff, width, width, color,
+    uvg_dequant(state, coeff_out, coeff, width, height, color,
       cur_cu->type, cur_cu->tr_idx == MTS_SKIP && color == COLOR_Y);
 
     if (state->encoder_control->cfg.lfnst && cur_cu->type == CU_INTRA) {
       // Inverse low frequency non-separable transform
-      uvg_inv_lfnst(cur_cu, width, height, color, lfnst_index, coeff, tree_type);
+      uvg_inv_lfnst(cur_cu, width, height, color, lfnst_index, coeff, tree_type, state->collocated_luma_mode);
     }
     if (use_trskip) {
-      uvg_itransformskip(state->encoder_control, residual, coeff, width);
+      uvg_itransformskip(state->encoder_control, residual, coeff, width, height);
     }
     else {
-      uvg_itransform2d(state->encoder_control, residual, coeff, width, color, cur_cu);
+      uvg_itransform2d(state->encoder_control, residual, coeff, width, height, color, cur_cu);
     }
 
     if (state->tile->frame->lmcs_aps->m_sliceReshapeInfo.enableChromaAdj && color != COLOR_Y) {
       int y, x;
       int sign, absval;
       int maxAbsclipBD = (1 << UVG_BIT_DEPTH) - 1;
-      for (y = 0; y < width; ++y) {
+      for (y = 0; y < height; ++y) {
         for (x = 0; x < width; ++x) {
           residual[x + y * width] = (int16_t)CLIP((int16_t)(-maxAbsclipBD - 1), (int16_t)maxAbsclipBD, residual[x + y * width]);
           sign = residual[x + y * width] >= 0 ? 1 : -1;
@@ -739,14 +781,14 @@ int uvg_quantize_residual_avx2(encoder_state_t *const state,
     }
 
     // Get quantized reconstruction. (residual + pred_in -> rec_out)
-    get_quantized_recon_avx2(residual, pred_in, in_stride, rec_out, out_stride, width);
+    get_quantized_recon_avx2(residual, pred_in, in_stride, rec_out, out_stride, width, height);
   }
   else if (rec_out != pred_in) {
     // With no coeffs and rec_out == pred_int we skip copying the coefficients
     // because the reconstruction is just the prediction.
     int y, x;
 
-    for (y = 0; y < width; ++y) {
+    for (y = 0; y < height; ++y) {
       for (x = 0; x < width; ++x) {
         rec_out[x + y * out_stride] = pred_in[x + y * in_stride];
       }
@@ -763,20 +805,26 @@ int uvg_quantize_residual_avx2(encoder_state_t *const state,
 void uvg_dequant_avx2(const encoder_state_t * const state, coeff_t *q_coef, coeff_t *coef, int32_t width, int32_t height,color_t color, int8_t block_type, int8_t transform_skip)
 {
   const encoder_control_t * const encoder = state->encoder_control;
+  if (encoder->cfg.dep_quant && !transform_skip) {
+    uvg_dep_quant_dequant(state, block_type, width, height, color, q_coef, coef, encoder->cfg.scaling_list);
+    return;
+  }
   int32_t shift,add,coeff_q;
   int32_t n;
-  int32_t transform_shift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - ((uvg_math_floor_log2(width) + uvg_math_floor_log2(height)) >> 1); // Represents scaling through forward transform
+  const uint32_t log2_tr_width =  uvg_g_convert_to_log2[width];
+  const uint32_t log2_tr_height = uvg_g_convert_to_log2[height];
+  int32_t transform_shift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - ((log2_tr_width + log2_tr_height) >> 1);
+  bool needs_block_size_trafo_scale = !transform_skip && ((log2_tr_height + log2_tr_width) % 2 == 1);
+  needs_block_size_trafo_scale |= 0; // Non log2 block size// Represents scaling through forward transform
 
 
   int32_t qp_scaled = uvg_get_scaled_qp(color, state->qp, (encoder->bitdepth-8)*6, encoder->qp_map[0]);
   qp_scaled = transform_skip ? MAX(qp_scaled, 4 + 6 * MIN_QP_PRIME_TS) : qp_scaled;
 
-  shift = 20 - QUANT_SHIFT - (transform_skip ? 0 : transform_shift);
+  shift = 20 - QUANT_SHIFT - (transform_skip ? 0 : transform_shift - needs_block_size_trafo_scale);
 
   if (encoder->scaling_list.enable)
   {
-    uint32_t log2_tr_width = uvg_math_floor_log2(height) + 2;
-    uint32_t log2_tr_height = uvg_math_floor_log2(width) + 2;
     int32_t scalinglist_type = (block_type == CU_INTRA ? 0 : 3) + (int8_t)(color);
 
     const int32_t* dequant_coef = encoder->scaling_list.de_quant_coeff[log2_tr_width - 2][log2_tr_height - 2][scalinglist_type][qp_scaled % 6];
@@ -797,7 +845,7 @@ void uvg_dequant_avx2(const encoder_state_t * const state, coeff_t *q_coef, coef
       }
     }
   } else {
-    int32_t scale = uvg_g_inv_quant_scales[qp_scaled%6] << (qp_scaled/6);
+    int32_t scale = uvg_g_inv_quant_scales[needs_block_size_trafo_scale][qp_scaled%6] << (qp_scaled/6);
     add = 1 << (shift-1);
 
     __m256i v_scale = _mm256_set1_epi32(scale);
@@ -845,8 +893,9 @@ static uint32_t coeff_abs_sum_avx2(const coeff_t *coeffs, const size_t length)
   return parts[0] + parts[1] + parts[2] + parts[3];
 }
 
-static uint32_t fast_coeff_cost_avx2(const coeff_t *coeff, int32_t width, uint64_t weights)
+static uint32_t fast_coeff_cost_avx2(const coeff_t *coeff, int32_t width, int32_t height, uint64_t weights)
 {
+  assert((width == height) && "Non-square block handling not implemented for this function.");
   const __m256i zero           = _mm256_setzero_si256();
   const __m256i threes         = _mm256_set1_epi16(3);
   const __m256i negate_hibytes = _mm256_set1_epi16(0xff00);
@@ -863,7 +912,7 @@ static uint32_t fast_coeff_cost_avx2(const coeff_t *coeff, int32_t width, uint64
   __m256i wts_lo     = _mm256_broadcastsi128_si256(wts_lo_128);
   __m256i wts_hi     = _mm256_broadcastsi128_si256(wts_hi_128);
 
-  for (int i = 0; i < width * width; i += 32) {
+  for (int i = 0; i < width * height; i += 32) {
     __m256i curr_lo      = _mm256_loadu_si256 ((const __m256i *)(coeff + i));
     __m256i curr_abs_lo  = _mm256_abs_epi16   (curr_lo);
     __m256i curr_max3_lo = _mm256_min_epu16   (curr_abs_lo, threes);

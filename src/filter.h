@@ -46,8 +46,8 @@
  * \brief Edge direction.
  */
 typedef enum edge_dir {
-  EDGE_VER = 0, // vertical
-  EDGE_HOR = 1, // horizontal
+  EDGE_VER = 1, // vertical
+  EDGE_HOR = 2, // horizontal
 } edge_dir;
 
 

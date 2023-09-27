@@ -58,61 +58,51 @@ void uvg_change_precision_vector2d(int src, int dst, vector2d_t* mv);
 void uvg_round_precision(int src, int dst, mv_t* hor, mv_t* ver);
 void uvg_round_precision_vector2d(int src, int dst, vector2d_t* mv);
 
-void uvg_inter_recon_cu(const encoder_state_t * const state,
-                        lcu_t *lcu,
-                        int32_t x,
-                        int32_t y,
-                        int32_t width,
-                        bool predict_luma,
-                        bool predict_chroma);
-
-void uvg_inter_pred_pu(const encoder_state_t * const state,
+void uvg_inter_recon_cu(
+  const encoder_state_t * const state,
   lcu_t *lcu,
-  int32_t x,
-  int32_t y,
-  int32_t width,
   bool predict_luma,
   bool predict_chroma,
-  int i_pu);
+  const cu_loc_t* const cu_loc);
+
+void uvg_inter_pred_pu(
+  const encoder_state_t * const state,
+  lcu_t *lcu,
+  bool predict_luma,
+  bool predict_chroma,
+  const cu_loc_t* const cu_loc);
 
 void uvg_hmvp_add_mv(const encoder_state_t* const state, uint32_t pic_x, uint32_t pic_y, uint32_t block_width, uint32_t block_height, const cu_info_t* cu);
 
-void uvg_inter_recon_bipred(const encoder_state_t * const state,
-                            const uvg_picture * ref1,
-                            const uvg_picture * ref2,
-                            int32_t xpos,
-                            int32_t ypos,
-                            int32_t width,
-                            int32_t height,
-                            mv_t mv_param[2][2],
-                            lcu_t* lcu,
-                            bool predict_luma,
-                            bool predict_chroma);
+void uvg_inter_recon_bipred(
+  const encoder_state_t * const state,
+  const uvg_picture * ref1,
+  const uvg_picture * ref2,
+  mv_t mv_param[2][2],
+  lcu_t* lcu,
+  bool predict_luma,
+  bool predict_chroma,
+  const cu_loc_t* const cu_loc);
 
 
-void uvg_inter_get_mv_cand(const encoder_state_t * const state,
-                           int32_t x,
-                           int32_t y,
-                           int32_t width,
-                           int32_t height,
-                           mv_t mv_cand[2][2],
-                           const cu_info_t* cur_cu,
-                           lcu_t *lcu,
-                           int8_t reflist);
+void uvg_inter_get_mv_cand(
+  const encoder_state_t * const state,
+  mv_t mv_cand[2][2],
+  const cu_info_t* cur_cu,
+  lcu_t *lcu,
+  int8_t reflist,
+  const cu_loc_t* const cu_loc);
 
-void uvg_inter_get_mv_cand_cua(const encoder_state_t * const state,
-                               int32_t x,
-                               int32_t y,
-                               int32_t width,
-                               int32_t height,
-                               mv_t mv_cand[2][2],
-                               const cu_info_t* cur_cu,
-                               int8_t reflist);
+void uvg_inter_get_mv_cand_cua(
+  const encoder_state_t * const state,
+  mv_t mv_cand[2][2],
+  const cu_info_t* cur_cu,
+  int8_t reflist,
+  const cu_loc_t* const cu_loc);
 
-uint8_t uvg_inter_get_merge_cand(const encoder_state_t * const state,
-                                 int32_t x, int32_t y,
-                                 int32_t width, int32_t height,
-                                 bool use_a1, bool use_b1,
-                                 inter_merge_cand_t mv_cand[MRG_MAX_NUM_CANDS],
-                                 lcu_t *lcu);
+uint8_t uvg_inter_get_merge_cand(
+  const encoder_state_t * const state,
+  const cu_loc_t* const cu_loc,
+  inter_merge_cand_t mv_cand[MRG_MAX_NUM_CANDS],
+  lcu_t *lcu);
 #endif
