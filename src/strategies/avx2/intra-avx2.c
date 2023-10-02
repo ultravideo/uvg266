@@ -581,6 +581,164 @@ static void uvg_angular_pred_avx2_old(
 }
 
 
+// TODO: vectorize
+static void angular_pred_avx2_delta_tables(int64_t* delta_int, int32_t* delta_fract, const int line, const int mrl, const int sample_disp)
+{
+  for (int i = 0, delta_pos = sample_disp * (1 + mrl); i < line; ++i, delta_pos += sample_disp) {
+    delta_int[i] = delta_pos >> 5;
+    delta_fract[i] = delta_pos & (32 - 1);
+  }
+}
+
+
+static const int16_t cubic_filter[32][4] =
+{
+  { 0, 64,  0,  0 },
+  { -1, 63,  2,  0 },
+  { -2, 62,  4,  0 },
+  { -2, 60,  7, -1 },
+  { -2, 58, 10, -2 },
+  { -3, 57, 12, -2 },
+  { -4, 56, 14, -2 },
+  { -4, 55, 15, -2 },
+  { -4, 54, 16, -2 },
+  { -5, 53, 18, -2 },
+  { -6, 52, 20, -2 },
+  { -6, 49, 24, -3 },
+  { -6, 46, 28, -4 },
+  { -5, 44, 29, -4 },
+  { -4, 42, 30, -4 },
+  { -4, 39, 33, -4 },
+  { -4, 36, 36, -4 },
+  { -4, 33, 39, -4 },
+  { -4, 30, 42, -4 },
+  { -4, 29, 44, -5 },
+  { -4, 28, 46, -6 },
+  { -3, 24, 49, -6 },
+  { -2, 20, 52, -6 },
+  { -2, 18, 53, -5 },
+  { -2, 16, 54, -4 },
+  { -2, 15, 55, -4 },
+  { -2, 14, 56, -4 },
+  { -2, 12, 57, -3 },
+  { -2, 10, 58, -2 },
+  { -1,  7, 60, -2 },
+  { 0,  4, 62, -2 },
+  { 0,  2, 63, -1 },
+};
+
+
+static void angular_pred_avx2_w4_ver(uvg_pixel* dst, const uvg_pixel* ref_main, const int64_t* delta_int, const int32_t* delta_fract, const int height, const int use_cubic)
+{
+  const int width = 4;
+
+  const __m256i p_shuf_01 = _mm256_setr_epi8(
+    0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
+    0x08, 0x09, 0x09, 0x0a, 0x0a, 0x0b, 0x0b, 0x0c,
+    0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
+    0x08, 0x09, 0x09, 0x0a, 0x0a, 0x0b, 0x0b, 0x0c
+  );
+
+  const __m256i p_shuf_23 = _mm256_setr_epi8(
+    0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x05, 0x06,
+    0x0a, 0x0b, 0x0b, 0x0c, 0x0c, 0x0d, 0x0d, 0x0e,
+    0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x05, 0x06,
+    0x0a, 0x0b, 0x0b, 0x0c, 0x0c, 0x0d, 0x0d, 0x0e
+  );
+
+  const __m256i w_shuf_01 = _mm256_setr_epi8(
+    0x00, 0x02, 0x00, 0x02, 0x00, 0x02, 0x00, 0x02,
+    0x08, 0x0a, 0x08, 0x0a, 0x08, 0x0a, 0x08, 0x0a,
+    0x00, 0x02, 0x00, 0x02, 0x00, 0x02, 0x00, 0x02,
+    0x08, 0x0a, 0x08, 0x0a, 0x08, 0x0a, 0x08, 0x0a
+  );
+
+  const __m256i w_shuf_23 = _mm256_setr_epi8(
+    0x04, 0x06, 0x04, 0x06, 0x04, 0x06, 0x04, 0x06,
+    0x0c, 0x0e, 0x0c, 0x0e, 0x0c, 0x0e, 0x0c, 0x0e,
+    0x04, 0x06, 0x04, 0x06, 0x04, 0x06, 0x04, 0x06,
+    0x0c, 0x0e, 0x0c, 0x0e, 0x0c, 0x0e, 0x0c, 0x0e
+  );
+  
+  int16_t f[4][4] = { { 0 } };
+
+  // For a 4 width block, height must be at least 4. Handle 4 lines at once
+  for (int y = 0; y < height; y += 4)
+  {
+    if (use_cubic) {
+      memcpy(f[0], cubic_filter[delta_fract[y + 0]], 8);
+      memcpy(f[1], cubic_filter[delta_fract[y + 1]], 8);
+      memcpy(f[2], cubic_filter[delta_fract[y + 2]], 8);
+      memcpy(f[3], cubic_filter[delta_fract[y + 3]], 8);
+    }
+    else {
+      for (int yy = 0; yy < 4; ++yy) {
+        const int16_t offset = (delta_fract[y + yy] >> 1);
+        f[yy][0] = 16 - offset;
+        f[yy][1] = 32 - offset;
+        f[yy][2] = 16 + offset;
+        f[yy][3] = offset;
+      }
+    }
+
+    // Do 4-tap intra interpolation filtering
+    uvg_pixel* p = (uvg_pixel*)ref_main;
+    __m256i vidx = _mm256_loadu_si256((__m256i*)&delta_int[y]);
+    __m256i all_weights = _mm256_loadu_si256((__m256i*)f);
+    __m256i w01 = _mm256_shuffle_epi8(all_weights, w_shuf_01);
+    __m256i w23 = _mm256_shuffle_epi8(all_weights, w_shuf_23);
+
+    for (int_fast32_t x = 0; x + 3 < width; x += 4, p += 4) {
+
+      __m256i vp = _mm256_i64gather_epi64((const long long int*)p, vidx, 1);
+      __m256i vp_01 = _mm256_shuffle_epi8(vp, p_shuf_01);
+      __m256i vp_23 = _mm256_shuffle_epi8(vp, p_shuf_23);
+
+      __m256i dot_01 = _mm256_maddubs_epi16(vp_01, w01);
+      __m256i dot_23 = _mm256_maddubs_epi16(vp_23, w23);
+      __m256i sum = _mm256_add_epi16(dot_01, dot_23);
+      sum = _mm256_add_epi16(sum, _mm256_set1_epi16(32));
+      sum = _mm256_srai_epi16(sum, 6);
+
+      __m128i lo = _mm256_castsi256_si128(sum);
+      __m128i hi = _mm256_extracti128_si256(sum, 1);
+      __m128i filtered = _mm_packus_epi16(lo, hi);
+
+      *(uint32_t*)(dst + (y + 0) * width + x) = _mm_extract_epi32(filtered, 0);
+      *(uint32_t*)(dst + (y + 1) * width + x) = _mm_extract_epi32(filtered, 1);
+      *(uint32_t*)(dst + (y + 2) * width + x) = _mm_extract_epi32(filtered, 2);
+      *(uint32_t*)(dst + (y + 3) * width + x) = _mm_extract_epi32(filtered, 3);
+    }
+  }
+}
+
+
+// TODO: vectorize
+static void angular_pred_avx2_linear_filter(uvg_pixel* dst, uvg_pixel* ref, const int width, const int height, const int64_t* delta_int, const int32_t* delta_fract)
+{
+  for (int y = 0; y < height; ++y) {
+    for (int x = 0; x < width; ++x) {
+      uvg_pixel ref1 = ref[x + delta_int[y] + 1];
+      uvg_pixel ref2 = ref[x + delta_int[y] + 2];
+      dst[y * width + x] = ref1 + ((delta_fract[y] * (ref2 - ref1) + 16) >> 5);
+    }
+  }
+}
+
+
+// TODO: vectorize
+static void angular_pred_avx2_non_fractional_angle_pxl_copy(uvg_pixel* dst, uvg_pixel* ref, const int width, const int height, const int64_t* delta_int)
+{
+  for (int y = 0; y < height; ++y) {
+    uvg_pixel* dst_row = dst + y * width;
+    uvg_pixel* ref_row = ref + delta_int[y] + 1;
+    for (int_fast32_t x = 0; x + 3 < width; x += 4) {
+      memcpy(dst_row + x, ref_row + x, 4 * sizeof(dst[0]));
+    }
+  }
+}
+
+
 static void angular_pdpc_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int width, const int height, const int scale, const int_fast8_t mode_disp, const int16_t inv_sample_disp)
 {
   int16_t wL[4];
@@ -660,73 +818,9 @@ static void uvg_angular_pred_avx2(
   uint8_t multi_ref_index = channel_type == COLOR_Y ? multi_ref_idx : 0;
   uint8_t isp = isp_mode;
 
-  __m256i p_shuf_01 = _mm256_setr_epi8(
-    0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
-    0x08, 0x09, 0x09, 0x0a, 0x0a, 0x0b, 0x0b, 0x0c,
-    0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
-    0x08, 0x09, 0x09, 0x0a, 0x0a, 0x0b, 0x0b, 0x0c
-  );
-
-  __m256i p_shuf_23 = _mm256_setr_epi8(
-    0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x05, 0x06,
-    0x0a, 0x0b, 0x0b, 0x0c, 0x0c, 0x0d, 0x0d, 0x0e,
-    0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x05, 0x06,
-    0x0a, 0x0b, 0x0b, 0x0c, 0x0c, 0x0d, 0x0d, 0x0e
-  );
-
-  __m256i w_shuf_01 = _mm256_setr_epi8(
-    0x00, 0x02, 0x00, 0x02, 0x00, 0x02, 0x00, 0x02,
-    0x08, 0x0a, 0x08, 0x0a, 0x08, 0x0a, 0x08, 0x0a,
-    0x00, 0x02, 0x00, 0x02, 0x00, 0x02, 0x00, 0x02,
-    0x08, 0x0a, 0x08, 0x0a, 0x08, 0x0a, 0x08, 0x0a
-  );
-
-  __m256i w_shuf_23 = _mm256_setr_epi8(
-    0x04, 0x06, 0x04, 0x06, 0x04, 0x06, 0x04, 0x06,
-    0x0c, 0x0e, 0x0c, 0x0e, 0x0c, 0x0e, 0x0c, 0x0e,
-    0x04, 0x06, 0x04, 0x06, 0x04, 0x06, 0x04, 0x06,
-    0x0c, 0x0e, 0x0c, 0x0e, 0x0c, 0x0e, 0x0c, 0x0e
-  );
-
   static const int16_t modedisp2sampledisp[32] = { 0,    1,    2,    3,    4,    6,     8,   10,   12,   14,   16,   18,   20,   23,   26,   29,   32,   35,   39,  45,  51,  57,  64,  73,  86, 102, 128, 171, 256, 341, 512, 1024 };
   static const int16_t modedisp2invsampledisp[32] = { 0, 16384, 8192, 5461, 4096, 2731, 2048, 1638, 1365, 1170, 1024, 910, 819, 712, 630, 565, 512, 468, 420, 364, 321, 287, 256, 224, 191, 161, 128, 96, 64, 48, 32, 16 }; // (512 * 32) / sampledisp
   static const int32_t pre_scale[] = { 8, 7, 6, 5, 5, 4, 4, 4, 3, 3, 3, 3, 3, 3, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 0, 0, 0, -1, -1, -2, -3 };
-
-  static const int16_t cubic_filter[32][4] =
-  {
-    { 0, 64,  0,  0 },
-    { -1, 63,  2,  0 },
-    { -2, 62,  4,  0 },
-    { -2, 60,  7, -1 },
-    { -2, 58, 10, -2 },
-    { -3, 57, 12, -2 },
-    { -4, 56, 14, -2 },
-    { -4, 55, 15, -2 },
-    { -4, 54, 16, -2 },
-    { -5, 53, 18, -2 },
-    { -6, 52, 20, -2 },
-    { -6, 49, 24, -3 },
-    { -6, 46, 28, -4 },
-    { -5, 44, 29, -4 },
-    { -4, 42, 30, -4 },
-    { -4, 39, 33, -4 },
-    { -4, 36, 36, -4 },
-    { -4, 33, 39, -4 },
-    { -4, 30, 42, -4 },
-    { -4, 29, 44, -5 },
-    { -4, 28, 46, -6 },
-    { -3, 24, 49, -6 },
-    { -2, 20, 52, -6 },
-    { -2, 18, 53, -5 },
-    { -2, 16, 54, -4 },
-    { -2, 15, 55, -4 },
-    { -2, 14, 56, -4 },
-    { -2, 12, 57, -3 },
-    { -2, 10, 58, -2 },
-    { -1,  7, 60, -2 },
-    { 0,  4, 62, -2 },
-    { 0,  2, 63, -1 },
-  };
 
   // Temporary buffer for modes 11-25.
   // It only needs to be big enough to hold indices from -width to width-1.
@@ -795,7 +889,7 @@ static void uvg_angular_pred_avx2(
   // compensate for line offset in reference line buffers
   ref_main += multi_ref_index;
   ref_side += multi_ref_index;
-  if (!vertical_mode) { SWAP(width, height, int) }
+  //if (!vertical_mode) { SWAP(width, height, int) }
 
   static const int uvg_intra_hor_ver_dist_thres[8] = { 24, 24, 24, 14, 2, 0, 0, 0 };
   int filter_threshold = uvg_intra_hor_ver_dist_thres[(log2_width + log2_height) >> 1];
@@ -813,183 +907,54 @@ static void uvg_angular_pred_avx2(
     use_cubic = true;
   }
 
+
+
   if (sample_disp != 0) {
     // The mode is not horizontal or vertical, we have to do interpolation.
+    int64_t delta_int[MAX_PRED_WIDTH];
+    int32_t delta_fract[MAX_PRED_WIDTH];
 
-    // These are for the height >= 4 version
-    int_fast32_t delta_pos = sample_disp * multi_ref_index;
-    int64_t delta_int[4] = { 0 };
-    int16_t delta_fract[4] = { 0 };
+    // TODO: for horizontal modes, these should be constructed using width instead of height
+    angular_pred_avx2_delta_tables(delta_int, delta_fract, height, multi_ref_index, sample_disp);
 
-    // Special cases for height 1 & 2
-    if (height < 4) {
-      for (int_fast32_t y = 0, delta_pos = sample_disp * (1 + multi_ref_index); y < height; ++y, delta_pos += sample_disp) {
+    // Check if the angle is fractional. If yes, interpolation is needed
+    if ((abs(sample_disp) & 0x1F) != 0) {
 
-        int_fast32_t delta_int = delta_pos >> 5;
-        int_fast32_t delta_fract = delta_pos & (32 - 1);
-        const int16_t filter_coeff[4] = { 16 - (delta_fract >> 1), 32 - (delta_fract >> 1), 16 + (delta_fract >> 1), delta_fract >> 1 };
-        int16_t const* const f = use_cubic ? cubic_filter[delta_fract] : filter_coeff;
-
-        if ((abs(sample_disp) & 0x1F) != 0) {
-
-          // Luma Channel
-          if (channel_type == 0) {
-            int32_t ref_main_index = delta_int;
-            uvg_pixel p[4];
-
-            // Do 4-tap intra interpolation filtering
-            for (int_fast32_t x = 0; x < width; x++, ref_main_index++) {
-              p[0] = ref_main[ref_main_index];
-              p[1] = ref_main[ref_main_index + 1];
-              p[2] = ref_main[ref_main_index + 2];
-              p[3] = ref_main[ref_main_index + 3];
-
-              dst[y * width + x] = CLIP_TO_PIXEL(((int32_t)(f[0] * p[0]) + (int32_t)(f[1] * p[1]) + (int32_t)(f[2] * p[2]) + (int32_t)(f[3] * p[3]) + 32) >> 6);
-
-            }
-          }
-          else {
-
-            // Do linear filtering
-            for (int_fast32_t x = 0; x < width; ++x) {
-              uvg_pixel ref1 = ref_main[x + delta_int + 1];
-              uvg_pixel ref2 = ref_main[x + delta_int + 2];
-              dst[y * width + x] = ref1 + ((delta_fract * (ref2 - ref1) + 16) >> 5);
-            }
+      // Luma Channel
+      if (channel_type == 0) {
+        if (vertical_mode) {
+          switch (width) {
+            case  4: angular_pred_avx2_w4_ver(dst, ref_main, delta_int, delta_fract, height, use_cubic); break;
+            case  8: break;
+            case 16: break;
+            case 32: break;
+            case 64: break;
+            default:
+              assert(false && "Intra angular predicion: illegal width.\n");
+              break;
           }
         }
         else {
-          // Just copy the integer samples
-          for (int_fast32_t x = 0; x < width; x++) {
-            dst[y * width + x] = ref_main[x + delta_int + 1];
+          switch (width) {
+            case  4: break;
+            case  8: break;
+            case 16: break;
+            case 32: break;
+            case 64: break;
+            default:
+              assert(false && "Intra angular predicion: illegal width.\n");
+              break;
           }
         }
-
-
-        // PDPC
-        bool PDPC_filter = (width >= TR_MIN_WIDTH && height >= TR_MIN_WIDTH) && multi_ref_index == 0;
-        if (pred_mode > 1 && pred_mode < 67) {
-          if (mode_disp < 0 || multi_ref_index) { // Cannot be used with MRL.
-            PDPC_filter = false;
-          }
-          else if (mode_disp > 0) {
-            PDPC_filter &= (scale >= 0);
-          }
-        }
-        if (PDPC_filter) {
-          int inv_angle_sum = 256;
-          for (int x = 0; x < MIN(3 << scale, width); x++) {
-            inv_angle_sum += modedisp2invsampledisp[abs(mode_disp)];
-
-            int wL = 32 >> (2 * x >> scale);
-            const uvg_pixel left = ref_side[y + (inv_angle_sum >> 9) + 1];
-            dst[y * width + x] = dst[y * width + x] + ((wL * (left - dst[y * width + x]) + 32) >> 6);
-          }
-        }
+      }
+      else {
+        // Do linear filtering for chroma channels
+        angular_pred_avx2_linear_filter(dst, ref_main, width, height, delta_int, delta_fract);
       }
     }
     else {
-      for (int_fast32_t y = 0; y + 3 < height; y += 4) {
-
-        for (int yy = 0; yy < 4; ++yy) {
-          delta_pos += sample_disp;
-          delta_int[yy] = delta_pos >> 5;
-          delta_fract[yy] = delta_pos & (32 - 1);
-        }
-
-        if ((abs(sample_disp) & 0x1F) != 0) {
-
-          // Luma Channel
-          if (channel_type == 0) {
-            int16_t f[4][4] = { { 0 } };
-
-            if (use_cubic) {
-              memcpy(f[0], cubic_filter[delta_fract[0]], 8);
-              memcpy(f[1], cubic_filter[delta_fract[1]], 8);
-              memcpy(f[2], cubic_filter[delta_fract[2]], 8);
-              memcpy(f[3], cubic_filter[delta_fract[3]], 8);
-            }
-            else {
-              for (int yy = 0; yy < 4; ++yy) {
-                const int16_t offset = (delta_fract[yy] >> 1);
-                f[yy][0] = 16 - offset;
-                f[yy][1] = 32 - offset;
-                f[yy][2] = 16 + offset;
-                f[yy][3] = offset;
-              }
-            }
-
-            // Do 4-tap intra interpolation filtering
-            uvg_pixel* p = (uvg_pixel*)ref_main;
-            __m256i vidx = _mm256_loadu_si256((__m256i*)delta_int);
-            __m256i all_weights = _mm256_loadu_si256((__m256i*)f);
-            __m256i w01 = _mm256_shuffle_epi8(all_weights, w_shuf_01);
-            __m256i w23 = _mm256_shuffle_epi8(all_weights, w_shuf_23);
-
-            // Special case. Original height was < 4 and dimensions have been swapped -> current width < 4 (horizontal mode).
-            if (width < 4) {
-              for (int_fast32_t x = 0; x < width; ++x) {
-                uvg_pixel ref[4][4];
-                for (int r = 0; r < 4; ++r) {
-                  ref[0][r] = ref_main[(delta_int[0] + x) + r];
-                  ref[1][r] = ref_main[(delta_int[1] + x) + r];
-                  ref[2][r] = ref_main[(delta_int[2] + x) + r];
-                  ref[3][r] = ref_main[(delta_int[3] + x) + r];
-                }
-
-                dst[(y + 0) * width + x] = CLIP_TO_PIXEL(((int32_t)(f[0][0] * ref[0][0]) + (int32_t)(f[0][1] * ref[0][1]) + (int32_t)(f[0][2] * ref[0][2]) + (int32_t)(f[0][3] * ref[0][3]) + 32) >> 6);;
-                dst[(y + 1) * width + x] = CLIP_TO_PIXEL(((int32_t)(f[1][0] * ref[1][0]) + (int32_t)(f[1][1] * ref[1][1]) + (int32_t)(f[1][2] * ref[1][2]) + (int32_t)(f[1][3] * ref[1][3]) + 32) >> 6);;
-                dst[(y + 2) * width + x] = CLIP_TO_PIXEL(((int32_t)(f[2][0] * ref[2][0]) + (int32_t)(f[2][1] * ref[2][1]) + (int32_t)(f[2][2] * ref[2][2]) + (int32_t)(f[2][3] * ref[2][3]) + 32) >> 6);;
-                dst[(y + 3) * width + x] = CLIP_TO_PIXEL(((int32_t)(f[3][0] * ref[3][0]) + (int32_t)(f[3][1] * ref[3][1]) + (int32_t)(f[3][2] * ref[3][2]) + (int32_t)(f[3][3] * ref[3][3]) + 32) >> 6);;
-              }
-            }
-            else {
-              for (int_fast32_t x = 0; x + 3 < width; x += 4, p += 4) {
-
-                __m256i vp = _mm256_i64gather_epi64((const long long int*)p, vidx, 1);
-                __m256i vp_01 = _mm256_shuffle_epi8(vp, p_shuf_01);
-                __m256i vp_23 = _mm256_shuffle_epi8(vp, p_shuf_23);
-
-                __m256i dot_01 = _mm256_maddubs_epi16(vp_01, w01);
-                __m256i dot_23 = _mm256_maddubs_epi16(vp_23, w23);
-                __m256i sum = _mm256_add_epi16(dot_01, dot_23);
-                sum = _mm256_add_epi16(sum, _mm256_set1_epi16(32));
-                sum = _mm256_srai_epi16(sum, 6);
-
-                __m128i lo = _mm256_castsi256_si128(sum);
-                __m128i hi = _mm256_extracti128_si256(sum, 1);
-                __m128i filtered = _mm_packus_epi16(lo, hi);
-
-                *(uint32_t*)(dst + (y + 0) * width + x) = _mm_extract_epi32(filtered, 0);
-                *(uint32_t*)(dst + (y + 1) * width + x) = _mm_extract_epi32(filtered, 1);
-                *(uint32_t*)(dst + (y + 2) * width + x) = _mm_extract_epi32(filtered, 2);
-                *(uint32_t*)(dst + (y + 3) * width + x) = _mm_extract_epi32(filtered, 3);
-              }
-            }
-          }
-          else {
-
-            // Do linear filtering
-            for (int yy = 0; yy < 4; ++yy) {
-              for (int_fast32_t x = 0; x < width; ++x) {
-                uvg_pixel ref1 = ref_main[x + delta_int[yy] + 1];
-                uvg_pixel ref2 = ref_main[x + delta_int[yy] + 2];
-                dst[(y + yy) * width + x] = ref1 + ((delta_fract[yy] * (ref2 - ref1) + 16) >> 5);
-              }
-            }
-          }
-        }
-        else {
-          // Just copy the integer samples
-          for (int yy = 0; yy < 4; ++yy) {
-            uvg_pixel* dst_row = dst + (y + yy) * width;
-            uvg_pixel* ref_row = ref_main + delta_int[yy] + 1;
-            for (int_fast32_t x = 0; x < width; x += 4) {
-              memcpy(dst_row + x, ref_row + x, 4 * sizeof(dst[0]));
-            }
-          }
-        }
-      }
+      // No interpolation or filtering needed, just copy the integer samples
+      angular_pred_avx2_non_fractional_angle_pxl_copy(dst, ref_main, width, height, delta_int);
     }
   }
   else {
@@ -1014,9 +979,8 @@ static void uvg_angular_pred_avx2(
   }
 
   // PDPC for non-horizontal and non-vertical modes
-
   if (!(pred_mode == 18 || pred_mode == 50)) {
-    bool PDPC_filter = ((width >= TR_MIN_WIDTH && height >= TR_MIN_WIDTH) || channel_type != 0);
+    bool PDPC_filter = (width >= TR_MIN_WIDTH && height >= TR_MIN_WIDTH);
     if (pred_mode > 1 && pred_mode < 67) {
       // Disable PDPC filter if both references are used or if MRL is used
       if (mode_disp < 0 || multi_ref_index) {
@@ -1029,40 +993,6 @@ static void uvg_angular_pred_avx2(
     }
     if (PDPC_filter) {
       angular_pdpc_avx2(dst, ref_side, width, height, scale, mode_disp, modedisp2invsampledisp[abs(mode_disp)]);
-    }
-  }
-
-  // TODO: to get rid of this transpose, do a separate implementation for horizontal and vertical modes
-  // Flip the block if this is was a horizontal mode.
-  if (!vertical_mode) {
-
-    const __m128i vtranspose_mask = _mm_setr_epi8(
-      0, 4, 8, 12,
-      1, 5, 9, 13,
-      2, 6, 10, 14,
-      3, 7, 11, 15
-    );
-
-    const __m128i vseq = _mm_setr_epi32(0, 1, 2, 3);
-    const __m128i vidx = _mm_slli_epi32(vseq, log2_width);
-
-    // Brute force transpose, works with all block sizes
-    uvg_pixel tmp[PRED_BUF_SIZE];
-    memcpy(tmp, dst, (sizeof(uvg_pixel) * (width * height)));
-
-    if (width == height) {
-      for (int_fast32_t y = 0; y < height - 1; ++y) {
-        for (int_fast32_t x = y + 1; x < width; ++x) {
-          SWAP(dst[y * height + x], dst[x * width + y], uvg_pixel);
-        }
-      }
-    }
-    else {
-      for (int y = 0; y < width; ++y) {
-        for (int x = 0; x < height; ++x) {
-          dst[x + y * height] = tmp[y + x * width];
-        }
-      }
     }
   }
 }
