@@ -154,8 +154,9 @@ ALIGNED(32) static const int8_t planar_avx2_ver_w8ys[2080] = {
   0,   1,   0,   1,   0,   1,   0,   1,   0,   1,   0,   1,   0,   1,   0,   1,   0,   1,   0,   1,   0,   1,   0,   1,   0,   1,   0,   1,   0,   1,   0,   1,  // offset 64, line == 1, this might not be needed, ever
 };
 
+// TODO: extend delta tables to hold 64 y offsets when 64x64 prediction is supported.
 // Delta int and delta fract tables. Rows are prediction mode, columns y offset.
-ALIGNED(32) static const int64_t delta_int_table[2112] = {
+ALIGNED(32) static const int16_t delta_int_table[2112] = {
   1,   2,   3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,  14,  15,  16,  17,  18,  19,  20,  21,  22,  23,  24,  25,  26,  27,  28,  29,  30,  31,  32,  // 2  Diagonal mode
   0,   1,   2,   3,   4,   5,   6,   7,   8,   9,   9,  10,  11,  12,  13,  14,  15,  16,  17,  18,  19,  19,  20,  21,  22,  23,  24,  25,  26,  27,  28,  29,
   0,   1,   2,   3,   4,   4,   5,   6,   7,   8,   8,   9,  10,  11,  12,  13,  13,  14,  15,  16,  17,  17,  18,  19,  20,  21,  21,  22,  23,  24,  25,  26,
@@ -223,7 +224,7 @@ ALIGNED(32) static const int64_t delta_int_table[2112] = {
   1,   2,   3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,  14,  15,  16,  17,  18,  19,  20,  21,  22,  23,  24,  25,  26,  27,  28,  29,  30,  31,  32,  // 66  Diagonal mode
 };
 
-ALIGNED(32) static const int32_t delta_fract_table[2212] = {
+ALIGNED(32) static const int16_t delta_fract_table[2212] = {
   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,  // 2  Diagonal mode
  29,  26,  23,  20,  17,  14,  11,   8,   5,   2,  31,  28,  25,  22,  19,  16,  13,  10,   7,   4,   1,  30,  27,  24,  21,  18,  15,  12,   9,   6,   3,   0,
  26,  20,  14,   8,   2,  28,  22,  16,  10,   4,  30,  24,  18,  12,   6,   0,  26,  20,  14,   8,   2,  28,  22,  16,  10,   4,  30,  24,  18,  12,   6,   0,
@@ -766,7 +767,7 @@ static const int16_t cubic_filter[32][4] =
 };
 
 
-static void angular_pred_avx2_w4_ver(uvg_pixel* dst, const uvg_pixel* ref_main, const int64_t* delta_int, const int32_t* delta_fract, const int height, const int use_cubic)
+static void angular_pred_avx2_w4_ver(uvg_pixel* dst, const uvg_pixel* ref_main, const int16_t* delta_int, const int16_t* delta_fract, const int height, const int use_cubic)
 {
   const int width = 4;
 
@@ -801,8 +802,7 @@ static void angular_pred_avx2_w4_ver(uvg_pixel* dst, const uvg_pixel* ref_main, 
   int16_t f[4][4] = { { 0 } };
 
   // For a 4 width block, height must be at least 4. Handle 4 lines at once
-  for (int y = 0; y < height; y += 4)
-  {
+  for (int y = 0; y < height; y += 4) {
     if (use_cubic) {
       memcpy(f[0], cubic_filter[delta_fract[y + 0]], 8);
       memcpy(f[1], cubic_filter[delta_fract[y + 1]], 8);
@@ -821,7 +821,12 @@ static void angular_pred_avx2_w4_ver(uvg_pixel* dst, const uvg_pixel* ref_main, 
 
     // Do 4-tap intra interpolation filtering
     uvg_pixel* p = (uvg_pixel*)ref_main;
-    __m256i vidx = _mm256_loadu_si256((__m256i*)&delta_int[y]);
+    // This solution assumes the delta int values to be 64-bit
+    // Cast from 16-bit to 64-bit.
+    __m256i vidx = _mm256_setr_epi64x(delta_int[y + 0],
+                                      delta_int[y + 1],
+                                      delta_int[y + 2],
+                                      delta_int[y + 3]);
     __m256i all_weights = _mm256_loadu_si256((__m256i*)f);
     __m256i w01 = _mm256_shuffle_epi8(all_weights, w_shuf_01);
     __m256i w23 = _mm256_shuffle_epi8(all_weights, w_shuf_23);
@@ -851,14 +856,102 @@ static void angular_pred_avx2_w4_ver(uvg_pixel* dst, const uvg_pixel* ref_main, 
 }
 
 
-static void angular_pred_avx2_w16_ver(uvg_pixel* dst, const uvg_pixel* ref_main, const int64_t* delta_int, const int32_t* delta_fract, const int height, const int use_cubic)
+static void angular_pred_avx2_w16_ver(uvg_pixel* dst, const uvg_pixel* ref_main, const int16_t* delta_int, const int16_t* delta_fract, const int height, const int use_cubic)
 {
   const int width = 16;
+
+  const __m256i p_shuf_01 = _mm256_setr_epi8(
+    0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
+    0x08, 0x09, 0x09, 0x0a, 0x0a, 0x0b, 0x0b, 0x0c,
+    0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
+    0x08, 0x09, 0x09, 0x0a, 0x0a, 0x0b, 0x0b, 0x0c
+  );
+
+  const __m256i p_shuf_23 = _mm256_setr_epi8(
+    0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x05, 0x06,
+    0x0a, 0x0b, 0x0b, 0x0c, 0x0c, 0x0d, 0x0d, 0x0e,
+    0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x05, 0x06,
+    0x0a, 0x0b, 0x0b, 0x0c, 0x0c, 0x0d, 0x0d, 0x0e
+  );
+
+  const __m256i w_shuf_01 = _mm256_setr_epi8(
+    0x00, 0x02, 0x00, 0x02, 0x00, 0x02, 0x00, 0x02,
+    0x08, 0x0a, 0x08, 0x0a, 0x08, 0x0a, 0x08, 0x0a,
+    0x00, 0x02, 0x00, 0x02, 0x00, 0x02, 0x00, 0x02,
+    0x08, 0x0a, 0x08, 0x0a, 0x08, 0x0a, 0x08, 0x0a
+  );
+
+  const __m256i w_shuf_23 = _mm256_setr_epi8(
+    0x04, 0x06, 0x04, 0x06, 0x04, 0x06, 0x04, 0x06,
+    0x0c, 0x0e, 0x0c, 0x0e, 0x0c, 0x0e, 0x0c, 0x0e,
+    0x04, 0x06, 0x04, 0x06, 0x04, 0x06, 0x04, 0x06,
+    0x0c, 0x0e, 0x0c, 0x0e, 0x0c, 0x0e, 0x0c, 0x0e
+  );
+
+  //int16_t f[4][4] = { { 0 } };
+
+  // For a 16 width block, height can be 1.
+  for (int y = 0; y < height; ++y) {
+    __m256i all_weights;
+    if (use_cubic) {
+      //memcpy(f[0], cubic_filter[delta_fract[y + 0]], 8);
+      //memcpy(f[1], cubic_filter[delta_fract[y + 1]], 8);
+      //memcpy(f[2], cubic_filter[delta_fract[y + 2]], 8);
+      //memcpy(f[3], cubic_filter[delta_fract[y + 3]], 8);
+      int64_t *tmp = (int64_t*)&delta_fract[y];
+      all_weights = _mm256_set1_epi64x(*tmp);
+    }
+    else {
+      for (int yy = 0; yy < 4; ++yy) {
+        const int16_t offset = (delta_fract[y + yy] >> 1);
+        int16_t tmp[4];
+        tmp[0] = 16 - offset;
+        tmp[1] = 32 - offset;
+        tmp[2] = 16 + offset;
+        tmp[3] = offset;
+        all_weights = _mm256_set1_epi64x(*(int64_t*)tmp);
+      }
+    }
+
+    // Do 4-tap intra interpolation filtering
+    uvg_pixel* p = (uvg_pixel*)ref_main;
+    // This solution assumes the delta int values to be 64-bit
+    // Cast from 16-bit to 64-bit.
+    __m256i vidx = _mm256_setr_epi64x(delta_int[y + 0],
+      delta_int[y + 1],
+      delta_int[y + 2],
+      delta_int[y + 3]);
+    //__m256i all_weights = _mm256_loadu_si256((__m256i*)f);
+    __m256i w01 = _mm256_shuffle_epi8(all_weights, w_shuf_01);
+    __m256i w23 = _mm256_shuffle_epi8(all_weights, w_shuf_23);
+
+    for (int_fast32_t x = 0; x + 3 < width; x += 4, p += 4) {
+
+      __m256i vp = _mm256_i64gather_epi64((const long long int*)p, vidx, 1);
+      __m256i vp_01 = _mm256_shuffle_epi8(vp, p_shuf_01);
+      __m256i vp_23 = _mm256_shuffle_epi8(vp, p_shuf_23);
+
+      __m256i dot_01 = _mm256_maddubs_epi16(vp_01, w01);
+      __m256i dot_23 = _mm256_maddubs_epi16(vp_23, w23);
+      __m256i sum = _mm256_add_epi16(dot_01, dot_23);
+      sum = _mm256_add_epi16(sum, _mm256_set1_epi16(32));
+      sum = _mm256_srai_epi16(sum, 6);
+
+      __m128i lo = _mm256_castsi256_si128(sum);
+      __m128i hi = _mm256_extracti128_si256(sum, 1);
+      __m128i filtered = _mm_packus_epi16(lo, hi);
+
+      *(uint32_t*)(dst + (y + 0) * width + x) = _mm_extract_epi32(filtered, 0);
+      *(uint32_t*)(dst + (y + 1) * width + x) = _mm_extract_epi32(filtered, 1);
+      *(uint32_t*)(dst + (y + 2) * width + x) = _mm_extract_epi32(filtered, 2);
+      *(uint32_t*)(dst + (y + 3) * width + x) = _mm_extract_epi32(filtered, 3);
+    }
+  }
 }
 
 
 // TODO: vectorize
-static void angular_pred_avx2_linear_filter(uvg_pixel* dst, uvg_pixel* ref, const int width, const int height, const int64_t* delta_int, const int32_t* delta_fract)
+static void angular_pred_avx2_linear_filter(uvg_pixel* dst, uvg_pixel* ref, const int width, const int height, const int16_t* delta_int, const int16_t* delta_fract)
 {
   for (int y = 0; y < height; ++y) {
     for (int x = 0; x < width; ++x) {
@@ -871,7 +964,7 @@ static void angular_pred_avx2_linear_filter(uvg_pixel* dst, uvg_pixel* ref, cons
 
 
 // TODO: vectorize
-static void angular_pred_avx2_non_fractional_angle_pxl_copy(uvg_pixel* dst, uvg_pixel* ref, const int width, const int height, const int64_t* delta_int)
+static void angular_pred_avx2_non_fractional_angle_pxl_copy(uvg_pixel* dst, uvg_pixel* ref, const int width, const int height, const int16_t* delta_int)
 {
   for (int y = 0; y < height; ++y) {
     uvg_pixel* dst_row = dst + y * width;
@@ -1058,8 +1151,8 @@ static void uvg_angular_pred_avx2(
 
     // Set delta table pointers
     int mode_offset = (pred_mode - 2) * 32;
-    const int64_t* delta_int = &delta_int_table[mode_offset];
-    const int32_t* delta_fract = &delta_fract_table[mode_offset];
+    const int16_t* delta_int = &delta_int_table[mode_offset];
+    const int16_t* delta_fract = &delta_fract_table[mode_offset];
 
     // TODO: for horizontal modes, these should be constructed using width instead of height
     //angular_pred_avx2_delta_tables(delta_int, delta_fract, height, multi_ref_index, sample_disp);
