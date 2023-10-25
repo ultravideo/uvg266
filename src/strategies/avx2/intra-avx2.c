@@ -181,7 +181,7 @@ static void uvg_angular_pred_avx2_old(
   const int log2_width =  uvg_g_convert_to_log2[width];
   const int log2_height = uvg_g_convert_to_log2[height];
 
-  assert((log2_width >= 2 && log2_width <= 5) && (log2_height >= 2 && log2_height <= 5));
+  assert((log2_width >= 2 && log2_width <= 6) && (log2_height <= 6));
   assert(intra_mode >= 2 && intra_mode <= 66);
 
   // TODO: implement handling of MRL
@@ -984,7 +984,7 @@ static void uvg_angular_pred_avx2(
           for (int yy = 0; yy < 4; ++yy) {
             uvg_pixel* dst_row = dst + (y + yy) * width;
             uvg_pixel* ref_row = ref_main + delta_int[yy] + 1;
-            for (int_fast32_t x = 0; x + 3 < width; x += 4) {
+            for (int_fast32_t x = 0; x < width; x += 4) {
               memcpy(dst_row + x, ref_row + x, 4 * sizeof(dst[0]));
             }
           }
