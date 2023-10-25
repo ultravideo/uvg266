@@ -719,6 +719,7 @@ static void uvg_angular_pred_avx2_old(
 
 
 // TODO: vectorize
+// TODO: obsolete, remove all usage
 static void angular_pred_avx2_delta_tables(int64_t* delta_int, int32_t* delta_fract, const int line, const int mrl, const int sample_disp)
 {
   for (int i = 0, delta_pos = sample_disp * (1 + mrl); i < line; ++i, delta_pos += sample_disp) {
@@ -1054,11 +1055,14 @@ static void uvg_angular_pred_avx2(
 
   if (sample_disp != 0) {
     // The mode is not horizontal or vertical, we have to do interpolation.
-    int64_t delta_int[MAX_PRED_WIDTH];
-    int32_t delta_fract[MAX_PRED_WIDTH];
+
+    // Set delta table pointers
+    int mode_offset = (pred_mode - 2) * 32;
+    const int64_t* delta_int = &delta_int_table[mode_offset];
+    const int32_t* delta_fract = &delta_fract_table[mode_offset];
 
     // TODO: for horizontal modes, these should be constructed using width instead of height
-    angular_pred_avx2_delta_tables(delta_int, delta_fract, height, multi_ref_index, sample_disp);
+    //angular_pred_avx2_delta_tables(delta_int, delta_fract, height, multi_ref_index, sample_disp);
 
     // Check if the angle is fractional. If yes, interpolation is needed
     if ((abs(sample_disp) & 0x1F) != 0) {
@@ -1069,7 +1073,7 @@ static void uvg_angular_pred_avx2(
           switch (width) {
             case  4: angular_pred_avx2_w4_ver(dst, ref_main, delta_int, delta_fract, height, use_cubic); break;
             case  8: break;
-            case 16: break;
+            case 16: angular_pred_avx2_w16_ver(dst, ref_main, delta_int, delta_fract, height, use_cubic); break;
             case 32: break;
             case 64: break;
             default:
