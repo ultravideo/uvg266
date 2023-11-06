@@ -969,14 +969,14 @@ static void angular_pred_avx2_non_fractional_angle_pxl_copy(uvg_pixel* dst, uvg_
   for (int y = 0; y < height; ++y) {
     uvg_pixel* dst_row = dst + y * width;
     uvg_pixel* ref_row = ref + delta_int[y] + 1;
-    for (int_fast32_t x = 0; x + 3 < width; x += 4) {
+    for (int_fast32_t x = 0; x < width; x += 4) {
       memcpy(dst_row + x, ref_row + x, 4 * sizeof(dst[0]));
     }
   }
 }
 
 
-static void angular_pdpc_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int width, const int height, const int scale, const int_fast8_t mode_disp, const int16_t inv_sample_disp)
+static void angular_pdpc_ver_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int width, const int height, const int scale, const int16_t inv_sample_disp)
 {
   int16_t wL[4];
   int16_t left[4][4];
@@ -1031,6 +1031,22 @@ static void angular_pdpc_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const i
   }
 }
 
+
+static void angular_pdpc_hor_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int width, const int height, const int scale, const int16_t inv_sample_disp)
+{
+  // TODO: PDPC for horizontal modes
+  
+  for (int y = 0; y < height; ++y) {
+    int inv_angle_sum = 256 + (y + 1) * inv_sample_disp;
+    int16_t wT = 32 >> ((y << 1) >> scale);
+    for (int x = 0; x < width; ++x) {
+      int16_t top = ref_side[x + (inv_angle_sum >> 9) + 1];
+      dst[y * width + x] = CLIP_TO_PIXEL((top * wT + (64 - wT) * dst[y * width + x] + 32) >> 6);
+    }
+  }
+}
+
+
 static void uvg_angular_pred_avx2(
   const cu_loc_t* const cu_loc,
   const int_fast8_t intra_mode,
@@ -1068,9 +1084,9 @@ static void uvg_angular_pred_avx2(
 
   // Whether to swap references to always project on the left reference row.
   const bool vertical_mode = intra_mode >= 34;
-  // Modes distance to horizontal or vertical mode.
+  // Modes distance to horizontal or vertical mode. Possible values: [-16, 16]
+  // For pure vertical or horizontal modes, this is 0. For pure diagonal modes, this is either -16 or 16.
   const int_fast8_t mode_disp = vertical_mode ? pred_mode - 50 : -(pred_mode - 18);
-  //const int_fast8_t mode_disp = vertical_mode ? intra_mode - 26 : 10 - intra_mode;
 
   // Sample displacement per column in fractions of 32.
   const int_fast8_t sample_disp = (mode_disp < 0 ? -1 : 1) * modedisp2sampledisp[abs(mode_disp)];
@@ -1232,8 +1248,11 @@ static void uvg_angular_pred_avx2(
       }
     }
     if (PDPC_filter) {
-      angular_pdpc_avx2(dst, ref_side, width, height, scale, mode_disp, modedisp2invsampledisp[abs(mode_disp)]);
-    }
+      if (vertical_mode)
+        angular_pdpc_ver_avx2(dst, ref_side, width, height, scale, modedisp2invsampledisp[abs(mode_disp)]);
+      else
+        angular_pdpc_hor_avx2(dst, ref_side, width, height, scale, modedisp2invsampledisp[abs(mode_disp)]);
+    } 
   }
 }
 
