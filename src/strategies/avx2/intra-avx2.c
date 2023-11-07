@@ -1035,8 +1035,9 @@ static void angular_pdpc_ver_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, con
 static void angular_pdpc_hor_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int width, const int height, const int scale, const int16_t inv_sample_disp)
 {
   // TODO: PDPC for horizontal modes
-  
-  for (int y = 0; y < height; ++y) {
+  int limit = MIN(3 << scale, height);
+
+  for (int y = 0; y < limit; ++y) {
     int inv_angle_sum = 256 + (y + 1) * inv_sample_disp;
     int16_t wT = 32 >> ((y << 1) >> scale);
     for (int x = 0; x < width; ++x) {
