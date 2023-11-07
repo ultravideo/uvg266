@@ -898,19 +898,20 @@ static void angular_pred_avx2_w16_ver(uvg_pixel* dst, const uvg_pixel* ref_main,
       //memcpy(f[1], cubic_filter[delta_fract[y + 1]], 8);
       //memcpy(f[2], cubic_filter[delta_fract[y + 2]], 8);
       //memcpy(f[3], cubic_filter[delta_fract[y + 3]], 8);
-      int64_t *tmp = (int64_t*)&delta_fract[y];
-      all_weights = _mm256_set1_epi64x(*tmp);
+      //int64_t *tmp = (int64_t*)&delta_fract[y];
+      int16_t tmp[4];
+      memcpy(&tmp, cubic_filter[delta_fract[y]], 8);
+      all_weights = _mm256_set1_epi64x(*(int64_t*)tmp);
     }
     else {
-      for (int yy = 0; yy < 4; ++yy) {
-        const int16_t offset = (delta_fract[y + yy] >> 1);
-        int16_t tmp[4];
-        tmp[0] = 16 - offset;
-        tmp[1] = 32 - offset;
-        tmp[2] = 16 + offset;
-        tmp[3] = offset;
-        all_weights = _mm256_set1_epi64x(*(int64_t*)tmp);
-      }
+      const int16_t offset = (delta_fract[y] >> 1);
+      int16_t tmp[4];
+      tmp[0] = 16 - offset;
+      tmp[1] = 32 - offset;
+      tmp[2] = 16 + offset;
+      tmp[3] = offset;
+      all_weights = _mm256_set1_epi64x(*(int64_t*)tmp);
+      
     }
 
     // Do 4-tap intra interpolation filtering
@@ -1034,7 +1035,7 @@ static void angular_pdpc_ver_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, con
 
 static void angular_pdpc_hor_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int width, const int height, const int scale, const int16_t inv_sample_disp)
 {
-  // TODO: PDPC for horizontal modes
+  // TODO: PDPC for horizontal modes. Change this to AVX2
   int limit = MIN(3 << scale, height);
 
   for (int y = 0; y < limit; ++y) {
