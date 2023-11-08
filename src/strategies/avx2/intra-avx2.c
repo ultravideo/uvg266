@@ -1003,15 +1003,15 @@ static void angular_pred_avx2_w16_ver(uvg_pixel* dst, const uvg_pixel* ref_main,
     uvg_pixel* p = (uvg_pixel*)ref_main;
     // This solution assumes the delta int values to be 64-bit
     // Cast from 16-bit to 64-bit.
-    __m256i vidx = _mm256_setr_epi64x(delta_int[y + 0],
-      delta_int[y + 1],
-      delta_int[y + 2],
-      delta_int[y + 3]);
+    __m256i vidx = _mm256_setr_epi64x(delta_int[y] + 0,
+                                      delta_int[y] + 4,
+                                      delta_int[y] + 8,
+                                      delta_int[y] + 12);
     //__m256i all_weights = _mm256_loadu_si256((__m256i*)f);
     __m256i w01 = _mm256_shuffle_epi8(all_weights, w_shuf_01);
     __m256i w23 = _mm256_shuffle_epi8(all_weights, w_shuf_23);
 
-    for (int_fast32_t x = 0; x < width; x += 4, p += 4) {
+    for (int_fast32_t x = 0; x < width; x += 16, p += 16) {
 
       __m256i vp = _mm256_i64gather_epi64((const long long int*)p, vidx, 1);
       __m256i vp_01 = _mm256_shuffle_epi8(vp, p_shuf_01);
@@ -1027,7 +1027,10 @@ static void angular_pred_avx2_w16_ver(uvg_pixel* dst, const uvg_pixel* ref_main,
       __m128i hi = _mm256_extracti128_si256(sum, 1);
       __m128i filtered = _mm_packus_epi16(lo, hi);
 
-      *(uint32_t*)(dst + (y + 0) * width + x) = _mm_extract_epi32(filtered, 0);
+      *(uint32_t*)(dst + (y + 0) * width + x + 0) = _mm_extract_epi32(filtered, 0);
+      *(uint32_t*)(dst + (y + 0) * width + x + 4) = _mm_extract_epi32(filtered, 1);
+      *(uint32_t*)(dst + (y + 0) * width + x + 8) = _mm_extract_epi32(filtered, 2);
+      *(uint32_t*)(dst + (y + 0) * width + x + 12) = _mm_extract_epi32(filtered, 3);
     }
   }
 }
