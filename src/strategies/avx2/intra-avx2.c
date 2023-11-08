@@ -915,12 +915,12 @@ static void angular_pred_avx2_w8_ver(uvg_pixel* dst, const uvg_pixel* ref_main, 
     // Cast from 16-bit to 64-bit.
     __m256i vidx = _mm256_setr_epi64x(delta_int[y + 0],
       delta_int[y + 1],
-      delta_int[y + 2],
-      delta_int[y + 3]);
+      delta_int[y + 0] + 4,
+      delta_int[y + 1] + 4);
     __m256i w01 = _mm256_shuffle_epi8(all_weights, w_shuf_01);
     __m256i w23 = _mm256_shuffle_epi8(all_weights, w_shuf_23);
 
-    for (int_fast32_t x = 0; x + 3 < width; x += 4, p += 4) {
+    for (int_fast32_t x = 0; x < width; x += 8, p += 8) {
 
       __m256i vp = _mm256_i64gather_epi64((const long long int*)p, vidx, 1);
       __m256i vp_01 = _mm256_shuffle_epi8(vp, p_shuf_01);
@@ -936,18 +936,16 @@ static void angular_pred_avx2_w8_ver(uvg_pixel* dst, const uvg_pixel* ref_main, 
       __m128i hi = _mm256_extracti128_si256(sum, 1);
       __m128i filtered = _mm_packus_epi16(lo, hi);
 
-      *(uint32_t*)(dst + (y + 0) * width + x) = _mm_extract_epi32(filtered, 0);
-      *(uint32_t*)(dst + (y + 1) * width + x) = _mm_extract_epi32(filtered, 1);
-      *(uint32_t*)(dst + (y + 2) * width + x) = _mm_extract_epi32(filtered, 2);
-      *(uint32_t*)(dst + (y + 3) * width + x) = _mm_extract_epi32(filtered, 3);
+      *(uint32_t*)(dst + (y + 0) * width + (x + 0)) = _mm_extract_epi32(filtered, 0);
+      *(uint32_t*)(dst + (y + 1) * width + (x + 0)) = _mm_extract_epi32(filtered, 1);
+      *(uint32_t*)(dst + (y + 0) * width + (x + 4)) = _mm_extract_epi32(filtered, 2);
+      *(uint32_t*)(dst + (y + 1) * width + (x + 4)) = _mm_extract_epi32(filtered, 3);
     }
   }
 }
 
-static void angular_pred_avx2_w16_ver(uvg_pixel* dst, const uvg_pixel* ref_main, const int16_t* delta_int, const int16_t* delta_fract, const int height, const int use_cubic)
+static void angular_pred_avx2_w16_ver(uvg_pixel* dst, const uvg_pixel* ref_main, const int16_t* delta_int, const int16_t* delta_fract, const int width, const int height, const int use_cubic)
 {
-  const int width = 16;
-
   const __m256i p_shuf_01 = _mm256_setr_epi8(
     0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
     0x08, 0x09, 0x09, 0x0a, 0x0a, 0x0b, 0x0b, 0x0c,
@@ -1013,7 +1011,7 @@ static void angular_pred_avx2_w16_ver(uvg_pixel* dst, const uvg_pixel* ref_main,
     __m256i w01 = _mm256_shuffle_epi8(all_weights, w_shuf_01);
     __m256i w23 = _mm256_shuffle_epi8(all_weights, w_shuf_23);
 
-    for (int_fast32_t x = 0; x + 3 < width; x += 4, p += 4) {
+    for (int_fast32_t x = 0; x < width; x += 4, p += 4) {
 
       __m256i vp = _mm256_i64gather_epi64((const long long int*)p, vidx, 1);
       __m256i vp_01 = _mm256_shuffle_epi8(vp, p_shuf_01);
@@ -1030,9 +1028,6 @@ static void angular_pred_avx2_w16_ver(uvg_pixel* dst, const uvg_pixel* ref_main,
       __m128i filtered = _mm_packus_epi16(lo, hi);
 
       *(uint32_t*)(dst + (y + 0) * width + x) = _mm_extract_epi32(filtered, 0);
-      *(uint32_t*)(dst + (y + 1) * width + x) = _mm_extract_epi32(filtered, 1);
-      *(uint32_t*)(dst + (y + 2) * width + x) = _mm_extract_epi32(filtered, 2);
-      *(uint32_t*)(dst + (y + 3) * width + x) = _mm_extract_epi32(filtered, 3);
     }
   }
 }
@@ -1271,9 +1266,9 @@ static void uvg_angular_pred_avx2(
           switch (width) {
             case  4: angular_pred_avx2_w4_ver(dst, ref_main, delta_int, delta_fract, height, use_cubic); break;
             case  8: angular_pred_avx2_w8_ver(dst, ref_main, delta_int, delta_fract, height, use_cubic); break;
-            case 16: angular_pred_avx2_w16_ver(dst, ref_main, delta_int, delta_fract, height, use_cubic); break;
-            case 32: break;
-            case 64: break;
+            case 16: angular_pred_avx2_w16_ver(dst, ref_main, delta_int, delta_fract, width, height, use_cubic); break;
+            case 32: angular_pred_avx2_w16_ver(dst, ref_main, delta_int, delta_fract, width, height, use_cubic); break;
+            case 64: angular_pred_avx2_w16_ver(dst, ref_main, delta_int, delta_fract, width, height, use_cubic); break;
             default:
               assert(false && "Intra angular predicion: illegal width.\n");
               break;
