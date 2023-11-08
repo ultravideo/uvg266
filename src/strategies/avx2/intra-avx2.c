@@ -855,6 +855,94 @@ static void angular_pred_avx2_w4_ver(uvg_pixel* dst, const uvg_pixel* ref_main, 
   }
 }
 
+static void angular_pred_avx2_w8_ver(uvg_pixel* dst, const uvg_pixel* ref_main, const int16_t* delta_int, const int16_t* delta_fract, const int height, const int use_cubic)
+{
+  const int width = 8;
+
+  const __m256i p_shuf_01 = _mm256_setr_epi8(
+    0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
+    0x08, 0x09, 0x09, 0x0a, 0x0a, 0x0b, 0x0b, 0x0c,
+    0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
+    0x08, 0x09, 0x09, 0x0a, 0x0a, 0x0b, 0x0b, 0x0c
+  );
+
+  const __m256i p_shuf_23 = _mm256_setr_epi8(
+    0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x05, 0x06,
+    0x0a, 0x0b, 0x0b, 0x0c, 0x0c, 0x0d, 0x0d, 0x0e,
+    0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x05, 0x06,
+    0x0a, 0x0b, 0x0b, 0x0c, 0x0c, 0x0d, 0x0d, 0x0e
+  );
+
+  const __m256i w_shuf_01 = _mm256_setr_epi8(
+    0x00, 0x02, 0x00, 0x02, 0x00, 0x02, 0x00, 0x02,
+    0x08, 0x0a, 0x08, 0x0a, 0x08, 0x0a, 0x08, 0x0a,
+    0x00, 0x02, 0x00, 0x02, 0x00, 0x02, 0x00, 0x02,
+    0x08, 0x0a, 0x08, 0x0a, 0x08, 0x0a, 0x08, 0x0a
+  );
+
+  const __m256i w_shuf_23 = _mm256_setr_epi8(
+    0x04, 0x06, 0x04, 0x06, 0x04, 0x06, 0x04, 0x06,
+    0x0c, 0x0e, 0x0c, 0x0e, 0x0c, 0x0e, 0x0c, 0x0e,
+    0x04, 0x06, 0x04, 0x06, 0x04, 0x06, 0x04, 0x06,
+    0x0c, 0x0e, 0x0c, 0x0e, 0x0c, 0x0e, 0x0c, 0x0e
+  );
+
+  // For a 8 width block, height must be at least 2. Handle 2 lines at once
+  for (int y = 0; y < height; y += 2) {
+    __m256i all_weights;
+    if (use_cubic) {
+      int16_t tmp[8];
+      memcpy(&tmp[0], cubic_filter[delta_fract[y + 0]], 8);
+      memcpy(&tmp[4], cubic_filter[delta_fract[y + 1]], 8);
+      all_weights = _mm256_setr_epi64x(*(int64_t*)&tmp[0], *(int64_t*)&tmp[4], *(int64_t*)&tmp[0], *(int64_t*)&tmp[4]);
+    }
+    else {
+      int16_t tmp[8];
+      for (int yy = 0; yy < 2; ++yy) {
+        const int16_t offset = (delta_fract[y + yy] >> 1);
+        const int idx = yy * 4;
+        tmp[idx + 0] = 16 - offset;
+        tmp[idx + 1] = 32 - offset;
+        tmp[idx + 2] = 16 + offset;
+        tmp[idx + 3] = offset;
+      }
+      all_weights = _mm256_setr_epi64x(*(int64_t*)&tmp[0], *(int64_t*)&tmp[4], *(int64_t*)&tmp[0], *(int64_t*)&tmp[4]);
+    }
+
+    // Do 4-tap intra interpolation filtering
+    uvg_pixel* p = (uvg_pixel*)ref_main;
+    // This solution assumes the delta int values to be 64-bit
+    // Cast from 16-bit to 64-bit.
+    __m256i vidx = _mm256_setr_epi64x(delta_int[y + 0],
+      delta_int[y + 1],
+      delta_int[y + 2],
+      delta_int[y + 3]);
+    __m256i w01 = _mm256_shuffle_epi8(all_weights, w_shuf_01);
+    __m256i w23 = _mm256_shuffle_epi8(all_weights, w_shuf_23);
+
+    for (int_fast32_t x = 0; x + 3 < width; x += 4, p += 4) {
+
+      __m256i vp = _mm256_i64gather_epi64((const long long int*)p, vidx, 1);
+      __m256i vp_01 = _mm256_shuffle_epi8(vp, p_shuf_01);
+      __m256i vp_23 = _mm256_shuffle_epi8(vp, p_shuf_23);
+
+      __m256i dot_01 = _mm256_maddubs_epi16(vp_01, w01);
+      __m256i dot_23 = _mm256_maddubs_epi16(vp_23, w23);
+      __m256i sum = _mm256_add_epi16(dot_01, dot_23);
+      sum = _mm256_add_epi16(sum, _mm256_set1_epi16(32));
+      sum = _mm256_srai_epi16(sum, 6);
+
+      __m128i lo = _mm256_castsi256_si128(sum);
+      __m128i hi = _mm256_extracti128_si256(sum, 1);
+      __m128i filtered = _mm_packus_epi16(lo, hi);
+
+      *(uint32_t*)(dst + (y + 0) * width + x) = _mm_extract_epi32(filtered, 0);
+      *(uint32_t*)(dst + (y + 1) * width + x) = _mm_extract_epi32(filtered, 1);
+      *(uint32_t*)(dst + (y + 2) * width + x) = _mm_extract_epi32(filtered, 2);
+      *(uint32_t*)(dst + (y + 3) * width + x) = _mm_extract_epi32(filtered, 3);
+    }
+  }
+}
 
 static void angular_pred_avx2_w16_ver(uvg_pixel* dst, const uvg_pixel* ref_main, const int16_t* delta_int, const int16_t* delta_fract, const int height, const int use_cubic)
 {
@@ -911,7 +999,6 @@ static void angular_pred_avx2_w16_ver(uvg_pixel* dst, const uvg_pixel* ref_main,
       tmp[2] = 16 + offset;
       tmp[3] = offset;
       all_weights = _mm256_set1_epi64x(*(int64_t*)tmp);
-      
     }
 
     // Do 4-tap intra interpolation filtering
@@ -1183,7 +1270,7 @@ static void uvg_angular_pred_avx2(
         if (vertical_mode) {
           switch (width) {
             case  4: angular_pred_avx2_w4_ver(dst, ref_main, delta_int, delta_fract, height, use_cubic); break;
-            case  8: break;
+            case  8: angular_pred_avx2_w8_ver(dst, ref_main, delta_int, delta_fract, height, use_cubic); break;
             case 16: angular_pred_avx2_w16_ver(dst, ref_main, delta_int, delta_fract, height, use_cubic); break;
             case 32: break;
             case 64: break;
