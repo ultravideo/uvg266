@@ -948,16 +948,16 @@ static void angular_pred_avx2_w16_ver(uvg_pixel* dst, const uvg_pixel* ref_main,
 {
   const __m256i p_shuf_01 = _mm256_setr_epi8(
     0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
-    0x08, 0x09, 0x09, 0x0a, 0x0a, 0x0b, 0x0b, 0x0c,
+    0x04, 0x05, 0x05, 0x06, 0x06, 0x07, 0x07, 0x08,
     0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
-    0x08, 0x09, 0x09, 0x0a, 0x0a, 0x0b, 0x0b, 0x0c
+    0x04, 0x05, 0x05, 0x06, 0x06, 0x07, 0x07, 0x08
   );
 
   const __m256i p_shuf_23 = _mm256_setr_epi8(
     0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x05, 0x06,
-    0x0a, 0x0b, 0x0b, 0x0c, 0x0c, 0x0d, 0x0d, 0x0e,
+    0x06, 0x07, 0x07, 0x08, 0x08, 0x09, 0x09, 0x0a,
     0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x05, 0x06,
-    0x0a, 0x0b, 0x0b, 0x0c, 0x0c, 0x0d, 0x0d, 0x0e
+    0x06, 0x07, 0x07, 0x08, 0x08, 0x09, 0x09, 0x0a
   );
 
   const __m256i w_shuf_01 = _mm256_setr_epi8(
@@ -1007,15 +1007,19 @@ static void angular_pred_avx2_w16_ver(uvg_pixel* dst, const uvg_pixel* ref_main,
                                       delta_int[y] + 4,
                                       delta_int[y] + 8,
                                       delta_int[y] + 12);
+
     //__m256i all_weights = _mm256_loadu_si256((__m256i*)f);
+
     __m256i w01 = _mm256_shuffle_epi8(all_weights, w_shuf_01);
     __m256i w23 = _mm256_shuffle_epi8(all_weights, w_shuf_23);
 
     for (int_fast32_t x = 0; x < width; x += 16, p += 16) {
+      __m256i vp = _mm256_loadu_si256((__m256i*)(p + delta_int[y]));
 
-      __m256i vp = _mm256_i64gather_epi64((const long long int*)p, vidx, 1);
-      __m256i vp_01 = _mm256_shuffle_epi8(vp, p_shuf_01);
-      __m256i vp_23 = _mm256_shuffle_epi8(vp, p_shuf_23);
+      __m256i tmp = _mm256_permute4x64_epi64(vp, _MM_SHUFFLE(2, 1, 1, 0));
+
+      __m256i vp_01 = _mm256_shuffle_epi8(tmp, p_shuf_01);
+      __m256i vp_23 = _mm256_shuffle_epi8(tmp, p_shuf_23);
 
       __m256i dot_01 = _mm256_maddubs_epi16(vp_01, w01);
       __m256i dot_23 = _mm256_maddubs_epi16(vp_23, w23);
@@ -1027,10 +1031,8 @@ static void angular_pred_avx2_w16_ver(uvg_pixel* dst, const uvg_pixel* ref_main,
       __m128i hi = _mm256_extracti128_si256(sum, 1);
       __m128i filtered = _mm_packus_epi16(lo, hi);
 
-      *(uint32_t*)(dst + (y + 0) * width + x + 0) = _mm_extract_epi32(filtered, 0);
-      *(uint32_t*)(dst + (y + 0) * width + x + 4) = _mm_extract_epi32(filtered, 1);
-      *(uint32_t*)(dst + (y + 0) * width + x + 8) = _mm_extract_epi32(filtered, 2);
-      *(uint32_t*)(dst + (y + 0) * width + x + 12) = _mm_extract_epi32(filtered, 3);
+      _mm_store_si128((__m128i*)dst, filtered);
+      dst += 16;
     }
   }
 }
