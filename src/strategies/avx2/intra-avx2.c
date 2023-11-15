@@ -1063,26 +1063,12 @@ static void angular_pred_avx2_w4_hor(uvg_pixel* dst, const uvg_pixel* ref_main, 
     0x00, 0x02, 0x08, 0x0a, 0x00, 0x02, 0x08, 0x0a
   );
 
-  //const __m256i w_shuf_01 = _mm256_setr_epi8(
-  //  0x00, 0x02, 0x00, 0x02, 0x00, 0x02, 0x00, 0x02,
-  //  0x08, 0x0a, 0x08, 0x0a, 0x08, 0x0a, 0x08, 0x0a,
-  //  0x00, 0x02, 0x00, 0x02, 0x00, 0x02, 0x00, 0x02,
-  //  0x08, 0x0a, 0x08, 0x0a, 0x08, 0x0a, 0x08, 0x0a
-  //);
-
   const __m256i w_shuf_23 = _mm256_setr_epi8(
     0x04, 0x06, 0x0c, 0x0e, 0x04, 0x06, 0x0c, 0x0e,
     0x04, 0x06, 0x0c, 0x0e, 0x04, 0x06, 0x0c, 0x0e,
     0x04, 0x06, 0x0c, 0x0e, 0x04, 0x06, 0x0c, 0x0e,
     0x04, 0x06, 0x0c, 0x0e, 0x04, 0x06, 0x0c, 0x0e
   );
-
-  /*const __m256i w_shuf_23 = _mm256_setr_epi8(
-    0x04, 0x06, 0x04, 0x06, 0x04, 0x06, 0x04, 0x06,
-    0x0c, 0x0e, 0x0c, 0x0e, 0x0c, 0x0e, 0x0c, 0x0e,
-    0x04, 0x06, 0x04, 0x06, 0x04, 0x06, 0x04, 0x06,
-    0x0c, 0x0e, 0x0c, 0x0e, 0x0c, 0x0e, 0x0c, 0x0e
-  );*/
 
   const __m128i r_shuffle = _mm_setr_epi8(
     0x00, 0x01, 0x08, 0x09, 0x02, 0x03, 0x0a, 0x0b,
@@ -1097,7 +1083,7 @@ static void angular_pred_avx2_w4_hor(uvg_pixel* dst, const uvg_pixel* ref_main, 
     // Do 4-tap intra interpolation filtering
     uvg_pixel* p = (uvg_pixel*)(ref_main + y);
 
-    for (int_fast32_t x = 0; x < width; x += 4, p += 4) {
+    for (int_fast32_t x = 0; x < width; x += 4) {
       if (use_cubic) {
         memcpy(f[0], cubic_filter[delta_fract[x + 0]], 8);
         memcpy(f[1], cubic_filter[delta_fract[x + 1]], 8);
@@ -1142,9 +1128,105 @@ static void angular_pred_avx2_w4_hor(uvg_pixel* dst, const uvg_pixel* ref_main, 
       __m128i hi = _mm256_extracti128_si256(sum, 1);
       __m128i filtered = _mm_packus_epi16(lo, hi);
 
-      
-
       _mm_store_si128((__m128i*)dst, _mm_shuffle_epi8(filtered, r_shuffle));
+      dst += 16;
+    }
+  }
+}
+
+static void angular_pred_avx2_w8_hor(uvg_pixel* dst, const uvg_pixel* ref_main, const int16_t* delta_int, const int16_t* delta_fract, const int height, const int use_cubic)
+{
+  const int width = 8;
+
+  const __m256i p_shuf_01 = _mm256_setr_epi8(
+    0x00, 0x01, 0x08, 0x09, 0x01, 0x02, 0x09, 0x0a,
+    0x02, 0x03, 0x0a, 0x0b, 0x03, 0x04, 0x0b, 0x0c,
+    0x00, 0x01, 0x08, 0x09, 0x01, 0x02, 0x09, 0x0a,
+    0x02, 0x03, 0x0a, 0x0b, 0x03, 0x04, 0x0b, 0x0c
+  );
+
+  const __m256i p_shuf_23 = _mm256_setr_epi8(
+    0x02, 0x03, 0x0a, 0x0b, 0x03, 0x04, 0x0b, 0x0c,
+    0x04, 0x05, 0x0c, 0x0d, 0x05, 0x06, 0x0d, 0x0e,
+    0x02, 0x03, 0x0a, 0x0b, 0x03, 0x04, 0x0b, 0x0c,
+    0x04, 0x05, 0x0c, 0x0d, 0x05, 0x06, 0x0d, 0x0e
+  );
+
+  const __m256i w_shuf_01 = _mm256_setr_epi8(
+    0x00, 0x02, 0x08, 0x0a, 0x00, 0x02, 0x08, 0x0a,
+    0x00, 0x02, 0x08, 0x0a, 0x00, 0x02, 0x08, 0x0a,
+    0x00, 0x02, 0x08, 0x0a, 0x00, 0x02, 0x08, 0x0a,
+    0x00, 0x02, 0x08, 0x0a, 0x00, 0x02, 0x08, 0x0a
+  );
+
+  const __m256i w_shuf_23 = _mm256_setr_epi8(
+    0x04, 0x06, 0x0c, 0x0e, 0x04, 0x06, 0x0c, 0x0e,
+    0x04, 0x06, 0x0c, 0x0e, 0x04, 0x06, 0x0c, 0x0e,
+    0x04, 0x06, 0x0c, 0x0e, 0x04, 0x06, 0x0c, 0x0e,
+    0x04, 0x06, 0x0c, 0x0e, 0x04, 0x06, 0x0c, 0x0e
+  );
+
+  const __m128i r_shuffle = _mm_setr_epi8(
+    0x00, 0x01, 0x08, 0x09, 0x02, 0x03, 0x0a, 0x0b,
+    0x04, 0x05, 0x0c, 0x0d, 0x06, 0x07, 0x0e, 0x0f
+  );
+
+  int16_t f[8][4] = { { 0 } };
+
+  // For a 8 width block, height must be at least 2. Handle 2 lines at once
+  for (int y = 0; y < height; y += 2) {
+
+    // Do 4-tap intra interpolation filtering
+    uvg_pixel* p = (uvg_pixel*)(ref_main + y);
+
+    for (int_fast32_t x = 0; x < width; x += 8) {
+      if (use_cubic) {
+        memcpy(f[0], cubic_filter[delta_fract[x + 0]], 8);
+        memcpy(f[1], cubic_filter[delta_fract[x + 1]], 8);
+        memcpy(f[2], cubic_filter[delta_fract[x + 2]], 8);
+        memcpy(f[3], cubic_filter[delta_fract[x + 3]], 8);
+        memcpy(f[4], cubic_filter[delta_fract[x + 4]], 8);
+        memcpy(f[5], cubic_filter[delta_fract[x + 5]], 8);
+        memcpy(f[6], cubic_filter[delta_fract[x + 6]], 8);
+        memcpy(f[7], cubic_filter[delta_fract[x + 7]], 8);
+      }
+      else {
+        for (int xx = 0; xx < 8; ++xx) {
+          const int16_t offset = (delta_fract[x + xx] >> 1);
+          f[xx][0] = 16 - offset;
+          f[xx][1] = 32 - offset;
+          f[xx][2] = 16 + offset;
+          f[xx][3] = offset;
+        }
+      }
+
+      // This solution assumes the delta int values to be 64-bit
+      // Cast from 16-bit to 64-bit.
+      __m256i vidx = _mm256_setr_epi32(delta_int[x + 0], delta_int[x + 1],
+                                       delta_int[x + 2], delta_int[x + 3],
+                                       delta_int[x + 4], delta_int[x + 5],
+                                       delta_int[x + 6], delta_int[x + 7]);
+      __m256i all_weights = _mm256_loadu_si256((__m256i*)f);
+      __m256i w01 = _mm256_shuffle_epi8(all_weights, w_shuf_01);
+      __m256i w23 = _mm256_shuffle_epi8(all_weights, w_shuf_23);
+
+      __m256i vp = _mm256_i32gather_epi32((const int*)p, vidx, 1);
+
+      __m256i vp_01 = _mm256_shuffle_epi8(vp, p_shuf_01);
+      __m256i vp_23 = _mm256_shuffle_epi8(vp, p_shuf_23);
+
+      __m256i dot_01 = _mm256_maddubs_epi16(vp_01, w01);
+      __m256i dot_23 = _mm256_maddubs_epi16(vp_23, w23);
+      __m256i sum = _mm256_add_epi16(dot_01, dot_23);
+      sum = _mm256_add_epi16(sum, _mm256_set1_epi16(32));
+      sum = _mm256_srai_epi16(sum, 6);
+
+      __m128i lo = _mm256_castsi256_si128(sum);
+      __m128i hi = _mm256_extracti128_si256(sum, 1);
+      __m128i filtered = _mm_packus_epi16(lo, hi);
+      
+      _mm_store_si128((__m128i*)dst,  _mm_shuffle_epi8(filtered, r_shuffle));
+ 
       dst += 16;
     }
   }
@@ -1395,7 +1477,7 @@ static void uvg_angular_pred_avx2(
         else {
           switch (width) {
             case  4: angular_pred_avx2_w4_hor(dst, ref_main, delta_int, delta_fract, height, use_cubic); break;
-            case  8: break;
+            case  8: angular_pred_avx2_w8_hor(dst, ref_main, delta_int, delta_fract, height, use_cubic); break;
             case 16: break;
             case 32: break;
             case 64: break;
