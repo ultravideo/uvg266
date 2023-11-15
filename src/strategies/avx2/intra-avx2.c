@@ -914,7 +914,7 @@ static void angular_pred_avx2_w8_ver(uvg_pixel* dst, const uvg_pixel* ref_main, 
     // This solution assumes the delta int values to be 64-bit
     // Cast from 16-bit to 64-bit.
     __m256i vidx = _mm256_setr_epi64x(delta_int[y + 0],
-      delta_int[y + 1],
+      delta_int[y + 1],        // TODO: flip these middle ones, then replace gather with 128-bit load. Replace extract with store. Also, fix shuffle vectors.
       delta_int[y + 0] + 4,
       delta_int[y + 1] + 4);
     __m256i w01 = _mm256_shuffle_epi8(all_weights, w_shuf_01);
@@ -1350,7 +1350,8 @@ static void uvg_angular_pred_avx2(
   const int log2_height = uvg_g_convert_to_log2[height];
 
   assert((log2_width >= 2 && log2_width <= 6) && (log2_height >= 0 && log2_height <= 6));
-  assert(intra_mode >= 2 && intra_mode <= 66);
+  // Modes [-1, -14] and [67, 80] are wide angle modes
+  assert(intra_mode >= -14 && intra_mode <= 80);
 
   uint8_t multi_ref_index = channel_type == COLOR_Y ? multi_ref_idx : 0;
   uint8_t isp = isp_mode;
