@@ -233,7 +233,7 @@ ALIGNED(32) static const int16_t delta_fract_table[2112] = {
 
 // TODO: cut this table in half due to symmetry
 // Delta int and delta fract wide angle tables. Rows are corrected prediction mode, columns y offset. (or x offset for horizontal modes)
-ALIGNED(32) static const int16_t delta_int_wide_angle_table[1856] = {
+ALIGNED(32) static const int16_t delta_int_wide_angle_table[1792] = {
   16,   32,   48,   64,   80,   96,  112,  128,  144,  160,  176,  192,  208,  224,  240,  256,  272,  288,  304,  320,  336,  352,  368,  384,  400,  416,  432,  448,  464,  480,  496,  512,  528,  544,  560,  576,  592,  608,  624,  640,  656,  672,  688,  704,  720,  736,  752,  768,  784,  800,  816,  832,  848,  864,  880,  896,  912,  928,  944,  960,  976,  992, 1008, 1024,  // -12
   10,   21,   31,   42,   53,   63,   74,   85,   95,  106,  117,  127,  138,  149,  159,  170,  181,  191,  202,  213,  223,  234,  245,  255,  266,  277,  287,  298,  309,  319,  330,  341,  351,  362,  372,  383,  394,  404,  415,  426,  436,  447,  458,  468,  479,  490,  500,  511,  522,  532,  543,  554,  564,  575,  586,  596,  607,  618,  628,  639,  650,  660,  671,  682,
    8,   16,   24,   32,   40,   48,   56,   64,   72,   80,   88,   96,  104,  112,  120,  128,  136,  144,  152,  160,  168,  176,  184,  192,  200,  208,  216,  224,  232,  240,  248,  256,  264,  272,  280,  288,  296,  304,  312,  320,  328,  336,  344,  352,  360,  368,  376,  384,  392,  400,  408,  416,  424,  432,  440,  448,  456,  464,  472,  480,  488,  496,  504,  512,  // -10
@@ -262,11 +262,11 @@ ALIGNED(32) static const int16_t delta_int_wide_angle_table[1856] = {
    8,   16,   24,   32,   40,   48,   56,   64,   72,   80,   88,   96,  104,  112,  120,  128,  136,  144,  152,  160,  168,  176,  184,  192,  200,  208,  216,  224,  232,  240,  248,  256,  264,  272,  280,  288,  296,  304,  312,  320,  328,  336,  344,  352,  360,  368,  376,  384,  392,  400,  408,  416,  424,  432,  440,  448,  456,  464,  472,  480,  488,  496,  504,  512,
   10,   21,   31,   42,   53,   63,   74,   85,   95,  106,  117,  127,  138,  149,  159,  170,  181,  191,  202,  213,  223,  234,  245,  255,  266,  277,  287,  298,  309,  319,  330,  341,  351,  362,  372,  383,  394,  404,  415,  426,  436,  447,  458,  468,  479,  490,  500,  511,  522,  532,  543,  554,  564,  575,  586,  596,  607,  618,  628,  639,  650,  660,  671,  682,  // 79
   16,   32,   48,   64,   80,   96,  112,  128,  144,  160,  176,  192,  208,  224,  240,  256,  272,  288,  304,  320,  336,  352,  368,  384,  400,  416,  432,  448,  464,  480,  496,  512,  528,  544,  560,  576,  592,  608,  624,  640,  656,  672,  688,  704,  720,  736,  752,  768,  784,  800,  816,  832,  848,  864,  880,  896,  912,  928,  944,  960,  976,  992, 1008, 1024,
-  32,   64,   96,  128,  160,  192,  224,  256,  288,  320,  352,  384,  416,  448,  480,  512,  544,  576,  608,  640,  672,  704,  736,  768,  800,  832,  864,  896,  928,  960,  992, 1024, 1056, 1088, 1120, 1152, 1184, 1216, 1248, 1280, 1312, 1344, 1376, 1408, 1440, 1472, 1504, 1536, 1568, 1600, 1632, 1664, 1696, 1728, 1760, 1792, 1824, 1856, 1888, 1920, 1952, 1984, 2016, 2048,  // 81
+ 
 };
 
 // TODO: cut out the latter 32 entries due to symmetry
-ALIGNED(32) static const int16_t delta_fract_wide_angle_table[1856] = {
+ALIGNED(32) static const int16_t delta_fract_wide_angle_table[1792] = {
  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  // -12
 21, 10, 31, 20,  9, 30, 19,  8, 29, 18,  7, 28, 17,  6, 27, 16,  5, 26, 15,  4, 25, 14,  3, 24, 13,  2, 23, 12,  1, 22, 11,  0, 21, 10, 31, 20,  9, 30, 19,  8, 29, 18,  7, 28, 17,  6, 27, 16,  5, 26, 15,  4, 25, 14,  3, 24, 13,  2, 23, 12,  1, 22, 11,  0,
  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  // -10
@@ -295,7 +295,6 @@ ALIGNED(32) static const int16_t delta_fract_wide_angle_table[1856] = {
  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
 21, 10, 31, 20,  9, 30, 19,  8, 29, 18,  7, 28, 17,  6, 27, 16,  5, 26, 15,  4, 25, 14,  3, 24, 13,  2, 23, 12,  1, 22, 11,  0, 21, 10, 31, 20,  9, 30, 19,  8, 29, 18,  7, 28, 17,  6, 27, 16,  5, 26, 15,  4, 25, 14,  3, 24, 13,  2, 23, 12,  1, 22, 11,  0,  // 79
  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
- 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  // 81
 };
 
 
@@ -1145,97 +1144,91 @@ static void angular_pred_avx2_w8_hor(uvg_pixel* dst, const uvg_pixel* ref_main, 
 {
   const int width = 8;
 
-  const __m256i p_shuf_01 = _mm256_setr_epi8(
-    0x00, 0x01, 0x08, 0x09, 0x01, 0x02, 0x09, 0x0a,
-    0x02, 0x03, 0x0a, 0x0b, 0x03, 0x04, 0x0b, 0x0c,
-    0x00, 0x01, 0x08, 0x09, 0x01, 0x02, 0x09, 0x0a,
-    0x02, 0x03, 0x0a, 0x0b, 0x03, 0x04, 0x0b, 0x0c
-  );
-
-  const __m256i p_shuf_23 = _mm256_setr_epi8(
-    0x02, 0x03, 0x0a, 0x0b, 0x03, 0x04, 0x0b, 0x0c,
-    0x04, 0x05, 0x0c, 0x0d, 0x05, 0x06, 0x0d, 0x0e,
-    0x02, 0x03, 0x0a, 0x0b, 0x03, 0x04, 0x0b, 0x0c,
-    0x04, 0x05, 0x0c, 0x0d, 0x05, 0x06, 0x0d, 0x0e
-  );
-
-  const __m256i w_shuf_01 = _mm256_setr_epi8(
-    0x00, 0x02, 0x08, 0x0a, 0x00, 0x02, 0x08, 0x0a,
-    0x00, 0x02, 0x08, 0x0a, 0x00, 0x02, 0x08, 0x0a,
-    0x00, 0x02, 0x08, 0x0a, 0x00, 0x02, 0x08, 0x0a,
-    0x00, 0x02, 0x08, 0x0a, 0x00, 0x02, 0x08, 0x0a
-  );
-
-  const __m256i w_shuf_23 = _mm256_setr_epi8(
-    0x04, 0x06, 0x0c, 0x0e, 0x04, 0x06, 0x0c, 0x0e,
-    0x04, 0x06, 0x0c, 0x0e, 0x04, 0x06, 0x0c, 0x0e,
-    0x04, 0x06, 0x0c, 0x0e, 0x04, 0x06, 0x0c, 0x0e,
-    0x04, 0x06, 0x0c, 0x0e, 0x04, 0x06, 0x0c, 0x0e
+  const __m256i w_shuf = _mm256_setr_epi8(
+    0x00, 0x02, 0x00, 0x02, 0x04, 0x06, 0x04, 0x06,
+    0x08, 0x0a, 0x08, 0x0a, 0x0c, 0x0e, 0x0c, 0x0e,
+    0x00, 0x02, 0x00, 0x02, 0x04, 0x06, 0x04, 0x06,
+    0x08, 0x0a, 0x08, 0x0a, 0x0c, 0x0e, 0x0c, 0x0e
   );
 
   const __m128i r_shuffle = _mm_setr_epi8(
-    0x00, 0x01, 0x08, 0x09, 0x02, 0x03, 0x0a, 0x0b,
-    0x04, 0x05, 0x0c, 0x0d, 0x06, 0x07, 0x0e, 0x0f
+    0x00, 0x02, 0x04, 0x06, 0x01, 0x03, 0x05, 0x07,
+    0x08, 0x0a, 0x0c, 0x0e, 0x09, 0x0b, 0x0d, 0x0f
   );
 
   int16_t f[8][4] = { { 0 } };
+  if (use_cubic) {
+    memcpy(f[0], cubic_filter[delta_fract[0]], sizeof(int16_t) * 4);
+    memcpy(f[1], cubic_filter[delta_fract[1]], sizeof(int16_t) * 4);
+    memcpy(f[2], cubic_filter[delta_fract[2]], sizeof(int16_t) * 4);
+    memcpy(f[3], cubic_filter[delta_fract[3]], sizeof(int16_t) * 4);
+    memcpy(f[4], cubic_filter[delta_fract[4]], sizeof(int16_t) * 4);
+    memcpy(f[5], cubic_filter[delta_fract[5]], sizeof(int16_t) * 4);
+    memcpy(f[6], cubic_filter[delta_fract[6]], sizeof(int16_t) * 4);
+    memcpy(f[7], cubic_filter[delta_fract[7]], sizeof(int16_t) * 4);
+  }
+  else {
+    for (int x = 0; x < 8; ++x) {
+      const int16_t offset = (delta_fract[x] >> 1);
+      f[x][0] = 16 - offset;
+      f[x][1] = 32 - offset;
+      f[x][2] = 16 + offset;
+      f[x][3] = offset;
+    }
+  }
+
+  __m256i vidx = _mm256_setr_epi32(delta_int[0], delta_int[1],
+                                   delta_int[2], delta_int[3],
+                                   delta_int[4], delta_int[5],
+                                   delta_int[6], delta_int[7]);
+  __m256i weights0 = _mm256_loadu_si256((__m256i*)&f[0]);
+  __m256i weights1 = _mm256_loadu_si256((__m256i*)&f[4]);
+
+  weights0 = _mm256_shuffle_epi32(weights0, _MM_SHUFFLE(3, 1, 2, 0));
+  weights1 = _mm256_shuffle_epi32(weights1, _MM_SHUFFLE(3, 1, 2, 0));
+
+  weights0 = _mm256_permute4x64_epi64(weights0, _MM_SHUFFLE(3, 1, 2, 0));
+  weights1 = _mm256_permute4x64_epi64(weights1, _MM_SHUFFLE(3, 1, 2, 0));
+
+  __m256i tmp0 = _mm256_shuffle_epi8(weights0, w_shuf);
+  __m256i tmp1 = _mm256_shuffle_epi8(weights1, w_shuf);
+
+  __m256i w0 = _mm256_permute2x128_si256(tmp0, tmp1, 0x20);
+  __m256i w1 = _mm256_permute2x128_si256(tmp0, tmp1, 0x31);
 
   // For a 8 width block, height must be at least 2. Handle 2 lines at once
   for (int y = 0; y < height; y += 2) {
 
     // Do 4-tap intra interpolation filtering
     uvg_pixel* p = (uvg_pixel*)(ref_main + y);
+    __m256i vp0 = _mm256_i32gather_epi32((const int*)(p + 0), vidx, 1);
+    __m256i vp1 = _mm256_i32gather_epi32((const int*)(p + 1), vidx, 1);
 
-    for (int_fast32_t x = 0; x < width; x += 8) {
-      if (use_cubic) {
-        memcpy(f[0], cubic_filter[delta_fract[x + 0]], 8);
-        memcpy(f[1], cubic_filter[delta_fract[x + 1]], 8);
-        memcpy(f[2], cubic_filter[delta_fract[x + 2]], 8);
-        memcpy(f[3], cubic_filter[delta_fract[x + 3]], 8);
-        memcpy(f[4], cubic_filter[delta_fract[x + 4]], 8);
-        memcpy(f[5], cubic_filter[delta_fract[x + 5]], 8);
-        memcpy(f[6], cubic_filter[delta_fract[x + 6]], 8);
-        memcpy(f[7], cubic_filter[delta_fract[x + 7]], 8);
-      }
-      else {
-        for (int xx = 0; xx < 8; ++xx) {
-          const int16_t offset = (delta_fract[x + xx] >> 1);
-          f[xx][0] = 16 - offset;
-          f[xx][1] = 32 - offset;
-          f[xx][2] = 16 + offset;
-          f[xx][3] = offset;
-        }
-      }
+    __m256i vp_lo = _mm256_unpacklo_epi16(vp0, vp1);
+    __m256i vp_hi = _mm256_unpackhi_epi16(vp0, vp1);
 
-      // This solution assumes the delta int values to be 64-bit
-      // Cast from 16-bit to 64-bit.
-      __m256i vidx = _mm256_setr_epi32(delta_int[x + 0], delta_int[x + 1],
-                                       delta_int[x + 2], delta_int[x + 3],
-                                       delta_int[x + 4], delta_int[x + 5],
-                                       delta_int[x + 6], delta_int[x + 7]);
-      __m256i all_weights = _mm256_loadu_si256((__m256i*)f);
-      __m256i w01 = _mm256_shuffle_epi8(all_weights, w_shuf_01);
-      __m256i w23 = _mm256_shuffle_epi8(all_weights, w_shuf_23);
+    vp_lo = _mm256_shuffle_epi32(vp_lo, _MM_SHUFFLE(3, 1, 2, 0));
+    vp_hi = _mm256_shuffle_epi32(vp_hi, _MM_SHUFFLE(3, 1, 2, 0));
 
-      __m256i vp = _mm256_i32gather_epi32((const int*)p, vidx, 1);
+    __m256i vp_lo64 = _mm256_unpacklo_epi64(vp_lo, vp_hi);
+    __m256i vp_hi64 = _mm256_unpackhi_epi64(vp_lo, vp_hi);
 
-      __m256i vp_01 = _mm256_shuffle_epi8(vp, p_shuf_01);
-      __m256i vp_23 = _mm256_shuffle_epi8(vp, p_shuf_23);
+    __m256i dot_01 = _mm256_maddubs_epi16(vp_lo64, w0);
+    __m256i dot_23 = _mm256_maddubs_epi16(vp_hi64, w1);
+    __m256i sum = _mm256_add_epi16(dot_01, dot_23);
+    sum = _mm256_add_epi16(sum, _mm256_set1_epi16(32));
+    sum = _mm256_srai_epi16(sum, 6);
 
-      __m256i dot_01 = _mm256_maddubs_epi16(vp_01, w01);
-      __m256i dot_23 = _mm256_maddubs_epi16(vp_23, w23);
-      __m256i sum = _mm256_add_epi16(dot_01, dot_23);
-      sum = _mm256_add_epi16(sum, _mm256_set1_epi16(32));
-      sum = _mm256_srai_epi16(sum, 6);
-
-      __m128i lo = _mm256_castsi256_si128(sum);
-      __m128i hi = _mm256_extracti128_si256(sum, 1);
-      __m128i filtered = _mm_packus_epi16(lo, hi);
+    __m128i lo = _mm256_castsi256_si128(sum);
+    __m128i hi = _mm256_extracti128_si256(sum, 1);
+    __m128i filtered = _mm_packus_epi16(lo, hi);
+    filtered = _mm_shuffle_epi8(filtered, r_shuffle);
+    filtered = _mm_shuffle_epi32(filtered, _MM_SHUFFLE(3, 1, 2, 0));
       
-      _mm_store_si128((__m128i*)dst,  _mm_shuffle_epi8(filtered, r_shuffle));
+    _mm_store_si128((__m128i*)dst,  filtered);
  
-      dst += 16;
-    }
+    dst += 16;
+    
   }
 }
 
@@ -1460,7 +1453,7 @@ static void uvg_angular_pred_avx2(
     // The mode is not horizontal or vertical, we have to do interpolation.
 
     // Set delta table pointers
-    const int table_offset = wide_angle_mode ? (pred_mode < 2 ? (pred_mode + 12) * 64 : (67 + 14 - pred_mode) * 64) : (pred_mode <= 34 ? (pred_mode - 2) * 64 : (66 - pred_mode) * 64);
+    const int table_offset = wide_angle_mode ? (pred_mode < 2 ? (pred_mode + 12) * 64 : (pred_mode - 67 + 14) * 64) : (pred_mode <= 34 ? (pred_mode - 2) * 64 : (66 - pred_mode) * 64);
     const int16_t* delta_int   = wide_angle_mode ? &delta_int_wide_angle_table[table_offset] : &delta_int_table[table_offset];
     const int16_t* delta_fract = wide_angle_mode ? &delta_fract_wide_angle_table[table_offset] : &delta_fract_table[table_offset];
 
