@@ -773,6 +773,43 @@ static const int16_t cubic_filter[32][4] =
 };
 
 
+static const int8_t cubic_filter_8bit[32][4] =
+{
+  { 0, 64,  0,  0 },
+  { -1, 63,  2,  0 },
+  { -2, 62,  4,  0 },
+  { -2, 60,  7, -1 },
+  { -2, 58, 10, -2 },
+  { -3, 57, 12, -2 },
+  { -4, 56, 14, -2 },
+  { -4, 55, 15, -2 },
+  { -4, 54, 16, -2 },
+  { -5, 53, 18, -2 },
+  { -6, 52, 20, -2 },
+  { -6, 49, 24, -3 },
+  { -6, 46, 28, -4 },
+  { -5, 44, 29, -4 },
+  { -4, 42, 30, -4 },
+  { -4, 39, 33, -4 },
+  { -4, 36, 36, -4 },
+  { -4, 33, 39, -4 },
+  { -4, 30, 42, -4 },
+  { -4, 29, 44, -5 },
+  { -4, 28, 46, -6 },
+  { -3, 24, 49, -6 },
+  { -2, 20, 52, -6 },
+  { -2, 18, 53, -5 },
+  { -2, 16, 54, -4 },
+  { -2, 15, 55, -4 },
+  { -2, 14, 56, -4 },
+  { -2, 12, 57, -3 },
+  { -2, 10, 58, -2 },
+  { -1,  7, 60, -2 },
+  { 0,  4, 62, -2 },
+  { 0,  2, 63, -1 },
+};
+
+
 static void angular_pred_avx2_w4_ver(uvg_pixel* dst, const uvg_pixel* ref_main, const int16_t* delta_int, const int16_t* delta_fract, const int height, const int use_cubic)
 {
   const int width = 4;
@@ -1145,10 +1182,10 @@ static void angular_pred_avx2_w8_hor(uvg_pixel* dst, const uvg_pixel* ref_main, 
   const int width = 8;
 
   const __m256i w_shuf = _mm256_setr_epi8(
-    0x00, 0x02, 0x00, 0x02, 0x04, 0x06, 0x04, 0x06,
-    0x08, 0x0a, 0x08, 0x0a, 0x0c, 0x0e, 0x0c, 0x0e,
-    0x00, 0x02, 0x00, 0x02, 0x04, 0x06, 0x04, 0x06,
-    0x08, 0x0a, 0x08, 0x0a, 0x0c, 0x0e, 0x0c, 0x0e
+    0x00, 0x02, 0x04, 0x06, 0x08, 0x0a, 0x0c, 0x0e,
+    0x00, 0x02, 0x04, 0x06, 0x08, 0x0a, 0x0c, 0x0e,
+    0x00, 0x02, 0x04, 0x06, 0x08, 0x0a, 0x0c, 0x0e,
+    0x00, 0x02, 0x04, 0x06, 0x08, 0x0a, 0x0c, 0x0e
   );
 
   const __m128i r_shuffle = _mm_setr_epi8(
@@ -1156,20 +1193,20 @@ static void angular_pred_avx2_w8_hor(uvg_pixel* dst, const uvg_pixel* ref_main, 
     0x08, 0x0a, 0x0c, 0x0e, 0x09, 0x0b, 0x0d, 0x0f
   );
 
-  int16_t f[8][4] = { { 0 } };
+  int8_t f[8][4] = { { 0 } };
   if (use_cubic) {
-    memcpy(f[0], cubic_filter[delta_fract[0]], sizeof(int16_t) * 4);
-    memcpy(f[1], cubic_filter[delta_fract[1]], sizeof(int16_t) * 4);
-    memcpy(f[2], cubic_filter[delta_fract[2]], sizeof(int16_t) * 4);
-    memcpy(f[3], cubic_filter[delta_fract[3]], sizeof(int16_t) * 4);
-    memcpy(f[4], cubic_filter[delta_fract[4]], sizeof(int16_t) * 4);
-    memcpy(f[5], cubic_filter[delta_fract[5]], sizeof(int16_t) * 4);
-    memcpy(f[6], cubic_filter[delta_fract[6]], sizeof(int16_t) * 4);
-    memcpy(f[7], cubic_filter[delta_fract[7]], sizeof(int16_t) * 4);
+    memcpy(f[0], cubic_filter_8bit[delta_fract[0]], sizeof(int8_t) * 4);
+    memcpy(f[1], cubic_filter_8bit[delta_fract[1]], sizeof(int8_t) * 4);
+    memcpy(f[2], cubic_filter_8bit[delta_fract[2]], sizeof(int8_t) * 4);
+    memcpy(f[3], cubic_filter_8bit[delta_fract[3]], sizeof(int8_t) * 4);
+    memcpy(f[4], cubic_filter_8bit[delta_fract[4]], sizeof(int8_t) * 4);
+    memcpy(f[5], cubic_filter_8bit[delta_fract[5]], sizeof(int8_t) * 4);
+    memcpy(f[6], cubic_filter_8bit[delta_fract[6]], sizeof(int8_t) * 4);
+    memcpy(f[7], cubic_filter_8bit[delta_fract[7]], sizeof(int8_t) * 4);
   }
   else {
     for (int x = 0; x < 8; ++x) {
-      const int16_t offset = (delta_fract[x] >> 1);
+      const int8_t offset = (delta_fract[x] >> 1);
       f[x][0] = 16 - offset;
       f[x][1] = 32 - offset;
       f[x][2] = 16 + offset;
@@ -1181,20 +1218,10 @@ static void angular_pred_avx2_w8_hor(uvg_pixel* dst, const uvg_pixel* ref_main, 
                                    delta_int[2], delta_int[3],
                                    delta_int[4], delta_int[5],
                                    delta_int[6], delta_int[7]);
-  __m256i weights0 = _mm256_loadu_si256((__m256i*)&f[0]);
-  __m256i weights1 = _mm256_loadu_si256((__m256i*)&f[4]);
-
-  weights0 = _mm256_shuffle_epi32(weights0, _MM_SHUFFLE(3, 1, 2, 0));
-  weights1 = _mm256_shuffle_epi32(weights1, _MM_SHUFFLE(3, 1, 2, 0));
-
-  weights0 = _mm256_permute4x64_epi64(weights0, _MM_SHUFFLE(3, 1, 2, 0));
-  weights1 = _mm256_permute4x64_epi64(weights1, _MM_SHUFFLE(3, 1, 2, 0));
-
-  __m256i tmp0 = _mm256_shuffle_epi8(weights0, w_shuf);
-  __m256i tmp1 = _mm256_shuffle_epi8(weights1, w_shuf);
-
-  __m256i w0 = _mm256_permute2x128_si256(tmp0, tmp1, 0x20);
-  __m256i w1 = _mm256_permute2x128_si256(tmp0, tmp1, 0x31);
+  __m256i w0 = _mm256_loadu_si256((__m256i*)&f[0]);
+  //__m256i w1 = _mm256_loadu_si256((__m256i*)&f[4]);
+  //w0 = _mm256_shuffle_epi8(w0, w_shuf);
+  //w1 = _mm256_shuffle_epi8(w1, w_shuf);
 
   // For a 8 width block, height must be at least 2. Handle 2 lines at once
   for (int y = 0; y < height; y += 2) {
@@ -1204,25 +1231,17 @@ static void angular_pred_avx2_w8_hor(uvg_pixel* dst, const uvg_pixel* ref_main, 
     __m256i vp0 = _mm256_i32gather_epi32((const int*)(p + 0), vidx, 1);
     __m256i vp1 = _mm256_i32gather_epi32((const int*)(p + 1), vidx, 1);
 
-    __m256i vp_lo = _mm256_unpacklo_epi16(vp0, vp1);
-    __m256i vp_hi = _mm256_unpackhi_epi16(vp0, vp1);
-
-    vp_lo = _mm256_shuffle_epi32(vp_lo, _MM_SHUFFLE(3, 1, 2, 0));
-    vp_hi = _mm256_shuffle_epi32(vp_hi, _MM_SHUFFLE(3, 1, 2, 0));
-
-    __m256i vp_lo64 = _mm256_unpacklo_epi64(vp_lo, vp_hi);
-    __m256i vp_hi64 = _mm256_unpackhi_epi64(vp_lo, vp_hi);
-
-    __m256i dot_01 = _mm256_maddubs_epi16(vp_lo64, w0);
-    __m256i dot_23 = _mm256_maddubs_epi16(vp_hi64, w1);
-    __m256i sum = _mm256_add_epi16(dot_01, dot_23);
+    __m256i dot_01 = _mm256_maddubs_epi16(vp0, w0);
+    __m256i dot_23 = _mm256_maddubs_epi16(vp1, w0);
+    __m256i sum = _mm256_hadd_epi16(dot_01, dot_23);
+    //__m256i sum = _mm256_add_epi16(dot_01, dot_23);
     sum = _mm256_add_epi16(sum, _mm256_set1_epi16(32));
     sum = _mm256_srai_epi16(sum, 6);
 
     __m128i lo = _mm256_castsi256_si128(sum);
     __m128i hi = _mm256_extracti128_si256(sum, 1);
     __m128i filtered = _mm_packus_epi16(lo, hi);
-    filtered = _mm_shuffle_epi8(filtered, r_shuffle);
+    //filtered = _mm_shuffle_epi8(filtered, r_shuffle);
     filtered = _mm_shuffle_epi32(filtered, _MM_SHUFFLE(3, 1, 2, 0));
       
     _mm_store_si128((__m128i*)dst,  filtered);
