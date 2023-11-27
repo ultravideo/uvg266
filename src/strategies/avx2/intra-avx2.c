@@ -1181,18 +1181,6 @@ static void angular_pred_avx2_w8_hor(uvg_pixel* dst, const uvg_pixel* ref_main, 
 {
   const int width = 8;
 
-  const __m256i w_shuf = _mm256_setr_epi8(
-    0x00, 0x02, 0x04, 0x06, 0x08, 0x0a, 0x0c, 0x0e,
-    0x00, 0x02, 0x04, 0x06, 0x08, 0x0a, 0x0c, 0x0e,
-    0x00, 0x02, 0x04, 0x06, 0x08, 0x0a, 0x0c, 0x0e,
-    0x00, 0x02, 0x04, 0x06, 0x08, 0x0a, 0x0c, 0x0e
-  );
-
-  const __m128i r_shuffle = _mm_setr_epi8(
-    0x00, 0x02, 0x04, 0x06, 0x01, 0x03, 0x05, 0x07,
-    0x08, 0x0a, 0x0c, 0x0e, 0x09, 0x0b, 0x0d, 0x0f
-  );
-
   int8_t f[8][4] = { { 0 } };
   if (use_cubic) {
     memcpy(f[0], cubic_filter_8bit[delta_fract[0]], sizeof(int8_t) * 4);
@@ -1218,12 +1206,8 @@ static void angular_pred_avx2_w8_hor(uvg_pixel* dst, const uvg_pixel* ref_main, 
                                    delta_int[2], delta_int[3],
                                    delta_int[4], delta_int[5],
                                    delta_int[6], delta_int[7]);
-  __m256i w0 = _mm256_loadu_si256((__m256i*)&f[0]);
-  //__m256i w1 = _mm256_loadu_si256((__m256i*)&f[4]);
-  //w0 = _mm256_shuffle_epi8(w0, w_shuf);
-  //w1 = _mm256_shuffle_epi8(w1, w_shuf);
+  __m256i weights = _mm256_loadu_si256((__m256i*)&f[0]);
 
-  // For a 8 width block, height must be at least 2. Handle 2 lines at once
   for (int y = 0; y < height; y += 2) {
 
     // Do 4-tap intra interpolation filtering
@@ -1231,23 +1215,76 @@ static void angular_pred_avx2_w8_hor(uvg_pixel* dst, const uvg_pixel* ref_main, 
     __m256i vp0 = _mm256_i32gather_epi32((const int*)(p + 0), vidx, 1);
     __m256i vp1 = _mm256_i32gather_epi32((const int*)(p + 1), vidx, 1);
 
-    __m256i dot_01 = _mm256_maddubs_epi16(vp0, w0);
-    __m256i dot_23 = _mm256_maddubs_epi16(vp1, w0);
+    __m256i dot_01 = _mm256_maddubs_epi16(vp0, weights);
+    __m256i dot_23 = _mm256_maddubs_epi16(vp1, weights);
     __m256i sum = _mm256_hadd_epi16(dot_01, dot_23);
-    //__m256i sum = _mm256_add_epi16(dot_01, dot_23);
     sum = _mm256_add_epi16(sum, _mm256_set1_epi16(32));
     sum = _mm256_srai_epi16(sum, 6);
 
     __m128i lo = _mm256_castsi256_si128(sum);
     __m128i hi = _mm256_extracti128_si256(sum, 1);
     __m128i filtered = _mm_packus_epi16(lo, hi);
-    //filtered = _mm_shuffle_epi8(filtered, r_shuffle);
     filtered = _mm_shuffle_epi32(filtered, _MM_SHUFFLE(3, 1, 2, 0));
       
     _mm_store_si128((__m128i*)dst,  filtered);
  
     dst += 16;
-    
+  }
+}
+
+static void angular_pred_avx2_w16_hor(uvg_pixel* dst, const uvg_pixel* ref_main, const int16_t* delta_int, const int16_t* delta_fract, const int width, const int height, const int use_cubic)
+{
+  int8_t f[64][4] = { { 0 } };
+  if (use_cubic) {
+    for (int x = 0; x < width; ++x) {
+      memcpy(f[x], cubic_filter_8bit[delta_fract[x]], sizeof(int8_t) * 4);
+    }
+  }
+  else {
+    for (int x = 0; x < width; ++x) {
+      const int8_t offset = (delta_fract[x] >> 1);
+      f[x][0] = 16 - offset;
+      f[x][1] = 32 - offset;
+      f[x][2] = 16 + offset;
+      f[x][3] = offset;
+    }
+  }
+
+  for (int x = 0; x < width; x += 16) {
+    __m256i vidx0 = _mm256_setr_epi32(delta_int[x + 0], delta_int[x + 1],
+                                      delta_int[x + 2], delta_int[x + 3],
+                                      delta_int[x + 4], delta_int[x + 5],
+                                      delta_int[x + 6], delta_int[x + 7]);
+
+    __m256i vidx1 = _mm256_setr_epi32(delta_int[x + 8],  delta_int[x + 9],
+                                      delta_int[x + 10], delta_int[x + 11],
+                                      delta_int[x + 12], delta_int[x + 13],
+                                      delta_int[x + 14], delta_int[x + 15]);
+
+    __m256i w0 = _mm256_loadu_si256((__m256i*) & f[x + 0]);
+    __m256i w1 = _mm256_loadu_si256((__m256i*) & f[x + 8]);
+
+    // Width 16, handle one row at a time
+    for (int y = 0; y < height; ++y) {
+
+      // Do 4-tap intra interpolation filtering
+      uvg_pixel* p = (uvg_pixel*)(ref_main + y);
+      __m256i vp0 = _mm256_i32gather_epi32((const int*)p, vidx0, 1);
+      __m256i vp1 = _mm256_i32gather_epi32((const int*)p, vidx1, 1);
+
+      __m256i dot_01 = _mm256_maddubs_epi16(vp0, w0);
+      __m256i dot_23 = _mm256_maddubs_epi16(vp1, w1);
+      __m256i sum = _mm256_hadd_epi16(dot_01, dot_23);
+      sum = _mm256_add_epi16(sum, _mm256_set1_epi16(32));
+      sum = _mm256_srai_epi16(sum, 6);
+
+      __m128i lo = _mm256_castsi256_si128(sum);
+      __m128i hi = _mm256_extracti128_si256(sum, 1);
+      __m128i filtered = _mm_packus_epi16(lo, hi);
+      filtered = _mm_shuffle_epi32(filtered, _MM_SHUFFLE(3, 1, 2, 0));
+
+      _mm_store_si128((__m128i*)(dst + (y * width + x)), filtered);
+    }
   }
 }
 
@@ -1497,9 +1534,9 @@ static void uvg_angular_pred_avx2(
           switch (width) {
             case  4: angular_pred_avx2_w4_hor(dst, ref_main, delta_int, delta_fract, height, use_cubic); break;
             case  8: angular_pred_avx2_w8_hor(dst, ref_main, delta_int, delta_fract, height, use_cubic); break;
-            case 16: break;
-            case 32: break;
-            case 64: break;
+            case 16: angular_pred_avx2_w16_hor(dst, ref_main, delta_int, delta_fract, width, height, use_cubic); break;
+            case 32: angular_pred_avx2_w16_hor(dst, ref_main, delta_int, delta_fract, width, height, use_cubic); break;
+            case 64: angular_pred_avx2_w16_hor(dst, ref_main, delta_int, delta_fract, width, height, use_cubic); break;
             default:
               assert(false && "Intra angular predicion: illegal width.\n");
               break;
