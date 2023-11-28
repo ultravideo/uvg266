@@ -265,7 +265,7 @@ ALIGNED(32) static const int16_t delta_int_wide_angle_table[1792] = {
  
 };
 
-// TODO: cut out the latter 32 entries due to symmetry
+// TODO: cut out the latter 32 entries due to symmetry. Also, cut in half due to vertical symmetry
 ALIGNED(32) static const int16_t delta_fract_wide_angle_table[1792] = {
  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  // -12
 21, 10, 31, 20,  9, 30, 19,  8, 29, 18,  7, 28, 17,  6, 27, 16,  5, 26, 15,  4, 25, 14,  3, 24, 13,  2, 23, 12,  1, 22, 11,  0, 21, 10, 31, 20,  9, 30, 19,  8, 29, 18,  7, 28, 17,  6, 27, 16,  5, 26, 15,  4, 25, 14,  3, 24, 13,  2, 23, 12,  1, 22, 11,  0,
@@ -1555,20 +1555,44 @@ static void uvg_angular_pred_avx2(
   }
   else {
     // Mode is horizontal or vertical, just copy the pixels.
+    // NOTE: includes PDPC.
 
     // TODO: update outer loop to use height instead of width
-    for (int_fast32_t y = 0; y < height; ++y) {
-      for (int_fast32_t x = 0; x < width; ++x) {
-        dst[y * width + x] = ref_main[x + 1];
+    if (vertical_mode) {
+      for (int_fast32_t y = 0; y < height; ++y) {
+        for (int_fast32_t x = 0; x < width; ++x) {
+          dst[y * width + x] = ref_main[x + 1];
+        }
+        if (((width >= 4 && height >= 4) || channel_type != 0) && sample_disp >= 0 && multi_ref_index == 0) {
+          int scale = (log2_width + log2_height - 2) >> 2;
+          const uvg_pixel top_left = ref_main[0];
+          const uvg_pixel left = ref_side[1 + y];
+          for (int i = 0; i < MIN(3 << scale, width); i++) {
+            const int wL = 32 >> (2 * i >> scale);
+            const uvg_pixel val = dst[y * width + i];
+            dst[y * width + i] = CLIP_TO_PIXEL(val + ((wL * (left - top_left) + 32) >> 6));
+          }
+        }
       }
-      if (((width >= 4 && height >= 4) || channel_type != 0) && sample_disp >= 0 && multi_ref_index == 0) {
-        int scale = (log2_width + log2_height - 2) >> 2;
-        const uvg_pixel top_left = ref_main[0];
-        const uvg_pixel left = ref_side[1 + y];
-        for (int i = 0; i < MIN(3 << scale, width); i++) {
-          const int wL = 32 >> (2 * i >> scale);
-          const uvg_pixel val = dst[y * width + i];
-          dst[y * width + i] = CLIP_TO_PIXEL(val + ((wL * (left - top_left) + 32) >> 6));
+    }
+    else {
+      const uvg_pixel top_left = ref_main[0];
+      int scale = (log2_width + log2_height - 2) >> 2;
+      for (int_fast32_t x = 0; x < width; ++x) {
+        for (int y = 0; y < height; ++y) {
+          dst[y * width + x] = ref_main[y + 1];
+        }
+
+        if (((width >= 4 && height >= 4) || channel_type != 0) && sample_disp >= 0 && multi_ref_index == 0) {
+          const uvg_pixel ref_top = ref_side[1 + x];
+          for (int yy = 0; yy < MIN(3 << scale, height); ++yy) {
+            const int wT = 32 >> ((yy * 2) >> scale);
+            
+            const uvg_pixel val = dst[yy * width + x];
+            dst[yy * width + x] = CLIP_TO_PIXEL(val + (((ref_top - top_left) * wT + 32) >> 6));
+
+            // pred_samples[x][y] = CLIP((refL[x][y] * wL[x] + refT[x][y] * wT[y] + (64 - wL[x] - wT[y]) * pred_samples[x][y] + 32) >> 6 )
+          }
         }
       }
     }
