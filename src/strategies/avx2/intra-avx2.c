@@ -890,10 +890,7 @@ static void angular_pred_avx2_w4_ver(uvg_pixel* dst, const uvg_pixel* ref_main, 
       __m128i hi = _mm256_extracti128_si256(sum, 1);
       __m128i filtered = _mm_packus_epi16(lo, hi);
 
-      *(uint32_t*)(dst + (y + 0) * width + x) = _mm_extract_epi32(filtered, 0);
-      *(uint32_t*)(dst + (y + 1) * width + x) = _mm_extract_epi32(filtered, 1);
-      *(uint32_t*)(dst + (y + 2) * width + x) = _mm_extract_epi32(filtered, 2);
-      *(uint32_t*)(dst + (y + 3) * width + x) = _mm_extract_epi32(filtered, 3);
+      _mm_storeu_si128((__m128i*)(dst + (y * width + x)), filtered);
     }
   }
 }
@@ -1202,11 +1199,9 @@ static void angular_pred_avx2_w8_hor(uvg_pixel* dst, const uvg_pixel* ref_main, 
     }
   }
 
-  __m256i vidx = _mm256_setr_epi32(delta_int[0], delta_int[1],
-                                   delta_int[2], delta_int[3],
-                                   delta_int[4], delta_int[5],
-                                   delta_int[6], delta_int[7]);
-  __m256i weights = _mm256_loadu_si256((__m256i*)&f[0]);
+  __m128i tmp = _mm_load_si128((__m128i*)delta_int);
+  __m256i vidx = _mm256_cvtepi16_epi32(tmp);
+  __m256i weights = _mm256_loadu_si256((__m256i*)f);
 
   for (int y = 0; y < height; y += 2) {
 
@@ -1251,15 +1246,10 @@ static void angular_pred_avx2_w16_hor(uvg_pixel* dst, const uvg_pixel* ref_main,
   }
 
   for (int x = 0; x < width; x += 16) {
-    __m256i vidx0 = _mm256_setr_epi32(delta_int[x + 0], delta_int[x + 1],
-                                      delta_int[x + 2], delta_int[x + 3],
-                                      delta_int[x + 4], delta_int[x + 5],
-                                      delta_int[x + 6], delta_int[x + 7]);
-
-    __m256i vidx1 = _mm256_setr_epi32(delta_int[x + 8],  delta_int[x + 9],
-                                      delta_int[x + 10], delta_int[x + 11],
-                                      delta_int[x + 12], delta_int[x + 13],
-                                      delta_int[x + 14], delta_int[x + 15]);
+    __m128i tmp0 = _mm_load_si128((__m128i*)&delta_int[x]);
+    __m128i tmp1 = _mm_load_si128((__m128i*)&delta_int[x + 8]);
+    __m256i vidx0 = _mm256_cvtepi16_epi32(tmp0);
+    __m256i vidx1 = _mm256_cvtepi16_epi32(tmp1);
 
     __m256i w0 = _mm256_loadu_si256((__m256i*) & f[x + 0]);
     __m256i w1 = _mm256_loadu_si256((__m256i*) & f[x + 8]);
@@ -1374,14 +1364,72 @@ static void angular_pdpc_ver_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, con
 // TODO: vectorize
 static void angular_pdpc_hor_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int width, const int height, const int scale, const int16_t inv_sample_disp)
 {
-  int limit = MIN(3 << scale, height);
+  //int limit = MIN(3 << scale, height);
 
-  for (int y = 0; y < limit; ++y) {
-    int inv_angle_sum = 256 + (y + 1) * inv_sample_disp;
-    int16_t wT = 32 >> ((y << 1) >> scale);
-    for (int x = 0; x < width; ++x) {
-      int16_t top = ref_side[x + (inv_angle_sum >> 9) + 1];
-      dst[y * width + x] = CLIP_TO_PIXEL((top * wT + (64 - wT) * dst[y * width + x] + 32) >> 6);
+  //for (int y = 0; y < limit; ++y) {
+  //  int inv_angle_sum = 256 + (y + 1) * inv_sample_disp;
+  //  int16_t wT = 32 >> ((y << 1) >> scale);
+  //  for (int x = 0; x < width; ++x) {
+  //    int16_t top = ref_side[x + (inv_angle_sum >> 9) + 1];
+  //    dst[y * width + x] = CLIP_TO_PIXEL((top * wT + (64 - wT) * dst[y * width + x] + 32) >> 6);
+  //  }
+  //}
+  int16_t wT[4];
+  int16_t ref_top[4][4];
+
+  int limit = MIN(3 << scale, height);
+  const int log2_width = uvg_g_convert_to_log2[width];
+
+  __m128i vseq = _mm_setr_epi32(0, 1, 2, 3);
+  __m128i vidx = _mm_slli_epi32(vseq, log2_width);
+  __m256i v32s = _mm256_set1_epi16(32);
+  __m256i vwT_shuffle = _mm256_setr_epi8(0, 1, 0, 1, 0, 1, 0, 1,
+                                         2, 3, 2, 3, 2, 3, 2, 3,
+                                         4, 5, 4, 5, 4, 5, 4, 5,
+                                         6, 7, 6, 7, 6, 7, 6, 7);
+  for (int y = 0; y < limit; y += 4) {
+    for (int x = 0; x < width; x += 4) {
+
+      for (int yy = 0; yy < 4; ++yy) {
+        int inv_angle_sum = 256 + (y + yy + 1) * inv_sample_disp;
+        
+        // Set weight to zero if limit reached.
+        // This removes the need to blend results with unmodified values in the end.
+        wT[yy] = y + yy < limit ? 32 >> (2 * (y + yy) >> scale) : 0;
+        for (int xx = 0; xx < 4; ++xx) {
+          ref_top[yy][xx] = ref_side[(x + xx) + (inv_angle_sum >> 9) + 1];
+        }
+      }
+
+      __m128i vpred = _mm_i32gather_epi32((const int32_t*)(dst + y * width + x), vidx, 1);
+      __m256i vpred16 = _mm256_cvtepu8_epi16(vpred);
+      __m256i vtop = _mm256_loadu_si256((__m256i*)ref_top);
+      uint64_t quad;
+      memcpy(&quad, wT, sizeof(quad));
+      __m256i vwT = _mm256_set1_epi64x(quad);
+      vwT = _mm256_shuffle_epi8(vwT, vwT_shuffle);
+      __m256i accu = _mm256_sub_epi16(vtop, vpred16);
+      accu = _mm256_mullo_epi16(vwT, accu);
+      accu = _mm256_add_epi16(accu, v32s);
+      accu = _mm256_srai_epi16(accu, 6);
+      accu = _mm256_add_epi16(vpred16, accu);
+
+      __m128i lo = _mm256_castsi256_si128(accu);
+      __m128i hi = _mm256_extracti128_si256(accu, 1);
+      __m128i filtered = _mm_packus_epi16(lo, hi);
+
+      // Need to mask remainder samples on the last iteration when limit % 4 != 0
+      //int rem_bits = 8 * (limit - y);
+      //__m128i ones = _mm_set1_epi32(0xFF);
+      //__m128i vmask = _mm_slli_epi32(ones, rem_bits);
+
+      //// 0 selects filtered, 1 vdst (unchanged)
+      //vpred = _mm_blendv_epi8(filtered, vpred, vmask);
+
+      *(uint32_t*)(dst + (y + 0) * width + x) = _mm_extract_epi32(filtered, 0);
+      *(uint32_t*)(dst + (y + 1) * width + x) = _mm_extract_epi32(filtered, 1);
+      *(uint32_t*)(dst + (y + 2) * width + x) = _mm_extract_epi32(filtered, 2);
+      *(uint32_t*)(dst + (y + 3) * width + x) = _mm_extract_epi32(filtered, 3);
     }
   }
 }
@@ -2645,8 +2693,7 @@ static void uvg_pdpc_planar_dc_avx2(
   }
 
   // Process in 4x4 blocks
-  // TODO: replace width with height
-  for (int y = 0; y < width; y += 4) {
+  for (int y = 0; y < height; y += 4) {
     for (int x = 0; x < width; x += 4) {
 
       uint32_t dw_left;
