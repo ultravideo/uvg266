@@ -1490,19 +1490,6 @@ static void angular_pdpc_ver_w16_avx2(uvg_pixel* dst, const uvg_pixel* ref_side,
   }
 }
 
-static void angular_pdpc_ver_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int width, const int height, const int scale, const int16_t inv_sample_disp)
-{
-  switch (width) {
-  case 4:  angular_pdpc_ver_w4_avx2(dst, ref_side, height, scale, inv_sample_disp); break;
-  case 8:  angular_pdpc_ver_w8_avx2(dst, ref_side, height, scale, inv_sample_disp); break;
-  case 16: // 16 width and higher done with the same function
-  case 32: 
-  case 64: angular_pdpc_ver_w16_avx2(dst, ref_side, width, height, scale, inv_sample_disp); break;
-  default:
-    assert(false && "Intra PDPC: Invalid width.\n");
-  }
-}
-
 
 static void angular_pdpc_hor_old_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int width, const int height, const int scale, const int16_t inv_sample_disp)
 {
@@ -1706,19 +1693,6 @@ static void angular_pdpc_hor_w16_avx2(uvg_pixel* dst, const uvg_pixel* ref_side,
 
       _mm_storeu_si128((__m128i*)(dst + (y * width + x)), filtered);
     }
-  }
-}
-
-static void angular_pdpc_hor_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int width, const int height, const int scale, const int16_t inv_sample_disp)
-{
-  switch (width) {
-    case 4:  angular_pdpc_hor_w4_avx2(dst, ref_side, height, scale, inv_sample_disp); break;
-    case 8:  angular_pdpc_hor_w8_avx2(dst, ref_side, height, scale, inv_sample_disp); break;
-    case 16: // 16 width and higher done with the same function
-    case 32: 
-    case 64: angular_pdpc_hor_w16_avx2(dst, ref_side, width, height, scale, inv_sample_disp); break;
-    default:
-      assert(false && "Intra PDPC: Invalid width.\n");
   }
 }
 
@@ -1949,9 +1923,25 @@ static void uvg_angular_pred_avx2(
     }
     if (PDPC_filter) {
       if (vertical_mode)
-        angular_pdpc_ver_avx2(dst, ref_side, width, height, scale, modedisp2invsampledisp[abs(mode_disp)]);
+        switch (width) {
+          case 4:  angular_pdpc_ver_w4_avx2(dst, ref_side, height, scale, modedisp2invsampledisp[abs(mode_disp)]); break;
+          case 8:  angular_pdpc_ver_w8_avx2(dst, ref_side, height, scale, modedisp2invsampledisp[abs(mode_disp)]); break;
+          case 16: // 16 width and higher done with the same function
+          case 32:
+          case 64: angular_pdpc_ver_w16_avx2(dst, ref_side, width, height, scale, modedisp2invsampledisp[abs(mode_disp)]); break;
+          default:
+            assert(false && "Intra PDPC: Invalid width.\n");
+        }
       else
-        angular_pdpc_hor_avx2(dst, ref_side, width, height, scale, modedisp2invsampledisp[abs(mode_disp)]);
+        switch (width) {
+          case 4:  angular_pdpc_hor_w4_avx2(dst, ref_side, height, scale, modedisp2invsampledisp[abs(mode_disp)]); break;
+          case 8:  angular_pdpc_hor_w8_avx2(dst, ref_side, height, scale, modedisp2invsampledisp[abs(mode_disp)]); break;
+          case 16: // 16 width and higher done with the same function
+          case 32:
+          case 64: angular_pdpc_hor_w16_avx2(dst, ref_side, width, height, scale, modedisp2invsampledisp[abs(mode_disp)]); break;
+          default:
+            assert(false && "Intra PDPC: Invalid width.\n");
+        }
     } 
   }
 }
