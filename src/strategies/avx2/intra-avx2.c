@@ -1607,8 +1607,6 @@ static void angular_pdpc_hor_w8_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, 
 {
   const int width = 8;
 
-  int16_t ref_top[2][8];
-
   int limit = MIN(3 << scale, height);
   const int log2_width = uvg_g_convert_to_log2[width];
 
@@ -1616,41 +1614,28 @@ static void angular_pdpc_hor_w8_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, 
   __m128i vidx = _mm_slli_epi64(vseq, log2_width);
   __m256i v32s = _mm256_set1_epi16(32);
 
-  for (int y = 0; y < height; y += 2) {
+  for (int y = 0; y < limit; y += 2) {
     // Set weight to zero if limit reached.
     // This removes the need to blend results with unmodified values in the end.
-    const int16_t wT0 = y + 0 < limit ? 32 >> (2 * (y + 0) >> scale) : 0;
+    const int16_t wT0 = 32 >> (2 * (y + 0) >> scale); // This cannot reach limit, so do not check
     const int16_t wT1 = y + 1 < limit ? 32 >> (2 * (y + 1) >> scale) : 0;
 
     __m128i vwT[2];
     vwT[0] = _mm_set1_epi16(wT0);
     vwT[1] = _mm_set1_epi16(wT1);
     
-    int inv_angle_sum = 256 + (y + 0 + 1) * inv_sample_disp;
-    ref_top[0][0] = ref_side[0 + (inv_angle_sum >> 9) + 1];
-    ref_top[0][1] = ref_side[1 + (inv_angle_sum >> 9) + 1];
-    ref_top[0][2] = ref_side[2 + (inv_angle_sum >> 9) + 1];
-    ref_top[0][3] = ref_side[3 + (inv_angle_sum >> 9) + 1];
-    ref_top[0][4] = ref_side[4 + (inv_angle_sum >> 9) + 1];
-    ref_top[0][5] = ref_side[5 + (inv_angle_sum >> 9) + 1];
-    ref_top[0][6] = ref_side[6 + (inv_angle_sum >> 9) + 1];
-    ref_top[0][7] = ref_side[7 + (inv_angle_sum >> 9) + 1];
+    __m128i tmp[2];
+    int shifted_inv_angle_sum = (256 + (y + 0 + 1) * inv_sample_disp) >> 9;
+    tmp[0] = _mm_load_si128((__m128i*)&ref_side[shifted_inv_angle_sum + 1]);
 
-    inv_angle_sum = 256 + (y + 1 + 1) * inv_sample_disp;
-    ref_top[1][0] = ref_side[0 + (inv_angle_sum >> 9) + 1];
-    ref_top[1][1] = ref_side[1 + (inv_angle_sum >> 9) + 1];
-    ref_top[1][2] = ref_side[2 + (inv_angle_sum >> 9) + 1];
-    ref_top[1][3] = ref_side[3 + (inv_angle_sum >> 9) + 1];
-    ref_top[1][4] = ref_side[4 + (inv_angle_sum >> 9) + 1];
-    ref_top[1][5] = ref_side[5 + (inv_angle_sum >> 9) + 1];
-    ref_top[1][6] = ref_side[6 + (inv_angle_sum >> 9) + 1];
-    ref_top[1][7] = ref_side[7 + (inv_angle_sum >> 9) + 1];
+    shifted_inv_angle_sum = (256 + (y + 1 + 1) * inv_sample_disp) >> 9;
+    tmp[1] = _mm_load_si128((__m128i*) &ref_side[shifted_inv_angle_sum + 1]);
     
     __m128i vpred = _mm_i64gather_epi64((const int64_t*)(dst + y * width), vidx, 1);
     __m256i vpred16 = _mm256_cvtepu8_epi16(vpred);
-    __m256i vtop = _mm256_loadu_si256((__m256i*)ref_top);
+    __m256i* vtop = (__m256i*)tmp;
     
-    __m256i accu = _mm256_sub_epi16(vtop, vpred16);
+    __m256i accu = _mm256_sub_epi16(*vtop, vpred16);
     accu = _mm256_mullo_epi16(*(__m256i*)vwT, accu);
     accu = _mm256_add_epi16(accu, v32s);
     accu = _mm256_srai_epi16(accu, 6);
