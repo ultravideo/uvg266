@@ -1407,9 +1407,7 @@ static void angular_pdpc_ver_w4_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, 
 static void angular_pdpc_ver_w8_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int height, const int scale, const int16_t inv_sample_disp)
 {
   const int width = 8;
-  ALIGNED(32) int16_t wL[8];
-  ALIGNED(32) int16_t left[2][8];
-
+  
   int limit = MIN(3 << scale, width);
   const int log2_width = uvg_g_convert_to_log2[width];
 
@@ -1419,12 +1417,14 @@ static void angular_pdpc_ver_w8_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, 
 
   // For width 8, height must be at least 2. Handle 2 lines at once.
   for (int y = 0; y < height; y += 2) {
-    for (int xx = 0; xx < width; ++xx) {
+    ALIGNED(32) int16_t wL[8] = {0};
+    ALIGNED(32) int16_t left[16] = {0};
+    for (int xx = 0; xx < limit; ++xx) {
       int shifted_inv_angle_sum = (256 + (xx + 1) * inv_sample_disp) >> 9;
       wL[xx] = xx < limit ? 32 >> ((2 * xx) >> scale) : 0;
 
       for (int yy = 0; yy < 2; ++yy) {
-        left[yy][xx] = ref_side[(y + yy) + shifted_inv_angle_sum + 1];
+        left[yy * width +xx] = ref_side[(y + yy) + shifted_inv_angle_sum + 1];
       }
     }
 
@@ -1486,6 +1486,160 @@ static void angular_pdpc_ver_w16_avx2(uvg_pixel* dst, const uvg_pixel* ref_side,
       __m128i filtered = _mm_packus_epi16(lo, hi);
 
       _mm_store_si128((__m128i*)(dst + (y * width + x)), filtered);
+    }
+  }
+}
+
+
+// Height versions of vertical PDPC
+
+static void angular_pdpc_ver_h4_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int width, const int scale, const int16_t inv_sample_disp)
+{
+  const int height = 4;
+
+  int limit = MIN(3 << scale, width);
+  const int log2_width = uvg_g_convert_to_log2[width];
+
+  const __m256i v32s = _mm256_set1_epi16(32);
+  const __m256i wL_shuffle = _mm256_setr_epi8(
+    0x00, 0x02, 0x00, 0x02, 0x00, 0x02, 0x00, 0x02,
+    0x08, 0x0a, 0x08, 0x0a, 0x08, 0x0a, 0x08, 0x0a,
+    0x00, 0x02, 0x00, 0x02, 0x00, 0x02, 0x00, 0x02,
+    0x08, 0x0a, 0x08, 0x0a, 0x08, 0x0a, 0x08, 0x0a
+  );
+
+  for (int x = 0; x < limit; x += 4) {
+    int shifted_inv_angle_sum[4] = {0};
+    int16_t wL[4] = {0};
+    ALIGNED(32) uvg_pixel tmp[16];
+    for (int xx = 0; xx < 4; ++xx) {
+      shifted_inv_angle_sum[xx] = (256 + (x + xx + 1) * inv_sample_disp) >> 9;
+      wL[xx] = (x + xx) < limit ? 32 >> ((2 * (x + xx)) >> scale) : 0;
+
+      tmp[xx * 4 + 0]  = ref_side[0 + shifted_inv_angle_sum[xx] + 1];
+      tmp[xx * 4 + 1]  = ref_side[1 + shifted_inv_angle_sum[xx] + 1];
+      tmp[xx * 4 + 2]  = ref_side[2 + shifted_inv_angle_sum[xx] + 1];
+      tmp[xx * 4 + 3]  = ref_side[3 + shifted_inv_angle_sum[xx] + 1];
+
+    }
+
+    int16_t tmp_dst[16];
+    for (int yy = 0; yy < height; ++yy) {
+      tmp_dst[0 + yy]  = dst[yy * width + x + 0];
+      tmp_dst[4 + yy]  = dst[yy * width + x + 1];
+      tmp_dst[8 + yy]  = dst[yy * width + x + 2];
+      tmp_dst[12 + yy] = dst[yy * width + x + 3];
+    }
+    
+    __m256i* vdst16 = (__m256i*)tmp_dst;
+    __m128i vleft = _mm_load_si128((__m128i*)tmp);
+    __m256i vleft16 = _mm256_cvtepu8_epi16(vleft);
+    __m256i accu = _mm256_sub_epi16(vleft16, *vdst16);
+    __m256i vwL = _mm256_setr_epi64x(wL[0], wL[1], wL[2], wL[3]);
+    vwL = _mm256_shuffle_epi8(vwL, wL_shuffle);
+    accu = _mm256_mullo_epi16(vwL, accu);
+    accu = _mm256_add_epi16(accu, v32s);
+    accu = _mm256_srai_epi16(accu, 6);
+    accu = _mm256_add_epi16(*vdst16, accu);
+
+    __m128i lo = _mm256_castsi256_si128(accu);
+    __m128i hi = _mm256_extracti128_si256(accu, 1);
+    __m128i filtered = _mm_packus_epi16(lo, hi);
+
+    const uvg_pixel* result = (uvg_pixel*)&filtered;
+
+    for (int yy = 0; yy < height; ++yy) {
+      dst[yy * width + x + 0] = result[0 + yy];
+      dst[yy * width + x + 1] = result[4 + yy];
+      dst[yy * width + x + 2] = result[8 + yy];
+      dst[yy * width + x + 3] = result[12 + yy];
+    }
+  }
+}
+
+static void angular_pdpc_ver_h8_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int width, const int scale, const int16_t inv_sample_disp)
+{
+  const int height = 8;
+
+  int limit = MIN(3 << scale, width);
+  __m256i v32s = _mm256_set1_epi16(32);
+
+  for (int x = 0; x < limit; x += 2) {
+    int shifted_inv_angle_sum0 = (256 + (x + 0 + 1) * inv_sample_disp) >> 9;
+    int shifted_inv_angle_sum1 = (256 + (x + 1 + 1) * inv_sample_disp) >> 9;
+    __m128i vwL[2];
+    const int16_t wL0 = 32 >> ((2 * (x + 0)) >> scale);
+    const int16_t wL1 = (x + 1) < limit ? 32 >> ((2 * (x + 1)) >> scale) : 0;
+    vwL[0] = _mm_set1_epi16(wL0);
+    vwL[1] = _mm_set1_epi16(wL1);
+
+    ALIGNED(32) int16_t tmp_dst[16];
+    for (int yy = 0; yy < height; ++yy) {
+      tmp_dst[0 + yy] = dst[(yy) * width + x + 0];
+      tmp_dst[8 + yy] = dst[(yy) * width + x + 1];
+    }
+
+    ALIGNED(32) uvg_pixel left[16];
+    memcpy(&left[0], &ref_side[shifted_inv_angle_sum0 + 1], 8 * sizeof(uvg_pixel));
+    memcpy(&left[8], &ref_side[shifted_inv_angle_sum1 + 1], 8 * sizeof(uvg_pixel));
+
+    __m256i vdst16 = _mm256_load_si256((__m256i*)tmp_dst);
+    __m128i vleft = _mm_load_si128((__m128i*)left);
+    __m256i vleft16 = _mm256_cvtepu8_epi16(vleft);
+    __m256i* vwL256 = (__m256i*)vwL;
+
+    __m256i accu = _mm256_sub_epi16(vleft16, vdst16);
+    accu = _mm256_mullo_epi16(*vwL256, accu);
+    accu = _mm256_add_epi16(accu, v32s);
+    accu = _mm256_srai_epi16(accu, 6);
+    accu = _mm256_add_epi16(vdst16, accu);
+
+    __m128i lo = _mm256_castsi256_si128(accu);
+    __m128i hi = _mm256_extracti128_si256(accu, 1);
+    __m128i filtered = _mm_packus_epi16(lo, hi);
+
+    const uvg_pixel* result = (uvg_pixel*)&filtered;
+    for (int yy = 0; yy < height; ++yy) {
+      dst[(yy) * width + x + 0] = result[0 + yy];
+      dst[(yy) * width + x + 1] = result[8 + yy];
+    }
+    
+  }
+}
+
+static void angular_pdpc_ver_h16_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int width, const int height, const int scale, const int16_t inv_sample_disp)
+{
+  int limit = MIN(3 << scale, width);
+  __m256i v32s = _mm256_set1_epi16(32);
+
+  for (int x = 0; x < limit; ++x) {
+    int shifted_inv_angle_sum = (256 + (x + 1) * inv_sample_disp) >> 9;
+    const int16_t wL = 32 >> ((2 * x) >> scale);
+    const __m256i vwL = _mm256_set1_epi16(wL);
+
+    for (int y = 0; y < height; y += 16) {
+      ALIGNED(32) int16_t tmp_dst[16];
+      for (int yy = 0; yy < 16; ++yy) {
+        tmp_dst[yy] = dst[(y + yy) * width + x];
+      }
+      __m256i vdst16 = _mm256_load_si256((__m256i*)tmp_dst);
+      __m128i vleft = _mm_loadu_si128((__m128i*)&ref_side[y + shifted_inv_angle_sum + 1]);
+      __m256i vleft16 = _mm256_cvtepu8_epi16(vleft);
+
+      __m256i accu = _mm256_sub_epi16(vleft16, vdst16);
+      accu = _mm256_mullo_epi16(vwL, accu);
+      accu = _mm256_add_epi16(accu, v32s);
+      accu = _mm256_srai_epi16(accu, 6);
+      accu = _mm256_add_epi16(vdst16, accu);
+
+      __m128i lo = _mm256_castsi256_si128(accu);
+      __m128i hi = _mm256_extracti128_si256(accu, 1);
+      __m128i filtered = _mm_packus_epi16(lo, hi);
+
+      const uvg_pixel* result = (uvg_pixel*)&filtered;
+      for (int yy = 0; yy < 16; ++yy) {
+        dst[(y + yy) * width + x] = result[yy];
+      }
     }
   }
 }
@@ -1624,18 +1778,19 @@ static void angular_pdpc_hor_w8_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, 
     vwT[0] = _mm_set1_epi16(wT0);
     vwT[1] = _mm_set1_epi16(wT1);
     
-    __m128i tmp[2];
+    ALIGNED(32) uvg_pixel tmp[16];
     int shifted_inv_angle_sum = (256 + (y + 0 + 1) * inv_sample_disp) >> 9;
-    tmp[0] = _mm_load_si128((__m128i*)&ref_side[shifted_inv_angle_sum + 1]);
+    memcpy(&tmp[0], &ref_side[shifted_inv_angle_sum + 1], 8 * sizeof(uvg_pixel));
 
     shifted_inv_angle_sum = (256 + (y + 1 + 1) * inv_sample_disp) >> 9;
-    tmp[1] = _mm_load_si128((__m128i*) &ref_side[shifted_inv_angle_sum + 1]);
+    memcpy(&tmp[8], &ref_side[shifted_inv_angle_sum + 1], 8 * sizeof(uvg_pixel));
     
     __m128i vpred = _mm_i64gather_epi64((const int64_t*)(dst + y * width), vidx, 1);
     __m256i vpred16 = _mm256_cvtepu8_epi16(vpred);
-    __m256i* vtop = (__m256i*)tmp;
+    __m128i vtop = _mm_load_si128((__m128i*)tmp);
+    __m256i vtop16 = _mm256_cvtepu8_epi16(vtop);
     
-    __m256i accu = _mm256_sub_epi16(*vtop, vpred16);
+    __m256i accu = _mm256_sub_epi16(vtop16, vpred16);
     accu = _mm256_mullo_epi16(*(__m256i*)vwT, accu);
     accu = _mm256_add_epi16(accu, v32s);
     accu = _mm256_srai_epi16(accu, 6);
@@ -1908,12 +2063,12 @@ static void uvg_angular_pred_avx2(
     }
     if (PDPC_filter) {
       if (vertical_mode)
-        switch (width) {
-          case 4:  angular_pdpc_ver_w4_avx2(dst, ref_side, height, scale, modedisp2invsampledisp[abs(mode_disp)]); break;
-          case 8:  angular_pdpc_ver_w8_avx2(dst, ref_side, height, scale, modedisp2invsampledisp[abs(mode_disp)]); break;
-          case 16: // 16 width and higher done with the same function
+        switch (height) {
+          case 4:  angular_pdpc_ver_h4_avx2(dst, ref_side, width, scale, modedisp2invsampledisp[abs(mode_disp)]); break;
+          case 8:  angular_pdpc_ver_h8_avx2(dst, ref_side, width, scale, modedisp2invsampledisp[abs(mode_disp)]); break;
+          case 16: // 16 height and higher done with the same function
           case 32:
-          case 64: angular_pdpc_ver_w16_avx2(dst, ref_side, width, height, scale, modedisp2invsampledisp[abs(mode_disp)]); break;
+          case 64: angular_pdpc_ver_h16_avx2(dst, ref_side, width, height, scale, modedisp2invsampledisp[abs(mode_disp)]); break;
           default:
             assert(false && "Intra PDPC: Invalid width.\n");
         }
