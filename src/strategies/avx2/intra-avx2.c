@@ -2007,15 +2007,17 @@ static void uvg_angular_pred_avx2(
     // Mode is horizontal or vertical, just copy the pixels.
     // NOTE: includes PDPC.
 
-    // TODO: update outer loop to use height instead of width
     if (vertical_mode) {
+      const uvg_pixel top_left = ref_main[0];
+      int scale = (log2_width + log2_height - 2) >> 2;
       for (int_fast32_t y = 0; y < height; ++y) {
-        for (int_fast32_t x = 0; x < width; ++x) {
+        memcpy(&dst[y * width], &ref_main[1], width * sizeof(uvg_pixel));
+        /*for (int_fast32_t x = 0; x < width; ++x) {
           dst[y * width + x] = ref_main[x + 1];
-        }
+        }*/
+
+        // PDPC
         if (((width >= 4 && height >= 4) || channel_type != 0) && sample_disp >= 0 && multi_ref_index == 0) {
-          int scale = (log2_width + log2_height - 2) >> 2;
-          const uvg_pixel top_left = ref_main[0];
           const uvg_pixel left = ref_side[1 + y];
           for (int i = 0; i < MIN(3 << scale, width); i++) {
             const int wL = 32 >> (2 * i >> scale);
@@ -2028,11 +2030,15 @@ static void uvg_angular_pred_avx2(
     else {
       const uvg_pixel top_left = ref_main[0];
       int scale = (log2_width + log2_height - 2) >> 2;
+      for (int y = 0; y < height; ++y) {
+        memset(&dst[y * width], ref_main[y + 1], width * sizeof(uvg_pixel));
+      }
       for (int_fast32_t x = 0; x < width; ++x) {
-        for (int y = 0; y < height; ++y) {
+        /*for (int y = 0; y < height; ++y) {
           dst[y * width + x] = ref_main[y + 1];
-        }
+        }*/
 
+        // PDPC
         if (((width >= 4 && height >= 4) || channel_type != 0) && sample_disp >= 0 && multi_ref_index == 0) {
           const uvg_pixel ref_top = ref_side[1 + x];
           for (int yy = 0; yy < MIN(3 << scale, height); ++yy) {
