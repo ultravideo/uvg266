@@ -2011,7 +2011,14 @@ static void uvg_angular_pred_avx2(
       const uvg_pixel top_left = ref_main[0];
       int scale = (log2_width + log2_height - 2) >> 2;
       for (int_fast32_t y = 0; y < height; ++y) {
-        memcpy(&dst[y * width], &ref_main[1], width * sizeof(uvg_pixel));
+        switch (width) {
+          case 4:  memcpy(&dst[y * 4],  &ref_main[1],  4 * sizeof(uvg_pixel)); break;
+          case 8:  memcpy(&dst[y * 8],  &ref_main[1],  8 * sizeof(uvg_pixel)); break;
+          case 16: memcpy(&dst[y * 16], &ref_main[1], 16 * sizeof(uvg_pixel)); break;
+          case 32: memcpy(&dst[y * 32], &ref_main[1], 32 * sizeof(uvg_pixel)); break;
+          case 64: memcpy(&dst[y * 64], &ref_main[1], 64 * sizeof(uvg_pixel)); break;
+        }
+        
         /*for (int_fast32_t x = 0; x < width; ++x) {
           dst[y * width + x] = ref_main[x + 1];
         }*/
@@ -2031,7 +2038,16 @@ static void uvg_angular_pred_avx2(
       const uvg_pixel top_left = ref_main[0];
       int scale = (log2_width + log2_height - 2) >> 2;
       for (int y = 0; y < height; ++y) {
-        memset(&dst[y * width], ref_main[y + 1], width * sizeof(uvg_pixel));
+        switch (width) {
+          case 4:  memset(&dst[y * 4],  ref_main[y + 1],  4 * sizeof(uvg_pixel)); break;
+          case 8:  memset(&dst[y * 8],  ref_main[y + 1],  8 * sizeof(uvg_pixel)); break;
+          case 16: memset(&dst[y * 16], ref_main[y + 1], 16 * sizeof(uvg_pixel)); break;
+          case 32: memset(&dst[y * 32], ref_main[y + 1], 32 * sizeof(uvg_pixel)); break;
+          case 64: memset(&dst[y * 64], ref_main[y + 1], 64 * sizeof(uvg_pixel)); break;
+          default:
+            assert(false && "Intra angular predicion: illegal width.\n");
+            break;
+        }
       }
       for (int_fast32_t x = 0; x < width; ++x) {
         /*for (int y = 0; y < height; ++y) {
