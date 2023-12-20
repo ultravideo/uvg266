@@ -1292,14 +1292,17 @@ static void angular_pred_avx2_linear_filter(uvg_pixel* dst, uvg_pixel* ref, cons
 }
 
 
-// TODO: vectorize
 static void angular_pred_avx2_non_fractional_angle_pxl_copy(uvg_pixel* dst, uvg_pixel* ref, const int width, const int height, const int16_t* delta_int)
 {
   for (int y = 0; y < height; ++y) {
     uvg_pixel* dst_row = dst + y * width;
     uvg_pixel* ref_row = ref + delta_int[y] + 1;
-    for (int_fast32_t x = 0; x < width; x += 4) {
-      memcpy(dst_row + x, ref_row + x, 4 * sizeof(dst[0]));
+    switch (width) {
+      case 4: memcpy(dst_row, ref_row, 4 * sizeof(uvg_pixel)); break;
+      case 8: memcpy(dst_row, ref_row, 8 * sizeof(uvg_pixel)); break;
+      case 16: memcpy(dst_row, ref_row, 16 * sizeof(uvg_pixel)); break;
+      case 32: memcpy(dst_row, ref_row, 32 * sizeof(uvg_pixel)); break;
+      case 64: memcpy(dst_row, ref_row, 64 * sizeof(uvg_pixel)); break;
     }
   }
 }
