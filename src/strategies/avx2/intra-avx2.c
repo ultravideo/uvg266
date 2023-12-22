@@ -773,7 +773,9 @@ static const int16_t cubic_filter[32][4] =
 };
 
 
-static const int8_t cubic_filter_8bit[32][4] =
+// Specified in JVET-T2001 8.4.5.2.13 Table 25
+// These are the fC interpolation filter coefficients
+static const int8_t cubic_filter_8bit_c[32][4] =
 {
   { 0, 64,  0,  0 },
   { -1, 63,  2,  0 },
@@ -807,6 +809,44 @@ static const int8_t cubic_filter_8bit[32][4] =
   { -1,  7, 60, -2 },
   { 0,  4, 62, -2 },
   { 0,  2, 63, -1 },
+};
+
+// Specified in JVET-T2001 8.4.5.2.13 Table 25
+// These are the fG interpolation filter coefficients
+static const int8_t cubic_filter_8bit_g[32][4] = 
+{
+  {16, 32, 16, 0},
+  {16, 32, 16, 0},
+  {15, 31, 17, 1},
+  {15, 31, 17, 1},
+  {14, 30, 18, 2},
+  {14, 30, 18, 2},
+  {13, 29, 19, 3},
+  {13, 29, 19, 3},
+  {12, 28, 20, 4},
+  {12, 28, 20, 4},
+  {11, 27, 21, 5},
+  {11, 27, 21, 5},
+  {10, 26, 22, 6},
+  {10, 26, 22, 6},
+  { 9, 25, 23, 7},
+  { 9, 25, 23, 7},
+  { 8, 24, 24, 8},
+  { 8, 24, 24, 8},
+  { 7, 23, 25, 9},
+  { 7, 23, 25, 9},
+  { 6, 22, 26, 10},
+  { 6, 22, 26, 10},
+  { 5, 21, 27, 11},
+  { 5, 21, 27, 11},
+  { 4, 20, 28, 12},
+  { 4, 20, 28, 12},
+  { 3, 19, 29, 13},
+  { 3, 19, 29, 13},
+  { 2, 18, 30, 14},
+  { 2, 18, 30, 14},
+  { 1, 17, 31, 15},
+  { 1, 17, 31, 15}
 };
 
 
@@ -1180,14 +1220,14 @@ static void angular_pred_avx2_w8_hor(uvg_pixel* dst, const uvg_pixel* ref_main, 
 
   int8_t f[8][4] = { { 0 } };
   if (use_cubic) {
-    memcpy(f[0], cubic_filter_8bit[delta_fract[0]], sizeof(int8_t) * 4);
-    memcpy(f[1], cubic_filter_8bit[delta_fract[1]], sizeof(int8_t) * 4);
-    memcpy(f[2], cubic_filter_8bit[delta_fract[2]], sizeof(int8_t) * 4);
-    memcpy(f[3], cubic_filter_8bit[delta_fract[3]], sizeof(int8_t) * 4);
-    memcpy(f[4], cubic_filter_8bit[delta_fract[4]], sizeof(int8_t) * 4);
-    memcpy(f[5], cubic_filter_8bit[delta_fract[5]], sizeof(int8_t) * 4);
-    memcpy(f[6], cubic_filter_8bit[delta_fract[6]], sizeof(int8_t) * 4);
-    memcpy(f[7], cubic_filter_8bit[delta_fract[7]], sizeof(int8_t) * 4);
+    memcpy(f[0], cubic_filter_8bit_c[delta_fract[0]], sizeof(int8_t) * 4);
+    memcpy(f[1], cubic_filter_8bit_c[delta_fract[1]], sizeof(int8_t) * 4);
+    memcpy(f[2], cubic_filter_8bit_c[delta_fract[2]], sizeof(int8_t) * 4);
+    memcpy(f[3], cubic_filter_8bit_c[delta_fract[3]], sizeof(int8_t) * 4);
+    memcpy(f[4], cubic_filter_8bit_c[delta_fract[4]], sizeof(int8_t) * 4);
+    memcpy(f[5], cubic_filter_8bit_c[delta_fract[5]], sizeof(int8_t) * 4);
+    memcpy(f[6], cubic_filter_8bit_c[delta_fract[6]], sizeof(int8_t) * 4);
+    memcpy(f[7], cubic_filter_8bit_c[delta_fract[7]], sizeof(int8_t) * 4);
   }
   else {
     for (int x = 0; x < 8; ++x) {
@@ -1232,7 +1272,7 @@ static void angular_pred_avx2_w16_hor(uvg_pixel* dst, const uvg_pixel* ref_main,
   int8_t f[64][4] = { { 0 } };
   if (use_cubic) {
     for (int x = 0; x < width; ++x) {
-      memcpy(f[x], cubic_filter_8bit[delta_fract[x]], sizeof(int8_t) * 4);
+      memcpy(f[x], cubic_filter_8bit_c[delta_fract[x]], sizeof(int8_t) * 4);
     }
   }
   else {
@@ -1286,50 +1326,56 @@ static void angular_pred_generic_linear_filter(uvg_pixel* dst, uvg_pixel* ref, c
     for (int x = 0; x < width; ++x) {
       uvg_pixel ref1 = ref[x + delta_int[y] + 1];
       uvg_pixel ref2 = ref[x + delta_int[y] + 2];
-      dst[y * width + x] = ref1 + ((delta_fract[y] * (ref2 - ref1) + 16) >> 5);
+      //dst[y * width + x] = ref1 + ((delta_fract[y] * (ref2 - ref1) + 16) >> 5);
+      dst[y * width + x] = ((32 - delta_fract[y]) * ref1 + delta_fract[y] * ref2 + 16) >> 5;
     }
   }
 }
 
 
-static void angular_pred_avx2_linear_filter_ver(uvg_pixel* dst, uvg_pixel* ref, const int width, const int height, const int16_t* delta_int, const int16_t* delta_fract)
+static void angular_pred_avx2_linear_filter_w4_ver(uvg_pixel* dst, uvg_pixel* ref, const int height, const int16_t* delta_int, const int16_t* delta_fract)
 {
-  // 2-tap linear filter
-
-  // Handle filtering in 4x4 blocks
+  const int width = 4;
   const int16_t* dint = delta_int;
+  const __m128i v16s = _mm_set1_epi16(16);
+  // Height has to be at least 4, handle 4 lines at once
   for (int y = 0; y < height; y += 4) {
-    const __m128i vidx0 = _mm_setr_epi8(
-      dint[0], dint[0], dint[0], dint[0],
-      dint[0], dint[0], dint[0], dint[0],
-      dint[1], dint[1], dint[1], dint[1],
-      dint[1], dint[1], dint[1], dint[1]
-    );
-    const __m128i vidx1 = _mm_setr_epi8(
-      dint[2], dint[2], dint[2], dint[2],
-      dint[2], dint[2], dint[2], dint[2],
-      dint[3], dint[3], dint[3], dint[3],
-      dint[3], dint[3], dint[3], dint[3]
-    );
+    uvg_pixel src[32];
+    int16_t coeff_tmp[4];
+    // TODO: get rid of this slow crap, this is just here to test the calculations
+    for (int yy = 0; yy < 4; ++yy) {
+      src[yy * 8 + 0] = ref[dint[yy] + 1 + 0];
+      src[yy * 8 + 1] = ref[dint[yy] + 1 + 1];
+      src[yy * 8 + 2] = ref[dint[yy] + 1 + 1];
+      src[yy * 8 + 3] = ref[dint[yy] + 1 + 2];
+      src[yy * 8 + 4] = ref[dint[yy] + 1 + 2];
+      src[yy * 8 + 5] = ref[dint[yy] + 1 + 3];
+      src[yy * 8 + 6] = ref[dint[yy] + 1 + 3];
+      src[yy * 8 + 7] = ref[dint[yy] + 1 + 4];
+      int8_t tmp[2] = { 32 - delta_fract[y + yy], delta_fract[y + yy] };
+      coeff_tmp[yy] = *(int16_t*)tmp;
+    }
     dint += 4;
 
-    __m128i vshuffle0 = _mm_setr_epi8(
-      0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
-      0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04
-    );
+    int8_t tmp[2] = {32 - delta_fract[y], delta_fract[y]};
+    const __m128i vcoeff0 = _mm_setr_epi16(coeff_tmp[0], coeff_tmp[0], coeff_tmp[0], coeff_tmp[0],
+                                           coeff_tmp[1], coeff_tmp[1], coeff_tmp[1], coeff_tmp[1]);
+    const __m128i vcoeff1 = _mm_setr_epi16(coeff_tmp[2], coeff_tmp[2], coeff_tmp[2], coeff_tmp[2],
+                                           coeff_tmp[3], coeff_tmp[3], coeff_tmp[3], coeff_tmp[3]);
+    //const __m256i vcoeff = _mm256_set1_epi16(*(int16_t*)tmp);
 
-    vshuffle0 = _mm_add_epi8(vshuffle0, vidx0);
-    const __m128i vshuffle1 = _mm_add_epi8(vshuffle0, vidx1);
-    int8_t tmp[2] = { -delta_fract[y], delta_fract[y] };
-    const __m128i vcoeff = _mm_set1_epi16(*(int16_t*)tmp);
+    const __m128i* vsrc0 = (const __m128i*)&src[0];
+    const __m128i* vsrc1 = (const __m128i*)&src[16];
+    
+    __m128i res0 = _mm_maddubs_epi16(*vsrc0, vcoeff0);
+    __m128i res1 = _mm_maddubs_epi16(*vsrc1, vcoeff1);
+    res0 = _mm_add_epi16(res0, v16s);
+    res1 = _mm_add_epi16(res1, v16s);
+    res0 = _mm_srai_epi16(res0, 5);
+    res1 = _mm_srai_epi16(res1, 5);
 
-    for (int x = 0; x < width; x += 4) {
-      const __m128i vref = _mm_loadu_si128((const __m128i*)&ref[delta_int[y] + x + 1]);
-      const __m256i vref16 = _mm256_cvtepu8_epi16(vref);
-
-      const __m128i vref0 = _mm_shuffle_epi8(vref, vshuffle0);
-      const __m128i vref1 = _mm_shuffle_epi8(vref, vshuffle1);
-    }
+    _mm_store_si128((__m128i*)dst, _mm_packus_epi16(res0, res1));
+    dst += 16;
   }
 }
 
@@ -2060,11 +2106,29 @@ static void uvg_angular_pred_avx2(
       }
       // Chroma channels
       else {
-        // Do linear filtering for chroma channels
-        if (vertical_mode)
-          angular_pred_avx2_linear_filter_ver(dst, ref_main, width, height, delta_int, delta_fract);
-        else
-          angular_pred_avx2_linear_filter_hor(dst, ref_main, height, width, delta_int, delta_fract);
+        // Do 2-tap linear filtering for chroma channels
+        if (vertical_mode) {
+          switch (width) {
+            case  4: angular_pred_avx2_linear_filter_w4_ver(dst, ref_main, height, delta_int, delta_fract); break;
+            case  8: angular_pred_generic_linear_filter(dst, ref_main, width, height, delta_int, delta_fract); break;
+            case 16: angular_pred_generic_linear_filter(dst, ref_main, width, height, delta_int, delta_fract); break;
+            case 32: angular_pred_generic_linear_filter(dst, ref_main, width, height, delta_int, delta_fract); break;
+            default:
+              assert(false && "Intra angular predicion: illegal chroma width.\n");
+              break;
+          }
+        }
+        else {
+          switch (width) { // TODO: this generic solution does not work for horizontal modes. Start by implementing the vertical prediction first
+            case  4: angular_pred_generic_linear_filter(dst, ref_main, width, height, delta_int, delta_fract); break;
+            case  8: angular_pred_generic_linear_filter(dst, ref_main, width, height, delta_int, delta_fract); break;
+            case 16: angular_pred_generic_linear_filter(dst, ref_main, width, height, delta_int, delta_fract); break;
+            case 32: angular_pred_generic_linear_filter(dst, ref_main, width, height, delta_int, delta_fract); break;
+            default:
+              assert(false && "Intra angular predicion: illegal chroma width.\n");
+              break;
+          }
+        }
       }
     }
     else {
