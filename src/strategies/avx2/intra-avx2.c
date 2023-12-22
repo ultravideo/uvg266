@@ -1279,14 +1279,70 @@ static void angular_pred_avx2_w16_hor(uvg_pixel* dst, const uvg_pixel* ref_main,
 }
 
 
-// TODO: vectorize
-static void angular_pred_avx2_linear_filter(uvg_pixel* dst, uvg_pixel* ref, const int width, const int height, const int16_t* delta_int, const int16_t* delta_fract)
+static void angular_pred_generic_linear_filter(uvg_pixel* dst, uvg_pixel* ref, const int width, const int height, const int16_t* delta_int, const int16_t* delta_fract)
 {
+  // 2-tap filter
   for (int y = 0; y < height; ++y) {
     for (int x = 0; x < width; ++x) {
       uvg_pixel ref1 = ref[x + delta_int[y] + 1];
       uvg_pixel ref2 = ref[x + delta_int[y] + 2];
       dst[y * width + x] = ref1 + ((delta_fract[y] * (ref2 - ref1) + 16) >> 5);
+    }
+  }
+}
+
+
+static void angular_pred_avx2_linear_filter_ver(uvg_pixel* dst, uvg_pixel* ref, const int width, const int height, const int16_t* delta_int, const int16_t* delta_fract)
+{
+  // 2-tap linear filter
+
+  // Handle filtering in 4x4 blocks
+  const int16_t* dint = delta_int;
+  for (int y = 0; y < height; y += 4) {
+    const __m128i vidx0 = _mm_setr_epi8(
+      dint[0], dint[0], dint[0], dint[0],
+      dint[0], dint[0], dint[0], dint[0],
+      dint[1], dint[1], dint[1], dint[1],
+      dint[1], dint[1], dint[1], dint[1]
+    );
+    const __m128i vidx1 = _mm_setr_epi8(
+      dint[2], dint[2], dint[2], dint[2],
+      dint[2], dint[2], dint[2], dint[2],
+      dint[3], dint[3], dint[3], dint[3],
+      dint[3], dint[3], dint[3], dint[3]
+    );
+    dint += 4;
+
+    __m128i vshuffle0 = _mm_setr_epi8(
+      0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
+      0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04
+    );
+
+    vshuffle0 = _mm_add_epi8(vshuffle0, vidx0);
+    const __m128i vshuffle1 = _mm_add_epi8(vshuffle0, vidx1);
+    int8_t tmp[2] = { -delta_fract[y], delta_fract[y] };
+    const __m128i vcoeff = _mm_set1_epi16(*(int16_t*)tmp);
+
+    for (int x = 0; x < width; x += 4) {
+      const __m128i vref = _mm_loadu_si128((const __m128i*)&ref[delta_int[y] + x + 1]);
+      const __m256i vref16 = _mm256_cvtepu8_epi16(vref);
+
+      const __m128i vref0 = _mm_shuffle_epi8(vref, vshuffle0);
+      const __m128i vref1 = _mm_shuffle_epi8(vref, vshuffle1);
+    }
+  }
+}
+
+
+static void angular_pred_avx2_linear_filter_hor(uvg_pixel* dst, uvg_pixel* ref, const int width, const int height, const int16_t* delta_int, const int16_t* delta_fract)
+{
+  // 2-tap linear filter
+
+  // Handle filtering in 4x4 blocks
+  for (int y = 0; y < height; y += 4) {
+    const __m256i vref = _mm256_loadu_si256((const __m256i*) & ref[y + 1]);
+    for (int x = 0; x < width; x += 4) {
+
     }
   }
 }
@@ -1859,6 +1915,12 @@ static void uvg_angular_pred_avx2(
   const int log2_height = uvg_g_convert_to_log2[height];
 
   assert((log2_width >= 2 && log2_width <= 6) && (log2_height >= 0 && log2_height <= 6));
+
+  // For chroma blocks, height has to be at least 2
+  if (channel_type != COLOR_Y) {
+    assert(log2_height >= 1);
+  }
+
   // Modes [-1, -14] and [67, 80] are wide angle modes
   assert(intra_mode >= -14 && intra_mode <= 80);
 
@@ -1996,9 +2058,13 @@ static void uvg_angular_pred_avx2(
           }
         }
       }
+      // Chroma channels
       else {
         // Do linear filtering for chroma channels
-        angular_pred_avx2_linear_filter(dst, ref_main, width, height, delta_int, delta_fract);
+        if (vertical_mode)
+          angular_pred_avx2_linear_filter_ver(dst, ref_main, width, height, delta_int, delta_fract);
+        else
+          angular_pred_avx2_linear_filter_hor(dst, ref_main, height, width, delta_int, delta_fract);
       }
     }
     else {
