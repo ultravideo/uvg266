@@ -125,7 +125,7 @@ typedef struct
   uint8_t merged      : 1; //!< \brief flag to indicate this block is merged
   uint8_t merge_idx   : 3; //!< \brief merge index
   uint8_t tr_skip     : 3; //!< \brief transform skip flag
-  uint8_t tr_idx      : 3; //!< \brief transform index
+  uint8_t tr_idx      ; //!< \brief transform index
   uint8_t joint_cb_cr : 2; //!< \brief joint chroma residual coding 
 
   uint8_t log2_width : 3;
@@ -155,7 +155,7 @@ typedef struct
   uint8_t violates_lfnst_constrained_luma : 1;
   uint8_t violates_lfnst_constrained_chroma : 1;
   uint8_t lfnst_last_scan_pos : 1;
-  uint8_t lfnst_idx : 2;
+  uint8_t lfnst_idx ;
   uint8_t cr_lfnst_idx : 2;
 
   uint8_t luma_deblocking : 2;

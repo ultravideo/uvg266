@@ -64,6 +64,9 @@
 // Cost threshold for doing intra search in inter frames with --rd=0.
 static const int INTRA_THRESHOLD = 8;
 
+static FILE * fp =  NULL;
+static pthread_mutex_t * file_lock =NULL;
+
 
 static INLINE void copy_cu_info(lcu_t *from, lcu_t *to, const cu_loc_t* const cu_loc, enum uvg_tree_type
                                 tree_type)
@@ -1206,12 +1209,13 @@ static bool check_for_early_termission(const int cu_width, const int cu_height, 
  */
 static double search_cu(
   encoder_state_t* const state,
-  const cu_loc_t* const cu_loc,
-  const cu_loc_t* const chroma_loc,
-  lcu_t* lcu,
-  enum uvg_tree_type tree_type,
-  const split_tree_t split_tree,
-  bool has_chroma)
+  const cu_loc_t* const  cu_loc,
+  const cu_loc_t* const  chroma_loc,
+  lcu_t*                 lcu,
+  enum uvg_tree_type     tree_type,
+  const split_tree_t     split_tree,
+  bool                   has_chroma,
+  uint64_t*              timestamp)
 {
   const int depth = split_tree.current_depth;
   const encoder_control_t* ctrl = state->encoder_control;
@@ -1468,6 +1472,8 @@ static double search_cu(
       }
     }
 
+
+
     // Reconstruct best mode because we need the reconstructed pixels for
     // mode search of adjacent CUs.
     if (cur_cu->type == CU_INTRA) {
@@ -1592,7 +1598,39 @@ static double search_cu(
       lcu_fill_cbf(lcu, x_local, y_local, cu_width, cu_height, cur_cu, UVG_BOTH_T);
     }
   }
-  
+
+
+  if (cur_cu->type != CU_NOTSET) {
+    uint8_t type = 0;
+    pthread_mutex_lock(&file_lock);
+    fwrite(&type, 1, 1, fp);
+    fwrite(timestamp, 8, 1, fp);
+    fwrite(&cu_loc->x, 2, 1, fp);
+    fwrite(&cu_loc->y, 2, 1, fp);
+    fwrite(&cu_loc->width, 1, 1, fp);
+    fwrite(&cu_loc->height, 1, 1, fp);
+    fwrite(&cur_cu->intra.mode, 1, 1, fp);
+    fwrite(&cur_cu->intra.multi_ref_idx, 1, 1, fp);
+    fwrite(&cur_cu->intra.mip_flag, 1, 1, fp);
+    fwrite(&cur_cu->intra.mip_is_transposed, 1, 1, fp);
+    fwrite(&cur_cu->intra.isp_mode, 1, 1, fp);
+    fwrite(&cur_cu->cbf, 2, 1, fp);
+    fwrite(&cur_cu->lfnst_idx, 1, 1, fp);
+    fwrite(&cur_cu->tr_idx, 1, 1, fp);
+
+    uvg_pixel pixel_buffer[LCU_WIDTH * LCU_WIDTH];
+    uvg_pixels_blit(&lcu->rec.y[x_local + y_local * LCU_WIDTH], pixel_buffer, cu_width, cu_height, LCU_WIDTH, cu_width);
+    fwrite(pixel_buffer, sizeof (uvg_pixel), cu_loc->width*cu_loc->height, fp);
+
+    uvg_pixels_blit(&lcu->rec.u[x_local/2 + y_local/2 * LCU_WIDTH_C], pixel_buffer, cu_width / 2, cu_height / 2, LCU_WIDTH_C, cu_width / 2);
+    fwrite(pixel_buffer, sizeof (uvg_pixel), cu_loc->width*cu_loc->height / 4, fp);
+
+    uvg_pixels_blit(&lcu->rec.v[x_local/2 + y_local/2 * LCU_WIDTH_C], pixel_buffer, cu_width / 2, cu_height / 2, LCU_WIDTH_C, cu_width / 2);
+    fwrite(pixel_buffer, sizeof (uvg_pixel), cu_loc->width*cu_loc->height / 4, fp);
+    pthread_mutex_unlock(&file_lock);
+  }
+  *timestamp += 1;
+
   // The cabac functions assume chroma locations whereas the search uses luma locations
   // for the chroma tree, therefore we need to shift the chroma coordinates here for
   // passing to the bit cost calculating functions.
@@ -1822,10 +1860,11 @@ static double search_cu(
       for (int split = 0; split < splits; ++split) {
         new_split.part_index = split;
         split_cost += search_cu(state, 
-          &new_cu_loc[split], separate_chroma ? chroma_loc : &new_cu_loc[split],
-          &split_lcu[split_type -1], 
-          tree_type, new_split,
-          !separate_chroma || (split == splits - 1 && has_chroma));
+                                &new_cu_loc[split], separate_chroma ? chroma_loc : &new_cu_loc[split],
+                                &split_lcu[split_type -1], 
+                                tree_type, new_split,
+                                !separate_chroma || (split == splits - 1 && has_chroma),
+                                timestamp);
         // If there is no separate chroma the block will always have chroma, otherwise it is the last block of the split that has the chroma
 
         if (split_type == QT_SPLIT && completely_inside) {
@@ -1914,6 +1953,36 @@ static double search_cu(
         memcpy(&post_seach_cabac, &state->search_cabac, sizeof(post_seach_cabac));
         memcpy(&state->search_cabac, &temp_cabac, sizeof(temp_cabac));
       }
+    }
+
+    if (cost <= best_split_cost) {
+      uint8_t type = 1;
+      pthread_mutex_lock(&file_lock);
+      fwrite(&type, 1, 1, fp);
+      fwrite(timestamp, 8, 1, fp);
+      fwrite(&cu_loc->x, 2, 1, fp);
+      fwrite(&cu_loc->y, 2, 1, fp);
+      fwrite(&cu_loc->width, 1, 1, fp);
+      fwrite(&cu_loc->height, 1, 1, fp);
+      fwrite(&cur_cu->intra.mode, 1, 1, fp);
+      fwrite(&cur_cu->intra.multi_ref_idx, 1, 1, fp);
+      fwrite(&cur_cu->intra.mip_flag, 1, 1, fp);
+      fwrite(&cur_cu->intra.mip_is_transposed, 1, 1, fp);
+      fwrite(&cur_cu->intra.isp_mode, 1, 1, fp);
+      fwrite(&cur_cu->cbf, 2, 1, fp);
+      fwrite(&cur_cu->lfnst_idx, 1, 1, fp);
+      fwrite(&cur_cu->tr_idx, 1, 1, fp);
+
+      uvg_pixel pixel_buffer[LCU_WIDTH * LCU_WIDTH];
+      uvg_pixels_blit(&lcu->rec.y[x_local + y_local * LCU_WIDTH], pixel_buffer, cu_width, cu_height, LCU_WIDTH, cu_width);
+      fwrite(pixel_buffer, sizeof (uvg_pixel), cu_loc->width*cu_loc->height, fp);
+
+      uvg_pixels_blit(&lcu->rec.u[x_local/2 + y_local/2 * LCU_WIDTH_C], pixel_buffer, cu_width / 2, cu_height / 2, LCU_WIDTH_C, cu_width / 2);
+      fwrite(pixel_buffer, sizeof (uvg_pixel), cu_loc->width*cu_loc->height / 4, fp);
+
+      uvg_pixels_blit(&lcu->rec.v[x_local/2 + y_local/2 * LCU_WIDTH_C], pixel_buffer, cu_width / 2, cu_height / 2, LCU_WIDTH_C, cu_width / 2);
+      fwrite(pixel_buffer, sizeof (uvg_pixel), cu_loc->width*cu_loc->height / 4, fp);
+      pthread_mutex_unlock(&file_lock);
     }
 
     if (best_split_cost < cost) {
@@ -2147,6 +2216,8 @@ static void copy_lcu_to_cu_data(const encoder_state_t * const state, int x_px, i
  */
 void uvg_search_lcu(encoder_state_t * const state, const int x, const int y, const yuv_t * const hor_buf, const yuv_t * const ver_buf, lcu_coeff_t *coeff)
 {
+  if (fp == NULL) fp = fopen("data.dat", "wb");
+  if (file_lock == NULL) pthread_mutex_init(&file_lock, NULL);
   memcpy(&state->search_cabac, &state->cabac, sizeof(cabac_data_t));
   state->search_cabac.only_count = 1;
   assert(x % LCU_WIDTH == 0);
@@ -2173,6 +2244,7 @@ void uvg_search_lcu(encoder_state_t * const state, const int x, const int y, con
                     : UVG_BOTH_T;
 
   cu_loc_t start;
+  uint64_t timestamp = 0;
   uvg_cu_loc_ctor(&start, x, y, LCU_WIDTH, LCU_WIDTH);
   split_tree_t split_tree = { 0, 0, 0, 0, 0 };
   // Start search from depth 0.
@@ -2183,7 +2255,8 @@ void uvg_search_lcu(encoder_state_t * const state, const int x, const int y, con
     &work_tree,
     tree_type,
     split_tree,
-    tree_type == UVG_BOTH_T);
+    tree_type == UVG_BOTH_T,
+    &timestamp);
 
   // Save squared cost for rate control.
   if(state->encoder_control->cfg.rc_algorithm == UVG_LAMBDA) {
@@ -2199,11 +2272,12 @@ void uvg_search_lcu(encoder_state_t * const state, const int x, const int y, con
 
   if(state->frame->slicetype == UVG_SLICE_I && state->encoder_control->cfg.dual_tree) {
     cost = search_cu(
-      state, &start,
-      &start,
-      &work_tree, UVG_CHROMA_T,
-      split_tree,
-      true);
+        state, &start,
+        &start,
+        &work_tree, UVG_CHROMA_T,
+        split_tree,
+        true,
+      &timestamp);
 
     if (state->encoder_control->cfg.rc_algorithm == UVG_LAMBDA) {
       uvg_get_lcu_stats(state, x / LCU_WIDTH, y / LCU_WIDTH)->weight += cost * cost;
