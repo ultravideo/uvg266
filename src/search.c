@@ -65,7 +65,7 @@
 static const int INTRA_THRESHOLD = 8;
 
 static FILE * fp =  NULL;
-static pthread_mutex_t * file_lock =NULL;
+static pthread_mutex_t file_lock;
 
 
 static INLINE void copy_cu_info(lcu_t *from, lcu_t *to, const cu_loc_t* const cu_loc, enum uvg_tree_type
@@ -2216,8 +2216,10 @@ static void copy_lcu_to_cu_data(const encoder_state_t * const state, int x_px, i
  */
 void uvg_search_lcu(encoder_state_t * const state, const int x, const int y, const yuv_t * const hor_buf, const yuv_t * const ver_buf, lcu_coeff_t *coeff)
 {
-  if (fp == NULL) fp = fopen("data.dat", "wb");
-  if (file_lock == NULL) pthread_mutex_init(&file_lock, NULL);
+  if (fp == NULL) {
+    fp = fopen("data.dat", "wb");
+    pthread_mutex_init(&file_lock, NULL);
+  }
   memcpy(&state->search_cabac, &state->cabac, sizeof(cabac_data_t));
   state->search_cabac.only_count = 1;
   assert(x % LCU_WIDTH == 0);
