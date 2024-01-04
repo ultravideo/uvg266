@@ -1208,14 +1208,13 @@ static bool check_for_early_termission(const int cu_width, const int cu_height, 
  *   will be the final output of the recursion.
  */
 static double search_cu(
-  encoder_state_t* const state,
-  const cu_loc_t* const  cu_loc,
-  const cu_loc_t* const  chroma_loc,
-  lcu_t*                 lcu,
-  enum uvg_tree_type     tree_type,
-  const split_tree_t     split_tree,
-  bool                   has_chroma,
-  uint64_t*              timestamp)
+  encoder_state_t * const state,
+  const cu_loc_t * const  cu_loc,
+  const cu_loc_t * const  chroma_loc,
+  lcu_t                  *lcu,
+  enum uvg_tree_type      tree_type,
+  const split_tree_t      split_tree,
+  bool                    has_chroma)
 {
   const int depth = split_tree.current_depth;
   const encoder_control_t* ctrl = state->encoder_control;
@@ -1602,9 +1601,12 @@ static double search_cu(
 
   if (cur_cu->type != CU_NOTSET) {
     uint8_t type = 0;
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    uint64_t timestamp = ts.tv_sec * 1000000000 + ts.tv_nsec;
     pthread_mutex_lock(&file_lock);
     fwrite(&type, 1, 1, fp);
-    fwrite(timestamp, 8, 1, fp);
+    fwrite(&timestamp, 8, 1, fp);
     fwrite(&cu_loc->x, 2, 1, fp);
     fwrite(&cu_loc->y, 2, 1, fp);
     fwrite(&cu_loc->width, 1, 1, fp);
@@ -1629,7 +1631,6 @@ static double search_cu(
     fwrite(pixel_buffer, sizeof (uvg_pixel), cu_loc->width*cu_loc->height / 4, fp);
     pthread_mutex_unlock(&file_lock);
   }
-  *timestamp += 1;
 
   // The cabac functions assume chroma locations whereas the search uses luma locations
   // for the chroma tree, therefore we need to shift the chroma coordinates here for
@@ -1859,12 +1860,14 @@ static double search_cu(
       initialize_partial_work_tree(state, lcu, &split_lcu[split_type - 1], cu_loc , separate_chroma ? chroma_loc : cu_loc, tree_type);
       for (int split = 0; split < splits; ++split) {
         new_split.part_index = split;
-        split_cost += search_cu(state, 
-                                &new_cu_loc[split], separate_chroma ? chroma_loc : &new_cu_loc[split],
-                                &split_lcu[split_type -1], 
-                                tree_type, new_split,
-                                !separate_chroma || (split == splits - 1 && has_chroma),
-                                timestamp);
+        split_cost += search_cu(
+          state,
+          &new_cu_loc[split],
+          separate_chroma ? chroma_loc : &new_cu_loc[split],
+          &split_lcu[split_type - 1],
+          tree_type,
+          new_split,
+          !separate_chroma || (split == splits - 1 && has_chroma));
         // If there is no separate chroma the block will always have chroma, otherwise it is the last block of the split that has the chroma
 
         if (split_type == QT_SPLIT && completely_inside) {
@@ -1957,9 +1960,12 @@ static double search_cu(
 
     if (cost <= best_split_cost) {
       uint8_t type = 1;
+      struct timespec ts;
+      clock_gettime(CLOCK_REALTIME, &ts);
+      uint64_t timestamp = ts.tv_sec * 1000000000 + ts.tv_nsec;
       pthread_mutex_lock(&file_lock);
       fwrite(&type, 1, 1, fp);
-      fwrite(timestamp, 8, 1, fp);
+      fwrite(&timestamp, 8, 1, fp);
       fwrite(&cu_loc->x, 2, 1, fp);
       fwrite(&cu_loc->y, 2, 1, fp);
       fwrite(&cu_loc->width, 1, 1, fp);
@@ -2251,14 +2257,13 @@ void uvg_search_lcu(encoder_state_t * const state, const int x, const int y, con
   split_tree_t split_tree = { 0, 0, 0, 0, 0 };
   // Start search from depth 0.
   double cost = search_cu(
-    state, 
+    state,
     &start,
     &start,
     &work_tree,
     tree_type,
     split_tree,
-    tree_type == UVG_BOTH_T,
-    &timestamp);
+    tree_type == UVG_BOTH_T);
 
   // Save squared cost for rate control.
   if(state->encoder_control->cfg.rc_algorithm == UVG_LAMBDA) {
@@ -2274,12 +2279,13 @@ void uvg_search_lcu(encoder_state_t * const state, const int x, const int y, con
 
   if(state->frame->slicetype == UVG_SLICE_I && state->encoder_control->cfg.dual_tree) {
     cost = search_cu(
-        state, &start,
-        &start,
-        &work_tree, UVG_CHROMA_T,
-        split_tree,
-        true,
-      &timestamp);
+      state,
+      &start,
+      &start,
+      &work_tree,
+      UVG_CHROMA_T,
+      split_tree,
+      true);
 
     if (state->encoder_control->cfg.rc_algorithm == UVG_LAMBDA) {
       uvg_get_lcu_stats(state, x / LCU_WIDTH, y / LCU_WIDTH)->weight += cost * cost;
