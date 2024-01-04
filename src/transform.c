@@ -669,7 +669,7 @@ void uvg_chroma_transform_search(
       &u_coeff_cost,
       &v_coeff_cost);
     pred_cu->joint_cb_cr = old_jccr;
-    if (pred_cu->cr_lfnst_idx != 0 && !u_has_coeffs && !v_has_coeffs) goto reset_cabac;
+    if (pred_cu->cr_lfnst_idx != 0 && !u_has_coeffs && !v_has_coeffs && tree_type == UVG_CHROMA_T) goto reset_cabac;
     
     if(pred_cu->type == CU_INTRA && transforms[i] != CHROMA_TS && tree_type == UVG_CHROMA_T) {
       bool constraints[2] = { false, false };
@@ -677,7 +677,7 @@ void uvg_chroma_transform_search(
       if(!is_jccr) {
         uvg_derive_lfnst_constraints(pred_cu, constraints, v_quant_coeff, width, height, NULL, COLOR_V);
       }
-      if (!constraints[1] && (u_has_coeffs || v_has_coeffs) && pred_cu->cr_lfnst_idx != 0) goto reset_cabac;
+      if (!constraints[1] && (u_has_coeffs || v_has_coeffs) && pred_cu->cr_lfnst_idx != 0 && tree_type == UVG_CHROMA_T) goto reset_cabac;
     }
 
     if (is_jccr && !u_has_coeffs) goto reset_cabac;

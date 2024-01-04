@@ -1516,7 +1516,7 @@ static double search_cu(
           chroma_loc,
           tree_type);
       } else {
-        assert(cur_cu->cr_lfnst_idx == 0 && "If we don't have separate tree chroma lfnst index must be 0");
+        // assert(cur_cu->cr_lfnst_idx == 0 && "If we don't have separate tree chroma lfnst index must be 0");
       }
 
       // Set isp split cbfs here

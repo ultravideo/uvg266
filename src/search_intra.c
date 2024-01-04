@@ -1481,7 +1481,7 @@ int8_t uvg_search_intra_chroma_rdo(
       }
     }
     else {
-      lfnst_modes_to_check[0] = 0;
+      lfnst_modes_to_check[0] = chroma_data->pred_cu.lfnst_idx;
       lfnst_modes_to_check[1] = -1;
       lfnst_modes_to_check[2] = -1;
     }
