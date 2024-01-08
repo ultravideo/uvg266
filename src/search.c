@@ -1607,6 +1607,7 @@ static double search_cu(
     pthread_mutex_lock(&file_lock);
     fwrite(&type, 1, 1, fp);
     fwrite(&timestamp, 8, 1, fp);
+    fwrite(&state->frame->num, 1, 1, fp);
     fwrite(&cu_loc->x, 2, 1, fp);
     fwrite(&cu_loc->y, 2, 1, fp);
     fwrite(&cu_loc->width, 1, 1, fp);
@@ -1966,6 +1967,7 @@ static double search_cu(
       pthread_mutex_lock(&file_lock);
       fwrite(&type, 1, 1, fp);
       fwrite(&timestamp, 8, 1, fp);
+      fwrite(&state->frame->num, 1, 1, fp);
       fwrite(&cu_loc->x, 2, 1, fp);
       fwrite(&cu_loc->y, 2, 1, fp);
       fwrite(&cu_loc->width, 1, 1, fp);
