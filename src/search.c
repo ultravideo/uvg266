@@ -1612,12 +1612,15 @@ static double search_cu(
     fwrite(&cu_loc->y, 2, 1, fp);
     fwrite(&cu_loc->width, 1, 1, fp);
     fwrite(&cu_loc->height, 1, 1, fp);
+
+    fwrite(&cur_cu->split_tree, 4, 1, fp);
+    fwrite(&cur_cu->qp, 1, 1, fp);
     fwrite(&cur_cu->intra.mode, 1, 1, fp);
-    fwrite(&cur_cu->intra.multi_ref_idx, 1, 1, fp);
     fwrite(&cur_cu->intra.mip_flag, 1, 1, fp);
     fwrite(&cur_cu->intra.mip_is_transposed, 1, 1, fp);
+    fwrite(&cur_cu->intra.multi_ref_idx, 1, 1, fp);
     fwrite(&cur_cu->intra.isp_mode, 1, 1, fp);
-    fwrite(&cur_cu->cbf, 2, 1, fp);
+
     fwrite(&cur_cu->lfnst_idx, 1, 1, fp);
     fwrite(&cur_cu->tr_idx, 1, 1, fp);
 
@@ -1972,12 +1975,15 @@ static double search_cu(
       fwrite(&cu_loc->y, 2, 1, fp);
       fwrite(&cu_loc->width, 1, 1, fp);
       fwrite(&cu_loc->height, 1, 1, fp);
+
+      fwrite(&cur_cu->split_tree, 4, 1, fp);
+      fwrite(&cur_cu->qp, 1, 1, fp);
       fwrite(&cur_cu->intra.mode, 1, 1, fp);
-      fwrite(&cur_cu->intra.multi_ref_idx, 1, 1, fp);
       fwrite(&cur_cu->intra.mip_flag, 1, 1, fp);
       fwrite(&cur_cu->intra.mip_is_transposed, 1, 1, fp);
+      fwrite(&cur_cu->intra.multi_ref_idx, 1, 1, fp);
       fwrite(&cur_cu->intra.isp_mode, 1, 1, fp);
-      fwrite(&cur_cu->cbf, 2, 1, fp);
+
       fwrite(&cur_cu->lfnst_idx, 1, 1, fp);
       fwrite(&cur_cu->tr_idx, 1, 1, fp);
 

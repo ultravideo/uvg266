@@ -138,7 +138,7 @@ typedef struct
 
   uint8_t root_cbf;
 
-  uint32_t split_tree : 3 * 9;
+  uint32_t split_tree;
 
   /**
    * \brief QP used for the CU.
