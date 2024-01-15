@@ -305,7 +305,7 @@ static double search_intra_trdepth(
 
   if (width <= TR_MAX_WIDTH && height <= TR_MAX_WIDTH) {
 
-    const bool mts_enabled = (state->encoder_control->cfg.mts == UVG_MTS_INTRA || state->encoder_control->cfg.mts == UVG_MTS_BOTH)
+    const bool mts_enabled = (state->frame->cfg->mts == UVG_MTS_INTRA || state->frame->cfg->mts == UVG_MTS_BOTH)
       && PU_IS_TU(pred_cu);
 
     nosplit_cost = 0.0;
@@ -338,7 +338,7 @@ static double search_intra_trdepth(
       num_transforms = pred_cu->intra.isp_mode == ISP_MODE_NO_ISP ? num_transforms : 1;
     }
     const int mts_start = trafo;
-    if (state->encoder_control->cfg.trskip_enable 
+    if (state->frame->cfg->trskip_enable
       && width <= (1 << state->encoder_control->cfg.trskip_max_size)
       && height <= (1 << state->encoder_control->cfg.trskip_max_size)
       && PU_IS_TU(pred_cu)
@@ -355,7 +355,7 @@ static double search_intra_trdepth(
     }
     
     int start_idx = 0;
-    int end_lfnst_idx = state->encoder_control->cfg.lfnst && PU_IS_TU(pred_cu) &&
+    int end_lfnst_idx = state->frame->cfg->lfnst && PU_IS_TU(pred_cu) &&
                   uvg_can_use_isp_with_lfnst(width, height, pred_cu->intra.isp_mode, tree_type) ? max_lfnst_idx : 0;
     for (int i = start_idx; i < end_lfnst_idx + 1; ++i) {
       search_data->lfnst_costs[i] = MAX_DOUBLE;
@@ -1337,7 +1337,7 @@ static int8_t search_intra_rdo(
     double best_isp_cost = MAX_DOUBLE;
     double best_bits = MAX_DOUBLE;
     int8_t best_isp_mode = 0;
-    int max_isp_modes = can_do_isp_search && uvg_can_use_isp(width, height) && state->encoder_control->cfg.isp ? NUM_ISP_MODES : 1;
+    int max_isp_modes = can_do_isp_search && uvg_can_use_isp(width, height) && state->frame->cfg->isp ? NUM_ISP_MODES : 1;
 
     //
     uint8_t best_mts_mode_for_isp[NUM_ISP_MODES] = {0};
@@ -1819,7 +1819,7 @@ void uvg_search_cu_intra(
   temp_pred_cu.type = CU_INTRA;
   FILL(temp_pred_cu.intra, 0);
   // Find modes with multiple reference lines if in use. Do not use if CU in first row.
-  uint8_t lines = state->encoder_control->cfg.mrl && lcu_px.y != 0 ? MAX_REF_LINE_IDX : 1;
+  uint8_t lines = state->frame->cfg->mrl && lcu_px.y != 0 ? MAX_REF_LINE_IDX : 1;
 
   uint8_t number_of_modes;
   uint8_t num_regular_modes;
@@ -1891,7 +1891,7 @@ void uvg_search_cu_intra(
   // num_regular_modes += num_mrl_modes;
 
   int num_mip_modes = 0;
-  if (state->encoder_control->cfg.mip) {
+  if (state->frame->cfg->mip) {
     // MIP is not allowed for 64 x 4 or 4 x 64 blocks
     if (!((cu_loc->height == 64 && cu_loc->width== 4) || (cu_loc->height== 4 && cu_loc->width == 64))) {
       num_mip_modes = NUM_MIP_MODES_FULL(cu_loc->width, cu_loc->height);
@@ -1940,7 +1940,7 @@ void uvg_search_cu_intra(
       number_of_modes_to_search = 0;
     }
     if(!skip_rough_search) {
-      if(state->encoder_control->cfg.mip) {
+      if(state->frame->cfg->mip) {
         number_of_modes_to_search = select_candidates_for_further_search(
           state,
           search_data,

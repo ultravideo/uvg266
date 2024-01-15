@@ -196,6 +196,7 @@ typedef struct encoder_state_config_frame_t {
 
   bool jccr_sign; 
 
+  uvg_config *cfg;
 } encoder_state_config_frame_t;
 
 typedef struct encoder_state_config_tile_t {

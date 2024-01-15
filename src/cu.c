@@ -393,14 +393,15 @@ int uvg_get_possible_splits(const encoder_state_t * const state,
   const int slice_type = state->frame->is_irap ? (tree_type == UVG_CHROMA_T ? 2 : 0) : 1;
 
   const unsigned max_btd =
-    state->encoder_control->cfg.max_btt_depth[slice_type] + split_tree.implicit_mtt_depth;
-  const unsigned max_bt_size = state->encoder_control->cfg.max_bt_size[slice_type];
+    state->frame->cfg->max_btt_depth[slice_type] + split_tree.implicit_mtt_depth;
+  const unsigned max_bt_size = state->frame->cfg->max_bt_size[slice_type];
   const unsigned min_bt_size = 1 << MIN_SIZE;
-  const unsigned max_tt_size = state->encoder_control->cfg.max_tt_size[slice_type];
+  const unsigned max_tt_size = state->frame->cfg->max_tt_size[slice_type];
   const unsigned min_tt_size = 1 << MIN_SIZE;
-  const unsigned min_qt_size = state->encoder_control->cfg.min_qt_size[slice_type];
+  const unsigned min_qt_size = state->frame->cfg->min_qt_size[slice_type];
 
-  const enum split_type implicitSplit = uvg_get_implicit_split(state, cu_loc, max_btd);
+  const enum split_type implicitSplit = uvg_get_implicit_split(state, cu_loc,
+                                                               state->encoder_control->cfg.max_btt_depth[slice_type] + split_tree.implicit_mtt_depth);
   
   splits[NO_SPLIT] = splits[QT_SPLIT] = splits[BT_HOR_SPLIT] = splits[TT_HOR_SPLIT] = splits[BT_VER_SPLIT] = splits[TT_VER_SPLIT] = true;
   bool can_btt = split_tree.mtt_depth < max_btd;
