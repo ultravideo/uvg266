@@ -70,6 +70,8 @@ if(NOT EXISTS "${PROJECT_SOURCE_DIR}/greatest/greatest.h")
     message(WARNING "The submodule greatest was not loaded, some tests may fail")
 endif()
 
+
+find_package(ZeroMQ REQUIRED)
 # Grab <year>-<month>-<day> timestamp for debug purposes
 string(TIMESTAMP CMAKE_BUILD_DATE %Y-%m-%d)
 
@@ -163,7 +165,7 @@ endif()
 
 add_executable(uvg266-bin ${CLI_SOURCES})
 
-target_link_libraries(uvg266-bin PUBLIC uvg266)
+target_link_libraries(uvg266-bin PUBLIC uvg266 zmq)
 
 set_target_properties(uvg266-bin PROPERTIES OUTPUT_NAME uvg266)
 set_target_properties(uvg266-bin PROPERTIES RUNTIME_OUTPUT_NAME uvg266)
@@ -181,7 +183,7 @@ else()
   endif()
   set(THREADS_PREFER_PTHREAD_FLAG ON)
   find_package(Threads REQUIRED)
-  target_link_libraries(uvg266 PUBLIC Threads::Threads)
+  target_link_libraries(uvg266 PUBLIC Threads::Threads zmq)
 
   include(CheckLibraryExists)
 
@@ -191,7 +193,7 @@ else()
       set(EXTRA_LIBS ${EXTRA_LIBS} m)
   endif (HAVE_LIB_M)
 
-  target_link_libraries(uvg266-bin PUBLIC ${EXTRA_LIBS})
+  target_link_libraries(uvg266-bin PUBLIC ${EXTRA_LIBS} zmq)
 endif()
 
 # Source grouping

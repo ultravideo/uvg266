@@ -263,6 +263,7 @@ static void* input_read_thread(void* in_args)
     }
 
     frames_read++;
+    sleep(30);
 
     if (args->encoder->cfg.source_scan_type != 0) {
       // Set source scan type for frame, so that it will be turned into fields.

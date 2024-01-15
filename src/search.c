@@ -34,6 +34,7 @@
 
 #include <limits.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "cabac.h"
 #include "cu.h"
@@ -1243,6 +1244,22 @@ static double search_cu(
   cu_info_t hmvp_lut_ibc[MAX_NUM_HMVP_CANDS];
   uint8_t hmvp_lut_size_ibc = state->tile->frame->hmvp_size_ibc[ctu_row];
 
+  zmq_pollitem_t pollitem = { state->zmq_socket, 0, ZMQ_POLLIN, 0 };
+  int ret = zmq_poll(&pollitem, 1, 0);
+
+  if(ret > 0) {
+  char buf[256];
+    int len = zmq_recv(state->zmq_socket, buf, 256, 0);
+    if (len > 0) {
+      buf[len] = 0;
+    }
+    printf("%d %d Received: %s\n", x, y, buf);
+
+  }
+  if (ret < 0) {
+    printf("zmq_poll failed: %s\n", zmq_strerror(errno));
+  }
+
   // Store original HMVP lut before search and restore after, since it's modified
   if (state->frame->slicetype != UVG_SLICE_I) memcpy(hmvp_lut, &state->tile->frame->hmvp_lut[ctu_row_mul_five], sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
   if(state->encoder_control->cfg.ibc) memcpy(hmvp_lut_ibc, &state->tile->frame->hmvp_lut_ibc[ctu_row_mul_five], sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
@@ -1601,39 +1618,37 @@ static double search_cu(
 
   if (cur_cu->type != CU_NOTSET) {
     uint8_t type = 0;
+    uint8_t buffer[8192];
     struct timespec ts;
     clock_gettime(CLOCK_REALTIME, &ts);
     uint64_t timestamp = ts.tv_sec * 1000000000 + ts.tv_nsec;
-    pthread_mutex_lock(&file_lock);
-    fwrite(&type, 1, 1, fp);
-    fwrite(&timestamp, 8, 1, fp);
-    fwrite(&state->frame->num, 1, 1, fp);
-    fwrite(&cu_loc->x, 2, 1, fp);
-    fwrite(&cu_loc->y, 2, 1, fp);
-    fwrite(&cu_loc->width, 1, 1, fp);
-    fwrite(&cu_loc->height, 1, 1, fp);
+    uint64_t bytes = 0;
+    memcpy(buffer, &type, 1); bytes++;
+    memcpy(buffer + bytes, &timestamp, 8); bytes+=8;
+    memcpy(buffer + bytes, &state->frame->num, 1); bytes++;
+    memcpy(buffer + bytes, &cu_loc->x, 2); bytes+=2;
+    memcpy(buffer + bytes, &cu_loc->y, 2); bytes+=2;
+    memcpy(buffer + bytes, &cu_loc->width, 1); bytes++;
+    memcpy(buffer + bytes, &cu_loc->height, 1); bytes++;
+    memcpy(buffer + bytes, &cur_cu->split_tree, 4); bytes+=4;
+    memcpy(buffer + bytes, &cur_cu->qp, 1); bytes++;
+    memcpy(buffer + bytes, &cur_cu->intra.mode, 1); bytes++;
+    memcpy(buffer + bytes, &cur_cu->intra.mip_flag, 1); bytes++;
+    memcpy(buffer + bytes, &cur_cu->intra.mip_is_transposed, 1); bytes++;
+    memcpy(buffer + bytes, &cur_cu->intra.multi_ref_idx, 1); bytes++;
+    memcpy(buffer + bytes, &cur_cu->intra.isp_mode, 1); bytes++;
+    memcpy(buffer + bytes, &cur_cu->lfnst_idx, 1); bytes++;
+    memcpy(buffer + bytes, &cur_cu->tr_idx, 1); bytes++;
 
-    fwrite(&cur_cu->split_tree, 4, 1, fp);
-    fwrite(&cur_cu->qp, 1, 1, fp);
-    fwrite(&cur_cu->intra.mode, 1, 1, fp);
-    fwrite(&cur_cu->intra.mip_flag, 1, 1, fp);
-    fwrite(&cur_cu->intra.mip_is_transposed, 1, 1, fp);
-    fwrite(&cur_cu->intra.multi_ref_idx, 1, 1, fp);
-    fwrite(&cur_cu->intra.isp_mode, 1, 1, fp);
+    uvg_pixels_blit(&lcu->rec.y[x_local + y_local * LCU_WIDTH], buffer + bytes, cu_width, cu_height, LCU_WIDTH, cu_width);
+    bytes += cu_loc->width*cu_loc->height;
+    uvg_pixels_blit(&lcu->rec.u[x_local/2 + y_local/2 * LCU_WIDTH_C], buffer + bytes, cu_width / 2, cu_height / 2, LCU_WIDTH_C, cu_width / 2);
+    bytes += cu_loc->width*cu_loc->height / 4;
+    uvg_pixels_blit(&lcu->rec.v[x_local/2 + y_local/2 * LCU_WIDTH_C], buffer + bytes, cu_width / 2, cu_height / 2, LCU_WIDTH_C, cu_width / 2);
+    bytes += cu_loc->width*cu_loc->height / 4;
 
-    fwrite(&cur_cu->lfnst_idx, 1, 1, fp);
-    fwrite(&cur_cu->tr_idx, 1, 1, fp);
-
-    uvg_pixel pixel_buffer[LCU_WIDTH * LCU_WIDTH];
-    uvg_pixels_blit(&lcu->rec.y[x_local + y_local * LCU_WIDTH], pixel_buffer, cu_width, cu_height, LCU_WIDTH, cu_width);
-    fwrite(pixel_buffer, sizeof (uvg_pixel), cu_loc->width*cu_loc->height, fp);
-
-    uvg_pixels_blit(&lcu->rec.u[x_local/2 + y_local/2 * LCU_WIDTH_C], pixel_buffer, cu_width / 2, cu_height / 2, LCU_WIDTH_C, cu_width / 2);
-    fwrite(pixel_buffer, sizeof (uvg_pixel), cu_loc->width*cu_loc->height / 4, fp);
-
-    uvg_pixels_blit(&lcu->rec.v[x_local/2 + y_local/2 * LCU_WIDTH_C], pixel_buffer, cu_width / 2, cu_height / 2, LCU_WIDTH_C, cu_width / 2);
-    fwrite(pixel_buffer, sizeof (uvg_pixel), cu_loc->width*cu_loc->height / 4, fp);
-    pthread_mutex_unlock(&file_lock);
+    zmq_send(state->send_socket, buffer, bytes, 0);
+    usleep(33000);
   }
 
   // The cabac functions assume chroma locations whereas the search uses luma locations

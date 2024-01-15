@@ -272,6 +272,12 @@ static int encoder_state_config_wfrow_init(encoder_state_t * const state,
                                           const int lcu_offset_y) {
   
   state->wfrow->lcu_offset_y = lcu_offset_y;
+  state->zmq_socket = zmq_socket(state->encoder_control->zmq_context, ZMQ_SUB);
+  zmq_connect(state->zmq_socket, "tcp://localhost:5555");
+  zmq_setsockopt(state->zmq_socket, ZMQ_SUBSCRIBE, "", 0);
+
+  state->send_socket = zmq_socket(state->encoder_control->zmq_context, ZMQ_PUB);
+  zmq_connect(state->send_socket, "tcp://localhost:5556");
   return 1;
 }
 
@@ -759,7 +765,14 @@ void uvg_encoder_state_finalize(encoder_state_t * const state) {
     encoder_state_config_frame_finalize(state);
     FREE_POINTER(state->frame);
   }
-  
+
+  if(state->zmq_socket) {
+    zmq_close(state->zmq_socket);
+  }
+  if (state->send_socket) {
+    zmq_close(state->send_socket);
+  }
+
   if (state->constraint) {
     // End of the constraint structure
     uvg_constraint_free(state);

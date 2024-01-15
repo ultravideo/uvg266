@@ -156,6 +156,7 @@ typedef struct encoder_control_t
 
   FILE* cabac_debug_file;
 
+  void *zmq_context;
 } encoder_control_t;
 
 encoder_control_t* uvg_encoder_control_init(const uvg_config *cfg);

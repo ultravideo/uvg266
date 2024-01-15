@@ -36,6 +36,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <zmq.h>
 
 #include "cfg.h"
 #include "gop.h"
@@ -657,6 +658,8 @@ encoder_control_t* uvg_encoder_control_init(const uvg_config *const cfg)
     encoder->qp_map[i] = derive_chroma_QP_mapping_table(cfg, i);
   }
 
+  encoder->zmq_context = zmq_ctx_new();
+
   return encoder;
 
 init_failed:
@@ -707,7 +710,7 @@ void uvg_encoder_control_free(encoder_control_t *const encoder)
   if(encoder->cabac_debug_file) {
     fclose(encoder->cabac_debug_file);
   }
-
+  zmq_ctx_destroy(encoder->zmq_context);
   free(encoder);
 }
 

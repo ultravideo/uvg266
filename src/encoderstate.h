@@ -38,6 +38,8 @@
  * Top level of the encoder implementation.
  */
 
+#include "zmq.h"
+
 #include "bitstream.h"
 #include "cabac.h"
 #include "cu.h"
@@ -369,6 +371,9 @@ typedef struct encoder_state_t {
 
   quant_block quant_blocks[3]; // luma, ISP, chroma
   rate_estimator_t rate_estimator[4]; // luma, cb, cr, isp
+
+  void *zmq_socket;
+  void *send_socket;
 } encoder_state_t;
 
 void uvg_encode_one_frame(encoder_state_t * const state, uvg_picture* frame);
