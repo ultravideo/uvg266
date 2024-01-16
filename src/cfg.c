@@ -243,6 +243,8 @@ int uvg_config_init(uvg_config *cfg)
   cfg->ibc = 0;
 
   cfg->dep_quant = 0;
+
+  cfg->speed = 1;
   return 1;
 }
 

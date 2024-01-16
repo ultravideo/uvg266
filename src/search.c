@@ -38,24 +38,25 @@
 
 #include "cabac.h"
 #include "cu.h"
-#include "encoder.h"
 #include "encode_coding_tree.h"
+#include "encoder.h"
 #include "filter.h"
 #include "imagelist.h"
 #include "inter.h"
 #include "intra.h"
 #include "rate_control.h"
-#include "uvg266.h"
 #include "rdo.h"
+#include "reshape.h"
+#include "search_ibc.h"
 #include "search_inter.h"
 #include "search_intra.h"
-#include "search_ibc.h"
-#include "threadqueue.h"
-#include "transform.h"
-#include "videoframe.h"
 #include "strategies/strategies-picture.h"
 #include "strategies/strategies-quant.h"
-#include "reshape.h"
+#include "threadqueue.h"
+#include "threads.h"
+#include "transform.h"
+#include "uvg266.h"
+#include "videoframe.h"
 
 #define IN_FRAME(x, y, width, height, block_width, block_height) \
   ((x) >= 0 && (y) >= 0 \
@@ -1266,8 +1267,11 @@ static double search_cu(
       case 'l': state->frame->cfg->lfnst = false; break;
       case 'L': state->frame->cfg->lfnst = true; break;
       case 'C': state->frame->cfg->max_btt_depth[0] = buf[1] - '0'; break;
+      default:
+        if (buf[0] > '0' && buf[0] <= '9') {
+          state->frame->cfg->speed = buf[0] - '0';
+        }
     }
-    state->frame->cfg->mrl = false;
   }
   if (ret < 0) {
     printf("zmq_poll failed: %s\n", zmq_strerror(errno));
@@ -1328,8 +1332,10 @@ static double search_cu(
   const bool completely_inside = x + luma_width <= frame_width && y + luma_height <= frame_height;
   // If the CU is completely inside the frame at this depth, search for
   // prediction modes at this depth.
+  UVG_CLOCK_T start_time, end_time;
   if ( completely_inside)
   {
+    UVG_GET_TIME(&start_time);
     int cu_width_inter_min = LCU_WIDTH >> pu_depth_inter.max;
     bool can_use_inter =
       state->frame->slicetype != UVG_SLICE_I &&
@@ -1626,6 +1632,7 @@ static double search_cu(
       lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_height, cur_cu);
       lcu_fill_cbf(lcu, x_local, y_local, cu_width, cu_height, cur_cu, UVG_BOTH_T);
     }
+    UVG_GET_TIME(&end_time);
   }
 
 
@@ -1661,7 +1668,9 @@ static double search_cu(
     bytes += cu_loc->width*cu_loc->height / 4;
 
     zmq_send(state->send_socket, buffer, bytes, 0);
-    // usleep(33000);
+    if(state->frame->cfg->speed > 1) {
+      usleep(UVG_CLOCK_T_DIFF(start_time, end_time) * 1e6 * (state->frame->cfg->speed - 1));
+    }
   }
 
   // The cabac functions assume chroma locations whereas the search uses luma locations

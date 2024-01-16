@@ -553,6 +553,8 @@ typedef struct uvg_config
 
   uint8_t ibc; /* \brief Intra Block Copy parameter */
   uint8_t dep_quant;
+
+  uint8_t speed;
 } uvg_config;
 
 /**
