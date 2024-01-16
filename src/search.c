@@ -1253,7 +1253,20 @@ static double search_cu(
     if (len > 0) {
       buf[len] = 0;
     }
-    printf("%d %d %d Received: %s\n", x, y, split_tree.split_tree, buf);
+    // printf("%d %d %d Received: %s\n", x, y, split_tree.split_tree, buf);
+    switch (buf[0]) {
+      case 's': state->frame->cfg->mrl = false; break;
+      case 'S': state->frame->cfg->mrl = true; break;
+      case 'm': state->frame->cfg->mip = false; break;
+      case 'M': state->frame->cfg->mip = true; break;
+      case 'p': state->frame->cfg->isp = false; break;
+      case 'P': state->frame->cfg->isp = true; break;
+      case 't': state->frame->cfg->mts = UVG_MTS_OFF; break;
+      case 'T': state->frame->cfg->mts = state->encoder_control->cfg.mts; break;
+      case 'l': state->frame->cfg->lfnst = false; break;
+      case 'L': state->frame->cfg->lfnst = true; break;
+      case 'C': state->frame->cfg->max_btt_depth[0] = buf[1] - '0'; break;
+    }
     state->frame->cfg->mrl = false;
   }
   if (ret < 0) {
