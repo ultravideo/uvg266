@@ -53,6 +53,7 @@
 #include "threadqueue.h"
 #include "videoframe.h"
 #include "reshape.h"
+#include "rate_control.h"
 
 #define JVET_S0266_VUI_length 1
 #define LUMA_ADAPTIVE_DEBLOCKING_FILTER_QP_OFFSET 1
@@ -1574,6 +1575,9 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
     state->frame->total_bits_coded = state->previous_encoder_state->frame->total_bits_coded;
   }
   state->frame->total_bits_coded += newpos - curpos;
+  if(state->encoder_control->cfg.stats_file_prefix) {
+    uvg_update_after_picture(state);
+  }
 
     state->frame->cur_gop_bits_coded = state->previous_encoder_state->frame->cur_gop_bits_coded;
   state->frame->cur_gop_bits_coded += newpos - curpos;
