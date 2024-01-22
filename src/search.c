@@ -1269,7 +1269,7 @@ static double search_cu(
       case 'C': state->frame->cfg->max_btt_depth[0] = buf[1] - '0'; break;
       default:
         if (buf[0] > '0' && buf[0] <= '9') {
-          state->frame->cfg->speed = buf[0] - '0';
+          state->frame->cfg->speed = 1 << (buf[0] - '1');
         }
     }
   }
