@@ -270,15 +270,21 @@ static void* input_read_thread(void* in_args)
       frame_in->interlacing = args->encoder->cfg.source_scan_type;
     }
 
+    usleep(33000);
     // Wait until main thread is ready to receive the next frame.
-    uvg_sem_wait(args->available_input_slots);
-    args->img_in = frame_in;
-    args->retval = retval;
-    // Unlock main_thread_mutex to notify main thread that the new img_in
-    // and retval have been placed to args.
-    uvg_sem_post(args->filled_input_slots);
+    if (uvg_sem_trywait(args->available_input_slots) == 0) {
+      args->img_in = frame_in;
+      args->retval = retval;
+      // Unlock main_thread_mutex to notify main thread that the new img_in
+      // and retval have been placed to args.
+      uvg_sem_post(args->filled_input_slots);
 
-    frame_in = NULL;
+      frame_in = NULL;
+    }
+    else {
+      args->api->picture_free(frame_in);
+      frame_in = NULL;
+    }
   }
 
 done:

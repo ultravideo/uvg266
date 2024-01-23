@@ -132,6 +132,11 @@ static INLINE void uvg_sem_wait(uvg_sem_t *sem)
     sem_wait(sem);
 }
 
+static INLINE int uvg_sem_trywait(uvg_sem_t *sem)
+{
+    return sem_trywait(sem);
+}
+
 static INLINE void uvg_sem_post(uvg_sem_t *sem)
 {
     sem_post(sem);
