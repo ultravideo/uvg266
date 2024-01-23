@@ -1669,7 +1669,10 @@ static double search_cu(
 
     zmq_send(state->send_socket, buffer, bytes, 0);
     if(state->frame->cfg->speed > 1) {
-      usleep(UVG_CLOCK_T_DIFF(start_time, end_time) * 1e6 * (state->frame->cfg->speed - 1));
+      struct timespec sleep_time;
+      sleep_time.tv_sec = 0;
+      sleep_time.tv_nsec = UVG_CLOCK_T_DIFF(start_time, end_time) * 1e9 * (state->frame->cfg->speed - 1);
+      nanosleep(&sleep_time, NULL);
     }
   }
 
