@@ -1285,6 +1285,13 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
             uvg_threadqueue_job_dep_add(job[0], bitstream_job[-state->tile->frame->width_in_lcu]);
           }
 
+          if(state->frame->num != 0) {
+            uint32_t ctu_fraction = (state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu) / (cfg->owf + 1);
+            vector2d_t ctu_pos = to_xy(ctu_fraction, state->tile->frame->width_in_lcu, state->tile->frame->height_in_lcu);
+            const lcu_order_element_t *dep_lcu = &state->lcu_order[(ctu_pos.y - 1)* state->tile->frame->width_in_lcu + ctu_pos.x];
+            uvg_threadqueue_job_dep_add(job[0], state->previous_encoder_state->tile->wf_recon_jobs[ctu_pos.y * state->tile->frame->width_in_lcu + ctu_pos.x]);
+          }
+
           uvg_threadqueue_submit(state->encoder_control->threadqueue, job[0]);
 
           uvg_threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], state->tile->wf_recon_jobs[lcu->id]);
@@ -1294,14 +1301,6 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
             uvg_threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], state->tile->wf_recon_jobs[(lcu->id / state->tile->frame->width_in_lcu - 1) * state->tile->frame->width_in_lcu]);
           }
 #endif
-        }
-
-        if(state->frame->num != 0) {
-          uint32_t ctu_fraction = (state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu) / (cfg->owf + 1);
-          vector2d_t ctu_pos = to_xy(ctu_fraction, state->tile->frame->width_in_lcu, state->tile->frame->height_in_lcu);
-          const lcu_order_element_t *dep_lcu = &state->lcu_order[ctu_pos.y * state->tile->frame->width_in_lcu + ctu_pos.x];
-          if(i == 0) printf("ctu_fraction: %d, ctu_pos: %d, %d %d\n", ctu_fraction, ctu_pos.x, ctu_pos.y, dep_lcu->id);
-          uvg_threadqueue_job_dep_add(job[0], state->previous_encoder_state->tile->wf_recon_jobs[ctu_pos.y * state->tile->frame->width_in_lcu + ctu_pos.x]);
         }
         uvg_threadqueue_submit(state->encoder_control->threadqueue, state->tile->wf_jobs[lcu->id]);
 
