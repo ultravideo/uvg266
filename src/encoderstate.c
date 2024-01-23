@@ -1001,6 +1001,125 @@ void uvg_alf_enc_process_job(void* opaque) {
   encoder_state_init_children_after_simulation(parent);
 }
 
+#define ARITHMETIC_SUM(n) ((n) * ((n) + 1) / 2)
+
+static size_t to_zscan(int x, int y, int width, int height)
+{
+  if (x + y < width && x + y < height) return ARITHMETIC_SUM(x + y) + y;
+
+  if (x + y < height && height >= width) {
+    int temp = x + y - width;
+    int r    = (temp * temp + temp) / 2;
+    return ARITHMETIC_SUM(y + x) + (width - x) - r - 1;
+  }
+
+  if (height <= x + y < width && width >= height) {
+    int temp = x + y - height;
+    int r    = (temp * temp + temp) / 2;
+    return ARITHMETIC_SUM(x + y) + y - r;
+  }
+
+  if (x + y >= height && x + y >= width)
+    return height * width - 1 - to_zscan(width - x - 1, height - y - 1, width, height);
+}
+
+
+
+static vector2d_t to_xy(uint32_t z, uint32_t width, uint32_t height) {
+  vector2d_t result = {0, 0};
+
+  if (z >= width * height) {
+    result.x = -1;
+    result.y = -1;
+    return result;
+  }
+
+  int smaller_dim = (width < height) ? width : height;
+  int corner_size = ARITHMETIC_SUM(smaller_dim - 1);
+  if (z >= 2 * corner_size && z < width * height - 2 * corner_size) {
+    if (width >= height) {
+      int y_start = (z - corner_size) / height;
+      int x_start = height + y_start;
+      int temp = z - corner_size - y_start * height;
+      result.x = x_start - temp;
+      result.y = temp;
+      return result;
+    }
+    int y_start = (z - corner_size) / width;
+    int temp = z - corner_size - y_start * width;
+    result.x = width - temp - 1;
+    result.y = y_start + temp;
+    return result;
+  }
+
+  if (z < 2 * corner_size) {
+    int offset = 0;
+    int x_start = 0;
+    int y_start = 0;
+    int t = 0;
+
+    while (z > offset) {
+      offset += 1 + t;
+      t += 1;
+      x_start += 1;
+    }
+
+    if (z == offset) {
+      result.x = x_start;
+      result.y = y_start;
+      return result;
+    }
+
+    x_start -= 1;
+    offset -= t;
+
+    while (z != offset) {
+      offset += 1;
+      y_start += 1;
+      x_start -= 1;
+    }
+
+    result.x = x_start;
+    result.y = y_start;
+    return result;
+  }
+
+  if (z >= width * height - 2 * corner_size) {
+    int offset = width * height - 1;
+    int x_start = width - 1;
+    int y_start = height - 1;
+    int t = 0;
+
+    while (z < offset) {
+      offset -= 1 + t;
+      t += 1;
+      x_start -= 1;
+    }
+
+    if (z == offset) {
+      result.x = x_start;
+      result.y = y_start;
+      return result;
+    }
+
+    x_start += 1;
+    offset += t;
+
+    while (z != offset) {
+      offset -= 1;
+      y_start -= 1;
+      x_start += 1;
+    }
+
+    result.x = x_start;
+    result.y = y_start;
+    return result;
+  }
+
+  return result; // This line is not reachable, but added to suppress compiler warning
+}
+
+
 static void encoder_state_encode_leaf(encoder_state_t * const state)
 {
   const encoder_control_t * const encoder = state->encoder_control;
@@ -1177,6 +1296,13 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
 #endif
         }
 
+        if(state->frame->num != 0) {
+          uint32_t ctu_fraction = (state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu) / (cfg->owf + 1);
+          vector2d_t ctu_pos = to_xy(ctu_fraction, state->tile->frame->width_in_lcu, state->tile->frame->height_in_lcu);
+          const lcu_order_element_t *dep_lcu = &state->lcu_order[ctu_pos.y * state->tile->frame->width_in_lcu + ctu_pos.x];
+          if(i == 0) printf("ctu_fraction: %d, ctu_pos: %d, %d %d\n", ctu_fraction, ctu_pos.x, ctu_pos.y, dep_lcu->id);
+          uvg_threadqueue_job_dep_add(job[0], state->previous_encoder_state->tile->wf_recon_jobs[ctu_pos.y * state->tile->frame->width_in_lcu + ctu_pos.x]);
+        }
         uvg_threadqueue_submit(state->encoder_control->threadqueue, state->tile->wf_jobs[lcu->id]);
 
         // The wavefront row is done when the last LCU in the row is done.
