@@ -1334,10 +1334,10 @@ static void angular_pred_generic_linear_filter(uvg_pixel* dst, uvg_pixel* ref, c
 }
 
 
-static void angular_pred_avx2_linear_filter_w4_ver(uvg_pixel* dst, uvg_pixel* ref, const int height, const int16_t* delta_int, const int16_t* delta_fract)
+// Linear interpolation filter for width 4 has a different call, since it uses premade tables for coefficients
+static void angular_pred_avx2_linear_filter_w4_ver(uvg_pixel* dst, uvg_pixel* ref, const int height, const int16_t* delta_int, const bool wide_angle_mode, const int32_t pred_mode)
 {
   const int16_t* dint = delta_int;
-  const int16_t* dfract = delta_fract;
   const __m128i v16s = _mm_set1_epi16(16);
   const __m256i vshuf = _mm256_setr_epi8(
     0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
@@ -1347,12 +1347,16 @@ static void angular_pred_avx2_linear_filter_w4_ver(uvg_pixel* dst, uvg_pixel* re
   );
   const __m128i vsub = _mm_set1_epi16(0x0020); // 32 and 0 as 8-bit signed integers
 
+  // TODO: Different modes have differing amounts of unique coefficient vectors. Make an offset table, indexed by mode to get correct table offset.
+  const int table_offset = wide_angle_mode ? 0 : (pred_mode <= 34 ? (pred_mode - 2) * 16 : (66 - pred_mode) * 16);
+  
+
   // Height has to be at least 4, handle 4 lines at once
   for (int y = 0; y < height; y += 4) {
     const __m256i vidx = _mm256_setr_epi64x(dint[0]+1, dint[1]+1, dint[2]+1, dint[3]+1);
     dint += 4;
 
-    const __m128i vcoeff = _mm_load_si128((const __m128i*)intra_chroma_linear_interpolation_w4_m40);
+    const __m128i vcoeff = _mm_load_si128((const __m128i*)&intra_chroma_linear_interpolation_w4[table_offset]);
 
     __m256i vsrc;
     vsrc = _mm256_i64gather_epi64((const long long int*)ref, vidx, 1);
@@ -2215,7 +2219,7 @@ static void uvg_angular_pred_avx2(
         // Do 2-tap linear filtering for chroma channels
         if (vertical_mode) {
           switch (width) {
-            case  4: angular_pred_avx2_linear_filter_w4_ver(dst, ref_main, height, delta_int, delta_fract); break;
+            case  4: angular_pred_avx2_linear_filter_w4_ver(dst, ref_main, height, delta_int, wide_angle_mode, pred_mode); break;
             case  8: angular_pred_avx2_linear_filter_w8_ver(dst, ref_main, height, delta_int, delta_fract); break;
             case 16: angular_pred_avx2_linear_filter_w16_ver(dst, ref_main, height, delta_int, delta_fract); break;
             case 32: angular_pred_avx2_linear_filter_w32_ver(dst, ref_main, height, delta_int, delta_fract); break;
