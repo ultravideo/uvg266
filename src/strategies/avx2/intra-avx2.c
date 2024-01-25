@@ -1348,15 +1348,19 @@ static void angular_pred_avx2_linear_filter_w4_ver(uvg_pixel* dst, uvg_pixel* re
   const __m128i vsub = _mm_set1_epi16(0x0020); // 32 and 0 as 8-bit signed integers
 
   // TODO: Different modes have differing amounts of unique coefficient vectors. Make an offset table, indexed by mode to get correct table offset.
-  const int table_offset = wide_angle_mode ? 0 : (pred_mode <= 34 ? (pred_mode - 2) * 16 : (66 - pred_mode) * 16);
-  
+  const int mode_idx = wide_angle_mode ? 0 : (pred_mode <= 34 ? (pred_mode - 2) : (66 - pred_mode));
+  const int table_offset = coeff_table_mode_offsets[mode_idx];
+  const int vnum = coeff_vector128_num_by_mode[mode_idx];
+  int offset_num = 0;
 
   // Height has to be at least 4, handle 4 lines at once
   for (int y = 0; y < height; y += 4) {
+    const int offset = table_offset + (offset_num * 16);
     const __m256i vidx = _mm256_setr_epi64x(dint[0]+1, dint[1]+1, dint[2]+1, dint[3]+1);
     dint += 4;
 
-    const __m128i vcoeff = _mm_load_si128((const __m128i*)&intra_chroma_linear_interpolation_w4[table_offset]);
+    const __m128i vcoeff0 = _mm_load_si128((const __m128i*)&intra_chroma_linear_interpolation_w4[offset]);
+    const __m128i vcoeff1 = vnum == 1 ? vcoeff0 : _mm_load_si128((const __m128i*)&intra_chroma_linear_interpolation_w4[offset + 16]);
 
     __m256i vsrc;
     vsrc = _mm256_i64gather_epi64((const long long int*)ref, vidx, 1);
@@ -1365,8 +1369,8 @@ static void angular_pred_avx2_linear_filter_w4_ver(uvg_pixel* dst, uvg_pixel* re
     __m128i vsrc0 = _mm256_extracti128_si256(vsrc, 0);
     __m128i vsrc1 = _mm256_extracti128_si256(vsrc, 1);
     
-    __m128i res0 = _mm_maddubs_epi16(vsrc0, vcoeff);
-    __m128i res1 = _mm_maddubs_epi16(vsrc1, vcoeff);
+    __m128i res0 = _mm_maddubs_epi16(vsrc0, vcoeff0);
+    __m128i res1 = _mm_maddubs_epi16(vsrc1, vcoeff1);
     res0 = _mm_add_epi16(res0, v16s);
     res1 = _mm_add_epi16(res1, v16s);
     res0 = _mm_srai_epi16(res0, 5);
@@ -1374,6 +1378,10 @@ static void angular_pred_avx2_linear_filter_w4_ver(uvg_pixel* dst, uvg_pixel* re
 
     _mm_store_si128((__m128i*)dst, _mm_packus_epi16(res0, res1));
     dst += 16;
+    offset_num += 2;
+    if (offset_num >= vnum) {
+      offset_num = 0;
+    }
   }
 }
 
