@@ -40,6 +40,15 @@ public:
         }
     }
 
+    int trywait()
+    {
+        std::unique_lock<std::mutex> lck(mtx_);
+        if (val_ > 0) {
+          --val_;
+            return 0;
+        }
+        return -1;
+    }
 
 private:
 
@@ -69,4 +78,9 @@ int sem_post(sem_t* sem) {
 int sem_wait(sem_t* sem) {
     static_cast<Semaphore*>(*sem)->wait();
     return 0;
+}
+
+int sem_trywait(sem_t* sem)
+{
+     return static_cast<Semaphore*>(*sem)->trywait();
 }

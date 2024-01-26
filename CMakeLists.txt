@@ -71,7 +71,7 @@ if(NOT EXISTS "${PROJECT_SOURCE_DIR}/greatest/greatest.h")
 endif()
 
 
-find_package(ZeroMQ REQUIRED)
+find_package(ZeroMQ REQUIRED SHARED)
 # Grab <year>-<month>-<day> timestamp for debug purposes
 string(TIMESTAMP CMAKE_BUILD_DATE %Y-%m-%d)
 
@@ -144,6 +144,7 @@ endif()
 target_include_directories(uvg266 PUBLIC src)
 target_include_directories(uvg266 PUBLIC src/extras)
 target_include_directories(uvg266 PUBLIC src/strategies)
+target_include_directories(uvg266 PUBLIC "G:/Local/sainio/Documents/libzmq/out/install/include")
 
 file(GLOB LIB_SOURCES_STRATEGIES_AVX2 RELATIVE ${PROJECT_SOURCE_DIR} "src/strategies/avx2/*.c")
 file(GLOB LIB_SOURCES_STRATEGIES_SSE41 RELATIVE ${PROJECT_SOURCE_DIR} "src/strategies/sse41/*.c")
@@ -165,7 +166,7 @@ endif()
 
 add_executable(uvg266-bin ${CLI_SOURCES})
 
-target_link_libraries(uvg266-bin PUBLIC uvg266 zmq)
+target_link_libraries(uvg266-bin PUBLIC uvg266 "G:/Local/sainio/Documents/libzmq/out/install/lib/libzmq-mt-4_3_6.lib")
 
 set_target_properties(uvg266-bin PROPERTIES OUTPUT_NAME uvg266)
 set_target_properties(uvg266-bin PROPERTIES RUNTIME_OUTPUT_NAME uvg266)

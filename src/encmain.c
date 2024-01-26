@@ -270,7 +270,12 @@ static void* input_read_thread(void* in_args)
       frame_in->interlacing = args->encoder->cfg.source_scan_type;
     }
 
+#if defined(__GNUC__) && !defined(__MINGW32__)
     usleep(33000);
+#else
+    Sleep(33);
+#endif
+
     // Wait until main thread is ready to receive the next frame.
     if (uvg_sem_trywait(args->available_input_slots) == 0) {
       args->img_in = frame_in;

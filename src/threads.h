@@ -76,6 +76,7 @@
 #define UVG_GET_TIME(clock_t) { GetSystemTimeAsFileTime(clock_t); }
 // _FILETIME has 32bit low and high part of 64bit 100ns resolution timestamp (since 12:00 AM January 1, 1601)
 #define UVG_CLOCK_T_AS_DOUBLE(ts) ((double)(((uint64_t)(ts).dwHighDateTime)<<32 | (uint64_t)(ts).dwLowDateTime) / 1e7)
+#define UVG_CLOCK_T_AS_UINT64_T(ts) (((uint64_t)(ts).dwHighDateTime)<<32 | (((uint64_t)(ts).dwLowDateTime) * 100))
 #define UVG_CLOCK_T_DIFF(start, stop) ((double)((((uint64_t)(stop).dwHighDateTime)<<32 | (uint64_t)(stop).dwLowDateTime) - \
                                   (((uint64_t)(start).dwHighDateTime)<<32 | (uint64_t)(start).dwLowDateTime)) / 1e7)
 

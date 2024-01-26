@@ -34,7 +34,6 @@
 
 #include <limits.h>
 #include <string.h>
-#include <unistd.h>
 
 #include "cabac.h"
 #include "cu.h"
@@ -57,6 +56,27 @@
 #include "transform.h"
 #include "uvg266.h"
 #include "videoframe.h"
+
+
+#if defined(__GNUC__) && !defined(__MINGW32__)
+#include <unistd.h>
+#else
+#include <windows.h>
+void          usleep(__int64 usec)
+{
+  HANDLE        timer;
+  LARGE_INTEGER ft;
+
+  ft.QuadPart = -(
+    10 *
+    usec); // Convert to 100 nanosecond interval, negative value indicates relative time
+
+  timer = CreateWaitableTimer(NULL, TRUE, NULL);
+  SetWaitableTimer(timer, &ft, 0, NULL, NULL, 0);
+  WaitForSingleObject(timer, INFINITE);
+  CloseHandle(timer);
+}
+#endif
 
 #define IN_FRAME(x, y, width, height, block_width, block_height) \
   ((x) >= 0 && (y) >= 0 \
@@ -1639,13 +1659,26 @@ static double search_cu(
   if (cur_cu->type != CU_NOTSET) {
     uint8_t type = 0;
     uint8_t buffer[8192];
-    struct timespec ts;
-    clock_gettime(CLOCK_REALTIME, &ts);
-    uint64_t timestamp = ts.tv_sec * 1000000000 + ts.tv_nsec;
+    UVG_CLOCK_T time;
+    UVG_GET_TIME(&time);
+    uint64_t time_high = time.dwHighDateTime & 0x000fffff;
+    time_high <<= 32;
+    uint64_t time_low  = time.dwLowDateTime;
+    uint64_t timestamp = time_high | time_low;
+    timestamp *= 100;
+    // printf("%llu\n", timestamp);
     uint64_t bytes = 0;
     memcpy(buffer, &type, 1); bytes++;
     memcpy(buffer + bytes, &timestamp, 8); bytes+=8;
     memcpy(buffer + bytes, &state->frame->num, 1); bytes++;
+    if (cu_height == 64 && cu_width == 64) {
+      printf("%llu\n", timestamp);
+      printf("%llx\n", timestamp);
+      for (int i = 0; i < bytes; i++) {
+        printf("%2x", buffer[i]);
+      }
+      printf("\n");
+    }
     memcpy(buffer + bytes, &cu_loc->x, 2); bytes+=2;
     memcpy(buffer + bytes, &cu_loc->y, 2); bytes+=2;
     memcpy(buffer + bytes, &cu_loc->width, 1); bytes++;
@@ -1659,6 +1692,13 @@ static double search_cu(
     memcpy(buffer + bytes, &cur_cu->intra.isp_mode, 1); bytes++;
     memcpy(buffer + bytes, &cur_cu->lfnst_idx, 1); bytes++;
     memcpy(buffer + bytes, &cur_cu->tr_idx, 1); bytes++;
+    if (cu_height == 64 && cu_width == 64) {
+      for (int i = 0; i < bytes; i++) {
+        printf("%2x", buffer[i]);
+      }
+      printf("\n");
+    }
+
 
     uvg_pixels_blit(&lcu->rec.y[x_local + y_local * LCU_WIDTH], buffer + bytes, cu_width, cu_height, LCU_WIDTH, cu_width);
     bytes += cu_loc->width*cu_loc->height;
@@ -1668,11 +1708,18 @@ static double search_cu(
     bytes += cu_loc->width*cu_loc->height / 4;
 
     zmq_send(state->send_socket, buffer, bytes, 0);
-    if(state->frame->cfg->speed > 1) {
+    if (state->frame->cfg->speed > 1) {
+#if defined(__GNUC__) && !defined(__MINGW32__)
       struct timespec sleep_time;
       sleep_time.tv_sec = 0;
       sleep_time.tv_nsec = UVG_CLOCK_T_DIFF(start_time, end_time) * 1e9 * (state->frame->cfg->speed - 1);
       nanosleep(&sleep_time, NULL);
+#else
+      usleep(
+        UVG_CLOCK_T_DIFF(start_time, end_time) * 1e6 *
+        (state->frame->cfg->speed - 1));
+#endif
+
     }
   }
 
@@ -2004,10 +2051,15 @@ static double search_cu(
 
     if (cost <= best_split_cost) {
       uint8_t type = 1;
-      uint8_t buffer[8192];
-      struct timespec ts;
-      clock_gettime(CLOCK_REALTIME, &ts);
-      uint64_t timestamp = ts.tv_sec * 1000000000 + ts.tv_nsec;
+      uint8_t     buffer[8192];
+      UVG_CLOCK_T time;
+      UVG_GET_TIME(&time);
+      uint64_t time_high = time.dwHighDateTime & 0x000fffff;
+      time_high <<= 32;
+      uint64_t time_low  = time.dwLowDateTime;
+      uint64_t timestamp = time_high | time_low;
+      timestamp *= 100;
+      //printf("%llu\n", timestamp);
       uint64_t bytes = 0;
       memcpy(buffer, &type, 1); bytes++;
       memcpy(buffer + bytes, &timestamp, 8); bytes+=8;
