@@ -1345,12 +1345,11 @@ static void angular_pred_avx2_linear_filter_w4_ver(uvg_pixel* dst, uvg_pixel* re
     0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
     0x08, 0x09, 0x09, 0x0a, 0x0a, 0x0b, 0x0b, 0x0c
   );
-  const __m128i vsub = _mm_set1_epi16(0x0020); // 32 and 0 as 8-bit signed integers
 
-  // TODO: Different modes have differing amounts of unique coefficient vectors. Make an offset table, indexed by mode to get correct table offset.
   const int mode_idx = wide_angle_mode ? 0 : (pred_mode <= 34 ? (pred_mode - 2) : (66 - pred_mode));
   const int table_offset = coeff_table_mode_offsets[mode_idx];
   const int vnum = coeff_vector128_num_by_mode[mode_idx];
+  const int modulo = vnum - 1;
   int offset_num = 0;
 
   // Height has to be at least 4, handle 4 lines at once
@@ -1379,9 +1378,8 @@ static void angular_pred_avx2_linear_filter_w4_ver(uvg_pixel* dst, uvg_pixel* re
     _mm_store_si128((__m128i*)dst, _mm_packus_epi16(res0, res1));
     dst += 16;
     offset_num += 2;
-    if (offset_num >= vnum) {
-      offset_num = 0;
-    }
+    // This resets the offset number to 0 when it reaches the end of the table. Only works on powers of 2.
+    offset_num &= modulo;
   }
 }
 
@@ -1493,6 +1491,174 @@ static void angular_pred_avx2_linear_filter_w32_ver(uvg_pixel* dst, uvg_pixel* r
     res1 = _mm256_srai_epi16(res1, 5);
 
     _mm256_store_si256((__m256i*)dst, _mm256_packus_epi16(res0, res1));
+    dst += 32;
+  }
+}
+
+
+static void angular_pred_avx2_linear_filter_w4_hor(uvg_pixel* dst, uvg_pixel* ref, const int height, const int16_t* delta_int, const int16_t* delta_fract)
+{
+  const int16_t* dint = delta_int;
+  const int16_t* dfract = delta_fract;
+  const __m128i v16s = _mm_set1_epi16(16);
+
+  int8_t tmp_coeff[16];
+  for (int x = 0, offset = 0; x < 4; ++x, offset += 2) {
+    tmp_coeff[offset + 0] = 32 - dfract[x];
+    tmp_coeff[offset + 1] = dfract[x];
+    tmp_coeff[8 + offset + 0] = 32 - dfract[x];
+    tmp_coeff[8 + offset + 1] = dfract[x];
+  }
+  __m128i* vcoeff = (__m128i*) &tmp_coeff[0];
+
+  // Height has to be at least 4, handle 4 lines at once
+  for (int y = 0; y < height; y += 4) {
+    // TODO: find a more efficient way to do this
+    uvg_pixel src[32];
+    for (int yy = 0; yy < 4; ++yy) {
+      for (int x = 0, offset = 0; x < 4; ++x, offset += 2) {
+        const int ref_offset = dint[x] + y + yy + 1;
+        src[yy * 8 + offset + 0] = ref[ref_offset + 0];
+        src[yy * 8 + offset + 1] = ref[ref_offset + 1];
+      }
+    }
+    __m128i* vsrc0 = (__m128i*)&src[0];
+    __m128i* vsrc1 = (__m128i*)&src[16];
+    
+    __m128i res0 = _mm_maddubs_epi16(*vsrc0, *vcoeff);
+    __m128i res1 = _mm_maddubs_epi16(*vsrc1, *vcoeff);
+    res0 = _mm_add_epi16(res0, v16s);
+    res1 = _mm_add_epi16(res1, v16s);
+    res0 = _mm_srai_epi16(res0, 5);
+    res1 = _mm_srai_epi16(res1, 5);
+
+    _mm_store_si128((__m128i*)dst, _mm_packus_epi16(res0, res1));
+    dst += 16;
+  }
+}
+
+
+static void angular_pred_avx2_linear_filter_w8_hor(uvg_pixel* dst, uvg_pixel* ref, const int height, const int16_t* delta_int, const int16_t* delta_fract)
+{
+  const int16_t* dint = delta_int;
+  const int16_t* dfract = delta_fract;
+  const __m128i v16s = _mm_set1_epi16(16);
+
+  int8_t tmp_coeff[16];
+  for (int x = 0, offset = 0; x < 8; ++x, offset += 2) {
+    tmp_coeff[offset + 0] = 32 - dfract[x];
+    tmp_coeff[offset + 1] = dfract[x];
+  }
+  __m128i* vcoeff = (__m128i*) &tmp_coeff[0];
+
+  // Height has to be at least 2, handle 2 lines at once
+  for (int y = 0; y < height; y += 2) {
+    // TODO: find a more efficient way to do this
+    uvg_pixel src[32];
+    for (int yy = 0; yy < 2; ++yy) {
+      for (int x = 0, offset = 0; x < 8; ++x, offset += 2) {
+        const int ref_offset = dint[x] + y + yy + 1;
+        src[yy * 16 + offset + 0] = ref[ref_offset + 0];
+        src[yy * 16 + offset + 1] = ref[ref_offset + 1];
+      }
+    }
+
+    __m128i* vsrc0 = (__m128i*) & src[0];
+    __m128i* vsrc1 = (__m128i*) & src[16];
+
+    __m128i res0 = _mm_maddubs_epi16(*vsrc0, *vcoeff);
+    __m128i res1 = _mm_maddubs_epi16(*vsrc1, *vcoeff);
+    res0 = _mm_add_epi16(res0, v16s);
+    res1 = _mm_add_epi16(res1, v16s);
+    res0 = _mm_srai_epi16(res0, 5);
+    res1 = _mm_srai_epi16(res1, 5);
+
+    _mm_store_si128((__m128i*)dst, _mm_packus_epi16(res0, res1));
+    dst += 16;
+  }
+}
+
+
+static void angular_pred_avx2_linear_filter_w16_hor(uvg_pixel* dst, uvg_pixel* ref, const int height, const int16_t* delta_int, const int16_t* delta_fract)
+{
+  const int16_t* dint = delta_int;
+  const int16_t* dfract = delta_fract;
+  const __m128i v16s = _mm_set1_epi16(16);
+
+  int8_t tmp_coeff[32];
+  for (int x = 0, offset = 0; x < 16; ++x, offset += 2) {
+    tmp_coeff[offset + 0] = 32 - dfract[x];
+    tmp_coeff[offset + 1] = dfract[x];
+  }
+  __m128i* vcoeff0 = (__m128i*) &tmp_coeff[0];
+  __m128i* vcoeff1 = (__m128i*) &tmp_coeff[16];
+
+  // Height has to be at least 1, handle 1 line at a time
+  for (int y = 0; y < height; ++y) {
+    // TODO: find a more efficient way to do this
+    uvg_pixel src[32];
+    for (int x = 0, offset = 0; x < 16; ++x, offset += 2) {
+      const int ref_offset = dint[x] + y + 1;
+      src[offset + 0] = ref[ref_offset + 0];
+      src[offset + 1] = ref[ref_offset + 1];
+    }
+    
+    __m128i* vsrc0 = (__m128i*) & src[0];
+    __m128i* vsrc1 = (__m128i*) & src[16];
+
+    __m128i res0 = _mm_maddubs_epi16(*vsrc0, *vcoeff0);
+    __m128i res1 = _mm_maddubs_epi16(*vsrc1, *vcoeff1);
+    res0 = _mm_add_epi16(res0, v16s);
+    res1 = _mm_add_epi16(res1, v16s);
+    res0 = _mm_srai_epi16(res0, 5);
+    res1 = _mm_srai_epi16(res1, 5);
+
+    _mm_store_si128((__m128i*)dst, _mm_packus_epi16(res0, res1));
+    dst += 16;
+  }
+}
+
+
+static void angular_pred_avx2_linear_filter_w32_hor(uvg_pixel* dst, uvg_pixel* ref, const int height, const int16_t* delta_int, const int16_t* delta_fract)
+{
+  const int16_t* dint = delta_int;
+  const int16_t* dfract = delta_fract;
+  const __m256i v16s = _mm256_set1_epi16(16);
+
+  int8_t tmp_coeff[64];
+  for (int x = 0, offset = 0; x < 32; ++x, offset += 2) {
+    tmp_coeff[offset + 0] = 32 - dfract[x];
+    tmp_coeff[offset + 1] = dfract[x];
+  }
+  __m256i* vcoeff0 = (__m256i*) &tmp_coeff[0];
+  __m256i* vcoeff1 = (__m256i*) &tmp_coeff[32];
+
+  // Height has to be at least 1, handle 1 line at a time
+  for (int y = 0; y < height; ++y) {
+    // TODO: find a more efficient way to do this
+    uvg_pixel src[64];
+    for (int x = 0, offset = 0; x < 32; ++x, offset += 2) {
+      const int ref_offset = dint[x] + y + 1;
+      src[offset + 0] = ref[ref_offset + 0];
+      src[offset + 1] = ref[ref_offset + 1];
+    }
+
+
+    __m256i* vsrc0 = (__m256i*) &src[0];
+    __m256i* vsrc1 = (__m256i*) &src[32];
+
+    __m256i res0 = _mm256_maddubs_epi16(*vsrc0, *vcoeff0);
+    __m256i res1 = _mm256_maddubs_epi16(*vsrc1, *vcoeff1);
+    res0 = _mm256_add_epi16(res0, v16s);
+    res1 = _mm256_add_epi16(res1, v16s);
+    res0 = _mm256_srai_epi16(res0, 5);
+    res1 = _mm256_srai_epi16(res1, 5);
+    //res0 = _mm256_permute4x64_epi64(res0, _MM_SHUFFLE(3, 1, 2, 0));
+    //res1 = _mm256_permute4x64_epi64(res1, _MM_SHUFFLE(3, 1, 2, 0));
+    __m256i res_final = _mm256_packus_epi16(res0, res1);
+    res_final = _mm256_permute4x64_epi64(res_final, _MM_SHUFFLE(3, 1, 2, 0));
+
+    _mm256_store_si256((__m256i*)dst, res_final);
     dst += 32;
   }
 }
@@ -2237,11 +2403,11 @@ static void uvg_angular_pred_avx2(
           }
         }
         else {
-          switch (width) { // TODO: this generic solution does not work for horizontal modes. Start by implementing the vertical prediction first
-            case  4: angular_pred_generic_linear_filter(dst, ref_main, width, height, delta_int, delta_fract); break;
-            case  8: angular_pred_generic_linear_filter(dst, ref_main, width, height, delta_int, delta_fract); break;
-            case 16: angular_pred_generic_linear_filter(dst, ref_main, width, height, delta_int, delta_fract); break;
-            case 32: angular_pred_generic_linear_filter(dst, ref_main, width, height, delta_int, delta_fract); break;
+          switch (width) {
+            case  4: angular_pred_avx2_linear_filter_w4_hor(dst, ref_main, height, delta_int, delta_fract); break;
+            case  8: angular_pred_avx2_linear_filter_w8_hor(dst, ref_main, height, delta_int, delta_fract); break;
+            case 16: angular_pred_avx2_linear_filter_w16_hor(dst, ref_main, height, delta_int, delta_fract); break;
+            case 32: angular_pred_avx2_linear_filter_w32_hor(dst, ref_main, height, delta_int, delta_fract); break;
             default:
               assert(false && "Intra angular predicion: illegal chroma width.\n");
               break;
