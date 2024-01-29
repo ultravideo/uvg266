@@ -8,6 +8,14 @@ ALIGNED(32) const int8_t  intra_chroma_linear_interpolation_w4_m40[] = {
   16,  16,  16,  16,  16,  16,  16,  16,  32,   0,  32,   0,  32,   0,  32,   0,
 };
 
+// Another test table
+ALIGNED(32) const int8_t intra_chroma_linear_interpolation_shuffle_w4_m30[] = {
+  0x02, 0x03, 0x01, 0x02, 0x01, 0x02, 0x00, 0x01,
+  0x03, 0x04, 0x02, 0x03, 0x02, 0x03, 0x01, 0x02,
+  0x0a, 0x0b, 0x09, 0x0a, 0x09, 0x0a, 0x08, 0x09,
+  0x0b, 0x0c, 0x0a, 0x0b, 0x0a, 0x0b, 0x09, 0x0a
+};
+
 // The number of unique 128-bit coefficient vectors for a given prediction mode. Applicable for width 4 chroma linear interpolation.
 const int8_t coeff_vector128_num_by_mode[33] = {
   1, 16,  8, 16, 4,  8, 1,  8, 4,  8, 2,  8, 4, 16,  8, 16,

@@ -1502,6 +1502,9 @@ static void angular_pred_avx2_linear_filter_w4_hor(uvg_pixel* dst, uvg_pixel* re
   const int16_t* dfract = delta_fract;
   const __m128i v16s = _mm_set1_epi16(16);
 
+  // TODO: hard coded some stuff to test mode 30 with new faster system
+
+  // TODO: fetch coeffs (filter weights) from table instead of constructing
   int8_t tmp_coeff[16];
   for (int x = 0, offset = 0; x < 4; ++x, offset += 2) {
     tmp_coeff[offset + 0] = 32 - dfract[x];
@@ -1511,10 +1514,23 @@ static void angular_pred_avx2_linear_filter_w4_hor(uvg_pixel* dst, uvg_pixel* re
   }
   __m128i* vcoeff = (__m128i*) &tmp_coeff[0];
 
+  __m128i vshuf[2];
+  vshuf[0] = _mm_load_si128((const __m128i*) & intra_chroma_linear_interpolation_shuffle_w4_m30[0]);
+  vshuf[1] = _mm_load_si128((const __m128i*) & intra_chroma_linear_interpolation_shuffle_w4_m30[16]);
+
+  // Prepare sources
+  const int16_t min_offset = 1 + MIN(dint[0], dint[3]);
+  __m128i vsrc[16];
+  for (int y = 0, d = 0; y < height; y += 4, d += 2) {
+    __m128i vidx = _mm_set_epi64x((long long int)(min_offset + y + 2), (long long int)(min_offset + y + 0));
+    __m128i vsrc_tmp = _mm_i64gather_epi64((const long long*)ref, vidx, 1);
+    vsrc[d + 0] = _mm_shuffle_epi8(vsrc_tmp, vshuf[0]);
+    vsrc[d + 1] = _mm_shuffle_epi8(vsrc_tmp, vshuf[1]);
+  }
+
   // Height has to be at least 4, handle 4 lines at once
-  for (int y = 0; y < height; y += 4) {
-    // TODO: find a more efficient way to do this
-    uvg_pixel src[32];
+  for (int y = 0, s = 0; y < height; y += 4, s += 2) {
+    /*uvg_pixel src[32];
     for (int yy = 0; yy < 4; ++yy) {
       for (int x = 0, offset = 0; x < 4; ++x, offset += 2) {
         const int ref_offset = dint[x] + y + yy + 1;
@@ -1522,11 +1538,12 @@ static void angular_pred_avx2_linear_filter_w4_hor(uvg_pixel* dst, uvg_pixel* re
         src[yy * 8 + offset + 1] = ref[ref_offset + 1];
       }
     }
-    __m128i* vsrc0 = (__m128i*)&src[0];
-    __m128i* vsrc1 = (__m128i*)&src[16];
     
-    __m128i res0 = _mm_maddubs_epi16(*vsrc0, *vcoeff);
-    __m128i res1 = _mm_maddubs_epi16(*vsrc1, *vcoeff);
+    __m128i* vsrc0 = (__m128i*) & src[0];
+    __m128i* vsrc1 = (__m128i*) & src[16];*/
+
+    __m128i res0 = _mm_maddubs_epi16(vsrc[s + 0], *vcoeff);
+    __m128i res1 = _mm_maddubs_epi16(vsrc[s + 1], *vcoeff);
     res0 = _mm_add_epi16(res0, v16s);
     res1 = _mm_add_epi16(res1, v16s);
     res0 = _mm_srai_epi16(res0, 5);
