@@ -1661,24 +1661,19 @@ static double search_cu(
     uint8_t buffer[8192];
     UVG_CLOCK_T time;
     UVG_GET_TIME(&time);
+#ifdef _MSC_VER
     uint64_t time_high = time.dwHighDateTime & 0x000fffff;
     time_high <<= 32;
     uint64_t time_low  = time.dwLowDateTime;
     uint64_t timestamp = time_high | time_low;
     timestamp *= 100;
-    // printf("%llu\n", timestamp);
+#else
+    uint64_t timestamp = time.tv_sec * 1000000000 + time.tv_nsec;
+#endif
     uint64_t bytes = 0;
     memcpy(buffer, &type, 1); bytes++;
     memcpy(buffer + bytes, &timestamp, 8); bytes+=8;
     memcpy(buffer + bytes, &state->frame->num, 1); bytes++;
-    if (cu_height == 64 && cu_width == 64) {
-      printf("%llu\n", timestamp);
-      printf("%llx\n", timestamp);
-      for (int i = 0; i < bytes; i++) {
-        printf("%2x", buffer[i]);
-      }
-      printf("\n");
-    }
     memcpy(buffer + bytes, &cu_loc->x, 2); bytes+=2;
     memcpy(buffer + bytes, &cu_loc->y, 2); bytes+=2;
     memcpy(buffer + bytes, &cu_loc->width, 1); bytes++;
@@ -1692,12 +1687,12 @@ static double search_cu(
     memcpy(buffer + bytes, &cur_cu->intra.isp_mode, 1); bytes++;
     memcpy(buffer + bytes, &cur_cu->lfnst_idx, 1); bytes++;
     memcpy(buffer + bytes, &cur_cu->tr_idx, 1); bytes++;
-    if (cu_height == 64 && cu_width == 64) {
-      for (int i = 0; i < bytes; i++) {
-        printf("%2x", buffer[i]);
-      }
-      printf("\n");
-    }
+    float float_cost = (float)intra_search.cost;
+    float float_bits = (float)intra_search.bits;
+    float float_dist = (float)intra_search.distortion;
+    memcpy(buffer + bytes, &float_cost, 4); bytes+=4;
+    memcpy(buffer + bytes, &float_bits, 4); bytes+=4;
+    memcpy(buffer + bytes, &float_dist, 4); bytes+=4;
 
 
     uvg_pixels_blit(&lcu->rec.y[x_local + y_local * LCU_WIDTH], buffer + bytes, cu_width, cu_height, LCU_WIDTH, cu_width);
@@ -2054,12 +2049,15 @@ static double search_cu(
       uint8_t     buffer[8192];
       UVG_CLOCK_T time;
       UVG_GET_TIME(&time);
+      #ifdef _MSC_VER
       uint64_t time_high = time.dwHighDateTime & 0x000fffff;
       time_high <<= 32;
       uint64_t time_low  = time.dwLowDateTime;
       uint64_t timestamp = time_high | time_low;
       timestamp *= 100;
-      //printf("%llu\n", timestamp);
+      #else
+      uint64_t timestamp = time.tv_sec * 1000000000 + time.tv_nsec;
+      #endif
       uint64_t bytes = 0;
       memcpy(buffer, &type, 1); bytes++;
       memcpy(buffer + bytes, &timestamp, 8); bytes+=8;
@@ -2077,6 +2075,12 @@ static double search_cu(
       memcpy(buffer + bytes, &cur_cu->intra.isp_mode, 1); bytes++;
       memcpy(buffer + bytes, &cur_cu->lfnst_idx, 1); bytes++;
       memcpy(buffer + bytes, &cur_cu->tr_idx, 1); bytes++;
+      float float_cost = (float)cost;
+      float float_bits = (float)((cost - intra_search.distortion) / state->lambda);
+      float float_dist = (float)intra_search.distortion;
+      memcpy(buffer + bytes, &float_cost, 4); bytes+=4;
+      memcpy(buffer + bytes, &float_bits, 4); bytes+=4;
+      memcpy(buffer + bytes, &float_dist, 4); bytes+=4;
 
       uvg_pixels_blit(&lcu->rec.y[x_local + y_local * LCU_WIDTH], buffer + bytes, cu_width, cu_height, LCU_WIDTH, cu_width);
       bytes += cu_loc->width*cu_loc->height;
