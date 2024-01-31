@@ -1609,46 +1609,48 @@ static void angular_pred_avx2_linear_filter_w16_hor(uvg_pixel* dst, uvg_pixel* r
 }
 
 
-static void angular_pred_avx2_linear_filter_w32_hor(uvg_pixel* dst, uvg_pixel* ref, const int height, const int16_t* delta_int, const int16_t* delta_fract)
+static void angular_pred_avx2_linear_filter_w32_hor(uvg_pixel* dst, uvg_pixel* ref, const int height, const int mode, const int16_t* delta_int, const int16_t* delta_fract)
 {
   const int16_t* dint = delta_int;
   const int16_t* dfract = delta_fract;
   const __m256i v16s = _mm256_set1_epi16(16);
+  const int16_t weigth_offset = (mode - 2) * 64;
+  const int16_t shuf_offset = (mode - 2) * 64;
 
-  int8_t tmp_coeff[64];
-  for (int x = 0, offset = 0; x < 32; ++x, offset += 2) {
-    tmp_coeff[offset + 0] = 32 - dfract[x];
-    tmp_coeff[offset + 1] = dfract[x];
-  }
-  __m256i* vcoeff0 = (__m256i*) &tmp_coeff[0];
-  __m256i* vcoeff1 = (__m256i*) &tmp_coeff[32];
+  __m256i vcoeff0 = _mm256_load_si256((const __m256i*) &intra_chroma_linear_interpolation_weights_w32_hor[weigth_offset + 0]);
+  __m256i vcoeff1 = _mm256_load_si256((const __m256i*) &intra_chroma_linear_interpolation_weights_w32_hor[weigth_offset + 32]);
+  __m128i vshuf0 = _mm_load_si128((const __m128i*) &intra_chroma_linear_interpolation_shuffle_vectors_w32_hor[shuf_offset + 0]);
+  __m128i vshuf1 = _mm_load_si128((const __m128i*) &intra_chroma_linear_interpolation_shuffle_vectors_w32_hor[shuf_offset + 16]);
+  __m128i vshuf2 = _mm_load_si128((const __m128i*) &intra_chroma_linear_interpolation_shuffle_vectors_w32_hor[shuf_offset + 32]);
+  __m128i vshuf3 = _mm_load_si128((const __m128i*) &intra_chroma_linear_interpolation_shuffle_vectors_w32_hor[shuf_offset + 48]);
 
-  // Height has to be at least 1, handle 1 line at a time
+  // Load refs from smallest index onwards, shuffle will handle the rest. The smallest index will be at one of these delta int table indices
+  // Due to width, two loads are needed, and therefore two offsets. Cannot use 256-bit loads due to alignment issues.
+  const int16_t min_offset0 = 1 + MIN(dint[0], dint[15]);
+  const int16_t min_offset1 = 1 + MIN(dint[16], dint[31]);
+
+  // Height has to be at least 2. Due to width, handle 1 line at a time
   for (int y = 0; y < height; ++y) {
-    // TODO: find a more efficient way to do this
-    uvg_pixel src[64];
-    for (int x = 0, offset = 0; x < 32; ++x, offset += 2) {
-      const int ref_offset = dint[x] + y + 1;
-      src[offset + 0] = ref[ref_offset + 0];
-      src[offset + 1] = ref[ref_offset + 1];
-    }
+    // Prepare sources
+    __m128i vsrc_tmp0 = _mm_loadu_si128((__m128i*) &ref[min_offset0 + y]);
+    __m128i vsrc_tmp1 = _mm_loadu_si128((__m128i*) &ref[min_offset1 + y]);
+    __m128i vsrc[4];
+    vsrc[0] = _mm_shuffle_epi8(vsrc_tmp0, vshuf0);
+    vsrc[1] = _mm_shuffle_epi8(vsrc_tmp1, vshuf2); // Swap the middle two shuffle vectors and sources. Packus will swap results back into place. Corresponding weights are also swapped in the table.
+    vsrc[2] = _mm_shuffle_epi8(vsrc_tmp0, vshuf1);
+    vsrc[3] = _mm_shuffle_epi8(vsrc_tmp1, vshuf3);
 
+    const __m256i* vsrc256_0 = (const __m256i*) &vsrc[0];
+    const __m256i* vsrc256_1 = (const __m256i*) &vsrc[2];
 
-    __m256i* vsrc0 = (__m256i*) &src[0];
-    __m256i* vsrc1 = (__m256i*) &src[32];
-
-    __m256i res0 = _mm256_maddubs_epi16(*vsrc0, *vcoeff0);
-    __m256i res1 = _mm256_maddubs_epi16(*vsrc1, *vcoeff1);
+    __m256i res0 = _mm256_maddubs_epi16(*vsrc256_0, vcoeff0);
+    __m256i res1 = _mm256_maddubs_epi16(*vsrc256_1, vcoeff1);
     res0 = _mm256_add_epi16(res0, v16s);
     res1 = _mm256_add_epi16(res1, v16s);
     res0 = _mm256_srai_epi16(res0, 5);
     res1 = _mm256_srai_epi16(res1, 5);
-    //res0 = _mm256_permute4x64_epi64(res0, _MM_SHUFFLE(3, 1, 2, 0));
-    //res1 = _mm256_permute4x64_epi64(res1, _MM_SHUFFLE(3, 1, 2, 0));
-    __m256i res_final = _mm256_packus_epi16(res0, res1);
-    res_final = _mm256_permute4x64_epi64(res_final, _MM_SHUFFLE(3, 1, 2, 0));
 
-    _mm256_store_si256((__m256i*)dst, res_final);
+    _mm256_store_si256((__m256i*)dst, _mm256_packus_epi16(res0, res1));
     dst += 32;
   }
 }
@@ -2397,7 +2399,7 @@ static void uvg_angular_pred_avx2(
             case  4: angular_pred_avx2_linear_filter_w4_hor(dst, ref_main, height, pred_mode, delta_int); break;
             case  8: angular_pred_avx2_linear_filter_w8_hor(dst, ref_main, height, pred_mode, delta_int); break;
             case 16: angular_pred_avx2_linear_filter_w16_hor(dst, ref_main, height, pred_mode, delta_int); break;
-            case 32: angular_pred_avx2_linear_filter_w32_hor(dst, ref_main, height, delta_int, delta_fract); break;
+            case 32: angular_pred_avx2_linear_filter_w32_hor(dst, ref_main, height, pred_mode, delta_int, delta_fract); break;
             default:
               assert(false && "Intra angular predicion: illegal chroma width.\n");
               break;
