@@ -1504,9 +1504,6 @@ static void angular_pred_avx2_linear_filter_w4_hor(uvg_pixel* dst, uvg_pixel* re
   const int16_t weigth_offset = mode_to_weight_table_offset_w4_hor[mode];
   const int16_t shuf_offset = mode_to_shuffle_vector_table_offset_w4_hor[mode];
 
-  __m128i vkek0 = _mm_load_si128((const __m128i*) intra_chroma_linear_interpolation_shuffle_w4_m30);
-  __m128i vkek1 = _mm_load_si128((const __m128i*) &intra_chroma_linear_interpolation_shuffle_w4_m30[16]);
-
   __m128i vcoeff = _mm_load_si128((const __m128i*) &intra_chroma_linear_interpolation_weights_w4_hor[weigth_offset]);
   __m128i vshuf0 = _mm_load_si128((const __m128i*) &intra_chroma_linear_interpolation_shuffle_vectors_w4_hor[shuf_offset + 0]);
   __m128i vshuf1 = _mm_load_si128((const __m128i*) &intra_chroma_linear_interpolation_shuffle_vectors_w4_hor[shuf_offset + 16]);
@@ -1535,36 +1532,29 @@ static void angular_pred_avx2_linear_filter_w4_hor(uvg_pixel* dst, uvg_pixel* re
 }
 
 
-static void angular_pred_avx2_linear_filter_w8_hor(uvg_pixel* dst, uvg_pixel* ref, const int height, const int16_t* delta_int, const int16_t* delta_fract)
+static void angular_pred_avx2_linear_filter_w8_hor(uvg_pixel* dst, uvg_pixel* ref, const int height, const int mode, const int16_t* delta_int)
 {
   const int16_t* dint = delta_int;
-  const int16_t* dfract = delta_fract;
   const __m128i v16s = _mm_set1_epi16(16);
+  const int16_t weigth_offset = (mode - 2) * 16;
+  const int16_t shuf_offset = (mode - 2) * 32;
 
-  int8_t tmp_coeff[16];
-  for (int x = 0, offset = 0; x < 8; ++x, offset += 2) {
-    tmp_coeff[offset + 0] = 32 - dfract[x];
-    tmp_coeff[offset + 1] = dfract[x];
-  }
-  __m128i* vcoeff = (__m128i*) &tmp_coeff[0];
+  __m128i vcoeff = _mm_load_si128((const __m128i*) & intra_chroma_linear_interpolation_weights_w8_hor[weigth_offset]);
+  __m128i vshuf0 = _mm_load_si128((const __m128i*) & intra_chroma_linear_interpolation_shuffle_vectors_w8_hor[shuf_offset + 0]);
+  __m128i vshuf1 = _mm_load_si128((const __m128i*) & intra_chroma_linear_interpolation_shuffle_vectors_w8_hor[shuf_offset + 16]);
+
+  // Load refs from smallest index onwards, shuffle will handle the rest. The smallest index will be at one of these delta int table indices
+  const int16_t min_offset = 1 + MIN(dint[0], dint[7]);
 
   // Height has to be at least 2, handle 2 lines at once
   for (int y = 0; y < height; y += 2) {
-    // TODO: find a more efficient way to do this
-    uvg_pixel src[32];
-    for (int yy = 0; yy < 2; ++yy) {
-      for (int x = 0, offset = 0; x < 8; ++x, offset += 2) {
-        const int ref_offset = dint[x] + y + yy + 1;
-        src[yy * 16 + offset + 0] = ref[ref_offset + 0];
-        src[yy * 16 + offset + 1] = ref[ref_offset + 1];
-      }
-    }
+    // Prepare sources
+    __m128i vsrc_tmp = _mm_loadu_si128((__m128i*)&ref[min_offset + y]);
+    const __m128i vsrc0 = _mm_shuffle_epi8(vsrc_tmp, vshuf0);
+    const __m128i vsrc1 = _mm_shuffle_epi8(vsrc_tmp, vshuf1);
 
-    __m128i* vsrc0 = (__m128i*) & src[0];
-    __m128i* vsrc1 = (__m128i*) & src[16];
-
-    __m128i res0 = _mm_maddubs_epi16(*vsrc0, *vcoeff);
-    __m128i res1 = _mm_maddubs_epi16(*vsrc1, *vcoeff);
+    __m128i res0 = _mm_maddubs_epi16(vsrc0, vcoeff);
+    __m128i res1 = _mm_maddubs_epi16(vsrc1, vcoeff);
     res0 = _mm_add_epi16(res0, v16s);
     res1 = _mm_add_epi16(res1, v16s);
     res0 = _mm_srai_epi16(res0, 5);
@@ -2402,7 +2392,7 @@ static void uvg_angular_pred_avx2(
         else {
           switch (width) {
             case  4: angular_pred_avx2_linear_filter_w4_hor(dst, ref_main, height, pred_mode, delta_int); break;
-            case  8: angular_pred_avx2_linear_filter_w8_hor(dst, ref_main, height, delta_int, delta_fract); break;
+            case  8: angular_pred_avx2_linear_filter_w8_hor(dst, ref_main, height, pred_mode, delta_int); break;
             case 16: angular_pred_avx2_linear_filter_w16_hor(dst, ref_main, height, delta_int, delta_fract); break;
             case 32: angular_pred_avx2_linear_filter_w32_hor(dst, ref_main, height, delta_int, delta_fract); break;
             default:
