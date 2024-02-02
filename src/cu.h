@@ -181,6 +181,11 @@ typedef struct
       uint8_t imv      : 2; // \brief Adaptive motion vector resolution for this block
     } inter;
   };
+
+  float cost;
+  float dist;
+  float bits;
+  
 } cu_info_t;
 
 typedef struct {

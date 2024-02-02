@@ -1222,6 +1222,40 @@ static bool check_for_early_termission(const int cu_width, const int cu_height, 
   return false;
 }
 
+static void recreate(const lcu_t * const ctu, const cu_loc_t * const cu_loc, int depth, uint8_t * buffer, uint64_t *offset, uint64_t *count)
+{
+  const cu_info_t *const cur_cu = LCU_GET_CU_AT_PX(ctu, cu_loc->local_x, cu_loc->local_y);
+
+  enum split_type        split = GET_SPLITDATA(cur_cu, depth);
+  if (split == NO_SPLIT) {
+    uint64_t bytes = *offset;
+    memcpy(buffer + bytes, &cu_loc->x, 2); bytes+=2;
+    memcpy(buffer + bytes, &cu_loc->y, 2); bytes+=2;
+    memcpy(buffer + bytes, &cu_loc->width, 1); bytes++;
+    memcpy(buffer + bytes, &cu_loc->height, 1); bytes++;
+    memcpy(buffer + bytes, &cur_cu->split_tree, 4); bytes+=4;
+    memcpy(buffer + bytes, &cur_cu->qp, 1); bytes++;
+    memcpy(buffer + bytes, &cur_cu->intra.mode, 1); bytes++;
+    memcpy(buffer + bytes, &cur_cu->intra.mip_flag, 1); bytes++;
+    memcpy(buffer + bytes, &cur_cu->intra.mip_is_transposed, 1); bytes++;
+    memcpy(buffer + bytes, &cur_cu->intra.multi_ref_idx, 1); bytes++;
+    memcpy(buffer + bytes, &cur_cu->intra.isp_mode, 1); bytes++;
+    memcpy(buffer + bytes, &cur_cu->lfnst_idx, 1); bytes++;
+    memcpy(buffer + bytes, &cur_cu->tr_idx, 1); bytes++;
+    memcpy(buffer + bytes, &cur_cu->cost, 4); bytes += 4;
+    memcpy(buffer + bytes, &cur_cu->bits, 4); bytes+=4;
+    memcpy(buffer + bytes, &cur_cu->dist, 4); bytes+=4;
+    *offset = bytes;
+    *count += 1;
+    return;
+  }
+  cu_loc_t split_cu_locs[4];
+  int      split_count = uvg_get_split_locs(cu_loc, split, split_cu_locs, NULL);
+  for (int i = 0; i < split_count; ++i) {
+    recreate(ctu, &split_cu_locs[i], depth + 1, buffer, offset, count);
+  }
+}
+
 /**
  * Search every mode from 0 to MAX_PU_DEPTH and return cost of best mode.
  * - The recursion is started at depth 0 and goes in Z-order to MAX_PU_DEPTH.
@@ -1543,14 +1577,17 @@ static double search_cu(
       }
       lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_height, cur_cu);
       if (!state->encoder_control->cfg.cclm && cur_cu->intra.isp_mode != ISP_MODE_NO_ISP) {
+        cabac_data_t temp_cabac;
+        memcpy(&temp_cabac, &state->search_cabac, sizeof(cabac_data_t));
+        state->search_cabac.update = 1;
         uvg_recon_and_estimate_cost_isp(
           state,
           cu_loc,
           0,
           &intra_search,
           lcu,
-          NULL
-        );
+          NULL);
+        memcpy(&state->search_cabac, &temp_cabac, sizeof(cabac_data_t));
       }
       else {
         uvg_intra_recon_cu(state,
@@ -1727,6 +1764,9 @@ static double search_cu(
       memcpy(buffer + bytes, &float_cost, 4); bytes+=4;
       memcpy(buffer + bytes, &float_bits, 4); bytes+=4;
       memcpy(buffer + bytes, &float_dist, 4); bytes+=4;
+      cur_cu->bits = float_bits;
+      cur_cu->cost = float_cost;
+      cur_cu->dist = float_dist;
 
 
       uvg_pixels_blit(&lcu->rec.y[x_local + y_local * LCU_WIDTH], buffer + bytes, cu_width, cu_height, LCU_WIDTH, cu_width);
@@ -2097,7 +2137,7 @@ static double search_cu(
       zmq_send(state->send_socket, buffer, bytes, 0);
     }
 
-    if (best_split_cost < cost) {
+    else if (best_split_cost < cost) {
       // Copy split modes to this depth.
       cost = best_split_cost;
       memcpy(&state->search_cabac, &best_split_cabac, sizeof(best_split_cabac));
@@ -2105,6 +2145,44 @@ static double search_cu(
       downsample_cclm_rec(
         state, x, y, cu_width / 2, cu_height / 2, lcu->rec.y, lcu->left_ref.y[64]
       );
+
+      
+      if(completely_inside) {
+        uint8_t     type = 2;
+        uint8_t     buffer[8192 *  2];
+        UVG_CLOCK_T time;
+        UVG_GET_TIME(&time);
+#ifdef _MSC_VER
+        uint64_t time_high = time.dwHighDateTime & 0x000fffff;
+        time_high <<= 32;
+        uint64_t time_low  = time.dwLowDateTime;
+        uint64_t timestamp = time_high | time_low;
+        timestamp *= 100;
+#else
+        uint64_t timestamp = time.tv_sec * 1000000000 + time.tv_nsec;
+#endif
+        uint64_t bytes = 0;
+        memcpy(buffer, &type, 1); bytes++;
+        bytes+=2;
+        memcpy(buffer + bytes, &timestamp, 8); bytes+=8;
+        memcpy(buffer + bytes, &state->frame->num, 1); bytes++;
+        memcpy(buffer + bytes, &cu_width, 1); bytes++;
+        memcpy(buffer + bytes, &cu_height, 1); bytes++;
+
+        uint64_t count = 0;
+        recreate(lcu, cu_loc, split_tree.current_depth, buffer, &bytes, &count);
+        memcpy(buffer + 1, &count, 2);
+
+        uvg_pixels_blit(&lcu->rec.y[x_local + y_local * LCU_WIDTH], buffer + bytes, cu_width, cu_height, LCU_WIDTH, cu_width);
+        bytes += cu_loc->width*cu_loc->height;
+        uvg_pixels_blit(&lcu->rec.u[x_local/2 + y_local/2 * LCU_WIDTH_C], buffer + bytes, cu_width / 2, cu_height / 2, LCU_WIDTH_C, cu_width / 2);
+        bytes += cu_loc->width*cu_loc->height / 4;
+        uvg_pixels_blit(&lcu->rec.v[x_local/2 + y_local/2 * LCU_WIDTH_C], buffer + bytes, cu_width / 2, cu_height / 2, LCU_WIDTH_C, cu_width / 2);
+        bytes += cu_loc->width*cu_loc->height / 4;
+
+        zmq_send(state->send_socket, buffer, bytes, 0);
+      }
+      
 #if UVG_DEBUG
       //debug_split = 1;
 #endif
