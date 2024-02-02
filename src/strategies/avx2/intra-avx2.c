@@ -1569,41 +1569,46 @@ static void angular_pred_avx2_linear_filter_w8_hor(uvg_pixel* dst, uvg_pixel* re
 static void angular_pred_avx2_linear_filter_w16_hor(uvg_pixel* dst, uvg_pixel* ref, const int height, const int mode, const int16_t* delta_int)
 {
   const int16_t* dint = delta_int;
-  const __m256i v16s = _mm256_set1_epi16(16);
-  const int16_t weigth_offset = (mode - 2) * 64;
+  const __m128i v16s = _mm_set1_epi16(16);
+  const int16_t weigth_offset = (mode - 2) * 32;
   const int16_t shuf_offset = (mode - 2) * 64;
 
-  __m256i vcoeff0 = _mm256_load_si256((const __m256i*) & intra_chroma_linear_interpolation_weights_w16_hor[weigth_offset + 0]);
-  __m256i vcoeff1 = _mm256_load_si256((const __m256i*) & intra_chroma_linear_interpolation_weights_w16_hor[weigth_offset + 32]);
+  __m128i vcoeff0 = _mm_load_si128((const __m128i*) & intra_chroma_linear_interpolation_weights_w16_hor[weigth_offset + 0]);
+  __m128i vcoeff1 = _mm_load_si128((const __m128i*) & intra_chroma_linear_interpolation_weights_w16_hor[weigth_offset + 16]);
   __m128i vshuf0 = _mm_load_si128((const __m128i*) & intra_chroma_linear_interpolation_shuffle_vectors_w16_hor[shuf_offset + 0]);
-  __m128i vshuf2 = _mm_load_si128((const __m128i*) & intra_chroma_linear_interpolation_shuffle_vectors_w16_hor[shuf_offset + 16]); // Swap the middle two shuffle vectors. Packus will swap results back into place.
-  __m128i vshuf1 = _mm_load_si128((const __m128i*) & intra_chroma_linear_interpolation_shuffle_vectors_w16_hor[shuf_offset + 32]);
+  __m128i vshuf1 = _mm_load_si128((const __m128i*) & intra_chroma_linear_interpolation_shuffle_vectors_w16_hor[shuf_offset + 16]);
+  __m128i vshuf2 = _mm_load_si128((const __m128i*) & intra_chroma_linear_interpolation_shuffle_vectors_w16_hor[shuf_offset + 32]);
   __m128i vshuf3 = _mm_load_si128((const __m128i*) & intra_chroma_linear_interpolation_shuffle_vectors_w16_hor[shuf_offset + 48]);
 
   // Load refs from smallest index onwards, shuffle will handle the rest. The smallest index will be at one of these delta int table indices
-  const int16_t min_offset = 1 + MIN(dint[0], dint[15]);
+  const int16_t min_offset0 = 1 + MIN(dint[0], dint[7]);
+  const int16_t min_offset1 = 1 + MIN(dint[8], dint[15]);
 
-  // Height has to be at least 2, there is no 16x1 block for chroma. Handle 2 lines at once with 256-bit vectors.
+  // Height has to be at least 2, there is no 16x1 block for chroma.
   for (int y = 0; y < height; y += 2) {
     // Prepare sources
-    __m128i vsrc_tmp = _mm_loadu_si128((__m128i*) & ref[min_offset + y]);
-    __m128i vsrc[4];
-    vsrc[0] = _mm_shuffle_epi8(vsrc_tmp, vshuf0);
-    vsrc[1] = _mm_shuffle_epi8(vsrc_tmp, vshuf1);
-    vsrc[2] = _mm_shuffle_epi8(vsrc_tmp, vshuf2);
-    vsrc[3] = _mm_shuffle_epi8(vsrc_tmp, vshuf3);
+    __m128i vsrc_tmp0 = _mm_loadu_si128((__m128i*) &ref[min_offset0 + y]);
+    __m128i vsrc_tmp1 = _mm_loadu_si128((__m128i*) &ref[min_offset1 + y]);
+    const __m128i vsrc0 = _mm_shuffle_epi8(vsrc_tmp0, vshuf0);
+    const __m128i vsrc1 = _mm_shuffle_epi8(vsrc_tmp1, vshuf1);
+    const __m128i vsrc2 = _mm_shuffle_epi8(vsrc_tmp0, vshuf2);
+    const __m128i vsrc3 = _mm_shuffle_epi8(vsrc_tmp1, vshuf3);
 
-    const __m256i* vsrc256_0 = (const __m256i*)&vsrc[0];
-    const __m256i* vsrc256_1 = (const __m256i*)&vsrc[2];
+    __m128i res0 = _mm_maddubs_epi16(vsrc0, vcoeff0);
+    __m128i res1 = _mm_maddubs_epi16(vsrc1, vcoeff1);
+    __m128i res2 = _mm_maddubs_epi16(vsrc2, vcoeff0);
+    __m128i res3 = _mm_maddubs_epi16(vsrc3, vcoeff1);
+    res0 = _mm_add_epi16(res0, v16s);
+    res1 = _mm_add_epi16(res1, v16s);
+    res2 = _mm_add_epi16(res2, v16s);
+    res3 = _mm_add_epi16(res3, v16s);
+    res0 = _mm_srai_epi16(res0, 5);
+    res1 = _mm_srai_epi16(res1, 5);
+    res2 = _mm_srai_epi16(res2, 5);
+    res3 = _mm_srai_epi16(res3, 5);
 
-    __m256i res0 = _mm256_maddubs_epi16(*vsrc256_0, vcoeff0);
-    __m256i res1 = _mm256_maddubs_epi16(*vsrc256_1, vcoeff1);
-    res0 = _mm256_add_epi16(res0, v16s);
-    res1 = _mm256_add_epi16(res1, v16s);
-    res0 = _mm256_srai_epi16(res0, 5);
-    res1 = _mm256_srai_epi16(res1, 5);
-
-    _mm256_store_si256((__m256i*)dst, _mm256_packus_epi16(res0, res1));
+    _mm_store_si128((__m128i*)&dst[0], _mm_packus_epi16(res0, res1));
+    _mm_store_si128((__m128i*)&dst[16], _mm_packus_epi16(res2, res3));
     dst += 32;
   }
 }
