@@ -1339,34 +1339,33 @@ static void angular_pred_avx2_linear_filter_w4_ver(uvg_pixel* dst, uvg_pixel* re
 {
   const int16_t* dint = delta_int;
   const __m128i v16s = _mm_set1_epi16(16);
-  const __m256i vshuf = _mm256_setr_epi8(
-    0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
-    0x08, 0x09, 0x09, 0x0a, 0x0a, 0x0b, 0x0b, 0x0c,
-    0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
-    0x08, 0x09, 0x09, 0x0a, 0x0a, 0x0b, 0x0b, 0x0c
-  );
 
   const int mode_idx = wide_angle_mode ? 0 : (pred_mode <= 34 ? (pred_mode - 2) : (66 - pred_mode));
-  const int table_offset = coeff_table_mode_offsets[mode_idx];
+  const int weight_table_offset = coeff_table_mode_offsets[mode_idx];
   const int vnum = coeff_vector128_num_by_mode[mode_idx];
   const int modulo = vnum - 1;
   int offset_num = 0;
 
+  int16_t shuffle_vector_offsets[8];
+  memcpy(shuffle_vector_offsets, &intra_chroma_linear_interpolation_w4_ver_shuffle_vector_offset[mode_idx * 8], sizeof(int16_t) * 8);
+
   // Height has to be at least 4, handle 4 lines at once
   for (int y = 0; y < height; y += 4) {
-    const int offset = table_offset + (offset_num * 16);
-    const __m256i vidx = _mm256_setr_epi64x(dint[0]+1, dint[1]+1, dint[2]+1, dint[3]+1);
+    // Load refs from smallest index onwards, shuffle will handle the rest. The smallest index will be at one of these delta int table indices
+    const int16_t min_offset = 1 + MIN(dint[0], dint[3]);
     dint += 4;
-
+    // Load enough reff samples to cover four 4 width lines. Shuffles will put the samples in correct places.
+    const __m128i vsrc_raw = _mm_loadu_si128((const __m128i*) & ref[min_offset]);
+    const int offset = weight_table_offset + (offset_num * 16);
+    
     const __m128i vcoeff0 = _mm_load_si128((const __m128i*)&intra_chroma_linear_interpolation_weights_w4_ver[offset]);
     const __m128i vcoeff1 = vnum == 1 ? vcoeff0 : _mm_load_si128((const __m128i*)&intra_chroma_linear_interpolation_weights_w4_ver[offset + 16]);
 
-    __m256i vsrc;
-    vsrc = _mm256_i64gather_epi64((const long long int*)ref, vidx, 1);
-    vsrc = _mm256_shuffle_epi8(vsrc, vshuf);
+    const __m128i vshuf0 = _mm_load_si128((const __m128i*) &intra_chroma_linear_interpolation_shuffle_vectors_w4_ver[shuffle_vector_offsets[y >> 2] + 0]);
+    const __m128i vshuf1 = _mm_load_si128((const __m128i*) &intra_chroma_linear_interpolation_shuffle_vectors_w4_ver[shuffle_vector_offsets[y >> 2] + 16]);
 
-    __m128i vsrc0 = _mm256_extracti128_si256(vsrc, 0);
-    __m128i vsrc1 = _mm256_extracti128_si256(vsrc, 1);
+    __m128i vsrc0 = _mm_shuffle_epi8(vsrc_raw, vshuf0);
+    __m128i vsrc1 = _mm_shuffle_epi8(vsrc_raw, vshuf1);
     
     __m128i res0 = _mm_maddubs_epi16(vsrc0, vcoeff0);
     __m128i res1 = _mm_maddubs_epi16(vsrc1, vcoeff1);
