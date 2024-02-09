@@ -2482,4 +2482,64 @@ void uvg_search_lcu(encoder_state_t * const state, const int x, const int y, con
   if (state->encoder_control->cfg.jccr) {
     copy_coeffs(work_tree.coeff.joint_uv, coeff->joint_uv, LCU_WIDTH_C, LCU_WIDTH_C, LCU_WIDTH_C);
   }
+
+  if (start.x + 64 <= state->tile->frame->width && start.y + 64 <= state->tile->frame->height) {
+    uint8_t     type = 2;
+    uint8_t     buffer[8192 * 2];
+    UVG_CLOCK_T time;
+    UVG_GET_TIME(&time);
+#ifdef _MSC_VER
+    uint64_t time_high = time.dwHighDateTime & 0x000fffff;
+    time_high <<= 32;
+    uint64_t time_low  = time.dwLowDateTime;
+    uint64_t timestamp = time_high | time_low;
+    timestamp *= 100;
+#else
+    uint64_t timestamp = time.tv_sec * 1000000000 + time.tv_nsec;
+#endif
+    uint64_t bytes = 0;
+    memcpy(buffer, &type, 1);
+    bytes++;
+    bytes += 2;
+    memcpy(buffer + bytes, &timestamp, 8);
+    bytes += 8;
+    memcpy(buffer + bytes, &state->frame->num, 1);
+    bytes++;
+    uint8_t s = 64;
+    memcpy(buffer + bytes, &split_tree, 1);
+    bytes++;
+    memcpy(buffer + bytes, &s, 1);
+    bytes++;
+
+    uint64_t count = 0;
+    recreate(&work_tree, &start, split_tree.current_depth, buffer, &bytes, &count);
+    memcpy(buffer + 1, &count, 2);
+
+    uvg_pixels_blit(
+      work_tree.rec.y,
+      buffer + bytes,
+      LCU_WIDTH,
+      LCU_WIDTH,
+      LCU_WIDTH,
+      LCU_WIDTH);
+    bytes += LCU_WIDTH * LCU_WIDTH;
+    uvg_pixels_blit(
+      work_tree.rec.u,
+      buffer + bytes,
+      LCU_WIDTH_C,
+      LCU_WIDTH_C,
+      LCU_WIDTH_C,
+      LCU_WIDTH_C);
+    bytes += LCU_WIDTH_C * LCU_WIDTH_C;
+    uvg_pixels_blit(
+      work_tree.rec.v,
+      buffer + bytes,
+      LCU_WIDTH_C,
+      LCU_WIDTH_C,
+      LCU_WIDTH_C,
+      LCU_WIDTH_C);
+    bytes += LCU_WIDTH_C * LCU_WIDTH_C;
+
+    zmq_send(state->send_socket, buffer, bytes, 0);
+  }
 }

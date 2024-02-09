@@ -273,7 +273,7 @@ static void* input_read_thread(void* in_args)
 #if defined(__GNUC__) && !defined(__MINGW32__)
     usleep(33000);
 #else
-    Sleep(33);
+    // Sleep(33);
 #endif
 
     // Wait until main thread is ready to receive the next frame.
