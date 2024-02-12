@@ -1397,12 +1397,6 @@ static void angular_pred_avx2_linear_filter_w8_ver(uvg_pixel* dst, uvg_pixel* re
 
   // Height has to be at least 2, handle 2 lines at once
   for (int y = 0; y < height; y += 2) {
-    /*int8_t tmp[2] = {32 - delta_fract[y + 0], delta_fract[y + 0]};
-    int16_t coeff_tmp0 = *(int16_t*)tmp;
-    tmp[0] = 32 - delta_fract[y + 1];
-    tmp[1] = delta_fract[y + 1];
-    int16_t coeff_tmp1 = *(int16_t*)tmp;*/
-
     const int16_t* coeff_tmp0 = (const int16_t*) &intra_chroma_linear_interpolation_weights_w8_ver[coeff_table_offset + (y << 1) + 0];
     const int16_t* coeff_tmp1 = (const int16_t*) &intra_chroma_linear_interpolation_weights_w8_ver[coeff_table_offset + (y << 1) + 2];
     
@@ -1428,7 +1422,7 @@ static void angular_pred_avx2_linear_filter_w8_ver(uvg_pixel* dst, uvg_pixel* re
 }
 
 
-static void angular_pred_avx2_linear_filter_w16_ver(uvg_pixel* dst, uvg_pixel* ref, const int height, const int16_t* delta_int, const int16_t* delta_fract)
+static void angular_pred_avx2_linear_filter_w16_ver(uvg_pixel* dst, uvg_pixel* ref, const int height, const int16_t* delta_int, const int pred_mode)
 {
   const __m128i v16s = _mm_set1_epi16(16);
   const __m128i vshuf = _mm_setr_epi8(
@@ -1436,11 +1430,13 @@ static void angular_pred_avx2_linear_filter_w16_ver(uvg_pixel* dst, uvg_pixel* r
     0x04, 0x05, 0x05, 0x06, 0x06, 0x07, 0x07, 0x08
   );
 
+  const int mode_idx = (pred_mode <= 34 ? (pred_mode - 2) : (66 - pred_mode));
+  const int coeff_table_offset = mode_idx * 64;
+
   // Handle 1 line at a time
   for (int y = 0; y < height; ++y) {
-    int8_t tmp0[2] = { 32 - delta_fract[y + 0], delta_fract[y + 0]};
-    int16_t coeff_tmp = *(int16_t*)tmp0;
-    __m128i vcoeff = _mm_set1_epi16(coeff_tmp);
+    const int16_t* coeff_tmp = (const int16_t*)&intra_chroma_linear_interpolation_weights_w8_ver[coeff_table_offset + (y << 1)];
+    __m128i vcoeff = _mm_set1_epi16(*coeff_tmp);
 
     __m128i vsrc0 = _mm_loadu_si128((const __m128i*)&ref[delta_int[y] + 0 + 1]);
     __m128i vsrc1 = _mm_loadu_si128((const __m128i*)&ref[delta_int[y] + 8 + 1]);
@@ -1461,7 +1457,7 @@ static void angular_pred_avx2_linear_filter_w16_ver(uvg_pixel* dst, uvg_pixel* r
 }
 
 
-static void angular_pred_avx2_linear_filter_w32_ver(uvg_pixel* dst, uvg_pixel* ref, const int height, const int16_t* delta_int, const int16_t* delta_fract)
+static void angular_pred_avx2_linear_filter_w32_ver(uvg_pixel* dst, uvg_pixel* ref, const int height, const int16_t* delta_int, const int pred_mode)
 {
   const __m256i v16s = _mm256_set1_epi16(16);
   const __m256i vshuf = _mm256_setr_epi8(
@@ -1471,11 +1467,13 @@ static void angular_pred_avx2_linear_filter_w32_ver(uvg_pixel* dst, uvg_pixel* r
     0x04, 0x05, 0x05, 0x06, 0x06, 0x07, 0x07, 0x08
   );
 
+  const int mode_idx = (pred_mode <= 34 ? (pred_mode - 2) : (66 - pred_mode));
+  const int coeff_table_offset = mode_idx * 64;
+
   // Handle 1 line at a time
   for (int y = 0; y < height; ++y) {
-    int8_t tmp0[2] = { 32 - delta_fract[y + 0], delta_fract[y + 0] };
-    int16_t coeff_tmp = *(int16_t*)tmp0;
-    __m256i vcoeff = _mm256_set1_epi16(coeff_tmp);
+    const int16_t* coeff_tmp = (const int16_t*)&intra_chroma_linear_interpolation_weights_w8_ver[coeff_table_offset + (y << 1)];
+    __m256i vcoeff = _mm256_set1_epi16(*coeff_tmp);
 
     __m128i vsrc[4];
     vsrc[0] = _mm_loadu_si128((const __m128i*) & ref[delta_int[y] + 0 + 1]);
@@ -2401,8 +2399,8 @@ static void uvg_angular_pred_avx2(
           switch (width) {
             case  4: angular_pred_avx2_linear_filter_w4_ver(dst, ref_main, height, delta_int, wide_angle_mode, pred_mode); break;
             case  8: angular_pred_avx2_linear_filter_w8_ver(dst, ref_main, height, delta_int, pred_mode); break;
-            case 16: angular_pred_avx2_linear_filter_w16_ver(dst, ref_main, height, delta_int, delta_fract); break;
-            case 32: angular_pred_avx2_linear_filter_w32_ver(dst, ref_main, height, delta_int, delta_fract); break;
+            case 16: angular_pred_avx2_linear_filter_w16_ver(dst, ref_main, height, delta_int, pred_mode); break;
+            case 32: angular_pred_avx2_linear_filter_w32_ver(dst, ref_main, height, delta_int, pred_mode); break;
             default:
               assert(false && "Intra angular predicion: illegal chroma width.\n");
               break;
