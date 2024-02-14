@@ -2577,7 +2577,7 @@ static void uvg_angular_pred_avx2(
   const bool wide_angle_mode = mode_disp > 16;
 
   // Sample displacement per column in fractions of 32.
-  const int_fast8_t sample_disp = (mode_disp < 0 ? -1 : 1) * modedisp2sampledisp[abs(mode_disp)];
+  const int_fast16_t sample_disp = (mode_disp < 0 ? -1 : 1) * modedisp2sampledisp[abs(mode_disp)];
 
   const int side_size = vertical_mode ? log2_height : log2_width;
   int scale = MIN(2, side_size - pre_scale[abs(mode_disp)]);
@@ -2697,7 +2697,7 @@ static void uvg_angular_pred_avx2(
             case  4: angular_pred_avx2_linear_filter_w4_ver_wide_angle(dst, ref_main, height, pred_mode, delta_int, delta_fract); break;
             case  8: angular_pred_avx2_linear_filter_w8_ver_wide_angle(dst, ref_main, height, pred_mode, delta_int, delta_fract); break;
             case 16: angular_pred_avx2_linear_filter_w16_ver_wide_angle(dst, ref_main, height, pred_mode, delta_int, delta_fract); break;
-            case 32: angular_pred_avx2_linear_filter_w32_ver_wide_angle(dst, ref_main, height, pred_mode, delta_int, delta_fract); break; // This may never get reached.
+            case 32: angular_pred_avx2_linear_filter_w32_ver_wide_angle(dst, ref_main, height, pred_mode, delta_int, delta_fract); break;
             default:
               assert(false && "Intra angular predicion: illegal chroma width.\n");
               break;
@@ -2708,7 +2708,7 @@ static void uvg_angular_pred_avx2(
             case  4: angular_pred_avx2_linear_filter_w4_hor_wide_angle(dst, ref_main, height, pred_mode, delta_int, delta_fract); break;
             case  8: angular_pred_avx2_linear_filter_w8_hor_wide_angle(dst, ref_main, height, pred_mode, delta_int, delta_fract); break;
             case 16: angular_pred_avx2_linear_filter_w16_hor_wide_angle(dst, ref_main, height, pred_mode, delta_int, delta_fract); break;
-            case 32: break; // This may never get reached.
+            case 32: assert(false && "This code branch only works with UVG_FORMAT_P420."); break; // This branch is never executed with UVG_FORMAT_P420, due to chroma being only 32 width or height
             default:
               assert(false && "Intra angular predicion: illegal chroma width.\n");
               break;
