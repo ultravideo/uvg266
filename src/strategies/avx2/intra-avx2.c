@@ -1390,14 +1390,15 @@ static void angular_pred_avx2_linear_filter_w8_ver(uvg_pixel* dst, uvg_pixel* re
     0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
     0x04, 0x05, 0x05, 0x06, 0x06, 0x07, 0x07, 0x08
   );
-
-  const int mode_idx = (pred_mode <= 34 ? (pred_mode - 2) : (66 - pred_mode));
+  const int wide_angle = pred_mode > 66 || pred_mode < 2;
+  const int mode_idx = wide_angle ? (pred_mode < 2 ? 12 + pred_mode : 80 - pred_mode) : (pred_mode <= 34 ? (pred_mode - 2) : (66 - pred_mode));
+  const int8_t* coeff_table = wide_angle ? intra_chroma_linear_interpolation_weights_w8_ver_wide_angle : intra_chroma_linear_interpolation_weights_w8_ver;
   const int coeff_table_offset = mode_idx * 64;
 
   // Height has to be at least 2, handle 2 lines at once
   for (int y = 0; y < height; y += 2) {
-    const int16_t* coeff_tmp0 = (const int16_t*) &intra_chroma_linear_interpolation_weights_w8_ver[coeff_table_offset + (y << 1) + 0];
-    const int16_t* coeff_tmp1 = (const int16_t*) &intra_chroma_linear_interpolation_weights_w8_ver[coeff_table_offset + (y << 1) + 2];
+    const int16_t* coeff_tmp0 = (const int16_t*) &coeff_table[coeff_table_offset + (y << 1) + 0];
+    const int16_t* coeff_tmp1 = (const int16_t*) &coeff_table[coeff_table_offset + (y << 1) + 2];
     
     __m128i vsrc0 = _mm_loadu_si128((const __m128i*) & ref[delta_int[y + 0] + 1]);
     __m128i vsrc1 = _mm_loadu_si128((const __m128i*) & ref[delta_int[y + 1] + 1]);
@@ -1429,12 +1430,14 @@ static void angular_pred_avx2_linear_filter_w16_ver(uvg_pixel* dst, uvg_pixel* r
     0x04, 0x05, 0x05, 0x06, 0x06, 0x07, 0x07, 0x08
   );
 
-  const int mode_idx = (pred_mode <= 34 ? (pred_mode - 2) : (66 - pred_mode));
+  const int wide_angle = pred_mode > 66 || pred_mode < 2;
+  const int mode_idx = wide_angle ? (pred_mode < 2 ? 12 + pred_mode : 80 - pred_mode) : (pred_mode <= 34 ? (pred_mode - 2) : (66 - pred_mode));
+  const int8_t* coeff_table = wide_angle ? intra_chroma_linear_interpolation_weights_w8_ver_wide_angle : intra_chroma_linear_interpolation_weights_w8_ver;
   const int coeff_table_offset = mode_idx * 64;
 
   // Handle 1 line at a time
   for (int y = 0; y < height; ++y) {
-    const int16_t* coeff_tmp = (const int16_t*)&intra_chroma_linear_interpolation_weights_w8_ver[coeff_table_offset + (y << 1)];
+    const int16_t* coeff_tmp = (const int16_t*)&coeff_table[coeff_table_offset + (y << 1)];
     __m128i vcoeff = _mm_set1_epi16(*coeff_tmp);
 
     __m128i vsrc0 = _mm_loadu_si128((const __m128i*)&ref[delta_int[y] + 0 + 1]);
@@ -1466,12 +1469,14 @@ static void angular_pred_avx2_linear_filter_w32_ver(uvg_pixel* dst, uvg_pixel* r
     0x04, 0x05, 0x05, 0x06, 0x06, 0x07, 0x07, 0x08
   );
 
-  const int mode_idx = (pred_mode <= 34 ? (pred_mode - 2) : (66 - pred_mode));
+  const int wide_angle = pred_mode > 66 || pred_mode < 2;
+  const int mode_idx = wide_angle ? (pred_mode < 2 ? 12 + pred_mode : 80 - pred_mode) : (pred_mode <= 34 ? (pred_mode - 2) : (66 - pred_mode));
+  const int8_t* coeff_table = wide_angle ? intra_chroma_linear_interpolation_weights_w8_ver_wide_angle : intra_chroma_linear_interpolation_weights_w8_ver;
   const int coeff_table_offset = mode_idx * 64;
 
   // Handle 1 line at a time
   for (int y = 0; y < height; ++y) {
-    const int16_t* coeff_tmp = (const int16_t*)&intra_chroma_linear_interpolation_weights_w8_ver[coeff_table_offset + (y << 1)];
+    const int16_t* coeff_tmp = (const int16_t*)&coeff_table[coeff_table_offset + (y << 1)];
     __m256i vcoeff = _mm256_set1_epi16(*coeff_tmp);
 
     __m128i vsrc[4];
@@ -1667,6 +1672,7 @@ static void angular_pred_avx2_linear_filter_w32_hor(uvg_pixel* dst, uvg_pixel* r
 }
 
 
+// Can handle most of the wide angle modes.
 static void angular_pred_avx2_linear_filter_w4_ver_wide_angle(uvg_pixel* dst, uvg_pixel* ref, const int height, const int mode, const int16_t* delta_int, const int16_t* delta_fract)
 {
   const int width = 4;
@@ -1695,6 +1701,52 @@ static void angular_pred_avx2_linear_filter_w4_ver_wide_angle(uvg_pixel* dst, uv
                                            coeff_tmp[1], coeff_tmp[1], coeff_tmp[1], coeff_tmp[1]);
     const __m128i vcoeff1 = _mm_setr_epi16(coeff_tmp[2], coeff_tmp[2], coeff_tmp[2], coeff_tmp[2],
                                            coeff_tmp[3], coeff_tmp[3], coeff_tmp[3], coeff_tmp[3]);
+
+    const __m128i* vsrc0 = (const __m128i*) & src[0];
+    const __m128i* vsrc1 = (const __m128i*) & src[16];
+
+    __m128i res0 = _mm_maddubs_epi16(*vsrc0, vcoeff0);
+    __m128i res1 = _mm_maddubs_epi16(*vsrc1, vcoeff1);
+    res0 = _mm_add_epi16(res0, v16s);
+    res1 = _mm_add_epi16(res1, v16s);
+    res0 = _mm_srai_epi16(res0, 5);
+    res1 = _mm_srai_epi16(res1, 5);
+
+    _mm_store_si128((__m128i*)dst, _mm_packus_epi16(res0, res1));
+    dst += 16;
+  }
+}
+
+
+// Handles the extreme wide angle modes, as these need a different memory load pattern.
+static void angular_pred_avx2_linear_filter_w4_ver_extreme_angle(uvg_pixel* dst, uvg_pixel* ref, const int height, const int mode, const int16_t* delta_int, const int16_t* delta_fract)
+{
+  const int width = 4;
+  const int16_t* dint = delta_int;
+  const __m128i v16s = _mm_set1_epi16(16);
+  // Height has to be at least 4, handle 4 lines at once
+  for (int y = 0; y < height; y += 4) {
+    uvg_pixel src[32];
+    int16_t coeff_tmp[4];
+    // TODO: get rid of this slow crap, this is just here to test the calculations
+    for (int yy = 0; yy < 4; ++yy) {
+      src[yy * 8 + 0] = ref[dint[yy] + 1 + 0];
+      src[yy * 8 + 1] = ref[dint[yy] + 1 + 1];
+      src[yy * 8 + 2] = ref[dint[yy] + 1 + 1];
+      src[yy * 8 + 3] = ref[dint[yy] + 1 + 2];
+      src[yy * 8 + 4] = ref[dint[yy] + 1 + 2];
+      src[yy * 8 + 5] = ref[dint[yy] + 1 + 3];
+      src[yy * 8 + 6] = ref[dint[yy] + 1 + 3];
+      src[yy * 8 + 7] = ref[dint[yy] + 1 + 4];
+      int8_t tmp[2] = { 32 - delta_fract[y + yy], delta_fract[y + yy] };
+      coeff_tmp[yy] = *(int16_t*)tmp;
+    }
+    dint += 4;
+
+    const __m128i vcoeff0 = _mm_setr_epi16(coeff_tmp[0], coeff_tmp[0], coeff_tmp[0], coeff_tmp[0],
+      coeff_tmp[1], coeff_tmp[1], coeff_tmp[1], coeff_tmp[1]);
+    const __m128i vcoeff1 = _mm_setr_epi16(coeff_tmp[2], coeff_tmp[2], coeff_tmp[2], coeff_tmp[2],
+      coeff_tmp[3], coeff_tmp[3], coeff_tmp[3], coeff_tmp[3]);
 
     const __m128i* vsrc0 = (const __m128i*) & src[0];
     const __m128i* vsrc1 = (const __m128i*) & src[16];
@@ -2653,7 +2705,7 @@ static void uvg_angular_pred_avx2(
     // The mode is not horizontal or vertical, we have to do interpolation.
 
     // Set delta table pointers
-    const int table_offset = wide_angle_mode ? (pred_mode < 2 ? (pred_mode + 12) * 64 : (pred_mode - 67 + 14) * 64) : (pred_mode <= 34 ? (pred_mode - 2) * 64 : (66 - pred_mode) * 64);
+    const int table_offset = wide_angle_mode ? (pred_mode < 2 ? (pred_mode + 12) * 64 : (80 - pred_mode) * 64) : (pred_mode <= 34 ? (pred_mode - 2) * 64 : (66 - pred_mode) * 64);
     const int16_t* delta_int   = wide_angle_mode ? &delta_int_wide_angle_table[table_offset] : &delta_int_table[table_offset];
     const int16_t* delta_fract = wide_angle_mode ? &delta_fract_wide_angle_table[table_offset] : &delta_fract_table[table_offset];
 
@@ -2690,37 +2742,30 @@ static void uvg_angular_pred_avx2(
       // Chroma channels
       else {
         // Do 2-tap linear filtering for chroma channels
-        if (wide_angle_mode) {
-          if (vertical_mode) {
-            switch (width) {
-            case  4: angular_pred_avx2_linear_filter_w4_ver_wide_angle(dst, ref_main, height, pred_mode, delta_int, delta_fract); break;
-            case  8: angular_pred_avx2_linear_filter_w8_ver_wide_angle(dst, ref_main, height, pred_mode, delta_int, delta_fract); break;
-            case 16: angular_pred_avx2_linear_filter_w16_ver_wide_angle(dst, ref_main, height, pred_mode, delta_int, delta_fract); break;
-            case 32: angular_pred_avx2_linear_filter_w32_ver_wide_angle(dst, ref_main, height, pred_mode, delta_int, delta_fract); break;
-            default:
-              assert(false && "Intra angular predicion: illegal chroma width.\n");
-              break;
-            }
+        
+        if (vertical_mode) {
+          switch (width) {
+          case  4: 
+            if (wide_angle_mode) 
+              angular_pred_avx2_linear_filter_w4_ver_wide_angle(dst, ref_main, height, pred_mode, delta_int, delta_fract); 
+            else
+              angular_pred_avx2_linear_filter_w4_ver(dst, ref_main, height, delta_int, pred_mode);
+            break;
+          case  8: angular_pred_avx2_linear_filter_w8_ver(dst, ref_main, height, delta_int, pred_mode); break;
+          case 16: angular_pred_avx2_linear_filter_w16_ver(dst, ref_main, height, delta_int, pred_mode); break;
+          case 32: angular_pred_avx2_linear_filter_w32_ver(dst, ref_main, height, delta_int, pred_mode); break;
+          default:
+            assert(false && "Intra angular predicion: illegal chroma width.\n");
+            break;
           }
-          else {
+        }
+        else {
+          if (wide_angle_mode) {
             switch (width) {
             case  4: angular_pred_avx2_linear_filter_w4_hor_wide_angle(dst, ref_main, height, pred_mode, delta_int, delta_fract); break;
             case  8: angular_pred_avx2_linear_filter_w8_hor_wide_angle(dst, ref_main, height, pred_mode, delta_int, delta_fract); break;
             case 16: angular_pred_avx2_linear_filter_w16_hor_wide_angle(dst, ref_main, height, pred_mode, delta_int, delta_fract); break;
-            case 32: assert(false && "This code branch only works with UVG_FORMAT_P420."); break; // This branch is never executed with UVG_FORMAT_P420, due to chroma being only 32 width or height
-            default:
-              assert(false && "Intra angular predicion: illegal chroma width.\n");
-              break;
-            }
-          }
-        }
-        else {
-          if (vertical_mode) {
-            switch (width) {
-            case  4: angular_pred_avx2_linear_filter_w4_ver(dst, ref_main, height, delta_int, pred_mode); break;
-            case  8: angular_pred_avx2_linear_filter_w8_ver(dst, ref_main, height, delta_int, pred_mode); break;
-            case 16: angular_pred_avx2_linear_filter_w16_ver(dst, ref_main, height, delta_int, pred_mode); break;
-            case 32: angular_pred_avx2_linear_filter_w32_ver(dst, ref_main, height, delta_int, pred_mode); break;
+            case 32: assert(false && "This code branch only works with UVG_FORMAT_P420."); break; // This branch is never executed with UVG_FORMAT_P420, due to chroma being only 32 width or height.
             default:
               assert(false && "Intra angular predicion: illegal chroma width.\n");
               break;
