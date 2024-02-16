@@ -103,6 +103,9 @@ ALIGNED(32) const int8_t intra_chroma_linear_interpolation_shuffle_vectors_w4_ve
 };
 
 
+// NOTE: shuffle vectors for w8, w16, and w32 vertical do not exists as they are not needed.
+
+
 ALIGNED(32) const int8_t intra_chroma_linear_interpolation_shuffle_vectors_w4_hor[] = {
   0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,  // Mode 2
   0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05,

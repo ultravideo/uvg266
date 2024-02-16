@@ -2746,6 +2746,7 @@ static void uvg_angular_pred_avx2(
         if (vertical_mode) {
           switch (width) {
           case  4: 
+            // TODO: handle extreme wide angles separately. Most wide angles can be handled with the old code.
             if (wide_angle_mode) 
               angular_pred_avx2_linear_filter_w4_ver_wide_angle(dst, ref_main, height, pred_mode, delta_int, delta_fract); 
             else
