@@ -1479,7 +1479,7 @@ static void angular_pred_avx2_linear_filter_w32_ver(uvg_pixel* dst, uvg_pixel* r
     const int16_t* coeff_tmp = (const int16_t*)&coeff_table[coeff_table_offset + (y << 1)];
     __m256i vcoeff = _mm256_set1_epi16(*coeff_tmp);
 
-    __m128i vsrc[4];
+    ALIGNED(32) __m128i vsrc[4];
     vsrc[0] = _mm_loadu_si128((const __m128i*) & ref[delta_int[y] + 0 + 1]);
     vsrc[1] = _mm_loadu_si128((const __m128i*) & ref[delta_int[y] + 16 + 1]); // Flip these two middle sources. They will be later flipped back into place by packus
     vsrc[2] = _mm_loadu_si128((const __m128i*) & ref[delta_int[y] + 8 + 1]);
@@ -1881,16 +1881,11 @@ static void angular_pred_avx2_linear_filter_w4_hor_wide_angle(uvg_pixel* dst, uv
   const int width = 4;
   const __m128i v16s = _mm_set1_epi16(16);
 
-  int16_t coeff_tmp[4];
-  for (int x = 0; x < width; ++x) {
-    int8_t tmp[2] = { 32 - delta_fract[x], delta_fract[x] };
-    coeff_tmp[x] = *(int16_t*)tmp;
-  }
+  const int mode_idx = mode < 2 ? mode + 12 : 80 - mode;
+  const int table_offset = mode_idx * 32;
 
-  const __m128i vcoeff0 = _mm_setr_epi16(coeff_tmp[0], coeff_tmp[0], coeff_tmp[0], coeff_tmp[0],
-                                         coeff_tmp[1], coeff_tmp[1], coeff_tmp[1], coeff_tmp[1]);
-  const __m128i vcoeff1 = _mm_setr_epi16(coeff_tmp[2], coeff_tmp[2], coeff_tmp[2], coeff_tmp[2],
-                                         coeff_tmp[3], coeff_tmp[3], coeff_tmp[3], coeff_tmp[3]);
+  const __m128i vcoeff0 = _mm_load_si128((const __m128i*) &intra_chroma_linear_interpolation_weights_w4_hor_wide_angle[table_offset + 0]);
+  const __m128i vcoeff1 = _mm_load_si128((const __m128i*) &intra_chroma_linear_interpolation_weights_w4_hor_wide_angle[table_offset + 16]);
 
   const __m128i vshuf = _mm_setr_epi8(
     0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
@@ -1902,9 +1897,10 @@ static void angular_pred_avx2_linear_filter_w4_hor_wide_angle(uvg_pixel* dst, uv
     0x02, 0x06, 0x0a, 0x0e, 0x03, 0x07, 0x0b, 0x0f
   );
 
+  const __m256i vidx = _mm256_setr_epi64x(delta_int[0], delta_int[1], delta_int[2], delta_int[3]);
+
   // Height has to be at least 4, handle 4 lines at once
   for (int y = 0; y < height; y += 4) {
-    const __m256i vidx = _mm256_setr_epi64x(delta_int[0], delta_int[1], delta_int[2], delta_int[3]);
     const __m256i vsrc_raw = _mm256_i64gather_epi64((const long long*)&ref[y + 1], vidx, 1);
 
     __m128i vsrc0 = _mm256_extracti128_si256(vsrc_raw, 0);
