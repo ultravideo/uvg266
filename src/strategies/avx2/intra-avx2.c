@@ -1887,36 +1887,42 @@ static void angular_pred_avx2_linear_filter_w4_hor_wide_angle(uvg_pixel* dst, uv
     coeff_tmp[x] = *(int16_t*)tmp;
   }
 
-  const __m128i vcoeff = _mm_setr_epi16(coeff_tmp[0], coeff_tmp[1], coeff_tmp[2], coeff_tmp[3],
-                                        coeff_tmp[0], coeff_tmp[1], coeff_tmp[2], coeff_tmp[3]);
+  const __m128i vcoeff0 = _mm_setr_epi16(coeff_tmp[0], coeff_tmp[0], coeff_tmp[0], coeff_tmp[0],
+                                         coeff_tmp[1], coeff_tmp[1], coeff_tmp[1], coeff_tmp[1]);
+  const __m128i vcoeff1 = _mm_setr_epi16(coeff_tmp[2], coeff_tmp[2], coeff_tmp[2], coeff_tmp[2],
+                                         coeff_tmp[3], coeff_tmp[3], coeff_tmp[3], coeff_tmp[3]);
+
+  const __m128i vshuf = _mm_setr_epi8(
+    0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
+    0x08, 0x09, 0x09, 0x0a, 0x0a, 0x0b, 0x0b, 0x0c
+  );
+
+  const __m128i vtranspose = _mm_setr_epi8(
+    0x00, 0x04, 0x08, 0x0c, 0x01, 0x05, 0x09, 0x0d,
+    0x02, 0x06, 0x0a, 0x0e, 0x03, 0x07, 0x0b, 0x0f
+  );
 
   // Height has to be at least 4, handle 4 lines at once
   for (int y = 0; y < height; y += 4) {
-    uvg_pixel src[32];
+    const __m256i vidx = _mm256_setr_epi64x(delta_int[0], delta_int[1], delta_int[2], delta_int[3]);
+    const __m256i vsrc_raw = _mm256_i64gather_epi64((const long long*)&ref[y + 1], vidx, 1);
+
+    __m128i vsrc0 = _mm256_extracti128_si256(vsrc_raw, 0);
+    __m128i vsrc1 = _mm256_extracti128_si256(vsrc_raw, 1);
     
-    // TODO: get rid of this slow crap, this is just here to test the calculations
-    for (int x = 0, d = 0; x < width; ++x, d += 2) {
-      src[d + 0]  = ref[delta_int[x] + y + 1 + 0];
-      src[d + 1]  = ref[delta_int[x] + y + 1 + 1];
-      src[d + 8]  = ref[delta_int[x] + y + 2 + 0];
-      src[d + 9]  = ref[delta_int[x] + y + 2 + 1];
-      src[d + 16] = ref[delta_int[x] + y + 3 + 0];
-      src[d + 17] = ref[delta_int[x] + y + 3 + 1];
-      src[d + 24] = ref[delta_int[x] + y + 4 + 0];
-      src[d + 25] = ref[delta_int[x] + y + 4 + 1];
-    }
+    vsrc0 = _mm_shuffle_epi8(vsrc0, vshuf);
+    vsrc1 = _mm_shuffle_epi8(vsrc1, vshuf);
 
-    const __m128i* vsrc0 = (const __m128i*) & src[0];
-    const __m128i* vsrc1 = (const __m128i*) & src[16];
-
-    __m128i res0 = _mm_maddubs_epi16(*vsrc0, vcoeff);
-    __m128i res1 = _mm_maddubs_epi16(*vsrc1, vcoeff);
+    __m128i res0 = _mm_maddubs_epi16(vsrc0, vcoeff0);
+    __m128i res1 = _mm_maddubs_epi16(vsrc1, vcoeff1);
     res0 = _mm_add_epi16(res0, v16s);
     res1 = _mm_add_epi16(res1, v16s);
     res0 = _mm_srai_epi16(res0, 5);
     res1 = _mm_srai_epi16(res1, 5);
+    __m128i vfinal = _mm_packus_epi16(res0, res1);
+    vfinal = _mm_shuffle_epi8(vfinal, vtranspose);
 
-    _mm_store_si128((__m128i*)dst, _mm_packus_epi16(res0, res1));
+    _mm_store_si128((__m128i*)dst, vfinal);
     dst += 16;
   }
 }
