@@ -1785,7 +1785,6 @@ static void angular_pred_avx2_linear_filter_w32_ver_wide_angle(uvg_pixel* dst, u
 
 static void angular_pred_avx2_linear_filter_w4_hor_wide_angle(uvg_pixel* dst, uvg_pixel* ref, const int height, const int mode, const int16_t* delta_int)
 {
-  const int width = 4;
   const __m128i v16s = _mm_set1_epi16(16);
 
   const int mode_idx = mode < 2 ? mode + 12 : 80 - mode;
@@ -1842,11 +1841,31 @@ static void angular_pred_avx2_linear_filter_w8_hor_wide_angle(uvg_pixel* dst, uv
     coeff_tmp[x] = *(int16_t*)tmp;
   }
 
-  const __m128i vcoeff = _mm_setr_epi16(coeff_tmp[0], coeff_tmp[1], coeff_tmp[2], coeff_tmp[3],
-                                        coeff_tmp[4], coeff_tmp[5], coeff_tmp[6], coeff_tmp[7]);
+  const __m128i vshuf = _mm_setr_epi8(
+    0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
+    0x08, 0x09, 0x09, 0x0a, 0x0a, 0x0b, 0x0b, 0x0c
+  );
 
-  // Height has to be at least 2, handle 2 lines at once
-  for (int y = 0; y < height; y += 2) {
+  const __m128i vtranspose = _mm_setr_epi8(
+    0x00, 0x04, 0x08, 0x0c, 0x01, 0x05, 0x09, 0x0d,
+    0x02, 0x06, 0x0a, 0x0e, 0x03, 0x07, 0x0b, 0x0f
+  );
+
+  const __m256i vidx0 = _mm256_setr_epi64x(delta_int[0], delta_int[1], delta_int[2], delta_int[3]);
+  const __m256i vidx1 = _mm256_setr_epi64x(delta_int[4], delta_int[5], delta_int[6], delta_int[7]);
+
+  const __m128i vcoeff0 = _mm_setr_epi16(coeff_tmp[0], coeff_tmp[0], coeff_tmp[0], coeff_tmp[0],
+                                         coeff_tmp[1], coeff_tmp[1], coeff_tmp[1], coeff_tmp[1]);
+  const __m128i vcoeff1 = _mm_setr_epi16(coeff_tmp[2], coeff_tmp[2], coeff_tmp[2], coeff_tmp[2],
+                                         coeff_tmp[3], coeff_tmp[3], coeff_tmp[3], coeff_tmp[3]);
+  const __m128i vcoeff2 = _mm_setr_epi16(coeff_tmp[4], coeff_tmp[4], coeff_tmp[4], coeff_tmp[4],
+                                         coeff_tmp[5], coeff_tmp[5], coeff_tmp[5], coeff_tmp[5]);
+  const __m128i vcoeff3 = _mm_setr_epi16(coeff_tmp[6], coeff_tmp[6], coeff_tmp[6], coeff_tmp[6],
+                                         coeff_tmp[7], coeff_tmp[7], coeff_tmp[7], coeff_tmp[7]);
+
+  // Height has to be at least 2. Handle as 4x4 blocks. Special handling needed when height == 2.
+  // TODO: make sure this function is not called when height is 2.
+  for (int y = 0; y < height; y += 4) {
     uvg_pixel src[32];
     // TODO: get rid of this slow crap, this is just here to test the calculations
     for (int x = 0, d = 0; x < width; ++x, d += 2) {
@@ -1856,18 +1875,47 @@ static void angular_pred_avx2_linear_filter_w8_hor_wide_angle(uvg_pixel* dst, uv
       src[d + 17] = ref[delta_int[x] + y + 2 + 1];
     }
 
-    const __m128i* vsrc0 = (const __m128i*) & src[0];
-    const __m128i* vsrc1 = (const __m128i*) & src[16];
+    const __m256i vsrc_raw0 = _mm256_i64gather_epi64((const long long*)&ref[y + 1], vidx0, 1);
+    const __m256i vsrc_raw1 = _mm256_i64gather_epi64((const long long*)&ref[y + 1], vidx1, 1);
 
-    __m128i res0 = _mm_maddubs_epi16(*vsrc0, vcoeff);
-    __m128i res1 = _mm_maddubs_epi16(*vsrc1, vcoeff);
+    __m128i vsrc0 = _mm256_extracti128_si256(vsrc_raw0, 0);
+    __m128i vsrc1 = _mm256_extracti128_si256(vsrc_raw0, 1);
+    __m128i vsrc2 = _mm256_extracti128_si256(vsrc_raw1, 0);
+    __m128i vsrc3 = _mm256_extracti128_si256(vsrc_raw1, 1);
+
+    vsrc0 = _mm_shuffle_epi8(vsrc0, vshuf);
+    vsrc1 = _mm_shuffle_epi8(vsrc1, vshuf);
+    vsrc2 = _mm_shuffle_epi8(vsrc2, vshuf);
+    vsrc3 = _mm_shuffle_epi8(vsrc3, vshuf);
+
+    const __m128i* kek0 = (const __m128i*) & src[0];
+    const __m128i* kek1 = (const __m128i*) & src[16];
+
+    __m128i res0 = _mm_maddubs_epi16(vsrc0, vcoeff0);
+    __m128i res1 = _mm_maddubs_epi16(vsrc1, vcoeff1);
+    __m128i res2 = _mm_maddubs_epi16(vsrc2, vcoeff2);
+    __m128i res3 = _mm_maddubs_epi16(vsrc3, vcoeff3);
     res0 = _mm_add_epi16(res0, v16s);
     res1 = _mm_add_epi16(res1, v16s);
+    res2 = _mm_add_epi16(res2, v16s);
+    res3 = _mm_add_epi16(res3, v16s);
     res0 = _mm_srai_epi16(res0, 5);
     res1 = _mm_srai_epi16(res1, 5);
+    res2 = _mm_srai_epi16(res2, 5);
+    res3 = _mm_srai_epi16(res3, 5);
 
-    _mm_store_si128((__m128i*)dst, _mm_packus_epi16(res0, res1));
-    dst += 16;
+    __m128i vtmp0 = _mm_packus_epi16(res0, res1);
+    __m128i vtmp1 = _mm_packus_epi16(res2, res3);
+    vtmp0 = _mm_shuffle_epi8(vtmp0, vtranspose);
+    vtmp1 = _mm_shuffle_epi8(vtmp1, vtranspose);
+
+    __m128i vfinal0 = _mm_unpacklo_epi32(vtmp0, vtmp1);
+    __m128i vfinal1 = _mm_unpackhi_epi32(vtmp0, vtmp1);
+    
+
+    _mm_store_si128((__m128i*)&dst[0],  vfinal0);
+    _mm_store_si128((__m128i*)&dst[16], vfinal1);
+    dst += 32;
   }
 }
 
