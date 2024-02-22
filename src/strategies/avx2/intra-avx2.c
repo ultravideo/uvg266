@@ -1788,10 +1788,10 @@ static void angular_pred_avx2_linear_filter_w4_hor_wide_angle(uvg_pixel* dst, uv
   const __m128i v16s = _mm_set1_epi16(16);
 
   const int mode_idx = mode < 2 ? mode + 12 : 80 - mode;
-  const int table_offset = mode_idx * 32;
+  const int table_offset = mode_idx * 128;
 
-  const __m128i vcoeff0 = _mm_load_si128((const __m128i*) &intra_chroma_linear_interpolation_weights_w4_hor_wide_angle[table_offset + 0]);
-  const __m128i vcoeff1 = _mm_load_si128((const __m128i*) &intra_chroma_linear_interpolation_weights_w4_hor_wide_angle[table_offset + 16]);
+  const __m128i vcoeff0 = _mm_load_si128((const __m128i*) &intra_chroma_linear_interpolation_weights_w16_hor_wide_angle[table_offset + 0]);
+  const __m128i vcoeff1 = _mm_load_si128((const __m128i*) &intra_chroma_linear_interpolation_weights_w16_hor_wide_angle[table_offset + 16]);
 
   const __m128i vshuf = _mm_setr_epi8(
     0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
@@ -1835,12 +1835,6 @@ static void angular_pred_avx2_linear_filter_w8_hor_wide_angle(uvg_pixel* dst, uv
   const int width = 8;
   const __m128i v16s = _mm_set1_epi16(16);
 
-  int16_t coeff_tmp[8];
-  for (int x = 0; x < width; ++x) {
-    int8_t tmp[2] = { 32 - delta_fract[x], delta_fract[x] };
-    coeff_tmp[x] = *(int16_t*)tmp;
-  }
-
   const __m128i vshuf = _mm_setr_epi8(
     0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
     0x08, 0x09, 0x09, 0x0a, 0x0a, 0x0b, 0x0b, 0x0c
@@ -1854,14 +1848,13 @@ static void angular_pred_avx2_linear_filter_w8_hor_wide_angle(uvg_pixel* dst, uv
   const __m256i vidx0 = _mm256_setr_epi64x(delta_int[0], delta_int[1], delta_int[2], delta_int[3]);
   const __m256i vidx1 = _mm256_setr_epi64x(delta_int[4], delta_int[5], delta_int[6], delta_int[7]);
 
-  const __m128i vcoeff0 = _mm_setr_epi16(coeff_tmp[0], coeff_tmp[0], coeff_tmp[0], coeff_tmp[0],
-                                         coeff_tmp[1], coeff_tmp[1], coeff_tmp[1], coeff_tmp[1]);
-  const __m128i vcoeff1 = _mm_setr_epi16(coeff_tmp[2], coeff_tmp[2], coeff_tmp[2], coeff_tmp[2],
-                                         coeff_tmp[3], coeff_tmp[3], coeff_tmp[3], coeff_tmp[3]);
-  const __m128i vcoeff2 = _mm_setr_epi16(coeff_tmp[4], coeff_tmp[4], coeff_tmp[4], coeff_tmp[4],
-                                         coeff_tmp[5], coeff_tmp[5], coeff_tmp[5], coeff_tmp[5]);
-  const __m128i vcoeff3 = _mm_setr_epi16(coeff_tmp[6], coeff_tmp[6], coeff_tmp[6], coeff_tmp[6],
-                                         coeff_tmp[7], coeff_tmp[7], coeff_tmp[7], coeff_tmp[7]);
+  const int mode_idx = mode < 2 ? mode + 12 : 80 - mode;
+  const int table_offset = mode_idx * 128;
+
+  const __m128i vcoeff0 = _mm_load_si128((const __m128i*) & intra_chroma_linear_interpolation_weights_w16_hor_wide_angle[table_offset + 0]);
+  const __m128i vcoeff1 = _mm_load_si128((const __m128i*) & intra_chroma_linear_interpolation_weights_w16_hor_wide_angle[table_offset + 16]);
+  const __m128i vcoeff2 = _mm_load_si128((const __m128i*) & intra_chroma_linear_interpolation_weights_w16_hor_wide_angle[table_offset + 32]);
+  const __m128i vcoeff3 = _mm_load_si128((const __m128i*) & intra_chroma_linear_interpolation_weights_w16_hor_wide_angle[table_offset + 48]);
 
   // Height has to be at least 2. Handle as 4x4 blocks. Special handling needed when height == 2.
   // TODO: make sure this function is not called when height is 2.
@@ -1932,21 +1925,17 @@ static void angular_pred_avx2_linear_filter_w16_hor_wide_angle(uvg_pixel* dst, u
     0x02, 0x06, 0x0a, 0x0e, 0x03, 0x07, 0x0b, 0x0f
   );
 
-  int16_t coeff_tmp[16];
-  for (int x = 0; x < width; ++x) {
-    int8_t tmp[2] = { 32 - delta_fract[x], delta_fract[x] };
-    coeff_tmp[x] = *(int16_t*)tmp;
-  }
-
   __m256i vidx[4];
   for (int i = 0, d = 0; i < 4; ++i, d += 4) {
     vidx[i] = _mm256_setr_epi64x(delta_int[d + 0], delta_int[d + 1], delta_int[d + 2], delta_int[d + 3]);
   }
 
+  const int mode_idx = mode < 2 ? mode + 12 : 80 - mode;
+  const int table_offset = mode_idx * 128;
+
   __m128i vcoeff[8];
-  for (int i = 0, c = 0; i < 8; ++i, c += 2) {
-    vcoeff[i] = _mm_setr_epi16(coeff_tmp[c + 0], coeff_tmp[c + 0], coeff_tmp[c + 0], coeff_tmp[c + 0],
-                               coeff_tmp[c + 1], coeff_tmp[c + 1], coeff_tmp[c + 1], coeff_tmp[c + 1]);
+  for (int i = 0, o = 0; i < 8; ++i, o += 16) {
+    vcoeff[i] = _mm_load_si128((const __m128i*) & intra_chroma_linear_interpolation_weights_w16_hor_wide_angle[table_offset + o]);
   }
 
   // Height has to be at least 2. Handle as 4x4 blocks. Special handling needed when height < 4.
