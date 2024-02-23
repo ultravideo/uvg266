@@ -1845,8 +1845,13 @@ static void angular_pred_avx2_linear_filter_w8_hor_wide_angle(uvg_pixel* dst, uv
     0x02, 0x06, 0x0a, 0x0e, 0x03, 0x07, 0x0b, 0x0f
   );
 
-  const __m256i vidx0 = _mm256_setr_epi64x(delta_int[0], delta_int[1], delta_int[2], delta_int[3]);
-  const __m256i vidx1 = _mm256_setr_epi64x(delta_int[4], delta_int[5], delta_int[6], delta_int[7]);
+  const __m128i vidxshuf = _mm_setr_epi8(0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+                                         0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff); // Don't care
+  __m128i vidx_raw = _mm_load_si128((__m128i*)delta_int);
+
+  const __m256i vidx0 = _mm256_cvtepi16_epi64(vidx_raw);
+  vidx_raw = _mm_shuffle_epi8(vidx_raw, vidxshuf);
+  const __m256i vidx1 = _mm256_cvtepi16_epi64(vidx_raw);
 
   const int mode_idx = mode < 2 ? mode + 12 : 80 - mode;
   const int table_offset = mode_idx * 128;
@@ -1916,10 +1921,20 @@ static void angular_pred_avx2_linear_filter_w16_hor_wide_angle(uvg_pixel* dst, u
     0x02, 0x06, 0x0a, 0x0e, 0x03, 0x07, 0x0b, 0x0f
   );
 
+  const __m128i vidxshuf = _mm_setr_epi8(0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+                                         0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff); // Don't care
+
+  __m128i vidx_raw0 = _mm_load_si128((__m128i*) & delta_int[0]);
+  __m128i vidx_raw1 = _mm_load_si128((__m128i*) & delta_int[8]);
+
   __m256i vidx[4];
-  for (int i = 0, d = 0; i < 4; ++i, d += 4) {
-    vidx[i] = _mm256_setr_epi64x(delta_int[d + 0], delta_int[d + 1], delta_int[d + 2], delta_int[d + 3]);
-  }
+  vidx[0] = _mm256_cvtepi16_epi64(vidx_raw0);
+  vidx_raw0 = _mm_shuffle_epi8(vidx_raw0, vidxshuf);
+  vidx[1] = _mm256_cvtepi16_epi64(vidx_raw0);
+
+  vidx[2] = _mm256_cvtepi16_epi64(vidx_raw1);
+  vidx_raw1 = _mm_shuffle_epi8(vidx_raw1, vidxshuf);
+  vidx[3] = _mm256_cvtepi16_epi64(vidx_raw1);
 
   const int mode_idx = mode < 2 ? mode + 12 : 80 - mode;
   const int table_offset = mode_idx * 128;
