@@ -1859,15 +1859,6 @@ static void angular_pred_avx2_linear_filter_w8_hor_wide_angle(uvg_pixel* dst, uv
   // Height has to be at least 2. Handle as 4x4 blocks. Special handling needed when height == 2.
   // TODO: make sure this function is not called when height is 2.
   for (int y = 0; y < height; y += 4) {
-    uvg_pixel src[32];
-    // TODO: get rid of this slow crap, this is just here to test the calculations
-    for (int x = 0, d = 0; x < width; ++x, d += 2) {
-      src[d + 0] = ref[delta_int[x] + y + 1 + 0];
-      src[d + 1] = ref[delta_int[x] + y + 1 + 1];
-      src[d + 16] = ref[delta_int[x] + y + 2 + 0];
-      src[d + 17] = ref[delta_int[x] + y + 2 + 1];
-    }
-
     const __m256i vsrc_raw0 = _mm256_i64gather_epi64((const long long*)&ref[y + 1], vidx0, 1);
     const __m256i vsrc_raw1 = _mm256_i64gather_epi64((const long long*)&ref[y + 1], vidx1, 1);
 
