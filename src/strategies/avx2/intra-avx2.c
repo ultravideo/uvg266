@@ -2453,10 +2453,9 @@ static void angular_pdpc_hor_w4_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, 
   int16_t ref_top[4][4];
 
   int limit = MIN(3 << scale, height);
-  const int log2_width = uvg_g_convert_to_log2[width];
 
   __m128i vseq = _mm_setr_epi32(0, 1, 2, 3);
-  __m128i vidx = _mm_slli_epi32(vseq, log2_width);
+  __m128i vidx = _mm_slli_epi32(vseq, 2); // 2 is log2_width
   __m256i v32s = _mm256_set1_epi16(32);
 
   // Scale can be 0, 1 or 2
