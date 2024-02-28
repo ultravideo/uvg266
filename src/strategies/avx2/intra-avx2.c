@@ -2458,29 +2458,24 @@ static void angular_pdpc_hor_w4_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, 
   __m128i vseq = _mm_setr_epi32(0, 1, 2, 3);
   __m128i vidx = _mm_slli_epi32(vseq, log2_width);
   __m256i v32s = _mm256_set1_epi16(32);
-  __m256i vwT_shuffle = _mm256_setr_epi8(0, 1, 0, 1, 0, 1, 0, 1,
-                                         2, 3, 2, 3, 2, 3, 2, 3,
-                                         4, 5, 4, 5, 4, 5, 4, 5,
-                                         6, 7, 6, 7, 6, 7, 6, 7);
-  for (int y = 0; y < limit; y += 4) {
+
+  // Scale can be 0, 1 or 2
+  const int table_offset = scale * 64;
+
+  for (int y = 0, o = 0; y < limit; y += 4, o += 16) {
     for (int yy = 0; yy < 4; ++yy) {
       int inv_angle_sum = 256 + (y + yy + 1) * inv_sample_disp;
-
-      // Set weight to zero if limit reached.
-      // This removes the need to blend results with unmodified values in the end.
-      wT[yy] = y + yy < limit ? 32 >> (2 * (y + yy) >> scale) : 0;
       for (int x = 0; x < 4; ++x) {
         ref_top[yy][x] = ref_side[(x) + (inv_angle_sum >> 9) + 1];
       }
     }
+    const int offset = table_offset + o;
 
     __m128i vpred = _mm_i32gather_epi32((const int32_t*)(dst + y * width), vidx, 1);
     __m256i vpred16 = _mm256_cvtepu8_epi16(vpred);
     __m256i vtop = _mm256_loadu_si256((__m256i*)ref_top);
-    uint64_t quad;
-    memcpy(&quad, wT, sizeof(quad));
-    __m256i vwT = _mm256_set1_epi64x(quad);
-    vwT = _mm256_shuffle_epi8(vwT, vwT_shuffle);
+    __m256i vwT = _mm256_load_si256((const __m256i*)&intra_pdpc_w4_hor_weight[offset]);
+
     __m256i accu = _mm256_sub_epi16(vtop, vpred16);
     accu = _mm256_mullo_epi16(vwT, accu);
     accu = _mm256_add_epi16(accu, v32s);
