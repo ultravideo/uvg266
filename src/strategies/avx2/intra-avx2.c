@@ -2104,10 +2104,9 @@ static void angular_pdpc_ver_w4_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, 
   int16_t left[4][4];
 
   int limit = MIN(3 << scale, width);
-  const int log2_width = uvg_g_convert_to_log2[width];
 
   __m128i vseq = _mm_setr_epi32(0, 1, 2, 3);
-  __m128i vidx = _mm_slli_epi32(vseq, log2_width);
+  //__m128i vidx = _mm_slli_epi32(vseq, 2); // 2 is log2 width
   __m256i v32s = _mm256_set1_epi16(32);
 
   // Scale can be 0, 1 or 2
@@ -2124,7 +2123,7 @@ static void angular_pdpc_ver_w4_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, 
       }
     }
 
-    __m128i vdst = _mm_i32gather_epi32((const int32_t*)(dst + y * width), vidx, 1);
+    __m128i vdst = _mm_i32gather_epi32((const int32_t*)(dst + y * width), vseq, 4);
     __m256i vdst16 = _mm256_cvtepu8_epi16(vdst);
     __m256i vleft = _mm256_loadu_si256((__m256i*)left);
 
@@ -2147,35 +2146,30 @@ static void angular_pdpc_ver_w8_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, 
   const int width = 8;
   
   int limit = MIN(3 << scale, width);
-  const int log2_width = uvg_g_convert_to_log2[width];
 
   __m128i vseq = _mm_setr_epi32(0x00, 0x00, 0x01, 0x00);
-  __m128i vidx = _mm_slli_epi64(vseq, log2_width);
+  //__m128i vidx = _mm_slli_epi64(vseq, 3); // 3 is log2 width
   __m256i v32s = _mm256_set1_epi16(32);
+
+  const int offset = scale * 16;
+  const __m256i vweight = _mm256_load_si256((const __m256i*)&intra_pdpc_w8_ver_weight[offset]);
 
   // For width 8, height must be at least 2. Handle 2 lines at once.
   for (int y = 0; y < height; y += 2) {
-    ALIGNED(32) int16_t wL[8] = {0};
     ALIGNED(32) int16_t left[16] = {0};
     for (int xx = 0; xx < limit; ++xx) {
       int shifted_inv_angle_sum = (256 + (xx + 1) * inv_sample_disp) >> 9;
-      wL[xx] = xx < limit ? 32 >> ((2 * xx) >> scale) : 0;
-
       for (int yy = 0; yy < 2; ++yy) {
         left[yy * width +xx] = ref_side[(y + yy) + shifted_inv_angle_sum + 1];
       }
     }
 
-    __m128i vdst = _mm_i64gather_epi64((const int64_t*)(dst + y * width), vidx, 1);
+    __m128i vdst = _mm_i64gather_epi64((const int64_t*)(dst + y * width), vseq, 8);
     __m256i vdst16 = _mm256_cvtepu8_epi16(vdst);
     __m256i vleft = _mm256_loadu_si256((__m256i*)left);
-    __m128i tmp[2];
-    // Duplicate weights
-    tmp[0] = _mm_load_si128((__m128i*)wL);
-    tmp[1] = tmp[0];
-    __m256i* vwL = (__m256i*)tmp;
+    
     __m256i accu = _mm256_sub_epi16(vleft, vdst16);
-    accu = _mm256_mullo_epi16(*vwL, accu);
+    accu = _mm256_mullo_epi16(vweight, accu);
     accu = _mm256_add_epi16(accu, v32s);
     accu = _mm256_srai_epi16(accu, 6);
     accu = _mm256_add_epi16(vdst16, accu);
