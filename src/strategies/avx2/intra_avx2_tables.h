@@ -1339,4 +1339,12 @@ ALIGNED(32) const int16_t intra_pdpc_w8_ver_weight[] = {
 };
 
 
+// Weights for intra pdpc w16 vertical.
+ALIGNED(32) const int16_t intra_pdpc_w16_ver_weight[] = {
+  32,  8,  2,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  // Scale 0
+  32, 16,  8,  4,  2,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  // Scale 1
+  32, 32, 16, 16,  8,  8,  4,  4,  2,  2,  1,  1,  0,  0,  0,  0,  // Scale 2
+};
+
+
 #endif INTRA_AVX2_TABLES_H

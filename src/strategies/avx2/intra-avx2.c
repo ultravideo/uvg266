@@ -2184,31 +2184,26 @@ static void angular_pdpc_ver_w8_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, 
 
 static void angular_pdpc_ver_w16_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int width, const int height, const int scale, const int16_t inv_sample_disp)
 {
-  
-
   int limit = MIN(3 << scale, width);
-  const int log2_width = uvg_g_convert_to_log2[width];
-
-  __m128i vseq = _mm_setr_epi32(0x00, 0x00, 0x01, 0x00);
-  __m128i vidx = _mm_slli_epi64(vseq, log2_width);
   __m256i v32s = _mm256_set1_epi16(32);
+
+  const int offset = scale * 16;
+  const __m256i vweight = _mm256_load_si256((const __m256i*)&intra_pdpc_w16_ver_weight[offset]);
 
   for (int y = 0; y < height; ++y) {
     for (int  x = 0; x < limit; x += 16) {
-      ALIGNED(32) int16_t wL[16] = {0};
       ALIGNED(32) int16_t left[16] = {0};
       for (int xx = 0; x + xx < limit; ++xx) {
         int shifted_inv_angle_sum = (256 + (x + xx + 1) * inv_sample_disp) >> 9;
-        wL[xx] = xx < limit ? 32 >> ((2 * (x + xx)) >> scale) : 0;
         left[xx] = ref_side[y + shifted_inv_angle_sum + 1];
       }
 
       __m128i vdst = _mm_load_si128((const __m128i*)(dst + (y * width + x)));
       __m256i vdst16 = _mm256_cvtepu8_epi16(vdst);
       __m256i vleft = _mm256_loadu_si256((__m256i*)left);
-      __m256i* vwL = (__m256i*)wL;
+
       __m256i accu = _mm256_sub_epi16(vleft, vdst16);
-      accu = _mm256_mullo_epi16(*vwL, accu);
+      accu = _mm256_mullo_epi16(vweight, accu);
       accu = _mm256_add_epi16(accu, v32s);
       accu = _mm256_srai_epi16(accu, 6);
       accu = _mm256_add_epi16(vdst16, accu);
