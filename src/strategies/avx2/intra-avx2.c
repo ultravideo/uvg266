@@ -2101,7 +2101,6 @@ static void angular_pdpc_ver_old_avx2(uvg_pixel* dst, const uvg_pixel* ref_side,
 static void angular_pdpc_ver_w4_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int height, const int scale, const int16_t inv_sample_disp)
 {
   const int width = 4;
-  int16_t wL[4];
   int16_t left[4][4];
 
   int limit = MIN(3 << scale, width);
@@ -2111,11 +2110,14 @@ static void angular_pdpc_ver_w4_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, 
   __m128i vidx = _mm_slli_epi32(vseq, log2_width);
   __m256i v32s = _mm256_set1_epi16(32);
 
+  // Scale can be 0, 1 or 2
+  const int offset = scale * 16;
+  const __m256i vweight = _mm256_load_si256((const __m256i*)&intra_pdpc_w4_ver_weight[offset]);
+
   // For a 4 width block, height must be at least 4. Handle 4 lines at once.
   for (int y = 0; y < height; y += 4) {
     for (int xx = 0; xx < width; ++xx) {
       int shifted_inv_angle_sum = (256 + (xx + 1) * inv_sample_disp) >> 9;
-      wL[xx] = xx < limit ? 32 >> ((2 * xx) >> scale) : 0;
 
       for (int yy = 0; yy < 4; ++yy) {
         left[yy][xx] = ref_side[(y + yy) + shifted_inv_angle_sum + 1];
@@ -2125,11 +2127,9 @@ static void angular_pdpc_ver_w4_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, 
     __m128i vdst = _mm_i32gather_epi32((const int32_t*)(dst + y * width), vidx, 1);
     __m256i vdst16 = _mm256_cvtepu8_epi16(vdst);
     __m256i vleft = _mm256_loadu_si256((__m256i*)left);
-    uint64_t quad;
-    memcpy(&quad, wL, sizeof(quad));
-    __m256i vwL = _mm256_set1_epi64x(quad);
+
     __m256i accu = _mm256_sub_epi16(vleft, vdst16);
-    accu = _mm256_mullo_epi16(vwL, accu);
+    accu = _mm256_mullo_epi16(vweight, accu);
     accu = _mm256_add_epi16(accu, v32s);
     accu = _mm256_srai_epi16(accu, 6);
     accu = _mm256_add_epi16(vdst16, accu);
@@ -2855,12 +2855,12 @@ static void uvg_angular_pred_avx2(
     }
     if (PDPC_filter) {
       if (vertical_mode)
-        switch (height) {
-          case 4:  angular_pdpc_ver_h4_avx2(dst, ref_side, width, scale, modedisp2invsampledisp[abs(mode_disp)]); break;
-          case 8:  angular_pdpc_ver_h8_avx2(dst, ref_side, width, scale, modedisp2invsampledisp[abs(mode_disp)]); break;
+        switch (width) {
+          case 4:  angular_pdpc_ver_w4_avx2(dst, ref_side, width, scale, modedisp2invsampledisp[abs(mode_disp)]); break;
+          case 8:  angular_pdpc_ver_w8_avx2(dst, ref_side, width, scale, modedisp2invsampledisp[abs(mode_disp)]); break;
           case 16: // 16 height and higher done with the same function
           case 32:
-          case 64: angular_pdpc_ver_h16_avx2(dst, ref_side, width, height, scale, modedisp2invsampledisp[abs(mode_disp)]); break;
+          case 64: angular_pdpc_ver_w16_avx2(dst, ref_side, width, height, scale, modedisp2invsampledisp[abs(mode_disp)]); break;
           default:
             assert(false && "Intra PDPC: Invalid width.\n");
         }
