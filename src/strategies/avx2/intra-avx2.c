@@ -2396,7 +2396,9 @@ static void angular_pdpc_hor_old_avx2(uvg_pixel* dst, const uvg_pixel* ref_side,
         // Set weight to zero if limit reached.
         // This removes the need to blend results with unmodified values in the end.
         wT[yy] = y + yy < limit ? 32 >> (2 * (y + yy) >> scale) : 0;
-        memcpy(ref_top[yy], &ref_side[(x) + (inv_angle_sum >> 9) + 1], 4 * sizeof(int16_t));
+        for (int xx = 0; xx < 4; ++xx) {
+          ref_top[yy][xx] = ref_side[(x + xx) + (inv_angle_sum >> 9) + 1];
+        }
       }
 
       __m128i vpred = _mm_i32gather_epi32((const int32_t*)(dst + y * width + x), vidx, 1);
@@ -2451,7 +2453,9 @@ static void angular_pdpc_hor_w4_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, 
   for (int y = 0, o = 0; y < limit; y += 4, o += 16) {
     for (int yy = 0; yy < 4; ++yy) {
       int inv_angle_sum = (256 + (y + yy + 1) * inv_sample_disp) >> 9;
-      memcpy(ref_top[yy], &ref_side[(inv_angle_sum >> 9) + 1], 4 * sizeof(int16_t));
+      for (int x = 0; x < 4; ++x) {
+        ref_top[yy][x] = ref_side[x + inv_angle_sum + 1];
+      }
     }
     const int offset = table_offset + o;
 
