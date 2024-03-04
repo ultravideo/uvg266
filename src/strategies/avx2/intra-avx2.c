@@ -2225,6 +2225,57 @@ static void angular_pdpc_ver_w16_avx2(uvg_pixel* dst, const uvg_pixel* ref_side,
   }
 }
 
+static void angular_pdpc_ver_w16_scale0_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int width, const int height, const int mode_disp)
+{
+  // NOTE: This function is just the w4 function, retrofitted to work with width 16 and up when scale is 0.
+  // Since scale is 0, limit is 3 and therefore there is no meaningful work to be done when x > 3, so only the first column of 4x4 chunks is handled.
+  const int scale = 0;
+  int16_t left[4][4];
+  const int log2_width = uvg_g_convert_to_log2[width];
+
+  const int limit = 3;
+
+  __m128i vseq = _mm_setr_epi32(0, 1, 2, 3);
+  __m128i vidx = _mm_slli_epi32(vseq, log2_width);
+  __m256i v32s = _mm256_set1_epi16(32);
+
+  // Scale can be 0, 1 or 2
+  const int offset = scale * 16;
+  const __m256i vweight = _mm256_load_si256((const __m256i*) & intra_pdpc_w4_ver_weight[offset]);
+
+  const int inv_angle_offset = mode_disp * 64;
+  int16_t shifted_inv_angle_sum[64];
+  memcpy(shifted_inv_angle_sum, &intra_pdpc_shifted_inv_angle_sum[inv_angle_offset], height * sizeof(int16_t)); // TODO: would this be faster if the max amount (64) would be always loaded?
+
+  // For a 4 width block, height must be at least 4. Handle 4 lines at once.
+  for (int y = 0; y < height; y += 4) {
+    for (int xx = 0; xx < 4; ++xx) {
+      for (int yy = 0; yy < 4; ++yy) {
+        left[yy][xx] = ref_side[(y + yy) + shifted_inv_angle_sum[xx] + 1];
+      }
+    }
+
+    __m128i vdst = _mm_i32gather_epi32((const int32_t*)(dst + y * 4), vidx, 1);
+    __m256i vdst16 = _mm256_cvtepu8_epi16(vdst);
+    __m256i vleft = _mm256_loadu_si256((__m256i*)left);
+
+    __m256i accu = _mm256_sub_epi16(vleft, vdst16);
+    accu = _mm256_mullo_epi16(vweight, accu);
+    accu = _mm256_add_epi16(accu, v32s);
+    accu = _mm256_srai_epi16(accu, 6);
+    accu = _mm256_add_epi16(vdst16, accu);
+
+    __m128i lo = _mm256_castsi256_si128(accu);
+    __m128i hi = _mm256_extracti128_si256(accu, 1);
+    __m128i filtered = _mm_packus_epi16(lo, hi);
+
+    *(uint32_t*)(dst + (y + 0) * width) = _mm_extract_epi32(filtered, 0);
+    *(uint32_t*)(dst + (y + 1) * width) = _mm_extract_epi32(filtered, 1);
+    *(uint32_t*)(dst + (y + 2) * width) = _mm_extract_epi32(filtered, 2);
+    *(uint32_t*)(dst + (y + 3) * width) = _mm_extract_epi32(filtered, 3);
+  }
+}
+
 
 // Height versions of vertical PDPC
 
@@ -2861,17 +2912,27 @@ static void uvg_angular_pred_avx2(
       }
     }
     if (PDPC_filter) {
-      if (vertical_mode)
+      if (vertical_mode) {
         switch (width) {
           case 4:  angular_pdpc_ver_w4_avx2(dst, ref_side, width, scale, mode_disp); break;
           case 8:  angular_pdpc_ver_w8_avx2(dst, ref_side, width, scale, mode_disp); break;
           case 16: // 16 height and higher done with the same function
           case 32:
-          case 64: angular_pdpc_ver_w16_avx2(dst, ref_side, width, height, scale, mode_disp); break;
+          case 64: 
+            switch (scale) {
+              case 0: angular_pdpc_ver_w16_scale0_avx2(dst, ref_side, width, height, mode_disp); break;
+              //case 0: angular_pdpc_ver_w16_avx2(dst, ref_side, width, height, scale, mode_disp); break;
+              case 1: angular_pdpc_ver_w16_avx2(dst, ref_side, width, height, scale, mode_disp); break;
+              case 2: angular_pdpc_ver_w16_avx2(dst, ref_side, width, height, scale, mode_disp); break;
+              default:
+                assert(false && "Intra PDPC: Invalid scale.\n");
+            }
+            break;
           default:
             assert(false && "Intra PDPC: Invalid width.\n");
         }
-      else
+      }
+      else {
         switch (width) {
           case 4:  angular_pdpc_hor_w4_avx2(dst, ref_side, height, scale, mode_disp); break;
           case 8:  angular_pdpc_hor_w8_avx2(dst, ref_side, height, scale, mode_disp); break;
@@ -2881,6 +2942,7 @@ static void uvg_angular_pred_avx2(
           default:
             assert(false && "Intra PDPC: Invalid width.\n");
         }
+      }
     } 
   }
 }
