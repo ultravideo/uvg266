@@ -2098,7 +2098,7 @@ static void angular_pdpc_ver_old_avx2(uvg_pixel* dst, const uvg_pixel* ref_side,
   }
 }
 
-static void angular_pdpc_ver_w4_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int height, const int scale, const int16_t inv_sample_disp)
+static void angular_pdpc_ver_w4_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int height, const int scale, const int mode_disp)
 {
   const int width = 4;
   int16_t left[4][4];
@@ -2113,13 +2113,15 @@ static void angular_pdpc_ver_w4_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, 
   const int offset = scale * 16;
   const __m256i vweight = _mm256_load_si256((const __m256i*)&intra_pdpc_w4_ver_weight[offset]);
 
+  const int inv_angle_offset = mode_disp * 64;
+  int16_t shifted_inv_angle_sum[64];
+  memcpy(shifted_inv_angle_sum, &intra_pdpc_shifted_inv_angle_sum[inv_angle_offset], height * sizeof(int16_t)); // TODO: would this be faster if the max amount (64) would be always loaded?
+
   // For a 4 width block, height must be at least 4. Handle 4 lines at once.
   for (int y = 0; y < height; y += 4) {
     for (int xx = 0; xx < width; ++xx) {
-      int shifted_inv_angle_sum = (256 + (xx + 1) * inv_sample_disp) >> 9;
-
       for (int yy = 0; yy < 4; ++yy) {
-        left[yy][xx] = ref_side[(y + yy) + shifted_inv_angle_sum + 1];
+        left[yy][xx] = ref_side[(y + yy) + shifted_inv_angle_sum[xx] + 1];
       }
     }
 
@@ -2141,7 +2143,7 @@ static void angular_pdpc_ver_w4_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, 
   }
 }
 
-static void angular_pdpc_ver_w8_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int height, const int scale, const int16_t inv_sample_disp)
+static void angular_pdpc_ver_w8_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int height, const int scale, const int mode_disp)
 {
   const int width = 8;
   
@@ -2154,13 +2156,16 @@ static void angular_pdpc_ver_w8_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, 
   const int offset = scale * 16;
   const __m256i vweight = _mm256_load_si256((const __m256i*)&intra_pdpc_w8_ver_weight[offset]);
 
+  const int inv_angle_offset = mode_disp * 64;
+  int16_t shifted_inv_angle_sum[64];
+  memcpy(shifted_inv_angle_sum, &intra_pdpc_shifted_inv_angle_sum[inv_angle_offset], height * sizeof(int16_t)); // TODO: would this be faster if the max amount (64) would be always loaded?
+
   // For width 8, height must be at least 2. Handle 2 lines at once.
   for (int y = 0; y < height; y += 2) {
     ALIGNED(32) int16_t left[16] = {0};
     for (int xx = 0; xx < limit; ++xx) {
-      int shifted_inv_angle_sum = (256 + (xx + 1) * inv_sample_disp) >> 9;
       for (int yy = 0; yy < 2; ++yy) {
-        left[yy * width +xx] = ref_side[(y + yy) + shifted_inv_angle_sum + 1];
+        left[yy * width +xx] = ref_side[(y + yy) + shifted_inv_angle_sum[xx] + 1];
       }
     }
 
@@ -2182,7 +2187,7 @@ static void angular_pdpc_ver_w8_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, 
   }
 }
 
-static void angular_pdpc_ver_w16_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int width, const int height, const int scale, const int16_t inv_sample_disp)
+static void angular_pdpc_ver_w16_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int width, const int height, const int scale, const int mode_disp)
 {
   int limit = MIN(3 << scale, width);
   __m256i v32s = _mm256_set1_epi16(32);
@@ -2190,12 +2195,15 @@ static void angular_pdpc_ver_w16_avx2(uvg_pixel* dst, const uvg_pixel* ref_side,
   const int offset = scale * 16;
   const __m256i vweight = _mm256_load_si256((const __m256i*)&intra_pdpc_w16_ver_weight[offset]);
 
+  const int inv_angle_offset = mode_disp * 64;
+  int16_t shifted_inv_angle_sum[64];
+  memcpy(shifted_inv_angle_sum, &intra_pdpc_shifted_inv_angle_sum[inv_angle_offset], height * sizeof(int16_t)); // TODO: would this be faster if the max amount (64) would be always loaded?
+
   for (int y = 0; y < height; ++y) {
     for (int  x = 0; x < limit; x += 16) {
       ALIGNED(32) int16_t left[16] = {0};
       for (int xx = 0; x + xx < limit; ++xx) {
-        int shifted_inv_angle_sum = (256 + (x + xx + 1) * inv_sample_disp) >> 9;
-        left[xx] = ref_side[y + shifted_inv_angle_sum + 1];
+        left[xx] = ref_side[y + shifted_inv_angle_sum[xx] + 1];
       }
 
       __m128i vdst = _mm_load_si128((const __m128i*)(dst + (y * width + x)));
@@ -2855,11 +2863,11 @@ static void uvg_angular_pred_avx2(
     if (PDPC_filter) {
       if (vertical_mode)
         switch (width) {
-          case 4:  angular_pdpc_ver_w4_avx2(dst, ref_side, width, scale, modedisp2invsampledisp[abs(mode_disp)]); break;
-          case 8:  angular_pdpc_ver_w8_avx2(dst, ref_side, width, scale, modedisp2invsampledisp[abs(mode_disp)]); break;
+          case 4:  angular_pdpc_ver_w4_avx2(dst, ref_side, width, scale, mode_disp); break;
+          case 8:  angular_pdpc_ver_w8_avx2(dst, ref_side, width, scale, mode_disp); break;
           case 16: // 16 height and higher done with the same function
           case 32:
-          case 64: angular_pdpc_ver_w16_avx2(dst, ref_side, width, height, scale, modedisp2invsampledisp[abs(mode_disp)]); break;
+          case 64: angular_pdpc_ver_w16_avx2(dst, ref_side, width, height, scale, mode_disp); break;
           default:
             assert(false && "Intra PDPC: Invalid width.\n");
         }
