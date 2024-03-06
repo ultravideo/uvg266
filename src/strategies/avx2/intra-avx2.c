@@ -2543,7 +2543,7 @@ static void angular_pdpc_hor_w4_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, 
   const int width = 4;
 
   int16_t wT[4];
-  int16_t ref_top[4][4];
+  int8_t ref_top[4][4];
 
   int limit = MIN(3 << scale, height);
 
@@ -2558,18 +2558,17 @@ static void angular_pdpc_hor_w4_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, 
 
   for (int y = 0, o = 0; y < limit; y += 4, o += 16) {
     for (int yy = 0; yy < 4; ++yy) {
-      for (int x = 0; x < 4; ++x) {
-        ref_top[yy][x] = ref_side[x + shifted_inv_angle_sum[y + yy] + 1]; // TODO: this can be done with a 32-bit gather. NOTE: 8-bit values must be extended to 16-bit.
-      }
+      memcpy(ref_top[yy], &ref_side[shifted_inv_angle_sum[y + yy] + 1], 4 * sizeof(int8_t));
     }
     const int offset = table_offset + o;
 
     __m128i vpred = _mm_i32gather_epi32((const int32_t*)(dst + y * width), vidx, 1);
     __m256i vpred16 = _mm256_cvtepu8_epi16(vpred);
-    __m256i vtop = _mm256_loadu_si256((__m256i*)ref_top);
+    __m128i vtop = _mm_loadu_si128((__m128i*)ref_top);
+    __m256i vtop16 = _mm256_cvtepu8_epi16(vtop);
     __m256i vwT = _mm256_load_si256((const __m256i*)&intra_pdpc_w4_hor_weight[offset]);
 
-    __m256i accu = _mm256_sub_epi16(vtop, vpred16);
+    __m256i accu = _mm256_sub_epi16(vtop16, vpred16);
     accu = _mm256_mullo_epi16(vwT, accu);
     accu = _mm256_add_epi16(accu, v32s);
     accu = _mm256_srai_epi16(accu, 6);
