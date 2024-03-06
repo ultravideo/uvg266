@@ -2114,8 +2114,7 @@ static void angular_pdpc_ver_w4_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, 
   const __m256i vweight = _mm256_load_si256((const __m256i*)&intra_pdpc_w4_ver_weight[offset]);
 
   const int inv_angle_offset = mode_disp * 64;
-  int16_t shifted_inv_angle_sum[64];
-  memcpy(shifted_inv_angle_sum, &intra_pdpc_shifted_inv_angle_sum[inv_angle_offset], height * sizeof(int16_t)); // TODO: would this be faster if the max amount (64) would be always loaded?
+  const int16_t* shifted_inv_angle_sum = &intra_pdpc_shifted_inv_angle_sum[inv_angle_offset];
 
   // For a 4 width block, height must be at least 4. Handle 4 lines at once.
   for (int y = 0; y < height; y += 4) {
@@ -2157,8 +2156,7 @@ static void angular_pdpc_ver_w8_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, 
   const __m256i vweight = _mm256_load_si256((const __m256i*)&intra_pdpc_w8_ver_weight[offset]);
 
   const int inv_angle_offset = mode_disp * 64;
-  int16_t shifted_inv_angle_sum[64];
-  memcpy(shifted_inv_angle_sum, &intra_pdpc_shifted_inv_angle_sum[inv_angle_offset], height * sizeof(int16_t)); // TODO: would this be faster if the max amount (64) would be always loaded?
+  const int16_t* shifted_inv_angle_sum = &intra_pdpc_shifted_inv_angle_sum[inv_angle_offset];
 
   // For width 8, height must be at least 2. Handle 2 lines at once.
   for (int y = 0; y < height; y += 2) {
@@ -2197,8 +2195,7 @@ static void angular_pdpc_ver_w16_avx2(uvg_pixel* dst, const uvg_pixel* ref_side,
   const __m256i vweight = _mm256_load_si256((const __m256i*)&intra_pdpc_w16_ver_weight[offset]);
 
   const int inv_angle_offset = mode_disp * 64;
-  int16_t shifted_inv_angle_sum[64];
-  memcpy(shifted_inv_angle_sum, &intra_pdpc_shifted_inv_angle_sum[inv_angle_offset], height * sizeof(int16_t)); // TODO: would this be faster if the max amount (64) would be always loaded?
+  const int16_t* shifted_inv_angle_sum = &intra_pdpc_shifted_inv_angle_sum[inv_angle_offset];
 
   for (int y = 0; y < height; ++y) {
     for (int  x = 0; x < limit; x += 16) {
@@ -2295,8 +2292,7 @@ static void angular_pdpc_ver_w16_scale1_avx2(uvg_pixel* dst, const uvg_pixel* re
   const __m256i vweight = _mm256_load_si256((const __m256i*) &intra_pdpc_w8_ver_weight[offset]);
 
   const int inv_angle_offset = mode_disp * 64;
-  int16_t shifted_inv_angle_sum[64];
-  memcpy(shifted_inv_angle_sum, &intra_pdpc_shifted_inv_angle_sum[inv_angle_offset], height * sizeof(int16_t)); // TODO: would this be faster if the max amount (64) would be always loaded?
+  const int16_t *shifted_inv_angle_sum = &intra_pdpc_shifted_inv_angle_sum[inv_angle_offset];
 
   // For width 8, height must be at least 2. Handle 2 lines at once.
   for (int y = 0; y < height; y += 2) {
@@ -2558,8 +2554,7 @@ static void angular_pdpc_hor_w4_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, 
   // Scale can be 0, 1 or 2
   const int table_offset = scale * 64;
   const int inv_angle_offset = mode_disp * 64;
-  int16_t shifted_inv_angle_sum[64];
-  memcpy(shifted_inv_angle_sum, &intra_pdpc_shifted_inv_angle_sum[inv_angle_offset], height * sizeof(int16_t)); // TODO: would this be faster if the max amount (64) would be always loaded?
+  const int16_t* shifted_inv_angle_sum = &intra_pdpc_shifted_inv_angle_sum[inv_angle_offset];
 
   for (int y = 0, o = 0; y < limit; y += 4, o += 16) {
     for (int yy = 0; yy < 4; ++yy) {
@@ -2601,8 +2596,7 @@ static void angular_pdpc_hor_w8_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, 
   // Scale can be 0, 1 or 2
   const int table_offset = scale * 128;
   const int inv_angle_offset = mode_disp * 64;
-  int16_t shifted_inv_angle_sum[64];
-  memcpy(shifted_inv_angle_sum, &intra_pdpc_shifted_inv_angle_sum[inv_angle_offset], height * sizeof(int16_t)); // TODO: would this be faster if the max amount (64) would be always loaded?
+  const int16_t* shifted_inv_angle_sum = &intra_pdpc_shifted_inv_angle_sum[inv_angle_offset];
 
   for (int y = 0, o = table_offset; y < limit; y += 2, o += 16) {
     const __m256i vwT = _mm256_load_si256((const __m256i*)&intra_pdpc_w8_hor_weight[o]);
@@ -2636,8 +2630,7 @@ static void angular_pdpc_hor_w16_avx2(uvg_pixel* dst, const uvg_pixel* ref_side,
   __m256i v32s = _mm256_set1_epi16(32);
 
   const int inv_angle_offset = mode_disp * 64;
-  int16_t shifted_inv_angle_sum[64];
-  memcpy(shifted_inv_angle_sum, &intra_pdpc_shifted_inv_angle_sum[inv_angle_offset], height * sizeof(int16_t)); // TODO: would this be faster if the max amount (64) would be always loaded?
+  const int16_t* shifted_inv_angle_sum = &intra_pdpc_shifted_inv_angle_sum[inv_angle_offset];
 
   // Handle one line at a time. Skip line if vertical limit reached.
   for (int y = 0; y < limit; ++y) {
