@@ -2684,8 +2684,8 @@ static void uvg_angular_pred_avx2(
     assert(log2_height >= 1);
   }
 
-  // Modes [-1, -14] and [67, 80] are wide angle modes
-  assert(intra_mode >= -14 && intra_mode <= 80);
+  // Modes [-1, -14] and [67, 81] are wide angle modes
+  assert(intra_mode >= -14 && intra_mode <= 81);
 
   uint8_t multi_ref_index = channel_type == COLOR_Y ? multi_ref_idx : 0;
   uint8_t isp = isp_mode;
