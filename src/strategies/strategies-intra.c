@@ -42,6 +42,7 @@ angular_pred_func *uvg_angular_pred;
 intra_pred_planar_func *uvg_intra_pred_planar;
 intra_pred_filtered_dc_func *uvg_intra_pred_filtered_dc;
 pdpc_planar_dc_func *uvg_pdpc_planar_dc;
+mip_pred_func *uvg_mip_predict;
 
 int uvg_strategy_register_intra(void* opaque, uint8_t bitdepth) {
   bool success = true;

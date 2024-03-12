@@ -32,6 +32,7 @@
 
 #include "strategies/avx2/intra-avx2.h"
 
+
 #if COMPILE_INTEL_AVX2 && defined X86_64
 #include "uvg266.h"
 #include "cu.h"
@@ -46,6 +47,8 @@
 #include "global.h"
 #include "intra-avx2.h"
 #include "intra_avx2_tables.h"
+#include "mip_data.h"
+#include "uvg_math.h"
 
  #include "strategyselector.h"
  #include "strategies/missing-intel-intrinsics.h"
@@ -4532,10 +4535,301 @@ static void uvg_pdpc_planar_dc_avx2(
   }
 }
 
+void uvg_mip_boundary_downsampling_1D_avx2(int* reduced_dst, const int* const ref_src, int src_len, int dst_len)
+{
+  if (dst_len < src_len)
+  {
+    // Create reduced boundary by downsampling
+    uint16_t down_smp_factor = src_len / dst_len;
+    const int log2_factor = uvg_math_floor_log2(down_smp_factor);
+    const int rounding_offset = (1 << (log2_factor - 1));
+
+    uint16_t src_idx = 0;
+    for (uint16_t dst_idx = 0; dst_idx < dst_len; dst_idx++)
+    {
+      int sum = 0;
+      for (int k = 0; k < down_smp_factor; k++)
+      {
+        sum += ref_src[src_idx++];
+      }
+      reduced_dst[dst_idx] = (sum + rounding_offset) >> log2_factor;
+    }
+  }
+  else
+  {
+    // Copy boundary if no downsampling is needed
+    for (uint16_t i = 0; i < dst_len; ++i)
+    {
+      reduced_dst[i] = ref_src[i];
+    }
+  }
+}
+
+
+void uvg_mip_reduced_pred_avx2(int* const output,
+  const int* const input,
+  const uint8_t* matrix,
+  const bool transpose,
+  const int red_bdry_size,
+  const int red_pred_size,
+  const int size_id,
+  const int in_offset,
+  const int in_offset_tr)
+{
+  const int input_size = 2 * red_bdry_size;
+
+  // Use local buffer for transposed result
+  int out_buf_transposed[LCU_WIDTH * LCU_WIDTH];
+  int* const out_ptr = transpose ? out_buf_transposed : output;
+
+  int sum = 0;
+  for (int i = 0; i < input_size; i++) {
+    sum += input[i];
+  }
+  const int offset = (1 << (MIP_SHIFT_MATRIX - 1)) - MIP_OFFSET_MATRIX * sum;
+  assert((input_size == 4 * (input_size >> 2)) && "MIP input size must be divisible by four");
+
+  const uint8_t* weight = matrix;
+  const int input_offset = transpose ? in_offset_tr : in_offset;
+
+  const bool red_size = (size_id == 2);
+  int pos_res = 0;
+  for (int y = 0; y < red_pred_size; y++) {
+    for (int x = 0; x < red_pred_size; x++) {
+      if (red_size) {
+        weight -= 1;
+      }
+      int tmp0 = red_size ? 0 : (input[0] * weight[0]);
+      int tmp1 = input[1] * weight[1];
+      int tmp2 = input[2] * weight[2];
+      int tmp3 = input[3] * weight[3];
+      for (int i = 4; i < input_size; i += 4) {
+        tmp0 += input[i] * weight[i];
+        tmp1 += input[i + 1] * weight[i + 1];
+        tmp2 += input[i + 2] * weight[i + 2];
+        tmp3 += input[i + 3] * weight[i + 3];
+      }
+      out_ptr[pos_res] = CLIP_TO_PIXEL(((tmp0 + tmp1 + tmp2 + tmp3 + offset) >> MIP_SHIFT_MATRIX) + input_offset);
+      pos_res++;
+      weight += input_size;
+    }
+  }
+
+  if (transpose) {
+    for (int y = 0; y < red_pred_size; y++) {
+      for (int x = 0; x < red_pred_size; x++) {
+        output[y * red_pred_size + x] = out_ptr[x * red_pred_size + y];
+      }
+    }
+  }
+}
+
+
+void uvg_mip_pred_upsampling_1D_avx2(int* const dst, const int* const src, const int* const boundary,
+  const uint16_t src_size_ups_dim, const uint16_t src_size_orth_dim,
+  const uint16_t src_step, const uint16_t src_stride,
+  const uint16_t dst_step, const uint16_t dst_stride,
+  const uint16_t boundary_step,
+  const uint16_t ups_factor)
+{
+  const int log2_factor = uvg_math_floor_log2(ups_factor);
+  assert(ups_factor >= 2 && "Upsampling factor must be at least 2.");
+  const int rounding_offset = 1 << (log2_factor - 1);
+
+  uint16_t idx_orth_dim = 0;
+  const int* src_line = src;
+  int* dst_line = dst;
+  const int* boundary_line = boundary + boundary_step - 1;
+  while (idx_orth_dim < src_size_orth_dim)
+  {
+    uint16_t idx_upsample_dim = 0;
+    const int* before = boundary_line;
+    const int* behind = src_line;
+    int* cur_dst = dst_line;
+    while (idx_upsample_dim < src_size_ups_dim)
+    {
+      uint16_t pos = 1;
+      int scaled_before = (*before) << log2_factor;
+      int scaled_behind = 0;
+      while (pos <= ups_factor)
+      {
+        scaled_before -= *before;
+        scaled_behind += *behind;
+        *cur_dst = (scaled_before + scaled_behind + rounding_offset) >> log2_factor;
+
+        pos++;
+        cur_dst += dst_step;
+      }
+
+      idx_upsample_dim++;
+      before = behind;
+      behind += src_step;
+    }
+
+    idx_orth_dim++;
+    src_line += src_stride;
+    dst_line += dst_stride;
+    boundary_line += boundary_step;
+  }
+}
+
+
+
+/** \brief Matrix weighted intra prediction.
+*/
+static void mip_predict_avx2(
+  //const encoder_state_t* const state,
+  const uvg_intra_references* const refs,
+  const uint16_t pred_block_width,
+  const uint16_t pred_block_height,
+  uvg_pixel* dst,
+  const int mip_mode,
+  const bool mip_transp)
+{
+  // MIP prediction uses int values instead of uvg_pixel as some temp values may be negative
+
+  uvg_pixel* out = dst;
+  int result[32 * 32] = { 0 };
+  const int mode_idx = mip_mode;
+
+  // *** INPUT PREP ***
+
+  // Initialize prediction parameters START
+  uint16_t width = pred_block_width;
+  uint16_t height = pred_block_height;
+
+  int size_id; // Prediction block type
+  if (width == 4 && height == 4) {
+    size_id = 0;
+  }
+  else if (width == 4 || height == 4 || (width == 8 && height == 8)) {
+    size_id = 1;
+  }
+  else {
+    size_id = 2;
+  }
+
+  // Reduced boundary and prediction sizes
+  int red_bdry_size = (size_id == 0) ? 2 : 4;
+  int red_pred_size = (size_id < 2) ? 4 : 8;
+
+  // Upsampling factors
+  uint16_t ups_hor_factor = width / red_pred_size;
+  uint16_t ups_ver_factor = height / red_pred_size;
+
+  // Upsampling factors must be powers of two
+  assert(!((ups_hor_factor < 1) || ((ups_hor_factor & (ups_hor_factor - 1))) != 0) && "Horizontal upsampling factor must be power of two.");
+  assert(!((ups_ver_factor < 1) || ((ups_ver_factor & (ups_ver_factor - 1))) != 0) && "Vertical upsampling factor must be power of two.");
+
+  // Initialize prediction parameters END
+
+  int ref_samples_top[INTRA_REF_LENGTH];
+  int ref_samples_left[INTRA_REF_LENGTH];
+
+  for (int i = 1; i < INTRA_REF_LENGTH; i++) {
+    ref_samples_top[i - 1] = (int)refs->ref.top[i]; // NOTE: in VTM code these are indexed as x + 1 & y + 1 during init
+    ref_samples_left[i - 1] = (int)refs->ref.left[i];
+  }
+
+  // Compute reduced boundary with Haar-downsampling
+  const int input_size = 2 * red_bdry_size;
+
+  int red_bdry[MIP_MAX_INPUT_SIZE];
+  int red_bdry_trans[MIP_MAX_INPUT_SIZE];
+
+  int* const top_reduced = &red_bdry[0];
+  int* const left_reduced = &red_bdry[red_bdry_size];
+
+  uvg_mip_boundary_downsampling_1D_avx2(top_reduced, ref_samples_top, width, red_bdry_size);
+  uvg_mip_boundary_downsampling_1D_avx2(left_reduced, ref_samples_left, height, red_bdry_size);
+
+  // Transposed reduced boundaries
+  int* const left_reduced_trans = &red_bdry_trans[0];
+  int* const top_reduced_trans = &red_bdry_trans[red_bdry_size];
+
+  for (int x = 0; x < red_bdry_size; x++) {
+    top_reduced_trans[x] = top_reduced[x];
+  }
+  for (int y = 0; y < red_bdry_size; y++) {
+    left_reduced_trans[y] = left_reduced[y];
+  }
+
+  int input_offset = red_bdry[0];
+  int input_offset_trans = red_bdry_trans[0];
+
+  const bool has_first_col = (size_id < 2);
+  // First column of matrix not needed for large blocks
+  red_bdry[0] = has_first_col ? ((1 << (UVG_BIT_DEPTH - 1)) - input_offset) : 0;
+  red_bdry_trans[0] = has_first_col ? ((1 << (UVG_BIT_DEPTH - 1)) - input_offset_trans) : 0;
+
+  for (int i = 1; i < input_size; ++i) {
+    red_bdry[i] -= input_offset;
+    red_bdry_trans[i] -= input_offset_trans;
+  }
+
+  // *** INPUT PREP *** END
+
+  // *** BLOCK PREDICT ***
+
+  const bool need_upsampling = (ups_hor_factor > 1) || (ups_ver_factor > 1);
+  const bool transpose = mip_transp;
+
+  const uint8_t* matrix;
+  switch (size_id) {
+  case 0:
+    matrix = &uvg_mip_matrix_4x4[mode_idx][0][0];
+    break;
+  case 1:
+    matrix = &uvg_mip_matrix_8x8[mode_idx][0][0];
+    break;
+  case 2:
+    matrix = &uvg_mip_matrix_16x16[mode_idx][0][0];
+    break;
+  default:
+    assert(false && "Invalid MIP size id.");
+  }
+
+  // Max possible size is red_pred_size * red_pred_size, red_pred_size can be either 4 or 8
+  int red_pred_buffer[8 * 8];
+  int* const reduced_pred = need_upsampling ? red_pred_buffer : result;
+
+  const int* const reduced_bdry = transpose ? red_bdry_trans : red_bdry;
+
+  uvg_mip_reduced_pred_avx2(reduced_pred, reduced_bdry, matrix, transpose, red_bdry_size, red_pred_size, size_id, input_offset, input_offset_trans);
+  if (need_upsampling) {
+    const int* ver_src = reduced_pred;
+    uint16_t ver_src_step = width;
+
+    if (ups_hor_factor > 1) {
+      int* const hor_dst = result + (ups_ver_factor - 1) * width;
+      ver_src = hor_dst;
+      ver_src_step *= ups_ver_factor;
+
+      uvg_mip_pred_upsampling_1D_avx2(hor_dst, reduced_pred, ref_samples_left,
+        red_pred_size, red_pred_size,
+        1, red_pred_size, 1, ver_src_step,
+        ups_ver_factor, ups_hor_factor);
+    }
+
+    if (ups_ver_factor > 1) {
+      uvg_mip_pred_upsampling_1D_avx2(result, ver_src, ref_samples_top,
+        red_pred_size, width,
+        ver_src_step, 1, width, 1,
+        1, ups_ver_factor);
+    }
+  }
+
+  // Assign and cast values from temp array to output
+  for (int i = 0; i < 32 * 32; i++) {
+    out[i] = (uvg_pixel)result[i];
+  }
+  // *** BLOCK PREDICT *** END
+}
+
+
 #endif // UVG_BIT_DEPTH == 8
 
 #endif // COMPILE_INTEL_AVX2 && defined X86_64
-
 
 int uvg_strategy_register_intra_avx2(void* opaque, uint8_t bitdepth)
 {
@@ -4547,6 +4841,7 @@ int uvg_strategy_register_intra_avx2(void* opaque, uint8_t bitdepth)
     success &= uvg_strategyselector_register(opaque, "intra_pred_planar", "avx2", 40, &uvg_intra_pred_planar_avx2);
     success &= uvg_strategyselector_register(opaque, "intra_pred_filtered_dc", "avx2", 40, &uvg_intra_pred_filtered_dc_avx2);
     success &= uvg_strategyselector_register(opaque, "pdpc_planar_dc", "avx2", 40, &uvg_pdpc_planar_dc_avx2);
+    success &= uvg_strategyselector_register(opaque, "mip_predict", "avx2", 40, &mip_predict_avx2);
   }
 #endif //UVG_BIT_DEPTH == 8
 #endif //COMPILE_INTEL_AVX2 && defined X86_64

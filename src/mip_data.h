@@ -43,9 +43,7 @@
 #define MIP_SHIFT_MATRIX 6
 #define MIP_OFFSET_MATRIX 32
 
-// NOTE: these matrices need to be aligned if used with avx2
-const uint8_t uvg_mip_matrix_4x4[16][16][4] =
-{
+ALIGNED(32) static const uint8_t uvg_mip_matrix_4x4[16][16][4] = {
   {
     {   32,   30,   90,   28},
     {   32,   32,   72,   28},
@@ -336,7 +334,7 @@ const uint8_t uvg_mip_matrix_4x4[16][16][4] =
   }
 };
 
-const uint8_t uvg_mip_matrix_8x8[8][16][8] =
+ALIGNED(32) static const uint8_t uvg_mip_matrix_8x8[8][16][8] =
 {
   {
     {   30,   63,   46,   37,   25,   33,   33,   34},
@@ -484,7 +482,7 @@ const uint8_t uvg_mip_matrix_8x8[8][16][8] =
   }
 };
 
-const uint8_t uvg_mip_matrix_16x16[6][64][7] =
+ALIGNED(32) static const uint8_t uvg_mip_matrix_16x16[6][64][7] =
 {
   {
     {   42,   37,   33,   27,   44,   33,   35},
