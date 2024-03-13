@@ -4537,31 +4537,42 @@ static void uvg_pdpc_planar_dc_avx2(
 
 void uvg_mip_boundary_downsampling_1D_avx2(int* reduced_dst, const int* const ref_src, int src_len, int dst_len)
 {
+  // Source length can be 4, 8, 16, 32 or 64
+  // Destination length can be 2 or 4
+
+  // Due to the small size of dst_len, not much can be done with AVX2 here
+
   if (dst_len < src_len)
   {
     // Create reduced boundary by downsampling
+    // Maximum down sample factor is 64 / 2 = 32
     uint16_t down_smp_factor = src_len / dst_len;
     const int log2_factor = uvg_math_floor_log2(down_smp_factor);
     const int rounding_offset = (1 << (log2_factor - 1));
 
     uint16_t src_idx = 0;
-    for (uint16_t dst_idx = 0; dst_idx < dst_len; dst_idx++)
-    {
+    // This loop is run max 4 times
+    for (uint16_t dst_idx = 0; dst_idx < dst_len; dst_idx++) {
       int sum = 0;
-      for (int k = 0; k < down_smp_factor; k++)
-      {
+      // Sum together up tp 32 sequential source samples
+      for (int k = 0; k < down_smp_factor; k++) {
         sum += ref_src[src_idx++];
       }
       reduced_dst[dst_idx] = (sum + rounding_offset) >> log2_factor;
+      // I can only see limited optimization potential here. There's a lot of additions, but not too much data.
+      // For down sample factor 2, a simple horizontal add would do wonders, but it can only handle that specific case.
+      // There needs to be several versions of this function for different cases, not entirely sure if its worth it.
     }
   }
   else
   {
-    // Copy boundary if no downsampling is needed
-    for (uint16_t i = 0; i < dst_len; ++i)
+    // Copy boundary if no downsampling is needed. If this branch is reached, dst_len must be 4
+    memcpy(reduced_dst, ref_src, 4 * sizeof(int)); // Copy as much as dst_len indicates
+
+    /*for (uint16_t i = 0; i < dst_len; ++i)
     {
       reduced_dst[i] = ref_src[i];
-    }
+    }*/
   }
 }
 
@@ -4576,7 +4587,8 @@ void uvg_mip_reduced_pred_avx2(int* const output,
   const int in_offset,
   const int in_offset_tr)
 {
-  const int input_size = 2 * red_bdry_size;
+  // Reduced boundary size is 2 or 4 -> input size is 4 or 8
+  const int input_size = 2 * red_bdry_size; 
 
   // Use local buffer for transposed result
   int out_buf_transposed[LCU_WIDTH * LCU_WIDTH];
@@ -4594,6 +4606,8 @@ void uvg_mip_reduced_pred_avx2(int* const output,
 
   const bool red_size = (size_id == 2);
   int pos_res = 0;
+
+  // Reduced prediction size is 4 or 8
   for (int y = 0; y < red_pred_size; y++) {
     for (int x = 0; x < red_pred_size; x++) {
       if (red_size) {
@@ -4677,7 +4691,7 @@ void uvg_mip_pred_upsampling_1D_avx2(int* const dst, const int* const src, const
 
 /** \brief Matrix weighted intra prediction.
 */
-static void mip_predict_avx2(
+void mip_predict_avx2(
   //const encoder_state_t* const state,
   const uvg_intra_references* const refs,
   const uint16_t pred_block_width,
@@ -4774,7 +4788,7 @@ static void mip_predict_avx2(
   const bool need_upsampling = (ups_hor_factor > 1) || (ups_ver_factor > 1);
   const bool transpose = mip_transp;
 
-  const uint8_t* matrix;
+  const uint8_t* matrix = 0;
   switch (size_id) {
   case 0:
     matrix = &uvg_mip_matrix_4x4[mode_idx][0][0];
