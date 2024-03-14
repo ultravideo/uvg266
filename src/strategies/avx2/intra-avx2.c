@@ -4535,7 +4535,7 @@ static void uvg_pdpc_planar_dc_avx2(
   }
 }
 
-void uvg_mip_boundary_downsampling_1D_avx2(int* reduced_dst, const int* const ref_src, int src_len, int dst_len)
+void uvg_mip_boundary_downsampling_1D_avx2(uvg_pixel* reduced_dst, const uvg_pixel* const ref_src, int src_len, int dst_len)
 {
   // Source length can be 4, 8, 16, 32 or 64
   // Destination length can be 2 or 4
@@ -4577,8 +4577,8 @@ void uvg_mip_boundary_downsampling_1D_avx2(int* reduced_dst, const int* const re
 }
 
 
-void uvg_mip_reduced_pred_avx2(int* const output,
-  const int* const input,
+void uvg_mip_reduced_pred_avx2(uvg_pixel* const output,
+  const int16_t* const input,
   const uint8_t* matrix,
   const bool transpose,
   const int red_bdry_size,
@@ -4591,8 +4591,8 @@ void uvg_mip_reduced_pred_avx2(int* const output,
   const int input_size = 2 * red_bdry_size; 
 
   // Use local buffer for transposed result
-  int out_buf_transposed[LCU_WIDTH * LCU_WIDTH];
-  int* const out_ptr = transpose ? out_buf_transposed : output;
+  uvg_pixel out_buf_transposed[64]; // Max size 8x8, was LCU_WIDTH * LCU_WIDTH
+  uvg_pixel* const out_ptr = transpose ? out_buf_transposed : output;
 
   int sum = 0;
   for (int i = 0; i < input_size; i++) {
@@ -4613,6 +4613,7 @@ void uvg_mip_reduced_pred_avx2(int* const output,
       if (red_size) {
         weight -= 1;
       }
+      // Use 16-bit intermediates
       int tmp0 = red_size ? 0 : (input[0] * weight[0]);
       int tmp1 = input[1] * weight[1];
       int tmp2 = input[2] * weight[2];
@@ -4639,27 +4640,27 @@ void uvg_mip_reduced_pred_avx2(int* const output,
 }
 
 
-void uvg_mip_pred_upsampling_1D_avx2(int* const dst, const int* const src, const int* const boundary,
-  const uint16_t src_size_ups_dim, const uint16_t src_size_orth_dim,
-  const uint16_t src_step, const uint16_t src_stride,
-  const uint16_t dst_step, const uint16_t dst_stride,
-  const uint16_t boundary_step,
-  const uint16_t ups_factor)
+void uvg_mip_pred_upsampling_1D_avx2(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const boundary,
+  const uint8_t src_size_ups_dim, const uint16_t src_size_orth_dim,
+  const uint8_t src_step, const uint8_t src_stride,
+  const uint8_t dst_step, const uint8_t dst_stride,
+  const uint8_t boundary_step,
+  const uint8_t ups_factor)
 {
   const int log2_factor = uvg_math_floor_log2(ups_factor);
   assert(ups_factor >= 2 && "Upsampling factor must be at least 2.");
   const int rounding_offset = 1 << (log2_factor - 1);
 
   uint16_t idx_orth_dim = 0;
-  const int* src_line = src;
-  int* dst_line = dst;
-  const int* boundary_line = boundary + boundary_step - 1;
+  const uvg_pixel* src_line = src;
+  uvg_pixel* dst_line = dst;
+  const uvg_pixel* boundary_line = boundary + boundary_step - 1;
   while (idx_orth_dim < src_size_orth_dim)
   {
     uint16_t idx_upsample_dim = 0;
-    const int* before = boundary_line;
-    const int* behind = src_line;
-    int* cur_dst = dst_line;
+    const uvg_pixel* before = boundary_line;
+    const uvg_pixel* behind = src_line;
+    uvg_pixel* cur_dst = dst_line;
     while (idx_upsample_dim < src_size_ups_dim)
     {
       uint16_t pos = 1;
@@ -4703,7 +4704,7 @@ void mip_predict_avx2(
   // MIP prediction uses int values instead of uvg_pixel as some temp values may be negative
 
   uvg_pixel* out = dst;
-  int result[32 * 32] = { 0 };
+  uvg_pixel result[32 * 32] = { 0 };
   const int mode_idx = mip_mode;
 
   // *** INPUT PREP ***
@@ -4737,29 +4738,27 @@ void mip_predict_avx2(
 
   // Initialize prediction parameters END
 
-  int ref_samples_top[INTRA_REF_LENGTH];
-  int ref_samples_left[INTRA_REF_LENGTH];
-
-  for (int i = 1; i < INTRA_REF_LENGTH; i++) {
-    ref_samples_top[i - 1] = (int)refs->ref.top[i]; // NOTE: in VTM code these are indexed as x + 1 & y + 1 during init
-    ref_samples_left[i - 1] = (int)refs->ref.left[i];
-  }
+  const uvg_pixel* ref_samples_top = &refs->ref.top[1];
+  const uvg_pixel* ref_samples_left = &refs->ref.left[1];
 
   // Compute reduced boundary with Haar-downsampling
   const int input_size = 2 * red_bdry_size;
 
-  int red_bdry[MIP_MAX_INPUT_SIZE];
-  int red_bdry_trans[MIP_MAX_INPUT_SIZE];
+  uvg_pixel red_bdry[MIP_MAX_INPUT_SIZE];
+  uvg_pixel red_bdry_trans[MIP_MAX_INPUT_SIZE];
+  int16_t red_bdry16[MIP_MAX_INPUT_SIZE];
+  int16_t red_bdry_trans16[MIP_MAX_INPUT_SIZE];
 
-  int* const top_reduced = &red_bdry[0];
-  int* const left_reduced = &red_bdry[red_bdry_size];
+  uvg_pixel* const top_reduced = &red_bdry[0];
+  uvg_pixel* const left_reduced = &red_bdry[red_bdry_size];
 
+  // These work fine with uvg_pixel
   uvg_mip_boundary_downsampling_1D_avx2(top_reduced, ref_samples_top, width, red_bdry_size);
   uvg_mip_boundary_downsampling_1D_avx2(left_reduced, ref_samples_left, height, red_bdry_size);
 
   // Transposed reduced boundaries
-  int* const left_reduced_trans = &red_bdry_trans[0];
-  int* const top_reduced_trans = &red_bdry_trans[red_bdry_size];
+  uvg_pixel* const left_reduced_trans = &red_bdry_trans[0];
+  uvg_pixel* const top_reduced_trans = &red_bdry_trans[red_bdry_size];
 
   for (int x = 0; x < red_bdry_size; x++) {
     top_reduced_trans[x] = top_reduced[x];
@@ -4768,17 +4767,19 @@ void mip_predict_avx2(
     left_reduced_trans[y] = left_reduced[y];
   }
 
-  int input_offset = red_bdry[0];
-  int input_offset_trans = red_bdry_trans[0];
+  uvg_pixel input_offset = red_bdry[0];
+  uvg_pixel input_offset_trans = red_bdry_trans[0];
 
   const bool has_first_col = (size_id < 2);
   // First column of matrix not needed for large blocks
-  red_bdry[0] = has_first_col ? ((1 << (UVG_BIT_DEPTH - 1)) - input_offset) : 0;
-  red_bdry_trans[0] = has_first_col ? ((1 << (UVG_BIT_DEPTH - 1)) - input_offset_trans) : 0;
+  // These can potentially fail with uvg_pixel
+  red_bdry16[0] = has_first_col ? ((1 << (UVG_BIT_DEPTH - 1)) - input_offset) : 0;
+  red_bdry_trans16[0] = has_first_col ? ((1 << (UVG_BIT_DEPTH - 1)) - input_offset_trans) : 0;
 
+  // This fails with uvg_pixel, here at least int16_t is needed
   for (int i = 1; i < input_size; ++i) {
-    red_bdry[i] -= input_offset;
-    red_bdry_trans[i] -= input_offset_trans;
+    red_bdry16[i] = red_bdry[i] - input_offset;
+    red_bdry_trans16[i] = red_bdry_trans[i] - input_offset_trans;
   }
 
   // *** INPUT PREP *** END
@@ -4804,18 +4805,19 @@ void mip_predict_avx2(
   }
 
   // Max possible size is red_pred_size * red_pred_size, red_pred_size can be either 4 or 8
-  int red_pred_buffer[8 * 8];
-  int* const reduced_pred = need_upsampling ? red_pred_buffer : result;
+  uvg_pixel red_pred_buffer[8 * 8];
+  uvg_pixel* const reduced_pred = need_upsampling ? red_pred_buffer : result;
 
-  const int* const reduced_bdry = transpose ? red_bdry_trans : red_bdry;
+  const uvg_pixel* const reduced_bdry = transpose ? red_bdry_trans : red_bdry;
+  const int16_t* const reduced_bdry16 = transpose ? red_bdry_trans16 : red_bdry16;
 
-  uvg_mip_reduced_pred_avx2(reduced_pred, reduced_bdry, matrix, transpose, red_bdry_size, red_pred_size, size_id, input_offset, input_offset_trans);
+  uvg_mip_reduced_pred_avx2(reduced_pred, reduced_bdry16, matrix, transpose, red_bdry_size, red_pred_size, size_id, input_offset, input_offset_trans);
   if (need_upsampling) {
-    const int* ver_src = reduced_pred;
+    const uvg_pixel* ver_src = reduced_pred;
     uint16_t ver_src_step = width;
 
     if (ups_hor_factor > 1) {
-      int* const hor_dst = result + (ups_ver_factor - 1) * width;
+      uvg_pixel* const hor_dst = result + (ups_ver_factor - 1) * width;
       ver_src = hor_dst;
       ver_src_step *= ups_ver_factor;
 
