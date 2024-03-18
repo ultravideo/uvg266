@@ -516,15 +516,11 @@ void uvg_mip_reduced_pred(int* const output,
 
   const uint8_t* weight = matrix;
   const int input_offset = transpose ? in_offset_tr : in_offset;
-
-  const bool red_size = (size_id == 2);
+  
   int pos_res = 0;
   for (int y = 0; y < red_pred_size; y++) {
     for (int x = 0; x < red_pred_size; x++) {
-      if (red_size) {
-        weight -= 1;
-      }
-      int tmp0 = red_size ? 0 : (input[0] * weight[0]);
+      int tmp0 = input[0] * weight[0];
       int tmp1 = input[1] * weight[1];
       int tmp2 = input[2] * weight[2];
       int tmp3 = input[3] * weight[3];

@@ -4604,17 +4604,13 @@ void uvg_mip_reduced_pred_avx2(uvg_pixel* const output,
   const uint8_t* weight = matrix;
   const int input_offset = transpose ? in_offset_tr : in_offset;
 
-  const bool red_size = (size_id == 2);
   int pos_res = 0;
 
   // Reduced prediction size is 4 or 8
   for (int y = 0; y < red_pred_size; y++) {
     for (int x = 0; x < red_pred_size; x++) {
-      if (red_size) {
-        weight -= 1;
-      }
       // Use 16-bit intermediates
-      int tmp0 = red_size ? 0 : (input[0] * weight[0]);
+      int tmp0 = input[0] * weight[0];
       int tmp1 = input[1] * weight[1];
       int tmp2 = input[2] * weight[2];
       int tmp3 = input[3] * weight[3];
@@ -4634,6 +4630,62 @@ void uvg_mip_reduced_pred_avx2(uvg_pixel* const output,
     for (int y = 0; y < red_pred_size; y++) {
       for (int x = 0; x < red_pred_size; x++) {
         output[y * red_pred_size + x] = out_ptr[x * red_pred_size + y];
+      }
+    }
+  }
+}
+
+
+// Size ID 2
+void uvg_mip_reduced_pred_sid2_avx2(uvg_pixel* const output,
+  const int16_t* const input,
+  const uint8_t* matrix,
+  const bool transpose,
+  const int in_offset,
+  const int in_offset_tr)
+{
+  const int input_size = 8;
+  const int pred_size = 8;
+  const int size_id = 2;
+
+  // Use local buffer for transposed result
+  uvg_pixel out_buf_transposed[64]; // Max size 8x8, was LCU_WIDTH * LCU_WIDTH
+  uvg_pixel* const out_ptr = transpose ? out_buf_transposed : output;
+
+  int sum = 0;
+  for (int i = 0; i < input_size; i++) {
+    sum += input[i];
+  }
+  const int offset = (1 << (MIP_SHIFT_MATRIX - 1)) - MIP_OFFSET_MATRIX * sum;
+
+  const uint8_t* weight = matrix;
+  const int input_offset = transpose ? in_offset_tr : in_offset;
+
+  int pos_res = 0;
+
+  // Reduced prediction size is 4 or 8
+  for (int y = 0; y < pred_size; y++) {
+    for (int x = 0; x < pred_size; x++) {
+      int tmp0 = input[0] * weight[0];
+      int tmp1 = input[1] * weight[1];
+      int tmp2 = input[2] * weight[2];
+      int tmp3 = input[3] * weight[3];
+
+      tmp0 += input[4] * weight[4];
+      tmp1 += input[5] * weight[5];
+      tmp2 += input[6] * weight[6];
+      tmp3 += input[7] * weight[7];
+
+      out_ptr[pos_res] = CLIP_TO_PIXEL(((tmp0 + tmp1 + tmp2 + tmp3 + offset) >> MIP_SHIFT_MATRIX) + input_offset);
+      pos_res++;
+      weight += input_size;
+    }
+  }
+
+  if (transpose) {
+    for (int y = 0; y < pred_size; y++) {
+      for (int x = 0; x < pred_size; x++) {
+        output[y * pred_size + x] = out_ptr[x * pred_size + y];
       }
     }
   }
@@ -4811,7 +4863,14 @@ void mip_predict_avx2(
   const uvg_pixel* const reduced_bdry = transpose ? red_bdry_trans : red_bdry;
   const int16_t* const reduced_bdry16 = transpose ? red_bdry_trans16 : red_bdry16;
 
-  uvg_mip_reduced_pred_avx2(reduced_pred, reduced_bdry16, matrix, transpose, red_bdry_size, red_pred_size, size_id, input_offset, input_offset_trans);
+  switch (size_id) {
+    case 0: uvg_mip_reduced_pred_avx2(reduced_pred, reduced_bdry16, matrix, transpose, red_bdry_size, red_pred_size, size_id, input_offset, input_offset_trans); break;
+    case 1: uvg_mip_reduced_pred_avx2(reduced_pred, reduced_bdry16, matrix, transpose, red_bdry_size, red_pred_size, size_id, input_offset, input_offset_trans); break;
+    case 2: uvg_mip_reduced_pred_sid2_avx2(reduced_pred, reduced_bdry16, matrix, transpose, input_offset, input_offset_trans); break;
+    default:
+      assert(false && "Intra MIP: invalid size id.\n");
+      break;
+  }
   if (need_upsampling) {
     const uvg_pixel* ver_src = reduced_pred;
     uint16_t ver_src_step = width;
