@@ -4636,8 +4636,107 @@ void uvg_mip_reduced_pred_avx2(uvg_pixel* const output,
 }
 
 
-// Size ID 2
-void uvg_mip_reduced_pred_sid2_avx2(uvg_pixel* const output,
+// Size ID 0
+void uvg_mip_reduced_pred_sid0_avx2(uvg_pixel* const output,
+  const int16_t* const input,
+  const uint16_t* matrix,
+  const bool transpose,
+  const int in_offset,
+  const int in_offset_tr)
+{
+  const int input_size = 4;
+  const int pred_size = 4;
+  const int size_id = 0;
+
+  // Use local buffer for transposed result
+  uvg_pixel out_buf_transposed[64]; // Max size 8x8, was LCU_WIDTH * LCU_WIDTH
+  uvg_pixel* out_ptr = transpose ? out_buf_transposed : output;
+
+  int sum = 0;
+  for (int i = 0; i < input_size; i++) {
+    sum += input[i];
+  }
+  const int offset = (1 << (MIP_SHIFT_MATRIX - 1)) - MIP_OFFSET_MATRIX * sum;
+
+  const __m128i vofs = _mm_set1_epi32(offset);
+
+  const uint16_t* weight = matrix;
+  const int input_offset = transpose ? in_offset_tr : in_offset;
+
+  const __m128i vinofs = _mm_set1_epi32(input_offset);
+
+  const __m128i vshuf = _mm_setr_epi8(
+    0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+    0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07
+  );
+  
+  const __m128i vinraw = _mm_loadu_si128((__m128i*)input);
+  const __m128i vin = _mm_shuffle_epi8(vinraw, vshuf);
+
+  // Calculate first half
+  __m128i vweight0 = _mm_loadu_si128((__m128i*) &weight[0]);
+  __m128i vweight1 = _mm_loadu_si128((__m128i*) &weight[8]);
+  __m128i vweight2 = _mm_loadu_si128((__m128i*) &weight[16]);
+  __m128i vweight3 = _mm_loadu_si128((__m128i*) &weight[24]);
+
+  weight += 32;
+
+  __m128i vmadd0 = _mm_madd_epi16(vin, vweight0);
+  __m128i vmadd1 = _mm_madd_epi16(vin, vweight1);
+  __m128i vmadd2 = _mm_madd_epi16(vin, vweight2);
+  __m128i vmadd3 = _mm_madd_epi16(vin, vweight3);
+
+  __m128i vresult0 = _mm_hadd_epi32(vmadd0, vmadd1);
+  __m128i vresult1 = _mm_hadd_epi32(vmadd2, vmadd3);
+
+  vresult0 = _mm_add_epi32(vresult0, vofs);
+  vresult0 = _mm_srai_epi32(vresult0, MIP_SHIFT_MATRIX);
+  vresult0 = _mm_add_epi32(vresult0, vinofs);
+
+  vresult1 = _mm_add_epi32(vresult1, vofs);
+  vresult1 = _mm_srai_epi32(vresult1, MIP_SHIFT_MATRIX);
+  vresult1 = _mm_add_epi32(vresult1, vinofs);
+
+  __m128i vres16_a = _mm_packus_epi32(vresult0, vresult1);
+
+  // Calculate second half
+  vweight0 = _mm_loadu_si128((__m128i*) & weight[0]);
+  vweight1 = _mm_loadu_si128((__m128i*) & weight[8]);
+  vweight2 = _mm_loadu_si128((__m128i*) & weight[16]);
+  vweight3 = _mm_loadu_si128((__m128i*) & weight[24]);
+
+  vmadd0 = _mm_madd_epi16(vin, vweight0);
+  vmadd1 = _mm_madd_epi16(vin, vweight1);
+  vmadd2 = _mm_madd_epi16(vin, vweight2);
+  vmadd3 = _mm_madd_epi16(vin, vweight3);
+
+  vresult0 = _mm_hadd_epi32(vmadd0, vmadd1);
+  vresult1 = _mm_hadd_epi32(vmadd2, vmadd3);
+
+  vresult0 = _mm_add_epi32(vresult0, vofs);
+  vresult0 = _mm_srai_epi32(vresult0, MIP_SHIFT_MATRIX);
+  vresult0 = _mm_add_epi32(vresult0, vinofs);
+
+  vresult1 = _mm_add_epi32(vresult1, vofs);
+  vresult1 = _mm_srai_epi32(vresult1, MIP_SHIFT_MATRIX);
+  vresult1 = _mm_add_epi32(vresult1, vinofs);
+
+  __m128i vres16_b = _mm_packus_epi32(vresult0, vresult1);
+  __m128i vres8 = _mm_packus_epi16(vres16_a, vres16_b);
+
+  _mm_storeu_si128((__m128i*)out_ptr, vres8);
+  
+  if (transpose) {
+    for (int y = 0; y < pred_size; y++) {
+      for (int x = 0; x < pred_size; x++) {
+        output[y * pred_size + x] = out_ptr[x * pred_size + y];
+      }
+    }
+  }
+}
+
+// Size ID 1
+void uvg_mip_reduced_pred_sid1_avx2(uvg_pixel* const output,
   const int16_t* const input,
   const uint16_t* matrix,
   const bool transpose,
@@ -4645,7 +4744,166 @@ void uvg_mip_reduced_pred_sid2_avx2(uvg_pixel* const output,
   const int in_offset_tr)
 {
   const int input_size = 8;
-  const int pred_size = 8;
+  const int pred_size = 4;
+  const int size_id = 1;
+
+  // Use local buffer for transposed result
+  uvg_pixel out_buf_transposed[64]; // Max size 8x8, was LCU_WIDTH * LCU_WIDTH
+  uvg_pixel* out_ptr = transpose ? out_buf_transposed : output;
+
+  int sum = 0;
+  for (int i = 0; i < input_size; i++) {
+    sum += input[i];
+  }
+  const int offset = (1 << (MIP_SHIFT_MATRIX - 1)) - MIP_OFFSET_MATRIX * sum;
+
+  const __m128i vofs = _mm_set1_epi32(offset);
+
+  const uint16_t* weight = matrix;
+  const int input_offset = transpose ? in_offset_tr : in_offset;
+
+  const __m128i vinofs = _mm_set1_epi32(input_offset);
+
+  const __m128i vshuf0 = _mm_setr_epi8(
+    0x00, 0x01, 0x02, 0x03, 0x00, 0x01, 0x02, 0x03,
+    0x00, 0x01, 0x02, 0x03, 0x00, 0x01, 0x02, 0x03);
+  const __m128i vshuf1 = _mm_setr_epi8(
+    0x04, 0x05, 0x06, 0x07, 0x04, 0x05, 0x06, 0x07,
+    0x04, 0x05, 0x06, 0x07, 0x04, 0x05, 0x06, 0x07);
+  const __m128i vshuf2 = _mm_setr_epi8(
+    0x08, 0x09, 0x0a, 0x0b, 0x08, 0x09, 0x0a, 0x0b,
+    0x08, 0x09, 0x0a, 0x0b, 0x08, 0x09, 0x0a, 0x0b);
+  const __m128i vshuf3 = _mm_setr_epi8(
+    0x0c, 0x0d, 0x0e, 0x0f, 0x0c, 0x0d, 0x0e, 0x0f,
+    0x0c, 0x0d, 0x0e, 0x0f, 0x0c, 0x0d, 0x0e, 0x0f);
+
+  const __m128i vinraw = _mm_loadu_si128((__m128i*)input);
+
+  const __m128i vin0 = _mm_shuffle_epi8(vinraw, vshuf0);
+  const __m128i vin1 = _mm_shuffle_epi8(vinraw, vshuf1);
+  const __m128i vin2 = _mm_shuffle_epi8(vinraw, vshuf2);
+  const __m128i vin3 = _mm_shuffle_epi8(vinraw, vshuf3);
+
+
+  for (int y = 0; y < pred_size; y += 2) {
+    // Calculate row 1, first 4
+    __m128i vweight0 = _mm_loadu_si128((__m128i*) &weight[0]);
+    __m128i vweight1 = _mm_loadu_si128((__m128i*) &weight[8]);
+    __m128i vweight2 = _mm_loadu_si128((__m128i*) &weight[16]);
+    __m128i vweight3 = _mm_loadu_si128((__m128i*) &weight[24]);
+
+    __m128i vmadd0 = _mm_madd_epi16(vin0, vweight0);
+    __m128i vmadd1 = _mm_madd_epi16(vin1, vweight1);
+    __m128i vmadd2 = _mm_madd_epi16(vin2, vweight2);
+    __m128i vmadd3 = _mm_madd_epi16(vin3, vweight3);
+
+    __m128i vadd0 = _mm_add_epi32(vmadd0, vmadd1);
+    __m128i vadd1 = _mm_add_epi32(vmadd2, vmadd3);
+
+    __m128i result0 = _mm_add_epi32(vadd0, vadd1);
+
+    result0 = _mm_add_epi32(result0, vofs);
+    result0 = _mm_srai_epi32(result0, MIP_SHIFT_MATRIX);
+    result0 = _mm_add_epi32(result0, vinofs);
+
+    weight += input_size * 4;
+
+    // Calculate row 1, last 4
+    vweight0 = _mm_loadu_si128((__m128i*) &weight[0]);
+    vweight1 = _mm_loadu_si128((__m128i*) &weight[8]);
+    vweight2 = _mm_loadu_si128((__m128i*) &weight[16]);
+    vweight3 = _mm_loadu_si128((__m128i*) &weight[24]);
+
+    vmadd0 = _mm_madd_epi16(vin0, vweight0);
+    vmadd1 = _mm_madd_epi16(vin1, vweight1);
+    vmadd2 = _mm_madd_epi16(vin2, vweight2);
+    vmadd3 = _mm_madd_epi16(vin3, vweight3);
+
+    vadd0 = _mm_add_epi32(vmadd0, vmadd1);
+    vadd1 = _mm_add_epi32(vmadd2, vmadd3);
+
+    __m128i result1 = _mm_add_epi32(vadd0, vadd1);
+
+    result1 = _mm_add_epi32(result1, vofs);
+    result1 = _mm_srai_epi32(result1, MIP_SHIFT_MATRIX);
+    result1 = _mm_add_epi32(result1, vinofs);
+
+    __m128i vres16_a = _mm_packus_epi32(result0, result1);
+
+    weight += input_size * 4;
+
+    // Calculate row 2, first 4
+    vweight0 = _mm_loadu_si128((__m128i*) &weight[0]);
+    vweight1 = _mm_loadu_si128((__m128i*) &weight[8]);
+    vweight2 = _mm_loadu_si128((__m128i*) &weight[16]);
+    vweight3 = _mm_loadu_si128((__m128i*) &weight[24]);
+
+    vmadd0 = _mm_madd_epi16(vin0, vweight0);
+    vmadd1 = _mm_madd_epi16(vin1, vweight1);
+    vmadd2 = _mm_madd_epi16(vin2, vweight2);
+    vmadd3 = _mm_madd_epi16(vin3, vweight3);
+
+    vadd0 = _mm_add_epi32(vmadd0, vmadd1);
+    vadd1 = _mm_add_epi32(vmadd2, vmadd3);
+
+    result0 = _mm_add_epi32(vadd0, vadd1);
+
+    result0 = _mm_add_epi32(result0, vofs);
+    result0 = _mm_srai_epi32(result0, MIP_SHIFT_MATRIX);
+    result0 = _mm_add_epi32(result0, vinofs);
+
+    weight += input_size * 4;
+
+    // Calculate row 2, last 4
+    vweight0 = _mm_loadu_si128((__m128i*) &weight[0]);
+    vweight1 = _mm_loadu_si128((__m128i*) &weight[8]);
+    vweight2 = _mm_loadu_si128((__m128i*) &weight[16]);
+    vweight3 = _mm_loadu_si128((__m128i*) &weight[24]);
+
+    vmadd0 = _mm_madd_epi16(vin0, vweight0);
+    vmadd1 = _mm_madd_epi16(vin1, vweight1);
+    vmadd2 = _mm_madd_epi16(vin2, vweight2);
+    vmadd3 = _mm_madd_epi16(vin3, vweight3);
+
+    vadd0 = _mm_add_epi32(vmadd0, vmadd1);
+    vadd1 = _mm_add_epi32(vmadd2, vmadd3);
+
+    result1 = _mm_add_epi32(vadd0, vadd1);
+
+    result1 = _mm_add_epi32(result1, vofs);
+    result1 = _mm_srai_epi32(result1, MIP_SHIFT_MATRIX);
+    result1 = _mm_add_epi32(result1, vinofs);
+
+    __m128i vres16_b = _mm_packus_epi32(result0, result1);
+    __m128i vres8 = _mm_packus_epi16(vres16_a, vres16_b);
+
+    _mm_storeu_si128((__m128i*)out_ptr, vres8);
+
+    //out_ptr[pos_res] = CLIP_TO_PIXEL(((tmp0 + tmp1 + tmp2 + tmp3 + offset) >> MIP_SHIFT_MATRIX) + input_offset);
+    out_ptr += 16;
+    weight += input_size * 4;
+  }
+
+  if (transpose) {
+    for (int y = 0; y < pred_size; y++) {
+      for (int x = 0; x < pred_size; x++) {
+        output[y * pred_size + x] = out_ptr[x * pred_size + y];
+      }
+    }
+  }
+}
+
+// Size ID 2
+void uvg_mip_reduced_pred_sid2_avx2(uvg_pixel* const output,
+  const int16_t* const input,
+  const uint16_t* matrix,
+  const int red_pred_size,
+  const bool transpose,
+  const int in_offset,
+  const int in_offset_tr)
+{
+  const int input_size = 8;
+  const int pred_size = red_pred_size;
   const int size_id = 2;
 
   // Use local buffer for transposed result
@@ -4734,10 +4992,10 @@ void uvg_mip_reduced_pred_sid2_avx2(uvg_pixel* const output,
     weight += input_size * 4;
 
     // Calculate row 2, first 4
-    vweight0 = _mm_loadu_si128((__m128i*) & weight[0]);
-    vweight1 = _mm_loadu_si128((__m128i*) & weight[8]);
-    vweight2 = _mm_loadu_si128((__m128i*) & weight[16]);
-    vweight3 = _mm_loadu_si128((__m128i*) & weight[24]);
+    vweight0 = _mm_loadu_si128((__m128i*) &weight[0]);
+    vweight1 = _mm_loadu_si128((__m128i*) &weight[8]);
+    vweight2 = _mm_loadu_si128((__m128i*) &weight[16]);
+    vweight3 = _mm_loadu_si128((__m128i*) &weight[24]);
 
     vmadd0 = _mm_madd_epi16(vin0, vweight0);
     vmadd1 = _mm_madd_epi16(vin1, vweight1);
@@ -4756,10 +5014,10 @@ void uvg_mip_reduced_pred_sid2_avx2(uvg_pixel* const output,
     weight += input_size * 4;
 
     // Calculate row 2, last 4
-    vweight0 = _mm_loadu_si128((__m128i*) & weight[0]);
-    vweight1 = _mm_loadu_si128((__m128i*) & weight[8]);
-    vweight2 = _mm_loadu_si128((__m128i*) & weight[16]);
-    vweight3 = _mm_loadu_si128((__m128i*) & weight[24]);
+    vweight0 = _mm_loadu_si128((__m128i*) &weight[0]);
+    vweight1 = _mm_loadu_si128((__m128i*) &weight[8]);
+    vweight2 = _mm_loadu_si128((__m128i*) &weight[16]);
+    vweight3 = _mm_loadu_si128((__m128i*) &weight[24]);
 
     vmadd0 = _mm_madd_epi16(vin0, vweight0);
     vmadd1 = _mm_madd_epi16(vin1, vweight1);
@@ -4887,11 +5145,8 @@ void mip_predict_avx2(
   uint16_t ups_hor_factor = width / red_pred_size;
   uint16_t ups_ver_factor = height / red_pred_size;
 
-  // Upsampling factors must be powers of two
-  assert(!((ups_hor_factor < 1) || ((ups_hor_factor & (ups_hor_factor - 1))) != 0) && "Horizontal upsampling factor must be power of two.");
-  assert(!((ups_ver_factor < 1) || ((ups_ver_factor & (ups_ver_factor - 1))) != 0) && "Vertical upsampling factor must be power of two.");
-
   // Initialize prediction parameters END
+
 
   const uvg_pixel* ref_samples_top = &refs->ref.top[1];
   const uvg_pixel* ref_samples_left = &refs->ref.left[1];
@@ -4948,10 +5203,10 @@ void mip_predict_avx2(
   const uint16_t* matrix16 = 0;
   switch (size_id) {
   case 0:
-    matrix = &uvg_mip_matrix_4x4[mode_idx][0][0];
+    matrix16 = &uvg_mip_sid0_weights[mode_idx][0][0];
     break;
   case 1:
-    matrix = &uvg_mip_matrix_8x8[mode_idx][0][0];
+    matrix16 = &uvg_mip_sid1_weights[mode_idx * 128];
     break;
   case 2:
     //matrix = &uvg_mip_matrix_16x16[mode_idx][0][0];
@@ -4969,9 +5224,9 @@ void mip_predict_avx2(
   const int16_t* const reduced_bdry16 = transpose ? red_bdry_trans16 : red_bdry16;
 
   switch (size_id) {
-    case 0: uvg_mip_reduced_pred_avx2(reduced_pred, reduced_bdry16, matrix, transpose, red_bdry_size, red_pred_size, size_id, input_offset, input_offset_trans); break;
-    case 1: uvg_mip_reduced_pred_avx2(reduced_pred, reduced_bdry16, matrix, transpose, red_bdry_size, red_pred_size, size_id, input_offset, input_offset_trans); break;
-    case 2: uvg_mip_reduced_pred_sid2_avx2(reduced_pred, reduced_bdry16, matrix16, transpose, input_offset, input_offset_trans); break;
+    case 0: uvg_mip_reduced_pred_sid0_avx2(reduced_pred, reduced_bdry16, matrix16, transpose, input_offset, input_offset_trans); break;
+    case 1: // Size id 1 can use the same function as size id 2
+    case 2: uvg_mip_reduced_pred_sid2_avx2(reduced_pred, reduced_bdry16, matrix16, red_pred_size, transpose, input_offset, input_offset_trans); break;
     default:
       assert(false && "Intra MIP: invalid size id.\n");
       break;
