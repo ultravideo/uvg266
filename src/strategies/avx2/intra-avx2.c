@@ -40,6 +40,7 @@
 #if UVG_BIT_DEPTH == 8
 
 #include <immintrin.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
@@ -5060,6 +5061,95 @@ void uvg_mip_pred_upsampling_1D_avx2(uvg_pixel* const dst, const uvg_pixel* cons
   const uint8_t boundary_step,
   const uint8_t ups_factor)
 {
+  const int log2_factor = uvg_g_convert_to_log2[ups_factor];
+  assert(ups_factor >= 2 && "Upsampling factor must be at least 2.");
+  const int rounding_offset = 1 << (log2_factor - 1);
+
+  uint16_t idx_orth_dim = 0;
+  const uvg_pixel* src_line = src;
+  uvg_pixel* dst_line = dst;
+  const uvg_pixel* boundary_line = boundary + boundary_step - 1;
+  while (idx_orth_dim < src_size_orth_dim)
+  {
+    uint16_t idx_upsample_dim = 0;
+    const uvg_pixel* before = boundary_line;
+    const uvg_pixel* behind = src_line;
+    uvg_pixel* cur_dst = dst_line;
+    while (idx_upsample_dim < src_size_ups_dim)
+    {
+      uint16_t pos = 1;
+      int scaled_before = (*before) << log2_factor;
+      int scaled_behind = 0;
+      while (pos <= ups_factor)
+      {
+        scaled_before -= *before;
+        scaled_behind += *behind;
+        *cur_dst = (scaled_before + scaled_behind + rounding_offset) >> log2_factor;
+
+        pos++;
+        cur_dst += dst_step;
+      }
+
+      idx_upsample_dim++;
+      before = behind;
+      behind += src_step;
+    }
+
+    idx_orth_dim++;
+    src_line += src_stride;
+    dst_line += dst_stride;
+    boundary_line += boundary_step;
+  }
+}
+
+void uvg_mip_pred_upsampling_1D_hor_avx2(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref, 
+                                         const uint8_t red_pred_size, const uint16_t dst_step, const uint8_t ups_ver_factor, const uint8_t ups_hor_factor)
+{
+  const uint8_t ref_step = ups_ver_factor; // height / red_pred_size
+  const uint8_t ups_factor = ups_hor_factor; // width / red_pred_size
+
+  const int log2_factor = uvg_g_convert_to_log2[ups_factor];
+  assert(ups_factor >= 2 && "Upsampling factor must be at least 2.");
+  const int rounding_offset = 1 << (log2_factor - 1);
+
+  uint16_t idx_orth_dim = 0;
+  const uvg_pixel* src_line = src;
+  uvg_pixel* dst_line = dst;
+  const uvg_pixel* ref_line = ref + ref_step - 1;
+  for (int idx_orth_dim = 0; idx_orth_dim < red_pred_size; ++idx_orth_dim) {
+    uint16_t idx_upsample_dim = 0;
+    const uvg_pixel* before = ref_line;
+    const uvg_pixel* behind = src_line;
+    uvg_pixel* cur_dst = dst_line;
+    for (int idx_upsample_dim = 0; idx_upsample_dim < red_pred_size; ++idx_upsample_dim) {
+      uint16_t pos = 1;
+      int scaled_before = (*before) << log2_factor;
+      int scaled_behind = 0;
+      for (int pos = 0; pos < ups_factor; ++pos) {
+        scaled_before -= *before;
+        scaled_behind += *behind;
+        *cur_dst = (scaled_before + scaled_behind + rounding_offset) >> log2_factor;
+
+        cur_dst++; // Destination step is 1
+      }
+
+      before = behind;
+      behind++; // Source step is 1
+    }
+
+    src_line += red_pred_size; // Source stride is same as red_pred_size
+    dst_line += dst_step; // Destination stride is same as ver_src_step, which is width * ups_ver_factor. Can be as high as 512, must be 16-bit
+    ref_line += ref_step;
+  }
+}
+
+void uvg_mip_pred_upsampling_1D_ver_avx2(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const boundary,
+  const uint8_t src_size_ups_dim, const uint16_t src_size_orth_dim,
+  const uint16_t src_step, const uint8_t src_stride,
+  const uint8_t dst_step, const uint8_t dst_stride,
+  const uint8_t boundary_step,
+  const uint8_t ups_factor)
+{
   const int log2_factor = uvg_math_floor_log2(ups_factor);
   assert(ups_factor >= 2 && "Upsampling factor must be at least 2.");
   const int rounding_offset = 1 << (log2_factor - 1);
@@ -5102,6 +5192,83 @@ void uvg_mip_pred_upsampling_1D_avx2(uvg_pixel* const dst, const uvg_pixel* cons
 }
 
 
+// 32x32, size id 2 hor upscale params [8, 8, 1, 8, 1, 128, 4, 4]
+static void mip_upsampling_32x32_hor_avx2(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref)
+{
+  const uint8_t red_pred_size = 8;
+  const uint16_t dst_step = 128;
+
+  const uint8_t ref_step = 4;   // height / red_pred_size
+  const uint8_t ups_factor = 4; // width / red_pred_size
+
+  const int log2_factor = uvg_g_convert_to_log2[ups_factor];
+  assert(ups_factor >= 2 && "Upsampling factor must be at least 2.");
+  const int rounding_offset = 1 << (log2_factor - 1);
+
+  __m128i vshuf0 = _mm_setr_epi8(
+    0x00, 0x08, 0x01, 0x09, 0x02, 0x0a, 0x03, 0x0b,
+    0x04, 0x0c, 0x05, 0x0d, 0x06, 0x0e, 0x07, 0x0f
+  );
+
+
+  ALIGNED(32) int16_t refs[8];
+  ALIGNED(32) int16_t srcs[8];
+  const uvg_pixel* ref_ptr = ref + ref_step - 1;
+  const uvg_pixel* src_ptr = src;
+
+  int step = ref_step;
+
+  for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < 8; ++i) {
+      refs[i] = *ref_ptr;
+      srcs[i] = *src_ptr;
+
+      ref_ptr += step;
+      src_ptr += red_pred_size;
+    }
+
+    __m128i vrnd = _mm_set1_epi16(rounding_offset);
+
+    __m128i vaccu_ref = _mm_load_si128((__m128i*)refs);
+    __m128i vsub_ref = vaccu_ref;
+    vaccu_ref = _mm_slli_epi16(vaccu_ref, log2_factor);
+
+    __m128i vaccu_src = _mm_setzero_si128();
+    __m128i vadd_src = _mm_load_si128((__m128i*)srcs);
+
+    __m128i vres[4];
+    for (int res = 0; res < 4; ++res) {
+      vaccu_ref = _mm_sub_epi16(vaccu_ref, vsub_ref);
+      vaccu_src = _mm_add_epi16(vaccu_src, vadd_src);
+      vres[res] = _mm_add_epi16(vaccu_ref, vaccu_src);
+      vres[res] = _mm_add_epi16(vres[res], vrnd);
+      vres[res] = _mm_srli_epi16(vres[res], log2_factor);
+    }
+
+    __m128i vout0 = _mm_packus_epi16(vres[0], vres[1]);
+    __m128i vout1 = _mm_packus_epi16(vres[2], vres[3]);
+    vout0 = _mm_shuffle_epi8(vout0, vshuf0);
+    vout1 = _mm_shuffle_epi8(vout1, vshuf0);
+
+    __m128i vtmp16lo = _mm_unpacklo_epi16(vout0, vout1);
+    __m128i vtmp16hi = _mm_unpackhi_epi16(vout0, vout1);
+
+    const int dst_offset = i * 4;
+
+    *(uint32_t*)&dst[dst_offset + dst_step * 0] = _mm_extract_epi32(vtmp16lo, 0);
+    *(uint32_t*)&dst[dst_offset + dst_step * 1] = _mm_extract_epi32(vtmp16lo, 1);
+    *(uint32_t*)&dst[dst_offset + dst_step * 2] = _mm_extract_epi32(vtmp16lo, 2);
+    *(uint32_t*)&dst[dst_offset + dst_step * 3] = _mm_extract_epi32(vtmp16lo, 3);
+    *(uint32_t*)&dst[dst_offset + dst_step * 4] = _mm_extract_epi32(vtmp16hi, 0);
+    *(uint32_t*)&dst[dst_offset + dst_step * 5] = _mm_extract_epi32(vtmp16hi, 1);
+    *(uint32_t*)&dst[dst_offset + dst_step * 6] = _mm_extract_epi32(vtmp16hi, 2);
+    *(uint32_t*)&dst[dst_offset + dst_step * 7] = _mm_extract_epi32(vtmp16hi, 3);
+
+    ref_ptr = src + i;
+    src_ptr = src + i + 1;
+    step = red_pred_size; // Switch ref step
+  }
+}
 
 /** \brief Matrix weighted intra prediction.
 */
@@ -5240,22 +5407,27 @@ void mip_predict_avx2(
       ver_src = hor_dst;
       ver_src_step *= ups_ver_factor;
 
-      uvg_mip_pred_upsampling_1D_avx2(hor_dst, reduced_pred, ref_samples_left,
-        red_pred_size, red_pred_size,
-        1, red_pred_size, 1, ver_src_step,
-        ups_ver_factor, ups_hor_factor);
+      // void uvg_mip_pred_upsampling_1D_hor_avx2(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const boundary, const uint8_t red_pred_size, const uint8_t ver_src_step, const uint8_t ups_ver_factor, const uint8_t ups_hor_factor)
+
+      // TODO: MIP upscale function pointer table. Test with a single size for now (32x32)
+      mip_upsampling_32x32_hor_avx2(hor_dst, reduced_pred, ref_samples_left);
+
     }
 
     if (ups_ver_factor > 1) {
-      uvg_mip_pred_upsampling_1D_avx2(result, ver_src, ref_samples_top,
-        red_pred_size, width,
-        ver_src_step, 1, width, 1,
-        1, ups_ver_factor);
+      switch (size_id) {
+        case 0: assert(false && "MIP upscale. Invalid size id.\n"); break; // No upscale is needed for size id 0
+        case 1: uvg_mip_pred_upsampling_1D_ver_avx2(result, ver_src, ref_samples_top, red_pred_size, width, ver_src_step, 1, width, 1, 1, ups_ver_factor); break;
+        case 2: uvg_mip_pred_upsampling_1D_ver_avx2(result, ver_src, ref_samples_top, red_pred_size, width, ver_src_step, 1, width, 1, 1, ups_ver_factor); break;
+        default:
+          assert(false && "Intra MIP: invalid size id.\n");
+          break;
+      }  
     }
   }
 
   // Assign and cast values from temp array to output
-  for (int i = 0; i < 32 * 32; i++) {
+  for (int i = 0; i < width * height; i++) {
     out[i] = (uvg_pixel)result[i];
   }
   // *** BLOCK PREDICT *** END
