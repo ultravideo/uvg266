@@ -5192,24 +5192,18 @@ void uvg_mip_pred_upsampling_1D_ver_avx2(uvg_pixel* const dst, const uvg_pixel* 
 }
 
 
-// 32x32, size id 2 hor upscale params [8, 8, 1, 8, 1, 128, 4, 4]
-static void mip_upsampling_32x32_hor_avx2(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref)
+static void mip_upsampling_w32_ups4_hor_avx2(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref, const uint16_t dst_step, const uint8_t ref_step)
 {
   const uint8_t red_pred_size = 8;
-  const uint16_t dst_step = 128;
-
-  const uint8_t ref_step = 4;   // height / red_pred_size
   const uint8_t ups_factor = 4; // width / red_pred_size
 
   const int log2_factor = uvg_g_convert_to_log2[ups_factor];
-  assert(ups_factor >= 2 && "Upsampling factor must be at least 2.");
   const int rounding_offset = 1 << (log2_factor - 1);
 
-  __m128i vshuf0 = _mm_setr_epi8(
+  __m128i vshuf = _mm_setr_epi8(
     0x00, 0x08, 0x01, 0x09, 0x02, 0x0a, 0x03, 0x0b,
     0x04, 0x0c, 0x05, 0x0d, 0x06, 0x0e, 0x07, 0x0f
   );
-
 
   ALIGNED(32) int16_t refs[8];
   ALIGNED(32) int16_t srcs[8];
@@ -5219,9 +5213,9 @@ static void mip_upsampling_32x32_hor_avx2(uvg_pixel* const dst, const uvg_pixel*
   int step = ref_step;
 
   for (int i = 0; i < 8; i++) {
-    for (int i = 0; i < 8; ++i) {
-      refs[i] = *ref_ptr;
-      srcs[i] = *src_ptr;
+    for (int ref = 0; ref < 8; ++ref) {
+      refs[ref] = *ref_ptr;
+      srcs[ref] = *src_ptr;
 
       ref_ptr += step;
       src_ptr += red_pred_size;
@@ -5247,8 +5241,8 @@ static void mip_upsampling_32x32_hor_avx2(uvg_pixel* const dst, const uvg_pixel*
 
     __m128i vout0 = _mm_packus_epi16(vres[0], vres[1]);
     __m128i vout1 = _mm_packus_epi16(vres[2], vres[3]);
-    vout0 = _mm_shuffle_epi8(vout0, vshuf0);
-    vout1 = _mm_shuffle_epi8(vout1, vshuf0);
+    vout0 = _mm_shuffle_epi8(vout0, vshuf);
+    vout1 = _mm_shuffle_epi8(vout1, vshuf);
 
     __m128i vtmp16lo = _mm_unpacklo_epi16(vout0, vout1);
     __m128i vtmp16hi = _mm_unpackhi_epi16(vout0, vout1);
@@ -5284,7 +5278,7 @@ void mip_predict_avx2(
   // MIP prediction uses int values instead of uvg_pixel as some temp values may be negative
 
   uvg_pixel* out = dst;
-  uvg_pixel result[32 * 32] = { 0 };
+  uvg_pixel result[64 * 64] = { 0 };
   const int mode_idx = mip_mode;
 
   // *** INPUT PREP ***
@@ -5292,6 +5286,9 @@ void mip_predict_avx2(
   // Initialize prediction parameters START
   uint16_t width = pred_block_width;
   uint16_t height = pred_block_height;
+
+  int log2x_minus2 = uvg_g_convert_to_log2[width] - 2;
+  int log2y_minus2 = uvg_g_convert_to_log2[height] - 2;
 
   int size_id; // Prediction block type
   if (width == 4 && height == 4) {
@@ -5409,9 +5406,23 @@ void mip_predict_avx2(
 
       // void uvg_mip_pred_upsampling_1D_hor_avx2(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const boundary, const uint8_t red_pred_size, const uint8_t ver_src_step, const uint8_t ups_ver_factor, const uint8_t ups_hor_factor)
 
-      // TODO: MIP upscale function pointer table. Test with a single size for now (32x32)
-      mip_upsampling_32x32_hor_avx2(hor_dst, reduced_pred, ref_samples_left);
-
+      switch (width) {
+        case 4: uvg_mip_pred_upsampling_1D_hor_avx2(hor_dst, reduced_pred, ref_samples_left, red_pred_size, ver_src_step, ups_ver_factor, ups_hor_factor); break;
+        case 8: uvg_mip_pred_upsampling_1D_hor_avx2(hor_dst, reduced_pred, ref_samples_left, red_pred_size, ver_src_step, ups_ver_factor, ups_hor_factor); break;
+        case 16: uvg_mip_pred_upsampling_1D_hor_avx2(hor_dst, reduced_pred, ref_samples_left, red_pred_size, ver_src_step, ups_ver_factor, ups_hor_factor); break;
+        case 32:
+          if (red_pred_size == 4) {
+            uvg_mip_pred_upsampling_1D_hor_avx2(hor_dst, reduced_pred, ref_samples_left, red_pred_size, ver_src_step, ups_ver_factor, ups_hor_factor);
+          }
+          else {
+            mip_upsampling_w32_ups4_hor_avx2(hor_dst, reduced_pred, ref_samples_left, ver_src_step, ups_ver_factor); // Works for height 8, 16, 32 and 64. Upsamples 1 to 4.
+          }
+          break;
+        case 64: uvg_mip_pred_upsampling_1D_hor_avx2(hor_dst, reduced_pred, ref_samples_left, red_pred_size, ver_src_step, ups_ver_factor, ups_hor_factor); break;
+        default:
+          assert(false && "Invalid MIP width.\n");
+          break;
+      }
     }
 
     if (ups_ver_factor > 1) {
