@@ -5192,6 +5192,85 @@ void uvg_mip_pred_upsampling_1D_ver_avx2(uvg_pixel* const dst, const uvg_pixel* 
 }
 
 
+// 8x8, size id 1 hor upscale params [4, 4, 1, 4, 1, 16, 2, 2]
+static void mip_upsampling_w8_ups2_hor_avx2(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref, const uint16_t dst_step, const uint8_t ref_step)
+{
+  const uint8_t red_pred_size = 4;
+  const uint8_t ups_factor = 2; // width / red_pred_size
+
+  const int log2_factor = uvg_g_convert_to_log2[ups_factor];
+  const int rounding_offset = 1 << (log2_factor - 1);
+  
+  // Shuffles for result lines 0 and 1
+  __m128i vshuf0 = _mm_setr_epi8(
+    0xff, 0x00, 0x00, 0x01, 0x01, 0x02, 0x02, 0x03,
+    0xff, 0x04, 0x04, 0x05, 0x05, 0x06, 0x06, 0x07
+  );
+
+  __m128i vshuf1 = _mm_setr_epi8(
+    0x00, 0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03,
+    0x04, 0x04, 0x05, 0x05, 0x06, 0x06, 0x07, 0x07
+  );
+
+  // Shuffles for result lines 2 and 3
+  __m128i vshuf2 = _mm_setr_epi8(
+    0xff, 0x08, 0x08, 0x09, 0x09, 0x0a, 0x0a, 0x0b,
+    0xff, 0x0c, 0x0c, 0x0d, 0x0d, 0x0e, 0x0e, 0x0f
+  );
+
+  __m128i vshuf3 = _mm_setr_epi8(
+    0x08, 0x08, 0x09, 0x09, 0x0a, 0x0a, 0x0b, 0x0b,
+    0x0c, 0x0c, 0x0d, 0x0d, 0x0e, 0x0e, 0x0f, 0x0f
+  );
+
+  __m256i vrnd = _mm256_set1_epi16(rounding_offset);
+
+  uvg_pixel ref0 = *(ref + (ref_step * 1) - 1);
+  uvg_pixel ref1 = *(ref + (ref_step * 2) - 1);
+  uvg_pixel ref2 = *(ref + (ref_step * 3) - 1);
+  uvg_pixel ref3 = *(ref + (ref_step * 4) - 1);
+
+  __m128i vsrc = _mm_loadu_si128((__m128i*)src);
+
+  __m128i vadd0 = _mm_shuffle_epi8(vsrc, vshuf0);
+  __m128i vadd1 = _mm_shuffle_epi8(vsrc, vshuf1);
+  __m128i vadd2 = _mm_shuffle_epi8(vsrc, vshuf2);
+  __m128i vadd3 = _mm_shuffle_epi8(vsrc, vshuf3);
+
+  vadd0 = _mm_insert_epi8(vadd0, ref0, 0x00);
+  vadd0 = _mm_insert_epi8(vadd0, ref1, 0x08);
+  vadd2 = _mm_insert_epi8(vadd2, ref2, 0x00);
+  vadd2 = _mm_insert_epi8(vadd2, ref3, 0x08);
+
+  // Extend to 16-bit
+  __m256i vadd16_0 = _mm256_cvtepu8_epi16(vadd0);
+  __m256i vadd16_1 = _mm256_cvtepu8_epi16(vadd1);
+  __m256i vadd16_2 = _mm256_cvtepu8_epi16(vadd2);
+  __m256i vadd16_3 = _mm256_cvtepu8_epi16(vadd3);
+
+  __m256i vtmp0 = _mm256_add_epi16(vadd16_0, vadd16_1);
+  __m256i vtmp1 = _mm256_add_epi16(vadd16_2, vadd16_3);
+
+  vtmp0 = _mm256_add_epi16(vtmp0, vrnd);
+  vtmp1 = _mm256_add_epi16(vtmp1, vrnd);
+
+  vtmp0 = _mm256_srli_epi16(vtmp0, log2_factor);
+  vtmp1 = _mm256_srli_epi16(vtmp1, log2_factor);
+
+  __m256i vres = _mm256_packus_epi16(vtmp0, vtmp1);
+  vres = _mm256_permute4x64_epi64(vres, _MM_SHUFFLE(3, 1, 2, 0));
+
+  if (dst_step == 8) {
+    _mm256_storeu_si256((__m256i*)dst, vres);
+  }
+  else {
+    *(uint64_t*)&dst[dst_step * 0] = _mm256_extract_epi64(vres, 0);
+    *(uint64_t*)&dst[dst_step * 1] = _mm256_extract_epi64(vres, 1);
+    *(uint64_t*)&dst[dst_step * 2] = _mm256_extract_epi64(vres, 2);
+    *(uint64_t*)&dst[dst_step * 3] = _mm256_extract_epi64(vres, 3);
+  }
+}
+
 static void mip_upsampling_w32_ups4_hor_avx2(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref, const uint16_t dst_step, const uint8_t ref_step)
 {
   const uint8_t red_pred_size = 8;
@@ -5204,6 +5283,8 @@ static void mip_upsampling_w32_ups4_hor_avx2(uvg_pixel* const dst, const uvg_pix
     0x00, 0x08, 0x01, 0x09, 0x02, 0x0a, 0x03, 0x0b,
     0x04, 0x0c, 0x05, 0x0d, 0x06, 0x0e, 0x07, 0x0f
   );
+
+  __m128i vrnd = _mm_set1_epi16(rounding_offset);
 
   ALIGNED(32) int16_t refs[8];
   ALIGNED(32) int16_t srcs[8];
@@ -5220,8 +5301,6 @@ static void mip_upsampling_w32_ups4_hor_avx2(uvg_pixel* const dst, const uvg_pix
       ref_ptr += step;
       src_ptr += red_pred_size;
     }
-
-    __m128i vrnd = _mm_set1_epi16(rounding_offset);
 
     __m128i vaccu_ref = _mm_load_si128((__m128i*)refs);
     __m128i vsub_ref = vaccu_ref;
@@ -5287,9 +5366,6 @@ void mip_predict_avx2(
   uint16_t width = pred_block_width;
   uint16_t height = pred_block_height;
 
-  int log2x_minus2 = uvg_g_convert_to_log2[width] - 2;
-  int log2y_minus2 = uvg_g_convert_to_log2[height] - 2;
-
   int size_id; // Prediction block type
   if (width == 4 && height == 4) {
     size_id = 0;
@@ -5310,7 +5386,6 @@ void mip_predict_avx2(
   uint16_t ups_ver_factor = height / red_pred_size;
 
   // Initialize prediction parameters END
-
 
   const uvg_pixel* ref_samples_top = &refs->ref.top[1];
   const uvg_pixel* ref_samples_left = &refs->ref.left[1];
@@ -5408,7 +5483,15 @@ void mip_predict_avx2(
 
       switch (width) {
         case 4: uvg_mip_pred_upsampling_1D_hor_avx2(hor_dst, reduced_pred, ref_samples_left, red_pred_size, ver_src_step, ups_ver_factor, ups_hor_factor); break;
-        case 8: uvg_mip_pred_upsampling_1D_hor_avx2(hor_dst, reduced_pred, ref_samples_left, red_pred_size, ver_src_step, ups_ver_factor, ups_hor_factor); break;
+        case 8: 
+          if (red_pred_size == 4) {
+            //uvg_mip_pred_upsampling_1D_hor_avx2(hor_dst, reduced_pred, ref_samples_left, red_pred_size, ver_src_step, ups_ver_factor, ups_hor_factor);
+            mip_upsampling_w8_ups2_hor_avx2(hor_dst, reduced_pred, ref_samples_left, ver_src_step, ups_ver_factor);
+          }
+          else {
+            uvg_mip_pred_upsampling_1D_hor_avx2(hor_dst, reduced_pred, ref_samples_left, red_pred_size, ver_src_step, ups_ver_factor, ups_hor_factor);
+          }
+          break;
         case 16: uvg_mip_pred_upsampling_1D_hor_avx2(hor_dst, reduced_pred, ref_samples_left, red_pred_size, ver_src_step, ups_ver_factor, ups_hor_factor); break;
         case 32:
           if (red_pred_size == 4) {
