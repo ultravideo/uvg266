@@ -5343,6 +5343,89 @@ static void mip_upsampling_w32_ups4_hor_avx2(uvg_pixel* const dst, const uvg_pix
   }
 }
 
+static void mip_upsampling_w64_ups8_hor_avx2(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref, const uint16_t dst_step, const uint8_t ref_step)
+{
+  const uint8_t red_pred_size = 8;
+  const uint8_t ups_factor = 8; // width / red_pred_size
+
+  const int log2_factor = uvg_g_convert_to_log2[ups_factor];
+  const int rounding_offset = 1 << (log2_factor - 1);
+
+  __m128i vshuf = _mm_setr_epi8(
+    0x00, 0x08, 0x01, 0x09, 0x02, 0x0a, 0x03, 0x0b,
+    0x04, 0x0c, 0x05, 0x0d, 0x06, 0x0e, 0x07, 0x0f
+  );
+
+  __m128i vrnd = _mm_set1_epi16(rounding_offset);
+
+  ALIGNED(32) int16_t refs[8];
+  ALIGNED(32) int16_t srcs[8];
+  const uvg_pixel* ref_ptr = ref + ref_step - 1;
+  const uvg_pixel* src_ptr = src;
+
+  int step = ref_step;
+
+  for (int i = 0; i < 8; i++) {
+    for (int ref = 0; ref < 8; ++ref) {
+      refs[ref] = *ref_ptr;
+      srcs[ref] = *src_ptr;
+
+      ref_ptr += step;
+      src_ptr += red_pred_size;
+    }
+
+    __m128i vaccu_ref = _mm_load_si128((__m128i*)refs);
+    __m128i vsub_ref = vaccu_ref;
+    vaccu_ref = _mm_slli_epi16(vaccu_ref, log2_factor);
+
+    __m128i vaccu_src = _mm_setzero_si128();
+    __m128i vadd_src = _mm_load_si128((__m128i*)srcs);
+
+    __m128i vres[8];
+    for (int res = 0; res < 8; ++res) {
+      vaccu_ref = _mm_sub_epi16(vaccu_ref, vsub_ref);
+      vaccu_src = _mm_add_epi16(vaccu_src, vadd_src);
+      vres[res] = _mm_add_epi16(vaccu_ref, vaccu_src);
+      vres[res] = _mm_add_epi16(vres[res], vrnd);
+      vres[res] = _mm_srli_epi16(vres[res], log2_factor);
+    }
+
+    __m128i vout0 = _mm_packus_epi16(vres[0], vres[1]);
+    __m128i vout1 = _mm_packus_epi16(vres[2], vres[3]);
+    __m128i vout2 = _mm_packus_epi16(vres[4], vres[5]);
+    __m128i vout3 = _mm_packus_epi16(vres[6], vres[7]);
+    vout0 = _mm_shuffle_epi8(vout0, vshuf);
+    vout1 = _mm_shuffle_epi8(vout1, vshuf);
+    vout2 = _mm_shuffle_epi8(vout2, vshuf);
+    vout3 = _mm_shuffle_epi8(vout3, vshuf);
+
+    __m128i vtmp16lo0 = _mm_unpacklo_epi16(vout0, vout1);
+    __m128i vtmp16hi0 = _mm_unpackhi_epi16(vout0, vout1);
+    __m128i vtmp16lo1 = _mm_unpacklo_epi16(vout2, vout3);
+    __m128i vtmp16hi1 = _mm_unpackhi_epi16(vout2, vout3);
+
+    __m128i vtmp32lo0 = _mm_unpacklo_epi32(vtmp16lo0, vtmp16lo1);
+    __m128i vtmp32hi0 = _mm_unpackhi_epi32(vtmp16lo0, vtmp16lo1);
+    __m128i vtmp32lo1 = _mm_unpacklo_epi32(vtmp16hi0, vtmp16hi1);
+    __m128i vtmp32hi1 = _mm_unpackhi_epi32(vtmp16hi0, vtmp16hi1);
+
+    const int dst_offset = i * 8;
+
+    *(uint64_t*)&dst[dst_offset + dst_step * 0] = _mm_extract_epi64(vtmp32lo0, 0);
+    *(uint64_t*)&dst[dst_offset + dst_step * 1] = _mm_extract_epi64(vtmp32lo0, 1);
+    *(uint64_t*)&dst[dst_offset + dst_step * 2] = _mm_extract_epi64(vtmp32hi0, 0);
+    *(uint64_t*)&dst[dst_offset + dst_step * 3] = _mm_extract_epi64(vtmp32hi0, 1);
+    *(uint64_t*)&dst[dst_offset + dst_step * 4] = _mm_extract_epi64(vtmp32lo1, 0);
+    *(uint64_t*)&dst[dst_offset + dst_step * 5] = _mm_extract_epi64(vtmp32lo1, 1);
+    *(uint64_t*)&dst[dst_offset + dst_step * 6] = _mm_extract_epi64(vtmp32hi1, 0);
+    *(uint64_t*)&dst[dst_offset + dst_step * 7] = _mm_extract_epi64(vtmp32hi1, 1);
+
+    ref_ptr = src + i;
+    src_ptr = src + i + 1;
+    step = red_pred_size; // Switch ref step
+  }
+}
+
 /** \brief Matrix weighted intra prediction.
 */
 void mip_predict_avx2(
@@ -5480,6 +5563,8 @@ void mip_predict_avx2(
 
       // void uvg_mip_pred_upsampling_1D_hor_avx2(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const boundary, const uint8_t red_pred_size, const uint8_t ver_src_step, const uint8_t ups_ver_factor, const uint8_t ups_hor_factor)
 
+      //uvg_pixel tmp[64 * 64] = { 0 };
+      //uvg_pixel* const tmp_dst = tmp + (ups_ver_factor - 1) * width;
       switch (width) {
         case 4: uvg_mip_pred_upsampling_1D_hor_avx2(hor_dst, reduced_pred, ref_samples_left, red_pred_size, ver_src_step, ups_ver_factor, ups_hor_factor); break;
         case 8: 
@@ -5500,7 +5585,7 @@ void mip_predict_avx2(
             mip_upsampling_w32_ups4_hor_avx2(hor_dst, reduced_pred, ref_samples_left, ver_src_step, ups_ver_factor); // Works for height 8, 16, 32 and 64. Upsamples 1 to 4.
           }
           break;
-        case 64: uvg_mip_pred_upsampling_1D_hor_avx2(hor_dst, reduced_pred, ref_samples_left, red_pred_size, ver_src_step, ups_ver_factor, ups_hor_factor); break;
+        case 64: mip_upsampling_w64_ups8_hor_avx2(hor_dst, reduced_pred, ref_samples_left, ver_src_step, ups_ver_factor); break;
         default:
           assert(false && "Invalid MIP width.\n");
           break;
