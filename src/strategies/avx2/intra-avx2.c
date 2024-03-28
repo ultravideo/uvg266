@@ -4568,7 +4568,7 @@ void uvg_mip_boundary_downsampling_1D_avx2(uvg_pixel* reduced_dst, const uvg_pix
   else
   {
     // Copy boundary if no downsampling is needed. If this branch is reached, dst_len must be 4
-    memcpy(reduced_dst, ref_src, 4 * sizeof(int)); // Copy as much as dst_len indicates
+    memcpy(reduced_dst, ref_src, 4 * sizeof(uvg_pixel)); // Copy as much as dst_len indicates
 
     /*for (uint16_t i = 0; i < dst_len; ++i)
     {
@@ -4944,7 +4944,7 @@ void uvg_mip_reduced_pred_sid2_avx2(uvg_pixel* const output,
   const __m128i vin2 = _mm_shuffle_epi8(vinraw, vshuf2);
   const __m128i vin3 = _mm_shuffle_epi8(vinraw, vshuf3);
   
-
+  // TODO: this does one unnecessary loop for sizes 8x4 and 4x8. Solve this.
   for (int y = 0; y < pred_size; y += 2) {
     // Calculate row 1, first 4
     __m128i vweight0 = _mm_loadu_si128((__m128i*) &weight[0]);
@@ -5384,7 +5384,6 @@ void mip_predict_avx2(
   // Upsampling factors
   uint16_t ups_hor_factor = width / red_pred_size;
   uint16_t ups_ver_factor = height / red_pred_size;
-
   // Initialize prediction parameters END
 
   const uvg_pixel* ref_samples_top = &refs->ref.top[1];
