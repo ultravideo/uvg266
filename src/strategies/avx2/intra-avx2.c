@@ -5533,8 +5533,10 @@ static void mip_upsampling_w32_ups4_hor_avx2_alt(uvg_pixel* const dst, const uvg
   __m256i permute_mask = _mm256_setr_epi32(0, 2, 4, 6, 1, 3, 5, 7);
 
 
-  for (int i = 0; i < 32 * 32; i += 512) {
+  // This will process 4 rows at a time. Limit is always 8 rows.
+  for (int i = 0; i < 2; ++i) {
 
+    // Assign references by hand after copying sources. This will avoid the use of inserts later.
     ALIGNED(32) uint8_t before[33];
     memcpy(&before[1], src_ptr, 32);
     before[0] =  ref_ptr[ref_step * 0];
@@ -5546,25 +5548,32 @@ static void mip_upsampling_w32_ups4_hor_avx2_alt(uvg_pixel* const dst, const uvg
     __m256i vbefore = _mm256_load_si256((__m256i*)before);
     __m256i vbehind = _mm256_load_si256((__m256i*)src_ptr);
 
+    // Permute the input values to get the result in correct order.
     vbefore = _mm256_permutevar8x32_epi32(vbefore, permute_mask);
     vbehind = _mm256_permutevar8x32_epi32(vbehind, permute_mask);
 
+    // Calculate the 3 interpolated values between before and behind, middle, left and right.
     __m256i vmiddle = _mm256_avg_epu8(vbefore, vbehind);
     __m256i vleft = _mm256_avg_epu8(vmiddle, vbefore);
     __m256i vright = _mm256_avg_epu8(vmiddle, vbehind);
     
+    // Calculate the two last bits of difference between before and behind. These bits are used to determine if there will be rounding error.
+    // Rounding error occurs in the left interpolated value if the two last bits of the difference between before and behind is 0b01.
     __m256i diff = _mm256_sub_epi8(vbehind, vbefore);
     diff = _mm256_and_si256(diff, threes);
-    __m256i mask = _mm256_cmpeq_epi8(diff, ones);
+    __m256i mask = _mm256_cmpeq_epi8(diff, ones); // The rounding error mask will be generated based on the calculated last bits.
     __m256i sub_amount = _mm256_blendv_epi8(_mm256_set1_epi8(0), ones, mask);
 
     vleft = _mm256_sub_epi8(vleft, sub_amount);
 
+    // Same rounding error handling for right interpolated values. 
+    // Error happens if the two last bits of the difference between before and behind is 0b11.
     mask = _mm256_cmpeq_epi8(diff, threes);
     sub_amount = _mm256_blendv_epi8(_mm256_set1_epi8(0), ones, mask);
 
     vright = _mm256_sub_epi8(vright, sub_amount);
 
+    // Interleave results.
     __m256i left_temp0 = _mm256_unpacklo_epi8(vleft, vmiddle);
     __m256i left_temp1 = _mm256_unpackhi_epi8(vleft, vmiddle);
     __m256i right_temp0 = _mm256_unpacklo_epi8(vright, vbehind);
@@ -5579,27 +5588,6 @@ static void mip_upsampling_w32_ups4_hor_avx2_alt(uvg_pixel* const dst, const uvg
     _mm256_store_si256((__m256i*)(dst_ptr + dst_step * 1), vtmp1);
     _mm256_store_si256((__m256i*)(dst_ptr + dst_step * 2), vtmp2);
     _mm256_store_si256((__m256i*)(dst_ptr + dst_step * 3), vtmp3);
-
-    //__m128i vtmp0_lo = _mm256_castsi256_si128(vtmp0);
-    //__m128i vtmp0_hi = _mm256_extracti128_si256(vtmp0, 1);
-    //__m128i vtmp1_lo = _mm256_castsi256_si128(vtmp1);
-    //__m128i vtmp1_hi = _mm256_extracti128_si256(vtmp1, 1);
-    //__m128i vtmp2_lo = _mm256_castsi256_si128(vtmp2);
-    //__m128i vtmp2_hi = _mm256_extracti128_si256(vtmp2, 1);
-    //__m128i vtmp3_lo = _mm256_castsi256_si128(vtmp3);
-    //__m128i vtmp3_hi = _mm256_extracti128_si256(vtmp3, 1);
-
-    //_mm_store_si128((__m128i*)dst_ptr, vtmp0_lo);
-    //_mm_store_si128((__m128i*)dst_ptr + 1, vtmp1_lo);
-
-    //_mm_store_si128((__m128i*)dst_ptr + 8, vtmp2_lo);
-    //_mm_store_si128((__m128i*)dst_ptr + 9, vtmp3_lo);
-
-    //_mm_store_si128((__m128i*)dst_ptr + 16, vtmp0_hi);
-    //_mm_store_si128((__m128i*)dst_ptr + 17, vtmp1_hi);
-
-    //_mm_store_si128((__m128i*)dst_ptr + 24, vtmp2_hi);
-    //_mm_store_si128((__m128i*)dst_ptr + 25, vtmp3_hi);
 
     src_ptr += 32;
     ref_ptr += ref_step * 4;
