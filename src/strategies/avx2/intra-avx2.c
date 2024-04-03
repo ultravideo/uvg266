@@ -5860,13 +5860,14 @@ void mip_predict_avx2(
       //uvg_pixel tmp[64 * 64] = { 0 };
       //uvg_pixel* const tmp_dst = tmp + (ups_ver_factor - 1) * width;
       switch (width) {
-        case 4: uvg_mip_pred_upsampling_1D_hor_avx2(hor_dst, reduced_pred, ref_samples_left, red_pred_size, ver_src_step, ups_ver_factor, ups_hor_factor); break;
+        // Case 4 does not exist. There is no need for horizontal upsampling when width is 4.
         case 8: 
           // This will only get called for 8x8 blocks.
           mip_upsampling_w8_ups2_hor_avx2(hor_dst, reduced_pred, ref_samples_left, ver_src_step, ups_ver_factor);
-
           break;
-        case 16: uvg_mip_pred_upsampling_1D_hor_avx2(hor_dst, reduced_pred, ref_samples_left, red_pred_size, ver_src_step, ups_ver_factor, ups_hor_factor); break;
+        case 16: 
+          uvg_mip_pred_upsampling_1D_hor_avx2(hor_dst, reduced_pred, ref_samples_left, red_pred_size, ver_src_step, ups_ver_factor, ups_hor_factor); 
+          break;
         case 32:
           if (red_pred_size == 4) {
             uvg_mip_pred_upsampling_1D_hor_avx2(hor_dst, reduced_pred, ref_samples_left, red_pred_size, ver_src_step, ups_ver_factor, ups_hor_factor);
@@ -5875,7 +5876,9 @@ void mip_predict_avx2(
             mip_upsampling_w32_ups4_hor_avx2_alt(hor_dst, reduced_pred, ref_samples_left, ver_src_step, ups_ver_factor); // Works for height 8, 16, 32 and 64. Upsamples 1 to 4.
           }
           break;
-        case 64: mip_upsampling_w64_ups8_hor_avx2_alt(hor_dst, reduced_pred, ref_samples_left, ver_src_step, ups_ver_factor); break;
+        case 64: 
+          mip_upsampling_w64_ups8_hor_avx2_alt(hor_dst, reduced_pred, ref_samples_left, ver_src_step, ups_ver_factor); 
+          break;
         default:
           assert(false && "Invalid MIP width.\n");
           break;
