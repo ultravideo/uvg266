@@ -5530,6 +5530,9 @@ static void mip_upsampling_w32_ups4_hor_avx2_alt(uvg_pixel* const dst, const uvg
   __m256i threes = _mm256_set1_epi8(3);
 
 
+  __m256i permute_mask = _mm256_setr_epi32(0, 2, 4, 6, 1, 3, 5, 7);
+
+
   for (int i = 0; i < 32 * 32; i += 512) {
 
     ALIGNED(32) uint8_t before[33];
@@ -5545,6 +5548,9 @@ static void mip_upsampling_w32_ups4_hor_avx2_alt(uvg_pixel* const dst, const uvg
 
     __m256i vbefore = _mm256_load_si256((__m256i*)before);
     __m256i vbehind = _mm256_load_si256((__m256i*)src_ptr);
+
+    vbefore = _mm256_permutevar8x32_epi32(vbefore, permute_mask);
+    vbehind = _mm256_permutevar8x32_epi32(vbehind, permute_mask);
 
     __m256i vmiddle = _mm256_avg_epu8(vbefore, vbehind);
     __m256i vleft = _mm256_avg_epu8(vmiddle, vbefore);
@@ -5575,30 +5581,37 @@ static void mip_upsampling_w32_ups4_hor_avx2_alt(uvg_pixel* const dst, const uvg
     __m256i vtmp1 = _mm256_unpackhi_epi16(left_temp0, right_temp0);
     __m256i vtmp2 = _mm256_unpacklo_epi16(left_temp1, right_temp1);
     __m256i vtmp3 = _mm256_unpackhi_epi16(left_temp1, right_temp1);
+
+    _mm256_store_si256((__m256i*)dst_ptr, vtmp0);
+    _mm256_store_si256((__m256i*)dst_ptr+4, vtmp1);
+    _mm256_store_si256((__m256i*)dst_ptr+8, vtmp2);
+    _mm256_store_si256((__m256i*)dst_ptr+12, vtmp3);
+
+
     //vtmp0 = _mm256_permute4x64_epi64(vtmp0, _MM_SHUFFLE(3, 1, 2, 0));
     //vtmp1 = _mm256_permute4x64_epi64(vtmp1, _MM_SHUFFLE(3, 1, 2, 0));
     //vtmp2 = _mm256_permute4x64_epi64(vtmp2, _MM_SHUFFLE(3, 1, 2, 0));
     //vtmp3 = _mm256_permute4x64_epi64(vtmp3, _MM_SHUFFLE(3, 1, 2, 0));
-    __m128i vtmp0_lo = _mm256_castsi256_si128(vtmp0);
-    __m128i vtmp0_hi = _mm256_extracti128_si256(vtmp0, 1);
-    __m128i vtmp1_lo = _mm256_castsi256_si128(vtmp1);
-    __m128i vtmp1_hi = _mm256_extracti128_si256(vtmp1, 1);
-    __m128i vtmp2_lo = _mm256_castsi256_si128(vtmp2);
-    __m128i vtmp2_hi = _mm256_extracti128_si256(vtmp2, 1);
-    __m128i vtmp3_lo = _mm256_castsi256_si128(vtmp3);
-    __m128i vtmp3_hi = _mm256_extracti128_si256(vtmp3, 1);
+    //__m128i vtmp0_lo = _mm256_castsi256_si128(vtmp0);
+    //__m128i vtmp0_hi = _mm256_extracti128_si256(vtmp0, 1);
+    //__m128i vtmp1_lo = _mm256_castsi256_si128(vtmp1);
+    //__m128i vtmp1_hi = _mm256_extracti128_si256(vtmp1, 1);
+    //__m128i vtmp2_lo = _mm256_castsi256_si128(vtmp2);
+    //__m128i vtmp2_hi = _mm256_extracti128_si256(vtmp2, 1);
+    //__m128i vtmp3_lo = _mm256_castsi256_si128(vtmp3);
+    //__m128i vtmp3_hi = _mm256_extracti128_si256(vtmp3, 1);
 
-    _mm_store_si128((__m128i*)dst_ptr, vtmp0_lo);
-    _mm_store_si128((__m128i*)dst_ptr + 1, vtmp1_lo);
+    //_mm_store_si128((__m128i*)dst_ptr, vtmp0_lo);
+    //_mm_store_si128((__m128i*)dst_ptr + 1, vtmp1_lo);
 
-    _mm_store_si128((__m128i*)dst_ptr + 8, vtmp2_lo);
-    _mm_store_si128((__m128i*)dst_ptr + 9, vtmp3_lo);
+    //_mm_store_si128((__m128i*)dst_ptr + 8, vtmp2_lo);
+    //_mm_store_si128((__m128i*)dst_ptr + 9, vtmp3_lo);
 
-    _mm_store_si128((__m128i*)dst_ptr + 16, vtmp0_hi);
-    _mm_store_si128((__m128i*)dst_ptr + 17, vtmp1_hi);
+    //_mm_store_si128((__m128i*)dst_ptr + 16, vtmp0_hi);
+    //_mm_store_si128((__m128i*)dst_ptr + 17, vtmp1_hi);
 
-    _mm_store_si128((__m128i*)dst_ptr + 24, vtmp2_hi);
-    _mm_store_si128((__m128i*)dst_ptr + 25, vtmp3_hi);
+    //_mm_store_si128((__m128i*)dst_ptr + 24, vtmp2_hi);
+    //_mm_store_si128((__m128i*)dst_ptr + 25, vtmp3_hi);
 
     src_ptr += 32;
     ref_ptr += 16;
