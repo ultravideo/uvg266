@@ -5537,14 +5537,11 @@ static void mip_upsampling_w32_ups4_hor_avx2_alt(uvg_pixel* const dst, const uvg
 
     ALIGNED(32) uint8_t before[33];
     memcpy(&before[1], src_ptr, 32);
-    before[0] = ref_ptr[0];
-    // memcpy(&before[1], src_ptr, 7 * sizeof(uint8_t));
-    before[8] = ref_ptr[4];
-    // memcpy(&before[9], src_ptr + 8, 7 * sizeof(uint8_t));
-    before[16] = ref_ptr[8];
-    // memcpy(&before[17], src_ptr + 16, 7 * sizeof(uint8_t));
-    before[24] = ref_ptr[12];
-    // memcpy(&before[25], src_ptr + 24, 7 * sizeof(uint8_t));
+    before[0] =  ref_ptr[ref_step * 0];
+    before[8] =  ref_ptr[ref_step * 1];
+    before[16] = ref_ptr[ref_step * 2];
+    before[24] = ref_ptr[ref_step * 3];
+    
 
     __m256i vbefore = _mm256_load_si256((__m256i*)before);
     __m256i vbehind = _mm256_load_si256((__m256i*)src_ptr);
@@ -5572,26 +5569,17 @@ static void mip_upsampling_w32_ups4_hor_avx2_alt(uvg_pixel* const dst, const uvg
     __m256i left_temp1 = _mm256_unpackhi_epi8(vleft, vmiddle);
     __m256i right_temp0 = _mm256_unpacklo_epi8(vright, vbehind);
     __m256i right_temp1 = _mm256_unpackhi_epi8(vright, vbehind);
-    //left_temp0 = _mm256_permute4x64_epi64(left_temp0, _MM_SHUFFLE(3, 1, 2, 0));
-    //left_temp1 = _mm256_permute4x64_epi64(left_temp1, _MM_SHUFFLE(3, 1, 2, 0));
-    //right_temp0 = _mm256_permute4x64_epi64(right_temp0, _MM_SHUFFLE(3, 1, 2, 0));
-    //right_temp1 = _mm256_permute4x64_epi64(right_temp1, _MM_SHUFFLE(3, 1, 2, 0));
 
     __m256i vtmp0 = _mm256_unpacklo_epi16(left_temp0, right_temp0);
     __m256i vtmp1 = _mm256_unpackhi_epi16(left_temp0, right_temp0);
     __m256i vtmp2 = _mm256_unpacklo_epi16(left_temp1, right_temp1);
     __m256i vtmp3 = _mm256_unpackhi_epi16(left_temp1, right_temp1);
 
-    _mm256_store_si256((__m256i*)dst_ptr, vtmp0);
-    _mm256_store_si256((__m256i*)dst_ptr+4, vtmp1);
-    _mm256_store_si256((__m256i*)dst_ptr+8, vtmp2);
-    _mm256_store_si256((__m256i*)dst_ptr+12, vtmp3);
+    _mm256_store_si256((__m256i*)(dst_ptr + dst_step * 0), vtmp0);
+    _mm256_store_si256((__m256i*)(dst_ptr + dst_step * 1), vtmp1);
+    _mm256_store_si256((__m256i*)(dst_ptr + dst_step * 2), vtmp2);
+    _mm256_store_si256((__m256i*)(dst_ptr + dst_step * 3), vtmp3);
 
-
-    //vtmp0 = _mm256_permute4x64_epi64(vtmp0, _MM_SHUFFLE(3, 1, 2, 0));
-    //vtmp1 = _mm256_permute4x64_epi64(vtmp1, _MM_SHUFFLE(3, 1, 2, 0));
-    //vtmp2 = _mm256_permute4x64_epi64(vtmp2, _MM_SHUFFLE(3, 1, 2, 0));
-    //vtmp3 = _mm256_permute4x64_epi64(vtmp3, _MM_SHUFFLE(3, 1, 2, 0));
     //__m128i vtmp0_lo = _mm256_castsi256_si128(vtmp0);
     //__m128i vtmp0_hi = _mm256_extracti128_si256(vtmp0, 1);
     //__m128i vtmp1_lo = _mm256_castsi256_si128(vtmp1);
@@ -5614,8 +5602,8 @@ static void mip_upsampling_w32_ups4_hor_avx2_alt(uvg_pixel* const dst, const uvg
     //_mm_store_si128((__m128i*)dst_ptr + 25, vtmp3_hi);
 
     src_ptr += 32;
-    ref_ptr += 16;
-    dst_ptr += 512;
+    ref_ptr += ref_step * 4;
+    dst_ptr += dst_step * 4;
   }
 }
 
