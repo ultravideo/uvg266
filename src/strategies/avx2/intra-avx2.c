@@ -5510,17 +5510,7 @@ static void mip_upsampling_w32_ups4_hor_avx2_alt(uvg_pixel* const dst, const uvg
   const uint8_t ups_factor = 4; // width / red_pred_size
 
   const int log2_factor = uvg_g_convert_to_log2[ups_factor];
-  const int rounding_offset = 1 << (log2_factor - 1);
 
-  __m128i vshuf = _mm_setr_epi8(
-    0x00, 0x08, 0x01, 0x09, 0x02, 0x0a, 0x03, 0x0b,
-    0x04, 0x0c, 0x05, 0x0d, 0x06, 0x0e, 0x07, 0x0f
-  );
-
-  __m128i vrnd = _mm_set1_epi16(rounding_offset);
-
-  ALIGNED(32) int16_t refs[8];
-  ALIGNED(32) int16_t srcs[8];
   const uvg_pixel* ref_ptr = ref + ref_step - 1;
   const uvg_pixel* src_ptr = src;
   const uvg_pixel* dst_ptr = dst;
@@ -5529,14 +5519,15 @@ static void mip_upsampling_w32_ups4_hor_avx2_alt(uvg_pixel* const dst, const uvg
   __m256i ones = _mm256_set1_epi8(1);
   __m256i threes = _mm256_set1_epi8(3);
 
-
   __m256i permute_mask = _mm256_setr_epi32(0, 2, 4, 6, 1, 3, 5, 7);
-
 
   // This will process 4 rows at a time. Limit is always 8 rows.
   for (int i = 0; i < 2; ++i) {
 
     // Assign references by hand after copying sources. This will avoid the use of inserts later.
+    // Before buffer length is 33 since we need to copy reference value into the first index.
+    // Copying 32 samples is faster than copying 31. First indices of each 8 wide row will be replaced
+    // with a reference value.
     ALIGNED(32) uint8_t before[33];
     memcpy(&before[1], src_ptr, 32);
     before[0] =  ref_ptr[ref_step * 0];
