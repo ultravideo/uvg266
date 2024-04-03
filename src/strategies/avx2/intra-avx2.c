@@ -5320,6 +5320,117 @@ static void mip_upsampling_w8_ups2_hor_avx2_alt(uvg_pixel* const dst, const uvg_
   }*/
 }
 
+static void mip_upsampling_w16_ups2_hor_avx2(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref, const uint16_t dst_step, const uint8_t ref_step)
+{
+  const uint8_t red_pred_size = 4;
+  const uint8_t ups_factor = 2; // width / red_pred_size
+
+  const int log2_factor = uvg_g_convert_to_log2[ups_factor];
+
+  const uvg_pixel* ref_ptr = ref + ref_step - 1;
+  const uvg_pixel* src_ptr = src;
+  const uvg_pixel* dst_ptr = dst;
+
+  for (int i = 0; i < 2; ++i) {
+    ALIGNED(32) uint8_t before[33];
+    memcpy(&before[1], src_ptr, 32);
+    before[0] = ref_ptr[ref_step * 0];
+    before[8] = ref_ptr[ref_step * 1];
+    before[16] = ref_ptr[ref_step * 2];
+    before[24] = ref_ptr[ref_step * 3];
+
+    __m256i vbefore = _mm256_load_si256((__m256i*)before);
+    __m256i vbehind = _mm256_load_si256((__m256i*)src_ptr);
+
+    __m256i vavg = _mm256_avg_epu8(vbefore, vbehind);
+
+    __m256i vreslo = _mm256_unpacklo_epi8(vavg, vbehind);
+    __m256i vreshi = _mm256_unpackhi_epi8(vavg, vbehind);
+
+    _mm_store_si128((__m128i*) & dst_ptr[dst_step * 0], _mm256_extracti128_si256(vreslo, 0));
+    _mm_store_si128((__m128i*) & dst_ptr[dst_step * 1], _mm256_extracti128_si256(vreshi, 0));
+    _mm_store_si128((__m128i*) & dst_ptr[dst_step * 2], _mm256_extracti128_si256(vreslo, 1));
+    _mm_store_si128((__m128i*) & dst_ptr[dst_step * 3], _mm256_extracti128_si256(vreshi, 1));
+
+    src_ptr += 32;
+    dst_ptr += dst_step * 4;
+    ref_ptr += ref_step * 4;
+  }
+}
+
+static void mip_upsampling_w16_ups4_hor_avx2(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref, const uint16_t dst_step, const uint8_t ref_step)
+{
+  const uint8_t red_pred_size = 4;
+  const uint8_t ups_factor = 4; // width / red_pred_size
+
+  const int log2_factor = uvg_g_convert_to_log2[ups_factor];
+
+  const uvg_pixel* ref_ptr = ref + ref_step - 1;
+  const uvg_pixel* src_ptr = src;
+  const uvg_pixel* dst_ptr = dst;
+
+  int step = ref_step;
+  __m128i ones   = _mm_set1_epi8(1);
+  __m128i threes = _mm_set1_epi8(3);
+
+  __m256i permute_mask = _mm256_setr_epi32(0, 2, 4, 6, 1, 3, 5, 7);
+
+  // Assign references by hand after copying sources. This will avoid the use of inserts later.
+  // Before buffer length is 33 since we need to copy reference value into the first index.
+  // Copying 32 samples is faster than copying 31. First indices of each 8 wide row will be replaced
+  // with a reference value.
+  ALIGNED(16) uint8_t before[17];
+  memcpy(&before[1], src_ptr, 16);
+  before[0] = ref_ptr[ref_step * 0];
+  before[4] = ref_ptr[ref_step * 1];
+  before[8] = ref_ptr[ref_step * 2];
+  before[12] = ref_ptr[ref_step * 3];
+
+  __m128i vbefore = _mm_load_si128((__m128i*)before);
+  __m128i vbehind = _mm_load_si128((__m128i*)src_ptr);
+
+  // Permute the input values to get the result in correct order.
+  //vbefore = _mm256_permutevar8x32_epi32(vbefore, permute_mask);
+  //vbehind = _mm256_permutevar8x32_epi32(vbehind, permute_mask);
+
+  // Calculate the 3 interpolated values between before and behind, middle, left and right.
+  __m128i vmiddle = _mm_avg_epu8(vbefore, vbehind);
+  __m128i vleft =   _mm_avg_epu8(vmiddle, vbefore);
+  __m128i vright =  _mm_avg_epu8(vmiddle, vbehind);
+
+  // Calculate the two last bits of difference between before and behind. These bits are used to determine if there will be rounding error.
+  // Rounding error occurs in the left interpolated value if the two last bits of the difference between before and behind is 0b01.
+  __m128i diff = _mm_sub_epi8(vbehind, vbefore);
+  diff = _mm_and_si128(diff, threes);
+  __m128i mask = _mm_cmpeq_epi8(diff, ones); // The rounding error mask will be generated based on the calculated last bits.
+  __m128i sub_amount = _mm_blendv_epi8(_mm_set1_epi8(0), ones, mask);
+
+  vleft = _mm_sub_epi8(vleft, sub_amount);
+
+  // Same rounding error handling for right interpolated values. 
+  // Error happens if the two last bits of the difference between before and behind is 0b11.
+  mask = _mm_cmpeq_epi8(diff, threes);
+  sub_amount = _mm_blendv_epi8(_mm_set1_epi8(0), ones, mask);
+
+  vright = _mm_sub_epi8(vright, sub_amount);
+
+  // Interleave results.
+  __m128i left_temp0 = _mm_unpacklo_epi8(vleft, vmiddle);
+  __m128i left_temp1 = _mm_unpackhi_epi8(vleft, vmiddle);
+  __m128i right_temp0 = _mm_unpacklo_epi8(vright, vbehind);
+  __m128i right_temp1 = _mm_unpackhi_epi8(vright, vbehind);
+
+  __m128i vtmp0 = _mm_unpacklo_epi16(left_temp0, right_temp0);
+  __m128i vtmp1 = _mm_unpackhi_epi16(left_temp0, right_temp0);
+  __m128i vtmp2 = _mm_unpacklo_epi16(left_temp1, right_temp1);
+  __m128i vtmp3 = _mm_unpackhi_epi16(left_temp1, right_temp1);
+
+  _mm_store_si128((__m128i*)(dst_ptr + dst_step * 0), vtmp0);
+  _mm_store_si128((__m128i*)(dst_ptr + dst_step * 1), vtmp1);
+  _mm_store_si128((__m128i*)(dst_ptr + dst_step * 2), vtmp2);
+  _mm_store_si128((__m128i*)(dst_ptr + dst_step * 3), vtmp3);
+}
+
 static void mip_upsampling_w32_ups4_hor_avx2(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref, const uint16_t dst_step, const uint8_t ref_step)
 {
   const uint8_t red_pred_size = 8;
@@ -5497,6 +5608,114 @@ static void mip_upsampling_w32_ups4_hor_avx2_alt(uvg_pixel* const dst, const uvg
     vmulres3 = _mm_srai_epi16(vmulres3, log2_factor);
 
     vres = _mm_packus_epi16(vmulres2, vmulres3);
+
+    _mm_store_si128((__m128i*)(dst_ptr + 16), vres);
+
+    dst_ptr += dst_step;
+    ref_ptr += ref_step;
+    src_ptr += red_pred_size;
+  }
+}
+
+static void mip_upsampling_w32_ups8_hor_avx2(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref, const uint16_t dst_step, const uint8_t ref_step)
+{
+  const uint8_t red_pred_size = 4;
+  const uint8_t ups_factor = 8; // width / red_pred_size
+
+  const int log2_factor = uvg_g_convert_to_log2[ups_factor];
+  const int rounding_offset = 1 << (log2_factor - 1);
+
+  __m128i vshufsrc = _mm_setr_epi8(
+    0xff, 0xff, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05,
+    0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d
+  );
+
+  __m128i vshuf0 = _mm_setr_epi8(
+    0x00, 0x01, 0x00, 0x01, 0x00, 0x01, 0x00, 0x01,
+    0x00, 0x01, 0x00, 0x01, 0x00, 0x01, 0x00, 0x01
+  );
+
+  __m128i vshuf1 = _mm_setr_epi8(
+    0x02, 0x03, 0x02, 0x03, 0x02, 0x03, 0x02, 0x03,
+    0x02, 0x03, 0x02, 0x03, 0x02, 0x03, 0x02, 0x03
+  );
+
+  __m128i vshuf2 = _mm_setr_epi8(
+    0x04, 0x05, 0x04, 0x05, 0x04, 0x05, 0x04, 0x05,
+    0x04, 0x05, 0x04, 0x05, 0x04, 0x05, 0x04, 0x05
+  );
+
+  __m128i vshuf3 = _mm_setr_epi8(
+    0x06, 0x07, 0x06, 0x07, 0x06, 0x07, 0x06, 0x07,
+    0x06, 0x07, 0x06, 0x07, 0x06, 0x07, 0x06, 0x07
+  );
+
+  __m128i vrnd = _mm_set1_epi16(rounding_offset);
+  __m128i vmul = _mm_setr_epi16(1, 2, 3, 4, 5, 6, 7, 8);
+
+  const uvg_pixel* ref_ptr = ref + ref_step - 1;
+  const uvg_pixel* src_ptr = src;
+
+  int step = ref_step;
+
+  uvg_pixel* dst_ptr = dst;
+
+  for (int i = 0; i < 8; i++) {
+    // Handle input data
+    int16_t before = *ref_ptr;
+    __m128i vtmp = _mm_loadu_si128((__m128i*)src_ptr);
+    __m128i vbehind = _mm_cvtepu8_epi16(vtmp);
+
+    __m128i vbefore = vbehind;
+    vbefore = _mm_shuffle_epi8(vbefore, vshufsrc);
+    vbefore = _mm_insert_epi16(vbefore, before, 0);
+    __m128i vbeforeshifted = _mm_slli_epi16(vbefore, log2_factor);
+
+    __m128i vinterpolate = _mm_sub_epi16(vbehind, vbefore);
+
+    // Calculate 1st 16 result chunk
+    __m128i vbefore0 = _mm_shuffle_epi8(vbeforeshifted, vshuf0);
+    __m128i vinterpolate0 = _mm_shuffle_epi8(vinterpolate, vshuf0);
+
+    __m128i vmulres0 = _mm_mullo_epi16(vinterpolate0, vmul);
+    vmulres0 = _mm_add_epi16(vmulres0, vbefore0);
+
+    vmulres0 = _mm_add_epi16(vmulres0, vrnd);
+    vmulres0 = _mm_srai_epi16(vmulres0, log2_factor);
+
+    __m128i vbefore1 = _mm_shuffle_epi8(vbeforeshifted, vshuf1);
+    __m128i vinterpolate1 = _mm_shuffle_epi8(vinterpolate, vshuf1);
+
+    __m128i vmulres1 = _mm_mullo_epi16(vinterpolate1, vmul);
+    vmulres1 = _mm_add_epi16(vmulres1, vbefore1);
+
+    vmulres1 = _mm_add_epi16(vmulres1, vrnd);
+    vmulres1 = _mm_srai_epi16(vmulres1, log2_factor);
+
+    __m128i vres = _mm_packus_epi16(vmulres0, vmulres1);
+
+    _mm_store_si128((__m128i*)(dst_ptr + 0), vres);
+
+    // Calculate 2nd 16 result chunk
+    vbefore0 = _mm_shuffle_epi8(vbeforeshifted, vshuf2);
+    vinterpolate0 = _mm_shuffle_epi8(vinterpolate, vshuf2);
+
+    vmulres0 = _mm_mullo_epi16(vinterpolate0, vmul);
+    vmulres0 = _mm_add_epi16(vmulres0, vbefore0);
+
+    vmulres0 = _mm_add_epi16(vmulres0, vrnd);
+    vmulres0 = _mm_srai_epi16(vmulres0, log2_factor);
+
+    vbefore1 = _mm_shuffle_epi8(vbeforeshifted, vshuf3);
+    vinterpolate1 = _mm_shuffle_epi8(vinterpolate, vshuf3);
+
+    vmulres1 = _mm_mullo_epi16(vinterpolate1, vmul);
+    vmulres1 = _mm_add_epi16(vmulres1, vbefore1);
+
+    vmulres1 = _mm_add_epi16(vmulres1, vrnd);
+    vmulres1 = _mm_srai_epi16(vmulres1, log2_factor);
+
+    vres = _mm_packus_epi16(vmulres0, vmulres1);
 
     _mm_store_si128((__m128i*)(dst_ptr + 16), vres);
 
@@ -5900,8 +6119,6 @@ void mip_predict_avx2(
 
       // void uvg_mip_pred_upsampling_1D_hor_avx2(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const boundary, const uint8_t red_pred_size, const uint8_t ver_src_step, const uint8_t ups_ver_factor, const uint8_t ups_hor_factor)
 
-      //uvg_pixel tmp[64 * 64] = { 0 };
-      //uvg_pixel* const tmp_dst = tmp + (ups_ver_factor - 1) * width;
       switch (width) {
         // Case 4 does not exist. There is no need for horizontal upsampling when width is 4.
         case 8: 
@@ -5909,18 +6126,23 @@ void mip_predict_avx2(
           mip_upsampling_w8_ups2_hor_avx2_alt(hor_dst, reduced_pred, ref_samples_left, ver_src_step, ups_ver_factor);
           break;
         case 16: 
-          uvg_mip_pred_upsampling_1D_hor_avx2(hor_dst, reduced_pred, ref_samples_left, red_pred_size, ver_src_step, ups_ver_factor, ups_hor_factor); 
+          if (red_pred_size == 4) {
+            mip_upsampling_w16_ups4_hor_avx2(hor_dst, reduced_pred, ref_samples_left, ver_src_step, ups_ver_factor);
+          }
+          else {
+            mip_upsampling_w16_ups2_hor_avx2(hor_dst, reduced_pred, ref_samples_left, ver_src_step, ups_ver_factor); // Works for height 8, 16, 32 and 64. Upsamples 1 to 2.
+          }
           break;
         case 32:
           if (red_pred_size == 4) {
-            uvg_mip_pred_upsampling_1D_hor_avx2(hor_dst, reduced_pred, ref_samples_left, red_pred_size, ver_src_step, ups_ver_factor, ups_hor_factor);
+            mip_upsampling_w32_ups8_hor_avx2(hor_dst, reduced_pred, ref_samples_left, ver_src_step, ups_ver_factor);
           }
           else {
             mip_upsampling_w32_ups4_hor_avx2_alt(hor_dst, reduced_pred, ref_samples_left, ver_src_step, ups_ver_factor); // Works for height 8, 16, 32 and 64. Upsamples 1 to 4.
           }
           break;
         case 64: 
-          mip_upsampling_w64_ups8_hor_avx2_alt(hor_dst, reduced_pred, ref_samples_left, ver_src_step, ups_ver_factor); 
+          mip_upsampling_w64_ups8_hor_avx2_alt(hor_dst, reduced_pred, ref_samples_left, ver_src_step, ups_ver_factor); // Works for height 8, 16, 32 and 64. Upsamples 1 to 8.
           break;
         default:
           assert(false && "Invalid MIP width.\n");
