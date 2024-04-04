@@ -6005,6 +6005,38 @@ static void mip_upsampling_w4_ups8_ver_avx2(uvg_pixel* const dst, const uvg_pixe
   _mm256_store_si256((__m256i*)(dst + 96), vres3);
 }
 
+static void mip_upsampling_w8_ups2_ver_avx2(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref, const int height)
+{
+  int64_t refline = *(int64_t*)ref;
+  __m128i vidx0 = _mm_set_epi64x(0, 2);
+  __m128i vidx1 = _mm_set_epi64x(4, 6);
+
+  __m128i vbehind0 = _mm_i64gather_epi64((const long long*)src, vidx0, 1);
+  __m128i vbehind1 = _mm_i64gather_epi64((const long long*)src, vidx1, 1);
+  
+  __m128i vbefore0 = vbehind0;
+  vbefore0 = _mm_slli_si128(vbefore0, 8); // Shift left to make room for one 64-bit integer. This could be done with a shuffle, but there should be no performance difference.
+  vbefore0 = _mm_insert_epi64(vbefore0, refline, 0);
+
+  __m128i vbefore1 = vbehind1;
+  vbefore1 = _mm_slli_si128(vbefore1, 8);
+
+  vbefore1 = _mm_blend_epi32(vbefore1, vbehind1, 0b0011);
+
+  __m128i kek = _mm_setzero_si128();
+  
+
+  // Shuffle inputs to get the results in correct order.
+
+  /*__m128i vavg = _mm_avg_epu8(vbefore, vbehind);
+
+  __m128i vres0 = _mm_unpacklo_epi32(vavg, vbehind);
+  __m128i vres1 = _mm_unpackhi_epi32(vavg, vbehind);
+
+  _mm_store_si128((__m128i*)(dst + 0), vres0);
+  _mm_store_si128((__m128i*)(dst + 16), vres1);*/
+}
+
 /** \brief Matrix weighted intra prediction.
 */
 void mip_predict_avx2(
@@ -6180,7 +6212,7 @@ void mip_predict_avx2(
     //                                          const uint8_t boundary_step,
     //                                          const uint8_t ups_factor)
 
-    //uvg_pixel tmp[64 * 64] = {0};
+    uvg_pixel tmp[64 * 64] = {0};
     if (ups_ver_factor > 1) {
       switch (width) {
         case 4: 
@@ -6196,7 +6228,18 @@ void mip_predict_avx2(
           }
           break;
         
-        case 8: uvg_mip_pred_upsampling_1D_ver_avx2(result, ver_src, ref_samples_top, red_pred_size, width, ver_src_step, 1, width, 1, 1, ups_ver_factor); break;
+        case 8: 
+          if (ups_ver_factor == 2) {
+            uvg_mip_pred_upsampling_1D_ver_avx2(tmp, ver_src, ref_samples_top, red_pred_size, width, ver_src_step, 1, width, 1, 1, ups_ver_factor);
+            mip_upsampling_w8_ups2_ver_avx2(result, ver_src, ref_samples_top, height);
+          }
+          else if (ups_ver_factor == 4) {
+            uvg_mip_pred_upsampling_1D_ver_avx2(result, ver_src, ref_samples_top, red_pred_size, width, ver_src_step, 1, width, 1, 1, ups_ver_factor);
+          }
+          else {
+            uvg_mip_pred_upsampling_1D_ver_avx2(result, ver_src, ref_samples_top, red_pred_size, width, ver_src_step, 1, width, 1, 1, ups_ver_factor);
+          }
+          break;
         case 16: uvg_mip_pred_upsampling_1D_ver_avx2(result, ver_src, ref_samples_top, red_pred_size, width, ver_src_step, 1, width, 1, 1, ups_ver_factor); break;
         case 32: uvg_mip_pred_upsampling_1D_ver_avx2(result, ver_src, ref_samples_top, red_pred_size, width, ver_src_step, 1, width, 1, 1, ups_ver_factor); break;
         case 64: uvg_mip_pred_upsampling_1D_ver_avx2(result, ver_src, ref_samples_top, red_pred_size, width, ver_src_step, 1, width, 1, 1, ups_ver_factor); break;
