@@ -5587,7 +5587,6 @@ static void mip_upsampling_w32_ups4_hor_avx2_alt(uvg_pixel* const dst, const uvg
 }
 
 
-
 static void mip_upsampling_w32_ups8_hor_avx2(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref, const uint16_t dst_step, const uint8_t ref_step)
 {
   const uint8_t red_pred_size = 4;
@@ -5698,260 +5697,137 @@ static void mip_upsampling_w32_ups8_hor_avx2(uvg_pixel* const dst, const uvg_pix
 
 static void mip_upsampling_w64_ups8_hor_avx2(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref, const uint16_t dst_step, const uint8_t ref_step)
 {
-  const uint8_t red_pred_size = 8;
-  const uint8_t ups_factor = 8; // width / red_pred_size
-
-  const int log2_factor = uvg_g_convert_to_log2[ups_factor];
-  const int rounding_offset = 1 << (log2_factor - 1);
-
-  __m128i vshuf = _mm_setr_epi8(
-    0x00, 0x08, 0x01, 0x09, 0x02, 0x0a, 0x03, 0x0b,
-    0x04, 0x0c, 0x05, 0x0d, 0x06, 0x0e, 0x07, 0x0f
-  );
-
-  __m128i vrnd = _mm_set1_epi16(rounding_offset);
-
-  ALIGNED(32) int16_t refs[8];
-  ALIGNED(32) int16_t srcs[8];
   const uvg_pixel* ref_ptr = ref + ref_step - 1;
   const uvg_pixel* src_ptr = src;
+  const uvg_pixel* dst_ptr = dst;
+  
+  const __m256i ones = _mm256_set1_epi8(1);
+  const __m256i twos = _mm256_set1_epi8(2);
+  const __m256i threes = _mm256_set1_epi8(3);
+  const __m256i fours = _mm256_set1_epi8(4);
+  const __m256i fives = _mm256_set1_epi8(5);
+  const __m256i sixes = _mm256_set1_epi8(6);
+  const __m256i sevens = _mm256_set1_epi8(7);
+  const __m256i eights = _mm256_set1_epi8(8);
 
-  int step = ref_step;
-
-  for (int i = 0; i < 8; i++) {
-    for (int ref = 0; ref < 8; ++ref) {
-      refs[ref] = *ref_ptr;
-      srcs[ref] = *src_ptr;
-
-      ref_ptr += step;
-      src_ptr += red_pred_size;
-    }
-
-    __m128i vaccu_ref = _mm_load_si128((__m128i*)refs);
-    __m128i vsub_ref = vaccu_ref;
-    vaccu_ref = _mm_slli_epi16(vaccu_ref, log2_factor);
-
-    __m128i vaccu_src = _mm_setzero_si128();
-    __m128i vadd_src = _mm_load_si128((__m128i*)srcs);
-
-    __m128i vres[8];
-    for (int res = 0; res < 8; ++res) {
-      vaccu_ref = _mm_sub_epi16(vaccu_ref, vsub_ref);
-      vaccu_src = _mm_add_epi16(vaccu_src, vadd_src);
-      vres[res] = _mm_add_epi16(vaccu_ref, vaccu_src);
-      vres[res] = _mm_add_epi16(vres[res], vrnd);
-      vres[res] = _mm_srli_epi16(vres[res], log2_factor);
-    }
-
-    __m128i vout0 = _mm_packus_epi16(vres[0], vres[1]);
-    __m128i vout1 = _mm_packus_epi16(vres[2], vres[3]);
-    __m128i vout2 = _mm_packus_epi16(vres[4], vres[5]);
-    __m128i vout3 = _mm_packus_epi16(vres[6], vres[7]);
-    vout0 = _mm_shuffle_epi8(vout0, vshuf);
-    vout1 = _mm_shuffle_epi8(vout1, vshuf);
-    vout2 = _mm_shuffle_epi8(vout2, vshuf);
-    vout3 = _mm_shuffle_epi8(vout3, vshuf);
-
-    __m128i vtmp16lo0 = _mm_unpacklo_epi16(vout0, vout1);
-    __m128i vtmp16hi0 = _mm_unpackhi_epi16(vout0, vout1);
-    __m128i vtmp16lo1 = _mm_unpacklo_epi16(vout2, vout3);
-    __m128i vtmp16hi1 = _mm_unpackhi_epi16(vout2, vout3);
-
-    __m128i vtmp32lo0 = _mm_unpacklo_epi32(vtmp16lo0, vtmp16lo1);
-    __m128i vtmp32hi0 = _mm_unpackhi_epi32(vtmp16lo0, vtmp16lo1);
-    __m128i vtmp32lo1 = _mm_unpacklo_epi32(vtmp16hi0, vtmp16hi1);
-    __m128i vtmp32hi1 = _mm_unpackhi_epi32(vtmp16hi0, vtmp16hi1);
-
-    const int dst_offset = i * 8;
-
-    *(uint64_t*)&dst[dst_offset + dst_step * 0] = _mm_extract_epi64(vtmp32lo0, 0);
-    *(uint64_t*)&dst[dst_offset + dst_step * 1] = _mm_extract_epi64(vtmp32lo0, 1);
-    *(uint64_t*)&dst[dst_offset + dst_step * 2] = _mm_extract_epi64(vtmp32hi0, 0);
-    *(uint64_t*)&dst[dst_offset + dst_step * 3] = _mm_extract_epi64(vtmp32hi0, 1);
-    *(uint64_t*)&dst[dst_offset + dst_step * 4] = _mm_extract_epi64(vtmp32lo1, 0);
-    *(uint64_t*)&dst[dst_offset + dst_step * 5] = _mm_extract_epi64(vtmp32lo1, 1);
-    *(uint64_t*)&dst[dst_offset + dst_step * 6] = _mm_extract_epi64(vtmp32hi1, 0);
-    *(uint64_t*)&dst[dst_offset + dst_step * 7] = _mm_extract_epi64(vtmp32hi1, 1);
-
-    ref_ptr = src + i;
-    src_ptr = src + i + 1;
-    step = red_pred_size; // Switch ref step
-  }
-}
-
-static void mip_upsampling_w64_ups8_hor_avx2_alt(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref, const uint16_t dst_step, const uint8_t ref_step)
-{
-  const uint8_t red_pred_size = 8;
-  const uint8_t ups_factor = 8; // width / red_pred_size
-
-  const int log2_factor = uvg_g_convert_to_log2[ups_factor];
-  const int rounding_offset = 1 << (log2_factor - 1);
-
-  __m128i vshufsrc = _mm_setr_epi8(
-    0xff, 0xff, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05,
-    0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d
+  __m256i shuffle_mask = _mm256_setr_epi8(
+    0x00, 0x01, 0x04, 0x05, 0x08, 0x09, 0x0c, 0x0d,
+    0x02, 0x03, 0x06, 0x07, 0x0a, 0x0b, 0x0e, 0x0f,
+    0x00, 0x01, 0x04, 0x05, 0x08, 0x09, 0x0c, 0x0d,
+    0x02, 0x03, 0x06, 0x07, 0x0a, 0x0b, 0x0e, 0x0f
   );
 
-  __m128i vshuf0 = _mm_setr_epi8(
-    0x00, 0x01, 0x00, 0x01, 0x00, 0x01, 0x00, 0x01,
-    0x00, 0x01, 0x00, 0x01, 0x00, 0x01, 0x00, 0x01
-  );
 
-  __m128i vshuf1 = _mm_setr_epi8(
-    0x02, 0x03, 0x02, 0x03, 0x02, 0x03, 0x02, 0x03,
-    0x02, 0x03, 0x02, 0x03, 0x02, 0x03, 0x02, 0x03
-  );
+  // This will process 2 rows at a time. Limit is always 8 rows.
+  for (int i = 0; i < 2; ++i) {
 
-  __m128i vshuf2 = _mm_setr_epi8(
-    0x04, 0x05, 0x04, 0x05, 0x04, 0x05, 0x04, 0x05,
-    0x04, 0x05, 0x04, 0x05, 0x04, 0x05, 0x04, 0x05
-  );
+    // Assign references by hand after copying sources. This will avoid the use of inserts later.
+    ALIGNED(32) uint8_t before[33];
+    memcpy(&before[1], src_ptr, 32);
+    before[0] = ref_ptr[ref_step * 0];
+    before[8] = ref_ptr[ref_step * 1];
+    before[16] = ref_ptr[ref_step * 2];
+    before[24] = ref_ptr[ref_step * 3];
 
-  __m128i vshuf3 = _mm_setr_epi8(
-    0x06, 0x07, 0x06, 0x07, 0x06, 0x07, 0x06, 0x07,
-    0x06, 0x07, 0x06, 0x07, 0x06, 0x07, 0x06, 0x07
-  );
+    __m256i vbefore = _mm256_load_si256((__m256i*)before);
+    __m256i vbehind = _mm256_load_si256((__m256i*)src_ptr);
 
-  __m128i vshuf4 = _mm_setr_epi8(
-    0x08, 0x09, 0x08, 0x09, 0x08, 0x09, 0x08, 0x09,
-    0x08, 0x09, 0x08, 0x09, 0x08, 0x09, 0x08, 0x09
-  );
+    // Permute the input values to get the result in correct order.
+    vbefore = _mm256_shuffle_epi8(vbefore, shuffle_mask);
+    vbehind = _mm256_shuffle_epi8(vbehind, shuffle_mask);
+    vbefore = _mm256_permute4x64_epi64(vbefore, _MM_SHUFFLE(3, 1, 2, 0));
+    vbehind = _mm256_permute4x64_epi64(vbehind, _MM_SHUFFLE(3, 1, 2, 0));
 
-  __m128i vshuf5 = _mm_setr_epi8(
-    0x0a, 0x0b, 0x0a, 0x0b, 0x0a, 0x0b, 0x0a, 0x0b,
-    0x0a, 0x0b, 0x0a, 0x0b, 0x0a, 0x0b, 0x0a, 0x0b
-  );
+    // Calculate the 7 interpolated values between before and behind, middle, left and right.
+    __m256i vmiddle = _mm256_avg_epu8(vbefore, vbehind);
+    __m256i vleft_middle = _mm256_avg_epu8(vmiddle, vbefore);
+    __m256i vright_middle = _mm256_avg_epu8(vmiddle, vbehind);
+    __m256i vleft_left = _mm256_avg_epu8(vbefore, vleft_middle);
+    __m256i vleft_right = _mm256_avg_epu8(vleft_middle, vmiddle);
+    __m256i vright_left = _mm256_avg_epu8(vmiddle, vright_middle);
+    __m256i vright_right = _mm256_avg_epu8(vright_middle, vbehind);
 
-  __m128i vshuf6 = _mm_setr_epi8(
-    0x0c, 0x0d, 0x0c, 0x0d, 0x0c, 0x0d, 0x0c, 0x0d,
-    0x0c, 0x0d, 0x0c, 0x0d, 0x0c, 0x0d, 0x0c, 0x0d
-  );
+    // Calculate the three and two last bits of difference between before and behind. These bits are used to determine if there will be rounding error.
+    __m256i diff = _mm256_sub_epi8(vbehind, vbefore);
+    diff = _mm256_and_si256(diff, sevens);
+    __m256i three_diff = _mm256_and_si256(diff, threes);
 
-  __m128i vshuf7 = _mm_setr_epi8(
-    0x0e, 0x0f, 0x0e, 0x0f, 0x0e, 0x0f, 0x0e, 0x0f,
-    0x0e, 0x0f, 0x0e, 0x0f, 0x0e, 0x0f, 0x0e, 0x0f
-  );
+    // Right side
+    __m256i mask = _mm256_cmpgt_epi8(diff, fours);  // The rounding error mask will be generated based on the calculated last bits.
+    __m256i sub_amount = _mm256_blendv_epi8(_mm256_set1_epi8(0), ones, mask); // If 5, 6, 7 select one
+    vright_right = _mm256_sub_epi8(vright_right, sub_amount);
 
-  __m128i vrnd = _mm_set1_epi16(rounding_offset);
-  __m128i vmul = _mm_setr_epi16(1, 2, 3, 4, 5, 6, 7, 8);
+    mask = _mm256_cmpeq_epi8(three_diff, threes);
+    sub_amount = _mm256_blendv_epi8(_mm256_set1_epi8(0), ones, mask); // If 3 or 7 select one
+    vright_middle = _mm256_sub_epi8(vright_middle, sub_amount);
 
-  const uvg_pixel* ref_ptr = ref + ref_step - 1;
-  const uvg_pixel* src_ptr = src;
+    __m256i is_two = _mm256_cmpeq_epi8(diff, twos);
+    __m256i is_five = _mm256_cmpeq_epi8(diff, fives);
+    mask = _mm256_or_si256(mask, is_two);
+    mask = _mm256_or_si256(mask, is_five);
+    sub_amount = _mm256_blendv_epi8(_mm256_set1_epi8(0), ones, mask); // If 2, 3, 5, or 7 select one
+    vright_left = _mm256_sub_epi8(vright_left, sub_amount);
 
-  int step = ref_step;
-
-  uvg_pixel* dst_ptr = dst;
-
-  for (int i = 0; i < 8; i++) {
-    // Handle input data
-    int16_t before = *ref_ptr;
-    __m128i vtmp = _mm_loadu_si128((__m128i*)src_ptr);
-    __m128i vbehind = _mm_cvtepu8_epi16(vtmp);
-
-    __m128i vbefore = vbehind;
-    vbefore = _mm_shuffle_epi8(vbefore, vshufsrc);
-    vbefore = _mm_insert_epi16(vbefore, before, 0);
-    __m128i vbeforeshifted = _mm_slli_epi16(vbefore, log2_factor);
-
-    __m128i vinterpolate = _mm_sub_epi16(vbehind, vbefore);
-
-    // Calculate 1st 16 result chunk
-    __m128i vbefore0 = _mm_shuffle_epi8(vbeforeshifted, vshuf0);
-    __m128i vinterpolate0 = _mm_shuffle_epi8(vinterpolate, vshuf0);
-
-    __m128i vmulres0 = _mm_mullo_epi16(vinterpolate0, vmul);
-    vmulres0 = _mm_add_epi16(vmulres0, vbefore0);
-
-    vmulres0 = _mm_add_epi16(vmulres0, vrnd);
-    vmulres0 = _mm_srai_epi16(vmulres0, log2_factor);
-
-    __m128i vbefore1 = _mm_shuffle_epi8(vbeforeshifted, vshuf1);
-    __m128i vinterpolate1 = _mm_shuffle_epi8(vinterpolate, vshuf1);
-
-    __m128i vmulres1 = _mm_mullo_epi16(vinterpolate1, vmul);
-    vmulres1 = _mm_add_epi16(vmulres1, vbefore1);
-
-    vmulres1 = _mm_add_epi16(vmulres1, vrnd);
-    vmulres1 = _mm_srai_epi16(vmulres1, log2_factor);
-
-    __m128i vres = _mm_packus_epi16(vmulres0, vmulres1);
-
-    _mm_store_si128((__m128i*)(dst_ptr + 0), vres);
-
-    // Calculate 2nd 16 result chunk
-    vbefore0 = _mm_shuffle_epi8(vbeforeshifted, vshuf2);
-    vinterpolate0 = _mm_shuffle_epi8(vinterpolate, vshuf2);
-
-    vmulres0 = _mm_mullo_epi16(vinterpolate0, vmul);
-    vmulres0 = _mm_add_epi16(vmulres0, vbefore0);
-
-    vmulres0 = _mm_add_epi16(vmulres0, vrnd);
-    vmulres0 = _mm_srai_epi16(vmulres0, log2_factor);
-
-    vbefore1 = _mm_shuffle_epi8(vbeforeshifted, vshuf3);
-    vinterpolate1 = _mm_shuffle_epi8(vinterpolate, vshuf3);
-
-    vmulres1 = _mm_mullo_epi16(vinterpolate1, vmul);
-    vmulres1 = _mm_add_epi16(vmulres1, vbefore1);
-
-    vmulres1 = _mm_add_epi16(vmulres1, vrnd);
-    vmulres1 = _mm_srai_epi16(vmulres1, log2_factor);
-
-    vres = _mm_packus_epi16(vmulres0, vmulres1);
-
-    _mm_store_si128((__m128i*)(dst_ptr + 16), vres);
-
-    // Calculate 3rd 16 result chunk
-    vbefore0 = _mm_shuffle_epi8(vbeforeshifted, vshuf4);
-    vinterpolate0 = _mm_shuffle_epi8(vinterpolate, vshuf4);
-
-    vmulres0 = _mm_mullo_epi16(vinterpolate0, vmul);
-    vmulres0 = _mm_add_epi16(vmulres0, vbefore0);
-
-    vmulres0 = _mm_add_epi16(vmulres0, vrnd);
-    vmulres0 = _mm_srai_epi16(vmulres0, log2_factor);
-
-    vbefore1 = _mm_shuffle_epi8(vbeforeshifted, vshuf5);
-    vinterpolate1 = _mm_shuffle_epi8(vinterpolate, vshuf5);
-
-    vmulres1 = _mm_mullo_epi16(vinterpolate1, vmul);
-    vmulres1 = _mm_add_epi16(vmulres1, vbefore1);
-
-    vmulres1 = _mm_add_epi16(vmulres1, vrnd);
-    vmulres1 = _mm_srai_epi16(vmulres1, log2_factor);
-
-    vres = _mm_packus_epi16(vmulres0, vmulres1);
-
-    _mm_store_si128((__m128i*)(dst_ptr + 32), vres);
-
-    // Calculate 4th 16 result chunk
-    vbefore0 = _mm_shuffle_epi8(vbeforeshifted, vshuf6);
-    vinterpolate0 = _mm_shuffle_epi8(vinterpolate, vshuf6);
-
-    vmulres0 = _mm_mullo_epi16(vinterpolate0, vmul);
-    vmulres0 = _mm_add_epi16(vmulres0, vbefore0);
-
-    vmulres0 = _mm_add_epi16(vmulres0, vrnd);
-    vmulres0 = _mm_srai_epi16(vmulres0, log2_factor);
-
-    vbefore1 = _mm_shuffle_epi8(vbeforeshifted, vshuf7);
-    vinterpolate1 = _mm_shuffle_epi8(vinterpolate, vshuf7);
-
-    vmulres1 = _mm_mullo_epi16(vinterpolate1, vmul);
-    vmulres1 = _mm_add_epi16(vmulres1, vbefore1);
-
-    vmulres1 = _mm_add_epi16(vmulres1, vrnd);
-    vmulres1 = _mm_srai_epi16(vmulres1, log2_factor);
-
-    vres = _mm_packus_epi16(vmulres0, vmulres1);
-
-    _mm_store_si128((__m128i*)(dst_ptr + 48), vres);
+    // Left side
+    diff = _mm256_blendv_epi8(diff, eights, _mm256_cmpeq_epi8(_mm256_set1_epi8(0), diff)); // Replace zeros with eights to enable using GT
+    mask = _mm256_cmpgt_epi8(diff, threes);
+    sub_amount = _mm256_blendv_epi8(ones, _mm256_set1_epi8(0), mask); // If greater than three select zero
+    vleft_left = _mm256_sub_epi8(vleft_left, sub_amount);
     
-    dst_ptr += dst_step;
-    ref_ptr += ref_step;
-    src_ptr += red_pred_size;
+    mask = _mm256_cmpeq_epi8(three_diff, ones);
+    sub_amount = _mm256_blendv_epi8(_mm256_set1_epi8(0), ones, mask); // If 1 or 5 select one
+    vleft_middle = _mm256_sub_epi8(vleft_middle, sub_amount);
+
+    __m256i is_three = _mm256_cmpeq_epi8(diff, threes);
+    __m256i is_six = _mm256_cmpeq_epi8(diff, sixes);
+    mask = _mm256_or_si256(mask, is_three);
+    mask = _mm256_or_si256(mask, is_six);
+    sub_amount = _mm256_blendv_epi8(_mm256_set1_epi8(0), ones, mask); // If 1, 3, 5, 6 select one
+    vleft_right = _mm256_sub_epi8(vleft_right, sub_amount);
+
+    // Interleave results.
+    __m256i left_left_temp0 = _mm256_unpacklo_epi8(vleft_left, vleft_middle);
+    __m256i left_left_temp1 = _mm256_unpackhi_epi8(vleft_left, vleft_middle);
+    __m256i left_right_temp0 = _mm256_unpacklo_epi8(vleft_right, vmiddle);
+    __m256i left_right_temp1 = _mm256_unpackhi_epi8(vleft_right, vmiddle);
+    __m256i right_left_temp0 = _mm256_unpacklo_epi8(vright_left, vright_middle);
+    __m256i right_left_temp1 = _mm256_unpackhi_epi8(vright_left, vright_middle);
+    __m256i right_right_temp0 = _mm256_unpacklo_epi8(vright_right, vbehind);
+    __m256i right_right_temp1 = _mm256_unpackhi_epi8(vright_right, vbehind);
+
+    __m256i vleft_temp0 = _mm256_unpacklo_epi16(left_left_temp0, left_right_temp0);
+    __m256i vleft_temp1 = _mm256_unpackhi_epi16(left_left_temp0, left_right_temp0);
+    __m256i vleft_temp2 = _mm256_unpacklo_epi16(left_left_temp1, left_right_temp1);
+    __m256i vleft_temp3 = _mm256_unpackhi_epi16(left_left_temp1, left_right_temp1);
+    __m256i vright_temp0 = _mm256_unpacklo_epi16(right_left_temp0, right_right_temp0);
+    __m256i vright_temp1 = _mm256_unpackhi_epi16(right_left_temp0, right_right_temp0);
+    __m256i vright_temp2 = _mm256_unpacklo_epi16(right_left_temp1, right_right_temp1);
+    __m256i vright_temp3 = _mm256_unpackhi_epi16(right_left_temp1, right_right_temp1);
+
+    __m256i vtmp0 = _mm256_unpacklo_epi32(vleft_temp0, vright_temp0);
+    __m256i vtmp1 = _mm256_unpackhi_epi32(vleft_temp0, vright_temp0);
+    __m256i vtmp2 = _mm256_unpacklo_epi32(vleft_temp1, vright_temp1);
+    __m256i vtmp3 = _mm256_unpackhi_epi32(vleft_temp1, vright_temp1);
+    __m256i vtmp4 = _mm256_unpacklo_epi32(vleft_temp2, vright_temp2);
+    __m256i vtmp5 = _mm256_unpackhi_epi32(vleft_temp2, vright_temp2);
+    __m256i vtmp6 = _mm256_unpacklo_epi32(vleft_temp3, vright_temp3);
+    __m256i vtmp7 = _mm256_unpackhi_epi32(vleft_temp3, vright_temp3);
+
+    _mm256_store_si256((__m256i*)(dst_ptr + dst_step * 0 + 00), vtmp0);
+    _mm256_store_si256((__m256i*)(dst_ptr + dst_step * 0 + 32), vtmp1);
+    _mm256_store_si256((__m256i*)(dst_ptr + dst_step * 1 + 00), vtmp2);
+    _mm256_store_si256((__m256i*)(dst_ptr + dst_step * 1 + 32), vtmp3);
+    _mm256_store_si256((__m256i*)(dst_ptr + dst_step * 2 + 00), vtmp4);
+    _mm256_store_si256((__m256i*)(dst_ptr + dst_step * 2 + 32), vtmp5);
+    _mm256_store_si256((__m256i*)(dst_ptr + dst_step * 3 + 00), vtmp6);
+    _mm256_store_si256((__m256i*)(dst_ptr + dst_step * 3 + 32), vtmp7);
+
+    src_ptr += 32;
+    ref_ptr += ref_step * 4;
+    dst_ptr += dst_step * 4;
   }
 }
+
 
 /** \brief Matrix weighted intra prediction.
 */
@@ -6113,7 +5989,7 @@ void mip_predict_avx2(
           }
           break;
         case 64: 
-          mip_upsampling_w64_ups8_hor_avx2_alt(hor_dst, reduced_pred, ref_samples_left, ver_src_step, ups_ver_factor); // Works for height 8, 16, 32 and 64. Upsamples 1 to 8.
+          mip_upsampling_w64_ups8_hor_avx2(hor_dst, reduced_pred, ref_samples_left, ver_src_step, ups_ver_factor); // Works for height 8, 16, 32 and 64. Upsamples 1 to 8.
           break;
         default:
           assert(false && "Invalid MIP width.\n");
