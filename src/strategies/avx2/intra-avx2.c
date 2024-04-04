@@ -5832,87 +5832,20 @@ static void mip_upsampling_w4_ups2_ver_avx2(uvg_pixel* const dst, const uvg_pixe
   const uint8_t red_pred_size = 4;
   const uint8_t ups_factor = 2; // height / red_pred_size
 
-  const int log2_factor = uvg_g_convert_to_log2[ups_factor];
-  const int rounding_offset = 1 << (log2_factor - 1);
-
-  __m256i vrnd = _mm256_set1_epi16(rounding_offset);
-
-  /*__m128i vshufbefore = _mm_setr_epi8(
-    0xff, 0xff, 0xff, 0xff, 0x00, 0x01, 0x02, 0x03,
-    0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b
-  );*/
-
-  __m256i vshufres = _mm256_setr_epi8(
-    0x00, 0x01, 0x02, 0x03, 0x08, 0x09, 0x0a, 0x0b,
-    0x04, 0x05, 0x06, 0x07, 0x0c, 0x0d, 0x0e, 0x0f,
-    0x00, 0x01, 0x02, 0x03, 0x08, 0x09, 0x0a, 0x0b,
-    0x04, 0x05, 0x06, 0x07, 0x0c, 0x0d, 0x0e, 0x0f
-  );
-
   int32_t refline = *(int32_t*)ref;
-  //__m128i vidx = _mm_setr_epi32(0, 32, 64, 96);
-  //__m128i vbehind = _mm_i32gather_epi32((const int*)src, vidx, 1);
   __m128i vbehind = _mm_loadu_si128((__m128i*)src);
   __m128i vbefore = vbehind;
 
   vbefore = _mm_slli_si128(vbefore, 4); // Shift left to make room for one 32-bit integer. This could be done with a shuffle, but there should be no performance difference.
   vbefore = _mm_insert_epi32(vbefore, refline, 0);
 
-  __m256i vbefore256 = _mm256_cvtepu8_epi16(vbefore);
-  __m256i vbehind256 = _mm256_cvtepu8_epi16(vbehind);
+  __m128i vavg = _mm_avg_epu8(vbefore, vbehind);
 
-  __m256i vbeforeshifted = _mm256_slli_epi16(vbefore256, log2_factor);
+  __m128i vres0 = _mm_unpacklo_epi32(vavg, vbehind);
+  __m128i vres1 = _mm_unpackhi_epi32(vavg, vbehind);
 
-  __m256i vinterpolate = _mm256_sub_epi16(vbehind256, vbefore256);
-
-  __m256i vrow0 = _mm256_add_epi16(vbeforeshifted, vinterpolate);
-  __m256i vrow1 = _mm256_add_epi16(vrow0, vinterpolate);
-  __m256i vrow2 = _mm256_add_epi16(vrow1, vinterpolate);
-  __m256i vrow3 = _mm256_add_epi16(vrow2, vinterpolate);
-  __m256i vrow4 = _mm256_add_epi16(vrow3, vinterpolate);
-  __m256i vrow5 = _mm256_add_epi16(vrow4, vinterpolate);
-  __m256i vrow6 = _mm256_add_epi16(vrow5, vinterpolate);
-
-  vrow0 = _mm256_add_epi16(vrow0, vrnd);
-  vrow1 = _mm256_add_epi16(vrow1, vrnd);
-  vrow2 = _mm256_add_epi16(vrow2, vrnd);
-  vrow3 = _mm256_add_epi16(vrow3, vrnd);
-  vrow4 = _mm256_add_epi16(vrow4, vrnd);
-  vrow5 = _mm256_add_epi16(vrow5, vrnd);
-  vrow6 = _mm256_add_epi16(vrow6, vrnd);
-
-  vrow0 = _mm256_srai_epi16(vrow0, log2_factor);
-  vrow1 = _mm256_srai_epi16(vrow1, log2_factor);
-  vrow2 = _mm256_srai_epi16(vrow2, log2_factor);
-  vrow3 = _mm256_srai_epi16(vrow3, log2_factor);
-  vrow4 = _mm256_srai_epi16(vrow4, log2_factor);
-  vrow5 = _mm256_srai_epi16(vrow5, log2_factor);
-  vrow6 = _mm256_srai_epi16(vrow6, log2_factor);
-
-  __m256i vres0 = _mm256_packus_epi16(vrow0, vrow1);
-  __m256i vres1 = _mm256_packus_epi16(vrow2, vrow3);
-  __m256i vres2 = _mm256_packus_epi16(vrow4, vrow5);
-  __m256i vres3 = _mm256_packus_epi16(vrow6, vbehind256);
-
-  vres0 = _mm256_shuffle_epi8(vres0, vshufres);
-  vres1 = _mm256_shuffle_epi8(vres1, vshufres);
-  vres2 = _mm256_shuffle_epi8(vres2, vshufres);
-  vres3 = _mm256_shuffle_epi8(vres3, vshufres);
-
-  __m256i vupklo0 = _mm256_unpacklo_epi64(vres0, vres1);
-  __m256i vupklo1 = _mm256_unpacklo_epi64(vres2, vres3);
-  __m256i vupkhi0 = _mm256_unpackhi_epi64(vres0, vres1);
-  __m256i vupkhi1 = _mm256_unpackhi_epi64(vres2, vres3);
-
-  vres0 = _mm256_permute2x128_si256(vupklo0, vupklo1, 0x20);
-  vres1 = _mm256_permute2x128_si256(vupkhi0, vupkhi1, 0x20);
-  vres2 = _mm256_permute2x128_si256(vupklo0, vupklo1, 0x31);
-  vres3 = _mm256_permute2x128_si256(vupkhi0, vupkhi1, 0x31);
-
-  _mm256_store_si256((__m256i*)(dst + 0), vres0);
-  _mm256_store_si256((__m256i*)(dst + 32), vres1);
-  _mm256_store_si256((__m256i*)(dst + 64), vres2);
-  _mm256_store_si256((__m256i*)(dst + 96), vres3);
+  _mm_store_si128((__m128i*)(dst +  0), vres0);
+  _mm_store_si128((__m128i*)(dst + 16), vres1);  
 }
 
 static void mip_upsampling_w4_ups4_ver_avx2(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref)
@@ -6252,14 +6185,13 @@ void mip_predict_avx2(
       switch (width) {
         case 4: 
           if (ups_ver_factor == 2) {
-            uvg_mip_pred_upsampling_1D_ver_avx2(result, ver_src, ref_samples_top, red_pred_size, width, ver_src_step, 1, width, 1, 1, ups_ver_factor);
+            //uvg_mip_pred_upsampling_1D_ver_avx2(tmp, ver_src, ref_samples_top, red_pred_size, width, ver_src_step, 1, width, 1, 1, ups_ver_factor);
+            mip_upsampling_w4_ups2_ver_avx2(result, ver_src, ref_samples_top);
           }
           else if (ups_ver_factor == 4) {
-            //uvg_mip_pred_upsampling_1D_ver_avx2(tmp, ver_src, ref_samples_top, red_pred_size, width, ver_src_step, 1, width, 1, 1, ups_ver_factor);
             mip_upsampling_w4_ups4_ver_avx2(result, ver_src, ref_samples_top);
           }
           else {
-            
             mip_upsampling_w4_ups8_ver_avx2(result, ver_src, ref_samples_top);
           }
           break;
