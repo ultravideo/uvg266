@@ -6769,6 +6769,208 @@ static void mip_upsampling_w64_ups4_ver_avx2(uvg_pixel* const dst, const uvg_pix
   }
 }
 
+static void mip_upsampling_w64_ups8_ver_avx2(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref)
+{
+  const uint8_t red_pred_size = 8;
+  const uint8_t ups_factor = 8; // height / red_pred_size
+
+  const int log2_factor = uvg_g_convert_to_log2[ups_factor];
+  const int rounding_offset = 1 << (log2_factor - 1);
+  __m256i vrnd = _mm256_set1_epi16(rounding_offset);
+
+  __m256i vbefore256a;
+  __m256i vbehind256a;
+
+  __m256i vbefore256b;
+  __m256i vbehind256b;
+
+  __m256i vbefore256c;
+  __m256i vbehind256c;
+
+  __m256i vbefore256d;
+  __m256i vbehind256d;
+
+  __m128i vbeforea = _mm_load_si128((__m128i*)(ref + 0));
+  __m128i vbeforeb = _mm_load_si128((__m128i*)(ref + 16));
+  __m128i vbeforec = _mm_load_si128((__m128i*)(ref + 32));
+  __m128i vbefored = _mm_load_si128((__m128i*)(ref + 48));
+  vbefore256a = _mm256_cvtepu8_epi16(vbeforea);
+  vbefore256b = _mm256_cvtepu8_epi16(vbeforeb);
+  vbefore256c = _mm256_cvtepu8_epi16(vbeforec);
+  vbefore256d = _mm256_cvtepu8_epi16(vbefored);
+
+  for (int i = 0; i < 8; ++i) {
+    __m128i vbehinda = _mm_loadu_si128((__m128i*)(src + (i * 512) + 0));
+    __m128i vbehindb = _mm_loadu_si128((__m128i*)(src + (i * 512) + 16));
+    __m128i vbehindc = _mm_loadu_si128((__m128i*)(src + (i * 512) + 32));
+    __m128i vbehindd = _mm_loadu_si128((__m128i*)(src + (i * 512) + 48));
+    vbehind256a = _mm256_cvtepu8_epi16(vbehinda);
+    vbehind256b = _mm256_cvtepu8_epi16(vbehindb);
+    vbehind256c = _mm256_cvtepu8_epi16(vbehindc);
+    vbehind256d = _mm256_cvtepu8_epi16(vbehindd);
+
+    // Calculate 1/4 part of 64 wide lane
+    __m256i vbeforeshifted = _mm256_slli_epi16(vbefore256a, log2_factor);
+
+    // Add rounding offset
+    vbeforeshifted = _mm256_add_epi16(vbeforeshifted, vrnd);
+
+    __m256i vinterpolate = _mm256_sub_epi16(vbehind256a, vbefore256a);
+
+    __m256i vrowa0 = _mm256_add_epi16(vbeforeshifted, vinterpolate);
+    __m256i vrowa1 = _mm256_add_epi16(vrowa0, vinterpolate);
+    __m256i vrowa2 = _mm256_add_epi16(vrowa1, vinterpolate);
+    __m256i vrowa3 = _mm256_add_epi16(vrowa2, vinterpolate);
+    __m256i vrowa4 = _mm256_add_epi16(vrowa3, vinterpolate);
+    __m256i vrowa5 = _mm256_add_epi16(vrowa4, vinterpolate);
+    __m256i vrowa6 = _mm256_add_epi16(vrowa5, vinterpolate);
+
+    vrowa0 = _mm256_srai_epi16(vrowa0, log2_factor);
+    vrowa1 = _mm256_srai_epi16(vrowa1, log2_factor);
+    vrowa2 = _mm256_srai_epi16(vrowa2, log2_factor);
+    vrowa3 = _mm256_srai_epi16(vrowa3, log2_factor);
+    vrowa4 = _mm256_srai_epi16(vrowa4, log2_factor);
+    vrowa5 = _mm256_srai_epi16(vrowa5, log2_factor);
+    vrowa6 = _mm256_srai_epi16(vrowa6, log2_factor);
+
+
+    // Calculate 2/4 part of 64 wide lane
+    vbeforeshifted = _mm256_slli_epi16(vbefore256b, log2_factor);
+
+    // Add rounding offset
+    vbeforeshifted = _mm256_add_epi16(vbeforeshifted, vrnd);
+
+    vinterpolate = _mm256_sub_epi16(vbehind256b, vbefore256b);
+
+    __m256i vrowb0 = _mm256_add_epi16(vbeforeshifted, vinterpolate);
+    __m256i vrowb1 = _mm256_add_epi16(vrowb0, vinterpolate);
+    __m256i vrowb2 = _mm256_add_epi16(vrowb1, vinterpolate);
+    __m256i vrowb3 = _mm256_add_epi16(vrowb2, vinterpolate);
+    __m256i vrowb4 = _mm256_add_epi16(vrowb3, vinterpolate);
+    __m256i vrowb5 = _mm256_add_epi16(vrowb4, vinterpolate);
+    __m256i vrowb6 = _mm256_add_epi16(vrowb5, vinterpolate);
+
+    vrowb0 = _mm256_srai_epi16(vrowb0, log2_factor);
+    vrowb1 = _mm256_srai_epi16(vrowb1, log2_factor);
+    vrowb2 = _mm256_srai_epi16(vrowb2, log2_factor);
+    vrowb3 = _mm256_srai_epi16(vrowb3, log2_factor);
+    vrowb4 = _mm256_srai_epi16(vrowb4, log2_factor);
+    vrowb5 = _mm256_srai_epi16(vrowb5, log2_factor);
+    vrowb6 = _mm256_srai_epi16(vrowb6, log2_factor);
+
+
+    // Calculate 3/4 part of 64 wide lane
+    vbeforeshifted = _mm256_slli_epi16(vbefore256c, log2_factor);
+
+    // Add rounding offset
+    vbeforeshifted = _mm256_add_epi16(vbeforeshifted, vrnd);
+
+    vinterpolate = _mm256_sub_epi16(vbehind256c, vbefore256c);
+
+    __m256i vrowc0 = _mm256_add_epi16(vbeforeshifted, vinterpolate);
+    __m256i vrowc1 = _mm256_add_epi16(vrowc0, vinterpolate);
+    __m256i vrowc2 = _mm256_add_epi16(vrowc1, vinterpolate);
+    __m256i vrowc3 = _mm256_add_epi16(vrowc2, vinterpolate);
+    __m256i vrowc4 = _mm256_add_epi16(vrowc3, vinterpolate);
+    __m256i vrowc5 = _mm256_add_epi16(vrowc4, vinterpolate);
+    __m256i vrowc6 = _mm256_add_epi16(vrowc5, vinterpolate);
+
+    vrowc0 = _mm256_srai_epi16(vrowc0, log2_factor);
+    vrowc1 = _mm256_srai_epi16(vrowc1, log2_factor);
+    vrowc2 = _mm256_srai_epi16(vrowc2, log2_factor);
+    vrowc3 = _mm256_srai_epi16(vrowc3, log2_factor);
+    vrowc4 = _mm256_srai_epi16(vrowc4, log2_factor);
+    vrowc5 = _mm256_srai_epi16(vrowc5, log2_factor);
+    vrowc6 = _mm256_srai_epi16(vrowc6, log2_factor);
+
+
+    // Calculate 3/4 part of 64 wide lane
+    vbeforeshifted = _mm256_slli_epi16(vbefore256d, log2_factor);
+
+    // Add rounding offset
+    vbeforeshifted = _mm256_add_epi16(vbeforeshifted, vrnd);
+
+    vinterpolate = _mm256_sub_epi16(vbehind256d, vbefore256d);
+
+    __m256i vrowd0 = _mm256_add_epi16(vbeforeshifted, vinterpolate);
+    __m256i vrowd1 = _mm256_add_epi16(vrowd0, vinterpolate);
+    __m256i vrowd2 = _mm256_add_epi16(vrowd1, vinterpolate);
+    __m256i vrowd3 = _mm256_add_epi16(vrowd2, vinterpolate);
+    __m256i vrowd4 = _mm256_add_epi16(vrowd3, vinterpolate);
+    __m256i vrowd5 = _mm256_add_epi16(vrowd4, vinterpolate);
+    __m256i vrowd6 = _mm256_add_epi16(vrowd5, vinterpolate);
+
+    vrowd0 = _mm256_srai_epi16(vrowd0, log2_factor);
+    vrowd1 = _mm256_srai_epi16(vrowd1, log2_factor);
+    vrowd2 = _mm256_srai_epi16(vrowd2, log2_factor);
+    vrowd3 = _mm256_srai_epi16(vrowd3, log2_factor);
+    vrowd4 = _mm256_srai_epi16(vrowd4, log2_factor);
+    vrowd5 = _mm256_srai_epi16(vrowd5, log2_factor);
+    vrowd6 = _mm256_srai_epi16(vrowd6, log2_factor);
+
+
+    // Store results
+    __m256i vres00 = _mm256_packus_epi16(vrowa0, vrowb0);
+    __m256i vres01 = _mm256_packus_epi16(vrowc0, vrowd0);
+    
+    __m256i vres10 = _mm256_packus_epi16(vrowa1, vrowb1);
+    __m256i vres11 = _mm256_packus_epi16(vrowc1, vrowd1);
+
+    __m256i vres20 = _mm256_packus_epi16(vrowa2, vrowb2);
+    __m256i vres21 = _mm256_packus_epi16(vrowc2, vrowd2);
+
+    __m256i vres30 = _mm256_packus_epi16(vrowa3, vrowb3);
+    __m256i vres31 = _mm256_packus_epi16(vrowc3, vrowd3);
+
+    __m256i vres40 = _mm256_packus_epi16(vrowa4, vrowb4);
+    __m256i vres41 = _mm256_packus_epi16(vrowc4, vrowd4);
+
+    __m256i vres50 = _mm256_packus_epi16(vrowa5, vrowb5);
+    __m256i vres51 = _mm256_packus_epi16(vrowc5, vrowd5);
+
+    __m256i vres60 = _mm256_packus_epi16(vrowa6, vrowb6);
+    __m256i vres61 = _mm256_packus_epi16(vrowc6, vrowd6);
+
+    
+    vres00 = _mm256_permute4x64_epi64(vres00, _MM_SHUFFLE(3, 1, 2, 0));
+    vres01 = _mm256_permute4x64_epi64(vres01, _MM_SHUFFLE(3, 1, 2, 0));
+    vres10 = _mm256_permute4x64_epi64(vres10, _MM_SHUFFLE(3, 1, 2, 0));
+    vres11 = _mm256_permute4x64_epi64(vres11, _MM_SHUFFLE(3, 1, 2, 0));
+    vres20 = _mm256_permute4x64_epi64(vres20, _MM_SHUFFLE(3, 1, 2, 0));
+    vres21 = _mm256_permute4x64_epi64(vres21, _MM_SHUFFLE(3, 1, 2, 0));
+    vres30 = _mm256_permute4x64_epi64(vres30, _MM_SHUFFLE(3, 1, 2, 0));
+    vres31 = _mm256_permute4x64_epi64(vres31, _MM_SHUFFLE(3, 1, 2, 0));
+    vres40 = _mm256_permute4x64_epi64(vres40, _MM_SHUFFLE(3, 1, 2, 0));
+    vres41 = _mm256_permute4x64_epi64(vres41, _MM_SHUFFLE(3, 1, 2, 0));
+    vres50 = _mm256_permute4x64_epi64(vres50, _MM_SHUFFLE(3, 1, 2, 0));
+    vres51 = _mm256_permute4x64_epi64(vres51, _MM_SHUFFLE(3, 1, 2, 0));
+    vres60 = _mm256_permute4x64_epi64(vres60, _MM_SHUFFLE(3, 1, 2, 0));
+    vres61 = _mm256_permute4x64_epi64(vres61, _MM_SHUFFLE(3, 1, 2, 0));
+
+
+    _mm256_store_si256((__m256i*)(dst + (i * 512) +   0), vres00);
+    _mm256_store_si256((__m256i*)(dst + (i * 512) +  32), vres01);
+    _mm256_store_si256((__m256i*)(dst + (i * 512) +  64), vres10);
+    _mm256_store_si256((__m256i*)(dst + (i * 512) +  96), vres11);
+    _mm256_store_si256((__m256i*)(dst + (i * 512) + 128), vres20);
+    _mm256_store_si256((__m256i*)(dst + (i * 512) + 160), vres21);
+    _mm256_store_si256((__m256i*)(dst + (i * 512) + 192), vres30);
+    _mm256_store_si256((__m256i*)(dst + (i * 512) + 224), vres31);
+    _mm256_store_si256((__m256i*)(dst + (i * 512) + 256), vres40);
+    _mm256_store_si256((__m256i*)(dst + (i * 512) + 288), vres41);
+    _mm256_store_si256((__m256i*)(dst + (i * 512) + 320), vres50);
+    _mm256_store_si256((__m256i*)(dst + (i * 512) + 352), vres51);
+    _mm256_store_si256((__m256i*)(dst + (i * 512) + 384), vres60);
+    _mm256_store_si256((__m256i*)(dst + (i * 512) + 416), vres61);
+    
+
+    vbefore256a = vbehind256a;
+    vbefore256b = vbehind256b;
+    vbefore256c = vbehind256c;
+    vbefore256d = vbehind256d;
+  }
+}
+
 /** \brief Matrix weighted intra prediction.
 */
 void mip_predict_avx2(
@@ -6937,7 +7139,7 @@ void mip_predict_avx2(
       }
     }
 
-    uvg_pixel tmp[64 * 64] = {0};
+    //uvg_pixel tmp[64 * 64] = {0};
     if (ups_ver_factor > 1) {
       switch (width) {
         case 4: 
@@ -7002,8 +7204,8 @@ void mip_predict_avx2(
             mip_upsampling_w64_ups4_ver_avx2(result, ver_src, ref_samples_top);
           }
           else {
-            uvg_mip_pred_upsampling_1D_ver_avx2(result, ver_src, ref_samples_top, red_pred_size, width, ver_src_step, 1, width, 1, 1, ups_ver_factor);
-            //mip_upsampling_w64_ups8_ver_avx2(result, ver_src, ref_samples_top);
+            //uvg_mip_pred_upsampling_1D_ver_avx2(tmp, ver_src, ref_samples_top, red_pred_size, width, ver_src_step, 1, width, 1, 1, ups_ver_factor);
+            mip_upsampling_w64_ups8_ver_avx2(result, ver_src, ref_samples_top);
           }
           break;
 
