@@ -6091,7 +6091,6 @@ static void mip_upsampling_w8_ups4_ver_avx2(uvg_pixel* const dst, const uvg_pixe
   const int rounding_offset = 1 << (log2_factor - 1);
   __m256i vrnd = _mm256_set1_epi16(rounding_offset);
 
-
   int64_t refline = *(int64_t*)ref;
   __m128i vbehind = _mm_loadu_si128((__m128i*)src);
   __m128i vbefore = vbehind;
@@ -6156,6 +6155,148 @@ static void mip_upsampling_w8_ups4_ver_avx2(uvg_pixel* const dst, const uvg_pixe
     _mm256_store_si256((__m256i*)(dst + (i * 64) +  0), vlo128);
     _mm256_store_si256((__m256i*)(dst + (i * 64) + 32), vhi128);
   }
+}
+
+static void mip_upsampling_w8_ups8_ver_avx2(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref)
+{
+  const uint8_t red_pred_size = 8;
+  const uint8_t ups_factor = 8; // height / red_pred_size
+
+  const int log2_factor = uvg_g_convert_to_log2[ups_factor];
+  const int rounding_offset = 1 << (log2_factor - 1);
+  __m256i vrnd = _mm256_set1_epi16(rounding_offset);
+
+  int64_t refline = *(int64_t*)ref;
+  __m128i vbehind = _mm_loadu_si128((__m128i*)src);
+  __m128i vbefore = vbehind;
+
+  vbefore = _mm_slli_si128(vbefore, 8); // Shift left to make room for one 64-bit integer. This could be done with a shuffle, but there should be no performance difference.
+  vbefore = _mm_insert_epi64(vbefore, refline, 0);
+
+  __m256i vbefore256 = _mm256_cvtepu8_epi16(vbefore);
+  __m256i vbehind256 = _mm256_cvtepu8_epi16(vbehind);
+
+  __m256i vbeforeshifted = _mm256_slli_epi16(vbefore256, log2_factor);
+
+  // Add rounding offset
+  vbeforeshifted = _mm256_add_epi16(vbeforeshifted, vrnd);
+
+  __m256i vinterpolate = _mm256_sub_epi16(vbehind256, vbefore256);
+
+  __m256i vrow0 = _mm256_add_epi16(vbeforeshifted, vinterpolate);
+  __m256i vrow1 = _mm256_add_epi16(vrow0, vinterpolate);
+  __m256i vrow2 = _mm256_add_epi16(vrow1, vinterpolate);
+  __m256i vrow3 = _mm256_add_epi16(vrow2, vinterpolate);
+  __m256i vrow4 = _mm256_add_epi16(vrow3, vinterpolate);
+  __m256i vrow5 = _mm256_add_epi16(vrow4, vinterpolate);
+  __m256i vrow6 = _mm256_add_epi16(vrow5, vinterpolate);
+
+  vrow0 = _mm256_srai_epi16(vrow0, log2_factor);
+  vrow1 = _mm256_srai_epi16(vrow1, log2_factor);
+  vrow2 = _mm256_srai_epi16(vrow2, log2_factor);
+  vrow3 = _mm256_srai_epi16(vrow3, log2_factor);
+  vrow4 = _mm256_srai_epi16(vrow4, log2_factor);
+  vrow5 = _mm256_srai_epi16(vrow5, log2_factor);
+  vrow6 = _mm256_srai_epi16(vrow6, log2_factor);
+
+  __m256i vres0 = _mm256_packus_epi16(vrow0, vrow1);
+  __m256i vres1 = _mm256_packus_epi16(vrow2, vrow3);
+  __m256i vres2 = _mm256_packus_epi16(vrow4, vrow5);
+  __m256i vres3 = _mm256_packus_epi16(vrow6, vbehind256);
+
+  __m256i vlo128a = _mm256_permute2x128_si256(vres0, vres1, 0x20);
+  __m256i vlo128b = _mm256_permute2x128_si256(vres2, vres3, 0x20);
+  __m256i vhi128a = _mm256_permute2x128_si256(vres0, vres1, 0x31);
+  __m256i vhi128b = _mm256_permute2x128_si256(vres2, vres3, 0x31);
+
+  _mm256_store_si256((__m256i*)(dst + 0),  vlo128a);
+  _mm256_store_si256((__m256i*)(dst + 32), vlo128b);
+  _mm256_store_si256((__m256i*)(dst + 64), vhi128a);
+  _mm256_store_si256((__m256i*)(dst + 96), vhi128b);
+
+  for (int i = 1; i < 4; ++i) {
+    vbefore = _mm_loadu_si128((__m128i*)(src + (i * 16 - 8)));
+    vbehind = _mm_loadu_si128((__m128i*)(src + (i * 16)));
+    vbefore256 = _mm256_cvtepu8_epi16(vbefore);
+    vbehind256 = _mm256_cvtepu8_epi16(vbehind);
+
+    vbeforeshifted = _mm256_slli_epi16(vbefore256, log2_factor);
+
+    // Add rounding offset
+    vbeforeshifted = _mm256_add_epi16(vbeforeshifted, vrnd);
+
+    vinterpolate = _mm256_sub_epi16(vbehind256, vbefore256);
+
+    vrow0 = _mm256_add_epi16(vbeforeshifted, vinterpolate);
+    vrow1 = _mm256_add_epi16(vrow0, vinterpolate);
+    vrow2 = _mm256_add_epi16(vrow1, vinterpolate);
+    vrow3 = _mm256_add_epi16(vrow2, vinterpolate);
+    vrow4 = _mm256_add_epi16(vrow3, vinterpolate);
+    vrow5 = _mm256_add_epi16(vrow4, vinterpolate);
+    vrow6 = _mm256_add_epi16(vrow5, vinterpolate);
+
+    vrow0 = _mm256_srai_epi16(vrow0, log2_factor);
+    vrow1 = _mm256_srai_epi16(vrow1, log2_factor);
+    vrow2 = _mm256_srai_epi16(vrow2, log2_factor);
+    vrow3 = _mm256_srai_epi16(vrow3, log2_factor);
+    vrow4 = _mm256_srai_epi16(vrow4, log2_factor);
+    vrow5 = _mm256_srai_epi16(vrow5, log2_factor);
+    vrow6 = _mm256_srai_epi16(vrow6, log2_factor);
+
+    vres0 = _mm256_packus_epi16(vrow0, vrow1);
+    vres1 = _mm256_packus_epi16(vrow2, vrow3);
+    vres2 = _mm256_packus_epi16(vrow4, vrow5);
+    vres3 = _mm256_packus_epi16(vrow6, vbehind256);
+
+    vlo128a = _mm256_permute2x128_si256(vres0, vres1, 0x20);
+    vlo128b = _mm256_permute2x128_si256(vres2, vres3, 0x20);
+    vhi128a = _mm256_permute2x128_si256(vres0, vres1, 0x31);
+    vhi128b = _mm256_permute2x128_si256(vres2, vres3, 0x31);
+
+    _mm256_store_si256((__m256i*)(dst + (i * 128) +  0), vlo128a);
+    _mm256_store_si256((__m256i*)(dst + (i * 128) + 32), vlo128b);
+    _mm256_store_si256((__m256i*)(dst + (i * 128) + 64), vhi128a);
+    _mm256_store_si256((__m256i*)(dst + (i * 128) + 96), vhi128b);
+  }
+}
+
+static void mip_upsampling_w16_ups2_ver_avx2(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref)
+{
+  __m128i vbehind0 = _mm_loadu_si128((__m128i*)(src + 0));
+  __m128i vbehind1 = _mm_loadu_si128((__m128i*)(src + 32));
+  __m128i vbehind2 = _mm_loadu_si128((__m128i*)(src + 64));
+  __m128i vbehind3 = _mm_loadu_si128((__m128i*)(src + 96));
+  __m128i vbehind4 = _mm_loadu_si128((__m128i*)(src + 128));
+  __m128i vbehind5 = _mm_loadu_si128((__m128i*)(src + 160));
+  __m128i vbehind6 = _mm_loadu_si128((__m128i*)(src + 192));
+  __m128i vbehind7 = _mm_loadu_si128((__m128i*)(src + 224));
+
+  __m128i vbefore0 = _mm_load_si128((__m128i*)ref);
+  __m128i vbefore1 = vbehind0;
+  __m128i vbefore2 = vbehind1;
+  __m128i vbefore3 = vbehind2;
+  __m128i vbefore4 = vbehind3;
+  __m128i vbefore5 = vbehind4;
+  __m128i vbefore6 = vbehind5;
+  __m128i vbefore7 = vbehind6;
+
+  __m128i vavg0 = _mm_avg_epu8(vbefore0, vbehind0);
+  __m128i vavg1 = _mm_avg_epu8(vbefore1, vbehind1);
+  __m128i vavg2 = _mm_avg_epu8(vbefore2, vbehind2);
+  __m128i vavg3 = _mm_avg_epu8(vbefore3, vbehind3);
+  __m128i vavg4 = _mm_avg_epu8(vbefore4, vbehind4);
+  __m128i vavg5 = _mm_avg_epu8(vbefore5, vbehind5);
+  __m128i vavg6 = _mm_avg_epu8(vbefore6, vbehind6);
+  __m128i vavg7 = _mm_avg_epu8(vbefore7, vbehind7);
+
+  _mm_store_si128((__m128i*)(dst +   0), vavg0);
+  _mm_store_si128((__m128i*)(dst +  32), vavg1);
+  _mm_store_si128((__m128i*)(dst +  64), vavg2);
+  _mm_store_si128((__m128i*)(dst +  96), vavg3);
+  _mm_store_si128((__m128i*)(dst + 128), vavg4);
+  _mm_store_si128((__m128i*)(dst + 160), vavg5);
+  _mm_store_si128((__m128i*)(dst + 192), vavg6);
+  _mm_store_si128((__m128i*)(dst + 224), vavg7);
 }
 
 /** \brief Matrix weighted intra prediction.
@@ -6353,14 +6494,26 @@ void mip_predict_avx2(
             }
           }
           else if (ups_ver_factor == 4) {
-            uvg_mip_pred_upsampling_1D_ver_avx2(tmp, ver_src, ref_samples_top, red_pred_size, width, ver_src_step, 1, width, 1, 1, ups_ver_factor);
             mip_upsampling_w8_ups4_ver_avx2(result, ver_src, ref_samples_top);
           }
           else {
-            uvg_mip_pred_upsampling_1D_ver_avx2(result, ver_src, ref_samples_top, red_pred_size, width, ver_src_step, 1, width, 1, 1, ups_ver_factor);
+            mip_upsampling_w8_ups8_ver_avx2(result, ver_src, ref_samples_top);
           }
           break;
-        case 16: uvg_mip_pred_upsampling_1D_ver_avx2(result, ver_src, ref_samples_top, red_pred_size, width, ver_src_step, 1, width, 1, 1, ups_ver_factor); break;
+        case 16: 
+          if (ups_ver_factor == 2) {
+            uvg_mip_pred_upsampling_1D_ver_avx2(tmp, ver_src, ref_samples_top, red_pred_size, width, ver_src_step, 1, width, 1, 1, ups_ver_factor);
+            mip_upsampling_w16_ups2_ver_avx2(result, ver_src, ref_samples_top);
+          }
+          else if (ups_ver_factor == 4) {
+            uvg_mip_pred_upsampling_1D_ver_avx2(result, ver_src, ref_samples_top, red_pred_size, width, ver_src_step, 1, width, 1, 1, ups_ver_factor);
+            //mip_upsampling_w16_ups4_ver_avx2(result, ver_src, ref_samples_top);
+          }
+          else {
+            uvg_mip_pred_upsampling_1D_ver_avx2(result, ver_src, ref_samples_top, red_pred_size, width, ver_src_step, 1, width, 1, 1, ups_ver_factor);
+            //mip_upsampling_w16_ups8_ver_avx2(result, ver_src, ref_samples_top);
+          }
+          break;
         case 32: uvg_mip_pred_upsampling_1D_ver_avx2(result, ver_src, ref_samples_top, red_pred_size, width, ver_src_step, 1, width, 1, 1, ups_ver_factor); break;
         case 64: uvg_mip_pred_upsampling_1D_ver_avx2(result, ver_src, ref_samples_top, red_pred_size, width, ver_src_step, 1, width, 1, 1, ups_ver_factor); break;
         default:
