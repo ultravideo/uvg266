@@ -6407,6 +6407,20 @@ static void mip_upsampling_w16_ups8_ver_avx2(uvg_pixel* const dst, const uvg_pix
   }
 }
 
+static void mip_upsampling_w32_ups2_ver_avx2(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref)
+{
+  __m256i vbefore = _mm256_load_si256((__m256i*)ref);
+
+  for (int i = 0; i < 8; ++i) {
+    __m256i vbehind = _mm256_load_si256((__m256i*)(src + (i * 64)));
+    __m256i vavg = _mm256_avg_epu8(vbefore, vbehind);
+
+    _mm256_store_si256((__m256i*)(dst + (i * 64)), vavg);
+
+    vbefore = vbehind;
+  }
+}
+
 /** \brief Matrix weighted intra prediction.
 */
 void mip_predict_avx2(
@@ -6575,7 +6589,7 @@ void mip_predict_avx2(
       }
     }
 
-    //uvg_pixel tmp[64 * 64] = {0};
+    uvg_pixel tmp[64 * 64] = {0};
     if (ups_ver_factor > 1) {
       switch (width) {
         case 4: 
@@ -6607,6 +6621,7 @@ void mip_predict_avx2(
             mip_upsampling_w8_ups8_ver_avx2(result, ver_src, ref_samples_top);
           }
           break;
+
         case 16: 
           if (ups_ver_factor == 2) {
             mip_upsampling_w16_ups2_ver_avx2(result, ver_src, ref_samples_top);
@@ -6618,7 +6633,22 @@ void mip_predict_avx2(
             mip_upsampling_w16_ups8_ver_avx2(result, ver_src, ref_samples_top);
           }
           break;
-        case 32: uvg_mip_pred_upsampling_1D_ver_avx2(result, ver_src, ref_samples_top, red_pred_size, width, ver_src_step, 1, width, 1, 1, ups_ver_factor); break;
+
+        case 32: 
+          if (ups_ver_factor == 2) {
+            uvg_mip_pred_upsampling_1D_ver_avx2(tmp, ver_src, ref_samples_top, red_pred_size, width, ver_src_step, 1, width, 1, 1, ups_ver_factor);
+            mip_upsampling_w32_ups2_ver_avx2(result, ver_src, ref_samples_top);
+          }
+          else if (ups_ver_factor == 4) {
+            uvg_mip_pred_upsampling_1D_ver_avx2(result, ver_src, ref_samples_top, red_pred_size, width, ver_src_step, 1, width, 1, 1, ups_ver_factor);
+            //mip_upsampling_w32_ups4_ver_avx2(result, ver_src, ref_samples_top);
+          }
+          else {
+            uvg_mip_pred_upsampling_1D_ver_avx2(result, ver_src, ref_samples_top, red_pred_size, width, ver_src_step, 1, width, 1, 1, ups_ver_factor);
+            //mip_upsampling_w32_ups8_ver_avx2(result, ver_src, ref_samples_top);
+          }
+          break;
+          
         case 64: uvg_mip_pred_upsampling_1D_ver_avx2(result, ver_src, ref_samples_top, red_pred_size, width, ver_src_step, 1, width, 1, 1, ups_ver_factor); break;
         default:
           assert(false && "Invalid MIP width.\n");
