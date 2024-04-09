@@ -6779,10 +6779,9 @@ static void mip_upsampling_w64_ups4_ver_avx2_alt(uvg_pixel* const dst, const uvg
   __m256i vbeforeleft = _mm256_load_si256((__m256i*)(ref + 0));
   __m256i vbeforeright = _mm256_load_si256((__m256i*)(ref + 32));
 
-  __m256i zeros = _mm256_setzero_si256();
-  __m256i ones = _mm256_set1_epi8(1);
-  __m256i threes = _mm256_set1_epi8(3);
-  __m256i permute_mask = _mm256_setr_epi32(0, 2, 4, 6, 1, 3, 5, 7);
+  const __m256i zeros = _mm256_setzero_si256();
+  const __m256i ones = _mm256_set1_epi8(1);
+  const __m256i threes = _mm256_set1_epi8(3);
 
   for (int i = 0; i < 8; ++i) {
     // Calculate 4 lines at a time
@@ -7053,6 +7052,150 @@ static void mip_upsampling_w64_ups8_ver_avx2(uvg_pixel* const dst, const uvg_pix
   }
 }
 
+static void mip_upsampling_w64_ups8_ver_avx2_alt(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref)
+{
+  const uvg_pixel* src_ptr = src;
+  const uvg_pixel* dst_ptr = dst;
+
+  const __m256i zeros = _mm256_setzero_si256();
+  const __m256i ones = _mm256_set1_epi8(1);
+  const __m256i twos = _mm256_set1_epi8(2);
+  const __m256i threes = _mm256_set1_epi8(3);
+  const __m256i fours = _mm256_set1_epi8(4);
+  const __m256i fives = _mm256_set1_epi8(5);
+  const __m256i sixes = _mm256_set1_epi8(6);
+  const __m256i sevens = _mm256_set1_epi8(7);
+  const __m256i eights = _mm256_set1_epi8(8);
+
+  __m256i vbeforeleft = _mm256_load_si256((__m256i*)(ref + 0));
+  __m256i vbeforeright = _mm256_load_si256((__m256i*)(ref + 32));
+
+  for (int i = 0; i < 8; ++i) {
+    __m256i vbehindleft  = _mm256_load_si256((__m256i*)(src_ptr + 0));
+    __m256i vbehindright = _mm256_load_si256((__m256i*)(src_ptr + 32));
+
+    // Calculate left side of 64 wide lane.
+    // Calculate the 7 interpolated lines between before and behind. Ordered by number from top to bottom.
+    __m256i vleft3 = _mm256_avg_epu8(vbeforeleft, vbehindleft); // Middle
+    __m256i vleft1 = _mm256_avg_epu8(vleft3, vbeforeleft);      // Top middle
+    __m256i vleft5 = _mm256_avg_epu8(vleft3, vbehindleft);      // Bottom middle
+    __m256i vleft0 = _mm256_avg_epu8(vbeforeleft, vleft1);      // Top middle top
+    __m256i vleft2 = _mm256_avg_epu8(vleft1, vleft3);           // Top middle bottom
+    __m256i vleft4 = _mm256_avg_epu8(vleft3, vleft5);           // Bottom middle top
+    __m256i vleft6 = _mm256_avg_epu8(vleft5, vbehindleft);      // Bottom middle bottom
+
+    // Calculate the three and two last bits of difference between before and behind. These bits are used to determine if there will be rounding error.
+    __m256i diff = _mm256_sub_epi8(vbehindleft, vbeforeleft);
+    diff = _mm256_and_si256(diff, sevens);
+    __m256i three_diff = _mm256_and_si256(diff, threes);
+
+    // Bottom side
+    __m256i mask = _mm256_cmpgt_epi8(diff, fours);  // The rounding error mask will be generated based on the calculated last bits.
+    __m256i sub_amount = _mm256_blendv_epi8(zeros, ones, mask); // If 5, 6, 7 select one
+    vleft6 = _mm256_sub_epi8(vleft6, sub_amount);
+
+    mask = _mm256_cmpeq_epi8(three_diff, threes);
+    sub_amount = _mm256_blendv_epi8(zeros, ones, mask); // If 3 or 7 select one
+    vleft5 = _mm256_sub_epi8(vleft5, sub_amount);
+
+    __m256i is_two = _mm256_cmpeq_epi8(diff, twos);
+    __m256i is_five = _mm256_cmpeq_epi8(diff, fives);
+    mask = _mm256_or_si256(mask, is_two);
+    mask = _mm256_or_si256(mask, is_five);
+    sub_amount = _mm256_blendv_epi8(zeros, ones, mask); // If 2, 3, 5, or 7 select one
+    vleft4 = _mm256_sub_epi8(vleft4, sub_amount);
+
+    // Top side
+    diff = _mm256_blendv_epi8(diff, eights, _mm256_cmpeq_epi8(zeros, diff)); // Replace zeros with eights to enable using GT
+    mask = _mm256_cmpgt_epi8(diff, threes);
+    sub_amount = _mm256_blendv_epi8(ones, zeros, mask); // If greater than three select zero
+    vleft0 = _mm256_sub_epi8(vleft0, sub_amount);
+
+    mask = _mm256_cmpeq_epi8(three_diff, ones);
+    sub_amount = _mm256_blendv_epi8(zeros, ones, mask); // If 1 or 5 select one
+    vleft1 = _mm256_sub_epi8(vleft1, sub_amount);
+
+    __m256i is_three = _mm256_cmpeq_epi8(diff, threes);
+    __m256i is_six = _mm256_cmpeq_epi8(diff, sixes);
+    mask = _mm256_or_si256(mask, is_three);
+    mask = _mm256_or_si256(mask, is_six);
+    sub_amount = _mm256_blendv_epi8(zeros, ones, mask); // If 1, 3, 5, 6 select one
+    vleft2 = _mm256_sub_epi8(vleft2, sub_amount);
+
+    
+    // Calculate right side of 64 wide lane.
+    // Calculate the 7 interpolated lines between before and behind. Ordered by number from top to bottom.
+    __m256i vright3 = _mm256_avg_epu8(vbeforeright, vbehindright); // Middle
+    __m256i vright1 = _mm256_avg_epu8(vright3, vbeforeright);      // Top middle
+    __m256i vright5 = _mm256_avg_epu8(vright3, vbehindright);      // Bottom middle
+    __m256i vright0 = _mm256_avg_epu8(vbeforeright, vright1);      // Top middle top
+    __m256i vright2 = _mm256_avg_epu8(vright1, vright3);           // Top middle bottom
+    __m256i vright4 = _mm256_avg_epu8(vright3, vright5);           // Bottom middle top
+    __m256i vright6 = _mm256_avg_epu8(vright5, vbehindright);      // Bottom middle bottom
+
+    // Calculate the three and two last bits of difference between before and behind. These bits are used to determine if there will be rounding error.
+    diff = _mm256_sub_epi8(vbehindright, vbeforeright);
+    diff = _mm256_and_si256(diff, sevens);
+    three_diff = _mm256_and_si256(diff, threes);
+
+    // Bottom side
+    mask = _mm256_cmpgt_epi8(diff, fours);  // The rounding error mask will be generated based on the calculated last bits.
+    sub_amount = _mm256_blendv_epi8(zeros, ones, mask); // If 5, 6, 7 select one
+    vright6 = _mm256_sub_epi8(vright6, sub_amount);
+
+    mask = _mm256_cmpeq_epi8(three_diff, threes);
+    sub_amount = _mm256_blendv_epi8(zeros, ones, mask); // If 3 or 7 select one
+    vright5 = _mm256_sub_epi8(vright5, sub_amount);
+
+    is_two = _mm256_cmpeq_epi8(diff, twos);
+    is_five = _mm256_cmpeq_epi8(diff, fives);
+    mask = _mm256_or_si256(mask, is_two);
+    mask = _mm256_or_si256(mask, is_five);
+    sub_amount = _mm256_blendv_epi8(zeros, ones, mask); // If 2, 3, 5, or 7 select one
+    vright4 = _mm256_sub_epi8(vright4, sub_amount);
+
+    // Top side
+    diff = _mm256_blendv_epi8(diff, eights, _mm256_cmpeq_epi8(zeros, diff)); // Replace zeros with eights to enable using GT
+    mask = _mm256_cmpgt_epi8(diff, threes);
+    sub_amount = _mm256_blendv_epi8(ones, zeros, mask); // If greater than three select zero
+    vright0 = _mm256_sub_epi8(vright0, sub_amount);
+
+    mask = _mm256_cmpeq_epi8(three_diff, ones);
+    sub_amount = _mm256_blendv_epi8(zeros, ones, mask); // If 1 or 5 select one
+    vright1 = _mm256_sub_epi8(vright1, sub_amount);
+
+    is_three = _mm256_cmpeq_epi8(diff, threes);
+    is_six = _mm256_cmpeq_epi8(diff, sixes);
+    mask = _mm256_or_si256(mask, is_three);
+    mask = _mm256_or_si256(mask, is_six);
+    sub_amount = _mm256_blendv_epi8(zeros, ones, mask); // If 1, 3, 5, 6 select one
+    vright2 = _mm256_sub_epi8(vright2, sub_amount);
+
+
+    // Store results
+    _mm256_store_si256((__m256i*)(dst_ptr +   0), vleft0);
+    _mm256_store_si256((__m256i*)(dst_ptr +  32), vright0);
+    _mm256_store_si256((__m256i*)(dst_ptr +  64), vleft1);
+    _mm256_store_si256((__m256i*)(dst_ptr +  96), vright1);
+    _mm256_store_si256((__m256i*)(dst_ptr + 128), vleft2);
+    _mm256_store_si256((__m256i*)(dst_ptr + 160), vright2);
+    _mm256_store_si256((__m256i*)(dst_ptr + 192), vleft3);
+    _mm256_store_si256((__m256i*)(dst_ptr + 224), vright3);
+    _mm256_store_si256((__m256i*)(dst_ptr + 256), vleft4);
+    _mm256_store_si256((__m256i*)(dst_ptr + 288), vright4);
+    _mm256_store_si256((__m256i*)(dst_ptr + 320), vleft5);
+    _mm256_store_si256((__m256i*)(dst_ptr + 352), vright5);
+    _mm256_store_si256((__m256i*)(dst_ptr + 384), vleft6);
+    _mm256_store_si256((__m256i*)(dst_ptr + 416), vright6);
+
+    vbeforeleft = vbehindleft;
+    vbeforeright = vbehindright;
+
+    dst_ptr += 512;
+    src_ptr += 512;
+  }
+}
+
 /** \brief Matrix weighted intra prediction.
 */
 void mip_predict_avx2(
@@ -7221,7 +7364,7 @@ void mip_predict_avx2(
       }
     }
 
-    uvg_pixel tmp[64 * 64] = {0};
+    //uvg_pixel tmp[64 * 64] = {0};
     if (ups_ver_factor > 1) {
       switch (width) {
         case 4: 
@@ -7288,7 +7431,8 @@ void mip_predict_avx2(
           }
           else {
             //uvg_mip_pred_upsampling_1D_ver_avx2(tmp, ver_src, ref_samples_top, red_pred_size, width, ver_src_step, 1, width, 1, 1, ups_ver_factor);
-            mip_upsampling_w64_ups8_ver_avx2(result, ver_src, ref_samples_top);
+            //mip_upsampling_w64_ups8_ver_avx2(tmp, ver_src, ref_samples_top);
+            mip_upsampling_w64_ups8_ver_avx2_alt(result, ver_src, ref_samples_top);
           }
           break;
 
