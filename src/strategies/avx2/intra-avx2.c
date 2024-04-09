@@ -5827,6 +5827,8 @@ static void mip_upsampling_w64_ups8_hor_avx2(uvg_pixel* const dst, const uvg_pix
 }
 
 
+
+
 static void mip_upsampling_w4_ups2_ver_avx2(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref)
 {
   const uint8_t red_pred_size = 4;
@@ -6769,6 +6771,86 @@ static void mip_upsampling_w64_ups4_ver_avx2(uvg_pixel* const dst, const uvg_pix
   }
 }
 
+static void mip_upsampling_w64_ups4_ver_avx2_alt(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref)
+{
+  const uvg_pixel* src_ptr = src;
+  const uvg_pixel* dst_ptr = dst;
+
+  __m256i vbeforeleft = _mm256_load_si256((__m256i*)(ref + 0));
+  __m256i vbeforeright = _mm256_load_si256((__m256i*)(ref + 32));
+
+  __m256i zeros = _mm256_setzero_si256();
+  __m256i ones = _mm256_set1_epi8(1);
+  __m256i threes = _mm256_set1_epi8(3);
+  __m256i permute_mask = _mm256_setr_epi32(0, 2, 4, 6, 1, 3, 5, 7);
+
+  for (int i = 0; i < 8; ++i) {
+    // Calculate 4 lines at a time
+    __m256i vbehindleft  = _mm256_load_si256((__m256i*)(src_ptr + 0));
+    __m256i vbehindright = _mm256_load_si256((__m256i*)(src_ptr + 32));
+
+    // Calculate left side of 64 wide lane
+    // Calculate the 3 interpolated lines between before and behind. Top row, middle row and bottom row.
+    __m256i vmiddleleft = _mm256_avg_epu8(vbeforeleft, vbehindleft);
+    __m256i vtopleft = _mm256_avg_epu8(vbeforeleft, vmiddleleft);
+    __m256i vbottomleft = _mm256_avg_epu8(vmiddleleft, vbehindleft);
+
+    // Calculate the two last bits of difference between before and behind. These bits are used to determine if there will be rounding error.
+    // Rounding error occurs in the left interpolated value if the two last bits of the difference between before and behind is 0b01.
+    __m256i diff = _mm256_sub_epi8(vbehindleft, vbeforeleft);
+    diff = _mm256_and_si256(diff, threes);
+    __m256i mask = _mm256_cmpeq_epi8(diff, ones); // The rounding error mask will be generated based on the calculated last bits.
+    __m256i sub_amount = _mm256_blendv_epi8(zeros, ones, mask);
+
+    vtopleft = _mm256_sub_epi8(vtopleft, sub_amount);
+
+    // Same rounding error handling for bottom interpolated values. 
+    // Error happens if the two last bits of the difference between before and behind is 0b11.
+    mask = _mm256_cmpeq_epi8(diff, threes);
+    sub_amount = _mm256_blendv_epi8(zeros, ones, mask);
+
+    vbottomleft = _mm256_sub_epi8(vbottomleft, sub_amount);
+
+
+    // Calculate right side of 64 wide lane
+    // Calculate the 3 interpolated lines between before and behind. Top row, middle row and bottom row.
+    __m256i vmiddleright = _mm256_avg_epu8(vbeforeright, vbehindright);
+    __m256i vtopright = _mm256_avg_epu8(vbeforeright, vmiddleright);
+    __m256i vbottomright = _mm256_avg_epu8(vmiddleright, vbehindright);
+
+    // Calculate the two last bits of difference between before and behind. These bits are used to determine if there will be rounding error.
+    // Rounding error occurs in the right interpolated value if the two last bits of the difference between before and behind is 0b01.
+    diff = _mm256_sub_epi8(vbehindright, vbeforeright);
+    diff = _mm256_and_si256(diff, threes);
+    mask = _mm256_cmpeq_epi8(diff, ones); // The rounding error mask will be generated based on the calculated last bits.
+    sub_amount = _mm256_blendv_epi8(zeros, ones, mask);
+
+    vtopright = _mm256_sub_epi8(vtopright, sub_amount);
+
+    // Same rounding error handling for bottom interpolated values. 
+    // Error happens if the two last bits of the difference between before and behind is 0b11.
+    mask = _mm256_cmpeq_epi8(diff, threes);
+    sub_amount = _mm256_blendv_epi8(zeros, ones, mask);
+
+    vbottomright = _mm256_sub_epi8(vbottomright, sub_amount);
+
+    // Store results
+    _mm256_store_si256((__m256i*)(dst_ptr + 0), vtopleft);
+    _mm256_store_si256((__m256i*)(dst_ptr + 32), vtopright);
+    _mm256_store_si256((__m256i*)(dst_ptr + 64), vmiddleleft);
+    _mm256_store_si256((__m256i*)(dst_ptr + 96), vmiddleright);
+    _mm256_store_si256((__m256i*)(dst_ptr + 128), vbottomleft);
+    _mm256_store_si256((__m256i*)(dst_ptr + 160), vbottomright);
+    // No need to store the last line of the 4 lines as it is already present in the result array and it was not modified in any way.
+
+    vbeforeleft = vbehindleft;
+    vbeforeright = vbehindright;
+
+    dst_ptr += 256;
+    src_ptr += 256;
+  }
+}
+
 static void mip_upsampling_w64_ups8_ver_avx2(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref)
 {
   const uint8_t red_pred_size = 8;
@@ -7139,7 +7221,7 @@ void mip_predict_avx2(
       }
     }
 
-    //uvg_pixel tmp[64 * 64] = {0};
+    uvg_pixel tmp[64 * 64] = {0};
     if (ups_ver_factor > 1) {
       switch (width) {
         case 4: 
@@ -7201,7 +7283,8 @@ void mip_predict_avx2(
             mip_upsampling_w64_ups2_ver_avx2(result, ver_src, ref_samples_top);
           }
           else if (ups_ver_factor == 4) {
-            mip_upsampling_w64_ups4_ver_avx2(result, ver_src, ref_samples_top);
+            //mip_upsampling_w64_ups4_ver_avx2(tmp, ver_src, ref_samples_top);
+            mip_upsampling_w64_ups4_ver_avx2_alt(result, ver_src, ref_samples_top);
           }
           else {
             //uvg_mip_pred_upsampling_1D_ver_avx2(tmp, ver_src, ref_samples_top, red_pred_size, width, ver_src_step, 1, width, 1, 1, ups_ver_factor);
