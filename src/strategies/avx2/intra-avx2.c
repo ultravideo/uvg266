@@ -6347,7 +6347,7 @@ static void mip_upsampling_w16_ups4_ver_avx2(uvg_pixel* const dst, const uvg_pix
     vbefore256 = vbehind256;
   }
 }
-//
+
 static void mip_upsampling_w16_ups8_ver_avx2(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref)
 {
   const uint8_t red_pred_size = 8;
@@ -6408,6 +6408,90 @@ static void mip_upsampling_w16_ups8_ver_avx2(uvg_pixel* const dst, const uvg_pix
     vbefore256 = vbehind256;
   }
 }
+
+static void mip_upsampling_w16_ups8_ver_avx2_alt(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref)
+{
+  const uvg_pixel* src_ptr = src;
+  const uvg_pixel* dst_ptr = dst;
+
+  const __m128i zeros  = _mm_setzero_si128();
+  const __m128i ones   = _mm_set1_epi8(1);
+  const __m128i twos   = _mm_set1_epi8(2);
+  const __m128i threes = _mm_set1_epi8(3);
+  const __m128i fours  = _mm_set1_epi8(4);
+  const __m128i fives  = _mm_set1_epi8(5);
+  const __m128i sixes  = _mm_set1_epi8(6);
+  const __m128i sevens = _mm_set1_epi8(7);
+  const __m128i eights = _mm_set1_epi8(8);
+
+  __m128i vbefore = _mm_load_si128((__m128i*)ref);
+
+  for (int i = 0; i < 8; ++i) {
+    __m128i vbehind = _mm_loadu_si128((__m128i*)src_ptr);
+
+    // Calculate the 7 interpolated lines between before and behind. Ordered by number from top to bottom.
+    __m128i vrow3 = _mm_avg_epu8(vbefore, vbehind); // Middle
+    __m128i vrow1 = _mm_avg_epu8(vrow3, vbefore);   // Top middle
+    __m128i vrow5 = _mm_avg_epu8(vrow3, vbehind);   // Bottom middle
+    __m128i vrow0 = _mm_avg_epu8(vbefore, vrow1);   // Top middle top
+    __m128i vrow2 = _mm_avg_epu8(vrow1, vrow3);     // Top middle bottom
+    __m128i vrow4 = _mm_avg_epu8(vrow3, vrow5);     // Bottom middle top
+    __m128i vrow6 = _mm_avg_epu8(vrow5, vbehind);   // Bottom middle bottom
+
+    // Calculate the three and two last bits of difference between before and behind. These bits are used to determine if there will be rounding error.
+    __m128i diff       = _mm_sub_epi8(vbehind, vbefore);
+            diff       = _mm_and_si128(diff, sevens);
+    __m128i three_diff = _mm_and_si128(diff, threes);
+
+    // Bottom side
+    __m128i mask       = _mm_cmpgt_epi8(diff, fours);  // The rounding error mask will be generated based on the calculated last bits.
+    __m128i sub_amount = _mm_blendv_epi8(zeros, ones, mask); // If 5, 6, 7 select one
+            vrow6      = _mm_sub_epi8(vrow6, sub_amount);
+
+    mask       = _mm_cmpeq_epi8(three_diff, threes);
+    sub_amount = _mm_blendv_epi8(zeros, ones, mask); // If 3 or 7 select one
+    vrow5      = _mm_sub_epi8(vrow5, sub_amount);
+
+    __m128i is_two     = _mm_cmpeq_epi8(diff, twos);
+    __m128i is_five    = _mm_cmpeq_epi8(diff, fives);
+            mask       = _mm_or_si128(mask, is_two);
+            mask       = _mm_or_si128(mask, is_five);
+            sub_amount = _mm_blendv_epi8(zeros, ones, mask); // If 2, 3, 5, or 7 select one
+            vrow4      = _mm_sub_epi8(vrow4, sub_amount);
+
+    // Top side
+    diff       = _mm_blendv_epi8(diff, eights, _mm_cmpeq_epi8(zeros, diff)); // Replace zeros with eights to enable using GT
+    mask       = _mm_cmpgt_epi8(diff, threes);
+    sub_amount = _mm_blendv_epi8(ones, zeros, mask); // If greater than three select zero
+    vrow0      = _mm_sub_epi8(vrow0, sub_amount);
+
+    mask       = _mm_cmpeq_epi8(three_diff, ones);
+    sub_amount = _mm_blendv_epi8(zeros, ones, mask); // If 1 or 5 select one
+    vrow1      = _mm_sub_epi8(vrow1, sub_amount);
+
+    __m128i is_three   = _mm_cmpeq_epi8(diff, threes);
+    __m128i is_six     = _mm_cmpeq_epi8(diff, sixes);
+            mask       = _mm_or_si128(mask, is_three);
+            mask       = _mm_or_si128(mask, is_six);
+            sub_amount = _mm_blendv_epi8(zeros, ones, mask); // If 1, 3, 5, 6 select one
+            vrow2      = _mm_sub_epi8(vrow2, sub_amount);
+    
+    // Store results
+    _mm_store_si128((__m128i*)(dst_ptr +  0), vrow0);
+    _mm_store_si128((__m128i*)(dst_ptr + 16), vrow1);
+    _mm_store_si128((__m128i*)(dst_ptr + 32), vrow2);
+    _mm_store_si128((__m128i*)(dst_ptr + 48), vrow3);
+    _mm_store_si128((__m128i*)(dst_ptr + 64), vrow4);
+    _mm_store_si128((__m128i*)(dst_ptr + 80), vrow5);
+    _mm_store_si128((__m128i*)(dst_ptr + 96), vrow6);
+
+    vbefore = vbehind;
+    src_ptr += 128;
+    dst_ptr += 128;
+  }
+}
+
+
 
 static void mip_upsampling_w32_ups2_ver_avx2(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref)
 {
@@ -7533,7 +7617,7 @@ void mip_predict_avx2(
             mip_upsampling_w16_ups4_ver_avx2(result, ver_src, ref_samples_top);
           }
           else {
-            mip_upsampling_w16_ups8_ver_avx2(result, ver_src, ref_samples_top);
+            mip_upsampling_w16_ups8_ver_avx2_alt(result, ver_src, ref_samples_top);
           }
           break;
 
