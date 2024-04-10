@@ -7659,10 +7659,10 @@ void mip_predict_avx2(
             mip_upsampling_w16_ups2_ver_avx2(result, ver_src, ref_samples_top);
           }
           else if (ups_ver_factor == 4) {
-            mip_upsampling_w16_ups4_ver_avx2_alt(result, ver_src, ref_samples_top); // TODO: change this back to original function.
+            mip_upsampling_w16_ups4_ver_avx2(result, ver_src, ref_samples_top);
           }
           else {
-            mip_upsampling_w16_ups8_ver_avx2_alt(result, ver_src, ref_samples_top); // TODO: change this back to the original function.
+            mip_upsampling_w16_ups8_ver_avx2(result, ver_src, ref_samples_top);
           }
           break;
 
