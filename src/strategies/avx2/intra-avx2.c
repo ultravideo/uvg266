@@ -6083,7 +6083,7 @@ static void mip_upsampling_w8_ups2_h16_ver_avx2(uvg_pixel* const dst, const uvg_
   _mm_store_si128((__m128i*)(dst +  96), vres2);
   _mm_store_si128((__m128i*)(dst + 112), vres3);
 }
-
+//
 static void mip_upsampling_w8_ups4_ver_avx2(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref)
 {
   const uint8_t red_pred_size = 8;
@@ -6300,7 +6300,7 @@ static void mip_upsampling_w16_ups2_ver_avx2(uvg_pixel* const dst, const uvg_pix
   _mm_store_si128((__m128i*)(dst + 192), vavg6);
   _mm_store_si128((__m128i*)(dst + 224), vavg7);
 }
-
+//
 static void mip_upsampling_w16_ups4_ver_avx2(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref)
 {
   const uint8_t red_pred_size = 8;
@@ -6347,7 +6347,7 @@ static void mip_upsampling_w16_ups4_ver_avx2(uvg_pixel* const dst, const uvg_pix
     vbefore256 = vbehind256;
   }
 }
-
+//
 static void mip_upsampling_w16_ups8_ver_avx2(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref)
 {
   const uint8_t red_pred_size = 8;
@@ -6422,7 +6422,7 @@ static void mip_upsampling_w32_ups2_ver_avx2(uvg_pixel* const dst, const uvg_pix
     vbefore = vbehind;
   }
 }
-
+//
 static void mip_upsampling_w32_ups4_ver_avx2(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref)
 {
   const uint8_t red_pred_size = 8;
@@ -6500,7 +6500,7 @@ static void mip_upsampling_w32_ups4_ver_avx2(uvg_pixel* const dst, const uvg_pix
     vbefore256b = vbehind256b;
   }
 }
-
+//
 static void mip_upsampling_w32_ups8_ver_avx2(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref)
 {
   const uint8_t red_pred_size = 8;
@@ -6604,6 +6604,88 @@ static void mip_upsampling_w32_ups8_ver_avx2(uvg_pixel* const dst, const uvg_pix
 
     vbefore256a = vbehind256a;
     vbefore256b = vbehind256b;
+  }
+}
+
+static void mip_upsampling_w32_ups8_ver_avx2_alt(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref)
+{
+  const uvg_pixel* src_ptr = src;
+  const uvg_pixel* dst_ptr = dst;
+
+  const __m256i zeros = _mm256_setzero_si256();
+  const __m256i ones = _mm256_set1_epi8(1);
+  const __m256i twos = _mm256_set1_epi8(2);
+  const __m256i threes = _mm256_set1_epi8(3);
+  const __m256i fours = _mm256_set1_epi8(4);
+  const __m256i fives = _mm256_set1_epi8(5);
+  const __m256i sixes = _mm256_set1_epi8(6);
+  const __m256i sevens = _mm256_set1_epi8(7);
+  const __m256i eights = _mm256_set1_epi8(8);
+
+  __m256i vbefore = _mm256_load_si256((__m256i*)(ref + 0));
+
+  for (int i = 0; i < 8; ++i) {
+    __m256i vbehind = _mm256_load_si256((__m256i*)src_ptr);
+
+    // Calculate the 7 interpolated lines between before and behind. Ordered by number from top to bottom.
+    __m256i vrow3 = _mm256_avg_epu8(vbefore, vbehind); // Middle
+    __m256i vrow1 = _mm256_avg_epu8(vrow3, vbefore);   // Top middle
+    __m256i vrow5 = _mm256_avg_epu8(vrow3, vbehind);   // Bottom middle
+    __m256i vrow0 = _mm256_avg_epu8(vbefore, vrow1);   // Top middle top
+    __m256i vrow2 = _mm256_avg_epu8(vrow1, vrow3);     // Top middle bottom
+    __m256i vrow4 = _mm256_avg_epu8(vrow3, vrow5);     // Bottom middle top
+    __m256i vrow6 = _mm256_avg_epu8(vrow5, vbehind);   // Bottom middle bottom
+
+    // Calculate the three and two last bits of difference between before and behind. These bits are used to determine if there will be rounding error.
+    __m256i diff = _mm256_sub_epi8(vbehind, vbefore);
+    diff = _mm256_and_si256(diff, sevens);
+    __m256i three_diff = _mm256_and_si256(diff, threes);
+
+    // Bottom side
+    __m256i mask = _mm256_cmpgt_epi8(diff, fours);  // The rounding error mask will be generated based on the calculated last bits.
+    __m256i sub_amount = _mm256_blendv_epi8(zeros, ones, mask); // If 5, 6, 7 select one
+    vrow6 = _mm256_sub_epi8(vrow6, sub_amount);
+
+    mask = _mm256_cmpeq_epi8(three_diff, threes);
+    sub_amount = _mm256_blendv_epi8(zeros, ones, mask); // If 3 or 7 select one
+    vrow5 = _mm256_sub_epi8(vrow5, sub_amount);
+
+    __m256i is_two = _mm256_cmpeq_epi8(diff, twos);
+    __m256i is_five = _mm256_cmpeq_epi8(diff, fives);
+    mask = _mm256_or_si256(mask, is_two);
+    mask = _mm256_or_si256(mask, is_five);
+    sub_amount = _mm256_blendv_epi8(zeros, ones, mask); // If 2, 3, 5, or 7 select one
+    vrow4 = _mm256_sub_epi8(vrow4, sub_amount);
+
+    // Top side
+    diff = _mm256_blendv_epi8(diff, eights, _mm256_cmpeq_epi8(zeros, diff)); // Replace zeros with eights to enable using GT
+    mask = _mm256_cmpgt_epi8(diff, threes);
+    sub_amount = _mm256_blendv_epi8(ones, zeros, mask); // If greater than three select zero
+    vrow0 = _mm256_sub_epi8(vrow0, sub_amount);
+
+    mask = _mm256_cmpeq_epi8(three_diff, ones);
+    sub_amount = _mm256_blendv_epi8(zeros, ones, mask); // If 1 or 5 select one
+    vrow1 = _mm256_sub_epi8(vrow1, sub_amount);
+
+    __m256i is_three = _mm256_cmpeq_epi8(diff, threes);
+    __m256i is_six = _mm256_cmpeq_epi8(diff, sixes);
+    mask = _mm256_or_si256(mask, is_three);
+    mask = _mm256_or_si256(mask, is_six);
+    sub_amount = _mm256_blendv_epi8(zeros, ones, mask); // If 1, 3, 5, 6 select one
+    vrow2 = _mm256_sub_epi8(vrow2, sub_amount);
+
+    // Store results
+    _mm256_store_si256((__m256i*)(dst_ptr +   0), vrow0);
+    _mm256_store_si256((__m256i*)(dst_ptr +  32), vrow1);
+    _mm256_store_si256((__m256i*)(dst_ptr +  64), vrow2);
+    _mm256_store_si256((__m256i*)(dst_ptr +  96), vrow3);
+    _mm256_store_si256((__m256i*)(dst_ptr + 128), vrow4);
+    _mm256_store_si256((__m256i*)(dst_ptr + 160), vrow5);
+    _mm256_store_si256((__m256i*)(dst_ptr + 192), vrow6);
+
+    vbefore = vbehind;
+    src_ptr += 256;
+    dst_ptr += 256;
   }
 }
 
@@ -7417,7 +7499,8 @@ void mip_predict_avx2(
             mip_upsampling_w32_ups4_ver_avx2(result, ver_src, ref_samples_top);
           }
           else {
-            mip_upsampling_w32_ups8_ver_avx2(result, ver_src, ref_samples_top);
+            //mip_upsampling_w32_ups8_ver_avx2(tmp, ver_src, ref_samples_top);
+            mip_upsampling_w32_ups8_ver_avx2_alt(result, ver_src, ref_samples_top);
           }
           break;
           
