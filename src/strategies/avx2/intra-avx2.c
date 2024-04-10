@@ -6422,7 +6422,7 @@ static void mip_upsampling_w32_ups2_ver_avx2(uvg_pixel* const dst, const uvg_pix
     vbefore = vbehind;
   }
 }
-//
+
 static void mip_upsampling_w32_ups4_ver_avx2(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref)
 {
   const uint8_t red_pred_size = 8;
@@ -6500,7 +6500,53 @@ static void mip_upsampling_w32_ups4_ver_avx2(uvg_pixel* const dst, const uvg_pix
     vbefore256b = vbehind256b;
   }
 }
-//
+
+static void mip_upsampling_w32_ups4_ver_avx2_alt(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref)
+{
+  const uvg_pixel* src_ptr = src;
+  const uvg_pixel* dst_ptr = dst;
+
+  __m256i vbefore = _mm256_load_si256((__m256i*)ref);
+
+  const __m256i zeros = _mm256_setzero_si256();
+  const __m256i ones = _mm256_set1_epi8(1);
+  const __m256i threes = _mm256_set1_epi8(3);
+
+  for (int i = 0; i < 8; ++i) {
+    __m256i vbehind = _mm256_load_si256((__m256i*)src_ptr);
+
+    // Calculate the 3 interpolated lines between before and behind. Top row, middle row and bottom row.
+    __m256i vmiddle = _mm256_avg_epu8(vbefore, vbehind);
+    __m256i vtop    = _mm256_avg_epu8(vbefore, vmiddle);
+    __m256i vbottom = _mm256_avg_epu8(vmiddle, vbehind);
+
+    // Calculate the two last bits of difference between before and behind. These bits are used to determine if there will be rounding error.
+    // Rounding error occurs in the left interpolated value if the two last bits of the difference between before and behind is 0b01.
+    __m256i diff = _mm256_sub_epi8(vbehind, vbefore);
+    diff = _mm256_and_si256(diff, threes);
+    __m256i mask = _mm256_cmpeq_epi8(diff, ones); // The rounding error mask will be generated based on the calculated last bits.
+    __m256i sub_amount = _mm256_blendv_epi8(zeros, ones, mask);
+
+    vtop = _mm256_sub_epi8(vtop, sub_amount);
+
+    // Same rounding error handling for bottom interpolated values. 
+    // Error happens if the two last bits of the difference between before and behind is 0b11.
+    mask = _mm256_cmpeq_epi8(diff, threes);
+    sub_amount = _mm256_blendv_epi8(zeros, ones, mask);
+
+    vbottom = _mm256_sub_epi8(vbottom, sub_amount);
+
+    // Store results
+    _mm256_store_si256((__m256i*)(dst_ptr +  0), vtop);
+    _mm256_store_si256((__m256i*)(dst_ptr + 32), vmiddle);
+    _mm256_store_si256((__m256i*)(dst_ptr + 64), vbottom);
+
+    vbefore = vbehind;
+    src_ptr += 128;
+    dst_ptr += 128;
+  }
+}
+
 static void mip_upsampling_w32_ups8_ver_avx2(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref)
 {
   const uint8_t red_pred_size = 8;
@@ -7496,7 +7542,7 @@ void mip_predict_avx2(
             mip_upsampling_w32_ups2_ver_avx2(result, ver_src, ref_samples_top);
           }
           else if (ups_ver_factor == 4) {
-            mip_upsampling_w32_ups4_ver_avx2(result, ver_src, ref_samples_top);
+            mip_upsampling_w32_ups4_ver_avx2_alt(result, ver_src, ref_samples_top);
           }
           else {
             //mip_upsampling_w32_ups8_ver_avx2(tmp, ver_src, ref_samples_top);
