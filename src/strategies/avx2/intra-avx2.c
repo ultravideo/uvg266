@@ -4577,6 +4577,76 @@ void uvg_mip_boundary_downsampling_1D_avx2(uvg_pixel* reduced_dst, const uvg_pix
   }
 }
 
+static void mip_ref_downsampling_1D_8to4_avx2(uvg_pixel* reduced_dst, const uvg_pixel* const ref_src)
+{
+  const uint8_t down_smp_factor = 2; // width / red_bdry_size
+  const int log2_factor = uvg_g_convert_to_log2[down_smp_factor];
+  const int rounding_offset = (1 << (log2_factor - 1));
+
+  const __m128i vrnd = _mm_set1_epi16(rounding_offset);
+
+  __m128i vref = _mm_loadu_si128((__m128i*)ref_src); // Half the data is garbage and will be ignored.
+  vref = _mm_cvtepu8_epi16(vref);
+  __m128i vres = _mm_hadd_epi16(vref, vref);
+  vres = _mm_add_epi16(vres, vrnd);
+  vres = _mm_srli_epi16(vres, log2_factor);
+  __m128i vout = _mm_packus_epi16(vres, vres);
+
+  *(int32_t*)reduced_dst = _mm_extract_epi32(vout, 0);
+}
+
+static void mip_ref_downsampling_1D_16to4_avx2(uvg_pixel* reduced_dst, const uvg_pixel* const ref_src)
+{
+  const uint8_t down_smp_factor = 4; // width / red_bdry_size
+  const int log2_factor = uvg_g_convert_to_log2[down_smp_factor];
+  const int rounding_offset = (1 << (log2_factor - 1));
+
+  const __m256i vrnd = _mm256_set1_epi16(rounding_offset);
+
+  // TODO: try _mm256_dpbuud
+  __m128i vref = _mm_loadu_si128((__m128i*)ref_src);
+  __m256i vref256 = _mm256_cvtepu8_epi16(vref);
+  __m256i vres = _mm256_hadd_epi16(vref256, vref256);
+  vres = _mm256_hadd_epi16(vres, vres);
+  vres = _mm256_add_epi16(vres, vrnd);
+  vres = _mm256_srli_epi16(vres, log2_factor);
+  __m256i vout = _mm256_packus_epi16(vres, vres);
+
+  *(int32_t*)(reduced_dst + 0) = _mm256_extract_epi16(vout, 0);
+  *(int32_t*)(reduced_dst + 2) = _mm256_extract_epi16(vout, 8);
+}
+
+static void mip_ref_downsampling_1D_32to4_avx2(uvg_pixel* reduced_dst, const uvg_pixel* const ref_src)
+{
+  const uint8_t down_smp_factor = 8; // width / red_bdry_size
+  const int log2_factor = uvg_g_convert_to_log2[down_smp_factor];
+  const int rounding_offset = (1 << (log2_factor - 1));
+
+  const __m256i vrnd = _mm256_set1_epi16(rounding_offset);
+
+  __m128i vrefa = _mm_loadu_si128((__m128i*)(ref_src + 0));
+  __m128i vrefb = _mm_loadu_si128((__m128i*)(ref_src + 16));
+
+  __m256i vref256a = _mm256_cvtepu8_epi16(vrefa);
+  __m256i vref256b = _mm256_cvtepu8_epi16(vrefb);
+  
+  // These instructions cause error 0xC000001D: Illegal Instruction.
+  /*__m128i vtmpa = _mm_dpbuud_epi32(zeros, vrefa, ones);
+  __m128i vtmpb = _mm_dpbuud_epi32(zeros, vrefa, ones);*/
+
+  __m256i vres = _mm256_hadd_epi16(vref256a, vref256b);
+  vres = _mm256_hadd_epi16(vres, vres);
+  vres = _mm256_hadd_epi16(vres, vres);
+  vres = _mm256_hadd_epi16(vres, vres);
+
+  vres = _mm256_add_epi32(vres, vrnd);
+  vres = _mm256_srli_epi32(vres, log2_factor);
+  __m256i vout = _mm256_packus_epi16(vres, vres);
+
+  *(int32_t*)(reduced_dst + 0) = _mm256_extract_epi16(vout, 0);
+  //*(int32_t*)(reduced_dst + 2) = _mm_extract_epi16(vout, 8);
+}
+
 
 void uvg_mip_reduced_pred_avx2(uvg_pixel* const output,
   const int16_t* const input,
@@ -7510,9 +7580,59 @@ void mip_predict_avx2(
   uvg_pixel* const top_reduced = &red_bdry[0];
   uvg_pixel* const left_reduced = &red_bdry[red_bdry_size];
 
-  // These work fine with uvg_pixel
-  uvg_mip_boundary_downsampling_1D_avx2(top_reduced, ref_samples_top, width, red_bdry_size);
-  uvg_mip_boundary_downsampling_1D_avx2(left_reduced, ref_samples_left, height, red_bdry_size);
+  // Horizontal downsampling
+  // uvg_mip_boundary_downsampling_1D_avx2(top_reduced, ref_samples_top, width, red_bdry_size);
+  uvg_pixel tmp[8];
+  switch (width) {
+    case 4: 
+      if (height == 4) {
+        uvg_mip_boundary_downsampling_1D_avx2(top_reduced, ref_samples_top, width, red_bdry_size);
+      }
+      else {
+        // No horizontal downsampling needed
+        // TODO: copy reference pixels
+        uvg_mip_boundary_downsampling_1D_avx2(top_reduced, ref_samples_top, width, red_bdry_size);
+      }
+      break;
+    case 8: 
+      // TODO: for 8x8, make a specialized 2D function.
+      //uvg_mip_boundary_downsampling_1D_avx2(tmp, ref_samples_top, width, red_bdry_size);
+      mip_ref_downsampling_1D_8to4_avx2(top_reduced, ref_samples_top);
+      break;
+    case 16: 
+      //uvg_mip_boundary_downsampling_1D_avx2(tmp, ref_samples_top, width, red_bdry_size);
+      mip_ref_downsampling_1D_16to4_avx2(top_reduced, ref_samples_top);
+      break;
+    case 32: 
+      uvg_mip_boundary_downsampling_1D_avx2(tmp, ref_samples_top, width, red_bdry_size); 
+      mip_ref_downsampling_1D_32to4_avx2(top_reduced, ref_samples_top);
+      break;
+    case 64: uvg_mip_boundary_downsampling_1D_avx2(top_reduced, ref_samples_top, width, red_bdry_size); break;
+    default:
+      assert(false && "MIP horizontal downsampling. Invalid width.\n");
+      break;
+  }
+  
+  // Vertical downsampling
+  // uvg_mip_boundary_downsampling_1D_avx2(left_reduced, ref_samples_left, height, red_bdry_size);
+  switch (height) {
+    case 4:
+      if (width == 4) {
+        uvg_mip_boundary_downsampling_1D_avx2(left_reduced, ref_samples_left, height, red_bdry_size);
+      }
+      else {
+        // No vertical downsampling needed
+        // TODO: copy reference pixels
+        uvg_mip_boundary_downsampling_1D_avx2(left_reduced, ref_samples_left, height, red_bdry_size);
+      }
+    case 8: uvg_mip_boundary_downsampling_1D_avx2(left_reduced, ref_samples_left, height, red_bdry_size); break;
+    case 16: uvg_mip_boundary_downsampling_1D_avx2(left_reduced, ref_samples_left, height, red_bdry_size); break;
+    case 32: uvg_mip_boundary_downsampling_1D_avx2(left_reduced, ref_samples_left, height, red_bdry_size); break;
+    case 64: uvg_mip_boundary_downsampling_1D_avx2(left_reduced, ref_samples_left, height, red_bdry_size); break;
+    default:
+      assert(false && "MIP vertical downsampling. Invalid height.\n");
+      break;
+  }
 
   // Transposed reduced boundaries
   uvg_pixel* const left_reduced_trans = &red_bdry_trans[0];
