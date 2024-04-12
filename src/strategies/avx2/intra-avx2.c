@@ -4577,6 +4577,55 @@ void uvg_mip_boundary_downsampling_1D_avx2(uvg_pixel* reduced_dst, const uvg_pix
   }
 }
 
+static void mip_ref_downsampling_4x4_4to2_avx2(uvg_pixel* reduced_dst, const uvg_pixel* const ref_top, const uvg_pixel* const ref_left)
+{
+  const uint8_t down_smp_factor = 2; // width / red_bdry_size
+  const int log2_factor = uvg_g_convert_to_log2[down_smp_factor];
+  const int rounding_offset = (1 << (log2_factor - 1));
+
+  const __m128i vrnd = _mm_set1_epi16(rounding_offset);
+
+  ALIGNED(16) uint32_t ref[2];
+  ref[0] = *(uint32_t*)ref_top;
+  ref[1] = *(uint32_t*)ref_left;
+
+  __m128i vref = _mm_load_si128((__m128i*)ref);
+  vref = _mm_cvtepu8_epi16(vref);
+
+  __m128i vres = _mm_hadd_epi16(vref, vref);
+
+  vres = _mm_add_epi16(vres, vrnd);
+  vres = _mm_srli_epi16(vres, log2_factor);
+  __m128i vout = _mm_packus_epi16(vres, vres);
+
+  *(uint32_t*)reduced_dst = _mm_extract_epi32(vout, 0);
+}
+
+static void mip_ref_downsampling_8x8_8to4_avx2(uvg_pixel* reduced_dst, const uvg_pixel* const ref_top, const uvg_pixel* const ref_left)
+{
+  const uint8_t down_smp_factor = 2; // width / red_bdry_size
+  const int log2_factor = uvg_g_convert_to_log2[down_smp_factor];
+  const int rounding_offset = (1 << (log2_factor - 1));
+
+  const __m256i vrnd = _mm256_set1_epi16(rounding_offset);
+
+  ALIGNED(16) uint64_t ref[2];
+  ref[0] = *(uint64_t*)ref_top;
+  ref[1] = *(uint64_t*)ref_left;
+
+  __m128i vref = _mm_load_si128((__m128i*)ref);
+  __m256i vref256 = _mm256_cvtepu8_epi16(vref);
+
+  __m256i vres = _mm256_hadd_epi16(vref256, vref256);
+  vres = _mm256_permute4x64_epi64(vres, _MM_SHUFFLE(3, 1, 2, 0));
+
+  vres = _mm256_add_epi16(vres, vrnd);
+  vres = _mm256_srli_epi16(vres, log2_factor);
+  __m256i vout = _mm256_packus_epi16(vres, vres);
+
+  *(uint64_t*)reduced_dst = _mm256_extract_epi64(vout, 0);
+}
+
 static void mip_ref_downsampling_1D_8to4_avx2(uvg_pixel* reduced_dst, const uvg_pixel* const ref_src)
 {
   const uint8_t down_smp_factor = 2; // width / red_bdry_size
@@ -7621,49 +7670,50 @@ void mip_predict_avx2(
   uvg_pixel* const top_reduced = &red_bdry[0];
   uvg_pixel* const left_reduced = &red_bdry[red_bdry_size];
 
-  // Horizontal downsampling
-  // uvg_mip_boundary_downsampling_1D_avx2(top_reduced, ref_samples_top, width, red_bdry_size);
-  switch (width) {
-    case 4: 
-      if (height == 4) {
-        uvg_mip_boundary_downsampling_1D_avx2(top_reduced, ref_samples_top, width, red_bdry_size);
-      }
-      else {
-        // No horizontal downsampling needed
-        // TODO: copy reference pixels
-        uvg_mip_boundary_downsampling_1D_avx2(top_reduced, ref_samples_top, width, red_bdry_size);
-      }
-      break;
-    // TODO: for 8x8, make a specialized 2D function.
-    case 8:  mip_ref_downsampling_1D_8to4_avx2(top_reduced, ref_samples_top);  break;
-    case 16: mip_ref_downsampling_1D_16to4_avx2(top_reduced, ref_samples_top); break;
-    case 32: mip_ref_downsampling_1D_32to4_avx2(top_reduced, ref_samples_top); break;
-    case 64: mip_ref_downsampling_1D_64to4_avx2(top_reduced, ref_samples_top); break;
-    default:
-      assert(false && "MIP horizontal downsampling. Invalid width.\n");
-      break;
+  if (width == 4 && height == 4) {
+    // 4 to 2 downsampling for both dimensions
+    mip_ref_downsampling_4x4_4to2_avx2(top_reduced, ref_samples_top, ref_samples_left);
+  }
+  else if (width == 8 && height == 8) {
+    // 8 to 4 downsampling for both dimensions
+    mip_ref_downsampling_8x8_8to4_avx2(top_reduced, ref_samples_top, ref_samples_left);
+  }
+  else {
+    // Horizontal downsampling
+    // uvg_mip_boundary_downsampling_1D_avx2(top_reduced, ref_samples_top, width, red_bdry_size);
+    switch (width) {
+      case 4:
+        // 4x4 case handled elsewhere.
+        // No horizontal downsampling needed. Copy pixels.
+        memcpy(top_reduced, ref_samples_top, 4 * sizeof(uvg_pixel));
+        break;
+      case 8:  mip_ref_downsampling_1D_8to4_avx2(top_reduced, ref_samples_top);  break; // 8x8 case handled elsewhere.
+      case 16: mip_ref_downsampling_1D_16to4_avx2(top_reduced, ref_samples_top); break;
+      case 32: mip_ref_downsampling_1D_32to4_avx2(top_reduced, ref_samples_top); break;
+      case 64: mip_ref_downsampling_1D_64to4_avx2(top_reduced, ref_samples_top); break;
+      default:
+        assert(false && "MIP horizontal downsampling. Invalid width.\n");
+        break;
+    }
+
+    // Vertical downsampling
+    // uvg_mip_boundary_downsampling_1D_avx2(left_reduced, ref_samples_left, height, red_bdry_size);
+    switch (height) {
+      case 4:
+        // 4x4 case handled elsewhere.
+        // No vertical downsampling needed. Copy pixels.
+        memcpy(left_reduced, ref_samples_left, 4 * sizeof(uvg_pixel));
+        break;
+      case 8:  mip_ref_downsampling_1D_8to4_avx2(left_reduced, ref_samples_left);  break; // 8x8 case handled elsewhere.
+      case 16: mip_ref_downsampling_1D_16to4_avx2(left_reduced, ref_samples_left); break;
+      case 32: mip_ref_downsampling_1D_32to4_avx2(left_reduced, ref_samples_left); break;
+      case 64: mip_ref_downsampling_1D_64to4_avx2(left_reduced, ref_samples_left); break;
+      default:
+        assert(false && "MIP vertical downsampling. Invalid height.\n");
+        break;
+    }
   }
   
-  // Vertical downsampling
-  // uvg_mip_boundary_downsampling_1D_avx2(left_reduced, ref_samples_left, height, red_bdry_size);
-  switch (height) {
-    case 4:
-      if (width == 4) {
-        uvg_mip_boundary_downsampling_1D_avx2(left_reduced, ref_samples_left, height, red_bdry_size);
-      }
-      else {
-        // No vertical downsampling needed
-        // TODO: copy reference pixels
-        uvg_mip_boundary_downsampling_1D_avx2(left_reduced, ref_samples_left, height, red_bdry_size);
-      }
-    case 8: uvg_mip_boundary_downsampling_1D_avx2(left_reduced, ref_samples_left, height, red_bdry_size); break;
-    case 16: uvg_mip_boundary_downsampling_1D_avx2(left_reduced, ref_samples_left, height, red_bdry_size); break;
-    case 32: uvg_mip_boundary_downsampling_1D_avx2(left_reduced, ref_samples_left, height, red_bdry_size); break;
-    case 64: uvg_mip_boundary_downsampling_1D_avx2(left_reduced, ref_samples_left, height, red_bdry_size); break;
-    default:
-      assert(false && "MIP vertical downsampling. Invalid height.\n");
-      break;
-  }
 
   // Transposed reduced boundaries
   uvg_pixel* const left_reduced_trans = &red_bdry_trans[0];
