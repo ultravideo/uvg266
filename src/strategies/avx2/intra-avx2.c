@@ -4607,13 +4607,13 @@ static void mip_ref_downsampling_1D_16to4_avx2(uvg_pixel* reduced_dst, const uvg
   __m128i vref = _mm_loadu_si128((__m128i*)ref_src);
   __m256i vref256 = _mm256_cvtepu8_epi16(vref);
   __m256i vres = _mm256_hadd_epi16(vref256, vref256);
+  vres = _mm256_permute4x64_epi64(vres, _MM_SHUFFLE(3, 1, 2, 0));
   vres = _mm256_hadd_epi16(vres, vres);
   vres = _mm256_add_epi16(vres, vrnd);
   vres = _mm256_srli_epi16(vres, log2_factor);
   __m256i vout = _mm256_packus_epi16(vres, vres);
 
-  *(int32_t*)(reduced_dst + 0) = _mm256_extract_epi16(vout, 0);
-  *(int32_t*)(reduced_dst + 2) = _mm256_extract_epi16(vout, 8);
+  *(int32_t*)(reduced_dst + 0) = _mm256_extract_epi32(vout, 0);
 }
 
 static void mip_ref_downsampling_1D_32to4_avx2(uvg_pixel* reduced_dst, const uvg_pixel* const ref_src)
@@ -4635,15 +4635,56 @@ static void mip_ref_downsampling_1D_32to4_avx2(uvg_pixel* reduced_dst, const uvg
   __m128i vtmpb = _mm_dpbuud_epi32(zeros, vrefa, ones);*/
 
   __m256i vres = _mm256_hadd_epi16(vref256a, vref256b);
+  vres = _mm256_permute4x64_epi64(vres, _MM_SHUFFLE(3, 1, 2, 0));
   vres = _mm256_hadd_epi16(vres, vres);
-  vres = _mm256_hadd_epi16(vres, vres);
+  vres = _mm256_permute4x64_epi64(vres, _MM_SHUFFLE(3, 1, 2, 0));
   vres = _mm256_hadd_epi16(vres, vres);
 
-  vres = _mm256_add_epi32(vres, vrnd);
-  vres = _mm256_srli_epi32(vres, log2_factor);
+  vres = _mm256_add_epi16(vres, vrnd);
+  vres = _mm256_srli_epi16(vres, log2_factor);
   __m256i vout = _mm256_packus_epi16(vres, vres);
 
-  *(int32_t*)(reduced_dst + 0) = _mm256_extract_epi16(vout, 0);
+  *(int32_t*)(reduced_dst + 0) = _mm256_extract_epi32(vout, 0);
+  //*(int32_t*)(reduced_dst + 2) = _mm_extract_epi16(vout, 8);
+}
+
+static void mip_ref_downsampling_1D_64to4_avx2(uvg_pixel* reduced_dst, const uvg_pixel* const ref_src)
+{
+  const uint8_t down_smp_factor = 16; // width / red_bdry_size
+  const int log2_factor = uvg_g_convert_to_log2[down_smp_factor];
+  const int rounding_offset = (1 << (log2_factor - 1));
+
+  const __m256i vrnd = _mm256_set1_epi16(rounding_offset);
+
+  __m128i vrefa = _mm_loadu_si128((__m128i*)(ref_src + 0));
+  __m128i vrefb = _mm_loadu_si128((__m128i*)(ref_src + 16));
+  __m128i vrefc = _mm_loadu_si128((__m128i*)(ref_src + 32));
+  __m128i vrefd = _mm_loadu_si128((__m128i*)(ref_src + 48));
+
+  __m256i vref256a = _mm256_cvtepu8_epi16(vrefa);
+  __m256i vref256b = _mm256_cvtepu8_epi16(vrefb);
+  __m256i vref256c = _mm256_cvtepu8_epi16(vrefc);
+  __m256i vref256d = _mm256_cvtepu8_epi16(vrefd);
+
+
+  __m256i vres0 = _mm256_hadd_epi16(vref256a, vref256b);
+  __m256i vres1 = _mm256_hadd_epi16(vref256c, vref256d);
+  vres0 = _mm256_permute4x64_epi64(vres0, _MM_SHUFFLE(3, 1, 2, 0));
+  vres1 = _mm256_permute4x64_epi64(vres1, _MM_SHUFFLE(3, 1, 2, 0));
+
+  vres0 = _mm256_hadd_epi16(vres0, vres1);
+  vres0 = _mm256_permute4x64_epi64(vres0, _MM_SHUFFLE(3, 1, 2, 0));
+
+  vres0 = _mm256_hadd_epi16(vres0, vres0);
+  vres0 = _mm256_permute4x64_epi64(vres0, _MM_SHUFFLE(3, 1, 2, 0));
+
+  vres0 = _mm256_hadd_epi16(vres0, vres0);
+
+  vres0 = _mm256_add_epi16(vres0, vrnd);
+  vres0 = _mm256_srli_epi16(vres0, log2_factor);
+  __m256i vout = _mm256_packus_epi16(vres0, vres0);
+
+  *(int32_t*)(reduced_dst + 0) = _mm256_extract_epi32(vout, 0);
   //*(int32_t*)(reduced_dst + 2) = _mm_extract_epi16(vout, 8);
 }
 
@@ -7582,7 +7623,6 @@ void mip_predict_avx2(
 
   // Horizontal downsampling
   // uvg_mip_boundary_downsampling_1D_avx2(top_reduced, ref_samples_top, width, red_bdry_size);
-  uvg_pixel tmp[8];
   switch (width) {
     case 4: 
       if (height == 4) {
@@ -7594,20 +7634,11 @@ void mip_predict_avx2(
         uvg_mip_boundary_downsampling_1D_avx2(top_reduced, ref_samples_top, width, red_bdry_size);
       }
       break;
-    case 8: 
-      // TODO: for 8x8, make a specialized 2D function.
-      //uvg_mip_boundary_downsampling_1D_avx2(tmp, ref_samples_top, width, red_bdry_size);
-      mip_ref_downsampling_1D_8to4_avx2(top_reduced, ref_samples_top);
-      break;
-    case 16: 
-      //uvg_mip_boundary_downsampling_1D_avx2(tmp, ref_samples_top, width, red_bdry_size);
-      mip_ref_downsampling_1D_16to4_avx2(top_reduced, ref_samples_top);
-      break;
-    case 32: 
-      uvg_mip_boundary_downsampling_1D_avx2(tmp, ref_samples_top, width, red_bdry_size); 
-      mip_ref_downsampling_1D_32to4_avx2(top_reduced, ref_samples_top);
-      break;
-    case 64: uvg_mip_boundary_downsampling_1D_avx2(top_reduced, ref_samples_top, width, red_bdry_size); break;
+    // TODO: for 8x8, make a specialized 2D function.
+    case 8:  mip_ref_downsampling_1D_8to4_avx2(top_reduced, ref_samples_top);  break;
+    case 16: mip_ref_downsampling_1D_16to4_avx2(top_reduced, ref_samples_top); break;
+    case 32: mip_ref_downsampling_1D_32to4_avx2(top_reduced, ref_samples_top); break;
+    case 64: mip_ref_downsampling_1D_64to4_avx2(top_reduced, ref_samples_top); break;
     default:
       assert(false && "MIP horizontal downsampling. Invalid width.\n");
       break;
