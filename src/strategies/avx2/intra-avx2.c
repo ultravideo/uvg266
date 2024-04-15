@@ -7626,8 +7626,9 @@ void mip_predict_avx2(
 {
   // MIP prediction uses int values instead of uvg_pixel as some temp values may be negative
 
-  uvg_pixel* out = dst;
-  uvg_pixel result[64 * 64] = { 0 };
+  //uvg_pixel* out = dst;
+  //uvg_pixel result[64 * 64] = { 0 };
+  uvg_pixel* result = dst;
   const int mode_idx = mip_mode;
 
   // *** INPUT PREP ***
@@ -7896,11 +7897,6 @@ void mip_predict_avx2(
           break;
       }
     }
-  }
-
-  // Assign and cast values from temp array to output
-  for (int i = 0; i < width * height; i++) {
-    out[i] = (uvg_pixel)result[i];
   }
   // *** BLOCK PREDICT *** END
 }
