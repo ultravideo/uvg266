@@ -4735,7 +4735,7 @@ static INLINE void mip_ref_downsampling_1D_64to4_avx2(uvg_pixel* reduced_dst, co
 }
 
 
-// This function is not optimized, do not use in production. It is left here for reference.
+// This function is not optimized, do not use in production. It is left here for reference. 
 void uvg_mip_reduced_pred_avx2(uvg_pixel* const output,
   const int16_t* const input,
   const uint8_t* matrix,
@@ -4796,7 +4796,7 @@ void uvg_mip_reduced_pred_avx2(uvg_pixel* const output,
 
 
 // Size ID 0
-void uvg_mip_reduced_pred_sid0_avx2(uvg_pixel* const output,
+static INLINE void mip_reduced_pred_sid0_avx2(uvg_pixel* const output,
   const int16_t* const input,
   const uint16_t* matrix,
   const bool transpose,
@@ -4804,12 +4804,8 @@ void uvg_mip_reduced_pred_sid0_avx2(uvg_pixel* const output,
   const int in_offset_tr)
 {
   const int input_size = 4;
-  const int pred_size = 4;
-  const int size_id = 0;
-
-  // Use local buffer for transposed result
-  uvg_pixel out_buf_transposed[64]; // Max size 8x8, was LCU_WIDTH * LCU_WIDTH
-  uvg_pixel* out_ptr = transpose ? out_buf_transposed : output;
+  // const int pred_size = 4;
+  // const int size_id = 0;
 
   int sum = 0;
   for (int i = 0; i < input_size; i++) {
@@ -4827,6 +4823,11 @@ void uvg_mip_reduced_pred_sid0_avx2(uvg_pixel* const output,
   const __m128i vshuf = _mm_setr_epi8(
     0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
     0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07
+  );
+
+  const __m128i vtranspose = _mm_setr_epi8(
+    0x00, 0x04, 0x08, 0x0c, 0x01, 0x05, 0x09, 0x0d,
+    0x02, 0x06, 0x0a, 0x0e, 0x03, 0x07, 0x0b, 0x0f
   );
   
   const __m128i vinraw = _mm_loadu_si128((__m128i*)input);
@@ -4883,14 +4884,12 @@ void uvg_mip_reduced_pred_sid0_avx2(uvg_pixel* const output,
   __m128i vres16_b = _mm_packus_epi32(vresult0, vresult1);
   __m128i vres8 = _mm_packus_epi16(vres16_a, vres16_b);
 
-  _mm_storeu_si128((__m128i*)out_ptr, vres8);
-  
   if (transpose) {
-    for (int y = 0; y < pred_size; y++) {
-      for (int x = 0; x < pred_size; x++) {
-        output[y * pred_size + x] = out_ptr[x * pred_size + y];
-      }
-    }
+    vres8 = _mm_shuffle_epi8(vres8, vtranspose);
+    _mm_storeu_si128((__m128i*)output, vres8);
+  }
+  else {
+    _mm_storeu_si128((__m128i*)output, vres8);
   }
 }
 
@@ -7772,7 +7771,7 @@ void mip_predict_avx2(
   const int16_t* const reduced_bdry16 = transpose ? red_bdry_trans16 : red_bdry16;
 
   switch (size_id) {
-    case 0: uvg_mip_reduced_pred_sid0_avx2(reduced_pred, reduced_bdry16, matrix16, transpose, input_offset, input_offset_trans); break;
+    case 0: mip_reduced_pred_sid0_avx2(reduced_pred, reduced_bdry16, matrix16, transpose, input_offset, input_offset_trans); break;
     case 1: // Size id 1 can use the same function as size id 2
     case 2: uvg_mip_reduced_pred_sid2_avx2(reduced_pred, reduced_bdry16, matrix16, red_pred_size, transpose, input_offset, input_offset_trans); break;
     default:
