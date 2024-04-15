@@ -4577,7 +4577,7 @@ void uvg_mip_boundary_downsampling_1D_avx2(uvg_pixel* reduced_dst, const uvg_pix
   }
 }
 
-static void mip_ref_downsampling_4x4_4to2_avx2(uvg_pixel* reduced_dst, const uvg_pixel* const ref_top, const uvg_pixel* const ref_left)
+static INLINE void mip_ref_downsampling_4x4_4to2_avx2(uvg_pixel* reduced_dst, const uvg_pixel* const ref_top, const uvg_pixel* const ref_left)
 {
   const uint8_t down_smp_factor = 2; // width / red_bdry_size
   const int log2_factor = uvg_g_convert_to_log2[down_smp_factor];
@@ -4601,7 +4601,7 @@ static void mip_ref_downsampling_4x4_4to2_avx2(uvg_pixel* reduced_dst, const uvg
   *(uint32_t*)reduced_dst = _mm_extract_epi32(vout, 0);
 }
 
-static void mip_ref_downsampling_8x8_8to4_avx2(uvg_pixel* reduced_dst, const uvg_pixel* const ref_top, const uvg_pixel* const ref_left)
+static INLINE void mip_ref_downsampling_8x8_8to4_avx2(uvg_pixel* reduced_dst, const uvg_pixel* const ref_top, const uvg_pixel* const ref_left)
 {
   const uint8_t down_smp_factor = 2; // width / red_bdry_size
   const int log2_factor = uvg_g_convert_to_log2[down_smp_factor];
@@ -4626,7 +4626,7 @@ static void mip_ref_downsampling_8x8_8to4_avx2(uvg_pixel* reduced_dst, const uvg
   *(uint64_t*)reduced_dst = _mm256_extract_epi64(vout, 0);
 }
 
-static void mip_ref_downsampling_1D_8to4_avx2(uvg_pixel* reduced_dst, const uvg_pixel* const ref_src)
+static INLINE void mip_ref_downsampling_1D_8to4_avx2(uvg_pixel* reduced_dst, const uvg_pixel* const ref_src)
 {
   const uint8_t down_smp_factor = 2; // width / red_bdry_size
   const int log2_factor = uvg_g_convert_to_log2[down_smp_factor];
@@ -4644,7 +4644,7 @@ static void mip_ref_downsampling_1D_8to4_avx2(uvg_pixel* reduced_dst, const uvg_
   *(int32_t*)reduced_dst = _mm_extract_epi32(vout, 0);
 }
 
-static void mip_ref_downsampling_1D_16to4_avx2(uvg_pixel* reduced_dst, const uvg_pixel* const ref_src)
+static INLINE void mip_ref_downsampling_1D_16to4_avx2(uvg_pixel* reduced_dst, const uvg_pixel* const ref_src)
 {
   const uint8_t down_smp_factor = 4; // width / red_bdry_size
   const int log2_factor = uvg_g_convert_to_log2[down_smp_factor];
@@ -4652,7 +4652,9 @@ static void mip_ref_downsampling_1D_16to4_avx2(uvg_pixel* reduced_dst, const uvg
 
   const __m256i vrnd = _mm256_set1_epi16(rounding_offset);
 
-  // TODO: try _mm256_dpbuud
+  // TODO: try _mm256_dpbuud. 
+  // NOTE: ignore this TODO for now, using dpbuud causes error 0xC000001D: Illegal Instruction.
+  // The instruction requires a newer CPU.
   __m128i vref = _mm_loadu_si128((__m128i*)ref_src);
   __m256i vref256 = _mm256_cvtepu8_epi16(vref);
   __m256i vres = _mm256_hadd_epi16(vref256, vref256);
@@ -4665,7 +4667,7 @@ static void mip_ref_downsampling_1D_16to4_avx2(uvg_pixel* reduced_dst, const uvg
   *(int32_t*)(reduced_dst + 0) = _mm256_extract_epi32(vout, 0);
 }
 
-static void mip_ref_downsampling_1D_32to4_avx2(uvg_pixel* reduced_dst, const uvg_pixel* const ref_src)
+static INLINE void mip_ref_downsampling_1D_32to4_avx2(uvg_pixel* reduced_dst, const uvg_pixel* const ref_src)
 {
   const uint8_t down_smp_factor = 8; // width / red_bdry_size
   const int log2_factor = uvg_g_convert_to_log2[down_smp_factor];
@@ -4678,10 +4680,6 @@ static void mip_ref_downsampling_1D_32to4_avx2(uvg_pixel* reduced_dst, const uvg
 
   __m256i vref256a = _mm256_cvtepu8_epi16(vrefa);
   __m256i vref256b = _mm256_cvtepu8_epi16(vrefb);
-  
-  // These instructions cause error 0xC000001D: Illegal Instruction.
-  /*__m128i vtmpa = _mm_dpbuud_epi32(zeros, vrefa, ones);
-  __m128i vtmpb = _mm_dpbuud_epi32(zeros, vrefa, ones);*/
 
   __m256i vres = _mm256_hadd_epi16(vref256a, vref256b);
   vres = _mm256_permute4x64_epi64(vres, _MM_SHUFFLE(3, 1, 2, 0));
@@ -4694,10 +4692,9 @@ static void mip_ref_downsampling_1D_32to4_avx2(uvg_pixel* reduced_dst, const uvg
   __m256i vout = _mm256_packus_epi16(vres, vres);
 
   *(int32_t*)(reduced_dst + 0) = _mm256_extract_epi32(vout, 0);
-  //*(int32_t*)(reduced_dst + 2) = _mm_extract_epi16(vout, 8);
 }
 
-static void mip_ref_downsampling_1D_64to4_avx2(uvg_pixel* reduced_dst, const uvg_pixel* const ref_src)
+static INLINE void mip_ref_downsampling_1D_64to4_avx2(uvg_pixel* reduced_dst, const uvg_pixel* const ref_src)
 {
   const uint8_t down_smp_factor = 16; // width / red_bdry_size
   const int log2_factor = uvg_g_convert_to_log2[down_smp_factor];
@@ -4738,6 +4735,7 @@ static void mip_ref_downsampling_1D_64to4_avx2(uvg_pixel* reduced_dst, const uvg
 }
 
 
+// This function is not optimized, do not use in production. It is left here for reference.
 void uvg_mip_reduced_pred_avx2(uvg_pixel* const output,
   const int16_t* const input,
   const uint8_t* matrix,
@@ -7839,7 +7837,6 @@ void mip_predict_avx2(
           break;
         
         case 8: 
-          // TODO: remove the if clauses and add a switch for height
           if (ups_ver_factor == 2) {
             if (height == 8) {
               mip_upsampling_w8_ups2_h8_ver_avx2(result, ver_src, ref_samples_top);
