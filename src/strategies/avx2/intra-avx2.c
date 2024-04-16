@@ -4894,7 +4894,7 @@ static INLINE void mip_reduced_pred_sid0_avx2(uvg_pixel* const output,
 }
 
 // Size ID 1
-void uvg_mip_reduced_pred_sid1_avx2(uvg_pixel* const output,
+void INLINE mip_reduced_pred_sid1_avx2(uvg_pixel* const output,
   const int16_t* const input,
   const uint16_t* matrix,
   const bool transpose,
@@ -5036,7 +5036,7 @@ void uvg_mip_reduced_pred_sid1_avx2(uvg_pixel* const output,
 }
 
 // Size ID 2
-void uvg_mip_reduced_pred_sid2_avx2(uvg_pixel* const output,
+void INLINE mip_reduced_pred_sid2_avx2(uvg_pixel* const output,
   const int16_t* const input,
   const uint16_t* matrix,
   const bool transpose,
@@ -7784,8 +7784,8 @@ void mip_predict_avx2(
 
   switch (size_id) {
     case 0: mip_reduced_pred_sid0_avx2(reduced_pred, reduced_bdry16, matrix16, transpose, input_offset, input_offset_trans); break;
-    case 1: uvg_mip_reduced_pred_sid1_avx2(reduced_pred, reduced_bdry16, matrix16, transpose, input_offset, input_offset_trans); break;
-    case 2: uvg_mip_reduced_pred_sid2_avx2(reduced_pred, reduced_bdry16, matrix16, transpose, input_offset, input_offset_trans); break;
+    case 1: mip_reduced_pred_sid1_avx2(reduced_pred, reduced_bdry16, matrix16, transpose, input_offset, input_offset_trans); break;
+    case 2: mip_reduced_pred_sid2_avx2(reduced_pred, reduced_bdry16, matrix16, transpose, input_offset, input_offset_trans); break;
     default:
       assert(false && "Intra MIP: invalid size id.\n");
       break;
