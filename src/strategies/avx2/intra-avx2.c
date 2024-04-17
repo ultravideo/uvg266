@@ -931,31 +931,27 @@ static void angular_pred_avx2_w8_ver(uvg_pixel* dst, const uvg_pixel* ref_main, 
 {
   const int width = 8;
 
-  const __m256i p_shuf_01 = _mm256_setr_epi8(
+  const __m128i p_shuf_01 = _mm_setr_epi8(
     0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
-    0x08, 0x09, 0x09, 0x0a, 0x0a, 0x0b, 0x0b, 0x0c,
-    0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
-    0x08, 0x09, 0x09, 0x0a, 0x0a, 0x0b, 0x0b, 0x0c
+    0x04, 0x05, 0x05, 0x06, 0x06, 0x07, 0x07, 0x08
   );
 
-  const __m256i p_shuf_23 = _mm256_setr_epi8(
+  const __m128i p_shuf_23 = _mm_setr_epi8(
     0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x05, 0x06,
-    0x0a, 0x0b, 0x0b, 0x0c, 0x0c, 0x0d, 0x0d, 0x0e,
-    0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x05, 0x06,
-    0x0a, 0x0b, 0x0b, 0x0c, 0x0c, 0x0d, 0x0d, 0x0e
+    0x06, 0x07, 0x07, 0x08, 0x08, 0x09, 0x09, 0x0a
   );
 
   const __m256i w_shuf_01 = _mm256_setr_epi8(
     0x00, 0x02, 0x00, 0x02, 0x00, 0x02, 0x00, 0x02,
-    0x08, 0x0a, 0x08, 0x0a, 0x08, 0x0a, 0x08, 0x0a,
     0x00, 0x02, 0x00, 0x02, 0x00, 0x02, 0x00, 0x02,
+    0x08, 0x0a, 0x08, 0x0a, 0x08, 0x0a, 0x08, 0x0a,
     0x08, 0x0a, 0x08, 0x0a, 0x08, 0x0a, 0x08, 0x0a
   );
 
   const __m256i w_shuf_23 = _mm256_setr_epi8(
     0x04, 0x06, 0x04, 0x06, 0x04, 0x06, 0x04, 0x06,
-    0x0c, 0x0e, 0x0c, 0x0e, 0x0c, 0x0e, 0x0c, 0x0e,
     0x04, 0x06, 0x04, 0x06, 0x04, 0x06, 0x04, 0x06,
+    0x0c, 0x0e, 0x0c, 0x0e, 0x0c, 0x0e, 0x0c, 0x0e,
     0x0c, 0x0e, 0x0c, 0x0e, 0x0c, 0x0e, 0x0c, 0x0e
   );
 
@@ -964,8 +960,8 @@ static void angular_pred_avx2_w8_ver(uvg_pixel* dst, const uvg_pixel* ref_main, 
     __m256i all_weights;
     if (use_cubic) {
       int16_t tmp[8];
-      memcpy(&tmp[0], cubic_filter[delta_fract[y + 0]], 8);
-      memcpy(&tmp[4], cubic_filter[delta_fract[y + 1]], 8);
+      memcpy(&tmp[0], cubic_filter[delta_fract[y + 0]], 4 * sizeof(int16_t));
+      memcpy(&tmp[4], cubic_filter[delta_fract[y + 1]], 4 * sizeof(int16_t));
       all_weights = _mm256_setr_epi64x(*(int64_t*)&tmp[0], *(int64_t*)&tmp[4], *(int64_t*)&tmp[0], *(int64_t*)&tmp[4]);
     }
     else {
@@ -983,20 +979,20 @@ static void angular_pred_avx2_w8_ver(uvg_pixel* dst, const uvg_pixel* ref_main, 
 
     // Do 4-tap intra interpolation filtering
     uvg_pixel* p = (uvg_pixel*)ref_main;
-    // This solution assumes the delta int values to be 64-bit
-    // Cast from 16-bit to 64-bit.
-    __m256i vidx = _mm256_setr_epi64x(delta_int[y + 0],
-      delta_int[y + 1],        // TODO: flip these middle ones, then replace gather with 128-bit load. Replace extract with store. Also, fix shuffle vectors.
-      delta_int[y + 0] + 4,
-      delta_int[y + 1] + 4);
+
+    // Weights are 16-bit, but shuffle will cut out the unnecessary bits.
     __m256i w01 = _mm256_shuffle_epi8(all_weights, w_shuf_01);
     __m256i w23 = _mm256_shuffle_epi8(all_weights, w_shuf_23);
 
     for (int_fast32_t x = 0; x < width; x += 8, p += 8) {
+      __m128i vp0 = _mm_loadu_si128((__m128i*)(p + delta_int[y + 0]));
+      __m128i vp1 = _mm_loadu_si128((__m128i*)(p + delta_int[y + 1]));
 
-      __m256i vp = _mm256_i64gather_epi64((const long long int*)p, vidx, 1);
-      __m256i vp_01 = _mm256_shuffle_epi8(vp, p_shuf_01);
-      __m256i vp_23 = _mm256_shuffle_epi8(vp, p_shuf_23);
+      __m256i vp_01 = _mm256_castsi128_si256(_mm_shuffle_epi8(vp0, p_shuf_01));
+      vp_01 = _mm256_inserti128_si256(vp_01, _mm_shuffle_epi8(vp1, p_shuf_01), 1);
+
+      __m256i vp_23 = _mm256_castsi128_si256(_mm_shuffle_epi8(vp0, p_shuf_23));
+      vp_23 = _mm256_inserti128_si256(vp_23, _mm_shuffle_epi8(vp1, p_shuf_23), 1);
 
       __m256i dot_01 = _mm256_maddubs_epi16(vp_01, w01);
       __m256i dot_23 = _mm256_maddubs_epi16(vp_23, w23);
@@ -1008,10 +1004,7 @@ static void angular_pred_avx2_w8_ver(uvg_pixel* dst, const uvg_pixel* ref_main, 
       __m128i hi = _mm256_extracti128_si256(sum, 1);
       __m128i filtered = _mm_packus_epi16(lo, hi);
 
-      *(uint32_t*)(dst + (y + 0) * width + (x + 0)) = _mm_extract_epi32(filtered, 0);
-      *(uint32_t*)(dst + (y + 1) * width + (x + 0)) = _mm_extract_epi32(filtered, 1);
-      *(uint32_t*)(dst + (y + 0) * width + (x + 4)) = _mm_extract_epi32(filtered, 2);
-      *(uint32_t*)(dst + (y + 1) * width + (x + 4)) = _mm_extract_epi32(filtered, 3);
+      _mm_store_si128((__m128i*)(dst + (y * 8)), filtered);
     }
   }
 }
