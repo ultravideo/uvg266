@@ -722,14 +722,14 @@ static void uvg_intra_pred_planar_avx2_old(
 }
 
 
-typedef void (intra_planar_half_func)(const uvg_pixel* ref, const int line, const int shift, __m256i* dst);
+typedef void (intra_planar_half_func)(const uvg_pixel* ref_main, const uvg_pixel* ref_side, const int line, const int shift, __m256i* dst);
 
 // w1 and w2 for planar horizontal do not exist, since intra prediction must be at least of width 4
 // Also worth noting is that minimum amount of samples must be 16, 
 // therefore the smallest possible predictions are 4x4, 8x2 and 16x1
-static void intra_pred_planar_hor_w4(const uvg_pixel* ref, const int line, const int shift, __m256i* dst)
+static void intra_pred_planar_hor_w4(const uvg_pixel* ref, const uvg_pixel* ref_side, const int line, const int shift, __m256i* dst)
 {
-  const __m256i v_last_ref = _mm256_set1_epi16(ref[4 + 1]);
+  const __m256i v_last_ref = _mm256_set1_epi16(ref_side[4 + 1]);
 
   const __m256i v_ref_coeff = _mm256_setr_epi16(3, 2, 1, 0, 3, 2, 1, 0, 3, 2, 1, 0, 3, 2, 1, 0);
   const __m256i v_last_ref_coeff = _mm256_setr_epi16(1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4);
@@ -766,9 +766,9 @@ static void intra_pred_planar_hor_w4(const uvg_pixel* ref, const int line, const
   }
   #undef UNROLL_LOOP
 }
-static void intra_pred_planar_hor_w8(const uvg_pixel* ref, const int line, const int shift, __m256i* dst)
+static void intra_pred_planar_hor_w8(const uvg_pixel* ref, const uvg_pixel* ref_side, const int line, const int shift, __m256i* dst)
 {
-  const __m256i v_last_ref = _mm256_set1_epi16(ref[8 + 1]);
+  const __m256i v_last_ref = _mm256_set1_epi16(ref_side[8 + 1]);
 
   const __m256i v_ref_coeff = _mm256_setr_epi16(7, 6, 5, 4, 3, 2, 1, 0, 7, 6, 5, 4, 3, 2, 1, 0);
   const __m256i v_last_ref_coeff = _mm256_setr_epi16(1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8);
@@ -803,9 +803,9 @@ static void intra_pred_planar_hor_w8(const uvg_pixel* ref, const int line, const
   }
   #undef UNROLL_LOOP
 }
-static void intra_pred_planar_hor_w16(const uvg_pixel* ref, const int line, const int shift, __m256i* dst)
+static void intra_pred_planar_hor_w16(const uvg_pixel* ref, const uvg_pixel* ref_side, const int line, const int shift, __m256i* dst)
 {
-  const __m256i v_last_ref = _mm256_set1_epi16(ref[16 + 1]);
+  const __m256i v_last_ref = _mm256_set1_epi16(ref_side[16 + 1]);
 
   const __m256i v_ref_coeff = _mm256_setr_epi16(15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0);
   const __m256i v_last_ref_coeff = _mm256_setr_epi16(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16);
@@ -833,9 +833,9 @@ static void intra_pred_planar_hor_w16(const uvg_pixel* ref, const int line, cons
   }
   #undef UNROLL_LOOP
 }
-static void intra_pred_planar_hor_w32(const uvg_pixel* ref, const int line, const int shift, __m256i* dst)
+static void intra_pred_planar_hor_w32(const uvg_pixel* ref, const uvg_pixel* ref_side, const int line, const int shift, __m256i* dst)
 {
-  const __m256i v_last_ref = _mm256_set1_epi16(ref[32 + 1]);
+  const __m256i v_last_ref = _mm256_set1_epi16(ref_side[32 + 1]);
 
   const __m256i v_ref_coeff0 = _mm256_setr_epi16(31, 30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 17, 16);
   const __m256i v_ref_coeff1 = _mm256_setr_epi16(15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0);
@@ -869,9 +869,9 @@ static void intra_pred_planar_hor_w32(const uvg_pixel* ref, const int line, cons
   }
   #undef UNROLL_LOOP
 }
-static void intra_pred_planar_hor_w64(const uvg_pixel* ref, const int line, const int shift, __m256i* dst)
+static void intra_pred_planar_hor_w64(const uvg_pixel* ref, const uvg_pixel* ref_side, const int line, const int shift, __m256i* dst)
 {
-  const __m256i v_last_ref = _mm256_set1_epi16(ref[64 + 1]);
+  const __m256i v_last_ref = _mm256_set1_epi16(ref_side[64 + 1]);
 
   const __m256i v_ref_coeff0 = _mm256_setr_epi16(63, 62, 61, 60, 59, 58, 57, 56, 55, 54, 53, 52, 51, 50, 49, 48);
   const __m256i v_ref_coeff1 = _mm256_setr_epi16(47, 46, 45, 44, 43, 42, 41, 40, 39, 38, 37, 36, 35, 34, 33, 32);
@@ -901,9 +901,9 @@ static void intra_pred_planar_hor_w64(const uvg_pixel* ref, const int line, cons
   }
 }
 
-static void intra_pred_planar_ver_w4(const uvg_pixel* ref, const int line, const int shift, __m256i* dst)
+static void intra_pred_planar_ver_w4(const uvg_pixel* ref, const uvg_pixel* ref_side, const int line, const int shift, __m256i* dst)
 {
-  const __m256i v_last_ref = _mm256_set1_epi8(ref[line + 1]);
+  const __m256i v_last_ref = _mm256_set1_epi8(ref_side[line + 1]);
 
   // Overflow possible for this width if line > 32
   const bool overflow = line > 32;
@@ -948,9 +948,9 @@ static void intra_pred_planar_ver_w4(const uvg_pixel* ref, const int line, const
   }
   #undef UNROLL_LOOP
 }
-static void intra_pred_planar_ver_w8(const uvg_pixel* ref, const int line, const int shift, __m256i* dst) 
+static void intra_pred_planar_ver_w8(const uvg_pixel* ref, const uvg_pixel* ref_side, const int line, const int shift, __m256i* dst)
 {
-  const __m256i v_last_ref = _mm256_set1_epi8(ref[line + 1]);
+  const __m256i v_last_ref = _mm256_set1_epi8(ref_side[line + 1]);
   
   // Got eight 8-bit samples, or 64 bits of data. Duplicate to fill a whole 256-bit vector.
   const __m128i v_ref_raw = _mm_loadu_si128((const __m128i*)&ref[1]);
@@ -1003,9 +1003,9 @@ static void intra_pred_planar_ver_w8(const uvg_pixel* ref, const int line, const
   }
   #undef UNROLL_LOOP
 }
-static void intra_pred_planar_ver_w16(const uvg_pixel* ref, const int line, const int shift, __m256i* dst)
+static void intra_pred_planar_ver_w16(const uvg_pixel* ref, const uvg_pixel* ref_side, const int line, const int shift, __m256i* dst)
 {
-  const __m256i v_last_ref = _mm256_set1_epi8(ref[line + 1]);
+  const __m256i v_last_ref = _mm256_set1_epi8(ref_side[line + 1]);
 
   // Got 16 8-bit samples, or 128 bits of data. Duplicate to fill a whole 256-bit vector.
   const __m128i v_ref_raw = _mm_loadu_si128((const __m128i*) &ref[1]);
@@ -1067,9 +1067,9 @@ static void intra_pred_planar_ver_w16(const uvg_pixel* ref, const int line, cons
   }
 #undef UNROLL_LOOP
 }
-static void intra_pred_planar_ver_w32(const uvg_pixel* ref, const int line, const int shift, __m256i* dst)
+static void intra_pred_planar_ver_w32(const uvg_pixel* ref, const uvg_pixel* ref_side, const int line, const int shift, __m256i* dst)
 {
-  const __m256i v_last_ref = _mm256_set1_epi8(ref[line + 1]);
+  const __m256i v_last_ref = _mm256_set1_epi8(ref_side[line + 1]);
 
   // Got 32 8-bit samples, or 256 bits of data. Load into a single vector
   const __m256i v_ref = _mm256_loadu_si256((const __m256i*) &ref[1]);
@@ -1104,9 +1104,9 @@ static void intra_pred_planar_ver_w32(const uvg_pixel* ref, const int line, cons
   }
   #undef UNROLL_LOOP
 }
-static void intra_pred_planar_ver_w64(const uvg_pixel* ref, const int line, const int shift, __m256i* dst)
+static void intra_pred_planar_ver_w64(const uvg_pixel* ref, const uvg_pixel* ref_side, const int line, const int shift, __m256i* dst)
 {
-  const __m256i v_last_ref = _mm256_set1_epi8(ref[line + 1]);
+  const __m256i v_last_ref = _mm256_set1_epi8(ref_side[line + 1]);
 
   // Got 64 8-bit samples, or 512 bits of data. Load into two vectors
   const __m256i v_ref0 = _mm256_loadu_si256((const __m256i*) &ref[1]);
@@ -1163,8 +1163,8 @@ void uvg_intra_pred_planar_avx2(const cu_loc_t* const cu_loc,
   intra_planar_half_func* planar_hor = planar_func_table[0][log2_width];
   intra_planar_half_func* planar_ver = planar_func_table[1][log2_width];
 
-  planar_hor(ref_left, height, log2_height, v_pred_hor);
-  planar_ver(ref_top, height, log2_width, v_pred_ver);
+  planar_hor(ref_left, ref_top, height, log2_height, v_pred_hor);
+  planar_ver(ref_top, ref_left, height, log2_width, v_pred_ver);
 
   // debug
   int16_t* hor_res = (int16_t*)v_pred_hor;
