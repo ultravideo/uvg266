@@ -90,7 +90,6 @@ ALIGNED(32) static const int8_t planar_avx2_ver_w4ys[1024] = {
   1,   1,   1,   1,   1,   1,   1,   1,   0,   2,   0,   2,   0,   2,   0,   2,   1,   1,   1,   1,   1,   1,   1,   1,   0,   2,   0,   2,   0,   2,   0,   2,  // offset 31. line == 2
 };
 
-// TODO: Reduce size back to 2048 if last line is not needed
 ALIGNED(32) static const int8_t planar_avx2_ver_w8ys[2080] = { 
  63,   1,  63,   1,  63,   1,  63,   1,  63,   1,  63,   1,  63,   1,  63,   1,  62,   2,  62,   2,  62,   2,  62,   2,  62,   2,  62,   2,  62,   2,  62,   2,  // offset 0, line == 64
  61,   3,  61,   3,  61,   3,  61,   3,  61,   3,  61,   3,  61,   3,  61,   3,  60,   4,  60,   4,  60,   4,  60,   4,  60,   4,  60,   4,  60,   4,  60,   4,
@@ -725,17 +724,6 @@ static void uvg_angular_pred_avx2_old(
         *(uint32_t*)(dst + (x + 3) * width + y) = _mm_extract_epi32(v4x4, 3);
       }
     }
-  }
-}
-
-
-// TODO: vectorize
-// TODO: obsolete, remove all usage
-static void angular_pred_avx2_delta_tables(int64_t* delta_int, int32_t* delta_fract, const int line, const int mrl, const int sample_disp)
-{
-  for (int i = 0, delta_pos = sample_disp * (1 + mrl); i < line; ++i, delta_pos += sample_disp) {
-    delta_int[i] = delta_pos >> 5;
-    delta_fract[i] = delta_pos & (32 - 1);
   }
 }
 
