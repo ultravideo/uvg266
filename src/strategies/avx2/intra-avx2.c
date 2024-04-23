@@ -2083,6 +2083,7 @@ static void angular_pdpc_ver_old_avx2(uvg_pixel* dst, const uvg_pixel* ref_side,
   }
 }
 
+
 static void angular_pdpc_ver_w4_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int height, const int scale, const int mode_disp)
 {
   const int width = 4;
@@ -2169,12 +2170,6 @@ static void angular_pdpc_ver_w8_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, 
 
     _mm_store_si128((__m128i*)(dst + (y * width)), filtered);
   }
-}
-
-
-static void angular_pdpc_ver_w8_high_angle_scale0_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int height, const int mode_disp)
-{
-
 }
 
 
@@ -2405,7 +2400,6 @@ static void angular_pdpc_ver_w4_high_angle_avx2(uvg_pixel* dst, const uvg_pixel*
     _mm_store_si128((__m128i*)(dst + (y * width)), filtered);
   }
 }
-
 
 static void angular_pdpc_ver_4x4_scale0_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int width, const int height, const int mode_disp)
 {
@@ -3070,6 +3064,293 @@ static void angular_pdpc_hor_w4_high_angle_avx2(uvg_pixel* dst, const uvg_pixel*
 }
 
 
+static void angular_pdpc_mode18_avx2(uvg_pixel* dst, const uvg_pixel top_left, const uvg_pixel* ref_side, const int width, const int height, const int scale)
+{
+  const int limit = MIN(3 << scale, height);
+  for (int_fast32_t x = 0; x < width; ++x) {
+    const uvg_pixel ref_top = ref_side[1 + x];
+    for (int yy = 0; yy < limit; ++yy) {
+      const int wT = 32 >> ((yy * 2) >> scale);
+      const uvg_pixel val = dst[yy * width + x];
+      dst[yy * width + x] = CLIP_TO_PIXEL(val + (((ref_top - top_left) * wT + 32) >> 6));
+    }
+  }
+}
+
+static void angular_pdpc_mode18_w4_avx2(uvg_pixel* dst, const uvg_pixel top_left, const uvg_pixel* ref_side, const int height, const int scale)
+{
+  const int width = 4;
+  const int limit = MIN(3 << scale, height);
+
+  __m128i vseq = _mm_setr_epi32(0, 1, 2, 3);
+  __m128i vidx = _mm_slli_epi32(vseq, 2); // 2 is log2_width
+  __m256i v32s = _mm256_set1_epi16(32);
+
+  const uint32_t ref4 = *(uint32_t*)&ref_side[1];
+  
+  __m128i vref = _mm_set1_epi32(ref4);
+  __m256i vref16 = _mm256_cvtepu8_epi16(vref);
+
+  __m256i vtopleft = _mm256_set1_epi16((uint16_t)top_left);
+
+  // Weight table offset
+  const int table_offset = scale * 64;
+
+  for (int y = 0, o = 0; y < limit; y += 4, o += 16) {
+    const int offset = table_offset + o;
+
+    __m128i vpred = _mm_i32gather_epi32((const int32_t*)(dst + y * width), vidx, 1);
+    __m256i vpred16 = _mm256_cvtepu8_epi16(vpred);
+    __m256i vwT = _mm256_load_si256((const __m256i*) &intra_pdpc_w4_hor_weight[offset]);
+
+    __m256i accu = _mm256_sub_epi16(vref16, vtopleft);
+    accu = _mm256_mullo_epi16(vwT, accu);
+    accu = _mm256_add_epi16(accu, v32s);
+    accu = _mm256_srai_epi16(accu, 6);
+    accu = _mm256_add_epi16(vpred16, accu);
+
+    __m128i lo = _mm256_castsi256_si128(accu);
+    __m128i hi = _mm256_extracti128_si256(accu, 1);
+    __m128i filtered = _mm_packus_epi16(lo, hi);
+
+    _mm_storeu_si128((__m128i*)(dst + (y * width)), filtered);
+  }
+}
+
+static void angular_pdpc_mode18_w8_avx2(uvg_pixel* dst, const uvg_pixel top_left, const uvg_pixel* ref_side, const int height, const int scale)
+{
+  const int width = 8;
+
+  int limit = MIN(3 << scale, height);
+
+  __m128i vseq = _mm_setr_epi32(0x00, 0x00, 0x01, 0x00);
+  __m128i vidx = _mm_slli_epi64(vseq, 3); // 3 is log2 width
+  __m256i v32s = _mm256_set1_epi16(32);
+
+  const uint64_t ref8 = *(uint64_t*)&ref_side[1];
+
+  __m128i vref = _mm_set1_epi64x(ref8);
+  __m256i vref16 = _mm256_cvtepu8_epi16(vref);
+
+  __m256i vtopleft = _mm256_set1_epi16((uint16_t)top_left);
+
+  // Weight table offset
+  const int table_offset = scale * 128;
+
+  for (int y = 0, o = table_offset; y < limit; y += 2, o += 16) {
+    const __m256i vwT = _mm256_load_si256((const __m256i*) &intra_pdpc_w8_hor_weight[o]);
+
+    __m128i vpred = _mm_i64gather_epi64((const int64_t*)(dst + y * width), vidx, 1);
+    __m256i vpred16 = _mm256_cvtepu8_epi16(vpred);
+    
+    __m256i accu = _mm256_sub_epi16(vref16, vtopleft);
+    accu = _mm256_mullo_epi16(vwT, accu);
+    accu = _mm256_add_epi16(accu, v32s);
+    accu = _mm256_srai_epi16(accu, 6);
+    accu = _mm256_add_epi16(vpred16, accu);
+
+    __m128i lo = _mm256_castsi256_si128(accu);
+    __m128i hi = _mm256_extracti128_si256(accu, 1);
+    __m128i filtered = _mm_packus_epi16(lo, hi);
+
+    _mm_storeu_si128((__m128i*)(dst + (y * width)), filtered);
+  }
+}
+
+static void angular_pdpc_mode18_w16_avx2(uvg_pixel* dst, const uvg_pixel top_left, const uvg_pixel* ref_side, const int height, const int scale)
+{
+  const int width = 16;
+  int limit = MIN(3 << scale, height);
+  __m256i v32s = _mm256_set1_epi16(32);
+
+  __m128i vref = _mm_loadu_si128((const __m128i*)&ref_side[1]);
+  __m256i vref16 = _mm256_cvtepu8_epi16(vref);
+
+  __m256i vtopleft = _mm256_set1_epi16((uint16_t)top_left);
+
+  // Handle one line at a time. Skip line if vertical limit reached.
+  for (int y = 0; y < limit; ++y) {
+    const int16_t wT = 32 >> (2 * (y + 0) >> scale);
+    __m256i vwT = _mm256_set1_epi16(wT);
+
+    for (int x = 0; x < width; x += 16) {
+      __m128i vpred = _mm_load_si128((__m128i*)(dst + (y * width + x)));
+      __m256i vpred16 = _mm256_cvtepu8_epi16(vpred);
+      
+      __m256i accu = _mm256_sub_epi16(vref16, vtopleft);
+      accu = _mm256_mullo_epi16(vwT, accu);
+      accu = _mm256_add_epi16(accu, v32s);
+      accu = _mm256_srai_epi16(accu, 6);
+      accu = _mm256_add_epi16(vpred16, accu);
+
+      __m128i lo = _mm256_castsi256_si128(accu);
+      __m128i hi = _mm256_extracti128_si256(accu, 1);
+      __m128i filtered = _mm_packus_epi16(lo, hi);
+
+      _mm_storeu_si128((__m128i*)(dst + (y * width + x)), filtered);
+    }
+  }
+}
+
+static void angular_pdpc_mode18_w32_avx2(uvg_pixel* dst, const uvg_pixel top_left, const uvg_pixel* ref_side, const int height, const int scale)
+{
+  const int width = 32;
+  int limit = MIN(3 << scale, height);
+  __m256i v32s = _mm256_set1_epi16(32);
+
+  __m128i vrefa = _mm_loadu_si128((const __m128i*) &ref_side[1]);
+  __m256i vref16a = _mm256_cvtepu8_epi16(vrefa);
+
+  __m128i vrefb = _mm_loadu_si128((const __m128i*) &ref_side[17]);
+  __m256i vref16b = _mm256_cvtepu8_epi16(vrefb);
+
+  __m256i vtopleft = _mm256_set1_epi16((uint16_t)top_left);
+
+  // Handle one line at a time. Skip line if vertical limit reached.
+  for (int y = 0; y < limit; ++y) {
+    const int16_t wT = 32 >> (2 * (y + 0) >> scale);
+    __m256i vwT = _mm256_set1_epi16(wT);
+
+    // Calculate first half
+    __m128i vpred = _mm_load_si128((__m128i*)(dst + (y * width + 0)));
+    __m256i vpred16 = _mm256_cvtepu8_epi16(vpred);
+
+    __m256i accu = _mm256_sub_epi16(vref16a, vtopleft);
+    accu = _mm256_mullo_epi16(vwT, accu);
+    accu = _mm256_add_epi16(accu, v32s);
+    accu = _mm256_srai_epi16(accu, 6);
+    accu = _mm256_add_epi16(vpred16, accu);
+
+    __m128i lo = _mm256_castsi256_si128(accu);
+    __m128i hi = _mm256_extracti128_si256(accu, 1);
+    __m128i filtered = _mm_packus_epi16(lo, hi);
+
+    _mm_storeu_si128((__m128i*)(dst + (y * width + 0)), filtered);
+
+    // Calculate second half
+    vpred = _mm_load_si128((__m128i*)(dst + (y * width + 16)));
+    vpred16 = _mm256_cvtepu8_epi16(vpred);
+
+    accu = _mm256_sub_epi16(vref16b, vtopleft);
+    accu = _mm256_mullo_epi16(vwT, accu);
+    accu = _mm256_add_epi16(accu, v32s);
+    accu = _mm256_srai_epi16(accu, 6);
+    accu = _mm256_add_epi16(vpred16, accu);
+
+    lo = _mm256_castsi256_si128(accu);
+    hi = _mm256_extracti128_si256(accu, 1);
+    filtered = _mm_packus_epi16(lo, hi);
+
+    _mm_storeu_si128((__m128i*)(dst + (y * width + 16)), filtered);
+  }
+}
+
+static void angular_pdpc_mode18_w64_avx2(uvg_pixel* dst, const uvg_pixel top_left, const uvg_pixel* ref_side, const int height, const int scale)
+{
+  const int width = 64;
+  int limit = MIN(3 << scale, height);
+  __m256i v32s = _mm256_set1_epi16(32);
+
+  __m128i vrefa = _mm_loadu_si128((const __m128i*) &ref_side[0 + 1]);
+  __m256i vref16a = _mm256_cvtepu8_epi16(vrefa);
+
+  __m128i vrefb = _mm_loadu_si128((const __m128i*) &ref_side[16 + 1]);
+  __m256i vref16b = _mm256_cvtepu8_epi16(vrefb);
+
+  __m128i vrefc = _mm_loadu_si128((const __m128i*) &ref_side[32 + 1]);
+  __m256i vref16c = _mm256_cvtepu8_epi16(vrefc);
+
+  __m128i vrefd = _mm_loadu_si128((const __m128i*) &ref_side[48 + 1]);
+  __m256i vref16d = _mm256_cvtepu8_epi16(vrefd);
+
+  __m256i vtopleft = _mm256_set1_epi16((uint16_t)top_left);
+
+  // Handle one line at a time. Skip line if vertical limit reached.
+  for (int y = 0; y < limit; ++y) {
+    const int16_t wT = 32 >> (2 * (y + 0) >> scale);
+    __m256i vwT = _mm256_set1_epi16(wT);
+
+    // Calculate first quarter
+    __m128i vpred = _mm_load_si128((__m128i*)(dst + (y * width + 0)));
+    __m256i vpred16 = _mm256_cvtepu8_epi16(vpred);
+
+    __m256i accu = _mm256_sub_epi16(vref16a, vtopleft);
+    accu = _mm256_mullo_epi16(vwT, accu);
+    accu = _mm256_add_epi16(accu, v32s);
+    accu = _mm256_srai_epi16(accu, 6);
+    accu = _mm256_add_epi16(vpred16, accu);
+
+    __m128i lo = _mm256_castsi256_si128(accu);
+    __m128i hi = _mm256_extracti128_si256(accu, 1);
+    __m128i filtered = _mm_packus_epi16(lo, hi);
+
+    _mm_storeu_si128((__m128i*)(dst + (y * width + 0)), filtered);
+
+    // Calculate second quarter
+    vpred = _mm_load_si128((__m128i*)(dst + (y * width + 16)));
+    vpred16 = _mm256_cvtepu8_epi16(vpred);
+
+    accu = _mm256_sub_epi16(vref16b, vtopleft);
+    accu = _mm256_mullo_epi16(vwT, accu);
+    accu = _mm256_add_epi16(accu, v32s);
+    accu = _mm256_srai_epi16(accu, 6);
+    accu = _mm256_add_epi16(vpred16, accu);
+
+    lo = _mm256_castsi256_si128(accu);
+    hi = _mm256_extracti128_si256(accu, 1);
+    filtered = _mm_packus_epi16(lo, hi);
+
+    _mm_storeu_si128((__m128i*)(dst + (y * width + 16)), filtered);
+
+    // Calculate third quarter
+    vpred = _mm_load_si128((__m128i*)(dst + (y * width + 32)));
+    vpred16 = _mm256_cvtepu8_epi16(vpred);
+
+    accu = _mm256_sub_epi16(vref16c, vtopleft);
+    accu = _mm256_mullo_epi16(vwT, accu);
+    accu = _mm256_add_epi16(accu, v32s);
+    accu = _mm256_srai_epi16(accu, 6);
+    accu = _mm256_add_epi16(vpred16, accu);
+
+    lo = _mm256_castsi256_si128(accu);
+    hi = _mm256_extracti128_si256(accu, 1);
+    filtered = _mm_packus_epi16(lo, hi);
+
+    _mm_storeu_si128((__m128i*)(dst + (y * width + 32)), filtered);
+
+    // Calculate fourth quarter
+    vpred = _mm_load_si128((__m128i*)(dst + (y * width + 48)));
+    vpred16 = _mm256_cvtepu8_epi16(vpred);
+
+    accu = _mm256_sub_epi16(vref16d, vtopleft);
+    accu = _mm256_mullo_epi16(vwT, accu);
+    accu = _mm256_add_epi16(accu, v32s);
+    accu = _mm256_srai_epi16(accu, 6);
+    accu = _mm256_add_epi16(vpred16, accu);
+
+    lo = _mm256_castsi256_si128(accu);
+    hi = _mm256_extracti128_si256(accu, 1);
+    filtered = _mm_packus_epi16(lo, hi);
+
+    _mm_storeu_si128((__m128i*)(dst + (y * width + 48)), filtered);
+  }
+}
+
+
+static void angular_pdpc_mode50_avx2(uvg_pixel* dst, const uvg_pixel top_left, const uvg_pixel* ref_side, const int width, const int height, const int scale)
+{
+  const int limit = MIN(3 << scale, width);
+  for (int y = 0; y < height; ++y) {
+    const uvg_pixel left = ref_side[1 + y];
+    for (int x = 0; x < limit; x++) {
+      const int wL = 32 >> (2 * x >> scale);
+      const uvg_pixel val = dst[y * width + x];
+      dst[y * width + x] = CLIP_TO_PIXEL(val + ((wL * (left - top_left) + 32) >> 6));
+    }
+  }
+}
+
+
 static void uvg_angular_pred_avx2(
   const cu_loc_t* const cu_loc,
   const int_fast8_t intra_mode,
@@ -3286,11 +3567,7 @@ static void uvg_angular_pred_avx2(
   }
   else {
     // Mode is horizontal or vertical, just copy the pixels.
-    // NOTE: includes PDPC.
-
     if (vertical_mode) {
-      const uvg_pixel top_left = ref_main[0];
-      int scale = (log2_width + log2_height - 2) >> 2;
       for (int_fast32_t y = 0; y < height; ++y) {
         switch (width) {
           case 4:  memcpy(&dst[y * 4],  &ref_main[1],  4 * sizeof(uvg_pixel)); break;
@@ -3299,25 +3576,9 @@ static void uvg_angular_pred_avx2(
           case 32: memcpy(&dst[y * 32], &ref_main[1], 32 * sizeof(uvg_pixel)); break;
           case 64: memcpy(&dst[y * 64], &ref_main[1], 64 * sizeof(uvg_pixel)); break;
         }
-        
-        /*for (int_fast32_t x = 0; x < width; ++x) {
-          dst[y * width + x] = ref_main[x + 1];
-        }*/
-
-        // PDPC
-        if (((width >= 4 && height >= 4) || channel_type != 0) && sample_disp >= 0 && multi_ref_index == 0) {
-          const uvg_pixel left = ref_side[1 + y];
-          for (int i = 0; i < MIN(3 << scale, width); i++) {
-            const int wL = 32 >> (2 * i >> scale);
-            const uvg_pixel val = dst[y * width + i];
-            dst[y * width + i] = CLIP_TO_PIXEL(val + ((wL * (left - top_left) + 32) >> 6));
-          }
-        }
       }
     }
     else {
-      const uvg_pixel top_left = ref_main[0];
-      int scale = (log2_width + log2_height - 2) >> 2;
       for (int y = 0; y < height; ++y) {
         switch (width) {
           case 4:  memset(&dst[y * 4],  ref_main[y + 1],  4 * sizeof(uvg_pixel)); break;
@@ -3330,121 +3591,125 @@ static void uvg_angular_pred_avx2(
             break;
         }
       }
-      for (int_fast32_t x = 0; x < width; ++x) {
-        /*for (int y = 0; y < height; ++y) {
-          dst[y * width + x] = ref_main[y + 1];
-        }*/
-
-        // PDPC
-        if (((width >= 4 && height >= 4) || channel_type != 0) && sample_disp >= 0 && multi_ref_index == 0) {
-          const uvg_pixel ref_top = ref_side[1 + x];
-          for (int yy = 0; yy < MIN(3 << scale, height); ++yy) {
-            const int wT = 32 >> ((yy * 2) >> scale);
-            
-            const uvg_pixel val = dst[yy * width + x];
-            dst[yy * width + x] = CLIP_TO_PIXEL(val + (((ref_top - top_left) * wT + 32) >> 6));
-
-            // pred_samples[x][y] = CLIP((refL[x][y] * wL[x] + refT[x][y] * wT[y] + (64 - wL[x] - wT[y]) * pred_samples[x][y] + 32) >> 6 )
-          }
-        }
-      }
     }
   }
 
-  // PDPC for non-horizontal and non-vertical modes
-  if (!(pred_mode == 18 || pred_mode == 50)) {
-    bool PDPC_filter = (width >= TR_MIN_WIDTH && height >= TR_MIN_WIDTH);
-    if (pred_mode > 1 && pred_mode < 67) {
-      // Disable PDPC filter if both references are used or if MRL is used
-      if (mode_disp < 0 || multi_ref_index) {
-        PDPC_filter = false;
-      }
-      else if (mode_disp > 0) {
-        // If scale is negative, PDPC filtering has no effect, therefore disable it.
-        PDPC_filter &= (scale >= 0);
+  
+  bool PDPC_filter = (width >= TR_MIN_WIDTH && height >= TR_MIN_WIDTH);
+  if (pred_mode > 1 && pred_mode < 67) {
+    // Disable PDPC filter if both references are used or if MRL is used
+    if (mode_disp < 0 || multi_ref_index) {
+      PDPC_filter = false;
+    }
+    else if (mode_disp > 0) {
+      // If scale is negative, PDPC filtering has no effect, therefore disable it.
+      PDPC_filter &= (scale >= 0);
+    }
+  }
+  if (PDPC_filter) {
+    // Handle pure horizontal and vertical with separate PDPC solution
+    if (pred_mode == 18) {
+      scale = (log2_width + log2_height - 2) >> 2;
+      const uvg_pixel top_left = ref_main[0];
+      
+      switch (width) {
+        case 4: angular_pdpc_mode18_w4_avx2(dst, top_left, ref_side, height, scale); break;
+        case 8: angular_pdpc_mode18_w8_avx2(dst, top_left, ref_side, height, scale); break;
+        case 16: angular_pdpc_mode18_w16_avx2(dst, top_left, ref_side, height, scale); break;
+        case 32: angular_pdpc_mode18_w32_avx2(dst, top_left, ref_side, height, scale); break;
+        case 64: angular_pdpc_mode18_w64_avx2(dst, top_left, ref_side, height, scale); break;
+        default:
+          assert(false && "Intra PDPC, invalid width.\n");
+          break;
       }
     }
-    if (PDPC_filter) {
+    else if (pred_mode == 50) {
+      scale = (log2_width + log2_height - 2) >> 2;
+      const uvg_pixel top_left = ref_main[0];
+      angular_pdpc_mode50_avx2(dst, top_left, ref_side, width, height, scale);
+
+    }
+    else {
       if (vertical_mode) {
         // Note: no need to check for negative mode_disp, since it is already checked before.
         switch (width) {
-          case 4:
-            // Low mode disp -> low angle. For pdpc, this causes the needed references to be extremely sparse making loads without using gathers impossible.
-            // Handle high angles with more tight reference spacing with separate functions with more optimized loads.
+        case 4:
+          // Low mode disp -> low angle. For pdpc, this causes the needed references to be extremely sparse making loads without using gathers impossible.
+          // Handle high angles with more tight reference spacing with separate functions with more optimized loads.
+          if (mode_disp < 6)
+            angular_pdpc_ver_w4_avx2(dst, ref_side, height, scale, mode_disp);
+          else
+            angular_pdpc_ver_w4_high_angle_avx2(dst, ref_side, height, scale, mode_disp);
+          break;
+        case 8:
+          if (scale == 0) {
             if (mode_disp < 6)
-              angular_pdpc_ver_w4_avx2(dst, ref_side, height, scale, mode_disp);
+              angular_pdpc_ver_4x4_scale0_avx2(dst, ref_side, width, height, mode_disp);
             else
-              angular_pdpc_ver_w4_high_angle_avx2(dst, ref_side, height, scale, mode_disp);
+              angular_pdpc_ver_4x4_scale0_high_angle_avx2(dst, ref_side, width, height, mode_disp);
+          }
+          else if (scale == 1) {
+            if (mode_disp < 8)
+              angular_pdpc_ver_8x2_scale1_avx2(dst, ref_side, width, height, mode_disp);
+            else
+              angular_pdpc_ver_8x2_scale1_high_angle_avx2(dst, ref_side, width, height, mode_disp);
+          }
+          else {
+            if (mode_disp < 10)
+              angular_pdpc_ver_w8_avx2(dst, ref_side, height, scale, mode_disp);
+            else
+              angular_pdpc_ver_8x2_scale2_high_angle_avx2(dst, ref_side, width, height, mode_disp);
+          }
+          break;
+        case 16: // 16 width and higher done with the same functions
+        case 32:
+        case 64:
+          switch (scale) {
+          case 0:
+            if (mode_disp < 6)
+              angular_pdpc_ver_4x4_scale0_avx2(dst, ref_side, width, height, mode_disp);
+            else
+              angular_pdpc_ver_4x4_scale0_high_angle_avx2(dst, ref_side, width, height, mode_disp);
             break;
-          case 8:
-            if (scale == 0) {
-              if (mode_disp < 6)
-                angular_pdpc_ver_4x4_scale0_avx2(dst, ref_side, width, height, mode_disp);
-              else
-                angular_pdpc_ver_4x4_scale0_high_angle_avx2(dst, ref_side, width, height, mode_disp);
-            }
-            else if (scale == 1) {
-              if (mode_disp < 8)
-                angular_pdpc_ver_8x2_scale1_avx2(dst, ref_side, width, height, mode_disp);
-              else
-                angular_pdpc_ver_8x2_scale1_high_angle_avx2(dst, ref_side, width, height, mode_disp);
-            }
-            else {
-              if (mode_disp < 10)
-                angular_pdpc_ver_w8_avx2(dst, ref_side, height, scale, mode_disp);
-              else
-                angular_pdpc_ver_8x2_scale2_high_angle_avx2(dst, ref_side, width, height, mode_disp);
-            }
+          case 1:
+            if (mode_disp < 8)
+              angular_pdpc_ver_8x2_scale1_avx2(dst, ref_side, width, height, mode_disp);
+            else
+              angular_pdpc_ver_8x2_scale1_high_angle_avx2(dst, ref_side, width, height, mode_disp);
             break;
-          case 16: // 16 width and higher done with the same functions
-          case 32:
-          case 64:
-            switch (scale) {
-            case 0:
-              if (mode_disp < 6)
-                angular_pdpc_ver_4x4_scale0_avx2(dst, ref_side, width, height, mode_disp);
-              else
-                angular_pdpc_ver_4x4_scale0_high_angle_avx2(dst, ref_side, width, height, mode_disp);
-              break;
-            case 1:
-              if (mode_disp < 8)
-                angular_pdpc_ver_8x2_scale1_avx2(dst, ref_side, width, height, mode_disp);
-              else
-                angular_pdpc_ver_8x2_scale1_high_angle_avx2(dst, ref_side, width, height, mode_disp);
-              break;
-            case 2: 
-              if (mode_disp < 14)
-                angular_pdpc_ver_w16_avx2(dst, ref_side, width, height, mode_disp);
-              else
-                angular_pdpc_ver_w16_scale2_high_angle_avx2(dst, ref_side, width, height, mode_disp);
-              break;
-            default:
-              assert(false && "Intra PDPC: Invalid scale.\n");
-            }
+          case 2:
+            if (mode_disp < 14)
+              angular_pdpc_ver_w16_avx2(dst, ref_side, width, height, mode_disp);
+            else
+              angular_pdpc_ver_w16_scale2_high_angle_avx2(dst, ref_side, width, height, mode_disp);
             break;
           default:
-            assert(false && "Intra PDPC: Invalid width.\n");
+            assert(false && "Intra PDPC: Invalid scale.\n");
+          }
+          break;
+        default:
+          assert(false && "Intra PDPC: Invalid width.\n");
         }
       }
       else {
         switch (width) {
-          case 4:  
-            // Low mode disp -> low angle. For pdpc, this causes the needed references to be extremely sparse making loads without using gathers impossible.
-            // Handle high angles with more tight reference spacing with separate functions with more optimized loads.
-            if (mode_disp < 6)
-              angular_pdpc_hor_w4_avx2(dst, ref_side, height, scale, mode_disp);
-            else
-              angular_pdpc_hor_w4_high_angle_avx2(dst, ref_side, height, scale, mode_disp);
-            break;
-          case 8:  angular_pdpc_hor_w8_avx2(dst, ref_side, height, scale, mode_disp); break;
-          case 16: // 16 width and higher done with the same function
-          case 32:
-          case 64: angular_pdpc_hor_w16_avx2(dst, ref_side, width, height, scale, mode_disp); break;
-          default:
-            assert(false && "Intra PDPC: Invalid width.\n");
+        case 4:
+          // Low mode disp -> low angle. For pdpc, this causes the needed references to be extremely sparse making loads without using gathers impossible.
+          // Handle high angles with more tight reference spacing with separate functions with more optimized loads.
+          if (mode_disp < 6)
+            angular_pdpc_hor_w4_avx2(dst, ref_side, height, scale, mode_disp);
+          else
+            angular_pdpc_hor_w4_high_angle_avx2(dst, ref_side, height, scale, mode_disp);
+          break;
+        case 8:  angular_pdpc_hor_w8_avx2(dst, ref_side, height, scale, mode_disp); break;
+        case 16: // 16 width and higher done with the same function
+        case 32:
+        case 64: angular_pdpc_hor_w16_avx2(dst, ref_side, width, height, scale, mode_disp); break;
+        default:
+          assert(false && "Intra PDPC: Invalid width.\n");
         }
       }
-    } 
+    }
   }
 }
 
