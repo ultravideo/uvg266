@@ -3579,18 +3579,63 @@ static void uvg_angular_pred_avx2(
       }
     }
     else {
-      for (int y = 0; y < height; ++y) {
-        switch (width) {
-          case 4:  memset(&dst[y * 4],  ref_main[y + 1],  4 * sizeof(uvg_pixel)); break;
-          case 8:  memset(&dst[y * 8],  ref_main[y + 1],  8 * sizeof(uvg_pixel)); break;
-          case 16: memset(&dst[y * 16], ref_main[y + 1], 16 * sizeof(uvg_pixel)); break;
-          case 32: memset(&dst[y * 32], ref_main[y + 1], 32 * sizeof(uvg_pixel)); break;
-          case 64: memset(&dst[y * 64], ref_main[y + 1], 64 * sizeof(uvg_pixel)); break;
-          default:
-            assert(false && "Intra angular predicion: illegal width.\n");
-            break;
-        }
+    #define UNROLL(w, h) \
+      if ((h) == height && (w) == width) { \
+        for (int y = 0; y < (h); ++y) { \
+          const __m128i vdst = _mm_set1_epi8(ref_main[y + 1]); \
+          switch ((w)) {\
+            case 4:  _mm_storeu_si32((__m128i*) &dst[y * 4], vdst); break;\
+            case 8:  _mm_storeu_si64((__m128i*) &dst[y * 8], vdst); break;\
+            case 16: _mm_store_si128((__m128i*) &dst[y * 16], vdst); break;\
+            case 32:\
+              _mm_store_si128((__m128i*) &dst[y * 32 +  0], vdst);\
+              _mm_store_si128((__m128i*) &dst[y * 32 + 16], vdst);\
+              break;\
+            case 64: \
+              _mm_store_si128((__m128i*) &dst[y * 64 +  0], vdst);\
+              _mm_store_si128((__m128i*) &dst[y * 64 + 16], vdst);\
+              _mm_store_si128((__m128i*) &dst[y * 64 + 32], vdst);\
+              _mm_store_si128((__m128i*) &dst[y * 64 + 48], vdst);\
+              break;  \
+            default:\
+              assert(false && "Intra angular predicion: illegal width.\n");\
+              break;\
+          }\
+        } \
       }
+      UNROLL(4, 4);
+      UNROLL(4, 8);
+      UNROLL(4, 16);
+      UNROLL(4, 32);
+      UNROLL(4, 64);
+      UNROLL(8, 2);
+      UNROLL(8, 4);
+      UNROLL(8, 8);
+      UNROLL(8, 16);
+      UNROLL(8, 32);
+      UNROLL(8, 64);
+      UNROLL(16, 1);
+      UNROLL(16, 2);
+      UNROLL(16, 4);
+      UNROLL(16, 8);
+      UNROLL(16, 16);
+      UNROLL(16, 32);
+      UNROLL(16, 64);
+      UNROLL(32, 1);
+      UNROLL(32, 2);
+      UNROLL(32, 4);
+      UNROLL(32, 8);
+      UNROLL(32, 16);
+      UNROLL(32, 32);
+      UNROLL(32, 64);
+      UNROLL(64, 1);
+      UNROLL(64, 2);
+      UNROLL(64, 4);
+      UNROLL(64, 8);
+      UNROLL(64, 16);
+      UNROLL(64, 32);
+      UNROLL(64, 64);
+      #undef UNROLL
     }
   }
 
