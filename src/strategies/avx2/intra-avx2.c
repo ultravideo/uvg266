@@ -815,7 +815,7 @@ static const int8_t cubic_filter_8bit_g[32][4] =
 };
 
 
-static void angular_pred_avx2_w4_ver(uvg_pixel* dst, const uvg_pixel* ref_main, const int16_t* delta_int, const int16_t* delta_fract, const int height, const int use_cubic)
+static void angular_pred_w4_ver_avx2(uvg_pixel* dst, const uvg_pixel* ref_main, const int16_t* delta_int, const int16_t* delta_fract, const int height, const int use_cubic)
 {
   const int width = 4;
 
@@ -900,7 +900,7 @@ static void angular_pred_avx2_w4_ver(uvg_pixel* dst, const uvg_pixel* ref_main, 
   }
 }
 
-static void angular_pred_avx2_w8_ver(uvg_pixel* dst, const uvg_pixel* ref_main, const int16_t* delta_int, const int16_t* delta_fract, const int height, const int use_cubic)
+static void angular_pred_w8_ver_avx2(uvg_pixel* dst, const uvg_pixel* ref_main, const int16_t* delta_int, const int16_t* delta_fract, const int height, const int use_cubic)
 {
   const int width = 8;
 
@@ -982,7 +982,7 @@ static void angular_pred_avx2_w8_ver(uvg_pixel* dst, const uvg_pixel* ref_main, 
   }
 }
 
-static void angular_pred_avx2_w16_ver(uvg_pixel* dst, const uvg_pixel* ref_main, const int16_t* delta_int, const int16_t* delta_fract, const int width, const int height, const int use_cubic)
+static void angular_pred_w16_ver_avx2(uvg_pixel* dst, const uvg_pixel* ref_main, const int16_t* delta_int, const int16_t* delta_fract, const int width, const int height, const int use_cubic)
 {
   const __m256i p_shuf_01 = _mm256_setr_epi8(
     0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
@@ -1076,7 +1076,7 @@ static void angular_pred_avx2_w16_ver(uvg_pixel* dst, const uvg_pixel* ref_main,
 }
 
 
-static void angular_pred_avx2_w4_hor(uvg_pixel* dst, const uvg_pixel* ref_main, const int16_t* delta_int, const int16_t* delta_fract, const int height, const int use_cubic)
+static void angular_pred_w4_hor_avx2(uvg_pixel* dst, const uvg_pixel* ref_main, const int16_t* delta_int, const int16_t* delta_fract, const int height, const int use_cubic)
 {
   const int width = 4;
 
@@ -1172,7 +1172,7 @@ static void angular_pred_avx2_w4_hor(uvg_pixel* dst, const uvg_pixel* ref_main, 
   }
 }
 
-static void angular_pred_avx2_w8_hor(uvg_pixel* dst, const uvg_pixel* ref_main, const int16_t* delta_int, const int16_t* delta_fract, const int height, const int use_cubic)
+static void angular_pred_w8_hor_avx2(uvg_pixel* dst, const uvg_pixel* ref_main, const int16_t* delta_int, const int16_t* delta_fract, const int height, const int use_cubic)
 {
   const int width = 8;
 
@@ -1225,7 +1225,7 @@ static void angular_pred_avx2_w8_hor(uvg_pixel* dst, const uvg_pixel* ref_main, 
   }
 }
 
-static void angular_pred_avx2_w16_hor(uvg_pixel* dst, const uvg_pixel* ref_main, const int16_t* delta_int, const int16_t* delta_fract, const int width, const int height, const int use_cubic)
+static void angular_pred_w16_hor_avx2(uvg_pixel* dst, const uvg_pixel* ref_main, const int16_t* delta_int, const int16_t* delta_fract, const int width, const int height, const int use_cubic)
 {
   int8_t f[64][4] = { { 0 } };
   if (use_cubic) {
@@ -1292,7 +1292,7 @@ static void angular_pred_generic_linear_filter(uvg_pixel* dst, uvg_pixel* ref, c
 
 
 // Linear interpolation filter for width 4 has a different call, since it uses premade tables for coefficients
-static void angular_pred_avx2_linear_filter_w4_ver(uvg_pixel* dst, uvg_pixel* ref, const int height, const int16_t* delta_int, const int32_t pred_mode)
+static void angular_pred_linear_filter_w4_ver_avx2(uvg_pixel* dst, uvg_pixel* ref, const int height, const int16_t* delta_int, const int32_t pred_mode)
 {
   const int16_t* dint = delta_int;
   const __m128i v16s = _mm_set1_epi16(16);
@@ -1340,7 +1340,7 @@ static void angular_pred_avx2_linear_filter_w4_ver(uvg_pixel* dst, uvg_pixel* re
 }
 
 
-static void angular_pred_avx2_linear_filter_w8_ver(uvg_pixel* dst, uvg_pixel* ref, const int height, const int16_t* delta_int, const int pred_mode)
+static void angular_pred_linear_filter_w8_ver_avx2(uvg_pixel* dst, uvg_pixel* ref, const int height, const int16_t* delta_int, const int pred_mode)
 {
   const int width = 8;
   const __m128i v16s = _mm_set1_epi16(16);
@@ -1380,7 +1380,7 @@ static void angular_pred_avx2_linear_filter_w8_ver(uvg_pixel* dst, uvg_pixel* re
 }
 
 
-static void angular_pred_avx2_linear_filter_w16_ver(uvg_pixel* dst, uvg_pixel* ref, const int height, const int16_t* delta_int, const int pred_mode)
+static void angular_pred_linear_filter_w16_ver_avx2(uvg_pixel* dst, uvg_pixel* ref, const int height, const int16_t* delta_int, const int pred_mode)
 {
   const __m128i v16s = _mm_set1_epi16(16);
   const __m128i vshuf = _mm_setr_epi8(
@@ -1417,7 +1417,7 @@ static void angular_pred_avx2_linear_filter_w16_ver(uvg_pixel* dst, uvg_pixel* r
 }
 
 
-static void angular_pred_avx2_linear_filter_w32_ver(uvg_pixel* dst, uvg_pixel* ref, const int height, const int16_t* delta_int, const int pred_mode)
+static void angular_pred_linear_filter_w32_ver_avx2(uvg_pixel* dst, uvg_pixel* ref, const int height, const int16_t* delta_int, const int pred_mode)
 {
   const __m256i v16s = _mm256_set1_epi16(16);
   const __m256i vshuf = _mm256_setr_epi8(
@@ -1460,7 +1460,7 @@ static void angular_pred_avx2_linear_filter_w32_ver(uvg_pixel* dst, uvg_pixel* r
 }
 
 
-static void angular_pred_avx2_linear_filter_w4_hor(uvg_pixel* dst, uvg_pixel* ref, const int height, const int mode, const int16_t* delta_int)
+static void angular_pred_linear_filter_w4_hor_avx2(uvg_pixel* dst, uvg_pixel* ref, const int height, const int mode, const int16_t* delta_int)
 {
   const int16_t* dint = delta_int;
   const __m128i v16s = _mm_set1_epi16(16);
@@ -1496,7 +1496,7 @@ static void angular_pred_avx2_linear_filter_w4_hor(uvg_pixel* dst, uvg_pixel* re
 }
 
 
-static void angular_pred_avx2_linear_filter_w8_hor(uvg_pixel* dst, uvg_pixel* ref, const int height, const int mode, const int16_t* delta_int)
+static void angular_pred_linear_filter_w8_hor_avx2(uvg_pixel* dst, uvg_pixel* ref, const int height, const int mode, const int16_t* delta_int)
 {
   const int16_t* dint = delta_int;
   const __m128i v16s = _mm_set1_epi16(16);
@@ -1530,7 +1530,7 @@ static void angular_pred_avx2_linear_filter_w8_hor(uvg_pixel* dst, uvg_pixel* re
 }
 
 
-static void angular_pred_avx2_linear_filter_w16_hor(uvg_pixel* dst, uvg_pixel* ref, const int height, const int mode, const int16_t* delta_int)
+static void angular_pred_linear_filter_w16_hor_avx2(uvg_pixel* dst, uvg_pixel* ref, const int height, const int mode, const int16_t* delta_int)
 {
   const int16_t* dint = delta_int;
   const __m128i v16s = _mm_set1_epi16(16);
@@ -1578,7 +1578,7 @@ static void angular_pred_avx2_linear_filter_w16_hor(uvg_pixel* dst, uvg_pixel* r
 }
 
 
-static void angular_pred_avx2_linear_filter_w32_hor(uvg_pixel* dst, uvg_pixel* ref, const int height, const int mode, const int16_t* delta_int)
+static void angular_pred_linear_filter_w32_hor_avx2(uvg_pixel* dst, uvg_pixel* ref, const int height, const int mode, const int16_t* delta_int)
 {
   const int16_t* dint = delta_int;
   const __m128i v16s = _mm_set1_epi16(16);
@@ -1629,7 +1629,7 @@ static void angular_pred_avx2_linear_filter_w32_hor(uvg_pixel* dst, uvg_pixel* r
 }
 
 
-static void angular_pred_avx2_linear_filter_w8_ver_wide_angle(uvg_pixel* dst, uvg_pixel* ref, const int height, const int mode, const int16_t* delta_int, const int16_t* delta_fract)
+static void angular_pred_linear_filter_w8_ver_wide_angle_avx2(uvg_pixel* dst, uvg_pixel* ref, const int height, const int mode, const int16_t* delta_int, const int16_t* delta_fract)
 {
   const int width = 8;
   const int16_t* dint = delta_int;
@@ -1668,7 +1668,7 @@ static void angular_pred_avx2_linear_filter_w8_ver_wide_angle(uvg_pixel* dst, uv
 }
 
 
-static void angular_pred_avx2_linear_filter_w16_ver_wide_angle(uvg_pixel* dst, uvg_pixel* ref, const int height, const int mode, const int16_t* delta_int, const int16_t* delta_fract)
+static void angular_pred_linear_filter_w16_ver_wide_angle_avx2(uvg_pixel* dst, uvg_pixel* ref, const int height, const int mode, const int16_t* delta_int, const int16_t* delta_fract)
 {
   const int width = 16;
   const int16_t* dint = delta_int;
@@ -1703,7 +1703,7 @@ static void angular_pred_avx2_linear_filter_w16_ver_wide_angle(uvg_pixel* dst, u
 }
 
 
-static void angular_pred_avx2_linear_filter_w32_ver_wide_angle(uvg_pixel* dst, uvg_pixel* ref, const int height, const int mode, const int16_t* delta_int, const int16_t* delta_fract)
+static void angular_pred_linear_filter_w32_ver_wide_angle_avx2(uvg_pixel* dst, uvg_pixel* ref, const int height, const int mode, const int16_t* delta_int, const int16_t* delta_fract)
 {
   const int width = 32;
   const int16_t* dint = delta_int;
@@ -1741,7 +1741,7 @@ static void angular_pred_avx2_linear_filter_w32_ver_wide_angle(uvg_pixel* dst, u
 }
 
 
-static void angular_pred_avx2_linear_filter_w4_hor_wide_angle(uvg_pixel* dst, uvg_pixel* ref, const int height, const int mode, const int16_t* delta_int)
+static void angular_pred_linear_filter_w4_hor_wide_angle_avx2(uvg_pixel* dst, uvg_pixel* ref, const int height, const int mode, const int16_t* delta_int)
 {
   const __m128i v16s = _mm_set1_epi16(16);
 
@@ -1788,7 +1788,7 @@ static void angular_pred_avx2_linear_filter_w4_hor_wide_angle(uvg_pixel* dst, uv
 }
 
 
-static void angular_pred_avx2_linear_filter_w8_hor_wide_angle(uvg_pixel* dst, uvg_pixel* ref, const int height, const int mode, const int16_t* delta_int, const int16_t* delta_fract)
+static void angular_pred_linear_filter_w8_hor_wide_angle_avx2(uvg_pixel* dst, uvg_pixel* ref, const int height, const int mode, const int16_t* delta_int, const int16_t* delta_fract)
 {
   const int width = 8;
   const __m128i v16s = _mm_set1_epi16(16);
@@ -1864,7 +1864,7 @@ static void angular_pred_avx2_linear_filter_w8_hor_wide_angle(uvg_pixel* dst, uv
 }
 
 
-static void angular_pred_avx2_linear_filter_w16_hor_wide_angle(uvg_pixel* dst, uvg_pixel* ref, const int height, const int mode, const int16_t* delta_int, const int16_t* delta_fract)
+static void angular_pred_linear_filter_w16_hor_wide_angle_avx2(uvg_pixel* dst, uvg_pixel* ref, const int height, const int mode, const int16_t* delta_int, const int16_t* delta_fract)
 {
   const int width = 16;
   const __m128i v16s = _mm_set1_epi16(16);
@@ -1960,7 +1960,7 @@ static void angular_pred_avx2_linear_filter_w16_hor_wide_angle(uvg_pixel* dst, u
 }
 
 
-static void angular_pred_avx2_linear_filter_hor(uvg_pixel* dst, uvg_pixel* ref, const int width, const int height, const int16_t* delta_int, const int16_t* delta_fract)
+static void angular_pred_linear_filter_hor_avx2(uvg_pixel* dst, uvg_pixel* ref, const int width, const int height, const int16_t* delta_int, const int16_t* delta_fract)
 {
   // 2-tap linear filter
 
@@ -1974,7 +1974,7 @@ static void angular_pred_avx2_linear_filter_hor(uvg_pixel* dst, uvg_pixel* ref, 
 }
 
 
-static void angular_pred_avx2_non_fractional_angle_pxl_copy_ver(uvg_pixel* dst, uvg_pixel* ref, const int width, const int height, const int16_t* delta_int)
+static void angular_pred_non_fractional_angle_pxl_copy_ver_avx2(uvg_pixel* dst, uvg_pixel* ref, const int width, const int height, const int16_t* delta_int)
 {
   // Note: this probably won't work for wide angle modes.
   for (int y = 0; y < height; ++y) {
@@ -1990,7 +1990,7 @@ static void angular_pred_avx2_non_fractional_angle_pxl_copy_ver(uvg_pixel* dst, 
   }
 }
 
-static void angular_pred_avx2_non_fractional_angle_pxl_copy_hor(uvg_pixel* dst, uvg_pixel* ref, const int width, const int height, const int16_t* delta_int)
+static void angular_pred_non_fractional_angle_pxl_copy_hor_avx2(uvg_pixel* dst, uvg_pixel* ref, const int width, const int height, const int16_t* delta_int)
 {
   // TODO: replace this generic solution after testing
   for (int y = 0; y < height; ++y) { 
@@ -3627,11 +3627,11 @@ static void uvg_angular_pred_avx2(
       if (channel_type == 0) {
         if (vertical_mode) {
           switch (width) {
-            case  4: angular_pred_avx2_w4_ver(dst, ref_main, delta_int, delta_fract, height, use_cubic); break;
-            case  8: angular_pred_avx2_w8_ver(dst, ref_main, delta_int, delta_fract, height, use_cubic); break;
-            case 16: angular_pred_avx2_w16_ver(dst, ref_main, delta_int, delta_fract, width, height, use_cubic); break;
-            case 32: angular_pred_avx2_w16_ver(dst, ref_main, delta_int, delta_fract, width, height, use_cubic); break;
-            case 64: angular_pred_avx2_w16_ver(dst, ref_main, delta_int, delta_fract, width, height, use_cubic); break;
+            case  4: angular_pred_w4_ver_avx2(dst, ref_main, delta_int, delta_fract, height, use_cubic); break;
+            case  8: angular_pred_w8_ver_avx2(dst, ref_main, delta_int, delta_fract, height, use_cubic); break;
+            case 16: angular_pred_w16_ver_avx2(dst, ref_main, delta_int, delta_fract, width, height, use_cubic); break;
+            case 32: angular_pred_w16_ver_avx2(dst, ref_main, delta_int, delta_fract, width, height, use_cubic); break;
+            case 64: angular_pred_w16_ver_avx2(dst, ref_main, delta_int, delta_fract, width, height, use_cubic); break;
             default:
               assert(false && "Intra angular predicion: illegal width.\n");
               break;
@@ -3639,11 +3639,11 @@ static void uvg_angular_pred_avx2(
         }
         else {
           switch (width) {
-            case  4: angular_pred_avx2_w4_hor(dst, ref_main, delta_int, delta_fract, height, use_cubic); break;
-            case  8: angular_pred_avx2_w8_hor(dst, ref_main, delta_int, delta_fract, height, use_cubic); break;
-            case 16: angular_pred_avx2_w16_hor(dst, ref_main, delta_int, delta_fract, width, height, use_cubic); break;
-            case 32: angular_pred_avx2_w16_hor(dst, ref_main, delta_int, delta_fract, width, height, use_cubic); break;
-            case 64: angular_pred_avx2_w16_hor(dst, ref_main, delta_int, delta_fract, width, height, use_cubic); break;
+            case  4: angular_pred_w4_hor_avx2(dst, ref_main, delta_int, delta_fract, height, use_cubic); break;
+            case  8: angular_pred_w8_hor_avx2(dst, ref_main, delta_int, delta_fract, height, use_cubic); break;
+            case 16: angular_pred_w16_hor_avx2(dst, ref_main, delta_int, delta_fract, width, height, use_cubic); break;
+            case 32: angular_pred_w16_hor_avx2(dst, ref_main, delta_int, delta_fract, width, height, use_cubic); break;
+            case 64: angular_pred_w16_hor_avx2(dst, ref_main, delta_int, delta_fract, width, height, use_cubic); break;
             default:
               assert(false && "Intra angular predicion: illegal width.\n");
               break;
@@ -3657,10 +3657,10 @@ static void uvg_angular_pred_avx2(
         if (vertical_mode) {
           switch (width) {
           // No wide angle handling for w4 is needed.
-          case  4: angular_pred_avx2_linear_filter_w4_ver(dst, ref_main, height, delta_int, pred_mode); break;
-          case  8: angular_pred_avx2_linear_filter_w8_ver(dst, ref_main, height, delta_int, pred_mode); break;
-          case 16: angular_pred_avx2_linear_filter_w16_ver(dst, ref_main, height, delta_int, pred_mode); break;
-          case 32: angular_pred_avx2_linear_filter_w32_ver(dst, ref_main, height, delta_int, pred_mode); break;
+          case  4: angular_pred_linear_filter_w4_ver_avx2(dst, ref_main, height, delta_int, pred_mode); break;
+          case  8: angular_pred_linear_filter_w8_ver_avx2(dst, ref_main, height, delta_int, pred_mode); break;
+          case 16: angular_pred_linear_filter_w16_ver_avx2(dst, ref_main, height, delta_int, pred_mode); break;
+          case 32: angular_pred_linear_filter_w32_ver_avx2(dst, ref_main, height, delta_int, pred_mode); break;
           default:
             assert(false && "Intra angular predicion: illegal chroma width.\n");
             break;
@@ -3669,9 +3669,9 @@ static void uvg_angular_pred_avx2(
         else {
           if (wide_angle_mode) {
             switch (width) {
-            case  4: angular_pred_avx2_linear_filter_w4_hor_wide_angle(dst, ref_main, height, pred_mode, delta_int); break;
-            case  8: angular_pred_avx2_linear_filter_w8_hor_wide_angle(dst, ref_main, height, pred_mode, delta_int, delta_fract); break;
-            case 16: angular_pred_avx2_linear_filter_w16_hor_wide_angle(dst, ref_main, height, pred_mode, delta_int, delta_fract); break;
+            case  4: angular_pred_linear_filter_w4_hor_wide_angle_avx2(dst, ref_main, height, pred_mode, delta_int); break;
+            case  8: angular_pred_linear_filter_w8_hor_wide_angle_avx2(dst, ref_main, height, pred_mode, delta_int, delta_fract); break;
+            case 16: angular_pred_linear_filter_w16_hor_wide_angle_avx2(dst, ref_main, height, pred_mode, delta_int, delta_fract); break;
             case 32: assert(false && "This code branch only works with UVG_FORMAT_P420."); break; // This branch is never executed with UVG_FORMAT_P420, due to chroma being only 32 width or height.
             default:
               assert(false && "Intra angular predicion: illegal chroma width.\n");
@@ -3680,10 +3680,10 @@ static void uvg_angular_pred_avx2(
           }
           else {
             switch (width) {
-            case  4: angular_pred_avx2_linear_filter_w4_hor(dst, ref_main, height, pred_mode, delta_int); break;
-            case  8: angular_pred_avx2_linear_filter_w8_hor(dst, ref_main, height, pred_mode, delta_int); break;
-            case 16: angular_pred_avx2_linear_filter_w16_hor(dst, ref_main, height, pred_mode, delta_int); break;
-            case 32: angular_pred_avx2_linear_filter_w32_hor(dst, ref_main, height, pred_mode, delta_int); break;
+            case  4: angular_pred_linear_filter_w4_hor_avx2(dst, ref_main, height, pred_mode, delta_int); break;
+            case  8: angular_pred_linear_filter_w8_hor_avx2(dst, ref_main, height, pred_mode, delta_int); break;
+            case 16: angular_pred_linear_filter_w16_hor_avx2(dst, ref_main, height, pred_mode, delta_int); break;
+            case 32: angular_pred_linear_filter_w32_hor_avx2(dst, ref_main, height, pred_mode, delta_int); break;
             default:
               assert(false && "Intra angular predicion: illegal chroma width.\n");
               break;
@@ -3695,10 +3695,10 @@ static void uvg_angular_pred_avx2(
     else {
       // No interpolation or filtering needed, just copy the integer samples
       if (vertical_mode) {
-        angular_pred_avx2_non_fractional_angle_pxl_copy_ver(dst, ref_main, width, height, delta_int);
+        angular_pred_non_fractional_angle_pxl_copy_ver_avx2(dst, ref_main, width, height, delta_int);
       }
       else {
-        angular_pred_avx2_non_fractional_angle_pxl_copy_hor(dst, ref_main, width, height, delta_int);
+        angular_pred_non_fractional_angle_pxl_copy_hor_avx2(dst, ref_main, width, height, delta_int);
       }
     }
   }
