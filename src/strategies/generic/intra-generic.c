@@ -36,7 +36,7 @@
 
 #include "cu.h"
 #include "intra.h"
-#include "mip_data.h"
+#include "strategies/generic/mip_data_generic.h"
 #include "uvg266.h"
 #include "strategyselector.h"
 #include "uvg_math.h"
