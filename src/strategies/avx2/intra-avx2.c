@@ -2202,7 +2202,7 @@ static void angular_pdpc_hor_w16_avx2(uvg_pixel* dst, const uvg_pixel* ref_side,
     for (int x = 0; x < width; x += 16) {
       __m128i vpred = _mm_load_si128((__m128i*)(dst + (y * width + x)));
       __m256i vpred16 = _mm256_cvtepu8_epi16(vpred);
-      __m128i vtop = _mm_load_si128((__m128i*)&ref_side[x + shifted_inv_angle_sum[y] + 1]);
+      __m128i vtop = _mm_loadu_si128((__m128i*)&ref_side[x + shifted_inv_angle_sum[y] + 1]);
       __m256i vtop16 = _mm256_cvtepu8_epi16(vtop);
 
       __m256i accu = _mm256_sub_epi16(vtop16, vpred16);
@@ -3641,7 +3641,7 @@ static void uvg_intra_pred_planar_avx2(const cu_loc_t* const cu_loc,
       __m256i v_tmp = _mm256_packus_epi16(v_res[s + 0], v_res[s + 1]);
       v_tmp = _mm256_permute4x64_epi64(v_tmp, _MM_SHUFFLE(3, 1, 2, 0));
 
-      _mm256_store_si256((__m256i*)&dst[i], v_tmp);
+      _mm256_storeu_si256((__m256i*)&dst[i], v_tmp);
     }
   }
 }
