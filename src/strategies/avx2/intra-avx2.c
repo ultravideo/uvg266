@@ -2853,7 +2853,9 @@ static void uvg_angular_pred_avx2(
     // Set delta table pointers
     const int table_offset = wide_angle_mode ? (pred_mode < 2 ? (pred_mode + 13) * 64 : (81 - pred_mode) * 64) : (pred_mode <= 34 ? (pred_mode - 2) * 64 : (66 - pred_mode) * 64);
     const int16_t* delta_int   = wide_angle_mode ? &delta_int_wide_angle_table[table_offset] : &delta_int_table[table_offset];
+    delta_int += multi_ref_index; // TODO: This are not necessarily large enough for 64 dimension blocks
     const int16_t* delta_fract = wide_angle_mode ? &delta_fract_wide_angle_table[table_offset] : &delta_fract_table[table_offset];
+    delta_fract += multi_ref_index;
 
     // Check if the angle is fractional. If yes, interpolation is needed
     if ((abs(sample_disp) & 0x1F) != 0) {
