@@ -4361,7 +4361,7 @@ static INLINE void mip_reduced_pred_sid0_avx2(uvg_pixel* const output,
 }
 
 // Size ID 1
-void INLINE mip_reduced_pred_sid1_avx2(uvg_pixel* const output,
+static void INLINE mip_reduced_pred_sid1_avx2(uvg_pixel* const output,
   const int16_t* const input,
   const uint16_t* matrix,
   const bool transpose,
@@ -4503,7 +4503,7 @@ void INLINE mip_reduced_pred_sid1_avx2(uvg_pixel* const output,
 }
 
 // Size ID 2
-void INLINE mip_reduced_pred_sid2_avx2(uvg_pixel* const output,
+static void INLINE mip_reduced_pred_sid2_avx2(uvg_pixel* const output,
   const int16_t* const input,
   const uint16_t* matrix,
   const bool transpose,
