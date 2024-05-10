@@ -4657,10 +4657,6 @@ static void INLINE mip_reduced_pred_sid2_avx2(uvg_pixel* const output,
      _mm_storeu_si128((__m128i*)out_ptr, vres8);
       out_ptr += 16;
     }
-
-    //out_ptr[pos_res] = CLIP_TO_PIXEL(((tmp0 + tmp1 + tmp2 + tmp3 + offset) >> MIP_SHIFT_MATRIX) + input_offset);
-    out_ptr += 16;
-    weight += input_size * 4;
   }
 
   if (transpose) {
@@ -4840,7 +4836,7 @@ static void mip_upsampling_w16_ups2_hor_avx2(uvg_pixel* const dst, const uvg_pix
     before[24] = ref_ptr[ref_step * 3];
 
     __m256i vbefore = _mm256_load_si256((__m256i*)before);
-    __m256i vbehind = _mm256_load_si256((__m256i*)src_ptr);
+    __m256i vbehind = _mm256_loadu_si256((__m256i*)src_ptr);
 
     __m256i vavg = _mm256_avg_epu8(vbefore, vbehind);
 
@@ -5074,10 +5070,10 @@ static void mip_upsampling_w32_ups4_hor_avx2_alt(uvg_pixel* const dst, const uvg
     __m256i vtmp2 = _mm256_unpacklo_epi16(left_temp1, right_temp1);
     __m256i vtmp3 = _mm256_unpackhi_epi16(left_temp1, right_temp1);
 
-    _mm256_store_si256((__m256i*)(dst_ptr + dst_step * 0), vtmp0);
-    _mm256_store_si256((__m256i*)(dst_ptr + dst_step * 1), vtmp1);
-    _mm256_store_si256((__m256i*)(dst_ptr + dst_step * 2), vtmp2);
-    _mm256_store_si256((__m256i*)(dst_ptr + dst_step * 3), vtmp3);
+    _mm256_storeu_si256((__m256i*)(dst_ptr + dst_step * 0), vtmp0);
+    _mm256_storeu_si256((__m256i*)(dst_ptr + dst_step * 1), vtmp1);
+    _mm256_storeu_si256((__m256i*)(dst_ptr + dst_step * 2), vtmp2);
+    _mm256_storeu_si256((__m256i*)(dst_ptr + dst_step * 3), vtmp3);
 
     src_ptr += 32;
     ref_ptr += ref_step * 4;
@@ -5773,7 +5769,7 @@ static void mip_upsampling_w16_ups2_ver_avx2(uvg_pixel* const dst, const uvg_pix
   __m128i vbehind6 = _mm_loadu_si128((__m128i*)(src + 192));
   __m128i vbehind7 = _mm_loadu_si128((__m128i*)(src + 224));
 
-  __m128i vbefore0 = _mm_load_si128((__m128i*)ref);
+  __m128i vbefore0 = _mm_loadu_si128((__m128i*)ref);
   __m128i vbefore1 = vbehind0;
   __m128i vbefore2 = vbehind1;
   __m128i vbefore3 = vbehind2;
@@ -6135,14 +6131,14 @@ static void mip_upsampling_w32_ups4_ver_avx2_alt(uvg_pixel* const dst, const uvg
   const uvg_pixel* src_ptr = src;
   const uvg_pixel* dst_ptr = dst;
 
-  __m256i vbefore = _mm256_load_si256((__m256i*)ref);
+  __m256i vbefore = _mm256_loadu_si256((__m256i*)ref);
 
   const __m256i zeros = _mm256_setzero_si256();
   const __m256i ones = _mm256_set1_epi8(1);
   const __m256i threes = _mm256_set1_epi8(3);
 
   for (int i = 0; i < 8; ++i) {
-    __m256i vbehind = _mm256_load_si256((__m256i*)src_ptr);
+    __m256i vbehind = _mm256_loadu_si256((__m256i*)src_ptr);
 
     // Calculate the 3 interpolated lines between before and behind. Top row, middle row and bottom row.
     __m256i vmiddle = _mm256_avg_epu8(vbefore, vbehind);
@@ -6166,9 +6162,9 @@ static void mip_upsampling_w32_ups4_ver_avx2_alt(uvg_pixel* const dst, const uvg
     vbottom = _mm256_sub_epi8(vbottom, sub_amount);
 
     // Store results
-    _mm256_store_si256((__m256i*)(dst_ptr +  0), vtop);
-    _mm256_store_si256((__m256i*)(dst_ptr + 32), vmiddle);
-    _mm256_store_si256((__m256i*)(dst_ptr + 64), vbottom);
+    _mm256_storeu_si256((__m256i*)(dst_ptr +  0), vtop);
+    _mm256_storeu_si256((__m256i*)(dst_ptr + 32), vmiddle);
+    _mm256_storeu_si256((__m256i*)(dst_ptr + 64), vbottom);
 
     vbefore = vbehind;
     src_ptr += 128;
