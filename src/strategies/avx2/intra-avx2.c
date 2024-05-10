@@ -4114,7 +4114,7 @@ static INLINE void mip_ref_downsampling_4x4_4to2_avx2(uvg_pixel* reduced_dst, co
 
   const __m128i vrnd = _mm_set1_epi16(rounding_offset);
 
-  ALIGNED(16) uint32_t ref[2];
+  ALIGNED(16) uint32_t ref[4];
   ref[0] = *(uint32_t*)ref_top;
   ref[1] = *(uint32_t*)ref_left;
 
