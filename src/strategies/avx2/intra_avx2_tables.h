@@ -3,50 +3,35 @@
 
 #include "global.h"
 
-// Test tables
-ALIGNED(32) const int8_t  intra_chroma_linear_interpolation_w4_m40[] = {
-  16,  16,  16,  16,  16,  16,  16,  16,  32,   0,  32,   0,  32,   0,  32,   0,
-};
-
-ALIGNED(32) const int8_t intra_chroma_linear_interpolation_shuffle_w4_m30[] = {
-  0x02, 0x03, 0x01, 0x02, 0x01, 0x02, 0x00, 0x01,
-  0x03, 0x04, 0x02, 0x03, 0x02, 0x03, 0x01, 0x02,
-  0x0a, 0x0b, 0x09, 0x0a, 0x09, 0x0a, 0x08, 0x09,
-  0x0b, 0x0c, 0x0a, 0x0b, 0x0a, 0x0b, 0x09, 0x0a
-};
-
-ALIGNED(32) const int8_t intra_chroma_linear_interpolation_w4_m30_coeff[] = {
-  20, 12,  8, 24, 28, 04, 16, 16, 20, 12,  8, 24, 28, 04, 16, 16,
-};
 
 
 // The number of unique 128-bit coefficient vectors for a given prediction mode. Applicable for width 4 chroma linear interpolation.
-ALIGNED(32) const int8_t coeff_vector128_num_by_mode[33] = {
+static ALIGNED(32) const int8_t coeff_vector128_num_by_mode[33] = {
   1, 16,  8, 16, 4,  8, 1,  8, 4,  8, 2,  8, 4, 16,  8, 16,
   1, 16,  8, 16, 4,  8, 2,  8, 4,  8, 1,  8, 4, 16,  8, 16, 1
 };
 
-ALIGNED(32) const int8_t coeff_vector128_num_by_mode_wide_angle[14] = {
+static ALIGNED(32) const int8_t coeff_vector128_num_by_mode_wide_angle[14] = {
   1, 16,  1,  16,  1,  8,  8, 16,  1, 16, 16, 16, 16, 16
 };
 
 
-ALIGNED(32) const int16_t coeff_table_mode_offsets[33] = {
+static ALIGNED(32) const int16_t coeff_table_mode_offsets[33] = {
   0, 16, 272, 400, 656, 720, 848, 864, 992, 1056, 1184, 1216, 1344, 1408, 1664, 1792, 
   2048, 2064, 2320, 2448, 2704, 2768, 2896, 2928, 3056, 3120, 3248, 3264, 3392, 3456, 3712, 3840, 4096
 };
 
-ALIGNED(32) const int16_t mode_to_weight_table_offset_w4_hor[35] = {
+static ALIGNED(32) const int16_t mode_to_weight_table_offset_w4_hor[35] = {
   0, 0, 0, 16, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 240, 256, 272, 288, 304, 320, 336, 352, 368, 384, 400, 416, 432, 448, 464, 480, 496, 512
 };
 
-ALIGNED(32) const int16_t mode_to_shuffle_vector_table_offset_w4_hor[35] = {
+static ALIGNED(32) const int16_t mode_to_shuffle_vector_table_offset_w4_hor[35] = {
   0, 0, 0, 32, 64, 96, 128, 160, 192, 224, 256, 288, 320, 352, 384, 416, 448, 480, 512, 544, 576, 608, 640, 672, 704, 736, 768, 800, 832, 864, 896, 928, 960, 992, 1024
 };
 
 
 // Index with (mode - 2) * 8 + (y >> 2). The given index will point to the correct place in shuffle vector table.
-ALIGNED(32) const int16_t intra_chroma_linear_interpolation_w4_ver_shuffle_vector_offset[] = {
+static ALIGNED(32) const int16_t intra_chroma_linear_interpolation_w4_ver_shuffle_vector_offset[] = {
     0,   0,   0,   0,   0,   0,   0,   0, // Mode 2
     0,   0,  32,   0,   0,  64,   0,   0, // Mode 3
     0,  64,  32,   0,   0,  64,  32,   0, // Mode 4
@@ -84,7 +69,7 @@ ALIGNED(32) const int16_t intra_chroma_linear_interpolation_w4_ver_shuffle_vecto
 
 
 // Shuffle vectors for w4 vertical. This is indexed based on the shape of delta int table for each mode.
-ALIGNED(32) const int8_t intra_chroma_linear_interpolation_shuffle_vectors_w4_ver[] = {                                                                                                           //  Shape of the delta int table in sets of four
+static ALIGNED(32) const int8_t intra_chroma_linear_interpolation_shuffle_vectors_w4_ver[] = {                                                                                                           //  Shape of the delta int table in sets of four
   0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x05, 0x06, 0x03, 0x04, 0x04, 0x05, 0x05, 0x06, 0x06, 0x07, //  [0, 1, 2, 3]
   0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x05, 0x06, //  [0, 1, 1, 2]
   0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x05, 0x06, //  [0, 0, 1, 2]
@@ -106,7 +91,7 @@ ALIGNED(32) const int8_t intra_chroma_linear_interpolation_shuffle_vectors_w4_ve
 // NOTE: shuffle vectors for w8, w16, and w32 vertical do not exists as they are not needed.
 
 
-ALIGNED(32) const int8_t intra_chroma_linear_interpolation_shuffle_vectors_w4_hor[] = {
+static ALIGNED(32) const int8_t intra_chroma_linear_interpolation_shuffle_vectors_w4_hor[] = {
   0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,  // Mode 2
   0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05,
   0x08, 0x09, 0x09, 0x0a, 0x0a, 0x0b, 0x0b, 0x0c,
@@ -242,7 +227,7 @@ ALIGNED(32) const int8_t intra_chroma_linear_interpolation_shuffle_vectors_w4_ho
 };
 
 
-ALIGNED(32) const int8_t intra_chroma_linear_interpolation_shuffle_vectors_w8_hor[] = {
+static ALIGNED(32) const int8_t intra_chroma_linear_interpolation_shuffle_vectors_w8_hor[] = {
   0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x05, 0x06, 0x06, 0x07, 0x07, 0x08,  // Mode 2
   0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x05, 0x06, 0x06, 0x07, 0x07, 0x08, 0x08, 0x09,
   0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x05, 0x06, 0x06, 0x07, 0x07, 0x08,  // Mode 3
@@ -312,7 +297,7 @@ ALIGNED(32) const int8_t intra_chroma_linear_interpolation_shuffle_vectors_w8_ho
 };
 
 
-ALIGNED(32) const int8_t intra_chroma_linear_interpolation_shuffle_vectors_w16_hor[] = {
+static ALIGNED(32) const int8_t intra_chroma_linear_interpolation_shuffle_vectors_w16_hor[] = {
   0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x05, 0x06, 0x06, 0x07, 0x07, 0x08,  // Mode 2
   0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x05, 0x06, 0x06, 0x07, 0x07, 0x08,
   0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x05, 0x06, 0x06, 0x07, 0x07, 0x08, 0x08, 0x09,
@@ -448,7 +433,7 @@ ALIGNED(32) const int8_t intra_chroma_linear_interpolation_shuffle_vectors_w16_h
 };
 
 
-ALIGNED(32) const int8_t intra_chroma_linear_interpolation_shuffle_vectors_w32_hor[] = {
+static ALIGNED(32) const int8_t intra_chroma_linear_interpolation_shuffle_vectors_w32_hor[] = {
   0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x05, 0x06, 0x06, 0x07, 0x07, 0x08, 0x08, 0x09, 0x09, 0x0a, 0x0a, 0x0b, 0x0b, 0x0c, 0x0c, 0x0d, 0x0d, 0x0e, 0x0e, 0x0f, 0x0f, 0x10,  // Mode 2
   0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x05, 0x06, 0x06, 0x07, 0x07, 0x08, 0x08, 0x09, 0x09, 0x0a, 0x0a, 0x0b, 0x0b, 0x0c, 0x0c, 0x0d, 0x0d, 0x0e, 0x0e, 0x0f, 0x0f, 0x10,
   0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x05, 0x06, 0x06, 0x07, 0x07, 0x08, 0x08, 0x09, 0x09, 0x0a, 0x09, 0x0a, 0x0a, 0x0b, 0x0b, 0x0c, 0x0c, 0x0d, 0x0d, 0x0e, 0x0e, 0x0f,  // Mode 3
@@ -519,7 +504,7 @@ ALIGNED(32) const int8_t intra_chroma_linear_interpolation_shuffle_vectors_w32_h
 
 
 // Chroma linear interpolation filter weights for width 8, vertical modes. These also work for w16 and w32.
-ALIGNED(32) const int8_t intra_chroma_linear_interpolation_weights_w8_ver[] = {
+static ALIGNED(32) const int8_t intra_chroma_linear_interpolation_weights_w8_ver[] = {
   32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0,   // Mode 2
    3, 29,  6, 26,  9, 23, 12, 20, 15, 17, 18, 14, 21, 11, 24,  8, 27,  5, 30,  2,  1, 31,  4, 28,  7, 25, 10, 22, 13, 19, 16, 16, 19, 13, 22, 10, 25,  7, 28,  4, 31,  1,  2, 30,  5, 27,  8, 24, 11, 21, 14, 18, 17, 15, 20, 12, 23,  9, 26,  6, 29,  3, 32,  0,   // Mode 3
    6, 26, 12, 20, 18, 14, 24,  8, 30,  2,  4, 28, 10, 22, 16, 16, 22, 10, 28,  4,  2, 30,  8, 24, 14, 18, 20, 12, 26,  6, 32,  0,  6, 26, 12, 20, 18, 14, 24,  8, 30,  2,  4, 28, 10, 22, 16, 16, 22, 10, 28,  4,  2, 30,  8, 24, 14, 18, 20, 12, 26,  6, 32,  0,   // Mode 4
@@ -556,7 +541,7 @@ ALIGNED(32) const int8_t intra_chroma_linear_interpolation_weights_w8_ver[] = {
 };
 
 // Chroma linear interpolation filter weights for width 8, vertical wide angle modes. These also work for w16 and w32.
-ALIGNED(32) const int8_t intra_chroma_linear_interpolation_weights_w8_ver_wide_angle[] = {
+static ALIGNED(32) const int8_t intra_chroma_linear_interpolation_weights_w8_ver_wide_angle[] = {
   32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0,   // Mode -12  Offset 0
   11, 21, 22, 10,  1, 31, 12, 20, 23,  9,  2, 30, 13, 19, 24,  8,  3, 29, 14, 18, 25,  7,  4, 28, 15, 17, 26,  6,  5, 27, 16, 16, 27,  5,  6, 26, 17, 15, 28,  4,  7, 25, 18, 14, 29,  3,  8, 24, 19, 13, 30,  2,  9, 23, 20, 12, 31,  1, 10, 22, 21, 11, 32,  0,   // Mode -11  Offset 64
   32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0,   // Mode -10  Offset 128
@@ -574,7 +559,7 @@ ALIGNED(32) const int8_t intra_chroma_linear_interpolation_weights_w8_ver_wide_a
 };
 
 // Chroma linear interpolation filter weights for width 4, horizontal modes
-ALIGNED(32) const int8_t intra_chroma_linear_interpolation_weights_w4_hor[] = {
+static ALIGNED(32) const int8_t intra_chroma_linear_interpolation_weights_w4_hor[] = {
   32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0,   // Mode 2
    3, 29,  6, 26,  9, 23, 12, 20,  3, 29,  6, 26,  9, 23, 12, 20,   // Mode 3
    6, 26, 12, 20, 18, 14, 24,  8,  6, 26, 12, 20, 18, 14, 24,  8,   // Mode 4
@@ -612,7 +597,7 @@ ALIGNED(32) const int8_t intra_chroma_linear_interpolation_weights_w4_hor[] = {
 
 
 // Chroma linear interpolation filter weights for width 8, horizontal modes
-ALIGNED(32) const int8_t intra_chroma_linear_interpolation_weights_w8_hor[] = {
+static ALIGNED(32) const int8_t intra_chroma_linear_interpolation_weights_w8_hor[] = {
   32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0,   // Mode 2
    3, 29,  6, 26,  9, 23, 12, 20, 15, 17, 18, 14, 21, 11, 24,  8,   // Mode 3
    6, 26, 12, 20, 18, 14, 24,  8, 30,  2,  4, 28, 10, 22, 16, 16,   // Mode 4
@@ -650,7 +635,7 @@ ALIGNED(32) const int8_t intra_chroma_linear_interpolation_weights_w8_hor[] = {
 
 
 // Chroma linear interpolation filter weights for width 16, horizontal modes.
-ALIGNED(32) const int8_t intra_chroma_linear_interpolation_weights_w16_hor[] = {
+static ALIGNED(32) const int8_t intra_chroma_linear_interpolation_weights_w16_hor[] = {
   32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0,   // Mode 2
    3, 29,  6, 26,  9, 23, 12, 20, 15, 17, 18, 14, 21, 11, 24,  8, 27,  5, 30,  2,  1, 31,  4, 28,  7, 25, 10, 22, 13, 19, 16, 16,   // Mode 3
    6, 26, 12, 20, 18, 14, 24,  8, 30,  2,  4, 28, 10, 22, 16, 16, 22, 10, 28,  4,  2, 30,  8, 24, 14, 18, 20, 12, 26,  6, 32,  0,   // Mode 4
@@ -688,7 +673,7 @@ ALIGNED(32) const int8_t intra_chroma_linear_interpolation_weights_w16_hor[] = {
 
 
 // Chroma linear interpolation filter weights for width 32, horizontal modes.
-ALIGNED(32) const int8_t intra_chroma_linear_interpolation_weights_w32_hor[] = {
+static ALIGNED(32) const int8_t intra_chroma_linear_interpolation_weights_w32_hor[] = {
   32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0,   // Mode 2
    3, 29,  6, 26,  9, 23, 12, 20, 15, 17, 18, 14, 21, 11, 24,  8, 27,  5, 30,  2,  1, 31,  4, 28,  7, 25, 10, 22, 13, 19, 16, 16, 19, 13, 22, 10, 25,  7, 28,  4, 31,  1,  2, 30,  5, 27,  8, 24, 11, 21, 14, 18, 17, 15, 20, 12, 23,  9, 26,  6, 29,  3, 32,  0,   // Mode 3
    6, 26, 12, 20, 18, 14, 24,  8, 30,  2,  4, 28, 10, 22, 16, 16, 22, 10, 28,  4,  2, 30,  8, 24, 14, 18, 20, 12, 26,  6, 32,  0,  6, 26, 12, 20, 18, 14, 24,  8, 30,  2,  4, 28, 10, 22, 16, 16, 22, 10, 28,  4,  2, 30,  8, 24, 14, 18, 20, 12, 26,  6, 32,  0,   // Mode 4
@@ -726,7 +711,7 @@ ALIGNED(32) const int8_t intra_chroma_linear_interpolation_weights_w32_hor[] = {
 
 
 // Chroma linear interpolation filter weights for width 4, vertical modes.
-ALIGNED(32) const int8_t intra_chroma_linear_interpolation_weights_w4_ver[4112] = {
+static ALIGNED(32) const int8_t intra_chroma_linear_interpolation_weights_w4_ver[4112] = {
   32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0,  // Mode 2 Offset 0
    3, 29,  3, 29,  3, 29,  3, 29,  6, 26,  6, 26,  6, 26,  6, 26,  // Mode 3 Offset 16
    9, 23,  9, 23,  9, 23,  9, 23, 12, 20, 12, 20, 12, 20, 12, 20,
@@ -988,7 +973,7 @@ ALIGNED(32) const int8_t intra_chroma_linear_interpolation_weights_w4_ver[4112] 
 
 
 // Chroma linear interpolation filter weights for width 4, wide angle vertical modes.
-ALIGNED(32) const int8_t intra_chroma_linear_interpolation_weights_w4_ver_wide_angle[2368] = {
+static ALIGNED(32) const int8_t intra_chroma_linear_interpolation_weights_w4_ver_wide_angle[2368] = {
   32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0,  // Mode -12 Offset 0
   11, 21, 11, 21, 11, 21, 11, 21, 22, 10, 22, 10, 22, 10, 22, 10,  // Mode -11 Offset 16
    1, 31,  1, 31,  1, 31,  1, 31, 12, 20, 12, 20, 12, 20, 12, 20,
@@ -1161,7 +1146,7 @@ ALIGNED(32) const int8_t intra_chroma_linear_interpolation_weights_w4_ver_wide_a
 
 // NOTE: this table can also be used by horizontal w4 and w8 wide angle functions since their tables are just a subset of this one.
 // Chroma linear interpolation filter weights for width 4, horizontal wide angle modes.
-ALIGNED(32) const int8_t intra_chroma_linear_interpolation_weights_w16_hor_wide_angle[] = {
+static ALIGNED(32) const int8_t intra_chroma_linear_interpolation_weights_w16_hor_wide_angle[] = {
   32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0,   // Mode -12
   32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0,
   32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0, 32,  0,
@@ -1278,7 +1263,7 @@ ALIGNED(32) const int8_t intra_chroma_linear_interpolation_weights_w16_hor_wide_
 
 
 // Weights for intra pdpc w4 horizontal.
-ALIGNED(32) const int16_t intra_pdpc_w4_hor_weight[] = {
+static ALIGNED(32) const int16_t intra_pdpc_w4_hor_weight[] = {
   32, 32, 32, 32,  8,  8,  8,  8,  2,  2,  2,  2,  0,  0,  0,  0,  // Scale 0
    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
@@ -1295,7 +1280,7 @@ ALIGNED(32) const int16_t intra_pdpc_w4_hor_weight[] = {
 
 
 // Weights for intra pdpc w8 horizontal.
-ALIGNED(32) const int16_t intra_pdpc_w8_hor_weight[] = {
+static ALIGNED(32) const int16_t intra_pdpc_w8_hor_weight[] = {
   32, 32, 32, 32, 32, 32, 32, 32,  8,  8,  8,  8,  8,  8,  8,  8,  // Scale 0
    2,  2,  2,  2,  2,  2,  2,  2,  0,  0,  0,  0,  0,  0,  0,  0,
    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
@@ -1324,7 +1309,7 @@ ALIGNED(32) const int16_t intra_pdpc_w8_hor_weight[] = {
 
 
 // Weights for intra pdpc w4 vertical.
-ALIGNED(32) const int16_t intra_pdpc_w4_ver_weight[] = {
+static ALIGNED(32) const int16_t intra_pdpc_w4_ver_weight[] = {
   32,  8,  2,  0, 32,  8,  2,  0, 32,  8,  2,  0, 32,  8,  2,  0,  // Scale 0
   32, 16,  8,  4, 32, 16,  8,  4, 32, 16,  8,  4, 32, 16,  8,  4,  // Scale 1
   32, 32, 16, 16, 32, 32, 16, 16, 32, 32, 16, 16, 32, 32, 16, 16,  // Scale 2
@@ -1332,7 +1317,7 @@ ALIGNED(32) const int16_t intra_pdpc_w4_ver_weight[] = {
 
 
 // Weights for intra pdpc w8 vertical.
-ALIGNED(32) const int16_t intra_pdpc_w8_ver_weight[] = {
+static ALIGNED(32) const int16_t intra_pdpc_w8_ver_weight[] = {
   32,  8,  2,  0,  0,  0,  0,  0, 32,  8,  2,  0,  0,  0,  0,  0,  // Scale 0
   32, 16,  8,  4,  2,  1,  0,  0, 32, 16,  8,  4,  2,  1,  0,  0,  // Scale 1
   32, 32, 16, 16,  8,  8,  4,  4, 32, 32, 16, 16,  8,  8,  4,  4,  // Scale 2
@@ -1340,7 +1325,7 @@ ALIGNED(32) const int16_t intra_pdpc_w8_ver_weight[] = {
 
 
 // Weights for intra pdpc w16 vertical.
-ALIGNED(32) const int16_t intra_pdpc_w16_ver_weight[] = {
+static ALIGNED(32) const int16_t intra_pdpc_w16_ver_weight[] = {
   32,  8,  2,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  // Scale 0
   32, 16,  8,  4,  2,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  // Scale 1
   32, 32, 16, 16,  8,  8,  4,  4,  2,  2,  1,  1,  0,  0,  0,  0,  // Scale 2
@@ -1349,7 +1334,7 @@ ALIGNED(32) const int16_t intra_pdpc_w16_ver_weight[] = {
 
 // Pre-calculated shifted inverse angle sums for pdpc for y- and x-values [0, 64]. Grouped by mode_disp.
 // Index by y or x based on pdpc direction.
-ALIGNED(32) const int16_t intra_pdpc_shifted_inv_angle_sum[] = {
+static ALIGNED(32) const int16_t intra_pdpc_shifted_inv_angle_sum[] = {
    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,  // Mode disp 0
    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,
   32,   64,   96,  128,  160,  192,  224,  256,  288,  320,  352,  384,  416,  448,  480,  512,  544,  576,  608,  640,  672,  704,  736,  768,  800,  832,  864,  896,  928,  960,  992, 1024,  // Mode disp 1
@@ -1420,7 +1405,7 @@ ALIGNED(32) const int16_t intra_pdpc_shifted_inv_angle_sum[] = {
 // TODO: prune this table. These is a ton of duplicates. Pruning may introduce some extra logic, but it will save a lot of space and probably speed up memory access.
 // NOTE: The vectors from this table can be only used up from mode disp 6. The reference samples are too sparse for vectorized shuffle below mode disp 6.
 // Shuffle vectors for w4 horizontal pdpc.
-ALIGNED(32) const int8_t intra_pdpc_shuffle_vectors_w4_hor[] = {
+static ALIGNED(32) const int8_t intra_pdpc_shuffle_vectors_w4_hor[] = {
   0x000, 0x001, 0x002, 0x003, 0x000, 0x001, 0x002, 0x003, 0x000, 0x001, 0x002, 0x003, 0x000, 0x001, 0x002, 0x003,  // Mode disp 0
   0x000, 0x001, 0x002, 0x003, 0x000, 0x001, 0x002, 0x003, 0x000, 0x001, 0x002, 0x003, 0x000, 0x001, 0x002, 0x003,
   0x000, 0x001, 0x002, 0x003, 0x000, 0x001, 0x002, 0x003, 0x000, 0x001, 0x002, 0x003, 0x000, 0x001, 0x002, 0x003,
@@ -1937,7 +1922,7 @@ ALIGNED(32) const int8_t intra_pdpc_shuffle_vectors_w4_hor[] = {
 
 
 // Shuffle vectors for w4 vertical pdpc.
-ALIGNED(32) const int8_t intra_pdpc_shuffle_vectors_w4_ver[] = {
+static ALIGNED(32) const int8_t intra_pdpc_shuffle_vectors_w4_ver[] = {
   0x000, 0x000, 0x000, 0x000, 0x001, 0x001, 0x001, 0x001, 0x002, 0x002, 0x002, 0x002, 0x003, 0x003, 0x003, 0x003,  // Mode disp 0
   0x000, 0x020, 0x040, 0x060, 0x001, 0x021, 0x041, 0x061, 0x002, 0x022, 0x042, 0x062, 0x003, 0x023, 0x043, 0x063,  // Mode disp 1
   0x000, 0x010, 0x020, 0x030, 0x001, 0x011, 0x021, 0x031, 0x002, 0x012, 0x022, 0x032, 0x003, 0x013, 0x023, 0x033,  // Mode disp 2
@@ -1975,7 +1960,7 @@ ALIGNED(32) const int8_t intra_pdpc_shuffle_vectors_w4_ver[] = {
 
 // Shuffle vectors for 8x2 scale 1 vertical pdpc. 0xfff entries are "don't care", those will be zeroed out by zero weights
 // These are basically same as the 8x2 scale2 vectors, but with added "don't care" entries. This table can be safely removed.
-ALIGNED(32) const int8_t intra_pdpc_shuffle_vectors_8x2_scale1_ver[] = {
+static ALIGNED(32) const int8_t intra_pdpc_shuffle_vectors_8x2_scale1_ver[] = {
   0x000, 0x000, 0x000, 0x000, 0x000, 0x000, 0xfff, 0xfff, 0x001, 0x001, 0x001, 0x001, 0x001, 0x001, 0xfff, 0xfff,  // Mode disp 0
   0x000, 0x020, 0x040, 0x060, 0x080, 0x0a0, 0xfff, 0xfff, 0x001, 0x021, 0x041, 0x061, 0x081, 0x0a1, 0xfff, 0xfff,  // Mode disp 1
   0x000, 0x010, 0x020, 0x030, 0x040, 0x050, 0xfff, 0xfff, 0x001, 0x011, 0x021, 0x031, 0x041, 0x051, 0xfff, 0xfff,  // Mode disp 2
@@ -2012,7 +1997,7 @@ ALIGNED(32) const int8_t intra_pdpc_shuffle_vectors_8x2_scale1_ver[] = {
 
 
 // Shuffle vectors for 8x2 scale 2 vertical pdpc.
-ALIGNED(32) const int8_t intra_pdpc_shuffle_vectors_8x2_scale2_ver[] = {
+static ALIGNED(32) const int8_t intra_pdpc_shuffle_vectors_8x2_scale2_ver[] = {
   0x000, 0x000, 0x000, 0x000, 0x000, 0x000, 0x000, 0x000, 0x001, 0x001, 0x001, 0x001, 0x001, 0x001, 0x001, 0x001,  // Mode disp 0   -- Unused
   0x000, 0x020, 0x040, 0x060, 0x080, 0x0a0, 0x0c0, 0x0e0, 0x001, 0x021, 0x041, 0x061, 0x081, 0x0a1, 0x0c1, 0x0e1,  // Mode disp 1   *
   0x000, 0x010, 0x020, 0x030, 0x040, 0x050, 0x060, 0x070, 0x001, 0x011, 0x021, 0x031, 0x041, 0x051, 0x061, 0x071,  // Mode disp 2   *
@@ -2049,7 +2034,7 @@ ALIGNED(32) const int8_t intra_pdpc_shuffle_vectors_8x2_scale2_ver[] = {
 
 
 // Shuffle vectors for w16 scale 2 vertical pdpc.
-ALIGNED(32) const int8_t intra_pdpc_shuffle_vectors_w16_scale2_ver[] = {
+static ALIGNED(32) const int8_t intra_pdpc_shuffle_vectors_w16_scale2_ver[] = {
   0x000, 0x000, 0x000, 0x000, 0x000, 0x000, 0x000, 0x000, 0x000, 0x000, 0x000, 0x000, 0x000, 0x000, 0x000, 0x000,  // Mode disp 0   -- Unused
   0x000, 0x020, 0x040, 0x060, 0x080, 0x0a0, 0x0c0, 0x0e0, 0x100, 0x120, 0x140, 0x160, 0x180, 0x1a0, 0x1c0, 0x1e0,  // Mode disp 1   *
   0x000, 0x010, 0x020, 0x030, 0x040, 0x050, 0x060, 0x070, 0x080, 0x090, 0x0a0, 0x0b0, 0x0c0, 0x0d0, 0x0e0, 0x0f0,  // Mode disp 2   *
