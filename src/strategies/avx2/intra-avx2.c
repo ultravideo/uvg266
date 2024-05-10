@@ -4657,6 +4657,7 @@ static void INLINE mip_reduced_pred_sid2_avx2(uvg_pixel* const output,
      _mm_storeu_si128((__m128i*)out_ptr, vres8);
       out_ptr += 16;
     }
+    weight += input_size * 4;
   }
 
   if (transpose) {
