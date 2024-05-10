@@ -551,7 +551,7 @@ static void angular_pred_w8_hor_avx2(uvg_pixel* dst, const uvg_pixel* ref_main, 
     }
   }
 
-  __m128i tmp = _mm_load_si128((__m128i*)delta_int);
+  __m128i tmp = _mm_loadu_si128((__m128i*)delta_int);
   __m256i vidx = _mm256_cvtepi16_epi32(tmp);
   __m256i weights = _mm256_loadu_si256((__m256i*)f);
 
@@ -598,8 +598,8 @@ static void angular_pred_w16_hor_avx2(uvg_pixel* dst, const uvg_pixel* ref_main,
   }
 
   for (int x = 0; x < width; x += 16) {
-    __m128i tmp0 = _mm_load_si128((__m128i*)&delta_int[x]);
-    __m128i tmp1 = _mm_load_si128((__m128i*)&delta_int[x + 8]);
+    __m128i tmp0 = _mm_loadu_si128((__m128i*)&delta_int[x]);
+    __m128i tmp1 = _mm_loadu_si128((__m128i*)&delta_int[x + 8]);
     __m256i vidx0 = _mm256_cvtepi16_epi32(tmp0);
     __m256i vidx1 = _mm256_cvtepi16_epi32(tmp1);
 
