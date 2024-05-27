@@ -62,7 +62,7 @@ void uvg_scalinglist_init(scaling_list_t * const scaling_list);
 void uvg_scalinglist_destroy(scaling_list_t * const scaling_list);
 
 int  uvg_scalinglist_parse(scaling_list_t * const scaling_list, FILE *fp);
-void uvg_scalinglist_process(scaling_list_t *scaling_list, uint8_t bitdepth);
+void uvg_scalinglist_process(scaling_list_t * const scaling_list, uint8_t bitdepth);
 
 
 

@@ -47,8 +47,8 @@
 struct encoder_state_t;
 
 
-int uvg_encoder_state_init(struct encoder_state_t * child_state, struct encoder_state_t * parent_state);
-void uvg_encoder_state_finalize(struct encoder_state_t *state);
+int uvg_encoder_state_init(struct encoder_state_t *const child_state, struct encoder_state_t *const parent_state);
+void uvg_encoder_state_finalize(struct encoder_state_t *const state);
 
 
 #endif // ENCODER_STATE_CTORS_DTORS_H_

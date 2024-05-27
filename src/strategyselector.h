@@ -96,7 +96,7 @@ extern hardware_flags_t uvg_g_strategies_in_use;
 extern hardware_flags_t uvg_g_strategies_available;
 
 int uvg_strategyselector_init(int32_t cpuid, uint8_t bitdepth);
-int uvg_strategyselector_register(void *opaque, const char *type, const char *strategy_name, int priority, void *fptr);
+int uvg_strategyselector_register(void *opaque, const char *type, const char *const strategy_name, int priority, void *const fptr);
 
 
 //Strategy to include

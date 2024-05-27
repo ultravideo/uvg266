@@ -82,7 +82,7 @@ void uvg_sort_modes_intra_luma(int8_t *__restrict modes, int8_t *__restrict traf
 
 void uvg_sort_keys_by_cost(unit_stats_map_t *__restrict map);
 
-void uvg_search_lcu(encoder_state_t *state, int x, int y, const yuv_t *hor_buf, const yuv_t *ver_buf, lcu_coeff_t *coeff);
+void uvg_search_lcu(encoder_state_t *const state, const int x, const int y, const yuv_t *const hor_buf, const yuv_t *const ver_buf, lcu_coeff_t *coeff);
 
 double uvg_cu_rd_cost_luma(
   const encoder_state_t *const state,

@@ -1656,15 +1656,12 @@ static bool merge_candidate_in_list(inter_merge_cand_t *all_cands,
  * \brief Collect PU parameters and costs at this depth.
  *
  * \param state       encoder state
- * \param x_cu        x-coordinate of the containing CU
- * \param y_cu        y-coordinate of the containing CU
- * \param depth       depth of the CU in the quadtree
- * \param part_mode   partition mode of the CU
- * \param i_pu        index of the PU in the CU
+ * \param cu_loc      Size and location of current cu
  * \param lcu         containing LCU
  *
  * \param amvp        Return searched AMVP PUs sorted by costs
  * \param merge       Return searched Merge PUs sorted by costs
+ * \param info        Information related to inter search
  */
 static void search_pu_inter(
   encoder_state_t * const state,
@@ -2109,13 +2106,13 @@ static void search_pu_inter(
 * for both luma and chroma if enabled.
 *
 * \param state       encoder state
-* \param x           x-coordinate of the CU
-* \param y           y-coordinate of the CU
-* \param depth       depth of the CU in the quadtree
+* \param cur_cu      Coding information related to current cu
 * \param lcu         containing LCU
 *
 * \param inter_cost    Return inter cost
 * \param inter_bitcost Return inter bitcost
+*
+* \param cu_loc      Size and location of current cu
 */
 void uvg_cu_cost_inter_rd2(
   encoder_state_t * const state,
@@ -2300,13 +2297,9 @@ void uvg_cu_cost_inter_rd2(
 /**
  * \brief Update CU to have best modes at this depth.
  *
- * Only searches the 2Nx2N partition mode.
  *
  * \param state       encoder state
- * \param x           x-coordinate of the CU
- * \param y           y-coordinate of the CU
- * \param depth       depth of the CU in the quadtree
- * \param lcu         containing LCU
+ * \param cu_loc      The position and size of the current cu
  *
  * \param inter_cost    Return inter cost
  * \param inter_bitcost Return inter bitcost

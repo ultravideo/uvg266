@@ -135,22 +135,22 @@ extern const uint8_t uvg_g_auc_renorm_table[32];
 
 
 // Functions
-void uvg_cabac_start(cabac_data_t *data);
-void uvg_cabac_encode_bin(cabac_data_t *data, uint32_t bin_value);
-void uvg_cabac_encode_bin_ep(cabac_data_t *data, uint32_t bin_value);
-void uvg_cabac_encode_trunc_bin(cabac_data_t *data, uint32_t bin_value, uint32_t max_value, double* bits_out);
-void uvg_cabac_encode_bins_ep(cabac_data_t *data, uint32_t bin_values, int num_bins);
-void uvg_cabac_encode_bin_trm(cabac_data_t *data, uint8_t bin_value);
-void uvg_cabac_write(cabac_data_t *data);
-void uvg_cabac_finish(cabac_data_t *data);
-int uvg_cabac_write_coeff_remain(cabac_data_t *cabac, uint32_t symbol,
-                              uint32_t r_param, const unsigned int cutoff);
-uint32_t uvg_cabac_write_ep_ex_golomb(struct encoder_state_t * const state, cabac_data_t *data,
+void uvg_cabac_start(cabac_data_t *const data);
+void uvg_cabac_encode_bin(cabac_data_t *const data, const uint32_t bin_value);
+void uvg_cabac_encode_bin_ep(cabac_data_t *const data, const uint32_t bin_value);
+void uvg_cabac_encode_trunc_bin(cabac_data_t *const data, const uint32_t bin_value, const uint32_t max_value, double* bits_out);
+void uvg_cabac_encode_bins_ep(cabac_data_t *const data, uint32_t bin_values, int num_bins);
+void uvg_cabac_encode_bin_trm(cabac_data_t *const data, const uint8_t bin_value);
+void uvg_cabac_write(cabac_data_t *const data);
+void uvg_cabac_finish(cabac_data_t *const data);
+int uvg_cabac_write_coeff_remain(cabac_data_t *const cabac, const uint32_t symbol,
+                              const uint32_t r_param, const unsigned int cutoff);
+uint32_t uvg_cabac_write_ep_ex_golomb(struct encoder_state_t * const state, cabac_data_t *const data,
                 uint32_t symbol, uint32_t count);
-void uvg_cabac_write_unary_max_symbol(cabac_data_t *data, cabac_ctx_t *ctx,
-                                      uint32_t symbol, int32_t offset,
-                                      uint32_t max_symbol, double* bits_out);
-void uvg_cabac_write_unary_max_symbol_ep(cabac_data_t *data, unsigned int symbol, unsigned int max_symbol);
+void uvg_cabac_write_unary_max_symbol(cabac_data_t *const data, cabac_ctx_t *const ctx,
+                                      uint32_t symbol, const int32_t offset,
+                                      const uint32_t max_symbol, double* bits_out);
+void uvg_cabac_write_unary_max_symbol_ep(cabac_data_t *const data, unsigned int symbol, const unsigned int max_symbol);
 
 #define CTX_PROB_BITS 15
 #define CTX_PROB_BITS_0 10

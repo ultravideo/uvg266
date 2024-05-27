@@ -100,6 +100,6 @@ typedef struct videoframe
 videoframe_t *uvg_videoframe_alloc(int32_t width, int32_t height, enum uvg_chroma_format chroma_format, enum uvg_alf alf_type, bool cclm);
 int uvg_videoframe_free(videoframe_t * const frame);
 
-void uvg_videoframe_set_poc(videoframe_t * frame, int32_t poc);
+void uvg_videoframe_set_poc(videoframe_t *const frame, const int32_t poc);
 
 #endif

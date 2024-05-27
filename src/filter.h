@@ -51,6 +51,6 @@ typedef enum edge_dir {
 } edge_dir;
 
 
-void uvg_filter_deblock_lcu(encoder_state_t *state, int x_px, int y_px);
+void uvg_filter_deblock_lcu(encoder_state_t *const state, int x_px, int y_px);
 
 #endif

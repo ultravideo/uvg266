@@ -50,8 +50,8 @@ extern const int16_t uvg_g_quant_scales[2][6];
 #define COEFF_ORDER_LINEAR 0
 #define COEFF_ORDER_CU 1
 
-void uvg_transformskip(const encoder_control_t *encoder, int16_t *block,int16_t *coeff, int8_t width, int8_t height);
-void uvg_itransformskip(const encoder_control_t *encoder, int16_t *block,int16_t *coeff, int8_t width, int8_t height);
+void uvg_transformskip(const encoder_control_t *const encoder, int16_t *block,int16_t *coeff, int8_t width, int8_t height);
+void uvg_itransformskip(const encoder_control_t *const encoder, int16_t *block,int16_t *coeff, int8_t width, int8_t height);
 
 void uvg_transform2d(const encoder_control_t * const encoder,
                      int16_t *block,
@@ -95,9 +95,9 @@ typedef struct {
 } uvg_chorma_ts_out_t;
 
 void uvg_quantize_lcu_residual(
-  encoder_state_t *state,
-  bool luma,
-  bool chroma,
+  encoder_state_t *const state,
+  const bool luma,
+  const bool chroma,
   const bool jccr,
   const cu_loc_t* cu_loc,
   cu_info_t *cur_cu,

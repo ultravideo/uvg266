@@ -365,15 +365,12 @@ static void inter_cp_with_ext_border(const uvg_pixel *ref_buf, int ref_stride,
  *
  * \param state          encoder state
  * \param ref            picture to copy the data from
- * \param pu_x           PU x position
- * \param pu_y           PU y position
- * \param width          PU width
- * \param height         PU height
  * \param mv_param       motion vector
  * \param yuv_px         destination buffer for pixel precision
  * \param yuv_im         destination buffer for high-precision, or NULL if not needed
  * \param predict_luma   Enable or disable luma prediction for this call.
  * \param predict_chroma Enable or disable chroma prediction for this call.
+ * \param cu_loc         Size and position of current PU/CU
 */
 static unsigned inter_recon_unipred(
   const encoder_state_t * const state,
@@ -501,14 +498,11 @@ static unsigned inter_recon_unipred(
  * \param state          encoder state
  * \param ref1           reference picture to copy the data from
  * \param ref2           other reference picture to copy the data from
- * \param pu_x           PU x position
- * \param pu_y           PU y position
- * \param width          PU width
- * \param height         PU height
  * \param mv_param       motion vectors
  * \param lcu            destination lcu
  * \param predict_luma   Enable or disable luma prediction for this call.
  * \param predict_chroma Enable or disable chroma prediction for this call.
+ * \param cu_loc         Size and position of current PU/CU
  */
 void uvg_inter_recon_bipred(
   const encoder_state_t *const state,
@@ -578,11 +572,9 @@ void uvg_inter_recon_bipred(
  *
  * \param state   encoder state
  * \param lcu     containing LCU
- * \param x       x-coordinate of the CU in pixels
- * \param y       y-coordinate of the CU in pixels
- * \param width   CU width
  * \param predict_luma   Enable or disable luma prediction for this call.
  * \param predict_chroma Enable or disable chroma prediction for this call.
+ * \param cu_loc         Size and position of current CU
  */
 void uvg_inter_recon_cu(
   const encoder_state_t * const state,
@@ -661,12 +653,9 @@ static void ibc_recon_cu(const encoder_state_t * const state,
  *
  * \param state          encoder state
  * \param lcu            containing LCU
- * \param x              x-coordinate of the CU in pixels
- * \param y              y-coordinate of the CU in pixels
- * \param width          CU width
  * \param predict_luma   Enable or disable luma prediction for this call.
  * \param predict_chroma Enable or disable chroma prediction for this call.
- * \param i_pu           Index of the PU. Always zero for 2Nx2N. Used for SMP+AMP.
+ * \param cu_loc         Size and position of current PU/CU
  */
 void uvg_inter_pred_pu(
   const encoder_state_t * const state,
@@ -891,10 +880,7 @@ static bool is_b0_cand_coded(int x, int y, int width, int height)
  * \brief Get merge candidates for current block
  *
  * \param state     encoder control state to use
- * \param x         block x position in SCU
- * \param y         block y position in SCU
- * \param width     current block width
- * \param height    current block height
+ * \param cu_loc    Size and position of current CU
  * \param ref_list  which reference list, L0 is 1 and L1 is 2
  * \param ref_idx   index in the reference list
  * \param cand_out  will be filled with C0 and C1 candidates
@@ -1569,14 +1555,11 @@ static void get_mv_cand_from_candidates(
  * \brief Get MV prediction for current block.
  *
  * \param state     encoder state
- * \param x         block x position in pixels
- * \param y         block y position in pixels
- * \param width     block width in pixels
- * \param height    block height in pixels
  * \param mv_cand   Return the motion vector candidates.
  * \param cur_cu    current CU
  * \param lcu       current LCU
  * \param reflist   reflist index (either 0 or 1)
+ * \param cu_loc    Size and position of current CU
  */
 void uvg_inter_get_mv_cand(
   const encoder_state_t * const state,
@@ -1610,13 +1593,10 @@ void uvg_inter_get_mv_cand(
  * \brief Get MV prediction for current block using state->tile->frame->cu_array.
  *
  * \param state     encoder state
- * \param x         block x position in pixels
- * \param y         block y position in pixels
- * \param width     block width in pixels
- * \param height    block height in pixels
  * \param mv_cand   Return the motion vector candidates.
  * \param cur_cu    current CU
  * \param reflist   reflist index (either 0 or 1)
+ * \param cu_loc    Size and position of current PU/CU
  */
 void uvg_inter_get_mv_cand_cua(
   const encoder_state_t * const state,
@@ -1854,12 +1834,7 @@ void uvg_round_precision_vector2d(int src, int dst, vector2d_t* mv) {
 /**
  * \brief Get merge predictions for current block
  * \param state     the encoder state
- * \param x         block x position in SCU
- * \param y         block y position in SCU
- * \param width     block width
- * \param height    block height
- * \param use_a1    true, if candidate a1 can be used
- * \param use_b1    true, if candidate b1 can be used
+ * \param cu_loc    Size and position of current PU/CU
  * \param mv_cand   Returns the merge candidates.
  * \param lcu       lcu containing the block
  * \return          number of merge candidates

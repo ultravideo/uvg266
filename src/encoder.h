@@ -158,8 +158,8 @@ typedef struct encoder_control_t
 
 } encoder_control_t;
 
-encoder_control_t* uvg_encoder_control_init(const uvg_config *cfg);
-void uvg_encoder_control_free(encoder_control_t *encoder);
+encoder_control_t* uvg_encoder_control_init(const uvg_config *const cfg);
+void uvg_encoder_control_free(encoder_control_t *const encoder);
 
-void uvg_encoder_control_input_init(encoder_control_t *encoder, int32_t width, int32_t height);
+void uvg_encoder_control_input_init(encoder_control_t *const encoder, const int32_t width, int32_t height);
 #endif

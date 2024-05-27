@@ -79,7 +79,7 @@ typedef struct {
 uvg_picture *uvg_image_alloc_420(const int32_t width, const int32_t height);
 uvg_picture *uvg_image_alloc(enum uvg_chroma_format chroma_format, const int32_t width, const int32_t height);
 
-void uvg_image_free(uvg_picture *im);
+void uvg_image_free(uvg_picture *const im);
 
 uvg_picture *uvg_image_copy_ref(uvg_picture *im);
 
@@ -115,9 +115,9 @@ unsigned uvg_image_calc_satd(const uvg_picture *pic,
                              int block_height);
 
 
-void uvg_pixels_blit(const uvg_pixel* orig, uvg_pixel *dst,
-                         unsigned width, unsigned height,
-                         unsigned orig_stride, unsigned dst_stride);
+void uvg_pixels_blit(const uvg_pixel *const orig, uvg_pixel *const dst,
+                         const unsigned width, const unsigned height,
+                         const unsigned orig_stride, const unsigned dst_stride);
 
 
 #endif

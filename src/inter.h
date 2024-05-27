@@ -88,7 +88,7 @@ void uvg_inter_recon_bipred(
 void uvg_inter_get_mv_cand(
   const encoder_state_t * const state,
   mv_t mv_cand[2][2],
-  const cu_info_t* cur_cu,
+  const cu_info_t *const cur_cu,
   lcu_t *lcu,
   int8_t reflist,
   const cu_loc_t* const cu_loc);

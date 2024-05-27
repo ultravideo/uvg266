@@ -61,8 +61,8 @@ typedef struct cmdline_opts_t {
   bool loop_input;
 } cmdline_opts_t;
 
-cmdline_opts_t* cmdline_opts_parse(const uvg_api *api, int argc, char *argv[]);
-void cmdline_opts_free(const uvg_api *api, cmdline_opts_t *opts);
+cmdline_opts_t* cmdline_opts_parse(const uvg_api *const api, int argc, char *argv[]);
+void cmdline_opts_free(const uvg_api *const api, cmdline_opts_t *opts);
 
 void print_usage(void);
 void print_version(bool);
