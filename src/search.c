@@ -373,8 +373,8 @@ static void lcu_fill_chroma_cu_info(lcu_t *lcu, const cu_loc_t * const cu_loc)
 
 static void lcu_fill_chroma_cbfs(lcu_t *lcu, const cu_loc_t * const chroma_loc, enum uvg_tree_type tree_type)
 {
-  int8_t height = chroma_loc->height;
-  int8_t width =  chroma_loc->width;
+  uint8_t height = chroma_loc->height;
+  uint8_t width =  chroma_loc->width;
   uint32_t x_local = chroma_loc->local_x;
   uint32_t y_local = chroma_loc->local_y;
   const int offset = ~((TR_MAX_WIDTH) - 1);

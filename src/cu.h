@@ -188,10 +188,10 @@ typedef struct {
   int16_t y;
   uint8_t local_x;
   uint8_t local_y;
-  int8_t width;
-  int8_t height;
-  int8_t chroma_width;
-  int8_t chroma_height;
+  uint8_t width;
+  uint8_t height;
+  uint8_t chroma_width;
+  uint8_t chroma_height;
 } cu_loc_t;
 
 void uvg_cu_loc_ctor(cu_loc_t *loc, int x, int y, int width, int height);

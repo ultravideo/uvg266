@@ -356,7 +356,7 @@ void uvg_encode_ts_residual(encoder_state_t* const state,
       belowPixel = pos_y > 0 ? coeff[pos_x + (pos_y - 1) * width] : 0;
       absLevel = uvg_derive_mod_coeff(rightPixel, belowPixel, abs(coeff[blk_pos]), 0);
       cutoffVal = 2;
-      for (int j = 0; j < numGtBins; j++)
+      for (unsigned j = 0; j < numGtBins; j++)
       {
         if (absLevel >= cutoffVal)
         {
