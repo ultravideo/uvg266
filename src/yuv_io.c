@@ -293,35 +293,48 @@ int yuv_io_read(FILE* file,
  */
 int yuv_io_seek(FILE* file, unsigned frames,
                 unsigned input_width, unsigned input_height,
-                unsigned file_format)
+                unsigned in_bitdepth, unsigned file_format)
 {
-    const size_t frame_bytes = (size_t)(input_width * input_height * 3 / 2);
+  const unsigned bytes_per_sample = in_bitdepth > 8 ? 2 : 1;
+  const size_t frame_bytes = (size_t)(bytes_per_sample * input_width * input_height * 3 / 2);
 
-    if (file_format == UVG_FORMAT_Y4M) {
-      for (unsigned i = 0; i < frames; i++) {
-        if (!read_frame_header(file)) return 0;
-        if (fseek(file, frame_bytes, SEEK_CUR)) return 0;
-      }
-      return 1;
+  if (file_format == UVG_FORMAT_Y4M) {
+    for (unsigned i = 0; i < frames; i++) {
+      if (!read_frame_header(file)) return 0;
+      if (fseek(file, (long)frame_bytes, SEEK_CUR)) return 0; //Doesn't seek correctly if frame_bytes larger than max_long
     }
+    return 1;
+  }
 
-    const int64_t skip_bytes = (int64_t)(frames * frame_bytes);
+  const size_t skip_bytes = (size_t)(frames * frame_bytes);
 
+  //fseek only supports offsets of sizeof(long) bits. Use other methods if frame_bytes would be too big.
+  const size_t max_long = (1ULL << (8 * sizeof(long) - 1)) - 1; //long is signed so only sizeof(long)-1 bits can be used to seek forward
+
+  if (skip_bytes <= max_long) {
     // Attempt to seek normally.
-    size_t error = fseek(file, skip_bytes, SEEK_CUR);
-    if (!error) return 1;
-
-    // Seek failed. Skip data by reading.
-    error = 0;
-    unsigned char* tmp[4096];
-    size_t bytes_left = skip_bytes;
-    while (bytes_left > 0 && !error) {
-      const size_t skip = MIN(4096, bytes_left);
-      error = fread(tmp, sizeof(unsigned char), skip, file) != skip;
-      bytes_left -= skip;
+    if (!fseek(file, (long)skip_bytes, SEEK_CUR)) return 1;
+  } else if (frame_bytes <= max_long) {
+    int seek_error = 0;
+    for (unsigned i = 0; i < frames; i++) {
+      seek_error = fseek(file, (long)frame_bytes, SEEK_CUR);
+      if (seek_error) break;
     }
+    if (!seek_error) return 1;
+  }
 
-    return !error || feof(file);
+  // Seek failed. Skip data by reading.
+  rewind(file);
+  size_t error = 0;
+  unsigned char* tmp[4096];
+  size_t bytes_left = skip_bytes;
+  while (bytes_left > 0 && !error) {
+    const size_t skip = MIN(4096, bytes_left);
+    error = fread(tmp, sizeof(unsigned char), skip, file) != skip;
+    bytes_left -= skip;
+  }
+
+  return !error || feof(file);
 }
 
 
