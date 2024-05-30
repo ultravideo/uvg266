@@ -1796,21 +1796,21 @@ static void angular_pdpc_ver_8x2_scale1_avx2(uvg_pixel* dst, const uvg_pixel* re
 
   // For width 8, height must be at least 2. Handle 2 lines at once.
   for (int y = 0; y < height; y += 2) {
-    /*ALIGNED(32) int16_t left[16] = { 0 };
+    ALIGNED(32) int16_t left[16] = { 0 };
     for (int yy = 0; yy < 2; ++yy) {
       for (int xx = 0; xx < limit; ++xx) {
         left[yy * 8 + xx] = ref_side[(y + yy) + shifted_inv_angle_sum[xx] + 1];
       }
-    }*/
-    __m128i vleft = _mm_loadu_si128((__m128i*) & ref_side[y + shifted_inv_angle_sum[0] + 1]);
-    vleft = _mm_shuffle_epi8(vleft, vshuf);
+    }
+    //__m128i vleft = _mm_loadu_si128((__m128i*) & ref_side[y + shifted_inv_angle_sum[0] + 1]);
+    //vleft = _mm_shuffle_epi8(vleft, vshuf);
 
     __m128i vdst = _mm_i64gather_epi64((const int64_t*)(dst + y * width), vidx, 1);
     __m256i vdst16 = _mm256_cvtepu8_epi16(vdst);
-    __m256i vleft16 = _mm256_cvtepu8_epi16(vleft);
-    //__m256i vleft = _mm256_loadu_si256((__m256i*)left);
+    //__m256i vleft16 = _mm256_cvtepu8_epi16(vleft);
+    __m256i vleft = _mm256_loadu_si256((__m256i*)left);
 
-    __m256i accu = _mm256_sub_epi16(vleft16, vdst16);
+    __m256i accu = _mm256_sub_epi16(vleft, vdst16);
     accu = _mm256_mullo_epi16(vweight, accu);
     accu = _mm256_add_epi16(accu, v32s);
     accu = _mm256_srai_epi16(accu, 6);
@@ -4045,11 +4045,11 @@ static void uvg_pdpc_planar_dc_avx2(
   );
 
   // TODO: replace latter log2_width with log2_height
-  const int scale = ((log2_width - 2 + log2_width - 2 + 2) >> 2);
+  const int scale = ((log2_width - 2 + log2_height - 2 + 2) >> 2);
 
   // Same weights regardless of axis, compute once
   int16_t w[LCU_WIDTH];
-  for (int i = 0; i < width; i += 4) {
+  for (int i = 0; i < MAX(width, height); i += 4) {
     __m128i base = _mm_set1_epi32(i);
     __m128i offs = _mm_setr_epi32(0, 1, 2, 3);
     __m128i idxs = _mm_add_epi32(base, offs);
