@@ -1314,20 +1314,6 @@ static void angular_pred_linear_filter_w16_hor_wide_angle_avx2(uvg_pixel* dst, u
 }
 
 
-static void angular_pred_linear_filter_hor_avx2(uvg_pixel* dst, uvg_pixel* ref, const int width, const int height, const int16_t* delta_int, const int16_t* delta_fract)
-{
-  // 2-tap linear filter
-
-  // Handle filtering in 4x4 blocks
-  for (int y = 0; y < height; y += 4) {
-    const __m256i vref = _mm256_loadu_si256((const __m256i*) & ref[y + 1]);
-    for (int x = 0; x < width; x += 4) {
-
-    }
-  }
-}
-
-
 static void angular_pred_non_fractional_angle_pxl_copy_ver_avx2(uvg_pixel* dst, uvg_pixel* ref, const int width, const int height, const int16_t* delta_int)
 {
   // Note: this probably won't work for wide angle modes.
@@ -1344,13 +1330,533 @@ static void angular_pred_non_fractional_angle_pxl_copy_ver_avx2(uvg_pixel* dst, 
   }
 }
 
-static void angular_pred_non_fractional_angle_pxl_copy_hor_avx2(uvg_pixel* dst, uvg_pixel* ref, const int width, const int height, const int16_t* delta_int)
+static void angular_pred_non_fractional_angle_pxl_copy_w4_mode2_hor_avx2(uvg_pixel* dst, uvg_pixel* ref, const int height)
 {
-  // TODO: replace this generic solution after testing
-  for (int y = 0; y < height; ++y) { 
-    for (int x = 0; x < width; ++x) {
-      dst[y * width + x] = ref[delta_int[x] + y + 1];
+  // const int width = 4;
+  
+  const __m128i vrefshuf0 = _mm_setr_epi8(
+    0x00, 0x01, 0x02, 0x03, 0x01, 0x02, 0x03, 0x04,
+    0x02, 0x03, 0x04, 0x05, 0x03, 0x04, 0x05, 0x06
+  );
+
+  const __m128i vrefshuf1 = _mm_setr_epi8(
+    0x04, 0x05, 0x06, 0x07, 0x05, 0x06, 0x07, 0x08,
+    0x06, 0x07, 0x08, 0x09, 0x07, 0x08, 0x09, 0x0a
+  );
+
+  // Handle as 4x4 blocks. There is no case where height < 4.
+  if (height == 4) {
+    // Offset indices by one since index 0 is top left and plus one since delta_int[0] for mode 2 is 1.
+    __m128i vref = _mm_loadu_si128((__m128i*)&ref[2]);
+    vref = _mm_shuffle_epi8(vref, vrefshuf0);
+
+    _mm_store_si128((__m128i*)dst, vref);
+  }
+  else {
+    // Can handle 8 rows at once
+    for (int y = 0; y < height; y += 8) {
+      
+      __m128i vref = _mm_loadu_si128((__m128i*)(ref + 2 + y));
+
+      __m128i vres0 = _mm_shuffle_epi8(vref, vrefshuf0);
+      __m128i vres1 = _mm_shuffle_epi8(vref, vrefshuf1);
+
+      _mm_store_si128((__m128i*)(dst + 0), vres0);
+      _mm_store_si128((__m128i*)(dst + 16), vres1);
+      dst += 32;
     }
+  }
+}
+
+static void angular_pred_non_fractional_angle_pxl_copy_w8_mode2_hor_avx2(uvg_pixel* dst, uvg_pixel* ref, const int height)
+{
+
+  const __m128i vrefshuf0 = _mm_setr_epi8(
+    0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+    0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08
+  );
+
+  const __m128i vrefshuf1 = _mm_setr_epi8(
+    0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09,
+    0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a
+  );
+
+  const __m128i vrefshuf2 = _mm_setr_epi8(
+    0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b,
+    0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c
+  );
+
+  const __m128i vrefshuf3 = _mm_setr_epi8(
+    0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d,
+    0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e
+  );
+
+  // Can handle 8 rows at once. There is no case for height 2 and 4, this function is not reached in those cases.
+  for (int y = 0; y < height; y += 8) {
+    // Offset indices by one since index 0 is top left and plus one since delta_int[0] for mode 2 is 1.
+    __m128i vref = _mm_loadu_si128((__m128i*)(ref + 2 + y));
+    _mm_store_si128((__m128i*)(dst + 0), _mm_shuffle_epi8(vref, vrefshuf0));
+    _mm_store_si128((__m128i*)(dst + 16), _mm_shuffle_epi8(vref, vrefshuf1));
+    _mm_store_si128((__m128i*)(dst + 32), _mm_shuffle_epi8(vref, vrefshuf2));
+    _mm_store_si128((__m128i*)(dst + 48), _mm_shuffle_epi8(vref, vrefshuf3));
+    dst += 64;
+  }
+}
+
+static void angular_pred_non_fractional_angle_pxl_copy_w4_wide_angle_hor_avx2(uvg_pixel* dst, uvg_pixel* ref, const int height, const int16_t* delta_int)
+{
+  // const int width = 4;
+
+  const __m128i vtranspose = _mm_setr_epi8(
+    0x00, 0x04, 0x08, 0x0c, 0x01, 0x05, 0x09, 0x0d,
+    0x02, 0x06, 0x0a, 0x0e, 0x03, 0x07, 0x0b, 0x0f
+  );
+
+  //__m128i vidx = _mm_setr_epi32(delta_int[0], delta_int[1], delta_int[2], delta_int[3]);
+  __m128i vidx = _mm_load_si128((__m128i*)delta_int);
+  vidx = _mm_cvtepi16_epi32(vidx);
+
+  // Handle as 4x4 blocks. There is no case where height < 4.
+  for (int y = 0; y < height; y += 4) {
+    // Offset indices by one since index 0 is top left.
+
+    __m128i vref = _mm_i32gather_epi32((const int*)(ref + y + 1), vidx, 1);
+
+    vref = _mm_shuffle_epi8(vref, vtranspose);
+
+    _mm_store_si128((__m128i*)dst, vref);
+    dst += 16;
+  }
+}
+
+static void angular_pred_non_fractional_angle_pxl_copy_w8_wide_angle_hor_avx2(uvg_pixel* dst, uvg_pixel* ref, const int height, const int16_t* delta_int)
+{
+  // const int width = 8;
+
+  // Place the next 4 16-bit delta int values in the lower half of the register.
+  const __m128i vidxshuf = _mm_setr_epi8(
+    0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff  // Don't care.
+  );
+
+  // 1st step of the transpose
+  const __m256i vtranspose0 = _mm256_setr_epi8(
+    0x00, 0x08, 0x01, 0x09, 0x02, 0x0a, 0x03, 0x0b,
+    0x04, 0x0c, 0x05, 0x0d, 0x06, 0x0e, 0x07, 0x0f,
+    0x00, 0x08, 0x01, 0x09, 0x02, 0x0a, 0x03, 0x0b,
+    0x04, 0x0c, 0x05, 0x0d, 0x06, 0x0e, 0x07, 0x0f
+  );
+
+  // 3rd step of the transpose, after permute4x64_epi64
+  const __m256i vtranspose1 = _mm256_setr_epi8(
+    0x00, 0x01, 0x08, 0x09, 0x02, 0x03, 0x0a, 0x0b,
+    0x04, 0x05, 0x0c, 0x0d, 0x06, 0x07, 0x0e, 0x0f,
+    0x00, 0x01, 0x08, 0x09, 0x02, 0x03, 0x0a, 0x0b,
+    0x04, 0x05, 0x0c, 0x0d, 0x06, 0x07, 0x0e, 0x0f
+  );
+
+  const __m128i vidx = _mm_loadu_si128((__m128i*)delta_int);
+  const __m256i vidx0 = _mm256_cvtepi16_epi64(vidx);
+  const __m256i vidx1 = _mm256_cvtepi16_epi64(_mm_shuffle_epi8(vidx, vidxshuf));
+
+  // Handle as 8x8 blocks.
+  for (int y = 0; y < height; y += 8) {
+    __m256i vref0 = _mm256_i64gather_epi64((const long long*)&ref[y + 1], vidx0, 1);
+    __m256i vref1 = _mm256_i64gather_epi64((const long long*)&ref[y + 1], vidx1, 1);
+
+    // Transpose the 8x8 block
+    vref0 = _mm256_shuffle_epi8(vref0, vtranspose0);
+    vref1 = _mm256_shuffle_epi8(vref1, vtranspose0);
+    
+    vref0 = _mm256_permute4x64_epi64(vref0, _MM_SHUFFLE(3, 1, 2, 0));
+    vref1 = _mm256_permute4x64_epi64(vref1, _MM_SHUFFLE(3, 1, 2, 0));
+
+    vref0 = _mm256_shuffle_epi8(vref0, vtranspose1);
+    vref1 = _mm256_shuffle_epi8(vref1, vtranspose1);
+
+    __m256i vlo32 = _mm256_unpacklo_epi32(vref0, vref1);
+    __m256i vhi32 = _mm256_unpackhi_epi32(vref0, vref1);
+
+    __m256i vfinal0 = _mm256_permute2x128_si256(vlo32, vhi32, 0x20);
+    __m256i vfinal1 = _mm256_permute2x128_si256(vlo32, vhi32, 0x31);
+
+    _mm256_store_si256((__m256i*)(dst + 0),  vfinal0);
+    _mm256_store_si256((__m256i*)(dst + 32), vfinal1);
+
+    dst += 64;
+  }
+}
+
+static void angular_pred_non_fractional_angle_pxl_copy_w16_wide_angle_hor_avx2(uvg_pixel* dst, uvg_pixel* ref, const int height, const int16_t* delta_int)
+{
+  // const int width = 16;
+  
+  // Handle as 16x16 blocks. This function can handle widths from 16 onwards.
+  for (int y = 0; y < height; y += 16) {
+    // Offset indices by one since ref[0] is top left.
+    __m128i vref0 = _mm_loadu_si128((__m128i*)(ref + y + 1 + delta_int[0x00]));
+    __m128i vref1 = _mm_loadu_si128((__m128i*)(ref + y + 1 + delta_int[0x01]));
+    __m128i vref2 = _mm_loadu_si128((__m128i*)(ref + y + 1 + delta_int[0x02]));
+    __m128i vref3 = _mm_loadu_si128((__m128i*)(ref + y + 1 + delta_int[0x03]));
+    __m128i vref4 = _mm_loadu_si128((__m128i*)(ref + y + 1 + delta_int[0x04]));
+    __m128i vref5 = _mm_loadu_si128((__m128i*)(ref + y + 1 + delta_int[0x05]));
+    __m128i vref6 = _mm_loadu_si128((__m128i*)(ref + y + 1 + delta_int[0x06]));
+    __m128i vref7 = _mm_loadu_si128((__m128i*)(ref + y + 1 + delta_int[0x07]));
+
+    __m128i vref8 = _mm_loadu_si128((__m128i*)(ref + y + 1 + delta_int[0x08]));
+    __m128i vref9 = _mm_loadu_si128((__m128i*)(ref + y + 1 + delta_int[0x09]));
+    __m128i vrefa = _mm_loadu_si128((__m128i*)(ref + y + 1 + delta_int[0x0a]));
+    __m128i vrefb = _mm_loadu_si128((__m128i*)(ref + y + 1 + delta_int[0x0b]));
+    __m128i vrefc = _mm_loadu_si128((__m128i*)(ref + y + 1 + delta_int[0x0c]));
+    __m128i vrefd = _mm_loadu_si128((__m128i*)(ref + y + 1 + delta_int[0x0d]));
+    __m128i vrefe = _mm_loadu_si128((__m128i*)(ref + y + 1 + delta_int[0x0e]));
+    __m128i vreff = _mm_loadu_si128((__m128i*)(ref + y + 1 + delta_int[0x0f]));
+
+    // The result is just a transpose of the 16x16 block.
+    __m128i vlo8_0 = _mm_unpacklo_epi8(vref0, vref1);
+    __m128i vlo8_1 = _mm_unpacklo_epi8(vref2, vref3);
+    __m128i vlo8_2 = _mm_unpacklo_epi8(vref4, vref5);
+    __m128i vlo8_3 = _mm_unpacklo_epi8(vref6, vref7);
+    __m128i vlo8_4 = _mm_unpacklo_epi8(vref8, vref9);
+    __m128i vlo8_5 = _mm_unpacklo_epi8(vrefa, vrefb);
+    __m128i vlo8_6 = _mm_unpacklo_epi8(vrefc, vrefd);
+    __m128i vlo8_7 = _mm_unpacklo_epi8(vrefe, vreff);
+
+    __m128i vhi8_0 = _mm_unpackhi_epi8(vref0, vref1);
+    __m128i vhi8_1 = _mm_unpackhi_epi8(vref2, vref3);
+    __m128i vhi8_2 = _mm_unpackhi_epi8(vref4, vref5);
+    __m128i vhi8_3 = _mm_unpackhi_epi8(vref6, vref7);
+    __m128i vhi8_4 = _mm_unpackhi_epi8(vref8, vref9);
+    __m128i vhi8_5 = _mm_unpackhi_epi8(vrefa, vrefb);
+    __m128i vhi8_6 = _mm_unpackhi_epi8(vrefc, vrefd);
+    __m128i vhi8_7 = _mm_unpackhi_epi8(vrefe, vreff);
+
+    __m128i vlo16_0 = _mm_unpacklo_epi16(vlo8_0, vlo8_1);
+    __m128i vlo16_1 = _mm_unpacklo_epi16(vlo8_2, vlo8_3);
+    __m128i vlo16_2 = _mm_unpacklo_epi16(vhi8_0, vhi8_1);
+    __m128i vlo16_3 = _mm_unpacklo_epi16(vhi8_2, vhi8_3);
+    __m128i vlo16_4 = _mm_unpacklo_epi16(vlo8_4, vlo8_5);
+    __m128i vlo16_5 = _mm_unpacklo_epi16(vlo8_6, vlo8_7);
+    __m128i vlo16_6 = _mm_unpacklo_epi16(vhi8_4, vhi8_5);
+    __m128i vlo16_7 = _mm_unpacklo_epi16(vhi8_6, vhi8_7);
+
+
+    __m128i vhi16_0 = _mm_unpackhi_epi16(vlo8_0, vlo8_1);
+    __m128i vhi16_1 = _mm_unpackhi_epi16(vlo8_2, vlo8_3);
+    __m128i vhi16_2 = _mm_unpackhi_epi16(vhi8_0, vhi8_1);
+    __m128i vhi16_3 = _mm_unpackhi_epi16(vhi8_2, vhi8_3);
+    __m128i vhi16_4 = _mm_unpackhi_epi16(vlo8_4, vlo8_5);
+    __m128i vhi16_5 = _mm_unpackhi_epi16(vlo8_6, vlo8_7);
+    __m128i vhi16_6 = _mm_unpackhi_epi16(vhi8_4, vhi8_5);
+    __m128i vhi16_7 = _mm_unpackhi_epi16(vhi8_6, vhi8_7);
+
+    __m128i vlo32_0 = _mm_unpacklo_epi32(vlo16_0, vlo16_1);
+    __m128i vlo32_1 = _mm_unpacklo_epi32(vlo16_2, vlo16_3);
+    __m128i vlo32_2 = _mm_unpacklo_epi32(vhi16_0, vhi16_1);
+    __m128i vlo32_3 = _mm_unpacklo_epi32(vhi16_2, vhi16_3);
+    __m128i vlo32_4 = _mm_unpacklo_epi32(vlo16_4, vlo16_5);
+    __m128i vlo32_5 = _mm_unpacklo_epi32(vlo16_6, vlo16_7);
+    __m128i vlo32_6 = _mm_unpacklo_epi32(vhi16_4, vhi16_5);
+    __m128i vlo32_7 = _mm_unpacklo_epi32(vhi16_6, vhi16_7);
+
+    __m128i vhi32_0 = _mm_unpackhi_epi32(vlo16_0, vlo16_1);
+    __m128i vhi32_1 = _mm_unpackhi_epi32(vlo16_2, vlo16_3);
+    __m128i vhi32_2 = _mm_unpackhi_epi32(vhi16_0, vhi16_1);
+    __m128i vhi32_3 = _mm_unpackhi_epi32(vhi16_2, vhi16_3);
+    __m128i vhi32_4 = _mm_unpackhi_epi32(vlo16_4, vlo16_5);
+    __m128i vhi32_5 = _mm_unpackhi_epi32(vlo16_6, vlo16_7);
+    __m128i vhi32_6 = _mm_unpackhi_epi32(vhi16_4, vhi16_5);
+    __m128i vhi32_7 = _mm_unpackhi_epi32(vhi16_6, vhi16_7);
+
+    __m128i vrow0 = _mm_unpacklo_epi64(vlo32_0, vlo32_4);
+    __m128i vrow1 = _mm_unpackhi_epi64(vlo32_0, vlo32_4);
+    __m128i vrow2 = _mm_unpacklo_epi64(vhi32_0, vhi32_4);
+    __m128i vrow3 = _mm_unpackhi_epi64(vhi32_0, vhi32_4);
+    __m128i vrow4 = _mm_unpacklo_epi64(vlo32_2, vlo32_6);
+    __m128i vrow5 = _mm_unpackhi_epi64(vlo32_2, vlo32_6);
+    __m128i vrow6 = _mm_unpacklo_epi64(vhi32_2, vhi32_6);
+    __m128i vrow7 = _mm_unpackhi_epi64(vhi32_2, vhi32_6);
+
+    __m128i vrow8 = _mm_unpacklo_epi64(vlo32_1, vlo32_5);
+    __m128i vrwo9 = _mm_unpackhi_epi64(vlo32_1, vlo32_5);
+    __m128i vrowa = _mm_unpacklo_epi64(vhi32_1, vhi32_5);
+    __m128i vrowb = _mm_unpackhi_epi64(vhi32_1, vhi32_5);
+    __m128i vrowc = _mm_unpacklo_epi64(vlo32_3, vlo32_7);
+    __m128i vrowd = _mm_unpackhi_epi64(vlo32_3, vlo32_7);
+    __m128i vrowe = _mm_unpacklo_epi64(vhi32_3, vhi32_7);
+    __m128i vrowf = _mm_unpackhi_epi64(vhi32_3, vhi32_7);
+
+    _mm_store_si128((__m128i*)(dst + 0), vrow0);
+    _mm_store_si128((__m128i*)(dst + 16), vrow1);
+    _mm_store_si128((__m128i*)(dst + 32), vrow2);
+    _mm_store_si128((__m128i*)(dst + 48), vrow3);
+    _mm_store_si128((__m128i*)(dst + 64), vrow4);
+    _mm_store_si128((__m128i*)(dst + 80), vrow5);
+    _mm_store_si128((__m128i*)(dst + 96), vrow6);
+    _mm_store_si128((__m128i*)(dst + 112), vrow7);
+
+    _mm_store_si128((__m128i*)(dst + 128), vrow8);
+    _mm_store_si128((__m128i*)(dst + 144), vrwo9);
+    _mm_store_si128((__m128i*)(dst + 160), vrowa);
+    _mm_store_si128((__m128i*)(dst + 176), vrowb);
+    _mm_store_si128((__m128i*)(dst + 192), vrowc);
+    _mm_store_si128((__m128i*)(dst + 208), vrowd);
+    _mm_store_si128((__m128i*)(dst + 224), vrowe);
+    _mm_store_si128((__m128i*)(dst + 240), vrowf);
+
+    dst += 256;
+  }
+}
+
+static void angular_pred_non_fractional_angle_pxl_copy_w32_wide_angle_hor_avx2(uvg_pixel* dst, uvg_pixel* ref, const int height, const int16_t* delta_int)
+{
+  // const int width = 32;
+  // Handle as 32x32 blocks. Similarly to the w16 version, this is also just a transpose of the 32x32 block.
+  // TODO: if this is too slow, consider doing it in 16x16 blocks. There will be a lot of moving data between registers in this solution.
+  for (int y = 0; y < height; y += 32) {
+    // Offset indices by one since ref[0] is top left.
+    __m256i vref00 = _mm256_loadu_si256((__m256i*)(ref + y + 1 + delta_int[0x00]));
+    __m256i vref01 = _mm256_loadu_si256((__m256i*)(ref + y + 1 + delta_int[0x01]));
+    __m256i vref02 = _mm256_loadu_si256((__m256i*)(ref + y + 1 + delta_int[0x02]));
+    __m256i vref03 = _mm256_loadu_si256((__m256i*)(ref + y + 1 + delta_int[0x03]));
+    __m256i vref04 = _mm256_loadu_si256((__m256i*)(ref + y + 1 + delta_int[0x04]));
+    __m256i vref05 = _mm256_loadu_si256((__m256i*)(ref + y + 1 + delta_int[0x05]));
+    __m256i vref06 = _mm256_loadu_si256((__m256i*)(ref + y + 1 + delta_int[0x06]));
+    __m256i vref07 = _mm256_loadu_si256((__m256i*)(ref + y + 1 + delta_int[0x07]));
+
+    __m256i vref08 = _mm256_loadu_si256((__m256i*)(ref + y + 1 + delta_int[0x08]));
+    __m256i vref09 = _mm256_loadu_si256((__m256i*)(ref + y + 1 + delta_int[0x09]));
+    __m256i vref0a = _mm256_loadu_si256((__m256i*)(ref + y + 1 + delta_int[0x0a]));
+    __m256i vref0b = _mm256_loadu_si256((__m256i*)(ref + y + 1 + delta_int[0x0b]));
+    __m256i vref0c = _mm256_loadu_si256((__m256i*)(ref + y + 1 + delta_int[0x0c]));
+    __m256i vref0d = _mm256_loadu_si256((__m256i*)(ref + y + 1 + delta_int[0x0d]));
+    __m256i vref0e = _mm256_loadu_si256((__m256i*)(ref + y + 1 + delta_int[0x0e]));
+    __m256i vref0f = _mm256_loadu_si256((__m256i*)(ref + y + 1 + delta_int[0x0f]));
+
+    __m256i vref10 = _mm256_loadu_si256((__m256i*)(ref + y + 1 + delta_int[0x10]));
+    __m256i vref11 = _mm256_loadu_si256((__m256i*)(ref + y + 1 + delta_int[0x11]));
+    __m256i vref12 = _mm256_loadu_si256((__m256i*)(ref + y + 1 + delta_int[0x12]));
+    __m256i vref13 = _mm256_loadu_si256((__m256i*)(ref + y + 1 + delta_int[0x13]));
+    __m256i vref14 = _mm256_loadu_si256((__m256i*)(ref + y + 1 + delta_int[0x14]));
+    __m256i vref15 = _mm256_loadu_si256((__m256i*)(ref + y + 1 + delta_int[0x15]));
+    __m256i vref16 = _mm256_loadu_si256((__m256i*)(ref + y + 1 + delta_int[0x16]));
+    __m256i vref17 = _mm256_loadu_si256((__m256i*)(ref + y + 1 + delta_int[0x17]));
+
+    __m256i vref18 = _mm256_loadu_si256((__m256i*)(ref + y + 1 + delta_int[0x18]));
+    __m256i vref19 = _mm256_loadu_si256((__m256i*)(ref + y + 1 + delta_int[0x19]));
+    __m256i vref1a = _mm256_loadu_si256((__m256i*)(ref + y + 1 + delta_int[0x1a]));
+    __m256i vref1b = _mm256_loadu_si256((__m256i*)(ref + y + 1 + delta_int[0x1b]));
+    __m256i vref1c = _mm256_loadu_si256((__m256i*)(ref + y + 1 + delta_int[0x1c]));
+    __m256i vref1d = _mm256_loadu_si256((__m256i*)(ref + y + 1 + delta_int[0x1d]));
+    __m256i vref1e = _mm256_loadu_si256((__m256i*)(ref + y + 1 + delta_int[0x1e]));
+    __m256i vref1f = _mm256_loadu_si256((__m256i*)(ref + y + 1 + delta_int[0x1f]));
+
+    __m256i vlo8_0 = _mm256_unpacklo_epi8(vref00, vref01);
+    __m256i vlo8_1 = _mm256_unpacklo_epi8(vref02, vref03);
+    __m256i vlo8_2 = _mm256_unpacklo_epi8(vref04, vref05);
+    __m256i vlo8_3 = _mm256_unpacklo_epi8(vref06, vref07);
+    __m256i vlo8_4 = _mm256_unpacklo_epi8(vref08, vref09);
+    __m256i vlo8_5 = _mm256_unpacklo_epi8(vref0a, vref0b);
+    __m256i vlo8_6 = _mm256_unpacklo_epi8(vref0c, vref0d);
+    __m256i vlo8_7 = _mm256_unpacklo_epi8(vref0e, vref0f);
+    __m256i vlo8_8 = _mm256_unpacklo_epi8(vref10, vref11);
+    __m256i vlo8_9 = _mm256_unpacklo_epi8(vref12, vref13);
+    __m256i vlo8_a = _mm256_unpacklo_epi8(vref14, vref15);
+    __m256i vlo8_b = _mm256_unpacklo_epi8(vref16, vref17);
+    __m256i vlo8_c = _mm256_unpacklo_epi8(vref18, vref19);
+    __m256i vlo8_d = _mm256_unpacklo_epi8(vref1a, vref1b);
+    __m256i vlo8_e = _mm256_unpacklo_epi8(vref1c, vref1d);
+    __m256i vlo8_f = _mm256_unpacklo_epi8(vref1e, vref1f);
+
+    __m256i vhi8_0 = _mm256_unpackhi_epi8(vref00, vref01);
+    __m256i vhi8_1 = _mm256_unpackhi_epi8(vref02, vref03);
+    __m256i vhi8_2 = _mm256_unpackhi_epi8(vref04, vref05);
+    __m256i vhi8_3 = _mm256_unpackhi_epi8(vref06, vref07);
+    __m256i vhi8_4 = _mm256_unpackhi_epi8(vref08, vref09);
+    __m256i vhi8_5 = _mm256_unpackhi_epi8(vref0a, vref0b);
+    __m256i vhi8_6 = _mm256_unpackhi_epi8(vref0c, vref0d);
+    __m256i vhi8_7 = _mm256_unpackhi_epi8(vref0e, vref0f);
+    __m256i vhi8_8 = _mm256_unpackhi_epi8(vref10, vref11);
+    __m256i vhi8_9 = _mm256_unpackhi_epi8(vref12, vref13);
+    __m256i vhi8_a = _mm256_unpackhi_epi8(vref14, vref15);
+    __m256i vhi8_b = _mm256_unpackhi_epi8(vref16, vref17);
+    __m256i vhi8_c = _mm256_unpackhi_epi8(vref18, vref19);
+    __m256i vhi8_d = _mm256_unpackhi_epi8(vref1a, vref1b);
+    __m256i vhi8_e = _mm256_unpackhi_epi8(vref1c, vref1d);
+    __m256i vhi8_f = _mm256_unpackhi_epi8(vref1e, vref1f);
+
+    __m256i vlo16_0 = _mm256_unpacklo_epi16(vlo8_0, vlo8_1);
+    __m256i vlo16_1 = _mm256_unpacklo_epi16(vlo8_2, vlo8_3);
+    __m256i vlo16_2 = _mm256_unpacklo_epi16(vlo8_4, vlo8_5);
+    __m256i vlo16_3 = _mm256_unpacklo_epi16(vlo8_6, vlo8_7);
+    __m256i vlo16_4 = _mm256_unpacklo_epi16(vlo8_8, vlo8_9);
+    __m256i vlo16_5 = _mm256_unpacklo_epi16(vlo8_a, vlo8_b);
+    __m256i vlo16_6 = _mm256_unpacklo_epi16(vlo8_c, vlo8_d);
+    __m256i vlo16_7 = _mm256_unpacklo_epi16(vlo8_e, vlo8_f);
+    __m256i vlo16_8 = _mm256_unpacklo_epi16(vhi8_0, vhi8_1);
+    __m256i vlo16_9 = _mm256_unpacklo_epi16(vhi8_2, vhi8_3);
+    __m256i vlo16_a = _mm256_unpacklo_epi16(vhi8_4, vhi8_5);
+    __m256i vlo16_b = _mm256_unpacklo_epi16(vhi8_6, vhi8_7);
+    __m256i vlo16_c = _mm256_unpacklo_epi16(vhi8_8, vhi8_9);
+    __m256i vlo16_d = _mm256_unpacklo_epi16(vhi8_a, vhi8_b);
+    __m256i vlo16_e = _mm256_unpacklo_epi16(vhi8_c, vhi8_d);
+    __m256i vlo16_f = _mm256_unpacklo_epi16(vhi8_e, vhi8_f);
+
+    __m256i vhi16_0 = _mm256_unpackhi_epi16(vlo8_0, vlo8_1);
+    __m256i vhi16_1 = _mm256_unpackhi_epi16(vlo8_2, vlo8_3);
+    __m256i vhi16_2 = _mm256_unpackhi_epi16(vlo8_4, vlo8_5);
+    __m256i vhi16_3 = _mm256_unpackhi_epi16(vlo8_6, vlo8_7);
+    __m256i vhi16_4 = _mm256_unpackhi_epi16(vlo8_8, vlo8_9);
+    __m256i vhi16_5 = _mm256_unpackhi_epi16(vlo8_a, vlo8_b);
+    __m256i vhi16_6 = _mm256_unpackhi_epi16(vlo8_c, vlo8_d);
+    __m256i vhi16_7 = _mm256_unpackhi_epi16(vlo8_e, vlo8_f);
+    __m256i vhi16_8 = _mm256_unpackhi_epi16(vhi8_0, vhi8_1);
+    __m256i vhi16_9 = _mm256_unpackhi_epi16(vhi8_2, vhi8_3);
+    __m256i vhi16_a = _mm256_unpackhi_epi16(vhi8_4, vhi8_5);
+    __m256i vhi16_b = _mm256_unpackhi_epi16(vhi8_6, vhi8_7);
+    __m256i vhi16_c = _mm256_unpackhi_epi16(vhi8_8, vhi8_9);
+    __m256i vhi16_d = _mm256_unpackhi_epi16(vhi8_a, vhi8_b);
+    __m256i vhi16_e = _mm256_unpackhi_epi16(vhi8_c, vhi8_d);
+    __m256i vhi16_f = _mm256_unpackhi_epi16(vhi8_e, vhi8_f);
+
+    __m256i vlo32_0 = _mm256_unpacklo_epi32(vlo16_0, vlo16_1);
+    __m256i vlo32_1 = _mm256_unpacklo_epi32(vlo16_2, vlo16_3);
+    __m256i vlo32_2 = _mm256_unpacklo_epi32(vlo16_4, vlo16_5);
+    __m256i vlo32_3 = _mm256_unpacklo_epi32(vlo16_6, vlo16_7);
+    __m256i vlo32_4 = _mm256_unpacklo_epi32(vhi16_0, vhi16_1);
+    __m256i vlo32_5 = _mm256_unpacklo_epi32(vhi16_2, vhi16_3);
+    __m256i vlo32_6 = _mm256_unpacklo_epi32(vhi16_4, vhi16_5);
+    __m256i vlo32_7 = _mm256_unpacklo_epi32(vhi16_6, vhi16_7);
+    __m256i vlo32_8 = _mm256_unpacklo_epi32(vlo16_8, vlo16_9);
+    __m256i vlo32_9 = _mm256_unpacklo_epi32(vlo16_a, vlo16_b);
+    __m256i vlo32_a = _mm256_unpacklo_epi32(vlo16_c, vlo16_d);
+    __m256i vlo32_b = _mm256_unpacklo_epi32(vlo16_e, vlo16_f);
+    __m256i vlo32_c = _mm256_unpacklo_epi32(vhi16_8, vhi16_9);
+    __m256i vlo32_d = _mm256_unpacklo_epi32(vhi16_a, vhi16_b);
+    __m256i vlo32_e = _mm256_unpacklo_epi32(vhi16_c, vhi16_d);
+    __m256i vlo32_f = _mm256_unpacklo_epi32(vhi16_e, vhi16_f);
+
+    __m256i vhi32_0 = _mm256_unpackhi_epi32(vlo16_0, vlo16_1);
+    __m256i vhi32_1 = _mm256_unpackhi_epi32(vlo16_2, vlo16_3);
+    __m256i vhi32_2 = _mm256_unpackhi_epi32(vlo16_4, vlo16_5);
+    __m256i vhi32_3 = _mm256_unpackhi_epi32(vlo16_6, vlo16_7);
+    __m256i vhi32_4 = _mm256_unpackhi_epi32(vhi16_0, vhi16_1);
+    __m256i vhi32_5 = _mm256_unpackhi_epi32(vhi16_2, vhi16_3);
+    __m256i vhi32_6 = _mm256_unpackhi_epi32(vhi16_4, vhi16_5);
+    __m256i vhi32_7 = _mm256_unpackhi_epi32(vhi16_6, vhi16_7);
+    __m256i vhi32_8 = _mm256_unpackhi_epi32(vlo16_8, vlo16_9);
+    __m256i vhi32_9 = _mm256_unpackhi_epi32(vlo16_a, vlo16_b);
+    __m256i vhi32_a = _mm256_unpackhi_epi32(vlo16_c, vlo16_d);
+    __m256i vhi32_b = _mm256_unpackhi_epi32(vlo16_e, vlo16_f);
+    __m256i vhi32_c = _mm256_unpackhi_epi32(vhi16_8, vhi16_9);
+    __m256i vhi32_d = _mm256_unpackhi_epi32(vhi16_a, vhi16_b);
+    __m256i vhi32_e = _mm256_unpackhi_epi32(vhi16_c, vhi16_d);
+    __m256i vhi32_f = _mm256_unpackhi_epi32(vhi16_e, vhi16_f);
+
+    __m256i vlo64_0 = _mm256_unpacklo_epi64(vlo32_0, vlo32_1);
+    __m256i vlo64_1 = _mm256_unpacklo_epi64(vlo32_2, vlo32_3);
+    __m256i vlo64_2 = _mm256_unpacklo_epi64(vhi32_0, vhi32_1);
+    __m256i vlo64_3 = _mm256_unpacklo_epi64(vhi32_2, vhi32_3);
+    __m256i vlo64_4 = _mm256_unpacklo_epi64(vlo32_4, vlo32_5);
+    __m256i vlo64_5 = _mm256_unpacklo_epi64(vlo32_6, vlo32_7);
+    __m256i vlo64_6 = _mm256_unpacklo_epi64(vhi32_4, vhi32_5);
+    __m256i vlo64_7 = _mm256_unpacklo_epi64(vhi32_6, vhi32_7);
+    __m256i vlo64_8 = _mm256_unpacklo_epi64(vlo32_8, vlo32_9);
+    __m256i vlo64_9 = _mm256_unpacklo_epi64(vlo32_a, vlo32_b);
+    __m256i vlo64_a = _mm256_unpacklo_epi64(vhi32_8, vhi32_9);
+    __m256i vlo64_b = _mm256_unpacklo_epi64(vhi32_a, vhi32_b);
+    __m256i vlo64_c = _mm256_unpacklo_epi64(vlo32_c, vlo32_d);
+    __m256i vlo64_d = _mm256_unpacklo_epi64(vlo32_e, vlo32_f);
+    __m256i vlo64_e = _mm256_unpacklo_epi64(vhi32_c, vhi32_d);
+    __m256i vlo64_f = _mm256_unpacklo_epi64(vhi32_e, vhi32_f);
+
+    __m256i vhi64_0 = _mm256_unpackhi_epi64(vlo32_0, vlo32_1);
+    __m256i vhi64_1 = _mm256_unpackhi_epi64(vlo32_2, vlo32_3);
+    __m256i vhi64_2 = _mm256_unpackhi_epi64(vhi32_0, vhi32_1);
+    __m256i vhi64_3 = _mm256_unpackhi_epi64(vhi32_2, vhi32_3);
+    __m256i vhi64_4 = _mm256_unpackhi_epi64(vlo32_4, vlo32_5);
+    __m256i vhi64_5 = _mm256_unpackhi_epi64(vlo32_6, vlo32_7);
+    __m256i vhi64_6 = _mm256_unpackhi_epi64(vhi32_4, vhi32_5);
+    __m256i vhi64_7 = _mm256_unpackhi_epi64(vhi32_6, vhi32_7);
+    __m256i vhi64_8 = _mm256_unpackhi_epi64(vlo32_8, vlo32_9);
+    __m256i vhi64_9 = _mm256_unpackhi_epi64(vlo32_a, vlo32_b);
+    __m256i vhi64_a = _mm256_unpackhi_epi64(vhi32_8, vhi32_9);
+    __m256i vhi64_b = _mm256_unpackhi_epi64(vhi32_a, vhi32_b);
+    __m256i vhi64_c = _mm256_unpackhi_epi64(vlo32_c, vlo32_d);
+    __m256i vhi64_d = _mm256_unpackhi_epi64(vlo32_e, vlo32_f);
+    __m256i vhi64_e = _mm256_unpackhi_epi64(vhi32_c, vhi32_d);
+    __m256i vhi64_f = _mm256_unpackhi_epi64(vhi32_e, vhi32_f);
+
+    __m256i vrow00 = _mm256_permute2x128_si256(vlo64_0, vlo64_1, 0x20);
+    __m256i vrow01 = _mm256_permute2x128_si256(vhi64_0, vhi64_1, 0x20);
+    __m256i vrow02 = _mm256_permute2x128_si256(vlo64_2, vlo64_3, 0x20);
+    __m256i vrow03 = _mm256_permute2x128_si256(vhi64_2, vhi64_3, 0x20);
+    __m256i vrow04 = _mm256_permute2x128_si256(vlo64_4, vlo64_5, 0x20);
+    __m256i vrow05 = _mm256_permute2x128_si256(vhi64_4, vhi64_5, 0x20);
+    __m256i vrow06 = _mm256_permute2x128_si256(vlo64_6, vlo64_7, 0x20);
+    __m256i vrow07 = _mm256_permute2x128_si256(vhi64_6, vhi64_7, 0x20);
+
+    __m256i vrow08 = _mm256_permute2x128_si256(vlo64_8, vlo64_9, 0x20);
+    __m256i vrow09 = _mm256_permute2x128_si256(vhi64_8, vhi64_9, 0x20);
+    __m256i vrow0a = _mm256_permute2x128_si256(vlo64_a, vlo64_b, 0x20);
+    __m256i vrow0b = _mm256_permute2x128_si256(vhi64_a, vhi64_b, 0x20);
+    __m256i vrow0c = _mm256_permute2x128_si256(vlo64_c, vlo64_d, 0x20);
+    __m256i vrow0d = _mm256_permute2x128_si256(vhi64_c, vhi64_d, 0x20);
+    __m256i vrow0e = _mm256_permute2x128_si256(vlo64_e, vlo64_f, 0x20);
+    __m256i vrow0f = _mm256_permute2x128_si256(vhi64_e, vhi64_f, 0x20);
+
+    __m256i vrow10 = _mm256_permute2x128_si256(vlo64_0, vlo64_1, 0x31);
+    __m256i vrow11 = _mm256_permute2x128_si256(vhi64_0, vhi64_1, 0x31);
+    __m256i vrow12 = _mm256_permute2x128_si256(vlo64_2, vlo64_3, 0x31);
+    __m256i vrow13 = _mm256_permute2x128_si256(vhi64_2, vhi64_3, 0x31);
+    __m256i vrow14 = _mm256_permute2x128_si256(vlo64_4, vlo64_5, 0x31);
+    __m256i vrow15 = _mm256_permute2x128_si256(vhi64_4, vhi64_5, 0x31);
+    __m256i vrow16 = _mm256_permute2x128_si256(vlo64_6, vlo64_7, 0x31);
+    __m256i vrow17 = _mm256_permute2x128_si256(vhi64_6, vhi64_7, 0x31);
+
+    __m256i vrow18 = _mm256_permute2x128_si256(vlo64_8, vlo64_9, 0x31);
+    __m256i vrow19 = _mm256_permute2x128_si256(vhi64_8, vhi64_9, 0x31);
+    __m256i vrow1a = _mm256_permute2x128_si256(vlo64_a, vlo64_b, 0x31);
+    __m256i vrow1b = _mm256_permute2x128_si256(vhi64_a, vhi64_b, 0x31);
+    __m256i vrow1c = _mm256_permute2x128_si256(vlo64_c, vlo64_d, 0x31);
+    __m256i vrow1d = _mm256_permute2x128_si256(vhi64_c, vhi64_d, 0x31);
+    __m256i vrow1e = _mm256_permute2x128_si256(vlo64_e, vlo64_f, 0x31);
+    __m256i vrow1f = _mm256_permute2x128_si256(vhi64_e, vhi64_f, 0x31);
+    
+    _mm256_store_si256((__m256i*)(dst + 0),   vrow00);
+    _mm256_store_si256((__m256i*)(dst + 32),  vrow01);
+    _mm256_store_si256((__m256i*)(dst + 64),  vrow02);
+    _mm256_store_si256((__m256i*)(dst + 96),  vrow03);
+    _mm256_store_si256((__m256i*)(dst + 128), vrow04);
+    _mm256_store_si256((__m256i*)(dst + 160), vrow05);
+    _mm256_store_si256((__m256i*)(dst + 192), vrow06);
+    _mm256_store_si256((__m256i*)(dst + 224), vrow07);
+    _mm256_store_si256((__m256i*)(dst + 256), vrow08);
+    _mm256_store_si256((__m256i*)(dst + 288), vrow09);
+    _mm256_store_si256((__m256i*)(dst + 320), vrow0a);
+    _mm256_store_si256((__m256i*)(dst + 352), vrow0b);
+    _mm256_store_si256((__m256i*)(dst + 384), vrow0c);
+    _mm256_store_si256((__m256i*)(dst + 416), vrow0d);
+    _mm256_store_si256((__m256i*)(dst + 448), vrow0e);
+    _mm256_store_si256((__m256i*)(dst + 480), vrow0f);
+    _mm256_store_si256((__m256i*)(dst + 512), vrow10);
+    _mm256_store_si256((__m256i*)(dst + 544), vrow11);
+    _mm256_store_si256((__m256i*)(dst + 576), vrow12);
+    _mm256_store_si256((__m256i*)(dst + 608), vrow13);
+    _mm256_store_si256((__m256i*)(dst + 640), vrow14);
+    _mm256_store_si256((__m256i*)(dst + 672), vrow15);
+    _mm256_store_si256((__m256i*)(dst + 704), vrow16);
+    _mm256_store_si256((__m256i*)(dst + 736), vrow17);
+    _mm256_store_si256((__m256i*)(dst + 768), vrow18);
+    _mm256_store_si256((__m256i*)(dst + 800), vrow19);
+    _mm256_store_si256((__m256i*)(dst + 832), vrow1a);
+    _mm256_store_si256((__m256i*)(dst + 864), vrow1b);
+    _mm256_store_si256((__m256i*)(dst + 896), vrow1c);
+    _mm256_store_si256((__m256i*)(dst + 928), vrow1d);
+    _mm256_store_si256((__m256i*)(dst + 960), vrow1e);
+    _mm256_store_si256((__m256i*)(dst + 992), vrow1f);
+
+    dst += 1024;
   }
 }
 
@@ -2935,7 +3441,51 @@ static void uvg_angular_pred_avx2(
         angular_pred_non_fractional_angle_pxl_copy_ver_avx2(dst, ref_main, width, height, delta_int);
       }
       else {
-        angular_pred_non_fractional_angle_pxl_copy_hor_avx2(dst, ref_main, width, height, delta_int);
+        if (pred_mode == 2) {
+          switch (width) {
+            // Note: these functions do not need the delta int table as the mode is known
+            case 4: angular_pred_non_fractional_angle_pxl_copy_w4_mode2_hor_avx2(dst, ref_main, height); break;
+            case 8: angular_pred_non_fractional_angle_pxl_copy_w8_mode2_hor_avx2(dst, ref_main, height); break;
+            // Cases 16 onward can be solved with a simple memcpy
+            case 16:
+              for (int y = 0; y < height; ++y) {
+                // Offset indices by one since index 0 is top left and plus one since delta_int[0] for mode 2 is 1.
+                memcpy(&dst[y * 16], &ref_main[2 + y], 16 * sizeof(uvg_pixel));
+              }
+              break;
+            case 32:
+              for (int y = 0; y < height; ++y) {
+                memcpy(&dst[y * 32], &ref_main[2 + y], 32 * sizeof(uvg_pixel));
+              }
+              break;
+            case 64:
+              for (int y = 0; y < height; ++y) {
+                memcpy(&dst[y * 64], &ref_main[2 + y], 64 * sizeof(uvg_pixel));
+              }
+              break;
+            default:
+              assert(false && "Intra angular predicion: illegal width.\n");
+              break;
+          }
+
+        }
+        else {
+          // Wide angle modes -12, -10, -8 and -4
+          switch (width) {
+            case 4: angular_pred_non_fractional_angle_pxl_copy_w4_wide_angle_hor_avx2(dst, ref_main, height, delta_int); break;
+            case 8: angular_pred_non_fractional_angle_pxl_copy_w8_wide_angle_hor_avx2(dst, ref_main, height, delta_int); break;
+            case 16: angular_pred_non_fractional_angle_pxl_copy_w16_wide_angle_hor_avx2(dst, ref_main, height, delta_int); break;
+            case 32: angular_pred_non_fractional_angle_pxl_copy_w32_wide_angle_hor_avx2(dst, ref_main, height, delta_int); break;
+            // Width 64 never goes into this branch. Leave an assert here to catch future problems.
+            case 64: 
+              //angular_pred_non_fractional_angle_pxl_copy_hor_avx2(dst, ref_main, width, height, delta_int); break;
+              assert(false && "Intra angular predicion: Non fractional angle pixel copy with width 64. This should never happen.\n");
+              break;
+            default:
+              assert(false && "Intra angular predicion: illegal width.\n");
+              break;
+          }
+        }
       }
     }
   }
