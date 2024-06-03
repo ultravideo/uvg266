@@ -1330,7 +1330,7 @@ static void angular_pred_non_fractional_angle_pxl_copy_ver_avx2(uvg_pixel* dst, 
   }
 }
 
-static void angular_pred_non_fractional_angle_pxl_copy_w4_mode2_hor_avx2(uvg_pixel* dst, uvg_pixel* ref, const int height)
+static void angular_pred_non_fractional_angle_pxl_copy_w4_mode2_hor_avx2(uvg_pixel* dst, uvg_pixel* ref, const int height, const int multi_ref_offset)
 {
   // const int width = 4;
   
@@ -1347,7 +1347,7 @@ static void angular_pred_non_fractional_angle_pxl_copy_w4_mode2_hor_avx2(uvg_pix
   // Handle as 4x4 blocks. There is no case where height < 4.
   if (height == 4) {
     // Offset indices by one since index 0 is top left and plus one since delta_int[0] for mode 2 is 1.
-    __m128i vref = _mm_loadu_si128((__m128i*)&ref[2]);
+    __m128i vref = _mm_loadu_si128((__m128i*)&ref[2] + multi_ref_offset);
     vref = _mm_shuffle_epi8(vref, vrefshuf0);
 
     _mm_store_si128((__m128i*)dst, vref);
@@ -1356,7 +1356,7 @@ static void angular_pred_non_fractional_angle_pxl_copy_w4_mode2_hor_avx2(uvg_pix
     // Can handle 8 rows at once
     for (int y = 0; y < height; y += 8) {
       
-      __m128i vref = _mm_loadu_si128((__m128i*)(ref + 2 + y));
+      __m128i vref = _mm_loadu_si128((__m128i*)(ref + 2 + y + multi_ref_offset));
 
       __m128i vres0 = _mm_shuffle_epi8(vref, vrefshuf0);
       __m128i vres1 = _mm_shuffle_epi8(vref, vrefshuf1);
@@ -1368,7 +1368,7 @@ static void angular_pred_non_fractional_angle_pxl_copy_w4_mode2_hor_avx2(uvg_pix
   }
 }
 
-static void angular_pred_non_fractional_angle_pxl_copy_w8_mode2_hor_avx2(uvg_pixel* dst, uvg_pixel* ref, const int height)
+static void angular_pred_non_fractional_angle_pxl_copy_w8_mode2_hor_avx2(uvg_pixel* dst, uvg_pixel* ref, const int height, const int multi_ref_offset)
 {
 
   const __m128i vrefshuf0 = _mm_setr_epi8(
@@ -1394,7 +1394,7 @@ static void angular_pred_non_fractional_angle_pxl_copy_w8_mode2_hor_avx2(uvg_pix
   // Can handle 8 rows at once. There is no case for height 2 and 4, this function is not reached in those cases.
   for (int y = 0; y < height; y += 8) {
     // Offset indices by one since index 0 is top left and plus one since delta_int[0] for mode 2 is 1.
-    __m128i vref = _mm_loadu_si128((__m128i*)(ref + 2 + y));
+    __m128i vref = _mm_loadu_si128((__m128i*)(ref + 2 + y + multi_ref_offset));
     _mm_store_si128((__m128i*)(dst + 0), _mm_shuffle_epi8(vref, vrefshuf0));
     _mm_store_si128((__m128i*)(dst + 16), _mm_shuffle_epi8(vref, vrefshuf1));
     _mm_store_si128((__m128i*)(dst + 32), _mm_shuffle_epi8(vref, vrefshuf2));
@@ -3357,7 +3357,7 @@ static void uvg_angular_pred_avx2(
     // The mode is not horizontal or vertical, we have to do interpolation.
 
     // Set delta table pointers
-    const int table_offset = wide_angle_mode ? (pred_mode < 2 ? (pred_mode + 13) * 64 : (81 - pred_mode) * 64) : (pred_mode <= 34 ? (pred_mode - 2) * 64 : (66 - pred_mode) * 64);
+    const int table_offset = wide_angle_mode ? (pred_mode < 2 ? (pred_mode + 13) * DELTA_TABLE_ROW_LENGTH : (81 - pred_mode) * DELTA_TABLE_ROW_LENGTH) : (pred_mode <= 34 ? (pred_mode - 2) * DELTA_TABLE_ROW_LENGTH : (66 - pred_mode) * DELTA_TABLE_ROW_LENGTH);
     const int16_t* delta_int   = wide_angle_mode ? &delta_int_wide_angle_table[table_offset] : &delta_int_table[table_offset];
     delta_int += multi_ref_index; // TODO: This are not necessarily large enough for 64 dimension blocks
     const int16_t* delta_fract = wide_angle_mode ? &delta_fract_wide_angle_table[table_offset] : &delta_fract_table[table_offset];
@@ -3444,23 +3444,23 @@ static void uvg_angular_pred_avx2(
         if (pred_mode == 2) {
           switch (width) {
             // Note: these functions do not need the delta int table as the mode is known
-            case 4: angular_pred_non_fractional_angle_pxl_copy_w4_mode2_hor_avx2(dst, ref_main, height); break;
-            case 8: angular_pred_non_fractional_angle_pxl_copy_w8_mode2_hor_avx2(dst, ref_main, height); break;
+            case 4: angular_pred_non_fractional_angle_pxl_copy_w4_mode2_hor_avx2(dst, ref_main, height, multi_ref_index); break;
+            case 8: angular_pred_non_fractional_angle_pxl_copy_w8_mode2_hor_avx2(dst, ref_main, height, multi_ref_index); break;
             // Cases 16 onward can be solved with a simple memcpy
             case 16:
               for (int y = 0; y < height; ++y) {
                 // Offset indices by one since index 0 is top left and plus one since delta_int[0] for mode 2 is 1.
-                memcpy(&dst[y * 16], &ref_main[2 + y], 16 * sizeof(uvg_pixel));
+                memcpy(&dst[y * 16], &ref_main[2 + y + multi_ref_index], 16 * sizeof(uvg_pixel));
               }
               break;
             case 32:
               for (int y = 0; y < height; ++y) {
-                memcpy(&dst[y * 32], &ref_main[2 + y], 32 * sizeof(uvg_pixel));
+                memcpy(&dst[y * 32], &ref_main[2 + y + multi_ref_index], 32 * sizeof(uvg_pixel));
               }
               break;
             case 64:
               for (int y = 0; y < height; ++y) {
-                memcpy(&dst[y * 64], &ref_main[2 + y], 64 * sizeof(uvg_pixel));
+                memcpy(&dst[y * 64], &ref_main[2 + y + multi_ref_index], 64 * sizeof(uvg_pixel));
               }
               break;
             default:
@@ -3564,7 +3564,7 @@ static void uvg_angular_pred_avx2(
   }
 
   
-  bool PDPC_filter = (width >= TR_MIN_WIDTH && height >= TR_MIN_WIDTH);
+  bool PDPC_filter = (width >= TR_MIN_WIDTH && height >= TR_MIN_WIDTH && multi_ref_index == 0);
   if (pred_mode > 1 && pred_mode < 67) {
     // Disable PDPC filter if both references are used or if MRL is used
     if (mode_disp < 0 || multi_ref_index) {
