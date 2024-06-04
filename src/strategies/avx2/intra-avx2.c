@@ -1413,7 +1413,7 @@ static void angular_pred_non_fractional_angle_pxl_copy_w4_wide_angle_hor_avx2(uv
   );
 
   //__m128i vidx = _mm_setr_epi32(delta_int[0], delta_int[1], delta_int[2], delta_int[3]);
-  __m128i vidx = _mm_load_si128((__m128i*)delta_int);
+  __m128i vidx = _mm_loadu_si128((__m128i*)delta_int);
   vidx = _mm_cvtepi16_epi32(vidx);
 
   // Handle as 4x4 blocks. There is no case where height < 4.
@@ -1931,7 +1931,7 @@ static void angular_pdpc_ver_w8_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, 
       }
     }
 
-    __m128i vdst = _mm_i64gather_epi64((const int64_t*)(dst + y * width), vseq, 8);
+    __m128i vdst = _mm_i64gather_epi64((const long long int*)(dst + y * width), vseq, 8);
     __m256i vdst16 = _mm256_cvtepu8_epi16(vdst);
     __m256i vleft = _mm256_loadu_si256((__m256i*)left);
     
@@ -2068,7 +2068,7 @@ static void angular_pdpc_ver_w16_scale1_avx2(uvg_pixel* dst, const uvg_pixel* re
       }
     }
 
-    __m128i vdst = _mm_i64gather_epi64((const int64_t*)(dst + y * width), vidx, 1);
+    __m128i vdst = _mm_i64gather_epi64((const long long int*)(dst + y * width), vidx, 1);
     __m256i vdst16 = _mm256_cvtepu8_epi16(vdst);
     __m256i vleft = _mm256_loadu_si256((__m256i*)left);
 
@@ -2311,7 +2311,7 @@ static void angular_pdpc_ver_8x2_scale1_avx2(uvg_pixel* dst, const uvg_pixel* re
     //__m128i vleft = _mm_loadu_si128((__m128i*) & ref_side[y + shifted_inv_angle_sum[0] + 1]);
     //vleft = _mm_shuffle_epi8(vleft, vshuf);
 
-    __m128i vdst = _mm_i64gather_epi64((const int64_t*)(dst + y * width), vidx, 1);
+    __m128i vdst = _mm_i64gather_epi64((const long long int*)(dst + y * width), vidx, 1);
     __m256i vdst16 = _mm256_cvtepu8_epi16(vdst);
     //__m256i vleft16 = _mm256_cvtepu8_epi16(vleft);
     __m256i vleft = _mm256_loadu_si256((__m256i*)left);
@@ -2371,7 +2371,7 @@ static void angular_pdpc_ver_8x2_scale2_high_angle_avx2(uvg_pixel* dst, const uv
     __m128i vleft = _mm_loadu_si128((__m128i*) & ref_side[y + shifted_inv_angle_sum[0] + 1]);
     vleft = _mm_shuffle_epi8(vleft, vshuf);
 
-    __m128i vdst = _mm_i64gather_epi64((const int64_t*)(dst + y * width), vidx, 1);
+    __m128i vdst = _mm_i64gather_epi64((const long long int*)(dst + y * width), vidx, 1);
     __m256i vdst16 = _mm256_cvtepu8_epi16(vdst);
     __m256i vleft16 = _mm256_cvtepu8_epi16(vleft);
     //__m256i vleft = _mm256_loadu_si256((__m256i*)left);
@@ -2427,7 +2427,7 @@ static void angular_pdpc_ver_8x2_scale1_high_angle_avx2(uvg_pixel* dst, const uv
       }
     }
 
-    __m128i vdst = _mm_i64gather_epi64((const int64_t*)(dst + y * width), vidx, 1);
+    __m128i vdst = _mm_i64gather_epi64((const long long int*)(dst + y * width), vidx, 1);
     __m256i vdst16 = _mm256_cvtepu8_epi16(vdst);
     __m256i vleft = _mm256_loadu_si256((__m256i*)left);
 
@@ -2673,7 +2673,7 @@ static void angular_pdpc_hor_w8_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, 
     memcpy(&tmp[0], &ref_side[shifted_inv_angle_sum[y + 0] + 1], 8 * sizeof(uvg_pixel));
     memcpy(&tmp[8], &ref_side[shifted_inv_angle_sum[y + 1] + 1], 8 * sizeof(uvg_pixel));
     
-    __m128i vpred = _mm_i64gather_epi64((const int64_t*)(dst + y * width), vidx, 1);
+    __m128i vpred = _mm_i64gather_epi64((const long long int*)(dst + y * width), vidx, 1);
     __m256i vpred16 = _mm256_cvtepu8_epi16(vpred);
     __m128i vtop = _mm_load_si128((__m128i*)tmp);
     __m256i vtop16 = _mm256_cvtepu8_epi16(vtop);
@@ -2855,7 +2855,7 @@ static void angular_pdpc_mode18_w8_avx2(uvg_pixel* dst, const uvg_pixel top_left
   for (int y = 0, o = table_offset; y < limit; y += 2, o += 16) {
     const __m256i vwT = _mm256_load_si256((const __m256i*) &intra_pdpc_w8_hor_weight[o]);
 
-    __m128i vpred = _mm_i64gather_epi64((const int64_t*)(dst + y * width), vidx, 1);
+    __m128i vpred = _mm_i64gather_epi64((const long long int*)(dst + y * width), vidx, 1);
     __m256i vpred16 = _mm256_cvtepu8_epi16(vpred);
     
     __m256i accu = _mm256_sub_epi16(vref16, vtopleft);
@@ -3210,7 +3210,7 @@ static void angular_pdpc_mode50_scale1_avx2(uvg_pixel* dst, const uvg_pixel top_
     __m256i vref16 = _mm256_cvtepu8_epi16(vref);
 
     //__m128i vdst = _mm_load_si128((const __m128i*)(dst + y * width));
-    __m128i vdst = _mm_i64gather_epi64((const int64_t*)(dst + y * width), vidx, 1);
+    __m128i vdst = _mm_i64gather_epi64((const long long int*)(dst + y * width), vidx, 1);
     __m256i vdst16 = _mm256_cvtepu8_epi16(vdst);
 
     __m256i accu = _mm256_sub_epi16(vref16, vtopleft);
@@ -5583,7 +5583,7 @@ static void mip_upsampling_w32_ups4_hor_avx2_alt(uvg_pixel* const dst, const uvg
     
 
     __m256i vbefore = _mm256_load_si256((__m256i*)before);
-    __m256i vbehind = _mm256_load_si256((__m256i*)src_ptr);
+    __m256i vbehind = _mm256_loadu_si256((__m256i*)src_ptr);
 
     // Permute the input values to get the result in correct order.
     vbefore = _mm256_permutevar8x32_epi32(vbefore, permute_mask);
@@ -5962,8 +5962,8 @@ static void mip_upsampling_w4_ups4_ver_avx2(uvg_pixel* const dst, const uvg_pixe
   vres0 = _mm256_permute4x64_epi64(vlo128, _MM_SHUFFLE(3, 1, 2, 0));
   vres1 = _mm256_permute4x64_epi64(vhi128, _MM_SHUFFLE(3, 1, 2, 0));
 
-  _mm256_store_si256((__m256i*)(dst + 0), vres0);
-  _mm256_store_si256((__m256i*)(dst + 32), vres1);
+  _mm256_storeu_si256((__m256i*)(dst + 0), vres0);
+  _mm256_storeu_si256((__m256i*)(dst + 32), vres1);
   
 }
 
@@ -6092,7 +6092,7 @@ static void mip_upsampling_w8_ups2_h16_ver_avx2(uvg_pixel* const dst, const uvg_
 {
   int64_t refline = *(int64_t*)ref;
   __m128i vbehind0 = _mm_load_si128((__m128i*)(src + 0));
-  __m128i vbefore1 = _mm_load_si128((__m128i*)(src + 8));
+  __m128i vbefore1 = _mm_loadu_si128((__m128i*)(src + 8));
   __m128i vbehind1 = _mm_load_si128((__m128i*)(src + 16));
 
   __m128i vbefore0 = vbehind0;
@@ -6112,9 +6112,9 @@ static void mip_upsampling_w8_ups2_h16_ver_avx2(uvg_pixel* const dst, const uvg_
   _mm_store_si128((__m128i*)(dst + 32), vres2);
   _mm_store_si128((__m128i*)(dst + 48), vres3);
 
-  vbefore0 = _mm_load_si128((__m128i*)(src + 24));
+  vbefore0 = _mm_loadu_si128((__m128i*)(src + 24));
   vbehind0 = _mm_load_si128((__m128i*)(src + 32));
-  vbefore1 = _mm_load_si128((__m128i*)(src + 40));
+  vbefore1 = _mm_loadu_si128((__m128i*)(src + 40));
   vbehind1 = _mm_load_si128((__m128i*)(src + 48));
 
   vavg0 = _mm_avg_epu8(vbefore0, vbehind0);
@@ -6360,7 +6360,7 @@ static void mip_upsampling_w16_ups4_ver_avx2(uvg_pixel* const dst, const uvg_pix
   __m256i vbefore256;
   __m256i vbehind256;
 
-  __m128i vbefore = _mm_load_si128((__m128i*)ref);
+  __m128i vbefore = _mm_loadu_si128((__m128i*)ref);
   vbefore256 = _mm256_cvtepu8_epi16(vbefore);
   
   for (int i = 0; i < 8; ++i) {
@@ -6388,8 +6388,8 @@ static void mip_upsampling_w16_ups4_ver_avx2(uvg_pixel* const dst, const uvg_pix
     vres0 = _mm256_permute4x64_epi64(vres0, _MM_SHUFFLE(3, 1, 2, 0));
     vres1 = _mm256_permute4x64_epi64(vres1, _MM_SHUFFLE(3, 1, 2, 0));
 
-    _mm256_store_si256((__m256i*)(dst + (i * 64) +  0), vres0);
-    _mm256_store_si256((__m256i*)(dst + (i * 64) + 32), vres1);
+    _mm256_storeu_si256((__m256i*)(dst + (i * 64) +  0), vres0);
+    _mm256_storeu_si256((__m256i*)(dst + (i * 64) + 32), vres1);
 
     vbefore256 = vbehind256;
   }
@@ -6587,13 +6587,13 @@ static void mip_upsampling_w16_ups8_ver_avx2_alt(uvg_pixel* const dst, const uvg
 
 static void mip_upsampling_w32_ups2_ver_avx2(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref)
 {
-  __m256i vbefore = _mm256_load_si256((__m256i*)ref);
+  __m256i vbefore = _mm256_loadu_si256((__m256i*)ref);
 
   for (int i = 0; i < 8; ++i) {
-    __m256i vbehind = _mm256_load_si256((__m256i*)(src + (i * 64)));
+    __m256i vbehind = _mm256_loadu_si256((__m256i*)(src + (i * 64)));
     __m256i vavg = _mm256_avg_epu8(vbefore, vbehind);
 
-    _mm256_store_si256((__m256i*)(dst + (i * 64)), vavg);
+    _mm256_storeu_si256((__m256i*)(dst + (i * 64)), vavg);
 
     vbefore = vbehind;
   }

@@ -3201,7 +3201,7 @@ static void fast_forward_tr_4x32_avx2(const int16_t* src, int16_t* dst, tr_type_
     ver_coeff = ff_dct8_4x32_coeff_ver;
   }
 
-  int16_t v_hor_pass_out[4*32];
+  ALIGNED(32) int16_t v_hor_pass_out[4*32];
   fast_forward_tr_4xN_avx2_hor(src, (__m256i*)v_hor_pass_out, hor_coeff, shift_1st, height, 0, skip_width);
 
 
@@ -5637,7 +5637,7 @@ static void fast_forward_tr_16x32_avx2(const int16_t* src, int16_t* dst, tr_type
     ver_coeff = ff_dct8_16x32_coeff_ver;
   }
 
-  int16_t v_hor_pass_out[32*16];
+  ALIGNED(32) int16_t v_hor_pass_out[32*16];
   fast_forward_DCT2_B16_avx2_hor(src, (__m256i*)v_hor_pass_out, hor_coeff, shift_1st, height, 0, skip_width);
 
 

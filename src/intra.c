@@ -1498,7 +1498,7 @@ static void intra_recon_tb_leaf(
 
   uvg_intra_build_reference(state, pu_loc, cu_loc, color, &luma_px, &pic_px, lcu, &refs, cfg->wpp, extra_refs, multi_ref_index, isp_mode);
 
-  uvg_pixel pred[32 * 32];
+  ALIGNED(32) uvg_pixel pred[32 * 32];
   uvg_intra_predict(state, &refs, cu_loc, pu_loc, color, pred, search_data, lcu);
 
   const int index = lcu_px.x + lcu_px.y * lcu_width;
