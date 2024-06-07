@@ -5949,7 +5949,7 @@ static void fast_forward_DCT2_B32_avx2_hor(const int16_t* src, __m256i* dst, con
     v_trunc_0 = _mm256_packs_epi32(v_trunc_0, v_trunc_1);
     v_trunc_1 = _mm256_packs_epi32(v_trunc_2, v_trunc_3);
 
-    if(line == 32) {
+    if(line == 32 || line == 1) {
       v_trunc_0 = _mm256_permute4x64_epi64(v_trunc_0, _MM_SHUFFLE(3, 1, 2, 0));
       v_trunc_1 = _mm256_permute4x64_epi64(v_trunc_1, _MM_SHUFFLE(3, 1, 2, 0));
     }

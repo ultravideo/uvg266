@@ -1347,7 +1347,7 @@ static void angular_pred_non_fractional_angle_pxl_copy_w4_mode2_hor_avx2(uvg_pix
   // Handle as 4x4 blocks. There is no case where height < 4.
   if (height == 4) {
     // Offset indices by one since index 0 is top left and plus one since delta_int[0] for mode 2 is 1.
-    __m128i vref = _mm_loadu_si128((__m128i*)&ref[2] + multi_ref_offset);
+    __m128i vref = _mm_loadu_si128((__m128i*)(&ref[2] + multi_ref_offset));
     vref = _mm_shuffle_epi8(vref, vrefshuf0);
 
     _mm_store_si128((__m128i*)dst, vref);
@@ -3639,7 +3639,7 @@ static void uvg_angular_pred_avx2(
               angular_pdpc_ver_8x2_scale1_high_angle_avx2(dst, ref_side, width, height, mode_disp);
           }
           else {
-            if (mode_disp < 10)
+            if (mode_disp < 10 || 1)
               angular_pdpc_ver_w8_avx2(dst, ref_side, height, scale, mode_disp);
             else
               angular_pdpc_ver_8x2_scale2_high_angle_avx2(dst, ref_side, width, height, mode_disp);
