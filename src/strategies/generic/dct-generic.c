@@ -2608,6 +2608,7 @@ static void mts_dct_generic(
     if (height == 1) {
       dct_hor(input, output, shift_1st, height, 0, skip_width);
     } else if (width == 1) {
+      // The shift value is taken from VTM, it's a special case for width == 1
       dct_ver(input, output, log2_height_minus1 + 1 + bitdepth + 6 - 15, width, 0, skip_height);
     } else {
       dct_hor(input, tmp, shift_1st, height, 0, skip_width);

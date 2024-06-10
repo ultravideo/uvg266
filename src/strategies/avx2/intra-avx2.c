@@ -2343,7 +2343,7 @@ static void angular_pdpc_ver_8x2_scale2_high_angle_avx2(uvg_pixel* dst, const uv
   // NOTE: This function is just the w8 function, retrofitted to work with width 16 and up when scale is 1.
   // Since scale is 1, limit is 6 and therefore there is no meaningful work to be done when x > 6, so only the first column of 8x2 chunks is handled.
   // This function handles cases where prediction angle is high. For PDPC, this means the needed reference samples are close together, enabling more effective loading.
-  const int scale = 1;
+  const int scale = 2;
   const int log2_width = uvg_g_convert_to_log2[width];
 
   const int limit = 6;
@@ -3639,7 +3639,7 @@ static void uvg_angular_pred_avx2(
               angular_pdpc_ver_8x2_scale1_high_angle_avx2(dst, ref_side, width, height, mode_disp);
           }
           else {
-            if (mode_disp < 10 || 1)
+            if (mode_disp < 10)
               angular_pdpc_ver_w8_avx2(dst, ref_side, height, scale, mode_disp);
             else
               angular_pdpc_ver_8x2_scale2_high_angle_avx2(dst, ref_side, width, height, mode_disp);
