@@ -1663,6 +1663,7 @@ int8_t uvg_get_co_located_luma_mode(
   else {
     cu = LCU_GET_CU_AT_PX(lcu, SUB_SCU(x), SUB_SCU(y));
   }
+  assert(cu->type != CU_INTER && "co-located CU should not be an inter CU");
   if (cu->intra.mip_flag) {
     return 0;
   }

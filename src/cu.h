@@ -108,6 +108,7 @@ typedef struct  {
   uint8_t mtt_depth;
   uint8_t implicit_mtt_depth;
   uint8_t part_index;
+  uint8_t scipu_cb_depth;
 } split_tree_t;
 
 
@@ -202,6 +203,7 @@ int uvg_get_split_locs(
   enum split_type split,
   cu_loc_t out[4],
   uint8_t* separate_chroma);
+void uvg_get_split_parent_loc( const cu_loc_t* parent_loc, const enum split_type parent_split, const cu_loc_t* const cur_cu_loc, uint8_t cur_cu_part_index);
 int uvg_get_possible_splits(const encoder_state_t* const state,
                             const cu_loc_t* const cu_loc, split_tree_t split_tree, enum uvg_tree_type tree_type, bool splits[6]);
 

@@ -1295,6 +1295,25 @@ static double search_cu(
     cur_cu->log2_chroma_width = uvg_g_convert_to_log2[chroma_loc->chroma_width];
   }
 
+  //Account for SCIPU. All sub-blocks of a SCIPU need to be either all intra or all inter
+  bool is_scipu_inter = false;
+  bool constrain_mode = true;
+  if (split_tree.scipu_cb_depth == 1 && split_tree.part_index == 0) { 
+    constrain_mode = false; //Let first scipu sub-block be chosen freely
+  }
+  else if (split_tree.scipu_cb_depth > 0) {
+    //Force same pred. type as the first sub-block in SCIPU
+    const enum split_type parent_split = GET_SPLITDATA(&split_tree, split_tree.current_depth - 1);
+    cu_loc_t split_cu_loc[4];
+    cu_loc_t parent_loc;
+    uint8_t separate_chroma = 0;
+    uvg_get_split_parent_loc(&parent_loc, parent_split, cu_loc, split_tree.part_index);
+    uvg_get_split_locs(&parent_loc, parent_split, split_cu_loc, &separate_chroma);
+    is_scipu_inter = LCU_GET_CU_AT_PX(lcu, split_cu_loc[0].local_x, split_cu_loc[0].local_y)->type == CU_INTER;
+  } else {
+    constrain_mode = false; 
+  }
+
   intra_search_data_t intra_search = {0};
 
   const bool completely_inside = x + luma_width <= frame_width && y + luma_height <= frame_height;
@@ -1313,7 +1332,9 @@ static double search_cu(
         // otherwise forbid it.
         (x & ~(cu_width_inter_min - 1)) + cu_width_inter_min > frame_width ||
         (y & ~(cu_width_inter_min - 1)) + cu_width_inter_min > frame_height
-      ) && cu_loc->width == cu_loc->height; // Don't allow non square inter CUs for now
+        ) && (cu_loc->width != 4 || cu_loc->height != 4) && // 4x4 inter not allowed
+      ((state->encoder_control->chroma_format != UVG_CSP_400) ? (cu_loc->chroma_height * cu_loc->chroma_width) >= 16 : true) && // Don't allow blocks with <16 chroma samples for now (TODO: investigate small chroma blocks)
+      (constrain_mode ? is_scipu_inter : true); //Account for SCIPU
 
     if (can_use_inter) {
       double mode_cost;
@@ -1345,7 +1366,8 @@ static double search_cu(
         // otherwise forbid it.
         (x & ~(cu_width_intra_min - 1)) + cu_width_intra_min > frame_width ||
         (y & ~(cu_width_intra_min - 1)) + cu_width_intra_min > frame_height) &&
-      !(state->encoder_control->cfg.force_inter && state->frame->slicetype != UVG_SLICE_I);
+      !(state->encoder_control->cfg.force_inter && state->frame->slicetype != UVG_SLICE_I) &&
+      (constrain_mode ? !is_scipu_inter : true); //Account for SCIPU;
 
     intra_search.cost = 0;
     if (can_use_intra && !skip_intra) {
@@ -1745,7 +1767,8 @@ static double search_cu(
         split_tree.current_depth + 1,
         split_tree.mtt_depth + (split_type != QT_SPLIT),
         split_tree.implicit_mtt_depth + (split_type != QT_SPLIT && is_implicit),
-        0
+        0,
+        split_tree.scipu_cb_depth
       };
 
       if (completely_inside && check_for_early_termission(
@@ -1822,6 +1845,8 @@ static double search_cu(
       cu_loc_t new_cu_loc[4];
       uint8_t separate_chroma = 0;
       const int splits = uvg_get_split_locs(cu_loc, split_type, new_cu_loc, &separate_chroma);
+      bool is_scipu = separate_chroma || split_tree.scipu_cb_depth > 0;
+      if (is_scipu) new_split.scipu_cb_depth += 1;
       separate_chroma |= !has_chroma;
       initialize_partial_work_tree(state, lcu, &split_lcu[split_type - 1], cu_loc , separate_chroma ? chroma_loc : cu_loc, tree_type);
       for (int split = 0; split < splits; ++split) {
@@ -1844,6 +1869,19 @@ static double search_cu(
         if (split_cost > cost || split_cost > best_split_cost) {
           can_split[split_type] = false;
           break;
+        }
+      }
+
+      //Check that sub-blocks for SCIPU are either all inter or all intra
+      if (is_scipu && can_split[split_type]) {
+        const bool is_inter = LCU_GET_CU_AT_PX(&split_lcu[split_type - 1], new_cu_loc[0].local_x, new_cu_loc[0].local_y)->type == CU_INTER;
+        for (int y_tmp = cu_loc->local_y; y_tmp < cu_loc->local_y + cu_loc->height; y_tmp += 4) {
+          for (int x_tmp = cu_loc->local_x; x_tmp < cu_loc->local_x + cu_loc->width; x_tmp += 4) {
+          //assert(is_inter ? LCU_GET_CU_AT_PX(&split_lcu[split_type - 1], new_cu_loc[split].local_x, new_cu_loc[split].local_y)->type == CU_INTER 
+          //                : LCU_GET_CU_AT_PX(&split_lcu[split_type - 1], new_cu_loc[split].local_x, new_cu_loc[split].local_y)->type != CU_INTER);
+            assert(is_inter ? LCU_GET_CU_AT_PX(&split_lcu[split_type - 1], x_tmp, y_tmp)->type == CU_INTER
+                            : LCU_GET_CU_AT_PX(&split_lcu[split_type - 1], x_tmp, y_tmp)->type != CU_INTER );
+          }
         }
       }
 
@@ -2179,7 +2217,7 @@ void uvg_search_lcu(encoder_state_t * const state, const int x, const int y, con
 
   cu_loc_t start;
   uvg_cu_loc_ctor(&start, x, y, LCU_WIDTH, LCU_WIDTH);
-  split_tree_t split_tree = { 0, 0, 0, 0, 0 };
+  split_tree_t split_tree = { 0, 0, 0, 0, 0, 0 };
   double cost = 0; //TODO: save cost when resuming
 
 #ifdef UVG_ENCODING_RESUME

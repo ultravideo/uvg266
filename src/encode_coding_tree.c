@@ -1399,11 +1399,14 @@ void uvg_encode_coding_tree(
       );
     
     if (split_flag != NO_SPLIT) {
-      split_tree_t new_split_tree = { cur_cu->split_tree,
+      split_tree_t new_split_tree = { 
+        cur_cu->split_tree,
         split_tree.current_depth + 1,
         split_tree.mtt_depth + (split_flag != QT_SPLIT),
         split_tree.implicit_mtt_depth + (split_flag != QT_SPLIT && is_implicit),
-      0};
+        0,
+        split_tree.scipu_cb_depth
+      };
 
       cu_loc_t new_cu_loc[4];
       uint8_t separate_chroma = 0;
