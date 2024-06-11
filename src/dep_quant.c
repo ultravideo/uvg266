@@ -579,7 +579,7 @@ static INLINE void update_common_context(
       sbbFlags[i * 4 + curr_state_without_offset] = cc->m_allSbbCtx[cc->m_prev_sbb_ctx_offset].sbbFlags[i * 4 + prev_sbb_state];
     }
     for (int i = 16; i < setCpSize; ++i) {
-      levels[scan_pos * 4 + i * 4 + curr_state_without_offset] = cc->m_allSbbCtx[cc->m_prev_sbb_ctx_offset].sbbFlags[scan_pos * 4 + i * 4 + prev_sbb_state];
+      levels[scan_pos * 4 + i * 4 + curr_state_without_offset] = cc->m_allSbbCtx[cc->m_prev_sbb_ctx_offset].levels[scan_pos * 4 + i * 4 + prev_sbb_state];
     }
   }
   else {
