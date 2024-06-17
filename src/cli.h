@@ -59,6 +59,8 @@ typedef struct cmdline_opts_t {
   bool version;
   /** \brief Whether to loop input */
   bool loop_input;
+
+  bool skip_input;
 } cmdline_opts_t;
 
 cmdline_opts_t* cmdline_opts_parse(const uvg_api *api, int argc, char *argv[]);

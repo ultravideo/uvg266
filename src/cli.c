@@ -117,6 +117,7 @@ static const struct option long_options[] = {
   { "version",                  no_argument, NULL, 0 },
   { "help",                     no_argument, NULL, 0 },
   { "loop-input",               no_argument, NULL, 0 },
+  { "skip-input",               no_argument, NULL, 0 },
   { "mv-constraint",      required_argument, NULL, 0 },
   { "hash",               required_argument, NULL, 0 },
   {"cu-split-termination",required_argument, NULL, 0 },
@@ -339,6 +340,8 @@ cmdline_opts_t* cmdline_opts_parse(const uvg_api *const api, int argc, char *arg
       goto done;
     } else if (!strcmp(name, "loop-input")) {
       opts->loop_input = true;
+    } else if (!strcmp(name, "skip-input")) {
+      opts->skip_input = true;
     } else if (!api->config_parse(opts->config, name, optarg)) {
       fprintf(stderr, "invalid argument: %s=%s\n", name, optarg);
       ok = 0;

@@ -271,11 +271,20 @@ static void* input_read_thread(void* in_args)
     }
 
 #if defined(__GNUC__) && !defined(__MINGW32__)
-    usleep(33000);
+    // usleep(33000);
 #else
     // Sleep(33);
 #endif
+    if (!args->opts->skip_input) {
+      uvg_sem_wait(args->available_input_slots);
+      args->img_in = frame_in;
+      args->retval = retval;
+      // Unlock main_thread_mutex to notify main thread that the new img_in
+      // and retval have been placed to args.
+      uvg_sem_post(args->filled_input_slots);
+      frame_in = NULL;
 
+    } else 
     // Wait until main thread is ready to receive the next frame.
     if (uvg_sem_trywait(args->available_input_slots) == 0) {
       args->img_in = frame_in;

@@ -144,7 +144,6 @@ endif()
 target_include_directories(uvg266 PUBLIC src)
 target_include_directories(uvg266 PUBLIC src/extras)
 target_include_directories(uvg266 PUBLIC src/strategies)
-target_include_directories(uvg266 PUBLIC "G:/Local/sainio/Documents/libzmq/out/install/include")
 
 file(GLOB LIB_SOURCES_STRATEGIES_AVX2 RELATIVE ${PROJECT_SOURCE_DIR} "src/strategies/avx2/*.c")
 file(GLOB LIB_SOURCES_STRATEGIES_SSE41 RELATIVE ${PROJECT_SOURCE_DIR} "src/strategies/sse41/*.c")
@@ -165,8 +164,6 @@ if(MSVC)
 endif()
 
 add_executable(uvg266-bin ${CLI_SOURCES})
-
-target_link_libraries(uvg266-bin PUBLIC uvg266 "G:/Local/sainio/Documents/libzmq/out/install/lib/libzmq-mt-4_3_6.lib")
 
 set_target_properties(uvg266-bin PROPERTIES OUTPUT_NAME uvg266)
 set_target_properties(uvg266-bin PROPERTIES RUNTIME_OUTPUT_NAME uvg266)
