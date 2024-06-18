@@ -1216,7 +1216,8 @@ static double search_cu(
   lcu_t* lcu,
   enum uvg_tree_type tree_type,
   const split_tree_t split_tree,
-  bool has_chroma)
+  bool has_chroma,
+  int8_t constrain_mode) //constrain_mode: -1 -> No constrain, 0 -> force intra, 1 -> force inter
 {
   const int depth = split_tree.current_depth;
   const encoder_control_t* ctrl = state->encoder_control;
@@ -1296,23 +1297,9 @@ static double search_cu(
   }
 
   //Account for SCIPU. All sub-blocks of a SCIPU need to be either all intra or all inter
-  bool is_scipu_inter = false;
-  bool constrain_mode = true;
-  if (split_tree.scipu_cb_depth == 1 && split_tree.part_index == 0) { 
-    constrain_mode = false; //Let first scipu sub-block be chosen freely
-  }
-  else if (split_tree.scipu_cb_depth > 0) {
-    //Force same pred. type as the first sub-block in SCIPU
-    const enum split_type parent_split = GET_SPLITDATA(&split_tree, split_tree.current_depth - 1);
-    cu_loc_t split_cu_loc[4];
-    cu_loc_t parent_loc;
-    uint8_t separate_chroma = 0;
-    uvg_get_split_parent_loc(&parent_loc, parent_split, cu_loc, split_tree.part_index);
-    uvg_get_split_locs(&parent_loc, parent_split, split_cu_loc, &separate_chroma);
-    is_scipu_inter = LCU_GET_CU_AT_PX(lcu, split_cu_loc[0].local_x, split_cu_loc[0].local_y)->type == CU_INTER;
-  } else {
-    constrain_mode = false; 
-  }
+  bool is_scipu_inter = constrain_mode == 1;
+  bool is_constrain_mode = constrain_mode != -1;
+
 
   intra_search_data_t intra_search = {0};
 
@@ -1334,7 +1321,7 @@ static double search_cu(
         (y & ~(cu_width_inter_min - 1)) + cu_width_inter_min > frame_height
         ) && (cu_loc->width != 4 || cu_loc->height != 4) && // 4x4 inter not allowed
       ((state->encoder_control->chroma_format != UVG_CSP_400) ? (cu_loc->chroma_height * cu_loc->chroma_width) >= 16 : true) && // Don't allow blocks with <16 chroma samples for now (TODO: investigate small chroma blocks)
-      (constrain_mode ? is_scipu_inter : true); //Account for SCIPU
+      (is_constrain_mode ? is_scipu_inter : true); //Account for SCIPU
 
     if (can_use_inter) {
       double mode_cost;
@@ -1367,7 +1354,7 @@ static double search_cu(
         (x & ~(cu_width_intra_min - 1)) + cu_width_intra_min > frame_width ||
         (y & ~(cu_width_intra_min - 1)) + cu_width_intra_min > frame_height) &&
       !(state->encoder_control->cfg.force_inter && state->frame->slicetype != UVG_SLICE_I) &&
-      (constrain_mode ? !is_scipu_inter : true); //Account for SCIPU;
+      (is_constrain_mode ? !is_scipu_inter : true); //Account for SCIPU;
 
     intra_search.cost = 0;
     if (can_use_intra && !skip_intra) {
@@ -1845,17 +1832,28 @@ static double search_cu(
       cu_loc_t new_cu_loc[4];
       uint8_t separate_chroma = 0;
       const int splits = uvg_get_split_locs(cu_loc, split_type, new_cu_loc, &separate_chroma);
+
+      int8_t split_constrain_mode = constrain_mode;
       bool is_scipu = separate_chroma || split_tree.scipu_cb_depth > 0;
       if (is_scipu) new_split.scipu_cb_depth += 1;
+
       separate_chroma |= !has_chroma;
       initialize_partial_work_tree(state, lcu, &split_lcu[split_type - 1], cu_loc , separate_chroma ? chroma_loc : cu_loc, tree_type);
       for (int split = 0; split < splits; ++split) {
+        if (split_constrain_mode == -1 && is_scipu && split != 0) {
+          split_constrain_mode = LCU_GET_CU_AT_PX( &split_lcu[split_type - 1],
+                                                   new_cu_loc[0].local_x,
+                                                   new_cu_loc[0].local_y
+                                                  )->type == CU_INTER;
+        }
+        
         new_split.part_index = split;
         split_cost += search_cu(state, 
           &new_cu_loc[split], separate_chroma ? chroma_loc : &new_cu_loc[split],
           &split_lcu[split_type -1], 
           tree_type, new_split,
-          !separate_chroma || (split == splits - 1 && has_chroma));
+          !separate_chroma || (split == splits - 1 && has_chroma),
+          split_constrain_mode);
         // If there is no separate chroma the block will always have chroma, otherwise it is the last block of the split that has the chroma
 
         if (split_type == QT_SPLIT && completely_inside) {
@@ -1873,7 +1871,7 @@ static double search_cu(
       }
 
       //Check that sub-blocks for SCIPU are either all inter or all intra
-      if (is_scipu && can_split[split_type]) {
+      if (is_scipu /*&& can_split[split_type]*/) {
         const bool is_inter = LCU_GET_CU_AT_PX(&split_lcu[split_type - 1], new_cu_loc[0].local_x, new_cu_loc[0].local_y)->type == CU_INTER;
         for (int y_tmp = cu_loc->local_y; y_tmp < cu_loc->local_y + cu_loc->height; y_tmp += 4) {
           for (int x_tmp = cu_loc->local_x; x_tmp < cu_loc->local_x + cu_loc->width; x_tmp += 4) {
@@ -2234,7 +2232,8 @@ void uvg_search_lcu(encoder_state_t * const state, const int x, const int y, con
     &work_tree,
     tree_type,
     split_tree,
-    tree_type == UVG_BOTH_T);
+    tree_type == UVG_BOTH_T,
+    -1);
 
 #ifdef UVG_ENCODING_RESUME
     uvg_process_resume_encoding(state, x, y, false, &cost, &work_tree, false);
@@ -2254,6 +2253,8 @@ void uvg_search_lcu(encoder_state_t * const state, const int x, const int y, con
   copy_coeffs(work_tree.coeff.y, coeff->y, LCU_WIDTH, LCU_WIDTH, LCU_WIDTH);
 
   if(state->frame->slicetype == UVG_SLICE_I && state->encoder_control->cfg.dual_tree) {
+      true,
+      -1);
 #ifdef UVG_ENCODING_RESUME
     if (uvg_can_resume_encoding(state, x, y, true)) {
       uvg_process_resume_encoding(state, x, y, true, &cost, &work_tree, true);
