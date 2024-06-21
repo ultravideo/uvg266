@@ -1836,6 +1836,14 @@ static double search_cu(
       int8_t split_constrain_mode = constrain_mode;
       bool is_scipu = separate_chroma || split_tree.scipu_cb_depth > 0;
       if (is_scipu) new_split.scipu_cb_depth += 1;
+      //Limit split when forced inter. Don't allow split if inter can't be used. TODO: Move to uvg_get_possible_splits?
+      if (split_constrain_mode == 1 &&
+          ((new_cu_loc[0].width == 4 && new_cu_loc[0].height == 4) ||
+           ((state->encoder_control->chroma_format != UVG_CSP_400) ? (new_cu_loc[0].chroma_height * new_cu_loc[0].chroma_width) < 16 : false))
+         ) {
+        can_split[split_type] = false;
+        continue;
+      }
 
       separate_chroma |= !has_chroma;
       initialize_partial_work_tree(state, lcu, &split_lcu[split_type - 1], cu_loc , separate_chroma ? chroma_loc : cu_loc, tree_type);
@@ -1877,8 +1885,10 @@ static double search_cu(
           for (int x_tmp = cu_loc->local_x; x_tmp < cu_loc->local_x + cu_loc->width; x_tmp += 4) {
           //assert(is_inter ? LCU_GET_CU_AT_PX(&split_lcu[split_type - 1], new_cu_loc[split].local_x, new_cu_loc[split].local_y)->type == CU_INTER 
           //                : LCU_GET_CU_AT_PX(&split_lcu[split_type - 1], new_cu_loc[split].local_x, new_cu_loc[split].local_y)->type != CU_INTER);
-            assert(is_inter ? LCU_GET_CU_AT_PX(&split_lcu[split_type - 1], x_tmp, y_tmp)->type == CU_INTER
-                            : LCU_GET_CU_AT_PX(&split_lcu[split_type - 1], x_tmp, y_tmp)->type != CU_INTER );
+            const cu_info_t * const t = LCU_GET_CU_AT_PX(&split_lcu[split_type - 1], x_tmp, y_tmp);
+            if (t->type != CU_NOTSET) {
+              assert(is_inter ? t->type == CU_INTER : t->type != CU_INTER);
+            }
           }
         }
       }
