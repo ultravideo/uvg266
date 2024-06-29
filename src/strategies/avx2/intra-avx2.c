@@ -2137,7 +2137,7 @@ static void angular_pdpc_ver_w4_high_angle_avx2(uvg_pixel* dst, const uvg_pixel*
 
   int limit = MIN(3 << scale, width);
 
-  __m128i vseq = _mm_setr_epi32(0, 1, 2, 3);
+  //__m128i vseq = _mm_setr_epi32(0, 1, 2, 3);
   //__m128i vidx = _mm_slli_epi32(vseq, 2); // 2 is log2 width
   __m256i v32s = _mm256_set1_epi16(32);
 
@@ -2160,7 +2160,8 @@ static void angular_pdpc_ver_w4_high_angle_avx2(uvg_pixel* dst, const uvg_pixel*
     __m128i vleft = _mm_loadu_si128((__m128i*)&ref_side[y + shifted_inv_angle_sum[0] + 1]);
     vleft = _mm_shuffle_epi8(vleft, vshuf);
 
-    __m128i vdst = _mm_i32gather_epi32((const int32_t*)(dst + y * width), vseq, 4);
+    //__m128i vdst = _mm_i32gather_epi32((const int32_t*)(dst + y * width), vseq, 4);
+    __m128i vdst = _mm_loadu_si128((const __m128i*)(dst + y * width));
     __m256i vdst16 = _mm256_cvtepu8_epi16(vdst);
     __m256i vleft16 = _mm256_cvtepu8_epi16(vleft);
 
@@ -3296,6 +3297,8 @@ static void uvg_angular_pred_avx2(
   // Set ref_main and ref_side such that, when indexed with 0, they point to
   // index 0 in block coordinates.
   if (sample_disp < 0) {
+    // In cases where sample_disp is negative, references are needed from both sides.
+    // This step combines the main and side reference.
     memcpy(&temp_main[height], &in_ref_above[0], (width + 2 + multi_ref_index) * sizeof(uvg_pixel));
     memcpy(&temp_side[width], &in_ref_left[0], (height + 2 + multi_ref_index) * sizeof(uvg_pixel));
 
