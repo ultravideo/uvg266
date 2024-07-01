@@ -4,7 +4,7 @@ project(uvg266
 LANGUAGES C CXX
 HOMEPAGE_URL https://github.com/ultravideo/uvg266
 DESCRIPTION "An open-source VVC encoder licensed under 3-clause BSD"
-VERSION 0.8.0 )
+VERSION 0.8.1 )
 
 option(BUILD_SHARED_LIBS "Build using shared uvg266 library" ON)
 
