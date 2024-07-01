@@ -6,7 +6,7 @@ Join channel [#ultravideo](https://web.libera.chat/#ultravideo) in [Libera.Chat]
 
 uvg266 is still under development. Speed and RD-quality will continue to improve.
 
-http://ultravideo.fi/#encoder for more information.
+https://ultravideo.fi/uvg266.html for more information.
 
 - Linux [![uvg266_tests](https://github.com/ultravideo/uvg266/actions/workflows/uvg266.yml/badge.svg)](https://github.com/ultravideo/uvg266/actions/workflows/uvg266.yml)
 - Windows [![Build status](https://ci.appveyor.com/api/projects/status/c1gwnnkyt5lycqka?svg=true)](https://ci.appveyor.com/project/Ultravideo/uvg266)
@@ -447,7 +447,13 @@ where the names have been abbreviated to fit the layout in GitHub.
 | early-skip           | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 0     |
 | fast-residual-cost   | 28    | 28    | 28    | 0     | 0     | 0     | 0     | 0     | 0     | 0     |
 | max-merge            | 5     | 5     | 5     | 5     | 5     | 5     | 5     | 5     | 5     | 5     |
-
+| cclm                 | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 1     | 1     |
+| dual-tree            | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 1     | 1     |
+| jccr                 | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 1     | 1     |
+| mip                  | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 1     | 1     |
+| mrl                  | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 1     | 1     |
+| mts                  | off   | off   | off   | off   | off   | off   | off   | off   | both  | both  |
+| dep-quant            | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 1     | 1     |
 
 ## uvg266 library
 See [uvg266.h](src/uvg266.h) for the library API and its

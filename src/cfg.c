@@ -596,7 +596,7 @@ int uvg_config_parse(uvg_config *cfg, const char *name, const char *value)
 
   static const char * const file_format_names[] = {"auto", "y4m", "yuv", NULL};
 
-  static const char * const preset_values[11][25*2] = {
+  static const char * const preset_values[11][32*2] = {
       {
         "ultrafast",
         "rd", "0",
@@ -621,6 +621,13 @@ int uvg_config_parse(uvg_config *cfg, const char *name, const char *value)
         "early-skip", "1",
         "fast-residual-cost", "28",
         "max-merge", "6",
+        "cclm", "0",
+        "dual-tree", "0",
+        "jccr", "0",
+        "mip", "0",
+        "mrl", "0",
+        "mts", "off",
+        "dep-quant", "0",
         NULL
       },
       {
@@ -647,6 +654,13 @@ int uvg_config_parse(uvg_config *cfg, const char *name, const char *value)
         "early-skip", "1",
         "fast-residual-cost", "28",
         "max-merge", "6",
+        "cclm", "0",
+        "dual-tree", "0",
+        "jccr", "0",
+        "mip", "0",
+        "mrl", "0",
+        "mts", "off",
+        "dep-quant", "0",
         NULL
       },
       {
@@ -673,6 +687,13 @@ int uvg_config_parse(uvg_config *cfg, const char *name, const char *value)
         "early-skip", "1",
         "fast-residual-cost", "28",
         "max-merge", "6",
+        "cclm", "0",
+        "dual-tree", "0",
+        "jccr", "0",
+        "mip", "0",
+        "mrl", "0",
+        "mts", "off",
+        "dep-quant", "0",
         NULL
       },
       {
@@ -699,6 +720,13 @@ int uvg_config_parse(uvg_config *cfg, const char *name, const char *value)
         "early-skip", "1",
         "fast-residual-cost", "0",
         "max-merge", "6",
+        "cclm", "0",
+        "dual-tree", "0",
+        "jccr", "0",
+        "mip", "0",
+        "mrl", "0",
+        "mts", "off",
+        "dep-quant", "0",
         NULL
       },
       {
@@ -725,6 +753,13 @@ int uvg_config_parse(uvg_config *cfg, const char *name, const char *value)
         "early-skip", "1",
         "fast-residual-cost", "0",
         "max-merge", "6",
+        "cclm", "0",
+        "dual-tree", "0",
+        "jccr", "0",
+        "mip", "0",
+        "mrl", "0",
+        "mts", "off",
+        "dep-quant", "0",
         NULL
       },
       {
@@ -751,6 +786,13 @@ int uvg_config_parse(uvg_config *cfg, const char *name, const char *value)
         "early-skip", "1",
         "fast-residual-cost", "0",
         "max-merge", "6",
+        "cclm", "0",
+        "dual-tree", "0",
+        "jccr", "0",
+        "mip", "0",
+        "mrl", "0",
+        "mts", "off",
+        "dep-quant", "0",
         NULL
       },
       {
@@ -777,6 +819,13 @@ int uvg_config_parse(uvg_config *cfg, const char *name, const char *value)
         "early-skip", "1",
         "fast-residual-cost", "0",
         "max-merge", "6",
+        "cclm", "0",
+        "dual-tree", "0",
+        "jccr", "0",
+        "mip", "0",
+        "mrl", "0",
+        "mts", "off",
+        "dep-quant", "0",
         NULL
       },
       {
@@ -803,6 +852,13 @@ int uvg_config_parse(uvg_config *cfg, const char *name, const char *value)
         "early-skip", "1",
         "fast-residual-cost", "0",
         "max-merge", "6",
+        "cclm", "0",
+        "dual-tree", "0",
+        "jccr", "0",
+        "mip", "0",
+        "mrl", "0",
+        "mts", "off",
+        "dep-quant", "0",
         NULL
       },
       {
@@ -829,6 +885,13 @@ int uvg_config_parse(uvg_config *cfg, const char *name, const char *value)
         "early-skip", "1",
         "fast-residual-cost", "0",
         "max-merge", "6",
+        "cclm", "1",
+        "dual-tree", "1",
+        "jccr", "1",
+        "mip", "1",
+        "mrl", "1",
+        "mts", "both",
+        "dep-quant", "1",
         NULL
       },
       {
@@ -855,6 +918,13 @@ int uvg_config_parse(uvg_config *cfg, const char *name, const char *value)
         "early-skip", "0",
         "fast-residual-cost", "0",
         "max-merge", "6",
+        "cclm", "1",
+        "dual-tree", "1",
+        "jccr", "1",
+        "mip", "1",
+        "mrl", "1",
+        "mts", "both",
+        "dep-quant", "1",
         NULL
       },
       { NULL }
