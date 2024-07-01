@@ -52,8 +52,8 @@ bool uvg_is_mts_allowed(const encoder_state_t * const state, cu_info_t *const pr
 {
   uint32_t ts_max_size = 1 << state->encoder_control->cfg.trskip_max_size; 
   const uint32_t max_size = 32; // CU::isIntra(cu) ? MTS_INTRA_MAX_CU_SIZE : MTS_INTER_MAX_CU_SIZE;
-  const uint32_t cu_width    = cu_loc->width;
-  const uint32_t cu_height   = cu_loc->height;
+  const uint32_t cu_width    = 1 << pred_cu->log2_width;
+  const uint32_t cu_height   = 1 << pred_cu->log2_height;
   //bool mts_allowed = cu.chType == CHANNEL_TYPE_LUMA && compID == COMPONENT_Y;
 
   uint8_t mts_type = state->encoder_control->cfg.mts;
