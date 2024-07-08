@@ -201,6 +201,8 @@ static const struct option long_options[] = {
   { "ibc",                required_argument, NULL, 0 },
   { "dep-quant",                no_argument, NULL, 0 },
   { "no-dep-quant",             no_argument, NULL, 0 },
+  { "ref-wraparound",           no_argument, NULL, 0 },
+  { "no-ref-wraparound",        no_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 

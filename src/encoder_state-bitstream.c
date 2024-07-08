@@ -612,7 +612,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
     WRITE_UE(stream, 0, "num_ref_pic_lists_in_sps[0]");
     WRITE_UE(stream, 0, "num_ref_pic_lists_in_sps[0]");
 
-    WRITE_U(stream, 0, 1, "sps_ref_wraparound_enabled_flag");
+    WRITE_U(stream, encoder->cfg.ref_wraparound, 1, "sps_ref_wraparound_enabled_flag");
 
 
 
