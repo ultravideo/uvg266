@@ -53,6 +53,7 @@ void uvg_encode_coding_tree(
   encoder_state_t * const state,
   lcu_coeff_t *coeff,
   enum uvg_tree_type tree_type,
+  enum mode_type mode_type,
   const cu_loc_t* const cu_loc,
   const cu_loc_t* const chroma_loc,
   split_tree_t split_tree,
@@ -81,6 +82,7 @@ double uvg_mock_encode_coding_unit(
   lcu_t* lcu,
   cu_info_t* cur_cu,
   enum uvg_tree_type tree_type,
+  enum mode_type mode_type,
   const split_tree_t split_tree);
 
 int uvg_encode_inter_prediction_unit(
@@ -106,8 +108,9 @@ uint8_t uvg_write_split_flag(
   const cu_info_t* left_cu,
   const cu_info_t* above_cu,
   const cu_loc_t* const cu_loc,
-  split_tree_t,
+  split_tree_t split_tree,
   enum uvg_tree_type tree_type,
+  enum mode_type* mode_type,
   bool* is_implicit_out,
   double* bits_out);
 

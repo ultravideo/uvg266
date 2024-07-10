@@ -78,7 +78,8 @@ typedef struct
     cabac_ctx_t split_flag_model[9]; //!< \brief split flag context models
     cabac_ctx_t qt_split_flag_model[6]; //!< \brief qt split flag context models
     cabac_ctx_t mtt_vertical_model[5]; 
-    cabac_ctx_t mtt_binary_model[4]; 
+    cabac_ctx_t mtt_binary_model[4];
+    cabac_ctx_t non_inter_flag_model[2];
     cabac_ctx_t intra_luma_mpm_flag_model;    //!< \brief intra mode context models
     cabac_ctx_t intra_subpart_model[2];    //!< \brief intra sub part context models
     cabac_ctx_t chroma_pred_model;

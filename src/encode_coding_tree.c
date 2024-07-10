@@ -1233,6 +1233,7 @@ uint8_t uvg_write_split_flag(
   const cu_loc_t* const cu_loc,
   split_tree_t split_tree,
   enum uvg_tree_type tree_type,
+  enum mode_type* mode_type,
   bool* is_implicit_out,
   double* bits_out)
 {
@@ -1245,7 +1246,7 @@ uint8_t uvg_write_split_flag(
 
 
   bool can_split[6];
-  const bool is_implicit = uvg_get_possible_splits(state, cu_loc, split_tree, tree_type, can_split);
+  const bool is_implicit = uvg_get_possible_splits(state, cu_loc, split_tree, tree_type, *mode_type, can_split);
 
 
   bool allow_split = can_split[1] || can_split[2] || can_split[3] || can_split[4] || can_split[5];
@@ -1293,12 +1294,12 @@ uint8_t uvg_write_split_flag(
       unsigned left_qt_depth = 0;
       unsigned top_qt_depth = 0;
       if(left_cu) {
-        while (((left_cu->split_tree >> (left_qt_depth * 3)) & 7u) == QT_SPLIT) {
+        while (GET_SPLITDATA(left_cu, left_qt_depth) == QT_SPLIT) {
           left_qt_depth++;
         }
       }
       if(above_cu) {
-        while (((above_cu->split_tree >> (top_qt_depth * 3)) & 7u) == QT_SPLIT) {
+        while (GET_SPLITDATA(above_cu, top_qt_depth) == QT_SPLIT) {
           top_qt_depth++;
         }
       }
@@ -1328,6 +1329,20 @@ uint8_t uvg_write_split_flag(
           split_flag == BT_VER_SPLIT || split_flag == BT_HOR_SPLIT, bits, "mtt_binary_flag");
       }
     }
+    const enum mode_type_condition mode_type_condition = uvg_derive_mode_type_cond(cu_loc, state->frame->slicetype, tree_type, state->encoder_control->chroma_format, split_flag, *mode_type);
+    const enum mode_type mode_type_parent = GET_MODETYPEDATA(split_tree.mode_type_tree, split_tree.current_depth);
+    if (mode_type_condition == MODE_TYPE_INFER) {
+      //assert(mode_type_parent == MODE_TYPE_INTRA && "If mode type inferred, mode type should be INTRA");
+      *mode_type = MODE_TYPE_INTRA;
+    }
+    else if (mode_type_condition == MODE_TYPE_SIGNAL) {
+      //assert(*mode_type != MODE_TYPE_ALL && "If mode type signaled, mode type should not be unconstrained");
+      const int non_inter_model = ((above_cu && above_cu->type == CU_INTRA) || (left_cu && left_cu->type == CU_INTRA)) ? 1 : 0;
+      CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.non_inter_flag_model[non_inter_model]), *mode_type != MODE_TYPE_INTER, bits, "non_inter_flag");
+    }
+    else { // MODE_TYPE_INHERIT
+      //assert( *mode_type == mode_type_parent && "Parent and child mode should match");
+    }
   }
 
   if (bits_out) *bits_out += bits;
@@ -1338,6 +1353,7 @@ void uvg_encode_coding_tree(
   encoder_state_t * const state,
   lcu_coeff_t *coeff,
   enum uvg_tree_type tree_type,
+  enum mode_type mode_type,
   const cu_loc_t* const cu_loc,
   const cu_loc_t* const chroma_loc,
   split_tree_t split_tree,
@@ -1385,7 +1401,9 @@ void uvg_encode_coding_tree(
   // When not in MAX_DEPTH, insert split flag and split the blocks if needed
   if (cu_width + cu_height > 8) {
     split_tree.split_tree = cur_cu->split_tree;
+    split_tree.mode_type_tree = cur_cu->mode_type_tree;
     bool is_implicit;
+    enum mode_type split_mode_type = mode_type;
     const int split_flag = uvg_write_split_flag(
       state,
       cabac,
@@ -1394,6 +1412,7 @@ void uvg_encode_coding_tree(
       tree_type != UVG_CHROMA_T ? cu_loc : chroma_loc,
       split_tree,
       tree_type,
+      &split_mode_type,
       &is_implicit,
       NULL
       );
@@ -1401,11 +1420,12 @@ void uvg_encode_coding_tree(
     if (split_flag != NO_SPLIT) {
       split_tree_t new_split_tree = { 
         cur_cu->split_tree,
+        cur_cu->mode_type_tree,
         split_tree.current_depth + 1,
         split_tree.mtt_depth + (split_flag != QT_SPLIT),
         split_tree.implicit_mtt_depth + (split_flag != QT_SPLIT && is_implicit),
         0,
-        split_tree.scipu_cb_depth
+        split_tree.scipu_cb_depth + (split_mode_type != MODE_TYPE_ALL ? 1 : 0)
       };
 
       cu_loc_t new_cu_loc[4];
@@ -1414,7 +1434,7 @@ void uvg_encode_coding_tree(
       separate_chroma |= !has_chroma;
       for (int split = 0; split <splits; ++split) {
         new_split_tree.part_index = split;
-        uvg_encode_coding_tree(state, coeff, tree_type,
+        uvg_encode_coding_tree(state, coeff, tree_type, split_mode_type,
           &new_cu_loc[split], 
           separate_chroma ? chroma_loc : &new_cu_loc[split],
           new_split_tree, !separate_chroma || (split == splits - 1 && has_chroma));
@@ -1691,6 +1711,7 @@ double uvg_mock_encode_coding_unit(
   lcu_t* lcu,
   cu_info_t* cur_cu,
   enum uvg_tree_type tree_type,
+  enum mode_type mode_type,
   const split_tree_t split_tree) {
   double bits = 0;
   const encoder_control_t* const ctrl = state->encoder_control;
@@ -1737,7 +1758,7 @@ double uvg_mock_encode_coding_unit(
       above_cu,
       cu_loc,
       split_tree,
-      tree_type, &is_implicit,
+      tree_type, &mode_type, &is_implicit,
       &bits
       );
   }

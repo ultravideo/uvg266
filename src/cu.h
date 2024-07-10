@@ -102,8 +102,21 @@ enum split_type {
   TT_VER_SPLIT = 5,
 };
 
+enum mode_type {
+  MODE_TYPE_ALL = 0,
+  MODE_TYPE_INTER = 1,
+  MODE_TYPE_INTRA = 2,
+};
+
+enum mode_type_condition {
+  MODE_TYPE_INHERIT = 0,
+  MODE_TYPE_INFER = 1,
+  MODE_TYPE_SIGNAL = 2,
+};
+
 typedef struct  {
   uint32_t split_tree;
+  uint32_t mode_type_tree;
   uint8_t current_depth;
   uint8_t mtt_depth;
   uint8_t implicit_mtt_depth;
@@ -140,6 +153,7 @@ typedef struct
   uint8_t root_cbf;
 
   uint32_t split_tree : 3 * 9;
+  uint32_t mode_type_tree : 2 * 9;
 
   /**
    * \brief QP used for the CU.
@@ -203,9 +217,13 @@ int uvg_get_split_locs(
   enum split_type split,
   cu_loc_t out[4],
   uint8_t* separate_chroma);
-void uvg_get_split_parent_loc( const cu_loc_t* parent_loc, const enum split_type parent_split, const cu_loc_t* const cur_cu_loc, uint8_t cur_cu_part_index);
+//TODO: Remove if not needed
+//void uvg_get_split_parent_loc( const cu_loc_t* parent_loc, const enum split_type parent_split, const cu_loc_t* const cur_cu_loc, uint8_t cur_cu_part_index);
 int uvg_get_possible_splits(const encoder_state_t* const state,
-                            const cu_loc_t* const cu_loc, split_tree_t split_tree, enum uvg_tree_type tree_type, bool splits[6]);
+                            const cu_loc_t* const cu_loc, split_tree_t split_tree, enum uvg_tree_type tree_type, enum mode_type mode_type,
+                            bool splits[6]);
+enum mode_type_condition uvg_derive_mode_type_cond(const cu_loc_t* const cu_loc, const enum uvg_slice_type slice_type, const enum uvg_tree_type tree_type,
+                                                   const enum uvg_chroma_format chroma_format, const enum split_type split_type, const enum mode_type mode_type);
 
 
 #define CU_GET_MV_CAND(cu_info_ptr, reflist) \
@@ -617,6 +635,7 @@ static INLINE void cbf_copy(uint16_t *cbf, uint16_t src, color_t plane)
 }
 
 #define GET_SPLITDATA(CU,curDepth) ((CU)->split_tree >> ((MAX((curDepth), 0) * 3)) & 7)
+#define GET_MODETYPEDATA(mode_type_tree,curDepth) ((mode_type_tree) >> ((MAX((curDepth), 0) * 2)) & 3)
 #define PU_IS_TU(cu) ((cu)->log2_width <= TR_MAX_LOG2_SIZE && (cu)->log2_height <= TR_MAX_LOG2_SIZE)
 
 #endif
