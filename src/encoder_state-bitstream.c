@@ -801,7 +801,12 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
 
   WRITE_U(stream, 0, 1, "pps_weighted_pred_flag");   // Use of Weighting Prediction (P_SLICE)
   WRITE_U(stream, 0, 1, "pps_weighted_bipred_flag");  // Use of Weighting Bi-Prediction (B_SLICE)
-  WRITE_U(stream, 0, 1, "pps_ref_wraparound_enabled_flag");
+  WRITE_U(stream, encoder->cfg.ref_wraparound, 1, "pps_ref_wraparound_enabled_flag");
+
+  if (encoder->cfg.ref_wraparound) {
+    // ToDo: Add wraparound offset
+    WRITE_UE(stream, 0, "pps_pic_width_minus_wraparound_offset");
+  }
 
   WRITE_SE(stream, ((int8_t)encoder->cfg.qp) - 26, "pps_init_qp_minus26");
   WRITE_U(stream, state->frame->max_qp_delta_depth >= 0 ? 1:0, 1, "pps_cu_qp_delta_enabled_flag");

@@ -486,7 +486,8 @@ unsigned uvg_image_calc_satd(const uvg_picture *pic,
                              int ref_x,
                              int ref_y,
                              int block_width,
-                             int block_height)
+                             int block_height,
+                             uint8_t ref_wraparound)
 {
   assert(pic_x >= 0 && pic_x <= pic->width - block_width);
   assert(pic_y >= 0 && pic_y <= pic->height - block_height);
@@ -536,7 +537,11 @@ unsigned uvg_image_calc_satd(const uvg_picture *pic,
     epol_args.ext_origin = &ext_origin;
     epol_args.ext_s = &ext_s;
 
-    uvg_get_extended_block(&epol_args);
+    if (ref_wraparound) {
+      uvg_get_extended_block_wraparound(&epol_args);
+    } else {
+      uvg_get_extended_block(&epol_args);
+    }
 
     const uvg_pixel *pic_data = &pic->y[pic_y * pic->stride + pic_x];
 
