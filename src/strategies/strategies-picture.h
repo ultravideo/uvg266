@@ -207,6 +207,7 @@ int uvg_strategy_register_picture(void* opaque, uint8_t bitdepth);
 cost_pixel_nxn_multi_func * uvg_pixels_get_satd_dual_func(unsigned width, unsigned height);
 cost_pixel_nxn_multi_func * uvg_pixels_get_sad_dual_func(unsigned width, unsigned height);
 
+#if UVG_BIT_DEPTH == 8 
 #define STRATEGIES_PICTURE_EXPORTS \
   {"crc32c_4x4", (void**) &uvg_crc32c_4x4}, \
   {"crc32c_8x8", (void **)&uvg_crc32c_8x8}, \
@@ -241,6 +242,42 @@ cost_pixel_nxn_multi_func * uvg_pixels_get_sad_dual_func(unsigned width, unsigne
   {"hor_sad", (void**) &uvg_hor_sad}, \
   {"pixel_var", (void**) &uvg_pixel_var}, \
   {"generate_residual", (void**) &uvg_generate_residual}, \
+
+#else
+#define STRATEGIES_PICTURE_EXPORTS \
+  {"reg_sad", (void**) &uvg_reg_sad}, \
+  {"sad_4x4", (void**) &uvg_sad_4x4}, \
+  {"sad_8x8", (void**) &uvg_sad_8x8}, \
+  {"sad_16x16", (void**) &uvg_sad_16x16}, \
+  {"sad_32x32", (void**) &uvg_sad_32x32}, \
+  {"sad_64x64", (void**) &uvg_sad_64x64}, \
+  {"satd_4x4", (void**) &uvg_satd_4x4}, \
+  {"satd_8x8", (void**) &uvg_satd_8x8}, \
+  {"satd_16x16", (void**) &uvg_satd_16x16}, \
+  {"satd_32x32", (void**) &uvg_satd_32x32}, \
+  {"satd_64x64", (void**) &uvg_satd_64x64}, \
+  {"satd_any_size", (void**) &uvg_satd_any_size}, \
+  {"satd_any_size_vtm", (void**) &uvg_satd_any_size_vtm}, \
+  {"sad_4x4_dual", (void**) &uvg_sad_4x4_dual}, \
+  {"sad_8x8_dual", (void**) &uvg_sad_8x8_dual}, \
+  {"sad_16x16_dual", (void**) &uvg_sad_16x16_dual}, \
+  {"sad_32x32_dual", (void**) &uvg_sad_32x32_dual}, \
+  {"sad_64x64_dual", (void**) &uvg_sad_64x64_dual}, \
+  {"satd_4x4_dual", (void**) &uvg_satd_4x4_dual}, \
+  {"satd_8x8_dual", (void**) &uvg_satd_8x8_dual}, \
+  {"satd_16x16_dual", (void**) &uvg_satd_16x16_dual}, \
+  {"satd_32x32_dual", (void**) &uvg_satd_32x32_dual}, \
+  {"satd_64x64_dual", (void**) &uvg_satd_64x64_dual}, \
+  {"satd_any_size_quad", (void**) &uvg_satd_any_size_quad}, \
+  {"pixels_calc_ssd", (void**) &uvg_pixels_calc_ssd}, \
+  {"bipred_average", (void**) &uvg_bipred_average}, \
+  {"get_optimized_sad", (void**) &uvg_get_optimized_sad}, \
+  {"ver_sad", (void**) &uvg_ver_sad}, \
+  {"hor_sad", (void**) &uvg_hor_sad}, \
+  {"pixel_var", (void**) &uvg_pixel_var}, \
+  {"generate_residual", (void**) &uvg_generate_residual}, \
+
+#endif 
 
 
 

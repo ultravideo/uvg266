@@ -141,12 +141,16 @@ static int get_max_parallelism(const encoder_control_t *const encoder)
 static int8_t* derive_chroma_QP_mapping_table(const uvg_config* const cfg, int i)
 {
   const int MAX_QP = 63;
+  const int qpBdOffsetC = (cfg->input_bitdepth - 8) * 6;
 
   int8_t qpInVal[16], qpOutVal[16];
-  int8_t* table = calloc(MAX_QP + 1, sizeof(int8_t));
+  int8_t* table = calloc(MAX_QP + 1+qpBdOffsetC, sizeof(int8_t));
+  if (table == NULL) {
+    fprintf(stderr, "Failed to allocate memory for chroma QP mapping table.\n");
+    return NULL;
+  }
+  table += qpBdOffsetC;
 
-
-  const int qpBdOffsetC = (cfg->input_bitdepth - 8) * 6;
   const int numPtsInCQPTableMinus1 = cfg->qp_table_length_minus1[i];
 
   qpInVal[0] = cfg->qp_table_start_minus26[i] + 26;
@@ -652,7 +656,7 @@ encoder_control_t* uvg_encoder_control_init(const uvg_config *const cfg)
   } else {
     encoder->cfg.vps_period = -1;
   }
-
+  
   for (int i = 0; i < cfg->num_used_table; i++) {
     encoder->qp_map[i] = derive_chroma_QP_mapping_table(cfg, i);
   }
@@ -670,6 +674,7 @@ init_failed:
 void uvg_encoder_control_free(encoder_control_t *const encoder)
 {
   if (!encoder) return;
+  const int qpBdOffsetC = (encoder->cfg.input_bitdepth - 8) * 6;
 
   //Slices
   FREE_POINTER(encoder->slice_addresses_in_ts);
@@ -695,7 +700,8 @@ void uvg_encoder_control_free(encoder_control_t *const encoder)
   uvg_threadqueue_free(encoder->threadqueue);
   encoder->threadqueue = NULL;
   for (int i = 0; i < encoder->cfg.num_used_table; i++) {
-    if (encoder->qp_map[i]) FREE_POINTER(encoder->qp_map[i]);
+    int8_t *temp = encoder->qp_map[i] - qpBdOffsetC;
+    if (encoder->qp_map[i] - qpBdOffsetC) FREE_POINTER(temp);
   }
 
   uvg_close_rdcost_outfiles();
