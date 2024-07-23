@@ -1056,7 +1056,7 @@ int uvg_dep_quant(
   for (; prev_id >= 0; scanIdx++) {
     Decision temp       = dep_quant_context.m_trellis[scanIdx];
     int32_t blkpos = scan[scanIdx];
-    coeff_out[blkpos] = (srcCoeff[blkpos] < 0 ? -temp.absLevel[prev_id] : temp.absLevel[prev_id]);
+    coeff_out[blkpos] = temp.zero_out ? 0 : (srcCoeff[blkpos] < 0 ? -temp.absLevel[prev_id] : temp.absLevel[prev_id]);
     *absSum += temp.absLevel[prev_id];
     prev_id = temp.prevId[prev_id];
   }

@@ -1448,6 +1448,7 @@ void uvg_dep_quant_decide_and_update_avx2(
   }
 
   xDecide(&ctxs->m_allStates, &ctxs->m_startState, ctxs->m_quant, spt, absCoeff, re->m_lastBitsX[scan_info->pos_x] + re->m_lastBitsY[scan_info->pos_y], decisions, zeroOut, quantCoeff,ctxs->m_skip_state_offset, ctxs->m_prev_state_offset);
+  decisions->zero_out = zeroOut;
 
   if (scan_pos) {
     if (!(scan_pos & 15)) {
