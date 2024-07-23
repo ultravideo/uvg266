@@ -80,8 +80,8 @@ int uvg_init_nb_info(encoder_control_t * encoder) {
       const int           scanType = SCAN_DIAG;
       const uint32_t      blkWidthIdx = hd;
       const uint32_t      blkHeightIdx = vd;
-      const uint32_t* scanId2RP = uvg_get_scan_order_table(SCAN_GROUP_4X4, scanType, blkWidthIdx, blkHeightIdx);
-      const uint32_t* const cg_scan = uvg_get_scan_order_table(SCAN_GROUP_UNGROUPED, 0, hd, vd);
+      const uint32_t* scanId2RP = uvg_get_scan_order_table(SCAN_GROUP_4X4, scanType, blkWidthIdx, blkHeightIdx, 0);
+      const uint32_t* const cg_scan = uvg_get_scan_order_table(SCAN_GROUP_UNGROUPED, 0, hd, vd, 0);
       NbInfoSbb** sId2NbSbb = &encoder->m_scanId2NbInfoSbbArray[hd][vd];
       NbInfoOut** sId2NbOut = &encoder->m_scanId2NbInfoOutArray[hd][vd];
       // consider only non-zero-out region
@@ -329,7 +329,6 @@ static void reset_common_context(common_context* ctx, const rate_estimator_t * r
   }
   ctx->m_curr_sbb_ctx_offset = 0;
   ctx->m_prev_sbb_ctx_offset = 1;
-  ctx->num_coeff = num_coeff;
 }
 
 static void init_rate_esimator(rate_estimator_t * rate_estimator, const cabac_data_t * const ctx, color_t color)
@@ -862,7 +861,6 @@ int uvg_dep_quant(
                                cur_tu->lfnst_idx :
                                cur_tu->cr_lfnst_idx;
   
-  const int       numCoeff = width * height;
 
   memset(coeff_out, 0x00, width * height * sizeof(coeff_t));
   *absSum                    = 0;
@@ -872,8 +870,9 @@ int uvg_dep_quant(
 
   const uint32_t  log2_tr_width  = uvg_g_convert_to_log2[width];
   const uint32_t  log2_tr_height = uvg_g_convert_to_log2[height];
-  const uint32_t* const scan     = uvg_get_scan_order_table(SCAN_GROUP_4X4,0,log2_tr_width,log2_tr_height);
-  const uint32_t* const cg_scan     = uvg_get_scan_order_table(SCAN_GROUP_UNGROUPED,0,log2_tr_width,log2_tr_height);
+  const uint32_t* const scan     = uvg_get_scan_order_table(SCAN_GROUP_4X4,0,log2_tr_width,log2_tr_height, 0);
+  const uint32_t* const scan2     = uvg_get_scan_order_table(SCAN_GROUP_4X4,0,log2_tr_width,log2_tr_height, is_mts);
+  const uint32_t* const cg_scan     = uvg_get_scan_order_table(SCAN_GROUP_UNGROUPED,0,log2_tr_width,log2_tr_height, 0);
 
   int32_t qp_scaled = uvg_get_scaled_qp(compID, state->qp, (encoder->bitdepth - 8) * 6, encoder->qp_map[0]);
   qp_scaled = is_ts ? MAX(qp_scaled, 4 + 6 * MIN_QP_PRIME_TS) : qp_scaled;
@@ -913,6 +912,7 @@ int uvg_dep_quant(
     effWidth  = (width == 32) ? 16 : width;
     zeroOut   = (effHeight < height || effWidth < width);
   }
+  const int numCoeff = effWidth * effHeight;
   zeroOutforThres  = zeroOut || (32 < height || 32 < width);
   //===== find first test position =====
   int firstTestPos = numCoeff - 1;
@@ -925,7 +925,7 @@ int uvg_dep_quant(
     srcCoeff,
     enableScalingLists,
     &dep_quant_context,
-    scan,
+    scan2,
     q_coeff,
     &firstTestPos,
     width, 
@@ -1080,7 +1080,7 @@ void uvg_dep_quant_dequant(
   
   const uint32_t  log2_tr_width = uvg_g_convert_to_log2[width];
   const uint32_t  log2_tr_height = uvg_g_convert_to_log2[height];
-  const uint32_t* const scan = uvg_get_scan_order_table(SCAN_GROUP_4X4, 0, log2_tr_width, log2_tr_height);
+  const uint32_t* const scan = uvg_get_scan_order_table(SCAN_GROUP_4X4, 0, log2_tr_width, log2_tr_height, 0);
   bool needs_block_size_trafo_scale =((log2_tr_height + log2_tr_width) % 2 == 1);
   needs_block_size_trafo_scale |= 0; // Non log2 block size
 
