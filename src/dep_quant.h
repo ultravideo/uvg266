@@ -108,6 +108,7 @@ typedef struct {
   int64_t ALIGNED(32) rdCost[8];
   int32_t ALIGNED(32) absLevel[8];
   int32_t ALIGNED(32) prevId[8];
+  uint8_t zero_out;
 } Decision;
 
 
