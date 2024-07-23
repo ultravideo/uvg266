@@ -188,7 +188,7 @@ void uvg_derive_lfnst_constraints(
 
   const uint32_t log2_tr_width = uvg_g_convert_to_log2[width];
   const uint32_t log2_tr_height = uvg_g_convert_to_log2[height];
-  const uint32_t* scan = uvg_get_scan_order_table(SCAN_GROUP_4X4, scan_idx, log2_tr_width, log2_tr_height);
+  const uint32_t* scan = uvg_get_scan_order_table(SCAN_GROUP_4X4, scan_idx, log2_tr_width, log2_tr_height, 0);
 
   signed scan_pos_last = -1;
   coeff_t temp[TR_MAX_WIDTH * TR_MAX_WIDTH];

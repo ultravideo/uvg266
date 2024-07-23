@@ -63,7 +63,7 @@ void uvg_quant_generic(
   const encoder_control_t * const encoder = state->encoder_control;
   const uint32_t log2_tr_width  = uvg_g_convert_to_log2[width];
   const uint32_t log2_tr_height = uvg_g_convert_to_log2[height];
-  const uint32_t * const scan = uvg_get_scan_order_table(SCAN_GROUP_4X4, scan_idx, log2_tr_width, log2_tr_height);
+  const uint32_t * const scan = uvg_get_scan_order_table(SCAN_GROUP_4X4, scan_idx, log2_tr_width, log2_tr_height, 0);
 
   int32_t qp_scaled = uvg_get_scaled_qp(color, state->qp, (encoder->bitdepth - 8) * 6, encoder->qp_map[0]);
   qp_scaled = transform_skip ? MAX(qp_scaled, 4 + 6 * MIN_QP_PRIME_TS) : qp_scaled;

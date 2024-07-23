@@ -143,6 +143,6 @@ extern const uint32_t uvg_g_log2_sbb_size[7 + 1][7 + 1][2];
 #define SCAN_GROUP_UNGROUPED 0
 #define SCAN_GROUP_4X4 1
 
-const uint32_t* const uvg_get_scan_order_table(int scan_group, int scan_type, int log2_w, int log2_h);
+const uint32_t* const uvg_get_scan_order_table(int scan_group, int scan_type, int log2_w, int log2_h, bool mts_reduced);
 
 #endif //TABLES_H_

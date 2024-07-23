@@ -124,7 +124,6 @@ typedef struct {
   int              m_prev_sbb_ctx_offset;
   uint8_t          sbb_memory[8 * 1024];
   uint8_t          level_memory[8 * TR_MAX_WIDTH * TR_MAX_WIDTH];
-  int              num_coeff;
 } common_context;
 
 
