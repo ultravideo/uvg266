@@ -1631,7 +1631,6 @@ static double search_cu(
       lcu,
       cur_cu,
       tree_type,
-      mode_type,
       split_tree);
 
     
@@ -1754,7 +1753,7 @@ static double search_cu(
         continue;
       split_tree_t new_split = {
         split_tree.split_tree | split_type << (split_tree.current_depth * 3),
-        split_tree.mode_type_tree | mode_type << (split_tree.current_depth * 2),
+        split_tree.mode_type_tree, // | mode_type << (split_tree.current_depth * 2),
         split_tree.current_depth + 1,
         split_tree.mtt_depth + (split_type != QT_SPLIT),
         split_tree.implicit_mtt_depth + (split_type != QT_SPLIT && is_implicit),
@@ -1785,7 +1784,9 @@ static double search_cu(
 
       enum mode_type split_mode_type = mode_type;
       //TODO: use for searching both modes in scipu
-      //enum mode_type_condition mode_type_cond = uvg_derive_mode_type_cond(cu_loc, state->frame->slicetype, tree_type, state->encoder_control->chroma_format, split_type, mode_type);
+      const enum mode_type_condition mode_type_cond = uvg_derive_mode_type_cond(cu_loc, state->frame->slicetype, tree_type, state->encoder_control->chroma_format, split_type, mode_type);
+      if (mode_type_cond == MODE_TYPE_INFER) split_mode_type = MODE_TYPE_INTRA;
+      //new_split.mode_type_tree = split_tree.mode_type_tree | split_mode_type << (split_tree.current_depth * 2);
 
       if (cur_cu->log2_height + cur_cu->log2_width > 4) {
 
@@ -1810,7 +1811,8 @@ static double search_cu(
         }
         split_tree_t count_tree = split_tree;
         count_tree.split_tree = split_tree.split_tree | split_type << (split_tree.current_depth * 3);
-        count_tree.mode_type_tree = split_tree.mode_type_tree | mode_type << (split_tree.current_depth * 2);
+        count_tree.mode_type_tree = split_tree.mode_type_tree; // | mode_type << (split_tree.current_depth * 2);
+        const enum mode_type count_mode_type = mode_type_cond == MODE_TYPE_SIGNAL ? (cur_cu->type == CU_INTER ? MODE_TYPE_INTER : MODE_TYPE_INTRA) : split_mode_type;
         uvg_write_split_flag(
           state,
           &state->search_cabac,
@@ -1819,7 +1821,7 @@ static double search_cu(
           cu_loc,
           count_tree,
           tree_type,
-          &split_mode_type,
+          count_mode_type,
           &is_implicit,
           &split_bits
           );
@@ -1859,13 +1861,13 @@ static double search_cu(
       separate_chroma |= !has_chroma;
       initialize_partial_work_tree(state, lcu, &split_lcu[split_type - 1], cu_loc , separate_chroma ? chroma_loc : cu_loc, tree_type);
       for (int split = 0; split < splits; ++split) {
-        if (split_mode_type == MODE_TYPE_ALL && is_scipu && split != 0) { //TODO: remove when proper search is added for scipu mode
-          split_mode_type = (LCU_GET_CU_AT_PX( &split_lcu[split_type - 1],
-                                                   new_cu_loc[0].local_x,
-                                                   new_cu_loc[0].local_y
-                                                  )->type == CU_INTER) ? MODE_TYPE_INTER : MODE_TYPE_INTRA;
-        }
-
+        //if (split_mode_type == MODE_TYPE_ALL && is_scipu && split != 0) { //TODO: remove when proper search is added for scipu mode
+        //  split_mode_type = (LCU_GET_CU_AT_PX( &split_lcu[split_type - 1],
+        //                                           new_cu_loc[0].local_x,
+        //                                           new_cu_loc[0].local_y
+        //                                          )->type == CU_INTER) ? MODE_TYPE_INTER : MODE_TYPE_INTRA;
+        //}
+        new_split.mode_type_tree = new_split.mode_type_tree | split_mode_type << (split_tree.current_depth * 2);
         new_split.part_index = split;
         split_cost += search_cu(state, 
           &new_cu_loc[split], separate_chroma ? chroma_loc : &new_cu_loc[split],
@@ -1874,6 +1876,15 @@ static double search_cu(
           !separate_chroma || (split == splits - 1 && has_chroma),
           split_mode_type);
         // If there is no separate chroma the block will always have chroma, otherwise it is the last block of the split that has the chroma
+
+        // Set mode type for first split block
+        if (split_mode_type == MODE_TYPE_ALL && is_scipu && split == 0) { //TODO: remove when proper search is added for scipu mode
+          cu_info_t* const first_cu = LCU_GET_CU_AT_PX(&split_lcu[split_type - 1],
+                                                        new_cu_loc[0].local_x,
+                                                        new_cu_loc[0].local_y);
+          split_mode_type = (first_cu->type == CU_INTER) ? MODE_TYPE_INTER : MODE_TYPE_INTRA;
+          first_cu->mode_type_tree = first_cu->mode_type_tree | split_mode_type << (split_tree.current_depth * 2);
+        }
 
         if (split_type == QT_SPLIT && completely_inside) {
           const cu_info_t * const t = LCU_GET_CU_AT_PX(
@@ -1938,7 +1949,7 @@ static double search_cu(
         bool   is_implicit = false;
         uvg_write_split_flag(state, &state->search_cabac,
                              x > 0 ? LCU_GET_CU_AT_PX(lcu, SUB_SCU(x) - 1, SUB_SCU(y)) : NULL,
-                             y > 0 ? LCU_GET_CU_AT_PX(lcu, SUB_SCU(x), SUB_SCU(y) - 1) : NULL, cu_loc, split_tree, tree_type, &mode_type, &is_implicit,
+                             y > 0 ? LCU_GET_CU_AT_PX(lcu, SUB_SCU(x), SUB_SCU(y) - 1) : NULL, cu_loc, split_tree, tree_type, mode_type, &is_implicit,
                              &bits);
 
         cur_cu->intra = cu_d1->intra;

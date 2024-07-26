@@ -635,7 +635,7 @@ static INLINE void cbf_copy(uint16_t *cbf, uint16_t src, color_t plane)
 }
 
 #define GET_SPLITDATA(CU,curDepth) ((CU)->split_tree >> ((MAX((curDepth), 0) * 3)) & 7)
-#define GET_MODETYPEDATA(mode_type_tree,curDepth) ((mode_type_tree) >> ((MAX((curDepth), 0) * 2)) & 3)
+#define GET_MODETYPEDATA(CU,curDepth) ((CU)->mode_type_tree >> ((MAX((curDepth), 0) * 2)) & 3)
 #define PU_IS_TU(cu) ((cu)->log2_width <= TR_MAX_LOG2_SIZE && (cu)->log2_height <= TR_MAX_LOG2_SIZE)
 
 #endif
