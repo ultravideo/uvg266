@@ -205,10 +205,11 @@ file(GLOB SOURCE_GROUP_CONTROL RELATIVE ${PROJECT_SOURCE_DIR} "src/cfg.*" "src/e
 file(GLOB SOURCE_GROUP_DATA_STRUCTURES RELATIVE ${PROJECT_SOURCE_DIR} "src/cu.*" "src/image.*" "src/imagelist.*" "src/videoframe.*" "src/hashmap.*")
 file(GLOB SOURCE_GROUP_EXTRAS RELATIVE ${PROJECT_SOURCE_DIR} "src/extras/*.h" "src/extras/*.c")
 file(GLOB_RECURSE SOURCE_GROUP_STRATEGIES RELATIVE ${PROJECT_SOURCE_DIR} "src/strategies/*.h" "src/strategies/*.c")
-file(GLOB SOURCE_GROUP_RECON RELATIVE ${PROJECT_SOURCE_DIR} "src/alf.*" "src/filter.*" "src/inter.*" "src/intra.*" "src/reshape.*" "src/sao.*" "src/scalinglist.*" "src/tables.*" "src/transform.*")
+file(GLOB SOURCE_GROUP_RECON RELATIVE ${PROJECT_SOURCE_DIR} "src/alf.*" "src/filter.*" "src/inter.*" "src/intra.*" "src/reshape.*" "src/sao.*" "src/scalinglist.*" "src/tables.*" "src/transform.*" "src/dep_quant.*" "src/lfnst_tables.h")
 file(GLOB SOURCE_GROUP_THREADING RELATIVE ${PROJECT_SOURCE_DIR} "src/threadqueue.*" "src/threads.*")
 file(GLOB_RECURSE SOURCE_GROUP_THREADWRAPPER RELATIVE ${PROJECT_SOURCE_DIR} "src/threadwrapper/*.cpp" "src/threadwrapper/*.h")
-file(GLOB SOURCE_GROUP_TOPLEVEL RELATIVE ${PROJECT_SOURCE_DIR} "src/debug.*" "src/global.h" "src/version.h" "src/uvg_math.h" "src/checkpoint.*")
+file(GLOB SOURCE_GROUP_DEBUGGING RELATIVE ${PROJECT_SOURCE_DIR} "src/debug.*" "src/checkpoint.*" "src/encoding_resume.*")
+file(GLOB SOURCE_GROUP_TOPLEVEL RELATIVE ${PROJECT_SOURCE_DIR} "src/global.h" "src/version.h" "src/uvg_math.h")
 
 source_group( "Bitstream" FILES  ${SOURCE_GROUP_BITSTREAM})
 source_group( "CABAC" FILES ${SOURCE_GROUP_CABAC})
@@ -217,6 +218,7 @@ source_group( "Constraint" FILES ${SOURCE_GROUP_CONSTRAINT})
 source_group( "Control" FILES ${SOURCE_GROUP_CONTROL})
 source_group( "Data Structures" FILES ${SOURCE_GROUP_DATA_STRUCTURES})
 source_group( "Extras" FILES ${SOURCE_GROUP_EXTRAS})
+source_group( "Debugging" FILES ${SOURCE_GROUP_DEBUGGING})
 
 # Handle the strategies directory structure better in visual studio
 if(MSVC)

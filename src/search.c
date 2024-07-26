@@ -56,6 +56,11 @@
 #include "strategies/strategies-quant.h"
 #include "reshape.h"
 
+#ifdef UVG_ENCODING_RESUME
+#include "encoding_resume.h"
+#endif // UVG_ENCODING_RESUME
+
+
 #define IN_FRAME(x, y, width, height, block_width, block_height) \
   ((x) >= 0 && (y) >= 0 \
   && (x) + (block_width) <= (width) \
@@ -2175,15 +2180,28 @@ void uvg_search_lcu(encoder_state_t * const state, const int x, const int y, con
   cu_loc_t start;
   uvg_cu_loc_ctor(&start, x, y, LCU_WIDTH, LCU_WIDTH);
   split_tree_t split_tree = { 0, 0, 0, 0, 0 };
-  // Start search from depth 0.
-  double cost = search_cu(
-    state, 
-    &start,
-    &start,
-    &work_tree,
-    tree_type,
-    split_tree,
-    tree_type == UVG_BOTH_T);
+  double cost = 0; //TODO: save cost when resuming
+
+#ifdef UVG_ENCODING_RESUME
+  if (uvg_can_resume_encoding(state, x, y, false)) {
+    uvg_process_resume_encoding(state, x, y, false, &work_tree, true);
+  } else {
+#endif // UVG_ENCODING_RESUME
+
+    // Start search from depth 0.
+    cost = search_cu(
+      state,
+      &start,
+      &start,
+      &work_tree,
+      tree_type,
+      split_tree,
+      tree_type == UVG_BOTH_T);
+
+#ifdef UVG_ENCODING_RESUME
+    uvg_process_resume_encoding(state, x, y, false, &work_tree, false);
+  }
+#endif // UVG_ENCODING_RESUME
 
   // Save squared cost for rate control.
   if(state->encoder_control->cfg.rc_algorithm == UVG_LAMBDA) {
@@ -2198,12 +2216,23 @@ void uvg_search_lcu(encoder_state_t * const state, const int x, const int y, con
   copy_coeffs(work_tree.coeff.y, coeff->y, LCU_WIDTH, LCU_WIDTH, LCU_WIDTH);
 
   if(state->frame->slicetype == UVG_SLICE_I && state->encoder_control->cfg.dual_tree) {
-    cost = search_cu(
-      state, &start,
-      &start,
-      &work_tree, UVG_CHROMA_T,
-      split_tree,
-      true);
+#ifdef UVG_ENCODING_RESUME
+    if (uvg_can_resume_encoding(state, x, y, true)) {
+      uvg_process_resume_encoding(state, x, y, true, &work_tree, true);
+    } else {
+#endif // UVG_ENCODING_RESUME
+
+      cost = search_cu(
+        state, &start,
+        &start,
+        &work_tree, UVG_CHROMA_T,
+        split_tree,
+        true);
+
+#ifdef UVG_ENCODING_RESUME
+       uvg_process_resume_encoding(state, x, y, true, &work_tree, false);
+    }
+#endif // UVG_ENCODING_RESUME
 
     if (state->encoder_control->cfg.rc_algorithm == UVG_LAMBDA) {
       uvg_get_lcu_stats(state, x / LCU_WIDTH, y / LCU_WIDTH)->weight += cost * cost;

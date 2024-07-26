@@ -134,6 +134,9 @@ typedef int32_t mv_t;
 
 //#define UVG_DEBUG_PRINT_YUVIEW_CSV 1
 //#define UVG_DEBUG_PRINT_MV_INFO 1
+
+//#define UVG_ENCODING_RESUME 1
+
 /* CONFIG VARIABLES */
 
 //spec: references to variables defined in Rec. ITU-T H.265 (04/2013)
