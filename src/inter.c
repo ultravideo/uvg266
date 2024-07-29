@@ -371,7 +371,7 @@ static void inter_cp_with_ext_border(const uvg_pixel *ref_buf, int ref_stride,
     for (int x = mv_in_frame->x; x < mv_in_frame->x + width; ++x) {
       vector2d_t in_frame = {
         mv_wrap?((x<0)?x+ref_width:x%ref_width):CLIP(0, ref_width - 1, x),
-        mv_wrap?((y<0)?y+ref_height:y%ref_height):CLIP(0, ref_height - 1, y),
+        CLIP(0, ref_height - 1, y),
       };
       vector2d_t in_pu = {
         x - mv_in_frame->x,

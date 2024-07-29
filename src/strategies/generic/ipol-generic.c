@@ -828,26 +828,25 @@ void uvg_get_extended_block_wraparound_generic(uvg_epol_args *args)
     *args->ext_origin = args->buf + args->pad_t * (*args->ext_s) + args->pad_l;
 
     // Note that stride equals width here.
-    int cnt_l         = CLIP(0, *args->ext_s, -min_x);
-    int cnt_r         = CLIP(0, *args->ext_s, max_x - (args->src_w - 1));
-    int cnt_m         = CLIP(0, *args->ext_s, *args->ext_s - cnt_l - cnt_r);
+    int count_left         = CLIP(0, *args->ext_s, -min_x);
+    int count_right         = CLIP(0, *args->ext_s, max_x - (args->src_w - 1));
+    int count_middle         = CLIP(0, *args->ext_s, *args->ext_s - count_left - count_right);
 
     // For each row including real padding.
     // Don't read "don't care" values (SIMD padding). Zero them out.
     int y;
     for (y = -args->pad_t; y < args->blk_h + args->pad_b; ++y) {
-      int        absolute_y = args->blk_y + y;
-      int wrapped_y       = absolute_y<0?args->src_h+absolute_y:((absolute_y > args->src_h - 1)?absolute_y-args->src_h:absolute_y);
-      uvg_pixel *sample_l  = args->src + wrapped_y * args->src_s;
+      int        clipped_y = CLIP(0, args->src_h - 1, args->blk_y + y);
+      uvg_pixel *sample_l  = args->src + clipped_y * args->src_s;
       uvg_pixel *sample_r =
-        args->src + wrapped_y * args->src_s + args->src_w - 1;
-      uvg_pixel *src_m = args->src + wrapped_y * args->src_s + MAX(min_x, 0);
+        args->src + clipped_y * args->src_s + args->src_w - 1;
+      uvg_pixel *src_m = args->src + clipped_y * args->src_s + MAX(min_x, 0);
       uvg_pixel *dst_l = args->buf + (y + args->pad_t) * (*args->ext_s);
-      uvg_pixel *dst_m = dst_l + cnt_l;
-      uvg_pixel *dst_r = dst_m + cnt_m;
-      for (int i = 0; i < cnt_l; ++i) *(dst_l + i) = *(sample_r - (cnt_l-i));
-      for (int i = 0; i < cnt_m; ++i) *(dst_m + i) = *(src_m + i);
-      for (int i = 0; i < cnt_r; ++i) *(dst_r + i) = *(sample_l + i);
+      uvg_pixel *dst_m = dst_l + count_left;
+      uvg_pixel *dst_r = dst_m + count_middle;
+      for (int i = 0; i < count_left; ++i) *(dst_l + i) = *((sample_r - (count_left-1)) + i);
+      for (int i = 0; i < count_middle; ++i) *(dst_m + i) = *(src_m + i);
+      for (int i = 0; i < count_right; ++i) *(dst_r + i) = *(sample_l + i);
     }
 
     for (int y_simd = 0; y_simd < args->pad_b_simd; ++y_simd) {
