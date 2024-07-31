@@ -584,8 +584,9 @@ static void predict_cclm(
     if (x_scu == 0) available_left_below = MIN(MIN(height / 2, (64 - y_scu - height * 2) / 4), (state->tile->frame->height - y0 - height * 2) / 4);
     for (; available_left_below < height / 2; available_left_below++) {
       int y_extension = y_scu + height * 2 + 4 * available_left_below;
+      if (y_extension >= ctu_size) break;
       const cu_info_t* pu = LCU_GET_CU_AT_PX(lcu, (x_scu) - 4, y_extension);
-      if (y_extension >= ctu_size || pu->type == CU_NOTSET || (pu->type == CU_INTRA && pu->intra.mode_chroma == -1)) break;
+      if (pu->type == CU_NOTSET || (pu->type == CU_INTRA && pu->intra.mode_chroma == -1)) break;
       if(x_scu == 32 && y_scu == 0 && pu->log2_height == 6 && pu->log2_width == 6 ) break;
     }
     for(int i = 0; i < height + available_left_below * 2; i++) {
