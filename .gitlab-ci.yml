@@ -6,7 +6,7 @@ test-uvg266: &test-template
   stage: test
   script:
     - bash .travis-install.bash
-    - export PATH="${HOME}/bin:${PATH}"
+    - export PATH="/opt/homebrew/bin/:${HOME}/bin:${PATH}"
     - cmake -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=./ . || (cat config.log && false)
     - make install
     - env CTEST_PARALLEL_LEVEL=8 CTEST_OUTPUT_ON_FAILURE=1 make test
@@ -43,9 +43,31 @@ test-valgrind:
   variables:
     UVG_TEST_VALGRIND: 1
 
-# TODO: If someone knows YAML better, there has to be some better way to
-# concatenate stuff into the test-template script than just manually copy
-# pasting
+test-macos:
+  <<: *test-template
+  tags:
+    - macOS
+  
+test-macos-asan:
+  <<: *test-template
+  tags:
+    - macOS
+  variables:
+    CFLAGS: '-fsanitize=address -g'
+    # LeakSanitizer doesn't work inside the container because it requires
+    # ptrace so we disable it.
+    ASAN_OPTIONS: 'detect_leaks=0'
+    # AddressSanitizer adds some extra symbols so we expect a failure from
+    # the external symbols test.
+    XFAIL_TESTS: test_external_symbols
+    
+test-macos-ubsan:
+  <<: *test-template
+  tags:
+    - macOS
+  variables:
+    CFLAGS: '-fsanitize=undefined -fno-sanitize-recover=all -fno-sanitize=alignment -g'
+    
 #test-distcheck:
 #  <<: *test-template
 #  script:
