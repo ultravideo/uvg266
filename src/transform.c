@@ -570,9 +570,9 @@ void uvg_chroma_transform_search(
   enum uvg_tree_type tree_type)
 {
   ALIGNED(64) coeff_t u_coeff[LCU_WIDTH_C * LCU_WIDTH_C * 5];
-  ALIGNED(64) uint8_t u_recon[LCU_WIDTH_C * LCU_WIDTH_C * 5];
+  ALIGNED(64) uvg_pixel u_recon[LCU_WIDTH_C * LCU_WIDTH_C * 5];
   ALIGNED(64) coeff_t v_coeff[LCU_WIDTH_C * LCU_WIDTH_C * 2]; // In case of JCCR the v channel does not have coefficients
-  ALIGNED(64) uint8_t v_recon[LCU_WIDTH_C * LCU_WIDTH_C * 5];
+  ALIGNED(64) uvg_pixel v_recon[LCU_WIDTH_C * LCU_WIDTH_C * 5];
   const int width  = cu_loc->chroma_width;
   const int height = cu_loc->chroma_height;
 
