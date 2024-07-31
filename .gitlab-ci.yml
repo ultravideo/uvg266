@@ -48,6 +48,26 @@ test-macos:
   tags:
     - macOS
   
+test-macos-asan:
+  <<: *test-template
+  tags:
+    - macOS
+  variables:
+    CFLAGS: '-fsanitize=address -g'
+    # LeakSanitizer doesn't work inside the container because it requires
+    # ptrace so we disable it.
+    ASAN_OPTIONS: 'detect_leaks=0'
+    # AddressSanitizer adds some extra symbols so we expect a failure from
+    # the external symbols test.
+    XFAIL_TESTS: test_external_symbols
+    
+test-macos-ubsan:
+  <<: *test-template
+  tags:
+    - macOS
+  variables:
+    CFLAGS: '-fsanitize=undefined -fno-sanitize-recover=all -fno-sanitize=alignment -g'
+    
 #test-distcheck:
 #  <<: *test-template
 #  script:
