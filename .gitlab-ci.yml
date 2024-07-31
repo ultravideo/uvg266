@@ -43,9 +43,11 @@ test-valgrind:
   variables:
     UVG_TEST_VALGRIND: 1
 
-# TODO: If someone knows YAML better, there has to be some better way to
-# concatenate stuff into the test-template script than just manually copy
-# pasting
+test-macos:
+  <<: *test-template
+  tags:
+    - macOS
+  
 #test-distcheck:
 #  <<: *test-template
 #  script:
