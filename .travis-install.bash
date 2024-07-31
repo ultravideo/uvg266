@@ -6,6 +6,8 @@ set -euvo pipefail
 
 mkdir -p "${HOME}/bin"
 
+export PATH="/opt/homebrew/bin/:${PATH}"
+
 if [ "$(uname)" == "Darwin" ]; then
 wget http://ultravideo.fi/ffmpeg-release-7.0-static-applesilicon.tar.xz
 sha256sum -c - << EOF
