@@ -2285,7 +2285,6 @@ void uvg_search_lcu(encoder_state_t * const state, const int x, const int y, con
   copy_coeffs(work_tree.coeff.y, coeff->y, LCU_WIDTH, LCU_WIDTH, LCU_WIDTH);
 
   if(state->frame->slicetype == UVG_SLICE_I && state->encoder_control->cfg.dual_tree) {
-      split_tree,
 #ifdef UVG_ENCODING_RESUME
     if (uvg_can_resume_encoding(state, x, y, true)) {
       uvg_process_resume_encoding(state, x, y, true, &cost, &work_tree, true);

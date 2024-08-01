@@ -213,6 +213,7 @@ static void process_cu(FILE* const file, lcu_t* const lcu, bool read_mode) {
       PROCESS_VAR(uint16_t, 1, &(cu->cbf), file, read_mode);
       PROCESS_VAR(uint8_t, 1, &(cu->root_cbf), file, read_mode);
       PROCESS_FIELD(uint32_t, cu->split_tree, file, read_mode);
+      PROCESS_FIELD(uint32_t, cu->mode_type_tree, file, read_mode);
       PROCESS_VAR(uint8_t, 1, &(cu->qp), file, read_mode);
       PROCESS_FIELD(uint8_t, cu->bdpcmMode, file, read_mode);
       PROCESS_FIELD(uint8_t, cu->violates_mts_coeff_constraint, file, read_mode);
