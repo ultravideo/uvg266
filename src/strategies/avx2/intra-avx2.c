@@ -2779,6 +2779,60 @@ static void angular_pdpc_hor_w4_high_angle_avx2(uvg_pixel* dst, const uvg_pixel*
 }
 
 
+// Improved PDPC functions. These use the streamlined PDPC equation
+
+// Mode 18
+
+
+// Mode 50
+
+
+// Other modes
+
+static void angular_pdpc_ver_w4_improved_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int height, const int scale, const int mode_disp)
+{
+  const int width = 4;
+  __m128i v32s = _mm_set1_epi16(32);
+
+  // Scale can be 0, 1 or 2
+  const int offset = scale * 16;
+  const int inv_angle_offset = mode_disp * 64;
+  const int shuf_offset = mode_disp * 16;
+
+  const int16_t* shifted_inv_angle_sum = &intra_pdpc_shifted_inv_angle_sum[inv_angle_offset];
+  const __m128i vweight = _mm_load_si128((const __m128i*) &intra_pdpc_w4_ver_improved_weight[offset]);
+  const __m128i vshuf = _mm_loadu_si128((__m128i*) &intra_pdpc_shuffle_vectors_w4_ver[shuf_offset]);
+
+  // For a 4 width block, height must be at least 4. Handle 4 lines at once.
+  for (int y = 0; y < height; y += 4) {
+    __m128i vleft = _mm_loadu_si128((__m128i*) &ref_side[y + shifted_inv_angle_sum[0] + 1]);
+    vleft = _mm_shuffle_epi8(vleft, vshuf);
+
+    //__m128i vdst = _mm_i32gather_epi32((const int32_t*)(dst + y * width), vseq, 4);
+    __m128i vdst = _mm_loadu_si128((const __m128i*)(dst + y * width));
+    
+    __m128i vlo = _mm_unpacklo_epi8(vdst, vleft);
+    __m128i vhi = _mm_unpackhi_epi8(vdst, vleft);
+
+    __m128i vmaddlo = _mm_maddubs_epi16(vlo, vweight);
+    __m128i vmaddhi = _mm_maddubs_epi16(vhi, vweight);
+
+    vmaddlo = _mm_add_epi16(vmaddlo, v32s);
+    vmaddhi = _mm_add_epi16(vmaddhi, v32s);
+
+    vmaddlo = _mm_srai_epi16(vmaddlo, 6);
+    vmaddhi = _mm_srai_epi16(vmaddhi, 6);
+
+    __m128i packed = _mm_packus_epi16(vmaddlo, vmaddhi);
+
+    _mm_store_si128((__m128i*)(dst + (y * width)), packed);
+  }
+}
+
+
+
+
+
 // This is the non-vectorized version of pdpc mode 18. It is left here for archiving purposes.
 static void angular_pdpc_mode18_avx2(uvg_pixel* dst, const uvg_pixel top_left, const uvg_pixel* ref_side, const int width, const int height, const int scale)
 {
@@ -3626,7 +3680,7 @@ static void uvg_angular_pred_avx2(
           if (mode_disp < 6)
             angular_pdpc_ver_w4_high_angle_avx2(dst, ref_side, height, scale, mode_disp);
           else
-            angular_pdpc_ver_w4_avx2(dst, ref_side, height, scale, mode_disp);
+            angular_pdpc_ver_w4_improved_avx2(dst, ref_side, height, scale, mode_disp);
           break;
         case 8:
           if (scale == 0) {
