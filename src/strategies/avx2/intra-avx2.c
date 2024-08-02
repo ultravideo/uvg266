@@ -2792,7 +2792,7 @@ static void angular_pdpc_hor_w4_high_angle_avx2(uvg_pixel* dst, const uvg_pixel*
 static void angular_pdpc_ver_w4_high_angle_improved_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int height, const int scale, const int mode_disp)
 {
   const int width = 4;
-  ALIGNED(32) uint8_t left[4][4];
+  //ALIGNED(32) uint8_t left[4][4];
   __m128i v32s = _mm_set1_epi16(32);
 
   // Scale can be 0, 1 or 2
@@ -2804,16 +2804,21 @@ static void angular_pdpc_ver_w4_high_angle_improved_avx2(uvg_pixel* dst, const u
 
   const __m128i vleftshuf = _mm_setr_epi8(
     0x00, 0x04, 0x08, 0x0c, 0x01, 0x05, 0x09, 0x0d, 
-    0x02, 0x06, 0x0a, 0x0e, 0x03, 0x07, 0x0b, 0x0f);
+    0x02, 0x06, 0x0a, 0x0e, 0x03, 0x07, 0x0b, 0x0f
+  );
+
+  __m128i vidx = _mm_setr_epi32(shifted_inv_angle_sum[0], shifted_inv_angle_sum[1], 
+                                shifted_inv_angle_sum[2], shifted_inv_angle_sum[3]);
 
   // For a 4 width block, height must be at least 4. Handle 4 lines at once.
   for (int y = 0; y < height; y += 4) {
-    for (int xx = 0; xx < width; ++xx) {
+    /*for (int xx = 0; xx < width; ++xx) {
       memcpy(left[xx], &ref_side[(y + 0) + shifted_inv_angle_sum[xx] + 1], 4 * sizeof(uint8_t));
-    }
+    }*/
 
     __m128i vdst = _mm_loadu_si128((const __m128i*)(dst + y * width));
-    __m128i vleft = _mm_load_si128((__m128i*)left);
+    //__m128i vleft = _mm_load_si128((__m128i*)left);
+    __m128i vleft = _mm_i32gather_epi32((const int32_t*)&ref_side[y + 1], vidx, 1);
     vleft = _mm_shuffle_epi8(vleft, vleftshuf);
 
     __m128i vlo = _mm_unpacklo_epi8(vdst, vleft);
