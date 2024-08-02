@@ -244,6 +244,8 @@ encoder_control_t* uvg_encoder_control_init(const uvg_config *const cfg)
   encoder->max_inter_ref_lcu.right = 1;
   encoder->max_inter_ref_lcu.down  = 1;
 
+  if (encoder->cfg.ref_wraparound) encoder->max_inter_ref_lcu.right = (encoder->cfg.width+LCU_LUMA_SIZE-1)>>LOG2_LCU_WIDTH;
+
   int max_threads = encoder->cfg.threads;
   if (max_threads < 0) {
     max_threads = cfg_num_threads();
