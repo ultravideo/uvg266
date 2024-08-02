@@ -796,10 +796,18 @@ int uvg_encode_inter_prediction_unit(
       }
     }
 #ifdef UVG_DEBUG_PRINT_YUVIEW_CSV
-    int abs_x = cu_loc->x + state->tile->offset_x;
-    int abs_y = cu_loc->y + state->tile->offset_y;
-    if (cur_cu->inter.mv_dir & 1) DBG_YUVIEW_MV(state->frame->poc, DBG_YUVIEW_MVMERGE_L0, abs_x, abs_y, cu_loc->width, cu_loc->height, cur_cu->inter.mv[0][0], cur_cu->inter.mv[0][1]);
-    if (cur_cu->inter.mv_dir & 2) DBG_YUVIEW_MV(state->frame->poc, DBG_YUVIEW_MVMERGE_L1, abs_x, abs_y, cu_loc->width, cu_loc->height, cur_cu->inter.mv[1][0], cur_cu->inter.mv[1][1]);
+    if (!cabac->only_count) {
+      int abs_x = cu_loc->x + state->tile->offset_x;
+      int abs_y = cu_loc->y + state->tile->offset_y;
+      if (cur_cu->inter.mv_dir & 1) {
+        DBG_YUVIEW_MV(state->frame->poc, DBG_YUVIEW_MVMERGE_L0, abs_x, abs_y, cu_loc->width, cu_loc->height, cur_cu->inter.mv[0][0], cur_cu->inter.mv[0][1]);
+        DBG_YUVIEW_VALUE(state->frame->poc, DBG_YUVIEW_REFIDX_MERGE_L0, abs_x, abs_y, cu_loc->width, cu_loc->height, cur_cu->inter.mv_ref[0]);
+      }
+      if (cur_cu->inter.mv_dir & 2) { 
+        DBG_YUVIEW_MV(state->frame->poc, DBG_YUVIEW_MVMERGE_L1, abs_x, abs_y, cu_loc->width, cu_loc->height, cur_cu->inter.mv[1][0], cur_cu->inter.mv[1][1]);
+        DBG_YUVIEW_VALUE(state->frame->poc, DBG_YUVIEW_REFIDX_MERGE_L1, abs_x, abs_y, cu_loc->width, cu_loc->height, cur_cu->inter.mv_ref[1]);
+      }
+    }
 #endif
   } else {
     if (state->frame->slicetype == UVG_SLICE_B && cur_cu->type != CU_IBC) {
@@ -821,9 +829,12 @@ int uvg_encode_inter_prediction_unit(
         continue;
       }
 #ifdef UVG_DEBUG_PRINT_YUVIEW_CSV
-      int abs_x = cu_loc->x + state->tile->offset_x;
-      int abs_y = cu_loc->y + state->tile->offset_y;
-      DBG_YUVIEW_MV(state->frame->poc, ref_list_idx ? DBG_YUVIEW_MVINTER_L1 : DBG_YUVIEW_MVINTER_L0, abs_x, abs_y, cu_loc->width, cu_loc->height, cur_cu->inter.mv[ref_list_idx][0], cur_cu->inter.mv[ref_list_idx][1]);
+      if (!cabac->only_count) {
+        int abs_x = cu_loc->x + state->tile->offset_x;
+        int abs_y = cu_loc->y + state->tile->offset_y;
+        DBG_YUVIEW_MV(state->frame->poc, ref_list_idx ? DBG_YUVIEW_MVINTER_L1 : DBG_YUVIEW_MVINTER_L0, abs_x, abs_y, cu_loc->width, cu_loc->height, cur_cu->inter.mv[ref_list_idx][0], cur_cu->inter.mv[ref_list_idx][1]);
+        DBG_YUVIEW_VALUE(state->frame->poc,  ref_list_idx ? DBG_YUVIEW_REFIDX_INTER_L1 : DBG_YUVIEW_REFIDX_INTER_L0, abs_x, abs_y, cu_loc->width, cu_loc->height, cur_cu->inter.mv_ref[ref_list_idx]);
+      }
 #endif
       // size of the current reference index list (L0/L1)
       uint8_t ref_LX_size = state->frame->ref_LX_size[ref_list_idx];
@@ -1474,8 +1485,16 @@ void uvg_encode_coding_tree(
         }
       }
 #ifdef UVG_DEBUG_PRINT_YUVIEW_CSV
-      if (cur_cu->inter.mv_dir & 1) DBG_YUVIEW_MV(state->frame->poc, DBG_YUVIEW_MVSKIP_L0, abs_x, abs_y, cu_width, cu_height, cur_cu->inter.mv[0][0], cur_cu->inter.mv[0][1]);
-      if (cur_cu->inter.mv_dir & 2) DBG_YUVIEW_MV(state->frame->poc, DBG_YUVIEW_MVSKIP_L1, abs_x, abs_y, cu_width, cu_height, cur_cu->inter.mv[1][0], cur_cu->inter.mv[1][1]);
+      if (!cabac->only_count) {
+        if (cur_cu->inter.mv_dir & 1) {
+          DBG_YUVIEW_MV(state->frame->poc, DBG_YUVIEW_MVSKIP_L0, abs_x, abs_y, cu_width, cu_height, cur_cu->inter.mv[0][0], cur_cu->inter.mv[0][1]);
+          DBG_YUVIEW_VALUE(state->frame->poc,  DBG_YUVIEW_REFIDX_SKIP_L0, abs_x, abs_y, cu_width, cu_height, cur_cu->inter.mv_ref[0]);
+        }
+        if (cur_cu->inter.mv_dir & 2) {
+          DBG_YUVIEW_MV(state->frame->poc, DBG_YUVIEW_MVSKIP_L1, abs_x, abs_y, cu_width, cu_height, cur_cu->inter.mv[1][0], cur_cu->inter.mv[1][1]);
+          DBG_YUVIEW_VALUE(state->frame->poc,  DBG_YUVIEW_REFIDX_SKIP_L1, abs_x, abs_y, cu_width, cu_height, cur_cu->inter.mv_ref[1]);
+        }
+      }
 #endif
 
       goto end;
