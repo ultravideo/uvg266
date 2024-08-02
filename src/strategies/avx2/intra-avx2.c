@@ -2789,6 +2789,51 @@ static void angular_pdpc_hor_w4_high_angle_avx2(uvg_pixel* dst, const uvg_pixel*
 
 // Other modes
 
+static void angular_pdpc_ver_w4_high_angle_improved_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int height, const int scale, const int mode_disp)
+{
+  const int width = 4;
+  ALIGNED(32) uint8_t left[4][4];
+  __m128i v32s = _mm_set1_epi16(32);
+
+  // Scale can be 0, 1 or 2
+  const int offset = scale * 16;
+  const __m128i vweight = _mm_load_si128((const __m128i*) &intra_pdpc_w4_ver_improved_weight[offset]);
+
+  const int inv_angle_offset = mode_disp * 64;
+  const int16_t* shifted_inv_angle_sum = &intra_pdpc_shifted_inv_angle_sum[inv_angle_offset];
+
+  const __m128i vleftshuf = _mm_setr_epi8(
+    0x00, 0x04, 0x08, 0x0c, 0x01, 0x05, 0x09, 0x0d, 
+    0x02, 0x06, 0x0a, 0x0e, 0x03, 0x07, 0x0b, 0x0f);
+
+  // For a 4 width block, height must be at least 4. Handle 4 lines at once.
+  for (int y = 0; y < height; y += 4) {
+    for (int xx = 0; xx < width; ++xx) {
+      memcpy(left[xx], &ref_side[(y + 0) + shifted_inv_angle_sum[xx] + 1], 4 * sizeof(uint8_t));
+    }
+
+    __m128i vdst = _mm_loadu_si128((const __m128i*)(dst + y * width));
+    __m128i vleft = _mm_load_si128((__m128i*)left);
+    vleft = _mm_shuffle_epi8(vleft, vleftshuf);
+
+    __m128i vlo = _mm_unpacklo_epi8(vdst, vleft);
+    __m128i vhi = _mm_unpackhi_epi8(vdst, vleft);
+
+    __m128i vmaddlo = _mm_maddubs_epi16(vlo, vweight);
+    __m128i vmaddhi = _mm_maddubs_epi16(vhi, vweight);
+
+    vmaddlo = _mm_add_epi16(vmaddlo, v32s);
+    vmaddhi = _mm_add_epi16(vmaddhi, v32s);
+
+    vmaddlo = _mm_srai_epi16(vmaddlo, 6);
+    vmaddhi = _mm_srai_epi16(vmaddhi, 6);
+
+    __m128i packed = _mm_packus_epi16(vmaddlo, vmaddhi);
+
+    _mm_store_si128((__m128i*)(dst + (y * width)), packed);
+  }
+}
+
 static void angular_pdpc_ver_w4_improved_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int height, const int scale, const int mode_disp)
 {
   const int width = 4;
@@ -2828,9 +2873,6 @@ static void angular_pdpc_ver_w4_improved_avx2(uvg_pixel* dst, const uvg_pixel* r
     _mm_store_si128((__m128i*)(dst + (y * width)), packed);
   }
 }
-
-
-
 
 
 // This is the non-vectorized version of pdpc mode 18. It is left here for archiving purposes.
@@ -3678,7 +3720,7 @@ static void uvg_angular_pred_avx2(
           // Low mode disp -> high angle. For pdpc, this causes the needed references to be extremely sparse making loads without using gathers impossible.
           // Handle low angles with more tight reference spacing with separate functions with more optimized loads.
           if (mode_disp < 6)
-            angular_pdpc_ver_w4_high_angle_avx2(dst, ref_side, height, scale, mode_disp);
+            angular_pdpc_ver_w4_high_angle_improved_avx2(dst, ref_side, height, scale, mode_disp);
           else
             angular_pdpc_ver_w4_improved_avx2(dst, ref_side, height, scale, mode_disp);
           break;
