@@ -2879,6 +2879,59 @@ static void angular_pdpc_ver_w4_improved_avx2(uvg_pixel* dst, const uvg_pixel* r
   }
 }
 
+static void angular_pdpc_ver_4x4_scale0_high_angle_improved_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int width, const int height, const int mode_disp)
+{
+  // This function is just the w4 function, retrofitted to work with any width when scale is 0. If width is 4, use a specialized function instead.
+  // Since scale is 0, limit is 3 and therefore there is no meaningful work to be done when x > 3, so only the first column of 4x4 chunks is handled.
+  const int scale = 0;
+  const int log2_width = uvg_g_convert_to_log2[width];
+  __m128i v32s = _mm_set1_epi16(32);
+
+  // Scale can be 0, 1 or 2
+  const int offset = scale * 16;
+  const __m128i vweight = _mm_load_si128((const __m128i*) & intra_pdpc_w4_ver_improved_weight[offset]);
+
+  const int inv_angle_offset = mode_disp * 64;
+  const int16_t* shifted_inv_angle_sum = &intra_pdpc_shifted_inv_angle_sum[inv_angle_offset];
+
+  __m128i vseq = _mm_setr_epi32(0, 1, 2, 3);
+  __m128i vidx = _mm_slli_epi32(vseq, log2_width);
+
+  __m128i vidx_left = _mm_setr_epi32(shifted_inv_angle_sum[0], shifted_inv_angle_sum[1],
+                                     shifted_inv_angle_sum[2], shifted_inv_angle_sum[3]);
+
+  const __m128i vleftshuf = _mm_setr_epi8(
+    0x00, 0x04, 0x08, 0x0c, 0x01, 0x05, 0x09, 0x0d,
+    0x02, 0x06, 0x0a, 0x0e, 0x03, 0x07, 0x0b, 0x0f
+  );
+
+  // For a 4 width block, height must be at least 4. Handle 4 lines at once.
+  for (int y = 0; y < height; y += 4) {
+    __m128i vdst = _mm_i32gather_epi32((const int32_t*)(dst + y * width), vidx, 1);
+    __m128i vleft = _mm_i32gather_epi32((const int32_t*)&ref_side[y + 1], vidx_left, 1);
+    vleft = _mm_shuffle_epi8(vleft, vleftshuf);
+
+    __m128i vlo = _mm_unpacklo_epi8(vdst, vleft);
+    __m128i vhi = _mm_unpackhi_epi8(vdst, vleft);
+
+    __m128i vmaddlo = _mm_maddubs_epi16(vlo, vweight);
+    __m128i vmaddhi = _mm_maddubs_epi16(vhi, vweight);
+
+    vmaddlo = _mm_add_epi16(vmaddlo, v32s);
+    vmaddhi = _mm_add_epi16(vmaddhi, v32s);
+
+    vmaddlo = _mm_srai_epi16(vmaddlo, 6);
+    vmaddhi = _mm_srai_epi16(vmaddhi, 6);
+
+    __m128i packed = _mm_packus_epi16(vmaddlo, vmaddhi);
+
+    *(uint32_t*)(dst + (y + 0) * width) = _mm_extract_epi32(packed, 0);
+    *(uint32_t*)(dst + (y + 1) * width) = _mm_extract_epi32(packed, 1);
+    *(uint32_t*)(dst + (y + 2) * width) = _mm_extract_epi32(packed, 2);
+    *(uint32_t*)(dst + (y + 3) * width) = _mm_extract_epi32(packed, 3);
+  }
+}
+
 
 // This is the non-vectorized version of pdpc mode 18. It is left here for archiving purposes.
 static void angular_pdpc_mode18_avx2(uvg_pixel* dst, const uvg_pixel top_left, const uvg_pixel* ref_side, const int width, const int height, const int scale)
@@ -3732,7 +3785,7 @@ static void uvg_angular_pred_avx2(
         case 8:
           if (scale == 0) {
             if (mode_disp < 6)
-              angular_pdpc_ver_4x4_scale0_high_angle_avx2(dst, ref_side, width, height, mode_disp);
+              angular_pdpc_ver_4x4_scale0_high_angle_improved_avx2(dst, ref_side, width, height, mode_disp);
             else
               angular_pdpc_ver_4x4_scale0_avx2(dst, ref_side, width, height, mode_disp);
           }
