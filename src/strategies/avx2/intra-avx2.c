@@ -2879,6 +2879,7 @@ static void angular_pdpc_ver_w4_improved_avx2(uvg_pixel* dst, const uvg_pixel* r
   }
 }
 
+
 static void angular_pdpc_ver_4x4_scale0_high_angle_improved_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int width, const int height, const int mode_disp)
 {
   // This function is just the w4 function, retrofitted to work with any width when scale is 0. If width is 4, use a specialized function instead.
@@ -2982,6 +2983,84 @@ static void angular_pdpc_ver_4x4_scale0_improved_avx2(uvg_pixel* dst, const uvg_
   }
 }
 
+
+static void angular_pdpc_ver_8x4_scale1_high_angle_improved_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int width, const int height, const int mode_disp)
+{
+  // NOTE: This function is just the w8 function, retrofitted to work with width 16 and up when scale is 1.
+  // Since scale is 1, limit is 6 and therefore there is no meaningful work to be done when x > 6, so only the first column of 8x2 chunks is handled.
+  const int scale = 1;
+  const int log2_width = uvg_g_convert_to_log2[width];
+
+  const int limit = 6;
+
+  __m256i vseq = _mm256_setr_epi64x(0, 1, 2, 3);
+  __m256i vidx = _mm256_slli_epi32(vseq, log2_width);
+  __m256i v32s = _mm256_set1_epi16(32);
+
+  const int offset = scale * 32;
+  const int inv_angle_offset = mode_disp * 64;
+  const int shuf_offset = mode_disp * 16;
+
+  const __m256i vweight = _mm256_load_si256((const __m256i*) &intra_pdpc_w8_ver_improved_weight[offset]);
+  const int16_t* shifted_inv_angle_sum = &intra_pdpc_shifted_inv_angle_sum[inv_angle_offset];
+  //const __m128i vshuf = _mm_loadu_si128((__m128i*) &intra_pdpc_shuffle_vectors_8x2_scale1_ver[shuf_offset]);
+
+  __m256i vidxleft = _mm256_setr_epi32(shifted_inv_angle_sum[0], shifted_inv_angle_sum[1],
+                                       shifted_inv_angle_sum[2], shifted_inv_angle_sum[3],
+                                       shifted_inv_angle_sum[4], shifted_inv_angle_sum[5],
+                                       shifted_inv_angle_sum[6], shifted_inv_angle_sum[7]); // These two are not needed.
+
+  const __m256i vtranspose0 = _mm256_setr_epi8(
+    0x00, 0x04, 0x08, 0x0c, 0x01, 0x05, 0x09, 0x0d,
+    0x02, 0x06, 0x0a, 0x0e, 0x03, 0x07, 0x0b, 0x0f,
+    0x00, 0x04, 0x08, 0x0c, 0x01, 0x05, 0x09, 0x0d,
+    0x02, 0x06, 0x0a, 0x0e, 0x03, 0x07, 0x0b, 0x0f
+  );
+
+  const __m256i vtranspose1 = _mm256_setr_epi8(
+    0x00, 0x01, 0x02, 0x03, 0x08, 0x09, 0x0a, 0x0b,
+    0x04, 0x05, 0x06, 0x07, 0x0c, 0x0d, 0x0e, 0x0f,
+    0x00, 0x01, 0x02, 0x03, 0x08, 0x09, 0x0a, 0x0b,
+    0x04, 0x05, 0x06, 0x07, 0x0c, 0x0d, 0x0e, 0x0f
+  );
+
+  // For width 8, height must be at least 4 as PDPC is not done when height < 4. Handle 4 lines at once, this enables us to use gather for ref pixels.
+  for (int y = 0; y < height; y += 4) {
+    __m256i vdst =  _mm256_i64gather_epi64((const long long int*)(dst + y * width), vidx, 1);
+    __m256i vleft = _mm256_i32gather_epi32((const int32_t*)&ref_side[y + 1], vidxleft, 1);
+    
+    // Transpose vleft
+    vleft = _mm256_shuffle_epi8(vleft, vtranspose0);
+    vleft = _mm256_permute4x64_epi64(vleft, _MM_SHUFFLE(3, 1, 2, 0));
+    vleft = _mm256_shuffle_epi8(vleft, vtranspose1);
+    
+    __m256i vlo = _mm256_unpacklo_epi8(vdst, vleft);
+    __m256i vhi = _mm256_unpackhi_epi8(vdst, vleft);
+
+    __m256i vmaddlo = _mm256_maddubs_epi16(vlo, vweight);
+    __m256i vmaddhi = _mm256_maddubs_epi16(vhi, vweight);
+
+    vmaddlo = _mm256_add_epi16(vmaddlo, v32s);
+    vmaddhi = _mm256_add_epi16(vmaddhi, v32s);
+
+    vmaddlo = _mm256_srai_epi16(vmaddlo, 6);
+    vmaddhi = _mm256_srai_epi16(vmaddhi, 6);
+
+    __m256i packed = _mm256_packus_epi16(vmaddlo, vmaddhi);
+
+    // TODO: if this if branch is deemed to cause slow down, make another version of this, where this check is not needed.
+    // If this does not slow down significantly, make this same check in other functions to reduce the function call switch case complexity
+    if (width == 8) {
+      _mm256_store_si256((__m256i*)(dst + (y * width)), packed);
+    }
+    else {
+      *(uint64_t*)(dst + (y + 0) * width) = _mm256_extract_epi64(packed, 0);
+      *(uint64_t*)(dst + (y + 1) * width) = _mm256_extract_epi64(packed, 1);
+      *(uint64_t*)(dst + (y + 2) * width) = _mm256_extract_epi64(packed, 2);
+      *(uint64_t*)(dst + (y + 3) * width) = _mm256_extract_epi64(packed, 3);
+    }
+  }
+}
 
 // This is the non-vectorized version of pdpc mode 18. It is left here for archiving purposes.
 static void angular_pdpc_mode18_avx2(uvg_pixel* dst, const uvg_pixel top_left, const uvg_pixel* ref_side, const int width, const int height, const int scale)
@@ -3841,7 +3920,7 @@ static void uvg_angular_pred_avx2(
           }
           else if (scale == 1) {
             if (mode_disp < 8)
-              angular_pdpc_ver_8x2_scale1_high_angle_avx2(dst, ref_side, width, height, mode_disp);
+              angular_pdpc_ver_8x4_scale1_high_angle_improved_avx2(dst, ref_side, width, height, mode_disp);
             else
               angular_pdpc_ver_8x2_scale1_avx2(dst, ref_side, width, height, mode_disp);
           }

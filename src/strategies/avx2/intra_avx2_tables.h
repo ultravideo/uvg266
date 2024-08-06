@@ -1334,13 +1334,21 @@ static ALIGNED(32) const int16_t intra_pdpc_w16_ver_weight[] = {
   32, 32, 16, 16,  8,  8,  4,  4,  2,  2,  1,  1,  0,  0,  0,  0,  // Scale 2
 };
 
+
 // Weights for improved PDPC
 
-// Weights for intra pdpc w4 vertical.
+// Weights for improved intra pdpc w4 vertical.
 ALIGNED(32) const uint8_t intra_pdpc_w4_ver_improved_weight[] = {
   32, 32, 56,  8, 62,  2, 64,  0, 32, 32, 56,  8, 62,  2, 64,  0,  // Scale 0
   32, 32, 48, 16, 56,  8, 60,  4, 32, 32, 48, 16, 56,  8, 60,  4,  // Scale 1
   32, 32, 32, 32, 48, 16, 48, 16, 32, 32, 32, 32, 48, 16, 48, 16,  // Scale 2
+};
+
+// Weights for improved intra pdpc w8 vertical.
+ALIGNED(32) const uint8_t intra_pdpc_w8_ver_improved_weight[] = {
+  32, 32, 56,  8, 62,  2, 64,  0, 64,  0, 64,  0, 64,  0, 64,  0, 32, 32, 56,  8, 62,  2, 64,  0, 64,  0, 64,  0, 64,  0, 64,  0,  // Scale 0
+  32, 32, 48, 16, 56,  8, 60,  4, 62,  2, 63,  1, 64,  0, 64,  0, 32, 32, 48, 16, 56,  8, 60,  4, 62,  2, 63,  1, 64,  0, 64,  0,  // Scale 1
+  32, 32, 32, 32, 48, 16, 48, 16, 56,  8, 56,  8, 60,  4, 60,  4, 32, 32, 32, 32, 48, 16, 48, 16, 56,  8, 56,  8, 60,  4, 60,  4,  // Scale 2
 };
 
 
