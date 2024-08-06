@@ -3062,7 +3062,7 @@ static void angular_pdpc_ver_8x4_scale1_high_angle_improved_avx2(uvg_pixel* dst,
   }
 }
 
-static void angular_pdpc_ver_8x2_scale1_improved_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int width, const int height, const int mode_disp)
+static void angular_pdpc_ver_8x4_scale1_improved_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int width, const int height, const int mode_disp)
 {
   // NOTE: This function is just the w8 function, retrofitted to work with width 16 and up when scale is 1.
   // Since scale is 1, limit is 6 and therefore there is no meaningful work to be done when x > 6, so only the first column of 8x2 chunks is handled.
@@ -3072,47 +3072,52 @@ static void angular_pdpc_ver_8x2_scale1_improved_avx2(uvg_pixel* dst, const uvg_
 
   const int limit = 6;
 
-  __m128i vseq = _mm_set_epi64x(1, 0);
-  __m128i vidx = _mm_slli_epi32(vseq, log2_width);
-  __m128i v32s = _mm_set1_epi16(32);
+  __m256i vseq = _mm256_setr_epi64x(0, 1, 2, 3);
+  __m256i vidx = _mm256_slli_epi32(vseq, log2_width);
+  __m256i v32s = _mm256_set1_epi16(32);
 
   const int offset = scale * 32;
   const int inv_angle_offset = mode_disp * 64;
   const int shuf_offset = mode_disp * 16;
 
-  const __m128i vweight = _mm_load_si128((const __m128i*) &intra_pdpc_w8_ver_improved_weight[offset]);
+  const __m256i vweight = _mm256_load_si256((const __m256i*) &intra_pdpc_w8_ver_improved_weight[offset]);
   const int16_t* shifted_inv_angle_sum = &intra_pdpc_shifted_inv_angle_sum[inv_angle_offset];
   const __m128i vshuf = _mm_loadu_si128((__m128i*) &intra_pdpc_shuffle_vectors_8x2_scale1_ver[shuf_offset]);
 
-  // For width 8, height must be at least 2. Handle 2 lines at once.
-  for (int y = 0; y < height; y += 2) {
-    __m128i vleft = _mm_loadu_si128((__m128i*) &ref_side[y + shifted_inv_angle_sum[0] + 1]);
-    vleft = _mm_shuffle_epi8(vleft, vshuf);
+  // For width 8, height must be at least 4 as PDPC is not done when height < 4. Handle 4 lines at once.
+  for (int y = 0; y < height; y += 4) {
+    __m128i vleft0 = _mm_loadu_si128((__m128i*) &ref_side[(y + 0) + shifted_inv_angle_sum[0] + 1]);
+    __m128i vleft1 = _mm_loadu_si128((__m128i*) &ref_side[(y + 2) + shifted_inv_angle_sum[0] + 1]);
+    vleft0 = _mm_shuffle_epi8(vleft0, vshuf);
+    vleft1 = _mm_shuffle_epi8(vleft1, vshuf);
 
-    __m128i vdst = _mm_i64gather_epi64((const long long int*)(dst + y * width), vidx, 1);
+    __m256i vleft = _mm256_inserti128_si256(_mm256_castsi128_si256(vleft0), vleft1, 1);
+    __m256i vdst = _mm256_i64gather_epi64((const long long int*)(dst + y * width), vidx, 1);
 
-    __m128i vlo = _mm_unpacklo_epi8(vdst, vleft);
-    __m128i vhi = _mm_unpackhi_epi8(vdst, vleft);
+    __m256i vlo = _mm256_unpacklo_epi8(vdst, vleft);
+    __m256i vhi = _mm256_unpackhi_epi8(vdst, vleft);
 
-    __m128i vmaddlo = _mm_maddubs_epi16(vlo, vweight);
-    __m128i vmaddhi = _mm_maddubs_epi16(vhi, vweight);
+    __m256i vmaddlo = _mm256_maddubs_epi16(vlo, vweight);
+    __m256i vmaddhi = _mm256_maddubs_epi16(vhi, vweight);
 
-    vmaddlo = _mm_add_epi16(vmaddlo, v32s);
-    vmaddhi = _mm_add_epi16(vmaddhi, v32s);
+    vmaddlo = _mm256_add_epi16(vmaddlo, v32s);
+    vmaddhi = _mm256_add_epi16(vmaddhi, v32s);
 
-    vmaddlo = _mm_srai_epi16(vmaddlo, 6);
-    vmaddhi = _mm_srai_epi16(vmaddhi, 6);
+    vmaddlo = _mm256_srai_epi16(vmaddlo, 6);
+    vmaddhi = _mm256_srai_epi16(vmaddhi, 6);
 
-    __m128i packed = _mm_packus_epi16(vmaddlo, vmaddhi);
+    __m256i packed = _mm256_packus_epi16(vmaddlo, vmaddhi);
 
     // TODO: if this if branch is deemed to cause slow down, make another version of this, where this check is not needed.
     // If this does not slow down significantly, make this same check in other functions to reduce the function call switch case complexity
     if (width == 8) {
-      _mm_store_si128((__m128i*)(dst + (y * width)), packed);
+      _mm256_store_si256((__m256i*)(dst + (y * width)), packed);
     }
     else {
-      *(uint64_t*)(dst + (y + 0) * width) = _mm_extract_epi64(packed, 0);
-      *(uint64_t*)(dst + (y + 1) * width) = _mm_extract_epi64(packed, 1);
+      *(uint64_t*)(dst + (y + 0) * width) = _mm256_extract_epi64(packed, 0);
+      *(uint64_t*)(dst + (y + 1) * width) = _mm256_extract_epi64(packed, 1);
+      *(uint64_t*)(dst + (y + 2) * width) = _mm256_extract_epi64(packed, 2);
+      *(uint64_t*)(dst + (y + 3) * width) = _mm256_extract_epi64(packed, 3);
     }
   }
 }
@@ -3979,7 +3984,7 @@ static void uvg_angular_pred_avx2(
             if (mode_disp < 8)
               angular_pdpc_ver_8x4_scale1_high_angle_improved_avx2(dst, ref_side, width, height, mode_disp);
             else
-              angular_pdpc_ver_8x2_scale1_improved_avx2(dst, ref_side, width, height, mode_disp);
+              angular_pdpc_ver_8x4_scale1_improved_avx2(dst, ref_side, width, height, mode_disp);
           }
           else {
             if (mode_disp < 10)
