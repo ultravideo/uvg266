@@ -1383,6 +1383,7 @@ void uvg_encode_coding_tree(
     above_cu = uvg_cu_array_at_const(used_array, x, y - 1);
   }
 
+  enum mode_type mode_type_curr = GET_MODETYPEDATA(cur_cu, depth);
 
   // Absolute coordinates
   uint16_t abs_x = x + state->tile->offset_x;
@@ -1403,7 +1404,7 @@ void uvg_encode_coding_tree(
     split_tree.split_tree = cur_cu->split_tree;
     split_tree.mode_type_tree = cur_cu->mode_type_tree;
     bool is_implicit;
-    const enum mode_type split_mode_type = GET_MODETYPEDATA(cur_cu, depth);
+    const enum mode_type split_mode_type = mode_type_curr;
     const int split_flag = uvg_write_split_flag(
       state,
       cabac,
@@ -1452,6 +1453,10 @@ void uvg_encode_coding_tree(
     CABAC_BIN(cabac, 1, "cu_transquant_bypass_flag");
   }
 
+  if (state->frame->slicetype == UVG_SLICE_I && (cu_width > 64 || cu_height > 64)) {
+    mode_type_curr = MODE_TYPE_INTRA;
+  }
+
   // Encode skip flag
   if ((state->frame->slicetype != UVG_SLICE_I || state->encoder_control->cfg.ibc)) {
 
@@ -1463,11 +1468,11 @@ void uvg_encode_coding_tree(
     if (above_cu && above_cu->skipped) {
       ctx_skip++;
     }
-    if (cu_width > 4 || state->encoder_control->cfg.ibc) {
+    if (((cu_width != 4 || cu_height != 4) && mode_type_curr != MODE_TYPE_INTRA ) || (state->encoder_control->cfg.ibc && cu_width <= 64 && cu_height <= 64)) {
       cabac->cur_ctx = &(cabac->ctx.cu_skip_flag_model[ctx_skip]);
       CABAC_BIN(cabac, cur_cu->skipped, "SkipFlag");
     }
-
+    //TODO: double check ibc flag writing condition
     if (cur_cu->skipped) {
 
       if (state->encoder_control->cfg.ibc && state->frame->slicetype != UVG_SLICE_I)
@@ -1504,7 +1509,7 @@ void uvg_encode_coding_tree(
       goto end;
     }
   }
-
+  //TODO: double check ibc flag writing condition
   // Prediction mode
   if ((state->frame->slicetype == UVG_SLICE_I || cu_width == 4) && state->encoder_control->cfg.ibc) { // ToDo: Only for luma channel
     // ToDo: Disable for blocks over 64x64 pixels
@@ -1515,7 +1520,7 @@ void uvg_encode_coding_tree(
     CABAC_BIN(cabac, (cur_cu->type == CU_IBC), "IBCFlag");
   }
 
-  if (state->frame->slicetype != UVG_SLICE_I && cu_width != 4 && cu_height != 4)  {
+  if (state->frame->slicetype != UVG_SLICE_I && (cu_width != 4 || cu_height != 4) && mode_type_curr == MODE_TYPE_ALL)  {
 
     int8_t ctx_predmode = 0;
 
@@ -1534,9 +1539,10 @@ void uvg_encode_coding_tree(
       cabac->cur_ctx = &(cabac->ctx.ibc_flag[ctx_ibc]);
       CABAC_BIN(cabac, (cur_cu->type == CU_IBC), "IBCFlag");
     }
+  } else {
+    if (mode_type_curr == MODE_TYPE_INTRA) assert(cur_cu->type != CU_INTER);
+    if (mode_type_curr == MODE_TYPE_INTER) assert(cur_cu->type == CU_INTER);
   }
-    
-
 #if ENABLE_PCM
   // Code IPCM block
   if (FORCE_PCM || cur_cu->type == CU_PCM) {

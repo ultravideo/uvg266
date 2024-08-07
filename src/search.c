@@ -1289,7 +1289,7 @@ static double search_cu(
   cur_cu->type = CU_NOTSET;
   cur_cu->qp = state->qp;
   cur_cu->split_tree = split_tree.split_tree;
-  cur_cu->mode_type_tree = split_tree.mode_type_tree;
+  cur_cu->mode_type_tree = split_tree.mode_type_tree | mode_type << (split_tree.current_depth * 2);
   cur_cu->log2_width = uvg_g_convert_to_log2[cu_width];
   cur_cu->log2_height = uvg_g_convert_to_log2[cu_height];
 
@@ -1884,6 +1884,7 @@ static double search_cu(
                                                         new_cu_loc[0].local_y);
           split_mode_type = (first_cu->type == CU_INTER) ? MODE_TYPE_INTER : MODE_TYPE_INTRA;
           first_cu->mode_type_tree = first_cu->mode_type_tree | split_mode_type << (split_tree.current_depth * 2);
+          first_cu->mode_type_tree = first_cu->mode_type_tree | split_mode_type << (new_split.current_depth * 2);
         }
 
         if (split_type == QT_SPLIT && completely_inside) {
