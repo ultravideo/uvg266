@@ -52,14 +52,14 @@
 #define RESUME_DIRNAME "./resume_data"
 
 #define RESUME_SLICE_COND UVG_SLICE_I
-//#define RESUME_POC_LTE_COND 0
+#define RESUME_POC_LTE_COND 0
 //#define RESUME_X_LTE_COND 0
 //#define RESUME_Y_LTE_COND 0
 //#define RESUME_NO_CHROMA_COND 1
 
 
 bool uvg_can_resume_encoding(const encoder_state_t * const state, const int x, const int y, const bool chroma_only);
-void uvg_process_resume_encoding(const encoder_state_t * const state, const int x, const int y, const bool chroma_only, lcu_t* const lcu, bool read_mode);
+void uvg_process_resume_encoding(const encoder_state_t * const state, const int x, const int y, const bool chroma_only, double * const cost, lcu_t* const lcu, bool read_mode);
 
 #endif
 

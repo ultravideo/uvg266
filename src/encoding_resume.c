@@ -33,6 +33,8 @@
 #include "encoding_resume.h"
 #if defined(UVG_ENCODING_RESUME)
 
+#include "extras/libmd5.h"
+
 #define PROCESS_VAR(type, num, var, file, read_mode) {\
   if (read_mode){\
     fread(var, sizeof(type), num, file);\
@@ -52,22 +54,71 @@
   }\
 }\
 
-static const char* const resume_fname_format = "%s/%s_poc%d_(%d,%d)%s";
+static const char* const resume_fname_format = "%s/%s_fnum%d_(%d,%d)%s";
 //#define RESUME_MAX_NUM_PREC "9999"
 //#define RESUME_MAX_FTYPE_LEN 6
 
-#define GET_RESUME_ID(chroma_only) (chroma_only) ? "enc_resume_c" : "enc_resume"
-#define GET_REC_FILENAME(fname, id, poc, posx, posy) snprintf(fname, FILENAME_MAX, resume_fname_format, RESUME_DIRNAME, id, poc, posx, posy, ".rec")
-#define GET_COEFF_FILENAME(fname, id, poc, posx, posy) snprintf(fname, FILENAME_MAX, resume_fname_format, RESUME_DIRNAME, id, poc, posx, posy, ".coeff")
-#define GET_CU_FILENAME(fname, id, poc, posx, posy) snprintf(fname, FILENAME_MAX, resume_fname_format, RESUME_DIRNAME, id, poc, posx, posy, ".cu")
+//#define GET_RESUME_ID(chroma_only) (chroma_only) ? "enc_resume_c" : "enc_resume"
+#define CREATE_RESUME_ID(id, chroma_only, state) {\
+  const char *const postfix = (chroma_only) ? "_C" : "";\
+  id = MALLOC(char, 32+strlen(postfix)+1);\
+  hash_cfg(state, id);\
+  strcat(id, postfix);\
+}\
+
+#define FREE_RESUME_ID(id) free(id);
+
+#define GET_REC_FILENAME(fname, id, fnum, posx, posy) snprintf(fname, FILENAME_MAX, resume_fname_format, RESUME_DIRNAME, id, fnum, posx, posy, ".rec")
+#define GET_COEFF_FILENAME(fname, id, fnum, posx, posy) snprintf(fname, FILENAME_MAX, resume_fname_format, RESUME_DIRNAME, id, fnum, posx, posy, ".coeff")
+#define GET_CU_FILENAME(fname, id, fnum, posx, posy) snprintf(fname, FILENAME_MAX, resume_fname_format, RESUME_DIRNAME, id, fnum, posx, posy, ".cu")
 
 static char tmp_fname[FILENAME_MAX];
 
-#define OPEN_RESUME_FILE(file, fname_macro, id, poc, posx, posy, mode){\
-  fname_macro(tmp_fname, id, poc, posx, posy);\
+#define OPEN_RESUME_FILE(file, fname_macro, id, fnum, posx, posy, mode){\
+  fname_macro(tmp_fname, id, fnum, posx, posy);\
   file = fopen(tmp_fname, mode);\
 }\
 
+
+static void hash_cfg(const encoder_state_t * const state, char id_out[33]) {
+  uvg_config cfg;
+  memcpy(&cfg, &(state->encoder_control->cfg), sizeof(uvg_config));
+  
+  //Null pointers
+  //  Not populated in encoder_control cfg
+  cfg.cqmfile = NULL;
+  cfg.tiles_width_split = NULL;
+  cfg.tiles_height_split = NULL;
+  cfg.slice_addresses_in_ts = NULL;
+  //  Potentially populated
+  cfg.roi.file_path = NULL;
+  cfg.stats_file_prefix = NULL;
+  cfg.fast_coeff_table_fn = NULL;
+  cfg.fastrd_learning_outdir_fn = NULL;
+  cfg.cabac_debug_file_name = NULL;
+
+  //Create hash
+  context_md5_t ctx;
+  uvg_md5_init(&ctx);
+  uvg_md5_update(&ctx, (char *)(&cfg), sizeof(cfg));
+
+  //Add other potential parameters that were nulled previously, but leave out parameters not affecting encoding
+  if (state->encoder_control->cfg.roi.file_path) uvg_md5_update(&ctx, state->encoder_control->cfg.roi.file_path, (unsigned int)strlen(state->encoder_control->cfg.roi.file_path)); // Assume null terminated string
+  //if (state->encoder_control->cfg.stats_file_prefix) uvg_md5_update(&ctx, state->encoder_control->cfg.stats_file_prefix, (unsigned int)strlen(state->encoder_control->cfg.stats_file_prefix)); // Assume null terminated string
+  if (state->encoder_control->cfg.fast_coeff_table_fn) uvg_md5_update(&ctx, state->encoder_control->cfg.fast_coeff_table_fn, (unsigned int)strlen(state->encoder_control->cfg.fast_coeff_table_fn)); // Assume null terminated string
+  //if (state->encoder_control->cfg.fastrd_learning_outdir_fn) uvg_md5_update(&ctx, state->encoder_control->cfg.fastrd_learning_outdir_fn, (unsigned int)strlen(state->encoder_control->cfg.fastrd_learning_outdir_fn)); // Assume null terminated string
+  //if (state->encoder_control->cfg.cabac_debug_file_name) uvg_md5_update(&ctx, state->encoder_control->cfg.cabac_debug_file_name, (unsigned int)strlen(state->encoder_control->cfg.cabac_debug_file_name)); // Assume null terminated string
+
+  //Get hash and write it to id_out
+  unsigned char hash[16];
+  uvg_md5_final(hash, &ctx);
+
+  //Convert to hex
+  unsigned long long* hash_ll = (unsigned long long*)hash;
+  snprintf(id_out, 33, "%llX%llX", hash_ll[0], hash_ll[1]);
+
+  return;
+}
 
 static bool use_resume(const encoder_state_t * const state, const int x, const int y, const bool chroma_only) {
 #ifdef RESUME_SLICE_COND
@@ -99,26 +150,30 @@ bool uvg_can_resume_encoding(const encoder_state_t * const state, const int x, c
   
   if (!use_resume(state, x, y, chroma_only)) return false;
 
-  const char* const id = GET_RESUME_ID(chroma_only);
-  const int32_t poc = state->frame->poc;
+  char* id; // = GET_RESUME_ID(chroma_only);
+  CREATE_RESUME_ID(id, chroma_only, state);
+
+  const int32_t frame_num = state->frame->num;
   const int posx = x >> LOG2_LCU_WIDTH;
   const int posy = y >> LOG2_LCU_WIDTH;//state->wfrow->lcu_offset_y;
   FILE* tmp_file;
 
     //Check if data files exist
-  OPEN_RESUME_FILE(tmp_file, GET_REC_FILENAME, id, poc, posx, posy, "r");
+  OPEN_RESUME_FILE(tmp_file, GET_REC_FILENAME, id, frame_num, posx, posy, "r");
   if (!tmp_file) return false;
   fclose(tmp_file);
 
-  OPEN_RESUME_FILE(tmp_file, GET_COEFF_FILENAME, id, poc, posx, posy, "r");
+  OPEN_RESUME_FILE(tmp_file, GET_COEFF_FILENAME, id, frame_num, posx, posy, "r");
   if (!tmp_file) return false;
   fclose(tmp_file);
 
-  OPEN_RESUME_FILE(tmp_file, GET_CU_FILENAME, id, poc, posx, posy, "r");
+  OPEN_RESUME_FILE(tmp_file, GET_CU_FILENAME, id, frame_num, posx, posy, "r");
   if (!tmp_file) return false;
   fclose(tmp_file);
 
   //free(tmp_fname);
+  FREE_RESUME_ID(id);
+
   return true;
 }
 
@@ -192,33 +247,37 @@ static void process_cu(FILE* const file, lcu_t* const lcu, bool read_mode) {
 }
 
 
-void uvg_process_resume_encoding(const encoder_state_t * const state, const int x, const int y, const bool chroma_only, lcu_t * const lcu, bool read_mode)
+void uvg_process_resume_encoding(const encoder_state_t * const state, const int x, const int y, const bool chroma_only, double * const cost, lcu_t * const lcu, bool read_mode)
 {
   if (!use_resume(state, x, y, chroma_only)) return;
 
   FILE* file;
-  const char* const id = GET_RESUME_ID(chroma_only);
-  const int32_t poc = state->frame->poc;
+  char* id; //= GET_RESUME_ID(chroma_only);
+  CREATE_RESUME_ID(id, chroma_only, state);
+
+  const int32_t frame_num = state->frame->num;
   const int posx = x >> LOG2_LCU_WIDTH;
   const int posy = y >> LOG2_LCU_WIDTH;//state->wfrow->lcu_offset_y;
   const char* const mode = read_mode ? "rb" : "wb";
   
-  OPEN_RESUME_FILE(file, GET_REC_FILENAME, id, poc, posx, posy, mode);
+  OPEN_RESUME_FILE(file, GET_REC_FILENAME, id, frame_num, posx, posy, mode);
   process_rec(file, &(lcu->rec), read_mode);
   assert(!ferror(file) && "Processing failed");
   //lcu->rec.chroma_format = state->encoder_control->chroma_format;
   fclose(file);
   
-  OPEN_RESUME_FILE(file, GET_COEFF_FILENAME, id, poc, posx, posy, mode);
+  OPEN_RESUME_FILE(file, GET_COEFF_FILENAME, id, frame_num, posx, posy, mode);
   process_coeff(file, &(lcu->coeff), read_mode);
   assert(!ferror(file) && "Processing failed");
   fclose(file);
 
-  OPEN_RESUME_FILE(file, GET_CU_FILENAME, id, poc, posx, posy, mode);
+  OPEN_RESUME_FILE(file, GET_CU_FILENAME, id, frame_num, posx, posy, mode);
+  PROCESS_VAR(double, 1, cost, file, read_mode);
   process_cu(file, lcu, read_mode);
   assert(!ferror(file) && "Processing failed");
   fclose(file);
 
+  FREE_RESUME_ID(id);
 }
 
 #endif

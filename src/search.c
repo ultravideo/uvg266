@@ -2184,22 +2184,22 @@ void uvg_search_lcu(encoder_state_t * const state, const int x, const int y, con
 
 #ifdef UVG_ENCODING_RESUME
   if (uvg_can_resume_encoding(state, x, y, false)) {
-    uvg_process_resume_encoding(state, x, y, false, &work_tree, true);
+    uvg_process_resume_encoding(state, x, y, false, &cost, &work_tree, true);
   } else {
 #endif // UVG_ENCODING_RESUME
 
-    // Start search from depth 0.
-    cost = search_cu(
-      state,
-      &start,
-      &start,
-      &work_tree,
-      tree_type,
-      split_tree,
-      tree_type == UVG_BOTH_T);
+  // Start search from depth 0.
+  cost = search_cu(
+    state,
+    &start,
+    &start,
+    &work_tree,
+    tree_type,
+    split_tree,
+    tree_type == UVG_BOTH_T);
 
 #ifdef UVG_ENCODING_RESUME
-    uvg_process_resume_encoding(state, x, y, false, &work_tree, false);
+    uvg_process_resume_encoding(state, x, y, false, &cost, &work_tree, false);
   }
 #endif // UVG_ENCODING_RESUME
 
@@ -2218,19 +2218,19 @@ void uvg_search_lcu(encoder_state_t * const state, const int x, const int y, con
   if(state->frame->slicetype == UVG_SLICE_I && state->encoder_control->cfg.dual_tree) {
 #ifdef UVG_ENCODING_RESUME
     if (uvg_can_resume_encoding(state, x, y, true)) {
-      uvg_process_resume_encoding(state, x, y, true, &work_tree, true);
+      uvg_process_resume_encoding(state, x, y, true, &cost, &work_tree, true);
     } else {
 #endif // UVG_ENCODING_RESUME
 
-      cost = search_cu(
-        state, &start,
-        &start,
-        &work_tree, UVG_CHROMA_T,
-        split_tree,
-        true);
+    cost = search_cu(
+      state, &start,
+      &start,
+      &work_tree, UVG_CHROMA_T,
+      split_tree,
+      true);
 
 #ifdef UVG_ENCODING_RESUME
-       uvg_process_resume_encoding(state, x, y, true, &work_tree, false);
+       uvg_process_resume_encoding(state, x, y, true, &cost, &work_tree, false);
     }
 #endif // UVG_ENCODING_RESUME
 
