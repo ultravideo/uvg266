@@ -2787,7 +2787,7 @@ static void angular_pdpc_hor_w4_high_angle_avx2(uvg_pixel* dst, const uvg_pixel*
 // Mode 50
 
 
-// Other modes
+// Vertical modes
 
 static void angular_pdpc_ver_w4_high_angle_improved_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int height, const int scale, const int mode_disp)
 {
@@ -3122,6 +3122,54 @@ static void angular_pdpc_ver_8x4_scale1_improved_avx2(uvg_pixel* dst, const uvg_
   }
 }
 
+
+static void angular_pdpc_ver_w8_high_angle_improved_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int height, const int mode_disp)
+{
+  // Only handles cases where scale is 2.
+  const int width = 8;
+  const int scale = 2;
+
+  int limit = MIN(3 << scale, width);
+
+  __m128i vseq = _mm_setr_epi32(0x00, 0x00, 0x01, 0x00);
+  __m128i vidx = _mm_slli_epi64(vseq, 3); // 3 is log2 width
+  __m256i v32s = _mm256_set1_epi16(32);
+
+  const int offset = scale * 32;
+  const __m256i vweight = _mm256_load_si256((const __m256i*) & intra_pdpc_w8_ver_improved_weight[offset]);
+
+  const int inv_angle_offset = mode_disp * 64;
+  const int16_t* shifted_inv_angle_sum = &intra_pdpc_shifted_inv_angle_sum[inv_angle_offset];
+
+  // For width 8, height must be at least 2. Handle 2 lines at once.
+  for (int y = 0; y < height; y += 2) {
+    ALIGNED(32) int16_t left[16] = { 0 };
+    for (int xx = 0; xx < limit; ++xx) {
+      for (int yy = 0; yy < 2; ++yy) {
+        left[yy * width + xx] = ref_side[(y + yy) + shifted_inv_angle_sum[xx] + 1];
+      }
+    }
+
+    __m128i vdst = _mm_i64gather_epi64((const long long int*)(dst + y * width), vseq, 8);
+    __m256i vdst16 = _mm256_cvtepu8_epi16(vdst);
+    __m256i vleft = _mm256_loadu_si256((__m256i*)left);
+
+    __m256i accu = _mm256_sub_epi16(vleft, vdst16);
+    accu = _mm256_mullo_epi16(vweight, accu);
+    accu = _mm256_add_epi16(accu, v32s);
+    accu = _mm256_srai_epi16(accu, 6);
+    accu = _mm256_add_epi16(vdst16, accu);
+
+    __m128i lo = _mm256_castsi256_si128(accu);
+    __m128i hi = _mm256_extracti128_si256(accu, 1);
+    __m128i filtered = _mm_packus_epi16(lo, hi);
+
+    _mm_store_si128((__m128i*)(dst + (y * width)), filtered);
+  }
+}
+
+
+// Horizontal modes
 
 
 // This is the non-vectorized version of pdpc mode 18. It is left here for archiving purposes.
@@ -3980,18 +4028,19 @@ static void uvg_angular_pred_avx2(
             else
               angular_pdpc_ver_4x4_scale0_improved_avx2(dst, ref_side, width, height, mode_disp);
           }
-          else if (scale == 1) {
+          else /*if (scale == 1)*/ {
             if (mode_disp < 8)
               angular_pdpc_ver_8x4_scale1_high_angle_improved_avx2(dst, ref_side, width, height, mode_disp);
             else
               angular_pdpc_ver_8x4_scale1_improved_avx2(dst, ref_side, width, height, mode_disp);
           }
-          else {
+          // This branch was never executed. There is no case where width == 8 and scale == 2 and PDPC is enabled.
+          /*else {
             if (mode_disp < 10)
-              angular_pdpc_ver_w8_high_angle_avx2(dst, ref_side, height, scale, mode_disp);
+              angular_pdpc_ver_w8_high_angle_improved_avx2(dst, ref_side, height, mode_disp);
             else
               angular_pdpc_ver_8x2_scale2_avx2(dst, ref_side, width, height, mode_disp);
-          }
+          }*/
           break;
         case 16: // 16 width and higher done with the same functions
         case 32:
