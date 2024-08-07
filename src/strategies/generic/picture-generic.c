@@ -1374,17 +1374,29 @@ INLINE static uint32_t uvg_crc32c_4_generic(uint32_t crc, const uvg_pixel *buf)
   return crc;
 }
 
+INLINE static uint32_t uvg_crc32c_4_16bit_generic(uint32_t crc, const uvg_pixel *buf)
+{
+  const uint8_t *buf8 = (const uint8_t *)buf;
+  for (int i = 0; i < 8; i++) {
+    crc = (crc >> 8) ^ uvg_crc_table[(crc ^ buf8[i]) & 0xFF];
+  }
+  return crc;
+}
 
 INLINE static uint32_t uvg_crc32c_8_generic(uint32_t crc, const uvg_pixel *buf)
 {
-  crc = (crc >> 8) ^ uvg_crc_table[(crc ^ buf[0]) & 0xFF];
-  crc = (crc >> 8) ^ uvg_crc_table[(crc ^ buf[1]) & 0xFF];
-  crc = (crc >> 8) ^ uvg_crc_table[(crc ^ buf[2]) & 0xFF];
-  crc = (crc >> 8) ^ uvg_crc_table[(crc ^ buf[3]) & 0xFF];
-  crc = (crc >> 8) ^ uvg_crc_table[(crc ^ buf[4]) & 0xFF];
-  crc = (crc >> 8) ^ uvg_crc_table[(crc ^ buf[5]) & 0xFF];
-  crc = (crc >> 8) ^ uvg_crc_table[(crc ^ buf[6]) & 0xFF];
-  crc = (crc >> 8) ^ uvg_crc_table[(crc ^ buf[7]) & 0xFF];
+  for (int i = 0; i < 8; i++) {
+    crc = (crc >> 8) ^ uvg_crc_table[(crc ^ buf[i]) & 0xFF];
+  }
+  return crc;
+}
+
+INLINE static uint32_t uvg_crc32c_8_16bit_generic(uint32_t crc, const uvg_pixel *buf)
+{
+  const uint8_t* buf8 = (const uint8_t*)buf;
+  for (int i = 0; i < 16; i++) {
+    crc = (crc >> 8) ^ uvg_crc_table[(crc ^ buf8[i]) & 0xFF];
+  }
   return crc;
 }
 
@@ -1401,34 +1413,29 @@ static uint32_t uvg_crc32c_4x4_8bit_generic(const uvg_pixel *buf, uint32_t pic_s
 static uint32_t uvg_crc32c_4x4_16bit_generic(const uvg_pixel *buf, uint32_t pic_stride)
 {
   uint32_t crc = 0xFFFFFFFF;
-  crc = uvg_crc32c_4_generic(crc, &buf[0 * pic_stride]);
-  crc = uvg_crc32c_4_generic(crc, &buf[0 * pic_stride] + 4);
+  crc = uvg_crc32c_4_16bit_generic(crc, &buf[0 * pic_stride]);
+  crc = uvg_crc32c_4_16bit_generic(crc, &buf[1 * pic_stride]);
+  crc = uvg_crc32c_4_16bit_generic(crc, &buf[2 * pic_stride]);
+  crc = uvg_crc32c_4_16bit_generic(crc, &buf[3 * pic_stride]);
 
-  crc = uvg_crc32c_4_generic(crc, &buf[1 * pic_stride]);
-  crc = uvg_crc32c_4_generic(crc, &buf[1 * pic_stride] + 4);
-
-  crc = uvg_crc32c_4_generic(crc, &buf[2 * pic_stride]);
-  crc = uvg_crc32c_4_generic(crc, &buf[2 * pic_stride] + 4);
-
-  crc = uvg_crc32c_4_generic(crc, &buf[3 * pic_stride]);
-  crc = uvg_crc32c_4_generic(crc, &buf[3 * pic_stride] + 4);  
   return crc ^ 0xFFFFFFFF;
 }
 
 static uint32_t uvg_crc32c_8x8_8bit_generic(const uvg_pixel *buf, uint32_t pic_stride)
 {
   uint32_t crc = 0xFFFFFFFF;
-  crc = uvg_crc32c_8_generic(crc, &buf[0 * pic_stride]);
-  crc = uvg_crc32c_8_generic(crc, &buf[1 * pic_stride]);
+  for (int i = 0; i < 8; i++) {
+    crc = uvg_crc32c_8_generic(crc, &buf[i * pic_stride]);
+  }
+  return crc ^ 0xFFFFFFFF;
+}
 
-  crc = uvg_crc32c_8_generic(crc, &buf[2 * pic_stride]);
-  crc = uvg_crc32c_8_generic(crc, &buf[3 * pic_stride]);
-
-  crc = uvg_crc32c_8_generic(crc, &buf[4 * pic_stride]);
-  crc = uvg_crc32c_8_generic(crc, &buf[5 * pic_stride]);
-
-  crc = uvg_crc32c_8_generic(crc, &buf[6 * pic_stride]);
-  crc = uvg_crc32c_8_generic(crc, &buf[7 * pic_stride]);  
+static uint32_t uvg_crc32c_8x8_16bit_generic(const uvg_pixel *buf, uint32_t pic_stride)
+{
+  uint32_t crc = 0xFFFFFFFF;
+  for (int i = 0; i < 8; i++) {
+    crc = uvg_crc32c_8_16bit_generic(crc, &buf[i * pic_stride]);
+  }
   return crc ^ 0xFFFFFFFF;
 }
 
@@ -1440,6 +1447,7 @@ int uvg_strategy_register_picture_generic(void* opaque, uint8_t bitdepth)
     success &= uvg_strategyselector_register(opaque, "crc32c_8x8", "generic", 0, &uvg_crc32c_8x8_8bit_generic);
   } else {
     success &= uvg_strategyselector_register(opaque, "crc32c_4x4", "generic", 0, &uvg_crc32c_4x4_16bit_generic);
+    success &= uvg_strategyselector_register(opaque, "crc32c_8x8", "generic", 0, &uvg_crc32c_8x8_16bit_generic);
   }
   
 
