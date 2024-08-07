@@ -3220,6 +3220,48 @@ static void angular_pdpc_ver_w16_high_angle_improved_avx2(uvg_pixel* dst, const 
   }
 }
 
+static void angular_pdpc_ver_w16_scale2_improved_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int width, const int height, const int mode_disp)
+{
+  __m128i v32s = _mm_set1_epi16(32);
+  const int scale = 2; // Other functions handle scales 0 and 1
+  int limit = 12; // With scale 2, limit is always 12.
+
+  const int offset = scale * 32;
+  const int inv_angle_offset = mode_disp * 64;
+  const int shuf_offset = mode_disp * 16;
+
+  const __m128i vweightlo = _mm_load_si128((const __m128i*) &intra_pdpc_w16_ver_improved_weight[offset + 0]);
+  const __m128i vweighthi = _mm_load_si128((const __m128i*) &intra_pdpc_w16_ver_improved_weight[offset + 16]);
+  const int16_t* shifted_inv_angle_sum = &intra_pdpc_shifted_inv_angle_sum[inv_angle_offset];
+  const __m128i vshuf = _mm_load_si128((const __m128i*) & intra_pdpc_shuffle_vectors_w16_scale2_ver[shuf_offset]);
+
+  // Handle 2 rows at once.
+  for (int y = 0; y < height; ++y) {
+    for (int x = 0; x < limit; x += 16) {
+      __m128i vleft = _mm_loadu_si128((__m128i*) &ref_side[(y + 0) + shifted_inv_angle_sum[0] + 1]);
+      vleft = _mm_shuffle_epi8(vleft, vshuf);
+      
+      __m128i vdst = _mm_load_si128((const __m128i*)(dst + ((y + 0) * width + x)));
+
+      __m128i vlo = _mm_unpacklo_epi8(vdst, vleft);
+      __m128i vhi = _mm_unpackhi_epi8(vdst, vleft);
+
+      __m128i vmaddlo = _mm_maddubs_epi16(vlo, vweightlo);
+      __m128i vmaddhi = _mm_maddubs_epi16(vhi, vweighthi);
+
+      vmaddlo = _mm_add_epi16(vmaddlo, v32s);
+      vmaddhi = _mm_add_epi16(vmaddhi, v32s);
+
+      vmaddlo = _mm_srai_epi16(vmaddlo, 6);
+      vmaddhi = _mm_srai_epi16(vmaddhi, 6);
+
+      __m128i packed = _mm_packus_epi16(vmaddlo, vmaddhi);
+
+      _mm_store_si128((__m128i*)(dst + (y * width + x)), packed);
+    }
+  }
+}
+
 
 // Horizontal modes
 
@@ -4114,7 +4156,7 @@ static void uvg_angular_pred_avx2(
             if (mode_disp < 14)
               angular_pdpc_ver_w16_high_angle_improved_avx2(dst, ref_side, width, height, mode_disp);
             else
-              angular_pdpc_ver_w16_scale2_avx2(dst, ref_side, width, height, mode_disp);
+              angular_pdpc_ver_w16_scale2_improved_avx2(dst, ref_side, width, height, mode_disp);
             break;
           default:
             assert(false && "Intra PDPC: Invalid scale.\n");
