@@ -1351,6 +1351,13 @@ ALIGNED(32) const uint8_t intra_pdpc_w8_ver_improved_weight[] = {
   32, 32, 32, 32, 48, 16, 48, 16, 56,  8, 56,  8, 60,  4, 60,  4, 32, 32, 32, 32, 48, 16, 48, 16, 56,  8, 56,  8, 60,  4, 60,  4,  // Scale 2
 };
 
+// Weights for improved intra pdpc w16 vertical.
+ALIGNED(32) const uint8_t intra_pdpc_w16_ver_improved_weight[] = {
+  32, 32, 56,  8, 62,  2, 64,  0, 64,  0, 64,  0, 64,  0, 64,  0, 64,  0, 64,  0, 64,  0, 64,  0, 64,  0, 64,  0, 64,  0, 64,  0,  // Scale 0
+  32, 32, 48, 16, 56,  8, 60,  4, 62,  2, 63,  1, 64,  0, 64,  0, 64,  0, 64,  0, 64,  0, 64,  0, 64,  0, 64,  0, 64,  0, 64,  0,  // Scale 1
+  32, 32, 32, 32, 48, 16, 48, 16, 56,  8, 56,  8, 60,  4, 60,  4, 62,  2, 62,  2, 63,  1, 63,  1, 64,  0, 64,  0, 64,  0, 64,  0,  // Scale 2
+};
+
 
 // Pre-calculated shifted inverse angle sums for pdpc for y- and x-values [0, 64]. Grouped by mode_disp.
 // Index by y or x based on pdpc direction.
