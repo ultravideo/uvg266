@@ -99,7 +99,11 @@ static void inter_recon_frac_luma(const encoder_state_t * const state,
   epol_args.ext_origin = &ext_origin;
   epol_args.ext_s = &ext_s;
 
-  uvg_get_extended_block(&epol_args);
+  if (state->encoder_control->cfg.ref_wraparound) {
+    uvg_get_extended_block_wraparound(&epol_args);
+  } else {
+    uvg_get_extended_block(&epol_args);
+  } 
   uvg_sample_quarterpel_luma(state->encoder_control,
     ext_origin,
     ext_s,
@@ -155,7 +159,11 @@ static void inter_recon_frac_luma_hi(const encoder_state_t *const state,
   epol_args.ext_origin = &ext_origin;
   epol_args.ext_s = &ext_s;
 
-  uvg_get_extended_block(&epol_args);
+  if (state->encoder_control->cfg.ref_wraparound) {
+    uvg_get_extended_block_wraparound(&epol_args);
+  } else {  
+    uvg_get_extended_block(&epol_args);
+  }
   uvg_sample_quarterpel_luma_hi(state->encoder_control,
     ext_origin,
     ext_s,
@@ -218,7 +226,11 @@ static void inter_recon_frac_chroma(const encoder_state_t *const state,
   epol_args.ext_origin = &ext_origin;
   epol_args.ext_s = &ext_s;
 
-  uvg_get_extended_block(&epol_args);
+  if (state->encoder_control->cfg.ref_wraparound) {
+    uvg_get_extended_block_wraparound(&epol_args);
+  } else {
+    uvg_get_extended_block(&epol_args);
+  }  
   uvg_sample_octpel_chroma(state->encoder_control,
     ext_origin,
     ext_s,
@@ -232,7 +244,11 @@ static void inter_recon_frac_chroma(const encoder_state_t *const state,
 
   // Chroma V
   epol_args.src = ref->v;
-  uvg_get_extended_block(&epol_args);
+  if (state->encoder_control->cfg.ref_wraparound) {
+    uvg_get_extended_block_wraparound(&epol_args);
+  } else {
+    uvg_get_extended_block(&epol_args);
+  } 
   uvg_sample_octpel_chroma(state->encoder_control,
     ext_origin,
     ext_s,
@@ -295,7 +311,11 @@ static void inter_recon_frac_chroma_hi(const encoder_state_t *const state,
   epol_args.ext_origin = &ext_origin;
   epol_args.ext_s = &ext_s;
 
-  uvg_get_extended_block(&epol_args);
+  if (state->encoder_control->cfg.ref_wraparound) {
+    uvg_get_extended_block_wraparound(&epol_args);
+  } else {
+    uvg_get_extended_block(&epol_args);
+  } 
   uvg_sample_octpel_chroma_hi(state->encoder_control,
     ext_origin,
     ext_s,
@@ -309,7 +329,11 @@ static void inter_recon_frac_chroma_hi(const encoder_state_t *const state,
 
   // Chroma V
   epol_args.src = ref->v;
-  uvg_get_extended_block(&epol_args);
+  if (state->encoder_control->cfg.ref_wraparound) {
+    uvg_get_extended_block_wraparound(&epol_args);
+  } else {
+    uvg_get_extended_block(&epol_args);
+  } 
   uvg_sample_octpel_chroma_hi(state->encoder_control,
     ext_origin,
     ext_s,
@@ -340,12 +364,13 @@ static void inter_cp_with_ext_border(const uvg_pixel *ref_buf, int ref_stride,
                                      int ref_width, int ref_height,
                                      uvg_pixel *rec_buf, int rec_stride,
                                      int width, int height,
-                                     const vector2d_t *mv_in_frame)
+                                     const vector2d_t *mv_in_frame,
+                                     const int mv_wrap)
 {
   for (int y = mv_in_frame->y; y < mv_in_frame->y + height; ++y) {
     for (int x = mv_in_frame->x; x < mv_in_frame->x + width; ++x) {
       vector2d_t in_frame = {
-        CLIP(0, ref_width - 1, x),
+        mv_wrap?((x<0)?x+ref_width:x%ref_width):CLIP(0, ref_width - 1, x),
         CLIP(0, ref_height - 1, y),
       };
       vector2d_t in_pu = {
@@ -432,7 +457,7 @@ static unsigned inter_recon_unipred(
           ref->width, ref->height,
           yuv_px->y, out_stride_luma,
           pu_w, pu_h,
-          &int_mv_in_frame);
+          &int_mv_in_frame, state->encoder_control->cfg.ref_wraparound);
       }
       else {
         const int frame_mv_index = int_mv_in_frame.y * ref->stride + int_mv_in_frame.x;
@@ -473,12 +498,12 @@ static unsigned inter_recon_unipred(
                                ref->width / 2, ref->height / 2,
                                yuv_px->u, out_stride_c,
                                pu_w / 2, pu_h / 2,
-                               &int_mv_in_frame_c);
+                               &int_mv_in_frame_c, state->encoder_control->cfg.ref_wraparound);
       inter_cp_with_ext_border(ref->v, ref->stride / 2,
                                ref->width / 2, ref->height / 2,
                                yuv_px->v, out_stride_c,
                                pu_w / 2, pu_h / 2,
-                               &int_mv_in_frame_c);
+                               &int_mv_in_frame_c, state->encoder_control->cfg.ref_wraparound);
     } else {
       const int frame_mv_index = int_mv_in_frame_c.y * ref->stride / 2 + int_mv_in_frame_c.x;
 

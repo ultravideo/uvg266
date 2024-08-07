@@ -809,6 +809,79 @@ void uvg_get_extended_block_generic(uvg_epol_args *args) {
   }
 }
 
+
+void uvg_get_extended_block_wraparound_generic(uvg_epol_args *args)
+{
+
+  int  min_y = args->blk_y - args->pad_t;
+  int  max_y = args->blk_y + args->blk_h + args->pad_b + args->pad_b_simd - 1;
+  bool out_of_bounds_y = (min_y < 0) || (max_y >= args->src_h);
+
+  int  min_x           = args->blk_x - args->pad_l;
+  int  max_x           = args->blk_x + args->blk_w + args->pad_r;
+  bool out_of_bounds_x = (min_x < 0) || (max_x >= args->src_w);
+
+  if (out_of_bounds_y || out_of_bounds_x) {
+
+    int first_x_start = 0;
+    int first_x_count = 0;
+
+    int second_x_start = 0;
+    int second_x_count = 0;
+
+
+    if (out_of_bounds_x) {
+      if (min_x < 0) { // The block goes over the left edge of the frame.
+        first_x_start = args->src_w + min_x;
+        first_x_count = -min_x;
+        if (max_x >= 0) { // Right side of the block doesn't wrap around the frame so we need to copy it separately.
+          second_x_count = max_x;
+        }
+      } else { // The block wraps around the right edge of the frame.
+        if (min_x >= args->src_w) { // The whole block wraps around the frame so copy in one go.
+          first_x_start = min_x - args->src_w;
+          first_x_count = max_x-min_x;
+        } else { // The left side of the block doesn't wrap around the frame so we need to copy it separately.
+          first_x_start  = min_x;
+          first_x_count = args->src_w - min_x;          
+          second_x_count = max_x - args->src_w;
+        }
+      }
+    } else { // The block is not over the horizontal edges of the frame, just copy directly
+      first_x_count = max_x-min_x;
+      first_x_start  = min_x;
+    }
+
+    *args->ext        = args->buf;
+    *args->ext_s      = args->pad_l + args->blk_w + args->pad_r;
+    *args->ext_origin = args->buf + args->pad_t * (*args->ext_s) + args->pad_l;
+
+    // For each row including real padding.
+    // Don't read "don't care" values (SIMD padding). Zero them out.
+    int y;
+    for (y = -args->pad_t; y < args->blk_h + args->pad_b; ++y) {
+      int        clipped_y = CLIP(0, args->src_h - 1, args->blk_y + y);
+      uvg_pixel *samples = args->src + clipped_y * args->src_s;
+      uvg_pixel *dst = args->buf + (y + args->pad_t) * (*args->ext_s);
+
+      if (first_x_count) memcpy(dst, samples + first_x_start, first_x_count*sizeof(uvg_pixel));
+      if (second_x_count) memcpy(dst + first_x_count, samples + second_x_start, second_x_count*sizeof(uvg_pixel));
+    }
+
+    for (int y_simd = 0; y_simd < args->pad_b_simd; ++y_simd) {
+      uvg_pixel *dst = args->buf + (y + args->pad_t + y_simd) * (*args->ext_s);
+      FILL_ARRAY(dst, 0, *args->ext_s);
+    }
+
+  } else {
+
+    *args->ext = args->src + (args->blk_y - args->pad_t) * args->src_s +
+                 (args->blk_x - args->pad_l);
+    *args->ext_origin = args->src + args->blk_y * args->src_s + args->blk_x;
+    *args->ext_s      = args->src_s;
+  }
+}
+
 int uvg_strategy_register_ipol_generic(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
@@ -822,6 +895,8 @@ int uvg_strategy_register_ipol_generic(void* opaque, uint8_t bitdepth)
   success &= uvg_strategyselector_register(opaque, "sample_quarterpel_luma_hi", "generic", 0, &uvg_sample_quarterpel_luma_hi_generic);
   success &= uvg_strategyselector_register(opaque, "sample_octpel_chroma_hi", "generic", 0, &uvg_sample_octpel_chroma_hi_generic);
   success &= uvg_strategyselector_register(opaque, "get_extended_block", "generic", 0, &uvg_get_extended_block_generic);
+  success &= uvg_strategyselector_register(opaque, "get_extended_block_wraparound", "generic", 0, &uvg_get_extended_block_wraparound_generic);
+  
 
   return success;
 }

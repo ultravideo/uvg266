@@ -128,6 +128,7 @@ extern ipol_blocks_func * uvg_filter_hpel_blocks_diag_luma;
 extern ipol_blocks_func * uvg_filter_qpel_blocks_hor_ver_luma;
 extern ipol_blocks_func * uvg_filter_qpel_blocks_diag_luma;
 extern epol_func * uvg_get_extended_block;
+extern epol_func * uvg_get_extended_block_wraparound;
 extern uvg_sample_quarterpel_luma_func * uvg_sample_quarterpel_luma;
 extern uvg_sample_octpel_chroma_func * uvg_sample_octpel_chroma;
 extern uvg_sample_quarterpel_luma_hi_func * uvg_sample_quarterpel_luma_hi;
@@ -147,6 +148,7 @@ int uvg_strategy_register_ipol(void* opaque, uint8_t bitdepth);
   {"sample_quarterpel_luma_hi", (void**) &uvg_sample_quarterpel_luma_hi}, \
   {"sample_octpel_chroma_hi", (void**) &uvg_sample_octpel_chroma_hi}, \
   {"get_extended_block", (void**) &uvg_get_extended_block}, \
+  {"get_extended_block_wraparound", (void**) &uvg_get_extended_block_wraparound}, \
 
 
 

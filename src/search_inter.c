@@ -1102,7 +1102,11 @@ static void search_frac(inter_search_info_t *info,
   epol_args.ext_origin = &ext_origin;
   epol_args.ext_s = &ext_s;
 
-  uvg_get_extended_block(&epol_args);
+  if (state->encoder_control->cfg.ref_wraparound) {
+    uvg_get_extended_block_wraparound(&epol_args);
+  } else {
+    uvg_get_extended_block(&epol_args);
+  }
 
   uvg_pixel *tmp_pic = pic->y + orig.y * pic->stride + orig.x;
   int tmp_stride = pic->stride;
@@ -1451,7 +1455,8 @@ static void search_pu_inter_ref(
       info->state->tile->offset_x + info->origin.x + (best_mv.x >> INTERNAL_MV_PREC),
       info->state->tile->offset_y + info->origin.y + (best_mv.y >> INTERNAL_MV_PREC),
       info->width,
-      info->height);
+      info->height,
+      cfg->ref_wraparound);
     best_cost += best_bits * info->state->lambda_sqrt;
   }
 

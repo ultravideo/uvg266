@@ -112,7 +112,8 @@ unsigned uvg_image_calc_satd(const uvg_picture *pic,
                              int ref_x,
                              int ref_y,
                              int block_width,
-                             int block_height);
+                             int block_height,
+                             uint8_t ref_wraparound);
 
 
 void uvg_pixels_blit(const uvg_pixel* orig, uvg_pixel *dst,

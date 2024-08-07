@@ -43,6 +43,7 @@ ipol_blocks_func * uvg_filter_hpel_blocks_diag_luma;
 ipol_blocks_func * uvg_filter_qpel_blocks_hor_ver_luma;
 ipol_blocks_func * uvg_filter_qpel_blocks_diag_luma;
 epol_func *uvg_get_extended_block;
+epol_func *uvg_get_extended_block_wraparound;
 uvg_sample_quarterpel_luma_func * uvg_sample_quarterpel_luma;
 uvg_sample_octpel_chroma_func * uvg_sample_octpel_chroma;
 uvg_sample_quarterpel_luma_hi_func * uvg_sample_quarterpel_luma_hi;
