@@ -53,28 +53,49 @@ static void fill_after_frame(unsigned height, unsigned array_width,
 }
 
 
-static int read_and_fill_frame_data(FILE *file,
-                                    unsigned width, unsigned height, unsigned bytes_per_sample,
-                                    unsigned array_width, uvg_pixel *data)
+static int read_and_fill_frame_data(
+  FILE*      file,
+  unsigned   width,
+  unsigned   height,
+  unsigned   bytes_per_sample,
+  unsigned   array_width,
+  uvg_pixel* data)
 {
-  uvg_pixel* p = data;
-  uvg_pixel* end = data + array_width * height;
-  uvg_pixel fill_char;
-  unsigned i;
 
-  while (p < end) {
-    // Read the beginning of the line from input.
-    if (width != fread(p, bytes_per_sample, width, file))
-      return 0;
+  unsigned   i;
+  if (bytes_per_sample != sizeof(uvg_pixel)) {
+    uint8_t* p   = (uint8_t*)data;
+    uint8_t*  end = (uint8_t*)data + array_width * height;
+    uint8_t  fill_char;
+    while (p < end) {
+      // Read the beginning of the line from input.
+      if (width != fread(p, bytes_per_sample, width, file)) return 0;
+      // Fill the rest with the last pixel value.
+      // Fill the rest with the last pixel value.
+      fill_char = p[width - 1];
 
-    // Fill the rest with the last pixel value.
-    fill_char = p[width - 1];
+      for (i = width; i < array_width; ++i) {
+        p[i] = fill_char;
+      }
 
-    for (i = width; i < array_width; ++i) {
-      p[i] = fill_char;
+      p += array_width;
     }
+  } else {
+    uvg_pixel* p   = data;
+    uvg_pixel* end = data + array_width * height;
+    uvg_pixel  fill_char;
+    while (p < end) {
+      // Read the beginning of the line from input.
+      if (width != fread(p, bytes_per_sample, width, file)) return 0;
+      // Fill the rest with the last pixel value.
+      fill_char = p[width - 1];
 
-    p += array_width;
+      for (i = width; i < array_width; ++i) {
+        p[i] = fill_char;
+      }
+
+      p += array_width;
+    }
   }
   return 1;
 }
