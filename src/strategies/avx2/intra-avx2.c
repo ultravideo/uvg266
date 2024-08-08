@@ -3271,8 +3271,6 @@ static void angular_pdpc_hor_w4_improved_avx2(uvg_pixel* dst, const uvg_pixel* r
 
   int limit = MIN(3 << scale, height);
   
-  // __m128i vseq = _mm_setr_epi32(0, 1, 2, 3);
-  // __m128i vidx = _mm_slli_epi32(vseq, 2); // 2 is log2_width
   __m128i v32s = _mm_set1_epi16(32);
 
   // Scale can be 0, 1 or 2
@@ -3289,7 +3287,6 @@ static void angular_pdpc_hor_w4_improved_avx2(uvg_pixel* dst, const uvg_pixel* r
 
     const int offset = table_offset + wo;
 
-    //__m128i vdst = _mm_i32gather_epi32((const int32_t*)(dst + y * width), vidx, 1);
     __m128i vdst = _mm_load_si128((const __m128i*)(dst + y * width));
     __m128i vweightlo = _mm_load_si128((const __m128i*) &intra_pdpc_w4_hor_improved_weight[offset + 0]);
     __m128i vweighthi = _mm_load_si128((const __m128i*) &intra_pdpc_w4_hor_improved_weight[offset + 16]);
@@ -3309,6 +3306,52 @@ static void angular_pdpc_hor_w4_improved_avx2(uvg_pixel* dst, const uvg_pixel* r
     __m128i packed = _mm_packus_epi16(vmaddlo, vmaddhi);
 
     _mm_storeu_si128((__m128i*)(dst + (y * width)), packed);
+  }
+}
+
+static void angular_pdpc_hor_w8_improved_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int height, const int scale, const int mode_disp)
+{
+  const int width = 8;
+
+  int limit = MIN(3 << scale, height);
+
+  __m256i v32s = _mm256_set1_epi16(32);
+
+  // Scale can be 0, 1 or 2
+  const int table_offset = scale * 256;
+  const int inv_angle_offset = mode_disp * 64;
+  const int16_t* shifted_inv_angle_sum = &intra_pdpc_shifted_inv_angle_sum[inv_angle_offset];
+
+  // Handle 4 lines at once since PDPC is not done on 8x2 blocks.
+  for (int y = 0, o = table_offset; y < limit; y += 4, o += 64) {
+    const __m256i vweight01 = _mm256_load_si256((const __m256i*) &intra_pdpc_w8_hor_improved_weight[o + 0]);
+    const __m256i vweight23 = _mm256_load_si256((const __m256i*) &intra_pdpc_w8_hor_improved_weight[o + 32]);
+
+    const __m256i vidx = _mm256_set_epi64x(shifted_inv_angle_sum[y + 3], shifted_inv_angle_sum[y + 2],
+                                           shifted_inv_angle_sum[y + 1], shifted_inv_angle_sum[y + 0]);
+
+    __m256i vdst = _mm256_load_si256((const __m256i*)(dst + y * width));
+    __m256i vtop = _mm256_i64gather_epi64((const long long int*)&ref_side[1], vidx, 1);
+    
+    __m256i vlo = _mm256_unpacklo_epi8(vdst, vtop);
+    __m256i vhi = _mm256_unpackhi_epi8(vdst, vtop);
+
+    __m256i v01 = _mm256_permute2x128_si256(vlo, vhi, 0x20);
+    __m256i v23 = _mm256_permute2x128_si256(vlo, vhi, 0x31);
+
+    __m256i vmadd01 = _mm256_maddubs_epi16(v01, vweight01);
+    __m256i vmadd23 = _mm256_maddubs_epi16(v23, vweight23);
+
+    vmadd01 = _mm256_add_epi16(vmadd01, v32s);
+    vmadd23 = _mm256_add_epi16(vmadd23, v32s);
+
+    vmadd01 = _mm256_srai_epi16(vmadd01, 6);
+    vmadd23 = _mm256_srai_epi16(vmadd23, 6);
+
+    __m256i packed = _mm256_packus_epi16(vmadd01, vmadd23);
+    packed = _mm256_permute4x64_epi64(packed, _MM_SHUFFLE(3, 1, 2, 0));
+
+    _mm256_storeu_si256((__m256i*)(dst + (y * width)), packed);
   }
 }
 
@@ -4224,7 +4267,7 @@ static void uvg_angular_pred_avx2(
           // The above code was not accessed ever. There is no case where width == 4 and and mode disp < 6 for horizontal modes where PDPC is enabled.
           angular_pdpc_hor_w4_improved_avx2(dst, ref_side, height, scale, mode_disp);
           break;
-        case 8:  angular_pdpc_hor_w8_avx2(dst, ref_side, height, scale, mode_disp); break;
+        case 8:  angular_pdpc_hor_w8_improved_avx2(dst, ref_side, height, scale, mode_disp); break;
         case 16: // 16 width and higher done with the same function
         case 32:
         case 64: angular_pdpc_hor_w16_avx2(dst, ref_side, width, height, scale, mode_disp); break;
