@@ -2825,11 +2825,8 @@ static void angular_pdpc_mode18_w4_improved_avx2(uvg_pixel* dst, const uvg_pixel
 static void angular_pdpc_mode18_w8_improved_avx2(uvg_pixel* dst, const uvg_pixel top_left, const uvg_pixel* ref_side, const int height, const int scale)
 {
   const int width = 8;
-
   int limit = MIN(3 << scale, height);
 
-  //__m128i vseq = _mm_setr_epi32(0x00, 0x00, 0x01, 0x00);
-  //__m128i vidx = _mm_slli_epi64(vseq, 3); // 3 is log2 width
   __m256i v32s = _mm256_set1_epi16(32);
 
   const uint64_t ref8 = *(uint64_t*)&ref_side[1];
@@ -2845,7 +2842,6 @@ static void angular_pdpc_mode18_w8_improved_avx2(uvg_pixel* dst, const uvg_pixel
   for (int y = 0, o = table_offset; y < limit; y += 2, o += 16) {
     const __m256i vwT = _mm256_load_si256((const __m256i*) & intra_pdpc_w8_hor_weight[o]);
 
-    //__m128i vpred = _mm_i64gather_epi64((const long long int*)(dst + y * width), vidx, 1);
     __m128i vpred = _mm_load_si128((__m128i*)(dst + y * width));
     __m256i vpred16 = _mm256_cvtepu8_epi16(vpred);
 
@@ -2860,6 +2856,130 @@ static void angular_pdpc_mode18_w8_improved_avx2(uvg_pixel* dst, const uvg_pixel
     __m128i filtered = _mm_packus_epi16(lo, hi);
 
     _mm_storeu_si128((__m128i*)(dst + (y * width)), filtered);
+  }
+}
+
+// Can't do anything to improve w16
+
+static void angular_pdpc_mode18_w32_improved_avx2(uvg_pixel* dst, const uvg_pixel top_left, const uvg_pixel* ref_side, const int height, const int scale)
+{
+  const int width = 32;
+  int limit = MIN(3 << scale, height);
+  __m256i v32s = _mm256_set1_epi16(32);
+
+  __m128i vrefa = _mm_loadu_si128((const __m128i*) & ref_side[1]);
+  __m256i vref16a = _mm256_cvtepu8_epi16(vrefa);
+
+  __m128i vrefb = _mm_loadu_si128((const __m128i*) & ref_side[17]);
+  __m256i vref16b = _mm256_cvtepu8_epi16(vrefb);
+
+  __m256i vtopleft = _mm256_set1_epi16((uint16_t)top_left);
+
+  // Handle one line at a time. Skip line if vertical limit reached.
+  for (int y = 0; y < limit; ++y) {
+    const int16_t wT = 32 >> (2 * (y + 0) >> scale);
+    __m256i vwT = _mm256_set1_epi16(wT);
+
+    // Calculate first half
+    __m128i vpred = _mm_load_si128((__m128i*)(dst + (y * width + 0)));
+    __m256i vpred16 = _mm256_cvtepu8_epi16(vpred);
+
+    __m256i accu0 = _mm256_sub_epi16(vref16a, vtopleft);
+    accu0 = _mm256_mullo_epi16(vwT, accu0);
+    accu0 = _mm256_add_epi16(accu0, v32s);
+    accu0 = _mm256_srai_epi16(accu0, 6);
+    accu0 = _mm256_add_epi16(vpred16, accu0);
+
+    // Calculate second half
+    vpred = _mm_load_si128((__m128i*)(dst + (y * width + 16)));
+    vpred16 = _mm256_cvtepu8_epi16(vpred);
+
+    __m256i accu1 = _mm256_sub_epi16(vref16b, vtopleft);
+    accu1 = _mm256_mullo_epi16(vwT, accu1);
+    accu1 = _mm256_add_epi16(accu1, v32s);
+    accu1 = _mm256_srai_epi16(accu1, 6);
+    accu1 = _mm256_add_epi16(vpred16, accu1);
+
+    // Store results
+    __m256i packed = _mm256_packus_epi16(accu0, accu1);
+    packed = _mm256_permute4x64_epi64(packed, _MM_SHUFFLE(3, 1, 2, 0));
+
+    _mm256_store_si256((__m256i*)(dst + (y * width)), packed);
+  }
+}
+
+static void angular_pdpc_mode18_w64_improved_avx2(uvg_pixel* dst, const uvg_pixel top_left, const uvg_pixel* ref_side, const int height, const int scale)
+{
+  const int width = 64;
+  int limit = MIN(3 << scale, height);
+  __m256i v32s = _mm256_set1_epi16(32);
+
+  __m128i vrefa = _mm_loadu_si128((const __m128i*) &ref_side[0 + 1]);
+  __m256i vref16a = _mm256_cvtepu8_epi16(vrefa);
+
+  __m128i vrefb = _mm_loadu_si128((const __m128i*) &ref_side[16 + 1]);
+  __m256i vref16b = _mm256_cvtepu8_epi16(vrefb);
+
+  __m128i vrefc = _mm_loadu_si128((const __m128i*) &ref_side[32 + 1]);
+  __m256i vref16c = _mm256_cvtepu8_epi16(vrefc);
+
+  __m128i vrefd = _mm_loadu_si128((const __m128i*) &ref_side[48 + 1]);
+  __m256i vref16d = _mm256_cvtepu8_epi16(vrefd);
+
+  __m256i vtopleft = _mm256_set1_epi16((uint16_t)top_left);
+
+  // Handle one line at a time. Skip line if vertical limit reached.
+  for (int y = 0; y < limit; ++y) {
+    const int16_t wT = 32 >> (2 * (y + 0) >> scale);
+    __m256i vwT = _mm256_set1_epi16(wT);
+
+    // Calculate first quarter
+    __m128i vpred = _mm_load_si128((__m128i*)(dst + (y * width + 0)));
+    __m256i vpred16 = _mm256_cvtepu8_epi16(vpred);
+
+    __m256i accu0 = _mm256_sub_epi16(vref16a, vtopleft);
+    accu0 = _mm256_mullo_epi16(vwT, accu0);
+    accu0 = _mm256_add_epi16(accu0, v32s);
+    accu0 = _mm256_srai_epi16(accu0, 6);
+    accu0 = _mm256_add_epi16(vpred16, accu0);
+
+    // Calculate second quarter
+    vpred = _mm_load_si128((__m128i*)(dst + (y * width + 16)));
+    vpred16 = _mm256_cvtepu8_epi16(vpred);
+
+    __m256i accu1 = _mm256_sub_epi16(vref16b, vtopleft);
+    accu1 = _mm256_mullo_epi16(vwT, accu1);
+    accu1 = _mm256_add_epi16(accu1, v32s);
+    accu1 = _mm256_srai_epi16(accu1, 6);
+    accu1 = _mm256_add_epi16(vpred16, accu1);
+
+    // Calculate third quarter
+    vpred = _mm_load_si128((__m128i*)(dst + (y * width + 32)));
+    vpred16 = _mm256_cvtepu8_epi16(vpred);
+
+    __m256i accu2 = _mm256_sub_epi16(vref16c, vtopleft);
+    accu2 = _mm256_mullo_epi16(vwT, accu2);
+    accu2 = _mm256_add_epi16(accu2, v32s);
+    accu2 = _mm256_srai_epi16(accu2, 6);
+    accu2 = _mm256_add_epi16(vpred16, accu2);
+
+    // Calculate fourth quarter
+    vpred = _mm_load_si128((__m128i*)(dst + (y * width + 48)));
+    vpred16 = _mm256_cvtepu8_epi16(vpred);
+
+    __m256i accu3 = _mm256_sub_epi16(vref16d, vtopleft);
+    accu3 = _mm256_mullo_epi16(vwT, accu3);
+    accu3 = _mm256_add_epi16(accu3, v32s);
+    accu3 = _mm256_srai_epi16(accu3, 6);
+    accu3 = _mm256_add_epi16(vpred16, accu3);
+
+    __m256i packed0 = _mm256_packus_epi16(accu0, accu1);
+    __m256i packed1 = _mm256_packus_epi16(accu2, accu3);
+    packed0 = _mm256_permute4x64_epi64(packed0, _MM_SHUFFLE(3, 1, 2, 0));
+    packed1 = _mm256_permute4x64_epi64(packed1, _MM_SHUFFLE(3, 1, 2, 0));
+
+    _mm256_store_si256((__m256i*)(dst + (y * width + 0)),  packed0);
+    _mm256_store_si256((__m256i*)(dst + (y * width + 32)), packed1);
   }
 }
 
@@ -4284,8 +4404,8 @@ static void uvg_angular_pred_avx2(
         case 4:  angular_pdpc_mode18_w4_improved_avx2(dst, top_left, ref_side, height, scale); break;
         case 8:  angular_pdpc_mode18_w8_improved_avx2(dst, top_left, ref_side, height, scale); break;
         case 16: angular_pdpc_mode18_w16_avx2(dst, top_left, ref_side, height, scale); break;
-        case 32: angular_pdpc_mode18_w32_avx2(dst, top_left, ref_side, height, scale); break;
-        case 64: angular_pdpc_mode18_w64_avx2(dst, top_left, ref_side, height, scale); break;
+        case 32: angular_pdpc_mode18_w32_improved_avx2(dst, top_left, ref_side, height, scale); break;
+        case 64: angular_pdpc_mode18_w64_improved_avx2(dst, top_left, ref_side, height, scale); break;
         default:
           assert(false && "Intra PDPC, invalid width.\n");
           break;
