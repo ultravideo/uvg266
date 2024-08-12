@@ -3363,19 +3363,21 @@ static void angular_pdpc_hor_w16_improved_avx2(uvg_pixel* dst, const uvg_pixel* 
   const int inv_angle_offset = mode_disp * 64;
   const int16_t* shifted_inv_angle_sum = &intra_pdpc_shifted_inv_angle_sum[inv_angle_offset];
 
-  const __m128i vblend = _mm_setr_epi8(
+  /*const __m128i vblend = _mm_setr_epi8(
     0x00, 0xff, 0x00, 0xff, 0x00, 0xff, 0x00, 0xff,
     0x00, 0xff, 0x00, 0xff, 0x00, 0xff, 0x00, 0xff
-  );
+  );*/
 
   // Handle one line at a time. Skip line if vertical limit reached.
   for (int y = 0; y < limit; ++y) {
     const uint8_t weight1 = 32 >> (2 * y >> scale);
     const uint8_t weight0 = 64 - weight1;
-    __m128i vw0 = _mm_set1_epi8(weight0);
-    __m128i vw1 = _mm_set1_epi8(weight1);
+    ALIGNED(2) const uint8_t tmp[2] = { weight0, weight1 };
+    // __m128i vw0 = _mm_set1_epi8(weight0);
+    // __m128i vw1 = _mm_set1_epi8(weight1);
 
-    __m128i vweight = _mm_blendv_epi8(vw0, vw1, vblend);
+    //__m128i vweight = _mm_blendv_epi8(vw0, vw1, vblend);
+    __m128i vweight = _mm_set1_epi16(*(uint16_t*)tmp);
 
     for (int x = 0; x < width; x += 16) {
       __m128i vdst = _mm_load_si128((__m128i*)(dst + (y * width + x)));
