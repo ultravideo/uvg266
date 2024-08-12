@@ -2783,6 +2783,48 @@ static void angular_pdpc_hor_w4_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, 
 
 // Mode 18
 
+static void angular_pdpc_mode18_w4_improved_avx2(uvg_pixel* dst, const uvg_pixel top_left, const uvg_pixel* ref_side, const int height, const int scale)
+{
+  const int width = 4;
+  const int limit = MIN(3 << scale, height);
+
+  //__m128i vseq = _mm_setr_epi32(0, 1, 2, 3);
+  //__m128i vidx = _mm_slli_epi32(vseq, 2); // 2 is log2_width
+  __m256i v32s = _mm256_set1_epi16(32);
+
+  const uint32_t ref4 = *(uint32_t*)&ref_side[1];
+
+  __m128i vref = _mm_set1_epi32(ref4);
+  __m256i vref16 = _mm256_cvtepu8_epi16(vref);
+
+  __m256i vtopleft = _mm256_set1_epi16((uint16_t)top_left);
+
+  // Weight table offset
+  const int table_offset = scale * 64;
+
+  for (int y = 0, o = 0; y < limit; y += 4, o += 16) {
+    const int offset = table_offset + o;
+
+    //__m128i vpred = _mm_i32gather_epi32((const int32_t*)(dst + y * width), vidx, 1);
+    __m128i vpred = _mm_load_si128((__m128i*)(dst + y * width));
+
+    __m256i vpred16 = _mm256_cvtepu8_epi16(vpred);
+    __m256i vweight = _mm256_load_si256((const __m256i*) & intra_pdpc_w4_hor_weight[offset]);
+
+    __m256i accu = _mm256_sub_epi16(vref16, vtopleft);
+    accu = _mm256_mullo_epi16(vweight, accu);
+    accu = _mm256_add_epi16(accu, v32s);
+    accu = _mm256_srai_epi16(accu, 6);
+    accu = _mm256_add_epi16(vpred16, accu);
+
+    __m128i lo = _mm256_castsi256_si128(accu);
+    __m128i hi = _mm256_extracti128_si256(accu, 1);
+    __m128i filtered = _mm_packus_epi16(lo, hi);
+
+    _mm_storeu_si128((__m128i*)(dst + (y * width)), filtered);
+  }
+}
+
 
 // Mode 50
 
@@ -3363,20 +3405,12 @@ static void angular_pdpc_hor_w16_improved_avx2(uvg_pixel* dst, const uvg_pixel* 
   const int inv_angle_offset = mode_disp * 64;
   const int16_t* shifted_inv_angle_sum = &intra_pdpc_shifted_inv_angle_sum[inv_angle_offset];
 
-  /*const __m128i vblend = _mm_setr_epi8(
-    0x00, 0xff, 0x00, 0xff, 0x00, 0xff, 0x00, 0xff,
-    0x00, 0xff, 0x00, 0xff, 0x00, 0xff, 0x00, 0xff
-  );*/
-
   // Handle one line at a time. Skip line if vertical limit reached.
   for (int y = 0; y < limit; ++y) {
     const uint8_t weight1 = 32 >> (2 * y >> scale);
     const uint8_t weight0 = 64 - weight1;
     ALIGNED(2) const uint8_t tmp[2] = { weight0, weight1 };
-    // __m128i vw0 = _mm_set1_epi8(weight0);
-    // __m128i vw1 = _mm_set1_epi8(weight1);
 
-    //__m128i vweight = _mm_blendv_epi8(vw0, vw1, vblend);
     __m128i vweight = _mm_set1_epi16(*(uint16_t*)tmp);
 
     for (int x = 0; x < width; x += 16) {
@@ -4209,7 +4243,7 @@ static void uvg_angular_pred_avx2(
       const uvg_pixel top_left = ref_main[0];
       
       switch (width) {
-        case 4:  angular_pdpc_mode18_w4_avx2(dst, top_left, ref_side, height, scale); break;
+        case 4:  angular_pdpc_mode18_w4_improved_avx2(dst, top_left, ref_side, height, scale); break;
         case 8:  angular_pdpc_mode18_w8_avx2(dst, top_left, ref_side, height, scale); break;
         case 16: angular_pdpc_mode18_w16_avx2(dst, top_left, ref_side, height, scale); break;
         case 32: angular_pdpc_mode18_w32_avx2(dst, top_left, ref_side, height, scale); break;
