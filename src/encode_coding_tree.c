@@ -796,10 +796,10 @@ int uvg_encode_inter_prediction_unit(
       }
     }
 #ifdef UVG_DEBUG_PRINT_YUVIEW_CSV
-    int abs_x = x + state->tile->offset_x;
-    int abs_y = y + state->tile->offset_y;
-    if (cur_cu->inter.mv_dir & 1) DBG_YUVIEW_MV(state->frame->poc, DBG_YUVIEW_MVMERGE_L0, abs_x, abs_y, width, height, cur_cu->inter.mv[0][0], cur_cu->inter.mv[0][1]);
-    if (cur_cu->inter.mv_dir & 2) DBG_YUVIEW_MV(state->frame->poc, DBG_YUVIEW_MVMERGE_L1, abs_x, abs_y, width, height, cur_cu->inter.mv[1][0], cur_cu->inter.mv[1][1]);
+    int abs_x = cu_loc->x;
+    int abs_y = cu_loc->y;
+    if (cur_cu->inter.mv_dir & 1) DBG_YUVIEW_MV(state->frame->poc, DBG_YUVIEW_MVMERGE_L0, abs_x, abs_y, cu_loc->width, cu_loc->height, cur_cu->inter.mv[0][0], cur_cu->inter.mv[0][1]);
+    if (cur_cu->inter.mv_dir & 2) DBG_YUVIEW_MV(state->frame->poc, DBG_YUVIEW_MVMERGE_L1, abs_x, abs_y, cu_loc->width, cu_loc->height, cur_cu->inter.mv[1][0], cur_cu->inter.mv[1][1]);
 #endif
   } else {
     if (state->frame->slicetype == UVG_SLICE_B && cur_cu->type != CU_IBC) {
@@ -821,9 +821,9 @@ int uvg_encode_inter_prediction_unit(
         continue;
       }
 #ifdef UVG_DEBUG_PRINT_YUVIEW_CSV
-      int abs_x = x + state->tile->offset_x;
-      int abs_y = y + state->tile->offset_y;
-      DBG_YUVIEW_MV(state->frame->poc, ref_list_idx ? DBG_YUVIEW_MVINTER_L1 : DBG_YUVIEW_MVINTER_L0, abs_x, abs_y, width, height, cur_cu->inter.mv[ref_list_idx][0], cur_cu->inter.mv[ref_list_idx][1]);
+      int abs_x = cu_loc->x;
+      int abs_y = cu_loc->y;
+      DBG_YUVIEW_MV(state->frame->poc, ref_list_idx ? DBG_YUVIEW_MVINTER_L1 : DBG_YUVIEW_MVINTER_L0, abs_x, abs_y, cu_loc->width, cu_loc->height, cur_cu->inter.mv[ref_list_idx][0], cur_cu->inter.mv[ref_list_idx][1]);
 #endif
       // size of the current reference index list (L0/L1)
       uint8_t ref_LX_size = state->frame->ref_LX_size[ref_list_idx];
