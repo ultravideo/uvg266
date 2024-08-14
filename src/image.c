@@ -504,7 +504,7 @@ unsigned uvg_image_calc_satd(const uvg_picture *pic,
                              pic_data,
                              pic->stride,
                              ref_data,
-                             ref->stride) >> (UVG_BIT_DEPTH - 8);
+                             ref->stride);
   } else {
     // Extrapolate pixels from outside the frame.
 
@@ -550,7 +550,7 @@ unsigned uvg_image_calc_satd(const uvg_picture *pic,
       pic_data,
       pic->stride,
       ext_origin,
-      ext_s) >> (UVG_BIT_DEPTH - 8);
+      ext_s);
 
     return satd;
   }
