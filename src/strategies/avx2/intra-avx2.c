@@ -509,7 +509,7 @@ static void angular_pred_w4_hor_high_angle_avx2(uvg_pixel* dst, const uvg_pixel*
   }
 }
 
-static void angular_pred_w4_hor_avx2(uvg_pixel* dst, const uvg_pixel* ref_main, const int16_t pred_mode, const int16_t* delta_int, const int16_t* delta_fract, const int height, const int8_t (*filter)[4])
+static void angular_pred_w4_hor_avx2(uvg_pixel* dst, const uvg_pixel* ref_main, const int16_t pred_mode, const int16_t multi_ref_line, const int16_t* delta_int, const int16_t* delta_fract, const int height, const int8_t (*filter)[4])
 {
   // const int width = 4;
 
@@ -527,8 +527,8 @@ static void angular_pred_w4_hor_avx2(uvg_pixel* dst, const uvg_pixel* ref_main, 
     0x02, 0x03, 0x06, 0x07, 0x0a, 0x0b, 0x0e, 0x0f
   );
 
-  const int mode_idx = pred_mode <= 34 ? pred_mode - 2 : 66 - pred_mode;
-  const int table_offset = mode_idx * 64;
+  const int mode_idx = pred_mode <= 34 ? pred_mode + 12 : 80 - pred_mode; // Considers also wide angle modes.
+  const int table_offset = mode_idx * 192 + multi_ref_line * 64;
 
   const __m256i vpshuf0 = _mm256_load_si256((__m256i*) &intra_luma_interpolation_shuffle_vectors_w4_hor[table_offset + 0]);
   const __m256i vpshuf1 = _mm256_load_si256((__m256i*) &intra_luma_interpolation_shuffle_vectors_w4_hor[table_offset + 32]);
@@ -4252,10 +4252,10 @@ static void uvg_angular_pred_avx2(
         else {
           switch (width) {
             case  4: 
-              if (wide_angle_mode)
+              if (pred_mode < -7 || (multi_ref_index == 2 && pred_mode == -7)) // High angles need special handling
                 angular_pred_w4_hor_high_angle_avx2(dst, ref_main, delta_int, delta_fract, height, pfilter); 
               else
-                angular_pred_w4_hor_avx2(dst, ref_main, pred_mode, delta_int, delta_fract, height, pfilter);
+                angular_pred_w4_hor_avx2(dst, ref_main, pred_mode, multi_ref_index, delta_int, delta_fract, height, pfilter);
               
               break;
             case  8: angular_pred_w8_hor_avx2(dst, ref_main, delta_int, delta_fract, height, use_cubic); break;
