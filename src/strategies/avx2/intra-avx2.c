@@ -430,7 +430,7 @@ static void angular_pred_w16_ver_avx2(uvg_pixel* dst, const uvg_pixel* ref_main,
 }
 
 
-static void angular_pred_w4_hor_high_angle_avx2(uvg_pixel* dst, const uvg_pixel* ref_main, const int16_t* delta_int, const int16_t* delta_fract, const int height, const bool use_cubic)
+static void angular_pred_w4_hor_high_angle_avx2(uvg_pixel* dst, const uvg_pixel* ref_main, const int16_t* delta_int, const int16_t* delta_fract, const int height, const int8_t(*filter)[4])
 {
   const int width = 4;
 
@@ -449,17 +449,17 @@ static void angular_pred_w4_hor_high_angle_avx2(uvg_pixel* dst, const uvg_pixel*
   );
 
   const __m256i w_shuf_01 = _mm256_setr_epi8(
-    0x00, 0x02, 0x08, 0x0a, 0x00, 0x02, 0x08, 0x0a,
-    0x00, 0x02, 0x08, 0x0a, 0x00, 0x02, 0x08, 0x0a,
-    0x00, 0x02, 0x08, 0x0a, 0x00, 0x02, 0x08, 0x0a,
-    0x00, 0x02, 0x08, 0x0a, 0x00, 0x02, 0x08, 0x0a
+    0x00, 0x01, 0x04, 0x05, 0x08, 0x09, 0x0c, 0x0d,
+    0x00, 0x01, 0x04, 0x05, 0x08, 0x09, 0x0c, 0x0d,
+    0x00, 0x01, 0x04, 0x05, 0x08, 0x09, 0x0c, 0x0d,
+    0x00, 0x01, 0x04, 0x05, 0x08, 0x09, 0x0c, 0x0d
   );
 
   const __m256i w_shuf_23 = _mm256_setr_epi8(
-    0x04, 0x06, 0x0c, 0x0e, 0x04, 0x06, 0x0c, 0x0e,
-    0x04, 0x06, 0x0c, 0x0e, 0x04, 0x06, 0x0c, 0x0e,
-    0x04, 0x06, 0x0c, 0x0e, 0x04, 0x06, 0x0c, 0x0e,
-    0x04, 0x06, 0x0c, 0x0e, 0x04, 0x06, 0x0c, 0x0e
+    0x02, 0x03, 0x06, 0x07, 0x0a, 0x0b, 0x0e, 0x0f,
+    0x02, 0x03, 0x06, 0x07, 0x0a, 0x0b, 0x0e, 0x0f,
+    0x02, 0x03, 0x06, 0x07, 0x0a, 0x0b, 0x0e, 0x0f,
+    0x02, 0x03, 0x06, 0x07, 0x0a, 0x0b, 0x0e, 0x0f
   );
 
   const __m128i r_shuffle = _mm_setr_epi8(
@@ -467,62 +467,45 @@ static void angular_pred_w4_hor_high_angle_avx2(uvg_pixel* dst, const uvg_pixel*
     0x04, 0x05, 0x0c, 0x0d, 0x06, 0x07, 0x0e, 0x0f
   );
 
-  int16_t f[4][4] = { { 0 } };
+  // Copy the filter to local memory
+  __m128i vdfract = _mm_load_si128((__m128i*)delta_fract);
+  __m128i vidx = _mm_cvtepi16_epi32(vdfract);
+  __m128i all_weights = _mm_i32gather_epi32((const int32_t*)(void*)filter, vidx, 4);
+
+  __m256i weights256 = _mm256_insertf128_si256(_mm256_castsi128_si256(all_weights), all_weights, 1);
+  // Shuffle the interpolation weights into place.
+  __m256i w01 = _mm256_shuffle_epi8(weights256, w_shuf_01);
+  __m256i w23 = _mm256_shuffle_epi8(weights256, w_shuf_23);
 
   // For a 4 width block, height must be at least 4. Handle 4 lines at once
   for (int y = 0; y < height; y += 4) {
+    // This solution assumes the delta int values to be 64-bit
+    // Cast from 16-bit to 64-bit.
+    __m128i vidx = _mm_load_si128((__m128i*)delta_int);
+    __m256i vidx256 = _mm256_cvtepu16_epi64(vidx);
     
-    // Do 4-tap intra interpolation filtering
-    uvg_pixel* p = (uvg_pixel*)(ref_main + y);
+    __m256i vp = _mm256_i64gather_epi64((const long long int*)&ref_main[y], vidx256, 1);
 
-    
-      if (use_cubic) {
-        memcpy(f[0], cubic_filter[delta_fract[0]], 8);
-        memcpy(f[1], cubic_filter[delta_fract[1]], 8);
-        memcpy(f[2], cubic_filter[delta_fract[2]], 8);
-        memcpy(f[3], cubic_filter[delta_fract[3]], 8);
-      }
-      else {
-        for (int xx = 0; xx < 4; ++xx) {
-          const int16_t offset = (delta_fract[xx] >> 1);
-          f[xx][0] = 16 - offset;
-          f[xx][1] = 32 - offset;
-          f[xx][2] = 16 + offset;
-          f[xx][3] = offset;
-        }
-      }
+    __m256i vp_01 = _mm256_shuffle_epi8(vp, p_shuf_01);
+    __m256i vp_23 = _mm256_shuffle_epi8(vp, p_shuf_23);
 
-      // This solution assumes the delta int values to be 64-bit
-      // Cast from 16-bit to 64-bit.
-      __m256i vidx = _mm256_setr_epi64x(delta_int[0],
-                                        delta_int[1],
-                                        delta_int[2],
-                                        delta_int[3]);
-      __m256i all_weights = _mm256_loadu_si256((__m256i*)f);
-      __m256i w01 = _mm256_shuffle_epi8(all_weights, w_shuf_01);
-      __m256i w23 = _mm256_shuffle_epi8(all_weights, w_shuf_23);
+    vp_01 = _mm256_permute4x64_epi64(vp_01, _MM_SHUFFLE(3, 1, 2, 0));
+    vp_23 = _mm256_permute4x64_epi64(vp_23, _MM_SHUFFLE(3, 1, 2, 0));
+    vp_01 = _mm256_shuffle_epi32(vp_01, _MM_SHUFFLE(3, 1, 2, 0));
+    vp_23 = _mm256_shuffle_epi32(vp_23, _MM_SHUFFLE(3, 1, 2, 0));
 
-      __m256i vp = _mm256_i64gather_epi64((const long long int*)p, vidx, 1);
-      //__m256i vp = _mm256_loadu_si256((__m256i*)(p + delta_int[y]));
+    __m256i dot_01 = _mm256_maddubs_epi16(vp_01, w01);
+    __m256i dot_23 = _mm256_maddubs_epi16(vp_23, w23);
+    __m256i sum = _mm256_add_epi16(dot_01, dot_23);
+    sum = _mm256_add_epi16(sum, _mm256_set1_epi16(32));
+    sum = _mm256_srai_epi16(sum, 6);
 
-      //__m256i tmp = _mm256_permute4x64_epi64(vp, _MM_SHUFFLE(2, 1, 1, 0));
+    __m128i lo = _mm256_castsi256_si128(sum);
+    __m128i hi = _mm256_extracti128_si256(sum, 1);
+    __m128i packed = _mm_packus_epi16(lo, hi);
 
-      __m256i vp_01 = _mm256_shuffle_epi8(vp, p_shuf_01);
-      __m256i vp_23 = _mm256_shuffle_epi8(vp, p_shuf_23);
-
-      __m256i dot_01 = _mm256_maddubs_epi16(vp_01, w01);
-      __m256i dot_23 = _mm256_maddubs_epi16(vp_23, w23);
-      __m256i sum = _mm256_add_epi16(dot_01, dot_23);
-      sum = _mm256_add_epi16(sum, _mm256_set1_epi16(32));
-      sum = _mm256_srai_epi16(sum, 6);
-
-      __m128i lo = _mm256_castsi256_si128(sum);
-      __m128i hi = _mm256_extracti128_si256(sum, 1);
-      __m128i filtered = _mm_packus_epi16(lo, hi);
-
-      _mm_store_si128((__m128i*)dst, _mm_shuffle_epi8(filtered, r_shuffle));
-      dst += 16;
-    
+    _mm_store_si128((__m128i*)dst, packed);
+    dst += 16;
   }
 }
 
@@ -4270,7 +4253,7 @@ static void uvg_angular_pred_avx2(
           switch (width) {
             case  4: 
               if (wide_angle_mode)
-                angular_pred_w4_hor_high_angle_avx2(dst, ref_main, delta_int, delta_fract, height, use_cubic); 
+                angular_pred_w4_hor_high_angle_avx2(dst, ref_main, delta_int, delta_fract, height, pfilter); 
               else
                 angular_pred_w4_hor_avx2(dst, ref_main, pred_mode, delta_int, delta_fract, height, pfilter);
               
