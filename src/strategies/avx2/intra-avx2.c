@@ -462,11 +462,6 @@ static void angular_pred_w4_hor_high_angle_avx2(uvg_pixel* dst, const uvg_pixel*
     0x02, 0x03, 0x06, 0x07, 0x0a, 0x0b, 0x0e, 0x0f
   );
 
-  const __m128i r_shuffle = _mm_setr_epi8(
-    0x00, 0x01, 0x08, 0x09, 0x02, 0x03, 0x0a, 0x0b,
-    0x04, 0x05, 0x0c, 0x0d, 0x06, 0x07, 0x0e, 0x0f
-  );
-
   // Copy the filter to local memory
   __m128i vdfract = _mm_load_si128((__m128i*)delta_fract);
   __m128i vidx = _mm_cvtepi16_epi32(vdfract);
@@ -533,8 +528,6 @@ static void angular_pred_w4_hor_avx2(uvg_pixel* dst, const uvg_pixel* ref_main, 
   const __m256i vpshuf0 = _mm256_load_si256((__m256i*) &intra_luma_interpolation_shuffle_vectors_w4_hor[table_offset + 0]);
   const __m256i vpshuf1 = _mm256_load_si256((__m256i*) &intra_luma_interpolation_shuffle_vectors_w4_hor[table_offset + 32]);
   
-  // Case for pred mode 2 where offset is 1, do not need to be handled, as that mode is handled by other function. Positive numbers would brake the indexing.
-  // Valid ref offsets are negative, in range -1 to -4
   int ref_offset = MIN(delta_int[0], delta_int[3]);
 
   // Copy the filter to local memory
@@ -573,7 +566,7 @@ static void angular_pred_w4_hor_avx2(uvg_pixel* dst, const uvg_pixel* ref_main, 
   }
 }
 
-static void angular_pred_w8_hor_avx2(uvg_pixel* dst, const uvg_pixel* ref_main, const int16_t* delta_int, const int16_t* delta_fract, const int height, const int use_cubic)
+static void angular_pred_w8_hor_high_angle_avx2(uvg_pixel* dst, const uvg_pixel* ref_main, const int16_t* delta_int, const int16_t* delta_fract, const int height, const int use_cubic)
 {
   const int width = 8;
 
@@ -622,6 +615,75 @@ static void angular_pred_w8_hor_avx2(uvg_pixel* dst, const uvg_pixel* ref_main, 
       
     _mm_store_si128((__m128i*)dst,  filtered);
  
+    dst += 16;
+  }
+}
+
+static void angular_pred_w8_hor_avx2(uvg_pixel* dst, const uvg_pixel* ref_main, const int16_t pred_mode, const int16_t multi_ref_line, const int16_t* delta_int, const int16_t* delta_fract, const int height, const int8_t (*filter)[4])
+{
+  // const int width = 8;
+  
+  __m256i vwshuf01 = _mm256_setr_epi8(
+    0x00, 0x01, 0x04, 0x05, 0x08, 0x09, 0x0c, 0x0d,
+    0x00, 0x01, 0x04, 0x05, 0x08, 0x09, 0x0c, 0x0d,
+    0x00, 0x01, 0x04, 0x05, 0x08, 0x09, 0x0c, 0x0d,
+    0x00, 0x01, 0x04, 0x05, 0x08, 0x09, 0x0c, 0x0d
+  );
+
+  __m256i vwshuf23 = _mm256_setr_epi8(
+    0x02, 0x03, 0x06, 0x07, 0x0a, 0x0b, 0x0e, 0x0f,
+    0x02, 0x03, 0x06, 0x07, 0x0a, 0x0b, 0x0e, 0x0f,
+    0x02, 0x03, 0x06, 0x07, 0x0a, 0x0b, 0x0e, 0x0f,
+    0x02, 0x03, 0x06, 0x07, 0x0a, 0x0b, 0x0e, 0x0f
+  );
+
+  int ref_offset = MIN(delta_int[0], delta_int[7]);
+  const __m256i v32s = _mm256_set1_epi16(32);
+
+  // Load weights
+  __m128i tmp = _mm_load_si128((__m128i*)delta_fract);
+  __m256i vidxw = _mm256_cvtepi16_epi32(tmp);
+  __m256i vweights = _mm256_i32gather_epi32((const int32_t*)(void*)filter, vidxw, 4);
+  
+  __m256i vw01 = _mm256_shuffle_epi8(vweights, vwshuf01);
+  __m256i vw23 = _mm256_shuffle_epi8(vweights, vwshuf23);
+
+  vw01 = _mm256_permute4x64_epi64(vw01, _MM_SHUFFLE(3, 1, 2, 0));
+  vw23 = _mm256_permute4x64_epi64(vw23, _MM_SHUFFLE(3, 1, 2, 0));
+
+  /*tmp = _mm_load_si128((__m128i*)delta_int);
+  __m256i vidx = _mm256_cvtepi16_epi32(tmp);*/
+
+  const int mode_idx = pred_mode <= 34 ? pred_mode + 12 : 80 - pred_mode; // Considers also wide angle modes.
+  const int table_offset = mode_idx * 192 + multi_ref_line * 64;
+
+  const __m256i vpshuf01 = _mm256_loadu_si256((__m256i*) &intra_luma_interpolation_shuffle_vectors_w8_hor[table_offset + 0]);
+  const __m256i vpshuf23 = _mm256_loadu_si256((__m256i*) &intra_luma_interpolation_shuffle_vectors_w8_hor[table_offset + 32]);
+
+  // 4-tap interpolation filtering.
+  // For a 8 width block, height must be at least 2. Handle 2 lines at once.
+  for (int y = 0; y < height; y += 2) {
+    // Load samples and shuffle into place
+    __m128i vp = _mm_loadu_si128((__m128i*)&ref_main[y + ref_offset]);
+    __m256i vp256 = _mm256_inserti128_si256(_mm256_castsi128_si256(vp), vp, 1);
+    //__m256i vp0 = _mm256_i32gather_epi32((const int*)&ref_main[y + 0], vidx, 1);
+    //__m256i vp1 = _mm256_i32gather_epi32((const int*)&ref_main[y + 1], vidx, 1);
+    __m256i vp01 = _mm256_shuffle_epi8(vp256, vpshuf01);
+    __m256i vp23 = _mm256_shuffle_epi8(vp256, vpshuf23);
+    
+    __m256i dot_01 = _mm256_maddubs_epi16(vp01, vw01);
+    __m256i dot_23 = _mm256_maddubs_epi16(vp23, vw23);
+    __m256i sum = _mm256_add_epi16(dot_01, dot_23);
+    sum = _mm256_add_epi16(sum, v32s);
+    sum = _mm256_srai_epi16(sum, 6);
+
+    __m128i lo = _mm256_castsi256_si128(sum);
+    __m128i hi = _mm256_extracti128_si256(sum, 1);
+    __m128i packed = _mm_packus_epi16(lo, hi);
+    //filtered = _mm_shuffle_epi32(filtered, _MM_SHUFFLE(3, 1, 2, 0));
+
+    _mm_store_si128((__m128i*)dst, packed);
+
     dst += 16;
   }
 }
@@ -4258,7 +4320,13 @@ static void uvg_angular_pred_avx2(
                 angular_pred_w4_hor_avx2(dst, ref_main, pred_mode, multi_ref_index, delta_int, delta_fract, height, pfilter);
               
               break;
-            case  8: angular_pred_w8_hor_avx2(dst, ref_main, delta_int, delta_fract, height, use_cubic); break;
+            case  8: 
+              if (pred_mode < -2)
+                angular_pred_w8_hor_high_angle_avx2(dst, ref_main, delta_int, delta_fract, height, use_cubic);
+              else
+                angular_pred_w8_hor_avx2(dst, ref_main, pred_mode, multi_ref_index, delta_int, delta_fract, height, pfilter);
+
+              break;
             case 16: angular_pred_w16_hor_avx2(dst, ref_main, delta_int, delta_fract, width, height, use_cubic); break;
             case 32: angular_pred_w16_hor_avx2(dst, ref_main, delta_int, delta_fract, width, height, use_cubic); break;
             case 64: angular_pred_w16_hor_avx2(dst, ref_main, delta_int, delta_fract, width, height, use_cubic); break;
