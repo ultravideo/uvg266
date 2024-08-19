@@ -187,6 +187,11 @@ static void angular_pred_w4_ver_avx2(uvg_pixel* dst, const uvg_pixel* ref_main, 
     0x0a, 0x0b, 0x0b, 0x0c, 0x0c, 0x0d, 0x0d, 0x0e
   );
 
+ALIGNED(32) static const uint8_t delta_fract_symmetry[] = {
+   1, 32, 16, 32,  8, 16,  2, 16,  8, 16,  4, 16, 32, 16, 32,  1,
+  32, 16, 32,  8, 16,  4, 16,  8, 16,  2, 16,  8, 16,  8, 32, 16, 32, 1
+};
+
   const __m256i w_shuf_01 = _mm256_setr_epi8(
     0x00, 0x02, 0x00, 0x02, 0x00, 0x02, 0x00, 0x02,
     0x08, 0x0a, 0x08, 0x0a, 0x08, 0x0a, 0x08, 0x0a,
@@ -633,9 +638,6 @@ static void angular_pred_w8_hor_avx2(uvg_pixel* dst, const uvg_pixel* ref_main, 
   vw01 = _mm256_permute4x64_epi64(vw01, _MM_SHUFFLE(3, 1, 2, 0));
   vw23 = _mm256_permute4x64_epi64(vw23, _MM_SHUFFLE(3, 1, 2, 0));
 
-  /*tmp = _mm_load_si128((__m128i*)delta_int);
-  __m256i vidx = _mm256_cvtepi16_epi32(tmp);*/
-
   const int mode_idx = pred_mode <= 34 ? pred_mode + 12 : 80 - pred_mode; // Considers also wide angle modes.
   const int table_offset = mode_idx * 192 + multi_ref_line * 64;
 
@@ -670,7 +672,7 @@ static void angular_pred_w8_hor_avx2(uvg_pixel* dst, const uvg_pixel* ref_main, 
   }
 }
 
-static void angular_pred_w16_hor_avx2(uvg_pixel* dst, const uvg_pixel* ref_main, const int16_t* delta_int, const int16_t* delta_fract, const int width, const int height, const int use_cubic)
+static void angular_pred_w16_hor_high_angle_avx2(uvg_pixel* dst, const uvg_pixel* ref_main, const int16_t* delta_int, const int16_t* delta_fract, const int width, const int height, const int use_cubic)
 {
   int8_t f[64][4] = { { 0 } };
   if (use_cubic) {
@@ -718,6 +720,51 @@ static void angular_pred_w16_hor_avx2(uvg_pixel* dst, const uvg_pixel* ref_main,
 
       _mm_store_si128((__m128i*)(dst + (y * width + x)), filtered);
     }
+  }
+}
+
+static void angular_pred_w16_hor_avx2(uvg_pixel* dst, const uvg_pixel* ref_main, const int16_t pred_mode, const int16_t multi_ref_line, const int16_t* delta_int, const int16_t* delta_fract, const int height, const int8_t(*filter)[4])
+{
+  const int width = 16;
+  const int ref_offset = MIN(delta_int[0], delta_int[15]);
+  const __m256i v32s = _mm256_set1_epi16(32);
+  
+  __m128i tmp0 = _mm_loadu_si128((__m128i*) &delta_fract[0]);
+  __m128i tmp1 = _mm_loadu_si128((__m128i*) &delta_fract[8]);
+
+  __m256i vidx0 = _mm256_cvtepi16_epi32(tmp0);
+  __m256i vidx1 = _mm256_cvtepi16_epi32(tmp1);
+
+  __m256i vw0 = _mm256_i32gather_epi32((const int32_t*)(void*)filter, vidx0, 4);
+  __m256i vw1 = _mm256_i32gather_epi32((const int32_t*)(void*)filter, vidx1, 4);
+
+  const int mode_idx = pred_mode <= 34 ? pred_mode + 12 : 80 - pred_mode; // Considers also wide angle modes.
+  const int table_offset = mode_idx * 192 + multi_ref_line * 64;
+
+  const __m256i vpshuf01 = _mm256_loadu_si256((__m256i*) &intra_luma_interpolation_shuffle_vectors_w16_hor[table_offset + 0]);
+  const __m256i vpshuf23 = _mm256_loadu_si256((__m256i*) &intra_luma_interpolation_shuffle_vectors_w16_hor[table_offset + 32]);
+
+  // Width 16, handle one row at a time
+  for (int y = 0; y < height; ++y) {
+    // Do 4-tap intra interpolation filtering
+    __m128i vp = _mm_loadu_si128((__m128i*)&ref_main[y + ref_offset]);
+    __m256i vp256 = _mm256_inserti128_si256(_mm256_castsi128_si256(vp), vp, 1);
+
+    __m256i vp0 = _mm256_shuffle_epi8(vp256, vpshuf01);
+    __m256i vp1 = _mm256_shuffle_epi8(vp256, vpshuf23);
+
+    __m256i vmadd0 = _mm256_maddubs_epi16(vp0, vw0);
+    __m256i vmadd1 = _mm256_maddubs_epi16(vp1, vw1);
+    __m256i sum = _mm256_hadd_epi16(vmadd0, vmadd1);
+    sum = _mm256_add_epi16(sum, v32s);
+    sum = _mm256_srai_epi16(sum, 6);
+
+    __m128i lo = _mm256_castsi256_si128(sum);
+    __m128i hi = _mm256_extracti128_si256(sum, 1);
+    __m128i packed = _mm_packus_epi16(lo, hi);
+    packed = _mm_shuffle_epi32(packed, _MM_SHUFFLE(3, 1, 2, 0));
+
+    _mm_store_si128((__m128i*)(dst + (y * width)), packed);
   }
 }
 
@@ -4309,9 +4356,15 @@ static void uvg_angular_pred_avx2(
                 angular_pred_w8_hor_avx2(dst, ref_main, pred_mode, multi_ref_index, delta_int, delta_fract, height, pfilter);
 
               break;
-            case 16: angular_pred_w16_hor_avx2(dst, ref_main, delta_int, delta_fract, width, height, use_cubic); break;
-            case 32: angular_pred_w16_hor_avx2(dst, ref_main, delta_int, delta_fract, width, height, use_cubic); break;
-            case 64: angular_pred_w16_hor_avx2(dst, ref_main, delta_int, delta_fract, width, height, use_cubic); break;
+            case 16: 
+              if (pred_mode < 5 || pred_mode == 33)
+                angular_pred_w16_hor_high_angle_avx2(dst, ref_main, delta_int, delta_fract, width, height, use_cubic);
+              else
+                angular_pred_w16_hor_avx2(dst, ref_main, pred_mode, multi_ref_index, delta_int, delta_fract, height, pfilter);
+              
+              break;
+            case 32: angular_pred_w16_hor_high_angle_avx2(dst, ref_main, delta_int, delta_fract, width, height, use_cubic); break;
+            case 64: angular_pred_w16_hor_high_angle_avx2(dst, ref_main, delta_int, delta_fract, width, height, use_cubic); break;
             default:
               assert(false && "Intra angular predicion: illegal width.\n");
               break;
