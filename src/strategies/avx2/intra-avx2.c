@@ -760,23 +760,14 @@ static void angular_pred_w16_hor_avx2(uvg_pixel* dst, const uvg_pixel* ref_main,
   }
 }
 
+// Note: use this same function also for w64. w16 could use this, but it was slightly faster without the for loop overheads
 static void angular_pred_w32_hor_avx2(uvg_pixel* dst, const uvg_pixel* ref_main, const int16_t pred_mode, const int16_t multi_ref_line, const int16_t* delta_int, const int16_t* delta_fract, const int width, const int height, const int8_t(*filter)[4])
 {
-  // const int width = 32;
   const __m256i v32s = _mm256_set1_epi16(32);
 
   // Unused modes are pruned from the table and it starts from mode 5. Offset mode 5 to zero index.
   const int mode_idx = pred_mode - 5;
   const int table_offset = mode_idx * 768 + multi_ref_line * 256; // mode_idx * (3 * 256) + mrl * 256
-
-  /*__m256i vw[8];
-  __m256i vpshuf[8];
-  for (int x = 0, vid = 0, table = 0; x < width; x += 8, ++vid, table += 32) {
-    __m128i tmp = _mm_loadu_si128((__m128i*) &delta_fract[x]);
-    __m256i vidx = _mm256_cvtepi16_epi32(tmp);
-    vw[vid] = _mm256_i32gather_epi32((const int32_t*)(void*)filter, vidx, 4);
-    vpshuf[vid] = _mm256_loadu_si256((__m256i*) &intra_luma_interpolation_shuffle_vectors_w64_hor[table_offset + table]);
-  }*/
 
   for (int x = 0, shuf = table_offset; x < width; x += 16, shuf += 64) {
     const int ref_offset = MIN(delta_int[x], delta_int[x + 15]);
@@ -4420,7 +4411,13 @@ static void uvg_angular_pred_avx2(
                 angular_pred_w32_hor_avx2(dst, ref_main, pred_mode, multi_ref_index, delta_int, delta_fract, width, height, pfilter);
 
               break;
-            case 64: angular_pred_w16_hor_high_angle_avx2(dst, ref_main, delta_int, delta_fract, width, height, pfilter); break;
+            case 64: 
+              if (pred_mode < 5 || pred_mode == 33)
+                angular_pred_w16_hor_high_angle_avx2(dst, ref_main, delta_int, delta_fract, width, height, pfilter);
+              else
+                angular_pred_w32_hor_avx2(dst, ref_main, pred_mode, multi_ref_index, delta_int, delta_fract, width, height, pfilter);
+
+              break;
             default:
               assert(false && "Intra angular predicion: illegal width.\n");
               break;
