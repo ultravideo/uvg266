@@ -4303,8 +4303,8 @@ static void uvg_angular_pred_avx2(
 
   // Temporary buffer for modes 11-25.
   // It only needs to be big enough to hold indices from -width to width-1.
-  uvg_pixel temp_main[2 * 128 + 3 + 33 * MAX_REF_LINE_IDX] = { 0 };
-  uvg_pixel temp_side[2 * 128 + 3 + 33 * MAX_REF_LINE_IDX] = { 0 };
+  uvg_pixel temp_main[2 * 128 + 3 + 33 * MAX_REF_LINE_IDX];
+  uvg_pixel temp_side[2 * 128 + 3 + 33 * MAX_REF_LINE_IDX];
 
   int32_t pred_mode = intra_mode; // ToDo: handle WAIP
 
@@ -4314,13 +4314,14 @@ static void uvg_angular_pred_avx2(
   // Modes distance to horizontal or vertical mode. Possible values: [-16, 16]
   // For pure vertical or horizontal modes, this is 0. For pure diagonal modes, this is either -16 or 16.
   const int_fast8_t mode_disp = vertical_mode ? pred_mode - 50 : -(pred_mode - 18);
+  const int_fast8_t abs_mode_disp = abs(mode_disp);
   const bool wide_angle_mode = mode_disp > 16;
 
   // Sample displacement per column in fractions of 32.
-  const int_fast16_t sample_disp = (mode_disp < 0 ? -1 : 1) * modedisp2sampledisp[abs(mode_disp)];
+  const int_fast16_t sample_disp = (mode_disp < 0 ? -1 : 1) * modedisp2sampledisp[abs_mode_disp];
 
   const int side_size = vertical_mode ? log2_height : log2_width;
-  int scale = MIN(2, side_size - pre_scale[abs(mode_disp)]);
+  int scale = MIN(2, side_size - pre_scale[abs_mode_disp]);
 
   // Pointer for the reference we are interpolating from.
   uvg_pixel* ref_main;
@@ -4342,8 +4343,9 @@ static void uvg_angular_pred_avx2(
     ref_side = vertical_mode ? temp_side + width  : temp_main + height;
 
     int size_side = vertical_mode ? height : width;
+    const int modedisp2invsampledisp_abs = modedisp2invsampledisp[abs_mode_disp];
     for (int i = -size_side; i <= -1; i++) {
-      ref_main[i] = ref_side[MIN((-i * modedisp2invsampledisp[abs(mode_disp)] + 256) >> 9, size_side)];
+      ref_main[i] = ref_side[MIN((-i * modedisp2invsampledisp_abs + 256) >> 9, size_side)];
     }
   }
   else {
