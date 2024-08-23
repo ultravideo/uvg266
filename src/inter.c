@@ -1733,7 +1733,7 @@ void uvg_hmvp_add_mv(const encoder_state_t* const state, uint32_t pic_x, uint32_
   //if (!cu.geoFlag && !cu.affine)
   if(cu->type != CU_INTRA)
   {    
-
+    assert((cu->type != CU_IBC || block_width * block_height > 16) && "Do not add IBC hmvp for small blocks");
     const uint8_t parallel_merge_level = state->encoder_control->cfg.log2_parallel_merge_level;
     const uint32_t xBr = block_width + pic_x;
     const uint32_t yBr = block_height + pic_y;

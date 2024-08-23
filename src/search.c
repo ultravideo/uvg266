@@ -1747,6 +1747,12 @@ static double search_cu(
     cabac_data_t post_seach_cabac;
     cabac_data_t best_split_cabac;
     memcpy(&post_seach_cabac, &state->search_cabac, sizeof(post_seach_cabac));
+    
+    cu_info_t best_split_hmvp_lut[MAX_NUM_HMVP_CANDS];
+    uint8_t best_split_hmvp_lut_size = state->tile->frame->hmvp_size[ctu_row];
+    cu_info_t best_split_hmvp_lut_ibc[MAX_NUM_HMVP_CANDS];
+    uint8_t best_split_hmvp_lut_size_ibc = state->tile->frame->hmvp_size_ibc[ctu_row];
+
     // Recursively split all the way to max search depth.
     for (int split_type = QT_SPLIT; split_type <= TT_VER_SPLIT; ++split_type) {
       if (!can_split[split_type])
@@ -1858,6 +1864,16 @@ static double search_cu(
         continue;
       }
 
+      //Reset HMVP incase it has been modified while checking previous split types
+      if (state->frame->slicetype != UVG_SLICE_I) {
+        memcpy(&state->tile->frame->hmvp_lut[ctu_row_mul_five], hmvp_lut, sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
+        state->tile->frame->hmvp_size[ctu_row] = hmvp_lut_size;
+      }
+      if (state->encoder_control->cfg.ibc) {
+        memcpy(&state->tile->frame->hmvp_lut_ibc[ctu_row_mul_five], hmvp_lut_ibc, sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
+        state->tile->frame->hmvp_size_ibc[ctu_row] = hmvp_lut_size_ibc;
+      }
+
       separate_chroma |= !has_chroma;
       initialize_partial_work_tree(state, lcu, &split_lcu[split_type - 1], cu_loc , separate_chroma ? chroma_loc : cu_loc, tree_type);
       for (int split = 0; split < splits; ++split) {
@@ -1922,6 +1938,16 @@ static double search_cu(
         best_split_cost = split_cost;
         best_split = split_type;
         memcpy(&best_split_cabac, &state->search_cabac, sizeof(cabac_data_t));
+
+        //Store HMVP lut of best split
+        if (state->frame->slicetype != UVG_SLICE_I) {
+          memcpy(best_split_hmvp_lut, &state->tile->frame->hmvp_lut[ctu_row_mul_five], sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
+          best_split_hmvp_lut_size = state->tile->frame->hmvp_size[ctu_row];
+        }
+        if (state->encoder_control->cfg.ibc) {
+          best_split_hmvp_lut_size_ibc = state->tile->frame->hmvp_size_ibc[ctu_row];
+          memcpy(best_split_hmvp_lut_ibc, &state->tile->frame->hmvp_lut_ibc[ctu_row_mul_five], sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
+        }
       }
       if (stop_to_qt) break;
     }
@@ -1998,6 +2024,16 @@ static double search_cu(
       downsample_cclm_rec(
         state, x, y, cu_width / 2, cu_height / 2, lcu->rec.y, lcu->left_ref.y[64]
       );
+
+      //Need to restore best split HMVP
+      if (state->frame->slicetype != UVG_SLICE_I) {
+        memcpy(&state->tile->frame->hmvp_lut[ctu_row_mul_five], best_split_hmvp_lut, sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
+        state->tile->frame->hmvp_size[ctu_row] = best_split_hmvp_lut_size;
+      }
+      if (state->encoder_control->cfg.ibc) {
+        memcpy(&state->tile->frame->hmvp_lut_ibc[ctu_row_mul_five], best_split_hmvp_lut_ibc, sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
+        state->tile->frame->hmvp_size_ibc[ctu_row] = best_split_hmvp_lut_size_ibc;
+      }
 #if UVG_DEBUG
       //debug_split = 1;
 #endif
