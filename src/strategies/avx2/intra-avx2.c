@@ -272,7 +272,7 @@ static void angular_pred_w8_ver_avx2(uvg_pixel* dst, const uvg_pixel* ref_main, 
   for (int y = 0; y < height; y += 2) {
     
     // Load and shuffle filter weights
-    __m128i vidxw = _mm_load_si128((__m128i*)&delta_fract[y]);
+    __m128i vidxw = _mm_loadu_si128((__m128i*)&delta_fract[y]);
     __m128i vidxw32 = _mm_cvtepi16_epi32(vidxw);
     __m128i all_weights = _mm_i32gather_epi32((const int32_t*)filter, vidxw32, 4);
     __m256i aw256 = _mm256_inserti128_si256(_mm256_castsi128_si256(all_weights), all_weights, 1);
@@ -353,7 +353,7 @@ static void angular_pred_w8_ver_avx2(uvg_pixel* dst, const uvg_pixel* ref_main, 
   for (int y = 0; y < height; y += 4) {
 
     // Load and shuffle filter weights
-    __m128i vidxw = _mm_load_si128((__m128i*) & delta_fract[y]);
+    __m128i vidxw = _mm_loadu_si128((__m128i*) &delta_fract[y]);
     __m128i vidxw32 = _mm_cvtepi16_epi32(vidxw);
     __m128i all_weights = _mm_i32gather_epi32((const int32_t*)filter, vidxw32, 4);
     __m256i aw256 = _mm256_inserti128_si256(_mm256_castsi128_si256(all_weights), all_weights, 1);
