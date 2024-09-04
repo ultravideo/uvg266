@@ -732,6 +732,115 @@ static void inter_clear_cu_unused(cu_info_t* cu)
   }
 }
 
+
+static bool is_cand_coded(int cur_x, int cur_y, int cand_x, int cand_y, uint32_t split_tree) 
+{
+  //Start from the LCU and figure out which sub-blocks the cur and cand cu belong to
+  int log2_width = LOG2_LCU_WIDTH; int log2_height = LOG2_LCU_WIDTH;
+  int cur_block_x = (cur_x >> log2_width); int cur_block_y = (cur_y >> log2_height);
+  int cand_block_x = (cand_x >> log2_width); int cand_block_y = (cand_y >> log2_height);
+  
+  // If different LCU and cand block is before cur in raster scan order, it is coded.
+  if (cur_block_y != cand_block_y) {
+    
+    return cand_block_y < cur_block_y;
+  }
+  else if (cur_block_x != cand_block_x) {
+    return cand_block_x < cur_block_x;
+  }
+
+  struct {
+    uint32_t split_tree;
+  } split_data = {split_tree};
+
+  int offset_x = 0; int offset_y = 0;
+  int cur_cu_index = 0;
+  int cand_cu_index = 0;
+  int depth = 0;
+  do
+  {
+    uint32_t split = GET_SPLITDATA(&split_data, depth);
+    depth++;
+    // Figure out which sub-block cand and cur belong to in the current split
+    switch (split)
+    {
+    case QT_SPLIT: // Four way split, index based on both x and y
+      log2_width--; log2_height--;
+
+      cur_block_x = ((cur_x + offset_x) >> log2_width) & 1;
+      cur_block_y = ((cur_y + offset_y) >> log2_width) & 1;
+      cur_cu_index = cur_block_x + 2 * cur_block_y;
+      
+      cand_block_x = ((cand_x + offset_x) >> log2_height) & 1;
+      cand_block_y = ((cand_y + offset_y) >> log2_height) & 1;
+      cand_cu_index = cand_block_x + 2 * cand_block_y;
+      break;
+
+    case BT_HOR_SPLIT: // Two way split, index only based on y
+      log2_height--;
+
+      cur_block_y = ((cur_y + offset_y) >> log2_height) & 1;
+      cur_cu_index = cur_block_y;
+
+      cand_block_y = ((cand_y + offset_y) >> log2_height) & 1;
+      cand_cu_index = cand_block_y;
+      break;
+
+    case BT_VER_SPLIT: // Two way split, index only based on x
+      log2_width--;
+
+      cur_block_x = ((cur_x + offset_x) >> log2_width) & 1;
+      cur_cu_index = cur_block_x;
+
+      cand_block_x = ((cand_x + offset_x) >> log2_width) & 1;
+      cand_cu_index = cand_block_x;
+      break;
+
+    case TT_HOR_SPLIT: // Three way split, index only based on y. Need log2_height + 1 and log2_height bit to determine index. block == 0 -> index := 0, block == {1,2} -> index := 1, block == 3 -> index := 2 
+      log2_height -= 2; //set to smallest block size
+
+      cur_block_y = ((cur_y + offset_y) >> log2_height) & 3;
+      cur_cu_index = (cur_block_y == 0) ? 0 : ((cur_block_y != 3) ? 1 : 2);
+
+      cand_block_y = ((cand_y + offset_y) >> log2_height) & 3;
+      cand_cu_index = (cand_block_y == 0) ? 0 : ((cand_block_y != 3) ? 1 : 2);
+
+      if (cur_cu_index == 1) {
+        // TT split causes misalignment in the middle block, so need to use offset to get correct alignment (to a (1 << log2_size)-grid) for indexing.
+        // Alignment is fixed after a BT split, but no need to reset offset since it does not affect indexing for smaller blocks than current (1 << log2_size). 
+        offset_y = (1 << log2_height); 
+        log2_height++; //middle block is larger so need to increase size
+      }
+      break;
+
+    case TT_VER_SPLIT: // Three way split, index only based on x. Need log2_width + 1 and log2_width bit to determine index. block == 0 -> index := 0, block == {1,2} -> index := 1, block == 3 -> index := 2 
+      log2_width -= 2; //set to smallest block size
+
+      cur_block_x = ((cur_x + offset_x) >> log2_width) & 3;
+      cur_cu_index = (cur_block_x == 0) ? 0 : ((cur_block_x != 3) ? 1 : 2);
+
+      cand_block_x = ((cand_x + offset_x) >> log2_width) & 3;
+      cand_cu_index = (cand_block_x == 0) ? 0 : ((cand_block_x != 3) ? 1 : 2);
+      
+      if (cur_cu_index == 1) {
+        // TT split causes misalignment in the middle block, so need to use offset to get correct alignment (to a (1 << log2_size)-grid) for indexing.
+        // Alignment is fixed after a BT split, but no need to reset offset since it does not affect indexing for smaller blocks than current (1 << log2_size). 
+        offset_x = (1 << log2_width); 
+        log2_width++; //middle block is larger so need to increase size
+      }
+      break;
+
+    default:
+      assert(false && "Not a valid split");
+    }
+    if (cand_cu_index != cur_cu_index) return cand_cu_index < cur_cu_index;
+
+  } while (depth < MAX_DEPTH);
+
+  assert(false && "Either max depth reached or cur and cand are the same block"); // We should not get here 
+  return false;
+}
+
 /**
  * \brief Check whether a0 mv cand block is coded before the current block.
  * \param x       x-coordinate of the current block (in pixels)
@@ -1248,6 +1357,8 @@ static void get_spatial_merge_candidates(const cu_loc_t* const cu_loc,
   const int y = cu_loc->y;
   const int width = cu_loc->width;
   const int height = cu_loc->height;
+  const cu_info_t* const cur_cu = LCU_GET_CU_AT_PX(lcu, x_local, y_local);
+
   // A0 and A1 availability testing
   if (x != 0) {
     cu_info_t *a1 = LCU_GET_CU_AT_PX(lcu, x_local - 1, y_local + height - 1);
@@ -1260,7 +1371,7 @@ static void get_spatial_merge_candidates(const cu_loc_t* const cu_loc,
 
     if (y_local + height < LCU_WIDTH && y + height < picture_height) {
       cu_info_t *a0 = LCU_GET_CU_AT_PX(lcu, x_local - 1, y_local + height);
-      if (a0->type == CU_INTER && is_a0_cand_coded(x, y, width, height)) {
+      if (a0->type == CU_INTER && is_cand_coded(x, y, x - 1, y + height, cur_cu->split_tree)) {
         inter_clear_cu_unused(a0);
         cand_out->a[0] = a0;
       }
@@ -1278,7 +1389,7 @@ static void get_spatial_merge_candidates(const cu_loc_t* const cu_loc,
         b0 = LCU_GET_TOP_RIGHT_CU(lcu);
       }
     }
-    if (b0 && b0->type == CU_INTER && is_b0_cand_coded(x, y, width, height)) {
+    if (b0 && b0->type == CU_INTER && is_cand_coded(x, y, x + width, y - 1, cur_cu->split_tree)) {
       inter_clear_cu_unused(b0);
       cand_out->b[0] = b0;
     }
@@ -1344,6 +1455,8 @@ static void get_spatial_merge_candidates_cua(
   const int height = cu_loc->height;
   const int32_t x_local = SUB_SCU(x); //!< coordinates from top-left of this LCU
   const int32_t y_local = SUB_SCU(y);
+  const cu_info_t* const cur_cu = uvg_cu_array_at_const(cua, x, y);
+
   // A0 and A1 availability testing
   if (x != 0) {
     const cu_info_t *a1 = uvg_cu_array_at_const(cua, x - 1, y + height - 1);
@@ -1354,7 +1467,7 @@ static void get_spatial_merge_candidates_cua(
 
     if (y_local + height < LCU_WIDTH && y + height < picture_height) {
       const cu_info_t *a0 = uvg_cu_array_at_const(cua, x - 1, y + height);
-      if (a0->type == CU_INTER && is_a0_cand_coded(x, y, width, height)) {
+      if (a0->type == CU_INTER && is_cand_coded(x, y, x - 1, y + height, cur_cu->split_tree)) {
         cand_out->a[0] = a0;
       }
     }
@@ -1364,7 +1477,7 @@ static void get_spatial_merge_candidates_cua(
   if (y != 0) {
     if (x + width < picture_width && (x_local + width < LCU_WIDTH || (!wpp && y_local == 0))) {
       const cu_info_t *b0 = uvg_cu_array_at_const(cua, x + width, y - 1);
-      if (b0->type == CU_INTER && is_b0_cand_coded(x, y, width, height)) {
+      if (b0->type == CU_INTER && is_cand_coded(x, y, x + width, y - 1, cur_cu->split_tree)) {
         cand_out->b[0] = b0;
       }
     }
