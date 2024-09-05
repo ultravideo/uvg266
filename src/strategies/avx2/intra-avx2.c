@@ -4404,7 +4404,59 @@ static void uvg_angular_pred_avx2(
         break;
       }
       case 64:
+      {
+        int shuf_offset = abs_mode_disp * 64;
+        __m128i vshuf0 = _mm_load_si128((__m128i*) &intra_refbuild_shuffle_vectors_sidesize_64[shuf_offset + 0]);
+        __m128i vshuf1 = _mm_load_si128((__m128i*) &intra_refbuild_shuffle_vectors_sidesize_64[shuf_offset + 16]);
+        __m128i vshuf2 = _mm_load_si128((__m128i*) &intra_refbuild_shuffle_vectors_sidesize_64[shuf_offset + 32]);
+        __m128i vshuf3 = _mm_load_si128((__m128i*) &intra_refbuild_shuffle_vectors_sidesize_64[shuf_offset + 48]);
+
+        __m128i vref0 = _mm_loadu_si128((const __m128i*) &ref_side[ 0 + 1]); // Offset ref by one to fit all necessary 16 refs. Offset accounted for in shuffle vectors.
+        __m128i vref1 = _mm_loadu_si128((const __m128i*) &ref_side[16 + 1]);
+        __m128i vref2 = _mm_loadu_si128((const __m128i*) &ref_side[32 + 1]);
+        __m128i vref3 = _mm_loadu_si128((const __m128i*) &ref_side[48 + 1]);
+
+        // First quarter of references use references from vref3 only
+        __m128i vrefout0 = _mm_shuffle_epi8(vref3, vshuf0);
+
+        // Second quarter can require samples from vref3 and vref2
+        __m128i vreftmp0 = _mm_shuffle_epi8(vref3, vshuf1);
+        __m128i vreftmp1 = _mm_shuffle_epi8(vref2, vshuf1);
+        __m128i vblend0 = _mm_cmpgt_epi8(vshuf1, _mm_set1_epi8(47));
+        __m128i vrefout1 = _mm_blendv_epi8(vreftmp1, vreftmp0, vblend0);
+
+        // Third quarter can require samples from vref3, vref2 and vref1
+        vreftmp0 = _mm_shuffle_epi8(vref3, vshuf2);
+        vreftmp1 = _mm_shuffle_epi8(vref2, vshuf2);
+        __m128i vreftmp2 = _mm_shuffle_epi8(vref1, vshuf2);
+        vblend0 = _mm_cmpgt_epi8(vshuf2, _mm_set1_epi8(47));
+        __m128i vblend1 = _mm_cmpgt_epi8(vshuf2, _mm_set1_epi8(31));
+
+        vreftmp0 = _mm_blendv_epi8(vreftmp1, vreftmp0, vblend0);
+        __m128i vrefout2 = _mm_blendv_epi8(vreftmp2, vreftmp0, vblend1);
+
+        // Fourth quarter can require samples from vref3, vref2, vref1 and vref0
+        vreftmp0 = _mm_shuffle_epi8(vref3, vshuf3);
+        vreftmp1 = _mm_shuffle_epi8(vref2, vshuf3);
+        vreftmp2 = _mm_shuffle_epi8(vref1, vshuf3);
+        __m128i vreftmp3 = _mm_shuffle_epi8(vref0, vshuf3);
+
+        vblend0 = _mm_cmpgt_epi8(vshuf3, _mm_set1_epi8(47));
+        vblend1 = _mm_cmpgt_epi8(vshuf3, _mm_set1_epi8(31));
+        __m128i vblend2 = _mm_cmpgt_epi8(vshuf3, _mm_set1_epi8(15));
+
+        vreftmp0 = _mm_blendv_epi8(vreftmp1, vreftmp0, vblend0);
+        vreftmp0 = _mm_blendv_epi8(vreftmp2, vreftmp0, vblend1);
+        __m128i vrefout3 = _mm_blendv_epi8(vreftmp3, vreftmp0, vblend2);
+
+        _mm_store_si128((__m128i*) &temp_main[0],  vrefout0);
+        _mm_store_si128((__m128i*) &temp_main[16], vrefout1);
+        _mm_store_si128((__m128i*) &temp_main[32], vrefout2);
+        _mm_store_si128((__m128i*) &temp_main[48], vrefout3);
+        break;
+      }
       default:
+        // This should work in the case everything else fails.
         const int modedisp2invsampledisp_abs = modedisp2invsampledisp[abs_mode_disp];
         for (int i = -size_side; i <= -1; i++) {
           ref_main[i] = ref_side[MIN((-i * modedisp2invsampledisp_abs + 256) >> 9, size_side)];
