@@ -1300,7 +1300,7 @@ void uvg_intra_build_reference_inner(
   //if (is_first_isp_block && isp_mode == ISP_MODE_VER && px_available_top == cu_width * 2) px_available_top -= MIN(pu_loc->width, 4); 
   px_available_top = MIN(px_available_top, (pic_px->x - luma_px->x) >> is_chroma);
 
-  if (entropy_sync && px.y == 0) px_available_top = MIN(px_available_top, ((LCU_WIDTH >> is_chroma) - px.x) -1);
+  if (entropy_sync && px.y == 0) px_available_top = MIN(px_available_top, ((LCU_WIDTH >> is_chroma) - px.x));
 
   // Copy all the pixels we can.
   i = 0;

@@ -3330,26 +3330,8 @@ static void uvg_angular_pred_avx2(
     }
   }
   else {
-    memcpy(&temp_main[0], &in_ref_above[0], (top_ref_length + 1 + multi_ref_index) * sizeof(uvg_pixel));
-    memcpy(&temp_side[0], &in_ref_left[0], (left_ref_length + 1 + multi_ref_index) * sizeof(uvg_pixel));
-
-    ref_main = vertical_mode ? temp_main : temp_side;
-    ref_side = vertical_mode ? temp_side : temp_main;
-
-    const int log2_ratio = log2_width - log2_height;
-    const int s = MAX(0, vertical_mode ? log2_ratio : -log2_ratio);
-    const int max_index = (multi_ref_index << s) + 2;
-    int ref_length;
-    if (isp_mode) {
-      ref_length = vertical_mode ? top_ref_length : left_ref_length;
-    }
-    else {
-      ref_length = vertical_mode ? width << 1 : height << 1;
-    }
-    const uvg_pixel val = ref_main[ref_length + multi_ref_index];
-    for (int j = 1; j <= max_index; j++) {
-      ref_main[ref_length + multi_ref_index + j] = val;
-    }
+    ref_main = (uvg_pixel*)(vertical_mode ? in_ref_above : in_ref_left);
+    ref_side = vertical_mode ? in_ref_left : in_ref_above;
   }
 
   // compensate for line offset in reference line buffers
