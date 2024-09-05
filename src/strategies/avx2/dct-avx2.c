@@ -54,7 +54,6 @@ extern const int16_t uvg_g_dct_32_t[32][32];
 
 #if COMPILE_INTEL_AVX2 
 #include "uvg266.h"
-#if UVG_BIT_DEPTH == 8
 #include <immintrin.h>
 #include "strategies/avx2/dct_avx2_tables.h"
 #define MAX_LOG2_TR_DYNAMIC_RANGE 15
@@ -8039,34 +8038,28 @@ static void mts_idct_avx2(
   }
 }
 
-#endif // UVG_BIT_DEPTH == 8
 #endif //COMPILE_INTEL_AVX2
 
 int uvg_strategy_register_dct_avx2(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
 #if COMPILE_INTEL_AVX2
-#if UVG_BIT_DEPTH == 8
-  if (bitdepth == 8){
-    //success &= uvg_strategyselector_register(opaque, "fast_forward_dst_4x4", "avx2", 40, &matrix_dst_4x4_avx2);
 
-    success &= uvg_strategyselector_register(opaque, "dct_4x4", "avx2", 40, &matrix_dct_4x4_avx2);
-    success &= uvg_strategyselector_register(opaque, "dct_8x8", "avx2", 40, &matrix_dct_8x8_avx2);
-    success &= uvg_strategyselector_register(opaque, "dct_16x16", "avx2", 40, &matrix_dct_16x16_avx2);
-    success &= uvg_strategyselector_register(opaque, "dct_32x32", "avx2", 40, &matrix_dct_32x32_avx2);
+  success &= uvg_strategyselector_register(opaque, "dct_4x4", "avx2", 40, &matrix_dct_4x4_avx2);
+  success &= uvg_strategyselector_register(opaque, "dct_8x8", "avx2", 40, &matrix_dct_8x8_avx2);
+  success &= uvg_strategyselector_register(opaque, "dct_16x16", "avx2", 40, &matrix_dct_16x16_avx2);
+  success &= uvg_strategyselector_register(opaque, "dct_32x32", "avx2", 40, &matrix_dct_32x32_avx2);
 
-    // success &= uvg_strategyselector_register(opaque, "fast_inverse_dst_4x4", "avx2", 40, &matrix_idst_4x4_avx2);
 
-    success &= uvg_strategyselector_register(opaque, "idct_4x4", "avx2", 40, &matrix_idct_4x4_avx2);
-    success &= uvg_strategyselector_register(opaque, "idct_8x8", "avx2", 40, &matrix_idct_8x8_avx2);
-    success &= uvg_strategyselector_register(opaque, "idct_16x16", "avx2", 40, &matrix_idct_16x16_avx2);
-    success &= uvg_strategyselector_register(opaque, "idct_32x32", "avx2", 40, &matrix_idct_32x32_avx2);
+  success &= uvg_strategyselector_register(opaque, "idct_4x4", "avx2", 40, &matrix_idct_4x4_avx2);
+  success &= uvg_strategyselector_register(opaque, "idct_8x8", "avx2", 40, &matrix_idct_8x8_avx2);
+  success &= uvg_strategyselector_register(opaque, "idct_16x16", "avx2", 40, &matrix_idct_16x16_avx2);
+  success &= uvg_strategyselector_register(opaque, "idct_32x32", "avx2", 40, &matrix_idct_32x32_avx2);
 
-    success &= uvg_strategyselector_register(opaque, "mts_dct", "avx2", 40, &mts_dct_avx2);
-    success &= uvg_strategyselector_register(opaque, "mts_idct", "avx2", 40, &mts_idct_avx2);
+  success &= uvg_strategyselector_register(opaque, "mts_dct", "avx2", 40, &mts_dct_avx2);
+  success &= uvg_strategyselector_register(opaque, "mts_idct", "avx2", 40, &mts_idct_avx2);
 
-  }
-#endif // UVG_BIT_DEPTH == 8
+
 #endif //COMPILE_INTEL_AVX2  
   return success;
 }
