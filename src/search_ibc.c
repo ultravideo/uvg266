@@ -219,38 +219,6 @@ static uint32_t calculate_ibc_cost_sad(ibc_search_info_t *info, const cu_loc_t* 
   return cost;
 }
 
-static bool check_mv_cost_satd(ibc_search_info_t *info,
-                          int x,
-                          int y,
-                          double *best_cost,
-                          double* best_bits,
-                          vector2d_t *best_mv)
-{
-  if (!intmv_within_ibc_range(info, x, y)) return false;
-
-  double cost = calculate_ibc_cost_satd(info->state, info->lcu, &info->origin, x, y);
-
-  if (cost >= *best_cost) return false;
-
-  cost += info->mvd_cost_func(
-      info->state,
-      x, y, INTERNAL_MV_PREC,
-      info->mv_cand,
-      NULL,
-      0,
-      0,
-      best_bits
-  );
-
-  if (cost >= *best_cost) return false;
-
-  // Set to motion vector in internal pixel precision.
-  best_mv->x = x * (1 << INTERNAL_MV_PREC);
-  best_mv->y = y * (1 << INTERNAL_MV_PREC);
-  *best_cost = cost;
-
-  return true;
- }
 /**
  * \brief Calculate cost for an integer motion vector.
  *
