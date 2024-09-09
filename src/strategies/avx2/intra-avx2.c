@@ -450,7 +450,7 @@ static void angular_pred_w4_hor_high_angle_avx2(uvg_pixel* dst, const uvg_pixel*
   // Copy the filter to local memory
   __m128i vdfract = _mm_load_si128((__m128i*)delta_fract);
   __m128i vidx = _mm_cvtepi16_epi32(vdfract);
-  __m128i all_weights = _mm_i32gather_epi32((const int32_t*)(void*)filter, vidx, 4);
+  __m128i all_weights = _mm_i32gather_epi32((const int32_t*)filter, vidx, 4);
 
   __m256i weights256 = _mm256_insertf128_si256(_mm256_castsi128_si256(all_weights), all_weights, 1);
   // Shuffle the interpolation weights into place.
@@ -518,7 +518,7 @@ static void angular_pred_w4_hor_avx2(uvg_pixel* dst, const uvg_pixel* ref_main, 
   // Copy the filter to local memory
   __m128i vdfract = _mm_load_si128((__m128i*)delta_fract);
   __m128i vidx = _mm_cvtepi16_epi32(vdfract);
-  __m128i all_weights = _mm_i32gather_epi32((const int32_t*)(void*)filter, vidx, 4);
+  __m128i all_weights = _mm_i32gather_epi32((const int32_t*)filter, vidx, 4);
   
   __m256i weights256 = _mm256_insertf128_si256(_mm256_castsi128_si256(all_weights), all_weights, 1);
 
@@ -560,7 +560,7 @@ static void angular_pred_w8_hor_high_angle_avx2(uvg_pixel* dst, const uvg_pixel*
   // Load weights
   tmp = _mm_load_si128((__m128i*)delta_fract);
   __m256i vidxw = _mm256_cvtepi16_epi32(tmp);
-  __m256i vweights = _mm256_i32gather_epi32((const int32_t*)(void*)filter, vidxw, 4);
+  __m256i vweights = _mm256_i32gather_epi32((const int32_t*)filter, vidxw, 4);
 
   for (int y = 0; y < height; y += 2) {
 
@@ -610,7 +610,7 @@ static void angular_pred_w8_hor_avx2(uvg_pixel* dst, const uvg_pixel* ref_main, 
   // Load weights
   __m128i tmp = _mm_load_si128((__m128i*)delta_fract);
   __m256i vidxw = _mm256_cvtepi16_epi32(tmp);
-  __m256i vweights = _mm256_i32gather_epi32((const int32_t*)(void*)filter, vidxw, 4);
+  __m256i vweights = _mm256_i32gather_epi32((const int32_t*)filter, vidxw, 4);
   
   __m256i vw01 = _mm256_shuffle_epi8(vweights, vwshuf01);
   __m256i vw23 = _mm256_shuffle_epi8(vweights, vwshuf23);
@@ -705,8 +705,8 @@ static void angular_pred_w16_hor_avx2(uvg_pixel* dst, const uvg_pixel* ref_main,
   __m256i vidx0 = _mm256_cvtepi16_epi32(tmp0);
   __m256i vidx1 = _mm256_cvtepi16_epi32(tmp1);
 
-  __m256i vw0 = _mm256_i32gather_epi32((const int32_t*)(void*)filter, vidx0, 4);
-  __m256i vw1 = _mm256_i32gather_epi32((const int32_t*)(void*)filter, vidx1, 4);
+  __m256i vw0 = _mm256_i32gather_epi32((const int32_t*)filter, vidx0, 4);
+  __m256i vw1 = _mm256_i32gather_epi32((const int32_t*)filter, vidx1, 4);
 
   // Unused modes are pruned from the table and it starts from mode 5. Offset mode 5 to zero index.
   const int mode_idx = pred_mode - 5;
@@ -758,8 +758,8 @@ static void angular_pred_w32_hor_avx2(uvg_pixel* dst, const uvg_pixel* ref_main,
     __m256i vidx0 = _mm256_cvtepi16_epi32(tmp0);
     __m256i vidx1 = _mm256_cvtepi16_epi32(tmp1);
 
-    __m256i vw0 = _mm256_i32gather_epi32((const int32_t*)(void*)filter, vidx0, 4);
-    __m256i vw1 = _mm256_i32gather_epi32((const int32_t*)(void*)filter, vidx1, 4);
+    __m256i vw0 = _mm256_i32gather_epi32((const int32_t*)filter, vidx0, 4);
+    __m256i vw1 = _mm256_i32gather_epi32((const int32_t*)filter, vidx1, 4);
 
     __m256i vpshuf0 = _mm256_loadu_si256((__m256i*) &intra_luma_interpolation_shuffle_vectors_w64_hor[shuf + 0]);
     __m256i vpshuf1 = _mm256_loadu_si256((__m256i*) &intra_luma_interpolation_shuffle_vectors_w64_hor[shuf + 32]);
