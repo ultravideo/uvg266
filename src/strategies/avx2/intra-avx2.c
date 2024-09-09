@@ -851,20 +851,6 @@ static void angular_pred_w32_hor_avx2(uvg_pixel* dst, const uvg_pixel* ref_main,
 }
 
 
-static void angular_pred_generic_linear_filter(uvg_pixel* dst, uvg_pixel* ref, const int width, const int height, const int16_t* delta_int, const int16_t* delta_fract)
-{
-  // 2-tap filter
-  for (int y = 0; y < height; ++y) {
-    for (int x = 0; x < width; ++x) {
-      uvg_pixel ref1 = ref[x + delta_int[y] + 1];
-      uvg_pixel ref2 = ref[x + delta_int[y] + 2];
-      //dst[y * width + x] = ref1 + ((delta_fract[y] * (ref2 - ref1) + 16) >> 5);
-      dst[y * width + x] = ((32 - delta_fract[y]) * ref1 + delta_fract[y] * ref2 + 16) >> 5;
-    }
-  }
-}
-
-
 // Linear interpolation filter for width 4 has a different call, since it uses premade tables for coefficients
 static void angular_pred_linear_filter_w4_ver_avx2(uvg_pixel* dst, uvg_pixel* ref, const int height, const int16_t* delta_int, const int32_t pred_mode)
 {
@@ -913,7 +899,6 @@ static void angular_pred_linear_filter_w4_ver_avx2(uvg_pixel* dst, uvg_pixel* re
   }
 }
 
-
 static void angular_pred_linear_filter_w8_ver_avx2(uvg_pixel* dst, uvg_pixel* ref, const int height, const int16_t* delta_int, const int pred_mode)
 {
   const int width = 8;
@@ -953,7 +938,6 @@ static void angular_pred_linear_filter_w8_ver_avx2(uvg_pixel* dst, uvg_pixel* re
   }
 }
 
-
 static void angular_pred_linear_filter_w16_ver_avx2(uvg_pixel* dst, uvg_pixel* ref, const int height, const int16_t* delta_int, const int pred_mode)
 {
   const __m128i v16s = _mm_set1_epi16(16);
@@ -989,7 +973,6 @@ static void angular_pred_linear_filter_w16_ver_avx2(uvg_pixel* dst, uvg_pixel* r
     dst += 16;
   }
 }
-
 
 static void angular_pred_linear_filter_w32_ver_avx2(uvg_pixel* dst, uvg_pixel* ref, const int height, const int16_t* delta_int, const int pred_mode)
 {
@@ -1069,7 +1052,6 @@ static void angular_pred_linear_filter_w4_hor_avx2(uvg_pixel* dst, uvg_pixel* re
   }
 }
 
-
 static void angular_pred_linear_filter_w8_hor_avx2(uvg_pixel* dst, uvg_pixel* ref, const int height, const int mode, const int16_t* delta_int)
 {
   const int16_t* dint = delta_int;
@@ -1102,7 +1084,6 @@ static void angular_pred_linear_filter_w8_hor_avx2(uvg_pixel* dst, uvg_pixel* re
     dst += 16;
   }
 }
-
 
 static void angular_pred_linear_filter_w16_hor_avx2(uvg_pixel* dst, uvg_pixel* ref, const int height, const int mode, const int16_t* delta_int)
 {
@@ -1150,7 +1131,6 @@ static void angular_pred_linear_filter_w16_hor_avx2(uvg_pixel* dst, uvg_pixel* r
     dst += 32;
   }
 }
-
 
 static void angular_pred_linear_filter_w32_hor_avx2(uvg_pixel* dst, uvg_pixel* ref, const int height, const int mode, const int16_t* delta_int)
 {
@@ -1203,118 +1183,6 @@ static void angular_pred_linear_filter_w32_hor_avx2(uvg_pixel* dst, uvg_pixel* r
 }
 
 
-static void angular_pred_linear_filter_w8_ver_wide_angle_avx2(uvg_pixel* dst, uvg_pixel* ref, const int height, const int mode, const int16_t* delta_int, const int16_t* delta_fract)
-{
-  const int width = 8;
-  const int16_t* dint = delta_int;
-  const __m128i v16s = _mm_set1_epi16(16);
-  // Height has to be at least 2, handle 2 lines at once
-  for (int y = 0; y < height; y += 2) {
-    uvg_pixel src[32];
-    int16_t coeff_tmp[2];
-    // TODO: get rid of this slow crap, this is just here to test the calculations
-    for (int yy = 0; yy < 2; ++yy) {
-      for (int x = 0, d = 0; x < width; ++x, d += 2) {
-        src[yy * 16 + d + 0] = ref[dint[yy] + 1 + x + 0];
-        src[yy * 16 + d + 1] = ref[dint[yy] + 1 + x + 1];
-      }
-      int8_t tmp[2] = { 32 - delta_fract[y + yy], delta_fract[y + yy] };
-      coeff_tmp[yy] = *(int16_t*)tmp;
-    }
-    dint += 2;
-
-    const __m128i vcoeff0 = _mm_set1_epi16(coeff_tmp[0]);
-    const __m128i vcoeff1 = _mm_set1_epi16(coeff_tmp[1]);
-
-    const __m128i* vsrc0 = (const __m128i*) & src[0];
-    const __m128i* vsrc1 = (const __m128i*) & src[16];
-
-    __m128i res0 = _mm_maddubs_epi16(*vsrc0, vcoeff0);
-    __m128i res1 = _mm_maddubs_epi16(*vsrc1, vcoeff1);
-    res0 = _mm_add_epi16(res0, v16s);
-    res1 = _mm_add_epi16(res1, v16s);
-    res0 = _mm_srai_epi16(res0, 5);
-    res1 = _mm_srai_epi16(res1, 5);
-
-    _mm_store_si128((__m128i*)dst, _mm_packus_epi16(res0, res1));
-    dst += 16;
-  }
-}
-
-
-static void angular_pred_linear_filter_w16_ver_wide_angle_avx2(uvg_pixel* dst, uvg_pixel* ref, const int height, const int mode, const int16_t* delta_int, const int16_t* delta_fract)
-{
-  const int width = 16;
-  const int16_t* dint = delta_int;
-  const __m128i v16s = _mm_set1_epi16(16);
-  // Height has to be at least 2, handle 1 line at a time
-  for (int y = 0; y < height; ++y) {
-    uvg_pixel src[32];
-    // TODO: get rid of this slow crap, this is just here to test the calculations
-    for (int x = 0, d = 0; x < width; ++x, d += 2) {
-      src[d + 0] = ref[*dint + 1 + x + 0];
-      src[d + 1] = ref[*dint + 1 + x + 1];
-    }
-    dint++;
-
-    int8_t tmp[2] = { 32 - delta_fract[y], delta_fract[y] };
-    const int16_t coeff_tmp = *(int16_t*)tmp;
-    const __m128i vcoeff = _mm_set1_epi16(coeff_tmp);
-    
-    const __m128i* vsrc0 = (const __m128i*) & src[0];
-    const __m128i* vsrc1 = (const __m128i*) & src[16];
-
-    __m128i res0 = _mm_maddubs_epi16(*vsrc0, vcoeff);
-    __m128i res1 = _mm_maddubs_epi16(*vsrc1, vcoeff);
-    res0 = _mm_add_epi16(res0, v16s);
-    res1 = _mm_add_epi16(res1, v16s);
-    res0 = _mm_srai_epi16(res0, 5);
-    res1 = _mm_srai_epi16(res1, 5);
-
-    _mm_store_si128((__m128i*)dst, _mm_packus_epi16(res0, res1));
-    dst += 16;
-  }
-}
-
-
-static void angular_pred_linear_filter_w32_ver_wide_angle_avx2(uvg_pixel* dst, uvg_pixel* ref, const int height, const int mode, const int16_t* delta_int, const int16_t* delta_fract)
-{
-  const int width = 32;
-  const int16_t* dint = delta_int;
-  const __m256i v16s = _mm256_set1_epi16(16);
-  // Height has to be at least 2, handle 1 line at a time
-  for (int y = 0; y < height; ++y) {
-    uvg_pixel src[64];
-    // TODO: get rid of this slow crap, this is just here to test the calculations
-    for (int x = 0, d = 0; x < width; ++x, d += 2) {
-      src[d + 0] = ref[*dint + 1 + x + 0];
-      src[d + 1] = ref[*dint + 1 + x + 1];
-    }
-    dint++;
-
-    int8_t tmp[2] = { 32 - delta_fract[y], delta_fract[y] };
-    const int16_t coeff_tmp = *(int16_t*)tmp;
-    const __m256i vcoeff = _mm256_set1_epi16(coeff_tmp);
-
-    const __m256i* vsrc0 = (const __m256i*) & src[0];
-    const __m256i* vsrc1 = (const __m256i*) & src[32];
-
-    __m256i res0 = _mm256_maddubs_epi16(*vsrc0, vcoeff);
-    __m256i res1 = _mm256_maddubs_epi16(*vsrc1, vcoeff);
-    res0 = _mm256_add_epi16(res0, v16s);
-    res1 = _mm256_add_epi16(res1, v16s);
-    res0 = _mm256_srai_epi16(res0, 5);
-    res1 = _mm256_srai_epi16(res1, 5);
-
-    __m256i vfinal = _mm256_packus_epi16(res0, res1);
-    vfinal = _mm256_permute4x64_epi64(vfinal, _MM_SHUFFLE(3, 1, 2, 0));
-
-    _mm256_store_si256((__m256i*)dst, vfinal);
-    dst += 32;
-  }
-}
-
-
 static void angular_pred_linear_filter_w4_hor_wide_angle_avx2(uvg_pixel* dst, uvg_pixel* ref, const int height, const int mode, const int16_t* delta_int)
 {
   const __m128i v16s = _mm_set1_epi16(16);
@@ -1360,7 +1228,6 @@ static void angular_pred_linear_filter_w4_hor_wide_angle_avx2(uvg_pixel* dst, uv
     dst += 16;
   }
 }
-
 
 static void angular_pred_linear_filter_w8_hor_wide_angle_avx2(uvg_pixel* dst, uvg_pixel* ref, const int height, const int mode, const int16_t* delta_int, const int16_t* delta_fract)
 {
@@ -1436,7 +1303,6 @@ static void angular_pred_linear_filter_w8_hor_wide_angle_avx2(uvg_pixel* dst, uv
     dst += 32;
   }
 }
-
 
 static void angular_pred_linear_filter_w16_hor_wide_angle_avx2(uvg_pixel* dst, uvg_pixel* ref, const int height, const int mode, const int16_t* delta_int, const int16_t* delta_fract)
 {
@@ -1533,7 +1399,7 @@ static void angular_pred_linear_filter_w16_hor_wide_angle_avx2(uvg_pixel* dst, u
   }
 }
 
-
+// Used for angles which do not require interpolation.
 static void angular_pred_non_fractional_angle_pxl_copy_ver_avx2(uvg_pixel* dst, uvg_pixel* ref, const int width, const int height, const int16_t* delta_int)
 {
   // Note: this probably won't work for wide angle modes.
@@ -1550,6 +1416,7 @@ static void angular_pred_non_fractional_angle_pxl_copy_ver_avx2(uvg_pixel* dst, 
   }
 }
 
+// Horizontal pixel copy for prediction mode 2.
 static void angular_pred_non_fractional_angle_pxl_copy_w4_mode2_hor_avx2(uvg_pixel* dst, uvg_pixel* ref, const int height, const int multi_ref_offset)
 {
   // const int width = 4;
@@ -1623,6 +1490,7 @@ static void angular_pred_non_fractional_angle_pxl_copy_w8_mode2_hor_avx2(uvg_pix
   }
 }
 
+// Horizontal pixel copy for wide angles modes.
 static void angular_pred_non_fractional_angle_pxl_copy_w4_wide_angle_hor_avx2(uvg_pixel* dst, uvg_pixel* ref, const int height, const int16_t* delta_int)
 {
   // const int width = 4;
@@ -2084,44 +1952,45 @@ static void angular_pred_non_fractional_angle_pxl_copy_w32_wide_angle_hor_avx2(u
 static void angular_pdpc_ver_w4_high_angle_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int height, const int scale, const int mode_disp)
 {
   const int width = 4;
-  int16_t left[4][4];
-
-  int limit = MIN(3 << scale, width);
-
-  __m128i vseq = _mm_setr_epi32(0, 1, 2, 3);
-  //__m128i vidx = _mm_slli_epi32(vseq, 2); // 2 is log2 width
-  __m256i v32s = _mm256_set1_epi16(32);
+  //ALIGNED(32) uint8_t left[4][4];
+  __m128i v32s = _mm_set1_epi16(32);
 
   // Scale can be 0, 1 or 2
   const int offset = scale * 16;
-  const __m256i vweight = _mm256_load_si256((const __m256i*)&intra_pdpc_w4_ver_weight[offset]);
+  const __m128i vweight = _mm_load_si128((const __m128i*) &intra_pdpc_w4_ver_improved_weight[offset]);
 
   const int inv_angle_offset = mode_disp * 64;
   const int16_t* shifted_inv_angle_sum = &intra_pdpc_shifted_inv_angle_sum[inv_angle_offset];
 
+  const __m128i vleftshuf = _mm_setr_epi8(
+    0x00, 0x04, 0x08, 0x0c, 0x01, 0x05, 0x09, 0x0d, 
+    0x02, 0x06, 0x0a, 0x0e, 0x03, 0x07, 0x0b, 0x0f
+  );
+
+  __m128i vidx = _mm_setr_epi32(shifted_inv_angle_sum[0], shifted_inv_angle_sum[1], 
+                                shifted_inv_angle_sum[2], shifted_inv_angle_sum[3]);
+
   // For a 4 width block, height must be at least 4. Handle 4 lines at once.
   for (int y = 0; y < height; y += 4) {
-    for (int xx = 0; xx < width; ++xx) {
-      for (int yy = 0; yy < 4; ++yy) {
-        left[yy][xx] = ref_side[(y + yy) + shifted_inv_angle_sum[xx] + 1];
-      }
-    }
+    __m128i vdst = _mm_loadu_si128((const __m128i*)(dst + y * width));
+    __m128i vleft = _mm_i32gather_epi32((const int32_t*)&ref_side[y + 1], vidx, 1);
+    vleft = _mm_shuffle_epi8(vleft, vleftshuf);
 
-    __m128i vdst = _mm_i32gather_epi32((const int32_t*)(dst + y * width), vseq, 4);
-    __m256i vdst16 = _mm256_cvtepu8_epi16(vdst);
-    __m256i vleft = _mm256_loadu_si256((__m256i*)left);
+    __m128i vlo = _mm_unpacklo_epi8(vdst, vleft);
+    __m128i vhi = _mm_unpackhi_epi8(vdst, vleft);
 
-    __m256i accu = _mm256_sub_epi16(vleft, vdst16);
-    accu = _mm256_mullo_epi16(vweight, accu);
-    accu = _mm256_add_epi16(accu, v32s);
-    accu = _mm256_srai_epi16(accu, 6);
-    accu = _mm256_add_epi16(vdst16, accu);
+    __m128i vmaddlo = _mm_maddubs_epi16(vlo, vweight);
+    __m128i vmaddhi = _mm_maddubs_epi16(vhi, vweight);
 
-    __m128i lo = _mm256_castsi256_si128(accu);
-    __m128i hi = _mm256_extracti128_si256(accu, 1);
-    __m128i filtered = _mm_packus_epi16(lo, hi);
+    vmaddlo = _mm_add_epi16(vmaddlo, v32s);
+    vmaddhi = _mm_add_epi16(vmaddhi, v32s);
 
-    _mm_store_si128((__m128i*)(dst + (y * width)), filtered);
+    vmaddlo = _mm_srai_epi16(vmaddlo, 6);
+    vmaddhi = _mm_srai_epi16(vmaddhi, 6);
+
+    __m128i packed = _mm_packus_epi16(vmaddlo, vmaddhi);
+
+    _mm_store_si128((__m128i*)(dst + (y * width)), packed);
   }
 }
 
@@ -2260,746 +2129,6 @@ static void angular_pdpc_ver_w16_scale0_avx2(uvg_pixel* dst, const uvg_pixel* re
   }
 }
 
-static void angular_pdpc_ver_w16_scale1_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int width, const int height, const int mode_disp)
-{
-  // NOTE: This function is just the w8 function, retrofitted to work with width 16 and up when scale is 1.
-  // Since scale is 1, limit is 6 and therefore there is no meaningful work to be done when x > 6, so only the first column of 8x2 chunks is handled.
-  const int scale = 1;
-  const int log2_width = uvg_g_convert_to_log2[width];
-
-  const int limit = 6;
-
-  __m128i vseq = _mm_set_epi64x(1, 0);
-  __m128i vidx = _mm_slli_epi32(vseq, log2_width);
-  __m256i v32s = _mm256_set1_epi16(32);
-
-  const int offset = scale * 16;
-  const __m256i vweight = _mm256_load_si256((const __m256i*) &intra_pdpc_w8_ver_weight[offset]);
-
-  const int inv_angle_offset = mode_disp * 64;
-  const int16_t *shifted_inv_angle_sum = &intra_pdpc_shifted_inv_angle_sum[inv_angle_offset];
-
-  // For width 8, height must be at least 2. Handle 2 lines at once.
-  for (int y = 0; y < height; y += 2) {
-    ALIGNED(32) int16_t left[16] = { 0 };
-    for (int yy = 0; yy < 2; ++yy) {
-      for (int xx = 0; xx < limit; ++xx) {
-        left[yy * 8 + xx] = ref_side[(y + yy) + shifted_inv_angle_sum[xx] + 1];
-      }
-    }
-
-    __m128i vdst = _mm_i64gather_epi64((const long long int*)(dst + y * width), vidx, 1);
-    __m256i vdst16 = _mm256_cvtepu8_epi16(vdst);
-    __m256i vleft = _mm256_loadu_si256((__m256i*)left);
-
-    __m256i accu = _mm256_sub_epi16(vleft, vdst16);
-    accu = _mm256_mullo_epi16(vweight, accu);
-    accu = _mm256_add_epi16(accu, v32s);
-    accu = _mm256_srai_epi16(accu, 6);
-    accu = _mm256_add_epi16(vdst16, accu);
-
-    __m128i lo = _mm256_castsi256_si128(accu);
-    __m128i hi = _mm256_extracti128_si256(accu, 1);
-    __m128i filtered = _mm_packus_epi16(lo, hi);
-
-    *(uint64_t*)(dst + (y + 0) * width) = _mm_extract_epi64(filtered, 0);
-    *(uint64_t*)(dst + (y + 1) * width) = _mm_extract_epi64(filtered, 1);
-  }
-}
-
-static void angular_pdpc_ver_w16_scale2_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int width, const int height, const int mode_disp)
-{
-  __m256i v32s = _mm256_set1_epi16(32);
-  const int scale = 2; // Other functions handle scales 0 and 1
-  int limit = 12; // With scale 2, limit is always 12.
-
-  const int offset = scale * 16;
-  const int inv_angle_offset = mode_disp * 64;
-  const int shuf_offset = mode_disp * 16;
-  
-  const __m256i vweight = _mm256_load_si256((const __m256i*) &intra_pdpc_w16_ver_weight[offset]);
-  const int16_t* shifted_inv_angle_sum = &intra_pdpc_shifted_inv_angle_sum[inv_angle_offset];
-  const __m128i vshuf = _mm_load_si128((const __m128i*) &intra_pdpc_shuffle_vectors_w16_scale2_ver[shuf_offset]);
-
-  for (int y = 0; y < height; ++y) {
-    for (int x = 0; x < limit; x += 16) {
-      /*ALIGNED(32) int16_t left[16] = { 0 };
-      for (int xx = 0; x + xx < limit; ++xx) {
-        left[xx] = ref_side[y + shifted_inv_angle_sum[xx] + 1];
-      }*/
-      __m128i vleft = _mm_loadu_si128((__m128i*) & ref_side[y + shifted_inv_angle_sum[0] + 1]);
-      vleft = _mm_shuffle_epi8(vleft, vshuf);
-
-      __m128i vdst = _mm_load_si128((const __m128i*)(dst + (y * width + x)));
-      __m256i vdst16 = _mm256_cvtepu8_epi16(vdst);
-      __m256i vleft16 = _mm256_cvtepu8_epi16(vleft);
-
-      __m256i accu = _mm256_sub_epi16(vleft16, vdst16);
-      accu = _mm256_mullo_epi16(vweight, accu);
-      accu = _mm256_add_epi16(accu, v32s);
-      accu = _mm256_srai_epi16(accu, 6);
-      accu = _mm256_add_epi16(vdst16, accu);
-
-      __m128i lo = _mm256_castsi256_si128(accu);
-      __m128i hi = _mm256_extracti128_si256(accu, 1);
-      __m128i filtered = _mm_packus_epi16(lo, hi);
-
-      _mm_store_si128((__m128i*)(dst + (y * width + x)), filtered);
-    }
-  }
-}
-
-
-static void angular_pdpc_ver_w4_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int height, const int scale, const int mode_disp)
-{
-  const int width = 4;
-  int16_t left[4][4];
-
-  int limit = MIN(3 << scale, width);
-
-  //__m128i vseq = _mm_setr_epi32(0, 1, 2, 3);
-  //__m128i vidx = _mm_slli_epi32(vseq, 2); // 2 is log2 width
-  __m256i v32s = _mm256_set1_epi16(32);
-
-  // Scale can be 0, 1 or 2
-  const int offset = scale * 16;
-  const int inv_angle_offset = mode_disp * 64;
-  const int shuf_offset = mode_disp * 16;
-  
-  const int16_t* shifted_inv_angle_sum = &intra_pdpc_shifted_inv_angle_sum[inv_angle_offset];
-  const __m256i vweight = _mm256_load_si256((const __m256i*) &intra_pdpc_w4_ver_weight[offset]);
-  const __m128i vshuf = _mm_loadu_si128((__m128i*) &intra_pdpc_shuffle_vectors_w4_ver[shuf_offset]);
-
-  // For a 4 width block, height must be at least 4. Handle 4 lines at once.
-  for (int y = 0; y < height; y += 4) {
-    /*for (int xx = 0; xx < width; ++xx) {
-      for (int yy = 0; yy < 4; ++yy) {
-        left[yy][xx] = ref_side[(y + yy) + shifted_inv_angle_sum[xx] + 1];
-      }
-    }*/
-    __m128i vleft = _mm_loadu_si128((__m128i*)&ref_side[y + shifted_inv_angle_sum[0] + 1]);
-    vleft = _mm_shuffle_epi8(vleft, vshuf);
-
-    //__m128i vdst = _mm_i32gather_epi32((const int32_t*)(dst + y * width), vseq, 4);
-    __m128i vdst = _mm_loadu_si128((const __m128i*)(dst + y * width));
-    __m256i vdst16 = _mm256_cvtepu8_epi16(vdst);
-    __m256i vleft16 = _mm256_cvtepu8_epi16(vleft);
-
-    __m256i accu = _mm256_sub_epi16(vleft16, vdst16);
-    accu = _mm256_mullo_epi16(vweight, accu);
-    accu = _mm256_add_epi16(accu, v32s);
-    accu = _mm256_srai_epi16(accu, 6);
-    accu = _mm256_add_epi16(vdst16, accu);
-
-    __m128i lo = _mm256_castsi256_si128(accu);
-    __m128i hi = _mm256_extracti128_si256(accu, 1);
-    __m128i filtered = _mm_packus_epi16(lo, hi);
-
-    _mm_store_si128((__m128i*)(dst + (y * width)), filtered);
-  }
-}
-
-static void angular_pdpc_ver_4x4_scale0_high_angle_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int width, const int height, const int mode_disp)
-{
-  // This function is just the w4 function, retrofitted to work with any width when scale is 0. If width is 4, use a specialized function instead.
-  // Since scale is 0, limit is 3 and therefore there is no meaningful work to be done when x > 3, so only the first column of 4x4 chunks is handled.
-  const int scale = 0;
-  int16_t left[4][4];
-  const int log2_width = uvg_g_convert_to_log2[width];
-
-  const int limit = 3;
-
-  __m128i vseq = _mm_setr_epi32(0, 1, 2, 3);
-  __m128i vidx = _mm_slli_epi32(vseq, log2_width);
-  __m256i v32s = _mm256_set1_epi16(32);
-
-  // Scale can be 0, 1 or 2
-  const int offset = scale * 16;
-  const __m256i vweight = _mm256_load_si256((const __m256i*) &intra_pdpc_w4_ver_weight[offset]);
-
-  const int inv_angle_offset = mode_disp * 64;
-  const int16_t* shifted_inv_angle_sum = &intra_pdpc_shifted_inv_angle_sum[inv_angle_offset];
-
-  // For a 4 width block, height must be at least 4. Handle 4 lines at once.
-  for (int y = 0; y < height; y += 4) {
-    for (int xx = 0; xx < 4; ++xx) {
-      for (int yy = 0; yy < 4; ++yy) {
-        left[yy][xx] = ref_side[(y + yy) + shifted_inv_angle_sum[xx] + 1];
-      }
-    }
-
-    __m128i vdst = _mm_i32gather_epi32((const int32_t*)(dst + y * width), vidx, 1);
-    __m256i vdst16 = _mm256_cvtepu8_epi16(vdst);
-    __m256i vleft = _mm256_loadu_si256((__m256i*)left);
-
-    __m256i accu = _mm256_sub_epi16(vleft, vdst16);
-    accu = _mm256_mullo_epi16(vweight, accu);
-    accu = _mm256_add_epi16(accu, v32s);
-    accu = _mm256_srai_epi16(accu, 6);
-    accu = _mm256_add_epi16(vdst16, accu);
-
-    __m128i lo = _mm256_castsi256_si128(accu);
-    __m128i hi = _mm256_extracti128_si256(accu, 1);
-    __m128i filtered = _mm_packus_epi16(lo, hi);
-
-    *(uint32_t*)(dst + (y + 0) * width) = _mm_extract_epi32(filtered, 0);
-    *(uint32_t*)(dst + (y + 1) * width) = _mm_extract_epi32(filtered, 1);
-    *(uint32_t*)(dst + (y + 2) * width) = _mm_extract_epi32(filtered, 2);
-    *(uint32_t*)(dst + (y + 3) * width) = _mm_extract_epi32(filtered, 3);
-  }
-}
-
-static void angular_pdpc_ver_4x4_scale0_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int width, const int height, const int mode_disp)
-{
-  // This function is just the w4 function, retrofitted to work with any width when scale is 0. If width is 4, use a specialized function instead.
-  // Since scale is 0, limit is 3 and therefore there is no meaningful work to be done when x > 3, so only the first column of 4x4 chunks is handled.
-  // This function handles cases where prediction angle is high. For PDPC, this means the needed reference samples are close together, enabling more effective loading.
-  const int scale = 0;
-  int16_t left[4][4];
-  const int log2_width = uvg_g_convert_to_log2[width];
-
-  const int limit = 3;
-
-  __m128i vseq = _mm_setr_epi32(0, 1, 2, 3);
-  __m128i vidx = _mm_slli_epi32(vseq, log2_width);
-  __m256i v32s = _mm256_set1_epi16(32);
-
-  // Scale can be 0, 1 or 2
-  const int offset = scale * 16;
-  const int inv_angle_offset = mode_disp * 64;
-  const int shuf_offset = mode_disp * 16;
-  
-  const __m256i vweight = _mm256_load_si256((const __m256i*) &intra_pdpc_w4_ver_weight[offset]);
-  const int16_t* shifted_inv_angle_sum = &intra_pdpc_shifted_inv_angle_sum[inv_angle_offset];
-  const __m128i vshuf = _mm_loadu_si128((__m128i*) &intra_pdpc_shuffle_vectors_w4_ver[shuf_offset]);
-
-  // For a 4 width block, height must be at least 4. Handle 4 lines at once.
-  for (int y = 0; y < height; y += 4) {
-    __m128i vleft = _mm_loadu_si128((__m128i*) &ref_side[y + shifted_inv_angle_sum[0] + 1]);
-    vleft = _mm_shuffle_epi8(vleft, vshuf);
-
-    __m128i vdst = _mm_i32gather_epi32((const int32_t*)(dst + y * width), vidx, 1);
-    __m256i vdst16 = _mm256_cvtepu8_epi16(vdst);
-    __m256i vleft16 = _mm256_cvtepu8_epi16(vleft);
-
-    __m256i accu = _mm256_sub_epi16(vleft16, vdst16);
-    accu = _mm256_mullo_epi16(vweight, accu);
-    accu = _mm256_add_epi16(accu, v32s);
-    accu = _mm256_srai_epi16(accu, 6);
-    accu = _mm256_add_epi16(vdst16, accu);
-
-    __m128i lo = _mm256_castsi256_si128(accu);
-    __m128i hi = _mm256_extracti128_si256(accu, 1);
-    __m128i filtered = _mm_packus_epi16(lo, hi);
-
-    *(uint32_t*)(dst + (y + 0) * width) = _mm_extract_epi32(filtered, 0);
-    *(uint32_t*)(dst + (y + 1) * width) = _mm_extract_epi32(filtered, 1);
-    *(uint32_t*)(dst + (y + 2) * width) = _mm_extract_epi32(filtered, 2);
-    *(uint32_t*)(dst + (y + 3) * width) = _mm_extract_epi32(filtered, 3);
-  }
-}
-
-
-static void angular_pdpc_ver_8x2_scale1_high_angle_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int width, const int height, const int mode_disp)
-{
-  // NOTE: This function is just the w8 function, retrofitted to work with width 16 and up when scale is 1.
-  // Since scale is 1, limit is 6 and therefore there is no meaningful work to be done when x > 6, so only the first column of 8x2 chunks is handled.
-  const int scale = 1;
-  const int log2_width = uvg_g_convert_to_log2[width];
-
-  const int limit = 6;
-
-  __m128i vseq = _mm_set_epi64x(1, 0);
-  __m128i vidx = _mm_slli_epi32(vseq, log2_width);
-  __m256i v32s = _mm256_set1_epi16(32);
-
-  const int offset = scale * 16;
-  const int inv_angle_offset = mode_disp * 64;
-  const int shuf_offset = mode_disp * 16;
-
-  const __m256i vweight = _mm256_load_si256((const __m256i*) & intra_pdpc_w8_ver_weight[offset]);
-  const int16_t* shifted_inv_angle_sum = &intra_pdpc_shifted_inv_angle_sum[inv_angle_offset];
-  const __m128i vshuf = _mm_loadu_si128((__m128i*) & intra_pdpc_shuffle_vectors_8x2_scale1_ver[shuf_offset]);
-
-  // For width 8, height must be at least 2. Handle 2 lines at once.
-  for (int y = 0; y < height; y += 2) {
-    ALIGNED(32) int16_t left[16] = { 0 };
-    for (int yy = 0; yy < 2; ++yy) {
-      for (int xx = 0; xx < limit; ++xx) {
-        left[yy * 8 + xx] = ref_side[(y + yy) + shifted_inv_angle_sum[xx] + 1];
-      }
-    }
-    //__m128i vleft = _mm_loadu_si128((__m128i*) & ref_side[y + shifted_inv_angle_sum[0] + 1]);
-    //vleft = _mm_shuffle_epi8(vleft, vshuf);
-
-    __m128i vdst = _mm_i64gather_epi64((const long long int*)(dst + y * width), vidx, 1);
-    __m256i vdst16 = _mm256_cvtepu8_epi16(vdst);
-    //__m256i vleft16 = _mm256_cvtepu8_epi16(vleft);
-    __m256i vleft = _mm256_loadu_si256((__m256i*)left);
-
-    __m256i accu = _mm256_sub_epi16(vleft, vdst16);
-    accu = _mm256_mullo_epi16(vweight, accu);
-    accu = _mm256_add_epi16(accu, v32s);
-    accu = _mm256_srai_epi16(accu, 6);
-    accu = _mm256_add_epi16(vdst16, accu);
-
-    __m128i lo = _mm256_castsi256_si128(accu);
-    __m128i hi = _mm256_extracti128_si256(accu, 1);
-    __m128i filtered = _mm_packus_epi16(lo, hi);
-
-    // TODO: if this if branch is deemed to cause slow down, make another version of this, where this check is not needed.
-    // If this does not slow down significantly, make this same check in other functions to reduce the function call switch case complexity
-    if (width == 8) { 
-      _mm_store_si128((__m128i*)(dst + (y * width)), filtered);
-    }
-    else {
-      *(uint64_t*)(dst + (y + 0) * width) = _mm_extract_epi64(filtered, 0);
-      *(uint64_t*)(dst + (y + 1) * width) = _mm_extract_epi64(filtered, 1);
-    }
-  }
-}
-
-static void angular_pdpc_ver_8x2_scale2_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int width, const int height, const int mode_disp)
-{
-  // NOTE: This function is just the w8 function, retrofitted to work with width 16 and up when scale is 1.
-  // Since scale is 1, limit is 6 and therefore there is no meaningful work to be done when x > 6, so only the first column of 8x2 chunks is handled.
-  // This function handles cases where prediction angle is high. For PDPC, this means the needed reference samples are close together, enabling more effective loading.
-  const int scale = 2;
-  const int log2_width = uvg_g_convert_to_log2[width];
-
-  const int limit = 6;
-
-  __m128i vseq = _mm_set_epi64x(1, 0);
-  __m128i vidx = _mm_slli_epi32(vseq, log2_width);
-  __m256i v32s = _mm256_set1_epi16(32);
-
-  const int offset = scale * 16;
-  const int inv_angle_offset = mode_disp * 64;
-  const int shuf_offset = mode_disp * 16;
-
-  const __m256i vweight = _mm256_load_si256((const __m256i*) & intra_pdpc_w8_ver_weight[offset]);
-  const int16_t* shifted_inv_angle_sum = &intra_pdpc_shifted_inv_angle_sum[inv_angle_offset];
-  const __m128i vshuf = _mm_loadu_si128((__m128i*) & intra_pdpc_shuffle_vectors_8x2_scale2_ver[shuf_offset]);
-
-  // For width 8, height must be at least 2. Handle 2 lines at once.
-  for (int y = 0; y < height; y += 2) {
-    /*ALIGNED(32) int16_t left[16] = { 0 };
-    for (int yy = 0; yy < 2; ++yy) {
-      for (int xx = 0; xx < limit; ++xx) {
-        left[yy * 8 + xx] = ref_side[(y + yy) + shifted_inv_angle_sum[xx] + 1];
-      }
-    }*/
-    __m128i vleft = _mm_loadu_si128((__m128i*) & ref_side[y + shifted_inv_angle_sum[0] + 1]);
-    vleft = _mm_shuffle_epi8(vleft, vshuf);
-
-    __m128i vdst = _mm_i64gather_epi64((const long long int*)(dst + y * width), vidx, 1);
-    __m256i vdst16 = _mm256_cvtepu8_epi16(vdst);
-    __m256i vleft16 = _mm256_cvtepu8_epi16(vleft);
-    //__m256i vleft = _mm256_loadu_si256((__m256i*)left);
-
-    __m256i accu = _mm256_sub_epi16(vleft16, vdst16);
-    accu = _mm256_mullo_epi16(vweight, accu);
-    accu = _mm256_add_epi16(accu, v32s);
-    accu = _mm256_srai_epi16(accu, 6);
-    accu = _mm256_add_epi16(vdst16, accu);
-
-    __m128i lo = _mm256_castsi256_si128(accu);
-    __m128i hi = _mm256_extracti128_si256(accu, 1);
-    __m128i filtered = _mm_packus_epi16(lo, hi);
-
-    // TODO: if this if branch is deemed to cause slow down, make another version of this, where this check is not needed.
-    // If this does not slow down significantly, make this same check in other functions to reduce the function call switch case complexity
-    if (width == 8) {
-      _mm_store_si128((__m128i*)(dst + (y * width)), filtered);
-    }
-    else {
-      *(uint64_t*)(dst + (y + 0) * width) = _mm_extract_epi64(filtered, 0);
-      *(uint64_t*)(dst + (y + 1) * width) = _mm_extract_epi64(filtered, 1);
-    }
-  }
-}
-
-static void angular_pdpc_ver_8x2_scale1_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int width, const int height, const int mode_disp)
-{
-  // NOTE: This function is just the w8 function, retrofitted to work with width 16 and up when scale is 1.
-  // Since scale is 1, limit is 6 and therefore there is no meaningful work to be done when x > 6, so only the first column of 8x2 chunks is handled.
-  // This function handles cases where prediction angle is high. For PDPC, this means the needed reference samples are close together, enabling more effective loading.
-  const int scale = 1;
-  const int log2_width = uvg_g_convert_to_log2[width];
-
-  const int limit = 6;
-
-  __m128i vseq = _mm_set_epi64x(1, 0);
-  __m128i vidx = _mm_slli_epi32(vseq, log2_width);
-  __m256i v32s = _mm256_set1_epi16(32);
-
-  const int offset = scale * 16;
-  const __m256i vweight = _mm256_load_si256((const __m256i*) & intra_pdpc_w8_ver_weight[offset]);
-
-  const int inv_angle_offset = mode_disp * 64;
-  const int16_t* shifted_inv_angle_sum = &intra_pdpc_shifted_inv_angle_sum[inv_angle_offset];
-
-  // For width 8, height must be at least 2. Handle 2 lines at once.
-  for (int y = 0; y < height; y += 2) {
-    ALIGNED(32) int16_t left[16] = { 0 };
-    for (int yy = 0; yy < 2; ++yy) {
-      for (int xx = 0; xx < limit; ++xx) {
-        left[yy * 8 + xx] = ref_side[(y + yy) + shifted_inv_angle_sum[xx] + 1];
-      }
-    }
-
-    __m128i vdst = _mm_i64gather_epi64((const long long int*)(dst + y * width), vidx, 1);
-    __m256i vdst16 = _mm256_cvtepu8_epi16(vdst);
-    __m256i vleft = _mm256_loadu_si256((__m256i*)left);
-
-    __m256i accu = _mm256_sub_epi16(vleft, vdst16);
-    accu = _mm256_mullo_epi16(vweight, accu);
-    accu = _mm256_add_epi16(accu, v32s);
-    accu = _mm256_srai_epi16(accu, 6);
-    accu = _mm256_add_epi16(vdst16, accu);
-
-    __m128i lo = _mm256_castsi256_si128(accu);
-    __m128i hi = _mm256_extracti128_si256(accu, 1);
-    __m128i filtered = _mm_packus_epi16(lo, hi);
-
-    // TODO: if this if branch is deemed to cause slow down, make another version of this, where this check is not needed.
-    // If this does not slow down significantly, make this same check in other functions to reduce the function call switch case complexity
-    if (width == 8) {
-      _mm_store_si128((__m128i*)(dst + (y * width)), filtered);
-    }
-    else {
-      *(uint64_t*)(dst + (y + 0) * width) = _mm_extract_epi64(filtered, 0);
-      *(uint64_t*)(dst + (y + 1) * width) = _mm_extract_epi64(filtered, 1);
-    }
-  }
-}
-
-
-// Height versions of vertical PDPC, these are unused but left here for archiving purposes. Maybe this method can be refined to be effective.
-
-static void angular_pdpc_ver_h4_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int width, const int scale, const int16_t inv_sample_disp)
-{
-  const int height = 4;
-
-  int limit = MIN(3 << scale, width);
-  const int log2_width = uvg_g_convert_to_log2[width];
-
-  const __m256i v32s = _mm256_set1_epi16(32);
-  const __m256i wL_shuffle = _mm256_setr_epi8(
-    0x00, 0x02, 0x00, 0x02, 0x00, 0x02, 0x00, 0x02,
-    0x08, 0x0a, 0x08, 0x0a, 0x08, 0x0a, 0x08, 0x0a,
-    0x00, 0x02, 0x00, 0x02, 0x00, 0x02, 0x00, 0x02,
-    0x08, 0x0a, 0x08, 0x0a, 0x08, 0x0a, 0x08, 0x0a
-  );
-
-  for (int x = 0; x < limit; x += 4) {
-    int shifted_inv_angle_sum[4] = {0};
-    int16_t wL[4] = {0};
-    ALIGNED(32) uvg_pixel tmp[16];
-    for (int xx = 0; xx < 4; ++xx) {
-      shifted_inv_angle_sum[xx] = (256 + (x + xx + 1) * inv_sample_disp) >> 9;
-      wL[xx] = (x + xx) < limit ? 32 >> ((2 * (x + xx)) >> scale) : 0;
-
-      tmp[xx * 4 + 0]  = ref_side[0 + shifted_inv_angle_sum[xx] + 1];
-      tmp[xx * 4 + 1]  = ref_side[1 + shifted_inv_angle_sum[xx] + 1];
-      tmp[xx * 4 + 2]  = ref_side[2 + shifted_inv_angle_sum[xx] + 1];
-      tmp[xx * 4 + 3]  = ref_side[3 + shifted_inv_angle_sum[xx] + 1];
-
-    }
-
-    int16_t tmp_dst[16];
-    for (int yy = 0; yy < height; ++yy) {
-      tmp_dst[0 + yy]  = dst[yy * width + x + 0];
-      tmp_dst[4 + yy]  = dst[yy * width + x + 1];
-      tmp_dst[8 + yy]  = dst[yy * width + x + 2];
-      tmp_dst[12 + yy] = dst[yy * width + x + 3];
-    }
-    
-    __m256i* vdst16 = (__m256i*)tmp_dst;
-    __m128i vleft = _mm_load_si128((__m128i*)tmp);
-    __m256i vleft16 = _mm256_cvtepu8_epi16(vleft);
-    __m256i accu = _mm256_sub_epi16(vleft16, *vdst16);
-    __m256i vwL = _mm256_setr_epi64x(wL[0], wL[1], wL[2], wL[3]);
-    vwL = _mm256_shuffle_epi8(vwL, wL_shuffle);
-    accu = _mm256_mullo_epi16(vwL, accu);
-    accu = _mm256_add_epi16(accu, v32s);
-    accu = _mm256_srai_epi16(accu, 6);
-    accu = _mm256_add_epi16(*vdst16, accu);
-
-    __m128i lo = _mm256_castsi256_si128(accu);
-    __m128i hi = _mm256_extracti128_si256(accu, 1);
-    __m128i filtered = _mm_packus_epi16(lo, hi);
-
-    const uvg_pixel* result = (uvg_pixel*)&filtered;
-
-    for (int yy = 0; yy < height; ++yy) {
-      dst[yy * width + x + 0] = result[0 + yy];
-      dst[yy * width + x + 1] = result[4 + yy];
-      dst[yy * width + x + 2] = result[8 + yy];
-      dst[yy * width + x + 3] = result[12 + yy];
-    }
-  }
-}
-
-static void angular_pdpc_ver_h8_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int width, const int scale, const int16_t inv_sample_disp)
-{
-  const int height = 8;
-
-  int limit = MIN(3 << scale, width);
-  __m256i v32s = _mm256_set1_epi16(32);
-
-  for (int x = 0; x < limit; x += 2) {
-    int shifted_inv_angle_sum0 = (256 + (x + 0 + 1) * inv_sample_disp) >> 9;
-    int shifted_inv_angle_sum1 = (256 + (x + 1 + 1) * inv_sample_disp) >> 9;
-    __m128i vwL[2];
-    const int16_t wL0 = 32 >> ((2 * (x + 0)) >> scale);
-    const int16_t wL1 = (x + 1) < limit ? 32 >> ((2 * (x + 1)) >> scale) : 0;
-    vwL[0] = _mm_set1_epi16(wL0);
-    vwL[1] = _mm_set1_epi16(wL1);
-
-    ALIGNED(32) int16_t tmp_dst[16];
-    for (int yy = 0; yy < height; ++yy) {
-      tmp_dst[0 + yy] = dst[(yy) * width + x + 0];
-      tmp_dst[8 + yy] = dst[(yy) * width + x + 1];
-    }
-
-    ALIGNED(32) uvg_pixel left[16];
-    memcpy(&left[0], &ref_side[shifted_inv_angle_sum0 + 1], 8 * sizeof(uvg_pixel));
-    memcpy(&left[8], &ref_side[shifted_inv_angle_sum1 + 1], 8 * sizeof(uvg_pixel));
-
-    __m256i vdst16 = _mm256_load_si256((__m256i*)tmp_dst);
-    __m128i vleft = _mm_load_si128((__m128i*)left);
-    __m256i vleft16 = _mm256_cvtepu8_epi16(vleft);
-    __m256i* vwL256 = (__m256i*)vwL;
-
-    __m256i accu = _mm256_sub_epi16(vleft16, vdst16);
-    accu = _mm256_mullo_epi16(*vwL256, accu);
-    accu = _mm256_add_epi16(accu, v32s);
-    accu = _mm256_srai_epi16(accu, 6);
-    accu = _mm256_add_epi16(vdst16, accu);
-
-    __m128i lo = _mm256_castsi256_si128(accu);
-    __m128i hi = _mm256_extracti128_si256(accu, 1);
-    __m128i filtered = _mm_packus_epi16(lo, hi);
-
-    const uvg_pixel* result = (uvg_pixel*)&filtered;
-    for (int yy = 0; yy < height; ++yy) {
-      dst[(yy) * width + x + 0] = result[0 + yy];
-      dst[(yy) * width + x + 1] = result[8 + yy];
-    }
-    
-  }
-}
-
-static void angular_pdpc_ver_h16_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int width, const int height, const int scale, const int16_t inv_sample_disp)
-{
-  int limit = MIN(3 << scale, width);
-  __m256i v32s = _mm256_set1_epi16(32);
-
-  for (int x = 0; x < limit; ++x) {
-    int shifted_inv_angle_sum = (256 + (x + 1) * inv_sample_disp) >> 9;
-    const int16_t wL = 32 >> ((2 * x) >> scale);
-    const __m256i vwL = _mm256_set1_epi16(wL);
-
-    for (int y = 0; y < height; y += 16) {
-      ALIGNED(32) int16_t tmp_dst[16];
-      for (int yy = 0; yy < 16; ++yy) {
-        tmp_dst[yy] = dst[(y + yy) * width + x];
-      }
-      __m256i vdst16 = _mm256_load_si256((__m256i*)tmp_dst);
-      __m128i vleft = _mm_loadu_si128((__m128i*)&ref_side[y + shifted_inv_angle_sum + 1]);
-      __m256i vleft16 = _mm256_cvtepu8_epi16(vleft);
-
-      __m256i accu = _mm256_sub_epi16(vleft16, vdst16);
-      accu = _mm256_mullo_epi16(vwL, accu);
-      accu = _mm256_add_epi16(accu, v32s);
-      accu = _mm256_srai_epi16(accu, 6);
-      accu = _mm256_add_epi16(vdst16, accu);
-
-      __m128i lo = _mm256_castsi256_si128(accu);
-      __m128i hi = _mm256_extracti128_si256(accu, 1);
-      __m128i filtered = _mm_packus_epi16(lo, hi);
-
-      const uvg_pixel* result = (uvg_pixel*)&filtered;
-      for (int yy = 0; yy < 16; ++yy) {
-        dst[(y + yy) * width + x] = result[yy];
-      }
-    }
-  }
-}
-
-static void angular_pdpc_hor_w4_high_angle_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int height, const int scale, const int mode_disp)
-{
-  const int width = 4;
-
-  int16_t wT[4];
-  int8_t ref_top[4][4];
-
-  int limit = MIN(3 << scale, height);
-
-  __m128i vseq = _mm_setr_epi32(0, 1, 2, 3);
-  __m128i vidx = _mm_slli_epi32(vseq, 2); // 2 is log2_width
-  __m256i v32s = _mm256_set1_epi16(32);
-
-  // Scale can be 0, 1 or 2
-  const int table_offset = scale * 64;
-  const int inv_angle_offset = mode_disp * 64;
-  const int16_t* shifted_inv_angle_sum = &intra_pdpc_shifted_inv_angle_sum[inv_angle_offset];
-
-  for (int y = 0, o = 0; y < limit; y += 4, o += 16) {
-    for (int yy = 0; yy < 4; ++yy) {
-      memcpy(ref_top[yy], &ref_side[shifted_inv_angle_sum[y + yy] + 1], 4 * sizeof(int8_t));
-    }
-    const int offset = table_offset + o;
-
-    __m128i vpred = _mm_i32gather_epi32((const int32_t*)(dst + y * width), vidx, 1);
-    __m256i vpred16 = _mm256_cvtepu8_epi16(vpred);
-    __m128i vtop = _mm_loadu_si128((__m128i*)ref_top);
-    __m256i vtop16 = _mm256_cvtepu8_epi16(vtop);
-    __m256i vwT = _mm256_load_si256((const __m256i*)&intra_pdpc_w4_hor_weight[offset]);
-
-    __m256i accu = _mm256_sub_epi16(vtop16, vpred16);
-    accu = _mm256_mullo_epi16(vwT, accu);
-    accu = _mm256_add_epi16(accu, v32s);
-    accu = _mm256_srai_epi16(accu, 6);
-    accu = _mm256_add_epi16(vpred16, accu);
-
-    __m128i lo = _mm256_castsi256_si128(accu);
-    __m128i hi = _mm256_extracti128_si256(accu, 1);
-    __m128i filtered = _mm_packus_epi16(lo, hi);
-
-    _mm_storeu_si128((__m128i*)(dst + (y * width)), filtered);
-  }
-}
-
-static void angular_pdpc_hor_w8_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int height, const int scale, const int mode_disp)
-{
-  const int width = 8;
-
-  int limit = MIN(3 << scale, height);
-
-  __m128i vseq = _mm_setr_epi32(0x00, 0x00, 0x01, 0x00);
-  __m128i vidx = _mm_slli_epi64(vseq, 3); // 3 is log2 width
-  __m256i v32s = _mm256_set1_epi16(32);
-
-  // Scale can be 0, 1 or 2
-  const int table_offset = scale * 128;
-  const int inv_angle_offset = mode_disp * 64;
-  const int16_t* shifted_inv_angle_sum = &intra_pdpc_shifted_inv_angle_sum[inv_angle_offset];
-
-  for (int y = 0, o = table_offset; y < limit; y += 2, o += 16) {
-    const __m256i vwT = _mm256_load_si256((const __m256i*)&intra_pdpc_w8_hor_weight[o]);
-    
-    ALIGNED(32) uvg_pixel tmp[16];
-    memcpy(&tmp[0], &ref_side[shifted_inv_angle_sum[y + 0] + 1], 8 * sizeof(uvg_pixel));
-    memcpy(&tmp[8], &ref_side[shifted_inv_angle_sum[y + 1] + 1], 8 * sizeof(uvg_pixel));
-    
-    __m128i vpred = _mm_i64gather_epi64((const long long int*)(dst + y * width), vidx, 1);
-    __m256i vpred16 = _mm256_cvtepu8_epi16(vpred);
-    __m128i vtop = _mm_load_si128((__m128i*)tmp);
-    __m256i vtop16 = _mm256_cvtepu8_epi16(vtop);
-    
-    __m256i accu = _mm256_sub_epi16(vtop16, vpred16);
-    accu = _mm256_mullo_epi16(vwT, accu);
-    accu = _mm256_add_epi16(accu, v32s);
-    accu = _mm256_srai_epi16(accu, 6);
-    accu = _mm256_add_epi16(vpred16, accu);
-
-    __m128i lo = _mm256_castsi256_si128(accu);
-    __m128i hi = _mm256_extracti128_si256(accu, 1);
-    __m128i filtered = _mm_packus_epi16(lo, hi);
-
-    _mm_storeu_si128((__m128i*)(dst + (y * width)), filtered);
-  }
-}
-
-static void angular_pdpc_hor_w16_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int width, const int height, const int scale, const int mode_disp)
-{
-  int limit = MIN(3 << scale, height);
-  __m256i v32s = _mm256_set1_epi16(32);
-
-  const int inv_angle_offset = mode_disp * 64;
-  const int16_t* shifted_inv_angle_sum = &intra_pdpc_shifted_inv_angle_sum[inv_angle_offset];
-
-  // Handle one line at a time. Skip line if vertical limit reached.
-  for (int y = 0; y < limit; ++y) {
-    const int16_t wT = 32 >> (2 * (y + 0) >> scale);
-    __m256i vwT = _mm256_set1_epi16(wT);
-
-    for (int x = 0; x < width; x += 16) {
-      __m128i vpred = _mm_load_si128((__m128i*)(dst + (y * width + x)));
-      __m256i vpred16 = _mm256_cvtepu8_epi16(vpred);
-      __m128i vtop = _mm_loadu_si128((__m128i*)&ref_side[x + shifted_inv_angle_sum[y] + 1]);
-      __m256i vtop16 = _mm256_cvtepu8_epi16(vtop);
-
-      __m256i accu = _mm256_sub_epi16(vtop16, vpred16);
-      accu = _mm256_mullo_epi16(vwT, accu);
-      accu = _mm256_add_epi16(accu, v32s);
-      accu = _mm256_srai_epi16(accu, 6);
-      accu = _mm256_add_epi16(vpred16, accu);
-
-      __m128i lo = _mm256_castsi256_si128(accu);
-      __m128i hi = _mm256_extracti128_si256(accu, 1);
-      __m128i filtered = _mm_packus_epi16(lo, hi);
-
-      _mm_storeu_si128((__m128i*)(dst + (y * width + x)), filtered);
-    }
-  }
-}
-
-
-static void angular_pdpc_hor_w4_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int height, const int scale, const int mode_disp)
-{
-  const int width = 4;
-
-  int16_t wT[4];
-  int8_t ref_top[4][4];
-
-  int limit = MIN(3 << scale, height);
-
-  __m128i vseq = _mm_setr_epi32(0, 1, 2, 3);
-  __m128i vidx = _mm_slli_epi32(vseq, 2); // 2 is log2_width
-  __m256i v32s = _mm256_set1_epi16(32);
-
-  // Scale can be 0, 1 or 2
-  const int table_offset = scale * 64;
-  const int shuf_offset = mode_disp * 256;
-  const int inv_angle_offset = mode_disp * 64;
-  const int16_t* shifted_inv_angle_sum = &intra_pdpc_shifted_inv_angle_sum[inv_angle_offset];
-
-  for (int y = 0, o = 0; y < limit; y += 4, o += 16) {
-    const __m128i vshuf = _mm_loadu_si128((__m128i*)&intra_pdpc_shuffle_vectors_w4_hor[shuf_offset + o]);
-    /*for (int yy = 0; yy < 4; ++yy) {
-      memcpy(ref_top[yy], &ref_side[shifted_inv_angle_sum[y + yy] + 1], 4 * sizeof(int8_t));
-    }*/
-
-    __m128i vtop = _mm_loadu_si128((__m128i*)&ref_side[shifted_inv_angle_sum[y] + 1]);
-    vtop = _mm_shuffle_epi8(vtop, vshuf);
-
-    const int offset = table_offset + o;
-
-    __m128i vpred = _mm_i32gather_epi32((const int32_t*)(dst + y * width), vidx, 1);
-    __m256i vpred16 = _mm256_cvtepu8_epi16(vpred);
-    //__m128i vtop = _mm_loadu_si128((__m128i*)ref_top);
-    __m256i vtop16 = _mm256_cvtepu8_epi16(vtop);
-    __m256i vwT = _mm256_load_si256((const __m256i*) & intra_pdpc_w4_hor_weight[offset]);
-
-    __m256i accu = _mm256_sub_epi16(vtop16, vpred16);
-    accu = _mm256_mullo_epi16(vwT, accu);
-    accu = _mm256_add_epi16(accu, v32s);
-    accu = _mm256_srai_epi16(accu, 6);
-    accu = _mm256_add_epi16(vpred16, accu);
-
-    __m128i lo = _mm256_castsi256_si128(accu);
-    __m128i hi = _mm256_extracti128_si256(accu, 1);
-    __m128i filtered = _mm_packus_epi16(lo, hi);
-
-    _mm_storeu_si128((__m128i*)(dst + (y * width)), filtered);
-  }
-}
-
-
-// Improved PDPC functions. These use the streamlined PDPC equation
 
 // Mode 18
 
@@ -3079,7 +2208,40 @@ static void angular_pdpc_mode18_w8_improved_avx2(uvg_pixel* dst, const uvg_pixel
   }
 }
 
-// Can't do anything to improve w16
+static void angular_pdpc_mode18_w16_avx2(uvg_pixel* dst, const uvg_pixel top_left, const uvg_pixel* ref_side, const int height, const int scale)
+{
+  const int width = 16;
+  int limit = MIN(3 << scale, height);
+  __m256i v32s = _mm256_set1_epi16(32);
+
+  __m128i vref = _mm_loadu_si128((const __m128i*) & ref_side[1]);
+  __m256i vref16 = _mm256_cvtepu8_epi16(vref);
+
+  __m256i vtopleft = _mm256_set1_epi16((uint16_t)top_left);
+
+  // Handle one line at a time. Skip line if vertical limit reached.
+  for (int y = 0; y < limit; ++y) {
+    const int16_t wT = 32 >> (2 * (y + 0) >> scale);
+    __m256i vwT = _mm256_set1_epi16(wT);
+
+    for (int x = 0; x < width; x += 16) {
+      __m128i vpred = _mm_load_si128((__m128i*)(dst + (y * width + x)));
+      __m256i vpred16 = _mm256_cvtepu8_epi16(vpred);
+
+      __m256i accu = _mm256_sub_epi16(vref16, vtopleft);
+      accu = _mm256_mullo_epi16(vwT, accu);
+      accu = _mm256_add_epi16(accu, v32s);
+      accu = _mm256_srai_epi16(accu, 6);
+      accu = _mm256_add_epi16(vpred16, accu);
+
+      __m128i lo = _mm256_castsi256_si128(accu);
+      __m128i hi = _mm256_extracti128_si256(accu, 1);
+      __m128i filtered = _mm_packus_epi16(lo, hi);
+
+      _mm_storeu_si128((__m128i*)(dst + (y * width + x)), filtered);
+    }
+  }
+}
 
 static void angular_pdpc_mode18_w32_improved_avx2(uvg_pixel* dst, const uvg_pixel top_left, const uvg_pixel* ref_side, const int height, const int scale)
 {
@@ -3202,9 +2364,6 @@ static void angular_pdpc_mode18_w64_improved_avx2(uvg_pixel* dst, const uvg_pixe
     _mm256_store_si256((__m256i*)(dst + (y * width + 32)), packed1);
   }
 }
-
-
-// Mode 50
 
 
 // Vertical modes
@@ -3815,294 +2974,7 @@ static void angular_pdpc_hor_w16_improved_avx2(uvg_pixel* dst, const uvg_pixel* 
 }
 
 
-// This is the non-vectorized version of pdpc mode 18. It is left here for archiving purposes.
-static void angular_pdpc_mode18_avx2(uvg_pixel* dst, const uvg_pixel top_left, const uvg_pixel* ref_side, const int width, const int height, const int scale)
-{
-  const int limit = MIN(3 << scale, height);
-  for (int_fast32_t x = 0; x < width; ++x) {
-    const uvg_pixel ref_top = ref_side[1 + x];
-    for (int yy = 0; yy < limit; ++yy) {
-      const int wT = 32 >> ((yy * 2) >> scale);
-      const uvg_pixel val = dst[yy * width + x];
-      dst[yy * width + x] = CLIP_TO_PIXEL(val + (((ref_top - top_left) * wT + 32) >> 6));
-    }
-  }
-}
-
-static void angular_pdpc_mode18_w4_avx2(uvg_pixel* dst, const uvg_pixel top_left, const uvg_pixel* ref_side, const int height, const int scale)
-{
-  const int width = 4;
-  const int limit = MIN(3 << scale, height);
-
-  __m128i vseq = _mm_setr_epi32(0, 1, 2, 3);
-  __m128i vidx = _mm_slli_epi32(vseq, 2); // 2 is log2_width
-  __m256i v32s = _mm256_set1_epi16(32);
-
-  const uint32_t ref4 = *(uint32_t*)&ref_side[1];
-  
-  __m128i vref = _mm_set1_epi32(ref4);
-  __m256i vref16 = _mm256_cvtepu8_epi16(vref);
-
-  __m256i vtopleft = _mm256_set1_epi16((uint16_t)top_left);
-
-  // Weight table offset
-  const int table_offset = scale * 64;
-
-  for (int y = 0, o = 0; y < limit; y += 4, o += 16) {
-    const int offset = table_offset + o;
-
-    __m128i vpred = _mm_i32gather_epi32((const int32_t*)(dst + y * width), vidx, 1);
-    __m256i vpred16 = _mm256_cvtepu8_epi16(vpred);
-    __m256i vwT = _mm256_load_si256((const __m256i*) &intra_pdpc_w4_hor_weight[offset]);
-
-    __m256i accu = _mm256_sub_epi16(vref16, vtopleft);
-    accu = _mm256_mullo_epi16(vwT, accu);
-    accu = _mm256_add_epi16(accu, v32s);
-    accu = _mm256_srai_epi16(accu, 6);
-    accu = _mm256_add_epi16(vpred16, accu);
-
-    __m128i lo = _mm256_castsi256_si128(accu);
-    __m128i hi = _mm256_extracti128_si256(accu, 1);
-    __m128i filtered = _mm_packus_epi16(lo, hi);
-
-    _mm_storeu_si128((__m128i*)(dst + (y * width)), filtered);
-  }
-}
-
-static void angular_pdpc_mode18_w8_avx2(uvg_pixel* dst, const uvg_pixel top_left, const uvg_pixel* ref_side, const int height, const int scale)
-{
-  const int width = 8;
-
-  int limit = MIN(3 << scale, height);
-
-  __m128i vseq = _mm_setr_epi32(0x00, 0x00, 0x01, 0x00);
-  __m128i vidx = _mm_slli_epi64(vseq, 3); // 3 is log2 width
-  __m256i v32s = _mm256_set1_epi16(32);
-
-  const uint64_t ref8 = *(uint64_t*)&ref_side[1];
-
-  __m128i vref = _mm_set1_epi64x(ref8);
-  __m256i vref16 = _mm256_cvtepu8_epi16(vref);
-
-  __m256i vtopleft = _mm256_set1_epi16((uint16_t)top_left);
-
-  // Weight table offset
-  const int table_offset = scale * 128;
-
-  for (int y = 0, o = table_offset; y < limit; y += 2, o += 16) {
-    const __m256i vwT = _mm256_load_si256((const __m256i*) &intra_pdpc_w8_hor_weight[o]);
-
-    __m128i vpred = _mm_i64gather_epi64((const long long int*)(dst + y * width), vidx, 1);
-    __m256i vpred16 = _mm256_cvtepu8_epi16(vpred);
-    
-    __m256i accu = _mm256_sub_epi16(vref16, vtopleft);
-    accu = _mm256_mullo_epi16(vwT, accu);
-    accu = _mm256_add_epi16(accu, v32s);
-    accu = _mm256_srai_epi16(accu, 6);
-    accu = _mm256_add_epi16(vpred16, accu);
-
-    __m128i lo = _mm256_castsi256_si128(accu);
-    __m128i hi = _mm256_extracti128_si256(accu, 1);
-    __m128i filtered = _mm_packus_epi16(lo, hi);
-
-    _mm_storeu_si128((__m128i*)(dst + (y * width)), filtered);
-  }
-}
-
-static void angular_pdpc_mode18_w16_avx2(uvg_pixel* dst, const uvg_pixel top_left, const uvg_pixel* ref_side, const int height, const int scale)
-{
-  const int width = 16;
-  int limit = MIN(3 << scale, height);
-  __m256i v32s = _mm256_set1_epi16(32);
-
-  __m128i vref = _mm_loadu_si128((const __m128i*)&ref_side[1]);
-  __m256i vref16 = _mm256_cvtepu8_epi16(vref);
-
-  __m256i vtopleft = _mm256_set1_epi16((uint16_t)top_left);
-
-  // Handle one line at a time. Skip line if vertical limit reached.
-  for (int y = 0; y < limit; ++y) {
-    const int16_t wT = 32 >> (2 * (y + 0) >> scale);
-    __m256i vwT = _mm256_set1_epi16(wT);
-
-    for (int x = 0; x < width; x += 16) {
-      __m128i vpred = _mm_load_si128((__m128i*)(dst + (y * width + x)));
-      __m256i vpred16 = _mm256_cvtepu8_epi16(vpred);
-      
-      __m256i accu = _mm256_sub_epi16(vref16, vtopleft);
-      accu = _mm256_mullo_epi16(vwT, accu);
-      accu = _mm256_add_epi16(accu, v32s);
-      accu = _mm256_srai_epi16(accu, 6);
-      accu = _mm256_add_epi16(vpred16, accu);
-
-      __m128i lo = _mm256_castsi256_si128(accu);
-      __m128i hi = _mm256_extracti128_si256(accu, 1);
-      __m128i filtered = _mm_packus_epi16(lo, hi);
-
-      _mm_storeu_si128((__m128i*)(dst + (y * width + x)), filtered);
-    }
-  }
-}
-
-static void angular_pdpc_mode18_w32_avx2(uvg_pixel* dst, const uvg_pixel top_left, const uvg_pixel* ref_side, const int height, const int scale)
-{
-  const int width = 32;
-  int limit = MIN(3 << scale, height);
-  __m256i v32s = _mm256_set1_epi16(32);
-
-  __m128i vrefa = _mm_loadu_si128((const __m128i*) &ref_side[1]);
-  __m256i vref16a = _mm256_cvtepu8_epi16(vrefa);
-
-  __m128i vrefb = _mm_loadu_si128((const __m128i*) &ref_side[17]);
-  __m256i vref16b = _mm256_cvtepu8_epi16(vrefb);
-
-  __m256i vtopleft = _mm256_set1_epi16((uint16_t)top_left);
-
-  // Handle one line at a time. Skip line if vertical limit reached.
-  for (int y = 0; y < limit; ++y) {
-    const int16_t wT = 32 >> (2 * (y + 0) >> scale);
-    __m256i vwT = _mm256_set1_epi16(wT);
-
-    // Calculate first half
-    __m128i vpred = _mm_load_si128((__m128i*)(dst + (y * width + 0)));
-    __m256i vpred16 = _mm256_cvtepu8_epi16(vpred);
-
-    __m256i accu = _mm256_sub_epi16(vref16a, vtopleft);
-    accu = _mm256_mullo_epi16(vwT, accu);
-    accu = _mm256_add_epi16(accu, v32s);
-    accu = _mm256_srai_epi16(accu, 6);
-    accu = _mm256_add_epi16(vpred16, accu);
-
-    __m128i lo = _mm256_castsi256_si128(accu);
-    __m128i hi = _mm256_extracti128_si256(accu, 1);
-    __m128i filtered = _mm_packus_epi16(lo, hi);
-
-    _mm_storeu_si128((__m128i*)(dst + (y * width + 0)), filtered);
-
-    // Calculate second half
-    vpred = _mm_load_si128((__m128i*)(dst + (y * width + 16)));
-    vpred16 = _mm256_cvtepu8_epi16(vpred);
-
-    accu = _mm256_sub_epi16(vref16b, vtopleft);
-    accu = _mm256_mullo_epi16(vwT, accu);
-    accu = _mm256_add_epi16(accu, v32s);
-    accu = _mm256_srai_epi16(accu, 6);
-    accu = _mm256_add_epi16(vpred16, accu);
-
-    lo = _mm256_castsi256_si128(accu);
-    hi = _mm256_extracti128_si256(accu, 1);
-    filtered = _mm_packus_epi16(lo, hi);
-
-    _mm_storeu_si128((__m128i*)(dst + (y * width + 16)), filtered);
-  }
-}
-
-static void angular_pdpc_mode18_w64_avx2(uvg_pixel* dst, const uvg_pixel top_left, const uvg_pixel* ref_side, const int height, const int scale)
-{
-  const int width = 64;
-  int limit = MIN(3 << scale, height);
-  __m256i v32s = _mm256_set1_epi16(32);
-
-  __m128i vrefa = _mm_loadu_si128((const __m128i*) &ref_side[0 + 1]);
-  __m256i vref16a = _mm256_cvtepu8_epi16(vrefa);
-
-  __m128i vrefb = _mm_loadu_si128((const __m128i*) &ref_side[16 + 1]);
-  __m256i vref16b = _mm256_cvtepu8_epi16(vrefb);
-
-  __m128i vrefc = _mm_loadu_si128((const __m128i*) &ref_side[32 + 1]);
-  __m256i vref16c = _mm256_cvtepu8_epi16(vrefc);
-
-  __m128i vrefd = _mm_loadu_si128((const __m128i*) &ref_side[48 + 1]);
-  __m256i vref16d = _mm256_cvtepu8_epi16(vrefd);
-
-  __m256i vtopleft = _mm256_set1_epi16((uint16_t)top_left);
-
-  // Handle one line at a time. Skip line if vertical limit reached.
-  for (int y = 0; y < limit; ++y) {
-    const int16_t wT = 32 >> (2 * (y + 0) >> scale);
-    __m256i vwT = _mm256_set1_epi16(wT);
-
-    // Calculate first quarter
-    __m128i vpred = _mm_load_si128((__m128i*)(dst + (y * width + 0)));
-    __m256i vpred16 = _mm256_cvtepu8_epi16(vpred);
-
-    __m256i accu = _mm256_sub_epi16(vref16a, vtopleft);
-    accu = _mm256_mullo_epi16(vwT, accu);
-    accu = _mm256_add_epi16(accu, v32s);
-    accu = _mm256_srai_epi16(accu, 6);
-    accu = _mm256_add_epi16(vpred16, accu);
-
-    __m128i lo = _mm256_castsi256_si128(accu);
-    __m128i hi = _mm256_extracti128_si256(accu, 1);
-    __m128i filtered = _mm_packus_epi16(lo, hi);
-
-    _mm_storeu_si128((__m128i*)(dst + (y * width + 0)), filtered);
-
-    // Calculate second quarter
-    vpred = _mm_load_si128((__m128i*)(dst + (y * width + 16)));
-    vpred16 = _mm256_cvtepu8_epi16(vpred);
-
-    accu = _mm256_sub_epi16(vref16b, vtopleft);
-    accu = _mm256_mullo_epi16(vwT, accu);
-    accu = _mm256_add_epi16(accu, v32s);
-    accu = _mm256_srai_epi16(accu, 6);
-    accu = _mm256_add_epi16(vpred16, accu);
-
-    lo = _mm256_castsi256_si128(accu);
-    hi = _mm256_extracti128_si256(accu, 1);
-    filtered = _mm_packus_epi16(lo, hi);
-
-    _mm_storeu_si128((__m128i*)(dst + (y * width + 16)), filtered);
-
-    // Calculate third quarter
-    vpred = _mm_load_si128((__m128i*)(dst + (y * width + 32)));
-    vpred16 = _mm256_cvtepu8_epi16(vpred);
-
-    accu = _mm256_sub_epi16(vref16c, vtopleft);
-    accu = _mm256_mullo_epi16(vwT, accu);
-    accu = _mm256_add_epi16(accu, v32s);
-    accu = _mm256_srai_epi16(accu, 6);
-    accu = _mm256_add_epi16(vpred16, accu);
-
-    lo = _mm256_castsi256_si128(accu);
-    hi = _mm256_extracti128_si256(accu, 1);
-    filtered = _mm_packus_epi16(lo, hi);
-
-    _mm_storeu_si128((__m128i*)(dst + (y * width + 32)), filtered);
-
-    // Calculate fourth quarter
-    vpred = _mm_load_si128((__m128i*)(dst + (y * width + 48)));
-    vpred16 = _mm256_cvtepu8_epi16(vpred);
-
-    accu = _mm256_sub_epi16(vref16d, vtopleft);
-    accu = _mm256_mullo_epi16(vwT, accu);
-    accu = _mm256_add_epi16(accu, v32s);
-    accu = _mm256_srai_epi16(accu, 6);
-    accu = _mm256_add_epi16(vpred16, accu);
-
-    lo = _mm256_castsi256_si128(accu);
-    hi = _mm256_extracti128_si256(accu, 1);
-    filtered = _mm_packus_epi16(lo, hi);
-
-    _mm_storeu_si128((__m128i*)(dst + (y * width + 48)), filtered);
-  }
-}
-
-
-// This is the non-vectorized version of pdpc mode 50. It is left here for archiving purposes.
-static void angular_pdpc_mode50_avx2(uvg_pixel* dst, const uvg_pixel top_left, const uvg_pixel* ref_side, const int width, const int height, const int scale)
-{
-  const int limit = MIN(3 << scale, width);
-  for (int y = 0; y < height; ++y) {
-    const uvg_pixel left = ref_side[1 + y];
-    for (int x = 0; x < limit; x++) {
-      const int wL = 32 >> (2 * x >> scale);
-      const uvg_pixel val = dst[y * width + x];
-      dst[y * width + x] = CLIP_TO_PIXEL(val + ((wL * (left - top_left) + 32) >> 6));
-    }
-  }
-}
-
+// Prediction mode 50 versions of PDPC functions.
 static void angular_pdpc_mode50_w4_avx2(uvg_pixel* dst, const uvg_pixel top_left, const uvg_pixel* ref_side, const int height, const int scale)
 {
   const int width = 4;
@@ -4266,6 +3138,19 @@ static void angular_pdpc_mode50_scale1_avx2(uvg_pixel* dst, const uvg_pixel top_
   }
 }
 
+// The main angular prediction entry point for AVX2.
+/**
+ * \brief AVX2 version of angular intra prediction.
+ * \param cu_loc        CU location and size data.
+ * \param intra_mode    Intra prediction mode.
+ * \param channel_type  Color channel.
+ * \param in_ref_above  Pointer to -1 index of above reference.
+ * \param in_ref_left   Pointer to -1 index of left reference.
+ * \param dst           Buffer of size MAX_PRED_WIDTH * MAX_PRED_WIDTH.
+ * \param multi_ref_idx Multi reference index.
+ * \param isp_mode      Intra sub-partition mode.
+ * \param cu_dim        CU dimension, used along ISP mode.
+ */
 static void uvg_angular_pred_avx2(
   const cu_loc_t* const cu_loc,
   const int_fast8_t intra_mode,
