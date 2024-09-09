@@ -566,44 +566,26 @@ static void angular_pred_w4_hor_avx2(uvg_pixel* dst, const uvg_pixel* ref_main, 
   }
 }
 
-static void angular_pred_w8_hor_high_angle_avx2(uvg_pixel* dst, const uvg_pixel* ref_main, const int16_t* delta_int, const int16_t* delta_fract, const int height, const int use_cubic)
+static void angular_pred_w8_hor_high_angle_avx2(uvg_pixel* dst, const uvg_pixel* ref_main, const int16_t* delta_int, const int16_t* delta_fract, const int height, const int8_t(*filter)[4])
 {
   const int width = 8;
 
-  int8_t f[8][4] = { { 0 } };
-  if (use_cubic) {
-    memcpy(f[0], cubic_filter_8bit_c[delta_fract[0]], sizeof(int8_t) * 4);
-    memcpy(f[1], cubic_filter_8bit_c[delta_fract[1]], sizeof(int8_t) * 4);
-    memcpy(f[2], cubic_filter_8bit_c[delta_fract[2]], sizeof(int8_t) * 4);
-    memcpy(f[3], cubic_filter_8bit_c[delta_fract[3]], sizeof(int8_t) * 4);
-    memcpy(f[4], cubic_filter_8bit_c[delta_fract[4]], sizeof(int8_t) * 4);
-    memcpy(f[5], cubic_filter_8bit_c[delta_fract[5]], sizeof(int8_t) * 4);
-    memcpy(f[6], cubic_filter_8bit_c[delta_fract[6]], sizeof(int8_t) * 4);
-    memcpy(f[7], cubic_filter_8bit_c[delta_fract[7]], sizeof(int8_t) * 4);
-  }
-  else {
-    for (int x = 0; x < 8; ++x) {
-      const int8_t offset = (delta_fract[x] >> 1);
-      f[x][0] = 16 - offset;
-      f[x][1] = 32 - offset;
-      f[x][2] = 16 + offset;
-      f[x][3] = offset;
-    }
-  }
-
   __m128i tmp = _mm_loadu_si128((__m128i*)delta_int);
   __m256i vidx = _mm256_cvtepi16_epi32(tmp);
-  __m256i weights = _mm256_loadu_si256((__m256i*)f);
+  // Load weights
+  tmp = _mm_load_si128((__m128i*)delta_fract);
+  __m256i vidxw = _mm256_cvtepi16_epi32(tmp);
+  __m256i vweights = _mm256_i32gather_epi32((const int32_t*)(void*)filter, vidxw, 4);
 
   for (int y = 0; y < height; y += 2) {
 
     // Do 4-tap intra interpolation filtering
     uvg_pixel* p = (uvg_pixel*)(ref_main + y);
-    __m256i vp0 = _mm256_i32gather_epi32((const int*)(p + 0), vidx, 1);
-    __m256i vp1 = _mm256_i32gather_epi32((const int*)(p + 1), vidx, 1);
+    __m256i vp0 = _mm256_i32gather_epi32((const int*)&ref_main[y + 0], vidx, 1);
+    __m256i vp1 = _mm256_i32gather_epi32((const int*)&ref_main[y + 1], vidx, 1);
 
-    __m256i dot_01 = _mm256_maddubs_epi16(vp0, weights);
-    __m256i dot_23 = _mm256_maddubs_epi16(vp1, weights);
+    __m256i dot_01 = _mm256_maddubs_epi16(vp0, vweights);
+    __m256i dot_23 = _mm256_maddubs_epi16(vp1, vweights);
     __m256i sum = _mm256_hadd_epi16(dot_01, dot_23);
     sum = _mm256_add_epi16(sum, _mm256_set1_epi16(32));
     sum = _mm256_srai_epi16(sum, 6);
@@ -4322,7 +4304,7 @@ static void uvg_angular_pred_avx2(
               break;
             case  8: 
               if (pred_mode < -2)
-                angular_pred_w8_hor_high_angle_avx2(dst, ref_main, delta_int, delta_fract, height, use_cubic);
+                angular_pred_w8_hor_high_angle_avx2(dst, ref_main, delta_int, delta_fract, height, pfilter);
               else
                 angular_pred_w8_hor_avx2(dst, ref_main, pred_mode, multi_ref_index, delta_int, delta_fract, height, pfilter);
 
