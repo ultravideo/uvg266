@@ -239,7 +239,7 @@ static void angular_pred_w4_ver_avx2(uvg_pixel* dst, const uvg_pixel* ref_main, 
   }
 }
 
-static void angular_pred_w8_ver_avx2(uvg_pixel* dst, const uvg_pixel* ref_main, const int16_t* delta_int, const int16_t* delta_fract, const int height, const int8_t(*filter)[4])
+static void angular_pred_w8_h2_ver_avx2(uvg_pixel* dst, const uvg_pixel* ref_main, const int16_t* delta_int, const int16_t* delta_fract, const int height, const int8_t(*filter)[4])
 {
   //const int width = 8;
 
@@ -4336,16 +4336,56 @@ static void uvg_angular_pred_avx2(
   if (sample_disp < 0) {
     // In cases where sample_disp is negative, references are needed from both sides.
     // This step combines the main and side reference.
-    memcpy(&temp_main[height], &in_ref_above[0], (width + 2 + multi_ref_index) * sizeof(uvg_pixel));
-    memcpy(&temp_side[width], &in_ref_left[0], (height + 2 + multi_ref_index) * sizeof(uvg_pixel));
+    if (vertical_mode) {
+      memcpy(&temp_main[height], in_ref_above, (width + 2 + multi_ref_index) * sizeof(uvg_pixel));
+    }
+    else {
+      memcpy(&temp_main[width], in_ref_left, (height + 2 + multi_ref_index) * sizeof(uvg_pixel));
+    }
+    //memcpy(&temp_main[height], &in_ref_above[0], (width + 2 + multi_ref_index) * sizeof(uvg_pixel));
+    //memcpy(&temp_side[width], &in_ref_left[0], (height + 2 + multi_ref_index) * sizeof(uvg_pixel));
 
-    ref_main = vertical_mode ? temp_main + height : temp_side + width;
-    ref_side = vertical_mode ? temp_side + width  : temp_main + height;
+    ref_main = vertical_mode ? &temp_main[height] : &temp_main[width];
+    ref_side = vertical_mode ? in_ref_left : in_ref_above;
 
     int size_side = vertical_mode ? height : width;
-    const int modedisp2invsampledisp_abs = modedisp2invsampledisp[abs_mode_disp];
-    for (int i = -size_side; i <= -1; i++) {
-      ref_main[i] = ref_side[MIN((-i * modedisp2invsampledisp_abs + 256) >> 9, size_side)];
+    switch (size_side) {
+      case 4:
+      {
+        int shuf_offset = abs_mode_disp * 16;
+        __m128i vshuf = _mm_load_si128((__m128i*) &intra_refbuild_shuffle_vectors_sidesize_4[shuf_offset]);
+        __m128i vref = _mm_loadu_si128((const __m128i*) &ref_side[0]);
+        vref = _mm_shuffle_epi8(vref, vshuf);
+        uint32_t tmp = _mm_extract_epi32(vref, 0);
+        memcpy(&temp_main[0], &tmp, sizeof(uint32_t));
+        break;
+      }
+      case 8:
+      {
+        int shuf_offset = abs_mode_disp * 16;
+        __m128i vshuf = _mm_load_si128((__m128i*) &intra_refbuild_shuffle_vectors_sidesize_8[shuf_offset]);
+        __m128i vref = _mm_loadu_si128((const __m128i*) &ref_side[0]);
+        vref = _mm_shuffle_epi8(vref, vshuf);
+        uint64_t tmp = _mm_extract_epi64(vref, 0);
+        memcpy(&temp_main[0], &tmp, sizeof(uint64_t));
+        break;
+      }
+      case 16:
+      {
+        int shuf_offset = abs_mode_disp * 16;
+        __m128i vshuf = _mm_load_si128((__m128i*) &intra_refbuild_shuffle_vectors_sidesize_16[shuf_offset]);
+        __m128i vref = _mm_loadu_si128((const __m128i*) &ref_side[1]); // Offset ref by one to fit all necessary 16 refs. Offset accounted for in shuffle vectors.
+        vref = _mm_shuffle_epi8(vref, vshuf);
+        _mm_store_si128((__m128i*) &temp_main[0], vref);
+        break;
+      }
+      case 32:
+      case 64:
+      default:
+        const int modedisp2invsampledisp_abs = modedisp2invsampledisp[abs_mode_disp];
+        for (int i = -size_side; i <= -1; i++) {
+          ref_main[i] = ref_side[MIN((-i * modedisp2invsampledisp_abs + 256) >> 9, size_side)];
+        }
     }
   }
   else {
