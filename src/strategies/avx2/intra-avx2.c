@@ -445,7 +445,7 @@ static void angular_pred_w16_ver_avx2(uvg_pixel* dst, const uvg_pixel* ref_main,
   for (int y = 0; y < height; ++y) {
 
     // Load and shuffle filter weights
-    __m128i vweights = _mm_load_si128((__m128i*)&filter[delta_fract[y]]);
+    __m128i vweights = _mm_loadu_si128((__m128i*)&filter[delta_fract[y]]);
     __m256i vw256 = _mm256_inserti128_si256(_mm256_castsi128_si256(vweights), vweights, 1);
 
     __m256i w01 = _mm256_shuffle_epi8(vw256, w_shuf_01);
