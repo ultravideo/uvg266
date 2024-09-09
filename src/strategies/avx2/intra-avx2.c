@@ -4356,8 +4356,9 @@ static void uvg_angular_pred_avx2(
         __m128i vshuf = _mm_load_si128((__m128i*) &intra_refbuild_shuffle_vectors_sidesize_4[shuf_offset]);
         __m128i vref = _mm_loadu_si128((const __m128i*) &ref_side[0]);
         vref = _mm_shuffle_epi8(vref, vshuf);
-        uint32_t tmp = _mm_extract_epi32(vref, 0);
-        memcpy(&temp_main[0], &tmp, sizeof(uint32_t));
+        /*uint32_t tmp = _mm_extract_epi32(vref, 0);
+        memcpy(&temp_main[0], &tmp, sizeof(uint32_t));*/
+        _mm_maskstore_epi32((int32_t*)&temp_main[0], _mm_setr_epi32(0xffffffff, 0, 0, 0), vref);
         break;
       }
       case 8:
@@ -4366,8 +4367,9 @@ static void uvg_angular_pred_avx2(
         __m128i vshuf = _mm_load_si128((__m128i*) &intra_refbuild_shuffle_vectors_sidesize_8[shuf_offset]);
         __m128i vref = _mm_loadu_si128((const __m128i*) &ref_side[0]);
         vref = _mm_shuffle_epi8(vref, vshuf);
-        uint64_t tmp = _mm_extract_epi64(vref, 0);
-        memcpy(&temp_main[0], &tmp, sizeof(uint64_t));
+        /*uint64_t tmp = _mm_extract_epi64(vref, 0);
+        memcpy(&temp_main[0], &tmp, sizeof(uint64_t));*/
+        _mm_maskstore_epi32((int32_t*)&temp_main[0], _mm_setr_epi32(0xffffffff, 0xffffffff, 0, 0), vref);
         break;
       }
       case 16:
@@ -4380,6 +4382,27 @@ static void uvg_angular_pred_avx2(
         break;
       }
       case 32:
+      {
+        int shuf_offset = abs_mode_disp * 32;
+        __m128i vshufhi = _mm_load_si128((__m128i*) &intra_refbuild_shuffle_vectors_sidesize_32[shuf_offset + 0]);
+        __m128i vshuflo = _mm_load_si128((__m128i*) &intra_refbuild_shuffle_vectors_sidesize_32[shuf_offset + 16]);
+        __m128i vblend = _mm_cmpgt_epi8(vshuflo, _mm_set1_epi8(15));
+        
+        __m128i vreflo = _mm_loadu_si128((const __m128i*) & ref_side[1]); // Offset ref by one to fit all necessary 16 refs. Offset accounted for in shuffle vectors.
+        __m128i vrefhi = _mm_loadu_si128((const __m128i*) & ref_side[17]);
+        
+        // Second half of references requires samples from both sides
+        __m128i vreftmphi = _mm_shuffle_epi8(vrefhi, vshuflo);
+        __m128i vreftmplo = _mm_shuffle_epi8(vreflo, vshuflo);
+        vreflo = _mm_blendv_epi8(vreftmplo, vreftmphi, vblend);
+        
+        // First half of references use references from the hi side only
+        vrefhi = _mm_shuffle_epi8(vrefhi, vshufhi);
+        
+        _mm_store_si128((__m128i*) &temp_main[0], vrefhi);
+        _mm_store_si128((__m128i*) &temp_main[16], vreflo);
+        break;
+      }
       case 64:
       default:
         const int modedisp2invsampledisp_abs = modedisp2invsampledisp[abs_mode_disp];
