@@ -305,6 +305,111 @@ static void angular_pred_w8_ver_avx2(uvg_pixel* dst, const uvg_pixel* ref_main, 
   }
 }
 
+static void angular_pred_w8_ver_avx2(uvg_pixel* dst, const uvg_pixel* ref_main, const int16_t* delta_int, const int16_t* delta_fract, const int height, const int8_t(*filter)[4])
+{
+  //const int width = 8;
+
+  const __m128i p_shuf_01 = _mm_setr_epi8(
+    0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
+    0x04, 0x05, 0x05, 0x06, 0x06, 0x07, 0x07, 0x08
+  );
+
+  const __m128i p_shuf_23 = _mm_setr_epi8(
+    0x02, 0x03, 0x03, 0x04, 0x04, 0x05, 0x05, 0x06,
+    0x06, 0x07, 0x07, 0x08, 0x08, 0x09, 0x09, 0x0a
+  );
+
+  const __m256i w_shuf_01_row01 = _mm256_setr_epi8(
+    0x00, 0x01, 0x00, 0x01, 0x00, 0x01, 0x00, 0x01,
+    0x00, 0x01, 0x00, 0x01, 0x00, 0x01, 0x00, 0x01,
+    0x04, 0x05, 0x04, 0x05, 0x04, 0x05, 0x04, 0x05,
+    0x04, 0x05, 0x04, 0x05, 0x04, 0x05, 0x04, 0x05
+  );
+
+  const __m256i w_shuf_23_row01 = _mm256_setr_epi8(
+    0x02, 0x03, 0x02, 0x03, 0x02, 0x03, 0x02, 0x03,
+    0x02, 0x03, 0x02, 0x03, 0x02, 0x03, 0x02, 0x03,
+    0x06, 0x07, 0x06, 0x07, 0x06, 0x07, 0x06, 0x07,
+    0x06, 0x07, 0x06, 0x07, 0x06, 0x07, 0x06, 0x07
+  );
+
+  const __m256i w_shuf_01_row23 = _mm256_setr_epi8(
+    0x08, 0x09, 0x08, 0x09, 0x08, 0x09, 0x08, 0x09,
+    0x08, 0x09, 0x08, 0x09, 0x08, 0x09, 0x08, 0x09,
+    0x0c, 0x0d, 0x0c, 0x0d, 0x0c, 0x0d, 0x0c, 0x0d,
+    0x0c, 0x0d, 0x0c, 0x0d, 0x0c, 0x0d, 0x0c, 0x0d
+  );
+
+  const __m256i w_shuf_23_row23 = _mm256_setr_epi8(
+    0x0a, 0x0b, 0x0a, 0x0b, 0x0a, 0x0b, 0x0a, 0x0b,
+    0x0a, 0x0b, 0x0a, 0x0b, 0x0a, 0x0b, 0x0a, 0x0b,
+    0x0e, 0x0f, 0x0e, 0x0f, 0x0e, 0x0f, 0x0e, 0x0f,
+    0x0e, 0x0f, 0x0e, 0x0f, 0x0e, 0x0f, 0x0e, 0x0f
+  );
+
+  // Do 4-tap intra interpolation filtering
+  // For a 8 width block, height must be at least 2. This version handles 4 lines at once to minimize vidx loads.
+  // No need to check height 2 cases, other function handles that.
+  for (int y = 0; y < height; y += 4) {
+
+    // Load and shuffle filter weights
+    __m128i vidxw = _mm_load_si128((__m128i*) & delta_fract[y]);
+    __m128i vidxw32 = _mm_cvtepi16_epi32(vidxw);
+    __m128i all_weights = _mm_i32gather_epi32((const int32_t*)filter, vidxw32, 4);
+    __m256i aw256 = _mm256_inserti128_si256(_mm256_castsi128_si256(all_weights), all_weights, 1);
+
+    __m256i w01_row01 = _mm256_shuffle_epi8(aw256, w_shuf_01_row01);
+    __m256i w23_row01 = _mm256_shuffle_epi8(aw256, w_shuf_23_row01);
+    __m256i w01_row23 = _mm256_shuffle_epi8(aw256, w_shuf_01_row23);
+    __m256i w23_row23 = _mm256_shuffle_epi8(aw256, w_shuf_23_row23);
+
+    // Load and shuffle reference pixels
+    __m128i vp0 = _mm_loadu_si128((__m128i*)(ref_main + delta_int[y + 0]));
+    __m128i vp1 = _mm_loadu_si128((__m128i*)(ref_main + delta_int[y + 1]));
+    __m128i vp2 = _mm_loadu_si128((__m128i*)(ref_main + delta_int[y + 2]));
+    __m128i vp3 = _mm_loadu_si128((__m128i*)(ref_main + delta_int[y + 3]));
+
+    __m256i vp_01_row01 = _mm256_castsi128_si256(_mm_shuffle_epi8(vp0, p_shuf_01));
+    vp_01_row01 = _mm256_inserti128_si256(vp_01_row01, _mm_shuffle_epi8(vp1, p_shuf_01), 1);
+
+    __m256i vp_23_row01 = _mm256_castsi128_si256(_mm_shuffle_epi8(vp0, p_shuf_23));
+    vp_23_row01 = _mm256_inserti128_si256(vp_23_row01, _mm_shuffle_epi8(vp1, p_shuf_23), 1);
+
+    __m256i vp_01_row23 = _mm256_castsi128_si256(_mm_shuffle_epi8(vp2, p_shuf_01));
+    vp_01_row23 = _mm256_inserti128_si256(vp_01_row23, _mm_shuffle_epi8(vp3, p_shuf_01), 1);
+
+    __m256i vp_23_row23 = _mm256_castsi128_si256(_mm_shuffle_epi8(vp2, p_shuf_23));
+    vp_23_row23 = _mm256_inserti128_si256(vp_23_row23, _mm_shuffle_epi8(vp3, p_shuf_23), 1);
+
+    __m256i vmadd01_row01 = _mm256_maddubs_epi16(vp_01_row01, w01_row01);
+    __m256i vmadd23_row01 = _mm256_maddubs_epi16(vp_23_row01, w23_row01);
+    __m256i vmadd01_row23 = _mm256_maddubs_epi16(vp_01_row23, w01_row23);
+    __m256i vmadd23_row23 = _mm256_maddubs_epi16(vp_23_row23, w23_row23);
+
+
+    __m256i sum01 = _mm256_add_epi16(vmadd01_row01, vmadd23_row01);
+    __m256i sum23 = _mm256_add_epi16(vmadd01_row23, vmadd23_row23);
+    sum01 = _mm256_add_epi16(sum01, _mm256_set1_epi16(32));
+    sum23 = _mm256_add_epi16(sum23, _mm256_set1_epi16(32));
+    sum01 = _mm256_srai_epi16(sum01, 6);
+    sum23 = _mm256_srai_epi16(sum23, 6);
+
+    __m128i lo01 = _mm256_castsi256_si128(sum01);
+    __m128i hi01 = _mm256_extracti128_si256(sum01, 1);
+    __m128i lo23 = _mm256_castsi256_si128(sum23);
+    __m128i hi23 = _mm256_extracti128_si256(sum23, 1);
+
+    __m128i packed01 = _mm_packus_epi16(lo01, hi01);
+    __m128i packed23 = _mm_packus_epi16(lo23, hi23);
+    //__m256i packed = _mm256_inserti128_si256(_mm256_castsi128_si256(packed01), packed23, 1);
+
+    //_mm256_store_si256((__m256i*)dst, packed);
+    _mm_store_si128((__m128i*)(dst + 0), packed01);
+    _mm_store_si128((__m128i*)(dst + 16), packed23);
+    dst += 32;
+  }
+}
+
 static void angular_pred_w16_ver_avx2(uvg_pixel* dst, const uvg_pixel* ref_main, const int16_t* delta_int, const int16_t* delta_fract, const int width, const int height, const int8_t(*filter)[4])
 {
   const __m256i p_shuf_01 = _mm256_setr_epi8(
@@ -4308,9 +4413,14 @@ static void uvg_angular_pred_avx2(
         if (vertical_mode) {
           switch (width) {
             case  4: angular_pred_w4_ver_avx2(dst, ref_main, delta_int, delta_fract, height, pfilter); break;
-            case  8: angular_pred_w8_ver_avx2(dst, ref_main, delta_int, delta_fract, height, pfilter); break;
-            case 16: angular_pred_w16_ver_avx2(dst, ref_main, delta_int, delta_fract, width, height, pfilter); break;
-            case 32: angular_pred_w16_ver_avx2(dst, ref_main, delta_int, delta_fract, width, height, pfilter); break;
+            case  8: 
+              if (height < 4)
+                angular_pred_w8_h2_ver_avx2(dst, ref_main, delta_int, delta_fract, height, pfilter);
+              else
+                angular_pred_w8_ver_avx2(dst, ref_main, delta_int, delta_fract, height, pfilter);
+              break;
+            case 16: // Use w16 function for all widths 16 and up
+            case 32: 
             case 64: angular_pred_w16_ver_avx2(dst, ref_main, delta_int, delta_fract, width, height, pfilter); break;
             default:
               assert(false && "Intra angular predicion: illegal width.\n");
