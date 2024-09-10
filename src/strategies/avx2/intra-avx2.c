@@ -410,6 +410,7 @@ static void angular_pred_w8_ver_avx2(uvg_pixel* dst, const uvg_pixel* ref_main, 
   }
 }
 
+NO_ASAN
 static void angular_pred_w16_ver_avx2(uvg_pixel* dst, const uvg_pixel* ref_main, const int16_t* delta_int, const int16_t* delta_fract, const int width, const int height, const int8_t(*filter)[4])
 {
   const __m256i p_shuf_01 = _mm256_setr_epi8(

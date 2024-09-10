@@ -314,6 +314,12 @@ typedef int32_t mv_t;
 #endif
 
 #ifdef _MSC_VER
+#define NO_ASAN
+#else
+#define NO_ASAN __attribute__((no_sanitize("address")))
+#endif
+
+#ifdef _MSC_VER
 // Buggy VS2010 throws intellisense warnings if void* is not casted.
   #define MALLOC(type, num) (type *)malloc(sizeof(type) * (num))
   #define MALLOC_SIMD_PADDED(type, num, padding) (type *)malloc(sizeof(type) * (num) + (padding))
