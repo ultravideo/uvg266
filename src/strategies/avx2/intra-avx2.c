@@ -525,7 +525,7 @@ static void angular_pred_w4_hor_high_angle_avx2(uvg_pixel* dst, const uvg_pixel*
   for (int y = 0; y < height; y += 4) {
     // This solution assumes the delta int values to be 64-bit
     // Cast from 16-bit to 64-bit.
-    __m128i vidx = _mm_load_si128((__m128i*)delta_int);
+    __m128i vidx = _mm_loadu_si128((__m128i*)delta_int);
     __m256i vidx256 = _mm256_cvtepu16_epi64(vidx);
     
     __m256i vp = _mm256_i64gather_epi64((const long long int*)&ref_main[y], vidx256, 1);
