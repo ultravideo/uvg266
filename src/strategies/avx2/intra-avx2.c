@@ -4963,48 +4963,6 @@ static void mip_upsampling_w8_ups2_hor_avx2(uvg_pixel* const dst, const uvg_pixe
   }*/
 }
 
-static void mip_upsampling_w8_ups2_hor_avx2_alt(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref, const uint16_t dst_step, const uint8_t ref_step)
-{
-  const uint8_t red_pred_size = 4;
-  const uint8_t ups_factor = 2; // width / red_pred_size
-
-  const int log2_factor = uvg_g_convert_to_log2[ups_factor];
-
-  const uvg_pixel* ref_ptr = ref + ref_step - 1;
-  const uvg_pixel* src_ptr = src;
-  const uvg_pixel* dst_ptr = dst;
-
-  ALIGNED(16) uint8_t before[17];
-  memcpy(&before[1], src_ptr, 16);
-  before[0] = ref_ptr[ref_step * 0];
-  before[4] = ref_ptr[ref_step * 1];
-  before[8] = ref_ptr[ref_step * 2];
-  before[12] = ref_ptr[ref_step * 3];
-
-  __m128i vbefore = _mm_load_si128((__m128i*)before);
-  __m128i vbehind = _mm_load_si128((__m128i*)src_ptr);
-
-  __m128i vavg = _mm_avg_epu8(vbefore, vbehind);
-
-  __m128i vreslo = _mm_unpacklo_epi8(vavg, vbehind);
-  __m128i vreshi = _mm_unpackhi_epi8(vavg, vbehind);
-
-  // Dst step is never 8, since this is only called for 8x8 blocks
-  *(uint64_t*)&dst[dst_step * 0] = _mm_extract_epi64(vreslo, 0);
-  *(uint64_t*)&dst[dst_step * 1] = _mm_extract_epi64(vreslo, 1);
-  *(uint64_t*)&dst[dst_step * 2] = _mm_extract_epi64(vreshi, 0);
-  *(uint64_t*)&dst[dst_step * 3] = _mm_extract_epi64(vreshi, 1);
-
-  /*if (dst_step == 8) {
-    _mm256_storeu_si256((__m256i*)dst, vres);
-  }
-  else {
-    *(uint64_t*)&dst[dst_step * 0] = _mm256_extract_epi64(vres, 0);
-    *(uint64_t*)&dst[dst_step * 1] = _mm256_extract_epi64(vres, 1);
-    *(uint64_t*)&dst[dst_step * 2] = _mm256_extract_epi64(vres, 2);
-    *(uint64_t*)&dst[dst_step * 3] = _mm256_extract_epi64(vres, 3);
-  }*/
-}
 
 static void mip_upsampling_w16_ups2_hor_avx2(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref, const uint16_t dst_step, const uint8_t ref_step)
 {
@@ -5117,7 +5075,7 @@ static void mip_upsampling_w16_ups4_hor_avx2(uvg_pixel* const dst, const uvg_pix
   _mm_store_si128((__m128i*)(dst_ptr + dst_step * 3), vtmp3);
 }
 
-static void mip_upsampling_w32_ups4_hor_avx2_alt(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref, const uint16_t dst_step, const uint8_t ref_step)
+static void mip_upsampling_w32_ups4_hor_avx2(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref, const uint16_t dst_step, const uint8_t ref_step)
 {
   const uint8_t red_pred_size = 8;
   const uint8_t ups_factor = 4; // width / red_pred_size
@@ -5917,7 +5875,7 @@ static void mip_upsampling_w16_ups2_ver_avx2(uvg_pixel* const dst, const uvg_pix
   _mm_store_si128((__m128i*)(dst + 224), vavg7);
 }
 
-static void mip_upsampling_w16_ups4_ver_avx2_alt(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref)
+static void mip_upsampling_w16_ups4_ver_avx2(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref)
 {
   const uvg_pixel* src_ptr = src;
   const uvg_pixel* dst_ptr = dst;
@@ -6039,7 +5997,7 @@ static void mip_upsampling_w32_ups2_ver_avx2(uvg_pixel* const dst, const uvg_pix
   }
 }
 
-static void mip_upsampling_w32_ups4_ver_avx2_alt(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref)
+static void mip_upsampling_w32_ups4_ver_avx2(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref)
 {
   const uvg_pixel* src_ptr = src;
   const uvg_pixel* dst_ptr = dst;
@@ -6085,7 +6043,7 @@ static void mip_upsampling_w32_ups4_ver_avx2_alt(uvg_pixel* const dst, const uvg
   }
 }
 
-static void mip_upsampling_w32_ups8_ver_avx2_alt(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref)
+static void mip_upsampling_w32_ups8_ver_avx2(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref)
 {
   const uvg_pixel* src_ptr = src;
   const uvg_pixel* dst_ptr = dst;
@@ -6187,7 +6145,7 @@ static void mip_upsampling_w64_ups2_ver_avx2(uvg_pixel* const dst, const uvg_pix
   }
 }
 
-static void mip_upsampling_w64_ups4_ver_avx2_alt(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref)
+static void mip_upsampling_w64_ups4_ver_avx2(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref)
 {
   const uvg_pixel* src_ptr = src;
   const uvg_pixel* dst_ptr = dst;
@@ -6266,7 +6224,7 @@ static void mip_upsampling_w64_ups4_ver_avx2_alt(uvg_pixel* const dst, const uvg
   }
 }
 
-static void mip_upsampling_w64_ups8_ver_avx2_alt(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref)
+static void mip_upsampling_w64_ups8_ver_avx2(uvg_pixel* const dst, const uvg_pixel* const src, const uvg_pixel* const ref)
 {
   const uvg_pixel* src_ptr = src;
   const uvg_pixel* dst_ptr = dst;
@@ -6589,7 +6547,7 @@ static void mip_predict_avx2(
         // Case 4 does not exist. There is no need for horizontal upsampling when width is 4.
         case 8: 
           // This will only get called for 8x8 blocks.
-          mip_upsampling_w8_ups2_hor_avx2_alt(hor_dst, reduced_pred, ref_samples_left, ver_src_step, ups_ver_factor);
+          mip_upsampling_w8_ups2_hor_avx2(hor_dst, reduced_pred, ref_samples_left, ver_src_step, ups_ver_factor);
           break;
         case 16: 
           if (red_pred_size == 4) {
@@ -6604,7 +6562,7 @@ static void mip_predict_avx2(
             mip_upsampling_w32_ups8_hor_avx2(hor_dst, reduced_pred, ref_samples_left, ver_src_step, ups_ver_factor);
           }
           else {
-            mip_upsampling_w32_ups4_hor_avx2_alt(hor_dst, reduced_pred, ref_samples_left, ver_src_step, ups_ver_factor); // Works for height 8, 16, 32 and 64. Upsamples 1 to 4.
+            mip_upsampling_w32_ups4_hor_avx2(hor_dst, reduced_pred, ref_samples_left, ver_src_step, ups_ver_factor); // Works for height 8, 16, 32 and 64. Upsamples 1 to 4.
           }
           break;
         case 64: 
@@ -6652,7 +6610,7 @@ static void mip_predict_avx2(
             mip_upsampling_w16_ups2_ver_avx2(result, ver_src, ref_samples_top);
           }
           else if (ups_ver_factor == 4) {
-            mip_upsampling_w16_ups4_ver_avx2_alt(result, ver_src, ref_samples_top);
+            mip_upsampling_w16_ups4_ver_avx2(result, ver_src, ref_samples_top);
           }
           else {
             mip_upsampling_w16_ups8_ver_avx2(result, ver_src, ref_samples_top);
@@ -6664,10 +6622,10 @@ static void mip_predict_avx2(
             mip_upsampling_w32_ups2_ver_avx2(result, ver_src, ref_samples_top);
           }
           else if (ups_ver_factor == 4) {
-            mip_upsampling_w32_ups4_ver_avx2_alt(result, ver_src, ref_samples_top);
+            mip_upsampling_w32_ups4_ver_avx2(result, ver_src, ref_samples_top);
           }
           else {
-            mip_upsampling_w32_ups8_ver_avx2_alt(result, ver_src, ref_samples_top);
+            mip_upsampling_w32_ups8_ver_avx2(result, ver_src, ref_samples_top);
           }
           break;
           
@@ -6676,10 +6634,10 @@ static void mip_predict_avx2(
             mip_upsampling_w64_ups2_ver_avx2(result, ver_src, ref_samples_top);
           }
           else if (ups_ver_factor == 4) {
-            mip_upsampling_w64_ups4_ver_avx2_alt(result, ver_src, ref_samples_top);
+            mip_upsampling_w64_ups4_ver_avx2(result, ver_src, ref_samples_top);
           }
           else {
-            mip_upsampling_w64_ups8_ver_avx2_alt(result, ver_src, ref_samples_top);
+            mip_upsampling_w64_ups8_ver_avx2(result, ver_src, ref_samples_top);
           }
           break;
 
