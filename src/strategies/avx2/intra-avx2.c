@@ -446,6 +446,8 @@ static void angular_pred_w16_ver_avx2(uvg_pixel* dst, const uvg_pixel* ref_main,
   for (int y = 0; y < height; ++y) {
 
     // Load and shuffle filter weights
+    // This load can read beyond the end of the filter table, however the values
+    // are not used in the shuffle operation.
     __m128i vweights = _mm_loadu_si128((__m128i*)&filter[delta_fract[y]]);
     __m256i vw256 = _mm256_inserti128_si256(_mm256_castsi128_si256(vweights), vweights, 1);
 
@@ -578,7 +580,7 @@ static void angular_pred_w4_hor_avx2(uvg_pixel* dst, const uvg_pixel* ref_main, 
   int ref_offset = MIN(delta_int[0], delta_int[3]);
 
   // Copy the filter to local memory
-  __m128i vdfract = _mm_load_si128((__m128i*)delta_fract);
+  __m128i vdfract = _mm_loadu_si128((__m128i*)delta_fract);
   __m128i vidx = _mm_cvtepi16_epi32(vdfract);
   __m128i all_weights = _mm_i32gather_epi32((const int32_t*)filter, vidx, 4);
   
@@ -670,7 +672,7 @@ static void angular_pred_w8_hor_avx2(uvg_pixel* dst, const uvg_pixel* ref_main, 
   const __m256i v32s = _mm256_set1_epi16(32);
 
   // Load weights
-  __m128i tmp = _mm_load_si128((__m128i*)delta_fract);
+  __m128i tmp = _mm_loadu_si128((__m128i*)delta_fract);
   __m256i vidxw = _mm256_cvtepi16_epi32(tmp);
   __m256i vweights = _mm256_i32gather_epi32((const int32_t*)filter, vidxw, 4);
   
@@ -728,8 +730,8 @@ static void angular_pred_w16_hor_high_angle_avx2(uvg_pixel* dst, const uvg_pixel
   }
   
   for (int x = 0, vi = 0; x < width; x += 16, ++vi) {
-    __m128i tmp0 = _mm_load_si128((__m128i*)&delta_int[x]);
-    __m128i tmp1 = _mm_load_si128((__m128i*)&delta_int[x + 8]);
+    __m128i tmp0 = _mm_loadu_si128((__m128i*)&delta_int[x]);
+    __m128i tmp1 = _mm_loadu_si128((__m128i*)&delta_int[x + 8]);
     __m256i vidx0 = _mm256_cvtepi16_epi32(tmp0);
     __m256i vidx1 = _mm256_cvtepi16_epi32(tmp1);
 
@@ -814,8 +816,8 @@ static void angular_pred_w32_hor_avx2(uvg_pixel* dst, const uvg_pixel* ref_main,
   for (int x = 0, shuf = table_offset; x < width; x += 16, shuf += 64) {
     const int ref_offset = MIN(delta_int[x], delta_int[x + 15]);
 
-    __m128i tmp0 = _mm_load_si128((__m128i*)&delta_fract[x]);
-    __m128i tmp1 = _mm_load_si128((__m128i*)&delta_fract[x + 8]);
+    __m128i tmp0 = _mm_loadu_si128((__m128i*)&delta_fract[x]);
+    __m128i tmp1 = _mm_loadu_si128((__m128i*)&delta_fract[x + 8]);
 
     __m256i vidx0 = _mm256_cvtepi16_epi32(tmp0);
     __m256i vidx1 = _mm256_cvtepi16_epi32(tmp1);
