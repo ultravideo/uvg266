@@ -121,6 +121,15 @@ static void hash_cfg(const encoder_state_t * const state, char id_out[33]) {
 }
 
 static bool use_resume(const encoder_state_t * const state, const int x, const int y, const bool chroma_only) {
+
+#ifdef RESUME_SUB_FRAME_POC_COND
+  if (state->frame->poc == RESUME_SUB_FRAME_POC_COND) {
+#ifdef RESUME_SUB_FRAME_LCU_IND_LT_COND
+    if ((x >> LOG2_LCU_WIDTH) + (y >> LOG2_LCU_WIDTH) * state->tile->frame->width_in_lcu < RESUME_SUB_FRAME_LCU_IND_LT_COND) return true;
+#endif // RESUME_SUB_FRAME_LCU_IND_LT_COND
+  }
+#endif //RESUME_SUB_FRAME_POC_COND
+  
 #ifdef RESUME_SLICE_COND
   if (state->frame->slicetype != RESUME_SLICE_COND) return false;
 #endif // RESUME_SLICE_COND
