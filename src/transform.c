@@ -1551,8 +1551,8 @@ void uvg_quantize_lcu_residual(
     
     cur_pu->root_cbf = cbf_is_set_any(cur_pu->cbf)
       || cbf_is_set_any(child_cbfs[0])
-      || cbf_is_set_any(child_cbfs[1])
-      || cbf_is_set_any(child_cbfs[2]);
+      || (split_count > 2 && cbf_is_set_any(child_cbfs[1]))
+      || (split_count > 3 && cbf_is_set_any(child_cbfs[2]));
     
 
   } else {

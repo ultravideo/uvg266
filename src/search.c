@@ -1733,7 +1733,7 @@ static double search_cu(
   // might not give any better results but takes more time to do.
   // It is ok to interrupt the search as soon as it is known that
   // the split costs at least as much as not splitting.
-  int cbf = cbf_is_set_any(cur_cu->cbf);
+  int cbf = cbf_is_set_any(cur_cu->cbf) || cur_cu->root_cbf;
 
   // 3.13
   if ((cu_height < 32 || cu_width < 32) && cur_cu->type != CU_NOTSET  && !cbf && split_tree.mtt_depth > 1 && tree_type != UVG_CHROMA_T) {
