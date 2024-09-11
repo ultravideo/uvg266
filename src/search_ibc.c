@@ -928,7 +928,7 @@ static void search_pu_ibc(
         uvg_inter_recon_cu(state, lcu, true, false, cu_loc);
         uvg_quantize_lcu_residual(state, true, false, false, cu_loc, cur_pu, lcu, true, UVG_BOTH_T);
 
-        if (cbf_is_set(cur_pu->cbf, COLOR_Y)) {
+        if (cbf_is_set(cur_pu->cbf, COLOR_Y) || cur_pu->root_cbf) {
           continue;
         }
         else if (has_chroma) {
@@ -936,7 +936,7 @@ static void search_pu_ibc(
           uvg_quantize_lcu_residual(state, false, has_chroma, 
             false, /*we are only checking for lack of coeffs so no need to check jccr*/
             cu_loc, cur_pu, lcu, true, UVG_BOTH_T);
-          if (!cbf_is_set_any(cur_pu->cbf)) {
+          if (!cbf_is_set_any(cur_pu->cbf) && !cur_pu->root_cbf) {
             cur_pu->type = CU_IBC;
             cur_pu->merge_idx = merge_idx;
             cur_pu->skipped = true;

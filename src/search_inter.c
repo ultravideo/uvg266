@@ -1812,7 +1812,7 @@ static void search_pu_inter(
 
         uvg_quantize_lcu_residual(state, true, false, false, cu_loc, cur_pu, lcu, true, UVG_BOTH_T);
 
-        if (cbf_is_set(cur_pu->cbf, COLOR_Y)) {
+        if (cbf_is_set(cur_pu->cbf, COLOR_Y) || cur_pu->root_cbf) {
           continue;
         }
         else if (has_chroma) {
@@ -1823,7 +1823,7 @@ static void search_pu_inter(
                                     cu_loc, cur_pu, lcu,
                                     true,
                                     UVG_BOTH_T);
-          if (!cbf_is_set_any(cur_pu->cbf)) {
+          if (!cbf_is_set_any(cur_pu->cbf) && !cur_pu->root_cbf) {
             cur_pu->type = CU_INTER;
             cur_pu->merge_idx = merge_idx;
             cur_pu->skipped = true;
@@ -2258,7 +2258,7 @@ void uvg_cu_cost_inter_rd2(
                               UVG_BOTH_T);    
   }
 
-  int cbf = cbf_is_set_any(cur_cu->cbf);
+  int cbf = cbf_is_set_any(cur_cu->cbf) || cur_cu->root_cbf;
   
   if(cbf) {
     *inter_cost = uvg_cu_rd_cost_luma(state, cu_loc, cur_cu, lcu, 0);

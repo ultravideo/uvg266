@@ -1592,7 +1592,7 @@ static double search_cu(
                                   false,
                                   tree_type);
 
-        int cbf = cbf_is_set_any(cur_cu->cbf);
+        int cbf =  cbf_is_set_any(cur_cu->cbf) || cur_cu->root_cbf;
 
         if (cur_cu->merged && !cbf) {
           cur_cu->merged = 0;
