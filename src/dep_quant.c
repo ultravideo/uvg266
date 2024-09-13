@@ -241,7 +241,7 @@ void uvg_dealloc_nb_info(encoder_control_t* encoder) {
         continue;
       }
       if(encoder->m_scanId2NbInfoOutArray[hd][vd]) FREE_POINTER(encoder->m_scanId2NbInfoOutArray[hd][vd]);
-      if(encoder->m_scanId2NbInfoOutArray[hd][vd]) FREE_POINTER(encoder->m_scanId2NbInfoSbbArray[hd][vd]);
+      if(encoder->m_scanId2NbInfoSbbArray[hd][vd]) FREE_POINTER(encoder->m_scanId2NbInfoSbbArray[hd][vd]);
       if(encoder->scan_info[hd][vd]) FREE_POINTER(encoder->scan_info[hd][vd]);
     }
   }
