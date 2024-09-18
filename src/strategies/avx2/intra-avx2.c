@@ -2622,6 +2622,67 @@ static void angular_pdpc_ver_8x4_scale1_avx2(uvg_pixel* dst, const uvg_pixel* re
 }
 
 
+static void angular_pdpc_ver_8x2_scale2_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int width, const int height, const int mode_disp)
+{
+  // NOTE: This function is just the w8 function, retrofitted to work with width 16 and up when scale is 1.
+  // Since scale is 1, limit is 6 and therefore there is no meaningful work to be done when x > 6, so only the first column of 8x2 chunks is handled.
+  // This function handles cases where prediction angle is high. For PDPC, this means the needed reference samples are close together, enabling more effective loading.
+  const int scale = 2;
+  const int log2_width = uvg_g_convert_to_log2[width];
+
+  const int limit = 6;
+
+  __m128i vseq = _mm_set_epi64x(1, 0);
+  __m128i vidx = _mm_slli_epi32(vseq, log2_width);
+  __m256i v32s = _mm256_set1_epi16(32);
+
+  const int offset = scale * 16;
+  const int inv_angle_offset = mode_disp * 64;
+  const int shuf_offset = mode_disp * 16;
+
+  const __m256i vweight = _mm256_load_si256((const __m256i*) & intra_pdpc_w8_ver_weight[offset]);
+  const int16_t* shifted_inv_angle_sum = &intra_pdpc_shifted_inv_angle_sum[inv_angle_offset];
+  const __m128i vshuf = _mm_loadu_si128((__m128i*) & intra_pdpc_shuffle_vectors_8x2_scale2_ver[shuf_offset]);
+
+  // For width 8, height must be at least 2. Handle 2 lines at once.
+  for (int y = 0; y < height; y += 2) {
+    /*ALIGNED(32) int16_t left[16] = { 0 };
+    for (int yy = 0; yy < 2; ++yy) {
+      for (int xx = 0; xx < limit; ++xx) {
+        left[yy * 8 + xx] = ref_side[(y + yy) + shifted_inv_angle_sum[xx] + 1];
+      }
+    }*/
+    __m128i vleft = _mm_loadu_si128((__m128i*) & ref_side[y + shifted_inv_angle_sum[0] + 1]);
+    vleft = _mm_shuffle_epi8(vleft, vshuf);
+
+    __m128i vdst = _mm_i64gather_epi64((const long long int*)(dst + y * width), vidx, 1);
+    __m256i vdst16 = _mm256_cvtepu8_epi16(vdst);
+    __m256i vleft16 = _mm256_cvtepu8_epi16(vleft);
+    //__m256i vleft = _mm256_loadu_si256((__m256i*)left);
+
+    __m256i accu = _mm256_sub_epi16(vleft16, vdst16);
+    accu = _mm256_mullo_epi16(vweight, accu);
+    accu = _mm256_add_epi16(accu, v32s);
+    accu = _mm256_srai_epi16(accu, 6);
+    accu = _mm256_add_epi16(vdst16, accu);
+
+    __m128i lo = _mm256_castsi256_si128(accu);
+    __m128i hi = _mm256_extracti128_si256(accu, 1);
+    __m128i filtered = _mm_packus_epi16(lo, hi);
+
+    // TODO: if this if branch is deemed to cause slow down, make another version of this, where this check is not needed.
+    // If this does not slow down significantly, make this same check in other functions to reduce the function call switch case complexity
+    if (width == 8) {
+      _mm_store_si128((__m128i*)(dst + (y * width)), filtered);
+    }
+    else {
+      *(uint64_t*)(dst + (y + 0) * width) = _mm_extract_epi64(filtered, 0);
+      *(uint64_t*)(dst + (y + 1) * width) = _mm_extract_epi64(filtered, 1);
+    }
+  }
+}
+
+
 static void angular_pdpc_ver_w16_high_angle_avx2(uvg_pixel* dst, const uvg_pixel* ref_side, const int width, const int height, const int mode_disp)
 {
   __m256i v32s = _mm256_set1_epi16(32);
@@ -3631,19 +3692,18 @@ static void uvg_angular_pred_avx2(
             else
               angular_pdpc_ver_4x4_scale0_avx2(dst, ref_side, width, height, mode_disp);
           }
-          else /*if (scale == 1)*/ {
+          else if (scale == 1) {
             if (mode_disp < 8)
               angular_pdpc_ver_8x4_scale1_high_angle_avx2(dst, ref_side, width, height, mode_disp);
             else
               angular_pdpc_ver_8x4_scale1_avx2(dst, ref_side, width, height, mode_disp);
           }
-          // This branch was never executed. There is no case where width == 8 and scale == 2 and PDPC is enabled.
-          /*else {
+          else {
             if (mode_disp < 10)
-              angular_pdpc_ver_w8_high_angle_avx2(dst, ref_side, height, mode_disp);
+              angular_pdpc_ver_w8_high_angle_avx2(dst, ref_side, height, 2, mode_disp);
             else
               angular_pdpc_ver_8x2_scale2_avx2(dst, ref_side, width, height, mode_disp);
-          }*/
+          }
           break;
         case 16: // 16 width and higher done with the same functions
         case 32:
