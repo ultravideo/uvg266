@@ -1691,7 +1691,7 @@ static double search_cu(
       }
     }
   } 
-
+  
   bool can_split_cu =
     // If the CU is partially outside the frame, we need to split it even
     // if pu_depth_intra and pu_depth_inter would not permit it.
@@ -1744,9 +1744,9 @@ static double search_cu(
     lcu_t * split_lcu = MALLOC(lcu_t, 5);
     enum split_type best_split = 0;
     double best_split_cost = MAX_DOUBLE;
-    cabac_data_t post_seach_cabac;
+    cabac_data_t post_search_cabac;
     cabac_data_t best_split_cabac;
-    memcpy(&post_seach_cabac, &state->search_cabac, sizeof(post_seach_cabac));
+    memcpy(&post_search_cabac, &state->search_cabac, sizeof(post_search_cabac));
     
     cu_info_t best_split_hmvp_lut[MAX_NUM_HMVP_CANDS];
     uint8_t best_split_hmvp_lut_size = state->tile->frame->hmvp_size[ctu_row];
@@ -1757,15 +1757,6 @@ static double search_cu(
     for (int split_type = QT_SPLIT; split_type <= TT_VER_SPLIT; ++split_type) {
       if (!can_split[split_type])
         continue;
-      split_tree_t new_split = {
-        split_tree.split_tree | split_type << (split_tree.current_depth * 3),
-        split_tree.mode_type_tree, // | mode_type << (split_tree.current_depth * 2),
-        split_tree.current_depth + 1,
-        split_tree.mtt_depth + (split_type != QT_SPLIT),
-        split_tree.implicit_mtt_depth + (split_type != QT_SPLIT && is_implicit),
-        0,
-        split_tree.scipu_cb_depth
-      };
 
       if (completely_inside && check_for_early_termission(
             cu_width,
@@ -1782,17 +1773,72 @@ static double search_cu(
         continue;
       }
 
+      // 3.7
+      bool stop_to_qt = false;
+
       double split_cost = 0.0;
-      memcpy(&state->search_cabac, &pre_search_cabac, sizeof(post_seach_cabac));
-
-
       double split_bits = 0;
 
-      enum mode_type split_mode_type = mode_type;
+//#define SKIP_SCIPU_SEARCH 1
+
       //TODO: use for searching both modes in scipu
       const enum mode_type_condition mode_type_cond = uvg_derive_mode_type_cond(cu_loc, state->frame->slicetype, tree_type, state->encoder_control->chroma_format, split_type, mode_type);
+#ifdef SKIP_SCIPU_SEARCH
+      enum mode_type split_mode_type = mode_type;
       if (mode_type_cond == MODE_TYPE_INFER) split_mode_type = MODE_TYPE_INTRA;
       //new_split.mode_type_tree = split_tree.mode_type_tree | split_mode_type << (split_tree.current_depth * 2);
+
+#else
+      double best_mode_type_cost = MAX_DOUBLE;
+      bool best_mode_type_stop_to_qt = false;
+      lcu_t * best_mode_type_lcu = NULL;
+      cabac_data_t best_mode_type_cabac;
+      cu_info_t best_mode_type_hmvp_lut[MAX_NUM_HMVP_CANDS];
+      uint8_t best_mode_type_hmvp_lut_size = state->tile->frame->hmvp_size[ctu_row];
+      cu_info_t best_mode_type_hmvp_lut_ibc[MAX_NUM_HMVP_CANDS];
+      uint8_t best_mode_type_hmvp_lut_size_ibc = state->tile->frame->hmvp_size_ibc[ctu_row];
+
+      enum mode_type start_mode_type, end_mode_type;
+      switch (mode_type_cond)
+      {
+      case MODE_TYPE_INHERIT:
+        start_mode_type = end_mode_type = mode_type;
+        break;
+
+      case MODE_TYPE_INFER:
+        start_mode_type = end_mode_type = MODE_TYPE_INTRA;
+        break;
+
+      case MODE_TYPE_SIGNAL:
+        start_mode_type = MODE_TYPE_INTER;
+        end_mode_type = MODE_TYPE_INTRA;
+        break;
+      }
+      for( enum mode_type split_mode_type = start_mode_type; split_mode_type <= end_mode_type; split_mode_type++) {
+        if (start_mode_type != end_mode_type) {
+          //If we do multiple rounds, reset relevant things
+          can_split[split_type] = true;
+          stop_to_qt = false;
+          split_cost = split_bits = 0.0;
+          //memset(&split_lcu[split_type - 1], 0, sizeof(lcu_t)); //Necessary?
+        }
+#endif
+
+      memcpy(&state->search_cabac, &pre_search_cabac, sizeof(pre_search_cabac));
+
+      split_tree_t new_split = {
+        split_tree.split_tree | split_type << (split_tree.current_depth * 3),
+#ifdef SKIP_SCIPU_SEARCH
+        split_tree.mode_type_tree,
+#else
+        split_tree.mode_type_tree | split_mode_type << (split_tree.current_depth * 2),
+#endif // SKIP_SCIPU_SEARCH
+        split_tree.current_depth + 1,
+        split_tree.mtt_depth + (split_type != QT_SPLIT),
+        split_tree.implicit_mtt_depth + (split_type != QT_SPLIT && is_implicit),
+        0,
+        split_tree.scipu_cb_depth
+      };
 
       if (cur_cu->log2_height + cur_cu->log2_width > 4) {
 
@@ -1818,7 +1864,11 @@ static double search_cu(
         split_tree_t count_tree = split_tree;
         count_tree.split_tree = split_tree.split_tree | split_type << (split_tree.current_depth * 3);
         count_tree.mode_type_tree = split_tree.mode_type_tree; // | mode_type << (split_tree.current_depth * 2);
+#ifdef SKIP_SCIPU_SEARCH
         const enum mode_type count_mode_type = mode_type_cond == MODE_TYPE_SIGNAL ? (cur_cu->type == CU_INTER ? MODE_TYPE_INTER : MODE_TYPE_INTRA) : split_mode_type;
+#else
+        const enum mode_type count_mode_type = split_mode_type;
+#endif
         uvg_write_split_flag(
           state,
           &state->search_cabac,
@@ -1844,8 +1894,6 @@ static double search_cu(
       state->search_cabac.update = 0;
       split_cost += split_bits * state->lambda;
 
-      // 3.7
-      bool stop_to_qt = false;
 
       cu_loc_t new_cu_loc[4];
       uint8_t separate_chroma = 0;
@@ -1864,7 +1912,7 @@ static double search_cu(
         continue;
       }
 
-      //Reset HMVP incase it has been modified while checking previous split types
+      //Reset HMVP in case it has been modified while checking previous split types
       if (state->frame->slicetype != UVG_SLICE_I) {
         memcpy(&state->tile->frame->hmvp_lut[ctu_row_mul_five], hmvp_lut, sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
         state->tile->frame->hmvp_size[ctu_row] = hmvp_lut_size;
@@ -1883,7 +1931,11 @@ static double search_cu(
         //                                           new_cu_loc[0].local_y
         //                                          )->type == CU_INTER) ? MODE_TYPE_INTER : MODE_TYPE_INTRA;
         //}
-        new_split.mode_type_tree = new_split.mode_type_tree | split_mode_type << (split_tree.current_depth * 2);
+#ifdef SKIP_SCIPU_SEARCH
+        new_split.mode_type_tree = split_tree.mode_type_tree | split_mode_type << (split_tree.current_depth * 2);
+
+#endif // SKIP_SCIPU_SEARCH
+
         new_split.part_index = split;
         split_cost += search_cu(state, 
           &new_cu_loc[split], separate_chroma ? chroma_loc : &new_cu_loc[split],
@@ -1894,6 +1946,7 @@ static double search_cu(
         // If there is no separate chroma the block will always have chroma, otherwise it is the last block of the split that has the chroma
 
         // Set mode type for first split block
+#ifdef SKIP_SCIPU_SEARCH
         if (split_mode_type == MODE_TYPE_ALL && is_scipu && split == 0) { //TODO: remove when proper search is added for scipu mode
           cu_info_t* const first_cu = LCU_GET_CU_AT_PX(&split_lcu[split_type - 1],
                                                         new_cu_loc[0].local_x,
@@ -1902,6 +1955,7 @@ static double search_cu(
           first_cu->mode_type_tree = first_cu->mode_type_tree | split_mode_type << (split_tree.current_depth * 2);
           first_cu->mode_type_tree = first_cu->mode_type_tree | split_mode_type << (new_split.current_depth * 2);
         }
+#endif
 
         if (split_type == QT_SPLIT && completely_inside) {
           const cu_info_t * const t = LCU_GET_CU_AT_PX(
@@ -1916,7 +1970,56 @@ static double search_cu(
           break;
         }
       }
+#ifndef SKIP_SCIPU_SEARCH
 
+        // If multiple mode types are searched, save previous/best results and prepare for next round
+        
+        if (split_cost < best_mode_type_cost) {
+          best_mode_type_cost = split_cost;
+          if (split_mode_type != end_mode_type) {
+            best_mode_type_stop_to_qt = stop_to_qt;
+            if (!best_mode_type_lcu) best_mode_type_lcu = MALLOC(lcu_t, 1);
+            memcpy(best_mode_type_lcu, &split_lcu[split_type - 1], sizeof(lcu_t));
+            memcpy(&best_mode_type_cabac, &state->search_cabac, sizeof(best_mode_type_cabac));
+
+            //Store HMVP lut of best mode type split
+            if (state->frame->slicetype != UVG_SLICE_I) {
+              memcpy(best_mode_type_hmvp_lut, &state->tile->frame->hmvp_lut[ctu_row_mul_five], sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
+              best_mode_type_hmvp_lut_size = state->tile->frame->hmvp_size[ctu_row];
+            }
+            if (state->encoder_control->cfg.ibc) {
+              best_mode_type_hmvp_lut_size_ibc = state->tile->frame->hmvp_size_ibc[ctu_row];
+              memcpy(best_mode_type_hmvp_lut_ibc, &state->tile->frame->hmvp_lut_ibc[ctu_row_mul_five], sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
+            }
+          }
+        }       
+      }
+    
+      // If best mode type was not the latest round of search, restore the best mode type results
+      if (best_mode_type_cost == MAX_DOUBLE) {
+        // No valid split for any mode found so continue
+        continue;
+      }
+      if (split_cost != best_mode_type_cost) {
+        // Last round of search was not the best cost so restore best mode type split
+        split_cost = best_mode_type_cost;
+        stop_to_qt = best_mode_type_stop_to_qt;
+        memcpy(&split_lcu[split_type - 1], best_mode_type_lcu, sizeof(lcu_t));
+        memcpy(&state->search_cabac, &best_mode_type_cabac, sizeof(best_mode_type_cabac));
+
+        //Need to restore best mode type split HMVP
+        if (state->frame->slicetype != UVG_SLICE_I) {
+          memcpy(&state->tile->frame->hmvp_lut[ctu_row_mul_five], best_mode_type_hmvp_lut, sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
+          state->tile->frame->hmvp_size[ctu_row] = best_mode_type_hmvp_lut_size;
+        }
+        if (state->encoder_control->cfg.ibc) {
+          memcpy(&state->tile->frame->hmvp_lut_ibc[ctu_row_mul_five], best_mode_type_hmvp_lut_ibc, sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
+          state->tile->frame->hmvp_size_ibc[ctu_row] = best_mode_type_hmvp_lut_size_ibc;
+        }
+      }
+      if (best_mode_type_lcu) FREE_POINTER(best_mode_type_lcu);
+
+#else
       //Check that sub-blocks for SCIPU are either all inter or all intra
       if (is_scipu /*&& can_split[split_type]*/) {
         const bool is_inter = LCU_GET_CU_AT_PX(&split_lcu[split_type - 1], new_cu_loc[0].local_x, new_cu_loc[0].local_y)->type == CU_INTER;
@@ -1931,6 +2034,7 @@ static double search_cu(
           }
         }
       }
+#endif // !SKIP_SCIPU_SEARCH
 
       improved[split_type] = cost > split_cost;
       
@@ -2011,7 +2115,7 @@ static double search_cu(
 
         mark_deblocking(cu_loc, chroma_loc, lcu, tree_type, has_chroma, is_separate_tree, x_local, y_local);
 
-        memcpy(&post_seach_cabac, &state->search_cabac, sizeof(post_seach_cabac));
+        memcpy(&post_search_cabac, &state->search_cabac, sizeof(post_search_cabac));
         memcpy(&state->search_cabac, &temp_cabac, sizeof(temp_cabac));
       }
     }
@@ -2040,7 +2144,7 @@ static double search_cu(
     } else if (depth > 0) {
       // Copy this CU's mode all the way down for use in adjacent CUs mode
       // search.
-      memcpy(&state->search_cabac, &post_seach_cabac, sizeof(post_seach_cabac));
+      memcpy(&state->search_cabac, &post_search_cabac, sizeof(post_search_cabac));
       downsample_cclm_rec(
         state, x, y, cu_width / 2, cu_height / 2, lcu->rec.y, lcu->left_ref.y[64]
       );
@@ -2346,7 +2450,7 @@ void uvg_search_lcu(encoder_state_t * const state, const int x, const int y, con
     }
     copy_lcu_to_cu_data(state, x, y, &work_tree, UVG_CHROMA_T);
   }
-
+  
   copy_coeffs(work_tree.coeff.u, coeff->u, LCU_WIDTH_C, LCU_WIDTH_C, LCU_WIDTH_C);
   copy_coeffs(work_tree.coeff.v, coeff->v, LCU_WIDTH_C, LCU_WIDTH_C, LCU_WIDTH_C);
   if (state->encoder_control->cfg.jccr) {
