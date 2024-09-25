@@ -835,7 +835,7 @@ static bool is_cand_coded(int cur_x, int cur_y, int cand_x, int cand_y, uint32_t
     }
     if (cand_cu_index != cur_cu_index) return cand_cu_index < cur_cu_index;
 
-  } while (depth < MAX_DEPTH);
+  } while (depth < MAX_DEPTH); //TODO: check that MAX_DEPTH is actually max split amount in all cases
 
   assert(false && "Either max depth reached or cur and cand are the same block"); // We should not get here 
   return false;

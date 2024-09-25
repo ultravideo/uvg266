@@ -1903,10 +1903,12 @@ static double search_cu(
       //TODO: remove if not necessary after inclusion of mode type 
       bool is_scipu = separate_chroma || split_tree.scipu_cb_depth > 0;
       if (is_scipu) new_split.scipu_cb_depth += 1;
-      //Limit split when forced inter. Don't allow split if inter can't be used. TODO: Move to uvg_get_possible_splits?
-      if (split_mode_type == MODE_TYPE_INTER &&
-          ((new_cu_loc[0].width == 4 && new_cu_loc[0].height == 4) ||
-           ((state->encoder_control->chroma_format != UVG_CSP_400) ? (new_cu_loc[0].chroma_height * new_cu_loc[0].chroma_width) < 16 : false))
+      //Limit split when forced inter. Don't allow split if inter can't be used. TODO: Move to uvg_get_possible_splits / separate function?
+      if (split_mode_type == MODE_TYPE_INTER && (
+             new_split.current_depth > MAX_DEPTH ||
+             (new_cu_loc[0].width == 4 && new_cu_loc[0].height == 4) ||
+             ((state->encoder_control->chroma_format != UVG_CSP_400) ? (new_cu_loc[0].chroma_height * new_cu_loc[0].chroma_width) < 16 : false)
+           )
          ) {
         can_split[split_type] = false;
         continue;
