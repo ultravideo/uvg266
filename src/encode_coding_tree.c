@@ -1433,6 +1433,7 @@ void uvg_encode_coding_tree(
       uint8_t separate_chroma = 0;
       const int splits = uvg_get_split_locs(cu_loc, split_flag, new_cu_loc, &separate_chroma);
       separate_chroma |= !has_chroma;
+      separate_chroma &= split_mode_type != MODE_TYPE_INTER; //Separate chroma should only be used with non-inter blocks
       for (int split = 0; split <splits; ++split) {
         new_split_tree.part_index = split;
         uvg_encode_coding_tree(state, coeff, tree_type,

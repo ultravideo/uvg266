@@ -1925,6 +1925,7 @@ static double search_cu(
       }
 
       separate_chroma |= !has_chroma;
+      separate_chroma &= split_mode_type != MODE_TYPE_INTER; //Separate chroma should only be used with non-inter blocks
       initialize_partial_work_tree(state, lcu, &split_lcu[split_type - 1], cu_loc , separate_chroma ? chroma_loc : cu_loc, tree_type);
       for (int split = 0; split < splits; ++split) {
         //if (split_mode_type == MODE_TYPE_ALL && is_scipu && split != 0) { //TODO: remove when proper search is added for scipu mode
