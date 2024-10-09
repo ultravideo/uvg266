@@ -1791,6 +1791,7 @@ static double search_cu(
 #else
       double best_mode_type_cost = MAX_DOUBLE;
       bool best_mode_type_stop_to_qt = false;
+      bool best_mode_type_can_split = true;
       lcu_t * best_mode_type_lcu = NULL;
       cabac_data_t best_mode_type_cabac;
       cu_info_t best_mode_type_hmvp_lut[MAX_NUM_HMVP_CANDS];
@@ -1968,7 +1969,7 @@ static double search_cu(
           stop_to_qt |= GET_SPLITDATA(t, depth + 1) == QT_SPLIT;
         }
 
-        if (split_cost > cost || split_cost > best_split_cost) {
+        if (split_cost > cost || split_cost > best_split_cost || split_cost > best_mode_type_cost) {
           can_split[split_type] = false;
           break;
         }
@@ -1980,6 +1981,7 @@ static double search_cu(
         if (split_cost < best_mode_type_cost) {
           best_mode_type_cost = split_cost;
           if (split_mode_type != end_mode_type) {
+            best_mode_type_can_split = can_split[split_type];
             best_mode_type_stop_to_qt = stop_to_qt;
             if (!best_mode_type_lcu) best_mode_type_lcu = MALLOC(lcu_t, 1);
             memcpy(best_mode_type_lcu, &split_lcu[split_type - 1], sizeof(lcu_t));
@@ -2007,6 +2009,7 @@ static double search_cu(
         // Last round of search was not the best cost so restore best mode type split
         split_cost = best_mode_type_cost;
         stop_to_qt = best_mode_type_stop_to_qt;
+        can_split[split_type] = best_mode_type_can_split;
         memcpy(&split_lcu[split_type - 1], best_mode_type_lcu, sizeof(lcu_t));
         memcpy(&state->search_cabac, &best_mode_type_cabac, sizeof(best_mode_type_cabac));
 
@@ -2090,6 +2093,11 @@ static double search_cu(
         cur_cu->type = CU_INTRA;
         if (cur_cu->intra.mode_chroma > 79) {
           cur_cu->intra.mode_chroma = cur_cu->intra.mode;
+        } else if ((state->encoder_control->chroma_format != UVG_CSP_400)
+                   && (cu_d1->log2_width - 1 != cu_d1->log2_chroma_width || cu_d1->log2_height - 1 != cu_d1->log2_chroma_height)) {
+          // If d1 has a separate tree for chroma, the chroma intra mode may not be valid for this depth, so set chroma mode to match (co-located) luma mode
+          cur_cu->intra.mode_chroma = !is_separate_tree ? cur_cu->intra.mode
+                                                        : uvg_get_co_located_luma_mode(chroma_loc, cu_loc, cur_cu, lcu, NULL, tree_type);
         }
 
         // Disable MRL in this case
