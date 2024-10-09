@@ -48,7 +48,13 @@ TEST test_get_spatial_merge_cand(void)
 
   cu_loc_t cu_loc;
   uvg_cu_loc_ctor(&cu_loc, 64 + 32, 64, // x, y
-    32, 24); // width, height)
+    32, 16); // width, height)
+
+  // Set split_tree
+ cu_info_t* cur_cu = LCU_GET_CU_AT_PX(&lcu, cu_loc.local_x, cu_loc.local_y);
+ cur_cu->split_tree = 35;
+ lcu.cu[16].split_tree = lcu.cu[8].split_tree = 1;
+ lcu.cu[76].split_tree = lcu.cu[93].split_tree = 147;
 
   get_spatial_merge_candidates(&cu_loc,      
                                1920, 1080,  // picture size
@@ -59,8 +65,8 @@ TEST test_get_spatial_merge_cand(void)
   ASSERT_EQ(cand.b[0], &lcu.cu[289]);
   ASSERT_EQ(cand.b[1], &lcu.cu[ 16]);
   ASSERT_EQ(cand.b[2], &lcu.cu[  8]);
-  ASSERT_EQ(cand.a[0], &lcu.cu[127]);
-  ASSERT_EQ(cand.a[1], &lcu.cu[110]);
+  ASSERT_EQ(cand.a[0], &lcu.cu[ 93]);
+  ASSERT_EQ(cand.a[1], &lcu.cu[ 76]);
 
   PASS();
 }
