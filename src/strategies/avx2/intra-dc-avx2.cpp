@@ -57,6 +57,130 @@ extern "C" {
 #include <string.h>
 
 
+static INLINE int16_t dc_sum_w4_avx2(const uvg_pixel* const ref)
+{
+  __m128i vref = _mm_loadu_si128((const __m128i*)ref);
+  __m128i vref16 = _mm_cvtepu8_epi16(vref);
+  __m128i vhadd = _mm_hadd_epi16(vref16, vref16);
+  vhadd = _mm_hadd_epi16(vhadd, vhadd);
+
+  int16_t sum = _mm_extract_epi16(vhadd, 0);
+  return sum;
+}
+
+static INLINE int16_t dc_sum_w8_avx2(const uvg_pixel* const ref)
+{
+  __m128i vref = _mm_loadu_si128((const __m128i*)ref);
+  
+  int16_t sum = 0;
+  return sum;
+}
+
+static INLINE int16_t dc_sum_w16_avx2(const uvg_pixel* const ref)
+{
+  __m128i vref = _mm_loadu_si128((const __m128i*)ref);
+  
+  int16_t sum = 0;
+  return sum;
+}
+
+static INLINE int16_t dc_sum_w32_avx2(const uvg_pixel* const ref)
+{
+  __m128i vref = _mm_loadu_si128((const __m128i*)ref);
+  
+  int16_t sum = 0;
+  return sum;
+}
+
+static INLINE int16_t dc_sum_w64_avx2(const uvg_pixel* const ref)
+{
+  __m128i vref = _mm_loadu_si128((const __m128i*)ref);
+
+  int16_t sum = 0;
+  return sum;
+}
+
+static void uvg_intra_pred_dc_avx2(
+  const cu_loc_t* const cu_loc,
+  const color_t color,
+  const uvg_pixel* const ref_top,
+  const uvg_pixel* const ref_left,
+  uvg_pixel* const out_block,
+  const uint8_t multi_ref_idx)
+{
+  const int width = color == COLOR_Y ? cu_loc->width : cu_loc->chroma_width;
+  const int height = color == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
+
+  int16_t sum = 0;
+  // Only one loop is done for non-square blocks.
+  // In case of non-square blocks, only the longer reference is summed.
+  if (width >= height) {
+    switch (width) {
+      case 4:
+        sum = dc_sum_w4_avx2(&ref_top[1 + multi_ref_idx]);
+        break;
+      case 8:
+        sum = dc_sum_w8_avx2(&ref_top[1 + multi_ref_idx]);
+        break;
+      case 16:
+        sum = dc_sum_w16_avx2(&ref_top[1 + multi_ref_idx]);
+        break;
+      case 32:
+        sum = dc_sum_w32_avx2(&ref_top[1 + multi_ref_idx]);
+        break;
+      case 64:
+        sum = dc_sum_w64_avx2(&ref_top[1 + multi_ref_idx]);
+        break;
+      default:
+        assert(false && "Intra DC AVX2: Illegal width.\n");
+    }
+    /*for (int_fast8_t i = 0; i < width; ++i) {
+      sum += ref_top[i + 1 + multi_ref_idx];
+    }*/
+  }
+  // For square blocks, add left reference to sum
+  if (width <= height) {
+    switch (height) {
+    case 4:
+      sum += dc_sum_w4_avx2(&ref_left[1 + multi_ref_idx]);
+      break;
+    case 8:
+      sum += dc_sum_w8_avx2(&ref_left[1 + multi_ref_idx]);
+      break;
+    case 16:
+      sum += dc_sum_w16_avx2(&ref_left[1 + multi_ref_idx]);
+      break;
+    case 32:
+      sum += dc_sum_w32_avx2(&ref_left[1 + multi_ref_idx]);
+      break;
+    case 64:
+      sum += dc_sum_w64_avx2(&ref_left[1 + multi_ref_idx]);
+      break;
+    default:
+      assert(false && "Intra DC AVX2: Illegal height.\n");
+    }
+  }
+  /*if (width <= height) {
+    for (int_fast8_t j = 0; j < height; ++j) {
+      sum += ref_left[j + 1 + multi_ref_idx];
+    }
+  }*/
+
+  // JVET_K0122
+  const int denom = width == height ? width << 1 : MAX(width, height);
+  const int divShift = uvg_math_floor_log2(denom);
+  const int divOffset = denom >> 1;
+
+  const uvg_pixel dc_val = (sum + divOffset) >> divShift;
+  //const uvg_pixel dc_val = (sum + width) >> (log2_width + 1);
+  const int_fast16_t block_size = width * height;
+
+  for (int_fast16_t i = 0; i < block_size; ++i) {
+    out_block[i] = dc_val;
+  }
+}
+
+
 /**
 * \brief Position Dependent Prediction Combination for Planar and DC modes.
 * \param mode          Intra mode, 0 for planar, 1 for DC.
