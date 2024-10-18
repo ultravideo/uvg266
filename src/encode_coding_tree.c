@@ -707,6 +707,7 @@ static void encode_transform_coeff(
   if ((cur_tu->type == CU_INTRA || !PU_IS_TU(cur_tu) || cb_flag_u || cb_flag_v) && !only_chroma && tree_type != UVG_CHROMA_T) {
     if (can_skip_last_cbf && isp_split && last_split) {
       // Do not write luma cbf if first three isp splits have luma cbf 0
+      assert(cb_flag_y == 1 && "luma cbf is inferred to be 1, so cb_flag_y should be 1");
     } else {
       cabac->cur_ctx = &(cabac->ctx.qt_cbf_model_luma[*luma_cbf_ctx]);
       CABAC_BIN(cabac, cb_flag_y, "cbf_luma");

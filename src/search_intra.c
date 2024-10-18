@@ -1659,6 +1659,7 @@ int8_t uvg_search_cu_intra_chroma(
     if(!is_separate && tree_type == UVG_BOTH_T) {
       memcpy(chroma_data[i].lfnst_costs, search_data->lfnst_costs, sizeof(double) * 3);
     }
+    chroma_data[i].best_isp_cbfs = search_data->best_isp_cbfs; //Copy isp cbfs so they don't get overwriten later
   }
   // Don't do rough mode search if all modes are selected.
   // FIXME: It might make more sense to only disable rough search if
