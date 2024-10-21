@@ -368,48 +368,30 @@ static void uvg_intra_pred_dc_avx2(
   const int height = color == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
 
   int16_t sum = 0;
-  const uvg_pixel * const refp = width > height ? &ref_top[1 + multi_ref_idx] : &ref_left[1 + multi_ref_idx];
+  const uvg_pixel * const refp_left = &ref_left[1 + multi_ref_idx];
+  const uvg_pixel * const refp_top = &ref_top[1 + multi_ref_idx];
+  const uvg_pixel * const refp = width > height ? refp_top : refp_left;
   const int dim = width >= height ? width : height;
   // Only one loop is done for non-square blocks.
   // In case of non-square blocks, only the longer reference is summed.
   if (width != height) {
     switch (dim) {
-      case 4:
-        sum = dc_sum_w4_avx2(refp);
-        break;
-      case 8:
-        sum = dc_sum_w8_avx2(refp);
-        break;
-      case 16:
-        sum = dc_sum_w16_avx2(refp);
-        break;
-      case 32:
-        sum = dc_sum_w32_avx2(refp);
-        break;
-      case 64:
-        sum = dc_sum_w64_avx2(refp);
-        break;
+      case 4: sum = dc_sum_w4_avx2(refp); break;
+      case 8: sum = dc_sum_w8_avx2(refp); break;
+      case 16: sum = dc_sum_w16_avx2(refp); break;
+      case 32: sum = dc_sum_w32_avx2(refp); break;
+      case 64: sum = dc_sum_w64_avx2(refp); break;
       default:
         assert(false && "Intra DC AVX2: Illegal width.\n");
     }
   } 
   else { // Square blocks
     switch (dim) {
-    case 4:
-      sum = dc_sum_square_w4_avx2(&ref_top[1 + multi_ref_idx], &ref_left[1 + multi_ref_idx]);
-      break;
-    case 8:
-      sum = dc_sum_square_w8_avx2(&ref_top[1 + multi_ref_idx], &ref_left[1 + multi_ref_idx]);
-      break;
-    case 16:
-      sum = dc_sum_square_w16_avx2(&ref_top[1 + multi_ref_idx], &ref_left[1 + multi_ref_idx]);
-      break;
-    case 32:
-      sum = dc_sum_square_w32_avx2(&ref_top[1 + multi_ref_idx], &ref_left[1 + multi_ref_idx]);
-      break;
-    case 64:
-      sum = dc_sum_square_w64_avx2(&ref_top[1 + multi_ref_idx], &ref_left[1 + multi_ref_idx]);
-      break;
+    case 4: sum = dc_sum_square_w4_avx2(refp_top, refp_left); break;
+    case 8: sum = dc_sum_square_w8_avx2(refp_top, refp_left); break;
+    case 16: sum = dc_sum_square_w16_avx2(refp_top, refp_left); break;
+    case 32: sum = dc_sum_square_w32_avx2(refp_top, refp_left); break;
+    case 64: sum = dc_sum_square_w64_avx2(refp_top, refp_left); break;
     default:
       assert(false && "Intra DC AVX2: Illegal block size.\n");
     }
@@ -422,11 +404,8 @@ static void uvg_intra_pred_dc_avx2(
 
   const uvg_pixel dc_val = (sum + divOffset) >> divShift;
   //const uvg_pixel dc_val = (sum + width) >> (log2_width + 1);
-  const int_fast16_t block_size = width * height;
-
-  for (int_fast16_t i = 0; i < block_size; ++i) {
-    out_block[i] = dc_val;
-  }
+  const uint16_t block_size = width * height;
+  memset(out_block, dc_val, block_size * sizeof(uvg_pixel));
 }
 
 
