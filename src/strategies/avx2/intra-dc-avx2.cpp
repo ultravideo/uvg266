@@ -368,50 +368,33 @@ static void uvg_intra_pred_dc_avx2(
   const int height = color == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
 
   int16_t sum = 0;
+  const uvg_pixel * const refp = width > height ? &ref_top[1 + multi_ref_idx] : &ref_left[1 + multi_ref_idx];
+  const int dim = width >= height ? width : height;
   // Only one loop is done for non-square blocks.
   // In case of non-square blocks, only the longer reference is summed.
-  if (width > height) {
-    switch (width) {
+  if (width != height) {
+    switch (dim) {
       case 4:
-        sum = dc_sum_w4_avx2(&ref_top[1 + multi_ref_idx]);
+        sum = dc_sum_w4_avx2(refp);
         break;
       case 8:
-        sum = dc_sum_w8_avx2(&ref_top[1 + multi_ref_idx]);
+        sum = dc_sum_w8_avx2(refp);
         break;
       case 16:
-        sum = dc_sum_w16_avx2(&ref_top[1 + multi_ref_idx]);
+        sum = dc_sum_w16_avx2(refp);
         break;
       case 32:
-        sum = dc_sum_w32_avx2(&ref_top[1 + multi_ref_idx]);
+        sum = dc_sum_w32_avx2(refp);
         break;
       case 64:
-        sum = dc_sum_w64_avx2(&ref_top[1 + multi_ref_idx]);
+        sum = dc_sum_w64_avx2(refp);
         break;
       default:
         assert(false && "Intra DC AVX2: Illegal width.\n");
     }
-  } else if (width < height) {
-    switch (height) {
-    case 4:
-      sum = dc_sum_w4_avx2(&ref_left[1 + multi_ref_idx]);
-      break;
-    case 8:
-      sum = dc_sum_w8_avx2(&ref_left[1 + multi_ref_idx]);
-      break;
-    case 16:
-      sum = dc_sum_w16_avx2(&ref_left[1 + multi_ref_idx]);
-      break;
-    case 32:
-      sum = dc_sum_w32_avx2(&ref_left[1 + multi_ref_idx]);
-      break;
-    case 64:
-      sum = dc_sum_w64_avx2(&ref_left[1 + multi_ref_idx]);
-      break;
-    default:
-      assert(false && "Intra DC AVX2: Illegal height.\n");
-    }
-  } else { // Square blocks
-    switch (width) {
+  } 
+  else { // Square blocks
+    switch (dim) {
     case 4:
       sum = dc_sum_square_w4_avx2(&ref_top[1 + multi_ref_idx], &ref_left[1 + multi_ref_idx]);
       break;
