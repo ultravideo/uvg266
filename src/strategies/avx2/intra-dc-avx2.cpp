@@ -57,6 +57,9 @@ extern "C" {
 #include <string.h>
 
 
+// Following functions calculate a sum of adjacent reference pixel values.
+// Amount of pixels specified by function name, i.e. width 4 (w4) sums four adjacent pixels.
+// These are used when only one reference side needs to be summed.
 static INLINE int16_t dc_sum_w4_avx2(const uvg_pixel* const ref)
 {
   __m128i vref = _mm_loadu_si128((const __m128i*)ref);
@@ -71,32 +74,103 @@ static INLINE int16_t dc_sum_w4_avx2(const uvg_pixel* const ref)
 static INLINE int16_t dc_sum_w8_avx2(const uvg_pixel* const ref)
 {
   __m128i vref = _mm_loadu_si128((const __m128i*)ref);
+  __m128i vref16 = _mm_cvtepu8_epi16(vref);
+  __m128i vhadd = _mm_hadd_epi16(vref16, vref16);
+  vhadd = _mm_hadd_epi16(vhadd, vhadd);
+  vhadd = _mm_hadd_epi16(vhadd, vhadd);
+
   
-  int16_t sum = 0;
+  int16_t sum = _mm_extract_epi16(vhadd, 0);
   return sum;
 }
 
 static INLINE int16_t dc_sum_w16_avx2(const uvg_pixel* const ref)
 {
-  __m128i vref = _mm_loadu_si128((const __m128i*)ref);
+  const __m128i vshuf = _mm_setr_epi8(
+    0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 // don't care
+  );
+  __m128i vrefa = _mm_loadu_si128((const __m128i*)&ref[0]);
+  __m128i vrefb = _mm_shuffle_epi8(vrefa, vshuf);
+  __m128i vref16a = _mm_cvtepu8_epi16(vrefa);
+  __m128i vref16b = _mm_cvtepu8_epi16(vrefb);
+
+  __m128i vadd = _mm_add_epi16(vref16a, vref16b);
+  __m128i vhadd = _mm_hadd_epi16(vadd, vadd);
+  vhadd = _mm_hadd_epi16(vhadd, vhadd);
+  vhadd = _mm_hadd_epi16(vhadd, vhadd);
   
-  int16_t sum = 0;
+  int16_t sum = _mm_extract_epi16(vhadd, 0);
   return sum;
 }
 
 static INLINE int16_t dc_sum_w32_avx2(const uvg_pixel* const ref)
 {
-  __m128i vref = _mm_loadu_si128((const __m128i*)ref);
+  const __m128i vshuf = _mm_setr_epi8(
+    0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 // don't care
+  );
+  __m128i vrefa = _mm_loadu_si128((const __m128i*) & ref[0]);
+  __m128i vrefb = _mm_shuffle_epi8(vrefa, vshuf);
+  __m128i vrefc = _mm_loadu_si128((const __m128i*) & ref[16]);
+  __m128i vrefd = _mm_shuffle_epi8(vrefc, vshuf);
+
+  __m128i vref16a = _mm_cvtepu8_epi16(vrefa);
+  __m128i vref16b = _mm_cvtepu8_epi16(vrefb);
+  __m128i vref16c = _mm_cvtepu8_epi16(vrefc);
+  __m128i vref16d = _mm_cvtepu8_epi16(vrefd);
+
+  __m128i vaddab = _mm_add_epi16(vref16a, vref16b);
+  __m128i vaddcd = _mm_add_epi16(vref16c, vref16d);
+
+  __m128i vadd = _mm_add_epi16(vaddab, vaddcd);
+  __m128i vhadd = _mm_hadd_epi16(vadd, vadd);
+  vhadd = _mm_hadd_epi16(vhadd, vhadd);
+  vhadd = _mm_hadd_epi16(vhadd, vhadd);
   
-  int16_t sum = 0;
+  int16_t sum = _mm_extract_epi16(vhadd, 0);
   return sum;
 }
 
 static INLINE int16_t dc_sum_w64_avx2(const uvg_pixel* const ref)
 {
-  __m128i vref = _mm_loadu_si128((const __m128i*)ref);
+  const __m128i vshuf = _mm_setr_epi8(
+    0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 // don't care
+  );
+  __m128i vrefa = _mm_loadu_si128((const __m128i*) &ref[0]);
+  __m128i vrefb = _mm_shuffle_epi8(vrefa, vshuf);
+  __m128i vrefc = _mm_loadu_si128((const __m128i*) &ref[16]);
+  __m128i vrefd = _mm_shuffle_epi8(vrefc, vshuf);
+  __m128i vrefe = _mm_loadu_si128((const __m128i*) &ref[32]);
+  __m128i vreff = _mm_shuffle_epi8(vrefe, vshuf);
+  __m128i vrefg = _mm_loadu_si128((const __m128i*) &ref[48]);
+  __m128i vrefh = _mm_shuffle_epi8(vrefg, vshuf);
 
-  int16_t sum = 0;
+  __m128i vref16a = _mm_cvtepu8_epi16(vrefa);
+  __m128i vref16b = _mm_cvtepu8_epi16(vrefb);
+  __m128i vref16c = _mm_cvtepu8_epi16(vrefc);
+  __m128i vref16d = _mm_cvtepu8_epi16(vrefd);
+  __m128i vref16e = _mm_cvtepu8_epi16(vrefe);
+  __m128i vref16f = _mm_cvtepu8_epi16(vreff);
+  __m128i vref16g = _mm_cvtepu8_epi16(vrefg);
+  __m128i vref16h = _mm_cvtepu8_epi16(vrefh);
+
+  __m128i vadd_ab = _mm_add_epi16(vref16a, vref16b);
+  __m128i vadd_cd = _mm_add_epi16(vref16c, vref16d);
+  __m128i vadd_ef = _mm_add_epi16(vref16e, vref16f);
+  __m128i vadd_gh = _mm_add_epi16(vref16g, vref16h);
+
+  __m128i vadd_abcd = _mm_add_epi16(vadd_ab, vadd_cd);
+  __m128i vadd_efgh = _mm_add_epi16(vadd_ef, vadd_gh);
+
+  __m128i vadd = _mm_add_epi16(vadd_abcd, vadd_efgh);
+
+  __m128i vhadd = _mm_hadd_epi16(vadd, vadd);
+  vhadd = _mm_hadd_epi16(vhadd, vhadd);
+  vhadd = _mm_hadd_epi16(vhadd, vhadd);
+
+  int16_t sum = _mm_extract_epi16(vhadd, 0);
   return sum;
 }
 
@@ -288,6 +362,7 @@ int uvg_strategy_register_intra_dc_avx2(void* opaque, uint8_t bitdepth)
 #if UVG_BIT_DEPTH == 8
   if (bitdepth == 8) {
     success &= uvg_strategyselector_register(opaque, "pdpc_planar_dc", "avx2", 40, reinterpret_cast<void*>(&uvg_pdpc_planar_dc_avx2));
+    success &= uvg_strategyselector_register(opaque, "intra_dc", "avx2", 40, reinterpret_cast<void*>(&uvg_intra_pred_dc_avx2));
   }
 #endif //UVG_BIT_DEPTH == 8
   return success;
