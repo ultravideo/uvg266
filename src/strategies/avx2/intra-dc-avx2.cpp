@@ -174,6 +174,188 @@ static INLINE int16_t dc_sum_w64_avx2(const uvg_pixel* const ref)
   return sum;
 }
 
+// These functions do the same as above, but for square blocks where
+// both references are summed
+static INLINE int16_t dc_sum_square_w4_avx2(const uvg_pixel* const ref_top, const uvg_pixel* const ref_left)
+{
+  __m128i vrefa = _mm_loadu_si128((const __m128i*)ref_top);
+  __m128i vrefb = _mm_loadu_si128((const __m128i*)ref_left);
+  __m128i vref16a = _mm_cvtepu8_epi16(vrefa);
+  __m128i vref16b = _mm_cvtepu8_epi16(vrefb);
+
+  __m128i vadd = _mm_add_epi16(vref16a, vref16b);
+
+  __m128i vhadd = _mm_hadd_epi16(vadd, vadd);
+  vhadd = _mm_hadd_epi16(vhadd, vhadd);
+
+  int16_t sum = _mm_extract_epi16(vhadd, 0);
+  return sum;
+}
+
+static INLINE int16_t dc_sum_square_w8_avx2(const uvg_pixel* const ref_top, const uvg_pixel* const ref_left)
+{
+  __m128i vrefa = _mm_loadu_si128((const __m128i*)ref_top);
+  __m128i vrefb = _mm_loadu_si128((const __m128i*)ref_left);
+  __m128i vref16a = _mm_cvtepu8_epi16(vrefa);
+  __m128i vref16b = _mm_cvtepu8_epi16(vrefb);
+
+  __m128i vadd = _mm_add_epi16(vref16a, vref16b);
+
+  __m128i vhadd = _mm_hadd_epi16(vadd, vadd);
+  vhadd = _mm_hadd_epi16(vhadd, vhadd);
+  vhadd = _mm_hadd_epi16(vhadd, vhadd);
+
+  int16_t sum = _mm_extract_epi16(vhadd, 0);
+  return sum;
+}
+
+static INLINE int16_t dc_sum_square_w16_avx2(const uvg_pixel* const ref_top, const uvg_pixel* const ref_left)
+{
+  const __m128i vshuf = _mm_setr_epi8(
+    0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 // don't care
+  );
+  __m128i vref_topa = _mm_loadu_si128((const __m128i*)ref_top);
+  __m128i vref_topb = _mm_shuffle_epi8(vref_topa, vshuf);
+  __m128i vref_lefta = _mm_loadu_si128((const __m128i*)ref_left);
+  __m128i vref_leftb = _mm_shuffle_epi8(vref_lefta, vshuf);
+  
+  __m128i vref16_topa = _mm_cvtepu8_epi16(vref_topa);
+  __m128i vref16_topb = _mm_cvtepu8_epi16(vref_topb);
+  __m128i vref16_lefta = _mm_cvtepu8_epi16(vref_lefta);
+  __m128i vref16_leftb = _mm_cvtepu8_epi16(vref_leftb);
+
+  __m128i vaddtop = _mm_add_epi16(vref16_topa, vref16_topb);
+  __m128i vaddleft = _mm_add_epi16(vref16_lefta, vref16_leftb);
+
+  __m128i vadd = _mm_add_epi16(vaddtop, vaddleft);
+
+  __m128i vhadd = _mm_hadd_epi16(vadd, vadd);
+  vhadd = _mm_hadd_epi16(vhadd, vhadd);
+  vhadd = _mm_hadd_epi16(vhadd, vhadd);
+
+  int16_t sum = _mm_extract_epi16(vhadd, 0);
+  return sum;
+}
+
+static INLINE int16_t dc_sum_square_w32_avx2(const uvg_pixel* const ref_top, const uvg_pixel* const ref_left)
+{
+  const __m128i vshuf = _mm_setr_epi8(
+    0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 // don't care
+  );
+  __m128i vref_topa = _mm_loadu_si128((const __m128i*) &ref_top[0]);
+  __m128i vref_topb = _mm_shuffle_epi8(vref_topa, vshuf);
+  __m128i vref_topc = _mm_loadu_si128((const __m128i*) &ref_top[16]);
+  __m128i vref_topd = _mm_shuffle_epi8(vref_topc, vshuf);
+  
+  __m128i vref_lefta = _mm_loadu_si128((const __m128i*) &ref_left[0]);
+  __m128i vref_leftb = _mm_shuffle_epi8(vref_lefta, vshuf);
+  __m128i vref_leftc = _mm_loadu_si128((const __m128i*) &ref_left[16]);
+  __m128i vref_leftd = _mm_shuffle_epi8(vref_leftc, vshuf);
+
+  __m128i vref16_topa = _mm_cvtepu8_epi16(vref_topa);
+  __m128i vref16_topb = _mm_cvtepu8_epi16(vref_topb);
+  __m128i vref16_topc = _mm_cvtepu8_epi16(vref_topc);
+  __m128i vref16_topd = _mm_cvtepu8_epi16(vref_topd);
+  __m128i vref16_lefta = _mm_cvtepu8_epi16(vref_lefta);
+  __m128i vref16_leftb = _mm_cvtepu8_epi16(vref_leftb);
+  __m128i vref16_leftc = _mm_cvtepu8_epi16(vref_leftc);
+  __m128i vref16_leftd = _mm_cvtepu8_epi16(vref_leftd);
+
+  __m128i vaddtop_ab = _mm_add_epi16(vref16_topa, vref16_topb);
+  __m128i vaddtop_cd = _mm_add_epi16(vref16_topc, vref16_topd);
+  __m128i vaddleft_ab = _mm_add_epi16(vref16_lefta, vref16_leftb);
+  __m128i vaddleft_cd = _mm_add_epi16(vref16_leftc, vref16_leftd);
+
+  __m128i vaddtop_abcd = _mm_add_epi16(vaddtop_ab, vaddtop_cd);
+  __m128i vaddleft_abcd = _mm_add_epi16(vaddleft_ab, vaddleft_cd);
+
+  __m128i vadd = _mm_add_epi16(vaddtop_abcd, vaddleft_abcd);
+
+  __m128i vhadd = _mm_hadd_epi16(vadd, vadd);
+  vhadd = _mm_hadd_epi16(vhadd, vhadd);
+  vhadd = _mm_hadd_epi16(vhadd, vhadd);
+
+  int16_t sum = _mm_extract_epi16(vhadd, 0);
+  return sum;
+}
+
+static INLINE int16_t dc_sum_square_w64_avx2(const uvg_pixel* const ref_top, const uvg_pixel* const ref_left)
+{
+  const __m128i vshuf = _mm_setr_epi8(
+    0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 // don't care
+  );
+
+  // Sum top ref
+  __m128i vrefa = _mm_loadu_si128((const __m128i*) &ref_top[0]);
+  __m128i vrefb = _mm_shuffle_epi8(vrefa, vshuf);
+  __m128i vrefc = _mm_loadu_si128((const __m128i*) &ref_top[16]);
+  __m128i vrefd = _mm_shuffle_epi8(vrefc, vshuf);
+  __m128i vrefe = _mm_loadu_si128((const __m128i*) &ref_top[32]);
+  __m128i vreff = _mm_shuffle_epi8(vrefe, vshuf);
+  __m128i vrefg = _mm_loadu_si128((const __m128i*) &ref_top[48]);
+  __m128i vrefh = _mm_shuffle_epi8(vrefg, vshuf);
+
+  vrefa = _mm_cvtepu8_epi16(vrefa);
+  vrefb = _mm_cvtepu8_epi16(vrefb);
+  vrefc = _mm_cvtepu8_epi16(vrefc);
+  vrefd = _mm_cvtepu8_epi16(vrefd);
+  vrefe = _mm_cvtepu8_epi16(vrefe);
+  vreff = _mm_cvtepu8_epi16(vreff);
+  vrefg = _mm_cvtepu8_epi16(vrefg);
+  vrefh = _mm_cvtepu8_epi16(vrefh);
+
+  __m128i vadd_ab = _mm_add_epi16(vrefa, vrefb);
+  __m128i vadd_cd = _mm_add_epi16(vrefc, vrefd);
+  __m128i vadd_ef = _mm_add_epi16(vrefe, vreff);
+  __m128i vadd_gh = _mm_add_epi16(vrefg, vrefh);
+
+  __m128i vadd_abcd = _mm_add_epi16(vadd_ab, vadd_cd);
+  __m128i vadd_efgh = _mm_add_epi16(vadd_ef, vadd_gh);
+
+  __m128i vaddtop = _mm_add_epi16(vadd_abcd, vadd_efgh);
+
+  // Sum left ref
+  vrefa = _mm_loadu_si128((const __m128i*) &ref_left[0]);
+  vrefb = _mm_shuffle_epi8(vrefa, vshuf);
+  vrefc = _mm_loadu_si128((const __m128i*) &ref_left[16]);
+  vrefd = _mm_shuffle_epi8(vrefc, vshuf);
+  vrefe = _mm_loadu_si128((const __m128i*) &ref_left[32]);
+  vreff = _mm_shuffle_epi8(vrefe, vshuf);
+  vrefg = _mm_loadu_si128((const __m128i*) &ref_left[48]);
+  vrefh = _mm_shuffle_epi8(vrefg, vshuf);
+
+  vrefa = _mm_cvtepu8_epi16(vrefa);
+  vrefb = _mm_cvtepu8_epi16(vrefb);
+  vrefc = _mm_cvtepu8_epi16(vrefc);
+  vrefd = _mm_cvtepu8_epi16(vrefd);
+  vrefe = _mm_cvtepu8_epi16(vrefe);
+  vreff = _mm_cvtepu8_epi16(vreff);
+  vrefg = _mm_cvtepu8_epi16(vrefg);
+  vrefh = _mm_cvtepu8_epi16(vrefh);
+
+  vadd_ab = _mm_add_epi16(vrefa, vrefb);
+  vadd_cd = _mm_add_epi16(vrefc, vrefd);
+  vadd_ef = _mm_add_epi16(vrefe, vreff);
+  vadd_gh = _mm_add_epi16(vrefg, vrefh);
+
+  vadd_abcd = _mm_add_epi16(vadd_ab, vadd_cd);
+  vadd_efgh = _mm_add_epi16(vadd_ef, vadd_gh);
+
+  __m128i vaddleft = _mm_add_epi16(vadd_abcd, vadd_efgh);
+
+  // Add top and left sums
+  __m128i vadd = _mm_add_epi16(vaddtop, vaddleft);
+  __m128i vhadd = _mm_hadd_epi16(vadd, vadd);
+  vhadd = _mm_hadd_epi16(vhadd, vhadd);
+  vhadd = _mm_hadd_epi16(vhadd, vhadd);
+
+  int16_t sum = _mm_extract_epi16(vhadd, 0);
+  return sum;
+}
+
 static void uvg_intra_pred_dc_avx2(
   const cu_loc_t* const cu_loc,
   const color_t color,
@@ -188,7 +370,7 @@ static void uvg_intra_pred_dc_avx2(
   int16_t sum = 0;
   // Only one loop is done for non-square blocks.
   // In case of non-square blocks, only the longer reference is summed.
-  if (width >= height) {
+  if (width > height) {
     switch (width) {
       case 4:
         sum = dc_sum_w4_avx2(&ref_top[1 + multi_ref_idx]);
@@ -208,37 +390,47 @@ static void uvg_intra_pred_dc_avx2(
       default:
         assert(false && "Intra DC AVX2: Illegal width.\n");
     }
-    /*for (int_fast8_t i = 0; i < width; ++i) {
-      sum += ref_top[i + 1 + multi_ref_idx];
-    }*/
-  }
-  // For square blocks, add left reference to sum
-  if (width <= height) {
+  } else if (width < height) {
     switch (height) {
     case 4:
-      sum += dc_sum_w4_avx2(&ref_left[1 + multi_ref_idx]);
+      sum = dc_sum_w4_avx2(&ref_left[1 + multi_ref_idx]);
       break;
     case 8:
-      sum += dc_sum_w8_avx2(&ref_left[1 + multi_ref_idx]);
+      sum = dc_sum_w8_avx2(&ref_left[1 + multi_ref_idx]);
       break;
     case 16:
-      sum += dc_sum_w16_avx2(&ref_left[1 + multi_ref_idx]);
+      sum = dc_sum_w16_avx2(&ref_left[1 + multi_ref_idx]);
       break;
     case 32:
-      sum += dc_sum_w32_avx2(&ref_left[1 + multi_ref_idx]);
+      sum = dc_sum_w32_avx2(&ref_left[1 + multi_ref_idx]);
       break;
     case 64:
-      sum += dc_sum_w64_avx2(&ref_left[1 + multi_ref_idx]);
+      sum = dc_sum_w64_avx2(&ref_left[1 + multi_ref_idx]);
       break;
     default:
       assert(false && "Intra DC AVX2: Illegal height.\n");
     }
-  }
-  /*if (width <= height) {
-    for (int_fast8_t j = 0; j < height; ++j) {
-      sum += ref_left[j + 1 + multi_ref_idx];
+  } else { // Square blocks
+    switch (width) {
+    case 4:
+      sum = dc_sum_square_w4_avx2(&ref_top[1 + multi_ref_idx], &ref_left[1 + multi_ref_idx]);
+      break;
+    case 8:
+      sum = dc_sum_square_w8_avx2(&ref_top[1 + multi_ref_idx], &ref_left[1 + multi_ref_idx]);
+      break;
+    case 16:
+      sum = dc_sum_square_w16_avx2(&ref_top[1 + multi_ref_idx], &ref_left[1 + multi_ref_idx]);
+      break;
+    case 32:
+      sum = dc_sum_square_w32_avx2(&ref_top[1 + multi_ref_idx], &ref_left[1 + multi_ref_idx]);
+      break;
+    case 64:
+      sum = dc_sum_square_w64_avx2(&ref_top[1 + multi_ref_idx], &ref_left[1 + multi_ref_idx]);
+      break;
+    default:
+      assert(false && "Intra DC AVX2: Illegal block size.\n");
     }
-  }*/
+  }
 
   // JVET_K0122
   const int denom = width == height ? width << 1 : MAX(width, height);
