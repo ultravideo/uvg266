@@ -11,3 +11,4 @@ common_args='264x130 10 yuv420p --preset=ultrafast --threads=0 --no-cpuid --no-w
 valgrind_test $common_args --rd=0 --mtt-depth-inter 1 --pu-depth-inter 2-3
 valgrind_test $common_args --rd=3 --mtt-depth-inter 1 --pu-depth-inter 0-5
 valgrind_test $common_args --rd=3 --mtt-depth-inter 3 --pu-depth-inter 0-8
+valgrind_test $common_args --rd=3 --mtt-depth-inter 3 --pu-depth-inter 0-8 --mts inter
