@@ -614,7 +614,7 @@ void uvg_chroma_transform_search(
       &num_transforms);
   }
 
-  double lambda = state->c_lambda;
+  const double c_lambda = state->c_lambda;
 
   chorma_ts_out->best_u_cost = MAX_DOUBLE;
   chorma_ts_out->best_v_cost = MAX_DOUBLE;
@@ -639,7 +639,7 @@ void uvg_chroma_transform_search(
     uint8_t old_jccr = pred_cu->joint_cb_cr;
     pred_cu->joint_cb_cr = 0;
     if(is_jccr) {
-      state->c_lambda = lambda *  (transforms[i] == JCCR_3 ? 0.5 : 0.8);
+      state->c_lambda = c_lambda *  (transforms[i] == JCCR_3 ? 0.5 : 0.8);
       pred_cu->joint_cb_cr = transforms[i];
     }
     else if(state->encoder_control->cfg.dep_quant) {
@@ -871,6 +871,9 @@ void uvg_chroma_transform_search(
 reset_cabac:
     memcpy(&state->search_cabac, temp_cabac, sizeof(cabac_data_t));
   }
+  
+  // Reset c_lambda in case it has been modified because of jccr
+  state->c_lambda = c_lambda;
 }
 
 
