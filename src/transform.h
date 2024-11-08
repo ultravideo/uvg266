@@ -92,7 +92,7 @@ typedef struct {
   uint64_t v_distortion;
   double   u_bits;
   double   v_bits;
-} uvg_chorma_ts_out_t;
+} uvg_chroma_ts_out_t;
 
 void uvg_quantize_lcu_residual(
   encoder_state_t *const state,
@@ -116,7 +116,7 @@ void uvg_chroma_transform_search(
   uvg_pixel v_pred[1024],
   int16_t u_resi[1024],
   int16_t v_resi[1024],
-  uvg_chorma_ts_out_t* chorma_ts_out,
+  uvg_chroma_ts_out_t* chroma_ts_out,
   enum uvg_tree_type tree_type);
 
 enum uvg_chroma_transforms {

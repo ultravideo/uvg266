@@ -2216,7 +2216,7 @@ void uvg_cu_cost_inter_rd2(
       LCU_WIDTH_C,
       width);
 
-    uvg_chorma_ts_out_t chorma_ts_out;
+    uvg_chroma_ts_out_t chroma_ts_out;
     uvg_chroma_transform_search(
       state,
       lcu,
@@ -2228,23 +2228,24 @@ void uvg_cu_cost_inter_rd2(
       v_pred,
       u_resi,
       v_resi,
-      &chorma_ts_out,
+      &chroma_ts_out,
       UVG_BOTH_T);
     cbf_clear(&cur_cu->cbf, COLOR_U);
     cbf_clear(&cur_cu->cbf, COLOR_V);
-    if (chorma_ts_out.best_u_cost + chorma_ts_out.best_v_cost < chorma_ts_out.best_combined_cost) {
+    if ((chroma_ts_out.best_u_cost + chroma_ts_out.best_v_cost < chroma_ts_out.best_combined_cost)
+        || chroma_ts_out.best_combined_index != 3) {
       cur_cu->joint_cb_cr = 0;
-      cur_cu->tr_skip |= (chorma_ts_out.best_u_index == CHROMA_TS) << COLOR_U;
-      cur_cu->tr_skip |= (chorma_ts_out.best_v_index == CHROMA_TS) << COLOR_V;
-      if(chorma_ts_out.best_u_index != NO_RESIDUAL) cbf_set(&cur_cu->cbf, COLOR_U);
-      if(chorma_ts_out.best_v_index != NO_RESIDUAL) cbf_set(&cur_cu->cbf, COLOR_V);
-      chroma_cost += chorma_ts_out.best_u_cost + chorma_ts_out.best_v_cost;
+      cur_cu->tr_skip |= (chroma_ts_out.best_u_index == CHROMA_TS) << COLOR_U;
+      cur_cu->tr_skip |= (chroma_ts_out.best_v_index == CHROMA_TS) << COLOR_V;
+      if(chroma_ts_out.best_u_index != NO_RESIDUAL) cbf_set(&cur_cu->cbf, COLOR_U);
+      if(chroma_ts_out.best_v_index != NO_RESIDUAL) cbf_set(&cur_cu->cbf, COLOR_V);
+      chroma_cost += chroma_ts_out.best_u_cost + chroma_ts_out.best_v_cost;
     }
     else {
-      cur_cu->joint_cb_cr = chorma_ts_out.best_combined_index;
-      if (chorma_ts_out.best_combined_index & 2) cbf_set(&cur_cu->cbf, COLOR_U);
-      if (chorma_ts_out.best_combined_index & 1) cbf_set(&cur_cu->cbf, COLOR_V);
-      chroma_cost += chorma_ts_out.best_combined_cost;
+      cur_cu->joint_cb_cr = chroma_ts_out.best_combined_index;
+      if (chroma_ts_out.best_combined_index & 2) cbf_set(&cur_cu->cbf, COLOR_U);
+      if (chroma_ts_out.best_combined_index & 1) cbf_set(&cur_cu->cbf, COLOR_V);
+      chroma_cost += chroma_ts_out.best_combined_cost;
     }
   }
   else {
@@ -2256,6 +2257,13 @@ void uvg_cu_cost_inter_rd2(
                               lcu,
                               false,
                               UVG_BOTH_T);    
+  }
+
+  if (state->encoder_control->cfg.jccr) {
+    // Only mode 2 (joint_cb_cr == 3 in uvg266) is allowed for jccr in P/B slices for inter
+    assert((cur_cu->joint_cb_cr == 3 && cbf_is_set(cur_cu->cbf, COLOR_U)
+                                     && cbf_is_set(cur_cu->cbf, COLOR_V))
+           || cur_cu->joint_cb_cr == 0);
   }
 
   int cbf = cbf_is_set_any(cur_cu->cbf) || cur_cu->root_cbf;

@@ -566,7 +566,7 @@ void uvg_chroma_transform_search(
   uvg_pixel v_pred[1024],
   int16_t u_resi[1024],
   int16_t v_resi[1024],
-  uvg_chorma_ts_out_t* chorma_ts_out,
+  uvg_chroma_ts_out_t* chroma_ts_out,
   enum uvg_tree_type tree_type)
 {
   ALIGNED(64) coeff_t u_coeff[LCU_WIDTH_C * LCU_WIDTH_C * 5];
@@ -616,12 +616,12 @@ void uvg_chroma_transform_search(
 
   const double c_lambda = state->c_lambda;
 
-  chorma_ts_out->best_u_cost = MAX_DOUBLE;
-  chorma_ts_out->best_v_cost = MAX_DOUBLE;
-  chorma_ts_out->best_combined_cost = MAX_DOUBLE;
-  chorma_ts_out->best_u_index = -1;
-  chorma_ts_out->best_v_index = -1;
-  chorma_ts_out->best_combined_index = -1;
+  chroma_ts_out->best_u_cost = MAX_DOUBLE;
+  chroma_ts_out->best_v_cost = MAX_DOUBLE;
+  chroma_ts_out->best_combined_cost = MAX_DOUBLE;
+  chroma_ts_out->best_u_index = -1;
+  chroma_ts_out->best_v_index = -1;
+  chroma_ts_out->best_combined_index = -1;
   for (int i = 0; i < num_transforms; i++) {
     coeff_t u_quant_coeff[LCU_WIDTH_C * LCU_WIDTH_C];
     coeff_t v_quant_coeff[LCU_WIDTH_C * LCU_WIDTH_C];
@@ -844,28 +844,28 @@ void uvg_chroma_transform_search(
     if (!is_jccr) {
       double u_cost = UVG_CHROMA_MULT * ssd_u + u_bits * state->lambda;
       double v_cost = UVG_CHROMA_MULT * ssd_v + v_bits * state->lambda;
-      if (u_cost < chorma_ts_out->best_u_cost) {
-        chorma_ts_out->best_u_cost = u_cost;
-        chorma_ts_out->best_u_index = u_has_coeffs ? transforms[i] : NO_RESIDUAL;
-        chorma_ts_out->u_bits = u_bits;
-        chorma_ts_out->u_distortion = ssd_u;
+      if (u_cost < chroma_ts_out->best_u_cost) {
+        chroma_ts_out->best_u_cost = u_cost;
+        chroma_ts_out->best_u_index = u_has_coeffs ? transforms[i] : NO_RESIDUAL;
+        chroma_ts_out->u_bits = u_bits;
+        chroma_ts_out->u_distortion = ssd_u;
       }
-      if (v_cost < chorma_ts_out->best_v_cost) {
-        chorma_ts_out->best_v_cost = v_cost;
-        chorma_ts_out->best_v_index = v_has_coeffs ? transforms[i] : NO_RESIDUAL;
-        chorma_ts_out->v_bits = v_bits;
-        chorma_ts_out->v_distortion = ssd_v;
+      if (v_cost < chroma_ts_out->best_v_cost) {
+        chroma_ts_out->best_v_cost = v_cost;
+        chroma_ts_out->best_v_index = v_has_coeffs ? transforms[i] : NO_RESIDUAL;
+        chroma_ts_out->v_bits = v_bits;
+        chroma_ts_out->v_distortion = ssd_v;
       }
     }
     else {
       double cost = UVG_CHROMA_MULT * (ssd_u + ssd_v) + (u_bits + v_bits) * state->lambda;
-      if (cost < chorma_ts_out->best_combined_cost && cost < chorma_ts_out->best_u_cost + chorma_ts_out->best_v_cost) {
-        chorma_ts_out->best_combined_cost = cost;
-        chorma_ts_out->best_combined_index = transforms[i];
-        chorma_ts_out->u_bits              = u_bits;
-        chorma_ts_out->u_distortion        = ssd_u;
-        chorma_ts_out->v_bits              = v_bits;
-        chorma_ts_out->v_distortion        = ssd_v;
+      if (cost < chroma_ts_out->best_combined_cost && cost < chroma_ts_out->best_u_cost + chroma_ts_out->best_v_cost) {
+        chroma_ts_out->best_combined_cost = cost;
+        chroma_ts_out->best_combined_index = transforms[i];
+        chroma_ts_out->u_bits              = u_bits;
+        chroma_ts_out->u_distortion        = ssd_u;
+        chroma_ts_out->v_bits              = v_bits;
+        chroma_ts_out->v_distortion        = ssd_v;
       }
     }
 reset_cabac:
