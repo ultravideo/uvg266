@@ -369,7 +369,7 @@ static void generate_jccr_transforms(
   int64_t min_dist2 = INT64_MAX;
   int     cbf_mask1 = 0;
   int     cbf_mask2 = 0;
-  for (int cbfMask = 1; cbfMask < 4; cbfMask++)
+  for (int cbfMask = pred_cu->type == CU_INTRA ? 1 : 3; cbfMask < 4; cbfMask++)
   {
     if (costs[cbfMask] < min_dist1)
     {
