@@ -2143,7 +2143,7 @@ void uvg_cu_cost_inter_rd2(
                                    LCU_WIDTH, LCU_WIDTH,
                                    width, height) * UVG_LUMA_MULT;
   if (reconstruct_chroma) {
-    int index = y_px / 2 * LCU_WIDTH_C + x_px / 2;
+    index = y_px / 2 * LCU_WIDTH_C + x_px / 2;
     double ssd_u = uvg_pixels_calc_ssd(&lcu->ref.u[index], &lcu->rec.u[index],
                                        LCU_WIDTH_C, LCU_WIDTH_C,
                                        cu_loc->chroma_width, cu_loc->chroma_height);
