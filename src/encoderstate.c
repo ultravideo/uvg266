@@ -883,7 +883,7 @@ static void encoder_state_worker_encode_lcu_bitstream(void * opaque)
   //Encode coding tree
   cu_loc_t start;
   uvg_cu_loc_ctor(&start, lcu->position.x * LCU_WIDTH, lcu->position.y * LCU_WIDTH, LCU_WIDTH, LCU_WIDTH);
-  split_tree_t split_tree = { 0, 0, 0, 0, 0, 0, 0 };
+  split_tree_t split_tree = { 0, MODE_TYPE_ALL, 0, 0, 0, 0 };
 
   uvg_encode_coding_tree(state, lcu->coeff, tree_type,&start, &start, split_tree, true);
 

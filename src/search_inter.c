@@ -2166,7 +2166,7 @@ void uvg_cu_cost_inter_rd2(
     depth++;
     splits >>= 3;
   }
-  const split_tree_t splitt_tree = { cur_cu->split_tree, cur_cu->mode_type_tree, depth, mtt_depth, 0, 0, 0};
+  const split_tree_t splitt_tree = { cur_cu->split_tree, cur_cu->mode_type_tree, depth, mtt_depth, 0, 0};
   if (cur_cu->merged) {
     no_cbf_bits = CTX_ENTROPY_FBITS(&state->cabac.ctx.cu_skip_flag_model[skip_context], 1) + *inter_bitcost;
     bits += uvg_mock_encode_coding_unit(state, cabac, cu_loc, cu_loc, lcu, cur_cu, UVG_BOTH_T, splitt_tree);

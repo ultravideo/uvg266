@@ -732,7 +732,16 @@ static void inter_clear_cu_unused(cu_info_t* cu)
   }
 }
 
-
+/**
+ * \brief Check whether a mv cand block is coded before the current block.
+ * \param cur_x       x-coordinate of the current block (in pixels)
+ * \param cur_y       y-coordinate of the current block (in pixels)
+ * \param cand_x      x-coordinate of the candidate block (in pixels)
+ * \param cand_y      y-coordinate of the candidate block (in pixels)
+ * \param split_tree  split three of the current block
+ * \return        True, if the a0 mv candidate block is coded before the
+ *                current block. Otherwise false.
+ */
 static bool is_cand_coded(int cur_x, int cur_y, int cand_x, int cand_y, uint32_t split_tree) 
 {
   //Start from the LCU and figure out which sub-blocks the cur and cand cu belong to

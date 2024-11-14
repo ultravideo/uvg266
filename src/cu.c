@@ -369,52 +369,6 @@ int uvg_get_split_locs(
   return 0;
 }
 
-//TODO: Remove if not needed
-//void uvg_get_split_parent_loc(const cu_loc_t * parent_loc, const enum split_type parent_split, const cu_loc_t * const cur_cu_loc, uint8_t cur_cu_part_index)
-//{
-//  const int double_width = cur_cu_loc->width << 1;
-//  const int double_height = cur_cu_loc->height << 1;
-//  const int quad_width = cur_cu_loc->width << 2;
-//  const int quad_height = cur_cu_loc->height << 2;
-//  const int half_width = cur_cu_loc->width >> 1;
-//  const int half_height = cur_cu_loc->height >> 1;
-//
-//  switch (parent_split) {
-//    case NO_SPLIT:
-//      assert(0 && "trying to get split from no split");
-//      break;
-//    case QT_SPLIT:
-//      if (cur_cu_part_index == 0) uvg_cu_loc_ctor(parent_loc, cur_cu_loc->x, cur_cu_loc->y, double_width, double_height);
-//      else if (cur_cu_part_index == 1) uvg_cu_loc_ctor(parent_loc, cur_cu_loc->x - cur_cu_loc->width, cur_cu_loc->y, double_width, double_height);
-//      else if (cur_cu_part_index == 2) uvg_cu_loc_ctor(parent_loc, cur_cu_loc->x, cur_cu_loc->y - cur_cu_loc->height, double_width, double_height);
-//      else if (cur_cu_part_index == 3) uvg_cu_loc_ctor(parent_loc, cur_cu_loc->x - cur_cu_loc->width, cur_cu_loc->y - cur_cu_loc->height, double_width, double_height);
-//      else assert(0 && "cur_cu_part_index is not a valid number");
-//      return;
-//    case BT_HOR_SPLIT:
-//      if (cur_cu_part_index == 0) uvg_cu_loc_ctor(parent_loc, cur_cu_loc->x, cur_cu_loc->y, cur_cu_loc->width, double_height);
-//      else if (cur_cu_part_index == 1) uvg_cu_loc_ctor(parent_loc, cur_cu_loc->x, cur_cu_loc->y - cur_cu_loc->height, cur_cu_loc->width, double_height);
-//      else assert(0 && "cur_cu_part_index is not a valid number");
-//      return;
-//    case BT_VER_SPLIT:
-//      if (cur_cu_part_index == 0) uvg_cu_loc_ctor(parent_loc, cur_cu_loc->x, cur_cu_loc->y, double_width, cur_cu_loc->height);
-//      else if (cur_cu_part_index == 1) uvg_cu_loc_ctor(parent_loc, cur_cu_loc->x - cur_cu_loc->width, cur_cu_loc->y, double_width, cur_cu_loc->height);
-//      else assert(0 && "cur_cu_part_index is not a valid number");
-//      return;
-//    case TT_HOR_SPLIT:
-//      if (cur_cu_part_index == 0) uvg_cu_loc_ctor(parent_loc, cur_cu_loc->x, cur_cu_loc->y, cur_cu_loc->width, quad_height);
-//      else if (cur_cu_part_index == 1) uvg_cu_loc_ctor(parent_loc, cur_cu_loc->x, cur_cu_loc->y - half_height, cur_cu_loc->width, double_height);
-//      else if (cur_cu_part_index == 2) uvg_cu_loc_ctor(parent_loc, cur_cu_loc->x, cur_cu_loc->y - double_height - cur_cu_loc->height, cur_cu_loc->width, quad_height);
-//      else assert(0 && "cur_cu_part_index is not a valid number");
-//      return;
-//    case TT_VER_SPLIT:
-//      if (cur_cu_part_index == 0) uvg_cu_loc_ctor(parent_loc, cur_cu_loc->x, cur_cu_loc->y, quad_width, cur_cu_loc->height);
-//      else if (cur_cu_part_index == 1) uvg_cu_loc_ctor(parent_loc, cur_cu_loc->x - half_width, cur_cu_loc->y, double_width, cur_cu_loc->height);
-//      else if (cur_cu_part_index == 2) uvg_cu_loc_ctor(parent_loc, cur_cu_loc->x - double_width - cur_cu_loc->width, cur_cu_loc->y, quad_width, cur_cu_loc->height);
-//      else assert(0 && "cur_cu_part_index is not a valid number");
-//      return;
-//  }
-//}
-
 
 int uvg_get_implicit_split(
   const encoder_state_t* const state,
@@ -456,12 +410,14 @@ enum mode_type_condition uvg_derive_mode_type_cond(const cu_loc_t* const cu_loc,
 }
 
 int uvg_get_possible_splits(const encoder_state_t * const state,
-                            const cu_loc_t * const cu_loc, split_tree_t split_tree, enum uvg_tree_type tree_type, enum mode_type mode_type,
+                            const cu_loc_t * const cu_loc, split_tree_t split_tree, enum uvg_tree_type tree_type,
                             bool splits[6])
 {
   const unsigned width = cu_loc->width;
   const unsigned height = cu_loc->height;
   const int slice_type = state->frame->is_irap ? (tree_type == UVG_CHROMA_T ? 2 : 0) : 1;
+
+  enum mode_type mode_type_parent = GET_MODETYPEDATA(&split_tree, split_tree.current_depth-1);
 
   const unsigned max_btd =
     state->encoder_control->cfg.max_btt_depth[slice_type] + split_tree.implicit_mtt_depth;
@@ -479,7 +435,7 @@ int uvg_get_possible_splits(const encoder_state_t * const state,
   const enum split_type last_split = GET_SPLITDATA(&split_tree, split_tree.current_depth - 1);
   const enum split_type parl_split = last_split == TT_HOR_SPLIT ? BT_HOR_SPLIT : BT_VER_SPLIT;
 
-  if (tree_type == UVG_CHROMA_T && mode_type == MODE_TYPE_INTRA) {
+  if (tree_type == UVG_CHROMA_T && mode_type_parent == MODE_TYPE_INTRA) {
     splits[QT_SPLIT] = splits[BT_HOR_SPLIT] = splits[TT_HOR_SPLIT] = splits[BT_VER_SPLIT] = splits[TT_VER_SPLIT] = false;
     return implicitSplit != NO_SPLIT;
   }
@@ -539,7 +495,7 @@ int uvg_get_possible_splits(const encoder_state_t * const state,
   if (width <= 64 && height > 64) splits[BT_VER_SPLIT] = false;
   if (tree_type == UVG_CHROMA_T && (width * height <= 64 || width <= 8))     splits[BT_VER_SPLIT] = false;
 
-  if (mode_type == MODE_TYPE_INTER && width * height == 32)  splits[BT_VER_SPLIT] = splits[BT_HOR_SPLIT] = false;
+  if (mode_type_parent == MODE_TYPE_INTER && width * height == 32)  splits[BT_VER_SPLIT] = splits[BT_HOR_SPLIT] = false;
 
   if (height <= 2 * min_tt_size || height > max_tt_size || width > max_tt_size)
     splits[TT_HOR_SPLIT] = false;
@@ -551,7 +507,7 @@ int uvg_get_possible_splits(const encoder_state_t * const state,
   if (width > 64 || height > 64)  splits[TT_VER_SPLIT] = false;
   if (tree_type == UVG_CHROMA_T && (width * height <= 64 * 2 || width <= 16))     splits[TT_VER_SPLIT] = false;
 
-  if (mode_type == MODE_TYPE_INTER && width * height == 64)  splits[TT_VER_SPLIT] = splits[TT_HOR_SPLIT] = false;
+  if (mode_type_parent == MODE_TYPE_INTER && width * height == 64)  splits[TT_VER_SPLIT] = splits[TT_HOR_SPLIT] = false;
 
   return 0;
 }
