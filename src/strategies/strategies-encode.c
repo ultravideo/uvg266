@@ -30,11 +30,11 @@
  * INCLUDING NEGLIGENCE OR OTHERWISE ARISING IN ANY WAY OUT OF THE USE OF THIS
  ****************************************************************************/
 
-#include "strategies-encode.h"
+#include "strategies/strategies-encode.h"
 #if defined(__AVX512F__)
-#include "avx2/encode_coding_tree-avx2.h"
+#include "strategies/avx2/encode_coding_tree-avx2.h"
 #endif
-#include "encode_coding_tree-generic.h"
+#include "strategies/generic/encode_coding_tree-generic.h"
 #include "strategyselector.h"
 
 
