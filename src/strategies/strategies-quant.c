@@ -31,8 +31,9 @@
  ****************************************************************************/
 
 #include "strategies/strategies-quant.h"
-
+#if defined(__AVX512F__)
 #include "strategies/avx2/quant-avx2.h"
+#endif
 #include "strategies/generic/quant-generic.h"
 #include "strategyselector.h"
 
@@ -51,9 +52,10 @@ int uvg_strategy_register_quant(void *opaque, uint8_t bitdepth)
   bool success = true;
 
   success &= uvg_strategy_register_quant_generic(opaque, bitdepth);
-
+#if defined(__AVX512F__)
   if (uvg_g_hardware_flags.intel_flags.avx2) {
     success &= uvg_strategy_register_quant_avx2(opaque, bitdepth);
   }
+#endif
   return success;
 }
