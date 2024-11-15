@@ -30,11 +30,11 @@
  * INCLUDING NEGLIGENCE OR OTHERWISE ARISING IN ANY WAY OUT OF THE USE OF THIS
  ****************************************************************************/
 
-#include "strategies-intra.h"
+#include "strategies/strategies-intra.h"
 #if defined(__AVX512F__)
-#include "avx2/intra-avx2.h"
+#include "strategies/avx2/intra-avx2.h"
 #endif
-#include "intra-generic.h"
+#include "strategies/generic/intra-generic.h"
 #include "strategyselector.h"
 
 
