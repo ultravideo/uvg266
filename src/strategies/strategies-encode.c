@@ -30,10 +30,11 @@
  * INCLUDING NEGLIGENCE OR OTHERWISE ARISING IN ANY WAY OUT OF THE USE OF THIS
  ****************************************************************************/
 
-#include "strategies/strategies-encode.h"
-
-#include "strategies/avx2/encode_coding_tree-avx2.h"
-#include "strategies/generic/encode_coding_tree-generic.h"
+#include "strategies-encode.h"
+#if defined(__AVX512F__)
+#include "avx2/encode_coding_tree-avx2.h"
+#endif
+#include "encode_coding_tree-generic.h"
 #include "strategyselector.h"
 
 
@@ -45,9 +46,10 @@ int uvg_strategy_register_encode(void* opaque, uint8_t bitdepth) {
   bool success = true;
 
   success &= uvg_strategy_register_encode_generic(opaque, bitdepth);
-
+#if defined(__AVX512F__)
   if (uvg_g_hardware_flags.intel_flags.avx2) {
     //success &= uvg_strategy_register_encode_avx2(opaque, bitdepth);
   }
+#endif
   return success;
 }
