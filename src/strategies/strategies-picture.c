@@ -33,7 +33,9 @@
 #include "strategies/strategies-picture.h"
 
 #include "strategies/altivec/picture-altivec.h"
+#if defined(__AVX512F__)
 #include "strategies/avx2/picture-avx2.h"
+#endif
 #include "strategies/generic/picture-generic.h"
 #include "strategies/sse2/picture-sse2.h"
 #include "strategies/sse41/picture-sse41.h"
@@ -103,9 +105,11 @@ int uvg_strategy_register_picture(void* opaque, uint8_t bitdepth) {
   if (uvg_g_hardware_flags.intel_flags.sse42) {
     success &= uvg_strategy_register_picture_sse42(opaque, bitdepth);
   }
+#if defined(__AVX512F__)
   if (uvg_g_hardware_flags.intel_flags.avx2) {
     success &= uvg_strategy_register_picture_avx2(opaque, bitdepth);
   }
+#endif
   if (uvg_g_hardware_flags.powerpc_flags.altivec) {
     success &= uvg_strategy_register_picture_altivec(opaque, bitdepth);
   }
