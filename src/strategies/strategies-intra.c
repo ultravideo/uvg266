@@ -30,10 +30,11 @@
  * INCLUDING NEGLIGENCE OR OTHERWISE ARISING IN ANY WAY OUT OF THE USE OF THIS
  ****************************************************************************/
 
-#include "strategies/strategies-intra.h"
-
-#include "strategies/avx2/intra-avx2.h"
-#include "strategies/generic/intra-generic.h"
+#include "strategies-intra.h"
+#if defined(__AVX512F__)
+#include "avx2/intra-avx2.h"
+#endif
+#include "intra-generic.h"
 #include "strategyselector.h"
 
 
@@ -47,10 +48,10 @@ int uvg_strategy_register_intra(void* opaque, uint8_t bitdepth) {
   bool success = true;
 
   success &= uvg_strategy_register_intra_generic(opaque, bitdepth);
-
+#if defined(__AVX512F__)
   if (uvg_g_hardware_flags.intel_flags.avx2) {
     success &= uvg_strategy_register_intra_avx2(opaque, bitdepth);
   }
-
+#endif
   return success;
 }
