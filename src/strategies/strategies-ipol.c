@@ -30,10 +30,11 @@
  * INCLUDING NEGLIGENCE OR OTHERWISE ARISING IN ANY WAY OUT OF THE USE OF THIS
  ****************************************************************************/
 
-#include "strategies/strategies-ipol.h"
-
-#include "strategies/avx2/ipol-avx2.h"
-#include "strategies/generic/ipol-generic.h"
+#include "strategies-ipol.h"
+#if defined(__AVX512F__)
+#include "avx2/ipol-avx2.h"
+#endif
+#include "ipol-generic.h"
 #include "strategyselector.h"
 
 
@@ -55,8 +56,10 @@ int uvg_strategy_register_ipol(void* opaque, uint8_t bitdepth) {
 
   success &= uvg_strategy_register_ipol_generic(opaque, bitdepth);
 
+#if defined(__AVX512F__)
   if (uvg_g_hardware_flags.intel_flags.avx2) {
     success &= uvg_strategy_register_ipol_avx2(opaque, bitdepth);
   }
+#endif
   return success;
 }
