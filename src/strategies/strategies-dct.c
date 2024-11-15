@@ -31,9 +31,10 @@
  ****************************************************************************/
 
 #include "strategies/strategies-dct.h"
-
-#include "avx2/dct-avx2.h"
-#include "generic/dct-generic.h"
+#if defined(__AVX512F__)
+#include "strategies/avx2/dct-avx2.h"
+#endif
+#include "strategies/generic/dct-generic.h"
 #include "strategyselector.h"
 
 
@@ -76,11 +77,11 @@ int uvg_strategy_register_dct(void* opaque, uint8_t bitdepth) {
   bool success = true;
 
   success &= uvg_strategy_register_dct_generic(opaque, bitdepth);
-
+#if defined(__AVX512F__)
   if (uvg_g_hardware_flags.intel_flags.avx2) {
     success &= uvg_strategy_register_dct_avx2(opaque, bitdepth);
   }
-
+#endif
   return success;
 }
 
