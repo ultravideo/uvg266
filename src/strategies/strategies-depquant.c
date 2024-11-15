@@ -30,10 +30,11 @@
  * INCLUDING NEGLIGENCE OR OTHERWISE ARISING IN ANY WAY OUT OF THE USE OF THIS
  ****************************************************************************/
 
-#include "strategies/strategies-depquant.h"
-
-#include "strategies/avx2/depquant-avx2.h"
-#include "strategies/generic/depquant-generic.h"
+#include "strategies-depquant.h"
+#if defined(__AVX512F__)
+#include "avx2/depquant-avx2.h"
+#endif
+#include "depquant-generic.h"
 #include "strategyselector.h"
 
 
@@ -47,9 +48,10 @@ int uvg_strategy_register_depquant(void *opaque, uint8_t bitdepth)
   bool success = true;
 
   success &= uvg_strategy_register_depquant_generic(opaque, bitdepth);
-
+#if defined(__AVX512F__)
   if (uvg_g_hardware_flags.intel_flags.avx2) {
     success &= uvg_strategy_register_depquant_avx2(opaque, bitdepth);
   }
+#endif
   return success;
 }
