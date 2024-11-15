@@ -30,11 +30,11 @@
  * INCLUDING NEGLIGENCE OR OTHERWISE ARISING IN ANY WAY OUT OF THE USE OF THIS
  ****************************************************************************/
 
-#include "strategies-depquant.h"
+#include "strategies/strategies-depquant.h"
 #if defined(__AVX512F__)
-#include "avx2/depquant-avx2.h"
+#include "strategies/avx2/depquant-avx2.h"
 #endif
-#include "depquant-generic.h"
+#include "strategies/generic/depquant-generic.h"
 #include "strategyselector.h"
 
 
