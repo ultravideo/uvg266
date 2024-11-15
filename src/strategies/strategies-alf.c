@@ -32,7 +32,9 @@
 
 #include "strategies/strategies-alf.h"
 #include "strategies/sse41/alf-sse41.h"
+#if defined(__AVX512F__)
 #include "strategies/avx2/alf-avx2.h"
+#endif
 #include "strategies/generic/alf-generic.h"
 #include "strategyselector.h"
 
@@ -51,9 +53,10 @@ int uvg_strategy_register_alf(void* opaque, uint8_t bitdepth) {
   if (uvg_g_hardware_flags.intel_flags.sse41) {
     success &= uvg_strategy_register_alf_sse41(opaque, bitdepth);
   }
+#if defined(__AVX512F__)
   if (uvg_g_hardware_flags.intel_flags.avx2) {
     success &= uvg_strategy_register_alf_avx2(opaque, bitdepth);
   }
-
+#endif
   return success;
 }
