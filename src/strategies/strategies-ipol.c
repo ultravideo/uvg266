@@ -30,11 +30,11 @@
  * INCLUDING NEGLIGENCE OR OTHERWISE ARISING IN ANY WAY OUT OF THE USE OF THIS
  ****************************************************************************/
 
-#include "strategies-ipol.h"
+#include "strategies/strategies-ipol.h"
 #if defined(__AVX512F__)
-#include "avx2/ipol-avx2.h"
+#include "strategies/avx2/ipol-avx2.h"
 #endif
-#include "ipol-generic.h"
+#include "strategies/generic/ipol-generic.h"
 #include "strategyselector.h"
 
 
