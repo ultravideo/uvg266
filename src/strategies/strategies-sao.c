@@ -31,7 +31,9 @@
  ****************************************************************************/
 
 #include "strategies/strategies-sao.h"
+#if defined(__AVX512F__)
 #include "strategies/avx2/sao-avx2.h"
+#endif
 #include "strategies/generic/sao-generic.h"
 #include "strategyselector.h"
 
@@ -47,10 +49,10 @@ int uvg_strategy_register_sao(void* opaque, uint8_t bitdepth) {
   bool success = true;
 
   success &= uvg_strategy_register_sao_generic(opaque, bitdepth);
-
+#if defined(__AVX512F__)
   if (uvg_g_hardware_flags.intel_flags.avx2) {
     success &= uvg_strategy_register_sao_avx2(opaque, bitdepth);
   }
-
+#endif
   return success;
 }
