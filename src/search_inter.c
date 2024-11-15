@@ -2194,8 +2194,10 @@ void uvg_cu_cost_inter_rd2(
                               UVG_BOTH_T);
     ALIGNED(64) uvg_pixel u_pred[LCU_WIDTH_C * LCU_WIDTH_C];
     ALIGNED(64) uvg_pixel v_pred[LCU_WIDTH_C * LCU_WIDTH_C];
-    uvg_pixels_blit(&lcu->ref.u[index], u_pred, width, height, LCU_WIDTH_C, width);
-    uvg_pixels_blit(&lcu->ref.v[index], v_pred, width, height, LCU_WIDTH_C, width);
+    const int chroma_width = cu_loc->chroma_width;
+    const int chroma_height = cu_loc->chroma_height;
+    uvg_pixels_blit(&lcu->ref.u[index], u_pred, chroma_width, chroma_height, LCU_WIDTH_C, chroma_width);
+    uvg_pixels_blit(&lcu->ref.v[index], v_pred, chroma_width, chroma_height, LCU_WIDTH_C, chroma_width);
     ALIGNED(64) int16_t u_resi[LCU_WIDTH_C * LCU_WIDTH_C];
     ALIGNED(64) int16_t v_resi[LCU_WIDTH_C * LCU_WIDTH_C];
 
@@ -2203,18 +2205,18 @@ void uvg_cu_cost_inter_rd2(
       &lcu->ref.u[index],
       u_pred,
       u_resi,
-      width,
-      height,
+      chroma_width,
+      chroma_height,
       LCU_WIDTH_C,
-      width);
+      chroma_width);
     uvg_generate_residual(
       &lcu->ref.v[index],
       v_pred,
       v_resi,
-      width,
-      height,
+      chroma_width,
+      chroma_height,
       LCU_WIDTH_C,
-      width);
+      chroma_width);
 
     uvg_chroma_ts_out_t chroma_ts_out;
     uvg_chroma_transform_search(
