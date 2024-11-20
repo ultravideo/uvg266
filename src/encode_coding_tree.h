@@ -106,7 +106,7 @@ uint8_t uvg_write_split_flag(
   const cu_info_t* left_cu,
   const cu_info_t* above_cu,
   const cu_loc_t* const cu_loc,
-  split_tree_t,
+  split_tree_t split_tree,
   enum uvg_tree_type tree_type,
   bool* is_implicit_out,
   double* bits_out);

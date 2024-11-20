@@ -59,7 +59,7 @@ uvg_hashmap_t* uvg_hashmap_create(uint32_t bucket_size)
   uvg_hashmap_t* new_hashmap = (uvg_hashmap_t*)malloc(sizeof(uvg_hashmap_t));
   new_hashmap->bucket_size = bucket_size;
   new_hashmap->table = (uvg_hashmap_node_t**)malloc(sizeof(uvg_hashmap_node_t*) * bucket_size);
-  for (int i = 0; i < bucket_size; i++) {
+  for (unsigned i = 0; i < bucket_size; i++) {
     new_hashmap->table[i] = NULL;
   }
   return new_hashmap;
@@ -141,7 +141,7 @@ void uvg_hashmap_node_free(uvg_hashmap_node_t* node)
  * \param map the hashmap to free the memory of.
  */
 void uvg_hashmap_free(uvg_hashmap_t* map) {
-  for (int i = 0; i < map->bucket_size; i++) {
+  for (unsigned i = 0; i < map->bucket_size; i++) {
     uvg_hashmap_node_t* temp = map->table[i];
     uvg_hashmap_node_free(temp);
   }

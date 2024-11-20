@@ -212,7 +212,7 @@ void uvg_bitstream_clear(bitstream_t *const stream)
  * \param stream  stream the data is to be appended to
  * \param data  input data
  */
-void uvg_bitstream_put_byte(bitstream_t *const stream, uint32_t data)
+void uvg_bitstream_put_byte(bitstream_t *const stream, const uint32_t data)
 {
   assert(stream->cur_bit == 0);
   const uint8_t emulation_prevention_three_byte = 0x03;

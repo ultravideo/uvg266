@@ -246,7 +246,7 @@ void uvg_cabac_encode_bin_ep(cabac_data_t * const data, const uint32_t bin_value
 }
 
 // Import from VTM 4.0
-void uvg_cabac_encode_aligned_bins_ep(cabac_data_t * const data, uint32_t bin_values, int num_bins) 
+void uvg_cabac_encode_aligned_bins_ep(cabac_data_t * const data, const uint32_t bin_values, int num_bins) 
 {
   uint32_t rem_bins = num_bins;
   while (rem_bins > 0) {

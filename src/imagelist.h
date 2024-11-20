@@ -62,7 +62,7 @@ image_list_t * uvg_image_list_alloc(int size);
 int uvg_image_list_resize(image_list_t *list, unsigned size);
 int uvg_image_list_destroy(image_list_t *list);
 int uvg_image_list_add(image_list_t *list, uvg_picture *im, cu_array_t* cua, int32_t poc, uint8_t ref_LX[2][16]);
-int uvg_image_list_rem(image_list_t *list, unsigned n);
+int uvg_image_list_rem(image_list_t *const list, const unsigned n);
 
 int uvg_image_list_copy_contents(image_list_t *target, image_list_t *source);
 

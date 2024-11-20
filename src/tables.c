@@ -86,7 +86,7 @@ const uint32_t* const uvg_g_sig_last_scan[3][5] = {
 };
 
 // Holds scan order indices for all possible block sizes for diagonal scan order and coefficient group scan order
-static const uint32_t const g_scan_order_buffer[32258] = {
+static const uint32_t g_scan_order_buffer[32258] = {
    0,    0,    1,    0,    1,    2,    3,    0,    1,    2,    3,    4,    5, // UNGROUPED 1xN, 1x2, 1x4, 1x8
    6,    7,    0,    1,    2,    3,    4,    5,    6,    7,    8,    9,   10, // 1x16
   11,   12,   13,   14,   15,    0,    1,    2,    3,    4,    5,    6,    7, // 1x32

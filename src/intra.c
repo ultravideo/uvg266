@@ -1664,6 +1664,7 @@ int8_t uvg_get_co_located_luma_mode(
   else {
     cu = LCU_GET_CU_AT_PX(lcu, SUB_SCU(x), SUB_SCU(y));
   }
+  assert(cu->type != CU_INTER && "co-located CU should not be an inter CU");
   if (cu->intra.mip_flag) {
     return 0;
   }
@@ -1863,8 +1864,18 @@ void uvg_intra_recon_cu(
   };
   const int8_t width = cu_loc->width;
   const int8_t height = cu_loc->height;
+
+  const bool has_luma = recon_luma && search_data->pred_cu.intra.isp_mode == ISP_MODE_NO_ISP;
+  const bool has_chroma = recon_chroma;
+  const bool use_jccr = search_data->pred_cu.joint_cb_cr & 3 && state->encoder_control->cfg.jccr && has_chroma;
+
   if (cur_cu == NULL) {
     cur_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
+
+    //If jccr is used, the mode may not be set for cus in the lcu, so copy it from search_data
+    if (use_jccr) {
+      cur_cu->joint_cb_cr = search_data->pred_cu.joint_cb_cr;
+    }
   }
 
    
@@ -1928,9 +1939,7 @@ void uvg_intra_recon_cu(
       cur_cu->intra.isp_cbfs = search_data->best_isp_cbfs;
     }
   }
-  const bool has_luma = recon_luma && search_data->pred_cu.intra.isp_mode == ISP_MODE_NO_ISP;
-  const bool has_chroma = recon_chroma;
-     
+
   // Process a leaf TU.
   if (has_luma) {
     intra_recon_tb_leaf(state, cu_loc, cu_loc, lcu, COLOR_Y, search_data);
@@ -1942,7 +1951,7 @@ void uvg_intra_recon_cu(
 
   // TODO: not necessary to call if only luma and ISP is on
   uvg_quantize_lcu_residual(state, has_luma, has_chroma && !(search_data->pred_cu.joint_cb_cr & 3),
-                            search_data->pred_cu.joint_cb_cr & 3 && state->encoder_control->cfg.jccr && has_chroma,
+                            use_jccr,
                             cu_loc, cur_cu, lcu,
                             false,
                             tree_type);

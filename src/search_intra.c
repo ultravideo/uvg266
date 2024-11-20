@@ -1544,7 +1544,7 @@ int8_t uvg_search_intra_chroma_rdo(
             chroma_height,
             LCU_WIDTH_C,
             chroma_width);
-          uvg_chorma_ts_out_t chorma_ts_out;
+          uvg_chroma_ts_out_t chroma_ts_out;
           uvg_chroma_transform_search(
             state,
             lcu,
@@ -1556,24 +1556,24 @@ int8_t uvg_search_intra_chroma_rdo(
             v_pred,
             u_resi,
             v_resi,
-            &chorma_ts_out,
+            &chroma_ts_out,
             is_separate ? UVG_CHROMA_T : tree_type);
 
           // LFNST constraint failed
-          if(chorma_ts_out.best_u_index == -1 && chorma_ts_out.best_combined_index == -1) {
+          if(chroma_ts_out.best_u_index == -1 && chroma_ts_out.best_combined_index == -1) {
             chroma_data[mode_i].lfnst_costs[lfnst] = MAX_DOUBLE;
             continue;
           }
 
-          double actual_cost = state->lambda * (chorma_ts_out.u_bits + chorma_ts_out.v_bits + mode_bits) + (chorma_ts_out.u_distortion + chorma_ts_out.v_distortion);
-          if(chorma_ts_out.best_u_cost + chorma_ts_out.best_v_cost < chorma_ts_out.best_combined_cost) {
+          double actual_cost = state->lambda * (chroma_ts_out.u_bits + chroma_ts_out.v_bits + mode_bits) + (chroma_ts_out.u_distortion + chroma_ts_out.v_distortion);
+          if(chroma_ts_out.best_u_cost + chroma_ts_out.best_v_cost < chroma_ts_out.best_combined_cost) {
             chroma_data[mode_i].lfnst_costs[lfnst] = actual_cost;
             if( chroma_data[mode_i].lfnst_costs[lfnst] 
                 < chroma_data[mode_i].lfnst_costs[best_lfnst_index] || lfnst_i == 0) {
               chroma_data[mode_i].pred_cu.joint_cb_cr = 0;
               chroma_data[mode_i].pred_cu.tr_skip &= 1;
-              chroma_data[mode_i].pred_cu.tr_skip |= (chorma_ts_out.best_u_index == CHROMA_TS) << COLOR_U;
-              chroma_data[mode_i].pred_cu.tr_skip |= (chorma_ts_out.best_v_index == CHROMA_TS) << COLOR_V;
+              chroma_data[mode_i].pred_cu.tr_skip |= (chroma_ts_out.best_u_index == CHROMA_TS) << COLOR_U;
+              chroma_data[mode_i].pred_cu.tr_skip |= (chroma_ts_out.best_v_index == CHROMA_TS) << COLOR_V;
               best_lfnst_index = lfnst;
               chroma_data[mode_i].cost = chroma_data[mode_i].lfnst_costs[lfnst];
             }
@@ -1582,7 +1582,7 @@ int8_t uvg_search_intra_chroma_rdo(
             chroma_data[mode_i].lfnst_costs[lfnst] = actual_cost;
             if (chroma_data[mode_i].lfnst_costs[lfnst]
               < chroma_data[mode_i].lfnst_costs[best_lfnst_index] || lfnst_i == 0) {
-              chroma_data[mode_i].pred_cu.joint_cb_cr = chorma_ts_out.best_combined_index;
+              chroma_data[mode_i].pred_cu.joint_cb_cr = chroma_ts_out.best_combined_index;
               chroma_data[mode_i].pred_cu.tr_skip &= 1;
               best_lfnst_index = lfnst;
               chroma_data[mode_i].cost = chroma_data[mode_i].lfnst_costs[lfnst];
@@ -1659,6 +1659,7 @@ int8_t uvg_search_cu_intra_chroma(
     if(!is_separate && tree_type == UVG_BOTH_T) {
       memcpy(chroma_data[i].lfnst_costs, search_data->lfnst_costs, sizeof(double) * 3);
     }
+    chroma_data[i].best_isp_cbfs = search_data->best_isp_cbfs; //Copy isp cbfs so they don't get overwriten later
   }
   // Don't do rough mode search if all modes are selected.
   // FIXME: It might make more sense to only disable rough search if

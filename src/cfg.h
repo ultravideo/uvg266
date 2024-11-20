@@ -48,6 +48,6 @@ int uvg_config_init(uvg_config *cfg);
 int uvg_config_destroy(uvg_config *cfg);
 int uvg_config_parse(uvg_config *cfg, const char *name, const char *value);
 void uvg_config_process_lp_gop(uvg_config *cfg);
-int uvg_config_validate(const uvg_config *cfg);
+int uvg_config_validate(const uvg_config *const cfg);
 
 #endif

@@ -575,18 +575,18 @@ static INLINE void update_common_context(
   size_t         setCpSize = cc->m_nbInfo[scan_pos - 1].maxDist * sizeof(uint8_t);
   if (prev_state != -1) {
     const int8_t prev_sbb_state = ctxs->m_allStates.m_refSbbCtxId[prev_state];
-    for (int i = 0; i < numSbb; ++i) {
+    for (unsigned i = 0; i < numSbb; ++i) {
       sbbFlags[i * 4 + curr_state_without_offset] = cc->m_allSbbCtx[cc->m_prev_sbb_ctx_offset].sbbFlags[i * 4 + prev_sbb_state];
     }
-    for (int i = 16; i < setCpSize; ++i) {
+    for (unsigned i = 16; i < setCpSize; ++i) {
       levels[scan_pos * 4 + i * 4 + curr_state_without_offset] = cc->m_allSbbCtx[cc->m_prev_sbb_ctx_offset].sbbFlags[scan_pos * 4 + i * 4 + prev_sbb_state];
     }
   }
   else {
-    for (int i = 0; i < numSbb; ++i) {
+    for (unsigned i = 0; i < numSbb; ++i) {
       sbbFlags[i * 4 + curr_state_without_offset] = 0;
     }
-    for (int i = 16; i < setCpSize; ++i) {
+    for (unsigned i = 16; i < setCpSize; ++i) {
       levels[scan_pos * 4 + i * 4 + curr_state_without_offset] = 0;
     }
   }

@@ -390,15 +390,12 @@ static void inter_cp_with_ext_border(const uvg_pixel *ref_buf, int ref_stride,
  *
  * \param state          encoder state
  * \param ref            picture to copy the data from
- * \param pu_x           PU x position
- * \param pu_y           PU y position
- * \param width          PU width
- * \param height         PU height
  * \param mv_param       motion vector
  * \param yuv_px         destination buffer for pixel precision
  * \param yuv_im         destination buffer for high-precision, or NULL if not needed
  * \param predict_luma   Enable or disable luma prediction for this call.
  * \param predict_chroma Enable or disable chroma prediction for this call.
+ * \param cu_loc         Size and position of current PU/CU
 */
 static unsigned inter_recon_unipred(
   const encoder_state_t * const state,
@@ -526,14 +523,11 @@ static unsigned inter_recon_unipred(
  * \param state          encoder state
  * \param ref1           reference picture to copy the data from
  * \param ref2           other reference picture to copy the data from
- * \param pu_x           PU x position
- * \param pu_y           PU y position
- * \param width          PU width
- * \param height         PU height
  * \param mv_param       motion vectors
  * \param lcu            destination lcu
  * \param predict_luma   Enable or disable luma prediction for this call.
  * \param predict_chroma Enable or disable chroma prediction for this call.
+ * \param cu_loc         Size and position of current PU/CU
  */
 void uvg_inter_recon_bipred(
   const encoder_state_t *const state,
@@ -603,11 +597,9 @@ void uvg_inter_recon_bipred(
  *
  * \param state   encoder state
  * \param lcu     containing LCU
- * \param x       x-coordinate of the CU in pixels
- * \param y       y-coordinate of the CU in pixels
- * \param width   CU width
  * \param predict_luma   Enable or disable luma prediction for this call.
  * \param predict_chroma Enable or disable chroma prediction for this call.
+ * \param cu_loc         Size and position of current CU
  */
 void uvg_inter_recon_cu(
   const encoder_state_t * const state,
@@ -686,12 +678,9 @@ static void ibc_recon_cu(const encoder_state_t * const state,
  *
  * \param state          encoder state
  * \param lcu            containing LCU
- * \param x              x-coordinate of the CU in pixels
- * \param y              y-coordinate of the CU in pixels
- * \param width          CU width
  * \param predict_luma   Enable or disable luma prediction for this call.
  * \param predict_chroma Enable or disable chroma prediction for this call.
- * \param i_pu           Index of the PU. Always zero for 2Nx2N. Used for SMP+AMP.
+ * \param cu_loc         Size and position of current PU/CU
  */
 void uvg_inter_pred_pu(
   const encoder_state_t * const state,
@@ -766,6 +755,124 @@ static void inter_clear_cu_unused(cu_info_t* cu)
     cu->inter.mv[i][1] = 0;
     cu->inter.mv_ref[i] = 255;
   }
+}
+
+/**
+ * \brief Check whether a mv cand block is coded before the current block.
+ * \param cur_x       x-coordinate of the current block (in pixels)
+ * \param cur_y       y-coordinate of the current block (in pixels)
+ * \param cand_x      x-coordinate of the candidate block (in pixels)
+ * \param cand_y      y-coordinate of the candidate block (in pixels)
+ * \param split_tree  split three of the current block
+ * \return        True, if the a0 mv candidate block is coded before the
+ *                current block. Otherwise false.
+ */
+static bool is_cand_coded(int cur_x, int cur_y, int cand_x, int cand_y, uint32_t split_tree) 
+{
+  //Start from the LCU and figure out which sub-blocks the cur and cand cu belong to
+  int log2_width = LOG2_LCU_WIDTH; int log2_height = LOG2_LCU_WIDTH;
+  int cur_block_x = (cur_x >> log2_width); int cur_block_y = (cur_y >> log2_height);
+  int cand_block_x = (cand_x >> log2_width); int cand_block_y = (cand_y >> log2_height);
+  
+  // If different LCU and cand block is before cur in raster scan order, it is coded.
+  if (cur_block_y != cand_block_y) {
+    
+    return cand_block_y < cur_block_y;
+  }
+  else if (cur_block_x != cand_block_x) {
+    return cand_block_x < cur_block_x;
+  }
+
+  struct {
+    uint32_t split_tree;
+  } split_data = {split_tree};
+
+  int offset_x = 0; int offset_y = 0;
+  int cur_cu_index = 0;
+  int cand_cu_index = 0;
+  int depth = 0;
+  do
+  {
+    uint32_t split = GET_SPLITDATA(&split_data, depth);
+    depth++;
+    // Figure out which sub-block cand and cur belong to in the current split
+    switch (split)
+    {
+    case QT_SPLIT: // Four way split, index based on both x and y
+      log2_width--; log2_height--;
+
+      cur_block_x = ((cur_x + offset_x) >> log2_width) & 1;
+      cur_block_y = ((cur_y + offset_y) >> log2_width) & 1;
+      cur_cu_index = cur_block_x + 2 * cur_block_y;
+      
+      cand_block_x = ((cand_x + offset_x) >> log2_height) & 1;
+      cand_block_y = ((cand_y + offset_y) >> log2_height) & 1;
+      cand_cu_index = cand_block_x + 2 * cand_block_y;
+      break;
+
+    case BT_HOR_SPLIT: // Two way split, index only based on y
+      log2_height--;
+
+      cur_block_y = ((cur_y + offset_y) >> log2_height) & 1;
+      cur_cu_index = cur_block_y;
+
+      cand_block_y = ((cand_y + offset_y) >> log2_height) & 1;
+      cand_cu_index = cand_block_y;
+      break;
+
+    case BT_VER_SPLIT: // Two way split, index only based on x
+      log2_width--;
+
+      cur_block_x = ((cur_x + offset_x) >> log2_width) & 1;
+      cur_cu_index = cur_block_x;
+
+      cand_block_x = ((cand_x + offset_x) >> log2_width) & 1;
+      cand_cu_index = cand_block_x;
+      break;
+
+    case TT_HOR_SPLIT: // Three way split, index only based on y. Need log2_height + 1 and log2_height bit to determine index. block == 0 -> index := 0, block == {1,2} -> index := 1, block == 3 -> index := 2 
+      log2_height -= 2; //set to smallest block size
+
+      cur_block_y = ((cur_y + offset_y) >> log2_height) & 3;
+      cur_cu_index = (cur_block_y == 0) ? 0 : ((cur_block_y != 3) ? 1 : 2);
+
+      cand_block_y = ((cand_y + offset_y) >> log2_height) & 3;
+      cand_cu_index = (cand_block_y == 0) ? 0 : ((cand_block_y != 3) ? 1 : 2);
+
+      if (cur_cu_index == 1) {
+        // TT split causes misalignment in the middle block, so need to use offset to get correct alignment (to a (1 << log2_size)-grid) for indexing.
+        // Alignment is fixed after a BT split, but no need to reset offset since it does not affect indexing for smaller blocks than current (1 << log2_size). 
+        offset_y = (1 << log2_height); 
+        log2_height++; //middle block is larger so need to increase size
+      }
+      break;
+
+    case TT_VER_SPLIT: // Three way split, index only based on x. Need log2_width + 1 and log2_width bit to determine index. block == 0 -> index := 0, block == {1,2} -> index := 1, block == 3 -> index := 2 
+      log2_width -= 2; //set to smallest block size
+
+      cur_block_x = ((cur_x + offset_x) >> log2_width) & 3;
+      cur_cu_index = (cur_block_x == 0) ? 0 : ((cur_block_x != 3) ? 1 : 2);
+
+      cand_block_x = ((cand_x + offset_x) >> log2_width) & 3;
+      cand_cu_index = (cand_block_x == 0) ? 0 : ((cand_block_x != 3) ? 1 : 2);
+      
+      if (cur_cu_index == 1) {
+        // TT split causes misalignment in the middle block, so need to use offset to get correct alignment (to a (1 << log2_size)-grid) for indexing.
+        // Alignment is fixed after a BT split, but no need to reset offset since it does not affect indexing for smaller blocks than current (1 << log2_size). 
+        offset_x = (1 << log2_width); 
+        log2_width++; //middle block is larger so need to increase size
+      }
+      break;
+
+    default:
+      assert(false && "Not a valid split");
+    }
+    if (cand_cu_index != cur_cu_index) return cand_cu_index < cur_cu_index;
+
+  } while (depth < MAX_DEPTH); //TODO: check that MAX_DEPTH is actually max split amount in all cases
+
+  assert(false && "Either max depth reached or cur and cand are the same block"); // We should not get here 
+  return false;
 }
 
 /**
@@ -916,10 +1023,7 @@ static bool is_b0_cand_coded(int x, int y, int width, int height)
  * \brief Get merge candidates for current block
  *
  * \param state     encoder control state to use
- * \param x         block x position in SCU
- * \param y         block y position in SCU
- * \param width     current block width
- * \param height    current block height
+ * \param cu_loc    Size and position of current CU
  * \param ref_list  which reference list, L0 is 1 and L1 is 2
  * \param ref_idx   index in the reference list
  * \param cand_out  will be filled with C0 and C1 candidates
@@ -1287,6 +1391,8 @@ static void get_spatial_merge_candidates(const cu_loc_t* const cu_loc,
   const int y = cu_loc->y;
   const int width = cu_loc->width;
   const int height = cu_loc->height;
+  const cu_info_t* const cur_cu = LCU_GET_CU_AT_PX(lcu, x_local, y_local);
+
   // A0 and A1 availability testing
   if (x != 0) {
     cu_info_t *a1 = LCU_GET_CU_AT_PX(lcu, x_local - 1, y_local + height - 1);
@@ -1299,7 +1405,7 @@ static void get_spatial_merge_candidates(const cu_loc_t* const cu_loc,
 
     if (y_local + height < LCU_WIDTH && y + height < picture_height) {
       cu_info_t *a0 = LCU_GET_CU_AT_PX(lcu, x_local - 1, y_local + height);
-      if (a0->type == CU_INTER && is_a0_cand_coded(x, y, width, height)) {
+      if (a0->type == CU_INTER && is_cand_coded(x, y, x - 1, y + height, cur_cu->split_tree)) {
         inter_clear_cu_unused(a0);
         cand_out->a[0] = a0;
       }
@@ -1317,7 +1423,7 @@ static void get_spatial_merge_candidates(const cu_loc_t* const cu_loc,
         b0 = LCU_GET_TOP_RIGHT_CU(lcu);
       }
     }
-    if (b0 && b0->type == CU_INTER && is_b0_cand_coded(x, y, width, height)) {
+    if (b0 && b0->type == CU_INTER && is_cand_coded(x, y, x + width, y - 1, cur_cu->split_tree)) {
       inter_clear_cu_unused(b0);
       cand_out->b[0] = b0;
     }
@@ -1383,6 +1489,8 @@ static void get_spatial_merge_candidates_cua(
   const int height = cu_loc->height;
   const int32_t x_local = SUB_SCU(x); //!< coordinates from top-left of this LCU
   const int32_t y_local = SUB_SCU(y);
+  const cu_info_t* const cur_cu = uvg_cu_array_at_const(cua, x, y);
+
   // A0 and A1 availability testing
   if (x != 0) {
     const cu_info_t *a1 = uvg_cu_array_at_const(cua, x - 1, y + height - 1);
@@ -1393,7 +1501,7 @@ static void get_spatial_merge_candidates_cua(
 
     if (y_local + height < LCU_WIDTH && y + height < picture_height) {
       const cu_info_t *a0 = uvg_cu_array_at_const(cua, x - 1, y + height);
-      if (a0->type == CU_INTER && is_a0_cand_coded(x, y, width, height)) {
+      if (a0->type == CU_INTER && is_cand_coded(x, y, x - 1, y + height, cur_cu->split_tree)) {
         cand_out->a[0] = a0;
       }
     }
@@ -1403,7 +1511,7 @@ static void get_spatial_merge_candidates_cua(
   if (y != 0) {
     if (x + width < picture_width && (x_local + width < LCU_WIDTH || (!wpp && y_local == 0))) {
       const cu_info_t *b0 = uvg_cu_array_at_const(cua, x + width, y - 1);
-      if (b0->type == CU_INTER && is_b0_cand_coded(x, y, width, height)) {
+      if (b0->type == CU_INTER && is_cand_coded(x, y, x + width, y - 1, cur_cu->split_tree)) {
         cand_out->b[0] = b0;
       }
     }
@@ -1594,14 +1702,11 @@ static void get_mv_cand_from_candidates(
  * \brief Get MV prediction for current block.
  *
  * \param state     encoder state
- * \param x         block x position in pixels
- * \param y         block y position in pixels
- * \param width     block width in pixels
- * \param height    block height in pixels
  * \param mv_cand   Return the motion vector candidates.
  * \param cur_cu    current CU
  * \param lcu       current LCU
  * \param reflist   reflist index (either 0 or 1)
+ * \param cu_loc    Size and position of current CU
  */
 void uvg_inter_get_mv_cand(
   const encoder_state_t * const state,
@@ -1635,13 +1740,10 @@ void uvg_inter_get_mv_cand(
  * \brief Get MV prediction for current block using state->tile->frame->cu_array.
  *
  * \param state     encoder state
- * \param x         block x position in pixels
- * \param y         block y position in pixels
- * \param width     block width in pixels
- * \param height    block height in pixels
  * \param mv_cand   Return the motion vector candidates.
  * \param cur_cu    current CU
  * \param reflist   reflist index (either 0 or 1)
+ * \param cu_loc    Size and position of current PU/CU
  */
 void uvg_inter_get_mv_cand_cua(
   const encoder_state_t * const state,
@@ -1778,7 +1880,7 @@ void uvg_hmvp_add_mv(const encoder_state_t* const state, uint32_t pic_x, uint32_
   //if (!cu.geoFlag && !cu.affine)
   if(cu->type != CU_INTRA)
   {    
-
+    assert((cu->type != CU_IBC || block_width * block_height > 16) && "Do not add IBC hmvp for small blocks");
     const uint8_t parallel_merge_level = state->encoder_control->cfg.log2_parallel_merge_level;
     const uint32_t xBr = block_width + pic_x;
     const uint32_t yBr = block_height + pic_y;
@@ -1879,12 +1981,7 @@ void uvg_round_precision_vector2d(int src, int dst, vector2d_t* mv) {
 /**
  * \brief Get merge predictions for current block
  * \param state     the encoder state
- * \param x         block x position in SCU
- * \param y         block y position in SCU
- * \param width     block width
- * \param height    block height
- * \param use_a1    true, if candidate a1 can be used
- * \param use_b1    true, if candidate b1 can be used
+ * \param cu_loc    Size and position of current PU/CU
  * \param mv_cand   Returns the merge candidates.
  * \param lcu       lcu containing the block
  * \return          number of merge candidates

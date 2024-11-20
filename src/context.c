@@ -63,7 +63,14 @@ static const uint8_t INIT_BINARY_SPLIT_FLAG[4][4] = {
   {  43,  37,  21,  22, },
   {  36,  45,  36,  45, },
   {  12,  13,  12,  13, },
-  };
+};
+
+static const uint8_t INIT_NON_INTER_FLAG[4][2] = {
+  {  25,  20, },
+  {  25,  12, },
+  { CNU, CNU, },
+  {   1,   0, },
+};
 
 static const uint8_t INIT_SKIP_FLAG[4][3] = {
   {  57,  60,  46, },
@@ -565,6 +572,8 @@ void uvg_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
   //TODO: ignore P/B contexts on intra frame
   uvg_ctx_init(&cabac->ctx.cu_pred_mode_model[0], QP, INIT_PRED_MODE[slice][0], INIT_PRED_MODE[3][0]);
   uvg_ctx_init(&cabac->ctx.cu_pred_mode_model[1], QP, INIT_PRED_MODE[slice][1], INIT_PRED_MODE[3][1]);
+  uvg_ctx_init(&cabac->ctx.non_inter_flag_model[0], QP, INIT_NON_INTER_FLAG[slice][0], INIT_NON_INTER_FLAG[3][0]);
+  uvg_ctx_init(&cabac->ctx.non_inter_flag_model[1], QP, INIT_NON_INTER_FLAG[slice][1], INIT_NON_INTER_FLAG[3][1]);
 
   uvg_ctx_init(&cabac->ctx.cu_qt_root_cbf_model, QP, INIT_QT_ROOT_CBF[slice][0], INIT_QT_ROOT_CBF[3][0]);
   uvg_ctx_init(&cabac->ctx.mvp_idx_model, QP, INIT_MVP_IDX[slice][0], INIT_MVP_IDX[3][0]);

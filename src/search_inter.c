@@ -1661,15 +1661,12 @@ static bool merge_candidate_in_list(inter_merge_cand_t *all_cands,
  * \brief Collect PU parameters and costs at this depth.
  *
  * \param state       encoder state
- * \param x_cu        x-coordinate of the containing CU
- * \param y_cu        y-coordinate of the containing CU
- * \param depth       depth of the CU in the quadtree
- * \param part_mode   partition mode of the CU
- * \param i_pu        index of the PU in the CU
+ * \param cu_loc      Size and location of current cu
  * \param lcu         containing LCU
  *
  * \param amvp        Return searched AMVP PUs sorted by costs
  * \param merge       Return searched Merge PUs sorted by costs
+ * \param info        Information related to inter search
  */
 static void search_pu_inter(
   encoder_state_t * const state,
@@ -1820,7 +1817,7 @@ static void search_pu_inter(
 
         uvg_quantize_lcu_residual(state, true, false, false, cu_loc, cur_pu, lcu, true, UVG_BOTH_T);
 
-        if (cbf_is_set(cur_pu->cbf, COLOR_Y)) {
+        if (cbf_is_set(cur_pu->cbf, COLOR_Y) || cur_pu->root_cbf) {
           continue;
         }
         else if (has_chroma) {
@@ -1831,7 +1828,7 @@ static void search_pu_inter(
                                     cu_loc, cur_pu, lcu,
                                     true,
                                     UVG_BOTH_T);
-          if (!cbf_is_set_any(cur_pu->cbf)) {
+          if (!cbf_is_set_any(cur_pu->cbf) && !cur_pu->root_cbf) {
             cur_pu->type = CU_INTER;
             cur_pu->merge_idx = merge_idx;
             cur_pu->skipped = true;
@@ -2114,13 +2111,13 @@ static void search_pu_inter(
 * for both luma and chroma if enabled.
 *
 * \param state       encoder state
-* \param x           x-coordinate of the CU
-* \param y           y-coordinate of the CU
-* \param depth       depth of the CU in the quadtree
+* \param cur_cu      Coding information related to current cu
 * \param lcu         containing LCU
 *
 * \param inter_cost    Return inter cost
 * \param inter_bitcost Return inter bitcost
+*
+* \param cu_loc      Size and location of current cu
 */
 void uvg_cu_cost_inter_rd2(
   encoder_state_t * const state,
@@ -2151,7 +2148,7 @@ void uvg_cu_cost_inter_rd2(
                                    LCU_WIDTH, LCU_WIDTH,
                                    width, height) * UVG_LUMA_MULT;
   if (reconstruct_chroma) {
-    int index = y_px / 2 * LCU_WIDTH_C + x_px / 2;
+    index = y_px / 2 * LCU_WIDTH_C + x_px / 2;
     double ssd_u = uvg_pixels_calc_ssd(&lcu->ref.u[index], &lcu->rec.u[index],
                                        LCU_WIDTH_C, LCU_WIDTH_C,
                                        cu_loc->chroma_width, cu_loc->chroma_height);
@@ -2174,7 +2171,7 @@ void uvg_cu_cost_inter_rd2(
     depth++;
     splits >>= 3;
   }
-  const split_tree_t splitt_tree = { cur_cu->split_tree, depth, mtt_depth, 0};
+  const split_tree_t splitt_tree = { cur_cu->split_tree, cur_cu->mode_type_tree, depth, mtt_depth, 0, 0};
   if (cur_cu->merged) {
     no_cbf_bits = CTX_ENTROPY_FBITS(&state->cabac.ctx.cu_skip_flag_model[skip_context], 1) + *inter_bitcost;
     bits += uvg_mock_encode_coding_unit(state, cabac, cu_loc, cu_loc, lcu, cur_cu, UVG_BOTH_T, splitt_tree);
@@ -2202,8 +2199,10 @@ void uvg_cu_cost_inter_rd2(
                               UVG_BOTH_T);
     ALIGNED(64) uvg_pixel u_pred[LCU_WIDTH_C * LCU_WIDTH_C];
     ALIGNED(64) uvg_pixel v_pred[LCU_WIDTH_C * LCU_WIDTH_C];
-    uvg_pixels_blit(&lcu->ref.u[index], u_pred, width, height, LCU_WIDTH_C, width);
-    uvg_pixels_blit(&lcu->ref.v[index], v_pred, width, height, LCU_WIDTH_C, width);
+    const int chroma_width = cu_loc->chroma_width;
+    const int chroma_height = cu_loc->chroma_height;
+    uvg_pixels_blit(&lcu->ref.u[index], u_pred, chroma_width, chroma_height, LCU_WIDTH_C, chroma_width);
+    uvg_pixels_blit(&lcu->ref.v[index], v_pred, chroma_width, chroma_height, LCU_WIDTH_C, chroma_width);
     ALIGNED(64) int16_t u_resi[LCU_WIDTH_C * LCU_WIDTH_C];
     ALIGNED(64) int16_t v_resi[LCU_WIDTH_C * LCU_WIDTH_C];
 
@@ -2211,20 +2210,20 @@ void uvg_cu_cost_inter_rd2(
       &lcu->ref.u[index],
       u_pred,
       u_resi,
-      width,
-      height,
+      chroma_width,
+      chroma_height,
       LCU_WIDTH_C,
-      width);
+      chroma_width);
     uvg_generate_residual(
       &lcu->ref.v[index],
       v_pred,
       v_resi,
-      width,
-      height,
+      chroma_width,
+      chroma_height,
       LCU_WIDTH_C,
-      width);
+      chroma_width);
 
-    uvg_chorma_ts_out_t chorma_ts_out;
+    uvg_chroma_ts_out_t chroma_ts_out;
     uvg_chroma_transform_search(
       state,
       lcu,
@@ -2236,23 +2235,24 @@ void uvg_cu_cost_inter_rd2(
       v_pred,
       u_resi,
       v_resi,
-      &chorma_ts_out,
+      &chroma_ts_out,
       UVG_BOTH_T);
     cbf_clear(&cur_cu->cbf, COLOR_U);
     cbf_clear(&cur_cu->cbf, COLOR_V);
-    if (chorma_ts_out.best_u_cost + chorma_ts_out.best_v_cost < chorma_ts_out.best_combined_cost) {
+    if ((chroma_ts_out.best_u_cost + chroma_ts_out.best_v_cost < chroma_ts_out.best_combined_cost)
+        || chroma_ts_out.best_combined_index != 3) {
       cur_cu->joint_cb_cr = 0;
-      cur_cu->tr_skip |= (chorma_ts_out.best_u_index == CHROMA_TS) << COLOR_U;
-      cur_cu->tr_skip |= (chorma_ts_out.best_v_index == CHROMA_TS) << COLOR_V;
-      if(chorma_ts_out.best_u_index != NO_RESIDUAL) cbf_set(&cur_cu->cbf, COLOR_U);
-      if(chorma_ts_out.best_v_index != NO_RESIDUAL) cbf_set(&cur_cu->cbf, COLOR_V);
-      chroma_cost += chorma_ts_out.best_u_cost + chorma_ts_out.best_v_cost;
+      cur_cu->tr_skip |= (chroma_ts_out.best_u_index == CHROMA_TS) << COLOR_U;
+      cur_cu->tr_skip |= (chroma_ts_out.best_v_index == CHROMA_TS) << COLOR_V;
+      if(chroma_ts_out.best_u_index != NO_RESIDUAL) cbf_set(&cur_cu->cbf, COLOR_U);
+      if(chroma_ts_out.best_v_index != NO_RESIDUAL) cbf_set(&cur_cu->cbf, COLOR_V);
+      chroma_cost += chroma_ts_out.best_u_cost + chroma_ts_out.best_v_cost;
     }
     else {
-      cur_cu->joint_cb_cr = chorma_ts_out.best_combined_index;
-      if (chorma_ts_out.best_combined_index & 2) cbf_set(&cur_cu->cbf, COLOR_U);
-      if (chorma_ts_out.best_combined_index & 1) cbf_set(&cur_cu->cbf, COLOR_V);
-      chroma_cost += chorma_ts_out.best_combined_cost;
+      cur_cu->joint_cb_cr = chroma_ts_out.best_combined_index;
+      if (chroma_ts_out.best_combined_index & 2) cbf_set(&cur_cu->cbf, COLOR_U);
+      if (chroma_ts_out.best_combined_index & 1) cbf_set(&cur_cu->cbf, COLOR_V);
+      chroma_cost += chroma_ts_out.best_combined_cost;
     }
   }
   else {
@@ -2266,7 +2266,14 @@ void uvg_cu_cost_inter_rd2(
                               UVG_BOTH_T);    
   }
 
-  int cbf = cbf_is_set_any(cur_cu->cbf);
+  if (state->encoder_control->cfg.jccr) {
+    // Only mode 2 (joint_cb_cr == 3 in uvg266) is allowed for jccr in P/B slices for inter
+    assert((cur_cu->joint_cb_cr == 3 && cbf_is_set(cur_cu->cbf, COLOR_U)
+                                     && cbf_is_set(cur_cu->cbf, COLOR_V))
+           || cur_cu->joint_cb_cr == 0);
+  }
+
+  int cbf = cbf_is_set_any(cur_cu->cbf) || cur_cu->root_cbf;
   
   if(cbf) {
     *inter_cost = uvg_cu_rd_cost_luma(state, cu_loc, cur_cu, lcu, 0);
@@ -2305,13 +2312,9 @@ void uvg_cu_cost_inter_rd2(
 /**
  * \brief Update CU to have best modes at this depth.
  *
- * Only searches the 2Nx2N partition mode.
  *
  * \param state       encoder state
- * \param x           x-coordinate of the CU
- * \param y           y-coordinate of the CU
- * \param depth       depth of the CU in the quadtree
- * \param lcu         containing LCU
+ * \param cu_loc      The position and size of the current cu
  *
  * \param inter_cost    Return inter cost
  * \param inter_bitcost Return inter bitcost

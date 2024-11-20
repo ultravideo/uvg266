@@ -115,13 +115,13 @@ static unsigned satd_ ## n ## x ## n ## _ ## suffix ( \
 typedef unsigned(reg_sad_func)(const uvg_pixel *const data1, const uvg_pixel *const data2,
   const int width, const int height,
   const unsigned stride1, const unsigned stride2);
-typedef unsigned (cost_pixel_nxn_func)(const uvg_pixel *block1, const uvg_pixel *block2);
+typedef unsigned (cost_pixel_nxn_func)(const uvg_pixel *const block1, const uvg_pixel *const block2);
 typedef unsigned (cost_pixel_any_size_func)(
     int width, int height,
     const uvg_pixel *block1, int stride1,
     const uvg_pixel *block2, int stride2
 );
-typedef void (cost_pixel_nxn_multi_func)(const pred_buffer preds, const uvg_pixel *orig, unsigned num_modes, unsigned *costs_out);
+typedef void (cost_pixel_nxn_multi_func)(const pred_buffer preds, const uvg_pixel *const orig, unsigned num_modes, unsigned *costs_out);
 typedef void (cost_pixel_any_size_multi_func)(int width, int height, const uvg_pixel **preds, const int stride, const uvg_pixel *orig, const int orig_stride, unsigned num_modes, unsigned *costs_out, int8_t *valid);
 
 typedef unsigned (pixels_calc_ssd_func)(const uvg_pixel *const ref, const uvg_pixel *const rec, const int ref_stride, const int rec_stride, const int width, const int height);

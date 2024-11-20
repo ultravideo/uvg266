@@ -1,5 +1,5 @@
-#ifndef FILTER_H_
-#define FILTER_H_
+#ifndef ENCODING_RESUME_H_
+#define ENCODING_RESUME_H_
 /*****************************************************************************
  * This file is part of uvg266 VVC encoder.
  *
@@ -33,24 +33,43 @@
  ****************************************************************************/
 
 /**
- * \ingroup Reconstruction
  * \file
- * Deblocking filter.
+ * Allow skipping search for specific frames to speed up debugging by reading previous data from file
  */
 
-#include "encoderstate.h"
 #include "global.h" // IWYU pragma: keep
 
+#ifdef UVG_ENCODING_RESUME
 
-/**
- * \brief Edge direction.
- */
-typedef enum edge_dir {
-  EDGE_VER = 1, // vertical
-  EDGE_HOR = 2, // horizontal
-} edge_dir;
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "cu.h"
+#include "encoderstate.h"
+#include "uvg266.h"
+
+#define RESUME_DIRNAME "./resume_data"
+
+#define RESUME_SLICE_COND UVG_SLICE_I
+//#define RESUME_POC_LTE_COND 0
+//#define RESUME_X_LTE_COND 0
+//#define RESUME_Y_LTE_COND 0
+//#define RESUME_NO_CHROMA_COND 1
+
+#define RESUME_SUB_FRAME_POC_COND 16
+#define RESUME_SUB_FRAME_LCU_IND_LT_COND 791
 
 
-void uvg_filter_deblock_lcu(encoder_state_t *const state, int x_px, int y_px);
+bool uvg_can_resume_encoding(const encoder_state_t * const state, const int x, const int y, const bool chroma_only);
+void uvg_process_resume_encoding(const encoder_state_t * const state, const int x, const int y, const bool chroma_only, double * const cost, lcu_t* const lcu, bool read_mode);
 
 #endif
+
+#if !defined(UVG_ENCODING_RESUME)
+
+#endif
+
+
+
+#endif //ENCODER_RESUME_H_

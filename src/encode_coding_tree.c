@@ -356,7 +356,7 @@ void uvg_encode_ts_residual(encoder_state_t* const state,
       belowPixel = pos_y > 0 ? coeff[pos_x + (pos_y - 1) * width] : 0;
       absLevel = uvg_derive_mod_coeff(rightPixel, belowPixel, abs(coeff[blk_pos]), 0);
       cutoffVal = 2;
-      for (int j = 0; j < numGtBins; j++)
+      for (unsigned j = 0; j < numGtBins; j++)
       {
         if (absLevel >= cutoffVal)
         {
@@ -707,6 +707,7 @@ static void encode_transform_coeff(
   if ((cur_tu->type == CU_INTRA || !PU_IS_TU(cur_tu) || cb_flag_u || cb_flag_v) && !only_chroma && tree_type != UVG_CHROMA_T) {
     if (can_skip_last_cbf && isp_split && last_split) {
       // Do not write luma cbf if first three isp splits have luma cbf 0
+      assert(cb_flag_y == 1 && "luma cbf is inferred to be 1, so cb_flag_y should be 1");
     } else {
       cabac->cur_ctx = &(cabac->ctx.qt_cbf_model_luma[*luma_cbf_ctx]);
       CABAC_BIN(cabac, cb_flag_y, "cbf_luma");
@@ -1261,7 +1262,7 @@ uint8_t uvg_write_split_flag(
 
   bool allow_split = can_split[1] || can_split[2] || can_split[3] || can_split[4] || can_split[5];
 
-  enum split_type split_flag = (split_tree.split_tree >> (split_tree.current_depth * 3)) & 7;
+  enum split_type split_flag = GET_SPLITDATA(&split_tree, split_tree.current_depth);
 
   assert(can_split[split_flag] && "Trying to write an illegal split");
 
@@ -1304,12 +1305,12 @@ uint8_t uvg_write_split_flag(
       unsigned left_qt_depth = 0;
       unsigned top_qt_depth = 0;
       if(left_cu) {
-        while (((left_cu->split_tree >> (left_qt_depth * 3)) & 7u) == QT_SPLIT) {
+        while (GET_SPLITDATA(left_cu, left_qt_depth) == QT_SPLIT) {
           left_qt_depth++;
         }
       }
       if(above_cu) {
-        while (((above_cu->split_tree >> (top_qt_depth * 3)) & 7u) == QT_SPLIT) {
+        while (GET_SPLITDATA(above_cu, top_qt_depth) == QT_SPLIT) {
           top_qt_depth++;
         }
       }
@@ -1339,8 +1340,24 @@ uint8_t uvg_write_split_flag(
           split_flag == BT_VER_SPLIT || split_flag == BT_HOR_SPLIT, bits, "mtt_binary_flag");
       }
     }
-  }
 
+    const enum mode_type mode_type_parent = GET_MODETYPEDATA(&split_tree, split_tree.current_depth - 1);
+    const enum mode_type mode_type = GET_MODETYPEDATA(&split_tree, split_tree.current_depth);
+    const enum mode_type_condition mode_type_condition = uvg_derive_mode_type_cond(cu_loc, state->frame->slicetype, tree_type, state->encoder_control->chroma_format, split_flag, mode_type_parent);
+    if (mode_type_condition == MODE_TYPE_INFER) {
+      assert(mode_type == MODE_TYPE_INTRA && "If mode type inferred, mode type should be INTRA");
+      //*mode_type = MODE_TYPE_INTRA;
+    }
+    else if (mode_type_condition == MODE_TYPE_SIGNAL) {
+      assert(mode_type != MODE_TYPE_ALL && "If mode type signaled, mode type should not be unconstrained");
+      const int non_inter_model = ((above_cu && above_cu->type == CU_INTRA) || (left_cu && left_cu->type == CU_INTRA)) ? 1 : 0;
+      CABAC_FBITS_UPDATE(cabac, &(cabac->ctx.non_inter_flag_model[non_inter_model]), mode_type != MODE_TYPE_INTER, bits, "non_inter_flag");
+    }
+    else { // MODE_TYPE_INHERIT
+      assert( mode_type == mode_type_parent && "Parent and child mode should match");
+    }
+  }
+  
   if (bits_out) *bits_out += bits;
   return split_flag;
 }
@@ -1378,6 +1395,7 @@ void uvg_encode_coding_tree(
     above_cu = uvg_cu_array_at_const(used_array, x, y - 1);
   }
 
+  enum mode_type mode_type_curr = GET_MODETYPEDATA(cur_cu, depth);
 
   // Absolute coordinates
   uint16_t abs_x = x + state->tile->offset_x;
@@ -1396,6 +1414,7 @@ void uvg_encode_coding_tree(
   // When not in MAX_DEPTH, insert split flag and split the blocks if needed
   if (cu_width + cu_height > 8) {
     split_tree.split_tree = cur_cu->split_tree;
+    split_tree.mode_type_tree = cur_cu->mode_type_tree;
     bool is_implicit;
     const int split_flag = uvg_write_split_flag(
       state,
@@ -1410,16 +1429,20 @@ void uvg_encode_coding_tree(
       );
     
     if (split_flag != NO_SPLIT) {
-      split_tree_t new_split_tree = { cur_cu->split_tree,
+      split_tree_t new_split_tree = { 
+        cur_cu->split_tree,
+        cur_cu->mode_type_tree,
         split_tree.current_depth + 1,
         split_tree.mtt_depth + (split_flag != QT_SPLIT),
         split_tree.implicit_mtt_depth + (split_flag != QT_SPLIT && is_implicit),
-      0};
+        0
+      };
 
       cu_loc_t new_cu_loc[4];
       uint8_t separate_chroma = 0;
       const int splits = uvg_get_split_locs(cu_loc, split_flag, new_cu_loc, &separate_chroma);
       separate_chroma |= !has_chroma;
+      separate_chroma &= mode_type_curr != MODE_TYPE_INTER; //Separate chroma should only be used with non-inter blocks
       for (int split = 0; split <splits; ++split) {
         new_split_tree.part_index = split;
         uvg_encode_coding_tree(state, coeff, tree_type,
@@ -1440,6 +1463,10 @@ void uvg_encode_coding_tree(
     CABAC_BIN(cabac, 1, "cu_transquant_bypass_flag");
   }
 
+  if (state->frame->slicetype == UVG_SLICE_I && (cu_width > 64 || cu_height > 64)) {
+    mode_type_curr = MODE_TYPE_INTRA;
+  }
+
   // Encode skip flag
   if ((state->frame->slicetype != UVG_SLICE_I || state->encoder_control->cfg.ibc)) {
 
@@ -1451,11 +1478,11 @@ void uvg_encode_coding_tree(
     if (above_cu && above_cu->skipped) {
       ctx_skip++;
     }
-    if (cu_width > 4 || state->encoder_control->cfg.ibc) {
+    if (((cu_width != 4 || cu_height != 4) && mode_type_curr != MODE_TYPE_INTRA ) || (state->encoder_control->cfg.ibc && cu_width <= 64 && cu_height <= 64)) {
       cabac->cur_ctx = &(cabac->ctx.cu_skip_flag_model[ctx_skip]);
       CABAC_BIN(cabac, cur_cu->skipped, "SkipFlag");
     }
-
+    //TODO: double check ibc flag writing condition
     if (cur_cu->skipped) {
 
       if (state->encoder_control->cfg.ibc && state->frame->slicetype != UVG_SLICE_I)
@@ -1500,7 +1527,7 @@ void uvg_encode_coding_tree(
       goto end;
     }
   }
-
+  //TODO: double check ibc flag writing condition
   // Prediction mode
   if ((state->frame->slicetype == UVG_SLICE_I || cu_width == 4) && state->encoder_control->cfg.ibc) { // ToDo: Only for luma channel
     // ToDo: Disable for blocks over 64x64 pixels
@@ -1511,7 +1538,7 @@ void uvg_encode_coding_tree(
     CABAC_BIN(cabac, (cur_cu->type == CU_IBC), "IBCFlag");
   }
 
-  if (state->frame->slicetype != UVG_SLICE_I && cu_width != 4 && cu_height != 4)  {
+  if (state->frame->slicetype != UVG_SLICE_I && (cu_width != 4 || cu_height != 4) && mode_type_curr == MODE_TYPE_ALL)  {
 
     int8_t ctx_predmode = 0;
 
@@ -1530,9 +1557,10 @@ void uvg_encode_coding_tree(
       cabac->cur_ctx = &(cabac->ctx.ibc_flag[ctx_ibc]);
       CABAC_BIN(cabac, (cur_cu->type == CU_IBC), "IBCFlag");
     }
+  } else {
+    if (mode_type_curr == MODE_TYPE_INTRA) assert(cur_cu->type != CU_INTER);
+    if (mode_type_curr == MODE_TYPE_INTER) assert(cur_cu->type == CU_INTER);
   }
-    
-
 #if ENABLE_PCM
   // Code IPCM block
   if (FORCE_PCM || cur_cu->type == CU_PCM) {

@@ -781,15 +781,10 @@ static bool merge_candidate_in_list(inter_merge_cand_t *all_cands,
  * \brief Collect PU parameters and costs at this depth.
  *
  * \param state       encoder state
- * \param x_cu        x-coordinate of the containing CU
- * \param y_cu        y-coordinate of the containing CU
- * \param depth       depth of the CU in the quadtree
- * \param part_mode   partition mode of the CU
- * \param i_pu        index of the PU in the CU
- * \param lcu         containing LCU
- *
+ * \param cu_loc      Size and location of current cu
  * \param amvp        Return searched AMVP PUs sorted by costs
  * \param merge       Return searched Merge PUs sorted by costs
+ * \param info        Information related to the IBC search
  */
 static void search_pu_ibc(
   encoder_state_t * const state,
@@ -924,7 +919,7 @@ static void search_pu_ibc(
         uvg_inter_recon_cu(state, lcu, true, false, cu_loc);
         uvg_quantize_lcu_residual(state, true, false, false, cu_loc, cur_pu, lcu, true, UVG_BOTH_T);
 
-        if (cbf_is_set(cur_pu->cbf, COLOR_Y)) {
+        if (cbf_is_set(cur_pu->cbf, COLOR_Y) || cur_pu->root_cbf) {
           continue;
         }
         else if (has_chroma) {
@@ -932,7 +927,7 @@ static void search_pu_ibc(
           uvg_quantize_lcu_residual(state, false, has_chroma, 
             false, /*we are only checking for lack of coeffs so no need to check jccr*/
             cu_loc, cur_pu, lcu, true, UVG_BOTH_T);
-          if (!cbf_is_set_any(cur_pu->cbf)) {
+          if (!cbf_is_set_any(cur_pu->cbf) && !cur_pu->root_cbf) {
             cur_pu->type = CU_IBC;
             cur_pu->merge_idx = merge_idx;
             cur_pu->skipped = true;
@@ -1269,9 +1264,7 @@ static int uvg_search_hash_cu_ibc(encoder_state_t* const state,
  * Only searches the 2Nx2N partition mode.
  *
  * \param state       encoder state
- * \param x           x-coordinate of the CU
- * \param y           y-coordinate of the CU
- * \param depth       depth of the CU in the quadtree
+ * \param cu_loc      Size and position of current cu
  * \param lcu         containing LCU
  *
  * \param inter_cost    Return inter cost

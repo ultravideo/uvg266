@@ -50,7 +50,7 @@ int yuv_io_read(FILE* file,
 
 int yuv_io_seek(FILE* file, unsigned frames,
                 unsigned input_width, unsigned input_height,
-                unsigned file_format);
+                unsigned in_bitdepth, unsigned file_format);
 
 int yuv_io_write(FILE* file,
                 const uvg_picture *img,

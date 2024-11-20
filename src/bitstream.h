@@ -73,27 +73,27 @@ typedef struct
   uint32_t value;
 } bit_table_t;
 
-void uvg_bitstream_init(bitstream_t * stream);
+void uvg_bitstream_init(bitstream_t *const stream);
 uvg_data_chunk * uvg_bitstream_alloc_chunk();
-uvg_data_chunk * uvg_bitstream_take_chunks(bitstream_t *stream);
-void uvg_bitstream_free_chunks(uvg_data_chunk *chunk);
-void uvg_bitstream_finalize(bitstream_t * stream);
+uvg_data_chunk * uvg_bitstream_take_chunks(bitstream_t *const stream);
+void uvg_bitstream_free_chunks(uvg_data_chunk * chunk);
+void uvg_bitstream_finalize(bitstream_t *const stream);
 
-uint64_t uvg_bitstream_tell(const bitstream_t * stream);
+uint64_t uvg_bitstream_tell(const bitstream_t *const stream);
 
-void uvg_bitstream_writebyte(bitstream_t *stream, uint8_t byte);
-void uvg_bitstream_move(bitstream_t *dst, bitstream_t *src);
-void uvg_bitstream_clear(bitstream_t *stream);
+void uvg_bitstream_writebyte(bitstream_t *const stream, const uint8_t byte);
+void uvg_bitstream_move(bitstream_t *const dst, bitstream_t *const src);
+void uvg_bitstream_clear(bitstream_t *const stream);
 
-void uvg_bitstream_put(bitstream_t *stream, uint32_t data, uint8_t bits);
+void uvg_bitstream_put(bitstream_t *const stream, const uint32_t data, uint8_t bits);
 void uvg_bitstream_put_byte(bitstream_t *const stream, const uint32_t data);
 
 void uvg_bitstream_put_ue(bitstream_t *stream, uint32_t data);
 void uvg_bitstream_put_se(bitstream_t *stream, int32_t data);
 
-void uvg_bitstream_add_rbsp_trailing_bits(bitstream_t *stream);
-void uvg_bitstream_align(bitstream_t *stream);
-void uvg_bitstream_align_zero(bitstream_t *stream);
+void uvg_bitstream_add_rbsp_trailing_bits(bitstream_t *const stream);
+void uvg_bitstream_align(bitstream_t *const stream);
+void uvg_bitstream_align_zero(bitstream_t *const stream);
 
 /* In debug mode print out some extra info */
 #ifdef VERBOSE

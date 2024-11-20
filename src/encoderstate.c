@@ -883,9 +883,9 @@ static void encoder_state_worker_encode_lcu_bitstream(void * opaque)
   //Encode coding tree
   cu_loc_t start;
   uvg_cu_loc_ctor(&start, lcu->position.x * LCU_WIDTH, lcu->position.y * LCU_WIDTH, LCU_WIDTH, LCU_WIDTH);
-  split_tree_t split_tree = { 0, 0, 0, 0, 0 };
+  split_tree_t split_tree = { 0, MODE_TYPE_ALL, 0, 0, 0, 0 };
 
-  uvg_encode_coding_tree(state, lcu->coeff, tree_type, &start, &start, split_tree, true);
+  uvg_encode_coding_tree(state, lcu->coeff, tree_type,&start, &start, split_tree, true);
 
   if(tree_type == UVG_LUMA_T && state->encoder_control->chroma_format != UVG_CSP_400) {
     uvg_cu_loc_ctor(&start, lcu->position.x * LCU_WIDTH, lcu->position.y * LCU_WIDTH, LCU_WIDTH, LCU_WIDTH);
@@ -2052,7 +2052,7 @@ void uvg_encode_one_frame(encoder_state_t * const state, uvg_picture* frame)
 {
 #if UVG_DEBUG_PRINT_CABAC == 1
   // uvg_cabac_bins_count = 0;
-  if (state->frame->num == 0) uvg_cabac_bins_verbose = true;
+  if (state->frame->num == 1) uvg_cabac_bins_verbose = true;
   // else uvg_cabac_bins_verbose = false;
 #endif
 

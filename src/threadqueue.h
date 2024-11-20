@@ -47,7 +47,7 @@ typedef struct threadqueue_queue_t threadqueue_queue_t;
 threadqueue_queue_t * uvg_threadqueue_init(int thread_count);
 
 threadqueue_job_t * uvg_threadqueue_job_create(void (*fptr)(void *arg), void *arg);
-int uvg_threadqueue_submit(threadqueue_queue_t * threadqueue, threadqueue_job_t *job);
+int uvg_threadqueue_submit(threadqueue_queue_t *const threadqueue, threadqueue_job_t *job);
 
 int uvg_threadqueue_job_dep_add(threadqueue_job_t *job, threadqueue_job_t *dependency);
 
@@ -56,5 +56,5 @@ threadqueue_job_t *uvg_threadqueue_copy_ref(threadqueue_job_t *job);
 void uvg_threadqueue_free_job(threadqueue_job_t **job_ptr);
 
 int uvg_threadqueue_waitfor(threadqueue_queue_t * threadqueue, threadqueue_job_t * job);
-int uvg_threadqueue_stop(threadqueue_queue_t * threadqueue);
+int uvg_threadqueue_stop(threadqueue_queue_t *const threadqueue);
 void uvg_threadqueue_free(threadqueue_queue_t * threadqueue);

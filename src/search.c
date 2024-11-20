@@ -56,6 +56,11 @@
 #include "strategies/strategies-quant.h"
 #include "reshape.h"
 
+#ifdef UVG_ENCODING_RESUME
+#include "encoding_resume.h"
+#endif // UVG_ENCODING_RESUME
+
+
 #define IN_FRAME(x, y, width, height, block_width, block_height) \
   ((x) >= 0 && (y) >= 0 \
   && (x) + (block_width) <= (width) \
@@ -315,6 +320,7 @@ static void lcu_fill_cu_info(lcu_t *lcu, int x_local, int y_local, int width, in
       to->type      = cu->type;
       to->qp        = cu->qp;
       to->split_tree = cu->split_tree;
+      to->mode_type_tree = cu->mode_type_tree;
       //to->tr_idx    = cu->tr_idx;
       to->lfnst_idx = cu->lfnst_idx;
       to->cr_lfnst_idx = cu->cr_lfnst_idx;
@@ -373,8 +379,8 @@ static void lcu_fill_chroma_cu_info(lcu_t *lcu, const cu_loc_t * const cu_loc)
 
 static void lcu_fill_chroma_cbfs(lcu_t *lcu, const cu_loc_t * const chroma_loc, enum uvg_tree_type tree_type)
 {
-  int8_t height = chroma_loc->height;
-  int8_t width =  chroma_loc->width;
+  uint8_t height = chroma_loc->height;
+  uint8_t width =  chroma_loc->width;
   uint32_t x_local = chroma_loc->local_x;
   uint32_t y_local = chroma_loc->local_y;
   const int offset = ~((TR_MAX_WIDTH) - 1);
@@ -1194,6 +1200,82 @@ static bool check_for_early_termission(const int cu_width, const int cu_height, 
   return false;
 }
 
+static bool check_can_use_inter(const encoder_state_t* const state,
+                                const cu_loc_t* const cu_loc,
+                                const split_tree_t split_tree,
+                                const int32_t pu_depth_inter_min,
+                                const int32_t pu_depth_inter_max)
+{
+  const int32_t frame_width = state->tile->frame->width;
+  const int32_t frame_height = state->tile->frame->height;
+  const int x = cu_loc->x; const int y = cu_loc->y;
+  const enum mode_type mode_type_parent = GET_MODETYPEDATA(&split_tree, split_tree.current_depth - 1);
+  const int cu_width_inter_min = LCU_WIDTH >> pu_depth_inter_max;
+
+  //Inter not allowed in I slices
+  if (state->frame->slicetype == UVG_SLICE_I) return false;
+  
+  //Check depth constraints
+  if (split_tree.current_depth > MAX_DEPTH ||
+      !(WITHIN(split_tree.current_depth, pu_depth_inter_min, pu_depth_inter_max) ||
+        // When the split was forced because the CTU is partially outside the
+        // frame, we permit inter coding even if pu_depth_inter would
+        // otherwise forbid it.
+        (x & ~(cu_width_inter_min - 1)) + cu_width_inter_min > frame_width ||
+        (y & ~(cu_width_inter_min - 1)) + cu_width_inter_min > frame_height
+      )
+    ) {
+    return false;
+  }
+    
+  // 4x4 inter not allowed
+  if (cu_loc->width == 4 && cu_loc->height == 4) return false;
+
+  // Don't allow blocks with <16 chroma samples for now (TODO: investigate small chroma blocks)
+  if ((state->encoder_control->chroma_format != UVG_CSP_400)
+      ? (cu_loc->chroma_height * cu_loc->chroma_width) < 16
+      : false) {
+    return false;
+  }
+   
+  // Inter not allowed if mode type constraint is set to MODE_TYPE_INTRA
+  if (mode_type_parent == MODE_TYPE_INTRA) return false;
+
+  return true;
+}
+
+static bool check_can_use_intra(const encoder_state_t* const state,
+                                const cu_loc_t* const cu_loc,
+                                const split_tree_t split_tree,
+                                const int32_t pu_depth_intra_min,
+                                const int32_t pu_depth_intra_max)
+{
+  const int32_t frame_width = state->tile->frame->width;
+  const int32_t frame_height = state->tile->frame->height;
+  const int x = cu_loc->x; const int y = cu_loc->y;
+  const enum mode_type mode_type_parent = GET_MODETYPEDATA(&split_tree, split_tree.current_depth - 1);
+  int32_t cu_width_intra_min = LCU_WIDTH >> pu_depth_intra_max;
+  
+  // Check if inter is forced for non I slices
+  if (state->encoder_control->cfg.force_inter && state->frame->slicetype != UVG_SLICE_I) return false;
+
+  // Check depth constraints
+  if (!(WITHIN(split_tree.current_depth, pu_depth_intra_min, pu_depth_intra_max) ||
+        // When the split was forced because the CTU is partially outside
+        // the frame, we permit intra coding even if pu_depth_intra would
+        // otherwise forbid it.
+        (x & ~(cu_width_intra_min - 1)) + cu_width_intra_min > frame_width ||
+        (y & ~(cu_width_intra_min - 1)) + cu_width_intra_min > frame_height)
+    ) {
+    return false;
+  }
+  
+  // Intra not allowed if mode type constraint is set to MODE_TYPE_INTER
+  if (mode_type_parent == MODE_TYPE_INTER) return false;
+
+  return true;
+}
+
 /**
  * Search every mode from 0 to MAX_PU_DEPTH and return cost of best mode.
  * - The recursion is started at depth 0 and goes in Z-order to MAX_PU_DEPTH.
@@ -1290,6 +1372,11 @@ static double search_cu(
     cur_cu->log2_chroma_width = uvg_g_convert_to_log2[chroma_loc->chroma_width];
   }
 
+  //Account for SCIPU. All sub-blocks of a SCIPU need to either all be intra or all be inter
+  //Also set cur depth mode type for cu here so that bitstream writing works correctly (should be inherited from parent)
+  enum mode_type mode_type_parent = GET_MODETYPEDATA(&split_tree, depth - 1);
+  cur_cu->mode_type_tree = split_tree.mode_type_tree | mode_type_parent << (depth * 2);
+
   intra_search_data_t intra_search = {0};
 
   const bool completely_inside = x + luma_width <= frame_width && y + luma_height <= frame_height;
@@ -1297,18 +1384,7 @@ static double search_cu(
   // prediction modes at this depth.
   if ( completely_inside)
   {
-    int cu_width_inter_min = LCU_WIDTH >> pu_depth_inter.max;
-    bool can_use_inter =
-      state->frame->slicetype != UVG_SLICE_I &&
-      split_tree.current_depth <= MAX_DEPTH &&
-      (
-        WITHIN(split_tree.current_depth, pu_depth_inter.min, pu_depth_inter.max) ||
-        // When the split was forced because the CTU is partially outside the
-        // frame, we permit inter coding even if pu_depth_inter would
-        // otherwise forbid it.
-        (x & ~(cu_width_inter_min - 1)) + cu_width_inter_min > frame_width ||
-        (y & ~(cu_width_inter_min - 1)) + cu_width_inter_min > frame_height
-      ) && cu_loc->width == cu_loc->height; // Don't allow non square inter CUs for now
+    const bool can_use_inter = check_can_use_inter(state, cu_loc, split_tree, pu_depth_inter.min, pu_depth_inter.max);
 
     if (can_use_inter) {
       double mode_cost;
@@ -1327,20 +1403,12 @@ static double search_cu(
     // Try to skip intra search in rd==0 mode.
     // This can be quite severe on bdrate. It might be better to do this
     // decision after reconstructing the inter frame.
-    bool skip_intra = (state->encoder_control->cfg.rdo == 0
-                      && cur_cu->type != CU_NOTSET
-                      && cost / (cu_width * cu_width) < INTRA_THRESHOLD)
-                      || (ctrl->cfg.early_skip && cur_cu->skipped);
+    const bool skip_intra = (state->encoder_control->cfg.rdo == 0
+                          && cur_cu->type != CU_NOTSET
+                          && cost / (cu_width * cu_width) < INTRA_THRESHOLD)
+                          || (ctrl->cfg.early_skip && cur_cu->skipped);
 
-    int32_t cu_width_intra_min = LCU_WIDTH >> pu_depth_intra.max;
-    bool can_use_intra =
-      (WITHIN(split_tree.current_depth, pu_depth_intra.min, pu_depth_intra.max) ||
-        // When the split was forced because the CTU is partially outside
-        // the frame, we permit intra coding even if pu_depth_intra would
-        // otherwise forbid it.
-        (x & ~(cu_width_intra_min - 1)) + cu_width_intra_min > frame_width ||
-        (y & ~(cu_width_intra_min - 1)) + cu_width_intra_min > frame_height) &&
-      !(state->encoder_control->cfg.force_inter && state->frame->slicetype != UVG_SLICE_I);
+    const bool can_use_intra = check_can_use_intra(state, cu_loc, split_tree, pu_depth_intra.min, pu_depth_intra.max);
 
     intra_search.cost = 0;
     if (can_use_intra && !skip_intra) {
@@ -1576,7 +1644,7 @@ static double search_cu(
                                   false,
                                   tree_type);
 
-        int cbf = cbf_is_set_any(cur_cu->cbf);
+        int cbf =  cbf_is_set_any(cur_cu->cbf) || cur_cu->root_cbf;
 
         if (cur_cu->merged && !cbf) {
           cur_cu->merged = 0;
@@ -1675,7 +1743,7 @@ static double search_cu(
       }
     }
   } 
-
+  
   bool can_split_cu =
     // If the CU is partially outside the frame, we need to split it even
     // if pu_depth_intra and pu_depth_inter would not permit it.
@@ -1717,7 +1785,7 @@ static double search_cu(
   // might not give any better results but takes more time to do.
   // It is ok to interrupt the search as soon as it is known that
   // the split costs at least as much as not splitting.
-  int cbf = cbf_is_set_any(cur_cu->cbf);
+  int cbf = cbf_is_set_any(cur_cu->cbf) || cur_cu->root_cbf;
 
   // 3.13
   if ((cu_height < 32 || cu_width < 32) && cur_cu->type != CU_NOTSET  && !cbf && split_tree.mtt_depth > 1 && tree_type != UVG_CHROMA_T) {
@@ -1728,20 +1796,19 @@ static double search_cu(
     lcu_t * split_lcu = MALLOC(lcu_t, 5);
     enum split_type best_split = 0;
     double best_split_cost = MAX_DOUBLE;
-    cabac_data_t post_seach_cabac;
+    cabac_data_t post_search_cabac;
     cabac_data_t best_split_cabac;
-    memcpy(&post_seach_cabac, &state->search_cabac, sizeof(post_seach_cabac));
+    memcpy(&post_search_cabac, &state->search_cabac, sizeof(post_search_cabac));
+    
+    cu_info_t best_split_hmvp_lut[MAX_NUM_HMVP_CANDS];
+    uint8_t best_split_hmvp_lut_size = state->tile->frame->hmvp_size[ctu_row];
+    cu_info_t best_split_hmvp_lut_ibc[MAX_NUM_HMVP_CANDS];
+    uint8_t best_split_hmvp_lut_size_ibc = state->tile->frame->hmvp_size_ibc[ctu_row];
+
     // Recursively split all the way to max search depth.
     for (int split_type = QT_SPLIT; split_type <= TT_VER_SPLIT; ++split_type) {
       if (!can_split[split_type])
         continue;
-      split_tree_t new_split = {
-        split_tree.split_tree | split_type << (split_tree.current_depth * 3),
-        split_tree.current_depth + 1,
-        split_tree.mtt_depth + (split_type != QT_SPLIT),
-        split_tree.implicit_mtt_depth + (split_type != QT_SPLIT && is_implicit),
-        0
-      };
 
       if (completely_inside && check_for_early_termission(
             cu_width,
@@ -1758,89 +1825,204 @@ static double search_cu(
         continue;
       }
 
-      double split_cost = 0.0;
-      memcpy(&state->search_cabac, &pre_search_cabac, sizeof(post_seach_cabac));
-
-
-      double split_bits = 0;
-
-      if (cur_cu->log2_height + cur_cu->log2_width > 4) {
-
-        state->search_cabac.update = 1;
-        // Add cost of cu_split_flag.
-        const cu_info_t* left_cu = NULL, * above_cu = NULL;
-        if (x) {
-          if (x_local || tree_type != UVG_CHROMA_T) {
-            left_cu = LCU_GET_CU_AT_PX(lcu, x_local - 1, y_local);
-          }
-          else {
-            left_cu = uvg_cu_array_at_const(state->tile->frame->chroma_cu_array, x - 1, y);
-          }
-        }
-        if (y) {
-          if (y_local || tree_type != UVG_CHROMA_T) {
-            above_cu = LCU_GET_CU_AT_PX(lcu, x_local, y_local - 1);
-          }
-          else {
-            above_cu = uvg_cu_array_at_const(state->tile->frame->chroma_cu_array, x, y - 1);
-          }
-        }
-        split_tree_t count_tree = split_tree;
-        count_tree.split_tree = split_tree.split_tree | split_type << (split_tree.current_depth * 3);
-        uvg_write_split_flag(
-          state,
-          &state->search_cabac,
-          left_cu,
-          above_cu, 
-          cu_loc,
-          count_tree,
-          tree_type,
-          &is_implicit,
-          &split_bits
-          );
-      }
-
-      // 3.9
-      const double factor    = state->qp > 30 ? 1.1 : 1.075;
-      if (split_bits * state->lambda + cost / factor > cost) {
-        can_split[split_type] = false;
-        continue;
-      }
-
-
-      state->search_cabac.update = 0;
-      split_cost += split_bits * state->lambda;
-
       // 3.7
       bool stop_to_qt = false;
 
-      cu_loc_t new_cu_loc[4];
-      uint8_t separate_chroma = 0;
-      const int splits = uvg_get_split_locs(cu_loc, split_type, new_cu_loc, &separate_chroma);
-      separate_chroma |= !has_chroma;
-      initialize_partial_work_tree(state, lcu, &split_lcu[split_type - 1], cu_loc , separate_chroma ? chroma_loc : cu_loc, tree_type);
-      for (int split = 0; split < splits; ++split) {
-        new_split.part_index = split;
-        split_cost += search_cu(state, 
-          &new_cu_loc[split], separate_chroma ? chroma_loc : &new_cu_loc[split],
-          &split_lcu[split_type -1], 
-          tree_type, new_split,
-          !separate_chroma || (split == splits - 1 && has_chroma));
-        // If there is no separate chroma the block will always have chroma, otherwise it is the last block of the split that has the chroma
+      double split_cost = 0.0;
+      double split_bits = 0;
 
-        if (split_type == QT_SPLIT && completely_inside) {
-          const cu_info_t * const t = LCU_GET_CU_AT_PX(
-            &split_lcu[0],
-            new_cu_loc[split].local_x,
-            new_cu_loc[split].local_y);
-          stop_to_qt |= GET_SPLITDATA(t, depth + 1) == QT_SPLIT;
+
+      //Determine what mode types should be searched
+      const enum mode_type_condition mode_type_cond = uvg_derive_mode_type_cond(cu_loc, state->frame->slicetype, tree_type, state->encoder_control->chroma_format, split_type, mode_type_parent);
+
+      double best_mode_type_cost = MAX_DOUBLE;
+      bool best_mode_type_stop_to_qt = false;
+      bool best_mode_type_can_split = true;
+      lcu_t * best_mode_type_lcu = NULL;
+      cabac_data_t best_mode_type_cabac;
+      cu_info_t best_mode_type_hmvp_lut[MAX_NUM_HMVP_CANDS];
+      uint8_t best_mode_type_hmvp_lut_size = state->tile->frame->hmvp_size[ctu_row];
+      cu_info_t best_mode_type_hmvp_lut_ibc[MAX_NUM_HMVP_CANDS];
+      uint8_t best_mode_type_hmvp_lut_size_ibc = state->tile->frame->hmvp_size_ibc[ctu_row];
+
+      enum mode_type start_mode_type, end_mode_type;
+      switch (mode_type_cond)
+      {
+      case MODE_TYPE_INHERIT:
+        start_mode_type = end_mode_type = mode_type_parent;
+        break;
+
+      case MODE_TYPE_INFER:
+        start_mode_type = end_mode_type = MODE_TYPE_INTRA;
+        break;
+
+      case MODE_TYPE_SIGNAL:
+        start_mode_type = MODE_TYPE_INTER;
+        end_mode_type = MODE_TYPE_INTRA;
+        break;
+      }
+      for( enum mode_type mode_type = start_mode_type; mode_type <= end_mode_type; mode_type++) {
+        if (start_mode_type != end_mode_type) {
+          //If we do multiple rounds, reset relevant things
+          can_split[split_type] = true;
+          stop_to_qt = false;
+          split_cost = split_bits = 0.0;
+          //memset(&split_lcu[split_type - 1], 0, sizeof(lcu_t)); //Necessary?
         }
 
-        if (split_cost > cost || split_cost > best_split_cost) {
+        memcpy(&state->search_cabac, &pre_search_cabac, sizeof(pre_search_cabac));
+
+        split_tree_t new_split = {
+          split_tree.split_tree | split_type << (split_tree.current_depth * 3),
+          split_tree.mode_type_tree | mode_type << (split_tree.current_depth * 2),
+          split_tree.current_depth + 1,
+          split_tree.mtt_depth + (split_type != QT_SPLIT),
+          split_tree.implicit_mtt_depth + (split_type != QT_SPLIT && is_implicit),
+          0,
+        };
+
+        if (cur_cu->log2_height + cur_cu->log2_width > 4) {
+
+          state->search_cabac.update = 1;
+          // Add cost of cu_split_flag.
+          const cu_info_t* left_cu = NULL, * above_cu = NULL;
+          if (x) {
+            if (x_local || tree_type != UVG_CHROMA_T) {
+              left_cu = LCU_GET_CU_AT_PX(lcu, x_local - 1, y_local);
+            }
+            else {
+              left_cu = uvg_cu_array_at_const(state->tile->frame->chroma_cu_array, x - 1, y);
+            }
+          }
+          if (y) {
+            if (y_local || tree_type != UVG_CHROMA_T) {
+              above_cu = LCU_GET_CU_AT_PX(lcu, x_local, y_local - 1);
+            }
+            else {
+              above_cu = uvg_cu_array_at_const(state->tile->frame->chroma_cu_array, x, y - 1);
+            }
+          }
+          split_tree_t count_tree = split_tree;
+          count_tree.split_tree = split_tree.split_tree | split_type << (split_tree.current_depth * 3);
+          count_tree.mode_type_tree = split_tree.mode_type_tree | mode_type << (split_tree.current_depth * 2);
+
+          uvg_write_split_flag(
+            state,
+            &state->search_cabac,
+            left_cu,
+            above_cu, 
+            cu_loc,
+            count_tree,
+            tree_type,
+            &is_implicit,
+            &split_bits
+            );
+        }
+
+        // 3.9
+        const double factor    = state->qp > 30 ? 1.1 : 1.075;
+        if (split_bits * state->lambda + cost / factor > cost) {
           can_split[split_type] = false;
-          break;
+          continue;
+        }
+
+        state->search_cabac.update = 0;
+        split_cost += split_bits * state->lambda;
+
+        cu_loc_t new_cu_loc[4];
+        uint8_t separate_chroma = 0;
+        const int splits = uvg_get_split_locs(cu_loc, split_type, new_cu_loc, &separate_chroma);
+
+        //Limit split when forced inter. Don't allow split if inter can't be used. TODO: Maybe there is a bette way to do this
+        if (mode_type == MODE_TYPE_INTER && !check_can_use_inter(state, new_cu_loc, new_split, pu_depth_inter.min, pu_depth_inter.max)) {
+          can_split[split_type] = false;
+          continue;
+        }
+
+        //Reset HMVP in case it has been modified while checking previous split types
+        if (state->frame->slicetype != UVG_SLICE_I) {
+          memcpy(&state->tile->frame->hmvp_lut[ctu_row_mul_five], hmvp_lut, sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
+          state->tile->frame->hmvp_size[ctu_row] = hmvp_lut_size;
+        }
+        if (state->encoder_control->cfg.ibc) {
+          memcpy(&state->tile->frame->hmvp_lut_ibc[ctu_row_mul_five], hmvp_lut_ibc, sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
+          state->tile->frame->hmvp_size_ibc[ctu_row] = hmvp_lut_size_ibc;
+        }
+
+        separate_chroma |= !has_chroma;
+        separate_chroma &= mode_type != MODE_TYPE_INTER; //Separate chroma should only be used with non-inter blocks
+        initialize_partial_work_tree(state, lcu, &split_lcu[split_type - 1], cu_loc , separate_chroma ? chroma_loc : cu_loc, tree_type);
+        for (int split = 0; split < splits; ++split) {
+
+          new_split.part_index = split;
+          split_cost += search_cu(state, 
+            &new_cu_loc[split], separate_chroma ? chroma_loc : &new_cu_loc[split],
+            &split_lcu[split_type -1], 
+            tree_type, new_split,
+            !separate_chroma || (split == splits - 1 && has_chroma));
+          // If there is no separate chroma the block will always have chroma, otherwise it is the last block of the split that has the chroma
+
+          if (split_type == QT_SPLIT && completely_inside) {
+            const cu_info_t * const t = LCU_GET_CU_AT_PX(
+              &split_lcu[0],
+              new_cu_loc[split].local_x,
+              new_cu_loc[split].local_y);
+            stop_to_qt |= GET_SPLITDATA(t, depth + 1) == QT_SPLIT;
+          }
+
+          if (split_cost > cost || split_cost > best_split_cost || split_cost > best_mode_type_cost) {
+            can_split[split_type] = false;
+            break;
+          }
+        }
+
+        // If multiple mode types are searched, save previous/best results and prepare for next round
+        if (split_cost < best_mode_type_cost) {
+          best_mode_type_cost = split_cost;
+          if (mode_type != end_mode_type) {
+            best_mode_type_can_split = can_split[split_type];
+            best_mode_type_stop_to_qt = stop_to_qt;
+            if (!best_mode_type_lcu) best_mode_type_lcu = MALLOC(lcu_t, 1);
+            memcpy(best_mode_type_lcu, &split_lcu[split_type - 1], sizeof(lcu_t));
+            memcpy(&best_mode_type_cabac, &state->search_cabac, sizeof(best_mode_type_cabac));
+
+            //Store HMVP lut of best mode type split
+            if (state->frame->slicetype != UVG_SLICE_I) {
+              memcpy(best_mode_type_hmvp_lut, &state->tile->frame->hmvp_lut[ctu_row_mul_five], sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
+              best_mode_type_hmvp_lut_size = state->tile->frame->hmvp_size[ctu_row];
+            }
+            if (state->encoder_control->cfg.ibc) {
+              best_mode_type_hmvp_lut_size_ibc = state->tile->frame->hmvp_size_ibc[ctu_row];
+              memcpy(best_mode_type_hmvp_lut_ibc, &state->tile->frame->hmvp_lut_ibc[ctu_row_mul_five], sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
+            }
+          }
+        }       
+      }
+    
+      // If best mode type was not the latest round of search, restore the best mode type results
+      if (best_mode_type_cost == MAX_DOUBLE) {
+        // No valid split for any mode found so continue
+        continue;
+      }
+      if (split_cost != best_mode_type_cost) {
+        // Last round of search was not the best cost so restore best mode type split
+        split_cost = best_mode_type_cost;
+        stop_to_qt = best_mode_type_stop_to_qt;
+        can_split[split_type] = best_mode_type_can_split;
+        memcpy(&split_lcu[split_type - 1], best_mode_type_lcu, sizeof(lcu_t));
+        memcpy(&state->search_cabac, &best_mode_type_cabac, sizeof(best_mode_type_cabac));
+
+        //Need to restore best mode type split HMVP
+        if (state->frame->slicetype != UVG_SLICE_I) {
+          memcpy(&state->tile->frame->hmvp_lut[ctu_row_mul_five], best_mode_type_hmvp_lut, sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
+          state->tile->frame->hmvp_size[ctu_row] = best_mode_type_hmvp_lut_size;
+        }
+        if (state->encoder_control->cfg.ibc) {
+          memcpy(&state->tile->frame->hmvp_lut_ibc[ctu_row_mul_five], best_mode_type_hmvp_lut_ibc, sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
+          state->tile->frame->hmvp_size_ibc[ctu_row] = best_mode_type_hmvp_lut_size_ibc;
         }
       }
+      if (best_mode_type_lcu) FREE_POINTER(best_mode_type_lcu);
 
       improved[split_type] = cost > split_cost;
       
@@ -1848,6 +2030,16 @@ static double search_cu(
         best_split_cost = split_cost;
         best_split = split_type;
         memcpy(&best_split_cabac, &state->search_cabac, sizeof(cabac_data_t));
+
+        //Store HMVP lut of best split
+        if (state->frame->slicetype != UVG_SLICE_I) {
+          memcpy(best_split_hmvp_lut, &state->tile->frame->hmvp_lut[ctu_row_mul_five], sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
+          best_split_hmvp_lut_size = state->tile->frame->hmvp_size[ctu_row];
+        }
+        if (state->encoder_control->cfg.ibc) {
+          best_split_hmvp_lut_size_ibc = state->tile->frame->hmvp_size_ibc[ctu_row];
+          memcpy(best_split_hmvp_lut_ibc, &state->tile->frame->hmvp_lut_ibc[ctu_row_mul_five], sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
+        }
       }
       if (stop_to_qt) break;
     }
@@ -1883,6 +2075,11 @@ static double search_cu(
         cur_cu->type = CU_INTRA;
         if (cur_cu->intra.mode_chroma > 79) {
           cur_cu->intra.mode_chroma = cur_cu->intra.mode;
+        } else if ((state->encoder_control->chroma_format != UVG_CSP_400)
+                   && (cu_d1->log2_width - 1 != cu_d1->log2_chroma_width || cu_d1->log2_height - 1 != cu_d1->log2_chroma_height)) {
+          // If d1 has a separate tree for chroma, the chroma intra mode may not be valid for this depth, so set chroma mode to match (co-located) luma mode
+          cur_cu->intra.mode_chroma = !is_separate_tree ? cur_cu->intra.mode
+                                                        : uvg_get_co_located_luma_mode(chroma_loc, cu_loc, cur_cu, lcu, NULL, tree_type);
         }
 
         // Disable MRL in this case
@@ -1911,7 +2108,7 @@ static double search_cu(
 
         mark_deblocking(cu_loc, chroma_loc, lcu, tree_type, has_chroma, is_separate_tree, x_local, y_local);
 
-        memcpy(&post_seach_cabac, &state->search_cabac, sizeof(post_seach_cabac));
+        memcpy(&post_search_cabac, &state->search_cabac, sizeof(post_search_cabac));
         memcpy(&state->search_cabac, &temp_cabac, sizeof(temp_cabac));
       }
     }
@@ -1924,13 +2121,23 @@ static double search_cu(
       downsample_cclm_rec(
         state, x, y, cu_width / 2, cu_height / 2, lcu->rec.y, lcu->left_ref.y[64]
       );
+
+      //Need to restore best split HMVP
+      if (state->frame->slicetype != UVG_SLICE_I) {
+        memcpy(&state->tile->frame->hmvp_lut[ctu_row_mul_five], best_split_hmvp_lut, sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
+        state->tile->frame->hmvp_size[ctu_row] = best_split_hmvp_lut_size;
+      }
+      if (state->encoder_control->cfg.ibc) {
+        memcpy(&state->tile->frame->hmvp_lut_ibc[ctu_row_mul_five], best_split_hmvp_lut_ibc, sizeof(cu_info_t) * MAX_NUM_HMVP_CANDS);
+        state->tile->frame->hmvp_size_ibc[ctu_row] = best_split_hmvp_lut_size_ibc;
+      }
 #if UVG_DEBUG
       //debug_split = 1;
 #endif
     } else if (depth > 0) {
       // Copy this CU's mode all the way down for use in adjacent CUs mode
       // search.
-      memcpy(&state->search_cabac, &post_seach_cabac, sizeof(post_seach_cabac));
+      memcpy(&state->search_cabac, &post_search_cabac, sizeof(post_search_cabac));
       downsample_cclm_rec(
         state, x, y, cu_width / 2, cu_height / 2, lcu->rec.y, lcu->left_ref.y[64]
       );
@@ -2174,16 +2381,29 @@ void uvg_search_lcu(encoder_state_t * const state, const int x, const int y, con
 
   cu_loc_t start;
   uvg_cu_loc_ctor(&start, x, y, LCU_WIDTH, LCU_WIDTH);
-  split_tree_t split_tree = { 0, 0, 0, 0, 0 };
+  split_tree_t split_tree = { 0, MODE_TYPE_ALL, 0, 0, 0, 0};
+  double cost = 0; //TODO: save cost when resuming
+
+#ifdef UVG_ENCODING_RESUME
+  if (uvg_can_resume_encoding(state, x, y, false)) {
+    uvg_process_resume_encoding(state, x, y, false, &cost, &work_tree, true);
+  } else {
+#endif // UVG_ENCODING_RESUME
+
   // Start search from depth 0.
-  double cost = search_cu(
-    state, 
+  cost = search_cu(
+    state,
     &start,
     &start,
     &work_tree,
     tree_type,
     split_tree,
     tree_type == UVG_BOTH_T);
+
+#ifdef UVG_ENCODING_RESUME
+    uvg_process_resume_encoding(state, x, y, false, &cost, &work_tree, false);
+  }
+#endif // UVG_ENCODING_RESUME
 
   // Save squared cost for rate control.
   if(state->encoder_control->cfg.rc_algorithm == UVG_LAMBDA) {
@@ -2198,6 +2418,12 @@ void uvg_search_lcu(encoder_state_t * const state, const int x, const int y, con
   copy_coeffs(work_tree.coeff.y, coeff->y, LCU_WIDTH, LCU_WIDTH, LCU_WIDTH);
 
   if(state->frame->slicetype == UVG_SLICE_I && state->encoder_control->cfg.dual_tree) {
+#ifdef UVG_ENCODING_RESUME
+    if (uvg_can_resume_encoding(state, x, y, true)) {
+      uvg_process_resume_encoding(state, x, y, true, &cost, &work_tree, true);
+    } else {
+#endif // UVG_ENCODING_RESUME
+
     cost = search_cu(
       state, &start,
       &start,
@@ -2205,12 +2431,17 @@ void uvg_search_lcu(encoder_state_t * const state, const int x, const int y, con
       split_tree,
       true);
 
+#ifdef UVG_ENCODING_RESUME
+       uvg_process_resume_encoding(state, x, y, true, &cost, &work_tree, false);
+    }
+#endif // UVG_ENCODING_RESUME
+
     if (state->encoder_control->cfg.rc_algorithm == UVG_LAMBDA) {
       uvg_get_lcu_stats(state, x / LCU_WIDTH, y / LCU_WIDTH)->weight += cost * cost;
     }
     copy_lcu_to_cu_data(state, x, y, &work_tree, UVG_CHROMA_T);
   }
-
+  
   copy_coeffs(work_tree.coeff.u, coeff->u, LCU_WIDTH_C, LCU_WIDTH_C, LCU_WIDTH_C);
   copy_coeffs(work_tree.coeff.v, coeff->v, LCU_WIDTH_C, LCU_WIDTH_C, LCU_WIDTH_C);
   if (state->encoder_control->cfg.jccr) {

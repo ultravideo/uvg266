@@ -54,7 +54,7 @@ int uvg_init_rdcost_outfiles(const char *fn_template);
 void uvg_close_rdcost_outfiles(void);
 
 void  uvg_rdoq(
-  encoder_state_t *state,
+  encoder_state_t *const state,
   coeff_t *coef,
   coeff_t *dest_coeff,
   int32_t width,
@@ -80,9 +80,9 @@ double uvg_get_coeff_cost(
   int8_t tr_skip,
   int coeff_order);
 
-int32_t uvg_get_ic_rate(encoder_state_t *state, uint32_t abs_level, uint16_t ctx_num_gt1, uint16_t ctx_num_gt2, uint16_t ctx_num_par,
+int32_t uvg_get_ic_rate(encoder_state_t *const state, uint32_t abs_level, uint16_t ctx_num_gt1, uint16_t ctx_num_gt2, uint16_t ctx_num_par,
                     uint16_t abs_go_rice, uint32_t reg_bins, int8_t type, int use_limited_prefix_length);
-uint32_t uvg_get_coded_level(encoder_state_t * state, double* coded_cost, double* coded_cost0, double* coded_cost_sig,
+uint32_t uvg_get_coded_level(encoder_state_t *const state, double* coded_cost, double* coded_cost0, double* coded_cost_sig,
                          int32_t level_double, uint32_t max_abs_level,
                          uint16_t ctx_num_sig, uint16_t ctx_num_gt1, uint16_t ctx_num_gt2, uint16_t ctx_num_par,
                          uint16_t abs_go_rice,
@@ -94,8 +94,8 @@ uvg_mvd_cost_func uvg_calc_ibc_mvd_cost_cabac;
 
 double uvg_get_mvd_coding_cost_cabac(const encoder_state_t* state,
                                      const cabac_data_t* cabac,
-                                     int32_t mvd_hor,
-                                     int32_t mvd_ver);
+                                     const int32_t mvd_hor,
+                                     const int32_t mvd_ver);
 
 // Number of fixed point fractional bits used in the fractional bit table.
 #define CTX_FRAC_BITS 15
