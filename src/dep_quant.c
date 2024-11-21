@@ -857,9 +857,7 @@ int uvg_dep_quant(
   dep_quant_context.m_curr_state_offset = 0;
   dep_quant_context.m_prev_state_offset = 4;
   dep_quant_context.m_skip_state_offset = 8;
-  memset(dep_quant_context.m_common_context.sbb_memory, 0, sizeof(dep_quant_context.m_common_context.sbb_memory));
-  memset(dep_quant_context.m_common_context.level_memory, 0, sizeof(dep_quant_context.m_common_context.level_memory));
-   
+     
   const uint32_t  lfnstIdx = tree_type != UVG_CHROMA_T  || compID == COLOR_Y ?
                                cur_tu->lfnst_idx :
                                cur_tu->cr_lfnst_idx;
@@ -893,7 +891,7 @@ int uvg_dep_quant(
     dep_quant_context.m_quant = (quant_block*)&state->quant_blocks[0];   
   }
   //TODO: no idea when it is safe not to reinit for inter
-  if (1 /* dep_quant_context.m_quant->needs_init || cur_tu->type == CU_INTER */) {
+  if (dep_quant_context.m_quant->needs_init || cur_tu->type == CU_INTER) {
     init_quant_block(state, dep_quant_context.m_quant, cur_tu, log2_tr_width, log2_tr_height, compID, needs_block_size_trafo_scale, -1);
   }
   
@@ -940,7 +938,7 @@ int uvg_dep_quant(
   //===== real init =====
   rate_estimator_t* rate_estimator = (rate_estimator_t *)(compID == COLOR_Y && cur_tu->type == CU_INTRA && cur_tu->intra.isp_mode != ISP_MODE_NO_ISP ?
     &state->rate_estimator[3] : &state->rate_estimator[compID]);
-  if(1 /* rate_estimator->needs_init || cur_tu->type == CU_INTER */) {
+  if(rate_estimator->needs_init || cur_tu->type == CU_INTER) {
     init_rate_esimator(rate_estimator, &state->search_cabac, compID);
     xSetLastCoeffOffset(state, cur_tu, width, height, rate_estimator, compID);
     rate_estimator->needs_init = false;
