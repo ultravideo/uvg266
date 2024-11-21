@@ -574,15 +574,13 @@ static INLINE void update_common_context(
   uint8_t*       levels = cc->m_allSbbCtx[cc->m_curr_sbb_ctx_offset].levels;
   size_t         setCpSize = cc->m_nbInfo[scan_pos - 1].maxDist * sizeof(uint8_t);
 
-  if (prev_state != -1) {
+  if (prev_state != -1 && ctxs->m_allStates.m_refSbbCtxId[prev_state] >= 0) {
     const int8_t prev_sbb_state = ctxs->m_allStates.m_refSbbCtxId[prev_state];
-    if (prev_sbb_state >= 0) {
-      for (unsigned i = 0; i < numSbb; ++i) {
-        sbbFlags[i * 4 + curr_state_without_offset] = cc->m_allSbbCtx[cc->m_prev_sbb_ctx_offset].sbbFlags[i * 4 + prev_sbb_state];
-      }
-      for (unsigned i = 16; i < setCpSize; ++i) {
-        levels[scan_pos * 4 + i * 4 + curr_state_without_offset] = cc->m_allSbbCtx[cc->m_prev_sbb_ctx_offset].levels[scan_pos * 4 + i * 4 + prev_sbb_state];
-      }
+    for (unsigned i = 0; i < numSbb; ++i) {
+      sbbFlags[i * 4 + curr_state_without_offset] = cc->m_allSbbCtx[cc->m_prev_sbb_ctx_offset].sbbFlags[i * 4 + prev_sbb_state];
+    }
+    for (unsigned i = 16; i < setCpSize; ++i) {
+      levels[scan_pos * 4 + i * 4 + curr_state_without_offset] = cc->m_allSbbCtx[cc->m_prev_sbb_ctx_offset].levels[scan_pos * 4 + i * 4 + prev_sbb_state];
     }
   }
   else {
