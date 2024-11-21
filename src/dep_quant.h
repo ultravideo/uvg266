@@ -108,6 +108,7 @@ typedef struct {
   int64_t ALIGNED(32) rdCost[8];
   int32_t ALIGNED(32) absLevel[8];
   int32_t ALIGNED(32) prevId[8];
+  uint8_t zero_out;
 } Decision;
 
 
@@ -124,7 +125,6 @@ typedef struct {
   int              m_prev_sbb_ctx_offset;
   uint8_t          sbb_memory[8 * 1024];
   uint8_t          level_memory[8 * TR_MAX_WIDTH * TR_MAX_WIDTH];
-  int              num_coeff;
 } common_context;
 
 

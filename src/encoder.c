@@ -712,6 +712,10 @@ void uvg_encoder_control_free(encoder_control_t *const encoder)
     fclose(encoder->roi_file);
   }
 
+  if (encoder->cfg.dep_quant) {
+    uvg_dealloc_nb_info(encoder);
+  }
+
   if(encoder->cabac_debug_file) {
     fclose(encoder->cabac_debug_file);
   }

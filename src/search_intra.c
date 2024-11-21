@@ -216,8 +216,8 @@ static void derive_mts_constraints(cu_info_t *const pred_cu,
   const uint32_t log2_block_height = uvg_g_convert_to_log2[height];
   const uint32_t log2_cg_size = uvg_g_log2_sbb_size[log2_block_width][log2_block_height][0]
     + uvg_g_log2_sbb_size[log2_block_width][log2_block_height][1];
-  const uint32_t * const scan = uvg_get_scan_order_table(SCAN_GROUP_4X4, scan_idx, log2_block_width, log2_block_height);
-  const uint32_t * const scan_cg = uvg_get_scan_order_table(SCAN_GROUP_UNGROUPED, scan_idx, log2_block_width, log2_block_height);
+  const uint32_t * const scan = uvg_get_scan_order_table(SCAN_GROUP_4X4, scan_idx, log2_block_width, log2_block_height, 0);
+  const uint32_t * const scan_cg = uvg_get_scan_order_table(SCAN_GROUP_UNGROUPED, scan_idx, log2_block_width, log2_block_height, 0);
 
   coeff_t coeff_y[TR_MAX_WIDTH * TR_MAX_WIDTH];
   uvg_get_sub_coeff(coeff_y, lcu->coeff.y, lcu_px.x, lcu_px.y, width, height, LCU_WIDTH);
