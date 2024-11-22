@@ -647,7 +647,7 @@ static void update_state_eos_avx2(context_store* ctxs, const uint32_t scan_pos, 
           for (int i = 0; i < numSbb * 4; i += 32) {
             __m256i sbb_flags = _mm256_loadu_si256((__m256i*)(&cc->m_allSbbCtx[cc->m_prev_sbb_ctx_offset].sbbFlags[i]));
             sbb_flags = _mm256_shuffle_epi8(sbb_flags, inc_ref_state);
-            _mm256_store_si256((__m256i*)&sbbFlags[i], sbb_flags);
+            _mm256_storeu_si256((__m256i*)&sbbFlags[i], sbb_flags);
           }
         }
         // The first 16 variables will be loaded from the previous state so this can be started from 16
