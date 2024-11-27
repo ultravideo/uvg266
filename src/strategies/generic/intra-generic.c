@@ -144,9 +144,6 @@ static void uvg_angular_pred_generic(
   const uvg_pixel *ref_side;
   uvg_pixel* work = width == height || vertical_mode ? dst : temp_dst;
   
-  const int top_ref_length  = isp_mode == ISP_MODE_VER ? width + cu_dim  : width << 1;
-  const int left_ref_length = isp_mode == ISP_MODE_HOR ? height + cu_dim : height << 1;
-
   // Set ref_main and ref_side such that, when indexed with 0, they point to
   // index 0 in block coordinates.
   if (sample_disp < 0) {
@@ -160,28 +157,9 @@ static void uvg_angular_pred_generic(
     for (int i = -size_side; i <= -1; i++) {
       ref_main[i] = ref_side[MIN((-i * modedisp2invsampledisp[abs(mode_disp)] + 256) >> 9, size_side)];
     }
-  }
-  else {
-    memcpy(&temp_above[0], &in_ref_above[0], (top_ref_length + 1 + multi_ref_index) * sizeof(uvg_pixel));
-    memcpy(&temp_left[0], &in_ref_left[0], (left_ref_length + 1 + multi_ref_index) * sizeof(uvg_pixel));
-
-    ref_main = vertical_mode ? temp_above : temp_left;
-    ref_side = vertical_mode ? temp_left : temp_above;
-
-    const int log2_ratio = log2_width - log2_height;
-    const int s = MAX(0, vertical_mode ? log2_ratio : -log2_ratio);
-    const int max_index = (multi_ref_index << s) + 2;
-    int ref_length;
-    if (isp_mode) {
-      ref_length = vertical_mode ? top_ref_length : left_ref_length;
-    }
-    else {
-      ref_length = vertical_mode ? width << 1 : height << 1;
-    }
-    const uvg_pixel val = ref_main[ref_length + multi_ref_index];
-    for (int j = 1; j <= max_index; j++) {
-      ref_main[ref_length + multi_ref_index +  j] = val;
-    }
+  } else {
+    ref_main = (uvg_pixel*)(vertical_mode ? in_ref_above : in_ref_left);
+    ref_side = vertical_mode ? in_ref_left : in_ref_above;
   }
 
 

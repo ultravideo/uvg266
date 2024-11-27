@@ -198,8 +198,8 @@ static void intra_filter_reference(
     refs->filtered_initialized = true;
   }
 
-  const int_fast8_t ref_width = 2 * (1 << log2_width) + 1;
-  const int_fast8_t ref_height = 2 * (1 << log2_height) + 1;
+  const int_fast16_t ref_width = 2 * (1 << (log2_width)) + 1;
+  const int_fast16_t ref_height = 2 * (1 << (log2_height)) + 1;
   uvg_intra_ref *ref = &refs->ref;
   uvg_intra_ref *filtered_ref = &refs->filtered_ref;
 
@@ -208,7 +208,7 @@ static void intra_filter_reference(
   filtered_ref->top[0] = filtered_ref->left[0];
 
   // Top to bottom
-  for (int_fast8_t y = 1; y < ref_height - 1; ++y) {
+  for (int_fast16_t y = 1; y < ref_height - 1; ++y) {
     uvg_pixel *p = &ref->left[y];
     filtered_ref->left[y] = (p[-1] + 2 * p[0] + p[1] + 2) >> 2;
   }
@@ -216,7 +216,7 @@ static void intra_filter_reference(
   filtered_ref->left[ref_height - 1] = ref->left[ref_height - 1];
 
   // Left to right
-  for (int_fast8_t x = 1; x < ref_width - 1; ++x) {
+  for (int_fast16_t x = 1; x < ref_width - 1; ++x) {
     uvg_pixel *p = &ref->top[x];
     filtered_ref->top[x] = (p[-1] + 2 * p[0] + p[1] + 2) >> 2;
   }
@@ -713,7 +713,16 @@ static void intra_predict_regular(
   }
 
   if (used_ref == &refs->filtered_ref && !refs->filtered_initialized) {
-    intra_filter_reference(log2_width, log2_height, refs);
+    int temp_log2_width = log2_width;
+    int temp_log2_height = log2_height;
+    if (color == COLOR_Y && isp_mode == ISP_MODE_NO_ISP) {
+      temp_log2_width = cur_cu->log2_width;
+      temp_log2_height = cur_cu->log2_height;
+    } else if (color != COLOR_Y) {
+      temp_log2_width = cur_cu->log2_chroma_width;
+      temp_log2_height = cur_cu->log2_chroma_height;
+    }
+    intra_filter_reference(temp_log2_width, temp_log2_height, refs);
   }
 
   if (mode == 0) {
@@ -780,7 +789,6 @@ void uvg_intra_build_reference_any(
 
   const uvg_pixel dc_val = 1 << (UVG_BIT_DEPTH - 1); //TODO: add used bitdepth as a variable
   const int is_chroma = color != COLOR_Y ? 1 : 0;
-  const int is_dual_tree = is_chroma && state->encoder_control->cfg.dual_tree && state->frame->is_irap;
 
   // Get multi ref index from CU under prediction or reconstrcution. Do not use MRL if not luma
   const uint8_t multi_ref_index = !is_chroma ? multi_ref_idx : 0;
@@ -799,7 +807,7 @@ void uvg_intra_build_reference_any(
   // Init pointers to LCUs reconstruction buffers, such that index 0 refers to block coordinate 0.
   const uvg_pixel *left_ref;
   bool extra_ref = false;
-  // On the left LCU edge, if left neighboring LCU is available, 
+  // On the left LCU edge, if left neighboring LCU is available,
   // left_ref needs to point to correct extra reference line if MRL is used.
   if (luma_px->x > 0 && lcu_px.x == 0 && multi_ref_index != 0) {
     left_ref = &extra_ref_lines[multi_ref_index * 128];
@@ -836,6 +844,9 @@ void uvg_intra_build_reference_any(
     left_stride = 1;
   }
 
+  const int log2_ratio    = log2_width - log2_height;
+  int       s             = MAX(0, -log2_ratio);
+  int       mrl_extension = (multi_ref_index << s) + (height << s) + 2;
   // Generate left reference.
   if (luma_px->x > 0) {
     // Get the number of reference pixels based on the PU coordinate within the LCU.
@@ -856,7 +867,7 @@ void uvg_intra_build_reference_any(
 
     // Limit the number of available pixels based on block size and dimensions
     // of the picture.
-    px_available_left = MIN(px_available_left, cu_height * 2 + multi_ref_index);
+    px_available_left = MIN(px_available_left, cu_height + pu_loc->height);
     px_available_left = MIN(px_available_left, (pic_px->y - luma_px->y) >> is_chroma);
 
     // Copy pixels from coded CUs.
@@ -869,7 +880,8 @@ void uvg_intra_build_reference_any(
 
     // If first isp split, take samples as if it were normal square block
     int tmp_h = is_first_isp_block ? cu_height * 2 : (isp_mode ? cu_height + height : height * 2);
-    for (int i = px_available_left; i < tmp_h + multi_ref_index * 2; ++i) {
+    int total_height = MIN(tmp_h + mrl_extension, INTRA_REF_LENGTH);
+    for (int i = px_available_left; i < total_height; ++i) {
       out_left_ref[i + 1 + multi_ref_index] = nearest_pixel;
     }
   } else {
@@ -877,7 +889,8 @@ void uvg_intra_build_reference_any(
     uvg_pixel nearest_pixel = luma_px->y > 0 ? top_border[0] : dc_val;
     // If first isp split, take samples as if it were normal square block
     int tmp_h = is_first_isp_block ? cu_height * 2 : (isp_mode ? cu_height + height : height * 2);
-    for (int i = 0; i < tmp_h + multi_ref_index; i++) {
+    int total_height = MIN(tmp_h + mrl_extension, INTRA_REF_LENGTH);
+    for (int i = 0; i < total_height; i++) {
       // Reserve space for top left reference
       out_left_ref[i + 1 + multi_ref_index] = nearest_pixel;
     }
@@ -899,9 +912,22 @@ void uvg_intra_build_reference_any(
       else if (px.x == 0) {
         // LCU left border case
         uvg_pixel *top_left_corner = &extra_ref_lines[multi_ref_index * 128];
-        for (int i = 0; i <= multi_ref_index; ++i) {
-          out_left_ref[i] = left_border[(i - 1 - multi_ref_index) * left_stride];
-          out_top_ref[i] = top_left_corner[(128 * -i) + MAX_REF_LINE_IDX - 1 - multi_ref_index];
+        switch (multi_ref_index) {
+          case 0:
+            out_left_ref[0] = left_border[(-1) * left_stride];
+            out_top_ref[0] = top_left_corner[MAX_REF_LINE_IDX - 1];
+            break;
+          case 1:
+            for (int i = 0; i <= 1; ++i) {
+              out_left_ref[i] = left_border[(i - 1 - 1) * left_stride];
+              out_top_ref[i] = top_left_corner[(128 * -i) + MAX_REF_LINE_IDX - 1 - 1];
+            } break;
+          case 2:
+            for (int i = 0; i <= 2; ++i) {
+              out_left_ref[i] = left_border[(i - 1 - 2) * left_stride];
+              out_top_ref[i] = top_left_corner[(128 * -i) + MAX_REF_LINE_IDX - 1 - 2];
+            } break;
+          default: break;
         }
       }
       else if (px.y == 0) {
@@ -911,9 +937,23 @@ void uvg_intra_build_reference_any(
       }
       else {
         // Inner case
-        for (int i = 0; i <= multi_ref_index; ++i) {
-          out_left_ref[i] = left_border[(i - 1 - multi_ref_index) * left_stride];
-          out_top_ref[i] = top_border[i - 1 - multi_ref_index];
+        switch (multi_ref_index) {
+          case 0:
+            for (int i = 0; i <= 0; ++i) {
+              out_left_ref[i] = left_border[(i - 1 - 0) * left_stride];
+              out_top_ref[i] = top_border[i - 1 - 0];
+            } break;
+          case 1:
+            for (int i = 0; i <= 1; ++i) {
+              out_left_ref[i] = left_border[(i - 1 - 1) * left_stride];
+              out_top_ref[i] = top_border[i - 1 - 1];
+            } break;
+          case 2:
+            for (int i = 0; i <= 2; ++i) {
+              out_left_ref[i] = left_border[(i - 1 - 2) * left_stride];
+              out_top_ref[i] = top_border[i - 1 - 2];
+            } break;
+          default: break;
         }
       }
     }
@@ -927,10 +967,22 @@ void uvg_intra_build_reference_any(
       else if (px.x == 0) {
         // Picture left border case. Reference pixel cannot be taken from outside LCU border
         uvg_pixel nearest = out_left_ref[1 + multi_ref_index];
-        for (int i = 0; i <= multi_ref_index; ++i) {
-          out_left_ref[i] = nearest;
-          out_top_ref[i] = nearest;
+        switch (multi_ref_index) {
+          case 2:
+            out_left_ref[2] = nearest;
+            out_top_ref[2]  = nearest;
+            // Fall through
+          case 1:
+            out_left_ref[1] = nearest;
+            out_top_ref[1]  = nearest;
+            // Fall through
+          case 0:
+            out_left_ref[0] = nearest;
+            out_top_ref[0]  = nearest;
+            break;
+          default: break;
         }
+
       }
       else {
         // Picture top border case. Multi ref will be 0.
@@ -961,6 +1013,8 @@ void uvg_intra_build_reference_any(
 
   // Generate top reference.
   int px_available_top;
+  s             = MAX(0, log2_ratio);
+  mrl_extension = (multi_ref_index << s) + (width << s) + 2;
   if (luma_px->y > 0) {
     // Get the number of reference pixels based on the PU coordinate within the LCU.
     if (isp_mode && !is_first_isp_block && !is_chroma) {
@@ -976,10 +1030,10 @@ void uvg_intra_build_reference_any(
       const int num_cus = uvg_count_available_edge_cus(cu_loc, lcu, false);
       px_available_top = !is_chroma ? num_cus * 4 : num_cus * 2;
     }
-    
+
     // Limit the number of available pixels based on block size and dimensions
     // of the picture.
-    px_available_top = MIN(px_available_top, cu_width * 2 + multi_ref_index);
+    px_available_top = MIN(px_available_top, cu_width + pu_loc->width);
     px_available_top = MIN(px_available_top, (pic_px->x - luma_px->x) >> is_chroma);
 
     // Copy all the pixels we can.
@@ -991,7 +1045,8 @@ void uvg_intra_build_reference_any(
 
     // If first isp split, take samples as if it were normal square block
     int tmp_w = is_first_isp_block ? cu_width * 2 : (isp_mode ? cu_width + width : width * 2);
-    for (int i = px_available_top; i < tmp_w + multi_ref_index * 2; ++i) {
+    int total_width = MIN(tmp_w + mrl_extension, INTRA_REF_LENGTH);
+    for (int i = px_available_top; i < total_width; ++i) {
       out_top_ref[i + 1 + multi_ref_index] = nearest_pixel;
     }
   } else {
@@ -1000,7 +1055,8 @@ void uvg_intra_build_reference_any(
 
     // If first isp split, take samples as if it were normal square block
     int tmp_w = is_first_isp_block ? cu_width * 2 : (isp_mode ? cu_width + width : width * 2);
-    for (int i = 0; i < tmp_w + multi_ref_index * 2; i++) {
+    int total_width = MIN(tmp_w + mrl_extension, INTRA_REF_LENGTH);
+    for (int i = 0; i < total_width; i++) {
       out_top_ref[i + 1] = nearest_pixel;
     }
   }
@@ -1111,9 +1167,22 @@ void uvg_intra_build_reference_inner(
     else if (px.x == 0) {
       // LCU left border case
       uvg_pixel* top_left_corner = &extra_ref_lines[multi_ref_index * 128];
-      for (int i = 0; i <= multi_ref_index; ++i) {
-        out_left_ref[i] = left_border[(i - 1 - multi_ref_index) * left_stride];
-        out_top_ref[i] = top_left_corner[(128 * -i) + MAX_REF_LINE_IDX - 1 - multi_ref_index];
+      switch (multi_ref_index) {
+        case 0:          
+          out_left_ref[0] = left_border[(-1) * left_stride];
+          out_top_ref[0] = top_left_corner[MAX_REF_LINE_IDX - 1];
+          break;
+        case 1:          
+          for (int i = 0; i <= 1; ++i) {
+            out_left_ref[i] = left_border[(i - 1 - 1) * left_stride];
+            out_top_ref[i] = top_left_corner[(128 * -i) + MAX_REF_LINE_IDX - 1 - 1];
+          } break;
+        case 2:
+          for (int i = 0; i <= 2; ++i) {
+            out_left_ref[i] = left_border[(i - 1 - 2) * left_stride];
+            out_top_ref[i] = top_left_corner[(128 * -i) + MAX_REF_LINE_IDX - 1 - 2];
+          } break;
+        default: break;
       }
     }
     else if (px.y == 0) {
@@ -1123,9 +1192,23 @@ void uvg_intra_build_reference_inner(
     }
     else {
       // Inner case
-      for (int i = 0; i <= multi_ref_index; ++i) {
-        out_left_ref[i] = left_border[(i - 1 - multi_ref_index) * left_stride];
-        out_top_ref[i] = top_border[i - 1 - multi_ref_index];
+      switch (multi_ref_index) {
+        case 0:
+          for (int i = 0; i <= 0; ++i) {
+            out_left_ref[i] = left_border[(i - 1 - 0) * left_stride];
+            out_top_ref[i] = top_border[i - 1 - 0];
+          } break;
+        case 1:
+          for (int i = 0; i <= 1; ++i) {
+            out_left_ref[i] = left_border[(i - 1 - 1) * left_stride];
+            out_top_ref[i] = top_border[i - 1 - 1];
+          } break;
+        case 2:
+          for (int i = 0; i <= 2; ++i) {
+            out_left_ref[i] = left_border[(i - 1 - 2) * left_stride];
+            out_top_ref[i] = top_border[i - 1 - 2];
+          } break;
+        default: break;
       }
     }
   }
@@ -1167,14 +1250,15 @@ void uvg_intra_build_reference_inner(
 
   // Limit the number of available pixels based on block size and dimensions
   // of the picture.
-  px_available_left = MIN(px_available_left, cu_height * 2);
+  px_available_left = MIN(px_available_left, cu_height + pu_loc->height);
+  // if (is_first_isp_block && isp_mode == ISP_MODE_HOR && px_available_left == cu_height * 2) px_available_left -= (pu_loc->height); 
   px_available_left = MIN(px_available_left, (pic_px->y - luma_px->y) >> is_chroma);
 
   // Copy pixels from coded CUs.
   int i = multi_ref_index;  // Offset by multi_ref_index
   
   // Do different loop for heights smaller than 4 (possible for some ISP splits)
-  if (px.y % 4 != 0 || px_available_left < 4) {
+  if (px.y % 4 != 0 || px_available_left % 4 != 0) {
     do {
       out_left_ref[i + 1] = left_border[(i + 0 - multi_ref_index) * left_stride];
       i += 1;
@@ -1194,20 +1278,18 @@ void uvg_intra_build_reference_inner(
   uvg_pixel nearest_pixel = out_left_ref[i];
 
   // If first isp split, take samples as if it were normal square block
+  const int log2_ratio    = log2_width - log2_height;
+  int       s             = MAX(0, -log2_ratio);
+  int       mrl_extension = ((multi_ref_index + 0) << s) + (height << s) + 2;
   int tmp_h = is_first_isp_block ? cu_height * 2 : (isp_mode ? cu_height + height : height * 2);
-  for (; i < tmp_h; i += 4) {
+  int total_height = MIN(tmp_h + mrl_extension, INTRA_REF_LENGTH - 2);
+  for (; i < total_height; i += 4) {
     out_left_ref[i + 1] = nearest_pixel;
     out_left_ref[i + 2] = nearest_pixel;
     out_left_ref[i + 3] = nearest_pixel;
     out_left_ref[i + 4] = nearest_pixel;
   }
 
-  // Extend for MRL
-  if (multi_ref_index) {
-    for (; i < height * 2 + multi_ref_index; ++i) {
-      out_left_ref[i + 1] = nearest_pixel;
-    }
-  }
 
   // Generate top reference.
 
@@ -1229,24 +1311,28 @@ void uvg_intra_build_reference_inner(
 
   // Limit the number of available pixels based on block size and dimensions
   // of the picture.
-  px_available_top = MIN(px_available_top, cu_width * 2 + multi_ref_index);
+  px_available_top = MIN(px_available_top, cu_width + pu_loc->width);
+  //if (is_first_isp_block && isp_mode == ISP_MODE_VER && px_available_top == cu_width * 2) px_available_top -= MIN(pu_loc->width, 4); 
   px_available_top = MIN(px_available_top, (pic_px->x - luma_px->x) >> is_chroma);
 
-  if (entropy_sync && px.y == 0) px_available_top = MIN(px_available_top, ((LCU_WIDTH >> is_chroma) - px.x) -1);
+  if (entropy_sync && px.y == 0) px_available_top = MIN(px_available_top, ((LCU_WIDTH >> is_chroma) - px.x));
 
   // Copy all the pixels we can.
   i = 0;
   do {
-    memcpy(out_top_ref + i + 1 + multi_ref_index, top_border + i, 4 * sizeof(uvg_pixel));
-    i += 4;
+    memcpy(out_top_ref + i + 1 + multi_ref_index, top_border + i, sizeof(uvg_pixel));
+    i += 1;
   } while (i < px_available_top);
 
   // Extend the last pixel for the rest of the reference values.
   nearest_pixel = out_top_ref[i + multi_ref_index];
 
   // If first isp split, take samples as if it were normal square block
+  s             = MAX(0, -log2_ratio);
+  mrl_extension = ((multi_ref_index + 0) << s) + (width << s) + 2;
   int tmp_w = is_first_isp_block ? cu_width * 2 : (isp_mode ? cu_width + width : width * 2);
-  for (; i < tmp_w + (multi_ref_index * 2); i += 4) {
+  int total_width = MIN(tmp_w+ mrl_extension, INTRA_REF_LENGTH - 2);
+  for (; i < total_width; i += 4) {
     out_top_ref[i + 1 + multi_ref_index] = nearest_pixel;
     out_top_ref[i + 2 + multi_ref_index] = nearest_pixel;
     out_top_ref[i + 3 + multi_ref_index] = nearest_pixel;
