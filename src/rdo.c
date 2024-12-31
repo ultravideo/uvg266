@@ -1010,7 +1010,7 @@ static INLINE int x_get_ic_rate_ts(const uint32_t            abs_level,
       {
         const uint16_t ctxGtX = cutoffVal >> 1;
         // const BinFracBits* fracBitsGtX = fracBitsAccess.getFracBitsArray(ctxGtX);
-        unsigned gtX = ((int32_t)abs_level >= (cutoffVal + 2));
+        unsigned gtX = ((uint32_t)abs_level >= (cutoffVal + 2u));
         rate += CTX_ENTROPY_BITS(&frac_bits_gtx_ctx[ctxGtX], gtX);// fracBitsGtX.intBits[gtX];
         num_ctx_bins++;
       }
