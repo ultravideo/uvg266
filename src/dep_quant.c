@@ -271,11 +271,12 @@ static void init_quant_block(
   unsigned               log2_height,
   color_t                color,
   const bool             needsSqrt2ScaleAdjustment,
-  const int              gValue)
+  const int              gValue, 
+  const uint8_t          scaled_qp)
 {
   double     lambda = color == COLOR_Y ? state->lambda : state->c_lambda;
 
-  const int  qpDQ = state->qp + 1;
+  const int  qpDQ = scaled_qp + 1;
   const int  qpPer = qpDQ / 6;
   const int  qpRem = qpDQ - 6 * qpPer;
   const int  channelBitDepth = state->encoder_control->bitdepth;
@@ -892,7 +893,7 @@ int uvg_dep_quant(
   }
   //TODO: no idea when it is safe not to reinit for inter
   if (dep_quant_context.m_quant->needs_init || cur_tu->type == CU_INTER) {
-    init_quant_block(state, dep_quant_context.m_quant, cur_tu, log2_tr_width, log2_tr_height, compID, needs_block_size_trafo_scale, -1);
+    init_quant_block(state, dep_quant_context.m_quant, cur_tu, log2_tr_width, log2_tr_height, compID, needs_block_size_trafo_scale, -1, qp_scaled);
   }
   
   //===== scaling matrix ====
@@ -1004,7 +1005,7 @@ int uvg_dep_quant(
 
     context_store* ctxs = &dep_quant_context;
     if (enableScalingLists) {
-      init_quant_block(state, dep_quant_context.m_quant, cur_tu, log2_tr_width, log2_tr_height, compID, needs_block_size_trafo_scale, q_coeff[blkpos]);
+      init_quant_block(state, dep_quant_context.m_quant, cur_tu, log2_tr_width, log2_tr_height, compID, needs_block_size_trafo_scale, q_coeff[blkpos], qp_scaled);
 
       uvg_dep_quant_decide_and_update(
         rate_estimator,
