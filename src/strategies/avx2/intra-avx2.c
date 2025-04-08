@@ -3322,11 +3322,13 @@ static void uvg_angular_pred_avx2(
         break;
       }
       default:
+       {
         // This should work in the case everything else fails.
         const int modedisp2invsampledisp_abs = modedisp2invsampledisp[abs_mode_disp];
         for (int i = -size_side; i <= -1; i++) {
           ref_main[i] = ref_side[MIN((-i * modedisp2invsampledisp_abs + 256) >> 9, size_side)];
         }
+       }
     }
   }
   else {
