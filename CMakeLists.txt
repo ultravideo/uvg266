@@ -13,6 +13,23 @@ option(ENABLE_AVX2 "Enable AVX2 optimizations" ON)
 option(BUILD_TESTS "Build tests" ON)
 
 include(GNUInstallDirs) #Helps to define correct distro specific install directories
+include(CheckCSourceCompiles)
+
+if(ENABLE_AVX2)
+  check_c_source_compiles("
+    #include <immintrin.h>
+    int main() {
+      __m256i x = _mm256_set1_epi32(42);
+      return 0;
+    }" HAVE_AVX2)
+
+  if(NOT HAVE_AVX2)
+    message(WARNING "AVX2 not supported by the target CPU/compiler. Disabling AVX2.")
+    set(ENABLE_AVX2 OFF CACHE BOOL "Enable AVX2 optimizations" FORCE)
+  else()
+    message(STATUS "AVX2 is supported.")
+  endif()
+endif()
 
 set(UVG266_INSTALL_LIBDIR "${CMAKE_INSTALL_LIBDIR}" CACHE PATH "uvg266 library install path")
 set(UVG266_INSTALL_BINDIR "${CMAKE_INSTALL_BINDIR}" CACHE PATH "uvg266 binary install path")
