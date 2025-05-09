@@ -52,7 +52,7 @@ int main(int argc, char **argv)
 {
   GREATEST_MAIN_BEGIN();
 
-  init_test_strategies(1);
+  init_test_strategies();
 #if UVG_BIT_DEPTH == 8
   RUN_SUITE(sad_tests);
   RUN_SUITE(intra_sad_tests);
