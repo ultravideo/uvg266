@@ -1072,7 +1072,15 @@ void uvg_sort_keys_by_cost(unit_stats_map_t *__restrict map)
 }
 
 
-static void mark_deblocking(const cu_loc_t* const cu_loc, const cu_loc_t* const chroma_loc, lcu_t* lcu, enum uvg_tree_type tree_type, bool has_chroma, const bool is_separate_tree, int x_local, int y_local)
+static void mark_deblocking(
+  const cu_loc_t* const cu_loc, 
+  const cu_loc_t* const chroma_loc, 
+  lcu_t* lcu, 
+  enum uvg_tree_type tree_type,
+  bool has_chroma,
+  const bool is_separate_tree,
+  int x_local, int y_local,
+  bool is_skip)
 {
   if(tree_type != UVG_CHROMA_T) {
     if(cu_loc->x) {
@@ -1083,7 +1091,7 @@ static void mark_deblocking(const cu_loc_t* const cu_loc, const cu_loc_t* const 
         }
       }
     }
-    else if(cu_loc->width == 64) {
+    else if(cu_loc->width == 64 && !is_skip) {
       for (int y = cu_loc->local_y; y < cu_loc->local_y + cu_loc->height; y += SCU_WIDTH) {
         LCU_GET_CU_AT_PX(lcu, TR_MAX_WIDTH, y)->luma_deblocking |= EDGE_VER;
         if (!is_separate_tree && tree_type == UVG_BOTH_T) LCU_GET_CU_AT_PX(lcu, TR_MAX_WIDTH, y)->chroma_deblocking |= EDGE_VER;
@@ -1098,7 +1106,7 @@ static void mark_deblocking(const cu_loc_t* const cu_loc, const cu_loc_t* const 
         }
       }
     }
-    else if (cu_loc->height == 64) {
+    else if (cu_loc->height == 64 && !is_skip) {
       for (int x = cu_loc->local_x; x < cu_loc->local_x + cu_loc->width; x += SCU_WIDTH) {
         LCU_GET_CU_AT_PX(lcu, x, TR_MAX_WIDTH)->luma_deblocking |= EDGE_HOR;
         if (!is_separate_tree && tree_type == UVG_BOTH_T) LCU_GET_CU_AT_PX(lcu, x, TR_MAX_WIDTH)->chroma_deblocking |= EDGE_HOR;
@@ -1113,7 +1121,7 @@ static void mark_deblocking(const cu_loc_t* const cu_loc, const cu_loc_t* const 
           }
         }
       }
-      else if(cu_loc->width == 64) {
+      else if (cu_loc->width == 64 && !is_skip) {
         for (int y = chroma_loc->local_y; y < chroma_loc->local_y + chroma_loc->height; y += SCU_WIDTH) {
           LCU_GET_CU_AT_PX(lcu, TR_MAX_WIDTH, y)->chroma_deblocking |= EDGE_VER;
         }          
@@ -1126,7 +1134,7 @@ static void mark_deblocking(const cu_loc_t* const cu_loc, const cu_loc_t* const 
           }
         }
       }
-      else if (cu_loc->height == 64) {
+      else if (cu_loc->height == 64 && !is_skip) {
         for (int x = chroma_loc->local_x; x < chroma_loc->local_x + chroma_loc->width; x += SCU_WIDTH) {
           LCU_GET_CU_AT_PX(lcu, x, TR_MAX_WIDTH)->chroma_deblocking |= EDGE_HOR;
         }
@@ -1142,7 +1150,7 @@ static void mark_deblocking(const cu_loc_t* const cu_loc, const cu_loc_t* const 
         }
       }
     }
-    else if(chroma_loc->width == 64) {
+    else if(chroma_loc->width == 64 && !is_skip) {
       for (int y = y_local; y < y_local + chroma_loc->height; y += SCU_WIDTH) {
         LCU_GET_CU_AT_PX(lcu, TR_MAX_WIDTH, y)->chroma_deblocking |= EDGE_VER;
       }        
@@ -1155,7 +1163,7 @@ static void mark_deblocking(const cu_loc_t* const cu_loc, const cu_loc_t* const 
         }
       }        
     }
-    else if (chroma_loc->height == 64) {
+    else if (chroma_loc->height == 64 && !is_skip) {
       for (int x = x_local; x < x_local + chroma_loc->width; x += SCU_WIDTH) {
         LCU_GET_CU_AT_PX(lcu, x, TR_MAX_WIDTH)->chroma_deblocking |= EDGE_HOR;
       }
@@ -1656,6 +1664,11 @@ static double search_cu(
           inter_bitcost += cur_cu->merge_idx;        
         }
       }
+      else if (!state->encoder_control->cfg.early_skip) {
+        const bool has_chroma =
+          state->encoder_control->chroma_format != UVG_CSP_400;
+        uvg_inter_recon_cu(state, lcu, true, has_chroma, cu_loc);
+      }
       lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_height, cur_cu);
       lcu_fill_cbf(lcu, x_local, y_local, cu_width, cu_height, cur_cu, UVG_BOTH_T);
     }
@@ -1716,7 +1729,8 @@ static double search_cu(
       has_chroma,
       is_separate_tree,
       x_local,
-      y_local);
+      y_local, 
+      cur_cu->skipped);
     if (cur_cu->type == CU_INTRA && cur_cu->intra.isp_mode != ISP_MODE_NO_ISP && tree_type != UVG_CHROMA_T) {
       const int split_num = uvg_get_isp_split_num( cu_width, cu_height, cur_cu->intra.isp_mode,true);
       for (int i = 1; i < split_num; i++) {
@@ -1739,7 +1753,8 @@ static double search_cu(
           false,
           false,
           isp_loc.local_x,
-          isp_loc.local_y);
+          isp_loc.local_y, 
+          cur_cu->skipped);
       }
     }
   } 
@@ -2106,7 +2121,7 @@ static double search_cu(
 
         cost += cu_rd_cost_tr_split_accurate(state, cur_cu, lcu, tree_type, 0, cu_loc, chroma_loc, has_chroma);
 
-        mark_deblocking(cu_loc, chroma_loc, lcu, tree_type, has_chroma, is_separate_tree, x_local, y_local);
+        mark_deblocking(cu_loc, chroma_loc, lcu, tree_type, has_chroma, is_separate_tree, x_local, y_local, cur_cu->skipped);
 
         memcpy(&post_search_cabac, &state->search_cabac, sizeof(post_search_cabac));
         memcpy(&state->search_cabac, &temp_cabac, sizeof(temp_cabac));
