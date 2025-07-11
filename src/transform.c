@@ -1545,6 +1545,12 @@ void uvg_quantize_lcu_residual(
     const int split_count = uvg_get_split_locs(cu_loc, split, split_cu_loc,NULL);
     
     for (int i = 0; i < split_count; ++i) {
+      state->quant_blocks[0].needs_init = true;
+      state->quant_blocks[2].needs_init = true;
+      state->rate_estimator[0].needs_init = true;
+      state->rate_estimator[1].needs_init = true;
+      state->rate_estimator[2].needs_init = true;
+      state->rate_estimator[3].needs_init = true;
       uvg_quantize_lcu_residual(state, luma, chroma, 0, &split_cu_loc[i], NULL, lcu, early_skip, tree_type);
       if(i != 0) {
         child_cbfs[i - 1] = LCU_GET_CU_AT_PX(lcu, split_cu_loc[i].local_x, split_cu_loc[i].local_y)->cbf;

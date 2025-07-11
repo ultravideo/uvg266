@@ -939,7 +939,7 @@ int uvg_dep_quant(
   //===== real init =====
   rate_estimator_t* rate_estimator = (rate_estimator_t *)(compID == COLOR_Y && cur_tu->type == CU_INTRA && cur_tu->intra.isp_mode != ISP_MODE_NO_ISP ?
     &state->rate_estimator[3] : &state->rate_estimator[compID]);
-  if(rate_estimator->needs_init || cur_tu->type == CU_INTER) {
+  if(cur_tu->type == CU_INTER || rate_estimator->needs_init) {
     init_rate_esimator(rate_estimator, &state->search_cabac, compID);
     xSetLastCoeffOffset(state, cur_tu, width, height, rate_estimator, compID);
     rate_estimator->needs_init = false;
