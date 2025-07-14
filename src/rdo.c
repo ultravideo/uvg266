@@ -1854,7 +1854,7 @@ void uvg_rdoq(
       int32_t blk_y = blkPos >> log2_block_width;
       int32_t level      = blk_x >= 16 || blk_y >= 16 ? 0 : dest_coeff[blkPos];
       abs_sum            += level;
-      dest_coeff[blkPos] = (coeff_t)((coef[blkPos] < 0) ? -level : level);
+      dest_coeff[blkPos] = (coeff_t)((level != 0 && coef[blkPos] < 0) ? -level : level);
     }
   }
   //===== clean uncoded coefficients =====
