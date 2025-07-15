@@ -1514,6 +1514,8 @@ static double search_cu(
         cost = intra_cost;
         *cur_cu = intra_search.pred_cu;
         cur_cu->type = CU_INTRA;
+        cur_cu->skipped = false;
+        cur_cu->merged = false;
       }
     }
 
@@ -1668,6 +1670,9 @@ static double search_cu(
         const bool has_chroma =
           state->encoder_control->chroma_format != UVG_CSP_400;
         uvg_inter_recon_cu(state, lcu, true, has_chroma, cu_loc);
+      }
+      if (cur_cu->merged && !cur_cu->skipped && !cur_cu->root_cbf && !cur_cu->cbf) {
+        assert(0 && "Merged without residual");
       }
       lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_height, cur_cu);
       lcu_fill_cbf(lcu, x_local, y_local, cu_width, cu_height, cur_cu, UVG_BOTH_T);
