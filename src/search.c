@@ -1089,6 +1089,7 @@ static void mark_deblocking(
           LCU_GET_CU_AT_PX(lcu, x, y)->luma_deblocking |= EDGE_VER;
           if(!is_separate_tree && tree_type == UVG_BOTH_T) LCU_GET_CU_AT_PX(lcu, x, y)->chroma_deblocking |= EDGE_VER;
         }
+        if (is_skip) break;
       }
     }
     else if(cu_loc->width == 64 && !is_skip) {
@@ -1104,6 +1105,7 @@ static void mark_deblocking(
           LCU_GET_CU_AT_PX(lcu, x, y)->luma_deblocking |= EDGE_HOR;
           if (!is_separate_tree && tree_type == UVG_BOTH_T) LCU_GET_CU_AT_PX(lcu, x, y)->chroma_deblocking |= EDGE_HOR;
         }
+        if (is_skip) break;
       }
     }
     else if (cu_loc->height == 64 && !is_skip) {
@@ -1670,6 +1672,13 @@ static double search_cu(
         const bool has_chroma =
           state->encoder_control->chroma_format != UVG_CSP_400;
         uvg_inter_recon_cu(state, lcu, true, has_chroma, cu_loc);
+        for (int y = 0; y < cu_height; y += TR_MAX_WIDTH) {
+          for (int x = 0; x < cu_width; x += TR_MAX_WIDTH) {
+            cbf_clear(&LCU_GET_CU_AT_PX(lcu, cu_loc->local_x + x, cu_loc->local_y + y)->cbf, COLOR_Y);
+            cbf_clear(&LCU_GET_CU_AT_PX(lcu, cu_loc->local_x + x, cu_loc->local_y + y)->cbf, COLOR_U);
+            cbf_clear(&LCU_GET_CU_AT_PX(lcu, cu_loc->local_x + x, cu_loc->local_y + y)->cbf, COLOR_V);
+          }
+        }
       }
       if (cur_cu->merged && !cur_cu->skipped && !cur_cu->root_cbf && !cur_cu->cbf) {
         assert(0 && "Merged without residual");
