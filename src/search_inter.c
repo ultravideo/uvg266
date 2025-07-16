@@ -2301,6 +2301,13 @@ void uvg_cu_cost_inter_rd2(
     cur_cu->cbf = 0;
     if (cur_cu->merged) {
       cur_cu->skipped = 1;
+      for (int y = 0; y < height; y += TR_MAX_WIDTH) {
+        for (int x = 0; x < width; x += TR_MAX_WIDTH) {
+          cbf_clear(&LCU_GET_CU_AT_PX(lcu, x_px + x, y_px + y)->cbf, COLOR_Y);
+          cbf_clear(&LCU_GET_CU_AT_PX(lcu, x_px + x, y_px + y)->cbf, COLOR_U);
+          cbf_clear(&LCU_GET_CU_AT_PX(lcu, x_px + x, y_px + y)->cbf, COLOR_V);
+        }
+      }
     }
     *inter_cost = no_cbf_cost;
     *inter_bitcost = no_cbf_bits;
