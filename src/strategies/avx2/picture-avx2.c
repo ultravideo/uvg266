@@ -818,6 +818,92 @@ static uint64_t hadamard_16x8_fw_avx2(const uvg_pixel* ref, const uvg_pixel* pre
   return satd;
 }
 
+static INLINE void ver_transform_block_w8x16_avx2(__m128i (*rows)[16])
+{
+  __m128i temp0[16];
+  add_sub_avx2(temp0, (*rows), 0x00, 0x01, 0x00, 0x01);
+  add_sub_avx2(temp0, (*rows), 0x02, 0x03, 0x02, 0x03);
+  add_sub_avx2(temp0, (*rows), 0x04, 0x05, 0x04, 0x05);
+  add_sub_avx2(temp0, (*rows), 0x06, 0x07, 0x06, 0x07);
+  add_sub_avx2(temp0, (*rows), 0x08, 0x09, 0x08, 0x09);
+  add_sub_avx2(temp0, (*rows), 0x0a, 0x0b, 0x0a, 0x0b);
+  add_sub_avx2(temp0, (*rows), 0x0c, 0x0d, 0x0c, 0x0d);
+  add_sub_avx2(temp0, (*rows), 0x0e, 0x0f, 0x0e, 0x0f);
+
+  __m128i temp1[16];
+  add_sub_avx2(temp1, temp0, 0x00, 0x01, 0x00, 0x02);
+  add_sub_avx2(temp1, temp0, 0x02, 0x03, 0x01, 0x03);
+  add_sub_avx2(temp1, temp0, 0x04, 0x05, 0x04, 0x06);
+  add_sub_avx2(temp1, temp0, 0x06, 0x07, 0x05, 0x07);
+  add_sub_avx2(temp1, temp0, 0x08, 0x09, 0x08, 0x0a);
+  add_sub_avx2(temp1, temp0, 0x0a, 0x0b, 0x09, 0x0b);
+  add_sub_avx2(temp1, temp0, 0x0c, 0x0d, 0x0c, 0x0e);
+  add_sub_avx2(temp1, temp0, 0x0e, 0x0f, 0x0d, 0x0f);
+
+  add_sub_avx2(temp0, temp1, 0x00, 0x01, 0x00, 0x04);
+  add_sub_avx2(temp0, temp1, 0x02, 0x03, 0x01, 0x05);
+  add_sub_avx2(temp0, temp1, 0x04, 0x05, 0x02, 0x06);
+  add_sub_avx2(temp0, temp1, 0x06, 0x07, 0x03, 0x07);
+  add_sub_avx2(temp0, temp1, 0x08, 0x09, 0x08, 0x0c);
+  add_sub_avx2(temp0, temp1, 0x0a, 0x0b, 0x09, 0x0d);
+  add_sub_avx2(temp0, temp1, 0x0c, 0x0d, 0x0a, 0x0e);
+  add_sub_avx2(temp0, temp1, 0x0e, 0x0f, 0x0b, 0x0f);
+
+  add_sub_avx2((*rows), temp0, 0x00, 0x01, 0x00, 0x08);
+  add_sub_avx2((*rows), temp0, 0x02, 0x03, 0x01, 0x09);
+  add_sub_avx2((*rows), temp0, 0x04, 0x05, 0x02, 0x0a);
+  add_sub_avx2((*rows), temp0, 0x06, 0x07, 0x03, 0x0b);
+  add_sub_avx2((*rows), temp0, 0x08, 0x09, 0x04, 0x0c);
+  add_sub_avx2((*rows), temp0, 0x0a, 0x0b, 0x05, 0x0d);
+  add_sub_avx2((*rows), temp0, 0x0c, 0x0d, 0x06, 0x0e);
+  add_sub_avx2((*rows), temp0, 0x0e, 0x0f, 0x07, 0x0f);
+}
+
+static uint64_t hadamard_8x16_fw_avx2(const uvg_pixel* ref, const uvg_pixel* pred, int ref_stride, int pred_stride)
+{
+  uint64_t satd = 0;
+
+  __m128i vdiff[16];
+  for (int i = 0; i < 16; ++i) {
+    __m128i vref = _mm_loadu_si128((__m128i*) & ref[i * ref_stride]);
+    __m128i vpred = _mm_loadu_si128((__m128i*) & pred[i * pred_stride]);
+    vref = _mm_cvtepu8_epi16(vref);
+    vpred = _mm_cvtepu8_epi16(vpred);
+    vdiff[i] = _mm_sub_epi16(vref, vpred);
+  }
+  
+  for (int i = 0; i < 16; ++i) {
+    hor_transform_row_avx2(&vdiff[i]);
+  }
+
+  ver_transform_block_w8x16_avx2(&vdiff);
+
+  // Calculate sum in two parts to avoid overflow
+  __m128i vsum0 = _mm_setzero_si128();
+  __m128i vsum1 = _mm_setzero_si128();
+  int16_t dc = abs(_mm_extract_epi16(vdiff[0], 0));
+  for (int i = 0; i < 16; i += 2) {
+    vsum0 = _mm_add_epi16(vsum0, _mm_abs_epi16(vdiff[i + 0]));
+    vsum1 = _mm_add_epi16(vsum1, _mm_abs_epi16(vdiff[i + 1]));
+  }
+  
+  // Do the final adds horizontally. First round with madd to extend to 32 bits
+  // Before madd 8 16-bit values                       0 1 2 3 4 5 6 7
+  vsum0 = _mm_madd_epi16(vsum0, _mm_set1_epi16(1)); // 01 23 45 67
+  vsum1 = _mm_madd_epi16(vsum1, _mm_set1_epi16(1));
+  __m128i vsum = _mm_add_epi32(vsum0, vsum1);
+  vsum = _mm_hadd_epi32(vsum, vsum); // 0123 4567 xxxx xxxx
+  vsum = _mm_hadd_epi32(vsum, vsum); // 01234567 xxxxxxxx ...
+
+  satd = (uint64_t)_mm_extract_epi32(vsum, 0);
+
+  satd -= abs(dc);
+  satd += abs(dc) >> 2;
+  satd = (int)(satd / sqrt(16.0 * 8) * 2);
+
+  return satd;
+}
+
 static uint64_t uvg_get_hadamard_avx2(int width, int height, const uvg_pixel* ref_in, int ref_stride, const uvg_pixel* pred_in, int pred_stride)
 {
   const uvg_pixel* ref_in_ptr = ref_in;
@@ -850,6 +936,7 @@ static uint64_t uvg_get_hadamard_avx2(int width, int height, const uvg_pixel* re
       for (x = 0; x < cols; x += 8)
       {
         //uiSum += xCalcHADs8x16(&ref_in_ptr[x], &pred_in_ptr[x], iStrideOrg, iStrideCur);
+        sum += hadamard_8x16_fw_avx2(&ref_in_ptr[x], &pred_in_ptr[x], ref_in_stride, pred_in_stride);
       }
       ref_in_ptr += ref_in_stride * 16;
       pred_in_ptr += pred_in_stride * 16;
