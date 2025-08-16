@@ -904,6 +904,56 @@ static uint64_t hadamard_8x16_fw_avx2(const uvg_pixel* ref, const uvg_pixel* pre
   return satd;
 }
 
+static INLINE void ver_transform_block_8x4_avx2(__m128i (*rows)[4])
+{
+  __m128i temp0[4];
+  add_sub_avx2(temp0, (*rows), 0x00, 0x01, 0x00, 0x01);
+  add_sub_avx2(temp0, (*rows), 0x02, 0x03, 0x02, 0x03);
+  
+  add_sub_avx2((*rows), temp0, 0x00, 0x01, 0x00, 0x02);
+  add_sub_avx2((*rows), temp0, 0x02, 0x03, 0x01, 0x03);
+}
+
+static uint64_t hadamard_8x4_fw_avx2(const uvg_pixel* ref, const uvg_pixel* pred, int ref_stride, int pred_stride)
+{
+  uint64_t satd = 0;
+
+  __m128i vdiff[4];
+  for (int i = 0; i < 4; ++i) {
+    __m128i vref = _mm_loadu_si128((__m128i*) & ref[i * ref_stride]);
+    __m128i vpred = _mm_loadu_si128((__m128i*) & pred[i * pred_stride]);
+    vref = _mm_cvtepu8_epi16(vref);
+    vpred = _mm_cvtepu8_epi16(vpred);
+    vdiff[i] = _mm_sub_epi16(vref, vpred);
+  }
+
+  for (int i = 0; i < 4; ++i) {
+    hor_transform_row_avx2(&vdiff[i]);
+  }
+
+  ver_transform_block_8x4_avx2(&vdiff);
+
+  // Calculate sum
+  __m128i vsum = _mm_setzero_si128();
+  int16_t dc = abs(_mm_extract_epi16(vdiff[0], 0));
+  for (int i = 0; i < 4; ++i) {
+    vsum = _mm_add_epi16(vsum, _mm_abs_epi16(vdiff[i]));
+  }
+
+  // Do the final adds horizontally
+  vsum = _mm_hadd_epi16(vsum, vsum); // 01 23 45 67 xx xx xx xx
+  vsum = _mm_hadd_epi16(vsum, vsum); // 0123 4567 xxxx xxxx xxxx xxxx xxxx xxxx
+  vsum = _mm_hadd_epi16(vsum, vsum); // 01234567 xxxxxxxx ...
+
+  satd = (uint64_t)_mm_extract_epi16(vsum, 0);
+
+  satd -= abs(dc);
+  satd += abs(dc) >> 2;
+  satd = (int)(satd / sqrt(8.0 * 4) * 2);
+
+  return satd;
+}
+
 static uint64_t uvg_get_hadamard_avx2(int width, int height, const uvg_pixel* ref_in, int ref_stride, const uvg_pixel* pred_in, int pred_stride)
 {
   const uvg_pixel* ref_in_ptr = ref_in;
@@ -949,6 +999,7 @@ static uint64_t uvg_get_hadamard_avx2(int width, int height, const uvg_pixel* re
       for (x = 0; x < cols; x += 8)
       {
         //uiSum += xCalcHADs8x4(&ref_in_ptr[x], &pred_in_ptr[x], iStrideOrg, iStrideCur);
+        sum += hadamard_8x4_fw_avx2(&ref_in_ptr[x], &pred_in_ptr[x], ref_in_stride, pred_in_stride);
       }
       ref_in_ptr += ref_in_stride * 4;
       pred_in_ptr += pred_in_stride * 4;
