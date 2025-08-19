@@ -1066,6 +1066,64 @@ static uint64_t hadamard_4x8_fw_avx2(const uvg_pixel* ref, const uvg_pixel* pred
   return satd;
 }
 
+static INLINE void ver_transform_block_4x4_avx2(__m128i (*rows)[2])
+{
+  __m128i temp0[2];
+  add_sub_w4_avx2(temp0, (*rows), 0, 0);
+  add_sub_w4_avx2(temp0, (*rows), 1, 1);
+
+  add_sub_avx2((*rows), temp0, 0, 1, 0, 1);
+}
+
+static uint64_t hadamard_4x4_fw_avx2(const uvg_pixel* ref, const uvg_pixel* pred, int ref_stride, int pred_stride)
+{
+  uint64_t satd = 0;
+
+  __m128i vdiff[2];
+
+  // Load four rows at a time using gather
+  __m128i vindex_ref = _mm_setr_epi32(0 * ref_stride, 1 * ref_stride, 2 * ref_stride, 3 * ref_stride);
+  __m128i vindex_pred = _mm_setr_epi32(0 * pred_stride, 1 * pred_stride, 2 * pred_stride, 3 * pred_stride);
+
+  __m128i vref = _mm_i32gather_epi32((int*)(ref + (0 * ref_stride)), vindex_ref, 1);
+  __m128i vpred = _mm_i32gather_epi32((int*)(pred + (0 * pred_stride)), vindex_pred, 1);
+  
+  // Calculate the diff between lower halves
+  __m128i vtmpref = _mm_cvtepu8_epi16(vref);
+  __m128i vtmppred = _mm_cvtepu8_epi16(vpred);
+
+  vdiff[0] = _mm_sub_epi16(vtmpref, vtmppred);
+
+  // Do the same for upper halves
+  vtmpref = _mm_cvtepu8_epi16(_mm_shuffle_epi32(vref, _MM_SHUFFLE(1, 0, 3, 2)));
+  vtmppred = _mm_cvtepu8_epi16(_mm_shuffle_epi32(vpred, _MM_SHUFFLE(1, 0, 3, 2)));
+
+  vdiff[1] = _mm_sub_epi16(vtmpref, vtmppred);
+
+  for (int i = 0; i < 2; ++i) {
+    hor_transform_row_w4_avx2(&vdiff[i]);
+  }
+
+  ver_transform_block_4x4_avx2(&vdiff);
+
+  // Calculate sum
+  __m128i vsum = _mm_add_epi16(_mm_abs_epi16(vdiff[0]), _mm_abs_epi16(vdiff[1]));
+  int16_t dc = abs(_mm_extract_epi16(vdiff[0], 0));
+  
+  // Do the final adds horizontally
+  vsum = _mm_hadd_epi16(vsum, vsum); // 01 23 45 67 xx xx xx xx
+  vsum = _mm_hadd_epi16(vsum, vsum); // 0123 4567 xxxx xxxx xxxx xxxx xxxx xxxx
+  vsum = _mm_hadd_epi16(vsum, vsum); // 01234567 xxxxxxxx ...
+
+  satd = (uint64_t)_mm_extract_epi16(vsum, 0);
+
+  satd -= abs(dc);
+  satd += abs(dc) >> 2;
+  satd = ((satd + 1) >> 1);
+
+  return satd;
+}
+
 static uint64_t uvg_get_hadamard_avx2(int width, int height, const uvg_pixel* ref_in, int ref_stride, const uvg_pixel* pred_in, int pred_stride)
 {
   const uvg_pixel* ref_in_ptr = ref_in;
@@ -1149,6 +1207,7 @@ static uint64_t uvg_get_hadamard_avx2(int width, int height, const uvg_pixel* re
       for (x = 0; x < cols; x += 4)
       {
         //uiSum += uvg_satd_4x4_subblock_generic(&ref_in_ptr[x], iStrideOrg, &pred_in_ptr[x], iStrideCur);
+        sum += hadamard_4x4_fw_avx2(&ref_in_ptr[x], &pred_in_ptr[x], ref_in_stride, pred_in_stride);
       }
       ref_in_ptr += 4 * ref_in_stride;
       pred_in_ptr += 4 * pred_in_stride;
