@@ -1124,6 +1124,28 @@ static uint64_t hadamard_4x4_fw_avx2(const uvg_pixel* ref, const uvg_pixel* pred
   return satd;
 }
 
+static uint64_t hadamard_2x2_fw_avx2(const uvg_pixel* ref, const uvg_pixel* pred, int ref_stride, int pred_stride)
+{
+  uint64_t satd = 0;
+  coeff_t diff[4], m[4];
+
+  diff[0] = ref[0] - pred[0];
+  diff[1] = ref[1] - pred[1];
+  diff[2] = ref[ref_stride + 0] - pred[pred_stride + 0];
+  diff[3] = ref[ref_stride + 1] - pred[pred_stride + 1];
+  m[0] = diff[0] + diff[2];
+  m[1] = diff[1] + diff[3];
+  m[2] = diff[0] - diff[2];
+  m[3] = diff[1] - diff[3];
+
+  satd += abs(m[0] + m[1]) >> 2;
+  satd += abs(m[0] - m[1]);
+  satd += abs(m[2] + m[3]);
+  satd += abs(m[2] - m[3]);
+
+  return satd;
+}
+
 static uint64_t uvg_get_hadamard_avx2(int width, int height, const uvg_pixel* ref_in, int ref_stride, const uvg_pixel* pred_in, int pred_stride)
 {
   const uvg_pixel* ref_in_ptr = ref_in;
@@ -1220,6 +1242,7 @@ static uint64_t uvg_get_hadamard_avx2(int width, int height, const uvg_pixel* re
       for (x = 0; x < cols; x += 2)
       {
         //uiSum += xCalcHADs2x2(&ref_in_ptr[x], &pred_in_ptr[x], iStrideOrg, iStrideCur);
+        sum += hadamard_2x2_fw_avx2(&ref_in_ptr[x], &pred_in_ptr[x], ref_in_stride, pred_in_stride);
       }
       ref_in_ptr += 2 * ref_in_stride;
       pred_in_ptr += 2 * pred_in_stride;
@@ -2329,6 +2352,7 @@ int uvg_strategy_register_picture_avx2(void* opaque, uint8_t bitdepth)
     success &= uvg_strategyselector_register(opaque, "satd_32x32_dual", "avx2", 40, &satd_8bit_32x32_dual_avx2);
     success &= uvg_strategyselector_register(opaque, "satd_64x64_dual", "avx2", 40, &satd_8bit_64x64_dual_avx2);
     success &= uvg_strategyselector_register(opaque, "satd_any_size", "avx2", 40, &satd_any_size_8bit_avx2);
+    success &= uvg_strategyselector_register(opaque, "satd_any_size_vtm", "avx2", 40, &uvg_get_hadamard_avx2);
     success &= uvg_strategyselector_register(opaque, "satd_any_size_quad", "avx2", 40, &satd_any_size_quad_avx2);
 
     success &= uvg_strategyselector_register(opaque, "pixels_calc_ssd", "avx2", 40, &pixels_calc_ssd_avx2);
