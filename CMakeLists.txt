@@ -35,6 +35,7 @@ if(ENABLE_AVX2)
   else()
     message(STATUS "AVX2 is supported.")
   endif()
+  unset(CMAKE_REQUIRED_FLAGS)
 endif()
 
 set(UVG266_INSTALL_LIBDIR "${CMAKE_INSTALL_LIBDIR}" CACHE PATH "uvg266 library install path")
