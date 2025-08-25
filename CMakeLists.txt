@@ -8,9 +8,35 @@ VERSION 0.8.1 )
 
 option(BUILD_SHARED_LIBS "Build using shared uvg266 library" ON)
 
+option(ENABLE_AVX2 "Enable AVX2 optimizations" ON)
+
 option(BUILD_TESTS "Build tests" ON)
 
 include(GNUInstallDirs) #Helps to define correct distro specific install directories
+include(CheckCSourceCompiles)
+
+if(ENABLE_AVX2)
+  if(MSVC)
+    set(CMAKE_REQUIRED_FLAGS "/arch:AVX2")
+  else()
+    set(CMAKE_REQUIRED_FLAGS "-mavx2")
+  endif()
+
+  check_c_source_compiles("
+    #include <immintrin.h>
+    int main() {
+      __m256i x = _mm256_set1_epi32(42);
+      return 0;
+    }" HAVE_AVX2)
+
+  if(NOT HAVE_AVX2)
+    message(WARNING "AVX2 not supported by the target CPU/compiler. Disabling AVX2.")
+    set(ENABLE_AVX2 OFF CACHE BOOL "Enable AVX2 optimizations" FORCE)
+  else()
+    message(STATUS "AVX2 is supported.")
+  endif()
+  unset(CMAKE_REQUIRED_FLAGS)
+endif()
 
 set(UVG266_INSTALL_LIBDIR "${CMAKE_INSTALL_LIBDIR}" CACHE PATH "uvg266 library install path")
 set(UVG266_INSTALL_BINDIR "${CMAKE_INSTALL_BINDIR}" CACHE PATH "uvg266 binary install path")
@@ -143,7 +169,12 @@ target_include_directories(uvg266 PUBLIC src)
 target_include_directories(uvg266 PUBLIC src/extras)
 target_include_directories(uvg266 PUBLIC src/strategies)
 
-file(GLOB LIB_SOURCES_STRATEGIES_AVX2 RELATIVE ${PROJECT_SOURCE_DIR} "src/strategies/avx2/*.c")
+if(ENABLE_AVX2)
+  file(GLOB LIB_SOURCES_STRATEGIES_AVX2 RELATIVE ${PROJECT_SOURCE_DIR} "src/strategies/avx2/*.c")
+else()
+  set(LIB_SOURCES_STRATEGIES_AVX2 "")
+endif()
+
 file(GLOB LIB_SOURCES_STRATEGIES_SSE41 RELATIVE ${PROJECT_SOURCE_DIR} "src/strategies/sse41/*.c")
 file(GLOB LIB_SOURCES_STRATEGIES_SSE42 RELATIVE ${PROJECT_SOURCE_DIR} "src/strategies/sse42/*.c")
 
@@ -171,11 +202,15 @@ set_target_properties(uvg266-bin PROPERTIES RUNTIME_OUTPUT_NAME uvg266)
 
 if(MSVC)
   target_include_directories(uvg266 PUBLIC src/threadwrapper/include)
-  set_property( SOURCE ${LIB_SOURCES_STRATEGIES_AVX2} APPEND PROPERTY COMPILE_FLAGS "/arch:AVX2" )
+  if(ENABLE_AVX2)
+    set_property( SOURCE ${LIB_SOURCES_STRATEGIES_AVX2} APPEND PROPERTY COMPILE_FLAGS "/arch:AVX2" )
+  endif()
 else()
   list(APPEND ALLOW_AVX2 "x86_64" "AMD64")
-  if(${CMAKE_SYSTEM_PROCESSOR} IN_LIST ALLOW_AVX2) 
-    set_property( SOURCE ${LIB_SOURCES_STRATEGIES_AVX2} APPEND PROPERTY COMPILE_FLAGS "-mavx2 -mbmi -mpopcnt -mlzcnt -mbmi2" )
+  if(${CMAKE_SYSTEM_PROCESSOR} IN_LIST ALLOW_AVX2)
+    if(ENABLE_AVX2)
+      set_property( SOURCE ${LIB_SOURCES_STRATEGIES_AVX2} APPEND PROPERTY COMPILE_FLAGS "-mavx2 -mbmi -mpopcnt -mlzcnt -mbmi2" )
+    endif()
     set_property( SOURCE ${LIB_SOURCES_STRATEGIES_SSE41} APPEND PROPERTY COMPILE_FLAGS "-msse4.1" )
     set_property( SOURCE ${LIB_SOURCES_STRATEGIES_SSE42} APPEND PROPERTY COMPILE_FLAGS "-msse4.2" )
   endif()
