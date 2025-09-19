@@ -1253,6 +1253,116 @@ static uint64_t uvg_get_hadamard_avx2(int width, int height, const uvg_pixel* re
   return (sum >> 0);
 }
 
+static void uvg_get_hadamard_dual_avx2(int width, int height, const pred_buffer preds, const uvg_pixel* const orig, unsigned num_modes, unsigned* costs_out)
+{
+  int y = 0, x = 0;
+
+  const uvg_pixel* ref_in_ptr = orig;
+  const uvg_pixel* pred_in_ptr0 = preds[0];
+  const uvg_pixel* pred_in_ptr1 = preds[1];
+  const int ref_in_stride = width;
+  const int pred_in_stride = width;
+
+  costs_out[0] = 0;
+  costs_out[1] = 0;
+
+  if (width > height && (height & 7) == 0 && (width & 15) == 0)
+  {
+    for (y = 0; y < height; y += 8)
+    {
+      for (x = 0; x < width; x += 16)
+      {
+        costs_out[0] += hadamard_16x8_fw_avx2(&ref_in_ptr[x], &pred_in_ptr0[x], ref_in_stride, pred_in_stride);
+        costs_out[1] += hadamard_16x8_fw_avx2(&ref_in_ptr[x], &pred_in_ptr1[x], ref_in_stride, pred_in_stride);
+      }
+      ref_in_ptr += ref_in_stride * 8;
+      pred_in_ptr0 += pred_in_stride * 8;
+      pred_in_ptr1 += pred_in_stride * 8;
+    }
+  }
+  else if (width < height && (width & 7) == 0 && (height & 15) == 0)
+  {
+    for (y = 0; y < height; y += 16)
+    {
+      for (x = 0; x < width; x += 8)
+      {
+        costs_out[0] += hadamard_8x16_fw_avx2(&ref_in_ptr[x], &pred_in_ptr0[x], ref_in_stride, pred_in_stride);
+        costs_out[1] += hadamard_8x16_fw_avx2(&ref_in_ptr[x], &pred_in_ptr1[x], ref_in_stride, pred_in_stride);
+      }
+      ref_in_ptr += ref_in_stride * 16;
+      pred_in_ptr0 += pred_in_stride * 16;
+      pred_in_ptr1 += pred_in_stride * 16;
+    }
+  }
+  else if (width > height && (height & 3) == 0 && (width & 7) == 0)
+  {
+    for (y = 0; y < height; y += 4)
+    {
+      for (x = 0; x < width; x += 8)
+      {
+        costs_out[0] += hadamard_8x4_fw_avx2(&ref_in_ptr[x], &pred_in_ptr0[x], ref_in_stride, pred_in_stride);
+        costs_out[1] += hadamard_8x4_fw_avx2(&ref_in_ptr[x], &pred_in_ptr1[x], ref_in_stride, pred_in_stride);
+      }
+      ref_in_ptr += ref_in_stride * 4;
+      pred_in_ptr0 += pred_in_stride * 4;
+      pred_in_ptr1 += pred_in_stride * 4;
+    }
+  }
+  else if (width < height && (width & 3) == 0 && (height & 7) == 0)
+  {
+    for (y = 0; y < height; y += 8)
+    {
+      for (x = 0; x < width; x += 4)
+      {
+        costs_out[0] += hadamard_4x8_fw_avx2(&ref_in_ptr[x], &pred_in_ptr0[x], ref_in_stride, pred_in_stride);
+        costs_out[1] += hadamard_4x8_fw_avx2(&ref_in_ptr[x], &pred_in_ptr1[x], ref_in_stride, pred_in_stride);
+      }
+      ref_in_ptr += ref_in_stride * 8;
+      pred_in_ptr0 += pred_in_stride * 8;
+      pred_in_ptr1 += pred_in_stride * 8;
+    }
+  }
+  else if ((height % 8 == 0) && (width % 8 == 0))
+  {
+    for (y = 0; y < height; y += 8)
+    {
+      for (x = 0; x < width; x += 8)
+      {
+        costs_out[0] += satd_8x8_subblock_8bit_avx2(&ref_in_ptr[x], ref_in_stride, &pred_in_ptr0[x], pred_in_stride);
+        costs_out[1] += satd_8x8_subblock_8bit_avx2(&ref_in_ptr[x], ref_in_stride, &pred_in_ptr1[x], pred_in_stride);          
+      }
+      ref_in_ptr += 8 * ref_in_stride;
+      pred_in_ptr0 += 8 * pred_in_stride;
+      pred_in_ptr1 += 8 * pred_in_stride;
+    }
+  }
+  else if ((height % 4 == 0) && (width % 4 == 0))
+  {
+    // The 4x4 subblock is only called when block size is 4x4. Other functions handle larger sizes.
+    // Passing stride in this case is not needed.
+
+    costs_out[0] += hadamard_4x4_fw_avx2(&ref_in_ptr[x], &pred_in_ptr0[x], ref_in_stride, pred_in_stride);
+    costs_out[1] += hadamard_4x4_fw_avx2(&ref_in_ptr[x], &pred_in_ptr1[x], ref_in_stride, pred_in_stride);
+  }
+  else if ((height % 2 == 0) && (width % 2 == 0))
+  {
+    for (y = 0; y < height; y += 2)
+    {
+      for (x = 0; x < width; x += 2)
+      {
+        costs_out[0] += hadamard_2x2_fw_avx2(&ref_in_ptr[x], &pred_in_ptr0[x], ref_in_stride, pred_in_stride);
+        costs_out[1] += hadamard_2x2_fw_avx2(&ref_in_ptr[x], &pred_in_ptr1[x], ref_in_stride, pred_in_stride);
+      }
+      ref_in_ptr += 2 * ref_in_stride;
+      pred_in_ptr0 += 2 * pred_in_stride;
+      pred_in_ptr1 += 2 * pred_in_stride;
+    }
+  }
+  else {
+    assert(false && "Dual SATD: Unexpected block size.");
+  }
+}
+
 
 static unsigned pixels_calc_ssd_avx2(const uint8_t *const ref, const uint8_t *const rec,
                  const int ref_stride, const int rec_stride,
@@ -2353,6 +2463,7 @@ int uvg_strategy_register_picture_avx2(void* opaque, uint8_t bitdepth)
     success &= uvg_strategyselector_register(opaque, "satd_64x64_dual", "avx2", 40, &satd_8bit_64x64_dual_avx2);
     success &= uvg_strategyselector_register(opaque, "satd_any_size", "avx2", 40, &satd_any_size_8bit_avx2);
     success &= uvg_strategyselector_register(opaque, "satd_any_size_vtm", "avx2", 40, &uvg_get_hadamard_avx2);
+    success &= uvg_strategyselector_register(opaque, "satd_any_size_vtm_dual", "avx2", 40, &uvg_get_hadamard_dual_avx2);
     success &= uvg_strategyselector_register(opaque, "satd_any_size_quad", "avx2", 40, &satd_any_size_quad_avx2);
 
     success &= uvg_strategyselector_register(opaque, "pixels_calc_ssd", "avx2", 40, &pixels_calc_ssd_avx2);
