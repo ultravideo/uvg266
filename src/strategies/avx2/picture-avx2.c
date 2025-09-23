@@ -1339,10 +1339,7 @@ static void uvg_get_hadamard_dual_avx2(int width, int height, const pred_buffer 
   else if ((height % 4 == 0) && (width % 4 == 0))
   {
     // The 4x4 subblock is only called when block size is 4x4. Other functions handle larger sizes.
-    // Passing stride in this case is not needed.
-
-    costs_out[0] += hadamard_4x4_fw_avx2(&ref_in_ptr[x], &pred_in_ptr0[x], ref_in_stride, pred_in_stride);
-    costs_out[1] += hadamard_4x4_fw_avx2(&ref_in_ptr[x], &pred_in_ptr1[x], ref_in_stride, pred_in_stride);
+    satd_8bit_4x4_dual_avx2(preds, orig, num_modes, costs_out);
   }
   else if ((height % 2 == 0) && (width % 2 == 0))
   {
