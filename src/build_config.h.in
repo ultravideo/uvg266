@@ -57,4 +57,7 @@
 #define UVG_HAVE_X86_64_AVX       0
 #define UVG_HAVE_X86_64_AVX2      @UVG_HAVE_X86_64_AVX2@
 
+#define UVG_HAVE_ARM64            @UVG_HAVE_ARM64@
+#define UVG_HAVE_ARM_NEON         @UVG_HAVE_ARM_NEON@
+
 #endif // BUILD_CONFIG_H_

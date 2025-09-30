@@ -134,6 +134,32 @@ macro(uvg_maybe_enable_altivec)
 endmacro()
 
 ############################################################
+# AArch
+############################################################
+
+macro(uvg_check_have_arm64)
+  uvg_try_compile("${CMAKE_SOURCE_DIR}/cmake/checks/arch/have_arm64.c" "" UVG_HAVE_ARM64)
+endmacro()
+
+macro(uvg_check_have_neon)
+  set(UVG_CFLAGS_NEON "")
+  set(UVG_CXXFLAGS_NEON "")
+  uvg_try_compile("${CMAKE_SOURCE_DIR}/cmake/checks/arch/have_arm_neon.cpp" "${UVG_CXXFLAGS_NEON}" UVG_HAVE_ARM_NEON)
+endmacro()
+
+macro(uvg_maybe_enable_neon)
+  if(UVG_ENABLE_NEON)
+    message(STATUS "Detecting Neon support")
+    uvg_check_have_neon()
+    if(UVG_HAVE_ARM_NEON)
+      message(STATUS "Detecting Neon support - yes")
+    else()
+      message(STATUS "Detecting Neon support - no")
+    endif()
+  endif()
+endmacro()
+
+############################################################
 # Generic
 ############################################################
 
@@ -151,8 +177,12 @@ macro(uvg_detect_cpu_features)
   set(UVG_HAVE_POWERPC 0)
   set(UVG_HAVE_POWERPC_ALTIVEC 0)
 
+  set(UVG_HAVE_ARM64 0)
+  set(UVG_HAVE_ARM_NEON 0)
+
   uvg_check_have_x86_64()
   uvg_check_have_powerpc()
+  uvg_check_have_arm64()
 
   if(UVG_HAVE_X86_64)
     message(STATUS "Targeting x86-64")
@@ -163,5 +193,8 @@ macro(uvg_detect_cpu_features)
   elseif(UVG_HAVE_POWERPC)
     message(STATUS "Targeting PowerPC")
     uvg_maybe_enable_altivec()
+  elseif(UVG_HAVE_ARM64)
+    message(STATUS "Targeting Arm64")
+    uvg_maybe_enable_neon()
   endif()
 endmacro()

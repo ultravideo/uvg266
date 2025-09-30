@@ -585,6 +585,21 @@ static void set_hardware_flags(int32_t cpuid) {
   fprintf(stderr, "\n");
 #endif //UVG_HAVE_X86_64
 
+#if UVG_HAVE_ARM64
+  fprintf(stderr, "Compiled: Arm64, flags:");
+#if UVG_HAVE_ARM_NEON
+  fprintf(stderr, " NEON");
+#endif
+  fprintf(stderr, "\nDetected: Arm64, flags:");
+#if UVG_HAVE_ARM_NEON
+  // TODO: How to handle this? NEON is always supported on AArch64,
+  // so it technically doesn't need to be detected, but claiming that
+  // we detected it is not exactly true either.
+  fprintf(stderr, " NEON");
+#endif
+  fprintf(stderr, "\n");
+#endif
+
 #if UVG_HAVE_POWERPC
   if (cpuid) {
     uvg_g_hardware_flags.powerpc_flags.altivec = altivec_available();

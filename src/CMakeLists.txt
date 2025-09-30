@@ -109,6 +109,19 @@ if(UVG_HAVE_POWERPC_ALTIVEC)
   endforeach()
 endif()
 
+if(UVG_HAVE_ARM_NEON)
+  foreach(c_source
+  )
+    target_sources(libuvg266 PRIVATE ${c_source})
+    set_property(SOURCE ${c_source} APPEND_STRING PROPERTY COMPILE_FLAGS " ${UVG_CFLAGS_NEON} ${CFLAGS_NEON} $ENV{CFLAGS_NEON}")
+  endforeach()
+  foreach(cxx_source
+  )
+    target_sources(libuvg266 PRIVATE ${cxx_source})
+    set_property(SOURCE ${cxx_source} APPEND_STRING PROPERTY COMPILE_FLAGS " ${UVG_CXXFLAGS_NEON} ${CXXFLAGS_NEON} $ENV{CXXFLAGS_NEON}")
+  endforeach()
+endif()
+
 if(UVG_HAVE_X86_64_AVX2)
   foreach(source
     strategies/avx2/alf-avx2.c
