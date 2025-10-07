@@ -1227,6 +1227,94 @@ static uint64_t hadamard_8x4_fw_avx2(const uvg_pixel* ref, const uvg_pixel* pred
   return satd;
 }
 
+static void hadamard_8x4_fw_dual_avx2(const uvg_pixel* ref, const uvg_pixel* pred0, const uvg_pixel* pred1, const int stride, unsigned* costs_out)
+{
+  uint64_t satd0 = 0;
+  uint64_t satd1 = 0;
+
+  __m256i vdiff[4];
+  const __m128i vidx = _mm_set_epi64x(stride, 0);
+  
+  // Collect samples using gather, 2 rows at a time
+  __m128i vreftmp   = _mm_i64gather_epi64((const long long*)(ref   + (0 * stride)), vidx, 1);
+  __m128i vpred0tmp = _mm_i64gather_epi64((const long long*)(pred0 + (0 * stride)), vidx, 1);
+  __m128i vpred1tmp = _mm_i64gather_epi64((const long long*)(pred1 + (0 * stride)), vidx, 1);
+
+  __m256i vref = _mm256_cvtepu8_epi16(vreftmp);
+  __m256i vpred0 = _mm256_cvtepu8_epi16(vpred0tmp);
+  __m256i vpred1 = _mm256_cvtepu8_epi16(vpred1tmp);
+
+  __m256i vtmpdiff0 = _mm256_sub_epi16(vref, vpred0);
+  __m256i vtmpdiff1 = _mm256_sub_epi16(vref, vpred1);
+
+  // Arrange input so the low 128 bits hold pred 0 rows and the high 128 holds pred 1 rows.
+  vdiff[0] = _mm256_permute2x128_si256(vtmpdiff0, vtmpdiff1, 0x20);
+  vdiff[1] = _mm256_permute2x128_si256(vtmpdiff0, vtmpdiff1, 0x31);
+
+  vreftmp   = _mm_i64gather_epi64((const long long*)(ref   + (2 * stride)), vidx, 1);
+  vpred0tmp = _mm_i64gather_epi64((const long long*)(pred0 + (2 * stride)), vidx, 1);
+  vpred1tmp = _mm_i64gather_epi64((const long long*)(pred1 + (2 * stride)), vidx, 1);
+  
+  vref = _mm256_cvtepu8_epi16(vreftmp);
+  vpred0 = _mm256_cvtepu8_epi16(vpred0tmp);
+  vpred1 = _mm256_cvtepu8_epi16(vpred1tmp);
+  
+  vtmpdiff0 = _mm256_sub_epi16(vref, vpred0);
+  vtmpdiff1 = _mm256_sub_epi16(vref, vpred1);
+
+  vdiff[2] = _mm256_permute2x128_si256(vtmpdiff0, vtmpdiff1, 0x20);
+  vdiff[3] = _mm256_permute2x128_si256(vtmpdiff0, vtmpdiff1, 0x31);
+  
+  
+  __m256i vtmp0[4];
+  __m256i vtmp1[4];
+
+  // Horizontal
+  hadd_hsub_w8_dual_avx2(vtmp0, vdiff, 0, 1, 0, 1);
+  hadd_hsub_w8_dual_avx2(vtmp0, vdiff, 2, 3, 2, 3);
+
+  hadd_hsub_w8_dual_avx2(vtmp1, vtmp0, 0, 1, 0, 1);
+  hadd_hsub_w8_dual_avx2(vtmp1, vtmp0, 2, 3, 2, 3);
+
+  hadd_hsub_w8_dual_avx2(vdiff, vtmp1, 0, 1, 0, 1);
+  hadd_hsub_w8_dual_avx2(vdiff, vtmp1, 2, 3, 2, 3);
+
+  // Vertical
+  hadd_hsub_w8_dual_avx2(vtmp0, vdiff, 0, 1, 0, 1);
+  hadd_hsub_w8_dual_avx2(vtmp0, vdiff, 2, 3, 2, 3);
+
+  add_sub_w8_dual_avx2(vdiff, vtmp0, 0, 1, 0, 2);
+  add_sub_w8_dual_avx2(vdiff, vtmp0, 2, 3, 1, 3);
+
+  // Calculate sum
+  __m256i vsum = _mm256_setzero_si256();
+  int16_t dc0 = abs(_mm256_extract_epi16(vdiff[0], 0));
+  int16_t dc1 = abs(_mm256_extract_epi16(vdiff[0], 8));
+  for (int i = 0; i < 4; ++i) {
+    vsum = _mm256_add_epi16(vsum, _mm256_abs_epi16(vdiff[i]));
+  }
+
+  // Do the final adds horizontally
+  vsum = _mm256_hadd_epi16(vsum, vsum); // 01 23 45 67 xx xx xx xx
+  vsum = _mm256_hadd_epi16(vsum, vsum); // 0123 4567 xxxx xxxx xxxx xxxx xxxx xxxx
+  vsum = _mm256_hadd_epi16(vsum, vsum); // 01234567 xxxxxxxx ...
+
+  satd0 = (uint64_t)_mm256_extract_epi16(vsum, 0);
+
+  satd0 -= abs(dc0);
+  satd0 += abs(dc0) >> 2;
+  satd0 = (int)(satd0 / sqrt(8.0 * 4) * 2);
+
+  satd1 = (uint64_t)_mm256_extract_epi16(vsum, 8);
+
+  satd1 -= abs(dc1);
+  satd1 += abs(dc1) >> 2;
+  satd1 = (int)(satd1 / sqrt(8.0 * 4) * 2);
+
+  costs_out[0] += satd0;
+  costs_out[1] += satd1;
+}
+
 static INLINE void hor_transform_row_w4_avx2(__m128i* row) {
 
   __m128i vpos = _mm_set1_epi16(1);
@@ -1337,6 +1425,108 @@ static uint64_t hadamard_4x8_fw_avx2(const uvg_pixel* ref, const uvg_pixel* pred
   satd = (int)(satd / sqrt(4.0 * 8) * 2);
 
   return satd;
+}
+
+static void hadamard_4x8_fw_dual_avx2(const uvg_pixel* ref, const uvg_pixel* pred0, const uvg_pixel* pred1, const int stride, unsigned* costs_out)
+{
+  uint64_t satd0 = 0;
+  uint64_t satd1 = 0;
+
+  __m256i vdiff[4];
+
+  // Load four rows at a time using gather
+  __m128i vidx = _mm_setr_epi32(0 * stride, 1 * stride, 2 * stride, 3 * stride);
+
+  __m128i vref   = _mm_i32gather_epi32((int*)(ref   + (0 * stride)), vidx, 1);
+  __m128i vpred0 = _mm_i32gather_epi32((int*)(pred0 + (0 * stride)), vidx, 1);
+  __m128i vpred1 = _mm_i32gather_epi32((int*)(pred1 + (0 * stride)), vidx, 1);
+  
+  // Extend to 16-bits
+  __m256i vtmpref  = _mm256_cvtepu8_epi16(vref);
+  __m256i vtmppred0 = _mm256_cvtepu8_epi16(vpred0);
+  __m256i vtmppred1 = _mm256_cvtepu8_epi16(vpred1);
+
+  __m256i vtmpdiff0 = _mm256_sub_epi16(vtmpref, vtmppred0);
+  __m256i vtmpdiff1 = _mm256_sub_epi16(vtmpref, vtmppred1);
+
+  // Arrange diff0 and diff1 to low and high halves, respectively
+  vdiff[0] = _mm256_permute2x128_si256(vtmpdiff0, vtmpdiff1, 0x20);
+  vdiff[1] = _mm256_permute2x128_si256(vtmpdiff0, vtmpdiff1, 0x31);
+
+  // Same operations for the remaining rows
+  vref   = _mm_i32gather_epi32((int*)(ref   + (4 * stride)), vidx, 1);
+  vpred0 = _mm_i32gather_epi32((int*)(pred0 + (4 * stride)), vidx, 1);
+  vpred1 = _mm_i32gather_epi32((int*)(pred1 + (4 * stride)), vidx, 1);
+
+  vtmpref = _mm256_cvtepu8_epi16(vref);
+  vtmppred0 = _mm256_cvtepu8_epi16(vpred0);
+  vtmppred1 = _mm256_cvtepu8_epi16(vpred1);
+
+  vtmpdiff0 = _mm256_sub_epi16(vtmpref, vtmppred0);
+  vtmpdiff1 = _mm256_sub_epi16(vtmpref, vtmppred1);
+
+  vdiff[2] = _mm256_permute2x128_si256(vtmpdiff0, vtmpdiff1, 0x20);
+  vdiff[3] = _mm256_permute2x128_si256(vtmpdiff0, vtmpdiff1, 0x31);
+  
+  // Horizontal
+  __m256i vtmp0[4];
+  __m256i vtmp1[4];
+
+  vtmp0[0] = _mm256_hadd_epi16(vdiff[0], vdiff[1]);
+  vtmp0[1] = _mm256_hsub_epi16(vdiff[0], vdiff[1]);
+  vtmp0[2] = _mm256_hadd_epi16(vdiff[2], vdiff[3]);
+  vtmp0[3] = _mm256_hsub_epi16(vdiff[2], vdiff[3]);
+
+  vdiff[0] = _mm256_hadd_epi16(vtmp0[0], vtmp0[1]);
+  vdiff[1] = _mm256_hsub_epi16(vtmp0[0], vtmp0[1]);
+  vdiff[2] = _mm256_hadd_epi16(vtmp0[2], vtmp0[3]);
+  vdiff[3] = _mm256_hsub_epi16(vtmp0[2], vtmp0[3]);
+
+  // Vertical
+  vtmp0[0] = _mm256_hadd_epi16(vdiff[0], vdiff[1]);
+  vtmp0[1] = _mm256_hsub_epi16(vdiff[0], vdiff[1]);
+  vtmp0[2] = _mm256_hadd_epi16(vdiff[2], vdiff[3]);
+  vtmp0[3] = _mm256_hsub_epi16(vdiff[2], vdiff[3]);
+
+  vtmp1[0] = _mm256_hadd_epi16(vtmp0[0], vtmp0[1]);
+  vtmp1[1] = _mm256_hsub_epi16(vtmp0[0], vtmp0[1]);
+  vtmp1[2] = _mm256_hadd_epi16(vtmp0[2], vtmp0[3]);
+  vtmp1[3] = _mm256_hsub_epi16(vtmp0[2], vtmp0[3]);
+
+  vdiff[0] = _mm256_add_epi16(vtmp1[0], vtmp1[2]);
+  vdiff[1] = _mm256_sub_epi16(vtmp1[0], vtmp1[2]);
+  vdiff[2] = _mm256_add_epi16(vtmp1[1], vtmp1[3]);
+  vdiff[3] = _mm256_sub_epi16(vtmp1[1], vtmp1[3]);
+
+
+  // Calculate sum
+  int16_t dc0 = abs(_mm256_extract_epi16(vdiff[0], 0));
+  int16_t dc1 = abs(_mm256_extract_epi16(vdiff[0], 8));
+  
+  __m256i vtmpsum0 = _mm256_add_epi16(_mm256_abs_epi16(vdiff[0]), _mm256_abs_epi16(vdiff[1]));
+  __m256i vtmpsum1 = _mm256_add_epi16(_mm256_abs_epi16(vdiff[2]), _mm256_abs_epi16(vdiff[3]));
+
+  __m256i vsum = _mm256_add_epi16(vtmpsum0, vtmpsum1);
+
+  // Do the final adds horizontally
+  vsum = _mm256_hadd_epi16(vsum, vsum); // 01 23 45 67 xx xx xx xx | 89 ab cd ef xx xx xx xx
+  vsum = _mm256_hadd_epi16(vsum, vsum); // 0123 4567 xxxx xxxx ... | 89ab cdef xxxx xxxx ...
+  vsum = _mm256_hadd_epi16(vsum, vsum); // 01234567 xxxxxxxx ... | 89abcdef xxxxxxxx ...
+
+  satd0 = (uint64_t)_mm256_extract_epi16(vsum, 0);
+
+  satd0 -= abs(dc0);
+  satd0 += abs(dc0) >> 2;
+  satd0 = (int)(satd0 / sqrt(4.0 * 8) * 2);
+
+  satd1 = (uint64_t)_mm256_extract_epi16(vsum, 8);
+
+  satd1 -= abs(dc1);
+  satd1 += abs(dc1) >> 2;
+  satd1 = (int)(satd1 / sqrt(4.0 * 8) * 2);
+
+  costs_out[0] += satd0;
+  costs_out[1] += satd1;
 }
 
 static INLINE void ver_transform_block_4x4_avx2(__m128i (*rows)[2])
@@ -1571,8 +1761,7 @@ static void uvg_get_hadamard_dual_avx2(int width, int height, const pred_buffer 
     {
       for (x = 0; x < width; x += 8)
       {
-        costs_out[0] += hadamard_8x4_fw_avx2(&ref_in_ptr[x], &pred_in_ptr0[x], ref_in_stride, pred_in_stride);
-        costs_out[1] += hadamard_8x4_fw_avx2(&ref_in_ptr[x], &pred_in_ptr1[x], ref_in_stride, pred_in_stride);
+        hadamard_8x4_fw_dual_avx2((ref_in_ptr + x), (pred_in_ptr0 + x), (pred_in_ptr1 + x), width, costs_out);
       }
       ref_in_ptr += ref_in_stride * 4;
       pred_in_ptr0 += pred_in_stride * 4;
@@ -1585,8 +1774,7 @@ static void uvg_get_hadamard_dual_avx2(int width, int height, const pred_buffer 
     {
       for (x = 0; x < width; x += 4)
       {
-        costs_out[0] += hadamard_4x8_fw_avx2(&ref_in_ptr[x], &pred_in_ptr0[x], ref_in_stride, pred_in_stride);
-        costs_out[1] += hadamard_4x8_fw_avx2(&ref_in_ptr[x], &pred_in_ptr1[x], ref_in_stride, pred_in_stride);
+        hadamard_4x8_fw_dual_avx2((ref_in_ptr + x), (pred_in_ptr0 + x), (pred_in_ptr1 + x), width, costs_out);
       }
       ref_in_ptr += ref_in_stride * 8;
       pred_in_ptr0 += pred_in_stride * 8;
