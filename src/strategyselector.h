@@ -110,6 +110,7 @@ int uvg_strategyselector_register(void *const opaque, const char *const type, co
 #include "strategies/strategies-encode.h"
 #include "strategies/strategies-depquant.h"
 #include "strategies/strategies-alf.h"
+#include "strategies/strategies-transpose.h"
 
 static const strategy_to_select_t strategies_to_select[] = {
   STRATEGIES_NAL_EXPORTS
@@ -122,6 +123,7 @@ static const strategy_to_select_t strategies_to_select[] = {
   STRATEGIES_ENCODE_EXPORTS
   STRATEGIES_ALF_EXPORTS
   STRATEGIES_DEPQUANT_EXPORTS
+  STRATEGIES_TRANSPOSE_EXPORTS
   { NULL, NULL },
 };
 

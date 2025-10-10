@@ -82,6 +82,7 @@ add_library(libuvg266 OBJECT
   strategies/strategies-picture.c
   strategies/strategies-quant.c
   strategies/strategies-sao.c
+  strategies/strategies-transpose.c
 )
 
 foreach(source
@@ -95,6 +96,7 @@ foreach(source
   strategies/generic/picture-generic.c
   strategies/generic/quant-generic.c
   strategies/generic/sao-generic.c
+  strategies/generic/transpose-generic.c
 )
   target_sources(libuvg266 PRIVATE ${source})
   set_property(SOURCE ${source} APPEND_STRING PROPERTY COMPILE_FLAGS " ${UVG_CFLAGS_GENERIC} ${CFLAGS_GENERIC} $ENV{CFLAGS_GENERIC}")
