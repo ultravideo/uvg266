@@ -1787,8 +1787,11 @@ static void uvg_get_hadamard_dual_avx2(int width, int height, const pred_buffer 
     {
       for (x = 0; x < width; x += 8)
       {
-        costs_out[0] += satd_8x8_subblock_8bit_avx2(&ref_in_ptr[x], ref_in_stride, &pred_in_ptr0[x], pred_in_stride);
-        costs_out[1] += satd_8x8_subblock_8bit_avx2(&ref_in_ptr[x], ref_in_stride, &pred_in_ptr1[x], pred_in_stride);          
+        unsigned sum0 = 0;
+        unsigned sum1 = 0;
+        uvg_satd_8bit_8x8_general_dual_avx2((pred_in_ptr0 + x), width, (pred_in_ptr1 + x), width, (ref_in_ptr + x), width, &sum0, &sum1);
+        costs_out[0] += sum0;
+        costs_out[1] += sum1;
       }
       ref_in_ptr += 8 * ref_in_stride;
       pred_in_ptr0 += 8 * pred_in_stride;
