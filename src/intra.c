@@ -1512,8 +1512,8 @@ int uvg_get_isp_split_num(const int width, const int height, const int split_typ
 void uvg_get_isp_split_loc(cu_loc_t *loc, const int x, const int y, const int block_w, const int block_h, int split_idx, const int split_type, const bool is_transform_split)
 {
   // Check for illegal splits
-  assert(!(block_w == 4 && block_h == 4) || split_idx == 0 && "Trying to get ISP split CU when split is not allowed.");
-  assert(!((block_w * block_h) <= 16) || split_idx < 2 && "Split index for small blocks must be in [0, 1]");
+  assert((!(block_w == 4 && block_h == 4) || split_idx == 0) && "Trying to get ISP split CU when split is not allowed.");
+  assert((!((block_w * block_h) <= 16) || split_idx < 2) && "Split index for small blocks must be in [0, 1]");
   assert((split_idx >= 0 && split_idx <= 3) && "ISP split index must be in [0, 3].");
   assert((split_type != ISP_MODE_NO_ISP || split_idx == 0) && "Trying to ISP split when split type = NO_ISP.");
   int part_dim = block_w;
