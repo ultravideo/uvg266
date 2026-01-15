@@ -354,44 +354,6 @@ const int16_t uvg_g_dct_64_t[64][64] =
  * \returns TODO
  */
 
- // Fast DST Algorithm. Full matrix multiplication for DST and Fast DST algorithm
- // gives identical results
-static void fast_forward_dst_4_generic(const short* block, short* coeff, int32_t shift)  // input block, output coeff
-{
-  int32_t i, c[4];
-  int32_t rnd_factor = 1 << (shift - 1);
-  for (i = 0; i < 4; i++) {
-    // int32_termediate Variables
-    c[0] = block[4 * i + 0] + block[4 * i + 3];
-    c[1] = block[4 * i + 1] + block[4 * i + 3];
-    c[2] = block[4 * i + 0] - block[4 * i + 1];
-    c[3] = 74 * block[4 * i + 2];
-
-    coeff[i] = (short)((29 * c[0] + 55 * c[1] + c[3] + rnd_factor) >> shift);
-    coeff[4 + i] = (short)((74 * (block[4 * i + 0] + block[4 * i + 1] - block[4 * i + 3]) + rnd_factor) >> shift);
-    coeff[8 + i] = (short)((29 * c[2] + 55 * c[0] - c[3] + rnd_factor) >> shift);
-    coeff[12 + i] = (short)((55 * c[2] - 29 * c[1] + c[3] + rnd_factor) >> shift);
-  }
-}
-
-static void fast_inverse_dst_4_generic(const short* tmp, short* block, int shift)  // input tmp, output block
-{
-  int i, c[4];
-  int rnd_factor = 1 << (shift - 1);
-  for (i = 0; i < 4; i++) {
-    // Intermediate Variables
-    c[0] = tmp[i] + tmp[8 + i];
-    c[1] = tmp[8 + i] + tmp[12 + i];
-    c[2] = tmp[i] - tmp[12 + i];
-    c[3] = 74 * tmp[4 + i];
-
-    block[4 * i + 0] = (short)CLIP(-32768, 32767, (29 * c[0] + 55 * c[1] + c[3] + rnd_factor) >> shift);
-    block[4 * i + 1] = (short)CLIP(-32768, 32767, (55 * c[2] - 29 * c[1] + c[3] + rnd_factor) >> shift);
-    block[4 * i + 2] = (short)CLIP(-32768, 32767, (74 * (tmp[i] - tmp[8 + i] + tmp[12 + i]) + rnd_factor) >> shift);
-    block[4 * i + 3] = (short)CLIP(-32768, 32767, (55 * c[0] + 29 * c[2] - c[3] + rnd_factor) >> shift);
-  }
-}
-
 
 static void partial_butterfly_4_generic(const short* src, short* dst,
   int32_t shift)
@@ -748,26 +710,6 @@ IDCT_NXN_GENERIC(4);
 IDCT_NXN_GENERIC(8);
 IDCT_NXN_GENERIC(16);
 IDCT_NXN_GENERIC(32);
-
-static void fast_forward_dst_4x4_generic(int8_t bitdepth, const int16_t* input, int16_t* output)
-{
-  int16_t tmp[4 * 4];
-  int32_t shift_1st = uvg_g_convert_to_bit[4] + 1 + (bitdepth - 8);
-  int32_t shift_2nd = uvg_g_convert_to_bit[4] + 8;
-
-  fast_forward_dst_4_generic(input, tmp, shift_1st);
-  fast_forward_dst_4_generic(tmp, output, shift_2nd);
-}
-
-static void fast_inverse_dst_4x4_generic(int8_t bitdepth, const int16_t* input, int16_t* output)
-{
-  int16_t tmp[4 * 4];
-  int32_t shift_1st = 7;
-  int32_t shift_2nd = 12 - (bitdepth - 8);
-
-  fast_inverse_dst_4_generic(input, tmp, shift_1st);
-  fast_inverse_dst_4_generic(tmp, output, shift_2nd);
-}
 
 
 // DCT-2
@@ -2368,116 +2310,6 @@ static void fastInverseDST7_B8(const int16_t *src, int16_t *dst, int32_t shift, 
 }
 
 
-
-
-
-#define DCT_MTS_NXN_GENERIC(t, n) \
-static void fastForward ## t ## _B ## n (const int16_t *src, int16_t *dst, int32_t shift, int line, int skip_line, int skip_line2) {\
-\
-  const int tr_size = n;\
-  const int32_t rnd_factor = 1 << (shift - 1);\
-  const int reduced_line = line - skip_line;\
-  const int cutoff = tr_size - skip_line2;\
-  int16_t *p_coef;\
-\
-  for (int i = 0; i < reduced_line; i++) \
-  {\
-    p_coef = dst;\
-    const int16_t* iT = uvg_g_ ## t ## P ## n ;\
-    for (int j = 0; j < cutoff; j++) \
-    {\
-      int32_t sum = 0;\
-      for (int k = 0; k < tr_size ; k++) \
-      {\
-        sum += src[k] * iT[k];\
-      }\
-      p_coef[i] = (sum + rnd_factor) >> shift;\
-      p_coef += line;\
-      iT += tr_size;\
-    }\
-    src += tr_size;\
-  }\
-  if (skip_line) {\
-    p_coef = dst + reduced_line;\
-    for (int32_t j = 0; j < cutoff; j++) {\
-      memset(p_coef, 0, sizeof(int16_t) * skip_line);\
-      p_coef += line;\
-    }\
-  }\
-  if (skip_line2) {\
-    p_coef = dst + line * cutoff;\
-    memset(p_coef, 0, sizeof(int32_t) * line * skip_line2);\
-  }\
-}
-
-#define IDCT_MTS_NXN_GENERIC(t, n) \
-static void fastInverse ## t ## _B ## n (const int16_t *src, int16_t *dst, int32_t shift, int line, int skip_line, int skip_line2) {\
-\
-  const int tr_size = n;\
-  const int32_t rnd_factor = 1 << (shift - 1);\
-  const int reduced_line = line - skip_line;\
-  const int cutoff = tr_size - skip_line2;\
-  const int16_t* iT = uvg_g_ ## t ## P ## n ;\
-\
-  for (int i = 0; i < reduced_line; i++)\
-  {\
-    for (int j = 0; j < tr_size; j++)\
-    {\
-      int32_t sum = 0;\
-      for (int k = 0; k < cutoff; k++)\
-      {\
-        sum += src[k * line + i] * iT[k * tr_size + j];\
-      }\
-      dst[i * tr_size + j] = (short)CLIP(-32768, 32767, (sum + rnd_factor) >> shift);\
-    }\
-  }\
-\
-  if (skip_line)\
-  {\
-    memset(dst + (reduced_line * tr_size), 0, (skip_line * tr_size) * sizeof(int16_t));\
-  }\
-}
-
-
-// DCT 8
-//IDCT_MTS_NXN_GENERIC(DCT8, 8);
-//IDCT_MTS_NXN_GENERIC(DCT8, 16);
-//IDCT_MTS_NXN_GENERIC(DCT8, 32);
-
-//DCT_MTS_NXN_GENERIC(DCT8, 8);
-//DCT_MTS_NXN_GENERIC(DCT8, 16);
-//DCT_MTS_NXN_GENERIC(DCT8, 32);
-/*
-// DCT 5
-IDCT_MTS_NXN_GENERIC(DCT5, 4);
-IDCT_MTS_NXN_GENERIC(DCT5, 8);
-IDCT_MTS_NXN_GENERIC(DCT5, 16);
-IDCT_MTS_NXN_GENERIC(DCT5, 32);
-
-DCT_MTS_NXN_GENERIC(DCT5, 4);
-DCT_MTS_NXN_GENERIC(DCT5, 8);
-DCT_MTS_NXN_GENERIC(DCT5, 16);
-DCT_MTS_NXN_GENERIC(DCT5, 32);
-
-// DST 1
-IDCT_MTS_NXN_GENERIC(DST1, 8);
-IDCT_MTS_NXN_GENERIC(DST1, 16);
-IDCT_MTS_NXN_GENERIC(DST1, 32);
-
-DCT_MTS_NXN_GENERIC(DST1, 8);
-DCT_MTS_NXN_GENERIC(DST1, 16);
-DCT_MTS_NXN_GENERIC(DST1, 32);
-*/
-// DST 7
-//IDCT_MTS_NXN_GENERIC(DST7, 8);
-//IDCT_MTS_NXN_GENERIC(DST7, 16);
-//IDCT_MTS_NXN_GENERIC(DST7, 32);
-
-//DCT_MTS_NXN_GENERIC(DST7, 8);
-//DCT_MTS_NXN_GENERIC(DST7, 16);
-//DCT_MTS_NXN_GENERIC(DST7, 32);
-
-
 typedef void partial_tr_func(const int16_t*, int16_t*, int32_t, int, int, int);
 
 // ToDo: Enable MTS 2x2 and 64x64 transforms
@@ -2572,48 +2404,40 @@ void uvg_mts_dct_generic(
 
   uvg_get_tr_type(width, height, color, tu, &type_hor, &type_ver, mts_type);
 
-  if (type_hor == DCT2 && type_ver == DCT2 && !tu->lfnst_idx && !tu->cr_lfnst_idx && width == height)
-  {
-    dct_func *dct_func = uvg_get_dct_func(width, height, color, tu->type);
-    dct_func(bitdepth, input, output);
-  }
-  else
-  {
-    int skip_width = (type_hor != DCT2 && width == 32) ? 16 : (width > 32 ? width - 32 : 0);
-    int skip_height = (type_ver != DCT2 && height == 32) ? 16 : (height > 32 ? height - 32 : 0);
-    const int log2_width_minus1  = uvg_g_convert_to_log2[width] - 1;
-    const int log2_height_minus1 = uvg_g_convert_to_log2[height] - 1;
-    //const int log2_width_minus2 = uvg_g_convert_to_bit[width];
-    //const int log2_height_minus2 = uvg_g_convert_to_bit[height];
+  int skip_width = (type_hor != DCT2 && width == 32) ? 16 : (width > 32 ? width - 32 : 0);
+  int skip_height = (type_ver != DCT2 && height == 32) ? 16 : (height > 32 ? height - 32 : 0);
+  const int log2_width_minus1  = uvg_g_convert_to_log2[width] - 1;
+  const int log2_height_minus1 = uvg_g_convert_to_log2[height] - 1;
+  //const int log2_width_minus2 = uvg_g_convert_to_bit[width];
+  //const int log2_height_minus2 = uvg_g_convert_to_bit[height];
 
-    if((tu->lfnst_idx && color == COLOR_Y) || (tu->cr_lfnst_idx && color != COLOR_Y)) {
-      if ((width == 4 && height > 4) || (width > 4 && height == 4))
-      {
-        skip_width = width - 4;
-        skip_height = height - 4;
-      }
-      else if ((width >= 8 && height >= 8))
-      {
-        skip_width = width - 8;
-        skip_height = height - 8;
-      }
+  if((tu->lfnst_idx && color == COLOR_Y) || (tu->cr_lfnst_idx && color != COLOR_Y)) {
+    if ((width == 4 && height > 4) || (width > 4 && height == 4))
+    {
+      skip_width = width - 4;
+      skip_height = height - 4;
     }
+    else if ((width >= 8 && height >= 8))
+    {
+      skip_width = width - 8;
+      skip_height = height - 8;
+    }
+  }
 
-    partial_tr_func* dct_hor = width != 1 ? dct_table[type_hor][log2_width_minus1] : NULL;
-    partial_tr_func* dct_ver = height != 1 ? dct_table[type_ver][log2_height_minus1] : NULL;
+  partial_tr_func* dct_hor = width != 1 ? dct_table[type_hor][log2_width_minus1] : NULL;
+  partial_tr_func* dct_ver = height != 1 ? dct_table[type_ver][log2_height_minus1] : NULL;
 
-    int16_t tmp[32 * 32];
-    const int32_t shift_1st = log2_width_minus1 + bitdepth - 8;
-    const int32_t shift_2nd = log2_height_minus1 + 7;
-    if (height == 1) {
-      dct_hor(input, output, shift_1st, height, 0, skip_width);
-    } else if (width == 1) {
-      // The shift value is taken from VTM, it's a special case for width == 1
-      dct_ver(input, output, log2_height_minus1 + 1 + bitdepth + 6 - 15, width, 0, skip_height);
-    } else {
-      dct_hor(input, tmp, shift_1st, height, 0, skip_width);
-      dct_ver(tmp, output, shift_2nd, width, skip_width, skip_height);
-    }    
+  int16_t tmp[32 * 32];
+  const int32_t shift_1st = log2_width_minus1 + bitdepth - 8;
+  const int32_t shift_2nd = log2_height_minus1 + 7;
+  if (height == 1) {
+    dct_hor(input, output, shift_1st, height, 0, skip_width);
+  } else if (width == 1) {
+    // The shift value is taken from VTM, it's a special case for width == 1
+    dct_ver(input, output, log2_height_minus1 + 1 + bitdepth + 6 - 15, width, 0, skip_height);
+  } else {
+    dct_hor(input, tmp, shift_1st, height, 0, skip_width);
+    dct_ver(tmp, output, shift_2nd, width, skip_width, skip_height);
   }
 }
 
@@ -2633,47 +2457,39 @@ void uvg_mts_idct_generic(
 
   uvg_get_tr_type(width, height, color, tu, &type_hor, &type_ver, mts_type);
 
-  if (type_hor == DCT2 && type_ver == DCT2 && !tu->lfnst_idx && !tu->cr_lfnst_idx && width == height)
-  {
-    dct_func *idct_func = uvg_get_idct_func(width, height, color, tu->type);
-    idct_func(bitdepth, input, output);
+  int skip_width = (type_hor != DCT2 && width == 32) ? 16 : width > 32 ? width - 32 : 0;
+  int skip_height = (type_ver != DCT2 && height == 32) ? 16 : height > 32 ? height - 32 : 0;
+  const int log2_width_minus1  = uvg_g_convert_to_log2[width] - 1;
+  const int log2_height_minus1 = uvg_g_convert_to_log2[height] - 1;
+
+  if ((tu->lfnst_idx && color == COLOR_Y) || (tu->cr_lfnst_idx && color != COLOR_Y)) {
+    if ((width == 4 && height > 4) || (width > 4 && height == 4)) {
+      skip_width = width - 4;
+      skip_height = height - 4;
+    }
+    else if ((width >= 8 && height >= 8)) {
+      skip_width = width - 8;
+      skip_height = height - 8;
+    }
   }
-  else
-  {
-    int skip_width = (type_hor != DCT2 && width == 32) ? 16 : width > 32 ? width - 32 : 0;
-    int skip_height = (type_ver != DCT2 && height == 32) ? 16 : height > 32 ? height - 32 : 0;
-    const int log2_width_minus1  = uvg_g_convert_to_log2[width] - 1;
-    const int log2_height_minus1 = uvg_g_convert_to_log2[height] - 1;
 
-    if ((tu->lfnst_idx && color == COLOR_Y) || (tu->cr_lfnst_idx && color != COLOR_Y)) {
-      if ((width == 4 && height > 4) || (width > 4 && height == 4)) {
-        skip_width = width - 4;
-        skip_height = height - 4;
-      }
-      else if ((width >= 8 && height >= 8)) {
-        skip_width = width - 8;
-        skip_height = height - 8;
-      }
-    }
+  partial_tr_func* idct_hor = width != 1 ? idct_table[type_hor][log2_width_minus1] : NULL;
+  partial_tr_func* idct_ver = height != 1 ? idct_table[type_ver][log2_height_minus1] : NULL;
 
-    partial_tr_func* idct_hor = width != 1 ? idct_table[type_hor][log2_width_minus1] : NULL;
-    partial_tr_func* idct_ver = height != 1 ? idct_table[type_ver][log2_height_minus1] : NULL;
+  int16_t tmp[32 * 32];
+  const int max_log2_tr_dynamic_range = 15;
+  const int transform_matrix_shift = 6;
 
-    int16_t tmp[32 * 32];
-    const int max_log2_tr_dynamic_range = 15;
-    const int transform_matrix_shift = 6;
+  const int32_t shift_1st = transform_matrix_shift + 1;
+  const int32_t shift_2nd = (transform_matrix_shift + max_log2_tr_dynamic_range - 1) - bitdepth;
 
-    const int32_t shift_1st = transform_matrix_shift + 1;
-    const int32_t shift_2nd = (transform_matrix_shift + max_log2_tr_dynamic_range - 1) - bitdepth;
-
-    if (height == 1) {
-      idct_hor(input, output, shift_2nd + 1, height, 0, skip_width);
-    } else if (width == 1) {
-      idct_ver(input, output, shift_2nd + 1, width, 0, skip_height);
-    } else {
-      idct_ver(input, tmp, shift_1st, width, skip_width, skip_height);
-      idct_hor(tmp, output, shift_2nd, height, 0, skip_width);
-    }
+  if (height == 1) {
+    idct_hor(input, output, shift_2nd + 1, height, 0, skip_width);
+  } else if (width == 1) {
+    idct_ver(input, output, shift_2nd + 1, width, 0, skip_height);
+  } else {
+    idct_ver(input, tmp, shift_1st, width, skip_width, skip_height);
+    idct_hor(tmp, output, shift_2nd, height, 0, skip_width);
   }
 }
 
@@ -2681,24 +2497,15 @@ void uvg_mts_idct_generic(
 int uvg_strategy_register_dct_generic(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
-
-  success &= uvg_strategyselector_register(opaque, "fast_forward_dst_4x4", "generic", 0, &fast_forward_dst_4x4_generic);
-
   success &= uvg_strategyselector_register(opaque, "dct_4x4", "generic", 0, &uvg_dct_4x4_generic);
   success &= uvg_strategyselector_register(opaque, "dct_8x8", "generic", 0, &uvg_dct_8x8_generic);
   success &= uvg_strategyselector_register(opaque, "dct_16x16", "generic", 0, &uvg_dct_16x16_generic);
   success &= uvg_strategyselector_register(opaque, "dct_32x32", "generic", 0, &uvg_dct_32x32_generic);
-  //success &= uvg_strategyselector_register(opaque, "dct_non_square", "generic", 0, &dct_non_square_generic);
-
-  success &= uvg_strategyselector_register(opaque, "fast_inverse_dst_4x4", "generic", 0, &fast_inverse_dst_4x4_generic);
-
   success &= uvg_strategyselector_register(opaque, "idct_4x4", "generic", 0, &uvg_idct_4x4_generic);
   success &= uvg_strategyselector_register(opaque, "idct_8x8", "generic", 0, &uvg_idct_8x8_generic);
   success &= uvg_strategyselector_register(opaque, "idct_16x16", "generic", 0, &uvg_idct_16x16_generic);
   success &= uvg_strategyselector_register(opaque, "idct_32x32", "generic", 0, &uvg_idct_32x32_generic);
-
   success &= uvg_strategyselector_register(opaque, "mts_dct", "generic", 0, &uvg_mts_dct_generic);
   success &= uvg_strategyselector_register(opaque, "mts_idct", "generic", 0, &uvg_mts_idct_generic);
-
   return success;
 }

@@ -424,12 +424,10 @@ SUITE(speed_tests)
         RUN_TEST(inter_sad);
       }
 
-    } else if (strncmp(strategy->type, "dct_", 4) == 0 ||
-               strcmp(strategy->type, "fast_forward_dst_4x4") == 0)
+    } else if (strncmp(strategy->type, "dct_", 4) == 0)
     {
       RUN_TEST(fdct);
-    } else if (strncmp(strategy->type, "idct_", 4) == 0 ||
-               strcmp(strategy->type, "fast_inverse_dst_4x4") == 0)
+    } else if (strncmp(strategy->type, "idct_", 5) == 0)
     {
       RUN_TEST(idct);
     }

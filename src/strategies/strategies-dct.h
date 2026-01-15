@@ -45,15 +45,11 @@ typedef void (dct_func)(int8_t bitdepth, const int16_t *input, int16_t *output);
 
 
 // Declare function pointers.
-extern dct_func * uvg_fast_forward_dst_4x4;
 
 extern dct_func * uvg_dct_4x4;
 extern dct_func * uvg_dct_8x8;
 extern dct_func * uvg_dct_16x16;
 extern dct_func * uvg_dct_32x32;
-extern dct_func * uvg_dct_non_square;
-
-extern dct_func * uvg_fast_inverse_dst_4x4;
 
 extern dct_func * uvg_idct_4x4;
 extern dct_func * uvg_idct_8x8;
@@ -91,15 +87,10 @@ dct_func * uvg_get_idct_func(int8_t width, int8_t height, color_t color, cu_type
 
 
 #define STRATEGIES_DCT_EXPORTS \
-  {"fast_forward_dst_4x4", (void**) &uvg_fast_forward_dst_4x4}, \
-  \
   {"dct_4x4", (void**) &uvg_dct_4x4}, \
   {"dct_8x8", (void**) &uvg_dct_8x8}, \
   {"dct_16x16", (void**) &uvg_dct_16x16}, \
   {"dct_32x32", (void**) &uvg_dct_32x32}, \
-  \
-  {"fast_inverse_dst_4x4", (void**) &uvg_fast_inverse_dst_4x4}, \
-  \
   {"idct_4x4", (void**)&uvg_idct_4x4}, \
   {"idct_8x8", (void**)&uvg_idct_8x8}, \
   {"idct_16x16", (void**)&uvg_idct_16x16}, \

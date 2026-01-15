@@ -101,8 +101,6 @@ static void setup_tests()
     dct_func* dct_generic = 0;
     if (
       (
-
-      strcmp(strat->type, "fast_forward_dst_4x4") == 0 ||
       strcmp(strat->type, "dct_4x4") == 0 ||
       strcmp(strat->type, "dct_8x8") == 0 || 
       strcmp(strat->type, "dct_16x16") == 0 || 
@@ -125,8 +123,6 @@ static void setup_tests()
     dct_func* idct_generic = 0;
     if (
       (
-
-      strcmp(strat->type, "fast_inverse_dst_4x4") == 0 ||
       strcmp(strat->type, "idct_4x4") == 0 ||
       strcmp(strat->type, "idct_8x8") == 0 ||
       strcmp(strat->type, "idct_16x16") == 0 ||
@@ -155,8 +151,7 @@ static void tear_down_tests()
 // TESTS
 TEST dct(void)
 {
-  int index = test_env.log_width - 1;
-  if (strcmp(test_env.strategy->type, "fast_forward_dst_4x4") == 0) index = 0;
+  int index = test_env.log_width - 2;
 
   int16_t *buf = dct_bufs[index];
   ALIGNED(32) int16_t test_result[LCU_WIDTH*LCU_WIDTH] = { 0 };
@@ -172,8 +167,7 @@ TEST dct(void)
 
 TEST idct(void)
 {
-  int index = test_env.log_width - 1;
-  if (strcmp(test_env.strategy->type, "fast_inverse_dst_4x4") == 0) index = 0;
+  int index = test_env.log_width - 2;
 
   int16_t *buf = dct_bufs[index];
   ALIGNED(32) int16_t test_result[LCU_WIDTH*LCU_WIDTH] = { 0 };
@@ -203,10 +197,7 @@ SUITE(dct_tests)
     const strategy_t * strategy = &strategies.strategies[i];
 
     // Select buffer width according to function name for dct function.
-    if (strcmp(strategy->type, "fast_forward_dst_4x4") == 0) {
-      test_env.log_width = 2;
-    }
-    else if (strcmp(strategy->type, "dct_4x4") == 0) {
+    if (strcmp(strategy->type, "dct_4x4") == 0) {
       test_env.log_width = 2;
     }
     else if (strcmp(strategy->type, "dct_8x8") == 0) {
@@ -217,9 +208,6 @@ SUITE(dct_tests)
     }
     else if (strcmp(strategy->type, "dct_32x32") == 0) {
       test_env.log_width = 5;
-    }
-    else if (strcmp(strategy->type, "fast_inverse_dst_4x4") == 0) {
-      test_env.log_width = 2;
     }
     else if (strcmp(strategy->type, "idct_4x4") == 0) {
       test_env.log_width = 2;
@@ -242,13 +230,11 @@ SUITE(dct_tests)
 
     // Call different tests depending on type of function.
     // This allows for selecting a subset of tests with -t parameter.
-   if (strncmp(strategy->type, "dct_", 4) == 0 ||
-      strcmp(strategy->type, "fast_forward_dst_4x4") == 0)
+   if (strncmp(strategy->type, "dct_", 4) == 0)
     {
       RUN_TEST(dct);
     }
-    else if (strncmp(strategy->type, "idct_", 4) == 0 ||
-      strcmp(strategy->type, "fast_inverse_dst_4x4") == 0)
+    else if (strncmp(strategy->type, "idct_", 5) == 0)
     {
       RUN_TEST(idct);
     }
