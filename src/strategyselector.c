@@ -393,10 +393,10 @@ static INLINE int get_cpuid(unsigned level, unsigned sublevel, cpuid_t *cpu_info
 #endif // COMPILE_INTEL
 
 #if COMPILE_POWERPC
-#  if defined(__linux__) || (defined(__FreeBSD__) && __FreeBSD__ >= 12)
+#  if defined(__linux__) || defined(HAVE_ELF_AUX_INFO)
 #ifdef __linux__
 #include <asm/cputable.h>
-#else
+#elif defined(__FreeBSD__)
 #include <machine/cpu.h>
 #endif
 #include <sys/auxv.h>
