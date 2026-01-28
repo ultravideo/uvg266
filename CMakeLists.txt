@@ -226,6 +226,14 @@ else()
       set(EXTRA_LIBS ${EXTRA_LIBS} m)
   endif (HAVE_LIB_M)
 
+  include(CheckSymbolExists)
+
+  CHECK_SYMBOL_EXISTS(elf_aux_info sys/auxv.h HAVE_ELF_AUX_INFO)
+
+  if (HAVE_ELF_AUX_INFO)
+      add_definitions(-DHAVE_ELF_AUX_INFO)
+  endif (HAVE_ELF_AUX_INFO)
+
   target_link_libraries(uvg266-bin PUBLIC ${EXTRA_LIBS})
 endif()
 
