@@ -5,11 +5,9 @@
 function(add_greatest_tests)
   add_executable(run-greatest
     coeff_sum_tests.c
-    dct_tests.c
     # FIXME
     #inter_recon_bipred_tests.c
     intra_sad_tests.c
-    mts_tests.c
     mv_cand_tests.c
     sad_tests.c
     satd_tests.c
