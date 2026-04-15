@@ -1,0 +1,10 @@
+# Ensure text files are always committed with LF.
+# They will still be locally checked out with CRLF on Windows if
+# core.autocrlf=true.
+* text=auto
+
+# Force scripts that need to be runnable on Linux to be checked out with LF.
+# This is helpful when the directory is shared between Windows and Linux,
+# such as when using WSL.
+*.py eol=lf
+*.sh eol=lf
