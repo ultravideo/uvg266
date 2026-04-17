@@ -96,3 +96,35 @@ function(try_build_tests)
 endfunction()
 
 try_build_tests()
+
+############################################################
+# Target: run-benchmark
+############################################################
+
+function(try_build_benchmarks)
+  find_package(benchmark QUIET)
+  find_package(CLI11 QUIET)
+
+  if(NOT benchmark_FOUND)
+    message(WARNING "Google Benchmark not found - benchmarks will not be built")
+    return()
+  endif()
+
+  if(NOT CLI11_FOUND)
+    message(WARNING "CLI11 not found - benchmarks will not be built")
+    return()
+  endif()
+
+  add_executable(run-benchmark
+    run-benchmark.cpp
+  )
+  target_link_libraries(run-benchmark
+    PRIVATE
+      libuvg266_static
+      benchmark::benchmark
+      CLI11::CLI11
+  )
+  target_compile_definitions(run-benchmark PRIVATE UVG_NO_TESTS=1)
+endfunction()
+
+try_build_benchmarks()

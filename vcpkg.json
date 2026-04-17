@@ -2,14 +2,28 @@
   "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
   "dependencies": [
     {
+      "name": "benchmark"
+    },
+    {
       "name": "catch2"
+    },
+    {
+      "name": "cli11"
     }
   ],
   "builtin-baseline": "9e593bb18ea69cc5095e012465dcd675a822ed0d",
   "overrides": [
     {
+      "name": "benchmark",
+      "version": "1.9.5"
+    },
+    {
       "name": "catch2",
       "version": "3.15.3"
+    },
+    {
+      "name": "cli11",
+      "version": "2.6.2"
     }
   ]
 }
