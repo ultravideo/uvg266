@@ -68,3 +68,31 @@ endfunction()
 if(UNIX)
   add_shell_tests()
 endif()
+
+############################################################
+# Target: run-catch2
+############################################################
+
+function(try_build_tests)
+  find_package(Catch2 QUIET)
+
+  if(NOT Catch2_FOUND)
+    message(WARNING "Catch2 not found - tests will not be built")
+    return()
+  endif()
+
+  add_executable(run-catch2
+    run-catch2.cpp
+  )
+  target_link_libraries(run-catch2
+    PRIVATE
+      libuvg266_static
+      Catch2::Catch2
+  )
+  target_compile_definitions(run-catch2 PRIVATE UVG_NO_BENCHMARKS=1)
+
+  include(Catch)
+  catch_discover_tests(run-catch2)
+endfunction()
+
+try_build_tests()
