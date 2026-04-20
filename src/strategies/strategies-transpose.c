@@ -32,6 +32,7 @@
 
 #include "strategies/strategies-transpose.h"
 #include "strategies/generic/transpose-generic.h"
+#include "strategies/neon/transpose-neon.h"
 #include "strategyselector.h"
 
 transpose_8bit_func* uvg_transpose_8bit;
@@ -42,6 +43,10 @@ int uvg_strategy_register_transpose(void* opaque, uint8_t bitdepth) {
   bool success = true;
 
   success &= uvg_strategy_register_transpose_generic(opaque, bitdepth);
+
+#if UVG_HAVE_ARM_NEON
+  success &= uvg_strategy_register_transpose_neon(opaque, bitdepth);
+#endif
 
   return success;
 }

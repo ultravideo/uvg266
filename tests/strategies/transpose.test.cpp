@@ -1,6 +1,7 @@
 extern "C" {
 #include "build_config.h"
 #include "strategies/generic/transpose-generic.h"
+#include "strategies/neon/transpose-neon.h"
 #include "strategies/strategies-transpose.h"
 }
 
@@ -113,6 +114,25 @@ TEST_CASE("uvg_transpose_px_generic")
   run_test<uvg_pixel, transpose_px_func>(uvg_transpose_px_generic, transpose_px_reference);
 }
 
+#if UVG_HAVE_ARM_NEON
+
+TEST_CASE("uvg_transpose_8bit_neon")
+{
+  run_test<uint8_t, transpose_8bit_func>(uvg_transpose_8bit_neon, transpose_8bit_reference);
+}
+
+TEST_CASE("uvg_transpose_16bit_neon")
+{
+  run_test<uint16_t, transpose_16bit_func>(uvg_transpose_16bit_neon, transpose_16bit_reference);
+}
+
+TEST_CASE("uvg_transpose_px_neon")
+{
+  run_test<uvg_pixel, transpose_px_func>(uvg_transpose_px_neon, transpose_px_reference);
+}
+
+#endif
+
 #endif // UVG_NO_TESTS
 
 // ---------------------------------------------------------
@@ -188,5 +208,10 @@ auto benchmark_init(int argc, char** argv) -> int
 
 UVG_BENCHMARK_REGISTER("uvg_transpose_8bit_generic", (benchmark_init<uint8_t, uvg_transpose_8bit_generic>));
 UVG_BENCHMARK_REGISTER("uvg_transpose_16bit_generic", (benchmark_init<uint16_t, uvg_transpose_16bit_generic>));
+
+#if UVG_HAVE_ARM_NEON
+UVG_BENCHMARK_REGISTER("uvg_transpose_8bit_neon", (benchmark_init<uint8_t, uvg_transpose_8bit_neon>));
+UVG_BENCHMARK_REGISTER("uvg_transpose_16bit_neon", (benchmark_init<uint16_t, uvg_transpose_16bit_neon>));
+#endif
 
 #endif // UVG_NO_BENCHMARKS

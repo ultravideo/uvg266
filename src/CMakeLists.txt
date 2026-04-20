@@ -113,11 +113,13 @@ endif()
 
 if(UVG_HAVE_ARM_NEON)
   foreach(c_source
+    strategies/neon/transpose-neon.c
   )
     target_sources(libuvg266 PRIVATE ${c_source})
     set_property(SOURCE ${c_source} APPEND_STRING PROPERTY COMPILE_FLAGS " ${UVG_CFLAGS_NEON} ${CFLAGS_NEON} $ENV{CFLAGS_NEON}")
   endforeach()
   foreach(cxx_source
+    strategies/neon/transpose-neon.cpp
   )
     target_sources(libuvg266 PRIVATE ${cxx_source})
     set_property(SOURCE ${cxx_source} APPEND_STRING PROPERTY COMPILE_FLAGS " ${UVG_CXXFLAGS_NEON} ${CXXFLAGS_NEON} $ENV{CXXFLAGS_NEON}")
