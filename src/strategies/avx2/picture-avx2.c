@@ -36,7 +36,6 @@
 
 #include "global.h"
 
-#if COMPILE_INTEL_AVX2
 #include "uvg266.h"
 #if UVG_BIT_DEPTH == 8
 #include "strategies/avx2/picture-avx2.h"
@@ -1786,12 +1785,10 @@ static void generate_residual_avx2(const uint8_t* ref_in, const uint8_t* pred_in
 
 
 #endif // KVZ_BIT_DEPTH == 8
-#endif //COMPILE_INTEL_AVX2
 
 int uvg_strategy_register_picture_avx2(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
-#if COMPILE_INTEL_AVX2
 #if UVG_BIT_DEPTH == 8
   // We don't actually use SAD for intra right now, other than 4x4 for
   // transform skip, but we might again one day and this is some of the
@@ -1831,6 +1828,5 @@ int uvg_strategy_register_picture_avx2(void* opaque, uint8_t bitdepth)
 
   }
 #endif // UVG_BIT_DEPTH == 8
-#endif
   return success;
 }

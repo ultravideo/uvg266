@@ -41,7 +41,7 @@
 #include "strategyselector.h"
 #include "transform.h"
 #include "uvg_math.h"
-#include "generic/quant-generic.h"
+#include "strategies/generic/quant-generic.h"
 static const int32_t g_goRiceBits[4][RICEMAX] = {
   {32768,  65536,  98304,  131072, 163840, 196608, 262144, 262144,
    327680, 327680, 327680, 327680, 393216, 393216, 393216, 393216,

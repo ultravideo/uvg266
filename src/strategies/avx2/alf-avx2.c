@@ -34,7 +34,8 @@
 
 #include "strategies/avx2/alf-avx2.h"
 
-#if COMPILE_INTEL_AVX2
+#include <immintrin.h>
+
 #include "uvg266.h"
 #if UVG_BIT_DEPTH == 8
 
@@ -299,17 +300,14 @@ static void alf_get_blk_stats_avx2(encoder_state_t* const state,
 }
 
 #endif // UVG_BIT_DEPTH == 8
-#endif //COMPILE_INTEL_AVX2
 
 
 int uvg_strategy_register_alf_avx2(void* opaque, uint8_t bitdepth) {
   bool success = true;
-#if COMPILE_INTEL_AVX2
 #if UVG_BIT_DEPTH == 8
   if (bitdepth == 8){
     success &= uvg_strategyselector_register(opaque, "alf_get_blk_stats", "avx2", 40, &alf_get_blk_stats_avx2);
   }
 #endif // UVG_BIT_DEPTH == 8
-#endif
   return success;
 }

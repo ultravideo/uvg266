@@ -36,7 +36,7 @@
 
 #include "encoder.h"
 #include "uvg266.h"
-#include "pthread.h"
+#include <pthread.h>
 
 
 static const int MIN_SMOOTHING_WINDOW = 40;

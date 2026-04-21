@@ -32,7 +32,6 @@
 
 #include "strategyselector.h"
 
-#if COMPILE_INTEL_AVX2
 #include "avx2_common_functions.h"
 #include "cabac.h"
 #include "context.h"
@@ -603,15 +602,12 @@ void uvg_encode_coeff_nxn_avx2(encoder_state_t * const state,
   }
   if (cabac->only_count) *bits_out += bits;
 }
-#endif // COMPILE_INTEL_AVX2
 
 int uvg_strategy_register_encode_avx2(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
 
-#if COMPILE_INTEL_AVX2
   success &= uvg_strategyselector_register(opaque, "encode_coeff_nxn", "avx2", 40, &uvg_encode_coeff_nxn_avx2);
-#endif
 
   return success;
 }

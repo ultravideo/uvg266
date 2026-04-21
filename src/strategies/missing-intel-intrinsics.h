@@ -1,6 +1,7 @@
 #ifndef MISSING_INTEL_INTRINSICS_H_
 #define MISSING_INTEL_INTRINSICS_H_
 
+#include "build_config.h"
 #include <immintrin.h>
 
 // Old Visual Studio headers lack the bsrli variant
@@ -19,7 +20,7 @@
 #endif // _andn_u32
 
 // Some Visual Studio headers apparently lack these pseudoinstructions
-#if COMPILE_INTEL_AVX2
+#if UVG_HAVE_X86_64_AVX2
   #ifndef _mm256_bsrli_epi128
     #define _mm256_bsrli_epi128(a, imm8) _mm256_srli_si256((a), (imm8))
   #endif

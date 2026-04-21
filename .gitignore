@@ -51,10 +51,4 @@ Makefile.in
 *.log
 .kdev4
 configure.scan
-src/uvg266
-src/libuvg266.so.*
-src/uvg266.pc
-src/version.h
-tests/uvg266_tests
-tests/uvg266_tests.trs
 out

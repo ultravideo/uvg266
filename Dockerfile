@@ -17,20 +17,21 @@
 # Use Ubuntu 22.04 as a base for now
 FROM ubuntu:22.04
 
-MAINTAINER Marko Viitanen <fador@iki.fi>
+LABEL maintainer="Marko Viitanen <fador@iki.fi>"
 
-# List of needed packages to be able to build uvg266 with autotools
-ENV REQUIRED_PACKAGES automake autoconf libtool m4 build-essential git cmake pkgconf
+# List of extra packages required to build uvg266
+ENV REQUIRED_PACKAGES="build-essential cmake"
 
 COPY . uvg266
 # Run all the commands in one RUN so we don't have any extra history
 # data in the image.
-RUN apt-get update \
+RUN apt-get update -y \
     && apt-get install -y $REQUIRED_PACKAGES \
-    && cd uvg266/build \
-    && cmake -DUSE_SHARED_LIB=OFF .. \
-    && make\
-    && make install \
+    && cd uvg266 \
+    && cmake -B build -S . -DUVG_BUILD_TESTS=0 \
+    && cmake --build build --parallel \
+    && cmake --install build \
+    && rm -rf build \
     && AUTOINSTALLED_PACKAGES=`apt-mark showauto` \
     && apt-get remove --purge --force-yes -y $REQUIRED_PACKAGES $AUTOINSTALLED_PACKAGES \
     && apt-get autoremove -y \

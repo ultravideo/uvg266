@@ -4,16 +4,17 @@ image: ultravideo/kvazaar_ci_base:latest
 # Build and test kvazaar
 test-uvg266: &test-template
   stage: test
+  variables:
+    UVG_CTEST_TIMEOUT: 1800
   script:
     - bash .travis-install.bash
     - export PATH="/opt/homebrew/bin/:${HOME}/bin:${PATH}"
-    - cmake -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=./ . || (cat config.log && false)
-    - make install
-    - env CTEST_PARALLEL_LEVEL=8 CTEST_OUTPUT_ON_FAILURE=1 make test
-  artifacts:
-    paths:
-    - bin/uvg266
-    expire_in: 1 week
+    - cmake -B build -S .
+    - cmake --build build --parallel
+    # FIXME: This install step is pretty dumb, but works for now.
+    # (The tests currently require uvg266 to be in ${PWD}/bin).
+    - cmake --install build --prefix ${PWD}
+    - ctest --test-dir build --parallel $(nproc) --timeout ${UVG_CTEST_TIMEOUT} --output-on-failure
 
 test-asan:
   <<: *test-template
@@ -42,12 +43,15 @@ test-valgrind:
   <<: *test-template
   variables:
     UVG_TEST_VALGRIND: 1
+    UVG_CTEST_TIMEOUT: 7200
 
 test-macos:
   <<: *test-template
   tags:
     - macOS
-  
+  variables:
+    UVG_CTEST_TIMEOUT: 1800
+
 test-macos-asan:
   <<: *test-template
   tags:
@@ -60,14 +64,16 @@ test-macos-asan:
     # AddressSanitizer adds some extra symbols so we expect a failure from
     # the external symbols test.
     XFAIL_TESTS: test_external_symbols
-    
+    UVG_CTEST_TIMEOUT: 1800
+
 test-macos-ubsan:
   <<: *test-template
   tags:
     - macOS
   variables:
     CFLAGS: '-fsanitize=undefined -fno-sanitize-recover=all -fno-sanitize=alignment -g'
-    
+    UVG_CTEST_TIMEOUT: 1800
+
 #test-distcheck:
 #  <<: *test-template
 #  script:

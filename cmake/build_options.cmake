@@ -1,0 +1,13 @@
+macro(uvg_validate_build_options)
+  if(NOT UVG_BUILD_SHARED AND NOT UVG_BUILD_STATIC)
+    message(FATAL_ERROR "Neither UVG_BUILD_SHARED nor UVG_BUILD_STATIC is ON")
+  endif()
+
+  if(UVG_BIT_DEPTH STREQUAL "8")
+    message(STATUS "8-bit build")
+  elseif(UVG_BIT_DEPTH STREQUAL "10")
+    message(STATUS "10-bit build")
+  else()
+    message(FATAL_ERROR "Unsupported bit depth: ${UVG_BIT_DEPTH} (must be 8 or 10)")
+  endif()
+endmacro()

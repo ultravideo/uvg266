@@ -32,7 +32,6 @@
 
 #include "strategies/avx2/sao-avx2.h"
 
-#if COMPILE_INTEL_AVX2
 #include "uvg266.h"
 #if UVG_BIT_DEPTH == 8
 #include <immintrin.h>
@@ -898,12 +897,10 @@ use_generic:
 }
 
 #endif // UVG_BIT_DEPTH == 8
-#endif //COMPILE_INTEL_AVX2
 
 int uvg_strategy_register_sao_avx2(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
-#if COMPILE_INTEL_AVX2
 #if UVG_BIT_DEPTH == 8
   if (bitdepth == 8) {
     success &= uvg_strategyselector_register(opaque, "sao_edge_ddistortion", "avx2", 40, &sao_edge_ddistortion_avx2);
@@ -912,6 +909,5 @@ int uvg_strategy_register_sao_avx2(void* opaque, uint8_t bitdepth)
     success &= uvg_strategyselector_register(opaque, "sao_band_ddistortion", "avx2", 40, &sao_band_ddistortion_avx2);
   }
 #endif // UVG_BIT_DEPTH == 8
-#endif //COMPILE_INTEL_AVX2
   return success;
 }

@@ -32,7 +32,6 @@
 
 #include "strategies/sse2/picture-sse2.h"
 
-#if COMPILE_INTEL_SSE2
 #include "uvg266.h"
 #if UVG_BIT_DEPTH == 8
 #include <immintrin.h>
@@ -79,18 +78,15 @@ static unsigned sad_8bit_4x4_sse2(const uint8_t *buf1, const uint8_t *buf2)
 }
 
 #endif // UVG_BIT_DEPTH == 8
-#endif //COMPILE_INTEL_SSE2
 
 int uvg_strategy_register_picture_sse2(void* opaque, uint8_t bitdepth) {
   bool success = true;
-#if COMPILE_INTEL_SSE2
 #if UVG_BIT_DEPTH == 8
   if (bitdepth == 8){
     success &= uvg_strategyselector_register(opaque, "reg_sad", "sse2", 10, &reg_sad_sse2);
     success &= uvg_strategyselector_register(opaque, "sad_4x4", "sse2", 10, &sad_8bit_4x4_sse2);
   }
 #endif // UVG_BIT_DEPTH == 8
-#endif
   return success;
 }
 

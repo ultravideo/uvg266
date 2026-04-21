@@ -32,6 +32,7 @@
 
 #include "strategies/strategies-picture.h"
 
+#include "build_config.h"
 #include "strategies/altivec/picture-altivec.h"
 #include "strategies/avx2/picture-avx2.h"
 #include "strategies/generic/picture-generic.h"
@@ -94,21 +95,35 @@ int uvg_strategy_register_picture(void* opaque, uint8_t bitdepth) {
 
   success &= uvg_strategy_register_picture_generic(opaque, bitdepth);
 
+#if UVG_HAVE_X86_64_SSE2
   if (uvg_g_hardware_flags.intel_flags.sse2) {
     success &= uvg_strategy_register_picture_sse2(opaque, bitdepth);
   }
+#endif
+
+#if UVG_HAVE_X86_64_SSE41
   if (uvg_g_hardware_flags.intel_flags.sse41) {
     success &= uvg_strategy_register_picture_sse41(opaque, bitdepth);
   }
+#endif
+
+#if UVG_HAVE_X86_64_SSE42
   if (uvg_g_hardware_flags.intel_flags.sse42) {
     success &= uvg_strategy_register_picture_sse42(opaque, bitdepth);
   }
+#endif
+
+#if UVG_HAVE_X86_64_AVX2
   if (uvg_g_hardware_flags.intel_flags.avx2) {
     success &= uvg_strategy_register_picture_avx2(opaque, bitdepth);
   }
+#endif
+
+#if UVG_HAVE_POWERPC_ALTIVEC
   if (uvg_g_hardware_flags.powerpc_flags.altivec) {
     success &= uvg_strategy_register_picture_altivec(opaque, bitdepth);
   }
+#endif
 
   return success;
 }

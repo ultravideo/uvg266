@@ -14,7 +14,8 @@ ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
-#include "pthread.h"
+#include "../include/pthread.h"
+
 #include <condition_variable>
 #include <mutex>
 #include <shared_mutex>

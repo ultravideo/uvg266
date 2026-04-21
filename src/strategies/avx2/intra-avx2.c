@@ -33,7 +33,6 @@
 #include "strategies/avx2/intra-avx2.h"
 
 
-#if COMPILE_INTEL_AVX2 && defined X86_64
 #include "uvg266.h"
 #include "cu.h"
 #include "tables.h"
@@ -6700,12 +6699,9 @@ static void mip_predict_avx2(
 
 #endif // UVG_BIT_DEPTH == 8
 
-#endif // COMPILE_INTEL_AVX2 && defined X86_64
-
 int uvg_strategy_register_intra_avx2(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
-#if COMPILE_INTEL_AVX2 && defined X86_64
 #if UVG_BIT_DEPTH == 8
   if (bitdepth == 8) {
     success &= uvg_strategyselector_register(opaque, "angular_pred", "avx2", 40, &uvg_angular_pred_avx2);
@@ -6714,7 +6710,6 @@ int uvg_strategy_register_intra_avx2(void* opaque, uint8_t bitdepth)
     success &= uvg_strategyselector_register(opaque, "mip_predict", "avx2", 40, &mip_predict_avx2);
   }
 #endif //UVG_BIT_DEPTH == 8
-#endif //COMPILE_INTEL_AVX2 && defined X86_64
   return success;
 }
 
