@@ -2,6 +2,7 @@
 extern "C" {
 #include "strategies/strategies-dct.h"
 #include "strategies/generic/dct-generic.h"
+#include "strategies/neon/transform-neon.h"
 #include "uvg266.h"
 }
 
@@ -185,6 +186,60 @@ static void run_test_idct(dct_func* tested_impl, dct_func* golden_impl)
   }
 }
 
+#if UVG_HAVE_ARM_NEON
+
+TEST_CASE("uvg_mts_dct_neon")
+{
+  run_test_mts_dct(uvg_mts_dct_neon, uvg_mts_dct_generic);
+}
+
+TEST_CASE("uvg_mts_idct_neon")
+{
+  run_test_mts_idct(uvg_mts_idct_neon, uvg_mts_idct_generic);
+}
+
+TEST_CASE("uvg_dct_4x4_neon")
+{
+  run_test_dct(uvg_dct_4x4_neon, uvg_dct_4x4_generic);
+}
+
+TEST_CASE("uvg_dct_8x8_neon")
+{
+  run_test_dct(uvg_dct_8x8_neon, uvg_dct_8x8_generic);
+}
+
+TEST_CASE("uvg_dct_16x16_neon")
+{
+  run_test_dct(uvg_dct_16x16_neon, uvg_dct_16x16_generic);
+}
+
+TEST_CASE("uvg_dct_32x32_neon")
+{
+  run_test_dct(uvg_dct_32x32_neon, uvg_dct_32x32_generic);
+}
+
+TEST_CASE("uvg_idct_4x4_neon")
+{
+  run_test_idct(uvg_idct_4x4_neon, uvg_idct_4x4_generic);
+}
+
+TEST_CASE("uvg_idct_8x8_neon")
+{
+  run_test_idct(uvg_idct_8x8_neon, uvg_idct_8x8_generic);
+}
+
+TEST_CASE("uvg_idct_16x16_neon")
+{
+  run_test_idct(uvg_idct_16x16_neon, uvg_idct_16x16_generic);
+}
+
+TEST_CASE("uvg_idct_32x32_neon")
+{
+  run_test_idct(uvg_idct_32x32_neon, uvg_idct_32x32_generic);
+}
+
+#endif // UVG_HAVE_ARM_NEON
+
 #endif // UVG_NO_TESTS
 
 // ---------------------------------------------------------
@@ -264,5 +319,14 @@ UVG_BENCHMARK_REGISTER("dct8_forward_generic", (benchmark_init<MTS_DCT8_DCT8, uv
 UVG_BENCHMARK_REGISTER("dct8_inverse_generic", (benchmark_init<MTS_DCT8_DCT8, uvg_mts_idct_generic>));
 UVG_BENCHMARK_REGISTER("dst7_forward_generic", (benchmark_init<MTS_DST7_DST7, uvg_mts_dct_generic>));
 UVG_BENCHMARK_REGISTER("dst7_inverse_generic", (benchmark_init<MTS_DST7_DST7, uvg_mts_idct_generic>));
+
+#if UVG_HAVE_ARM_NEON
+UVG_BENCHMARK_REGISTER("dct2_forward_neon", (benchmark_init<MTS_DCT2_DCT2, uvg_mts_dct_neon>));
+UVG_BENCHMARK_REGISTER("dct2_inverse_neon", (benchmark_init<MTS_DCT2_DCT2, uvg_mts_idct_neon>));
+UVG_BENCHMARK_REGISTER("dct8_forward_neon", (benchmark_init<MTS_DCT8_DCT8, uvg_mts_dct_neon>));
+UVG_BENCHMARK_REGISTER("dct8_inverse_neon", (benchmark_init<MTS_DCT8_DCT8, uvg_mts_idct_neon>));
+UVG_BENCHMARK_REGISTER("dst7_forward_neon", (benchmark_init<MTS_DST7_DST7, uvg_mts_dct_neon>));
+UVG_BENCHMARK_REGISTER("dst7_inverse_neon", (benchmark_init<MTS_DST7_DST7, uvg_mts_idct_neon>));
+#endif
 
 #endif // UVG_NO_BENCHMARKS
