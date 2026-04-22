@@ -1,43 +1,70 @@
-file( GLOB TEST_SOURCES "*.c" )
+############################################################
+# Tests implemented with greatest
+############################################################
 
-# ToDo: fix the tests
-list(REMOVE_ITEM TEST_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/inter_recon_bipred_tests.c")
-
-add_executable(uvg266_tests ${TEST_SOURCES} )
-
-target_include_directories(uvg266_tests PUBLIC ${PROJECT_SOURCE_DIR})
-target_include_directories(uvg266_tests PUBLIC ${PROJECT_SOURCE_DIR}/src)
-target_include_directories(uvg266_tests PUBLIC ${PROJECT_SOURCE_DIR}/src/extras)
-
-add_definitions(-DUVG_DLL_EXPORTS)
-
-if(BUILD_SHARED_LIBS)
-  add_definitions(-DPIC)
-endif()
-
-if(MSVC)
-  target_include_directories(uvg266_tests PUBLIC ../src/threadwrapper/include)
-
-  set_property( SOURCE ${TEST_SOURCES}  APPEND PROPERTY COMPILE_FLAGS "/arch:AVX2" )
-  add_definitions(-DWIN32_LEAN_AND_MEAN -D_WIN32 -DWIN32 -DWIN64)
-else()
-  list(APPEND ALLOW_AVX2 "x86_64" "AMD64")
-  if(${CMAKE_SYSTEM_PROCESSOR} IN_LIST ALLOW_AVX2) 
-    set_property( SOURCE ${TEST_SOURCES}  APPEND PROPERTY COMPILE_FLAGS "-mavx2 -mbmi -mpopcnt -mlzcnt -mbmi2" )
+function(add_greatest_tests)
+  add_executable(run-greatest
+    coeff_sum_tests.c
+    dct_tests.c
+    # FIXME
+    #inter_recon_bipred_tests.c
+    intra_sad_tests.c
+    mts_tests.c
+    mv_cand_tests.c
+    sad_tests.c
+    satd_tests.c
+    speed_tests.c
+    test_strategies.c
+    tests_main.c
+  )
+  target_link_libraries(run-greatest PRIVATE libuvg266_static)
+  target_include_directories(run-greatest PRIVATE ${PROJECT_SOURCE_DIR})
+  if(MSVC)
+    target_include_directories(run-greatest SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/src/threadwrapper/include)
   endif()
-  find_package(Threads REQUIRED)
-  target_link_libraries(uvg266_tests PUBLIC Threads::Threads)
+  add_test(NAME "Test_uvg266" COMMAND run-greatest)
+endfunction()
 
-  include(CheckLibraryExists)
-
-  CHECK_LIBRARY_EXISTS(m sin "" HAVE_LIB_M)
-
-  if (HAVE_LIB_M)
-      set(EXTRA_LIBS ${EXTRA_LIBS} m)
-  endif (HAVE_LIB_M)
-
-  target_link_libraries(uvg266_tests PUBLIC ${EXTRA_LIBS})
+if(EXISTS "${PROJECT_SOURCE_DIR}/greatest/greatest.h")
+  add_greatest_tests()
+else()
+  message(WARNING "Couldn't find greatest.h - some tests will not be built")
 endif()
 
-target_link_libraries(uvg266_tests PUBLIC uvg266)
+############################################################
+# Tests implemented with shell scripts
+############################################################
 
+function(add_shell_tests)
+  # Disable tests in XFAIL_TESTS env, usage: `XFAIL_TESTS="test_intra;test_external_symbols" cmake .`
+  list(APPEND XFAIL "off")
+  if(DEFINED ENV{XFAIL_TESTS})
+    list(APPEND XFAIL $ENV{XFAIL_TESTS})
+  endif()
+
+  foreach(TEST
+    test_external_symbols
+    test_mtt_intra
+    test_mtt_inter
+    test_mtt_both
+    test_intra
+    test_invalid_input
+    test_monochrome
+    test_lmcs
+    test_tools
+    test_slices
+    test_cabac_state
+  )
+    if(NOT "${TEST}" IN_LIST XFAIL)
+      add_test(
+        NAME "${TEST}"
+        COMMAND ${PROJECT_SOURCE_DIR}/tests/${TEST}.sh
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/tests
+      )
+    endif()
+  endforeach()
+endfunction()
+
+if(UNIX)
+  add_shell_tests()
+endif()

@@ -32,7 +32,6 @@
 
 #include "strategies/altivec/picture-altivec.h"
 
-#if COMPILE_POWERPC_ALTIVEC
 #undef bool
 #include <altivec.h>
 #define bool _Bool
@@ -86,14 +85,12 @@ static unsigned reg_sad_altivec(const uvg_pixel * const data1, const uvg_pixel *
   return sad;
 }
 
-#endif //COMPILE_POWERPC_ALTIVEC
-
 int uvg_strategy_register_picture_altivec(void* opaque, uint8_t bitdepth) {
   bool success = true;
-#if COMPILE_POWERPC_ALTIVEC
+
   if(bitdepth == 8){
     success &= uvg_strategyselector_register(opaque, "reg_sad", "altivec", 10, &reg_sad_altivec);
   }
-#endif
+
   return success;
 }

@@ -418,7 +418,7 @@ void print_usage(void)
 void print_version(bool to_stderr)
 {
   fprintf(to_stderr ? stderr : stdout,
-    "uvg266 " VERSION_STRING " [" UVG_COMPILER_STRING "] " UVG_COMPILE_DATE "\n");
+    "uvg266 " UVG_VERSION_STRING " [" UVG_COMPILER_STRING "] " UVG_COMPILE_DATE "\n");
 }
 
 

@@ -39,7 +39,7 @@
 #include "rdo.h"
 #include "search.h"
 #include "search_intra.h"
-#include "strategies-picture.h"
+#include "strategies/strategies-picture.h"
 #include "strategies/strategies-intra.h"
 #include "tables.h"
 #include "transform.h"

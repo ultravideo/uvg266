@@ -1,0 +1,18 @@
+@PACKAGE_INIT@
+
+if(NOT MSVC)
+  include(CMakeFindDependencyMacro)
+  find_dependency(Threads)
+endif()
+
+include("${CMAKE_CURRENT_LIST_DIR}/uvg266Targets.cmake")
+
+if(TARGET uvg266::libuvg266)
+  set(uvg266_libuvg266_FOUND TRUE)
+endif()
+
+if(TARGET uvg266::libuvg266_static)
+  set(uvg266_libuvg266_static_FOUND TRUE)
+endif()
+
+check_required_components(uvg266)

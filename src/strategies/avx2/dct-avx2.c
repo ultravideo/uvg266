@@ -52,7 +52,6 @@ extern const int16_t uvg_g_dct_8_t[8][8];
 extern const int16_t uvg_g_dct_16_t[16][16];
 extern const int16_t uvg_g_dct_32_t[32][32];
 
-#if COMPILE_INTEL_AVX2 
 #include "uvg266.h"
 #include <immintrin.h>
 #include "strategies/avx2/dct_avx2_tables.h"
@@ -8038,12 +8037,9 @@ static void mts_idct_avx2(
   }
 }
 
-#endif //COMPILE_INTEL_AVX2
-
 int uvg_strategy_register_dct_avx2(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
-#if COMPILE_INTEL_AVX2
 
   success &= uvg_strategyselector_register(opaque, "dct_4x4", "avx2", 40, &matrix_dct_4x4_avx2);
   success &= uvg_strategyselector_register(opaque, "dct_8x8", "avx2", 40, &matrix_dct_8x8_avx2);
@@ -8059,7 +8055,5 @@ int uvg_strategy_register_dct_avx2(void* opaque, uint8_t bitdepth)
   success &= uvg_strategyselector_register(opaque, "mts_dct", "avx2", 40, &mts_dct_avx2);
   success &= uvg_strategyselector_register(opaque, "mts_idct", "avx2", 40, &mts_idct_avx2);
 
-
-#endif //COMPILE_INTEL_AVX2  
   return success;
 }

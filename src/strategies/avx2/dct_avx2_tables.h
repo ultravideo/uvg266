@@ -4824,4 +4824,4 @@ ALIGNED(32) static const int16_t  ff_dct8_32x32_coeff_ver[1024] = {
 }
 
 
-#endif DCT_AVX2_TABLES_H
+#endif // DCT_AVX2_TABLES_H

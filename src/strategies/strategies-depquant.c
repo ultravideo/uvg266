@@ -32,6 +32,7 @@
 
 #include "strategies/strategies-depquant.h"
 
+#include "build_config.h"
 #include "strategies/avx2/depquant-avx2.h"
 #include "strategies/generic/depquant-generic.h"
 #include "strategyselector.h"
@@ -48,8 +49,11 @@ int uvg_strategy_register_depquant(void *opaque, uint8_t bitdepth)
 
   success &= uvg_strategy_register_depquant_generic(opaque, bitdepth);
 
+#if UVG_HAVE_X86_64_AVX2
   if (uvg_g_hardware_flags.intel_flags.avx2) {
     success &= uvg_strategy_register_depquant_avx2(opaque, bitdepth);
   }
+#endif
+
   return success;
 }

@@ -32,7 +32,6 @@
 
 #include "global.h"
 
-#if COMPILE_INTEL_SSE41
 #include "uvg266.h"
 #if UVG_BIT_DEPTH == 8
 #include "strategies/sse41/alf-sse41.h"
@@ -756,12 +755,10 @@ static void alf_filter_7x7_block_sse41(encoder_state_t* const state,
 
 
 #endif // UVG_BIT_DEPTH == 8
-#endif //COMPILE_INTEL_SSE41
 
 
 int uvg_strategy_register_alf_sse41(void* opaque, uint8_t bitdepth) {
   bool success = true;
-#if COMPILE_INTEL_SSE41
 #if UVG_BIT_DEPTH == 8
   if (bitdepth == 8){
     success &= uvg_strategyselector_register(opaque, "alf_derive_classification_blk", "sse41", 20, &alf_derive_classification_blk_sse41);
@@ -769,6 +766,5 @@ int uvg_strategy_register_alf_sse41(void* opaque, uint8_t bitdepth) {
     success &= uvg_strategyselector_register(opaque, "alf_filter_7x7_blk", "sse41", 0, &alf_filter_7x7_block_sse41);
   }
 #endif // UVG_BIT_DEPTH == 8
-#endif
   return success;
 }

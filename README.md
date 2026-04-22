@@ -472,30 +472,27 @@ Others might encounter the same problem and there is probably much to
 improve in the build process. We want to make this as simple as
 possible.
 
-**CMakeLists.txt assumes that the x86 based CPUs are 64bit and support AVX2**
-
 ### CMake
 Depending on the platform, some additional tools are required for compiling uvg266 with CMake.
 For Ubuntu, the required packages are `build-essential cmake`.
 
-Run the following commands to generate the build scripts
+First, configure the build:
+```
+cmake -B build -S .
+```
 
-    cd build
-    cmake ..
-    
-Then depending on your generator settings you might want to use Make to compile and install uvg266, force with `-G 'Unix Makefiles'` in CMake command
+Then, build the project:
+```
+cmake --build build --parallel
+```
 
-    make
-    sudo make install
-    
-or Ninja, force with `-G Ninja` in the CMake command
-
-    ninja
-    sudo ninja install
+Finally, if you want to install uvg266:
+```
+sudo cmake --install build
+```
 
 Visual Studio natively supports opening the `CMakeLists.txt` of the CMake build package has been installed.
 Otherwise CMake-CLI can be used to generate the Visual Studio project files.
-**When building shared library with visual studio/MSys2/MinGW the tests will fail to link, so they are disabled**
 
 ### Docker
 This project includes a [Dockerfile](./Dockerfile), which enables building for Docker.

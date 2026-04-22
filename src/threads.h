@@ -70,6 +70,7 @@
 
 #else //__GNUC__
 //TODO: we assume !GCC => Windows... this may be bad
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h> // IWYU pragma: export
 
 #define UVG_CLOCK_T struct _FILETIME

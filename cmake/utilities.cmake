@@ -1,0 +1,21 @@
+macro(uvg_set_if_not_defined name value)
+  if(NOT DEFINED ${ARGV0})
+    set(${ARGV0} ${ARGV1})
+  endif()
+endmacro()
+
+macro(uvg_option_bool name description default)
+  set(${name} ${default} CACHE BOOL "${description}")
+endmacro()
+
+macro(uvg_option_enum name description choices default)
+  set(${name} ${default} CACHE STRING "${description}")
+  set_property(CACHE ${name} PROPERTY STRINGS ${choices})
+endmacro()
+
+macro(uvg_validate_enum name)
+  get_property(choices CACHE ${ARGV0} PROPERTY STRINGS)
+  if(NOT "${${ARGV0}}" IN_LIST choices)
+    message(FATAL_ERROR "Invalid value for ${ARGV0}: ${${ARGV0}} (must be one of: ${choices})")
+  endif()
+endmacro()

@@ -32,6 +32,7 @@
 
 #include "strategies/strategies-dct.h"
 
+#include "build_config.h"
 #include "avx2/dct-avx2.h"
 #include "generic/dct-generic.h"
 #include "strategyselector.h"
@@ -77,9 +78,11 @@ int uvg_strategy_register_dct(void* opaque, uint8_t bitdepth) {
 
   success &= uvg_strategy_register_dct_generic(opaque, bitdepth);
 
+#if UVG_HAVE_X86_64_AVX2
   if (uvg_g_hardware_flags.intel_flags.avx2) {
     success &= uvg_strategy_register_dct_avx2(opaque, bitdepth);
   }
+#endif
 
   return success;
 }

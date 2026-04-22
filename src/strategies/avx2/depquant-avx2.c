@@ -38,7 +38,6 @@
 #include "strategyselector.h"
 
 
-#if COMPILE_INTEL_AVX2 && defined X86_64
 #include "dep_quant.h"
 
 #include <immintrin.h>
@@ -47,7 +46,7 @@
 #include "intra.h"
 #include "rdo.h"
 #include "transform.h"
-#include "generic/quant-generic.h"
+#include "strategies/generic/quant-generic.h"
 #include "uvg_math.h"
 static const int32_t g_goRiceBits[4][RICEMAX] = {
     { 32768,  65536,  98304, 131072, 163840, 196608, 262144, 262144, 327680, 327680, 327680, 327680, 393216, 393216, 393216, 393216, 393216, 393216, 393216, 393216, 458752, 458752, 458752, 458752, 458752, 458752, 458752, 458752, 458752, 458752, 458752, 458752},
@@ -1529,17 +1528,12 @@ void uvg_find_first_non_zero_avx2(const coeff_t* srcCoeff, const bool enableScal
   *firstTestPos = temp;
 }
 
-
-#endif //COMPILE_INTEL_AVX2 && defined X86_64
-
 int uvg_strategy_register_depquant_avx2(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
 
-#if COMPILE_INTEL_AVX2 && defined X86_64
   success &= uvg_strategyselector_register(opaque, "dep_quant_decide_and_update", "avx2", 40, &uvg_dep_quant_decide_and_update_avx2);
   success &= uvg_strategyselector_register(opaque, "find_first_non_zero_coeff", "avx2", 40, &uvg_find_first_non_zero_avx2);
-#endif //COMPILE_INTEL_AVX2 && defined X86_64
 
   return success;
 }

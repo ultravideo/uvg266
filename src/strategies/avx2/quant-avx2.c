@@ -36,7 +36,6 @@
 
 #include "strategies/avx2/quant-avx2.h"
 
-#if COMPILE_INTEL_AVX2 && defined X86_64
 #include <immintrin.h>
 #include <stdlib.h>
 
@@ -951,13 +950,10 @@ static uint32_t fast_coeff_cost_avx2(const coeff_t *coeff, int32_t width, int32_
   return (_mm_cvtsi128_si32(sum128) + (1 << 7)) >> 8;
 }
 
-#endif //COMPILE_INTEL_AVX2 && defined X86_64
-
 int uvg_strategy_register_quant_avx2(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
 
-#if COMPILE_INTEL_AVX2 && defined X86_64
 #if UVG_BIT_DEPTH == 8
   if (bitdepth == 8) {
     success &= uvg_strategyselector_register(opaque, "quantize_residual", "avx2", 40, &uvg_quantize_residual_avx2);
@@ -967,7 +963,6 @@ int uvg_strategy_register_quant_avx2(void* opaque, uint8_t bitdepth)
   success &= uvg_strategyselector_register(opaque, "quant", "avx2", 40, &uvg_quant_avx2);
   success &= uvg_strategyselector_register(opaque, "coeff_abs_sum", "avx2", 0, &coeff_abs_sum_avx2);
   success &= uvg_strategyselector_register(opaque, "fast_coeff_cost", "avx2", 40, &fast_coeff_cost_avx2);
-#endif //COMPILE_INTEL_AVX2 && defined X86_64
 
   return success;
 }

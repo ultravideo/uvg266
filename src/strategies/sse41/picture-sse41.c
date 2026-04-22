@@ -32,7 +32,6 @@
 
 #include "global.h"
 
-#if COMPILE_INTEL_SSE41
 #include "uvg266.h"
 #if UVG_BIT_DEPTH == 8
 #include "strategies/sse41/picture-sse41.h"
@@ -229,12 +228,10 @@ static uint32_t hor_sad_sse41(const uint8_t *pic_data, const uint8_t *ref_data,
 }
 
 #endif // UVG_BIT_DEPTH == 8
-#endif //COMPILE_INTEL_SSE41
 
 
 int uvg_strategy_register_picture_sse41(void* opaque, uint8_t bitdepth) {
   bool success = true;
-#if COMPILE_INTEL_SSE41
 #if UVG_BIT_DEPTH == 8
   if (bitdepth == 8){
     success &= uvg_strategyselector_register(opaque, "reg_sad", "sse41", 20, &uvg_reg_sad_sse41);
@@ -243,6 +240,5 @@ int uvg_strategy_register_picture_sse41(void* opaque, uint8_t bitdepth) {
     success &= uvg_strategyselector_register(opaque, "hor_sad", "sse41", 20, &hor_sad_sse41);
   }
 #endif // UVG_BIT_DEPTH == 8
-#endif
   return success;
 }

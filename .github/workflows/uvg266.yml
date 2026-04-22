@@ -11,28 +11,32 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-    - name: cmake
-      run: cmake -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=./ . || (cat config.log && false)
-    - name: make
-      run: make install -j
-    - name: Run tests
-      run: export PATH="/home/docker/bin:${PATH}" && CTEST_PARALLEL_LEVEL=8 CTEST_OUTPUT_ON_FAILURE=1 make test
-      
+    - name: configure
+      run: cmake -B build -S . -DCMAKE_BUILD_TYPE=RelWithDebInfo
+    - name: build
+      run: cmake --build build --parallel
+    - name: install
+      run: cmake --install build --prefix "${PWD}"
+    - name: test
+      run: export PATH="/home/docker/bin:${PATH}" && ctest --test-dir build --parallel --timeout 1800 --output-on-failure
+
   test-ubsan:
     runs-on: self-hosted
     env:
       CC: gcc
       CFLAGS: -fsanitize=undefined -fno-sanitize-recover=all -fno-sanitize=alignment
-      
+
     steps:
     - uses: actions/checkout@v2
-    - name: cmake
-      run: cmake -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=./ . || (cat config.log && false)
-    - name: make
-      run: make install -j
-    - name: Run tests
-      run: export PATH="/home/docker/bin:${PATH}" && CTEST_PARALLEL_LEVEL=8 CTEST_OUTPUT_ON_FAILURE=1 make test
-      
+    - name: configure
+      run: cmake -B build -S . -DCMAKE_BUILD_TYPE=RelWithDebInfo
+    - name: build
+      run: cmake --build build --parallel
+    - name: install
+      run: cmake --install build --prefix "${PWD}"
+    - name: test
+      run: export PATH="/home/docker/bin:${PATH}" && ctest --test-dir build --parallel --timeout 1800 --output-on-failure
+
   test-asan:
     runs-on: self-hosted
     env:
@@ -42,42 +46,48 @@ jobs:
       # AddressSanitizer adds some extra symbols so we expect a failure from
       # the external symbols test.
       XFAIL_TESTS: test_external_symbols
-      
+
     steps:
     - uses: actions/checkout@v2
-    - name: cmake
-      run: cmake -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=./ . || (cat config.log && false)
-    - name: make
-      run: make install -j
-    - name: Run tests
-      run: export PATH="/home/docker/bin:${PATH}" && CTEST_PARALLEL_LEVEL=8 CTEST_OUTPUT_ON_FAILURE=1 make test
-      
+    - name: configure
+      run: cmake -B build -S . -DCMAKE_BUILD_TYPE=RelWithDebInfo
+    - name: build
+      run: cmake --build build --parallel
+    - name: install
+      run: cmake --install build --prefix "${PWD}"
+    - name: test
+      run: export PATH="/home/docker/bin:${PATH}" && ctest --test-dir build --parallel --timeout 1800 --output-on-failure
+
   # test-tsan:
     # runs-on: self-hosted
     # env:
       # CC: gcc
       # CFLAGS: -fsanitize=thread
-      
+
     # steps:
     # - uses: actions/checkout@v2
-    # - name: cmake
-      # run: cmake -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=./ . || (cat config.log && false)
-    # - name: make
-      # run: make install -j
-    # - name: Run tests
-      # run: export PATH="/home/docker/bin:${PATH}" && CTEST_PARALLEL_LEVEL=8 CTEST_OUTPUT_ON_FAILURE=1 make test
-      
+    - name: configure
+      run: cmake -B build -S . -DCMAKE_BUILD_TYPE=RelWithDebInfo
+    - name: build
+      run: cmake --build build --parallel
+    - name: install
+      run: cmake --install build --prefix "${PWD}"
+    - name: test
+      run: export PATH="/home/docker/bin:${PATH}" && ctest --test-dir build --parallel --timeout 1800 --output-on-failure
+
   test-valgrind:
     runs-on: self-hosted
-    
+
     env:
       UVG266_OVERRIDE_angular_pred: generic
-      
+
     steps:
     - uses: actions/checkout@v2
-    - name: cmake
-      run: cmake -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=./ . || (cat config.log && false)
-    - name: make
-      run: make install -j
-    - name: Run tests
-      run: export PATH="/home/docker/bin:${PATH}" && CTEST_PARALLEL_LEVEL=8 CTEST_OUTPUT_ON_FAILURE=1 make test
+    - name: configure
+      run: cmake -B build -S . -DCMAKE_BUILD_TYPE=RelWithDebInfo
+    - name: build
+      run: cmake --build build --parallel
+    - name: install
+      run: cmake --install build --prefix "${PWD}"
+    - name: test
+      run: export PATH="/home/docker/bin:${PATH}" && ctest --test-dir build --parallel --timeout 7200 --output-on-failure

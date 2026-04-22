@@ -30,6 +30,7 @@
  * INCLUDING NEGLIGENCE OR OTHERWISE ARISING IN ANY WAY OUT OF THE USE OF THIS
  ****************************************************************************/
 
+#include "build_config.h"
 #include "strategies/strategies-alf.h"
 #include "strategies/sse41/alf-sse41.h"
 #include "strategies/avx2/alf-avx2.h"
@@ -48,12 +49,17 @@ int uvg_strategy_register_alf(void* opaque, uint8_t bitdepth) {
 
   success &= uvg_strategy_register_alf_generic(opaque, bitdepth);
 
+#if UVG_HAVE_X86_64_SSE41
   if (uvg_g_hardware_flags.intel_flags.sse41) {
     success &= uvg_strategy_register_alf_sse41(opaque, bitdepth);
   }
+#endif
+
+#if UVG_HAVE_X86_64_AVX2
   if (uvg_g_hardware_flags.intel_flags.avx2) {
     success &= uvg_strategy_register_alf_avx2(opaque, bitdepth);
   }
+#endif
 
   return success;
 }

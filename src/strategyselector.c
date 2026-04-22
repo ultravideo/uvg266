@@ -31,12 +31,14 @@
  ****************************************************************************/
 
 #include "strategyselector.h"
+#include "build_config.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #else
 #include <unistd.h>
@@ -347,7 +349,7 @@ static void* strategyselector_choose_for(const strategy_list_t * const strategie
   return strategies->strategies[max_priority_i].fptr;
 }
 
-#if COMPILE_INTEL
+#if UVG_HAVE_X86_64
 
 typedef struct {
   unsigned int eax;
@@ -390,10 +392,10 @@ static INLINE int get_cpuid(unsigned level, unsigned sublevel, cpuid_t *cpu_info
   return 0;
 }
 #  endif
-#endif // COMPILE_INTEL
+#endif // UVG_HAVE_X86_64
 
-#if COMPILE_POWERPC
-#  if defined(__linux__) || defined(HAVE_ELF_AUX_INFO)
+#if UVG_HAVE_POWERPC
+#if defined(__linux__) || defined(UVG_HAVE_ELF_AUX_INFO)
 #ifdef __linux__
 #include <asm/cputable.h>
 #elif defined(__FreeBSD__)
@@ -447,19 +449,19 @@ static int altivec_available(void)
 #  else
 static int altivec_available(void)
 {
-#if COMPILE_POWERPC_ALTIVEC
+#if UVG_HAVE_POWERPC_ALTIVEC
   return 1;
 #else
   return 0;
 #endif
 }
 #  endif
-#endif //COMPILE_POWERPC
+#endif //UVG_HAVE_POWERPC
 
 static void set_hardware_flags(int32_t cpuid) {
   FILL(uvg_g_hardware_flags, 0);
 
-#if COMPILE_INTEL
+#if UVG_HAVE_X86_64
   if (cpuid) {
     cpuid_t cpuid1 = { 0, 0, 0, 0 };
     /* CPU feature bits */
@@ -542,35 +544,35 @@ static void set_hardware_flags(int32_t cpuid) {
     }
   }
 
-  fprintf(stderr, "Compiled: INTEL, flags:");
-#if COMPILE_INTEL_MMX
+  fprintf(stderr, "Compiled: x86-64, flags:");
+#if UVG_HAVE_X86_64_MMX
   fprintf(stderr, " MMX");
 #endif
-#if COMPILE_INTEL_SSE
+#if UVG_HAVE_X86_64_SSE
   fprintf(stderr, " SSE");
 #endif
-#if COMPILE_INTEL_SSE2
+#if UVG_HAVE_X86_64_SSE2
   fprintf(stderr, " SSE2");
 #endif
-#if COMPILE_INTEL_SSE3
+#if UVG_HAVE_X86_64_SSE3
   fprintf(stderr, " SSE3");
 #endif
-#if COMPILE_INTEL_SSSE3
+#if UVG_HAVE_X86_64_SSSE3
   fprintf(stderr, " SSSE3");
 #endif
-#if COMPILE_INTEL_SSE41
+#if UVG_HAVE_X86_64_SSE41
   fprintf(stderr, " SSE41");
 #endif
-#if COMPILE_INTEL_SSE42
+#if UVG_HAVE_X86_64_SSE42
   fprintf(stderr, " SSE42");
 #endif
-#if COMPILE_INTEL_AVX
+#if UVG_HAVE_X86_64_AVX
   fprintf(stderr, " AVX");
 #endif
-#if COMPILE_INTEL_AVX2
+#if UVG_HAVE_X86_64_AVX2
   fprintf(stderr, " AVX2");
 #endif
-  fprintf(stderr, "\nDetected: INTEL, flags:");
+  fprintf(stderr, "\nDetected: x86-64, flags:");
   if (uvg_g_hardware_flags.intel_flags.mmx) fprintf(stderr, " MMX");
   if (uvg_g_hardware_flags.intel_flags.sse) fprintf(stderr, " SSE");
   if (uvg_g_hardware_flags.intel_flags.sse2) fprintf(stderr, " SSE2");
@@ -581,15 +583,15 @@ static void set_hardware_flags(int32_t cpuid) {
   if (uvg_g_hardware_flags.intel_flags.avx) fprintf(stderr, " AVX");
   if (uvg_g_hardware_flags.intel_flags.avx2) fprintf(stderr, " AVX2");
   fprintf(stderr, "\n");
-#endif //COMPILE_INTEL
+#endif //UVG_HAVE_X86_64
 
-#if COMPILE_POWERPC
+#if UVG_HAVE_POWERPC
   if (cpuid) {
     uvg_g_hardware_flags.powerpc_flags.altivec = altivec_available();
   }
   
   fprintf(stderr, "Compiled: PowerPC, flags:");
-#if COMPILE_POWERPC_ALTIVEC
+#if UVG_HAVE_POWERPC_ALTIVEC
   fprintf(stderr, " AltiVec");
 #endif
   fprintf(stderr, "\nDetected: PowerPC, flags:");

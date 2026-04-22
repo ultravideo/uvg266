@@ -1,0 +1,18 @@
+function(uvg_check_have_elf_aux_info result)
+  if(NOT UNIX)
+    set(${result} 0 PARENT_SCOPE)
+    return()
+  endif()
+
+  include(CheckSymbolExists)
+  check_symbol_exists(elf_aux_info sys/auxv.h success)
+  if(success)
+    set(${result} 1 PARENT_SCOPE)
+  else()
+    set(${result} 0 PARENT_SCOPE)
+  endif()
+endfunction()
+
+macro(uvg_detect_system_features)
+  uvg_check_have_elf_aux_info(UVG_HAVE_ELF_AUX_INFO)
+endmacro()

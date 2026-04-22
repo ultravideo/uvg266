@@ -868,7 +868,7 @@ static void encoder_state_write_bitstream_prefix_sei_version(encoder_state_t * c
   memcpy(buf, uuid, 16);
 
   // user_data_payload_byte
-  s += sprintf(s, "uvg266 VVC Encoder v. " VERSION_STRING " - "
+  s += sprintf(s, "uvg266 VVC Encoder v. " UVG_VERSION_STRING " - "
                   "Copyleft 2020- - http://ultravideo.fi/ - options:");
   s += sprintf(s, " %dx%d", cfg->width, cfg->height);
   s += sprintf(s, " deblock=%d:%d:%d", cfg->deblock_enable,

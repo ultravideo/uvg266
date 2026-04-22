@@ -41,7 +41,7 @@
 #include "global.h" // IWYU pragma: keep
 
 #include "encoderstate.h"
-#include "pthread.h"
+#include <pthread.h>
 
 typedef struct uvg_rc_data {
   double *c_para[UVG_MAX_GOP_LAYERS];
