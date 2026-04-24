@@ -208,7 +208,7 @@ set_target_properties(libuvg266_shared PROPERTIES
   EXPORT_NAME libuvg266
 )
 
-if(WIN32)
+if(MSVC)
   set_target_properties(libuvg266_shared PROPERTIES
     ARCHIVE_OUTPUT_NAME libuvg266-stub
     RUNTIME_OUTPUT_NAME libuvg266
@@ -231,7 +231,7 @@ set_target_properties(libuvg266_static PROPERTIES
   EXPORT_NAME libuvg266_static
 )
 
-if(WIN32)
+if(MSVC)
   set_target_properties(libuvg266_static PROPERTIES
     OUTPUT_NAME libuvg266
   )
