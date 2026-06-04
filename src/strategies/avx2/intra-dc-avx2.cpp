@@ -418,91 +418,389 @@ static void uvg_intra_pred_dc_avx2(
 */
 // TODO: allegedly does not work with blocks with height 1 and 2. Test this.
 // TODO: or just rework the whole thing. We might be able to optimize this further.
+template<int N>
+static inline constexpr int log2_const()
+{
+  static_assert(N == 4 || N == 8 || N == 16 || N == 32 || N == 64,
+    "PDPC size must be power of two from 4 to 64");
+
+  if constexpr (N == 4)  return 2;
+  if constexpr (N == 8)  return 3;
+  if constexpr (N == 16) return 4;
+  if constexpr (N == 32) return 5;
+  if constexpr (N == 64) return 6;
+}
+
+static inline uint32_t load_u32_unaligned(const void* p)
+{
+  uint32_t v;
+  memcpy(&v, p, sizeof(v));
+  return v;
+}
+
+static inline void store_u32_unaligned(void* p, uint32_t v)
+{
+  memcpy(p, &v, sizeof(v));
+}
+
+template<int W, int H>
+static inline void pdpc_make_weights(int16_t* w)
+{
+  constexpr int log2_width = log2_const<W>();
+  constexpr int log2_height = log2_const<H>();
+  constexpr int scale = ((log2_width - 2 + log2_height - 2 + 2) >> 2);
+  constexpr int max_size = W > H ? W : H;
+
+  for (int i = 0; i < max_size; ++i) {
+    const int shift = (2 * i) >> scale;
+    w[i] = (int16_t)(shift >= 6 ? 0 : (32 >> shift));
+  }
+}
+template<int W, int H>
+static inline void pdpc_16x2_avx2(
+  const uvg_pixel* left,
+  const uvg_pixel* top,
+  const int16_t* w,
+  uvg_pixel* dst,
+  const int x,
+  const int y)
+{
+  static_assert(W >= 16);
+  static_assert(H >= 2);
+
+  uvg_pixel* dst0 = dst + (y + 0) * W + x;
+  uvg_pixel* dst1 = dst + (y + 1) * W + x;
+
+  // Load 16 destination pixels from two rows.
+  const __m128i dst0_8 = _mm_loadu_si128((const __m128i*)dst0);
+  const __m128i dst1_8 = _mm_loadu_si128((const __m128i*)dst1);
+
+  const __m256i vdst0 = _mm256_cvtepu8_epi16(dst0_8);
+  const __m256i vdst1 = _mm256_cvtepu8_epi16(dst1_8);
+
+  // Same top samples for both rows.
+  const __m128i top_8 = _mm_loadu_si128((const __m128i*)(top + x + 1));
+  const __m256i vtop = _mm256_cvtepu8_epi16(top_8);
+
+  // Same horizontal weights for both rows.
+  const __m256i vwL = _mm256_loadu_si256((const __m256i*)(w + x));
+
+  // Row-specific left references.
+  const __m256i vleft0 = _mm256_set1_epi16((int16_t)left[y + 1]);
+  const __m256i vleft1 = _mm256_set1_epi16((int16_t)left[y + 2]);
+
+  // Row-specific vertical weights.
+  const __m256i vwT0 = _mm256_set1_epi16(w[y + 0]);
+  const __m256i vwT1 = _mm256_set1_epi16(w[y + 1]);
+
+  const __m256i diff_left0 = _mm256_sub_epi16(vleft0, vdst0);
+  const __m256i diff_left1 = _mm256_sub_epi16(vleft1, vdst1);
+
+  const __m256i diff_top0 = _mm256_sub_epi16(vtop, vdst0);
+  const __m256i diff_top1 = _mm256_sub_epi16(vtop, vdst1);
+
+  __m256i accu0 = _mm256_add_epi16(
+    _mm256_mullo_epi16(vwL, diff_left0),
+    _mm256_mullo_epi16(vwT0, diff_top0)
+  );
+
+  __m256i accu1 = _mm256_add_epi16(
+    _mm256_mullo_epi16(vwL, diff_left1),
+    _mm256_mullo_epi16(vwT1, diff_top1)
+  );
+
+  const __m256i round = _mm256_set1_epi16(32);
+
+  accu0 = _mm256_add_epi16(accu0, round);
+  accu1 = _mm256_add_epi16(accu1, round);
+
+  accu0 = _mm256_srai_epi16(accu0, 6);
+  accu1 = _mm256_srai_epi16(accu1, 6);
+
+  accu0 = _mm256_add_epi16(vdst0, accu0);
+  accu1 = _mm256_add_epi16(vdst1, accu1);
+
+  // Packs inside 128-bit lanes:
+  //   before permute:
+  //     qword0 = row0[0..7]
+  //     qword1 = row1[0..7]
+  //     qword2 = row0[8..15]
+  //     qword3 = row1[8..15]
+  //
+  //   after 0xD8 = [0, 2, 1, 3]:
+  //     lower 128 = row0[0..15]
+  //     upper 128 = row1[0..15]
+  __m256i packed = _mm256_packus_epi16(accu0, accu1);
+  packed = _mm256_permute4x64_epi64(packed, 0xD8);
+
+  if constexpr (W == 16) {
+    _mm256_storeu_si256((__m256i*)dst0, packed);
+  }
+  else {
+    _mm_storeu_si128((__m128i*)dst0, _mm256_castsi256_si128(packed));
+    _mm_storeu_si128((__m128i*)dst1, _mm256_extracti128_si256(packed, 1));
+  }
+}
+
+template<int W, int H>
+static inline void pdpc_8x4_avx2(
+  const uvg_pixel* left,
+  const uvg_pixel* top,
+  const int16_t* w,
+  uvg_pixel* dst,
+  const int y)
+{
+  static_assert(W == 8);
+  static_assert(H >= 4);
+
+  uvg_pixel* dst0 = dst + (y + 0) * W;
+  uvg_pixel* dst1 = dst + (y + 1) * W;
+  uvg_pixel* dst2 = dst + (y + 2) * W;
+  uvg_pixel* dst3 = dst + (y + 3) * W;
+
+  const __m128i dst0_8 = _mm_loadl_epi64((const __m128i*)dst0);
+  const __m128i dst1_8 = _mm_loadl_epi64((const __m128i*)dst1);
+  const __m128i dst2_8 = _mm_loadl_epi64((const __m128i*)dst2);
+  const __m128i dst3_8 = _mm_loadl_epi64((const __m128i*)dst3);
+
+  // Vector A:
+  //   low  lane: row0[0..7]
+  //   high lane: row1[0..7]
+  //
+  // Vector B:
+  //   low  lane: row2[0..7]
+  //   high lane: row3[0..7]
+  const __m256i vdst01 = _mm256_inserti128_si256(
+    _mm256_cvtepu8_epi16(dst0_8),
+    _mm256_castsi256_si128(_mm256_cvtepu8_epi16(dst1_8)),
+    1
+  );
+
+  const __m256i vdst23 = _mm256_inserti128_si256(
+    _mm256_cvtepu8_epi16(dst2_8),
+    _mm256_castsi256_si128(_mm256_cvtepu8_epi16(dst3_8)),
+    1
+  );
+
+  const __m128i top_8 = _mm_loadl_epi64((const __m128i*)(top + 1));
+  __m256i vtop = _mm256_cvtepu8_epi16(top_8);
+  vtop = _mm256_permute2x128_si256(vtop, vtop, 0x00);
+
+  const __m128i wL_128 = _mm_loadu_si128((const __m128i*)w);
+  const __m256i vwL = _mm256_set_m128i(wL_128, wL_128);
+
+  const __m256i vleft01 = _mm256_set_m128i(
+    _mm_set1_epi16((int16_t)left[y + 2]),
+    _mm_set1_epi16((int16_t)left[y + 1])
+  );
+
+  const __m256i vleft23 = _mm256_set_m128i(
+    _mm_set1_epi16((int16_t)left[y + 4]),
+    _mm_set1_epi16((int16_t)left[y + 3])
+  );
+
+  const __m256i vwT01 = _mm256_set_m128i(
+    _mm_set1_epi16(w[y + 1]),
+    _mm_set1_epi16(w[y + 0])
+  );
+
+  const __m256i vwT23 = _mm256_set_m128i(
+    _mm_set1_epi16(w[y + 3]),
+    _mm_set1_epi16(w[y + 2])
+  );
+
+  const __m256i round = _mm256_set1_epi16(32);
+
+  __m256i accu01 = _mm256_add_epi16(
+    _mm256_mullo_epi16(vwL, _mm256_sub_epi16(vleft01, vdst01)),
+    _mm256_mullo_epi16(vwT01, _mm256_sub_epi16(vtop, vdst01))
+  );
+
+  __m256i accu23 = _mm256_add_epi16(
+    _mm256_mullo_epi16(vwL, _mm256_sub_epi16(vleft23, vdst23)),
+    _mm256_mullo_epi16(vwT23, _mm256_sub_epi16(vtop, vdst23))
+  );
+
+  accu01 = _mm256_add_epi16(_mm256_srai_epi16(_mm256_add_epi16(accu01, round), 6), vdst01);
+  accu23 = _mm256_add_epi16(_mm256_srai_epi16(_mm256_add_epi16(accu23, round), 6), vdst23);
+
+  // packed contains:
+  //   qword0 = row0[0..7]
+  //   qword1 = row2[0..7]
+  //   qword2 = row1[0..7]
+  //   qword3 = row3[0..7]
+  //
+  // because packing is lane-local:
+  //   low lane  packs accu01.low  + accu23.low  => row0,row2
+  //   high lane packs accu01.high + accu23.high => row1,row3
+  __m256i packed = _mm256_packus_epi16(accu01, accu23);
+
+  // Reorder qwords from [row0,row2,row1,row3] to [row0,row1,row2,row3].
+  packed = _mm256_permute4x64_epi64(packed, 0xD8);
+
+  // Since W == 8, four rows are contiguous in memory.
+  _mm256_storeu_si256((__m256i*)dst0, packed);
+}
+
+template<int W, int H>
+static inline void pdpc_4x4_avx2(
+  const uvg_pixel* left,
+  const uvg_pixel* top,
+  const int16_t* w,
+  uvg_pixel* dst,
+  const int y,
+  const __m256i shuf_mask_byte,
+  const __m256i shuf_mask_word)
+{
+  static_assert(W == 4);
+
+  const uint32_t r0 = load_u32_unaligned(dst + (y + 0) * W);
+  const uint32_t r1 = load_u32_unaligned(dst + (y + 1) * W);
+  const uint32_t r2 = load_u32_unaligned(dst + (y + 2) * W);
+  const uint32_t r3 = load_u32_unaligned(dst + (y + 3) * W);
+
+  const __m128i rows = _mm_setr_epi32((int)r0, (int)r1, (int)r2, (int)r3);
+  const __m256i vdst = _mm256_cvtepu8_epi16(rows);
+
+  uint32_t dw_left;
+  uint32_t dw_top;
+  memcpy(&dw_left, left + y + 1, sizeof(dw_left));
+  memcpy(&dw_top, top + 1, sizeof(dw_top));
+
+  __m256i vleft = _mm256_set1_epi32((int)dw_left);
+  vleft = _mm256_shuffle_epi8(vleft, shuf_mask_byte);
+
+  __m256i vtop = _mm256_set1_epi32((int)dw_top);
+  vtop = _mm256_cvtepu8_epi16(_mm256_castsi256_si128(vtop));
+
+  uint64_t quad_wL;
+  uint64_t quad_wT;
+  memcpy(&quad_wL, w, sizeof(quad_wL));
+  memcpy(&quad_wT, w + y, sizeof(quad_wT));
+
+  __m256i vwL = _mm256_set1_epi64x((int64_t)quad_wL);
+
+  __m256i vwT = _mm256_set1_epi64x((int64_t)quad_wT);
+  vwT = _mm256_shuffle_epi8(vwT, shuf_mask_word);
+
+  const __m256i diff_left = _mm256_sub_epi16(vleft, vdst);
+  const __m256i diff_top = _mm256_sub_epi16(vtop, vdst);
+
+  __m256i accu = _mm256_add_epi16(
+    _mm256_mullo_epi16(vwL, diff_left),
+    _mm256_mullo_epi16(vwT, diff_top)
+  );
+
+  accu = _mm256_add_epi16(accu, _mm256_set1_epi16(32));
+  accu = _mm256_srai_epi16(accu, 6);
+  accu = _mm256_add_epi16(vdst, accu);
+
+  const __m128i lo = _mm256_castsi256_si128(accu);
+  const __m128i hi = _mm256_extracti128_si256(accu, 1);
+  const __m128i packed = _mm_packus_epi16(lo, hi);
+
+  store_u32_unaligned(dst + (y + 0) * W, (uint32_t)_mm_extract_epi32(packed, 0));
+  store_u32_unaligned(dst + (y + 1) * W, (uint32_t)_mm_extract_epi32(packed, 1));
+  store_u32_unaligned(dst + (y + 2) * W, (uint32_t)_mm_extract_epi32(packed, 2));
+  store_u32_unaligned(dst + (y + 3) * W, (uint32_t)_mm_extract_epi32(packed, 3));
+}
+template<int W, int H>
+static inline void uvg_pdpc_planar_dc_avx2_size(
+  const uvg_intra_ref* const used_ref,
+  uvg_pixel* const dst)
+{
+  alignas(32) int16_t w[64];
+  pdpc_make_weights<W, H>(w);
+
+  if constexpr (W >= 16) {
+    for (int y = 0; y < H; y += 2) {
+      for (int x = 0; x < W; x += 16) {
+        pdpc_16x2_avx2<W, H>(
+          used_ref->left,
+          used_ref->top,
+          w,
+          dst,
+          x,
+          y
+        );
+        if (y > 12) break;
+      }
+    }
+  }
+  else if constexpr (W == 8) {
+    for (int y = 0; y < H; y += 4) {
+      pdpc_8x4_avx2<W, H>(
+        used_ref->left,
+        used_ref->top,
+        w,
+        dst,
+        y
+      );
+    }
+  }
+  else {
+    static_assert(W == 4);
+
+    const __m256i shuf_mask_byte = _mm256_setr_epi8(
+      0, -1, 0, -1, 0, -1, 0, -1,
+      1, -1, 1, -1, 1, -1, 1, -1,
+      2, -1, 2, -1, 2, -1, 2, -1,
+      3, -1, 3, -1, 3, -1, 3, -1
+    );
+
+    const __m256i shuf_mask_word = _mm256_setr_epi8(
+      0, 1, 0, 1, 0, 1, 0, 1,
+      2, 3, 2, 3, 2, 3, 2, 3,
+      4, 5, 4, 5, 4, 5, 4, 5,
+      6, 7, 6, 7, 6, 7, 6, 7
+    );
+
+    for (int y = 0; y < H; y += 4) {
+      pdpc_4x4_avx2<W, H>(
+        used_ref->left,
+        used_ref->top,
+        w,
+        dst,
+        y,
+        shuf_mask_byte,
+        shuf_mask_word
+      );
+    }
+  }
+}
+
+#define DISPATCH_PDPC_HEIGHT(WIDTH)                         \
+  switch (height) {                                         \
+    case 4:  uvg_pdpc_planar_dc_avx2_size<WIDTH, 4 >(used_ref, dst); break; \
+    case 8:  uvg_pdpc_planar_dc_avx2_size<WIDTH, 8 >(used_ref, dst); break; \
+    case 16: uvg_pdpc_planar_dc_avx2_size<WIDTH, 16>(used_ref, dst); break; \
+    case 32: uvg_pdpc_planar_dc_avx2_size<WIDTH, 32>(used_ref, dst); break; \
+    case 64: uvg_pdpc_planar_dc_avx2_size<WIDTH, 64>(used_ref, dst); break; \
+    default: assert(0); break;                              \
+  }
+
 static void uvg_pdpc_planar_dc_avx2(
   const int mode,
   const cu_loc_t* const cu_loc,
   const color_t color,
-  const uvg_intra_ref *const used_ref,
-  uvg_pixel *const dst)
+  const uvg_intra_ref* const used_ref,
+  uvg_pixel* const dst)
 {
-  assert(mode == 0 || mode == 1);  // planar or DC
+  assert(mode == 0 || mode == 1);
+
   const int width = color == COLOR_Y ? cu_loc->width : cu_loc->chroma_width;
   const int height = color == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
-  const int log2_width =  uvg_g_convert_to_log2[width];
-  const int log2_height = uvg_g_convert_to_log2[height];
 
-  __m256i shuf_mask_byte = _mm256_setr_epi8(
-    0, -1, 0, -1, 0, -1, 0, -1,
-    1, -1, 1, -1, 1, -1, 1, -1,
-    2, -1, 2, -1, 2, -1, 2, -1,
-    3, -1, 3, -1, 3, -1, 3, -1
-  );
+  assert(width == 4 || width == 8 || width == 16 || width == 32 || width == 64);
+  assert(height == 4 || height == 8 || height == 16 || height == 32 || height == 64);
 
-  __m256i shuf_mask_word = _mm256_setr_epi8(
-    0, 1, 0, 1, 0, 1, 0, 1,
-    2, 3, 2, 3, 2, 3, 2, 3,
-    4, 5, 4, 5, 4, 5, 4, 5,
-    6, 7, 6, 7, 6, 7, 6, 7
-  );
-
-  const int scale = ((log2_width - 2 + log2_height - 2 + 2) >> 2);
-
-  // Same weights regardless of axis, compute once
-  int16_t w[LCU_WIDTH];
-  for (int i = 0; i < MAX(width, height); i += 4) {
-    __m128i base = _mm_set1_epi32(i);
-    __m128i offs = _mm_setr_epi32(0, 1, 2, 3);
-    __m128i idxs = _mm_add_epi32(base, offs);
-    __m128i unclipped = _mm_slli_epi32(idxs, 1);
-    unclipped = _mm_srli_epi32(unclipped, scale);
-    __m128i clipped = _mm_min_epi32( _mm_set1_epi32(31), unclipped);
-    __m128i weights = _mm_srlv_epi32(_mm_set1_epi32(32), clipped);
-    weights = _mm_packus_epi32(weights, weights);
-    _mm_storel_epi64((__m128i*)&w[i], weights);
-  }
-
-  // Process in 4x4 blocks
-  for (int y = 0; y < height; y += 4) {
-    for (int x = 0; x < width; x += 4) {
-
-      uint32_t dw_left;
-      uint32_t dw_top;
-      memcpy(&dw_left, &used_ref->left[y + 1], sizeof(dw_left));
-      memcpy(&dw_top , &used_ref->top [x + 1], sizeof(dw_top));
-      __m256i vleft = _mm256_set1_epi32(dw_left);
-      __m256i vtop  = _mm256_set1_epi32(dw_top);
-      vleft  = _mm256_shuffle_epi8(vleft, shuf_mask_byte);
-      vtop = _mm256_cvtepu8_epi16(_mm256_castsi256_si128(vtop));
-
-      __m128i vseq = _mm_setr_epi32(0, 1, 2, 3);
-      __m128i vidx = _mm_slli_epi32(vseq, log2_width);
-      __m128i vdst = _mm_i32gather_epi32((const int32_t*)(dst + y * width + x), vidx, 1);
-      __m256i vdst16 = _mm256_cvtepu8_epi16(vdst);
-      uint64_t quad_wL;
-      uint64_t quad_wT;
-      memcpy(&quad_wL, &w[x], sizeof(quad_wL));
-      memcpy(&quad_wT, &w[y], sizeof(quad_wT));
-      __m256i vwL = _mm256_set1_epi64x(quad_wL); 
-      __m256i vwT = _mm256_set1_epi64x(quad_wT);
-      vwT = _mm256_shuffle_epi8(vwT, shuf_mask_word);
-      __m256i diff_left = _mm256_sub_epi16(vleft, vdst16);
-      __m256i diff_top  = _mm256_sub_epi16(vtop , vdst16);
-      __m256i prod_left = _mm256_mullo_epi16(vwL, diff_left);
-      __m256i prod_top  = _mm256_mullo_epi16(vwT, diff_top);
-      __m256i accu = _mm256_add_epi16(prod_left, prod_top);
-      accu = _mm256_add_epi16(accu, _mm256_set1_epi16(32));
-      accu = _mm256_srai_epi16(accu, 6);
-      accu = _mm256_add_epi16(vdst16, accu);
-
-      __m128i lo = _mm256_castsi256_si128(accu);
-      __m128i hi = _mm256_extracti128_si256(accu, 1);
-      vdst = _mm_packus_epi16(lo, hi);
-
-      *(uint32_t*)(dst + (y + 0) * width + x) = _mm_extract_epi32(vdst, 0);
-      *(uint32_t*)(dst + (y + 1) * width + x) = _mm_extract_epi32(vdst, 1);
-      *(uint32_t*)(dst + (y + 2) * width + x) = _mm_extract_epi32(vdst, 2);
-      *(uint32_t*)(dst + (y + 3) * width + x) = _mm_extract_epi32(vdst, 3);
-    }
+  switch (width) {
+  case 4:  DISPATCH_PDPC_HEIGHT(4);  break;
+  case 8:  DISPATCH_PDPC_HEIGHT(8);  break;
+  case 16: DISPATCH_PDPC_HEIGHT(16); break;
+  case 32: DISPATCH_PDPC_HEIGHT(32); break;
+  case 64: DISPATCH_PDPC_HEIGHT(64); break;
+  default: assert(0); break;
   }
 }
 
