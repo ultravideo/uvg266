@@ -456,8 +456,10 @@ static inline void pdpc_make_weights(int16_t* w)
     w[i] = (int16_t)(shift >= 6 ? 0 : (32 >> shift));
   }
 }
+
+
 template<int W, int H>
-static inline void pdpc_16x2_avx2(
+static inline void pdpc_16x2_top_left_avx2(
   const uvg_pixel* left,
   const uvg_pixel* top,
   const int16_t* w,
@@ -508,6 +510,146 @@ static inline void pdpc_16x2_avx2(
     _mm256_mullo_epi16(vwL, diff_left1),
     _mm256_mullo_epi16(vwT1, diff_top1)
   );
+
+  const __m256i round = _mm256_set1_epi16(32);
+
+  accu0 = _mm256_add_epi16(accu0, round);
+  accu1 = _mm256_add_epi16(accu1, round);
+
+  accu0 = _mm256_srai_epi16(accu0, 6);
+  accu1 = _mm256_srai_epi16(accu1, 6);
+
+  accu0 = _mm256_add_epi16(vdst0, accu0);
+  accu1 = _mm256_add_epi16(vdst1, accu1);
+
+  // Packs inside 128-bit lanes:
+  //   before permute:
+  //     qword0 = row0[0..7]
+  //     qword1 = row1[0..7]
+  //     qword2 = row0[8..15]
+  //     qword3 = row1[8..15]
+  //
+  //   after 0xD8 = [0, 2, 1, 3]:
+  //     lower 128 = row0[0..15]
+  //     upper 128 = row1[0..15]
+  __m256i packed = _mm256_packus_epi16(accu0, accu1);
+  packed = _mm256_permute4x64_epi64(packed, 0xD8);
+
+  if constexpr (W == 16) {
+    _mm256_storeu_si256((__m256i*)dst0, packed);
+  }
+  else {
+    _mm_storeu_si128((__m128i*)dst0, _mm256_castsi256_si128(packed));
+    _mm_storeu_si128((__m128i*)dst1, _mm256_extracti128_si256(packed, 1));
+  }
+}
+
+
+template<int W, int H>
+static inline void pdpc_16x2_left_avx2(
+  const uvg_pixel* left,
+  const int16_t* w,
+  uvg_pixel* dst,
+  const int x,
+  const int y)
+{
+  static_assert(W >= 16);
+  static_assert(H >= 2);
+
+  uvg_pixel* dst0 = dst + (y + 0) * W + x;
+  uvg_pixel* dst1 = dst + (y + 1) * W + x;
+
+  // Load 16 destination pixels from two rows.
+  const __m128i dst0_8 = _mm_loadu_si128((const __m128i*)dst0);
+  const __m128i dst1_8 = _mm_loadu_si128((const __m128i*)dst1);
+
+  const __m256i vdst0 = _mm256_cvtepu8_epi16(dst0_8);
+  const __m256i vdst1 = _mm256_cvtepu8_epi16(dst1_8);
+
+  // Same horizontal weights for both rows.
+  const __m256i vwL = _mm256_loadu_si256((const __m256i*)(w + x));
+
+  // Row-specific left references.
+  const __m256i vleft0 = _mm256_set1_epi16((int16_t)left[y + 1]);
+  const __m256i vleft1 = _mm256_set1_epi16((int16_t)left[y + 2]);
+
+  const __m256i diff_left0 = _mm256_sub_epi16(vleft0, vdst0);
+  const __m256i diff_left1 = _mm256_sub_epi16(vleft1, vdst1);
+
+  __m256i accu0 = _mm256_mullo_epi16(vwL, diff_left0);
+
+  __m256i accu1 = _mm256_mullo_epi16(vwL, diff_left1);
+
+  const __m256i round = _mm256_set1_epi16(32);
+
+  accu0 = _mm256_add_epi16(accu0, round);
+  accu1 = _mm256_add_epi16(accu1, round);
+
+  accu0 = _mm256_srai_epi16(accu0, 6);
+  accu1 = _mm256_srai_epi16(accu1, 6);
+
+  accu0 = _mm256_add_epi16(vdst0, accu0);
+  accu1 = _mm256_add_epi16(vdst1, accu1);
+
+  // Packs inside 128-bit lanes:
+  //   before permute:
+  //     qword0 = row0[0..7]
+  //     qword1 = row1[0..7]
+  //     qword2 = row0[8..15]
+  //     qword3 = row1[8..15]
+  //
+  //   after 0xD8 = [0, 2, 1, 3]:
+  //     lower 128 = row0[0..15]
+  //     upper 128 = row1[0..15]
+  __m256i packed = _mm256_packus_epi16(accu0, accu1);
+  packed = _mm256_permute4x64_epi64(packed, 0xD8);
+
+  if constexpr (W == 16) {
+    _mm256_storeu_si256((__m256i*)dst0, packed);
+  }
+  else {
+    _mm_storeu_si128((__m128i*)dst0, _mm256_castsi256_si128(packed));
+    _mm_storeu_si128((__m128i*)dst1, _mm256_extracti128_si256(packed, 1));
+  }
+}
+
+
+template<int W, int H>
+static inline void pdpc_16x2_top_avx2(
+  const uvg_pixel* top,
+  const int16_t* w,
+  uvg_pixel* dst,
+  const int x,
+  const int y)
+{
+  static_assert(W >= 16);
+  static_assert(H >= 2);
+
+  uvg_pixel* dst0 = dst + (y + 0) * W + x;
+  uvg_pixel* dst1 = dst + (y + 1) * W + x;
+
+  // Load 16 destination pixels from two rows.
+  const __m128i dst0_8 = _mm_loadu_si128((const __m128i*)dst0);
+  const __m128i dst1_8 = _mm_loadu_si128((const __m128i*)dst1);
+
+  const __m256i vdst0 = _mm256_cvtepu8_epi16(dst0_8);
+  const __m256i vdst1 = _mm256_cvtepu8_epi16(dst1_8);
+
+  // Same top samples for both rows.
+  const __m128i top_8 = _mm_loadu_si128((const __m128i*)(top + x + 1));
+  const __m256i vtop = _mm256_cvtepu8_epi16(top_8);
+
+  // Row-specific vertical weights.
+  const __m256i vwT0 = _mm256_set1_epi16(w[y + 0]);
+  const __m256i vwT1 = _mm256_set1_epi16(w[y + 1]);
+
+
+  const __m256i diff_top0 = _mm256_sub_epi16(vtop, vdst0);
+  const __m256i diff_top1 = _mm256_sub_epi16(vtop, vdst1);
+
+  __m256i accu0 = _mm256_mullo_epi16(vwT0, diff_top0);
+
+  __m256i accu1 = _mm256_mullo_epi16(vwT1, diff_top1);
 
   const __m256i round = _mm256_set1_epi16(32);
 
@@ -642,6 +784,101 @@ static inline void pdpc_8x4_avx2(
   _mm256_storeu_si256((__m256i*)dst0, packed);
 }
 
+
+template<int W, int H>
+static inline void pdpc_8x4_left_avx2(
+  const uvg_pixel* left,
+  const int16_t* w,
+  uvg_pixel* dst,
+  const int y)
+{
+  static_assert(W >= 16);
+  static_assert(H >= 4);
+
+  uvg_pixel* dst0 = dst + (y + 0) * W;
+  uvg_pixel* dst1 = dst + (y + 1) * W;
+  uvg_pixel* dst2 = dst + (y + 2) * W;
+  uvg_pixel* dst3 = dst + (y + 3) * W;
+
+  const __m128i dst0_8 = _mm_loadl_epi64((const __m128i*)dst0);
+  const __m128i dst1_8 = _mm_loadl_epi64((const __m128i*)dst1);
+  const __m128i dst2_8 = _mm_loadl_epi64((const __m128i*)dst2);
+  const __m128i dst3_8 = _mm_loadl_epi64((const __m128i*)dst3);
+
+  // Vector A:
+  //   low  lane: row0[0..7]
+  //   high lane: row1[0..7]
+  //
+  // Vector B:
+  //   low  lane: row2[0..7]
+  //   high lane: row3[0..7]
+  const __m256i vdst01 = _mm256_inserti128_si256(
+    _mm256_cvtepu8_epi16(dst0_8),
+    _mm256_castsi256_si128(_mm256_cvtepu8_epi16(dst1_8)),
+    1
+  );
+
+  const __m256i vdst23 = _mm256_inserti128_si256(
+    _mm256_cvtepu8_epi16(dst2_8),
+    _mm256_castsi256_si128(_mm256_cvtepu8_epi16(dst3_8)),
+    1
+  );
+
+
+  const __m128i wL_128 = _mm_loadu_si128((const __m128i*)w);
+  const __m256i vwL = _mm256_set_m128i(wL_128, wL_128);
+
+  const __m256i vleft01 = _mm256_set_m128i(
+    _mm_set1_epi16((int16_t)left[y + 2]),
+    _mm_set1_epi16((int16_t)left[y + 1])
+  );
+
+  const __m256i vleft23 = _mm256_set_m128i(
+    _mm_set1_epi16((int16_t)left[y + 4]),
+    _mm_set1_epi16((int16_t)left[y + 3])
+  );
+
+  const __m256i vwT01 = _mm256_set_m128i(
+    _mm_set1_epi16(w[y + 1]),
+    _mm_set1_epi16(w[y + 0])
+  );
+
+  const __m256i vwT23 = _mm256_set_m128i(
+    _mm_set1_epi16(w[y + 3]),
+    _mm_set1_epi16(w[y + 2])
+  );
+
+  const __m256i round = _mm256_set1_epi16(32);
+
+  __m256i accu01 = _mm256_mullo_epi16(vwL, _mm256_sub_epi16(vleft01, vdst01));
+
+  __m256i accu23 = _mm256_mullo_epi16(vwL, _mm256_sub_epi16(vleft23, vdst23));
+
+  accu01 = _mm256_add_epi16(_mm256_srai_epi16(_mm256_add_epi16(accu01, round), 6), vdst01);
+  accu23 = _mm256_add_epi16(_mm256_srai_epi16(_mm256_add_epi16(accu23, round), 6), vdst23);
+
+  // packed contains:
+  //   qword0 = row0[0..7]
+  //   qword1 = row2[0..7]
+  //   qword2 = row1[0..7]
+  //   qword3 = row3[0..7]
+  //
+  // because packing is lane-local:
+  //   low lane  packs accu01.low  + accu23.low  => row0,row2
+  //   high lane packs accu01.high + accu23.high => row1,row3
+  __m256i packed = _mm256_packus_epi16(accu01, accu23);
+  
+  // Since W == 8, four rows are contiguous in memory.
+  uint64_t first = _mm256_extract_epi64(packed, 0);
+  uint64_t second = _mm256_extract_epi64(packed, 2);
+  uint64_t third = _mm256_extract_epi64(packed, 1);
+  uint64_t fourth = _mm256_extract_epi64(packed, 3);
+  memcpy(dst0, &first, 8);
+  memcpy(dst1, &second, 8);
+  memcpy(dst2, &third, 8);
+  memcpy(dst3, &fourth, 8);
+}
+
 template<int W, int H>
 static inline void pdpc_4x4_avx2(
   const uvg_pixel* left,
@@ -709,21 +946,57 @@ static inline void uvg_pdpc_planar_dc_avx2_size(
   const uvg_intra_ref* const used_ref,
   uvg_pixel* const dst)
 {
+  constexpr int limit = 3 << ((log2_const<W>() + log2_const<H>() - 2) >> 2);
   alignas(32) int16_t w[64];
   pdpc_make_weights<W, H>(w);
 
   if constexpr (W >= 16) {
     for (int y = 0; y < H; y += 2) {
       for (int x = 0; x < W; x += 16) {
-        pdpc_16x2_avx2<W, H>(
-          used_ref->left,
-          used_ref->top,
-          w,
-          dst,
-          x,
-          y
-        );
-        if (y > 12) break;
+        if (x == 0 && y < limit)
+        {
+          pdpc_16x2_top_left_avx2<W, H>(
+            used_ref->left,
+            used_ref->top,
+            w,
+            dst,
+            x,
+            y
+          );
+        }
+        else if (x != 0)
+        {
+          pdpc_16x2_top_avx2<W, H>(
+            used_ref->top,
+            w,
+            dst,
+            x,
+            y
+          );
+        }
+        else
+        {
+          if constexpr(limit == 12 )
+          {
+            pdpc_16x2_left_avx2<W, H>(
+              used_ref->left,
+              w,
+              dst,
+              x,
+              y
+            );
+          } else
+          {
+            pdpc_8x4_left_avx2<W, H>(
+              used_ref->left,
+              w,
+              dst,
+              y
+            );
+            y += 2;
+          }
+        }
+        if (y >= limit) break;
       }
     }
   }
