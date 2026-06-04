@@ -936,11 +936,9 @@ static inline void pdpc_4x4_avx2(
   const __m128i hi = _mm256_extracti128_si256(accu, 1);
   const __m128i packed = _mm_packus_epi16(lo, hi);
 
-  store_u32_unaligned(dst + (y + 0) * W, (uint32_t)_mm_extract_epi32(packed, 0));
-  store_u32_unaligned(dst + (y + 1) * W, (uint32_t)_mm_extract_epi32(packed, 1));
-  store_u32_unaligned(dst + (y + 2) * W, (uint32_t)_mm_extract_epi32(packed, 2));
-  store_u32_unaligned(dst + (y + 3) * W, (uint32_t)_mm_extract_epi32(packed, 3));
+  _mm_store_si128((__m128i*)(dst + y * 4), packed);
 }
+
 template<int W, int H>
 static inline void uvg_pdpc_planar_dc_avx2_size(
   const uvg_intra_ref* const used_ref,
