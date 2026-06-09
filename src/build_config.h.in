@@ -46,6 +46,9 @@
 #define UVG_HAVE_POWERPC          @UVG_HAVE_POWERPC@
 #define UVG_HAVE_POWERPC_ALTIVEC  @UVG_HAVE_POWERPC_ALTIVEC@
 
+#define UVG_HAVE_RISCV            @UVG_HAVE_RISCV@
+#define UVG_HAVE_RISCV_64         @UVG_HAVE_RISCV_64@
+
 #define UVG_HAVE_X86_64           @UVG_HAVE_X86_64@
 #define UVG_HAVE_X86_64_MMX       0
 #define UVG_HAVE_X86_64_SSE       0

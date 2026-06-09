@@ -134,6 +134,18 @@ macro(uvg_maybe_enable_altivec)
 endmacro()
 
 ############################################################
+# RISC-V
+############################################################
+
+macro(uvg_check_have_riscv)
+  uvg_try_compile("${CMAKE_SOURCE_DIR}/cmake/checks/arch/have_riscv.c" "" UVG_HAVE_RISCV)
+endmacro()
+
+macro(uvg_check_have_riscv_64)
+  uvg_try_compile("${CMAKE_SOURCE_DIR}/cmake/checks/arch/have_riscv_64.c" "" UVG_HAVE_RISCV_64)
+endmacro()
+
+############################################################
 # Generic
 ############################################################
 
@@ -151,8 +163,13 @@ macro(uvg_detect_cpu_features)
   set(UVG_HAVE_POWERPC 0)
   set(UVG_HAVE_POWERPC_ALTIVEC 0)
 
+  set(UVG_HAVE_RISCV 0)
+  set(UVG_HAVE_RISCV_64 0)
+
   uvg_check_have_x86_64()
   uvg_check_have_powerpc()
+  uvg_check_have_riscv()
+  uvg_check_have_riscv_64()
 
   if(UVG_HAVE_X86_64)
     message(STATUS "Targeting x86-64")
@@ -163,5 +180,9 @@ macro(uvg_detect_cpu_features)
   elseif(UVG_HAVE_POWERPC)
     message(STATUS "Targeting PowerPC")
     uvg_maybe_enable_altivec()
+  elseif(UVG_HAVE_RISCV_64)
+    message(STATUS "Targeting RISC-V 64-bit")
+  elseif(UVG_HAVE_RISCV)
+    message(STATUS "Targeting RISC-V")
   endif()
 endmacro()
