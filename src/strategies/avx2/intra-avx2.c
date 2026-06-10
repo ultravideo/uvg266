@@ -976,7 +976,7 @@ static void angular_pred_linear_filter_w16_ver_avx2(uvg_pixel* dst, uvg_pixel* r
   }
 }
 
-static void angular_pred_linear_filter_w32_ver_avx2(uvg_pixel* dst, uvg_pixel* ref, const int height, const int16_t* delta_int, const int pred_mode)
+static void angular_pred_linear_filter_w32_ver_avx2(uvg_pixel* dst, uvg_pixel* ref, const int height, const int16_t* delta_int, const int16_t* delta_fract)
 {
   const __m256i v16s = _mm256_set1_epi16(16);
   const __m256i vshuf = _mm256_setr_epi8(
@@ -984,30 +984,28 @@ static void angular_pred_linear_filter_w32_ver_avx2(uvg_pixel* dst, uvg_pixel* r
     0x04, 0x05, 0x05, 0x06, 0x06, 0x07, 0x07, 0x08,
     0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
     0x04, 0x05, 0x05, 0x06, 0x06, 0x07, 0x07, 0x08
-  );
-
-  const int wide_angle = pred_mode > 66 || pred_mode < 2;
-  const int mode_idx = wide_angle ? (pred_mode < 2 ? 12 + pred_mode : 80 - pred_mode) : (pred_mode <= 34 ? (pred_mode - 2) : (66 - pred_mode));
-  const int8_t* coeff_table = wide_angle ? intra_chroma_linear_interpolation_weights_w8_ver_wide_angle : intra_chroma_linear_interpolation_weights_w8_ver;
-  const int coeff_table_offset = mode_idx * 64;
+  );  
 
   // Handle 1 line at a time
   for (int y = 0; y < height; ++y) {
-    const int16_t* coeff_tmp = (const int16_t*)&coeff_table[coeff_table_offset + (y << 1)];
-    __m256i vcoeff = _mm256_set1_epi16(*coeff_tmp);
+    ALIGNED(2) int8_t coeff[2];
+    coeff[0] = 32 - delta_fract[y];
+    coeff[1] = (int8_t)delta_fract[y];
+    __m256i vcoeff = _mm256_set1_epi16(*(int16_t*)coeff);
+    
+    const __m128i vtmp0 = _mm_loadu_si128((const __m128i*) & ref[delta_int[y] + 0  + 1]);
+    const __m128i vtmp1 = _mm_loadu_si128((const __m128i*) & ref[delta_int[y] + 8  + 1]);
+    const __m128i vtmp2 = _mm_loadu_si128((const __m128i*) & ref[delta_int[y] + 16 + 1]);
+    const __m128i vtmp3 = _mm_loadu_si128((const __m128i*) & ref[delta_int[y] + 24 + 1]);
 
-    ALIGNED(32) __m128i vsrc[4];
-    vsrc[0] = _mm_loadu_si128((const __m128i*) & ref[delta_int[y] + 0 + 1]);
-    vsrc[1] = _mm_loadu_si128((const __m128i*) & ref[delta_int[y] + 16 + 1]); // Flip these two middle sources. They will be later flipped back into place by packus
-    vsrc[2] = _mm_loadu_si128((const __m128i*) & ref[delta_int[y] + 8 + 1]);
-    vsrc[3] = _mm_loadu_si128((const __m128i*) & ref[delta_int[y] + 24 + 1]);
+    __m256i vsrc0 = _mm256_inserti128_si256(_mm256_castsi128_si256(vtmp0), vtmp2, 1); // Flip the two middle sources. They will be later flipped back into place by packus
+    __m256i vsrc1 = _mm256_inserti128_si256(_mm256_castsi128_si256(vtmp1), vtmp3, 1);
+    
+    vsrc0 = _mm256_shuffle_epi8(vsrc0, vshuf);
+    vsrc1 = _mm256_shuffle_epi8(vsrc1, vshuf);
 
-    __m256i* vsrc256 = (__m256i*)vsrc;
-    vsrc256[0] = _mm256_shuffle_epi8(vsrc256[0], vshuf);
-    vsrc256[1] = _mm256_shuffle_epi8(vsrc256[1], vshuf);
-
-    __m256i res0 = _mm256_maddubs_epi16(vsrc256[0], vcoeff);
-    __m256i res1 = _mm256_maddubs_epi16(vsrc256[1], vcoeff);
+    __m256i res0 = _mm256_maddubs_epi16(vsrc0, vcoeff);
+    __m256i res1 = _mm256_maddubs_epi16(vsrc1, vcoeff);
     res0 = _mm256_add_epi16(res0, v16s);
     res1 = _mm256_add_epi16(res1, v16s);
     res0 = _mm256_srai_epi16(res0, 5);
@@ -3446,7 +3444,7 @@ static void uvg_angular_pred_avx2(
           case  4: angular_pred_linear_filter_w4_ver_avx2(dst, ref_main, height, delta_int, pred_mode); break;
           case  8: angular_pred_linear_filter_w8_ver_avx2(dst, ref_main, height, delta_int, pred_mode); break;
           case 16: angular_pred_linear_filter_w16_ver_avx2(dst, ref_main, height, delta_int, pred_mode); break;
-          case 32: angular_pred_linear_filter_w32_ver_avx2(dst, ref_main, height, delta_int, pred_mode); break;
+          case 32: angular_pred_linear_filter_w32_ver_avx2(dst, ref_main, height, delta_int, delta_fract); break;
           default:
             assert(false && "Intra angular predicion: illegal chroma width.\n");
             break;
