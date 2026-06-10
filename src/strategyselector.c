@@ -598,5 +598,13 @@ static void set_hardware_flags(int32_t cpuid) {
   if (uvg_g_hardware_flags.powerpc_flags.altivec) fprintf(stderr, " AltiVec");
   fprintf(stderr, "\n");
 #endif
+
+#if UVG_HAVE_RISCV
+  fprintf(stderr, "Compiled: RISC-V");
+#if UVG_HAVE_RISCV_64
+  fprintf(stderr, " 64-bit");
+#endif
+  fprintf(stderr, ", flags:\nDetected: RISC-V, flags:\n");
+#endif
   
 }
