@@ -987,11 +987,8 @@ static void angular_pred_linear_filter_w32_ver_avx2(uvg_pixel* dst, uvg_pixel* r
   );  
 
   // Handle 1 line at a time
-  for (int y = 0; y < height; ++y) {
-    ALIGNED(2) int8_t coeff[2];
-    coeff[0] = 32 - delta_fract[y];
-    coeff[1] = (int8_t)delta_fract[y];
-    __m256i vcoeff = _mm256_set1_epi16(*(int16_t*)coeff);
+  for (int y = 0; y < height; ++y) {    
+    const __m256i vcoeff = _mm256_set1_epi16(delta_fract[y]);
     
     const __m128i vtmp0 = _mm_loadu_si128((const __m128i*) & ref[delta_int[y] + 0  + 1]);
     const __m128i vtmp1 = _mm_loadu_si128((const __m128i*) & ref[delta_int[y] + 8  + 1]);
@@ -3366,7 +3363,8 @@ static void uvg_angular_pred_avx2(
     const int table_offset = wide_angle_mode ? (pred_mode < 2 ? (pred_mode + 13) * DELTA_TABLE_ROW_LENGTH : (81 - pred_mode) * DELTA_TABLE_ROW_LENGTH) : (pred_mode <= 34 ? (pred_mode - 2) * DELTA_TABLE_ROW_LENGTH : (66 - pred_mode) * DELTA_TABLE_ROW_LENGTH);
     const int16_t* delta_int   = wide_angle_mode ? &delta_int_wide_angle_table[table_offset] : &delta_int_table[table_offset];
     delta_int += multi_ref_index; // TODO: This are not necessarily large enough for 64 dimension blocks
-    const int16_t* delta_fract = wide_angle_mode ? &delta_fract_wide_angle_table[table_offset] : &delta_fract_table[table_offset];
+    const int16_t* delta_fract = channel_type == COLOR_Y ? (wide_angle_mode ? &delta_fract_wide_angle_table[table_offset] : &delta_fract_table[table_offset]) : 
+                                                           (wide_angle_mode ? (int16_t*)&delta_fract_wide_angle_coeff_pairs_8bit[table_offset] : (int16_t*)&delta_fract_coeff_pairs_8bit[table_offset]);
     delta_fract += multi_ref_index;
 
     // Check if the angle is fractional. If yes, interpolation is needed
