@@ -1048,37 +1048,54 @@ static void angular_pred_linear_filter_w32_ver_avx2(uvg_pixel* dst, uvg_pixel* r
 }
 
 
-static void angular_pred_linear_filter_w4_hor_avx2(uvg_pixel* dst, uvg_pixel* ref, const int height, const int mode, const int16_t* delta_int)
+static void angular_pred_linear_filter_w4_hor_avx2(uvg_pixel* dst, uvg_pixel* ref, const int height, const int16_t* delta_int, const int16_t* delta_fract)
 {
-  const int16_t* dint = delta_int;
-  const __m128i v16s = _mm_set1_epi16(16);
+  const int width = 4;  
+  
+  // Prepare shuffle vectors
+  __m256i vshuf_base = _mm256_setr_epi8(
+    0x00, 0x01, 0x00, 0x01, 0x00, 0x01, 0x00, 0x01,
+    0x01, 0x02, 0x01, 0x02, 0x01, 0x02, 0x01, 0x02,
+    0x02, 0x03, 0x02, 0x03, 0x02, 0x03, 0x02, 0x03,
+    0x03, 0x04, 0x03, 0x04, 0x03, 0x04, 0x03, 0x04
+  );
 
-  const int16_t weigth_offset = mode_to_weight_table_offset_w4_hor[mode];
-  const int16_t shuf_offset = mode_to_shuffle_vector_table_offset_w4_hor[mode];
-
-  __m128i vcoeff = _mm_load_si128((const __m128i*) &intra_chroma_linear_interpolation_weights_w4_hor[weigth_offset]);
-  __m128i vshuf0 = _mm_load_si128((const __m128i*) &intra_chroma_linear_interpolation_shuffle_vectors_w4_hor[shuf_offset + 0]);
-  __m128i vshuf1 = _mm_load_si128((const __m128i*) &intra_chroma_linear_interpolation_shuffle_vectors_w4_hor[shuf_offset + 16]);
+  __m256i vshuf_delta = _mm256_setr_epi8(
+    0x00, 0x00, 0x02, 0x02, 0x04, 0x04, 0x06, 0x06,
+    0x00, 0x00, 0x02, 0x02, 0x04, 0x04, 0x06, 0x06,
+    0x00, 0x00, 0x02, 0x02, 0x04, 0x04, 0x06, 0x06,
+    0x00, 0x00, 0x02, 0x02, 0x04, 0x04, 0x06, 0x06
+  );
 
   // Load refs from smallest index onwards, shuffle will handle the rest. The smallest index will be at one of these delta int table indices
-  const int16_t min_offset = 1 + MIN(dint[0], dint[3]);
+  const int16_t min_offset = MIN(delta_int[0], delta_int[width - 1]);
+  const __m128i vdelta = _mm_loadu_si128((__m128i*)delta_int);
+  __m256i vdelta_int = _mm256_inserti128_si256(_mm256_castsi128_si256(vdelta), vdelta, 1);
+  vdelta_int = _mm256_shuffle_epi8(vdelta_int, vshuf_delta);
+  vdelta_int = _mm256_sub_epi8(vdelta_int, _mm256_set1_epi8(min_offset));
+
+  const __m256i vshuf = _mm256_add_epi8(vshuf_base, vdelta_int);
+
+  // Prepare weights
+  const __m128i vcoefftmp = _mm_loadu_si128((__m128i*)delta_fract);
+  __m256i vcoeff = _mm256_inserti128_si256(_mm256_castsi128_si256(vcoefftmp), vcoefftmp, 1);
+  vcoeff = _mm256_shuffle_epi32(vcoeff, _MM_SHUFFLE(1, 0, 1, 0));
 
   // Height has to be at least 4, handle 4 lines at once
   for (int y = 0; y < height; y += 4) {
     // Prepare sources
-    __m128i vidx = _mm_set_epi64x((long long int)(min_offset + y + 2), (long long int)(min_offset + y + 0));
-    __m128i vsrc_tmp = _mm_i64gather_epi64((const long long*)ref, vidx, 1);
-    __m128i vsrc0 = _mm_shuffle_epi8(vsrc_tmp, vshuf0);
-    __m128i vsrc1 = _mm_shuffle_epi8(vsrc_tmp, vshuf1);
-  
-    __m128i res0 = _mm_maddubs_epi16(vsrc0, vcoeff);
-    __m128i res1 = _mm_maddubs_epi16(vsrc1, vcoeff);
-    res0 = _mm_add_epi16(res0, v16s);
-    res1 = _mm_add_epi16(res1, v16s);
-    res0 = _mm_srai_epi16(res0, 5);
-    res1 = _mm_srai_epi16(res1, 5);
+    __m128i vsrctmp = _mm_loadu_si128((__m128i*)(ref + y + min_offset + 1));
+    __m256i vsrc = _mm256_inserti128_si256(_mm256_castsi128_si256(vsrctmp), vsrctmp, 1);
+    vsrc = _mm256_shuffle_epi8(vsrc, vshuf);
 
-    _mm_store_si128((__m128i*)dst, _mm_packus_epi16(res0, res1));
+    __m256i vres = _mm256_maddubs_epi16(vsrc, vcoeff);
+    vres = _mm256_add_epi16(vres, _mm256_set1_epi16(16));
+    vres = _mm256_srai_epi16(vres, 5);
+
+    const __m128i vres0 = _mm256_castsi256_si128(vres);
+    const __m128i vres1 = _mm256_extracti128_si256(vres, 1);
+
+    _mm_store_si128((__m128i*)dst, _mm_packus_epi16(vres0, vres1));
     dst += 16;
   }
 }
@@ -3496,7 +3513,7 @@ static void uvg_angular_pred_avx2(
           }
           else {
             switch (width) {
-            case  4: angular_pred_linear_filter_w4_hor_avx2(dst, ref_main, height, pred_mode, delta_int); break;
+            case  4: angular_pred_linear_filter_w4_hor_avx2(dst, ref_main, height, delta_int, delta_fract); break;
             case  8: angular_pred_linear_filter_w8_hor_avx2(dst, ref_main, height, pred_mode, delta_int); break;
             case 16: angular_pred_linear_filter_w16_hor_avx2(dst, ref_main, height, pred_mode, delta_int); break;
             case 32: angular_pred_linear_filter_w32_hor_avx2(dst, ref_main, height, pred_mode, delta_int); break;
