@@ -854,50 +854,78 @@ static void angular_pred_w32_hor_avx2(uvg_pixel* dst, const uvg_pixel* ref_main,
 
 
 // Linear interpolation filter for width 4 has a different call, since it uses premade tables for coefficients
-static void angular_pred_linear_filter_w4_ver_avx2(uvg_pixel* dst, uvg_pixel* ref, const int height, const int16_t* delta_int, const int32_t pred_mode)
-{
-  const int16_t* dint = delta_int;
-  const __m128i v16s = _mm_set1_epi16(16);
+static void angular_pred_linear_filter_w4_ver_avx2(uvg_pixel* dst, uvg_pixel* ref, const int height, const int16_t* delta_int, const int16_t* delta_fract)
+{  
+  const __m256i v16s = _mm256_set1_epi16(16);
 
-  const int mode_idx = pred_mode <= 34 ? pred_mode - 2 : 66 - pred_mode;
-  const int weight_table_offset = coeff_table_mode_offsets[mode_idx];
-  const int vnum = coeff_vector128_num_by_mode[mode_idx];
-  const int modulo = vnum - 1;
-  int offset_num = 0;
+  const __m256i vshuf_base = _mm256_setr_epi8(
+    0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
+    0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
+    0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04,
+    0x00, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03, 0x04
+  );
 
-  ALIGNED(16) int16_t shuffle_vector_offsets[8];
-  memcpy(shuffle_vector_offsets, &intra_chroma_linear_interpolation_w4_ver_shuffle_vector_offset[mode_idx * 8], sizeof(int16_t) * 8);
+  const __m256i vshuf_delta0 = _mm256_setr_epi8(
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02,
+    0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04,
+    0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06
+  );
+  const __m256i vshuf_delta1 = _mm256_add_epi8(vshuf_delta0, _mm256_set1_epi8(8));
 
-  // Height has to be at least 4, handle 4 lines at once
-  for (int y = 0; y < height; y += 4) {
-    // Load refs from smallest index onwards, shuffle will handle the rest. The smallest index will be at one of these delta int table indices
-    const int16_t min_offset = 1 + MIN(dint[0], dint[3]);
-    dint += 4;
+  const __m256i vshuf_deltafract0 = _mm256_setr_epi8(
+    0x00, 0x01, 0x00, 0x01, 0x00, 0x01, 0x00, 0x01,
+    0x02, 0x03, 0x02, 0x03, 0x02, 0x03, 0x02, 0x03,
+    0x04, 0x05, 0x04, 0x05, 0x04, 0x05, 0x04, 0x05,
+    0x06, 0x07, 0x06, 0x07, 0x06, 0x07, 0x06, 0x07
+  );
+
+  const __m256i vshuf_deltafract1 = _mm256_add_epi8(vshuf_deltafract0, _mm256_set1_epi8(8));
+
+  // Handle 8 lines at once
+  for (int y = 0; y < height; y += 8) {   
+    const int min_offset0 = MIN(delta_int[y + 0], delta_int[y + 3]);
+    const int min_offset1 = MIN(delta_int[y + 4], delta_int[y + 7]);
+    
+    // Prepare weights
+    const __m128i vtmpcoeff = _mm_loadu_si128((__m128i*)&delta_fract[y]);
+    const __m256i vcoeff = _mm256_inserti128_si256(_mm256_castsi128_si256(vtmpcoeff), vtmpcoeff, 1);
+    const __m256i vcoeff0 = _mm256_shuffle_epi8(vcoeff, vshuf_deltafract0);
+    const __m256i vcoeff1 = _mm256_shuffle_epi8(vcoeff, vshuf_deltafract1);
+    
     // Load enough reff samples to cover four 4 width lines. Shuffles will put the samples in correct places.
-    const __m128i vsrc_raw = _mm_loadu_si128((const __m128i*) & ref[min_offset]);
-    const int offset = weight_table_offset + (offset_num * 16);
+    const __m128i vtmpsrc0 = _mm_loadu_si128((const __m128i*) (ref + min_offset0 + 1));
+    const __m128i vtmpsrc1 = _mm_loadu_si128((const __m128i*) (ref + min_offset1 + 1));
     
-    const __m128i vcoeff0 = _mm_load_si128((const __m128i*)&intra_chroma_linear_interpolation_weights_w4_ver[offset]);
-    const __m128i vcoeff1 = vnum == 1 ? vcoeff0 : _mm_load_si128((const __m128i*)&intra_chroma_linear_interpolation_weights_w4_ver[offset + 16]);
-
-    const __m128i vshuf0 = _mm_load_si128((const __m128i*) &intra_chroma_linear_interpolation_shuffle_vectors_w4_ver[shuffle_vector_offsets[y >> 2] + 0]);
-    const __m128i vshuf1 = _mm_load_si128((const __m128i*) &intra_chroma_linear_interpolation_shuffle_vectors_w4_ver[shuffle_vector_offsets[y >> 2] + 16]);
-
-    __m128i vsrc0 = _mm_shuffle_epi8(vsrc_raw, vshuf0);
-    __m128i vsrc1 = _mm_shuffle_epi8(vsrc_raw, vshuf1);
+    __m256i vsrc0 = _mm256_inserti128_si256(_mm256_castsi128_si256(vtmpsrc0), vtmpsrc0, 1);
+    __m256i vsrc1 = _mm256_inserti128_si256(_mm256_castsi128_si256(vtmpsrc1), vtmpsrc1, 1);
     
-    __m128i res0 = _mm_maddubs_epi16(vsrc0, vcoeff0);
-    __m128i res1 = _mm_maddubs_epi16(vsrc1, vcoeff1);
-    res0 = _mm_add_epi16(res0, v16s);
-    res1 = _mm_add_epi16(res1, v16s);
-    res0 = _mm_srai_epi16(res0, 5);
-    res1 = _mm_srai_epi16(res1, 5);
+    // Prepare shuffle vector
+    const __m128i vtmpdelta = _mm_loadu_si128((const __m128i*) &delta_int[y]);
+    __m256i vdelta_int = _mm256_inserti128_si256(_mm256_castsi128_si256(vtmpdelta), vtmpdelta, 1);
+    
+    __m256i vshufoffset0 = _mm256_shuffle_epi8(vdelta_int, vshuf_delta0);        
+    __m256i vshufoffset1 = _mm256_shuffle_epi8(vdelta_int, vshuf_delta1);        
+    vshufoffset0 = _mm256_sub_epi8(vshufoffset0, _mm256_set1_epi8(min_offset0));
+    vshufoffset1 = _mm256_sub_epi8(vshufoffset1, _mm256_set1_epi8(min_offset1));
+    const __m256i vshuf0 = _mm256_add_epi8(vshufoffset0, vshuf_base);
+    const __m256i vshuf1 = _mm256_add_epi8(vshufoffset1, vshuf_base);
+    
+    vsrc0 = _mm256_shuffle_epi8(vsrc0, vshuf0);
+    vsrc1 = _mm256_shuffle_epi8(vsrc1, vshuf1);
 
-    _mm_store_si128((__m128i*)dst, _mm_packus_epi16(res0, res1));
-    dst += 16;
-    offset_num += 2;
-    // This resets the offset number to 0 when it reaches the end of the table. Only works on powers of 2.
-    offset_num &= modulo;
+    __m256i vres0 = _mm256_maddubs_epi16(vsrc0, vcoeff0);
+    vres0 = _mm256_add_epi16(vres0, v16s);
+    vres0 = _mm256_srai_epi16(vres0, 5);
+
+    __m256i vres1 = _mm256_maddubs_epi16(vsrc1, vcoeff1);
+    vres1 = _mm256_add_epi16(vres1, v16s);
+    vres1 = _mm256_srai_epi16(vres1, 5);
+
+    const __m256i vout = _mm256_permute4x64_epi64(_mm256_packus_epi16(vres0, vres1), _MM_SHUFFLE(3, 1, 2, 0));
+
+    _mm256_store_si256((__m256i*)dst, vout);
+    dst += 32;
   }
 }
 
@@ -3445,7 +3473,7 @@ static void uvg_angular_pred_avx2(
         if (vertical_mode) {
           switch (width) {
           // No wide angle handling for w4 is needed.
-          case  4: angular_pred_linear_filter_w4_ver_avx2(dst, ref_main, height, delta_int, pred_mode); break;
+          case  4: angular_pred_linear_filter_w4_ver_avx2(dst, ref_main, height, delta_int, delta_fract); break;
           case  8: angular_pred_linear_filter_w8_ver_avx2(dst, ref_main, height, delta_int, delta_fract); break;
           case 16: angular_pred_linear_filter_w16_ver_avx2(dst, ref_main, height, delta_int, delta_fract); break;
           case 32: angular_pred_linear_filter_w32_ver_avx2(dst, ref_main, height, delta_int, delta_fract); break;
