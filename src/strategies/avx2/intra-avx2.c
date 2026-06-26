@@ -3938,9 +3938,9 @@ static void intra_pred_planar_hor_w32(const uvg_pixel* ref, const uvg_pixel* ref
 }
 static void intra_pred_planar_hor_w64(const uvg_pixel* ref, const uvg_pixel* ref_side, const int line, const int shift, __m256i* dst)
 {
-  const __m256i v_last_ref = _mm256_set1_epi16(ref_side[64 + 1]);
+  const __m256i vtopright = _mm256_set1_epi8(ref_side[64 + 1]);
 
-  const __m256i v_ref_coeff0 = _mm256_setr_epi16(63, 62, 61, 60, 59, 58, 57, 56, 55, 54, 53, 52, 51, 50, 49, 48);
+  /*const __m256i v_ref_coeff0 = _mm256_setr_epi16(63, 62, 61, 60, 59, 58, 57, 56, 55, 54, 53, 52, 51, 50, 49, 48);
   const __m256i v_ref_coeff1 = _mm256_setr_epi16(47, 46, 45, 44, 43, 42, 41, 40, 39, 38, 37, 36, 35, 34, 33, 32);
   const __m256i v_ref_coeff2 = _mm256_setr_epi16(31, 30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 17, 16);
   const __m256i v_ref_coeff3 = _mm256_setr_epi16(15, 14, 13, 12, 11, 10,  9,  8,  7,  6,  5,  4,  3,  2,  1,  0);
@@ -3948,23 +3948,37 @@ static void intra_pred_planar_hor_w64(const uvg_pixel* ref, const uvg_pixel* ref
   const __m256i v_last_ref_coeff0 = _mm256_setr_epi16( 1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 16);
   const __m256i v_last_ref_coeff1 = _mm256_setr_epi16(17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32);
   const __m256i v_last_ref_coeff2 = _mm256_setr_epi16(33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48);
-  const __m256i v_last_ref_coeff3 = _mm256_setr_epi16(49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64);
+  const __m256i v_last_ref_coeff3 = _mm256_setr_epi16(49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64);*/
 
-  const __m256i v_last_ref_mul0 = _mm256_mullo_epi16(v_last_ref, v_last_ref_coeff0);
+  /*const __m256i v_last_ref_mul0 = _mm256_mullo_epi16(v_last_ref, v_last_ref_coeff0);
   const __m256i v_last_ref_mul1 = _mm256_mullo_epi16(v_last_ref, v_last_ref_coeff1);
   const __m256i v_last_ref_mul2 = _mm256_mullo_epi16(v_last_ref, v_last_ref_coeff2);
-  const __m256i v_last_ref_mul3 = _mm256_mullo_epi16(v_last_ref, v_last_ref_coeff3);
+  const __m256i v_last_ref_mul3 = _mm256_mullo_epi16(v_last_ref, v_last_ref_coeff3);*/
+
+  const __m256i vcoeff0 = _mm256_setr_epi8(
+    63, 1, 62, 2, 61, 3, 60, 4, 59, 5, 58, 6, 57, 7, 56, 8, 55, 9, 54, 10, 53, 11, 52, 12, 51, 13, 50, 14, 49, 15, 48, 16
+  );
+  const __m256i vcoeff1 = _mm256_setr_epi8(
+    47, 17, 46, 18, 45, 19, 44, 20, 43, 21, 42, 22, 41, 23, 40, 24, 39, 25, 38, 26, 37, 27, 36, 28, 35, 29, 34, 30, 33, 31, 32, 32
+  );
+  const __m256i vcoeff2 = _mm256_setr_epi8(
+    31, 33, 30, 34, 29, 35, 28, 36, 27, 37, 26, 38, 25, 39, 24, 40, 23, 41, 22, 42, 21, 43, 20, 44, 19, 45, 18, 46, 17, 47, 16, 48
+  );
+  const __m256i vcoeff3 = _mm256_setr_epi8(
+    15, 49, 14, 50, 13, 51, 12, 52, 11, 53, 10, 54, 9, 55, 8, 56, 7, 57, 6, 58, 5, 59, 4, 60, 3, 61, 2, 62, 1, 63, 0, 64
+  );
 
   for (int i = 0, d = 0; i < line; ++i, d += 4) {
-    __m256i v_ref = _mm256_set1_epi16(ref[i + 1]);
-    __m256i v_tmp0 = _mm256_mullo_epi16(v_ref, v_ref_coeff0);
+    __m256i vref = _mm256_set1_epi8(ref[i + 1]);
+    vref = _mm256_unpacklo_epi8(vref, vtopright);
+    /*__m256i v_tmp0 = _mm256_mullo_epi16(v_ref, v_ref_coeff0);
     __m256i v_tmp1 = _mm256_mullo_epi16(v_ref, v_ref_coeff1);
     __m256i v_tmp2 = _mm256_mullo_epi16(v_ref, v_ref_coeff2);
-    __m256i v_tmp3 = _mm256_mullo_epi16(v_ref, v_ref_coeff3);
-    dst[d + 0] = _mm256_add_epi16(v_last_ref_mul0, v_tmp0);
-    dst[d + 1] = _mm256_add_epi16(v_last_ref_mul1, v_tmp1);
-    dst[d + 2] = _mm256_add_epi16(v_last_ref_mul2, v_tmp2);
-    dst[d + 3] = _mm256_add_epi16(v_last_ref_mul3, v_tmp3);
+    __m256i v_tmp3 = _mm256_mullo_epi16(v_ref, v_ref_coeff3);*/
+    dst[d + 0] = _mm256_maddubs_epi16(vref, vcoeff0);
+    dst[d + 1] = _mm256_maddubs_epi16(vref, vcoeff1);
+    dst[d + 2] = _mm256_maddubs_epi16(vref, vcoeff2);
+    dst[d + 3] = _mm256_maddubs_epi16(vref, vcoeff3);
   }
 }
 
