@@ -4187,32 +4187,37 @@ static void intra_pred_planar_ver_w32(const uvg_pixel* ref, const uvg_pixel* ref
 }
 static void intra_pred_planar_ver_w64(const uvg_pixel* ref, const uvg_pixel* ref_side, const int line, const int shift, __m256i* dst)
 {
-  const __m256i v_last_ref = _mm256_set1_epi8(ref_side[line + 1]);
+  const __m256i vbottomleft = _mm256_set1_epi8(ref_side[line + 1]);
 
   // Got 64 8-bit samples, or 512 bits of data. Load into two vectors
-  const __m256i v_ref0 = _mm256_loadu_si256((const __m256i*) &ref[1]);
-  const __m256i v_ref1 = _mm256_loadu_si256((const __m256i*) &ref[33]);
+  const __m256i vtmp0 = _mm256_loadu_si256((const __m256i*) & ref[1]);
+  const __m256i vtmp1 = _mm256_loadu_si256((const __m256i*) & ref[33]);
 
   // These stay constant through the loop
-  const __m256i v_lo0 = _mm256_unpacklo_epi8(v_ref0, v_last_ref);
-  const __m256i v_lo1 = _mm256_unpacklo_epi8(v_ref1, v_last_ref);
-  const __m256i v_hi0 = _mm256_unpackhi_epi8(v_ref0, v_last_ref);
-  const __m256i v_hi1 = _mm256_unpackhi_epi8(v_ref1, v_last_ref);
+  const __m256i vlo0 = _mm256_unpacklo_epi8(vtmp0, vbottomleft);
+  const __m256i vlo1 = _mm256_unpacklo_epi8(vtmp1, vbottomleft);
+  const __m256i vhi0 = _mm256_unpackhi_epi8(vtmp0, vbottomleft);
+  const __m256i vhi1 = _mm256_unpackhi_epi8(vtmp1, vbottomleft);
+
+  const __m256i vref0 = _mm256_permute2x128_si256(vlo0, vhi0, 0x20);
+  const __m256i vref1 = _mm256_permute2x128_si256(vlo0, vhi0, 0x31);
+  const __m256i vref2 = _mm256_permute2x128_si256(vlo1, vhi1, 0x20);
+  const __m256i vref3 = _mm256_permute2x128_si256(vlo1, vhi1, 0x31);
 
   for (uint8_t y = 0, a = line - 1, b = 1, d = 0; y < line; ++y, --a, ++b, d += 4) {
-    uint8_t tmp[2] = {a, b};
+    ALIGNED(2) uint8_t tmp[2] = { a, b };
     uint16_t* tmp2 = (uint16_t*)tmp;
     const __m256i v_ys = _mm256_set1_epi16(*tmp2);
-    
-    __m256i v_madd_lo0 = _mm256_maddubs_epi16(v_lo0, v_ys);
-    __m256i v_madd_lo1 = _mm256_maddubs_epi16(v_lo1, v_ys);
-    __m256i v_madd_hi0 = _mm256_maddubs_epi16(v_hi0, v_ys);
-    __m256i v_madd_hi1 = _mm256_maddubs_epi16(v_hi1, v_ys);
 
-    dst[d + 0] = _mm256_permute2x128_si256(v_madd_lo0, v_madd_hi0, 0x20);
+    dst[d + 0] = _mm256_maddubs_epi16(vref0, v_ys);
+    dst[d + 1] = _mm256_maddubs_epi16(vref1, v_ys);
+    dst[d + 2] = _mm256_maddubs_epi16(vref2, v_ys);
+    dst[d + 3] = _mm256_maddubs_epi16(vref3, v_ys);
+
+    /*dst[d + 0] = _mm256_permute2x128_si256(v_madd_lo0, v_madd_hi0, 0x20);
     dst[d + 1] = _mm256_permute2x128_si256(v_madd_lo0, v_madd_hi0, 0x31);
     dst[d + 2] = _mm256_permute2x128_si256(v_madd_lo1, v_madd_hi1, 0x20);
-    dst[d + 3] = _mm256_permute2x128_si256(v_madd_lo1, v_madd_hi1, 0x31);
+    dst[d + 3] = _mm256_permute2x128_si256(v_madd_lo1, v_madd_hi1, 0x31);*/
   }
 }
 
