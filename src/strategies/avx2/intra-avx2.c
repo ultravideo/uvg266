@@ -4433,6 +4433,13 @@ static INLINE void mip_ref_downsampling_1D_64to4_avx2(uvg_pixel* reduced_dst, co
 
   const __m256i vrnd = _mm256_set1_epi16(rounding_offset);
 
+  const __m256i vshuf = _mm256_setr_epi8(
+    0x00, 0x01, 0x08, 0x09, 0x02, 0x03, 0x0a, 0x0b,
+    0x04, 0x05, 0x0c, 0x0d, 0x06, 0x07, 0x0e, 0x0f,
+    0x00, 0x01, 0x08, 0x09, 0x02, 0x03, 0x0a, 0x0b,
+    0x04, 0x05, 0x0c, 0x0d, 0x06, 0x07, 0x0e, 0x0f
+  );
+
   __m128i vrefa = _mm_loadu_si128((__m128i*)(ref_src + 0));
   __m128i vrefb = _mm_loadu_si128((__m128i*)(ref_src + 16));
   __m128i vrefc = _mm_loadu_si128((__m128i*)(ref_src + 32));
@@ -4446,14 +4453,15 @@ static INLINE void mip_ref_downsampling_1D_64to4_avx2(uvg_pixel* reduced_dst, co
 
   __m256i vres0 = _mm256_hadd_epi16(vref256a, vref256b);
   __m256i vres1 = _mm256_hadd_epi16(vref256c, vref256d);
-  vres0 = _mm256_permute4x64_epi64(vres0, _MM_SHUFFLE(3, 1, 2, 0));
-  vres1 = _mm256_permute4x64_epi64(vres1, _MM_SHUFFLE(3, 1, 2, 0));
+  // vres0 = _mm256_permute4x64_epi64(vres0, _MM_SHUFFLE(3, 1, 2, 0));
+  // vres1 = _mm256_permute4x64_epi64(vres1, _MM_SHUFFLE(3, 1, 2, 0));
 
   vres0 = _mm256_hadd_epi16(vres0, vres1);
-  vres0 = _mm256_permute4x64_epi64(vres0, _MM_SHUFFLE(3, 1, 2, 0));
+  // vres0 = _mm256_permute4x64_epi64(vres0, _MM_SHUFFLE(3, 1, 2, 0));
 
   vres0 = _mm256_hadd_epi16(vres0, vres0);
   vres0 = _mm256_permute4x64_epi64(vres0, _MM_SHUFFLE(3, 1, 2, 0));
+  vres0 = _mm256_shuffle_epi8(vres0, vshuf);
 
   vres0 = _mm256_hadd_epi16(vres0, vres0);
 
