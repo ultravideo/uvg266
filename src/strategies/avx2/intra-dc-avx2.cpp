@@ -270,68 +270,29 @@ static INLINE int16_t dc_sum_square_w32_avx2(const uvg_pixel* const ref_top, con
 
 static INLINE int16_t dc_sum_square_w64_avx2(const uvg_pixel* const ref_top, const uvg_pixel* const ref_left)
 {
-  const __m128i vshuf = _mm_setr_epi8(
-    0x08, 0xff, 0x09, 0xff, 0x0a, 0xff, 0x0b, 0xff,
-    0x0c, 0xff, 0x0d, 0xff, 0x0e, 0xff, 0x0f, 0xff
-  );
+  __m256i vsum = _mm256_setzero_si256();
 
-  // Sum top ref
-  __m128i vrefa = _mm_loadu_si128((const __m128i*) &ref_top[0]);
-  __m128i vrefb = _mm_shuffle_epi8(vrefa, vshuf);
-  __m128i vrefc = _mm_loadu_si128((const __m128i*) &ref_top[16]);
-  __m128i vrefd = _mm_shuffle_epi8(vrefc, vshuf);
-  __m128i vrefe = _mm_loadu_si128((const __m128i*) &ref_top[32]);
-  __m128i vreff = _mm_shuffle_epi8(vrefe, vshuf);
-  __m128i vrefg = _mm_loadu_si128((const __m128i*) &ref_top[48]);
-  __m128i vrefh = _mm_shuffle_epi8(vrefg, vshuf);
+  for (int i = 0; i < 64; i += 16) {
+    __m128i vtmp = _mm_loadu_si128((__m128i*)(ref_top + i));
+    __m256i vref = _mm256_cvtepu8_epi16(vtmp);
+    vsum = _mm256_add_epi16(vsum, vref);
+  }
 
-  vrefa = _mm_cvtepu8_epi16(vrefa);
-  vrefc = _mm_cvtepu8_epi16(vrefc);
-  vrefe = _mm_cvtepu8_epi16(vrefe);
-  vrefg = _mm_cvtepu8_epi16(vrefg);
+  for (int i = 0; i < 64; i += 16) {
+    __m128i vtmp = _mm_loadu_si128((__m128i*)(ref_left + i));
+    __m256i vref = _mm256_cvtepu8_epi16(vtmp);
+    vsum = _mm256_add_epi16(vsum, vref);
+  }
 
-  __m128i vadd_ab = _mm_add_epi16(vrefa, vrefb);
-  __m128i vadd_cd = _mm_add_epi16(vrefc, vrefd);
-  __m128i vadd_ef = _mm_add_epi16(vrefe, vreff);
-  __m128i vadd_gh = _mm_add_epi16(vrefg, vrefh);
+  __m256i vhadd = _mm256_hadd_epi16(vsum, vsum);
+  vhadd = _mm256_hadd_epi16(vhadd, vhadd);
+  vhadd = _mm256_hadd_epi16(vhadd, vhadd);  
 
-  __m128i vadd_abcd = _mm_add_epi16(vadd_ab, vadd_cd);
-  __m128i vadd_efgh = _mm_add_epi16(vadd_ef, vadd_gh);
+  __m128i vres0 = _mm256_castsi256_si128(vhadd);
+  __m128i vres1 = _mm256_extracti128_si256(vhadd, 1);
+  __m128i vresult = _mm_add_epi16(vres0, vres1);
 
-  __m128i vaddtop = _mm_add_epi16(vadd_abcd, vadd_efgh);
-
-  // Sum left ref
-  vrefa = _mm_loadu_si128((const __m128i*) &ref_left[0]);
-  vrefb = _mm_shuffle_epi8(vrefa, vshuf);
-  vrefc = _mm_loadu_si128((const __m128i*) &ref_left[16]);
-  vrefd = _mm_shuffle_epi8(vrefc, vshuf);
-  vrefe = _mm_loadu_si128((const __m128i*) &ref_left[32]);
-  vreff = _mm_shuffle_epi8(vrefe, vshuf);
-  vrefg = _mm_loadu_si128((const __m128i*) &ref_left[48]);
-  vrefh = _mm_shuffle_epi8(vrefg, vshuf);
-
-  vrefa = _mm_cvtepu8_epi16(vrefa);
-  vrefc = _mm_cvtepu8_epi16(vrefc);
-  vrefe = _mm_cvtepu8_epi16(vrefe);
-  vrefg = _mm_cvtepu8_epi16(vrefg);
-
-  vadd_ab = _mm_add_epi16(vrefa, vrefb);
-  vadd_cd = _mm_add_epi16(vrefc, vrefd);
-  vadd_ef = _mm_add_epi16(vrefe, vreff);
-  vadd_gh = _mm_add_epi16(vrefg, vrefh);
-
-  vadd_abcd = _mm_add_epi16(vadd_ab, vadd_cd);
-  vadd_efgh = _mm_add_epi16(vadd_ef, vadd_gh);
-
-  __m128i vaddleft = _mm_add_epi16(vadd_abcd, vadd_efgh);
-
-  // Add top and left sums
-  __m128i vadd = _mm_add_epi16(vaddtop, vaddleft);
-  __m128i vhadd = _mm_hadd_epi16(vadd, vadd);
-  vhadd = _mm_hadd_epi16(vhadd, vhadd);
-  vhadd = _mm_hadd_epi16(vhadd, vhadd);
-
-  int16_t sum = _mm_extract_epi16(vhadd, 0);
+  int16_t sum = _mm_extract_epi16(vresult, 0);
   return sum;
 }
 
