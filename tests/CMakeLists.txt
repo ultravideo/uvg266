@@ -83,6 +83,7 @@ function(try_build_tests)
 
   add_executable(run-catch2
     run-catch2.cpp
+    strategies/transform.test.cpp
     strategies/transpose.test.cpp
   )
   target_link_libraries(run-catch2
@@ -118,6 +119,7 @@ function(try_build_benchmarks)
 
   add_executable(run-benchmark
     run-benchmark.cpp
+    strategies/transform.test.cpp
     strategies/transpose.test.cpp
   )
   target_link_libraries(run-benchmark
