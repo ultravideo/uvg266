@@ -39,6 +39,7 @@
  */
 
 #include  "global.h" // IWYU pragma: keep
+#include "cu.h"
 
 extern const int16_t uvg_g_dst_4[4][4];
 extern const int16_t uvg_g_dct_4[4][4];
@@ -52,6 +53,46 @@ extern const int16_t uvg_g_dct_8_t[8][8];
 extern const int16_t uvg_g_dct_16_t[16][16];
 extern const int16_t uvg_g_dct_32_t[32][32];
 
+void uvg_get_tr_type(
+  int8_t width,
+  int8_t height,
+  color_t color,
+  const cu_info_t* tu,
+  tr_type_t* hor_out,
+  tr_type_t* ver_out,
+  int8_t mts_type
+);
+
+void uvg_mts_dct_generic(
+  const int8_t bitdepth,
+  const color_t color,
+  const cu_info_t* tu,
+  const int8_t width,
+  const int8_t height,
+  const int16_t* input,
+  int16_t* output,
+  const int8_t mts_type);
+
+void uvg_mts_idct_generic(
+  const int8_t bitdepth,
+  const color_t color,
+  const cu_info_t* tu,
+  const int8_t width,
+  const int8_t height,
+  const int16_t* input,
+  int16_t* output,
+  const int8_t mts_type);
+
 int uvg_strategy_register_dct_generic(void* opaque, uint8_t bitdepth);
+
+// Deprecated.
+void uvg_dct_4x4_generic(int8_t bitdepth, const int16_t* input, int16_t* output);
+void uvg_dct_8x8_generic(int8_t bitdepth, const int16_t* input, int16_t* output);
+void uvg_dct_16x16_generic(int8_t bitdepth, const int16_t* input, int16_t* output);
+void uvg_dct_32x32_generic(int8_t bitdepth, const int16_t* input, int16_t* output);
+void uvg_idct_4x4_generic(int8_t bitdepth, const int16_t* input, int16_t* output);
+void uvg_idct_8x8_generic(int8_t bitdepth, const int16_t* input, int16_t* output);
+void uvg_idct_16x16_generic(int8_t bitdepth, const int16_t* input, int16_t* output);
+void uvg_idct_32x32_generic(int8_t bitdepth, const int16_t* input, int16_t* output);
 
 #endif //STRATEGIES_DCT_GENERIC_H_

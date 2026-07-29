@@ -718,7 +718,7 @@ static void partial_butterfly_inverse_32_generic(const int16_t* src, int16_t* ds
 }
 
 #define DCT_NXN_GENERIC(n) \
-static void dct_ ## n ## x ## n ## _generic(int8_t bitdepth, const int16_t *input, int16_t *output) { \
+void uvg_dct_ ## n ## x ## n ## _generic(int8_t bitdepth, const int16_t *input, int16_t *output) { \
 \
   int16_t tmp[ n * n ]; \
   int32_t shift_1st = uvg_g_convert_to_bit[ n ] + 1 + (bitdepth - 8); \
@@ -729,7 +729,7 @@ static void dct_ ## n ## x ## n ## _generic(int8_t bitdepth, const int16_t *inpu
 }
 
 #define IDCT_NXN_GENERIC(n) \
-static void idct_ ## n ## x ## n ## _generic(int8_t bitdepth, const int16_t *input, int16_t *output) { \
+void uvg_idct_ ## n ## x ## n ## _generic(int8_t bitdepth, const int16_t *input, int16_t *output) { \
 \
   int16_t tmp[ n * n ]; \
   int32_t shift_1st = 7; \
@@ -2557,7 +2557,7 @@ void uvg_get_tr_type(
 }
 
 
-static void mts_dct_generic(
+void uvg_mts_dct_generic(
   const int8_t bitdepth,
   const color_t color,
   const cu_info_t* tu,
@@ -2618,7 +2618,7 @@ static void mts_dct_generic(
 }
 
 
-static void mts_idct_generic(
+void uvg_mts_idct_generic(
   const int8_t bitdepth,
   const color_t color,
   const cu_info_t* tu,
@@ -2684,21 +2684,21 @@ int uvg_strategy_register_dct_generic(void* opaque, uint8_t bitdepth)
 
   success &= uvg_strategyselector_register(opaque, "fast_forward_dst_4x4", "generic", 0, &fast_forward_dst_4x4_generic);
 
-  success &= uvg_strategyselector_register(opaque, "dct_4x4", "generic", 0, &dct_4x4_generic);
-  success &= uvg_strategyselector_register(opaque, "dct_8x8", "generic", 0, &dct_8x8_generic);
-  success &= uvg_strategyselector_register(opaque, "dct_16x16", "generic", 0, &dct_16x16_generic);
-  success &= uvg_strategyselector_register(opaque, "dct_32x32", "generic", 0, &dct_32x32_generic);
+  success &= uvg_strategyselector_register(opaque, "dct_4x4", "generic", 0, &uvg_dct_4x4_generic);
+  success &= uvg_strategyselector_register(opaque, "dct_8x8", "generic", 0, &uvg_dct_8x8_generic);
+  success &= uvg_strategyselector_register(opaque, "dct_16x16", "generic", 0, &uvg_dct_16x16_generic);
+  success &= uvg_strategyselector_register(opaque, "dct_32x32", "generic", 0, &uvg_dct_32x32_generic);
   //success &= uvg_strategyselector_register(opaque, "dct_non_square", "generic", 0, &dct_non_square_generic);
 
   success &= uvg_strategyselector_register(opaque, "fast_inverse_dst_4x4", "generic", 0, &fast_inverse_dst_4x4_generic);
 
-  success &= uvg_strategyselector_register(opaque, "idct_4x4", "generic", 0, &idct_4x4_generic);
-  success &= uvg_strategyselector_register(opaque, "idct_8x8", "generic", 0, &idct_8x8_generic);
-  success &= uvg_strategyselector_register(opaque, "idct_16x16", "generic", 0, &idct_16x16_generic);
-  success &= uvg_strategyselector_register(opaque, "idct_32x32", "generic", 0, &idct_32x32_generic);
+  success &= uvg_strategyselector_register(opaque, "idct_4x4", "generic", 0, &uvg_idct_4x4_generic);
+  success &= uvg_strategyselector_register(opaque, "idct_8x8", "generic", 0, &uvg_idct_8x8_generic);
+  success &= uvg_strategyselector_register(opaque, "idct_16x16", "generic", 0, &uvg_idct_16x16_generic);
+  success &= uvg_strategyselector_register(opaque, "idct_32x32", "generic", 0, &uvg_idct_32x32_generic);
 
-  success &= uvg_strategyselector_register(opaque, "mts_dct", "generic", 0, &mts_dct_generic);
-  success &= uvg_strategyselector_register(opaque, "mts_idct", "generic", 0, &mts_idct_generic);
+  success &= uvg_strategyselector_register(opaque, "mts_dct", "generic", 0, &uvg_mts_dct_generic);
+  success &= uvg_strategyselector_register(opaque, "mts_idct", "generic", 0, &uvg_mts_idct_generic);
 
   return success;
 }
