@@ -9,6 +9,7 @@ test-uvg266: &test-template
   script:
     - bash .travis-install.bash
     - export PATH="/opt/homebrew/bin/:${HOME}/bin:${PATH}"
+    - git submodule update --init --recursive
     - cmake -B build -S .
     - cmake --build build --parallel
     # FIXME: This install step is pretty dumb, but works for now.

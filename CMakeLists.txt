@@ -18,6 +18,12 @@ if(NOT DEFINED CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 17)
 endif()
 
+uvg_option_bool(UVG_ENABLE_VCPKG "Acquire optional dependencies via the bundled vcpkg instance" ON)
+if(UVG_ENABLE_VCPKG AND NOT DEFINED CMAKE_TOOLCHAIN_FILE AND NOT PROJECT_NAME)
+  set(VCPKG_INSTALL_OPTIONS "--no-print-usage")
+  set(CMAKE_TOOLCHAIN_FILE "${CMAKE_CURRENT_LIST_DIR}/extern/vcpkg/scripts/buildsystems/vcpkg.cmake" CACHE STRING "" FORCE)
+endif()
+
 project(uvg266
   LANGUAGES C CXX
   HOMEPAGE_URL https://github.com/ultravideo/uvg266
