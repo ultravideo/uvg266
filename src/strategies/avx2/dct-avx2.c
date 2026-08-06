@@ -35,22 +35,10 @@
 */
 
 #include "strategies/avx2/dct-avx2.h"
-
+#include "strategies/generic/dct-generic.h"
 
 #include "strategyselector.h"
 #include "tables.h"
-
-extern const int16_t uvg_g_dst_4[4][4];
-extern const int16_t uvg_g_dct_4[4][4];
-extern const int16_t uvg_g_dct_8[8][8];
-extern const int16_t uvg_g_dct_16[16][16];
-extern const int16_t uvg_g_dct_32[32][32];
-
-extern const int16_t uvg_g_dst_4_t[4][4];
-extern const int16_t uvg_g_dct_4_t[4][4];
-extern const int16_t uvg_g_dct_8_t[8][8];
-extern const int16_t uvg_g_dct_16_t[16][16];
-extern const int16_t uvg_g_dct_32_t[32][32];
 
 #include "uvg266.h"
 #include <immintrin.h>
@@ -691,8 +679,8 @@ static void matrix_dst_4x4_avx2(int8_t bitdepth, const int16_t *input, int16_t *
 {
   int32_t shift_1st = uvg_g_convert_to_bit[4] + 1 + (bitdepth - 8);
   int32_t shift_2nd = uvg_g_convert_to_bit[4] + 8;
-  const int16_t *tdst = &uvg_g_dst_4_t[0][0];
-  const int16_t *dst  = &uvg_g_dst_4  [0][0];
+  const int16_t *tdst = &uvg_g_dst7_4x4_t[0][0];
+  const int16_t *dst  = &uvg_g_dst7_4x4  [0][0];
 
   __m256i tdst_v = _mm256_load_si256((const __m256i *) tdst);
   __m256i  dst_v = _mm256_load_si256((const __m256i *)  dst);
@@ -709,8 +697,8 @@ static void matrix_idst_4x4_avx2(int8_t bitdepth, const int16_t *input, int16_t 
   int32_t shift_1st = 7;
   int32_t shift_2nd = 12 - (bitdepth - 8);
 
-  const int16_t *tdst = &uvg_g_dst_4_t[0][0];
-  const int16_t *dst  = &uvg_g_dst_4  [0][0];
+  const int16_t *tdst = &uvg_g_dst7_4x4_t[0][0];
+  const int16_t *dst  = &uvg_g_dst7_4x4  [0][0];
 
   __m256i tdst_v = _mm256_load_si256((const __m256i *)tdst);
   __m256i  dst_v = _mm256_load_si256((const __m256i *) dst);
@@ -726,8 +714,8 @@ static void matrix_dct_4x4_avx2(int8_t bitdepth, const int16_t *input, int16_t *
 {
   int32_t shift_1st = uvg_g_convert_to_bit[4] + 1 + (bitdepth - 8);
   int32_t shift_2nd = uvg_g_convert_to_bit[4] + 8;
-  const int16_t *tdct = &uvg_g_dct_4_t[0][0];
-  const int16_t *dct  = &uvg_g_dct_4  [0][0];
+  const int16_t *tdct = &uvg_g_dct2_4x4_t[0][0];
+  const int16_t *dct  = &uvg_g_dct2_4x4  [0][0];
 
   __m256i tdct_v = _mm256_load_si256((const __m256i *) tdct);
   __m256i  dct_v = _mm256_load_si256((const __m256i *)  dct);
@@ -744,8 +732,8 @@ static void matrix_idct_4x4_avx2(int8_t bitdepth, const int16_t *input, int16_t 
   int32_t shift_1st = 7;
   int32_t shift_2nd = 12 - (bitdepth - 8);
 
-  const int16_t *tdct = &uvg_g_dct_4_t[0][0];
-  const int16_t *dct  = &uvg_g_dct_4  [0][0];
+  const int16_t *tdct = &uvg_g_dct2_4x4_t[0][0];
+  const int16_t *dct  = &uvg_g_dct2_4x4  [0][0];
 
   __m256i tdct_v = _mm256_load_si256((const __m256i *)tdct);
   __m256i  dct_v = _mm256_load_si256((const __m256i *) dct);
@@ -948,7 +936,7 @@ static void matrix_dct_8x8_avx2(int8_t bitdepth, const int16_t *input, int16_t *
   int32_t shift_1st = uvg_g_convert_to_bit[8] + 1 + (bitdepth - 8);
   int32_t shift_2nd = uvg_g_convert_to_bit[8] + 8;
 
-  const int16_t *dct  = &uvg_g_dct_8[0][0];
+  const int16_t *dct  = &uvg_g_dct2_8x8[0][0];
 
   /*
    * Multiply input by the tranpose of DCT matrix into tmpres, and DCT matrix
@@ -975,8 +963,8 @@ static void matrix_idct_8x8_avx2(int8_t bitdepth, const int16_t *input, int16_t 
   int32_t shift_2nd = 12 - (bitdepth - 8);
   ALIGNED(64) int16_t tmp[8 * 8];
 
-  const int16_t *tdct = &uvg_g_dct_8_t[0][0];
-  const int16_t *dct  = &uvg_g_dct_8  [0][0];
+  const int16_t *tdct = &uvg_g_dct2_8x8_t[0][0];
+  const int16_t *dct  = &uvg_g_dct2_8x8  [0][0];
 
   mul_clip_matrix_8x8_avx2(tdct, input, tmp,    shift_1st);
   mul_clip_matrix_8x8_avx2(tmp,  dct,   output, shift_2nd);
@@ -1256,7 +1244,7 @@ static void partial_butterfly_inverse_16_avx2(const int16_t *src, int16_t *dst, 
 
   const uint32_t width = 16;
 
-  const int16_t *tdct = &uvg_g_dct_16_t[0][0];
+  const int16_t *tdct = &uvg_g_dct2_16x16_t[0][0];
 
   const __m256i  eo_signmask = _mm256_setr_epi32( 1,  1,  1,  1, -1, -1, -1, -1);
   const __m256i eeo_signmask = _mm256_setr_epi32( 1,  1, -1, -1, -1, -1,  1,  1);
@@ -1361,7 +1349,7 @@ static void matrix_dct_16x16_avx2(int8_t bitdepth, const int16_t *input, int16_t
   int32_t shift_1st = uvg_g_convert_to_bit[16] + 1 + (bitdepth - 8);
   int32_t shift_2nd = uvg_g_convert_to_bit[16] + 8;
 
-  const int16_t *dct  = &uvg_g_dct_16[0][0];
+  const int16_t *dct  = &uvg_g_dct2_16x16[0][0];
 
   /*
    * Multiply input by the tranpose of DCT matrix into tmpres, and DCT matrix
@@ -1476,13 +1464,13 @@ static void mul_clip_matrix_32x32_avx2(const int16_t *left,
 // Macro that generates 2D transform functions with clipping values.
 // Sets correct shift values and matrices according to transform type and
 // block size. Performs matrix multiplication horizontally and vertically.
-#define TRANSFORM(type, n) static void matrix_ ## type ## _ ## n ## x ## n ## _avx2(int8_t bitdepth, const int16_t *input, int16_t *output)\
+#define TRANSFORM(type, matrix, tmatrix, n) static void matrix_ ## type ## _ ## n ## x ## n ## _avx2(int8_t bitdepth, const int16_t *input, int16_t *output)\
 {\
   int32_t shift_1st = uvg_g_convert_to_bit[n] + 1 + (bitdepth - 8); \
   int32_t shift_2nd = uvg_g_convert_to_bit[n] + 8; \
   ALIGNED(64) int16_t tmp[n * n];\
-  const int16_t *tdct = &uvg_g_ ## type ## _ ## n ## _t[0][0];\
-  const int16_t *dct = &uvg_g_ ## type ## _ ## n [0][0];\
+  const int16_t *tdct = &tmatrix[0][0];\
+  const int16_t *dct = &matrix[0][0];\
 \
   mul_clip_matrix_ ## n ## x ## n ## _avx2(input, tdct, tmp, shift_1st);\
   mul_clip_matrix_ ## n ## x ## n ## _avx2(dct, tmp, output, shift_2nd);\
@@ -1491,14 +1479,14 @@ static void mul_clip_matrix_32x32_avx2(const int16_t *left,
 // Macro that generates 2D inverse transform functions with clipping values.
 // Sets correct shift values and matrices according to transform type and
 // block size. Performs matrix multiplication horizontally and vertically.
-#define ITRANSFORM(type, n) \
+#define ITRANSFORM(type, matrix, tmatrix, n) \
 static void matrix_i ## type ## _## n ## x ## n ## _avx2(int8_t bitdepth, const int16_t *input, int16_t *output)\
 {\
   int32_t shift_1st = 7; \
   int32_t shift_2nd = 12 - (bitdepth - 8); \
   ALIGNED(64) int16_t tmp[n * n];\
-  const int16_t *tdct = &uvg_g_ ## type ## _ ## n ## _t[0][0];\
-  const int16_t *dct = &uvg_g_ ## type ## _ ## n [0][0];\
+  const int16_t *tdct = &tmatrix[0][0];\
+  const int16_t *dct = &matrix[0][0];\
 \
   mul_clip_matrix_ ## n ## x ## n ## _avx2(tdct, input, tmp, shift_1st);\
   mul_clip_matrix_ ## n ## x ## n ## _avx2(tmp, dct, output, shift_2nd);\
@@ -1516,8 +1504,8 @@ static void matrix_i ## type ## _## n ## x ## n ## _avx2(int8_t bitdepth, const 
 
 // Generate all the transform functions
 
-TRANSFORM(dct, 32);
-ITRANSFORM(dct, 32);
+TRANSFORM(dct, uvg_g_dct2_32x32, uvg_g_dct2_32x32_t, 32);
+ITRANSFORM(dct, uvg_g_dct2_32x32, uvg_g_dct2_32x32_t, 32);
 
 
 /*****************************************************/
@@ -1623,12 +1611,12 @@ ALIGNED(64) const int16_t uvg_g_dct8_32[32][32] = DEFINE_DCT8_P32_MATRIX(90, 90,
 
 const int16_t* uvg_g_mts_input[2][3][5] = {
   {
-    {&uvg_g_dct_4[0][0],  &uvg_g_dct_8[0][0],  &uvg_g_dct_16[0][0],  &uvg_g_dct_32[0][0], NULL},
+    {&uvg_g_dct2_4x4[0][0],  &uvg_g_dct2_8x8[0][0],  &uvg_g_dct2_16x16[0][0],  &uvg_g_dct2_32x32[0][0], NULL},
     {&uvg_g_dct8_4[0][0], &uvg_g_dct8_8[0][0], &uvg_g_dct8_16[0][0], &uvg_g_dct8_32[0][0], NULL},
     {&uvg_g_dst7_4[0][0], &uvg_g_dst7_8[0][0], &uvg_g_dst7_16[0][0], &uvg_g_dst7_32[0][0], NULL}
   },
   {
-    {&uvg_g_dct_4_t[0][0],  &uvg_g_dct_8_t[0][0],  &uvg_g_dct_16_t[0][0],  &uvg_g_dct_32_t[0][0], NULL},
+    {&uvg_g_dct2_4x4_t[0][0],  &uvg_g_dct2_8x8_t[0][0],  &uvg_g_dct2_16x16_t[0][0],  &uvg_g_dct2_32x32_t[0][0], NULL},
     {  &uvg_g_dct8_4[0][0],   &uvg_g_dct8_8[0][0],   &uvg_g_dct8_16[0][0],   &uvg_g_dct8_32[0][0], NULL},
     {&uvg_g_dst7_4_t[0][0], &uvg_g_dst7_8_t[0][0], &uvg_g_dst7_16_t[0][0], &uvg_g_dst7_32_t[0][0], NULL}
   },
@@ -2167,7 +2155,7 @@ static void fast_forward_tr_2x16_avx2(const int16_t* src, int16_t* dst, tr_type_
   const int32_t shift_2nd = log2_height_minus1 + 7;
 
   const int16_t* hor_coeff = ff_dct2_2xN_coeff_hor;
-  const int16_t* ver_coeff = &uvg_g_dct_16[0][0];
+  const int16_t* ver_coeff = &uvg_g_dct2_16x16[0][0];
   if (ver == DST7) {
     ver_coeff = &uvg_g_dst7_16[0][0];
   }
@@ -2358,7 +2346,7 @@ static void fast_forward_tr_2x32_avx2(const int16_t* src, int16_t* dst, tr_type_
   const int32_t shift_2nd = log2_height_minus1 + 7;
 
   const int16_t* hor_coeff = ff_dct2_2xN_coeff_hor;
-  const int16_t* ver_coeff = &uvg_g_dct_32[0][0];
+  const int16_t* ver_coeff = &uvg_g_dct2_32x32[0][0];
   // For result shuffling, can use existing shuffle vector
   const __m256i v_res_shuffle = _mm256_load_si256((const __m256i*)ff_dct2_2x16_ver_result_shuffle);
   // No coeffs for DCT8 and DST7 transforms since they do not exist for this block size
@@ -2531,7 +2519,7 @@ static void fast_inverse_tr_2x32_avx2(const int16_t* src, int16_t* dst, tr_type_
   const int32_t shift_1st = INVERSE_SHIFT_1ST;
   const int32_t shift_2nd = INVERSE_SHIFT_2ND;
 
-  const int16_t* ver_coeff = &uvg_g_dct_32_t[0][0]; // rename
+  const int16_t* ver_coeff = &uvg_g_dct2_32x32_t[0][0]; // rename
   const int16_t* hor_coeff = fi_dct2_32x2_coeff_ver; // TODO: rename
   // No coeffs for DCT8 and DST7 transforms since they do not exist for this block size
 
@@ -2955,7 +2943,7 @@ static void fast_forward_tr_4x16_avx2(const int16_t* src, int16_t* dst, tr_type_
   const int32_t shift_2nd = log2_height_minus1 + 7;
 
   const int16_t* hor_coeff = fast_forward_dct2_b4_coeff;
-  const int16_t* ver_coeff = &uvg_g_dct_16[0][0];
+  const int16_t* ver_coeff = &uvg_g_dct2_16x16[0][0];
   if (hor == DST7) {
     hor_coeff = fast_forward_dst7_b4_coeff;
   } else if (hor == DCT8) {
@@ -3372,7 +3360,7 @@ static void fast_inverse_tr_4x32_avx2(const int16_t* src, int16_t* dst, tr_type_
   const int32_t shift_1st = INVERSE_SHIFT_1ST;
   const int32_t shift_2nd = INVERSE_SHIFT_2ND;
 
-  const int16_t* ver_coeff = &uvg_g_dct_32_t[0][0];
+  const int16_t* ver_coeff = &uvg_g_dct2_32x32_t[0][0];
   const int16_t* hor_coeff = fi_dct2_32x4_coeff_ver; // TODO: rename
   if (hor == DST7) {
     hor_coeff = fi_dst7_32x4_coeff_ver; // TODO: rename
@@ -4532,7 +4520,7 @@ static void fast_inverse_tr_8x32_avx2(const int16_t* src, int16_t* dst, tr_type_
   const int32_t shift_1st = INVERSE_SHIFT_1ST;
   const int32_t shift_2nd = INVERSE_SHIFT_2ND;
 
-  const int16_t* ver_coeff = &uvg_g_dct_32_t[0][0];
+  const int16_t* ver_coeff = &uvg_g_dct2_32x32_t[0][0];
   const int16_t* hor_coeff = fi_dct2_32x8_coeff_ver; // TODO: rename table
   if (hor == DST7) {
     hor_coeff = fi_dst7_32x8_coeff_ver; // TODO: rename
@@ -5881,7 +5869,7 @@ static void fast_inverse_tr_16x32_avx2(const int16_t* src, int16_t* dst, tr_type
   const int32_t shift_1st = INVERSE_SHIFT_1ST;
   const int32_t shift_2nd = INVERSE_SHIFT_2ND;
 
-  const int16_t* ver_coeff = &uvg_g_dct_32_t[0][0];
+  const int16_t* ver_coeff = &uvg_g_dct2_32x32_t[0][0];
   const int16_t* hor_coeff = fi_dct2_16x16_coeff_hor;
   if (hor == DST7) {
     hor_coeff = fi_dst7_16x32_coeff_hor; // TODO: coeffs
@@ -6079,7 +6067,7 @@ static void fast_forward_DCT2_32x4_avx2_ver(const __m256i* src, int16_t* dst, in
   // Got data for 8 vectors, 32 lines with 4 samples each
 
   // Prepare coeffs
-  const int16_t* coeff = &uvg_g_dct_4[0][0];
+  const int16_t* coeff = &uvg_g_dct2_4x4[0][0];
   const int a = coeff[0];
   const int b = coeff[1 * 4 + 0];
   const int c = coeff[1 * 4 + 1];
@@ -6801,7 +6789,7 @@ static void fast_inverse_tr_32x4_avx2(const int16_t* src, int16_t* dst, tr_type_
   const int32_t shift_2nd = INVERSE_SHIFT_2ND;
 
   const int16_t* ver_coeff = fi_dct2_4x32_coeff_hor; // TODO: rename
-  const int16_t* hor_coeff = &uvg_g_dct_32_t[0][0];
+  const int16_t* hor_coeff = &uvg_g_dct2_32x32_t[0][0];
   if (hor == DST7) {
     hor_coeff = &uvg_g_dst7_32_t[0][0];
   } else if (hor == DCT8) {
@@ -7895,7 +7883,7 @@ static void fast_inverse_tr_32x32_avx2(const int16_t* src, int16_t* dst, tr_type
   const int32_t shift_1st = INVERSE_SHIFT_1ST;
   const int32_t shift_2nd = INVERSE_SHIFT_2ND;
 
-  const int16_t* ver_coeff = &uvg_g_dct_32_t[0][0];
+  const int16_t* ver_coeff = &uvg_g_dct2_32x32_t[0][0];
   const int16_t* hor_coeff = fi_dct2_32xN_coeff_hor;
   if (hor == DST7) {
     hor_coeff = fi_dst7_32xN_coeff_hor;

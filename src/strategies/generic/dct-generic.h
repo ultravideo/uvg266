@@ -41,17 +41,47 @@
 #include  "global.h" // IWYU pragma: keep
 #include "cu.h"
 
-extern const int16_t uvg_g_dst_4[4][4];
-extern const int16_t uvg_g_dct_4[4][4];
-extern const int16_t uvg_g_dct_8[8][8];
-extern const int16_t uvg_g_dct_16[16][16];
-extern const int16_t uvg_g_dct_32[32][32];
+ALIGNED(16) extern const int16_t uvg_g_dct2_2x2[2][2];
+ALIGNED(16) extern const int16_t uvg_g_dct2_2x2_t[2][2];
 
-extern const int16_t uvg_g_dst_4_t[4][4];
-extern const int16_t uvg_g_dct_4_t[4][4];
-extern const int16_t uvg_g_dct_8_t[8][8];
-extern const int16_t uvg_g_dct_16_t[16][16];
-extern const int16_t uvg_g_dct_32_t[32][32];
+ALIGNED(32) extern const int16_t uvg_g_dct2_4x4[4][4];
+ALIGNED(32) extern const int16_t uvg_g_dct2_4x4_t[4][4];
+
+ALIGNED(64) extern const int16_t uvg_g_dct2_8x8[8][8];
+ALIGNED(64) extern const int16_t uvg_g_dct2_8x8_t[8][8];
+
+ALIGNED(64) extern const int16_t uvg_g_dct2_16x16[16][16];
+ALIGNED(64) extern const int16_t uvg_g_dct2_16x16_t[16][16];
+
+ALIGNED(64) extern const int16_t uvg_g_dct2_32x32[32][32];
+ALIGNED(64) extern const int16_t uvg_g_dct2_32x32_t[32][32];
+
+ALIGNED(64) extern const int16_t uvg_g_dct2_64x64[64][64];
+ALIGNED(64) extern const int16_t uvg_g_dct2_64x64_t[64][64];
+
+ALIGNED(32) extern const int16_t uvg_g_dct8_4x4[4][4];
+ALIGNED(32) extern const int16_t uvg_g_dct8_4x4_t[4][4];
+
+ALIGNED(64) extern const int16_t uvg_g_dct8_8x8[8][8];
+ALIGNED(64) extern const int16_t uvg_g_dct8_8x8_t[8][8];
+
+ALIGNED(64) extern const int16_t uvg_g_dct8_16x16[16][16];
+ALIGNED(64) extern const int16_t uvg_g_dct8_16x16_t[16][16];
+
+ALIGNED(64) extern const int16_t uvg_g_dct8_32x32[32][32];
+ALIGNED(64) extern const int16_t uvg_g_dct8_32x32_t[32][32];
+
+ALIGNED(32) extern const int16_t uvg_g_dst7_4x4[4][4];
+ALIGNED(32) extern const int16_t uvg_g_dst7_4x4_t[4][4];
+
+ALIGNED(64) extern const int16_t uvg_g_dst7_8x8[8][8];
+ALIGNED(64) extern const int16_t uvg_g_dst7_8x8_t[8][8];
+
+ALIGNED(64) extern const int16_t uvg_g_dst7_16x16[16][16];
+ALIGNED(64) extern const int16_t uvg_g_dst7_16x16_t[16][16];
+
+ALIGNED(64) extern const int16_t uvg_g_dst7_32x32[32][32];
+ALIGNED(64) extern const int16_t uvg_g_dst7_32x32_t[32][32];
 
 void uvg_get_tr_type(
   int8_t width,
