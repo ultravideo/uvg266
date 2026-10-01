@@ -409,7 +409,8 @@ static int altivec_available(void)
 #ifdef __linux__
     hwcap = getauxval(AT_HWCAP);
 #else
-    elf_aux_info(AT_HWCAP, &hwcap, sizeof(hwcap));
+    if (elf_aux_info(AT_HWCAP, &hwcap, sizeof(hwcap)) != 0)
+      hwcap = 0;
 #endif
     return !!(hwcap & PPC_FEATURE_HAS_ALTIVEC);
 }
