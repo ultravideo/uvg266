@@ -242,7 +242,7 @@ static void alf_get_blk_stats_avx2(encoder_state_t* const state,
             __m256i e_local_b0_d = _mm256_set1_epi32((int32_t)e_local[k][b0]);
             /*for (int b1 = 0; b1 < 4; b1++)
             {
-              alf_covariance[class_idx].ee[k][l][b0][b1] += e_local[k][b0] * (double)e_local[l][b1];
+              alf_covariance_[class_idx].ee[k][l][b0][b1] += e_local[k][b0] * (double)e_local[l][b1];
             }*/
             
             __m128i e_local_1 = _mm_loadl_epi64((__m128i*) & e_local[l][0]);
@@ -256,7 +256,7 @@ static void alf_get_blk_stats_avx2(encoder_state_t* const state,
         /*
         for (int b = 0; b < 4; b++)
         {
-          alf_covariance[class_idx].y[k][b] += e_local[k][b] * (double)y_local;
+          alf_covariance_[class_idx].y[k][b] += e_local[k][b] * (double)y_local;
         }*/       
         
       }

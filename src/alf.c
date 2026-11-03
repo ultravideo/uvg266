@@ -3206,8 +3206,8 @@ static void alf_init_covariance(videoframe_t* frame, enum uvg_chroma_format chro
 
   const int num_covs = num_ctus_in_pic * num_classes;
   const int num_luma_covs = num_ctus_in_pic * MAX_NUM_ALF_CLASSES;
-  alf_info->alf_covariance = malloc(num_covs * sizeof(alf_covariance));
-  alf_info->alf_covariance_y = &alf_info->alf_covariance[0];
+  alf_info->alf_covariance_ = malloc(num_covs * sizeof(alf_covariance));
+  alf_info->alf_covariance_y = &alf_info->alf_covariance_[0];
 
   for (int indx = 0; indx < num_luma_covs; indx++)
   {
@@ -3220,8 +3220,8 @@ static void alf_init_covariance(videoframe_t* frame, enum uvg_chroma_format chro
 
   if (chroma_format != UVG_CSP_400) {
     const int num_chroma_covs = num_ctus_in_pic;
-    alf_info->alf_covariance_u = &alf_info->alf_covariance[num_luma_covs];
-    alf_info->alf_covariance_v = &alf_info->alf_covariance[num_luma_covs + num_chroma_covs];
+    alf_info->alf_covariance_u = &alf_info->alf_covariance_[num_luma_covs];
+    alf_info->alf_covariance_v = &alf_info->alf_covariance_[num_luma_covs + num_chroma_covs];
     for (int k = 0; k < num_chroma_covs; k++)
     {
       init_alf_covariance(&alf_info->alf_covariance_u[k], chroma_coeffs);
@@ -3364,9 +3364,9 @@ static void alf_covariance_destroy(videoframe_t* const frame)
   {
     alf_info->alf_covariance_v = NULL;
   }
-  if (alf_info->alf_covariance)
+  if (alf_info->alf_covariance_)
   {
-    FREE_POINTER(alf_info->alf_covariance);
+    FREE_POINTER(alf_info->alf_covariance_);
   }
   for (int comp_idx = 0; comp_idx < MAX_NUM_COMPONENT; comp_idx++)
   {

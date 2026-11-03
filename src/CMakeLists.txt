@@ -117,6 +117,7 @@ if(UVG_HAVE_X86_64_AVX2)
     # FIXME: Not yet converted to VVC and fails to build.
     #strategies/avx2/encode_coding_tree-avx2.c
     strategies/avx2/intra-avx2.c
+    strategies/avx2/intra-dc-avx2.cpp
     strategies/avx2/ipol-avx2.c
     strategies/avx2/picture-avx2.c
     strategies/avx2/quant-avx2.c

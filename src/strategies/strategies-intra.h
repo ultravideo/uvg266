@@ -84,12 +84,21 @@ typedef void(mip_pred_func)(
   const int                          mip_mode,
   const bool                         mip_transp);
 
+typedef void (intra_dc_func)(
+  const cu_loc_t* const cu_loc,
+  const color_t color,
+  const uvg_pixel *const ref_top,
+  const uvg_pixel *const ref_left,
+  uvg_pixel *const out_block,
+  const uint8_t multi_ref_idx);
+
 // Declare function pointers.
 extern angular_pred_func * uvg_angular_pred;
 extern intra_pred_planar_func * uvg_intra_pred_planar;
 extern intra_pred_filtered_dc_func * uvg_intra_pred_filtered_dc;
 extern pdpc_planar_dc_func * uvg_pdpc_planar_dc;
 extern mip_pred_func *uvg_mip_predict;
+extern intra_dc_func *uvg_dc_predict;
 
 int uvg_strategy_register_intra(void* opaque, uint8_t bitdepth);
 
@@ -99,7 +108,8 @@ int uvg_strategy_register_intra(void* opaque, uint8_t bitdepth);
   {"intra_pred_planar", (void**) &uvg_intra_pred_planar}, \
   {"intra_pred_filtered_dc", (void**) &uvg_intra_pred_filtered_dc}, \
   {"pdpc_planar_dc", (void**) &uvg_pdpc_planar_dc}, \
-  {"mip_predict", (void**) &uvg_mip_predict},
+  {"mip_predict", (void**) &uvg_mip_predict}, \
+  {"intra_dc", (void**) &uvg_dc_predict},
 
 
 

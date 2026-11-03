@@ -224,54 +224,6 @@ static void intra_filter_reference(
   filtered_ref->top[ref_width - 1] = ref->top[ref_width - 1];
 }
 
-/**
-* \brief Generate dc prediction.
-* \param cu_loc        CU location and size data.
-* \param color         Color channel.
-* \param ref_top       Pointer to -1 index of above reference, length=width*2+1.
-* \param ref_left      Pointer to -1 index of left reference, length=width*2+1.
-* \param dst           Buffer of size width*width.
-* \param multi_ref_idx Multi reference line index for use with MRL.
-*/
-static void intra_pred_dc(
-  const cu_loc_t* const cu_loc,
-  const color_t color,
-  const uvg_pixel *const ref_top,
-  const uvg_pixel *const ref_left,
-  uvg_pixel *const out_block,
-  const uint8_t multi_ref_idx)
-{
-  const int width = color == COLOR_Y ? cu_loc->width : cu_loc->chroma_width;
-  const int height = color == COLOR_Y ? cu_loc->height : cu_loc->chroma_height;
-  
-  int_fast16_t sum = 0;
-  // Only one loop is done for non-square blocks.
-  // In case of non-square blocks, only the longer reference is summed.
-  if (width >= height) {
-    for (int_fast8_t i = 0; i < width; ++i) {
-      sum += ref_top[i + 1 + multi_ref_idx];
-    }
-  }
-  if (width <= height) {
-    for (int_fast8_t j = 0; j < height; ++j) {
-      sum += ref_left[j + 1 + multi_ref_idx];
-    }
-  }
-  
-  // JVET_K0122
-  const int denom     = width == height ? width << 1 : MAX(width, height);
-  const int divShift  = uvg_math_floor_log2(denom);
-  const int divOffset = denom >> 1;
-  
-  const uvg_pixel dc_val = (sum + divOffset) >> divShift;
-  //const uvg_pixel dc_val = (sum + width) >> (log2_width + 1);
-  const int_fast16_t block_size = width * height;
-
-  for (int_fast16_t i = 0; i < block_size; ++i) {
-    out_block[i] = dc_val;
-  }
-}
-
 
 bool uvg_cclm_is_allowed(const encoder_state_t* const state, const cu_loc_t * const luma_loc, cu_info_t const * const cur_cu, enum
                          uvg_tree_type tree_type)
@@ -728,7 +680,7 @@ static void intra_predict_regular(
   if (mode == 0) {
     uvg_intra_pred_planar(pu_loc, color, used_ref->top, used_ref->left, dst);
   } else if (mode == 1) {
-    intra_pred_dc(pu_loc, color, used_ref->top, used_ref->left, dst, multi_ref_index);
+    uvg_dc_predict(pu_loc, color, used_ref->top, used_ref->left, dst, multi_ref_index);
   } else {
     uvg_angular_pred(
       pu_loc,

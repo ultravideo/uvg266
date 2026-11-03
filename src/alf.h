@@ -244,7 +244,7 @@ typedef struct alf_info_t {
   uvg_pixel *alf_tmp_u;
   uvg_pixel *alf_tmp_v;
 
-  alf_covariance* alf_covariance; //Covariances of each CTU for luma and chroma components //[ctu_idx][class_idx]
+  alf_covariance* alf_covariance_; //Covariances of each CTU for luma and chroma components //[ctu_idx][class_idx]
   alf_covariance* alf_covariance_y; //Pointer to the first luma covaraince //[ctu_idx][class_idx]
   alf_covariance* alf_covariance_u; //Pointer to the first Cb covariance //[ctu_idx][class_idx]
   alf_covariance* alf_covariance_v; //Pointer tot he first Cr covariance //[ctu_idx][class_idx]

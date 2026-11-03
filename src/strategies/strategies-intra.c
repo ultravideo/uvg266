@@ -34,6 +34,7 @@
 
 #include "build_config.h"
 #include "strategies/avx2/intra-avx2.h"
+#include "strategies/avx2/intra-dc-avx2.h"
 #include "strategies/generic/intra-generic.h"
 #include "strategyselector.h"
 
@@ -44,6 +45,7 @@ intra_pred_planar_func *uvg_intra_pred_planar;
 intra_pred_filtered_dc_func *uvg_intra_pred_filtered_dc;
 pdpc_planar_dc_func *uvg_pdpc_planar_dc;
 mip_pred_func *uvg_mip_predict;
+intra_dc_func *uvg_dc_predict;
 
 int uvg_strategy_register_intra(void* opaque, uint8_t bitdepth) {
   bool success = true;
@@ -53,6 +55,7 @@ int uvg_strategy_register_intra(void* opaque, uint8_t bitdepth) {
 #if UVG_HAVE_X86_64_AVX2
   if (uvg_g_hardware_flags.intel_flags.avx2) {
     success &= uvg_strategy_register_intra_avx2(opaque, bitdepth);
+    success &= uvg_strategy_register_intra_dc_avx2(opaque, bitdepth);
   }
 #endif
 
