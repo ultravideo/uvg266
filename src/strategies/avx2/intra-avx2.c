@@ -883,7 +883,8 @@ static void angular_pred_linear_filter_w4_ver_avx2(uvg_pixel* dst, uvg_pixel* re
   const __m256i vshuf_deltafract1 = _mm256_add_epi8(vshuf_deltafract0, _mm256_set1_epi8(8));
 
   // Handle 8 lines at once
-  for (int y = 0; y < height; y += 8) {   
+  int y = 0;
+  for (; y + 8 <= height; y += 8) {   
     const int min_offset0 = MIN(delta_int[y + 0], delta_int[y + 3]);
     const int min_offset1 = MIN(delta_int[y + 4], delta_int[y + 7]);
     
@@ -927,6 +928,36 @@ static void angular_pred_linear_filter_w4_ver_avx2(uvg_pixel* dst, uvg_pixel* re
     _mm256_store_si256((__m256i*)dst, vout);
     dst += 32;
   }
+
+  // Handle the last 4 lines if height is not a multiple of 8. Only these
+  // lines are read and written, so nothing outside the block is touched.
+  if (y < height) {
+    const int min_offset0 = MIN(delta_int[y + 0], delta_int[y + 3]);
+
+    const __m128i vtmpcoeff = _mm_loadu_si128((__m128i*)&delta_fract[y]);
+    const __m256i vcoeff = _mm256_inserti128_si256(_mm256_castsi128_si256(vtmpcoeff), vtmpcoeff, 1);
+    const __m256i vcoeff0 = _mm256_shuffle_epi8(vcoeff, vshuf_deltafract0);
+
+    const __m128i vtmpsrc0 = _mm_loadu_si128((const __m128i*) (ref + min_offset0 + 1));
+    __m256i vsrc0 = _mm256_inserti128_si256(_mm256_castsi128_si256(vtmpsrc0), vtmpsrc0, 1);
+
+    const __m128i vtmpdelta = _mm_loadu_si128((const __m128i*) &delta_int[y]);
+    __m256i vdelta_int = _mm256_inserti128_si256(_mm256_castsi128_si256(vtmpdelta), vtmpdelta, 1);
+
+    __m256i vshufoffset0 = _mm256_shuffle_epi8(vdelta_int, vshuf_delta0);
+    vshufoffset0 = _mm256_sub_epi8(vshufoffset0, _mm256_set1_epi8(min_offset0));
+    const __m256i vshuf0 = _mm256_add_epi8(vshufoffset0, vshuf_base);
+
+    vsrc0 = _mm256_shuffle_epi8(vsrc0, vshuf0);
+
+    __m256i vres0 = _mm256_maddubs_epi16(vsrc0, vcoeff0);
+    vres0 = _mm256_add_epi16(vres0, v16s);
+    vres0 = _mm256_srai_epi16(vres0, 5);
+
+    // Low lane holds lines 0 and 1, high lane holds lines 2 and 3.
+    const __m128i vout = _mm_packus_epi16(_mm256_castsi256_si128(vres0), _mm256_extracti128_si256(vres0, 1));
+    _mm_store_si128((__m128i*)dst, vout);
+  }
 }
 
 static void angular_pred_linear_filter_w8_ver_avx2(uvg_pixel* dst, uvg_pixel* ref, const int height, const int16_t* delta_int, const int16_t* delta_fract)
@@ -940,7 +971,8 @@ static void angular_pred_linear_filter_w8_ver_avx2(uvg_pixel* dst, uvg_pixel* re
   );
 
   // Handle 4 lines at once
-  for (int y = 0; y < height; y += 4) {
+  int y = 0;
+  for (; y + 4 <= height; y += 4) {
     const __m128i vcoefftmp0 = _mm_set1_epi16(delta_fract[y + 0]);
     const __m128i vcoefftmp1 = _mm_set1_epi16(delta_fract[y + 1]);
     const __m128i vcoefftmp2 = _mm_set1_epi16(delta_fract[y + 2]);
@@ -969,6 +1001,27 @@ static void angular_pred_linear_filter_w8_ver_avx2(uvg_pixel* dst, uvg_pixel* re
 
     _mm256_store_si256((__m256i*)dst, _mm256_packus_epi16(res0, res1));
     dst += 32;
+  }
+
+  // Handle the last 2 lines if height is not a multiple of 4. Only these
+  // lines are read and written, so nothing outside the block is touched.
+  if (y < height) {
+    const __m128i vcoefftmp0 = _mm_set1_epi16(delta_fract[y + 0]);
+    const __m128i vcoefftmp1 = _mm_set1_epi16(delta_fract[y + 1]);
+    const __m256i vcoeff = _mm256_inserti128_si256(_mm256_castsi128_si256(vcoefftmp0), vcoefftmp1, 1);
+
+    const __m128i vtmp0 = _mm_loadu_si128((const __m128i*) (ref + delta_int[y + 0] + 1));
+    const __m128i vtmp1 = _mm_loadu_si128((const __m128i*) (ref + delta_int[y + 1] + 1));
+
+    __m256i vsrc = _mm256_inserti128_si256(_mm256_castsi128_si256(vtmp0), vtmp1, 1);
+    vsrc = _mm256_shuffle_epi8(vsrc, vshuf);
+
+    __m256i res = _mm256_maddubs_epi16(vsrc, vcoeff);
+    res = _mm256_add_epi16(res, v16s);
+    res = _mm256_srai_epi16(res, 5);
+
+    // Low lane holds line 0, high lane holds line 1.
+    _mm_store_si128((__m128i*)dst, _mm_packus_epi16(_mm256_castsi256_si128(res), _mm256_extracti128_si256(res, 1)));
   }
 }
 
