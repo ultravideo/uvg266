@@ -43,6 +43,7 @@
 
 #include <immintrin.h>
 #include <emmintrin.h>
+#include <math.h>
 #include <mmintrin.h>
 #include <xmmintrin.h>
 #include <string.h>
@@ -714,6 +715,1112 @@ SATD_NXN_DUAL_AVX2(64)
   }
 
 SATD_ANY_SIZE_MULTI_AVX2(quad_avx2, 4)
+
+
+static INLINE void hadd_hsub_w8_dual_avx2(__m256i* out, __m256i* in, unsigned out_idx0, unsigned out_idx1, unsigned in_idx0, unsigned in_idx1)
+{
+  out[out_idx0] = _mm256_hadd_epi16(in[in_idx0], in[in_idx1]);
+  out[out_idx1] = _mm256_hsub_epi16(in[in_idx0], in[in_idx1]);
+}
+
+static INLINE void add_sub_w8_dual_avx2(__m256i* out, __m256i* in, unsigned out_idx0, unsigned out_idx1, unsigned in_idx0, unsigned in_idx1)
+{
+  out[out_idx0] = _mm256_add_epi16(in[in_idx0], in[in_idx1]);
+  out[out_idx1] = _mm256_sub_epi16(in[in_idx0], in[in_idx1]);
+}
+
+static INLINE void hor_transform_row_w16_avx2(__m256i *row) {
+
+  __m256i vpos = _mm256_set1_epi16(1);
+  __m256i vneg = _mm256_set1_epi16(-1);
+  __m256i vsign = _mm256_permute2x128_si256(vpos, vneg, 0x20); // + + + + + + + + | - - - - - - - -
+                                                           // row 0 1 2 3 4 5 6 7 | 8 9 a b c d e f
+  __m256i vtemp = _mm256_permute2x128_si256(*row, *row, 0x01); // 8 9 a b c d e f | 0 1 2 3 4 5 6 7
+  *row = _mm256_sign_epi16(*row, vsign);
+  *row = _mm256_add_epi16(*row, vtemp);
+
+  vsign = _mm256_unpacklo_epi64(vpos, vneg); // + + + + - - - - | + + + + - - - -
+  vtemp = _mm256_shuffle_epi32(*row, _MM_SHUFFLE(1, 0, 3, 2));
+  *row = _mm256_sign_epi16(*row, vsign);
+  *row = _mm256_add_epi16(*row, vtemp);
+
+  vsign = _mm256_unpacklo_epi32(vpos, vneg); // + + - - + + - - | + + - - + + - -
+  vtemp = _mm256_shuffle_epi32(*row, _MM_SHUFFLE(2, 3, 0, 1));  
+  *row = _mm256_sign_epi16(*row, vsign);
+  *row = _mm256_add_epi16(*row, vtemp);
+
+  vsign = _mm256_unpacklo_epi16(vpos, vneg); // + - + - + - + - | + - + - + - + -
+  vtemp = _mm256_shufflelo_epi16(*row, _MM_SHUFFLE(2, 3, 0, 1));
+  vtemp = _mm256_shufflehi_epi16(vtemp, _MM_SHUFFLE(2, 3, 0, 1));
+  *row = _mm256_sign_epi16(*row, vsign);
+  *row = _mm256_add_epi16(*row, vtemp);
+}
+
+static INLINE void add_sub_w16_avx2(__m256i* out, __m256i* in, unsigned out_idx0, unsigned out_idx1, unsigned in_idx0, unsigned in_idx1)
+{
+  out[out_idx0] = _mm256_add_epi16(in[in_idx0], in[in_idx1]);
+  out[out_idx1] = _mm256_sub_epi16(in[in_idx0], in[in_idx1]);
+}
+
+static INLINE void ver_transform_block_16x8_avx2(__m256i (*rows)[8]) {
+
+  __m256i temp0[8];
+  add_sub_w16_avx2(temp0, (*rows), 0, 1, 0, 1);
+  add_sub_w16_avx2(temp0, (*rows), 2, 3, 2, 3);
+  add_sub_w16_avx2(temp0, (*rows), 4, 5, 4, 5);
+  add_sub_w16_avx2(temp0, (*rows), 6, 7, 6, 7);
+
+  __m256i temp1[8];
+  add_sub_w16_avx2(temp1, temp0, 0, 1, 0, 2);
+  add_sub_w16_avx2(temp1, temp0, 2, 3, 1, 3);
+  add_sub_w16_avx2(temp1, temp0, 4, 5, 4, 6);
+  add_sub_w16_avx2(temp1, temp0, 6, 7, 5, 7);
+
+  add_sub_w16_avx2((*rows), temp1, 0, 1, 0, 4);
+  add_sub_w16_avx2((*rows), temp1, 2, 3, 1, 5);
+  add_sub_w16_avx2((*rows), temp1, 4, 5, 2, 6);
+  add_sub_w16_avx2((*rows), temp1, 6, 7, 3, 7);
+
+}
+
+static uint64_t hadamard_16x8_fw_avx2(const uvg_pixel* ref, const uvg_pixel* pred, int ref_stride, int pred_stride)
+{
+  uint64_t satd = 0;
+
+  __m256i vdiff[8];
+  for (int i = 0; i < 8; ++i) {
+    __m128i vref = _mm_loadu_si128((__m128i*) & ref[i * ref_stride]);
+    __m128i vpred = _mm_loadu_si128((__m128i*) & pred[i * pred_stride]);
+    __m256i vref256 = _mm256_cvtepu8_epi16(vref);
+    __m256i vpred256 = _mm256_cvtepu8_epi16(vpred);
+    vdiff[i] = _mm256_sub_epi16(vref256, vpred256);
+  }
+    
+  for (int i = 0; i < 8; ++i) {
+    hor_transform_row_w16_avx2(&vdiff[i]);
+  }
+
+  ver_transform_block_16x8_avx2(&vdiff);
+
+  // Calculate sum in two parts to avoid overflow
+  __m256i vsum0 = _mm256_setzero_si256();
+  __m256i vsum1 = _mm256_setzero_si256();
+  int16_t dc = abs(_mm256_extract_epi16(vdiff[0], 0));
+  for (int i = 0; i < 8; i += 2) {
+    vsum0 = _mm256_add_epi16(vsum0, _mm256_abs_epi16(vdiff[i + 0]));
+    vsum1 = _mm256_add_epi16(vsum1, _mm256_abs_epi16(vdiff[i + 1]));
+  }
+
+  // Do the final adds horizontally. First round with madd to extend to 32 bits
+  // Before madd                                                   0 1 2 3 4 5 6 7 | 8 9 a b c d e f
+  vsum0 = _mm256_madd_epi16(vsum0, _mm256_set1_epi16(1));       // 01 23 45 67 | 89 ab cd ef
+  vsum1 = _mm256_madd_epi16(vsum1, _mm256_set1_epi16(1));
+  __m256i vsum = _mm256_add_epi32(vsum0, vsum1);
+  vsum = _mm256_hadd_epi32(vsum, vsum); // 0123 4567 xxxx xxxx | 89ab cdef xxxx xxxx
+  vsum = _mm256_permute4x64_epi64(vsum, _MM_SHUFFLE(3, 1, 2, 0)); // 0123 4567 89ab cdef | xxxx xxxx xxxx xxxx
+  vsum = _mm256_hadd_epi32(vsum, vsum); // 01234567 89abcdef xxxxxxxx ... | xxxxxxxx ...
+  vsum = _mm256_hadd_epi32(vsum, vsum);
+
+  satd = (uint64_t)_mm256_extract_epi32(vsum, 0);
+
+  satd -= abs(dc);
+  satd += abs(dc) >> 2;
+  satd = (int)(satd / sqrt(16.0 * 8) * 2);
+
+  return satd;
+}
+
+static void hadamard_16x8_fw_dual_avx2(const uvg_pixel* ref, const uvg_pixel* pred0, const uvg_pixel* pred1, const int stride, unsigned* costs_out)
+{
+  uint64_t satd0 = 0;
+  uint64_t satd1 = 0;
+
+  __m256i vdifflo[8];
+  __m256i vdiffhi[8];
+
+  for (int i = 0; i < 8; ++i) {
+    const __m128i vreftmp   = _mm_load_si128((const __m128i*) (ref   + (stride * i)));
+    const __m128i vpred0tmp = _mm_load_si128((const __m128i*) (pred0 + (stride * i)));
+    const __m128i vpred1tmp = _mm_load_si128((const __m128i*) (pred1 + (stride * i)));
+
+    const __m256i vref = _mm256_cvtepu8_epi16(vreftmp);
+    const __m256i vpred0 = _mm256_cvtepu8_epi16(vpred0tmp);
+    const __m256i vpred1 = _mm256_cvtepu8_epi16(vpred1tmp);
+
+    const __m256i vtmp0 = _mm256_sub_epi16(vref, vpred0);
+    const __m256i vtmp1 = _mm256_sub_epi16(vref, vpred1);
+
+    // Arrange input so the low 128 bits hold pred 0 rows and the high 128 holds pred 1 rows.
+    // Split the 16 wide row into two 8 wide halves.
+    vdifflo[i] = _mm256_permute2x128_si256(vtmp0, vtmp1, 0x20);
+    vdiffhi[i] = _mm256_permute2x128_si256(vtmp0, vtmp1, 0x31);
+  }
+
+  __m256i vtmplo0[8];
+  __m256i vtmplo1[8];
+  __m256i vtmphi0[8];
+  __m256i vtmphi1[8];
+  
+  // Horizontal
+  // Low
+  hadd_hsub_w8_dual_avx2(vtmplo0, vdifflo, 0, 1, 0, 1);
+  hadd_hsub_w8_dual_avx2(vtmplo0, vdifflo, 2, 3, 2, 3);
+  hadd_hsub_w8_dual_avx2(vtmplo0, vdifflo, 4, 5, 4, 5);
+  hadd_hsub_w8_dual_avx2(vtmplo0, vdifflo, 6, 7, 6, 7);
+
+  hadd_hsub_w8_dual_avx2(vtmplo1, vtmplo0, 0, 1, 0, 1);
+  hadd_hsub_w8_dual_avx2(vtmplo1, vtmplo0, 2, 3, 2, 3);
+  hadd_hsub_w8_dual_avx2(vtmplo1, vtmplo0, 4, 5, 4, 5);
+  hadd_hsub_w8_dual_avx2(vtmplo1, vtmplo0, 6, 7, 6, 7);
+
+  hadd_hsub_w8_dual_avx2(vdifflo, vtmplo1, 0, 1, 0, 1);
+  hadd_hsub_w8_dual_avx2(vdifflo, vtmplo1, 2, 3, 2, 3);
+  hadd_hsub_w8_dual_avx2(vdifflo, vtmplo1, 4, 5, 4, 5);
+  hadd_hsub_w8_dual_avx2(vdifflo, vtmplo1, 6, 7, 6, 7);
+
+  // High
+  hadd_hsub_w8_dual_avx2(vtmphi0, vdiffhi, 0, 1, 0, 1);
+  hadd_hsub_w8_dual_avx2(vtmphi0, vdiffhi, 2, 3, 2, 3);
+  hadd_hsub_w8_dual_avx2(vtmphi0, vdiffhi, 4, 5, 4, 5);
+  hadd_hsub_w8_dual_avx2(vtmphi0, vdiffhi, 6, 7, 6, 7);
+
+  hadd_hsub_w8_dual_avx2(vtmphi1, vtmphi0, 0, 1, 0, 1);
+  hadd_hsub_w8_dual_avx2(vtmphi1, vtmphi0, 2, 3, 2, 3);
+  hadd_hsub_w8_dual_avx2(vtmphi1, vtmphi0, 4, 5, 4, 5);
+  hadd_hsub_w8_dual_avx2(vtmphi1, vtmphi0, 6, 7, 6, 7);
+
+  hadd_hsub_w8_dual_avx2(vdiffhi, vtmphi1, 0, 1, 0, 1);
+  hadd_hsub_w8_dual_avx2(vdiffhi, vtmphi1, 2, 3, 2, 3);
+  hadd_hsub_w8_dual_avx2(vdiffhi, vtmphi1, 4, 5, 4, 5);
+  hadd_hsub_w8_dual_avx2(vdiffhi, vtmphi1, 6, 7, 6, 7);
+
+  __m256i vtmpout[16];
+  for (int i = 0, idx = 0; i < 8; ++i, idx += 2) {
+    vtmpout[idx + 0] = _mm256_add_epi16(vdifflo[i], vdiffhi[i]);
+    vtmpout[idx + 1] = _mm256_sub_epi16(vdifflo[i], vdiffhi[i]);
+  }
+
+  // Vertical
+  __m256i vtmp0[16];
+  __m256i vtmp1[16];
+  hadd_hsub_w8_dual_avx2(vtmp0, vtmpout, 0x00, 0x01, 0x00, 0x01);
+  hadd_hsub_w8_dual_avx2(vtmp0, vtmpout, 0x02, 0x03, 0x02, 0x03);
+  hadd_hsub_w8_dual_avx2(vtmp0, vtmpout, 0x04, 0x05, 0x04, 0x05);
+  hadd_hsub_w8_dual_avx2(vtmp0, vtmpout, 0x06, 0x07, 0x06, 0x07);
+  hadd_hsub_w8_dual_avx2(vtmp0, vtmpout, 0x08, 0x09, 0x08, 0x09);
+  hadd_hsub_w8_dual_avx2(vtmp0, vtmpout, 0x0a, 0x0b, 0x0a, 0x0b);
+  hadd_hsub_w8_dual_avx2(vtmp0, vtmpout, 0x0c, 0x0d, 0x0c, 0x0d);
+  hadd_hsub_w8_dual_avx2(vtmp0, vtmpout, 0x0e, 0x0f, 0x0e, 0x0f);
+
+  add_sub_dual_avx2(vtmp1, vtmp0, 0x00, 0x01, 0x00, 0x04);
+  add_sub_dual_avx2(vtmp1, vtmp0, 0x02, 0x03, 0x01, 0x05);
+  add_sub_dual_avx2(vtmp1, vtmp0, 0x04, 0x05, 0x02, 0x06);
+  add_sub_dual_avx2(vtmp1, vtmp0, 0x06, 0x07, 0x03, 0x07);
+  add_sub_dual_avx2(vtmp1, vtmp0, 0x08, 0x09, 0x08, 0x0c);
+  add_sub_dual_avx2(vtmp1, vtmp0, 0x0a, 0x0b, 0x09, 0x0d);
+  add_sub_dual_avx2(vtmp1, vtmp0, 0x0c, 0x0d, 0x0a, 0x0e);
+  add_sub_dual_avx2(vtmp1, vtmp0, 0x0e, 0x0f, 0x0b, 0x0f);
+
+  add_sub_dual_avx2(vtmpout, vtmp1, 0x00, 0x01, 0x00, 0x08);
+  add_sub_dual_avx2(vtmpout, vtmp1, 0x02, 0x03, 0x01, 0x09);
+  add_sub_dual_avx2(vtmpout, vtmp1, 0x04, 0x05, 0x02, 0x0a);
+  add_sub_dual_avx2(vtmpout, vtmp1, 0x06, 0x07, 0x03, 0x0b);
+  add_sub_dual_avx2(vtmpout, vtmp1, 0x08, 0x09, 0x04, 0x0c);
+  add_sub_dual_avx2(vtmpout, vtmp1, 0x0a, 0x0b, 0x05, 0x0d);
+  add_sub_dual_avx2(vtmpout, vtmp1, 0x0c, 0x0d, 0x06, 0x0e);
+  add_sub_dual_avx2(vtmpout, vtmp1, 0x0e, 0x0f, 0x07, 0x0f);
+
+  // Calculate final sum in two parts to avoid overflow.
+  __m256i vsum0 = _mm256_setzero_si256();
+  __m256i vsum1 = _mm256_setzero_si256();
+  int16_t dc0 = abs(_mm256_extract_epi16(vtmpout[0], 0));
+  int16_t dc1 = abs(_mm256_extract_epi16(vtmpout[0], 8));
+  for (int i = 0; i < 16; i += 2) {
+    vsum0 = _mm256_add_epi16(vsum0, _mm256_abs_epi16(vtmpout[i + 0]));
+    vsum1 = _mm256_add_epi16(vsum1, _mm256_abs_epi16(vtmpout[i + 1]));
+  }
+
+  // Do the final adds horizontally. First round with madd to extend to 32 bits
+  // Before madd                                             0 1 2 3 4 5 6 7 | 8 9 a b c d e f
+  vsum0 = _mm256_madd_epi16(vsum0, _mm256_set1_epi16(1)); // 01 23 45 67 | 89 ab cd ef
+  vsum1 = _mm256_madd_epi16(vsum1, _mm256_set1_epi16(1));
+  __m256i vsum = _mm256_add_epi32(vsum0, vsum1);
+  vsum = _mm256_hadd_epi32(vsum, vsum); // 0123 4567 xxxx xxxx | 89ab cdef xxxx xxxx
+  vsum = _mm256_hadd_epi32(vsum, vsum); // 01234567  xxxxxxxx ... | 89abcdef xxxxxxxx ...
+
+  satd0 = (uint64_t)_mm256_extract_epi32(vsum, 0);
+  satd1 = (uint64_t)_mm256_extract_epi32(vsum, 4);
+
+  satd0 -= abs(dc0);
+  satd0 += abs(dc0) >> 2;
+  satd0 = (int)(satd0 / sqrt(16.0 * 8) * 2);
+
+  satd1 -= abs(dc1);
+  satd1 += abs(dc1) >> 2;
+  satd1 = (int)(satd1 / sqrt(16.0 * 8) * 2);
+
+  costs_out[0] += satd0;
+  costs_out[1] += satd1;
+}
+
+static INLINE void ver_transform_block_w8x16_avx2(__m128i (*rows)[16])
+{
+  __m128i temp0[16];
+  add_sub_avx2(temp0, (*rows), 0x00, 0x01, 0x00, 0x01);
+  add_sub_avx2(temp0, (*rows), 0x02, 0x03, 0x02, 0x03);
+  add_sub_avx2(temp0, (*rows), 0x04, 0x05, 0x04, 0x05);
+  add_sub_avx2(temp0, (*rows), 0x06, 0x07, 0x06, 0x07);
+  add_sub_avx2(temp0, (*rows), 0x08, 0x09, 0x08, 0x09);
+  add_sub_avx2(temp0, (*rows), 0x0a, 0x0b, 0x0a, 0x0b);
+  add_sub_avx2(temp0, (*rows), 0x0c, 0x0d, 0x0c, 0x0d);
+  add_sub_avx2(temp0, (*rows), 0x0e, 0x0f, 0x0e, 0x0f);
+
+  __m128i temp1[16];
+  add_sub_avx2(temp1, temp0, 0x00, 0x01, 0x00, 0x02);
+  add_sub_avx2(temp1, temp0, 0x02, 0x03, 0x01, 0x03);
+  add_sub_avx2(temp1, temp0, 0x04, 0x05, 0x04, 0x06);
+  add_sub_avx2(temp1, temp0, 0x06, 0x07, 0x05, 0x07);
+  add_sub_avx2(temp1, temp0, 0x08, 0x09, 0x08, 0x0a);
+  add_sub_avx2(temp1, temp0, 0x0a, 0x0b, 0x09, 0x0b);
+  add_sub_avx2(temp1, temp0, 0x0c, 0x0d, 0x0c, 0x0e);
+  add_sub_avx2(temp1, temp0, 0x0e, 0x0f, 0x0d, 0x0f);
+
+  add_sub_avx2(temp0, temp1, 0x00, 0x01, 0x00, 0x04);
+  add_sub_avx2(temp0, temp1, 0x02, 0x03, 0x01, 0x05);
+  add_sub_avx2(temp0, temp1, 0x04, 0x05, 0x02, 0x06);
+  add_sub_avx2(temp0, temp1, 0x06, 0x07, 0x03, 0x07);
+  add_sub_avx2(temp0, temp1, 0x08, 0x09, 0x08, 0x0c);
+  add_sub_avx2(temp0, temp1, 0x0a, 0x0b, 0x09, 0x0d);
+  add_sub_avx2(temp0, temp1, 0x0c, 0x0d, 0x0a, 0x0e);
+  add_sub_avx2(temp0, temp1, 0x0e, 0x0f, 0x0b, 0x0f);
+
+  add_sub_avx2((*rows), temp0, 0x00, 0x01, 0x00, 0x08);
+  add_sub_avx2((*rows), temp0, 0x02, 0x03, 0x01, 0x09);
+  add_sub_avx2((*rows), temp0, 0x04, 0x05, 0x02, 0x0a);
+  add_sub_avx2((*rows), temp0, 0x06, 0x07, 0x03, 0x0b);
+  add_sub_avx2((*rows), temp0, 0x08, 0x09, 0x04, 0x0c);
+  add_sub_avx2((*rows), temp0, 0x0a, 0x0b, 0x05, 0x0d);
+  add_sub_avx2((*rows), temp0, 0x0c, 0x0d, 0x06, 0x0e);
+  add_sub_avx2((*rows), temp0, 0x0e, 0x0f, 0x07, 0x0f);
+}
+
+static uint64_t hadamard_8x16_fw_avx2(const uvg_pixel* ref, const uvg_pixel* pred, int ref_stride, int pred_stride)
+{
+  uint64_t satd = 0;
+
+  __m128i vdiff[16];
+  for (int i = 0; i < 16; ++i) {
+    __m128i vref = _mm_loadu_si128((__m128i*) & ref[i * ref_stride]);
+    __m128i vpred = _mm_loadu_si128((__m128i*) & pred[i * pred_stride]);
+    vref = _mm_cvtepu8_epi16(vref);
+    vpred = _mm_cvtepu8_epi16(vpred);
+    vdiff[i] = _mm_sub_epi16(vref, vpred);
+  }
+  
+  for (int i = 0; i < 16; ++i) {
+    hor_transform_row_avx2(&vdiff[i]);
+  }
+
+  ver_transform_block_w8x16_avx2(&vdiff);
+
+  // Calculate sum in two parts to avoid overflow
+  __m128i vsum0 = _mm_setzero_si128();
+  __m128i vsum1 = _mm_setzero_si128();
+  int16_t dc = abs(_mm_extract_epi16(vdiff[0], 0));
+  for (int i = 0; i < 16; i += 2) {
+    vsum0 = _mm_add_epi16(vsum0, _mm_abs_epi16(vdiff[i + 0]));
+    vsum1 = _mm_add_epi16(vsum1, _mm_abs_epi16(vdiff[i + 1]));
+  }
+  
+  // Do the final adds horizontally. First round with madd to extend to 32 bits
+  // Before madd 8 16-bit values                       0 1 2 3 4 5 6 7
+  vsum0 = _mm_madd_epi16(vsum0, _mm_set1_epi16(1)); // 01 23 45 67
+  vsum1 = _mm_madd_epi16(vsum1, _mm_set1_epi16(1));
+  __m128i vsum = _mm_add_epi32(vsum0, vsum1);
+  vsum = _mm_hadd_epi32(vsum, vsum); // 0123 4567 xxxx xxxx
+  vsum = _mm_hadd_epi32(vsum, vsum); // 01234567 xxxxxxxx ...
+
+  satd = (uint64_t)_mm_extract_epi32(vsum, 0);
+
+  satd -= abs(dc);
+  satd += abs(dc) >> 2;
+  satd = (int)(satd / sqrt(16.0 * 8) * 2);
+
+  return satd;
+}
+
+static void hadamard_8x16_fw_dual_avx2(const uvg_pixel* ref, const uvg_pixel* pred0, const uvg_pixel* pred1, const int stride, unsigned* costs_out)
+{
+  uint64_t satd0 = 0;
+  uint64_t satd1 = 0;
+
+  __m256i vdiff[16];
+  const __m128i vidx = _mm_set_epi64x(stride, 0);
+
+  for (int i = 0, idx = 0; i < 8; ++i, idx += 2) {
+    // Collect samples using gather
+    const __m128i vreftmp   = _mm_i64gather_epi64((const long long*)(ref   + (i * 2 * stride)), vidx, 1);
+    const __m128i vpred0tmp = _mm_i64gather_epi64((const long long*)(pred0 + (i * 2 * stride)), vidx, 1);
+    const __m128i vpred1tmp = _mm_i64gather_epi64((const long long*)(pred1 + (i * 2 * stride)), vidx, 1);
+
+    const __m256i vref = _mm256_cvtepu8_epi16(vreftmp);
+    const __m256i vpred0 = _mm256_cvtepu8_epi16(vpred0tmp);
+    const __m256i vpred1 = _mm256_cvtepu8_epi16(vpred1tmp);
+
+    const __m256i vtmp0 = _mm256_sub_epi16(vref, vpred0);
+    const __m256i vtmp1 = _mm256_sub_epi16(vref, vpred1);
+
+    // Arrange input so the low 128 bits hold pred 0 rows and the high 128 holds pred 1 rows.
+    vdiff[idx + 0] = _mm256_permute2x128_si256(vtmp0, vtmp1, 0x20);
+    vdiff[idx + 1] = _mm256_permute2x128_si256(vtmp0, vtmp1, 0x31);
+  }
+
+  __m256i vtmp0[16];
+  __m256i vtmp1[16];
+
+  // Horizontal
+  hadd_hsub_w8_dual_avx2(vtmp0, vdiff, 0x00, 0x01, 0x00, 0x01);
+  hadd_hsub_w8_dual_avx2(vtmp0, vdiff, 0x02, 0x03, 0x02, 0x03);
+  hadd_hsub_w8_dual_avx2(vtmp0, vdiff, 0x04, 0x05, 0x04, 0x05);
+  hadd_hsub_w8_dual_avx2(vtmp0, vdiff, 0x06, 0x07, 0x06, 0x07);
+  hadd_hsub_w8_dual_avx2(vtmp0, vdiff, 0x08, 0x09, 0x08, 0x09);
+  hadd_hsub_w8_dual_avx2(vtmp0, vdiff, 0x0a, 0x0b, 0x0a, 0x0b);
+  hadd_hsub_w8_dual_avx2(vtmp0, vdiff, 0x0c, 0x0d, 0x0c, 0x0d);
+  hadd_hsub_w8_dual_avx2(vtmp0, vdiff, 0x0e, 0x0f, 0x0e, 0x0f);
+
+  hadd_hsub_w8_dual_avx2(vtmp1, vtmp0, 0x00, 0x01, 0x00, 0x01);
+  hadd_hsub_w8_dual_avx2(vtmp1, vtmp0, 0x02, 0x03, 0x02, 0x03);
+  hadd_hsub_w8_dual_avx2(vtmp1, vtmp0, 0x04, 0x05, 0x04, 0x05);
+  hadd_hsub_w8_dual_avx2(vtmp1, vtmp0, 0x06, 0x07, 0x06, 0x07);
+  hadd_hsub_w8_dual_avx2(vtmp1, vtmp0, 0x08, 0x09, 0x08, 0x09);
+  hadd_hsub_w8_dual_avx2(vtmp1, vtmp0, 0x0a, 0x0b, 0x0a, 0x0b);
+  hadd_hsub_w8_dual_avx2(vtmp1, vtmp0, 0x0c, 0x0d, 0x0c, 0x0d);
+  hadd_hsub_w8_dual_avx2(vtmp1, vtmp0, 0x0e, 0x0f, 0x0e, 0x0f);
+
+  hadd_hsub_w8_dual_avx2(vdiff, vtmp1, 0x00, 0x01, 0x00, 0x01);
+  hadd_hsub_w8_dual_avx2(vdiff, vtmp1, 0x02, 0x03, 0x02, 0x03);
+  hadd_hsub_w8_dual_avx2(vdiff, vtmp1, 0x04, 0x05, 0x04, 0x05);
+  hadd_hsub_w8_dual_avx2(vdiff, vtmp1, 0x06, 0x07, 0x06, 0x07);
+  hadd_hsub_w8_dual_avx2(vdiff, vtmp1, 0x08, 0x09, 0x08, 0x09);
+  hadd_hsub_w8_dual_avx2(vdiff, vtmp1, 0x0a, 0x0b, 0x0a, 0x0b);
+  hadd_hsub_w8_dual_avx2(vdiff, vtmp1, 0x0c, 0x0d, 0x0c, 0x0d);
+  hadd_hsub_w8_dual_avx2(vdiff, vtmp1, 0x0e, 0x0f, 0x0e, 0x0f);
+
+  // Vertical
+  hadd_hsub_w8_dual_avx2(vtmp0, vdiff, 0x00, 0x01, 0x00, 0x01);
+  hadd_hsub_w8_dual_avx2(vtmp0, vdiff, 0x02, 0x03, 0x02, 0x03);
+  hadd_hsub_w8_dual_avx2(vtmp0, vdiff, 0x04, 0x05, 0x04, 0x05);
+  hadd_hsub_w8_dual_avx2(vtmp0, vdiff, 0x06, 0x07, 0x06, 0x07);
+  hadd_hsub_w8_dual_avx2(vtmp0, vdiff, 0x08, 0x09, 0x08, 0x09);
+  hadd_hsub_w8_dual_avx2(vtmp0, vdiff, 0x0a, 0x0b, 0x0a, 0x0b);
+  hadd_hsub_w8_dual_avx2(vtmp0, vdiff, 0x0c, 0x0d, 0x0c, 0x0d);
+  hadd_hsub_w8_dual_avx2(vtmp0, vdiff, 0x0e, 0x0f, 0x0e, 0x0f);
+
+  add_sub_w8_dual_avx2(vtmp1, vtmp0, 0x00, 0x02, 0x00, 0x02);
+  add_sub_w8_dual_avx2(vtmp1, vtmp0, 0x01, 0x03, 0x01, 0x03);
+  add_sub_w8_dual_avx2(vtmp1, vtmp0, 0x04, 0x06, 0x04, 0x06);
+  add_sub_w8_dual_avx2(vtmp1, vtmp0, 0x05, 0x07, 0x05, 0x07);
+  add_sub_w8_dual_avx2(vtmp1, vtmp0, 0x08, 0x0a, 0x08, 0x0a);
+  add_sub_w8_dual_avx2(vtmp1, vtmp0, 0x09, 0x0b, 0x09, 0x0b);
+  add_sub_w8_dual_avx2(vtmp1, vtmp0, 0x0c, 0x0e, 0x0c, 0x0e);
+  add_sub_w8_dual_avx2(vtmp1, vtmp0, 0x0d, 0x0f, 0x0d, 0x0f);
+
+  add_sub_w8_dual_avx2(vtmp0, vtmp1, 0x00, 0x04, 0x00, 0x04);
+  add_sub_w8_dual_avx2(vtmp0, vtmp1, 0x01, 0x05, 0x01, 0x05);
+  add_sub_w8_dual_avx2(vtmp0, vtmp1, 0x02, 0x06, 0x02, 0x06);
+  add_sub_w8_dual_avx2(vtmp0, vtmp1, 0x03, 0x07, 0x03, 0x07);
+  add_sub_w8_dual_avx2(vtmp0, vtmp1, 0x08, 0x0c, 0x08, 0x0c);
+  add_sub_w8_dual_avx2(vtmp0, vtmp1, 0x09, 0x0d, 0x09, 0x0d);
+  add_sub_w8_dual_avx2(vtmp0, vtmp1, 0x0a, 0x0e, 0x0a, 0x0e);
+  add_sub_w8_dual_avx2(vtmp0, vtmp1, 0x0b, 0x0f, 0x0b, 0x0f);
+
+  add_sub_w8_dual_avx2(vdiff, vtmp0, 0x00, 0x01, 0x00, 0x08);
+  add_sub_w8_dual_avx2(vdiff, vtmp0, 0x02, 0x03, 0x01, 0x09);
+  add_sub_w8_dual_avx2(vdiff, vtmp0, 0x04, 0x05, 0x02, 0x0a);
+  add_sub_w8_dual_avx2(vdiff, vtmp0, 0x06, 0x07, 0x03, 0x0b);
+  add_sub_w8_dual_avx2(vdiff, vtmp0, 0x08, 0x09, 0x04, 0x0c);
+  add_sub_w8_dual_avx2(vdiff, vtmp0, 0x0a, 0x0b, 0x05, 0x0d);
+  add_sub_w8_dual_avx2(vdiff, vtmp0, 0x0c, 0x0d, 0x06, 0x0e);
+  add_sub_w8_dual_avx2(vdiff, vtmp0, 0x0e, 0x0f, 0x07, 0x0f);
+
+  // Calculate sum in two parts to avoid overflow
+  __m256i vsum0 = _mm256_setzero_si256();
+  __m256i vsum1 = _mm256_setzero_si256();
+  int16_t dc0 = abs(_mm256_extract_epi16(vdiff[0], 0));
+  int16_t dc1 = abs(_mm256_extract_epi16(vdiff[0], 8));
+  for (int i = 0; i < 16; i += 2) {
+    vsum0 = _mm256_add_epi16(vsum0, _mm256_abs_epi16(vdiff[i + 0]));
+    vsum1 = _mm256_add_epi16(vsum1, _mm256_abs_epi16(vdiff[i + 1]));
+  }
+
+  // Do the final adds horizontally. First round with madd to extend to 32 bits
+  // Before madd 8 16-bit values                             0 1 2 3 4 5 6 7 | 8 9 a b c d e f
+  vsum0 = _mm256_madd_epi16(vsum0, _mm256_set1_epi16(1)); // 01 23 45 67 | 89 ab cd ef
+  vsum1 = _mm256_madd_epi16(vsum1, _mm256_set1_epi16(1));
+  __m256i vsum = _mm256_add_epi32(vsum0, vsum1);
+  vsum = _mm256_hadd_epi32(vsum, vsum); // 0123 4567 xxxx xxxx | 89ab cdef xxxx xxxx
+  vsum = _mm256_hadd_epi32(vsum, vsum); // 01234567 xxxxxxxx ... | 89abcdef xxxxxxxx ...
+
+  satd0 = (uint64_t)_mm256_extract_epi32(vsum, 0);
+
+  satd0 -= abs(dc0);
+  satd0 += abs(dc0) >> 2;
+  satd0 = (int)(satd0 / sqrt(16.0 * 8) * 2);
+
+  satd1 = (uint64_t)_mm256_extract_epi32(vsum, 4);
+
+  satd1 -= abs(dc1);
+  satd1 += abs(dc1) >> 2;
+  satd1 = (int)(satd1 / sqrt(16.0 * 8) * 2);
+
+  costs_out[0] += satd0;
+  costs_out[1] += satd1;
+}
+
+static INLINE void ver_transform_block_8x4_avx2(__m128i (*rows)[4])
+{
+  __m128i temp0[4];
+  add_sub_avx2(temp0, (*rows), 0x00, 0x01, 0x00, 0x01);
+  add_sub_avx2(temp0, (*rows), 0x02, 0x03, 0x02, 0x03);
+  
+  add_sub_avx2((*rows), temp0, 0x00, 0x01, 0x00, 0x02);
+  add_sub_avx2((*rows), temp0, 0x02, 0x03, 0x01, 0x03);
+}
+
+static uint64_t hadamard_8x4_fw_avx2(const uvg_pixel* ref, const uvg_pixel* pred, int ref_stride, int pred_stride)
+{
+  uint64_t satd = 0;
+
+  __m128i vdiff[4];
+  for (int i = 0; i < 4; ++i) {
+    __m128i vref = _mm_loadu_si128((__m128i*) & ref[i * ref_stride]);
+    __m128i vpred = _mm_loadu_si128((__m128i*) & pred[i * pred_stride]);
+    vref = _mm_cvtepu8_epi16(vref);
+    vpred = _mm_cvtepu8_epi16(vpred);
+    vdiff[i] = _mm_sub_epi16(vref, vpred);
+  }
+
+  for (int i = 0; i < 4; ++i) {
+    hor_transform_row_avx2(&vdiff[i]);
+  }
+
+  ver_transform_block_8x4_avx2(&vdiff);
+
+  // Calculate sum
+  __m128i vsum = _mm_setzero_si128();
+  int16_t dc = abs(_mm_extract_epi16(vdiff[0], 0));
+  for (int i = 0; i < 4; ++i) {
+    vsum = _mm_add_epi16(vsum, _mm_abs_epi16(vdiff[i]));
+  }
+
+  // Do the final adds horizontally
+  vsum = _mm_hadd_epi16(vsum, vsum); // 01 23 45 67 xx xx xx xx
+  vsum = _mm_hadd_epi16(vsum, vsum); // 0123 4567 xxxx xxxx xxxx xxxx xxxx xxxx
+  vsum = _mm_hadd_epi16(vsum, vsum); // 01234567 xxxxxxxx ...
+
+  satd = (uint64_t)_mm_extract_epi16(vsum, 0);
+
+  satd -= abs(dc);
+  satd += abs(dc) >> 2;
+  satd = (int)(satd / sqrt(8.0 * 4) * 2);
+
+  return satd;
+}
+
+static void hadamard_8x4_fw_dual_avx2(const uvg_pixel* ref, const uvg_pixel* pred0, const uvg_pixel* pred1, const int stride, unsigned* costs_out)
+{
+  uint64_t satd0 = 0;
+  uint64_t satd1 = 0;
+
+  __m256i vdiff[4];
+  const __m128i vidx = _mm_set_epi64x(stride, 0);
+  
+  // Collect samples using gather, 2 rows at a time
+  __m128i vreftmp   = _mm_i64gather_epi64((const long long*)(ref   + (0 * stride)), vidx, 1);
+  __m128i vpred0tmp = _mm_i64gather_epi64((const long long*)(pred0 + (0 * stride)), vidx, 1);
+  __m128i vpred1tmp = _mm_i64gather_epi64((const long long*)(pred1 + (0 * stride)), vidx, 1);
+
+  __m256i vref = _mm256_cvtepu8_epi16(vreftmp);
+  __m256i vpred0 = _mm256_cvtepu8_epi16(vpred0tmp);
+  __m256i vpred1 = _mm256_cvtepu8_epi16(vpred1tmp);
+
+  __m256i vtmpdiff0 = _mm256_sub_epi16(vref, vpred0);
+  __m256i vtmpdiff1 = _mm256_sub_epi16(vref, vpred1);
+
+  // Arrange input so the low 128 bits hold pred 0 rows and the high 128 holds pred 1 rows.
+  vdiff[0] = _mm256_permute2x128_si256(vtmpdiff0, vtmpdiff1, 0x20);
+  vdiff[1] = _mm256_permute2x128_si256(vtmpdiff0, vtmpdiff1, 0x31);
+
+  vreftmp   = _mm_i64gather_epi64((const long long*)(ref   + (2 * stride)), vidx, 1);
+  vpred0tmp = _mm_i64gather_epi64((const long long*)(pred0 + (2 * stride)), vidx, 1);
+  vpred1tmp = _mm_i64gather_epi64((const long long*)(pred1 + (2 * stride)), vidx, 1);
+  
+  vref = _mm256_cvtepu8_epi16(vreftmp);
+  vpred0 = _mm256_cvtepu8_epi16(vpred0tmp);
+  vpred1 = _mm256_cvtepu8_epi16(vpred1tmp);
+  
+  vtmpdiff0 = _mm256_sub_epi16(vref, vpred0);
+  vtmpdiff1 = _mm256_sub_epi16(vref, vpred1);
+
+  vdiff[2] = _mm256_permute2x128_si256(vtmpdiff0, vtmpdiff1, 0x20);
+  vdiff[3] = _mm256_permute2x128_si256(vtmpdiff0, vtmpdiff1, 0x31);
+  
+  
+  __m256i vtmp0[4];
+  __m256i vtmp1[4];
+
+  // Horizontal
+  hadd_hsub_w8_dual_avx2(vtmp0, vdiff, 0, 1, 0, 1);
+  hadd_hsub_w8_dual_avx2(vtmp0, vdiff, 2, 3, 2, 3);
+
+  hadd_hsub_w8_dual_avx2(vtmp1, vtmp0, 0, 1, 0, 1);
+  hadd_hsub_w8_dual_avx2(vtmp1, vtmp0, 2, 3, 2, 3);
+
+  hadd_hsub_w8_dual_avx2(vdiff, vtmp1, 0, 1, 0, 1);
+  hadd_hsub_w8_dual_avx2(vdiff, vtmp1, 2, 3, 2, 3);
+
+  // Vertical
+  hadd_hsub_w8_dual_avx2(vtmp0, vdiff, 0, 1, 0, 1);
+  hadd_hsub_w8_dual_avx2(vtmp0, vdiff, 2, 3, 2, 3);
+
+  add_sub_w8_dual_avx2(vdiff, vtmp0, 0, 1, 0, 2);
+  add_sub_w8_dual_avx2(vdiff, vtmp0, 2, 3, 1, 3);
+
+  // Calculate sum
+  __m256i vsum = _mm256_setzero_si256();
+  int16_t dc0 = abs(_mm256_extract_epi16(vdiff[0], 0));
+  int16_t dc1 = abs(_mm256_extract_epi16(vdiff[0], 8));
+  for (int i = 0; i < 4; ++i) {
+    vsum = _mm256_add_epi16(vsum, _mm256_abs_epi16(vdiff[i]));
+  }
+
+  // Do the final adds horizontally
+  vsum = _mm256_hadd_epi16(vsum, vsum); // 01 23 45 67 xx xx xx xx
+  vsum = _mm256_hadd_epi16(vsum, vsum); // 0123 4567 xxxx xxxx xxxx xxxx xxxx xxxx
+  vsum = _mm256_hadd_epi16(vsum, vsum); // 01234567 xxxxxxxx ...
+
+  satd0 = (uint64_t)_mm256_extract_epi16(vsum, 0);
+
+  satd0 -= abs(dc0);
+  satd0 += abs(dc0) >> 2;
+  satd0 = (int)(satd0 / sqrt(8.0 * 4) * 2);
+
+  satd1 = (uint64_t)_mm256_extract_epi16(vsum, 8);
+
+  satd1 -= abs(dc1);
+  satd1 += abs(dc1) >> 2;
+  satd1 = (int)(satd1 / sqrt(8.0 * 4) * 2);
+
+  costs_out[0] += satd0;
+  costs_out[1] += satd1;
+}
+
+static INLINE void hor_transform_row_w4_avx2(__m128i* row) {
+
+  __m128i vpos = _mm_set1_epi16(1);
+  __m128i vneg = _mm_set1_epi16(-1);
+  __m128i vsign = _mm_unpacklo_epi32(vpos, vneg); // + + - - + + - -
+  __m128i vtemp = _mm_shuffle_epi32(*row, _MM_SHUFFLE(2, 3, 0, 1));
+  *row = _mm_sign_epi16(*row, vsign);
+  *row = _mm_add_epi16(*row, vtemp);
+
+  vsign = _mm_unpacklo_epi16(vpos, vneg); // + - + - + - + -
+  vtemp = _mm_shufflelo_epi16(*row, _MM_SHUFFLE(2, 3, 0, 1));
+  vtemp = _mm_shufflehi_epi16(vtemp, _MM_SHUFFLE(2, 3, 0, 1));
+  *row = _mm_sign_epi16(*row, vsign);
+  *row = _mm_add_epi16(*row, vtemp);
+}
+
+static INLINE void add_sub_w4_avx2(__m128i* out, __m128i* in, unsigned out_idx0, unsigned in_idx0)
+{
+  const __m128i vpos = _mm_set1_epi16(1);
+  const __m128i vneg = _mm_set1_epi16(-1);
+  const __m128i vsign = _mm_unpacklo_epi64(vpos, vneg); // + + + + - - - -
+  
+  // Arrange data to allow vertical add
+  __m128i vlow = _mm_shuffle_epi32(in[in_idx0], _MM_SHUFFLE(1, 0, 1, 0));  // 0 1 2 3 0 1 2 3
+  __m128i vhigh = _mm_shuffle_epi32(in[in_idx0], _MM_SHUFFLE(3, 2, 3, 2)); // 4 5 6 7 4 5 6 7
+  
+  // Add low 64 bits. Subtract high 64 bits.
+  out[out_idx0] = _mm_add_epi16(vlow, _mm_sign_epi16(vhigh, vsign));
+}
+
+static INLINE void ver_transform_block_4x8_avx2(__m128i (*rows)[4])
+{
+  __m128i temp0[4];
+  add_sub_w4_avx2(temp0, (*rows), 0, 0);
+  add_sub_w4_avx2(temp0, (*rows), 1, 1);
+  add_sub_w4_avx2(temp0, (*rows), 2, 2);
+  add_sub_w4_avx2(temp0, (*rows), 3, 3);
+
+  __m128i temp1[4];
+  add_sub_avx2(temp1, temp0, 0, 1, 0, 1);
+  add_sub_avx2(temp1, temp0, 2, 3, 2, 3);  
+
+  add_sub_avx2((*rows), temp1, 0, 1, 0, 2);
+  add_sub_avx2((*rows), temp1, 2, 3, 1, 3);
+}
+
+static uint64_t hadamard_4x8_fw_avx2(const uvg_pixel* ref, const uvg_pixel* pred, int ref_stride, int pred_stride)
+{
+  uint64_t satd = 0;
+
+  __m128i vdiff[4];
+
+  // Load four rows at a time using gather
+  __m128i vindex_ref = _mm_setr_epi32(0 * ref_stride, 1 * ref_stride, 2 * ref_stride, 3 * ref_stride);
+  __m128i vindex_pred = _mm_setr_epi32(0 * pred_stride, 1 * pred_stride, 2 * pred_stride, 3 * pred_stride);
+
+  __m128i vref0 = _mm_i32gather_epi32((int*)(ref + (0 * ref_stride)), vindex_ref, 1);
+  __m128i vref1 = _mm_i32gather_epi32((int*)(ref + (4 * ref_stride)), vindex_ref, 1);
+  
+  __m128i vpred0 = _mm_i32gather_epi32((int*)(pred + (0 * pred_stride)), vindex_pred, 1);
+  __m128i vpred1 = _mm_i32gather_epi32((int*)(pred + (4 * pred_stride)), vindex_pred, 1);
+
+  // Calculate the diff between lower halves
+  __m128i vtmpref = _mm_cvtepu8_epi16(vref0);
+  __m128i vtmppred = _mm_cvtepu8_epi16(vpred0);
+
+  vdiff[0] = _mm_sub_epi16(vtmpref, vtmppred);
+
+  // Do the same for upper halves
+  vtmpref = _mm_cvtepu8_epi16(_mm_shuffle_epi32(vref0, _MM_SHUFFLE(1, 0, 3, 2)));
+  vtmppred = _mm_cvtepu8_epi16(_mm_shuffle_epi32(vpred0, _MM_SHUFFLE(1, 0, 3, 2)));
+
+  vdiff[1] = _mm_sub_epi16(vtmpref, vtmppred);
+
+  // Repeat for remaining sources
+  vtmpref = _mm_cvtepu8_epi16(vref1);
+  vtmppred = _mm_cvtepu8_epi16(vpred1);
+
+  vdiff[2] = _mm_sub_epi16(vtmpref, vtmppred);
+
+  vtmpref = _mm_cvtepu8_epi16(_mm_shuffle_epi32(vref1, _MM_SHUFFLE(1, 0, 3, 2)));
+  vtmppred = _mm_cvtepu8_epi16(_mm_shuffle_epi32(vpred1, _MM_SHUFFLE(1, 0, 3, 2)));
+
+  vdiff[3] = _mm_sub_epi16(vtmpref, vtmppred);
+
+  for (int i = 0; i < 4; ++i) {
+    hor_transform_row_w4_avx2(&vdiff[i]);
+  }
+
+  ver_transform_block_4x8_avx2(&vdiff);
+
+  // Calculate sum
+  __m128i vsum = _mm_setzero_si128();
+  int16_t dc = abs(_mm_extract_epi16(vdiff[0], 0));
+  for (int i = 0; i < 4; ++i) {
+    vsum = _mm_add_epi16(vsum, _mm_abs_epi16(vdiff[i]));
+  }
+
+  // Do the final adds horizontally
+  vsum = _mm_hadd_epi16(vsum, vsum); // 01 23 45 67 xx xx xx xx
+  vsum = _mm_hadd_epi16(vsum, vsum); // 0123 4567 xxxx xxxx xxxx xxxx xxxx xxxx
+  vsum = _mm_hadd_epi16(vsum, vsum); // 01234567 xxxxxxxx ...
+
+  satd = (uint64_t)_mm_extract_epi16(vsum, 0);
+
+  satd -= abs(dc);
+  satd += abs(dc) >> 2;
+  satd = (int)(satd / sqrt(4.0 * 8) * 2);
+
+  return satd;
+}
+
+static void hadamard_4x8_fw_dual_avx2(const uvg_pixel* ref, const uvg_pixel* pred0, const uvg_pixel* pred1, const int stride, unsigned* costs_out)
+{
+  uint64_t satd0 = 0;
+  uint64_t satd1 = 0;
+
+  __m256i vdiff[4];
+
+  // Load four rows at a time using gather
+  __m128i vidx = _mm_setr_epi32(0 * stride, 1 * stride, 2 * stride, 3 * stride);
+
+  __m128i vref   = _mm_i32gather_epi32((int*)(ref   + (0 * stride)), vidx, 1);
+  __m128i vpred0 = _mm_i32gather_epi32((int*)(pred0 + (0 * stride)), vidx, 1);
+  __m128i vpred1 = _mm_i32gather_epi32((int*)(pred1 + (0 * stride)), vidx, 1);
+  
+  // Extend to 16-bits
+  __m256i vtmpref  = _mm256_cvtepu8_epi16(vref);
+  __m256i vtmppred0 = _mm256_cvtepu8_epi16(vpred0);
+  __m256i vtmppred1 = _mm256_cvtepu8_epi16(vpred1);
+
+  __m256i vtmpdiff0 = _mm256_sub_epi16(vtmpref, vtmppred0);
+  __m256i vtmpdiff1 = _mm256_sub_epi16(vtmpref, vtmppred1);
+
+  // Arrange diff0 and diff1 to low and high halves, respectively
+  vdiff[0] = _mm256_permute2x128_si256(vtmpdiff0, vtmpdiff1, 0x20);
+  vdiff[1] = _mm256_permute2x128_si256(vtmpdiff0, vtmpdiff1, 0x31);
+
+  // Same operations for the remaining rows
+  vref   = _mm_i32gather_epi32((int*)(ref   + (4 * stride)), vidx, 1);
+  vpred0 = _mm_i32gather_epi32((int*)(pred0 + (4 * stride)), vidx, 1);
+  vpred1 = _mm_i32gather_epi32((int*)(pred1 + (4 * stride)), vidx, 1);
+
+  vtmpref = _mm256_cvtepu8_epi16(vref);
+  vtmppred0 = _mm256_cvtepu8_epi16(vpred0);
+  vtmppred1 = _mm256_cvtepu8_epi16(vpred1);
+
+  vtmpdiff0 = _mm256_sub_epi16(vtmpref, vtmppred0);
+  vtmpdiff1 = _mm256_sub_epi16(vtmpref, vtmppred1);
+
+  vdiff[2] = _mm256_permute2x128_si256(vtmpdiff0, vtmpdiff1, 0x20);
+  vdiff[3] = _mm256_permute2x128_si256(vtmpdiff0, vtmpdiff1, 0x31);
+  
+  // Horizontal
+  __m256i vtmp0[4];
+  __m256i vtmp1[4];
+
+  vtmp0[0] = _mm256_hadd_epi16(vdiff[0], vdiff[1]);
+  vtmp0[1] = _mm256_hsub_epi16(vdiff[0], vdiff[1]);
+  vtmp0[2] = _mm256_hadd_epi16(vdiff[2], vdiff[3]);
+  vtmp0[3] = _mm256_hsub_epi16(vdiff[2], vdiff[3]);
+
+  vdiff[0] = _mm256_hadd_epi16(vtmp0[0], vtmp0[1]);
+  vdiff[1] = _mm256_hsub_epi16(vtmp0[0], vtmp0[1]);
+  vdiff[2] = _mm256_hadd_epi16(vtmp0[2], vtmp0[3]);
+  vdiff[3] = _mm256_hsub_epi16(vtmp0[2], vtmp0[3]);
+
+  // Vertical
+  vtmp0[0] = _mm256_hadd_epi16(vdiff[0], vdiff[1]);
+  vtmp0[1] = _mm256_hsub_epi16(vdiff[0], vdiff[1]);
+  vtmp0[2] = _mm256_hadd_epi16(vdiff[2], vdiff[3]);
+  vtmp0[3] = _mm256_hsub_epi16(vdiff[2], vdiff[3]);
+
+  vtmp1[0] = _mm256_hadd_epi16(vtmp0[0], vtmp0[1]);
+  vtmp1[1] = _mm256_hsub_epi16(vtmp0[0], vtmp0[1]);
+  vtmp1[2] = _mm256_hadd_epi16(vtmp0[2], vtmp0[3]);
+  vtmp1[3] = _mm256_hsub_epi16(vtmp0[2], vtmp0[3]);
+
+  vdiff[0] = _mm256_add_epi16(vtmp1[0], vtmp1[2]);
+  vdiff[1] = _mm256_sub_epi16(vtmp1[0], vtmp1[2]);
+  vdiff[2] = _mm256_add_epi16(vtmp1[1], vtmp1[3]);
+  vdiff[3] = _mm256_sub_epi16(vtmp1[1], vtmp1[3]);
+
+
+  // Calculate sum
+  int16_t dc0 = abs(_mm256_extract_epi16(vdiff[0], 0));
+  int16_t dc1 = abs(_mm256_extract_epi16(vdiff[0], 8));
+  
+  __m256i vtmpsum0 = _mm256_add_epi16(_mm256_abs_epi16(vdiff[0]), _mm256_abs_epi16(vdiff[1]));
+  __m256i vtmpsum1 = _mm256_add_epi16(_mm256_abs_epi16(vdiff[2]), _mm256_abs_epi16(vdiff[3]));
+
+  __m256i vsum = _mm256_add_epi16(vtmpsum0, vtmpsum1);
+
+  // Do the final adds horizontally
+  vsum = _mm256_hadd_epi16(vsum, vsum); // 01 23 45 67 xx xx xx xx | 89 ab cd ef xx xx xx xx
+  vsum = _mm256_hadd_epi16(vsum, vsum); // 0123 4567 xxxx xxxx ... | 89ab cdef xxxx xxxx ...
+  vsum = _mm256_hadd_epi16(vsum, vsum); // 01234567 xxxxxxxx ... | 89abcdef xxxxxxxx ...
+
+  satd0 = (uint64_t)_mm256_extract_epi16(vsum, 0);
+
+  satd0 -= abs(dc0);
+  satd0 += abs(dc0) >> 2;
+  satd0 = (int)(satd0 / sqrt(4.0 * 8) * 2);
+
+  satd1 = (uint64_t)_mm256_extract_epi16(vsum, 8);
+
+  satd1 -= abs(dc1);
+  satd1 += abs(dc1) >> 2;
+  satd1 = (int)(satd1 / sqrt(4.0 * 8) * 2);
+
+  costs_out[0] += satd0;
+  costs_out[1] += satd1;
+}
+
+static INLINE void ver_transform_block_4x4_avx2(__m128i (*rows)[2])
+{
+  __m128i temp0[2];
+  add_sub_w4_avx2(temp0, (*rows), 0, 0);
+  add_sub_w4_avx2(temp0, (*rows), 1, 1);
+
+  add_sub_avx2((*rows), temp0, 0, 1, 0, 1);
+}
+
+static uint64_t hadamard_4x4_fw_avx2(const uvg_pixel* ref, const uvg_pixel* pred, int ref_stride, int pred_stride)
+{
+  uint64_t satd = 0;
+
+  __m128i vdiff[2];
+
+  // Load four rows at a time using gather
+  __m128i vindex_ref = _mm_setr_epi32(0 * ref_stride, 1 * ref_stride, 2 * ref_stride, 3 * ref_stride);
+  __m128i vindex_pred = _mm_setr_epi32(0 * pred_stride, 1 * pred_stride, 2 * pred_stride, 3 * pred_stride);
+
+  __m128i vref = _mm_i32gather_epi32((int*)(ref + (0 * ref_stride)), vindex_ref, 1);
+  __m128i vpred = _mm_i32gather_epi32((int*)(pred + (0 * pred_stride)), vindex_pred, 1);
+  
+  // Calculate the diff between lower halves
+  __m128i vtmpref = _mm_cvtepu8_epi16(vref);
+  __m128i vtmppred = _mm_cvtepu8_epi16(vpred);
+
+  vdiff[0] = _mm_sub_epi16(vtmpref, vtmppred);
+
+  // Do the same for upper halves
+  vtmpref = _mm_cvtepu8_epi16(_mm_shuffle_epi32(vref, _MM_SHUFFLE(1, 0, 3, 2)));
+  vtmppred = _mm_cvtepu8_epi16(_mm_shuffle_epi32(vpred, _MM_SHUFFLE(1, 0, 3, 2)));
+
+  vdiff[1] = _mm_sub_epi16(vtmpref, vtmppred);
+
+  for (int i = 0; i < 2; ++i) {
+    hor_transform_row_w4_avx2(&vdiff[i]);
+  }
+
+  ver_transform_block_4x4_avx2(&vdiff);
+
+  // Calculate sum
+  __m128i vsum = _mm_add_epi16(_mm_abs_epi16(vdiff[0]), _mm_abs_epi16(vdiff[1]));
+  int16_t dc = abs(_mm_extract_epi16(vdiff[0], 0));
+  
+  // Do the final adds horizontally
+  vsum = _mm_hadd_epi16(vsum, vsum); // 01 23 45 67 xx xx xx xx
+  vsum = _mm_hadd_epi16(vsum, vsum); // 0123 4567 xxxx xxxx xxxx xxxx xxxx xxxx
+  vsum = _mm_hadd_epi16(vsum, vsum); // 01234567 xxxxxxxx ...
+
+  satd = (uint64_t)_mm_extract_epi16(vsum, 0);
+
+  satd -= abs(dc);
+  satd += abs(dc) >> 2;
+  satd = ((satd + 1) >> 1);
+
+  return satd;
+}
+
+static uint64_t hadamard_2x2_fw_avx2(const uvg_pixel* ref, const uvg_pixel* pred, int ref_stride, int pred_stride)
+{
+  uint64_t satd = 0;
+  coeff_t diff[4], m[4];
+
+  diff[0] = ref[0] - pred[0];
+  diff[1] = ref[1] - pred[1];
+  diff[2] = ref[ref_stride + 0] - pred[pred_stride + 0];
+  diff[3] = ref[ref_stride + 1] - pred[pred_stride + 1];
+  m[0] = diff[0] + diff[2];
+  m[1] = diff[1] + diff[3];
+  m[2] = diff[0] - diff[2];
+  m[3] = diff[1] - diff[3];
+
+  satd += abs(m[0] + m[1]) >> 2;
+  satd += abs(m[0] - m[1]);
+  satd += abs(m[2] + m[3]);
+  satd += abs(m[2] - m[3]);
+
+  return satd;
+}
+
+static uint64_t uvg_get_hadamard_avx2(int width, int height, const uvg_pixel* ref_in, int ref_stride, const uvg_pixel* pred_in, int pred_stride)
+{
+  const uvg_pixel* ref_in_ptr = ref_in;
+  const uvg_pixel* pred_in_ptr = pred_in;
+  const int  rows = height;
+  const int  cols = width;
+  const int  ref_in_stride = ref_stride;
+  const int  pred_in_stride = pred_stride;
+
+  int  x = 0, y = 0;
+
+  uint64_t sum = 0;
+  if (cols > rows && (rows & 7) == 0 && (cols & 15) == 0)
+  {
+    for (y = 0; y < rows; y += 8)
+    {
+      for (x = 0; x < cols; x += 16)
+      {
+        //uiSum += xCalcHADs16x8(&ref_in_ptr[x], &pred_in_ptr[x], iStrideOrg, iStrideCur);
+        sum += hadamard_16x8_fw_avx2(&ref_in_ptr[x], &pred_in_ptr[x], ref_in_stride, pred_in_stride);
+      }
+      ref_in_ptr += ref_in_stride * 8;
+      pred_in_ptr += pred_in_stride * 8;
+    }
+  }
+  else if (cols < rows && (cols & 7) == 0 && (rows & 15) == 0)
+  {
+    for (y = 0; y < rows; y += 16)
+    {
+      for (x = 0; x < cols; x += 8)
+      {
+        //uiSum += xCalcHADs8x16(&ref_in_ptr[x], &pred_in_ptr[x], iStrideOrg, iStrideCur);
+        sum += hadamard_8x16_fw_avx2(&ref_in_ptr[x], &pred_in_ptr[x], ref_in_stride, pred_in_stride);
+      }
+      ref_in_ptr += ref_in_stride * 16;
+      pred_in_ptr += pred_in_stride * 16;
+    }
+  }
+  else if (cols > rows && (rows & 3) == 0 && (cols & 7) == 0)
+  {
+    for (y = 0; y < rows; y += 4)
+    {
+      for (x = 0; x < cols; x += 8)
+      {
+        //uiSum += xCalcHADs8x4(&ref_in_ptr[x], &pred_in_ptr[x], iStrideOrg, iStrideCur);
+        sum += hadamard_8x4_fw_avx2(&ref_in_ptr[x], &pred_in_ptr[x], ref_in_stride, pred_in_stride);
+      }
+      ref_in_ptr += ref_in_stride * 4;
+      pred_in_ptr += pred_in_stride * 4;
+    }
+  }
+  else if (cols < rows && (cols & 3) == 0 && (rows & 7) == 0)
+  {
+    for (y = 0; y < rows; y += 8)
+    {
+      for (x = 0; x < cols; x += 4)
+      {
+        //uiSum += xCalcHADs4x8(&ref_in_ptr[x], &pred_in_ptr[x], iStrideOrg, iStrideCur);
+        sum += hadamard_4x8_fw_avx2(&ref_in_ptr[x], &pred_in_ptr[x], ref_in_stride, pred_in_stride);
+      }
+      ref_in_ptr += ref_in_stride * 8;
+      pred_in_ptr += pred_in_stride * 8;
+    }
+  }
+  else if ((rows % 8 == 0) && (cols % 8 == 0))
+  {
+    for (y = 0; y < rows; y += 8)
+    {
+      for (x = 0; x < cols; x += 8)
+      {
+        sum += satd_8x8_subblock_8bit_avx2(&ref_in_ptr[x], ref_in_stride, &pred_in_ptr[x], pred_in_stride);
+      }
+      ref_in_ptr += 8 * ref_in_stride;
+      pred_in_ptr += 8 * pred_in_stride;
+    }
+  }
+  else if ((rows % 4 == 0) && (cols % 4 == 0))
+  {
+    for (y = 0; y < rows; y += 4)
+    {
+      for (x = 0; x < cols; x += 4)
+      {
+        //uiSum += uvg_satd_4x4_subblock_generic(&ref_in_ptr[x], iStrideOrg, &pred_in_ptr[x], iStrideCur);
+        sum += hadamard_4x4_fw_avx2(&ref_in_ptr[x], &pred_in_ptr[x], ref_in_stride, pred_in_stride);
+      }
+      ref_in_ptr += 4 * ref_in_stride;
+      pred_in_ptr += 4 * pred_in_stride;
+    }
+  }
+  else if ((rows % 2 == 0) && (cols % 2 == 0))
+  {
+    for (y = 0; y < rows; y += 2)
+    {
+      for (x = 0; x < cols; x += 2)
+      {
+        //uiSum += xCalcHADs2x2(&ref_in_ptr[x], &pred_in_ptr[x], iStrideOrg, iStrideCur);
+        sum += hadamard_2x2_fw_avx2(&ref_in_ptr[x], &pred_in_ptr[x], ref_in_stride, pred_in_stride);
+      }
+      ref_in_ptr += 2 * ref_in_stride;
+      pred_in_ptr += 2 * pred_in_stride;
+    }
+  }
+
+  // TODO: 10 bit
+  return (sum >> 0);
+}
+
+static void uvg_get_hadamard_dual_avx2(int width, int height, const pred_buffer preds, const uvg_pixel* const orig, unsigned num_modes, unsigned* costs_out)
+{
+  int y = 0, x = 0;
+
+  const uvg_pixel* ref_in_ptr = orig;
+  const uvg_pixel* pred_in_ptr0 = preds[0];
+  const uvg_pixel* pred_in_ptr1 = preds[1];
+  const int ref_in_stride = width;
+  const int pred_in_stride = width;
+
+  costs_out[0] = 0;
+  costs_out[1] = 0;
+
+  if (width > height && (height & 7) == 0 && (width & 15) == 0)
+  {
+    for (y = 0; y < height; y += 8)
+    {
+      for (x = 0; x < width; x += 16)
+      {
+        hadamard_16x8_fw_dual_avx2((ref_in_ptr + x), (pred_in_ptr0 + x), (pred_in_ptr1 + x), width, costs_out);
+      }
+      ref_in_ptr += ref_in_stride * 8;
+      pred_in_ptr0 += pred_in_stride * 8;
+      pred_in_ptr1 += pred_in_stride * 8;
+    }
+  }
+  else if (width < height && (width & 7) == 0 && (height & 15) == 0)
+  {
+    for (y = 0; y < height; y += 16)
+    {
+      for (x = 0; x < width; x += 8)
+      {
+        hadamard_8x16_fw_dual_avx2((ref_in_ptr + x), (pred_in_ptr0 + x), (pred_in_ptr1 + x), width, costs_out);
+      }
+      ref_in_ptr += ref_in_stride * 16;
+      pred_in_ptr0 += pred_in_stride * 16;
+      pred_in_ptr1 += pred_in_stride * 16;
+    }
+  }
+  else if (width > height && (height & 3) == 0 && (width & 7) == 0)
+  {
+    for (y = 0; y < height; y += 4)
+    {
+      for (x = 0; x < width; x += 8)
+      {
+        hadamard_8x4_fw_dual_avx2((ref_in_ptr + x), (pred_in_ptr0 + x), (pred_in_ptr1 + x), width, costs_out);
+      }
+      ref_in_ptr += ref_in_stride * 4;
+      pred_in_ptr0 += pred_in_stride * 4;
+      pred_in_ptr1 += pred_in_stride * 4;
+    }
+  }
+  else if (width < height && (width & 3) == 0 && (height & 7) == 0)
+  {
+    for (y = 0; y < height; y += 8)
+    {
+      for (x = 0; x < width; x += 4)
+      {
+        hadamard_4x8_fw_dual_avx2((ref_in_ptr + x), (pred_in_ptr0 + x), (pred_in_ptr1 + x), width, costs_out);
+      }
+      ref_in_ptr += ref_in_stride * 8;
+      pred_in_ptr0 += pred_in_stride * 8;
+      pred_in_ptr1 += pred_in_stride * 8;
+    }
+  }
+  else if ((height % 8 == 0) && (width % 8 == 0))
+  {
+    for (y = 0; y < height; y += 8)
+    {
+      for (x = 0; x < width; x += 8)
+      {
+        unsigned sum0 = 0;
+        unsigned sum1 = 0;
+        uvg_satd_8bit_8x8_general_dual_avx2((pred_in_ptr0 + x), width, (pred_in_ptr1 + x), width, (ref_in_ptr + x), width, &sum0, &sum1);
+        costs_out[0] += sum0;
+        costs_out[1] += sum1;
+      }
+      ref_in_ptr += 8 * ref_in_stride;
+      pred_in_ptr0 += 8 * pred_in_stride;
+      pred_in_ptr1 += 8 * pred_in_stride;
+    }
+  }
+  else if ((height % 4 == 0) && (width % 4 == 0))
+  {
+    // The 4x4 subblock is only called when block size is 4x4. Other functions handle larger sizes.
+    satd_8bit_4x4_dual_avx2(preds, orig, num_modes, costs_out);
+  }
+  else if ((height % 2 == 0) && (width % 2 == 0))
+  {
+    for (y = 0; y < height; y += 2)
+    {
+      for (x = 0; x < width; x += 2)
+      {
+        costs_out[0] += hadamard_2x2_fw_avx2(&ref_in_ptr[x], &pred_in_ptr0[x], ref_in_stride, pred_in_stride);
+        costs_out[1] += hadamard_2x2_fw_avx2(&ref_in_ptr[x], &pred_in_ptr1[x], ref_in_stride, pred_in_stride);
+      }
+      ref_in_ptr += 2 * ref_in_stride;
+      pred_in_ptr0 += 2 * pred_in_stride;
+      pred_in_ptr1 += 2 * pred_in_stride;
+    }
+  }
+  else {
+    assert(false && "Dual SATD: Unexpected block size.");
+  }
+}
 
 
 static unsigned pixels_calc_ssd_avx2(const uint8_t *const ref, const uint8_t *const rec,
@@ -1814,6 +2921,8 @@ int uvg_strategy_register_picture_avx2(void* opaque, uint8_t bitdepth)
     success &= uvg_strategyselector_register(opaque, "satd_32x32_dual", "avx2", 40, &satd_8bit_32x32_dual_avx2);
     success &= uvg_strategyselector_register(opaque, "satd_64x64_dual", "avx2", 40, &satd_8bit_64x64_dual_avx2);
     success &= uvg_strategyselector_register(opaque, "satd_any_size", "avx2", 40, &satd_any_size_8bit_avx2);
+    success &= uvg_strategyselector_register(opaque, "satd_any_size_vtm", "avx2", 40, &uvg_get_hadamard_avx2);
+    success &= uvg_strategyselector_register(opaque, "satd_any_size_vtm_dual", "avx2", 40, &uvg_get_hadamard_dual_avx2);
     success &= uvg_strategyselector_register(opaque, "satd_any_size_quad", "avx2", 40, &satd_any_size_quad_avx2);
 
     success &= uvg_strategyselector_register(opaque, "pixels_calc_ssd", "avx2", 40, &pixels_calc_ssd_avx2);
