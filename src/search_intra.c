@@ -145,8 +145,7 @@ static void get_cost_dual(
   if (satd_twin_func != NULL) {
     satd_twin_func(preds, orig_block, PARALLEL_BLKS, satd_costs);
   } else {
-    satd_costs[0] = uvg_satd_any_size_vtm(width, height, orig_block, width, preds[0], width);
-    satd_costs[1] = uvg_satd_any_size_vtm(width, height, orig_block, width, preds[1], width);
+    uvg_satd_any_size_vtm_dual(width, height, preds, orig_block, PARALLEL_BLKS, satd_costs);
   }
   unsigned unsigned_sad_costs[PARALLEL_BLKS] = { 0 };
   if (sad_twin_func != NULL) {

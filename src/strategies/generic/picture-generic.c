@@ -1048,6 +1048,18 @@ static uint64_t xGetHADs(int width, int height, const uvg_pixel* ref_in, int ref
   return (uiSum >> 0);
 }
 
+/**
+ * \brief Calculate xGetHADs SATD for several predictions of the same block.
+ *
+ * Each prediction and the original block are stored with a stride of width.
+ */
+static void satd_any_size_vtm_dual_generic(int width, int height, const pred_buffer preds, const uvg_pixel *const orig, unsigned num_modes, unsigned *costs_out)
+{
+  for (unsigned i = 0; i < num_modes; ++i) {
+    costs_out[i] = xGetHADs(width, height, orig, width, preds[i], width);
+  }
+}
+
 
 // Function macro for defining SAD calculating functions
 // for fixed size blocks.
@@ -1481,6 +1493,7 @@ int uvg_strategy_register_picture_generic(void* opaque, uint8_t bitdepth)
   success &= uvg_strategyselector_register(opaque, "satd_64x64_dual", "generic", 0, &satd_64x64_dual_generic);
   success &= uvg_strategyselector_register(opaque, "satd_any_size", "generic", 0, &satd_any_size_generic);
   success &= uvg_strategyselector_register(opaque, "satd_any_size_vtm", "generic", 0, &xGetHADs);
+  success &= uvg_strategyselector_register(opaque, "satd_any_size_vtm_dual", "generic", 0, &satd_any_size_vtm_dual_generic);
   success &= uvg_strategyselector_register(opaque, "satd_any_size_quad", "generic", 0, &satd_any_size_quad_generic);
 
   success &= uvg_strategyselector_register(opaque, "pixels_calc_ssd", "generic", 0, &pixels_calc_ssd_generic);
